@@ -1,0 +1,6 @@
+[submodule "3rdparty/magnum"]
+	path = 3rdparty/magnum
+	url = https://github.com/mosra/magnum.git
+[submodule "3rdparty/corrade"]
+	path = 3rdparty/corrade
+	url = https://github.com/mosra/corrade.git
