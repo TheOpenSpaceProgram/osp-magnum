@@ -1,10 +1,11 @@
 find_package(Corrade REQUIRED Main)
 find_package(Magnum REQUIRED GL Shaders Sdl2Application)
+find_package(Threads)
 
-file (GLOB CPP_FILES 
+file (GLOB_RECURSE CPP_FILES
         *.cpp)
 
-file (GLOB H_FILES *.h)
+file (GLOB_RECURSE H_FILES *.h)
 
 
 set (SOURCE_FILES ${CPP_FILES} ${H_FILES})
@@ -15,6 +16,7 @@ add_executable(osp-magnum ${CPP_FILES})
 set_target_properties(osp-magnum PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../bin)
 
 target_link_libraries(osp-magnum PRIVATE
+    ${CMAKE_THREAD_LIBS_INIT}
     Corrade::Main
     Magnum::Application
     Magnum::GL
