@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <cstdint>
+
 #include "Satellite.h"
 
 namespace osp
@@ -21,13 +22,26 @@ public:
 
 
     Satellite& add_satellite(Satellite& sat);
+
+    /**
+     * Create a new satellite
+     * Arguments and template passed to Satellite::create_object to initialize
+     * a SatelliteObject
+     * @return The new Satellite just created
+     */
     template <class T, class... Args>
     Satellite& create_sat(Args&& ... args);
+
+    /**
+     * Create a blank satellite
+     * @return The new Satellite just created
+     */
+    Satellite& create_sat();
 
 
     const std::vector<Satellite>& get_sats() const { return m_satellites; }
 
-protected:
+private:
 
     std::vector<Satellite> m_satellites;
 

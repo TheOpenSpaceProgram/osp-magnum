@@ -25,29 +25,18 @@ int main(int argc, char** argv)
     g_argc = argc;
     g_argv = argv;
 
-    // create some satellites
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-    g_universe.create_sat<osp::SatActiveArea>();
-
     return debug_cli_loop();
 }
 
 /**
- * Starts a magnum application
+ * Starts a magnum application, an active area, and links them together
  */
 void magnum_application()
 {
+    osp::Satellite& sat = g_universe.create_sat();
+    osp::SatActiveArea& area = sat.create_object<osp::SatActiveArea>();
     osp::OSPMagnum app({g_argc, g_argv});
+    app.set_active_area(area);
     app.exec();
 }
 
@@ -64,7 +53,7 @@ int debug_cli_loop()
         << "OSP-Magnum Temporary Debug CLI\n"
         << "Things to type:\n"
         << "* ulist     - List Satellites in the universe\n"
-        << "* magstart  - Start Magnum thread\n"
+        << "* start     - Create an ActiveArea and start Magnum\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
 
     std::string command;
@@ -78,7 +67,7 @@ int debug_cli_loop()
         {
             cli_print_sats();
         }
-        else if (command == "magstart")
+        else if (command == "start")
         {
             std::thread t(magnum_application);
             g_magnumThread.swap(t);

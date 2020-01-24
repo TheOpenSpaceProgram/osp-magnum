@@ -3,14 +3,10 @@
 #include <Magnum/Math/Vector3.h>
 #include <memory>
 
+#include "Types.h"
+
 namespace osp
 {
-
-typedef int64_t Coordinate;
-
-// A Vector3 for space
-typedef Magnum::Math::Vector3<Coordinate> Vector3s;
-
 
 class SatelliteObject
 {
@@ -20,6 +16,7 @@ public:
 
     virtual int on_load() { return 0; };
 };
+
 
 
 class Satellite
@@ -39,6 +36,8 @@ public:
     template <class T, class... Args>
     T& create_object(Args&& ... args);
 
+
+
 protected:
 
     std::unique_ptr<SatelliteObject> m_object;
@@ -51,7 +50,6 @@ protected:
 
     Vector3s m_position;
 };
-
 
 
 // maybe move this into its own header, but not now

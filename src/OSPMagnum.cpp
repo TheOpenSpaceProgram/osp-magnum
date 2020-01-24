@@ -14,6 +14,11 @@ OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments):
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 }
 
+void OSPMagnum::set_active_area(SatActiveArea& area)
+{
+    m_area = &area;
+}
+
 
 void OSPMagnum::drawEvent()
 {

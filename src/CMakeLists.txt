@@ -21,6 +21,7 @@ target_link_libraries(osp-magnum PRIVATE
     Magnum::Application
     Magnum::GL
     Magnum::Magnum
+    Magnum::SceneGraph
     Magnum::Shaders)
 
 

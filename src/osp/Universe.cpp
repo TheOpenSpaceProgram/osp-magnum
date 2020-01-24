@@ -9,5 +9,10 @@ Universe::Universe()
     // put something here eventually
 }
 
+Satellite& Universe::create_sat()
+{
+    m_satellites.emplace_back();
+    return m_satellites.back();
+}
 
 }
