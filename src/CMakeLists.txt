@@ -1,5 +1,13 @@
 find_package(Corrade REQUIRED Main)
-find_package(Magnum REQUIRED GL Shaders Sdl2Application)
+find_package(Magnum REQUIRED
+    GL
+    Shaders
+    MeshTools
+    Primitives
+    SceneGraph
+    Trade
+    Sdl2Application)
+
 find_package(Threads)
 
 file (GLOB_RECURSE CPP_FILES
@@ -21,7 +29,10 @@ target_link_libraries(osp-magnum PRIVATE
     Magnum::Application
     Magnum::GL
     Magnum::Magnum
+    Magnum::MeshTools
+    Magnum::Primitives
     Magnum::SceneGraph
-    Magnum::Shaders)
+    Magnum::Shaders
+    Magnum::Trade)
 
 

@@ -38,6 +38,7 @@ void magnum_application()
     osp::OSPMagnum app({g_argc, g_argv});
     app.set_active_area(area);
     app.exec();
+    std::cout << "Application closed\n";
 }
 
 
@@ -69,6 +70,10 @@ int debug_cli_loop()
         }
         else if (command == "start")
         {
+            if (g_magnumThread.joinable())
+            {
+                g_magnumThread.join();
+            }
             std::thread t(magnum_application);
             g_magnumThread.swap(t);
         }
