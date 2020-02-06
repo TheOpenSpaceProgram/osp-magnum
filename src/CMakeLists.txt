@@ -6,7 +6,11 @@ find_package(Magnum REQUIRED
     Primitives
     SceneGraph
     Trade
-    Sdl2Application)
+    Sdl2Application
+    )
+
+find_package(MagnumPlugins REQUIRED
+    TinyGltfImporter)
 
 find_package(Threads)
 
@@ -33,6 +37,6 @@ target_link_libraries(osp-magnum PRIVATE
     Magnum::Primitives
     Magnum::SceneGraph
     Magnum::Shaders
-    Magnum::Trade)
-
-
+    Magnum::Trade
+    MagnumPlugins::TinyGltfImporter
+    )

@@ -4,10 +4,11 @@
 #include <Magnum/SceneGraph/MatrixTransformation3D.h>
 #include <Magnum/SceneGraph/Scene.h>
 
-typedef int64_t Coordinate;
+// An int for space
+typedef int64_t SpaceInt;
 
 // A Vector3 for space
-typedef Magnum::Math::Vector3<Coordinate> Vector3s;
+typedef Magnum::Math::Vector3<SpaceInt> Vector3s;
 
 
 typedef Magnum::SceneGraph::Object<Magnum::SceneGraph::MatrixTransformation3D> Object3D;

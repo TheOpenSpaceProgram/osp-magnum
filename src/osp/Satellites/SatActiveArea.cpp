@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include "SatActiveArea.h"
+#include "../Vehicle/SturdyImporter.h"
 
 // for the 0xrrggbb_rgbf literals
 using namespace Magnum::Math::Literals;
@@ -84,6 +85,11 @@ int SatActiveArea::on_load()
         .setAspectRatioPolicy(Magnum::SceneGraph::AspectRatioPolicy::Extend)
         .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
         .setViewport(Magnum::GL::defaultFramebuffer.viewport().size());
+
+    SturdyImporter t;
+
+    t.open_filepath("test.sturdy.gltf");
+
 
     return 0;
 }

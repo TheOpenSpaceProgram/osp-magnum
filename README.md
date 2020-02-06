@@ -7,9 +7,10 @@ urho-osp repository. I hope this is a good idea :)
 * ~~Hello World, tests, and working build system~~
 * ~~Simple console interface for streamlining~~
 * Some Universe of Satellites
+* Showing glTF sturdy models
 * ActiveAreas with loading. Intergrate Newton Dynamics, and make a
   SatDebugPlanet as some flat plane to test things on
-* Crafts, and Loading glTF sturdies
+* Crafts that fire thrust
 * Terrain maybe?
 
 ## Main Features
