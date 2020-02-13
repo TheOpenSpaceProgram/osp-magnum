@@ -3,11 +3,11 @@
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/Math/Vector3.h>
 #include <Magnum/Math/Constants.h>
-#include <Magnum/Math/Color.h>
 #include <Magnum/MeshTools/Compile.h>
 #include <Magnum/MeshTools/Transform.h>
 #include <Magnum/Primitives/Cube.h>
-#include <Magnum/Trade/MeshData3D.h>
+
+
 
 #include <iostream>
 
@@ -20,6 +20,7 @@ using namespace Magnum::Math::Literals;
 
 namespace osp
 {
+
 
 SatActiveArea::SatActiveArea() : SatelliteObject()
 {
@@ -35,10 +36,12 @@ void SatActiveArea::draw_gl()
 {
     //std::cout << "draw call\n";
 
-    using namespace  Magnum;
+    using namespace Magnum;
 
     GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
     GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
+
+    // Temporary: draw the spinning rectangular prisim
 
     static Deg lazySpin;
     lazySpin += 5.0_degf;
@@ -63,12 +66,13 @@ void SatActiveArea::draw_gl()
 
 int SatActiveArea::on_load()
 {
-    // when switched to
+    // when switched to. Active areas can only be loaded by the universe.
+    // why, and how would an active area load another active area?
     m_loadedActive = true;
 
 
 
-    // Temporary only
+    // Temporary: draw a spinning rectangular prisim
 
     m_bocks = std::make_unique<Magnum::GL::Mesh>(
                 Magnum::GL::Mesh(Magnum::MeshTools::compile(
@@ -86,9 +90,6 @@ int SatActiveArea::on_load()
         .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
         .setViewport(Magnum::GL::defaultFramebuffer.viewport().size());
 
-    SturdyImporter t;
-
-    t.open_filepath("test.sturdy.gltf");
 
 
     return 0;

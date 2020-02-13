@@ -1,18 +1,22 @@
 #pragma once
 
 
+#include <Magnum/Math/Color.h>
 #include <Magnum/GL/Mesh.h>
+#include <Magnum/PixelFormat.h>
 #include <Magnum/SceneGraph/Camera.h>
-#include <Magnum/SceneGraph/Drawable.h>
-#include <Magnum/Shaders/Phong.h>
 
-#include "../Types.h"
+
+#include "../types.h"
 #include "../Satellite.h"
+#include "../scene.h"
 
 class OSPMagnum;
 
 namespace osp
 {
+
+
 
 class SatActiveArea : public SatelliteObject
 {

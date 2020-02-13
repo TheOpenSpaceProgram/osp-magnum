@@ -4,6 +4,7 @@
 #include "OSPMagnum.h"
 #include "osp/Universe.h"
 #include "osp/Satellites/SatActiveArea.h"
+#include "osp/Vehicle/SturdyImporter.h"
 
 void magnum_application();
 
@@ -33,11 +34,28 @@ int main(int argc, char** argv)
  */
 void magnum_application()
 {
+    static bool s_partsLoaded = false;
+    if (!s_partsLoaded)
+    {
+        osp::SturdyImporter importer;
+        importer.open_filepath("OSPData/adera/spamcan.sturdy.gltf");
+
+        std::vector<osp::PartPrototype> prototypesToLoadVerySoonIThink;
+        importer.obtain_parts(prototypesToLoadVerySoonIThink);
+
+        g_universe.add_parts(prototypesToLoadVerySoonIThink);
+
+        s_partsLoaded = true;
+    }
+
     osp::Satellite& sat = g_universe.create_sat();
     osp::SatActiveArea& area = sat.create_object<osp::SatActiveArea>();
+
     osp::OSPMagnum app({g_argc, g_argv});
     app.set_active_area(area);
+
     app.exec();
+
     std::cout << "Application closed\n";
 }
 

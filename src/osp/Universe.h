@@ -4,6 +4,8 @@
 #include <cstdint>
 
 #include "Satellite.h"
+#include "Vehicle/PartPrototype.h"
+
 
 namespace osp
 {
@@ -19,6 +21,10 @@ class Universe
 {
 public:
     Universe();
+
+
+    void add_part(PartPrototype& prototype);
+    void add_parts(const std::vector<PartPrototype>& prototypes);
 
     /**
      * Add a satellite to the universe
@@ -49,6 +55,7 @@ public:
 private:
 
     std::vector<Satellite> m_satellites;
+    std::vector<PartPrototype> m_prototypes;
 
 };
 
