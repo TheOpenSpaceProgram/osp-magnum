@@ -7,3 +7,6 @@
 [submodule "3rdparty/magnum-plugins"]
 	path = 3rdparty/magnum-plugins
 	url = https://github.com/mosra/magnum-plugins.git
+[submodule "magnum-plugins"]
+	path = magnum-plugins
+	url = https://github.com/mosra/magnum-plugins.git

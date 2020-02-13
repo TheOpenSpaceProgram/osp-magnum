@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "Satellite.h"
-#include "Vehicle/PartPrototype.h"
+#include "Resource/PartPrototype.h"
 
 
 namespace osp

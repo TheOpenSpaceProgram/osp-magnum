@@ -12,7 +12,7 @@
 #include <iostream>
 
 #include "SatActiveArea.h"
-#include "../Vehicle/SturdyImporter.h"
+#include "../Resource/SturdyImporter.h"
 
 // for the 0xrrggbb_rgbf literals
 using namespace Magnum::Math::Literals;

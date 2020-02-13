@@ -4,7 +4,7 @@
 #include "OSPMagnum.h"
 #include "osp/Universe.h"
 #include "osp/Satellites/SatActiveArea.h"
-#include "osp/Vehicle/SturdyImporter.h"
+#include "osp/Resource/SturdyImporter.h"
 
 void magnum_application();
 
