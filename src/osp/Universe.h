@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdint>
 
+#include "Resource/Package.h"
 #include "Satellite.h"
 #include "Resource/PartPrototype.h"
 
@@ -53,6 +54,8 @@ public:
     const std::vector<Satellite>& get_sats() const { return m_satellites; }
 
 private:
+
+    std::vector<Package> m_packages;
 
     std::vector<Satellite> m_satellites;
     std::vector<PartPrototype> m_prototypes;
