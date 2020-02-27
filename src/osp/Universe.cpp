@@ -10,10 +10,7 @@ Universe::Universe()
 {
     // put something here eventually
 
-    // temporary: add a default package
 
-    Package p({'l','z','d','b'}, "lazy-debug");
-    m_packages.push_back(std::move(p));
 }
 
 void Universe::add_part(PartPrototype& prototype)

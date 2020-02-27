@@ -34,16 +34,28 @@ int main(int argc, char** argv)
  */
 void magnum_application()
 {
+
+    // only call load once
     static bool s_partsLoaded = false;
     if (!s_partsLoaded)
     {
+        // Create a new package
+        osp::Package lazyDebugPack({'l','z','d','b'}, "lazy-debug");
+        //m_packages.push_back(std::move(p));
+
+        // Create a sturdy
         osp::SturdyImporter importer;
         importer.open_filepath("OSPData/adera/spamcan.sturdy.gltf");
 
-        std::vector<osp::PartPrototype> prototypesToLoadVerySoonIThink;
-        importer.obtain_parts(prototypesToLoadVerySoonIThink);
+        importer.load_config(lazyDebugPack);
 
-        g_universe.add_parts(prototypesToLoadVerySoonIThink);
+        g_universe.debug_get_packges().push_back(std::move(lazyDebugPack));
+
+        //importer.load_config();
+        //std::vector<osp::PartPrototype> prototypesToLoadVerySoonIThink;
+        //importer.obtain_parts(prototypesToLoadVerySoonIThink);
+
+        //g_universe.add_parts(prototypesToLoadVerySoonIThink);
 
         s_partsLoaded = true;
     }

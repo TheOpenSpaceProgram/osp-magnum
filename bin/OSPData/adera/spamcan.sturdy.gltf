@@ -1,0 +1,263 @@
+{
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 613,
+            "max" : [
+                0.6190319657325745,
+                0.5,
+                0.6190319657325745
+            ],
+            "min" : [
+                -0.6190319657325745,
+                -0.5,
+                -0.6190319061279297
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 613,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5126,
+            "count" : 613,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 3,
+            "componentType" : 5123,
+            "count" : 1947,
+            "type" : "SCALAR"
+        }
+    ],
+    "asset" : {
+        "generator" : "Khronos Blender glTF 2.0 I/O",
+        "version" : "2.0"
+    },
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 7356,
+            "byteOffset" : 0
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 7356,
+            "byteOffset" : 7356
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 4904,
+            "byteOffset" : 14712
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 3894,
+            "byteOffset" : 19616
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 23512,
+            "uri" : "spamcan.sturdy.bin"
+        }
+    ],
+    "extensions" : {},
+    "images" : [
+        {
+            "mimeType" : "image/png",
+            "name" : "spamcanhd",
+            "uri" : "spamcanhd.png"
+        },
+        {
+            "mimeType" : "image/png",
+            "name" : "Material Metallic",
+            "uri" : "Material Metallicspamcanrough.png"
+        }
+    ],
+    "materials" : [
+        {
+            "name" : "Material",
+            "pbrMetallicRoughness" : {
+                "baseColorTexture" : {
+                    "index" : 0,
+                    "texCoord" : 0
+                },
+                "metallicRoughnessTexture" : {
+                    "index" : 1,
+                    "texCoord" : 0
+                }
+            }
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Cylinder.001",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "NORMAL" : 1,
+                        "POSITION" : 0,
+                        "TEXCOORD_0" : 2
+                    },
+                    "indices" : 3,
+                    "material" : 0
+                }
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "name" : "attach_bottom",
+            "rotation" : [
+                0,
+                0.7071068286895752,
+                -0.7071068286895752,
+                8.432165188310137e-09
+            ],
+            "translation" : [
+                0,
+                0,
+                -0.41243380308151245
+            ]
+        },
+        {
+            "name" : "attach_top",
+            "rotation" : [
+                0.7071068286895752,
+                0,
+                0,
+                0.7071068286895752
+            ],
+            "translation" : [
+                0,
+                0,
+                0.6194949746131897
+            ]
+        },
+        {
+            "extras" : {
+                "shape" : "cylinder"
+            },
+            "name" : "col_notacylinder",
+            "rotation" : [
+                0.7071068286895752,
+                0,
+                0,
+                0.7071068286895752
+            ],
+            "scale" : [
+                0.6155989170074463,
+                0.5083622336387634,
+                0.6155989170074463
+            ],
+            "translation" : [
+                0,
+                0,
+                0.09948033094406128
+            ]
+        },
+        {
+            "extras" : {
+                "prop" : 1
+            },
+            "mesh" : 0,
+            "name" : "Cylinder",
+            "rotation" : [
+                0.7071068286895752,
+                0,
+                0,
+                0.7071068286895752
+            ],
+            "translation" : [
+                0,
+                0,
+                0.10438030958175659
+            ]
+        },
+        {
+            "children" : [
+                0,
+                1,
+                2,
+                3
+            ],
+            "extras" : {
+                "country" : "Canarda",
+                "description" : "A kettle used to boil people",
+                "machines" : [
+                    {
+                        "type" : "Control"
+                    }
+                ],
+                "manufacturer" : "Gotzietek",
+                "massdry" : 100,
+                "name" : "FOO-42 Spamcan"
+            },
+            "name" : "part_spamcan",
+            "rotation" : [
+                -0.7071068286895752,
+                0,
+                0,
+                0.7071068286895752
+            ],
+            "translation" : [
+                0,
+                0.8315048813819885,
+                0
+            ]
+        },
+        {
+            "name" : "Lamp",
+            "rotation" : [
+                0.16907575726509094,
+                0.7558802962303162,
+                -0.27217137813568115,
+                0.570947527885437
+            ],
+            "translation" : [
+                0.9812868237495422,
+                2.0040431022644043,
+                -2.0130770206451416
+            ]
+        },
+        {
+            "name" : "Camera",
+            "rotation" : [
+                0.483536034822464,
+                0.33687159419059753,
+                -0.20870360732078552,
+                0.7804827094078064
+            ],
+            "translation" : [
+                7.481131553649902,
+                5.34366512298584,
+                6.5076398849487305
+            ]
+        }
+    ],
+    "scene" : 0,
+    "scenes" : [
+        {
+            "name" : "Scene",
+            "nodes" : [
+                4,
+                5,
+                6
+            ]
+        }
+    ],
+    "textures" : [
+        {
+            "source" : 0
+        },
+        {
+            "source" : 1
+        }
+    ]
+}

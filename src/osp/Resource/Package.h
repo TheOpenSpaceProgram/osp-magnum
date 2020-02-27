@@ -5,14 +5,20 @@
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
 #include <Magnum/Trade/ImageData.h>
+#include <Magnum/Trade/MeshData3D.h>
 
 #include <iostream>
 #include <cstdint>
 #include <string>
 
+//#include "SturdyImporter.h"
+#include "PartPrototype.h"
 
 namespace osp
 {
+
+//class SturdyFile;
+class PartPrototype;
 
 //
 // What I think might be a good idea:
@@ -39,27 +45,35 @@ namespace osp
 struct AbstractResource
 {
 
-    std::string m_name;
+    //std::string m_name; // name is kind of useless when there's path
     std::string m_path;
 
     bool m_loaded;
 
-    // maybe some sort of type identification, or just use typeof
-    // implement when needed
+    // TODO: * some sort of type identification, or just use typeof.
+    //         implement when needed.
+    //       * a way to identify loading strategy: dir, network, zip, etc
+    //       * dependency to other resources
+
 };
 
 template <class T>
 struct Resource : public AbstractResource
 {
+    Resource() = default;
+    Resource(T&& move) : m_data(std::move(move)) {};
+    Resource(const T& copy) : m_data(copy) {};
+
     T m_data;
 };
 
 // supported resources
 struct ResourceTable :
 
-    std::vector< Resource<Magnum::GL::Mesh> >,
-    //std::vector< Resource<Magnum::Trade::ImageData2D> >,
-    std::vector< Resource<std::string> >
+    std::vector< Resource<Magnum::Trade::MeshData3D> >,
+    std::vector< Resource<Magnum::Trade::ImageData2D> >,
+    std::vector< Resource<PartPrototype> >
+    //std::vector< Resource<SturdyFile> >
 {
     // prevent copying
     ResourceTable() = default;
@@ -95,6 +109,9 @@ public:
 
     template<class T>
     Resource<T>* get_resource(std::string const& path);
+
+    template<class T>
+    Resource<T>* get_resource(unsigned resIndex);
 
 private:
     // highly suggested to not change these when initialized, so const.
@@ -133,5 +150,20 @@ Resource<T>* Package::get_resource(std::string const& path)
     return nullptr;
 }
 
+
+template<class T>
+Resource<T>* Package::get_resource(unsigned resIndex)
+{
+    std::vector< Resource<T> >& tResources =
+            static_cast< std::vector< Resource<T> > >(m_resources);
+
+    // check if the index is within the array size
+    if (resIndex < tResources.size())
+    {
+        return tResources[resIndex];
+    }
+
+    return nullptr;
+}
 
 }

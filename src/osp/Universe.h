@@ -53,6 +53,10 @@ public:
      */
     const std::vector<Satellite>& get_sats() const { return m_satellites; }
 
+    std::vector<Package>& debug_get_packges() { return m_packages; };
+    //void add_package(Package&& p);
+    //void get_package(unsigned index);
+
 private:
 
     std::vector<Package> m_packages;
