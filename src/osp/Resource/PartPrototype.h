@@ -35,7 +35,10 @@ enum class ColliderType
 
 struct DrawableData
 {
+
+    // index to a resource path (aka: name) string in m_strings
     unsigned m_mesh;
+    //std::string m_mesh;
     //unsigned m_material;
 };
 
@@ -55,6 +58,8 @@ struct ObjectPrototype
 
     std::string m_name;
 
+    std::vector<std::string> m_strings;
+
     //Magnum::Matrix4 m_transform;
     Magnum::Vector3 m_translation;
     Magnum::Quaternion m_rotation;
@@ -66,8 +71,10 @@ struct ObjectPrototype
     {
         DrawableData m_drawable;
         ColliderData m_collider;
+
     };
 
+    // Put more OSP-specific data in here
 };
 
 
@@ -79,7 +86,7 @@ public:
     PartPrototype();
 
     std::vector<ObjectPrototype>& get_objects() { return m_objects; }
-
+    std::vector<ObjectPrototype> const& get_objects() const { return m_objects; }
 
 private:
     //std::string name; use path

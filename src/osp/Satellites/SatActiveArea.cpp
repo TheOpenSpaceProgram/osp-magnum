@@ -11,12 +11,16 @@
 
 #include <iostream>
 
+
 #include "SatActiveArea.h"
 #include "../Resource/SturdyImporter.h"
+#include "../Universe.h"
+
 
 // for the 0xrrggbb_rgbf literals
 using namespace Magnum::Math::Literals;
 
+using Magnum::Matrix4;
 
 namespace osp
 {
@@ -32,10 +36,109 @@ SatActiveArea::~SatActiveArea()
     // do something here eventually
 }
 
+
+
+Object3D* SatActiveArea::part_instantiate(PartPrototype& part, Package& package)
+{
+
+    std::vector<ObjectPrototype> const& prototypes = part.get_objects();
+    std::vector<Object3D*> newObjects(prototypes.size());
+
+    std::cout << "size: " << newObjects.size() << "\n";
+
+    for (int i = 0; i < prototypes.size(); i ++)
+    {
+        const ObjectPrototype& current = prototypes[i];
+        Object3D *obj = new Object3D(&m_scene);
+        newObjects[i] = obj;
+
+        std::cout << "objind:" << " parent: " << current.m_parentIndex << "\n";
+        std::cout << "trans: " << current.m_translation.x() << ", " << current.m_translation.y() << ", " << current.m_translation.z() << " \n";
+        std::cout << "scale: " << current.m_scale.x() << ", " << current.m_scale.y() << ", " << current.m_scale.z() << " \n";
+
+
+        if (current.m_parentIndex == i)
+        {
+            // if parented to self,
+            //obj->setParent(&m_scene);
+        }
+        else
+        {
+            // since objects were loaded recursively, the parents always load
+            // before their children
+            obj->setParent(newObjects[current.m_parentIndex]);
+        }
+
+        obj->setTransformation(Matrix4::from(current.m_rotation.toMatrix(),
+                                             current.m_translation)
+                               * Matrix4::scaling(current.m_scale));
+
+        if (current.m_type == ObjectType::MESH)
+        {
+            using Magnum::Trade::MeshData3D;
+            using Magnum::GL::Mesh;
+
+
+            Mesh* mesh = nullptr;
+            Resource<Mesh>* meshRes
+                    = package.get_resource<Mesh>(current.m_drawable.m_mesh);
+
+
+            if (!meshRes)
+            {
+                // Mesh isn't compiled yet, now check if mesh data exists
+                std::string const& meshName
+                        = current.m_strings[current.m_drawable.m_mesh];
+
+                Resource<MeshData3D>* meshDataRes
+                        = package.get_resource<MeshData3D>(meshName);
+
+                if (meshDataRes)
+                {
+                    // Compile the mesh data into a mesh
+
+                    std::cout << "Compiling mesh \"" << meshName << "\"\n";
+
+                    MeshData3D* meshData = &(meshDataRes->m_data);
+
+
+                    Resource<Mesh> compiledMesh;
+                    compiledMesh.m_data = Magnum::MeshTools::compile(*meshData);
+
+                    mesh = &(package.debug_add_resource<Mesh>(
+                                std::move(compiledMesh))->m_data);
+
+                    m_bocks = mesh;
+                }
+                else
+                {
+                    std::cout << "Mesh \"" << meshName << "\" doesn't exist!\n";
+                    return nullptr;
+                }
+
+            }
+            else
+            {
+                // mesh already loaded
+                // TODO: this actually crashes, as all the opengl stuff were
+                //       cleared.
+                mesh = &(meshRes->m_data);
+            }
+
+            // by now, the mesh should exist
+
+            new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
+        }
+
+
+
+    }
+    // first element is 100% going to be the root object
+    return newObjects[0];
+}
+
 void SatActiveArea::draw_gl()
 {
-    //std::cout << "draw call\n";
-
     using namespace Magnum;
 
     GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
@@ -44,12 +147,12 @@ void SatActiveArea::draw_gl()
     // Temporary: draw the spinning rectangular prisim
 
     static Deg lazySpin;
-    lazySpin += 5.0_degf;
+    lazySpin += 1.0_degf;
 
     Matrix4 ttt;
     ttt = Matrix4::translation(Vector3(0, 0, -5))
-        * Matrix4::rotationY(lazySpin)
-        * Matrix4::scaling({0.05f, 1.0f, 2.0f});
+        * Matrix4::rotationX(lazySpin)
+        * Matrix4::scaling({1.0f, 1.0f, 1.0f});
 
     (*m_shader)
         .setDiffuseColor(0x67ff00_rgbf)
@@ -60,8 +163,15 @@ void SatActiveArea::draw_gl()
         .setProjectionMatrix(m_camera->projectionMatrix())
         .setNormalMatrix(ttt.normalMatrix());
 
-    m_bocks->draw(*m_shader);
+    //m_bocks->draw(*m_shader);
 
+    m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
+
+    static_cast<Object3D&>(m_camera->object()).setTransformation(
+                            Matrix4::translation(Vector3(0, 0, 5)));
+
+
+    m_camera->draw(m_drawables);
 }
 
 int SatActiveArea::on_load()
@@ -70,15 +180,25 @@ int SatActiveArea::on_load()
     // why, and how would an active area load another active area?
     m_loadedActive = true;
 
+    std::cout << "Active Area loading...\n";
 
+
+    // Temporary: instantiate a part
+
+    Universe* u = m_sat->get_universe();
+    Package& p = u->debug_get_packges()[0];
+    PartPrototype& part = p.get_resource<PartPrototype>(0)->m_data;
+
+    m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
+
+    m_partTest = part_instantiate(part, p);
 
     // Temporary: draw a spinning rectangular prisim
 
-    m_bocks = std::make_unique<Magnum::GL::Mesh>(
-                Magnum::GL::Mesh(Magnum::MeshTools::compile(
-                                        Magnum::Primitives::cubeSolid())));
+    //m_bocks = &(Magnum::GL::Mesh(Magnum::MeshTools::compile(
+    //                                    Magnum::Primitives::cubeSolid())));
 
-    m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
+
 
 
     Object3D *cameraObj = new Object3D{&m_scene};

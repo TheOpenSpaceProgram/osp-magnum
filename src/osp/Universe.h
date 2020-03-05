@@ -77,7 +77,7 @@ Satellite& Universe::create_sat(Args&& ... args)
     //Satellite newSat;
     //m_satellites.push_back(newSat);
 
-    m_satellites.emplace_back();
+    m_satellites.emplace_back(this);
     Satellite& newSat = m_satellites.back();
     newSat.create_object<T>(args...);
     return newSat;

@@ -11,6 +11,9 @@
 #include "../Satellite.h"
 #include "../scene.h"
 
+#include "../Resource/Package.h"
+#include "../Resource/PartPrototype.h"
+
 class OSPMagnum;
 
 namespace osp
@@ -29,14 +32,14 @@ public:
 
     bool is_loaded_active() { return m_loadedActive; }
 
+    Scene3D& get_scene() { return m_scene; }
 
     /**
      * Do actual drawing of scene. Call only on context thread.
      */
     void draw_gl();
 
-    Scene3D& get_scene() { return m_scene; }
-
+    void part_instantiate(PartPrototype& part, Package& pack);
 
     /**
      * Load objects into scene. Call only on context thread.
@@ -53,7 +56,7 @@ private:
 
 
     // temporary test variables only
-    std::unique_ptr<Magnum::GL::Mesh> m_bocks;
+    Magnum::GL::Mesh *m_bocks;
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
 
 };

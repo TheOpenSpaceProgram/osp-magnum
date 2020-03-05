@@ -70,7 +70,7 @@ void SturdyImporter::load_config(Package& package)
             // Add objects to the part, and recurse
             proto_add_obj_recurse(part.m_data, 0, childId);
 
-            package.debug_add_resource(std::move(part));
+            package.debug_add_resource<PartPrototype>(std::move(part));
 
         }
 
@@ -82,15 +82,20 @@ void SturdyImporter::load_config(Package& package)
     // * load only required meshes
     for (unsigned i = 0; i < m_gltfImporter.mesh3DCount(); i ++)
     {
-        std::cout << "Mesh: " << m_gltfImporter.mesh3DName(i);
+        std::string const& meshName = m_gltfImporter.mesh3DName(i);
+        std::cout << "Mesh: " << meshName << "\n";
 
         Optional<MeshData3D> meshData = m_gltfImporter.mesh3D(i);
-        if (!meshData || !meshData->hasNormals() || meshData->primitive() != Magnum::MeshPrimitive::Triangles)
+        if (!meshData || !meshData->hasNormals()
+                || meshData->primitive() != Magnum::MeshPrimitive::Triangles)
         {
             continue;
         }
 
-        Resource<MeshData3D> meshResource(std::move(*meshData));
+        Resource<MeshData3D> meshDataRes(std::move(*meshData));
+        meshDataRes.m_path = meshName;
+
+        package.debug_add_resource(std::move(meshDataRes));
 
         // apparently this needs a GL context
         // maybe store compiled meshes in the active area, since they're
@@ -137,16 +142,24 @@ void SturdyImporter::proto_add_obj_recurse(PartPrototype& part,
         // do some stuff here
         obj.m_collider.m_type = ColliderType::CUBE;
 
-        std::cout << "collider!";
+        std::cout << "obj: " << name << " is a collider\n";
     }
     else if (hasMesh)
     {
         // Drawable mesh
-        //std::cout << "we got a mesh " << name << "\n";
+        const std::string& meshName = m_gltfImporter
+                                            .mesh3DName(childData->instance());
+        std::cout << "obj: " << name << " uses mesh: " << meshName << "\n";
         obj.m_type = ObjectType::MESH;
-        obj.m_drawable.m_mesh = m_meshOffset + childData->instance();
-    }
+        //obj.m_drawable.m_mesh = m_meshOffset + childData->instance();
 
+        // The way it's currently set up is that the mesh's names are the same
+        // as their resource paths. So the resource path is added to the part's
+        // list of strings, and the object's mesh is set to the index to that
+        // string.
+        obj.m_drawable.m_mesh = obj.m_strings.size();
+        obj.m_strings.push_back(meshName);
+    }
 
     //obj.m_mesh = m_meshOffset + childData->
     protoObjects.push_back(std::move(obj));

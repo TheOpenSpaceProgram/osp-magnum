@@ -8,21 +8,32 @@
 namespace osp
 {
 
+class Satellite;
+class Universe;
+
 class SatelliteObject
 {
+    friend Satellite;
+
 public:
     SatelliteObject();
+
     virtual ~SatelliteObject() {};
 
     virtual int on_load() { return 0; };
+
+protected:
+
+    Satellite* m_sat;
 };
 
 
 
 class Satellite
 {
+
 public:
-    Satellite();
+    Satellite(Universe* universe);
     Satellite(Satellite&& sat);
     ~Satellite() { m_object.release(); };
 
@@ -35,6 +46,9 @@ public:
      * @return Position (relative to parent)
      */
     const Vector3s& get_position() const { return m_position; }
+
+
+    Universe* get_universe() { return m_universe; };
 
     // too lazy to implement rn
     //void set_object(SatelliteObject *obj);
@@ -68,6 +82,10 @@ protected:
     // Describes the functionality of this Satellite.
     std::unique_ptr<SatelliteObject> m_object;
 
+    // Universe this satellite is part of. the only time this pointer will be
+    // invalid is the end of the universe.
+    Universe* m_universe;
+
     // TODO: Describes how this satellite travels through space (orbit)
     //std::unique_ptr<Trajectory> m_trajectory;
 
@@ -86,6 +104,7 @@ template <class T, class... Args>
 T& Satellite::create_object(Args&& ... args)
 {
     m_object = std::make_unique<T>(std::forward<Args>(args)...);
+    m_object->m_sat = this;
     return static_cast<T&>(*m_object);
 }
 

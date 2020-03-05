@@ -25,7 +25,7 @@ void Universe::add_parts(const std::vector<PartPrototype> &prototypes)
 
 Satellite& Universe::create_sat()
 {
-    m_satellites.emplace_back();
+    m_satellites.emplace_back(this);
     return m_satellites.back();
 }
 

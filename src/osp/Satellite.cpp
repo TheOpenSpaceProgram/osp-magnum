@@ -9,7 +9,7 @@ SatelliteObject::SatelliteObject()
 {
 }
 
-Satellite::Satellite()
+Satellite::Satellite(Universe* universe) : m_universe(universe)
 {
     m_name = "Innocent Satellite";
 
