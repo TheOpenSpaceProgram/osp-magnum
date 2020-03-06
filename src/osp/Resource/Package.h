@@ -106,6 +106,8 @@ public:
     //TypeMap<int>::fish;
     //std::vector< Resource<Magnum::Trade::ImageData> > g_imageData;
 
+    ResourceTable& debug_get_resource_table() { return m_resources; };
+
     template<class T>
     Resource<T>* debug_add_resource(Resource<T>&& resource);
 

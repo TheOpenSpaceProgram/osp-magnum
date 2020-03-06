@@ -162,11 +162,14 @@ void SturdyImporter::proto_add_obj_recurse(PartPrototype& part,
     }
 
     //obj.m_mesh = m_meshOffset + childData->
+    int objIndex = protoObjects.size();
     protoObjects.push_back(std::move(obj));
+
 
     for (unsigned childId: childData->children())
     {
-        proto_add_obj_recurse(part, protoObjects.size() - 1, childId);
+        //proto_add_obj_recurse(part, protoObjects.size() - 1, childId);
+        proto_add_obj_recurse(part, objIndex, childId);
     }
 }
 

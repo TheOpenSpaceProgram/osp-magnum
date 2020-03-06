@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "scene.h"
 
 void DrawablePhongColored::draw(const Magnum::Matrix4& transformationMatrix,
@@ -11,4 +13,6 @@ void DrawablePhongColored::draw(const Magnum::Matrix4& transformationMatrix,
         .setProjectionMatrix(camera.projectionMatrix());
 
     m_mesh.draw(m_shader);
+
+    //std::cout << "draw!!!\n";
 }

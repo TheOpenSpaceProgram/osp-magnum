@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Magnum/Magnum.h>
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/Math/Vector3.h>
 #include <Magnum/Math/Color.h>

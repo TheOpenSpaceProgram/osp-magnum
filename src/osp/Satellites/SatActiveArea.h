@@ -39,7 +39,7 @@ public:
      */
     void draw_gl();
 
-    void part_instantiate(PartPrototype& part, Package& pack);
+    Object3D* part_instantiate(PartPrototype& part, Package& pack);
 
     /**
      * Load objects into scene. Call only on context thread.
@@ -56,6 +56,7 @@ private:
 
 
     // temporary test variables only
+    Object3D* m_partTest;
     Magnum::GL::Mesh *m_bocks;
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
 
