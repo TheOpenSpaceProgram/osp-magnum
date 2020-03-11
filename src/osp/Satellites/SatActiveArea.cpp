@@ -210,8 +210,6 @@ int SatActiveArea::on_load()
         .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
         .setViewport(Magnum::GL::defaultFramebuffer.viewport().size());
 
-
-
     return 0;
 }
 

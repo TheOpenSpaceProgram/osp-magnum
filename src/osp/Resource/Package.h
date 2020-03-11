@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Corrade/Containers/LinkedList.h>
 #include <Magnum/MeshTools/Compile.h>
 #include <Magnum/Mesh.h>
 #include <Magnum/GL/Mesh.h>
@@ -42,6 +43,36 @@ class PartPrototype;
 // so packages don't strictly have to be folders.
 
 
+// TODO: move Resource stuff into its own file
+
+template <class T>
+class Resource;
+
+using Corrade::Containers::LinkedList;
+using Corrade::Containers::LinkedListItem;
+
+
+template <class T>
+class ResDependency : public LinkedListItem<ResDependency<T>, Resource<T> >
+{
+
+public:
+
+    void bind(LinkedList<ResDependency<T> >& resource)
+    {
+        resource.insert(this);
+    }
+
+    T* get_data() {
+        return &(LinkedListItem<ResDependency<T>, Resource<T> >::list().m_data);
+    }
+
+private:
+
+    //Resource<T>* m_resource;
+};
+
+
 struct AbstractResource
 {
 
@@ -57,13 +88,15 @@ struct AbstractResource
 
 };
 
+// TODO: make this a class
 template <class T>
-struct Resource : public AbstractResource
+struct Resource : public AbstractResource, LinkedList<ResDependency<T> >
 {
     Resource() = default;
     Resource(T&& move) : m_data(std::move(move)) {};
     Resource(const T& copy) : m_data(copy) {};
 
+    //LinkedList<ResDependency<T> > m_usedBy;
     T m_data;
 };
 

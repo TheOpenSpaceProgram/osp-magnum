@@ -9,6 +9,8 @@
 #include <array>
 #include <vector>
 
+#include "Package.h"
+
 namespace osp
 {
 

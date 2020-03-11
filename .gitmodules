@@ -10,3 +10,9 @@
 [submodule "magnum-plugins"]
 	path = magnum-plugins
 	url = https://github.com/mosra/magnum-plugins.git
+[submodule "3rdparty/magnum-integration"]
+	path = 3rdparty/magnum-integration
+	url = https://github.com/mosra/magnum-integration.git
+[submodule "3rdparty/newton-dynamics"]
+	path = 3rdparty/newton-dynamics
+	url = https://github.com/MADEAPPS/newton-dynamics.git

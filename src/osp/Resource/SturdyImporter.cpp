@@ -95,7 +95,25 @@ void SturdyImporter::load_config(Package& package)
         Resource<MeshData3D> meshDataRes(std::move(*meshData));
         meshDataRes.m_path = meshName;
 
+
+        // random dependency class test
+        std::cout << "emptyA:" << meshDataRes.isEmpty() << "\n";
+        {
+        ResDependency<Magnum::Trade::MeshData3D> test;
+        test.bind(meshDataRes);
+
+        std::cout << "emptyB:" << meshDataRes.isEmpty() << "\n";
+
+
+        }
+
+        std::cout << "emptyC:" << meshDataRes.isEmpty() << "\n";
+
         package.debug_add_resource(std::move(meshDataRes));
+
+
+
+
 
         // apparently this needs a GL context
         // maybe store compiled meshes in the active area, since they're

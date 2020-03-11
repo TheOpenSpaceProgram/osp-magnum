@@ -69,6 +69,13 @@ void magnum_application()
     app.exec();
 
     std::cout << "Application closed\n";
+    
+    // workaround: wipe mesh resources because they're specific to the
+    // opengl context
+    static_cast<std::vector<osp::Resource<Magnum::GL::Mesh> >& >(
+                g_universe.debug_get_packges()[0].debug_get_resource_table())
+                    .clear();
+    
 }
 
 
