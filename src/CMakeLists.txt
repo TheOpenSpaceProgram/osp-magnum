@@ -7,6 +7,7 @@ find_package(Magnum REQUIRED
     SceneGraph
     Trade
     Sdl2Application
+    AnyImageImporter
     )
 
 find_package(MagnumPlugins REQUIRED
@@ -38,5 +39,6 @@ target_link_libraries(osp-magnum PRIVATE
     Magnum::SceneGraph
     Magnum::Shaders
     Magnum::Trade
+    Magnum::AnyImageImporter
     MagnumPlugins::TinyGltfImporter
     )

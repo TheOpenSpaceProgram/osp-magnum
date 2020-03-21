@@ -56,7 +56,6 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part, Package& package)
         std::cout << "trans: " << current.m_translation.x() << ", " << current.m_translation.y() << ", " << current.m_translation.z() << " \n";
         std::cout << "scale: " << current.m_scale.x() << ", " << current.m_scale.y() << ", " << current.m_scale.z() << " \n";
 
-
         if (current.m_parentIndex == i)
         {
             // if parented to self,
@@ -139,6 +138,36 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part, Package& package)
 
 void SatActiveArea::draw_gl()
 {
+
+    // lazy way to set name
+    m_sat->set_name("ActiveArea");
+
+    // scan for nearby satellites
+
+    Universe& u = *(m_sat->get_universe());
+    std::vector<Satellite>& satellites = u.get_sats();
+
+    for (Satellite& sat : satellites)
+    {
+
+        // ignore self
+        if (&sat == m_sat)
+        {
+            continue;
+        }
+
+        // test distance to satellite
+        // btw: precision is 10
+        Vector3s relativePos = sat.position_relative_to(*m_sat);
+        //std::cout << "nearby sat: " << sat.get_name() << " dot: " << relativePos.dot() << " satrad: " << sat.get_load_radius() << " arearad: " << m_sat->get_load_radius() << "\n";
+
+        if (relativePos.dot()
+                < Magnum::Math::pow(sat.get_load_radius() + m_sat->get_load_radius(), 2.0f))
+        {
+            //std::cout << "is near!\n";
+        }
+    }
+
     using namespace Magnum;
 
     GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
@@ -146,26 +175,26 @@ void SatActiveArea::draw_gl()
 
     // Temporary: draw the spinning rectangular prisim
 
-    static Deg lazySpin;
-    lazySpin += 1.0_degf;
+    //static Deg lazySpin;
+    //lazySpin += 1.0_degf;
 
-    Matrix4 ttt;
-    ttt = Matrix4::translation(Vector3(0, 0, -5))
-        * Matrix4::rotationX(lazySpin)
-        * Matrix4::scaling({1.0f, 1.0f, 1.0f});
+    //Matrix4 ttt;
+    //ttt = Matrix4::translation(Vector3(0, 0, -5))
+    //    * Matrix4::rotationX(lazySpin)
+    //    * Matrix4::scaling({1.0f, 1.0f, 1.0f});
 
-    (*m_shader)
-        .setDiffuseColor(0x67ff00_rgbf)
-        .setAmbientColor(0x111111_rgbf)
-        .setSpecularColor(0x330000_rgbf)
-        .setLightPosition({10.0f, 15.0f, 5.0f})
-        .setTransformationMatrix(ttt)
-        .setProjectionMatrix(m_camera->projectionMatrix())
-        .setNormalMatrix(ttt.normalMatrix());
+    //(*m_shader)
+    //    .setDiffuseColor(0x67ff00_rgbf)
+    //    .setAmbientColor(0x111111_rgbf)
+    //    .setSpecularColor(0x330000_rgbf)
+    //    .setLightPosition({10.0f, 15.0f, 5.0f})
+    //    .setTransformationMatrix(ttt)
+    //    .setProjectionMatrix(m_camera->projectionMatrix())
+    //    .setNormalMatrix(ttt.normalMatrix());
 
     //m_bocks->draw(*m_shader);
 
-    m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
+    //m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
 
     static_cast<Object3D&>(m_camera->object()).setTransformation(
                             Matrix4::translation(Vector3(0, 0, 5)));
@@ -197,9 +226,6 @@ int SatActiveArea::on_load()
 
     //m_bocks = &(Magnum::GL::Mesh(Magnum::MeshTools::compile(
     //                                    Magnum::Primitives::cubeSolid())));
-
-
-
 
     Object3D *cameraObj = new Object3D{&m_scene};
     (*cameraObj).translate(Magnum::Vector3::zAxis(100.0f));

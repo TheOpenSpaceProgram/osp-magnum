@@ -7,17 +7,34 @@ namespace osp
 
 SatelliteObject::SatelliteObject()
 {
+
 }
 
 Satellite::Satellite(Universe* universe) : m_universe(universe)
 {
     m_name = "Innocent Satellite";
 
+    // 2^10 = 1024
+    // 1024 units = 1 meter
+    // enough for a solar system
+    m_precision = 10;
+    m_loadRadius = 1000.0f; // 1km radius sphere around sat
+    std::cout << "satellite created\n";
 }
 
+
 Satellite::Satellite(Satellite&& sat) : m_object(std::move(sat.m_object)),
-                                        m_name(std::move(sat.m_name))
+                                        m_name(std::move(sat.m_name)),
+                                        m_loadRadius(std::exchange(sat.m_loadRadius, 0))
 {
+    // TODO
+    std::cout << "satellite moved\n";
+}
+
+Vector3s Satellite::position_relative_to(Satellite& referenceFrame) const
+{
+    // might do more stuff here
+    return (m_position - referenceFrame.m_position);
 }
 
 //Satellite::~Satellite()

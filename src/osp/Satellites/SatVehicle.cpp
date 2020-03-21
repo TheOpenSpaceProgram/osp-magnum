@@ -2,7 +2,7 @@
 
 using namespace osp;
 
-SatVehicle::SatVehicle()
+SatVehicle::SatVehicle() : SatelliteObject()
 {
 
 }

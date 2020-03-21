@@ -15,6 +15,8 @@ public:
 
     int on_load();
 
+    VehicleBlueprint& get_blueprint() { return m_blueprint; }
+
 private:
 
     // blueprint to load when loaded by active area

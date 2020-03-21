@@ -49,9 +49,9 @@ public:
     Satellite& create_sat();
 
     /**
-     * @return Read-only list of satellites.
+     * @return Vector of satellites.
      */
-    const std::vector<Satellite>& get_sats() const { return m_satellites; }
+    std::vector<Satellite>& get_sats() { return m_satellites; }
 
     std::vector<Package>& debug_get_packges() { return m_packages; };
     //void add_package(Package&& p);

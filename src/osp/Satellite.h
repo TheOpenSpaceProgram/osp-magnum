@@ -37,6 +37,8 @@ public:
     Satellite(Satellite&& sat);
     ~Satellite() { m_object.release(); };
 
+    float get_load_radius() const { return m_loadRadius; }
+
     /**
      * @return Display name for this Satellite
      */
@@ -47,8 +49,11 @@ public:
      */
     const Vector3s& get_position() const { return m_position; }
 
-
     Universe* get_universe() { return m_universe; };
+
+    void set_name(const std::string& name) { m_name = name; }
+
+    Vector3s position_relative_to(Satellite& referenceFrame) const;
 
     // too lazy to implement rn
     //void set_object(SatelliteObject *obj);
@@ -96,6 +101,8 @@ protected:
     // TODO: Tree structure, and some identification method
 
     Vector3s m_position;
+
+    int m_precision;
 };
 
 

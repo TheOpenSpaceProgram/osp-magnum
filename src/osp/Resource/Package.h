@@ -58,6 +58,9 @@ class ResDependency : public LinkedListItem<ResDependency<T>, Resource<T> >
 
 public:
 
+    ResDependency() = default;
+    ResDependency(Resource<T>& resource) : LinkedListItem<ResDependency<T>, Resource<T> >() { resource.insert(this); }
+
     void bind(LinkedList<ResDependency<T> >& resource)
     {
         resource.insert(this);
@@ -129,10 +132,10 @@ public:
 
     ResourceTable m_resources;
 
-    //typedef uint32_t Prefix;
-    typedef char Prefix[4];
+    typedef uint32_t Prefix;
+    //typedef char Prefix[4];
 
-    Package(Prefix&& prefix, std::string const& packageName);
+    Package(std::string const& prefix, std::string const& packageName);
 
     //virtual Magnum::GL::Mesh* request_mesh(const std::string& path);
 
@@ -151,10 +154,10 @@ public:
     Resource<T>* get_resource(unsigned resIndex);
 
 private:
-    // highly suggested to not change these when initialized, so const.
-    const std::string m_packageName;
 
-    const Prefix m_prefix;
+    std::string m_packageName;
+
+    Prefix m_prefix;
 
     std::string m_displayName;
 

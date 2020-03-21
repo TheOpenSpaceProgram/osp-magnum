@@ -95,7 +95,11 @@ private:
 
     std::vector<ObjectPrototype> m_objects;
 
+    // TODO: more OSP information
+
     // std::vector <machines>
+
+
 
 };
 

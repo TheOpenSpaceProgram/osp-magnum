@@ -1,15 +1,23 @@
 #include <iostream>
 #include <thread>
+#include <random>
+
 
 #include "OSPMagnum.h"
 #include "osp/Universe.h"
 #include "osp/Satellites/SatActiveArea.h"
+#include "osp/Satellites/SatVehicle.h"
 #include "osp/Resource/SturdyImporter.h"
+#include "osp/Resource/Package.h"
+
 
 void magnum_application();
 
 int debug_cli_loop();
-void cli_print_sats();
+void debug_add_random_vehicle();
+void debug_print_sats();
+
+//bool g_partsLoaded = false;
 
 Magnum::Platform::Application::Arguments g_args();
 std::thread g_magnumThread;
@@ -36,28 +44,27 @@ void magnum_application()
 {
 
     // only call load once
-    static bool s_partsLoaded = false;
-    if (!s_partsLoaded)
+    //static bool s_partsLoaded = false;
+    if (!g_universe.debug_get_packges().size())
     {
         // Create a new package
-        osp::Package lazyDebugPack({'l','z','d','b'}, "lazy-debug");
+        osp::Package lazyDebugPack("lzdb", "lazy-debug");
         //m_packages.push_back(std::move(p));
 
         // Create a sturdy
         osp::SturdyImporter importer;
         importer.open_filepath("OSPData/adera/spamcan.sturdy.gltf");
 
+        // load the sturdy into the package
         importer.load_config(lazyDebugPack);
 
+        // Add package to the univere
         g_universe.debug_get_packges().push_back(std::move(lazyDebugPack));
 
-        //importer.load_config();
-        //std::vector<osp::PartPrototype> prototypesToLoadVerySoonIThink;
-        //importer.obtain_parts(prototypesToLoadVerySoonIThink);
+        // Add a vehicle so there's something to load
+        debug_add_random_vehicle();
 
-        //g_universe.add_parts(prototypesToLoadVerySoonIThink);
-
-        s_partsLoaded = true;
+        //s_partsLoaded = true;
     }
 
     osp::Satellite& sat = g_universe.create_sat();
@@ -103,7 +110,7 @@ int debug_cli_loop()
 
         if (command == "ulist")
         {
-            cli_print_sats();
+            debug_print_sats();
         }
         else if (command == "start")
         {
@@ -126,8 +133,27 @@ int debug_cli_loop()
     }
 }
 
+void debug_add_random_vehicle()
+{
+    osp::Satellite& sat = g_universe.create_sat();
+    osp::SatVehicle& vehicle = sat.create_object<osp::SatVehicle>();
 
-void cli_print_sats()
+    Vector3 randomvec(std::rand() % 64 - 32,
+                      std::rand() % 64 - 32,
+                      std::rand() % 64 - 32);
+
+
+    osp::Resource<osp::PartPrototype>* victim =
+            g_universe.debug_get_packges()[0]
+            .get_resource<osp::PartPrototype>(0);
+
+    vehicle.get_blueprint().debug_add_part(*victim, randomvec,
+                                           Quaternion(), Vector3(1, 1, 1));
+    //std::cout << "random: " <<  << "\n";
+
+}
+
+void debug_print_sats()
 {
     const std::vector<osp::Satellite>& sats = g_universe.get_sats();
 
