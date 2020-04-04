@@ -13,9 +13,25 @@ public:
     SatVehicle();
     ~SatVehicle();
 
-    int on_load();
+    static Id const& get_id_static()
+    {
+        static Id id{ typeid(SatVehicle).name() };
+        return id;
+    }
+
+    Id const& get_id() override
+    {
+        return get_id_static();
+    }
+
+    int on_load() override;
+
+    bool is_loadable() const override;
+
 
     VehicleBlueprint& get_blueprint() { return m_blueprint; }
+
+
 
 private:
 

@@ -36,8 +36,8 @@ void OSPMagnum::drawEvent()
         //Scene3D& scene = m_area->get_scene();
         if (!m_area->is_loaded_active())
         {
-            // Load active area if not already done so
-            m_area->on_load();
+            // Enable active area if not already done so
+            m_area->activate();
         }
 
         m_area->draw_gl();

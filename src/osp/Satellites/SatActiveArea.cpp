@@ -13,6 +13,7 @@
 
 
 #include "SatActiveArea.h"
+#include "SatVehicle.h"
 #include "../Resource/SturdyImporter.h"
 #include "../Universe.h"
 
@@ -26,9 +27,19 @@ namespace osp
 {
 
 
+// Loading functions
+
+
+int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
+{
+    std::cout << "loadin a vehicle!\n";
+    return 0;
+}
+
 SatActiveArea::SatActiveArea() : SatelliteObject()
 {
-    // do something here eventually
+    // use area_load_vehicle to load SatVechicles
+    load_func_add<SatVehicle>(area_load_vehicle);
 }
 
 SatActiveArea::~SatActiveArea()
@@ -142,19 +153,30 @@ void SatActiveArea::draw_gl()
     // lazy way to set name
     m_sat->set_name("ActiveArea");
 
-    // scan for nearby satellites
+    // scan for nearby satellites, partially remporary
 
     Universe& u = *(m_sat->get_universe());
     std::vector<Satellite>& satellites = u.get_sats();
 
     for (Satellite& sat : satellites)
     {
+        if (SatelliteObject* obj = sat.get_object())
+        {
+            //std::cout << "obj: " << obj->get_id().m_name
+            //          << ", " << (void*)(&(obj->get_id())) << "\n";
+        }
 
-        // ignore self
-        if (&sat == m_sat)
+        if (!sat.is_loadable())
         {
             continue;
         }
+
+
+        // ignore self (unreachable as active areas are unloadable)
+        //if (&sat == m_sat)
+        //{
+        //    continue;
+        //}
 
         // test distance to satellite
         // btw: precision is 10
@@ -162,9 +184,24 @@ void SatActiveArea::draw_gl()
         //std::cout << "nearby sat: " << sat.get_name() << " dot: " << relativePos.dot() << " satrad: " << sat.get_load_radius() << " arearad: " << m_sat->get_load_radius() << "\n";
 
         if (relativePos.dot()
-                < Magnum::Math::pow(sat.get_load_radius() + m_sat->get_load_radius(), 2.0f))
+                > Magnum::Math::pow(sat.get_load_radius()
+                                        + m_sat->get_load_radius(), 2.0f))
         {
-            //std::cout << "is near!\n";
+            continue;
+        }
+
+        std::cout << "is near!\n";
+
+        // Satellite is near! Attempt to load it
+
+        // see if there's a loading function for the satellite object
+        auto funcMapIt =
+                m_loadFunctions.find(&(sat.get_object()->get_id()));
+
+        if(funcMapIt != m_loadFunctions.end())
+        {
+            std::cout << "loading!\n";
+            funcMapIt->second(*this, *sat.get_object());
         }
     }
 
@@ -203,7 +240,7 @@ void SatActiveArea::draw_gl()
     m_camera->draw(m_drawables);
 }
 
-int SatActiveArea::on_load()
+int SatActiveArea::activate()
 {
     // when switched to. Active areas can only be loaded by the universe.
     // why, and how would an active area load another active area?

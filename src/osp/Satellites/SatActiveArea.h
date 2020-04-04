@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Mesh.h>
@@ -14,11 +15,15 @@
 #include "../Resource/Package.h"
 #include "../Resource/PartPrototype.h"
 
-class OSPMagnum;
+
 
 namespace osp
 {
 
+class OSPMagnum;
+class SatActiveArea;
+
+typedef int (*LoadStrategy)(SatActiveArea& area, SatelliteObject& loadMe);
 
 
 class SatActiveArea : public SatelliteObject
@@ -30,9 +35,27 @@ public:
     SatActiveArea();
     ~SatActiveArea();
 
+    static Id const& get_id_static()
+    {
+        static Id id{ typeid(SatActiveArea).name() };
+        return id;
+    }
+
+    Id const& get_id() override
+    {
+        return get_id_static();
+    }
+
+    bool is_loadable() const override { return false; }
+
     bool is_loaded_active() { return m_loadedActive; }
 
+    template<class T>
+    void load_func_add(LoadStrategy function);
+
     Scene3D& get_scene() { return m_scene; }
+
+    int activate();
 
     /**
      * Do actual drawing of scene. Call only on context thread.
@@ -41,19 +64,14 @@ public:
 
     Object3D* part_instantiate(PartPrototype& part, Package& pack);
 
-    /**
-     * Load objects into scene. Call only on context thread.
-     */
-    int on_load();
-
 private:
 
+    std::map<Id const*, LoadStrategy> m_loadFunctions;
 
     bool m_loadedActive;
     Scene3D m_scene;
     Magnum::SceneGraph::Camera3D* m_camera;
     Magnum::SceneGraph::DrawableGroup3D m_drawables;
-
 
     // temporary test variables only
     Object3D* m_partTest;
@@ -61,5 +79,13 @@ private:
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
 
 };
+
+
+
+template<class T>
+void SatActiveArea::load_func_add(LoadStrategy function)
+{
+    m_loadFunctions[&(T::get_id_static())] = function;
+}
 
 }

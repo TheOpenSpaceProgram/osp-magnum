@@ -31,6 +31,15 @@ Satellite::Satellite(Satellite&& sat) : m_object(std::move(sat.m_object)),
     std::cout << "satellite moved\n";
 }
 
+bool Satellite::is_loadable() const
+{
+    if (m_object.get())
+    {
+         return m_object->is_loadable();
+    }
+    return false;
+}
+
 Vector3s Satellite::position_relative_to(Satellite& referenceFrame) const
 {
     // might do more stuff here
