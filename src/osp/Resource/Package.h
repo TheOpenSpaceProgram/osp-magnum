@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Corrade/Containers/LinkedList.h>
 #include <Magnum/MeshTools/Compile.h>
 #include <Magnum/Mesh.h>
 #include <Magnum/GL/Mesh.h>
@@ -13,6 +12,7 @@
 #include <string>
 
 //#include "SturdyImporter.h"
+#include "Resource.h"
 #include "PartPrototype.h"
 
 namespace osp
@@ -41,67 +41,6 @@ class PartPrototype;
 // Package is abstracted because there might also have something like
 // PackageZip or PackageNetwork (custom stuff from a multiplayer server)
 // so packages don't strictly have to be folders.
-
-
-// TODO: move Resource stuff into its own file
-
-template <class T>
-class Resource;
-
-using Corrade::Containers::LinkedList;
-using Corrade::Containers::LinkedListItem;
-
-
-template <class T>
-class ResDependency : public LinkedListItem<ResDependency<T>, Resource<T> >
-{
-
-public:
-
-    ResDependency() = default;
-    ResDependency(Resource<T>& resource) : LinkedListItem<ResDependency<T>, Resource<T> >() { resource.insert(this); }
-
-    void bind(LinkedList<ResDependency<T> >& resource)
-    {
-        resource.insert(this);
-    }
-
-    T* get_data() {
-        return &(LinkedListItem<ResDependency<T>, Resource<T> >::list().m_data);
-    }
-
-private:
-
-    //Resource<T>* m_resource;
-};
-
-
-struct AbstractResource
-{
-
-    //std::string m_name; // name is kind of useless when there's path
-    std::string m_path;
-
-    bool m_loaded;
-
-    // TODO: * some sort of type identification, or just use typeof.
-    //         implement when needed.
-    //       * a way to identify loading strategy: dir, network, zip, etc
-    //       * dependency to other resources
-
-};
-
-// TODO: make this a class
-template <class T>
-struct Resource : public AbstractResource, LinkedList<ResDependency<T> >
-{
-    Resource() = default;
-    Resource(T&& move) : m_data(std::move(move)) {};
-    Resource(const T& copy) : m_data(copy) {};
-
-    //LinkedList<ResDependency<T> > m_usedBy;
-    T m_data;
-};
 
 
 // supported resources
@@ -142,7 +81,7 @@ public:
     //TypeMap<int>::fish;
     //std::vector< Resource<Magnum::Trade::ImageData> > g_imageData;
 
-    ResourceTable& debug_get_resource_table() { return m_resources; };
+    ResourceTable& debug_get_resource_table() { return m_resources; }
 
     template<class T>
     Resource<T>* debug_add_resource(Resource<T>&& resource);

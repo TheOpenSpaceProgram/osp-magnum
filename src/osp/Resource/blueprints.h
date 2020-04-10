@@ -35,8 +35,22 @@ class VehicleBlueprint
 
 public:
 
-    void debug_add_part(Resource<PartPrototype>& part, const Vector3& translation,
-                        const Quaternion& rotation, const Vector3& scale);
+    void debug_add_part(Resource<PartPrototype>& part,
+                        const Vector3& translation,
+                        const Quaternion& rotation,
+                        const Vector3& scale);
+
+    std::vector<ResDependency<PartPrototype> >& get_prototypes()
+    {
+        return m_prototypes;
+    }
+
+    std::vector<PartBlueprint>& get_blueprints()
+    {
+        return m_blueprints;
+    }
+
+
 
 private:
     // Unique part Resources used

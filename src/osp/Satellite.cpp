@@ -31,6 +31,11 @@ Satellite::Satellite(Satellite&& sat) : m_object(std::move(sat.m_object)),
     std::cout << "satellite moved\n";
 }
 
+Satellite::~Satellite()
+{
+    m_object.release();
+}
+
 bool Satellite::is_loadable() const
 {
     if (m_object.get())

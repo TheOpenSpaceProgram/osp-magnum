@@ -68,7 +68,7 @@ void SturdyImporter::load_config(Package& package)
             part.m_path = nodeName;
 
             // Add objects to the part, and recurse
-            proto_add_obj_recurse(part.m_data, 0, childId);
+            proto_add_obj_recurse(package, part.m_data, 0, childId);
 
             package.debug_add_resource<PartPrototype>(std::move(part));
 
@@ -95,25 +95,7 @@ void SturdyImporter::load_config(Package& package)
         Resource<MeshData3D> meshDataRes(std::move(*meshData));
         meshDataRes.m_path = meshName;
 
-
-        // random dependency class test
-        std::cout << "emptyA:" << meshDataRes.isEmpty() << "\n";
-        {
-        ResDependency<Magnum::Trade::MeshData3D> test;
-        test.bind(meshDataRes);
-
-        std::cout << "emptyB:" << meshDataRes.isEmpty() << "\n";
-
-
-        }
-
-        std::cout << "emptyC:" << meshDataRes.isEmpty() << "\n";
-
         package.debug_add_resource(std::move(meshDataRes));
-
-
-
-
 
         // apparently this needs a GL context
         // maybe store compiled meshes in the active area, since they're
@@ -126,7 +108,8 @@ void SturdyImporter::load_config(Package& package)
 
 }
 //either an appendable package, or
-void SturdyImporter::proto_add_obj_recurse(PartPrototype& part,
+void SturdyImporter::proto_add_obj_recurse(Package& package,
+                                           PartPrototype& part,
                                            unsigned parentProtoIndex,
                                            unsigned childGltfIndex)
 {
@@ -175,8 +158,9 @@ void SturdyImporter::proto_add_obj_recurse(PartPrototype& part,
         // as their resource paths. So the resource path is added to the part's
         // list of strings, and the object's mesh is set to the index to that
         // string.
-        obj.m_drawable.m_mesh = obj.m_strings.size();
-        obj.m_strings.push_back(meshName);
+        obj.m_drawable.m_mesh = part.get_strings().size();
+        part.get_strings().push_back(meshName);
+
     }
 
     //obj.m_mesh = m_meshOffset + childData->
@@ -187,7 +171,7 @@ void SturdyImporter::proto_add_obj_recurse(PartPrototype& part,
     for (unsigned childId: childData->children())
     {
         //proto_add_obj_recurse(part, protoObjects.size() - 1, childId);
-        proto_add_obj_recurse(part, objIndex, childId);
+        proto_add_obj_recurse(package, part, objIndex, childId);
     }
 }
 

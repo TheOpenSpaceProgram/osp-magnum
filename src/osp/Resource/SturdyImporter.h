@@ -68,7 +68,8 @@ private:
     // the package. This is the index to the first added mesh
     unsigned m_meshOffset;
 
-    void proto_add_obj_recurse(PartPrototype& part,
+    void proto_add_obj_recurse(Package& package,
+                               PartPrototype& part,
                                unsigned parentProtoIndex,
                                unsigned childGltfIndex);
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Magnum/Magnum.h>
+
+#include <Magnum/GL/Mesh.h>
 #include <Magnum/Math/Matrix4.h>
 #include <Magnum/Math/Quaternion.h>
 
@@ -38,7 +40,7 @@ enum class ColliderType
 struct DrawableData
 {
 
-    // index to a resource path (aka: name) string in m_strings
+    // index to a partPrototype.m_meshDataUsed
     unsigned m_mesh;
     //std::string m_mesh;
     //unsigned m_material;
@@ -50,6 +52,8 @@ struct ColliderData
     unsigned m_meshData;
 };
 
+using Magnum::Trade::MeshData3D;
+
 struct ObjectPrototype
 {
     unsigned m_parentIndex;
@@ -60,7 +64,7 @@ struct ObjectPrototype
 
     std::string m_name;
 
-    std::vector<std::string> m_strings;
+
 
     //Magnum::Matrix4 m_transform;
     Magnum::Vector3 m_translation;
@@ -90,16 +94,20 @@ public:
     std::vector<ObjectPrototype>& get_objects() { return m_objects; }
     std::vector<ObjectPrototype> const& get_objects() const { return m_objects; }
 
+    std::vector<std::string>& get_strings() { return m_strings; }
+
 private:
     //std::string name; use path
 
     std::vector<ObjectPrototype> m_objects;
 
+    //std::vector<ResDependency<MeshData3D> > m_meshDataUsed;
+
     // TODO: more OSP information
 
     // std::vector <machines>
 
-
+    std::vector<std::string> m_strings;
 
 };
 

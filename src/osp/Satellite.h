@@ -25,13 +25,13 @@ public:
 
 
     SatelliteObject();
-    virtual ~SatelliteObject() {};
+    virtual ~SatelliteObject() {}
 
     virtual Id const& get_id() = 0;
 
-    virtual int on_load() { return 0; };
+    virtual int on_load() { return 0; }
 
-    virtual bool is_loadable() const { return false; };
+    virtual bool is_loadable() const { return false; }
 
 
 protected:
@@ -48,9 +48,10 @@ class Satellite
 public:
     Satellite(Universe* universe);
     Satellite(Satellite&& sat);
-    ~Satellite() { m_object.release(); };
+    ~Satellite();
 
     bool is_loadable() const;
+
 
     float get_load_radius() const { return m_loadRadius; }
 
@@ -64,9 +65,14 @@ public:
      */
     const Vector3s& get_position() const { return m_position; }
 
-    Universe* get_universe() { return m_universe; };
+    SatelliteObject* get_loader() { return m_loadedBy; }
 
-    void set_name(const std::string& name) { m_name = name; }
+    Universe* get_universe() { return m_universe; }
+
+    void set_name(std::string const& name) { m_name = name; }
+
+    void set_loader(SatelliteObject* sat) { m_loadedBy = sat; }
+
 
     Vector3s position_relative_to(Satellite& referenceFrame) const;
 
@@ -102,7 +108,7 @@ protected:
     float m_mass;
 
     // Pointer to [probably an active area] when loaded
-    std::weak_ptr<SatelliteObject> m_loadedBy;
+    SatelliteObject* m_loadedBy;
 
     // Describes the functionality of this Satellite.
     std::unique_ptr<SatelliteObject> m_object;

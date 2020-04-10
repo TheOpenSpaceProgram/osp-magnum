@@ -48,13 +48,12 @@ public:
 
     bool is_loadable() const override { return false; }
 
-    bool is_loaded_active() { return m_loadedActive; }
 
-    template<class T>
-    void load_func_add(LoadStrategy function);
 
-    Scene3D& get_scene() { return m_scene; }
-
+    /**
+     * Setup magnum scene and sets m_loadedActive to true.
+     * @return only 0 for now
+     */
     int activate();
 
     /**
@@ -62,7 +61,22 @@ public:
      */
     void draw_gl();
 
-    Object3D* part_instantiate(PartPrototype& part, Package& pack);
+    template<class T>
+    void load_func_add(LoadStrategy function);
+
+    Object3D* part_instantiate(PartPrototype& part);
+
+    /**
+     * Attempt to load a satellite
+     * @return
+     */
+    int load_satellite(Satellite& sat);
+
+    bool is_loaded_active() { return m_loadedActive; }
+
+    Scene3D& get_scene() { return m_scene; }
+
+
 
 private:
 

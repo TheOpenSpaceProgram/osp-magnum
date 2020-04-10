@@ -33,6 +33,44 @@ namespace osp
 int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 {
     std::cout << "loadin a vehicle!\n";
+
+    // Get the needed variables
+    SatVehicle& vehicle = static_cast<SatVehicle&>(loadMe);
+    VehicleBlueprint& vehicleData = vehicle.get_blueprint();
+
+    // List of unique part prototypes used in the vehicle
+    // Access with [partBlueprint.m_partIndex]
+    std::vector<ResDependency<PartPrototype> >& partsUsed =
+            vehicleData.get_prototypes();
+
+    // List of parts, and how they're arranged
+    std::vector<PartBlueprint>& parts = vehicleData.get_blueprints();
+
+    // Loop through blueprints
+    for (PartBlueprint& partBp : parts)
+    {
+        ResDependency<PartPrototype>& partDepends =
+                partsUsed[partBp.m_partIndex];
+
+        PartPrototype *proto = partDepends.get_data();
+
+        // Check if the part prototype this depends on still exists
+        if (!proto)
+        {
+            return -1;
+        }
+
+        Object3D* partObject = area.part_instantiate(*proto);
+
+        // set the transformation
+        partObject->setTransformation(
+                Matrix4::from(partBp.m_rotation.toMatrix(),
+                              partBp.m_translation)
+                * Matrix4::scaling(partBp.m_scale));
+
+
+    }
+
     return 0;
 }
 
@@ -48,8 +86,136 @@ SatActiveArea::~SatActiveArea()
 }
 
 
+int SatActiveArea::activate()
+{
+    // when switched to. Active areas can only be loaded by the universe.
+    // why, and how would an active area load another active area?
+    m_loadedActive = true;
 
-Object3D* SatActiveArea::part_instantiate(PartPrototype& part, Package& package)
+    std::cout << "Active Area loading...\n";
+
+
+    // Temporary: instantiate a part
+
+    Universe* u = m_sat->get_universe();
+    Package& p = u->debug_get_packges()[0];
+    PartPrototype& part = p.get_resource<PartPrototype>(0)->m_data;
+
+    m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
+
+    //m_partTest = part_instantiate(part);
+
+    // Temporary: draw a spinning rectangular prisim
+
+    //m_bocks = &(Magnum::GL::Mesh(Magnum::MeshTools::compile(
+    //                                    Magnum::Primitives::cubeSolid())));
+
+    Object3D *cameraObj = new Object3D{&m_scene};
+    (*cameraObj).translate(Magnum::Vector3::zAxis(100.0f));
+    //            .rotate();
+    m_camera = new Magnum::SceneGraph::Camera3D(*cameraObj);
+    (*m_camera)
+        .setAspectRatioPolicy(Magnum::SceneGraph::AspectRatioPolicy::Extend)
+        .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
+        .setViewport(Magnum::GL::defaultFramebuffer.viewport().size());
+
+    return 0;
+}
+
+
+void SatActiveArea::draw_gl()
+{
+
+    // lazy way to set name
+    m_sat->set_name("ActiveArea");
+
+    // scan for nearby satellites, partially remporary
+
+    Universe& u = *(m_sat->get_universe());
+    std::vector<Satellite>& satellites = u.get_sats();
+
+    for (Satellite& sat : satellites)
+    {
+        if (SatelliteObject* obj = sat.get_object())
+        {
+            //std::cout << "obj: " << obj->get_id().m_name
+            //          << ", " << (void*)(&(obj->get_id())) << "\n";
+        }
+        else
+        {
+            // Satellite has no object, it's empty
+            continue;
+        }
+
+        // if satellite is not loadable or is already loaded
+        if (!sat.is_loadable() || sat.get_loader())
+        {
+            continue;
+        }
+
+
+        // ignore self (unreachable as active areas are unloadable)
+        //if (&sat == m_sat)
+        //{
+        //    continue;
+        //}
+
+        // test distance to satellite
+        // btw: precision is 10
+        Vector3s relativePos = sat.position_relative_to(*m_sat);
+        //std::cout << "nearby sat: " << sat.get_name() << " dot: " << relativePos.dot() << " satrad: " << sat.get_load_radius() << " arearad: " << m_sat->get_load_radius() << "\n";
+
+        if (relativePos.dot()
+                > Magnum::Math::pow(sat.get_load_radius()
+                                        + m_sat->get_load_radius(), 2.0f))
+        {
+            continue;
+        }
+
+        std::cout << "is near!\n";
+
+        // Satellite is near! Attempt to load it
+
+        load_satellite(sat);
+    }
+
+    using namespace Magnum;
+
+    GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
+    GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
+
+    // Temporary: draw the spinning rectangular prisim
+
+    //static Deg lazySpin;
+    //lazySpin += 1.0_degf;
+
+    //Matrix4 ttt;
+    //ttt = Matrix4::translation(Vector3(0, 0, -5))
+    //    * Matrix4::rotationX(lazySpin)
+    //    * Matrix4::scaling({1.0f, 1.0f, 1.0f});
+
+    //(*m_shader)
+    //    .setDiffuseColor(0x67ff00_rgbf)
+    //    .setAmbientColor(0x111111_rgbf)
+    //    .setSpecularColor(0x330000_rgbf)
+    //    .setLightPosition({10.0f, 15.0f, 5.0f})
+    //    .setTransformationMatrix(ttt)
+    //    .setProjectionMatrix(m_camera->projectionMatrix())
+    //    .setNormalMatrix(ttt.normalMatrix());
+
+    //m_bocks->draw(*m_shader);
+
+    //m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
+
+    static_cast<Object3D&>(m_camera->object()).setTransformation(
+                            Matrix4::translation(Vector3(0, 0, 5)));
+
+
+    m_camera->draw(m_drawables);
+}
+
+
+Object3D* SatActiveArea::part_instantiate(PartPrototype& part)
 {
 
     std::vector<ObjectPrototype> const& prototypes = part.get_objects();
@@ -88,6 +254,9 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part, Package& package)
             using Magnum::Trade::MeshData3D;
             using Magnum::GL::Mesh;
 
+            // TODO: put package prefixes in resource path
+            //       for now just get the first package
+            Package& package = m_sat->get_universe()->debug_get_packges()[0];
 
             Mesh* mesh = nullptr;
             Resource<Mesh>* meshRes
@@ -98,7 +267,7 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part, Package& package)
             {
                 // Mesh isn't compiled yet, now check if mesh data exists
                 std::string const& meshName
-                        = current.m_strings[current.m_drawable.m_mesh];
+                        = part.get_strings()[current.m_drawable.m_mesh];
 
                 Resource<MeshData3D>* meshDataRes
                         = package.get_resource<MeshData3D>(meshName);
@@ -147,133 +316,33 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part, Package& package)
     return newObjects[0];
 }
 
-void SatActiveArea::draw_gl()
+
+int SatActiveArea::load_satellite(Satellite& sat)
 {
+    // see if there's a loading function for the satellite object
+    auto funcMapIt =
+            m_loadFunctions.find(&(sat.get_object()->get_id()));
 
-    // lazy way to set name
-    m_sat->set_name("ActiveArea");
-
-    // scan for nearby satellites, partially remporary
-
-    Universe& u = *(m_sat->get_universe());
-    std::vector<Satellite>& satellites = u.get_sats();
-
-    for (Satellite& sat : satellites)
+    if(funcMapIt == m_loadFunctions.end())
     {
-        if (SatelliteObject* obj = sat.get_object())
-        {
-            //std::cout << "obj: " << obj->get_id().m_name
-            //          << ", " << (void*)(&(obj->get_id())) << "\n";
-        }
-
-        if (!sat.is_loadable())
-        {
-            continue;
-        }
-
-
-        // ignore self (unreachable as active areas are unloadable)
-        //if (&sat == m_sat)
-        //{
-        //    continue;
-        //}
-
-        // test distance to satellite
-        // btw: precision is 10
-        Vector3s relativePos = sat.position_relative_to(*m_sat);
-        //std::cout << "nearby sat: " << sat.get_name() << " dot: " << relativePos.dot() << " satrad: " << sat.get_load_radius() << " arearad: " << m_sat->get_load_radius() << "\n";
-
-        if (relativePos.dot()
-                > Magnum::Math::pow(sat.get_load_radius()
-                                        + m_sat->get_load_radius(), 2.0f))
-        {
-            continue;
-        }
-
-        std::cout << "is near!\n";
-
-        // Satellite is near! Attempt to load it
-
-        // see if there's a loading function for the satellite object
-        auto funcMapIt =
-                m_loadFunctions.find(&(sat.get_object()->get_id()));
-
-        if(funcMapIt != m_loadFunctions.end())
-        {
-            std::cout << "loading!\n";
-            funcMapIt->second(*this, *sat.get_object());
-        }
+        // no loading function exists for this satellite object type
+        return -1;
     }
 
-    using namespace Magnum;
+    std::cout << "loading!\n";
+    int loadStatus = funcMapIt->second(*this, *sat.get_object());
 
-    GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
-    GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
+    if (loadStatus)
+    {
+        // Load failed
+        return loadStatus;
+    }
 
-    // Temporary: draw the spinning rectangular prisim
-
-    //static Deg lazySpin;
-    //lazySpin += 1.0_degf;
-
-    //Matrix4 ttt;
-    //ttt = Matrix4::translation(Vector3(0, 0, -5))
-    //    * Matrix4::rotationX(lazySpin)
-    //    * Matrix4::scaling({1.0f, 1.0f, 1.0f});
-
-    //(*m_shader)
-    //    .setDiffuseColor(0x67ff00_rgbf)
-    //    .setAmbientColor(0x111111_rgbf)
-    //    .setSpecularColor(0x330000_rgbf)
-    //    .setLightPosition({10.0f, 15.0f, 5.0f})
-    //    .setTransformationMatrix(ttt)
-    //    .setProjectionMatrix(m_camera->projectionMatrix())
-    //    .setNormalMatrix(ttt.normalMatrix());
-
-    //m_bocks->draw(*m_shader);
-
-    //m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
-
-    static_cast<Object3D&>(m_camera->object()).setTransformation(
-                            Matrix4::translation(Vector3(0, 0, 5)));
-
-
-    m_camera->draw(m_drawables);
-}
-
-int SatActiveArea::activate()
-{
-    // when switched to. Active areas can only be loaded by the universe.
-    // why, and how would an active area load another active area?
-    m_loadedActive = true;
-
-    std::cout << "Active Area loading...\n";
-
-
-    // Temporary: instantiate a part
-
-    Universe* u = m_sat->get_universe();
-    Package& p = u->debug_get_packges()[0];
-    PartPrototype& part = p.get_resource<PartPrototype>(0)->m_data;
-
-    m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
-
-    m_partTest = part_instantiate(part, p);
-
-    // Temporary: draw a spinning rectangular prisim
-
-    //m_bocks = &(Magnum::GL::Mesh(Magnum::MeshTools::compile(
-    //                                    Magnum::Primitives::cubeSolid())));
-
-    Object3D *cameraObj = new Object3D{&m_scene};
-    (*cameraObj).translate(Magnum::Vector3::zAxis(100.0f));
-    //            .rotate();
-    m_camera = new Magnum::SceneGraph::Camera3D(*cameraObj);
-    (*m_camera)
-        .setAspectRatioPolicy(Magnum::SceneGraph::AspectRatioPolicy::Extend)
-        .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
-        .setViewport(Magnum::GL::defaultFramebuffer.viewport().size());
+    // Load success
+    sat.set_loader(m_sat->get_object());
 
     return 0;
 }
+
 
 }
