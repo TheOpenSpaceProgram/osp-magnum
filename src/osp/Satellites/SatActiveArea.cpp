@@ -74,7 +74,7 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
     return 0;
 }
 
-SatActiveArea::SatActiveArea() : SatelliteObject()
+SatActiveArea::SatActiveArea() : SatelliteObject(), m_nwtWorld(NewtonCreate())
 {
     // use area_load_vehicle to load SatVechicles
     load_func_add<SatVehicle>(area_load_vehicle);
@@ -82,7 +82,11 @@ SatActiveArea::SatActiveArea() : SatelliteObject()
 
 SatActiveArea::~SatActiveArea()
 {
-    // do something here eventually
+    // TODO: unload satellites
+
+    // Clean up newton dynamics stuff
+    NewtonDestroyAllBodies(m_nwtWorld);
+    NewtonDestroy(m_nwtWorld);
 }
 
 

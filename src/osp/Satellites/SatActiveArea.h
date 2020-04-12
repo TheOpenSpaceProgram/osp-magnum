@@ -7,6 +7,7 @@
 #include <Magnum/PixelFormat.h>
 #include <Magnum/SceneGraph/Camera.h>
 
+#include <Newton.h>
 
 #include "../types.h"
 #include "../Satellite.h"
@@ -91,6 +92,9 @@ private:
     Object3D* m_partTest;
     Magnum::GL::Mesh *m_bocks;
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
+
+    // Newton dynamics stuff
+    NewtonWorld* const m_nwtWorld;
 
 };
 

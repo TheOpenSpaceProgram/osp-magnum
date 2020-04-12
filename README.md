@@ -17,7 +17,7 @@ https://github.com/TheOpenSpaceProgram/OpenSpaceProgram/blob/master/docs/Technic
 * ~~Simple console interface for streamlining~~
 * ~~Minimal Universe of Satellites~~
 * ~~Showing glTF sturdy models~~
-* ActiveAreas that load nearby satellites
+* ~~ActiveAreas that load nearby satellites~~
 * Intergrate Newton Dynamics, and make a SatDebugPlanet as some flat plane to
   test things on
 * Crafts that fire thrust
