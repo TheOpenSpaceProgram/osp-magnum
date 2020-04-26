@@ -9,25 +9,30 @@
 
 #include <Newton.h>
 
-#include "../types.h"
+#include "../../types.h"
 #include "../Satellite.h"
 #include "../scene.h"
 
 #include "../Resource/Package.h"
 #include "../Resource/PartPrototype.h"
 
-
+#include "../Active/FtrNewtonBody.h"
 
 namespace osp
 {
+
 
 class OSPMagnum;
 class SatActiveArea;
 
 typedef int (*LoadStrategy)(SatActiveArea& area, SatelliteObject& loadMe);
 
+//using enum Magnum::Platform::Application::KeyEvent;
+//using namespace Magnum::Platform;
 
-class SatActiveArea : public SatelliteObject
+using Magnum::Platform::Application;
+
+class SatActiveArea : public SatelliteObject, public GroupFtrNewtonBody
 {
 
     friend OSPMagnum;
@@ -61,10 +66,26 @@ public:
      * Do actual drawing of scene. Call only on context thread.
      */
     void draw_gl();
+    
+    /**
+     * 
+     */
+    void update_physics(float deltaTime);
 
+    NewtonWorld* get_newton_world() { return m_nwtWorld; }
+
+    /**
+     * Add a loading strategy to add support for loading a type of satellite 
+     * @param function
+     */
     template<class T>
     void load_func_add(LoadStrategy function);
 
+    /**
+     * 
+     * @param part
+     * @return Pointer to object created
+     */
     Object3D* part_instantiate(PartPrototype& part);
 
     /**
@@ -76,6 +97,13 @@ public:
     bool is_loaded_active() { return m_loadedActive; }
 
     Scene3D& get_scene() { return m_scene; }
+
+    void input_key_press(Application::KeyEvent& event);
+    void input_key_release(Application::KeyEvent& event);
+
+    void input_mouse_press(Application::MouseEvent& event);
+    void input_mouse_release(Application::MouseEvent& event);
+    void input_mouse_move(Application::MouseMoveEvent& event);
 
 
 
@@ -94,8 +122,10 @@ private:
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
 
     // Newton dynamics stuff
+    // note: can be null for physics-less view-only areas
     NewtonWorld* const m_nwtWorld;
 
+    //GroupFtrNewtonBody m_newtonBodies;
 };
 
 

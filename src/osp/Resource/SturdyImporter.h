@@ -7,7 +7,7 @@
 #include "Package.h"
 #include "PartPrototype.h"
 
-#include "../types.h"
+#include "../../types.h"
 #include "../scene.h"
 
 namespace osp

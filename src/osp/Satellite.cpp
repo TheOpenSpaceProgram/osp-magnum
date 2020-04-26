@@ -33,7 +33,9 @@ Satellite::Satellite(Satellite&& sat) : m_object(std::move(sat.m_object)),
 
 Satellite::~Satellite()
 {
-    m_object.release();
+    std::cout << "satellite destroyed!\n";
+
+    //m_object.release(); // not the right thing to do
 }
 
 bool Satellite::is_loadable() const

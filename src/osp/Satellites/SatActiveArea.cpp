@@ -26,6 +26,11 @@ using Magnum::Matrix4;
 namespace osp
 {
 
+// debug navigation
+struct InputControl
+{
+    bool up, dn, fr, bk, lf, rt;
+} g_debugInput;
 
 // Loading functions
 
@@ -84,6 +89,8 @@ SatActiveArea::~SatActiveArea()
 {
     // TODO: unload satellites
 
+    std::cout << "Active Area destroyed\n";
+
     // Clean up newton dynamics stuff
     NewtonDestroyAllBodies(m_nwtWorld);
     NewtonDestroy(m_nwtWorld);
@@ -122,6 +129,8 @@ int SatActiveArea::activate()
         .setAspectRatioPolicy(Magnum::SceneGraph::AspectRatioPolicy::Extend)
         .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
         .setViewport(Magnum::GL::defaultFramebuffer.viewport().size());
+
+    cameraObj->setTransformation( Matrix4::translation(Vector3(0, 0, 5)));
 
     return 0;
 }
@@ -211,8 +220,8 @@ void SatActiveArea::draw_gl()
 
     //m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
 
-    static_cast<Object3D&>(m_camera->object()).setTransformation(
-                            Matrix4::translation(Vector3(0, 0, 5)));
+    //static_cast<Object3D&>(m_camera->object()).setTransformation(
+    //                        Matrix4::translation(Vector3(0, 0, 5)));
 
 
     m_camera->draw(m_drawables);
@@ -312,11 +321,21 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part)
 
             new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
         }
-
-
-
+        else if (current.m_type == ObjectType::COLLIDER)
+        {
+            //new FtrNewtonBody(*obj, *this);
+            // TODO collision shape!
+        }
     }
+
+
+
     // first element is 100% going to be the root object
+
+    // Temporary: add a rigid body root
+    new FtrNewtonBody(*(newObjects[0]), *this);
+
+    // return root object
     return newObjects[0];
 }
 
@@ -348,5 +367,116 @@ int SatActiveArea::load_satellite(Satellite& sat)
     return 0;
 }
 
+void SatActiveArea::update_physics(float deltaTime)
+{
+    // debug navigation
+
+    Object3D &cameraObj = static_cast<Object3D&>(m_camera->object());
+    float spd = 0.05f;
+
+    Vector3 mvtLocal((g_debugInput.rt - g_debugInput.lf) * spd, 0.0f,
+                     (g_debugInput.bk - g_debugInput.fr) * spd);
+    cameraObj.translateLocal(mvtLocal);
+
+    Vector3 mvtGlobal(0.0f, (g_debugInput.up - g_debugInput.dn) * spd, 0.0f);
+    cameraObj.translate(mvtGlobal);
+
+    // update physics
+    NewtonUpdate(m_nwtWorld, deltaTime);
+
+    GroupFtrNewtonBody& nwtBodies = *this;
+
+    for (unsigned i = 0; i < nwtBodies.size(); i++)
+    {
+        // Update positions of magnum objects
+        // TODO: interpolation
+
+        Matrix4 matrix;
+        NewtonBodyGetMatrix(nwtBodies[i].get_body(), matrix.data());
+        Vector3 trans = matrix.translation();
+
+        Object3D& obj = static_cast<Object3D&>(nwtBodies[i].object());
+        obj.setTransformation(matrix);
+
+
+        std::cout << "translation: [" << trans.x() << ", " << trans.y() << ", " << trans.z() << "]\n";
+        //Vector3 force(0.0f, -9.8f, 0.0f);
+        dFloat force[3] = {0, -1.0, 0};
+        NewtonBodySetForce(nwtBodies[i].get_body(), force);
+    }
+
+}
+
+using Magnum::Platform::Application;
+
+void SatActiveArea::input_key_press(Application::KeyEvent& event)
+{
+
+    const bool dir = true;
+    // debug navigation controls
+    switch(event.key())
+    {
+    case Application::KeyEvent::Key::W:
+        g_debugInput.fr = dir;
+        break;
+    case Application::KeyEvent::Key::A:
+        g_debugInput.lf = dir;
+        break;
+    case Application::KeyEvent::Key::S:
+        g_debugInput.bk = dir;
+        break;
+    case Application::KeyEvent::Key::D:
+        g_debugInput.rt = dir;
+        break;
+    case Application::KeyEvent::Key::Q:
+        g_debugInput.up = dir;
+        break;
+    case Application::KeyEvent::Key::E:
+        g_debugInput.dn = dir;
+        break;
+    }
+}
+
+void SatActiveArea::input_key_release(Application::KeyEvent& event)
+{
+    const bool dir = false;
+    // debug navigation controls
+    switch(event.key())
+    {
+    case Application::KeyEvent::Key::W:
+        g_debugInput.fr = dir;
+        break;
+    case Application::KeyEvent::Key::A:
+        g_debugInput.lf = dir;
+        break;
+    case Application::KeyEvent::Key::S:
+        g_debugInput.bk = dir;
+        break;
+    case Application::KeyEvent::Key::D:
+        g_debugInput.rt = dir;
+        break;
+    case Application::KeyEvent::Key::Q:
+        g_debugInput.up = dir;
+        break;
+    case Application::KeyEvent::Key::E:
+        g_debugInput.dn = dir;
+        break;
+    }
+}
+
+void SatActiveArea::input_mouse_press(Application::MouseEvent& event)
+{
+
+}
+
+void SatActiveArea::input_mouse_release(Application::MouseEvent& event)
+{
+
+}
+
+void SatActiveArea::input_mouse_move(Application::MouseMoveEvent& event)
+{
+
+}
 
 }

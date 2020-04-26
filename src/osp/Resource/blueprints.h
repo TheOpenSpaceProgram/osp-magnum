@@ -3,7 +3,7 @@
 #include "Package.h"
 
 #include "../Satellites/SatActiveArea.h"
-#include "../types.h"
+#include "../../types.h"
 
 namespace osp
 {

@@ -10,10 +10,11 @@ OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments):
     Magnum::Platform::Application{
         arguments,
         Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
-    m_area(nullptr){
+    m_area(nullptr)
+{
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 
-
+    m_timeline.start();
 
 }
 
@@ -24,7 +25,6 @@ void OSPMagnum::set_active_area(SatActiveArea& area)
     m_area = &area;
 
 }
-
 
 void OSPMagnum::drawEvent()
 {
@@ -40,13 +40,56 @@ void OSPMagnum::drawEvent()
             m_area->activate();
         }
 
+        std::cout << "deltaTime: " << m_timeline.previousFrameDuration() << "\n";
+
+        m_area->update_physics(1.0f / 60.0f);
+
         m_area->draw_gl();
     }
 
     // TODO: GUI and stuff
 
     swapBuffers();
+    m_timeline.nextFrame();
     redraw();
+}
+
+void OSPMagnum::keyPressEvent(KeyEvent& event)
+{
+    if (m_area)
+    {
+        m_area->input_key_press(event);
+    }
+}
+
+void OSPMagnum::keyReleaseEvent(KeyEvent& event)
+{
+    if (m_area)
+    {
+        m_area->input_key_release(event);
+    }
+}
+
+void OSPMagnum::mousePressEvent(MouseEvent& event)
+{
+    if (m_area)
+    {
+        m_area->input_mouse_press(event);
+    }
+}
+void OSPMagnum::mouseReleaseEvent(MouseEvent& event)
+{
+    if (m_area)
+    {
+        m_area->input_mouse_release(event);
+    }
+}
+void OSPMagnum::mouseMoveEvent(MouseMoveEvent& event)
+{
+    if (m_area)
+    {
+        m_area->input_mouse_move(event);
+    }
 }
 
 }

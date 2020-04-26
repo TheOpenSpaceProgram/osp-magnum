@@ -123,6 +123,8 @@ int debug_cli_loop()
         }
         else if (command == "exit")
         {
+            // delete the universe
+            g_universe.get_sats().clear();
             return 0;
         }
         else
