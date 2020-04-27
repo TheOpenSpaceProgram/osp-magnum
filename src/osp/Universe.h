@@ -62,7 +62,7 @@ private:
     std::vector<Package> m_packages;
 
     std::vector<Satellite> m_satellites;
-    std::vector<PartPrototype> m_prototypes;
+    //std::vector<PartPrototype> m_prototypes;
 
 };
 

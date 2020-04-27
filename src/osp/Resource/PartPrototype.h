@@ -67,6 +67,7 @@ struct ObjectPrototype
 
 
     //Magnum::Matrix4 m_transform;
+    // maybe not use magnum types here
     Magnum::Vector3 m_translation;
     Magnum::Quaternion m_rotation;
     Magnum::Vector3 m_scale;
