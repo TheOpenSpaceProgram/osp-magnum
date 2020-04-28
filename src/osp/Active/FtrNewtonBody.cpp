@@ -16,9 +16,9 @@ FtrNewtonBody::FtrNewtonBody(Object3D& object, SatActiveArea& area):
 {
 
     NewtonWorld* world = area.get_newton_world();
-    Matrix4 matrix(Magnum::Matrix4::translation(Vector3(0, 2, 0)));
+    Matrix4 matrix(Magnum::Matrix4::translation(Vector3(0, 0, 0)));
 
-    NewtonCollision *const ball = NewtonCreateSphere(world, 1, 0, NULL);
+    NewtonCollision const *ball = NewtonCreateSphere(world, 1, 0, NULL);
 
     m_body = NewtonCreateDynamicBody(world, ball, matrix.data());
 

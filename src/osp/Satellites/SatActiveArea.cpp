@@ -1,3 +1,4 @@
+#include <iostream>
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Renderer.h>
@@ -7,14 +8,17 @@
 #include <Magnum/MeshTools/Transform.h>
 #include <Magnum/Primitives/Cube.h>
 
-
-
-#include <iostream>
-
-
 #include "SatActiveArea.h"
 #include "SatVehicle.h"
+#include "SatPlanet.h"
+
+#include "../Active/FtrPlanet.h"
+#include "../Active/FtrNewtonBody.h"
+#include "../Active/FtrVehicle.h"
+
 #include "../Resource/SturdyImporter.h"
+#include "../Resource/PlanetData.h"
+
 #include "../Universe.h"
 
 
@@ -72,12 +76,26 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
                 Matrix4::from(partBp.m_rotation.toMatrix(),
                               partBp.m_translation)
                 * Matrix4::scaling(partBp.m_scale));
-
-
     }
+    return 0;
+}
+
+int area_load_planet(SatActiveArea& area, SatelliteObject& loadMe)
+{
+    std::cout << "loadin a planet!\n";
+
+    // Get the needed variables
+    SatPlanet& planet = static_cast<SatPlanet&>(loadMe);
+
+    Object3D *obj = new Object3D(&(area.get_scene()));
+
+    PlanetData dummy;
+
+    new FtrPlanet(*obj, dummy);
 
     return 0;
 }
+
 
 SatActiveArea::SatActiveArea() : SatelliteObject(), m_nwtWorld(NewtonCreate())
 {

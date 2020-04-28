@@ -1,5 +1,4 @@
-#ifndef FTRNEWTONBODY_H
-#define FTRNEWTONBODY_H
+#pragma once
 
 
 #include "../scene.h"
@@ -38,5 +37,3 @@ protected:
 };
 
 }
-
-#endif // FTRNEWTONBODY_H

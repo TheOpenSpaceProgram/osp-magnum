@@ -26,8 +26,8 @@ class DrawablePhongColored: public Magnum::SceneGraph::Drawable3D
             Magnum::GL::Mesh& mesh,
             const Magnum::Color4& color,
             Magnum::SceneGraph::DrawableGroup3D& group):
-            Magnum::SceneGraph::Drawable3D{object, &group},
-            m_shader(shader), m_mesh(mesh), m_color{color} {}
+                Magnum::SceneGraph::Drawable3D{object, &group},
+                m_shader(shader), m_mesh(mesh), m_color{color} {}
 
     private:
         void draw(const Magnum::Matrix4& transformationMatrix,

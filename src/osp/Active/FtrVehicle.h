@@ -1,11 +1,7 @@
-#ifndef FTRVEHICLE_H
-#define FTRVEHICLE_H
-
+#pragma once
 
 class FtrVehicle
 {
 public:
     FtrVehicle();
 };
-
-#endif // FTRVEHICLE_H
