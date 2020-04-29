@@ -40,7 +40,7 @@ void OSPMagnum::drawEvent()
             m_area->activate();
         }
 
-        std::cout << "deltaTime: " << m_timeline.previousFrameDuration() << "\n";
+       // std::cout << "deltaTime: " << m_timeline.previousFrameDuration() << "\n";
 
         m_area->update_physics(1.0f / 60.0f);
 

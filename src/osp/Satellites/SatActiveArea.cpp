@@ -101,6 +101,8 @@ SatActiveArea::SatActiveArea() : SatelliteObject(), m_nwtWorld(NewtonCreate())
 {
     // use area_load_vehicle to load SatVechicles
     load_func_add<SatVehicle>(area_load_vehicle);
+
+    load_func_add<SatPlanet>(area_load_planet);
 }
 
 SatActiveArea::~SatActiveArea()
@@ -203,7 +205,7 @@ void SatActiveArea::draw_gl()
             continue;
         }
 
-        std::cout << "is near!\n";
+        //std::cout << "is near!\n";
 
         // Satellite is near! Attempt to load it
 
@@ -417,7 +419,7 @@ void SatActiveArea::update_physics(float deltaTime)
         obj.setTransformation(matrix);
 
 
-        std::cout << "translation: [" << trans.x() << ", " << trans.y() << ", " << trans.z() << "]\n";
+        //std::cout << "translation: [" << trans.x() << ", " << trans.y() << ", " << trans.z() << "]\n";
         //Vector3 force(0.0f, -9.8f, 0.0f);
         dFloat force[3] = {0, -1.0, 0};
         NewtonBodySetForce(nwtBodies[i].get_body(), force);

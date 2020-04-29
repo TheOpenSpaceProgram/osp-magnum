@@ -1,12 +1,15 @@
 #pragma once
 
-
-#include "../scene.h"
-#include "../Resource/PlanetData.h"
-
 #include <Magnum/SceneGraph/Scene.h>
 #include <Magnum/SceneGraph/AbstractFeature.h>
 #include <Magnum/GL/Mesh.h>
+
+
+#include "../scene.h"
+#include "../Resource/PlanetData.h"
+#include "Planet/PlanetGeometryA.h"
+
+
 
 #include <Newton.h>
 
@@ -22,6 +25,10 @@ public:
     explicit FtrPlanet(Object3D& object, PlanetData& data);
 
     ~FtrPlanet();
+
+private:
+
+    PlanetGeometryA m_planet;
 };
 
 }

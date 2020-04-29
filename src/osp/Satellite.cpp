@@ -25,7 +25,8 @@ Satellite::Satellite(Universe* universe) : m_universe(universe)
 
 Satellite::Satellite(Satellite&& sat) : m_object(std::move(sat.m_object)),
                                         m_name(std::move(sat.m_name)),
-                                        m_loadRadius(std::exchange(sat.m_loadRadius, 0))
+                                        m_loadRadius(std::exchange(sat.m_loadRadius, 0)),
+                                        m_loadedBy(nullptr)
 {
     // TODO
     std::cout << "satellite moved\n";

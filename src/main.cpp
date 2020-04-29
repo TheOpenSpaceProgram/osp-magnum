@@ -7,6 +7,7 @@
 #include "osp/Universe.h"
 #include "osp/Satellites/SatActiveArea.h"
 #include "osp/Satellites/SatVehicle.h"
+#include "osp/Satellites/SatPlanet.h"
 #include "osp/Resource/SturdyImporter.h"
 #include "osp/Resource/Package.h"
 
@@ -63,6 +64,10 @@ void magnum_application()
 
         // Add a vehicle so there's something to load
         debug_add_random_vehicle();
+
+        // Add a planet too
+        osp::Satellite& planet = g_universe.create_sat();
+        planet.create_object<osp::SatPlanet>();
 
         //s_partsLoaded = true;
     }

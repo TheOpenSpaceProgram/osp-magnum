@@ -19,18 +19,41 @@ using buindex = uint32_t;
 class IcoSphereTree;
 struct SubTriangle;
 
+// The 20 faces of the icosahedron (Top, Left, Right)
+// Each number pointing to a vertex
+static constexpr uint8_t sc_icoTemplateTris[20 * 3] {
+//  TT  LL  RR   TT  LL  RR   TT  LL  RR   TT  LL  RR   TT  LL  RR
+     0,  2,  1,   0,  3,  2,   0,  4,  3,   0,  5,  4,   0,  1,  5,
+     8,  1,  2,   2,  7,  8,   7,  2,  3,   3,  6,  7,   6,  3,  4,
+     4,  10, 6,  10,  4,  5,   5,  9, 10,   9,  5,  1,   1,  8,  9,
+    11,  7,  6,  11,  8,  7,  11,  9,  8,  11, 10,  9,  11,  6, 10
+};
+
+// The 20 faces of the icosahedron (Bottom, Right, Left)
+static constexpr uint8_t sc_icoTemplateneighbours[20 * 3] {
+//  BB  RR  LL   BB  RR  LL   BB  RR  LL   BB  RR  LL   BB  RR  LL
+     5,  4,  1,   7,  0,  2,   9,  1,  3,  11,  2,  4,  13,  3,  0,
+     0,  6, 14,  16,  5,  7,   1,  8,  6,  15,  7,  9,   2, 10,  8,
+    19,  9, 11,   3, 12, 10,  18, 11, 13,   4, 14, 12,  17, 13,  5,
+     8, 19, 16,   6, 15, 17,  14, 16, 18,  12, 17, 19,  10, 18, 15
+};
+
+// If these change, then the universe is broken
+static constexpr int gc_icosahedronFaceCount = 20;
+static constexpr int gc_icosahedronVertCount = 12;
+
 
 // An icosahedron with subdividable faces
 // it starts with 20 triangles, and each face can be subdivided into 4 more
 class IcoSphereTree
 {
 
+public:
+
     IcoSphereTree() = default;
     ~IcoSphereTree() = default;
 
-public:
-
-    void initialize();
+    void initialize(float radius);
 
     /**
      * Get triangle from vector of triangles

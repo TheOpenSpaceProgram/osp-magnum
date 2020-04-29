@@ -24,6 +24,7 @@ public:
         return get_id_static();
     }
 
+    bool is_loadable() const override;
 
 private:
 
