@@ -1,8 +1,6 @@
 #include <iostream>
 
 
-#include "../../types.h"
-
 #include "../Satellites/SatActiveArea.h"
 
 #include "FtrNewtonBody.h"
@@ -16,7 +14,7 @@ FtrNewtonBody::FtrNewtonBody(Object3D& object, SatActiveArea& area):
 {
 
     NewtonWorld* world = area.get_newton_world();
-    Matrix4 matrix(Magnum::Matrix4::translation(Vector3(0, 0, 0)));
+    Matrix4 matrix(object.transformationMatrix());
 
     NewtonCollision const *ball = NewtonCreateSphere(world, 1, 0, NULL);
 
@@ -29,6 +27,11 @@ FtrNewtonBody::FtrNewtonBody(Object3D& object, SatActiveArea& area):
 FtrNewtonBody::~FtrNewtonBody()
 {
     NewtonDestroyBody(m_body);
+}
+
+void FtrNewtonBody::nwt_set_matrix(Matrix4 const& matrix)
+{
+    NewtonBodySetMatrix(m_body, matrix.data());
 }
 
 }

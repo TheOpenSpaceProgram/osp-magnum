@@ -2,6 +2,8 @@
 
 
 #include "../scene.h"
+#include "../../types.h"
+
 
 #include <Magnum/SceneGraph/Scene.h>
 #include <Magnum/SceneGraph/AbstractGroupedFeature.h>
@@ -31,6 +33,8 @@ public:
     ~FtrNewtonBody();
 
     NewtonBody* get_body() { return m_body; }
+
+    void nwt_set_matrix(Matrix4 const& matrix);
 
 protected:
     NewtonBody *m_body;

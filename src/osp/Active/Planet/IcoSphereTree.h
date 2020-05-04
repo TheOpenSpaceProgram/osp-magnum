@@ -50,6 +50,12 @@ class IcoSphereTree
 
 public:
 
+    // 6 components per vertex
+    // PosX, PosY, PosZ, NormX, NormY, NormZ
+    static constexpr int m_vrtxSize = 6;
+    static constexpr int m_vrtxCompOffsetPos = 0;
+    static constexpr int m_vrtxCompOffsetNrm = 3;
+
     IcoSphereTree() = default;
     ~IcoSphereTree() = default;
 
@@ -64,6 +70,26 @@ public:
     SubTriangle& get_triangle(trindex t)
     {
         return m_triangles[t];
+    }
+
+    std::vector<float> const& get_vertex_buffer()
+    {
+        return m_vrtxBuf;
+    }
+
+    float const* get_vertex_pos(buindex vrtOffset)
+    {
+        return m_vrtxBuf.data() + vrtOffset + m_vrtxCompOffsetPos;
+    }
+
+    float const* get_vertex_nrm(buindex nrmOffset)
+    {
+        return m_vrtxBuf.data() + nrmOffset + m_vrtxCompOffsetNrm;
+    }
+
+    float get_radius()
+    {
+        return m_radius;
     }
 
     /**
@@ -83,8 +109,8 @@ public:
      * @param lft Left
      * @param rte Right
      */
-    static void set_verts(SubTriangle& tri, trindex top,
-                          trindex lft, trindex rte);
+    static void set_verts(SubTriangle& tri, buindex top,
+                          buindex lft, buindex rte);
 
     void set_side_recurse(SubTriangle& tri, int side, trindex to);
 
@@ -119,18 +145,12 @@ public:
 
 private:
 
-
-
-    // 6 components per vertex
-    // PosX, PosY, PosZ, NormX, NormY, NormZ
-    static constexpr int m_vertCompCount = 6;
-
     //PODVector<PlanetWrenderer> m_viewers;
-    std::vector<float> m_vertBuf;
+    std::vector<float> m_vrtxBuf;
     std::vector<SubTriangle> m_triangles; // List of all triangles
     // List of indices to deleted triangles in the m_triangles
     std::vector<trindex> m_trianglesFree;
-    std::vector<buindex> m_vertFree; // Deleted vertices in m_vertBuf
+    std::vector<buindex> m_vrtxFree; // Deleted vertices in m_vertBuf
     // use "m_indDomain[buindex]" to get a triangle index
 
     unsigned m_maxDepth;
@@ -139,7 +159,7 @@ private:
     buindex m_maxVertice;
     buindex m_maxTriangles;
 
-    buindex m_vertCount;
+    buindex m_vrtxCount;
 
     float m_radius;
 };
@@ -160,13 +180,13 @@ struct SubTriangle
 
     // index to first child, always has 4 children if subdivided
     trindex m_children;
-    buindex m_midVerts[3]; // Bottom, Right, Left vertices in index buffer
+    buindex m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
     buindex m_index; // to index buffer
 
     // Data used when chunked
     chindex m_chunk; // Index to chunk. (First triangle ever chunked will be 0)
-    buindex m_chunkIndex; // Index to index data in the index buffer
-    buindex m_chunkVerts; // Index to vertex data
+    buindex m_chunkIndx; // Index to index data in the index buffer
+    buindex m_chunkVrtx; // Index to vertex data
 };
 
 }

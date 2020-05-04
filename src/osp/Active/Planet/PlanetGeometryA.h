@@ -9,18 +9,37 @@
 namespace osp
 {
 
-
+struct UpdateRange;
 
 static constexpr std::uint8_t gc_triangleMaskSubdivided = 0b0001;
 static constexpr std::uint8_t gc_triangleMaskChunked    = 0b0010;
 
 
-// Similar to urho-osp PlanetWrenderer.cpp
+// based on urho-osp PlanetWrenderer.cpp
+// variable names changed:
+// m_chunkCount           -> m_chunkCount
+// m_chunkIndDomain       -> m_chunkToTri
+// m_chunkVertFree        -> m_vrtxFree
+// m_chunkVertFreeShared  -> m_vrtxSharedFree
+// m_chunkVertUsers       -> m_vrtxSharedUsers
+// m_chunkSharedIndices   -> m_indToShared
+// m_chunkVertCountShared -> m_vrtxSharedCount
+// m_chunkMaxVert         -> m_vrtxMax
+// m_chunkMaxVertShared   -> m_vrtxSharedMax
+// m_maxChunks            -> m_chunkMax
+// m_chunkAreaThreshold   -> m_chunkAreaThreshold
+// m_chunkResolution      -> m_chunkWidth
+// m_chunkVertsPerSide    -> m_chunkWidthB
+// m_chunkSharedCount     -> m_vrtxSharedPerChunk
+// m_chunkSize            -> m_vrtxPerChunk
+// m_chunkSizeInd         -> m_indPerChunk
+
 class PlanetGeometryA
 {
 
 
 public:
+
     PlanetGeometryA() = default;
     ~PlanetGeometryA() = default;
 
@@ -37,6 +56,11 @@ public:
      * Print out information on vertice count, chunk count, etc...
      */
     void log_stats() const;
+
+    std::vector<float> const& get_vertex_buffer() { return m_vrtxBuffer; }
+    std::vector<unsigned> const& get_index_buffer() { return m_indxBuffer; }
+    buindex calc_index_count() { return m_chunkCount * m_indxPerChunk * 3; }
+
 
 private:
 
@@ -105,32 +129,40 @@ private:
     bool get_shared_from_tri(buindex* sharedIndex, const SubTriangle& tri,
                              unsigned side, float pos) const;
 
+
+    // 6 components per vertex
+    // PosX, PosY, PosZ, NormX, NormY, NormZ
+    int m_vrtxSize = 6;
+    int m_vrtxCompOffsetPos = 0;
+    int m_vrtxCompOffsetNrm = 3;
+
     std::shared_ptr<IcoSphereTree> m_icoTree;
-    //std::shared_ptr<Urho3D::IndexBuffer> m_indBufChunk;
-    //std::shared_ptr<Urho3D::VertexBuffer> m_chunkVertBuf;
+    std::vector<unsigned> m_indxBuffer;
+    std::vector<float> m_vrtxBuffer;
 
     chindex m_chunkCount; // How many chunks there are right now
 
-    std::vector<trindex> m_chunkIndDomain; // Maps chunks to triangles
+    std::vector<trindex> m_chunkToTri; // Maps chunks to triangles
     // Spots in the index buffer that want to die
     //Urho3D::PODVector<chindex> m_chunkIndDeleteMe;
-    // List of deleted chunk data to overwrite
-    std::vector<buindex> m_chunkVertFree;
-    // same as above but for individual shared verticies
-    std::vector<buindex> m_chunkVertFreeShared;
 
-    // it's impossible for a vertex to have more than 6 users
+    // List of deleted chunk data to overwrite
+    std::vector<buindex> m_vrtxFree;
+    // same as above but for individual shared verticies
+    std::vector<buindex> m_vrtxSharedFree;
+
+    // it's impossible for a shared vertex to have more than 6 users
     // Delete a shared vertex when it's users goes to zero
     // And use user count to calculate normals
 
     // Count how many times each shared chunk vertex is being used
-    std::vector<uint8_t> m_chunkVertUsers;
+    std::vector<uint8_t> m_vrtxSharedUsers;
 
     // Maps shared vertex indices to the index buffer, so that shared vertices
-    // can be obtained from a chunk
-    std::vector<buindex> m_chunkSharedIndices;
+    // can be obtained from a chunk's index data
+    std::vector<buindex> m_indToShared;
 
-    buindex m_chunkVertCountShared; // Current number of shared vertices
+    buindex m_vrtxSharedCount; // Current number of shared vertices
 
     float m_cameraDist;
     float m_threshold;
@@ -138,19 +170,20 @@ private:
     // Approx. screen area a triangle can take before it should be subdivided
     float m_subdivAreaThreshold = 0.02f;
 
-    // Preferred total size of chunk vertex buffer (m_chunkVertBuf)
-    buindex m_chunkMaxVert;
-    // How much is reserved for shared vertices
-    buindex m_chunkMaxVertShared;
-    chindex m_maxChunks; // Max number of chunks
+    // Preferred total size of chunk vertex buffer (m_vertBuffer)
+    buindex m_vrtxMax;
+    // How much of m_vertBuffer is reserved for shared vertices
+    buindex m_vrtxSharedMax;
+    chindex m_chunkMax; // Max number of chunks
 
     // How much screen area a triangle can take before it should be chunked
     float m_chunkAreaThreshold = 0.04f;
-    unsigned m_chunkResolution = 31; // How many vertices wide each chunk is
-    unsigned m_chunkVertsPerSide; // = m_chunkResolution - 1
-    unsigned m_chunkSharedCount; // How many shared verticies per chunk
-    unsigned m_chunkSize; // How many vertices there are in each chunk
-    unsigned m_chunkSizeInd; // How many triangles in each chunk
+
+    unsigned m_chunkWidth; // How many vertices wide each chunk is
+    unsigned m_chunkWidthB; // = m_chunkWidth - 1
+    unsigned m_vrtxSharedPerChunk; // How many shared verticies per chunk
+    unsigned m_vrtxPerChunk; // How many vertices there are in each chunk
+    unsigned m_indxPerChunk; // How many triangles in each chunk
 
     // Not implented, for something like running a server
     //
@@ -162,7 +195,7 @@ private:
     // In m_chunkVertBuf:
     // [shared vertex data, shared vertices]
     //                     ^               ^
-    //        (m_chunkMaxVertShared)    (m_chunkMaxVert)
+    //        (m_vrtxSharedMax)    (m_chunkMaxVert)
 
     // if chunk resolution is 16, then...
     // Chunks are triangles of 136 vertices (m_chunkSize)
@@ -173,5 +206,10 @@ private:
 
 };
 
+struct UpdateRange
+{
+    buindex m_start;
+    buindex m_end;
+};
 
 }

@@ -17,6 +17,8 @@ void IcoSphereTree::initialize(float radius)
     m_maxVertice = 512;
     m_maxTriangles = 256;
 
+    m_radius = radius;
+
     // Create an Icosahedron. Blender style, so there's a vertex directly on
     // top and directly on the bottom. Basicly, a sandwich of two pentagons,
     // rotated 180 apart from each other, and each 1/sqrt(5) above and below
@@ -56,15 +58,17 @@ void IcoSphereTree::initialize(float radius)
 
     using std::sqrt;
 
-    float scl = radius; // scale
-    float pnt = scl * (2.0f/5.0f * sqrt(5.0f));
-    float hei = scl * (1.0f / sqrt(5.0f));
-    float cxA = scl * ( 1.0f/2.0f - sqrt(5.0f)/10.0f );
-    float cxB = scl * ( 1.0f/2.0f + sqrt(5)/10.0f );
-    float syA = scl * ( 1.0f/10.0f * sqrt( 10.0f*(5.0f + sqrt(5.0f)) ) );
-    float syB = scl * ( 1.0f/10.0f * sqrt( 10.0f*(5.0f - sqrt(5.0f)) ) );
+    constexpr float scl = 8.0f; // scale
+    constexpr float pnt = scl * ( 2.0f/5.0f * sqrt(5.0f) );
+    constexpr float hei = scl * ( 1.0f / sqrt(5.0f) );
+    constexpr float cxA = scl * ( 1.0f/2.0f - sqrt(5.0f)/10.0f );
+    constexpr float cxB = scl * ( 1.0f/2.0f + sqrt(5)/10.0f );
+    constexpr float syA = scl * ( 1.0f/10.0f
+                                  * sqrt( 10.0f*(5.0f + sqrt(5.0f)) ) );
+    constexpr float syB = scl * ( 1.0f/10.0f
+                                  * sqrt( 10.0f*(5.0f - sqrt(5.0f)) ) );
 
-    float icosahedronVerts[] =
+    constexpr float icosahedronVerts[] =
     {
         0.0f,   0.0f,    scl, // top point
 
@@ -84,20 +88,73 @@ void IcoSphereTree::initialize(float radius)
     };
 
     // Reserve some space on the vertex buffer
-    m_vertBuf.resize(m_maxVertice * m_vertCompCount);
+    m_vrtxBuf.resize(m_maxVertice * m_vrtxSize);
 
-    m_vertBuf.assign(icosahedronVerts,
-                     icosahedronVerts + (gc_icosahedronVertCount * 3));
+    float radiusScaleFactor = radius / scl;
+    int icoCount = 0;
 
-    for (int i = 0; i < gc_icosahedronVertCount * 3; i += 3)
+    // Add to vertex buffer, along with normals
+    for (int i = 0; i < gc_icosahedronVertCount * m_vrtxSize;
+         i += m_vrtxSize)
     {
-        std::cout << "(" << m_vertBuf[i] << ", "
-                         << m_vertBuf[i + 1] << ", "
-                         <<  m_vertBuf[i + 2] << ") "
-                  << "mag: " << sqrt(m_vertBuf[i]*m_vertBuf[i]
-                                     + m_vertBuf[i+1]*m_vertBuf[i+1]
-                                     + m_vertBuf[i+2]*m_vertBuf[i+2])
+
+        // Add vertex data
+        m_vrtxBuf[i + m_vrtxCompOffsetPos + 0]
+                = icosahedronVerts[icoCount + 0] * radiusScaleFactor;
+        m_vrtxBuf[i + m_vrtxCompOffsetPos + 1]
+                = icosahedronVerts[icoCount + 1] * radiusScaleFactor;
+        m_vrtxBuf[i + m_vrtxCompOffsetPos + 2]
+                = icosahedronVerts[icoCount + 2] * radiusScaleFactor;
+
+        // Add normal data (just a normalized vertex)
+        m_vrtxBuf[i + m_vrtxCompOffsetNrm + 0]
+                = icosahedronVerts[icoCount + 0] / scl;
+        m_vrtxBuf[i + m_vrtxCompOffsetNrm + 1]
+                = icosahedronVerts[icoCount + 1] / scl;
+        m_vrtxBuf[i + m_vrtxCompOffsetNrm + 2]
+                = icosahedronVerts[icoCount + 2] / scl;
+
+
+
+        std::cout << "(" << m_vrtxBuf[i] << ", "
+                         << m_vrtxBuf[i + 1] << ", "
+                         <<  m_vrtxBuf[i + 2] << ") "
+                  << "mag: " << sqrt(m_vrtxBuf[i]*m_vrtxBuf[i]
+                                     + m_vrtxBuf[i+1]*m_vrtxBuf[i+1]
+                                     + m_vrtxBuf[i+2]*m_vrtxBuf[i+2])
                   << "\n";
+
+        icoCount += 3;
+    }
+
+
+    // Initialize first 20 triangles, indices from sc_icoTemplateTris
+    for (int i = 0; i < gc_icosahedronFaceCount; i ++)
+    {
+        // Set triangles
+        SubTriangle tri;
+
+        // indices were already calculated beforehand
+        set_verts(tri,
+                  sc_icoTemplateTris[i * 3 + 0] * m_vrtxSize
+                                                + m_vrtxCompOffsetPos,
+                  sc_icoTemplateTris[i * 3 + 1] * m_vrtxSize
+                                                + m_vrtxCompOffsetPos,
+                  sc_icoTemplateTris[i * 3 + 2] * m_vrtxSize
+                                                + m_vrtxCompOffsetPos);
+
+        // which triangles neighboor which were calculated beforehand too
+        set_neighbours(tri,
+                       sc_icoTemplateneighbours[i * 3 + 0],
+                       sc_icoTemplateneighbours[i * 3 + 1],
+                       sc_icoTemplateneighbours[i * 3 + 2]);
+
+        tri.m_bitmask = 0;
+        tri.m_depth = 0;
+        //calculate_center(tri);
+        m_triangles.push_back(std::move(tri));
+        //if (i != 0)
+        //set_visible(i, true);
     }
 
 }
@@ -113,8 +170,8 @@ void IcoSphereTree::set_neighbours(SubTriangle& tri,
     tri.m_neighbours[2] = lft;
 }
 
-void IcoSphereTree::set_verts(SubTriangle& tri, trindex top,
-                              trindex lft, trindex rte)
+void IcoSphereTree::set_verts(SubTriangle& tri, buindex top,
+                              buindex lft, buindex rte)
 {
     tri.m_corners[0] = top;
     tri.m_corners[1] = lft;

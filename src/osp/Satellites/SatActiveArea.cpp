@@ -91,7 +91,7 @@ int area_load_planet(SatActiveArea& area, SatelliteObject& loadMe)
 
     PlanetData dummy;
 
-    new FtrPlanet(*obj, dummy);
+    new FtrPlanet(*obj, dummy, area. get_drawables());
 
     return 0;
 }

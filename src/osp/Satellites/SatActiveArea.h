@@ -98,6 +98,8 @@ public:
 
     Scene3D& get_scene() { return m_scene; }
 
+    Magnum::SceneGraph::DrawableGroup3D& get_drawables() { return m_drawables; }
+
     void input_key_press(Application::KeyEvent& event);
     void input_key_release(Application::KeyEvent& event);
 
