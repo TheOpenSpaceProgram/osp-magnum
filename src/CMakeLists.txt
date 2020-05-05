@@ -4,7 +4,7 @@ find_package(Magnum REQUIRED
     Shaders
     MeshTools
     Primitives
-    SceneGraph
+    #SceneGraph
     Trade
     Sdl2Application
     AnyImageImporter
@@ -72,6 +72,9 @@ include_directories(../3rdparty/newton-dynamics/sdk/dVehicle/dPlayerController)
 include_directories(../3rdparty/newton-dynamics/sdk/dVehicle/dMultiBodyVehicle)
 
 
+# Include ENTT (header only lib)
+include_directories(../3rdparty/entt/src)
+
 
 add_executable(osp-magnum ${CPP_FILES})
 
@@ -86,7 +89,7 @@ target_link_libraries(osp-magnum PRIVATE
     Magnum::Magnum
     Magnum::MeshTools
     Magnum::Primitives
-    Magnum::SceneGraph
+    #Magnum::SceneGraph
     Magnum::Shaders
     Magnum::Trade
     Magnum::AnyImageImporter

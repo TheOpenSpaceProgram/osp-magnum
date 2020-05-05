@@ -4,19 +4,20 @@
 
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Mesh.h>
+#include <Magnum/Shaders/Phong.h>
 #include <Magnum/PixelFormat.h>
-#include <Magnum/SceneGraph/Camera.h>
+//#include <Magnum/SceneGraph/Camera.h>
 
 #include <Newton.h>
 
 #include "../../types.h"
 #include "../Satellite.h"
-#include "../scene.h"
+//#include "../scene.h"
 
 #include "../Resource/Package.h"
 #include "../Resource/PartPrototype.h"
 
-#include "../Active/FtrNewtonBody.h"
+//#include "../Active/FtrNewtonBody.h"
 
 namespace osp
 {
@@ -32,7 +33,7 @@ typedef int (*LoadStrategy)(SatActiveArea& area, SatelliteObject& loadMe);
 
 using Magnum::Platform::Application;
 
-class SatActiveArea : public SatelliteObject, public GroupFtrNewtonBody
+class SatActiveArea : public SatelliteObject//, public GroupFtrNewtonBody
 {
 
     friend OSPMagnum;
@@ -86,7 +87,7 @@ public:
      * @param part
      * @return Pointer to object created
      */
-    Object3D* part_instantiate(PartPrototype& part);
+    //Object3D* part_instantiate(PartPrototype& part);
 
     /**
      * Attempt to load a satellite
@@ -96,9 +97,9 @@ public:
 
     bool is_loaded_active() { return m_loadedActive; }
 
-    Scene3D& get_scene() { return m_scene; }
+    //Scene3D& get_scene() { return m_scene; }
 
-    Magnum::SceneGraph::DrawableGroup3D& get_drawables() { return m_drawables; }
+    //Magnum::SceneGraph::DrawableGroup3D& get_drawables() { return m_drawables; }
 
     void input_key_press(Application::KeyEvent& event);
     void input_key_release(Application::KeyEvent& event);
@@ -114,12 +115,12 @@ private:
     std::map<Id const*, LoadStrategy> m_loadFunctions;
 
     bool m_loadedActive;
-    Scene3D m_scene;
-    Magnum::SceneGraph::Camera3D* m_camera;
-    Magnum::SceneGraph::DrawableGroup3D m_drawables;
+    //Scene3D m_scene;
+    //Magnum::SceneGraph::Camera3D* m_camera;
+    //Magnum::SceneGraph::DrawableGroup3D m_drawables;
 
     // temporary test variables only
-    Object3D* m_partTest;
+    //Object3D* m_partTest;
     Magnum::GL::Mesh *m_bocks;
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
 

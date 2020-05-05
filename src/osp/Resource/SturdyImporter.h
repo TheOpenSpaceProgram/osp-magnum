@@ -8,7 +8,7 @@
 #include "PartPrototype.h"
 
 #include "../../types.h"
-#include "../scene.h"
+//#include "../scene.h"
 
 namespace osp
 {

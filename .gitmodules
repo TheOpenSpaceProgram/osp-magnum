@@ -16,3 +16,6 @@
 [submodule "3rdparty/newton-dynamics"]
 	path = 3rdparty/newton-dynamics
 	url = https://github.com/MADEAPPS/newton-dynamics.git
+[submodule "3rdparty/entt"]
+	path = 3rdparty/entt
+	url = https://github.com/skypjack/entt.git

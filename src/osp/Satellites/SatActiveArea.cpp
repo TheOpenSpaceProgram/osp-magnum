@@ -12,9 +12,11 @@
 #include "SatVehicle.h"
 #include "SatPlanet.h"
 
-#include "../Active/FtrPlanet.h"
-#include "../Active/FtrNewtonBody.h"
-#include "../Active/FtrVehicle.h"
+#include <entt/entity/registry.hpp>
+
+//#include "../Active/FtrPlanet.h"
+//#include "../Active/FtrNewtonBody.h"
+//#include "../Active/FtrVehicle.h"
 
 #include "../Resource/SturdyImporter.h"
 #include "../Resource/PlanetData.h"
@@ -41,6 +43,7 @@ struct InputControl
 
 int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 {
+    /*
     std::cout << "loadin a vehicle!\n";
 
     // Get the needed variables
@@ -71,12 +74,14 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 
         Object3D* partObject = area.part_instantiate(*proto);
 
+        //partObject->
+
         // set the transformation
         partObject->setTransformation(
                 Matrix4::from(partBp.m_rotation.toMatrix(),
                               partBp.m_translation)
                 * Matrix4::scaling(partBp.m_scale));
-    }
+    }*/
     return 0;
 }
 
@@ -84,6 +89,7 @@ int area_load_planet(SatActiveArea& area, SatelliteObject& loadMe)
 {
     std::cout << "loadin a planet!\n";
 
+    /*
     // Get the needed variables
     SatPlanet& planet = static_cast<SatPlanet&>(loadMe);
 
@@ -92,7 +98,7 @@ int area_load_planet(SatActiveArea& area, SatelliteObject& loadMe)
     PlanetData dummy;
 
     new FtrPlanet(*obj, dummy, area. get_drawables());
-
+    */
     return 0;
 }
 
@@ -138,19 +144,19 @@ int SatActiveArea::activate()
 
     // Temporary: draw a spinning rectangular prisim
 
-    //m_bocks = &(Magnum::GL::Mesh(Magnum::MeshTools::compile(
-    //                                    Magnum::Primitives::cubeSolid())));
+    m_bocks = (new Magnum::GL::Mesh(Magnum::MeshTools::compile(
+                                        Magnum::Primitives::cubeSolid())));
 
-    Object3D *cameraObj = new Object3D{&m_scene};
-    (*cameraObj).translate(Magnum::Vector3::zAxis(100.0f));
+    //Object3D *cameraObj = new Object3D{&m_scene};
+    //(*cameraObj).translate(Magnum::Vector3::zAxis(100.0f));
     //            .rotate();
-    m_camera = new Magnum::SceneGraph::Camera3D(*cameraObj);
-    (*m_camera)
-        .setAspectRatioPolicy(Magnum::SceneGraph::AspectRatioPolicy::Extend)
-        .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
-        .setViewport(Magnum::GL::defaultFramebuffer.viewport().size());
+    //m_camera = new Magnum::SceneGraph::Camera3D(*cameraObj);
+    //(*m_camera)
+    //    .setAspectRatioPolicy(Magnum::SceneGraph::AspectRatioPolicy::Extend)
+    //    .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
+    //    .setViewport(Magnum::GL::defaultFramebuffer.viewport().size());
 
-    cameraObj->setTransformation( Matrix4::translation(Vector3(0, 0, 5)));
+    //cameraObj->setTransformation( Matrix4::translation(Vector3(0, 0, 5)));
 
     return 0;
 }
@@ -219,24 +225,24 @@ void SatActiveArea::draw_gl()
 
     // Temporary: draw the spinning rectangular prisim
 
-    //static Deg lazySpin;
-    //lazySpin += 1.0_degf;
+    static Deg lazySpin;
+    lazySpin += 1.0_degf;
 
-    //Matrix4 ttt;
-    //ttt = Matrix4::translation(Vector3(0, 0, -5))
-    //    * Matrix4::rotationX(lazySpin)
-    //    * Matrix4::scaling({1.0f, 1.0f, 1.0f});
+    Matrix4 ttt;
+    ttt = Matrix4::translation(Vector3(0, 0, -5))
+        * Matrix4::rotationX(lazySpin)
+        * Matrix4::scaling({1.0f, 1.0f, 1.0f});
 
-    //(*m_shader)
-    //    .setDiffuseColor(0x67ff00_rgbf)
-    //    .setAmbientColor(0x111111_rgbf)
-    //    .setSpecularColor(0x330000_rgbf)
-    //    .setLightPosition({10.0f, 15.0f, 5.0f})
-    //    .setTransformationMatrix(ttt)
-    //    .setProjectionMatrix(m_camera->projectionMatrix())
-    //    .setNormalMatrix(ttt.normalMatrix());
+    (*m_shader)
+        .setDiffuseColor(0x67ff00_rgbf)
+        .setAmbientColor(0x111111_rgbf)
+        .setSpecularColor(0x330000_rgbf)
+        .setLightPosition({10.0f, 15.0f, 5.0f})
+        .setTransformationMatrix(ttt)
+        .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
+        .setNormalMatrix(ttt.normalMatrix());
 
-    //m_bocks->draw(*m_shader);
+    m_bocks->draw(*m_shader);
 
     //m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
 
@@ -244,10 +250,10 @@ void SatActiveArea::draw_gl()
     //                        Matrix4::translation(Vector3(0, 0, 5)));
 
 
-    m_camera->draw(m_drawables);
+    //m_camera->draw(m_drawables);
 }
 
-
+/*
 Object3D* SatActiveArea::part_instantiate(PartPrototype& part)
 {
 
@@ -358,7 +364,7 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part)
     // return root object
     return newObjects[0];
 }
-
+*/
 
 int SatActiveArea::load_satellite(Satellite& sat)
 {
@@ -391,6 +397,7 @@ void SatActiveArea::update_physics(float deltaTime)
 {
     // debug navigation
 
+    /*
     Object3D &cameraObj = static_cast<Object3D&>(m_camera->object());
     float spd = 0.05f;
 
@@ -424,6 +431,8 @@ void SatActiveArea::update_physics(float deltaTime)
         dFloat force[3] = {0, -1.0, 0};
         NewtonBodySetForce(nwtBodies[i].get_body(), force);
     }
+
+    */
 
 }
 

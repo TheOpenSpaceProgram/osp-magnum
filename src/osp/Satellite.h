@@ -29,8 +29,6 @@ public:
 
     virtual Id const& get_id() = 0;
 
-    virtual int on_load() { return 0; }
-
     virtual bool is_loadable() const { return false; }
 
 

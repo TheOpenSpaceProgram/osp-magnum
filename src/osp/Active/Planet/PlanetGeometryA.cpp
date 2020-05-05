@@ -15,7 +15,7 @@ void PlanetGeometryA::initialize(float radius)
     m_chunkMax = 100;
 
     m_chunkAreaThreshold = 0.04f;
-    m_chunkWidth = 31;
+    m_chunkWidth = 5;
     m_chunkWidthB = m_chunkWidth - 1; // used often in many calculations
 
     m_icoTree = std::make_shared<IcoSphereTree>();
@@ -277,7 +277,7 @@ void PlanetGeometryA::chunk_add(trindex t)
                 // side 1: Right
                 // side 2: Left
 
-                float pos = 1.0f - float(sideInd + 1) / float(m_chunkWidth);
+                float pos = 1.0f - float(sideInd + 1.0f) / float(m_chunkWidth);
 
                 // Take a vertex from a neighbour, if possible
                 if (get_shared_from_tri(&vertIndex, *neighbours[side],
@@ -371,7 +371,7 @@ void PlanetGeometryA::chunk_add(trindex t)
             else
             {
                 // up pointing triangle
-                // top, left, right
+                // top, left, rightkn
                 chunkIndData[i + 0]
                         = indices[get_index_ringed(x / 2, y)];
                 chunkIndData[i + 1]
@@ -435,7 +435,7 @@ bool PlanetGeometryA::get_shared_from_tri(buindex* sharedIndex,
         // a number from 0 to 8
 
         buindex localIndex = side * m_chunkWidthB
-                                + int(pos * float(m_chunkWidth));
+                                + std::round(pos * float(m_chunkWidth));
 
         // Loop around when value gets too high, because it's a triangle
         localIndex %= m_vrtxSharedPerChunk;
