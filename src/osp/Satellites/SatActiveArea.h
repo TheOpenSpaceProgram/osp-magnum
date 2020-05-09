@@ -8,7 +8,6 @@
 #include <Magnum/PixelFormat.h>
 //#include <Magnum/SceneGraph/Camera.h>
 
-#include <Newton.h>
 
 #include "../../types.h"
 #include "../Satellite.h"
@@ -16,6 +15,8 @@
 
 #include "../Resource/Package.h"
 #include "../Resource/PartPrototype.h"
+
+#include "../Active/ActiveScene.h"
 
 //#include "../Active/FtrNewtonBody.h"
 
@@ -73,7 +74,7 @@ public:
      */
     void update_physics(float deltaTime);
 
-    NewtonWorld* get_newton_world() { return m_nwtWorld; }
+    //NewtonWorld* get_newton_world() { return m_nwtWorld; }
 
     /**
      * Add a loading strategy to add support for loading a type of satellite 
@@ -124,11 +125,11 @@ private:
     Magnum::GL::Mesh *m_bocks;
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
 
-    // Newton dynamics stuff
-    // note: can be null for physics-less view-only areas
-    NewtonWorld* const m_nwtWorld;
+    std::shared_ptr<ActiveScene> m_scene;
 
     //GroupFtrNewtonBody m_newtonBodies;
+
+
 };
 
 

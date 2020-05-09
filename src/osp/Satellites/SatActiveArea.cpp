@@ -12,7 +12,6 @@
 #include "SatVehicle.h"
 #include "SatPlanet.h"
 
-#include <entt/entity/registry.hpp>
 
 //#include "../Active/FtrPlanet.h"
 //#include "../Active/FtrNewtonBody.h"
@@ -103,8 +102,9 @@ int area_load_planet(SatActiveArea& area, SatelliteObject& loadMe)
 }
 
 
-SatActiveArea::SatActiveArea() : SatelliteObject(), m_nwtWorld(NewtonCreate())
+SatActiveArea::SatActiveArea() : SatelliteObject(), m_loadedActive(false)//, m_nwtWorld(NewtonCreate())
 {
+
     // use area_load_vehicle to load SatVechicles
     load_func_add<SatVehicle>(area_load_vehicle);
 
@@ -118,13 +118,21 @@ SatActiveArea::~SatActiveArea()
     std::cout << "Active Area destroyed\n";
 
     // Clean up newton dynamics stuff
-    NewtonDestroyAllBodies(m_nwtWorld);
-    NewtonDestroy(m_nwtWorld);
+    //NewtonDestroyAllBodies(m_nwtWorld);
+    //NewtonDestroy(m_nwtWorld);
 }
 
 
 int SatActiveArea::activate()
 {
+    if (m_loadedActive)
+    {
+        return -1;
+    }
+
+    // lazy way to set name
+    m_sat->set_name("ActiveArea");
+
     // when switched to. Active areas can only be loaded by the universe.
     // why, and how would an active area load another active area?
     m_loadedActive = true;
@@ -147,6 +155,24 @@ int SatActiveArea::activate()
     m_bocks = (new Magnum::GL::Mesh(Magnum::MeshTools::compile(
                                         Magnum::Primitives::cubeSolid())));
 
+    m_scene = std::make_shared<ActiveScene>();
+
+    // create debug entities that have a transform and box model
+    entt::entity aEnt = m_scene->hier_create_child(m_scene->hier_get_root(),
+                                                   "Entity A");
+    CompTransform& aTransform
+            = m_scene->get_registry().emplace<CompTransform>(aEnt);
+    CompDrawableDebug& aBocks
+            = m_scene->get_registry().emplace<CompDrawableDebug>(aEnt,
+                    m_bocks, m_shader.get(), 0x67FF00_rgbf);
+
+    entt::entity bEnt = m_scene->hier_create_child(aEnt, "Entity B");
+    CompTransform& bTransform
+            = m_scene->get_registry().emplace<CompTransform>(bEnt);
+    CompDrawableDebug& bBocks
+            = m_scene->get_registry().emplace<CompDrawableDebug>(bEnt,
+                    m_bocks, m_shader.get(), 0xEE0201_rgbf);
+
     //Object3D *cameraObj = new Object3D{&m_scene};
     //(*cameraObj).translate(Magnum::Vector3::zAxis(100.0f));
     //            .rotate();
@@ -165,68 +191,34 @@ int SatActiveArea::activate()
 void SatActiveArea::draw_gl()
 {
 
-    // lazy way to set name
-    m_sat->set_name("ActiveArea");
-
-    // scan for nearby satellites, partially remporary
-
-    Universe& u = *(m_sat->get_universe());
-    std::vector<Satellite>& satellites = u.get_sats();
-
-    for (Satellite& sat : satellites)
-    {
-        if (SatelliteObject* obj = sat.get_object())
-        {
-            //std::cout << "obj: " << obj->get_id().m_name
-            //          << ", " << (void*)(&(obj->get_id())) << "\n";
-        }
-        else
-        {
-            // Satellite has no object, it's empty
-            continue;
-        }
-
-        // if satellite is not loadable or is already loaded
-        if (!sat.is_loadable() || sat.get_loader())
-        {
-            continue;
-        }
-
-
-        // ignore self (unreachable as active areas are unloadable)
-        //if (&sat == m_sat)
-        //{
-        //    continue;
-        //}
-
-        // test distance to satellite
-        // btw: precision is 10
-        Vector3s relativePos = sat.position_relative_to(*m_sat);
-        //std::cout << "nearby sat: " << sat.get_name() << " dot: " << relativePos.dot() << " satrad: " << sat.get_load_radius() << " arearad: " << m_sat->get_load_radius() << "\n";
-
-        if (relativePos.dot()
-                > Magnum::Math::pow(sat.get_load_radius()
-                                        + m_sat->get_load_radius(), 2.0f))
-        {
-            continue;
-        }
-
-        //std::cout << "is near!\n";
-
-        // Satellite is near! Attempt to load it
-
-        load_satellite(sat);
-    }
-
     using namespace Magnum;
+
+
+    // temporary stuff
+    static Deg lazySpin;
+    lazySpin += 3.0_degf;
+
+    CompHierarchy& root = m_scene->get_registry().get<CompHierarchy>(m_scene->hier_get_root());
+
+    // root's child is aEnt from activate()
+    CompTransform& aTransform = m_scene->get_registry().get<CompTransform>(root.m_childFirst);
+    CompHierarchy& aHierarchy = m_scene->get_registry().get<CompHierarchy>(root.m_childFirst);
+    aTransform.m_transform = Matrix4::rotationY(1.0_degf) * Matrix4::rotationZ(0.1_degf) * aTransform.m_transform;
+
+    // root's child child is bEnt from activate();
+    CompTransform& bTransform = m_scene->get_registry().get<CompTransform>(aHierarchy.m_childFirst);
+    bTransform.m_transform = Matrix4::translation(Vector3(0.0f, 2.0f * Math::sin(lazySpin), 0.0f))
+                               * Matrix4::scaling({0.5f, 0.5f, 2.0f});;
+
+    m_scene->update_hierarchy_transforms();
+
 
     GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
     GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
 
     // Temporary: draw the spinning rectangular prisim
 
-    static Deg lazySpin;
-    lazySpin += 1.0_degf;
+
 
     Matrix4 ttt;
     ttt = Matrix4::translation(Vector3(0, 0, -5))
@@ -242,7 +234,9 @@ void SatActiveArea::draw_gl()
         .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
         .setNormalMatrix(ttt.normalMatrix());
 
-    m_bocks->draw(*m_shader);
+    //m_bocks->draw(*m_shader);
+
+    m_scene->draw_meshes();
 
     //m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
 
@@ -395,6 +389,57 @@ int SatActiveArea::load_satellite(Satellite& sat)
 
 void SatActiveArea::update_physics(float deltaTime)
 {
+
+    // scan for nearby satellites, partially tremporary
+
+    Universe& u = *(m_sat->get_universe());
+    std::vector<Satellite>& satellites = u.get_sats();
+
+    for (Satellite& sat : satellites)
+    {
+        if (SatelliteObject* obj = sat.get_object())
+        {
+            //std::cout << "obj: " << obj->get_id().m_name
+            //          << ", " << (void*)(&(obj->get_id())) << "\n";
+        }
+        else
+        {
+            // Satellite has no object, it's empty
+            continue;
+        }
+
+        // if satellite is not loadable or is already loaded
+        if (!sat.is_loadable() || sat.get_loader())
+        {
+            continue;
+        }
+
+
+        // ignore self (unreachable as active areas are unloadable)
+        //if (&sat == m_sat)
+        //{
+        //    continue;
+        //}
+
+        // test distance to satellite
+        // btw: precision is 10
+        Vector3s relativePos = sat.position_relative_to(*m_sat);
+        //std::cout << "nearby sat: " << sat.get_name() << " dot: " << relativePos.dot() << " satrad: " << sat.get_load_radius() << " arearad: " << m_sat->get_load_radius() << "\n";
+
+        if (relativePos.dot()
+                > Magnum::Math::pow(sat.get_load_radius()
+                                        + m_sat->get_load_radius(), 2.0f))
+        {
+            continue;
+        }
+
+        //std::cout << "is near!\n";
+
+        // Satellite is near! Attempt to load it
+
+        load_satellite(sat);
+    }
+
     // debug navigation
 
     /*
