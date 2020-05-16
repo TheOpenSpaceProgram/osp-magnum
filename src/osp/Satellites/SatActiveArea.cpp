@@ -42,8 +42,13 @@ struct InputControl
 
 int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 {
-    /*
+
     std::cout << "loadin a vehicle!\n";
+    
+    // Convert position of the satellite o position in scene
+    Vector3 positionInScene = loadMe.get_satellite()->position_relative_to(*(area.get_satellite())).to_meters();
+
+    std::cout << "relative distance: " << positionInScene.length() << "\n";
 
     // Get the needed variables
     SatVehicle& vehicle = static_cast<SatVehicle&>(loadMe);
@@ -56,7 +61,7 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 
     // List of parts, and how they're arranged
     std::vector<PartBlueprint>& parts = vehicleData.get_blueprints();
-
+    
     // Loop through blueprints
     for (PartBlueprint& partBp : parts)
     {
@@ -71,16 +76,17 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
             return -1;
         }
 
-        Object3D* partObject = area.part_instantiate(*proto);
+        entt::entity partEntity = area.part_instantiate(*proto);
 
-        //partObject->
+        CompTransform& partTransform = area.get_scene()->get_registry()
+                                            .get<CompTransform>(partEntity);
 
         // set the transformation
-        partObject->setTransformation(
-                Matrix4::from(partBp.m_rotation.toMatrix(),
-                              partBp.m_translation)
-                * Matrix4::scaling(partBp.m_scale));
-    }*/
+        partTransform.m_transform
+                = Matrix4::from(partBp.m_rotation.toMatrix(),
+                              partBp.m_translation + positionInScene)
+                * Matrix4::scaling(partBp.m_scale);
+    }
     return 0;
 }
 
@@ -158,31 +164,37 @@ int SatActiveArea::activate()
     m_scene = std::make_shared<ActiveScene>();
 
     // create debug entities that have a transform and box model
-    entt::entity aEnt = m_scene->hier_create_child(m_scene->hier_get_root(),
+    m_debug_aEnt = m_scene->hier_create_child(m_scene->hier_get_root(),
                                                    "Entity A");
     CompTransform& aTransform
-            = m_scene->get_registry().emplace<CompTransform>(aEnt);
+            = m_scene->get_registry().emplace<CompTransform>(m_debug_aEnt);
     CompDrawableDebug& aBocks
-            = m_scene->get_registry().emplace<CompDrawableDebug>(aEnt,
+            = m_scene->get_registry().emplace<CompDrawableDebug>(m_debug_aEnt,
                     m_bocks, m_shader.get(), 0x67FF00_rgbf);
 
-    entt::entity bEnt = m_scene->hier_create_child(aEnt, "Entity B");
+    entt::entity bEnt = m_scene->hier_create_child(m_debug_aEnt, "Entity B");
     CompTransform& bTransform
             = m_scene->get_registry().emplace<CompTransform>(bEnt);
     CompDrawableDebug& bBocks
             = m_scene->get_registry().emplace<CompDrawableDebug>(bEnt,
                     m_bocks, m_shader.get(), 0xEE0201_rgbf);
 
-    //Object3D *cameraObj = new Object3D{&m_scene};
-    //(*cameraObj).translate(Magnum::Vector3::zAxis(100.0f));
-    //            .rotate();
-    //m_camera = new Magnum::SceneGraph::Camera3D(*cameraObj);
-    //(*m_camera)
-    //    .setAspectRatioPolicy(Magnum::SceneGraph::AspectRatioPolicy::Extend)
-    //    .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
-    //    .setViewport(Magnum::GL::defaultFramebuffer.viewport().size());
+    // Create the camera component
+    m_camera = m_scene->hier_create_child(m_scene->hier_get_root(), "Camera");
+    CompCamera& cameraComp
+            = m_scene->get_registry().emplace<CompCamera>(m_camera);
+    CompTransform& cameraTransform
+            = m_scene->get_registry().emplace<CompTransform>(m_camera);
 
-    //cameraObj->setTransformation( Matrix4::translation(Vector3(0, 0, 5)));
+    cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 5));
+
+    cameraComp.m_viewport = Vector2(Magnum::GL::defaultFramebuffer.viewport()
+                                                                  .size());
+    cameraComp.m_far = 128.0f;
+    cameraComp.m_near = 0.125f;
+    cameraComp.m_fov = 45.0_degf;
+
+    cameraComp.calculate_projection();
 
     return 0;
 }
@@ -198,11 +210,8 @@ void SatActiveArea::draw_gl()
     static Deg lazySpin;
     lazySpin += 3.0_degf;
 
-    CompHierarchy& root = m_scene->get_registry().get<CompHierarchy>(m_scene->hier_get_root());
-
-    // root's child is aEnt from activate()
-    CompTransform& aTransform = m_scene->get_registry().get<CompTransform>(root.m_childFirst);
-    CompHierarchy& aHierarchy = m_scene->get_registry().get<CompHierarchy>(root.m_childFirst);
+    CompTransform& aTransform = m_scene->get_registry().get<CompTransform>(m_debug_aEnt);
+    CompHierarchy& aHierarchy = m_scene->get_registry().get<CompHierarchy>(m_debug_aEnt);
     aTransform.m_transform = Matrix4::rotationY(1.0_degf) * Matrix4::rotationZ(0.1_degf) * aTransform.m_transform;
 
     // root's child child is bEnt from activate();
@@ -211,7 +220,6 @@ void SatActiveArea::draw_gl()
                                * Matrix4::scaling({0.5f, 0.5f, 2.0f});;
 
     m_scene->update_hierarchy_transforms();
-
 
     GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
     GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
@@ -236,7 +244,7 @@ void SatActiveArea::draw_gl()
 
     //m_bocks->draw(*m_shader);
 
-    m_scene->draw_meshes();
+    m_scene->draw_meshes(m_camera);
 
     //m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
 
@@ -247,60 +255,68 @@ void SatActiveArea::draw_gl()
     //m_camera->draw(m_drawables);
 }
 
-/*
-Object3D* SatActiveArea::part_instantiate(PartPrototype& part)
+
+entt::entity SatActiveArea::part_instantiate(PartPrototype& part)
 {
 
     std::vector<ObjectPrototype> const& prototypes = part.get_objects();
-    std::vector<Object3D*> newObjects(prototypes.size());
+    std::vector<entt::entity> newEntities(prototypes.size());
 
-    std::cout << "size: " << newObjects.size() << "\n";
+    //std::cout << "size: " << newEntities.size() << "\n";
 
     for (int i = 0; i < prototypes.size(); i ++)
     {
-        const ObjectPrototype& current = prototypes[i];
-        Object3D *obj = new Object3D(&m_scene);
-        newObjects[i] = obj;
+        const ObjectPrototype& currentPrototype = prototypes[i];
+        entt::entity currentEnt, parentEnt;
 
-        std::cout << "objind:" << " parent: " << current.m_parentIndex << "\n";
-        std::cout << "trans: " << current.m_translation.x() << ", " << current.m_translation.y() << ", " << current.m_translation.z() << " \n";
-        std::cout << "scale: " << current.m_scale.x() << ", " << current.m_scale.y() << ", " << current.m_scale.z() << " \n";
-
-        if (current.m_parentIndex == i)
+        // Get parent
+        if (currentPrototype.m_parentIndex == i)
         {
             // if parented to self,
-            //obj->setParent(&m_scene);
+            parentEnt = m_scene->hier_get_root();
         }
         else
         {
             // since objects were loaded recursively, the parents always load
             // before their children
-            obj->setParent(newObjects[current.m_parentIndex]);
+            parentEnt = newEntities[currentPrototype.m_parentIndex];
         }
 
-        obj->setTransformation(Matrix4::from(current.m_rotation.toMatrix(),
-                                             current.m_translation)
-                               * Matrix4::scaling(current.m_scale));
+        // Create the new entity
+        currentEnt = m_scene->hier_create_child(parentEnt,
+                                                currentPrototype.m_name);
+        newEntities[i] = currentEnt;
 
-        if (current.m_type == ObjectType::MESH)
+        // Add and set transform component
+        CompTransform& currentTransform
+                = m_scene->get_registry().emplace<CompTransform>(currentEnt);
+        currentTransform.m_transform
+                = Matrix4::from(currentPrototype.m_rotation.toMatrix(),
+                                currentPrototype.m_translation)
+                * Matrix4::scaling(currentPrototype.m_scale);
+        currentTransform.m_enableFloatingOrigin = true;
+
+        if (currentPrototype.m_type == ObjectType::MESH)
         {
             using Magnum::Trade::MeshData3D;
             using Magnum::GL::Mesh;
+
+            // Current prototype is a mesh, get the mesh and add it
 
             // TODO: put package prefixes in resource path
             //       for now just get the first package
             Package& package = m_sat->get_universe()->debug_get_packges()[0];
 
             Mesh* mesh = nullptr;
-            Resource<Mesh>* meshRes
-                    = package.get_resource<Mesh>(current.m_drawable.m_mesh);
-
+            Resource<Mesh>* meshRes = package.get_resource<Mesh>(
+                                            currentPrototype.m_drawable.m_mesh);
 
             if (!meshRes)
             {
                 // Mesh isn't compiled yet, now check if mesh data exists
                 std::string const& meshName
-                        = part.get_strings()[current.m_drawable.m_mesh];
+                        = part.get_strings()
+                                    [currentPrototype.m_drawable.m_mesh];
 
                 Resource<MeshData3D>* meshDataRes
                         = package.get_resource<MeshData3D>(meshName);
@@ -313,7 +329,6 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part)
 
                     MeshData3D* meshData = &(meshDataRes->m_data);
 
-
                     Resource<Mesh> compiledMesh;
                     compiledMesh.m_data = Magnum::MeshTools::compile(*meshData);
 
@@ -325,7 +340,7 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part)
                 else
                 {
                     std::cout << "Mesh \"" << meshName << "\" doesn't exist!\n";
-                    return nullptr;
+                    return entt::null;
                 }
 
             }
@@ -339,9 +354,13 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part)
 
             // by now, the mesh should exist
 
-            new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
+            CompDrawableDebug& bBocks
+                    = m_scene->get_registry().emplace<CompDrawableDebug>(
+                        currentEnt, mesh, m_shader.get(), 0x0202EE_rgbf);
+
+            //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
         }
-        else if (current.m_type == ObjectType::COLLIDER)
+        else if (currentPrototype.m_type == ObjectType::COLLIDER)
         {
             //new FtrNewtonBody(*obj, *this);
             // TODO collision shape!
@@ -353,12 +372,12 @@ Object3D* SatActiveArea::part_instantiate(PartPrototype& part)
     // first element is 100% going to be the root object
 
     // Temporary: add a rigid body root
-    new FtrNewtonBody(*(newObjects[0]), *this);
+    //new FtrNewtonBody(*(newObjects[0]), *this);
 
     // return root object
-    return newObjects[0];
+    return newEntities[0];
 }
-*/
+
 
 int SatActiveArea::load_satellite(Satellite& sat)
 {
@@ -423,17 +442,20 @@ void SatActiveArea::update_physics(float deltaTime)
 
         // test distance to satellite
         // btw: precision is 10
-        Vector3s relativePos = sat.position_relative_to(*m_sat);
+        Vector3 relativePos = sat.position_relative_to(*m_sat).to_meters();
         //std::cout << "nearby sat: " << sat.get_name() << " dot: " << relativePos.dot() << " satrad: " << sat.get_load_radius() << " arearad: " << m_sat->get_load_radius() << "\n";
 
-        if (relativePos.dot()
-                > Magnum::Math::pow(sat.get_load_radius()
-                                        + m_sat->get_load_radius(), 2.0f))
+        using Magnum::Math::pow;
+
+        // ignore if too far
+        if (relativePos.dot() > pow(sat.get_load_radius()
+                                     + m_sat->get_load_radius(), 2.0f))
         {
             continue;
         }
 
-        //std::cout << "is near!\n";
+        std::cout << "is near! dist: " << relativePos.length() << "/"
+                  << (sat.get_load_radius() + m_sat->get_load_radius()) << "\n";
 
         // Satellite is near! Attempt to load it
 
@@ -442,17 +464,17 @@ void SatActiveArea::update_physics(float deltaTime)
 
     // debug navigation
 
-    /*
-    Object3D &cameraObj = static_cast<Object3D&>(m_camera->object());
+
+    CompTransform& cameraTransform
+            = m_scene->get_registry().get<CompTransform>(m_camera);
     float spd = 0.05f;
 
     Vector3 mvtLocal((g_debugInput.rt - g_debugInput.lf) * spd, 0.0f,
                      (g_debugInput.bk - g_debugInput.fr) * spd);
-    cameraObj.translateLocal(mvtLocal);
 
-    Vector3 mvtGlobal(0.0f, (g_debugInput.up - g_debugInput.dn) * spd, 0.0f);
-    cameraObj.translate(mvtGlobal);
+    cameraTransform.m_transform = cameraTransform.m_transform * Matrix4::translation(mvtLocal);
 
+    /*
     // update physics
     NewtonUpdate(m_nwtWorld, deltaTime);
 
@@ -476,8 +498,8 @@ void SatActiveArea::update_physics(float deltaTime)
         dFloat force[3] = {0, -1.0, 0};
         NewtonBodySetForce(nwtBodies[i].get_body(), force);
     }
-
     */
+
 
 }
 

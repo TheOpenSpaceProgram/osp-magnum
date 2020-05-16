@@ -11,6 +11,16 @@ namespace osp
 // for the 0xrrggbb_rgbf and _deg literals
 using namespace Magnum::Math::Literals;
 
+void CompCamera::calculate_projection()
+{
+
+    m_projection = Matrix4::perspectiveProjection(
+                                m_fov, m_viewport.x() / m_viewport.y(),
+                                m_near, m_far);
+}
+
+
+
 ActiveScene::ActiveScene() : m_nwtWorld(NewtonCreate()),
                              m_hierarchyDirty(false)//, m_group(m_registry.group<CompHierarchy>())
 {
@@ -33,7 +43,7 @@ ActiveScene::ActiveScene() : m_nwtWorld(NewtonCreate()),
     CompHierarchy& hierarchy = m_registry.emplace<CompHierarchy>(m_root);
     hierarchy.m_name = "Root Entity";
 
-    m_hierLevels.resize(5);
+   // m_hierLevels.resize(5);
 }
 
 ActiveScene::~ActiveScene()
@@ -85,7 +95,7 @@ void ActiveScene::hier_set_parent_child(entt::entity parent, entt::entity child)
 
 void ActiveScene::on_hierarchy_construct(entt::registry& reg, entt::entity ent)
 {
-    std::cout << "hierarchy entity constructed\n";
+    //std::cout << "hierarchy entity constructed\n";
 
     m_hierarchyDirty = true;
 }
@@ -125,9 +135,14 @@ void ActiveScene::update_hierarchy_transforms()
         m_hierarchyDirty = false;
     }
 
+    //std::cout << "size: " << group.size() << "\n";
+
+    bool translateAll = !(m_floatingOriginTranslate.isZero());
+
+
     for(auto entity: group)
     {
-        std::cout << "nice: " << group.get<CompHierarchy>(entity).m_name << "\n";
+        //std::cout << "nice: " << group.get<CompHierarchy>(entity).m_name << "\n";
 
         CompHierarchy& hierarchy = group.get<CompHierarchy>(entity);
         CompTransform& transform = group.get<CompTransform>(entity);
@@ -135,7 +150,16 @@ void ActiveScene::update_hierarchy_transforms()
         if (hierarchy.m_parent == m_root)
         {
             // top level object, parent is root
+
+            if (translateAll && transform.m_enableFloatingOrigin)
+            {
+                // Do floating origin translation if enabled
+                Vector3& translation = transform.m_transform[3].xyz();
+                translation += m_floatingOriginTranslate;
+            }
+
             transform.m_transformWorld = transform.m_transform;
+
         }
         else
         {
@@ -148,34 +172,32 @@ void ActiveScene::update_hierarchy_transforms()
 
         }
     }
+
+    // everything was translated already, set back to zero
+    m_floatingOriginTranslate = Vector3(0.0f, 0.0f, 0.0f);
 }
 
-void ActiveScene::draw_meshes()
+void ActiveScene::draw_meshes(entt::entity camera)
 {
+    // Start by getting camera transform inverse and projection matrix
+
+    Matrix4 cameraProject;
+    Matrix4 cameraInverse;
+
+    {
+        // TODO: check if camera has the right components
+        CompCamera& cameraComp = m_registry.get<CompCamera>(camera);
+        CompTransform& cameraTransform = m_registry.get<CompTransform>(camera);
+
+        cameraProject = cameraComp.m_projection;
+        cameraInverse = cameraTransform.m_transformWorld.inverted();
+    }
+
+
+
+
     auto drawGroup = m_registry.group<CompDrawableDebug>(
                             entt::get<CompTransform>);
-
-    // temporary camera code
-
-    Vector2 viewport = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
-    Vector3 aspectFix(1.0f, 1.0f, 1.0f);
-
-    if (viewport.x() > viewport.y())
-    {
-        aspectFix.x() = viewport.y() / viewport.x();
-    }
-    else
-    {
-        aspectFix.y() = viewport.x() / viewport.y();
-    }
-
-    const Matrix4 cameraTransform = Matrix4::translation(Vector3(0, 0, 5));
-    const Matrix4 cameraProject
-            = Matrix4::scaling(aspectFix)
-                * Matrix4::perspectiveProjection(45.0_degf, 1.0f,
-                                                 0.001f, 100.0f);
-
-    const Matrix4 cameraInverse = cameraTransform.inverted();
 
 
     Matrix4 entRelative;
@@ -201,7 +223,7 @@ void ActiveScene::draw_meshes()
 
         drawable.m_mesh->draw(*(drawable.m_shader));
 
-        std::cout << "render! \n";
+        //std::cout << "render! \n";
     }
 }
 

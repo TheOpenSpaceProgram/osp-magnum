@@ -17,6 +17,7 @@
 #include "../Resource/PartPrototype.h"
 
 #include "../Active/ActiveScene.h"
+//#include "../Active/NewtonPhysics.h"
 
 //#include "../Active/FtrNewtonBody.h"
 
@@ -56,7 +57,7 @@ public:
 
     bool is_loadable() const override { return false; }
 
-
+    ActiveScene* get_scene() { return m_scene.get(); }
 
     /**
      * Setup magnum scene and sets m_loadedActive to true.
@@ -88,7 +89,7 @@ public:
      * @param part
      * @return Pointer to object created
      */
-    //Object3D* part_instantiate(PartPrototype& part);
+    entt::entity part_instantiate(PartPrototype& part);
 
     /**
      * Attempt to load a satellite
@@ -122,13 +123,15 @@ private:
 
     // temporary test variables only
     //Object3D* m_partTest;
+    entt::entity m_camera;
+
     Magnum::GL::Mesh *m_bocks;
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
 
     std::shared_ptr<ActiveScene> m_scene;
 
     //GroupFtrNewtonBody m_newtonBodies;
-
+    entt::entity m_debug_aEnt;
 
 };
 

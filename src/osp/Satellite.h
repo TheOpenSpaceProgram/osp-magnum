@@ -30,6 +30,8 @@ public:
     virtual Id const& get_id() = 0;
 
     virtual bool is_loadable() const { return false; }
+    
+    Satellite* get_satellite() { return m_sat; }
 
 
 protected:
@@ -67,9 +69,13 @@ public:
 
     Universe* get_universe() { return m_universe; }
 
-    void set_name(std::string const& name) { m_name = name; }
 
     void set_loader(SatelliteObject* sat) { m_loadedBy = sat; }
+
+    void set_position(Vector3s const& position) { m_position = position; }
+
+    void set_name(std::string const& name) { m_name = name; }
+
 
 
     Vector3s position_relative_to(Satellite& referenceFrame) const;
@@ -126,7 +132,7 @@ protected:
 
     Vector3s m_position;
 
-    int m_precision;
+    //int m_precision;
 };
 
 

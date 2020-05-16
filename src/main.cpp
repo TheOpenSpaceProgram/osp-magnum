@@ -15,7 +15,7 @@
 void magnum_application();
 
 int debug_cli_loop();
-void debug_add_random_vehicle();
+osp::Satellite& debug_add_random_vehicle();
 void debug_print_sats();
 
 //bool g_partsLoaded = false;
@@ -62,8 +62,25 @@ void magnum_application()
         // Add package to the univere
         g_universe.debug_get_packges().push_back(std::move(lazyDebugPack));
 
-        // Add a vehicle so there's something to load
-        debug_add_random_vehicle();
+        // Add vehicles so there's something to load
+        for (int i = 0; i < 6; i ++)
+        {
+            // Creates a random mess of spamcans
+            osp::Satellite& sat = debug_add_random_vehicle();
+
+            // clutter them around space
+
+            Vector3s randomvec(Magnum::Math::Vector3<SpaceInt>(
+                                    std::rand() % 16 - 8,
+                                    std::rand() % 8 - 4,
+                                    std::rand() % 16 - 8) * 1024, 10);
+
+            std::cout << "randomvec: " << randomvec.x() << ", " << randomvec.y() << ", " << randomvec.z() << "\n";
+
+            sat.set_position(randomvec);
+
+        }
+
 
         // Add a planet too
         osp::Satellite& planet = g_universe.create_sat();
@@ -140,7 +157,7 @@ int debug_cli_loop()
     }
 }
 
-void debug_add_random_vehicle()
+osp::Satellite& debug_add_random_vehicle()
 {
     osp::Satellite& sat = g_universe.create_sat();
     osp::SatVehicle& vehicle = sat.create_object<osp::SatVehicle>();
@@ -150,7 +167,7 @@ void debug_add_random_vehicle()
             g_universe.debug_get_packges()[0]
             .get_resource<osp::PartPrototype>(0);
 
-    for (int i = 0; i < 20; i ++)
+    for (int i = 0; i < 10; i ++)
     {
         // Generate random vector
         Vector3 randomvec(std::rand() % 64 - 32,
@@ -165,6 +182,7 @@ void debug_add_random_vehicle()
         //std::cout << "random: " <<  << "\n";
     }
 
+    return sat;
 
 }
 
@@ -176,7 +194,9 @@ void debug_print_sats()
     std::cout << "Universe:\n";
     for (const osp::Satellite& sat : sats)
     {
-        std::cout << "* " << sat.get_name() << "\n";
+        Vector3s pos = sat.get_position();
+        std::cout << "* " << sat.get_name() << "["
+                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "]\n";
     }
 
 }

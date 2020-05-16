@@ -15,11 +15,24 @@
 namespace osp
 {
 
+
+struct CompCamera
+{
+    float m_near, m_far;
+    Magnum::Deg m_fov;
+    Vector2 m_viewport;
+
+    Matrix4 m_projection;
+
+    void calculate_projection();
+};
+
 struct CompTransform
 {
     //Matrix4 m_transformPrev;
     Matrix4 m_transform;
     Matrix4 m_transformWorld;
+    bool m_enableFloatingOrigin;
 };
 
 struct CompHierarchy
@@ -47,14 +60,11 @@ struct CompDrawableDebug
     Magnum::Color4 m_color;
 };
 
-struct CompCamera
-{
-
-};
 
 //using CompHierarchyGroup = entt::basic_group<entt::entity, entt::exclude_t<>,
 //                                             entt::get_t<>, CompHierarchy>;
 
+//template <typename PhysicsEngine>
 class ActiveScene
 {
 
@@ -77,18 +87,20 @@ public:
      */
     void update_hierarchy_transforms();
 
-    void draw_meshes();
+    void draw_meshes(entt::entity camera);
 
     void on_hierarchy_construct(entt::registry& reg, entt::entity ent);
     void on_hierarchy_destruct(entt::registry& reg, entt::entity ent);
 
 private:
 
-    std::vector<std::vector<entt::entity> > m_hierLevels;
+    //std::vector<std::vector<entt::entity> > m_hierLevels;
     entt::registry m_registry;
     bool m_hierarchyDirty;
 
     entt::entity m_root;
+
+    Vector3 m_floatingOriginTranslate;
 
     //CompHierarchyGroup m_group;
 

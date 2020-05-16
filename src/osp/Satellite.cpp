@@ -17,18 +17,20 @@ Satellite::Satellite(Universe* universe) : m_universe(universe)
     // 2^10 = 1024
     // 1024 units = 1 meter
     // enough for a solar system
-    m_precision = 10;
-    m_loadRadius = 1000.0f; // 1km radius sphere around sat
+    //m_precision = 10;
+    m_loadRadius = 10.0f; // 1km radius sphere around sat
     std::cout << "satellite created\n";
 }
 
 
 Satellite::Satellite(Satellite&& sat) : m_object(std::move(sat.m_object)),
-                                        m_name(std::move(sat.m_name)),
                                         m_loadRadius(std::exchange(sat.m_loadRadius, 0)),
-                                        m_loadedBy(nullptr)
+                                        m_loadedBy(nullptr),
+                                        m_name(std::move(sat.m_name)),
+                                        m_position(sat.m_position)
 {
     // TODO
+    m_object->m_sat = this;
     std::cout << "satellite moved\n";
 }
 
