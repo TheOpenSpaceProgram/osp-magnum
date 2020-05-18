@@ -63,7 +63,7 @@ void magnum_application()
         g_universe.debug_get_packges().push_back(std::move(lazyDebugPack));
 
         // Add vehicles so there's something to load
-        for (int i = 0; i < 6; i ++)
+        for (int i = 0; i < 60; i ++)
         {
             // Creates a random mess of spamcans
             osp::Satellite& sat = debug_add_random_vehicle();
@@ -71,9 +71,9 @@ void magnum_application()
             // clutter them around space
 
             Vector3s randomvec(Magnum::Math::Vector3<SpaceInt>(
-                                    std::rand() % 16 - 8,
+                                    std::rand() % 32 - 16,
                                     std::rand() % 8 - 4,
-                                    std::rand() % 16 - 8) * 1024, 10);
+                                    std::rand() % 32 - 16) * 1024, 10);
 
             std::cout << "randomvec: " << randomvec.x() << ", " << randomvec.y() << ", " << randomvec.z() << "\n";
 

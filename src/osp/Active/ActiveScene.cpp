@@ -21,8 +21,8 @@ void CompCamera::calculate_projection()
 
 
 
-ActiveScene::ActiveScene() : m_nwtWorld(NewtonCreate()),
-                             m_hierarchyDirty(false)//, m_group(m_registry.group<CompHierarchy>())
+ActiveScene::ActiveScene() : m_hierarchyDirty(false),
+                             m_newton(this)
 {
     m_registry.on_construct<CompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_construct>(*this);
@@ -49,8 +49,8 @@ ActiveScene::ActiveScene() : m_nwtWorld(NewtonCreate()),
 ActiveScene::~ActiveScene()
 {
     // Clean up newton dynamics stuff
-    NewtonDestroyAllBodies(m_nwtWorld);
-    NewtonDestroy(m_nwtWorld);
+    //NewtonDestroyAllBodies(m_nwtWorld);
+    //NewtonDestroy(m_nwtWorld);
 }
 
 
@@ -108,7 +108,7 @@ void ActiveScene::on_hierarchy_destruct(entt::registry& reg, entt::entity ent)
 
 void ActiveScene::update_physics()
 {
-
+    m_newton.update(1.0f / 60.0f);
 }
 
 void ActiveScene::update_hierarchy_transforms()

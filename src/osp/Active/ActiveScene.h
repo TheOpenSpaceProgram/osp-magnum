@@ -10,7 +10,11 @@
 
 #include <entt/entt.hpp>
 
+#include "../Resource/PartPrototype.h"
+
 #include "../../types.h"
+
+#include "SystemNewton.h"
 
 namespace osp
 {
@@ -53,6 +57,12 @@ struct CompHierarchy
 
 };
 
+struct CompCollider
+{
+    ColliderType m_type;
+    // TODO: mesh data
+};
+
 struct CompDrawableDebug
 {
     Magnum::GL::Mesh* m_mesh;
@@ -92,6 +102,9 @@ public:
     void on_hierarchy_construct(entt::registry& reg, entt::entity ent);
     void on_hierarchy_destruct(entt::registry& reg, entt::entity ent);
 
+    // replace with something like get_systen<NewtonWorld>
+    SystemNewton& debug_get_newton() { return m_newton; }
+
 private:
 
     //std::vector<std::vector<entt::entity> > m_hierLevels;
@@ -102,11 +115,14 @@ private:
 
     Vector3 m_floatingOriginTranslate;
 
+    // TODO: base class and a list for Systems
+    SystemNewton m_newton;
+
     //CompHierarchyGroup m_group;
 
     // Newton dynamics stuff
     // note: can be null for physics-less view-only areas
-    NewtonWorld* const m_nwtWorld;
+    //NewtonWorld* const m_nwtWorld;
 };
 
 }

@@ -20,6 +20,9 @@
 #include "../Resource/SturdyImporter.h"
 #include "../Resource/PlanetData.h"
 
+#include "../Active/SystemNewton.h"
+
+
 #include "../Universe.h"
 
 
@@ -86,6 +89,9 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
                 = Matrix4::from(partBp.m_rotation.toMatrix(),
                               partBp.m_translation + positionInScene)
                 * Matrix4::scaling(partBp.m_scale);
+
+        // temporary: initialize the rigid body
+        area.get_scene()->debug_get_newton().create_body(partEntity);
     }
     return 0;
 }
@@ -212,7 +218,7 @@ void SatActiveArea::draw_gl()
 
     CompTransform& aTransform = m_scene->get_registry().get<CompTransform>(m_debug_aEnt);
     CompHierarchy& aHierarchy = m_scene->get_registry().get<CompHierarchy>(m_debug_aEnt);
-    aTransform.m_transform = Matrix4::rotationY(1.0_degf) * Matrix4::rotationZ(0.1_degf) * aTransform.m_transform;
+    aTransform.m_transform = Matrix4::rotationY(9.0_degf * Math::sin(lazySpin * 0.5f)) * Matrix4::rotationZ(0.1_degf) * aTransform.m_transform;
 
     // root's child child is bEnt from activate();
     CompTransform& bTransform = m_scene->get_registry().get<CompTransform>(aHierarchy.m_childFirst);
@@ -372,7 +378,9 @@ entt::entity SatActiveArea::part_instantiate(PartPrototype& part)
     // first element is 100% going to be the root object
 
     // Temporary: add a rigid body root
-    //new FtrNewtonBody(*(newObjects[0]), *this);
+    CompNewtonBody& nwtBody
+            = m_scene->get_registry().emplace<CompNewtonBody>(newEntities[0]);
+
 
     // return root object
     return newEntities[0];
@@ -472,7 +480,13 @@ void SatActiveArea::update_physics(float deltaTime)
     Vector3 mvtLocal((g_debugInput.rt - g_debugInput.lf) * spd, 0.0f,
                      (g_debugInput.bk - g_debugInput.fr) * spd);
 
-    cameraTransform.m_transform = cameraTransform.m_transform * Matrix4::translation(mvtLocal);
+    static Vector3 mvtVelocity;
+    mvtVelocity *= 0.9f;
+    mvtVelocity += mvtLocal;
+
+    cameraTransform.m_transform = cameraTransform.m_transform * Matrix4::translation(mvtVelocity);
+
+    m_scene->update_physics();
 
     /*
     // update physics
