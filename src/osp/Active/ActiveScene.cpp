@@ -108,6 +108,9 @@ void ActiveScene::on_hierarchy_destruct(entt::registry& reg, entt::entity ent)
 
 void ActiveScene::update_physics()
 {
+    // check if floating origin translation is requested
+    m_floatingOriginInProgress = !(m_floatingOriginTranslate.isZero());
+
     m_newton.update(1.0f / 60.0f);
 }
 
@@ -137,8 +140,7 @@ void ActiveScene::update_hierarchy_transforms()
 
     //std::cout << "size: " << group.size() << "\n";
 
-    bool translateAll = !(m_floatingOriginTranslate.isZero());
-
+    //bool translateAll = !(m_floatingOriginTranslate.isZero());
 
     for(auto entity: group)
     {
@@ -151,7 +153,7 @@ void ActiveScene::update_hierarchy_transforms()
         {
             // top level object, parent is root
 
-            if (translateAll && transform.m_enableFloatingOrigin)
+            if (m_floatingOriginInProgress && transform.m_enableFloatingOrigin)
             {
                 // Do floating origin translation if enabled
                 Vector3& translation = transform.m_transform[3].xyz();
@@ -175,6 +177,13 @@ void ActiveScene::update_hierarchy_transforms()
 
     // everything was translated already, set back to zero
     m_floatingOriginTranslate = Vector3(0.0f, 0.0f, 0.0f);
+    m_floatingOriginInProgress = false;
+}
+
+void ActiveScene::floating_origin_translate(Vector3 const& amount)
+{
+    m_floatingOriginTranslate += amount;
+    //m_floatingOriginDirty = true;
 }
 
 void ActiveScene::draw_meshes(entt::entity camera)

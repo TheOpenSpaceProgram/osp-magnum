@@ -10,15 +10,30 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 {
 
     NwtUserData *data = (NwtUserData*)NewtonBodyGetUserData(body);
+    ActiveScene *scene = data->m_scene;
 
     //Matrix4 matrix;
 
 
-    CompTransform& transform = data->m_scene->get_registry()
+    CompTransform& transform = scene->get_registry()
                                         .get<CompTransform>(data->m_entity);
     NewtonBodyGetMatrix(body, transform.m_transform.data());
 
-    //std::cout << "fish\n";
+    // Check if floating origin translation is in progress
+    if (scene->floating_origin_in_progress())
+    {
+        // Get matrix, translate, then set
+        Matrix4 matrix;
+        NewtonBodyGetMatrix(body, matrix.data());
+
+        matrix[3].xyz() += scene->floating_origin_get_total();
+
+        NewtonBodySetMatrix(body, matrix.data());
+
+        //std::cout << "fish\n";
+    }
+
+
 }
 
 

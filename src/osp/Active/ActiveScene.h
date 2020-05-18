@@ -97,6 +97,10 @@ public:
      */
     void update_hierarchy_transforms();
 
+    void floating_origin_translate(Vector3 const& amount);
+    Vector3 const& floating_origin_get_total() { return m_floatingOriginTranslate; }
+    bool floating_origin_in_progress() { return m_floatingOriginInProgress; }
+
     void draw_meshes(entt::entity camera);
 
     void on_hierarchy_construct(entt::registry& reg, entt::entity ent);
@@ -114,6 +118,7 @@ private:
     entt::entity m_root;
 
     Vector3 m_floatingOriginTranslate;
+    bool m_floatingOriginInProgress;
 
     // TODO: base class and a list for Systems
     SystemNewton m_newton;

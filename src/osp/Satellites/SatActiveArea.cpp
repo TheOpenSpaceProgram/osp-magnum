@@ -225,6 +225,7 @@ void SatActiveArea::draw_gl()
     bTransform.m_transform = Matrix4::translation(Vector3(0.0f, 2.0f * Math::sin(lazySpin), 0.0f))
                                * Matrix4::scaling({0.5f, 0.5f, 2.0f});;
 
+
     m_scene->update_hierarchy_transforms();
 
     GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
@@ -485,6 +486,8 @@ void SatActiveArea::update_physics(float deltaTime)
     mvtVelocity += mvtLocal;
 
     cameraTransform.m_transform = cameraTransform.m_transform * Matrix4::translation(mvtVelocity);
+
+    m_scene->floating_origin_translate(Vector3(0.0f, 0.1f, 0.0f));
 
     m_scene->update_physics();
 
