@@ -14,7 +14,12 @@
 
 #include "../../types.h"
 
-#include "SystemNewton.h"
+#include "SysNewton.h"
+#include "SysMachine.h"
+#include "SysWire.h"
+
+#include "Machines/UserControl.h"
+
 
 namespace osp
 {
@@ -97,6 +102,11 @@ public:
      */
     void update_hierarchy_transforms();
 
+    /**
+     * Request a floating origin mass translation. Multiple calls to this are
+     * accumolated and are applied on the next physics update
+     * @param amount
+     */
     void floating_origin_translate(Vector3 const& amount);
     Vector3 const& floating_origin_get_total() { return m_floatingOriginTranslate; }
     bool floating_origin_in_progress() { return m_floatingOriginInProgress; }
@@ -107,7 +117,7 @@ public:
     void on_hierarchy_destruct(entt::registry& reg, entt::entity ent);
 
     // replace with something like get_systen<NewtonWorld>
-    SystemNewton& debug_get_newton() { return m_newton; }
+    SysNewton& debug_get_newton() { return m_newton; }
 
 private:
 
@@ -121,7 +131,9 @@ private:
     bool m_floatingOriginInProgress;
 
     // TODO: base class and a list for Systems
-    SystemNewton m_newton;
+    SysNewton m_newton;
+    SysMachineUserControl m_machineUserControl;
+    SysWire m_wire;
 
     //CompHierarchyGroup m_group;
 

@@ -20,7 +20,7 @@
 #include "../Resource/SturdyImporter.h"
 #include "../Resource/PlanetData.h"
 
-#include "../Active/SystemNewton.h"
+#include "../Active/SysNewton.h"
 
 
 #include "../Universe.h"
@@ -482,12 +482,13 @@ void SatActiveArea::update_physics(float deltaTime)
                      (g_debugInput.bk - g_debugInput.fr) * spd);
 
     static Vector3 mvtVelocity;
-    mvtVelocity *= 0.9f;
+    mvtVelocity *= 0.95f;
     mvtVelocity += mvtLocal;
 
-    cameraTransform.m_transform = cameraTransform.m_transform * Matrix4::translation(mvtVelocity);
+    cameraTransform.m_transform = cameraTransform.m_transform
+                                   * Matrix4::translation(mvtVelocity);
 
-    m_scene->floating_origin_translate(Vector3(0.0f, 0.1f, 0.0f));
+    //m_scene->floating_origin_translate(Vector3(0.0f, 0.1f, 0.0f));
 
     m_scene->update_physics();
 

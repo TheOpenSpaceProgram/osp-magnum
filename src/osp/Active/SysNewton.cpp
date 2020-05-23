@@ -1,4 +1,4 @@
-#include "SystemNewton.h"
+#include "SysNewton.h"
 
 #include "ActiveScene.h"
 
@@ -37,13 +37,13 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 }
 
 
-SystemNewton::SystemNewton(ActiveScene *scene) : m_nwtWorld(NewtonCreate()),
+SysNewton::SysNewton(ActiveScene *scene) : m_nwtWorld(NewtonCreate()),
                                                  m_scene(scene)
 {
 
 }
 
-SystemNewton::~SystemNewton()
+SysNewton::~SysNewton()
 {
     // Clean up newton dynamics stuff
     NewtonDestroyAllBodies(m_nwtWorld);
@@ -51,7 +51,7 @@ SystemNewton::~SystemNewton()
 }
 
 
-void SystemNewton::create_body(entt::entity entity)
+void SysNewton::create_body(entt::entity entity)
 {
     // TODO: everything here, this is all temporary
 
@@ -88,7 +88,7 @@ void SystemNewton::create_body(entt::entity entity)
     NewtonDestroyCollision(ball);
 }
 
-void SystemNewton::update(float timestep)
+void SysNewton::update(float timestep)
 {
     NewtonUpdate(m_nwtWorld, timestep);
     //std::cout << "hi\n";

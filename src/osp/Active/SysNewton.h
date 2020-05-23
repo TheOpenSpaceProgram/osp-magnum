@@ -30,12 +30,12 @@ struct CompNewtonBody
 
 // TODO: system base class
 
-class SystemNewton
+class SysNewton
 {
 
 public:
-    SystemNewton(ActiveScene *scene);
-    ~SystemNewton();
+    SysNewton(ActiveScene *scene);
+    ~SysNewton();
 
     /**
      * Scan children for CompColliders. combine it all into a single compound

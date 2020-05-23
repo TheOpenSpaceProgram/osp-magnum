@@ -43,6 +43,10 @@ ActiveScene::ActiveScene() : m_hierarchyDirty(false),
     CompHierarchy& hierarchy = m_registry.emplace<CompHierarchy>(m_root);
     hierarchy.m_name = "Root Entity";
 
+    // test constructing a MachineUserControl
+    MachineUserControl& control = m_machineUserControl.emplace();
+
+
    // m_hierLevels.resize(5);
 }
 
@@ -108,8 +112,15 @@ void ActiveScene::on_hierarchy_destruct(entt::registry& reg, entt::entity ent)
 
 void ActiveScene::update_physics()
 {
+    // update which
+    m_machineUserControl.update();
+
     // check if floating origin translation is requested
     m_floatingOriginInProgress = !(m_floatingOriginTranslate.isZero());
+    if (m_floatingOriginInProgress)
+    {
+        std::cout << "Floating origin translation\n";
+    }
 
     m_newton.update(1.0f / 60.0f);
 }
