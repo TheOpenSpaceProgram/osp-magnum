@@ -75,6 +75,10 @@ void SysNewton::create_body(entt::entity entity)
     // Set position/rotation
     NewtonBodySetMatrix(bodyComp.m_body, transform.m_transform.data());
 
+    // Set damping to 0, as default is 0.1
+    // reference frame may be moving and air pressure stuff
+    NewtonBodySetLinearDamping(bodyComp.m_body, 0.0f);
+
     // Set callback for updating position of entity and everything else
     NewtonBodySetForceAndTorqueCallback(bodyComp.m_body, cb_force_torque);
 

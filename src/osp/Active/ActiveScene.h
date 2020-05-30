@@ -84,7 +84,7 @@ class ActiveScene
 {
 
 public:
-    ActiveScene();
+    ActiveScene(UserInputHandler &userInput);
     ~ActiveScene();
 
     entt::entity hier_get_root() { return m_root; }

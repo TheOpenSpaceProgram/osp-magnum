@@ -114,7 +114,10 @@ int area_load_planet(SatActiveArea& area, SatelliteObject& loadMe)
 }
 
 
-SatActiveArea::SatActiveArea() : SatelliteObject(), m_loadedActive(false)//, m_nwtWorld(NewtonCreate())
+SatActiveArea::SatActiveArea(UserInputHandler &userInput) :
+        SatelliteObject(),
+        m_loadedActive(false),
+        m_userInput(userInput)
 {
 
     // use area_load_vehicle to load SatVechicles
@@ -167,7 +170,7 @@ int SatActiveArea::activate()
     m_bocks = (new Magnum::GL::Mesh(Magnum::MeshTools::compile(
                                         Magnum::Primitives::cubeSolid())));
 
-    m_scene = std::make_shared<ActiveScene>();
+    m_scene = std::make_shared<ActiveScene>(m_userInput);
 
     // create debug entities that have a transform and box model
     m_debug_aEnt = m_scene->hier_create_child(m_scene->hier_get_root(),

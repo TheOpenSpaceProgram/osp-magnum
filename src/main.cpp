@@ -43,11 +43,29 @@ int main(int argc, char** argv)
  */
 void magnum_application()
 {
+    // Create the application
+    osp::OSPMagnum app({g_argc, g_argv});
 
-    // only call load once
+    // Configure Controls
+    using Key = osp::OSPMagnum::KeyEvent::Key;
+    using TermOp = osp::ButtonTermConfig::TermOperator;
+    using TermTrig = osp::ButtonTermConfig::TermTrigger;
+
+    osp::UserInputHandler& userInput = app.get_input_handler();
+    userInput.config_register_control("c_up",
+            {0, (int) Key::W, TermTrig::PRESSED, false, TermOp::OR});
+    userInput.config_register_control("c_dn",
+            {0, (int) Key::S, TermTrig::PRESSED, false, TermOp::OR});
+    userInput.config_register_control("c_lf",
+            {0, (int) Key::A, TermTrig::PRESSED, false, TermOp::OR});
+    userInput.config_register_control("c_rt",
+            {0, (int) Key::D, TermTrig::PRESSED, false, TermOp::OR});
+
+    // only call load once, since some stuff might already be loaded
     //static bool s_partsLoaded = false;
     if (!g_universe.debug_get_packges().size())
     {
+
         // Create a new package
         osp::Package lazyDebugPack("lzdb", "lazy-debug");
         //m_packages.push_back(std::move(p));
@@ -75,8 +93,6 @@ void magnum_application()
                                     std::rand() % 8 - 4,
                                     std::rand() % 32 - 16) * 1024, 10);
 
-            std::cout << "randomvec: " << randomvec.x() << ", " << randomvec.y() << ", " << randomvec.z() << "\n";
-
             sat.set_position(randomvec);
 
         }
@@ -90,9 +106,8 @@ void magnum_application()
     }
 
     osp::Satellite& sat = g_universe.create_sat();
-    osp::SatActiveArea& area = sat.create_object<osp::SatActiveArea>();
+    osp::SatActiveArea& area = sat.create_object<osp::SatActiveArea>(app.get_input_handler());
 
-    osp::OSPMagnum app({g_argc, g_argv});
     app.set_active_area(area);
 
     app.exec();

@@ -10,7 +10,8 @@ OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments):
     Magnum::Platform::Application{
         arguments,
         Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
-    m_area(nullptr)
+    m_area(nullptr),
+    m_userInput(12)
 {
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 

@@ -21,8 +21,10 @@ void CompCamera::calculate_projection()
 
 
 
-ActiveScene::ActiveScene() : m_hierarchyDirty(false),
-                             m_newton(this)
+ActiveScene::ActiveScene(UserInputHandler& userInput) :
+        m_hierarchyDirty(false),
+        m_newton(this),
+        m_machineUserControl(userInput)
 {
     m_registry.on_construct<CompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_construct>(*this);
@@ -35,7 +37,7 @@ ActiveScene::ActiveScene() : m_hierarchyDirty(false),
     //  freely. A group performs an initialization step the very first time
     //  it's requested and this could be quite costly. To avoid it, consider
     //  creating the group when no components have been assigned yet."
-    auto dummyGroup = m_registry.group<CompHierarchy, CompTransform>();
+    m_registry.group<CompHierarchy, CompTransform>();
 
     // Create the root entity
 

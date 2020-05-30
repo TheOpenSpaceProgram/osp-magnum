@@ -17,6 +17,8 @@
 #include "../Resource/PartPrototype.h"
 
 #include "../Active/ActiveScene.h"
+
+#include "../UserInputHandler.h"
 //#include "../Active/NewtonPhysics.h"
 
 //#include "../Active/FtrNewtonBody.h"
@@ -41,7 +43,7 @@ class SatActiveArea : public SatelliteObject//, public GroupFtrNewtonBody
     friend OSPMagnum;
 
 public:
-    SatActiveArea();
+    SatActiveArea(UserInputHandler& userInput);
     ~SatActiveArea();
 
     static Id const& get_id_static()
@@ -132,6 +134,8 @@ private:
 
     //GroupFtrNewtonBody m_newtonBodies;
     entt::entity m_debug_aEnt;
+
+    UserInputHandler& m_userInput;
 
 };
 
