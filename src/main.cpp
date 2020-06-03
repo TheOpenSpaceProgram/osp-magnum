@@ -52,14 +52,26 @@ void magnum_application()
     using TermTrig = osp::ButtonTermConfig::TermTrigger;
 
     osp::UserInputHandler& userInput = app.get_input_handler();
+
+    // throttle min/max
+    userInput.config_register_control("game_thr_max",
+            {{0, (int) Key::Z, TermTrig::PRESSED, false, TermOp::OR}});
+    userInput.config_register_control("game_thr_min",
+            {{0, (int) Key::X, TermTrig::PRESSED, false, TermOp::OR}});
+    userInput.config_register_control("game_self_destruct",
+            {{0, (int) Key::LeftCtrl, TermTrig::HOLD, false, TermOp::AND},
+             {0, (int) Key::C, TermTrig::PRESSED, false, TermOp::OR},
+             {0, (int) Key::LeftShift, TermTrig::HOLD, false, TermOp::AND},
+             {0, (int) Key::A, TermTrig::PRESSED, false, TermOp::OR}});
+
     userInput.config_register_control("c_up",
-            {0, (int) Key::W, TermTrig::PRESSED, false, TermOp::OR});
+            {{0, (int) Key::W, TermTrig::PRESSED, false, TermOp::OR}});
     userInput.config_register_control("c_dn",
-            {0, (int) Key::S, TermTrig::PRESSED, false, TermOp::OR});
+            {{0, (int) Key::S, TermTrig::PRESSED, false, TermOp::OR}});
     userInput.config_register_control("c_lf",
-            {0, (int) Key::A, TermTrig::PRESSED, false, TermOp::OR});
+            {{0, (int) Key::A, TermTrig::PRESSED, false, TermOp::OR}});
     userInput.config_register_control("c_rt",
-            {0, (int) Key::D, TermTrig::PRESSED, false, TermOp::OR});
+            {{0, (int) Key::D, TermTrig::PRESSED, false, TermOp::OR}});
 
     // only call load once, since some stuff might already be loaded
     //static bool s_partsLoaded = false;

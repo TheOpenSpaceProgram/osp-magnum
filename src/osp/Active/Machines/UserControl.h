@@ -19,8 +19,9 @@ public:
     void doUpdate();
 
 private:
-    ButtonHandle m_throttleMax;
-    ButtonHandle m_throttleMin;
+    ButtonControlHandle m_throttleMax;
+    ButtonControlHandle m_throttleMin;
+    ButtonControlHandle m_selfDestruct;
 };
 
 /**

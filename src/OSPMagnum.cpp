@@ -6,6 +6,12 @@
 namespace osp
 {
 
+// temporary-ish
+const UserInputHandler::DeviceId sc_keyboard = 0;
+const UserInputHandler::DeviceId sc_mouse = 1;
+
+
+
 OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments):
     Magnum::Platform::Application{
         arguments,
@@ -29,6 +35,9 @@ void OSPMagnum::set_active_area(SatActiveArea& area)
 
 void OSPMagnum::drawEvent()
 {
+    m_userInput.update_controls();
+
+
     Magnum::GL::defaultFramebuffer.clear(Magnum::GL::FramebufferClear::Color
                                          | Magnum::GL::FramebufferClear::Depth);
 
@@ -53,10 +62,21 @@ void OSPMagnum::drawEvent()
     swapBuffers();
     m_timeline.nextFrame();
     redraw();
+
+    m_userInput.event_clear();
 }
+
+
 
 void OSPMagnum::keyPressEvent(KeyEvent& event)
 {
+    if (event.isRepeated())
+    {
+        return;
+    }
+    m_userInput.event_raw(sc_keyboard, (int) event.key(),
+                          UserInputHandler::ButtonRawEvent::PRESSED);
+
     if (m_area)
     {
         m_area->input_key_press(event);
@@ -65,6 +85,14 @@ void OSPMagnum::keyPressEvent(KeyEvent& event)
 
 void OSPMagnum::keyReleaseEvent(KeyEvent& event)
 {
+    if (event.isRepeated())
+    {
+        return;
+    }
+
+    m_userInput.event_raw(sc_keyboard, (int) event.key(),
+                          UserInputHandler::ButtonRawEvent::RELEASED);
+
     if (m_area)
     {
         m_area->input_key_release(event);
@@ -73,6 +101,8 @@ void OSPMagnum::keyReleaseEvent(KeyEvent& event)
 
 void OSPMagnum::mousePressEvent(MouseEvent& event)
 {
+    m_userInput.event_raw(sc_mouse, (int) event.button(),
+                          UserInputHandler::ButtonRawEvent::PRESSED);
     if (m_area)
     {
         m_area->input_mouse_press(event);
@@ -80,6 +110,8 @@ void OSPMagnum::mousePressEvent(MouseEvent& event)
 }
 void OSPMagnum::mouseReleaseEvent(MouseEvent& event)
 {
+    m_userInput.event_raw(sc_mouse, (int) event.button(),
+                          UserInputHandler::ButtonRawEvent::RELEASED);
     if (m_area)
     {
         m_area->input_mouse_release(event);

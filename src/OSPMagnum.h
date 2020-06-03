@@ -49,7 +49,6 @@ private:
     UserInputHandler m_userInput;
     //std::weak_ptr<SatActiveArea> m_area;
 
-
     Magnum::Timeline m_timeline;
 
     void drawEvent() override;

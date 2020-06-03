@@ -9,37 +9,47 @@ namespace osp
 {
 
 class UserInputHandler;
+struct ButtonRaw;
 
-enum class ButtonEvent
-{
-    PRESSED,
-    RELEASED
-};
+using ButtonMap = std::map<int, ButtonRaw>;
 
-class ButtonHandle
+class ButtonControlHandle
 {
 public:
-    ButtonHandle(UserInputHandler *to, int buttonIndex) :
-            m_to(to), m_buttonIndex(buttonIndex) {};
-    bool single_press();
-    bool single_release();
-    bool is_pressed();
+    ButtonControlHandle() : m_to(nullptr), m_index(0) {}
+    ButtonControlHandle(UserInputHandler *to, int index);
+    ~ButtonControlHandle();
+
+    bool triggered();
+    bool trigger_hold();
 
 private:
     UserInputHandler *m_to;
-    int m_buttonIndex;
+    //ButtonMap::iterator m_button;
+    int m_index;
+    
 };
 
-struct ButtonInput
+struct ButtonRaw
 {
-    bool m_down;
+    bool m_pressed, m_justPressed, m_justReleased;
     uint8_t m_reference_count;
 };
+
+struct ButtonTermConfig;
 
 struct ButtonTerm
 {
 
-    uint16_t m_buttonIndex;
+    enum class TermTrigger { HOLD = 0, PRESSED = 1 };
+    enum class TermOperator { OR = 0, AND = 1 };
+
+    ButtonTerm(ButtonMap::iterator button, TermTrigger trigger,
+               bool invert, TermOperator nextOp);
+
+    ButtonTerm(ButtonMap::iterator button, ButtonTermConfig cfg);
+
+    //        m_button(button), m_bits(bits) {}
 
     // Bit 0: Trigger Mode
     //   0. Always true when button is held
@@ -53,59 +63,122 @@ struct ButtonTerm
     // Bit 3: Terminate?
     //   0. Last condition, terminate
     //   1. Next condition exists
-    uint8_t m_bits;
-};
+    //uint8_t m_bits;
 
+    ButtonMap::iterator m_button;
+    TermTrigger m_trigger;
+    bool m_invert;
+    TermOperator m_nextOp;
+};
 
 struct ButtonTermConfig
 {
-    enum class TermTrigger { HOLD, PRESSED };
-    enum class TermOperator { OR, AND };
+    using TermTrigger = ButtonTerm::TermTrigger;
+    using TermOperator = ButtonTerm::TermOperator;
 
-    ButtonTermConfig(int device, int devEnum, TermTrigger trigger,
-                     bool invert, TermOperator nextOp);
+    constexpr ButtonTermConfig(int device, int devEnum, TermTrigger trigger,
+                               bool invert, TermOperator nextOp) :
+            m_device(device),
+            m_devEnum(devEnum),
+            m_trigger(trigger),
+            m_invert(invert),
+            m_nextOp(nextOp) {}
 
     int m_device;
     int m_devEnum;
-    uint8_t m_bits;
+    TermTrigger m_trigger;
+    bool m_invert;
+    TermOperator m_nextOp;
+    //uint8_t m_bits;
+};
+
+struct ButtonConfig
+{
+    std::vector<ButtonTermConfig> m_terms;
+    bool m_enabled;
+    int m_index;
 };
 
 struct ButtonControl
 {
-    uint16_t reference_count;
+    uint16_t m_reference_count;
 
     // hold is true if just all the hold conditions are true.
     // ignore the press/releases
 
     bool m_detectHold;
-    bool m_active, m_activeHold;
-    std::array<ButtonTerm, 10> m_conditions;
+    bool m_triggered, m_triggerHold;
+    //std::array<ButtonTerm, 10> m_terms;
+    std::vector<ButtonTerm> m_terms;
 };
-
-// [buttons that need to be held down]
 
 class UserInputHandler
 {
+    friend ButtonControlHandle;
+
 public:
+
+    typedef int DeviceId;
+
+    enum class ButtonRawEvent
+    {
+        PRESSED,
+        RELEASED
+    };
+
+
     UserInputHandler(int deviceCount);
 
+    // TODO: deal with joystick 1D and 2D axis
+    // axis should have different modes:
+    // * Absolute: [mouse position, slider, touch screen, etc..]
+    // * Relative: something directional [joystick, mouse movement, etc...]
+    // TODO: think about a multitouch interface
+
     /**
-     * Register a new control
-     * @param name
-     * @param terms
+     * Register a new control into the config.
+     * @param name Name used for identification
+     * @param terms Expression needed to activate the control
      */
     void config_register_control(std::string const& name,
-                                 ButtonTermConfig terms...);
+            std::initializer_list<ButtonTermConfig> terms);
 
-    ButtonHandle config_get(std::string const& name);
+    /**
+     *
+     * @return ButtonHandle that can be used to read a ButtonControl
+     */
+    ButtonControlHandle config_get(std::string const& name);
 
+    /**
+     *
+     */
     void event_clear();
-    void event_raw(int deviceId, int buttonEnum, ButtonEvent dir);
+
+    /**
+     *
+     * @param deviceId
+     * @param buttonEnum
+     * @param dir
+     */
+    void event_raw(DeviceId deviceId, int buttonEnum, ButtonRawEvent dir);
+
+    /**
+     *
+     */
     void update_controls();
 
 private:
-    std::vector<ButtonInput> m_buttons;
-    std::vector<std::map<int, int>> m_devices;
+
+    std::vector<ButtonMap> m_deviceToButtonRaw;
+    std::map<std::string, ButtonConfig> m_controlConfigs;
+
+    //std::vector<ButtonRaw> m_buttons;
+    std::vector<ButtonControl> m_controls;
+
+    std::vector<ButtonMap::iterator> m_btnPressed;
+    std::vector<ButtonMap::iterator> m_btnReleased;
+
+    //std::map<std::string, int> m_controlActive;
 };
 
 }

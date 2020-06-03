@@ -23,11 +23,12 @@ Satellite::Satellite(Universe* universe) : m_universe(universe)
 }
 
 
-Satellite::Satellite(Satellite&& sat) : m_loadRadius(std::exchange(sat.m_loadRadius, 0)),
-                                        m_loadedBy(nullptr),
-                                        m_object(std::move(sat.m_object)),
-                                        m_name(std::move(sat.m_name)),
-                                        m_position(sat.m_position)
+Satellite::Satellite(Satellite&& sat) :
+        m_loadRadius(std::exchange(sat.m_loadRadius, 0)),
+        m_loadedBy(nullptr),
+        m_object(std::move(sat.m_object)),
+        m_name(std::move(sat.m_name)),
+        m_position(sat.m_position)
 {
     // TODO
     m_object->m_sat = this;

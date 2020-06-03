@@ -40,18 +40,34 @@ std::vector<WireOutput*> MachineUserControl::available_outputs()
 
 SysMachineUserControl::SysMachineUserControl(UserInputHandler& userControl) :
     m_throttleMax(userControl.config_get("game_thr_max")),
-    m_throttleMin(userControl.config_get("game_thr_min"))
+    m_throttleMin(userControl.config_get("game_thr_min")),
+    m_selfDestruct(userControl.config_get("game_self_destruct"))
 {
 
 }
 
 void SysMachineUserControl::doUpdate()
 {
-    std::cout << "updating all MachineUserControls\n";
+    //std::cout << "updating all MachineUserControls\n";
     // InputDevice.IsActivated()
     // Combination
     
-    
+    if (m_throttleMin.triggered())
+    {
+        std::cout << "throttle min\n";
+    }
+
+    if (m_throttleMax.triggered())
+    {
+        std::cout << "throttle max\n";
+    }
+
+    if (m_selfDestruct.triggered())
+    {
+        std::cout << "EXPLOSION BOOM!!!!\n";
+    }
+
+
     for (MachineUserControl& machine : m_machines)
     {
         
