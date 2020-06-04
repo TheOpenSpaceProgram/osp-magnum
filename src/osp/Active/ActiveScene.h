@@ -24,6 +24,11 @@
 namespace osp
 {
 
+// in case Newton Dynamics gets swapped out, one can implement a system class
+// with all the same methods
+using SysPhysics = SysNewton;
+
+using ActiveEnt = entt::entity;
 
 struct CompCamera
 {
@@ -50,13 +55,13 @@ struct CompHierarchy
 
     //unsigned m_childIndex;
     unsigned m_level{0};
-    entt::entity m_parent{entt::null};
-    entt::entity m_siblingNext{entt::null};
-    entt::entity m_siblingPrev{entt::null};
+    ActiveEnt m_parent{entt::null};
+    ActiveEnt m_siblingNext{entt::null};
+    ActiveEnt m_siblingPrev{entt::null};
 
     // as a parent
     unsigned m_childCount{0};
-    entt::entity m_childFirst{entt::null};
+    ActiveEnt m_childFirst{entt::null};
 
     // transform relative to parent
 
@@ -76,7 +81,7 @@ struct CompDrawableDebug
 };
 
 
-//using CompHierarchyGroup = entt::basic_group<entt::entity, entt::exclude_t<>,
+//using CompHierarchyGroup = entt::basic_group<ActiveEnt, entt::exclude_t<>,
 //                                             entt::get_t<>, CompHierarchy>;
 
 //template <typename PhysicsEngine>
@@ -87,13 +92,25 @@ public:
     ActiveScene(UserInputHandler &userInput);
     ~ActiveScene();
 
-    entt::entity hier_get_root() { return m_root; }
-    entt::entity hier_create_child(entt::entity parent,
+    ActiveEnt hier_get_root() { return m_root; }
+    ActiveEnt hier_create_child(ActiveEnt parent,
                                    std::string const& name = "Innocent Entity");
-    void hier_set_parent_child(entt::entity parent, entt::entity child);
+    void hier_set_parent_child(ActiveEnt parent, ActiveEnt child);
 
     entt::registry& get_registry() { return m_registry; }
 
+    template<class T>
+    T& reg_get(ActiveEnt ent) { return m_registry.get<T>(ent); };
+
+    template<class T, typename... Args>
+    T& reg_emplace(ActiveEnt ent, Args &&... args)
+    {
+        return m_registry.emplace<T>(ent, args...);
+    };
+
+    /**
+     *
+     */
     void update_physics();
 
     /**
@@ -108,38 +125,42 @@ public:
      * @param amount
      */
     void floating_origin_translate(Vector3 const& amount);
+
     Vector3 const& floating_origin_get_total() { return m_floatingOriginTranslate; }
     bool floating_origin_in_progress() { return m_floatingOriginInProgress; }
 
-    void draw_meshes(entt::entity camera);
+    /**
+     * @brief draw
+     * @param camera
+     */
+    void draw(ActiveEnt camera);
 
-    void on_hierarchy_construct(entt::registry& reg, entt::entity ent);
-    void on_hierarchy_destruct(entt::registry& reg, entt::entity ent);
+    void on_hierarchy_construct(entt::registry& reg, ActiveEnt ent);
+    void on_hierarchy_destruct(entt::registry& reg, ActiveEnt ent);
 
     // replace with something like get_systen<NewtonWorld>
-    SysNewton& debug_get_newton() { return m_newton; }
+    //SysNewton& debug_get_newton() { return m_newton; }
+
+    template<class T>
+    T& get_system();
 
 private:
 
-    //std::vector<std::vector<entt::entity> > m_hierLevels;
-    entt::registry m_registry;
+    //std::vector<std::vector<ActiveEnt> > m_hierLevels;
+    entt::basic_registry<ActiveEnt> m_registry;
+    ActiveEnt m_root;
     bool m_hierarchyDirty;
-
-    entt::entity m_root;
 
     Vector3 m_floatingOriginTranslate;
     bool m_floatingOriginInProgress;
 
+    //UserInputHandler &m_userInput;
+
     // TODO: base class and a list for Systems
-    SysNewton m_newton;
+    SysPhysics m_physics;
     SysMachineUserControl m_machineUserControl;
     SysWire m_wire;
 
-    //CompHierarchyGroup m_group;
-
-    // Newton dynamics stuff
-    // note: can be null for physics-less view-only areas
-    //NewtonWorld* const m_nwtWorld;
 };
 
 }

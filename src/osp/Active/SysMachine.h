@@ -1,5 +1,7 @@
 #pragma once
 
+
+#include <cstdint>
 #include <vector>
 
 #include <Corrade/Containers/LinkedList.h>
@@ -11,7 +13,6 @@ namespace osp
 
 using Corrade::Containers::LinkedList;
 using Corrade::Containers::LinkedListItem;
-
 
 class Machine;
 
@@ -35,10 +36,12 @@ public:
     virtual ~Machine() = default;
 
     virtual void propagate_output(WireOutput* output) = 0;
-    virtual void request_output(std::string const& name) {};
 
-    virtual std::vector<WireInput*> available_inputs() = 0;
-    virtual std::vector<WireOutput*> available_outputs() = 0;
+    virtual WireOutput* request_output(WireOutPort port) = 0;
+    virtual WireInput* request_input(WireInPort port) = 0;
+
+    virtual std::vector<WireInput*> existing_inputs() = 0;
+    virtual std::vector<WireOutput*> existing_outputs() = 0;
 };
 
 class AbstractSysMachine

@@ -54,8 +54,9 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
     std::cout << "relative distance: " << positionInScene.length() << "\n";
 
     // Get the needed variables
-    SatVehicle& vehicle = static_cast<SatVehicle&>(loadMe);
-    VehicleBlueprint& vehicleData = vehicle.get_blueprint();
+    SatVehicle &vehicle = static_cast<SatVehicle&>(loadMe);
+    VehicleBlueprint &vehicleData = vehicle.get_blueprint();
+    ActiveScene &scene = *(area.get_scene());
 
     // List of unique part prototypes used in the vehicle
     // Access with [partBlueprint.m_partIndex]
@@ -64,7 +65,15 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 
     // List of parts, and how they're arranged
     std::vector<PartBlueprint>& parts = vehicleData.get_blueprints();
-    
+
+    ActiveEnt root = scene.hier_get_root();
+    ActiveEnt vehicleEnt = scene.hier_create_child(root);
+
+    CompTransform& vehicleTransform = scene.get_registry()
+                                        .emplace<CompTransform>(vehicleEnt);
+    vehicleTransform.m_transform = Matrix4::translation(positionInScene);
+    vehicleTransform.m_enableFloatingOrigin = true;
+
     // Loop through blueprints
     for (PartBlueprint& partBp : parts)
     {
@@ -79,20 +88,26 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
             return -1;
         }
 
-        entt::entity partEntity = area.part_instantiate(*proto);
+        ActiveEnt partEntity = area.part_instantiate(*proto, vehicleEnt);
 
-        CompTransform& partTransform = area.get_scene()->get_registry()
+        CompTransform& partTransform = scene.get_registry()
                                             .get<CompTransform>(partEntity);
 
         // set the transformation
         partTransform.m_transform
                 = Matrix4::from(partBp.m_rotation.toMatrix(),
-                              partBp.m_translation + positionInScene)
+                              partBp.m_translation)
                 * Matrix4::scaling(partBp.m_scale);
 
         // temporary: initialize the rigid body
-        area.get_scene()->debug_get_newton().create_body(partEntity);
+        //area.get_scene()->debug_get_newton().create_body(partEntity);
     }
+
+    // temporary: make the whole thing a single rigid body
+    CompNewtonBody& nwtBody
+            = scene.get_registry().emplace<CompNewtonBody>(vehicleEnt);
+    area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
+
     return 0;
 }
 
@@ -180,8 +195,9 @@ int SatActiveArea::activate()
     CompDrawableDebug& aBocks
             = m_scene->get_registry().emplace<CompDrawableDebug>(m_debug_aEnt,
                     m_bocks, m_shader.get(), 0x67FF00_rgbf);
+    aTransform.m_enableFloatingOrigin = true;
 
-    entt::entity bEnt = m_scene->hier_create_child(m_debug_aEnt, "Entity B");
+    ActiveEnt bEnt = m_scene->hier_create_child(m_debug_aEnt, "Entity B");
     CompTransform& bTransform
             = m_scene->get_registry().emplace<CompTransform>(bEnt);
     CompDrawableDebug& bBocks
@@ -196,6 +212,7 @@ int SatActiveArea::activate()
             = m_scene->get_registry().emplace<CompTransform>(m_camera);
 
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 5));
+    cameraTransform.m_enableFloatingOrigin = true;
 
     cameraComp.m_viewport = Vector2(Magnum::GL::defaultFramebuffer.viewport()
                                                                   .size());
@@ -214,19 +231,21 @@ void SatActiveArea::draw_gl()
 
     using namespace Magnum;
 
-
     // temporary stuff
     static Deg lazySpin;
     lazySpin += 3.0_degf;
 
-    CompTransform& aTransform = m_scene->get_registry().get<CompTransform>(m_debug_aEnt);
-    CompHierarchy& aHierarchy = m_scene->get_registry().get<CompHierarchy>(m_debug_aEnt);
-    aTransform.m_transform = Matrix4::rotationY(9.0_degf * Math::sin(lazySpin * 0.5f)) * Matrix4::rotationZ(0.1_degf) * aTransform.m_transform;
+    CompTransform& aTransform = m_scene->reg_get<CompTransform>(m_debug_aEnt);
+    CompHierarchy& aHierarchy = m_scene->reg_get<CompHierarchy>(m_debug_aEnt);
 
     // root's child child is bEnt from activate();
-    CompTransform& bTransform = m_scene->get_registry().get<CompTransform>(aHierarchy.m_childFirst);
-    bTransform.m_transform = Matrix4::translation(Vector3(0.0f, 2.0f * Math::sin(lazySpin), 0.0f))
-                               * Matrix4::scaling({0.5f, 0.5f, 2.0f});;
+    CompTransform& bTransform
+            = m_scene->reg_get<CompTransform>(aHierarchy.m_childFirst);
+    bTransform.m_transform
+            = Matrix4::translation(Vector3(0.0f,
+                                           2.0f * Math::sin(lazySpin),
+                                           0.0f))
+            * Matrix4::scaling({0.5f, 0.5f, 2.0f});;
 
 
     m_scene->update_hierarchy_transforms();
@@ -254,7 +273,7 @@ void SatActiveArea::draw_gl()
 
     //m_bocks->draw(*m_shader);
 
-    m_scene->draw_meshes(m_camera);
+    m_scene->draw(m_camera);
 
     //m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
 
@@ -266,24 +285,25 @@ void SatActiveArea::draw_gl()
 }
 
 
-entt::entity SatActiveArea::part_instantiate(PartPrototype& part)
+ActiveEnt SatActiveArea::part_instantiate(PartPrototype& part,
+                                             ActiveEnt rootParent)
 {
 
     std::vector<ObjectPrototype> const& prototypes = part.get_objects();
-    std::vector<entt::entity> newEntities(prototypes.size());
+    std::vector<ActiveEnt> newEntities(prototypes.size());
 
     //std::cout << "size: " << newEntities.size() << "\n";
 
     for (int i = 0; i < prototypes.size(); i ++)
     {
         const ObjectPrototype& currentPrototype = prototypes[i];
-        entt::entity currentEnt, parentEnt;
+        ActiveEnt currentEnt, parentEnt;
 
         // Get parent
         if (currentPrototype.m_parentIndex == i)
         {
             // if parented to self,
-            parentEnt = m_scene->hier_get_root();
+            parentEnt = rootParent;//m_scene->hier_get_root();
         }
         else
         {
@@ -299,7 +319,7 @@ entt::entity SatActiveArea::part_instantiate(PartPrototype& part)
 
         // Add and set transform component
         CompTransform& currentTransform
-                = m_scene->get_registry().emplace<CompTransform>(currentEnt);
+                = m_scene->reg_emplace<CompTransform>(currentEnt);
         currentTransform.m_transform
                 = Matrix4::from(currentPrototype.m_rotation.toMatrix(),
                                 currentPrototype.m_translation)
@@ -365,7 +385,7 @@ entt::entity SatActiveArea::part_instantiate(PartPrototype& part)
             // by now, the mesh should exist
 
             CompDrawableDebug& bBocks
-                    = m_scene->get_registry().emplace<CompDrawableDebug>(
+                    = m_scene->reg_emplace<CompDrawableDebug>(
                         currentEnt, mesh, m_shader.get(), 0x0202EE_rgbf);
 
             //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
@@ -382,8 +402,8 @@ entt::entity SatActiveArea::part_instantiate(PartPrototype& part)
     // first element is 100% going to be the root object
 
     // Temporary: add a rigid body root
-    CompNewtonBody& nwtBody
-            = m_scene->get_registry().emplace<CompNewtonBody>(newEntities[0]);
+    //CompNewtonBody& nwtBody
+    //        = m_scene->get_registry().emplace<CompNewtonBody>(newEntities[0]);
 
 
     // return root object
@@ -474,125 +494,21 @@ void SatActiveArea::update_physics(float deltaTime)
         load_satellite(sat);
     }
 
-    // debug navigation
-
-
+    // Temporary: Floating origin follow cameara
     CompTransform& cameraTransform
-            = m_scene->get_registry().get<CompTransform>(m_camera);
-    float spd = 0.05f;
+            = m_scene->reg_get<CompTransform>(m_camera);
+    Magnum::Vector3i tra(cameraTransform.m_transform[3].xyz());
+    //tra.x() = Magnum::Math::round<float>(tra.x());
 
-    Vector3 mvtLocal((g_debugInput.rt - g_debugInput.lf) * spd, 0.0f,
-                     (g_debugInput.bk - g_debugInput.fr) * spd);
+    m_scene->floating_origin_translate(-Vector3(tra));
+    m_sat->set_position(m_sat->get_position()
+                        + Vector3sp({tra.x() * 1024,
+                                     tra.y() * 1024,
+                                     tra.z() * 1024}, 10));
+    //std::cout << "x: " << Vector3sp(m_sat->get_position()).x() << "\n";
 
-    static Vector3 mvtVelocity;
-    mvtVelocity *= 0.95f;
-    mvtVelocity += mvtLocal;
-
-    cameraTransform.m_transform = cameraTransform.m_transform
-                                   * Matrix4::translation(mvtVelocity);
-
-    //m_scene->floating_origin_translate(Vector3(0.0f, 0.1f, 0.0f));
 
     m_scene->update_physics();
-
-    /*
-    // update physics
-    NewtonUpdate(m_nwtWorld, deltaTime);
-
-    GroupFtrNewtonBody& nwtBodies = *this;
-
-    for (unsigned i = 0; i < nwtBodies.size(); i++)
-    {
-        // Update positions of magnum objects
-        // TODO: interpolation
-
-        Matrix4 matrix;
-        NewtonBodyGetMatrix(nwtBodies[i].get_body(), matrix.data());
-        Vector3 trans = matrix.translation();
-
-        Object3D& obj = static_cast<Object3D&>(nwtBodies[i].object());
-        obj.setTransformation(matrix);
-
-
-        //std::cout << "translation: [" << trans.x() << ", " << trans.y() << ", " << trans.z() << "]\n";
-        //Vector3 force(0.0f, -9.8f, 0.0f);
-        dFloat force[3] = {0, -1.0, 0};
-        NewtonBodySetForce(nwtBodies[i].get_body(), force);
-    }
-    */
-
-
-}
-
-using Magnum::Platform::Application;
-
-void SatActiveArea::input_key_press(Application::KeyEvent& event)
-{
-
-    const bool dir = true;
-    // debug navigation controls
-    switch(event.key())
-    {
-    case Application::KeyEvent::Key::W:
-        g_debugInput.fr = dir;
-        break;
-    case Application::KeyEvent::Key::A:
-        g_debugInput.lf = dir;
-        break;
-    case Application::KeyEvent::Key::S:
-        g_debugInput.bk = dir;
-        break;
-    case Application::KeyEvent::Key::D:
-        g_debugInput.rt = dir;
-        break;
-    case Application::KeyEvent::Key::Q:
-        g_debugInput.up = dir;
-        break;
-    case Application::KeyEvent::Key::E:
-        g_debugInput.dn = dir;
-        break;
-    }
-}
-
-void SatActiveArea::input_key_release(Application::KeyEvent& event)
-{
-    const bool dir = false;
-    // debug navigation controls
-    switch(event.key())
-    {
-    case Application::KeyEvent::Key::W:
-        g_debugInput.fr = dir;
-        break;
-    case Application::KeyEvent::Key::A:
-        g_debugInput.lf = dir;
-        break;
-    case Application::KeyEvent::Key::S:
-        g_debugInput.bk = dir;
-        break;
-    case Application::KeyEvent::Key::D:
-        g_debugInput.rt = dir;
-        break;
-    case Application::KeyEvent::Key::Q:
-        g_debugInput.up = dir;
-        break;
-    case Application::KeyEvent::Key::E:
-        g_debugInput.dn = dir;
-        break;
-    }
-}
-
-void SatActiveArea::input_mouse_press(Application::MouseEvent& event)
-{
-
-}
-
-void SatActiveArea::input_mouse_release(Application::MouseEvent& event)
-{
-
-}
-
-void SatActiveArea::input_mouse_move(Application::MouseMoveEvent& event)
-{
 
 }
 

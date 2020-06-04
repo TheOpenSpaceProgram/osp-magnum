@@ -1,12 +1,14 @@
 #pragma once
 
+#include <string>
+
 #include <Corrade/Containers/LinkedList.h>
 
 namespace osp
 {
 
 template <class T>
-class Resource;
+struct Resource;
 
 using Corrade::Containers::LinkedList;
 using Corrade::Containers::LinkedListItem;

@@ -26,6 +26,16 @@ struct PartBlueprint
 
 };
 
+struct WireBlueprint
+{
+    unsigned m_partFrom;
+    WireOutPort m_portFrom;
+
+    unsigned m_partTo;
+    WireInPort m_portTo;
+};
+
+
 class VehicleBlueprint
 {
     // Specific information on a vehicle
@@ -59,6 +69,8 @@ private:
     // Arrangement of Individual Parts
     std::vector<PartBlueprint> m_blueprints;
 
+    // Wires to connect
+    std::vector<WireBlueprint> m_wires;
 };
 
 }

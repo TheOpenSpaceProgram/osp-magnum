@@ -32,12 +32,7 @@ class SatActiveArea;
 
 typedef int (*LoadStrategy)(SatActiveArea& area, SatelliteObject& loadMe);
 
-//using enum Magnum::Platform::Application::KeyEvent;
-//using namespace Magnum::Platform;
-
-using Magnum::Platform::Application;
-
-class SatActiveArea : public SatelliteObject//, public GroupFtrNewtonBody
+class SatActiveArea : public SatelliteObject
 {
 
     friend OSPMagnum;
@@ -73,11 +68,10 @@ public:
     void draw_gl();
     
     /**
-     * 
+     * Load nearby satellites, Maybe request a floating origin translation,
+     * then calls update_physics of ActiveScene
      */
     void update_physics(float deltaTime);
-
-    //NewtonWorld* get_newton_world() { return m_nwtWorld; }
 
     /**
      * Add a loading strategy to add support for loading a type of satellite 
@@ -87,45 +81,29 @@ public:
     void load_func_add(LoadStrategy function);
 
     /**
-     * 
-     * @param part
+     * Create a Physical Part from a PartPrototype and put it in the world
+     * @param part the part to instantiate
+     * @param rootParent Entity to put part into
      * @return Pointer to object created
      */
-    entt::entity part_instantiate(PartPrototype& part);
+    ActiveEnt part_instantiate(PartPrototype& part,
+                                  ActiveEnt rootParent);
 
     /**
      * Attempt to load a satellite
-     * @return
+     * @return status, zero for no error
      */
     int load_satellite(Satellite& sat);
 
     bool is_loaded_active() { return m_loadedActive; }
-
-    //Scene3D& get_scene() { return m_scene; }
-
-    //Magnum::SceneGraph::DrawableGroup3D& get_drawables() { return m_drawables; }
-
-    void input_key_press(Application::KeyEvent& event);
-    void input_key_release(Application::KeyEvent& event);
-
-    void input_mouse_press(Application::MouseEvent& event);
-    void input_mouse_release(Application::MouseEvent& event);
-    void input_mouse_move(Application::MouseMoveEvent& event);
-
-
 
 private:
 
     std::map<Id const*, LoadStrategy> m_loadFunctions;
 
     bool m_loadedActive;
-    //Scene3D m_scene;
-    //Magnum::SceneGraph::Camera3D* m_camera;
-    //Magnum::SceneGraph::DrawableGroup3D m_drawables;
 
-    // temporary test variables only
-    //Object3D* m_partTest;
-    entt::entity m_camera;
+    ActiveEnt m_camera;
 
     Magnum::GL::Mesh *m_bocks;
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
@@ -133,7 +111,7 @@ private:
     std::shared_ptr<ActiveScene> m_scene;
 
     //GroupFtrNewtonBody m_newtonBodies;
-    entt::entity m_debug_aEnt;
+    ActiveEnt m_debug_aEnt;
 
     UserInputHandler& m_userInput;
 

@@ -37,14 +37,13 @@ public:
 
     ~MachineUserControl() = default;
 
-    //void WireElement::propagate_test();
     void propagate_output(WireOutput* output) override;
 
-    std::vector<WireInput*> available_inputs() override;
-    std::vector<WireOutput*> available_outputs() override;
+    WireInput* request_input(WireInPort port) override;
+    WireOutput* request_output(WireOutPort port) override;
 
-    //constexpr WireOutput& out_throttle() { return m_outputs[0]; }
-    //constexpr WireOutput& out_test() { return m_outputs[1]; }
+    std::vector<WireInput*> existing_inputs() override;
+    std::vector<WireOutput*> existing_outputs() override;
 
 private:
 

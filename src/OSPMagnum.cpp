@@ -76,11 +76,6 @@ void OSPMagnum::keyPressEvent(KeyEvent& event)
     }
     m_userInput.event_raw(sc_keyboard, (int) event.key(),
                           UserInputHandler::ButtonRawEvent::PRESSED);
-
-    if (m_area)
-    {
-        m_area->input_key_press(event);
-    }
 }
 
 void OSPMagnum::keyReleaseEvent(KeyEvent& event)
@@ -93,36 +88,23 @@ void OSPMagnum::keyReleaseEvent(KeyEvent& event)
     m_userInput.event_raw(sc_keyboard, (int) event.key(),
                           UserInputHandler::ButtonRawEvent::RELEASED);
 
-    if (m_area)
-    {
-        m_area->input_key_release(event);
-    }
 }
 
 void OSPMagnum::mousePressEvent(MouseEvent& event)
 {
     m_userInput.event_raw(sc_mouse, (int) event.button(),
                           UserInputHandler::ButtonRawEvent::PRESSED);
-    if (m_area)
-    {
-        m_area->input_mouse_press(event);
-    }
+
 }
 void OSPMagnum::mouseReleaseEvent(MouseEvent& event)
 {
     m_userInput.event_raw(sc_mouse, (int) event.button(),
                           UserInputHandler::ButtonRawEvent::RELEASED);
-    if (m_area)
-    {
-        m_area->input_mouse_release(event);
-    }
+
 }
 void OSPMagnum::mouseMoveEvent(MouseMoveEvent& event)
 {
-    if (m_area)
-    {
-        m_area->input_mouse_move(event);
-    }
+
 }
 
 }

@@ -28,12 +28,22 @@ void MachineUserControl::propagate_output(WireOutput* output)
     std::cout << "propagate test: " << output->get_name() << "\n";
 }
 
-std::vector<WireInput*> MachineUserControl::available_inputs()
+WireInput* MachineUserControl::request_input(WireInPort port)
+{
+    return existing_inputs()[port];
+}
+
+WireOutput* MachineUserControl::request_output(WireOutPort port)
+{
+    return existing_outputs()[port];
+}
+
+std::vector<WireInput*> MachineUserControl::existing_inputs()
 {
     return {&m_wiTest};
 }
 
-std::vector<WireOutput*> MachineUserControl::available_outputs()
+std::vector<WireOutput*> MachineUserControl::existing_outputs()
 {
     return {&m_woThrottle, &m_woTestPropagate};
 }

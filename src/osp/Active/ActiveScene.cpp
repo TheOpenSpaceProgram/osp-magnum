@@ -23,8 +23,10 @@ void CompCamera::calculate_projection()
 
 ActiveScene::ActiveScene(UserInputHandler& userInput) :
         m_hierarchyDirty(false),
-        m_newton(this),
+        //m_userInput(userInput),
+        m_physics(this),
         m_machineUserControl(userInput)
+
 {
     m_registry.on_construct<CompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_construct>(*this);
@@ -117,6 +119,8 @@ void ActiveScene::update_physics()
     // update which
     m_machineUserControl.update();
 
+    // TODO: update a bunch of machines
+
     // check if floating origin translation is requested
     m_floatingOriginInProgress = !(m_floatingOriginTranslate.isZero());
     if (m_floatingOriginInProgress)
@@ -124,7 +128,7 @@ void ActiveScene::update_physics()
         std::cout << "Floating origin translation\n";
     }
 
-    m_newton.update(1.0f / 60.0f);
+    m_physics.update(1.0f / 60.0f);
 }
 
 void ActiveScene::update_hierarchy_transforms()
@@ -199,7 +203,7 @@ void ActiveScene::floating_origin_translate(Vector3 const& amount)
     //m_floatingOriginDirty = true;
 }
 
-void ActiveScene::draw_meshes(entt::entity camera)
+void ActiveScene::draw(entt::entity camera)
 {
     // Start by getting camera transform inverse and projection matrix
 
@@ -215,12 +219,8 @@ void ActiveScene::draw_meshes(entt::entity camera)
         cameraInverse = cameraTransform.m_transformWorld.inverted();
     }
 
-
-
-
     auto drawGroup = m_registry.group<CompDrawableDebug>(
                             entt::get<CompTransform>);
-
 
     Matrix4 entRelative;
 
@@ -230,8 +230,6 @@ void ActiveScene::draw_meshes(entt::entity camera)
         CompTransform& transform = drawGroup.get<CompTransform>(entity);
 
         entRelative = cameraInverse * transform.m_transformWorld;
-
-
 
         (*drawable.m_shader)
             .setDiffuseColor(drawable.m_color)
@@ -247,6 +245,25 @@ void ActiveScene::draw_meshes(entt::entity camera)
 
         //std::cout << "render! \n";
     }
+}
+
+// There's probably a better way to do these:
+
+template<> SysPhysics& ActiveScene::get_system<SysPhysics>()
+{
+    return m_physics;
+}
+
+template<> SysMachineUserControl&
+                    ActiveScene::get_system<SysMachineUserControl>()
+{
+    return m_machineUserControl;
+}
+
+template<>
+SysWire& ActiveScene::get_system<SysWire>()
+{
+    return m_wire;
 }
 
 }

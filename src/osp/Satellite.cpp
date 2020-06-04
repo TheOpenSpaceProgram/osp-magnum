@@ -18,7 +18,7 @@ Satellite::Satellite(Universe* universe) : m_universe(universe)
     // 1024 units = 1 meter
     // enough for a solar system
     //m_precision = 10;
-    m_loadRadius = 10.0f; // 1km radius sphere around sat
+    m_loadRadius = 30.0f; // 1km radius sphere around sat
     std::cout << "satellite created\n";
 }
 
@@ -51,7 +51,7 @@ bool Satellite::is_loadable() const
     return false;
 }
 
-Vector3s Satellite::position_relative_to(Satellite& referenceFrame) const
+Vector3sp Satellite::position_relative_to(Satellite& referenceFrame) const
 {
     // might do more stuff here
     return (m_position - referenceFrame.m_position);

@@ -41,5 +41,25 @@ WireOutput::WireOutput(WireElement *element, WireOutput&& move) :
 
 }
 
+void WireInput::doErase()
+{
+     list()->cut(this);
+};
+
+void SysWire::update_propigate()
+{
+
+    for (DependentOutput &output : m_dependentOutputs)
+    {
+        output.m_element->propagate_output(output.m_output);
+    }
+}
+
+void SysWire::connect(WireOutput &wireFrom, WireInput &wireTo)
+{
+    wireFrom.insert(&wireTo);
+    // TODO: check for dependent outputs and add to list and sort
+}
+
 
 }

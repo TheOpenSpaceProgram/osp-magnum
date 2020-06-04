@@ -13,6 +13,10 @@ namespace osp
 using Corrade::Containers::LinkedList;
 using Corrade::Containers::LinkedListItem;
 
+using WireInPort = uint16_t;
+using WireOutPort = uint16_t;
+
+
 // Supported data types
 using WireData = std::variant<int>;
 
@@ -32,11 +36,14 @@ public:
 
 
     virtual void propagate_output(WireOutput* output) = 0;
-    virtual void request_output(std::string const& name) = 0;
+
+    // TODO: maybe get rid of the raw pointers somehow
+    virtual WireOutput* request_output(WireOutPort port) = 0;
+    virtual WireInput* request_input(WireInPort port) = 0;
 
     //void add_input(WireInput* input);
-    virtual std::vector<WireInput*> available_inputs() = 0;
-    virtual std::vector<WireOutput*> available_outputs() = 0;
+    virtual std::vector<WireInput*> existing_inputs() = 0;
+    virtual std::vector<WireOutput*> existing_outputs() = 0;
 
 private:
 
@@ -73,6 +80,7 @@ public:
     //    static_cast<LinkedList<WireInput>*>
     //            (element)->insert((this));
     //}
+    void doErase() override;
 
 private:
     WireElement* m_element;
@@ -124,13 +132,18 @@ public:
     //using LinkedListItem<WireOutput, WireElement>::erase;
     //using LinkedList<WireInput>::erase;
 
+    using LinkedList<WireInput>::insert;
+    using LinkedList<WireInput>::cut;
+
     void propagate()
     {
         //(list()->*m_propagate_output)();
         //list()->propagate_output(this);
+        //m_element->propagate_output(this);
     }
 
 private:
+    //unsigned m_port;
     WireData m_value;
     WireElement* m_element;
     std::string m_name;
@@ -143,11 +156,24 @@ private:
 
 
 
-
 class SysWire
 {
 public:
+
+    struct DependentOutput
+    {
+        WireElement *m_element;
+        WireOutput *m_output;
+        unsigned depth;
+    };
+
     SysWire() = default;
+
+    void update_propigate();
+    void connect(WireOutput &wireFrom, WireInput &wireTo);
+
+private:
+    std::vector<DependentOutput> m_dependentOutputs;
 };
 
 

@@ -63,7 +63,7 @@ public:
     /**
      * @return Position (relative to parent)
      */
-    const Vector3s& get_position() const { return m_position; }
+    const Vector3sp& get_position() const { return m_position; }
 
     SatelliteObject* get_loader() { return m_loadedBy; }
 
@@ -72,13 +72,13 @@ public:
 
     void set_loader(SatelliteObject* sat) { m_loadedBy = sat; }
 
-    void set_position(Vector3s const& position) { m_position = position; }
+    void set_position(Vector3sp const& position) { m_position = position; }
 
     void set_name(std::string const& name) { m_name = name; }
 
 
 
-    Vector3s position_relative_to(Satellite& referenceFrame) const;
+    Vector3sp position_relative_to(Satellite& referenceFrame) const;
 
     SatelliteObject* get_object() { return m_object.get(); }
 
@@ -130,7 +130,7 @@ protected:
 
     // TODO: Tree structure, and some identification method
 
-    Vector3s m_position;
+    Vector3sp m_position;
 
     //int m_precision;
 };
