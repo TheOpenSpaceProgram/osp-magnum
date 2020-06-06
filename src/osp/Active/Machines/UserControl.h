@@ -16,7 +16,8 @@ public:
 
     SysMachineUserControl(UserInputHandler& userControl);
 
-    void doUpdate();
+    void update_sensor() override;
+    void update_physics() override;
 
 private:
     ButtonControlHandle m_throttleMax;
@@ -25,7 +26,7 @@ private:
 };
 
 /**
- * Processes user inputs into usable WireOutputs
+ * Interfaces user control into WireOutputs for other Machines to use
  */
 class MachineUserControl : public Machine
 {

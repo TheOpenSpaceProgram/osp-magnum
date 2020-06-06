@@ -8,14 +8,14 @@
 namespace osp
 {
 
-struct PartBlueprint
+struct BlueprintPart
 { 
     // Specific information on a part:
     // * Which kind of part
     // * Enabled/disabled properties
     // * Transformation
 
-    unsigned m_partIndex; // index to VehicleBlueprint's m_partsUsed
+    unsigned m_partIndex; // index to BlueprintVehicle's m_partsUsed
 
 
     Vector3 m_translation;
@@ -26,8 +26,16 @@ struct PartBlueprint
 
 };
 
-struct WireBlueprint
+struct BlueprintWire
 {
+    BlueprintWire(unsigned partFrom, WireOutPort portFrom,
+                                 unsigned partTo, WireInPort portTo) :
+        m_partFrom(partFrom),
+        m_portFrom(portFrom),
+        m_partTo(partTo),
+        m_portTo(portTo)
+    {}
+
     unsigned m_partFrom;
     WireOutPort m_portFrom;
 
@@ -35,8 +43,12 @@ struct WireBlueprint
     WireInPort m_portTo;
 };
 
+struct BlueprintMachine
+{
 
-class VehicleBlueprint
+};
+
+class BlueprintVehicle
 {
     // Specific information on a vehicle
     // * List of part blueprints
@@ -45,17 +57,20 @@ class VehicleBlueprint
 
 public:
 
-    void debug_add_part(Resource<PartPrototype>& part,
-                        const Vector3& translation,
-                        const Quaternion& rotation,
-                        const Vector3& scale);
+    void add_part(Resource<PrototypePart>& part,
+                  const Vector3& translation,
+                  const Quaternion& rotation,
+                  const Vector3& scale);
 
-    std::vector<ResDependency<PartPrototype> >& get_prototypes()
+    void add_wire(unsigned partFrom, WireOutPort portFrom,
+                  unsigned partTo, WireInPort portTo);
+
+    std::vector<ResDependency<PrototypePart> >& get_prototypes()
     {
         return m_prototypes;
     }
 
-    std::vector<PartBlueprint>& get_blueprints()
+    std::vector<BlueprintPart>& get_blueprints()
     {
         return m_blueprints;
     }
@@ -64,13 +79,13 @@ public:
 
 private:
     // Unique part Resources used
-    std::vector<ResDependency<PartPrototype> > m_prototypes;
+    std::vector<ResDependency<PrototypePart> > m_prototypes;
 
     // Arrangement of Individual Parts
-    std::vector<PartBlueprint> m_blueprints;
+    std::vector<BlueprintPart> m_blueprints;
 
     // Wires to connect
-    std::vector<WireBlueprint> m_wires;
+    std::vector<BlueprintWire> m_wires;
 };
 
 }

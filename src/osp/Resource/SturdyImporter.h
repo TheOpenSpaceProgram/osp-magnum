@@ -5,7 +5,7 @@
 #include <MagnumPlugins/TinyGltfImporter/TinyGltfImporter.h>
 
 #include "Package.h"
-#include "PartPrototype.h"
+#include "PrototypePart.h"
 
 #include "../../types.h"
 //#include "../scene.h"
@@ -30,7 +30,7 @@ public:
      * Only looks through already-loaded data
      * @param parts Vector to add part data to
      */
-    //void obtain_parts(std::vector<PartPrototype> parts);
+    //void obtain_parts(std::vector<PrototypePart> parts);
 
     void open_filepath(const std::string& filepath);
 
@@ -58,7 +58,7 @@ public:
 
     //void debug_add_obj_recurse(Object3D &parent, unsigned id);
     //void dump_nodes(Scene3D& nodeDump);
-    //PartPrototype load_parts(int index)
+    //PrototypePart load_parts(int index)
     //void load_parts(int index, Package& out);
 
 
@@ -69,7 +69,7 @@ private:
     unsigned m_meshOffset;
 
     void proto_add_obj_recurse(Package& package,
-                               PartPrototype& part,
+                               PrototypePart& part,
                                unsigned parentProtoIndex,
                                unsigned childGltfIndex);
 

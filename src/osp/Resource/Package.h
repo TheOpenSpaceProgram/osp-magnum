@@ -13,13 +13,13 @@
 
 //#include "SturdyImporter.h"
 #include "Resource.h"
-#include "PartPrototype.h"
+#include "PrototypePart.h"
 
 namespace osp
 {
 
 //class SturdyFile;
-class PartPrototype;
+class PrototypePart;
 
 //
 // What I think might be a good idea:
@@ -49,7 +49,7 @@ struct ResourceTable  :
     std::vector< Resource<Magnum::GL::Mesh> >,
     std::vector< Resource<Magnum::Trade::MeshData3D> >,
     std::vector< Resource<Magnum::Trade::ImageData2D> >,
-    std::vector< Resource<PartPrototype> >
+    std::vector< Resource<PrototypePart> >
     //std::vector< Resource<SturdyFile> >
 {
     // prevent copying

@@ -55,16 +55,16 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 
     // Get the needed variables
     SatVehicle &vehicle = static_cast<SatVehicle&>(loadMe);
-    VehicleBlueprint &vehicleData = vehicle.get_blueprint();
+    BlueprintVehicle &vehicleData = vehicle.get_blueprint();
     ActiveScene &scene = *(area.get_scene());
 
     // List of unique part prototypes used in the vehicle
-    // Access with [partBlueprint.m_partIndex]
-    std::vector<ResDependency<PartPrototype> >& partsUsed =
+    // Access with [BlueprintPart.m_partIndex]
+    std::vector<ResDependency<PrototypePart> >& partsUsed =
             vehicleData.get_prototypes();
 
     // List of parts, and how they're arranged
-    std::vector<PartBlueprint>& parts = vehicleData.get_blueprints();
+    std::vector<BlueprintPart>& parts = vehicleData.get_blueprints();
 
     ActiveEnt root = scene.hier_get_root();
     ActiveEnt vehicleEnt = scene.hier_create_child(root);
@@ -75,12 +75,12 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
     vehicleTransform.m_enableFloatingOrigin = true;
 
     // Loop through blueprints
-    for (PartBlueprint& partBp : parts)
+    for (BlueprintPart& partBp : parts)
     {
-        ResDependency<PartPrototype>& partDepends =
+        ResDependency<PrototypePart>& partDepends =
                 partsUsed[partBp.m_partIndex];
 
-        PartPrototype *proto = partDepends.get_data();
+        PrototypePart *proto = partDepends.get_data();
 
         // Check if the part prototype this depends on still exists
         if (!proto)
@@ -174,7 +174,7 @@ int SatActiveArea::activate()
 
     Universe* u = m_sat->get_universe();
     Package& p = u->debug_get_packges()[0];
-    PartPrototype& part = p.get_resource<PartPrototype>(0)->m_data;
+    PrototypePart& part = p.get_resource<PrototypePart>(0)->m_data;
 
     m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
 
@@ -285,18 +285,18 @@ void SatActiveArea::draw_gl()
 }
 
 
-ActiveEnt SatActiveArea::part_instantiate(PartPrototype& part,
+ActiveEnt SatActiveArea::part_instantiate(PrototypePart& part,
                                              ActiveEnt rootParent)
 {
 
-    std::vector<ObjectPrototype> const& prototypes = part.get_objects();
+    std::vector<PrototypeObject> const& prototypes = part.get_objects();
     std::vector<ActiveEnt> newEntities(prototypes.size());
 
     //std::cout << "size: " << newEntities.size() << "\n";
 
     for (int i = 0; i < prototypes.size(); i ++)
     {
-        const ObjectPrototype& currentPrototype = prototypes[i];
+        const PrototypeObject& currentPrototype = prototypes[i];
         ActiveEnt currentEnt, parentEnt;
 
         // Get parent

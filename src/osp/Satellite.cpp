@@ -19,7 +19,7 @@ Satellite::Satellite(Universe* universe) : m_universe(universe)
     // enough for a solar system
     //m_precision = 10;
     m_loadRadius = 30.0f; // 1km radius sphere around sat
-    std::cout << "satellite created\n";
+    //std::cout << "satellite created\n";
 }
 
 
@@ -32,12 +32,12 @@ Satellite::Satellite(Satellite&& sat) :
 {
     // TODO
     m_object->m_sat = this;
-    std::cout << "satellite moved\n";
+    //std::cout << "satellite moved\n";
 }
 
 Satellite::~Satellite()
 {
-    std::cout << "satellite destroyed!\n";
+    //std::cout << "satellite destroyed!\n";
 
     //m_object.release(); // not the right thing to do
 }

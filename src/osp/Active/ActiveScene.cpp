@@ -2,8 +2,11 @@
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 
+#include "Machines/UserControl.h"
+#include "Machines/Rocket.h"
 
 #include "ActiveScene.h"
+
 
 namespace osp
 {
@@ -24,8 +27,7 @@ void CompCamera::calculate_projection()
 ActiveScene::ActiveScene(UserInputHandler& userInput) :
         m_hierarchyDirty(false),
         //m_userInput(userInput),
-        m_physics(this),
-        m_machineUserControl(userInput)
+        m_physics(this)
 
 {
     m_registry.on_construct<CompHierarchy>()
@@ -48,8 +50,24 @@ ActiveScene::ActiveScene(UserInputHandler& userInput) :
     hierarchy.m_name = "Root Entity";
 
     // test constructing a MachineUserControl
-    MachineUserControl& control = m_machineUserControl.emplace();
+    //MachineUserControl& control = m_machineUserControl.emplace();
 
+
+    // Register machines, maybe move this somewhere else?
+    //m_sysMachines.emplace_back(
+    //            std::make_unique<SysMachineUserControl>(userInput));
+    //m_sysMachines.emplace_back(
+    //            std::make_unique<SysMachineRocket>());
+    auto sysUserControl = m_sysMachines.emplace("UserControl",
+                          std::make_unique<SysMachineUserControl>(userInput));
+    auto sysMachineRocket = m_sysMachines.emplace("Rocket",
+                          std::make_unique<SysMachineRocket>());
+
+    // Add SysMachineUserControl to sensor update
+    m_update_sensor.emplace_back(*(sysUserControl.first->second));
+
+    // Add SysMachineRocket to physics update
+    m_update_physics.emplace_back(*(sysMachineRocket.first->second));
 
    // m_hierLevels.resize(5);
 }
@@ -116,10 +134,19 @@ void ActiveScene::on_hierarchy_destruct(entt::registry& reg, entt::entity ent)
 
 void ActiveScene::update_physics()
 {
-    // update which
-    m_machineUserControl.update();
+    // Update machine systems
+    for (AbstractSysMachine &sysMachine : m_update_sensor)
+    {
+        sysMachine.update_sensor();
+    }
 
-    // TODO: update a bunch of machines
+    m_wire.update_propigate();
+
+    for (AbstractSysMachine &sysMachine : m_update_physics)
+    {
+        sysMachine.update_physics();
+    }
+
 
     // check if floating origin translation is requested
     m_floatingOriginInProgress = !(m_floatingOriginTranslate.isZero());
@@ -254,11 +281,11 @@ template<> SysPhysics& ActiveScene::get_system<SysPhysics>()
     return m_physics;
 }
 
-template<> SysMachineUserControl&
-                    ActiveScene::get_system<SysMachineUserControl>()
-{
-    return m_machineUserControl;
-}
+//template<> SysMachineUserControl&
+//                    ActiveScene::get_system<SysMachineUserControl>()
+//{
+//    return m_machineUserControl;
+//}
 
 template<>
 SysWire& ActiveScene::get_system<SysWire>()

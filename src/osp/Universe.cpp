@@ -13,12 +13,12 @@ Universe::Universe()
 
 }
 
-void Universe::add_part(PartPrototype& prototype)
+void Universe::add_part(PrototypePart& prototype)
 {
 
 }
 
-void Universe::add_parts(const std::vector<PartPrototype> &prototypes)
+void Universe::add_parts(const std::vector<PrototypePart> &prototypes)
 {
     std::cout << "Adding prototypes: " << prototypes.size() << "\n";
 }

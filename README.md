@@ -140,7 +140,8 @@ See Technical.md for reasons why this is needed. Here, it's implemented
 something like this:
 
 **WireElement**
-* Stores an accesible list of WireInputs and WireOutputs
+* Base class for Machines
+* Has functions to list available WireInputs and WireOutputs
 * Inherited by Machine
 
 **WireOutput**
@@ -199,8 +200,35 @@ TODO: some details on how to actually sort it
 This is kind of complicated but in theory should even work for sequential logic
 like flip flops.
 
+### Update order
+
+The internal main loop is handled by Magnum, which calls OSPMagnum::drawEvent()
+
+Independent render and physics threads isn't implemented yet.
+
+**Render Frame (OSPMagnum::drawEvent())**
+* Call a physics update
+* Draw ActiveArea ( m_area->draw_gl() )
+  * Update ActiveScene hierarchy `ActiveScene::update_hierarchy_transforms()`
+    * Calculate world transformation
+    * Interpolate physics (not yet implemented)
+  * Draw ActiveScene  `ActiveScene::draw()`
+    * System Loop through drawables
+* Swap screen buffer
+
+**Update Physics**
+*.Update user controls `UserInputHandler::update_controls()`
+* Update ActiveArea `ActiveArea::update_physics()`
+  * Scan for nearby Satellites
+  * Request floating origin translation
+  * Call ActiveScene physics update `ActiveScene::update_physics()`
+    * SysMachines Sensor Update
+    * Wire Propagate Update
+    * SysMachines Physics Update
+    * Physics Engine Update `SysNewton::update`
+      * Updates Newton Dynamics, whatever happens there
+* Clear user controls
 
 ## Random Notes
 * This project might be codenamed 'adera'. the name of the street the 49 UBC
   bus was at while the project files were first created.
-* Maybe separate SatActiveArea into different Policies

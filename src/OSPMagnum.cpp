@@ -35,8 +35,6 @@ void OSPMagnum::set_active_area(SatActiveArea& area)
 
 void OSPMagnum::drawEvent()
 {
-    m_userInput.update_controls();
-
 
     Magnum::GL::defaultFramebuffer.clear(Magnum::GL::FramebufferClear::Color
                                          | Magnum::GL::FramebufferClear::Depth);
@@ -52,7 +50,11 @@ void OSPMagnum::drawEvent()
 
        // std::cout << "deltaTime: " << m_timeline.previousFrameDuration() << "\n";
 
+        // TODO: physics update
+        m_userInput.update_controls();
         m_area->update_physics(1.0f / 60.0f);
+        m_userInput.event_clear();
+        // end of physics update
 
         m_area->draw_gl();
     }
@@ -62,8 +64,6 @@ void OSPMagnum::drawEvent()
     swapBuffers();
     m_timeline.nextFrame();
     redraw();
-
-    m_userInput.event_clear();
 }
 
 

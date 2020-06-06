@@ -56,7 +56,7 @@ SysMachineUserControl::SysMachineUserControl(UserInputHandler& userControl) :
 
 }
 
-void SysMachineUserControl::doUpdate()
+void SysMachineUserControl::update_sensor()
 {
     //std::cout << "updating all MachineUserControls\n";
     // InputDevice.IsActivated()
@@ -82,6 +82,11 @@ void SysMachineUserControl::doUpdate()
     {
         
     }
+}
+
+void SysMachineUserControl::update_physics()
+{
+
 }
 
 }

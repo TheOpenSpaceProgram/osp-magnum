@@ -5,7 +5,7 @@
 
 #include "Resource/Package.h"
 #include "Satellite.h"
-#include "Resource/PartPrototype.h"
+#include "Resource/PrototypePart.h"
 
 
 namespace osp
@@ -24,8 +24,8 @@ public:
     Universe();
 
 
-    void add_part(PartPrototype& prototype);
-    void add_parts(const std::vector<PartPrototype>& prototypes);
+    void add_part(PrototypePart& prototype);
+    void add_parts(const std::vector<PrototypePart>& prototypes);
 
     /**
      * Add a satellite to the universe
@@ -62,7 +62,7 @@ private:
     std::vector<Package> m_packages;
 
     std::vector<Satellite> m_satellites;
-    //std::vector<PartPrototype> m_prototypes;
+    //std::vector<PrototypePart> m_prototypes;
 
 };
 

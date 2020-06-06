@@ -48,21 +48,32 @@ class AbstractSysMachine
 {
 public:
     AbstractSysMachine() = default;
-    virtual void update() = 0;
+    AbstractSysMachine(AbstractSysMachine const& copy) = delete;
+    AbstractSysMachine(AbstractSysMachine&& move) = delete;
+
+    virtual void update_sensor() = 0;
+    virtual void update_physics() = 0;
 };
 
 // Template for making Machine Systems
 template<class Derived, class Mach>
 class SysMachine : public AbstractSysMachine
 {
-
     friend Derived;
 
 public:
 
-    //virtual void update_sense() = 0;
-    //virtual void update_respond() = 0;
-    void update() { static_cast<Derived&>(*this).doUpdate(); }
+    virtual void update_sensor() = 0;
+    virtual void update_physics() = 0;
+    //void update_sensor() override
+    //{
+    //    static_cast<Derived&>(*this).do_update_sensor();
+    //}
+
+    //void update_physics() override
+    //{
+    //    static_cast<Derived&>(*this).do_update_physics();
+    //}
 
     /**
      * Create a new Machine and add to internal vector

@@ -28,14 +28,14 @@ public:
     bool is_loadable() const override;
 
 
-    VehicleBlueprint& get_blueprint() { return m_blueprint; }
+    BlueprintVehicle& get_blueprint() { return m_blueprint; }
 
 
 
 private:
 
     // blueprint to load when loaded by active area
-    VehicleBlueprint m_blueprint;
+    BlueprintVehicle m_blueprint;
 
 };
 

@@ -188,13 +188,14 @@ int debug_cli_loop()
 
 osp::Satellite& debug_add_random_vehicle()
 {
-    osp::Satellite& sat = g_universe.create_sat();
-    osp::SatVehicle& vehicle = sat.create_object<osp::SatVehicle>();
+    osp::Satellite &sat = g_universe.create_sat();
+    osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
+    osp::BlueprintVehicle &blueprint = vehicle.get_blueprint();
 
     // Part to add
-    osp::Resource<osp::PartPrototype>* victim =
+    osp::Resource<osp::PrototypePart>* victim =
             g_universe.debug_get_packges()[0]
-            .get_resource<osp::PartPrototype>(0);
+            .get_resource<osp::PrototypePart>(0);
 
     for (int i = 0; i < 10; i ++)
     {
@@ -206,10 +207,12 @@ osp::Satellite& debug_add_random_vehicle()
         randomvec /= 32.0f;
 
         // Add a new [victim] part
-        vehicle.get_blueprint().debug_add_part(*victim, randomvec,
-                                               Quaternion(), Vector3(1, 1, 1));
+        blueprint.add_part(*victim, randomvec,
+                           Quaternion(), Vector3(1, 1, 1));
         //std::cout << "random: " <<  << "\n";
     }
+
+
 
     return sat;
 

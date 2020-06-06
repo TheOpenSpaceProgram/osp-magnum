@@ -14,7 +14,7 @@
 //#include "../scene.h"
 
 #include "../Resource/Package.h"
-#include "../Resource/PartPrototype.h"
+#include "../Resource/PrototypePart.h"
 
 #include "../Active/ActiveScene.h"
 
@@ -81,12 +81,12 @@ public:
     void load_func_add(LoadStrategy function);
 
     /**
-     * Create a Physical Part from a PartPrototype and put it in the world
+     * Create a Physical Part from a PrototypePart and put it in the world
      * @param part the part to instantiate
      * @param rootParent Entity to put part into
      * @return Pointer to object created
      */
-    ActiveEnt part_instantiate(PartPrototype& part,
+    ActiveEnt part_instantiate(PrototypePart& part,
                                   ActiveEnt rootParent);
 
     /**

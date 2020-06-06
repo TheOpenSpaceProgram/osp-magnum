@@ -7,6 +7,8 @@
 #include <Magnum/Trade/SceneData.h>
 #include <Magnum/MeshTools/Compile.h>
 
+#include <MagnumExternal/TinyGltf/tiny_gltf.h>
+
 #include "Package.h"
 #include "SturdyImporter.h"
 
@@ -62,15 +64,42 @@ void SturdyImporter::load_config(Package& package)
 
             std::cout << "PART!\n";
 
-            //PartPrototype part;
-            Resource<PartPrototype> part;
+            //PrototypePart part;
+            Resource<PrototypePart> part;
             //part.m_name = nodeName;
             part.m_path = nodeName;
 
             // Add objects to the part, and recurse
             proto_add_obj_recurse(package, part.m_data, 0, childId);
 
-            package.debug_add_resource<PartPrototype>(std::move(part));
+            // Parse extras
+            tinygltf::Node const& node = *static_cast<tinygltf::Node const*>(
+                        m_gltfImporter.object3D(childId)->importerState());
+
+            tinygltf::Value const& extras = node.extras;
+            tinygltf::Value const& machines = extras.Get("machines");
+            if (machines.IsArray())
+            {
+                std::cout << "JSON machines!\n";
+                auto const& machArray = machines.Get<tinygltf::Value::Array>();
+
+                // Loop through machine configs
+                // machArray looks like:
+                // [
+                //    { "type": "Rocket", stuff... },
+                //    { "type": "Control", stuff...}
+                // ]
+                for (tinygltf::Value const& value : machArray)
+                {
+                    std::string type = value.Get("type").Get<std::string>();
+                }
+            }
+            else
+            {
+                std::cout << "JSON machines array not found\n";
+            }
+
+            package.debug_add_resource<PrototypePart>(std::move(part));
 
         }
 
@@ -109,17 +138,17 @@ void SturdyImporter::load_config(Package& package)
 }
 //either an appendable package, or
 void SturdyImporter::proto_add_obj_recurse(Package& package,
-                                           PartPrototype& part,
+                                           PrototypePart& part,
                                            unsigned parentProtoIndex,
                                            unsigned childGltfIndex)
 {
     // Add the object to the prototype
     Pointer<ObjectData3D> childData = m_gltfImporter.object3D(childGltfIndex);
-    std::vector<ObjectPrototype>& protoObjects = part.get_objects();
+    std::vector<PrototypeObject>& protoObjects = part.get_objects();
     const std::string& name = m_gltfImporter.object3DName(childGltfIndex);
 
     // I think I've been doing too much C
-    ObjectPrototype obj;
+    PrototypeObject obj;
     obj.m_parentIndex = parentProtoIndex;
     obj.m_childCount = childData->children().size();
     obj.m_translation = childData->translation();

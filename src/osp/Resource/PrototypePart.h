@@ -40,7 +40,7 @@ enum class ColliderType
 struct DrawableData
 {
 
-    // index to a partPrototype.m_meshDataUsed
+    // index to a PrototypePart.m_meshDataUsed
     unsigned m_mesh;
     //std::string m_mesh;
     //unsigned m_material;
@@ -54,7 +54,7 @@ struct ColliderData
 
 using Magnum::Trade::MeshData3D;
 
-struct ObjectPrototype
+struct PrototypeObject
 {
     unsigned m_parentIndex;
     unsigned m_childCount;
@@ -85,22 +85,22 @@ struct ObjectPrototype
 };
 
 
-class PartPrototype
+class PrototypePart
 {
 
 
 public:
-    PartPrototype();
+    PrototypePart();
 
-    std::vector<ObjectPrototype>& get_objects() { return m_objects; }
-    std::vector<ObjectPrototype> const& get_objects() const { return m_objects; }
+    std::vector<PrototypeObject>& get_objects() { return m_objects; }
+    std::vector<PrototypeObject> const& get_objects() const { return m_objects; }
 
     std::vector<std::string>& get_strings() { return m_strings; }
 
 private:
     //std::string name; use path
 
-    std::vector<ObjectPrototype> m_objects;
+    std::vector<PrototypeObject> m_objects;
 
     //std::vector<ResDependency<MeshData3D> > m_meshDataUsed;
 

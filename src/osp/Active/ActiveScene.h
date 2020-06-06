@@ -10,15 +10,15 @@
 
 #include <entt/entt.hpp>
 
-#include "../Resource/PartPrototype.h"
+#include "../Resource/PrototypePart.h"
+
+#include "../UserInputHandler.h"
 
 #include "../../types.h"
 
 #include "SysNewton.h"
 #include "SysMachine.h"
 #include "SysWire.h"
-
-#include "Machines/UserControl.h"
 
 
 namespace osp
@@ -155,10 +155,14 @@ private:
     bool m_floatingOriginInProgress;
 
     //UserInputHandler &m_userInput;
+    std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_sensor;
+    std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_physics;
+
+    std::map<std::string, std::unique_ptr<AbstractSysMachine>> m_sysMachines;
 
     // TODO: base class and a list for Systems
     SysPhysics m_physics;
-    SysMachineUserControl m_machineUserControl;
+    //SysMachineUserControl m_machineUserControl;
     SysWire m_wire;
 
 };

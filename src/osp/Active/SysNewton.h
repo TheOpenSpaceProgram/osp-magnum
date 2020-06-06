@@ -4,7 +4,7 @@
 
 #include <Newton.h>
 
-#include "../Resource/PartPrototype.h"
+#include "../Resource/PrototypePart.h"
 
 
 namespace osp
