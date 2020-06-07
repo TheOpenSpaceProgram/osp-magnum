@@ -6,12 +6,11 @@
 #include <Magnum/Math/Matrix4.h>
 #include <Magnum/Math/Quaternion.h>
 
+#include <Magnum/Trade/MeshData3D.h>
 
 #include <string>
 #include <array>
 #include <vector>
-
-#include "Package.h"
 
 namespace osp
 {
@@ -85,6 +84,13 @@ struct PrototypeObject
 };
 
 
+struct PrototypeMachine
+{
+    //std::string m_type;
+
+    // TODO: some sort of data
+};
+
 class PrototypePart
 {
 
@@ -101,6 +107,8 @@ private:
     //std::string name; use path
 
     std::vector<PrototypeObject> m_objects;
+
+    std::vector<PrototypeMachine> m_machines;
 
     //std::vector<ResDependency<MeshData3D> > m_meshDataUsed;
 

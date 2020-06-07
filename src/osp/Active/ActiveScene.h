@@ -10,8 +10,6 @@
 
 #include <entt/entt.hpp>
 
-#include "../Resource/PrototypePart.h"
-
 #include "../UserInputHandler.h"
 
 #include "../../types.h"

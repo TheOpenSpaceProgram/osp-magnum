@@ -14,6 +14,7 @@
 //#include "SturdyImporter.h"
 #include "Resource.h"
 #include "PrototypePart.h"
+#include "blueprints.h"
 
 namespace osp
 {
@@ -49,7 +50,8 @@ struct ResourceTable  :
     std::vector< Resource<Magnum::GL::Mesh> >,
     std::vector< Resource<Magnum::Trade::MeshData3D> >,
     std::vector< Resource<Magnum::Trade::ImageData2D> >,
-    std::vector< Resource<PrototypePart> >
+    std::vector< Resource<PrototypePart> >,
+    std::vector< Resource<BlueprintVehicle> >
     //std::vector< Resource<SturdyFile> >
 {
     // prevent copying

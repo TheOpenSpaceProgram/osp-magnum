@@ -1,12 +1,14 @@
 #pragma once
 
-#include "Package.h"
-
-#include "../Satellites/SatActiveArea.h"
 #include "../../types.h"
+
+#include "../Active/SysWire.h"
+#include "../Resource/Resource.h"
+#include "../Resource/PrototypePart.h"
 
 namespace osp
 {
+
 
 struct BlueprintPart
 { 

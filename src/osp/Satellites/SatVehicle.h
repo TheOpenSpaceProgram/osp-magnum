@@ -1,7 +1,10 @@
 #pragma once
 
-#include "../Resource/blueprints.h"
 #include "../Satellite.h"
+
+#include "../Resource/Resource.h"
+#include "../Resource/blueprints.h"
+
 
 namespace osp
 {
@@ -28,14 +31,19 @@ public:
     bool is_loadable() const override;
 
 
-    BlueprintVehicle& get_blueprint() { return m_blueprint; }
+    BlueprintVehicle& get_blueprint();
+
+    ResDependency<BlueprintVehicle>& get_blueprint_depend()
+    {
+        return m_blueprint;
+    }
 
 
 
 private:
 
     // blueprint to load when loaded by active area
-    BlueprintVehicle m_blueprint;
+    ResDependency<BlueprintVehicle> m_blueprint;
 
 };
 

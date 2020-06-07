@@ -92,6 +92,7 @@ void SturdyImporter::load_config(Package& package)
                 for (tinygltf::Value const& value : machArray)
                 {
                     std::string type = value.Get("type").Get<std::string>();
+                    std::cout << "test: " << type << "\n";
                 }
             }
             else

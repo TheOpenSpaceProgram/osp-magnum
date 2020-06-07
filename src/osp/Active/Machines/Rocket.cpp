@@ -47,7 +47,7 @@ void SysMachineRocket::update_sensor()
 
 void SysMachineRocket::update_physics()
 {
-    std::cout << "foo\n";
+    //std::cout << "foo\n";
 }
 
 }
