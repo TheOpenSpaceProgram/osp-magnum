@@ -17,6 +17,8 @@ struct BlueprintPart
     // * Enabled/disabled properties
     // * Transformation
 
+
+
     unsigned m_partIndex; // index to BlueprintVehicle's m_partsUsed
 
 
@@ -47,7 +49,7 @@ struct BlueprintWire
 
 struct BlueprintMachine
 {
-
+    // TODO specific settings for a machine
 };
 
 class BlueprintVehicle

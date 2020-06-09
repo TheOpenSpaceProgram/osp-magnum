@@ -91,8 +91,19 @@ void SturdyImporter::load_config(Package& package)
                 // ]
                 for (tinygltf::Value const& value : machArray)
                 {
+
                     std::string type = value.Get("type").Get<std::string>();
                     std::cout << "test: " << type << "\n";
+
+                    if (type.empty())
+                    {
+                        continue;
+                    }
+
+                    // TODO: more stuff
+                    PrototypeMachine machine;
+                    machine.m_type = std::move(type);
+                    part.m_data.get_machines().emplace_back(std::move(machine));
                 }
             }
             else

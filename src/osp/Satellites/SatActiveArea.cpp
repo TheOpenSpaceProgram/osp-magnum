@@ -21,6 +21,7 @@
 #include "../Resource/PlanetData.h"
 
 #include "../Active/SysNewton.h"
+#include "../Active/SysMachine.h"
 
 
 #include "../Universe.h"
@@ -89,6 +90,31 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
         }
 
         ActiveEnt partEntity = area.part_instantiate(*proto, vehicleEnt);
+
+        // Part now exists
+
+        // TODO: Deal with blueprint machines instead of prototypes directly
+
+        CompMachine& partMachines = scene.get_registry()
+                                            .emplace<CompMachine>(partEntity);
+
+        for (PrototypeMachine& protoMachine : proto->get_machines())
+        {
+            AbstractSysMachine* sysMachine
+                    = area.get_scene()->get_system_machine(protoMachine.m_type);
+
+            if (!sysMachine)
+            {
+                std::cout << "Machine: " << protoMachine.m_type << " Not found\n";
+                continue;
+            }
+
+            // TODO: pass the blueprint configs into this function
+            Machine& machine = sysMachine->instantiate();
+
+            // Add the machine to the part
+            partMachines.m_machines.insert(&machine);
+        }
 
         CompTransform& partTransform = scene.get_registry()
                                             .get<CompTransform>(partEntity);

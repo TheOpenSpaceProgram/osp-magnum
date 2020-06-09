@@ -17,8 +17,10 @@ using Corrade::Containers::LinkedListItem;
 class Machine;
 
 // Machine component to add to entt Entities
-class CompMachine
+struct CompMachine
 {
+    CompMachine() : m_machines() {}
+
     LinkedList<Machine> m_machines;
 
 };
@@ -35,6 +37,10 @@ public:
     Machine(Machine&& move) = default;
     virtual ~Machine() = default;
 
+
+    // polymorphic stuff is used only for wiring
+    // use a system for updating
+
     virtual void propagate_output(WireOutput* output) = 0;
 
     virtual WireOutput* request_output(WireOutPort port) = 0;
@@ -42,6 +48,8 @@ public:
 
     virtual std::vector<WireInput*> existing_inputs() = 0;
     virtual std::vector<WireOutput*> existing_outputs() = 0;
+
+
 };
 
 class AbstractSysMachine
@@ -53,6 +61,9 @@ public:
 
     virtual void update_sensor() = 0;
     virtual void update_physics() = 0;
+
+    // TODO: make some config an argument
+    virtual Machine& instantiate() = 0;
 };
 
 // Template for making Machine Systems
@@ -74,6 +85,7 @@ public:
     //{
     //    static_cast<Derived&>(*this).do_update_physics();
     //}
+    virtual Machine& instantiate() = 0;
 
     /**
      * Create a new Machine and add to internal vector
@@ -92,7 +104,7 @@ template<class Derived, class Mach>
 template<class... Args>
 Mach& SysMachine<Derived, Mach>::emplace(Args&& ... args)
 {
-    m_machines.emplace_back();//std::forward<Args>(args)...);
+    m_machines.emplace_back(std::forward<Args>(args)...);
     return m_machines.back();
 }
 

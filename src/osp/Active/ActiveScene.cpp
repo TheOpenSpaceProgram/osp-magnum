@@ -274,18 +274,26 @@ void ActiveScene::draw(entt::entity camera)
     }
 }
 
+AbstractSysMachine* ActiveScene::get_system_machine(std::string const& name)
+{
+    MapSysMachine::iterator sysIt = m_sysMachines.find(name);
+
+    if (sysIt == m_sysMachines.end())
+    {
+        return nullptr;
+    }
+    else
+    {
+        return sysIt->second.get();
+    }
+}
+
 // There's probably a better way to do these:
 
 template<> SysPhysics& ActiveScene::get_system<SysPhysics>()
 {
     return m_physics;
 }
-
-//template<> SysMachineUserControl&
-//                    ActiveScene::get_system<SysMachineUserControl>()
-//{
-//    return m_machineUserControl;
-//}
 
 template<>
 SysWire& ActiveScene::get_system<SysWire>()

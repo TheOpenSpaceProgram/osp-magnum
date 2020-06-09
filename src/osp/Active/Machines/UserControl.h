@@ -19,6 +19,8 @@ public:
     void update_sensor() override;
     void update_physics() override;
 
+    Machine& instantiate() override;
+
 private:
     ButtonControlHandle m_throttleMax;
     ButtonControlHandle m_throttleMin;

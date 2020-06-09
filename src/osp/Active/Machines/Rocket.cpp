@@ -50,4 +50,9 @@ void SysMachineRocket::update_physics()
     //std::cout << "foo\n";
 }
 
+Machine& SysMachineRocket::instantiate()
+{
+    return emplace();
+}
+
 }

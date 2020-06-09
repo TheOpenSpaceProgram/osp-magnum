@@ -80,13 +80,18 @@ void SysMachineUserControl::update_sensor()
 
     for (MachineUserControl& machine : m_machines)
     {
-        
+        std::cout << "updating a MachineUserControl" << "\n";
     }
 }
 
 void SysMachineUserControl::update_physics()
 {
 
+}
+
+Machine& SysMachineUserControl::instantiate()
+{
+    return emplace();
 }
 
 }

@@ -192,7 +192,10 @@
                 "description" : "A kettle used to boil people",
                 "machines" : [
                     {
-                        "type" : "Control"
+                        "type" : "UserControl"
+                    },
+                    {
+                        "type" : "FreeEnergyGenerator"
                     }
                 ],
                 "manufacturer" : "Gotzietek",

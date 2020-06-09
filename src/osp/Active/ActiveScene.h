@@ -28,6 +28,9 @@ using SysPhysics = SysNewton;
 
 using ActiveEnt = entt::entity;
 
+using MapSysMachine = std::map<std::string,
+                               std::unique_ptr<AbstractSysMachine>>;
+
 struct CompCamera
 {
     float m_near, m_far;
@@ -142,6 +145,8 @@ public:
     template<class T>
     T& get_system();
 
+    AbstractSysMachine* get_system_machine(std::string const& name);
+
 private:
 
     //std::vector<std::vector<ActiveEnt> > m_hierLevels;
@@ -156,7 +161,7 @@ private:
     std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_sensor;
     std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_physics;
 
-    std::map<std::string, std::unique_ptr<AbstractSysMachine>> m_sysMachines;
+    MapSysMachine m_sysMachines;
 
     // TODO: base class and a list for Systems
     SysPhysics m_physics;

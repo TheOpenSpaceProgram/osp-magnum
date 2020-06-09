@@ -190,9 +190,9 @@ osp::Satellite& debug_add_random_vehicle()
 {
     osp::Satellite &sat = g_universe.create_sat();
     osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
-    osp::BlueprintVehicle &blueprint = vehicle.get_blueprint();
+    osp::Resource<osp::BlueprintVehicle> blueprint;
 
-    // Part to add
+    // Part to add, very likely a spamcan
     osp::Resource<osp::PrototypePart>* victim =
             g_universe.debug_get_packges()[0]
             .get_resource<osp::PrototypePart>(0);
@@ -207,10 +207,17 @@ osp::Satellite& debug_add_random_vehicle()
         randomvec /= 32.0f;
 
         // Add a new [victim] part
-        blueprint.add_part(*victim, randomvec,
+        blueprint.m_data.add_part(*victim, randomvec,
                            Quaternion(), Vector3(1, 1, 1));
         //std::cout << "random: " <<  << "\n";
     }
+
+    // put blueprint in package
+    auto blueprintRes = g_universe.debug_get_packges()[0]
+            .debug_add_resource<osp::BlueprintVehicle>(std::move(blueprint));
+
+    // set the SatVehicle's blueprint to the one just made
+    vehicle.get_blueprint_depend().bind(*blueprintRes);
 
 
 
