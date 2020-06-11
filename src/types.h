@@ -21,6 +21,8 @@ using Magnum::Vector3;
 using Magnum::Quaternion;
 using Magnum::Matrix4;
 
+using Magnum::Rad;
+
 // An int for space
 typedef int64_t SpaceInt;
 

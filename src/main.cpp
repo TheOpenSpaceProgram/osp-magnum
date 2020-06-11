@@ -212,6 +212,12 @@ osp::Satellite& debug_add_random_vehicle()
         //std::cout << "random: " <<  << "\n";
     }
 
+    // Wire up throttle control
+    // from (output): a MachineUserControl m_woThrottle
+    // to    (input): a MachineRocket m_wiThrottle
+    blueprint.m_data.add_wire(0, 0, 0,
+                              0, 1, 1);
+
     // put blueprint in package
     auto blueprintRes = g_universe.debug_get_packges()[0]
             .debug_add_resource<osp::BlueprintVehicle>(std::move(blueprint));

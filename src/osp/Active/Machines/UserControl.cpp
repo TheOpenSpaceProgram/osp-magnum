@@ -12,15 +12,18 @@ MachineUserControl::MachineUserControl() :
     m_woThrottle(this, "Throttle"),
     m_wiTest(this, "Test")
 {
-    m_woTestPropagate.propagate();
+    //m_woTestPropagate.propagate();
+    m_enable = true;
+
 }
 
 MachineUserControl::MachineUserControl(MachineUserControl&& move) :
     m_woTestPropagate(this, std::move(move.m_woTestPropagate)),
     m_woThrottle(this, std::move(move.m_woThrottle)),
-    m_wiTest(this, std::move(move.m_wiTest))
+    m_wiTest(this, std::move(move.m_wiTest)),
+    Machine(std::move(move))
 {
-
+    m_enable = true;
 }
 
 void MachineUserControl::propagate_output(WireOutput* output)
@@ -80,7 +83,12 @@ void SysMachineUserControl::update_sensor()
 
     for (MachineUserControl& machine : m_machines)
     {
-        std::cout << "updating a MachineUserControl" << "\n";
+        if (!machine.m_enable)
+        {
+            continue;
+        }
+
+        //std::cout << "updating control\n";
     }
 }
 

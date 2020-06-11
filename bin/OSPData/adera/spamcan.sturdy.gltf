@@ -195,6 +195,9 @@
                         "type" : "UserControl"
                     },
                     {
+                        "type" : "Rocket"
+                    },
+                    {
                         "type" : "FreeEnergyGenerator"
                     }
                 ],

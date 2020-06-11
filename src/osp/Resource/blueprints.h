@@ -32,19 +32,23 @@ struct BlueprintPart
 
 struct BlueprintWire
 {
-    BlueprintWire(unsigned partFrom, WireOutPort portFrom,
-                                 unsigned partTo, WireInPort portTo) :
-        m_partFrom(partFrom),
-        m_portFrom(portFrom),
-        m_partTo(partTo),
-        m_portTo(portTo)
+    BlueprintWire(unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
+                  unsigned toPart, unsigned toMachine, WireOutPort toPort) :
+        m_fromPart(fromPart),
+        m_fromMachine(fromMachine),
+        m_fromPort(fromPort),
+        m_toPart(toPart),
+        m_toMachine(toMachine),
+        m_toPort(toPort)
     {}
 
-    unsigned m_partFrom;
-    WireOutPort m_portFrom;
+    unsigned m_fromPart;
+    unsigned m_fromMachine;
+    WireOutPort m_fromPort;
 
-    unsigned m_partTo;
-    WireInPort m_portTo;
+    unsigned m_toPart;
+    unsigned m_toMachine;
+    WireInPort m_toPort;
 };
 
 struct BlueprintMachine
@@ -66,8 +70,8 @@ public:
                   const Quaternion& rotation,
                   const Vector3& scale);
 
-    void add_wire(unsigned partFrom, WireOutPort portFrom,
-                  unsigned partTo, WireInPort portTo);
+    void add_wire(unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
+                  unsigned toPart, unsigned toMachine, WireOutPort toPort);
 
     std::vector<ResDependency<PrototypePart> >& get_prototypes()
     {
@@ -79,7 +83,10 @@ public:
         return m_blueprints;
     }
 
-
+    std::vector<BlueprintWire>& get_wires()
+    {
+        return m_wires;
+    }
 
 private:
     // Unique part Resources used

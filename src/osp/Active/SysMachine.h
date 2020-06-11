@@ -2,6 +2,7 @@
 
 
 #include <cstdint>
+#include <iostream>
 #include <vector>
 
 #include <Corrade/Containers/LinkedList.h>
@@ -19,7 +20,10 @@ class Machine;
 // Machine component to add to entt Entities
 struct CompMachine
 {
-    CompMachine() : m_machines() {}
+    CompMachine() = default;
+    CompMachine(CompMachine&& move) : m_machines(std::move(move.m_machines)) {}
+
+    CompMachine& operator=(CompMachine&& move) = default;
 
     LinkedList<Machine> m_machines;
 
@@ -49,7 +53,8 @@ public:
     virtual std::vector<WireInput*> existing_inputs() = 0;
     virtual std::vector<WireOutput*> existing_outputs() = 0;
 
-
+    // just a simple bool
+    bool m_enable;
 };
 
 class AbstractSysMachine

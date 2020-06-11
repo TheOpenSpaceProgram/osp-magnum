@@ -48,35 +48,44 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 {
 
     std::cout << "loadin a vehicle!\n";
-    
-    // Convert position of the satellite o position in scene
-    Vector3 positionInScene = loadMe.get_satellite()->position_relative_to(*(area.get_satellite())).to_meters();
 
-    std::cout << "relative distance: " << positionInScene.length() << "\n";
+    //std::cout << "relative distance: " << positionInScene.length() << "\n";
 
     // Get the needed variables
     SatVehicle &vehicle = static_cast<SatVehicle&>(loadMe);
     BlueprintVehicle &vehicleData = vehicle.get_blueprint();
     ActiveScene &scene = *(area.get_scene());
-
-    // List of unique part prototypes used in the vehicle
-    // Access with [BlueprintPart.m_partIndex]
-    std::vector<ResDependency<PrototypePart> >& partsUsed =
-            vehicleData.get_prototypes();
-
-    // List of parts, and how they're arranged
-    std::vector<BlueprintPart>& parts = vehicleData.get_blueprints();
-
     ActiveEnt root = scene.hier_get_root();
+
+    // Create the root entity to add parts to
+
     ActiveEnt vehicleEnt = scene.hier_create_child(root);
+
+    // Convert position of the satellite to position in scene
+    Vector3 positionInScene = loadMe.get_satellite()
+            ->position_relative_to(*(area.get_satellite())).to_meters();
 
     CompTransform& vehicleTransform = scene.get_registry()
                                         .emplace<CompTransform>(vehicleEnt);
     vehicleTransform.m_transform = Matrix4::translation(positionInScene);
     vehicleTransform.m_enableFloatingOrigin = true;
 
-    // Loop through blueprints
-    for (BlueprintPart& partBp : parts)
+    // Create the parts
+
+    // Unique part prototypes used in the vehicle
+    // Access with [blueprintParts.m_partIndex]
+    std::vector<ResDependency<PrototypePart> >& partsUsed =
+            vehicleData.get_prototypes();
+
+    // All the parts in the vehicle
+    std::vector<BlueprintPart> &blueprintParts = vehicleData.get_blueprints();
+
+    // Keep track of newly created parts
+    std::vector<ActiveEnt> newEntities;
+    newEntities.reserve(blueprintParts.size());
+
+    // Loop through list of blueprint parts
+    for (BlueprintPart& partBp : blueprintParts)
     {
         ResDependency<PrototypePart>& partDepends =
                 partsUsed[partBp.m_partIndex];
@@ -90,13 +99,13 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
         }
 
         ActiveEnt partEntity = area.part_instantiate(*proto, vehicleEnt);
+        newEntities.push_back(partEntity);
 
         // Part now exists
 
         // TODO: Deal with blueprint machines instead of prototypes directly
 
-        CompMachine& partMachines = scene.get_registry()
-                                            .emplace<CompMachine>(partEntity);
+        CompMachine& partMachines = scene.reg_emplace<CompMachine>(partEntity);
 
         for (PrototypeMachine& protoMachine : proto->get_machines())
         {
@@ -114,7 +123,12 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 
             // Add the machine to the part
             partMachines.m_machines.insert(&machine);
+
         }
+
+        std::cout << "empty? " << partMachines.m_machines.isEmpty() << "\n";
+
+        std::cout << "entity: " << int(partEntity) << "\n";
 
         CompTransform& partTransform = scene.get_registry()
                                             .get<CompTransform>(partEntity);
@@ -129,9 +143,50 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
         //area.get_scene()->debug_get_newton().create_body(partEntity);
     }
 
+    // Wire the thing up
+
+    SysWire& sysWire = scene.get_system<SysWire>();
+
+    // Loop through wire connections
+    for (BlueprintWire& blueprintWire : vehicleData.get_wires())
+    {
+        // TODO: check if the connections are valid
+
+        // TODO: find a better way to do this, because this is ugly
+
+        CompMachine& fromMachines = scene.reg_get<CompMachine>(
+                                        newEntities[blueprintWire.m_fromPart]);
+
+        // get wire from
+
+        Machine* fromMachine = fromMachines.m_machines.first();
+        for (unsigned i = 0; i < blueprintWire.m_fromMachine; i ++)
+        {
+            fromMachine = fromMachine->next();
+        }
+
+        WireOutput* fromWire =
+                fromMachine->request_output(blueprintWire.m_fromPort);
+
+        // get wire to
+
+        CompMachine& toMachines = scene.reg_get<CompMachine>(
+                                        newEntities[blueprintWire.m_toPart]);
+
+        // TODO: find a better way to do this
+        Machine* toMachine = toMachines.m_machines.first();
+        for (unsigned i = 0; i < blueprintWire.m_toMachine; i ++)
+        {
+            toMachine = toMachine->next();
+        }
+
+        WireInput* toWire = toMachine->request_input(blueprintWire.m_toPort);
+
+        sysWire.connect(*fromWire, *toWire);
+    }
+
     // temporary: make the whole thing a single rigid body
-    CompNewtonBody& nwtBody
-            = scene.get_registry().emplace<CompNewtonBody>(vehicleEnt);
+    CompNewtonBody& nwtBody = scene.reg_emplace<CompNewtonBody>(vehicleEnt);
     area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
 
     return 0;

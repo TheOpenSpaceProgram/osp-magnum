@@ -44,6 +44,8 @@ public:
     std::vector<WireOutput*> existing_outputs() override;
 
 private:
+    WireInput m_wiIgnition;
+    WireInput m_wiThrottle;
 };
 
 

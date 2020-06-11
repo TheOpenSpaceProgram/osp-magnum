@@ -21,6 +21,7 @@ https://github.com/TheOpenSpaceProgram/OpenSpaceProgram/blob/master/docs/Technic
 * ~~Intergrate Newton Dynamics~~
 * Controllable debug crafts that can fly around
 * Terrain maybe?
+* Scripting?
 
 ## Building
 Build using CMake, prefer not using a GUI for options to be set properly.
@@ -57,7 +58,7 @@ There is three main sides to the program:
   Satellites to be contiguous in memory.
 
 ### Differences with urho-osp
-* Uses more modern C++ (ECS and stuff)
+* Uses more modern C++ (ECS, data-oriented and stuff)
 * Less dependent on engine
 * Less spaghetti
 * Compiles faster

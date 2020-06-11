@@ -1,5 +1,7 @@
 #include "SysWire.h"
 
+#include <iostream>
+
 namespace osp
 {
 
@@ -16,6 +18,19 @@ WireInput::WireInput(WireElement *element, WireInput&& move) :
     m_name(std::move(move.m_name))
 {
 
+}
+
+WireData* WireInput::connected_value()
+{
+    WireOutput* woConnected = list();
+    if (woConnected)
+    {
+        return &(woConnected->value());
+    }
+    else
+    {
+        return nullptr;
+    }
 }
 
 WireOutput::WireOutput(WireElement* element, std::string const& name) :
@@ -57,6 +72,8 @@ void SysWire::update_propigate()
 
 void SysWire::connect(WireOutput &wireFrom, WireInput &wireTo)
 {
+    std::cout << "Connected " << wireFrom.get_name() << " to "
+              << wireTo.get_name() << "\n";
     wireFrom.insert(&wireTo);
     // TODO: check for dependent outputs and add to list and sort
 }
