@@ -35,12 +35,6 @@ using Magnum::Matrix4;
 namespace osp
 {
 
-// debug navigation
-struct InputControl
-{
-    bool up, dn, fr, bk, lf, rt;
-} g_debugInput;
-
 // Loading functions
 
 
@@ -224,7 +218,11 @@ SatActiveArea::SatActiveArea(UserInputHandler &userInput) :
 
 SatActiveArea::~SatActiveArea()
 {
-    // TODO: unload satellites
+    // Unload everything
+    for (SatelliteObject* satObj : m_loadedSats)
+    {
+        satObj->get_satellite()->set_loader(nullptr);
+    }
 
     std::cout << "Active Area destroyed\n";
 
@@ -292,7 +290,7 @@ int SatActiveArea::activate()
     CompTransform& cameraTransform
             = m_scene->get_registry().emplace<CompTransform>(m_camera);
 
-    cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 5));
+    cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     cameraTransform.m_enableFloatingOrigin = true;
 
     cameraComp.m_viewport = Vector2(Magnum::GL::defaultFramebuffer.viewport()
@@ -515,6 +513,7 @@ int SatActiveArea::load_satellite(Satellite& sat)
 
     // Load success
     sat.set_loader(m_sat->get_object());
+    m_loadedSats.push_back(sat.get_object());
 
     return 0;
 }
@@ -543,6 +542,7 @@ void SatActiveArea::update_physics(float deltaTime)
         // if satellite is not loadable or is already loaded
         if (!sat.is_loadable() || sat.get_loader())
         {
+            //std::cout << "already loaded\n";
             continue;
         }
 
@@ -575,9 +575,12 @@ void SatActiveArea::update_physics(float deltaTime)
         load_satellite(sat);
     }
 
-    // Temporary: Floating origin follow cameara
+
     CompTransform& cameraTransform
             = m_scene->reg_get<CompTransform>(m_camera);
+    cameraTransform.m_transform[3].xyz().x() += 0.1f; // move the camera right
+
+    // Temporary: Floating origin follow cameara
     Magnum::Vector3i tra(cameraTransform.m_transform[3].xyz());
     //tra.x() = Magnum::Math::round<float>(tra.x());
 

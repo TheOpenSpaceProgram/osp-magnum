@@ -23,30 +23,24 @@ class Universe
 public:
     Universe();
 
-
-    void add_part(PrototypePart& prototype);
-    void add_parts(const std::vector<PrototypePart>& prototypes);
-
-    /**
-     * Add a satellite to the universe
-     * @param sat
-     * @return
-     */
-    Satellite& add_satellite(Satellite& sat);
-
     /**
      * Creates then adds a new satellite to itself
      * @param args Arguments passed to the Satellite's SatelliteObject
      * @return The new Satellite just created
      */
     template <class T, class... Args>
-    Satellite& create_sat(Args&& ... args);
+    std::pair<Satellite&, T&> sat_create(Args&& ... args);
 
     /**
      * Create a blank satellite, and adds it to the universe
      * @return The new Satellite just created
      */
-    Satellite& create_sat();
+    Satellite& sat_create();
+
+    /**
+     * Remove a satellite by address
+     */
+    void sat_remove(Satellite* sat);
 
     /**
      * @return Vector of satellites.
@@ -66,21 +60,20 @@ private:
 
 };
 
+
 /**
  *
  */
 template <class T, class... Args>
-Satellite& Universe::create_sat(Args&& ... args)
+std::pair<Satellite&, T&> Universe::sat_create(Args&& ... args)
 {
     //Satellite sat;
     //m_satellites.push_back(sat);
     //Satellite newSat;
     //m_satellites.push_back(newSat);
-
-    m_satellites.emplace_back(this);
-    Satellite& newSat = m_satellites.back();
-    newSat.create_object<T>(args...);
-    return newSat;
+    Satellite& newSat = m_satellites.emplace_back(this);
+    T& obj = newSat.create_object<T>(args...);
+    return {newSat, obj};
 }
 
 }

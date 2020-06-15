@@ -53,6 +53,11 @@ public:
     virtual std::vector<WireInput*> existing_inputs() = 0;
     virtual std::vector<WireOutput*> existing_outputs() = 0;
 
+    void doErase() override
+    {
+        list()->cut(this);
+    }
+
     // just a simple bool
     bool m_enable;
 };

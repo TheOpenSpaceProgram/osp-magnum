@@ -7,33 +7,45 @@ namespace osp
 
 SatelliteObject::SatelliteObject()
 {
-
 }
 
-Satellite::Satellite(Universe* universe) : m_universe(universe)
+Satellite::Satellite(Universe* universe) :
+    m_physical(false),
+    m_loadRadius(30.0f), // 1km radius sphere around sat
+    m_mass(0.0f),
+    m_loadedBy(nullptr),
+    m_object(),
+    m_universe(universe),
+    m_name("Default Satellite"),
+    m_position({0, 0, 0}, 10)
 {
-    m_name = "Innocent Satellite";
 
     // 2^10 = 1024
     // 1024 units = 1 meter
     // enough for a solar system
     //m_precision = 10;
-    m_loadRadius = 30.0f; // 1km radius sphere around sat
+
     //std::cout << "satellite created\n";
 }
 
 
-Satellite::Satellite(Satellite&& sat) :
-        m_loadRadius(std::exchange(sat.m_loadRadius, 0)),
-        m_loadedBy(nullptr),
-        m_object(std::move(sat.m_object)),
-        m_name(std::move(sat.m_name)),
-        m_position(sat.m_position)
+Satellite::Satellite(Satellite&& move) :
+        m_physical(std::exchange(move.m_physical, false)),
+        m_loadRadius(std::exchange(move.m_loadRadius, 0)),
+        m_mass(std::exchange(move.m_mass, 0.0f)),
+        m_loadedBy(std::exchange(move.m_loadedBy, nullptr)),
+        m_object(std::move(move.m_object)),
+        m_universe(std::exchange(move.m_universe, nullptr)),
+        m_name(std::move(move.m_name)),
+        m_position(move.m_position)
 {
-    // TODO
-    m_object->m_sat = this;
-    //std::cout << "satellite moved\n";
+    if (m_object.get())
+    {
+        m_object->m_sat = this;
+    }
+    std::cout << "satellite moved\n";
 }
+
 
 Satellite::~Satellite()
 {
@@ -41,6 +53,28 @@ Satellite::~Satellite()
 
     //m_object.release(); // not the right thing to do
 }
+
+Satellite& Satellite::operator=(Satellite&& move)
+{
+    m_physical = std::exchange(move.m_physical, false);
+    m_loadRadius = std::exchange(move.m_loadRadius, 0);
+    m_mass = std::exchange(move.m_mass, 0.0f);
+    m_loadedBy = std::exchange(move.m_loadedBy, nullptr);
+    m_object = std::move(move.m_object);
+    m_universe = std::exchange(move.m_universe, nullptr);
+    m_name = std::move(move.m_name);
+    m_position = move.m_position;
+
+    if (m_object.get())
+    {
+        m_object->m_sat = this;
+    }
+
+    std::cout << "satellite move assigned\n";
+
+    return *this;
+}
+
 
 bool Satellite::is_loadable() const
 {

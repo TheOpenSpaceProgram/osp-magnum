@@ -14,7 +14,7 @@ MachineUserControl::MachineUserControl() :
 {
     //m_woTestPropagate.propagate();
     m_enable = true;
-
+    m_woThrottle.value() = wiretype::Percent{1.0f};
 }
 
 MachineUserControl::MachineUserControl(MachineUserControl&& move) :
@@ -24,6 +24,7 @@ MachineUserControl::MachineUserControl(MachineUserControl&& move) :
     Machine(std::move(move))
 {
     m_enable = true;
+    m_woThrottle.value() = wiretype::Percent{1.0f};
 }
 
 void MachineUserControl::propagate_output(WireOutput* output)
@@ -65,15 +66,6 @@ void SysMachineUserControl::update_sensor()
     // InputDevice.IsActivated()
     // Combination
     
-    if (m_throttleMin.triggered())
-    {
-        std::cout << "throttle min\n";
-    }
-
-    if (m_throttleMax.triggered())
-    {
-        std::cout << "throttle max\n";
-    }
 
     if (m_selfDestruct.triggered())
     {
@@ -88,6 +80,18 @@ void SysMachineUserControl::update_sensor()
             continue;
         }
 
+
+        if (m_throttleMin.triggered())
+        {
+            std::cout << "throttle min\n";
+            std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = 0.0f;
+        }
+
+        if (m_throttleMax.triggered())
+        {
+            std::cout << "throttle max\n";
+            std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = 1.0f;
+        }
         //std::cout << "updating control\n";
     }
 }

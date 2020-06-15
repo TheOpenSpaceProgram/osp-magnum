@@ -47,8 +47,10 @@ class Satellite
 
 public:
     Satellite(Universe* universe);
-    Satellite(Satellite&& sat);
+    Satellite(Satellite&& move);
     ~Satellite();
+
+    Satellite& operator=(Satellite&& move);
 
     bool is_loadable() const;
 

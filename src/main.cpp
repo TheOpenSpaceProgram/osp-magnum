@@ -31,11 +31,63 @@ char** g_argv;
 
 int main(int argc, char** argv)
 {   
-    // eventually do more important things here
+    // eventually do more important things here.
+    // just lazily save the arguments
     g_argc = argc;
     g_argv = argv;
 
+    // start doing debug cli loop
     return debug_cli_loop();
+}
+
+
+/**
+ * A basic spaghetti command line interface that gets inputs from stdin to
+ * mess with g_universe and g_ospMagnum. Replace this entire file eventually.
+ * @return An error code maybe
+ */
+int debug_cli_loop()
+{
+
+    std::cout
+        << "OSP-Magnum Temporary Debug CLI\n"
+        << "Things to type:\n"
+        << "* ulist     - List Satellites in the universe\n"
+        << "* start     - Create an ActiveArea and start Magnum\n"
+        << "* exit      - Deallocate everything and return memory to OS\n";
+
+    std::string command;
+
+    while(true)
+    {
+        std::cout << "> ";
+        std::cin >> command;
+
+        if (command == "ulist")
+        {
+            debug_print_sats();
+        }
+        else if (command == "start")
+        {
+            if (g_magnumThread.joinable())
+            {
+                g_magnumThread.join();
+            }
+            std::thread t(magnum_application);
+            g_magnumThread.swap(t);
+        }
+        else if (command == "exit")
+        {
+            // delete the universe
+            g_universe.get_sats().clear();
+            return 0;
+        }
+        else
+        {
+            std::cout << "that doesn't do anything ._.\n";
+        }
+
+    }
 }
 
 /**
@@ -93,7 +145,7 @@ void magnum_application()
         g_universe.debug_get_packges().push_back(std::move(lazyDebugPack));
 
         // Add vehicles so there's something to load
-        for (int i = 0; i < 4000; i ++)
+        for (int i = 0; i < 5000; i ++)
         {
             // Creates a random mess of spamcans
             osp::Satellite& sat = debug_add_random_vehicle();
@@ -113,21 +165,35 @@ void magnum_application()
 
 
         // Add a planet too
-        osp::Satellite& planet = g_universe.create_sat();
+        osp::Satellite& planet = g_universe.sat_create();
         planet.create_object<osp::SatPlanet>();
 
         //s_partsLoaded = true;
     }
 
-    osp::Satellite& sat = g_universe.create_sat();
-    osp::SatActiveArea& area = sat.create_object<osp::SatActiveArea>(app.get_input_handler());
 
+    // create a satellite with an ActiveArea
+    osp::Satellite& sat = g_universe.sat_create();
+    osp::SatActiveArea& area =
+            sat.create_object<osp::SatActiveArea>(app.get_input_handler());
+    sat.set_position({Vector3s(0, 0, 0), 10});
+
+    // make the application switch to that area
     app.set_active_area(area);
 
+    // sat reference becomes invalid btw, since it refers to a vector elem.
+
+    // this starts the game loop. non-asynchronous
+    // OSPMagnum::drawEvent gets looped
     app.exec();
 
-    std::cout << "Application closed\n";
-    
+    // app has been closed by now
+
+    std::cout << "Magnum Application closed\n";
+
+    // Kill the active area
+    g_universe.sat_remove(area.get_satellite());
+
     // workaround: wipe mesh resources because they're specific to the
     // opengl context
     static_cast<std::vector<osp::Resource<Magnum::GL::Mesh> >& >(
@@ -136,59 +202,9 @@ void magnum_application()
     
 }
 
-
-/**
- * A basic spaghetti command line interface that gets inputs from stdin to
- * mess with g_universe and g_ospMagnum. Replace this entire file eventually.
- * @return An error code maybe
- */
-int debug_cli_loop()
-{
-
-    std::cout
-        << "OSP-Magnum Temporary Debug CLI\n"
-        << "Things to type:\n"
-        << "* ulist     - List Satellites in the universe\n"
-        << "* start     - Create an ActiveArea and start Magnum\n"
-        << "* exit      - Deallocate everything and return memory to OS\n";
-
-    std::string command;
-
-    while(true)
-    {
-        std::cout << "> ";
-        std::cin >> command;
-
-        if (command == "ulist")
-        {
-            debug_print_sats();
-        }
-        else if (command == "start")
-        {
-            if (g_magnumThread.joinable())
-            {
-                g_magnumThread.join();
-            }
-            std::thread t(magnum_application);
-            g_magnumThread.swap(t);
-        }
-        else if (command == "exit")
-        {
-            // delete the universe
-            g_universe.get_sats().clear();
-            return 0;
-        }
-        else
-        {
-            std::cout << "that doesn't do anything ._.\n";
-        }
-
-    }
-}
-
 osp::Satellite& debug_add_random_vehicle()
 {
-    osp::Satellite &sat = g_universe.create_sat();
+    osp::Satellite &sat = g_universe.sat_create();
     osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
     osp::Resource<osp::BlueprintVehicle> blueprint;
 
@@ -233,15 +249,16 @@ osp::Satellite& debug_add_random_vehicle()
 
 void debug_print_sats()
 {
-    const std::vector<osp::Satellite>& sats = g_universe.get_sats();
+    std::vector<osp::Satellite>& sats = g_universe.get_sats();
 
     // Loop through g_universe's satellites and print them.
     std::cout << "Universe:\n";
-    for (const osp::Satellite& sat : sats)
+    for (osp::Satellite& sat : sats)
     {
         Vector3sp pos = sat.get_position();
         std::cout << "* " << sat.get_name() << "["
-                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "]\n";
+                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "] ("
+                  << sat.get_object()->get_id().m_name << ")\n";
     }
 
 }

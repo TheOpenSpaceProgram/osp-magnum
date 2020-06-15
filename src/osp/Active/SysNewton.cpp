@@ -33,6 +33,9 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
         //std::cout << "fish\n";
     }
 
+    // temporary fun stuff:
+    Vector3 torque(0, 1, 0);
+    NewtonBodySetTorque(body, torque.data());
 
 }
 

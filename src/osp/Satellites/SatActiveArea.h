@@ -56,6 +56,7 @@ public:
 
     ActiveScene* get_scene() { return m_scene.get(); }
 
+
     /**
      * Setup magnum scene and sets m_loadedActive to true.
      * @return only 0 for now
@@ -99,6 +100,7 @@ public:
 
 private:
 
+    std::vector<SatelliteObject*> m_loadedSats;
     std::map<Id const*, LoadStrategy> m_loadFunctions;
 
     bool m_loadedActive;

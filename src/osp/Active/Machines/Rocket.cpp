@@ -71,7 +71,7 @@ void SysMachineRocket::update_physics()
         if (WireData *throttle = machine.m_wiThrottle.connected_value())
         {
             Percent *percent = std::get_if<Percent>(throttle);
-            std::cout << "percent!!!!!!!1\n";
+            //std::cout << percent->m_value << "\n";
         }
     }
 }
