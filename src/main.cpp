@@ -1,4 +1,5 @@
 #include <iostream>
+#include <memory>
 #include <thread>
 #include <random>
 
@@ -12,7 +13,9 @@
 #include "osp/Resource/Package.h"
 
 
+
 void magnum_application();
+void load_a_bunch_of_stuff();
 
 int debug_cli_loop();
 osp::Satellite& debug_add_random_vehicle();
@@ -24,7 +27,7 @@ Magnum::Platform::Application::Arguments g_args();
 std::thread g_magnumThread;
 
 osp::Universe g_universe;
-osp::OSPMagnum *g_ospMagnum;
+std::unique_ptr<osp::OSPMagnum> g_ospMagnum;
 
 int g_argc;
 char** g_argv;
@@ -78,9 +81,12 @@ int debug_cli_loop()
         }
         else if (command == "exit")
         {
-            // delete the universe
-            g_universe.get_sats().clear();
-            return 0;
+            if (g_ospMagnum)
+            {
+                // request exit if application exists
+                g_ospMagnum->exit();
+            }
+            break;
         }
         else
         {
@@ -88,6 +94,16 @@ int debug_cli_loop()
         }
 
     }
+
+    // wait for magnum thread to exit if it exists
+    if (g_magnumThread.joinable())
+    {
+        g_magnumThread.join();
+    }
+
+    // destory the universe
+    g_universe.get_sats().clear();
+    return 0;
 }
 
 /**
@@ -96,26 +112,32 @@ int debug_cli_loop()
 void magnum_application()
 {
     // Create the application
-    osp::OSPMagnum app({g_argc, g_argv});
+    g_ospMagnum = std::make_unique<osp::OSPMagnum>(
+                osp::OSPMagnum::Arguments{g_argc, g_argv});
 
     // Configure Controls
+
     using Key = osp::OSPMagnum::KeyEvent::Key;
     using TermOp = osp::ButtonTermConfig::TermOperator;
     using TermTrig = osp::ButtonTermConfig::TermTrigger;
+    osp::UserInputHandler& userInput = g_ospMagnum->get_input_handler();
 
-    osp::UserInputHandler& userInput = app.get_input_handler();
+    // note: names like "game_thr_max" are arbitrary
 
-    // throttle min/max
+    // Set throttle max to Z
     userInput.config_register_control("game_thr_max",
             {{0, (int) Key::Z, TermTrig::PRESSED, false, TermOp::OR}});
+    // Set throttle min to X
     userInput.config_register_control("game_thr_min",
             {{0, (int) Key::X, TermTrig::PRESSED, false, TermOp::OR}});
+    // Set self destruct to LeftCtrl+C or LeftShift+A
     userInput.config_register_control("game_self_destruct",
             {{0, (int) Key::LeftCtrl, TermTrig::HOLD, false, TermOp::AND},
              {0, (int) Key::C, TermTrig::PRESSED, false, TermOp::OR},
              {0, (int) Key::LeftShift, TermTrig::HOLD, false, TermOp::AND},
              {0, (int) Key::A, TermTrig::PRESSED, false, TermOp::OR}});
 
+    // Set generic Up/down/left/right to WASD
     userInput.config_register_control("c_up",
             {{0, (int) Key::W, TermTrig::PRESSED, false, TermOp::OR}});
     userInput.config_register_control("c_dn",
@@ -126,68 +148,27 @@ void magnum_application()
             {{0, (int) Key::D, TermTrig::PRESSED, false, TermOp::OR}});
 
     // only call load once, since some stuff might already be loaded
-    //static bool s_partsLoaded = false;
     if (!g_universe.debug_get_packges().size())
     {
-
-        // Create a new package
-        osp::Package lazyDebugPack("lzdb", "lazy-debug");
-        //m_packages.push_back(std::move(p));
-
-        // Create a sturdy
-        osp::SturdyImporter importer;
-        importer.open_filepath("OSPData/adera/spamcan.sturdy.gltf");
-
-        // load the sturdy into the package
-        importer.load_config(lazyDebugPack);
-
-        // Add package to the univere
-        g_universe.debug_get_packges().push_back(std::move(lazyDebugPack));
-
-        // Add vehicles so there's something to load
-        for (int i = 0; i < 5000; i ++)
-        {
-            // Creates a random mess of spamcans
-            osp::Satellite& sat = debug_add_random_vehicle();
-
-            // clutter them around space
-
-            //Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
-            //                        std::rand() % 512 - 256,
-            //                        std::rand() % 8 - 4,
-            //                        std::rand() % 8 - 4) * 1024 * 2, 10);
-            Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
-                                    (i / 2) * 1024 * 5, 0,  0), 10);
-
-            sat.set_position(randomvec);
-
-        }
-
-
-        // Add a planet too
-        osp::Satellite& planet = g_universe.sat_create();
-        planet.create_object<osp::SatPlanet>();
-
-        //s_partsLoaded = true;
+        load_a_bunch_of_stuff();
     }
-
 
     // create a satellite with an ActiveArea
     osp::Satellite& sat = g_universe.sat_create();
-    osp::SatActiveArea& area =
-            sat.create_object<osp::SatActiveArea>(app.get_input_handler());
+    osp::SatActiveArea& area = sat.create_object<osp::SatActiveArea>(
+                                    g_ospMagnum->get_input_handler());
     sat.set_position({Vector3s(0, 0, 0), 10});
 
     // make the application switch to that area
-    app.set_active_area(area);
+    g_ospMagnum->set_active_area(area);
 
     // sat reference becomes invalid btw, since it refers to a vector elem.
 
     // this starts the game loop. non-asynchronous
     // OSPMagnum::drawEvent gets looped
-    app.exec();
+    g_ospMagnum->exec();
 
-    // app has been closed by now
+    // Close button has been pressed
 
     std::cout << "Magnum Application closed\n";
 
@@ -200,10 +181,56 @@ void magnum_application()
                 g_universe.debug_get_packges()[0].debug_get_resource_table())
                     .clear();
     
+    // destruct the application, this closes the window
+    g_ospMagnum.reset();
+}
+
+/**
+ * As the name implies.
+ *
+ * prefer not to use names like this anywhere else but main.cpp
+ */
+void load_a_bunch_of_stuff()
+{
+    // Create a new package
+    osp::Package lazyDebugPack("lzdb", "lazy-debug");
+    //m_packages.push_back(std::move(p));
+
+    // Create a sturdy
+    osp::SturdyImporter importer;
+    importer.open_filepath("OSPData/adera/spamcan.sturdy.gltf");
+
+    // load the sturdy into the package
+    importer.load_config(lazyDebugPack);
+
+    // Add package to the univere
+    g_universe.debug_get_packges().push_back(std::move(lazyDebugPack));
+
+    // Add 5000 vehicles so there's something to load
+    for (int i = 0; i < 5000; i ++)
+    {
+        // Creates a random mess of spamcans
+        osp::Satellite& sat = debug_add_random_vehicle();
+
+        // Put them in a long line along
+        Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
+                                (i / 2) * 1024 * 5, 0,  0), 10);
+
+        sat.set_position(randomvec);
+
+    }
+
+
+    // Add a planet too
+    osp::Satellite& planet = g_universe.sat_create();
+    planet.create_object<osp::SatPlanet>();
+
+    //s_partsLoaded = true;
 }
 
 osp::Satellite& debug_add_random_vehicle()
 {
+    // Get some needed variables
     osp::Satellite &sat = g_universe.sat_create();
     osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
     osp::Resource<osp::BlueprintVehicle> blueprint;
@@ -213,6 +240,7 @@ osp::Satellite& debug_add_random_vehicle()
             g_universe.debug_get_packges()[0]
             .get_resource<osp::PrototypePart>(0);
 
+    // Add 10 parts
     for (int i = 0; i < 10; i ++)
     {
         // Generate random vector
@@ -240,8 +268,6 @@ osp::Satellite& debug_add_random_vehicle()
 
     // set the SatVehicle's blueprint to the one just made
     vehicle.get_blueprint_depend().bind(*blueprintRes);
-
-
 
     return sat;
 

@@ -48,8 +48,10 @@ Application include path.
 ## Some Technical details
 
 There is three main sides to the program:
-* **Universe:**: Manages the large universe and its Satellites
-* **Active:** Uses the game engine and Active Areas to interact with universe
+* **Universe:**: Manages the large universe and its Satellites. This part deals
+  with orbits and other interactions between Satellites.
+* **Active:** Anything related to the game scene and engine, such as Physics,
+  Machines, Rendering, etc...
 * **Application:** Manages resources, and pretty much everything else
 
 ### Differences with Technical.md
@@ -58,7 +60,7 @@ There is three main sides to the program:
   Satellites to be contiguous in memory.
 
 ### Differences with urho-osp
-* Uses more modern C++ (ECS, data-oriented and stuff)
+* Uses more modern C++ (C++17, ECS, data-oriented and stuff)
 * Less dependent on engine
 * Less spaghetti
 * Compiles faster
@@ -67,75 +69,128 @@ There is three main sides to the program:
 So far, a small CLI is implemented in main.cpp for development purposes. This
 is not a permanent solution. When executed, it creates a `Universe` and starts
 listening for commands through stdin. When it gets the *start* command, it
-creates an `OSPMagnum` and a `SatActiveArea` to interact with the `Universe`.
+creates an `OSPMagnum`, loads a bunch of resources, then creates a
+`SatActiveArea` to view the `Universe`.
 
-### Class descriptions:
-
-**Core:**
+### Application classes
 
 * **OSPMagnum** (Magnum Application)
   * Manages an OpenGL context
   * can use several different OpenGL bindings supported by Magnum.
-  * can be bound to a `SatActiveArea` to render and pass inputs to it.
+  * Listens to user input, and feeds events into a UserInputHandler
+
+* **UserInputHandler**
+  * Configurable interface that can be fed button input events from any source
+    to map to specific controls.
+  * Supports binding controls to multiple buttons and combinations
+  * Used by MachineUserControl
+
+### Universe classes
 
 * **Universe**
   * Holds a vector of all the Satellites in existance
   * not much is implemented yet.
 
-**Resource Management:**
+* **Satellite**
+  * See Technical.md
+  * Has a position, can be loaded, etc...
+  * Has a unique_ptr to a SatelliteObject to give it functionality
 
-* **Package**
-  * Has a prefix, name, but mostly not yet implemented
-  * Stores vectors of `Resource<T>` for every class it supports
-  * Classes stored are addressable via a string
-  * Does not do any file operations or loading by itself, only stores
-  * see comments Package.h for more details
-  * tl;dr: resources are planned to use paths like "pkgA:rocketenginemesh"
+* **SatelliteObject**
+  * Base class that adds functionality to a Satellite
+  * Identifiable via virual functions
+  * Not movable nor copyable
 
-* **Resource<T>**
-  * Keeps a T as a member.
-  * Tracks dependencies as a LinkedList of `ResDependency<T>`s
-
-* **ResDependency<T>**
-  * Points to a Resource<T>
-  * Is a LinkedList item, and Resource<T> is the LinkedList
-  * Can be safely moved around or de-allocated without worry
-
-* **SturdyImporter**
-  * Uses a Magnum `TinyGltfImporter` to open GLTF files
-  * Outputs `PartPrototype`s to a `Package`
-
-**Resources**
-
-Try to keep struct-like resources easily accesible, serializable, or almost
-plain-old-data
-
-* **PartPrototype**
-  * Has a vector of `ObjectPrototype`s
-
-* **ObjectPrototype**
-  * Describes a game engine object: drawable, collider, etc...
-
-* **PartBlueprint**
-  * Describes a specific instance of a `PartPrototype`
-
-* **VehicleBlueprint**
-  * An arrangement of `PartBlueprint`s
-
-
-**Satellites**
+### SatelliteObject-derived classes
 
 * **SatActiveArea**
   * todo
 
 * **SatVehicle**
+  * Depends on a `BlueprintVehicle` from a `Package`
+
+* **SatPlanet**
   * todo
 
-**TODO: new ECS stuff**
+### Active classes
 
-### Wiring System
+* **ActiveScene**
+  * The game engine scene
+  * Has a `SysNewton` and `SysWire` as members
+  * Stores a map that maps strings to `AbstractSysMachine`s
+  * Calls update functions for pretty much everything
 
-TODO: this may need some discussion
+* **SysNewton**
+  * Handles Physics using Newton Dynamics
+
+* **SysWire**
+  * Deals with wiring: communication between Machines. read below
+  * Has a vector of `DependentOutput`s
+
+* **Machine**
+  * A base class for Machines, see below
+  * Uses virtual functions for Wiring only
+  * Instances are managed by a corresponding SysMachine
+
+* **AbstractSysMachine**
+  * Base class for SysMachine
+  * Used to polymorphically access to a SysMachine
+
+* **SysMachine<T>**
+  * Stores a vector of Machines specified by template
+  * Implements update functions that usually involve iterating the vector
+  * Has functions to instantiate or delete Machines
+
+ECS Components:
+
+* **CompCamera**
+* **CompTransform**
+* **CompHierarchy**
+* **CompCollider**
+* **CompDrawableDebug**
+* **CompMachine**
+* **CompNewtonBody**
+
+### Machine classes
+
+Derived SysMachines use CRTP for inheritance with SysMachine. SysMachine uses
+another template parameter to declare the Machine.
+
+```cpp
+
+class MachineDerived;
+
+// Declare the system
+class SysMachineDerived : public SysMachine<SysMachineDerived, MachineDerived>
+{
+    // stuff
+};
+
+// Declare the machine data
+class MachineDerived : public Machine
+{
+    friend SysMachineDerived;
+    // stuff
+};
+
+```
+
+Since all instances of the same Machine are contiguous in a vector, one can
+easily determine if an abstract Machine is of a specific type by checking if
+its memory address is within the vector's data.
+
+**Machines:**
+
+* **MachineUserControl**
+* **SysMachineUserControl**
+
+* **MachineRocket**
+* **SysMachineRocket**
+
+### Wiring classes
+
+TODO: this may need some discussion. Also, ignore anything related on Dependent
+Outputs since it isn't implemented, and isn't useful nor important yet.
 
 See Technical.md for reasons why this is needed. Here, it's implemented
 something like this:
@@ -200,6 +255,78 @@ TODO: some details on how to actually sort it
 
 This is kind of complicated but in theory should even work for sequential logic
 like flip flops.
+
+### Resource classes
+
+There can be multiple ways to load different assets, such as from disk,
+network, compressed archive, or from other existing resources. Because of this,
+Packages only store loaded data of specified types, how they're loaded is
+up to the application.
+
+this system still needs work, and it may be useful to have some sort of
+"request load" function for resources.
+
+**Managing Resources:**
+
+* **Package**
+  * Has a prefix, name, but mostly not yet implemented
+  * Stores vectors of `Resource<T>` for every class it supports
+  * Classes stored are addressable via a string
+  * Does not do any file operations or loading by itself, only stores
+  * see comments Package.h for more details
+  * tl;dr: resources are planned to use paths like "pkgA:rocketenginemesh"
+
+* **Resource<T>**
+  * Keeps a T as a member.
+  * Tracks dependencies as a LinkedList of `ResDependency<T>`s
+
+* **ResDependency<T>**
+  * Points to a Resource<T>
+  * Is a LinkedList item, and Resource<T> is the LinkedList
+  * Can be safely moved around or de-allocated without worry
+
+**Loading and creating Resources:**
+
+* **SturdyImporter**
+  * Uses a Magnum `TinyGltfImporter` to open GLTF files
+  * Outputs `PrototypePart`s to a `Package`
+
+**Main resources used in packages:**
+
+* **PrototypePart**
+  * Has a vector of `PrototypeObjects`s and a vector of `PrototypeMachines`s
+  * Usually loaded from a sturdy file
+
+* **BlueprintVehicle**
+  * Has a vector of `BlueprintPart`s, a vector of `Blueprint`s
+  * This is the thing that players get to build
+
+TODO: magnum stuff
+
+**Structs used by resources:**
+
+* **PrototypeObject**
+  * Owned by a PrototypePart
+  * Describes a game engine object: drawable, collider, etc...
+
+* **PrototypeMachine**
+  * Owned by a PrototypePart
+  * Describes a type of machine
+  * Contains default configs
+
+* **BlueprintPart**
+  * Owned by a BlueprintVehicle
+  * Describes a specific instance of a `PrototypePart`
+  * Has a transformation
+
+* **BlueprintMachine**
+  * Owned by a BlueprintPart
+  * Specific configuration of a machine
+
+* **BlueprintWire**
+  * Owned by a BlueprintVehicle
+  * Describes a wire connection between two `BlueprintPart`s
+
 
 ### Update order
 

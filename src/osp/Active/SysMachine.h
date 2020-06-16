@@ -45,13 +45,13 @@ public:
     // polymorphic stuff is used only for wiring
     // use a system for updating
 
-    virtual void propagate_output(WireOutput* output) = 0;
+    virtual void propagate_output(WireOutput* output) override = 0;
 
-    virtual WireOutput* request_output(WireOutPort port) = 0;
-    virtual WireInput* request_input(WireInPort port) = 0;
+    virtual WireOutput* request_output(WireOutPort port) override = 0;
+    virtual WireInput* request_input(WireInPort port) override = 0;
 
-    virtual std::vector<WireInput*> existing_inputs() = 0;
-    virtual std::vector<WireOutput*> existing_outputs() = 0;
+    virtual std::vector<WireInput*> existing_inputs() override = 0;
+    virtual std::vector<WireOutput*> existing_outputs() override = 0;
 
     void doErase() override
     {
