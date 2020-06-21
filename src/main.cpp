@@ -55,8 +55,8 @@ int debug_cli_loop()
     std::cout
         << "OSP-Magnum Temporary Debug CLI\n"
         << "Things to type:\n"
-        << "* ulist     - List Satellites in the universe\n"
         << "* start     - Create an ActiveArea and start Magnum\n"
+        << "* list_uni  - List Satellites in the universe\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
 
     std::string command;
@@ -66,7 +66,7 @@ int debug_cli_loop()
         std::cout << "> ";
         std::cin >> command;
 
-        if (command == "ulist")
+        if (command == "list_uni")
         {
             debug_print_sats();
         }
@@ -214,7 +214,7 @@ void load_a_bunch_of_stuff()
 
         // Put them in a long line along
         Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
-                                (i / 2) * 1024 * 5, 0,  0), 10);
+                                i * 1024 * 5, (i & 5) * 128,  (i & 3) * 1024), 10);
 
         sat.set_position(randomvec);
 

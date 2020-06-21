@@ -13,15 +13,15 @@ class SysMachineRocket :
 {
 public:
 
-    SysMachineRocket() = default;
+    SysMachineRocket(ActiveScene &scene);
 
     void update_sensor() override;
     void update_physics() override;
 
-    Machine& instantiate() override;
+    Machine& instantiate(ActiveEnt ent) override;
 
 private:
-
+    SysPhysics &m_physics;
 };
 
 
@@ -30,12 +30,12 @@ class MachineRocket : public Machine
     friend SysMachineRocket;
 
 public:
-    MachineRocket();
-    MachineRocket(MachineRocket&& move);
+    MachineRocket(ActiveEnt &ent);
+    MachineRocket(MachineRocket &&move);
 
     ~MachineRocket() = default;
 
-    void propagate_output(WireOutput* output) override;
+    void propagate_output(WireOutput *output) override;
 
     WireInput* request_input(WireInPort port) override;
     WireOutput* request_output(WireOutPort port) override;
@@ -46,6 +46,8 @@ public:
 private:
     WireInput m_wiIgnition;
     WireInput m_wiThrottle;
+
+    ActiveEnt m_rigidBody;
 };
 
 

@@ -113,7 +113,7 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
             }
 
             // TODO: pass the blueprint configs into this function
-            Machine& machine = sysMachine->instantiate();
+            Machine& machine = sysMachine->instantiate(partEntity);
 
             // Add the machine to the part
             partMachines.m_machines.insert(&machine);
@@ -180,7 +180,7 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
     }
 
     // temporary: make the whole thing a single rigid body
-    CompNewtonBody& nwtBody = scene.reg_emplace<CompNewtonBody>(vehicleEnt);
+    CompRigidBody& nwtBody = scene.reg_emplace<CompRigidBody>(vehicleEnt);
     area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
 
     return 0;
@@ -578,7 +578,7 @@ void SatActiveArea::update_physics(float deltaTime)
 
     CompTransform& cameraTransform
             = m_scene->reg_get<CompTransform>(m_camera);
-    cameraTransform.m_transform[3].xyz().x() += 0.1f; // move the camera right
+    //cameraTransform.m_transform[3].xyz().x() += 0.1f; // move the camera right
 
     // Temporary: Floating origin follow cameara
     Magnum::Vector3i tra(cameraTransform.m_transform[3].xyz());

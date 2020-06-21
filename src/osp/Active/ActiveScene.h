@@ -8,11 +8,10 @@
 
 #include <Newton.h>
 
-#include <entt/entt.hpp>
-
 #include "../UserInputHandler.h"
 
 #include "../../types.h"
+#include "activetypes.h"
 
 #include "SysNewton.h"
 #include "SysMachine.h"
@@ -21,12 +20,6 @@
 
 namespace osp
 {
-
-// in case Newton Dynamics gets swapped out, one can implement a system class
-// with all the same methods
-using SysPhysics = SysNewton;
-
-using ActiveEnt = entt::entity;
 
 using MapSysMachine = std::map<std::string,
                                std::unique_ptr<AbstractSysMachine>>;

@@ -67,10 +67,14 @@ There is three main sides to the program:
 
 ### Execution
 So far, a small CLI is implemented in main.cpp for development purposes. This
-is not a permanent solution. When executed, it creates a `Universe` and starts
-listening for commands through stdin. When it gets the *start* command, it
-creates an `OSPMagnum`, loads a bunch of resources, then creates a
-`SatActiveArea` to view the `Universe`.
+is not a permanent solution.
+
+When executed, it creates a `Universe`, does some
+configuring, and starts listening for commands through stdin.
+
+When the CLI gets the *start* command, it creates an `OSPMagnum`, loads a bunch
+of resources if not done so already, then creates a `SatActiveArea` for
+`OSPMagnum` to view the universe through.
 
 ### Application classes
 
@@ -98,7 +102,7 @@ creates an `OSPMagnum`, loads a bunch of resources, then creates a
 
 * **SatelliteObject**
   * Base class that adds functionality to a Satellite
-  * Identifiable via virual functions
+  * Identifiable via virtual functions
   * Not movable nor copyable
 
 ### SatelliteObject-derived classes
@@ -153,8 +157,8 @@ ECS Components:
 
 ### Machine classes
 
-Derived SysMachines use CRTP for inheritance with SysMachine. SysMachine uses
-another template parameter to declare the Machine.
+Derived SysMachines use CRTP for inheritance. SysMachine uses another template
+parameter to declare the Machine.
 
 ```cpp
 
@@ -345,7 +349,7 @@ Independent render and physics threads isn't implemented yet.
 * Swap screen buffer
 
 **Update Physics**
-*.Update user controls `UserInputHandler::update_controls()`
+* Update user controls `UserInputHandler::update_controls()`
 * Update ActiveArea `ActiveArea::update_physics()`
   * Scan for nearby Satellites
   * Request floating origin translation
@@ -360,3 +364,5 @@ Independent render and physics threads isn't implemented yet.
 ## Random Notes
 * This project might be codenamed 'adera'. the name of the street the 49 UBC
   bus was at while the project files were first created.
+* If there are problems with DPI scaling, then run with command line arguments
+  `--magnum-dpi-scaling 1.0`

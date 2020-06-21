@@ -27,7 +27,7 @@ void CompCamera::calculate_projection()
 ActiveScene::ActiveScene(UserInputHandler& userInput) :
         m_hierarchyDirty(false),
         //m_userInput(userInput),
-        m_physics(this)
+        m_physics(*this)
 
 {
     m_registry.on_construct<CompHierarchy>()
@@ -59,9 +59,9 @@ ActiveScene::ActiveScene(UserInputHandler& userInput) :
     //m_sysMachines.emplace_back(
     //            std::make_unique<SysMachineRocket>());
     auto sysUserControl = m_sysMachines.emplace("UserControl",
-                          std::make_unique<SysMachineUserControl>(userInput));
+                          std::make_unique<SysMachineUserControl>(*this, userInput));
     auto sysMachineRocket = m_sysMachines.emplace("Rocket",
-                          std::make_unique<SysMachineRocket>());
+                          std::make_unique<SysMachineRocket>(*this));
 
     // Add SysMachineUserControl to sensor update
     m_update_sensor.emplace_back(*(sysUserControl.first->second));

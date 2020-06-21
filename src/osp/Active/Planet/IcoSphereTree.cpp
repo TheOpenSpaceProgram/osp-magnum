@@ -24,7 +24,7 @@ void IcoSphereTree::initialize(float radius)
     // rotated 180 apart from each other, and each 1/sqrt(5) above and below
     // the origin.
     //
-    // Icosahedron indices viewed from above
+    // Icosahedron indices viewed from above (Z)
     //
     //          5
     //  4

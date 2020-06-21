@@ -14,12 +14,12 @@ class SysMachineUserControl :
 {
 public:
 
-    SysMachineUserControl(UserInputHandler& userControl);
+    SysMachineUserControl(ActiveScene &scene, UserInputHandler& userControl);
 
     void update_sensor() override;
     void update_physics() override;
 
-    Machine& instantiate() override;
+    Machine& instantiate(ActiveEnt ent) override;
 
 private:
     ButtonControlHandle m_throttleMax;
@@ -35,7 +35,7 @@ class MachineUserControl : public Machine
     friend SysMachineUserControl;
 
 public:
-    MachineUserControl();
+    MachineUserControl(ActiveEnt &ent);
     MachineUserControl(MachineUserControl&& move);
 
     ~MachineUserControl() = default;

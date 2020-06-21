@@ -6,25 +6,26 @@
 namespace osp
 {
 
-MachineUserControl::MachineUserControl() :
+MachineUserControl::MachineUserControl(ActiveEnt &ent) :
+    Machine(ent),
     //m_woTestPropagate(this, "TestOut", &MachineUserControl::propagate_test),
     m_woTestPropagate(this, "TestOut", m_wiTest),
     m_woThrottle(this, "Throttle"),
     m_wiTest(this, "Test")
 {
     //m_woTestPropagate.propagate();
-    m_enable = true;
-    m_woThrottle.value() = wiretype::Percent{1.0f};
+    //m_enable = true;
+    m_woThrottle.value() = wiretype::Percent{0.0f};
 }
 
 MachineUserControl::MachineUserControl(MachineUserControl&& move) :
+    Machine(std::move(move)),
     m_woTestPropagate(this, std::move(move.m_woTestPropagate)),
     m_woThrottle(this, std::move(move.m_woThrottle)),
-    m_wiTest(this, std::move(move.m_wiTest)),
-    Machine(std::move(move))
+    m_wiTest(this, std::move(move.m_wiTest))
 {
-    m_enable = true;
-    m_woThrottle.value() = wiretype::Percent{1.0f};
+    //m_enable = true;
+    m_woThrottle.value() = wiretype::Percent{0.0f};
 }
 
 void MachineUserControl::propagate_output(WireOutput* output)
@@ -52,7 +53,8 @@ std::vector<WireOutput*> MachineUserControl::existing_outputs()
     return {&m_woThrottle, &m_woTestPropagate};
 }
 
-SysMachineUserControl::SysMachineUserControl(UserInputHandler& userControl) :
+SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandler& userControl) :
+    SysMachine<SysMachineUserControl, MachineUserControl>(scene),
     m_throttleMax(userControl.config_get("game_thr_max")),
     m_throttleMin(userControl.config_get("game_thr_min")),
     m_selfDestruct(userControl.config_get("game_self_destruct"))
@@ -75,21 +77,21 @@ void SysMachineUserControl::update_sensor()
 
     for (MachineUserControl& machine : m_machines)
     {
-        if (!machine.m_enable)
-        {
-            continue;
-        }
+        //if (!machine.m_enable)
+        //{
+        //    continue;
+        //}
 
 
         if (m_throttleMin.triggered())
         {
-            std::cout << "throttle min\n";
+            //std::cout << "throttle min\n";
             std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = 0.0f;
         }
 
         if (m_throttleMax.triggered())
         {
-            std::cout << "throttle max\n";
+            //std::cout << "throttle max\n";
             std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = 1.0f;
         }
         //std::cout << "updating control\n";
@@ -101,9 +103,9 @@ void SysMachineUserControl::update_physics()
 
 }
 
-Machine& SysMachineUserControl::instantiate()
+Machine& SysMachineUserControl::instantiate(ActiveEnt ent)
 {
-    return emplace();
+    return emplace(ent);
 }
 
 }
