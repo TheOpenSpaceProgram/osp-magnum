@@ -38,7 +38,7 @@ namespace osp
 // Loading functions
 
 
-int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
+int area_activate_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 {
 
     std::cout << "loadin a vehicle!\n";
@@ -53,7 +53,7 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 
     // Create the root entity to add parts to
 
-    ActiveEnt vehicleEnt = scene.hier_create_child(root);
+    ActiveEnt vehicleEnt = scene.hier_create_child(root, "Vehicle");
 
     // Convert position of the satellite to position in scene
     Vector3 positionInScene = loadMe.get_satellite()
@@ -186,7 +186,7 @@ int area_load_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
     return 0;
 }
 
-int area_load_planet(SatActiveArea& area, SatelliteObject& loadMe)
+int area_activate_planet(SatActiveArea& area, SatelliteObject& loadMe)
 {
     std::cout << "loadin a planet!\n";
 
@@ -211,15 +211,15 @@ SatActiveArea::SatActiveArea(UserInputHandler &userInput) :
 {
 
     // use area_load_vehicle to load SatVechicles
-    load_func_add<SatVehicle>(area_load_vehicle);
+    load_func_add<SatVehicle>(area_activate_vehicle);
 
-    load_func_add<SatPlanet>(area_load_planet);
+    load_func_add<SatPlanet>(area_activate_planet);
 }
 
 SatActiveArea::~SatActiveArea()
 {
     // Unload everything
-    for (SatelliteObject* satObj : m_loadedSats)
+    for (SatelliteObject* satObj : m_activatedSats)
     {
         satObj->get_satellite()->set_loader(nullptr);
     }
@@ -242,7 +242,7 @@ int SatActiveArea::activate()
     // lazy way to set name
     m_sat->set_name("ActiveArea");
 
-    // when switched to. Active areas can only be loaded by the universe.
+    // when switched to. Active areas can only be activated by the universe.
     // why, and how would an active area load another active area?
     m_loadedActive = true;
 
@@ -513,7 +513,7 @@ int SatActiveArea::load_satellite(Satellite& sat)
 
     // Load success
     sat.set_loader(m_sat->get_object());
-    m_loadedSats.push_back(sat.get_object());
+    m_activatedSats.push_back(sat.get_object());
 
     return 0;
 }
@@ -539,8 +539,8 @@ void SatActiveArea::update_physics(float deltaTime)
             continue;
         }
 
-        // if satellite is not loadable or is already loaded
-        if (!sat.is_loadable() || sat.get_loader())
+        // if satellite is not loadable or is already activated
+        if (!sat.is_activatable() || sat.get_loader())
         {
             //std::cout << "already loaded\n";
             continue;

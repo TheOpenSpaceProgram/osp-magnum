@@ -24,7 +24,7 @@ public:
         return get_id_static();
     }
 
-    bool is_loadable() const override;
+    bool is_activatable() const override;
 
 private:
 

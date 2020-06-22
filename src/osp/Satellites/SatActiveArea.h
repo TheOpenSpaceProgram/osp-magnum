@@ -52,7 +52,7 @@ public:
         return get_id_static();
     }
 
-    bool is_loadable() const override { return false; }
+    bool is_activatable() const override { return false; }
 
     ActiveScene* get_scene() { return m_scene.get(); }
 
@@ -100,7 +100,7 @@ public:
 
 private:
 
-    std::vector<SatelliteObject*> m_loadedSats;
+    std::vector<SatelliteObject*> m_activatedSats;
     std::map<Id const*, LoadStrategy> m_loadFunctions;
 
     bool m_loadedActive;

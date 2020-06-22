@@ -80,7 +80,8 @@ ActiveScene::~ActiveScene()
 }
 
 
-entt::entity ActiveScene::hier_create_child(entt::entity parent, std::string const& name)
+entt::entity ActiveScene::hier_create_child(entt::entity parent,
+                                            std::string const& name)
 {
     entt::entity child = m_registry.create();
     CompHierarchy& childHierarchy = m_registry.emplace<CompHierarchy>(child);

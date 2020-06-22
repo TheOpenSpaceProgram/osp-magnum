@@ -29,7 +29,7 @@ public:
 
     virtual Id const& get_id() = 0;
 
-    virtual bool is_loadable() const { return false; }
+    virtual bool is_activatable() const { return false; }
     
     Satellite* get_satellite() { return m_sat; }
 
@@ -52,7 +52,7 @@ public:
 
     Satellite& operator=(Satellite&& move);
 
-    bool is_loadable() const;
+    bool is_activatable() const;
 
 
     float get_load_radius() const { return m_loadRadius; }
@@ -67,12 +67,12 @@ public:
      */
     const Vector3sp& get_position() const { return m_position; }
 
-    SatelliteObject* get_loader() { return m_loadedBy; }
+    SatelliteObject* get_loader() { return m_activatedBy; }
 
     Universe* get_universe() { return m_universe; }
 
 
-    void set_loader(SatelliteObject* sat) { m_loadedBy = sat; }
+    void set_loader(SatelliteObject* sat) { m_activatedBy = sat; }
 
     void set_position(Vector3sp const& position) { m_position = position; }
 
@@ -113,8 +113,8 @@ protected:
     // in kg
     float m_mass;
 
-    // Pointer to [probably an active area] when loaded
-    SatelliteObject* m_loadedBy;
+    // Pointer to [probably an active area] when activated
+    SatelliteObject* m_activatedBy;
 
     // Describes the functionality of this Satellite.
     std::unique_ptr<SatelliteObject> m_object;

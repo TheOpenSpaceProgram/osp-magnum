@@ -35,6 +35,7 @@ public:
     void mouseReleaseEvent(MouseEvent& event) override;
     void mouseMoveEvent(MouseMoveEvent& event) override;
 
+    SatActiveArea* get_active_area() { return m_area; }
     void set_active_area(SatActiveArea& area);
 
     UserInputHandler& get_input_handler() { return m_userInput; }

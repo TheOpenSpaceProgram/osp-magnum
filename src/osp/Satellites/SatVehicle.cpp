@@ -13,7 +13,7 @@ SatVehicle::~SatVehicle()
 
 }
 
-bool SatVehicle::is_loadable() const
+bool SatVehicle::is_activatable() const
 {
     // might put more stuff here
     return true;

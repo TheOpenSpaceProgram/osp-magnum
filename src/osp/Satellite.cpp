@@ -13,7 +13,7 @@ Satellite::Satellite(Universe* universe) :
     m_physical(false),
     m_loadRadius(30.0f), // 1km radius sphere around sat
     m_mass(0.0f),
-    m_loadedBy(nullptr),
+    m_activatedBy(nullptr),
     m_object(),
     m_universe(universe),
     m_name("Default Satellite"),
@@ -33,7 +33,7 @@ Satellite::Satellite(Satellite&& move) :
         m_physical(std::exchange(move.m_physical, false)),
         m_loadRadius(std::exchange(move.m_loadRadius, 0)),
         m_mass(std::exchange(move.m_mass, 0.0f)),
-        m_loadedBy(std::exchange(move.m_loadedBy, nullptr)),
+        m_activatedBy(std::exchange(move.m_activatedBy, nullptr)),
         m_object(std::move(move.m_object)),
         m_universe(std::exchange(move.m_universe, nullptr)),
         m_name(std::move(move.m_name)),
@@ -59,7 +59,7 @@ Satellite& Satellite::operator=(Satellite&& move)
     m_physical = std::exchange(move.m_physical, false);
     m_loadRadius = std::exchange(move.m_loadRadius, 0);
     m_mass = std::exchange(move.m_mass, 0.0f);
-    m_loadedBy = std::exchange(move.m_loadedBy, nullptr);
+    m_activatedBy = std::exchange(move.m_activatedBy, nullptr);
     m_object = std::move(move.m_object);
     m_universe = std::exchange(move.m_universe, nullptr);
     m_name = std::move(move.m_name);
@@ -76,11 +76,11 @@ Satellite& Satellite::operator=(Satellite&& move)
 }
 
 
-bool Satellite::is_loadable() const
+bool Satellite::is_activatable() const
 {
     if (m_object.get())
     {
-         return m_object->is_loadable();
+         return m_object->is_activatable();
     }
     return false;
 }

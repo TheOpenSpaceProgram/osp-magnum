@@ -1,6 +1,7 @@
 #include <iostream>
 #include <memory>
 #include <thread>
+#include <stack>
 #include <random>
 
 
@@ -20,6 +21,7 @@ void load_a_bunch_of_stuff();
 int debug_cli_loop();
 osp::Satellite& debug_add_random_vehicle();
 void debug_print_sats();
+void debug_print_hier();
 
 //bool g_partsLoaded = false;
 
@@ -57,6 +59,7 @@ int debug_cli_loop()
         << "Things to type:\n"
         << "* start     - Create an ActiveArea and start Magnum\n"
         << "* list_uni  - List Satellites in the universe\n"
+        << "* list_ent  - List Entities in active scene\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
 
     std::string command;
@@ -69,6 +72,10 @@ int debug_cli_loop()
         if (command == "list_uni")
         {
             debug_print_sats();
+        }
+        if (command == "list_ent")
+        {
+            debug_print_hier();
         }
         else if (command == "start")
         {
@@ -271,6 +278,63 @@ osp::Satellite& debug_add_random_vehicle()
 
     return sat;
 
+}
+
+void debug_print_hier()
+{
+    if (!g_ospMagnum)
+    {
+        return;
+    }
+
+    std::cout << "Entity Hierarchy:\n";
+
+    std::vector<osp::ActiveEnt> parentNextSibling;
+    osp::ActiveScene &scene = *(g_ospMagnum->get_active_area()->get_scene());
+    osp::ActiveEnt currentEnt = scene.hier_get_root();
+
+    parentNextSibling.reserve(16);
+
+    while (true)
+    {
+        // print some info about the entity
+        osp::CompHierarchy &hier = scene.reg_get<osp::CompHierarchy>(currentEnt);
+        for (unsigned i = 0; i < hier.m_level; i ++)
+        {
+            // print arrows to indicate level
+            std::cout << "  ->";
+        }
+        std::cout << "[" << int(currentEnt) << "]: " << hier.m_name << "\n";
+
+        if (hier.m_childCount)
+        {
+            // entity has some children
+            currentEnt = hier.m_childFirst;
+
+
+            // save next sibling for later if it exists
+            if (hier.m_siblingNext != entt::null)
+            {
+                parentNextSibling.push_back(hier.m_siblingNext);
+            }
+        }
+        else if (hier.m_siblingNext != entt::null)
+        {
+            // no children, move to next sibling
+            currentEnt = hier.m_siblingNext;
+        }
+        else if (parentNextSibling.size())
+        {
+            // last sibling, and not done yet
+            // is last sibling, move to parent's (or ancestor's) next sibling
+            currentEnt = parentNextSibling.back();
+            parentNextSibling.pop_back();
+        }
+        else
+        {
+            break;
+        }
+    }
 }
 
 void debug_print_sats()

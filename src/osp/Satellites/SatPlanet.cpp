@@ -15,7 +15,7 @@ SatPlanet::~SatPlanet()
 
 }
 
-bool SatPlanet::is_loadable() const
+bool SatPlanet::is_activatable() const
 {
     // might put more stuff here
     return true;
