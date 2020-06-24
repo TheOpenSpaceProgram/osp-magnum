@@ -61,6 +61,11 @@ void WireInput::doErase()
      list()->cut(this);
 };
 
+SysWire::SysWire(ActiveScene &scene)
+{
+
+}
+
 void SysWire::update_propigate()
 {
 

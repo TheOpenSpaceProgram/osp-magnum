@@ -22,13 +22,18 @@ void CompCamera::calculate_projection()
                                 m_near, m_far);
 }
 
+void test_function()
+{
+    std::cout << "test function\n";
+}
 
 
 ActiveScene::ActiveScene(UserInputHandler& userInput) :
         m_hierarchyDirty(false),
         //m_userInput(userInput),
-        m_physics(*this)
-
+        m_physics(*this),
+        m_wire(*this),
+        m_debugObj(*this)
 {
     m_registry.on_construct<CompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_construct>(*this);
@@ -70,6 +75,24 @@ ActiveScene::ActiveScene(UserInputHandler& userInput) :
     m_update_physics.emplace_back(*(sysMachineRocket.first->second));
 
    // m_hierLevels.resize(5);
+
+
+    m_updateOrder.add("A", "", "", test_function);
+    m_updateOrder.add("B", "", "", test_function);
+    m_updateOrder.add("C", "", "", test_function);
+    m_updateOrder.add("AfterABeforeB", "A", "B", test_function);
+    m_updateOrder.add("AfterC", "C", "", test_function);
+    m_updateOrder.add("BeforeA", "", "A", test_function);
+
+    // expected output after list_upd:
+    // Update order:
+    // * BeforeA
+    // * A
+    // * AfterABeforeB
+    // * B
+    // * AfterBBeforeC
+    // * C
+    // * AfterC
 }
 
 ActiveScene::~ActiveScene()
@@ -145,7 +168,7 @@ void ActiveScene::update_physics()
 
     for (AbstractSysMachine &sysMachine : m_update_physics)
     {
-        sysMachine.update_physics();
+        sysMachine.update_physics(1.0f/60.0f);
     }
 
 
@@ -289,17 +312,7 @@ AbstractSysMachine* ActiveScene::get_system_machine(std::string const& name)
     }
 }
 
-// There's probably a better way to do these:
 
-template<> SysPhysics& ActiveScene::get_system<SysPhysics>()
-{
-    return m_physics;
-}
 
-template<>
-SysWire& ActiveScene::get_system<SysWire>()
-{
-    return m_wire;
-}
 
 }

@@ -212,7 +212,6 @@ SatActiveArea::SatActiveArea(UserInputHandler &userInput) :
 
     // use area_load_vehicle to load SatVechicles
     load_func_add<SatVehicle>(area_activate_vehicle);
-
     load_func_add<SatPlanet>(area_activate_planet);
 }
 
@@ -475,7 +474,6 @@ ActiveEnt SatActiveArea::part_instantiate(PrototypePart& part,
             // TODO collision shape!
         }
     }
-
 
 
     // first element is 100% going to be the root object

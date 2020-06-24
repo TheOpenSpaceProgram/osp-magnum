@@ -16,6 +16,7 @@
 #include "SysNewton.h"
 #include "SysMachine.h"
 #include "SysWire.h"
+#include "SysDebugObject.h"
 
 
 namespace osp
@@ -132,11 +133,10 @@ public:
     void on_hierarchy_construct(entt::registry& reg, ActiveEnt ent);
     void on_hierarchy_destruct(entt::registry& reg, ActiveEnt ent);
 
-    // replace with something like get_systen<NewtonWorld>
-    //SysNewton& debug_get_newton() { return m_newton; }
+    UpdateOrder& get_update_order() { return m_updateOrder; }
 
     template<class T>
-    T& get_system();
+    constexpr T& get_system();
 
     AbstractSysMachine* get_system_machine(std::string const& name);
 
@@ -154,13 +154,37 @@ private:
     std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_sensor;
     std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_physics;
 
+    UpdateOrder m_updateOrder;
+
     MapSysMachine m_sysMachines;
 
-    // TODO: base class and a list for Systems
+    // TODO: base class and a list for Systems (or not)
     SysPhysics m_physics;
     //SysMachineUserControl m_machineUserControl;
     SysWire m_wire;
+    SysDebugObject m_debugObj;
+    //std::tuple<SysPhysics, SysWire, SysDebugObject> m_systems;
 
 };
+
+// There's probably a better way to do these:
+
+template<>
+constexpr SysPhysics& ActiveScene::get_system<SysPhysics>()
+{
+    return m_physics;
+}
+
+template<>
+constexpr SysWire& ActiveScene::get_system<SysWire>()
+{
+    return m_wire;
+}
+
+template<>
+constexpr SysDebugObject& ActiveScene::get_system<SysDebugObject>()
+{
+    return m_debugObj;
+}
 
 }

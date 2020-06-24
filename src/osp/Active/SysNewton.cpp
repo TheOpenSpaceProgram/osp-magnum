@@ -52,12 +52,12 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 SysNewton::SysNewton(ActiveScene &scene) : m_nwtWorld(NewtonCreate()),
                                                  m_scene(scene)
 {
-
-
+    std::cout << "sysnewtoninit\n";
 }
 
 SysNewton::~SysNewton()
 {
+    std::cout << "sysnewtondestroy\n";
     // Clean up newton dynamics stuff
     NewtonDestroyAllBodies(m_nwtWorld);
     NewtonDestroy(m_nwtWorld);

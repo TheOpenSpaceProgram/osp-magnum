@@ -98,7 +98,7 @@ void SysMachineUserControl::update_sensor()
     }
 }
 
-void SysMachineUserControl::update_physics()
+void SysMachineUserControl::update_physics(float delta)
 {
 
 }

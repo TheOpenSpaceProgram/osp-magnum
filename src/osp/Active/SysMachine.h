@@ -72,7 +72,7 @@ public:
     AbstractSysMachine(AbstractSysMachine&& move) = delete;
 
     virtual void update_sensor() = 0;
-    virtual void update_physics() = 0;
+    virtual void update_physics(float delta) = 0;
 
     // TODO: make some config an argument
     virtual Machine& instantiate(ActiveEnt ent) = 0;
@@ -89,7 +89,7 @@ public:
     SysMachine(ActiveScene &scene) : m_scene(scene) {}
 
     virtual void update_sensor() = 0;
-    virtual void update_physics() = 0;
+    virtual void update_physics(float delta) = 0;
     //void update_sensor() override
     //{
     //    static_cast<Derived&>(*this).do_update_sensor();

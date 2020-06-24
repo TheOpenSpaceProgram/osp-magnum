@@ -22,6 +22,7 @@ int debug_cli_loop();
 osp::Satellite& debug_add_random_vehicle();
 void debug_print_sats();
 void debug_print_hier();
+void debug_print_update_order();
 
 //bool g_partsLoaded = false;
 
@@ -60,6 +61,7 @@ int debug_cli_loop()
         << "* start     - Create an ActiveArea and start Magnum\n"
         << "* list_uni  - List Satellites in the universe\n"
         << "* list_ent  - List Entities in active scene\n"
+        << "* list_upd  - List Update order from active scene\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
 
     std::string command;
@@ -76,6 +78,10 @@ int debug_cli_loop()
         if (command == "list_ent")
         {
             debug_print_hier();
+        }
+        if (command == "list_upd")
+        {
+            debug_print_update_order();
         }
         else if (command == "start")
         {
@@ -278,6 +284,23 @@ osp::Satellite& debug_add_random_vehicle()
 
     return sat;
 
+}
+
+void debug_print_update_order()
+{
+    if (!g_ospMagnum)
+    {
+        return;
+    }
+
+    osp::UpdateOrder& order = g_ospMagnum->get_active_area()
+                                ->get_scene()->get_update_order();
+
+    std::cout << "Update order:\n";
+    for (auto call : order.get_call_list())
+    {
+        std::cout << "* " << call.m_name << "\n";
+    }
 }
 
 void debug_print_hier()

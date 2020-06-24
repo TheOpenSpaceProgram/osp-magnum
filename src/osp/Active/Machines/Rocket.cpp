@@ -60,7 +60,7 @@ void SysMachineRocket::update_sensor()
 {
 }
 
-void SysMachineRocket::update_physics()
+void SysMachineRocket::update_physics(float delta)
 {
     for (MachineRocket& machine : m_machines)
     {

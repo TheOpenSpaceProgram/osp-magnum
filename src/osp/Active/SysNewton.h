@@ -53,6 +53,9 @@ class SysNewton
 
 public:
     SysNewton(ActiveScene &scene);
+    SysNewton(SysNewton const& copy) = delete;
+    SysNewton(SysNewton&& move) = delete;
+
     ~SysNewton();
 
     /**

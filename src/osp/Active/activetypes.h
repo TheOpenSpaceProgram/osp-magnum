@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../FunctonOrder.h"
+
 #include <entt/entt.hpp>
 
 namespace osp
@@ -16,5 +18,10 @@ using ActiveEnt = entt::entity;
 class ActiveScene;
 
 constexpr unsigned gc_heir_physics_level = 1;
+
+
+using UpdateOrder = FunctionOrder<void(void)>;
+using UpdateOrderHandle = FunctionOrderHandle<void(void)>;
+
 
 }

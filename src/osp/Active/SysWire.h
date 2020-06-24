@@ -7,6 +7,7 @@
 #include <Corrade/Containers/LinkedList.h>
 
 #include "../../types.h"
+#include "activetypes.h"
 
 namespace osp
 {
@@ -238,7 +239,9 @@ public:
         unsigned depth;
     };
 
-    SysWire() = default;
+    SysWire(ActiveScene &scene);
+    SysWire(SysWire const& copy) = delete;
+    SysWire(SysWire&& move) = delete;
 
     void update_propigate();
     void connect(WireOutput &wireFrom, WireInput &wireTo);

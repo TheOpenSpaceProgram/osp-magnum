@@ -16,7 +16,7 @@ public:
     SysMachineRocket(ActiveScene &scene);
 
     void update_sensor() override;
-    void update_physics() override;
+    void update_physics(float delta) override;
 
     Machine& instantiate(ActiveEnt ent) override;
 
