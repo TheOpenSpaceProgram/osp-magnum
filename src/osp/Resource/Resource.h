@@ -21,21 +21,18 @@ class ResDependency : public LinkedListItem<ResDependency<T>, Resource<T> >
 public:
 
     ResDependency() = default;
-    ResDependency(Resource<T>& resource) : LinkedListItem<ResDependency<T>, Resource<T> >() { resource.insert(this); }
+    ResDependency(Resource<T>& resource) :
+            LinkedListItem<ResDependency<T>, Resource<T> >()
+    { resource.insert(this); }
 
     void bind(LinkedList<ResDependency<T> >& resource)
-    {
-        resource.insert(this);
-    }
+    { resource.insert(this); }
 
-    T* get_data()
+    constexpr T* get_data()
     {
         return &(LinkedListItem<ResDependency<T>, Resource<T> >::list()->m_data);
     }
 
-private:
-
-    //Resource<T>* m_resource;
 };
 
 

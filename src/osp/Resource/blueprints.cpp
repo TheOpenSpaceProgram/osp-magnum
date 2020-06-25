@@ -4,8 +4,10 @@
 using namespace osp;
 
 void BlueprintVehicle::add_part(
-                        Resource<PrototypePart>& prototype, const Vector3& translation,
-                        const Quaternion& rotation, const Vector3& scale)
+        Resource<PrototypePart>& prototype,
+        const Vector3& translation,
+        const Quaternion& rotation,
+        const Vector3& scale)
 {
     unsigned partIndex = m_prototypes.size();
 

@@ -15,16 +15,20 @@ public:
 
     SysMachineRocket(ActiveScene &scene);
 
-    void update_sensor() override;
-    void update_physics(float delta) override;
+    //void update_sensor();
+    void update_physics();
 
     Machine& instantiate(ActiveEnt ent) override;
 
 private:
+
     SysPhysics &m_physics;
+    UpdateOrderHandle m_updatePhysics;
 };
 
-
+/**
+ *
+ */
 class MachineRocket : public Machine
 {
     friend SysMachineRocket;

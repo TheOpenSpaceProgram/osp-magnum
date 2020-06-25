@@ -37,11 +37,6 @@ class PrototypePart;
 // TODO: Some sort of data-loading strategy/policy: folder, zip, network etc...
 //       For now, packages only store loaded data
 //
-// # ignore comments below:
-// PackageDir describe a directory in OSPData
-// Package is abstracted because there might also have something like
-// PackageZip or PackageNetwork (custom stuff from a multiplayer server)
-// so packages don't strictly have to be folders.
 
 
 // supported resources
@@ -83,7 +78,7 @@ public:
     //TypeMap<int>::fish;
     //std::vector< Resource<Magnum::Trade::ImageData> > g_imageData;
 
-    ResourceTable& debug_get_resource_table() { return m_resources; }
+    constexpr ResourceTable& debug_get_resource_table() { return m_resources; }
 
     template<class T>
     Resource<T>* debug_add_resource(Resource<T>&& resource);
@@ -104,6 +99,8 @@ private:
 
 };
 
+// TODO: move these somewhere else
+
 template<class T>
 Resource<T>* Package::debug_add_resource(Resource<T>&& resource)
 {
@@ -123,7 +120,7 @@ Resource<T>* Package::get_resource(std::string const& path)
     std::vector< Resource<T> >& resourceVec =
             static_cast< std::vector< Resource<T> >& >(m_resources);
 
-    // just match the path for now, find a better way eventually
+    // TODO: just match the path for now, find a better way eventually
 
     for (Resource<T>& resource : resourceVec)
     {

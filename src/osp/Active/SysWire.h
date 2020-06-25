@@ -81,8 +81,11 @@ namespace wiretype
 
 using wiretype::WireData;
 
-// Things that have WireInputs and WireOutputs. So far, just Machines inherit.
-// keep WireInputs and WireOutputs as members. move them explicitly
+
+/**
+ * Object that have WireInputs and WireOutputs. So far, just Machines inherit.
+ * keep WireInputs and WireOutputs as members. move them explicitly
+ */
 class WireElement
 {
 
@@ -92,23 +95,47 @@ public:
     WireElement(WireElement&& move) = default;
     virtual ~WireElement() = default;
 
-
-    virtual void propagate_output(WireOutput* output) = 0;
-
     // TODO: maybe get rid of the raw pointers somehow
+
+    /**
+     * Request a Dependent WireOutput's value to update, by reading the
+     * WireInputs it depends on
+     * @param pOutput [in] The output that needs to be updated
+     */
+    virtual void propagate_output(WireOutput* pOutput) = 0;
+
+    /**
+     * Request a WireOutput by port. What happens is up to the implemenation,
+     * this may access a map, array, or maybe even create a WireOutput on the
+     * fly.
+     *
+     * @param port Port to identify the WireOutput
+     * @return Pointer to found WireOutput, nullptr if not found
+     */
     virtual WireOutput* request_output(WireOutPort port) = 0;
+
+    /**
+     * Request a WireInput by port. What happens is up to the implemenation,
+     * this may access a map, array, or maybe even create a WireInput on the
+     * fly.
+     *
+     * @param port Port to identify the WireInput
+     * @return Pointer to found WireInput, nullptr if not found
+     */
     virtual WireInput* request_input(WireInPort port) = 0;
 
-    //void add_input(WireInput* input);
+    // TODO: maybe return ports too, as the pointers returned here can be
+    //       invalidated when the SysMachine reallocates
+
+    /**
+     * @return Vector of existing WireInputs
+     */
     virtual std::vector<WireInput*> existing_inputs() = 0;
+
+    /**
+     * @return Vector of existing WireInputs
+     */
     virtual std::vector<WireOutput*> existing_outputs() = 0;
-
-private:
-
-    // tracking inputs with linkedlist or vectors would complicate moves
-    // prefer listing WireI/O on-demend, since it doesn't happen often
-    //std::vector<WireInput*> m_inputs;
-    //std::vector<WireOutput*> m_outputs;
 
 };
 
@@ -121,6 +148,7 @@ class WireInput : private LinkedListItem<WireInput, WireOutput>
 public:
 
     explicit WireInput(WireElement *element, std::string const& name);
+
     /**
      * Move with new m_element. Use when this is a member of the WireElement
      * where m_element becomes invalid on move
@@ -141,7 +169,7 @@ public:
     void doErase() override;
 
     //bool is_connected() { return list(); }
-    std::string const& get_name() { return m_name; }
+    constexpr std::string const& get_name() { return m_name; }
 
     WireOutput* connected() { return list(); }
 
@@ -248,6 +276,7 @@ public:
 
 private:
     std::vector<DependentOutput> m_dependentOutputs;
+    UpdateOrderHandle m_updateWire;
 };
 
 

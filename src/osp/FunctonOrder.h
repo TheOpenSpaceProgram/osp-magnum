@@ -3,49 +3,42 @@
 #include <functional>
 #include <list>
 #include <string>
+#include <iostream>
 #include <vector>
 
 namespace osp
 {
 
-template<typename Func> class FunctionOrderCall;
+template<typename FUNC_T> struct FunctionOrderCall;
 
-template<typename Func>
-using FunctionOrderCallList = std::list<FunctionOrderCall<Func> >;
+template<typename FUNC_T> class FunctionOrderHandle;
 
-template<typename Func>
+template<typename FUNC_T>
+using FunctionOrderCallList = std::list<FunctionOrderCall<FUNC_T> >;
+
+template<typename FUNC_T>
 struct FunctionOrderCall
 {
+    template<class ... ARGS_T>
     FunctionOrderCall(std::string const& name,
                       std::string const& after,
                       std::string const& before,
-                      std::function<Func> function) :
+                      std::function<FUNC_T> function) :
             m_name(name),
             m_after(after),
             m_before(before),
-            m_function(function) {}
+            m_function(function)
+    {
+        std::cout << "fk\n";
+    }
 
-    //typename FunctionOrderCallList<Func>::iterator m_after, m_before;
+    //typename FunctionOrderCallList<FUNC_T>::iterator m_after, m_before;
 
     std::string m_name, m_after, m_before;
     //std::hash<std::string> m_nameHash;
-    std::function<Func> m_function;
+    std::function<FUNC_T> m_function;
     unsigned m_referenceCount;
 };
-
-
-
-
-template<typename Func>
-class FunctionOrderHandle
-{
-public:
-    FunctionOrderHandle(typename FunctionOrderCallList<Func>::iterator &to);
-    ~FunctionOrderHandle();
-private:
-    typename FunctionOrderCallList<Func>::iterator m_to;
-};
-
 
 
 
@@ -53,7 +46,7 @@ private:
  * A class that calls certain functions in an order based on before/after rules
  * @tparam Func type of function to be called, ie. void(void)
  */
-template<typename Func>
+template<typename FUNC_T>
 class FunctionOrder
 {
 public:
@@ -62,53 +55,121 @@ public:
     /**
      * @tparam Args arguments to pass to std::function constructor
      */
-    template<class ... Args>
-    FunctionOrderHandle<Func> add(std::string const& name,
-                                  std::string const& after,
-                                  std::string const& before,
-                                  Args&& ... args);
+    //template<class ... ARGS_T>
+    //FunctionOrderHandle<FUNC_T> emplace(
+    //        std::string const& name,
+    //        std::string const& after,
+    //        std::string const& before,
+    //        ARGS_T&& ... args);
 
-    FunctionOrderCallList<Func>& get_call_list() { return m_calls; }
+    /**
+     * Emplaces a new FunctionOrderCall, inserts it in the right place, then
+     * binds it to the passes FunctionOrderHandle
+     * @param rHandle [out] Handle to bind the newly created call to
+     * @param name [in] Name used to identify the new call
+     * @param after [in] After rule, the new call must be placed after the call
+     *              that has this name
+     * @param before [in] Before rule, the new call must be places before the
+     *               call that has this name
+     * @param args [in] arguments to pass to std::function constructor
+     */
+    template<class ... ARGS_T>
+    void add(FunctionOrderHandle<FUNC_T> &rHandle,
+             std::string const& name,
+             std::string const& after,
+             std::string const& before,
+             ARGS_T&& ... args);
+
+    /**
+     * Iterate through call list and call all of them
+     * @tparam ARGS_T arguments to pass to the functions to call
+     */
+    template<class ... ARGS_T>
+    void call(ARGS_T&& ... args);
+
+    constexpr FunctionOrderCallList<FUNC_T>& get_call_list() { return m_calls; }
 
 private:
-    FunctionOrderCallList<Func> m_calls;
+    FunctionOrderCallList<FUNC_T> m_calls;
 };
 
+
+template<typename FUNC_T>
+class FunctionOrderHandle
+{
+    friend FunctionOrder<FUNC_T>;
+public:
+    FunctionOrderHandle(typename FunctionOrderCallList<FUNC_T>::iterator &to);
+
+    template<class ... ARGS_T>
+    FunctionOrderHandle(
+            FunctionOrder<FUNC_T> &to,
+            std::string const& name,
+            std::string const& after,
+            std::string const& before,
+            ARGS_T&& ... args);
+    ~FunctionOrderHandle();
+private:
+    typename FunctionOrderCallList<FUNC_T>::iterator m_to;
+};
 
 
 
 // TODO: put these somewhere else
 
-//template<typename Func>
-//FunctionOrder<Func>::FunctionOrder()
+//template<typename FUNC_T>
+//FunctionOrder<FUNC_T>::FunctionOrder()
 //{
 //
 //}
+template<typename FUNC_T>
+template<class ... ARGS_T>
+void FunctionOrder<FUNC_T>::call(ARGS_T&& ... args)
+{
+    for (auto &funcToCall : m_calls)
+    {
+        funcToCall.m_function(args...);
+    }
+}
 
-template<typename Func>
-FunctionOrderHandle<Func>::FunctionOrderHandle(
-        typename FunctionOrderCallList<Func>::iterator &to) :
+template<typename FUNC_T>
+FunctionOrderHandle<FUNC_T>::FunctionOrderHandle(
+        typename FunctionOrderCallList<FUNC_T>::iterator &to) :
             m_to(to)
 {
     to->m_referenceCount ++;
 }
 
-template<typename Func>
-FunctionOrderHandle<Func>::~FunctionOrderHandle()
+template<typename FUNC_T>
+template<class ... ARGS_T>
+FunctionOrderHandle<FUNC_T>::FunctionOrderHandle(
+        FunctionOrder<FUNC_T> &to,
+        std::string const& name,
+        std::string const& after,
+        std::string const& before,
+        ARGS_T&& ... args)
+{
+    to.add(*this, name, after, before, args...);
+}
+
+template<typename FUNC_T>
+FunctionOrderHandle<FUNC_T>::~FunctionOrderHandle()
 {
     m_to->m_referenceCount --;
 }
 
 
-template<typename Func>
-template<class ... Args>
-FunctionOrderHandle<Func> FunctionOrder<Func>::add(std::string const& name,
-                                                   std::string const& after,
-                                                   std::string const& before,
-                                                   Args&& ... args)
+template<typename FUNC_T>
+template<class ... ARGS_T>
+void FunctionOrder<FUNC_T>::add(
+        FunctionOrderHandle<FUNC_T> &handle,
+        std::string const& name,
+        std::string const& after,
+        std::string const& before,
+        ARGS_T&& ... args)
 {
     //std::size_t  ::hash<std::string> m_nameHash;
-    typename FunctionOrderCallList<Func>::iterator minPos = m_calls.begin(),
+    typename FunctionOrderCallList<FUNC_T>::iterator minPos = m_calls.begin(),
                                                    maxPos = m_calls.end();
 
     // some algorithm for adding calls in order:
@@ -144,10 +205,8 @@ FunctionOrderHandle<Func> FunctionOrder<Func>::add(std::string const& name,
     // new FunctionOrderCall call can be emplaces somewhere between
     // minPos or maxPos
 
-    typename FunctionOrderCallList<Func>::iterator functonCall
-            = m_calls.insert(maxPos, {name, after, before, std::function<Func>(args...)});
+    handle.m_to = m_calls.insert(maxPos, {name, after, before, args...});
 
-    return FunctionOrderHandle<Func>(functonCall);
 }
 
 

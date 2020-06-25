@@ -91,22 +91,30 @@ struct PrototypeMachine
     // TODO: some sort of data
 };
 
+/**
+ * Describes everything on how to construct a part, loaded directly from a file
+ * or something
+ */
 class PrototypePart
 {
-
 
 public:
     PrototypePart();
 
-    std::vector<PrototypeObject>& get_objects() { return m_objects; }
-    std::vector<PrototypeObject> const& get_objects() const { return m_objects; }
+    constexpr std::vector<PrototypeObject>& get_objects()
+    { return m_objects; }
+    constexpr std::vector<PrototypeObject> const& get_objects() const
+    { return m_objects; }
 
 
-    std::vector<PrototypeMachine>& get_machines() { return m_machines; }
-    std::vector<PrototypeMachine> const& get_machines() const { return m_machines; }
+    constexpr std::vector<PrototypeMachine>& get_machines()
+    { return m_machines; }
+    constexpr std::vector<PrototypeMachine> const& get_machines() const
+    { return m_machines; }
 
 
-    std::vector<std::string>& get_strings() { return m_strings; }
+    constexpr std::vector<std::string>& get_strings()
+    { return m_strings; }
 
 private:
     //std::string name; use path

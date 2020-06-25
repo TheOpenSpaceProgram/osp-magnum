@@ -366,3 +366,4 @@ Independent render and physics threads isn't implemented yet.
   bus was at while the project files were first created.
 * If there are problems with DPI scaling, then run with command line arguments
   `--magnum-dpi-scaling 1.0`
+* Some commit messages are kind of verbose, and can be used to help fill a wiki

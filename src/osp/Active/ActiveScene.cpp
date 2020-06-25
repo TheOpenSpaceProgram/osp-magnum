@@ -54,45 +54,13 @@ ActiveScene::ActiveScene(UserInputHandler& userInput) :
     CompHierarchy& hierarchy = m_registry.emplace<CompHierarchy>(m_root);
     hierarchy.m_name = "Root Entity";
 
-    // test constructing a MachineUserControl
-    //MachineUserControl& control = m_machineUserControl.emplace();
 
+    // Register machines, move this somewhere else some dau
+    m_sysMachines.emplace("UserControl",
+            std::make_unique<SysMachineUserControl>(*this, userInput));
+    m_sysMachines.emplace("Rocket",
+            std::make_unique<SysMachineRocket>(*this));
 
-    // Register machines, maybe move this somewhere else?
-    //m_sysMachines.emplace_back(
-    //            std::make_unique<SysMachineUserControl>(userInput));
-    //m_sysMachines.emplace_back(
-    //            std::make_unique<SysMachineRocket>());
-    auto sysUserControl = m_sysMachines.emplace("UserControl",
-                          std::make_unique<SysMachineUserControl>(*this, userInput));
-    auto sysMachineRocket = m_sysMachines.emplace("Rocket",
-                          std::make_unique<SysMachineRocket>(*this));
-
-    // Add SysMachineUserControl to sensor update
-    m_update_sensor.emplace_back(*(sysUserControl.first->second));
-
-    // Add SysMachineRocket to physics update
-    m_update_physics.emplace_back(*(sysMachineRocket.first->second));
-
-   // m_hierLevels.resize(5);
-
-
-    m_updateOrder.add("A", "", "", test_function);
-    m_updateOrder.add("B", "", "", test_function);
-    m_updateOrder.add("C", "", "", test_function);
-    m_updateOrder.add("AfterABeforeB", "A", "B", test_function);
-    m_updateOrder.add("AfterC", "C", "", test_function);
-    m_updateOrder.add("BeforeA", "", "A", test_function);
-
-    // expected output after list_upd:
-    // Update order:
-    // * BeforeA
-    // * A
-    // * AfterABeforeB
-    // * B
-    // * AfterBBeforeC
-    // * C
-    // * AfterC
 }
 
 ActiveScene::~ActiveScene()
@@ -139,7 +107,7 @@ entt::entity ActiveScene::hier_create_child(entt::entity parent,
 void ActiveScene::hier_set_parent_child(entt::entity parent, entt::entity child)
 {
     //m_hierarchyDirty = true;
-    //todo
+    // TODO
 }
 
 
@@ -156,21 +124,25 @@ void ActiveScene::on_hierarchy_destruct(entt::registry& reg, entt::entity ent)
 
 }
 
-void ActiveScene::update_physics()
+void ActiveScene::update()
 {
     // Update machine systems
-    for (AbstractSysMachine &sysMachine : m_update_sensor)
-    {
-        sysMachine.update_sensor();
-    }
+    //for (AbstractSysMachine &sysMachine : m_update_sensor)
+    //{
+    //    sysMachine.update_sensor();
+    //}
 
-    m_wire.update_propigate();
+    //m_wire.update_propigate();
 
-    for (AbstractSysMachine &sysMachine : m_update_physics)
-    {
-        sysMachine.update_physics(1.0f/60.0f);
-    }
+    //for (AbstractSysMachine &sysMachine : m_update_physics)
+    //{
+    //    sysMachine.update_physics(1.0f/60.0f);
+    //}
+    m_updateOrder.call();
+}
 
+void ActiveScene::floating_origin_translate_begin()
+{
 
     // check if floating origin translation is requested
     m_floatingOriginInProgress = !(m_floatingOriginTranslate.isZero());
@@ -178,8 +150,6 @@ void ActiveScene::update_physics()
     {
         std::cout << "Floating origin translation\n";
     }
-
-    m_physics.update(1.0f / 60.0f);
 }
 
 void ActiveScene::update_hierarchy_transforms()
@@ -243,9 +213,12 @@ void ActiveScene::update_hierarchy_transforms()
         }
     }
 
-    // everything was translated already, set back to zero
-    m_floatingOriginTranslate = Vector3(0.0f, 0.0f, 0.0f);
-    m_floatingOriginInProgress = false;
+    if (m_floatingOriginInProgress)
+    {
+        // everything was translated already, set back to zero
+        m_floatingOriginTranslate = Vector3(0.0f, 0.0f, 0.0f);
+        m_floatingOriginInProgress = false;
+    }
 }
 
 void ActiveScene::floating_origin_translate(Vector3 const& amount)

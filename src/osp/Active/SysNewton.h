@@ -61,17 +61,17 @@ public:
     /**
      * Scan children for CompColliders. combine it all into a single compound
      * collision (not implemented and just adds a cube)
-     * @param entity Entity containing CompNewtonBody
+     * @param entity [in] Entity containing CompNewtonBody
      */
     void create_body(entt::entity entity);
 
-    void update(float timestep);
+    void update_world();
 
     /**
      *
-     * return Pair of {level-1 entity, pointer to body found}. If hierarchy
-     *        error, then {entt:null, nullptr}. If no CompRigidBody found,
-     *        then {level-1 entity, nullptr}
+     * @return Pair of {level-1 entity, pointer to body found}. If hierarchy
+     *         error, then {entt:null, nullptr}. If no CompRigidBody found,
+     *         then {level-1 entity, nullptr}
      */
     std::pair<ActiveEnt, CompRigidBody*> find_rigidbody_ancestor(
             ActiveEnt ent);
@@ -90,6 +90,8 @@ private:
 
     ActiveScene& m_scene;
     NewtonWorld *const m_nwtWorld;
+
+    UpdateOrderHandle m_updatePhysicsWorld;
 };
 
 }

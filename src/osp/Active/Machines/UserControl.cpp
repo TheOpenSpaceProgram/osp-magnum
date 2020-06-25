@@ -1,6 +1,6 @@
 #include <iostream>
 
-
+#include "../ActiveScene.h"
 #include "UserControl.h"
 
 namespace osp
@@ -57,7 +57,9 @@ SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandle
     SysMachine<SysMachineUserControl, MachineUserControl>(scene),
     m_throttleMax(userControl.config_get("game_thr_max")),
     m_throttleMin(userControl.config_get("game_thr_min")),
-    m_selfDestruct(userControl.config_get("game_self_destruct"))
+    m_selfDestruct(userControl.config_get("game_self_destruct")),
+    m_updateSensor(scene.get_update_order(), "mach_usercontrol", "", "wire",
+                   std::bind(&SysMachineUserControl::update_sensor, this))
 {
 
 }
@@ -96,11 +98,6 @@ void SysMachineUserControl::update_sensor()
         }
         //std::cout << "updating control\n";
     }
-}
-
-void SysMachineUserControl::update_physics(float delta)
-{
-
 }
 
 Machine& SysMachineUserControl::instantiate(ActiveEnt ent)

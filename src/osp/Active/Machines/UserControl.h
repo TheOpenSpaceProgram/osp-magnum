@@ -16,8 +16,7 @@ public:
 
     SysMachineUserControl(ActiveScene &scene, UserInputHandler& userControl);
 
-    void update_sensor() override;
-    void update_physics(float delta) override;
+    void update_sensor();
 
     Machine& instantiate(ActiveEnt ent) override;
 
@@ -25,6 +24,8 @@ private:
     ButtonControlHandle m_throttleMax;
     ButtonControlHandle m_throttleMin;
     ButtonControlHandle m_selfDestruct;
+
+    UpdateOrderHandle m_updateSensor;
 };
 
 /**

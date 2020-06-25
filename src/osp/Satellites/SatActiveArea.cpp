@@ -590,7 +590,7 @@ void SatActiveArea::update_physics(float deltaTime)
     //std::cout << "x: " << Vector3sp(m_sat->get_position()).x() << "\n";
 
 
-    m_scene->update_physics();
+    m_scene->update();
 
 }
 

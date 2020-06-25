@@ -49,8 +49,11 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 }
 
 
-SysNewton::SysNewton(ActiveScene &scene) : m_nwtWorld(NewtonCreate()),
-                                                 m_scene(scene)
+SysNewton::SysNewton(ActiveScene &scene) :
+        m_scene(scene),
+        m_nwtWorld(NewtonCreate()),
+        m_updatePhysicsWorld(scene.get_update_order(), "physics", "wire", "",
+                             std::bind(&SysNewton::update_world, this))
 {
     std::cout << "sysnewtoninit\n";
 }
@@ -111,9 +114,11 @@ void SysNewton::create_body(entt::entity entity)
     NewtonDestroyCollision(ball);
 }
 
-void SysNewton::update(float timestep)
+void SysNewton::update_world()
 {
-    NewtonUpdate(m_nwtWorld, timestep);
+    m_scene.floating_origin_translate_begin();
+
+    NewtonUpdate(m_nwtWorld, 1.0f / 60.0f);
     //std::cout << "hi\n";
 }
 

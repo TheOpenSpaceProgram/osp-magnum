@@ -18,7 +18,10 @@ using Corrade::Containers::LinkedListItem;
 
 class Machine;
 
-// Machine component to add to entt Entities
+/**
+ * Holds a LinkedList of abstract Machine classes, allowing Machines to be
+ * added to entities.
+ */
 struct CompMachine
 {
     CompMachine() = default;
@@ -31,7 +34,10 @@ struct CompMachine
 };
 
 
-// Base machine
+/**
+ * Machine Base class. Polymorphism is used only for wiring. Calling updates
+ * are handled by SysMachines
+ */
 class Machine : public WireElement,
                 public LinkedListItem<Machine, LinkedList<Machine>>
 {
@@ -71,8 +77,8 @@ public:
     AbstractSysMachine(AbstractSysMachine const& copy) = delete;
     AbstractSysMachine(AbstractSysMachine&& move) = delete;
 
-    virtual void update_sensor() = 0;
-    virtual void update_physics(float delta) = 0;
+    //virtual void update_sensor() = 0;
+    //virtual void update_physics(float delta) = 0;
 
     // TODO: make some config an argument
     virtual Machine& instantiate(ActiveEnt ent) = 0;
@@ -88,17 +94,7 @@ public:
 
     SysMachine(ActiveScene &scene) : m_scene(scene) {}
 
-    virtual void update_sensor() = 0;
-    virtual void update_physics(float delta) = 0;
-    //void update_sensor() override
-    //{
-    //    static_cast<Derived&>(*this).do_update_sensor();
-    //}
 
-    //void update_physics() override
-    //{
-    //    static_cast<Derived&>(*this).do_update_physics();
-    //}
     virtual Machine& instantiate(ActiveEnt ent) = 0;
 
     /**

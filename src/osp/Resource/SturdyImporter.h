@@ -16,21 +16,11 @@ namespace osp
 class SturdyImporter
 {
 
-
 typedef Magnum::Trade::TinyGltfImporter TinyGltfImporter;
-
-
 
 
 public:
     SturdyImporter();
-
-    /**
-     * Determine which nodes are parts, and add them to the passed vector.
-     * Only looks through already-loaded data
-     * @param parts Vector to add part data to
-     */
-    //void obtain_parts(std::vector<PrototypePart> parts);
 
     void open_filepath(const std::string& filepath);
 
@@ -42,10 +32,10 @@ public:
     }
 
     /**
-     * Load all data right away
-     * @param package
+     * Load all the sturdy data right away
+     * @param rPackage [out] Package to dump loaded data into
      */
-    void load_all(Package& package);
+    void load_all(Package& rPackage);
 
     /**
      * Load only associated config files, and add resource paths to the package
@@ -54,13 +44,6 @@ public:
      * @param package [out] Package to put resource paths into
      */
     void load_config(Package& package);
-
-
-    //void debug_add_obj_recurse(Object3D &parent, unsigned id);
-    //void dump_nodes(Scene3D& nodeDump);
-    //PrototypePart load_parts(int index)
-    //void load_parts(int index, Package& out);
-
 
 private:
 
