@@ -12,16 +12,16 @@
 #include "SatVehicle.h"
 #include "SatPlanet.h"
 
-
-//#include "../Active/FtrPlanet.h"
-//#include "../Active/FtrNewtonBody.h"
-//#include "../Active/FtrVehicle.h"
+#include "../Active/DebugObject.h"
 
 #include "../Resource/SturdyImporter.h"
 #include "../Resource/PlanetData.h"
 
 #include "../Active/SysNewton.h"
 #include "../Active/SysMachine.h"
+
+#include "../Active/Machines/Rocket.h"
+#include "../Active/Machines/UserControl.h"
 
 
 #include "../Universe.h"
@@ -104,7 +104,7 @@ int area_activate_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
         for (PrototypeMachine& protoMachine : proto->get_machines())
         {
             AbstractSysMachine* sysMachine
-                    = area.get_scene()->get_system_machine(protoMachine.m_type);
+                    = area.get_scene()->system_machine_find(protoMachine.m_type);
 
             if (!sysMachine)
             {
@@ -120,9 +120,9 @@ int area_activate_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 
         }
 
-        std::cout << "empty? " << partMachines.m_machines.isEmpty() << "\n";
+        //std::cout << "empty? " << partMachines.m_machines.isEmpty() << "\n";
 
-        std::cout << "entity: " << int(partEntity) << "\n";
+        //std::cout << "entity: " << int(partEntity) << "\n";
 
         CompTransform& partTransform = scene.get_registry()
                                             .get<CompTransform>(partEntity);
@@ -183,6 +183,13 @@ int area_activate_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
     CompRigidBody& nwtBody = scene.reg_emplace<CompRigidBody>(vehicleEnt);
     area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
 
+    if (area.get_scene()->get_registry().size<CompRigidBody>() == 1)
+    {
+        DebugCameraController *cam = (DebugCameraController*)(area.get_scene()->reg_get<CompDebugObject>(area.get_camera()).m_obj.get());
+
+        cam->view_track(vehicleEnt);
+    }
+
     return 0;
 }
 
@@ -213,6 +220,11 @@ SatActiveArea::SatActiveArea(UserInputHandler &userInput) :
     // use area_load_vehicle to load SatVechicles
     load_func_add<SatVehicle>(area_activate_vehicle);
     load_func_add<SatPlanet>(area_activate_planet);
+
+
+    //
+    //("Rocket",
+    //        std::make_unique<SysMachineRocket>(*this));
 }
 
 SatActiveArea::~SatActiveArea()
@@ -263,7 +275,12 @@ int SatActiveArea::activate()
     m_bocks = (new Magnum::GL::Mesh(Magnum::MeshTools::compile(
                                         Magnum::Primitives::cubeSolid())));
 
+    // Create the scene
     m_scene = std::make_shared<ActiveScene>(m_userInput);
+
+    // Register machines
+    m_scene->system_machine_add<SysMachineUserControl>("UserControl", m_userInput);
+    m_scene->system_machine_add<SysMachineRocket>("Rocket");
 
     // create debug entities that have a transform and box model
     m_debug_aEnt = m_scene->hier_create_child(m_scene->hier_get_root(),
@@ -282,12 +299,13 @@ int SatActiveArea::activate()
             = m_scene->get_registry().emplace<CompDrawableDebug>(bEnt,
                     m_bocks, m_shader.get(), 0xEE0201_rgbf);
 
-    // Create the camera component
+    // Create the camera entity
     m_camera = m_scene->hier_create_child(m_scene->hier_get_root(), "Camera");
+    CompTransform& cameraTransform = m_scene->reg_emplace<CompTransform>(m_camera);
+
+
     CompCamera& cameraComp
             = m_scene->get_registry().emplace<CompCamera>(m_camera);
-    CompTransform& cameraTransform
-            = m_scene->get_registry().emplace<CompTransform>(m_camera);
 
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     cameraTransform.m_enableFloatingOrigin = true;
@@ -299,6 +317,14 @@ int SatActiveArea::activate()
     cameraComp.m_fov = 45.0_degf;
 
     cameraComp.calculate_projection();
+
+    // Add the debug camera controller
+    std::unique_ptr<DebugCameraController> camObj
+            = std::make_unique<DebugCameraController>(*m_scene, m_camera);
+
+
+
+    m_scene->reg_emplace<CompDebugObject>(m_camera, std::move(camObj));
 
     return 0;
 }
@@ -372,7 +398,7 @@ ActiveEnt SatActiveArea::part_instantiate(PrototypePart& part,
 
     //std::cout << "size: " << newEntities.size() << "\n";
 
-    for (int i = 0; i < prototypes.size(); i ++)
+    for (unsigned i = 0; i < prototypes.size(); i ++)
     {
         const PrototypeObject& currentPrototype = prototypes[i];
         ActiveEnt currentEnt, parentEnt;
@@ -580,7 +606,6 @@ void SatActiveArea::update_physics(float deltaTime)
 
     // Temporary: Floating origin follow cameara
     Magnum::Vector3i tra(cameraTransform.m_transform[3].xyz());
-    //tra.x() = Magnum::Math::round<float>(tra.x());
 
     m_scene->floating_origin_translate(-Vector3(tra));
     m_sat->set_position(m_sat->get_position()

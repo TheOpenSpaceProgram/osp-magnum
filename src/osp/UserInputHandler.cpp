@@ -4,9 +4,9 @@
 namespace osp
 {
 
-//constexpr ButtonTermConfig::ButtonTermConfig(int device, int devEnum,
-//                                   TermTrigger trigger,  bool invert,
-//                                   TermOperator nextOp) :
+//constexpr ButtonVarConfig::ButtonVarConfig(int device, int devEnum,
+//                                   VarTrigger trigger,  bool invert,
+//                                   VarOperator nextOp) :
 
 //{
     //m_bits = (uint8_t(trigger) << 0)
@@ -36,28 +36,141 @@ bool ButtonControlHandle::triggered()
 
 bool ButtonControlHandle::trigger_hold()
 {
-    return m_to->m_controls[m_index].m_triggerHold;
+    return m_to->m_controls[m_index].m_held;
 }
 
 
-ButtonTerm::ButtonTerm(ButtonMap::iterator button, ButtonTermConfig cfg) :
-    m_button(button),
-    m_trigger(cfg.m_trigger),
-    m_invert(cfg.m_invert),
-    m_nextOp(cfg.m_nextOp) {}
+ButtonVar::ButtonVar(ButtonMap::iterator button, VarTrigger trigger,
+                     bool invert, VarOperator nextOp) :
+        m_button(button),
+        m_trigger(trigger),
+        m_invert(invert),
+        m_nextOp(nextOp) {}
+
+ButtonVar::ButtonVar(ButtonMap::iterator button, ButtonVarConfig cfg) :
+        m_button(button),
+        m_trigger(cfg.m_trigger),
+        m_invert(cfg.m_invert),
+        m_nextOp(cfg.m_nextOp) {}
 
 
 UserInputHandler::UserInputHandler(int deviceCount) :
-    m_deviceToButtonRaw(deviceCount)
+        m_deviceToButtonRaw(deviceCount)
 {
-
+    m_controls.reserve(7);
 }
 
-void UserInputHandler::config_register_control(std::string const& name,
-        std::initializer_list<ButtonTermConfig> terms)
+bool UserInputHandler::eval_button_expression(
+        ButtonExpr const& rExpr,
+        ButtonExpr* pReleaseExpr)
 {
-    std::vector<ButtonTermConfig> termVector(terms);
-    m_controlConfigs[name] = {std::move(termVector), false, 0};
+
+    using VarOperator = ButtonVar::VarOperator;
+    using VarTrigger = ButtonVar::VarTrigger;
+
+    bool totalOn = false;
+    bool termOn = false;
+
+    VarOperator prevOp = VarOperator::OR;
+    auto termStart = rExpr.begin();
+
+    //for (ButtonVar const& var : rExpression)
+    for (auto it =  rExpr.begin(); it != rExpr.end(); it ++)
+    {
+        ButtonVar const& var = *it;
+        ButtonRaw const& btnRaw = var.m_button->second;
+
+        bool varOn;
+
+        // Get the value the ButtonVar specifies
+        switch(var.m_trigger)
+        {
+        case VarTrigger::PRESSED:
+            if (var.m_invert)
+            {
+                varOn = btnRaw.m_justReleased;
+            }
+            else
+            {
+                varOn = btnRaw.m_justPressed;
+            }
+
+            break;
+        case VarTrigger::HOLD:
+            // "boolIn != bool" is a conditional invert
+            // 1 != 1 = 0
+            // 0 != 1 = 1
+            // 0 != 0 = 0
+            // 1 != 0 = 1
+
+            varOn = (btnRaw.m_pressed != var.m_invert);
+            break;
+        }
+
+        bool lastVar = ((it + 1) == rExpr.end());
+
+        // Deal with operations on that value
+        switch (prevOp)
+        {
+        case VarOperator::OR:
+            // Current var is the start of a new term.
+
+            // Add the previous term to the total
+            totalOn = totalOn || termOn;
+            termOn = varOn;
+            lastVar = true;
+
+            break;
+        case VarOperator::AND:
+            termOn = termOn && varOn;
+            break;
+        }
+
+        //std::cout << detect << ", ";
+        if (prevOp == VarOperator::OR || lastVar)
+        {
+            // if the previous term contributes to the expression being true
+            // and pReleaseExpr exists
+            if (termOn && pReleaseExpr)
+            {
+
+                auto termEnd = lastVar ? rExpr.end() : it;
+
+                // loop through the previous term, and add inverted
+                // just-pressed buttons to trigger the release
+                for (auto itB = termStart; itB != termEnd; itB ++)
+                {
+                    if (itB->m_trigger != VarTrigger::PRESSED)
+                    {
+                        continue;
+                    }
+                    pReleaseExpr->emplace_back(
+                            itB->m_button, VarTrigger::PRESSED,
+                            !(itB->m_invert), VarOperator::OR);
+                }
+            }
+
+            termStart = it;
+        }
+
+        prevOp = var.m_nextOp;
+
+    }
+
+    // consider the ver last term
+    totalOn = totalOn || termOn;
+
+    return totalOn;
+}
+
+
+void UserInputHandler::config_register_control(std::string const& name,
+        bool holdable,
+        std::initializer_list<ButtonVarConfig> vars)
+{
+    std::vector<ButtonVarConfig> varVector(vars);
+    m_controlConfigs[name] = ButtonConfig{std::move(varVector), holdable,
+                                          false, 0};
 }
 
 ButtonControlHandle UserInputHandler::config_get(std::string const& name)
@@ -73,7 +186,7 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
         return ButtonControlHandle(nullptr, 0);
     }
 
-    int index;
+    //int index;
 
     // Check if the control was already created before
     if (cfgIt->second.m_enabled)
@@ -86,21 +199,24 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
     {
         // Create a new ButtonControl
 
-        std::vector<ButtonTermConfig> &termConfigs = cfgIt->second.m_terms;
+        std::vector<ButtonVarConfig> &varConfigs = cfgIt->second.m_press;
         ButtonControl &control = m_controls.emplace_back();
 
-        control.m_terms.reserve(termConfigs.size());
+        control.m_holdable = (cfgIt->second.m_holdable);
+        control.m_held = false;
 
-        for (ButtonTermConfig &termCfg : termConfigs)
+        control.m_exprPress.reserve(varConfigs.size());
+
+        for (ButtonVarConfig &varCfg : varConfigs)
         {
-            // Each loop, create a ButtonTerm from the ButtonConfig and emplace
-            // it into control.m_terms
+            // Each loop, create a ButtonVar from the ButtonConfig and emplace
+            // it into control.m_vars
 
             // Map of buttons for the specified device
-            ButtonMap &btnMap = m_deviceToButtonRaw[termCfg.m_device];
+            ButtonMap &btnMap = m_deviceToButtonRaw[varCfg.m_device];
 
             // try inserting a new button index
-            auto btnInsert = btnMap.insert(std::make_pair(termCfg.m_devEnum,
+            auto btnInsert = btnMap.insert(std::make_pair(varCfg.m_devEnum,
                                                           ButtonRaw()));
             ButtonRaw &btnRaw = btnInsert.first->second;
 
@@ -118,11 +234,11 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
                 btnRaw.m_reference_count ++;
             }
 
-            //uint8_t bits = (uint8_t(termCfg.m_trigger) << 0)
-            //             | (uint8_t(termCfg.m_invert) << 1)
-            //             | (uint8_t(termCfg.m_nextOp) << 2);
+            //uint8_t bits = (uint8_t(varCfg.m_trigger) << 0)
+            //             | (uint8_t(varCfg.m_invert) << 1)
+            //             | (uint8_t(varCfg.m_nextOp) << 2);
 
-            control.m_terms.emplace_back(btnInsert.first, termCfg);
+            control.m_exprPress.emplace_back(btnInsert.first, varCfg);
         }
 
         // New control has been created, now return a pointer to it
@@ -184,83 +300,44 @@ void UserInputHandler::update_controls()
 {
     // Loop through controls and see which ones are triggered
 
-    //std::cout << "controls\n";
-
     for (ButtonControl &control : m_controls)
     {
-        using TermOperator = ButtonTerm::TermOperator;
-        using TermTrigger = ButtonTerm::TermTrigger;
+        ButtonExpr* pExprRelease = nullptr;
 
-        bool holdPresent = false;
-        bool current = false, currentHold = false;
-        bool trigger = false, triggerHold = false;
-        TermOperator prevOp = TermOperator::OR;
-
-        //std::cout << "* [ ";
-
-        for (ButtonTerm &term : control.m_terms)
+        // tell eval_button_expression to generate a release expression,
+        // if the control is holdable and is not held
+        if (control.m_holdable && !control.m_held)
         {
-            // Test if the current term is true
-
-            bool detect, detectHold;
-
-            ButtonRaw &btnRaw = term.m_button->second;
-
-            switch(term.m_trigger)
-            {
-            case TermTrigger::PRESSED:
-                if (term.m_invert)
-                {
-                    detect = btnRaw.m_justReleased;
-                }
-                else
-                {
-                    detect = btnRaw.m_justPressed;
-                }
-                detectHold = true;
-                break;
-            case TermTrigger::HOLD:
-                // "boolIn != bool" is a conditional invert
-                // 1 != 1 = 0
-                // 0 != 1 = 1
-                // 0 != 0 = 0
-                // 1 != 0 = 1
-                detect = detectHold = btnRaw.m_pressed != term.m_invert;
-                holdPresent = true;
-                break;
-            }
-
-            switch (prevOp)
-            {
-            case TermOperator::OR:
-                trigger = trigger || current;
-                current = detect;
-                if (holdPresent)
-                {
-                    triggerHold = triggerHold || currentHold;
-                    currentHold = detectHold;
-                }
-                break;
-            case TermOperator::AND:
-                current = current && detect;
-                currentHold = currentHold && detectHold;
-                break;
-            }
-
-            //std::cout << detect << ", ";
-
-            prevOp = term.m_nextOp;
-
+            pExprRelease = &(control.m_exprRelease);
         }
 
-        trigger = trigger || current;
-        triggerHold = triggerHold || currentHold;
+        control.m_triggered = eval_button_expression(control.m_exprPress,
+                                                     pExprRelease);
 
-        //std::cout << "] trigger: " << trigger
-        //          << ", hold: " << triggerHold << "\n";
+        if (!control.m_holdable)
+        {
+            continue;
+        }
 
-        control.m_triggered = trigger;
-        control.m_triggerHold = triggerHold;
+        if (control.m_held)
+        {
+            // if currently held
+            control.m_held = !eval_button_expression(control.m_exprRelease);
+
+            // if just released
+            if (!control.m_held)
+            {
+                control.m_exprRelease.clear();
+                std::cout << "RELEASE\n";
+            }
+        }
+        else if (control.m_triggered)
+        {
+            // start holding down the control. control.m_exprRelease should
+            // have been generated earlier
+            control.m_held = true;
+            std::cout << "HOLD\n";
+        }
     }
 }
 

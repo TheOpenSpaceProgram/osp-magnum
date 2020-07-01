@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <vector>
 
 #include <Magnum/Math/Color.h>
@@ -16,8 +17,6 @@
 #include "SysNewton.h"
 #include "SysMachine.h"
 #include "SysWire.h"
-#include "SysDebugObject.h"
-
 
 namespace osp
 {
@@ -132,9 +131,9 @@ public:
      * @tparam T Component to emplace
      */
     template<class T, typename... Args>
-    constexpr T& reg_emplace(ActiveEnt ent, Args &&... args)
+    constexpr T& reg_emplace(ActiveEnt ent, Args&& ... args)
     {
-        return m_registry.emplace<T>(ent, args...);
+        return m_registry.emplace<T>(ent, std::forward<Args>(args)...);
     }
 
     /**
@@ -179,7 +178,12 @@ public:
      */
     void draw(ActiveEnt camera);
 
+    constexpr UserInputHandler& get_user_input() { return m_userInput; }
+
     constexpr UpdateOrder& get_update_order() { return m_updateOrder; }
+
+    // TODO
+    constexpr float get_time_delta_fixed() { return 1.0f / 60.0f; }
 
     /**
      * Get one of the system members
@@ -189,11 +193,18 @@ public:
     constexpr T& get_system();
 
     /**
+     *
+     * @tparam T
+     */
+    template<class T, typename... Args>
+    void system_machine_add(std::string const& name, Args &&... args);
+
+    /**
      * Get a registered SysMachine by name. This accesses a map.
      * @param name [in] Name used as a key
      * @return Pointer to specified SysMachine, nullptr if not found
      */
-    AbstractSysMachine* get_system_machine(std::string const& name);
+    AbstractSysMachine* system_machine_find(std::string const& name);
 
 private:
 
@@ -209,7 +220,10 @@ private:
     Vector3 m_floatingOriginTranslate;
     bool m_floatingOriginInProgress;
 
-    //UserInputHandler &m_userInput;
+    float m_timescale;
+
+
+    UserInputHandler &m_userInput;
     //std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_sensor;
     //std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_physics;
 
@@ -220,10 +234,20 @@ private:
     // TODO: base class and a list for Systems (or not)
     SysPhysics m_physics;
     SysWire m_wire;
-    SysDebugObject m_debugObj;
+
+    //SysDebugObject m_debugObj;
     //std::tuple<SysPhysics, SysWire, SysDebugObject> m_systems;
 
 };
+
+// move these to another file eventually
+
+template<class T, typename... Args>
+void ActiveScene::system_machine_add(std::string const& name,
+                                             Args &&... args)
+{
+    m_sysMachines.emplace(name, std::make_unique<T>(*this, args...));
+}
 
 // TODO: There's probably a better way to do these:
 
@@ -239,10 +263,10 @@ constexpr SysWire& ActiveScene::get_system<SysWire>()
     return m_wire;
 }
 
-template<>
-constexpr SysDebugObject& ActiveScene::get_system<SysDebugObject>()
-{
-    return m_debugObj;
-}
+//template<>
+///constexpr SysDebugObject& ActiveScene::get_system<SysDebugObject>()
+//{
+//    return m_debugObj;
+//}
 
 }

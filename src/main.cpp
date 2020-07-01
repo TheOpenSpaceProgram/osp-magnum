@@ -131,34 +131,34 @@ void magnum_application()
     // Configure Controls
 
     using Key = osp::OSPMagnum::KeyEvent::Key;
-    using TermOp = osp::ButtonTermConfig::TermOperator;
-    using TermTrig = osp::ButtonTermConfig::TermTrigger;
+    using VarOp = osp::ButtonVarConfig::VarOperator;
+    using VarTrig = osp::ButtonVarConfig::VarTrigger;
     osp::UserInputHandler& userInput = g_ospMagnum->get_input_handler();
 
     // note: names like "game_thr_max" are arbitrary
 
     // Set throttle max to Z
-    userInput.config_register_control("game_thr_max",
-            {{0, (int) Key::Z, TermTrig::PRESSED, false, TermOp::OR}});
+    userInput.config_register_control("game_thr_max", false,
+            {{0, (int) Key::Z, VarTrig::PRESSED, false, VarOp::OR}});
     // Set throttle min to X
-    userInput.config_register_control("game_thr_min",
-            {{0, (int) Key::X, TermTrig::PRESSED, false, TermOp::OR}});
+    userInput.config_register_control("game_thr_min", false,
+            {{0, (int) Key::X, VarTrig::PRESSED, false, VarOp::OR}});
     // Set self destruct to LeftCtrl+C or LeftShift+A
-    userInput.config_register_control("game_self_destruct",
-            {{0, (int) Key::LeftCtrl, TermTrig::HOLD, false, TermOp::AND},
-             {0, (int) Key::C, TermTrig::PRESSED, false, TermOp::OR},
-             {0, (int) Key::LeftShift, TermTrig::HOLD, false, TermOp::AND},
-             {0, (int) Key::A, TermTrig::PRESSED, false, TermOp::OR}});
+    userInput.config_register_control("game_self_destruct", false,
+            {{0, (int) Key::LeftCtrl, VarTrig::HOLD, false, VarOp::AND},
+             {0, (int) Key::C, VarTrig::PRESSED, false, VarOp::OR},
+             {0, (int) Key::LeftShift, VarTrig::HOLD, false, VarOp::AND},
+             {0, (int) Key::A, VarTrig::PRESSED, false, VarOp::OR}});
 
     // Set generic Up/down/left/right to WASD
-    userInput.config_register_control("c_up",
-            {{0, (int) Key::W, TermTrig::PRESSED, false, TermOp::OR}});
-    userInput.config_register_control("c_dn",
-            {{0, (int) Key::S, TermTrig::PRESSED, false, TermOp::OR}});
-    userInput.config_register_control("c_lf",
-            {{0, (int) Key::A, TermTrig::PRESSED, false, TermOp::OR}});
-    userInput.config_register_control("c_rt",
-            {{0, (int) Key::D, TermTrig::PRESSED, false, TermOp::OR}});
+    userInput.config_register_control("ui_up", true,
+            {{0, (int) Key::W, VarTrig::PRESSED, false, VarOp::AND}});
+    userInput.config_register_control("ui_dn", true,
+            {{0, (int) Key::S, VarTrig::PRESSED, false, VarOp::AND}});
+    userInput.config_register_control("ui_lf", true,
+            {{0, (int) Key::A, VarTrig::PRESSED, false, VarOp::AND}});
+    userInput.config_register_control("ui_rt", true,
+            {{0, (int) Key::D, VarTrig::PRESSED, false, VarOp::AND}});
 
     // only call load once, since some stuff might already be loaded
     if (!g_universe.debug_get_packges().size())
@@ -218,6 +218,7 @@ void load_a_bunch_of_stuff()
 
     // Add package to the univere
     g_universe.debug_get_packges().push_back(std::move(lazyDebugPack));
+    g_universe.get_sats().reserve(5010);
 
     // Add 5000 vehicles so there's something to load
     for (int i = 0; i < 5000; i ++)

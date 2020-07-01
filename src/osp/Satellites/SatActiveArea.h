@@ -56,6 +56,7 @@ public:
 
     ActiveScene* get_scene() { return m_scene.get(); }
 
+    ActiveEnt get_camera() { return m_camera; }
 
     /**
      * Setup magnum scene and sets m_loadedActive to true.

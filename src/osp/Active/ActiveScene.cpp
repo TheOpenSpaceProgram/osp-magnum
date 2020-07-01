@@ -2,8 +2,9 @@
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 
-#include "Machines/UserControl.h"
-#include "Machines/Rocket.h"
+//#include "Machines/UserControl.h"
+//#include "Machines/Rocket.h"
+#include "DebugObject.h"
 
 #include "ActiveScene.h"
 
@@ -13,6 +14,7 @@ namespace osp
 
 // for the 0xrrggbb_rgbf and _deg literals
 using namespace Magnum::Math::Literals;
+
 
 void CompCamera::calculate_projection()
 {
@@ -30,10 +32,9 @@ void test_function()
 
 ActiveScene::ActiveScene(UserInputHandler& userInput) :
         m_hierarchyDirty(false),
-        //m_userInput(userInput),
+        m_userInput(userInput),
         m_physics(*this),
-        m_wire(*this),
-        m_debugObj(*this)
+        m_wire(*this)
 {
     m_registry.on_construct<CompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_construct>(*this);
@@ -54,20 +55,12 @@ ActiveScene::ActiveScene(UserInputHandler& userInput) :
     CompHierarchy& hierarchy = m_registry.emplace<CompHierarchy>(m_root);
     hierarchy.m_name = "Root Entity";
 
-
-    // Register machines, move this somewhere else some dau
-    m_sysMachines.emplace("UserControl",
-            std::make_unique<SysMachineUserControl>(*this, userInput));
-    m_sysMachines.emplace("Rocket",
-            std::make_unique<SysMachineRocket>(*this));
-
 }
 
 ActiveScene::~ActiveScene()
 {
-    // Clean up newton dynamics stuff
-    //NewtonDestroyAllBodies(m_nwtWorld);
-    //NewtonDestroy(m_nwtWorld);
+    // FIXME: not clearing these manually causes a SIGABRT on destruction
+    m_registry.clear<CompDebugObject>();
 }
 
 
@@ -271,7 +264,7 @@ void ActiveScene::draw(entt::entity camera)
     }
 }
 
-AbstractSysMachine* ActiveScene::get_system_machine(std::string const& name)
+AbstractSysMachine* ActiveScene::system_machine_find(const std::string &name)
 {
     MapSysMachine::iterator sysIt = m_sysMachines.find(name);
 

@@ -55,12 +55,12 @@ SysNewton::SysNewton(ActiveScene &scene) :
         m_updatePhysicsWorld(scene.get_update_order(), "physics", "wire", "",
                              std::bind(&SysNewton::update_world, this))
 {
-    std::cout << "sysnewtoninit\n";
+    //std::cout << "sysnewtoninit\n";
 }
 
 SysNewton::~SysNewton()
 {
-    std::cout << "sysnewtondestroy\n";
+    //std::cout << "sysnewtondestroy\n";
     // Clean up newton dynamics stuff
     NewtonDestroyAllBodies(m_nwtWorld);
     NewtonDestroy(m_nwtWorld);
@@ -118,7 +118,7 @@ void SysNewton::update_world()
 {
     m_scene.floating_origin_translate_begin();
 
-    NewtonUpdate(m_nwtWorld, 1.0f / 60.0f);
+    NewtonUpdate(m_nwtWorld, m_scene.get_time_delta_fixed());
     //std::cout << "hi\n";
 }
 

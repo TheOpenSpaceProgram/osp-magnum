@@ -76,6 +76,7 @@ public:
     AbstractSysMachine() = default;
     AbstractSysMachine(AbstractSysMachine const& copy) = delete;
     AbstractSysMachine(AbstractSysMachine&& move) = delete;
+    virtual ~AbstractSysMachine() = default;
 
     //virtual void update_sensor() = 0;
     //virtual void update_physics(float delta) = 0;
@@ -93,7 +94,7 @@ class SysMachine : public AbstractSysMachine
 public:
 
     SysMachine(ActiveScene &scene) : m_scene(scene) {}
-
+    ~SysMachine() = default;
 
     virtual Machine& instantiate(ActiveEnt ent) = 0;
 

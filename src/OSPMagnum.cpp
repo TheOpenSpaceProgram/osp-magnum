@@ -2,6 +2,8 @@
 
 #include "OSPMagnum.h"
 
+#include "osp/Active/DebugObject.h"
+
 
 namespace osp
 {
@@ -31,6 +33,8 @@ void OSPMagnum::set_active_area(SatActiveArea& area)
 
     m_area = &area;
 
+
+
 }
 
 void OSPMagnum::drawEvent()
@@ -46,6 +50,7 @@ void OSPMagnum::drawEvent()
         {
             // Enable active area if not already done so
             m_area->activate();
+
         }
 
        // std::cout << "deltaTime: " << m_timeline.previousFrameDuration() << "\n";

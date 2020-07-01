@@ -27,10 +27,7 @@ struct FunctionOrderCall
             m_name(name),
             m_after(after),
             m_before(before),
-            m_function(function)
-    {
-        std::cout << "fk\n";
-    }
+            m_function(function) {}
 
     //typename FunctionOrderCallList<FUNC_T>::iterator m_after, m_before;
 
