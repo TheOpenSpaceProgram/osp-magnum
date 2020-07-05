@@ -4,6 +4,8 @@
 
 #include "../UserInputHandler.h"
 #include "activetypes.h"
+#include "../../types.h"
+
 
 namespace osp
 {
@@ -51,11 +53,12 @@ public:
     DebugCameraController(ActiveScene &scene, ActiveEnt ent);
     ~DebugCameraController() = default;
     void update_physics_post();
-    void view_track(ActiveEnt ent);
+    void view_orbit(ActiveEnt ent);
 private:
 
-    ActiveEnt m_tracking;
-    float m_distance;
+    ActiveEnt m_orbiting;
+    Vector3 m_orbitPos;
+    float m_orbitDistance;
 
     UpdateOrderHandle m_updatePhysicsPost;
 

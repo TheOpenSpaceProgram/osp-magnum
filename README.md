@@ -19,7 +19,7 @@ https://github.com/TheOpenSpaceProgram/OpenSpaceProgram/blob/master/docs/Technic
 * ~~Showing glTF sturdy models~~
 * ~~ActiveAreas that load nearby satellites~~
 * ~~Intergrate Newton Dynamics~~
-* Controllable debug crafts that can fly around
+* ~~Controllable debug crafts that can fly around~~
 * Terrain maybe?
 * Scripting?
 

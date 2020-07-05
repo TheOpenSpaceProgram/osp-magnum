@@ -18,6 +18,7 @@ using Magnum::Vector2i;
 
 using Magnum::Vector3;
 using Magnum::Quaternion;
+using Magnum::Matrix3;
 using Magnum::Matrix4;
 
 using Magnum::Rad;

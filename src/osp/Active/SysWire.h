@@ -33,16 +33,28 @@ namespace wiretype
     };
 
     /**
-     * A change in rotation
+     * A change in rotation. Separate pitch, yaw and roll
      */
     struct AttitudeControl
     {
         //  each (-1.0 .. 1.0)
-        float m_yaw, m_pitch, m_roll;
-        Quaternion m_precise;
+        // pitch, yaw, roll
+        Vector3 m_attitude;
+
+        //Quaternion m_precise;
         //Quaternion m_rot;
         //Vector3 m_yawpitchroll
     };
+
+    /**
+     * A change in rotation in axis angle
+     *
+     */
+    //struct AttitudeControlPrecise
+    //{
+    //    //Quaternion m_precise;
+    //    Vector3 m_axis;
+    //};
 
     /**
      * For something like throttle

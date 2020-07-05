@@ -43,13 +43,12 @@ class Machine : public WireElement,
 {
 
 public:
-    Machine(ActiveEnt ent);
+    Machine(ActiveEnt ent, bool enable);
     Machine(Machine const& copy) = delete;
     Machine(Machine&& move) = default;
     virtual ~Machine() = default;
 
-
-    // polymorphic stuff is used only for wiring
+    // polymorphic stuff is used only for wiring.
     // use a system for updating
 
     virtual void propagate_output(WireOutput* output) override = 0;
@@ -62,11 +61,16 @@ public:
 
     ActiveEnt get_ent() { return m_ent; }
 
+    // i don't like getters and setters
+    //void set_enable(bool enable) { m_enable = enable; }
+    //bool get_enable() { return m_enable; }
+
     void doErase() override;
 
-    // just a simple bool
-    //bool m_enable;
+    bool m_enable;
+
 private:
+    //bool m_enable;
     ActiveEnt m_ent;
 };
 

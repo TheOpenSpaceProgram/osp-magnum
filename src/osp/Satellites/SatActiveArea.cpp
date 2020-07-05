@@ -43,6 +43,9 @@ int area_activate_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
 
     std::cout << "loadin a vehicle!\n";
 
+    // everything that involves this variable is temporary
+    bool debugFirstVehicle = !(area.get_scene()->get_registry().size<CompRigidBody>());
+
     //std::cout << "relative distance: " << positionInScene.length() << "\n";
 
     // Get the needed variables
@@ -115,6 +118,11 @@ int area_activate_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
             // TODO: pass the blueprint configs into this function
             Machine& machine = sysMachine->instantiate(partEntity);
 
+            if (debugFirstVehicle)
+            {
+                machine.m_enable = true;
+            }
+
             // Add the machine to the part
             partMachines.m_machines.insert(&machine);
 
@@ -183,11 +191,17 @@ int area_activate_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
     CompRigidBody& nwtBody = scene.reg_emplace<CompRigidBody>(vehicleEnt);
     area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
 
-    if (area.get_scene()->get_registry().size<CompRigidBody>() == 1)
+    if (debugFirstVehicle)
     {
-        DebugCameraController *cam = (DebugCameraController*)(area.get_scene()->reg_get<CompDebugObject>(area.get_camera()).m_obj.get());
+        // if first loaded vehicle
 
-        cam->view_track(vehicleEnt);
+        // point the camera
+        DebugCameraController *cam = (DebugCameraController*)(
+                    area.get_scene()->reg_get<CompDebugObject>(
+                        area.get_camera()).m_obj.get());
+        cam->view_orbit(vehicleEnt);
+
+
     }
 
     return 0;
@@ -312,7 +326,7 @@ int SatActiveArea::activate()
 
     cameraComp.m_viewport = Vector2(Magnum::GL::defaultFramebuffer.viewport()
                                                                   .size());
-    cameraComp.m_far = 128.0f;
+    cameraComp.m_far = 4096.0f;
     cameraComp.m_near = 0.125f;
     cameraComp.m_fov = 45.0_degf;
 

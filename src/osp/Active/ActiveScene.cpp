@@ -20,8 +20,8 @@ void CompCamera::calculate_projection()
 {
 
     m_projection = Matrix4::perspectiveProjection(
-                                m_fov, m_viewport.x() / m_viewport.y(),
-                                m_near, m_far);
+            m_fov, m_viewport.x() / m_viewport.y(),
+            m_near, m_far);
 }
 
 void test_function()

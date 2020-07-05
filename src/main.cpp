@@ -135,7 +135,22 @@ void magnum_application()
     using VarTrig = osp::ButtonVarConfig::VarTrigger;
     osp::UserInputHandler& userInput = g_ospMagnum->get_input_handler();
 
-    // note: names like "game_thr_max" are arbitrary
+    // note: names of controls are arbitrary
+
+    // vehicle control
+    // would help to get an axis for yaw, pitch, and roll, but use this for now
+    userInput.config_register_control("game_pitch_up", true,
+            {{0, (int) Key::S, VarTrig::PRESSED, false, VarOp::AND}});
+    userInput.config_register_control("game_pitch_dn", true,
+            {{0, (int) Key::W, VarTrig::PRESSED, false, VarOp::AND}});
+    userInput.config_register_control("game_yaw_lf", true,
+            {{0, (int) Key::A, VarTrig::PRESSED, false, VarOp::AND}});
+    userInput.config_register_control("game_yaw_rt", true,
+            {{0, (int) Key::D, VarTrig::PRESSED, false, VarOp::AND}});
+    userInput.config_register_control("game_roll_lf", true,
+            {{0, (int) Key::Q, VarTrig::PRESSED, false, VarOp::AND}});
+    userInput.config_register_control("game_roll_rt", true,
+            {{0, (int) Key::E, VarTrig::PRESSED, false, VarOp::AND}});
 
     // Set throttle max to Z
     userInput.config_register_control("game_thr_max", false,
@@ -150,15 +165,16 @@ void magnum_application()
              {0, (int) Key::LeftShift, VarTrig::HOLD, false, VarOp::AND},
              {0, (int) Key::A, VarTrig::PRESSED, false, VarOp::OR}});
 
-    // Set generic Up/down/left/right to WASD
+    // Set UI Up/down/left/right to arrow keys. this is used to rotate the view
+    // for now
     userInput.config_register_control("ui_up", true,
-            {{0, (int) Key::W, VarTrig::PRESSED, false, VarOp::AND}});
+            {{0, (int) Key::Up, VarTrig::PRESSED, false, VarOp::AND}});
     userInput.config_register_control("ui_dn", true,
-            {{0, (int) Key::S, VarTrig::PRESSED, false, VarOp::AND}});
+            {{0, (int) Key::Down, VarTrig::PRESSED, false, VarOp::AND}});
     userInput.config_register_control("ui_lf", true,
-            {{0, (int) Key::A, VarTrig::PRESSED, false, VarOp::AND}});
+            {{0, (int) Key::Left, VarTrig::PRESSED, false, VarOp::AND}});
     userInput.config_register_control("ui_rt", true,
-            {{0, (int) Key::D, VarTrig::PRESSED, false, VarOp::AND}});
+            {{0, (int) Key::Right, VarTrig::PRESSED, false, VarOp::AND}});
 
     // only call load once, since some stuff might already be loaded
     if (!g_universe.debug_get_packges().size())
@@ -270,11 +286,17 @@ osp::Satellite& debug_add_random_vehicle()
         //std::cout << "random: " <<  << "\n";
     }
 
-    // Wire up throttle control
+    // Wire throttle control
     // from (output): a MachineUserControl m_woThrottle
     // to    (input): a MachineRocket m_wiThrottle
+    blueprint.m_data.add_wire(0, 0, 1,
+                              0, 1, 2);
+
+    // Wire attitude control to gimbal
+    // from (output): a MachineUserControl m_woAttitude
+    // to    (input): a MachineRocket m_wiGimbal
     blueprint.m_data.add_wire(0, 0, 0,
-                              0, 1, 1);
+                              0, 1, 0);
 
     // put blueprint in package
     auto blueprintRes = g_universe.debug_get_packges()[0]

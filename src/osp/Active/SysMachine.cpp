@@ -9,7 +9,7 @@ using namespace osp;
 
 //}
 
-Machine::Machine(ActiveEnt ent) : m_ent(ent) {}
+Machine::Machine(ActiveEnt ent, bool enable) : m_enable(enable),  m_ent(ent) {}
 
 void Machine::doErase()
 {

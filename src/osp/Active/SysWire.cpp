@@ -51,6 +51,7 @@ WireOutput::WireOutput(WireElement* element, std::string const& name,
 
 WireOutput::WireOutput(WireElement *element, WireOutput&& move) :
         LinkedList<WireInput>(std::move(move)),
+        m_value(std::move(move.m_value)),
         m_element(element),
         m_name(std::move(move.m_name))
 {

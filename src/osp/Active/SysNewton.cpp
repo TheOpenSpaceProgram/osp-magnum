@@ -103,6 +103,9 @@ void SysNewton::create_body(entt::entity entity)
     // reference frame may be moving and air pressure stuff
     NewtonBodySetLinearDamping(body, 0.0f);
 
+    // Make it easier to rotate
+    NewtonBodySetAngularDamping(body, Vector3(1.0f, 1.0f, 1.0f).data());
+
     // Set callback for updating position of entity and everything else
     NewtonBodySetForceAndTorqueCallback(body, cb_force_torque);
 
@@ -149,6 +152,8 @@ std::pair<ActiveEnt, CompRigidBody*> SysNewton::find_rigidbody_ancestor(
 
 }
 
+// TODO
+
 void SysNewton::body_apply_force(CompRigidBody &body, Vector3 force)
 {
     body->m_netForce += force;
@@ -159,9 +164,9 @@ void SysNewton::body_apply_force_local(CompRigidBody &body, Vector3 force)
 
 }
 
-void SysNewton::body_apply_torque(CompRigidBody &body, Vector3 force)
+void SysNewton::body_apply_torque(CompRigidBody &body, Vector3 torque)
 {
-
+    body->m_netTorque += torque;
 }
 
 void SysNewton::body_apply_torque_local(CompRigidBody &body, Vector3 force)

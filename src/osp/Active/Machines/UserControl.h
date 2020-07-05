@@ -25,6 +25,13 @@ private:
     ButtonControlHandle m_throttleMin;
     ButtonControlHandle m_selfDestruct;
 
+    ButtonControlHandle m_pitchUp;
+    ButtonControlHandle m_pitchDn;
+    ButtonControlHandle m_yawLf;
+    ButtonControlHandle m_yawRt;
+    ButtonControlHandle m_rollLf;
+    ButtonControlHandle m_rollRt;
+
     UpdateOrderHandle m_updateSensor;
 };
 
@@ -53,6 +60,7 @@ private:
 
     //std::array<WireOutput, 2> m_outputs;
 
+    WireOutput m_woAttitude;
     WireOutput m_woTestPropagate;
     WireOutput m_woThrottle;
     WireInput m_wiTest;

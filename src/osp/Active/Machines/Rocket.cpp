@@ -8,7 +8,8 @@ namespace osp
 {
 
 MachineRocket::MachineRocket(ActiveEnt &ent) :
-        Machine(ent),
+        Machine(ent, true),
+        m_wiGimbal(this, "Gimbal"),
         m_wiIgnition(this, "Ignition"),
         m_wiThrottle(this, "Throttle"),
         m_rigidBody(entt::null)
@@ -18,6 +19,7 @@ MachineRocket::MachineRocket(ActiveEnt &ent) :
 
 MachineRocket::MachineRocket(MachineRocket&& move) :
         Machine(std::move(move)),
+        m_wiGimbal(this, std::move(move.m_wiGimbal)),
         m_wiIgnition(this, std::move(move.m_wiIgnition)),
         m_wiThrottle(this, std::move(move.m_wiThrottle))
 {
@@ -41,7 +43,7 @@ WireOutput* MachineRocket::request_output(WireOutPort port)
 
 std::vector<WireInput*> MachineRocket::existing_inputs()
 {
-    return {&m_wiIgnition, &m_wiThrottle};
+    return {&m_wiGimbal, &m_wiIgnition, &m_wiThrottle};
 }
 
 std::vector<WireOutput*> MachineRocket::existing_outputs()
@@ -73,6 +75,40 @@ void SysMachineRocket::update_physics()
 
         //std::cout << "updating a rocket\n";
 
+        CompRigidBody *compRb;
+        CompTransform *compTf;
+
+        if (m_scene.get_registry().valid(machine.m_rigidBody))
+        {
+            // Try to get the CompRigidBody if valid
+            compRb = m_scene.get_registry()
+                            .try_get<CompRigidBody>(machine.m_rigidBody);
+            compTf = m_scene.get_registry()
+                            .try_get<CompTransform>(machine.m_rigidBody);
+            if (!compRb || !compTf)
+            {
+                machine.m_rigidBody = entt::null;
+                continue;
+            }
+        }
+        else
+        {
+            // rocket's rigid body not set yet
+            auto body =
+                    m_physics.find_rigidbody_ancestor(machine.get_ent());
+
+            if (body.second == nullptr)
+            {
+                std::cout << "no rigid body!\b";
+                continue;
+            }
+
+            machine.m_rigidBody = body.first;
+            compRb = body.second;
+            compTf = m_scene.get_registry()
+                    .try_get<CompTransform>(body.first);
+        }
+
         if (WireData *ignition = machine.m_wiIgnition.connected_value())
         {
 
@@ -83,38 +119,34 @@ void SysMachineRocket::update_physics()
         if (WireData *throttle = machine.m_wiThrottle.connected_value())
         {
             Percent *percent = std::get_if<Percent>(throttle);
+
+            float thrust = 10.0f; // temporary
+
             //std::cout << percent->m_value << "\n";
 
-            CompRigidBody *compRb;
-            
-            if (m_scene.get_registry().valid(machine.m_rigidBody))
-            {
-                // Try to get the CompRigidBody if valid
-                compRb = m_scene.get_registry().try_get<CompRigidBody>(machine.m_rigidBody);
-                if (!compRb)
-                {
-                    machine.m_rigidBody = entt::null;
-                    continue;
-                }
-            }
-            else
-            {
-                // rocket's rigid body not set yet
-                auto body =
-                        m_physics.find_rigidbody_ancestor(machine.get_ent());
-
-                if (body.second == nullptr)
-                {
-                    std::cout << "no rigid body!\b";
-                    continue;
-                }
-
-                machine.m_rigidBody = body.first;
-                compRb = body.second;
-            }
-
-            m_physics.body_apply_force(*compRb, Vector3(0, percent->m_value * 10.0f, 0));
+            m_physics.body_apply_force(*compRb, compTf->m_transform.backward()
+                    * (percent->m_value * thrust));
         }
+
+
+
+        // this is suppose to be gimbal, but for now it applies torque
+
+        using wiretype::AttitudeControl;
+
+        if (WireData *gimbal = machine.m_wiGimbal.connected_value())
+        {
+            AttitudeControl *attCtrl = std::get_if<AttitudeControl>(gimbal);
+
+            Vector3 localTorque = compTf->m_transform
+                    .transformVector(attCtrl->m_attitude);
+
+            localTorque *= 3.0f; // arbitrary
+
+            m_physics.body_apply_torque(*compRb, localTorque);
+        }
+
+
     }
 }
 
