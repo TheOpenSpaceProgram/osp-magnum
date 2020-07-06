@@ -9,15 +9,18 @@
 //#include <Magnum/SceneGraph/Camera.h>
 
 
-#include "../../types.h"
+#include "../types.h"
 #include "../Satellite.h"
 //#include "../scene.h"
 
 #include "../Resource/Package.h"
 #include "../Resource/PrototypePart.h"
 
-#include "../Active/ActiveScene.h"
+//#include "../Active/ActiveScene.h"
 
+#include "../Active/activetypes.h"
+
+#include "../OSPApplication.h"
 #include "../UserInputHandler.h"
 //#include "../Active/NewtonPhysics.h"
 
@@ -62,7 +65,7 @@ public:
      * Setup magnum scene and sets m_loadedActive to true.
      * @return only 0 for now
      */
-    int activate();
+    int activate(OSPApplication& app);
 
     /**
      * Do actual drawing of scene. Call only on context thread.
@@ -77,25 +80,16 @@ public:
 
     /**
      * Add a loading strategy to add support for loading a type of satellite 
+     * @param id
      * @param function
      */
-    template<class T>
-    void load_func_add(LoadStrategy function);
-
-    /**
-     * Create a Physical Part from a PrototypePart and put it in the world
-     * @param part the part to instantiate
-     * @param rootParent Entity to put part into
-     * @return Pointer to object created
-     */
-    ActiveEnt part_instantiate(PrototypePart& part,
-                                  ActiveEnt rootParent);
+    void activate_func_add(Id const* id, LoadStrategy function);
 
     /**
      * Attempt to load a satellite
      * @return status, zero for no error
      */
-    int load_satellite(Satellite& sat);
+    int activate_satellite(Satellite& sat);
 
     bool is_loaded_active() { return m_loadedActive; }
 
@@ -122,10 +116,6 @@ private:
 
 
 
-template<class T>
-void SatActiveArea::load_func_add(LoadStrategy function)
-{
-    m_loadFunctions[&(T::get_id_static())] = function;
-}
+
 
 }

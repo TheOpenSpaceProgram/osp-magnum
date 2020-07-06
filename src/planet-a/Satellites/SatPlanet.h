@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Satellite.h"
+#include <osp/Satellite.h>
 
 namespace osp
 {

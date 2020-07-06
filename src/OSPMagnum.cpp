@@ -46,12 +46,11 @@ void OSPMagnum::drawEvent()
     if (m_area)
     {
         //Scene3D& scene = m_area->get_scene();
-        if (!m_area->is_loaded_active())
-        {
-            // Enable active area if not already done so
-            m_area->activate();
-
-        }
+        //if (!m_area->is_loaded_active())
+        //{
+        //    // Enable active area if not already done so
+        //    m_area->activate();
+        //}
 
        // std::cout << "deltaTime: " << m_timeline.previousFrameDuration() << "\n";
 

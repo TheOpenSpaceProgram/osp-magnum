@@ -20,6 +20,8 @@ file (GLOB_RECURSE CPP_FILES *.cpp)
 file (GLOB_RECURSE H_FILES *.h)
 set (SOURCE_FILES ${CPP_FILES} ${H_FILES})
 
+include_directories(.)
+
 # Include Newton Dynamics to the project
 
 # TODO: find a better way to do this.

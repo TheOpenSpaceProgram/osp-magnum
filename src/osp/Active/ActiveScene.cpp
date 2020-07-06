@@ -30,11 +30,13 @@ void test_function()
 }
 
 
-ActiveScene::ActiveScene(UserInputHandler& userInput) :
+ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication& app) :
+        m_app(app),
         m_hierarchyDirty(false),
         m_userInput(userInput),
         m_physics(*this),
-        m_wire(*this)
+        m_wire(*this),
+        m_vehicles(*this)
 {
     m_registry.on_construct<CompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_construct>(*this);

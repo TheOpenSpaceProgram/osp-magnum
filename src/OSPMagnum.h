@@ -14,15 +14,16 @@
 
 #include "osp/Satellites/SatActiveArea.h"
 
-#include "types.h"
+#include "osp/types.h"
 
+#include "osp/OSPApplication.h"
 #include "osp/Universe.h"
 #include "osp/UserInputHandler.h"
 
 namespace osp
 {
 
-class OSPMagnum: public Magnum::Platform::Application
+class OSPMagnum : public Magnum::Platform::Application
 {
 
 public:
@@ -39,7 +40,6 @@ public:
     void set_active_area(SatActiveArea& area);
 
     UserInputHandler& get_input_handler() { return m_userInput; }
-
 
 private:
 

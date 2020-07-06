@@ -1,7 +1,7 @@
 #include <iostream>
 
+#include <osp/Active/ActiveScene.h>
 
-#include "../ActiveScene.h"
 #include "Rocket.h"
 
 namespace osp

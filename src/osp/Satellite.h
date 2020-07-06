@@ -3,7 +3,7 @@
 #include <Magnum/Math/Vector3.h>
 #include <memory>
 
-#include "../types.h"
+#include "types.h"
 
 namespace osp
 {

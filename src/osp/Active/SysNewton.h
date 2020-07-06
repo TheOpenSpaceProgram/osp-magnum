@@ -5,7 +5,7 @@
 
 #include "../Resource/PrototypePart.h"
 
-#include "../../types.h"
+#include "../types.h"
 #include "activetypes.h"
 
 namespace osp

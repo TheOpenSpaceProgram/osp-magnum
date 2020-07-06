@@ -1,6 +1,7 @@
 #include <iostream>
 
-#include "../ActiveScene.h"
+#include <osp/Active/ActiveScene.h>
+
 #include "UserControl.h"
 
 namespace osp
@@ -9,7 +10,7 @@ namespace osp
 MachineUserControl::MachineUserControl(ActiveEnt &ent) :
     Machine(ent, false),
     //m_woTestPropagate(this, "TestOut", &MachineUserControl::propagate_test),
-    m_woAttitude(this, "Attitude"),
+    m_woAttitude(this, "AttitudeControl"),
     m_woTestPropagate(this, "TestOut", m_wiTest),
     m_woThrottle(this, "Throttle"),
     m_wiTest(this, "Test")

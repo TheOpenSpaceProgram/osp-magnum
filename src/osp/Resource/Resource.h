@@ -28,6 +28,9 @@ public:
     void bind(LinkedList<ResDependency<T> >& resource)
     { resource.insert(this); }
 
+    void doErase() override
+    { LinkedListItem<ResDependency<T>, Resource<T> >::list()->cut(this); }
+
     constexpr T* get_data()
     {
         return &(LinkedListItem<ResDependency<T>, Resource<T> >::list()->m_data);

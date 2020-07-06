@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../UserInputHandler.h"
-#include "../SysMachine.h"
+#include <osp/UserInputHandler.h>
+#include <osp/Active/SysMachine.h>
 
 namespace osp
 {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../types.h"
+#include "../types.h"
 
 #include "../Active/SysWire.h"
 #include "../Resource/Resource.h"

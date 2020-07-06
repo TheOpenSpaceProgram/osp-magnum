@@ -3,8 +3,8 @@
 #include <memory>
 
 #include "../UserInputHandler.h"
+#include "../types.h"
 #include "activetypes.h"
-#include "../../types.h"
 
 
 namespace osp

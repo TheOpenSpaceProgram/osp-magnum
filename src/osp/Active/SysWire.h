@@ -6,7 +6,7 @@
 
 #include <Corrade/Containers/LinkedList.h>
 
-#include "../../types.h"
+#include "../types.h"
 #include "activetypes.h"
 
 namespace osp

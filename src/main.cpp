@@ -4,16 +4,20 @@
 #include <stack>
 #include <random>
 
-
 #include "OSPMagnum.h"
 #include "osp/Universe.h"
 #include "osp/Satellites/SatActiveArea.h"
 #include "osp/Satellites/SatVehicle.h"
-#include "osp/Satellites/SatPlanet.h"
+//#include "osp/Satellites/SatPlanet.h"
 #include "osp/Resource/SturdyImporter.h"
 #include "osp/Resource/Package.h"
 
+#include "osp/Active/ActiveScene.h"
+#include "osp/Active/SysVehicle.h"
 
+
+#include "adera/Machines/UserControl.h"
+#include "adera/Machines/Rocket.h"
 
 void magnum_application();
 void load_a_bunch_of_stuff();
@@ -29,7 +33,12 @@ void debug_print_update_order();
 Magnum::Platform::Application::Arguments g_args();
 std::thread g_magnumThread;
 
-osp::Universe g_universe;
+// Deals with the underlying OSP universe, with the satellites and stuff
+// This also stores loaded resources in packages.
+osp::OSPApplication g_osp;
+
+// Deals with the window, OpenGL context, and other game engine stuff that
+// often have "Active" written all over them
 std::unique_ptr<osp::OSPMagnum> g_ospMagnum;
 
 int g_argc;
@@ -115,7 +124,7 @@ int debug_cli_loop()
     }
 
     // destory the universe
-    g_universe.get_sats().clear();
+    g_osp.get_universe().get_sats().clear();
     return 0;
 }
 
@@ -177,21 +186,33 @@ void magnum_application()
             {{0, (int) Key::Right, VarTrig::PRESSED, false, VarOp::AND}});
 
     // only call load once, since some stuff might already be loaded
-    if (!g_universe.debug_get_packges().size())
+    if (!g_osp.debug_get_packges().size())
     {
         load_a_bunch_of_stuff();
     }
 
     // create a satellite with an ActiveArea
-    osp::Satellite& sat = g_universe.sat_create();
+    osp::Satellite& sat = g_osp.get_universe().sat_create();
     osp::SatActiveArea& area = sat.create_object<osp::SatActiveArea>(
                                     g_ospMagnum->get_input_handler());
     sat.set_position({Vector3s(0, 0, 0), 10});
 
+    // Activate it
+    area.activate(g_osp);
+
+    // Register machines
+    area.get_scene()->system_machine_add<osp::SysMachineUserControl>
+            ("UserControl", g_ospMagnum->get_input_handler());
+    area.get_scene()->system_machine_add<osp::SysMachineRocket>
+            ("Rocket");
+
+    area.activate_func_add(&(osp::SatVehicle::get_id_static()), osp::SysVehicle::area_activate_vehicle);
+
     // make the application switch to that area
     g_ospMagnum->set_active_area(area);
 
-    // sat reference becomes invalid btw, since it refers to a vector elem.
+    // Note: sat becomes invalid btw, since it refers to a vector elem.
+    //       if new satellites are added, this can cause problems
 
     // this starts the game loop. non-asynchronous
     // OSPMagnum::drawEvent gets looped
@@ -202,13 +223,12 @@ void magnum_application()
     std::cout << "Magnum Application closed\n";
 
     // Kill the active area
-    g_universe.sat_remove(area.get_satellite());
+    g_osp.get_universe().sat_remove(area.get_satellite());
 
     // workaround: wipe mesh resources because they're specific to the
     // opengl context
     static_cast<std::vector<osp::Resource<Magnum::GL::Mesh> >& >(
-                g_universe.debug_get_packges()[0].debug_get_resource_table())
-                    .clear();
+            g_osp.debug_get_packges()[0].debug_get_resource_table()).clear();
     
     // destruct the application, this closes the window
     g_ospMagnum.reset();
@@ -233,8 +253,8 @@ void load_a_bunch_of_stuff()
     importer.load_config(lazyDebugPack);
 
     // Add package to the univere
-    g_universe.debug_get_packges().push_back(std::move(lazyDebugPack));
-    g_universe.get_sats().reserve(5010);
+    g_osp.debug_get_packges().push_back(std::move(lazyDebugPack));
+    g_osp.get_universe().get_sats().reserve(5010);
 
     // Add 5000 vehicles so there's something to load
     for (int i = 0; i < 5000; i ++)
@@ -252,8 +272,8 @@ void load_a_bunch_of_stuff()
 
 
     // Add a planet too
-    osp::Satellite& planet = g_universe.sat_create();
-    planet.create_object<osp::SatPlanet>();
+    //osp::Satellite& planet = g_universe.sat_create();
+    //planet.create_object<osp::SatPlanet>();
 
     //s_partsLoaded = true;
 }
@@ -261,13 +281,13 @@ void load_a_bunch_of_stuff()
 osp::Satellite& debug_add_random_vehicle()
 {
     // Get some needed variables
-    osp::Satellite &sat = g_universe.sat_create();
+    osp::Satellite &sat = g_osp.get_universe().sat_create();
     osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
     osp::Resource<osp::BlueprintVehicle> blueprint;
 
     // Part to add, very likely a spamcan
     osp::Resource<osp::PrototypePart>* victim =
-            g_universe.debug_get_packges()[0]
+            g_osp.debug_get_packges()[0]
             .get_resource<osp::PrototypePart>(0);
 
     // Add 10 parts
@@ -299,7 +319,7 @@ osp::Satellite& debug_add_random_vehicle()
                               0, 1, 0);
 
     // put blueprint in package
-    auto blueprintRes = g_universe.debug_get_packges()[0]
+    auto blueprintRes = g_osp.debug_get_packges()[0]
             .debug_add_resource<osp::BlueprintVehicle>(std::move(blueprint));
 
     // set the SatVehicle's blueprint to the one just made
@@ -385,7 +405,7 @@ void debug_print_hier()
 
 void debug_print_sats()
 {
-    std::vector<osp::Satellite>& sats = g_universe.get_sats();
+    std::vector<osp::Satellite>& sats = g_osp.get_universe().get_sats();
 
     // Loop through g_universe's satellites and print them.
     std::cout << "Universe:\n";

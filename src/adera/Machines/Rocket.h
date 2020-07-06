@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../SysMachine.h"
+#include <osp/Active/SysMachine.h>
 
 namespace osp
 {

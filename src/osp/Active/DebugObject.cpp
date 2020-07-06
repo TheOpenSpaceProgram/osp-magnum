@@ -74,3 +74,4 @@ void DebugCameraController::view_orbit(ActiveEnt ent)
 {
     m_orbiting = ent;
 }
+

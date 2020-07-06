@@ -9,13 +9,15 @@
 
 #include <Newton.h>
 
+#include "../OSPApplication.h"
 #include "../UserInputHandler.h"
 
-#include "../../types.h"
+#include "../types.h"
 #include "activetypes.h"
 
 #include "SysNewton.h"
 #include "SysMachine.h"
+#include "SysVehicle.h"
 #include "SysWire.h"
 
 namespace osp
@@ -88,8 +90,10 @@ class ActiveScene
 {
 
 public:
-    ActiveScene(UserInputHandler &userInput);
+    ActiveScene(UserInputHandler &userInput, OSPApplication& app);
     ~ActiveScene();
+
+    OSPApplication& get_application() { return m_app; };
 
     /**
      * @return Root entity of the entire scene graph
@@ -211,6 +215,7 @@ private:
     void on_hierarchy_construct(entt::registry& reg, ActiveEnt ent);
     void on_hierarchy_destruct(entt::registry& reg, ActiveEnt ent);
 
+    OSPApplication& m_app;
 
     //std::vector<std::vector<ActiveEnt> > m_hierLevels;
     entt::basic_registry<ActiveEnt> m_registry;
@@ -234,6 +239,7 @@ private:
     // TODO: base class and a list for Systems (or not)
     SysPhysics m_physics;
     SysWire m_wire;
+    SysVehicle m_vehicles;
 
     //SysDebugObject m_debugObj;
     //std::tuple<SysPhysics, SysWire, SysDebugObject> m_systems;
@@ -262,6 +268,13 @@ constexpr SysWire& ActiveScene::get_system<SysWire>()
 {
     return m_wire;
 }
+
+template<>
+constexpr SysVehicle& ActiveScene::get_system<SysVehicle>()
+{
+    return m_vehicles;
+}
+
 
 //template<>
 ///constexpr SysDebugObject& ActiveScene::get_system<SysDebugObject>()

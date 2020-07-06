@@ -9,25 +9,28 @@
 #include <Magnum/Primitives/Cube.h>
 
 #include "SatActiveArea.h"
-#include "SatVehicle.h"
-#include "SatPlanet.h"
 
+//#include "SatVehicle.h"
+//#include "SatPlanet.h"
+
+
+#include "../Active/ActiveScene.h"
 #include "../Active/DebugObject.h"
+#include "../Active/SysNewton.h"
+#include "../Active/SysMachine.h"
 
 #include "../Resource/SturdyImporter.h"
 #include "../Resource/PlanetData.h"
 
-#include "../Active/SysNewton.h"
-#include "../Active/SysMachine.h"
 
-#include "../Active/Machines/Rocket.h"
-#include "../Active/Machines/UserControl.h"
+//#include "../Active/Machines/Rocket.h"
+//#include "../Active/Machines/UserControl.h"
 
 
 #include "../Universe.h"
 
 
-// for the 0xrrggbb_rgbf literals
+// for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;
 
 using Magnum::Matrix4;
@@ -35,194 +38,6 @@ using Magnum::Matrix4;
 namespace osp
 {
 
-// Loading functions
-
-
-int area_activate_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
-{
-
-    std::cout << "loadin a vehicle!\n";
-
-    // everything that involves this variable is temporary
-    bool debugFirstVehicle = !(area.get_scene()->get_registry().size<CompRigidBody>());
-
-    //std::cout << "relative distance: " << positionInScene.length() << "\n";
-
-    // Get the needed variables
-    SatVehicle &vehicle = static_cast<SatVehicle&>(loadMe);
-    BlueprintVehicle &vehicleData = vehicle.get_blueprint();
-    ActiveScene &scene = *(area.get_scene());
-    ActiveEnt root = scene.hier_get_root();
-
-    // Create the root entity to add parts to
-
-    ActiveEnt vehicleEnt = scene.hier_create_child(root, "Vehicle");
-
-    // Convert position of the satellite to position in scene
-    Vector3 positionInScene = loadMe.get_satellite()
-            ->position_relative_to(*(area.get_satellite())).to_meters();
-
-    CompTransform& vehicleTransform = scene.get_registry()
-                                        .emplace<CompTransform>(vehicleEnt);
-    vehicleTransform.m_transform = Matrix4::translation(positionInScene);
-    vehicleTransform.m_enableFloatingOrigin = true;
-
-    // Create the parts
-
-    // Unique part prototypes used in the vehicle
-    // Access with [blueprintParts.m_partIndex]
-    std::vector<ResDependency<PrototypePart> >& partsUsed =
-            vehicleData.get_prototypes();
-
-    // All the parts in the vehicle
-    std::vector<BlueprintPart> &blueprintParts = vehicleData.get_blueprints();
-
-    // Keep track of newly created parts
-    std::vector<ActiveEnt> newEntities;
-    newEntities.reserve(blueprintParts.size());
-
-    // Loop through list of blueprint parts
-    for (BlueprintPart& partBp : blueprintParts)
-    {
-        ResDependency<PrototypePart>& partDepends =
-                partsUsed[partBp.m_partIndex];
-
-        PrototypePart *proto = partDepends.get_data();
-
-        // Check if the part prototype this depends on still exists
-        if (!proto)
-        {
-            return -1;
-        }
-
-        ActiveEnt partEntity = area.part_instantiate(*proto, vehicleEnt);
-        newEntities.push_back(partEntity);
-
-        // Part now exists
-
-        // TODO: Deal with blueprint machines instead of prototypes directly
-
-        CompMachine& partMachines = scene.reg_emplace<CompMachine>(partEntity);
-
-        for (PrototypeMachine& protoMachine : proto->get_machines())
-        {
-            AbstractSysMachine* sysMachine
-                    = area.get_scene()->system_machine_find(protoMachine.m_type);
-
-            if (!sysMachine)
-            {
-                std::cout << "Machine: " << protoMachine.m_type << " Not found\n";
-                continue;
-            }
-
-            // TODO: pass the blueprint configs into this function
-            Machine& machine = sysMachine->instantiate(partEntity);
-
-            if (debugFirstVehicle)
-            {
-                machine.m_enable = true;
-            }
-
-            // Add the machine to the part
-            partMachines.m_machines.insert(&machine);
-
-        }
-
-        //std::cout << "empty? " << partMachines.m_machines.isEmpty() << "\n";
-
-        //std::cout << "entity: " << int(partEntity) << "\n";
-
-        CompTransform& partTransform = scene.get_registry()
-                                            .get<CompTransform>(partEntity);
-
-        // set the transformation
-        partTransform.m_transform
-                = Matrix4::from(partBp.m_rotation.toMatrix(),
-                              partBp.m_translation)
-                * Matrix4::scaling(partBp.m_scale);
-
-        // temporary: initialize the rigid body
-        //area.get_scene()->debug_get_newton().create_body(partEntity);
-    }
-
-    // Wire the thing up
-
-    SysWire& sysWire = scene.get_system<SysWire>();
-
-    // Loop through wire connections
-    for (BlueprintWire& blueprintWire : vehicleData.get_wires())
-    {
-        // TODO: check if the connections are valid
-
-        // TODO: find a better way to do this, because this is ugly
-
-        CompMachine& fromMachines = scene.reg_get<CompMachine>(
-                                        newEntities[blueprintWire.m_fromPart]);
-
-        // get wire from
-
-        Machine* fromMachine = fromMachines.m_machines.first();
-        for (unsigned i = 0; i < blueprintWire.m_fromMachine; i ++)
-        {
-            fromMachine = fromMachine->next();
-        }
-
-        WireOutput* fromWire =
-                fromMachine->request_output(blueprintWire.m_fromPort);
-
-        // get wire to
-
-        CompMachine& toMachines = scene.reg_get<CompMachine>(
-                                        newEntities[blueprintWire.m_toPart]);
-
-        // TODO: find a better way to do this
-        Machine* toMachine = toMachines.m_machines.first();
-        for (unsigned i = 0; i < blueprintWire.m_toMachine; i ++)
-        {
-            toMachine = toMachine->next();
-        }
-
-        WireInput* toWire = toMachine->request_input(blueprintWire.m_toPort);
-
-        sysWire.connect(*fromWire, *toWire);
-    }
-
-    // temporary: make the whole thing a single rigid body
-    CompRigidBody& nwtBody = scene.reg_emplace<CompRigidBody>(vehicleEnt);
-    area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
-
-    if (debugFirstVehicle)
-    {
-        // if first loaded vehicle
-
-        // point the camera
-        DebugCameraController *cam = (DebugCameraController*)(
-                    area.get_scene()->reg_get<CompDebugObject>(
-                        area.get_camera()).m_obj.get());
-        cam->view_orbit(vehicleEnt);
-
-
-    }
-
-    return 0;
-}
-
-int area_activate_planet(SatActiveArea& area, SatelliteObject& loadMe)
-{
-    std::cout << "loadin a planet!\n";
-
-    /*
-    // Get the needed variables
-    SatPlanet& planet = static_cast<SatPlanet&>(loadMe);
-
-    Object3D *obj = new Object3D(&(area.get_scene()));
-
-    PlanetData dummy;
-
-    new FtrPlanet(*obj, dummy, area. get_drawables());
-    */
-    return 0;
-}
 
 
 SatActiveArea::SatActiveArea(UserInputHandler &userInput) :
@@ -231,9 +46,10 @@ SatActiveArea::SatActiveArea(UserInputHandler &userInput) :
         m_userInput(userInput)
 {
 
+
     // use area_load_vehicle to load SatVechicles
-    load_func_add<SatVehicle>(area_activate_vehicle);
-    load_func_add<SatPlanet>(area_activate_planet);
+    //load_func_add<SatVehicle>(area_activate_vehicle);
+    //load_func_add<SatPlanet>(area_activate_planet);
 
 
     //
@@ -257,7 +73,7 @@ SatActiveArea::~SatActiveArea()
 }
 
 
-int SatActiveArea::activate()
+int SatActiveArea::activate(OSPApplication& app)
 {
     if (m_loadedActive)
     {
@@ -273,13 +89,6 @@ int SatActiveArea::activate()
 
     std::cout << "Active Area loading...\n";
 
-
-    // Temporary: instantiate a part
-
-    Universe* u = m_sat->get_universe();
-    Package& p = u->debug_get_packges()[0];
-    PrototypePart& part = p.get_resource<PrototypePart>(0)->m_data;
-
     m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
 
     //m_partTest = part_instantiate(part);
@@ -290,11 +99,8 @@ int SatActiveArea::activate()
                                         Magnum::Primitives::cubeSolid())));
 
     // Create the scene
-    m_scene = std::make_shared<ActiveScene>(m_userInput);
+    m_scene = std::make_shared<ActiveScene>(m_userInput, app);
 
-    // Register machines
-    m_scene->system_machine_add<SysMachineUserControl>("UserControl", m_userInput);
-    m_scene->system_machine_add<SysMachineRocket>("Rocket");
 
     // create debug entities that have a transform and box model
     m_debug_aEnt = m_scene->hier_create_child(m_scene->hier_get_root(),
@@ -402,133 +208,13 @@ void SatActiveArea::draw_gl()
     //m_camera->draw(m_drawables);
 }
 
-
-ActiveEnt SatActiveArea::part_instantiate(PrototypePart& part,
-                                             ActiveEnt rootParent)
+void SatActiveArea::activate_func_add(Id const* id, LoadStrategy function)
 {
-
-    std::vector<PrototypeObject> const& prototypes = part.get_objects();
-    std::vector<ActiveEnt> newEntities(prototypes.size());
-
-    //std::cout << "size: " << newEntities.size() << "\n";
-
-    for (unsigned i = 0; i < prototypes.size(); i ++)
-    {
-        const PrototypeObject& currentPrototype = prototypes[i];
-        ActiveEnt currentEnt, parentEnt;
-
-        // Get parent
-        if (currentPrototype.m_parentIndex == i)
-        {
-            // if parented to self,
-            parentEnt = rootParent;//m_scene->hier_get_root();
-        }
-        else
-        {
-            // since objects were loaded recursively, the parents always load
-            // before their children
-            parentEnt = newEntities[currentPrototype.m_parentIndex];
-        }
-
-        // Create the new entity
-        currentEnt = m_scene->hier_create_child(parentEnt,
-                                                currentPrototype.m_name);
-        newEntities[i] = currentEnt;
-
-        // Add and set transform component
-        CompTransform& currentTransform
-                = m_scene->reg_emplace<CompTransform>(currentEnt);
-        currentTransform.m_transform
-                = Matrix4::from(currentPrototype.m_rotation.toMatrix(),
-                                currentPrototype.m_translation)
-                * Matrix4::scaling(currentPrototype.m_scale);
-        currentTransform.m_enableFloatingOrigin = true;
-
-        if (currentPrototype.m_type == ObjectType::MESH)
-        {
-            using Magnum::Trade::MeshData3D;
-            using Magnum::GL::Mesh;
-
-            // Current prototype is a mesh, get the mesh and add it
-
-            // TODO: put package prefixes in resource path
-            //       for now just get the first package
-            Package& package = m_sat->get_universe()->debug_get_packges()[0];
-
-            Mesh* mesh = nullptr;
-            Resource<Mesh>* meshRes = package.get_resource<Mesh>(
-                                            currentPrototype.m_drawable.m_mesh);
-
-            if (!meshRes)
-            {
-                // Mesh isn't compiled yet, now check if mesh data exists
-                std::string const& meshName
-                        = part.get_strings()
-                                    [currentPrototype.m_drawable.m_mesh];
-
-                Resource<MeshData3D>* meshDataRes
-                        = package.get_resource<MeshData3D>(meshName);
-
-                if (meshDataRes)
-                {
-                    // Compile the mesh data into a mesh
-
-                    std::cout << "Compiling mesh \"" << meshName << "\"\n";
-
-                    MeshData3D* meshData = &(meshDataRes->m_data);
-
-                    Resource<Mesh> compiledMesh;
-                    compiledMesh.m_data = Magnum::MeshTools::compile(*meshData);
-
-                    mesh = &(package.debug_add_resource<Mesh>(
-                                std::move(compiledMesh))->m_data);
-
-                    m_bocks = mesh;
-                }
-                else
-                {
-                    std::cout << "Mesh \"" << meshName << "\" doesn't exist!\n";
-                    return entt::null;
-                }
-
-            }
-            else
-            {
-                // mesh already loaded
-                // TODO: this actually crashes, as all the opengl stuff were
-                //       cleared.
-                mesh = &(meshRes->m_data);
-            }
-
-            // by now, the mesh should exist
-
-            CompDrawableDebug& bBocks
-                    = m_scene->reg_emplace<CompDrawableDebug>(
-                        currentEnt, mesh, m_shader.get(), 0x0202EE_rgbf);
-
-            //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
-        }
-        else if (currentPrototype.m_type == ObjectType::COLLIDER)
-        {
-            //new FtrNewtonBody(*obj, *this);
-            // TODO collision shape!
-        }
-    }
-
-
-    // first element is 100% going to be the root object
-
-    // Temporary: add a rigid body root
-    //CompNewtonBody& nwtBody
-    //        = m_scene->get_registry().emplace<CompNewtonBody>(newEntities[0]);
-
-
-    // return root object
-    return newEntities[0];
+    m_loadFunctions[id] = function;
 }
 
 
-int SatActiveArea::load_satellite(Satellite& sat)
+int SatActiveArea::activate_satellite(Satellite& sat)
 {
     // see if there's a loading function for the satellite object
     auto funcMapIt =
@@ -541,7 +227,7 @@ int SatActiveArea::load_satellite(Satellite& sat)
     }
 
     std::cout << "loading!\n";
-    int loadStatus = funcMapIt->second(*this, *sat.get_object());
+    int loadStatus = funcMapIt->second(* this, *sat.get_object());
 
     if (loadStatus)
     {
@@ -610,7 +296,7 @@ void SatActiveArea::update_physics(float deltaTime)
 
         // Satellite is near! Attempt to load it
 
-        load_satellite(sat);
+        activate_satellite(sat);
     }
 
 

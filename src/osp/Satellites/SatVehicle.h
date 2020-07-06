@@ -27,7 +27,6 @@ public:
         return get_id_static();
     }
 
-
     bool is_activatable() const override;
 
 

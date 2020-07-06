@@ -1,8 +1,8 @@
 #include <iostream>
 
 #include <Magnum/Math/Functions.h>
+#include <osp/types.h>
 
-#include "../../../types.h"
 #include "PlanetGeometryA.h"
 
 namespace osp

@@ -3,7 +3,7 @@
 #include <vector>
 #include <cstdint>
 
-#include "Resource/Package.h"
+//#include "Resource/Package.h"
 #include "Satellite.h"
 #include "Resource/PrototypePart.h"
 
@@ -47,13 +47,13 @@ public:
      */
     std::vector<Satellite>& get_sats() { return m_satellites; }
 
-    std::vector<Package>& debug_get_packges() { return m_packages; };
+    //std::vector<Package>& debug_get_packges() { return m_packages; };
     //void add_package(Package&& p);
     //void get_package(unsigned index);
 
 private:
 
-    std::vector<Package> m_packages;
+    //std::vector<Package> m_packages;
 
     std::vector<Satellite> m_satellites;
     //std::vector<PrototypePart> m_prototypes;
