@@ -7,8 +7,8 @@
 namespace osp
 {
 
-MachineUserControl::MachineUserControl(ActiveEnt &ent) :
-    Machine(ent, false),
+MachineUserControl::MachineUserControl() :
+    Machine(false),
     //m_woTestPropagate(this, "TestOut", &MachineUserControl::propagate_test),
     m_woAttitude(this, "AttitudeControl"),
     m_woTestPropagate(this, "TestOut", m_wiTest),
@@ -30,6 +30,11 @@ MachineUserControl::MachineUserControl(MachineUserControl&& move) :
 {
     //m_enable = true;
     //_woThrottle.value() = wiretype::Percent{0.0f};
+}
+
+MachineUserControl& MachineUserControl::operator=(MachineUserControl&& move)
+{
+    m_enable = move.m_enable;
 }
 
 void MachineUserControl::propagate_output(WireOutput* output)
@@ -58,18 +63,18 @@ std::vector<WireOutput*> MachineUserControl::existing_outputs()
 }
 
 SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandler& userControl) :
-    SysMachine<SysMachineUserControl, MachineUserControl>(scene),
-    m_throttleMax(userControl.config_get("game_thr_max")),
-    m_throttleMin(userControl.config_get("game_thr_min")),
-    m_selfDestruct(userControl.config_get("game_self_destruct")),
-    m_pitchUp(userControl.config_get("game_pitch_up")),
-    m_pitchDn(userControl.config_get("game_pitch_dn")),
-    m_yawLf(userControl.config_get("game_yaw_lf")),
-    m_yawRt(userControl.config_get("game_yaw_rt")),
-    m_rollLf(userControl.config_get("game_roll_lf")),
-    m_rollRt(userControl.config_get("game_roll_rt")),
-    m_updateSensor(scene.get_update_order(), "mach_usercontrol", "", "wire",
-                   std::bind(&SysMachineUserControl::update_sensor, this))
+        SysMachine<SysMachineUserControl, MachineUserControl>(scene),
+        m_throttleMax(userControl.config_get("game_thr_max")),
+        m_throttleMin(userControl.config_get("game_thr_min")),
+        m_selfDestruct(userControl.config_get("game_self_destruct")),
+        m_pitchUp(userControl.config_get("game_pitch_up")),
+        m_pitchDn(userControl.config_get("game_pitch_dn")),
+        m_yawLf(userControl.config_get("game_yaw_lf")),
+        m_yawRt(userControl.config_get("game_yaw_rt")),
+        m_rollLf(userControl.config_get("game_roll_lf")),
+        m_rollRt(userControl.config_get("game_roll_rt")),
+        m_updateSensor(scene.get_update_order(), "mach_usercontrol", "", "wire",
+                       std::bind(&SysMachineUserControl::update_sensor, this))
 {
 
 }
@@ -92,8 +97,13 @@ void SysMachineUserControl::update_sensor()
             m_yawLf.trigger_hold() - m_yawRt.trigger_hold(),
             m_rollRt.trigger_hold() - m_rollLf.trigger_hold());
 
-    for (MachineUserControl& machine : m_machines)
+    auto view = m_scene.get_registry().view<MachineUserControl>();
+
+    for (ActiveEnt ent : view)
     {
+        MachineUserControl &machine = view.get<MachineUserControl>(ent);
+
+
         if (!machine.m_enable)
         {
             continue;
@@ -120,7 +130,13 @@ void SysMachineUserControl::update_sensor()
 
 Machine& SysMachineUserControl::instantiate(ActiveEnt ent)
 {
-    return emplace(ent);
+    return m_scene.reg_emplace<MachineUserControl>(ent);
+}
+
+
+Machine& SysMachineUserControl::get(ActiveEnt ent)
+{
+    return m_scene.reg_get<MachineUserControl>(ent);
 }
 
 }

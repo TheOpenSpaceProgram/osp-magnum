@@ -7,8 +7,8 @@
 namespace osp
 {
 
-MachineRocket::MachineRocket(ActiveEnt &ent) :
-        Machine(ent, true),
+MachineRocket::MachineRocket() :
+        Machine(true),
         m_wiGimbal(this, "Gimbal"),
         m_wiIgnition(this, "Ignition"),
         m_wiThrottle(this, "Throttle"),
@@ -24,6 +24,12 @@ MachineRocket::MachineRocket(MachineRocket&& move) :
         m_wiThrottle(this, std::move(move.m_wiThrottle))
 {
     //m_enable = true;
+}
+
+
+MachineRocket& MachineRocket::operator=(MachineRocket&& move)
+{
+    m_enable = move.m_enable;
 }
 
 void MachineRocket::propagate_output(WireOutput* output)
@@ -66,8 +72,12 @@ SysMachineRocket::SysMachineRocket(ActiveScene &scene) :
 
 void SysMachineRocket::update_physics()
 {
-    for (MachineRocket& machine : m_machines)
+    auto view = m_scene.get_registry().view<MachineRocket>();
+
+    for (ActiveEnt ent : view)
     {
+        auto &machine = view.get<MachineRocket>(ent);
+
         //if (!machine.m_enable)
         //{
         //    continue;
@@ -94,8 +104,7 @@ void SysMachineRocket::update_physics()
         else
         {
             // rocket's rigid body not set yet
-            auto body =
-                    m_physics.find_rigidbody_ancestor(machine.get_ent());
+            auto body = m_physics.find_rigidbody_ancestor(ent);
 
             if (body.second == nullptr)
             {
@@ -152,7 +161,12 @@ void SysMachineRocket::update_physics()
 
 Machine& SysMachineRocket::instantiate(ActiveEnt ent)
 {
-    return emplace(ent);
+    return m_scene.reg_emplace<MachineRocket>(ent);//emplace(ent);
+}
+
+Machine& SysMachineRocket::get(ActiveEnt ent)
+{
+    return m_scene.reg_get<MachineRocket>(ent);//emplace(ent);
 }
 
 }

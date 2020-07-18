@@ -6,14 +6,14 @@
 namespace osp
 {
 
-WireInput::WireInput(WireElement* element, std::string const& name) :
+WireInput::WireInput(IWireElement* element, std::string const& name) :
         m_element(element),
         m_name(name)
 {
 
 }
 
-WireInput::WireInput(WireElement *element, WireInput&& move) :
+WireInput::WireInput(IWireElement *element, WireInput&& move) :
         LinkedListItem<WireInput, WireOutput>(std::move(move)),
         m_element(element),
         m_name(std::move(move.m_name))
@@ -34,14 +34,14 @@ WireData* WireInput::connected_value()
     }
 }
 
-WireOutput::WireOutput(WireElement* element, std::string const& name) :
+WireOutput::WireOutput(IWireElement* element, std::string const& name) :
         m_element(element),
         m_name(name)
 {
 
 }
 
-WireOutput::WireOutput(WireElement* element, std::string const& name,
+WireOutput::WireOutput(IWireElement* element, std::string const& name,
                        WireInput& propagateDepend ...) :
         m_element(element),
         m_name(name)
@@ -49,7 +49,7 @@ WireOutput::WireOutput(WireElement* element, std::string const& name,
 
 }
 
-WireOutput::WireOutput(WireElement *element, WireOutput&& move) :
+WireOutput::WireOutput(IWireElement *element, WireOutput&& move) :
         LinkedList<WireInput>(std::move(move)),
         m_value(std::move(move.m_value)),
         m_element(element),

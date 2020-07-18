@@ -122,14 +122,14 @@ void ActiveScene::on_hierarchy_destruct(entt::registry& reg, entt::entity ent)
 void ActiveScene::update()
 {
     // Update machine systems
-    //for (AbstractSysMachine &sysMachine : m_update_sensor)
+    //for (ISysMachine &sysMachine : m_update_sensor)
     //{
     //    sysMachine.update_sensor();
     //}
 
     //m_wire.update_propigate();
 
-    //for (AbstractSysMachine &sysMachine : m_update_physics)
+    //for (ISysMachine &sysMachine : m_update_physics)
     //{
     //    sysMachine.update_physics(1.0f/60.0f);
     //}
@@ -266,18 +266,23 @@ void ActiveScene::draw(entt::entity camera)
     }
 }
 
-AbstractSysMachine* ActiveScene::system_machine_find(const std::string &name)
+MapSysMachine::iterator ActiveScene::system_machine_find(const std::string &name)
 {
-    MapSysMachine::iterator sysIt = m_sysMachines.find(name);
+//    MapSysMachine::iterator sysIt = m_sysMachines.find(name);
+//    if (sysIt == m_sysMachines.end())
+//    {
+//        return nullptr;
+//    }
+//    else
+//    {
+//        return sysIt->second.get();
+//    }
+    return m_sysMachines.find(name);
+}
 
-    if (sysIt == m_sysMachines.end())
-    {
-        return nullptr;
-    }
-    else
-    {
-        return sysIt->second.get();
-    }
+bool ActiveScene::system_machine_it_valid(MapSysMachine::iterator it)
+{
+    return it != m_sysMachines.end();
 }
 
 

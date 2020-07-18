@@ -20,6 +20,8 @@ public:
 
     Machine& instantiate(ActiveEnt ent) override;
 
+    Machine& get(ActiveEnt ent) override;
+
 private:
 
     SysPhysics &m_physics;
@@ -34,8 +36,11 @@ class MachineRocket : public Machine
     friend SysMachineRocket;
 
 public:
-    MachineRocket(ActiveEnt &ent);
+    MachineRocket();
     MachineRocket(MachineRocket &&move);
+
+    MachineRocket& operator=(MachineRocket&& move);
+
 
     ~MachineRocket() = default;
 

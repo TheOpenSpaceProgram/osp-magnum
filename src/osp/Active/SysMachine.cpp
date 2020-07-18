@@ -4,14 +4,14 @@
 
 using namespace osp;
 
-//AbstractSysMachine::AbstractSysMachine(ActiveScene& scene)
+//ISysMachine::ISysMachine(ActiveScene& scene)
 //{
 
 //}
 
-Machine::Machine(ActiveEnt ent, bool enable) : m_enable(enable),  m_ent(ent) {}
+Machine::Machine(bool enable) : m_enable(enable) {}
 
-void Machine::doErase()
-{
-    list()->cut(this);
-}
+//void Machine::doErase()
+//{
+//    list()->cut(this);
+//}

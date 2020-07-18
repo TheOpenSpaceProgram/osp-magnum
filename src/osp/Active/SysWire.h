@@ -98,14 +98,14 @@ using wiretype::WireData;
  * Object that have WireInputs and WireOutputs. So far, just Machines inherit.
  * keep WireInputs and WireOutputs as members. move them explicitly
  */
-class WireElement
+class IWireElement
 {
 
 public:
 
-    WireElement() = default;
-    WireElement(WireElement&& move) = default;
-    virtual ~WireElement() = default;
+    //WireElement() = default;
+    //WireElement(WireElement&& move) = default;
+    //virtual ~WireElement() = default;
 
     // TODO: maybe get rid of the raw pointers somehow
 
@@ -159,7 +159,7 @@ class WireInput : private LinkedListItem<WireInput, WireOutput>
 
 public:
 
-    explicit WireInput(WireElement *element, std::string const& name);
+    explicit WireInput(IWireElement *element, std::string const& name);
 
     /**
      * Move with new m_element. Use when this is a member of the WireElement
@@ -167,7 +167,7 @@ public:
      * @param element
      * @param move
      */
-    explicit WireInput(WireElement *element, WireInput&& move);
+    explicit WireInput(IWireElement *element, WireInput&& move);
 
     WireInput(WireInput const& copy) = delete;
     WireInput(WireInput&& move) = default;
@@ -194,7 +194,7 @@ public:
     T* get_if();
 
 private:
-    WireElement* m_element;
+    IWireElement* m_element;
     std::string m_name;
 };
 
@@ -215,8 +215,8 @@ public:
      * @param element Associated WireElement, usually a Machine
      * @param name
      */
-    explicit WireOutput(WireElement* element, std::string const& name);
-    explicit WireOutput(WireElement* element, std::string const& name,
+    explicit WireOutput(IWireElement* element, std::string const& name);
+    explicit WireOutput(IWireElement* element, std::string const& name,
                         WireInput& propagateDepend ...);
     /**
      * Move with new m_element. Use when this is a member of the WireElement
@@ -224,7 +224,7 @@ public:
      * @param element
      * @param move
      */
-    explicit WireOutput(WireElement *element, WireOutput&& move);
+    explicit WireOutput(IWireElement *element, WireOutput&& move);
 
     WireOutput(WireOutput const& copy) = delete;
     WireOutput(WireOutput&& move) = default;
@@ -257,7 +257,7 @@ public:
 private:
     //unsigned m_port;
     WireData m_value;
-    WireElement* m_element;
+    IWireElement* m_element;
     std::string m_name;
 
     //void (WireElement::*m_propagate_output)();
@@ -274,7 +274,7 @@ public:
 
     struct DependentOutput
     {
-        WireElement *m_element;
+        IWireElement *m_element;
         WireOutput *m_output;
         unsigned depth;
     };

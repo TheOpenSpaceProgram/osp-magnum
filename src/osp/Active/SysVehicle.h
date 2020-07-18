@@ -15,6 +15,17 @@ namespace osp
 class SatActiveArea;
 class PrototypePart;
 
+struct WireMachineConnection
+{
+    ActiveEnt m_fromPartEnt;
+    unsigned m_fromMachine;
+    WireOutPort m_fromPort;
+
+    ActiveEnt m_toPartEnt;
+    unsigned m_toMachine;
+    WireInPort m_toPort;
+};
+
 struct CompVehicle
 {
 

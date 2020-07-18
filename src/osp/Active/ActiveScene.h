@@ -23,9 +23,6 @@
 namespace osp
 {
 
-using MapSysMachine = std::map<std::string,
-                               std::unique_ptr<AbstractSysMachine>>;
-
 /**
  * Component for transformation (in meters)
  */
@@ -80,6 +77,12 @@ struct CompDrawableDebug
     Magnum::GL::Mesh* m_mesh;
     Magnum::Shaders::Phong* m_shader;
     Magnum::Color4 m_color;
+};
+
+class IDynamicSystem
+{
+public:
+    virtual ~IDynamicSystem();
 };
 
 /**
@@ -206,9 +209,11 @@ public:
     /**
      * Get a registered SysMachine by name. This accesses a map.
      * @param name [in] Name used as a key
-     * @return Pointer to specified SysMachine, nullptr if not found
+     * @return Iterator to specified SysMachine
      */
-    AbstractSysMachine* system_machine_find(std::string const& name);
+    MapSysMachine::iterator system_machine_find(std::string const& name);
+
+    bool system_machine_it_valid(MapSysMachine::iterator it);
 
 private:
 
@@ -229,8 +234,8 @@ private:
 
 
     UserInputHandler &m_userInput;
-    //std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_sensor;
-    //std::vector<std::reference_wrapper<AbstractSysMachine>> m_update_physics;
+    //std::vector<std::reference_wrapper<ISysMachine>> m_update_sensor;
+    //std::vector<std::reference_wrapper<ISysMachine>> m_update_physics;
 
     UpdateOrder m_updateOrder;
 

@@ -15,6 +15,7 @@ using SysPhysics = SysNewton;
 
 using ActiveEnt = entt::entity;
 
+
 class ActiveScene;
 
 constexpr unsigned gc_heir_physics_level = 1;

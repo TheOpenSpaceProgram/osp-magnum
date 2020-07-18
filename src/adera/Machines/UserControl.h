@@ -20,6 +20,8 @@ public:
 
     Machine& instantiate(ActiveEnt ent) override;
 
+    Machine& get(ActiveEnt ent) override;
+
 private:
     ButtonControlHandle m_throttleMax;
     ButtonControlHandle m_throttleMin;
@@ -43,8 +45,11 @@ class MachineUserControl : public Machine
     friend SysMachineUserControl;
 
 public:
-    MachineUserControl(ActiveEnt &ent);
+    MachineUserControl();
     MachineUserControl(MachineUserControl&& move);
+
+    MachineUserControl& operator=(MachineUserControl&& move);
+
 
     ~MachineUserControl() = default;
 

@@ -87,21 +87,24 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
 
         // TODO: Deal with blueprint machines instead of prototypes directly
 
+        ActiveScene &scene = *(area.get_scene());
+
         CompMachine& partMachines = scene.reg_emplace<CompMachine>(partEntity);
 
         for (PrototypeMachine& protoMachine : proto->get_machines())
         {
-            AbstractSysMachine* sysMachine
-                    = area.get_scene()->system_machine_find(protoMachine.m_type);
+            MapSysMachine::iterator sysMachine
+                    = scene.system_machine_find(protoMachine.m_type);
 
-            if (!sysMachine)
+            if (!(scene.system_machine_it_valid(sysMachine)))
             {
                 std::cout << "Machine: " << protoMachine.m_type << " Not found\n";
                 continue;
             }
 
             // TODO: pass the blueprint configs into this function
-            Machine& machine = sysMachine->instantiate(partEntity);
+            Machine& machine = sysMachine->second->instantiate(partEntity);
+
 
             if (debugFirstVehicle)
             {
@@ -109,7 +112,7 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
             }
 
             // Add the machine to the part
-            partMachines.m_machines.insert(&machine);
+            partMachines.m_machines.emplace_back(partEntity, sysMachine);
 
         }
 
@@ -139,35 +142,32 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
     {
         // TODO: check if the connections are valid
 
-        // TODO: find a better way to do this, because this is ugly
+
+        // get wire from
 
         CompMachine& fromMachines = scene.reg_get<CompMachine>(
                                         newEntities[blueprintWire.m_fromPart]);
 
-        // get wire from
-
-        Machine* fromMachine = fromMachines.m_machines.first();
-        for (unsigned i = 0; i < blueprintWire.m_fromMachine; i ++)
-        {
-            fromMachine = fromMachine->next();
-        }
-
+        auto fromMachineEntry = fromMachines
+                .m_machines[blueprintWire.m_fromMachine];
+        Machine &fromMachine = fromMachineEntry.m_system->second
+                ->get(fromMachineEntry.m_partEnt);
         WireOutput* fromWire =
-                fromMachine->request_output(blueprintWire.m_fromPort);
+                fromMachine.request_output(blueprintWire.m_fromPort);
 
         // get wire to
 
         CompMachine& toMachines = scene.reg_get<CompMachine>(
                                         newEntities[blueprintWire.m_toPart]);
 
-        // TODO: find a better way to do this
-        Machine* toMachine = toMachines.m_machines.first();
-        for (unsigned i = 0; i < blueprintWire.m_toMachine; i ++)
-        {
-            toMachine = toMachine->next();
-        }
+        auto toMachineEntry = toMachines
+                .m_machines[blueprintWire.m_toMachine];
+        Machine &toMachine = toMachineEntry.m_system->second
+                ->get(toMachineEntry.m_partEnt);
+        WireInput* toWire =
+                toMachine.request_input(blueprintWire.m_toPort);
 
-        WireInput* toWire = toMachine->request_input(blueprintWire.m_toPort);
+        // make the connection
 
         sysWire.connect(*fromWire, *toWire);
     }
