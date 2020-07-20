@@ -56,19 +56,19 @@ void IcoSphereTree::initialize(float radius)
     // syA = m * s1 = 1/10 * sqrt( 10 * (5 + sqrt(5)) )
     // syN = m * s2 = 1/10 * sqrt( 10 * (5 - sqrt(5)) )
 
-    using std::sqrt;
+    using std::sqrt; // if only sqrt was constexpr
 
-    constexpr float scl = 8.0f; // scale
-    constexpr float pnt = scl * ( 2.0f/5.0f * sqrt(5.0f) );
-    constexpr float hei = scl * ( 1.0f / sqrt(5.0f) );
-    constexpr float cxA = scl * ( 1.0f/2.0f - sqrt(5.0f)/10.0f );
-    constexpr float cxB = scl * ( 1.0f/2.0f + sqrt(5)/10.0f );
-    constexpr float syA = scl * ( 1.0f/10.0f
+    float scl = 8.0f; // scale
+    float pnt = scl * ( 2.0f/5.0f * sqrt(5.0f) );
+    float hei = scl * ( 1.0f / sqrt(5.0f) );
+    float cxA = scl * ( 1.0f/2.0f - sqrt(5.0f)/10.0f );
+    float cxB = scl * ( 1.0f/2.0f + sqrt(5)/10.0f );
+    float syA = scl * ( 1.0f/10.0f
                                   * sqrt( 10.0f*(5.0f + sqrt(5.0f)) ) );
-    constexpr float syB = scl * ( 1.0f/10.0f
+    float syB = scl * ( 1.0f/10.0f
                                   * sqrt( 10.0f*(5.0f - sqrt(5.0f)) ) );
 
-    constexpr float icosahedronVerts[] =
+    float icosahedronVerts[] =
     {
         0.0f,   0.0f,    scl, // top point
 

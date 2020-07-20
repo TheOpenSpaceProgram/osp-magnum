@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 
 #include <Newton.h>
 
@@ -46,7 +47,22 @@ using CompRigidBody = std::unique_ptr<NwtUserData>;
 //    NewtonCollision *shape{nullptr};
 //};
 
-// TODO: system base class
+enum class ECollisionShape : uint8_t
+{
+    SPHERE,
+    BOX,
+    CAPSULE,
+    CYLINDER,
+    MESH,
+    CONVEX_HULL,
+    TERRAIN
+};
+
+struct CompCollisionShape
+{
+    NewtonCollision* m_collision;
+    ECollisionShape m_shape;
+};
 
 class SysNewton
 {
@@ -81,6 +97,8 @@ public:
 
     void body_apply_torque(CompRigidBody &body, Vector3 force);
     void body_apply_torque_local(CompRigidBody &body, Vector3 force);
+
+
 
 private:
 

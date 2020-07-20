@@ -8,16 +8,18 @@
 #include "osp/Universe.h"
 #include "osp/Satellites/SatActiveArea.h"
 #include "osp/Satellites/SatVehicle.h"
-//#include "osp/Satellites/SatPlanet.h"
 #include "osp/Resource/SturdyImporter.h"
 #include "osp/Resource/Package.h"
 
 #include "osp/Active/ActiveScene.h"
 #include "osp/Active/SysVehicle.h"
 
-
 #include "adera/Machines/UserControl.h"
 #include "adera/Machines/Rocket.h"
+
+#include "planet-a/Satellites/SatPlanet.h"
+#include "planet-a/Active/SysPlanetA.h"
+
 
 void magnum_application();
 void load_a_bunch_of_stuff();
@@ -206,7 +208,11 @@ void magnum_application()
     area.get_scene()->system_machine_add<osp::SysMachineRocket>
             ("Rocket");
 
-    area.activate_func_add(&(osp::SatVehicle::get_id_static()), osp::SysVehicle::area_activate_vehicle);
+    // Make active areas load vehicles and planets
+    area.activate_func_add(&(osp::SatVehicle::get_id_static()),
+                           osp::SysVehicle::area_activate_vehicle);
+    area.activate_func_add(&(osp::SatPlanet::get_id_static()),
+                           osp::SysPlanetA::area_activate_planet);
 
     // make the application switch to that area
     g_ospMagnum->set_active_area(area);
@@ -272,8 +278,8 @@ void load_a_bunch_of_stuff()
 
 
     // Add a planet too
-    //osp::Satellite& planet = g_universe.sat_create();
-    //planet.create_object<osp::SatPlanet>();
+    osp::Satellite& planet = g_osp.get_universe().sat_create();
+    planet.create_object<osp::SatPlanet>();
 
     //s_partsLoaded = true;
 }

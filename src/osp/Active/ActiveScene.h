@@ -3,18 +3,13 @@
 #include <utility>
 #include <vector>
 
-#include <Magnum/Math/Color.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/Shaders/Phong.h>
-
-#include <Newton.h>
-
 #include "../OSPApplication.h"
 #include "../UserInputHandler.h"
 
 #include "../types.h"
 #include "activetypes.h"
 
+#include "SysDebugRender.h"
 #include "SysNewton.h"
 #include "SysMachine.h"
 #include "SysVehicle.h"
@@ -70,19 +65,6 @@ struct CompCamera
     Matrix4 m_projection;
 
     void calculate_projection();
-};
-
-struct CompDrawableDebug
-{
-    Magnum::GL::Mesh* m_mesh;
-    Magnum::Shaders::Phong* m_shader;
-    Magnum::Color4 m_color;
-};
-
-class IDynamicSystem
-{
-public:
-    virtual ~IDynamicSystem();
 };
 
 /**
@@ -189,6 +171,8 @@ public:
 
     constexpr UpdateOrder& get_update_order() { return m_updateOrder; }
 
+    constexpr RenderOrder& get_render_order() { return m_renderOrder; }
+
     // TODO
     constexpr float get_time_delta_fixed() { return 1.0f / 60.0f; }
 
@@ -238,10 +222,13 @@ private:
     //std::vector<std::reference_wrapper<ISysMachine>> m_update_physics;
 
     UpdateOrder m_updateOrder;
+    RenderOrder m_renderOrder;
 
     MapSysMachine m_sysMachines;
+    MapDynamicSys m_dynamicSys;
 
     // TODO: base class and a list for Systems (or not)
+    SysDebugRender m_render;
     SysPhysics m_physics;
     SysWire m_wire;
     SysVehicle m_vehicles;

@@ -1,6 +1,5 @@
 #include <iostream>
 
-#include <Magnum/GL/DefaultFramebuffer.h>
 
 //#include "Machines/UserControl.h"
 //#include "Machines/Rocket.h"
@@ -12,9 +11,6 @@
 namespace osp
 {
 
-// for the 0xrrggbb_rgbf and _deg literals
-using namespace Magnum::Math::Literals;
-
 
 void CompCamera::calculate_projection()
 {
@@ -24,16 +20,12 @@ void CompCamera::calculate_projection()
             m_near, m_far);
 }
 
-void test_function()
-{
-    std::cout << "test function\n";
-}
-
 
 ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication& app) :
         m_app(app),
         m_hierarchyDirty(false),
         m_userInput(userInput),
+        m_render(*this),
         m_physics(*this),
         m_wire(*this),
         m_vehicles(*this)
@@ -224,46 +216,7 @@ void ActiveScene::floating_origin_translate(Vector3 const& amount)
 
 void ActiveScene::draw(entt::entity camera)
 {
-    // Start by getting camera transform inverse and projection matrix
-
-    Matrix4 cameraProject;
-    Matrix4 cameraInverse;
-
-    {
-        // TODO: check if camera has the right components
-        CompCamera& cameraComp = m_registry.get<CompCamera>(camera);
-        CompTransform& cameraTransform = m_registry.get<CompTransform>(camera);
-
-        cameraProject = cameraComp.m_projection;
-        cameraInverse = cameraTransform.m_transformWorld.inverted();
-    }
-
-    auto drawGroup = m_registry.group<CompDrawableDebug>(
-                            entt::get<CompTransform>);
-
-    Matrix4 entRelative;
-
-    for(auto entity: drawGroup)
-    {
-        CompDrawableDebug& drawable = drawGroup.get<CompDrawableDebug>(entity);
-        CompTransform& transform = drawGroup.get<CompTransform>(entity);
-
-        entRelative = cameraInverse * transform.m_transformWorld;
-
-        (*drawable.m_shader)
-            .setDiffuseColor(drawable.m_color)
-            .setAmbientColor(0x111111_rgbf)
-            .setSpecularColor(0x330000_rgbf)
-            .setLightPosition({10.0f, 15.0f, 5.0f})
-            .setTransformationMatrix(entRelative)
-            .setProjectionMatrix(cameraProject)
-            .setNormalMatrix(entRelative.normalMatrix());
-
-
-        drawable.m_mesh->draw(*(drawable.m_shader));
-
-        //std::cout << "render! \n";
-    }
+    m_renderOrder.call(camera);
 }
 
 MapSysMachine::iterator ActiveScene::system_machine_find(const std::string &name)

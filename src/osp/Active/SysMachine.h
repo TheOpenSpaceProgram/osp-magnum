@@ -93,9 +93,7 @@ private:
 class ISysMachine
 {
 public:
-    ISysMachine() = default;
-    ISysMachine(ISysMachine const& copy) = delete;
-    ISysMachine(ISysMachine&& move) = delete;
+
     virtual ~ISysMachine() = default;
 
     //virtual void update_sensor() = 0;

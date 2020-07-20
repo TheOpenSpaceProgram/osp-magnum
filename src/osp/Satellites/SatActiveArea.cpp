@@ -19,10 +19,6 @@
 #include "../Active/SysNewton.h"
 #include "../Active/SysMachine.h"
 
-#include "../Resource/SturdyImporter.h"
-#include "../Resource/PlanetData.h"
-
-
 //#include "../Active/Machines/Rocket.h"
 //#include "../Active/Machines/UserControl.h"
 
