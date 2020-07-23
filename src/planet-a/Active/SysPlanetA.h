@@ -32,13 +32,15 @@ public:
     static int area_activate_planet(SatActiveArea& area,
                                     SatelliteObject& loadMe);
 
+    SysPlanetA();
+
     void update_render();
 
     void update_geometry();
 
     void update_physics();
 
-    SysPlanetA();
+
 };
 
 }

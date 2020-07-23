@@ -7,6 +7,7 @@
 #include <Magnum/MeshTools/Compile.h>
 #include <Magnum/MeshTools/Transform.h>
 #include <Magnum/Primitives/Cube.h>
+#include <Magnum/Trade/MeshData.h>
 
 #include "SatActiveArea.h"
 

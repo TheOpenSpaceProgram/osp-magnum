@@ -5,7 +5,10 @@
 #include <Magnum/Trade/AbstractImporter.h>
 #include <Magnum/Trade/MeshObjectData3D.h>
 #include <Magnum/Trade/SceneData.h>
+#include <Magnum/Trade/MeshData.h>
 #include <Magnum/MeshTools/Compile.h>
+#include <Magnum/Mesh.h>
+
 
 #include <MagnumExternal/TinyGltf/tiny_gltf.h>
 
@@ -16,7 +19,7 @@ namespace osp
 {
 
 using Magnum::Containers::Pointer;
-using Magnum::Trade::MeshData3D;
+using Magnum::Trade::MeshData;
 using Magnum::Trade::ObjectData3D;
 using Magnum::Trade::SceneData;
 using Magnum::Containers::Optional;
@@ -121,14 +124,14 @@ void SturdyImporter::load_config(Package& package)
     // Load them immediately for the sake of development
     // eventually:
     // * load only required meshes
-    for (unsigned i = 0; i < m_gltfImporter.mesh3DCount(); i ++)
+    for (unsigned i = 0; i < m_gltfImporter.meshCount(); i ++)
     {
-        std::string const& meshName = m_gltfImporter.mesh3DName(i);
+        std::string const& meshName = m_gltfImporter.meshName(i);
         std::cout << "Mesh: " << meshName << "\n";
 
-        Optional<MeshData3D> meshData = m_gltfImporter.mesh3D(i);
-        if (!meshData || !meshData->hasNormals()
-                || meshData->primitive() != Magnum::MeshPrimitive::Triangles)
+        Optional<MeshData> meshData = m_gltfImporter.mesh(i);
+        if (!meshData
+                || (meshData->primitive() != Magnum::MeshPrimitive::Triangles))
         {
             continue;
         }
@@ -136,7 +139,7 @@ void SturdyImporter::load_config(Package& package)
         //Resource<MeshData3D> meshDataRes(std::move(*meshData));
         //meshDataRes.m_path = meshName;
 
-        package.add<MeshData3D>(meshName, std::move(*meshData));
+        package.add<MeshData>(meshName, std::move(*meshData));
 
         // apparently this needs a GL context
         // maybe store compiled meshes in the active area, since they're
@@ -190,7 +193,7 @@ void SturdyImporter::proto_add_obj_recurse(Package& package,
     {
         // Drawable mesh
         const std::string& meshName = m_gltfImporter
-                                            .mesh3DName(childData->instance());
+                                            .meshName(childData->instance());
         std::cout << "obj: " << name << " uses mesh: " << meshName << "\n";
         obj.m_type = ObjectType::MESH;
         //obj.m_drawable.m_mesh = m_meshOffset + childData->instance();

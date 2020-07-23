@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include <Magnum/MeshTools/Compile.h>
+#include <Magnum/Trade/MeshData.h>
 
 #include "ActiveScene.h"
 
@@ -237,7 +238,7 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
 
         if (currentPrototype.m_type == ObjectType::MESH)
         {
-            using Magnum::Trade::MeshData3D;
+            using Magnum::Trade::MeshData;
             using Magnum::GL::Mesh;
 
             // Current prototype is a mesh, get the mesh and add it
@@ -257,8 +258,8 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                         = part.get_strings()
                                     [currentPrototype.m_drawable.m_mesh];
 
-                DependRes<MeshData3D> meshDataRes
-                        = package.get<MeshData3D>(meshName);
+                DependRes<MeshData> meshDataRes
+                        = package.get<MeshData>(meshName);
 
                 if (!meshDataRes.empty())
                 {
@@ -266,7 +267,7 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
 
                     std::cout << "Compiling mesh \"" << meshName << "\"\n";
 
-                    MeshData3D &meshData = *meshDataRes;
+                    MeshData &meshData = *meshDataRes;
 
                     //Resource<Mesh> compiledMesh;
                     //compiledMesh.m_data = Magnum::MeshTools::compile(meshData);

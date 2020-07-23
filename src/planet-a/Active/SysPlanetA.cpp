@@ -11,6 +11,7 @@ int SysPlanetA::area_activate_planet(SatActiveArea& area,
 }
 
 SysPlanetA::SysPlanetA()
+
 {
 
 }

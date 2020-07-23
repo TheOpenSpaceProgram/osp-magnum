@@ -1,16 +1,11 @@
 #pragma once
 
-#include <Magnum/Magnum.h>
-
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/Math/Matrix4.h>
-#include <Magnum/Math/Quaternion.h>
-
-#include <Magnum/Trade/MeshData3D.h>
-
 #include <string>
 #include <array>
 #include <vector>
+
+
+#include "../types.h"
 
 namespace osp
 {
@@ -50,8 +45,6 @@ struct ColliderData
     ColliderType m_type;
     unsigned m_meshData;
 };
-
-using Magnum::Trade::MeshData3D;
 
 struct PrototypeObject
 {
