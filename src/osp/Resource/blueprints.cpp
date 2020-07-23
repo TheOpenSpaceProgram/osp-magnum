@@ -4,7 +4,7 @@
 using namespace osp;
 
 void BlueprintVehicle::add_part(
-        Resource<PrototypePart>& prototype,
+        DependRes<PrototypePart>& prototype,
         const Vector3& translation,
         const Quaternion& rotation,
         const Vector3& scale)
@@ -14,10 +14,9 @@ void BlueprintVehicle::add_part(
     // check if the part is added already.
     for (unsigned i = 0; i < partIndex; i ++)
     {
-        const ResDependency<PrototypePart>& dep = m_prototypes[i];
+        const DependRes<PrototypePart>& dep = m_prototypes[i];
 
-        // see if they're the same data, find a better way eventually
-        if (dep.list() == &(prototype))
+        if (dep == prototype)
         {
             // prototype was already added to the list
             partIndex = i;

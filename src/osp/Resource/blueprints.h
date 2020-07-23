@@ -70,6 +70,9 @@ class BlueprintVehicle
 
 public:
 
+    BlueprintVehicle() = default;
+    BlueprintVehicle(BlueprintVehicle&& move) = default;
+
     /**
      * Emplaces a BlueprintPart. This function searches the prototype vector
      * to see if the part has been added before.
@@ -78,7 +81,7 @@ public:
      * @param rotation
      * @param scale
      */
-    void add_part(Resource<PrototypePart>& part,
+    void add_part(DependRes<PrototypePart>& part,
                   const Vector3& translation,
                   const Quaternion& rotation,
                   const Vector3& scale);
@@ -95,7 +98,7 @@ public:
     void add_wire(unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
                   unsigned toPart, unsigned toMachine, WireOutPort toPort);
 
-    constexpr std::vector<ResDependency<PrototypePart> >& get_prototypes()
+    constexpr std::vector<DependRes<PrototypePart> >& get_prototypes()
     { return m_prototypes; }
 
     constexpr std::vector<BlueprintPart>& get_blueprints()
@@ -106,7 +109,7 @@ public:
 
 private:
     // Unique part Resources used
-    std::vector<ResDependency<PrototypePart> > m_prototypes;
+    std::vector<DependRes<PrototypePart> > m_prototypes;
 
     // Arrangement of Individual Parts
     std::vector<BlueprintPart> m_blueprints;

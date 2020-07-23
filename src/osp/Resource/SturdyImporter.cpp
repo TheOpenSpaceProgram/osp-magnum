@@ -65,12 +65,12 @@ void SturdyImporter::load_config(Package& package)
             std::cout << "PART!\n";
 
             //PrototypePart part;
-            Resource<PrototypePart> part;
+            PrototypePart part;
             //part.m_name = nodeName;
-            part.m_path = nodeName;
+            //part.m_path = nodeName;
 
             // Add objects to the part, and recurse
-            proto_add_obj_recurse(package, part.m_data, 0, childId);
+            proto_add_obj_recurse(package, part, 0, childId);
 
             // Parse extras
             tinygltf::Node const& node = *static_cast<tinygltf::Node const*>(
@@ -103,7 +103,7 @@ void SturdyImporter::load_config(Package& package)
                     // TODO: more stuff
                     PrototypeMachine machine;
                     machine.m_type = std::move(type);
-                    part.m_data.get_machines().emplace_back(std::move(machine));
+                    part.get_machines().emplace_back(std::move(machine));
                 }
             }
             else
@@ -111,7 +111,7 @@ void SturdyImporter::load_config(Package& package)
                 std::cout << "JSON machines array not found\n";
             }
 
-            package.debug_add_resource<PrototypePart>(std::move(part));
+            package.add<PrototypePart>(nodeName, std::move(part));
 
         }
 
@@ -133,10 +133,10 @@ void SturdyImporter::load_config(Package& package)
             continue;
         }
 
-        Resource<MeshData3D> meshDataRes(std::move(*meshData));
-        meshDataRes.m_path = meshName;
+        //Resource<MeshData3D> meshDataRes(std::move(*meshData));
+        //meshDataRes.m_path = meshName;
 
-        package.debug_add_resource(std::move(meshDataRes));
+        package.add<MeshData3D>(meshName, std::move(*meshData));
 
         // apparently this needs a GL context
         // maybe store compiled meshes in the active area, since they're

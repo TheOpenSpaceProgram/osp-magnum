@@ -19,7 +19,7 @@ using FunctionOrderCallList = std::list<FunctionOrderCall<FUNC_T> >;
 template<typename FUNC_T>
 struct FunctionOrderCall
 {
-    template<class ... ARGS_T>
+    //template<class ... ARGS_T>
     FunctionOrderCall(std::string const& name,
                       std::string const& after,
                       std::string const& before,

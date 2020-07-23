@@ -1,15 +1,12 @@
 #pragma once
 
-#include <Magnum/MeshTools/Compile.h>
-#include <Magnum/Mesh.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/GL/Texture.h>
-#include <Magnum/Trade/ImageData.h>
-#include <Magnum/Trade/MeshData3D.h>
-
+#include <any>
 #include <iostream>
 #include <cstdint>
+#include <map>
 #include <string>
+
+#include <entt/core/type_info.hpp>
 
 //#include "SturdyImporter.h"
 #include "Resource.h"
@@ -20,7 +17,7 @@ namespace osp
 {
 
 //class SturdyFile;
-class PrototypePart;
+//class PrototypePart;
 
 //
 // What I think might be a good idea:
@@ -40,56 +37,68 @@ class PrototypePart;
 
 
 // supported resources
-struct ResourceTable  :
-
-    std::vector< Resource<Magnum::GL::Mesh> >,
-    std::vector< Resource<Magnum::Trade::MeshData3D> >,
-    std::vector< Resource<Magnum::Trade::ImageData2D> >,
-    std::vector< Resource<PrototypePart> >,
-    std::vector< Resource<BlueprintVehicle> >
-    //std::vector< Resource<SturdyFile> >
-{
-    // prevent copying
-    ResourceTable() = default;
-    ResourceTable(ResourceTable&& move) = default;
-    ResourceTable(const ResourceTable& copy) = delete;
-};
 
 
 class Package
 {
 
+
+
 public:
+
 
     Package(Package&& move) = default;
     Package(const Package& copy) = delete;
-    //template <typename T>
-    //struct TypeMap {  std::vector< T > fish; };
 
-    ResourceTable m_resources;
+    Package(std::string const& prefix, std::string const& packageName);
+
+    //ResourceTable m_resources;
 
     typedef uint32_t Prefix;
     //typedef char Prefix[4];
-
-    Package(std::string const& prefix, std::string const& packageName);
 
     //virtual Magnum::GL::Mesh* request_mesh(const std::string& path);
 
     //TypeMap<int>::fish;
     //std::vector< Resource<Magnum::Trade::ImageData> > g_imageData;
 
-    constexpr ResourceTable& debug_get_resource_table() { return m_resources; }
+    //constexpr ResourceTable& debug_get_resource_table() { return m_resources; }
 
-    template<class T>
-    Resource<T>* debug_add_resource(Resource<T>&& resource);
+//    template<class T>
+//    Resource<T>* debug_add_resource(Resource<T>&& resource);
 
-    template<class T>
-    Resource<T>* get_resource(std::string const& path);
+//    template<class T>
+//    Resource<T>* get_resource(std::string const& path);
 
-    template<class T>
-    Resource<T>* get_resource(unsigned resIndex);
+//    template<class T>
+//    Resource<T>* get_resource(unsigned resIndex);
+
+    template<class TYPE_T, typename ... ARGS_T>
+    DependRes<TYPE_T> add(std::string const& path, ARGS_T&& ... args);
+
+    template<class TYPE_T>
+    DependRes<TYPE_T> get(std::string const& path);
+
+    template<class TYPE_T>
+    void clear();
+
+    struct GroupType
+    {
+        virtual ~GroupType() = default;
+    };
+
+    template<class TYPE_T>
+    struct GroupTypeRes : public GroupType
+    {
+        ~GroupTypeRes() = default;
+        //std::vector<TYPE_T> m_types;
+        std::map<std::string, Resource<TYPE_T>> m_resources;
+    };
+
 
 private:
+
+    std::map<entt::id_type, std::unique_ptr<GroupType>> m_groups;
 
     std::string m_packageName;
 
@@ -99,53 +108,68 @@ private:
 
 };
 
-// TODO: move these somewhere else
-
-template<class T>
-Resource<T>* Package::debug_add_resource(Resource<T>&& resource)
+template<class TYPE_T, typename ... ARGS_T>
+DependRes<TYPE_T> Package::add(std::string const& path,
+                               ARGS_T&& ... args)
 {
-    std::vector< Resource<T> >& resourceVec =
-            static_cast< std::vector< Resource<T> >& >(m_resources);
+    // this should create a blank if it doesn't exist yet
+    //std::any& groupAny(m_groups[entt::type_info<TYPE_T>::id()]);
+    std::unique_ptr<GroupType>& groupAny(m_groups[entt::type_info<TYPE_T>::id()]);
 
-    resourceVec.push_back(std::move(resource));
-
-    return &(resourceVec.back());
-
-}
-
-
-template<class T>
-Resource<T>* Package::get_resource(std::string const& path)
-{
-    std::vector< Resource<T> >& resourceVec =
-            static_cast< std::vector< Resource<T> >& >(m_resources);
-
-    // TODO: just match the path for now, find a better way eventually
-
-    for (Resource<T>& resource : resourceVec)
+    // check if blank
+    if(!groupAny)
     {
-        if (resource.m_path == path)
-        {
-            return &resource;
-        }
-    }
-    return nullptr;
-}
-
-
-template<class T>
-Resource<T>* Package::get_resource(unsigned resIndex)
-{
-    std::vector< Resource<T> >& resourceVec =
-            static_cast< std::vector< Resource<T> >& >(m_resources);
-
-    // check if the index is within the array size
-    if (resIndex < resourceVec.size())
-    {
-        return &(resourceVec[resIndex]);
+        groupAny = std::make_unique<GroupTypeRes<TYPE_T>>();
     }
 
-    return nullptr;
+    GroupTypeRes<TYPE_T> &group = *static_cast<GroupTypeRes<TYPE_T>*>(groupAny.get());
+
+    // problem: emplace without needing copy constructor
+    //group.m_resources.try_emplace(path, {std::forward<ARGS_T>(args)...}, false, 0);
+    //group.m_resources.emplace(std::piecewise_construct,
+    //                          std::forward_as_tuple(path),
+    //                          std::forward_as_tuple({std::forward<ARGS_T>(args)...}, false, 0));
+    //auto final = group.m_resources.try_emplace(path. );
+    auto final = group.m_resources.try_emplace(path, false, std::forward<ARGS_T>(args)...);
+
+    if (!final.second)
+    {
+        // resource already exists
+        std::cout << "resource already exists\n";
+    }
+
+    return DependRes<TYPE_T>(final.first);
+}
+
+template<class TYPE_T>
+DependRes<TYPE_T> Package::get(std::string const& path)
+{
+    auto itType = m_groups.find(entt::type_info<TYPE_T>::id());
+
+    if (itType == m_groups.end())
+    {
+        // type not found
+        return DependRes<TYPE_T>();
+    }
+
+    GroupTypeRes<TYPE_T> &group = *static_cast<GroupTypeRes<TYPE_T>*>(itType->second.get());
+
+    auto resIt = group.m_resources.find(path);
+
+    if (resIt == group.m_resources.end())
+    {
+        // resource not found
+        return DependRes<TYPE_T>();
+    }
+
+    // found
+    return DependRes<TYPE_T>(resIt);
+}
+
+template<class TYPE_T>
+void Package::clear()
+{
+    m_groups.erase(entt::type_info<TYPE_T>::id());
 }
 
 }

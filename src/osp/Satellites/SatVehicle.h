@@ -32,7 +32,7 @@ public:
 
     BlueprintVehicle& get_blueprint();
 
-    ResDependency<BlueprintVehicle>& get_blueprint_depend()
+    DependRes<BlueprintVehicle>& get_blueprint_depend()
     {
         return m_blueprint;
     }
@@ -42,7 +42,7 @@ public:
 private:
 
     // blueprint to load when loaded by active area
-    ResDependency<BlueprintVehicle> m_blueprint;
+    DependRes<BlueprintVehicle> m_blueprint;
 
 };
 

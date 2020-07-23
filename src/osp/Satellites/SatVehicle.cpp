@@ -22,5 +22,5 @@ bool SatVehicle::is_activatable() const
 BlueprintVehicle& SatVehicle::get_blueprint()
 {
     // TODO: check if blueprint is loaded
-    return *(m_blueprint.get_data());
+    return *m_blueprint;
 }

@@ -123,7 +123,7 @@ private:
 
     std::vector<PrototypeMachine> m_machines;
 
-    //std::vector<ResDependency<MeshData3D> > m_meshDataUsed;
+    //std::vector<DependRes<MeshData3D> > m_meshDataUsed;
 
     // TODO: more OSP information
 

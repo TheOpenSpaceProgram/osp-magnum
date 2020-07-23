@@ -1,4 +1,5 @@
 #include <iostream>
+//#include <format>
 #include <memory>
 #include <thread>
 #include <stack>
@@ -25,7 +26,7 @@ void magnum_application();
 void load_a_bunch_of_stuff();
 
 int debug_cli_loop();
-osp::Satellite& debug_add_random_vehicle();
+osp::Satellite& debug_add_random_vehicle(std::string const& name);
 void debug_print_sats();
 void debug_print_hier();
 void debug_print_update_order();
@@ -233,9 +234,10 @@ void magnum_application()
 
     // workaround: wipe mesh resources because they're specific to the
     // opengl context
-    static_cast<std::vector<osp::Resource<Magnum::GL::Mesh> >& >(
-            g_osp.debug_get_packges()[0].debug_get_resource_table()).clear();
-    
+    g_osp.debug_get_packges()[0].clear<Magnum::GL::Mesh>();
+    //static_cast<std::vector<osp::Resource<Magnum::GL::Mesh> >& >(
+    //        g_osp.debug_get_packges()[0].debug_get_resource_table()).clear();
+
     // destruct the application, this closes the window
     g_ospMagnum.reset();
 }
@@ -266,7 +268,7 @@ void load_a_bunch_of_stuff()
     for (int i = 0; i < 5000; i ++)
     {
         // Creates a random mess of spamcans
-        osp::Satellite& sat = debug_add_random_vehicle();
+        osp::Satellite& sat = debug_add_random_vehicle(std::to_string(i));
 
         // Put them in a long line along
         Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
@@ -284,17 +286,18 @@ void load_a_bunch_of_stuff()
     //s_partsLoaded = true;
 }
 
-osp::Satellite& debug_add_random_vehicle()
+osp::Satellite& debug_add_random_vehicle(std::string const& name)
 {
     // Get some needed variables
     osp::Satellite &sat = g_osp.get_universe().sat_create();
     osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
-    osp::Resource<osp::BlueprintVehicle> blueprint;
+    //osp::Resource<osp::BlueprintVehicle> blueprint;
+    osp::BlueprintVehicle blueprint;
 
     // Part to add, very likely a spamcan
-    osp::Resource<osp::PrototypePart>* victim =
+    osp::DependRes<osp::PrototypePart> victim =
             g_osp.debug_get_packges()[0]
-            .get_resource<osp::PrototypePart>(0);
+            .get<osp::PrototypePart>("part_spamcan");
 
     // Add 10 parts
     for (int i = 0; i < 10; i ++)
@@ -307,7 +310,7 @@ osp::Satellite& debug_add_random_vehicle()
         randomvec /= 32.0f;
 
         // Add a new [victim] part
-        blueprint.m_data.add_part(*victim, randomvec,
+        blueprint.add_part(victim, randomvec,
                            Quaternion(), Vector3(1, 1, 1));
         //std::cout << "random: " <<  << "\n";
     }
@@ -315,21 +318,19 @@ osp::Satellite& debug_add_random_vehicle()
     // Wire throttle control
     // from (output): a MachineUserControl m_woThrottle
     // to    (input): a MachineRocket m_wiThrottle
-    blueprint.m_data.add_wire(0, 0, 1,
+    blueprint.add_wire(0, 0, 1,
                               0, 1, 2);
 
     // Wire attitude control to gimbal
     // from (output): a MachineUserControl m_woAttitude
     // to    (input): a MachineRocket m_wiGimbal
-    blueprint.m_data.add_wire(0, 0, 0,
+    blueprint.add_wire(0, 0, 0,
                               0, 1, 0);
 
     // put blueprint in package
-    auto blueprintRes = g_osp.debug_get_packges()[0]
-            .debug_add_resource<osp::BlueprintVehicle>(std::move(blueprint));
-
-    // set the SatVehicle's blueprint to the one just made
-    vehicle.get_blueprint_depend().bind(*blueprintRes);
+    // and set the SatVehicle's blueprint to the one just made
+    //vehicle.get_blueprint_depend() = (blueprintRes);
+    vehicle.get_blueprint_depend() = g_osp.debug_get_packges()[0].add<osp::BlueprintVehicle>(name, std::move(blueprint));
 
     return sat;
 

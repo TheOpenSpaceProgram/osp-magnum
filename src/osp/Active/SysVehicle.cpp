@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include <Magnum/MeshTools/Compile.h>
+
 #include "ActiveScene.h"
 
 #include "DebugObject.h"
@@ -56,7 +58,7 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
 
     // Unique part prototypes used in the vehicle
     // Access with [blueprintParts.m_partIndex]
-    std::vector<ResDependency<PrototypePart> >& partsUsed =
+    std::vector<DependRes<PrototypePart> >& partsUsed =
             vehicleData.get_prototypes();
 
     // All the parts in the vehicle
@@ -69,18 +71,18 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
     // Loop through list of blueprint parts
     for (BlueprintPart& partBp : blueprintParts)
     {
-        ResDependency<PrototypePart>& partDepends =
+        DependRes<PrototypePart>& partDepends =
                 partsUsed[partBp.m_partIndex];
 
-        PrototypePart *proto = partDepends.get_data();
-
         // Check if the part prototype this depends on still exists
-        if (!proto)
+        if (partDepends.empty())
         {
             return -1;
         }
 
-        ActiveEnt partEntity = self.part_instantiate(*proto, vehicleEnt);
+        PrototypePart &proto = *partDepends;
+
+        ActiveEnt partEntity = self.part_instantiate(proto, vehicleEnt);
         newEntities.push_back(partEntity);
 
         // Part now exists
@@ -91,7 +93,7 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
 
         CompMachine& partMachines = scene.reg_emplace<CompMachine>(partEntity);
 
-        for (PrototypeMachine& protoMachine : proto->get_machines())
+        for (PrototypeMachine& protoMachine : proto.get_machines())
         {
             MapSysMachine::iterator sysMachine
                     = scene.system_machine_find(protoMachine.m_type);
@@ -244,33 +246,34 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
             //       for now just get the first package
             Package& package = m_scene.get_application().debug_get_packges()[0];
 
-            Mesh* mesh = nullptr;
-            Resource<Mesh>* meshRes = package.get_resource<Mesh>(
-                                            currentPrototype.m_drawable.m_mesh);
+            //Mesh* mesh = nullptr;
+            DependRes<Mesh> meshRes = package.get<Mesh>(
+                                            part.get_strings()[currentPrototype.m_drawable.m_mesh]);
 
-            if (!meshRes)
+            if (meshRes.empty())
             {
                 // Mesh isn't compiled yet, now check if mesh data exists
                 std::string const& meshName
                         = part.get_strings()
                                     [currentPrototype.m_drawable.m_mesh];
 
-                Resource<MeshData3D>* meshDataRes
-                        = package.get_resource<MeshData3D>(meshName);
+                DependRes<MeshData3D> meshDataRes
+                        = package.get<MeshData3D>(meshName);
 
-                if (meshDataRes)
+                if (!meshDataRes.empty())
                 {
                     // Compile the mesh data into a mesh
 
                     std::cout << "Compiling mesh \"" << meshName << "\"\n";
 
-                    MeshData3D* meshData = &(meshDataRes->m_data);
+                    MeshData3D &meshData = *meshDataRes;
 
-                    Resource<Mesh> compiledMesh;
-                    compiledMesh.m_data = Magnum::MeshTools::compile(*meshData);
+                    //Resource<Mesh> compiledMesh;
+                    //compiledMesh.m_data = Magnum::MeshTools::compile(meshData);
+                    //mesh = &(package.debug_add_resource<Mesh>(
+                    //            std::move(compiledMesh))->m_data);
 
-                    mesh = &(package.debug_add_resource<Mesh>(
-                                std::move(compiledMesh))->m_data);
+                    meshRes = package.add<Mesh>(meshName, Magnum::MeshTools::compile(meshData));
 
                 }
                 else
@@ -283,16 +286,13 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
             else
             {
                 // mesh already loaded
-                // TODO: this actually crashes, as all the opengl stuff were
-                //       cleared.
-                mesh = &(meshRes->m_data);
             }
 
             // by now, the mesh should exist
 
             CompDrawableDebug& bBocks
                     = m_scene.reg_emplace<CompDrawableDebug>(
-                        currentEnt, mesh, m_shader.get(), 0x0202EE_rgbf);
+                        currentEnt, &(*meshRes), m_shader.get(), 0x0202EE_rgbf);
 
             //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
         }
