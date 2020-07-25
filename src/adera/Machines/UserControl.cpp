@@ -66,15 +66,15 @@ std::vector<WireOutput*> MachineUserControl::existing_outputs()
 
 SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandler& userControl) :
         SysMachine<SysMachineUserControl, MachineUserControl>(scene),
-        m_throttleMax(userControl.config_get("game_thr_max")),
-        m_throttleMin(userControl.config_get("game_thr_min")),
-        m_selfDestruct(userControl.config_get("game_self_destruct")),
-        m_pitchUp(userControl.config_get("game_pitch_up")),
-        m_pitchDn(userControl.config_get("game_pitch_dn")),
-        m_yawLf(userControl.config_get("game_yaw_lf")),
-        m_yawRt(userControl.config_get("game_yaw_rt")),
-        m_rollLf(userControl.config_get("game_roll_lf")),
-        m_rollRt(userControl.config_get("game_roll_rt")),
+        m_throttleMax(userControl.config_get("vehicle_thr_max")),
+        m_throttleMin(userControl.config_get("vehicle_thr_min")),
+        m_selfDestruct(userControl.config_get("vehicle_self_destruct")),
+        m_pitchUp(userControl.config_get("vehicle_pitch_up")),
+        m_pitchDn(userControl.config_get("vehicle_pitch_dn")),
+        m_yawLf(userControl.config_get("vehicle_yaw_lf")),
+        m_yawRt(userControl.config_get("vehicle_yaw_rt")),
+        m_rollLf(userControl.config_get("vehicle_roll_lf")),
+        m_rollRt(userControl.config_get("vehicle_roll_rt")),
         m_updateSensor(scene.get_update_order(), "mach_usercontrol", "", "wire",
                        std::bind(&SysMachineUserControl::update_sensor, this))
 {

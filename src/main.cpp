@@ -1,3 +1,8 @@
+// This file is a bit spaghetti-style, but should be easy to understand.
+// All parts of OSP can be configured through just C++, and understanding what
+// this file is doing is a good start to getting familar with the codebase.
+// Replace this entire file eventually.
+
 #include <iostream>
 //#include <format>
 #include <memory>
@@ -24,28 +29,56 @@
 #include "planet-a/Active/SysPlanetA.h"
 
 
+/**
+ * Starts a magnum application, an active area, and links them together
+ */
 void magnum_application();
+
+/**
+ * As the name implies. This should only be called once for the entire lifetime
+ * of the program.
+ *
+ * prefer not to use names like this anywhere else but main.cpp
+ */
 void load_a_bunch_of_stuff();
 
-int debug_cli_loop();
+/**
+ * Creates a BlueprintVehicle and adds a random mess of 10 part_spamcans to it
+ *
+ * Also creates a
+ *
+ * Call load_a_bunch_of_stuff before this function to make sure part_spamcan
+ * is loaded
+ *
+ * @param name
+ * @return
+ */
 osp::Satellite& debug_add_random_vehicle(std::string const& name);
+
+/**
+ * The spaghetti command line interface that gets inputs from stdin. This
+ * function will only return once the user exits.
+ * @return An error code maybe
+ */
+int debug_cli_loop();
+
+// called only from commands to display information
+void debug_print_help();
 void debug_print_sats();
 void debug_print_hier();
 void debug_print_update_order();
 
-//bool g_partsLoaded = false;
-
-Magnum::Platform::Application::Arguments g_args();
-std::thread g_magnumThread;
-
-// Deals with the underlying OSP universe, with the satellites and stuff
-// This also stores loaded resources in packages.
+// Deals with the underlying OSP universe, with the satellites and stuff. A
+// Magnum application or OpenGL context is not required for the universe to
+// exist. This also stores loaded resources in packages.
 osp::OSPApplication g_osp;
 
 // Deals with the window, OpenGL context, and other game engine stuff that
 // often have "Active" written all over them
 std::unique_ptr<osp::OSPMagnum> g_ospMagnum;
+std::thread g_magnumThread;
 
+// lazily save the arguments to pass to Magnum
 int g_argc;
 char** g_argv;
 
@@ -60,23 +93,10 @@ int main(int argc, char** argv)
     return debug_cli_loop();
 }
 
-
-/**
- * A basic spaghetti command line interface that gets inputs from stdin to
- * mess with g_universe and g_ospMagnum. Replace this entire file eventually.
- * @return An error code maybe
- */
 int debug_cli_loop()
 {
 
-    std::cout
-        << "OSP-Magnum Temporary Debug CLI\n"
-        << "Things to type:\n"
-        << "* start     - Create an ActiveArea and start Magnum\n"
-        << "* list_uni  - List Satellites in the universe\n"
-        << "* list_ent  - List Entities in active scene\n"
-        << "* list_upd  - List Update order from active scene\n"
-        << "* exit      - Deallocate everything and return memory to OS\n";
+    debug_print_help();
 
     std::string command;
 
@@ -85,6 +105,10 @@ int debug_cli_loop()
         std::cout << "> ";
         std::cin >> command;
 
+        if (command == "help")
+        {
+            debug_print_help();
+        }
         if (command == "list_uni")
         {
             debug_print_sats();
@@ -133,14 +157,11 @@ int debug_cli_loop()
     return 0;
 }
 
-/**
- * Starts a magnum application, an active area, and links them together
- */
 void magnum_application()
 {
     // Create the application
     g_ospMagnum = std::make_unique<osp::OSPMagnum>(
-                osp::OSPMagnum::Arguments{g_argc, g_argv});
+                        osp::OSPMagnum::Arguments{g_argc, g_argv});
 
     // Configure Controls
 
@@ -149,35 +170,38 @@ void magnum_application()
     using VarTrig = osp::ButtonVarConfig::VarTrigger;
     osp::UserInputHandler& userInput = g_ospMagnum->get_input_handler();
 
-    // note: names of controls are arbitrary
+    // vehicle control, used by MachineUserControl
 
-    // vehicle control
-    // would help to get an axis for yaw, pitch, and roll, but use this for now
-    userInput.config_register_control("game_pitch_up", true,
+    // would help to get an axis for yaw, pitch, and roll, but use individual
+    // axis buttons for now
+    userInput.config_register_control("vehicle_pitch_up", true,
             {{0, (int) Key::S, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("game_pitch_dn", true,
+    userInput.config_register_control("vehicle_pitch_dn", true,
             {{0, (int) Key::W, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("game_yaw_lf", true,
+    userInput.config_register_control("vehicle_yaw_lf", true,
             {{0, (int) Key::A, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("game_yaw_rt", true,
+    userInput.config_register_control("vehicle_yaw_rt", true,
             {{0, (int) Key::D, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("game_roll_lf", true,
+    userInput.config_register_control("vehicle_roll_lf", true,
             {{0, (int) Key::Q, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("game_roll_rt", true,
+    userInput.config_register_control("vehicle_roll_rt", true,
             {{0, (int) Key::E, VarTrig::PRESSED, false, VarOp::AND}});
 
     // Set throttle max to Z
-    userInput.config_register_control("game_thr_max", false,
+    userInput.config_register_control("vehicle_thr_max", false,
             {{0, (int) Key::Z, VarTrig::PRESSED, false, VarOp::OR}});
     // Set throttle min to X
-    userInput.config_register_control("game_thr_min", false,
+    userInput.config_register_control("vehicle_thr_min", false,
             {{0, (int) Key::X, VarTrig::PRESSED, false, VarOp::OR}});
-    // Set self destruct to LeftCtrl+C or LeftShift+A
-    userInput.config_register_control("game_self_destruct", false,
+    // Set self destruct to LeftCtrl+C or LeftShift+A. this just prints
+    // a silly message.
+    userInput.config_register_control("vehicle_self_destruct", false,
             {{0, (int) Key::LeftCtrl, VarTrig::HOLD, false, VarOp::AND},
              {0, (int) Key::C, VarTrig::PRESSED, false, VarOp::OR},
              {0, (int) Key::LeftShift, VarTrig::HOLD, false, VarOp::AND},
              {0, (int) Key::A, VarTrig::PRESSED, false, VarOp::OR}});
+
+    // Camera and Game controls, handled in DebugCameraController
 
     // Switch to next vehicle
     userInput.config_register_control("game_switch", false,
@@ -226,8 +250,10 @@ void magnum_application()
 
     // Add the debug camera controller
     std::unique_ptr<osp::DebugCameraController> camObj
-            = std::make_unique<osp::DebugCameraController>(*(area.get_scene()), area.get_camera());
-    area.get_scene()->reg_emplace<osp::CompDebugObject>(area.get_camera(), std::move(camObj));
+            = std::make_unique<osp::DebugCameraController>(
+                    *(area.get_scene()), area.get_camera());
+    area.get_scene()->reg_emplace<osp::CompDebugObject>(area.get_camera(),
+                                                        std::move(camObj));
 
     // make the application switch to that area
     g_ospMagnum->set_active_area(area);
@@ -235,8 +261,8 @@ void magnum_application()
     // Note: sat becomes invalid btw, since it refers to a vector elem.
     //       if new satellites are added, this can cause problems
 
-    // this starts the game loop. non-asynchronous
-    // OSPMagnum::drawEvent gets looped
+    // Starts the game loop. This function will return when the window is
+    // closed. See OSPMagnum::drawEvent
     g_ospMagnum->exec();
 
     // Close button has been pressed
@@ -249,23 +275,15 @@ void magnum_application()
     // workaround: wipe mesh resources because they're specific to the
     // opengl context
     g_osp.debug_get_packges()[0].clear<Magnum::GL::Mesh>();
-    //static_cast<std::vector<osp::Resource<Magnum::GL::Mesh> >& >(
-    //        g_osp.debug_get_packges()[0].debug_get_resource_table()).clear();
 
     // destruct the application, this closes the window
     g_ospMagnum.reset();
 }
 
-/**
- * As the name implies.
- *
- * prefer not to use names like this anywhere else but main.cpp
- */
 void load_a_bunch_of_stuff()
 {
     // Create a new package
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
-    //m_packages.push_back(std::move(p));
 
     // Create a sturdy
     osp::SturdyImporter importer;
@@ -276,22 +294,23 @@ void load_a_bunch_of_stuff()
 
     // Add package to the univere
     g_osp.debug_get_packges().push_back(std::move(lazyDebugPack));
-    g_osp.get_universe().get_sats().reserve(5010);
 
-    // Add 5000 vehicles so there's something to load
-    for (int i = 0; i < 5000; i ++)
+    // Add 50 vehicles so there's something to load
+    g_osp.get_universe().get_sats().reserve(64);
+
+    for (int i = 0; i < 50; i ++)
     {
         // Creates a random mess of spamcans
         osp::Satellite& sat = debug_add_random_vehicle(std::to_string(i));
 
-        // Put them in a long line along
+        // Put them in a long chaotic line
         Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
-                                i * 1024 * 5, (i & 5) * 128,  (i & 3) * 1024), 10);
+                i * 1024 * 5,
+                (i & 5) * 128,
+                (i & 3) * 1024), 10);
 
         sat.set_position(randomvec);
-
     }
-
 
     // Add a planet too
     osp::Satellite& planet = g_osp.get_universe().sat_create();
@@ -302,10 +321,9 @@ void load_a_bunch_of_stuff()
 
 osp::Satellite& debug_add_random_vehicle(std::string const& name)
 {
-    // Get some needed variables
-    osp::Satellite &sat = g_osp.get_universe().sat_create();
-    osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
-    //osp::Resource<osp::BlueprintVehicle> blueprint;
+
+    // Start making the blueprint
+
     osp::BlueprintVehicle blueprint;
 
     // Part to add, very likely a spamcan
@@ -333,27 +351,48 @@ osp::Satellite& debug_add_random_vehicle(std::string const& name)
     // from (output): a MachineUserControl m_woThrottle
     // to    (input): a MachineRocket m_wiThrottle
     blueprint.add_wire(0, 0, 1,
-                              0, 1, 2);
+                       0, 1, 2);
 
     // Wire attitude control to gimbal
     // from (output): a MachineUserControl m_woAttitude
     // to    (input): a MachineRocket m_wiGimbal
     blueprint.add_wire(0, 0, 0,
-                              0, 1, 0);
+                       0, 1, 0);
 
     // put blueprint in package
-    // and set the SatVehicle's blueprint to the one just made
-    //vehicle.get_blueprint_depend() = (blueprintRes);
-    vehicle.get_blueprint_depend() = g_osp.debug_get_packges()[0].add<osp::BlueprintVehicle>(name, std::move(blueprint));
+    osp::DependRes<osp::BlueprintVehicle> depend = g_osp.debug_get_packges()[0]
+            .add<osp::BlueprintVehicle>(name, std::move(blueprint));
+
+    // Create the Satellite containing a SatVehicle
+
+    osp::Satellite &sat = g_osp.get_universe().sat_create();
+    osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
+
+    // set the SatVehicle's blueprint to the one just made
+    vehicle.get_blueprint_depend() = std::move(depend);
 
     return sat;
 
+}
+
+void debug_print_help()
+{
+    std::cout
+        << "OSP-Magnum Temporary Debug CLI\n"
+        << "Things to type:\n"
+        << "* start     - Create an ActiveArea and start Magnum\n"
+        << "* list_uni  - List Satellites in the universe\n"
+        << "* list_ent  - List Entities in active scene\n"
+        << "* list_upd  - List Update order from active scene\n"
+        << "* help      - Show this again\n"
+        << "* exit      - Deallocate everything and return memory to OS\n";
 }
 
 void debug_print_update_order()
 {
     if (!g_ospMagnum)
     {
+        std::cout << "Can't do that yet, start the magnum application first!\n";
         return;
     }
 
@@ -371,6 +410,7 @@ void debug_print_hier()
 {
     if (!g_ospMagnum)
     {
+        std::cout << "Can't do that yet, start the magnum application first!\n";
         return;
     }
 
