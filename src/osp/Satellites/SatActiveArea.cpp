@@ -1,33 +1,17 @@
 #include <iostream>
 
 #include <Magnum/GL/DefaultFramebuffer.h>
-#include <Magnum/GL/Renderer.h>
-#include <Magnum/Math/Vector3.h>
-#include <Magnum/Math/Constants.h>
-#include <Magnum/MeshTools/Compile.h>
-#include <Magnum/MeshTools/Transform.h>
-#include <Magnum/Primitives/Cube.h>
-#include <Magnum/Trade/MeshData.h>
 
 #include "SatActiveArea.h"
 
-//#include "SatVehicle.h"
-//#include "SatPlanet.h"
-
-
 #include "../Active/ActiveScene.h"
-#include "../Active/DebugObject.h"
 #include "../Active/SysNewton.h"
 #include "../Active/SysMachine.h"
-
-//#include "../Active/Machines/Rocket.h"
-//#include "../Active/Machines/UserControl.h"
-
 
 #include "../Universe.h"
 
 
-// for the 0xrrggbb_rgbf literalsm
+// for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
 using Magnum::Matrix4;
@@ -43,15 +27,6 @@ SatActiveArea::SatActiveArea(UserInputHandler &userInput) :
         m_userInput(userInput)
 {
 
-
-    // use area_load_vehicle to load SatVechicles
-    //load_func_add<SatVehicle>(area_activate_vehicle);
-    //load_func_add<SatPlanet>(area_activate_planet);
-
-
-    //
-    //("Rocket",
-    //        std::make_unique<SysMachineRocket>(*this));
 }
 
 SatActiveArea::~SatActiveArea()
@@ -64,9 +39,6 @@ SatActiveArea::~SatActiveArea()
 
     std::cout << "Active Area destroyed\n";
 
-    // Clean up newton dynamics stuff
-    //NewtonDestroyAllBodies(m_nwtWorld);
-    //NewtonDestroy(m_nwtWorld);
 }
 
 
@@ -86,35 +58,8 @@ int SatActiveArea::activate(OSPApplication& app)
 
     std::cout << "Active Area loading...\n";
 
-    m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
-
-    //m_partTest = part_instantiate(part);
-
-    // Temporary: draw a spinning rectangular prisim
-
-    m_bocks = (new Magnum::GL::Mesh(Magnum::MeshTools::compile(
-                                        Magnum::Primitives::cubeSolid())));
-
     // Create the scene
     m_scene = std::make_shared<ActiveScene>(m_userInput, app);
-
-
-    // create debug entities that have a transform and box model
-    m_debug_aEnt = m_scene->hier_create_child(m_scene->hier_get_root(),
-                                                   "Entity A");
-    CompTransform& aTransform
-            = m_scene->get_registry().emplace<CompTransform>(m_debug_aEnt);
-    CompDrawableDebug& aBocks
-            = m_scene->get_registry().emplace<CompDrawableDebug>(m_debug_aEnt,
-                    m_bocks, m_shader.get(), 0x67FF00_rgbf);
-    aTransform.m_enableFloatingOrigin = true;
-
-    ActiveEnt bEnt = m_scene->hier_create_child(m_debug_aEnt, "Entity B");
-    CompTransform& bTransform
-            = m_scene->get_registry().emplace<CompTransform>(bEnt);
-    CompDrawableDebug& bBocks
-            = m_scene->get_registry().emplace<CompDrawableDebug>(bEnt,
-                    m_bocks, m_shader.get(), 0xEE0201_rgbf);
 
     // Create the camera entity
     m_camera = m_scene->hier_create_child(m_scene->hier_get_root(), "Camera");
@@ -135,74 +80,14 @@ int SatActiveArea::activate(OSPApplication& app)
 
     cameraComp.calculate_projection();
 
-    // Add the debug camera controller
-    std::unique_ptr<DebugCameraController> camObj
-            = std::make_unique<DebugCameraController>(*m_scene, m_camera);
-
-
-
-    m_scene->reg_emplace<CompDebugObject>(m_camera, std::move(camObj));
-
     return 0;
 }
 
 
 void SatActiveArea::draw_gl()
 {
-
-    using namespace Magnum;
-
-    // temporary stuff
-    static Deg lazySpin;
-    lazySpin += 3.0_degf;
-
-    CompTransform& aTransform = m_scene->reg_get<CompTransform>(m_debug_aEnt);
-    CompHierarchy& aHierarchy = m_scene->reg_get<CompHierarchy>(m_debug_aEnt);
-
-    // root's child child is bEnt from activate();
-    CompTransform& bTransform
-            = m_scene->reg_get<CompTransform>(aHierarchy.m_childFirst);
-    bTransform.m_transform
-            = Matrix4::translation(Vector3(0.0f,
-                                           2.0f * Math::sin(lazySpin),
-                                           0.0f))
-            * Matrix4::scaling({0.5f, 0.5f, 2.0f});;
-
-
     m_scene->update_hierarchy_transforms();
-
-    GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
-    GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
-
-    // Temporary: draw the spinning rectangular prisim
-
-
-
-    Matrix4 ttt;
-    ttt = Matrix4::translation(Vector3(0, 0, -5))
-        * Matrix4::rotationX(lazySpin)
-        * Matrix4::scaling({1.0f, 1.0f, 1.0f});
-
-    (*m_shader)
-        .setDiffuseColor(0x67ff00_rgbf)
-        .setAmbientColor(0x111111_rgbf)
-        .setSpecularColor(0x330000_rgbf)
-        .setLightPosition({10.0f, 15.0f, 5.0f})
-        .setTransformationMatrix(ttt)
-        .setProjectionMatrix(Magnum::Matrix4::perspectiveProjection(45.0_degf, 1.0f, 0.001f, 100.0f))
-        .setNormalMatrix(ttt.normalMatrix());
-
-    //m_bocks->draw(*m_shader);
-
     m_scene->draw(m_camera);
-
-    //m_partTest->setTransformation(Matrix4::rotationX(lazySpin));
-
-    //static_cast<Object3D&>(m_camera->object()).setTransformation(
-    //                        Matrix4::translation(Vector3(0, 0, 5)));
-
-
-    //m_camera->draw(m_drawables);
 }
 
 void SatActiveArea::activate_func_add(Id const* id, LoadStrategy function)
@@ -223,7 +108,6 @@ int SatActiveArea::activate_satellite(Satellite& sat)
         return -1;
     }
 
-    std::cout << "loading!\n";
     int loadStatus = funcMapIt->second(* this, *sat.get_object());
 
     if (loadStatus)
@@ -242,7 +126,7 @@ int SatActiveArea::activate_satellite(Satellite& sat)
 void SatActiveArea::update_physics(float deltaTime)
 {
 
-    // scan for nearby satellites, partially tremporary
+    // scan for nearby satellites, maybe move this somewhere else some day
 
     Universe& u = *(m_sat->get_universe());
     std::vector<Satellite>& satellites = u.get_sats();

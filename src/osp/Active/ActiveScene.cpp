@@ -1,10 +1,5 @@
 #include <iostream>
 
-
-//#include "Machines/UserControl.h"
-//#include "Machines/Rocket.h"
-#include "DebugObject.h"
-
 #include "ActiveScene.h"
 
 
@@ -54,7 +49,9 @@ ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication& app) :
 ActiveScene::~ActiveScene()
 {
     // FIXME: not clearing these manually causes a SIGABRT on destruction
-    m_registry.clear<CompDebugObject>();
+    // because of CompDebugObject
+    //m_registry.clear<CompDebugObject>();
+    m_registry.clear();
 }
 
 

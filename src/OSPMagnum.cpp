@@ -2,8 +2,6 @@
 
 #include "OSPMagnum.h"
 
-#include "osp/Active/DebugObject.h"
-
 
 namespace osp
 {

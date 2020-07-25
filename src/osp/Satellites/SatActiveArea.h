@@ -3,8 +3,6 @@
 #include <map>
 
 #include <Magnum/Math/Color.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/Shaders/Phong.h>
 #include <Magnum/PixelFormat.h>
 //#include <Magnum/SceneGraph/Camera.h>
 
@@ -102,13 +100,7 @@ private:
 
     ActiveEnt m_camera;
 
-    Magnum::GL::Mesh *m_bocks;
-    std::unique_ptr<Magnum::Shaders::Phong> m_shader;
-
     std::shared_ptr<ActiveScene> m_scene;
-
-    //GroupFtrNewtonBody m_newtonBodies;
-    ActiveEnt m_debug_aEnt;
 
     UserInputHandler& m_userInput;
 

@@ -191,6 +191,13 @@ public:
     void system_machine_add(std::string const& name, Args &&... args);
 
     /**
+     *
+     * @tparam T
+     */
+    template<class T, typename... Args>
+    void dynamic_system_add(std::string const& name, Args &&... args);
+
+    /**
      * Get a registered SysMachine by name. This accesses a map.
      * @param name [in] Name used as a key
      * @return Iterator to specified SysMachine
@@ -245,6 +252,13 @@ void ActiveScene::system_machine_add(std::string const& name,
                                              Args &&... args)
 {
     m_sysMachines.emplace(name, std::make_unique<T>(*this, args...));
+}
+
+template<class T, typename... Args>
+void ActiveScene::dynamic_system_add(std::string const& name,
+                                             Args &&... args)
+{
+    m_dynamicSys.emplace(name, std::make_unique<T>(*this, args...));
 }
 
 // TODO: There's probably a better way to do these:

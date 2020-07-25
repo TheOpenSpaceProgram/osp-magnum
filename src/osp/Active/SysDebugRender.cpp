@@ -1,5 +1,5 @@
 #include <Magnum/GL/DefaultFramebuffer.h>
-
+#include <Magnum/GL/Renderer.h>
 
 #include "SysDebugRender.h"
 #include "ActiveScene.h"
@@ -16,7 +16,7 @@ using namespace Magnum::Math::Literals;
 
 SysDebugRender::SysDebugRender(ActiveScene &rScene) :
         m_scene(rScene),
-        m_renderDebugDraw(rScene.get_render_order(), "physics", "wire", "",
+        m_renderDebugDraw(rScene.get_render_order(), "debug", "", "",
                           std::bind(&SysDebugRender::draw, this, _1))
 {
 
@@ -24,6 +24,10 @@ SysDebugRender::SysDebugRender(ActiveScene &rScene) :
 
 void SysDebugRender::draw(ActiveEnt camera)
 {
+    using Magnum::GL::Renderer;
+
+    Renderer::enable(Renderer::Feature::DepthTest);
+    Renderer::enable(Renderer::Feature::FaceCulling);
 
     Matrix4 cameraProject;
     Matrix4 cameraInverse;
@@ -56,10 +60,8 @@ void SysDebugRender::draw(ActiveEnt camera)
             .setLightPosition({10.0f, 15.0f, 5.0f})
             .setTransformationMatrix(entRelative)
             .setProjectionMatrix(cameraProject)
-            .setNormalMatrix(entRelative.normalMatrix());
-
-
-        drawable.m_mesh->draw(*(drawable.m_shader));
+            .setNormalMatrix(entRelative.normalMatrix())
+            .draw(*(drawable.m_mesh));
 
         //std::cout << "render! \n";
     }

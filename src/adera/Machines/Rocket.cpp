@@ -30,6 +30,8 @@ MachineRocket::MachineRocket(MachineRocket&& move) :
 MachineRocket& MachineRocket::operator=(MachineRocket&& move)
 {
     m_enable = move.m_enable;
+    // TODO
+    return *this;
 }
 
 void MachineRocket::propagate_output(WireOutput* output)

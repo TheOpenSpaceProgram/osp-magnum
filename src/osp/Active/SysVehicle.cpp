@@ -5,8 +5,6 @@
 
 #include "ActiveScene.h"
 
-#include "DebugObject.h"
-
 #include "SysVehicle.h"
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
@@ -31,9 +29,6 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
 
     SysVehicle& self = area.get_scene()->get_system<SysVehicle>();
 
-    // everything that involves this variable is temporary
-    bool debugFirstVehicle = !(area.get_scene()->get_registry().size<CompRigidBody>());
-
     //std::cout << "relative distance: " << positionInScene.length() << "\n";
 
     // Get the needed variables
@@ -45,6 +40,8 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
     // Create the root entity to add parts to
 
     ActiveEnt vehicleEnt = scene.hier_create_child(root, "Vehicle");
+
+    CompVehicle& vehicleComp = scene.reg_emplace<CompVehicle>(vehicleEnt);
 
     // Convert position of the satellite to position in scene
     Vector3 positionInScene = loadMe.get_satellite()
@@ -65,9 +62,9 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
     // All the parts in the vehicle
     std::vector<BlueprintPart> &blueprintParts = vehicleData.get_blueprints();
 
-    // Keep track of newly created parts
-    std::vector<ActiveEnt> newEntities;
-    newEntities.reserve(blueprintParts.size());
+    // Keep track of parts
+    //std::vector<ActiveEnt> newEntities;
+    vehicleComp.m_parts.reserve(blueprintParts.size());
 
     // Loop through list of blueprint parts
     for (BlueprintPart& partBp : blueprintParts)
@@ -84,7 +81,7 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
         PrototypePart &proto = *partDepends;
 
         ActiveEnt partEntity = self.part_instantiate(proto, vehicleEnt);
-        newEntities.push_back(partEntity);
+        vehicleComp.m_parts.push_back(partEntity);
 
         // Part now exists
 
@@ -107,12 +104,6 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
 
             // TODO: pass the blueprint configs into this function
             Machine& machine = sysMachine->second->instantiate(partEntity);
-
-
-            if (debugFirstVehicle)
-            {
-                machine.m_enable = true;
-            }
 
             // Add the machine to the part
             partMachines.m_machines.emplace_back(partEntity, sysMachine);
@@ -145,11 +136,10 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
     {
         // TODO: check if the connections are valid
 
-
         // get wire from
 
         CompMachine& fromMachines = scene.reg_get<CompMachine>(
-                                        newEntities[blueprintWire.m_fromPart]);
+                vehicleComp.m_parts[blueprintWire.m_fromPart]);
 
         auto fromMachineEntry = fromMachines
                 .m_machines[blueprintWire.m_fromMachine];
@@ -161,7 +151,7 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
         // get wire to
 
         CompMachine& toMachines = scene.reg_get<CompMachine>(
-                                        newEntities[blueprintWire.m_toPart]);
+                vehicleComp.m_parts[blueprintWire.m_toPart]);
 
         auto toMachineEntry = toMachines
                 .m_machines[blueprintWire.m_toMachine];
@@ -178,19 +168,6 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
     // temporary: make the whole thing a single rigid body
     CompRigidBody& nwtBody = scene.reg_emplace<CompRigidBody>(vehicleEnt);
     area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
-
-    if (debugFirstVehicle)
-    {
-        // if first loaded vehicle
-
-        // point the camera
-        DebugCameraController *cam = (DebugCameraController*)(
-                    area.get_scene()->reg_get<CompDebugObject>(
-                        area.get_camera()).m_obj.get());
-        cam->view_orbit(vehicleEnt);
-
-
-    }
 
     return 0;
 }

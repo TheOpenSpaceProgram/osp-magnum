@@ -1,6 +1,6 @@
 #include "DebugObject.h"
 
-#include "ActiveScene.h"
+#include <osp/Active/ActiveScene.h>
 
 using namespace osp;
 
@@ -30,13 +30,71 @@ DebugCameraController::DebugCameraController(ActiveScene &scene, ActiveEnt ent) 
         m_up(m_userInput.config_get("ui_up")),
         m_dn(m_userInput.config_get("ui_dn")),
         m_lf(m_userInput.config_get("ui_lf")),
-        m_rt(m_userInput.config_get("ui_rt"))
+        m_rt(m_userInput.config_get("ui_rt")),
+        m_switch(m_userInput.config_get("game_switch"))
 {
     m_orbitDistance = 20.0f;
 }
 
 void DebugCameraController::update_physics_post()
 {
+
+    bool targetValid = m_scene.get_registry().valid(m_orbiting);
+
+    if (m_switch.triggered())
+    {
+        std::cout << "switch to new vehicle\n";
+
+        auto view = m_scene.get_registry().view<CompVehicle>();
+        auto it = view.find(m_orbiting);
+
+        if (targetValid)
+        {
+            // disable the first MachineUserControl because switching away
+            ActiveEnt firstPart = view.get(m_orbiting).m_parts[0];
+            m_scene.reg_get<MachineUserControl>(firstPart).m_enable = false;
+        }
+
+        if (it == view.end() || it == view.begin())
+        {
+            // no vehicle selected, or last vehicle is selected (loop around)
+            m_orbiting = view.back();
+        }
+        else
+        {
+            // pick the next vehicle
+            m_orbiting = *(--it);
+            std::cout << "next\n";
+        }
+
+        targetValid = m_scene.get_registry().valid(m_orbiting);
+
+        if (targetValid)
+        {
+            // enable the first MachineUserControl
+            ActiveEnt firstPart = view.get(m_orbiting).m_parts[0];
+
+            m_scene.reg_get<MachineUserControl>(firstPart).m_enable = true;
+        }
+
+        // pick next entity, or first entity in scene
+        //ActiveEnt search = targetValid
+        //        ? m_scene.reg_get<CompHierarchy>(m_orbiting).m_siblingNext
+        //        : m_scene.reg_get<CompHierarchy>(m_scene.hier_get_root())
+        //                 .m_childFirst;
+
+        // keep looping until a vehicle is found
+        //while ((!m_scene.get_registry().has<CompVehicle>(search)))
+        //{
+        //    search = m_scene.reg_get<CompHierarchy>(search).m_siblingNext;
+        //}
+    }
+
+    if (!targetValid)
+    {
+        return;
+    }
+
     float yaw =  m_rt.trigger_hold() - m_lf.trigger_hold();
     float pitch = m_dn.trigger_hold() - m_up.trigger_hold();
 

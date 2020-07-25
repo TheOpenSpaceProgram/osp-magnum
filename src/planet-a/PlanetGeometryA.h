@@ -43,7 +43,7 @@ public:
     PlanetGeometryA() = default;
     ~PlanetGeometryA() = default;
 
-    constexpr bool is_ready() const;
+    constexpr bool is_initialized() const { return m_initialized; }
 
     /**
      * Calculate initial icosahedron and initialize buffers.
@@ -189,7 +189,7 @@ private:
     //
     //bool m_noGPU = false;
 
-    bool m_ready = false;
+    bool m_initialized = false;
 
     // Vertex buffer data is divided unevenly for chunks
     // In m_chunkVertBuf:

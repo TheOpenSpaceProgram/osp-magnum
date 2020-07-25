@@ -35,6 +35,8 @@ MachineUserControl::MachineUserControl(MachineUserControl&& move) :
 MachineUserControl& MachineUserControl::operator=(MachineUserControl&& move)
 {
     m_enable = move.m_enable;
+    // TODO
+    return *this;
 }
 
 void MachineUserControl::propagate_output(WireOutput* output)

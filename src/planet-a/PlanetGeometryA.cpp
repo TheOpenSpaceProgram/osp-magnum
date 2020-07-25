@@ -119,6 +119,7 @@ void PlanetGeometryA::initialize(float radius)
         }
     }
 
+    m_initialized = true;
 
     // temporary: test chunking
     chunk_add(0);

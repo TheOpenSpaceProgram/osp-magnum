@@ -20,19 +20,20 @@ struct CompPlanet
     PlanetGeometryA m_planet;
     //Magnum::GL::Mesh m_mesh;
     std::unique_ptr<Magnum::Shaders::Phong> m_shader;
-    Magnum::GL::Buffer m_vrtxBufGL;
-    Magnum::GL::Buffer m_indxBufGL;
+    Magnum::GL::Buffer m_vrtxBufGL(Magnum::NoCreateT());
+    Magnum::GL::Buffer m_indxBufGL(Magnum::NoCreateT());
 };
 
 
-class SysPlanetA
+class SysPlanetA : public IDynamicSystem
 {
 public:
 
     static int area_activate_planet(SatActiveArea& area,
                                     SatelliteObject& loadMe);
 
-    SysPlanetA();
+    SysPlanetA(ActiveScene &scene);
+    ~SysPlanetA() = default;
 
     void update_render();
 
@@ -40,6 +41,12 @@ public:
 
     void update_physics();
 
+private:
+
+    ActiveScene &m_scene;
+
+    UpdateOrderHandle m_updateGeometry;
+    UpdateOrderHandle m_updatePhysics;
 
 };
 

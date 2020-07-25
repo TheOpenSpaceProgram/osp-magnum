@@ -111,6 +111,8 @@ public:
         }
         m_it = std::move(move.m_it);
         m_it->second.m_refCount ++;
+
+        return *this;
     }
 
     bool operator==(DependRes<TYPE_T> const& compare) const

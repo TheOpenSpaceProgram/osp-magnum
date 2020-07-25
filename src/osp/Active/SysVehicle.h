@@ -28,7 +28,7 @@ struct WireMachineConnection
 
 struct CompVehicle
 {
-
+    std::vector<ActiveEnt> m_parts;
 };
 
 class SysVehicle

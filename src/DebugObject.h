@@ -2,9 +2,10 @@
 
 #include <memory>
 
-#include "../UserInputHandler.h"
-#include "../types.h"
-#include "activetypes.h"
+#include <osp/Active/activetypes.h>
+#include <osp/types.h>
+
+#include <adera/Machines/UserControl.h>
 
 
 namespace osp
@@ -67,6 +68,7 @@ private:
     ButtonControlHandle m_dn;
     ButtonControlHandle m_lf;
     ButtonControlHandle m_rt;
+    ButtonControlHandle m_switch;
 };
 
 

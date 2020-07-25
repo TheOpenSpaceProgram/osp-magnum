@@ -6,6 +6,8 @@
 #include <random>
 
 #include "OSPMagnum.h"
+#include "DebugObject.h"
+
 #include "osp/Universe.h"
 #include "osp/Satellites/SatActiveArea.h"
 #include "osp/Satellites/SatVehicle.h"
@@ -177,6 +179,10 @@ void magnum_application()
              {0, (int) Key::LeftShift, VarTrig::HOLD, false, VarOp::AND},
              {0, (int) Key::A, VarTrig::PRESSED, false, VarOp::OR}});
 
+    // Switch to next vehicle
+    userInput.config_register_control("game_switch", false,
+            {{0, (int) Key::V, VarTrig::PRESSED, false, VarOp::OR}});
+
     // Set UI Up/down/left/right to arrow keys. this is used to rotate the view
     // for now
     userInput.config_register_control("ui_up", true,
@@ -203,6 +209,9 @@ void magnum_application()
     // Activate it
     area.activate(g_osp);
 
+    // Register dynamic systems
+    area.get_scene()->dynamic_system_add<osp::SysPlanetA>("Planet");
+
     // Register machines
     area.get_scene()->system_machine_add<osp::SysMachineUserControl>
             ("UserControl", g_ospMagnum->get_input_handler());
@@ -214,6 +223,11 @@ void magnum_application()
                            osp::SysVehicle::area_activate_vehicle);
     area.activate_func_add(&(osp::SatPlanet::get_id_static()),
                            osp::SysPlanetA::area_activate_planet);
+
+    // Add the debug camera controller
+    std::unique_ptr<osp::DebugCameraController> camObj
+            = std::make_unique<osp::DebugCameraController>(*(area.get_scene()), area.get_camera());
+    area.get_scene()->reg_emplace<osp::CompDebugObject>(area.get_camera(), std::move(camObj));
 
     // make the application switch to that area
     g_ospMagnum->set_active_area(area);
