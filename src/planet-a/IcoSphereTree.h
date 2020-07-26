@@ -42,6 +42,8 @@ static constexpr uint8_t sc_icoTemplateneighbours[20 * 3] {
 static constexpr int gc_icosahedronFaceCount = 20;
 static constexpr int gc_icosahedronVertCount = 12;
 
+static constexpr std::uint8_t gc_triangleMaskSubdivided = 0b0001;
+static constexpr std::uint8_t gc_triangleMaskChunked    = 0b0010;
 
 // An icosahedron with subdividable faces
 // it starts with 20 triangles, and each face can be subdivided into 4 more
@@ -77,12 +79,12 @@ public:
         return m_vrtxBuf;
     }
 
-    float const* get_vertex_pos(buindex vrtOffset)
+    float* get_vertex_pos(buindex vrtOffset)
     {
         return m_vrtxBuf.data() + vrtOffset + m_vrtxCompOffsetPos;
     }
 
-    float const* get_vertex_nrm(buindex nrmOffset)
+    float* get_vertex_nrm(buindex nrmOffset)
     {
         return m_vrtxBuf.data() + nrmOffset + m_vrtxCompOffsetNrm;
     }

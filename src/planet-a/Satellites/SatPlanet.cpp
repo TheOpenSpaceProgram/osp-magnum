@@ -7,6 +7,7 @@ namespace osp
 SatPlanet::SatPlanet() : SatelliteObject()
 {
     // put stuff here eventually
+    m_radius = 128;
 }
 
 

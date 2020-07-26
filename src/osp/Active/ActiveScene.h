@@ -63,6 +63,8 @@ struct CompCamera
     Vector2 m_viewport;
 
     Matrix4 m_projection;
+    Matrix4 m_inverse;
+
 
     void calculate_projection();
 };

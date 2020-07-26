@@ -1,6 +1,8 @@
 #include <cmath>
 #include <iostream>
 
+#include <osp/types.h>
+
 #include "IcoSphereTree.h"
 
 namespace osp
@@ -87,6 +89,8 @@ void IcoSphereTree::initialize(float radius)
         0.0f,   0.0f,   -scl  // 11 bottom point
     };
 
+    m_vrtxCount = gc_icosahedronVertCount;
+
     // Reserve some space on the vertex buffer
     m_vrtxBuf.resize(m_maxVertice * m_vrtxSize);
 
@@ -159,6 +163,185 @@ void IcoSphereTree::initialize(float radius)
 
 }
 
+void IcoSphereTree::subdivide_add(trindex t)
+{
+    // if bottom triangle is deeper, use that vertex
+    // same with left and right
+
+
+
+    // Add the 4 new triangles
+    // Top Left Right Center
+    trindex childrenIndex;
+    if (m_trianglesFree.size() == 0)
+    {
+        // Make new triangles
+        childrenIndex = m_triangles.size();
+        m_triangles.resize(childrenIndex + 4);
+    }
+    else
+    {
+        // Free triangles always come in groups of 4
+        // as triangles are always deleted in groups of 4
+        // pop doesn't return the value for Urho, so save last element then pop
+        const trindex j = m_trianglesFree[m_trianglesFree.size() - 1];
+        m_trianglesFree.pop_back();
+        childrenIndex = j;
+        //tri->children[1] = j + 1;
+        //tri->children[2] = j + 2;
+        //tri->children[3] = j + 3;
+    }
+
+    SubTriangle &tri = get_triangle(t);
+    tri.m_children = childrenIndex;
+
+    SubTriangle &childA = get_triangle(tri.m_children + 0),
+                &childB = get_triangle(tri.m_children + 1),
+                &childC = get_triangle(tri.m_children + 2),
+                &childD = get_triangle(tri.m_children + 3);
+
+    // Set the neighboors of the top triangle to:
+    // bottom neighboor = new middle triangle
+    // right neighboor  = right neighboor of parent (tri)
+    // left neighboor   = left neighboor of parent (tri)
+    set_neighbours(childA, tri.m_children + 3,
+                                tri.m_neighbours[1], tri.m_neighbours[2]);
+    // same but for every other triangle
+    set_neighbours(childB, tri.m_neighbours[0],
+                                tri.m_children + 3, tri.m_neighbours[2]);
+    set_neighbours(childC, tri.m_neighbours[0],
+                                tri.m_neighbours[1], tri.m_children + 3);
+    // the middle triangle is completely surrounded by its siblings
+    set_neighbours(childD, tri.m_children + 0,
+                                tri.m_children + 1, tri.m_children + 2);
+
+    // Inherit m_depth
+    childA.m_depth = childB.m_depth = childC.m_depth = childD.m_depth
+                   = tri.m_depth + 1;
+    // Set m_bitmasks to 0, for not visible, not subdivided, not chunked
+    childA.m_bitmask = childB.m_bitmask = childC.m_bitmask = childD.m_bitmask
+                     = 0;
+    // Subdivide lines and add verticies, or take from other triangles
+
+    // Preparation to write to vertex buffer
+    //unsigned char* vertData = m_vertBuf->GetShadowData();
+    //unsigned vertSize = m_vertBuf->GetVertexSize();
+    //float writeMe[3];
+    //printf("Vertex size: %u\n", vertSize);
+
+    // Loop through 3 sides of the triangle: Bottom, Right, Left
+    // tri.sides refers to an index of another triangle on that side
+    for (int i = 0; i < 3; i ++)
+    {
+        SubTriangle &triB = get_triangle(tri.m_neighbours[i]);
+        // Check if the line is already subdivided,
+        // or if there is no triangle on the other side
+        if (!(triB.m_bitmask & gc_triangleMaskSubdivided)
+                || (triB.m_depth != tri.m_depth))
+        {
+            // A new vertex has to be created in the middle of the line
+            if (m_vrtxFree.size())
+            {
+                tri.m_midVrtxs[i] = m_vrtxFree[m_vrtxFree.size() - 1];
+                m_vrtxFree.pop_back();
+            } else {
+                tri.m_midVrtxs[i] = m_vrtxCount * m_vrtxSize;
+                m_vrtxCount ++;
+            }
+
+            // Read vertex buffer data as Vector3
+            //Vector3& vertA = *reinterpret_cast<Vector3*>(m_vrtxBuf.data()
+            //                        + (tri.m_corners[(i + 1) % 3]));
+            //Vector3& vertB = *reinterpret_cast<Vector3*>(m_vrtxBuf.data()
+            //                        + (tri.m_corners[(i + 2) % 3]));
+
+            Vector3 const& vertA = *reinterpret_cast<Vector3 const*>(
+                                        get_vertex_pos(tri.m_corners[(i + 1) % 3]));
+            Vector3 const& vertB = *reinterpret_cast<Vector3 const*>(
+                                        get_vertex_pos(tri.m_corners[(i + 2) % 3]));
+
+            Vector3 &midPos = *reinterpret_cast<Vector3*>(
+                                        get_vertex_pos(tri.m_midVrtxs[i]));
+
+            Vector3 &destNrm = *reinterpret_cast<Vector3*>(
+                                        get_vertex_nrm(tri.m_midVrtxs[i]));
+
+            //Vector3 vertM[2];
+            destNrm = ((vertA + vertB) / 2).normalized();
+            midPos = destNrm * float(m_radius);
+
+            //memcpy(m_vrtxBuf.data() + tri.m_midVrtxs[i],
+            //       vertM, m_vrtxSize * sizeof(float));
+        }
+        else
+        {
+            // Which side tri is on triB
+            int sideB = neighbour_side(triB, t);
+            //printf("Vertex is being shared\n");
+
+            // Instead of creating a new vertex, use the one from triB since
+            // it's already subdivided
+            tri.m_midVrtxs[i] = triB.m_midVrtxs[sideB];
+            //console.log(i + ": Used existing vertex");
+
+            // Set sides
+            // Side 0(bottom) corresponds to child 1(left), 2(right)
+            // Side 1(right) corresponds to child 2(right), 0(top)
+            // Side 2(left) corresponds to child 0(top), 1(left)
+
+            // triX/Y refers to the two triangles on the side of tri
+            // triBX/Y refers to the two triangles on the side of triB
+            trindex triX = tri.m_children + trindex((i + 1) % 3);
+            trindex triY = tri.m_children + trindex((i + 2) % 3);
+            trindex triBX = triB.m_children + trindex((sideB + 1) % 3);
+            trindex triBY = triB.m_children + trindex((sideB + 2) % 3);
+
+            // Assign the face of each triangle to the other triangle beside it
+            m_triangles[triX].m_neighbours[i] = triBY;
+            m_triangles[triY].m_neighbours[i] = triBX;
+            //m_triangles[triBX].m_neighbours[sideB] = triY;
+            //m_triangles[triBY].m_neighbours[sideB] = triX;
+            set_side_recurse(m_triangles[triBX], uint8_t(sideB), triY);
+            set_side_recurse(m_triangles[triBY], uint8_t(sideB), triX);
+
+            //printf("Set Tri%u %u to %u", triBX)
+        }
+
+    }
+
+    // Set verticies
+    set_verts(childA,
+            tri.m_corners[0], tri.m_midVrtxs[2], tri.m_midVrtxs[1]);
+    set_verts(childB,
+            tri.m_midVrtxs[2], tri.m_corners[1], tri.m_midVrtxs[0]);
+    set_verts(childC,
+            tri.m_midVrtxs[1], tri.m_midVrtxs[0], tri.m_corners[2]);
+    // The center triangle is made up of purely middle vertices.
+    set_verts(childD,
+            tri.m_midVrtxs[0], tri.m_midVrtxs[1], tri.m_midVrtxs[2]);
+
+    // Calculate centers
+    //calculate_center(childA);
+    //calculate_center(childB);
+    //calculate_center(childC);
+    //calculate_center(childD);
+
+    tri.m_bitmask ^= gc_triangleMaskSubdivided;
+
+    // subdivide if below minimum depth
+//    if (tri.m_depth < m_minDepth)
+//    {
+//        // Triangle vector might reallocate, so accessing tri after
+//        // subdivide_add will cause undefiend behaviour
+//        //URHO3D_LOGINFOF("depth: %i tri: %i", tri->m_depth, t);
+//        trindex childs = tri.m_children;
+//        subdivide_add(childs + 0);
+//        subdivide_add(childs + 1);
+//        subdivide_add(childs + 2);
+//        subdivide_add(childs + 3);
+//    }
+}
+
 
 void IcoSphereTree::set_neighbours(SubTriangle& tri,
                                    trindex bot,
@@ -176,6 +359,23 @@ void IcoSphereTree::set_verts(SubTriangle& tri, buindex top,
     tri.m_corners[0] = top;
     tri.m_corners[1] = lft;
     tri.m_corners[2] = rte;
+}
+
+/**
+ * Set a neighbour of a triangle, and apply for all of it's children's
+ * @param tri [ref] Reference to triangle
+ * @param side [in] Which side to set
+ * @param to [in] Neighbour to operate on
+ */
+void IcoSphereTree::set_side_recurse(SubTriangle& tri, int side, trindex to)
+{
+    tri.m_neighbours[side] = to;
+    if (tri.m_bitmask & gc_triangleMaskSubdivided) {
+        set_side_recurse(m_triangles[tri.m_children + ((side + 1) % 3)],
+                side, to);
+        set_side_recurse(m_triangles[tri.m_children + ((side + 2) % 3)],
+                side, to);
+    }
 }
 
 int IcoSphereTree::neighbour_side(const SubTriangle& tri,

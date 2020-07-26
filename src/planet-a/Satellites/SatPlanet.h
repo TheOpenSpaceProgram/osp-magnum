@@ -26,8 +26,12 @@ public:
 
     bool is_activatable() const override;
 
+
+    double m_radius;
+
 private:
 
+    ;
 
 };
 

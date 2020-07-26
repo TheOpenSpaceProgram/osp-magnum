@@ -213,7 +213,17 @@ void ActiveScene::floating_origin_translate(Vector3 const& amount)
 
 void ActiveScene::draw(entt::entity camera)
 {
-    m_renderOrder.call(camera);
+    //Matrix4 cameraProject;
+    //Matrix4 cameraInverse;
+
+    // TODO: check if camera has the right components
+    CompCamera& cameraComp = reg_get<CompCamera>(camera);
+    CompTransform& cameraTransform = reg_get<CompTransform>(camera);
+
+    //cameraProject = cameraComp.m_projection;
+    cameraComp.m_inverse = cameraTransform.m_transformWorld.inverted();
+
+    m_renderOrder.call(cameraComp);
 }
 
 MapSysMachine::iterator ActiveScene::system_machine_find(const std::string &name)

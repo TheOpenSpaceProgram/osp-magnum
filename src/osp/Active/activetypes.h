@@ -13,6 +13,8 @@ class SysNewton;
 
 class ActiveScene;
 
+struct CompCamera;
+
 constexpr unsigned gc_heir_physics_level = 1;
 
 // in case Newton Dynamics gets swapped out, one can implement a system class
@@ -24,8 +26,8 @@ using ActiveEnt = entt::entity;
 using UpdateOrder = FunctionOrder<void(void)>;
 using UpdateOrderHandle = FunctionOrderHandle<void(void)>;
 
-using RenderOrder = FunctionOrder<void(ActiveEnt)>;
-using RenderOrderHandle = FunctionOrderHandle<void(ActiveEnt)>;
+using RenderOrder = FunctionOrder<void(CompCamera const&)>;
+using RenderOrderHandle = FunctionOrderHandle<void(CompCamera const&)>;
 
 // not really sure what else to put in here
 class IDynamicSystem

@@ -56,6 +56,8 @@ public:
 
 
     float get_load_radius() const { return m_loadRadius; }
+    void set_load_radius(float loadRadius) { m_loadRadius = loadRadius; }
+
 
     /**
      * @return Display name for this Satellite

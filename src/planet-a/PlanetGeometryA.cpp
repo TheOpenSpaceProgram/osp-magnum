@@ -122,17 +122,39 @@ void PlanetGeometryA::initialize(float radius)
     m_initialized = true;
 
     // temporary: test chunking
-    chunk_add(0);
+    //chunk_add(0);
+    m_icoTree->subdivide_add(0); // adds triangles 20, 21, 22, 23
+    //chunk_add(20);
+    m_icoTree->subdivide_add(20); // adds triangles 23, 24, 25, 26
+    chunk_add(24);
+    chunk_add(25);
+    chunk_add(26);
+    chunk_add(27);
+
+    chunk_add(21);
+    chunk_add(22);
+    chunk_add(23);
+
     chunk_add(1);
     chunk_add(2);
     chunk_add(3);
     chunk_add(4);
-
+    chunk_add(5);
+    chunk_add(6);
+    chunk_add(7);
+    chunk_add(8);
+    chunk_add(9);
+    chunk_add(10);
+    chunk_add(11);
+    chunk_add(12);
+    chunk_add(13);
+    chunk_add(14);
     chunk_add(15);
     chunk_add(16);
     chunk_add(17);
     chunk_add(18);
     chunk_add(19);
+
 }
 
 
@@ -211,17 +233,17 @@ void PlanetGeometryA::chunk_add(trindex t)
     Vector3 dirRte = (rte - lft) / m_chunkWidthB;
     Vector3 dirDwn = (lft - top) / m_chunkWidthB;
 
-    std::cout << "lft: ("
-              << lft.x() << ", "
-              << lft.y() << ", "
-              << lft.z() << ") "
-              << "mag: " << top.length() << "\n";
+//    std::cout << "lft: ("
+//              << lft.x() << ", "
+//              << lft.y() << ", "
+//              << lft.z() << ") "
+//              << "mag: " << top.length() << "\n";
 
-    std::cout << "dirRte: ("
-              << dirRte.x() << ", "
-              << dirRte.y() << ", "
-              << dirRte.z() << ") "
-              << "mag: " << dirRte.length() << "\n";
+//    std::cout << "dirRte: ("
+//              << dirRte.x() << ", "
+//              << dirRte.y() << ", "
+//              << dirRte.z() << ") "
+//              << "mag: " << dirRte.length() << "\n";
 
 
     // Loop through neighbours and see which ones are already chunked to share
@@ -340,7 +362,7 @@ void PlanetGeometryA::chunk_add(trindex t)
             // maybe add something else to the buffer some day
 
 
-            std::cout << "o " << pos.x() << " " << pos.y() << " " << pos.z() << "\n";
+            // std::cout << "o " << pos.x() << " " << pos.y() << " " << pos.z() << "\n";
 
             indices[localIndex] = vertIndex;
             i ++;
@@ -446,9 +468,9 @@ bool PlanetGeometryA::get_shared_from_tri(buindex* sharedIndex,
     }
     else if (tri.m_bitmask & gc_triangleMaskSubdivided)
     {
-        // Children might be chunked, recurse into child
+        // TODO: Children might be chunked, recurse into child
         *sharedIndex = 0;
-        return true;
+        return false;
     }
     else
     {

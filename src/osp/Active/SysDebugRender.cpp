@@ -22,24 +22,13 @@ SysDebugRender::SysDebugRender(ActiveScene &rScene) :
 
 }
 
-void SysDebugRender::draw(ActiveEnt camera)
+void SysDebugRender::draw(CompCamera const& camera)
 {
     using Magnum::GL::Renderer;
 
     Renderer::enable(Renderer::Feature::DepthTest);
     Renderer::enable(Renderer::Feature::FaceCulling);
 
-    Matrix4 cameraProject;
-    Matrix4 cameraInverse;
-
-    {
-        // TODO: check if camera has the right components
-        CompCamera& cameraComp = m_scene.reg_get<CompCamera>(camera);
-        CompTransform& cameraTransform = m_scene.reg_get<CompTransform>(camera);
-
-        cameraProject = cameraComp.m_projection;
-        cameraInverse = cameraTransform.m_transformWorld.inverted();
-    }
 
     auto drawGroup = m_scene.get_registry().group<CompDrawableDebug>(
                             entt::get<CompTransform>);
@@ -51,17 +40,17 @@ void SysDebugRender::draw(ActiveEnt camera)
         CompDrawableDebug& drawable = drawGroup.get<CompDrawableDebug>(entity);
         CompTransform& transform = drawGroup.get<CompTransform>(entity);
 
-        entRelative = cameraInverse * transform.m_transformWorld;
+        entRelative = camera.m_inverse * transform.m_transformWorld;
 
         (*drawable.m_shader)
-            .setDiffuseColor(drawable.m_color)
-            .setAmbientColor(0x111111_rgbf)
-            .setSpecularColor(0x330000_rgbf)
-            .setLightPosition({10.0f, 15.0f, 5.0f})
-            .setTransformationMatrix(entRelative)
-            .setProjectionMatrix(cameraProject)
-            .setNormalMatrix(entRelative.normalMatrix())
-            .draw(*(drawable.m_mesh));
+                .setDiffuseColor(drawable.m_color)
+                .setAmbientColor(0x111111_rgbf)
+                .setSpecularColor(0x330000_rgbf)
+                .setLightPosition({10.0f, 15.0f, 5.0f})
+                .setTransformationMatrix(entRelative)
+                .setProjectionMatrix(camera.m_projection)
+                .setNormalMatrix(entRelative.normalMatrix())
+                .draw(*(drawable.m_mesh));
 
         //std::cout << "render! \n";
     }

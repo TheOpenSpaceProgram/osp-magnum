@@ -315,6 +315,8 @@ void load_a_bunch_of_stuff()
     // Add a planet too
     osp::Satellite& planet = g_osp.get_universe().sat_create();
     planet.create_object<osp::SatPlanet>();
+    planet.set_load_radius(600);
+    planet.set_position({{0, 0, 1024 * -(128 + 12)}, 10});
 
     //s_partsLoaded = true;
 }

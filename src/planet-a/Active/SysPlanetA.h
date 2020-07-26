@@ -1,7 +1,6 @@
 #pragma once
 
-#include <Magnum/Shaders/Phong.h>
-
+#include <Magnum/Shaders/MeshVisualizer.h>
 #include <Magnum/GL/Mesh.h>
 
 #include <osp/Satellite.h>
@@ -17,11 +16,16 @@ namespace osp
 
 struct CompPlanet
 {
+
+
     PlanetGeometryA m_planet;
-    //Magnum::GL::Mesh m_mesh;
-    std::unique_ptr<Magnum::Shaders::Phong> m_shader;
-    Magnum::GL::Buffer m_vrtxBufGL(Magnum::NoCreateT());
-    Magnum::GL::Buffer m_indxBufGL(Magnum::NoCreateT());
+    Magnum::GL::Mesh m_mesh{};
+    Magnum::Shaders::MeshVisualizer3D m_shader{
+            Magnum::Shaders::MeshVisualizer3D::Flag::Wireframe
+            | Magnum::Shaders::MeshVisualizer3D::Flag::NormalDirection};
+    Magnum::GL::Buffer m_vrtxBufGL{};
+    Magnum::GL::Buffer m_indxBufGL{};
+    double m_radius;
 };
 
 
@@ -35,7 +39,7 @@ public:
     SysPlanetA(ActiveScene &scene);
     ~SysPlanetA() = default;
 
-    void update_render();
+    void draw(CompCamera const& camera);
 
     void update_geometry();
 
@@ -48,6 +52,7 @@ private:
     UpdateOrderHandle m_updateGeometry;
     UpdateOrderHandle m_updatePhysics;
 
+    RenderOrderHandle m_renderPlanetDraw;
 };
 
 }

@@ -11,10 +11,6 @@ namespace osp
 
 struct UpdateRange;
 
-static constexpr std::uint8_t gc_triangleMaskSubdivided = 0b0001;
-static constexpr std::uint8_t gc_triangleMaskChunked    = 0b0010;
-
-
 // based on urho-osp PlanetWrenderer.cpp
 // variable names changed:
 // m_chunkCount           -> m_chunkCount
@@ -60,6 +56,8 @@ public:
     std::vector<float> const& get_vertex_buffer() { return m_vrtxBuffer; }
     std::vector<unsigned> const& get_index_buffer() { return m_indxBuffer; }
     buindex calc_index_count() { return m_chunkCount * m_indxPerChunk * 3; }
+
+    IcoSphereTree* get_ico_tree() { return m_icoTree.get(); }
 
 
 private:

@@ -29,7 +29,6 @@ public:
 
     bool is_activatable() const override;
 
-
     BlueprintVehicle& get_blueprint();
 
     DependRes<BlueprintVehicle>& get_blueprint_depend()
