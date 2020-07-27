@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <stack>
 #include <array>
@@ -18,7 +19,7 @@ void PlanetGeometryA::initialize(float radius)
     m_chunkMax = 100;
 
     m_chunkAreaThreshold = 0.04f;
-    m_chunkWidth = 33; // MUST BE (POWER OF 2) + 1
+    m_chunkWidth = 17; // MUST BE (POWER OF 2) + 1
     m_chunkWidthB = m_chunkWidth - 1; // used often in many calculations
 
     m_icoTree = std::make_shared<IcoSphereTree>();
@@ -286,6 +287,13 @@ void PlanetGeometryA::chunk_add(trindex t)
                 VertexToSubdiv{0, m_chunkWidthB, 0},
                 VertexToSubdiv{m_chunkWidthB, m_chunkWidthB, 0}};
 
+    // make sure shared corners can be tracked properly
+    unsigned minSize = std::max({tri.m_corners[0] / m_icoTree->m_vrtxSize + 1,
+                                 tri.m_corners[1] / m_icoTree->m_vrtxSize + 1,
+                                 tri.m_corners[2] / m_icoTree->m_vrtxSize + 1,
+                                 (unsigned) m_vrtxSharedIcoCorners.size()});
+    m_vrtxSharedIcoCorners.resize(minSize, m_vrtxSharedMax);
+
     // Get neighbours and get/create 3 shared vertices for the first triangle
     for (int side = 0; side < 3; side ++)
     {
@@ -293,8 +301,36 @@ void PlanetGeometryA::chunk_add(trindex t)
         neighbourSide[side] = m_icoTree->neighbour_side(*neighbours[side], t);
         //neighbourDepths[i] = (triB->m_bitmask & gc_triangleMaskChunked);
 
+        int corner = (side + 2) % 3;
+
         unsigned vertIndex;
-        shared_from_tri(vertIndex, *neighbours[side], neighbourSide[side], 0);
+
+        buindex &sharedCorner = m_vrtxSharedIcoCorners[
+                                 tri.m_corners[corner] / m_icoTree->m_vrtxSize];
+
+        if (sharedCorner < m_vrtxSharedMax)
+        {
+            // a shared triangle can be taken from a corner
+            vertIndex = sharedCorner;
+            m_vrtxSharedUsers[vertIndex] ++;
+            std::cout << "Corner taken!\n";
+        }
+        else
+        {
+            if (shared_from_tri(vertIndex, *neighbours[side],
+                                            neighbourSide[side], 0))
+            {
+                // shared triangle taken from edge
+                // as of now this isn't possible yet
+                std::cout << "THIS SHOULDN'T HAPPEN, take note of this.\n";
+            }
+            else
+            {
+                // new shared triangle created
+            }
+
+            sharedCorner = vertIndex;
+        }
 
         auto vrtxOffset = m_vrtxBuffer.begin() + vertIndex * m_vrtxSize;
 
@@ -302,7 +338,7 @@ void PlanetGeometryA::chunk_add(trindex t)
         // side 1 sets corner 2
         // side 2 sets corner 0
 
-        int corner = (side + 2) % 3;
+
 
         initTri[corner].m_vrtxIndex = vertIndex;
         indices[((side + 1) % 3) * m_chunkWidthB] = vertIndex;
@@ -318,6 +354,7 @@ void PlanetGeometryA::chunk_add(trindex t)
         std::copy(vrtxDataRead + m_icoTree->m_vrtxCompOffsetNrm,
                   vrtxDataRead + m_icoTree->m_vrtxCompOffsetNrm + 3,
                   vrtxOffset + m_vrtxCompOffsetNrm);
+
 
 
         //std::cout << "corner: " << (corner * m_chunkWidthB) << "\n";

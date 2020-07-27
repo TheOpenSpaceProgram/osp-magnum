@@ -157,6 +157,10 @@ private:
     // Count how many times each shared chunk vertex is being used
     std::vector<uint8_t> m_vrtxSharedUsers;
 
+    // Associates IcoSphereTree verticies with a shared vertex
+    // Indices to m_vrtxSharedUsers, parallel with IcoSphereTree m_vrtxBuffer
+    std::vector<buindex> m_vrtxSharedIcoCorners;
+
     // Maps shared vertex indices to the index buffer, so that shared vertices
     // can be obtained from a chunk's index data
     std::vector<buindex> m_indToShared;

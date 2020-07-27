@@ -81,17 +81,17 @@ public:
 
     std::vector<float> const& get_vertex_buffer()
     {
-        return m_vrtxBuf;
+        return m_vrtxBuffer;
     }
 
     float* get_vertex_pos(buindex vrtOffset)
     {
-        return m_vrtxBuf.data() + vrtOffset + m_vrtxCompOffsetPos;
+        return m_vrtxBuffer.data() + vrtOffset + m_vrtxCompOffsetPos;
     }
 
     float* get_vertex_nrm(buindex nrmOffset)
     {
-        return m_vrtxBuf.data() + nrmOffset + m_vrtxCompOffsetNrm;
+        return m_vrtxBuffer.data() + nrmOffset + m_vrtxCompOffsetNrm;
     }
 
     float get_radius()
@@ -153,7 +153,7 @@ public:
 private:
 
     //PODVector<PlanetWrenderer> m_viewers;
-    std::vector<float> m_vrtxBuf;
+    std::vector<float> m_vrtxBuffer;
     std::vector<SubTriangle> m_triangles; // List of all triangles
     // List of indices to deleted triangles in the m_triangles
     std::vector<trindex> m_trianglesFree;

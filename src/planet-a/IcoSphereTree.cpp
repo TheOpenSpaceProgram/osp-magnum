@@ -90,7 +90,7 @@ void IcoSphereTree::initialize(float radius)
     m_vrtxCount = gc_icosahedronVertCount;
 
     // Reserve some space on the vertex buffer
-    m_vrtxBuf.resize(m_maxVertice * m_vrtxSize);
+    m_vrtxBuffer.resize(m_maxVertice * m_vrtxSize);
 
     float radiusScaleFactor = radius / scl;
     int icoCount = 0;
@@ -101,29 +101,29 @@ void IcoSphereTree::initialize(float radius)
     {
 
         // Add vertex data
-        m_vrtxBuf[i + m_vrtxCompOffsetPos + 0]
+        m_vrtxBuffer[i + m_vrtxCompOffsetPos + 0]
                 = icosahedronVerts[icoCount + 0] * radiusScaleFactor;
-        m_vrtxBuf[i + m_vrtxCompOffsetPos + 1]
+        m_vrtxBuffer[i + m_vrtxCompOffsetPos + 1]
                 = icosahedronVerts[icoCount + 1] * radiusScaleFactor;
-        m_vrtxBuf[i + m_vrtxCompOffsetPos + 2]
+        m_vrtxBuffer[i + m_vrtxCompOffsetPos + 2]
                 = icosahedronVerts[icoCount + 2] * radiusScaleFactor;
 
         // Add normal data (just a normalized vertex)
-        m_vrtxBuf[i + m_vrtxCompOffsetNrm + 0]
+        m_vrtxBuffer[i + m_vrtxCompOffsetNrm + 0]
                 = icosahedronVerts[icoCount + 0] / scl;
-        m_vrtxBuf[i + m_vrtxCompOffsetNrm + 1]
+        m_vrtxBuffer[i + m_vrtxCompOffsetNrm + 1]
                 = icosahedronVerts[icoCount + 1] / scl;
-        m_vrtxBuf[i + m_vrtxCompOffsetNrm + 2]
+        m_vrtxBuffer[i + m_vrtxCompOffsetNrm + 2]
                 = icosahedronVerts[icoCount + 2] / scl;
 
 
 
-        std::cout << "(" << m_vrtxBuf[i] << ", "
-                         << m_vrtxBuf[i + 1] << ", "
-                         <<  m_vrtxBuf[i + 2] << ") "
-                  << "mag: " << sqrt(m_vrtxBuf[i]*m_vrtxBuf[i]
-                                     + m_vrtxBuf[i+1]*m_vrtxBuf[i+1]
-                                     + m_vrtxBuf[i+2]*m_vrtxBuf[i+2])
+        std::cout << "(" << m_vrtxBuffer[i] << ", "
+                         << m_vrtxBuffer[i + 1] << ", "
+                         <<  m_vrtxBuffer[i + 2] << ") "
+                  << "mag: " << sqrt(m_vrtxBuffer[i]*m_vrtxBuffer[i]
+                                     + m_vrtxBuffer[i+1]*m_vrtxBuffer[i+1]
+                                     + m_vrtxBuffer[i+2]*m_vrtxBuffer[i+2])
                   << "\n";
 
         icoCount += 3;
@@ -248,9 +248,9 @@ void IcoSphereTree::subdivide_add(trindex t)
             }
 
             // Read vertex buffer data as Vector3
-            //Vector3& vertA = *reinterpret_cast<Vector3*>(m_vrtxBuf.data()
+            //Vector3& vertA = *reinterpret_cast<Vector3*>(m_vrtxBuffer.data()
             //                        + (tri.m_corners[(i + 1) % 3]));
-            //Vector3& vertB = *reinterpret_cast<Vector3*>(m_vrtxBuf.data()
+            //Vector3& vertB = *reinterpret_cast<Vector3*>(m_vrtxBuffer.data()
             //                        + (tri.m_corners[(i + 2) % 3]));
 
             Vector3 const& vertA = *reinterpret_cast<Vector3 const*>(
@@ -268,7 +268,7 @@ void IcoSphereTree::subdivide_add(trindex t)
             destNrm = ((vertA + vertB) / 2).normalized();
             midPos = destNrm * float(m_radius);
 
-            //memcpy(m_vrtxBuf.data() + tri.m_midVrtxs[i],
+            //memcpy(m_vrtxBuffer.data() + tri.m_midVrtxs[i],
             //       vertM, m_vrtxSize * sizeof(float));
         }
         else
