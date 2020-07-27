@@ -1,7 +1,10 @@
 #include <iostream>
+#include <stack>
+#include <array>
 
 #include <Magnum/Math/Functions.h>
 #include <osp/types.h>
+
 
 #include "PlanetGeometryA.h"
 
@@ -15,7 +18,7 @@ void PlanetGeometryA::initialize(float radius)
     m_chunkMax = 100;
 
     m_chunkAreaThreshold = 0.04f;
-    m_chunkWidth = 5;
+    m_chunkWidth = 33; // MUST BE (POWER OF 2) + 1
     m_chunkWidthB = m_chunkWidth - 1; // used often in many calculations
 
     m_icoTree = std::make_shared<IcoSphereTree>();
@@ -125,7 +128,7 @@ void PlanetGeometryA::initialize(float radius)
     //chunk_add(0);
     m_icoTree->subdivide_add(0); // adds triangles 20, 21, 22, 23
     //chunk_add(20);
-    m_icoTree->subdivide_add(20); // adds triangles 23, 24, 25, 26
+    m_icoTree->subdivide_add(20); // adds triangles 24, 25, 26, 27
     chunk_add(24);
     chunk_add(25);
     chunk_add(26);
@@ -189,6 +192,11 @@ constexpr unsigned PlanetGeometryA::get_index(int x, int y) const
     return unsigned(y * (y + 1) / 2 + x);
 }
 
+struct VertexToSubdiv
+{
+    unsigned m_x, m_y;
+    unsigned m_vrtxIndex;
+};
 
 void PlanetGeometryA::chunk_add(trindex t)
 {
@@ -219,7 +227,7 @@ void PlanetGeometryA::chunk_add(trindex t)
     //
     //     <----> m_chunkResolution
 
-    std::vector<float> const& icoVerts = m_icoTree->get_vertex_buffer();
+    //std::vector<float> const& icoVerts = m_icoTree->get_vertex_buffer();
 
     // top, left, and right vertices of triangle from IcoSphereTree
     Vector3 const& top = *reinterpret_cast<Vector3 const*>(
@@ -229,9 +237,8 @@ void PlanetGeometryA::chunk_add(trindex t)
     Vector3 const& rte = *reinterpret_cast<Vector3 const*>(
                                 m_icoTree->get_vertex_pos(tri.m_corners[2]));
 
-
-    Vector3 dirRte = (rte - lft) / m_chunkWidthB;
-    Vector3 dirDwn = (lft - top) / m_chunkWidthB;
+    //Vector3 dirRte = (rte - lft) / m_chunkWidthB;
+    //Vector3 dirDwn = (lft - top) / m_chunkWidthB;
 
 //    std::cout << "lft: ("
 //              << lft.x() << ", "
@@ -249,23 +256,13 @@ void PlanetGeometryA::chunk_add(trindex t)
     // Loop through neighbours and see which ones are already chunked to share
     // vertices with
 
-    //uint8_t neighbourDepths[3];
-    SubTriangle* neighbours[3];
-    int neighbourSide[3]; // Side of tri relative to neighbour's
-
-    for (int i = 0; i < 3; i ++)
-    {
-        neighbours[i] = &(m_icoTree->get_triangle(tri.m_neighbours[i]));
-        neighbourSide[i] = m_icoTree->neighbour_side(*neighbours[i], t);
-        //neighbourDepths[i] = (triB->m_bitmask & gc_triangleMaskChunked);
-    }
-
     // Take the space at the end of the chunk buffer
     tri.m_chunk = m_chunkCount;
 
     if (m_vrtxFree.size() == 0) {
         //
-        tri.m_chunkVrtx = m_vrtxSharedMax + m_chunkCount
+        tri.m_chunkVrtx = m_vrtxSharedMax
+                        + m_chunkCount
                             * (m_vrtxPerChunk - m_vrtxSharedPerChunk);
     }
     else
@@ -275,105 +272,206 @@ void PlanetGeometryA::chunk_add(trindex t)
         m_vrtxFree.pop_back();
     }
 
-    static std::vector<unsigned> indices;
-    indices.resize(m_vrtxPerChunk);
+    std::vector<int> indices(m_vrtxPerChunk, -1);
 
-    unsigned middleIndex = 0;
-    int i = 0;
-    for (int y = 0; y < int(m_chunkWidth); y ++)
+
+    using TriToSubdiv_t = std::array<VertexToSubdiv, 3>;
+
+    //uint8_t neighbourDepths[3];
+    SubTriangle* neighbours[3];
+    int neighbourSide[3]; // Side of tri relative to neighbour's
+
+    TriToSubdiv_t initTri{
+                VertexToSubdiv{0, 0, 0},
+                VertexToSubdiv{0, m_chunkWidthB, 0},
+                VertexToSubdiv{m_chunkWidthB, m_chunkWidthB, 0}};
+
+    // Get neighbours and get/create 3 shared vertices for the first triangle
+    for (int side = 0; side < 3; side ++)
     {
-        // Loops once, then twice, then thrice, etc...
-        // because a triangle starts with 1 vertex at the top
-        // 2 next row, 3 next, 4 next, 5 next, etc...
-        for (int x = 0; x <= y; x ++)
+        neighbours[side] = &(m_icoTree->get_triangle(tri.m_neighbours[side]));
+        neighbourSide[side] = m_icoTree->neighbour_side(*neighbours[side], t);
+        //neighbourDepths[i] = (triB->m_bitmask & gc_triangleMaskChunked);
+
+        unsigned vertIndex;
+        shared_from_tri(vertIndex, *neighbours[side], neighbourSide[side], 0);
+
+        auto vrtxOffset = m_vrtxBuffer.begin() + vertIndex * m_vrtxSize;
+
+        // side 0 sets corner 1
+        // side 1 sets corner 2
+        // side 2 sets corner 0
+
+        int corner = (side + 2) % 3;
+
+        initTri[corner].m_vrtxIndex = vertIndex;
+        indices[((side + 1) % 3) * m_chunkWidthB] = vertIndex;
+
+        float *vrtxDataRead = m_icoTree->get_vertex_pos(tri.m_corners[corner]);
+
+        // Copy Icotree's position and normal data to vertex buffer
+
+        std::copy(vrtxDataRead + m_icoTree->m_vrtxCompOffsetPos,
+                  vrtxDataRead + m_icoTree->m_vrtxCompOffsetPos + 3,
+                  vrtxOffset + m_vrtxCompOffsetPos);
+
+        std::copy(vrtxDataRead + m_icoTree->m_vrtxCompOffsetNrm,
+                  vrtxDataRead + m_icoTree->m_vrtxCompOffsetNrm + 3,
+                  vrtxOffset + m_vrtxCompOffsetNrm);
+
+
+        //std::cout << "corner: " << (corner * m_chunkWidthB) << "\n";
+    }
+
+    // subdivide the triangle multiple times
+
+    // top, left, right
+
+    std::stack<TriToSubdiv_t> m_toSubdiv;
+
+    // add the first triangle
+    m_toSubdiv.push(initTri);
+    //m_toSubdiv.emplace(TriToSubdiv_t{
+    //        VertexToSubdiv{0, 0, 0},
+    //        VertexToSubdiv{0, m_chunkWidthB, m_chunkWidthB},
+    //        VertexToSubdiv{m_chunkWidthB, m_chunkWidthB, 2 * m_chunkWidthB}});
+
+    // keep track of the non-shared center chunk vertices
+    unsigned centerIndex = 0;
+
+    while (!m_toSubdiv.empty())
+    {
+        // top, left, right
+        TriToSubdiv_t const triSub = m_toSubdiv.top();
+        m_toSubdiv.pop();
+
+        // subdivide and create middle vertices
+
+        // v = vertices of current triangle
+        // m = mid, middle vertices to calculate: bottom, left, right
+        // t = center of next triangles to subdivide: top, left, right
+
+        //            v0
+        //
+        //            t0
+        //
+        //      m1          m2
+        //
+        //      t1    t3    t2
+        //
+        // v1         m0         v2
+
+        std::cout << "newtri\n";
+
+        VertexToSubdiv mid[3];
+
+        // loop through midverts
+        for (int i = 0; i < 3; i ++)
         {
-            unsigned vertIndex;
-            unsigned localIndex = get_index_ringed(x, y);
+            VertexToSubdiv const &vrtxSubA = triSub[(2 + 3 - i) % 3];
+            VertexToSubdiv const &vrtxSubB = triSub[(1 + 3 - i) % 3];
+
+            mid[i].m_x = (vrtxSubA.m_x + vrtxSubB.m_x) / 2;
+            mid[i].m_y = (vrtxSubA.m_y + vrtxSubB.m_y) / 2;
+
+            unsigned localIndex = get_index_ringed(mid[i].m_x, mid[i].m_y);
+            //unsigned vertIndex;
+
+
+            std::cout << localIndex << "\n";
+
+
+            if (indices[localIndex] != -1)
+            {
+                // skip if midvert already exists
+                mid[i].m_vrtxIndex = indices[localIndex];
+                continue;
+            }
 
             if (localIndex < m_vrtxSharedPerChunk)
             {
+                // Current vertex is shared (on the edge), try to grab an
+                // existing vertex from a neighbouring triangle
 
                 // Both of these should get optimized into a single div op
                 unsigned side = localIndex / m_chunkWidthB;
                 unsigned sideInd = localIndex % m_chunkWidthB;
-                // side 0: Bottom
-                // side 1: Right
-                // side 2: Left
 
                 float pos = 1.0f - float(sideInd + 1.0f) / float(m_chunkWidth);
 
                 // Take a vertex from a neighbour, if possible
-                if (get_shared_from_tri(&vertIndex, *neighbours[side],
-                                        neighbourSide[side], pos))
-                {
-                    // increment number of users and stuff
-
-                }
-                else
-                {
-                    // If not, Make a new shared vertex
-
-                    // Indices from 0 to m_vrtxSharedMax
-                    if (m_vrtxSharedCount + 1 >= m_vrtxSharedMax)
-                    {
-                        //URHO3D_LOGERROR("Max Shared Vertices for Chunk");
-                        return;
-                    }
-                    if (m_vrtxSharedFree.size() == 0) {
-                        vertIndex = m_vrtxSharedCount;
-                    }
-                    else
-                    {
-                        vertIndex = m_vrtxSharedFree.back();
-                        m_vrtxSharedFree.pop_back();
-                    }
-
-                    m_vrtxSharedCount ++;
-                    m_vrtxSharedUsers[vertIndex] = 1;
-                }
+                shared_from_tri(mid[i].m_vrtxIndex, *neighbours[side],
+                                neighbourSide[side],
+                                int(pos * float(m_chunkWidth) + 0.5f));
             }
             else
             {
+                // Current vertex is in the center and is not shared
+
                 // Use a vertex from the space defined earler
-                vertIndex = tri.m_chunkVrtx + middleIndex;
+                mid[i].m_vrtxIndex = tri.m_chunkVrtx + centerIndex;
 
                 // Keep track of which middle index is being looped through
-                middleIndex ++;
+                centerIndex ++;
             }
 
-            Vector3 pos = top + (dirRte * x + dirDwn * y);
+            indices[localIndex] = mid[i].m_vrtxIndex;
+
+            float const* vrtxDataA = m_vrtxBuffer.data()
+                                        + vrtxSubA.m_vrtxIndex * m_vrtxSize;
+            float const* vrtxDataB = m_vrtxBuffer.data()
+                                        + vrtxSubB.m_vrtxIndex * m_vrtxSize;
+
+            Vector3 const& vrtxPosA = *reinterpret_cast<Vector3 const*>(
+                                            vrtxDataA + m_vrtxCompOffsetPos);
+            Vector3 const& vrtxPosB = *reinterpret_cast<Vector3 const*>(
+                                            vrtxDataB + m_vrtxCompOffsetPos);
+
+            Vector3 const& vertNrmA = *reinterpret_cast<Vector3 const*>(
+                                            vrtxDataA + m_vrtxCompOffsetPos);
+            Vector3 const& vertNrmB = *reinterpret_cast<Vector3 const*>(
+                                            vrtxDataB + m_vrtxCompOffsetPos);
+
+            auto vrtxDataMid = m_vrtxBuffer.begin() + mid[i].m_vrtxIndex * m_vrtxSize;
+
+            Vector3 pos = (vrtxPosA + vrtxPosB) * 0.5f;
             Vector3 nrm = pos.normalized();
 
             pos = nrm * float(m_icoTree->get_radius());
 
-            // Position and normal
-            //Vector3 vertM[2] = {pos, normal};
-
-            auto vrtxOffset = m_vrtxBuffer.begin() + vertIndex * m_vrtxSize;
-
             // Add Position data to vertex buffer
             std::copy(pos.data(), pos.data() + 3,
-                      vrtxOffset + m_vrtxCompOffsetPos);
+                      vrtxDataMid + m_vrtxCompOffsetPos);
 
             // Add Normal data to vertex buffer
             std::copy(nrm.data(), nrm.data() + 3,
-                      vrtxOffset + m_vrtxCompOffsetNrm);
-
-            // maybe add something else to the buffer some day
-
-
-            // std::cout << "o " << pos.x() << " " << pos.y() << " " << pos.z() << "\n";
-
-            indices[localIndex] = vertIndex;
-            i ++;
+                      vrtxDataMid + m_vrtxCompOffsetNrm);
         }
+
+        //Vector2i midvs[3] = {(verts[2] + verts[1]) / 2,
+        //                     (verts[1] + verts[0]) / 2,
+        //                     (verts[0] + verts[2]) / 2};
+
+        // return if not subdividable further, distance between two verts
+        // is 1
+        if (Magnum::Math::abs<int>(triSub[1].m_x - triSub[2].m_x) == 2)
+        {
+            continue;
+        }
+
+        // next triangles to subdivide
+        m_toSubdiv.emplace(TriToSubdiv_t{triSub[0],    mid[1],     mid[2]});
+        m_toSubdiv.emplace(TriToSubdiv_t{   mid[1], triSub[1],     mid[0]});
+        m_toSubdiv.emplace(TriToSubdiv_t{   mid[2],    mid[0],  triSub[2]});
+        m_toSubdiv.emplace(TriToSubdiv_t{   mid[0],    mid[2],     mid[1]});
     }
 
     // The data that will be pushed directly into the chunk index buffer
     // * 3 because there are 3 indices in a triangle
     std::vector<unsigned> chunkIndData(m_indxPerChunk * 3);
 
-    i = 0;
+
+    int i = 0;
     // indices array is now populated, connect the dots!
     for (int y = 0; y < int(m_chunkWidthB); y ++)
     {
@@ -429,12 +527,21 @@ void PlanetGeometryA::chunk_add(trindex t)
     tri.m_bitmask ^= gc_triangleMaskChunked;
 
 
+//    buindex muxi;
+//    static int fu = 0;
+//    shared_from_tri(muxi, tri, 0, fu);
+//    fu++;
+
+//    Vector3 & vrtxPosG = *reinterpret_cast<Vector3 *>(
+//                   m_vrtxBuffer.data() + muxi * m_vrtxSize + m_vrtxCompOffsetPos);
+
+//    vrtxPosG *= 0.0f;
 }
 
 
-bool PlanetGeometryA::get_shared_from_tri(buindex* sharedIndex,
-                                          SubTriangle const& tri,
-                                          unsigned side, float pos) const
+bool PlanetGeometryA::shared_from_tri(buindex& rSharedIndex,
+                                      SubTriangle const& tri,
+                                      unsigned side, int pos)
 {
 
     if (tri.m_bitmask & gc_triangleMaskChunked)
@@ -457,25 +564,50 @@ bool PlanetGeometryA::get_shared_from_tri(buindex* sharedIndex,
         // if resolution is 4 (4 vertices per edge), then localIndex is
         // a number from 0 to 8
 
-        buindex localIndex = side * m_chunkWidthB
-                                + std::round(pos * float(m_chunkWidth));
+        buindex localIndex = side * m_chunkWidthB + pos;
 
         // Loop around when value gets too high, because it's a triangle
         localIndex %= m_vrtxSharedPerChunk;
 
-        *sharedIndex = m_indxBuffer[tri.m_chunkIndx + m_indToShared[localIndex]];
+        rSharedIndex = m_indxBuffer[tri.m_chunkIndx + m_indToShared[localIndex]];
+
+        m_vrtxSharedUsers[rSharedIndex] ++;
+
+        std::cout << "grabbing vertex from side " << side << " pos: " << pos << "\n";
+
         return true;
     }
     else if (tri.m_bitmask & gc_triangleMaskSubdivided)
     {
         // TODO: Children might be chunked, recurse into child
-        *sharedIndex = 0;
+    }
+    //else
+    //{
+    //    // no communism today
+    //}
+
+    // If not, Make a new shared vertex
+
+    // Indices from 0 to m_vrtxSharedMax
+    if (m_vrtxSharedCount + 1 >= m_vrtxSharedMax)
+    {
+        // TODO: shared vertex buffer full, error!
         return false;
+    }
+    if (m_vrtxSharedFree.size() == 0)
+    {
+        rSharedIndex = m_vrtxSharedCount;
     }
     else
     {
-        return false;
+        rSharedIndex = m_vrtxSharedFree.back();
+        m_vrtxSharedFree.pop_back();
     }
+
+    m_vrtxSharedCount ++;
+    m_vrtxSharedUsers[rSharedIndex] = 1; // set reference count
+
+    return false;
 }
 
 }

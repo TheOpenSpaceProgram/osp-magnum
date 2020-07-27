@@ -52,11 +52,16 @@ class IcoSphereTree
 
 public:
 
+    // these aren't suppose to be const
     // 6 components per vertex
     // PosX, PosY, PosZ, NormX, NormY, NormZ
     static constexpr int m_vrtxSize = 6;
     static constexpr int m_vrtxCompOffsetPos = 0;
     static constexpr int m_vrtxCompOffsetNrm = 3;
+
+    // 1/2 of arc angle of icosahedron edge against circumscribed circle
+    // (1/2)theta = asin(2/sqrt(10 + 2sqrt(5)))
+    //static constexpr float sc_icoEdgeAngle = 0.553574358897f;
 
     IcoSphereTree() = default;
     ~IcoSphereTree() = default;

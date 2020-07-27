@@ -65,10 +65,8 @@ void IcoSphereTree::initialize(float radius)
     float hei = scl * ( 1.0f / sqrt(5.0f) );
     float cxA = scl * ( 1.0f/2.0f - sqrt(5.0f)/10.0f );
     float cxB = scl * ( 1.0f/2.0f + sqrt(5)/10.0f );
-    float syA = scl * ( 1.0f/10.0f
-                                  * sqrt( 10.0f*(5.0f + sqrt(5.0f)) ) );
-    float syB = scl * ( 1.0f/10.0f
-                                  * sqrt( 10.0f*(5.0f - sqrt(5.0f)) ) );
+    float syA = scl * ( 1.0f/10.0f * sqrt( 10.0f*(5.0f + sqrt(5.0f)) ) );
+    float syB = scl * ( 1.0f/10.0f * sqrt( 10.0f*(5.0f - sqrt(5.0f)) ) );
 
     float icosahedronVerts[] =
     {

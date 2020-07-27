@@ -122,10 +122,11 @@ private:
      * @param tri [in] Triangle to grab a
      * @param side [in] 0: bottom, 1: right, 2: left
      * @param pos [in] float from (usually) 0.0-1.0, position of vertex to grab
-     * @return true when a shared vertex can be taken from tri
+     * @return true when a shared vertex is grabbed successfully
+     *         false when a new shared vertex is created
      */
-    bool get_shared_from_tri(buindex* sharedIndex, const SubTriangle& tri,
-                             unsigned side, float pos) const;
+    bool shared_from_tri(buindex& rSharedIndex, const SubTriangle& tri,
+                         unsigned side, int pos);
 
 
     // 6 components per vertex
