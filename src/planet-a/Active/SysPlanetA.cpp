@@ -1,15 +1,14 @@
-#include <iostream>
+#include "../Satellites/SatPlanet.h"
+#include "SysPlanetA.h"
+
+#include <osp/Active/ActiveScene.h>
 
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
 
+#include <iostream>
 
-#include <osp/Active/ActiveScene.h>
-
-
-#include "../Satellites/SatPlanet.h"
-#include "SysPlanetA.h"
 
 // for _1, _2, _3, ... std::bind arguments
 using namespace std::placeholders;

@@ -8,13 +8,10 @@ namespace osp
 {
 
 // Index to a triangle
-using trindex = uint32_t;
-
-// Index to a chunk
-using chindex = uint32_t;
+using trindex_t = uint32_t;
 
 // Index to a buffer
-using buindex = uint32_t;
+using buindex_t = uint32_t;
 
 class IcoSphereTree;
 struct SubTriangle;
@@ -74,9 +71,14 @@ public:
      * @param t [in] Index to triangle
      * @return Pointer to triangle
      */
-    SubTriangle& get_triangle(trindex t)
+    SubTriangle& get_triangle(trindex_t t)
     {
         return m_triangles[t];
+    }
+
+    trindex_t triangle_count()
+    {
+        return m_triangles.size();
     }
 
     std::vector<float> const& get_vertex_buffer()
@@ -84,12 +86,12 @@ public:
         return m_vrtxBuffer;
     }
 
-    float* get_vertex_pos(buindex vrtOffset)
+    float* get_vertex_pos(buindex_t vrtOffset)
     {
         return m_vrtxBuffer.data() + vrtOffset + m_vrtxCompOffsetPos;
     }
 
-    float* get_vertex_nrm(buindex nrmOffset)
+    float* get_vertex_nrm(buindex_t nrmOffset)
     {
         return m_vrtxBuffer.data() + nrmOffset + m_vrtxCompOffsetNrm;
     }
@@ -106,8 +108,8 @@ public:
      * @param rte [in] Right
      * @param lft [in] Left
      */
-    static void set_neighbours(SubTriangle& tri, trindex bot,
-                               trindex rte, trindex lft);
+    static void set_neighbours(SubTriangle& tri, trindex_t bot,
+                               trindex_t rte, trindex_t lft);
 
     /**
      * A quick way to set vertices of a triangle
@@ -116,10 +118,10 @@ public:
      * @param lft Left
      * @param rte Right
      */
-    static void set_verts(SubTriangle& tri, buindex top,
-                          buindex lft, buindex rte);
+    static void set_verts(SubTriangle& tri, buindex_t top,
+                          buindex_t lft, buindex_t rte);
 
-    void set_side_recurse(SubTriangle& tri, int side, trindex to);
+    void set_side_recurse(SubTriangle& tri, int side, trindex_t to);
 
     /**
      * Find which side a triangle is on another triangle
@@ -128,21 +130,21 @@ public:
      * @return Neighbour index (0 - 2), or bottom, left, or right
      */
     static int neighbour_side(const SubTriangle& tri,
-                              const trindex lookingFor);
+                              const trindex_t lookingFor);
 
 
     /**
      * Subdivide a triangle into 4 more
      * @param [in] Triangle to subdivide
      */
-    void subdivide_add(trindex t);
+    void subdivide_add(trindex_t t);
 
     /**
      * Unsubdivide a triangle.
      * Removes children and sets neighbours of neighbours
      * @param t [in] Index of triangle to unsubdivide
      */
-    void subdivide_remove(trindex t);
+    void subdivide_remove(trindex_t t);
 
     /**
      * Calculates and sets m_center
@@ -156,17 +158,17 @@ private:
     std::vector<float> m_vrtxBuffer;
     std::vector<SubTriangle> m_triangles; // List of all triangles
     // List of indices to deleted triangles in the m_triangles
-    std::vector<trindex> m_trianglesFree;
-    std::vector<buindex> m_vrtxFree; // Deleted vertices in m_vertBuf
-    // use "m_indDomain[buindex]" to get a triangle index
+    std::vector<trindex_t> m_trianglesFree;
+    std::vector<buindex_t> m_vrtxFree; // Deleted vertices in m_vertBuf
+    // use "m_indDomain[buindex_t]" to get a triangle index
 
     unsigned m_maxDepth;
     unsigned m_minDepth; // never subdivide below this
 
-    buindex m_maxVertice;
-    buindex m_maxTriangles;
+    buindex_t m_maxVertice;
+    buindex_t m_maxTriangles;
 
-    buindex m_vrtxCount;
+    buindex_t m_vrtxCount;
 
     float m_radius;
 };
@@ -175,9 +177,9 @@ private:
 // Triangle on the IcoSphereTree
 struct SubTriangle
 {
-    trindex m_parent;
-    trindex m_neighbours[3];
-    buindex m_corners[3]; // to vertex buffer, 3 corners of triangle
+    trindex_t m_parent;
+    trindex_t m_neighbours[3];
+    buindex_t m_corners[3]; // to vertex buffer, 3 corners of triangle
 
     //bool subdivided;
     uint8_t m_bitmask;
@@ -186,14 +188,14 @@ struct SubTriangle
     // Data used when subdivided
 
     // index to first child, always has 4 children if subdivided
-    trindex m_children;
-    buindex m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
-    buindex m_index; // to index buffer
+    trindex_t m_children;
+    buindex_t m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
+    buindex_t m_index; // to index buffer
 
     // Data used when chunked
-    chindex m_chunk; // Index to chunk. (First triangle ever chunked will be 0)
-    buindex m_chunkIndx; // Index to index data in the index buffer
-    buindex m_chunkVrtx; // Index to vertex data
+    //unsigned m_chunk; // Index to chunk. (First triangle ever chunked will be 0)
+    //buindex_t m_chunkIndx; // Index to index data in the index buffer
+    //buindex_t m_chunkVrtx; // Index to vertex data
 };
 
 }

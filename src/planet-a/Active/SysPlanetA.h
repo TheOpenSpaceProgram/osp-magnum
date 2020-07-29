@@ -1,14 +1,15 @@
 #pragma once
 
-#include <Magnum/Shaders/MeshVisualizer.h>
-#include <Magnum/GL/Mesh.h>
+#include "../PlanetGeometryA.h"
 
 #include <osp/Satellite.h>
 #include <osp/Satellites/SatActiveArea.h>
 
 #include <osp/Active/activetypes.h>
 
-#include "../PlanetGeometryA.h"
+#include <Magnum/Shaders/MeshVisualizer.h>
+#include <Magnum/GL/Mesh.h>
+
 
 namespace osp
 

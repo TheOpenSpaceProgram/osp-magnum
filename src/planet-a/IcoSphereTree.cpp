@@ -1,9 +1,10 @@
-#include <cmath>
-#include <iostream>
+#include "IcoSphereTree.h"
 
 #include <osp/types.h>
 
-#include "IcoSphereTree.h"
+#include <cmath>
+#include <iostream>
+
 
 namespace osp
 {
@@ -161,7 +162,7 @@ void IcoSphereTree::initialize(float radius)
 
 }
 
-void IcoSphereTree::subdivide_add(trindex t)
+void IcoSphereTree::subdivide_add(trindex_t t)
 {
     // if bottom triangle is deeper, use that vertex
     // same with left and right
@@ -170,7 +171,7 @@ void IcoSphereTree::subdivide_add(trindex t)
 
     // Add the 4 new triangles
     // Top Left Right Center
-    trindex childrenIndex;
+    trindex_t childrenIndex;
     if (m_trianglesFree.size() == 0)
     {
         // Make new triangles
@@ -182,7 +183,7 @@ void IcoSphereTree::subdivide_add(trindex t)
         // Free triangles always come in groups of 4
         // as triangles are always deleted in groups of 4
         // pop doesn't return the value for Urho, so save last element then pop
-        const trindex j = m_trianglesFree[m_trianglesFree.size() - 1];
+        const trindex_t j = m_trianglesFree[m_trianglesFree.size() - 1];
         m_trianglesFree.pop_back();
         childrenIndex = j;
         //tri->children[1] = j + 1;
@@ -289,10 +290,10 @@ void IcoSphereTree::subdivide_add(trindex t)
 
             // triX/Y refers to the two triangles on the side of tri
             // triBX/Y refers to the two triangles on the side of triB
-            trindex triX = tri.m_children + trindex((i + 1) % 3);
-            trindex triY = tri.m_children + trindex((i + 2) % 3);
-            trindex triBX = triB.m_children + trindex((sideB + 1) % 3);
-            trindex triBY = triB.m_children + trindex((sideB + 2) % 3);
+            trindex_t triX = tri.m_children + trindex_t((i + 1) % 3);
+            trindex_t triY = tri.m_children + trindex_t((i + 2) % 3);
+            trindex_t triBX = triB.m_children + trindex_t((sideB + 1) % 3);
+            trindex_t triBY = triB.m_children + trindex_t((sideB + 2) % 3);
 
             // Assign the face of each triangle to the other triangle beside it
             m_triangles[triX].m_neighbours[i] = triBY;
@@ -332,7 +333,7 @@ void IcoSphereTree::subdivide_add(trindex t)
 //        // Triangle vector might reallocate, so accessing tri after
 //        // subdivide_add will cause undefiend behaviour
 //        //URHO3D_LOGINFOF("depth: %i tri: %i", tri->m_depth, t);
-//        trindex childs = tri.m_children;
+//        trindex_t childs = tri.m_children;
 //        subdivide_add(childs + 0);
 //        subdivide_add(childs + 1);
 //        subdivide_add(childs + 2);
@@ -342,17 +343,17 @@ void IcoSphereTree::subdivide_add(trindex t)
 
 
 void IcoSphereTree::set_neighbours(SubTriangle& tri,
-                                   trindex bot,
-                                   trindex rte,
-                                   trindex lft)
+                                   trindex_t bot,
+                                   trindex_t rte,
+                                   trindex_t lft)
 {
     tri.m_neighbours[0] = bot;
     tri.m_neighbours[1] = rte;
     tri.m_neighbours[2] = lft;
 }
 
-void IcoSphereTree::set_verts(SubTriangle& tri, buindex top,
-                              buindex lft, buindex rte)
+void IcoSphereTree::set_verts(SubTriangle& tri, buindex_t top,
+                              buindex_t lft, buindex_t rte)
 {
     tri.m_corners[0] = top;
     tri.m_corners[1] = lft;
@@ -365,7 +366,7 @@ void IcoSphereTree::set_verts(SubTriangle& tri, buindex top,
  * @param side [in] Which side to set
  * @param to [in] Neighbour to operate on
  */
-void IcoSphereTree::set_side_recurse(SubTriangle& tri, int side, trindex to)
+void IcoSphereTree::set_side_recurse(SubTriangle& tri, int side, trindex_t to)
 {
     tri.m_neighbours[side] = to;
     if (tri.m_bitmask & gc_triangleMaskSubdivided) {
@@ -377,7 +378,7 @@ void IcoSphereTree::set_side_recurse(SubTriangle& tri, int side, trindex to)
 }
 
 int IcoSphereTree::neighbour_side(const SubTriangle& tri,
-                                   const trindex lookingFor)
+                                   const trindex_t lookingFor)
 {
     // Loop through neighbours on the edges. child 4 (center) is not considered
     // as all it's neighbours are its siblings

@@ -1,13 +1,23 @@
 #pragma once
 
-#include <cstdint>
-#include <memory>
-#include <vector>
-
 #include "IcoSphereTree.h"
+
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <unordered_map>
+#include <vector>
 
 namespace osp
 {
+
+// Index to a chunk
+using chindex_t = uint32_t;
+
+// Index to a vertex
+using vrindex_t = uint32_t;
+
+constexpr chindex_t gc_invalidChunk = std::numeric_limits<chindex_t>::max();
 
 struct UpdateRange;
 
@@ -29,6 +39,17 @@ struct UpdateRange;
 // m_chunkSharedCount     -> m_vrtxSharedPerChunk
 // m_chunkSize            -> m_vrtxPerChunk
 // m_chunkSizeInd         -> m_indPerChunk
+
+
+struct SubTriangleChunk
+{
+    // Index to chunk. (First triangle ever chunked will be 0)
+    // equal to m_chunkMax when not chunked
+    chindex_t m_chunk;
+    buindex_t m_chunkIndx; // Index to index data in the index buffer
+    buindex_t m_chunkVrtx; // Index to vertex data
+};
+
 
 class PlanetGeometryA
 {
@@ -55,7 +76,7 @@ public:
 
     std::vector<float> const& get_vertex_buffer() { return m_vrtxBuffer; }
     std::vector<unsigned> const& get_index_buffer() { return m_indxBuffer; }
-    buindex calc_index_count() { return m_chunkCount * m_indxPerChunk * 3; }
+    buindex_t calc_index_count() { return m_chunkCount * m_indxPerChunk * 3; }
 
     IcoSphereTree* get_ico_tree() { return m_icoTree.get(); }
 
@@ -67,21 +88,20 @@ private:
      * (un)subdividing or chunking
      * @param t [in] Triangle to start with
      */
-    void sub_recurse(trindex t);
+    void sub_recurse(trindex_t t);
 
     /**
      *
      * @param t [in] Index of triangle to add chunk to
-     * @param gpuIgnore
      */
-    void chunk_add(trindex t);
+    void chunk_add(trindex_t t);
 
     /**
      * @brief chunk_remove
      * @param t
      * @param gpuIgnore
      */
-    void chunk_remove(trindex t);
+    void chunk_remove(trindex_t t);
 
     /**
      * Convert XY coordinates to a triangular number index
@@ -125,9 +145,13 @@ private:
      * @return true when a shared vertex is grabbed successfully
      *         false when a new shared vertex is created
      */
-    bool shared_from_tri(buindex& rSharedIndex, const SubTriangle& tri,
+    bool shared_from_tri(vrindex_t& rSharedIndex, const SubTriangleChunk& chunk,
                          unsigned side, int pos);
 
+
+    bool m_initialized = false;
+
+    std::shared_ptr<IcoSphereTree> m_icoTree;
 
     // 6 components per vertex
     // PosX, PosY, PosZ, NormX, NormY, NormZ
@@ -135,64 +159,69 @@ private:
     int m_vrtxCompOffsetPos = 0;
     int m_vrtxCompOffsetNrm = 3;
 
-    std::shared_ptr<IcoSphereTree> m_icoTree;
+
+
+    // Main buffer stuff
+
     std::vector<unsigned> m_indxBuffer;
     std::vector<float> m_vrtxBuffer;
 
-    chindex m_chunkCount; // How many chunks there are right now
+    // How much of m_vertBuffer is reserved for shared vertices
+    buindex_t m_vrtxSharedMax;
 
-    std::vector<trindex> m_chunkToTri; // Maps chunks to triangles
-    // Spots in the index buffer that want to die
-    //Urho3D::PODVector<chindex> m_chunkIndDeleteMe;
+    buindex_t m_vrtxMax; // Calculated max number of vertices
 
-    // List of deleted chunk data to overwrite
-    std::vector<buindex> m_vrtxFree;
-    // same as above but for individual shared verticies
-    std::vector<buindex> m_vrtxSharedFree;
 
+
+    // Chunk stuff
+
+    chindex_t m_chunkCount; // How many chunks there are right now
+
+    chindex_t m_chunkMax; // Max number of chunks
+
+    // parallel with IcoSphereTree's m_triangles
+    std::vector<SubTriangleChunk> m_triangleChunks;
+
+    std::vector<trindex_t> m_chunkToTri; // Maps chunks to triangles
+
+    std::vector<buindex_t> m_vrtxFree; // Deleted chunk data to overwrite
+
+    unsigned m_vrtxSharedPerChunk; // How many shared verticies per chunk
+    unsigned m_vrtxPerChunk; // How many vertices there are in each chunk
+    unsigned m_indxPerChunk; // How many triangles in each chunk
+    unsigned m_chunkWidth; // How many vertices wide each chunk is
+    unsigned m_chunkWidthB; // = m_chunkWidth - 1
+
+
+
+    // Shared Vertex stuff
+
+    buindex_t m_vrtxSharedCount; // Current number of shared vertices
+
+    // individual shared vertices that are deleted
+    std::vector<buindex_t> m_vrtxSharedFree;
+
+    // Count how many times each shared chunk vertex is being used
     // it's impossible for a shared vertex to have more than 6 users
     // Delete a shared vertex when it's users goes to zero
     // And use user count to calculate normals
-
-    // Count how many times each shared chunk vertex is being used
     std::vector<uint8_t> m_vrtxSharedUsers;
 
     // Associates IcoSphereTree verticies with a shared vertex
     // Indices to m_vrtxSharedUsers, parallel with IcoSphereTree m_vrtxBuffer
-    std::vector<buindex> m_vrtxSharedIcoCorners;
+    std::vector<buindex_t> m_vrtxSharedIcoCorners;
 
     // Maps shared vertex indices to the index buffer, so that shared vertices
     // can be obtained from a chunk's index data
-    std::vector<buindex> m_indToShared;
+    std::vector<buindex_t> m_indToShared;
 
-    buindex m_vrtxSharedCount; // Current number of shared vertices
-
-    float m_cameraDist;
-    float m_threshold;
-
-    // Approx. screen area a triangle can take before it should be subdivided
-    float m_subdivAreaThreshold = 0.02f;
-
-    // Preferred total size of chunk vertex buffer (m_vertBuffer)
-    buindex m_vrtxMax;
-    // How much of m_vertBuffer is reserved for shared vertices
-    buindex m_vrtxSharedMax;
-    chindex m_chunkMax; // Max number of chunks
 
     // How much screen area a triangle can take before it should be chunked
-    float m_chunkAreaThreshold = 0.04f;
-
-    unsigned m_chunkWidth; // How many vertices wide each chunk is
-    unsigned m_chunkWidthB; // = m_chunkWidth - 1
-    unsigned m_vrtxSharedPerChunk; // How many shared verticies per chunk
-    unsigned m_vrtxPerChunk; // How many vertices there are in each chunk
-    unsigned m_indxPerChunk; // How many triangles in each chunk
+    //float m_chunkAreaThreshold = 0.04f;
 
     // Not implented, for something like running a server
     //
     //bool m_noGPU = false;
-
-    bool m_initialized = false;
 
     // Vertex buffer data is divided unevenly for chunks
     // In m_chunkVertBuf:
@@ -211,8 +240,8 @@ private:
 
 struct UpdateRange
 {
-    buindex m_start;
-    buindex m_end;
+    buindex_t m_start;
+    buindex_t m_end;
 };
 
 }
