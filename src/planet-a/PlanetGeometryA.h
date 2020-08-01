@@ -137,7 +137,7 @@ private:
      * @param y [in]
      * @return
      */
-    constexpr unsigned get_index(int x, int y) const;
+    constexpr loindex_t get_index(int x, int y) const;
 
     /**
      * Similar to the normal get_index, but the first possible indices returned
@@ -155,7 +155,7 @@ private:
      * @param y [in]
      * @return
      */
-    unsigned get_index_ringed(unsigned x, unsigned y) const;
+    loindex_t get_index_ringed(unsigned x, unsigned y) const;
 
     /**
      * Grab a shared vertex from the side of a triangle.
@@ -171,7 +171,7 @@ private:
      *
      * @return
      */
-    vrindex_t shared_from_neighbour(trindex_t triInd, uint8_t side, loindex_t posIn);
+    vrindex_t shared_from_neighbour(trindex_t triInd, uint8_t side, loindex_t posIn, bool &rBetween);
 
     /**
      * Create a new shared vertex. This will get a vertex from m_vrtxSharedFree
