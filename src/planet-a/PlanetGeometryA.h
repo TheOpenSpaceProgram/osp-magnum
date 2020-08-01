@@ -2,10 +2,11 @@
 
 #include "IcoSphereTree.h"
 
+#include <Corrade/Containers/EnumSet.h>
+
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 namespace osp
@@ -14,10 +15,17 @@ namespace osp
 // Index to a chunk
 using chindex_t = uint32_t;
 
+// Index local to a chunk, from (0 ... m_vrtxPerChunk)
+using loindex_t = uint32_t;
+
 // Index to a vertex
 using vrindex_t = uint32_t;
 
 constexpr chindex_t gc_invalidChunk = std::numeric_limits<chindex_t>::max();
+constexpr loindex_t gc_invalidLocal = std::numeric_limits<loindex_t>::max();
+constexpr trindex_t gc_invalidTri = std::numeric_limits<trindex_t>::max();
+constexpr vrindex_t gc_invalidVrtx = std::numeric_limits<vrindex_t>::max();
+
 
 struct UpdateRange;
 
@@ -40,20 +48,33 @@ struct UpdateRange;
 // m_chunkSize            -> m_vrtxPerChunk
 // m_chunkSizeInd         -> m_indPerChunk
 
+//enum class EChunk: uint8_t
+//{
+//};
+
 
 struct SubTriangleChunk
 {
     // Index to chunk. (First triangle ever chunked will be 0)
-    // equal to m_chunkMax when not chunked
+    // set to m_chunkMax when not chunked
     chindex_t m_chunk;
-    buindex_t m_chunkIndx; // Index to index data in the index buffer
-    buindex_t m_chunkVrtx; // Index to vertex data
+
+    // Number of descendents that are chunked.
+    // Used to make sure that triangles aren't chunked when they already have
+    // chunked children, and for some shared vertex calculations
+    unsigned m_descendentChunked;
+
+    // Index to chunked ancestor if present
+    // set to IcoSphereTree.m_maxTriangles if invalid
+    trindex_t m_ancestorChunked;
+
+    buindex_t m_dataIndx; // Index to index data in the index buffer
+    buindex_t m_dataVrtx; // Index to vertex data
 };
 
 
 class PlanetGeometryA
 {
-
 
 public:
 
@@ -138,16 +159,28 @@ private:
 
     /**
      * Grab a shared vertex from the side of a triangle.
-     * @param sharedIndex [out] Set to index to shared vertex when successful
      * @param tri [in] Triangle to grab a
      * @param side [in] 0: bottom, 1: right, 2: left
      * @param pos [in] float from (usually) 0.0-1.0, position of vertex to grab
      * @return true when a shared vertex is grabbed successfully
      *         false when a new shared vertex is created
      */
-    bool shared_from_tri(vrindex_t& rSharedIndex, const SubTriangleChunk& chunk,
-                         unsigned side, int pos);
+    vrindex_t shared_from_tri(SubTriangleChunk const& chunk, uint8_t side, loindex_t pos);
 
+    /**
+     *
+     * @return
+     */
+    vrindex_t shared_from_neighbour(trindex_t triInd, uint8_t side, loindex_t posIn);
+
+    /**
+     * Create a new shared vertex. This will get a vertex from m_vrtxSharedFree
+     * or create a new one entirely.
+     * @return index to new shared vertex, or gc_invalidVrtx if buffer full
+     */
+    vrindex_t shared_create();
+
+    void set_chunk_ancestor_recurse(trindex_t triInd, trindex_t setTo);
 
     bool m_initialized = false;
 

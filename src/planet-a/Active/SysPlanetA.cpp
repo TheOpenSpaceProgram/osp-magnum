@@ -75,8 +75,6 @@ void SysPlanetA::update_geometry()
             planet.m_planet.initialize(planet.m_radius);
             std::cout << "planet init\n";
 
-
-
             planet.m_vrtxBufGL.setData(planet.m_planet.get_vertex_buffer());
             planet.m_indxBufGL.setData(planet.m_planet.get_index_buffer());
 

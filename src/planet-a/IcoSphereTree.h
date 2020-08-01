@@ -15,6 +15,7 @@ using buindex_t = uint32_t;
 
 class IcoSphereTree;
 struct SubTriangle;
+struct TriangleSideTransform;
 
 // The 20 faces of the icosahedron (Top, Left, Right)
 // Each number pointing to a vertex
@@ -40,7 +41,7 @@ static constexpr int gc_icosahedronFaceCount = 20;
 static constexpr int gc_icosahedronVertCount = 12;
 
 static constexpr std::uint8_t gc_triangleMaskSubdivided = 0b0001;
-static constexpr std::uint8_t gc_triangleMaskChunked    = 0b0010;
+//static constexpr std::uint8_t gc_triangleMaskChunked    = 0b0010;
 
 // An icosahedron with subdividable faces
 // it starts with 20 triangles, and each face can be subdivided into 4 more
@@ -132,7 +133,6 @@ public:
     static int neighbour_side(const SubTriangle& tri,
                               const trindex_t lookingFor);
 
-
     /**
      * Subdivide a triangle into 4 more
      * @param [in] Triangle to subdivide
@@ -152,6 +152,12 @@ public:
      */
     void calculate_center(SubTriangle& tri);
 
+    std::pair<trindex_t, trindex_t> find_neighbouring_ancestors(trindex_t a,
+                                                                trindex_t b);
+
+    TriangleSideTransform transform_to_ancestor(trindex_t t, uint8_t side,
+                                                uint8_t targetDepth, trindex_t *pAncestorOut = nullptr);
+
 private:
 
     //PODVector<PlanetWrenderer> m_viewers;
@@ -162,8 +168,8 @@ private:
     std::vector<buindex_t> m_vrtxFree; // Deleted vertices in m_vertBuf
     // use "m_indDomain[buindex_t]" to get a triangle index
 
-    unsigned m_maxDepth;
-    unsigned m_minDepth; // never subdivide below this
+    uint8_t m_maxDepth;
+    uint8_t m_minDepth; // never subdivide below this
 
     buindex_t m_maxVertice;
     buindex_t m_maxTriangles;
@@ -174,10 +180,19 @@ private:
 };
 
 
+struct TriangleSideTransform
+{
+    float m_translation;
+    float m_scale;
+};
+
+
 // Triangle on the IcoSphereTree
 struct SubTriangle
 {
     trindex_t m_parent;
+    uint8_t m_siblingIndex; // 0:Top 1:Left 2:Right 3:Center
+
     trindex_t m_neighbours[3];
     buindex_t m_corners[3]; // to vertex buffer, 3 corners of triangle
 
@@ -188,6 +203,7 @@ struct SubTriangle
     // Data used when subdivided
 
     // index to first child, always has 4 children if subdivided
+    // Top Left Right Center
     trindex_t m_children;
     buindex_t m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
     buindex_t m_index; // to index buffer

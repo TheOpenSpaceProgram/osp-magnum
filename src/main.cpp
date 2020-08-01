@@ -143,7 +143,6 @@ int debug_cli_loop()
         {
             std::cout << "that doesn't do anything ._.\n";
         }
-
     }
 
     // wait for magnum thread to exit if it exists

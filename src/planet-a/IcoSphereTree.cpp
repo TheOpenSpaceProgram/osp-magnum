@@ -199,6 +199,13 @@ void IcoSphereTree::subdivide_add(trindex_t t)
                 &childC = get_triangle(tri.m_children + 2),
                 &childD = get_triangle(tri.m_children + 3);
 
+    // set parent and sibling index
+    childA.m_parent = childB.m_parent = childC.m_parent = childD.m_parent = t;
+    childA.m_siblingIndex = 0;
+    childB.m_siblingIndex = 1;
+    childC.m_siblingIndex = 2;
+    childD.m_siblingIndex = 3;
+
     // Set the neighboors of the top triangle to:
     // bottom neighboor = new middle triangle
     // right neighboor  = right neighboor of parent (tri)
@@ -309,15 +316,11 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     }
 
     // Set verticies
-    set_verts(childA,
-            tri.m_corners[0], tri.m_midVrtxs[2], tri.m_midVrtxs[1]);
-    set_verts(childB,
-            tri.m_midVrtxs[2], tri.m_corners[1], tri.m_midVrtxs[0]);
-    set_verts(childC,
-            tri.m_midVrtxs[1], tri.m_midVrtxs[0], tri.m_corners[2]);
+    set_verts(childA, tri.m_corners[0], tri.m_midVrtxs[2], tri.m_midVrtxs[1]);
+    set_verts(childB, tri.m_midVrtxs[2], tri.m_corners[1], tri.m_midVrtxs[0]);
+    set_verts(childC, tri.m_midVrtxs[1], tri.m_midVrtxs[0], tri.m_corners[2]);
     // The center triangle is made up of purely middle vertices.
-    set_verts(childD,
-            tri.m_midVrtxs[0], tri.m_midVrtxs[1], tri.m_midVrtxs[2]);
+    set_verts(childD, tri.m_midVrtxs[0], tri.m_midVrtxs[1], tri.m_midVrtxs[2]);
 
     // Calculate centers
     //calculate_center(childA);
@@ -343,9 +346,7 @@ void IcoSphereTree::subdivide_add(trindex_t t)
 
 
 void IcoSphereTree::set_neighbours(SubTriangle& tri,
-                                   trindex_t bot,
-                                   trindex_t rte,
-                                   trindex_t lft)
+                                   trindex_t bot, trindex_t rte, trindex_t lft)
 {
     tri.m_neighbours[0] = bot;
     tri.m_neighbours[1] = rte;
@@ -378,7 +379,7 @@ void IcoSphereTree::set_side_recurse(SubTriangle& tri, int side, trindex_t to)
 }
 
 int IcoSphereTree::neighbour_side(const SubTriangle& tri,
-                                   const trindex_t lookingFor)
+                                  const trindex_t lookingFor)
 {
     // Loop through neighbours on the edges. child 4 (center) is not considered
     // as all it's neighbours are its siblings
@@ -389,6 +390,94 @@ int IcoSphereTree::neighbour_side(const SubTriangle& tri,
     // this means there's an error
     //assert(false);
     return 255;
+}
+
+
+std::pair<trindex_t, trindex_t> IcoSphereTree::find_neighbouring_ancestors(
+                                                    trindex_t a, trindex_t b)
+{
+    std::pair<trindex_t, trindex_t> out{a, b};
+
+    SubTriangle &triA = get_triangle(a);
+    SubTriangle &triB = get_triangle(b);
+
+    trindex_t *outIndex;
+    trindex_t curIndex;
+    uint8_t targetDepth;
+
+    if (triA.m_depth > triB.m_depth)
+    {
+        // A needs to get set
+        targetDepth = triB.m_depth;
+        outIndex = &(out.first);
+        curIndex = triA.m_parent;
+    }
+    else if (triA.m_depth < triB.m_depth)
+    {
+        // B needs to get set
+        targetDepth = triA.m_depth;
+        outIndex = &(out.second);
+        curIndex = triB.m_parent;
+    }
+    else
+    {
+        return out;
+    }
+
+    SubTriangle *curTri;
+    std::cout << "wtf\n";
+
+    // move up chain of parents to the right depth
+    do
+    {
+        *outIndex = curIndex;
+        curTri = &get_triangle(*outIndex);
+        curIndex = curTri->m_parent;
+    }
+    while (curTri->m_depth != targetDepth);
+
+    return out;
+}
+
+TriangleSideTransform IcoSphereTree::transform_to_ancestor(
+        trindex_t t, uint8_t side, uint8_t targetDepth, trindex_t *pAncestorOut)
+{
+    TriangleSideTransform out{0.0f, 1.0f};
+
+    trindex_t curT = t;
+    SubTriangle *tri;
+
+    while (true)
+    {
+        tri = &m_triangles[curT];
+
+        if (tri->m_depth == targetDepth)
+        {
+            if (pAncestorOut)
+            {
+                *pAncestorOut = curT;
+            }
+
+            return out;
+        }
+        else
+        {
+            // 0:top, 1:left, 2:right
+
+            // side 0 (bottom) : children 1, 2
+            // side 1  (right) : children 2, 0
+            // side 2   (left) : children 0, 1
+
+            out.m_scale *= 0.5f;
+
+            out.m_translation +=
+                    out.m_scale * (side == (tri->m_siblingIndex + 1) % 3);
+        }
+
+        curT = tri->m_parent;
+    }
+
+
 }
 
 }
