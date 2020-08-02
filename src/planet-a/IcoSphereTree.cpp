@@ -468,10 +468,18 @@ TriangleSideTransform IcoSphereTree::transform_to_ancestor(
             // side 1  (right) : children 2, 0
             // side 2   (left) : children 0, 1
 
+            // if sibling index: 0, side: 2, then translation +0.0
+            // if sibling index: 1, side: 2, then translation +0.5
+            // if sibling index: 1, side: 0, then translation +0.0
+            // if sibling index: 2, side: 0, then translation +0.5
+            // if sibling index: 2, side: 1, then translation +0.0
+            // if sibling index: 0, side: 1, then translation +0.5
+
             out.m_scale *= 0.5f;
 
-            out.m_translation +=
-                    out.m_scale * (side == (tri->m_siblingIndex + 1) % 3);
+            out.m_translation
+                    = out.m_translation * 0.5f
+                    + 0.5f * (side == (tri->m_siblingIndex + 1) % 3);
         }
 
         curT = tri->m_parent;
