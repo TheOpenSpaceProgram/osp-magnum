@@ -78,10 +78,14 @@ class PlanetGeometryA
 
 public:
 
+    class IteratorTriIndexed;
+
     PlanetGeometryA() = default;
     ~PlanetGeometryA() = default;
 
     constexpr bool is_initialized() const { return m_initialized; }
+
+    constexpr unsigned indices_per_chunk() const { return m_indxPerChunk; }
 
     /**
      * Calculate initial icosahedron and initialize buffers.
@@ -95,12 +99,13 @@ public:
      */
     void log_stats() const;
 
-    std::vector<float> const& get_vertex_buffer() { return m_vrtxBuffer; }
-    std::vector<unsigned> const& get_index_buffer() { return m_indxBuffer; }
-    buindex_t calc_index_count() { return m_chunkCount * m_indxPerChunk * 3; }
+    std::pair<IteratorTriIndexed, IteratorTriIndexed> iterate_chunk(chindex_t c);
+
+    constexpr std::vector<float> const& get_vertex_buffer() const { return m_vrtxBuffer; }
+    constexpr std::vector<unsigned> const& get_index_buffer() const { return m_indxBuffer; }
+    constexpr buindex_t calc_index_count() { return m_chunkCount * m_indxPerChunk * 3; }
 
     IcoSphereTree* get_ico_tree() { return m_icoTree.get(); }
-
 
 private:
 
@@ -269,6 +274,49 @@ private:
     // Which means there is 91 vertices left in the middle
     // (m_chunkSize - m_chunkSharedCount)
 
+};
+
+class PlanetGeometryA::IteratorTriIndexed :
+        std::vector<unsigned>::const_iterator
+{
+public:
+    IteratorTriIndexed() = default;
+    IteratorTriIndexed(std::vector<unsigned>::const_iterator indx,
+                       std::vector<float> const& vrtxBuffer) :
+            std::vector<unsigned>::const_iterator(indx),
+            m_vrtxBuffer(&vrtxBuffer) {};
+    IteratorTriIndexed(IteratorTriIndexed const &copy) = default;
+    IteratorTriIndexed(IteratorTriIndexed &&move) = default;
+
+    IteratorTriIndexed& operator=(IteratorTriIndexed&& move) = default;
+
+    float const* position()
+    {
+        return m_vrtxBuffer->data() + (**this * m_vrtxSize) + m_vrtxCompOffsetPos;
+    };
+    float const* normal()
+    {
+        return m_vrtxBuffer->data() + (**this * m_vrtxSize) + m_vrtxCompOffsetNrm;
+    };
+
+    //using std::vector<unsigned>::const_iterator::operator==;
+
+    using std::vector<unsigned>::const_iterator::operator+;
+    using std::vector<unsigned>::const_iterator::operator-;
+    using std::vector<unsigned>::const_iterator::operator++;
+    using std::vector<unsigned>::const_iterator::operator--;
+
+private:
+
+    //unsigned m_indxPerChunk;
+    //std::vector<unsigned> const* m_indxBuffer;
+
+    // TODO: set these properly
+    int m_vrtxSize = 6;
+    int m_vrtxCompOffsetPos = 0;
+    int m_vrtxCompOffsetNrm = 3;
+
+    std::vector<float> const* m_vrtxBuffer;
 };
 
 struct UpdateRange

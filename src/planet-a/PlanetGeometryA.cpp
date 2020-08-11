@@ -196,6 +196,16 @@ void PlanetGeometryA::initialize(float radius)
 
 }
 
+std::pair<PlanetGeometryA::IteratorTriIndexed,
+          PlanetGeometryA::IteratorTriIndexed>
+PlanetGeometryA::iterate_chunk(chindex_t c)
+{
+    IteratorTriIndexed begin(m_indxBuffer.begin() + m_indxPerChunk * c,
+                             m_vrtxBuffer);
+    IteratorTriIndexed end(m_indxBuffer.begin() + m_indxPerChunk * (c + 1),
+                           m_vrtxBuffer);
+    return {begin, end};
+}
 
 loindex_t PlanetGeometryA::get_index_ringed(unsigned x, unsigned y) const
 {

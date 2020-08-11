@@ -2,6 +2,8 @@
 
 #include "ActiveScene.h"
 
+#include <Newton.h>
+
 
 namespace osp
 {
@@ -13,7 +15,6 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
     ActiveScene &scene = data->m_scene;
 
     //Matrix4 matrix;
-
 
     CompTransform& transform = scene.get_registry()
                                         .get<CompTransform>(data->m_entity);
@@ -56,48 +57,111 @@ SysNewton::SysNewton(ActiveScene &scene) :
                              std::bind(&SysNewton::update_world, this))
 {
     //std::cout << "sysnewtoninit\n";
+
+    scene.get_registry().on_construct<CompRigidBody>()
+                    .connect<&SysNewton::on_body_construct>(*this);
+    scene.get_registry().on_destroy<CompRigidBody>()
+                    .connect<&SysNewton::on_body_destruct>(*this);
+
+    scene.get_registry().on_construct<CompCollisionShape>()
+                    .connect<&SysNewton::on_shape_construct>(*this);
+    scene.get_registry().on_destroy<CompCollisionShape>()
+                    .connect<&SysNewton::on_shape_destruct>(*this);
 }
 
 SysNewton::~SysNewton()
 {
     //std::cout << "sysnewtondestroy\n";
     // Clean up newton dynamics stuff
+    m_scene.get_registry().clear<CompRigidBody>();
+    m_scene.get_registry().clear<CompCollisionShape>();
     NewtonDestroyAllBodies(m_nwtWorld);
     NewtonDestroy(m_nwtWorld);
 }
 
-
-void SysNewton::create_body(entt::entity entity)
+void SysNewton::find_and_add_colliders(ActiveEnt ent, NewtonCollision *compound, Matrix4 const &currentTransform)
 {
 
-    CompRigidBody& bodyComp = m_scene.reg_get<CompRigidBody>(entity);
-    CompTransform& transform = m_scene.reg_get<CompTransform>(entity);
+    ActiveEnt nextChild = ent;
 
-    // Note: bodyComp is a unique_ptr<NwtUserData>
+    while(nextChild != entt::null)
+    {
+        CompHierarchy const &childHeir = m_scene.reg_get<CompHierarchy>(nextChild);
+        CompTransform const &childTransform = m_scene.reg_get<CompTransform>(nextChild);
 
-    if (bodyComp)
+        CompCollisionShape* childCollide = m_scene.get_registry().try_get<CompCollisionShape>(nextChild);
+        Matrix4 childMatrix = currentTransform * childTransform.m_transform;
+
+        if (childCollide)
+        {
+            NewtonCollision *collision = childCollide->m_collision;
+
+            if (collision)
+            {
+
+            }
+            else
+            {
+                // TODO: care about collision shape
+                childCollide->m_collision = collision = NewtonCreateSphere(m_nwtWorld, 0.5f, 0, NULL);
+            }
+
+            //Matrix4 nextTransformNorm = nextTransform.
+
+            // Set transform relative to root body
+            Matrix4 f = Matrix4::translation(childMatrix.translation());
+            NewtonCollisionSetMatrix(collision, f.data());
+
+            // Add body to compound collision
+            NewtonCompoundCollisionAddSubCollision(compound, collision);
+
+        }
+        else
+        {
+            //return;
+        }
+
+        find_and_add_colliders(childHeir.m_childFirst, compound, childMatrix);
+        nextChild = childHeir.m_siblingNext;
+    }
+}
+
+void SysNewton::create_body(ActiveEnt entity)
+{
+
+    CompHierarchy& entHeir = m_scene.reg_get<CompHierarchy>(entity);
+    CompRigidBody& entBody = m_scene.reg_get<CompRigidBody>(entity);
+    CompCollisionShape& entShape = m_scene.get_registry().get_or_emplace<CompCollisionShape>(entity);
+    CompTransform& entTransform = m_scene.reg_get<CompTransform>(entity);
+
+    // Note: entBody is a unique_ptr<NwtUserData>
+
+    if (entBody)
     {
         // body is already initialized
         return;
     }
 
     Matrix4 matrix;
+    NewtonCollision* compound = NewtonCreateCompoundCollision(m_nwtWorld, 0);
 
-    NewtonCollision *ball = NewtonCreateSphere(m_nwtWorld, 1, 0, NULL);
+    NewtonCompoundCollisionBeginAddRemove(compound);
+    find_and_add_colliders(entHeir.m_childFirst, compound, Matrix4());
+    NewtonCompoundCollisionEndAddRemove(compound);
 
-    // TODO: go through hierarchy children and add collision shapes
-    // temporary: Create the body
-    NewtonBody *body = NewtonCreateDynamicBody(m_nwtWorld, ball,
-                                                     matrix.data());
+    NewtonBody *body = NewtonCreateDynamicBody(m_nwtWorld, compound,
+                                               matrix.data());
+
+    NewtonDestroyCollision(compound);
 
     // Initialize user data
-    bodyComp = std::make_unique<NwtUserData>(entity, m_scene, body);
+    entBody = std::make_unique<NwtUserData>(entity, m_scene, body);
 
     // Set inertia and mass
     NewtonBodySetMassMatrix(body, 1.0f, 1, 1, 1);
 
     // Set position/rotation
-    NewtonBodySetMatrix(body, transform.m_transform.data());
+    NewtonBodySetMatrix(body, entTransform.m_transform.data());
 
     // Set damping to 0, as default is 0.1
     // reference frame may be moving and air pressure stuff
@@ -111,10 +175,10 @@ void SysNewton::create_body(entt::entity entity)
 
     // Set user data
     //NwtUserData *data = new NwtUserData(entity, m_scene);
-    NewtonBodySetUserData(body, bodyComp.get());
+    NewtonBodySetUserData(body, entBody.get());
 
     // don't leak memory
-    NewtonDestroyCollision(ball);
+    //NewtonDestroyCollision(ball);
 }
 
 void SysNewton::update_world()
@@ -181,7 +245,27 @@ void SysNewton::on_body_construct(entt::registry& reg, ActiveEnt ent)
 
 void SysNewton::on_body_destruct(entt::registry& reg, ActiveEnt ent)
 {
-    // TODO: make sure the newton body is destroyed
+    // make sure the newton body is destroyed
+    NewtonBody *body = reg.get<CompRigidBody>(ent)->m_body;
+    if (body)
+    {
+        NewtonDestroyBody(body);
+    }
+}
+
+void SysNewton::on_shape_construct(entt::registry& reg, ActiveEnt ent)
+{
+
+}
+
+void SysNewton::on_shape_destruct(entt::registry& reg, ActiveEnt ent)
+{
+    // make sure the collision shape destroyed
+    NewtonCollision *shape = reg.get<CompCollisionShape>(ent).m_collision;
+    if (shape)
+    {
+        NewtonDestroyCollision(shape);
+    }
 }
 
 

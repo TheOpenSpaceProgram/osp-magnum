@@ -1,14 +1,13 @@
-#include <iostream>
+#include "SysVehicle.h"
+
+#include "ActiveScene.h"
+#include "../Satellites/SatActiveArea.h"
+#include "../Satellites/SatVehicle.h"
 
 #include <Magnum/MeshTools/Compile.h>
 #include <Magnum/Trade/MeshData.h>
 
-#include "ActiveScene.h"
-
-#include "SysVehicle.h"
-#include "../Satellites/SatActiveArea.h"
-#include "../Satellites/SatVehicle.h"
-
+#include <iostream>
 
 
 using namespace osp;
@@ -276,8 +275,9 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
         }
         else if (currentPrototype.m_type == ObjectType::COLLIDER)
         {
-            //new FtrNewtonBody(*obj, *this);
-            // TODO collision shape!
+            CompCollisionShape collision = m_scene.reg_emplace<CompCollisionShape>(currentEnt);
+            collision.m_shape = currentPrototype.m_collider.m_type;
+
         }
     }
 

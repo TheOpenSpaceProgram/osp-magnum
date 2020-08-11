@@ -18,13 +18,17 @@ enum class ObjectType
     //ATTACHMENT  //
 };
 
-enum class ColliderType
+enum class ECollisionShape : uint8_t
 {
-    CUBE,
+    NONE,
+    COMBINED,
+    SPHERE,
+    BOX,
+    CAPSULE,
     CYLINDER,
-    MESH
-
-    // add more here
+    //MESH,
+    CONVEX_HULL,
+    TERRAIN
 };
 
 //const uint32_t gc_OBJ_MESH      = 1 << 2;
@@ -42,7 +46,7 @@ struct DrawableData
 
 struct ColliderData
 {
-    ColliderType m_type;
+    ECollisionShape m_type;
     unsigned m_meshData;
 };
 

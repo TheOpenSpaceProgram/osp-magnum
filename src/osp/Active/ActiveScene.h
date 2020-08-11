@@ -47,12 +47,6 @@ struct CompHierarchy
 
 };
 
-struct CompCollider
-{
-    ColliderType m_type;
-    // TODO: mesh data
-};
-
 /**
  * Component that represents a camera
  */

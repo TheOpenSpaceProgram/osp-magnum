@@ -185,7 +185,7 @@ void SturdyImporter::proto_add_obj_recurse(Package& package,
         obj.m_type = ObjectType::COLLIDER;
 
         // do some stuff here
-        obj.m_collider.m_type = ColliderType::CUBE;
+        obj.m_collider.m_type = ECollisionShape::BOX;
 
         std::cout << "obj: " << name << " is a collider\n";
     }

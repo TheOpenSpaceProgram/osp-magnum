@@ -332,15 +332,15 @@ osp::Satellite& debug_add_random_vehicle(std::string const& name)
             g_osp.debug_get_packges()[0]
             .get<osp::PrototypePart>("part_spamcan");
 
-    // Add 10 parts
-    for (int i = 0; i < 10; i ++)
+    // Add 6 parts
+    for (int i = 0; i < 6; i ++)
     {
         // Generate random vector
-        Vector3 randomvec(std::rand() % 64 - 32,
-                          std::rand() % 64 - 32,
-                          std::rand() % 64 - 32);
+        Vector3 randomvec(std::rand() % 128 - 64,
+                          std::rand() % 128 - 64,
+                          std::rand() % 128 - 64);
 
-        randomvec /= 32.0f;
+        randomvec /= 64.0f;
 
         // Add a new [victim] part
         blueprint.add_part(victim, randomvec,
