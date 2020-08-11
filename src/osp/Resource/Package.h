@@ -1,17 +1,16 @@
 #pragma once
 
+#include "Resource.h"
+
+#include <entt/core/type_info.hpp>
+
 #include <any>
 #include <iostream>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 
-#include <entt/core/type_info.hpp>
-
-//#include "SturdyImporter.h"
-#include "Resource.h"
-#include "PrototypePart.h"
-#include "blueprints.h"
 
 namespace osp
 {

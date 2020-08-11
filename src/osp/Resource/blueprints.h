@@ -2,12 +2,14 @@
 
 #include "../types.h"
 
-#include "../Active/SysWire.h"
-#include "../Resource/Resource.h"
-#include "../Resource/PrototypePart.h"
+#include "Resource.h"
+#include "PrototypePart.h"
 
 namespace osp
 {
+
+using WireInPort = uint16_t;
+using WireOutPort = uint16_t;
 
 /**
  * Specific information on a part in a vehicle:

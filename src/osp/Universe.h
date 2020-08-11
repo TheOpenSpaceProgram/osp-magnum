@@ -1,12 +1,9 @@
 #pragma once
 
+#include "Satellite.h"
+
 #include <vector>
 #include <cstdint>
-
-//#include "Resource/Package.h"
-#include "Satellite.h"
-#include "Resource/PrototypePart.h"
-
 
 namespace osp
 {

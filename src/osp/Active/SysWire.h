@@ -1,22 +1,20 @@
 #pragma once
 
-#include <variant>
-#include <string>
-#include <vector>
+#include "activetypes.h"
+#include "../types.h"
+#include "../Resource/blueprints.h"
 
 #include <Corrade/Containers/LinkedList.h>
 
-#include "../types.h"
-#include "activetypes.h"
+#include <variant>
+#include <string>
+#include <vector>
 
 namespace osp
 {
 
 using Corrade::Containers::LinkedList;
 using Corrade::Containers::LinkedListItem;
-
-using WireInPort = uint16_t;
-using WireOutPort = uint16_t;
 
 class WireInput;
 class WireOutput;

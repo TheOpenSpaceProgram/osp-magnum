@@ -1,9 +1,10 @@
 #pragma once
 
-#include <Magnum/Math/Vector3.h>
-#include <memory>
-
 #include "types.h"
+
+#include <memory>
+#include <string>
+
 
 namespace osp
 {

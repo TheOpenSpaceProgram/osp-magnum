@@ -1,13 +1,12 @@
 #pragma once
 
-
-#include <Magnum/Shaders/Phong.h>
-
-#include "../Satellite.h"
-
 #include "activetypes.h"
 
+#include "../Satellite.h"
 #include "../Resource/Package.h"
+#include "../Resource/blueprints.h"
+
+#include <Magnum/Shaders/Phong.h>
 
 namespace osp
 {

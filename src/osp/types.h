@@ -9,8 +9,6 @@
 #include <Magnum/Math/Matrix4.h>
 #include <Magnum/Math/Matrix3.h>
 
-#include <Magnum/Platform/Sdl2Application.h>
-
 //typedef KeyMap std::map<Magnum::Platform::Application::KeyEvent>
 
 using Magnum::Vector2;

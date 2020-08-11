@@ -1,24 +1,21 @@
 #pragma once
 
+#include "osp/types.h"
+#include "osp/OSPApplication.h"
+#include "osp/Universe.h"
+#include "osp/UserInputHandler.h"
+#include "osp/Satellites/SatActiveArea.h"
+
 #include <Magnum/Timeline.h>
-
 #include <Magnum/GL/Buffer.h>
-
 #include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/Math/Color.h>
+#include <Magnum/Platform/Sdl2Application.h>
 #include <Magnum/Shaders/VertexColor.h>
 
 #include <memory>
-
-#include "osp/Satellites/SatActiveArea.h"
-
-#include "osp/types.h"
-
-#include "osp/OSPApplication.h"
-#include "osp/Universe.h"
-#include "osp/UserInputHandler.h"
 
 namespace osp
 {
