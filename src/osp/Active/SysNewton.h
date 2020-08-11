@@ -53,7 +53,7 @@ using CompRigidBody = std::unique_ptr<NwtUserData>;
 struct CompCollisionShape
 {
     NewtonCollision* m_collision{nullptr};
-    ECollisionShape m_shape;
+    ECollisionShape m_shape{ECollisionShape::NONE};
 };
 
 class SysNewton
@@ -116,6 +116,16 @@ private:
     void on_shape_construct(entt::registry& reg, ActiveEnt ent);
     void on_shape_destruct(entt::registry& reg, ActiveEnt ent);
 
+    NewtonCollision* newton_create_tree_collision(
+            const NewtonWorld *newtonWorld, int shapeId);
+    void newton_tree_collision_add_face(
+            const NewtonCollision* treeCollision, int vertexCount,
+            const float* vertexPtr, int strideInBytes, int faceAttribute);
+    void newton_tree_collision_begin_build(
+            const NewtonCollision* treeCollision);
+    void newton_tree_collision_end_build(
+            const NewtonCollision* treeCollision,  int optimize);
+
 
     ActiveScene& m_scene;
     NewtonWorld *const m_nwtWorld;
@@ -128,13 +138,28 @@ void SysNewton::shape_create_tri_mesh_static(CompCollisionShape &shape,
                                              TRIANGLE_IT_T const& start,
                                              TRIANGLE_IT_T const& end)
 {
-    shape.m_shape = ECollisionShape::TERRAIN;
-    //shape.m_collision = NewtonCreateTreeCollision(m_nwtWorld, 0);
+    NewtonCollision* tree = newton_create_tree_collision(m_nwtWorld, 0);
 
-    for (TRIANGLE_IT_T it = start; it != end; it ++)
+    newton_tree_collision_begin_build(tree);
+
+    Vector3 triangle[3];
+
+    for (TRIANGLE_IT_T it = start; it != end; it += 3)
     {
+        triangle[0] = *reinterpret_cast<Vector3 const*>((it + 0).position());
+        triangle[1] = *reinterpret_cast<Vector3 const*>((it + 1).position());
+        triangle[2] = *reinterpret_cast<Vector3 const*>((it + 2).position());
+
+        newton_tree_collision_add_face(tree, 3,
+                                       reinterpret_cast<float*>(triangle),
+                                       sizeof(float) * 3, 0);
 
     }
+
+    newton_tree_collision_end_build(tree, 0);
+
+    shape.m_shape = ECollisionShape::TERRAIN;
+    shape.m_collision = tree;
 }
 
 }

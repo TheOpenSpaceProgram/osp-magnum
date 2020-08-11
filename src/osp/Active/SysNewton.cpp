@@ -131,8 +131,14 @@ void SysNewton::create_body(ActiveEnt entity)
 
     CompHierarchy& entHeir = m_scene.reg_get<CompHierarchy>(entity);
     CompRigidBody& entBody = m_scene.reg_get<CompRigidBody>(entity);
-    CompCollisionShape& entShape = m_scene.get_registry().get_or_emplace<CompCollisionShape>(entity);
+    CompCollisionShape* entShape = m_scene.get_registry().try_get<CompCollisionShape>(entity);
     CompTransform& entTransform = m_scene.reg_get<CompTransform>(entity);
+
+    if (!entShape)
+    {
+        // need collision shape to make a body
+        return;
+    }
 
     // Note: entBody is a unique_ptr<NwtUserData>
 
@@ -142,23 +148,46 @@ void SysNewton::create_body(ActiveEnt entity)
         return;
     }
 
-    Matrix4 matrix;
-    NewtonCollision* compound = NewtonCreateCompoundCollision(m_nwtWorld, 0);
+    NewtonBody *body;
 
-    NewtonCompoundCollisionBeginAddRemove(compound);
-    find_and_add_colliders(entHeir.m_childFirst, compound, Matrix4());
-    NewtonCompoundCollisionEndAddRemove(compound);
+    switch (entShape->m_shape)
+    {
+    case ECollisionShape::COMBINED:
+    {
+        NewtonCollision* compound = NewtonCreateCompoundCollision(m_nwtWorld, 0);
 
-    NewtonBody *body = NewtonCreateDynamicBody(m_nwtWorld, compound,
-                                               matrix.data());
+        NewtonCompoundCollisionBeginAddRemove(compound);
+        find_and_add_colliders(entHeir.m_childFirst, compound, Matrix4());
+        NewtonCompoundCollisionEndAddRemove(compound);
 
-    NewtonDestroyCollision(compound);
+        body = NewtonCreateDynamicBody(m_nwtWorld, compound,
+                                                   Matrix4().data());
+
+        NewtonDestroyCollision(compound);
+
+        // Set inertia and mass
+        NewtonBodySetMassMatrix(body, 1.0f, 1, 1, 1);
+        break;
+    }
+    case ECollisionShape::TERRAIN:
+    {
+        if (entShape->m_collision)
+        {
+            body = NewtonCreateDynamicBody(m_nwtWorld, entShape->m_collision,
+                                           Matrix4().data());
+        }
+        else
+        {
+            // make a collision shape somehow
+        }
+    }
+    default:
+        break;
+    }
+
 
     // Initialize user data
     entBody = std::make_unique<NwtUserData>(entity, m_scene, body);
-
-    // Set inertia and mass
-    NewtonBodySetMassMatrix(body, 1.0f, 1, 1, 1);
 
     // Set position/rotation
     NewtonBodySetMatrix(body, entTransform.m_transform.data());
@@ -238,6 +267,8 @@ void SysNewton::body_apply_torque_local(CompRigidBody &body, Vector3 force)
 
 }
 
+
+
 void SysNewton::on_body_construct(entt::registry& reg, ActiveEnt ent)
 {
 
@@ -268,5 +299,29 @@ void SysNewton::on_shape_destruct(entt::registry& reg, ActiveEnt ent)
     }
 }
 
+NewtonCollision* SysNewton::newton_create_tree_collision(
+        const NewtonWorld *newtonWorld, int shapeId)
+{
+    return NewtonCreateTreeCollision(newtonWorld, shapeId);
+}
+
+void SysNewton::newton_tree_collision_add_face(
+        const NewtonCollision* treeCollision, int vertexCount,
+        const float* vertexPtr, int strideInBytes, int faceAttribute)
+{
+    NewtonTreeCollisionAddFace(treeCollision, vertexCount, vertexPtr, strideInBytes, faceAttribute);
+}
+
+void SysNewton::newton_tree_collision_begin_build(
+        const NewtonCollision* treeCollision)
+{
+    NewtonTreeCollisionBeginBuild(treeCollision);
+}
+
+void SysNewton::newton_tree_collision_end_build(
+        const NewtonCollision* treeCollision, int optimize)
+{
+    NewtonTreeCollisionEndBuild(treeCollision, optimize);
+}
 
 }

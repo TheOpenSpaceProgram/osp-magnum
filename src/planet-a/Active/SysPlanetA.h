@@ -42,6 +42,9 @@ public:
 
     void draw(CompCamera const& camera);
 
+    void debug_create_chunk_collider(ActiveEnt ent, CompPlanet &planet,
+                                     chindex_t chunk);
+
     void update_geometry();
 
     void update_physics();

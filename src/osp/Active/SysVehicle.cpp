@@ -165,7 +165,9 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
     }
 
     // temporary: make the whole thing a single rigid body
-    CompRigidBody& nwtBody = scene.reg_emplace<CompRigidBody>(vehicleEnt);
+    CompRigidBody& vehicleBody = scene.reg_emplace<CompRigidBody>(vehicleEnt);
+    CompCollisionShape& vehicleShape = scene.reg_emplace<CompCollisionShape>(vehicleEnt);
+    vehicleShape.m_shape = ECollisionShape::COMBINED;
     area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
 
     return 0;

@@ -104,6 +104,7 @@ public:
     constexpr std::vector<float> const& get_vertex_buffer() const { return m_vrtxBuffer; }
     constexpr std::vector<unsigned> const& get_index_buffer() const { return m_indxBuffer; }
     constexpr buindex_t calc_index_count() { return m_chunkCount * m_indxPerChunk * 3; }
+    constexpr chindex_t chunk_count() { return m_chunkCount; }
 
     IcoSphereTree* get_ico_tree() { return m_icoTree.get(); }
 
@@ -280,6 +281,9 @@ class PlanetGeometryA::IteratorTriIndexed :
         std::vector<unsigned>::const_iterator
 {
 public:
+
+    using IndIt_t = std::vector<unsigned>::const_iterator;
+
     IteratorTriIndexed() = default;
     IteratorTriIndexed(std::vector<unsigned>::const_iterator indx,
                        std::vector<float> const& vrtxBuffer) :
@@ -301,10 +305,18 @@ public:
 
     //using std::vector<unsigned>::const_iterator::operator==;
 
-    using std::vector<unsigned>::const_iterator::operator+;
-    using std::vector<unsigned>::const_iterator::operator-;
+    //using std::vector<unsigned>::const_iterator::operator+;
+    //using std::vector<unsigned>::const_iterator::operator-;
     using std::vector<unsigned>::const_iterator::operator++;
     using std::vector<unsigned>::const_iterator::operator--;
+    using std::vector<unsigned>::const_iterator::operator+=;
+    using std::vector<unsigned>::const_iterator::operator-=;
+
+    IteratorTriIndexed operator+(difference_type rhs) { return IteratorTriIndexed(static_cast<IndIt_t>(*this) + rhs, *m_vrtxBuffer); }
+
+
+    bool operator==(IteratorTriIndexed const &rhs) { return static_cast<IndIt_t>(*this) == static_cast<IndIt_t>(rhs); }
+    bool operator!=(IteratorTriIndexed const &rhs) { return static_cast<IndIt_t>(*this) != static_cast<IndIt_t>(rhs); }
 
 private:
 

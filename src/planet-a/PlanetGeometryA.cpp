@@ -172,7 +172,7 @@ void PlanetGeometryA::initialize(float radius)
 
 
     // temporary: raise all shared vertices based on shared count
-    if (false)
+    if (true)
     {
         for (vrindex_t i = 0; i < m_vrtxSharedMax; i ++)
         {
@@ -200,9 +200,9 @@ std::pair<PlanetGeometryA::IteratorTriIndexed,
           PlanetGeometryA::IteratorTriIndexed>
 PlanetGeometryA::iterate_chunk(chindex_t c)
 {
-    IteratorTriIndexed begin(m_indxBuffer.begin() + m_indxPerChunk * c,
+    IteratorTriIndexed begin(m_indxBuffer.begin() + m_indxPerChunk * 3 * c,
                              m_vrtxBuffer);
-    IteratorTriIndexed end(m_indxBuffer.begin() + m_indxPerChunk * (c + 1),
+    IteratorTriIndexed end(m_indxBuffer.begin() + m_indxPerChunk * 3 * (c + 1),
                            m_vrtxBuffer);
     return {begin, end};
 }
