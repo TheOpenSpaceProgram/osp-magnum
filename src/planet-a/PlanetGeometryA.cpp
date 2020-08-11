@@ -172,7 +172,7 @@ void PlanetGeometryA::initialize(float radius)
 
 
     // temporary: raise all shared vertices based on shared count
-    if (true)
+    if (false)
     {
         for (vrindex_t i = 0; i < m_vrtxSharedMax; i ++)
         {

@@ -302,20 +302,35 @@ void load_a_bunch_of_stuff()
         // Creates a random mess of spamcans
         osp::Satellite& sat = debug_add_random_vehicle(std::to_string(i));
 
-        // Put them in a long chaotic line
+        // Put them in a long line each 5m apart
         Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
-                i * 1024 * 5,
-                (i & 5) * 128,
-                (i & 3) * 1024), 10);
+                i * 1024l * 5l,
+                0l,
+                0l), 10);
 
         sat.set_position(randomvec);
     }
 
-    // Add a planet too
-    osp::Satellite& planet = g_osp.get_universe().sat_create();
-    planet.create_object<osp::SatPlanet>();
-    planet.set_load_radius(600);
-    planet.set_position({{0, 0, 1024 * -(128 + 12)}, 10});
+    // Add Grid of planets too
+
+    for (int x = -1; x < 2; x ++)
+    {
+        for (int z = -1; z < 2; z ++)
+        {
+            osp::Satellite& planet = g_osp.get_universe().sat_create();
+
+            // for now, planets are hard-coded to 128 meters in radius
+            planet.create_object<osp::SatPlanet>();
+            // load the planet when active area is within 1km of the planet
+            planet.set_load_radius(1000.0f);
+
+            // space planets 400m apart from each other
+            // 1024 units = 1 meter
+            planet.set_position({{x * 1024l * 400l,
+                                  1024l * -140l,
+                                  z * 1024l * 400l}, 10});
+        }
+    }
 
     //s_partsLoaded = true;
 }

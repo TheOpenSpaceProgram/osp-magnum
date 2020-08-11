@@ -1,5 +1,7 @@
 # osp-magnum
 
+![screenshot](screenshot0.png?raw=true "Mess of vehicles and some tiny planets")
+
 OpenSpaceProgram is an open source initiative about creating a space flight
 simulator similar to Kerbal Space Program. This attempt uses Magnum Engine,
 and succeeds the urho-osp repository.
@@ -13,7 +15,8 @@ In short, nothing will be glued together and the project is modular.
 Magnum isn't really much of an engine, and this project is pretty much an
 entirely new custom game engine.
 
-See wiki for more technical details
+Build instructions and more details can be found in the
+[Wiki](https://github.com/TheOpenSpaceProgram/osp-magnum/wiki/).
 
 ## Nice Engine Features
 * Uses modern **C++17**
