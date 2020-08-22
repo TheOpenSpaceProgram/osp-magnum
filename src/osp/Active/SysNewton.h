@@ -138,6 +138,11 @@ void SysNewton::shape_create_tri_mesh_static(CompCollisionShape &shape,
                                              TRIANGLE_IT_T const& start,
                                              TRIANGLE_IT_T const& end)
 {
+    // TODO: this is actually horrendously slow and WILL cause issues later on.
+    //       Tree collisions aren't made for real-time loading. Consider
+    //       manually hacking up serialized data instead of add face, or use
+    //       Newton's dgAABBPolygonSoup stuff directly
+
     NewtonCollision* tree = newton_create_tree_collision(m_nwtWorld, 0);
 
     newton_tree_collision_begin_build(tree);

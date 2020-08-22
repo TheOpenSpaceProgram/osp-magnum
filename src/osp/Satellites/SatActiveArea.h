@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Universe.h"
+
 #include <map>
 
 #include <Magnum/Math/Color.h>
@@ -8,7 +10,6 @@
 
 
 #include "../types.h"
-#include "../Satellite.h"
 //#include "../scene.h"
 
 #include "../Resource/Package.h"
@@ -24,40 +25,40 @@
 
 //#include "../Active/FtrNewtonBody.h"
 
-namespace osp
+namespace osp::universe
 {
 
 
 class OSPMagnum;
 class SatActiveArea;
 
-typedef int (*LoadStrategy)(SatActiveArea& area, SatelliteObject& loadMe);
+typedef int (*LoadStrategy)(ActiveScene& scene, SatActiveArea& area,
+                            Satellite areaSat, Satellite loadMe);
 
-class SatActiveArea : public SatelliteObject
+namespace ucomp
+{
+
+struct ActiveArea
+{
+    std::map<ITypeSatellite*, LoadStrategy> m_loadFunctions;
+    std::vector<Satellite*> m_activatedSats;
+
+    ActiveEnt m_camera;
+
+    unsigned m_sceneIndex;
+};
+
+}
+
+
+class SatActiveArea : public ITypeSatellite
 {
 
     friend OSPMagnum;
 
 public:
     SatActiveArea(UserInputHandler& userInput);
-    ~SatActiveArea();
-
-    static Id const& get_id_static()
-    {
-        static Id id{ typeid(SatActiveArea).name() };
-        return id;
-    }
-
-    Id const& get_id() override
-    {
-        return get_id_static();
-    }
-
-    bool is_activatable() const override { return false; }
-
-    ActiveScene* get_scene() { return m_scene.get(); }
-
-    ActiveEnt get_camera() { return m_camera; }
+    ~SatActiveArea() = default;
 
     /**
      * Setup magnum scene and sets m_loadedActive to true.
@@ -81,28 +82,19 @@ public:
      * @param id
      * @param function
      */
-    void activate_func_add(Id const* id, LoadStrategy function);
+    void activate_func_add(ITypeSatellite*, LoadStrategy function);
 
-    /**
-     * Attempt to load a satellite
-     * @return status, zero for no error
-     */
-    int activate_satellite(Satellite& sat);
-
-    bool is_loaded_active() { return m_loadedActive; }
+    virtual std::string get_name() { return "ActiveArea"; };
 
 private:
 
-    std::vector<SatelliteObject*> m_activatedSats;
-    std::map<Id const*, LoadStrategy> m_loadFunctions;
+    //bool m_loadedActive;
 
-    bool m_loadedActive;
+    //ActiveEnt m_camera;
 
-    ActiveEnt m_camera;
+    //std::shared_ptr<ActiveScene> m_scene;
 
-    std::shared_ptr<ActiveScene> m_scene;
-
-    UserInputHandler& m_userInput;
+    //UserInputHandler& m_userInput;
 
 };
 

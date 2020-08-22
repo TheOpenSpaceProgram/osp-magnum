@@ -2,7 +2,7 @@
 
 #include "activetypes.h"
 
-#include "../Satellite.h"
+#include "../Universe.h"
 #include "../Resource/Package.h"
 #include "../Resource/blueprints.h"
 
@@ -11,7 +11,12 @@
 namespace osp
 {
 
+namespace universe
+{
 class SatActiveArea;
+}
+
+
 class PrototypePart;
 
 struct WireMachineConnection
@@ -38,8 +43,10 @@ public:
     SysVehicle(SysNewton const& copy) = delete;
     SysVehicle(SysNewton&& move) = delete;
 
-    static int area_activate_vehicle(SatActiveArea& area,
-                                     SatelliteObject& loadMe);
+    static int area_activate_vehicle(ActiveScene& scene,
+                                     universe::SatActiveArea& area,
+                                     universe::Satellite areaSat,
+                                     universe::Satellite loadMe);
 
     /**
      * Create a Physical Part from a PrototypePart and put it in the world

@@ -1,10 +1,7 @@
 #pragma once
 
-
 #include <map>
 #include <string>
-
-#include <Corrade/Containers/LinkedList.h>
 
 namespace osp
 {

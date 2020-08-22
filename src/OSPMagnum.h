@@ -33,8 +33,8 @@ public:
     void mouseReleaseEvent(MouseEvent& event) override;
     void mouseMoveEvent(MouseMoveEvent& event) override;
 
-    SatActiveArea* get_active_area() { return m_area; }
-    void set_active_area(SatActiveArea& area);
+    //universe::SatActiveArea* get_active_area() { return m_area; }
+    //void set_active_area(universe::SatActiveArea& area);
 
     UserInputHandler& get_input_handler() { return m_userInput; }
 
@@ -43,9 +43,11 @@ private:
     // TODO: not sure how to safely access m_area.
     //       SatelliteObjects are stored with unique_ptr in Satellite
     //       might have to used shared_ptr unless there's a better way
-    SatActiveArea* m_area;
+    //universe::SatActiveArea* m_area;
     UserInputHandler m_userInput;
     //std::weak_ptr<SatActiveArea> m_area;
+
+    std::map<std::string, ActiveScene> m_scenes;
 
     Magnum::Timeline m_timeline;
 

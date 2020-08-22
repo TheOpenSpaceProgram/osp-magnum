@@ -1,10 +1,12 @@
 #pragma once
 
 #include <map>
+#include <memory>
 
 #include "../FunctonOrder.h"
 
-#include <entt/entt.hpp>
+#include <entt/entity/registry.hpp>
+
 
 namespace osp
 {

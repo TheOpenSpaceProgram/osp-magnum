@@ -13,6 +13,7 @@
 #include "OSPMagnum.h"
 #include "DebugObject.h"
 
+#include "osp/types.h"
 #include "osp/Universe.h"
 #include "osp/Satellites/SatActiveArea.h"
 #include "osp/Satellites/SatVehicle.h"
@@ -53,7 +54,7 @@ void load_a_bunch_of_stuff();
  * @param name
  * @return
  */
-osp::Satellite& debug_add_random_vehicle(std::string const& name);
+osp::universe::Satellite debug_add_random_vehicle(std::string const& name);
 
 /**
  * The spaghetti command line interface that gets inputs from stdin. This
@@ -152,7 +153,7 @@ int debug_cli_loop()
     }
 
     // destory the universe
-    g_osp.get_universe().get_sats().clear();
+    //g_osp.get_universe().get_sats().clear();
     return 0;
 }
 
@@ -223,39 +224,42 @@ void magnum_application()
         load_a_bunch_of_stuff();
     }
 
+    using osp::universe::Satellite;
+    using osp::universe::SatActiveArea;
+
     // create a satellite with an ActiveArea
-    osp::Satellite& sat = g_osp.get_universe().sat_create();
-    osp::SatActiveArea& area = sat.create_object<osp::SatActiveArea>(
-                                    g_ospMagnum->get_input_handler());
-    sat.set_position({Vector3s(0, 0, 0), 10});
+    Satellite sat = g_osp.get_universe().sat_create();
+    //SatActiveArea& area = sat.create_object<osp::SatActiveArea>(
+    //                                g_ospMagnum->get_input_handler());
+    //sat.set_position({Vector3s(0, 0, 0), 10});
 
     // Activate it
-    area.activate(g_osp);
+    //area.activate(g_osp);
 
     // Register dynamic systems
-    area.get_scene()->dynamic_system_add<osp::SysPlanetA>("Planet");
+    //area.get_scene()->dynamic_system_add<osp::SysPlanetA>("Planet");
 
     // Register machines
-    area.get_scene()->system_machine_add<osp::SysMachineUserControl>
-            ("UserControl", g_ospMagnum->get_input_handler());
-    area.get_scene()->system_machine_add<osp::SysMachineRocket>
-            ("Rocket");
+    //area.get_scene()->system_machine_add<osp::SysMachineUserControl>
+    //        ("UserControl", g_ospMagnum->get_input_handler());
+    //area.get_scene()->system_machine_add<osp::SysMachineRocket>
+    //        ("Rocket");
 
     // Make active areas load vehicles and planets
-    area.activate_func_add(&(osp::SatVehicle::get_id_static()),
-                           osp::SysVehicle::area_activate_vehicle);
-    area.activate_func_add(&(osp::SatPlanet::get_id_static()),
-                           osp::SysPlanetA::area_activate_planet);
+    //area.activate_func_add(&(osp::SatVehicle::get_id_static()),
+    //                       osp::SysVehicle::area_activate_vehicle);
+    //area.activate_func_add(&(osp::SatPlanet::get_id_static()),
+    //                       osp::SysPlanetA::area_activate_planet);
 
     // Add the debug camera controller
-    std::unique_ptr<osp::DebugCameraController> camObj
-            = std::make_unique<osp::DebugCameraController>(
-                    *(area.get_scene()), area.get_camera());
-    area.get_scene()->reg_emplace<osp::CompDebugObject>(area.get_camera(),
-                                                        std::move(camObj));
+    //std::unique_ptr<osp::DebugCameraController> camObj
+    //        = std::make_unique<osp::DebugCameraController>(
+    //                *(area.get_scene()), area.get_camera());
+    //area.get_scene()->reg_emplace<osp::CompDebugObject>(area.get_camera(),
+    //                                                    std::move(camObj));
 
     // make the application switch to that area
-    g_ospMagnum->set_active_area(area);
+    //g_ospMagnum->set_active_area(area);
 
     // Note: sat becomes invalid btw, since it refers to a vector elem.
     //       if new satellites are added, this can cause problems
@@ -269,7 +273,7 @@ void magnum_application()
     std::cout << "Magnum Application closed\n";
 
     // Kill the active area
-    g_osp.get_universe().sat_remove(area.get_satellite());
+    //g_osp.get_universe().sat_remove(area.get_satellite());
 
     // workaround: wipe mesh resources because they're specific to the
     // opengl context
@@ -281,6 +285,8 @@ void magnum_application()
 
 void load_a_bunch_of_stuff()
 {
+    using osp::universe::Satellite;
+
     // Create a new package
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
@@ -295,20 +301,20 @@ void load_a_bunch_of_stuff()
     g_osp.debug_get_packges().push_back(std::move(lazyDebugPack));
 
     // Add 50 vehicles so there's something to load
-    g_osp.get_universe().get_sats().reserve(64);
+    //g_osp.get_universe().get_sats().reserve(64);
 
     for (int i = 0; i < 50; i ++)
     {
         // Creates a random mess of spamcans
-        osp::Satellite& sat = debug_add_random_vehicle(std::to_string(i));
+        Satellite sat = debug_add_random_vehicle(std::to_string(i));
 
         // Put them in a long line each 5m apart
-        Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
-                i * 1024l * 5l,
-                0l,
-                0l), 10);
+        //Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
+        //        i * 1024l * 5l,
+        //        0l,
+        //        0l), 10);
 
-        sat.set_position(randomvec);
+        //sat.set_position(randomvec);
     }
 
     // Add Grid of planets too
@@ -317,26 +323,28 @@ void load_a_bunch_of_stuff()
     {
         for (int z = -1; z < 2; z ++)
         {
-            osp::Satellite& planet = g_osp.get_universe().sat_create();
+            Satellite planet = g_osp.get_universe().sat_create();
 
             // for now, planets are hard-coded to 128 meters in radius
-            planet.create_object<osp::SatPlanet>();
+            //planet.create_object<osp::SatPlanet>();
             // load the planet when active area is within 1km of the planet
-            planet.set_load_radius(1000.0f);
+            //planet.set_load_radius(1000.0f);
 
             // space planets 400m apart from each other
             // 1024 units = 1 meter
-            planet.set_position({{x * 1024l * 400l,
-                                  1024l * -140l,
-                                  z * 1024l * 400l}, 10});
+            //planet.set_position({{x * 1024l * 400l,
+            //                      1024l * -140l,
+            //                      z * 1024l * 400l}, 10});
         }
     }
 
     //s_partsLoaded = true;
 }
 
-osp::Satellite& debug_add_random_vehicle(std::string const& name)
+osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
 {
+
+    using namespace osp;
 
     // Start making the blueprint
 
@@ -381,11 +389,11 @@ osp::Satellite& debug_add_random_vehicle(std::string const& name)
 
     // Create the Satellite containing a SatVehicle
 
-    osp::Satellite &sat = g_osp.get_universe().sat_create();
-    osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
+    universe::Satellite sat = g_osp.get_universe().sat_create();
+    //osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
 
     // set the SatVehicle's blueprint to the one just made
-    vehicle.get_blueprint_depend() = std::move(depend);
+    //vehicle.get_blueprint_depend() = std::move(depend);
 
     return sat;
 
@@ -412,86 +420,86 @@ void debug_print_update_order()
         return;
     }
 
-    osp::UpdateOrder& order = g_ospMagnum->get_active_area()
-                                ->get_scene()->get_update_order();
+    //osp::UpdateOrder& order = g_ospMagnum->get_active_area()
+    //                            ->get_scene()->get_update_order();
 
-    std::cout << "Update order:\n";
-    for (auto call : order.get_call_list())
-    {
-        std::cout << "* " << call.m_name << "\n";
-    }
+    //std::cout << "Update order:\n";
+    //for (auto call : order.get_call_list())
+    //{
+    //    std::cout << "* " << call.m_name << "\n";
+    //}
 }
 
 void debug_print_hier()
 {
-    if (!g_ospMagnum)
-    {
-        std::cout << "Can't do that yet, start the magnum application first!\n";
-        return;
-    }
+//    if (!g_ospMagnum)
+//    {
+//        std::cout << "Can't do that yet, start the magnum application first!\n";
+//        return;
+//    }
 
-    std::cout << "Entity Hierarchy:\n";
+//    std::cout << "Entity Hierarchy:\n";
 
-    std::vector<osp::ActiveEnt> parentNextSibling;
-    osp::ActiveScene &scene = *(g_ospMagnum->get_active_area()->get_scene());
-    osp::ActiveEnt currentEnt = scene.hier_get_root();
+//    std::vector<osp::ActiveEnt> parentNextSibling;
+//    osp::ActiveScene &scene = *(g_ospMagnum->get_active_area()->get_scene());
+//    osp::ActiveEnt currentEnt = scene.hier_get_root();
 
-    parentNextSibling.reserve(16);
+//    parentNextSibling.reserve(16);
 
-    while (true)
-    {
-        // print some info about the entity
-        osp::CompHierarchy &hier = scene.reg_get<osp::CompHierarchy>(currentEnt);
-        for (unsigned i = 0; i < hier.m_level; i ++)
-        {
-            // print arrows to indicate level
-            std::cout << "  ->";
-        }
-        std::cout << "[" << int(currentEnt) << "]: " << hier.m_name << "\n";
+//    while (true)
+//    {
+//        // print some info about the entity
+//        osp::CompHierarchy &hier = scene.reg_get<osp::CompHierarchy>(currentEnt);
+//        for (unsigned i = 0; i < hier.m_level; i ++)
+//        {
+//            // print arrows to indicate level
+//            std::cout << "  ->";
+//        }
+//        std::cout << "[" << int(currentEnt) << "]: " << hier.m_name << "\n";
 
-        if (hier.m_childCount)
-        {
-            // entity has some children
-            currentEnt = hier.m_childFirst;
+//        if (hier.m_childCount)
+//        {
+//            // entity has some children
+//            currentEnt = hier.m_childFirst;
 
 
-            // save next sibling for later if it exists
-            if (hier.m_siblingNext != entt::null)
-            {
-                parentNextSibling.push_back(hier.m_siblingNext);
-            }
-        }
-        else if (hier.m_siblingNext != entt::null)
-        {
-            // no children, move to next sibling
-            currentEnt = hier.m_siblingNext;
-        }
-        else if (parentNextSibling.size())
-        {
-            // last sibling, and not done yet
-            // is last sibling, move to parent's (or ancestor's) next sibling
-            currentEnt = parentNextSibling.back();
-            parentNextSibling.pop_back();
-        }
-        else
-        {
-            break;
-        }
-    }
+//            // save next sibling for later if it exists
+//            if (hier.m_siblingNext != entt::null)
+//            {
+//                parentNextSibling.push_back(hier.m_siblingNext);
+//            }
+//        }
+//        else if (hier.m_siblingNext != entt::null)
+//        {
+//            // no children, move to next sibling
+//            currentEnt = hier.m_siblingNext;
+//        }
+//        else if (parentNextSibling.size())
+//        {
+//            // last sibling, and not done yet
+//            // is last sibling, move to parent's (or ancestor's) next sibling
+//            currentEnt = parentNextSibling.back();
+//            parentNextSibling.pop_back();
+//        }
+//        else
+//        {
+//            break;
+//        }
+//    }
 }
 
 void debug_print_sats()
 {
-    std::vector<osp::Satellite>& sats = g_osp.get_universe().get_sats();
+//    std::vector<osp::Satellite>& sats = g_osp.get_universe().get_sats();
 
-    // Loop through g_universe's satellites and print them.
-    std::cout << "Universe:\n";
-    for (osp::Satellite& sat : sats)
-    {
-        Vector3sp pos = sat.get_position();
-        std::cout << "* " << sat.get_name() << "["
-                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "] ("
-                  << sat.get_object()->get_id().m_name << ")\n";
-    }
+//    // Loop through g_universe's satellites and print them.
+//    std::cout << "Universe:\n";
+//    for (osp::Satellite& sat : sats)
+//    {
+//        Vector3sp pos = sat.get_position();
+//        std::cout << "* " << sat.get_name() << "["
+//                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "] ("
+//                  << sat.get_object()->get_id().m_name << ")\n";
+//    }
 
 }

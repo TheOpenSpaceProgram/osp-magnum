@@ -305,6 +305,19 @@ NewtonCollision* SysNewton::newton_create_tree_collision(
     return NewtonCreateTreeCollision(newtonWorld, shapeId);
 }
 
+void foo(void* const serializeHandle, const void * const buffer, int size)
+{
+    std::cout << std::hex;
+    for (size_t i = 0; i < size; i ++)
+    {
+        int f = uint8_t(*((uint8_t*)buffer + i));
+         std::cout << f;
+    }
+    std::cout << std::dec;
+
+}
+
+
 void SysNewton::newton_tree_collision_add_face(
         const NewtonCollision* treeCollision, int vertexCount,
         const float* vertexPtr, int strideInBytes, int faceAttribute)

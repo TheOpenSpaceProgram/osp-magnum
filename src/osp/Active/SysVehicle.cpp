@@ -21,8 +21,13 @@ SysVehicle::SysVehicle(ActiveScene &scene) :
     m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
 }
 
-int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& loadMe)
+int SysVehicle::area_activate_vehicle(ActiveScene& scene,
+                                      universe::SatActiveArea& area,
+                                      universe::Satellite areaSat,
+                                      universe::Satellite loadMe)
 {
+
+    /*
 
     std::cout << "loadin a vehicle!\n";
 
@@ -170,6 +175,7 @@ int SysVehicle::area_activate_vehicle(SatActiveArea& area, SatelliteObject& load
     vehicleShape.m_shape = ECollisionShape::COMBINED;
     area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
 
+    */
     return 0;
 }
 

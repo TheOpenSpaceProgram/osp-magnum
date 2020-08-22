@@ -2,7 +2,7 @@
 
 #include "../PlanetGeometryA.h"
 
-#include <osp/Satellite.h>
+#include <osp/Universe.h>
 #include <osp/Satellites/SatActiveArea.h>
 
 #include <osp/Active/activetypes.h>
@@ -11,9 +11,11 @@
 #include <Magnum/GL/Mesh.h>
 
 
-namespace osp
-
+namespace planeta
 {
+
+using namespace osp;
+using namespace osp::universe;
 
 struct CompPlanet
 {
@@ -34,8 +36,8 @@ class SysPlanetA : public IDynamicSystem
 {
 public:
 
-    static int area_activate_planet(SatActiveArea& area,
-                                    SatelliteObject& loadMe);
+    static int area_activate_planet(ActiveScene& scene, universe::SatActiveArea& area,
+                        Satellite areaSat, Satellite loadMe);
 
     SysPlanetA(ActiveScene &scene);
     ~SysPlanetA() = default;

@@ -11,6 +11,9 @@
 
 //typedef KeyMap std::map<Magnum::Platform::Application::KeyEvent>
 
+namespace osp
+{
+
 using Magnum::Vector2;
 using Magnum::Vector2i;
 
@@ -83,3 +86,6 @@ private:
     Vector3s m_vector;
     int8_t m_precision;
 };
+
+
+}

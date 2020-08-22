@@ -1,37 +1,34 @@
 #pragma once
 
-#include <osp/Satellite.h>
+#include <osp/Universe.h>
 
-namespace osp
+namespace planeta::universe
 {
 
+using namespace osp;
+using namespace osp::universe;
 
-class SatPlanet : public SatelliteObject
+namespace ucomp
 {
 
-public:
-    SatPlanet();
-    ~SatPlanet();
-
-    static Id const& get_id_static()
-    {
-        static Id id{ typeid(SatPlanet).name() };
-        return id;
-    }
-
-    Id const& get_id() override
-    {
-        return get_id_static();
-    }
-
-    bool is_activatable() const override;
-
-
+struct Planet
+{
     double m_radius;
+};
+
+}
+
+
+class SatPlanet : public ITypeSatellite
+{
+public:
+    SatPlanet() = default;
+    ~SatPlanet() = default;
+
+    virtual std::string get_name() { return "Planet"; };
 
 private:
 
-    ;
 
 };
 

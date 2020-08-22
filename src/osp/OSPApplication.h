@@ -17,11 +17,11 @@ public:
 
     std::vector<Package>& debug_get_packges() { return m_packages; };
 
-    Universe& get_universe() { return m_universe; }
+    universe::Universe& get_universe() { return m_universe; }
 
 private:
     std::vector<Package> m_packages;
-    Universe m_universe;
+    universe::Universe m_universe;
 };
 
 }
