@@ -6,6 +6,10 @@
 
 using namespace osp::universe;
 
+Universe::Universe()
+{
+    m_root = sat_create();
+}
 
 Satellite Universe::sat_create()
 {

@@ -57,7 +57,7 @@ class SatActiveArea : public ITypeSatellite
     friend OSPMagnum;
 
 public:
-    SatActiveArea(UserInputHandler& userInput);
+    SatActiveArea() = default;
     ~SatActiveArea() = default;
 
     /**

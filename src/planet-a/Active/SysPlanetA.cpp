@@ -46,7 +46,7 @@ int SysPlanetA::area_activate_planet(ActiveScene& scene,
 
 //    planetComp.m_radius = planet.m_radius;
 
-//    return 0;
+    return 0;
 }
 
 SysPlanetA::SysPlanetA(ActiveScene &scene) :

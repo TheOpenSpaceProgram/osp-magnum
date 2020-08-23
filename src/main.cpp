@@ -15,6 +15,7 @@
 
 #include "osp/types.h"
 #include "osp/Universe.h"
+#include "osp/Trajectories/Stationary.h"
 #include "osp/Satellites/SatActiveArea.h"
 #include "osp/Satellites/SatVehicle.h"
 #include "osp/Resource/SturdyImporter.h"
@@ -42,6 +43,11 @@ void magnum_application();
  * prefer not to use names like this anywhere else but main.cpp
  */
 void load_a_bunch_of_stuff();
+
+/**
+ * Adds stuff to the universe
+ */
+void create_solar_system();
 
 /**
  * Creates a BlueprintVehicle and adds a random mess of 10 part_spamcans to it
@@ -222,6 +228,7 @@ void magnum_application()
     if (!g_osp.debug_get_packges().size())
     {
         load_a_bunch_of_stuff();
+        create_solar_system();
     }
 
     using osp::universe::Satellite;
@@ -303,6 +310,24 @@ void load_a_bunch_of_stuff()
     // Add 50 vehicles so there's something to load
     //g_osp.get_universe().get_sats().reserve(64);
 
+    //s_partsLoaded = true;
+}
+
+void create_solar_system()
+{
+    using namespace osp::universe;
+
+    Universe& universe = g_osp.get_universe();
+
+    // Register satellite types used
+    universe.register_satellite_type<SatActiveArea>();
+    universe.register_satellite_type<SatVehicle>();
+    universe.register_satellite_type<planeta::universe::SatPlanet>();
+
+    // Create trajectory that will make things added to the universe stationary
+    traj::Stationary& traj = universe.create_trajectory<traj::Stationary>(
+                                        universe, universe.sat_root());
+
     for (int i = 0; i < 50; i ++)
     {
         // Creates a random mess of spamcans
@@ -338,7 +363,6 @@ void load_a_bunch_of_stuff()
         }
     }
 
-    //s_partsLoaded = true;
 }
 
 osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
