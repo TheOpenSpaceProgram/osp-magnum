@@ -2,7 +2,7 @@
 
 #include "ActiveScene.h"
 
-using namespace osp;
+using namespace osp::active;
 
 //ISysMachine::ISysMachine(ActiveScene& scene)
 //{

@@ -15,7 +15,7 @@
 #include "SysVehicle.h"
 #include "SysWire.h"
 
-namespace osp
+namespace osp::active
 {
 
 /**
@@ -191,7 +191,7 @@ public:
      * @tparam T
      */
     template<class T, typename... Args>
-    void dynamic_system_add(std::string const& name, Args &&... args);
+    T& dynamic_system_add(std::string const& name, Args &&... args);
 
     /**
      * Get a registered SysMachine by name. This accesses a map.
@@ -251,10 +251,15 @@ void ActiveScene::system_machine_add(std::string const& name,
 }
 
 template<class T, typename... Args>
-void ActiveScene::dynamic_system_add(std::string const& name,
+T& ActiveScene::dynamic_system_add(std::string const& name,
                                              Args &&... args)
 {
-    m_dynamicSys.emplace(name, std::make_unique<T>(*this, args...));
+    auto ptr = std::make_unique<T>(*this, args...);
+    T &refReturn = *(ptr.get());
+
+    auto pair = m_dynamicSys.emplace(name, std::move(ptr));
+
+    return refReturn;
 }
 
 // TODO: There's probably a better way to do these:

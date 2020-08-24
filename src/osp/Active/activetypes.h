@@ -8,7 +8,7 @@
 #include <entt/entity/registry.hpp>
 
 
-namespace osp
+namespace osp::active
 {
 
 class SysNewton;

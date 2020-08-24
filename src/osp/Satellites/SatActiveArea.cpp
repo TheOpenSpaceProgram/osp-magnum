@@ -16,8 +16,14 @@ using namespace Magnum::Math::Literals;
 
 using Magnum::Matrix4;
 
-namespace osp
+namespace osp::universe
 {
+
+SatActiveArea::SatActiveArea(Universe& universe) :
+        CommonTypeSat<SatActiveArea, ucomp::ActiveArea>(universe)
+{
+
+}
 
 
 }

@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace osp
+namespace osp::active
 {
 
 using Corrade::Containers::LinkedList;

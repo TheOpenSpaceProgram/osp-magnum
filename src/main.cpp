@@ -23,6 +23,8 @@
 
 #include "osp/Active/ActiveScene.h"
 #include "osp/Active/SysVehicle.h"
+#include "osp/Active/SysAreaAssociate.h"
+
 
 #include "adera/Machines/UserControl.h"
 #include "adera/Machines/Rocket.h"
@@ -31,10 +33,48 @@
 #include "planet-a/Active/SysPlanetA.h"
 
 
+namespace universe
+{
+    using namespace osp::universe;
+    using namespace planeta::universe;
+}
+
+namespace ucomp // ECS components for Satellites
+{
+    using namespace osp::universe::ucomp;
+    using namespace planeta::universe::ucomp;
+}
+
+namespace active
+{
+    using namespace osp::active;
+    using namespace adera::active;
+    using namespace planeta::active;
+}
+
+namespace traj
+{
+    using namespace osp::universe::traj;
+    //using namespace planeta::universe::traj;
+}
+
+namespace machines
+{
+    using namespace adera::active::machines;
+}
+
+using osp::Vector2;
+using osp::Vector3;
+using osp::Matrix4;
+using osp::Quaternion;
+
+
 /**
  * Starts a magnum application, an active area, and links them together
  */
 void magnum_application();
+
+void config_controls();
 
 /**
  * As the name implies. This should only be called once for the entire lifetime
@@ -167,14 +207,114 @@ void magnum_application()
 {
     // Create the application
     g_ospMagnum = std::make_unique<osp::OSPMagnum>(
-                        osp::OSPMagnum::Arguments{g_argc, g_argv});
+                        osp::OSPMagnum::Arguments{g_argc, g_argv}, g_osp);
 
+    // self explanatory name
+    config_controls();
+
+    // Load if not loaded yet. This only calls once within the entire program's
+    // lifetime
+    if (!g_osp.debug_get_packges().size())
+    {
+        load_a_bunch_of_stuff();
+        create_solar_system();
+    }
+
+    // Create an ActiveArea
+
+
+    universe::Universe &uni = g_osp.get_universe();
+    universe::SatActiveArea &satAA = *static_cast<universe::SatActiveArea*>(
+            uni.sat_type_find("Vehicle")->second.get());
+    universe::SatPlanet &satPlanet = *static_cast<universe::SatPlanet*>(
+            uni.sat_type_find("Planet")->second.get());
+
+    // create a satellite with an ActiveArea
+    universe::Satellite sat = g_osp.get_universe().sat_create();
+
+    // assign sat as an ActiveArea
+    ucomp::ActiveArea* area = satAA.add_get_ucomp(sat);
+
+    // Create an ActiveScene
+    active::ActiveScene& scene = g_ospMagnum->scene_add("Area 1");
+
+    // Register dynamic systems for that scene
+    auto sysArea = scene.dynamic_system_add<active::SysAreaAssociate>("AreaAssociate");
+    scene.dynamic_system_add<active::SysPlanetA>("Planet");
+
+    // Register machines for that scene
+    scene.system_machine_add<machines::SysMachineUserControl>("UserControl",
+            g_ospMagnum->get_input_handler());
+    scene.system_machine_add<machines::SysMachineRocket>("Rocket");
+
+    // Link ActiveArea to scene using the AreaAssociate
+    sysArea.connect(sat);
+
+    // Make active areas load vehicles and planets
+//    sysArea.activate_func_add(satAA.),
+//                           active::SysVehicle::area_activate_vehicle);
+//    sysArea.activate_func_add(&(atPlanet::get_id_static()),
+//                           osp::SysPlanetA::area_activate_planet);
+
+    // for the 0xrrggbb_rgbf and angle literals
+    using namespace Magnum::Math::Literals;
+
+    // Create the camera entity
+    active::ActiveEnt camera = scene.hier_create_child(scene.hier_get_root(), "Camera");
+    active::CompTransform& cameraTransform = scene.reg_emplace<active::CompTransform>(camera);
+    active::CompCamera& cameraComp = scene.get_registry().emplace<active::CompCamera>(camera);
+
+    cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
+    cameraTransform.m_enableFloatingOrigin = true;
+
+    cameraComp.m_viewport = Vector2(Magnum::GL::defaultFramebuffer.viewport()
+                                                                 .size());
+    cameraComp.m_far = 4096.0f;
+    cameraComp.m_near = 0.125f;
+    cameraComp.m_fov = 45.0_degf;
+
+    cameraComp.calculate_projection();
+    // Add the debug camera controller
+    //std::unique_ptr<osp::DebugCameraController> camObj
+    //        = std::make_unique<osp::DebugCameraController>(
+    //                *(area.get_scene()), area.get_camera());
+    //area.get_scene()->reg_emplace<osp::CompDebugObject>(area.get_camera(),
+    //                                                    std::move(camObj));
+
+    // make the application switch to that area
+    //g_ospMagnum->set_active_area(area);
+
+    // Note: sat becomes invalid btw, since it refers to a vector elem.
+    //       if new satellites are added, this can cause problems
+
+    // Starts the game loop. This function will return when the window is
+    // closed. See OSPMagnum::drawEvent
+    g_ospMagnum->exec();
+
+    // Close button has been pressed
+
+    std::cout << "Magnum Application closed\n";
+
+    // Kill the active area
+    //g_osp.get_universe().sat_remove(area.get_satellite());
+
+    // workaround: wipe mesh resources because they're specific to the
+    // opengl context
+    g_osp.debug_get_packges()[0].clear<Magnum::GL::Mesh>();
+
+    // destruct the application, this closes the window
+    g_ospMagnum.reset();
+}
+
+void config_controls()
+{
     // Configure Controls
+    using namespace osp;
 
-    using Key = osp::OSPMagnum::KeyEvent::Key;
-    using VarOp = osp::ButtonVarConfig::VarOperator;
-    using VarTrig = osp::ButtonVarConfig::VarTrigger;
-    osp::UserInputHandler& userInput = g_ospMagnum->get_input_handler();
+    using Key = OSPMagnum::KeyEvent::Key;
+    using VarOp = ButtonVarConfig::VarOperator;
+    using VarTrig = ButtonVarConfig::VarTrigger;
+    UserInputHandler& userInput = g_ospMagnum->get_input_handler();
 
     // vehicle control, used by MachineUserControl
 
@@ -223,77 +363,10 @@ void magnum_application()
             {{0, (int) Key::Left, VarTrig::PRESSED, false, VarOp::AND}});
     userInput.config_register_control("ui_rt", true,
             {{0, (int) Key::Right, VarTrig::PRESSED, false, VarOp::AND}});
-
-    // only call load once, since some stuff might already be loaded
-    if (!g_osp.debug_get_packges().size())
-    {
-        load_a_bunch_of_stuff();
-        create_solar_system();
-    }
-
-    using osp::universe::Satellite;
-    using osp::universe::SatActiveArea;
-
-    // create a satellite with an ActiveArea
-    Satellite sat = g_osp.get_universe().sat_create();
-    //SatActiveArea& area = sat.create_object<osp::SatActiveArea>(
-    //                                g_ospMagnum->get_input_handler());
-    //sat.set_position({Vector3s(0, 0, 0), 10});
-
-    // Activate it
-    //area.activate(g_osp);
-
-    // Register dynamic systems
-    //area.get_scene()->dynamic_system_add<osp::SysPlanetA>("Planet");
-
-    // Register machines
-    //area.get_scene()->system_machine_add<osp::SysMachineUserControl>
-    //        ("UserControl", g_ospMagnum->get_input_handler());
-    //area.get_scene()->system_machine_add<osp::SysMachineRocket>
-    //        ("Rocket");
-
-    // Make active areas load vehicles and planets
-    //area.activate_func_add(&(osp::SatVehicle::get_id_static()),
-    //                       osp::SysVehicle::area_activate_vehicle);
-    //area.activate_func_add(&(osp::SatPlanet::get_id_static()),
-    //                       osp::SysPlanetA::area_activate_planet);
-
-    // Add the debug camera controller
-    //std::unique_ptr<osp::DebugCameraController> camObj
-    //        = std::make_unique<osp::DebugCameraController>(
-    //                *(area.get_scene()), area.get_camera());
-    //area.get_scene()->reg_emplace<osp::CompDebugObject>(area.get_camera(),
-    //                                                    std::move(camObj));
-
-    // make the application switch to that area
-    //g_ospMagnum->set_active_area(area);
-
-    // Note: sat becomes invalid btw, since it refers to a vector elem.
-    //       if new satellites are added, this can cause problems
-
-    // Starts the game loop. This function will return when the window is
-    // closed. See OSPMagnum::drawEvent
-    g_ospMagnum->exec();
-
-    // Close button has been pressed
-
-    std::cout << "Magnum Application closed\n";
-
-    // Kill the active area
-    //g_osp.get_universe().sat_remove(area.get_satellite());
-
-    // workaround: wipe mesh resources because they're specific to the
-    // opengl context
-    g_osp.debug_get_packges()[0].clear<Magnum::GL::Mesh>();
-
-    // destruct the application, this closes the window
-    g_ospMagnum.reset();
 }
 
 void load_a_bunch_of_stuff()
 {
-    using osp::universe::Satellite;
-
     // Create a new package
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
@@ -315,43 +388,48 @@ void load_a_bunch_of_stuff()
 
 void create_solar_system()
 {
-    using namespace osp::universe;
+    using osp::universe::Universe;
 
-    Universe& universe = g_osp.get_universe();
+    Universe& uni = g_osp.get_universe();
 
     // Register satellite types used
-    universe.register_satellite_type<SatActiveArea>();
-    universe.register_satellite_type<SatVehicle>();
-    universe.register_satellite_type<planeta::universe::SatPlanet>();
+    uni.sat_type_register<universe::SatActiveArea>(uni);
+    uni.sat_type_register<universe::SatVehicle>(uni);
+    auto &typePlanet = uni.sat_type_register<universe::SatPlanet>(uni);
 
     // Create trajectory that will make things added to the universe stationary
-    traj::Stationary& traj = universe.create_trajectory<traj::Stationary>(
-                                        universe, universe.sat_root());
+    auto &stationary = uni.trajectory_create<traj::Stationary>(
+                                        uni, uni.sat_root());
 
-    for (int i = 0; i < 50; i ++)
+    for (int i = 0; i < 20; i ++)
     {
         // Creates a random mess of spamcans
-        Satellite sat = debug_add_random_vehicle(std::to_string(i));
+        universe::Satellite sat = debug_add_random_vehicle("TestyMcTestFace Mk"
+                                                 + std::to_string(i));
 
-        // Put them in a long line each 5m apart
-        //Vector3sp randomvec(Magnum::Math::Vector3<SpaceInt>(
-        //        i * 1024l * 5l,
-        //        0l,
-        //        0l), 10);
+        auto &posTraj = uni.get_reg().get<ucomp::PositionTrajectory>(sat);
 
-        //sat.set_position(randomvec);
+        posTraj.m_position = osp::Vector3s(i * 1024l * 5l, 0l, 0l);
+        posTraj.m_dirty = true;
+
+        stationary.add(sat);
+
     }
 
+    return;
+
     // Add Grid of planets too
+    // for now, planets are hard-coded to 128 meters in radius
 
     for (int x = -1; x < 2; x ++)
     {
         for (int z = -1; z < 2; z ++)
         {
-            Satellite planet = g_osp.get_universe().sat_create();
+            universe::Satellite sat = g_osp.get_universe().sat_create();
 
-            // for now, planets are hard-coded to 128 meters in radius
-            //planet.create_object<osp::SatPlanet>();
+            // assign it as planet
+            typePlanet.add(sat);
+
             // load the planet when active area is within 1km of the planet
             //planet.set_load_radius(1000.0f);
 
@@ -368,16 +446,18 @@ void create_solar_system()
 osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
 {
 
-    using namespace osp;
+    using osp::BlueprintVehicle;
+    using osp::PrototypePart;
+    using osp::DependRes;
 
     // Start making the blueprint
 
-    osp::BlueprintVehicle blueprint;
+    BlueprintVehicle blueprint;
 
     // Part to add, very likely a spamcan
-    osp::DependRes<osp::PrototypePart> victim =
+    DependRes<PrototypePart> victim =
             g_osp.debug_get_packges()[0]
-            .get<osp::PrototypePart>("part_spamcan");
+            .get<PrototypePart>("part_spamcan");
 
     // Add 6 parts
     for (int i = 0; i < 6; i ++)
@@ -408,16 +488,29 @@ osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
                        0, 1, 0);
 
     // put blueprint in package
-    osp::DependRes<osp::BlueprintVehicle> depend = g_osp.debug_get_packges()[0]
-            .add<osp::BlueprintVehicle>(name, std::move(blueprint));
+    DependRes<BlueprintVehicle> depend = g_osp.debug_get_packges()[0]
+            .add<BlueprintVehicle>(name, std::move(blueprint));
 
     // Create the Satellite containing a SatVehicle
 
-    universe::Satellite sat = g_osp.get_universe().sat_create();
-    //osp::SatVehicle &vehicle = sat.create_object<osp::SatVehicle>();
+    // TODO: make this more safe
+
+    universe::Universe &uni = g_osp.get_universe();
+
+    // Create blank satellite
+    universe::Satellite sat = uni.sat_create();
+
+    // Set the name
+    auto &posTraj = uni.get_reg().get<ucomp::PositionTrajectory>(sat);
+    posTraj.m_name = name;
+
+    // Make it into a vehicle
+    auto &typeVehicle = *static_cast<universe::SatVehicle*>(
+            uni.sat_type_find("Vehicle")->second.get());
+    ucomp::Vehicle *ucompVehicle = typeVehicle.add_get_ucomp(sat);
 
     // set the SatVehicle's blueprint to the one just made
-    //vehicle.get_blueprint_depend() = std::move(depend);
+    ucompVehicle->m_blueprint = std::move(depend);
 
     return sat;
 
@@ -514,16 +607,34 @@ void debug_print_hier()
 
 void debug_print_sats()
 {
-//    std::vector<osp::Satellite>& sats = g_osp.get_universe().get_sats();
 
-//    // Loop through g_universe's satellites and print them.
-//    std::cout << "Universe:\n";
-//    for (osp::Satellite& sat : sats)
-//    {
-//        Vector3sp pos = sat.get_position();
-//        std::cout << "* " << sat.get_name() << "["
-//                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "] ("
-//                  << sat.get_object()->get_id().m_name << ")\n";
-//    }
+    universe::Universe &universe = g_osp.get_universe();
+
+    auto view = universe.get_reg().view<ucomp::PositionTrajectory,
+                                        ucomp::Type>();
+
+    for (universe::Satellite sat : view)
+    {
+        auto &posTraj = view.get<ucomp::PositionTrajectory>(sat);
+        auto &type = view.get<ucomp::Type>(sat);
+
+        auto &pos = posTraj.m_position;
+
+        std::cout << "SATELLITE: \"" << posTraj.m_name << "\" \n";
+        if (type.m_type)
+        {
+            std::cout << " * Type: " << type.m_type->get_name() << "\n";
+        }
+
+        if (posTraj.m_trajectory)
+        {
+            std::cout << " * Trajectory: "
+                      << posTraj.m_trajectory->get_type_name() << "\n";
+        }
+
+        std::cout << " * Position: ["
+                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "]\n";
+    }
+
 
 }

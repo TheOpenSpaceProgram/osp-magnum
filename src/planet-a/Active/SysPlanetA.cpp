@@ -17,11 +17,12 @@ using namespace std::placeholders;
 using namespace Magnum::Math::Literals;
 
 using namespace planeta;
+using namespace planeta::active;
 
-int SysPlanetA::area_activate_planet(ActiveScene& scene,
-                                     universe::SatActiveArea& area,
-                                     universe::Satellite areaSat,
-                                     universe::Satellite loadMe)
+int SysPlanetA::area_activate_planet(osp::active::ActiveScene& scene,
+                                     osp::universe::SatActiveArea& area,
+                                     osp::universe::Satellite areaSat,
+                                     osp::universe::Satellite loadMe)
 {
     std::cout << "activatin a planet!!!!!!!!!!!!!!!!11\n";
 
@@ -49,7 +50,7 @@ int SysPlanetA::area_activate_planet(ActiveScene& scene,
     return 0;
 }
 
-SysPlanetA::SysPlanetA(ActiveScene &scene) :
+SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene) :
     m_scene(scene),
     m_updateGeometry(scene.get_update_order(), "planet_geo", "", "physics",
                      std::bind(&SysPlanetA::update_geometry, this)),
@@ -61,9 +62,12 @@ SysPlanetA::SysPlanetA(ActiveScene &scene) :
 
 }
 
-void SysPlanetA::draw(CompCamera const& camera)
+void SysPlanetA::draw(osp::active::CompCamera const& camera)
 {
     using Magnum::GL::Renderer;
+    using osp::Matrix4;
+    using osp::Vector2;
+    using osp::active::CompTransform;
 
     auto drawGroup = m_scene.get_registry().group<CompPlanet>(
                             entt::get<CompTransform>);
@@ -90,9 +94,17 @@ void SysPlanetA::draw(CompCamera const& camera)
     }
 }
 
-void SysPlanetA::debug_create_chunk_collider(ActiveEnt ent, CompPlanet &planet,
+void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
+                                             CompPlanet &planet,
                                              chindex_t chunk)
 {
+    using osp::active::SysPhysics;
+    using osp::active::ActiveEnt;
+    using osp::active::CompTransform;
+    using osp::active::CompCollisionShape;
+    using osp::active::CompRigidBody;
+    using osp::ECollisionShape;
+
     SysPhysics &physics = m_scene.get_system<SysPhysics>();
 
     // Create entity and required components
@@ -125,7 +137,7 @@ void SysPlanetA::update_geometry()
 
     auto view = m_scene.get_registry().view<CompPlanet>();
 
-    for (ActiveEnt ent : view)
+    for (osp::active::ActiveEnt ent : view)
     {
         CompPlanet &planet = view.get<CompPlanet>(ent);
 

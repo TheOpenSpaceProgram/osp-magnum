@@ -10,14 +10,17 @@
 
 namespace osp
 {
+class PrototypePart;
+}
 
-namespace universe
+namespace osp::universe
 {
 class SatActiveArea;
 }
 
+namespace osp::active
+{
 
-class PrototypePart;
 
 struct WireMachineConnection
 {

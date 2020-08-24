@@ -5,8 +5,8 @@
 namespace planeta::universe
 {
 
-using namespace osp;
-using namespace osp::universe;
+//using namespace osp;
+//using namespace osp::universe;
 
 namespace ucomp
 {
@@ -19,10 +19,10 @@ struct Planet
 }
 
 
-class SatPlanet : public ITypeSatellite
+class SatPlanet : public osp::universe::CommonTypeSat<SatPlanet, ucomp::Planet>
 {
 public:
-    SatPlanet() = default;
+    SatPlanet(osp::universe::Universe& universe);
     ~SatPlanet() = default;
 
     virtual std::string get_name() { return "Planet"; };

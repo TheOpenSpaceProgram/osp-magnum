@@ -3,10 +3,8 @@
 #include <memory>
 
 #include <osp/Active/activetypes.h>
+#include <osp/UserInputHandler.h>
 #include <osp/types.h>
-
-#include <adera/Machines/UserControl.h>
-
 
 namespace osp
 {
@@ -26,14 +24,14 @@ class DebugObject : public AbstractDebugObject
 {
     friend Derived;
 public:
-    DebugObject(ActiveScene &scene, ActiveEnt ent) :
+    DebugObject(active::ActiveScene &scene, active::ActiveEnt ent) :
             m_scene(scene),
             m_ent(ent) {};
     virtual ~DebugObject() = default;
 
 private:
-    ActiveScene &m_scene;
-    ActiveEnt m_ent;
+    active::ActiveScene &m_scene;
+    active::ActiveEnt m_ent;
 };
 
 struct CompDebugObject
@@ -51,17 +49,17 @@ class DebugCameraController : public DebugObject<DebugCameraController>
 {
 
 public:
-    DebugCameraController(ActiveScene &scene, ActiveEnt ent);
+    DebugCameraController(active::ActiveScene &scene, active::ActiveEnt ent);
     ~DebugCameraController() = default;
     void update_physics_post();
-    void view_orbit(ActiveEnt ent);
+    void view_orbit(active::ActiveEnt ent);
 private:
 
-    ActiveEnt m_orbiting;
+    active::ActiveEnt m_orbiting;
     Vector3 m_orbitPos;
     float m_orbitDistance;
 
-    UpdateOrderHandle m_updatePhysicsPost;
+    active::UpdateOrderHandle m_updatePhysicsPost;
 
     UserInputHandler &m_userInput;
     ButtonControlHandle m_up;

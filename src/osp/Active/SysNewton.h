@@ -11,7 +11,7 @@ class NewtonBody;
 class NewtonCollision;
 class NewtonWorld;
 
-namespace osp
+namespace osp::active
 {
 
 class ActiveScene;

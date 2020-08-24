@@ -9,7 +9,7 @@
 #include <memory>
 #include <vector>
 
-namespace osp
+namespace planeta
 {
 
 // Index to a chunk

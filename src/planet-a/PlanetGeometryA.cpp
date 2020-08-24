@@ -11,9 +11,9 @@
 // maybe do something about how this file is almost a thousand lines long
 // there's a lot of comments though
 
+using namespace planeta;
 
-namespace osp
-{
+using osp::Vector3;
 
 void PlanetGeometryA::initialize(float radius)
 {
@@ -921,6 +921,4 @@ vrindex_t PlanetGeometryA::shared_create()
     m_vrtxSharedUsers[sharedOut] = 1; // set reference count
 
     return sharedOut;
-}
-
 }

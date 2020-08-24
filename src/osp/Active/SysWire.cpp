@@ -3,8 +3,8 @@
 #include "SysWire.h"
 #include "ActiveScene.h"
 
-namespace osp
-{
+using namespace osp;
+using namespace osp::active;
 
 WireInput::WireInput(IWireElement* element, std::string const& name) :
         m_element(element),
@@ -85,7 +85,4 @@ void SysWire::connect(WireOutput &wireFrom, WireInput &wireTo)
               << wireTo.get_name() << "\n";
     wireFrom.insert(&wireTo);
     // TODO: check for dependent outputs and add to list and sort
-}
-
-
 }

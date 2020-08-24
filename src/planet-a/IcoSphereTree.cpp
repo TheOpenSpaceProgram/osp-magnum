@@ -5,9 +5,9 @@
 #include <cmath>
 #include <iostream>
 
+using namespace planeta;
 
-namespace osp
-{
+using osp::Vector3;
 
 void IcoSphereTree::initialize(float radius)
 {
@@ -485,7 +485,5 @@ TriangleSideTransform IcoSphereTree::transform_to_ancestor(
         curT = tri->m_parent;
     }
 
-
-}
 
 }

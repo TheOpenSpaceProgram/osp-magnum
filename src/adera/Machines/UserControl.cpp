@@ -4,8 +4,9 @@
 
 #include "UserControl.h"
 
-namespace osp
-{
+using namespace adera::active::machines;
+using namespace osp::active;
+using namespace osp;
 
 MachineUserControl::MachineUserControl() :
     Machine(false),
@@ -139,6 +140,4 @@ Machine& SysMachineUserControl::instantiate(ActiveEnt ent)
 Machine& SysMachineUserControl::get(ActiveEnt ent)
 {
     return m_scene.reg_get<MachineUserControl>(ent);
-}
-
 }

@@ -4,10 +4,9 @@
 
 #include <map>
 
-#include <Magnum/Math/Color.h>
-#include <Magnum/PixelFormat.h>
+//#include <Magnum/Math/Color.h>
+//#include <Magnum/PixelFormat.h>
 //#include <Magnum/SceneGraph/Camera.h>
-
 
 #include "../types.h"
 //#include "../scene.h"
@@ -16,13 +15,8 @@
 #include "../Resource/PrototypePart.h"
 
 //#include "../Active/ActiveScene.h"
-
-#include "../Active/activetypes.h"
-
-#include "../OSPApplication.h"
-#include "../UserInputHandler.h"
-//#include "../Active/NewtonPhysics.h"
-
+//#include "../OSPApplication.h"
+//#include "../UserInputHandler.h"
 //#include "../Active/FtrNewtonBody.h"
 
 namespace osp::universe
@@ -32,18 +26,14 @@ namespace osp::universe
 class OSPMagnum;
 class SatActiveArea;
 
-typedef int (*LoadStrategy)(ActiveScene& scene, SatActiveArea& area,
-                            Satellite areaSat, Satellite loadMe);
 
 namespace ucomp
 {
 
 struct ActiveArea
 {
-    std::map<ITypeSatellite*, LoadStrategy> m_loadFunctions;
-    std::vector<Satellite*> m_activatedSats;
 
-    ActiveEnt m_camera;
+    //active::ActiveEnt m_camera;
 
     unsigned m_sceneIndex;
 };
@@ -51,20 +41,18 @@ struct ActiveArea
 }
 
 
-class SatActiveArea : public ITypeSatellite
+class SatActiveArea : public CommonTypeSat<SatActiveArea, ucomp::ActiveArea>
 {
 
-    friend OSPMagnum;
-
 public:
-    SatActiveArea() = default;
+    SatActiveArea(Universe& universe);
     ~SatActiveArea() = default;
 
     /**
      * Setup magnum scene and sets m_loadedActive to true.
      * @return only 0 for now
      */
-    int activate(OSPApplication& app);
+    //int activate(OSPApplication& app);
 
     /**
      * Do actual drawing of scene. Call only on context thread.
@@ -77,14 +65,7 @@ public:
      */
     void update_physics(float deltaTime);
 
-    /**
-     * Add a loading strategy to add support for loading a type of satellite 
-     * @param id
-     * @param function
-     */
-    void activate_func_add(ITypeSatellite*, LoadStrategy function);
-
-    virtual std::string get_name() { return "ActiveArea"; };
+    std::string get_name() { return "ActiveArea"; };
 
 private:
 

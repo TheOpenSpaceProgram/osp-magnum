@@ -3,44 +3,44 @@
 #include <osp/UserInputHandler.h>
 #include <osp/Active/SysMachine.h>
 
-namespace osp
+namespace adera::active::machines
 {
 
 class MachineUserControl;
 
-
 class SysMachineUserControl :
-        public SysMachine<SysMachineUserControl, MachineUserControl>
+        public osp::active::SysMachine<SysMachineUserControl, MachineUserControl>
 {
 public:
 
-    SysMachineUserControl(ActiveScene &scene, UserInputHandler& userControl);
+    SysMachineUserControl(osp::active::ActiveScene &scene,
+                          osp::UserInputHandler& userControl);
 
     void update_sensor();
 
-    Machine& instantiate(ActiveEnt ent) override;
+    osp::active::Machine& instantiate(osp::active::ActiveEnt ent) override;
 
-    Machine& get(ActiveEnt ent) override;
+    osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
 private:
-    ButtonControlHandle m_throttleMax;
-    ButtonControlHandle m_throttleMin;
-    ButtonControlHandle m_selfDestruct;
+    osp::ButtonControlHandle m_throttleMax;
+    osp::ButtonControlHandle m_throttleMin;
+    osp::ButtonControlHandle m_selfDestruct;
 
-    ButtonControlHandle m_pitchUp;
-    ButtonControlHandle m_pitchDn;
-    ButtonControlHandle m_yawLf;
-    ButtonControlHandle m_yawRt;
-    ButtonControlHandle m_rollLf;
-    ButtonControlHandle m_rollRt;
+    osp::ButtonControlHandle m_pitchUp;
+    osp::ButtonControlHandle m_pitchDn;
+    osp::ButtonControlHandle m_yawLf;
+    osp::ButtonControlHandle m_yawRt;
+    osp::ButtonControlHandle m_rollLf;
+    osp::ButtonControlHandle m_rollRt;
 
-    UpdateOrderHandle m_updateSensor;
+    osp::active::UpdateOrderHandle m_updateSensor;
 };
 
 /**
  * Interfaces user control into WireOutputs for other Machines to use
  */
-class MachineUserControl : public Machine
+class MachineUserControl : public osp::active::Machine
 {
     friend SysMachineUserControl;
 
@@ -53,22 +53,22 @@ public:
 
     ~MachineUserControl() = default;
 
-    void propagate_output(WireOutput* output) override;
+    void propagate_output(osp::active::WireOutput* output) override;
 
-    WireInput* request_input(WireInPort port) override;
-    WireOutput* request_output(WireOutPort port) override;
+    osp::active::WireInput* request_input(osp::WireInPort port) override;
+    osp::active::WireOutput* request_output(osp::WireOutPort port) override;
 
-    std::vector<WireInput*> existing_inputs() override;
-    std::vector<WireOutput*> existing_outputs() override;
+    std::vector<osp::active::WireInput*> existing_inputs() override;
+    std::vector<osp::active::WireOutput*> existing_outputs() override;
 
 private:
 
     //std::array<WireOutput, 2> m_outputs;
 
-    WireOutput m_woAttitude;
-    WireOutput m_woTestPropagate;
-    WireOutput m_woThrottle;
-    WireInput m_wiTest;
+    osp::active::WireOutput m_woAttitude;
+    osp::active::WireOutput m_woTestPropagate;
+    osp::active::WireOutput m_woThrottle;
+    osp::active::WireInput m_wiTest;
 
 };
 

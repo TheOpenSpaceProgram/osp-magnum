@@ -11,11 +11,8 @@
 #include <Magnum/GL/Mesh.h>
 
 
-namespace planeta
+namespace planeta::active
 {
-
-using namespace osp;
-using namespace osp::universe;
 
 struct CompPlanet
 {
@@ -32,19 +29,21 @@ struct CompPlanet
 };
 
 
-class SysPlanetA : public IDynamicSystem
+class SysPlanetA : public osp::active::IDynamicSystem
 {
 public:
 
-    static int area_activate_planet(ActiveScene& scene, universe::SatActiveArea& area,
-                        Satellite areaSat, Satellite loadMe);
+    static int area_activate_planet(
+            osp::active::ActiveScene& scene, osp::universe::SatActiveArea& area,
+            osp::universe::Satellite areaSat, osp::universe::Satellite loadMe);
 
-    SysPlanetA(ActiveScene &scene);
+    SysPlanetA(osp::active::ActiveScene &scene);
     ~SysPlanetA() = default;
 
-    void draw(CompCamera const& camera);
+    void draw(osp::active::CompCamera const& camera);
 
-    void debug_create_chunk_collider(ActiveEnt ent, CompPlanet &planet,
+    void debug_create_chunk_collider(osp::active::ActiveEnt ent,
+                                     CompPlanet &planet,
                                      chindex_t chunk);
 
     void update_geometry();
@@ -53,12 +52,12 @@ public:
 
 private:
 
-    ActiveScene &m_scene;
+    osp::active::ActiveScene &m_scene;
 
-    UpdateOrderHandle m_updateGeometry;
-    UpdateOrderHandle m_updatePhysics;
+    osp::active::UpdateOrderHandle m_updateGeometry;
+    osp::active::UpdateOrderHandle m_updatePhysics;
 
-    RenderOrderHandle m_renderPlanetDraw;
+    osp::active::RenderOrderHandle m_renderPlanetDraw;
 };
 
 }

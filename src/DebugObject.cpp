@@ -2,6 +2,10 @@
 
 #include <osp/Active/ActiveScene.h>
 
+#include <adera/Machines/UserControl.h>
+
+using adera::active::machines::MachineUserControl;
+
 using namespace osp;
 
 using namespace Magnum::Math::Literals;
@@ -20,7 +24,8 @@ using namespace Magnum::Math::Literals;
 //}
 
 
-DebugCameraController::DebugCameraController(ActiveScene &scene, ActiveEnt ent) :
+DebugCameraController::DebugCameraController(active::ActiveScene &scene,
+                                             active::ActiveEnt ent) :
         DebugObject(scene, ent),
         m_orbiting(entt::null),
         m_orbitPos(0, 0, 1),
@@ -39,19 +44,21 @@ DebugCameraController::DebugCameraController(ActiveScene &scene, ActiveEnt ent) 
 void DebugCameraController::update_physics_post()
 {
 
+
+
     bool targetValid = m_scene.get_registry().valid(m_orbiting);
 
     if (m_switch.triggered())
     {
         std::cout << "switch to new vehicle\n";
 
-        auto view = m_scene.get_registry().view<CompVehicle>();
+        auto view = m_scene.get_registry().view<active::CompVehicle>();
         auto it = view.find(m_orbiting);
 
         if (targetValid)
         {
             // disable the first MachineUserControl because switching away
-            ActiveEnt firstPart = view.get(m_orbiting).m_parts[0];
+            active::ActiveEnt firstPart = view.get(m_orbiting).m_parts[0];
             m_scene.reg_get<MachineUserControl>(firstPart).m_enable = false;
         }
 
@@ -72,7 +79,7 @@ void DebugCameraController::update_physics_post()
         if (targetValid)
         {
             // enable the first MachineUserControl
-            ActiveEnt firstPart = view.get(m_orbiting).m_parts[0];
+            active::ActiveEnt firstPart = view.get(m_orbiting).m_parts[0];
 
             m_scene.reg_get<MachineUserControl>(firstPart).m_enable = true;
         }
@@ -103,8 +110,8 @@ void DebugCameraController::update_physics_post()
 
     Quaternion quatYaw({0, 0.1f * yaw, 0});
 
-    Matrix4 &tf = m_scene.reg_get<CompTransform>(m_ent).m_transform;
-    Matrix4 const& tfTgt = m_scene.reg_get<CompTransform>(m_orbiting).m_transform;
+    Matrix4 &tf = m_scene.reg_get<active::CompTransform>(m_ent).m_transform;
+    Matrix4 const& tfTgt = m_scene.reg_get<active::CompTransform>(m_orbiting).m_transform;
 
     Vector3 posRelative = tf.translation() - tfTgt.translation();
 
@@ -128,7 +135,7 @@ void DebugCameraController::update_physics_post()
     tf = Matrix4::lookAt(tf.translation(), tfTgt.translation(), tf[1].xyz());
 }
 
-void DebugCameraController::view_orbit(ActiveEnt ent)
+void DebugCameraController::view_orbit(active::ActiveEnt ent)
 {
     m_orbiting = ent;
 }

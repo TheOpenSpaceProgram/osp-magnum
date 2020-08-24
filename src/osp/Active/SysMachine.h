@@ -10,7 +10,7 @@
 #include "activetypes.h"
 #include "SysWire.h"
 
-namespace osp
+namespace osp::active
 {
 
 using Corrade::Containers::LinkedList;

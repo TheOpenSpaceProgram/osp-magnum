@@ -1,8 +1,8 @@
 #include "SysVehicle.h"
-
 #include "ActiveScene.h"
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
+#include "../Resource/PrototypePart.h"
 
 #include <Magnum/MeshTools/Compile.h>
 #include <Magnum/Trade/MeshData.h>
@@ -11,6 +11,7 @@
 
 
 using namespace osp;
+using namespace osp::active;
 
 // for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;

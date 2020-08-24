@@ -5,7 +5,7 @@
 #include "ActiveScene.h"
 
 
-using namespace osp;
+using namespace osp::active;
 
 // for _1, _2, _3, ... std::bind arguments
 using namespace std::placeholders;

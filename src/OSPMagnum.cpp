@@ -1,6 +1,8 @@
 #include "OSPMagnum.h"
+#include "osp/types.h"
 
-#include "osp/Active/ActiveScene.h"
+#include <Magnum/Math/Color.h>
+#include <Magnum/PixelFormat.h>
 
 #include <iostream>
 
@@ -13,11 +15,13 @@ const UserInputHandler::DeviceId sc_mouse = 1;
 
 
 
-OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments):
-    Magnum::Platform::Application{
-        arguments,
-        Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
-    m_userInput(12)
+OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
+                     OSPApplication &ospApp) :
+        Magnum::Platform::Application{
+            arguments,
+            Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
+        m_userInput(12),
+        m_ospApp(ospApp)
 {
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 
@@ -50,6 +54,19 @@ void OSPMagnum::drawEvent()
 
 //        m_area->draw_gl();
 //    }
+
+    for (auto &[name, scene] : m_scenes)
+    {
+        scene.update();
+    }
+
+    for (auto &[name, scene] : m_scenes)
+    {
+        scene.update_hierarchy_transforms();
+        //scene.draw(m_camera);
+    }
+
+
 
     // TODO: GUI and stuff
 
@@ -97,6 +114,13 @@ void OSPMagnum::mouseReleaseEvent(MouseEvent& event)
 void OSPMagnum::mouseMoveEvent(MouseMoveEvent& event)
 {
 
+}
+
+active::ActiveScene& OSPMagnum::scene_add(const std::string &name)
+{
+    auto pair = m_scenes.try_emplace(name, m_userInput, m_ospApp);
+
+    return pair.first->second;
 }
 
 }

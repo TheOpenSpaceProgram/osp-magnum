@@ -4,9 +4,8 @@
 
 #include <Newton.h>
 
-
-namespace osp
-{
+using namespace osp;
+using namespace osp::active;
 
 void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 {
@@ -337,4 +336,3 @@ void SysNewton::newton_tree_collision_end_build(
     NewtonTreeCollisionEndBuild(treeCollision, optimize);
 }
 
-}

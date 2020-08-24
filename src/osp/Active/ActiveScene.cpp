@@ -2,10 +2,8 @@
 
 #include "ActiveScene.h"
 
-
-namespace osp
-{
-
+using namespace osp;
+using namespace osp::active;
 
 void CompCamera::calculate_projection()
 {
@@ -16,7 +14,7 @@ void CompCamera::calculate_projection()
 }
 
 
-ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication& app) :
+ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app) :
         m_app(app),
         m_hierarchyDirty(false),
         m_userInput(userInput),
@@ -246,6 +244,3 @@ bool ActiveScene::system_machine_it_valid(MapSysMachine::iterator it)
 }
 
 
-
-
-}

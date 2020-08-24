@@ -2,36 +2,36 @@
 
 #include <osp/Active/SysMachine.h>
 
-namespace osp
+namespace adera::active::machines
 {
 
 class MachineRocket;
 
 
 class SysMachineRocket :
-        public SysMachine<SysMachineRocket, MachineRocket>
+        public osp::active::SysMachine<SysMachineRocket, MachineRocket>
 {
 public:
 
-    SysMachineRocket(ActiveScene &scene);
+    SysMachineRocket(osp::active::ActiveScene &scene);
 
     //void update_sensor();
     void update_physics();
 
-    Machine& instantiate(ActiveEnt ent) override;
+    osp::active::Machine& instantiate(osp::active::ActiveEnt ent) override;
 
-    Machine& get(ActiveEnt ent) override;
+    osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
 private:
 
-    SysPhysics &m_physics;
-    UpdateOrderHandle m_updatePhysics;
+    osp::active::SysPhysics &m_physics;
+    osp::active::UpdateOrderHandle m_updatePhysics;
 };
 
 /**
  *
  */
-class MachineRocket : public Machine
+class MachineRocket : public osp::active::Machine
 {
     friend SysMachineRocket;
 
@@ -44,20 +44,20 @@ public:
 
     ~MachineRocket() = default;
 
-    void propagate_output(WireOutput *output) override;
+    void propagate_output(osp::active::WireOutput *output) override;
 
-    WireInput* request_input(WireInPort port) override;
-    WireOutput* request_output(WireOutPort port) override;
+    osp::active::WireInput* request_input(osp::WireInPort port) override;
+    osp::active::WireOutput* request_output(osp::WireOutPort port) override;
 
-    std::vector<WireInput*> existing_inputs() override;
-    std::vector<WireOutput*> existing_outputs() override;
+    std::vector<osp::active::WireInput*> existing_inputs() override;
+    std::vector<osp::active::WireOutput*> existing_outputs() override;
 
 private:
-    WireInput m_wiGimbal;
-    WireInput m_wiIgnition;
-    WireInput m_wiThrottle;
+    osp::active::WireInput m_wiGimbal;
+    osp::active::WireInput m_wiIgnition;
+    osp::active::WireInput m_wiThrottle;
 
-    ActiveEnt m_rigidBody;
+    osp::active::ActiveEnt m_rigidBody;
 };
 
 

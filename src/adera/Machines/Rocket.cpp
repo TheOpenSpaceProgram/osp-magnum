@@ -4,8 +4,9 @@
 
 #include "Rocket.h"
 
-namespace osp
-{
+using namespace adera::active::machines;
+using namespace osp::active;
+using namespace osp;
 
 MachineRocket::MachineRocket() :
         Machine(true),
@@ -169,6 +170,4 @@ Machine& SysMachineRocket::instantiate(ActiveEnt ent)
 Machine& SysMachineRocket::get(ActiveEnt ent)
 {
     return m_scene.reg_get<MachineRocket>(ent);//emplace(ent);
-}
-
 }

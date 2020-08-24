@@ -23,3 +23,7 @@ void Universe::sat_remove(Satellite sat)
 {
     m_registry.destroy(sat);
 }
+
+
+
+

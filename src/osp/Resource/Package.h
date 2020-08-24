@@ -115,6 +115,8 @@ DependRes<TYPE_T> Package::add(std::string const& path,
     //std::any& groupAny(m_groups[entt::type_info<TYPE_T>::id()]);
     std::unique_ptr<GroupType>& groupAny(m_groups[entt::type_info<TYPE_T>::id()]);
 
+
+
     // check if blank
     if(!groupAny)
     {

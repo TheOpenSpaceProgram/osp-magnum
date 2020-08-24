@@ -2,9 +2,10 @@
 
 #include "SatPlanet.h"
 
-namespace osp
+using namespace planeta::universe;
+
+SatPlanet::SatPlanet(osp::universe::Universe &universe) :
+        CommonTypeSat<SatPlanet, ucomp::Planet>(universe)
 {
 
 }
-
-

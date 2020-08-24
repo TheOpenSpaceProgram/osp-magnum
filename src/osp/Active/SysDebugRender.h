@@ -7,7 +7,7 @@
 #include "../types.h"
 #include "activetypes.h"
 
-namespace osp
+namespace osp::active
 {
 
 struct CompDrawableDebug

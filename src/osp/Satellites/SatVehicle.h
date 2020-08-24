@@ -12,18 +12,18 @@ namespace osp::universe
 namespace ucomp
 {
 
-struct InstanceVehicle
+struct Vehicle
 {
     DependRes<BlueprintVehicle> m_blueprint;
 };
 
 }
 
-class SatVehicle : public ITypeSatellite
+class SatVehicle : public CommonTypeSat<SatVehicle, ucomp::Vehicle>
 {
 
 public:
-    SatVehicle() = default;
+    SatVehicle(Universe& universe);
     ~SatVehicle() = default;
     virtual std::string get_name() { return "Vehicle"; };
 
