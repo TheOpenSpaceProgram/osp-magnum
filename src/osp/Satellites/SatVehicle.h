@@ -19,7 +19,7 @@ struct Vehicle
 
 }
 
-class SatVehicle : public CommonTypeSat<SatVehicle, ucomp::Vehicle>
+class SatVehicle : public CommonTypeSat<SatVehicle, ucomp::Vehicle, ucomp::Activatable>
 {
 
 public:

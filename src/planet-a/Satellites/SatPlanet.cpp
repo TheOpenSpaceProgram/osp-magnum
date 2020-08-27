@@ -5,7 +5,8 @@
 using namespace planeta::universe;
 
 SatPlanet::SatPlanet(osp::universe::Universe &universe) :
-        CommonTypeSat<SatPlanet, ucomp::Planet>(universe)
+        CommonTypeSat<SatPlanet, ucomp::Planet,
+                      osp::universe::ucomp::Activatable>(universe)
 {
 
 }

@@ -55,16 +55,27 @@ void OSPMagnum::drawEvent()
 //        m_area->draw_gl();
 //    }
 
+    m_userInput.update_controls();
+
     for (auto &[name, scene] : m_scenes)
     {
         scene.update();
     }
 
+    m_userInput.event_clear();
+
     for (auto &[name, scene] : m_scenes)
     {
         scene.update_hierarchy_transforms();
-        //scene.draw(m_camera);
+
+
+        // temporary: draw using first camera component found
+        scene.draw(scene.get_registry().view<active::CompCamera>().front());
     }
+
+
+
+
 
 
 

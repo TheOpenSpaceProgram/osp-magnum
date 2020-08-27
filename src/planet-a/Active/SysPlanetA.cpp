@@ -9,6 +9,12 @@
 
 #include <iostream>
 
+using namespace planeta;
+using namespace planeta::universe;
+using namespace planeta::active;
+using osp::active::ActiveEnt;
+using osp::Vector3;
+using osp::Matrix4;
 
 // for _1, _2, _3, ... std::bind arguments
 using namespace std::placeholders;
@@ -16,36 +22,31 @@ using namespace std::placeholders;
 // for the 0xrrggbb_rgbf and _deg literals
 using namespace Magnum::Math::Literals;
 
-using namespace planeta;
-using namespace planeta::active;
-
 int SysPlanetA::area_activate_planet(osp::active::ActiveScene& scene,
-                                     osp::universe::SatActiveArea& area,
+                                     osp::active::SysAreaAssociate& area,
                                      osp::universe::Satellite areaSat,
                                      osp::universe::Satellite loadMe)
 {
     std::cout << "activatin a planet!!!!!!!!!!!!!!!!11\n";
 
+    osp::universe::Universe &uni = area.get_universe();
+    //SysPlanetA& self = scene.get_system<SysPlanetA>();
+    ucomp::Planet &loadMePlanet = uni.get_reg().get<ucomp::Planet>(loadMe);
 
-//    // Get the needed variables
-//    SatPlanet &planet = static_cast<SatPlanet&>(loadMe);
-//    ActiveScene &scene = *(area.get_scene());
-//    ActiveEnt root = scene.hier_get_root();
+    ActiveEnt root = scene.hier_get_root();
 
-//    ActiveEnt planetEnt = scene.hier_create_child(root, "Planet");
+    ActiveEnt planetEnt = scene.hier_create_child(root, "Planet");
 
-//    // Convert position of the satellite to position in scene
-//    Vector3 positionInScene = planet.get_satellite()
-//            ->position_relative_to(*(area.get_satellite())).to_meters();
+    // Convert position of the satellite to position in scene
+    Vector3 positionInScene = uni.sat_calc_pos_meters(areaSat, loadMe);
 
-//    CompTransform& planetTransform = scene.get_registry()
-//                                        .emplace<CompTransform>(planetEnt);
-//    planetTransform.m_transform = Matrix4::translation(positionInScene);
-//    planetTransform.m_enableFloatingOrigin = true;
+    auto &planetTransform = scene.get_registry()
+                            .emplace<osp::active::CompTransform>(planetEnt);
+    planetTransform.m_transform = Matrix4::translation(positionInScene);
+    planetTransform.m_enableFloatingOrigin = true;
 
-//    CompPlanet& planetComp = scene.reg_emplace<CompPlanet>(planetEnt);
-
-//    planetComp.m_radius = planet.m_radius;
+    CompPlanet &planetComp = scene.reg_emplace<CompPlanet>(planetEnt);
+    planetComp.m_radius = loadMePlanet.m_radius;
 
     return 0;
 }
@@ -152,7 +153,7 @@ void SysPlanetA::update_geometry()
             for (chindex_t i = 0; i < planet.m_planet.chunk_count(); i ++)
             {
                 debug_create_chunk_collider(ent, planet, i);
-                std::cout << "* completed chunk: " << i << "\n";
+                std::cout << "* completed chunk collider: " << i << "\n";
             }
 
             std::cout << "Planet colliders done\n";

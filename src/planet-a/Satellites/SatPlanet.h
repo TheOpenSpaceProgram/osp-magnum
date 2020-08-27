@@ -19,7 +19,9 @@ struct Planet
 }
 
 
-class SatPlanet : public osp::universe::CommonTypeSat<SatPlanet, ucomp::Planet>
+class SatPlanet : public osp::universe::CommonTypeSat<
+        SatPlanet, ucomp::Planet,
+        osp::universe::ucomp::Activatable>
 {
 public:
     SatPlanet(osp::universe::Universe& universe);

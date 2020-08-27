@@ -3,8 +3,7 @@
 #include "../PlanetGeometryA.h"
 
 #include <osp/Universe.h>
-#include <osp/Satellites/SatActiveArea.h>
-
+#include <osp/Active/SysAreaAssociate.h>
 #include <osp/Active/activetypes.h>
 
 #include <Magnum/Shaders/MeshVisualizer.h>
@@ -34,7 +33,7 @@ class SysPlanetA : public osp::active::IDynamicSystem
 public:
 
     static int area_activate_planet(
-            osp::active::ActiveScene& scene, osp::universe::SatActiveArea& area,
+            osp::active::ActiveScene& scene, osp::active::SysAreaAssociate &area,
             osp::universe::Satellite areaSat, osp::universe::Satellite loadMe);
 
     SysPlanetA(osp::active::ActiveScene &scene);

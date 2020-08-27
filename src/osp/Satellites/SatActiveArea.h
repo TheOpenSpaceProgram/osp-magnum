@@ -38,6 +38,12 @@ struct ActiveArea
     unsigned m_sceneIndex;
 };
 
+//struct LoadRadius
+//{
+
+//};
+
+
 }
 
 

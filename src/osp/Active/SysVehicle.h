@@ -2,6 +2,8 @@
 
 #include "activetypes.h"
 
+#include "SysAreaAssociate.h"
+
 #include "../Universe.h"
 #include "../Resource/Package.h"
 #include "../Resource/blueprints.h"
@@ -20,7 +22,6 @@ class SatActiveArea;
 
 namespace osp::active
 {
-
 
 struct WireMachineConnection
 {
@@ -47,7 +48,7 @@ public:
     SysVehicle(SysNewton&& move) = delete;
 
     static int area_activate_vehicle(ActiveScene& scene,
-                                     universe::SatActiveArea& area,
+                                     SysAreaAssociate &area,
                                      universe::Satellite areaSat,
                                      universe::Satellite loadMe);
 

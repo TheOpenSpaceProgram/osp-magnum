@@ -1,10 +1,12 @@
+#include "Universe.h"
+
+#include "Satellites/SatActiveArea.h"
+
 #include <iostream>
 #include <iterator>
 
-#include "Universe.h"
-#include "Satellites/SatActiveArea.h"
-
 using namespace osp::universe;
+using namespace osp;
 
 Universe::Universe()
 {
@@ -25,5 +27,28 @@ void Universe::sat_remove(Satellite sat)
 }
 
 
+Vector3s Universe::sat_calc_pos(Satellite referenceFrame, Satellite target)
+{
+    auto view = m_registry.view<ucomp::PositionTrajectory>();
+
+    // TODO: maybe do some checks to make sure they have the components
+    auto &framePosTraj = view.get<ucomp::PositionTrajectory>(referenceFrame);
+    auto &targetPosTraj = view.get<ucomp::PositionTrajectory>(target);
+
+    if (framePosTraj.m_parent == targetPosTraj.m_parent)
+    {
+        // Same parent, easy calculation
+        return targetPosTraj.m_position - framePosTraj.m_position;
+    }
+    // TODO: calculation for different parents
+
+    return {0, 0, 0};
+}
+
+Vector3 Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target)
+{
+    // 1024 units = 1 meter. this can change
+    return Vector3(sat_calc_pos(referenceFrame, target)) / 1024.0f;
+}
 
 

@@ -38,7 +38,9 @@ public:
 
     active::ActiveScene& scene_add(std::string const &name);
 
-    UserInputHandler& get_input_handler() { return m_userInput; }
+    constexpr UserInputHandler& get_input_handler() { return m_userInput; }
+    constexpr std::map<std::string, active::ActiveScene>& get_scenes()
+    { return m_scenes; }
 
 private:
 

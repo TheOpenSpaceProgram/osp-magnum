@@ -44,8 +44,6 @@ DebugCameraController::DebugCameraController(active::ActiveScene &scene,
 void DebugCameraController::update_physics_post()
 {
 
-
-
     bool targetValid = m_scene.get_registry().valid(m_orbiting);
 
     if (m_switch.triggered())

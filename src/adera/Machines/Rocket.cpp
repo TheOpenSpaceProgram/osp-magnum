@@ -111,7 +111,7 @@ void SysMachineRocket::update_physics()
 
             if (body.second == nullptr)
             {
-                std::cout << "no rigid body!\b";
+                std::cout << "no rigid body!\n";
                 continue;
             }
 

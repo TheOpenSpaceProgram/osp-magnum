@@ -209,37 +209,30 @@ void magnum_application()
     g_ospMagnum = std::make_unique<osp::OSPMagnum>(
                         osp::OSPMagnum::Arguments{g_argc, g_argv}, g_osp);
 
-    // self explanatory name
-    config_controls();
+    config_controls(); // as the name implies
 
-    // Load if not loaded yet. This only calls once within the entire program's
-    // lifetime
+    // Load if not loaded yet. This only calls once during entire runtime
     if (!g_osp.debug_get_packges().size())
     {
         load_a_bunch_of_stuff();
         create_solar_system();
     }
 
-    // Create an ActiveArea
+    // Create an ActiveArea, an ActiveScene, then connect them together
 
-
+    // Get needed variables
     universe::Universe &uni = g_osp.get_universe();
-    universe::SatActiveArea &satAA = *static_cast<universe::SatActiveArea*>(
+    universe::SatActiveArea *satAA = static_cast<universe::SatActiveArea*>(
             uni.sat_type_find("Vehicle")->second.get());
-    universe::SatPlanet &satPlanet = *static_cast<universe::SatPlanet*>(
+    universe::SatPlanet *satPlanet = static_cast<universe::SatPlanet*>(
             uni.sat_type_find("Planet")->second.get());
-
-    // create a satellite with an ActiveArea
-    universe::Satellite sat = g_osp.get_universe().sat_create();
-
-    // assign sat as an ActiveArea
-    ucomp::ActiveArea* area = satAA.add_get_ucomp(sat);
 
     // Create an ActiveScene
     active::ActiveScene& scene = g_ospMagnum->scene_add("Area 1");
 
     // Register dynamic systems for that scene
-    auto sysArea = scene.dynamic_system_add<active::SysAreaAssociate>("AreaAssociate");
+    auto &sysArea = scene.dynamic_system_add<active::SysAreaAssociate>(
+                "AreaAssociate", uni);
     scene.dynamic_system_add<active::SysPlanetA>("Planet");
 
     // Register machines for that scene
@@ -247,48 +240,51 @@ void magnum_application()
             g_ospMagnum->get_input_handler());
     scene.system_machine_add<machines::SysMachineRocket>("Rocket");
 
+    // Make active areas load vehicles and planets
+    sysArea.activate_func_add(
+                satAA, active::SysVehicle::area_activate_vehicle);
+    sysArea.activate_func_add(
+                satPlanet, active::SysPlanetA::area_activate_planet);
+
+    // create a Satellite with an ActiveArea
+    universe::Satellite sat = g_osp.get_universe().sat_create();
+
+    // assign sat as an ActiveArea
+    ucomp::ActiveArea &area = satAA->add_get_ucomp(sat);
+
     // Link ActiveArea to scene using the AreaAssociate
     sysArea.connect(sat);
 
-    // Make active areas load vehicles and planets
-//    sysArea.activate_func_add(satAA.),
-//                           active::SysVehicle::area_activate_vehicle);
-//    sysArea.activate_func_add(&(atPlanet::get_id_static()),
-//                           osp::SysPlanetA::area_activate_planet);
+    // Add a camera to the scene
 
     // for the 0xrrggbb_rgbf and angle literals
     using namespace Magnum::Math::Literals;
 
     // Create the camera entity
-    active::ActiveEnt camera = scene.hier_create_child(scene.hier_get_root(), "Camera");
-    active::CompTransform& cameraTransform = scene.reg_emplace<active::CompTransform>(camera);
-    active::CompCamera& cameraComp = scene.get_registry().emplace<active::CompCamera>(camera);
+    active::ActiveEnt camera = scene.hier_create_child(scene.hier_get_root(),
+                                                       "Camera");
+    auto &cameraTransform = scene.reg_emplace<active::CompTransform>(camera);
+    auto &cameraComp = scene.get_registry().emplace<active::CompCamera>(camera);
 
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     cameraTransform.m_enableFloatingOrigin = true;
 
-    cameraComp.m_viewport = Vector2(Magnum::GL::defaultFramebuffer.viewport()
-                                                                 .size());
+    cameraComp.m_viewport
+            = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
     cameraComp.m_far = 4096.0f;
     cameraComp.m_near = 0.125f;
     cameraComp.m_fov = 45.0_degf;
 
     cameraComp.calculate_projection();
-    // Add the debug camera controller
-    //std::unique_ptr<osp::DebugCameraController> camObj
-    //        = std::make_unique<osp::DebugCameraController>(
-    //                *(area.get_scene()), area.get_camera());
-    //area.get_scene()->reg_emplace<osp::CompDebugObject>(area.get_camera(),
-    //                                                    std::move(camObj));
 
-    // make the application switch to that area
-    //g_ospMagnum->set_active_area(area);
+    // Add the debug camera controller to the scene. This adds controls
+    auto camObj = std::make_unique<osp::DebugCameraController>(scene, camera);
 
-    // Note: sat becomes invalid btw, since it refers to a vector elem.
-    //       if new satellites are added, this can cause problems
+    // Add a CompDebugObject to camera to manage camObj's lifetime
+    scene.reg_emplace<osp::CompDebugObject>(camera, std::move(camObj));
 
-    // Starts the game loop. This function will return when the window is
-    // closed. See OSPMagnum::drawEvent
+    // Starts the game loop. This function is blocking, and will only return
+    // when the window is  closed. See OSPMagnum::drawEvent
     g_ospMagnum->exec();
 
     // Close button has been pressed
@@ -309,6 +305,10 @@ void magnum_application()
 void config_controls()
 {
     // Configure Controls
+
+    // It should be pretty easy to write a config file parser that calls these
+    // functions.
+
     using namespace osp;
 
     using Key = OSPMagnum::KeyEvent::Key;
@@ -393,9 +393,9 @@ void create_solar_system()
     Universe& uni = g_osp.get_universe();
 
     // Register satellite types used
-    uni.sat_type_register<universe::SatActiveArea>(uni);
-    uni.sat_type_register<universe::SatVehicle>(uni);
-    auto &typePlanet = uni.sat_type_register<universe::SatPlanet>(uni);
+    uni.type_register<universe::SatActiveArea>(uni);
+    uni.type_register<universe::SatVehicle>(uni);
+    auto &typePlanet = uni.type_register<universe::SatPlanet>(uni);
 
     // Create trajectory that will make things added to the universe stationary
     auto &stationary = uni.trajectory_create<traj::Stationary>(
@@ -416,7 +416,6 @@ void create_solar_system()
 
     }
 
-    return;
 
     // Add Grid of planets too
     // for now, planets are hard-coded to 128 meters in radius
@@ -427,17 +426,19 @@ void create_solar_system()
         {
             universe::Satellite sat = g_osp.get_universe().sat_create();
 
-            // assign it as planet
-            typePlanet.add(sat);
+            // assign sat as a planet
+            ucomp::Planet &planet = typePlanet.add_get_ucomp(sat);
 
-            // load the planet when active area is within 1km of the planet
-            //planet.set_load_radius(1000.0f);
+            // set radius
+            planet.m_radius = 128;
+
+            auto &posTraj = uni.get_reg().get<ucomp::PositionTrajectory>(sat);
 
             // space planets 400m apart from each other
             // 1024 units = 1 meter
-            //planet.set_position({{x * 1024l * 400l,
-            //                      1024l * -140l,
-            //                      z * 1024l * 400l}, 10});
+            posTraj.m_position = {x * 1024l * 400l,
+                                  1024l * -140l,
+                                  z * 1024l * 400l};
         }
     }
 
@@ -507,10 +508,10 @@ osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
     // Make it into a vehicle
     auto &typeVehicle = *static_cast<universe::SatVehicle*>(
             uni.sat_type_find("Vehicle")->second.get());
-    ucomp::Vehicle *ucompVehicle = typeVehicle.add_get_ucomp(sat);
+    ucomp::Vehicle &ucompVehicle = typeVehicle.add_get_ucomp(sat);
 
     // set the SatVehicle's blueprint to the one just made
-    ucompVehicle->m_blueprint = std::move(depend);
+    ucompVehicle.m_blueprint = std::move(depend);
 
     return sat;
 
@@ -537,72 +538,73 @@ void debug_print_update_order()
         return;
     }
 
-    //osp::UpdateOrder& order = g_ospMagnum->get_active_area()
-    //                            ->get_scene()->get_update_order();
+    osp::active::UpdateOrder &order = g_ospMagnum->get_scenes().begin()
+                                            ->second.get_update_order();
 
-    //std::cout << "Update order:\n";
-    //for (auto call : order.get_call_list())
-    //{
-    //    std::cout << "* " << call.m_name << "\n";
-    //}
+    std::cout << "Update order:\n";
+    for (auto call : order.get_call_list())
+    {
+        std::cout << "* " << call.m_name << "\n";
+    }
 }
 
 void debug_print_hier()
 {
-//    if (!g_ospMagnum)
-//    {
-//        std::cout << "Can't do that yet, start the magnum application first!\n";
-//        return;
-//    }
 
-//    std::cout << "Entity Hierarchy:\n";
+    if (!g_ospMagnum)
+    {
+        std::cout << "Can't do that yet, start the magnum application first!\n";
+        return;
+    }
 
-//    std::vector<osp::ActiveEnt> parentNextSibling;
-//    osp::ActiveScene &scene = *(g_ospMagnum->get_active_area()->get_scene());
-//    osp::ActiveEnt currentEnt = scene.hier_get_root();
+    std::cout << "ActiveScene Entity Hierarchy:\n";
 
-//    parentNextSibling.reserve(16);
+    std::vector<active::ActiveEnt> parentNextSibling;
+    active::ActiveScene &scene = g_ospMagnum->get_scenes().begin()->second;
+    active::ActiveEnt currentEnt = scene.hier_get_root();
 
-//    while (true)
-//    {
-//        // print some info about the entity
-//        osp::CompHierarchy &hier = scene.reg_get<osp::CompHierarchy>(currentEnt);
-//        for (unsigned i = 0; i < hier.m_level; i ++)
-//        {
-//            // print arrows to indicate level
-//            std::cout << "  ->";
-//        }
-//        std::cout << "[" << int(currentEnt) << "]: " << hier.m_name << "\n";
+    parentNextSibling.reserve(16);
 
-//        if (hier.m_childCount)
-//        {
-//            // entity has some children
-//            currentEnt = hier.m_childFirst;
+    while (true)
+    {
+        // print some info about the entity
+        active::CompHierarchy &hier = scene.reg_get<active::CompHierarchy>(currentEnt);
+        for (unsigned i = 0; i < hier.m_level; i ++)
+        {
+            // print arrows to indicate level
+            std::cout << "  ->";
+        }
+        std::cout << "[" << int(currentEnt) << "]: " << hier.m_name << "\n";
+
+        if (hier.m_childCount)
+        {
+            // entity has some children
+            currentEnt = hier.m_childFirst;
 
 
-//            // save next sibling for later if it exists
-//            if (hier.m_siblingNext != entt::null)
-//            {
-//                parentNextSibling.push_back(hier.m_siblingNext);
-//            }
-//        }
-//        else if (hier.m_siblingNext != entt::null)
-//        {
-//            // no children, move to next sibling
-//            currentEnt = hier.m_siblingNext;
-//        }
-//        else if (parentNextSibling.size())
-//        {
-//            // last sibling, and not done yet
-//            // is last sibling, move to parent's (or ancestor's) next sibling
-//            currentEnt = parentNextSibling.back();
-//            parentNextSibling.pop_back();
-//        }
-//        else
-//        {
-//            break;
-//        }
-//    }
+            // save next sibling for later if it exists
+            if (hier.m_siblingNext != entt::null)
+            {
+                parentNextSibling.push_back(hier.m_siblingNext);
+            }
+        }
+        else if (hier.m_siblingNext != entt::null)
+        {
+            // no children, move to next sibling
+            currentEnt = hier.m_siblingNext;
+        }
+        else if (parentNextSibling.size())
+        {
+            // last sibling, and not done yet
+            // is last sibling, move to parent's (or ancestor's) next sibling
+            currentEnt = parentNextSibling.back();
+            parentNextSibling.pop_back();
+        }
+        else
+        {
+            break;
+        }
+    }
 }
 
 void debug_print_sats()

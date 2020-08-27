@@ -33,13 +33,10 @@ public:
     Universe(Universe &&move) = delete;
     ~Universe() = default;
 
-    static constexpr Satellite sat_invalid() { return entt::null; };
-
-    template<typename TYPESAT_T, typename ... ARGS_T>
-    TYPESAT_T& sat_type_register(ARGS_T&& ... args);
-
-    template<typename TRAJECTORY_T, typename ... ARGS_T>
-    TRAJECTORY_T& trajectory_create(ARGS_T&& ... args);
+    /**
+     * @return an null satellite
+     */
+    static constexpr Satellite sat_null() { return entt::null; };
 
     /**
      * Create a satellite with default components, and adds it to the universe
@@ -47,21 +44,52 @@ public:
      */
     Satellite sat_create();
 
+    /**
+     * @return Root Satellite of the universe. This will never change.
+     */
     constexpr Satellite sat_root() { return m_root; };
 
     /**
-     * Remove a satellite by address
+     * Remove a satellite
      */
     void sat_remove(Satellite sat);
 
-    //std::vector<Package>& debug_get_packges() { return m_packages; };
-    //void add_package(Package&& p);
-    //void get_package(unsigned index);
+    /**
+     * Calculate position between two satellites.
+     * @param referenceFrame
+     * @param target
+     * @return relative position of target in SpaceInt vector
+     */
+    Vector3s sat_calc_pos(Satellite referenceFrame, Satellite target);
+
+    /**
+     * Calculate position between two satellites.
+     * @param referenceFrame
+     * @param target
+     * @return relative position of target in meters
+     */
+    Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target);
+
+    /**
+     * Register an ITypeSatellite so the universe can recognize that this type
+     * of Satellite can exist.
+     * @tparam TYPESAT_T Unique ITypeSatellite to register
+     * @tparam ARGS_T Arguments to forward to TYPESAT_T's constructor
+     * @return reference to new TYPESAT_T just created
+     */
+    template<typename TYPESAT_T, typename ... ARGS_T>
+    TYPESAT_T& type_register(ARGS_T&& ... args);
 
     MapSatType::iterator sat_type_find(const std::string &name)
     {
         return m_satTypes.find(name);
     }
+
+    /**
+     *
+     */
+    template<typename TRAJECTORY_T, typename ... ARGS_T>
+    TRAJECTORY_T& trajectory_create(ARGS_T&& ... args);
 
     constexpr entt::basic_registry<Satellite>& get_reg() { return m_registry; }
 
@@ -84,7 +112,7 @@ private:
 
 
 template<typename TYPESAT_T, typename ... ARGS_T>
-TYPESAT_T& Universe::sat_type_register(ARGS_T&& ... args)
+TYPESAT_T& Universe::type_register(ARGS_T&& ... args)
 {
     std::unique_ptr<TYPESAT_T> newType
             = std::make_unique<TYPESAT_T>(std::forward<ARGS_T>(args)...);
@@ -110,11 +138,12 @@ namespace ucomp
 
 struct PositionTrajectory
 {
-    // Position is relative to trajectory's center satellite
-    // no longer has a 'parent'
+    // Position is relative to m_parent
     Vector3s m_position;
 
-    ISystemTrajectory* m_trajectory{nullptr}; // get rid of this some day
+    Satellite m_parent; // Set only by trajectory
+
+    ISystemTrajectory *m_trajectory{nullptr}; // get rid of this some day
     unsigned m_index; // index in trajectory's vector
 
     // set this to true when you modify something the trajectory might use
@@ -141,6 +170,12 @@ struct Type
     ITypeSatellite* m_type{nullptr};
 };
 
+struct Activatable
+{
+    // put something here some day
+    int m_dummy;
+};
+
 }
 
 /**
@@ -156,11 +191,12 @@ public:
     virtual void remove(Satellite sat) = 0;
 };
 
+
 /**
  * CRTP to implement common functions of TypeSatellites. add and remove
  * functions will add or remove the component UCOMP_T
  */
-template<typename TYPESAT_T, typename UCOMP_T>
+template<typename TYPESAT_T, typename ... UCOMP_T>
 class CommonTypeSat : public ITypeSatellite
 {
 
@@ -173,7 +209,8 @@ public:
     virtual void add(Satellite sat) { add_get_ucomp(sat); };
     virtual void remove(Satellite sat) override;
 
-    UCOMP_T* add_get_ucomp(Satellite sat);
+    std::tuple<UCOMP_T& ...> add_get_ucomp_all(Satellite sat);
+    auto& add_get_ucomp(Satellite sat);
 
     constexpr Universe& get_universe() { return m_universe; }
 
@@ -182,22 +219,36 @@ private:
     Universe& m_universe;
 };
 
-template<typename TYPESAT_T, typename UCOMP_T>
-UCOMP_T* CommonTypeSat<TYPESAT_T, UCOMP_T>::add_get_ucomp(Satellite sat)
+template<typename TYPESAT_T, typename ... UCOMP_T>
+std::tuple<UCOMP_T& ...> CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp_all(Satellite sat)
 {
     auto& type = m_universe.get_reg().get<ucomp::Type>(sat);
 
     if (type.m_type != nullptr)
     {
-        return nullptr;
+        //return ;
     }
 
     type.m_type = this;
-    return &(m_universe.get_reg().emplace<UCOMP_T>(sat));
+    return std::forward_as_tuple((m_universe.get_reg().emplace<UCOMP_T>(sat)) ...);
 }
 
-template<typename TYPESAT_T, typename UCOMP_T>
-void CommonTypeSat<TYPESAT_T, UCOMP_T>::remove(Satellite sat)
+template<typename TYPESAT_T, typename ... UCOMP_T>
+auto& CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp(Satellite sat)
+{
+    auto& type = m_universe.get_reg().get<ucomp::Type>(sat);
+
+    if (type.m_type != nullptr)
+    {
+        //return ;
+    }
+
+    type.m_type = this;
+    return std::get<0>(std::forward_as_tuple((m_universe.get_reg().emplace<UCOMP_T>(sat)) ...));
+}
+
+template<typename TYPESAT_T, typename ... UCOMP_T>
+void CommonTypeSat<TYPESAT_T, UCOMP_T ...>::remove(Satellite sat)
 {
     auto& type = m_universe.get_reg().get<ucomp::Type>(sat);
 
@@ -207,7 +258,7 @@ void CommonTypeSat<TYPESAT_T, UCOMP_T>::remove(Satellite sat)
     }
 
     type.m_type = nullptr;
-    m_universe.get_reg().remove<UCOMP_T>(sat);
+    m_universe.get_reg().remove<UCOMP_T ...>(sat);
 }
 
 using TrajectoryType = entt::id_type;
@@ -284,6 +335,7 @@ void CommonTrajectory<TRAJECTORY_T>::add(Satellite sat)
 
     posTraj.m_trajectory = this;
     posTraj.m_index = m_satellites.size();
+    posTraj.m_parent = m_center;
     m_satellites.push_back(sat);
 }
 
@@ -300,6 +352,7 @@ void CommonTrajectory<TRAJECTORY_T>::remove(Satellite sat)
     m_satellites.erase(m_satellites.begin() + posTraj.m_index);
 
     // disassociate with this satellite
+    posTraj.m_parent = entt::null;
     posTraj.m_trajectory = nullptr;
 }
 

@@ -98,14 +98,17 @@ public:
 
     DependRes<TYPE_T>& operator=(DependRes<TYPE_T>&& move)
     {
+        // TODO: this sucks, please change it
         if (!move.m_empty)
         {
             move.m_it->second.m_refCount --;
         }
         if (!m_empty)
         {
+            // existing iterator is being overwritten, release it
             m_it->second.m_refCount --;
         }
+        m_empty = false;
         m_it = std::move(move.m_it);
         m_it->second.m_refCount ++;
 

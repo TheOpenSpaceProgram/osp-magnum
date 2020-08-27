@@ -22,24 +22,27 @@ SysVehicle::SysVehicle(ActiveScene &scene) :
     m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
 }
 
-int SysVehicle::area_activate_vehicle(ActiveScene& scene,
-                                      universe::SatActiveArea& area,
+int SysVehicle::area_activate_vehicle(ActiveScene &scene,
+                                      SysAreaAssociate &area,
                                       universe::Satellite areaSat,
                                       universe::Satellite loadMe)
 {
 
-    /*
-
     std::cout << "loadin a vehicle!\n";
 
-    SysVehicle& self = area.get_scene()->get_system<SysVehicle>();
+    universe::Universe &uni = area.get_universe();
+    SysVehicle& self = scene.get_system<SysVehicle>();
+    universe::ucomp::Vehicle &loadMeVehicle
+            = uni.get_reg().get<universe::ucomp::Vehicle>(loadMe);
 
-    //std::cout << "relative distance: " << positionInScene.length() << "\n";
+    // make sure there is vehicle data to load
+    if (loadMeVehicle.m_blueprint.empty())
+    {
+        // no vehicle data to load
+        return 1;
+    }
 
-    // Get the needed variables
-    SatVehicle &vehicle = static_cast<SatVehicle&>(loadMe);
-    BlueprintVehicle &vehicleData = vehicle.get_blueprint();
-    ActiveScene &scene = *(area.get_scene());
+    BlueprintVehicle &vehicleData = *(loadMeVehicle.m_blueprint);
     ActiveEnt root = scene.hier_get_root();
 
     // Create the root entity to add parts to
@@ -49,8 +52,8 @@ int SysVehicle::area_activate_vehicle(ActiveScene& scene,
     CompVehicle& vehicleComp = scene.reg_emplace<CompVehicle>(vehicleEnt);
 
     // Convert position of the satellite to position in scene
-    Vector3 positionInScene = loadMe.get_satellite()
-            ->position_relative_to(*(area.get_satellite())).to_meters();
+    Vector3 positionInScene
+            = area.get_universe().sat_calc_pos_meters(areaSat, loadMe);
 
     CompTransform& vehicleTransform = scene.get_registry()
                                         .emplace<CompTransform>(vehicleEnt);
@@ -91,8 +94,6 @@ int SysVehicle::area_activate_vehicle(ActiveScene& scene,
         // Part now exists
 
         // TODO: Deal with blueprint machines instead of prototypes directly
-
-        ActiveScene &scene = *(area.get_scene());
 
         CompMachine& partMachines = scene.reg_emplace<CompMachine>(partEntity);
 
@@ -174,9 +175,8 @@ int SysVehicle::area_activate_vehicle(ActiveScene& scene,
     CompRigidBody& vehicleBody = scene.reg_emplace<CompRigidBody>(vehicleEnt);
     CompCollisionShape& vehicleShape = scene.reg_emplace<CompCollisionShape>(vehicleEnt);
     vehicleShape.m_shape = ECollisionShape::COMBINED;
-    area.get_scene()->get_system<SysNewton>().create_body(vehicleEnt);
+    scene.get_system<SysNewton>().create_body(vehicleEnt);
 
-    */
     return 0;
 }
 
