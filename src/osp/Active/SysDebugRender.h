@@ -23,7 +23,7 @@ public:
     SysDebugRender(ActiveScene &rScene);
     ~SysDebugRender() = default;
 
-    void draw(CompCamera const& camera);
+    void draw(ACompCamera const& camera);
 
 private:
     ActiveScene &m_scene;

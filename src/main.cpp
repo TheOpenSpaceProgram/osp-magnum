@@ -39,12 +39,6 @@ namespace universe
     using namespace planeta::universe;
 }
 
-namespace ucomp // ECS components for Satellites
-{
-    using namespace osp::universe::ucomp;
-    using namespace planeta::universe::ucomp;
-}
-
 namespace active
 {
     using namespace osp::active;
@@ -233,7 +227,9 @@ void magnum_application()
     // Register dynamic systems for that scene
     auto &sysArea = scene.dynamic_system_add<active::SysAreaAssociate>(
                 "AreaAssociate", uni);
-    scene.dynamic_system_add<active::SysPlanetA>("Planet");
+    auto &sysVehicle = scene.dynamic_system_add<active::SysVehicle>(
+                "Vehicle");
+    auto &sysPlanet = scene.dynamic_system_add<active::SysPlanetA>("Planet");
 
     // Register machines for that scene
     scene.system_machine_add<machines::SysMachineUserControl>("UserControl",
@@ -241,16 +237,14 @@ void magnum_application()
     scene.system_machine_add<machines::SysMachineRocket>("Rocket");
 
     // Make active areas load vehicles and planets
-    sysArea.activate_func_add(
-                satAA, active::SysVehicle::area_activate_vehicle);
-    sysArea.activate_func_add(
-                satPlanet, active::SysPlanetA::area_activate_planet);
+    sysArea.activator_add(satAA, sysVehicle);
+    sysArea.activator_add(satPlanet, sysPlanet);
 
     // create a Satellite with an ActiveArea
     universe::Satellite sat = g_osp.get_universe().sat_create();
 
     // assign sat as an ActiveArea
-    ucomp::ActiveArea &area = satAA->add_get_ucomp(sat);
+    universe::UCompActiveArea &area = satAA->add_get_ucomp(sat);
 
     // Link ActiveArea to scene using the AreaAssociate
     sysArea.connect(sat);
@@ -263,8 +257,8 @@ void magnum_application()
     // Create the camera entity
     active::ActiveEnt camera = scene.hier_create_child(scene.hier_get_root(),
                                                        "Camera");
-    auto &cameraTransform = scene.reg_emplace<active::CompTransform>(camera);
-    auto &cameraComp = scene.get_registry().emplace<active::CompCamera>(camera);
+    auto &cameraTransform = scene.reg_emplace<active::ACompTransform>(camera);
+    auto &cameraComp = scene.get_registry().emplace<active::ACompCamera>(camera);
 
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     cameraTransform.m_enableFloatingOrigin = true;
@@ -407,7 +401,7 @@ void create_solar_system()
         universe::Satellite sat = debug_add_random_vehicle("TestyMcTestFace Mk"
                                                  + std::to_string(i));
 
-        auto &posTraj = uni.get_reg().get<ucomp::PositionTrajectory>(sat);
+        auto &posTraj = uni.get_reg().get<universe::UCompPositionTrajectory>(sat);
 
         posTraj.m_position = osp::Vector3s(i * 1024l * 5l, 0l, 0l);
         posTraj.m_dirty = true;
@@ -427,12 +421,12 @@ void create_solar_system()
             universe::Satellite sat = g_osp.get_universe().sat_create();
 
             // assign sat as a planet
-            ucomp::Planet &planet = typePlanet.add_get_ucomp(sat);
+            universe::UCompPlanet &planet = typePlanet.add_get_ucomp(sat);
 
             // set radius
             planet.m_radius = 128;
 
-            auto &posTraj = uni.get_reg().get<ucomp::PositionTrajectory>(sat);
+            auto &posTraj = uni.get_reg().get<universe::UCompPositionTrajectory>(sat);
 
             // space planets 400m apart from each other
             // 1024 units = 1 meter
@@ -502,13 +496,13 @@ osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
     universe::Satellite sat = uni.sat_create();
 
     // Set the name
-    auto &posTraj = uni.get_reg().get<ucomp::PositionTrajectory>(sat);
+    auto &posTraj = uni.get_reg().get<universe::UCompPositionTrajectory>(sat);
     posTraj.m_name = name;
 
     // Make it into a vehicle
     auto &typeVehicle = *static_cast<universe::SatVehicle*>(
             uni.sat_type_find("Vehicle")->second.get());
-    ucomp::Vehicle &ucompVehicle = typeVehicle.add_get_ucomp(sat);
+    universe::UCompVehicle &ucompVehicle = typeVehicle.add_get_ucomp(sat);
 
     // set the SatVehicle's blueprint to the one just made
     ucompVehicle.m_blueprint = std::move(depend);
@@ -568,7 +562,7 @@ void debug_print_hier()
     while (true)
     {
         // print some info about the entity
-        active::CompHierarchy &hier = scene.reg_get<active::CompHierarchy>(currentEnt);
+        active::ACompHierarchy &hier = scene.reg_get<active::ACompHierarchy>(currentEnt);
         for (unsigned i = 0; i < hier.m_level; i ++)
         {
             // print arrows to indicate level
@@ -612,13 +606,13 @@ void debug_print_sats()
 
     universe::Universe &universe = g_osp.get_universe();
 
-    auto view = universe.get_reg().view<ucomp::PositionTrajectory,
-                                        ucomp::Type>();
+    auto view = universe.get_reg().view<universe::UCompPositionTrajectory,
+                                        universe::UCompType>();
 
     for (universe::Satellite sat : view)
     {
-        auto &posTraj = view.get<ucomp::PositionTrajectory>(sat);
-        auto &type = view.get<ucomp::Type>(sat);
+        auto &posTraj = view.get<universe::UCompPositionTrajectory>(sat);
+        auto &type = view.get<universe::UCompType>(sat);
 
         auto &pos = posTraj.m_position;
 

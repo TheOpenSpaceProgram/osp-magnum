@@ -15,8 +15,8 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 
     //Matrix4 matrix;
 
-    CompTransform& transform = scene.get_registry()
-                                        .get<CompTransform>(data->m_entity);
+    ACompTransform& transform = scene.get_registry()
+                                        .get<ACompTransform>(data->m_entity);
     NewtonBodyGetMatrix(body, transform.m_transform.data());
 
     Matrix4 matrix;
@@ -57,14 +57,14 @@ SysNewton::SysNewton(ActiveScene &scene) :
 {
     //std::cout << "sysnewtoninit\n";
 
-    scene.get_registry().on_construct<CompRigidBody>()
+    scene.get_registry().on_construct<ACompRigidBody>()
                     .connect<&SysNewton::on_body_construct>(*this);
-    scene.get_registry().on_destroy<CompRigidBody>()
+    scene.get_registry().on_destroy<ACompRigidBody>()
                     .connect<&SysNewton::on_body_destruct>(*this);
 
-    scene.get_registry().on_construct<CompCollisionShape>()
+    scene.get_registry().on_construct<ACompCollisionShape>()
                     .connect<&SysNewton::on_shape_construct>(*this);
-    scene.get_registry().on_destroy<CompCollisionShape>()
+    scene.get_registry().on_destroy<ACompCollisionShape>()
                     .connect<&SysNewton::on_shape_destruct>(*this);
 }
 
@@ -72,8 +72,8 @@ SysNewton::~SysNewton()
 {
     //std::cout << "sysnewtondestroy\n";
     // Clean up newton dynamics stuff
-    m_scene.get_registry().clear<CompRigidBody>();
-    m_scene.get_registry().clear<CompCollisionShape>();
+    m_scene.get_registry().clear<ACompRigidBody>();
+    m_scene.get_registry().clear<ACompCollisionShape>();
     NewtonDestroyAllBodies(m_nwtWorld);
     NewtonDestroy(m_nwtWorld);
 }
@@ -85,10 +85,10 @@ void SysNewton::find_and_add_colliders(ActiveEnt ent, NewtonCollision *compound,
 
     while(nextChild != entt::null)
     {
-        CompHierarchy const &childHeir = m_scene.reg_get<CompHierarchy>(nextChild);
-        CompTransform const &childTransform = m_scene.reg_get<CompTransform>(nextChild);
+        ACompHierarchy const &childHeir = m_scene.reg_get<ACompHierarchy>(nextChild);
+        ACompTransform const &childTransform = m_scene.reg_get<ACompTransform>(nextChild);
 
-        CompCollisionShape* childCollide = m_scene.get_registry().try_get<CompCollisionShape>(nextChild);
+        ACompCollisionShape* childCollide = m_scene.get_registry().try_get<ACompCollisionShape>(nextChild);
         Matrix4 childMatrix = currentTransform * childTransform.m_transform;
 
         if (childCollide)
@@ -128,10 +128,10 @@ void SysNewton::find_and_add_colliders(ActiveEnt ent, NewtonCollision *compound,
 void SysNewton::create_body(ActiveEnt entity)
 {
 
-    CompHierarchy& entHeir = m_scene.reg_get<CompHierarchy>(entity);
-    CompRigidBody& entBody = m_scene.reg_get<CompRigidBody>(entity);
-    CompCollisionShape* entShape = m_scene.get_registry().try_get<CompCollisionShape>(entity);
-    CompTransform& entTransform = m_scene.reg_get<CompTransform>(entity);
+    ACompHierarchy& entHeir = m_scene.reg_get<ACompHierarchy>(entity);
+    ACompRigidBody& entBody = m_scene.reg_get<ACompRigidBody>(entity);
+    ACompCollisionShape* entShape = m_scene.get_registry().try_get<ACompCollisionShape>(entity);
+    ACompTransform& entTransform = m_scene.reg_get<ACompTransform>(entity);
 
     if (!entShape)
     {
@@ -217,16 +217,16 @@ void SysNewton::update_world()
     //std::cout << "hi\n";
 }
 
-std::pair<ActiveEnt, CompRigidBody*> SysNewton::find_rigidbody_ancestor(
+std::pair<ActiveEnt, ACompRigidBody*> SysNewton::find_rigidbody_ancestor(
         ActiveEnt ent)
 {
     ActiveEnt prevEnt, currEnt = ent;
-    CompHierarchy *currHeir = nullptr;
+    ACompHierarchy *currHeir = nullptr;
 
     do
     {
 
-       currHeir = m_scene.get_registry().try_get<CompHierarchy>(currEnt);
+       currHeir = m_scene.get_registry().try_get<ACompHierarchy>(currEnt);
 
         if (!currHeir)
         {
@@ -238,7 +238,7 @@ std::pair<ActiveEnt, CompRigidBody*> SysNewton::find_rigidbody_ancestor(
     }
     while (currHeir->m_level != gc_heir_physics_level);
 
-    CompRigidBody *body = m_scene.get_registry().try_get<CompRigidBody>(prevEnt);
+    ACompRigidBody *body = m_scene.get_registry().try_get<ACompRigidBody>(prevEnt);
 
     return {prevEnt, body};
 
@@ -246,22 +246,22 @@ std::pair<ActiveEnt, CompRigidBody*> SysNewton::find_rigidbody_ancestor(
 
 // TODO
 
-void SysNewton::body_apply_force(CompRigidBody &body, Vector3 force)
+void SysNewton::body_apply_force(ACompRigidBody &body, Vector3 force)
 {
     body->m_netForce += force;
 }
 
-void SysNewton::body_apply_force_local(CompRigidBody &body, Vector3 force)
+void SysNewton::body_apply_force_local(ACompRigidBody &body, Vector3 force)
 {
 
 }
 
-void SysNewton::body_apply_torque(CompRigidBody &body, Vector3 torque)
+void SysNewton::body_apply_torque(ACompRigidBody &body, Vector3 torque)
 {
     body->m_netTorque += torque;
 }
 
-void SysNewton::body_apply_torque_local(CompRigidBody &body, Vector3 force)
+void SysNewton::body_apply_torque_local(ACompRigidBody &body, Vector3 force)
 {
 
 }
@@ -276,7 +276,7 @@ void SysNewton::on_body_construct(entt::registry& reg, ActiveEnt ent)
 void SysNewton::on_body_destruct(entt::registry& reg, ActiveEnt ent)
 {
     // make sure the newton body is destroyed
-    NewtonBody *body = reg.get<CompRigidBody>(ent)->m_body;
+    NewtonBody *body = reg.get<ACompRigidBody>(ent)->m_body;
     if (body)
     {
         NewtonDestroyBody(body);
@@ -291,7 +291,7 @@ void SysNewton::on_shape_construct(entt::registry& reg, ActiveEnt ent)
 void SysNewton::on_shape_destruct(entt::registry& reg, ActiveEnt ent)
 {
     // make sure the collision shape destroyed
-    NewtonCollision *shape = reg.get<CompCollisionShape>(ent).m_collision;
+    NewtonCollision *shape = reg.get<ACompCollisionShape>(ent).m_collision;
     if (shape)
     {
         NewtonDestroyCollision(shape);

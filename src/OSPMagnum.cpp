@@ -70,7 +70,7 @@ void OSPMagnum::drawEvent()
 
 
         // temporary: draw using first camera component found
-        scene.draw(scene.get_registry().view<active::CompCamera>().front());
+        scene.draw(scene.get_registry().view<active::ACompCamera>().front());
     }
 
 

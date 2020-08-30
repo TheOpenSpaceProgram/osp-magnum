@@ -27,27 +27,15 @@ class OSPMagnum;
 class SatActiveArea;
 
 
-namespace ucomp
+struct UCompActiveArea
 {
-
-struct ActiveArea
-{
-
     //active::ActiveEnt m_camera;
 
     unsigned m_sceneIndex;
 };
 
-//struct LoadRadius
-//{
 
-//};
-
-
-}
-
-
-class SatActiveArea : public CommonTypeSat<SatActiveArea, ucomp::ActiveArea>
+class SatActiveArea : public CommonTypeSat<SatActiveArea, UCompActiveArea>
 {
 
 public:
@@ -84,9 +72,5 @@ private:
     //UserInputHandler& m_userInput;
 
 };
-
-
-
-
 
 }

@@ -5,7 +5,7 @@
 using namespace osp;
 using namespace osp::active;
 
-void CompCamera::calculate_projection()
+void ACompCamera::calculate_projection()
 {
 
     m_projection = Matrix4::perspectiveProjection(
@@ -20,13 +20,12 @@ ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app) :
         m_userInput(userInput),
         m_render(*this),
         m_physics(*this),
-        m_wire(*this),
-        m_vehicles(*this)
+        m_wire(*this)
 {
-    m_registry.on_construct<CompHierarchy>()
+    m_registry.on_construct<ACompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_construct>(*this);
 
-    m_registry.on_destroy<CompHierarchy>()
+    m_registry.on_destroy<ACompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_destruct>(*this);
 
     // "There is no need to store groups around for they are extremely cheap to
@@ -34,12 +33,12 @@ ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app) :
     //  freely. A group performs an initialization step the very first time
     //  it's requested and this could be quite costly. To avoid it, consider
     //  creating the group when no components have been assigned yet."
-    m_registry.group<CompHierarchy, CompTransform>();
+    m_registry.group<ACompHierarchy, ACompTransform>();
 
     // Create the root entity
 
     m_root = m_registry.create();
-    CompHierarchy& hierarchy = m_registry.emplace<CompHierarchy>(m_root);
+    ACompHierarchy& hierarchy = m_registry.emplace<ACompHierarchy>(m_root);
     hierarchy.m_name = "Root Entity";
 
 }
@@ -57,11 +56,11 @@ entt::entity ActiveScene::hier_create_child(entt::entity parent,
                                             std::string const& name)
 {
     entt::entity child = m_registry.create();
-    CompHierarchy& childHierarchy = m_registry.emplace<CompHierarchy>(child);
-    //CompTransform& transform = m_registry.emplace<CompTransform>(ent);
+    ACompHierarchy& childHierarchy = m_registry.emplace<ACompHierarchy>(child);
+    //ACompTransform& transform = m_registry.emplace<ACompTransform>(ent);
     childHierarchy.m_name = name;
 
-    CompHierarchy& parentHierarchy = m_registry.get<CompHierarchy>(parent);
+    ACompHierarchy& parentHierarchy = m_registry.get<ACompHierarchy>(parent);
 
     // set new child's parent
     childHierarchy.m_parent = parent;
@@ -71,8 +70,8 @@ entt::entity ActiveScene::hier_create_child(entt::entity parent,
     if (parentHierarchy.m_childCount)
     {
         entt::entity const sibling = parentHierarchy.m_childFirst;
-        CompHierarchy& siblingHierarchy
-                = m_registry.get<CompHierarchy>(sibling);
+        ACompHierarchy& siblingHierarchy
+                = m_registry.get<ACompHierarchy>(sibling);
 
         // Set new child and former first child as siblings
         siblingHierarchy.m_siblingPrev = child;
@@ -144,13 +143,13 @@ void ActiveScene::update_hierarchy_transforms()
 
         }
     }*/
-    auto group = m_registry.group<CompHierarchy, CompTransform>();
+    auto group = m_registry.group<ACompHierarchy, ACompTransform>();
 
     if (m_hierarchyDirty)
     {
         // Sort by level, so that objects closer to the root are iterated first
-        group.sort<CompHierarchy>([](CompHierarchy const& lhs,
-                                     CompHierarchy const& rhs)
+        group.sort<ACompHierarchy>([](ACompHierarchy const& lhs,
+                                     ACompHierarchy const& rhs)
         {
             return lhs.m_level < rhs.m_level;
         }, entt::insertion_sort());
@@ -164,10 +163,10 @@ void ActiveScene::update_hierarchy_transforms()
 
     for(auto entity: group)
     {
-        //std::cout << "nice: " << group.get<CompHierarchy>(entity).m_name << "\n";
+        //std::cout << "nice: " << group.get<ACompHierarchy>(entity).m_name << "\n";
 
-        CompHierarchy& hierarchy = group.get<CompHierarchy>(entity);
-        CompTransform& transform = group.get<CompTransform>(entity);
+        ACompHierarchy& hierarchy = group.get<ACompHierarchy>(entity);
+        ACompTransform& transform = group.get<ACompTransform>(entity);
 
         if (hierarchy.m_parent == m_root)
         {
@@ -185,8 +184,8 @@ void ActiveScene::update_hierarchy_transforms()
         }
         else
         {
-            CompTransform& parentTransform
-                    = group.get<CompTransform>(hierarchy.m_parent);
+            ACompTransform& parentTransform
+                    = group.get<ACompTransform>(hierarchy.m_parent);
 
             // set transform relative to parent
             transform.m_transformWorld = parentTransform.m_transformWorld
@@ -215,8 +214,8 @@ void ActiveScene::draw(entt::entity camera)
     //Matrix4 cameraInverse;
 
     // TODO: check if camera has the right components
-    CompCamera& cameraComp = reg_get<CompCamera>(camera);
-    CompTransform& cameraTransform = reg_get<CompTransform>(camera);
+    ACompCamera& cameraComp = reg_get<ACompCamera>(camera);
+    ACompTransform& cameraTransform = reg_get<ACompTransform>(camera);
 
     //cameraProject = cameraComp.m_projection;
     cameraComp.m_inverse = cameraTransform.m_transformWorld.inverted();

@@ -22,7 +22,7 @@ void SysAreaAssociate::update_scan()
 
     //Universe& uni = m_universe;
     //std::vector<Satellite>& satellites = uni.
-    auto view = m_universe.get_reg().view<ucomp::Activatable>();
+    auto view = m_universe.get_reg().view<UCompActivatable>();
 
     for (Satellite sat : view)
     {
@@ -70,11 +70,11 @@ void SysAreaAssociate::update_scan()
 
         // Satellite is near! Attempt to load it
 
-        activate_satellite(sat);
+        sat_activate(sat);
     }
 
 
-//    CompTransform& cameraTransform = m_scene->reg_get<CompTransform>(m_camera);
+//    ACompTransform& cameraTransform = m_scene->reg_get<ACompTransform>(m_camera);
 //    //cameraTransform.m_transform[3].xyz().x() += 0.1f; // move the camera right
 
 //    // Temporary: Floating origin follow cameara
@@ -95,18 +95,18 @@ void SysAreaAssociate::connect(universe::Satellite sat)
 
     //auto &reg = m_scene.get_registry();
 
-    //ucomp::ActiveArea &areaAA = reg.get<>
+    //UCompActiveArea &areaAA = reg.get<>
 
     m_areaSat = sat;
 }
 
-void SysAreaAssociate::activate_func_add(universe::ITypeSatellite* type,
-                                         LoadStrategy function)
+void SysAreaAssociate::activator_add(universe::ITypeSatellite* type,
+                                         IActivator &activator)
 {
-    m_loadFunctions[type] = function;
+    m_activators[type] = &activator;
 }
 
-int SysAreaAssociate::activate_satellite(universe::Satellite sat)
+int SysAreaAssociate::sat_activate(universe::Satellite sat)
 {
 
     if (m_activatedSats.find(sat) != m_activatedSats.end())
@@ -115,17 +115,16 @@ int SysAreaAssociate::activate_satellite(universe::Satellite sat)
         return 1;
     }
 
-    namespace ucomp = universe::ucomp;
     auto &ureg = m_universe.get_reg();
 
-    auto &satType = ureg.get<ucomp::Type>(sat);
+    auto &satType = ureg.get<UCompType>(sat);
 
-    //auto &areaSatAA = reg.get<ucomp::Type>(m_areaSat);
+    //auto &areaSatAA = reg.get<UCompType>(m_areaSat);
 
     // see if there's a loading function for the satellite object
-    auto funcMapIt =  m_loadFunctions.find(satType.m_type);
+    auto funcMapIt =  m_activators.find(satType.m_type);
 
-    if(funcMapIt == m_loadFunctions.end())
+    if(funcMapIt == m_activators.end())
     {
         // no loading function exists for this satellite object type
         return -1;
@@ -134,8 +133,9 @@ int SysAreaAssociate::activate_satellite(universe::Satellite sat)
     //(ActiveScene& scene, osp::universe::SatActiveArea& area,
     //                universe::Satellite areaSat, universe::Satellite loadMe
 
-    // Call the LoadStrategy
-    int loadStatus = funcMapIt->second(m_scene, *this, m_areaSat, sat);
+    // Get activator and call the activate function
+    IActivator *activator = funcMapIt->second;
+    int loadStatus = activator->activate_sat(m_scene, *this, m_areaSat, sat);
 
     if (loadStatus)
     {
@@ -148,5 +148,10 @@ int SysAreaAssociate::activate_satellite(universe::Satellite sat)
     m_activatedSats.emplace(sat);
 
     return 0;
+}
+
+int SysAreaAssociate::sat_deactivate(ActiveEnt entity)
+{
+
 }
 

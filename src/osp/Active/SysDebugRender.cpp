@@ -22,7 +22,7 @@ SysDebugRender::SysDebugRender(ActiveScene &rScene) :
 
 }
 
-void SysDebugRender::draw(CompCamera const& camera)
+void SysDebugRender::draw(ACompCamera const& camera)
 {
     using Magnum::GL::Renderer;
 
@@ -31,14 +31,14 @@ void SysDebugRender::draw(CompCamera const& camera)
 
 
     auto drawGroup = m_scene.get_registry().group<CompDrawableDebug>(
-                            entt::get<CompTransform>);
+                            entt::get<ACompTransform>);
 
     Matrix4 entRelative;
 
     for(auto entity: drawGroup)
     {
         CompDrawableDebug& drawable = drawGroup.get<CompDrawableDebug>(entity);
-        CompTransform& transform = drawGroup.get<CompTransform>(entity);
+        ACompTransform& transform = drawGroup.get<ACompTransform>(entity);
 
         entRelative = camera.m_inverse * transform.m_transformWorld;
 

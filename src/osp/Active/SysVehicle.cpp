@@ -22,18 +22,18 @@ SysVehicle::SysVehicle(ActiveScene &scene) :
     m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
 }
 
-int SysVehicle::area_activate_vehicle(ActiveScene &scene,
-                                      SysAreaAssociate &area,
-                                      universe::Satellite areaSat,
-                                      universe::Satellite loadMe)
+int SysVehicle::activate_sat(ActiveScene &scene,
+                             SysAreaAssociate &area,
+                             universe::Satellite areaSat,
+                             universe::Satellite loadMe)
 {
 
     std::cout << "loadin a vehicle!\n";
 
     universe::Universe &uni = area.get_universe();
-    SysVehicle& self = scene.get_system<SysVehicle>();
-    universe::ucomp::Vehicle &loadMeVehicle
-            = uni.get_reg().get<universe::ucomp::Vehicle>(loadMe);
+    //SysVehicle& self = scene.get_system<SysVehicle>();
+    universe::UCompVehicle &loadMeVehicle
+            = uni.get_reg().get<universe::UCompVehicle>(loadMe);
 
     // make sure there is vehicle data to load
     if (loadMeVehicle.m_blueprint.empty())
@@ -55,8 +55,8 @@ int SysVehicle::area_activate_vehicle(ActiveScene &scene,
     Vector3 positionInScene
             = area.get_universe().sat_calc_pos_meters(areaSat, loadMe);
 
-    CompTransform& vehicleTransform = scene.get_registry()
-                                        .emplace<CompTransform>(vehicleEnt);
+    ACompTransform& vehicleTransform = scene.get_registry()
+                                        .emplace<ACompTransform>(vehicleEnt);
     vehicleTransform.m_transform = Matrix4::translation(positionInScene);
     vehicleTransform.m_enableFloatingOrigin = true;
 
@@ -88,7 +88,7 @@ int SysVehicle::area_activate_vehicle(ActiveScene &scene,
 
         PrototypePart &proto = *partDepends;
 
-        ActiveEnt partEntity = self.part_instantiate(proto, vehicleEnt);
+        ActiveEnt partEntity = this->part_instantiate(proto, vehicleEnt);
         vehicleComp.m_parts.push_back(partEntity);
 
         // Part now exists
@@ -120,8 +120,8 @@ int SysVehicle::area_activate_vehicle(ActiveScene &scene,
 
         //std::cout << "entity: " << int(partEntity) << "\n";
 
-        CompTransform& partTransform = scene.get_registry()
-                                            .get<CompTransform>(partEntity);
+        ACompTransform& partTransform = scene.get_registry()
+                                            .get<ACompTransform>(partEntity);
 
         // set the transformation
         partTransform.m_transform
@@ -172,13 +172,21 @@ int SysVehicle::area_activate_vehicle(ActiveScene &scene,
     }
 
     // temporary: make the whole thing a single rigid body
-    CompRigidBody& vehicleBody = scene.reg_emplace<CompRigidBody>(vehicleEnt);
-    CompCollisionShape& vehicleShape = scene.reg_emplace<CompCollisionShape>(vehicleEnt);
+    ACompRigidBody& vehicleBody = scene.reg_emplace<ACompRigidBody>(vehicleEnt);
+    ACompCollisionShape& vehicleShape = scene.reg_emplace<ACompCollisionShape>(vehicleEnt);
     vehicleShape.m_shape = ECollisionShape::COMBINED;
     scene.get_system<SysNewton>().create_body(vehicleEnt);
 
     return 0;
 }
+
+int SysVehicle::deactivate_sat(ActiveScene &scene, SysAreaAssociate &area,
+        universe::Satellite areaSat, universe::Satellite tgtSat,
+        ActiveEnt tgtEnt)
+{
+    return 0;
+}
+
 
 ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                                        ActiveEnt rootParent)
@@ -213,8 +221,8 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
         newEntities[i] = currentEnt;
 
         // Add and set transform component
-        CompTransform& currentTransform
-                = m_scene.reg_emplace<CompTransform>(currentEnt);
+        ACompTransform& currentTransform
+                = m_scene.reg_emplace<ACompTransform>(currentEnt);
         currentTransform.m_transform
                 = Matrix4::from(currentPrototype.m_rotation.toMatrix(),
                                 currentPrototype.m_translation)
@@ -284,7 +292,7 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
         }
         else if (currentPrototype.m_type == ObjectType::COLLIDER)
         {
-            CompCollisionShape collision = m_scene.reg_emplace<CompCollisionShape>(currentEnt);
+            ACompCollisionShape collision = m_scene.reg_emplace<ACompCollisionShape>(currentEnt);
             collision.m_shape = currentPrototype.m_collider.m_type;
 
         }

@@ -28,18 +28,30 @@ struct CompPlanet
 };
 
 
-class SysPlanetA : public osp::active::IDynamicSystem
+class SysPlanetA : public osp::active::IDynamicSystem,
+                   public osp::active::IActivator
 {
 public:
 
-    static int area_activate_planet(
-            osp::active::ActiveScene& scene, osp::active::SysAreaAssociate &area,
-            osp::universe::Satellite areaSat, osp::universe::Satellite loadMe);
+    //static int area_activate_planet(
+    //        osp::active::ActiveScene& scene, osp::active::SysAreaAssociate &area,
+    //        osp::universe::Satellite areaSat, osp::universe::Satellite loadMe);
 
     SysPlanetA(osp::active::ActiveScene &scene);
     ~SysPlanetA() = default;
 
-    void draw(osp::active::CompCamera const& camera);
+    int activate_sat(osp::active::ActiveScene &scene,
+                     osp::active::SysAreaAssociate &area,
+                     osp::universe::Satellite areaSat,
+                     osp::universe::Satellite tgtSat);
+
+    int deactivate_sat(osp::active::ActiveScene &scene,
+                       osp::active::SysAreaAssociate &area,
+                       osp::universe::Satellite areaSat,
+                       osp::universe::Satellite tgtSat,
+                       osp::active::ActiveEnt tgtEnt);
+
+    void draw(osp::active::ACompCamera const& camera);
 
     void debug_create_chunk_collider(osp::active::ActiveEnt ent,
                                      CompPlanet &planet,

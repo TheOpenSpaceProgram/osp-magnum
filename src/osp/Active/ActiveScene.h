@@ -12,16 +12,17 @@
 #include "SysDebugRender.h"
 #include "SysNewton.h"
 #include "SysMachine.h"
-#include "SysVehicle.h"
+//#include "SysVehicle.h"
 #include "SysWire.h"
 
 namespace osp::active
 {
 
+
 /**
  * Component for transformation (in meters)
  */
-struct CompTransform
+struct ACompTransform
 {
     //Matrix4 m_transformPrev;
     Matrix4 m_transform;
@@ -29,7 +30,7 @@ struct CompTransform
     bool m_enableFloatingOrigin;
 };
 
-struct CompHierarchy
+struct ACompHierarchy
 {
     std::string m_name;
 
@@ -50,7 +51,7 @@ struct CompHierarchy
 /**
  * Component that represents a camera
  */
-struct CompCamera
+struct ACompCamera
 {
     float m_near, m_far;
     Magnum::Deg m_fov;
@@ -82,7 +83,7 @@ public:
     constexpr ActiveEnt hier_get_root() { return m_root; }
 
     /**
-     * Create a new entity, and add a CompHierarchy to it
+     * Create a new entity, and add a ACompHierarchy to it
      * @param parent [in] Entity to assign as parent
      * @param name   [in] Name of entity
      * @return New entity created
@@ -92,7 +93,7 @@ public:
 
     /**
      * (NOT YET IMPLEMENTED) set parent-child relationship between two nodes
-     * containing a CompHierarchy
+     * containing a ACompHierarchy
      * @param parent
      * @param child
      */
@@ -127,8 +128,8 @@ public:
     void update();
 
     /**
-     * Update the m_transformWorld of entities with CompTransform and
-     * CompHierarchy. Intended for physics interpolation
+     * Update the m_transformWorld of entities with ACompTransform and
+     * ACompHierarchy. Intended for physics interpolation
      */
     void update_hierarchy_transforms();
 
@@ -159,7 +160,7 @@ public:
     /**
      * Calculate transformations relative to camera, and draw every
      * CompDrawableDebug
-     * @param camera [in] Entity containing a CompCamera
+     * @param camera [in] Entity containing a ACompCamera
      */
     void draw(ActiveEnt camera);
 
@@ -234,7 +235,7 @@ private:
     SysDebugRender m_render;
     SysPhysics m_physics;
     SysWire m_wire;
-    SysVehicle m_vehicles;
+    //SysVehicle m_vehicles;
 
     //SysDebugObject m_debugObj;
     //std::tuple<SysPhysics, SysWire, SysDebugObject> m_systems;
@@ -275,13 +276,6 @@ constexpr SysWire& ActiveScene::get_system<SysWire>()
 {
     return m_wire;
 }
-
-template<>
-constexpr SysVehicle& ActiveScene::get_system<SysVehicle>()
-{
-    return m_vehicles;
-}
-
 
 //template<>
 ///constexpr SysDebugObject& ActiveScene::get_system<SysDebugObject>()

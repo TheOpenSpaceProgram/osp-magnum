@@ -20,7 +20,7 @@ namespace osp::universe
 {
 
 SatActiveArea::SatActiveArea(Universe& universe) :
-        CommonTypeSat<SatActiveArea, ucomp::ActiveArea>(universe)
+        CommonTypeSat<SatActiveArea, UCompActiveArea>(universe)
 {
 
 }

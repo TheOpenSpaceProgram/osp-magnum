@@ -39,18 +39,24 @@ struct CompVehicle
     std::vector<ActiveEnt> m_parts;
 };
 
-class SysVehicle
+class SysVehicle : public IDynamicSystem, public IActivator
 {
 public:
 
     SysVehicle(ActiveScene &scene);
     SysVehicle(SysNewton const& copy) = delete;
     SysVehicle(SysNewton&& move) = delete;
+    ~SysVehicle() = default;
 
-    static int area_activate_vehicle(ActiveScene& scene,
-                                     SysAreaAssociate &area,
-                                     universe::Satellite areaSat,
-                                     universe::Satellite loadMe);
+    //static int area_activate_vehicle(ActiveScene& scene,
+    //                                 SysAreaAssociate &area,
+    //                                 universe::Satellite areaSat,
+    //                                 universe::Satellite loadMe);
+    int activate_sat(ActiveScene &scene, SysAreaAssociate &area,
+            universe::Satellite areaSat, universe::Satellite tgtSat);
+    int deactivate_sat(ActiveScene &scene, SysAreaAssociate &area,
+            universe::Satellite areaSat, universe::Satellite tgtSat,
+            ActiveEnt tgtEnt);
 
     /**
      * Create a Physical Part from a PrototypePart and put it in the world

@@ -9,17 +9,12 @@
 namespace osp::universe
 {
 
-namespace ucomp
-{
-
-struct Vehicle
+struct UCompVehicle
 {
     DependRes<BlueprintVehicle> m_blueprint;
 };
 
-}
-
-class SatVehicle : public CommonTypeSat<SatVehicle, ucomp::Vehicle, ucomp::Activatable>
+class SatVehicle : public CommonTypeSat<SatVehicle, UCompVehicle, UCompActivatable>
 {
 
 public:

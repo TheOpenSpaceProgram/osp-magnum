@@ -132,11 +132,9 @@ TRAJECTORY_T& Universe::trajectory_create(ARGS_T&& ... args)
 
 
 // default ECS components needed for the universe
-namespace ucomp
-{
 
 
-struct PositionTrajectory
+struct UCompPositionTrajectory
 {
     // Position is relative to m_parent
     Vector3s m_position;
@@ -153,30 +151,29 @@ struct PositionTrajectory
     std::string m_name;
 };
 
-//struct Activated
+//struct ACompActivated
 //{
 //    // Index to [probably an active area] when activated
 //    Satellite m_area;
 //}
 
-struct Velocity
+struct UCompVelocity
 {
     Vector3 m_velocity;
 };
 
-struct Type
+struct UCompType
 {
     // maybe use an iterator
     ITypeSatellite* m_type{nullptr};
 };
 
-struct Activatable
+struct UCompActivatable
 {
     // put something here some day
     int m_dummy;
 };
 
-}
 
 /**
  * A specific type of Satellite. A planet, star, vehicle, etc...
@@ -222,7 +219,7 @@ private:
 template<typename TYPESAT_T, typename ... UCOMP_T>
 std::tuple<UCOMP_T& ...> CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp_all(Satellite sat)
 {
-    auto& type = m_universe.get_reg().get<ucomp::Type>(sat);
+    auto& type = m_universe.get_reg().get<UCompType>(sat);
 
     if (type.m_type != nullptr)
     {
@@ -236,7 +233,7 @@ std::tuple<UCOMP_T& ...> CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp_al
 template<typename TYPESAT_T, typename ... UCOMP_T>
 auto& CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp(Satellite sat)
 {
-    auto& type = m_universe.get_reg().get<ucomp::Type>(sat);
+    auto& type = m_universe.get_reg().get<UCompType>(sat);
 
     if (type.m_type != nullptr)
     {
@@ -250,7 +247,7 @@ auto& CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp(Satellite sat)
 template<typename TYPESAT_T, typename ... UCOMP_T>
 void CommonTypeSat<TYPESAT_T, UCOMP_T ...>::remove(Satellite sat)
 {
-    auto& type = m_universe.get_reg().get<ucomp::Type>(sat);
+    auto& type = m_universe.get_reg().get<UCompType>(sat);
 
     if (type.m_type != this)
     {
@@ -326,7 +323,7 @@ private:
 template<typename TRAJECTORY_T>
 void CommonTrajectory<TRAJECTORY_T>::add(Satellite sat)
 {
-    auto &posTraj = m_universe.get_reg().get<ucomp::PositionTrajectory>(sat);
+    auto &posTraj = m_universe.get_reg().get<UCompPositionTrajectory>(sat);
 
     if (posTraj.m_trajectory)
     {
@@ -342,7 +339,7 @@ void CommonTrajectory<TRAJECTORY_T>::add(Satellite sat)
 template<typename TRAJECTORY_T>
 void CommonTrajectory<TRAJECTORY_T>::remove(Satellite sat)
 {
-    auto &posTraj = m_universe.get_reg().get<ucomp::PositionTrajectory>(sat);
+    auto &posTraj = m_universe.get_reg().get<UCompPositionTrajectory>(sat);
 
     if (posTraj.m_trajectory != this)
     {

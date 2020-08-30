@@ -16,8 +16,8 @@ Universe::Universe()
 Satellite Universe::sat_create()
 {
     Satellite sat = m_registry.create();
-    m_registry.emplace<ucomp::PositionTrajectory>(sat);
-    m_registry.emplace<ucomp::Type>(sat);
+    m_registry.emplace<UCompPositionTrajectory>(sat);
+    m_registry.emplace<UCompType>(sat);
     return sat;
 }
 
@@ -29,11 +29,11 @@ void Universe::sat_remove(Satellite sat)
 
 Vector3s Universe::sat_calc_pos(Satellite referenceFrame, Satellite target)
 {
-    auto view = m_registry.view<ucomp::PositionTrajectory>();
+    auto view = m_registry.view<UCompPositionTrajectory>();
 
     // TODO: maybe do some checks to make sure they have the components
-    auto &framePosTraj = view.get<ucomp::PositionTrajectory>(referenceFrame);
-    auto &targetPosTraj = view.get<ucomp::PositionTrajectory>(target);
+    auto &framePosTraj = view.get<UCompPositionTrajectory>(referenceFrame);
+    auto &targetPosTraj = view.get<UCompPositionTrajectory>(target);
 
     if (framePosTraj.m_parent == targetPosTraj.m_parent)
     {

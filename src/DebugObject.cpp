@@ -1,6 +1,7 @@
 #include "DebugObject.h"
 
 #include <osp/Active/ActiveScene.h>
+#include <osp/Active/SysVehicle.h>
 
 #include <adera/Machines/UserControl.h>
 
@@ -84,14 +85,14 @@ void DebugCameraController::update_physics_post()
 
         // pick next entity, or first entity in scene
         //ActiveEnt search = targetValid
-        //        ? m_scene.reg_get<CompHierarchy>(m_orbiting).m_siblingNext
-        //        : m_scene.reg_get<CompHierarchy>(m_scene.hier_get_root())
+        //        ? m_scene.reg_get<ACompHierarchy>(m_orbiting).m_siblingNext
+        //        : m_scene.reg_get<ACompHierarchy>(m_scene.hier_get_root())
         //                 .m_childFirst;
 
         // keep looping until a vehicle is found
         //while ((!m_scene.get_registry().has<CompVehicle>(search)))
         //{
-        //    search = m_scene.reg_get<CompHierarchy>(search).m_siblingNext;
+        //    search = m_scene.reg_get<ACompHierarchy>(search).m_siblingNext;
         //}
     }
 
@@ -108,8 +109,8 @@ void DebugCameraController::update_physics_post()
 
     Quaternion quatYaw({0, 0.1f * yaw, 0});
 
-    Matrix4 &tf = m_scene.reg_get<active::CompTransform>(m_ent).m_transform;
-    Matrix4 const& tfTgt = m_scene.reg_get<active::CompTransform>(m_orbiting).m_transform;
+    Matrix4 &tf = m_scene.reg_get<active::ACompTransform>(m_ent).m_transform;
+    Matrix4 const& tfTgt = m_scene.reg_get<active::ACompTransform>(m_orbiting).m_transform;
 
     Vector3 posRelative = tf.translation() - tfTgt.translation();
 

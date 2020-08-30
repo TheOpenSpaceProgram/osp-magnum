@@ -88,16 +88,16 @@ void SysMachineRocket::update_physics()
 
         //std::cout << "updating a rocket\n";
 
-        CompRigidBody *compRb;
-        CompTransform *compTf;
+        ACompRigidBody *compRb;
+        ACompTransform *compTf;
 
         if (m_scene.get_registry().valid(machine.m_rigidBody))
         {
-            // Try to get the CompRigidBody if valid
+            // Try to get the ACompRigidBody if valid
             compRb = m_scene.get_registry()
-                            .try_get<CompRigidBody>(machine.m_rigidBody);
+                            .try_get<ACompRigidBody>(machine.m_rigidBody);
             compTf = m_scene.get_registry()
-                            .try_get<CompTransform>(machine.m_rigidBody);
+                            .try_get<ACompTransform>(machine.m_rigidBody);
             if (!compRb || !compTf)
             {
                 machine.m_rigidBody = entt::null;
@@ -118,7 +118,7 @@ void SysMachineRocket::update_physics()
             machine.m_rigidBody = body.first;
             compRb = body.second;
             compTf = m_scene.get_registry()
-                    .try_get<CompTransform>(body.first);
+                    .try_get<ACompTransform>(body.first);
         }
 
         if (WireData *ignition = machine.m_wiIgnition.connected_value())

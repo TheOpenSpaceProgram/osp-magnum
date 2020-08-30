@@ -15,7 +15,7 @@ class SysNewton;
 
 class ActiveScene;
 
-struct CompCamera;
+struct ACompCamera;
 
 constexpr unsigned gc_heir_physics_level = 1;
 
@@ -28,8 +28,8 @@ using ActiveEnt = entt::entity;
 using UpdateOrder = FunctionOrder<void(void)>;
 using UpdateOrderHandle = FunctionOrderHandle<void(void)>;
 
-using RenderOrder = FunctionOrder<void(CompCamera const&)>;
-using RenderOrderHandle = FunctionOrderHandle<void(CompCamera const&)>;
+using RenderOrder = FunctionOrder<void(ACompCamera const&)>;
+using RenderOrderHandle = FunctionOrderHandle<void(ACompCamera const&)>;
 
 // not really sure what else to put in here
 class IDynamicSystem

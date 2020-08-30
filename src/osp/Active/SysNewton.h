@@ -42,7 +42,7 @@ struct NwtUserData
 //    std::unique_ptr<NwtUserData> m_data;
 //};
 
-using CompRigidBody = std::unique_ptr<NwtUserData>;
+using ACompRigidBody = std::unique_ptr<NwtUserData>;
 
 //struct CompNewtonCollision
 //{
@@ -50,11 +50,12 @@ using CompRigidBody = std::unique_ptr<NwtUserData>;
 //};
 
 
-struct CompCollisionShape
+struct ACompCollisionShape
 {
     NewtonCollision* m_collision{nullptr};
     ECollisionShape m_shape{ECollisionShape::NONE};
 };
+
 
 class SysNewton
 {
@@ -78,23 +79,23 @@ public:
     /**
      *
      * @return Pair of {level-1 entity, pointer to body found}. If hierarchy
-     *         error, then {entt:null, nullptr}. If no CompRigidBody found,
+     *         error, then {entt:null, nullptr}. If no ACompRigidBody found,
      *         then {level-1 entity, nullptr}
      */
-    std::pair<ActiveEnt, CompRigidBody*> find_rigidbody_ancestor(
+    std::pair<ActiveEnt, ACompRigidBody*> find_rigidbody_ancestor(
             ActiveEnt ent);
 
-    void body_apply_force(CompRigidBody &body, Vector3 force);
-    void body_apply_force_local(CompRigidBody &body, Vector3 force);
+    void body_apply_force(ACompRigidBody &body, Vector3 force);
+    void body_apply_force_local(ACompRigidBody &body, Vector3 force);
 
-    void body_apply_torque(CompRigidBody &body, Vector3 force);
-    void body_apply_torque_local(CompRigidBody &body, Vector3 force);
+    void body_apply_torque(ACompRigidBody &body, Vector3 force);
+    void body_apply_torque_local(ACompRigidBody &body, Vector3 force);
 
-    void shape_create_box(CompCollisionShape &shape, Vector3 size);
-    void shape_create_sphere(CompCollisionShape &shape, float radius);
+    void shape_create_box(ACompCollisionShape &shape, Vector3 size);
+    void shape_create_sphere(ACompCollisionShape &shape, float radius);
 
     template<class TRIANGLE_IT_T>
-    void shape_create_tri_mesh_static(CompCollisionShape &shape,
+    void shape_create_tri_mesh_static(ACompCollisionShape &shape,
                                       TRIANGLE_IT_T const& start,
                                       TRIANGLE_IT_T const& end);
 
@@ -134,7 +135,7 @@ private:
 };
 
 template<class TRIANGLE_IT_T>
-void SysNewton::shape_create_tri_mesh_static(CompCollisionShape &shape,
+void SysNewton::shape_create_tri_mesh_static(ACompCollisionShape &shape,
                                              TRIANGLE_IT_T const& start,
                                              TRIANGLE_IT_T const& end)
 {
