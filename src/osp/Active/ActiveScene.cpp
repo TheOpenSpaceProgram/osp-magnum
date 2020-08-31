@@ -45,9 +45,8 @@ ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app) :
 
 ActiveScene::~ActiveScene()
 {
-    // FIXME: not clearing these manually causes a SIGABRT on destruction
-    // because of CompDebugObject
-    //m_registry.clear<CompDebugObject>();
+    // destruct dynamic systems before registry
+    m_dynamicSys.clear();
     m_registry.clear();
 }
 

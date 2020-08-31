@@ -52,11 +52,12 @@ public:
     //                                 SysAreaAssociate &area,
     //                                 universe::Satellite areaSat,
     //                                 universe::Satellite loadMe);
-    int activate_sat(ActiveScene &scene, SysAreaAssociate &area,
+    StatusActivated activate_sat(ActiveScene &scene, SysAreaAssociate &area,
             universe::Satellite areaSat, universe::Satellite tgtSat);
     int deactivate_sat(ActiveScene &scene, SysAreaAssociate &area,
             universe::Satellite areaSat, universe::Satellite tgtSat,
             ActiveEnt tgtEnt);
+
 
     /**
      * Create a Physical Part from a PrototypePart and put it in the world

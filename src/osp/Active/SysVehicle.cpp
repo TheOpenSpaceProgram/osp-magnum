@@ -22,10 +22,10 @@ SysVehicle::SysVehicle(ActiveScene &scene) :
     m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
 }
 
-int SysVehicle::activate_sat(ActiveScene &scene,
-                             SysAreaAssociate &area,
-                             universe::Satellite areaSat,
-                             universe::Satellite loadMe)
+StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
+                                         SysAreaAssociate &area,
+                                         universe::Satellite areaSat,
+                                         universe::Satellite loadMe)
 {
 
     std::cout << "loadin a vehicle!\n";
@@ -39,7 +39,7 @@ int SysVehicle::activate_sat(ActiveScene &scene,
     if (loadMeVehicle.m_blueprint.empty())
     {
         // no vehicle data to load
-        return 1;
+        return {1, entt::null, false};
     }
 
     BlueprintVehicle &vehicleData = *(loadMeVehicle.m_blueprint);
@@ -83,7 +83,7 @@ int SysVehicle::activate_sat(ActiveScene &scene,
         // Check if the part prototype this depends on still exists
         if (partDepends.empty())
         {
-            return -1;
+            return {1, entt::null, false};
         }
 
         PrototypePart &proto = *partDepends;
@@ -177,13 +177,14 @@ int SysVehicle::activate_sat(ActiveScene &scene,
     vehicleShape.m_shape = ECollisionShape::COMBINED;
     scene.get_system<SysNewton>().create_body(vehicleEnt);
 
-    return 0;
+    return {0, vehicleEnt, true};
 }
 
 int SysVehicle::deactivate_sat(ActiveScene &scene, SysAreaAssociate &area,
         universe::Satellite areaSat, universe::Satellite tgtSat,
         ActiveEnt tgtEnt)
 {
+    area.sat_position_update(tgtEnt);
     return 0;
 }
 

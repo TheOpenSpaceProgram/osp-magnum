@@ -1,9 +1,9 @@
 #include "Stationary.h"
 
-using namespace osp::universe::traj;
+using namespace osp::universe;
 
-Stationary::Stationary(Universe& universe, Satellite center) :
-        CommonTrajectory<Stationary>(universe, center)
+TrajStationary::TrajStationary(Universe& universe, Satellite center) :
+        CommonTrajectory<TrajStationary>(universe, center)
 {
 
 }

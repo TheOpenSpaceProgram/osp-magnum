@@ -46,12 +46,6 @@ namespace active
     using namespace planeta::active;
 }
 
-namespace traj
-{
-    using namespace osp::universe::traj;
-    //using namespace planeta::universe::traj;
-}
-
 namespace machines
 {
     using namespace adera::active::machines;
@@ -61,6 +55,9 @@ using osp::Vector2;
 using osp::Vector3;
 using osp::Matrix4;
 using osp::Quaternion;
+
+// for the 0xrrggbb_rgbf and angle literals
+using namespace Magnum::Math::Literals;
 
 
 /**
@@ -251,9 +248,6 @@ void magnum_application()
 
     // Add a camera to the scene
 
-    // for the 0xrrggbb_rgbf and angle literals
-    using namespace Magnum::Math::Literals;
-
     // Create the camera entity
     active::ActiveEnt camera = scene.hier_create_child(scene.hier_get_root(),
                                                        "Camera");
@@ -285,8 +279,8 @@ void magnum_application()
 
     std::cout << "Magnum Application closed\n";
 
-    // Kill the active area
-    //g_osp.get_universe().sat_remove(area.get_satellite());
+    // Disconnect ActiveArea
+    sysArea.disconnect();
 
     // workaround: wipe mesh resources because they're specific to the
     // opengl context
@@ -392,7 +386,7 @@ void create_solar_system()
     auto &typePlanet = uni.type_register<universe::SatPlanet>(uni);
 
     // Create trajectory that will make things added to the universe stationary
-    auto &stationary = uni.trajectory_create<traj::Stationary>(
+    auto &stationary = uni.trajectory_create<universe::TrajStationary>(
                                         uni, uni.sat_root());
 
     for (int i = 0; i < 20; i ++)

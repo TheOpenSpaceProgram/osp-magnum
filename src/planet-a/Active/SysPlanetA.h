@@ -40,10 +40,11 @@ public:
     SysPlanetA(osp::active::ActiveScene &scene);
     ~SysPlanetA() = default;
 
-    int activate_sat(osp::active::ActiveScene &scene,
-                     osp::active::SysAreaAssociate &area,
-                     osp::universe::Satellite areaSat,
-                     osp::universe::Satellite tgtSat);
+    osp::active::StatusActivated activate_sat(
+            osp::active::ActiveScene &scene,
+            osp::active::SysAreaAssociate &area,
+            osp::universe::Satellite areaSat,
+            osp::universe::Satellite tgtSat);
 
     int deactivate_sat(osp::active::ActiveScene &scene,
                        osp::active::SysAreaAssociate &area,

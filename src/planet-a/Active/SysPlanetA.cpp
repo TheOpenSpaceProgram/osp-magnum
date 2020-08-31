@@ -26,10 +26,11 @@ using namespace Magnum::Math::Literals;
 
 using osp::universe::Satellite;
 
-int SysPlanetA::activate_sat(osp::active::ActiveScene &scene,
-                             osp::active::SysAreaAssociate &area,
-                             osp::universe::Satellite areaSat,
-                             osp::universe::Satellite tgtSat)
+StatusActivated SysPlanetA::activate_sat(
+        osp::active::ActiveScene &scene,
+        osp::active::SysAreaAssociate &area,
+        osp::universe::Satellite areaSat,
+        osp::universe::Satellite tgtSat)
 {
 
     std::cout << "activatin a planet!!!!!!!!!!!!!!!!11\n";
@@ -53,7 +54,7 @@ int SysPlanetA::activate_sat(osp::active::ActiveScene &scene,
     CompPlanet &planetComp = scene.reg_emplace<CompPlanet>(planetEnt);
     planetComp.m_radius = loadMePlanet.m_radius;
 
-    return 0;
+    return {0, planetEnt, false};
 }
 
 SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene) :

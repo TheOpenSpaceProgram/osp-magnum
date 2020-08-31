@@ -2,18 +2,18 @@
 
 #include "../Universe.h"
 
-namespace osp::universe::traj
+namespace osp::universe
 {
 
 /**
  * A static universe where everything stays still
  */
-class Stationary : public CommonTrajectory<Stationary>
+class TrajStationary : public CommonTrajectory<TrajStationary>
 {
 public:
 
-    Stationary(Universe& universe, Satellite center);
-    ~Stationary() = default;
+    TrajStationary(Universe& universe, Satellite center);
+    ~TrajStationary() = default;
     void update() {};
 };
 

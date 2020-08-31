@@ -14,7 +14,8 @@ namespace osp::universe
 class ISystemTrajectory;
 class ITypeSatellite;
 
-using Satellite = entt::entity;
+//using Satellite = entt::entity;
+ENTT_OPAQUE_TYPE(Satellite, uint32_t);
 
 using MapSatType = std::map<std::string, std::unique_ptr<ITypeSatellite>>;
 
