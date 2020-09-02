@@ -135,10 +135,13 @@ TRAJECTORY_T& Universe::trajectory_create(ARGS_T&& ... args)
 // default ECS components needed for the universe
 
 
-struct UCompPositionTrajectory
+struct UCompTransformTraj
 {
-    // Position is relative to m_parent
+    // Relative to m_parent
     Vector3s m_position;
+
+    // In 'global' space
+    Quaternion m_rotation;
 
     Satellite m_parent; // Set only by trajectory
 
@@ -324,7 +327,7 @@ private:
 template<typename TRAJECTORY_T>
 void CommonTrajectory<TRAJECTORY_T>::add(Satellite sat)
 {
-    auto &posTraj = m_universe.get_reg().get<UCompPositionTrajectory>(sat);
+    auto &posTraj = m_universe.get_reg().get<UCompTransformTraj>(sat);
 
     if (posTraj.m_trajectory)
     {
@@ -340,7 +343,7 @@ void CommonTrajectory<TRAJECTORY_T>::add(Satellite sat)
 template<typename TRAJECTORY_T>
 void CommonTrajectory<TRAJECTORY_T>::remove(Satellite sat)
 {
-    auto &posTraj = m_universe.get_reg().get<UCompPositionTrajectory>(sat);
+    auto &posTraj = m_universe.get_reg().get<UCompTransformTraj>(sat);
 
     if (posTraj.m_trajectory != this)
     {

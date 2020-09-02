@@ -119,22 +119,26 @@ void SysAreaAssociate::disconnect()
     m_areaSat = entt::null;
 }
 
-void SysAreaAssociate::sat_position_update(ActiveEnt ent)
+void SysAreaAssociate::sat_transform_update(ActiveEnt ent)
 {
     auto const &entAct = m_scene.reg_get<ACompActivatedSat>(ent);
     auto const &entTransform = m_scene.reg_get<ACompTransform>(ent);
 
     Satellite sat = entAct.m_sat;
     auto &satPosTraj = m_universe.get_reg()
-            .get<universe::UCompPositionTrajectory>(sat);
+            .get<universe::UCompTransformTraj>(sat);
 
     auto const &areaPosTraj = m_universe.get_reg()
-            .get<universe::UCompPositionTrajectory>(m_areaSat);
+            .get<universe::UCompTransformTraj>(m_areaSat);
 
     // 1024 units = 1 meter
     Vector3s posAreaRelative(entTransform.m_transform.translation() * 1024.0f);
 
+
+
     satPosTraj.m_position = areaPosTraj.m_position + posAreaRelative;
+    satPosTraj.m_rotation = Quaternion::
+            fromMatrix(entTransform.m_transform.rotationScaling());
     satPosTraj.m_dirty = true;
 }
 

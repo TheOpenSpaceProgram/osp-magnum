@@ -25,15 +25,17 @@ SysVehicle::SysVehicle(ActiveScene &scene) :
 StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
                                          SysAreaAssociate &area,
                                          universe::Satellite areaSat,
-                                         universe::Satellite loadMe)
+                                         universe::Satellite tgtSat)
 {
 
     std::cout << "loadin a vehicle!\n";
 
     universe::Universe &uni = area.get_universe();
     //SysVehicle& self = scene.get_system<SysVehicle>();
-    universe::UCompVehicle &loadMeVehicle
-            = uni.get_reg().get<universe::UCompVehicle>(loadMe);
+    auto &loadMeVehicle
+            = uni.get_reg().get<universe::UCompVehicle>(tgtSat);
+    auto &tgtPosTraj
+            = uni.get_reg().get<universe::UCompTransformTraj>(tgtSat);
 
     // make sure there is vehicle data to load
     if (loadMeVehicle.m_blueprint.empty())
@@ -53,11 +55,12 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
     // Convert position of the satellite to position in scene
     Vector3 positionInScene
-            = area.get_universe().sat_calc_pos_meters(areaSat, loadMe);
+            = area.get_universe().sat_calc_pos_meters(areaSat, tgtSat);
 
     ACompTransform& vehicleTransform = scene.get_registry()
                                         .emplace<ACompTransform>(vehicleEnt);
-    vehicleTransform.m_transform = Matrix4::translation(positionInScene);
+    vehicleTransform.m_transform
+            = Matrix4::from(tgtPosTraj.m_rotation.toMatrix(), positionInScene);
     vehicleTransform.m_enableFloatingOrigin = true;
 
     // Create the parts
@@ -184,7 +187,7 @@ int SysVehicle::deactivate_sat(ActiveScene &scene, SysAreaAssociate &area,
         universe::Satellite areaSat, universe::Satellite tgtSat,
         ActiveEnt tgtEnt)
 {
-    area.sat_position_update(tgtEnt);
+    area.sat_transform_update(tgtEnt);
     return 0;
 }
 

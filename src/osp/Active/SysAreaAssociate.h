@@ -57,7 +57,7 @@ public:
     /**
      * Update position of the associated Satellite of entity
      */
-    void sat_position_update(ActiveEnt ent);
+    void sat_transform_update(ActiveEnt ent);
 
     /**
      * Add a loading strategy to add support for loading a type of satellite

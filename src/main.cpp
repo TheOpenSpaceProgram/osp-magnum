@@ -395,7 +395,7 @@ void create_solar_system()
         universe::Satellite sat = debug_add_random_vehicle("TestyMcTestFace Mk"
                                                  + std::to_string(i));
 
-        auto &posTraj = uni.get_reg().get<universe::UCompPositionTrajectory>(sat);
+        auto &posTraj = uni.get_reg().get<universe::UCompTransformTraj>(sat);
 
         posTraj.m_position = osp::Vector3s(i * 1024l * 5l, 0l, 0l);
         posTraj.m_dirty = true;
@@ -420,7 +420,7 @@ void create_solar_system()
             // set radius
             planet.m_radius = 128;
 
-            auto &posTraj = uni.get_reg().get<universe::UCompPositionTrajectory>(sat);
+            auto &posTraj = uni.get_reg().get<universe::UCompTransformTraj>(sat);
 
             // space planets 400m apart from each other
             // 1024 units = 1 meter
@@ -490,7 +490,7 @@ osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
     universe::Satellite sat = uni.sat_create();
 
     // Set the name
-    auto &posTraj = uni.get_reg().get<universe::UCompPositionTrajectory>(sat);
+    auto &posTraj = uni.get_reg().get<universe::UCompTransformTraj>(sat);
     posTraj.m_name = name;
 
     // Make it into a vehicle
@@ -600,12 +600,12 @@ void debug_print_sats()
 
     universe::Universe &universe = g_osp.get_universe();
 
-    auto view = universe.get_reg().view<universe::UCompPositionTrajectory,
+    auto view = universe.get_reg().view<universe::UCompTransformTraj,
                                         universe::UCompType>();
 
     for (universe::Satellite sat : view)
     {
-        auto &posTraj = view.get<universe::UCompPositionTrajectory>(sat);
+        auto &posTraj = view.get<universe::UCompTransformTraj>(sat);
         auto &type = view.get<universe::UCompType>(sat);
 
         auto &pos = posTraj.m_position;
