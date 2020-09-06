@@ -37,22 +37,29 @@ StatusActivated SysPlanetA::activate_sat(
 
     osp::universe::Universe &uni = area.get_universe();
     //SysPlanetA& self = scene.get_system<SysPlanetA>();
-    universe::UCompPlanet &loadMePlanet = uni.get_reg().get<universe::UCompPlanet>(tgtSat);
-
-    ActiveEnt root = scene.hier_get_root();
-
-    ActiveEnt planetEnt = scene.hier_create_child(root, "Planet");
+    universe::UCompPlanet &loadMePlanet
+            = uni.get_reg().get<universe::UCompPlanet>(tgtSat);
 
     // Convert position of the satellite to position in scene
     Vector3 positionInScene = uni.sat_calc_pos_meters(areaSat, tgtSat);
+
+    // Create planet entity and add components to it
+
+    ActiveEnt root = scene.hier_get_root();
+    ActiveEnt planetEnt = scene.hier_create_child(root, "Planet");
 
     auto &planetTransform = scene.get_registry()
                             .emplace<osp::active::ACompTransform>(planetEnt);
     planetTransform.m_transform = Matrix4::translation(positionInScene);
     planetTransform.m_enableFloatingOrigin = true;
 
-    CompPlanet &planetComp = scene.reg_emplace<CompPlanet>(planetEnt);
-    planetComp.m_radius = loadMePlanet.m_radius;
+    auto &planetPlanet = scene.reg_emplace<CompPlanet>(planetEnt);
+    planetPlanet.m_radius = loadMePlanet.m_radius;
+
+    auto &planetForceField = scene.reg_emplace<ACompFFGravity>(planetEnt);
+
+    // arbitrarily picked nice working number
+    planetForceField.m_Gmass = 100000.0f;
 
     return {0, planetEnt, false};
 }

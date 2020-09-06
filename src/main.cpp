@@ -23,8 +23,8 @@
 
 #include "osp/Active/ActiveScene.h"
 #include "osp/Active/SysVehicle.h"
+#include "osp/Active/SysForceFields.h"
 #include "osp/Active/SysAreaAssociate.h"
-
 
 #include "adera/Machines/UserControl.h"
 #include "adera/Machines/Rocket.h"
@@ -226,7 +226,10 @@ void magnum_application()
                 "AreaAssociate", uni);
     auto &sysVehicle = scene.dynamic_system_add<active::SysVehicle>(
                 "Vehicle");
-    auto &sysPlanet = scene.dynamic_system_add<active::SysPlanetA>("Planet");
+    auto &sysPlanet = scene.dynamic_system_add<active::SysPlanetA>(
+                "Planet");
+    auto &sysGravity = scene.dynamic_system_add<active::SysFFGravity>(
+                "FFGravity");
 
     // Register machines for that scene
     scene.system_machine_add<machines::SysMachineUserControl>("UserControl",
@@ -408,9 +411,9 @@ void create_solar_system()
     // Add Grid of planets too
     // for now, planets are hard-coded to 128 meters in radius
 
-    for (int x = -1; x < 2; x ++)
+    for (int x = -0; x < 1; x ++)
     {
-        for (int z = -1; z < 2; z ++)
+        for (int z = -0; z < 1; z ++)
         {
             universe::Satellite sat = g_osp.get_universe().sat_create();
 
@@ -452,9 +455,9 @@ osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
     for (int i = 0; i < 6; i ++)
     {
         // Generate random vector
-        Vector3 randomvec(std::rand() % 128 - 64,
-                          std::rand() % 128 - 64,
-                          std::rand() % 128 - 64);
+        Vector3 randomvec(std::rand() % 64 - 32,
+                          std::rand() % 64 - 32,
+                          std::rand() % 64 - 32);
 
         randomvec /= 64.0f;
 

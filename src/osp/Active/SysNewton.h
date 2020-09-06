@@ -119,8 +119,8 @@ public:
     void body_apply_force(ACompRigidBody &body, Vector3 force);
     void body_apply_force_local(ACompRigidBody &body, Vector3 force);
 
-    void body_apply_accel(ACompRigidBody &body, Vector3 force);
-    void body_apply_accel_local(ACompRigidBody &body, Vector3 force);
+    void body_apply_accel(ACompRigidBody &body, Vector3 accel);
+    void body_apply_accel_local(ACompRigidBody &body, Vector3 accel);
 
     void body_apply_torque(ACompRigidBody &body, Vector3 force);
     void body_apply_torque_local(ACompRigidBody &body, Vector3 force);

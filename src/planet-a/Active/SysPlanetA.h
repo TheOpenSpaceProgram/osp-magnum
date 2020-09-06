@@ -4,6 +4,7 @@
 
 #include <osp/Universe.h>
 #include <osp/Active/SysAreaAssociate.h>
+#include <osp/Active/SysForceFields.h>
 #include <osp/Active/activetypes.h>
 
 #include <Magnum/Shaders/MeshVisualizer.h>
@@ -15,8 +16,6 @@ namespace planeta::active
 
 struct CompPlanet
 {
-
-
     PlanetGeometryA m_planet;
     Magnum::GL::Mesh m_mesh{};
     Magnum::Shaders::MeshVisualizer3D m_shader{
