@@ -16,25 +16,54 @@ namespace osp::active
 
 class ActiveScene;
 
-struct NwtUserData
+struct DataPhyRigidBody
 {
-    NwtUserData(ActiveEnt entity, ActiveScene &scene, NewtonBody* body) :
-            m_entity(entity),
-            m_scene(scene),
-            m_body(body),
-            m_netForce(),
-            m_netTorque() {}
-    NwtUserData(NwtUserData&& move) = delete;
-    NwtUserData& operator=(NwtUserData&& move) = delete;
-
-    ActiveEnt m_entity;
-    ActiveScene &m_scene;
-
-    NewtonBody *m_body;
-
+    float m_mass;
+    Vector3 m_intertia;
     Vector3 m_netForce;
     Vector3 m_netTorque;
 };
+
+struct ACompNwtBody
+{
+    ACompNwtBody() = default;
+    ACompNwtBody(ACompNwtBody&& move);
+    ACompNwtBody& operator=(ACompNwtBody&& move);
+
+    NewtonBody *m_body{nullptr};
+    ActiveEnt m_entity{entt::null};
+    //ActiveScene &m_scene;
+
+    DataPhyRigidBody m_bodyData;
+};
+
+
+
+using ACompRigidBody = ACompNwtBody;
+
+//{
+//    ACompRigidBody(ActiveEnt entity, ActiveScene &scene, NewtonBody* body) :
+//            m_entity(entity),
+//            m_scene(scene),
+//            m_body(body),
+//            m_netForce(),
+//            m_netTorque() {}
+//    ACompRigidBody(NwtUserData&& move) = delete;
+//    ACompRigidBody& operator=(NwtUserData&& move) = delete;
+
+//    ActiveEnt m_entity;
+//    ActiveScene &m_scene;
+
+//    NewtonBody *m_body;
+
+//    Vector3 m_netForce;
+//    Vector3 m_netTorque;
+//};
+
+//struct NwtUserDataWorld
+//{
+//    ActiveScene &m_scene;
+//};
 
 //struct CompNewtonBody
 //{
@@ -42,7 +71,7 @@ struct NwtUserData
 //    std::unique_ptr<NwtUserData> m_data;
 //};
 
-using ACompRigidBody = std::unique_ptr<NwtUserData>;
+//using ACompRigidBody = std::unique_ptr<NwtUserData>;
 
 //struct CompNewtonCollision
 //{
@@ -85,8 +114,13 @@ public:
     std::pair<ActiveEnt, ACompRigidBody*> find_rigidbody_ancestor(
             ActiveEnt ent);
 
+    constexpr ActiveScene& get_scene() { return m_scene; }
+
     void body_apply_force(ACompRigidBody &body, Vector3 force);
     void body_apply_force_local(ACompRigidBody &body, Vector3 force);
+
+    void body_apply_accel(ACompRigidBody &body, Vector3 force);
+    void body_apply_accel_local(ACompRigidBody &body, Vector3 force);
 
     void body_apply_torque(ACompRigidBody &body, Vector3 force);
     void body_apply_torque_local(ACompRigidBody &body, Vector3 force);

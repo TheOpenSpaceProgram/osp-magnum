@@ -180,6 +180,8 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
     vehicleShape.m_shape = ECollisionShape::COMBINED;
     scene.get_system<SysNewton>().create_body(vehicleEnt);
 
+
+
     return {0, vehicleEnt, true};
 }
 

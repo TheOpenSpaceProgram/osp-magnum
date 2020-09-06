@@ -8,6 +8,7 @@
 
 #include "../types.h"
 #include "activetypes.h"
+#include "physics.h"
 
 #include "SysDebugRender.h"
 #include "SysNewton.h"

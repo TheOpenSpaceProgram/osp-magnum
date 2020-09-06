@@ -9,14 +9,18 @@ using namespace osp::active;
 
 void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 {
+    SysNewton* sysNewton = static_cast<SysNewton*>(
+                NewtonWorldGetUserData(NewtonBodyGetWorld(body)));
+    ActiveScene &scene = sysNewton->get_scene();
 
-    NwtUserData *data = (NwtUserData*)NewtonBodyGetUserData(body);
-    ActiveScene &scene = data->m_scene;
+    ACompNwtBody *bodyComp
+            = static_cast<ACompNwtBody*>(NewtonBodyGetUserData(body));
+    DataPhyRigidBody &bodyPhy = bodyComp->m_bodyData;
 
     //Matrix4 matrix;
 
     ACompTransform& transform = scene.get_registry()
-                                        .get<ACompTransform>(data->m_entity);
+                                        .get<ACompTransform>(bodyComp->m_entity);
     NewtonBodyGetMatrix(body, transform.m_transform.data());
 
     Matrix4 matrix;
@@ -35,11 +39,12 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
     }
 
     // Apply force and torque
-    NewtonBodySetForce(body, data->m_netForce.data());
-    NewtonBodySetTorque(body, data->m_netTorque.data());
+    NewtonBodySetForce(body, bodyPhy.m_netForce.data());
+    NewtonBodySetTorque(body, bodyPhy.m_netTorque.data());
 
-    data->m_netForce = {0.0f, 0.0f, 0.0f};
-    data->m_netTorque = {0.0f, 0.0f, 0.0f};
+    // Reset accumolated net force and torque for next frame
+    bodyPhy.m_netForce = {0.0f, 0.0f, 0.0f};
+    bodyPhy.m_netTorque = {0.0f, 0.0f, 0.0f};
 
     // temporary fun stuff:
     //NewtonBodySetForce(body, (-(matrix[3].xyz() + Vector3(0, 0, 20)) * 0.1f).data());
@@ -48,6 +53,31 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 
 }
 
+ACompNwtBody::ACompNwtBody(ACompNwtBody&& move) :
+        m_body(move.m_body),
+        m_entity(move.m_entity),
+        //m_scene(move.m_scene),
+        m_bodyData(move.m_bodyData)
+{
+    if (m_body)
+    {
+        NewtonBodySetUserData(m_body, this);
+    }
+}
+
+ACompNwtBody& ACompNwtBody::operator=(ACompNwtBody&& move)
+{
+    m_body = move.m_body;
+    m_entity = move.m_entity;
+    m_bodyData = move.m_bodyData;
+
+    if (m_body)
+    {
+        NewtonBodySetUserData(m_body, this);
+    }
+
+    return *this;
+}
 
 SysNewton::SysNewton(ActiveScene &scene) :
         m_scene(scene),
@@ -56,6 +86,7 @@ SysNewton::SysNewton(ActiveScene &scene) :
                              std::bind(&SysNewton::update_world, this))
 {
     //std::cout << "sysnewtoninit\n";
+    NewtonWorldSetUserData(m_nwtWorld, this);
 
     scene.get_registry().on_construct<ACompRigidBody>()
                     .connect<&SysNewton::on_body_construct>(*this);
@@ -129,7 +160,7 @@ void SysNewton::create_body(ActiveEnt entity)
 {
 
     ACompHierarchy& entHeir = m_scene.reg_get<ACompHierarchy>(entity);
-    ACompRigidBody& entBody = m_scene.reg_get<ACompRigidBody>(entity);
+    ACompNwtBody& entBody = m_scene.reg_get<ACompNwtBody>(entity);
     ACompCollisionShape* entShape = m_scene.get_registry().try_get<ACompCollisionShape>(entity);
     ACompTransform& entTransform = m_scene.reg_get<ACompTransform>(entity);
 
@@ -139,9 +170,7 @@ void SysNewton::create_body(ActiveEnt entity)
         return;
     }
 
-    // Note: entBody is a unique_ptr<NwtUserData>
-
-    if (entBody)
+    if (entBody.m_body)
     {
         // body is already initialized
         return;
@@ -165,7 +194,7 @@ void SysNewton::create_body(ActiveEnt entity)
         NewtonDestroyCollision(compound);
 
         // Set inertia and mass
-        NewtonBodySetMassMatrix(body, 1.0f, 1, 1, 1);
+        NewtonBodySetMassMatrix(body, entBody.m_bodyData.m_mass, 1, 1, 1);
         break;
     }
     case ECollisionShape::TERRAIN:
@@ -184,9 +213,8 @@ void SysNewton::create_body(ActiveEnt entity)
         break;
     }
 
-
-    // Initialize user data
-    entBody = std::make_unique<NwtUserData>(entity, m_scene, body);
+    entBody.m_body = body;
+    entBody.m_entity = entity;
 
     // Set position/rotation
     NewtonBodySetMatrix(body, entTransform.m_transform.data());
@@ -203,7 +231,7 @@ void SysNewton::create_body(ActiveEnt entity)
 
     // Set user data
     //NwtUserData *data = new NwtUserData(entity, m_scene);
-    NewtonBodySetUserData(body, entBody.get());
+    NewtonBodySetUserData(body, &entBody);
 
     // don't leak memory
     //NewtonDestroyCollision(ball);
@@ -248,7 +276,7 @@ std::pair<ActiveEnt, ACompRigidBody*> SysNewton::find_rigidbody_ancestor(
 
 void SysNewton::body_apply_force(ACompRigidBody &body, Vector3 force)
 {
-    body->m_netForce += force;
+    body.m_bodyData.m_netForce += force;
 }
 
 void SysNewton::body_apply_force_local(ACompRigidBody &body, Vector3 force)
@@ -256,9 +284,19 @@ void SysNewton::body_apply_force_local(ACompRigidBody &body, Vector3 force)
 
 }
 
+void SysNewton::body_apply_accel(ACompRigidBody &body, Vector3 accel)
+{
+    body_apply_force(body, accel * body.m_bodyData.m_mass);
+}
+
+void SysNewton::body_apply_accel_local(ACompRigidBody &body, Vector3 accel)
+{
+
+}
+
 void SysNewton::body_apply_torque(ACompRigidBody &body, Vector3 torque)
 {
-    body->m_netTorque += torque;
+    body.m_bodyData.m_netTorque += torque;
 }
 
 void SysNewton::body_apply_torque_local(ACompRigidBody &body, Vector3 force)
@@ -270,13 +308,14 @@ void SysNewton::body_apply_torque_local(ACompRigidBody &body, Vector3 force)
 
 void SysNewton::on_body_construct(entt::registry& reg, ActiveEnt ent)
 {
-
+    // TODO
+    reg.get<ACompRigidBody>(ent).m_bodyData.m_mass = 1.0f;
 }
 
 void SysNewton::on_body_destruct(entt::registry& reg, ActiveEnt ent)
 {
     // make sure the newton body is destroyed
-    NewtonBody *body = reg.get<ACompRigidBody>(ent)->m_body;
+    NewtonBody *body = reg.get<ACompRigidBody>(ent).m_body;
     if (body)
     {
         NewtonDestroyBody(body);
