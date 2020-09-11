@@ -170,13 +170,11 @@ void SysNewton::create_body(ActiveEnt entity)
         return;
     }
 
-    if (entBody.m_body)
-    {
-        // body is already initialized
-        return;
-    }
+    //if (entBody.m_body)
+    //{
+        // body is already initialized, delete it first and make a new one
+    //}
 
-    NewtonBody *body;
 
     switch (entShape->m_shape)
     {
@@ -188,21 +186,38 @@ void SysNewton::create_body(ActiveEnt entity)
         find_and_add_colliders(entHeir.m_childFirst, compound, Matrix4());
         NewtonCompoundCollisionEndAddRemove(compound);
 
-        body = NewtonCreateDynamicBody(m_nwtWorld, compound,
-                                                   Matrix4().data());
+        if (entBody.m_body)
+        {
+            NewtonBodySetCollision(entBody.m_body, compound);
+        }
+        else
+        {
+            entBody.m_body = NewtonCreateDynamicBody(m_nwtWorld, compound,
+                                                       Matrix4().data());
+        }
 
         NewtonDestroyCollision(compound);
 
         // Set inertia and mass
-        NewtonBodySetMassMatrix(body, entBody.m_bodyData.m_mass, 1, 1, 1);
+        NewtonBodySetMassMatrix(entBody.m_body, entBody.m_bodyData.m_mass, 1, 1, 1);
         break;
     }
     case ECollisionShape::TERRAIN:
     {
         if (entShape->m_collision)
         {
-            body = NewtonCreateDynamicBody(m_nwtWorld, entShape->m_collision,
-                                           Matrix4().data());
+            if (entBody.m_body)
+            {
+                NewtonBodySetCollision(entBody.m_body, entShape->m_collision);
+            }
+            else
+            {
+                entBody.m_body = NewtonCreateDynamicBody(m_nwtWorld,
+                        entShape->m_collision,
+                        Matrix4().data());
+            }
+
+
         }
         else
         {
@@ -213,25 +228,24 @@ void SysNewton::create_body(ActiveEnt entity)
         break;
     }
 
-    entBody.m_body = body;
     entBody.m_entity = entity;
 
     // Set position/rotation
-    NewtonBodySetMatrix(body, entTransform.m_transform.data());
+    NewtonBodySetMatrix(entBody.m_body, entTransform.m_transform.data());
 
     // Set damping to 0, as default is 0.1
     // reference frame may be moving and air pressure stuff
-    NewtonBodySetLinearDamping(body, 0.0f);
+    NewtonBodySetLinearDamping(entBody.m_body, 0.0f);
 
     // Make it easier to rotate
-    NewtonBodySetAngularDamping(body, Vector3(1.0f, 1.0f, 1.0f).data());
+    NewtonBodySetAngularDamping(entBody.m_body, Vector3(1.0f, 1.0f, 1.0f).data());
 
     // Set callback for updating position of entity and everything else
-    NewtonBodySetForceAndTorqueCallback(body, cb_force_torque);
+    NewtonBodySetForceAndTorqueCallback(entBody.m_body, cb_force_torque);
 
     // Set user data
     //NwtUserData *data = new NwtUserData(entity, m_scene);
-    NewtonBodySetUserData(body, &entBody);
+    NewtonBodySetUserData(entBody.m_body, &entBody);
 
     // don't leak memory
     //NewtonDestroyCollision(ball);

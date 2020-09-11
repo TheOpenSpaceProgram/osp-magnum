@@ -2,6 +2,7 @@
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysVehicle.h>
+#include <osp/Active/physics.h>
 
 #include <adera/Machines/UserControl.h>
 
@@ -32,14 +33,40 @@ DebugCameraController::DebugCameraController(active::ActiveScene &scene,
         m_orbitPos(0, 0, 1),
         m_updatePhysicsPost(scene.get_update_order(), "dbg_cam", "physics", "",
                 std::bind(&DebugCameraController::update_physics_post, this)),
+        m_updateVehicleModPre(scene.get_update_order(), "dbg_cam_vmod", "", "vehicle_modification",
+                std::bind(&DebugCameraController::update_vehicle_mod_pre, this)),
         m_userInput(scene.get_user_input()),
         m_up(m_userInput.config_get("ui_up")),
         m_dn(m_userInput.config_get("ui_dn")),
         m_lf(m_userInput.config_get("ui_lf")),
         m_rt(m_userInput.config_get("ui_rt")),
-        m_switch(m_userInput.config_get("game_switch"))
+        m_switch(m_userInput.config_get("game_switch")),
+        m_selfDestruct(m_userInput.config_get("vehicle_self_destruct"))
 {
     m_orbitDistance = 20.0f;
+}
+
+void DebugCameraController::update_vehicle_mod_pre()
+{
+    if (!m_scene.get_registry().valid(m_orbiting))
+    {
+        return;
+    }
+
+    if (m_selfDestruct.triggered())
+    {
+        using osp::active::ACompVehicle;
+        using osp::active::ACompPart;
+
+        auto &tgtVehicle = m_scene.reg_get<ACompVehicle>(m_orbiting);
+
+        // delete the last part
+
+        auto &partPart = m_scene.reg_get<ACompPart>(tgtVehicle.m_parts.back());
+        partPart.m_destroy = true;
+
+        tgtVehicle.m_separationCount = 1;
+    }
 }
 
 void DebugCameraController::update_physics_post()
@@ -51,13 +78,14 @@ void DebugCameraController::update_physics_post()
     {
         std::cout << "switch to new vehicle\n";
 
-        auto view = m_scene.get_registry().view<active::CompVehicle>();
+        auto view = m_scene.get_registry().view<active::ACompVehicle>();
         auto it = view.find(m_orbiting);
 
         if (targetValid)
         {
             // disable the first MachineUserControl because switching away
-            active::ActiveEnt firstPart = view.get(m_orbiting).m_parts[0];
+            active::ActiveEnt firstPart
+                    = *(view.get(m_orbiting).m_parts.begin());
             m_scene.reg_get<MachineUserControl>(firstPart).m_enable = false;
         }
 
@@ -78,7 +106,8 @@ void DebugCameraController::update_physics_post()
         if (targetValid)
         {
             // enable the first MachineUserControl
-            active::ActiveEnt firstPart = view.get(m_orbiting).m_parts[0];
+            active::ActiveEnt firstPart
+                    = *(view.get(m_orbiting).m_parts.begin());
 
             m_scene.reg_get<MachineUserControl>(firstPart).m_enable = true;
         }
@@ -90,7 +119,7 @@ void DebugCameraController::update_physics_post()
         //                 .m_childFirst;
 
         // keep looping until a vehicle is found
-        //while ((!m_scene.get_registry().has<CompVehicle>(search)))
+        //while ((!m_scene.get_registry().has<ACompVehicle>(search)))
         //{
         //    search = m_scene.reg_get<ACompHierarchy>(search).m_siblingNext;
         //}

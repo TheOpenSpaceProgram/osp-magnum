@@ -51,6 +51,7 @@ class DebugCameraController : public DebugObject<DebugCameraController>
 public:
     DebugCameraController(active::ActiveScene &scene, active::ActiveEnt ent);
     ~DebugCameraController() = default;
+    void update_vehicle_mod_pre();
     void update_physics_post();
     void view_orbit(active::ActiveEnt ent);
 private:
@@ -59,6 +60,7 @@ private:
     Vector3 m_orbitPos;
     float m_orbitDistance;
 
+    active::UpdateOrderHandle m_updateVehicleModPre;
     active::UpdateOrderHandle m_updatePhysicsPost;
 
     UserInputHandler &m_userInput;
@@ -67,6 +69,9 @@ private:
     ButtonControlHandle m_lf;
     ButtonControlHandle m_rt;
     ButtonControlHandle m_switch;
+
+    ButtonControlHandle m_selfDestruct;
+
 };
 
 

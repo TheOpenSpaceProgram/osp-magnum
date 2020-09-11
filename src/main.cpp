@@ -330,8 +330,7 @@ void config_controls()
     // Set throttle min to X
     userInput.config_register_control("vehicle_thr_min", false,
             {{0, (int) Key::X, VarTrig::PRESSED, false, VarOp::OR}});
-    // Set self destruct to LeftCtrl+C or LeftShift+A. this just prints
-    // a silly message.
+    // Set self destruct to LeftCtrl+C or LeftShift+A
     userInput.config_register_control("vehicle_self_destruct", false,
             {{0, (int) Key::LeftCtrl, VarTrig::HOLD, false, VarOp::AND},
              {0, (int) Key::C, VarTrig::PRESSED, false, VarOp::OR},
@@ -499,10 +498,10 @@ osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
     // Make it into a vehicle
     auto &typeVehicle = *static_cast<universe::SatVehicle*>(
             uni.sat_type_find("Vehicle")->second.get());
-    universe::UCompVehicle &ucompVehicle = typeVehicle.add_get_ucomp(sat);
+    universe::UCompVehicle &UCompVehicle = typeVehicle.add_get_ucomp(sat);
 
     // set the SatVehicle's blueprint to the one just made
-    ucompVehicle.m_blueprint = std::move(depend);
+    UCompVehicle.m_blueprint = std::move(depend);
 
     return sat;
 

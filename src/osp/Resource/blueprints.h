@@ -118,6 +118,7 @@ private:
 
     // Wires to connect
     std::vector<BlueprintWire> m_wires;
+
 };
 
 }

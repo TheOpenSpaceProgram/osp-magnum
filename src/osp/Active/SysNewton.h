@@ -19,6 +19,9 @@ class ActiveScene;
 struct DataPhyRigidBody
 {
     float m_mass;
+    Vector3 m_velocity;
+    Vector3 m_rotVelocity;
+
     Vector3 m_intertia;
     Vector3 m_netForce;
     Vector3 m_netTorque;

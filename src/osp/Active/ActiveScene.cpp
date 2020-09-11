@@ -90,6 +90,48 @@ void ActiveScene::hier_set_parent_child(entt::entity parent, entt::entity child)
     // TODO
 }
 
+void ActiveScene::hier_destroy(ActiveEnt ent)
+{
+    auto &entHier = m_registry.get<ACompHierarchy>(ent);
+
+    // recurse into children. this can be optimized more but i'm lazy
+    while (entHier.m_childCount)
+    {
+        hier_destroy(entHier.m_childFirst);
+    }
+
+    hier_cut(ent);
+    m_registry.destroy(ent);
+}
+
+void ActiveScene::hier_cut(ActiveEnt ent)
+{
+    auto &entHier = m_registry.get<ACompHierarchy>(ent);
+
+    // Set sibling's sibling's to each other
+
+    if (m_registry.valid(entHier.m_siblingNext))
+    {
+        m_registry.get<ACompHierarchy>(entHier.m_siblingNext).m_siblingPrev
+                = entHier.m_siblingPrev;
+    }
+
+    if (m_registry.valid(entHier.m_siblingPrev))
+    {
+        m_registry.get<ACompHierarchy>(entHier.m_siblingPrev).m_siblingNext
+                = entHier.m_siblingNext;
+    }
+
+    // deal with parent
+
+    auto &parentHier = m_registry.get<ACompHierarchy>(entHier.m_parent);
+    parentHier.m_childCount --;
+
+    if (parentHier.m_childFirst == ent)
+    {
+        parentHier.m_childFirst = entHier.m_siblingNext;
+    }
+}
 
 void ActiveScene::on_hierarchy_construct(entt::registry& reg, entt::entity ent)
 {

@@ -17,7 +17,10 @@ using namespace osp::active;
 using namespace Magnum::Math::Literals;
 
 SysVehicle::SysVehicle(ActiveScene &scene) :
-        m_scene(scene)
+        m_scene(scene),
+        m_updateVehicleModification(
+            scene.get_update_order(), "vehicle_modification", "", "physics",
+            std::bind(&SysVehicle::update_vehicle_modification, this))
 {
     m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
 }
@@ -51,7 +54,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
     ActiveEnt vehicleEnt = scene.hier_create_child(root, "Vehicle");
 
-    CompVehicle& vehicleComp = scene.reg_emplace<CompVehicle>(vehicleEnt);
+    ACompVehicle& vehicleComp = scene.reg_emplace<ACompVehicle>(vehicleEnt);
 
     // Convert position of the satellite to position in scene
     Vector3 positionInScene
@@ -94,11 +97,14 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
         ActiveEnt partEntity = this->part_instantiate(proto, vehicleEnt);
         vehicleComp.m_parts.push_back(partEntity);
 
+        auto& partPart = scene.reg_emplace<ACompPart>(partEntity);
+        partPart.m_vehicle = vehicleEnt;
+
         // Part now exists
 
         // TODO: Deal with blueprint machines instead of prototypes directly
 
-        CompMachine& partMachines = scene.reg_emplace<CompMachine>(partEntity);
+        auto &partMachines = scene.reg_emplace<ACompMachines>(partEntity);
 
         for (PrototypeMachine& protoMachine : proto.get_machines())
         {
@@ -147,8 +153,8 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
         // get wire from
 
-        CompMachine& fromMachines = scene.reg_get<CompMachine>(
-                vehicleComp.m_parts[blueprintWire.m_fromPart]);
+        ACompMachines& fromMachines = scene.reg_get<ACompMachines>(
+                *(vehicleComp.m_parts.begin() + blueprintWire.m_fromPart));
 
         auto fromMachineEntry = fromMachines
                 .m_machines[blueprintWire.m_fromMachine];
@@ -159,8 +165,8 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
         // get wire to
 
-        CompMachine& toMachines = scene.reg_get<CompMachine>(
-                vehicleComp.m_parts[blueprintWire.m_toPart]);
+        ACompMachines& toMachines = scene.reg_get<ACompMachines>(
+                *(vehicleComp.m_parts.begin() + blueprintWire.m_toPart));
 
         auto toMachineEntry = toMachines
                 .m_machines[blueprintWire.m_toMachine];
@@ -178,9 +184,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
     ACompRigidBody& vehicleBody = scene.reg_emplace<ACompRigidBody>(vehicleEnt);
     ACompCollisionShape& vehicleShape = scene.reg_emplace<ACompCollisionShape>(vehicleEnt);
     vehicleShape.m_shape = ECollisionShape::COMBINED;
-    scene.get_system<SysNewton>().create_body(vehicleEnt);
-
-
+    scene.get_system<SysPhysics>().create_body(vehicleEnt);
 
     return {0, vehicleEnt, true};
 }
@@ -314,5 +318,57 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
 
     // return root object
     return newEntities[0];
+}
+
+void SysVehicle::update_vehicle_modification()
+{
+    auto view = m_scene.get_registry().view<ACompVehicle>();
+    auto viewParts = m_scene.get_registry().view<ACompPart>();
+
+    for (ActiveEnt vehicleEnt : view)
+    {
+        ACompVehicle &vehicleVehicle = view.get(vehicleEnt);
+        std::vector<ActiveEnt> &parts = vehicleVehicle.m_parts;
+
+        if (vehicleVehicle.m_separationCount)
+        {
+            // Separation requested
+
+            std::vector<ActiveEnt> m_split(vehicleVehicle.m_separationCount);
+
+            m_split[0] = vehicleEnt;
+
+            for (ActiveEnt partEnt : parts)
+            {
+
+            }
+
+            ActiveScene &scene = m_scene;
+
+            entt::basic_registry<ActiveEnt> &reg = m_scene.get_registry();
+            auto removeDestroyed = [&viewParts, &scene](ActiveEnt partEnt) -> bool
+            {
+                ACompPart &partPart = viewParts.get(partEnt);
+                if (partPart.m_destroy)
+                {
+                   // reg.destroy(partEnt);
+                    scene.hier_destroy(partEnt);
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            };
+
+            parts.erase(std::remove_if(parts.begin(), parts.end(),
+                                       removeDestroyed), parts.end());
+
+            // since stuff was erased, update rigid body
+            m_scene.get_system<SysPhysics>().create_body(vehicleEnt);
+
+            vehicleVehicle.m_separationCount = 0;
+        }
+    }
 }
 

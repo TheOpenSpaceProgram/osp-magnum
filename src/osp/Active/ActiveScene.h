@@ -101,6 +101,14 @@ public:
     void hier_set_parent_child(ActiveEnt parent, ActiveEnt child);
 
     /**
+     * Destroy an entity and all its descendents
+     * @param ent
+     */
+    void hier_destroy(ActiveEnt ent);
+
+    void hier_cut(ActiveEnt ent);
+
+    /**
      * @return Internal entt::registry
      */
     constexpr entt::registry& get_registry() { return m_registry; }

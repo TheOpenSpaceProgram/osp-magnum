@@ -27,7 +27,7 @@ using MapSysMachine = std::map<std::string,
  * Holds a LinkedList of abstract Machine classes, allowing Machines to be
  * added to entities.
  */
-struct CompMachine
+struct ACompMachines
 {
 
     struct PartMachine
@@ -38,10 +38,10 @@ struct CompMachine
         MapSysMachine::iterator m_system;
     };
 
-    CompMachine() = default;
-    CompMachine(CompMachine&& move) = default;// : m_machines(std::move(move.m_machines)) {}
+    ACompMachines() = default;
+    ACompMachines(ACompMachines&& move) = default;// : m_machines(std::move(move.m_machines)) {}
 
-    CompMachine& operator=(CompMachine&& move) = default;
+    ACompMachines& operator=(ACompMachines&& move) = default;
 
     //LinkedList<Machine> m_machines;
     std::vector<PartMachine> m_machines;
@@ -73,12 +73,6 @@ public:
 
     virtual std::vector<WireInput*> existing_inputs() override = 0;
     virtual std::vector<WireOutput*> existing_outputs() override = 0;
-
-    //ActiveEnt get_ent() { return m_ent; }
-
-    // i don't like getters and setters
-    //void set_enable(bool enable) { m_enable = enable; }
-    //bool get_enable() { return m_enable; }
 
     //void doErase() override;
 
