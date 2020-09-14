@@ -450,13 +450,13 @@ osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
             g_osp.debug_get_packges()[0]
             .get<PrototypePart>("part_spamcan");
 
-    // Add 6 parts
-    for (int i = 0; i < 6; i ++)
+    // Add 12 parts
+    for (int i = 0; i < 12; i ++)
     {
         // Generate random vector
         Vector3 randomvec(std::rand() % 64 - 32,
                           std::rand() % 64 - 32,
-                          std::rand() % 64 - 32);
+                          (i - 6) * 12);
 
         randomvec /= 64.0f;
 

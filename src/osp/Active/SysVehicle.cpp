@@ -325,49 +325,145 @@ void SysVehicle::update_vehicle_modification()
     auto view = m_scene.get_registry().view<ACompVehicle>();
     auto viewParts = m_scene.get_registry().view<ACompPart>();
 
+    // this part is sort of temporary and unoptimized. deal with it when it
+    // becomes a problem. TODO: use more views
+
     for (ActiveEnt vehicleEnt : view)
     {
         ACompVehicle &vehicleVehicle = view.get(vehicleEnt);
-        std::vector<ActiveEnt> &parts = vehicleVehicle.m_parts;
+        auto &vehicleTransform = m_scene.reg_get<ACompTransform>(vehicleEnt);
+        //std::vector<ActiveEnt> &parts = vehicleVehicle.m_parts;
 
         if (vehicleVehicle.m_separationCount)
         {
-            // Separation requested
+            // Separation requestedts
 
-            std::vector<ActiveEnt> m_split(vehicleVehicle.m_separationCount);
+            // Create the islands vector
+            // [0]: current vehicle
+            // [1+]: new vehicles
+            std::vector<ActiveEnt> islands(vehicleVehicle.m_separationCount);
+            vehicleVehicle.m_separationCount = 0;
 
-            m_split[0] = vehicleEnt;
+            islands[0] = vehicleEnt;
 
-            for (ActiveEnt partEnt : parts)
+            for (unsigned i = 1; i < islands.size(); i ++)
             {
+                ActiveEnt islandEnt = m_scene.hier_create_child(
+                            m_scene.hier_get_root());
+                m_scene.reg_emplace<ACompVehicle>(islandEnt);
+                auto &islandTransform
+                        = m_scene.reg_emplace<ACompTransform>(islandEnt);
+                auto &islandBody
+                        = m_scene.reg_emplace<ACompRigidBody>(islandEnt);
+                auto &islandShape
+                        = m_scene.reg_emplace<ACompCollisionShape>(islandEnt);
+                islandShape.m_shape = ECollisionShape::COMBINED;
 
+                islandTransform.m_transform = vehicleTransform.m_transform;
+                islandTransform.m_enableFloatingOrigin = true;
+
+                islands[i] = islandEnt;
+
+                // note: vehicleVehicle and vehicleTransform become invalid
+                //       when emplacing new ones.
             }
+
+
+            // iterate through parts
+            // * remove parts that are destroyed, destroy the part entity too
+            // * remove parts different islands, and move them to the new
+            //   vehicle
 
             ActiveScene &scene = m_scene;
 
             entt::basic_registry<ActiveEnt> &reg = m_scene.get_registry();
-            auto removeDestroyed = [&viewParts, &scene](ActiveEnt partEnt) -> bool
+            auto removeDestroyed = [&viewParts, &scene, &islands]
+                    (ActiveEnt partEnt) -> bool
             {
                 ACompPart &partPart = viewParts.get(partEnt);
                 if (partPart.m_destroy)
                 {
-                   // reg.destroy(partEnt);
+                    // destroy this part
                     scene.hier_destroy(partEnt);
                     return true;
                 }
-                else
+
+                if (partPart.m_separationIsland)
                 {
-                    return false;
+                    // separate into a new vehicle
+
+                    ActiveEnt islandEnt = islands[partPart.m_separationIsland];
+                    auto &islandVehicle = scene.reg_get<ACompVehicle>(
+                                islandEnt);
+                    islandVehicle.m_parts.push_back(partEnt);
+
+                    scene.hier_set_parent_child(islandEnt, partEnt);
+
+                    return true;
                 }
+
+                return false;
+
             };
+
+            std::vector<ActiveEnt> &parts = view.get(vehicleEnt).m_parts;
 
             parts.erase(std::remove_if(parts.begin(), parts.end(),
                                        removeDestroyed), parts.end());
 
-            // since stuff was erased, update rigid body
-            m_scene.get_system<SysPhysics>().create_body(vehicleEnt);
+            // update or create rigid bodies. also set center of masses
 
-            vehicleVehicle.m_separationCount = 0;
+            for (ActiveEnt islandEnt : islands)
+            {
+                ACompVehicle &islandVehicle = view.get(islandEnt);
+                auto &islandTransform
+                        = m_scene.reg_get<ACompTransform>(islandEnt);
+
+                Vector3 comOffset;
+                //float totalMass;
+
+                for (ActiveEnt partEnt : islandVehicle.m_parts)
+                {
+                    // TODO: deal with part mass
+                    auto const &partTransform
+                            = m_scene.reg_get<ACompTransform>(partEnt);
+
+                    comOffset += partTransform.m_transform.translation();
+
+                }
+
+                comOffset /= islandVehicle.m_parts.size();
+
+
+
+                for (ActiveEnt partEnt : islandVehicle.m_parts)
+                {
+                    ActiveEnt child = m_scene.reg_get<ACompHierarchy>(partEnt)
+                                        .m_childFirst;
+                    auto &partTransform
+                            = m_scene.reg_get<ACompTransform>(partEnt);
+
+                    partTransform.m_transform.translation() -= comOffset;
+                }
+
+//                ActiveEnt child = m_scene.reg_get<ACompHierarchy>(islandEnt)
+//                                    .m_childFirst;
+//                while (m_scene.get_registry().valid(child))
+//                {
+//                    auto &childTransform
+//                            = m_scene.reg_get<ACompTransform>(child);
+
+//                    childTransform.m_transform.translation() -= comOffset;
+
+//                    child = m_scene.reg_get<ACompHierarchy>(child)
+//                            .m_siblingNext;
+//                }
+
+                islandTransform.m_transform.translation() += comOffset;
+
+                m_scene.get_system<SysPhysics>().create_body(islandEnt);
+            }
+
         }
     }
 }

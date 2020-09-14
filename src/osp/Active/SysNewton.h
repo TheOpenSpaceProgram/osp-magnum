@@ -199,7 +199,7 @@ void SysNewton::shape_create_tri_mesh_static(ACompCollisionShape &shape,
 
     }
 
-    newton_tree_collision_end_build(tree, 0);
+    newton_tree_collision_end_build(tree, 2);
 
     shape.m_shape = ECollisionShape::TERRAIN;
     shape.m_collision = tree;

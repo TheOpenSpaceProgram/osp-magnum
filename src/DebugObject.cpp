@@ -61,11 +61,17 @@ void DebugCameraController::update_vehicle_mod_pre()
         auto &tgtVehicle = m_scene.reg_get<ACompVehicle>(m_orbiting);
 
         // delete the last part
+        //auto &partPart = m_scene.reg_get<ACompPart>(tgtVehicle.m_parts.back());
+        //partPart.m_destroy = true;
+        //tgtVehicle.m_separationCount = 1;
 
-        auto &partPart = m_scene.reg_get<ACompPart>(tgtVehicle.m_parts.back());
-        partPart.m_destroy = true;
-
-        tgtVehicle.m_separationCount = 1;
+        // separate all parts into their own separation islands
+        for (unsigned i = 0; i < tgtVehicle.m_parts.size(); i ++)
+        {
+            m_scene.reg_get<ACompPart>(tgtVehicle.m_parts[i])
+                    .m_separationIsland = i;
+        }
+        tgtVehicle.m_separationCount = tgtVehicle.m_parts.size();
     }
 }
 

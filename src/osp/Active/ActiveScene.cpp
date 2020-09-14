@@ -59,7 +59,23 @@ entt::entity ActiveScene::hier_create_child(entt::entity parent,
     //ACompTransform& transform = m_registry.emplace<ACompTransform>(ent);
     childHierarchy.m_name = name;
 
+    hier_set_parent_child(parent, child);
+
+    return child;
+}
+
+void ActiveScene::hier_set_parent_child(entt::entity parent, entt::entity child)
+{
+    ACompHierarchy& childHierarchy = m_registry.get<ACompHierarchy>(child);
+    //ACompTransform& transform = m_registry.emplace<ACompTransform>(ent);
+
     ACompHierarchy& parentHierarchy = m_registry.get<ACompHierarchy>(parent);
+
+    // if child has an existing parent, cut first
+    if (m_registry.valid(childHierarchy.m_parent))
+    {
+        hier_cut(child);
+    }
 
     // set new child's parent
     childHierarchy.m_parent = parent;
@@ -80,14 +96,6 @@ entt::entity ActiveScene::hier_create_child(entt::entity parent,
     // Set parent's first child to new child just created
     parentHierarchy.m_childFirst = child;
     parentHierarchy.m_childCount ++; // increase child count
-
-    return child;
-}
-
-void ActiveScene::hier_set_parent_child(entt::entity parent, entt::entity child)
-{
-    //m_hierarchyDirty = true;
-    // TODO
 }
 
 void ActiveScene::hier_destroy(ActiveEnt ent)
@@ -131,6 +139,9 @@ void ActiveScene::hier_cut(ActiveEnt ent)
     {
         parentHier.m_childFirst = entHier.m_siblingNext;
     }
+
+    entHier.m_parent = entHier.m_siblingNext = entHier.m_siblingPrev
+            = entt::null;
 }
 
 void ActiveScene::on_hierarchy_construct(entt::registry& reg, entt::entity ent)

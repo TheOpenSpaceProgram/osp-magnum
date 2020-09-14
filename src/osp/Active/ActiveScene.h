@@ -106,6 +106,10 @@ public:
      */
     void hier_destroy(ActiveEnt ent);
 
+    /**
+     * Cut an entity out of the hierarchy
+     * @param ent
+     */
     void hier_cut(ActiveEnt ent);
 
     /**
