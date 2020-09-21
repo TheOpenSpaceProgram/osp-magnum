@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include "types.h"
 
 namespace osp
 {
@@ -19,17 +20,14 @@ struct ButtonRaw;
 using ButtonMap = std::map<int, ButtonRaw>;
 using ButtonExpr = std::vector<ButtonVar>;
 
-
 struct ButtonRaw
 {
     bool m_pressed, m_justPressed, m_justReleased;
-    uint8_t m_reference_count;
+    uint8_t m_referenceCount;
 };
-
 
 struct ButtonVar
 {
-
     enum class VarTrigger { HOLD = 0, PRESSED = 1 };
     enum class VarOperator { OR = 0, AND = 1 };
 
@@ -89,9 +87,10 @@ struct ButtonConfig
     int m_index;
 };
 
+// Primary owner of button state, one per button
 struct ButtonControl
 {
-    uint16_t m_reference_count;
+    uint16_t m_referenceCount;
 
     // hold is true if just all the hold conditions are true.
     // ignore the press/releases
@@ -117,7 +116,58 @@ private:
     UserInputHandler *m_to;
     //ButtonMap::iterator m_button;
     int m_index;
+};
 
+struct MouseMotion
+{
+public:
+    Vector2i m_rawDelta;
+
+    /* 
+     * Mouse responsiveness - float between (0.0f, 1.0f]
+     * larger numbers -> less smooth, smaller numbers -> more floaty
+     * Recommend leaving this around 0.5
+    */
+    float m_responseFactor{ 0.5f };
+    
+    Vector2 m_smoothDelta{ 0.0f };
+    uint8_t m_referenceCount;
+};
+
+class MouseMovementHandle
+{
+public:
+    MouseMovementHandle() : m_to(nullptr) {}
+    MouseMovementHandle(UserInputHandler *to);
+    ~MouseMovementHandle();
+    
+    float dxSmooth() const;
+    float dySmooth() const;
+    int dxRaw() const;
+    int dyRaw() const;
+private:
+    UserInputHandler *m_to;
+};
+
+struct ScrollRaw
+{
+    Vector2i offset;
+
+    uint8_t m_referenceCount;
+};
+
+class ScrollInputHandle
+{
+public:
+    ScrollInputHandle() : m_to(nullptr) {}
+    ScrollInputHandle(UserInputHandler *to);
+    ~ScrollInputHandle();
+
+    int dx() const;
+    int dy() const;
+
+private:
+    UserInputHandler *m_to;
 };
 
 /**
@@ -177,6 +227,8 @@ private:
 class UserInputHandler
 {
     friend ButtonControlHandle;
+    friend MouseMovementHandle;
+    friend ScrollInputHandle;
 
 public:
 
@@ -187,7 +239,6 @@ public:
         PRESSED,
         RELEASED
     };
-
 
     UserInputHandler(int deviceCount);
 
@@ -220,15 +271,23 @@ public:
             std::initializer_list<ButtonVarConfig> vars);
 
     /**
-     *
+     * Fetch a button configuration
+     * 
+     * Spawns a new ButtonControl to allow 
+     * 
      * @return ButtonHandle that can be used to read a ButtonControl
      */
     ButtonControlHandle config_get(std::string const& name);
 
+    MouseMovementHandle mouse_get();
+
+    ScrollInputHandle scroll_get();
+
     /**
-     *
+     * Resets per-frame control properties, like button "just pressed" states
+     * and mouse motion deltas
      */
-    void event_clear();
+    void clear_events();
 
     /**
      *
@@ -243,13 +302,27 @@ public:
      */
     void update_controls();
 
+    /*
+     * Update this frame's mouse motion (position delta)
+     * @param delta Change in mouse position this frame
+    */
+    void mouse_delta(Vector2i delta);
+
+    /*
+     * Update this frame's scroll offset
+     * @param delta Change in mouse position this frame
+    */
+    void scroll_delta(Vector2i offset);
+
 private:
 
     std::vector<ButtonMap> m_deviceToButtonRaw;
     std::map<std::string, ButtonConfig> m_controlConfigs;
-
-    //std::vector<ButtonRaw> m_buttons;
     std::vector<ButtonControl> m_controls;
+
+    // Mouse inputs
+    MouseMotion m_mouseMotion;
+    ScrollRaw m_scrollOffset;
 
     std::vector<ButtonMap::iterator> m_btnPressed;
     std::vector<ButtonMap::iterator> m_btnReleased;
@@ -257,4 +330,7 @@ private:
     //std::map<std::string, int> m_controlActive;
 };
 
+// temporary-ish
+const UserInputHandler::DeviceId sc_keyboard = 0;
+const UserInputHandler::DeviceId sc_mouse = 1;
 }

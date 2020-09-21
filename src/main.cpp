@@ -93,6 +93,8 @@ void create_solar_system();
  */
 osp::universe::Satellite debug_add_random_vehicle(std::string const& name);
 
+osp::universe::Satellite debug_add_deterministic_vehicle(std::string const& name);
+
 /**
  * The spaghetti command line interface that gets inputs from stdin. This
  * function will only return once the user exits.
@@ -303,6 +305,7 @@ void config_controls()
     using namespace osp;
 
     using Key = OSPMagnum::KeyEvent::Key;
+    using Mouse = OSPMagnum::MouseEvent::Button;
     using VarOp = ButtonVarConfig::VarOperator;
     using VarTrig = ButtonVarConfig::VarTrigger;
     UserInputHandler& userInput = g_ospMagnum->get_input_handler();
@@ -346,13 +349,16 @@ void config_controls()
     // Set UI Up/down/left/right to arrow keys. this is used to rotate the view
     // for now
     userInput.config_register_control("ui_up", true,
-            {{0, (int) Key::Up, VarTrig::PRESSED, false, VarOp::AND}});
+            {{osp::sc_keyboard, (int) Key::Up, VarTrig::PRESSED, false, VarOp::AND}});
     userInput.config_register_control("ui_dn", true,
-            {{0, (int) Key::Down, VarTrig::PRESSED, false, VarOp::AND}});
+            {{osp::sc_keyboard, (int) Key::Down, VarTrig::PRESSED, false, VarOp::AND}});
     userInput.config_register_control("ui_lf", true,
-            {{0, (int) Key::Left, VarTrig::PRESSED, false, VarOp::AND}});
+            {{osp::sc_keyboard, (int) Key::Left, VarTrig::PRESSED, false, VarOp::AND}});
     userInput.config_register_control("ui_rt", true,
-            {{0, (int) Key::Right, VarTrig::PRESSED, false, VarOp::AND}});
+            {{osp::sc_keyboard, (int) Key::Right, VarTrig::PRESSED, false, VarOp::AND}});
+
+    userInput.config_register_control("ui_rmb", true,
+            {{osp::sc_mouse, (int) Mouse::Right, VarTrig::PRESSED, false, VarOp::AND}});
 }
 
 void load_a_bunch_of_stuff()
@@ -366,6 +372,12 @@ void load_a_bunch_of_stuff()
 
     // load the sturdy into the package
     importer.load_config(lazyDebugPack);
+
+    // Create another sturdy
+    importer.open_filepath("OSPData/adera/stomper.sturdy.gltf");
+    importer.load_config(lazyDebugPack);
+
+
 
     // Add package to the univere
     g_osp.debug_get_packges().push_back(std::move(lazyDebugPack));
@@ -403,8 +415,13 @@ void create_solar_system()
         posTraj.m_dirty = true;
 
         stationary.add(sat);
-
     }
+
+    universe::Satellite sat = debug_add_deterministic_vehicle("Stomper Mk. I");
+    auto& posTraj = uni.get_reg().get<universe::UCompTransformTraj>(sat);
+    posTraj.m_position = osp::Vector3s(22 * 1024l * 5l, 0l, 0l);
+    posTraj.m_dirty = true;
+    stationary.add(sat);
 
 
     // Add Grid of planets too
@@ -505,6 +522,55 @@ osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
 
     return sat;
 
+}
+
+osp::universe::Satellite debug_add_deterministic_vehicle(std::string const & name)
+{
+    using osp::BlueprintVehicle;
+    using osp::PrototypePart;
+    using osp::DependRes;
+
+    // Begin blueprint
+    BlueprintVehicle blueprint;
+
+    // Part to add
+    DependRes<PrototypePart> rocket =
+        g_osp.debug_get_packges()[0].get<PrototypePart>("part_stomper");
+    blueprint.add_part(rocket, Vector3(0.0f), Quaternion(), Vector3(1.0f));
+
+    // Wire throttle control
+    // from (output): a MachineUserControl m_woThrottle
+    // to    (input): a MachineRocket m_wiThrottle
+    blueprint.add_wire(0, 0, 1,
+        0, 1, 2);
+
+    // Wire attitude control to gimbal
+    // from (output): a MachineUserControl m_woAttitude
+    // to    (input): a MachineRocket m_wiGimbal
+    blueprint.add_wire(0, 0, 0,
+        0, 1, 0);
+
+    // Save blueprint
+    DependRes<BlueprintVehicle> depend = g_osp.debug_get_packges()[0]
+        .add<BlueprintVehicle>(name, std::move(blueprint));
+
+
+    universe::Universe &uni = g_osp.get_universe();
+
+    // Create new satellite
+    universe::Satellite sat = uni.sat_create();
+
+    // Set name
+    auto& posTraj = uni.get_reg().get<universe::UCompTransformTraj>(sat);
+    posTraj.m_name = name;
+
+    // Make it into a vehicle
+    auto& typeVehicle = *static_cast<universe::SatVehicle*>(
+        uni.sat_type_find("Vehicle")->second.get());
+    universe::UCompVehicle &UCompVehicle = typeVehicle.add_get_ucomp(sat);
+    UCompVehicle.m_blueprint = std::move(depend);
+
+    return sat;
 }
 
 void debug_print_help()

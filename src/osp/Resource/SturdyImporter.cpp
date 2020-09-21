@@ -6,6 +6,10 @@
 #include <Magnum/Trade/MeshObjectData3D.h>
 #include <Magnum/Trade/SceneData.h>
 #include <Magnum/Trade/MeshData.h>
+#include <Magnum/Trade/TextureData.h>
+#include <Magnum/Trade/ImageData.h>
+#include <Magnum/Trade/MaterialData.h>
+#include <Magnum/Trade/PbrMetallicRoughnessMaterialData.h>
 #include <Magnum/MeshTools/Compile.h>
 #include <Magnum/Mesh.h>
 
@@ -20,11 +24,14 @@ namespace osp
 
 using Magnum::Containers::Pointer;
 using Magnum::Trade::MeshData;
+using Magnum::Trade::TextureData;
+using Magnum::Trade::ImageData2D;
 using Magnum::Trade::ObjectData3D;
+using Magnum::Trade::MaterialData;
 using Magnum::Trade::SceneData;
 using Magnum::Containers::Optional;
 
-SturdyImporter::SturdyImporter()
+SturdyImporter::SturdyImporter() : m_gltfImporter(m_pluginManager)
 {
 
     //Magnum::PluginManager::Manager<Magnum::Trade::AbstractImporter> manager;
@@ -140,7 +147,7 @@ void SturdyImporter::load_config(Package& package)
         //meshDataRes.m_path = meshName;
 
         package.add<MeshData>(meshName, std::move(*meshData));
-
+        
         // apparently this needs a GL context
         // maybe store compiled meshes in the active area, since they're
         // specific to openGL
@@ -150,6 +157,19 @@ void SturdyImporter::load_config(Package& package)
         //package.debug_add_resource(std::move(meshResource));
     }
 
+    for (unsigned i = 0; i < m_gltfImporter.textureCount(); i++)
+    {
+        auto imgID = m_gltfImporter.texture(i)->image();
+        std::string const& imgName = m_gltfImporter.image2DName(imgID);
+        std::cout << "Loading image: " << imgName << "\n";
+        Optional<ImageData2D> imgData = m_gltfImporter.image2D(imgID);
+
+        if (!imgData)
+        {
+            continue;
+        }
+        package.add<ImageData2D>(imgName, std::move(*imgData));
+    }
 }
 //either an appendable package, or
 void SturdyImporter::proto_add_obj_recurse(Package& package,
@@ -174,37 +194,63 @@ void SturdyImporter::proto_add_obj_recurse(Package& package,
     //obj.m_transform = childData->transformation();
 
     std::cout << "Adding obj to Part: " << name << "\n";
+    int meshID = childData->instance();
 
     bool hasMesh = (
             childData->instanceType() == Magnum::Trade::ObjectInstanceType3D::Mesh
-            && childData->instance() != -1);
+            && meshID != -1);
 
     if (name.compare(0, 4, "col_") == 0)
-    {
-        // it's a collider
+    {   // It's a collider
         obj.m_type = ObjectType::COLLIDER;
 
         // do some stuff here
-        obj.m_collider.m_type = ECollisionShape::BOX;
+        obj.m_objectData = ColliderData{ECollisionShape::BOX};
 
         std::cout << "obj: " << name << " is a collider\n";
     }
     else if (hasMesh)
-    {
-        // Drawable mesh
-        const std::string& meshName = m_gltfImporter
-                                            .meshName(childData->instance());
+    {   // It's a drawable mesh
+        const std::string& meshName = m_gltfImporter.meshName(meshID);
         std::cout << "obj: " << name << " uses mesh: " << meshName << "\n";
         obj.m_type = ObjectType::MESH;
+
         //obj.m_drawable.m_mesh = m_meshOffset + childData->instance();
 
         // The way it's currently set up is that the mesh's names are the same
         // as their resource paths. So the resource path is added to the part's
         // list of strings, and the object's mesh is set to the index to that
         // string.
-        obj.m_drawable.m_mesh = part.get_strings().size();
+        obj.m_objectData = DrawableData{ static_cast<unsigned>(part.get_strings().size()) };
         part.get_strings().push_back(meshName);
 
+        Pointer<MaterialData> mat = m_gltfImporter.material(meshID);
+        
+        if (mat->types() & Magnum::Trade::MaterialType::PbrMetallicRoughness)
+        {
+            const auto& pbr =
+                mat->as<Magnum::Trade::PbrMetallicRoughnessMaterialData>();
+
+            auto imgID = m_gltfImporter.texture(pbr.baseColorTexture())->image();
+            std::string const& imgName = m_gltfImporter.image2DName(imgID);
+            std::cout << "Base Tex: " << imgName << "\n";
+            std::get<DrawableData>(obj.m_objectData).m_textures.push_back(
+                static_cast<unsigned>(part.get_strings().size()));
+            part.get_strings().push_back(imgName);
+
+            if (pbr.hasNoneRoughnessMetallicTexture())
+            {
+                imgID = m_gltfImporter.texture(pbr.metalnessTexture())->image();
+                std::cout << "Metal/rough texture: " << m_gltfImporter.image2DName(imgID) << "\n";
+            } else
+            {
+                std::cout << "No metal/rough texture found for " << name << "\n";
+            }
+            
+        } else
+        {
+            std::cout << "Error: unsupported material type\n";
+        }
     }
 
     //obj.m_mesh = m_meshOffset + childData->

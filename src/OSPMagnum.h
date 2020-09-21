@@ -35,6 +35,7 @@ public:
     void mousePressEvent(MouseEvent& event) override;
     void mouseReleaseEvent(MouseEvent& event) override;
     void mouseMoveEvent(MouseMoveEvent& event) override;
+    void mouseScrollEvent(MouseScrollEvent& event) override;
 
     active::ActiveScene& scene_add(std::string const &name);
 

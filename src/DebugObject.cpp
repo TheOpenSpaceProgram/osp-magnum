@@ -36,11 +36,14 @@ DebugCameraController::DebugCameraController(active::ActiveScene &scene,
         m_updateVehicleModPre(scene.get_update_order(), "dbg_cam_vmod", "", "vehicle_modification",
                 std::bind(&DebugCameraController::update_vehicle_mod_pre, this)),
         m_userInput(scene.get_user_input()),
+        m_mouseMotion(m_userInput.mouse_get()),
+        m_scrollInput(m_userInput.scroll_get()),
         m_up(m_userInput.config_get("ui_up")),
         m_dn(m_userInput.config_get("ui_dn")),
         m_lf(m_userInput.config_get("ui_lf")),
         m_rt(m_userInput.config_get("ui_rt")),
         m_switch(m_userInput.config_get("game_switch")),
+        m_rmb(m_userInput.config_get("ui_rmb")),
         m_selfDestruct(m_userInput.config_get("vehicle_self_destruct"))
 {
     m_orbitDistance = 20.0f;
@@ -136,37 +139,51 @@ void DebugCameraController::update_physics_post()
         return;
     }
 
-    float yaw =  m_rt.trigger_hold() - m_lf.trigger_hold();
-    float pitch = m_dn.trigger_hold() - m_up.trigger_hold();
+    Matrix4 &xform = m_scene.reg_get<active::ACompTransform>(m_ent).m_transform;
+    Matrix4 const& xformTgt = m_scene.reg_get<active::ACompTransform>(m_orbiting).m_transform;
 
-    // 180 degrees per second
-    auto rotDelta = 180.0_degf * m_scene.get_time_delta_fixed();
+    float keyRotYaw = static_cast<float>(m_rt.trigger_hold() - m_lf.trigger_hold());
+    float keyRotPitch = static_cast<float>(m_dn.trigger_hold() - m_up.trigger_hold());
 
-    Quaternion quatYaw({0, 0.1f * yaw, 0});
+    Quaternion mcFish(Magnum::Math::IdentityInit);
+    if (m_rmb.trigger_hold() || keyRotYaw || keyRotPitch)
+    {
+        // 180 degrees per second
+        auto keyRotDelta = 180.0_degf * m_scene.get_time_delta_fixed();
 
-    Matrix4 &tf = m_scene.reg_get<active::ACompTransform>(m_ent).m_transform;
-    Matrix4 const& tfTgt = m_scene.reg_get<active::ACompTransform>(m_orbiting).m_transform;
+        float yaw = keyRotYaw * static_cast<float>(keyRotDelta);
+        float pitch = keyRotPitch * static_cast<float>(keyRotDelta);
+        if (m_rmb.trigger_hold())
+        {
+            yaw += static_cast<float>(-m_mouseMotion.dxSmooth());
+            pitch += static_cast<float>(-m_mouseMotion.dySmooth());
+        }
 
-    Vector3 posRelative = tf.translation() - tfTgt.translation();
+        // 100 degrees per step
+        constexpr auto rotRate = 1.0_degf;
 
-    // set constant distance
+        // rotate it
+        mcFish = Quaternion::rotation(yaw * rotRate, xform.up())
+            * Quaternion::rotation(pitch * rotRate, xform.right());
+    }
+
+    Vector3 posRelative = xform.translation() - xformTgt.translation();
+
+    // set camera orbit distance
+    constexpr float distSensitivity = 1.0f;
+    m_orbitDistance += distSensitivity * static_cast<float>(-m_scrollInput.dy());
+    
+    // Clamp orbit distance to avoid producing a degenerate m_orbitPos vector
+    constexpr float minDist = 5.0f;
+    if (m_orbitDistance < minDist) { m_orbitDistance = minDist; }
+
     m_orbitPos = m_orbitPos.normalized() * m_orbitDistance;
-
-    // rotate it
-    Quaternion mcFish = Quaternion::rotation(yaw * rotDelta, tf.up())
-                      * Quaternion::rotation(pitch * rotDelta, tf.right());
-
     m_orbitPos = mcFish.transformVector(m_orbitPos);
 
-    tf.translation() = tfTgt.translation() + m_orbitPos;
-
-    //tf = tf * Matrix4::translation({0, 0, m_distance})
-    //        * Matrix4::rotationY(rotDelta * yaw)
-    //        * Matrix4::rotationX(rotDelta * pitch)
-    //        * Matrix4::translation({0, 0, -m_distance});
+    xform.translation() = xformTgt.translation() + m_orbitPos;
 
     // look at target
-    tf = Matrix4::lookAt(tf.translation(), tfTgt.translation(), tf[1].xyz());
+    xform = Matrix4::lookAt(xform.translation(), xformTgt.translation(), xform[1].xyz());
 }
 
 void DebugCameraController::view_orbit(active::ActiveEnt ent)

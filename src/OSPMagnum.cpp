@@ -9,12 +9,6 @@
 namespace osp
 {
 
-// temporary-ish
-const UserInputHandler::DeviceId sc_keyboard = 0;
-const UserInputHandler::DeviceId sc_mouse = 1;
-
-
-
 OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
                      OSPApplication &ospApp) :
         Magnum::Platform::Application{
@@ -49,7 +43,7 @@ void OSPMagnum::drawEvent()
 //        // TODO: physics update
 //        m_userInput.update_controls();
 //        m_area->update_physics(1.0f / 60.0f);
-//        m_userInput.event_clear();
+//        m_userInput.clear_events();
 //        // end of physics update
 
 //        m_area->draw_gl();
@@ -62,7 +56,7 @@ void OSPMagnum::drawEvent()
         scene.update();
     }
 
-    m_userInput.event_clear();
+    m_userInput.clear_events();
 
     for (auto &[name, scene] : m_scenes)
     {
@@ -72,11 +66,6 @@ void OSPMagnum::drawEvent()
         // temporary: draw using first camera component found
         scene.draw(scene.get_registry().view<active::ACompCamera>().front());
     }
-
-
-
-
-
 
 
     // TODO: GUI and stuff
@@ -90,47 +79,43 @@ void OSPMagnum::drawEvent()
 
 void OSPMagnum::keyPressEvent(KeyEvent& event)
 {
-    if (event.isRepeated())
-    {
-        return;
-    }
+    if (event.isRepeated()) { return; }
     m_userInput.event_raw(sc_keyboard, (int) event.key(),
                           UserInputHandler::ButtonRawEvent::PRESSED);
 }
 
 void OSPMagnum::keyReleaseEvent(KeyEvent& event)
 {
-    if (event.isRepeated())
-    {
-        return;
-    }
-
+    if (event.isRepeated()) { return; }
     m_userInput.event_raw(sc_keyboard, (int) event.key(),
                           UserInputHandler::ButtonRawEvent::RELEASED);
-
 }
 
 void OSPMagnum::mousePressEvent(MouseEvent& event)
 {
     m_userInput.event_raw(sc_mouse, (int) event.button(),
                           UserInputHandler::ButtonRawEvent::PRESSED);
-
 }
+
 void OSPMagnum::mouseReleaseEvent(MouseEvent& event)
 {
     m_userInput.event_raw(sc_mouse, (int) event.button(),
                           UserInputHandler::ButtonRawEvent::RELEASED);
-
 }
+
 void OSPMagnum::mouseMoveEvent(MouseMoveEvent& event)
 {
+    m_userInput.mouse_delta(event.relativePosition());
+}
 
+void OSPMagnum::mouseScrollEvent(MouseScrollEvent & event)
+{
+    m_userInput.scroll_delta(static_cast<Vector2i>(event.offset()));
 }
 
 active::ActiveScene& OSPMagnum::scene_add(const std::string &name)
 {
     auto pair = m_scenes.try_emplace(name, m_userInput, m_ospApp);
-
     return pair.first->second;
 }
 

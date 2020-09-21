@@ -6,6 +6,10 @@
 
 #include <Magnum/MeshTools/Compile.h>
 #include <Magnum/Trade/MeshData.h>
+#include <Magnum/Trade/TextureData.h>
+#include <Magnum/Trade/ImageData.h>
+#include <Magnum/ImageView.h>
+#include <Magnum/GL/Texture.h>
 
 #include <iostream>
 
@@ -22,7 +26,9 @@ SysVehicle::SysVehicle(ActiveScene &scene) :
             scene.get_update_order(), "vehicle_modification", "", "physics",
             std::bind(&SysVehicle::update_vehicle_modification, this))
 {
-    m_shader = std::make_unique<Magnum::Shaders::Phong>(Magnum::Shaders::Phong{});
+    using Magnum::Shaders::Phong;
+
+    m_shader = std::make_unique<Phong>(Phong::Flag::DiffuseTexture);
 }
 
 StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
@@ -242,24 +248,29 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
         if (currentPrototype.m_type == ObjectType::MESH)
         {
             using Magnum::Trade::MeshData;
+            using Magnum::Trade::ImageData2D;
             using Magnum::GL::Mesh;
+            using Magnum::GL::Texture2D;
+            using Magnum::GL::SamplerWrapping;
+            using Magnum::GL::SamplerFilter;
+            using Magnum::GL::TextureFormat;
 
             // Current prototype is a mesh, get the mesh and add it
 
             // TODO: put package prefixes in resource path
             //       for now just get the first package
             Package& package = m_scene.get_application().debug_get_packges()[0];
+            const DrawableData& drawable =
+                std::get<DrawableData>(currentPrototype.m_objectData);
 
             //Mesh* mesh = nullptr;
             DependRes<Mesh> meshRes = package.get<Mesh>(
-                                            part.get_strings()[currentPrototype.m_drawable.m_mesh]);
+                                            part.get_strings()[drawable.m_mesh]);
 
             if (meshRes.empty())
             {
                 // Mesh isn't compiled yet, now check if mesh data exists
-                std::string const& meshName
-                        = part.get_strings()
-                                    [currentPrototype.m_drawable.m_mesh];
+                std::string const& meshName = part.get_strings()[drawable.m_mesh];
 
                 DependRes<MeshData> meshDataRes
                         = package.get<MeshData>(meshName);
@@ -292,18 +303,54 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                 // mesh already loaded
             }
 
-            // by now, the mesh should exist
+            std::vector<Texture2D*> textureResources;
+            for (unsigned i = 0; i < drawable.m_textures.size(); i++)
+            {
+                unsigned texID = drawable.m_textures[i];
+                std::string const& texName = part.get_strings()[texID];
+                DependRes<Texture2D> texRes = package.get<Texture2D>(texName);
+
+                if (texRes.empty())
+                {   // Texture not yet compiled, check for image data
+                    DependRes<ImageData2D> imgDataRes = package.get<ImageData2D>(texName);
+
+                    if (!imgDataRes.empty())
+                    {  // Compile image into a texture
+                        std::cout << "Processing texture \"" << texName << "\"\n";
+
+                        ImageData2D& imgData = *imgDataRes;
+
+                        Magnum::ImageView2D view = imgData;
+
+                        Texture2D tex;
+                        tex.setWrapping(SamplerWrapping::ClampToEdge)
+                            .setMagnificationFilter(SamplerFilter::Linear)
+                            .setMinificationFilter(SamplerFilter::Linear)
+                            .setStorage(1, TextureFormat(imgData.format()), imgData.size())
+                            .setSubImage(0, {}, view);
+                        texRes = package.add<Texture2D>(texName, std::move(tex));
+                    } else
+                    {
+                        std::cout << "Texture \"" << texName << "\" doesn't exist!\n";
+                        return entt::null;
+                    }
+                }
+                textureResources.push_back(&(*texRes));
+            }
+
+            // by now, the mesh and texture should both exist
 
             CompDrawableDebug& bBocks
                     = m_scene.reg_emplace<CompDrawableDebug>(
-                        currentEnt, &(*meshRes), m_shader.get(), 0x0202EE_rgbf);
+                        currentEnt, &(*meshRes), std::move(textureResources), m_shader.get(), 0x0202EE_rgbf);
 
             //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
         }
         else if (currentPrototype.m_type == ObjectType::COLLIDER)
         {
             ACompCollisionShape collision = m_scene.reg_emplace<ACompCollisionShape>(currentEnt);
-            collision.m_shape = currentPrototype.m_collider.m_type;
+            const ColliderData& cd = std::get<ColliderData>(currentPrototype.m_objectData);
+            collision.m_shape = cd.m_type;
 
         }
     }

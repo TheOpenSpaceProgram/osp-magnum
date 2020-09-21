@@ -43,7 +43,7 @@ void SysDebugRender::draw(ACompCamera const& camera)
         entRelative = camera.m_inverse * transform.m_transformWorld;
 
         (*drawable.m_shader)
-                .setDiffuseColor(drawable.m_color)
+                .bindDiffuseTexture(*drawable.m_textures[0])
                 .setAmbientColor(0x111111_rgbf)
                 .setSpecularColor(0x330000_rgbf)
                 .setLightPosition({10.0f, 15.0f, 5.0f})

@@ -13,6 +13,7 @@ namespace osp::active
 struct CompDrawableDebug
 {
     Magnum::GL::Mesh* m_mesh;
+    std::vector<Magnum::GL::Texture2D*> m_textures;
     Magnum::Shaders::Phong* m_shader;
     Magnum::Color4 m_color;
 };

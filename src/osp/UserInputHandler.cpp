@@ -19,14 +19,13 @@ ButtonControlHandle::ButtonControlHandle(UserInputHandler *to, int index) :
         m_to(to), m_index(index)
 {
     std::cout << "ButtonControlHandle created\n";
-    to->m_controls[index].m_reference_count ++;
+    to->m_controls[index].m_referenceCount ++;
 }
 
 ButtonControlHandle::~ButtonControlHandle()
 {
     std::cout << "ButtonControlHandle is dead\n";
-
-    m_to->m_controls[m_index].m_reference_count --;
+    m_to->m_controls[m_index].m_referenceCount --;
 }
 
 bool ButtonControlHandle::triggered()
@@ -39,6 +38,59 @@ bool ButtonControlHandle::trigger_hold()
     return m_to->m_controls[m_index].m_held;
 }
 
+MouseMovementHandle::MouseMovementHandle(UserInputHandler *to) : m_to(to)
+{
+    std::cout << "MouseMovementHandle created\n";
+    m_to->m_mouseMotion.m_referenceCount++;
+}
+
+MouseMovementHandle::~MouseMovementHandle()
+{
+    std::cout << "MouseMovementHandle is dead\n";
+    m_to->m_mouseMotion.m_referenceCount--;
+}
+
+float MouseMovementHandle::dxSmooth() const
+{
+    return m_to->m_mouseMotion.m_smoothDelta.x();
+}
+
+float MouseMovementHandle::dySmooth() const
+{
+    return m_to->m_mouseMotion.m_smoothDelta.y();
+}
+
+int MouseMovementHandle::dxRaw() const
+{
+    return m_to->m_mouseMotion.m_rawDelta.x();
+}
+
+int MouseMovementHandle::dyRaw() const
+{
+    return m_to->m_mouseMotion.m_rawDelta.y();
+}
+
+ScrollInputHandle::ScrollInputHandle(UserInputHandler *to) : m_to(to)
+{
+    std::cout << "ScrollInputHandle created\n";
+    m_to->m_scrollOffset.m_referenceCount++;
+}
+
+ScrollInputHandle::~ScrollInputHandle()
+{
+    std::cout << "ScrollInputHandle is dead\n";
+    m_to->m_scrollOffset.m_referenceCount--;
+}
+
+int ScrollInputHandle::dx() const
+{
+    return m_to->m_scrollOffset.offset.x();
+}
+
+int ScrollInputHandle::dy() const
+{
+    return m_to->m_scrollOffset.offset.y();
+}
 
 ButtonVar::ButtonVar(ButtonMap::iterator button, VarTrigger trigger,
                      bool invert, VarOperator nextOp) :
@@ -193,7 +245,7 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
     {
         // Use existing ButtonControl
         return ButtonControlHandle(this, cfgIt->second.m_index);
-        //m_controls[index].m_reference_count ++;
+        //m_controls[index].m_referenceCount ++;
     }
     else
     {
@@ -226,12 +278,12 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
             {
                 // new ButtonRaw created
                 //btnRaw.m_pressed = 0;
-                btnRaw.m_reference_count = 1;
+                btnRaw.m_referenceCount = 1;
             }
             else
             {
                 // ButtonRaw already exists, add reference count
-                btnRaw.m_reference_count ++;
+                btnRaw.m_referenceCount ++;
             }
 
             //uint8_t bits = (uint8_t(varCfg.m_trigger) << 0)
@@ -247,7 +299,17 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
     }
 }
 
-void UserInputHandler::event_clear()
+MouseMovementHandle UserInputHandler::mouse_get()
+{
+    return MouseMovementHandle(this);
+}
+
+ScrollInputHandle UserInputHandler::scroll_get()
+{
+    return ScrollInputHandle(this);
+}
+
+void UserInputHandler::clear_events()
 {
     // remove any just pressed / just released flags
 
@@ -264,6 +326,12 @@ void UserInputHandler::event_clear()
     // clear the arrays
     m_btnPressed.clear();
     m_btnReleased.clear();
+
+    // Clear mouse delta
+    m_mouseMotion.m_rawDelta = Vector2i(0);
+
+    // Clear scroll offset
+    m_scrollOffset.offset = Vector2i(0);
 }
 
 void UserInputHandler::event_raw(DeviceId deviceId, int buttonEnum,
@@ -339,6 +407,28 @@ void UserInputHandler::update_controls()
             std::cout << "HOLD\n";
         }
     }
+
+    /* Check for mouse motion: if the mouse moved last frame (nonzero_delta),
+       apply smoothing and update smoothed output.
+
+       This does smooth out the stuttering at the hardware DPI limit at the cost
+       of the smoothed output having some "inertia" and moving after the mouse
+       stops at low response factors
+    */
+    m_mouseMotion.m_smoothDelta = Magnum::Math::lerp(
+        m_mouseMotion.m_smoothDelta,
+        static_cast<Vector2>(m_mouseMotion.m_rawDelta),
+        m_mouseMotion.m_responseFactor);
+}
+
+void UserInputHandler::mouse_delta(Vector2i delta)
+{
+    m_mouseMotion.m_rawDelta = delta;
+}
+
+void UserInputHandler::scroll_delta(Vector2i offset)
+{
+    m_scrollOffset.offset = offset;
 }
 
 }

@@ -3,7 +3,7 @@
 #include <string>
 #include <array>
 #include <vector>
-
+#include <variant>
 
 #include "../types.h"
 
@@ -40,6 +40,7 @@ struct DrawableData
 
     // index to a PrototypePart.m_meshDataUsed
     unsigned m_mesh;
+    std::vector<unsigned> m_textures;
     //std::string m_mesh;
     //unsigned m_material;
 };
@@ -70,12 +71,7 @@ struct PrototypeObject
 
     ObjectType m_type;
 
-    union
-    {
-        DrawableData m_drawable;
-        ColliderData m_collider;
-
-    };
+    std::variant<DrawableData, ColliderData> m_objectData;
 
     // Put more OSP-specific data in here
 };

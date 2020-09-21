@@ -3,6 +3,9 @@
 #include <string>
 
 #include <MagnumPlugins/TinyGltfImporter/TinyGltfImporter.h>
+#include <MagnumPlugins/StbImageImporter/StbImageImporter.h>
+#include <Corrade/PluginManager/Manager.h>
+
 
 #include "Package.h"
 #include "PrototypePart.h"
@@ -15,9 +18,7 @@ namespace osp
 
 class SturdyImporter
 {
-
 typedef Magnum::Trade::TinyGltfImporter TinyGltfImporter;
-
 
 public:
     SturdyImporter();
@@ -56,8 +57,9 @@ private:
                                unsigned parentProtoIndex,
                                unsigned childGltfIndex);
 
+    Corrade::PluginManager::Manager<Magnum::Trade::AbstractImporter> m_pluginManager;
     Magnum::Trade::TinyGltfImporter m_gltfImporter;
-
+    Magnum::Trade::StbImageImporter m_imgImporter;
 };
 
 }

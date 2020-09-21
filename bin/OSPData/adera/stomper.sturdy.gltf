@@ -1,0 +1,262 @@
+{
+    "asset" : {
+        "generator" : "Khronos glTF Blender I/O v1.2.75",
+        "version" : "2.0"
+    },
+    "scene" : 0,
+    "scenes" : [
+        {
+            "name" : "Scene",
+            "nodes" : [
+                6
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "extras" : {
+                "shape" : "cylinder"
+            },
+            "name" : "col_capsule",
+            "scale" : [
+                0.22988677024841309,
+                0.22988677024841309,
+                0.9030420780181885
+            ],
+            "translation" : [
+                0,
+                0,
+                5.9787516593933105
+            ]
+        },
+        {
+            "extras" : {
+                "shape" : "cylinder"
+            },
+            "name" : "col_engineCollider",
+            "scale" : [
+                0.45271503925323486,
+                0.45271503925323486,
+                0.5635837316513062
+            ],
+            "translation" : [
+                0,
+                0,
+                -5.107537746429443
+            ]
+        },
+        {
+            "extras" : {
+                "shape" : "cylinder"
+            },
+            "name" : "col_fuselageCylinder",
+            "scale" : [
+                1,
+                1,
+                4.749161720275879
+            ],
+            "translation" : [
+                0,
+                0,
+                0.27866148948669434
+            ]
+        },
+        {
+            "extras" : {
+                "shape" : "cube"
+            },
+            "name" : "col_xFinCollider",
+            "rotation" : [
+                0,
+                0,
+                -0.7071067690849304,
+                0.7071068286895752
+            ],
+            "scale" : [
+                0.025684762746095657,
+                1.7913727760314941,
+                0.9633103609085083
+            ],
+            "translation" : [
+                0,
+                0,
+                -3.327927589416504
+            ]
+        },
+        {
+            "extras" : {
+                "shape" : "cube"
+            },
+            "name" : "col_zFinCollider",
+            "scale" : [
+                0.025684762746095657,
+                1.7913727760314941,
+                0.9633103609085083
+            ],
+            "translation" : [
+                0,
+                0,
+                -3.327927589416504
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "Rocket",
+            "translation" : [
+                0,
+                0,
+                0.8712139129638672
+            ]
+        },
+        {
+            "children" : [
+                0,
+                1,
+                2,
+                3,
+                4,
+                5
+            ],
+            "extras" : {
+                "country" : "United Crates",
+                "description" : "A rocket constructed from a solid piece of material so as to maintain structural integrity while colliding with bystanders",
+                "machines" : [
+                    {
+                        "type" : "UserControl"
+                    },
+                    {
+                        "type" : "Rocket"
+                    },
+                    {
+                        "type" : "FreeEnergyGenerator"
+                    }
+                ],
+                "manufacturer" : "OSHA (Organization for Sinister and Hazardous Activities)",
+                "massdry" : 150,
+                "name" : "Stomper"
+            },
+            "name" : "part_stomper"
+        }
+    ],
+    "materials" : [
+        {
+            "doubleSided" : true,
+            "emissiveFactor" : [
+                0,
+                0,
+                0
+            ],
+            "name" : "Material",
+            "pbrMetallicRoughness" : {
+                "baseColorTexture" : {
+                    "index" : 0,
+                    "texCoord" : 0
+                },
+                "metallicRoughnessTexture" : {
+                    "index" : 1,
+                    "texCoord" : 0
+                }
+            }
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Cylinder.002",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "POSITION" : 0,
+                        "NORMAL" : 1,
+                        "TEXCOORD_0" : 2
+                    },
+                    "indices" : 3,
+                    "material" : 0
+                }
+            ]
+        }
+    ],
+    "textures" : [
+        {
+            "source" : 0
+        },
+        {
+            "source" : 1
+        }
+    ],
+    "images" : [
+        {
+            "mimeType" : "image/png",
+            "name" : "stomper",
+            "uri" : "stomper.png"
+        },
+        {
+            "mimeType" : "image/png",
+            "name" : "stomper_metal-stomper_rough",
+            "uri" : "stomper_metal-stomper_rough.png"
+        }
+    ],
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 1455,
+            "max" : [
+                1.794295310974121,
+                1.7942951917648315,
+                6.010564804077148
+            ],
+            "min" : [
+                -1.794295310974121,
+                -1.7942954301834106,
+                -6.54047966003418
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 1455,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5126,
+            "count" : 1455,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 3,
+            "componentType" : 5123,
+            "count" : 5088,
+            "type" : "SCALAR"
+        }
+    ],
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 17460,
+            "byteOffset" : 0
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 17460,
+            "byteOffset" : 17460
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 11640,
+            "byteOffset" : 34920
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 10176,
+            "byteOffset" : 46560
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 56736,
+            "uri" : "stomper.sturdy.bin"
+        }
+    ]
+}

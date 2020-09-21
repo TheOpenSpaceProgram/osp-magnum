@@ -64,6 +64,11 @@ private:
     active::UpdateOrderHandle m_updatePhysicsPost;
 
     UserInputHandler &m_userInput;
+    // Mouse inputs
+    MouseMovementHandle m_mouseMotion;
+    ScrollInputHandle m_scrollInput;
+    ButtonControlHandle m_rmb;
+    // Keyboard inputs
     ButtonControlHandle m_up;
     ButtonControlHandle m_dn;
     ButtonControlHandle m_lf;
