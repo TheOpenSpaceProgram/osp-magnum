@@ -1,0 +1,23 @@
+name: Linux
+
+on:
+  pull_request:
+  push:
+  release:
+    types: published
+
+jobs:
+  build:
+    runs-on: [ubuntu-latest]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install dependencies
+      run: |
+        sudo apt install libglfw3-dev libsdl2-dev libopenal-dev libglvnd-core-dev
+        git submodule update --init --recursive --depth 1
+
+    - name: Build OSP-Magnum
+      shell: bash
+      run: |
+        cmake -DCMAKE_BUILD_TYPE=Release -B build
+        cmake --build build --parallel --config Release
