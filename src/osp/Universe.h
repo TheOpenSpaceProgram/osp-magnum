@@ -15,7 +15,9 @@ class ISystemTrajectory;
 class ITypeSatellite;
 
 //using Satellite = entt::entity;
-ENTT_OPAQUE_TYPE(Satellite, uint32_t);
+//ENTT_OPAQUE_TYPE(Satellite, uint32_t);
+enum class Satellite: entt::id_type {};
+
 
 using MapSatType = std::map<std::string, std::unique_ptr<ITypeSatellite>>;
 
