@@ -9,6 +9,7 @@
 #include <Magnum/Trade/TextureData.h>
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/ImageView.h>
+#include <Magnum/GL/TextureFormat.h>
 #include <Magnum/GL/Texture.h>
 
 #include <iostream>
@@ -326,10 +327,11 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                         tex.setWrapping(SamplerWrapping::ClampToEdge)
                             .setMagnificationFilter(SamplerFilter::Linear)
                             .setMinificationFilter(SamplerFilter::Linear)
-                            .setStorage(1, TextureFormat(imgData.format()), imgData.size())
+                            .setStorage(1, Magnum::GL::textureFormat(imgData.format()), imgData.size())
                             .setSubImage(0, {}, view);
                         texRes = package.add<Texture2D>(texName, std::move(tex));
-                    } else
+                    }
+                    else
                     {
                         std::cout << "Texture \"" << texName << "\" doesn't exist!\n";
                         return entt::null;
