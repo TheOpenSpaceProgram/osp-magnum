@@ -57,27 +57,8 @@ elseif(MINGW)
 
 endif()
 
-# this too
-include_directories(../3rdparty/newton-dynamics/sdk/dMath/)
-include_directories(../3rdparty/newton-dynamics/sdk/dgCore/)
-include_directories(../3rdparty/newton-dynamics/sdk/dScene/)
-include_directories(../3rdparty/newton-dynamics/sdk/dModel/)
-include_directories(../3rdparty/newton-dynamics/sdk/dNewton/)
-include_directories(../3rdparty/newton-dynamics/sdk/dgNewton/)
-include_directories(../3rdparty/newton-dynamics/sdk/dVehicle/)
-include_directories(../3rdparty/newton-dynamics/sdk/dgPhysics/)
-include_directories(../3rdparty/newton-dynamics/sdk/dAnimation/)
-include_directories(../3rdparty/newton-dynamics/sdk/dgMeshUtil/)
-include_directories(../3rdparty/newton-dynamics/sdk/dContainers/)
-include_directories(../3rdparty/newton-dynamics/sdk/dCustomJoints/)
-include_directories(../3rdparty/newton-dynamics/sdk/thirdParty/tinyxml/)
-include_directories(../3rdparty/newton-dynamics/sdk/dVehicle/dPlayerController)
-include_directories(../3rdparty/newton-dynamics/sdk/dVehicle/dMultiBodyVehicle)
-
-
 # Include ENTT (header only lib)
 include_directories(../3rdparty/entt/src)
-
 
 add_executable(osp-magnum ${CPP_FILES})
 
