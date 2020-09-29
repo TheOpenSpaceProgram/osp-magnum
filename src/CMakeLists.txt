@@ -67,6 +67,7 @@ set_target_properties(osp-magnum PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../bin)
 
 target_link_libraries(osp-magnum PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
+    EnTT::EnTT
     Corrade::Main
     Magnum::Application
     Magnum::GL
