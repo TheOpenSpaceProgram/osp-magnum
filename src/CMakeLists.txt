@@ -57,9 +57,6 @@ elseif(MINGW)
 
 endif()
 
-# Include ENTT (header only lib)
-include_directories(../3rdparty/entt/src)
-
 add_executable(osp-magnum ${CPP_FILES})
 
 # Put executable in the bin folder
@@ -67,6 +64,7 @@ set_target_properties(osp-magnum PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../bin)
 
 target_link_libraries(osp-magnum PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
+    EnTT::EnTT
     Corrade::Main
     Magnum::Application
     Magnum::GL
