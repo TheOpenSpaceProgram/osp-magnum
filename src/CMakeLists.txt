@@ -21,7 +21,9 @@ file (GLOB_RECURSE CPP_FILES *.cpp)
 file (GLOB_RECURSE H_FILES *.h)
 set (SOURCE_FILES ${CPP_FILES} ${H_FILES})
 
-include_directories(.)
+add_executable(osp-magnum ${CPP_FILES})
+
+target_include_directories(osp-magnum PRIVATE .)
 
 # Include Newton Dynamics to the project
 
@@ -30,37 +32,35 @@ include_directories(.)
 #       This section was based on Newton Dynamic's CMakeLists.txt
 if(UNIX)
     if (BUILD_64)
-        add_definitions(-D_POSIX_VER_64)
+        target_compile_definitions(osp-magnum PRIVATE -D_POSIX_VER_64)
     else (BUILD_64)
-        add_definitions(-D_POSIX_VER)
+        target_compile_definitions(osp-magnum PRIVATE -D_POSIX_VER)
     endif (BUILD_64)
 
 elseif(MSVC)
     if(WIN32)
         if(CMAKE_CL_64)
-            add_definitions(-D_WIN_64_VER)
+            target_compile_definitions(osp-magnum PRIVATE -D_WIN_64_VER)
         else()
-            add_definitions(-D_WIN_32_VER)
+            target_compile_definitions(osp-magnum PRIVATE -D_WIN_32_VER)
         endif()
     else()
-        add_definitions(-D_ARM_VER)
+        target_compile_definitions(osp-magnum PRIVATE -D_ARM_VER)
     endif()
 
 elseif(MINGW)
     if(CMAKE_CL_64)
-        add_definitions(-D_MINGW_64_VER)
-        add_definitions(-D_WIN_64_VER)
+        target_compile_definitions(osp-magnum PRIVATE -D_MINGW_64_VER)
+        target_compile_definitions(osp-magnum PRIVATE -D_WIN_64_VER)
     else()
-        add_definitions(-D_MINGW_32_VER)
-        add_definitions(-D_WIN_32_VER)
+        target_compile_definitions(osp-magnum PRIVATE -D_MINGW_32_VER)
+        target_compile_definitions(osp-magnum PRIVATE -D_WIN_32_VER)
     endif()
 
 endif()
 
 # Include ENTT (header only lib)
-include_directories(../3rdparty/entt/src)
-
-add_executable(osp-magnum ${CPP_FILES})
+target_include_directories(osp-magnum PRIVATE ../3rdparty/entt/src)
 
 # Put executable in the bin folder
 set_target_properties(osp-magnum PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../bin)
