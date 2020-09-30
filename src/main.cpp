@@ -18,7 +18,7 @@
 #include "osp/Trajectories/Stationary.h"
 #include "osp/Satellites/SatActiveArea.h"
 #include "osp/Satellites/SatVehicle.h"
-#include "osp/Resource/SturdyImporter.h"
+#include "osp/Resource/AssetImporter.h"
 #include "osp/Resource/Package.h"
 
 #include "osp/Active/ActiveScene.h"
@@ -290,6 +290,7 @@ void magnum_application()
     // workaround: wipe mesh resources because they're specific to the
     // opengl context
     g_osp.debug_get_packges()[0].clear<Magnum::GL::Mesh>();
+    g_osp.debug_get_packges()[0].clear<Magnum::GL::Texture2D>();
 
     // destruct the application, this closes the window
     g_ospMagnum.reset();
@@ -366,18 +367,10 @@ void load_a_bunch_of_stuff()
     // Create a new package
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
-    // Create a sturdy
-    osp::SturdyImporter importer;
-    importer.open_filepath("OSPData/adera/spamcan.sturdy.gltf");
-
-    // load the sturdy into the package
-    importer.load_config(lazyDebugPack);
-
-    // Create another sturdy
-    importer.open_filepath("OSPData/adera/stomper.sturdy.gltf");
-    importer.load_config(lazyDebugPack);
-
-
+    // Load sturdy glTF files
+    osp::AssetImporter importer;
+    importer.load_sturdy("OSPData/adera/spamcan.sturdy.gltf", lazyDebugPack);
+    importer.load_sturdy("OSPData/adera/stomper.sturdy.gltf", lazyDebugPack);
 
     // Add package to the univere
     g_osp.debug_get_packges().push_back(std::move(lazyDebugPack));
