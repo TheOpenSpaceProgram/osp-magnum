@@ -82,3 +82,20 @@ target_link_libraries(osp-magnum PRIVATE
     MagnumPlugins::StbImageImporter
     dNewton dScene dModel dVehicle
     )
+
+find_program(iwyu_path NAMES include-what-you-use iwyu)
+if(iwyu_path)
+    set_property(TARGET osp-magnum
+                 PROPERTY
+                 CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path}
+                 -Xiwyu
+                 --mapping_file=${CMAKE_SOURCE_DIR}/iwyu.imp)
+endif()
+
+find_program(tidy_path NAMES clang-tidy)
+if(tidy_path)
+    set_property(TARGET osp-magnum
+                 PROPERTY
+                 CXX_CLANG_TIDY ${tidy_path}
+                 --checks="clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,readability-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-auto")
+endif()
