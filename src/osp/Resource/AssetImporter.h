@@ -22,18 +22,13 @@ namespace osp
 class AssetImporter
 {
 typedef Magnum::Trade::TinyGltfImporter TinyGltfImporter;
+typedef Corrade::PluginManager::Manager<Magnum::Trade::AbstractImporter>
+PluginManager;
 
 public:
-    AssetImporter() : m_gltfImporter(m_pluginManager) {}
+    AssetImporter() {}
 
-    /**
-     * Load only associated config files, and add resource paths to the package
-     * But for now, this function just loads everything.
-     *
-     * @param filepath [in] string filepath of requested sturdy file
-     * @param package [out] Package to put resource paths into
-     */
-    void load_sturdy(const std::string& filepath, Package& package);
+    static void load_sturdy_file(std::string const& filepath, Package& package);
 
     /**
      * Load an image from disk at the specified filepath
@@ -51,31 +46,51 @@ public:
      *
      * Takes the MeshData object from the package and compiles it into a Mesh
      * which can then be drawn
-     * @param filepath [in] string identifier of MeshData resource
+     * @param meshData [in] MeshData resource
      * @param package [out] Package to put Mesh resource into
      */
     static DependRes<Magnum::GL::Mesh> compile_mesh(
-        const std::string& meshDataName, Package& package);
+        const DependRes<Magnum::Trade::MeshData> meshData, Package& package);
 
     /**
      * Compile ImageData2D into an OpenGL Texture2D object
      *
      * Takes the ImageData2D object from the package and compiles it into a
      * Texture2D which can then be used by shaders
-     * @param filepath [in] string identifier of ImageData2D resource
+     * @param imageData [in] ImageData2D resource
      * @param package [out] Package to put Texture2D resource into
      */
     static DependRes<Magnum::GL::Texture2D> compile_tex(
-        const std::string& imageDataName, Package& package);
+        const DependRes<Magnum::Trade::ImageData2D> imageData, Package& package);
 private:
+    /**
+     * Load only associated config files, and add resource paths to the package
+     * But for now, this function just loads everything.
+     *
+     * @param gltfImporter [in] glTF importer referencing opened sturdy file
+     * @param package [out] Package to put resource paths into
+     */
+    static void load_sturdy(TinyGltfImporter& gltfImporter, Package& package);
 
-    void proto_add_obj_recurse(Package& package,
+    /**
+     * Load a part from a sturdy
+     *
+     * Reads the config from the node with the specified ID into a PrototypePart
+     * and stores it in the specified package
+     *
+     * @param gltfImpoter [in] importer used to read node data
+     * @param package [out] package which receives loaded data
+     * @param id [in] ID of node containing part information
+     */
+    static void load_part(TinyGltfImporter& gltfImporter,
+        Package& package, unsigned id);
+
+    static void proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
+                               Package& package,
                                PrototypePart& part,
                                unsigned parentProtoIndex,
                                unsigned childGltfIndex);
 
-    Corrade::PluginManager::Manager<Magnum::Trade::AbstractImporter> m_pluginManager;
-    Magnum::Trade::TinyGltfImporter m_gltfImporter;
 };
 
 }

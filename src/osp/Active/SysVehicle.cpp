@@ -244,13 +244,10 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
 
         if (currentPrototype.m_type == ObjectType::MESH)
         {
-            using Magnum::Trade::MeshData;
-            using Magnum::Trade::ImageData2D;
             using Magnum::GL::Mesh;
+            using Magnum::Trade::MeshData;
             using Magnum::GL::Texture2D;
-            using Magnum::GL::SamplerWrapping;
-            using Magnum::GL::SamplerFilter;
-            using Magnum::GL::TextureFormat;
+            using Magnum::Trade::ImageData2D;
 
             // Current prototype is a mesh, get the mesh and add it
 
@@ -268,7 +265,8 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
             {
                 // Mesh isn't compiled yet, now check if mesh data exists
                 std::string const& meshName = part.get_strings()[drawable.m_mesh];
-                meshRes = AssetImporter::compile_mesh(meshName, package);
+                DependRes<MeshData> meshData = package.get<MeshData>(meshName);
+                meshRes = AssetImporter::compile_mesh(meshData, package);
             }
 
             std::vector<Texture2D*> textureResources;
@@ -280,7 +278,8 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
 
                 if (texRes.empty())
                 {
-                    texRes = AssetImporter::compile_tex(texName, package);
+                    DependRes<ImageData2D> imageData = package.get<ImageData2D>(texName);
+                    texRes = AssetImporter::compile_tex(imageData, package);
                 }
                 textureResources.push_back(&(*texRes));
             }
