@@ -368,9 +368,8 @@ void load_a_bunch_of_stuff()
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
     // Load sturdy glTF files
-    osp::AssetImporter importer;
-    importer.load_sturdy("OSPData/adera/spamcan.sturdy.gltf", lazyDebugPack);
-    importer.load_sturdy("OSPData/adera/stomper.sturdy.gltf", lazyDebugPack);
+    osp::AssetImporter::load_sturdy_file("OSPData/adera/spamcan.sturdy.gltf", lazyDebugPack);
+    osp::AssetImporter::load_sturdy_file("OSPData/adera/stomper.sturdy.gltf", lazyDebugPack);
 
     // Add package to the univere
     g_osp.debug_get_packges().push_back(std::move(lazyDebugPack));
