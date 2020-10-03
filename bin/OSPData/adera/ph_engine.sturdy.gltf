@@ -1,0 +1,188 @@
+{
+    "asset" : {
+        "generator" : "Khronos glTF Blender I/O v1.3.48",
+        "version" : "2.0"
+    },
+    "scene" : 0,
+    "scenes" : [
+        {
+            "name" : "Scene",
+            "nodes" : [
+                4
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "name" : "attach_top_eng",
+            "translation" : [
+                0,
+                0,
+                0.39142751693725586
+            ]
+        },
+        {
+            "extras" : {
+                "shape" : "cylinder"
+            },
+            "name" : "col_eng",
+            "scale" : [
+                0.7890688180923462,
+                0.7890688180923462,
+                0.6423113346099854
+            ],
+            "translation" : [
+                0,
+                0,
+                -0.24876070022583008
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "engine"
+        },
+        {
+            "name" : "fx_plume_phPlume",
+            "translation" : [
+                0,
+                0,
+                -0.8904955387115479
+            ]
+        },
+        {
+            "children" : [
+                0,
+                1,
+                2,
+                3
+            ],
+            "extras" : {
+                "country" : "Placeholderland",
+                "description" : "A placeholder rocket engine",
+                "manufacturer" : "ACME Placeholders",
+                "machines" : [
+                    {
+                        "type" : "Rocket"
+                    },
+                    {
+                        "type" : "FreeEnergyGenerator"
+                    }
+                ],
+                "massdry" : 300,
+                "name" : "PH-314"
+            },
+            "name" : "part_phEngine"
+        }
+    ],
+    "materials" : [
+        {
+            "doubleSided" : true,
+            "emissiveFactor" : [
+                0,
+                0,
+                0
+            ],
+            "name" : "Material",
+            "pbrMetallicRoughness" : {
+                "baseColorTexture" : {
+                    "index" : 0,
+                    "texCoord" : 0
+                },
+                "metallicFactor" : 0,
+                "roughnessFactor" : 0.4000000059604645
+            }
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Cylinder.002",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "POSITION" : 0,
+                        "NORMAL" : 1,
+                        "TEXCOORD_0" : 2
+                    },
+                    "indices" : 3,
+                    "material" : 0
+                }
+            ]
+        }
+    ],
+    "textures" : [
+        {
+            "source" : 0
+        }
+    ],
+    "images" : [
+        {
+            "mimeType" : "image/png",
+            "name" : "ph_base",
+            "uri" : "ph_base.png"
+        }
+    ],
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 432,
+            "max" : [
+                0.7862619161605835,
+                0.7862621545791626,
+                0.3942076563835144
+            ],
+            "min" : [
+                -0.7862620949745178,
+                -0.7862619161605835,
+                -0.890497624874115
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 432,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5126,
+            "count" : 432,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 3,
+            "componentType" : 5123,
+            "count" : 1284,
+            "type" : "SCALAR"
+        }
+    ],
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 5184,
+            "byteOffset" : 0
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 5184,
+            "byteOffset" : 5184
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 3456,
+            "byteOffset" : 10368
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 2568,
+            "byteOffset" : 13824
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 16392,
+            "uri" : "ph_engine.sturdy.bin"
+        }
+    ]
+}

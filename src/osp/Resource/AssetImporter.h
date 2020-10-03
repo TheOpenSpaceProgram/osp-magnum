@@ -75,6 +75,8 @@ public:
      */
     static DependRes<Magnum::GL::Mesh> compile_mesh(
         const DependRes<Magnum::Trade::MeshData> meshData, Package& package);
+    static DependRes<Magnum::GL::Mesh> compile_mesh(
+        std::string_view meshDataName, Package& srcPackage, Package& dstPackage);
 
     /**
      * Compile ImageData2D into an OpenGL Texture2D object
@@ -86,6 +88,8 @@ public:
      */
     static DependRes<Magnum::GL::Texture2D> compile_tex(
         const DependRes<Magnum::Trade::ImageData2D> imageData, Package& package);
+    static DependRes<Magnum::GL::Texture2D> compile_tex(
+        std::string_view imageDataName, Package& srcPackage, Package& dstPackage);
 private:
     /**
      * Load only associated config files, and add resource paths to the package
