@@ -3,13 +3,9 @@
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
 #include "../Resource/PrototypePart.h"
+#include "../Resource/AssetImporter.h"
 
-#include <Magnum/MeshTools/Compile.h>
-#include <Magnum/Trade/MeshData.h>
-#include <Magnum/Trade/TextureData.h>
-#include <Magnum/Trade/ImageData.h>
-#include <Magnum/ImageView.h>
-#include <Magnum/GL/TextureFormat.h>
+#include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
 
 #include <iostream>
@@ -248,13 +244,10 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
 
         if (currentPrototype.m_type == ObjectType::MESH)
         {
-            using Magnum::Trade::MeshData;
-            using Magnum::Trade::ImageData2D;
             using Magnum::GL::Mesh;
+            using Magnum::Trade::MeshData;
             using Magnum::GL::Texture2D;
-            using Magnum::GL::SamplerWrapping;
-            using Magnum::GL::SamplerFilter;
-            using Magnum::GL::TextureFormat;
+            using Magnum::Trade::ImageData2D;
 
             // Current prototype is a mesh, get the mesh and add it
 
@@ -272,36 +265,8 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
             {
                 // Mesh isn't compiled yet, now check if mesh data exists
                 std::string const& meshName = part.get_strings()[drawable.m_mesh];
-
-                DependRes<MeshData> meshDataRes
-                        = package.get<MeshData>(meshName);
-
-                if (!meshDataRes.empty())
-                {
-                    // Compile the mesh data into a mesh
-
-                    std::cout << "Compiling mesh \"" << meshName << "\"\n";
-
-                    MeshData &meshData = *meshDataRes;
-
-                    //Resource<Mesh> compiledMesh;
-                    //compiledMesh.m_data = Magnum::MeshTools::compile(meshData);
-                    //mesh = &(package.debug_add_resource<Mesh>(
-                    //            std::move(compiledMesh))->m_data);
-
-                    meshRes = package.add<Mesh>(meshName, Magnum::MeshTools::compile(meshData));
-
-                }
-                else
-                {
-                    std::cout << "Mesh \"" << meshName << "\" doesn't exist!\n";
-                    return entt::null;
-                }
-
-            }
-            else
-            {
-                // mesh already loaded
+                DependRes<MeshData> meshData = package.get<MeshData>(meshName);
+                meshRes = AssetImporter::compile_mesh(meshData, package);
             }
 
             std::vector<Texture2D*> textureResources;
@@ -312,30 +277,9 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                 DependRes<Texture2D> texRes = package.get<Texture2D>(texName);
 
                 if (texRes.empty())
-                {   // Texture not yet compiled, check for image data
-                    DependRes<ImageData2D> imgDataRes = package.get<ImageData2D>(texName);
-
-                    if (!imgDataRes.empty())
-                    {  // Compile image into a texture
-                        std::cout << "Processing texture \"" << texName << "\"\n";
-
-                        ImageData2D& imgData = *imgDataRes;
-
-                        Magnum::ImageView2D view = imgData;
-
-                        Texture2D tex;
-                        tex.setWrapping(SamplerWrapping::ClampToEdge)
-                            .setMagnificationFilter(SamplerFilter::Linear)
-                            .setMinificationFilter(SamplerFilter::Linear)
-                            .setStorage(1, Magnum::GL::textureFormat(imgData.format()), imgData.size())
-                            .setSubImage(0, {}, view);
-                        texRes = package.add<Texture2D>(texName, std::move(tex));
-                    }
-                    else
-                    {
-                        std::cout << "Texture \"" << texName << "\" doesn't exist!\n";
-                        return entt::null;
-                    }
+                {
+                    DependRes<ImageData2D> imageData = package.get<ImageData2D>(texName);
+                    texRes = AssetImporter::compile_tex(imageData, package);
                 }
                 textureResources.push_back(&(*texRes));
             }

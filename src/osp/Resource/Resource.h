@@ -121,6 +121,7 @@ public:
     }
 
     bool empty() const { return m_empty; }
+    std::string name() const { return m_it->first; }
 
     TYPE_T const& operator*() const { return m_it->second.m_data; }
     TYPE_T& operator*() { return m_it->second.m_data; }
