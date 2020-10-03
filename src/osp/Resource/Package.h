@@ -120,10 +120,10 @@ public:
 //    Resource<T>* get_resource(unsigned resIndex);
 
     template<class TYPE_T, typename ... ARGS_T>
-    DependRes<TYPE_T> add(std::string const& path, ARGS_T&& ... args);
+    DependRes<TYPE_T> add(std::string_view path, ARGS_T&& ... args);
 
     template<class TYPE_T>
-    DependRes<TYPE_T> get(std::string const& path);
+    DependRes<TYPE_T> get(std::string_view path);
 
     template<class TYPE_T>
     void clear();
@@ -138,7 +138,7 @@ public:
     {
         ~GroupTypeRes() = default;
         //std::vector<TYPE_T> m_types;
-        std::map<std::string, Resource<TYPE_T>> m_resources;
+        std::map<std::string, Resource<TYPE_T>, std::less<>> m_resources;
     };
 
     ResPrefix_t get_prefix() const { return m_prefix; }
@@ -156,7 +156,7 @@ private:
 };
 
 template<class TYPE_T, typename ... ARGS_T>
-DependRes<TYPE_T> Package::add(std::string const& path,
+DependRes<TYPE_T> Package::add(std::string_view path,
                                ARGS_T&& ... args)
 {
     // this should create a blank if it doesn't exist yet
@@ -179,7 +179,8 @@ DependRes<TYPE_T> Package::add(std::string const& path,
     //                          std::forward_as_tuple(path),
     //                          std::forward_as_tuple({std::forward<ARGS_T>(args)...}, false, 0));
     //auto final = group.m_resources.try_emplace(path. );
-    auto final = group.m_resources.try_emplace(path, false, std::forward<ARGS_T>(args)...);
+    auto final = group.m_resources
+        .try_emplace(std::string{path}, false, std::forward<ARGS_T>(args)...);
 
     if (!final.second)
     {
@@ -191,7 +192,7 @@ DependRes<TYPE_T> Package::add(std::string const& path,
 }
 
 template<class TYPE_T>
-DependRes<TYPE_T> Package::get(std::string const& path)
+DependRes<TYPE_T> Package::get(std::string_view path)
 {
     auto itType = m_groups.find(entt::type_info<TYPE_T>::id());
 

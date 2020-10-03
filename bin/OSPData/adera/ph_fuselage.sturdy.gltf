@@ -1,0 +1,180 @@
+{
+    "asset" : {
+        "generator" : "Khronos glTF Blender I/O v1.3.48",
+        "version" : "2.0"
+    },
+    "scene" : 0,
+    "scenes" : [
+        {
+            "name" : "Scene",
+            "nodes" : [
+                4
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "name" : "attach_bottom_fuselage",
+            "translation" : [
+                0,
+                0,
+                -2.5
+            ]
+        },
+        {
+            "name" : "attach_top_fuselage",
+            "translation" : [
+                0,
+                0,
+                2.5
+            ]
+        },
+        {
+            "extras" : {
+                "shape" : "cylinder"
+            },
+            "name" : "col_tank",
+            "scale" : [
+                1,
+                1,
+                2.4968342781066895
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "fuselage"
+        },
+        {
+            "children" : [
+                0,
+                1,
+                2,
+                3
+            ],
+            "extras" : {
+                "country" : "Placeholderland",
+                "description" : "A placeholder fuel tank",
+                "machines" : [
+                    {
+                        "type" : "FreeEnergyGenerator"
+                    }
+                ],
+                "manufacturer" : "ACME Placeholders",
+                "massdry" : 100,
+                "name" : "Generic Tank 001b44a"
+            },
+            "name" : "part_phFuselage"
+        }
+    ],
+    "materials" : [
+        {
+            "doubleSided" : true,
+            "emissiveFactor" : [
+                0,
+                0,
+                0
+            ],
+            "name" : "Material",
+            "pbrMetallicRoughness" : {
+                "baseColorTexture" : {
+                    "index" : 0,
+                    "texCoord" : 0
+                },
+                "metallicFactor" : 0,
+                "roughnessFactor" : 0.4000000059604645
+            }
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Cylinder",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "POSITION" : 0,
+                        "NORMAL" : 1,
+                        "TEXCOORD_0" : 2
+                    },
+                    "indices" : 3,
+                    "material" : 0
+                }
+            ]
+        }
+    ],
+    "textures" : [
+        {
+            "source" : 0
+        }
+    ],
+    "images" : [
+        {
+            "mimeType" : "image/png",
+            "name" : "ph_base",
+            "uri" : "ph_base.png"
+        }
+    ],
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 144,
+            "max" : [
+                1,
+                1,
+                2.5
+            ],
+            "min" : [
+                -1,
+                -1,
+                -2.5
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 144,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5126,
+            "count" : 144,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 3,
+            "componentType" : 5123,
+            "count" : 420,
+            "type" : "SCALAR"
+        }
+    ],
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 1728,
+            "byteOffset" : 0
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 1728,
+            "byteOffset" : 1728
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 1152,
+            "byteOffset" : 3456
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 840,
+            "byteOffset" : 4608
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 5448,
+            "uri" : "ph_fuselage.sturdy.bin"
+        }
+    ]
+}

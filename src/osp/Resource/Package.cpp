@@ -45,7 +45,7 @@ StrViewPair_t decompose_str(std::string_view path, const char delim)
     };
 }
 
-Path decompose_str(std::string_view path)
+Path decompose_path(std::string_view path)
 {
     StrViewPair_t pair = decompose_str(path, ':');
     return { pair.first, pair.second };

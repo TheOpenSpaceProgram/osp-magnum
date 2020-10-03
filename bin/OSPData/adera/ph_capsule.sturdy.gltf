@@ -1,0 +1,174 @@
+{
+    "asset" : {
+        "generator" : "Khronos glTF Blender I/O v1.3.48",
+        "version" : "2.0"
+    },
+    "scene" : 0,
+    "scenes" : [
+        {
+            "name" : "Scene",
+            "nodes" : [
+                3
+            ]
+        }
+    ],
+    "nodes" : [
+        {
+            "name" : "attach_bottom_capsule",
+            "translation" : [
+                0,
+                0,
+                -0.6267187595367432
+            ]
+        },
+        {
+            "mesh" : 0,
+            "name" : "capsule"
+        },
+        {
+            "extras" : {
+                "shape" : "cylinder"
+            },
+            "name" : "col_capsule",
+            "scale" : [
+                1,
+                1,
+                0.6280607581138611
+            ]
+        },
+        {
+            "children" : [
+                0,
+                1,
+                2
+            ],
+            "extras" : {
+                "country" : "Placeholderland",
+                "description" : "A placerholder capsule",
+                "machines" : [
+                    {
+                        "type" : "UserControl"
+                    },
+                    {
+                        "type" : "FreeEnergyGenerator"
+                    }
+                ],
+                "manufacturer" : "ACME Placeholders",
+                "massdry" : 1000,
+                "name" : "P1-ACE \"holder\" capsule"
+            },
+            "name" : "part_phCapsule"
+        }
+    ],
+    "materials" : [
+        {
+            "doubleSided" : true,
+            "emissiveFactor" : [
+                0,
+                0,
+                0
+            ],
+            "name" : "Material",
+            "pbrMetallicRoughness" : {
+                "baseColorTexture" : {
+                    "index" : 0,
+                    "texCoord" : 0
+                },
+                "metallicFactor" : 0,
+                "roughnessFactor" : 0.4000000059604645
+            }
+        }
+    ],
+    "meshes" : [
+        {
+            "name" : "Cylinder.001",
+            "primitives" : [
+                {
+                    "attributes" : {
+                        "POSITION" : 0,
+                        "NORMAL" : 1,
+                        "TEXCOORD_0" : 2
+                    },
+                    "indices" : 3,
+                    "material" : 0
+                }
+            ]
+        }
+    ],
+    "textures" : [
+        {
+            "source" : 0
+        }
+    ],
+    "images" : [
+        {
+            "mimeType" : "image/png",
+            "name" : "ph_base",
+            "uri" : "ph_base.png"
+        }
+    ],
+    "accessors" : [
+        {
+            "bufferView" : 0,
+            "componentType" : 5126,
+            "count" : 252,
+            "max" : [
+                0.9999999403953552,
+                1.0000001192092896,
+                0.6280474662780762
+            ],
+            "min" : [
+                -1,
+                -0.9999998807907104,
+                -0.6280484199523926
+            ],
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 1,
+            "componentType" : 5126,
+            "count" : 252,
+            "type" : "VEC3"
+        },
+        {
+            "bufferView" : 2,
+            "componentType" : 5126,
+            "count" : 252,
+            "type" : "VEC2"
+        },
+        {
+            "bufferView" : 3,
+            "componentType" : 5123,
+            "count" : 1068,
+            "type" : "SCALAR"
+        }
+    ],
+    "bufferViews" : [
+        {
+            "buffer" : 0,
+            "byteLength" : 3024,
+            "byteOffset" : 0
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 3024,
+            "byteOffset" : 3024
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 2016,
+            "byteOffset" : 6048
+        },
+        {
+            "buffer" : 0,
+            "byteLength" : 2136,
+            "byteOffset" : 8064
+        }
+    ],
+    "buffers" : [
+        {
+            "byteLength" : 10200,
+            "uri" : "ph_capsule.sturdy.bin"
+        }
+    ]
+}

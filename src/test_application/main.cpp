@@ -29,6 +29,7 @@
 #include "universes/simple.h"
 
 #include <osp/Resource/AssetImporter.h>
+#include <osp/string_concat.h>
 
 #include <osp/Satellites/SatVehicle.h>
 
@@ -199,8 +200,34 @@ void load_a_bunch_of_stuff()
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
     // Load sturdy glTF files
-    osp::AssetImporter::load_sturdy_file("OSPData/adera/spamcan.sturdy.gltf", lazyDebugPack);
-    osp::AssetImporter::load_sturdy_file("OSPData/adera/stomper.sturdy.gltf", lazyDebugPack);
+    const std::string_view datapath = {"OSPData/adera/"};
+    const std::vector<std::string_view> meshes = 
+    {
+        "spamcan.sturdy.gltf",
+        "stomper.sturdy.gltf",
+        "ph_capsule.sturdy.gltf",
+        "ph_fuselage.sturdy.gltf",
+        "ph_engine.sturdy.gltf",
+        "ph_plume.sturdy.gltf",
+        "ph_rcs.sturdy.gltf",
+        "ph_rcs_plume.sturdy.gltf"
+    };
+    for (auto meshName : meshes)
+    {
+        osp::AssetImporter::load_sturdy_file(
+            osp::string_concat(datapath, meshName), lazyDebugPack);
+    }
+
+    // Load noise textures
+    const std::string noise256 = "noise256";
+    const std::string noise1024 = "noise1024";
+    const std::string n256path = osp::string_concat(datapath, noise256, ".png");
+    const std::string n1024path = osp::string_concat(datapath, noise1024, ".png");
+
+    osp::AssetImporter::load_image(n256path, lazyDebugPack);
+    osp::AssetImporter::load_image(n1024path, lazyDebugPack);
+    /*osp::AssetImporter::compile_tex(n256path, lazyDebugPack);
+    osp::AssetImporter::compile_tex(n1024path, lazyDebugPack);*/
 
     // Add package to the univere
     g_osp.debug_add_package(std::move(lazyDebugPack));
