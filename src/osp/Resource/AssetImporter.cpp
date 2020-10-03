@@ -234,6 +234,7 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
     using Corrade::Containers::Pointer;
     using Corrade::Containers::Optional;
     using Magnum::Trade::ObjectData3D;
+    using Magnum::Trade::MeshObjectData3D;
     using Magnum::Trade::ObjectInstanceType3D;
     using Magnum::Trade::MaterialData;
     using Magnum::Trade::MaterialType;
@@ -286,8 +287,9 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
             static_cast<unsigned>(part.get_strings().size())};
         part.get_strings().push_back(meshName);
 
-        Optional<MaterialData> mat = gltfImporter.material(meshID);
-        
+        MeshObjectData3D& mesh = static_cast<MeshObjectData3D&>(*childData);
+        Pointer<MaterialData> mat = gltfImporter.material(mesh.material());
+
         if (mat->types() & MaterialType::PbrMetallicRoughness)
         {
             const auto& pbr = mat->as<PbrMetallicRoughnessMaterialData>();
