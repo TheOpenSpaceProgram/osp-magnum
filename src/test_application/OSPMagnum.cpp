@@ -196,6 +196,12 @@ void testapp::config_controls(OSPMagnum& rOspApp)
     // Set throttle min to X
     rUserInput.config_register_control("vehicle_thr_min", false,
             {{0, (int) Key_t::X, VarTrig_t::PRESSED, false, VarOp_t::OR}});
+    // Set throttle increase to LShift
+    rUserInput.config_register_control("vehicle_thr_more", true,
+	    {{osp::sc_keyboard, (int)Key_t::LeftShift, VarTrig_t::PRESSED, false, VarOp_t::OR}});
+    // Set throttle decrease to LCtrl
+    rUserInput.config_register_control("vehicle_thr_less", true,
+            {{osp::sc_keyboard, (int)Key_t::LeftCtrl, VarTrig_t::PRESSED, false, VarOp_t::OR}});
     // Set self destruct to LeftCtrl+C or LeftShift+A
     rUserInput.config_register_control("vehicle_self_destruct", false,
             {{0, (int) Key_t::LeftCtrl, VarTrig_t::HOLD, false, VarOp_t::AND},
