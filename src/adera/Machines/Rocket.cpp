@@ -29,6 +29,7 @@
 
 
 #include "Rocket.h"
+#include "adera/SysExhaustPlume.h"
 
 using namespace adera::active::machines;
 using namespace osp::active;
@@ -166,6 +167,45 @@ void SysMachineRocket::update_physics()
 
 Machine& SysMachineRocket::instantiate(ActiveEnt ent)
 {
+    ActiveEnt plumeNode;
+
+    auto findPlumeHandle = [this, &plumeNode](ActiveEnt ent)
+    {
+        auto const& node = m_scene.reg_get<ACompHierarchy>(ent);
+        static constexpr std::string_view nodePrefix = "fx_plume_";
+        if (0 == node.m_name.compare(0, nodePrefix.size(), nodePrefix))
+        {
+            plumeNode = ent;
+            return EHierarchyTraverseStatus::Stop;  // terminate search
+        }
+        return EHierarchyTraverseStatus::Continue;
+    };
+
+    m_scene.hierarchy_traverse(ent, findPlumeHandle);
+
+    if (plumeNode == entt::null)
+    {
+        std::cout << "ERROR: could not find plume anchor for MachineRocket "
+            << ent << "\n";
+        return;
+    }
+    std::cout << "MachineRocket " << ent << "'s associated plume: "
+        << plumeNode << "\n";
+
+    // Get plume effect
+    Package& pkg = m_scene.get_application().debug_find_package("lzdb");
+    std::string_view plumeAnchorName = m_scene.reg_get<ACompHierarchy>(plumeNode).m_name;
+    std::string_view effectName = plumeAnchorName.substr(3, plumeAnchorName.length() - 3);
+    DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
+    if (plumeEffect.empty())
+    {
+        std::cout << "Found MachineRocket "
+            << static_cast<int>(ent) << "'s associated plume: "
+            << static_cast<int>(plumeNode) << "\n";
+
+        m_scene.reg_emplace<ACompExhaustPlume>(plumeNode, ent);
+    }
+
     return m_scene.reg_emplace<MachineRocket>(ent);//emplace(ent);
 }
 

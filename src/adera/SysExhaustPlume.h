@@ -23,52 +23,44 @@
  * SOFTWARE.
  */
 #pragma once
-
-#include <map>
-#include <memory>
-
-#include "../FunctonOrder.h"
-
-#include <entt/entity/registry.hpp>
-
+#include "osp/Active/physics.h"
+#include <Magnum/Shaders/Phong.h>
+#include "osp/Resource/Resource.h"
 
 namespace osp::active
 {
 
-class SysNewton;
-
-class ActiveScene;
-
-struct ACompCamera;
-
-constexpr unsigned gc_heir_physics_level = 1;
-
-enum class ActiveEnt: entt::id_type {};
-
-inline std::ostream& operator<<(std::ostream& os, ActiveEnt e)
-{ return os << static_cast<int>(e); }
-
-using ActiveReg_t = entt::basic_registry<ActiveEnt>;
-
-using UpdateOrder_t = FunctionOrder<void(ActiveScene&)>;
-using UpdateOrderHandle_t = FunctionOrderHandle<void(ActiveScene&)>;
-
-using RenderOrder_t = FunctionOrder<void(ACompCamera const&)>;
-using RenderOrderHandle_t = FunctionOrderHandle<void(ACompCamera const&)>;
-
-struct ACompFloatingOrigin
+struct ACompExhaustPlume
 {
-    //bool m_dummy;
+    ActiveEnt m_parentMachineRocket{entt::null};
+    //Magnum::Shaders::Phong m_shader;
+    //DependRes<PlumeEffect> m_effect;
 };
 
-// not really sure what else to put in here
-class IDynamicSystem
+class SysExhaustPlume : public IDynamicSystem
 {
 public:
-    virtual ~IDynamicSystem() = default;
+    static inline std::string smc_name = "ExhaustPlume";
+
+    SysExhaustPlume(ActiveScene& scene);
+    ~SysExhaustPlume() = default;
+
+    /**
+     * Initialize plume graphics
+     * 
+     * SysMachineRocket only attaches ACompExhaustPlume to eligible entities;
+     * this function takes such entities, retrieves the appropriate graphics
+     * resources, and configures the graphical components
+     */
+    void initialize_plume(ActiveEnt e);
+
+    void update_plumes(ActiveScene& rScene);
+
+private:
+    ActiveScene& m_scene;
+    float m_time;
+
+    UpdateOrderHandle_t m_updatePlume;
 };
 
-using MapDynamicSys_t = std::map<std::string, std::unique_ptr<IDynamicSystem>,
-                                 std::less<> >;
-
-}
+} // namespace osp::active
