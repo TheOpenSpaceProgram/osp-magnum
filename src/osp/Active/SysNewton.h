@@ -89,7 +89,7 @@ struct ACompCollisionShape
 };
 
 
-class SysNewton
+class SysNewton : public IDynamicSystem
 {
 
 public:

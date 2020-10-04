@@ -1,5 +1,6 @@
-#include "SysVehicle.h"
 #include "ActiveScene.h"
+#include "SysVehicle.h"
+#include "SysDebugRender.h"
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
 #include "../Resource/PrototypePart.h"
@@ -147,7 +148,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
     // Wire the thing up
 
-    SysWire& sysWire = scene.get_system<SysWire>();
+    SysWire& sysWire = scene.dynamic_system_get<SysWire>("Wire");
 
     // Loop through wire connections
     for (BlueprintWire& blueprintWire : vehicleData.get_wires())
@@ -187,7 +188,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
     ACompRigidBody& vehicleBody = scene.reg_emplace<ACompRigidBody>(vehicleEnt);
     ACompCollisionShape& vehicleShape = scene.reg_emplace<ACompCollisionShape>(vehicleEnt);
     vehicleShape.m_shape = ECollisionShape::COMBINED;
-    scene.get_system<SysPhysics>().create_body(vehicleEnt);
+    scene.dynamic_system_get<SysPhysics>("Physics").create_body(vehicleEnt);
 
     return {0, vehicleEnt, true};
 }
@@ -454,7 +455,7 @@ void SysVehicle::update_vehicle_modification()
 
                 islandTransform.m_transform.translation() += comOffset;
 
-                m_scene.get_system<SysPhysics>().create_body(islandEnt);
+                m_scene.dynamic_system_get<SysPhysics>("Physics").create_body(islandEnt);
             }
 
         }

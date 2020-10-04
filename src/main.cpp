@@ -22,6 +22,7 @@
 #include "osp/Resource/Package.h"
 
 #include "osp/Active/ActiveScene.h"
+#include "osp/Active/SysDebugRender.h"
 #include "osp/Active/SysVehicle.h"
 #include "osp/Active/SysForceFields.h"
 #include "osp/Active/SysAreaAssociate.h"
@@ -224,6 +225,13 @@ void magnum_application()
     active::ActiveScene& scene = g_ospMagnum->scene_add("Area 1");
 
     // Register dynamic systems for that scene
+
+    auto &sysPhysics = scene.dynamic_system_add<active::SysPhysics>(
+                "Physics");
+    auto &sysWire = scene.dynamic_system_add<active::SysWire>(
+                "Wire");
+    auto &sysDebugRender = scene.dynamic_system_add<active::SysDebugRender>(
+                "DebugRender");
     auto &sysArea = scene.dynamic_system_add<active::SysAreaAssociate>(
                 "AreaAssociate", uni);
     auto &sysVehicle = scene.dynamic_system_add<active::SysVehicle>(

@@ -10,11 +10,11 @@
 #include "activetypes.h"
 #include "physics.h"
 
-#include "SysDebugRender.h"
-#include "SysNewton.h"
+//#include "SysDebugRender.h"
+//#include "SysNewton.h"
 #include "SysMachine.h"
 //#include "SysVehicle.h"
-#include "SysWire.h"
+//#include "SysWire.h"
 
 namespace osp::active
 {
@@ -151,19 +151,20 @@ public:
     constexpr float get_time_delta_fixed() { return 1.0f / 60.0f; }
 
     /**
-     * @deprecated all systems will be dynamic soon
-     * Get one of the system members
-     * @tparam T either SysPhysics, SysWire, or SysDebugObject
-     */
-    template<class T>
-    constexpr T& get_system();
-
-    /**
      *
      * @tparam T
      */
     template<class T, typename... Args>
     void system_machine_add(std::string const& name, Args &&... args);
+
+    /**
+     * Find a registered SysMachine by name. This accesses a map.
+     * @param name [in] Name used as a key
+     * @return Iterator to specified SysMachine
+     */
+    MapSysMachine::iterator system_machine_find(std::string const& name);
+
+    bool system_machine_it_valid(MapSysMachine::iterator it);
 
     /**
      *
@@ -173,13 +174,22 @@ public:
     T& dynamic_system_add(std::string const& name, Args &&... args);
 
     /**
-     * Get a registered SysMachine by name. This accesses a map.
+     * Find a registered IDynamicSystem by name. This accesses a map.
      * @param name [in] Name used as a key
-     * @return Iterator to specified SysMachine
+     * @return Iterator to specified IDynamicSys
      */
-    MapSysMachine::iterator system_machine_find(std::string const& name);
+    MapDynamicSys::iterator dynamic_system_find(std::string const& name);
 
-    bool system_machine_it_valid(MapSysMachine::iterator it);
+    /**
+     * Get a registered IDynamicSystem by name, and cast it to SYSTEM_T. This
+     * accesses a map. If a system isn't found, this will assert.
+     * @param name [in] Name used as a key
+     * @return Reference to specified IDynamicSys
+     */
+    template<class SYSTEM_T>
+    SYSTEM_T& dynamic_system_get(std::string const& name);
+
+    bool dynamic_system_it_valid(MapDynamicSys::iterator it);
 
 private:
 
@@ -210,9 +220,9 @@ private:
     MapDynamicSys m_dynamicSys;
 
     // TODO: base class and a list for Systems (or not)
-    SysDebugRender m_render;
-    SysPhysics m_physics;
-    SysWire m_wire;
+    //SysDebugRender m_render;
+    //SysPhysics m_physics;
+    //SysWire m_wire;
     //SysVehicle m_vehicles;
 
     //SysDebugObject m_debugObj;
@@ -241,18 +251,14 @@ T& ActiveScene::dynamic_system_add(std::string const& name,
     return refReturn;
 }
 
-// TODO: There's probably a better way to do these:
-
-template<>
-constexpr SysPhysics& ActiveScene::get_system<SysPhysics>()
+template<class SYSTEM_T>
+SYSTEM_T& ActiveScene::dynamic_system_get(std::string const& name)
 {
-    return m_physics;
-}
+    MapDynamicSys::iterator it = dynamic_system_find(name);
 
-template<>
-constexpr SysWire& ActiveScene::get_system<SysWire>()
-{
-    return m_wire;
+    assert(dynamic_system_it_valid(it));
+
+    return static_cast<SYSTEM_T&>(*(it->second));
 }
 
 /**

@@ -5,6 +5,7 @@
 #include <osp/Universe.h>
 
 #include <Corrade/Containers/ArrayViewStl.h>
+#include <Magnum/Math/Color.h>
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
 
@@ -120,7 +121,7 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
 
     using osp::ECollisionShape;
 
-    SysPhysics &physics = m_scene.get_system<SysPhysics>();
+    SysPhysics &physics = m_scene.dynamic_system_get<SysPhysics>("Physics");
 
     // Create entity and required components
     ActiveEnt fish = m_scene.hier_create_child(m_scene.hier_get_root());

@@ -266,7 +266,7 @@ private:
 
 
 
-class SysWire
+class SysWire : public IDynamicSystem
 {
 public:
 

@@ -6,7 +6,7 @@ using namespace osp::active;
 
 SysFFGravity::SysFFGravity(ActiveScene &scene) :
         m_scene(scene),
-        m_physics(scene.get_system<SysPhysics>()),
+        m_physics(scene.dynamic_system_get<SysPhysics>("Physics")),
         m_updateForce(scene.get_update_order(), "ff_gravity", "", "physics",
                         std::bind(&SysFFGravity::update_force, this))
 {

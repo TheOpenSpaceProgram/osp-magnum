@@ -17,10 +17,7 @@ void ACompCamera::calculate_projection()
 ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app) :
         m_app(app),
         m_hierarchyDirty(false),
-        m_userInput(userInput),
-        m_render(*this),
-        m_physics(*this),
-        m_wire(*this)
+        m_userInput(userInput)
 {
     m_registry.on_construct<ACompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_construct>(*this);
@@ -296,4 +293,15 @@ bool ActiveScene::system_machine_it_valid(MapSysMachine::iterator it)
     return it != m_sysMachines.end();
 }
 
+
+
+MapDynamicSys::iterator ActiveScene::dynamic_system_find(const std::string &name)
+{
+    return m_dynamicSys.find(name);
+}
+
+bool ActiveScene::dynamic_system_it_valid(MapDynamicSys::iterator it)
+{
+    return it != m_dynamicSys.end();
+}
 
