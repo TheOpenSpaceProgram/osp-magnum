@@ -63,6 +63,8 @@ SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandle
         SysMachine<SysMachineUserControl, MachineUserControl>(scene),
         m_throttleMax(userControl.config_get("vehicle_thr_max")),
         m_throttleMin(userControl.config_get("vehicle_thr_min")),
+        m_throttleMore(userControl.config_get("vehicle_thr_more")),
+        m_throttleLess(userControl.config_get("vehicle_thr_less")),
         m_selfDestruct(userControl.config_get("vehicle_self_destruct")),
         m_pitchUp(userControl.config_get("vehicle_pitch_up")),
         m_pitchDn(userControl.config_get("vehicle_pitch_dn")),
@@ -99,7 +101,20 @@ void SysMachineUserControl::update_sensor()
     for (ActiveEnt ent : view)
     {
         MachineUserControl &machine = view.get<MachineUserControl>(ent);
+        auto& throttlePos = std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value;
 
+        float throttleRate = 0.5f;
+        auto delta = throttleRate * m_scene.get_time_delta_fixed();
+
+        if (m_throttleMore.trigger_hold())
+        {
+            throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
+        }
+
+        if (m_throttleLess.trigger_hold())
+        {
+            throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
+        }
 
         if (!machine.m_enable)
         {
@@ -109,13 +124,13 @@ void SysMachineUserControl::update_sensor()
         if (m_throttleMin.triggered())
         {
             //std::cout << "throttle min\n";
-            std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = 0.0f;
+            throttlePos = 0.0f;
         }
 
         if (m_throttleMax.triggered())
         {
             //std::cout << "throttle max\n";
-            std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = 1.0f;
+            throttlePos = 1.0f;
         }
 
         std::get<wiretype::AttitudeControl>(machine.m_woAttitude.value()).m_attitude = attitudeIn;

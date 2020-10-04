@@ -55,6 +55,8 @@ public:
 private:
     osp::ButtonControlHandle m_throttleMax;
     osp::ButtonControlHandle m_throttleMin;
+    osp::ButtonControlHandle m_throttleMore;
+    osp::ButtonControlHandle m_throttleLess;
     osp::ButtonControlHandle m_selfDestruct;
 
     osp::ButtonControlHandle m_pitchUp;
