@@ -24,44 +24,16 @@
  */
 #pragma once
 
-#include <Magnum/Math/Color.h>
-#include <Magnum/GL/Mesh.h>
+#include <string>
+//#include <Magnum/Math/Color.h>
+//#include <Magnum/Magnum.h>
 
-#include "osp/Resource/Resource.h"
-#include "osp/Active/Shader.h"
-#include "../types.h"
-#include "activetypes.h"
-
-namespace osp::active
+struct PlumeEffectData
 {
-
-struct CompDrawableDebug
-{
-    DependRes<Magnum::GL::Mesh> m_mesh;
-    ShaderDrawFnc_t m_shader_draw;
-    Magnum::Color4 m_color;
+    //float flowVelocity;
+    //Magnum::Color4 color;
+    //float zMin;
+    //float zMax;
+    std::string meshName;
 };
 
-struct CompVisibleDebug
-{
-    bool state = true;
-};
-
-class SysDebugRender : public IDynamicSystem
-{
-public:
-
-    static const std::string smc_name;
-
-    SysDebugRender(ActiveScene &rScene);
-    ~SysDebugRender() = default;
-
-    void draw(ACompCamera const& camera);
-
-private:
-    ActiveScene &m_scene;
-
-    RenderOrderHandle_t m_renderDebugDraw;
-};
-
-}

@@ -45,6 +45,22 @@ public:
     //void update_sensor();
     void update_physics();
 
+    /**
+     * Attach a visual exhaust plume effect to MachineRocket
+     *
+     * Searches the hierarchy under the specified MachineRocket entity and
+     * attaches a visual exhaust effect to the appropriate node
+     * @param ent The MachineRocket entity
+     */
+    void attach_plume_effect(osp::active::ActiveEnt ent);
+
+    /**
+     * Attach a MachineRocket to an entity
+     * 
+     * Also attempts to attach a plume component to the appropriate child node
+     * @param ent The entity that owns the MachineRocket
+     * @return The new MachineRocket instance
+     */
     osp::active::Machine& instantiate(osp::active::ActiveEnt ent) override;
 
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;

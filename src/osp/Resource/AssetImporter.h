@@ -117,6 +117,19 @@ private:
     static void load_part(TinyGltfImporter& gltfImporter,
         Package& package, Magnum::UnsignedInt id, std::string_view resPrefix);
 
+    /**
+     * Load a plume object from a sturdy
+     *
+     * Reads the config from the node with the specified ID into a PlumeEffectData
+     * and stores it in the specified package
+     *
+     * @param gltfImpoter [in] importer used to read node data
+     * @param package [out] package which receives loaded data
+     * @param id [in] ID of node containing plume information
+     */
+    static void load_plume(TinyGltfImporter& gltfImporter,
+        Package& package, Magnum::UnsignedInt id, std::string_view resPrefix);
+
     static void proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
                                Package& package,
                                std::string_view resPrefix,
