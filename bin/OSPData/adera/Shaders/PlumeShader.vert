@@ -22,55 +22,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
+ //#version 430 core
 
-#include <map>
-#include <memory>
+layout(location = 0) in vec4 vertPosition;
+layout(location = 1) in vec2 vertTexCoords;
+layout(location = 5) in vec3 vertNormal;
 
-#include "../FunctonOrder.h"
+out vec3 normal;
+out vec3 fragPos;
 
-#include <entt/entity/registry.hpp>
+layout(location = 0) uniform mat4 projMat;
+layout(location = 1) uniform mat4 modelTransformMat;
+layout(location = 2) uniform mat3 normalMat;
 
-
-namespace osp::active
+void main()
 {
+    gl_Position = projMat * modelTransformMat * vertPosition;
+    normal = normalMat * vertNormal;
 
-class SysNewton;
-
-class ActiveScene;
-
-struct ACompCamera;
-
-struct ACompTransform;
-
-constexpr unsigned gc_heir_physics_level = 1;
-
-enum class ActiveEnt: entt::id_type {};
-
-inline std::ostream& operator<<(std::ostream& os, ActiveEnt e)
-{ return os << static_cast<int>(e); }
-
-using ActiveReg_t = entt::basic_registry<ActiveEnt>;
-
-using UpdateOrder_t = FunctionOrder<void(ActiveScene&)>;
-using UpdateOrderHandle_t = FunctionOrderHandle<void(ActiveScene&)>;
-
-using RenderOrder_t = FunctionOrder<void(ACompCamera const&)>;
-using RenderOrderHandle_t = FunctionOrderHandle<void(ACompCamera const&)>;
-
-struct ACompFloatingOrigin
-{
-    //bool m_dummy;
-};
-
-// not really sure what else to put in here
-class IDynamicSystem
-{
-public:
-    virtual ~IDynamicSystem() = default;
-};
-
-using MapDynamicSys_t = std::map<std::string, std::unique_ptr<IDynamicSystem>,
-                                 std::less<> >;
-
+    // Send vert position to frag shader for UV calculation
+    fragPos = vec3(vertPosition);
 }
+

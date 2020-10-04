@@ -28,6 +28,7 @@
 #include "SysDebugRender.h"
 #include "ActiveScene.h"
 #include "adera/Shaders/Phong.h"
+#include "adera/Shaders/PlumeShader.h"
 
 
 using namespace osp::active;
@@ -46,34 +47,51 @@ SysDebugRender::SysDebugRender(ActiveScene &rScene) :
                           std::bind(&SysDebugRender::draw, this, _1))
 {
     Package& glResources = m_scene.get_context_resources();
-    glResources.add<adera::shader::Phong>("phong_shader",
-        adera::shader::Phong{Magnum::Shaders::Phong::Flag::DiffuseTexture});
+
+    using namespace adera::shader;
+
+    glResources.add<Phong>("phong_shader",
+        Phong{Magnum::Shaders::Phong::Flag::DiffuseTexture});
+
+    glResources.add<PlumeShader>("plume_shader");
 }
 
 void SysDebugRender::draw(ACompCamera const& camera)
 {
     using Magnum::GL::Renderer;
 
+    auto& reg = m_scene.get_registry();
+
     Renderer::enable(Renderer::Feature::DepthTest);
     Renderer::enable(Renderer::Feature::FaceCulling);
 
-    auto& reg = m_scene.get_registry();
-    auto drawGroup = reg.group<CompDrawableDebug>(
-                            entt::get<ACompTransform>);
 
-    Matrix4 entRelative;
 
-    for(auto entity: drawGroup)
-    {
-        CompDrawableDebug& drawable = drawGroup.get<CompDrawableDebug>(entity);
-        CompVisibleDebug* visible = reg.try_get<CompVisibleDebug>(entity);
-        
-        if (visible && !visible->state) { continue; }
-        
-        ACompTransform& transform = drawGroup.get<ACompTransform>(entity);
+    // Get opaque objects
+    auto opaqueObjects = reg.view<CompDrawableDebug, ACompTransform>(
+        entt::exclude<CompTransparentDebug>);
+    // Configure blend mode for opaque rendering
+    Renderer::disable(Renderer::Feature::Blending);
+    // Draw opaque objects
+    draw_group(opaqueObjects, camera);
 
-        entRelative = camera.m_inverse * transform.m_transformWorld;
+    // Get transparent objects
+    auto transparentObjects = m_scene.get_registry()
+        .view<CompDrawableDebug, CompVisibleDebug,
+        CompTransparentDebug, ACompTransform>();
 
-        drawable.m_shader_draw(entity, m_scene, *drawable.m_mesh, camera, transform);
-    }
+    // Configure blend mode for transparency
+    Renderer::enable(Renderer::Feature::Blending);
+    Renderer::setBlendFunction(
+        Renderer::BlendFunction::SourceAlpha,
+        Renderer::BlendFunction::OneMinusSourceAlpha);
+
+    // Draw backfaces first
+    Renderer::setFaceCullingMode(Renderer::PolygonFacing::Front);
+    draw_group(transparentObjects, camera);
+
+    // Then draw frontfaces
+    Renderer::setFaceCullingMode(Renderer::PolygonFacing::Back);
+    draw_group(transparentObjects, camera);
 }
+

@@ -31,6 +31,7 @@
 #include "Rocket.h"
 #include "osp/Resource/AssetImporter.h"
 #include "adera/Shaders/Phong.h"
+#include "adera/Shaders/PlumeShader.h"
 #include "adera/SysExhaustPlume.h"
 #include "adera/Plume.h"
 #include <Magnum/Trade/MeshData.h>
@@ -172,11 +173,6 @@ void SysMachineRocket::update_physics()
 
 void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
 {
-    using Magnum::GL::Mesh;
-    using Magnum::GL::Texture2D;
-    using Magnum::Trade::ImageData2D;
-    using namespace Magnum::Math::Literals;
-
     ActiveEnt plumeNode = entt::null;
 
     auto findPlumeHandle = [this, &plumeNode](ActiveEnt ent)
@@ -209,47 +205,11 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
     DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
     if (plumeEffect.empty())
     {
-        using Magnum::Trade::MeshData;
-
-        DependRes<MeshData> meshData = pkg.get<MeshData>(plumeEffect->meshName);
-        if (meshData.empty())
-        {
-            std::cout << "ERROR: couldn't find mesh " << plumeEffect->meshName
-                << " for plume effect\n";
-        }
-
-        plumeMesh = AssetImporter::compile_mesh(meshData, glResources);
+        std::cout << "ERROR: couldn't find plume effect " << effectName << "!\n";
+        return;
     }
 
-    // Get plume tex (TEMPORARY: just grab noise1024.png)
-    const std::string texName = "OSPData/adera/noise1024.png";
-    DependRes<Texture2D> plumeTex = glResources.get<Texture2D>(texName);
-    if (plumeTex.empty())
-    {
-        using Magnum::Trade::ImageData;
-
-        DependRes<ImageData2D> imageData = pkg.get<ImageData2D>(texName);
-        if (imageData.empty())
-        {
-            std::cout << "ERROR: couldn't find texture " << texName
-                << " for plume effect\n";
-        }
-
-        plumeTex = AssetImporter::compile_tex(imageData, glResources);
-    }
-
-    // by now, the mesh and texture should both exist
-    using adera::shader::Phong;
-    Phong::ACompPhongInstance shader;
-    shader.m_shaderProgram = glResources.get<Phong>("phong_shader");
-    shader.m_textures = std::vector<DependRes<Texture2D>>{plumeTex};
-    shader.m_lightPosition = Vector3{10.0f, 15.0f, 5.0f};
-    shader.m_ambientColor = 0x111111_rgbf;
-    shader.m_specularColor = 0x330000_rgbf;
-    m_scene.reg_emplace<Phong::ACompPhongInstance>(plumeNode, std::move(shader));
-    m_scene.reg_emplace<CompDrawableDebug>(plumeNode, plumeMesh,
-        &adera::shader::Phong::draw_entity);
-    m_scene.reg_emplace<CompVisibleDebug>(plumeNode, false);
+    m_scene.reg_emplace<ACompExhaustPlume>(plumeNode, ent, plumeEffect);
 }
 
 Machine& SysMachineRocket::instantiate(ActiveEnt ent)

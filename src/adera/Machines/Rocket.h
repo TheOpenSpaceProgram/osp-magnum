@@ -49,7 +49,9 @@ public:
      * Attach a visual exhaust plume effect to MachineRocket
      *
      * Searches the hierarchy under the specified MachineRocket entity and
-     * attaches a visual exhaust effect to the appropriate node
+     * attaches an ACompExhaustPlume to the rocket's plume node. A graphical
+     * exhaust plume effect will be attached to the node by SysExhaustPlume
+     * when it processes the component.
      * @param ent The MachineRocket entity
      */
     void attach_plume_effect(osp::active::ActiveEnt ent);

@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include <variant>
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Mesh.h>
 
@@ -31,6 +32,7 @@
 #include "osp/Active/Shader.h"
 #include "../types.h"
 #include "activetypes.h"
+#include "adera/Shaders/PlumeShader.h"
 
 namespace osp::active
 {
@@ -42,9 +44,14 @@ struct CompDrawableDebug
     Magnum::Color4 m_color;
 };
 
+struct CompTransparentDebug
+{
+    bool m_state = false;
+};
+
 struct CompVisibleDebug
 {
-    bool state = true;
+    bool m_state = true;
 };
 
 class SysDebugRender : public IDynamicSystem
@@ -59,9 +66,27 @@ public:
     void draw(ACompCamera const& camera);
 
 private:
+    template <typename T>
+    void draw_group(T& rCollection, ACompCamera const& camera);
+
     ActiveScene &m_scene;
 
     RenderOrderHandle_t m_renderDebugDraw;
 };
+
+template<typename T>
+inline void SysDebugRender::draw_group(T& rCollection, ACompCamera const& camera)
+{
+    for (auto entity : rCollection)
+    {
+        auto& drawable = rCollection.template get<CompDrawableDebug>(entity);
+        auto const& transform = rCollection.template get<ACompTransform>(entity);
+        auto const* visible = m_scene.get_registry().try_get<CompVisibleDebug>(entity);
+
+        if (visible && !visible->m_state) { continue; }
+
+        drawable.m_shader_draw(entity, m_scene, *drawable.m_mesh, camera, transform);
+    }
+}
 
 }

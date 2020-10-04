@@ -40,7 +40,8 @@
 using namespace osp::active;
 
 SysExhaustPlume::SysExhaustPlume(ActiveScene& rScene)
-    : m_scene(rScene), m_time(0.0f),
+    : m_scene(rScene)
+    , m_time(0.0f),
     m_updatePlume(rScene.get_update_order(), "exhaust_plume", "mach_rocket", "",
         [this](ActiveScene& rScene){this->update_plumes(rScene);})
 {}
@@ -74,7 +75,7 @@ void SysExhaustPlume::initialize_plume(ActiveEnt node)
     }
 
     // Get plume tex (TEMPORARY: just grab noise1024.png)
-    const std::string texName = "OSPData/adera/noise1024.png";
+    constexpr std::string_view texName = "OSPData/adera/noise1024.png";
     DependRes<Texture2D> n1024 = glResources.get<Texture2D>(texName);
     if (n1024.empty())
     {
@@ -82,12 +83,11 @@ void SysExhaustPlume::initialize_plume(ActiveEnt node)
     }
 
     // Emplace plume shader instance component from plume effect parameters
-    ShaderInstance_t shader(
+    m_scene.reg_emplace<ShaderInstance_t>(node,
         glResources.get<PlumeShader>("plume_shader"),
         n1024,
         n1024,
         *plumeEffect);
-    m_scene.reg_emplace<ShaderInstance_t>(node, std::move(shader));
 
     m_scene.reg_emplace<CompDrawableDebug>(node, plumeMesh,
         &adera::shader::PlumeShader::draw_plume);
@@ -97,25 +97,44 @@ void SysExhaustPlume::initialize_plume(ActiveEnt node)
 
 void SysExhaustPlume::update_plumes(ActiveScene& rScene)
 {
-    using adera::active::machines::MachineRocket;
-    auto plumeView = m_scene.get_registry().view<ACompExhaustPlume, CompVisibleDebug>();
+    m_time += m_scene.get_time_delta_fixed();
 
+    using adera::active::machines::MachineRocket;
+    using ShaderInstance_t = adera::shader::PlumeShader::ACompPlumeShaderInstance;
+
+    auto& reg = m_scene.get_registry();
+
+    // Initialize any uninitialized plumes
+    auto uninitializedComps =
+        reg.view<ACompExhaustPlume>(entt::exclude<ShaderInstance_t>);
+    for (ActiveEnt plumeEnt : uninitializedComps)
+    {
+        initialize_plume(plumeEnt);
+    }
+
+    // Process plumes
+    auto plumeView =
+        reg.view<ACompExhaustPlume, ShaderInstance_t, CompVisibleDebug>();
     for (ActiveEnt plumeEnt : plumeView)
     {
-        ACompExhaustPlume& plume = plumeView.get<ACompExhaustPlume>(plumeEnt);
+        auto& plume = plumeView.get<ACompExhaustPlume>(plumeEnt);
+        auto& plumeShader = plumeView.get<ShaderInstance_t>(plumeEnt);
         CompVisibleDebug& visibility = plumeView.get<CompVisibleDebug>(plumeEnt);
 
         auto& machine = m_scene.reg_get<MachineRocket>(plume.m_parentMachineRocket);
         const auto& throttle = *machine.request_input(2)->connected_value();
         const auto throttlePos = std::get<wiretype::Percent>(throttle).m_value;
 
+        plumeShader.m_currentTime = m_time;
+
         if (throttlePos > 0.0f)
         {
-            visibility.state = true;
+            plumeShader.m_powerLevel = throttlePos;
+            visibility.m_state = true;
         }
         else
         {
-            visibility.state = false;
+            visibility.m_state = false;
         }
     }
 }
