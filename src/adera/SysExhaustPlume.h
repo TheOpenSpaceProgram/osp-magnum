@@ -24,7 +24,8 @@
  */
 #pragma once
 #include "osp/Active/physics.h"
-#include <Magnum/Shaders/Phong.h>
+#include "adera/Plume.h"
+#include "adera/Shaders/PlumeShader.h"
 #include "osp/Resource/Resource.h"
 
 namespace osp::active
@@ -33,7 +34,7 @@ namespace osp::active
 struct ACompExhaustPlume
 {
     ActiveEnt m_parentMachineRocket{entt::null};
-    //DependRes<PlumeEffect> m_effect;
+    DependRes<PlumeEffectData> m_effect;
 };
 
 class SysExhaustPlume : public IDynamicSystem
@@ -41,7 +42,7 @@ class SysExhaustPlume : public IDynamicSystem
 public:
     static inline std::string smc_name = "ExhaustPlume";
 
-    SysExhaustPlume(ActiveScene& scene);
+    SysExhaustPlume(ActiveScene& rScene);
     ~SysExhaustPlume() = default;
 
     /**

@@ -133,15 +133,37 @@ void osp::AssetImporter::load_plume(TinyGltfImporter& gltfImporter,
 {
     using Corrade::Containers::Pointer;
     using Magnum::Trade::ObjectData3D;
+    using namespace tinygltf;
 
     std::cout << "Plume! Node \"" << gltfImporter.object3DName(id) << "\"\n";
 
-    PlumeEffectData plumeData;
-
+    // Get mesh data
     Pointer<ObjectData3D> rootNode = gltfImporter.object3D(id);
     unsigned meshID = gltfImporter.object3D(rootNode->children()[0])->instance();
     std::string meshName = string_concat(resPrefix, gltfImporter.meshName(meshID));
-    plumeData.meshName = meshName;
+
+    // Get shader params from extras
+    Node const& node = *static_cast<Node const*>(
+        gltfImporter.object3D(id)->importerState());
+
+    Value const& extras = node.extras;
+    float flowVel = extras.Get("flowvelocity").Get<double>();
+    Magnum::Color4 color;
+    Value::Array colorArray = extras.Get("color").Get<Value::Array>();
+    for (int i = 0; i < 4; i++)
+    {
+        Value const& component = colorArray[i];
+        color[i] = component.GetNumberAsDouble();
+    }
+    float zMax = extras.Get("zMax").Get<double>();
+    float zMin = extras.Get("zMin").Get<double>();
+
+    PlumeEffectData plumeData;
+    plumeData.m_meshName = meshName;
+    plumeData.m_flowVelocity = flowVel;
+    plumeData.m_color = color;
+    plumeData.m_zMax = zMax;
+    plumeData.m_zMin = zMin;
 
     pkg.add<PlumeEffectData>(gltfImporter.object3DName(id), std::move(plumeData));
 }
