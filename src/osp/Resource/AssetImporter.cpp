@@ -45,6 +45,7 @@
 #include "Package.h"
 #include "AssetImporter.h"
 #include "osp/string_concat.h"
+#include "adera/Plume.h"
 
 using Corrade::Containers::Optional;
 using Magnum::Trade::ImageData2D;
@@ -127,6 +128,24 @@ void osp::AssetImporter::load_part(TinyGltfImporter& gltfImporter,
     pkg.add<PrototypePart>(gltfImporter.object3DName(id), std::move(part));
 }
 
+void osp::AssetImporter::load_plume(TinyGltfImporter& gltfImporter,
+    Package& pkg, Magnum::UnsignedInt id, std::string_view resPrefix)
+{
+    using Corrade::Containers::Pointer;
+    using Magnum::Trade::ObjectData3D;
+
+    std::cout << "Plume! Node \"" << gltfImporter.object3DName(id) << "\"\n";
+
+    PlumeEffectData plumeData;
+
+    Pointer<ObjectData3D> rootNode = gltfImporter.object3D(id);
+    unsigned meshID = gltfImporter.object3D(rootNode->children()[0])->instance();
+    std::string meshName = string_concat(resPrefix, gltfImporter.meshName(meshID));
+    plumeData.meshName = meshName;
+
+    pkg.add<PlumeEffectData>(gltfImporter.object3DName(id), std::move(plumeData));
+}
+
 /* Explanation of resPrefix:
    When a mesh is created in blender, the object itself has a name (the one that
    shows up in the scene hierarchy), but the underlying mesh data within that
@@ -162,6 +181,10 @@ void osp::AssetImporter::load_sturdy(TinyGltfImporter& gltfImporter,
         if (nodeName.compare(0, 5, "part_") == 0)
         {
             load_part(gltfImporter, pkg, childID, resPrefix);
+        }
+        else if (nodeName.compare(0, 6, "plume_") == 0)
+        {
+            load_plume(gltfImporter, pkg, childID, resPrefix);
         }
     }
 

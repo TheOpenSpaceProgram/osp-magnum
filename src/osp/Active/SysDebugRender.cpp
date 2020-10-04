@@ -57,8 +57,8 @@ void SysDebugRender::draw(ACompCamera const& camera)
     Renderer::enable(Renderer::Feature::DepthTest);
     Renderer::enable(Renderer::Feature::FaceCulling);
 
-
-    auto drawGroup = m_scene.get_registry().group<CompDrawableDebug>(
+    auto& reg = m_scene.get_registry();
+    auto drawGroup = reg.group<CompDrawableDebug>(
                             entt::get<ACompTransform>);
 
     Matrix4 entRelative;
@@ -66,6 +66,10 @@ void SysDebugRender::draw(ACompCamera const& camera)
     for(auto entity: drawGroup)
     {
         CompDrawableDebug& drawable = drawGroup.get<CompDrawableDebug>(entity);
+        CompVisibleDebug* visible = reg.try_get<CompVisibleDebug>(entity);
+        
+        if (visible && !visible->state) { continue; }
+        
         ACompTransform& transform = drawGroup.get<ACompTransform>(entity);
 
         entRelative = camera.m_inverse * transform.m_transformWorld;
