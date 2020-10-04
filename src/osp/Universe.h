@@ -25,8 +25,25 @@ using MapSatType = std::map<std::string, std::unique_ptr<ITypeSatellite>>;
 //typedef Math::Vector3<int64_t> Coordinate;
 
 /**
- * A universe consisting of many satellites that can interact with each other.
- * [refer to document]
+ * A model of deep space. This class stores the data of astronomical objects
+ * represented in the universe, known as Satellites. Planets, stars, comets,
+ * vehicles, etc... are all Satellites.
+ *
+ * This class uses EnTT ECS, where Satellites are ECS entities. Components are
+ * structs prefixed with UComp.
+ *
+ * Satellites can have types that determine which components they have, see
+ * ITypeSatellite. These types are registered at runtime.
+ *
+ * Positions are stored in 64-bit unsigned int vectors in UCompTransformTraj.
+ * 1024 units = 1 meter
+ *
+ * Moving or any kind of iteration over Satellites, such as Orbits, are handled
+ * by Trajectory classes, see ISystemTrajectory.
+ *
+ * Example of usage:
+ * https://github.com/TheOpenSpaceProgram/osp-magnum/wiki/Cpp:-How-to-setup-a-Solar-System
+ *
  */
 class Universe
 {
@@ -42,7 +59,8 @@ public:
     static constexpr Satellite sat_null() { return entt::null; };
 
     /**
-     * Create a satellite with default components, and adds it to the universe
+     * Create a Satellite with default components, and adds it to the universe.
+     * This Satellite will not be assigned a type.
      * @return The new Satellite just created
      */
     Satellite sat_create();
@@ -59,16 +77,16 @@ public:
 
     /**
      * Calculate position between two satellites.
-     * @param referenceFrame
-     * @param target
+     * @param referenceFrame [in]
+     * @param target [in]
      * @return relative position of target in SpaceInt vector
      */
     Vector3s sat_calc_pos(Satellite referenceFrame, Satellite target);
 
     /**
      * Calculate position between two satellites.
-     * @param referenceFrame
-     * @param target
+     * @param referenceFrame [in]
+     * @param target [in]
      * @return relative position of target in meters
      */
     Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target);
@@ -83,13 +101,20 @@ public:
     template<typename TYPESAT_T, typename ... ARGS_T>
     TYPESAT_T& type_register(ARGS_T&& ... args);
 
+    /**
+     * Tries to locate an element in the map of registered Satellite Types.
+     * @param name [in] Name of ITypeSatellite
+     * @return Map iterator directly from std::map::find()
+     */
     MapSatType::iterator sat_type_find(const std::string &name)
     {
         return m_satTypes.find(name);
     }
 
     /**
-     *
+     * Create a Trajectory, and add it to the universe.
+     * @tparam TRAJECTORY_T Type of Trajectory to construct
+     * @return Reference to new trajectory just created
      */
     template<typename TRAJECTORY_T, typename ... ARGS_T>
     TRAJECTORY_T& trajectory_create(ARGS_T&& ... args);
@@ -127,7 +152,8 @@ TYPESAT_T& Universe::type_register(ARGS_T&& ... args)
 template<typename TRAJECTORY_T, typename ... ARGS_T>
 TRAJECTORY_T& Universe::trajectory_create(ARGS_T&& ... args)
 {
-    std::unique_ptr<TRAJECTORY_T> newTraj = std::make_unique<TRAJECTORY_T>(std::forward<ARGS_T>(args)...);
+    std::unique_ptr<TRAJECTORY_T> newTraj
+            = std::make_unique<TRAJECTORY_T>(std::forward<ARGS_T>(args)...);
     TRAJECTORY_T& toReturn = *newTraj;
     m_trajectories.push_back(std::move(newTraj)); // this invalidates newTraj
     return toReturn;

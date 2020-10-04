@@ -100,15 +100,18 @@ public:
     ~SysNewton();
 
     /**
-     * Scan children for CompColliders. combine it all into a single compound
-     * collision
-     * @param entity [in] Entity containing CompNewtonBody
+     * Scan children of specified rigid body entity for ACompCollisionShapes,
+     * then combine it all into a single compound collision
+     *
+     * @param entity [in] Entity containing ACompNwtBody
      */
     void create_body(ActiveEnt entity);
 
     void update_world();
 
     /**
+     * Used to find which rigid body an entity belongs to. This will keep
+     * looking up the tree of parents until it finds a rigid body.
      *
      * @return Pair of {level-1 entity, pointer to body found}. If hierarchy
      *         error, then {entt:null, nullptr}. If no ACompRigidBody found,
@@ -118,6 +121,8 @@ public:
             ActiveEnt ent);
 
     constexpr ActiveScene& get_scene() { return m_scene; }
+
+    // most of these are self-explanatory
 
     void body_apply_force(ACompRigidBody &body, Vector3 force);
     void body_apply_force_local(ACompRigidBody &body, Vector3 force);
@@ -131,6 +136,13 @@ public:
     void shape_create_box(ACompCollisionShape &shape, Vector3 size);
     void shape_create_sphere(ACompCollisionShape &shape, float radius);
 
+    /**
+     * Create a Newton TreeCollision from a mesh using those weird triangle
+     * mesh iterators.
+     * @param shape Shape component to store NewtonCollision* into
+     * @param start
+     * @param end
+     */
     template<class TRIANGLE_IT_T>
     void shape_create_tri_mesh_static(ACompCollisionShape &shape,
                                       TRIANGLE_IT_T const& start,

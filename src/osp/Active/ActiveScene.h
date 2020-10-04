@@ -19,55 +19,17 @@
 namespace osp::active
 {
 
-
 /**
- * Component for transformation (in meters)
- */
-struct ACompTransform
-{
-    //Matrix4 m_transformPrev;
-    Matrix4 m_transform;
-    Matrix4 m_transformWorld;
-    bool m_enableFloatingOrigin;
-};
-
-struct ACompHierarchy
-{
-    std::string m_name;
-
-    //unsigned m_childIndex;
-    unsigned m_level{0};
-    ActiveEnt m_parent{entt::null};
-    ActiveEnt m_siblingNext{entt::null};
-    ActiveEnt m_siblingPrev{entt::null};
-
-    // as a parent
-    unsigned m_childCount{0};
-    ActiveEnt m_childFirst{entt::null};
-
-    // transform relative to parent
-
-};
-
-/**
- * Component that represents a camera
- */
-struct ACompCamera
-{
-    float m_near, m_far;
-    Magnum::Deg m_fov;
-    Vector2 m_viewport;
-
-    Matrix4 m_projection;
-    Matrix4 m_inverse;
-
-
-    void calculate_projection();
-};
-
-/**
- * The 3D Game Engine scene. ActiveScene implements a scene graph hierarchy and
- * contains a bunch of other systems.
+ * An ECS 3D Game Engine scene that implements a scene graph hierarchy.
+ *
+ * Components are prefixed with AComp, for "Active Component."
+ *
+ * Features are added through "Dynamic Systems" (IDynamicSystem), which are
+ * classes that add functions to the UpdateOrder.
+ *
+ *
+ * In ECS, "System" refers to the functions; but here, systems refer to the
+ * classes containing those functions too.
  */
 class ActiveScene
 {
@@ -93,22 +55,24 @@ public:
                                 std::string const& name = "Innocent Entity");
 
     /**
-     * (NOT YET IMPLEMENTED) set parent-child relationship between two nodes
-     * containing a ACompHierarchy
-     * @param parent
-     * @param child
+     * Set parent-child relationship between two nodes containing an
+     * ACompHierarchy
+     *
+     * @param parent [in]
+     * @param child  [in]
      */
     void hier_set_parent_child(ActiveEnt parent, ActiveEnt child);
 
     /**
      * Destroy an entity and all its descendents
-     * @param ent
+     * @param ent [in]
      */
     void hier_destroy(ActiveEnt ent);
 
     /**
-     * Cut an entity out of the hierarchy
-     * @param ent
+     * Cut an entity out of it's parent. This will leave the entity with no
+     * parent.
+     * @param ent [in]
      */
     void hier_cut(ActiveEnt ent);
 
@@ -149,7 +113,7 @@ public:
     /**
      * Request a floating origin mass translation. Multiple calls to this are
      * accumulated and are applied on the next physics update
-     * @param pAmount Meters to translate
+     * @param pAmount [in] Meters to translate
      */
     void floating_origin_translate(Vector3 const& pAmount);
 
@@ -187,6 +151,7 @@ public:
     constexpr float get_time_delta_fixed() { return 1.0f / 60.0f; }
 
     /**
+     * @deprecated all systems will be dynamic soon
      * Get one of the system members
      * @tparam T either SysPhysics, SysWire, or SysDebugObject
      */
@@ -241,7 +206,7 @@ private:
     UpdateOrder m_updateOrder;
     RenderOrder m_renderOrder;
 
-    MapSysMachine m_sysMachines;
+    MapSysMachine m_sysMachines; // TODO: Put this in SysVehicle
     MapDynamicSys m_dynamicSys;
 
     // TODO: base class and a list for Systems (or not)
@@ -290,10 +255,49 @@ constexpr SysWire& ActiveScene::get_system<SysWire>()
     return m_wire;
 }
 
-//template<>
-///constexpr SysDebugObject& ActiveScene::get_system<SysDebugObject>()
-//{
-//    return m_debugObj;
-//}
+/**
+ * Component for transformation (in meters)
+ */
+struct ACompTransform
+{
+    //Matrix4 m_transformPrev;
+    Matrix4 m_transform;
+    Matrix4 m_transformWorld;
+    bool m_enableFloatingOrigin;
+};
+
+struct ACompHierarchy
+{
+    std::string m_name; // maybe move this somewhere
+
+    //unsigned m_childIndex;
+    unsigned m_level{0}; // 0 for root entity, 1 for root's child, etc...
+    ActiveEnt m_parent{entt::null};
+    ActiveEnt m_siblingNext{entt::null};
+    ActiveEnt m_siblingPrev{entt::null};
+
+    // as a parent
+    unsigned m_childCount{0};
+    ActiveEnt m_childFirst{entt::null};
+
+    // transform relative to parent
+
+};
+
+/**
+ * Component that represents a camera
+ */
+struct ACompCamera
+{
+    float m_near, m_far;
+    Magnum::Deg m_fov;
+    Vector2 m_viewport;
+
+    Matrix4 m_projection;
+    Matrix4 m_inverse;
+
+    void calculate_projection();
+};
+
 
 }

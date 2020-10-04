@@ -33,9 +33,11 @@ struct StatusActivated
 class IActivator
 {
 public:
-    virtual StatusActivated activate_sat(ActiveScene &scene, SysAreaAssociate &area,
+    virtual StatusActivated activate_sat(
+            ActiveScene &scene, SysAreaAssociate &area,
             universe::Satellite areaSat, universe::Satellite tgtSat) = 0;
-    virtual int deactivate_sat(ActiveScene &scene, SysAreaAssociate &area,
+    virtual int deactivate_sat(
+            ActiveScene &scene, SysAreaAssociate &area,
             universe::Satellite areaSat, universe::Satellite tgtSat,
             ActiveEnt tgtEnt) = 0;
 };
@@ -47,26 +49,40 @@ public:
     ~SysAreaAssociate() = default;
 
     /**
+     * Attempt to activate all the Satellites in the Universe for now.
      *
+     * What this is suppose to do in the future:
+     * Scan for nearby Satellites and attempt to activate them
      */
     void update_scan();
 
+    /**
+     * Connect this AreaAssociate to an ActiveArea Satellite. This sets the
+     * region of space in the universe the ActiveScene will represent
+     *
+     * @param sat [in] Satellite containing a UCompActiveArea
+     */
     void connect(universe::Satellite sat);
+
+    /**
+     * Deactivate all Activated Satellites and cut ties with ActiveArea
+     * Satellite
+     */
     void disconnect();
 
     /**
-     * Update position of the associated Satellite of entity
+     * Update position of ent's associated Satellite in the Universe, based on
+     * it's transform in the ActiveScene.
      */
     void sat_transform_update(ActiveEnt ent);
 
     /**
-     * Add a loading strategy to add support for loading a type of satellite
-     * @param type
-     * @param function
+     * Add an Activator, to add support for a type of satellite
+     * @param type [in] The type of Satellite that will be passed to the Activator
+     * @param activator [in]
      */
-    //void activate_func_add(universe::ITypeSatellite* type,
-    //                       LoadStrategy function);
-    void activator_add(universe::ITypeSatellite const* type, IActivator &activator);
+    void activator_add(universe::ITypeSatellite const* type,
+                       IActivator &activator);
 
     constexpr universe::Universe& get_universe() { return m_universe; }
 

@@ -8,6 +8,10 @@ namespace adera::active::machines
 
 class MachineUserControl;
 
+/**
+ * Gets ButtonControlHandle from a UserInputHandler, and updates
+ * MachineUserControls
+ */
 class SysMachineUserControl :
         public osp::active::SysMachine<SysMachineUserControl, MachineUserControl>
 {
@@ -38,7 +42,7 @@ private:
 };
 
 /**
- * Interfaces user control into WireOutputs for other Machines to use
+ * Interfaces user input into WireOutputs designed for controlling spacecraft.
  */
 class MachineUserControl : public osp::active::Machine
 {

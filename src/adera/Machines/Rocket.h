@@ -1,6 +1,7 @@
 #pragma once
 
 #include <osp/Active/SysMachine.h>
+#include <osp/Active/physics.h>
 
 namespace adera::active::machines
 {

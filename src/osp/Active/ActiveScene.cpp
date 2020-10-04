@@ -116,6 +116,8 @@ void ActiveScene::hier_cut(ActiveEnt ent)
 {
     auto &entHier = m_registry.get<ACompHierarchy>(ent);
 
+    // TODO: deal with m_depth
+
     // Set sibling's sibling's to each other
 
     if (m_registry.valid(entHier.m_siblingNext))

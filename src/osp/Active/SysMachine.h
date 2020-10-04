@@ -1,14 +1,10 @@
 #pragma once
 
+#include "SysWire.h"
 
 #include <cstdint>
 #include <iostream>
 #include <vector>
-
-#include <Corrade/Containers/LinkedList.h>
-
-#include "activetypes.h"
-#include "SysWire.h"
 
 namespace osp::active
 {
@@ -24,8 +20,9 @@ using MapSysMachine = std::map<std::string,
 
 
 /**
- * Holds a LinkedList of abstract Machine classes, allowing Machines to be
- * added to entities.
+ * This component is added to a part, and stores a vector that keeps track of
+ * all the Machines it uses. Machines are stored in multiple entities, so the
+ * vector stores pairs of [Entity, Machine Type (iterator to system class)]
  */
 struct ACompMachines
 {
@@ -34,12 +31,13 @@ struct ACompMachines
     {
         PartMachine(ActiveEnt partEnt, MapSysMachine::iterator system) :
             m_partEnt(partEnt), m_system(system) {}
+
         ActiveEnt m_partEnt;
         MapSysMachine::iterator m_system;
     };
 
     ACompMachines() = default;
-    ACompMachines(ACompMachines&& move) = default;// : m_machines(std::move(move.m_machines)) {}
+    ACompMachines(ACompMachines&& move) = default;
 
     ACompMachines& operator=(ACompMachines&& move) = default;
 
@@ -50,8 +48,10 @@ struct ACompMachines
 
 
 /**
- * Machine Base class. Polymorphism is used only for wiring. Calling updates
- * are handled by SysMachines
+ * Machine Base class. This should tecnically be an AComp Virtual functions are
+ * only for wiring; this will probably change soon.
+ *
+ * Calling updates are handled by SysMachines
  */
 class Machine : public IWireElement
                 //public LinkedListItem<Machine, LinkedList<Machine>>
