@@ -66,7 +66,7 @@ void BlueprintVehicle::add_part(
 
 void BlueprintVehicle::add_wire(
         unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
-        unsigned toPart, unsigned toMachine, WireOutPort toPort)
+        unsigned toPart, unsigned toMachine, WireInPort toPort)
 {
     m_wires.emplace_back(fromPart, fromMachine, fromPort,
                          toPart, toMachine, toPort);

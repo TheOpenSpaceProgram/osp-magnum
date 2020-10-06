@@ -234,8 +234,6 @@ void load_a_bunch_of_stuff()
 
     osp::AssetImporter::load_image(n256path, lazyDebugPack);
     osp::AssetImporter::load_image(n1024path, lazyDebugPack);
-    /*osp::AssetImporter::compile_tex(n256path, lazyDebugPack);
-    osp::AssetImporter::compile_tex(n1024path, lazyDebugPack);*/
 
     // Add package to the univere
     g_osp.debug_add_package(std::move(lazyDebugPack));

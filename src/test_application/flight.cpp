@@ -37,6 +37,7 @@
 
 #include <adera/Machines/UserControl.h>
 #include <adera/Machines/Rocket.h>
+#include <adera/Machines/RCSController.h>
 
 #include <planet-a/Active/SysPlanetA.h>
 #include <planet-a/Satellites/SatPlanet.h>
@@ -67,6 +68,7 @@ using osp::active::ACompFloatingOrigin;
 
 using adera::active::machines::SysMachineUserControl;
 using adera::active::machines::SysMachineRocket;
+using adera::active::machines::SysMachineRCSController;
 
 using planeta::universe::SatPlanet;
 
@@ -104,6 +106,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Register machines for that scene
     scene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());
     scene.system_machine_create<SysMachineRocket>();
+    scene.system_machine_create<SysMachineRCSController>();
 
     // Make active areas load vehicles and planets
     sysArea.activator_add(&satVehicle, sysVehicle);
