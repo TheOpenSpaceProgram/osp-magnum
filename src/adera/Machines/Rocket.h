@@ -26,6 +26,7 @@
 
 #include <osp/Active/SysMachine.h>
 #include <osp/Active/physics.h>
+#include <osp/Resource/blueprints.h>
 
 namespace adera::active::machines
 {
@@ -63,7 +64,8 @@ public:
      * @param ent The entity that owns the MachineRocket
      * @return The new MachineRocket instance
      */
-    osp::active::Machine& instantiate(osp::active::ActiveEnt ent) override;
+    osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
+        osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
 
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
@@ -80,7 +82,7 @@ class MachineRocket : public osp::active::Machine
     friend SysMachineRocket;
 
 public:
-    MachineRocket();
+    MachineRocket(float thrust);
     MachineRocket(MachineRocket &&move) noexcept;
     MachineRocket& operator=(MachineRocket&& move) noexcept;
 
@@ -101,12 +103,12 @@ private:
     osp::active::WireInput m_wiThrottle { this, "Throttle" };
 
     osp::active::ActiveEnt m_rigidBody  { entt::null };
+    float m_thrust{0.0f};
 }; // MachineRocket
 
-//-----------------------------------------------------------------------------
-
-inline MachineRocket::MachineRocket()
+inline MachineRocket::MachineRocket(float thrust)
  : Machine(true)
+ , m_thrust(thrust)
 { }
 
 inline MachineRocket::MachineRocket(MachineRocket&& move) noexcept
@@ -115,6 +117,7 @@ inline MachineRocket::MachineRocket(MachineRocket&& move) noexcept
  , m_wiIgnition(this, std::move(move.m_wiIgnition))
  , m_wiThrottle(this, std::move(move.m_wiThrottle))
  , m_rigidBody(std::move(move.m_rigidBody))
+ , m_thrust(std::exchange(move.m_thrust, 0.0f))
 { }
 
 inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
@@ -124,6 +127,7 @@ inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
     m_wiIgnition = { this, std::move(move.m_wiIgnition) };
     m_wiThrottle = { this, std::move(move.m_wiThrottle) };
     m_rigidBody  = std::move(move.m_rigidBody);
+    m_thrust = std::exchange(move.m_thrust, 0.0f);
     return *this;
 }
 

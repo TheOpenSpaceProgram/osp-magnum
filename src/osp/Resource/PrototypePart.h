@@ -30,6 +30,7 @@
 #include <variant>
 
 #include "../types.h"
+#include "osp/CommonPhysics.h"
 
 namespace osp
 {
@@ -42,18 +43,6 @@ enum class ObjectType
     //ATTACHMENT  //
 };
 
-enum class ECollisionShape : uint8_t
-{
-    NONE,
-    COMBINED,
-    SPHERE,
-    BOX,
-    CAPSULE,
-    CYLINDER,
-    //MESH,
-    CONVEX_HULL,
-    TERRAIN
-};
 
 //const uint32_t gc_OBJ_MESH      = 1 << 2;
 //const uint32_t gc_OBJ_COLLIDER  = 1 << 3;
@@ -71,7 +60,7 @@ struct DrawableData
 
 struct ColliderData
 {
-    ECollisionShape m_type;
+    phys::ECollisionShape m_type;
     unsigned m_meshData;
 };
 
@@ -100,12 +89,12 @@ struct PrototypeObject
     // Put more OSP-specific data in here
 };
 
+using config_node_t = std::variant<double, int, std::string>;
 
 struct PrototypeMachine
 {
     std::string m_type;
-
-    // TODO: some sort of data
+    std::map<std::string, config_node_t> m_config;
 };
 
 /**
