@@ -30,6 +30,7 @@
 
 #include "../types.h"
 #include "activetypes.h"
+#include "osp/CommonPhysics.h"
 #include <Magnum/Math/Vector4.h>
 
 class NewtonBody;
@@ -51,27 +52,9 @@ struct ACompNwtWorld
 };
 
 /**
- * Generic rigid body state
- */
-struct DataRigidBody
-{
-    // Modify these
-    Vector3 m_intertia{1, 1, 1};
-    Vector3 m_netForce{0, 0, 0};
-    Vector3 m_netTorque{0, 0, 0};
-
-    float m_mass{1.0f};
-    Vector3 m_velocity{0, 0, 0};
-    Vector3 m_rotVelocity{0, 0, 0};
-    Vector3 m_centerOfMassOffset{0, 0, 0};
-
-    bool m_colliderDirty{false}; // set true if collider is modified
-};
-
-/**
  * Rigid body with the Newton stuff
  */
-struct ACompNwtBody : public DataRigidBody
+struct ACompNwtBody : public phys::DataRigidBody
 {
     constexpr ACompNwtBody() = default;
     ACompNwtBody(ACompNwtBody&& move) noexcept;
@@ -91,7 +74,7 @@ struct ACompRigidbodyAncestor
 struct ACompCollisionShape
 {
     NewtonCollision *m_collision{nullptr};
-    ECollisionShape m_shape{ECollisionShape::NONE};
+    phys::ECollisionShape m_shape{phys::ECollisionShape::NONE};
 };
 
 using ACompRigidBody_t = ACompNwtBody;
@@ -236,6 +219,52 @@ private:
      */
     static Vector3 get_rigidbody_CoM(ACompNwtBody const& body);
 
+    /**
+     * Compute the volume of a part
+     *
+     * Traverses the immediate children of the specified entity and sums the
+     * volumes of any detected collision volumes. Cannot account for overlapping
+     * collider volumes.
+     * 
+     * @param rScene [in] ActiveScene containing relevant scene data
+     * @param part   [in] The part
+     * 
+     * @return The part's collider volume
+     */
+    static float compute_part_volume(ActiveScene& rScene, ActiveEnt part);
+
+    /**
+     * Compute the moment of inertia of a massive entity
+     *
+     * Searches the immediate children of the specified entity and computes
+     * its moment of inertia. The entity must have child nodes containing
+     * ACompCollisionShape components to compute its physical extent.
+     * Assumes mass is evenly distributed over collision volume and that the
+     * part's center of mass lies at its root origin.
+     * 
+     * @param rScene [in] ActiveScene containing relevant scene data
+     * @param part   [in] The entity with an ACompMass
+     * 
+     * @return The inertia tensor of the part about its origin
+     */
+    static Matrix3 compute_mass_inertia(ActiveScene& rScene, ActiveEnt part);
+
+    /**
+     * Compute the moment of inertia of a rigid body
+     *
+     * Searches the child nodes of the root and computes the total moment of
+     * inertia of the body. Does not perform recursion, as vehicles do not yet
+     * have nested hierarchies.
+     * 
+     * @param rScene       [in] ActiveScene containing relevant scene data
+     * @param root         [in] The root entity of the rigid body
+     * @param centerOfMass [in] The center of mass of the rigid body
+     * 
+     * @return The inertia tensor of the rigid body about its center of mass
+     */
+    static Matrix3 compute_body_inertia(ActiveScene& rScene, ActiveEnt root,
+        Vector3 centerOfMass, Matrix4 currentTransform);
+
     static void on_body_destruct(ActiveReg_t& reg, ActiveEnt ent);
     static void on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent);
     static void on_world_destruct(ActiveReg_t& reg, ActiveEnt ent);
@@ -286,7 +315,7 @@ void SysNewton::shape_create_tri_mesh_static(ACompCollisionShape &shape,
 
     newton_tree_collision_end_build(tree, 2);
 
-    shape.m_shape = ECollisionShape::TERRAIN;
+    shape.m_shape = phys::ECollisionShape::TERRAIN;
     shape.m_collision = tree;
 }
 

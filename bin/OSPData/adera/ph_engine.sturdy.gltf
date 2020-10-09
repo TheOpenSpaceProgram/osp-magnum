@@ -62,13 +62,14 @@
                 "manufacturer" : "ACME Placeholders",
                 "machines" : [
                     {
-                        "type" : "Rocket"
+                        "type" : "Rocket",
+                        "thrust" : 70000.0
                     },
                     {
                         "type" : "FreeEnergyGenerator"
                     }
                 ],
-                "massdry" : 1000,
+                "massdry" : 1000.0,
                 "name" : "PH-314"
             },
             "name" : "part_phEngine"

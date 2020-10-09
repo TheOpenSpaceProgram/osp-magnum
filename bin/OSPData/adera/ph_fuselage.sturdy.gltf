@@ -60,7 +60,7 @@
                     }
                 ],
                 "manufacturer" : "ACME Placeholders",
-                "massdry" : 100,
+                "massdry" : 5000.0,
                 "name" : "Generic Tank 001b44a"
             },
             "name" : "part_phFuselage"

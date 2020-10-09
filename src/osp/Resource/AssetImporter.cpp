@@ -121,9 +121,43 @@ void osp::AssetImporter::load_part(TinyGltfImporter& gltfImporter,
             continue;
         }
 
-        // TODO: more stuff
         PrototypeMachine machine;
         machine.m_type = std::move(type);
+
+        for (auto const& key : value.Keys())
+        {
+            std::cout << "Read config '" << key << "' : ";
+            tinygltf::Value v = value.Get(key);
+            switch (v.Type())
+            {
+            case tinygltf::Type::REAL_TYPE:
+            {
+                double val = v.Get<double>();
+                machine.m_config.emplace(key, val);
+                std::cout << val << " (real)\n";
+                break;
+            }
+
+            case tinygltf::Type::INT_TYPE:
+            {
+                int val = v.Get<int>();
+                machine.m_config.emplace(key, val);
+                std::cout << val << " (int)\n";
+                break;
+            }
+            case tinygltf::Type::STRING_TYPE:
+            {
+                std::string val = v.Get<std::string>();
+                machine.m_config.emplace(key, std::move(val));
+                std::cout << val << "(string)\n";
+                break;
+            }
+            default:
+                std::cout << "(UNKNOWN)\n";
+                break;
+            }
+        }
+
         part.get_machines().emplace_back(std::move(machine));
     }
 
@@ -383,9 +417,16 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
         obj.m_type = ObjectType::COLLIDER;
 
         // do some stuff here
-        obj.m_objectData = ColliderData{ECollisionShape::BOX};
+        tinygltf::Node const& node = *static_cast<tinygltf::Node const*>(
+            childData->importerState());
+        tinygltf::Value const& extras = node.extras;
 
-        std::cout << "obj: " << name << " is a collider\n";
+        std::string const& shapeName = extras.Get("shape").Get<std::string>();
+        const phys::ECollisionShape shape = (shapeName == "cylinder")
+            ? phys::ECollisionShape::CYLINDER : phys::ECollisionShape::BOX;
+        obj.m_objectData = ColliderData{shape};
+
+        std::cout << "obj: " << name << " is a \"" << shapeName << "\" collider\n";
     }
     else if (hasMesh)
     {
