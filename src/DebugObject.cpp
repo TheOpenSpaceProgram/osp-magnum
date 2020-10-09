@@ -76,6 +76,18 @@ void DebugCameraController::update_vehicle_mod_pre()
         }
         tgtVehicle.m_separationCount = tgtVehicle.m_parts.size();
     }
+
+    // Floating origin follow cameara
+
+    Matrix4 &xform = m_scene.reg_get<active::ACompTransform>(m_ent).m_transform;
+
+    Magnum::Vector3i tra(xform.translation() / 64);
+    tra *= 64;
+
+    //Magnum::Vector3i tra{0, 1, 0};
+
+    m_scene.floating_origin_translate(-Vector3(tra));
+
 }
 
 void DebugCameraController::update_physics_post()
