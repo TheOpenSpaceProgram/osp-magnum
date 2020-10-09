@@ -147,8 +147,8 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
                 continue;
             }
 
-            // TODO: pass the blueprint configs into this function
-            Machine& machine = sysMachine->second->instantiate(partEntity);
+            BlueprintMachine blueMach;  // TODO unused so far
+            Machine& machine = sysMachine->second->instantiate(partEntity, protoMachine, blueMach);
 
             // Add the machine to the part
             partMachines.m_machines.emplace_back(partEntity, sysMachine);
@@ -213,7 +213,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
     // temporary: make the whole thing a single rigid body
     auto& vehicleBody = scene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
     scene.reg_emplace<ACompCollisionShape>(vehicleEnt,
-        nullptr, ECollisionShape::COMBINED);
+        nullptr, phys::ECollisionShape::COMBINED);
     //scene.dynamic_system_find<SysPhysics>().create_body(vehicleEnt);
 
     return {0, vehicleEnt, true};
@@ -326,7 +326,7 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
         }
         else if (currentPrototype.m_type == ObjectType::COLLIDER)
         {
-            ACompCollisionShape collision = m_scene.reg_emplace<ACompCollisionShape>(currentEnt);
+            ACompCollisionShape& collision = m_scene.reg_emplace<ACompCollisionShape>(currentEnt);
             const ColliderData& cd = std::get<ColliderData>(currentPrototype.m_objectData);
             collision.m_shape = cd.m_type;
 
@@ -398,7 +398,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                         = m_scene.reg_emplace<ACompRigidBody_t>(islandEnt);
                 auto &islandShape
                         = m_scene.reg_emplace<ACompCollisionShape>(islandEnt);
-                islandShape.m_shape = ECollisionShape::COMBINED;
+                islandShape.m_shape = phys::ECollisionShape::COMBINED;
 
                 auto &vehicleTransform = m_scene.reg_get<ACompTransform>(vehicleEnt);
                 islandTransform.m_transform = vehicleTransform.m_transform;

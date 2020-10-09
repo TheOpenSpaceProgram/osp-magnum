@@ -106,7 +106,8 @@ public:
     virtual ~ISysMachine() = default;
 
     // TODO: make some config an argument
-    virtual Machine& instantiate(ActiveEnt ent) = 0;
+    virtual Machine& instantiate(ActiveEnt ent,
+        PrototypeMachine config, BlueprintMachine settings) = 0;
 
     virtual Machine& get(ActiveEnt ent) = 0;
 };
@@ -123,7 +124,9 @@ public:
     SysMachine(ActiveScene &scene) : m_scene(scene) {}
     ~SysMachine() = default;
 
-    virtual Machine& instantiate(ActiveEnt ent) = 0;
+    virtual Machine& instantiate(ActiveEnt ent, 
+        PrototypeMachine config,
+        BlueprintMachine settings) = 0;
 
 private:
     ActiveScene &m_scene;

@@ -62,13 +62,14 @@
                 		"type" : "RCSController"
                 	},
                     {
-                        "type" : "Rocket"
+                        "type" : "Rocket",
+                        "thrust" : 7000.0
                     },
                     {
                         "type" : "FreeEnergyGenerator"
                     }
                 ],
-                "massdry" : 10,
+                "massdry" : 5.0,
                 "name" : "Mk. 0 Placeholder RCS Thruster"
             },
             "name" : "part_phLinRCS"

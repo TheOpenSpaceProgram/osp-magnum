@@ -155,7 +155,7 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
                                              chindex_t chunk)
 {
 
-    using osp::ECollisionShape;
+    using osp::phys::ECollisionShape;
 
     auto &physics = m_scene.dynamic_system_find<SysPhysics_t>();
 

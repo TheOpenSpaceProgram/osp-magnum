@@ -133,6 +133,14 @@ public:
 
 
     /**
+     * Shorthand for get_registry().try_get<T>()
+     * @tparam T Component to get
+     * @return Pointer to component
+     */
+    template<class T>
+    constexpr T* reg_try_get(ActiveEnt ent) { return m_registry.try_get<T>(ent); };
+
+    /**
      * Shorthand for get_registry().emplace<T>()
      * @tparam T Component to emplace
      */
@@ -366,28 +374,32 @@ void ActiveScene::hierarchy_traverse(ActiveEnt root, FUNC_T callable)
     std::stack<ActiveEnt> parentNextSibling;
     ActiveEnt currentEnt = root;
 
+    unsigned int rootLevel = reg_get<ACompHierarchy>(root).m_level;
+
     while (true)
     {
         ACompHierarchy &hier = reg_get<ACompHierarchy>(currentEnt);
 
         if (callable(currentEnt) == EHierarchyTraverseStatus::Stop) { return; }
 
-        if (hier.m_childCount)
+        if (hier.m_childCount > 0)
         {
             // entity has some children
             currentEnt = hier.m_childFirst;
 
-
-            // save next sibling for later if it exists
-            if (hier.m_siblingNext != entt::null)
+            // Save next sibling for later if it exists
+            // Don't check siblings of the root node
+            if ((hier.m_siblingNext != entt::null) && (hier.m_level > rootLevel))
             {
                 parentNextSibling.push(hier.m_siblingNext);
             }
-        } else if (hier.m_siblingNext != entt::null)
+        }
+        else if ((hier.m_siblingNext != entt::null) && (hier.m_level > rootLevel))
         {
             // no children, move to next sibling
             currentEnt = hier.m_siblingNext;
-        } else if (parentNextSibling.size())
+        }
+        else if (parentNextSibling.size() > 0)
         {
             // last sibling, and not done yet
             // is last sibling, move to parent's (or ancestor's) next sibling

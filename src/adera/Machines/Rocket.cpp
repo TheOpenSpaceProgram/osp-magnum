@@ -32,6 +32,7 @@
 #include "osp/Resource/AssetImporter.h"
 #include "adera/Shaders/Phong.h"
 #include "adera/Shaders/PlumeShader.h"
+#include "osp/Resource/blueprints.h"
 #include "adera/SysExhaustPlume.h"
 #include "adera/Plume.h"
 #include <Magnum/Trade/MeshData.h>
@@ -112,7 +113,7 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
             Percent *pPercent = std::get_if<Percent>(pThrottle);
             if (pPercent == nullptr) { continue; }
 
-            float thrustMag = 10.0f; // temporary
+            float thrustMag = machine.m_thrust;
 
             Matrix4 relTransform = pRbAncestor->m_relTransform;
 
@@ -177,10 +178,14 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
     m_scene.reg_emplace<ACompExhaustPlume>(plumeNode, ent, plumeEffect);
 }
 
-Machine& SysMachineRocket::instantiate(ActiveEnt ent)
+Machine& SysMachineRocket::instantiate(ActiveEnt ent, PrototypeMachine config,
+    BlueprintMachine settings)
 {
+    // Read engine config
+    float thrust = std::get<double>(config.m_config["thrust"]);
+    
     attach_plume_effect(ent);
-    return m_scene.reg_emplace<MachineRocket>(ent);
+    return m_scene.reg_emplace<MachineRocket>(ent, thrust);
 }
 
 Machine& SysMachineRocket::get(ActiveEnt ent)

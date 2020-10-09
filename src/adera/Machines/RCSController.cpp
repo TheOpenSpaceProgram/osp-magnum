@@ -31,6 +31,7 @@
 
 using namespace adera::active::machines;
 using namespace osp::active;
+using namespace osp;
 using Magnum::Vector3;
 using Magnum::Matrix4;
 
@@ -151,7 +152,8 @@ void SysMachineRCSController::update_controls(ActiveScene& rScene)
     }
 }
 
-Machine& SysMachineRCSController::instantiate(ActiveEnt ent)
+Machine& SysMachineRCSController::instantiate(ActiveEnt ent, PrototypeMachine config,
+    BlueprintMachine settings)
 {
     return m_scene.reg_emplace<MachineRCSController>(ent);
 }

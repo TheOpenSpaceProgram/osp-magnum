@@ -125,7 +125,8 @@
                         "type" : "UserControl"
                     },
                     {
-                        "type" : "Rocket"
+                        "type" : "Rocket",
+                        "thrust" : 1000.0
                     },
                     {
                         "type" : "FreeEnergyGenerator"
