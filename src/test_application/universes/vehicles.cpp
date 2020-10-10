@@ -216,8 +216,11 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     Quaternion rotZ_270 = Quaternion::rotation(3 * qtrTurn, Vector3{0, 0, 1});
 
     blueprint.add_part(capsule, Vector3{0}, idRot, scl);
-    blueprint.add_part(fuselage, cfOset, idRot, scl);
-    blueprint.add_part(engine, cfOset + feOset, idRot, scl);
+
+    auto& fuselageBP = blueprint.add_part(fuselage, cfOset, idRot, scl);
+    fuselageBP.m_machines[1].m_config.emplace("resourcename", "lzdb:fuel");
+
+    auto& engBP = blueprint.add_part(engine, cfOset + feOset, idRot, scl);
 
     Quaternion yz090 = rotZ_090 * rotY_090;
     Quaternion yz180 = rotZ_180 * rotY_090;

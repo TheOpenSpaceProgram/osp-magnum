@@ -31,6 +31,7 @@
 #include "../Universe.h"
 #include "../Resource/Package.h"
 #include "../Resource/blueprints.h"
+#include "osp/Active/SysMachine.h"
 
 namespace osp::active
 {
@@ -89,16 +90,6 @@ public:
     SysVehicle(SysNewton&& move) = delete;
     ~SysVehicle() = default;
 
-
-    /**
-     * Create a Physical Part from a PrototypePart and put it in the world
-     * @param part the part to instantiate
-     * @param rootParent Entity to put part into
-     * @return Pointer to object created
-     */
-    static ActiveEnt part_instantiate(ActiveScene& rScene, PrototypePart& part,
-                                      ActiveEnt rootParent);
-
     static ActiveEnt activate(ActiveScene &rScene, universe::Universe &rUni,
                               universe::Satellite areaSat,
                               universe::Satellite tgtSat);
@@ -123,6 +114,80 @@ public:
     static void update_vehicle_modification(ActiveScene& rScene);
 
 private:
+
+    /* Stores the association between a PrototypeObj entity and the indices of
+     * its owned machines in the PrototypePart array. Stores a const reference
+     * to a vector because the vector is filled with PrototypePart machine data
+     * by part_instantiate() and consumed by part_instantiate_machines(), all
+     * within the activate() function scope within which the index data is stable.
+     */
+    struct MachineDef
+    {
+        ActiveEnt m_machineOwner;
+        std::vector<unsigned> const& m_machineIndices;
+
+        MachineDef(ActiveEnt owner, std::vector<unsigned> const& indexArray)
+            : m_machineOwner(owner)
+            , m_machineIndices(indexArray)
+        {}
+    };
+
+    /**
+     * Create a Physical Part from a PrototypePart and put it in the world
+     *
+     * @param part [in] The part prototype to instantiate
+     * @param blueprint [in] Unique part configuration data
+     * @param rootParent [in] Entity to put part into
+     *
+     * @return A pair containing the entity created and the list of part machines
+     */
+    static std::pair<ActiveEnt, std::vector<MachineDef>> part_instantiate(
+        ActiveScene& rScene,
+        PrototypePart& part,
+        BlueprintPart& blueprint,
+        ActiveEnt rootParent);
+
+    /**
+     * Add machines to the specified entity
+     *
+     * Receives the master arrays of prototype and blueprint machines from a
+     * prototype/blueprint part, as well as an array of indices that describe
+     * which of the machines from the master list are to be instantiated for
+     * the specified entity.
+     * @param partEnt [in] The part entity which owns the ACompMachines component
+     * @param entity [in] The target entity to receive the machines
+     * @param protoMachines [in] The master array of prototype machines
+     * @param blueprintMachines [in] The master array of machine configs
+     * @param machineIndices [in] The indices of the machines to add to entity
+     */
+    static void add_machines_to_object(ActiveScene& rScene,
+        ActiveEnt partEnt, ActiveEnt entity,
+        std::vector<PrototypeMachine> const& protoMachines,
+        std::vector<BlueprintMachine> const& blueprintMachines,
+        std::vector<unsigned> const& machineIndices);
+
+    /**
+     * Instantiate all part machines
+     *
+     * Machine instantiation requires the part's hierarchy to already exist
+     * in case a sub-object needs information about its peers. Since this means
+     * machines can't be instantiated alongside their associated object, the
+     * association between entities and prototype machines is captured, then used
+     * to call this function after all part children exist to instance all the
+     * machines at once.
+     *
+     * Effectively just calls add_machines_to_object() for each object in the
+     * part.
+     *
+     * @param partEnt [in] The root entity of the part
+     * @param machineMapping [in] The mapping from objects to their machines
+     * @param part [in] The prototype part being created
+     * @param partBP [in] The blueprint configs of the part being created
+     */
+    static void part_instantiate_machines(ActiveScene& rScene, ActiveEnt partEnt,
+        std::vector<MachineDef> const& machineMapping,
+        PrototypePart const& part, BlueprintPart const& partBP);
+
     //ActiveScene& m_scene;
     //AppPackages& m_packages;
 

@@ -33,6 +33,7 @@
 #include "adera/Shaders/Phong.h"
 #include "adera/Shaders/PlumeShader.h"
 #include "osp/Resource/blueprints.h"
+#include "osp/PhysicsConstants.h"
 #include "adera/SysExhaustPlume.h"
 #include "adera/Plume.h"
 #include <Magnum/Trade/MeshData.h>
@@ -60,6 +61,15 @@ WireOutput* MachineRocket::request_output(WireOutPort port)
 
 std::vector<WireInput*> MachineRocket::existing_inputs()
 {
+    /*std::vector<WireInput*> inputs;
+    inputs.reserve(3 + m_resourceLines.size());
+
+    inputs.insert(inputs.begin(), {&m_wiGimbal, &m_wiIgnition, &m_wiThrottle});
+    for (auto& resource : m_resourceLines)
+    {
+        inputs.push_back(&resource.m_lineIn);
+    }
+    return inputs;*/
     return {&m_wiGimbal, &m_wiIgnition, &m_wiThrottle};
 }
 
@@ -92,7 +102,46 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
             continue;
         }
 
-        //std::cout << "updating a rocket\n";
+        // Check for nonzero throttle, continue otherwise
+        WireData *pThrottle = machine.m_wiThrottle.connected_value();
+        wiretype::Percent* pPercent = nullptr;
+        if (pThrottle != nullptr)
+        {
+            using wiretype::Percent;
+            pPercent = std::get_if<Percent>(pThrottle);
+            if ((pPercent == nullptr) || !(pPercent->m_value > 0.0f))
+            {
+                continue;
+            }
+        }
+        else
+        {
+            continue;
+        }
+
+        // Check for adequate resource inputs
+        bool fail = false;
+        for (auto& resource : machine.m_resourceLines)
+        {
+            auto const* src = m_scene.reg_try_get<MachineContainer>(resource.m_sourceEnt);
+            if (!src)
+            {
+                std::cout << "Error: no source found\n";
+                fail = true;
+                break;
+            }
+            if (!src->check_contents().m_quantity > 0)
+            {
+                fail = true;
+                break;
+            }
+        }
+        if (fail)
+        {
+            continue;
+        }
+
+        // Perform physics calculation
 
         // Get rigidbody ancestor and its transformation component
         auto const* pRbAncestor =
@@ -105,34 +154,38 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
 
         }
 
-        using wiretype::Percent;
+        Matrix4 relTransform = pRbAncestor->m_relTransform;
 
-        if (WireData *pThrottle = machine.m_wiThrottle.connected_value();
-            pThrottle != nullptr)
+        /* Compute thrust force
+            * Thrust force is defined to be along +Z by convention.
+            * Obtains thrust vector in rigidbody space
+            */
+        Vector3 thrustDir = relTransform.transformVector(Vector3{0.0f, 0.0f, 1.0f});
+        float thrustMag = machine.m_params.m_maxThrust * pPercent->m_value;
+        // Take thrust in rigidbody space and apply to RB in world space
+        Vector3 thrust = thrustMag * thrustDir;
+        Vector3 worldThrust = rCompTf.m_transform.transformVector(thrust);
+        SysPhysics_t::body_apply_force(rCompRb, worldThrust);
+
+        // Obtain point where thrust is applied relative to RB CoM
+        Vector3 location = relTransform.translation();
+        // Compute worldspace torque from engine location, thrust vector
+        Vector3 torque = Magnum::Math::cross(location, thrust);
+        Vector3 worldTorque = rCompTf.m_transform.transformVector(torque);
+        SysPhysics_t::body_apply_torque(rCompRb, worldTorque);
+ 
+        // Perform resource consumption calculation
+        float massFlowRateTot = thrustMag /
+            (phys::constants::g_0 * machine.m_params.m_specImpulse);
+        for (auto const& resource : machine.m_resourceLines)
         {
-            Percent *pPercent = std::get_if<Percent>(pThrottle);
-            if (pPercent == nullptr) { continue; }
-
-            float thrustMag = machine.m_thrust;
-
-            Matrix4 relTransform = pRbAncestor->m_relTransform;
-
-            /* Compute thrust force
-             * Thrust force is defined to be along +Z by convention.
-             * Obtains thrust vector in rigidbody space
-             */
-            Vector3 thrustDir = relTransform.transformVector(Vector3{0.0f, 0.0f, 1.0f});
-            // Take thrust in rigidbody space and apply to RB in world space
-            Vector3 thrust = thrustMag*pPercent->m_value * thrustDir;
-            Vector3 worldThrust = rCompTf.m_transform.transformVector(thrust);
-            SysPhysics_t::body_apply_force(rCompRb, worldThrust);
-
-            // Obtain point where thrust is applied relative to RB CoM
-            Vector3 location = relTransform.translation();
-            // Compute worldspace torque from engine location, thrust vector
-            Vector3 torque = Magnum::Math::cross(location, thrust);
-            Vector3 worldTorque = rCompTf.m_transform.transformVector(torque);
-            SysPhysics_t::body_apply_torque(rCompRb, worldTorque);
+            float massFlowRate = massFlowRateTot * resource.m_massRateFraction;
+            float massFlow = massFlowRate * m_scene.get_time_delta_fixed();
+            uint64_t required = resource.m_type->resource_quantity(massFlow);
+            auto* src = m_scene.reg_try_get<MachineContainer>(resource.m_sourceEnt);
+            uint64_t consumed = src->request_contents(required);
+            std::cout << "consumed " << consumed << " units of fuel, "
+                << src->check_contents().m_quantity << " remaining\n";
         }
     }
 }
@@ -182,10 +235,40 @@ Machine& SysMachineRocket::instantiate(ActiveEnt ent, PrototypeMachine config,
     BlueprintMachine settings)
 {
     // Read engine config
-    float thrust = std::get<double>(config.m_config["thrust"]);
-    
+    MachineRocket::Parameters params;
+    params.m_maxThrust = std::get<double>(config.m_config["thrust"]);
+    params.m_specImpulse = std::get<double>(config.m_config["Isp"]);
+
+    MachineRocket::fuel_list_t inputs;
+    Package& pkg = m_scene.get_application().debug_find_package("lzdb");
+    DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>("fuel");
+    if (!fuel.empty())
+    {
+        // TMP: finds the first non-empty fuel tank in the ship
+        // Only works as long as the fuselage is added before the engine
+
+        ActiveEnt foundTank = entt::null;
+        auto find_fuel = [this, &foundTank](ActiveEnt e)
+        {
+            if (auto* fuel = this->m_scene.reg_try_get<MachineContainer>(e);
+                fuel != nullptr && fuel->check_contents().m_quantity > 0)
+            {
+                foundTank = e;
+                return EHierarchyTraverseStatus::Stop;
+            }
+            return EHierarchyTraverseStatus::Continue;
+        };
+        auto const& parent = m_scene.reg_get<ACompHierarchy>(ent);
+        m_scene.hierarchy_traverse(parent.m_parent, find_fuel);
+        // endTMP
+
+        ActiveEnt fuelSource = foundTank;
+        MachineRocket::ResourceInput input = {std::move(fuel), 1.0f, fuelSource};
+        inputs.push_back(std::move(input));
+    }
+
     attach_plume_effect(ent);
-    return m_scene.reg_emplace<MachineRocket>(ent, thrust);
+    return m_scene.reg_emplace<MachineRocket>(ent, params, inputs);
 }
 
 Machine& SysMachineRocket::get(ActiveEnt ent)

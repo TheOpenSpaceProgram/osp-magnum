@@ -87,6 +87,8 @@ struct PrototypeObject
     std::variant<DrawableData, ColliderData> m_objectData;
 
     // Put more OSP-specific data in here
+
+    std::vector<unsigned> m_machineIndices;
 };
 
 using config_node_t = std::variant<double, int, std::string>;
