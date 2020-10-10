@@ -24,10 +24,39 @@
  */
 #include "ShipResources.h"
 #include "osp/Active/ActiveScene.h"
+#include "osp/Resource/PrototypePart.h"
 
 using namespace osp;
 using namespace osp::active;
 using namespace adera::active::machines;
+
+/* ShipResourceType */
+
+double ShipResourceType::resource_volume(uint64_t quantity) const
+{
+    double units = static_cast<double>(quantity) / std::pow(2.0, m_quanta);
+    return units * m_volume;
+}
+
+double ShipResourceType::resource_mass(uint64_t quantity) const
+{
+    double units = static_cast<double>(quantity) / std::pow(2.0, m_quanta);
+    return units * m_mass;
+}
+
+uint64_t ShipResourceType::resource_capacity(double volume) const
+{
+    double units = volume / m_volume;
+    double quantaPerUnit = std::pow(2.0, m_quanta);
+    return static_cast<uint64_t>(units * quantaPerUnit);
+}
+
+uint64_t ShipResourceType::resource_quantity(double mass) const
+{
+    double units = mass / m_mass;
+    double quantaPerUnit = std::pow(2.0, m_quanta);
+    return static_cast<uint64_t>(units * quantaPerUnit);
+}
 
 /* MachineContainer */
 
@@ -56,6 +85,17 @@ std::vector<WireOutput*> MachineContainer::existing_outputs()
     return m_outputs;
 }
 
+uint64_t MachineContainer::request_contents(uint64_t quantity)
+{
+    if (quantity > m_contents.m_quantity)
+    {
+        return std::exchange(m_contents.m_quantity, 0);
+    }
+
+    m_contents.m_quantity -= quantity;
+    return quantity;
+}
+
 /* SysMachineContainer */
 
 SysMachineContainer::SysMachineContainer(ActiveScene& rScene)
@@ -76,39 +116,22 @@ void SysMachineContainer::update_containers(ActiveScene& rScene)
     }
 }
 
-float SysMachineContainer::resource_volume(ShipResourceType type, uint64_t quantity)
-{
-    uint64_t units = quantity / (1ull << type.m_quanta);
-    return static_cast<float>(units) * type.m_volume;
-}
-
-float SysMachineContainer::resource_mass(ShipResourceType type, uint64_t quantity)
-{
-    uint64_t units = quantity / (1ull << type.m_quanta);
-    return static_cast<float>(units) * type.m_mass;
-}
-
-uint64_t SysMachineContainer::resource_capacity(ShipResourceType type, float volume)
-{
-    double units = volume / type.m_volume;
-    double quantaPerUnit = static_cast<double>(1ull << type.m_quanta);
-    return static_cast<uint64_t>(units * quantaPerUnit);
-}
-
 Machine& SysMachineContainer::instantiate(ActiveEnt ent,
     PrototypeMachine config, BlueprintMachine settings)
 {
     float capacity = std::get<double>(config.m_config["capacity"]);
-    
-    // Currently disconnected; will be updated when BlueprintMachine is implemented
-    //std::string resName = std::get<std::string>(settings.m_config["resourcename"]);
-    std::string_view resName = "";
-    Path resPath = decompose_path(resName);
-    Package& pkg = m_scene.get_application().debug_find_package(resPath.prefix);
 
-    ShipResource resource;
-    resource.m_type = pkg.get<ShipResourceType>(resPath.identifier);
-    resource.m_quantity = resource_capacity(*resource.m_type, capacity);
+    ShipResource resource{};
+    if (auto resItr = settings.m_config.find("resourcename");
+        resItr != settings.m_config.end())
+    {
+        std::string_view resName = std::get<std::string>(resItr->second);
+        Path resPath = decompose_path(resName);
+        Package& pkg = m_scene.get_application().debug_find_package(resPath.prefix);
+
+        resource.m_type = pkg.get<ShipResourceType>(resPath.identifier);
+        resource.m_quantity = resource.m_type->resource_capacity(capacity);
+    }
 
     return m_scene.reg_emplace<MachineContainer>(ent, capacity, resource);
 }

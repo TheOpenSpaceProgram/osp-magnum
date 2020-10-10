@@ -127,7 +127,9 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 
         PrototypePart &proto = *partDepends;
 
-        ActiveEnt partEntity = part_instantiate(rScene, proto, vehicleEnt);
+        auto const& [partEntity, machineMapping] = part_instantiate(rScene, proto,
+                        partBp, vehicleEnt);
+
         vehicleComp.m_parts.push_back(partEntity);
 
         auto& partPart = rScene.reg_emplace<ACompPart>(partEntity);
@@ -135,28 +137,18 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 
         // Part now exists
 
-        // TODO: Deal with blueprint machines instead of prototypes directly
-
-        auto &partMachines = rScene.reg_emplace<ACompMachines>(partEntity);
-
-        for (PrototypeMachine& protoMachine : proto.get_machines())
-        {
-            MapSysMachine_t::iterator sysMachine
-                    = rScene.system_machine_find(protoMachine.m_type);
-
-            if (!(rScene.system_machine_it_valid(sysMachine)))
-            {
-                std::cout << "Machine: " << protoMachine.m_type << " Not found\n";
-                continue;
-            }
-
-            BlueprintMachine blueMach;  // TODO unused so far
-            Machine& machine = sysMachine->second->instantiate(partEntity, protoMachine, blueMach);
-
-            // Add the machine to the part
-            partMachines.m_machines.emplace_back(partEntity, sysMachine);
-
-        }
+        /* Deferred machine instantiation
+        * 
+        * Since machines may depend on the existence of other objects in the
+        * part's hierarchy, machine instantiation must be deferred until the
+        * entire hierarchy exists. For instance, a rocket engine's root
+        * "MachineRocket" machine may depend on the existence of a child node
+        * to receive an "ACompExhaustPlume" component that handles graphical
+        * effects related to the rocket machine, but that child node would not
+        * exist in time for the MachineRocket to be instantiated alongside
+        * the root part entity.
+        */
+        part_instantiate_machines(rScene, partEntity, machineMapping, proto, partBp);
 
         //std::cout << "empty? " << partMachines.m_machines.isEmpty() << "\n";
 
@@ -223,20 +215,70 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 }
 
 
-
-ActiveEnt SysVehicle::part_instantiate(ActiveScene& rScene, PrototypePart& part,
-                                       ActiveEnt rootParent)
+void SysVehicle::add_machines_to_object(ActiveScene& rScene,
+    ActiveEnt partEnt, ActiveEnt objEnt,
+    std::vector<PrototypeMachine> const& protoMachines,
+    std::vector<BlueprintMachine> const& blueprintMachines,
+    std::vector<unsigned> const& machineIndices)
 {
+    if (machineIndices.empty()) { return; }
 
+    auto &compMachines =
+        rScene.get_registry().get_or_emplace<ACompMachines>(partEnt);
+
+    for (unsigned i : machineIndices)
+    {
+        BlueprintMachine const& bpMachine = blueprintMachines[i];
+        PrototypeMachine const& protoMachine = protoMachines[i];
+
+        MapSysMachine_t::iterator sysMachine
+            = rScene.system_machine_find(protoMachine.m_type);
+
+        if (!(rScene.system_machine_it_valid(sysMachine)))
+        {
+            std::cout << "Machine type: " << protoMachine.m_type << " Not found\n";
+            continue;
+        }
+
+        // Instantiate the machine for the object
+        sysMachine->second->instantiate(objEnt, protoMachine, bpMachine);
+
+        // Add a PartMachine definition to the root part's ACompMachines
+        compMachines.m_machines.emplace_back(objEnt, sysMachine);
+    }
+}
+
+void SysVehicle::part_instantiate_machines(ActiveScene& rScene, ActiveEnt partEnt,
+    std::vector<MachineDef> const& machineMapping,
+    PrototypePart const& part, BlueprintPart const& partBP)
+{
+    std::vector<PrototypeMachine> const& protoMachines = part.get_machines();
+    std::vector<BlueprintMachine> const& bpMachines = partBP.m_machines;
+    for (auto const& obj : machineMapping)
+    {
+        add_machines_to_object(rScene, partEnt, obj.m_machineOwner,
+            protoMachines, bpMachines, obj.m_machineIndices);
+    }
+}
+
+std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_instantiate(
+    ActiveScene& rScene, PrototypePart& part, BlueprintPart& blueprint, ActiveEnt rootParent)
+{
     std::vector<PrototypeObject> const& prototypes = part.get_objects();
     std::vector<ActiveEnt> newEntities(prototypes.size());
 
+    /* A list of MachineDefs, which catalog all part machines and the ActiveEnts
+     * that are created to represent the objects that own them
+     */
+    std::vector<MachineDef> machineMapping;
+    machineMapping.reserve(prototypes.size());
+
     //std::cout << "size: " << newEntities.size() << "\n";
 
-    for (unsigned i = 0; i < prototypes.size(); i ++)
+    for (size_t i = 0; i < prototypes.size(); i++)
     {
-        const PrototypeObject& currentPrototype = prototypes[i];
-        ActiveEnt currentEnt, parentEnt;
+        PrototypeObject const& currentPrototype = prototypes[i];
+        ActiveEnt parentEnt;
 
         // Get parent
         if (currentPrototype.m_parentIndex == i)
@@ -252,7 +294,7 @@ ActiveEnt SysVehicle::part_instantiate(ActiveScene& rScene, PrototypePart& part,
         }
 
         // Create the new entity
-        currentEnt = rScene.hier_create_child(parentEnt,
+        ActiveEnt currentEnt = rScene.hier_create_child(parentEnt,
                                                 currentPrototype.m_name);
         newEntities[i] = currentEnt;
 
@@ -291,6 +333,7 @@ ActiveEnt SysVehicle::part_instantiate(ActiveScene& rScene, PrototypePart& part,
             }
 
             std::vector<DependRes<Texture2D>> textureResources;
+            textureResources.reserve(drawable.m_textures.size());
             for (unsigned i = 0; i < drawable.m_textures.size(); i++)
             {
                 unsigned texID = drawable.m_textures[i];
@@ -327,13 +370,16 @@ ActiveEnt SysVehicle::part_instantiate(ActiveScene& rScene, PrototypePart& part,
             collision.m_shape = cd.m_type;
 
         }
+
+        // Save the list of machines this object owns
+        machineMapping.emplace_back(currentEnt, currentPrototype.m_machineIndices);
     }
 
     // Create mass
     rScene.reg_emplace<ACompMass>(newEntities[0], part.get_mass());
 
     // return root object
-    return newEntities[0];
+    return {newEntities[0], machineMapping};
 }
 
 void SysVehicle::update_activate(ActiveScene &rScene)
