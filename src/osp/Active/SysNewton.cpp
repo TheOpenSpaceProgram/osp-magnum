@@ -9,34 +9,46 @@ using namespace osp::active;
 
 void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 {
-    SysNewton* sysNewton = static_cast<SysNewton*>(
+    auto* sysNewton = static_cast<SysNewton*>(
                 NewtonWorldGetUserData(NewtonBodyGetWorld(body)));
     ActiveScene &scene = sysNewton->get_scene();
 
-    ACompNwtBody *bodyComp
-            = static_cast<ACompNwtBody*>(NewtonBodyGetUserData(body));
+    auto *bodyComp = static_cast<ACompNwtBody*>(NewtonBodyGetUserData(body));
     DataPhyRigidBody &bodyPhy = bodyComp->m_bodyData;
 
-    //Matrix4 matrix;
+    auto& transform
+            = scene.get_registry().get<ACompTransform>(bodyComp->m_entity);
 
-    ACompTransform& transform = scene.get_registry()
-                                        .get<ACompTransform>(bodyComp->m_entity);
-    NewtonBodyGetMatrix(body, transform.m_transform.data());
-
+    // Get new transform matrix from newton
     Matrix4 matrix;
     NewtonBodyGetMatrix(body, matrix.data());
 
-    // Check if floating origin translation is in progress
-    if (scene.floating_origin_in_progress())
+    // Check if transform is being set
+    if (transform.m_transformDirty)
     {
-        // Do floating origin translation, then set position
+        // Instead of setting transform directly, it's better to add the
+        // difference with the previous transform. This ensures that the changes
+        // to the rigid body from Newton this frame will still apply.
 
-        matrix[3].xyz() += scene.floating_origin_get_total();
+        // TODO: there's probably a better way to do this. if not, account for
+        //       rotation too, since this is translation only.
+
+        Vector3 diffTranslate = transform.m_transform.translation()
+                              - bodyComp->m_prevTransform.translation();
+        matrix.translation() += diffTranslate;
 
         NewtonBodySetMatrix(body, matrix.data());
 
-        //std::cout << "fish\n";
+        transform.m_transformDirty = false;
     }
+
+    // update position in ActiveScene
+    transform.m_transform = matrix;
+
+
+    // save previous transform, for reasons above
+    bodyComp->m_prevTransform = matrix;
+
 
     // Apply force and torque
     NewtonBodySetForce(body, bodyPhy.m_netForce.data());
@@ -200,6 +212,9 @@ void SysNewton::create_body(ActiveEnt entity)
 
         // Set inertia and mass
         NewtonBodySetMassMatrix(entBody.m_body, entBody.m_bodyData.m_mass, 1, 1, 1);
+
+        Vector3 tmpOset{0.0f, 0.0f, 0.0f};
+        NewtonBodySetCentreOfMass(entBody.m_body, tmpOset.data());
         break;
     }
     case ECollisionShape::TERRAIN:
@@ -228,7 +243,9 @@ void SysNewton::create_body(ActiveEnt entity)
         break;
     }
 
+    entTransform.m_controlled = true;
     entBody.m_entity = entity;
+    entBody.m_prevTransform = entTransform.m_transform;
 
     // Set position/rotation
     NewtonBodySetMatrix(entBody.m_body, entTransform.m_transform.data());
@@ -253,7 +270,7 @@ void SysNewton::create_body(ActiveEnt entity)
 
 void SysNewton::update_world()
 {
-    m_scene.floating_origin_translate_begin();
+    //m_scene.floating_origin_translate_begin();
 
     NewtonUpdate(m_nwtWorld, m_scene.get_time_delta_fixed());
     //std::cout << "hi\n";

@@ -10,8 +10,8 @@ using namespace osp;
 SysAreaAssociate::SysAreaAssociate(ActiveScene &rScene, Universe &uni) :
        m_scene(rScene),
        m_universe(uni),
-       m_updateScan(rScene.get_update_order(), "areascan", "", "",
-                    std::bind(&SysAreaAssociate::update_scan, this))
+       m_updateScan(rScene.get_update_order(), "areascan", "physics", "",
+                    [this] { this->update_scan(); })
 {
 
 }
@@ -78,20 +78,6 @@ void SysAreaAssociate::update_scan()
         sat_activate(sat, view.get(sat));
     }
 
-
-//    ACompTransform& cameraTransform = m_scene->reg_get<ACompTransform>(m_camera);
-//    //cameraTransform.m_transform[3].xyz().x() += 0.1f; // move the camera right
-
-//    // Temporary: Floating origin follow cameara
-//    Magnum::Vector3i tra(cameraTransform.m_transform[3].xyz());
-
-//    m_scene->floating_origin_translate(-Vector3(tra));
-//    m_sat->set_position(m_sat->get_position()
-//    + Vector3sp({tra.x() * 1024,
-//    tra.y() * 1024,
-//    tra.z() * 1024}, 10));
-    //std::cout << "x: " << Vector3sp(m_sat->get_position()).x() << "\n";
-
 }
 
 void SysAreaAssociate::connect(universe::Satellite sat)
@@ -147,6 +133,32 @@ void SysAreaAssociate::activator_add(universe::ITypeSatellite const* type,
 {
     m_activators[type] = &activator;
 }
+
+
+void SysAreaAssociate::floating_origin_translate(Vector3 translation)
+{
+    auto view = m_scene.get_registry()
+            .view<ACompFloatingOrigin, ACompTransform>();
+
+    for (ActiveEnt ent : view)
+    {
+        auto &entTransform = view.get<ACompTransform>(ent);
+        //auto &entFloatingOrigin = view.get<ACompFloatingOrigin>(ent);
+
+        if (entTransform.m_controlled)
+        {
+            if (!entTransform.m_mutable)
+            {
+                continue;
+            }
+
+            entTransform.m_transformDirty = true;
+        }
+
+        entTransform.m_transform.translation() += translation;
+    }
+}
+
 
 int SysAreaAssociate::sat_activate(universe::Satellite sat,
                                    universe::UCompActivatable &satAct)

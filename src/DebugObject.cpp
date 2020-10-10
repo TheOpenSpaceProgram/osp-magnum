@@ -31,10 +31,12 @@ DebugCameraController::DebugCameraController(active::ActiveScene &scene,
         DebugObject(scene, ent),
         m_orbiting(entt::null),
         m_orbitPos(0, 0, 1),
-        m_updatePhysicsPost(scene.get_update_order(), "dbg_cam", "physics", "",
-                std::bind(&DebugCameraController::update_physics_post, this)),
         m_updateVehicleModPre(scene.get_update_order(), "dbg_cam_vmod", "", "vehicle_modification",
-                std::bind(&DebugCameraController::update_vehicle_mod_pre, this)),
+                [this] { this->update_vehicle_mod_pre(); }),
+        m_updatePhysicsPre(scene.get_update_order(), "dbg_cam_pre", "", "physics",
+                [this] { this->update_physics_pre(); }),
+        m_updatePhysicsPost(scene.get_update_order(), "dbg_cam_post", "physics", "",
+                [this] { this->update_physics_post(); }),
         m_userInput(scene.get_user_input()),
         m_mouseMotion(m_userInput.mouse_get()),
         m_scrollInput(m_userInput.scroll_get()),
@@ -76,18 +78,29 @@ void DebugCameraController::update_vehicle_mod_pre()
         }
         tgtVehicle.m_separationCount = tgtVehicle.m_parts.size();
     }
+}
 
-    // Floating origin follow cameara
+void DebugCameraController::update_physics_pre()
+{
+    // Floating Origin
+
+    // When the camera is too far from the origin of the ActiveScene
+    const int floatingOriginThreshold = 256;
 
     Matrix4 &xform = m_scene.reg_get<active::ACompTransform>(m_ent).m_transform;
 
-    Magnum::Vector3i tra(xform.translation() / 64);
-    tra *= 64;
+    // round to nearest (floatingOriginThreshold) by casting to int
+    Magnum::Vector3i tra(xform.translation() / floatingOriginThreshold);
+    tra *= floatingOriginThreshold;
 
-    //Magnum::Vector3i tra{0, 1, 0};
 
-    m_scene.floating_origin_translate(-Vector3(tra));
-
+    if (!tra.isZero())
+    {
+        std::cout << "Floating origin translation!\n";
+        // Tell SysAreaAssociate to translate everything
+        m_scene.dynamic_system_get<active::SysAreaAssociate>("AreaAssociate")
+                .floating_origin_translate(-Vector3(tra));
+    }
 }
 
 void DebugCameraController::update_physics_post()

@@ -38,8 +38,7 @@ StatusActivated SysPlanetA::activate_sat(
 
     osp::universe::Universe &uni = area.get_universe();
     //SysPlanetA& self = scene.get_system<SysPlanetA>();
-    universe::UCompPlanet &loadMePlanet
-            = uni.get_reg().get<universe::UCompPlanet>(tgtSat);
+    auto &loadMePlanet = uni.get_reg().get<universe::UCompPlanet>(tgtSat);
 
     // Convert position of the satellite to position in scene
     Vector3 positionInScene = uni.sat_calc_pos_meters(areaSat, tgtSat);
@@ -52,9 +51,9 @@ StatusActivated SysPlanetA::activate_sat(
     auto &planetTransform = scene.get_registry()
                             .emplace<osp::active::ACompTransform>(planetEnt);
     planetTransform.m_transform = Matrix4::translation(positionInScene);
-    planetTransform.m_enableFloatingOrigin = true;
+    scene.reg_emplace<ACompFloatingOrigin>(planetEnt);
 
-    auto &planetPlanet = scene.reg_emplace<CompPlanet>(planetEnt);
+    auto &planetPlanet = scene.reg_emplace<ACompPlanet>(planetEnt);
     planetPlanet.m_radius = loadMePlanet.m_radius;
 
     auto &planetForceField = scene.reg_emplace<ACompFFGravity>(planetEnt);
@@ -89,15 +88,15 @@ int SysPlanetA::deactivate_sat(osp::active::ActiveScene &scene,
 
 void SysPlanetA::draw(osp::active::ACompCamera const& camera)
 {
-    auto drawGroup = m_scene.get_registry().group<CompPlanet>(
+    auto drawGroup = m_scene.get_registry().group<ACompPlanet>(
                             entt::get<ACompTransform>);
 
     Matrix4 entRelative;
 
     for(auto entity: drawGroup)
     {
-        CompPlanet& planet = drawGroup.get<CompPlanet>(entity);
-        ACompTransform& transform = drawGroup.get<ACompTransform>(entity);
+        auto& planet = drawGroup.get<ACompPlanet>(entity);
+        auto& transform = drawGroup.get<ACompTransform>(entity);
 
         entRelative = camera.m_inverse * transform.m_transformWorld;
 
@@ -115,27 +114,24 @@ void SysPlanetA::draw(osp::active::ACompCamera const& camera)
 }
 
 void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
-                                             CompPlanet &planet,
+                                             ACompPlanet &planet,
                                              chindex_t chunk)
 {
 
     using osp::ECollisionShape;
 
-    SysPhysics &physics = m_scene.dynamic_system_get<SysPhysics>("Physics");
+    auto &physics = m_scene.dynamic_system_get<SysPhysics>("Physics");
 
     // Create entity and required components
     ActiveEnt fish = m_scene.hier_create_child(m_scene.hier_get_root());
-    ACompTransform &fishTransform
-            = m_scene.reg_emplace<ACompTransform>(fish);
-    ACompCollisionShape &fishShape
-            = m_scene.reg_emplace<ACompCollisionShape>(fish);
-    ACompRigidBody &fishBody
-            = m_scene.reg_emplace<ACompRigidBody>(fish);
+    auto &fishTransform = m_scene.reg_emplace<ACompTransform>(fish);
+    auto &fishShape = m_scene.reg_emplace<ACompCollisionShape>(fish);
+    auto &fishBody = m_scene.reg_emplace<ACompRigidBody>(fish);
+    m_scene.reg_emplace<ACompFloatingOrigin>(fish);
 
     // Set some stuff
     fishShape.m_shape = ECollisionShape::TERRAIN;
     fishTransform.m_transform = m_scene.reg_get<ACompTransform>(ent).m_transform;
-    fishTransform.m_enableFloatingOrigin = true;
 
     // Get triangle iterators to start and end triangles of the specified chunk
     auto itsChunk = planet.m_planet.iterate_chunk(chunk);
@@ -151,11 +147,11 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
 void SysPlanetA::update_geometry()
 {
 
-    auto view = m_scene.get_registry().view<CompPlanet>();
+    auto view = m_scene.get_registry().view<ACompPlanet>();
 
     for (osp::active::ActiveEnt ent : view)
     {
-        CompPlanet &planet = view.get<CompPlanet>(ent);
+        auto &planet = view.get<ACompPlanet>(ent);
 
         if (!planet.m_planet.is_initialized())
         {

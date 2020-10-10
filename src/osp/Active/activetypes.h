@@ -27,6 +27,11 @@ using UpdateOrderHandle = FunctionOrderHandle<void(void)>;
 using RenderOrder = FunctionOrder<void(ACompCamera const&)>;
 using RenderOrderHandle = FunctionOrderHandle<void(ACompCamera const&)>;
 
+struct ACompFloatingOrigin
+{
+    bool m_dummy;
+};
+
 // not really sure what else to put in here
 class IDynamicSystem
 {

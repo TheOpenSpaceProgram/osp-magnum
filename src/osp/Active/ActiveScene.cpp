@@ -173,27 +173,10 @@ void ActiveScene::update()
     m_updateOrder.call();
 }
 
-void ActiveScene::floating_origin_translate_begin()
-{
-
-    // check if floating origin translation is requested
-    m_floatingOriginInProgress = !(m_floatingOriginTranslate.isZero());
-    if (m_floatingOriginInProgress)
-    {
-        std::cout << "Floating origin translation\n";
-    }
-}
 
 void ActiveScene::update_hierarchy_transforms()
 {
-    // skip top level
-    /*for(auto it = m_hierLevels.begin() + 1; it != m_hierLevels.end(); it ++)
-    {
-        for (entt::entity entity : *it)
-        {
 
-        }
-    }*/
     auto group = m_registry.group<ACompHierarchy, ACompTransform>();
 
     if (m_hierarchyDirty)
@@ -208,10 +191,6 @@ void ActiveScene::update_hierarchy_transforms()
         m_hierarchyDirty = false;
     }
 
-    //std::cout << "size: " << group.size() << "\n";
-
-    //bool translateAll = !(m_floatingOriginTranslate.isZero());
-
     for(auto entity: group)
     {
         //std::cout << "nice: " << group.get<ACompHierarchy>(entity).m_name << "\n";
@@ -222,13 +201,6 @@ void ActiveScene::update_hierarchy_transforms()
         if (hierarchy.m_parent == m_root)
         {
             // top level object, parent is root
-
-            if (m_floatingOriginInProgress && transform.m_enableFloatingOrigin)
-            {
-                // Do floating origin translation if enabled
-                Vector3& translation = transform.m_transform[3].xyz();
-                translation += m_floatingOriginTranslate;
-            }
 
             transform.m_transformWorld = transform.m_transform;
 
@@ -245,18 +217,6 @@ void ActiveScene::update_hierarchy_transforms()
         }
     }
 
-    if (m_floatingOriginInProgress)
-    {
-        // everything was translated already, set back to zero
-        m_floatingOriginTranslate = Vector3(0.0f, 0.0f, 0.0f);
-        m_floatingOriginInProgress = false;
-    }
-}
-
-void ActiveScene::floating_origin_translate(Vector3 const& amount)
-{
-    m_floatingOriginTranslate += amount;
-    //m_floatingOriginDirty = true;
 }
 
 void ActiveScene::draw(entt::entity camera)

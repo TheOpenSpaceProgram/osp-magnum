@@ -111,30 +111,6 @@ public:
     void update_hierarchy_transforms();
 
     /**
-     * Request a floating origin mass translation. Multiple calls to this are
-     * accumulated and are applied on the next physics update
-     * @param pAmount [in] Meters to translate
-     */
-    void floating_origin_translate(Vector3 const& pAmount);
-
-    /**
-     * @return Accumulated total of floating_origin_translate
-     */
-    constexpr Vector3 const& floating_origin_get_total() { return m_floatingOriginTranslate; }
-
-    /**
-     * Attempt ro perform translations on this frame. Will do nothing if the
-     * floating origin total (m_floatingOriginTranslate) is 0
-     */
-    void floating_origin_translate_begin();
-
-    /**
-     * @return True if a floating origin translation is being performed this
-     *         frame
-     */
-    constexpr bool floating_origin_in_progress() { return m_floatingOriginInProgress; }
-
-    /**
      * Calculate transformations relative to camera, and draw every
      * CompDrawableDebug
      * @param camera [in] Entity containing a ACompCamera
@@ -203,11 +179,7 @@ private:
     ActiveEnt m_root;
     bool m_hierarchyDirty;
 
-    Vector3 m_floatingOriginTranslate;
-    bool m_floatingOriginInProgress;
-
     float m_timescale;
-
 
     UserInputHandler &m_userInput;
     //std::vector<std::reference_wrapper<ISysMachine>> m_update_sensor;
@@ -269,7 +241,18 @@ struct ACompTransform
     //Matrix4 m_transformPrev;
     Matrix4 m_transform;
     Matrix4 m_transformWorld;
-    bool m_enableFloatingOrigin;
+    //bool m_enableFloatingOrigin;
+
+    // For when transform is controlled by a specific system.
+    // Examples of this behaviour:
+    // * Entities with ACompRigidBody are controlled by SysPhysics, transform
+    //   is updated each frame
+    bool m_controlled{false};
+
+    // if this is true, then transform can be modified, as long as
+    // m_transformDirty is set afterwards
+    bool m_mutable{true};
+    bool m_transformDirty{false};
 };
 
 struct ACompHierarchy
