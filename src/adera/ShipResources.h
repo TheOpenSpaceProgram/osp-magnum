@@ -90,6 +90,18 @@ struct ShipResourceType
 
     // The density of this resource (kg/m^3)
     float m_density;
+
+    // Compute the volume of the specified quantity of resource
+    double resource_volume(uint64_t quantity) const;
+
+    // Compute the mass of the specified quantity of resource
+    double resource_mass(uint64_t quantity) const;
+
+    // Compute the quantity of resource that fits in the specified volume
+    uint64_t resource_capacity(double volume) const;
+
+    // Compute the quantity of resource that masses the specified amount
+    uint64_t resource_quantity(double mass) const;
 };
 
 struct ShipResource
@@ -104,13 +116,11 @@ class SysMachineContainer
     : public osp::active::SysMachine<SysMachineContainer, MachineContainer>
 {
 public:
+    static inline std::string smc_name = "Container";
+
     SysMachineContainer(osp::active::ActiveScene& rScene);
 
     static void update_containers(osp::active::ActiveScene& rScene);
-
-    static float resource_volume(ShipResourceType type, uint64_t quantity);
-    static float resource_mass(ShipResourceType type, uint64_t quantity);
-    static uint64_t resource_capacity(ShipResourceType type, float volume);
 
     osp::active::Machine& instantiate(
         osp::active::ActiveEnt ent,
@@ -142,6 +152,22 @@ public:
     std::vector<osp::active::WireInput*> existing_inputs() override;
     std::vector<osp::active::WireOutput*> existing_outputs() override;
 
+    constexpr const ShipResource& check_contents() const
+    { return m_contents; }
+    
+    /**
+     * Request a quantity of the contained resource
+     *
+     * Since the resources are stored as unsigned integers, avoiding wraparound
+     * is crucial. This function wraps the resource withdrawal process by
+     * internally checking the requested quantity of resource, bounds checking
+     * it, and only returning as much resources as are available.
+     *
+     * @param quantity [in] The requested quantity of resource
+     *
+     * @return The amount of resource that was received
+     */
+    uint64_t request_contents(uint64_t quantity);
 private:
     std::vector<osp::active::WireInput*> m_inputs;
     std::vector<osp::active::WireOutput*> m_outputs;
@@ -165,8 +191,8 @@ inline MachineContainer::MachineContainer(MachineContainer&& move) noexcept
 
 inline MachineContainer& MachineContainer::operator=(MachineContainer&& move) noexcept
 {
-    m_enable = move.m_enable;
-    m_capacity = move.m_capacity;
+    m_enable = std::exchange(move.m_enable, false);
+    m_capacity = std::exchange(move.m_capacity, 0.0f);
     m_contents = std::move(move.m_contents);
     
     return *this;

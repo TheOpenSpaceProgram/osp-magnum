@@ -23,10 +23,11 @@
  * SOFTWARE.
  */
 #pragma once
-
+#include <utility>
 #include <osp/Active/SysMachine.h>
 #include <osp/Active/physics.h>
 #include <osp/Resource/blueprints.h>
+#include "adera/ShipResources.h"
 
 namespace adera::active::machines
 {
@@ -80,9 +81,22 @@ private:
 class MachineRocket : public osp::active::Machine
 {
     friend SysMachineRocket;
+    struct ResourceInput
+    {
+        osp::DependRes<ShipResourceType> m_type;
+        float m_massRateFraction;
+        osp::active::ActiveEnt m_sourceEnt;
+    };
+    using fuel_list_t = std::vector<ResourceInput>;
+
+    struct Parameters
+    {
+        float m_maxThrust;
+        float m_specImpulse;
+    };
 
 public:
-    MachineRocket(float thrust);
+    MachineRocket(Parameters params, fuel_list_t& resources);
     MachineRocket(MachineRocket &&move) noexcept;
     MachineRocket& operator=(MachineRocket&& move) noexcept;
 
@@ -103,21 +117,25 @@ private:
     osp::active::WireInput m_wiThrottle { this, "Throttle" };
 
     osp::active::ActiveEnt m_rigidBody  { entt::null };
-    float m_thrust{0.0f};
+    fuel_list_t m_resourceLines;
+
+    Parameters m_params;
 }; // MachineRocket
 
-inline MachineRocket::MachineRocket(float thrust)
- : Machine(true)
- , m_thrust(thrust)
+inline MachineRocket::MachineRocket(Parameters params, fuel_list_t& resources)
+    : Machine(true)
+    , m_params(params)
+    , m_resourceLines(std::move(resources))
 { }
 
 inline MachineRocket::MachineRocket(MachineRocket&& move) noexcept
- : Machine(std::move(move))
- , m_wiGimbal(this, std::move(move.m_wiGimbal))
- , m_wiIgnition(this, std::move(move.m_wiIgnition))
- , m_wiThrottle(this, std::move(move.m_wiThrottle))
- , m_rigidBody(std::move(move.m_rigidBody))
- , m_thrust(std::exchange(move.m_thrust, 0.0f))
+   : Machine(std::move(move))
+   , m_wiGimbal(this, std::move(move.m_wiGimbal))
+   , m_wiIgnition(this, std::move(move.m_wiIgnition))
+   , m_wiThrottle(this, std::move(move.m_wiThrottle))
+   , m_rigidBody(std::move(move.m_rigidBody))
+   , m_params(std::move(move.m_params))
+   , m_resourceLines(std::move(move.m_resourceLines))
 { }
 
 inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
@@ -127,7 +145,8 @@ inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
     m_wiIgnition = { this, std::move(move.m_wiIgnition) };
     m_wiThrottle = { this, std::move(move.m_wiThrottle) };
     m_rigidBody  = std::move(move.m_rigidBody);
-    m_thrust = std::exchange(move.m_thrust, 0.0f);
+    m_params = std::move(move.m_params);
+    m_resourceLines = std::move(move.m_resourceLines);
     return *this;
 }
 
