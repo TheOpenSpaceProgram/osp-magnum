@@ -111,6 +111,20 @@ public:
     std::vector<osp::active::WireInput*> existing_inputs() override;
     std::vector<osp::active::WireOutput*> existing_outputs() override;
 
+    /**
+     * Return normalized power output level of the rocket this frame
+     *
+     * Returns a value [0,1] corresponding to the current output power of the
+     * engine. This value is equal to the throttle input level, unless the
+     * engine has run out of fuel, has a nonlinear throttle response, or some
+     * similar reason. Used primarily by SysExhaustPlume to determine what the
+     * exhaust plume effect should look like.
+     *
+     * @return normalized float [0,1] representing engine power output
+     */
+    float current_output_power() const
+    { return m_powerOutput; }
+
 private:
     osp::active::WireInput m_wiGimbal   { this, "Gimbal"   };
     osp::active::WireInput m_wiIgnition { this, "Ignition" };
@@ -118,8 +132,10 @@ private:
 
     osp::active::ActiveEnt m_rigidBody  { entt::null };
     fuel_list_t m_resourceLines;
-
     Parameters m_params;
+
+    // Rocket power output for the current frame
+    float m_powerOutput{0.0f};
 }; // MachineRocket
 
 inline MachineRocket::MachineRocket(Parameters params, fuel_list_t& resources)
@@ -136,6 +152,7 @@ inline MachineRocket::MachineRocket(MachineRocket&& move) noexcept
    , m_rigidBody(std::move(move.m_rigidBody))
    , m_params(std::move(move.m_params))
    , m_resourceLines(std::move(move.m_resourceLines))
+   , m_powerOutput(std::exchange(move.m_powerOutput, 0.0f))
 { }
 
 inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
@@ -147,6 +164,7 @@ inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
     m_rigidBody  = std::move(move.m_rigidBody);
     m_params = std::move(move.m_params);
     m_resourceLines = std::move(move.m_resourceLines);
+    m_powerOutput = std::exchange(move.m_powerOutput, 0.0f);
     return *this;
 }
 

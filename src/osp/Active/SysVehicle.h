@@ -133,6 +133,20 @@ private:
     };
 
     /**
+     * Compute the volume of a part
+     *
+     * Traverses the immediate children of the specified entity and sums the
+     * volumes of any detected collision volumes. Cannot account for overlapping
+     * collider volumes.
+     *
+     * @param rScene [in] ActiveScene containing relevant scene data
+     * @param part   [in] The part
+     *
+     * @return The part's collider volume
+     */
+    static float compute_hier_volume(ActiveScene& rScene, ActiveEnt part);
+
+    /**
      * Create a Physical Part from a PrototypePart and put it in the world
      *
      * @param part [in] The part prototype to instantiate

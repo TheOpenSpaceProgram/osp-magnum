@@ -44,7 +44,8 @@ using osp::active::ACompTransform;
 using osp::active::ACompFloatingOrigin;
 using osp::active::ACompRigidBody_t;
 using osp::active::ACompFFGravity;
-using osp::active::ACompCollisionShape;
+using osp::active::ACompShape;
+using osp::active::ACompCollider;
 using osp::active::ACompAreaLink;
 using osp::active::ACompActivatedSat;
 using osp::active::SysAreaAssociate;
@@ -169,7 +170,8 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
     // Create entity and required components
     ActiveEnt fish = m_scene.hier_create_child(m_scene.hier_get_root());
     auto &fishTransform = m_scene.reg_emplace<ACompTransform>(fish);
-    auto &fishShape = m_scene.reg_emplace<ACompCollisionShape>(fish);
+    auto &fishShape = m_scene.reg_emplace<ACompShape>(fish);
+    auto &fishCollide = m_scene.reg_emplace<ACompCollider>(fish);
     auto &fishBody = m_scene.reg_emplace<ACompRigidBody_t>(fish);
     m_scene.reg_emplace<ACompFloatingOrigin>(fish);
 
@@ -181,7 +183,7 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
     auto itsChunk = planet.m_planet->iterate_chunk(chunk);
 
     // Send them to the physics engine
-    physics.shape_create_tri_mesh_static(fishShape,
+    physics.shape_create_tri_mesh_static(fishShape, fishCollide,
                                          itsChunk.first, itsChunk.second);
 
     // create the rigid body

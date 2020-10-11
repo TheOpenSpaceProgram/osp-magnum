@@ -27,6 +27,7 @@
 
 #include "osp/Resource/Resource.h"
 #include "osp/Active/SysMachine.h"
+#include "osp/CommonPhysics.h"
 
 namespace adera::active::machines
 {
@@ -130,7 +131,6 @@ public:
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
 private:
-    
     osp::active::UpdateOrderHandle_t m_updateContainers;
 }; // class SysMachineContainer
 
@@ -168,6 +168,12 @@ public:
      * @return The amount of resource that was received
      */
     uint64_t request_contents(uint64_t quantity);
+
+    /**
+     * Compute the current mass of the container contents
+     * @return The current mass, in kg
+     */
+    float compute_mass() const noexcept;
 private:
     std::vector<osp::active::WireInput*> m_inputs;
     std::vector<osp::active::WireOutput*> m_outputs;
