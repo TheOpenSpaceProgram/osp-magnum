@@ -122,14 +122,13 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
         CompVisibleDebug& visibility = plumeView.get<CompVisibleDebug>(plumeEnt);
 
         auto& machine = m_scene.reg_get<MachineRocket>(plume.m_parentMachineRocket);
-        const auto& throttle = *machine.request_input(2)->connected_value();
-        const auto throttlePos = std::get<wiretype::Percent>(throttle).m_value;
+        float powerLevel = machine.current_output_power();
 
         plumeShader.m_currentTime = m_time;
 
-        if (throttlePos > 0.0f)
+        if (powerLevel > 0.0f)
         {
-            plumeShader.m_powerLevel = throttlePos;
+            plumeShader.m_powerLevel = powerLevel;
             visibility.m_state = true;
         }
         else

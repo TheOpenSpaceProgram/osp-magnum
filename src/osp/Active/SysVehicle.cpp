@@ -207,8 +207,8 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 
     // temporary: make the whole thing a single rigid body
     auto& vehicleBody = rScene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
-    rScene.reg_emplace<ACompCollisionShape>(vehicleEnt,
-        nullptr, phys::ECollisionShape::COMBINED);
+    rScene.reg_emplace<ACompShape>(vehicleEnt, phys::ECollisionShape::COMBINED);
+    rScene.reg_emplace<ACompCollider>(vehicleEnt, nullptr);
     //scene.dynamic_system_find<SysPhysics>().create_body(vehicleEnt);
 
     return vehicleEnt;
@@ -261,11 +261,32 @@ void SysVehicle::part_instantiate_machines(ActiveScene& rScene, ActiveEnt partEn
     }
 }
 
+// Traverses the hierarchy and sums the volume of all ACompShapes it finds
+float SysVehicle::compute_hier_volume(ActiveScene& rScene, ActiveEnt part)
+{
+    float volume = 0.0f;
+    auto checkVol = [&rScene, &volume](ActiveEnt ent)
+    {
+        auto const* shape = rScene.get_registry().try_get<ACompShape>(ent);
+        if (shape)
+        {
+            auto const& xform = rScene.reg_get<ACompTransform>(ent);
+            volume += shape_volume(shape->m_shape, xform.m_transform.scaling());
+        }
+        return EHierarchyTraverseStatus::Continue;
+    };
+
+    rScene.hierarchy_traverse(part, std::move(checkVol));
+
+    return volume;
+}
+
 std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_instantiate(
     ActiveScene& rScene, PrototypePart& part, BlueprintPart& blueprint, ActiveEnt rootParent)
 {
     std::vector<PrototypeObject> const& prototypes = part.get_objects();
     std::vector<ActiveEnt> newEntities(prototypes.size());
+    ActiveEnt& rootEntity = newEntities[0];
 
     /* A list of MachineDefs, which catalog all part machines and the ActiveEnts
      * that are created to represent the objects that own them
@@ -278,7 +299,7 @@ std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_insta
     for (size_t i = 0; i < prototypes.size(); i++)
     {
         PrototypeObject const& currentPrototype = prototypes[i];
-        ActiveEnt parentEnt;
+        ActiveEnt parentEnt = entt::null;
 
         // Get parent
         if (currentPrototype.m_parentIndex == i)
@@ -365,21 +386,54 @@ std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_insta
         }
         else if (currentPrototype.m_type == ObjectType::COLLIDER)
         {
-            ACompCollisionShape& collision = rScene.reg_emplace<ACompCollisionShape>(currentEnt);
+            // Emplace collider, collision volume
+            ACompShape& collision = rScene.reg_emplace<ACompShape>(currentEnt);
+            rScene.reg_emplace<ACompCollider>(currentEnt);
             const ColliderData& cd = std::get<ColliderData>(currentPrototype.m_objectData);
             collision.m_shape = cd.m_type;
-
         }
 
         // Save the list of machines this object owns
         machineMapping.emplace_back(currentEnt, currentPrototype.m_machineIndices);
     }
 
-    // Create mass
-    rScene.reg_emplace<ACompMass>(newEntities[0], part.get_mass());
+    /* Create masses
+     * 
+     * To allow the physics system to treat all massive objects homogeneously,
+     * the dry mass of the part must be distributed over its child collider
+     * volumes. We assume (for now) that the mass is distributed uniformly over
+     * the volumes.
+     * 
+     * We check the entities for ACompColliders, as we're interested in the
+     * part's physical volume. If we don't check for this component, we would
+     * double-count the volume in regions that also contain other shapes, like
+     * fuel tank volumes.
+     */
+    float partVolume = compute_hier_volume(rScene, rootEntity);
+    float partDensity = part.get_mass() / partVolume;
+
+    auto applyMasses = [&rScene, partDensity](ActiveEnt ent)
+    {
+        if (auto const* shape = rScene.reg_try_get<ACompShape>(ent);
+            shape != nullptr)
+        {
+            if (!rScene.get_registry().has<ACompCollider>(ent))
+            {
+                return EHierarchyTraverseStatus::Continue;
+            }
+            Matrix4 const& transform = rScene.reg_get<ACompTransform>(ent).m_transform;
+            float volume = phys::shape_volume(shape->m_shape, transform.scaling());
+            float mass = volume * partDensity;
+
+            rScene.reg_emplace<ACompMass>(ent, mass);
+        }
+        return EHierarchyTraverseStatus::Continue;
+    };
+
+    rScene.hierarchy_traverse(rootEntity, applyMasses);
 
     // return root object
-    return {newEntities[0], machineMapping};
+    return {rootEntity, machineMapping};
 }
 
 void SysVehicle::update_activate(ActiveScene &rScene)
@@ -472,7 +526,9 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                 auto &islandBody
                         = rScene.reg_emplace<ACompRigidBody_t>(islandEnt);
                 auto &islandShape
-                        = rScene.reg_emplace<ACompCollisionShape>(islandEnt);
+                        = rScene.reg_emplace<ACompShape>(islandEnt);
+                auto &islandCollider
+                        = rScene.reg_emplace<ACompCollider>(islandEnt, nullptr);
                 islandShape.m_shape = phys::ECollisionShape::COMBINED;
 
                 auto &vehicleTransform = rScene.reg_get<ACompTransform>(vehicleEnt);

@@ -71,10 +71,20 @@ struct ACompRigidbodyAncestor
     Matrix4 m_relTransform{};
 };
 
-struct ACompCollisionShape
+/**
+ * Represents the shape of an entity
+ */
+struct ACompShape
+{
+    phys::ECollisionShape m_shape{phys::ECollisionShape::NONE};
+};
+
+/**
+ * Stores a handle to a NewtonCollision object
+ */
+struct ACompCollider
 {
     NewtonCollision *m_collision{nullptr};
-    phys::ECollisionShape m_shape{phys::ECollisionShape::NONE};
 };
 
 using ACompRigidBody_t = ACompNwtBody;
@@ -160,12 +170,12 @@ public:
      * @param end
      */
     template<class TRIANGLE_IT_T>
-    void shape_create_tri_mesh_static(ACompCollisionShape& shape,
+    void shape_create_tri_mesh_static(ACompShape &rShape,
+                                      ACompCollider &rCollider,
                                       TRIANGLE_IT_T const& start,
                                       TRIANGLE_IT_T const& end);
 
 private:
-
     /**
      * Search descendents for collider components and add NewtonCollisions to a
      * vector. Make sure NewtonCompoundCollisionBeginAddRemove(rCompound) is
@@ -194,76 +204,54 @@ private:
                             NewtonWorld const* nwtWorld);
 
     /**
+     * Update the inertia properties of a rigid body
+     *
+     * Given an existing rigid body, computes and updates the mass matrix and
+     * center of mass. Entirely self contained, calls the other inertia
+     * functions in this class.
+     * @param entity [in] The rigid body to update
+     */
+    static void compute_rigidbody_inertia(ActiveScene& rScene, ActiveEnt entity);
+
+    enum EIncludeRootMass { Ignore, Include };
+    /**
     * Recursively compute the center of mass of a hierarchy subtree
     * 
-    * Takes in a root entity and recurses through its children. Entities which
-    * possess an ACompMass component are used to compute a center of mass for
-    * the entire subtree, treating it as a system of point masses.
+    * Takes in a root entity and recurses through its children. Entities which 
+    * possess an ACompMass component are used to compute a center of mass for 
+    * the entire subtree, treating it as a system of point masses. By default,
+    * the root entity's mass is not included; to include it, the optional
+    * includeRootMass argument can be set to 'true'.
+    * 
+    * @template CHECK_ROOT_MASS Include or exclude the mass of the root entity
+    * being passed to the function
     * 
     * @param rScene           [in] ActiveScene containing relevant scene data
     * @param root             [in] Entity at the root of the hierarchy subtree
-    * @param currentTransform [in] Transformation of root with respect to the
-    *                              initial call's root
+    * @param includeRootMass  [in] Set to true if the root entity's mass should
+    *                              be included in the calculation
     * 
     * @return A 4-vector containing xyz=CoM, w=total mass
     */
-    static Magnum::Vector4 compute_body_CoM(ActiveScene& rScene,
-        ActiveEnt root, Matrix4 currentTransform = Matrix4());
-
-    /**
-     * Query Newton for the center of mass of the specified rigidbody
-     * 
-     * @param body [in] ACompNwtBody containing a pointer to a NewtonBody
-     * 
-     * @return a 3-vector representing the CoM offset from the body origin
-     */
-    static Vector3 get_rigidbody_CoM(ACompNwtBody const& body);
-
-    /**
-     * Compute the volume of a part
-     *
-     * Traverses the immediate children of the specified entity and sums the
-     * volumes of any detected collision volumes. Cannot account for overlapping
-     * collider volumes.
-     * 
-     * @param rScene [in] ActiveScene containing relevant scene data
-     * @param part   [in] The part
-     * 
-     * @return The part's collider volume
-     */
-    static float compute_part_volume(ActiveScene& rScene, ActiveEnt part);
-
-    /**
-     * Compute the moment of inertia of a massive entity
-     *
-     * Searches the immediate children of the specified entity and computes
-     * its moment of inertia. The entity must have child nodes containing
-     * ACompCollisionShape components to compute its physical extent.
-     * Assumes mass is evenly distributed over collision volume and that the
-     * part's center of mass lies at its root origin.
-     * 
-     * @param rScene [in] ActiveScene containing relevant scene data
-     * @param part   [in] The entity with an ACompMass
-     * 
-     * @return The inertia tensor of the part about its origin
-     */
-    static Matrix3 compute_mass_inertia(ActiveScene& rScene, ActiveEnt part);
+    template <EIncludeRootMass INCLUDE_ROOT_MASS=EIncludeRootMass::Ignore>
+    static Vector4 compute_hier_CoM(ActiveScene& rScene, ActiveEnt root);
 
     /**
      * Compute the moment of inertia of a rigid body
      *
      * Searches the child nodes of the root and computes the total moment of
-     * inertia of the body. Does not perform recursion, as vehicles do not yet
-     * have nested hierarchies.
-     * 
+     * inertia of the body. To contribute to the inertia of the rigidbody, child
+     * entities must posses both an ACompMass and ACompShape component, so that
+     * the mass distribution of the entity may be calculated.
+     *
      * @param rScene       [in] ActiveScene containing relevant scene data
      * @param root         [in] The root entity of the rigid body
-     * @param centerOfMass [in] The center of mass of the rigid body
-     * 
-     * @return The inertia tensor of the rigid body about its center of mass
+     *
+     * @return The inertia tensor of the rigid body about its center of mass, and 
+     *         a 4-vector containing xyz=CoM, w=total mass
      */
-    static Matrix3 compute_body_inertia(ActiveScene& rScene, ActiveEnt root,
-        Vector3 centerOfMass, Matrix4 currentTransform);
+    static std::pair<Matrix3, Magnum::Vector4> compute_hier_inertia(ActiveScene& rScene,
+        ActiveEnt entity);
 
     static void on_body_destruct(ActiveReg_t& reg, ActiveEnt ent);
     static void on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent);
@@ -285,9 +273,8 @@ private:
 };
 
 template<class TRIANGLE_IT_T>
-void SysNewton::shape_create_tri_mesh_static(ACompCollisionShape &shape,
-                                             TRIANGLE_IT_T const& start,
-                                             TRIANGLE_IT_T const& end)
+void SysNewton::shape_create_tri_mesh_static(ACompShape& rShape,
+    ACompCollider& rCollider, TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end)
 {
     // TODO: this is actually horrendously slow and WILL cause issues later on.
     //       Tree collisions aren't made for real-time loading. Consider
@@ -315,8 +302,8 @@ void SysNewton::shape_create_tri_mesh_static(ACompCollisionShape &shape,
 
     newton_tree_collision_end_build(tree, 2);
 
-    shape.m_shape = phys::ECollisionShape::TERRAIN;
-    shape.m_collision = tree;
+    rShape.m_shape = phys::ECollisionShape::TERRAIN;
+    rCollider.m_collision = tree;
 }
 
 using SysPhysics_t = SysNewton;

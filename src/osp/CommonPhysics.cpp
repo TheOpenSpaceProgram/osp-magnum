@@ -31,7 +31,7 @@
 namespace osp::phys
 {
 
-float col_shape_volume(ECollisionShape shape, Vector3 scale)
+float shape_volume(ECollisionShape shape, Vector3 scale)
 {
     static constexpr float sc_pi = Magnum::Math::Constants<Magnum::Float>::pi();
     switch (shape)
@@ -53,7 +53,7 @@ float col_shape_volume(ECollisionShape shape, Vector3 scale)
     case ECollisionShape::COMBINED:
     default:
         std::cout << "Error: unsupported shape for volume calc\n";
-        return 0.0f;
+        assert(false);
     }
 }
 

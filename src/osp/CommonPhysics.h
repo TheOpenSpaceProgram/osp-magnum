@@ -43,7 +43,24 @@ enum class ECollisionShape : uint8_t
     TERRAIN = 8
 };
 
-float col_shape_volume(ECollisionShape shape, Vector3 scale);
+/**
+ * Compute the volume of an ECollisionShape
+ * 
+ * Given the type of shape and the scale in X,Y,Z, computes the volume of the
+ * primitive shape. Axis-aligned shapes (e.g. cylinder, capsule) are aligned
+ * along the z-axis.
+ * 
+ * As this function is meant to deal with shapes that are defined within parts
+ * in Blender, the default size of each primitive is inherited from Blender's
+ * default empty, which is a bounding box with dimensions 2x2x2 meters. See
+ * function implementation for shape-specific details.
+ * 
+ * @param shape [in] The primitive shape to compute
+ * @param scale [in] The scale in X,Y,Z to apply to the shape
+ * 
+ * @return the volume of the shape in m^3
+ */
+float shape_volume(ECollisionShape shape, Vector3 scale);
 
 // Formerly SysNewton
 /**
@@ -62,6 +79,7 @@ struct DataRigidBody
     Vector3 m_centerOfMassOffset{0, 0, 0};
 
     bool m_colliderDirty{false}; // set true if collider is modified
+    bool m_inertiaDirty{false}; // set true if rigidbody is modified
 };
 
 /**

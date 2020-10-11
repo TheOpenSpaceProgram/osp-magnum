@@ -102,14 +102,16 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
             continue;
         }
 
+        machine.m_powerOutput = 0.0f;  // Will be set later if engine is on
+
         // Check for nonzero throttle, continue otherwise
         WireData *pThrottle = machine.m_wiThrottle.connected_value();
-        wiretype::Percent* pPercent = nullptr;
+        wiretype::Percent* pThrotPercent = nullptr;
         if (pThrottle != nullptr)
         {
             using wiretype::Percent;
-            pPercent = std::get_if<Percent>(pThrottle);
-            if ((pPercent == nullptr) || !(pPercent->m_value > 0.0f))
+            pThrotPercent = std::get_if<Percent>(pThrottle);
+            if ((pThrotPercent == nullptr) || !(pThrotPercent->m_value > 0.0f))
             {
                 continue;
             }
@@ -157,11 +159,11 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         Matrix4 relTransform = pRbAncestor->m_relTransform;
 
         /* Compute thrust force
-            * Thrust force is defined to be along +Z by convention.
-            * Obtains thrust vector in rigidbody space
-            */
+         * Thrust force is defined to be along +Z by convention.
+         * Obtains thrust vector in rigidbody space
+         */
         Vector3 thrustDir = relTransform.transformVector(Vector3{0.0f, 0.0f, 1.0f});
-        float thrustMag = machine.m_params.m_maxThrust * pPercent->m_value;
+        float thrustMag = machine.m_params.m_maxThrust * pThrotPercent->m_value;
         // Take thrust in rigidbody space and apply to RB in world space
         Vector3 thrust = thrustMag * thrustDir;
         Vector3 worldThrust = rCompTf.m_transform.transformVector(thrust);
@@ -173,11 +175,13 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         Vector3 torque = Magnum::Math::cross(location, thrust);
         Vector3 worldTorque = rCompTf.m_transform.transformVector(torque);
         SysPhysics_t::body_apply_torque(rCompRb, worldTorque);
- 
+        
+        rCompRb.m_inertiaDirty = true;
+
         // Perform resource consumption calculation
         float massFlowRateTot = thrustMag /
             (phys::constants::g_0 * machine.m_params.m_specImpulse);
-        for (auto const& resource : machine.m_resourceLines)
+        for (MachineRocket::ResourceInput const& resource : machine.m_resourceLines)
         {
             float massFlowRate = massFlowRateTot * resource.m_massRateFraction;
             float massFlow = massFlowRate * m_scene.get_time_delta_fixed();
@@ -187,6 +191,10 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
             std::cout << "consumed " << consumed << " units of fuel, "
                 << src->check_contents().m_quantity << " remaining\n";
         }
+
+        // Set output power level (for plume effect)
+        // TODO: later, take into account low fuel pressure, bad mixture, etc.
+        machine.m_powerOutput = pThrotPercent->m_value;
     }
 }
 

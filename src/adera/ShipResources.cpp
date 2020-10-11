@@ -96,6 +96,12 @@ uint64_t MachineContainer::request_contents(uint64_t quantity)
     return quantity;
 }
 
+float MachineContainer::compute_mass() const noexcept
+{
+    if (m_contents.m_type.empty()) { return 0.0f; }
+    return m_contents.m_type->resource_mass(m_contents.m_quantity);
+}
+
 /* SysMachineContainer */
 
 SysMachineContainer::SysMachineContainer(ActiveScene& rScene)
@@ -106,13 +112,18 @@ SysMachineContainer::SysMachineContainer(ActiveScene& rScene)
 
 void SysMachineContainer::update_containers(ActiveScene& rScene)
 {
-    auto view = rScene.get_registry().view<MachineContainer>();
+    auto view = rScene.get_registry().view<MachineContainer, ACompMass>();
 
+    /* Currently, the only thing to do is to compute the mass of the container
+     * from the contents.
+     * TODO: in the future, there should be a "dirty" tag for this property
+     */
     for (ActiveEnt ent : view)
     {
         auto& container = view.get<MachineContainer>(ent);
+        auto& mass = view.get<ACompMass>(ent);
 
-        // Do something useful here... or not
+        mass.m_mass = container.compute_mass();
     }
 }
 
@@ -132,6 +143,10 @@ Machine& SysMachineContainer::instantiate(ActiveEnt ent,
         resource.m_type = pkg.get<ShipResourceType>(resPath.identifier);
         resource.m_quantity = resource.m_type->resource_capacity(capacity);
     }
+
+    m_scene.reg_emplace<ACompMass>(ent, 0.0f);
+    // All tanks are cylindrical for now
+    m_scene.reg_emplace<ACompShape>(ent, phys::ECollisionShape::CYLINDER);
 
     return m_scene.reg_emplace<MachineContainer>(ent, capacity, resource);
 }
