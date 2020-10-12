@@ -32,8 +32,78 @@
 namespace adera::active::machines
 {
 
-class MachineRocket;
+/**
+ *
+ */
+class MachineRocket : public osp::active::Machine
+{
+    friend class SysMachineRocket;
 
+    using input_t = std::pair<osp::DependRes<ShipResourceType>, float>;
+    struct ResourceInput
+    {
+        ResourceInput(osp::DependRes<ShipResourceType> type,
+            float massRateFraction, osp::active::WireInput source)
+            : m_type(std::move(type))
+            , m_massRateFraction(massRateFraction)
+            , m_source(std::move(source))
+        {}
+
+        osp::DependRes<ShipResourceType> m_type;
+        float m_massRateFraction;
+        osp::active::WireInput m_source;
+    };
+
+    struct Parameters
+    {
+        float m_maxThrust;
+        float m_specImpulse;
+    };
+
+public:
+    MachineRocket(Parameters params, std::vector<input_t> resources);
+    MachineRocket(MachineRocket &&move) noexcept;
+    MachineRocket& operator=(MachineRocket&& move) noexcept;
+
+    MachineRocket(MachineRocket const& copy) = delete;
+    MachineRocket& operator=(MachineRocket const& move) = delete;
+
+    void propagate_output(osp::active::WireOutput *output) override;
+
+    osp::active::WireInput* request_input(osp::WireInPort port) override;
+    osp::active::WireOutput* request_output(osp::WireOutPort port) override;
+
+    std::vector<osp::active::WireInput*> existing_inputs() override;
+    std::vector<osp::active::WireOutput*> existing_outputs() override;
+
+    /**
+     * Return normalized power output level of the rocket this frame
+     *
+     * Returns a value [0,1] corresponding to the current output power of the
+     * engine. This value is equal to the throttle input level, unless the
+     * engine has run out of fuel, has a nonlinear throttle response, or some
+     * similar reason. Used primarily by SysExhaustPlume to determine what the
+     * exhaust plume effect should look like.
+     *
+     * @return normalized float [0,1] representing engine power output
+     */
+    float current_output_power() const
+    {
+        return m_powerOutput;
+    }
+
+private:
+    osp::active::WireInput m_wiGimbal{this, "Gimbal"};
+    osp::active::WireInput m_wiIgnition{this, "Ignition"};
+    osp::active::WireInput m_wiThrottle{this, "Throttle"};
+    std::vector<ResourceInput> m_resourceLines;
+
+    osp::active::ActiveEnt m_rigidBody{entt::null};
+    Parameters m_params;
+
+    // Rocket power output for the current frame
+    float m_powerOutput{0.0f};
+}; // MachineRocket
 
 class SysMachineRocket :
         public osp::active::SysMachine<SysMachineRocket, MachineRocket>
@@ -71,78 +141,30 @@ public:
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
 private:
+    static uint64_t resource_units_required(
+        osp::active::ActiveScene const& scene,
+        MachineRocket const& machine, float throttle,
+        MachineRocket::ResourceInput const& resource);
+
+    constexpr static float resource_mass_flow_rate(MachineRocket const& machine,
+        float throttle, MachineRocket::ResourceInput const& resource);
 
     osp::active::UpdateOrderHandle_t m_updatePhysics;
 }; // SysMachineRocket
 
-/**
- *
- */
-class MachineRocket : public osp::active::Machine
-{
-    friend SysMachineRocket;
-    struct ResourceInput
-    {
-        osp::DependRes<ShipResourceType> m_type;
-        float m_massRateFraction;
-        osp::active::ActiveEnt m_sourceEnt;
-    };
-    using fuel_list_t = std::vector<ResourceInput>;
-
-    struct Parameters
-    {
-        float m_maxThrust;
-        float m_specImpulse;
-    };
-
-public:
-    MachineRocket(Parameters params, fuel_list_t& resources);
-    MachineRocket(MachineRocket &&move) noexcept;
-    MachineRocket& operator=(MachineRocket&& move) noexcept;
-
-    MachineRocket(MachineRocket const& copy) = delete;
-    MachineRocket& operator=(MachineRocket const& move) = delete;
-
-    void propagate_output(osp::active::WireOutput *output) override;
-
-    osp::active::WireInput* request_input(osp::WireInPort port) override;
-    osp::active::WireOutput* request_output(osp::WireOutPort port) override;
-
-    std::vector<osp::active::WireInput*> existing_inputs() override;
-    std::vector<osp::active::WireOutput*> existing_outputs() override;
-
-    /**
-     * Return normalized power output level of the rocket this frame
-     *
-     * Returns a value [0,1] corresponding to the current output power of the
-     * engine. This value is equal to the throttle input level, unless the
-     * engine has run out of fuel, has a nonlinear throttle response, or some
-     * similar reason. Used primarily by SysExhaustPlume to determine what the
-     * exhaust plume effect should look like.
-     *
-     * @return normalized float [0,1] representing engine power output
-     */
-    float current_output_power() const
-    { return m_powerOutput; }
-
-private:
-    osp::active::WireInput m_wiGimbal   { this, "Gimbal"   };
-    osp::active::WireInput m_wiIgnition { this, "Ignition" };
-    osp::active::WireInput m_wiThrottle { this, "Throttle" };
-
-    osp::active::ActiveEnt m_rigidBody  { entt::null };
-    fuel_list_t m_resourceLines;
-    Parameters m_params;
-
-    // Rocket power output for the current frame
-    float m_powerOutput{0.0f};
-}; // MachineRocket
-
-inline MachineRocket::MachineRocket(Parameters params, fuel_list_t& resources)
+inline MachineRocket::MachineRocket(Parameters params, std::vector<input_t> resources)
     : Machine(true)
     , m_params(params)
-    , m_resourceLines(std::move(resources))
-{ }
+{
+    for (input_t& input : std::move(resources))
+    {
+        std::string resName = input.first->m_identifier;
+        m_resourceLines.emplace_back(
+            std::move(input.first),
+            input.second,
+            osp::active::WireInput{this, resName});
+    }
+}
 
 inline MachineRocket::MachineRocket(MachineRocket&& move) noexcept
    : Machine(std::move(move))

@@ -219,6 +219,7 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
 
     auto& fuselageBP = blueprint.add_part(fuselage, cfOset, idRot, scl);
     fuselageBP.m_machines[1].m_config.emplace("resourcename", "lzdb:fuel");
+    fuselageBP.m_machines[1].m_config.emplace("fuellevel", 0.5);
 
     auto& engBP = blueprint.add_part(engine, cfOset + feOset, idRot, scl);
 
@@ -269,13 +270,23 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
         Parts::CAPSULE, 0, 0,
         Parts::ENGINE, 0, 0);
 
-    // Wire attitude control to RCS control, and RCS control to RCS rocket
+    // Pipe fuel tank to rocket engine
+    // from (output): fuselage MachineContainer m_outputs;
+    // to    (input): entine MachineRocket m_resourcesLines[0]
+    blueprint.add_wire(Parts::FUSELAGE, 0, 0,
+        Parts::ENGINE, 0, 3);
+
     for (auto port : rcsPorts)
     {
+        // Attitude control -> RCS Control
         blueprint.add_wire(Parts::CAPSULE, 0, 0,
             port, 0, 0);
+        // RCS Control -> RCS Rocket
         blueprint.add_wire(port, 0, 0,
             port, 1, 2);
+        // Fuselage tank -> RCS Rocket
+        blueprint.add_wire(Parts::FUSELAGE, 0, 0,
+            port, 1, 3);
     }
 
     // Put blueprint in package

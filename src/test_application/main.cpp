@@ -238,13 +238,15 @@ void load_a_bunch_of_stuff()
 
     // Load placeholder fuel type
     using adera::active::machines::ShipResourceType;
-    ShipResourceType fuel;
-    fuel.m_identifier = "fuel";
-    fuel.m_displayName = "Rocket fuel";
-    fuel.m_quanta = 16;
-    fuel.m_mass = 1.0f;
-    fuel.m_volume = 0.001f;
-    fuel.m_density = fuel.m_mass / fuel.m_volume;
+    ShipResourceType fuel
+    {
+        "fuel",        // identifier
+        "Rocket fuel", // display name
+        1 << 16,       // quanta per unit
+        1.0f,          // volume per unit (m^3)
+        1000.0f,       // mass per unit (kg)
+        1000.0f        // density (kg/m^3)
+    };
 
     lazyDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
 
