@@ -37,8 +37,6 @@ struct ACompNwtBody
     ActiveEnt m_entity{entt::null};
     //ActiveScene &m_scene;
 
-    Matrix4 m_prevTransform;
-
     DataPhyRigidBody m_bodyData;
 };
 

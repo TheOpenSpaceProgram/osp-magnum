@@ -19,36 +19,18 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
     auto& transform
             = scene.get_registry().get<ACompTransform>(bodyComp->m_entity);
 
-    // Get new transform matrix from newton
-    Matrix4 matrix;
-    NewtonBodyGetMatrix(body, matrix.data());
-
     // Check if transform is being set
     if (transform.m_transformDirty)
     {
-        // Instead of setting transform directly, it's better to add the
-        // difference with the previous transform. This ensures that the changes
-        // to the rigid body from Newton this frame will still apply.
+        Matrix4 matrix;
+        NewtonBodyGetMatrix(body, matrix.data());
 
-        // TODO: there's probably a better way to do this. if not, account for
-        //       rotation too, since this is translation only.
-
-        Vector3 diffTranslate = transform.m_transform.translation()
-                              - bodyComp->m_prevTransform.translation();
-        matrix.translation() += diffTranslate;
-
-        NewtonBodySetMatrix(body, matrix.data());
+        // Set matrix without Newton 'conveniently' sleeping for a frame
+        NewtonBodySetMatrixNoSleep(body,
+                                   matrix.data());
 
         transform.m_transformDirty = false;
     }
-
-    // update position in ActiveScene
-    transform.m_transform = matrix;
-
-
-    // save previous transform, for reasons above
-    bodyComp->m_prevTransform = matrix;
-
 
     // Apply force and torque
     NewtonBodySetForce(body, bodyPhy.m_netForce.data());
@@ -245,7 +227,6 @@ void SysNewton::create_body(ActiveEnt entity)
 
     entTransform.m_controlled = true;
     entBody.m_entity = entity;
-    entBody.m_prevTransform = entTransform.m_transform;
 
     // Set position/rotation
     NewtonBodySetMatrix(entBody.m_body, entTransform.m_transform.data());
@@ -272,8 +253,24 @@ void SysNewton::update_world()
 {
     //m_scene.floating_origin_translate_begin();
 
+    auto view = m_scene.get_registry().view<ACompRigidBody, ACompTransform>();
+
+    // Update the world
     NewtonUpdate(m_nwtWorld, m_scene.get_time_delta_fixed());
-    //std::cout << "hi\n";
+
+    // Apply transform changes after the Newton world updates
+    for (ActiveEnt ent : view)
+    {
+        auto &entBody      = view.get<ACompRigidBody>(ent);
+        auto &entTransform = view.get<ACompTransform>(ent);
+
+        if (entBody.m_body)
+        {
+            // Get new transform matrix from newton
+            NewtonBodyGetMatrix(entBody.m_body,
+                                entTransform.m_transform.data());
+        }
+    }
 }
 
 std::pair<ActiveEnt, ACompRigidBody*> SysNewton::find_rigidbody_ancestor(
