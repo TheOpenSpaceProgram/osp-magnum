@@ -65,6 +65,12 @@ public:
     void disconnect();
 
     /**
+     * Move the ActiveArea satellite, and translate everything in the
+     * ActiveScene, aka: floating origin translation
+     */
+    void area_move(Vector3s translate);
+
+    /**
      * Update position of ent's associated Satellite in the Universe, based on
      * it's transform in the ActiveScene.
      */
@@ -77,8 +83,6 @@ public:
      */
     void activator_add(universe::ITypeSatellite const* type,
                        IActivator &activator);
-
-    void floating_origin_translate(Vector3 translation);
 
     constexpr universe::Universe& get_universe() { return m_universe; }
 
@@ -99,7 +103,11 @@ private:
     //UpdateOrderHandle m_updateFloatingOrigin;
     UpdateOrderHandle m_updateScan;
 
-    //void floating_origin_translate(Vector3 translation);
+    /**
+     * Translate everything in the ActiveScene
+     * @param translation
+     */
+    void floating_origin_translate(Vector3 translation);
 
     /**
      * Attempt to load a satellite

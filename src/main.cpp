@@ -404,7 +404,7 @@ void create_solar_system()
     auto &stationary = uni.trajectory_create<universe::TrajStationary>(
                                         uni, uni.sat_root());
 
-    for (int i = 0; i < 0; i ++)
+    for (int i = 0; i < 10; i ++)
     {
         // Creates a random mess of spamcans
         universe::Satellite sat = debug_add_random_vehicle("TestyMcTestFace Mk"

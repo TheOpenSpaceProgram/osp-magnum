@@ -32,6 +32,9 @@ struct UCompActiveArea
     //active::ActiveEnt m_camera;
 
     unsigned m_sceneIndex;
+
+    // true when the ActiveArea is moving
+    bool m_inMotion;
 };
 
 

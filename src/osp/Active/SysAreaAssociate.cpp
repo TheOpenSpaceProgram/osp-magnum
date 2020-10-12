@@ -105,6 +105,18 @@ void SysAreaAssociate::disconnect()
     m_areaSat = entt::null;
 }
 
+void SysAreaAssociate::area_move(Vector3s translate)
+{
+    auto &areaPosTraj = m_universe.get_reg()
+            .get<universe::UCompTransformTraj>(m_areaSat);
+
+    areaPosTraj.m_position += translate;
+
+    Vector3 meters = Vector3(translate) / gc_units_per_meter;
+
+    floating_origin_translate(-meters);
+}
+
 void SysAreaAssociate::sat_transform_update(ActiveEnt ent)
 {
     auto const &entAct = m_scene.reg_get<ACompActivatedSat>(ent);
@@ -118,7 +130,8 @@ void SysAreaAssociate::sat_transform_update(ActiveEnt ent)
             .get<universe::UCompTransformTraj>(m_areaSat);
 
     // 1024 units = 1 meter
-    Vector3s posAreaRelative(entTransform.m_transform.translation() * 1024.0f);
+    Vector3s posAreaRelative(entTransform.m_transform.translation()
+                             * gc_units_per_meter);
 
 
 
