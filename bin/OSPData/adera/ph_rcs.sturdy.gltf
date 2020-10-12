@@ -65,7 +65,7 @@
                         "type" : "Rocket",
                         "thrust" : 7000.0,
                         "Isp" : 225.0,
-                        "fuel" : "lzdb:monoprop"
+                        "fueltype" : "lzdb:fuel"
                     },
                     {
                         "type" : "FreeEnergyGenerator"
