@@ -29,7 +29,7 @@ using RenderOrderHandle = FunctionOrderHandle<void(ACompCamera const&)>;
 
 struct ACompFloatingOrigin
 {
-    bool m_dummy;
+    //bool m_dummy;
 };
 
 // not really sure what else to put in here

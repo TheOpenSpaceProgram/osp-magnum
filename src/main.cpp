@@ -268,8 +268,7 @@ void magnum_application()
     auto &cameraComp = scene.get_registry().emplace<active::ACompCamera>(camera);
 
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
-    //scene.reg_emplace<active::ACompFloatingOrigin>(camera);
-    //cameraTransform.m_enableFloatingOrigin = true;
+    scene.reg_emplace<active::ACompFloatingOrigin>(camera);
 
     cameraComp.m_viewport
             = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
@@ -404,9 +403,10 @@ void create_solar_system()
     auto &stationary = uni.trajectory_create<universe::TrajStationary>(
                                         uni, uni.sat_root());
 
+    // Create 10 random vehicles
     for (int i = 0; i < 10; i ++)
     {
-        // Creates a random mess of spamcans
+        // Creates a random mess of spamcans as a vehicle
         universe::Satellite sat = debug_add_random_vehicle("TestyMcTestFace Mk"
                                                  + std::to_string(i));
 

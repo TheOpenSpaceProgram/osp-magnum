@@ -1,6 +1,8 @@
 #include "ActiveScene.h"
 #include "SysVehicle.h"
 #include "SysDebugRender.h"
+#include "physics.h"
+
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
 #include "../Resource/PrototypePart.h"

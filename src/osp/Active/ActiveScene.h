@@ -8,7 +8,7 @@
 
 #include "../types.h"
 #include "activetypes.h"
-#include "physics.h"
+//#include "physics.h"
 
 //#include "SysDebugRender.h"
 //#include "SysNewton.h"
@@ -87,14 +87,14 @@ public:
      * @return Reference to component
      */
     template<class T>
-    constexpr T& reg_get(ActiveEnt ent) { return m_registry.get<T>(ent); };
+    decltype(auto) reg_get(ActiveEnt ent) { return m_registry.get<T>(ent); };
 
     /**
      * Shorthand for get_registry().emplace<T>()
      * @tparam T Component to emplace
      */
     template<class T, typename... Args>
-    constexpr T& reg_emplace(ActiveEnt ent, Args&& ... args)
+    decltype(auto) reg_emplace(ActiveEnt ent, Args&& ... args)
     {
         return m_registry.emplace<T>(ent, std::forward<Args>(args)...);
     }

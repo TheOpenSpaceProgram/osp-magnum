@@ -22,12 +22,9 @@ void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
     // Check if transform is being set
     if (transform.m_transformDirty)
     {
-        Matrix4 matrix;
-        NewtonBodyGetMatrix(body, matrix.data());
 
-        // Set matrix without Newton 'conveniently' sleeping for a frame
-        NewtonBodySetMatrixNoSleep(body,
-                                   matrix.data());
+        // Set matrix
+        NewtonBodySetMatrix(body, transform.m_transform.data());
 
         transform.m_transformDirty = false;
     }

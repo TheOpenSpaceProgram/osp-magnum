@@ -90,12 +90,11 @@ void DebugCameraController::update_physics_pre()
     Matrix4 &xform = m_scene.reg_get<active::ACompTransform>(m_ent).m_transform;
 
     // round to nearest (floatingOriginThreshold)
-    Vector3s tra(xform.translation() / floatingOriginThreshold);
+    Vector3s tra(-xform.translation() / floatingOriginThreshold);
     tra *= floatingOriginThreshold;
 
     // convert to space int
     tra *= gc_units_per_meter;
-
 
     if (!tra.isZero())
     {
@@ -103,7 +102,7 @@ void DebugCameraController::update_physics_pre()
 
         // Move the active area to center on the camera
         m_scene.dynamic_system_get<active::SysAreaAssociate>("AreaAssociate")
-                .area_move(tra);
+                .area_move(-tra);
     }
 }
 
