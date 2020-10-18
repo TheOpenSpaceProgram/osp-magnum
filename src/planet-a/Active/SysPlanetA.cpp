@@ -91,14 +91,16 @@ StatusActivated SysPlanetA::activate_sat(
     return {0, planetEnt, false};
 }
 
-SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene) :
+SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene,
+                       osp::UserInputHandler &userInput) :
     m_scene(scene),
     m_updateGeometry(scene.get_update_order(), "planet_geo", "", "physics",
-                     std::bind(&SysPlanetA::update_geometry, this)),
+                    [this] { this->update_geometry(); } ),
     m_updatePhysics(scene.get_update_order(), "planet_phys", "planet_geo", "",
-                    std::bind(&SysPlanetA::update_geometry, this)),
+                    [this] { this->update_physics(); }),
     m_renderPlanetDraw(scene.get_render_order(), "", "", "",
-                       std::bind(&SysPlanetA::draw, this, _1))
+                       std::bind(&SysPlanetA::draw, this, _1)),
+    m_debugUpdate(userInput.config_get("debug_planet_update"))
 {
 
 }
@@ -124,6 +126,11 @@ void SysPlanetA::draw(osp::active::ACompCamera const& camera)
     {
         auto& planet = drawGroup.get<ACompPlanet>(entity);
         auto& transform = drawGroup.get<ACompTransform>(entity);
+
+        if (!planet.m_planet.is_initialized())
+        {
+            continue;
+        }
 
         entRelative = camera.m_inverse * transform.m_transformWorld;
 
@@ -211,6 +218,22 @@ void SysPlanetA::update_geometry()
                 .setIndexBuffer(planet.m_indxBufGL, 0,
                                 MeshIndexType::UnsignedInt)
                 .setCount(planet.m_planet.calc_index_count());
+
+
+        }
+
+        if (m_debugUpdate.triggered())
+        {
+            planet.m_vrtxBufGL.setSubData(0, {0.0f, 0.0f, 0.0f});
+
+            // subdivide all the triangles
+            planet.m_planet.chunk_geometry_update(
+                    [ent] (SubTriangle const& tri,
+                           SubTriangleChunk const& chunk,
+                           int index) -> EChunkUpdateAction
+            {
+                return EChunkUpdateAction::Subdivide;
+            });
         }
     }
 }

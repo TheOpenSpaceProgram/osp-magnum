@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include <osp/types.h>
+
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -101,12 +103,9 @@ public:
         return m_triangles[t];
     }
 
-    trindex_t triangle_count()
-    {
-        return m_triangles.size();
-    }
+    trindex_t triangle_count() { return m_triangles.size(); }
 
-    std::vector<float> const& get_vertex_buffer()
+    constexpr std::vector<float> const& get_vertex_buffer()
     {
         return m_vrtxBuffer;
     }
@@ -219,6 +218,8 @@ struct SubTriangle
 
     trindex_t m_neighbours[3];
     buindex_t m_corners[3]; // to vertex buffer, 3 corners of triangle
+
+    osp::Vector3 m_center;
 
     //bool subdivided;
     uint8_t m_bitmask;

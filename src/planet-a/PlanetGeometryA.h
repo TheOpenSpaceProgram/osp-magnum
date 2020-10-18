@@ -50,6 +50,8 @@ constexpr loindex_t gc_invalidLocal = std::numeric_limits<loindex_t>::max();
 constexpr trindex_t gc_invalidTri = std::numeric_limits<trindex_t>::max();
 constexpr vrindex_t gc_invalidVrtx = std::numeric_limits<vrindex_t>::max();
 
+enum class EChunkUpdateAction { Nothing, Subdivide, Unsubdivide,
+                                Chunk, Unchunk };
 
 struct UpdateRange;
 
@@ -122,6 +124,12 @@ public:
      * Print out information on vertice count, chunk count, etc...
      */
     void log_stats() const;
+
+    /**
+     * @tparam FUNC_T
+     */
+    template<typename FUNC_T>
+    void chunk_geometry_update(FUNC_T condition);
 
     std::pair<IteratorTriIndexed, IteratorTriIndexed> iterate_chunk(chindex_t c);
 
@@ -223,7 +231,6 @@ private:
     int m_vrtxCompOffsetNrm = 3;
 
 
-
     // Main buffer stuff
 
     std::vector<unsigned> m_indxBuffer;
@@ -247,7 +254,11 @@ private:
 
     std::vector<trindex_t> m_chunkToTri; // Maps chunks to triangles
 
-    std::vector<buindex_t> m_vrtxFree; // Deleted chunk data to overwrite
+    // Deleted chunks to overwrite
+    // Make sure this is empty before rendering
+    std::vector<chindex_t> m_chunkFree;
+
+    std::vector<buindex_t> m_vrtxFree; // Deleted chunk vertex data to overwrite
 
     unsigned m_vrtxSharedPerChunk; // How many shared verticies per chunk
     unsigned m_vrtxPerChunk; // How many vertices there are in each chunk
@@ -360,5 +371,23 @@ struct UpdateRange
     buindex_t m_start;
     buindex_t m_end;
 };
+
+template<typename FUNC_T>
+void PlanetGeometryA::chunk_geometry_update(FUNC_T condition)
+{
+    // loop through triangles
+
+    // pass entity through lambda
+
+    for (trindex_t i = 0; i < m_icoTree->triangle_count(); i ++)
+    {
+        SubTriangle const& tri = m_icoTree->get_triangle(i);
+        SubTriangleChunk const& chunk = m_triangleChunks[i];
+
+        // use condition to determine what should be done to this triangle
+        EChunkUpdateAction action = condition(tri, chunk, i);
+    }
+}
+
 
 }

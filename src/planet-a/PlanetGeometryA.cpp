@@ -194,7 +194,6 @@ void PlanetGeometryA::initialize(float radius)
     chunk_add(26);
     chunk_add(27);
 
-
     // temporary: raise all shared vertices based on shared count
     if (false)
     {
@@ -291,8 +290,18 @@ void PlanetGeometryA::chunk_add(trindex_t t)
         return;
     }
 
-    // Take the space at the end of the chunk buffer
-    chunk.m_chunk = m_chunkCount;
+    if (m_chunkFree.size() == 0)
+    {
+        // Take the space at the end of the chunk buffer
+        chunk.m_chunk = m_chunkCount;
+    }
+    else
+    {
+        // Use empty space available
+        chunk.m_chunk = m_chunkFree.back();
+        m_chunkFree.pop_back();
+    }
+
 
     // Keep track of which part of the index buffer refers to which triangle
     m_chunkToTri[m_chunkCount] = t;
@@ -633,8 +642,8 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
     // The last triangle in the chunk index buffer
     SubTriangle &lastTriangle =
             m_icoTree->get_triangle(m_chunkToTri[m_chunkCount]);
-    SubTriangleChunk &lastChunk =
-            m_triangleChunks[m_chunkToTri[m_chunkCount]];
+    //SubTriangleChunk &lastChunk =
+    //        m_triangleChunks[m_chunkToTri[m_chunkCount]];
 
     // Get positions in index buffer
     //unsigned* lastTriIndData = m_indxBuffer.data() + lastChunk.m_dataIndx;
@@ -681,12 +690,10 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
     }
 
 
-    // Setting index data
-
     // Move lastTri's index data to replace tri's data
-    std::copy(m_indxBuffer.begin() + lastChunk.m_dataIndx,
-              m_indxBuffer.begin() + lastChunk.m_dataIndx + m_indxPerChunk * 3,
-              m_indxBuffer.begin() + chunk.m_dataIndx);
+    //std::copy(m_indxBuffer.begin() + lastChunk.m_dataIndx,
+    //          m_indxBuffer.begin() + lastChunk.m_dataIndx + m_indxPerChunk * 3,
+    //          m_indxBuffer.begin() + chunk.m_dataIndx);
 
     // Make sure descendents know that they're no longer part of a chunk
     if (tri.m_bitmask & gc_triangleMaskSubdivided)
@@ -698,6 +705,7 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
     }
 
     // Let all ancestors know that lost one of their chunky descendents
+    if (tri.m_depth != 0)
     {
         trindex_t curIndex = tri.m_parent;
         SubTriangle *curTri;
@@ -711,8 +719,11 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
     }
 
     // Change lastTriangle's chunk index to tri's
-    lastChunk.m_dataIndx = chunk.m_dataIndx;
-    lastChunk.m_chunk = chunk.m_chunk;
+    //lastChunk.m_dataIndx = chunk.m_dataIndx;
+    //lastChunk.m_chunk = chunk.m_chunk;
+
+    // mark this chunk for replacement
+    m_chunkFree.push_back(chunk.m_chunk);
 
     // Set chunked
     chunk.m_chunk = gc_invalidChunk;

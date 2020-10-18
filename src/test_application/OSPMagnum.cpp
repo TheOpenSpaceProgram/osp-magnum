@@ -214,4 +214,8 @@ void testapp::config_controls(OSPMagnum& rOspApp)
 
     rUserInput.config_register_control("ui_rmb", true,
             {{osp::sc_mouse, (int) Mouse_t::Right, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+
+    rUserInput.config_register_control("debug_planet_update", false,
+            {{0, (int) Key_t::LeftCtrl, VarTrig_t::HOLD, false, VarOp_t::AND},
+             {0, (int) Key_t::One, VarTrig_t::PRESSED, false, VarOp_t::OR}});
 }

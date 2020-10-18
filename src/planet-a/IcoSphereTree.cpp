@@ -24,7 +24,6 @@
  */
 #include "IcoSphereTree.h"
 
-#include <osp/types.h>
 
 #include <cmath>
 #include <iostream>
@@ -178,10 +177,8 @@ void IcoSphereTree::initialize(float radius)
 
         tri.m_bitmask = 0;
         tri.m_depth = 0;
-        //calculate_center(tri);
+        calculate_center(tri);
         m_triangles.push_back(std::move(tri));
-        //if (i != 0)
-        //set_visible(i, true);
     }
 
 }
@@ -190,8 +187,6 @@ void IcoSphereTree::subdivide_add(trindex_t t)
 {
     // if bottom triangle is deeper, use that vertex
     // same with left and right
-
-
 
     // Add the 4 new triangles
     // Top Left Right Center
@@ -210,9 +205,6 @@ void IcoSphereTree::subdivide_add(trindex_t t)
         const trindex_t j = m_trianglesFree[m_trianglesFree.size() - 1];
         m_trianglesFree.pop_back();
         childrenIndex = j;
-        //tri->children[1] = j + 1;
-        //tri->children[2] = j + 2;
-        //tri->children[3] = j + 3;
     }
 
     SubTriangle &tri = get_triangle(t);
@@ -253,12 +245,6 @@ void IcoSphereTree::subdivide_add(trindex_t t)
                      = 0;
     // Subdivide lines and add verticies, or take from other triangles
 
-    // Preparation to write to vertex buffer
-    //unsigned char* vertData = m_vertBuf->GetShadowData();
-    //unsigned vertSize = m_vertBuf->GetVertexSize();
-    //float writeMe[3];
-    //printf("Vertex size: %u\n", vertSize);
-
     // Loop through 3 sides of the triangle: Bottom, Right, Left
     // tri.sides refers to an index of another triangle on that side
     for (int i = 0; i < 3; i ++)
@@ -279,16 +265,10 @@ void IcoSphereTree::subdivide_add(trindex_t t)
                 m_vrtxCount ++;
             }
 
-            // Read vertex buffer data as Vector3
-            //Vector3& vertA = *reinterpret_cast<Vector3*>(m_vrtxBuffer.data()
-            //                        + (tri.m_corners[(i + 1) % 3]));
-            //Vector3& vertB = *reinterpret_cast<Vector3*>(m_vrtxBuffer.data()
-            //                        + (tri.m_corners[(i + 2) % 3]));
-
             Vector3 const& vertA = *reinterpret_cast<Vector3 const*>(
-                                        get_vertex_pos(tri.m_corners[(i + 1) % 3]));
+                                    get_vertex_pos(tri.m_corners[(i + 1) % 3]));
             Vector3 const& vertB = *reinterpret_cast<Vector3 const*>(
-                                        get_vertex_pos(tri.m_corners[(i + 2) % 3]));
+                                    get_vertex_pos(tri.m_corners[(i + 2) % 3]));
 
             Vector3 &midPos = *reinterpret_cast<Vector3*>(
                                         get_vertex_pos(tri.m_midVrtxs[i]));
@@ -299,9 +279,6 @@ void IcoSphereTree::subdivide_add(trindex_t t)
             //Vector3 vertM[2];
             destNrm = ((vertA + vertB) / 2).normalized();
             midPos = destNrm * float(m_radius);
-
-            //memcpy(m_vrtxBuffer.data() + tri.m_midVrtxs[i],
-            //       vertM, m_vrtxSize * sizeof(float));
         }
         else
         {
@@ -346,11 +323,11 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     // The center triangle is made up of purely middle vertices.
     set_verts(childD, tri.m_midVrtxs[0], tri.m_midVrtxs[1], tri.m_midVrtxs[2]);
 
-    // Calculate centers
-    //calculate_center(childA);
-    //calculate_center(childB);
-    //calculate_center(childC);
-    //calculate_center(childD);
+    // Calculate centers of newly created children
+    calculate_center(childA);
+    calculate_center(childB);
+    calculate_center(childC);
+    calculate_center(childD);
 
     tri.m_bitmask ^= gc_triangleMaskSubdivided;
 
@@ -416,6 +393,19 @@ int IcoSphereTree::neighbour_side(const SubTriangle& tri,
     return 255;
 }
 
+void IcoSphereTree::calculate_center(SubTriangle &tri)
+{
+    // use average of 3 coners as the center
+
+    Vector3 const& vertA = *reinterpret_cast<Vector3 const*>(
+                                get_vertex_pos(tri.m_corners[0]));
+    Vector3 const& vertB = *reinterpret_cast<Vector3 const*>(
+                                get_vertex_pos(tri.m_corners[1]));
+    Vector3 const& vertC = *reinterpret_cast<Vector3 const*>(
+                                get_vertex_pos(tri.m_corners[2]));
+
+    tri.m_center = (vertA + vertB + vertC) / 3.0f;
+}
 
 std::pair<trindex_t, trindex_t> IcoSphereTree::find_neighbouring_ancestors(
                                                     trindex_t a, trindex_t b)
