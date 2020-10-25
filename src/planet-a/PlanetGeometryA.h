@@ -31,6 +31,8 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <queue>
+#include <set>
 #include <vector>
 
 namespace planeta
@@ -53,7 +55,7 @@ constexpr vrindex_t gc_invalidVrtx = std::numeric_limits<vrindex_t>::max();
 enum class EChunkUpdateAction { Nothing, Subdivide, Unsubdivide,
                                 Chunk, Unchunk };
 
-struct UpdateRange;
+struct UpdateRangeSub;
 
 // based on urho-osp PlanetWrenderer.cpp
 // variable names changed:
@@ -99,6 +101,15 @@ struct SubTriangleChunk
 };
 
 
+struct UpdateRangeSub
+{
+    buindex_t m_start;
+    buindex_t m_end;
+};
+
+void update_range_insert(std::vector<UpdateRangeSub>& range,
+                         UpdateRangeSub insert);
+
 class PlanetGeometryA
 {
 
@@ -129,12 +140,16 @@ public:
      * @tparam FUNC_T
      */
     template<typename FUNC_T>
-    void chunk_geometry_update(FUNC_T condition);
+    void chunk_geometry_update_all(FUNC_T condition);
 
     std::pair<IteratorTriIndexed, IteratorTriIndexed> iterate_chunk(chindex_t c);
 
     constexpr std::vector<float> const& get_vertex_buffer() const { return m_vrtxBuffer; }
     constexpr std::vector<unsigned> const& get_index_buffer() const { return m_indxBuffer; }
+
+    constexpr std::vector<UpdateRangeSub>& get_vertex_buffer_updates() { return m_gpuUpdVrtxBuffer; }
+    constexpr std::vector<UpdateRangeSub>& get_index_buffer_updates() { return m_gpuUpdIndxBuffer; }
+
     constexpr buindex_t calc_index_count() { return m_chunkCount * m_indxPerChunk * 3; }
     constexpr chindex_t chunk_count() { return m_chunkCount; }
 
@@ -161,6 +176,15 @@ private:
      * @param gpuIgnore
      */
     void chunk_remove(trindex_t t);
+
+    void chunk_pack();
+
+    /**
+     * @tparam FUNC_T
+     */
+    template<typename FUNC_T>
+    void chunk_geometry_update_recurse(FUNC_T condition, trindex_t t,
+                                       std::vector<trindex_t> &toChunk);
 
     /**
      * Convert XY coordinates to a triangular number index
@@ -241,8 +265,6 @@ private:
 
     buindex_t m_vrtxMax; // Calculated max number of vertices
 
-
-
     // Chunk stuff
 
     chindex_t m_chunkCount; // How many chunks there are right now
@@ -256,7 +278,7 @@ private:
 
     // Deleted chunks to overwrite
     // Make sure this is empty before rendering
-    std::vector<chindex_t> m_chunkFree;
+    std::set<chindex_t, std::greater<chindex_t>> m_chunkFree;
 
     std::vector<buindex_t> m_vrtxFree; // Deleted chunk vertex data to overwrite
 
@@ -265,8 +287,6 @@ private:
     unsigned m_indxPerChunk; // How many triangles in each chunk
     unsigned m_chunkWidth; // How many vertices wide each chunk is
     unsigned m_chunkWidthB; // = m_chunkWidth - 1
-
-
 
     // Shared Vertex stuff
 
@@ -289,6 +309,10 @@ private:
     // can be obtained from a chunk's index data
     std::vector<buindex_t> m_indToShared;
 
+    // GPU update stuff
+
+    std::vector<UpdateRangeSub> m_gpuUpdVrtxBuffer;
+    std::vector<UpdateRangeSub> m_gpuUpdIndxBuffer;
 
     // How much screen area a triangle can take before it should be chunked
     //float m_chunkAreaThreshold = 0.04f;
@@ -366,26 +390,67 @@ private:
     std::vector<float> const* m_vrtxBuffer;
 };
 
-struct UpdateRange
+template<typename FUNC_T>
+void PlanetGeometryA::chunk_geometry_update_all(FUNC_T condition)
 {
-    buindex_t m_start;
-    buindex_t m_end;
-};
+    // loop through triangles, see which ones to chunk, subdivide, etc...
+    std::vector<trindex_t> toChunk;
+
+    // subdivision/unsubdivision can be done right away
+    // un-chunking can be done right away
+    // chunking should all be done at the end
+
+    // Loop through initial 20 triangles of icosahedron
+    for (trindex_t t = 0; t < gc_icosahedronFaceCount; t ++)
+    {
+        chunk_geometry_update_recurse(condition, t, toChunk);
+    }
+
+    for (trindex_t t : toChunk)
+    {
+        chunk_add(t);
+    }
+
+    if (m_chunkFree.size() != 0)
+    {
+        // there's some chunks to move
+        chunk_pack();
+    }
+}
 
 template<typename FUNC_T>
-void PlanetGeometryA::chunk_geometry_update(FUNC_T condition)
+void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
+        trindex_t t, std::vector<trindex_t> &toChunk)
 {
-    // loop through triangles
+    SubTriangle const& tri = m_icoTree->get_triangle(t);
+    SubTriangleChunk const& chunk = m_triangleChunks[t];
 
-    // pass entity through lambda
+    // use condition to determine what should be done to this triangle
+    EChunkUpdateAction action = condition(tri, chunk, t);
 
-    for (trindex_t i = 0; i < m_icoTree->triangle_count(); i ++)
+    switch (action)
     {
-        SubTriangle const& tri = m_icoTree->get_triangle(i);
-        SubTriangleChunk const& chunk = m_triangleChunks[i];
+    case EChunkUpdateAction::Chunk:
+        toChunk.push_back(t);
+        break;
+    case EChunkUpdateAction::Unchunk:
+        chunk_remove(t); // chunks can be removed right away
+        break;
+    case EChunkUpdateAction::Subdivide:
+        m_icoTree->subdivide_add(t);
+        break;
+    case EChunkUpdateAction::Unsubdivide:
+        //m_icoTree->subdivide_remove(t);
+        break;
+    }
 
-        // use condition to determine what should be done to this triangle
-        EChunkUpdateAction action = condition(tri, chunk, i);
+    if (tri.m_bitmask & gc_triangleMaskSubdivided)
+    {
+        // Recurse into children
+        chunk_geometry_update_recurse(condition, tri.m_children + 0, toChunk);
+        chunk_geometry_update_recurse(condition, tri.m_children + 1, toChunk);
+        chunk_geometry_update_recurse(condition, tri.m_children + 2, toChunk);
+        chunk_geometry_update_recurse(condition, tri.m_children + 3, toChunk);
     }
 }
 

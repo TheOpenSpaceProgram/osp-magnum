@@ -206,6 +206,8 @@ void SysPlanetA::update_geometry()
             planet.m_vrtxBufGL.setData(planet.m_planet.get_vertex_buffer());
             planet.m_indxBufGL.setData(planet.m_planet.get_index_buffer());
 
+            planet.m_planet.get_index_buffer_updates().clear();
+
             using Magnum::Shaders::MeshVisualizer3D;
             using Magnum::GL::MeshPrimitive;
             using Magnum::GL::MeshIndexType;
@@ -224,16 +226,48 @@ void SysPlanetA::update_geometry()
 
         if (m_debugUpdate.triggered())
         {
-            planet.m_vrtxBufGL.setSubData(0, {0.0f, 0.0f, 0.0f});
 
             // subdivide all the triangles
-            planet.m_planet.chunk_geometry_update(
+            planet.m_planet.chunk_geometry_update_all(
                     [ent] (SubTriangle const& tri,
                            SubTriangleChunk const& chunk,
                            int index) -> EChunkUpdateAction
             {
-                return EChunkUpdateAction::Subdivide;
+                if (tri.m_depth == 2)
+                {
+                    if (chunk.m_chunk == gc_invalidChunk)
+                    {
+                        return EChunkUpdateAction::Chunk;
+                    }
+                    else
+                    {
+                        return EChunkUpdateAction::Unchunk;
+                    }
+                }
+                else
+                {
+                    return EChunkUpdateAction::Nothing;
+                }
             });
+
+            using Corrade::Containers::ArrayView;
+
+            std::vector<unsigned> const &indxData = planet.m_planet.get_index_buffer();
+
+            // update GPU buffers
+            for (UpdateRangeSub updRange : planet.m_planet.get_index_buffer_updates())
+            {
+                buindex_t size = updRange.m_end - updRange.m_start;
+                auto arrView = ArrayView(indxData.data() + updRange.m_start, size);
+                //planet.m_indxBufGL.setSubData(updRange.m_start, arrView);
+            }
+
+            planet.m_vrtxBufGL.setData(planet.m_planet.get_vertex_buffer());
+            planet.m_indxBufGL.setData(planet.m_planet.get_index_buffer());
+
+            planet.m_mesh.setCount(planet.m_planet.calc_index_count());
+
+            planet.m_planet.get_index_buffer_updates().clear();
         }
     }
 }
