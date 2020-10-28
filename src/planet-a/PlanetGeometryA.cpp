@@ -279,20 +279,10 @@ struct VertexToSubdiv
 
 void PlanetGeometryA::chunk_add(trindex_t t)
 {
+    chunk_triangle_assure();
+
     SubTriangle& tri = m_icoTree->get_triangle(t);
-
-    trindex_t min = std::max<trindex_t>(m_triangleChunks.size(),
-                                        m_icoTree->triangle_count());
-    m_triangleChunks.resize(min, {gc_invalidChunk, 0, gc_invalidTri, 0, 0});
-
     SubTriangleChunk& chunk = m_triangleChunks[t];
-
-
-    if (m_chunkCount >= m_chunkMax)
-    {
-        // chunk limit reached
-        return;
-    }
 
     if (chunk.m_chunk != gc_invalidChunk)
     {
@@ -302,25 +292,35 @@ void PlanetGeometryA::chunk_add(trindex_t t)
 
     if (m_chunkFree.empty())
     {
+
+        if (m_chunkCount >= m_chunkMax)
+        {
+            // chunk limit reached
+            return;
+        }
+
         // Take the space at the end of the chunk buffer
         chunk.m_chunk = m_chunkCount;
+        m_chunkCount ++;
     }
     else
     {
-        // Use empty space available
-        auto chunkToGet = m_chunkFree.end();
+        // Use empty space available. Get lowest value [last element] to make
+        // it less likely that the data will end up getting moved by chunk_pack
+        // when it's closer to the start of the buffer
+        std::set<chindex_t>::iterator chunkToGet = --m_chunkFree.end();
         chunk.m_chunk = *chunkToGet;
         m_chunkFree.erase(chunkToGet);
     }
 
 
     // Keep track of which part of the index buffer refers to which triangle
-    m_chunkToTri[m_chunkCount] = t;
+    m_chunkToTri[chunk.m_chunk] = t;
 
-    if (m_vrtxFree.empty()) {
-        chunk.m_dataVrtx
-                = m_vrtxSharedMax
-                + m_chunkCount * (m_vrtxPerChunk - m_vrtxSharedPerChunk);
+    if (m_vrtxFree.empty())
+    {
+        chunk.m_dataVrtx = m_vrtxSharedMax
+                + chunk.m_chunk * (m_vrtxPerChunk - m_vrtxSharedPerChunk);
     }
     else
     {
@@ -645,15 +645,21 @@ void PlanetGeometryA::chunk_add(trindex_t t)
     }
 
     // Put the index data at the end of the buffer
-    chunk.m_dataIndx = m_chunkCount * chunkIndData.size();
+    chunk.m_dataIndx = chunk.m_chunk * chunkIndData.size();
     std::copy(chunkIndData.begin(), chunkIndData.end(),
               m_indxBuffer.begin() + chunk.m_dataIndx);
 
     update_range_insert(m_gpuUpdIndxBuffer,
                         {chunk.m_dataIndx,
                          chunk.m_dataIndx + m_indxPerChunk * 3});
+}
 
-    m_chunkCount ++;
+
+void PlanetGeometryA::chunk_triangle_assure()
+{
+    trindex_t min = std::max<trindex_t>(m_triangleChunks.size(),
+                                        m_icoTree->triangle_count());
+    m_triangleChunks.resize(min, {gc_invalidChunk, 0, gc_invalidTri, 0, 0});
 }
 
 
@@ -733,6 +739,41 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
 
     // mark this chunk for replacement
     m_chunkFree.emplace(chunk.m_chunk);
+
+    // set to not chunked
+    chunk.m_chunk = gc_invalidChunk;
+}
+
+void PlanetGeometryA::chunk_remove_descendents_recurse(trindex_t t)
+{
+    SubTriangle &tri = m_icoTree->get_triangle(t);
+    SubTriangleChunk &chunk = m_triangleChunks[t];
+
+    if (chunk.m_chunk != gc_invalidChunk)
+    {
+        chunk_remove(t);
+    }
+    else if (chunk.m_descendentChunked != 0)
+    {
+        chunk_remove_descendents_recurse(tri.m_children + 0);
+        chunk_remove_descendents_recurse(tri.m_children + 1);
+        chunk_remove_descendents_recurse(tri.m_children + 2);
+        chunk_remove_descendents_recurse(tri.m_children + 3);
+    }
+}
+
+void PlanetGeometryA::chunk_remove_descendents(trindex_t t)
+{
+    SubTriangle &tri = m_icoTree->get_triangle(t);
+    SubTriangleChunk &chunk = m_triangleChunks[t];
+
+    if (chunk.m_descendentChunked != 0)
+    {
+        chunk_remove_descendents_recurse(tri.m_children + 0);
+        chunk_remove_descendents_recurse(tri.m_children + 1);
+        chunk_remove_descendents_recurse(tri.m_children + 2);
+        chunk_remove_descendents_recurse(tri.m_children + 3);
+    }
 }
 
 void PlanetGeometryA::chunk_pack()
@@ -775,7 +816,7 @@ void PlanetGeometryA::chunk_pack()
         // Do move
 
         // Replace tri's domain location with lastTriangle
-        m_chunkToTri[replaceChunk.m_chunk] = m_chunkToTri[moveChunk.m_chunk];
+        m_chunkToTri[chunk] = m_chunkToTri[moveChunk.m_chunk];
 
         // Move lastTri's index data to replace tri's data
         std::copy(m_indxBuffer.begin() + moveChunk.m_dataIndx,
@@ -788,10 +829,7 @@ void PlanetGeometryA::chunk_pack()
 
         // Change lastTriangle's chunk index to tri's
         moveChunk.m_dataIndx = replaceChunk.m_dataIndx;
-        moveChunk.m_chunk = replaceChunk.m_chunk;
-
-        // Set chunked
-        replaceChunk.m_chunk = gc_invalidChunk;
+        moveChunk.m_chunk = chunk;
     }
 
     m_chunkFree.clear();

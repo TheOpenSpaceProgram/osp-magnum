@@ -170,12 +170,18 @@ private:
      */
     void chunk_add(trindex_t t);
 
+    void chunk_triangle_assure();
+
     /**
      * @brief chunk_remove
      * @param t
      * @param gpuIgnore
      */
     void chunk_remove(trindex_t t);
+
+    void chunk_remove_descendents_recurse(trindex_t t);
+
+    void chunk_remove_descendents(trindex_t t);
 
     void chunk_pack();
 
@@ -411,7 +417,7 @@ void PlanetGeometryA::chunk_geometry_update_all(FUNC_T condition)
         chunk_add(t);
     }
 
-    if (m_chunkFree.size() != 0)
+    if (!m_chunkFree.empty())
     {
         // there's some chunks to move
         chunk_pack();
@@ -422,30 +428,60 @@ template<typename FUNC_T>
 void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
         trindex_t t, std::vector<trindex_t> &toChunk)
 {
-    SubTriangle const& tri = m_icoTree->get_triangle(t);
-    SubTriangleChunk const& chunk = m_triangleChunks[t];
 
-    // use condition to determine what should be done to this triangle
-    EChunkUpdateAction action = condition(tri, chunk, t);
+    EChunkUpdateAction action;
+    bool chunked, subdivided;
+
+    {
+        SubTriangle const& tri = m_icoTree->get_triangle(t);
+        SubTriangleChunk const& chunk = m_triangleChunks[t];
+
+        chunked = chunk.m_chunk != gc_invalidChunk;
+        subdivided = (tri.m_bitmask & gc_triangleMaskSubdivided);
+
+        // use condition to determine what should be done to this triangle
+        action = condition(tri, chunk, t);
+    }
 
     switch (action)
     {
     case EChunkUpdateAction::Chunk:
-        toChunk.push_back(t);
+        if (!chunked)
+        {
+            chunked = true;
+            chunk_remove_descendents(t); // make sure no descendents are chunked
+            toChunk.push_back(t);
+        }
         break;
     case EChunkUpdateAction::Unchunk:
         chunk_remove(t); // chunks can be removed right away
         break;
     case EChunkUpdateAction::Subdivide:
-        m_icoTree->subdivide_add(t);
+        if (chunked)
+        {
+            chunk_remove(t);
+            chunked = false;
+        }
+        if (!subdivided)
+        {
+            // remove chunk before subdividing
+
+            m_icoTree->subdivide_add(t);
+            subdivided = true;
+
+            chunk_triangle_assure();
+        }
         break;
     case EChunkUpdateAction::Unsubdivide:
         //m_icoTree->subdivide_remove(t);
         break;
     }
 
-    if (tri.m_bitmask & gc_triangleMaskSubdivided)
+    if (subdivided && !chunked)
     {
+        // possible that a reallocation happened, and tri previously is invalid
+        SubTriangle const& tri = m_icoTree->get_triangle(t);
+
         // Recurse into children
         chunk_geometry_update_recurse(condition, tri.m_children + 0, toChunk);
         chunk_geometry_update_recurse(condition, tri.m_children + 1, toChunk);

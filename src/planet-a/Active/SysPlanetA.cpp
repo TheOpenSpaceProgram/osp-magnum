@@ -181,11 +181,12 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
 void SysPlanetA::update_geometry()
 {
 
-    auto view = m_scene.get_registry().view<ACompPlanet>();
+    auto view = m_scene.get_registry().view<ACompPlanet, ACompTransform>();
 
     for (osp::active::ActiveEnt ent : view)
     {
         auto &planet = view.get<ACompPlanet>(ent);
+        auto &tf = view.get<ACompTransform>(ent);
 
         if (!planet.m_planet.is_initialized())
         {
@@ -226,14 +227,48 @@ void SysPlanetA::update_geometry()
 
         if (m_debugUpdate.triggered())
         {
+            ActiveEnt cam = m_scene.get_registry().view<ACompCamera>().front();
+            auto &camTf = m_scene.reg_get<ACompTransform>(cam);
 
-            // subdivide all the triangles
+            // camera position relative to planet
+            Vector3 camRelative = camTf.m_transform.translation()
+                                - tf.m_transform.translation();
+
+            using Magnum::Math::pow;
+            using Magnum::Math::sqrt;
+
+            // edge length of largest possible triangle
+            float edgeLengthA =  planet.m_planet.get_ico_tree()->get_radius()
+                                / sqrt(10.0f + 2.0f * sqrt(5.0f)) * 4.0;
+
+            float threshold = 1.0f;
+
             planet.m_planet.chunk_geometry_update_all(
-                    [ent] (SubTriangle const& tri,
-                           SubTriangleChunk const& chunk,
-                           int index) -> EChunkUpdateAction
+                    [edgeLengthA, threshold, tf, camRelative, ent] (
+                            SubTriangle const& tri,
+                            SubTriangleChunk const& chunk,
+                            int index) -> EChunkUpdateAction
             {
-                if (tri.m_depth == 2)
+                // approximation of triangle edge length
+                float edgeLength = edgeLengthA / float(pow(2, int(tri.m_depth)));
+
+                // distance between viewer and triangle
+                float dist = (tri.m_center - camRelative).length();
+
+                float screenLength = edgeLength / dist;
+
+                bool tooFar = screenLength < threshold;
+
+                if (tooFar)
+                {
+                    return EChunkUpdateAction::Chunk;
+                }
+                else
+                {
+                    return EChunkUpdateAction::Subdivide;
+                }
+
+                /*if (tri.m_depth == 2)
                 {
                     if (chunk.m_chunk == gc_invalidChunk)
                     {
@@ -247,7 +282,7 @@ void SysPlanetA::update_geometry()
                 else
                 {
                     return EChunkUpdateAction::Nothing;
-                }
+                }*/
             });
 
             using Corrade::Containers::ArrayView;
