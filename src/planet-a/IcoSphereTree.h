@@ -69,6 +69,46 @@ static constexpr int gc_icosahedronVertCount = 12;
 static constexpr std::uint8_t gc_triangleMaskSubdivided = 0b0001;
 //static constexpr std::uint8_t gc_triangleMaskChunked    = 0b0010;
 
+
+
+struct TriangleSideTransform
+{
+    float m_translation;
+    float m_scale;
+};
+
+
+// Triangle on the IcoSphereTree
+struct SubTriangle
+{
+    trindex_t m_parent;
+    uint8_t m_siblingIndex; // 0:Top 1:Left 2:Right 3:Center
+
+    trindex_t m_neighbours[3];
+    buindex_t m_corners[3]; // to vertex buffer, 3 corners of triangle
+
+    osp::Vector3 m_center;
+
+    //bool subdivided;
+    uint8_t m_bitmask;
+    uint8_t m_depth;
+
+    // Data used when subdivided
+
+    // index to first child, always has 4 children if subdivided
+    // Top Left Right Center
+    trindex_t m_children;
+    buindex_t m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
+    buindex_t m_index; // to index buffer
+
+    // Data used when chunked
+    //unsigned m_chunk; // Index to chunk. (First triangle ever chunked will be 0)
+    //buindex_t m_chunkIndx; // Index to index data in the index buffer
+    //buindex_t m_chunkVrtx; // Index to vertex data
+};
+
+
+
 // An icosahedron with subdividable faces
 // it starts with 20 triangles, and each face can be subdivided into 4 more
 class IcoSphereTree
@@ -92,6 +132,13 @@ public:
 
     void initialize(float radius);
 
+    trindex_t triangle_count() { return m_triangles.size(); }
+
+    constexpr bool tri_is_subdivided(SubTriangle &tri) const
+    {
+        return tri.m_bitmask & gc_triangleMaskSubdivided;
+    };
+
     /**
      * Get triangle from vector of triangles
      * be careful of reallocation!
@@ -102,8 +149,6 @@ public:
     {
         return m_triangles[t];
     }
-
-    trindex_t triangle_count() { return m_triangles.size(); }
 
     constexpr std::vector<float> const& get_vertex_buffer()
     {
@@ -181,6 +226,12 @@ public:
     TriangleSideTransform transform_to_ancestor(trindex_t t, uint8_t side,
                                                 uint8_t targetDepth, trindex_t *pAncestorOut = nullptr);
 
+    /**
+     * Checks all triangles for invalid states in order to squash some bugs
+     * @return true when error detected
+     */
+    bool debug_verify_state();
+
 private:
 
     //PODVector<PlanetWrenderer> m_viewers;
@@ -201,42 +252,4 @@ private:
 
     float m_radius;
 };
-
-
-struct TriangleSideTransform
-{
-    float m_translation;
-    float m_scale;
-};
-
-
-// Triangle on the IcoSphereTree
-struct SubTriangle
-{
-    trindex_t m_parent;
-    uint8_t m_siblingIndex; // 0:Top 1:Left 2:Right 3:Center
-
-    trindex_t m_neighbours[3];
-    buindex_t m_corners[3]; // to vertex buffer, 3 corners of triangle
-
-    osp::Vector3 m_center;
-
-    //bool subdivided;
-    uint8_t m_bitmask;
-    uint8_t m_depth;
-
-    // Data used when subdivided
-
-    // index to first child, always has 4 children if subdivided
-    // Top Left Right Center
-    trindex_t m_children;
-    buindex_t m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
-    buindex_t m_index; // to index buffer
-
-    // Data used when chunked
-    //unsigned m_chunk; // Index to chunk. (First triangle ever chunked will be 0)
-    //buindex_t m_chunkIndx; // Index to index data in the index buffer
-    //buindex_t m_chunkVrtx; // Index to vertex data
-};
-
 }

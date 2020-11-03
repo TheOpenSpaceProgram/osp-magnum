@@ -24,7 +24,7 @@
  */
 #include "IcoSphereTree.h"
 
-
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
@@ -185,8 +185,11 @@ void IcoSphereTree::initialize(float radius)
 
 void IcoSphereTree::subdivide_add(trindex_t t)
 {
-    // if bottom triangle is deeper, use that vertex
-    // same with left and right
+    if (m_vrtxCount + 3 >= m_maxVertice)
+    {
+        // error! max vertex count exceeded
+        return;
+    }
 
     // Add the 4 new triangles
     // Top Left Right Center
@@ -227,15 +230,15 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     // right neighboor  = right neighboor of parent (tri)
     // left neighboor   = left neighboor of parent (tri)
     set_neighbours(childA, tri.m_children + 3,
-                                tri.m_neighbours[1], tri.m_neighbours[2]);
+                   tri.m_neighbours[1], tri.m_neighbours[2]);
     // same but for every other triangle
     set_neighbours(childB, tri.m_neighbours[0],
-                                tri.m_children + 3, tri.m_neighbours[2]);
+                   tri.m_children + 3, tri.m_neighbours[2]);
     set_neighbours(childC, tri.m_neighbours[0],
-                                tri.m_neighbours[1], tri.m_children + 3);
+                   tri.m_neighbours[1], tri.m_children + 3);
     // the middle triangle is completely surrounded by its siblings
     set_neighbours(childD, tri.m_children + 0,
-                                tri.m_children + 1, tri.m_children + 2);
+                   tri.m_children + 1, tri.m_children + 2);
 
     // Inherit m_depth
     childA.m_depth = childB.m_depth = childC.m_depth = childD.m_depth
@@ -256,11 +259,13 @@ void IcoSphereTree::subdivide_add(trindex_t t)
                 || (triB.m_depth != tri.m_depth))
         {
             // A new vertex has to be created in the middle of the line
-            if (m_vrtxFree.size())
+            if (!m_vrtxFree.empty())
             {
                 tri.m_midVrtxs[i] = m_vrtxFree[m_vrtxFree.size() - 1];
                 m_vrtxFree.pop_back();
-            } else {
+            }
+            else
+            {
                 tri.m_midVrtxs[i] = m_vrtxCount * m_vrtxSize;
                 m_vrtxCount ++;
             }
@@ -329,7 +334,7 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     calculate_center(childC);
     calculate_center(childD);
 
-    tri.m_bitmask ^= gc_triangleMaskSubdivided;
+    tri.m_bitmask |= gc_triangleMaskSubdivided;
 
     // subdivide if below minimum depth
 //    if (tri.m_depth < m_minDepth)
@@ -500,4 +505,101 @@ TriangleSideTransform IcoSphereTree::transform_to_ancestor(
     }
 
 
+}
+
+bool IcoSphereTree::debug_verify_state()
+{
+    // Iterate triangle array and verify (skip triangles in trianglesFree):
+    // 1. Verify Hieratchy (skip if root):
+    //    * parent is not deleted
+    //    * triangle is parent's child, check m_siblingIndex
+    //    * m_depth is parent's m_index + 1
+    //    * if subdivided:
+    //      * make sure children are valid index and are not deleted
+    // 2. Verify neighbours
+    //    * Check if triangle can be found in neighbour's neighbours
+
+    std::cout << "IcoSphereTree Verify:\n";
+
+    bool error = false;
+
+    for (trindex_t t = 0; t < m_triangles.size(); t ++)
+    {
+        // skip deleted triangles
+        if (std::find(m_trianglesFree.begin(), m_trianglesFree.end(), t - t % 4)
+            ==  m_trianglesFree.end())
+        {
+            continue;
+        }
+
+        SubTriangle &tri = get_triangle(t);
+
+        // verify hierarchy, for non-root triangles.
+        // the first 20 triangles are the root ones
+        if (t >= gc_icosahedronFaceCount)
+        {
+            SubTriangle &parent = get_triangle(tri.m_parent);
+
+            if (std::find(m_trianglesFree.begin(), m_trianglesFree.end(),
+                          tri.m_parent - tri.m_parent % 4)
+                !=  m_trianglesFree.end())
+            {
+                std::cout << "* Invalid triangle " << t << ": "
+                          << "Parent is deleted\n";
+                error = true;
+            }
+
+            if (parent.m_children + tri.m_siblingIndex != t)
+            {
+                std::cout << "* Invalid triangle " << t << ": "
+                          << "Parent does not have child\n";
+                error = true;
+            }
+
+            if (tri.m_bitmask & gc_triangleMaskSubdivided
+                && std::find(m_trianglesFree.begin(), m_trianglesFree.end(),
+                          tri.m_children)
+                !=  m_trianglesFree.end())
+            {
+                std::cout << "* Invalid triangle " << t << ": "
+                          << "Children are deleted\n";
+                error = true;
+            }
+        }
+
+        // verify neighbours. there are always 3 neighbours
+        for (int i = 0; i < 3; i ++)
+        {
+            trindex_t neighbour =  tri.m_neighbours[i];
+
+            SubTriangle *neighbourTri = &get_triangle(neighbour);
+
+            while (neighbourTri->m_depth >= tri.m_depth)
+            {
+                neighbourTri = &get_triangle(neighbourTri->m_parent);
+            }
+
+            if (tri.m_depth < neighbourTri->m_depth)
+            {
+                std::cout << "* Invalid triangle " << t << ": "
+                          << "Neighbour " << i  << "has larger depth\n";
+                error = true;
+            }
+            else
+            {
+                int side = neighbour_side(*neighbourTri, t);
+
+                if (side == 255)
+                {
+                    std::cout << "* Invalid triangle " << t << ": "
+                              << "Neighbour " << i  << "does not recognize "
+                              << "this triangle as a neighbour\n";
+                    error = true;
+                }
+            }
+
+        }
+    }
+
+    return error;
 }

@@ -51,6 +51,7 @@ constexpr chindex_t gc_invalidChunk = std::numeric_limits<chindex_t>::max();
 constexpr loindex_t gc_invalidLocal = std::numeric_limits<loindex_t>::max();
 constexpr trindex_t gc_invalidTri = std::numeric_limits<trindex_t>::max();
 constexpr vrindex_t gc_invalidVrtx = std::numeric_limits<vrindex_t>::max();
+constexpr buindex_t gc_invalidBufIndx = std::numeric_limits<buindex_t>::max();
 
 enum class EChunkUpdateAction { Nothing, Subdivide, Unsubdivide,
                                 Chunk, Unchunk };
@@ -122,6 +123,11 @@ public:
 
     constexpr bool is_initialized() const { return m_initialized; }
 
+    constexpr bool tri_is_chunked(SubTriangleChunk &chunk) const
+    {
+        return chunk.m_chunk != gc_invalidChunk;
+    };
+
     constexpr unsigned indices_per_chunk() const { return m_indxPerChunk; }
 
     /**
@@ -154,6 +160,16 @@ public:
     constexpr chindex_t chunk_count() { return m_chunkCount; }
 
     IcoSphereTree* get_ico_tree() { return m_icoTree.get(); }
+
+    unsigned debug_chunk_count_descendents(SubTriangle &tri);
+
+    /**
+     * Checks all triangles for invalid states in order to squash some bugs
+     * @return true when error detected
+     */
+    bool debug_verify_state();
+
+    void debug_raise_by_share_count();
 
 private:
 
@@ -311,6 +327,11 @@ private:
     // Indices to m_vrtxSharedUsers, parallel with IcoSphereTree m_vrtxBuffer
     std::vector<buindex_t> m_vrtxSharedIcoCorners;
 
+    // Maps shared vertices to an index to m_vrtxSharedIcoCorners
+    // in a way this kind of acts like a 2-way map
+    std::vector<vrindex_t> m_vrtxSharedIcoCornersReverse;
+    //std::map<unsigned, buindex_t> m_vrtxSharedIcoCorners;
+
     // Maps shared vertex indices to the index buffer, so that shared vertices
     // can be obtained from a chunk's index data
     std::vector<buindex_t> m_indToShared;
@@ -412,9 +433,17 @@ void PlanetGeometryA::chunk_geometry_update_all(FUNC_T condition)
         chunk_geometry_update_recurse(condition, t, toChunk);
     }
 
+
+
     for (trindex_t t : toChunk)
     {
         chunk_add(t);
+
+        // check for bad programming
+        if (debug_verify_state() || m_icoTree->debug_verify_state())
+        {
+            int a = 2; // put breakpoint here
+        }
     }
 
     if (!m_chunkFree.empty())
@@ -422,6 +451,13 @@ void PlanetGeometryA::chunk_geometry_update_all(FUNC_T condition)
         // there's some chunks to move
         chunk_pack();
     }
+
+    // check for bad programming
+    if (debug_verify_state() || m_icoTree->debug_verify_state())
+    {
+        int a = 2; // put breakpoint here
+    }
+
 }
 
 template<typename FUNC_T>
@@ -467,7 +503,7 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
             // remove chunk before subdividing
 
             m_icoTree->subdivide_add(t);
-            subdivided = true;
+            subdivided = m_icoTree->tri_is_subdivided(m_icoTree->get_triangle(t));
 
             chunk_triangle_assure();
         }
@@ -475,6 +511,12 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
     case EChunkUpdateAction::Unsubdivide:
         //m_icoTree->subdivide_remove(t);
         break;
+    }
+
+    // check for bad programming
+    if (debug_verify_state() || m_icoTree->debug_verify_state())
+    {
+        int a = 2; // put breakpoint here
     }
 
     if (subdivided && !chunked)

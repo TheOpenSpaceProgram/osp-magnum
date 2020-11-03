@@ -285,6 +285,8 @@ void SysPlanetA::update_geometry()
                 }*/
             });
 
+            planet.m_planet.debug_raise_by_share_count();
+
             using Corrade::Containers::ArrayView;
 
             std::vector<unsigned> const &indxData = planet.m_planet.get_index_buffer();
