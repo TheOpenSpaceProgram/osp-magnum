@@ -37,8 +37,6 @@ void IcoSphereTree::initialize(float radius)
 
     // Set preferences to some magic numbers
     // TODO: implement a planet config file or something
-    m_maxDepth = 5;
-    m_minDepth = 0;
 
     m_maxVertice = 512;
     m_maxTriangles = 256;
@@ -158,7 +156,7 @@ void IcoSphereTree::initialize(float radius)
     for (int i = 0; i < gc_icosahedronFaceCount; i ++)
     {
         // Set triangles
-        SubTriangle tri;
+        SubTriangle &tri = m_triangles.emplace_back();
 
         // indices were already calculated beforehand
         set_verts(tri,
@@ -175,10 +173,9 @@ void IcoSphereTree::initialize(float radius)
                        sc_icoTemplateneighbours[i * 3 + 1],
                        sc_icoTemplateneighbours[i * 3 + 2]);
 
-        tri.m_bitmask = 0;
+        tri.m_subdivided = false;
         tri.m_depth = 0;
         calculate_center(tri);
-        m_triangles.push_back(std::move(tri));
     }
 
 }
@@ -194,7 +191,7 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     // Add the 4 new triangles
     // Top Left Right Center
     trindex_t childrenIndex;
-    if (m_trianglesFree.size() == 0)
+    if (m_trianglesFree.empty())
     {
         // Make new triangles
         childrenIndex = m_triangles.size();
@@ -213,10 +210,10 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     SubTriangle &tri = get_triangle(t);
     tri.m_children = childrenIndex;
 
-    SubTriangle &childA = get_triangle(tri.m_children + 0),
-                &childB = get_triangle(tri.m_children + 1),
-                &childC = get_triangle(tri.m_children + 2),
-                &childD = get_triangle(tri.m_children + 3);
+    SubTriangle &childA = get_triangle(tri.m_children + 0);
+    SubTriangle &childB = get_triangle(tri.m_children + 1);
+    SubTriangle &childC = get_triangle(tri.m_children + 2);
+    SubTriangle &childD = get_triangle(tri.m_children + 3);
 
     // set parent and sibling index
     childA.m_parent = childB.m_parent = childC.m_parent = childD.m_parent = t;
@@ -244,20 +241,20 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     childA.m_depth = childB.m_depth = childC.m_depth = childD.m_depth
                    = tri.m_depth + 1;
     // Set m_bitmasks to 0, for not visible, not subdivided, not chunked
-    childA.m_bitmask = childB.m_bitmask = childC.m_bitmask = childD.m_bitmask
-                     = 0;
+    childA.m_subdivided = childB.m_subdivided = childC.m_subdivided
+                        = childD.m_subdivided = false;
     // Subdivide lines and add verticies, or take from other triangles
 
-    // Loop through 3 sides of the triangle: Bottom, Right, Left
+    // Loop through 3 edges of the triangle: Bottom, Right, Left
     // tri.sides refers to an index of another triangle on that side
     for (int i = 0; i < 3; i ++)
     {
         SubTriangle &triB = get_triangle(tri.m_neighbours[i]);
-        // Check if the line is already subdivided,
-        // or if there is no triangle on the other side
-        if (!(triB.m_bitmask & gc_triangleMaskSubdivided)
-                || (triB.m_depth != tri.m_depth))
-        {
+
+        // Check if neighbour is subdivided. If so, then take it's middle vertex
+        // If not, then create a new vertex.
+        if (!triB.m_subdivided || (triB.m_depth != tri.m_depth))
+               {
             // A new vertex has to be created in the middle of the line
             if (!m_vrtxFree.empty())
             {
@@ -276,10 +273,10 @@ void IcoSphereTree::subdivide_add(trindex_t t)
                                     get_vertex_pos(tri.m_corners[(i + 2) % 3]));
 
             Vector3 &midPos = *reinterpret_cast<Vector3*>(
-                                        get_vertex_pos(tri.m_midVrtxs[i]));
+                                    get_vertex_pos(tri.m_midVrtxs[i]));
 
             Vector3 &destNrm = *reinterpret_cast<Vector3*>(
-                                        get_vertex_nrm(tri.m_midVrtxs[i]));
+                                    get_vertex_nrm(tri.m_midVrtxs[i]));
 
             //Vector3 vertM[2];
             destNrm = ((vertA + vertB) / 2).normalized();
@@ -287,36 +284,38 @@ void IcoSphereTree::subdivide_add(trindex_t t)
         }
         else
         {
+
+
             // Which side tri is on triB
             int sideB = neighbour_side(triB, t);
-            //printf("Vertex is being shared\n");
 
             // Instead of creating a new vertex, use the one from triB since
             // it's already subdivided
             tri.m_midVrtxs[i] = triB.m_midVrtxs[sideB];
+
+            // this commented out console.log was created back when this was a
+            // JS browser canvas test, survived being rewritten in Urho3D, and
+            // still survives in this magnum repo
             //console.log(i + ": Used existing vertex");
 
             // Set sides
-            // Side 0(bottom) corresponds to child 1(left), 2(right)
-            // Side 1(right) corresponds to child 2(right), 0(top)
-            // Side 2(left) corresponds to child 0(top), 1(left)
+            // Side 0(bottom) corresponds to child triangle 1(left),  2(right)
+            // Side 1(right)  corresponds to child triangle 2(right), 0(top)
+            // Side 2(left)   corresponds to child triangle 0(top),   1(left)
 
-            // triX/Y refers to the two triangles on the side of tri
-            // triBX/Y refers to the two triangles on the side of triB
+            // The two triangles on the side of tri
             trindex_t triX = tri.m_children + trindex_t((i + 1) % 3);
             trindex_t triY = tri.m_children + trindex_t((i + 2) % 3);
+
+            // The two child triangles on the side of triB
             trindex_t triBX = triB.m_children + trindex_t((sideB + 1) % 3);
             trindex_t triBY = triB.m_children + trindex_t((sideB + 2) % 3);
 
-            // Assign the face of each triangle to the other triangle beside it
+            // Assign neighbours of children to each other
             m_triangles[triX].m_neighbours[i] = triBY;
             m_triangles[triY].m_neighbours[i] = triBX;
-            //m_triangles[triBX].m_neighbours[sideB] = triY;
-            //m_triangles[triBY].m_neighbours[sideB] = triX;
             set_side_recurse(m_triangles[triBX], uint8_t(sideB), triY);
             set_side_recurse(m_triangles[triBY], uint8_t(sideB), triX);
-
-            //printf("Set Tri%u %u to %u", triBX)
         }
 
     }
@@ -334,20 +333,7 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     calculate_center(childC);
     calculate_center(childD);
 
-    tri.m_bitmask |= gc_triangleMaskSubdivided;
-
-    // subdivide if below minimum depth
-//    if (tri.m_depth < m_minDepth)
-//    {
-//        // Triangle vector might reallocate, so accessing tri after
-//        // subdivide_add will cause undefiend behaviour
-//        //URHO3D_LOGINFOF("depth: %i tri: %i", tri->m_depth, t);
-//        trindex_t childs = tri.m_children;
-//        subdivide_add(childs + 0);
-//        subdivide_add(childs + 1);
-//        subdivide_add(childs + 2);
-//        subdivide_add(childs + 3);
-//    }
+    tri.m_subdivided = true;
 }
 
 
@@ -367,16 +353,11 @@ void IcoSphereTree::set_verts(SubTriangle& tri, buindex_t top,
     tri.m_corners[2] = rte;
 }
 
-/**
- * Set a neighbour of a triangle, and apply for all of it's children's
- * @param tri [ref] Reference to triangle
- * @param side [in] Which side to set
- * @param to [in] Neighbour to operate on
- */
 void IcoSphereTree::set_side_recurse(SubTriangle& tri, int side, trindex_t to)
 {
     tri.m_neighbours[side] = to;
-    if (tri.m_bitmask & gc_triangleMaskSubdivided) {
+    if (tri.m_subdivided)
+    {
         set_side_recurse(m_triangles[tri.m_children + ((side + 1) % 3)],
                 side, to);
         set_side_recurse(m_triangles[tri.m_children + ((side + 2) % 3)],
@@ -389,13 +370,12 @@ int IcoSphereTree::neighbour_side(const SubTriangle& tri,
 {
     // Loop through neighbours on the edges. child 4 (center) is not considered
     // as all it's neighbours are its siblings
-    if(tri.m_neighbours[0] == lookingFor) return 0;
-    if(tri.m_neighbours[1] == lookingFor) return 1;
-    if(tri.m_neighbours[2] == lookingFor) return 2;
+    if (tri.m_neighbours[0] == lookingFor) { return 0; }
+    if (tri.m_neighbours[1] == lookingFor) { return 1; }
+    if (tri.m_neighbours[2] == lookingFor) { return 2; }
 
     // this means there's an error
-    //assert(false);
-    return 255;
+    return -1;
 }
 
 void IcoSphereTree::calculate_center(SubTriangle &tri)
@@ -412,52 +392,6 @@ void IcoSphereTree::calculate_center(SubTriangle &tri)
     tri.m_center = (vertA + vertB + vertC) / 3.0f;
 }
 
-std::pair<trindex_t, trindex_t> IcoSphereTree::find_neighbouring_ancestors(
-                                                    trindex_t a, trindex_t b)
-{
-    std::pair<trindex_t, trindex_t> out{a, b};
-
-    SubTriangle &triA = get_triangle(a);
-    SubTriangle &triB = get_triangle(b);
-
-    trindex_t *outIndex;
-    trindex_t curIndex;
-    uint8_t targetDepth;
-
-    if (triA.m_depth > triB.m_depth)
-    {
-        // A needs to get set
-        targetDepth = triB.m_depth;
-        outIndex = &(out.first);
-        curIndex = triA.m_parent;
-    }
-    else if (triA.m_depth < triB.m_depth)
-    {
-        // B needs to get set
-        targetDepth = triA.m_depth;
-        outIndex = &(out.second);
-        curIndex = triB.m_parent;
-    }
-    else
-    {
-        return out;
-    }
-
-    SubTriangle *curTri;
-    std::cout << "wtf\n";
-
-    // move up chain of parents to the right depth
-    do
-    {
-        *outIndex = curIndex;
-        curTri = &get_triangle(*outIndex);
-        curIndex = curTri->m_parent;
-    }
-    while (curTri->m_depth != targetDepth);
-
-    return out;
-}
-
 TriangleSideTransform IcoSphereTree::transform_to_ancestor(
         trindex_t t, uint8_t side, uint8_t targetDepth, trindex_t *pAncestorOut)
 {
@@ -472,7 +406,7 @@ TriangleSideTransform IcoSphereTree::transform_to_ancestor(
 
         if (tri->m_depth == targetDepth)
         {
-            if (pAncestorOut)
+            if (pAncestorOut != nullptr)
             {
                 *pAncestorOut = curT;
             }
@@ -496,9 +430,8 @@ TriangleSideTransform IcoSphereTree::transform_to_ancestor(
 
             out.m_scale *= 0.5f;
 
-            out.m_translation
-                    = out.m_translation * 0.5f
-                    + 0.5f * (side == (tri->m_siblingIndex + 1) % 3);
+            out.m_translation = out.m_translation * 0.5f
+                              + 0.5f * (side == (tri->m_siblingIndex + 1) % 3);
         }
 
         curT = tri->m_parent;
@@ -519,7 +452,7 @@ bool IcoSphereTree::debug_verify_state()
     // 2. Verify neighbours
     //    * Check if triangle can be found in neighbour's neighbours
 
-    std::cout << "IcoSphereTree Verify:\n";
+    //std::cout << "IcoSphereTree Verify:\n";
 
     bool error = false;
 
@@ -556,9 +489,9 @@ bool IcoSphereTree::debug_verify_state()
                 error = true;
             }
 
-            if (tri.m_bitmask & gc_triangleMaskSubdivided
+            if (tri.m_subdivided
                 && std::find(m_trianglesFree.begin(), m_trianglesFree.end(),
-                          tri.m_children)
+                             tri.m_children)
                 !=  m_trianglesFree.end())
             {
                 std::cout << "* Invalid triangle " << t << ": "
@@ -589,7 +522,7 @@ bool IcoSphereTree::debug_verify_state()
             {
                 int side = neighbour_side(*neighbourTri, t);
 
-                if (side == 255)
+                if (side == -1)
                 {
                     std::cout << "* Invalid triangle " << t << ": "
                               << "Neighbour " << i  << "does not recognize "

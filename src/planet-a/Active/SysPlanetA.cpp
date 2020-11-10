@@ -85,8 +85,8 @@ StatusActivated SysPlanetA::activate_sat(
 
     auto &planetForceField = scene.reg_emplace<ACompFFGravity>(planetEnt);
 
-    // arbitrarily picked nice working number
-    planetForceField.m_Gmass = 100000.0f;
+    // mass of moon * gravitational constant
+    planetForceField.m_Gmass = 4903895800000.0f;
 
     return {0, planetEnt, false};
 }
@@ -192,7 +192,16 @@ void SysPlanetA::update_geometry()
         {
             // initialize planet if not done so yet
             std::cout << "Initializing planet\n";
-            planet.m_planet.initialize(planet.m_radius);
+            planet.m_planet.initialize(planet.m_radius, 4, 1u << 9, 1u << 13);
+
+            // Chunk all the initial triangles
+            planet.m_planet.chunk_geometry_update_all(
+                    [] (SubTriangle const& tri, SubTriangleChunk const& chunk,
+                        int index) -> EChunkUpdateAction
+            {
+                return EChunkUpdateAction::Chunk;
+            });
+
             std::cout << "Planet initialized, now making colliders\n";
 
             // temporary: make colliders for all the chunks
@@ -225,7 +234,7 @@ void SysPlanetA::update_geometry()
 
         }
 
-        if (m_debugUpdate.triggered())
+        if (m_debugUpdate.triggered() || true)
         {
             ActiveEnt cam = m_scene.get_registry().view<ACompCamera>().front();
             auto &camTf = m_scene.reg_get<ACompTransform>(cam);
@@ -259,52 +268,55 @@ void SysPlanetA::update_geometry()
 
                 bool tooFar = screenLength < threshold;
 
-                if (tooFar)
+                if (tooFar || (tri.m_depth >= 13))
                 {
                     return EChunkUpdateAction::Chunk;
                 }
                 else
                 {
+                    // too close, subdivide it
                     return EChunkUpdateAction::Subdivide;
                 }
-
-                /*if (tri.m_depth == 2)
-                {
-                    if (chunk.m_chunk == gc_invalidChunk)
-                    {
-                        return EChunkUpdateAction::Chunk;
-                    }
-                    else
-                    {
-                        return EChunkUpdateAction::Unchunk;
-                    }
-                }
-                else
-                {
-                    return EChunkUpdateAction::Nothing;
-                }*/
             });
 
-            planet.m_planet.debug_raise_by_share_count();
+            //planet.m_planet.debug_raise_by_share_count();
 
             using Corrade::Containers::ArrayView;
 
-            std::vector<unsigned> const &indxData = planet.m_planet.get_index_buffer();
+            // update GPU index buffer
 
-            // update GPU buffers
-            for (UpdateRangeSub updRange : planet.m_planet.get_index_buffer_updates())
+            std::vector<unsigned> const &indxData
+                    = planet.m_planet.get_index_buffer();
+
+            for (UpdateRangeSub updRange
+                 : planet.m_planet.get_index_buffer_updates())
             {
                 buindex_t size = updRange.m_end - updRange.m_start;
-                auto arrView = ArrayView(indxData.data() + updRange.m_start, size);
-                //planet.m_indxBufGL.setSubData(updRange.m_start, arrView);
+                ArrayView arrView(indxData.data() + updRange.m_start, size);
+                planet.m_indxBufGL.setSubData(
+                        updRange.m_start * sizeof(*indxData.data()), arrView);
             }
 
-            planet.m_vrtxBufGL.setData(planet.m_planet.get_vertex_buffer());
-            planet.m_indxBufGL.setData(planet.m_planet.get_index_buffer());
+            // update GPU vertex buffer
+
+            std::vector<float> const &vrtxData
+                    = planet.m_planet.get_vertex_buffer();
+
+            for (UpdateRangeSub updRange
+                 : planet.m_planet.get_vertex_buffer_updates())
+            {
+                buindex_t size = updRange.m_end - updRange.m_start;
+                ArrayView arrView(vrtxData.data() + updRange.m_start, size);
+                planet.m_vrtxBufGL.setSubData(
+                        updRange.m_start * sizeof(*vrtxData.data()), arrView);
+            }
+
+            //planet.m_vrtxBufGL.setData(planet.m_planet.get_vertex_buffer());
+            //planet.m_indxBufGL.setData(planet.m_planet.get_index_buffer());
+            planet.m_planet.get_index_buffer_updates().clear();
+            planet.m_planet.get_vertex_buffer_updates().clear();
 
             planet.m_mesh.setCount(planet.m_planet.calc_index_count());
-
-            planet.m_planet.get_index_buffer_updates().clear();
         }
     }
 }

@@ -77,11 +77,6 @@ struct UpdateRangeSub;
 // m_chunkSize            -> m_vrtxPerChunk
 // m_chunkSizeInd         -> m_indPerChunk
 
-//enum class EChunk: uint8_t
-//{
-//};
-
-
 struct SubTriangleChunk
 {
     // Index to chunk. (First triangle ever chunked will be 0)
@@ -131,11 +126,15 @@ public:
     constexpr unsigned indices_per_chunk() const { return m_indxPerChunk; }
 
     /**
-     * Calculate initial icosahedron and initialize buffers.
-     * Call before drawing
-     * @param size [in] Minimum height of planet, or radius
+     * Configure and Initialize buffers.
+     * @param radius    [in] Radius of planet
+     * @param chunkDiv  [in] Number of subdivisions per chunk
+     * @param maxChunks [in] Chunk buffer size
+     * @param maxShared [in] Area in buffer reserved for shared vertices between
+     *                       chunks
      */
-    void initialize(float size);
+    void initialize(float radius, unsigned chunkDiv,
+                    chindex_t maxChunks, vrindex_t maxShared);
 
     /**
      * Print out information on vertice count, chunk count, etc...
@@ -148,15 +147,21 @@ public:
     template<typename FUNC_T>
     void chunk_geometry_update_all(FUNC_T condition);
 
-    std::pair<IteratorTriIndexed, IteratorTriIndexed> iterate_chunk(chindex_t c);
+    std::pair<IteratorTriIndexed, IteratorTriIndexed> iterate_chunk(
+            chindex_t c);
 
-    constexpr std::vector<float> const& get_vertex_buffer() const { return m_vrtxBuffer; }
-    constexpr std::vector<unsigned> const& get_index_buffer() const { return m_indxBuffer; }
+    constexpr std::vector<float> const& get_vertex_buffer() const
+    { return m_vrtxBuffer; }
+    constexpr std::vector<unsigned> const& get_index_buffer() const
+    { return m_indxBuffer; }
 
-    constexpr std::vector<UpdateRangeSub>& get_vertex_buffer_updates() { return m_gpuUpdVrtxBuffer; }
-    constexpr std::vector<UpdateRangeSub>& get_index_buffer_updates() { return m_gpuUpdIndxBuffer; }
+    constexpr std::vector<UpdateRangeSub>& get_vertex_buffer_updates()
+    { return m_gpuUpdVrtxBuffer; }
+    constexpr std::vector<UpdateRangeSub>& get_index_buffer_updates()
+    { return m_gpuUpdIndxBuffer; }
 
-    constexpr buindex_t calc_index_count() { return m_chunkCount * m_indxPerChunk * 3; }
+    constexpr buindex_t calc_index_count()
+    { return m_chunkCount * m_indxPerChunk * 3; }
     constexpr chindex_t chunk_count() { return m_chunkCount; }
 
     IcoSphereTree* get_ico_tree() { return m_icoTree.get(); }
@@ -249,13 +254,15 @@ private:
      * @return true when a shared vertex is grabbed successfully
      *         false when a new shared vertex is created
      */
-    vrindex_t shared_from_tri(SubTriangleChunk const& chunk, uint8_t side, loindex_t pos);
+    vrindex_t shared_from_tri(SubTriangleChunk const& chunk,
+                              uint8_t side, loindex_t pos);
 
     /**
      *
      * @return
      */
-    vrindex_t shared_from_neighbour(trindex_t triInd, uint8_t side, loindex_t posIn, bool &rBetween);
+    vrindex_t shared_from_neighbour(trindex_t triInd, uint8_t side,
+                                    loindex_t posIn, bool &rBetween);
 
     /**
      * Create a new shared vertex. This will get a vertex from m_vrtxSharedFree
@@ -283,9 +290,9 @@ private:
     std::vector<float> m_vrtxBuffer;
 
     // How much of m_vertBuffer is reserved for shared vertices
-    buindex_t m_vrtxSharedMax;
+    vrindex_t m_vrtxSharedMax;
 
-    buindex_t m_vrtxMax; // Calculated max number of vertices
+    vrindex_t m_vrtxMax; // Calculated max number of vertices
 
     // Chunk stuff
 
@@ -312,10 +319,10 @@ private:
 
     // Shared Vertex stuff
 
-    buindex_t m_vrtxSharedCount; // Current number of shared vertices
+    vrindex_t m_vrtxSharedCount; // Current number of shared vertices
 
     // individual shared vertices that are deleted
-    std::vector<buindex_t> m_vrtxSharedFree;
+    std::vector<vrindex_t> m_vrtxSharedFree;
 
     // Count how many times each shared chunk vertex is being used
     // it's impossible for a shared vertex to have more than 6 users
@@ -325,7 +332,7 @@ private:
 
     // Associates IcoSphereTree verticies with a shared vertex
     // Indices to m_vrtxSharedUsers, parallel with IcoSphereTree m_vrtxBuffer
-    std::vector<buindex_t> m_vrtxSharedIcoCorners;
+    std::vector<vrindex_t> m_vrtxSharedIcoCorners;
 
     // Maps shared vertices to an index to m_vrtxSharedIcoCorners
     // in a way this kind of acts like a 2-way map
@@ -334,7 +341,7 @@ private:
 
     // Maps shared vertex indices to the index buffer, so that shared vertices
     // can be obtained from a chunk's index data
-    std::vector<buindex_t> m_indToShared;
+    std::vector<vrindex_t> m_indToShared;
 
     // GPU update stuff
 
@@ -382,11 +389,13 @@ public:
 
     float const* position()
     {
-        return m_vrtxBuffer->data() + (**this * m_vrtxSize) + m_vrtxCompOffsetPos;
+        return m_vrtxBuffer->data() + (**this * m_vrtxSize)
+                + m_vrtxCompOffsetPos;
     };
     float const* normal()
     {
-        return m_vrtxBuffer->data() + (**this * m_vrtxSize) + m_vrtxCompOffsetNrm;
+        return m_vrtxBuffer->data() + (**this * m_vrtxSize)
+                + m_vrtxCompOffsetNrm;
     };
 
     //using std::vector<unsigned>::const_iterator::operator==;
@@ -398,11 +407,21 @@ public:
     using std::vector<unsigned>::const_iterator::operator+=;
     using std::vector<unsigned>::const_iterator::operator-=;
 
-    IteratorTriIndexed operator+(difference_type rhs) { return IteratorTriIndexed(static_cast<IndIt_t>(*this) + rhs, *m_vrtxBuffer); }
+    IteratorTriIndexed operator+(difference_type rhs)
+    {
+        return IteratorTriIndexed(static_cast<IndIt_t>(*this) + rhs,
+                                  *m_vrtxBuffer);
+    }
 
 
-    bool operator==(IteratorTriIndexed const &rhs) { return static_cast<IndIt_t>(*this) == static_cast<IndIt_t>(rhs); }
-    bool operator!=(IteratorTriIndexed const &rhs) { return static_cast<IndIt_t>(*this) != static_cast<IndIt_t>(rhs); }
+    bool operator==(IteratorTriIndexed const &rhs)
+    {
+        return static_cast<IndIt_t>(*this) == static_cast<IndIt_t>(rhs);
+    }
+    bool operator!=(IteratorTriIndexed const &rhs)
+    {
+        return static_cast<IndIt_t>(*this) != static_cast<IndIt_t>(rhs);
+    }
 
 private:
 
@@ -420,6 +439,9 @@ private:
 template<typename FUNC_T>
 void PlanetGeometryA::chunk_geometry_update_all(FUNC_T condition)
 {
+    // Make sure there's a SubTriangleChunk for every SubTriangle
+    chunk_triangle_assure();
+
     // loop through triangles, see which ones to chunk, subdivide, etc...
     std::vector<trindex_t> toChunk;
 
@@ -433,17 +455,9 @@ void PlanetGeometryA::chunk_geometry_update_all(FUNC_T condition)
         chunk_geometry_update_recurse(condition, t, toChunk);
     }
 
-
-
     for (trindex_t t : toChunk)
     {
         chunk_add(t);
-
-        // check for bad programming
-        if (debug_verify_state() || m_icoTree->debug_verify_state())
-        {
-            int a = 2; // put breakpoint here
-        }
     }
 
     if (!m_chunkFree.empty())
@@ -452,11 +466,6 @@ void PlanetGeometryA::chunk_geometry_update_all(FUNC_T condition)
         chunk_pack();
     }
 
-    // check for bad programming
-    if (debug_verify_state() || m_icoTree->debug_verify_state())
-    {
-        int a = 2; // put breakpoint here
-    }
 
 }
 
@@ -473,7 +482,7 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
         SubTriangleChunk const& chunk = m_triangleChunks[t];
 
         chunked = chunk.m_chunk != gc_invalidChunk;
-        subdivided = (tri.m_bitmask & gc_triangleMaskSubdivided);
+        subdivided = tri.m_subdivided;
 
         // use condition to determine what should be done to this triangle
         action = condition(tri, chunk, t);
@@ -503,7 +512,7 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
             // remove chunk before subdividing
 
             m_icoTree->subdivide_add(t);
-            subdivided = m_icoTree->tri_is_subdivided(m_icoTree->get_triangle(t));
+            subdivided = m_icoTree->get_triangle(t).m_subdivided;
 
             chunk_triangle_assure();
         }
@@ -511,12 +520,6 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
     case EChunkUpdateAction::Unsubdivide:
         //m_icoTree->subdivide_remove(t);
         break;
-    }
-
-    // check for bad programming
-    if (debug_verify_state() || m_icoTree->debug_verify_state())
-    {
-        int a = 2; // put breakpoint here
     }
 
     if (subdivided && !chunked)

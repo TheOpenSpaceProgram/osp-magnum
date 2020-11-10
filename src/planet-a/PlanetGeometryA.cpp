@@ -49,15 +49,17 @@ void planeta::update_range_insert(std::vector<UpdateRangeSub>& range,
     range.push_back(insert);
 }
 
-void PlanetGeometryA::initialize(float radius)
+void PlanetGeometryA::initialize(float radius, unsigned chunkDiv,
+                                 chindex_t maxChunks, vrindex_t maxShared)
 {
     //m_subdivAreaThreshold = 0.02f;
-    m_vrtxSharedMax = 10000;
-    m_chunkMax = 100;
+    m_vrtxSharedMax = maxShared;
+    m_chunkMax = maxChunks;
 
     //m_chunkAreaThreshold = 0.04f;
-    m_chunkWidth = 17; // MUST BE (POWER OF 2) + 1. min: 5
-    m_chunkWidthB = m_chunkWidth - 1; // used often in many calculations
+    m_chunkWidthB = (1 << chunkDiv);
+    m_chunkWidth  = m_chunkWidthB + 1; // MUST BE (POWER OF 2) + 1. min: 5
+
 
     m_icoTree = std::make_shared<IcoSphereTree>();
     m_icoTree->initialize(radius);
@@ -76,7 +78,7 @@ void PlanetGeometryA::initialize(float radius)
 
     // calculate total max vertices
     m_vrtxMax = m_vrtxSharedMax + m_chunkMax * (m_vrtxPerChunk
-            - m_vrtxSharedPerChunk);
+                                                - m_vrtxSharedPerChunk);
 
     // allocate vectors for dealing with chunks
     m_indxBuffer.resize(m_chunkMax * m_indxPerChunk * 3);
@@ -84,7 +86,6 @@ void PlanetGeometryA::initialize(float radius)
     m_chunkToTri.resize(m_chunkMax);
     m_vrtxSharedUsers.resize(m_vrtxSharedMax);
     m_vrtxSharedIcoCornersReverse.resize(m_vrtxSharedMax, gc_invalidBufIndx);
-
 
     // Calculate m_chunkSharedIndices;  use:
 
@@ -162,53 +163,6 @@ void PlanetGeometryA::initialize(float radius)
     }
 
     m_initialized = true;
-
-    // temporary: test chunking
-    //chunk_add(0);
-    m_icoTree->subdivide_add(0); // adds triangles 20, 21, 22, 23
-    //chunk_add(20);
-    m_icoTree->subdivide_add(20); // adds triangles 24, 25, 26, 27
-
-    //chunk_remove(24);
-    //chunk_remove(25);
-    //chunk_remove(26);
-    //chunk_remove(27);
-
-
-    chunk_add(1);
-    chunk_add(2);
-    chunk_add(3);
-    chunk_add(4);
-    chunk_add(5);
-    chunk_add(6);
-    chunk_add(7);
-    chunk_add(8);
-    chunk_add(9);
-    chunk_add(10);
-    chunk_add(11);
-    chunk_add(12);
-    chunk_add(13);
-    chunk_add(14);
-    chunk_add(15);
-    chunk_add(16);
-    chunk_add(17);
-    chunk_add(18);
-    chunk_add(19);
-
-
-    chunk_add(21);
-    chunk_add(22);
-    chunk_add(23);
-
-    chunk_add(24);
-    chunk_add(25);
-    chunk_add(26);
-    chunk_add(27);
-
-    m_icoTree->debug_verify_state();
-    debug_verify_state();
-
-
 }
 
 std::pair<PlanetGeometryA::IteratorTriIndexed,
@@ -357,27 +311,13 @@ void PlanetGeometryA::chunk_add(trindex_t t)
         vrindex_t vertIndex = gc_invalidVrtx;
 
         vrindex_t triCorner = tri.m_corners[corner] / m_icoTree->m_vrtxSize;
-        buindex_t &sharedCorner = m_vrtxSharedIcoCorners[triCorner];
+        vrindex_t &sharedCorner = m_vrtxSharedIcoCorners[triCorner];
 
         if (sharedCorner != gc_invalidBufIndx)
         {
-            if (m_vrtxSharedUsers[sharedCorner] == 0)
-            {
-                // vertex was previously deleted
-                std::cout << "should be deleted: " << sharedCorner << "\n";
-            }
-            else
-            {
-                // a shared triangle can be taken from a corner
-                vertIndex = sharedCorner;
-                m_vrtxSharedUsers[vertIndex] ++;
-
-                std::cout << "Triangle: " << t << " "
-                          << "IcoVertex: "  << (tri.m_corners[corner] / m_icoTree->m_vrtxSize) << " "
-                          << "Taking corner: " << vertIndex << " "
-                          << "current users: " << int(m_vrtxSharedUsers[vertIndex])
-                          << "\n";
-            }
+            // a shared triangle can be taken from a corner
+            vertIndex = sharedCorner;
+            m_vrtxSharedUsers[vertIndex] ++;
         }
 
         if (vertIndex == gc_invalidVrtx)
@@ -415,7 +355,7 @@ void PlanetGeometryA::chunk_add(trindex_t t)
         }
 
 
-        auto vrtxOffset = vertIndex * m_vrtxSize;
+        buindex_t vrtxOffset = vertIndex * m_vrtxSize;
         auto vrtxOffsetIt = m_vrtxBuffer.begin() + vrtxOffset;
 
         // sideB because local ringed indices start at the bottom left
@@ -526,11 +466,8 @@ void PlanetGeometryA::chunk_add(trindex_t t)
                 // Keep track of which middle index is being looped through
                 centerIndex ++;
 
-                buindex_t vrtxDataMid = mid[i].m_vrtxIndex * m_vrtxSize;
+                //buindex_t vrtxDataMid = mid[i].m_vrtxIndex * m_vrtxSize;
 
-                // Make sure the GPU knows about this individual vertex change
-                update_range_insert(m_gpuUpdVrtxBuffer,
-                                    {vrtxDataMid, vrtxDataMid + m_vrtxSize});
             }
 
             indices[localIndex] = mid[i].m_vrtxIndex;
@@ -562,12 +499,16 @@ void PlanetGeometryA::chunk_add(trindex_t t)
             }
 
             // Add Position data to vertex buffer
-            std::copy(pos.data(), pos.data() + 3,
+            std::copy(pos.data(), pos.data() + pos.Size,
                       vrtxDataMidIt + m_vrtxCompOffsetPos);
 
             // Add Normal data to vertex buffer
-            std::copy(nrm.data(), nrm.data() + 3,
+            std::copy(nrm.data(), nrm.data() + nrm.Size,
                       vrtxDataMidIt + m_vrtxCompOffsetNrm);
+
+            // Make sure the GPU knows about this individual vertex change
+            update_range_insert(m_gpuUpdVrtxBuffer,
+                                {vrtxDataMid, vrtxDataMid + m_vrtxSize});
 
         }
 
@@ -630,7 +571,7 @@ void PlanetGeometryA::chunk_add(trindex_t t)
     }
 
     // Make sure descendents know that they're part of a chunk
-    if (tri.m_bitmask & gc_triangleMaskSubdivided)
+    if (tri.m_subdivided)
     {
         set_chunk_ancestor_recurse(tri.m_children + 0, t);
         set_chunk_ancestor_recurse(tri.m_children + 1, t);
@@ -695,7 +636,7 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
 
     for (unsigned i = 0; i < m_vrtxSharedPerChunk; i ++)
     {
-        buindex_t sharedIndex = *(triIndData + m_indToShared[i]);
+        vrindex_t sharedIndex = *(triIndData + m_indToShared[i]);
 
         // Decrease number of users
         m_vrtxSharedUsers[sharedIndex] --;
@@ -703,7 +644,7 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
         if (m_vrtxSharedUsers[sharedIndex] == 0)
         {
             // If users is zero, then delete
-            std::cout << "shared removed: " << sharedIndex << "\n";
+            //std::cout << "shared removed: " << sharedIndex << "\n";
             m_vrtxSharedFree.push_back(sharedIndex);
             m_vrtxSharedCount --;
 
@@ -720,7 +661,7 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
     }
 
     // Make sure descendents know that they're no longer part of a chunk
-    if (m_icoTree->tri_is_subdivided(tri))
+    if (tri.m_subdivided)
     {
         set_chunk_ancestor_recurse(tri.m_children + 0, gc_invalidTri);
         set_chunk_ancestor_recurse(tri.m_children + 1, gc_invalidTri);
@@ -818,7 +759,8 @@ void PlanetGeometryA::chunk_pack()
 
         // Move lastTri's index data to replace tri's data
         std::copy(m_indxBuffer.begin() + moveChunk.m_dataIndx,
-                  m_indxBuffer.begin() + moveChunk.m_dataIndx + m_indxPerChunk * 3,
+                  m_indxBuffer.begin() + moveChunk.m_dataIndx
+                                       + m_indxPerChunk * 3,
                   m_indxBuffer.begin() + replaceChunk.m_dataIndx);
 
         update_range_insert(m_gpuUpdIndxBuffer,
@@ -840,7 +782,7 @@ void PlanetGeometryA::set_chunk_ancestor_recurse(trindex_t triInd,
 
     m_triangleChunks[triInd].m_ancestorChunked = setTo;
 
-    if (!m_icoTree->tri_is_subdivided(tri))
+    if (!tri.m_subdivided)
     {
         return;
     }
@@ -865,12 +807,12 @@ vrindex_t PlanetGeometryA::shared_from_tri(SubTriangleChunk const& chunk,
 
     // ie. if side = 1, pos will index {8, 9, 10, 11, 0}
 
-    buindex_t localIndex = (side * m_chunkWidthB + pos) % m_vrtxSharedPerChunk;
+    vrindex_t localIndex = (side * m_chunkWidthB + pos) % m_vrtxSharedPerChunk;
 
-    vrindex_t sharedOut = m_indxBuffer[chunk.m_dataIndx + m_indToShared[localIndex]];
+    vrindex_t sharedOut = m_indxBuffer[
+            chunk.m_dataIndx + m_indToShared[localIndex]];
     //m_vrtxSharedUsers[sharedOut] ++;
 
-    std::cout << "grabbing vertex from side " << side << " pos: " << pos << "\n";
     return sharedOut;
 }
 
@@ -930,14 +872,14 @@ vrindex_t PlanetGeometryA::shared_from_neighbour(
 
             float posChild = 1.0f - posTransformed;
 
-            SubTriangleChunk *triChildChunk = &neighbourChunk;
+            SubTriangleChunk *triChildChunk;
             SubTriangle *triChildTri = &neighbourTri;
             trindex_t triNextChild;
 
             do
             {
                 if (neighbourChunk.m_descendentChunked == 0
-                    || !(triChildTri->m_bitmask & gc_triangleMaskSubdivided))
+                    || !triChildTri->m_subdivided)
                 {
                     return gc_invalidVrtx;
                 }
@@ -991,7 +933,8 @@ vrindex_t PlanetGeometryA::shared_from_neighbour(
         return gc_invalidVrtx;
     }
 
-    SubTriangle &chunkedNeighbourTri = m_icoTree->get_triangle(neighbourWithChunk);
+    SubTriangle &chunkedNeighbourTri
+            = m_icoTree->get_triangle(neighbourWithChunk);
 
     // Detect if trying to get a space between vertices using divisibility by
     // powers of 2
@@ -1008,15 +951,17 @@ vrindex_t PlanetGeometryA::shared_from_neighbour(
 
     trindex_t ancestor;
 
-    TriangleSideTransform tranFrom = m_icoTree->transform_to_ancestor(triInd, side, commonDepth, &ancestor);
+    TriangleSideTransform tranFrom = m_icoTree->transform_to_ancestor(
+                triInd, side, commonDepth, &ancestor);
 
     if (neighbourSide == 255)
     {
-        neighbourSide = m_icoTree->neighbour_side(chunkedNeighbourTri, ancestor);
+        neighbourSide = m_icoTree->neighbour_side(chunkedNeighbourTri,
+                                                  ancestor);
     }
 
-    TriangleSideTransform tranTo = m_icoTree->transform_to_ancestor(neighbourWithChunk, neighbourSide,
-                                     commonDepth);
+    TriangleSideTransform tranTo = m_icoTree->transform_to_ancestor(
+            neighbourWithChunk, neighbourSide, commonDepth);
 
     // normalize
     //float posTransformed = float(posIn) / float(m_chunkWidthB);
@@ -1029,7 +974,8 @@ vrindex_t PlanetGeometryA::shared_from_neighbour(
 
     loindex_t posOut = std::round(posTransformed * m_chunkWidthB);
 
-    return shared_from_tri(m_triangleChunks[neighbourWithChunk], neighbourSide, posOut);
+    return shared_from_tri(m_triangleChunks[neighbourWithChunk],
+                           neighbourSide, posOut);
 }
 
 vrindex_t PlanetGeometryA::shared_create()
@@ -1042,7 +988,7 @@ vrindex_t PlanetGeometryA::shared_create()
         // TODO: shared vertex buffer full, error!
         return false;
     }
-    if (m_vrtxSharedFree.size() == 0)
+    if (m_vrtxSharedFree.empty())
     {
         sharedOut = m_vrtxSharedCount;
     }
@@ -1055,7 +1001,7 @@ vrindex_t PlanetGeometryA::shared_create()
     m_vrtxSharedCount ++;
     m_vrtxSharedUsers[sharedOut] = 1; // set reference count
 
-    std::cout << "shared create: " << sharedOut << "\n";
+    //std::cout << "shared create: " << sharedOut << "\n";
 
     return sharedOut;
 }
@@ -1065,7 +1011,7 @@ unsigned PlanetGeometryA::debug_chunk_count_descendents(SubTriangle &tri)
 {
     unsigned count = 0;
 
-    if (get_ico_tree()->tri_is_subdivided(tri))
+    if (tri.m_subdivided)
     {
         for (trindex_t i = 0; i < 4; i ++)
         {
@@ -1161,7 +1107,7 @@ bool PlanetGeometryA::debug_verify_state()
 
             for (unsigned i = 0; i < m_vrtxSharedPerChunk; i ++)
             {
-                buindex_t sharedIndex = *(triIndData + m_indToShared[i]);
+                vrindex_t sharedIndex = *(triIndData + m_indToShared[i]);
                 recountVrtxSharedUsers[sharedIndex] ++;
             }
         }
@@ -1176,12 +1122,12 @@ bool PlanetGeometryA::debug_verify_state()
     if (recountVrtxSharedUsers != m_vrtxSharedUsers)
     {
         std::cout << "* Invalid Shared vertex user count\n";
-        for (int i = 0; i < recountVrtxSharedUsers.size(); i ++)
+        for (unsigned i = 0; i < m_vrtxSharedMax; i ++)
         {
             if (m_vrtxSharedUsers[i] != recountVrtxSharedUsers[i])
             std::cout << "  * Vertex: " << i << "\n"
-                      << "    * Expected: " << int(recountVrtxSharedUsers[i]) << "\n"
-                      << "    * Obtained: " << int(m_vrtxSharedUsers[i]) << "\n";
+                      << "\n    * Expected: " << int(recountVrtxSharedUsers[i])
+                      << "\n    * Obtained: " << int(m_vrtxSharedUsers[i]);
         }
 
         std::cout << "\n";

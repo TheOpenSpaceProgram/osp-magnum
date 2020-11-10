@@ -69,8 +69,9 @@ static constexpr int gc_icosahedronVertCount = 12;
 static constexpr std::uint8_t gc_triangleMaskSubdivided = 0b0001;
 //static constexpr std::uint8_t gc_triangleMaskChunked    = 0b0010;
 
-
-
+/**
+ * A simple 1D translation and scale
+ */
 struct TriangleSideTransform
 {
     float m_translation;
@@ -78,7 +79,9 @@ struct TriangleSideTransform
 };
 
 
-// Triangle on the IcoSphereTree
+/**
+ * A triangle on the IcoSphereTree
+ */
 struct SubTriangle
 {
     trindex_t m_parent;
@@ -89,8 +92,8 @@ struct SubTriangle
 
     osp::Vector3 m_center;
 
-    //bool subdivided;
-    uint8_t m_bitmask;
+    bool m_subdivided;
+    //uint8_t m_bitmask;
     uint8_t m_depth;
 
     // Data used when subdivided
@@ -101,16 +104,21 @@ struct SubTriangle
     buindex_t m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
     buindex_t m_index; // to index buffer
 
-    // Data used when chunked
-    //unsigned m_chunk; // Index to chunk. (First triangle ever chunked will be 0)
-    //buindex_t m_chunkIndx; // Index to index data in the index buffer
-    //buindex_t m_chunkVrtx; // Index to vertex data
+    // Number of times this triangle is being used externally
+    // Make sure this number is zero before removing this triangle
+    // Examples of uses
+    // * used by both a separate renderer and a collider generator
+    // * used across multiple scenes
+    unsigned m_useCount;
 };
 
 
 
-// An icosahedron with subdividable faces
-// it starts with 20 triangles, and each face can be subdivided into 4 more
+
+/**
+ * An Icosahedron with subdividable faces
+ * it starts with 20 triangles, and each face can be subdivided into 4 more
+ */
 class IcoSphereTree
 {
 
@@ -133,11 +141,6 @@ public:
     void initialize(float radius);
 
     trindex_t triangle_count() { return m_triangles.size(); }
-
-    constexpr bool tri_is_subdivided(SubTriangle &tri) const
-    {
-        return tri.m_bitmask & gc_triangleMaskSubdivided;
-    };
 
     /**
      * Get triangle from vector of triangles
@@ -190,6 +193,12 @@ public:
     static void set_verts(SubTriangle& tri, buindex_t top,
                           buindex_t lft, buindex_t rte);
 
+    /**
+     * Set a neighbour of a triangle, and apply for all of it's children's
+     * @param tri [ref] Reference to triangle
+     * @param side [in] Which side to set
+     * @param to [in] Neighbour to operate on
+     */
     void set_side_recurse(SubTriangle& tri, int side, trindex_t to);
 
     /**
@@ -220,11 +229,9 @@ public:
      */
     void calculate_center(SubTriangle& tri);
 
-    std::pair<trindex_t, trindex_t> find_neighbouring_ancestors(trindex_t a,
-                                                                trindex_t b);
-
-    TriangleSideTransform transform_to_ancestor(trindex_t t, uint8_t side,
-                                                uint8_t targetDepth, trindex_t *pAncestorOut = nullptr);
+    TriangleSideTransform transform_to_ancestor(
+            trindex_t t, uint8_t side, uint8_t targetDepth,
+            trindex_t *pAncestorOut = nullptr);
 
     /**
      * Checks all triangles for invalid states in order to squash some bugs
@@ -234,16 +241,12 @@ public:
 
 private:
 
-    //PODVector<PlanetWrenderer> m_viewers;
     std::vector<float> m_vrtxBuffer;
     std::vector<SubTriangle> m_triangles; // List of all triangles
+
     // List of indices to deleted triangles in the m_triangles
     std::vector<trindex_t> m_trianglesFree;
     std::vector<buindex_t> m_vrtxFree; // Deleted vertices in m_vertBuf
-    // use "m_indDomain[buindex_t]" to get a triangle index
-
-    uint8_t m_maxDepth;
-    uint8_t m_minDepth; // never subdivide below this
 
     buindex_t m_maxVertice;
     buindex_t m_maxTriangles;
