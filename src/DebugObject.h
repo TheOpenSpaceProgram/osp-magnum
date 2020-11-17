@@ -76,6 +76,7 @@ public:
     DebugCameraController(active::ActiveScene &scene, active::ActiveEnt ent);
     ~DebugCameraController() = default;
     void update_vehicle_mod_pre();
+    void update_physics_pre();
     void update_physics_post();
     void view_orbit(active::ActiveEnt ent);
 private:
@@ -85,6 +86,7 @@ private:
     float m_orbitDistance;
 
     active::UpdateOrderHandle m_updateVehicleModPre;
+    active::UpdateOrderHandle m_updatePhysicsPre;
     active::UpdateOrderHandle m_updatePhysicsPost;
 
     UserInputHandler &m_userInput;

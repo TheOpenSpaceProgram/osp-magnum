@@ -25,6 +25,8 @@
 #include "ActiveScene.h"
 #include "SysVehicle.h"
 #include "SysDebugRender.h"
+#include "physics.h"
+
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
 #include "../Resource/PrototypePart.h"
@@ -92,7 +94,8 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
                                         .emplace<ACompTransform>(vehicleEnt);
     vehicleTransform.m_transform
             = Matrix4::from(tgtPosTraj.m_rotation.toMatrix(), positionInScene);
-    vehicleTransform.m_enableFloatingOrigin = true;
+    scene.reg_emplace<ACompFloatingOrigin>(vehicleEnt);
+    //vehicleTransform.m_enableFloatingOrigin = true;
 
     // Create the parts
 
@@ -265,7 +268,6 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                 = Matrix4::from(currentPrototype.m_rotation.toMatrix(),
                                 currentPrototype.m_translation)
                 * Matrix4::scaling(currentPrototype.m_scale);
-        currentTransform.m_enableFloatingOrigin = true;
 
         if (currentPrototype.m_type == ObjectType::MESH)
         {
@@ -378,7 +380,7 @@ void SysVehicle::update_vehicle_modification()
                 islandShape.m_shape = ECollisionShape::COMBINED;
 
                 islandTransform.m_transform = vehicleTransform.m_transform;
-                islandTransform.m_enableFloatingOrigin = true;
+                m_scene.reg_emplace<ACompFloatingOrigin>(islandEnt);
 
                 islands[i] = islandEnt;
 

@@ -37,12 +37,6 @@ namespace osp::active
 class SysAreaAssociate;
 struct ACompActivatedSat;
 
-//typedef int (*LoadStrategy)(ActiveScene &scene, SysAreaAssociate &area,
-//                universe::Satellite areaSat, universe::Satellite loadMe);
-
-// TODO: maybe consider getting rid of raw pointers here somehow.
-//       none of these take ownership, only reference
-
 struct StatusActivated
 {
     int m_status; // 0 for no errors
@@ -95,6 +89,12 @@ public:
     void disconnect();
 
     /**
+     * Move the ActiveArea satellite, and translate everything in the
+     * ActiveScene, aka: floating origin translation
+     */
+    void area_move(Vector3s translate);
+
+    /**
      * Update position of ent's associated Satellite in the Universe, based on
      * it's transform in the ActiveScene.
      */
@@ -124,7 +124,14 @@ private:
     //std::vector<universe::Satellite> m_activatedSats;
     entt::sparse_set<universe::Satellite> m_activatedSats;
 
+    //UpdateOrderHandle m_updateFloatingOrigin;
     UpdateOrderHandle m_updateScan;
+
+    /**
+     * Translate everything in the ActiveScene
+     * @param translation
+     */
+    void floating_origin_translate(Vector3 translation);
 
     /**
      * Attempt to load a satellite

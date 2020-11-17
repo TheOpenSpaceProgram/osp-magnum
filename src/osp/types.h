@@ -51,6 +51,10 @@ using Magnum::Rad;
 // An int for space
 typedef int64_t SpaceInt;
 
+// 1024 space units = 1 meter
+// TODO: this should vary by trajectory, but for now it's global
+const float gc_units_per_meter = 1024.0f;
+
 // A Vector3 for space
 //typedef Magnum::Math::Vector3<SpaceInt> Vector3sp;
 

@@ -55,10 +55,12 @@ DebugCameraController::DebugCameraController(active::ActiveScene &scene,
         DebugObject(scene, ent),
         m_orbiting(entt::null),
         m_orbitPos(0, 0, 1),
-        m_updatePhysicsPost(scene.get_update_order(), "dbg_cam", "physics", "",
-                std::bind(&DebugCameraController::update_physics_post, this)),
         m_updateVehicleModPre(scene.get_update_order(), "dbg_cam_vmod", "", "vehicle_modification",
-                std::bind(&DebugCameraController::update_vehicle_mod_pre, this)),
+                [this] { this->update_vehicle_mod_pre(); }),
+        m_updatePhysicsPre(scene.get_update_order(), "dbg_cam_pre", "", "physics",
+                [this] { this->update_physics_pre(); }),
+        m_updatePhysicsPost(scene.get_update_order(), "dbg_cam_post", "physics", "",
+                [this] { this->update_physics_post(); }),
         m_userInput(scene.get_user_input()),
         m_mouseMotion(m_userInput.mouse_get()),
         m_scrollInput(m_userInput.scroll_get()),
@@ -99,6 +101,32 @@ void DebugCameraController::update_vehicle_mod_pre()
                     .m_separationIsland = i;
         }
         tgtVehicle.m_separationCount = tgtVehicle.m_parts.size();
+    }
+}
+
+void DebugCameraController::update_physics_pre()
+{
+    // Floating Origin / Active area movement
+
+    // When the camera is too far from the origin of the ActiveScene
+    const int floatingOriginThreshold = 256;
+
+    Matrix4 &xform = m_scene.reg_get<active::ACompTransform>(m_ent).m_transform;
+
+    // round to nearest (floatingOriginThreshold)
+    Vector3s tra(-xform.translation() / floatingOriginThreshold);
+    tra *= floatingOriginThreshold;
+
+    // convert to space int
+    tra *= gc_units_per_meter;
+
+    if (!tra.isZero())
+    {
+        std::cout << "Floating origin translation!\n";
+
+        // Move the active area to center on the camera
+        m_scene.dynamic_system_get<active::SysAreaAssociate>("AreaAssociate")
+                .area_move(-tra);
     }
 }
 

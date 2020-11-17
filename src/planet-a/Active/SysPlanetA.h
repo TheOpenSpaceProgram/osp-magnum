@@ -38,7 +38,7 @@
 namespace planeta::active
 {
 
-struct CompPlanet
+struct ACompPlanet
 {
     PlanetGeometryA m_planet;
     Magnum::GL::Mesh m_mesh{};
@@ -78,7 +78,7 @@ public:
     void draw(osp::active::ACompCamera const& camera);
 
     void debug_create_chunk_collider(osp::active::ActiveEnt ent,
-                                     CompPlanet &planet,
+                                     ACompPlanet &planet,
                                      chindex_t chunk);
 
     void update_geometry();

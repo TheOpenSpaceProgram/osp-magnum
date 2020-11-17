@@ -34,8 +34,8 @@ using namespace osp;
 SysAreaAssociate::SysAreaAssociate(ActiveScene &rScene, Universe &uni) :
        m_scene(rScene),
        m_universe(uni),
-       m_updateScan(rScene.get_update_order(), "areascan", "", "",
-                    std::bind(&SysAreaAssociate::update_scan, this))
+       m_updateScan(rScene.get_update_order(), "areascan", "physics", "",
+                    [this] { this->update_scan(); })
 {
 
 }
@@ -102,20 +102,6 @@ void SysAreaAssociate::update_scan()
         sat_activate(sat, view.get(sat));
     }
 
-
-//    ACompTransform& cameraTransform = m_scene->reg_get<ACompTransform>(m_camera);
-//    //cameraTransform.m_transform[3].xyz().x() += 0.1f; // move the camera right
-
-//    // Temporary: Floating origin follow cameara
-//    Magnum::Vector3i tra(cameraTransform.m_transform[3].xyz());
-
-//    m_scene->floating_origin_translate(-Vector3(tra));
-//    m_sat->set_position(m_sat->get_position()
-//    + Vector3sp({tra.x() * 1024,
-//    tra.y() * 1024,
-//    tra.z() * 1024}, 10));
-    //std::cout << "x: " << Vector3sp(m_sat->get_position()).x() << "\n";
-
 }
 
 void SysAreaAssociate::connect(universe::Satellite sat)
@@ -143,6 +129,18 @@ void SysAreaAssociate::disconnect()
     m_areaSat = entt::null;
 }
 
+void SysAreaAssociate::area_move(Vector3s translate)
+{
+    auto &areaPosTraj = m_universe.get_reg()
+            .get<universe::UCompTransformTraj>(m_areaSat);
+
+    areaPosTraj.m_position += translate;
+
+    Vector3 meters = Vector3(translate) / gc_units_per_meter;
+
+    floating_origin_translate(-meters);
+}
+
 void SysAreaAssociate::sat_transform_update(ActiveEnt ent)
 {
     auto const &entAct = m_scene.reg_get<ACompActivatedSat>(ent);
@@ -156,7 +154,8 @@ void SysAreaAssociate::sat_transform_update(ActiveEnt ent)
             .get<universe::UCompTransformTraj>(m_areaSat);
 
     // 1024 units = 1 meter
-    Vector3s posAreaRelative(entTransform.m_transform.translation() * 1024.0f);
+    Vector3s posAreaRelative(entTransform.m_transform.translation()
+                             * gc_units_per_meter);
 
 
 
@@ -171,6 +170,32 @@ void SysAreaAssociate::activator_add(universe::ITypeSatellite const* type,
 {
     m_activators[type] = &activator;
 }
+
+
+void SysAreaAssociate::floating_origin_translate(Vector3 translation)
+{
+    auto view = m_scene.get_registry()
+            .view<ACompFloatingOrigin, ACompTransform>();
+
+    for (ActiveEnt ent : view)
+    {
+        auto &entTransform = view.get<ACompTransform>(ent);
+        //auto &entFloatingOrigin = view.get<ACompFloatingOrigin>(ent);
+
+        if (entTransform.m_controlled)
+        {
+            if (!entTransform.m_mutable)
+            {
+                continue;
+            }
+
+            entTransform.m_transformDirty = true;
+        }
+
+        entTransform.m_transform.translation() += translation;
+    }
+}
+
 
 int SysAreaAssociate::sat_activate(universe::Satellite sat,
                                    universe::UCompActivatable &satAct)
