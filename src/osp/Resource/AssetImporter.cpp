@@ -43,6 +43,7 @@
 #include <MagnumExternal/TinyGltf/tiny_gltf.h>
 
 #include "Package.h"
+#include "TextData.h"
 #include "AssetImporter.h"
 
 using Corrade::Containers::Optional;
@@ -349,6 +350,12 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
         proto_add_obj_recurse(gltfImporter, package, part, objIndex, childId);
     }
 }
+
+    void AssetImporter::load_text_to_toml(std::string const& filePath, Package& package)
+    {
+        std::ifstream data(filePath, std::ios_base::binary);
+        package.add<toml::value>(filePath, toml::parse(data));
+    }
 
 }
 

@@ -106,6 +106,7 @@ target_link_libraries(osp-magnum PRIVATE
     MagnumPlugins::TinyGltfImporter
     MagnumPlugins::StbImageImporter
     dNewton dScene dModel dVehicle
+    toml11
     )
 
 find_program(iwyu_path NAMES include-what-you-use iwyu)

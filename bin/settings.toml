@@ -23,20 +23,62 @@
 # SOFTWARE.
 ##
 
-ADD_SUBDIRECTORY(corrade EXCLUDE_FROM_ALL)
+[vehicle_pitch_up]
+primary = S
+secondary = 
 
-SET(BUILD_PLUGINS_STATIC ON CACHE BOOL "" FORCE)
-SET(WITH_SDL2APPLICATION ON CACHE BOOL "" FORCE)
-SET(WITH_ANYIMAGEIMPORTER ON CACHE BOOL "" FORCE)
-ADD_SUBDIRECTORY(magnum EXCLUDE_FROM_ALL)
+[vehicle_pitch_dn]
+primary = W
+secondary = 
 
-SET(WITH_TINYGLTFIMPORTER ON CACHE BOOL "" FORCE)
-SET(WITH_STBIMAGEIMPORTER ON CACHE BOOL "" FORCE)
-ADD_SUBDIRECTORY(magnum-plugins EXCLUDE_FROM_ALL)
+[vehicle_yaw_lf]
+primary = A
+secondary = 
 
-SET(NEWTON_BUILD_SANDBOX_DEMOS OFF)
-ADD_SUBDIRECTORY(newton-dynamics)
+[vehicle_yaw_rt]
+primary = D
+secondary = 
 
-ADD_SUBDIRECTORY(entt)
+[vehicle_roll_lf]
+primary = Q
+secondary = 
 
-ADD_SUBDIRECTORY(toml11)
+[vehicle_roll_rt]
+primary = E
+secondary = 
+
+[vehicle_thr_max]
+primary = Z
+secondary = 
+
+[vehicle_thr_min]
+primary = X
+secondary = 
+
+[vehicle_self_destruct]
+primary = LCtrl+C
+secondary = LShift+A
+
+[game_switch]
+primary = V
+secondary = 
+
+[ui_up]
+primary = Up
+secondary = 
+
+[ui_dn]
+primary = Down
+secondary = 
+
+[ui_lf]
+primary = Left
+secondary = 
+
+[ui_rt]
+primary = Right
+secondary = 
+
+[ui_rmb]
+primary = RtMouse
+secondary = 

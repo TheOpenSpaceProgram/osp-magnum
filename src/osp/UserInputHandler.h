@@ -295,6 +295,15 @@ public:
             std::initializer_list<ButtonVarConfig> vars);
 
     /**
+     * Register a new control into the config.
+     * @param name Name used for identification
+     * @param vars Expression needed to activate the control
+     */
+    void UserInputHandler::config_register_control(std::string const& name,
+        bool holdable,
+        std::vector<ButtonVarConfig> vars);
+
+    /**
      * Fetch a button configuration
      * 
      * Spawns a new ButtonControl to allow 
@@ -337,6 +346,9 @@ public:
      * @param delta Change in mouse position this frame
     */
     void scroll_delta(Vector2i offset);
+
+    void save_config(std::string const& file);
+    void load_config(std::string const& file, Package& pack);
 
 private:
 

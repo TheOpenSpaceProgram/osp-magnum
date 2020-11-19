@@ -174,15 +174,15 @@ int debug_cli_loop()
         {
             debug_print_help();
         }
-        if (command == "list_uni")
+        else if (command == "list_uni")
         {
             debug_print_sats();
         }
-        if (command == "list_ent")
+        else if (command == "list_ent")
         {
             debug_print_hier();
         }
-        if (command == "list_upd")
+        else if (command == "list_upd")
         {
             debug_print_update_order();
         }
@@ -347,6 +347,7 @@ void config_controls()
 
     // would help to get an axis for yaw, pitch, and roll, but use individual
     // axis buttons for now
+    
     userInput.config_register_control("vehicle_pitch_up", true,
             {{0, (int) Key::S, VarTrig::PRESSED, false, VarOp::AND}});
     userInput.config_register_control("vehicle_pitch_dn", true,
@@ -372,7 +373,7 @@ void config_controls()
              {0, (int) Key::C, VarTrig::PRESSED, false, VarOp::OR},
              {0, (int) Key::LeftShift, VarTrig::HOLD, false, VarOp::AND},
              {0, (int) Key::A, VarTrig::PRESSED, false, VarOp::OR}});
-
+    
     // Camera and Game controls, handled in DebugCameraController
 
     // Switch to next vehicle
@@ -491,7 +492,6 @@ osp::universe::Satellite debug_add_random_vehicle(std::string const& name)
     DependRes<PrototypePart> victim =
             g_osp.debug_get_packges()[0]
             .get<PrototypePart>("part_spamcan");
-
     // Add 12 parts
     for (int i = 0; i < 12; i ++)
     {
@@ -718,6 +718,5 @@ void debug_print_sats()
         std::cout << " * Position: ["
                   << pos.x() << ", " << pos.y() << ", " << pos.z() << "]\n";
     }
-
 
 }

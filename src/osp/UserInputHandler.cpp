@@ -24,6 +24,9 @@
  */
 #include <iostream>
 #include "UserInputHandler.h"
+#include <toml.hpp>
+#include "osp/Resource/Package.h"
+#include "osp/Resource/AssetImporter.h"
 
 namespace osp
 {
@@ -244,9 +247,14 @@ void UserInputHandler::config_register_control(std::string const& name,
         bool holdable,
         std::initializer_list<ButtonVarConfig> vars)
 {
-    std::vector<ButtonVarConfig> varVector(vars);
-    m_controlConfigs[name] = ButtonConfig{std::move(varVector), holdable,
-                                          false, 0};
+    config_register_control(name, holdable, std::vector(vars));
+}
+
+void UserInputHandler::config_register_control(std::string const& name,
+    bool holdable,
+    std::vector<ButtonVarConfig> vars) {
+    m_controlConfigs[name] = ButtonConfig{std::move(vars), holdable,
+                                          false, 0 };
 }
 
 ButtonControlHandle UserInputHandler::config_get(std::string const& name)
@@ -453,6 +461,19 @@ void UserInputHandler::mouse_delta(Vector2i delta)
 void UserInputHandler::scroll_delta(Vector2i offset)
 {
     m_scrollOffset.offset = offset;
+}
+
+void UserInputHandler::save_config(std::string const& file)
+{
+    
+}
+
+void UserInputHandler::load_config(std::string const& file, Package& pack)
+{
+    AssetImporter::load_text_to_toml(file, pack);
+    toml::value toml = *pack.get<toml::value>(file);
+    //Load the config
+    
 }
 
 }

@@ -32,7 +32,7 @@
 #include <Magnum/GL/Texture.h>
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/MeshData.h>
-
+#include <toml.hpp>
 
 #include "Package.h"
 #include "PrototypePart.h"
@@ -86,6 +86,11 @@ public:
      */
     static DependRes<Magnum::GL::Texture2D> compile_tex(
         const DependRes<Magnum::Trade::ImageData2D> imageData, Package& package);
+
+    /**
+    * Loads text from toml
+    */
+    static void load_text_to_toml(std::string const& filePath, Package& package);
 private:
     /**
      * Load only associated config files, and add resource paths to the package
@@ -114,7 +119,6 @@ private:
                                PrototypePart& part,
                                unsigned parentProtoIndex,
                                unsigned childGltfIndex);
-
 };
 
 }
