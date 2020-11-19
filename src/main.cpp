@@ -227,12 +227,11 @@ void magnum_application()
     g_ospMagnum = std::make_unique<osp::OSPMagnum>(
                         osp::OSPMagnum::Arguments{g_argc, g_argv}, g_osp);
 
-    config_controls(); // as the name implies
-
     // Load if not loaded yet. This only calls once during entire runtime
     if (!g_osp.debug_get_packges().size())
     {
         load_a_bunch_of_stuff();
+        config_controls(); // as the name implies
         create_solar_system();
     }
 
@@ -336,13 +335,12 @@ void config_controls()
     // functions.
 
     using namespace osp;
-
     using Key = OSPMagnum::KeyEvent::Key;
     using Mouse = OSPMagnum::MouseEvent::Button;
     using VarOp = ButtonVarConfig::VarOperator;
     using VarTrig = ButtonVarConfig::VarTrigger;
     UserInputHandler& userInput = g_ospMagnum->get_input_handler();
-
+/*
     // vehicle control, used by MachineUserControl
 
     // would help to get an axis for yaw, pitch, and roll, but use individual
@@ -393,8 +391,11 @@ void config_controls()
 
     userInput.config_register_control("ui_rmb", true,
             {{osp::sc_mouse, (int) Mouse::Right, VarTrig::PRESSED, false, VarOp::AND}});
+            */
+    std::cout << "loading config" << std::endl;
+    userInput.load_config("settings.toml", g_osp.debug_get_packges()[0]);
 }
-
+    
 void load_a_bunch_of_stuff()
 {
     // Create a new package

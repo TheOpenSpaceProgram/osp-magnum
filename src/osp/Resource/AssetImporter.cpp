@@ -43,7 +43,6 @@
 #include <MagnumExternal/TinyGltf/tiny_gltf.h>
 
 #include "Package.h"
-#include "TextData.h"
 #include "AssetImporter.h"
 
 using Corrade::Containers::Optional;

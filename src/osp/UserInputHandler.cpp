@@ -23,10 +23,13 @@
  * SOFTWARE.
  */
 #include <iostream>
-#include "UserInputHandler.h"
 #include <toml.hpp>
+#include <cctype>
+#include "UserInputHandler.h"
 #include "osp/Resource/Package.h"
 #include "osp/Resource/AssetImporter.h"
+
+#include "OSPMagnum.h"
 
 namespace osp
 {
@@ -471,9 +474,118 @@ void UserInputHandler::save_config(std::string const& file)
 void UserInputHandler::load_config(std::string const& file, Package& pack)
 {
     AssetImporter::load_text_to_toml(file, pack);
-    toml::value toml = *pack.get<toml::value>(file);
+    toml::value config = *(pack.get<toml::value>(file));
+
     //Load the config
+    for (auto& tab : config.as_table())
+    {
+
+        std::string name = tab.first;
+        std::vector< ButtonVarConfig> controls;
+        std::cout << name << std::endl;
+        std::vector<ButtonVarConfig> primary = parse_config_string(tab.second.at("primary").as_string());
+        controls.insert(controls.end(), primary.begin(), primary.end());
+        std::vector<ButtonVarConfig> secondary = parse_config_string(tab.second.at("secondary").as_string());
+        controls.insert(controls.end(), primary.begin(), primary.end());
+
+        //Will have to modify the holdable param so that it works
+        config_register_control(name, true,
+            controls);
+    }
+}
+
+std::vector<ButtonVarConfig> UserInputHandler::parse_config_string(std::string text)
+{
+    //Little bit sketchy, but good enough
+    size_t pos = 0;
+    std::string token;
+
+    auto start = 0U;
+    auto end = text.find("+");
+    std::vector<ButtonVarConfig> conf;
+    int len = 0;
+    do
+    {
+        token = text.substr(start, end - start);
+        //Set the config
+        ButtonVarConfig button = get_button(token);
+        conf.push_back(button);
+        start = end + 1;
+        end = text.find("+", start);
+        len++;
+    } while (end != std::string::npos);
+    //Parse last token
+    if (len > 1) {
+        token = text.substr(start, end - start);
+        ButtonVarConfig button = get_button(token);
+        conf.push_back(button);
+    }
+
+    int size = conf.size() - 1;
+    conf[size].m_nextOp = ButtonVarConfig::VarOperator::OR;
+    conf[size].m_trigger = ButtonVarConfig::VarTrigger::PRESSED;
+
+    return conf;
+}
+
+ButtonVarConfig UserInputHandler::get_button(std::string text)
+{
+    using namespace osp;
+    using Key = OSPMagnum::KeyEvent::Key;
+    using Mouse = OSPMagnum::MouseEvent::Button;
+    using VarOp = ButtonVarConfig::VarOperator;
+    using VarTrig = ButtonVarConfig::VarTrigger;
+    ButtonVarConfig config(0, 0, ButtonVar::VarTrigger::HOLD, false, ButtonVar::VarOperator::AND);
+    if (text == "RShift") {
+        config.m_devEnum = (int)Key::RightShift;
+    }
+    else if (text == "LShift") {
+        config.m_devEnum = (int)Key::LeftShift;
+    }
+    else if (text == "LCtrl") {
+        config.m_devEnum = (int)Key::LeftCtrl;
+    }
+    else if (text == "RCtrl") {
+        config.m_devEnum = (int)Key::RightCtrl;
+    }
+    else if (text == "LAlt") {
+        config.m_devEnum = (int)Key::LeftAlt;
+    }
+    else if (text == "RAlt") {
+        config.m_devEnum = (int)Key::RightAlt;
+    }
+    else if (text == "Up") {
+        config.m_devEnum = (int)Key::Up;
+    }
+    else if (text == "Down") {
+        config.m_devEnum = (int)Key::Down;
+    }
+    else if (text == "Left") {
+        config.m_devEnum = (int)Key::Left;
+    }
+    else if (text == "Right") {
+        config.m_devEnum = (int)Key::Right;
+    }
+    else if (text == "RtMouse") {
+        config.m_devEnum = (int) Mouse::Right;
+    }
+    else if (text == "LMouse") {
+        config.m_devEnum = (int)Mouse::Left;
+    }
+    else if (text == "MMouse") {
+        config.m_devEnum = (int)Mouse::Middle;
+    }
+    else if (text.length() == 1) {
+        //Ascii
+        int ascii = (int)text.at(0);
+        if (isalpha(ascii)) {
+            ascii = toupper(ascii);
+        }
+       config.m_devEnum = ascii;
+       std::cout << (char)ascii << std::endl;
+    }
     
+    return config;
 }
 
 }

@@ -31,6 +31,7 @@
 #include <vector>
 #include <optional>
 #include "types.h"
+#include "osp/Resource/Package.h"
 
 namespace osp
 {
@@ -87,6 +88,13 @@ struct ButtonVarConfig
     using VarTrigger = ButtonVar::VarTrigger;
     using VarOperator = ButtonVar::VarOperator;
 
+    /**
+    * @param device The devide
+    * @param devEnum the key
+    * @param trigger pressed or held
+    * @param invert to invert the button or not
+    * @param nextOp to include next operation or not
+    */
     constexpr ButtonVarConfig(int device, int devEnum, VarTrigger trigger,
                                bool invert, VarOperator nextOp) :
             m_device(device),
@@ -348,7 +356,7 @@ public:
     void scroll_delta(Vector2i offset);
 
     void save_config(std::string const& file);
-    void load_config(std::string const& file, Package& pack);
+    void load_config(std::string const& file, osp::Package& pack);
 
 private:
 
@@ -364,6 +372,9 @@ private:
     std::vector<ButtonMap::iterator> m_btnReleased;
 
     //std::map<std::string, int> m_controlActive;
+
+    std::vector<ButtonVarConfig> parse_config_string(std::string text);
+    ButtonVarConfig get_button(std::string text);
 };
 
 // temporary-ish

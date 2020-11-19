@@ -24,61 +24,61 @@
 ##
 
 [vehicle_pitch_up]
-primary = S
-secondary = 
+primary = "S"
+secondary = "None"
 
 [vehicle_pitch_dn]
-primary = W
-secondary = 
+primary = "W"
+secondary = "None"
 
 [vehicle_yaw_lf]
-primary = A
-secondary = 
+primary = "A"
+secondary = "None"
 
 [vehicle_yaw_rt]
-primary = D
-secondary = 
+primary = "D"
+secondary = "None"
 
 [vehicle_roll_lf]
-primary = Q
-secondary = 
+primary = "Q"
+secondary = "None"
 
 [vehicle_roll_rt]
-primary = E
-secondary = 
+primary = "E"
+secondary = "None"
 
 [vehicle_thr_max]
-primary = Z
-secondary = 
+primary = "Z"
+secondary = "None"
 
 [vehicle_thr_min]
-primary = X
-secondary = 
+primary = "X"
+secondary = "None"
 
 [vehicle_self_destruct]
-primary = LCtrl+C
-secondary = LShift+A
+primary = "LCtrl+C"
+secondary = "LShift+A"
 
 [game_switch]
-primary = V
-secondary = 
+primary = "V"
+secondary = "None"
 
 [ui_up]
-primary = Up
-secondary = 
+primary = "Up"
+secondary = "None"
 
 [ui_dn]
-primary = Down
-secondary = 
+primary = "Down"
+secondary = "None"
 
 [ui_lf]
-primary = Left
-secondary = 
+primary = "Left"
+secondary = "None"
 
 [ui_rt]
-primary = Right
-secondary = 
+primary = "Right"
+secondary = "None"
 
 [ui_rmb]
-primary = RtMouse
-secondary = 
+primary = "RtMouse"
+secondary = "None"
