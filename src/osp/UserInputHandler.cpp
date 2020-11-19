@@ -475,13 +475,11 @@ void UserInputHandler::load_config(std::string const& file, Package& pack)
 {
     AssetImporter::load_text_to_toml(file, pack);
     toml::value config = *(pack.get<toml::value>(file));
-
     //Load the config
     for (auto& tab : config.as_table())
     {
-
         std::string name = tab.first;
-        std::vector< ButtonVarConfig> controls;
+        std::vector<ButtonVarConfig> controls;
         std::cout << name << std::endl;
         std::vector<ButtonVarConfig> primary = parse_config_string(tab.second.at("primary").as_string());
         controls.insert(controls.end(), primary.begin(), primary.end());
@@ -491,18 +489,23 @@ void UserInputHandler::load_config(std::string const& file, Package& pack)
         //Will have to modify the holdable param so that it works
         config_register_control(name, true,
             controls);
+        std::cout << controls.size() << std::endl;
+        for (ButtonVarConfig c : controls) {
+            std::cout << c.m_devEnum << std::endl;
+        }
     }
 }
 
 std::vector<ButtonVarConfig> UserInputHandler::parse_config_string(std::string text)
 {
+    std::vector<ButtonVarConfig> conf;
+
     //Little bit sketchy, but good enough
     size_t pos = 0;
     std::string token;
-
     auto start = 0U;
     auto end = text.find("+");
-    std::vector<ButtonVarConfig> conf;
+    
     int len = 0;
     do
     {
@@ -514,12 +517,6 @@ std::vector<ButtonVarConfig> UserInputHandler::parse_config_string(std::string t
         end = text.find("+", start);
         len++;
     } while (end != std::string::npos);
-    //Parse last token
-    if (len > 1) {
-        token = text.substr(start, end - start);
-        ButtonVarConfig button = get_button(token);
-        conf.push_back(button);
-    }
 
     int size = conf.size() - 1;
     conf[size].m_nextOp = ButtonVarConfig::VarOperator::OR;
@@ -579,7 +576,7 @@ ButtonVarConfig UserInputHandler::get_button(std::string text)
         //Ascii
         int ascii = (int)text.at(0);
         if (isalpha(ascii)) {
-            ascii = toupper(ascii);
+            ascii = tolower(ascii);
         }
        config.m_devEnum = ascii;
        std::cout << (char)ascii << std::endl;

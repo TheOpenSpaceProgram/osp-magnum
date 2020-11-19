@@ -340,13 +340,13 @@ void config_controls()
     using VarOp = ButtonVarConfig::VarOperator;
     using VarTrig = ButtonVarConfig::VarTrigger;
     UserInputHandler& userInput = g_ospMagnum->get_input_handler();
-/*
+
     // vehicle control, used by MachineUserControl
 
     // would help to get an axis for yaw, pitch, and roll, but use individual
     // axis buttons for now
     
-    userInput.config_register_control("vehicle_pitch_up", true,
+    /*userInput.config_register_control("vehicle_pitch_up", true,
             {{0, (int) Key::S, VarTrig::PRESSED, false, VarOp::AND}});
     userInput.config_register_control("vehicle_pitch_dn", true,
             {{0, (int) Key::W, VarTrig::PRESSED, false, VarOp::AND}});
