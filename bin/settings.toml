@@ -80,5 +80,5 @@ primary = "Right"
 secondary = "None"
 
 [ui_rmb]
-primary = "RtMouse"
+primary = "RMouse"
 secondary = "None"

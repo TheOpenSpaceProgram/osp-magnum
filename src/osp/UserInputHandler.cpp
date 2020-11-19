@@ -490,33 +490,20 @@ void UserInputHandler::load_config(std::string const& file, Package& pack)
         config_register_control(name, true,
             controls);
         std::cout << controls.size() << std::endl;
-        for (ButtonVarConfig c : controls) {
-            std::cout << c.m_devEnum << std::endl;
-        }
     }
 }
 
 std::vector<ButtonVarConfig> UserInputHandler::parse_config_string(std::string text)
 {
-    std::vector<ButtonVarConfig> conf;
-
-    //Little bit sketchy, but good enough
-    size_t pos = 0;
-    std::string token;
-    auto start = 0U;
-    auto end = text.find("+");
+    std::vector<ButtonVarConfig> conf;  
     
-    int len = 0;
-    do
-    {
-        token = text.substr(start, end - start);
-        //Set the config
+    std::stringstream ss(text);
+    std::string token;
+    while (std::getline(ss, token, '+')) {
+        //Parse token
         ButtonVarConfig button = get_button(token);
         conf.push_back(button);
-        start = end + 1;
-        end = text.find("+", start);
-        len++;
-    } while (end != std::string::npos);
+    }
 
     int size = conf.size() - 1;
     conf[size].m_nextOp = ButtonVarConfig::VarOperator::OR;
@@ -533,6 +520,7 @@ ButtonVarConfig UserInputHandler::get_button(std::string text)
     using VarOp = ButtonVarConfig::VarOperator;
     using VarTrig = ButtonVarConfig::VarTrigger;
     ButtonVarConfig config(0, 0, ButtonVar::VarTrigger::HOLD, false, ButtonVar::VarOperator::AND);
+    std::cout << text << std::endl;
     if (text == "RShift") {
         config.m_devEnum = (int)Key::RightShift;
     }
@@ -563,14 +551,17 @@ ButtonVarConfig UserInputHandler::get_button(std::string text)
     else if (text == "Right") {
         config.m_devEnum = (int)Key::Right;
     }
-    else if (text == "RtMouse") {
+    else if (text == "RMouse") {
         config.m_devEnum = (int) Mouse::Right;
+        config.m_device = osp::sc_mouse;
     }
     else if (text == "LMouse") {
         config.m_devEnum = (int)Mouse::Left;
+        config.m_device = osp::sc_mouse;
     }
     else if (text == "MMouse") {
         config.m_devEnum = (int)Mouse::Middle;
+        config.m_device = osp::sc_mouse;
     }
     else if (text.length() == 1) {
         //Ascii
@@ -579,7 +570,6 @@ ButtonVarConfig UserInputHandler::get_button(std::string text)
             ascii = tolower(ascii);
         }
        config.m_devEnum = ascii;
-       std::cout << (char)ascii << std::endl;
     }
     
     return config;
