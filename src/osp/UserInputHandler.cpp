@@ -480,24 +480,24 @@ void UserInputHandler::load_config(std::string const& file, Package& pack)
     {
         std::string name = tab.first;
         std::vector<ButtonVarConfig> controls;
-        std::cout << name << std::endl;
-        std::vector<ButtonVarConfig> primary = parse_config_string(tab.second.at("primary").as_string());
+        
+        std::vector<ButtonVarConfig> primary = parse_config_string(tab.second.at("primary").as_string().str);
         controls.insert(controls.end(), primary.begin(), primary.end());
-        std::vector<ButtonVarConfig> secondary = parse_config_string(tab.second.at("secondary").as_string());
+
+        std::vector<ButtonVarConfig> secondary = parse_config_string((tab.second.at("secondary").as_string().str));
         controls.insert(controls.end(), primary.begin(), primary.end());
 
         //Will have to modify the holdable param so that it works
         config_register_control(name, true,
             controls);
-        std::cout << controls.size() << std::endl;
     }
 }
 
-std::vector<ButtonVarConfig> UserInputHandler::parse_config_string(std::string text)
+std::vector<ButtonVarConfig> UserInputHandler::parse_config_string(std::string_view config)
 {
     std::vector<ButtonVarConfig> conf;  
-    
-    std::stringstream ss(text);
+    std::string string = std::string(config);
+    std::stringstream ss(string);
     std::string token;
     while (std::getline(ss, token, '+')) {
         //Parse token
@@ -512,7 +512,7 @@ std::vector<ButtonVarConfig> UserInputHandler::parse_config_string(std::string t
     return conf;
 }
 
-ButtonVarConfig UserInputHandler::get_button(std::string text)
+ButtonVarConfig UserInputHandler::get_button(std::string_view text)
 {
     using namespace osp;
     using Key = OSPMagnum::KeyEvent::Key;

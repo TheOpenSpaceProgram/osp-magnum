@@ -373,8 +373,8 @@ private:
 
     //std::map<std::string, int> m_controlActive;
 
-    std::vector<ButtonVarConfig> parse_config_string(std::string text);
-    ButtonVarConfig get_button(std::string text);
+    std::vector<ButtonVarConfig> parse_config_string(std::string_view text);
+    ButtonVarConfig get_button(std::string_view text);
 };
 
 // temporary-ish
