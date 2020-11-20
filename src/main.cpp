@@ -371,9 +371,8 @@ void config_controls()
              {0, (int) Key::C, VarTrig::PRESSED, false, VarOp::OR},
              {0, (int) Key::LeftShift, VarTrig::HOLD, false, VarOp::AND},
              {0, (int) Key::A, VarTrig::PRESSED, false, VarOp::OR}});
-    
-    // Camera and Game controls, handled in DebugCameraController
 
+    // Camera and Game controls, handled in DebugCameraController
     // Switch to next vehicle
     userInput.config_register_control("game_switch", false,
             {{0, (int) Key::V, VarTrig::PRESSED, false, VarOp::OR}});

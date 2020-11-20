@@ -90,7 +90,7 @@ public:
     /**
     * Loads text from toml
     */
-    static void load_text_to_toml(std::string const& filePath, Package& package);
+    static void load_text_to_toml(std::filesystem::path const& filePath, Package& package);
 private:
     /**
      * Load only associated config files, and add resource paths to the package

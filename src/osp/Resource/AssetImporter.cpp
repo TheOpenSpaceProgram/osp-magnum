@@ -350,10 +350,10 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
     }
 }
 
-    void AssetImporter::load_text_to_toml(std::string const& filePath, Package& package)
+    void AssetImporter::load_text_to_toml(std::filesystem::path const& filePath, Package& package)
     {   
         std::ifstream data(filePath, std::ios_base::binary);
-        package.add<toml::value>(filePath, toml::parse(data));
+        package.add<toml::value>(filePath.string(), toml::parse(data));
     }
 
 }
