@@ -27,6 +27,9 @@
 #include <osp/types.h>
 
 #include <cstdint>
+#include <functional>
+#include <limits>
+#include <list>
 #include <memory>
 #include <vector>
 
@@ -35,13 +38,22 @@ namespace planeta
 
 // Index to a triangle
 using trindex_t = uint32_t;
+constexpr trindex_t gc_invalidTri = std::numeric_limits<trindex_t>::max();
 
 // Index to a buffer
 using buindex_t = uint32_t;
+constexpr buindex_t gc_invalidBufIndx = std::numeric_limits<buindex_t>::max();
+
+// Index to vertex
+using vrindex_t = uint32_t;
+constexpr vrindex_t gc_invalidVrtx = std::numeric_limits<vrindex_t>::max();
+
 
 class IcoSphereTree;
 struct SubTriangle;
 struct TriangleSideTransform;
+
+
 
 // The 20 faces of the icosahedron (Top, Left, Right)
 // Each number pointing to a vertex
@@ -78,6 +90,17 @@ struct TriangleSideTransform
     float m_scale;
 };
 
+class IcoSphereTreeObserver
+{
+public:
+    using Handle_T = std::list<std::weak_ptr<IcoSphereTreeObserver>>::iterator;
+
+
+    virtual void on_ico_triangles_added(std::vector<trindex_t> const&) = 0;
+    virtual void on_ico_triangles_removed(std::vector<trindex_t> const&) = 0;
+    virtual void on_ico_vertex_removed(std::vector<vrindex_t> const&) = 0;
+};
+
 
 /**
  * A triangle on the IcoSphereTree
@@ -92,9 +115,10 @@ struct SubTriangle
 
     osp::Vector3 m_center;
 
-    bool m_subdivided;
-    //uint8_t m_bitmask;
-    uint8_t m_depth;
+    bool m_subdivided{false}, m_deleted{false};
+
+    // 0 for first 20 triangles of icosahedron. +1 for each depth onwards
+    uint8_t m_depth{0};
 
     // Data used when subdivided
 
@@ -174,6 +198,12 @@ public:
     }
 
     /**
+     * Calculates and sets m_center
+     * @param tri [ref] Reference to triangle
+     */
+    void calculate_center(SubTriangle& tri);
+
+    /**
      * A quick way to set neighbours of a triangle
      * @param tri [ref] Reference to triangle
      * @param bot [in] Bottom
@@ -213,21 +243,26 @@ public:
     /**
      * Subdivide a triangle into 4 more
      * @param [in] Triangle to subdivide
+     * @return 0 if subdivision is succesful
      */
-    void subdivide_add(trindex_t t);
+    int subdivide_add(trindex_t t);
 
     /**
      * Unsubdivide a triangle.
      * Removes children and sets neighbours of neighbours
      * @param t [in] Index of triangle to unsubdivide
+     * @return 0 if removal is succesful
      */
-    void subdivide_remove(trindex_t t);
+    int subdivide_remove(trindex_t t);
 
-    /**
-     * Calculates and sets m_center
-     * @param tri [ref] Reference to triangle
-     */
-    void calculate_center(SubTriangle& tri);
+    void subdivide_remove_all_unused();
+
+    IcoSphereTreeObserver::Handle_T event_add(
+            std::weak_ptr<IcoSphereTreeObserver> observer);
+
+    void event_remove(IcoSphereTreeObserver::Handle_T observer);
+
+    void event_notify();
 
     TriangleSideTransform transform_to_ancestor(
             trindex_t t, uint8_t side, uint8_t targetDepth,
@@ -247,6 +282,12 @@ private:
     // List of indices to deleted triangles in the m_triangles
     std::vector<trindex_t> m_trianglesFree;
     std::vector<buindex_t> m_vrtxFree; // Deleted vertices in m_vertBuf
+
+    std::vector<trindex_t> m_trianglesAdded;
+    std::vector<trindex_t> m_trianglesRemoved;
+    std::vector<trindex_t> m_vrtxRemoved;
+
+    std::list<std::weak_ptr<IcoSphereTreeObserver>> m_observers;
 
     buindex_t m_maxVertice;
     buindex_t m_maxTriangles;

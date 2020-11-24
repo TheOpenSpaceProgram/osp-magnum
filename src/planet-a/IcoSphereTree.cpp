@@ -173,19 +173,72 @@ void IcoSphereTree::initialize(float radius)
                        sc_icoTemplateneighbours[i * 3 + 1],
                        sc_icoTemplateneighbours[i * 3 + 2]);
 
-        tri.m_subdivided = false;
-        tri.m_depth = 0;
         calculate_center(tri);
     }
 
 }
 
-void IcoSphereTree::subdivide_add(trindex_t t)
+void IcoSphereTree::calculate_center(SubTriangle &tri)
+{
+    // use average of 3 coners as the center
+
+    Vector3 const& vertA = *reinterpret_cast<Vector3 const*>(
+                                get_vertex_pos(tri.m_corners[0]));
+    Vector3 const& vertB = *reinterpret_cast<Vector3 const*>(
+                                get_vertex_pos(tri.m_corners[1]));
+    Vector3 const& vertC = *reinterpret_cast<Vector3 const*>(
+                                get_vertex_pos(tri.m_corners[2]));
+
+    tri.m_center = (vertA + vertB + vertC) / 3.0f;
+}
+
+void IcoSphereTree::set_neighbours(SubTriangle& tri,
+                                   trindex_t bot, trindex_t rte, trindex_t lft)
+{
+    tri.m_neighbours[0] = bot;
+    tri.m_neighbours[1] = rte;
+    tri.m_neighbours[2] = lft;
+}
+
+void IcoSphereTree::set_verts(SubTriangle& tri, buindex_t top,
+                              buindex_t lft, buindex_t rte)
+{
+    tri.m_corners[0] = top;
+    tri.m_corners[1] = lft;
+    tri.m_corners[2] = rte;
+}
+
+void IcoSphereTree::set_side_recurse(SubTriangle& tri, int side, trindex_t to)
+{
+    tri.m_neighbours[side] = to;
+    if (tri.m_subdivided)
+    {
+        set_side_recurse(m_triangles[tri.m_children + ((side + 1) % 3)],
+                side, to);
+        set_side_recurse(m_triangles[tri.m_children + ((side + 2) % 3)],
+                side, to);
+    }
+}
+
+int IcoSphereTree::neighbour_side(const SubTriangle& tri,
+                                  const trindex_t lookingFor)
+{
+    // Loop through neighbours on the edges. child 4 (center) is not considered
+    // as all it's neighbours are its siblings
+    if (tri.m_neighbours[0] == lookingFor) { return 0; }
+    if (tri.m_neighbours[1] == lookingFor) { return 1; }
+    if (tri.m_neighbours[2] == lookingFor) { return 2; }
+
+    // this means there's an error
+    return -1;
+}
+
+int IcoSphereTree::subdivide_add(trindex_t t)
 {
     if (m_vrtxCount + 3 >= m_maxVertice)
     {
         // error! max vertex count exceeded
-        return;
+        return 1;
     }
 
     // Add the 4 new triangles
@@ -221,6 +274,16 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     childB.m_siblingIndex = 1;
     childC.m_siblingIndex = 2;
     childD.m_siblingIndex = 3;
+
+    // set all as not deleted
+    childA.m_deleted = childB.m_deleted = childC.m_deleted = childD.m_deleted
+            = false;
+
+    // Later Notify observers about new triangles added
+    m_trianglesAdded.push_back(tri.m_children + 0);
+    m_trianglesAdded.push_back(tri.m_children + 1);
+    m_trianglesAdded.push_back(tri.m_children + 2);
+    m_trianglesAdded.push_back(tri.m_children + 3);
 
     // Set the neighboors of the top triangle to:
     // bottom neighboor = new middle triangle
@@ -334,62 +397,101 @@ void IcoSphereTree::subdivide_add(trindex_t t)
     calculate_center(childD);
 
     tri.m_subdivided = true;
+
+    return 0;
 }
 
-
-void IcoSphereTree::set_neighbours(SubTriangle& tri,
-                                   trindex_t bot, trindex_t rte, trindex_t lft)
+int IcoSphereTree::subdivide_remove(trindex_t t)
 {
-    tri.m_neighbours[0] = bot;
-    tri.m_neighbours[1] = rte;
-    tri.m_neighbours[2] = lft;
-}
+    SubTriangle &tri = get_triangle(t);
 
-void IcoSphereTree::set_verts(SubTriangle& tri, buindex_t top,
-                              buindex_t lft, buindex_t rte)
-{
-    tri.m_corners[0] = top;
-    tri.m_corners[1] = lft;
-    tri.m_corners[2] = rte;
-}
-
-void IcoSphereTree::set_side_recurse(SubTriangle& tri, int side, trindex_t to)
-{
-    tri.m_neighbours[side] = to;
-    if (tri.m_subdivided)
+    if (!tri.m_subdivided)
     {
-        set_side_recurse(m_triangles[tri.m_children + ((side + 1) % 3)],
-                side, to);
-        set_side_recurse(m_triangles[tri.m_children + ((side + 2) % 3)],
-                side, to);
+        // If not subdivided
+        return 1;
     }
+
+    if (tri.m_useCount != 0)
+    {
+        // If still has users
+        return 2;
+    }
+
+    // try unsubdividing children if any are
+    for (trindex_t i = 0; i < 4; i ++)
+    {
+        if (get_triangle(tri.m_children + i).m_subdivided)
+        {
+            return 3;
+            //int result = subdivide_remove(tri.m_children + i);
+            //if (result != 0)
+            //{
+            //    // can't unsubdivide child
+            //    return result;
+            //}
+        }
+    }
+
+
+    // Loop through 3 sides of triangle
+    for (int i = 0; i < 3; i ++)
+    {
+        // get neighbour on that side
+        SubTriangle &triB = get_triangle(tri.m_neighbours[i]);
+
+        // If the neighbour triangle side is not subdivided, then the it is not
+        // sharing the middle vertex. It can now be removed.
+        if (!triB.m_subdivided || triB.m_depth != tri.m_depth)
+        {
+            // Mark side vertex for replacement
+            m_vrtxFree.push_back(tri.m_midVrtxs[i]);
+
+            m_vrtxRemoved.push_back(tri.m_midVrtxs[i] / m_vrtxSize);
+        }
+        // else leave it alone, neighbour is still using the vertex
+
+        // Set neighbours, so that they don't reference deleted triangles
+        if (triB.m_depth == tri.m_depth)
+        {
+            int sideB = neighbour_side(triB, t);
+            set_side_recurse(triB, sideB, t);
+        }
+    }
+
+    // Now mark triangles for removal. they're always in groups of 4.
+    m_trianglesFree.push_back(tri.m_children);
+
+    // mark all children as deleted
+    // try unsubdividing children if any are
+    for (trindex_t i = 0; i < 4; i ++)
+    {
+        //std::cout << "deleted: " << (tri.m_children + i) << "\n";
+        get_triangle(tri.m_children + i).m_deleted = true;
+
+        // Later Notify observers about new triangles removed
+        m_trianglesRemoved.push_back(tri.m_children + i);
+    }
+
+    tri.m_subdivided = false;
+    tri.m_children = gc_invalidTri;
+
+    return 0;
 }
 
-int IcoSphereTree::neighbour_side(const SubTriangle& tri,
-                                  const trindex_t lookingFor)
+void IcoSphereTree::subdivide_remove_all_unused()
 {
-    // Loop through neighbours on the edges. child 4 (center) is not considered
-    // as all it's neighbours are its siblings
-    if (tri.m_neighbours[0] == lookingFor) { return 0; }
-    if (tri.m_neighbours[1] == lookingFor) { return 1; }
-    if (tri.m_neighbours[2] == lookingFor) { return 2; }
+    for (trindex_t t = 0; t < m_triangles.size(); t ++)
+    {
+        SubTriangle tri = get_triangle(t);
+        if (!tri.m_deleted && !tri.m_subdivided && tri.m_useCount == 0)
+        {
+            if (subdivide_remove(tri.m_parent) == 0)
+            {
 
-    // this means there's an error
-    return -1;
-}
-
-void IcoSphereTree::calculate_center(SubTriangle &tri)
-{
-    // use average of 3 coners as the center
-
-    Vector3 const& vertA = *reinterpret_cast<Vector3 const*>(
-                                get_vertex_pos(tri.m_corners[0]));
-    Vector3 const& vertB = *reinterpret_cast<Vector3 const*>(
-                                get_vertex_pos(tri.m_corners[1]));
-    Vector3 const& vertC = *reinterpret_cast<Vector3 const*>(
-                                get_vertex_pos(tri.m_corners[2]));
-
-    tri.m_center = (vertA + vertB + vertC) / 3.0f;
+                //std::cout << "recycled: " << tri.m_parent << "\n";
+            }
+        }
+    }
 }
 
 TriangleSideTransform IcoSphereTree::transform_to_ancestor(
@@ -437,7 +539,50 @@ TriangleSideTransform IcoSphereTree::transform_to_ancestor(
         curT = tri->m_parent;
     }
 
+}
 
+IcoSphereTreeObserver::Handle_T IcoSphereTree::event_add(
+        std::weak_ptr<IcoSphereTreeObserver> observer)
+{
+    return m_observers.emplace(m_observers.end(), std::move(observer));
+}
+
+void IcoSphereTree::event_remove(IcoSphereTreeObserver::Handle_T observer)
+{
+    // TODO
+}
+
+void IcoSphereTree::event_notify()
+{
+    if (!m_trianglesAdded.empty())
+    {
+        for (std::weak_ptr<IcoSphereTreeObserver> ob : m_observers)
+        {
+            // TODO: get rid of expired ones
+            ob.lock()->on_ico_triangles_added(m_trianglesAdded);
+        }
+        m_trianglesAdded.clear();
+    }
+
+    if (!m_trianglesRemoved.empty())
+    {
+        for (std::weak_ptr<IcoSphereTreeObserver> ob : m_observers)
+        {
+            // TODO: get rid of expired ones
+            ob.lock()->on_ico_triangles_removed(m_trianglesRemoved);
+        }
+        m_trianglesRemoved.clear();
+    }
+
+    if (!m_vrtxRemoved.empty())
+    {
+        for (std::weak_ptr<IcoSphereTreeObserver> ob : m_observers)
+        {
+            // TODO: get rid of expired ones
+            ob.lock()->on_ico_vertex_removed(m_vrtxRemoved);
+        }
+        m_vrtxRemoved.clear();
+    }
 }
 
 bool IcoSphereTree::debug_verify_state()
@@ -460,7 +605,7 @@ bool IcoSphereTree::debug_verify_state()
     {
         // skip deleted triangles
         if (std::find(m_trianglesFree.begin(), m_trianglesFree.end(), t - t % 4)
-            ==  m_trianglesFree.end())
+            !=  m_trianglesFree.end())
         {
             continue;
         }
@@ -507,18 +652,7 @@ bool IcoSphereTree::debug_verify_state()
 
             SubTriangle *neighbourTri = &get_triangle(neighbour);
 
-            while (neighbourTri->m_depth >= tri.m_depth)
-            {
-                neighbourTri = &get_triangle(neighbourTri->m_parent);
-            }
-
-            if (tri.m_depth < neighbourTri->m_depth)
-            {
-                std::cout << "* Invalid triangle " << t << ": "
-                          << "Neighbour " << i  << "has larger depth\n";
-                error = true;
-            }
-            else
+            if (tri.m_depth == neighbourTri->m_depth)
             {
                 int side = neighbour_side(*neighbourTri, t);
 
@@ -529,6 +663,12 @@ bool IcoSphereTree::debug_verify_state()
                               << "this triangle as a neighbour\n";
                     error = true;
                 }
+            }
+            else if (tri.m_depth < neighbourTri->m_depth)
+            {
+                std::cout << "* Invalid triangle " << t << ": "
+                          << "Neighbour " << i  << "has larger depth\n";
+                error = true;
             }
 
         }

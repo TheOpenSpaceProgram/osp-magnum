@@ -26,10 +26,7 @@
 
 #include "IcoSphereTree.h"
 
-#include <Corrade/Containers/EnumSet.h>
-
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <queue>
 #include <set>
@@ -44,14 +41,10 @@ using chindex_t = uint32_t;
 // Index local to a chunk, from (0 ... m_vrtxPerChunk)
 using loindex_t = uint32_t;
 
-// Index to a vertex
-using vrindex_t = uint32_t;
 
 constexpr chindex_t gc_invalidChunk = std::numeric_limits<chindex_t>::max();
 constexpr loindex_t gc_invalidLocal = std::numeric_limits<loindex_t>::max();
-constexpr trindex_t gc_invalidTri = std::numeric_limits<trindex_t>::max();
-constexpr vrindex_t gc_invalidVrtx = std::numeric_limits<vrindex_t>::max();
-constexpr buindex_t gc_invalidBufIndx = std::numeric_limits<buindex_t>::max();
+
 
 enum class EChunkUpdateAction { Nothing, Subdivide, Unsubdivide,
                                 Chunk, Unchunk };
@@ -106,7 +99,7 @@ struct UpdateRangeSub
 void update_range_insert(std::vector<UpdateRangeSub>& range,
                          UpdateRangeSub insert);
 
-class PlanetGeometryA
+class PlanetGeometryA : public IcoSphereTreeObserver
 {
 
 public:
@@ -133,7 +126,8 @@ public:
      * @param maxShared [in] Area in buffer reserved for shared vertices between
      *                       chunks
      */
-    void initialize(float radius, unsigned chunkDiv,
+    void initialize(std::shared_ptr<IcoSphereTree> sphere,
+                    float radius, unsigned chunkDiv,
                     chindex_t maxChunks, vrindex_t maxShared);
 
     /**
@@ -155,10 +149,14 @@ public:
     constexpr std::vector<unsigned> const& get_index_buffer() const
     { return m_indxBuffer; }
 
-    constexpr std::vector<UpdateRangeSub>& get_vertex_buffer_updates()
+    constexpr std::vector<UpdateRangeSub> const& updates_get_vertex_changes()
     { return m_gpuUpdVrtxBuffer; }
-    constexpr std::vector<UpdateRangeSub>& get_index_buffer_updates()
+    constexpr std::vector<UpdateRangeSub> const& updates_get_index_changes()
     { return m_gpuUpdIndxBuffer; }
+
+    void updates_clear();
+    void updates_ico_added();
+    void updates_ico_removed();
 
     constexpr buindex_t calc_index_count()
     { return m_chunkCount * m_indxPerChunk * 3; }
@@ -175,6 +173,10 @@ public:
     bool debug_verify_state();
 
     void debug_raise_by_share_count();
+
+    void on_ico_triangles_added(std::vector<trindex_t> const&) override;
+    void on_ico_triangles_removed(std::vector<trindex_t> const&) override;
+    void on_ico_vertex_removed(std::vector<vrindex_t> const&) override;
 
 private:
 
@@ -511,14 +513,22 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
         {
             // remove chunk before subdividing
 
-            m_icoTree->subdivide_add(t);
-            subdivided = m_icoTree->get_triangle(t).m_subdivided;
+            subdivided = m_icoTree->subdivide_add(t) == 0;
 
             chunk_triangle_assure();
         }
         break;
     case EChunkUpdateAction::Unsubdivide:
-        //m_icoTree->subdivide_remove(t);
+        /*if (subdivided)
+        {
+            if (m_icoTree->subdivide_remove(t) == 0)
+            {
+                subdivided = false;
+                m_icoTree->debug_verify_state();
+                m_triangleChunks[t].m_descendentChunked = 0;
+                m_triangleChunks[t].m_ancestorChunked = gc_invalidChunk;
+            }
+        }*/
         break;
     }
 

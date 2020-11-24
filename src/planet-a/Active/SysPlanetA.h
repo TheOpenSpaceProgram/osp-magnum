@@ -42,7 +42,8 @@ namespace planeta::active
 
 struct ACompPlanet
 {
-    PlanetGeometryA m_planet;
+    std::shared_ptr<IcoSphereTree> m_icoTree;
+    std::shared_ptr<PlanetGeometryA> m_planet;
     Magnum::GL::Mesh m_mesh{};
     Magnum::Shaders::MeshVisualizer3D m_shader{
             Magnum::Shaders::MeshVisualizer3D::Flag::Wireframe

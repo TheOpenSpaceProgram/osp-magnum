@@ -49,7 +49,8 @@ void planeta::update_range_insert(std::vector<UpdateRangeSub>& range,
     range.push_back(insert);
 }
 
-void PlanetGeometryA::initialize(float radius, unsigned chunkDiv,
+void PlanetGeometryA::initialize(std::shared_ptr<IcoSphereTree> sphere,
+                                 float radius, unsigned chunkDiv,
                                  chindex_t maxChunks, vrindex_t maxShared)
 {
     //m_subdivAreaThreshold = 0.02f;
@@ -61,8 +62,10 @@ void PlanetGeometryA::initialize(float radius, unsigned chunkDiv,
     m_chunkWidth  = m_chunkWidthB + 1; // MUST BE (POWER OF 2) + 1. min: 5
 
 
-    m_icoTree = std::make_shared<IcoSphereTree>();
-    m_icoTree->initialize(radius);
+    //m_icoTree = std::make_shared<IcoSphereTree>();
+    m_icoTree = sphere;
+
+    //m_icoTree->initialize(radius);
 
     using Magnum::Math::pow;
 
@@ -587,11 +590,14 @@ void PlanetGeometryA::chunk_add(trindex_t t)
         do
         {
             curTri = &(m_icoTree->get_triangle(curIndex));
+            curTri->m_useCount ++;
             m_triangleChunks[curIndex].m_descendentChunked ++;
             curIndex = curTri->m_parent;
         }
         while (curTri->m_depth != 0);
     }
+
+    tri.m_useCount ++;
 
     // Put the index data at the end of the buffer
     chunk.m_dataIndx = chunk.m_chunk * chunkIndData.size();
@@ -601,6 +607,8 @@ void PlanetGeometryA::chunk_add(trindex_t t)
     update_range_insert(m_gpuUpdIndxBuffer,
                         {chunk.m_dataIndx,
                          chunk.m_dataIndx + m_indxPerChunk * 3});
+
+    //debug_verify_state();
 }
 
 
@@ -677,10 +685,17 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
         do
         {
             curTri = &(m_icoTree->get_triangle(curIndex));
+            curTri->m_useCount --;
             m_triangleChunks[curIndex].m_descendentChunked --;
             curIndex = curTri->m_parent;
         }
         while (curTri->m_depth != 0);
+    }
+
+    tri.m_useCount --;
+    if (tri.m_useCount != 0)
+    {
+        int a = 0;
     }
 
     // mark this chunk for replacement
@@ -1006,6 +1021,22 @@ vrindex_t PlanetGeometryA::shared_create()
     return sharedOut;
 }
 
+void PlanetGeometryA::updates_clear()
+{
+    m_gpuUpdIndxBuffer.clear();
+    m_gpuUpdVrtxBuffer.clear();
+}
+
+void PlanetGeometryA::updates_ico_added()
+{
+
+}
+
+void PlanetGeometryA::updates_ico_removed()
+{
+
+}
+
 
 unsigned PlanetGeometryA::debug_chunk_count_descendents(SubTriangle &tri)
 {
@@ -1055,6 +1086,11 @@ bool PlanetGeometryA::debug_verify_state()
     {
         SubTriangle &tri = m_icoTree->get_triangle(t);
         SubTriangleChunk &chunk = m_triangleChunks[t];
+
+        if (tri.m_deleted)
+        {
+            continue;
+        }
 
         // Verify chunk hierarchy
 
@@ -1158,5 +1194,37 @@ void PlanetGeometryA::debug_raise_by_share_count()
                                         vrtxData + m_vrtxCompOffsetNrm);
 
         pos = nrm * m_icoTree->get_radius() + nrm * raise;
+    }
+}
+
+void PlanetGeometryA::on_ico_triangles_added(
+        std::vector<trindex_t> const& added)
+{
+    //std::cout << "foo!\n";
+}
+
+void PlanetGeometryA::on_ico_triangles_removed(
+        std::vector<trindex_t> const& removed)
+{
+    //std::cout << "bar!\n";
+    for (trindex_t t : removed)
+    {
+        m_triangleChunks[t].m_ancestorChunked = gc_invalidTri;
+        m_triangleChunks[t].m_descendentChunked = 0;
+
+        // remove some shared corners
+    }
+}
+
+void PlanetGeometryA::on_ico_vertex_removed(
+        std::vector<vrindex_t> const& vrtxRemoved)
+{
+    for (vrindex_t vrtx : vrtxRemoved)
+    {
+        if (m_vrtxSharedIcoCorners[vrtx] != gc_invalidVrtx)
+        {
+            m_vrtxSharedIcoCornersReverse[m_vrtxSharedIcoCorners[vrtx]] = gc_invalidVrtx;
+            m_vrtxSharedIcoCorners[vrtx] = gc_invalidVrtx;
+        }
     }
 }
