@@ -296,7 +296,7 @@ void SysPlanetA::update_geometry()
             planet.m_icoTree->subdivide_remove_all_unused();
             planet.m_icoTree->event_notify();
 
-            planet.m_planet->debug_raise_by_share_count();
+            //planet.m_planet->debug_raise_by_share_count();
 
             using Corrade::Containers::ArrayView;
 

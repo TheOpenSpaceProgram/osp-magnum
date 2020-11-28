@@ -87,6 +87,13 @@ struct SubTriangleChunk
 
     buindex_t m_dataIndx; // Index to index data in the index buffer
     buindex_t m_dataVrtx; // Index to vertex data
+
+    // Neighbours that are chunked. used for vertex sharing
+    trindex_t m_neighourChunked[3];
+
+    // Used to convert positions along the edge of this triangle, to a position
+    // along a neighbour's edge
+    TriangleSideTransform m_neighourTransform[3];
 };
 
 
@@ -149,17 +156,34 @@ public:
     constexpr std::vector<unsigned> const& get_index_buffer() const
     { return m_indxBuffer; }
 
+    /**
+     * Get changes in the vertex buffer; intended for updating buffers in the
+     * GPU. Changes are cleared with updates_clear()
+     * @return Update ranges specifying which parts of m_vrtxBuffer changed
+     */
     constexpr std::vector<UpdateRangeSub> const& updates_get_vertex_changes()
     { return m_gpuUpdVrtxBuffer; }
+
+    /**
+     * Get changes in the index buffer; intended for updating buffers in the
+     * GPU. Changes are cleared with updates_clear()
+     * @return Update ranges specifying which parts of m_indxBuffer changed
+     */
     constexpr std::vector<UpdateRangeSub> const& updates_get_index_changes()
     { return m_gpuUpdIndxBuffer; }
 
+    /**
+     * Clear recorded changes in vertex and index buffer. Call this just as GPU
+     * buffers are updated.
+     */
     void updates_clear();
-    void updates_ico_added();
-    void updates_ico_removed();
 
+    /**
+     * @return Calculated number of indices to draw
+     */
     constexpr buindex_t calc_index_count()
     { return m_chunkCount * m_indxPerChunk * 3; }
+
     constexpr chindex_t chunk_count() { return m_chunkCount; }
 
     IcoSphereTree* get_ico_tree() { return m_icoTree.get(); }
@@ -174,6 +198,8 @@ public:
 
     void debug_raise_by_share_count();
 
+    void debug_terrain_test();
+
     void on_ico_triangles_added(std::vector<trindex_t> const&) override;
     void on_ico_triangles_removed(std::vector<trindex_t> const&) override;
     void on_ico_vertex_removed(std::vector<vrindex_t> const&) override;
@@ -181,17 +207,21 @@ public:
 private:
 
     /**
-     * Recursively check every triangle for which ones need
-     * (un)subdividing or chunking
-     * @param t [in] Triangle to start with
-     */
-    void sub_recurse(trindex_t t);
-
-    /**
-     *
+     * Create a chunk of geometry patched over a triangle of the IcoSphereTree.
      * @param t [in] Index of triangle to add chunk to
      */
     void chunk_add(trindex_t t);
+
+    /**
+     * @param t
+     * @param side
+     * @param depth
+     */
+    void chunk_edge_transition(trindex_t t, uint8_t side, uint8_t depth);
+
+    void chunk_edge_transition_recurse(trindex_t t, uint8_t side, uint8_t depth);
+
+    void chunk_set_neighbour_recurse(trindex_t t, uint8_t side, trindex_t to);
 
     void chunk_triangle_assure();
 
@@ -214,6 +244,13 @@ private:
     template<typename FUNC_T>
     void chunk_geometry_update_recurse(FUNC_T condition, trindex_t t,
                                        std::vector<trindex_t> &toChunk);
+
+    template<typename VEC_T>
+    VEC_T& get_vertex_component(vrindex_t vrtx, unsigned offset)
+    {
+        return *reinterpret_cast<VEC_T*>(
+                    m_vrtxBuffer.data() + vrtx * m_vrtxSize + offset);
+    }
 
     /**
      * Convert XY coordinates to a triangular number index
@@ -264,7 +301,7 @@ private:
      * @return
      */
     vrindex_t shared_from_neighbour(trindex_t triInd, uint8_t side,
-                                    loindex_t posIn, bool &rBetween);
+                                    loindex_t posIn);
 
     /**
      * Create a new shared vertex. This will get a vertex from m_vrtxSharedFree
@@ -501,7 +538,11 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
         }
         break;
     case EChunkUpdateAction::Unchunk:
-        chunk_remove(t); // chunks can be removed right away
+        if (chunked)
+        {
+            chunk_remove(t); // chunks can be removed right away
+            chunked = false;
+        }
         break;
     case EChunkUpdateAction::Subdivide:
         if (chunked)
@@ -535,13 +576,13 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
     if (subdivided && !chunked)
     {
         // possible that a reallocation happened, and tri previously is invalid
-        SubTriangle const& tri = m_icoTree->get_triangle(t);
+        trindex_t children = m_icoTree->get_triangle(t).m_children;
 
         // Recurse into children
-        chunk_geometry_update_recurse(condition, tri.m_children + 0, toChunk);
-        chunk_geometry_update_recurse(condition, tri.m_children + 1, toChunk);
-        chunk_geometry_update_recurse(condition, tri.m_children + 2, toChunk);
-        chunk_geometry_update_recurse(condition, tri.m_children + 3, toChunk);
+        chunk_geometry_update_recurse(condition, children + 0, toChunk);
+        chunk_geometry_update_recurse(condition, children + 1, toChunk);
+        chunk_geometry_update_recurse(condition, children + 2, toChunk);
+        chunk_geometry_update_recurse(condition, children + 3, toChunk);
     }
 }
 

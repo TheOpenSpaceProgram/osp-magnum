@@ -86,15 +86,14 @@ static constexpr std::uint8_t gc_triangleMaskSubdivided = 0b0001;
  */
 struct TriangleSideTransform
 {
-    float m_translation;
-    float m_scale;
+    float m_translation{0.0f};
+    float m_scale{1.0f};
 };
 
 class IcoSphereTreeObserver
 {
 public:
     using Handle_T = std::list<std::weak_ptr<IcoSphereTreeObserver>>::iterator;
-
 
     virtual void on_ico_triangles_added(std::vector<trindex_t> const&) = 0;
     virtual void on_ico_triangles_removed(std::vector<trindex_t> const&) = 0;
@@ -127,6 +126,9 @@ struct SubTriangle
     trindex_t m_children;
     buindex_t m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
     buindex_t m_index; // to index buffer
+
+    // Index to Neighbour's m_neighbours that points to this triangle
+    uint8_t m_neighbourSide[3];
 
     // Number of times this triangle is being used externally
     // Make sure this number is zero before removing this triangle
@@ -182,12 +184,18 @@ public:
         return m_vrtxBuffer;
     }
 
-    float* get_vertex_pos(buindex_t vrtOffset)
+    /**
+     * @return Position component of vertex
+     */
+    float* get_vertex_pos(vrindex_t vrtOffset)
     {
         return m_vrtxBuffer.data() + vrtOffset + m_vrtxCompOffsetPos;
     }
 
-    float* get_vertex_nrm(buindex_t nrmOffset)
+    /**
+     * @return Normal component of vertex
+     */
+    float* get_vertex_nrm(vrindex_t nrmOffset)
     {
         return m_vrtxBuffer.data() + nrmOffset + m_vrtxCompOffsetNrm;
     }
@@ -198,7 +206,7 @@ public:
     }
 
     /**
-     * Calculates and sets m_center
+     * Calculates and sets m_center of a SubTriangle
      * @param tri [ref] Reference to triangle
      */
     void calculate_center(SubTriangle& tri);
@@ -212,6 +220,16 @@ public:
      */
     static void set_neighbours(SubTriangle& tri, trindex_t bot,
                                trindex_t rte, trindex_t lft);
+
+    /**
+     * A quick way to set neighbour's sides
+     * @param tri [ref] Reference to triangle
+     * @param bot [in] Bottom
+     * @param rte [in] Right
+     * @param lft [in] Left
+     */
+    static void set_neighbour_sides(SubTriangle& tri, trindex_t bot,
+                                    trindex_t rte, trindex_t lft);
 
     /**
      * A quick way to set vertices of a triangle
@@ -237,8 +255,10 @@ public:
      * @param [in] lookingFor Index of triangle to search for
      * @return Neighbour index (0 - 2), or bottom, left, or right
      */
-    static int neighbour_side(const SubTriangle& tri,
+    static int find_neighbour_side(const SubTriangle& tri,
                               const trindex_t lookingFor);
+
+    trindex_t ancestor_at_depth(trindex_t start, uint8_t targetDepth);
 
     /**
      * Subdivide a triangle into 4 more
@@ -255,15 +275,43 @@ public:
      */
     int subdivide_remove(trindex_t t);
 
+    /**
+     * Calls subdivide_remove on all triangles that have a 0 m_useCount
+     */
     void subdivide_remove_all_unused();
 
+    /**
+     * Adds an observer to listen for events
+     * @param observer [in] Observer to notify for events
+     * @return Iterator to observer once added to internal container, intended
+     *         to allow removing the observer later on.
+     */
     IcoSphereTreeObserver::Handle_T event_add(
             std::weak_ptr<IcoSphereTreeObserver> observer);
 
+    /**
+     * Remove an observer [TODO]
+     * @param observer
+     */
     void event_remove(IcoSphereTreeObserver::Handle_T observer);
 
+    /**
+     * Notify all observers about changes in triangles and vertices.
+     */
     void event_notify();
 
+    /**
+     * Create a TriangleSideTransform that converts coordinate space from child
+     * to ancestor. If 0.0 to 1.0 refers to a position along the edge of a
+     * child, then transforming to the parent's coordinate space will result in
+     * a number between 0.0 and 0.5, or 0.5 to 1.0.
+     *
+     * @param t             [in] Triangle with coordinates to transform from
+     * @param side          [in] Which side of that triangle to use
+     * @param targetDepth   [in] Depth of ancestor to transform to
+     * @param pAncestorOut  [out] optional index of ancestor triangle once found
+     * @return A TriangleSideTransform that can be used to transform positions
+     */
     TriangleSideTransform transform_to_ancestor(
             trindex_t t, uint8_t side, uint8_t targetDepth,
             trindex_t *pAncestorOut = nullptr);
