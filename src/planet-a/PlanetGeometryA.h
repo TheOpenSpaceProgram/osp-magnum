@@ -72,6 +72,7 @@ struct UpdateRangeSub;
 
 struct SubTriangleChunk
 {
+
     // Index to chunk. (First triangle ever chunked will be 0)
     // set to m_chunkMax when not chunked
     chindex_t m_chunk;
@@ -127,14 +128,12 @@ public:
 
     /**
      * Configure and Initialize buffers.
-     * @param radius    [in] Radius of planet
      * @param chunkDiv  [in] Number of subdivisions per chunk
      * @param maxChunks [in] Chunk buffer size
      * @param maxShared [in] Area in buffer reserved for shared vertices between
      *                       chunks
      */
-    void initialize(std::shared_ptr<IcoSphereTree> sphere,
-                    float radius, unsigned chunkDiv,
+    void initialize(std::shared_ptr<IcoSphereTree> sphere, unsigned chunkDiv,
                     chindex_t maxChunks, vrindex_t maxShared);
 
     /**
@@ -213,9 +212,13 @@ private:
     void chunk_add(trindex_t t);
 
     /**
-     * @param t
-     * @param side
-     * @param depth
+     * Align the vertices along the edge of a chunk with the edges of another
+     * chunk of lower level of detail.
+     *
+     * @param t     [in] Index of triangle containing chunk
+     * @param side  [in] 0, 1, or 2 for bottom, left, right
+     * @param depth [in] Depth of neighbouring chunk. This should be lower than
+     *                   t's depth
      */
     void chunk_edge_transition(trindex_t t, uint8_t side, uint8_t depth);
 

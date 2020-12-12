@@ -83,6 +83,9 @@ public:
                                      ACompPlanet &planet,
                                      chindex_t chunk);
 
+    void planet_update_geometry(osp::active::ActiveEnt ent,
+                                ACompPlanet &planet);
+
     void update_geometry();
 
     void update_physics();

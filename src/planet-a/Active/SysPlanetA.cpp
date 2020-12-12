@@ -199,8 +199,7 @@ void SysPlanetA::update_geometry()
 
             planet.m_icoTree->initialize(planet.m_radius);
 
-            planetGeo.initialize(planet.m_icoTree, planet.m_radius, 4,
-                                       1u << 9, 1u << 13);
+            planetGeo.initialize(planet.m_icoTree, 4, 1u << 9, 1u << 13);
 
             planet.m_icoTree->event_add(planet.m_planet);
 
@@ -211,6 +210,8 @@ void SysPlanetA::update_geometry()
             {
                 return EChunkUpdateAction::Chunk;
             });
+
+            planet_update_geometry(ent, planet);
 
             std::cout << "Planet initialized, now making colliders\n";
 
@@ -244,99 +245,110 @@ void SysPlanetA::update_geometry()
 
         if (m_debugUpdate.triggered() || true)
         {
-            PlanetGeometryA &planetGeo = *(planet.m_planet);
-
-            ActiveEnt cam = m_scene.get_registry().view<ACompCamera>().front();
-            auto &camTf = m_scene.reg_get<ACompTransform>(cam);
-
-            // camera position relative to planet
-            Vector3 camRelative = camTf.m_transform.translation()
-                                - tf.m_transform.translation();
-
-            using Magnum::Math::pow;
-            using Magnum::Math::sqrt;
-
-            // edge length of largest possible triangle
-            float edgeLengthA =  planetGeo.get_ico_tree()->get_radius()
-                                / sqrt(10.0f + 2.0f * sqrt(5.0f)) * 4.0;
-
-            float threshold = 1.0f;
-
-            planetGeo.chunk_geometry_update_all(
-                    [edgeLengthA, threshold, tf, camRelative, ent] (
-                            SubTriangle const& tri,
-                            SubTriangleChunk const& chunk,
-                            int index) -> EChunkUpdateAction
-            {
-                // approximation of triangle edge length
-                float edgeLength = edgeLengthA / float(pow(2, int(tri.m_depth)));
-
-                // distance between viewer and triangle
-                float dist = (tri.m_center - camRelative).length();
-
-                float screenLength = edgeLength / dist;
-
-                bool tooFar = screenLength < threshold;
-
-                if (tooFar || (tri.m_depth >= 13))
-                {
-                    return EChunkUpdateAction::Chunk;
-                }
-                else
-                {
-                    // too close, subdivide it
-                    return EChunkUpdateAction::Subdivide;
-                }
-            });
-
-            // New triangles were added, notify
-            planet.m_icoTree->event_notify();
-
-            // Remove unused
-            planet.m_icoTree->subdivide_remove_all_unused();
-            planet.m_icoTree->event_notify();
-
-            //planet.m_planet->debug_raise_by_share_count();
-
-            using Corrade::Containers::ArrayView;
-
-            // update GPU index buffer
-
-            std::vector<unsigned> const &indxData
-                    = planetGeo.get_index_buffer();
-
-            for (UpdateRangeSub updRange
-                 : planetGeo.updates_get_index_changes())
-            {
-                buindex_t size = updRange.m_end - updRange.m_start;
-                ArrayView arrView(indxData.data() + updRange.m_start, size);
-                planet.m_indxBufGL.setSubData(
-                        updRange.m_start * sizeof(*indxData.data()), arrView);
-            }
-
-            // update GPU vertex buffer
-
-            std::vector<float> const &vrtxData
-                    = planetGeo.get_vertex_buffer();
-
-            for (UpdateRangeSub updRange
-                 : planetGeo.updates_get_vertex_changes())
-            {
-                buindex_t size = updRange.m_end - updRange.m_start;
-                ArrayView arrView(vrtxData.data() + updRange.m_start, size);
-                planet.m_vrtxBufGL.setSubData(
-                        updRange.m_start * sizeof(*vrtxData.data()), arrView);
-            }
-
-            //planet.m_vrtxBufGL.setData(planet.m_planet.get_vertex_buffer());
-            //planet.m_indxBufGL.setData(planet.m_planet.get_index_buffer());
-            planetGeo.updates_clear();
-
-            planet.m_mesh.setCount(planetGeo.calc_index_count());
-
-            planetGeo.get_ico_tree()->debug_verify_state();
+            planet_update_geometry(ent, planet);
         }
     }
+}
+
+void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
+                                        ACompPlanet &planet)
+{
+    auto &tf = m_scene.reg_get<ACompTransform>(ent);
+
+    PlanetGeometryA &planetGeo = *(planet.m_planet);
+
+    ActiveEnt cam = m_scene.get_registry().view<ACompCamera>().front();
+    auto &camTf = m_scene.reg_get<ACompTransform>(cam);
+
+    // camera position relative to planet
+    Vector3 camRelative = camTf.m_transform.translation()
+                        - tf.m_transform.translation();
+
+    using Magnum::Math::pow;
+    using Magnum::Math::sqrt;
+
+    // edge length of largest possible triangle
+    float edgeLengthA =  planetGeo.get_ico_tree()->get_radius()
+                        / sqrt(10.0f + 2.0f * sqrt(5.0f)) * 4.0;
+
+    float threshold = 0.9f;
+
+    void debug_create_chunk_collider(osp::active::ActiveEnt ent,
+                                     ACompPlanet &planet,
+                                     chindex_t chunk);
+    planetGeo.chunk_geometry_update_all(
+            [edgeLengthA, threshold, tf, camRelative, ent] (
+                    SubTriangle const& tri,
+                    SubTriangleChunk const& chunk,
+                    int index) -> EChunkUpdateAction
+    {
+        // approximation of triangle edge length
+        float edgeLength = edgeLengthA / float(pow(2, int(tri.m_depth)));
+
+        // distance between viewer and triangle
+        float dist = (tri.m_center - camRelative).length();
+
+        float screenLength = edgeLength / dist;
+
+        bool tooFar = screenLength < threshold;
+
+        if (tooFar || (tri.m_depth >= 13))
+        {
+            return EChunkUpdateAction::Chunk;
+        }
+        else
+        {
+            // too close, subdivide it
+            return EChunkUpdateAction::Subdivide;
+        }
+    });
+
+    // New triangles were added, notify
+    planet.m_icoTree->event_notify();
+
+    // Remove unused
+    planet.m_icoTree->subdivide_remove_all_unused();
+    planet.m_icoTree->event_notify();
+
+    //planet.m_planet->debug_raise_by_share_count();
+
+    using Corrade::Containers::ArrayView;
+
+    // update GPU index buffer
+
+    std::vector<unsigned> const &indxData
+            = planetGeo.get_index_buffer();
+
+    for (UpdateRangeSub updRange
+         : planetGeo.updates_get_index_changes())
+    {
+        buindex_t size = updRange.m_end - updRange.m_start;
+        ArrayView arrView(indxData.data() + updRange.m_start, size);
+        planet.m_indxBufGL.setSubData(
+                updRange.m_start * sizeof(*indxData.data()), arrView);
+    }
+
+    // update GPU vertex buffer
+
+    std::vector<float> const &vrtxData
+            = planetGeo.get_vertex_buffer();
+
+    for (UpdateRangeSub updRange
+         : planetGeo.updates_get_vertex_changes())
+    {
+        buindex_t size = updRange.m_end - updRange.m_start;
+        ArrayView arrView(vrtxData.data() + updRange.m_start, size);
+        planet.m_vrtxBufGL.setSubData(
+                updRange.m_start * sizeof(*vrtxData.data()), arrView);
+    }
+
+    //planet.m_vrtxBufGL.setData(planet.m_planet.get_vertex_buffer());
+    //planet.m_indxBufGL.setData(planet.m_planet.get_index_buffer());
+    planetGeo.updates_clear();
+
+    planet.m_mesh.setCount(planetGeo.calc_index_count());
+
+    planetGeo.get_ico_tree()->debug_verify_state();
 }
 
 void SysPlanetA::update_physics()
