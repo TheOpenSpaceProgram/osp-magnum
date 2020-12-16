@@ -275,7 +275,7 @@ private:
 template<typename TYPESAT_T, typename ... UCOMP_T>
 std::tuple<UCOMP_T& ...> CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp_all(Satellite sat)
 {
-    auto& type = m_universe.get_reg().get<UCompType>(sat);
+    auto& type = m_universe.get_reg().template get<UCompType>(sat);
 
     if (type.m_type != nullptr)
     {
@@ -283,13 +283,14 @@ std::tuple<UCOMP_T& ...> CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp_al
     }
 
     type.m_type = this;
-    return std::forward_as_tuple((m_universe.get_reg().emplace<UCOMP_T>(sat)) ...);
+    return std::forward_as_tuple(
+                (m_universe.get_reg().template emplace<UCOMP_T>(sat)) ...);
 }
 
 template<typename TYPESAT_T, typename ... UCOMP_T>
 auto& CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp(Satellite sat)
 {
-    auto& type = m_universe.get_reg().get<UCompType>(sat);
+    auto& type = m_universe.get_reg().template get<UCompType>(sat);
 
     if (type.m_type != nullptr)
     {
@@ -297,13 +298,14 @@ auto& CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp(Satellite sat)
     }
 
     type.m_type = this;
-    return std::get<0>(std::forward_as_tuple((m_universe.get_reg().emplace<UCOMP_T>(sat)) ...));
+    return std::get<0>(std::forward_as_tuple(
+            (m_universe.get_reg().template emplace<UCOMP_T>(sat)) ...));
 }
 
 template<typename TYPESAT_T, typename ... UCOMP_T>
 void CommonTypeSat<TYPESAT_T, UCOMP_T ...>::remove(Satellite sat)
 {
-    auto& type = m_universe.get_reg().get<UCompType>(sat);
+    auto& type = m_universe.get_reg().template get<UCompType>(sat);
 
     if (type.m_type != this)
     {
@@ -311,7 +313,7 @@ void CommonTypeSat<TYPESAT_T, UCOMP_T ...>::remove(Satellite sat)
     }
 
     type.m_type = nullptr;
-    m_universe.get_reg().remove<UCOMP_T ...>(sat);
+    m_universe.get_reg().template remove<UCOMP_T ...>(sat);
 }
 
 using TrajectoryType = entt::id_type;
@@ -379,7 +381,7 @@ private:
 template<typename TRAJECTORY_T>
 void CommonTrajectory<TRAJECTORY_T>::add(Satellite sat)
 {
-    auto &posTraj = m_universe.get_reg().get<UCompTransformTraj>(sat);
+    auto &posTraj = m_universe.get_reg().template get<UCompTransformTraj>(sat);
 
     if (posTraj.m_trajectory)
     {
@@ -395,7 +397,7 @@ void CommonTrajectory<TRAJECTORY_T>::add(Satellite sat)
 template<typename TRAJECTORY_T>
 void CommonTrajectory<TRAJECTORY_T>::remove(Satellite sat)
 {
-    auto &posTraj = m_universe.get_reg().get<UCompTransformTraj>(sat);
+    auto &posTraj = m_universe.get_reg().template get<UCompTransformTraj>(sat);
 
     if (posTraj.m_trajectory != this)
     {
