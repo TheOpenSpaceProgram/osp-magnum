@@ -13,25 +13,25 @@
 #include "OSPMagnum.h"
 #include "DebugObject.h"
 
-#include "osp/types.h"
-#include "osp/Universe.h"
-#include "osp/Trajectories/Stationary.h"
-#include "osp/Satellites/SatActiveArea.h"
-#include "osp/Satellites/SatVehicle.h"
-#include "osp/Resource/AssetImporter.h"
-#include "osp/Resource/Package.h"
+#include <osp/types.h>
+#include <osp/Universe.h>
+#include <osp/Trajectories/Stationary.h>
+#include <osp/Satellites/SatActiveArea.h>
+#include <osp/Satellites/SatVehicle.h>
+#include <osp/Resource/AssetImporter.h>
+#include <osp/Resource/Package.h>
 
-#include "osp/Active/ActiveScene.h"
-#include "osp/Active/SysDebugRender.h"
-#include "osp/Active/SysVehicle.h"
-#include "osp/Active/SysForceFields.h"
-#include "osp/Active/SysAreaAssociate.h"
+#include <osp/Active/ActiveScene.h>
+#include <osp/Active/SysDebugRender.h>
+#include <osp/Active/SysVehicle.h>
+#include <osp/Active/SysForceFields.h>
+#include <osp/Active/SysAreaAssociate.h>
 
-#include "adera/Machines/UserControl.h"
-#include "adera/Machines/Rocket.h"
+#include <adera/Machines/UserControl.h>
+#include <adera/Machines/Rocket.h>
 
-#include "planet-a/Satellites/SatPlanet.h"
-#include "planet-a/Active/SysPlanetA.h"
+#include <planet-a/Satellites/SatPlanet.h>
+#include <planet-a/Active/SysPlanetA.h>
 
 
 namespace universe
