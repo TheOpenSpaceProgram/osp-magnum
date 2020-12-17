@@ -1,11 +1,11 @@
 #pragma once
 
-#include "osp/types.h"
-#include "osp/OSPApplication.h"
-#include "osp/Universe.h"
-#include "osp/UserInputHandler.h"
-#include "osp/Satellites/SatActiveArea.h"
-#include "osp/Active/ActiveScene.h"
+#include <osp/types.h>
+#include <osp/OSPApplication.h>
+#include <osp/Universe.h>
+#include <osp/UserInputHandler.h>
+#include <osp/Satellites/SatActiveArea.h>
+#include <osp/Active/ActiveScene.h>
 
 #include <Magnum/Timeline.h>
 #include <Magnum/GL/Buffer.h>
@@ -18,8 +18,6 @@
 
 #include <memory>
 
-namespace osp
-{
 
 class OSPMagnum : public Magnum::Platform::Application
 {
@@ -27,7 +25,7 @@ class OSPMagnum : public Magnum::Platform::Application
 public:
     explicit OSPMagnum(
             const Magnum::Platform::Application::Arguments& arguments,
-            OSPApplication &ospApp);
+            osp::OSPApplication &ospApp);
 
     void keyPressEvent(KeyEvent& event) override;
     void keyReleaseEvent(KeyEvent& event) override;
@@ -37,26 +35,24 @@ public:
     void mouseMoveEvent(MouseMoveEvent& event) override;
     void mouseScrollEvent(MouseScrollEvent& event) override;
 
-    active::ActiveScene& scene_add(std::string const &name);
+    osp::active::ActiveScene& scene_add(std::string const &name);
 
-    constexpr UserInputHandler& get_input_handler() { return m_userInput; }
-    constexpr std::map<std::string, active::ActiveScene>& get_scenes()
+    constexpr osp::UserInputHandler& get_input_handler() { return m_userInput; }
+    constexpr std::map<std::string, osp::active::ActiveScene>& get_scenes()
     { return m_scenes; }
 
 private:
 
     void drawEvent() override;
 
-    UserInputHandler m_userInput;
+    osp::UserInputHandler m_userInput;
 
-    std::map<std::string, active::ActiveScene> m_scenes;
+    std::map<std::string, osp::active::ActiveScene> m_scenes;
 
     Magnum::Timeline m_timeline;
 
-    OSPApplication& m_ospApp;
+    osp::OSPApplication& m_ospApp;
 
 };
 
-
-
-}
+void config_controls(OSPMagnum& userInput);
