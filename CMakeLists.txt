@@ -1,17 +1,33 @@
+##
+# Open Space Program
+# Copyright © 2019-2020 Open Space Program Project
+#
+# MIT License
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+##
+
 # Set CMake minimum version and CMake policy required by UrhoCommon module
-CMAKE_MINIMUM_REQUIRED(VERSION 3.2.3)
-IF(COMMAND cmake_policy)
-    # Libraries linked via full path no longer produce linker search paths
-    CMAKE_POLICY(SET CMP0003 NEW)
-    # INTERFACE_LINK_LIBRARIES defines the link interface
-    CMAKE_POLICY(SET CMP0022 NEW)
-    # Disallow use of the LOCATION target property - so we set to OLD as we still need it
-    CMAKE_POLICY(SET CMP0026 OLD)
-    # MACOSX_RPATH is enabled by default
-    CMAKE_POLICY(SET CMP0042 NEW)
-    # Honor the visibility properties for SHARED target types only
-    CMAKE_POLICY(SET CMP0063 OLD)
-ENDIF()
+CMAKE_MINIMUM_REQUIRED(VERSION 3.12.4)
+
+# Enable link time optimization
+CMAKE_POLICY(SET CMP0069 NEW)
 
 # Set project name
 PROJECT(OSP-MAGNUM CXX)
@@ -70,8 +86,7 @@ ENDIF() # OSP_WARNINGS_ARE_ERRORS
 
 # The sanatizers provide compile time code instrumentation that drastically improve the ability of programmars to find bugs.
 IF(OSP_BUILD_SANATIZER)
-  SET(GCC_COMPILE_FLAGS "${GCC_COMPILE_FLAGS} -fsanitize=address -fsanitize-address-use-after-scope -fsanitize=pointer-compare -fsanitize=pointer-subtract -fsanitize=leak")
-  SET(GCC_COMPILE_FLAGS "${GCC_COMPILE_FLAGS} -fstack-protector-all -fsanitize=bounds -fsanitize=enum")
+  SET(GCC_COMPILE_FLAGS "${GCC_COMPILE_FLAGS} -fstack-protector-all -fsanitize=address,bounds,enum,leak,pointer-compare,pointer-subtract -fsanitize-address-use-after-scope")
 ENDIF() # OSP_BUILD_SANATIZER
 
 IF(CMAKE_C_COMPILER_ID MATCHES "Clang")
@@ -96,10 +111,8 @@ SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -gz -O0")
 IF(CMAKE_BUILD_TYPE MATCHES "Debug")
 # Don't enable LTO in debug builds.
 ELSE()
-  CMAKE_POLICY(SET CMP0069 NEW)
   INCLUDE(CheckIPOSupported)
   CHECK_IPO_SUPPORTED(RESULT lto_supported OUTPUT error)
-
   IF( lto_supported )
     MESSAGE(STATUS "IPO / LTO enabled")
     SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
