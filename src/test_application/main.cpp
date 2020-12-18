@@ -26,14 +26,14 @@ void config_controls();
 void load_a_bunch_of_stuff();
 
 /**
- * Adds stuff to the universe
- */
-void create_solar_system();
-
-/**
- *  register_universe_types
+ * Register satellite types into the universe to add support for them.
  */
 void register_universe_types();
+
+/**
+ * Try to everything in the universe
+ */
+bool destroy_universe();
 
 /**
  * The spaghetti command line interface that gets inputs from stdin. This
@@ -63,8 +63,7 @@ int g_argc;
 char** g_argv;
 
 int main(int argc, char** argv)
-{   
-    // eventually do more important things here.
+{
     // just lazily save the arguments
     g_argc = argc;
     g_argv = argv;
@@ -86,8 +85,6 @@ int debug_cli_loop()
 
     std::string command;
 
-
-
     while(true)
     {
         std::cout << "> ";
@@ -97,19 +94,14 @@ int debug_cli_loop()
         {
             debug_print_help();
         }
-        if (command == "list_uni")
+        else if (command == "simple")
         {
-            debug_print_sats();
+            if (destroy_universe())
+            {
+                create_simple_solar_system(g_osp);
+            }
         }
-        if (command == "list_ent")
-        {
-            debug_print_hier();
-        }
-        if (command == "list_upd")
-        {
-            debug_print_update_order();
-        }
-        else if (command == "start")
+        else if (command == "flight")
         {
             if (g_magnumThread.joinable())
             {
@@ -118,6 +110,18 @@ int debug_cli_loop()
             std::thread t(test_flight, std::ref(g_ospMagnum), std::ref(g_osp),
                           OSPMagnum::Arguments{g_argc, g_argv});
             g_magnumThread.swap(t);
+        }
+        else if (command == "list_uni")
+        {
+            debug_print_sats();
+        }
+        else if (command == "list_ent")
+        {
+            debug_print_hier();
+        }
+        else if (command == "list_upd")
+        {
+            debug_print_update_order();
         }
         else if (command == "exit")
         {
@@ -140,9 +144,27 @@ int debug_cli_loop()
         g_magnumThread.join();
     }
 
-    // destory the universe
-    //g_osp.get_universe().get_sats().clear();
     return 0;
+}
+
+bool destroy_universe()
+{
+    // Make sure no application is open
+    if (g_ospMagnum.get() != nullptr)
+    {
+        std::cout << "Application must be closed to destroy universe.\n";
+        return false;
+    }
+
+    // Destroy all satellites
+    g_osp.get_universe().get_reg().clear();
+
+    // Destroy blueprints as part of destroying all vehicles
+    g_osp.debug_get_packges()[0].clear<BlueprintVehicle>();
+
+    std::cout << "*explosion* Universe destroyed!\n";
+
+    return true;
 }
 
 void load_a_bunch_of_stuff()
@@ -161,6 +183,8 @@ void load_a_bunch_of_stuff()
     //g_osp.get_universe().get_sats().reserve(64);
 
     //s_partsLoaded = true;
+
+    std::cout << "Resource loading complete\n\n";
 }
 
 void register_universe_types()
@@ -175,8 +199,13 @@ void debug_print_help()
 {
     std::cout
         << "OSP-Magnum Temporary Debug CLI\n"
-        << "Things to type:\n"
-        << "* start     - Create an ActiveArea and start Magnum\n"
+        << "Choose a test universe:\n"
+        << "* simple    - Simple test planet and vehicles (default)\n"
+        << "\n"
+        << "Start Application:\n"
+        << "* flight    - Create an ActiveArea and start Magnum\n"
+        << "\n"
+        << "Other things to type:\n"
         << "* list_uni  - List Satellites in the universe\n"
         << "* list_ent  - List Entities in active scene\n"
         << "* list_upd  - List Update order from active scene\n"
@@ -222,7 +251,7 @@ void debug_print_hier()
     while (true)
     {
         // print some info about the entity
-        active::ACompHierarchy &hier = scene.reg_get<active::ACompHierarchy>(currentEnt);
+        auto &hier = scene.reg_get<active::ACompHierarchy>(currentEnt);
         for (unsigned i = 0; i < hier.m_level; i ++)
         {
             // print arrows to indicate level

@@ -1,7 +1,7 @@
 # OSP Test Application
 
 This is the OSP test applicaton. It is designed demonstrate all parts of
-osp-magnum and its API, while being very simple.
+osp-magnum and its API, while being simple and easy to modify by contributors.
 
 ## Controls
 

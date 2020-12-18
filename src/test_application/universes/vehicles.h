@@ -9,10 +9,14 @@ using osp::Matrix4;
 using osp::Quaternion;
 
 /**
+ * Creates a vehicle satellite and adds a part_stomper to it, being very
+ * deterministic indeed. This will find "part_stomper" from the specified
+ * package, and use it to construct a BlueprintVehicle. This BlueprintVehicle
+ * is saved to the package.
  *
- * @param uni [in,out]
- * @param pkg [in,out]
- * @param name [in]
+ * @param uni [in,out] Universe to create the vehicle in
+ * @param pkg [in,out] Package to search for parts and save the blueprint
+ * @param name [in] Name of new vehicle used for blueprint and satellite
  * @return Satellite containing UCompVehicle
  */
 osp::universe::Satellite debug_add_deterministic_vehicle(
@@ -26,11 +30,14 @@ osp::universe::Satellite debug_add_deterministic_vehicle(
  * A new Satellite created in the specified universe will be returned,
  * containing a UCompVehicle with its blueprint set to the new vehicle.
  *
- * @param uni [in,out]
- * @param pkg [in,out]
- * @param name [in]
+ * @param uni [in,out] Universe to create the vehicle in
+ * @param pkg [in,out] Package to search for parts and save the blueprint
+ * @param name [in] Name of new vehicle used for blueprint and satellite
  * @return Satellite containing UCompVehicle
  */
 osp::universe::Satellite debug_add_random_vehicle(
         osp::universe::Universe& uni, osp::Package& pkg,
         std::string const & name);
+
+
+// TODO: put test with creating a universe with just vehicles

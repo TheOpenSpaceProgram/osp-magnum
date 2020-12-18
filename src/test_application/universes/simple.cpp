@@ -82,4 +82,6 @@ void create_simple_solar_system(osp::OSPApplication& ospApp)
                                   z * 1024l * 400l};
         }
     }
+
+    std::cout << "Created simple solar system\n";
 }
