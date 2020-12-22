@@ -32,6 +32,8 @@ using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
 
+const std::string SysMachineUserControl::smc_name = "UserControl";
+
 MachineUserControl::MachineUserControl() :
     Machine(false),
     //m_woTestPropagate(this, "TestOut", &MachineUserControl::propagate_test),

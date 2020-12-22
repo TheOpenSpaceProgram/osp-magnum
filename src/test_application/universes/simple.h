@@ -28,4 +28,9 @@
 #include <osp/Universe.h>
 #include <osp/OSPApplication.h>
 
+namespace testapp
+{
+
 void create_simple_solar_system(osp::OSPApplication& ospApp);
+
+}

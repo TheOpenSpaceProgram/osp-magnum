@@ -28,10 +28,8 @@
 #include <osp/Universe.h>
 #include <osp/Resource/Package.h>
 
-using osp::Vector2;
-using osp::Vector3;
-using osp::Matrix4;
-using osp::Quaternion;
+namespace testapp
+{
 
 /**
  * Creates a vehicle satellite and adds a part_stomper to it, being very
@@ -66,3 +64,5 @@ osp::universe::Satellite debug_add_random_vehicle(
 
 
 // TODO: put test with creating a universe with just vehicles
+
+}

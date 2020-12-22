@@ -117,6 +117,9 @@ class SysNewton : public IDynamicSystem
 {
 
 public:
+
+    static const std::string smc_name;
+
     SysNewton(ActiveScene &scene);
     SysNewton(SysNewton const& copy) = delete;
     SysNewton(SysNewton&& move) = delete;

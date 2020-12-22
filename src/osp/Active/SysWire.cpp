@@ -30,6 +30,8 @@
 using namespace osp;
 using namespace osp::active;
 
+const std::string SysWire::smc_name = "Wire";
+
 WireInput::WireInput(IWireElement* element, std::string const& name) :
         m_element(element),
         m_name(name)

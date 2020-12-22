@@ -94,6 +94,8 @@ class SysVehicle : public IDynamicSystem, public IActivator
 {
 public:
 
+    static const std::string smc_name;
+
     SysVehicle(ActiveScene &scene);
     SysVehicle(SysNewton const& copy) = delete;
     SysVehicle(SysNewton&& move) = delete;

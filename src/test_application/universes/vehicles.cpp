@@ -27,6 +27,13 @@
 
 #include <osp/Satellites/SatVehicle.h>
 
+using namespace testapp;
+
+using osp::Vector2;
+using osp::Vector3;
+using osp::Matrix4;
+using osp::Quaternion;
+
 using osp::Package;
 using osp::DependRes;
 
@@ -40,7 +47,7 @@ using osp::BlueprintVehicle;
 using osp::PrototypePart;
 
 
-osp::universe::Satellite debug_add_deterministic_vehicle(
+osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
         Universe& uni, Package& pkg, std::string const & name)
 {
     // Begin blueprint
@@ -83,7 +90,7 @@ osp::universe::Satellite debug_add_deterministic_vehicle(
     return sat;
 }
 
-osp::universe::Satellite debug_add_random_vehicle(
+osp::universe::Satellite testapp::debug_add_random_vehicle(
         osp::universe::Universe& uni, osp::Package& pkg,
         std::string const & name)
 {

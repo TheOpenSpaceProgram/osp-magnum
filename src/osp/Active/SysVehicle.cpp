@@ -44,6 +44,8 @@ using namespace osp::active;
 // for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;
 
+const std::string SysVehicle::smc_name = "Vehicle";
+
 SysVehicle::SysVehicle(ActiveScene &scene) :
         m_scene(scene),
         m_updateVehicleModification(
@@ -175,7 +177,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
     // Wire the thing up
 
-    SysWire& sysWire = scene.dynamic_system_get<SysWire>("Wire");
+    SysWire& sysWire = scene.dynamic_system_find<SysWire>();
 
     // Loop through wire connections
     for (BlueprintWire& blueprintWire : vehicleData.get_wires())
@@ -215,7 +217,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
     ACompRigidBody& vehicleBody = scene.reg_emplace<ACompRigidBody>(vehicleEnt);
     ACompCollisionShape& vehicleShape = scene.reg_emplace<ACompCollisionShape>(vehicleEnt);
     vehicleShape.m_shape = ECollisionShape::COMBINED;
-    scene.dynamic_system_get<SysPhysics>("Physics").create_body(vehicleEnt);
+    scene.dynamic_system_find<SysPhysics>().create_body(vehicleEnt);
 
     return {0, vehicleEnt, true};
 }
@@ -481,7 +483,7 @@ void SysVehicle::update_vehicle_modification()
 
                 islandTransform.m_transform.translation() += comOffset;
 
-                m_scene.dynamic_system_get<SysPhysics>("Physics").create_body(islandEnt);
+                m_scene.dynamic_system_find<SysPhysics>().create_body(islandEnt);
             }
 
         }

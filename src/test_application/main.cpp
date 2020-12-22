@@ -38,7 +38,7 @@
 #include <memory>
 #include <thread>
 
-using namespace osp;
+using namespace testapp;
 
 void config_controls();
 
@@ -175,7 +175,7 @@ int debug_cli_loop()
 bool destroy_universe()
 {
     // Make sure no application is open
-    if (g_ospMagnum.get() != nullptr)
+    if (g_ospMagnum != nullptr)
     {
         std::cout << "Application must be closed to destroy universe.\n";
         return false;
@@ -185,7 +185,7 @@ bool destroy_universe()
     g_osp.get_universe().get_reg().clear();
 
     // Destroy blueprints as part of destroying all vehicles
-    g_osp.debug_get_packges()[0].clear<BlueprintVehicle>();
+    g_osp.debug_get_packges()[0].clear<osp::BlueprintVehicle>();
 
     std::cout << "*explosion* Universe destroyed!\n";
 
@@ -246,11 +246,11 @@ void debug_print_update_order()
         return;
     }
 
-    osp::active::UpdateOrder &order = g_ospMagnum->get_scenes().begin()
+    osp::active::UpdateOrder const &order = g_ospMagnum->get_scenes().begin()
                                             ->second.get_update_order();
 
     std::cout << "Update order:\n";
-    for (auto call : order.get_call_list())
+    for (auto const& call : order.get_call_list())
     {
         std::cout << "* " << call.m_name << "\n";
     }
@@ -258,6 +258,9 @@ void debug_print_update_order()
 
 void debug_print_hier()
 {
+    using osp::active::ACompHierarchy;
+    using osp::active::ActiveScene;
+    using osp::active::ActiveEnt;
 
     if (!g_ospMagnum)
     {
@@ -267,16 +270,16 @@ void debug_print_hier()
 
     std::cout << "ActiveScene Entity Hierarchy:\n";
 
-    std::vector<active::ActiveEnt> parentNextSibling;
-    active::ActiveScene &scene = g_ospMagnum->get_scenes().begin()->second;
-    active::ActiveEnt currentEnt = scene.hier_get_root();
+    std::vector<ActiveEnt> parentNextSibling;
+    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second;
+    ActiveEnt currentEnt = scene.hier_get_root();
 
     parentNextSibling.reserve(16);
 
     while (true)
     {
-        // print some info about the entity
-        auto &hier = scene.reg_get<active::ACompHierarchy>(currentEnt);
+        // print some info about the entitysize() != 0
+        auto const &hier = scene.reg_get<ACompHierarchy>(currentEnt);
         for (unsigned i = 0; i < hier.m_level; i ++)
         {
             // print arrows to indicate level
@@ -284,7 +287,7 @@ void debug_print_hier()
         }
         std::cout << "[" << int(currentEnt) << "]: " << hier.m_name << "\n";
 
-        if (hier.m_childCount)
+        if (hier.m_childCount != 0)
         {
             // entity has some children
             currentEnt = hier.m_childFirst;
@@ -301,7 +304,7 @@ void debug_print_hier()
             // no children, move to next sibling
             currentEnt = hier.m_siblingNext;
         }
-        else if (parentNextSibling.size())
+        else if (!parentNextSibling.empty())
         {
             // last sibling, and not done yet
             // is last sibling, move to parent's (or ancestor's) next sibling
@@ -317,26 +320,28 @@ void debug_print_hier()
 
 void debug_print_sats()
 {
+    using osp::universe::UCompTransformTraj;
+    using osp::universe::UCompType;
 
-    universe::Universe &universe = g_osp.get_universe();
+    osp::universe::Universe const &universe = g_osp.get_universe();
 
-    auto view = universe.get_reg().view<universe::UCompTransformTraj,
-                                        universe::UCompType>();
+    auto const view = universe.get_reg().view<const UCompTransformTraj,
+                                              const UCompType>();
 
-    for (universe::Satellite sat : view)
+    for (osp::universe::Satellite sat : view)
     {
-        auto &posTraj = view.get<universe::UCompTransformTraj>(sat);
-        auto &type = view.get<universe::UCompType>(sat);
+        auto const &posTraj = view.get<const UCompTransformTraj>(sat);
+        auto const &type = view.get<const UCompType>(sat);
 
-        auto &pos = posTraj.m_position;
+        osp::Vector3s const &pos = posTraj.m_position;
 
         std::cout << "SATELLITE: \"" << posTraj.m_name << "\" \n";
-        if (type.m_type)
+        if (type.m_type != nullptr)
         {
             std::cout << " * Type: " << type.m_type->get_name() << "\n";
         }
 
-        if (posTraj.m_trajectory)
+        if (posTraj.m_trajectory != nullptr)
         {
             std::cout << " * Trajectory: "
                       << posTraj.m_trajectory->get_type_name() << "\n";

@@ -294,6 +294,8 @@ class SysWire : public IDynamicSystem
 {
 public:
 
+    static const std::string smc_name;
+
     struct DependentOutput
     {
         IWireElement *m_element;

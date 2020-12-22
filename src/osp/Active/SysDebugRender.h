@@ -45,6 +45,9 @@ struct CompDrawableDebug
 class SysDebugRender : public IDynamicSystem
 {
 public:
+
+    static const std::string smc_name;
+
     SysDebugRender(ActiveScene &rScene);
     ~SysDebugRender() = default;
 

@@ -67,7 +67,7 @@ public:
     /**
      * @return Root entity of the entire scene graph
      */
-    constexpr ActiveEnt hier_get_root() { return m_root; }
+    constexpr ActiveEnt hier_get_root() const { return m_root; }
 
     /**
      * Create a new entity, and add a ACompHierarchy to it
@@ -111,7 +111,11 @@ public:
      * @return Reference to component
      */
     template<class T>
-    decltype(auto) reg_get(ActiveEnt ent) { return m_registry.get<T>(ent); };
+    decltype(auto) reg_get(ActiveEnt ent) { return m_registry.get<T>(ent); }
+
+    template<class T>
+    decltype(auto) reg_get(ActiveEnt ent) const { return m_registry.get<T>(ent); }
+
 
     /**
      * Shorthand for get_registry().emplace<T>()
@@ -150,12 +154,16 @@ public:
     // TODO
     constexpr float get_time_delta_fixed() { return 1.0f / 60.0f; }
 
+    void system_machine_add(std::string const& name,
+                            std::unique_ptr<ISysMachine>&& sysMachine);
+
     /**
      *
      * @tparam T
      */
-    template<class T, typename... Args>
-    void system_machine_add(std::string const& name, Args &&... args);
+    template<class SYSMACH_T, typename... ARGS_T>
+    void system_machine_create(ARGS_T &&... args);
+
 
     /**
      * Find a registered SysMachine by name. This accesses a map.
@@ -170,8 +178,9 @@ public:
      *
      * @tparam T
      */
-    template<class T, typename... Args>
-    T& dynamic_system_add(std::string const& name, Args &&... args);
+    template<class DYNSYS_T, typename... Args>
+    DYNSYS_T& dynamic_system_add(Args &&... args);
+
 
     /**
      * Find a registered IDynamicSystem by name. This accesses a map.
@@ -181,13 +190,13 @@ public:
     MapDynamicSys::iterator dynamic_system_find(std::string const& name);
 
     /**
-     * Get a registered IDynamicSystem by name, and cast it to SYSTEM_T. This
+     * Find a registered IDynamicSystem by type, and cast it to SYSTEM_T. This
      * accesses a map. If a system isn't found, this will assert.
-     * @param name [in] Name used as a key
+     * @tparam SYSTEM_T Type of registered IDynamicSys
      * @return Reference to specified IDynamicSys
      */
     template<class SYSTEM_T>
-    SYSTEM_T& dynamic_system_get(std::string const& name);
+    SYSTEM_T& dynamic_system_find();
 
     bool dynamic_system_it_valid(MapDynamicSys::iterator it);
 
@@ -228,32 +237,31 @@ private:
 
 // move these to another file eventually
 
-template<class T, typename... Args>
-void ActiveScene::system_machine_add(std::string const& name,
-                                             Args &&... args)
+
+template<class SYSMACH_T, typename... ARGS_T>
+void ActiveScene::system_machine_create(ARGS_T &&... args)
 {
-    m_sysMachines.emplace(name, std::make_unique<T>(*this, args...));
+    system_machine_add(SYSMACH_T::smc_name,
+                       std::make_unique<SYSMACH_T>(*this, args...));
 }
 
-template<class T, typename... Args>
-T& ActiveScene::dynamic_system_add(std::string const& name,
-                                             Args &&... args)
-{
-    auto ptr = std::make_unique<T>(*this, args...);
-    T &refReturn = *(ptr.get());
 
-    auto pair = m_dynamicSys.emplace(name, std::move(ptr));
+template<class DYNSYS_T, typename... ARGS_T>
+DYNSYS_T& ActiveScene::dynamic_system_add(ARGS_T &&... args)
+{
+    auto ptr = std::make_unique<DYNSYS_T>(*this, args...);
+    DYNSYS_T &refReturn = *(ptr.get());
+
+    auto pair = m_dynamicSys.emplace(DYNSYS_T::smc_name, std::move(ptr));
 
     return refReturn;
 }
 
 template<class SYSTEM_T>
-SYSTEM_T& ActiveScene::dynamic_system_get(std::string const& name)
+SYSTEM_T& ActiveScene::dynamic_system_find()
 {
-    MapDynamicSys::iterator it = dynamic_system_find(name);
-
-    assert(dynamic_system_it_valid(it));
-
+    MapDynamicSys::iterator it = dynamic_system_find(SYSTEM_T::smc_name);
+    assert(it != m_dynamicSys.end());
     return static_cast<SYSTEM_T&>(*(it->second));
 }
 

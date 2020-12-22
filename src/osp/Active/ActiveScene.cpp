@@ -258,6 +258,12 @@ void ActiveScene::draw(entt::entity camera)
     m_renderOrder.call(cameraComp);
 }
 
+void ActiveScene::system_machine_add(std::string const& name,
+                                     std::unique_ptr<ISysMachine>&& sysMachine)
+{
+    m_sysMachines.emplace(name, std::move(sysMachine));
+}
+
 MapSysMachine::iterator ActiveScene::system_machine_find(const std::string &name)
 {
 //    MapSysMachine::iterator sysIt = m_sysMachines.find(name);

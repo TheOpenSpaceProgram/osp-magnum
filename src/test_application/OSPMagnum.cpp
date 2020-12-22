@@ -31,6 +31,7 @@
 
 #include <iostream>
 
+using namespace testapp;
 
 OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
                      osp::OSPApplication &ospApp) :
@@ -138,11 +139,11 @@ void OSPMagnum::mouseScrollEvent(MouseScrollEvent & event)
 
 osp::active::ActiveScene& OSPMagnum::scene_add(const std::string &name)
 {
-    auto pair = m_scenes.try_emplace(name, m_userInput, m_ospApp);
-    return pair.first->second;
+    auto const& [it, success] = m_scenes.try_emplace(name, m_userInput, m_ospApp);
+    return it->second;
 }
 
-void config_controls(OSPMagnum& ospApp)
+void testapp::config_controls(OSPMagnum& ospApp)
 {
     // Configure Controls
 
@@ -151,59 +152,60 @@ void config_controls(OSPMagnum& ospApp)
 
     using namespace osp;
 
-    using Key = OSPMagnum::KeyEvent::Key;
-    using Mouse = OSPMagnum::MouseEvent::Button;
-    using VarOp = ButtonVarConfig::VarOperator;
-    using VarTrig = ButtonVarConfig::VarTrigger;
-    UserInputHandler& userInput = ospApp.get_input_handler();
+    using Key_t = OSPMagnum::KeyEvent::Key;
+    using Mouse_t = OSPMagnum::MouseEvent::Button;
+    using VarOp_t = ButtonVarConfig::VarOperator;
+    using VarTrig_t = ButtonVarConfig::VarTrigger;
+
+    UserInputHandler& rUserInput = ospApp.get_input_handler();
 
     // vehicle control, used by MachineUserControl
 
     // would help to get an axis for yaw, pitch, and roll, but use individual
     // axis buttons for now
-    userInput.config_register_control("vehicle_pitch_up", true,
-            {{0, (int) Key::S, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("vehicle_pitch_dn", true,
-            {{0, (int) Key::W, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("vehicle_yaw_lf", true,
-            {{0, (int) Key::A, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("vehicle_yaw_rt", true,
-            {{0, (int) Key::D, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("vehicle_roll_lf", true,
-            {{0, (int) Key::Q, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("vehicle_roll_rt", true,
-            {{0, (int) Key::E, VarTrig::PRESSED, false, VarOp::AND}});
+    rUserInput.config_register_control("vehicle_pitch_up", true,
+            {{0, (int) Key_t::S, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    rUserInput.config_register_control("vehicle_pitch_dn", true,
+            {{0, (int) Key_t::W, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    rUserInput.config_register_control("vehicle_yaw_lf", true,
+            {{0, (int) Key_t::A, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    rUserInput.config_register_control("vehicle_yaw_rt", true,
+            {{0, (int) Key_t::D, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    rUserInput.config_register_control("vehicle_roll_lf", true,
+            {{0, (int) Key_t::Q, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    rUserInput.config_register_control("vehicle_roll_rt", true,
+            {{0, (int) Key_t::E, VarTrig_t::PRESSED, false, VarOp_t::AND}});
 
     // Set throttle max to Z
-    userInput.config_register_control("vehicle_thr_max", false,
-            {{0, (int) Key::Z, VarTrig::PRESSED, false, VarOp::OR}});
+    rUserInput.config_register_control("vehicle_thr_max", false,
+            {{0, (int) Key_t::Z, VarTrig_t::PRESSED, false, VarOp_t::OR}});
     // Set throttle min to X
-    userInput.config_register_control("vehicle_thr_min", false,
-            {{0, (int) Key::X, VarTrig::PRESSED, false, VarOp::OR}});
+    rUserInput.config_register_control("vehicle_thr_min", false,
+            {{0, (int) Key_t::X, VarTrig_t::PRESSED, false, VarOp_t::OR}});
     // Set self destruct to LeftCtrl+C or LeftShift+A
-    userInput.config_register_control("vehicle_self_destruct", false,
-            {{0, (int) Key::LeftCtrl, VarTrig::HOLD, false, VarOp::AND},
-             {0, (int) Key::C, VarTrig::PRESSED, false, VarOp::OR},
-             {0, (int) Key::LeftShift, VarTrig::HOLD, false, VarOp::AND},
-             {0, (int) Key::A, VarTrig::PRESSED, false, VarOp::OR}});
+    rUserInput.config_register_control("vehicle_self_destruct", false,
+            {{0, (int) Key_t::LeftCtrl, VarTrig_t::HOLD, false, VarOp_t::AND},
+             {0, (int) Key_t::C, VarTrig_t::PRESSED, false, VarOp_t::OR},
+             {0, (int) Key_t::LeftShift, VarTrig_t::HOLD, false, VarOp_t::AND},
+             {0, (int) Key_t::A, VarTrig_t::PRESSED, false, VarOp_t::OR}});
 
     // Camera and Game controls, handled in DebugCameraController
 
     // Switch to next vehicle
-    userInput.config_register_control("game_switch", false,
-            {{0, (int) Key::V, VarTrig::PRESSED, false, VarOp::OR}});
+    rUserInput.config_register_control("game_switch", false,
+            {{0, (int) Key_t::V, VarTrig_t::PRESSED, false, VarOp_t::OR}});
 
     // Set UI Up/down/left/right to arrow keys. this is used to rotate the view
     // for now
-    userInput.config_register_control("ui_up", true,
-            {{osp::sc_keyboard, (int) Key::Up, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("ui_dn", true,
-            {{osp::sc_keyboard, (int) Key::Down, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("ui_lf", true,
-            {{osp::sc_keyboard, (int) Key::Left, VarTrig::PRESSED, false, VarOp::AND}});
-    userInput.config_register_control("ui_rt", true,
-            {{osp::sc_keyboard, (int) Key::Right, VarTrig::PRESSED, false, VarOp::AND}});
+    rUserInput.config_register_control("ui_up", true,
+            {{osp::sc_keyboard, (int) Key_t::Up, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    rUserInput.config_register_control("ui_dn", true,
+            {{osp::sc_keyboard, (int) Key_t::Down, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    rUserInput.config_register_control("ui_lf", true,
+            {{osp::sc_keyboard, (int) Key_t::Left, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    rUserInput.config_register_control("ui_rt", true,
+            {{osp::sc_keyboard, (int) Key_t::Right, VarTrig_t::PRESSED, false, VarOp_t::AND}});
 
-    userInput.config_register_control("ui_rmb", true,
-            {{osp::sc_mouse, (int) Mouse::Right, VarTrig::PRESSED, false, VarOp::AND}});
+    rUserInput.config_register_control("ui_rmb", true,
+            {{osp::sc_mouse, (int) Mouse_t::Right, VarTrig_t::PRESSED, false, VarOp_t::AND}});
 }

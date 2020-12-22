@@ -62,6 +62,9 @@ struct ACompFFGravity : public BaseACompFF
 class SysFFGravity : public SysForceField
 {
 public:
+
+    static const std::string smc_name;
+
     SysFFGravity(ActiveScene &scene);
     ~SysFFGravity() = default;
 

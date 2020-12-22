@@ -44,10 +44,13 @@ class SatPlanet : public osp::universe::CommonTypeSat<
         osp::universe::UCompActivatable>
 {
 public:
+
+    static const std::string smc_name;
+
     SatPlanet(osp::universe::Universe& universe);
     ~SatPlanet() = default;
 
-    virtual std::string get_name() { return "Planet"; };
+    virtual std::string get_name() { return smc_name; };
 
 private:
 

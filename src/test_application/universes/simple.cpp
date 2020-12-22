@@ -33,6 +33,8 @@
 
 #include <planet-a/Satellites/SatPlanet.h>
 
+using namespace testapp;
+
 using osp::Package;
 
 using osp::universe::Satellite;
@@ -49,7 +51,7 @@ using planeta::universe::SatPlanet;
 using planeta::universe::UCompPlanet;
 
 
-void create_simple_solar_system(osp::OSPApplication& ospApp)
+void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
 {
     Universe &uni = ospApp.get_universe();
     Package &pkg = ospApp.debug_get_packges()[0];

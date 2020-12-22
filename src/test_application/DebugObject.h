@@ -31,22 +31,26 @@
 #include <osp/UserInputHandler.h>
 #include <osp/types.h>
 
-class AbstractDebugObject
+namespace testapp
+{
+
+class IDebugObject
 {
 public:
     // DebugObject(ActiveScene &scene, ActiveEnt ent);
-    virtual ~AbstractDebugObject() = default;
+    virtual ~IDebugObject() = default;
 
 
     //virtual void set_entity(ActiveEnt m_ent);
 };
 
 template <class Derived>
-class DebugObject : public AbstractDebugObject
+class DebugObject : public IDebugObject
 {
     friend Derived;
 public:
-    DebugObject(osp::active::ActiveScene &scene, osp::active::ActiveEnt ent) :
+    DebugObject(osp::active::ActiveScene &scene,
+                osp::active::ActiveEnt ent) noexcept :
             m_scene(scene),
             m_ent(ent) {};
     virtual ~DebugObject() = default;
@@ -58,12 +62,13 @@ private:
 
 struct ACompDebugObject
 {
-    ACompDebugObject(std::unique_ptr<AbstractDebugObject> ptr) :
+    ACompDebugObject(std::unique_ptr<IDebugObject> ptr) noexcept:
         m_obj(std::move(ptr)) {}
-    ACompDebugObject(ACompDebugObject&& move) = default;
-   ~ACompDebugObject() = default;
+    ACompDebugObject(ACompDebugObject&& move) noexcept = default;
+    ~ACompDebugObject() noexcept = default;
     ACompDebugObject& operator=(ACompDebugObject&& move) = default;
-    std::unique_ptr<AbstractDebugObject> m_obj;
+
+    std::unique_ptr<IDebugObject> m_obj;
 };
 
 
@@ -103,4 +108,6 @@ private:
     osp::ButtonControlHandle m_selfDestruct;
 
 };
+
+}
 

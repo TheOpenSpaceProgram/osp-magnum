@@ -42,6 +42,10 @@
 
 #include <memory>
 
+namespace testapp
+{
+
+using MapActiveScene_t = std::map<std::string, osp::active::ActiveScene>;
 
 class OSPMagnum : public Magnum::Platform::Application
 {
@@ -62,8 +66,7 @@ public:
     osp::active::ActiveScene& scene_add(std::string const &name);
 
     constexpr osp::UserInputHandler& get_input_handler() { return m_userInput; }
-    constexpr std::map<std::string, osp::active::ActiveScene>& get_scenes()
-    { return m_scenes; }
+    constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
 
 private:
 
@@ -71,7 +74,7 @@ private:
 
     osp::UserInputHandler m_userInput;
 
-    std::map<std::string, osp::active::ActiveScene> m_scenes;
+    MapActiveScene_t m_scenes;
 
     Magnum::Timeline m_timeline;
 
@@ -80,3 +83,5 @@ private:
 };
 
 void config_controls(OSPMagnum& userInput);
+
+}

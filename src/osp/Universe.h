@@ -126,7 +126,7 @@ public:
     TYPESAT_T& type_register(ARGS_T&& ... args);
 
     /**
-     * Tries to locate an element in the map of registered Satellite Types.
+     * Tries to locate an element in the map of registered Satellites by name.
      * @param name [in] Name of ITypeSatellite
      * @return Map iterator directly from std::map::find()
      */
@@ -134,6 +134,14 @@ public:
     {
         return m_satTypes.find(name);
     }
+
+    /**
+     * Tries to locate an element in the map of registered Satellite by type.
+     * @tparam SATTYPE_T Type of ITypeSatellite to find
+     * @return Map iterator directly from std::map::find()
+     */
+    template<typename SATTYPE_T>
+    SATTYPE_T& sat_type_find();
 
     /**
      * Create a Trajectory, and add it to the universe.
@@ -144,6 +152,8 @@ public:
     TRAJECTORY_T& trajectory_create(ARGS_T&& ... args);
 
     constexpr entt::basic_registry<Satellite>& get_reg() { return m_registry; }
+    constexpr const entt::basic_registry<Satellite>& get_reg() const
+    { return m_registry; }
 
 private:
 
@@ -171,6 +181,14 @@ TYPESAT_T& Universe::type_register(ARGS_T&& ... args)
     TYPESAT_T& toReturn = *newType;
     m_satTypes[newType->get_name()] = std::move(newType);
     return toReturn;
+}
+
+template<typename SATTYPE_T>
+SATTYPE_T& Universe::sat_type_find()
+{
+    MapSatType::iterator it = sat_type_find(SATTYPE_T::smc_name);
+    assert(it != m_satTypes.end());
+    return static_cast<SATTYPE_T&>(*it->second);
 }
 
 template<typename TRAJECTORY_T, typename ... ARGS_T>

@@ -40,14 +40,12 @@ using namespace Magnum::Math::Literals;
 
 using Magnum::Matrix4;
 
-namespace osp::universe
-{
+using namespace osp::universe;
+
+const std::string SatActiveArea::smc_name = "ActiveArea";
 
 SatActiveArea::SatActiveArea(Universe& universe) :
         CommonTypeSat<SatActiveArea, UCompActiveArea>(universe)
 {
-
-}
-
 
 }
