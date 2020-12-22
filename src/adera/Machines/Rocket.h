@@ -62,12 +62,11 @@ class MachineRocket : public osp::active::Machine
 
 public:
     MachineRocket();
-    MachineRocket(MachineRocket &&move);
+    MachineRocket(MachineRocket &&move) noexcept;
+    MachineRocket& operator=(MachineRocket&& move) noexcept;
 
-    MachineRocket& operator=(MachineRocket&& move);
-
-
-    ~MachineRocket() = default;
+    MachineRocket(MachineRocket const& copy) = delete;
+    MachineRocket& operator=(MachineRocket const& move) = delete;
 
     void propagate_output(osp::active::WireOutput *output) override;
 
@@ -78,12 +77,35 @@ public:
     std::vector<osp::active::WireOutput*> existing_outputs() override;
 
 private:
-    osp::active::WireInput m_wiGimbal;
-    osp::active::WireInput m_wiIgnition;
-    osp::active::WireInput m_wiThrottle;
+    osp::active::WireInput m_wiGimbal   { this, "Gimbal"   };
+    osp::active::WireInput m_wiIgnition { this, "Ignition" };
+    osp::active::WireInput m_wiThrottle { this, "Throttle" };
 
-    osp::active::ActiveEnt m_rigidBody;
+    osp::active::ActiveEnt m_rigidBody  { entt::null };
 };
 
+//-----------------------------------------------------------------------------
 
+inline MachineRocket::MachineRocket()
+ : Machine(true)
+{ }
+
+inline MachineRocket::MachineRocket(MachineRocket&& move) noexcept
+ : Machine(std::move(move))
+ , m_wiGimbal(this, std::move(move.m_wiGimbal))
+ , m_wiIgnition(this, std::move(move.m_wiIgnition))
+ , m_wiThrottle(this, std::move(move.m_wiThrottle))
+ , m_rigidBody(std::move(move.m_rigidBody))
+{ }
+
+inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
+{
+    Machine::operator=(std::move(move));
+    m_wiGimbal   = { this, std::move(move.m_wiGimbal)   };
+    m_wiIgnition = { this, std::move(move.m_wiIgnition) };
+    m_wiThrottle = { this, std::move(move.m_wiThrottle) };
+    m_rigidBody  = std::move(move.m_rigidBody);
+    return *this;
 }
+
+} // namespace adera::active::machines

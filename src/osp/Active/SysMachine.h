@@ -42,6 +42,7 @@ class Machine;
 using MapSysMachine = std::map<std::string,
                                std::unique_ptr<ISysMachine>>;
 
+//-----------------------------------------------------------------------------
 
 /**
  * This component is added to a part, and stores a vector that keeps track of
@@ -50,7 +51,6 @@ using MapSysMachine = std::map<std::string,
  */
 struct ACompMachines
 {
-
     struct PartMachine
     {
         PartMachine(ActiveEnt partEnt, MapSysMachine::iterator system) :
@@ -60,16 +60,17 @@ struct ACompMachines
         MapSysMachine::iterator m_system;
     };
 
-    ACompMachines() = default;
-    ACompMachines(ACompMachines&& move) = default;
-
+    ACompMachines() noexcept = default;
+    ACompMachines(ACompMachines&& move) noexcept = default;
+    ACompMachines(ACompMachines const& move) = delete;
     ACompMachines& operator=(ACompMachines&& move) = default;
+    ACompMachines& operator=(ACompMachines const& move) = delete;
 
     //LinkedList<Machine> m_machines;
     std::vector<PartMachine> m_machines;
-
 };
 
+//-----------------------------------------------------------------------------
 
 /**
  * Machine Base class. This should tecnically be an AComp Virtual functions are
@@ -78,35 +79,25 @@ struct ACompMachines
  * Calling updates are handled by SysMachines
  */
 class Machine : public IWireElement
-                //public LinkedListItem<Machine, LinkedList<Machine>>
 {
 
 public:
-    Machine(bool enable);
+    constexpr Machine() noexcept = default;
+    constexpr Machine(bool enable) noexcept;
+    constexpr Machine(Machine&& move) noexcept = default;
+    constexpr Machine& operator=(Machine&& move) noexcept = default;
+
     Machine(Machine const& copy) = delete;
-    Machine(Machine&& move) = default;
-    virtual ~Machine() = default;
+    Machine& operator=(Machine const& move) = delete;
 
-    // polymorphic stuff is used only for wiring.
-    // use a system for updating
+    constexpr void enable(void) noexcept;
+    constexpr void disable(void) noexcept;
 
-    virtual void propagate_output(WireOutput* output) override = 0;
-
-    virtual WireOutput* request_output(WireOutPort port) override = 0;
-    virtual WireInput* request_input(WireInPort port) override = 0;
-
-    virtual std::vector<WireInput*> existing_inputs() override = 0;
-    virtual std::vector<WireOutput*> existing_outputs() override = 0;
-
-    //void doErase() override;
-
-    bool m_enable;
-
-private:
-    //bool m_enable;
-    //ActiveEnt m_ent;
-
+protected:
+    bool m_enable = false;
 };
+
+//-----------------------------------------------------------------------------
 
 class ISysMachine
 {
@@ -114,14 +105,13 @@ public:
 
     virtual ~ISysMachine() = default;
 
-    //virtual void update_sensor() = 0;
-    //virtual void update_physics(float delta) = 0;
-
     // TODO: make some config an argument
     virtual Machine& instantiate(ActiveEnt ent) = 0;
 
     virtual Machine& get(ActiveEnt ent) = 0;
 };
+
+//-----------------------------------------------------------------------------
 
 // Template for making Machine Systems
 template<class Derived, class MACH_T>
@@ -130,32 +120,30 @@ class SysMachine : public ISysMachine
     friend Derived;
 
 public:
-
     SysMachine(ActiveScene &scene) : m_scene(scene) {}
     ~SysMachine() = default;
 
     virtual Machine& instantiate(ActiveEnt ent) = 0;
 
-    /**
-     * Create a new Machine component
-     * @param args
-     * @return
-     */
-    //template <class... Args>
-    //MACH_T& emplace(ActiveEnt ent, Args&& ... args);
-
 private:
     ActiveScene &m_scene;
-    //std::vector<MACH_T> m_machines;
-
 };
 
-//template<class Derived, class MACH_T>
-//template<class... Args>
-//MACH_T& SysMachine<Derived, MACH_T>::emplace(ActiveEnt ent, Args&& ... args)
-//{
-//    //m_machines.emplace_back(ent, std::forward<Args>(args)...);
-//    return m_scene.reg_emplace<MACH_T>(ent, std::forward<Args>(args)...);
-//}
+//-----------------------------------------------------------------------------
 
+constexpr Machine::Machine(bool enable) noexcept
+ : m_enable(enable)
+{ }
+
+constexpr void Machine::enable(void) noexcept
+{
+    m_enable = true;
 }
+
+constexpr void Machine::disable(void) noexcept
+{
+    m_enable = false;
+}
+
+
+} // namespace osp::active

@@ -147,7 +147,7 @@ void DebugCameraController::update_physics_post()
             // disable the first MachineUserControl because switching away
             active::ActiveEnt firstPart
                     = *(view.get(m_orbiting).m_parts.begin());
-            m_scene.reg_get<MachineUserControl>(firstPart).m_enable = false;
+            m_scene.reg_get<MachineUserControl>(firstPart).disable();
         }
 
         if (it == view.end() || it == view.begin())
@@ -170,7 +170,7 @@ void DebugCameraController::update_physics_post()
             active::ActiveEnt firstPart
                     = *(view.get(m_orbiting).m_parts.begin());
 
-            m_scene.reg_get<MachineUserControl>(firstPart).m_enable = true;
+            m_scene.reg_get<MachineUserControl>(firstPart).enable();
         }
 
         // pick next entity, or first entity in scene

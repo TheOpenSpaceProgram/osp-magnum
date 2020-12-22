@@ -34,33 +34,6 @@ using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
 
-MachineRocket::MachineRocket() :
-        Machine(true),
-        m_wiGimbal(this, "Gimbal"),
-        m_wiIgnition(this, "Ignition"),
-        m_wiThrottle(this, "Throttle"),
-        m_rigidBody(entt::null)
-{
-    //m_enable = true;
-}
-
-MachineRocket::MachineRocket(MachineRocket&& move) :
-        Machine(std::move(move)),
-        m_wiGimbal(this, std::move(move.m_wiGimbal)),
-        m_wiIgnition(this, std::move(move.m_wiIgnition)),
-        m_wiThrottle(this, std::move(move.m_wiThrottle))
-{
-    //m_enable = true;
-}
-
-
-MachineRocket& MachineRocket::operator=(MachineRocket&& move)
-{
-    m_enable = move.m_enable;
-    // TODO
-    return *this;
-}
-
 void MachineRocket::propagate_output(WireOutput* output)
 {
 

@@ -33,8 +33,6 @@ using namespace osp::active;
 
 //}
 
-Machine::Machine(bool enable) : m_enable(enable) {}
-
 //void Machine::doErase()
 //{
 //    list()->cut(this);
