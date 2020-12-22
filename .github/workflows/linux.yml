@@ -21,5 +21,5 @@ jobs:
 
     - name: Build OSP-Magnum
       run: |
-        scan-build -o scanlogs cmake -B build -DCMAKE_BUILD_TYPE=Release
-        scan-build -o scanlogs cmake --build build --parallel --config Release --target osp-magnum
+        scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake -B build -DCMAKE_BUILD_TYPE=Release
+        scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake --build build --parallel --config Release --target osp-magnum
