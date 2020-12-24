@@ -124,3 +124,5 @@ if(tidy_path)
                  CXX_CLANG_TIDY ${tidy_path}
                  --checks="clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,readability-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-auto")
 endif()
+
+FILE (COPY "${CMAKE_SOURCE_DIR}/bin/OSPData/adera/" DESTINATION "${CMAKE_BINARY_DIR}/bin/OSPData/adera")
