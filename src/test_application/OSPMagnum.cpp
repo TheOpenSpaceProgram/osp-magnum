@@ -34,12 +34,12 @@
 using namespace testapp;
 
 OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
-                     osp::OSPApplication &ospApp) :
+                     osp::OSPApplication &rOspApp) :
         Magnum::Platform::Application{
             arguments,
             Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
         m_userInput(12),
-        m_ospApp(ospApp)
+        m_ospApp(rOspApp)
 {
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 
@@ -137,13 +137,19 @@ void OSPMagnum::mouseScrollEvent(MouseScrollEvent & event)
     m_userInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 }
 
-osp::active::ActiveScene& OSPMagnum::scene_add(const std::string &name)
+osp::active::ActiveScene& OSPMagnum::scene_create(std::string const& name)
 {
     auto const& [it, success] = m_scenes.try_emplace(name, m_userInput, m_ospApp);
     return it->second;
 }
 
-void testapp::config_controls(OSPMagnum& ospApp)
+osp::active::ActiveScene& OSPMagnum::scene_create(std::string && name)
+{
+    auto const& [it, success] = m_scenes.try_emplace(std::move(name), m_userInput, m_ospApp);
+    return it->second;
+}
+
+void testapp::config_controls(OSPMagnum& rOspApp)
 {
     // Configure Controls
 
@@ -157,7 +163,7 @@ void testapp::config_controls(OSPMagnum& ospApp)
     using VarOp_t = ButtonVarConfig::VarOperator;
     using VarTrig_t = ButtonVarConfig::VarTrigger;
 
-    UserInputHandler& rUserInput = ospApp.get_input_handler();
+    UserInputHandler& rUserInput = rOspApp.get_input_handler();
 
     // vehicle control, used by MachineUserControl
 

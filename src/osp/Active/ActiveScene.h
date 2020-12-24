@@ -154,8 +154,17 @@ public:
     // TODO
     constexpr float get_time_delta_fixed() { return 1.0f / 60.0f; }
 
-    void system_machine_add(std::string const& name,
-                            std::unique_ptr<ISysMachine>&& sysMachine);
+    /**
+     * Add support for a new machine type by adding an ISysMachine
+     * @param name [in] Name to identify this machine type. This is used by part
+     *                  configs to idenfity which machines to use.
+     * @param sysMachine [in] ISysMachine to add. As this will transfer
+     *                        ownership, use std::move()
+     * @return Iterator to new machine added, or invalid iterator to end of map
+     *         if the name already exists.
+     */
+     MapSysMachine_t::iterator system_machine_add(std::string_view name,
+                            std::unique_ptr<ISysMachine> sysMachine);
 
     /**
      *
@@ -170,16 +179,16 @@ public:
      * @param name [in] Name used as a key
      * @return Iterator to specified SysMachine
      */
-    MapSysMachine::iterator system_machine_find(std::string const& name);
+    MapSysMachine_t::iterator system_machine_find(std::string_view name);
 
-    bool system_machine_it_valid(MapSysMachine::iterator it);
+    bool system_machine_it_valid(MapSysMachine_t::iterator it);
 
     /**
      *
      * @tparam T
      */
     template<class DYNSYS_T, typename... Args>
-    DYNSYS_T& dynamic_system_add(Args &&... args);
+    DYNSYS_T& dynamic_system_create(Args &&... args);
 
 
     /**
@@ -187,7 +196,7 @@ public:
      * @param name [in] Name used as a key
      * @return Iterator to specified IDynamicSys
      */
-    MapDynamicSys::iterator dynamic_system_find(std::string const& name);
+    MapDynamicSys_t::iterator dynamic_system_find(std::string_view name);
 
     /**
      * Find a registered IDynamicSystem by type, and cast it to SYSTEM_T. This
@@ -198,7 +207,7 @@ public:
     template<class SYSTEM_T>
     SYSTEM_T& dynamic_system_find();
 
-    bool dynamic_system_it_valid(MapDynamicSys::iterator it);
+    bool dynamic_system_it_valid(MapDynamicSys_t::iterator it);
 
 private:
 
@@ -221,8 +230,8 @@ private:
     UpdateOrder m_updateOrder;
     RenderOrder m_renderOrder;
 
-    MapSysMachine m_sysMachines; // TODO: Put this in SysVehicle
-    MapDynamicSys m_dynamicSys;
+    MapSysMachine_t m_sysMachines; // TODO: Put this in SysVehicle
+    MapDynamicSys_t m_dynamicSys;
 
     // TODO: base class and a list for Systems (or not)
     //SysDebugRender m_render;
@@ -247,10 +256,10 @@ void ActiveScene::system_machine_create(ARGS_T &&... args)
 
 
 template<class DYNSYS_T, typename... ARGS_T>
-DYNSYS_T& ActiveScene::dynamic_system_add(ARGS_T &&... args)
+DYNSYS_T& ActiveScene::dynamic_system_create(ARGS_T &&... args)
 {
-    auto ptr = std::make_unique<DYNSYS_T>(*this, args...);
-    DYNSYS_T &refReturn = *(ptr.get());
+    auto ptr = std::make_unique<DYNSYS_T>(*this, std::forward<ARGS_T>(args)...);
+    DYNSYS_T &refReturn = *ptr;
 
     auto pair = m_dynamicSys.emplace(DYNSYS_T::smc_name, std::move(ptr));
 
@@ -260,7 +269,7 @@ DYNSYS_T& ActiveScene::dynamic_system_add(ARGS_T &&... args)
 template<class SYSTEM_T>
 SYSTEM_T& ActiveScene::dynamic_system_find()
 {
-    MapDynamicSys::iterator it = dynamic_system_find(SYSTEM_T::smc_name);
+    MapDynamicSys_t::iterator it = dynamic_system_find(SYSTEM_T::smc_name);
     assert(it != m_dynamicSys.end());
     return static_cast<SYSTEM_T&>(*(it->second));
 }

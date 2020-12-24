@@ -63,6 +63,7 @@ public:
     virtual ~IDynamicSystem() = default;
 };
 
-using MapDynamicSys = std::map<std::string, std::unique_ptr<IDynamicSystem>>;
+using MapDynamicSys_t = std::map<std::string, std::unique_ptr<IDynamicSystem>,
+                                 std::less<> >;
 
 }

@@ -88,17 +88,17 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     config_controls(*pMagnumApp);
 
     // Create an ActiveScene
-    osp::active::ActiveScene& scene = pMagnumApp->scene_add("Area 1");
+    osp::active::ActiveScene& scene = pMagnumApp->scene_create("Area 1");
 
     // Register dynamic systems needed for flight scene
 
-    auto &sysPhysics = scene.dynamic_system_add<osp::active::SysPhysics>();
-    auto &sysWire = scene.dynamic_system_add<osp::active::SysWire>();
-    auto &sysDebugRender = scene.dynamic_system_add<osp::active::SysDebugRender>();
-    auto &sysArea = scene.dynamic_system_add<osp::active::SysAreaAssociate>(uni);
-    auto &sysVehicle = scene.dynamic_system_add<osp::active::SysVehicle>();
-    auto &sysPlanet = scene.dynamic_system_add<planeta::active::SysPlanetA>();
-    auto &sysGravity = scene.dynamic_system_add<osp::active::SysFFGravity>();
+    auto &sysPhysics        = scene.dynamic_system_create<osp::active::SysPhysics>();
+    auto &sysWire           = scene.dynamic_system_create<osp::active::SysWire>();
+    auto &sysDebugRender    = scene.dynamic_system_create<osp::active::SysDebugRender>();
+    auto &sysArea           = scene.dynamic_system_create<osp::active::SysAreaAssociate>(uni);
+    auto &sysVehicle        = scene.dynamic_system_create<osp::active::SysVehicle>();
+    auto &sysPlanet         = scene.dynamic_system_create<planeta::active::SysPlanetA>();
+    auto &sysGravity        = scene.dynamic_system_create<osp::active::SysFFGravity>();
 
     // Register machines for that scene
     scene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());

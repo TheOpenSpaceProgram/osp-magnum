@@ -141,7 +141,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
         for (PrototypeMachine& protoMachine : proto.get_machines())
         {
-            MapSysMachine::iterator sysMachine
+            MapSysMachine_t::iterator sysMachine
                     = scene.system_machine_find(protoMachine.m_type);
 
             if (!(scene.system_machine_it_valid(sysMachine)))

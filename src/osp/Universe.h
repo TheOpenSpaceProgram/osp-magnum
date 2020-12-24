@@ -136,9 +136,10 @@ public:
     }
 
     /**
-     * Tries to locate an element in the map of registered Satellite by type.
+     * Tries to locate an element in the map of registered Satellite by type,
+     * and casts it to SATTYPE_T
      * @tparam SATTYPE_T Type of ITypeSatellite to find
-     * @return Map iterator directly from std::map::find()
+     * @return Reference to satellite type found
      */
     template<typename SATTYPE_T>
     SATTYPE_T& sat_type_find();
@@ -195,10 +196,8 @@ template<typename TRAJECTORY_T, typename ... ARGS_T>
 TRAJECTORY_T& Universe::trajectory_create(ARGS_T&& ... args)
 {
     std::unique_ptr<TRAJECTORY_T> newTraj
-            = std::make_unique<TRAJECTORY_T>(std::forward<ARGS_T>(args)...);
-    TRAJECTORY_T& toReturn = *newTraj;
-    m_trajectories.push_back(std::move(newTraj)); // this invalidates newTraj
-    return toReturn;
+                = std::make_unique<TRAJECTORY_T>(std::forward<ARGS_T>(args)...);
+    return static_cast<TRAJECTORY_T&>(*m_trajectories.emplace_back(std::move(newTraj)));
 }
 
 

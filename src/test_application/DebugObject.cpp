@@ -129,7 +129,7 @@ void DebugCameraController::update_physics_pre()
     Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
 
     // round to nearest (floatingOriginThreshold)
-    Vector3s tra(-xform.translation() / floatingOriginThreshold);
+    Vector3s tra(xform.translation() / floatingOriginThreshold);
     tra *= floatingOriginThreshold;
 
     // convert to space int
@@ -140,7 +140,7 @@ void DebugCameraController::update_physics_pre()
         std::cout << "Floating origin translation!\n";
 
         // Move the active area to center on the camera
-        m_scene.dynamic_system_find<SysAreaAssociate>().area_move(-tra);
+        m_scene.dynamic_system_find<SysAreaAssociate>().area_move(tra);
     }
 }
 

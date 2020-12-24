@@ -34,6 +34,7 @@ namespace testapp
  * Start flight scene. This will create an ActiveArea in the universe and start
  * a Magnum application with an ActiveScene. All the necessary systems will be
  * registered to this scenes for in-universe flight, such as SysAreaAssociate.
+ * This function blocks execution until the window is closed.
  *
  * @param pMagnumApp [out] Magnum application created
  * @param rOspApp [in,out] OSP universe and resources to run the application on
