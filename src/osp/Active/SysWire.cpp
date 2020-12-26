@@ -30,21 +30,6 @@
 using namespace osp;
 using namespace osp::active;
 
-WireInput::WireInput(IWireElement* element, std::string const& name) :
-        m_element(element),
-        m_name(name)
-{
-
-}
-
-WireInput::WireInput(IWireElement *element, WireInput&& move) :
-        LinkedListItem<WireInput, WireOutput>(std::move(move)),
-        m_element(element),
-        m_name(std::move(move.m_name))
-{
-
-}
-
 WireData* WireInput::connected_value()
 {
     WireOutput* woConnected = list();
@@ -56,30 +41,6 @@ WireData* WireInput::connected_value()
     {
         return nullptr;
     }
-}
-
-WireOutput::WireOutput(IWireElement* element, std::string const& name) :
-        m_element(element),
-        m_name(name)
-{
-
-}
-
-WireOutput::WireOutput(IWireElement* element, std::string const& name,
-                       WireInput& propagateDepend ...) :
-        m_element(element),
-        m_name(name)
-{
-
-}
-
-WireOutput::WireOutput(IWireElement *element, WireOutput&& move) :
-        LinkedList<WireInput>(std::move(move)),
-        m_value(std::move(move.m_value)),
-        m_element(element),
-        m_name(std::move(move.m_name))
-{
-
 }
 
 void WireInput::doErase()

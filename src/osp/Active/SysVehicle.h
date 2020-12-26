@@ -34,14 +34,16 @@
 
 #include <Magnum/Shaders/Phong.h>
 
+// forward declare
 namespace osp
 {
-class PrototypePart;
+    class PrototypePart;
 }
 
+// forward declare
 namespace osp::universe
 {
-class SatActiveArea;
+    class SatActiveArea;
 }
 
 namespace osp::active

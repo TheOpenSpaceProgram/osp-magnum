@@ -32,38 +32,6 @@ using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
 
-MachineUserControl::MachineUserControl() :
-    Machine(false),
-    //m_woTestPropagate(this, "TestOut", &MachineUserControl::propagate_test),
-    m_woAttitude(this, "AttitudeControl"),
-    m_woTestPropagate(this, "TestOut", m_wiTest),
-    m_woThrottle(this, "Throttle"),
-    m_wiTest(this, "Test")
-{
-    //m_woTestPropagate.propagate();
-    //m_enable = true;
-    m_woAttitude.value() = wiretype::AttitudeControl{};
-    m_woThrottle.value() = wiretype::Percent{0.0f};
-}
-
-MachineUserControl::MachineUserControl(MachineUserControl&& move) :
-    Machine(std::move(move)),
-    m_woAttitude(this, std::move(move.m_woAttitude)),
-    m_woTestPropagate(this, std::move(move.m_woTestPropagate)),
-    m_woThrottle(this, std::move(move.m_woThrottle)),
-    m_wiTest(this, std::move(move.m_wiTest))
-{
-    //m_enable = true;
-    //_woThrottle.value() = wiretype::Percent{0.0f};
-}
-
-MachineUserControl& MachineUserControl::operator=(MachineUserControl&& move)
-{
-    m_enable = move.m_enable;
-    // TODO
-    return *this;
-}
-
 void MachineUserControl::propagate_output(WireOutput* output)
 {
     std::cout << "propagate test: " << output->get_name() << "\n";

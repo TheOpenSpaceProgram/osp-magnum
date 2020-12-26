@@ -78,9 +78,6 @@ public:
 
     MachineUserControl& operator=(MachineUserControl&& move);
 
-
-    ~MachineUserControl() = default;
-
     void propagate_output(osp::active::WireOutput* output) override;
 
     osp::active::WireInput* request_input(osp::WireInPort port) override;
@@ -90,15 +87,36 @@ public:
     std::vector<osp::active::WireOutput*> existing_outputs() override;
 
 private:
-
-    //std::array<WireOutput, 2> m_outputs;
-
-    osp::active::WireOutput m_woAttitude;
-    osp::active::WireOutput m_woTestPropagate;
-    osp::active::WireOutput m_woThrottle;
-    osp::active::WireInput m_wiTest;
-
+    osp::active::WireInput  m_wiTest          { this, "Test"              };
+    osp::active::WireOutput m_woAttitude      { this, "AttitudeControl"   };
+    osp::active::WireOutput m_woTestPropagate { this, "TestOut", m_wiTest };
+    osp::active::WireOutput m_woThrottle      { this, "Throttle"          };
 };
 
+//-----------------------------------------------------------------------------
 
+inline MachineUserControl::MachineUserControl()
+{
+    m_woAttitude.value() = osp::active::wiretype::AttitudeControl{};
+    m_woThrottle.value() = osp::active::wiretype::Percent{0.0f};
 }
+
+inline MachineUserControl::MachineUserControl(MachineUserControl&& move)
+ : Machine(std::move(move))
+ , m_wiTest(this, std::move(move.m_wiTest))
+ , m_woAttitude(this, std::move(move.m_woAttitude))
+ , m_woTestPropagate(this, std::move(move.m_woTestPropagate)) // TODO: Why not reference m_wiTest here?
+ , m_woThrottle(this, std::move(move.m_woThrottle))
+{ }
+
+inline MachineUserControl& MachineUserControl::operator=(MachineUserControl&& move)
+{
+    Machine::operator=(std::move(move));
+    m_wiTest          = { this, std::move(move.m_wiTest)          };
+    m_woAttitude      = { this, std::move(move.m_woAttitude)      };
+    m_woTestPropagate = { this, std::move(move.m_woTestPropagate) }; // TODO: Why not reference m_wiTest here?
+    m_woThrottle      = { this, std::move(move.m_woThrottle)      };
+    return *this;
+}
+
+} // namespace adera::active::machines

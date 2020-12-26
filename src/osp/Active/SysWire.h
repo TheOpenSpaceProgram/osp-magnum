@@ -86,7 +86,7 @@ namespace wiretype
         float m_value;
     };
 
-    enum class DeployOp {NONE, ON, OFF, TOGGLE};
+    enum class DeployOp : std::uint8_t { NONE, ON, OFF, TOGGLE };
 
     /**
      * Used to turn things on and off or ignite stuff
@@ -105,15 +105,15 @@ namespace wiretype
     {
         bool m_value;
     };
+} // namespace wiretype
 
-    // Supported data types
-    using WireData = std::variant<Attitude,
-                                  AttitudeControl,
-                                  Percent,
-                                  Deploy>;
-}
+// Supported data types
+using WireData = std::variant<wiretype::Attitude,
+                              wiretype::AttitudeControl,
+                              wiretype::Percent,
+                              wiretype::Deploy>;
 
-using wiretype::WireData;
+//-----------------------------------------------------------------------------
 
 
 /**
@@ -122,13 +122,7 @@ using wiretype::WireData;
  */
 class IWireElement
 {
-
 public:
-
-    //WireElement() = default;
-    //WireElement(WireElement&& move) = default;
-    //virtual ~WireElement() = default;
-
     // TODO: maybe get rid of the raw pointers somehow
 
     /**
@@ -170,8 +164,10 @@ public:
      * @return Vector of existing WireInputs
      */
     virtual std::vector<WireOutput*> existing_outputs() = 0;
-
 };
+
+
+//-----------------------------------------------------------------------------
 
 
 class WireInput : private LinkedListItem<WireInput, WireOutput>
@@ -180,8 +176,7 @@ class WireInput : private LinkedListItem<WireInput, WireOutput>
     friend LinkedList<WireInput>;
 
 public:
-
-    explicit WireInput(IWireElement *element, std::string const& name);
+    WireInput(IWireElement *element, std::string name) noexcept;
 
     /**
      * Move with new m_element. Use when this is a member of the WireElement
@@ -189,17 +184,16 @@ public:
      * @param element
      * @param move
      */
-    explicit WireInput(IWireElement *element, WireInput&& move);
+    WireInput(IWireElement *element, WireInput&& move) noexcept;
+
+    // For use in move constructors / move operators of classes
+    // that aggregate WireInput. Use at own risk!!!
+    WireInput(WireInput&& move) noexcept = default;
+    WireInput& operator=(WireInput&& move) = default;
 
     WireInput(WireInput const& copy) = delete;
-    WireInput(WireInput&& move) = default;
+    WireInput& operator=(WireInput const& move) = delete;
 
-    // :
-    //        m_name(name)
-    //{
-    //    static_cast<LinkedList<WireInput>*>
-    //            (element)->insert((this));
-    //}
     void doErase() override;
 
     //bool is_connected() { return list(); }
@@ -220,10 +214,7 @@ private:
     std::string m_name;
 };
 
-//template <void ()()>
-//struct WireOutput
-//{
-//};
+//-----------------------------------------------------------------------------
 
 class WireOutput : private LinkedList<WireInput>
 {
@@ -231,38 +222,31 @@ class WireOutput : private LinkedList<WireInput>
     friend LinkedListItem<WireInput, WireOutput>;
 
 public:
-
     /**
      * Construct a WireOutput
      * @param element Associated WireElement, usually a Machine
      * @param name
      */
-    explicit WireOutput(IWireElement* element, std::string const& name);
-    explicit WireOutput(IWireElement* element, std::string const& name,
-                        WireInput& propagateDepend ...);
+    WireOutput(IWireElement* element, std::string name);
+    WireOutput(IWireElement* element, std::string name, WireInput& propagateDepend);
+
     /**
      * Move with new m_element. Use when this is a member of the WireElement
      * where m_element becomes invalid on move
      * @param element
      * @param move
      */
-    explicit WireOutput(IWireElement *element, WireOutput&& move);
+    WireOutput(IWireElement *element, WireOutput&& move);
+
+    // For use in move constructors / move operators of classes
+    // that aggregate WireInput. Use at own risk!!!
+    WireOutput(WireOutput&& move) noexcept = default;
+    WireOutput& operator=(WireOutput&& move) = default;
 
     WireOutput(WireOutput const& copy) = delete;
-    WireOutput(WireOutput&& move) = default;
-
-    //WireOutput(WireElement* element, std::string const& name,
-    //           void (WireElement::*propagate_output)()) :
-    //        WireOutput(element, name)
-    //{
-    //    m_propagate_output = propagate_output;
-    //}
+    WireOutput& operator=(WireOutput const& move) = delete;
 
     std::string const& get_name() { return m_name; }
-
-
-    //using LinkedListItem<WireOutput, WireElement>::erase;
-    //using LinkedList<WireInput>::erase;
 
     using LinkedList<WireInput>::insert;
     using LinkedList<WireInput>::cut;
@@ -277,17 +261,13 @@ public:
     WireData& value() { return m_value; }
 
 private:
-    //unsigned m_port;
     WireData m_value;
     IWireElement* m_element;
     std::string m_name;
-
-    //void (WireElement::*m_propagate_output)();
-
-    //std::vector<>
-    //virtual void propagate() {}
 };
 
+
+//-----------------------------------------------------------------------------
 
 
 class SysWire : public IDynamicSystem
@@ -314,7 +294,7 @@ private:
 };
 
 
-
+//-----------------------------------------------------------------------------
 
 
 // TODO: move this somewhere else
@@ -333,5 +313,36 @@ T* WireInput::get_if()
     }
 }
 
+//-----------------------------------------------------------------------------
 
-}
+inline WireInput::WireInput(IWireElement* element, std::string name) noexcept
+ : m_element(element)
+ , m_name(std::move(name))
+{ }
+
+inline WireInput::WireInput(IWireElement *element, WireInput&& move) noexcept
+ : LinkedListItem<WireInput, WireOutput>(std::move(move))
+ , m_element(element)
+ , m_name(std::move(move.m_name))
+{ }
+
+//-----------------------------------------------------------------------------
+
+inline WireOutput::WireOutput(IWireElement* element, std::string name)
+ : m_element(element)
+ , m_name(std::move(name))
+{ }
+
+inline WireOutput::WireOutput(IWireElement* element, std::string name, WireInput& propagateDepend)
+ : m_element(element)
+ , m_name(std::move(name))
+{ }
+
+inline WireOutput::WireOutput(IWireElement *element, WireOutput&& move)
+ : LinkedList<WireInput>(std::move(move))
+ , m_value(std::move(move.m_value))
+ , m_element(element)
+ , m_name(std::move(move.m_name))
+{ }
+
+} // namespace osp::active
