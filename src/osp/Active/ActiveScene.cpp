@@ -258,9 +258,21 @@ void ActiveScene::draw(entt::entity camera)
     m_renderOrder.call(cameraComp);
 }
 
-MapSysMachine::iterator ActiveScene::system_machine_find(const std::string &name)
+MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,
+        std::unique_ptr<ISysMachine> sysMachine)
 {
-//    MapSysMachine::iterator sysIt = m_sysMachines.find(name);
+    auto const& [it, success] = m_sysMachines.emplace(
+            name, std::move(sysMachine));
+    if (success)
+    {
+        return it;
+    }
+    return m_sysMachines.end();
+}
+
+MapSysMachine_t::iterator ActiveScene::system_machine_find(std::string_view name)
+{
+//    MapSysMachine_t::iterator sysIt = m_sysMachines.find(name);
 //    if (sysIt == m_sysMachines.end())
 //    {
 //        return nullptr;
@@ -272,19 +284,19 @@ MapSysMachine::iterator ActiveScene::system_machine_find(const std::string &name
     return m_sysMachines.find(name);
 }
 
-bool ActiveScene::system_machine_it_valid(MapSysMachine::iterator it)
+bool ActiveScene::system_machine_it_valid(MapSysMachine_t::iterator it)
 {
     return it != m_sysMachines.end();
 }
 
 
 
-MapDynamicSys::iterator ActiveScene::dynamic_system_find(const std::string &name)
+MapDynamicSys_t::iterator ActiveScene::dynamic_system_find(std::string_view name)
 {
     return m_dynamicSys.find(name);
 }
 
-bool ActiveScene::dynamic_system_it_valid(MapDynamicSys::iterator it)
+bool ActiveScene::dynamic_system_it_valid(MapDynamicSys_t::iterator it)
 {
     return it != m_dynamicSys.end();
 }

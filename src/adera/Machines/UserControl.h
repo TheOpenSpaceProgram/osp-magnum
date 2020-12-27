@@ -41,6 +41,8 @@ class SysMachineUserControl :
 {
 public:
 
+    static const std::string smc_name;
+
     SysMachineUserControl(osp::active::ActiveScene &scene,
                           osp::UserInputHandler& userControl);
 

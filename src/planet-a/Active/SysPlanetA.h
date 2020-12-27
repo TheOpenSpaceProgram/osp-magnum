@@ -56,9 +56,7 @@ class SysPlanetA : public osp::active::IDynamicSystem,
 {
 public:
 
-    //static int area_activate_planet(
-    //        osp::active::ActiveScene& scene, osp::active::SysAreaAssociate &area,
-    //        osp::universe::Satellite areaSat, osp::universe::Satellite loadMe);
+    static const std::string smc_name;
 
     SysPlanetA(osp::active::ActiveScene &scene);
     ~SysPlanetA() = default;

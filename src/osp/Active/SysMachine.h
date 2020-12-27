@@ -39,8 +39,8 @@ using Corrade::Containers::LinkedListItem;
 class ISysMachine;
 class Machine;
 
-using MapSysMachine = std::map<std::string,
-                               std::unique_ptr<ISysMachine>>;
+using MapSysMachine_t = std::map<std::string, std::unique_ptr<ISysMachine>,
+                               std::less<> >;
 
 //-----------------------------------------------------------------------------
 
@@ -53,11 +53,11 @@ struct ACompMachines
 {
     struct PartMachine
     {
-        PartMachine(ActiveEnt partEnt, MapSysMachine::iterator system) :
+        PartMachine(ActiveEnt partEnt, MapSysMachine_t::iterator system) :
             m_partEnt(partEnt), m_system(system) {}
 
         ActiveEnt m_partEnt;
-        MapSysMachine::iterator m_system;
+        MapSysMachine_t::iterator m_system;
     };
 
     ACompMachines() noexcept = default;

@@ -51,6 +51,9 @@ using namespace Magnum::Math::Literals;
 
 using osp::universe::Satellite;
 
+const std::string SysPlanetA::smc_name = "PlanetA";
+
+
 StatusActivated SysPlanetA::activate_sat(
         osp::active::ActiveScene &scene,
         osp::active::SysAreaAssociate &area,
@@ -144,7 +147,7 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
 
     using osp::ECollisionShape;
 
-    auto &physics = m_scene.dynamic_system_get<SysPhysics>("Physics");
+    auto &physics = m_scene.dynamic_system_find<SysPhysics>();
 
     // Create entity and required components
     ActiveEnt fish = m_scene.hier_create_child(m_scene.hier_get_root());

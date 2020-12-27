@@ -109,6 +109,8 @@ public:
     void call(ARGS_T&& ... args);
 
     constexpr FunctionOrderCallList<FUNC_T>& get_call_list() { return m_calls; }
+    constexpr FunctionOrderCallList<FUNC_T> const& get_call_list() const
+    { return m_calls; }
 
 private:
     FunctionOrderCallList<FUNC_T> m_calls;

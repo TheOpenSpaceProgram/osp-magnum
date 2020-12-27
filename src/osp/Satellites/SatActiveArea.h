@@ -66,6 +66,9 @@ class SatActiveArea : public CommonTypeSat<SatActiveArea, UCompActiveArea>
 {
 
 public:
+
+    static const std::string smc_name;
+
     SatActiveArea(Universe& universe);
     ~SatActiveArea() = default;
 
@@ -86,7 +89,7 @@ public:
      */
     void update_physics(float deltaTime);
 
-    std::string get_name() { return "ActiveArea"; };
+    std::string get_name() { return smc_name; };
 
 private:
 

@@ -38,6 +38,8 @@ class SysMachineRocket :
 {
 public:
 
+    static const std::string smc_name;
+
     SysMachineRocket(osp::active::ActiveScene &scene);
 
     //void update_sensor();

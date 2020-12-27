@@ -22,6 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 #pragma once
 
 #include <memory>
@@ -30,42 +31,44 @@
 #include <osp/UserInputHandler.h>
 #include <osp/types.h>
 
-namespace osp
+namespace testapp
 {
 
-class AbstractDebugObject
+class IDebugObject
 {
 public:
     // DebugObject(ActiveScene &scene, ActiveEnt ent);
-    virtual ~AbstractDebugObject() = default;
+    virtual ~IDebugObject() = default;
 
 
     //virtual void set_entity(ActiveEnt m_ent);
 };
 
 template <class Derived>
-class DebugObject : public AbstractDebugObject
+class DebugObject : public IDebugObject
 {
     friend Derived;
 public:
-    DebugObject(active::ActiveScene &scene, active::ActiveEnt ent) :
+    DebugObject(osp::active::ActiveScene &scene,
+                osp::active::ActiveEnt ent) noexcept :
             m_scene(scene),
             m_ent(ent) {};
     virtual ~DebugObject() = default;
 
 private:
-    active::ActiveScene &m_scene;
-    active::ActiveEnt m_ent;
+    osp::active::ActiveScene &m_scene;
+    osp::active::ActiveEnt m_ent;
 };
 
-struct CompDebugObject
+struct ACompDebugObject
 {
-    CompDebugObject(std::unique_ptr<AbstractDebugObject> ptr) :
+    ACompDebugObject(std::unique_ptr<IDebugObject> ptr) noexcept:
         m_obj(std::move(ptr)) {}
-    CompDebugObject(CompDebugObject&& move) = default;
-    ~CompDebugObject() = default;
-    CompDebugObject& operator=(CompDebugObject&& move) = default;
-    std::unique_ptr<AbstractDebugObject> m_obj;
+    ACompDebugObject(ACompDebugObject&& move) noexcept = default;
+    ~ACompDebugObject() noexcept = default;
+    ACompDebugObject& operator=(ACompDebugObject&& move) = default;
+
+    std::unique_ptr<IDebugObject> m_obj;
 };
 
 
@@ -73,46 +76,38 @@ class DebugCameraController : public DebugObject<DebugCameraController>
 {
 
 public:
-    DebugCameraController(active::ActiveScene &scene, active::ActiveEnt ent);
+    DebugCameraController(osp::active::ActiveScene &scene,
+                          osp::active::ActiveEnt ent);
     ~DebugCameraController() = default;
     void update_vehicle_mod_pre();
     void update_physics_pre();
     void update_physics_post();
-    void view_orbit(active::ActiveEnt ent);
+    void view_orbit(osp::active::ActiveEnt ent);
 private:
 
-    active::ActiveEnt m_orbiting;
-    Vector3 m_orbitPos;
+    osp::active::ActiveEnt m_orbiting;
+    osp::Vector3 m_orbitPos;
     float m_orbitDistance;
 
-    active::UpdateOrderHandle m_updateVehicleModPre;
-    active::UpdateOrderHandle m_updatePhysicsPre;
-    active::UpdateOrderHandle m_updatePhysicsPost;
+    osp::active::UpdateOrderHandle m_updateVehicleModPre;
+    osp::active::UpdateOrderHandle m_updatePhysicsPre;
+    osp::active::UpdateOrderHandle m_updatePhysicsPost;
 
-    UserInputHandler &m_userInput;
+    osp::UserInputHandler &m_userInput;
     // Mouse inputs
-    MouseMovementHandle m_mouseMotion;
-    ScrollInputHandle m_scrollInput;
-    ButtonControlHandle m_rmb;
+    osp::MouseMovementHandle m_mouseMotion;
+    osp::ScrollInputHandle m_scrollInput;
+    osp::ButtonControlHandle m_rmb;
     // Keyboard inputs
-    ButtonControlHandle m_up;
-    ButtonControlHandle m_dn;
-    ButtonControlHandle m_lf;
-    ButtonControlHandle m_rt;
-    ButtonControlHandle m_switch;
+    osp::ButtonControlHandle m_up;
+    osp::ButtonControlHandle m_dn;
+    osp::ButtonControlHandle m_lf;
+    osp::ButtonControlHandle m_rt;
+    osp::ButtonControlHandle m_switch;
 
-    ButtonControlHandle m_selfDestruct;
+    osp::ButtonControlHandle m_selfDestruct;
 
 };
 
-
-//class SysDebugObject
-//{
-//public:
-//    SysDebugObject(ActiveScene &scene);
-
-//private:
-//    ActiveScene &m_scene;
-//};
-
 }
+

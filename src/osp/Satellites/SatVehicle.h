@@ -42,9 +42,12 @@ class SatVehicle : public CommonTypeSat<SatVehicle, UCompVehicle, UCompActivatab
 {
 
 public:
+
+    static const std::string smc_name;
+
     SatVehicle(Universe& universe);
     ~SatVehicle() = default;
-    virtual std::string get_name() { return "Vehicle"; };
+    virtual std::string get_name() { return smc_name; };
 
 };
 

@@ -31,6 +31,8 @@ using namespace osp::universe;
 using namespace osp::active;
 using namespace osp;
 
+const std::string SysAreaAssociate::smc_name = "AreaAssociate";
+
 SysAreaAssociate::SysAreaAssociate(ActiveScene &rScene, Universe &uni) :
        m_scene(rScene),
        m_universe(uni),

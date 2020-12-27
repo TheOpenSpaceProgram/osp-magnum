@@ -26,6 +26,8 @@
 
 using namespace osp::universe;
 
+const std::string SatVehicle::smc_name = "Vehicle";
+
 SatVehicle::SatVehicle(Universe& universe) :
         CommonTypeSat<SatVehicle, UCompVehicle, UCompActivatable>(universe)
 {
