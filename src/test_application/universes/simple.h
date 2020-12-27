@@ -22,41 +22,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 #pragma once
 
-#include <Magnum/Math/Color.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/Shaders/Phong.h>
+#include <osp/Universe.h>
+#include <osp/OSPApplication.h>
 
-#include "../types.h"
-#include "activetypes.h"
-
-namespace osp::active
+namespace testapp
 {
 
-struct CompDrawableDebug
-{
-    Magnum::GL::Mesh* m_mesh;
-    std::vector<Magnum::GL::Texture2D*> m_textures;
-    Magnum::Shaders::Phong* m_shader;
-    Magnum::Color4 m_color;
-};
-
-class SysDebugRender : public IDynamicSystem
-{
-public:
-
-    static const std::string smc_name;
-
-    SysDebugRender(ActiveScene &rScene);
-    ~SysDebugRender() = default;
-
-    void draw(ACompCamera const& camera);
-
-private:
-    ActiveScene &m_scene;
-
-    RenderOrderHandle m_renderDebugDraw;
-};
+void create_simple_solar_system(osp::OSPApplication& ospApp);
 
 }

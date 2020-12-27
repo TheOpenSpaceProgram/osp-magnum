@@ -34,6 +34,8 @@ using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
 
+const std::string SysMachineRocket::smc_name = "Rocket";
+
 void MachineRocket::propagate_output(WireOutput* output)
 {
 
@@ -61,7 +63,7 @@ std::vector<WireOutput*> MachineRocket::existing_outputs()
 
 SysMachineRocket::SysMachineRocket(ActiveScene &scene) :
     SysMachine<SysMachineRocket, MachineRocket>(scene),
-    m_physics(scene.dynamic_system_get<SysPhysics>("Physics")),
+    m_physics(scene.dynamic_system_find<SysPhysics>()),
     m_updatePhysics(scene.get_update_order(), "mach_rocket", "wire", "physics",
                     std::bind(&SysMachineRocket::update_physics, this))
 {

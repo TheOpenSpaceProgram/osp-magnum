@@ -28,6 +28,8 @@
 
 using namespace planeta::universe;
 
+const std::string SatPlanet::smc_name = "Planet";
+
 SatPlanet::SatPlanet(osp::universe::Universe &universe) :
         CommonTypeSat<SatPlanet, UCompPlanet,
                       osp::universe::UCompActivatable>(universe)

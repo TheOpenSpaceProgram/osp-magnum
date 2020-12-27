@@ -30,6 +30,9 @@
 using namespace osp;
 using namespace osp::active;
 
+
+const std::string SysWire::smc_name = "Wire";
+
 WireData* WireInput::connected_value()
 {
     WireOutput* woConnected = list();

@@ -63,6 +63,9 @@ public:
 class SysAreaAssociate : public IDynamicSystem
 {
 public:
+
+    static const std::string smc_name;
+
     SysAreaAssociate(ActiveScene &rScene, universe::Universe &uni);
     ~SysAreaAssociate() = default;
 

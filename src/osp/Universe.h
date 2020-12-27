@@ -126,7 +126,7 @@ public:
     TYPESAT_T& type_register(ARGS_T&& ... args);
 
     /**
-     * Tries to locate an element in the map of registered Satellite Types.
+     * Tries to locate an element in the map of registered Satellites by name.
      * @param name [in] Name of ITypeSatellite
      * @return Map iterator directly from std::map::find()
      */
@@ -134,6 +134,15 @@ public:
     {
         return m_satTypes.find(name);
     }
+
+    /**
+     * Tries to locate an element in the map of registered Satellite by type,
+     * and casts it to SATTYPE_T
+     * @tparam SATTYPE_T Type of ITypeSatellite to find
+     * @return Reference to satellite type found
+     */
+    template<typename SATTYPE_T>
+    SATTYPE_T& sat_type_find();
 
     /**
      * Create a Trajectory, and add it to the universe.
@@ -144,6 +153,8 @@ public:
     TRAJECTORY_T& trajectory_create(ARGS_T&& ... args);
 
     constexpr entt::basic_registry<Satellite>& get_reg() { return m_registry; }
+    constexpr const entt::basic_registry<Satellite>& get_reg() const
+    { return m_registry; }
 
 private:
 
@@ -173,14 +184,20 @@ TYPESAT_T& Universe::type_register(ARGS_T&& ... args)
     return toReturn;
 }
 
+template<typename SATTYPE_T>
+SATTYPE_T& Universe::sat_type_find()
+{
+    MapSatType::iterator it = sat_type_find(SATTYPE_T::smc_name);
+    assert(it != m_satTypes.end());
+    return static_cast<SATTYPE_T&>(*it->second);
+}
+
 template<typename TRAJECTORY_T, typename ... ARGS_T>
 TRAJECTORY_T& Universe::trajectory_create(ARGS_T&& ... args)
 {
     std::unique_ptr<TRAJECTORY_T> newTraj
-            = std::make_unique<TRAJECTORY_T>(std::forward<ARGS_T>(args)...);
-    TRAJECTORY_T& toReturn = *newTraj;
-    m_trajectories.push_back(std::move(newTraj)); // this invalidates newTraj
-    return toReturn;
+                = std::make_unique<TRAJECTORY_T>(std::forward<ARGS_T>(args)...);
+    return static_cast<TRAJECTORY_T&>(*m_trajectories.emplace_back(std::move(newTraj)));
 }
 
 

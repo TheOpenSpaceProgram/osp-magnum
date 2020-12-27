@@ -22,41 +22,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
 
-#include <Magnum/Math/Color.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/Shaders/Phong.h>
+#include "OSPMagnum.h"
 
-#include "../types.h"
-#include "activetypes.h"
+#include <thread>
 
-namespace osp::active
+namespace testapp
 {
 
-struct CompDrawableDebug
-{
-    Magnum::GL::Mesh* m_mesh;
-    std::vector<Magnum::GL::Texture2D*> m_textures;
-    Magnum::Shaders::Phong* m_shader;
-    Magnum::Color4 m_color;
-};
-
-class SysDebugRender : public IDynamicSystem
-{
-public:
-
-    static const std::string smc_name;
-
-    SysDebugRender(ActiveScene &rScene);
-    ~SysDebugRender() = default;
-
-    void draw(ACompCamera const& camera);
-
-private:
-    ActiveScene &m_scene;
-
-    RenderOrderHandle m_renderDebugDraw;
-};
+/**
+ * Start flight scene. This will create an ActiveArea in the universe and start
+ * a Magnum application with an ActiveScene. All the necessary systems will be
+ * registered to this scenes for in-universe flight, such as SysAreaAssociate.
+ * This function blocks execution until the window is closed.
+ *
+ * @param pMagnumApp [out] Magnum application created
+ * @param rOspApp [in,out] OSP universe and resources to run the application on
+ * @param args [in] Arguments to pass to Magnum
+ */
+void test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
+                 osp::OSPApplication& rOspApp, OSPMagnum::Arguments args);
 
 }

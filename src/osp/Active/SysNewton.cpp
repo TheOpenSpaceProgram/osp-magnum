@@ -31,6 +31,8 @@
 using namespace osp;
 using namespace osp::active;
 
+const std::string SysNewton::smc_name = "NewtonPhysics";
+
 // Callback called for every Rigid Body (even static ones) on NewtonUpdate
 void cb_force_torque(const NewtonBody* body, dFloat timestep, int threadIndex)
 {

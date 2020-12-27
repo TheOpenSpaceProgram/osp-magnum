@@ -30,11 +30,27 @@
 
 #include <adera/Machines/UserControl.h>
 
+using namespace testapp;
+
+using osp::Vector3;
+using osp::Vector3s;
+using osp::Quaternion;
+using osp::Matrix3;
+using osp::Matrix4;
+
+// for the 0xrrggbb_rgbf and angle literals
+using namespace Magnum::Math::Literals;
+
+using osp::active::ActiveEnt;
+using osp::active::ActiveScene;
+using osp::active::ACompCamera;
+using osp::active::ACompTransform;
+using osp::active::ACompVehicle;
+
+using osp::active::SysAreaAssociate;
+
 using adera::active::machines::MachineUserControl;
 
-using namespace osp;
-
-using namespace Magnum::Math::Literals;
 
 //DebugObject::DebugObject(ActiveScene &scene, ActiveEnt ent) :
 //    m_scene(scene),
@@ -50,8 +66,7 @@ using namespace Magnum::Math::Literals;
 //}
 
 
-DebugCameraController::DebugCameraController(active::ActiveScene &scene,
-                                             active::ActiveEnt ent) :
+DebugCameraController::DebugCameraController(ActiveScene &scene, ActiveEnt ent) :
         DebugObject(scene, ent),
         m_orbiting(entt::null),
         m_orbitPos(0, 0, 1),
@@ -111,22 +126,21 @@ void DebugCameraController::update_physics_pre()
     // When the camera is too far from the origin of the ActiveScene
     const int floatingOriginThreshold = 256;
 
-    Matrix4 &xform = m_scene.reg_get<active::ACompTransform>(m_ent).m_transform;
+    Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
 
     // round to nearest (floatingOriginThreshold)
-    Vector3s tra(-xform.translation() / floatingOriginThreshold);
+    Vector3s tra(xform.translation() / floatingOriginThreshold);
     tra *= floatingOriginThreshold;
 
     // convert to space int
-    tra *= gc_units_per_meter;
+    tra *= osp::gc_units_per_meter;
 
     if (!tra.isZero())
     {
         std::cout << "Floating origin translation!\n";
 
         // Move the active area to center on the camera
-        m_scene.dynamic_system_get<active::SysAreaAssociate>("AreaAssociate")
-                .area_move(-tra);
+        m_scene.dynamic_system_find<SysAreaAssociate>().area_move(tra);
     }
 }
 
@@ -139,13 +153,13 @@ void DebugCameraController::update_physics_post()
     {
         std::cout << "switch to new vehicle\n";
 
-        auto view = m_scene.get_registry().view<active::ACompVehicle>();
+        auto view = m_scene.get_registry().view<ACompVehicle>();
         auto it = view.find(m_orbiting);
 
         if (targetValid)
         {
             // disable the first MachineUserControl because switching away
-            active::ActiveEnt firstPart
+            ActiveEnt firstPart
                     = *(view.get(m_orbiting).m_parts.begin());
             m_scene.reg_get<MachineUserControl>(firstPart).disable();
         }
@@ -167,8 +181,7 @@ void DebugCameraController::update_physics_post()
         if (targetValid)
         {
             // enable the first MachineUserControl
-            active::ActiveEnt firstPart
-                    = *(view.get(m_orbiting).m_parts.begin());
+            ActiveEnt firstPart = *(view.get(m_orbiting).m_parts.begin());
 
             m_scene.reg_get<MachineUserControl>(firstPart).enable();
         }
@@ -191,8 +204,8 @@ void DebugCameraController::update_physics_post()
         return;
     }
 
-    Matrix4 &xform = m_scene.reg_get<active::ACompTransform>(m_ent).m_transform;
-    Matrix4 const& xformTgt = m_scene.reg_get<active::ACompTransform>(m_orbiting).m_transform;
+    Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
+    Matrix4 const& xformTgt = m_scene.reg_get<ACompTransform>(m_orbiting).m_transform;
 
     float keyRotYaw = static_cast<float>(m_rt.trigger_hold() - m_lf.trigger_hold());
     float keyRotPitch = static_cast<float>(m_dn.trigger_hold() - m_up.trigger_hold());
@@ -238,7 +251,7 @@ void DebugCameraController::update_physics_post()
     xform = Matrix4::lookAt(xform.translation(), xformTgt.translation(), xform[1].xyz());
 }
 
-void DebugCameraController::view_orbit(active::ActiveEnt ent)
+void DebugCameraController::view_orbit(ActiveEnt ent)
 {
     m_orbiting = ent;
 }

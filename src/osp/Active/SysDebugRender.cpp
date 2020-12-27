@@ -37,6 +37,7 @@ using namespace std::placeholders;
 // for the 0xrrggbb_rgbf and _deg literals
 using namespace Magnum::Math::Literals;
 
+const std::string SysDebugRender::smc_name = "DebugRender";
 
 SysDebugRender::SysDebugRender(ActiveScene &rScene) :
         m_scene(rScene),
