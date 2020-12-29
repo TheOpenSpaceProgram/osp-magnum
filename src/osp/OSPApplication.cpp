@@ -30,3 +30,18 @@ OSPApplication::OSPApplication()
 {
 
 }
+
+void OSPApplication::debug_add_package(Package&& p)
+{
+    auto const& [it, success] = m_packages.emplace(p.get_prefix(), std::move(p));
+    assert(success);
+}
+
+Package& OSPApplication::debug_find_package(std::string_view prefix)
+{
+    if (auto it = m_packages.find(prefix); it != m_packages.end())
+    {
+        return it->second;
+    }
+    throw std::out_of_range("Package not found");
+}

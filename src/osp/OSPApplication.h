@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include <map>
 #include "Universe.h"
 #include "Resource/Package.h"
 
@@ -39,12 +40,30 @@ public:
 
     OSPApplication();
 
-    std::vector<Package>& debug_get_packges() { return m_packages; };
+    /**
+     * Add a resource package to the application
+     *
+     * The package should be populated externally, then passed via rvalue
+     * reference so the contents can be moved into the application resources
+     *
+     * @param p [in] The package to add
+     */
+    void debug_add_package(Package&& p);
+
+    /**
+     * Get a resource package by prefix name
+     *
+     * @param prefix [in] The short prefix name of the package
+     * @return The resource package
+     */
+    Package& debug_find_package(std::string_view prefix);
+
+    size_t debug_num_packages() const { return m_packages.size(); }
 
     universe::Universe& get_universe() { return m_universe; }
 
 private:
-    std::vector<Package> m_packages;
+    std::map<ResPrefix_t, Package, std::less<>> m_packages;
     universe::Universe m_universe;
 };
 

@@ -54,7 +54,7 @@ using planeta::universe::UCompPlanet;
 void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
 {
     Universe &uni = ospApp.get_universe();
-    Package &pkg = ospApp.debug_get_packges()[0];
+    Package &pkg = ospApp.debug_find_package("lzdb");
 
     // Get the planet system used to create a UCompPlanet
     SatPlanet &typePlanet = static_cast<planeta::universe::SatPlanet&>(

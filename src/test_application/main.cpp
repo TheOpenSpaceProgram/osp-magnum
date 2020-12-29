@@ -185,7 +185,7 @@ bool destroy_universe()
     g_osp.get_universe().get_reg().clear();
 
     // Destroy blueprints as part of destroying all vehicles
-    g_osp.debug_get_packges()[0].clear<osp::BlueprintVehicle>();
+    g_osp.debug_find_package("lzdb").clear<osp::BlueprintVehicle>();
 
     std::cout << "*explosion* Universe destroyed!\n";
 
@@ -202,7 +202,7 @@ void load_a_bunch_of_stuff()
     osp::AssetImporter::load_sturdy_file("OSPData/adera/stomper.sturdy.gltf", lazyDebugPack);
 
     // Add package to the univere
-    g_osp.debug_get_packges().push_back(std::move(lazyDebugPack));
+    g_osp.debug_add_package(std::move(lazyDebugPack));
 
     // Add 50 vehicles so there's something to load
     //g_osp.get_universe().get_sats().reserve(64);

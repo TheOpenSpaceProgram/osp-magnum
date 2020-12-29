@@ -29,12 +29,27 @@
 namespace osp
 {
 
-Package::Package(std::string const& prefix, std::string const& packageName) :
-    // not sure about this but it compiles
+Package::Package(std::string prefix, std::string packageName) :
     m_groups(),
-    //m_prefix{prefix[0], prefix[1], prefix[2], prefix[3]},
-    m_packageName(packageName)
+    m_prefix(std::move(prefix)),
+    m_packageName(std::move(packageName))
 {
 }
+
+StrViewPair_t decompose_str(std::string_view path, const char delim)
+{
+    size_t pos = path.find(delim);
+    return {
+        path.substr(0, pos),
+        path.substr(pos + 1, path.length())
+    };
+}
+
+Path decompose_str(std::string_view path)
+{
+    StrViewPair_t pair = decompose_str(path, ':');
+    return { pair.first, pair.second };
+}
+
 
 }
