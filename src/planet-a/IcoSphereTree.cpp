@@ -261,6 +261,7 @@ trindex_t IcoSphereTree::ancestor_at_depth(trindex_t start, uint8_t targetDepth)
 
 int IcoSphereTree::subdivide_add(trindex_t t)
 {
+    //std::cout << "m_icoTree->subdivide_add(" << t << ");\n";
     if (m_vrtxCount + 3 >= m_maxVertice)
     {
         // error! max vertex count exceeded

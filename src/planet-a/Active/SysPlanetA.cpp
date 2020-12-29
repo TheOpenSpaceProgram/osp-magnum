@@ -63,7 +63,7 @@ StatusActivated SysPlanetA::activate_sat(
 
     std::cout << "activatin a planet!!!!!!!!!!!!!!!!11\n";
 
-    osp::universe::Universe &uni = area.get_universe();
+    osp::universe::Universe const &uni = area.get_universe();
     //SysPlanetA& self = scene.get_system<SysPlanetA>();
     auto &loadMePlanet = uni.get_reg().get<universe::UCompPlanet>(tgtSat);
 
@@ -75,18 +75,18 @@ StatusActivated SysPlanetA::activate_sat(
     ActiveEnt root = scene.hier_get_root();
     ActiveEnt planetEnt = scene.hier_create_child(root, "Planet");
 
-    auto &planetTransform = scene.get_registry()
-                            .emplace<osp::active::ACompTransform>(planetEnt);
-    planetTransform.m_transform = Matrix4::translation(positionInScene);
+    auto &rPlanetTransform = scene.get_registry()
+                             .emplace<osp::active::ACompTransform>(planetEnt);
+    rPlanetTransform.m_transform = Matrix4::translation(positionInScene);
     scene.reg_emplace<ACompFloatingOrigin>(planetEnt);
 
-    auto &planetPlanet = scene.reg_emplace<ACompPlanet>(planetEnt);
-    planetPlanet.m_radius = loadMePlanet.m_radius;
+    auto &rPlanetPlanet = scene.reg_emplace<ACompPlanet>(planetEnt);
+    rPlanetPlanet.m_radius = loadMePlanet.m_radius;
 
-    auto &planetForceField = scene.reg_emplace<ACompFFGravity>(planetEnt);
+    auto &rPlanetForceField = scene.reg_emplace<ACompFFGravity>(planetEnt);
 
     // mass of moon * gravitational constant
-    planetForceField.m_Gmass = 4903895800000.0f;
+    rPlanetForceField.m_Gmass = 4903895800000.0f * 0.0f;
 
     return {0, planetEnt, false};
 }
@@ -112,11 +112,15 @@ int SysPlanetA::deactivate_sat(osp::active::ActiveScene &scene,
                                osp::universe::Satellite tgtSat,
                                osp::active::ActiveEnt tgtEnt)
 {
+    // TODO
     return 0;
 }
 
 void SysPlanetA::draw(osp::active::ACompCamera const& camera)
 {
+    // TODO: move planet drawing to something more generic, like debug drawable
+    //       SysPlanet should NOT be doing rendering
+
     auto drawGroup = m_scene.get_registry().group<ACompPlanet>(
                             entt::get<ACompTransform>);
 
@@ -191,7 +195,7 @@ void SysPlanetA::update_geometry()
         if (planet.m_planet.get() == nullptr)
         {
             planet.m_planet = std::make_shared<PlanetGeometryA>();
-            PlanetGeometryA &planetGeo = *(planet.m_planet);
+            PlanetGeometryA &rPlanetGeo = *(planet.m_planet);
 
             // initialize planet if not done so yet
             std::cout << "Initializing planet\n";
@@ -199,24 +203,24 @@ void SysPlanetA::update_geometry()
 
             planet.m_icoTree->initialize(planet.m_radius);
 
-            planetGeo.initialize(planet.m_icoTree, 4, 1u << 9, 1u << 13);
+            rPlanetGeo.initialize(planet.m_icoTree, 4, 1u << 9, 1u << 13);
 
             planet.m_icoTree->event_add(planet.m_planet);
 
             // Chunk all the initial triangles
-            planetGeo.chunk_geometry_update_all(
+            rPlanetGeo.chunk_geometry_update_all(
                     [] (SubTriangle const& tri, SubTriangleChunk const& chunk,
                         int index) -> EChunkUpdateAction
             {
                 return EChunkUpdateAction::Chunk;
             });
 
-            planet_update_geometry(ent, planet);
+            //planet_update_geometry(ent, planet);
 
             std::cout << "Planet initialized, now making colliders\n";
 
             // temporary: make colliders for all the chunks
-            for (chindex_t i = 0; i < planetGeo.chunk_count(); i ++)
+            for (chindex_t i = 0; i < rPlanetGeo.chunk_count(); i ++)
             {
                 debug_create_chunk_collider(ent, planet, i);
                 std::cout << "* completed chunk collider: " << i << "\n";
@@ -224,10 +228,10 @@ void SysPlanetA::update_geometry()
 
             std::cout << "Planet colliders done\n";
 
-            planet.m_vrtxBufGL.setData(planetGeo.get_vertex_buffer());
-            planet.m_indxBufGL.setData(planetGeo.get_index_buffer());
+            planet.m_vrtxBufGL.setData(rPlanetGeo.get_vertex_buffer());
+            planet.m_indxBufGL.setData(rPlanetGeo.get_index_buffer());
 
-            planetGeo.updates_clear();
+            rPlanetGeo.updates_clear();
 
             using Magnum::Shaders::MeshVisualizer3D;
             using Magnum::GL::MeshPrimitive;
@@ -240,7 +244,7 @@ void SysPlanetA::update_geometry()
                                  MeshVisualizer3D::Normal{})
                 .setIndexBuffer(planet.m_indxBufGL, 0,
                                 MeshIndexType::UnsignedInt)
-                .setCount(planetGeo.calc_index_count());
+                .setCount(rPlanetGeo.calc_index_count());
         }
 
         if (m_debugUpdate.triggered() || true)
@@ -255,10 +259,11 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
 {
     auto &tf = m_scene.reg_get<ACompTransform>(ent);
 
-    PlanetGeometryA &planetGeo = *(planet.m_planet);
+    PlanetGeometryA &rPlanetGeo = *(planet.m_planet);
 
+    // Temporary: use the first camera in the scene as the viewer
     ActiveEnt cam = m_scene.get_registry().view<ACompCamera>().front();
-    auto &camTf = m_scene.reg_get<ACompTransform>(cam);
+    auto const &camTf = m_scene.reg_get<ACompTransform>(cam);
 
     // camera position relative to planet
     Vector3 camRelative = camTf.m_transform.translation()
@@ -267,16 +272,16 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
     using Magnum::Math::pow;
     using Magnum::Math::sqrt;
 
+    // Ratio between an icosahedron's edge length and radius
+    static const float sc_icoEdgeRatio = sqrt(10.0f + 2.0f * sqrt(5.0f)) / 4.0f;
+
     // edge length of largest possible triangle
-    float edgeLengthA =  planetGeo.get_ico_tree()->get_radius()
-                        / sqrt(10.0f + 2.0f * sqrt(5.0f)) * 4.0;
+    float edgeLengthA = rPlanetGeo.get_ico_tree()->get_radius()
+                        / sc_icoEdgeRatio;
 
     float threshold = 0.9f;
 
-    void debug_create_chunk_collider(osp::active::ActiveEnt ent,
-                                     ACompPlanet &planet,
-                                     chindex_t chunk);
-    planetGeo.chunk_geometry_update_all(
+    rPlanetGeo.chunk_geometry_update_all(
             [edgeLengthA, threshold, tf, camRelative, ent] (
                     SubTriangle const& tri,
                     SubTriangleChunk const& chunk,
@@ -292,7 +297,11 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
 
         bool tooFar = screenLength < threshold;
 
-        if (tooFar || (tri.m_depth >= 13))
+        if (tri.m_depth == 0 && !(index > 12) && false)
+        {
+            return EChunkUpdateAction::Nothing;
+        }
+        else if (tooFar || (tri.m_depth >= 13))
         {
             return EChunkUpdateAction::Chunk;
         }
@@ -316,11 +325,9 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
 
     // update GPU index buffer
 
-    std::vector<unsigned> const &indxData
-            = planetGeo.get_index_buffer();
+    std::vector<unsigned> const &indxData = rPlanetGeo.get_index_buffer();
 
-    for (UpdateRangeSub updRange
-         : planetGeo.updates_get_index_changes())
+    for (UpdateRangeSub updRange : rPlanetGeo.updates_get_index_changes())
     {
         buindex_t size = updRange.m_end - updRange.m_start;
         ArrayView arrView(indxData.data() + updRange.m_start, size);
@@ -330,11 +337,9 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
 
     // update GPU vertex buffer
 
-    std::vector<float> const &vrtxData
-            = planetGeo.get_vertex_buffer();
+    std::vector<float> const &vrtxData = rPlanetGeo.get_vertex_buffer();
 
-    for (UpdateRangeSub updRange
-         : planetGeo.updates_get_vertex_changes())
+    for (UpdateRangeSub updRange : rPlanetGeo.updates_get_vertex_changes())
     {
         buindex_t size = updRange.m_end - updRange.m_start;
         ArrayView arrView(vrtxData.data() + updRange.m_start, size);
@@ -342,13 +347,13 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
                 updRange.m_start * sizeof(*vrtxData.data()), arrView);
     }
 
-    //planet.m_vrtxBufGL.setData(planet.m_planet.get_vertex_buffer());
-    //planet.m_indxBufGL.setData(planet.m_planet.get_index_buffer());
-    planetGeo.updates_clear();
+    //planet.m_vrtxBufGL.setData(planet.m_planet->get_vertex_buffer());
+    //planet.m_indxBufGL.setData(planet.m_planet->get_index_buffer());
+    rPlanetGeo.updates_clear();
 
-    planet.m_mesh.setCount(planetGeo.calc_index_count());
+    planet.m_mesh.setCount(rPlanetGeo.calc_index_count());
 
-    planetGeo.get_ico_tree()->debug_verify_state();
+    rPlanetGeo.get_ico_tree()->debug_verify_state();
 }
 
 void SysPlanetA::update_physics()

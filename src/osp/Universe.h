@@ -105,7 +105,7 @@ public:
      * @param target [in]
      * @return relative position of target in SpaceInt vector
      */
-    Vector3s sat_calc_pos(Satellite referenceFrame, Satellite target);
+    Vector3s sat_calc_pos(Satellite referenceFrame, Satellite target) const;
 
     /**
      * Calculate position between two satellites.
@@ -113,7 +113,7 @@ public:
      * @param target [in]
      * @return relative position of target in meters
      */
-    Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target);
+    Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const;
 
     /**
      * Register an ITypeSatellite so the universe can recognize that this type

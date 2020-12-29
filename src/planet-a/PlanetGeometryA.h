@@ -119,7 +119,7 @@ public:
 
     constexpr bool is_initialized() const { return m_initialized; }
 
-    constexpr bool tri_is_chunked(SubTriangleChunk &chunk) const
+    constexpr bool tri_is_chunked(SubTriangleChunk const& chunk) const
     {
         return chunk.m_chunk != gc_invalidChunk;
     };
@@ -187,7 +187,7 @@ public:
 
     IcoSphereTree* get_ico_tree() { return m_icoTree.get(); }
 
-    unsigned debug_chunk_count_descendents(SubTriangle &tri);
+    unsigned debug_chunk_count_descendents(SubTriangle const& tri);
 
     /**
      * Checks all triangles for invalid states in order to squash some bugs
