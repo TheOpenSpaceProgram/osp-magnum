@@ -53,7 +53,6 @@ using osp::universe::Satellite;
 
 const std::string SysPlanetA::smc_name = "PlanetA";
 
-
 StatusActivated SysPlanetA::activate_sat(
         osp::active::ActiveScene &scene,
         osp::active::SysAreaAssociate &area,
@@ -276,7 +275,7 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt)
 
     // Set this somewhere else. Radius at which detail falloff will start
     // This will essentially be the physics area size
-    float viewerRadius = 128.0f;
+    float viewerRadius = 64.0f;
 
     // camera position relative to planet
     Vector3 camRelative = camTf.m_transform.translation()
@@ -290,7 +289,8 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt)
     static const float sc_icoEdgeRatio = sqrt(10.0f + 2.0f * sqrt(5.0f)) / 4.0f;
 
     // edge length of largest possible triangle
-    float edgeLengthA = planetUComp.m_radius / sc_icoEdgeRatio / rPlanetGeo.get_chunk_vertex_width();
+    float edgeLengthA = planetUComp.m_radius / sc_icoEdgeRatio
+                        / rPlanetGeo.get_chunk_vertex_width();
 
     rPlanetGeo.chunk_geometry_update_all(
             [edgeLengthA, planetUComp, camRelative, viewerRadius] (

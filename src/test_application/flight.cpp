@@ -130,8 +130,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     cameraComp.m_viewport
             = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
-    cameraComp.m_far = 4096.0f;
-    cameraComp.m_near = 0.125f;
+    cameraComp.m_far = 1u << 24;
+    cameraComp.m_near = 1.0f;
     cameraComp.m_fov = 45.0_degf;
 
     cameraComp.calculate_projection();

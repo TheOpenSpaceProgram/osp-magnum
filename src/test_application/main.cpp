@@ -27,6 +27,7 @@
 #include "flight.h"
 
 #include "universes/simple.h"
+#include "universes/planets.h"
 
 #include <osp/Resource/AssetImporter.h>
 
@@ -124,6 +125,13 @@ int debug_cli_loop()
             if (destroy_universe())
             {
                 create_simple_solar_system(g_osp);
+            }
+        }
+        else if (command == "moon")
+        {
+            if (destroy_universe())
+            {
+                create_real_moon(g_osp);
             }
         }
         else if (command == "flight")
@@ -226,6 +234,7 @@ void debug_print_help()
         << "OSP-Magnum Temporary Debug CLI\n"
         << "Choose a test universe:\n"
         << "* simple    - Simple test planet and vehicles (default)\n"
+        << "* moon      - Simulate size and gravity of real world moon\n"
         << "\n"
         << "Start Application:\n"
         << "* flight    - Create an ActiveArea and start Magnum\n"

@@ -25,4 +25,11 @@
 
 #pragma once
 
-// TODO: put test with planets here
+#include <osp/OSPApplication.h>
+
+namespace testapp
+{
+
+void create_real_moon(osp::OSPApplication& ospApp);
+
+}

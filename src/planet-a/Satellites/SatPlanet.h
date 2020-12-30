@@ -38,11 +38,18 @@ struct UCompPlanet
     double m_radius;
 
     // Approximate max length of a triangle edge on the surface. Lower number
-    // means higher resolution
+    // means higher detail.
     float m_resolutionSurfaceMax;
 
-    // Approximate max length of a triangle edge on the surface. Lower number
-    // means higher resolution
+    // Approximate max length of a triangle edge on the screen. The length is
+    // measured on a screen 1 meter away from the viewer. Lower number means
+    // higher detail.
+    //
+    // screenEdgeLength = physicalLength / distance
+    //
+    // If you stand 1m away from a meter stick perpendicular of you, then it
+    // will appear 1m wide on your screen. If you walk backwards 1m, then the
+    // meter stick will shrink to 0.5m, because it's further away.
     float m_resolutionScreenMax;
 
     // TODO: Use this until a UCompMass is added
