@@ -28,7 +28,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <queue>
 #include <set>
 #include <vector>
 
@@ -90,11 +89,11 @@ struct SubTriangleChunk
     buindex_t m_dataVrtx; // Index to vertex data
 
     // Neighbours that are chunked. used for vertex sharing
-    trindex_t m_neighourChunked[3];
+    trindex_t m_neighbourChunked[3];
 
     // Used to convert positions along the edge of this triangle, to a position
     // along a neighbour's edge
-    TriangleSideTransform m_neighourTransform[3];
+    TriangleSideTransform m_neighbourTransform[3];
 };
 
 
@@ -186,6 +185,8 @@ public:
     constexpr chindex_t chunk_count() { return m_chunkCount; }
 
     IcoSphereTree* get_ico_tree() { return m_icoTree.get(); }
+
+    constexpr unsigned get_chunk_vertex_width() { return m_chunkWidth; }
 
     unsigned debug_chunk_count_descendents(SubTriangle const& tri);
 

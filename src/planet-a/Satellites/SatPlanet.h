@@ -36,6 +36,17 @@ namespace planeta::universe
 struct UCompPlanet
 {
     double m_radius;
+
+    // Approximate max length of a triangle edge on the surface. Lower number
+    // means higher resolution
+    float m_resolutionSurfaceMax;
+
+    // Approximate max length of a triangle edge on the surface. Lower number
+    // means higher resolution
+    float m_resolutionScreenMax;
+
+    // TODO: Use this until a UCompMass is added
+    float m_mass;
 };
 
 

@@ -85,8 +85,10 @@ StatusActivated SysPlanetA::activate_sat(
 
     auto &rPlanetForceField = scene.reg_emplace<ACompFFGravity>(planetEnt);
 
-    // mass of moon * gravitational constant
-    rPlanetForceField.m_Gmass = 4903895800000.0f * 0.0f;
+    // gravitational constant
+    static const float sc_GravConst = 6.67408E-11f;
+
+    rPlanetForceField.m_Gmass = loadMePlanet.m_mass * sc_GravConst;
 
     return {0, planetEnt, false};
 }
@@ -249,26 +251,38 @@ void SysPlanetA::update_geometry()
 
         if (m_debugUpdate.triggered() || true)
         {
-            planet_update_geometry(ent, planet);
+            planet_update_geometry(ent);
         }
     }
 }
 
-void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
-                                        ACompPlanet &planet)
+void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt)
 {
-    auto &tf = m_scene.reg_get<ACompTransform>(ent);
+    auto &rPlanetPlanet = m_scene.reg_get<ACompPlanet>(planetEnt);
+    auto const &planetTf = m_scene.reg_get<ACompTransform>(planetEnt);
+    auto const &planetActivated = m_scene.reg_get<ACompActivatedSat>(planetEnt);
 
-    PlanetGeometryA &rPlanetGeo = *(planet.m_planet);
+    // TODO: de-spaghettify systems. make systems entirely stateless
+    osp::universe::Universe const &uni = m_scene.dynamic_system_find<SysAreaAssociate>().get_universe();
+
+    Satellite planetSat = planetActivated.m_sat;
+    auto &planetUComp = uni.get_reg().get<universe::UCompPlanet>(planetSat);
+
+    PlanetGeometryA &rPlanetGeo = *(rPlanetPlanet.m_planet);
 
     // Temporary: use the first camera in the scene as the viewer
     ActiveEnt cam = m_scene.get_registry().view<ACompCamera>().front();
     auto const &camTf = m_scene.reg_get<ACompTransform>(cam);
 
+    // Set this somewhere else. Radius at which detail falloff will start
+    // This will essentially be the physics area size
+    float viewerRadius = 128.0f;
+
     // camera position relative to planet
     Vector3 camRelative = camTf.m_transform.translation()
-                        - tf.m_transform.translation();
+                        - planetTf.m_transform.translation();
 
+    using Magnum::Math::max;
     using Magnum::Math::pow;
     using Magnum::Math::sqrt;
 
@@ -276,48 +290,42 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
     static const float sc_icoEdgeRatio = sqrt(10.0f + 2.0f * sqrt(5.0f)) / 4.0f;
 
     // edge length of largest possible triangle
-    float edgeLengthA = rPlanetGeo.get_ico_tree()->get_radius()
-                        / sc_icoEdgeRatio;
-
-    float threshold = 0.9f;
+    float edgeLengthA = planetUComp.m_radius / sc_icoEdgeRatio / rPlanetGeo.get_chunk_vertex_width();
 
     rPlanetGeo.chunk_geometry_update_all(
-            [edgeLengthA, threshold, tf, camRelative, ent] (
+            [edgeLengthA, planetUComp, camRelative, viewerRadius] (
                     SubTriangle const& tri,
                     SubTriangleChunk const& chunk,
-                    int index) -> EChunkUpdateAction
+                    trindex_t index) -> EChunkUpdateAction
     {
-        // approximation of triangle edge length
-        float edgeLength = edgeLengthA / float(pow(2, int(tri.m_depth)));
-
         // distance between viewer and triangle
         float dist = (tri.m_center - camRelative).length();
+        dist = max(0.0001f, dist - viewerRadius);
 
+        // approximation of current triangle edge length
+        float edgeLength = edgeLengthA / float(pow(2, int(tri.m_depth)));
         float screenLength = edgeLength / dist;
 
-        bool tooFar = screenLength < threshold;
+        bool tooClose = screenLength > planetUComp.m_resolutionScreenMax;
+        bool canDivideFurther = edgeLength > planetUComp.m_resolutionSurfaceMax;
 
-        if (tri.m_depth == 0 && !(index > 12) && false)
-        {
-            return EChunkUpdateAction::Nothing;
-        }
-        else if (tooFar || (tri.m_depth >= 13))
-        {
-            return EChunkUpdateAction::Chunk;
-        }
-        else
+        if (tooClose && canDivideFurther)
         {
             // too close, subdivide it
             return EChunkUpdateAction::Subdivide;
         }
+        else
+        {
+            return EChunkUpdateAction::Chunk;
+        }
     });
 
     // New triangles were added, notify
-    planet.m_icoTree->event_notify();
+    rPlanetPlanet.m_icoTree->event_notify();
 
     // Remove unused
-    planet.m_icoTree->subdivide_remove_all_unused();
-    planet.m_icoTree->event_notify();
+    rPlanetPlanet.m_icoTree->subdivide_remove_all_unused();
+    rPlanetPlanet.m_icoTree->event_notify();
 
     //planet.m_planet->debug_raise_by_share_count();
 
@@ -331,7 +339,7 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
     {
         buindex_t size = updRange.m_end - updRange.m_start;
         ArrayView arrView(indxData.data() + updRange.m_start, size);
-        planet.m_indxBufGL.setSubData(
+        rPlanetPlanet.m_indxBufGL.setSubData(
                 updRange.m_start * sizeof(*indxData.data()), arrView);
     }
 
@@ -343,7 +351,7 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
     {
         buindex_t size = updRange.m_end - updRange.m_start;
         ArrayView arrView(vrtxData.data() + updRange.m_start, size);
-        planet.m_vrtxBufGL.setSubData(
+        rPlanetPlanet.m_vrtxBufGL.setSubData(
                 updRange.m_start * sizeof(*vrtxData.data()), arrView);
     }
 
@@ -351,7 +359,7 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt ent,
     //planet.m_indxBufGL.setData(planet.m_planet->get_index_buffer());
     rPlanetGeo.updates_clear();
 
-    planet.m_mesh.setCount(rPlanetGeo.calc_index_count());
+    rPlanetPlanet.m_mesh.setCount(rPlanetGeo.calc_index_count());
 
     rPlanetGeo.get_ico_tree()->debug_verify_state();
 }

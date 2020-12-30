@@ -24,9 +24,6 @@
  */
 #include "PlanetGeometryA.h"
 
-#include <Magnum/Math/Functions.h>
-#include <osp/types.h>
-
 #include <algorithm>
 #include <iostream>
 #include <stack>
@@ -291,14 +288,14 @@ void PlanetGeometryA::chunk_add(trindex_t t)
     {
         trindex_t neighbourIndex = rTri.m_neighbours[side];
 
-        trindex_t &rNeighbourChunked = rChunk.m_neighourChunked[side];
+        trindex_t &rNeighbourChunked = rChunk.m_neighbourChunked[side];
         rNeighbourChunked = gc_invalidTri;
 
         // Neighbour that may be chunked, contains a chunk, or is part of a
         // chunk
         SubTriangle const &neighTri = m_icoTree->get_triangle(neighbourIndex);
         SubTriangleChunk const &neighChunk = m_triangleChunks[neighbourIndex];
-        TriangleSideTransform &neighTransform = rChunk.m_neighourTransform[side];
+        TriangleSideTransform &neighTransform = rChunk.m_neighbourTransform[side];
 
         neighTransform.m_scale = 1.0f;
         neighTransform.m_translation = 0.0f;
@@ -342,17 +339,17 @@ void PlanetGeometryA::chunk_add(trindex_t t)
             if (rTri.m_depth == rNeighBTri.m_depth)
             {
 
-                rNeighBChunk.m_neighourChunked[neighbourSide] = t;
-                rNeighBChunk.m_neighourTransform[side]
+                rNeighBChunk.m_neighbourChunked[neighbourSide] = t;
+                rNeighBChunk.m_neighbourTransform[side]
                         = TriangleSideTransform{0.0f, 1.0f};
             }
             else if (rTri.m_depth > rNeighBTri.m_depth)
             {
-                rNeighBChunk.m_neighourTransform[side]
+                rNeighBChunk.m_neighbourTransform[side]
                         = TriangleSideTransform{0.0f, 1.0f};
-                if (rNeighBChunk.m_neighourChunked[neighbourSide] == gc_invalidVrtx)
+                if (rNeighBChunk.m_neighbourChunked[neighbourSide] == gc_invalidVrtx)
                 {
-                    rNeighBChunk.m_neighourChunked[neighbourSide]
+                    rNeighBChunk.m_neighbourChunked[neighbourSide]
                             = rNeighBTri.m_neighbours[neighbourSide];
                 }
 
@@ -701,7 +698,7 @@ void PlanetGeometryA::chunk_add(trindex_t t)
 
     for (uint8_t side = 0; side < 3; side ++)
     {
-        trindex_t neighInd = rChunk.m_neighourChunked[side];
+        trindex_t neighInd = rChunk.m_neighbourChunked[side];
 
         if (neighInd == gc_invalidTri)
         {
@@ -796,16 +793,16 @@ void PlanetGeometryA::chunk_set_neighbour_recurse(
 
     if (rChunk.m_chunk != gc_invalidChunk)
     {
-        rChunk.m_neighourChunked[side] = to;
+        rChunk.m_neighbourChunked[side] = to;
 
         if (to != gc_invalidTri)
         {
-            rChunk.m_neighourTransform[side] = m_icoTree->transform_to_ancestor(
+            rChunk.m_neighbourTransform[side] = m_icoTree->transform_to_ancestor(
                         t, side, m_icoTree->get_triangle(to).m_depth);
         }
         else
         {
-            rChunk.m_neighourTransform[side] = TriangleSideTransform{0.0f, 1.0f};
+            rChunk.m_neighbourTransform[side] = TriangleSideTransform{0.0f, 1.0f};
         }
         return;
     }
@@ -881,7 +878,7 @@ void PlanetGeometryA::chunk_remove(trindex_t t)
     for (uint8_t i = 0; i < 3; i ++)
     {
         // Remove from neighbours
-        trindex_t &rNeighInd = rChunk.m_neighourChunked[i];
+        trindex_t &rNeighInd = rChunk.m_neighbourChunked[i];
 
         if (rNeighInd == gc_invalidTri)
         {
@@ -1067,7 +1064,7 @@ vrindex_t PlanetGeometryA::shared_from_neighbour(
     SubTriangle& tri = m_icoTree->get_triangle(triInd);
     SubTriangleChunk& chunk = m_triangleChunks[triInd];
 
-    trindex_t neighInd = chunk.m_neighourChunked[side];
+    trindex_t neighInd = chunk.m_neighbourChunked[side];
 
     if (neighInd == gc_invalidTri)
     {
@@ -1085,7 +1082,7 @@ vrindex_t PlanetGeometryA::shared_from_neighbour(
 
         if (neighChunk.m_chunk != gc_invalidChunk)
         {
-            takeInd = chunk.m_neighourChunked[side];
+            takeInd = chunk.m_neighbourChunked[side];
         }
         else // if neigh is same depth and contains chunked descendents.
         {
@@ -1138,8 +1135,8 @@ vrindex_t PlanetGeometryA::shared_from_neighbour(
         }
     }
 
-    TriangleSideTransform tranFrom = chunk.m_neighourTransform[side];
-    TriangleSideTransform tranTo = takeChunk.m_neighourTransform[takeSide];
+    TriangleSideTransform tranFrom = chunk.m_neighbourTransform[side];
+    TriangleSideTransform tranTo = takeChunk.m_neighbourTransform[takeSide];
 
     // apply transform from
     posTransformed = posTransformed * tranFrom.m_scale + tranFrom.m_translation;
