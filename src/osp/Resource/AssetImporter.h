@@ -52,7 +52,7 @@ PluginManager;
 public:
     AssetImporter() {}
 
-    static void load_sturdy_file(std::string const& filepath, Package& package);
+    static void load_sturdy_file(std::string_view filepath, Package& package);
 
     /**
      * Load an image from disk at the specified filepath
@@ -92,9 +92,12 @@ private:
      * But for now, this function just loads everything.
      *
      * @param gltfImporter [in] glTF importer referencing opened sturdy file
+     * @param resPrefix [in] Unique name associated with the data source,
+     *       used to make resource names (e.g. mesh) unique to avoid collisions
      * @param package [out] Package to put resource paths into
      */
-    static void load_sturdy(TinyGltfImporter& gltfImporter, Package& package);
+    static void load_sturdy(TinyGltfImporter& gltfImporter,
+            std::string_view resPrefix, Package& package);
 
     /**
      * Load a part from a sturdy
@@ -105,15 +108,17 @@ private:
      * @param gltfImpoter [in] importer used to read node data
      * @param package [out] package which receives loaded data
      * @param id [in] ID of node containing part information
+     * @param resPrefix [in] Unique prefix for mesh names (see load_sturdy())
      */
     static void load_part(TinyGltfImporter& gltfImporter,
-        Package& package, unsigned id);
+        Package& package, Magnum::UnsignedInt id, std::string_view resPrefix);
 
     static void proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
                                Package& package,
+                               std::string_view resPrefix,
                                PrototypePart& part,
-                               unsigned parentProtoIndex,
-                               unsigned childGltfIndex);
+                               Magnum::UnsignedInt parentProtoIndex,
+                               Magnum::UnsignedInt childGltfIndex);
 
 };
 
