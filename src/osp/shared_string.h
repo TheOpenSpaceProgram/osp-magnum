@@ -22,8 +22,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#ifndef INCLUDED_OSP_STRING_BUFFER_H_56F463BF_C8A5_4633_B906_D7250C06E2DB
-#define INCLUDED_OSP_STRING_BUFFER_H_56F463BF_C8A5_4633_B906_D7250C06E2DB
+#ifndef INCLUDED_OSP_SHARED_STRING_H_56F463BF_C8A5_4633_B906_D7250C06E2DB
+#define INCLUDED_OSP_SHARED_STRING_H_56F463BF_C8A5_4633_B906_D7250C06E2DB
 #pragma once
 
 #include <memory>
@@ -42,35 +42,35 @@ namespace osp
  * For example, data read out of a configuration file, or from the network, that needs to have a long lifetime
  * but which is never modified after initial creation.
  *
- * In either of those situations, using basic_string_buffer provides a single allocation for the lifetime of the
+ * In either of those situations, using basic_shared_string provides a single allocation for the lifetime of the
  * string data, while still providing the full interface of string_view, as well as relatively cheap copy operations
  * (depending on the specific LIFETIME_T parameter, of course).
  *
  * A very nieve implementation is to provide std::any as the lifetime management. This is undesirable because of the additional
  * pointer indirection that std::any incurs because of it's type erasure.
  *
- * The next most obvious implementation is to use std::shared_ptr<const char[]> for lifetime, which results in basic_string_buffer
+ * The next most obvious implementation is to use std::shared_ptr<const char[]> for lifetime, which results in basic_shared_string
  * having a size of 4*sizeof(void*) (2 for the std::string_view, 2 for the shared_ptr). That's the implementation provided by the
- * using string_buffer = ...; line below the template class declaration.
+ * using shared_string = ...; line below the template class declaration.
  *
  * A more sophisticated implementation could use intrusive reference counting for the string data, instead of a seperately
  * allocated and tracked management block like std::shared_ptr uses, and this interface also would allow for a choice of
  * atomic reference counting, or non-atomic, depending on the template parameters.
  *
- * Note also that the create_***() functions at the end of this file provide a mechanism to create a string_buffer that
+ * Note also that the create_***() functions at the end of this file provide a mechanism to create a shared_string that
  * does not attempt lifetime management (e.g. default constructs m_lifetime). This is provided for two purposes.
  * 1. compile-time string literals being passed to a function that take "ownership" of the data passed in,
  *    but the string literal requires no ownership because it's lifetime is a superset of the lifetime of the program
  *    in such case, the extra cost of copying / moving the m_lifetime variable can be omitted.
- * 2. Situations where the use of string_buffer is required due to type system constraints, but the caller of the code
- *    knows for certain that the ownership of the passed in string_buffer will never outlive the lifetime of the function call
- *    (e.g. the function never copies the string_buffer, only references it). Situations with this usage are rare, but do happen
- *    so the create_reference_string_buffer() function provides a way to do that.
+ * 2. Situations where the use of shared_string is required due to type system constraints, but the caller of the code
+ *    knows for certain that the ownership of the passed in shared_string will never outlive the lifetime of the function call
+ *    (e.g. the function never copies the shared_string, only references it). Situations with this usage are rare, but do happen
+ *    so the create_reference_shared_string() function provides a way to do that.
  */
 template<typename CHAR_T, typename LIFETIME_T>
-class basic_string_buffer : public std::basic_string_view<CHAR_T>
+class basic_shared_string : public std::basic_string_view<CHAR_T>
 {
-    using ThisType_t = basic_string_buffer;
+    using ThisType_t = basic_shared_string;
     using ViewBase_t = std::basic_string_view<CHAR_T>;
     static_assert(std::is_nothrow_default_constructible_v<ViewBase_t>);
     static_assert(std::is_nothrow_move_constructible_v<ViewBase_t>);
@@ -93,20 +93,20 @@ public:
     using size_type              = ViewBase_t::size_type;
     using difference_type        = ViewBase_t::difference_type;
 
-    constexpr basic_string_buffer(void) noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> ) = default;
-    basic_string_buffer(basic_string_buffer &&) noexcept( std::is_nothrow_move_constructible_v<LIFETIME_T> )  = default;
-    basic_string_buffer(basic_string_buffer const&) noexcept( std::is_nothrow_copy_constructible_v<LIFETIME_T> )  = default;
-    basic_string_buffer& operator=(basic_string_buffer &&) noexcept( std::is_nothrow_move_assignable_v<LIFETIME_T> )  = default;
-    basic_string_buffer& operator=(basic_string_buffer const&) noexcept( std::is_nothrow_copy_assignable_v<LIFETIME_T> )  = default;
-    ~basic_string_buffer() noexcept( std::is_nothrow_destructible_v<LIFETIME_T> )  = default;
+    constexpr basic_shared_string(void) noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> ) = default;
+    basic_shared_string(basic_shared_string &&) noexcept( std::is_nothrow_move_constructible_v<LIFETIME_T> )  = default;
+    basic_shared_string(basic_shared_string const&) noexcept( std::is_nothrow_copy_constructible_v<LIFETIME_T> )  = default;
+    basic_shared_string& operator=(basic_shared_string &&) noexcept( std::is_nothrow_move_assignable_v<LIFETIME_T> )  = default;
+    basic_shared_string& operator=(basic_shared_string const&) noexcept( std::is_nothrow_copy_assignable_v<LIFETIME_T> )  = default;
+    ~basic_shared_string() noexcept( std::is_nothrow_destructible_v<LIFETIME_T> )  = default;
 
     /**
      * @brief substr -- see std::string_view::substr
      * @param offset
      * @param length
-     * @return a new basic_string_buffer that has a copy of the m_lifetime variable to preserve the lifetime semantics of the object.
+     * @return a new basic_shared_string that has a copy of the m_lifetime variable to preserve the lifetime semantics of the object.
      */
-    basic_string_buffer substr(size_type offset, size_type length = ViewBase_t::npos) const& noexcept(false) // std::string_view::substr can throw.
+    basic_shared_string substr(size_type offset, size_type length = ViewBase_t::npos) const& noexcept(false) // std::string_view::substr can throw.
     {
         return { ViewBase_t::substr(offset, length), m_lifetime };
     }
@@ -115,17 +115,17 @@ public:
      * @brief substr -- see std::string_view::substr
      * @param offset
      * @param length
-     * @return a new basic_string_buffer that has the m_lifetime variable of this basic_string_buffer std::moved() into it.
-     * This allows for a basic_string_buffer that is an rvalue reference to have substr called on it, and avoid copying the lifetime.
+     * @return a new basic_shared_string that has the m_lifetime variable of this basic_shared_string std::moved() into it.
+     * This allows for a basic_shared_string that is an rvalue reference to have substr called on it, and avoid copying the lifetime.
      */
-    basic_string_buffer substr(size_type offset, size_type length = ViewBase_t::npos) && noexcept(false) // std::string_view::substr can throw.
+    basic_shared_string substr(size_type offset, size_type length = ViewBase_t::npos) && noexcept(false) // std::string_view::substr can throw.
     {
         return { ViewBase_t::substr(offset, length), std::move(m_lifetime) };
     }
 
     /**
      * @brief operator std::basic_string<CHAR_T>
-     * Convienience function for getting an std::basic_string<CHAR_T> from this basic_string_buffer
+     * Convienience function for getting an std::basic_string<CHAR_T> from this basic_shared_string
      */
     explicit operator std::basic_string<CHAR_T>() noexcept( noexcept( std::basic_string<CHAR_T>(data(), size()) ) )
     {
@@ -133,73 +133,90 @@ public:
     }
 
 protected:
-    friend basic_string_buffer create_string_buffer(ViewBase_t, LIFETIME_T) noexcept( std::is_nothrow_move_constructible_v<LIFETIME_T> );
+    friend basic_shared_string create_shared_string(ViewBase_t, LIFETIME_T) noexcept( std::is_nothrow_move_constructible_v<LIFETIME_T> );
 
     template<typename IT_T>
-    friend basic_string_buffer create_string_buffer(IT_T&&, IT_T&&) noexcept(false); // allocates
-    friend basic_string_buffer create_string_buffer(ViewBase_t) noexcept(false); // allocates
+    friend basic_shared_string create_shared_string(IT_T&&, IT_T&&) noexcept(false); // allocates
+    friend shared_string create_shared_string(const char * data, size_t len) noexcept(false);
+    friend basic_shared_string create_shared_string(ViewBase_t) noexcept(false); // allocates
 
-    friend constexpr basic_string_buffer create_reference_string_buffer(ViewBase_t) noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> );
+    friend constexpr basic_shared_string create_reference_shared_string(ViewBase_t) noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> );
 
-    explicit constexpr basic_string_buffer(ViewBase_t view) noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> )
+    explicit constexpr basic_shared_string(ViewBase_t view) noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> )
      : ViewBase_t{ view }
     { }
 
-    basic_string_buffer(ViewBase_t view, LIFETIME_T lifetime) noexcept( std::is_nothrow_move_constructible_v<LIFETIME_T> )
+    basic_shared_string(ViewBase_t view, LIFETIME_T lifetime) noexcept( std::is_nothrow_move_constructible_v<LIFETIME_T> )
      : ViewBase_t{ view }
      , m_lifetime{ std::move(lifetime) }
     { }
 
 private:
     LIFETIME_T m_lifetime;
-}; // class basic_string_buffer
+}; // class basic_shared_string
 
 /**
  * The concrete implementation.
  */
-using string_buffer = basic_string_buffer<char, std::shared_ptr<const CHAR_T[]>>;
+using shared_string = basic_shared_string<char, std::shared_ptr<const CHAR_T[]>>;
 
 
-string_buffer create_string_buffer(std::string_view view, std::shared_ptr<const CHAR_T[]> buf) noexcept
+shared_string create_shared_string(std::string_view view, std::shared_ptr<const CHAR_T[]> buf) noexcept
 {
-    return string_buffer{ view, std::move(buf) };
+    return shared_string{ view, std::move(buf) };
 }
 
 template<typename IT_T>
-string_buffer create_string_buffer(IT_T && begin, IT_T && end) noexcept(false) // allocates
+shared_string create_shared_string(IT_T && begin, IT_T && end) noexcept(false) // allocates
 {
     // Determine size
-    auto size = static_cast<std::size_t>(std::distance(begin, end));
+    auto len = static_cast<std::size_t>(std::distance(begin, end));
 
     // Make space to copy the string
-    auto buf = std::make_shared<char[]>(size);
+    auto buf = std::make_shared<char[]>(len);
 
     // Do the copy
     std::copy(std::forward<IT_T>(begin), std::forward<IT_T>(end), buf.get());
 
-    // Construct prior to string_buffer constructor to avoid
+    // Construct prior to shared_string constructor to avoid
     // ABI specific parameter passing order problems.
-    auto view = std::string_view{ buf.get(), size };
+    auto view = std::string_view{ buf.get(), len };
 
-    // Make the string_buffer
-    return create_string_buffer(view, std::move(buf));
+    // Make the shared_string
+    return create_shared_string(view, std::move(buf));
 }
 
-string_buffer create_string_buffer(std::string_view view) noexcept(false) // allocates
+shared_string create_shared_string(const char * data, size_t len) noexcept(false) // allocates
 {
-    return create_string_buffer(view.begin(), view.end());
+    // Make space to copy the string
+    auto buf = std::make_shared<char[]>(len);
+
+    // Do the copy
+    std::copy(data, data+len, buf.get());
+
+    // Construct prior to shared_string constructor to avoid
+    // ABI specific parameter passing order problems.
+    auto view = std::string_view{ buf.get(), len };
+
+    // Make the shared_string
+    return create_shared_string(view, std::move(buf));
+}
+
+shared_string create_shared_string(std::string_view view) noexcept(false) // allocates
+{
+    return create_shared_string(view.begin(), view.end());
 }
 
 /**
- * @brief create_reference_string_buffer
+ * @brief create_reference_shared_string
  * @param view
- * @return a string_buffer that does not attempt lifetime management at all.
+ * @return a shared_string that does not attempt lifetime management at all.
  */
-constexpr string_buffer create_reference_string_buffer(std::string_view view) noexcept
+constexpr shared_string create_reference_shared_string(std::string_view view) noexcept
 {
-    return string_buffer{ std::string_view };
+    return shared_string{ std::string_view };
 }
 
 } // namespace osp
 
-#endif // defined INCLUDED_OSP_STRING_BUFFER_H_56F463BF_C8A5_4633_B906_D7250C06E2DB
+#endif // defined INCLUDED_OSP_SHARED_STRING_H_56F463BF_C8A5_4633_B906_D7250C06E2DB
