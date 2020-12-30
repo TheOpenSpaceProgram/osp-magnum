@@ -171,12 +171,12 @@ public:
     /**
      * Get triangle from vector of triangles
      * be careful of reallocation!
-     * @param t [in] Index to triangle
+     * @param triInd [in] Index to triangle
      * @return Pointer to triangle
      */
-    SubTriangle& get_triangle(trindex_t t)
+    SubTriangle& get_triangle(trindex_t triInd)
     {
-        return m_triangles[t];
+        return m_triangles[triInd];
     }
 
     constexpr std::vector<float> const& get_vertex_buffer()
@@ -209,7 +209,7 @@ public:
      * Calculates and sets m_center of a SubTriangle
      * @param tri [ref] Reference to triangle
      */
-    void calculate_center(SubTriangle& tri);
+    void calculate_center(SubTriangle& rTri);
 
     /**
      * A quick way to set neighbours of a triangle
@@ -218,7 +218,7 @@ public:
      * @param rte [in] Right
      * @param lft [in] Left
      */
-    static void set_neighbours(SubTriangle& tri, trindex_t bot,
+    static void set_neighbours(SubTriangle& rTri, trindex_t bot,
                                trindex_t rte, trindex_t lft);
 
     /**
@@ -228,7 +228,7 @@ public:
      * @param rte [in] Right
      * @param lft [in] Left
      */
-    static void set_neighbour_sides(SubTriangle& tri, trindex_t bot,
+    static void set_neighbour_sides(SubTriangle& rTri, trindex_t bot,
                                     trindex_t rte, trindex_t lft);
 
     /**
@@ -238,7 +238,7 @@ public:
      * @param lft Left
      * @param rte Right
      */
-    static void set_verts(SubTriangle& tri, buindex_t top,
+    static void set_verts(SubTriangle& rTri, buindex_t top,
                           buindex_t lft, buindex_t rte);
 
     /**
@@ -247,7 +247,7 @@ public:
      * @param side [in] Which side to set
      * @param to [in] Neighbour to operate on
      */
-    void set_side_recurse(SubTriangle& tri, int side, trindex_t to);
+    void set_side_recurse(SubTriangle& rTri, int side, trindex_t to);
 
     /**
      * Find which side a triangle is on another triangle
@@ -265,7 +265,7 @@ public:
      * @param [in] Triangle to subdivide
      * @return 0 if subdivision is succesful
      */
-    int subdivide_add(trindex_t t);
+    int subdivide_add(trindex_t triInd);
 
     /**
      * Unsubdivide a triangle.
@@ -273,7 +273,7 @@ public:
      * @param t [in] Index of triangle to unsubdivide
      * @return 0 if removal is succesful
      */
-    int subdivide_remove(trindex_t t);
+    int subdivide_remove(trindex_t triInd);
 
     /**
      * Calls subdivide_remove on all triangles that have a 0 m_useCount
@@ -313,7 +313,7 @@ public:
      * @return A TriangleSideTransform that can be used to transform positions
      */
     TriangleSideTransform transform_to_ancestor(
-            trindex_t t, uint8_t side, uint8_t targetDepth,
+            trindex_t triInd, uint8_t side, uint8_t targetDepth,
             trindex_t *pAncestorOut = nullptr);
 
     /**

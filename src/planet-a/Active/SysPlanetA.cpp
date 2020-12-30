@@ -221,7 +221,7 @@ void SysPlanetA::update_geometry()
             std::cout << "Planet initialized, now making colliders\n";
 
             // temporary: make colliders for all the chunks
-            for (chindex_t i = 0; i < rPlanetGeo.chunk_count(); i ++)
+            for (chindex_t i = 0; i < rPlanetGeo.get_chunk_count(); i ++)
             {
                 debug_create_chunk_collider(ent, planet, i);
                 std::cout << "* completed chunk collider: " << i << "\n";
