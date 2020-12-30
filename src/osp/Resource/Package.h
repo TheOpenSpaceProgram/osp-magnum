@@ -61,24 +61,47 @@ namespace osp
 
 // supported resources
 
+// Just a string, but typedef'd to indicate that it represents a prefix
+using ResPrefix_t = std::string;
+
+// Stores a split path as <prefix, rest of path>
+struct Path
+{
+    std::string_view prefix;
+    std::string_view identifier;
+};
+
+using StrViewPair_t = std::pair<std::string_view, std::string_view>;
+/**
+ * Split a string_view at the first instance of a delimiter
+ *
+ */
+StrViewPair_t decompose_str(std::string_view path, const char delim);
+
+/**
+ * Split a resource path into a prefix and identifier
+ *
+ * A path of the format "prefix:identifier" is divided into the prefix (any
+ * text preceeding the first instance of the ':' character), and the following
+ * identifier.
+ *
+ * @param path [in] The path to split
+ * @return The path divided into a prefix and identifier
+ */
+Path decompose_path(std::string_view path);
 
 class Package
 {
-
-
-
 public:
 
 
     Package(Package&& move) = default;
     Package(const Package& copy) = delete;
+    Package& operator=(Package const& copy) = delete;
 
-    Package(std::string const& prefix, std::string const& packageName);
+    Package(std::string prefix, std::string packageName);
 
     //ResourceTable m_resources;
-
-    typedef uint32_t Prefix;
-    //typedef char Prefix[4];
 
     //virtual Magnum::GL::Mesh* request_mesh(const std::string& path);
 
@@ -118,6 +141,7 @@ public:
         std::map<std::string, Resource<TYPE_T>> m_resources;
     };
 
+    ResPrefix_t get_prefix() const { return m_prefix; }
 
 private:
 
@@ -125,7 +149,7 @@ private:
 
     std::string m_packageName;
 
-    Prefix m_prefix;
+    ResPrefix_t m_prefix;
 
     std::string m_displayName;
 

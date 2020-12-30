@@ -280,9 +280,7 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
 
             // Current prototype is a mesh, get the mesh and add it
 
-            // TODO: put package prefixes in resource path
-            //       for now just get the first package
-            Package& package = m_scene.get_application().debug_get_packges()[0];
+            Package& package = m_scene.get_application().debug_find_package("lzdb");
             const DrawableData& drawable =
                 std::get<DrawableData>(currentPrototype.m_objectData);
 
