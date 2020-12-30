@@ -53,25 +53,25 @@ using planeta::universe::UCompPlanet;
 
 void testapp::create_real_moon(osp::OSPApplication& ospApp)
 {
-    Universe &uni = ospApp.get_universe();
-    Package &pkg = ospApp.debug_get_packges()[0];
+    Universe &rUni = ospApp.get_universe();
+    Package &rPkg = ospApp.debug_find_package("lzdb");
 
     // Get the planet system used to create a UCompPlanet
     SatPlanet &typePlanet = static_cast<planeta::universe::SatPlanet&>(
-            *uni.sat_type_find("Planet")->second);
+            *rUni.sat_type_find("Planet")->second);
 
     // Create trajectory that will make things added to the universe stationary
-    auto &stationary = uni.trajectory_create<TrajStationary>(
-                                        uni, uni.sat_root());
+    auto &stationary = rUni.trajectory_create<TrajStationary>(
+                                        rUni, rUni.sat_root());
 
     // Create 10 random vehicles
     for (int i = 0; i < 10; i ++)
     {
         // Creates a random mess of spamcans as a vehicle
-        Satellite sat = debug_add_random_vehicle(uni, pkg, "TestyMcTestFace Mk"
+        Satellite sat = debug_add_random_vehicle(rUni, rPkg, "TestyMcTestFace Mk"
                                                  + std::to_string(i));
 
-        auto &posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
+        auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
 
         posTraj.m_position = osp::Vector3s(i * 1024l * 5l, 0l, 0l);
         posTraj.m_dirty = true;
@@ -79,8 +79,8 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
         stationary.add(sat);
     }
 
-    Satellite sat = debug_add_deterministic_vehicle(uni, pkg, "Stomper Mk. I");
-    auto& posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
+    Satellite sat = debug_add_deterministic_vehicle(rUni, rPkg, "Stomper Mk. I");
+    auto& posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
     posTraj.m_position = osp::Vector3s(22 * 1024l * 5l, 0l, 0l);
     posTraj.m_dirty = true;
     stationary.add(sat);
@@ -92,7 +92,7 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
     {
         for (int z = -0; z < 1; z ++)
         {
-            Satellite sat = uni.sat_create();
+            Satellite sat = rUni.sat_create();
 
             // assign sat as a planet
             UCompPlanet &planet = typePlanet.add_get_ucomp(sat);
@@ -104,7 +104,7 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
             planet.m_resolutionScreenMax = 0.056f;
             planet.m_resolutionSurfaceMax = 12.0f;
 
-            auto &posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
+            auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
 
             // space planets 400m apart from each other
             // 1024 units = 1 meter
