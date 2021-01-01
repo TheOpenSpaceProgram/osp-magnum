@@ -37,6 +37,13 @@ Universe::Universe()
     m_root = sat_create();
 }
 
+void Universe::destroy()
+{
+    m_trajectories.clear();
+    m_satTypes.clear();
+    m_registry.clear();
+}
+
 Satellite Universe::sat_create()
 {
     Satellite sat = m_registry.create();

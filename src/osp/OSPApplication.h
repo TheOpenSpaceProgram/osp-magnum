@@ -62,6 +62,11 @@ public:
 
     universe::Universe& get_universe() { return m_universe; }
 
+    /**
+     * Safely shuts down application by freeing resources in the correct order
+     */
+    void shutdown();
+
 private:
     std::map<ResPrefix_t, Package, std::less<>> m_packages;
     universe::Universe m_universe;

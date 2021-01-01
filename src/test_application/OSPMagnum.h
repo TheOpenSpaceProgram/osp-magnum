@@ -70,6 +70,7 @@ public:
     constexpr osp::UserInputHandler& get_input_handler() { return m_userInput; }
     constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
 
+    void free_scenes() { m_scenes.clear(); }
 private:
 
     void drawEvent() override;

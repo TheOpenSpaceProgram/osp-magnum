@@ -78,6 +78,11 @@ public:
     ~Universe() = default;
 
     /**
+     * Safely destroys the universe
+     */
+    void destroy();
+
+    /**
      * @return an null satellite
      */
     static constexpr Satellite sat_null() { return entt::null; };

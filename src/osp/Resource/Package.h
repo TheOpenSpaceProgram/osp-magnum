@@ -128,6 +128,8 @@ public:
     template<class TYPE_T>
     void clear();
 
+    void clear_all();
+
     struct GroupType
     {
         virtual ~GroupType() = default;

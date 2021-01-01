@@ -153,10 +153,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Disconnect ActiveArea
     sysArea.disconnect();
 
-    // workaround: wipe mesh resources because they're specific to the
-    // opengl context
-    rOspApp.debug_find_package("lzdb").clear<Magnum::GL::Mesh>();
-    rOspApp.debug_find_package("lzdb").clear<Magnum::GL::Texture2D>();
+    pMagnumApp->free_scenes();
+    rOspApp.shutdown();
 
     // destruct the application, this closes the window
     pMagnumApp.reset();

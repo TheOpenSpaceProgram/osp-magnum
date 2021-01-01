@@ -24,6 +24,8 @@
  */
 #include "OSPApplication.h"
 
+#include "osp/Resource/blueprints.h"
+
 using namespace osp;
 
 OSPApplication::OSPApplication()
@@ -44,4 +46,20 @@ Package& OSPApplication::debug_find_package(std::string_view prefix)
         return it->second;
     }
     throw std::out_of_range("Package not found");
+}
+
+void OSPApplication::shutdown()
+{
+    m_universe.destroy();
+
+    /* TODO HACK:
+       BlueprintVehicle resources themselves store DependRes<PrototypePart>,
+       whose group is destructed before BlueprintVehicle. In order to prevent
+       dereferencing of invalid pointers, the BlueprintVehicle group must be
+       manually cleared before the packages are destroyed.
+    */
+    Package& pkg = debug_find_package("lzdb");
+    pkg.clear<BlueprintVehicle>();
+
+    m_packages.clear();
 }

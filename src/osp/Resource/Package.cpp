@@ -36,6 +36,11 @@ Package::Package(std::string prefix, std::string packageName) :
 {
 }
 
+void Package::clear_all()
+{
+    m_groups.clear();
+}
+
 StrViewPair_t decompose_str(std::string_view path, const char delim)
 {
     size_t pos = path.find(delim);
@@ -45,7 +50,7 @@ StrViewPair_t decompose_str(std::string_view path, const char delim)
     };
 }
 
-Path decompose_str(std::string_view path)
+Path decompose_path(std::string_view path)
 {
     StrViewPair_t pair = decompose_str(path, ':');
     return { pair.first, pair.second };
