@@ -4,13 +4,13 @@
 using namespace osp::active;
 using namespace adera::shader;
 
-void Phong::draw(ActiveEnt e,
+void Phong::draw_entity(ActiveEnt e,
     ActiveScene& scene, 
     Magnum::GL::Mesh& mesh,
     ACompCamera const& camera,
     ACompTransform const& transform)
 {
-    PhongShaderInstance& shaderInstance = scene.reg_get<PhongShaderInstance>(e);
+    InstanceData& shaderInstance = scene.reg_get<InstanceData>(e);
     Phong& shader = *shaderInstance.m_shaderProgram;
 
     Magnum::Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;

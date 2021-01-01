@@ -70,7 +70,7 @@ public:
     void shutdown();
 
 private:
-    Package m_glResources;
+    Package m_glResources{"gl", "gl-resources"};
     std::map<ResPrefix_t, Package, std::less<>> m_packages;
     universe::Universe m_universe;
 };

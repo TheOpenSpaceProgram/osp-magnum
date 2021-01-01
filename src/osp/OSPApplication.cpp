@@ -28,7 +28,7 @@
 
 using namespace osp;
 
-OSPApplication::OSPApplication() : m_glResources("gl", "gl-resources")
+OSPApplication::OSPApplication()
 {
 
 }

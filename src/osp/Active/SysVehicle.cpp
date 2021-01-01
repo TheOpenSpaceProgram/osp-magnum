@@ -310,18 +310,18 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
             }
 
             // by now, the mesh and texture should both exist
-            using adera::shader::PhongShaderInstance;
+            using adera::shader::Phong;
             Package& glResources = m_scene.get_application().get_gl_resources();
-            PhongShaderInstance si;
-            si.m_shaderProgram = glResources.get<adera::shader::Phong>("phong_shader");
-            si.m_textures = std::move(textureResources);
-            si.m_lightPosition = Vector3{10.0f, 15.0f, 5.0f};
-            si.m_ambientColor = 0x111111_rgbf;
-            si.m_specularColor = 0x330000_rgbf;
-            m_scene.reg_emplace<PhongShaderInstance>(currentEnt, std::move(si));
+            Phong::InstanceData shader;
+            shader.m_shaderProgram = glResources.get<Phong>("phong_shader");
+            shader.m_textures = std::move(textureResources);
+            shader.m_lightPosition = Vector3{10.0f, 15.0f, 5.0f};
+            shader.m_ambientColor = 0x111111_rgbf;
+            shader.m_specularColor = 0x330000_rgbf;
+            m_scene.reg_emplace<Phong::InstanceData>(currentEnt, std::move(shader));
 
             CompDrawableDebug& bBocks = m_scene.reg_emplace<CompDrawableDebug>(
-                        currentEnt, meshRes, adera::shader::Phong::draw, 0x0202EE_rgbf);
+                        currentEnt, meshRes, Phong::draw_entity, 0x0202EE_rgbf);
 
             //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
         }
