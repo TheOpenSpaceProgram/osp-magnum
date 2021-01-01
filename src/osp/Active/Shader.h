@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright Â© 2019-2020 Open Space Program Project
+ * Copyright © 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -22,45 +22,26 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "OSPApplication.h"
+#pragma once
 
-#include "osp/Resource/blueprints.h"
+#include "activetypes.h"
+#include "osp/Active/ActiveScene.h"
+#include <Magnum/GL/Mesh.h>
 
-using namespace osp;
-
-OSPApplication::OSPApplication() : m_glResources("gl", "gl-resources")
+namespace osp::active
 {
-
-}
-
-void OSPApplication::debug_add_package(Package&& p)
-{
-    auto const& [it, success] = m_packages.emplace(p.get_prefix(), std::move(p));
-    assert(success);
-}
-
-Package& OSPApplication::debug_find_package(std::string_view prefix)
-{
-    if (auto it = m_packages.find(prefix); it != m_packages.end())
-    {
-        return it->second;
-    }
-    throw std::out_of_range("Package not found");
-}
-
-void OSPApplication::shutdown()
-{
-    m_glResources.clear_all();
-    m_universe.destroy();
-
-    /* TODO HACK:
-       BlueprintVehicle resources themselves store DependRes<PrototypePart>,
-       whose group is destructed before BlueprintVehicle. In order to prevent
-       dereferencing of invalid pointers, the BlueprintVehicle group must be
-       manually cleared before the packages are destroyed.
-    */
-    Package& pkg = debug_find_package("lzdb");
-    pkg.clear<BlueprintVehicle>();
-
-    m_packages.clear();
+/**
+ * A function pointer to a Shader's draw() function
+ * @param ActiveEnt - The entity being drawn; used to fetch component data
+ * @param ActiveScene - The scene containing the entity's component data
+ * @param Mesh - Mesh data to be drawn with the shader
+ * @param ACompCamera - Camera used to draw the scene
+ * @param ACompTransform - Object transformation data
+ */
+using ShaderDrawFnc_t = void (*)(
+    ActiveEnt,
+    ActiveScene&,
+    Magnum::GL::Mesh&,
+    ACompCamera const&,
+    ACompTransform const&);
 }

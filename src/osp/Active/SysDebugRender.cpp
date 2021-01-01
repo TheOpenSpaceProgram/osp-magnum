@@ -27,6 +27,7 @@
 
 #include "SysDebugRender.h"
 #include "ActiveScene.h"
+#include "adera/Shaders/Phong.h"
 
 
 using namespace osp::active;
@@ -44,7 +45,9 @@ SysDebugRender::SysDebugRender(ActiveScene &rScene) :
         m_renderDebugDraw(rScene.get_render_order(), "debug", "", "",
                           std::bind(&SysDebugRender::draw, this, _1))
 {
-
+    Package& glResources = m_scene.get_application().get_gl_resources();
+    glResources.add<adera::shader::Phong>("phong_shader",
+        adera::shader::Phong{Magnum::Shaders::Phong::Flag::DiffuseTexture});
 }
 
 void SysDebugRender::draw(ACompCamera const& camera)
@@ -67,16 +70,6 @@ void SysDebugRender::draw(ACompCamera const& camera)
 
         entRelative = camera.m_inverse * transform.m_transformWorld;
 
-        (*drawable.m_shader)
-                .bindDiffuseTexture(*drawable.m_textures[0])
-                .setAmbientColor(0x111111_rgbf)
-                .setSpecularColor(0x330000_rgbf)
-                .setLightPosition({10.0f, 15.0f, 5.0f})
-                .setTransformationMatrix(entRelative)
-                .setProjectionMatrix(camera.m_projection)
-                .setNormalMatrix(entRelative.normalMatrix())
-                .draw(*(drawable.m_mesh));
-
-        //std::cout << "render! \n";
+        drawable.m_shader_draw(entity, m_scene, *drawable.m_mesh, camera, transform);
     }
 }

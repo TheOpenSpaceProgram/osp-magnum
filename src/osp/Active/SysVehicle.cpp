@@ -31,6 +31,7 @@
 #include "../Satellites/SatVehicle.h"
 #include "../Resource/PrototypePart.h"
 #include "../Resource/AssetImporter.h"
+#include "adera/Shaders/Phong.h"
 
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
@@ -52,9 +53,6 @@ SysVehicle::SysVehicle(ActiveScene &scene) :
             scene.get_update_order(), "vehicle_modification", "", "physics",
             std::bind(&SysVehicle::update_vehicle_modification, this))
 {
-    using Magnum::Shaders::Phong;
-
-    m_shader = std::make_unique<Phong>(Phong::Flag::DiffuseTexture);
 }
 
 StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
@@ -296,7 +294,7 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                 meshRes = AssetImporter::compile_mesh(meshData, package);
             }
 
-            std::vector<Texture2D*> textureResources;
+            std::vector<DependRes<Texture2D>> textureResources;
             for (unsigned i = 0; i < drawable.m_textures.size(); i++)
             {
                 unsigned texID = drawable.m_textures[i];
@@ -308,14 +306,22 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                     DependRes<ImageData2D> imageData = package.get<ImageData2D>(texName);
                     texRes = AssetImporter::compile_tex(imageData, package);
                 }
-                textureResources.push_back(&(*texRes));
+                textureResources.push_back(texRes);
             }
 
             // by now, the mesh and texture should both exist
+            using adera::shader::PhongShaderInstance;
+            Package& glResources = m_scene.get_application().get_gl_resources();
+            PhongShaderInstance si;
+            si.m_shaderProgram = glResources.get<adera::shader::Phong>("phong_shader");
+            si.m_textures = std::move(textureResources);
+            si.m_lightPosition = Vector3{10.0f, 15.0f, 5.0f};
+            si.m_ambientColor = 0x111111_rgbf;
+            si.m_specularColor = 0x330000_rgbf;
+            m_scene.reg_emplace<PhongShaderInstance>(currentEnt, std::move(si));
 
-            CompDrawableDebug& bBocks
-                    = m_scene.reg_emplace<CompDrawableDebug>(
-                        currentEnt, &(*meshRes), std::move(textureResources), m_shader.get(), 0x0202EE_rgbf);
+            CompDrawableDebug& bBocks = m_scene.reg_emplace<CompDrawableDebug>(
+                        currentEnt, meshRes, adera::shader::Phong::draw, 0x0202EE_rgbf);
 
             //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
         }

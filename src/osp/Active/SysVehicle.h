@@ -32,8 +32,6 @@
 #include "../Resource/Package.h"
 #include "../Resource/blueprints.h"
 
-#include <Magnum/Shaders/Phong.h>
-
 // forward declare
 namespace osp
 {
@@ -127,9 +125,6 @@ public:
 private:
     ActiveScene& m_scene;
     //AppPackages& m_packages;
-
-    // temporary
-    std::unique_ptr<Magnum::Shaders::Phong> m_shader;
 
     UpdateOrderHandle m_updateVehicleModification;
 };

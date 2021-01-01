@@ -58,6 +58,8 @@ public:
      */
     Package& debug_find_package(std::string_view prefix);
 
+    Package& get_gl_resources() { return m_glResources; }
+
     size_t debug_num_packages() const { return m_packages.size(); }
 
     universe::Universe& get_universe() { return m_universe; }
@@ -68,6 +70,7 @@ public:
     void shutdown();
 
 private:
+    Package m_glResources;
     std::map<ResPrefix_t, Package, std::less<>> m_packages;
     universe::Universe m_universe;
 };
