@@ -38,7 +38,7 @@ public:
 
     // put more stuff into here eventually
 
-    OSPApplication();
+    OSPApplication() = default;
 
     /**
      * Add a resource package to the application

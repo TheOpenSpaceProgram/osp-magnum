@@ -22,22 +22,30 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "OSPApplication.h"
+#include "Phong.h"
+#include <Magnum/Math/Matrix4.h>
 
-using namespace osp;
+using namespace osp::active;
+using namespace adera::shader;
 
-void OSPApplication::debug_add_package(Package&& p)
+void Phong::draw_entity(ActiveEnt e,
+    ActiveScene& rScene, 
+    Magnum::GL::Mesh& rMesh,
+    ACompCamera const& camera,
+    ACompTransform const& transform)
 {
-    auto const& [it, success] = m_packages.emplace(p.get_prefix(), std::move(p));
-    assert(success);
-}
+    auto& shaderInstance = rScene.reg_get<ACompPhongInstance>(e);
+    Phong& shader = *shaderInstance.m_shaderProgram;
 
-Package& OSPApplication::debug_find_package(std::string_view prefix)
-{
-    if (auto it = m_packages.find(prefix); it != m_packages.end())
-    {
-        return it->second;
-    }
-    throw std::out_of_range("Package not found");
-}
+    Magnum::Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;
 
+    shader
+        .bindDiffuseTexture(*shaderInstance.m_textures[0])
+        .setAmbientColor(shaderInstance.m_ambientColor)
+        .setSpecularColor(shaderInstance.m_specularColor)
+        .setLightPosition(shaderInstance.m_lightPosition)
+        .setTransformationMatrix(entRelative)
+        .setProjectionMatrix(camera.m_projection)
+        .setNormalMatrix(entRelative.normalMatrix())
+        .draw(rMesh);
+}

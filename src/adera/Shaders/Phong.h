@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright Â© 2019-2020 Open Space Program Project
+ * Copyright © 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -22,22 +22,42 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "OSPApplication.h"
+#pragma once
 
-using namespace osp;
+#include <vector>
+#include <Magnum/Shaders/Phong.h>
+#include <Magnum/GL/Mesh.h>
+#include <Magnum/GL/Texture.h>
+#include <Magnum/Math/Color.h>
+#include "osp/Active/activetypes.h"
+#include "osp/Active/ActiveScene.h"
+#include "osp/Resource/Resource.h"
 
-void OSPApplication::debug_add_package(Package&& p)
+namespace adera::shader
 {
-    auto const& [it, success] = m_packages.emplace(p.get_prefix(), std::move(p));
-    assert(success);
-}
 
-Package& OSPApplication::debug_find_package(std::string_view prefix)
+
+class Phong : protected Magnum::Shaders::Phong
 {
-    if (auto it = m_packages.find(prefix); it != m_packages.end())
+public:
+    using Magnum::Shaders::Phong::Phong;
+
+    struct ACompPhongInstance
     {
-        return it->second;
-    }
-    throw std::out_of_range("Package not found");
-}
+        osp::DependRes<Phong> m_shaderProgram;
+        std::vector<osp::DependRes<Magnum::GL::Texture2D>> m_textures;
+        Magnum::Vector3 m_lightPosition;
+        Magnum::Color3 m_ambientColor;
+        Magnum::Color3 m_specularColor;
+    };
 
+    static void draw_entity(osp::active::ActiveEnt e,
+        osp::active::ActiveScene& rScene,
+        Magnum::GL::Mesh& rMesh,
+        osp::active::ACompCamera const& camera,
+        osp::active::ACompTransform const& transform);
+
+};
+
+
+}

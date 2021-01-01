@@ -26,8 +26,9 @@
 
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Mesh.h>
-#include <Magnum/Shaders/Phong.h>
 
+#include "osp/Resource/Resource.h"
+#include "osp/Active/Shader.h"
 #include "../types.h"
 #include "activetypes.h"
 
@@ -36,9 +37,8 @@ namespace osp::active
 
 struct CompDrawableDebug
 {
-    Magnum::GL::Mesh* m_mesh;
-    std::vector<Magnum::GL::Texture2D*> m_textures;
-    Magnum::Shaders::Phong* m_shader;
+    DependRes<Magnum::GL::Mesh> m_mesh;
+    ShaderDrawFnc_t m_shader_draw;
     Magnum::Color4 m_color;
 };
 
