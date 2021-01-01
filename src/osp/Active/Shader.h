@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright Â© 2019-2020 Open Space Program Project
+ * Copyright © 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -22,22 +22,26 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "OSPApplication.h"
+#pragma once
 
-using namespace osp;
+#include "activetypes.h"
+#include "osp/Active/ActiveScene.h"
+#include <Magnum/GL/Mesh.h>
 
-void OSPApplication::debug_add_package(Package&& p)
+namespace osp::active
 {
-    auto const& [it, success] = m_packages.emplace(p.get_prefix(), std::move(p));
-    assert(success);
+/**
+ * A function pointer to a Shader's draw() function
+ * @param ActiveEnt - The entity being drawn; used to fetch component data
+ * @param ActiveScene - The scene containing the entity's component data
+ * @param Mesh - Mesh data to be drawn with the shader
+ * @param ACompCamera - Camera used to draw the scene
+ * @param ACompTransform - Object transformation data
+ */
+using ShaderDrawFnc_t = void (*)(
+    ActiveEnt,
+    ActiveScene&,
+    Magnum::GL::Mesh&,
+    ACompCamera const&,
+    ACompTransform const&);
 }
-
-Package& OSPApplication::debug_find_package(std::string_view prefix)
-{
-    if (auto it = m_packages.find(prefix); it != m_packages.end())
-    {
-        return it->second;
-    }
-    throw std::out_of_range("Package not found");
-}
-
