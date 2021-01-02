@@ -56,6 +56,8 @@ public:
             const Magnum::Platform::Application::Arguments& arguments,
             osp::OSPApplication &ospApp);
 
+    ~OSPMagnum();
+
     void keyPressEvent(KeyEvent& event) override;
     void keyReleaseEvent(KeyEvent& event) override;
 

@@ -47,6 +47,12 @@ OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
 
 }
 
+OSPMagnum::~OSPMagnum()
+{
+    // Clear scene data before GL resources are freed
+    m_scenes.clear();
+}
+
 void OSPMagnum::drawEvent()
 {
 
