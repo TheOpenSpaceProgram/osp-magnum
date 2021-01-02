@@ -23,11 +23,13 @@
  * SOFTWARE.
  */
 #include "PlanetGeometryA.h"
-
+#include <iterator>
 #include <algorithm>
 #include <iostream>
 #include <stack>
 #include <array>
+#include <assert.h>
+
 
 // maybe do something about how this file is almost a thousand lines long
 // there's a lot of comments though
@@ -170,33 +172,21 @@ std::pair<PlanetGeometryA::IteratorTriIndexed,
           PlanetGeometryA::IteratorTriIndexed>
 PlanetGeometryA::iterate_chunk(chindex_t c)
 {
-    IteratorTriIndexed begin(m_indxBuffer.begin() + m_indxPerChunk * 3 * c,
+    IteratorTriIndexed begin(std::next(m_indxBuffer.begin(),
+                                       m_indxPerChunk * 3 * c),
                              m_vrtxBuffer);
-    IteratorTriIndexed end(m_indxBuffer.begin() + m_indxPerChunk * 3 * (c + 1),
+    IteratorTriIndexed end(std::next(m_indxBuffer.begin(),
+                                     m_indxPerChunk * 3 * (c + 1)),
                            m_vrtxBuffer);
     return {begin, end};
 }
 
 loindex_t PlanetGeometryA::get_index_ringed(unsigned x, unsigned y) const
 {
-    // || (x == y) ||
-    if (y == m_chunkWidthB)
-    {
-        // Bottom edge
-        return x;
-    }
-    if (x == 0)
-    {
-        // Left edge
-        return m_chunkWidthB * 2 + y;
-    }
-    if (x == y)
-    {
-        // Right edge
-        return m_chunkWidthB * 2 - y;
-    }
-    // Center
-    return m_vrtxSharedPerChunk + get_index(x - 1, y - 2);
+    if (y == m_chunkWidthB) return x;           // Bottom edge
+    if (x == 0) return m_chunkWidthB * 2 + y;   // Left edge
+    if (x == y) return m_chunkWidthB * 2 - y;   // Right edge
+    return m_vrtxSharedPerChunk + get_index(x - 1, y - 2); // Center
 }
 
 struct VertexToSubdiv
@@ -250,7 +240,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
         // Use empty space available. Get lowest value [last element] to make
         // it less likely that the data will end up getting moved by chunk_pack
         // when it's closer to the start of the buffer
-        std::set<chindex_t>::iterator chunkToGet = --m_chunkFree.end();
+        std::set<chindex_t>::iterator chunkToGet = std::prev(m_chunkFree.end());
         rChunk.m_chunk = *chunkToGet;
         m_chunkFree.erase(chunkToGet);
     }
@@ -310,8 +300,8 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
                 // if same depth, then set those descendent's chunked
                 // neighbours to t
 
-                uint8_t neighbourSide = rTri.m_neighbourSide[side];
-                chunk_set_neighbour_recurse(neighbourIndex, neighbourSide, triInd);
+                chunk_set_neighbour_recurse(neighbourIndex,
+                                            rTri.m_neighbourSide[side], triInd);
             }
         }
 
@@ -324,7 +314,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
             neighTransform = m_icoTree->transform_to_ancestor(triInd, side,
                     rNeighBTri.m_depth);
 
-            uint8_t neighbourSide = rTri.m_neighbourSide[side];
+            triside_t neighbourSide = rTri.m_neighbourSide[side];
 
             if (rTri.m_depth == rNeighBTri.m_depth)
             {
@@ -417,7 +407,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
 
 
         buindex_t vrtxOffset = vertIndex * m_vrtxSize;
-        auto vrtxOffsetIt = m_vrtxBuffer.begin() + vrtxOffset;
+        auto vrtxOffsetIt = std::next(m_vrtxBuffer.begin(), vrtxOffset);
 
         // sideB because local ringed indices start at the bottom left
         indices[sideB * m_chunkWidthB] = vertIndex;
@@ -442,10 +432,10 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
         pos += nrm * debug_stupid_heightmap(pos);
 
         std::copy(pos.data(), pos.data() + pos.Size,
-                  vrtxOffsetIt + m_vrtxCompOffsetPos);
+                  std::next(vrtxOffsetIt, m_vrtxCompOffsetPos));
 
         std::copy(nrm.data(), nrm.data() + nrm.Size,
-                  vrtxOffsetIt + m_vrtxCompOffsetNrm);
+                  std::next(vrtxOffsetIt, m_vrtxCompOffsetNrm));
 
         // Make sure this data is sent to the GPU eventually
         update_range_insert(m_gpuUpdVrtxBuffer,
@@ -511,7 +501,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
                 // existing vertex from a neighbouring triangle
 
                 // Both of these should get optimized into a single div op
-                uint8_t side = localIndex / m_chunkWidthB;
+                triside_t side = localIndex / m_chunkWidthB;
                 loindex_t sideInd = localIndex % m_chunkWidthB;
 
                 // Take a vertex from a neighbour, if possible
@@ -560,7 +550,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
                                             vrtxDataB + m_vrtxCompOffsetNrm);
 
             buindex_t vrtxDataMid = mid[i].m_vrtxIndex * m_vrtxSize;
-            auto vrtxDataMidIt = m_vrtxBuffer.begin() + vrtxDataMid;
+            auto vrtxDataMidIt = std::next(m_vrtxBuffer.begin(), vrtxDataMid);
 
             Vector3 pos = (vrtxPosA + vrtxPosB) * 0.5f;
             Vector3 nrm = pos.normalized();
@@ -571,11 +561,11 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
 
             // Add Position data to vertex buffer
             std::copy(pos.data(), pos.data() + pos.Size,
-                      vrtxDataMidIt + m_vrtxCompOffsetPos);
+                      std::next(vrtxDataMidIt, m_vrtxCompOffsetPos));
 
             // Add Normal data to vertex buffer
             std::copy(nrm.data(), nrm.data() + nrm.Size,
-                      vrtxDataMidIt + m_vrtxCompOffsetNrm);
+                     std::next(vrtxDataMidIt, m_vrtxCompOffsetNrm));
 
             // Make sure the GPU knows about this individual vertex change
             update_range_insert(m_gpuUpdVrtxBuffer,
@@ -647,7 +637,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
     // Put the index data at the end of the buffer
     rChunk.m_dataIndx = rChunk.m_chunk * chunkIndData.size();
     std::copy(chunkIndData.begin(), chunkIndData.end(),
-              m_indxBuffer.begin() + rChunk.m_dataIndx);
+              std::next(m_indxBuffer.begin(), rChunk.m_dataIndx));
 
     update_range_insert(m_gpuUpdIndxBuffer,
                         {rChunk.m_dataIndx,
@@ -687,7 +677,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
     // Step 7 (Maybe Temporary): Flatten seams on neighbouring chunks of
     //                           different levels of detail.
 
-    for (uint8_t side = 0; side < 3; side ++)
+    for (triside_t side = 0; side < 3; side ++)
     {
         trindex_t neighInd = rChunk.m_neighbourChunked[side];
 
@@ -714,7 +704,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
     //debug_verify_state();
 }
 
-void PlanetGeometryA::chunk_edge_transition(trindex_t triInd, uint8_t side,
+void PlanetGeometryA::chunk_edge_transition(trindex_t triInd, triside_t side,
                                             uint8_t depth)
 {
     SubTriangle const& tri = m_icoTree->get_triangle(triInd);
@@ -754,8 +744,8 @@ void PlanetGeometryA::chunk_edge_transition(trindex_t triInd, uint8_t side,
     }
 }
 
-void PlanetGeometryA::chunk_edge_transition_recurse(trindex_t triInd, uint8_t side,
-                                                    uint8_t depth)
+void PlanetGeometryA::chunk_edge_transition_recurse(
+        trindex_t triInd, triside_t side, uint8_t depth)
 {
     SubTriangle const &tri = m_icoTree->get_triangle(triInd);
     SubTriangleChunk const &chunk = m_triangleChunks[triInd];
@@ -777,7 +767,7 @@ void PlanetGeometryA::chunk_edge_transition_recurse(trindex_t triInd, uint8_t si
 }
 
 void PlanetGeometryA::chunk_set_neighbour_recurse(
-        trindex_t triInd, uint8_t side, trindex_t to)
+        trindex_t triInd, triside_t side, trindex_t to)
 {
     SubTriangle const &tri = m_icoTree->get_triangle(triInd);
     SubTriangleChunk &rChunk = m_triangleChunks[triInd];
@@ -865,7 +855,7 @@ void PlanetGeometryA::chunk_remove(trindex_t triInd)
         }
     }
 
-    for (uint8_t i = 0; i < 3; i ++)
+    for (triside_t i = 0; i < 3; i ++)
     {
         // Remove from neighbours
         trindex_t &rNeighInd = rChunk.m_neighbourChunked[i];
@@ -988,10 +978,10 @@ void PlanetGeometryA::chunk_pack()
         m_chunkToTri[chunk] = m_chunkToTri[moveChunk.m_chunk];
 
         // Move lastTri's index data to replace tri's data
-        std::copy(m_indxBuffer.begin() + moveChunk.m_dataIndx,
-                  m_indxBuffer.begin() + moveChunk.m_dataIndx
-                                       + m_indxPerChunk * 3,
-                  m_indxBuffer.begin() + rReplaceChunk.m_dataIndx);
+        std::copy(std::next(m_indxBuffer.begin(), moveChunk.m_dataIndx),
+                  std::next(m_indxBuffer.begin(), moveChunk.m_dataIndx
+                                                  + m_indxPerChunk * 3),
+                  std::next(m_indxBuffer.begin(), rReplaceChunk.m_dataIndx));
 
         update_range_insert(m_gpuUpdIndxBuffer,
                             {rReplaceChunk.m_dataIndx,
@@ -1028,7 +1018,7 @@ void PlanetGeometryA::set_chunk_ancestor_recurse(trindex_t triInd,
 
 
 vrindex_t PlanetGeometryA::shared_from_tri(SubTriangleChunk const& chunk,
-                                           uint8_t side, loindex_t pos)
+                                           triside_t side, loindex_t pos)
 {
     //                  8
     //                9   7
@@ -1049,7 +1039,7 @@ vrindex_t PlanetGeometryA::shared_from_tri(SubTriangleChunk const& chunk,
 }
 
 vrindex_t PlanetGeometryA::shared_from_neighbour(
-        trindex_t triInd, uint8_t side, loindex_t posIn)
+        trindex_t triInd, triside_t side, loindex_t posIn)
 {
     SubTriangle& tri = m_icoTree->get_triangle(triInd);
     SubTriangleChunk& chunk = m_triangleChunks[triInd];
@@ -1065,7 +1055,7 @@ vrindex_t PlanetGeometryA::shared_from_neighbour(
     float posTransformed = float(posIn) / float(m_chunkWidthB);
 
     trindex_t takeInd;
-    uint8_t takeSide = tri.m_neighbourSide[side];
+    triside_t takeSide = tri.m_neighbourSide[side];
 
     {
         SubTriangle const &neighTri = m_icoTree->get_triangle(neighInd);

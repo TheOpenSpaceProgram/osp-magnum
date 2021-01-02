@@ -26,6 +26,7 @@
 
 #include <osp/types.h>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -54,10 +55,9 @@ struct SubTriangle;
 struct TriangleSideTransform;
 
 
-
 // The 20 faces of the icosahedron (Top, Left, Right)
 // Each number pointing to a vertex
-static constexpr uint8_t sc_icoTemplateTris[20 * 3] {
+inline constexpr uint8_t sc_icoTemplateTris[20 * 3] {
 //  TT  LL  RR   TT  LL  RR   TT  LL  RR   TT  LL  RR   TT  LL  RR
      0,  2,  1,   0,  3,  2,   0,  4,  3,   0,  5,  4,   0,  1,  5,
      8,  1,  2,   2,  7,  8,   7,  2,  3,   3,  6,  7,   6,  3,  4,
@@ -66,7 +66,7 @@ static constexpr uint8_t sc_icoTemplateTris[20 * 3] {
 };
 
 // The 20 faces of the icosahedron (Bottom, Right, Left)
-static constexpr uint8_t sc_icoTemplateneighbours[20 * 3] {
+inline constexpr uint8_t sc_icoTemplateneighbours[20 * 3] {
 //  BB  RR  LL   BB  RR  LL   BB  RR  LL   BB  RR  LL   BB  RR  LL
      5,  4,  1,   7,  0,  2,   9,  1,  3,  11,  2,  4,  13,  3,  0,
      0,  6, 14,  16,  5,  7,   1,  8,  6,  15,  7,  9,   2, 10,  8,
@@ -75,11 +75,24 @@ static constexpr uint8_t sc_icoTemplateneighbours[20 * 3] {
 };
 
 // If these change, then the universe is broken
-static constexpr int gc_icosahedronFaceCount = 20;
-static constexpr int gc_icosahedronVertCount = 12;
+inline constexpr int gc_icosahedronFaceCount = 20;
+inline constexpr int gc_icosahedronVertCount = 12;
 
-static constexpr std::uint8_t gc_triangleMaskSubdivided = 0b0001;
-//static constexpr std::uint8_t gc_triangleMaskChunked    = 0b0010;
+template<typename INT_ENUM_T>
+constexpr INT_ENUM_T cycle3(INT_ENUM_T in, int cycle)
+{
+    return INT_ENUM_T((int(in) + cycle) % 3);
+}
+
+using triside_t = int8_t;
+
+enum ETriSibling : std::uint8_t
+{
+    TriSiblingTop       = 0,
+    TriSiblingLeft      = 1,
+    TriSiblingRight     = 2,
+    TriSiblingCenter    = 3
+};
 
 /**
  * A simple 1D translation and scale
@@ -100,21 +113,21 @@ public:
     virtual void on_ico_vertex_removed(std::vector<vrindex_t> const&) = 0;
 };
 
-
 /**
  * A triangle on the IcoSphereTree
  */
 struct SubTriangle
 {
     trindex_t m_parent;
-    uint8_t m_siblingIndex; // 0:Top 1:Left 2:Right 3:Center
+    ETriSibling m_siblingIndex;
 
-    trindex_t m_neighbours[3];
-    buindex_t m_corners[3]; // to vertex buffer, 3 corners of triangle
+    std::array<trindex_t, 3> m_neighbours;
+    std::array<buindex_t, 3> m_corners; // to vertex buffer, 3 corners of triangle
 
     osp::Vector3 m_center;
 
-    bool m_subdivided{false}, m_deleted{false};
+    bool m_subdivided{false};
+    bool m_deleted{false};
 
     // 0 for first 20 triangles of icosahedron. +1 for each depth onwards
     uint8_t m_depth{0};
@@ -124,11 +137,11 @@ struct SubTriangle
     // index to first child, always has 4 children if subdivided
     // Top Left Right Center
     trindex_t m_children;
-    buindex_t m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
+    std::array<buindex_t, 3> m_midVrtxs; // Bottom, Right, Left vertices in index buffer
     buindex_t m_index; // to index buffer
 
     // Index to Neighbour's m_neighbours that points to this triangle
-    uint8_t m_neighbourSide[3];
+    std::array<triside_t, 3> m_neighbourSide;
 
     // Number of times this triangle is being used externally
     // Make sure this number is zero before removing this triangle
@@ -136,6 +149,25 @@ struct SubTriangle
     // * used by both a separate renderer and a collider generator
     // * used across multiple scenes
     unsigned m_useCount;
+
+    constexpr trindex_t get_child(int i) { return m_children + i; }
+
+    /**
+     * Find which side a triangle is on another triangle
+     * @param [in] lookingFor Index of triangle to search for
+     * @return Neighbour index (0 - 2), or bottom, left, or right
+     */
+    constexpr int find_neighbour_side(const trindex_t lookingFor)
+    {
+        // Loop through neighbours on the edges. child 4 (center) is not considered
+        // as all it's neighbours are its siblings
+        if (this->m_neighbours[0] == lookingFor) { return 0; }
+        if (this->m_neighbours[1] == lookingFor) { return 1; }
+        if (this->m_neighbours[2] == lookingFor) { return 2; }
+
+        // Neighbour not found
+        return -1;
+    }
 };
 
 
@@ -212,51 +244,12 @@ public:
     void calculate_center(SubTriangle& rTri);
 
     /**
-     * A quick way to set neighbours of a triangle
-     * @param tri [ref] Reference to triangle
-     * @param bot [in] Bottom
-     * @param rte [in] Right
-     * @param lft [in] Left
-     */
-    static void set_neighbours(SubTriangle& rTri, trindex_t bot,
-                               trindex_t rte, trindex_t lft);
-
-    /**
-     * A quick way to set neighbour's sides
-     * @param tri [ref] Reference to triangle
-     * @param bot [in] Bottom
-     * @param rte [in] Right
-     * @param lft [in] Left
-     */
-    static void set_neighbour_sides(SubTriangle& rTri, trindex_t bot,
-                                    trindex_t rte, trindex_t lft);
-
-    /**
-     * A quick way to set vertices of a triangle
-     * @param tri [ref] Reference to triangle
-     * @param top [in] Top
-     * @param lft Left
-     * @param rte Right
-     */
-    static void set_verts(SubTriangle& rTri, buindex_t top,
-                          buindex_t lft, buindex_t rte);
-
-    /**
      * Set a neighbour of a triangle, and apply for all of it's children's
      * @param tri [ref] Reference to triangle
      * @param side [in] Which side to set
      * @param to [in] Neighbour to operate on
      */
     void set_side_recurse(SubTriangle& rTri, int side, trindex_t to);
-
-    /**
-     * Find which side a triangle is on another triangle
-     * @param [ref] tri Reference to triangle to be searched
-     * @param [in] lookingFor Index of triangle to search for
-     * @return Neighbour index (0 - 2), or bottom, left, or right
-     */
-    static int find_neighbour_side(const SubTriangle& tri,
-                              const trindex_t lookingFor);
 
     trindex_t ancestor_at_depth(trindex_t start, uint8_t targetDepth);
 
@@ -313,7 +306,7 @@ public:
      * @return A TriangleSideTransform that can be used to transform positions
      */
     TriangleSideTransform transform_to_ancestor(
-            trindex_t triInd, uint8_t side, uint8_t targetDepth,
+            trindex_t triInd, triside_t side, uint8_t targetDepth,
             trindex_t *pAncestorOut = nullptr);
 
     /**

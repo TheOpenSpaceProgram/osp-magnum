@@ -45,8 +45,13 @@ constexpr chindex_t gc_invalidChunk = std::numeric_limits<chindex_t>::max();
 constexpr loindex_t gc_invalidLocal = std::numeric_limits<loindex_t>::max();
 
 
-enum class EChunkUpdateAction { Nothing, Subdivide, Unsubdivide,
-                                Chunk, Unchunk };
+enum class EChunkUpdateAction : uint8_t
+{
+    Nothing     = 0,
+    Subdivide   = 1,
+    Chunk       = 2,
+    Unchunk     = 3
+};
 
 struct UpdateRangeSub;
 
@@ -225,7 +230,7 @@ private:
      * @param side   [in] Side to realign 0, 1, or 2 for bottom, left, right
      * @param depth  [in] Depth of neighbouring triangle to align to
      */
-    void chunk_edge_transition(trindex_t triInd, uint8_t side, uint8_t depth);
+    void chunk_edge_transition(trindex_t triInd, triside_t side, uint8_t depth);
 
     /**
      * Calls chunk_edge_transition on all children along a side
@@ -233,7 +238,7 @@ private:
      * @param side   [in] Side to realign 0, 1, or 2 for bottom, left, right
      * @param depth  [in] Depth of neighbouring triangle to align to
      */
-    void chunk_edge_transition_recurse(trindex_t triInd, uint8_t side, uint8_t depth);
+    void chunk_edge_transition_recurse(trindex_t triInd, triside_t side, uint8_t depth);
 
     /**
      * Set m_neighbourChunked of a triangle and all of it's children along a
@@ -243,7 +248,7 @@ private:
      * @param side   [in] Side for recursing children
      * @param to     [in] Index to set m_neighbourChunked to
      */
-    void chunk_set_neighbour_recurse(trindex_t triInd, uint8_t side, trindex_t to);
+    void chunk_set_neighbour_recurse(trindex_t triInd, triside_t side, trindex_t to);
 
     /**
      * Resize m_triangleChunks to assure that it's parallel with m_icoTree's
@@ -333,7 +338,7 @@ private:
      * @return Index to found vertex
      */
     vrindex_t shared_from_tri(SubTriangleChunk const& chunk,
-                              uint8_t side, loindex_t pos);
+                              triside_t side, loindex_t pos);
 
     /**
      * Attempt to grab a shared vertex from a triangle's neighbour
@@ -343,7 +348,7 @@ private:
      *                    that overlaps with one of the neighbour's vertices
      * @return Index to found vertex. gc_invalidVrtx if not found.
      */
-    vrindex_t shared_from_neighbour(trindex_t triInd, uint8_t side,
+    vrindex_t shared_from_neighbour(trindex_t triInd, triside_t side,
                                     loindex_t posIn);
 
     /**
@@ -600,18 +605,6 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
 
             chunk_triangle_assure();
         }
-        break;
-    case EChunkUpdateAction::Unsubdivide:
-        /*if (subdivided)
-        {
-            if (m_icoTree->subdivide_remove(t) == 0)
-            {
-                subdivided = false;
-                m_icoTree->debug_verify_state();
-                m_triangleChunks[t].m_descendentChunked = 0;
-                m_triangleChunks[t].m_ancestorChunked = gc_invalidChunk;
-            }
-        }*/
         break;
     }
 

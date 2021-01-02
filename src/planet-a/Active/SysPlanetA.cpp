@@ -93,18 +93,16 @@ StatusActivated SysPlanetA::activate_sat(
 }
 
 SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene,
-                       osp::UserInputHandler &userInput) :
-    m_scene(scene),
-    m_updateGeometry(scene.get_update_order(), "planet_geo", "", "physics",
-                    [this] { this->update_geometry(); } ),
-    m_updatePhysics(scene.get_update_order(), "planet_phys", "planet_geo", "",
-                    [this] { this->update_physics(); }),
-    m_renderPlanetDraw(scene.get_render_order(), "", "", "",
-                       std::bind(&SysPlanetA::draw, this, _1)),
-    m_debugUpdate(userInput.config_get("debug_planet_update"))
-{
-
-}
+                       osp::UserInputHandler &userInput)
+ : m_scene(scene)
+ , m_updateGeometry(scene.get_update_order(), "planet_geo", "", "physics",
+                    [this] { this->update_geometry(); } )
+ , m_updatePhysics(scene.get_update_order(), "planet_phys", "planet_geo", "",
+                   [this] { this->update_physics(); })
+ , m_renderPlanetDraw(scene.get_render_order(), "", "", "",
+                      [this] (ACompCamera const& camera) { this->draw(camera); })
+ , m_debugUpdate(userInput.config_get("debug_planet_update"))
+{ }
 
 
 int SysPlanetA::deactivate_sat(osp::active::ActiveScene &scene,
@@ -113,7 +111,7 @@ int SysPlanetA::deactivate_sat(osp::active::ActiveScene &scene,
                                osp::universe::Satellite tgtSat,
                                osp::active::ActiveEnt tgtEnt)
 {
-    // TODO
+    // TODO: Delete the planet entity from the scene
     return 0;
 }
 
@@ -132,7 +130,7 @@ void SysPlanetA::draw(osp::active::ACompCamera const& camera)
         auto& planet = drawGroup.get<ACompPlanet>(entity);
         auto& transform = drawGroup.get<ACompTransform>(entity);
 
-        if (planet.m_planet.get() == nullptr)
+        if (planet.m_planet == nullptr)
         {
             continue;
         }
@@ -208,10 +206,8 @@ void SysPlanetA::update_geometry()
 
             planet.m_icoTree->event_add(planet.m_planet);
 
-            // Chunk all the initial triangles
-            rPlanetGeo.chunk_geometry_update_all(
-                    [] (SubTriangle const& tri, SubTriangleChunk const& chunk,
-                        int index) -> EChunkUpdateAction
+            // Add chunks for the initial 20 triangles of the icosahedron
+            rPlanetGeo.chunk_geometry_update_all([] (...) -> EChunkUpdateAction
             {
                 return EChunkUpdateAction::Chunk;
             });
@@ -248,10 +244,9 @@ void SysPlanetA::update_geometry()
                 .setCount(rPlanetGeo.calc_index_count());
         }
 
-        if (m_debugUpdate.triggered() || true)
-        {
-            planet_update_geometry(ent);
-        }
+        //if (m_debugUpdate.triggered() || true)
+
+        planet_update_geometry(ent);
     }
 }
 
