@@ -285,7 +285,8 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                 std::get<DrawableData>(currentPrototype.m_objectData);
 
             //Mesh* mesh = nullptr;
-            DependRes<Mesh> meshRes = package.get<Mesh>(
+            Package& glResources = m_scene.get_context_resources();
+            DependRes<Mesh> meshRes = glResources.get<Mesh>(
                                             part.get_strings()[drawable.m_mesh]);
 
             if (meshRes.empty())
@@ -293,7 +294,7 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
                 // Mesh isn't compiled yet, now check if mesh data exists
                 std::string const& meshName = part.get_strings()[drawable.m_mesh];
                 DependRes<MeshData> meshData = package.get<MeshData>(meshName);
-                meshRes = AssetImporter::compile_mesh(meshData, package);
+                meshRes = AssetImporter::compile_mesh(meshData, glResources);
             }
 
             std::vector<Texture2D*> textureResources;
@@ -301,12 +302,12 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
             {
                 unsigned texID = drawable.m_textures[i];
                 std::string const& texName = part.get_strings()[texID];
-                DependRes<Texture2D> texRes = package.get<Texture2D>(texName);
+                DependRes<Texture2D> texRes = glResources.get<Texture2D>(texName);
 
                 if (texRes.empty())
                 {
                     DependRes<ImageData2D> imageData = package.get<ImageData2D>(texName);
-                    texRes = AssetImporter::compile_tex(imageData, package);
+                    texRes = AssetImporter::compile_tex(imageData, glResources);
                 }
                 textureResources.push_back(&(*texRes));
             }

@@ -155,6 +155,7 @@ int debug_cli_loop()
                 // request exit if application exists
                 g_ospMagnum->exit();
             }
+            destroy_universe();
             break;
         }
         else

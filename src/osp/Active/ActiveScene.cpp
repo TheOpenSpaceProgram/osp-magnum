@@ -38,8 +38,9 @@ void ACompCamera::calculate_projection()
 }
 
 
-ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app) :
+ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app, Package& context) :
         m_app(app),
+        m_context(context),
         m_hierarchyDirty(false),
         m_userInput(userInput)
 {
