@@ -78,6 +78,8 @@ private:
 
     MapActiveScene_t m_scenes;
 
+    osp::Package m_glResources{"gl", "gl-resources"};
+
     Magnum::Timeline m_timeline;
 
     osp::OSPApplication& m_ospApp;

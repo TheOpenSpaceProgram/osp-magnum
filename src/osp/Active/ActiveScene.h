@@ -59,7 +59,7 @@ class ActiveScene
 {
 
 public:
-    ActiveScene(UserInputHandler &userInput, OSPApplication& app);
+    ActiveScene(UserInputHandler &userInput, OSPApplication& app, Package& context);
     ~ActiveScene();
 
     OSPApplication& get_application() { return m_app; };
@@ -209,12 +209,14 @@ public:
 
     bool dynamic_system_it_valid(MapDynamicSys_t::iterator it);
 
+    Package& get_context_resources() { return m_context; }
 private:
 
     void on_hierarchy_construct(entt::registry& reg, ActiveEnt ent);
     void on_hierarchy_destruct(entt::registry& reg, ActiveEnt ent);
 
     OSPApplication& m_app;
+    Package& m_context;
 
     //std::vector<std::vector<ActiveEnt> > m_hierLevels;
     entt::basic_registry<ActiveEnt> m_registry;
