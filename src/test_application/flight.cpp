@@ -117,6 +117,9 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Link ActiveArea to scene using the AreaAssociate
     sysArea.connect(areaSat);
 
+    // Add default-constructed physics world to scene
+    scene.get_registry().emplace<osp::active::ACompNwtWorld>(scene.hier_get_root());
+
     // Add a camera to the scene
 
     // Create the camera entity

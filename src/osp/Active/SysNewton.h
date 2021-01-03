@@ -40,78 +40,53 @@ namespace osp::active
 
 class ActiveScene;
 
-struct DataPhyRigidBody
+/**
+ * Component that stores the NewtonWorld, only added to the root node.
+ */
+struct ACompNwtWorld
 {
-    float m_mass;
-    Vector3 m_velocity;
-    Vector3 m_rotVelocity;
-
-    Vector3 m_intertia;
-    Vector3 m_netForce;
-    Vector3 m_netTorque;
+    NewtonWorld *m_nwtWorld{nullptr};
+    float m_timeStep{1.0f / 60.0f};
 };
 
-struct ACompNwtBody
+/**
+ * Generic rigid body state
+ */
+struct DataRigidBody
 {
-    ACompNwtBody() = default;
-    ACompNwtBody(ACompNwtBody&& move);
-    ACompNwtBody& operator=(ACompNwtBody&& move);
+    // Modify these
+    Vector3 m_intertia{1, 1, 1};
+    Vector3 m_netForce{0, 0, 0};
+    Vector3 m_netTorque{0, 0, 0};
+
+    float m_mass{1.0f};
+    Vector3 m_velocity{0, 0, 0};
+    Vector3 m_rotVelocity{0, 0, 0};
+
+    bool m_colliderDirty{false}; // set true if collider is modified
+};
+
+/**
+ * Rigid body with the Newton stuff
+ */
+struct ACompNwtBody : public DataRigidBody
+{
+    constexpr ACompNwtBody() = default;
+    ACompNwtBody(ACompNwtBody&& move) noexcept;
+    ACompNwtBody& operator=(ACompNwtBody&& move) noexcept;
 
     NewtonBody *m_body{nullptr};
     ActiveEnt m_entity{entt::null};
     //ActiveScene &m_scene;
-
-    DataPhyRigidBody m_bodyData;
 };
-
-
-
-using ACompRigidBody = ACompNwtBody;
-
-//{
-//    ACompRigidBody(ActiveEnt entity, ActiveScene &scene, NewtonBody* body) :
-//            m_entity(entity),
-//            m_scene(scene),
-//            m_body(body),
-//            m_netForce(),
-//            m_netTorque() {}
-//    ACompRigidBody(NwtUserData&& move) = delete;
-//    ACompRigidBody& operator=(NwtUserData&& move) = delete;
-
-//    ActiveEnt m_entity;
-//    ActiveScene &m_scene;
-
-//    NewtonBody *m_body;
-
-//    Vector3 m_netForce;
-//    Vector3 m_netTorque;
-//};
-
-//struct NwtUserDataWorld
-//{
-//    ActiveScene &m_scene;
-//};
-
-//struct CompNewtonBody
-//{
-//    NewtonBody *m_body{nullptr};
-//    std::unique_ptr<NwtUserData> m_data;
-//};
-
-//using ACompRigidBody = std::unique_ptr<NwtUserData>;
-
-//struct CompNewtonCollision
-//{
-//    NewtonCollision *shape{nullptr};
-//};
-
 
 struct ACompCollisionShape
 {
-    NewtonCollision* m_collision{nullptr};
+    NewtonCollision *m_collision{nullptr};
     ECollisionShape m_shape{ECollisionShape::NONE};
 };
 
+using ACompRigidBody_t = ACompNwtBody;
 
 class SysNewton : public IDynamicSystem
 {
@@ -126,42 +101,30 @@ public:
 
     ~SysNewton();
 
-    /**
-     * Scan children of specified rigid body entity for ACompCollisionShapes,
-     * then combine it all into a single compound collision
-     *
-     * @param entity [in] Entity containing ACompNwtBody
-     */
-    void create_body(ActiveEnt entity);
-
     void update_world();
+
+    constexpr ActiveScene& get_scene() noexcept { return m_scene; }
+
+    static ACompNwtWorld* try_get_physics_world(ActiveScene &rScene);
 
     /**
      * Used to find which rigid body an entity belongs to. This will keep
      * looking up the tree of parents until it finds a rigid body.
      *
-     * @return Pair of {level-1 entity, pointer to body found}. If hierarchy
-     *         error, then {entt:null, nullptr}. If no ACompRigidBody found,
-     *         then {level-1 entity, nullptr}
+     * @param rScene [in] ActiveScene containing ent
+     * @param ent    [in] ActiveEnt with ACompHierarchy and rigid body ancestor
+     *
+     * @return Pair of {level-1 entity, pointer to ACompNwtBody found}. If
+     *         hierarchy error, then {entt:null, nullptr}. If no ACompNwtBody
+     *         component is found, then {level-1 entity, nullptr}
      */
-    std::pair<ActiveEnt, ACompRigidBody*> find_rigidbody_ancestor(
-            ActiveEnt ent);
-
-    constexpr ActiveScene& get_scene() { return m_scene; }
+    static std::pair<ActiveEnt, ACompNwtBody*> find_rigidbody_ancestor(
+            ActiveScene& rScene, ActiveEnt ent);
 
     // most of these are self-explanatory
-
-    void body_apply_force(ACompRigidBody &body, Vector3 force);
-    void body_apply_force_local(ACompRigidBody &body, Vector3 force);
-
-    void body_apply_accel(ACompRigidBody &body, Vector3 accel);
-    void body_apply_accel_local(ACompRigidBody &body, Vector3 accel);
-
-    void body_apply_torque(ACompRigidBody &body, Vector3 force);
-    void body_apply_torque_local(ACompRigidBody &body, Vector3 force);
-
-    void shape_create_box(ACompCollisionShape &shape, Vector3 size);
-    void shape_create_sphere(ACompCollisionShape &shape, float radius);
+    static void body_apply_force(ACompRigidBody_t& body, Vector3 force) noexcept;
+    static void body_apply_accel(ACompRigidBody_t& body, Vector3 accel) noexcept;
+    static void body_apply_torque(ACompRigidBody_t& body, Vector3 force) noexcept;
 
     /**
      * Create a Newton TreeCollision from a mesh using those weird triangle
@@ -171,42 +134,53 @@ public:
      * @param end
      */
     template<class TRIANGLE_IT_T>
-    void shape_create_tri_mesh_static(ACompCollisionShape &shape,
+    void shape_create_tri_mesh_static(ACompCollisionShape& shape,
                                       TRIANGLE_IT_T const& start,
                                       TRIANGLE_IT_T const& end);
 
 private:
 
     /**
-     * Search descendents for CompColliders and add NewtonCollisions to a vector.
-     * @param ent [in] Entity to check colliders for, and recurse into children
-     * @param compound [in] Compound collision
-     * @param currentTransform [in] Hierarchy transform of ancestors
+     * Search descendents for collider components and add NewtonCollisions to a
+     * vector. Make sure NewtonCompoundCollisionBeginAddRemove(rCompound) is
+     * called first.
+     *
+     * @param rScene    [in] ActiveScene containing entity and physics world
+     * @param ent       [in] Entity containing colliders, and recurse into children
+     * @param transform [in] Total transform from Hierarchy
+     * @param nwtWorld  [in] Newton world from scene
+     * @param rCompound [out] Compound collision to add new colliders to
      */
-    void find_and_add_colliders(ActiveEnt ent,
-                                NewtonCollision *compound,
-                                Matrix4 const &currentTransform);
+    static void find_colliders_recurse(ActiveScene& rScene, ActiveEnt ent,
+                                       Matrix4 const &transform,
+                                       NewtonWorld const* nwtWorld,
+                                       NewtonCollision *rCompound);
 
-    void on_body_construct(entt::registry& reg, ActiveEnt ent);
-    void on_body_destruct(entt::registry& reg, ActiveEnt ent);
+    /**
+     * Scan children of specified rigid body entity for ACompCollisionShapes,
+     * then combine it all into a single compound collision
+     *
+     * @param rScene [in] ActiveScene containing entity and physics world
+     * @param entity [in] Entity containing ACompNwtBody
+     */
+    static void create_body(ActiveScene& rScene, ActiveEnt entity,
+                            NewtonWorld const* nwtWorld);
 
-    void on_shape_construct(entt::registry& reg, ActiveEnt ent);
-    void on_shape_destruct(entt::registry& reg, ActiveEnt ent);
+    static void on_body_destruct(entt::registry& reg, ActiveEnt ent);
+    static void on_shape_destruct(entt::registry& reg, ActiveEnt ent);
+    static void on_world_destruct(entt::registry& reg, ActiveEnt ent);
 
-    NewtonCollision* newton_create_tree_collision(
+    static NewtonCollision* newton_create_tree_collision(
             const NewtonWorld *newtonWorld, int shapeId);
-    void newton_tree_collision_add_face(
+    static void newton_tree_collision_add_face(
             const NewtonCollision* treeCollision, int vertexCount,
             const float* vertexPtr, int strideInBytes, int faceAttribute);
-    void newton_tree_collision_begin_build(
+    static void newton_tree_collision_begin_build(
             const NewtonCollision* treeCollision);
-    void newton_tree_collision_end_build(
+    static void newton_tree_collision_end_build(
             const NewtonCollision* treeCollision,  int optimize);
 
-
     ActiveScene& m_scene;
-    NewtonWorld *const m_nwtWorld;
-
     UpdateOrderHandle m_updatePhysicsWorld;
 };
 
@@ -220,7 +194,8 @@ void SysNewton::shape_create_tri_mesh_static(ACompCollisionShape &shape,
     //       manually hacking up serialized data instead of add face, or use
     //       Newton's dgAABBPolygonSoup stuff directly
 
-    NewtonCollision* tree = newton_create_tree_collision(m_nwtWorld, 0);
+    ACompNwtWorld* nwtWorldComp = try_get_physics_world(m_scene);
+    NewtonCollision* tree = newton_create_tree_collision(nwtWorldComp->m_nwtWorld, 0);
 
     newton_tree_collision_begin_build(tree);
 
