@@ -40,15 +40,15 @@ using osp::active::ACompTransform;
 const std::string SysNewton::smc_name = "NewtonPhysics";
 
 // Callback called for every Rigid Body (even static ones) on NewtonUpdate
-void cb_force_torque(const NewtonBody* rBody, dFloat timestep, int threadIndex)
+void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
 {
     // Get Scene from Newton World
     ActiveScene* scene = static_cast<ActiveScene*>(
-                NewtonWorldGetUserData(NewtonBodyGetWorld(rBody)));
+                NewtonWorldGetUserData(NewtonBodyGetWorld(pBody)));
 
     // Get ACompNwtBody. Every NewtonBody created here is associated with an
     // entity that contains one.
-    auto *pBodyComp = static_cast<ACompNwtBody*>(NewtonBodyGetUserData(rBody));
+    auto *pBodyComp = static_cast<ACompNwtBody*>(NewtonBodyGetUserData(pBody));
     auto &rTransformComp = scene->reg_get<ACompTransform>(pBodyComp->m_entity);
 
     // Check if transform has been set externally
@@ -56,7 +56,7 @@ void cb_force_torque(const NewtonBody* rBody, dFloat timestep, int threadIndex)
     {
 
         // Set matrix
-        NewtonBodySetMatrix(rBody, rTransformComp.m_transform.data());
+        NewtonBodySetMatrix(pBody, rTransformComp.m_transform.data());
 
         rTransformComp.m_transformDirty = false;
     }
@@ -64,8 +64,8 @@ void cb_force_torque(const NewtonBody* rBody, dFloat timestep, int threadIndex)
     // TODO: deal with changing inertia, mass or stuff
 
     // Apply force and torque
-    NewtonBodySetForce(rBody, pBodyComp->m_netForce.data());
-    NewtonBodySetTorque(rBody, pBodyComp->m_netTorque.data());
+    NewtonBodySetForce(pBody, pBodyComp->m_netForce.data());
+    NewtonBodySetTorque(pBody, pBodyComp->m_netTorque.data());
 
     // Reset accumolated net force and torque for next frame
     pBodyComp->m_netForce = {0.0f, 0.0f, 0.0f};

@@ -107,7 +107,7 @@ void SysMachineRocket::update_physics()
         else
         {
             // rocket's rigid body not set yet
-            auto [bodyEnt, pBody]
+            auto const& [bodyEnt, pBody]
                     = SysPhysics_t::find_rigidbody_ancestor(m_scene, ent);
 
             if (pBody == nullptr)
