@@ -108,7 +108,7 @@ void SysMachineRocket::update_physics()
         {
             // rocket's rigid body not set yet
             auto [bodyEnt, pBody]
-                    = SysPhysics::find_rigidbody_ancestor(m_scene, ent);
+                    = SysPhysics_t::find_rigidbody_ancestor(m_scene, ent);
 
             if (pBody == nullptr)
             {
@@ -136,8 +136,10 @@ void SysMachineRocket::update_physics()
 
             //std::cout << percent->m_value << "\n";
 
-            SysPhysics::body_apply_force(*compRb, compTf->m_transform.backward()
-                    * (percent->m_value * thrust));
+            Vector3 thrustVec = compTf->m_transform.backward()
+                                    * (percent->m_value * thrust);
+
+            SysPhysics_t::body_apply_force(*compRb, thrustVec);
         }
 
 
@@ -155,7 +157,7 @@ void SysMachineRocket::update_physics()
 
             localTorque *= 3.0f; // arbitrary
 
-            SysPhysics::body_apply_torque(*compRb, localTorque);
+            SysPhysics_t::body_apply_torque(*compRb, localTorque);
         }
 
 

@@ -92,7 +92,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Register dynamic systems needed for flight scene
 
-    auto &sysPhysics        = scene.dynamic_system_create<osp::active::SysPhysics>();
+    auto &sysPhysics        = scene.dynamic_system_create<osp::active::SysPhysics_t>();
     auto &sysWire           = scene.dynamic_system_create<osp::active::SysWire>();
     auto &sysDebugRender    = scene.dynamic_system_create<osp::active::SysDebugRender>();
     auto &sysArea           = scene.dynamic_system_create<osp::active::SysAreaAssociate>(uni);
@@ -118,7 +118,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     sysArea.connect(areaSat);
 
     // Add default-constructed physics world to scene
-    scene.get_registry().emplace<osp::active::ACompNwtWorld>(scene.hier_get_root());
+    scene.get_registry().emplace<osp::active::ACompPhysicsWorld_t>(scene.hier_get_root());
 
     // Add a camera to the scene
 

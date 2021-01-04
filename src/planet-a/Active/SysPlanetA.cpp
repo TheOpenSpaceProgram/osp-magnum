@@ -147,7 +147,7 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
 
     using osp::ECollisionShape;
 
-    auto &physics = m_scene.dynamic_system_find<SysPhysics>();
+    auto &physics = m_scene.dynamic_system_find<SysPhysics_t>();
 
     // Create entity and required components
     ActiveEnt fish = m_scene.hier_create_child(m_scene.hier_get_root());

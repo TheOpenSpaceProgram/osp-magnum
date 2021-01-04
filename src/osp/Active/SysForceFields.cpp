@@ -69,7 +69,7 @@ void SysFFGravity::update_force()
             //               massBody.m_bodyData.m_mass / r;
             // gm1/r = a
 
-            SysPhysics::body_apply_accel(massBody, accel);
+            SysPhysics_t::body_apply_accel(massBody, accel);
         }
     }
 }

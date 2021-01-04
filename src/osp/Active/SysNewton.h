@@ -88,6 +88,8 @@ struct ACompCollisionShape
 
 using ACompRigidBody_t = ACompNwtBody;
 
+using ACompPhysicsWorld_t = ACompNwtWorld;
+
 class SysNewton : public IDynamicSystem
 {
 
@@ -160,8 +162,9 @@ private:
      * Scan children of specified rigid body entity for ACompCollisionShapes,
      * then combine it all into a single compound collision
      *
-     * @param rScene [in] ActiveScene containing entity and physics world
-     * @param entity [in] Entity containing ACompNwtBody
+     * @param rScene   [in] ActiveScene containing entity and physics world
+     * @param entity   [in] Entity containing ACompNwtBody
+     * @param nwtWorld [in] Newton physics world
      */
     static void create_body(ActiveScene& rScene, ActiveEnt entity,
                             NewtonWorld const* nwtWorld);
@@ -218,6 +221,8 @@ void SysNewton::shape_create_tri_mesh_static(ACompCollisionShape &shape,
     shape.m_shape = ECollisionShape::TERRAIN;
     shape.m_collision = tree;
 }
+
+using SysPhysics_t = SysNewton;
 
 }
 
