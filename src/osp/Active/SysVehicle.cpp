@@ -47,13 +47,12 @@ using namespace Magnum::Math::Literals;
 
 const std::string SysVehicle::smc_name = "Vehicle";
 
-SysVehicle::SysVehicle(ActiveScene &scene) :
-        m_scene(scene),
-        m_updateVehicleModification(
-            scene.get_update_order(), "vehicle_modification", "", "physics",
-            std::bind(&SysVehicle::update_vehicle_modification, this))
-{
-}
+SysVehicle::SysVehicle(ActiveScene &scene)
+ : m_scene(scene)
+ , m_updateVehicleModification(
+       scene.get_update_order(), "vehicle_modification", "", "physics",
+       [this] (ActiveScene& rScene) { this->update_vehicle_modification(rScene); })
+{ }
 
 StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
                                          SysAreaAssociate &area,
@@ -346,7 +345,7 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
     return newEntities[0];
 }
 
-void SysVehicle::update_vehicle_modification()
+void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 {
     auto view = m_scene.get_registry().view<ACompVehicle>();
     auto viewParts = m_scene.get_registry().view<ACompPart>();

@@ -64,7 +64,7 @@ private:
     osp::ButtonControlHandle m_rollLf;
     osp::ButtonControlHandle m_rollRt;
 
-    osp::active::UpdateOrderHandle m_updateSensor;
+    osp::active::UpdateOrderHandle_t m_updateSensor;
 };
 
 /**

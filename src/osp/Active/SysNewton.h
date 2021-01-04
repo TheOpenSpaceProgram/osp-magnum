@@ -134,7 +134,7 @@ public:
      */
     void create_body(ActiveEnt entity);
 
-    void update_world();
+    void update_world(ActiveScene& rScene);
 
     /**
      * Used to find which rigid body an entity belongs to. This will keep
@@ -187,11 +187,11 @@ private:
                                 NewtonCollision *compound,
                                 Matrix4 const &currentTransform);
 
-    void on_body_construct(entt::registry& reg, ActiveEnt ent);
-    void on_body_destruct(entt::registry& reg, ActiveEnt ent);
+    void on_body_construct(ActiveReg_t& reg, ActiveEnt ent);
+    void on_body_destruct(ActiveReg_t& reg, ActiveEnt ent);
 
-    void on_shape_construct(entt::registry& reg, ActiveEnt ent);
-    void on_shape_destruct(entt::registry& reg, ActiveEnt ent);
+    void on_shape_construct(ActiveReg_t& reg, ActiveEnt ent);
+    void on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent);
 
     NewtonCollision* newton_create_tree_collision(
             const NewtonWorld *newtonWorld, int shapeId);
@@ -207,7 +207,7 @@ private:
     ActiveScene& m_scene;
     NewtonWorld *const m_nwtWorld;
 
-    UpdateOrderHandle m_updatePhysicsWorld;
+    UpdateOrderHandle_t m_updatePhysicsWorld;
 };
 
 template<class TRIANGLE_IT_T>

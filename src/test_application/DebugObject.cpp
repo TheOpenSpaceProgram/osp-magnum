@@ -66,29 +66,29 @@ using adera::active::machines::MachineUserControl;
 //}
 
 
-DebugCameraController::DebugCameraController(ActiveScene &scene, ActiveEnt ent) :
-        DebugObject(scene, ent),
-        m_orbiting(entt::null),
-        m_orbitPos(0, 0, 1),
-        m_updateVehicleModPre(scene.get_update_order(), "dbg_cam_vmod", "", "vehicle_modification",
-                [this] { this->update_vehicle_mod_pre(); }),
-        m_updatePhysicsPre(scene.get_update_order(), "dbg_cam_pre", "", "physics",
-                [this] { this->update_physics_pre(); }),
-        m_updatePhysicsPost(scene.get_update_order(), "dbg_cam_post", "physics", "",
-                [this] { this->update_physics_post(); }),
-        m_userInput(scene.get_user_input()),
-        m_mouseMotion(m_userInput.mouse_get()),
-        m_scrollInput(m_userInput.scroll_get()),
-        m_up(m_userInput.config_get("ui_up")),
-        m_dn(m_userInput.config_get("ui_dn")),
-        m_lf(m_userInput.config_get("ui_lf")),
-        m_rt(m_userInput.config_get("ui_rt")),
-        m_switch(m_userInput.config_get("game_switch")),
-        m_rmb(m_userInput.config_get("ui_rmb")),
-        m_selfDestruct(m_userInput.config_get("vehicle_self_destruct"))
-{
-    m_orbitDistance = 20.0f;
-}
+DebugCameraController::DebugCameraController(ActiveScene &rScene, ActiveEnt ent)
+ : DebugObject(rScene, ent)
+ , m_orbiting(entt::null)
+ , m_orbitPos(0, 0, 1)
+ , m_orbitDistance(20.0f)
+ , m_updateVehicleModPre(
+       rScene.get_update_order(), "dbg_cam_vmod", "", "vehicle_modification",
+       [this] (ActiveScene&) { this->update_vehicle_mod_pre(); })
+ , m_updatePhysicsPre(rScene.get_update_order(), "dbg_cam_pre", "", "physics",
+                      [this] (ActiveScene&) { this->update_physics_pre(); })
+ , m_updatePhysicsPost(rScene.get_update_order(), "dbg_cam_post", "physics", "",
+                       [this] (ActiveScene&) { this->update_physics_post(); })
+ , m_userInput(rScene.get_user_input())
+ , m_mouseMotion(m_userInput.mouse_get())
+ , m_scrollInput(m_userInput.scroll_get())
+ , m_rmb(m_userInput.config_get("ui_rmb"))
+ , m_up(m_userInput.config_get("ui_up"))
+ , m_dn(m_userInput.config_get("ui_dn"))
+ , m_lf(m_userInput.config_get("ui_lf"))
+ , m_rt(m_userInput.config_get("ui_rt"))
+ , m_switch(m_userInput.config_get("game_switch"))
+ , m_selfDestruct(m_userInput.config_get("vehicle_self_destruct"))
+{ }
 
 void DebugCameraController::update_vehicle_mod_pre()
 {

@@ -283,8 +283,8 @@ void debug_print_update_order()
         return;
     }
 
-    osp::active::UpdateOrder const &order = g_ospMagnum->get_scenes().begin()
-                                            ->second.get_update_order();
+    osp::active::UpdateOrder_t const &order = g_ospMagnum->get_scenes().begin()
+                                              ->second.get_update_order();
 
     std::cout << "Update order:\n";
     for (auto const& call : order.get_call_list())

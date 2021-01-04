@@ -96,11 +96,11 @@ SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene,
                        osp::UserInputHandler &userInput)
  : m_scene(scene)
  , m_updateGeometry(scene.get_update_order(), "planet_geo", "", "physics",
-                    [this] { this->update_geometry(); } )
+            [this] (ActiveScene& rScene) { this->update_geometry(rScene); } )
  , m_updatePhysics(scene.get_update_order(), "planet_phys", "planet_geo", "",
-                   [this] { this->update_physics(); })
+            [this] (ActiveScene& rScene) { this->update_physics(rScene); })
  , m_renderPlanetDraw(scene.get_render_order(), "", "", "",
-                      [this] (ACompCamera const& camera) { this->draw(camera); })
+            [this] (ACompCamera const& camera) { this->draw(camera); })
  , m_debugUpdate(userInput.config_get("debug_planet_update"))
 { }
 
@@ -181,7 +181,7 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
     physics.create_body(fish);
 }
 
-void SysPlanetA::update_geometry()
+void SysPlanetA::update_geometry(ActiveScene& rScene)
 {
 
     auto view = m_scene.get_registry().view<ACompPlanet, ACompTransform>();
@@ -359,7 +359,7 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt)
     rPlanetGeo.get_ico_tree()->debug_verify_state();
 }
 
-void SysPlanetA::update_physics()
+void SysPlanetA::update_physics(ActiveScene& rScene)
 {
 
 }

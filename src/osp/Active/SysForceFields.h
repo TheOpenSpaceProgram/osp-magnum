@@ -68,7 +68,7 @@ public:
     SysFFGravity(ActiveScene &scene);
     ~SysFFGravity() = default;
 
-    void update_force();
+    void update_force(ActiveScene& rScene);
 
 private:
 
@@ -76,7 +76,7 @@ private:
     ActiveScene &m_scene;
     SysPhysics &m_physics;
 
-    UpdateOrderHandle m_updateForce;
+    UpdateOrderHandle_t m_updateForce;
 };
 
 
