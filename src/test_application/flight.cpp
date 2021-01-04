@@ -97,7 +97,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     auto &sysDebugRender    = scene.dynamic_system_create<osp::active::SysDebugRender>();
     auto &sysArea           = scene.dynamic_system_create<osp::active::SysAreaAssociate>(uni);
     auto &sysVehicle        = scene.dynamic_system_create<osp::active::SysVehicle>();
-    auto &sysPlanet         = scene.dynamic_system_create<planeta::active::SysPlanetA>();
+    auto &sysPlanet         = scene.dynamic_system_create<planeta::active::SysPlanetA>(pMagnumApp->get_input_handler());
     auto &sysGravity        = scene.dynamic_system_create<osp::active::SysFFGravity>();
 
     // Register machines for that scene
@@ -130,8 +130,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     cameraComp.m_viewport
             = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
-    cameraComp.m_far = 4096.0f;
-    cameraComp.m_near = 0.125f;
+    cameraComp.m_far = 1u << 24;
+    cameraComp.m_near = 1.0f;
     cameraComp.m_fov = 45.0_degf;
 
     cameraComp.calculate_projection();
