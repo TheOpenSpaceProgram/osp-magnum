@@ -287,7 +287,7 @@ public:
     SysWire(SysWire const& copy) = delete;
     SysWire(SysWire&& move) = delete;
 
-    void update_propigate(ActiveScene& rScene);
+    void update_propagate(ActiveScene& rScene);
     void connect(WireOutput &wireFrom, WireInput &wireTo);
 
 private:
