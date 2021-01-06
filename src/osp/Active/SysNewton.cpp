@@ -74,10 +74,8 @@ void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
 
 ACompNwtBody::ACompNwtBody(ACompNwtBody&& move) noexcept
  : DataRigidBody(std::move(move))
- , m_body(move.m_body)
- , m_entity(move.m_entity)
-        //m_scene(move.m_scene),
-        //m_bodyData(move.m_bodyData)
+ , m_body(std::exchange(move.m_body, nullptr))
+ , m_entity(std::exchange(move.m_entity, entt::null))
 {
     if (m_body != nullptr)
     {
@@ -87,9 +85,8 @@ ACompNwtBody::ACompNwtBody(ACompNwtBody&& move) noexcept
 
 ACompNwtBody& ACompNwtBody::operator=(ACompNwtBody&& move) noexcept
 {
-    m_body = move.m_body;
-    m_entity = move.m_entity;
-    //m_bodyData = move.m_bodyData;
+    m_body = std::exchange(move.m_body, nullptr);
+    m_entity = std::exchange(move.m_entity, entt::null);
 
     if (m_body != nullptr)
     {
@@ -122,12 +119,9 @@ SysNewton::SysNewton(ActiveScene &scene)
 
 SysNewton::~SysNewton()
 {
-    //std::cout << "sysnewtondestroy\n";
     // Clean up newton dynamics stuff
     m_scene.get_registry().clear<ACompNwtBody>();
     m_scene.get_registry().clear<ACompCollisionShape>();
-    //NewtonDestroyAllBodies(m_nwtWorld);
-    //NewtonDestroy(m_nwtWorld);
 }
 
 void SysNewton::update_world()
@@ -163,8 +157,7 @@ void SysNewton::update_world()
         // temporary: delete if something is dirty
         if (entBody.m_colliderDirty)
         {
-            NewtonDestroyBody(entBody.m_body);
-            entBody.m_body = nullptr;
+            NewtonDestroyBody(std::exchange(entBody.m_body, nullptr));
             entBody.m_colliderDirty = false;
         }
 
