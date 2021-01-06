@@ -59,6 +59,7 @@ class ActiveScene
 {
 
 public:
+
     ActiveScene(UserInputHandler &userInput, OSPApplication& app, Package& context);
     ~ActiveScene();
 
@@ -103,7 +104,8 @@ public:
     /**
      * @return Internal entt::registry
      */
-    constexpr entt::registry& get_registry() { return m_registry; }
+    constexpr ActiveReg_t& get_registry()
+    { return m_registry; }
 
     /**
      * Shorthand for get_registry().get<T>()
@@ -147,9 +149,9 @@ public:
 
     constexpr UserInputHandler& get_user_input() { return m_userInput; }
 
-    constexpr UpdateOrder& get_update_order() { return m_updateOrder; }
+    constexpr UpdateOrder_t& get_update_order() { return m_updateOrder; }
 
-    constexpr RenderOrder& get_render_order() { return m_renderOrder; }
+    constexpr RenderOrder_t& get_render_order() { return m_renderOrder; }
 
     // TODO
     constexpr float get_time_delta_fixed() { return 1.0f / 60.0f; }
@@ -212,14 +214,14 @@ public:
     Package& get_context_resources() { return m_context; }
 private:
 
-    void on_hierarchy_construct(entt::registry& reg, ActiveEnt ent);
-    void on_hierarchy_destruct(entt::registry& reg, ActiveEnt ent);
+    void on_hierarchy_construct(ActiveReg_t& reg, ActiveEnt ent);
+    void on_hierarchy_destruct(ActiveReg_t& reg, ActiveEnt ent);
 
     OSPApplication& m_app;
     Package& m_context;
 
     //std::vector<std::vector<ActiveEnt> > m_hierLevels;
-    entt::basic_registry<ActiveEnt> m_registry;
+    ActiveReg_t m_registry;
     ActiveEnt m_root;
     bool m_hierarchyDirty;
 
@@ -229,8 +231,8 @@ private:
     //std::vector<std::reference_wrapper<ISysMachine>> m_update_sensor;
     //std::vector<std::reference_wrapper<ISysMachine>> m_update_physics;
 
-    UpdateOrder m_updateOrder;
-    RenderOrder m_renderOrder;
+    UpdateOrder_t m_updateOrder;
+    RenderOrder_t m_renderOrder;
 
     MapSysMachine_t m_sysMachines; // TODO: Put this in SysVehicle
     MapDynamicSys_t m_dynamicSys;

@@ -73,10 +73,10 @@ ActiveScene::~ActiveScene()
 }
 
 
-entt::entity ActiveScene::hier_create_child(entt::entity parent,
+ActiveEnt ActiveScene::hier_create_child(ActiveEnt parent,
                                             std::string const& name)
 {
-    entt::entity child = m_registry.create();
+    ActiveEnt child = m_registry.create();
     ACompHierarchy& childHierarchy = m_registry.emplace<ACompHierarchy>(child);
     //ACompTransform& transform = m_registry.emplace<ACompTransform>(ent);
     childHierarchy.m_name = name;
@@ -86,7 +86,7 @@ entt::entity ActiveScene::hier_create_child(entt::entity parent,
     return child;
 }
 
-void ActiveScene::hier_set_parent_child(entt::entity parent, entt::entity child)
+void ActiveScene::hier_set_parent_child(ActiveEnt parent, ActiveEnt child)
 {
     ACompHierarchy& childHierarchy = m_registry.get<ACompHierarchy>(child);
     //ACompTransform& transform = m_registry.emplace<ACompTransform>(ent);
@@ -106,9 +106,8 @@ void ActiveScene::hier_set_parent_child(entt::entity parent, entt::entity child)
     // If has siblings (not first child)
     if (parentHierarchy.m_childCount)
     {
-        entt::entity const sibling = parentHierarchy.m_childFirst;
-        ACompHierarchy& siblingHierarchy
-                = m_registry.get<ACompHierarchy>(sibling);
+        ActiveEnt sibling = parentHierarchy.m_childFirst;
+        auto& siblingHierarchy = m_registry.get<ACompHierarchy>(sibling);
 
         // Set new child and former first child as siblings
         siblingHierarchy.m_siblingPrev = child;
@@ -168,17 +167,14 @@ void ActiveScene::hier_cut(ActiveEnt ent)
             = entt::null;
 }
 
-void ActiveScene::on_hierarchy_construct(entt::registry& reg, entt::entity ent)
+void ActiveScene::on_hierarchy_construct(ActiveReg_t& reg, ActiveEnt ent)
 {
-    //std::cout << "hierarchy entity constructed\n";
-
     m_hierarchyDirty = true;
 }
 
-void ActiveScene::on_hierarchy_destruct(entt::registry& reg, entt::entity ent)
+void ActiveScene::on_hierarchy_destruct(ActiveReg_t& reg, ActiveEnt ent)
 {
-    std::cout << "hierarchy entity destructed\n";
-
+    m_hierarchyDirty = true;
 }
 
 void ActiveScene::update()
@@ -195,7 +191,7 @@ void ActiveScene::update()
     //{
     //    sysMachine.update_physics(1.0f/60.0f);
     //}
-    m_updateOrder.call();
+    m_updateOrder.call(*this);
 }
 
 
@@ -244,7 +240,7 @@ void ActiveScene::update_hierarchy_transforms()
 
 }
 
-void ActiveScene::draw(entt::entity camera)
+void ActiveScene::draw(ActiveEnt camera)
 {
     //Matrix4 cameraProject;
     //Matrix4 cameraInverse;

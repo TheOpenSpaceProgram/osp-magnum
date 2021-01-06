@@ -287,12 +287,12 @@ public:
     SysWire(SysWire const& copy) = delete;
     SysWire(SysWire&& move) = delete;
 
-    void update_propigate();
+    void update_propagate(ActiveScene& rScene);
     void connect(WireOutput &wireFrom, WireInput &wireTo);
 
 private:
     std::vector<DependentOutput> m_dependentOutputs;
-    UpdateOrderHandle m_updateWire;
+    UpdateOrderHandle_t m_updateWire;
 };
 
 

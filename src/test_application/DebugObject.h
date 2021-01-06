@@ -89,9 +89,9 @@ private:
     osp::Vector3 m_orbitPos;
     float m_orbitDistance;
 
-    osp::active::UpdateOrderHandle m_updateVehicleModPre;
-    osp::active::UpdateOrderHandle m_updatePhysicsPre;
-    osp::active::UpdateOrderHandle m_updatePhysicsPost;
+    osp::active::UpdateOrderHandle_t m_updateVehicleModPre;
+    osp::active::UpdateOrderHandle_t m_updatePhysicsPre;
+    osp::active::UpdateOrderHandle_t m_updatePhysicsPost;
 
     osp::UserInputHandler &m_userInput;
     // Mouse inputs

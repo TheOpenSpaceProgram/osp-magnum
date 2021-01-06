@@ -85,18 +85,18 @@ public:
 
     void planet_update_geometry(osp::active::ActiveEnt planetEnt);
 
-    void update_geometry();
+    void update_geometry(osp::active::ActiveScene& rScene);
 
-    void update_physics();
+    void update_physics(osp::active::ActiveScene& rScene);
 
 private:
 
     osp::active::ActiveScene &m_scene;
 
-    osp::active::UpdateOrderHandle m_updateGeometry;
-    osp::active::UpdateOrderHandle m_updatePhysics;
+    osp::active::UpdateOrderHandle_t m_updateGeometry;
+    osp::active::UpdateOrderHandle_t m_updatePhysics;
 
-    osp::active::RenderOrderHandle m_renderPlanetDraw;
+    osp::active::RenderOrderHandle_t m_renderPlanetDraw;
 
     osp::ButtonControlHandle m_debugUpdate;
 };

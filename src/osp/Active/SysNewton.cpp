@@ -94,11 +94,11 @@ ACompNwtBody& ACompNwtBody::operator=(ACompNwtBody&& move)
     return *this;
 }
 
-SysNewton::SysNewton(ActiveScene &scene) :
-        m_scene(scene),
-        m_nwtWorld(NewtonCreate()),
-        m_updatePhysicsWorld(scene.get_update_order(), "physics", "wire", "",
-                             std::bind(&SysNewton::update_world, this))
+SysNewton::SysNewton(ActiveScene &scene)
+ : m_scene(scene)
+ , m_nwtWorld(NewtonCreate())
+ , m_updatePhysicsWorld(scene.get_update_order(), "physics", "wire", "",
+                [this] (ActiveScene& rScene) { this->update_world(rScene); })
 {
     //std::cout << "sysnewtoninit\n";
     NewtonWorldSetUserData(m_nwtWorld, this);
@@ -278,7 +278,7 @@ void SysNewton::create_body(ActiveEnt entity)
     //NewtonDestroyCollision(ball);
 }
 
-void SysNewton::update_world()
+void SysNewton::update_world(ActiveScene& rScene)
 {
     //m_scene.floating_origin_translate_begin();
 
@@ -363,13 +363,13 @@ void SysNewton::body_apply_torque_local(ACompRigidBody &body, Vector3 force)
 
 
 
-void SysNewton::on_body_construct(entt::registry& reg, ActiveEnt ent)
+void SysNewton::on_body_construct(ActiveReg_t& reg, ActiveEnt ent)
 {
     // TODO
     reg.get<ACompRigidBody>(ent).m_bodyData.m_mass = 1.0f;
 }
 
-void SysNewton::on_body_destruct(entt::registry& reg, ActiveEnt ent)
+void SysNewton::on_body_destruct(ActiveReg_t& reg, ActiveEnt ent)
 {
     // make sure the newton body is destroyed
     NewtonBody *body = reg.get<ACompRigidBody>(ent).m_body;
@@ -379,12 +379,12 @@ void SysNewton::on_body_destruct(entt::registry& reg, ActiveEnt ent)
     }
 }
 
-void SysNewton::on_shape_construct(entt::registry& reg, ActiveEnt ent)
+void SysNewton::on_shape_construct(ActiveReg_t& reg, ActiveEnt ent)
 {
 
 }
 
-void SysNewton::on_shape_destruct(entt::registry& reg, ActiveEnt ent)
+void SysNewton::on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent)
 {
     // make sure the collision shape destroyed
     NewtonCollision *shape = reg.get<ACompCollisionShape>(ent).m_collision;

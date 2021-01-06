@@ -120,13 +120,13 @@ public:
     ActiveEnt part_instantiate(PrototypePart& part, ActiveEnt rootParent);
 
     // Handle deleted parts and separations
-    void update_vehicle_modification();
+    void update_vehicle_modification(ActiveScene& rScene);
 
 private:
     ActiveScene& m_scene;
     //AppPackages& m_packages;
 
-    UpdateOrderHandle m_updateVehicleModification;
+    UpdateOrderHandle_t m_updateVehicleModification;
 };
 
 
