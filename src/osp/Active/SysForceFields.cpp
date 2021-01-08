@@ -30,15 +30,13 @@ using namespace osp::active;
 
 const std::string SysFFGravity::smc_name = "FFGravity";
 
-SysFFGravity::SysFFGravity(ActiveScene &scene) :
-        m_scene(scene),
-        m_updateForce(scene.get_update_order(), "ff_gravity", "", "physics",
-                        std::bind(&SysFFGravity::update_force, this))
-{
+SysFFGravity::SysFFGravity(ActiveScene &scene)
+ : m_scene(scene)
+ , m_updateForce(scene.get_update_order(), "ff_gravity", "", "physics",
+                 [this] (ActiveScene& rScene) { this->update_force(rScene); })
+{ }
 
-}
-
-void SysFFGravity::update_force()
+void SysFFGravity::update_force(ActiveScene& rScene)
 {
 
     auto viewFields = m_scene.get_registry()

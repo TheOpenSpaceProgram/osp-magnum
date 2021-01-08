@@ -99,7 +99,7 @@ ACompNwtBody& ACompNwtBody::operator=(ACompNwtBody&& move) noexcept
 SysNewton::SysNewton(ActiveScene &scene)
  : m_scene(scene)
  , m_updatePhysicsWorld(scene.get_update_order(), "physics", "wire", "",
-                        [this] { this->update_world(); })
+                [this] (ActiveScene& rScene) { this->update_world(rScene); })
 {
     //std::cout << "sysnewtoninit\n";
     //NewtonWorldSetUserData(m_nwtWorld, this);
@@ -124,12 +124,12 @@ SysNewton::~SysNewton()
     m_scene.get_registry().clear<ACompCollisionShape>();
 }
 
-void SysNewton::update_world()
+void SysNewton::update_world(ActiveScene& rScene)
 {
     // Try getting the newton world from the scene root.
     // It is very unlikely that multiple physics worlds are ever needed
-    auto *worldComp = m_scene.get_registry().try_get<ACompNwtWorld>(
-                m_scene.hier_get_root());
+    auto *worldComp = rScene.get_registry().try_get<ACompNwtWorld>(
+                                 rScene.hier_get_root());
 
     if (worldComp == nullptr)
     {
@@ -140,13 +140,13 @@ void SysNewton::update_world()
     {
         // Create world if not yet initialized
         worldComp->m_nwtWorld = NewtonCreate();
-        NewtonWorldSetUserData(worldComp->m_nwtWorld, &m_scene);
+        NewtonWorldSetUserData(worldComp->m_nwtWorld, &rScene);
     }
 
     NewtonWorld const* nwtWorld = worldComp->m_nwtWorld;
 
-    auto viewBody = m_scene.get_registry().view<ACompNwtBody>();
-    auto viewBodyTransform = m_scene.get_registry().view<ACompNwtBody,
+    auto viewBody = rScene.get_registry().view<ACompNwtBody>();
+    auto viewBodyTransform = rScene.get_registry().view<ACompNwtBody,
                                                          ACompTransform>();
 
     // Iterate just the entities with ACompNwtBody
@@ -164,12 +164,12 @@ void SysNewton::update_world()
         if (entBody.m_body == nullptr)
         {
             // Initialize body if not done so yet;
-            create_body(m_scene, ent, nwtWorld);
+            create_body(rScene, ent, nwtWorld);
         }
     }
 
     // Update the world
-    NewtonUpdate(nwtWorld, m_scene.get_time_delta_fixed());
+    NewtonUpdate(nwtWorld, rScene.get_time_delta_fixed());
 
     // Apply transform changes after the Newton world(s) updates
     for (ActiveEnt ent : viewBodyTransform)
@@ -393,7 +393,7 @@ void SysNewton::body_apply_torque(ACompRigidBody_t &body, Vector3 torque) noexce
     body.m_netTorque += torque;
 }
 
-void SysNewton::on_body_destruct(entt::registry& reg, ActiveEnt ent)
+void SysNewton::on_body_destruct(ActiveReg_t& reg, ActiveEnt ent)
 {
     NewtonBody const *body = reg.get<ACompNwtBody>(ent).m_body;
     if (body)
@@ -402,7 +402,7 @@ void SysNewton::on_body_destruct(entt::registry& reg, ActiveEnt ent)
     }
 }
 
-void SysNewton::on_shape_destruct(entt::registry& reg, ActiveEnt ent)
+void SysNewton::on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent)
 {
     NewtonCollision const *shape = reg.get<ACompCollisionShape>(ent).m_collision;
     if (shape != nullptr)
@@ -411,8 +411,7 @@ void SysNewton::on_shape_destruct(entt::registry& reg, ActiveEnt ent)
     }
 }
 
-
-void SysNewton::on_world_destruct(entt::registry& reg, ActiveEnt ent)
+void SysNewton::on_world_destruct(ActiveReg_t& reg, ActiveEnt ent)
 {
     NewtonWorld const *world = reg.get<ACompNwtWorld>(ent).m_nwtWorld;
     if (world != nullptr)

@@ -46,9 +46,21 @@ using osp::universe::UCompVehicle;
 using osp::BlueprintVehicle;
 using osp::PrototypePart;
 
+/**
+ * Utility: computes the displacement between two parts, relative to the
+ * specified sub-object (e.g. an attachment node).
+ *
+ * @param attachTo [in] The parent part
+ * @param attachToName [in] The name of the parent's object/attach point
+ * @param toAttach [in] The child part
+ * @param toAttachName [in] The name of the child's object/attach point
+ */
+Vector3 part_offset(
+    PrototypePart const& attachTo, std::string_view attachToName,
+    PrototypePart const& toAttach, std::string_view toAttachName);
 
 osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
-        Universe& uni, Package& pkg, std::string const & name)
+        Universe& uni, Package& pkg, std::string_view name)
 {
     // Begin blueprint
     BlueprintVehicle blueprint;
@@ -70,8 +82,8 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
         0, 1, 0);
 
     // Save blueprint
-    DependRes<BlueprintVehicle> depend = pkg
-            .add<BlueprintVehicle>(name, std::move(blueprint));
+    DependRes<BlueprintVehicle> depend =
+        pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
 
     // Create new satellite
     Satellite sat = uni.sat_create();
@@ -92,7 +104,7 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
 
 osp::universe::Satellite testapp::debug_add_random_vehicle(
         osp::universe::Universe& uni, osp::Package& pkg,
-        std::string const & name)
+        std::string_view name)
 {
 
     // Start making the blueprint
@@ -130,8 +142,8 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
                        0, 1, 0);
 
     // put blueprint in package
-    DependRes<BlueprintVehicle> depend = pkg.add<BlueprintVehicle>(name,
-                                                        std::move(blueprint));
+    DependRes<BlueprintVehicle> depend =
+        pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
 
     // Create the Satellite containing a SatVehicle
 
@@ -152,4 +164,133 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
 
     return sat;
 
+}
+
+Vector3 part_offset(PrototypePart const& attachTo,
+    std::string_view attachToName, PrototypePart const& toAttach,
+    std::string_view toAttachName)
+{
+    Vector3 oset1{0.0f};
+    Vector3 oset2{0.0f};
+
+    for (osp::PrototypeObject const& obj : attachTo.get_objects())
+    {
+        if (obj.m_name == attachToName)
+        {
+            oset1 = obj.m_translation;
+            break;
+        }
+    }
+
+    for (osp::PrototypeObject const& obj : toAttach.get_objects())
+    {
+        if (obj.m_name == toAttachName)
+        {
+            oset2 = obj.m_translation;
+            break;
+        }
+    }
+
+    return oset1 - oset2;
+}
+
+osp::universe::Satellite testapp::debug_add_part_vehicle(
+    osp::universe::Universe& uni, osp::Package& pkg,
+    std::string_view name)
+{
+    using namespace Magnum::Math::Literals;
+
+    // Start making the blueprint
+    BlueprintVehicle blueprint;
+
+    // Parts
+    auto capsule = pkg.get<PrototypePart>("part_phCapsule");
+    auto fuselage = pkg.get<PrototypePart>("part_phFuselage");
+    auto engine = pkg.get<PrototypePart>("part_phEngine");
+    auto rcs = pkg.get<PrototypePart>("part_phLinRCS");
+
+    Vector3 cfOset = part_offset(*capsule, "attach_bottom_capsule",
+        *fuselage, "attach_top_fuselage");
+    Vector3 feOset = part_offset(*fuselage, "attach_bottom_fuselage",
+        *engine, "attach_top_eng");
+    Vector3 rcsOsetTop = Vector3{1.0f, 0.0f, 2.0f};
+    Vector3 rcsOsetBtm = Vector3{1.0f, 0.0f, -2.0f};
+
+    Quaternion idRot;
+    Vector3 scl{1};
+    Magnum::Rad qtrTurn(90.0_degf);
+    Quaternion rotY_090 = Quaternion::rotation(qtrTurn, Vector3{0, 1, 0});
+    Quaternion rotZ_090 = Quaternion::rotation(qtrTurn, Vector3{0, 0, 1});
+    Quaternion rotZ_180 = Quaternion::rotation(2 * qtrTurn, Vector3{0, 0, 1});
+    Quaternion rotZ_270 = Quaternion::rotation(3 * qtrTurn, Vector3{0, 0, 1});
+
+    blueprint.add_part(capsule, Vector3{0}, idRot, scl);
+    blueprint.add_part(fuselage, cfOset, idRot, scl);
+    blueprint.add_part(engine, cfOset + feOset, idRot, scl);
+
+    Quaternion yz090 = rotZ_090 * rotY_090;
+    Quaternion yz180 = rotZ_180 * rotY_090;
+    Quaternion yz270 = rotZ_270 * rotY_090;
+
+    // Top RCS ring
+    /*blueprint.add_part(rcs, rcsOsetTop, rotY_090, scl);
+    blueprint.add_part(rcs, rotZ_090.transformVector(rcsOsetTop), yz090, scl);
+    blueprint.add_part(rcs, rotZ_180.transformVector(rcsOsetTop), yz180, scl);
+    blueprint.add_part(rcs, rotZ_270.transformVector(rcsOsetTop), yz270, scl);*/
+
+    // Top RCS ring
+    /*blueprint.add_part(rcs, rcsOsetBtm, rotY_090, scl);
+    blueprint.add_part(rcs, rotZ_090.transformVector(rcsOsetBtm), yz090, scl);
+    blueprint.add_part(rcs, rotZ_180.transformVector(rcsOsetBtm), yz180, scl);
+    blueprint.add_part(rcs, rotZ_270.transformVector(rcsOsetBtm), yz270, scl);*/
+
+    enum Parts
+    {
+        CAPSULE = 0,
+        FUSELAGE = 1,
+        ENGINE = 2,
+        RCS1 = 3,
+        RCS2 = 4,
+        RCS3 = 5,
+        RCS4 = 6,
+        RCS5 = 7,
+        RCS6 = 8,
+        RCS7 = 9,
+        RCS8 = 10
+    };
+
+    std::vector<int> rcsPorts = {RCS1, RCS2, RCS3, RCS4, RCS5, RCS6, RCS7, RCS8};
+
+    // Wire throttle control
+    // from (output): a MachineUserControl m_woThrottle
+    // to    (input): a MachineRocket m_wiThrottle
+    blueprint.add_wire(
+        Parts::CAPSULE, 0, 1,
+        Parts::ENGINE, 0, 2);
+
+    // Wire attitude contrl to gimbal
+    // from (output): a MachineUserControl m_woAttitude
+    // to    (input): a MachineRocket m_wiGimbal
+    blueprint.add_wire(
+        Parts::CAPSULE, 0, 0,
+        Parts::ENGINE, 0, 0);
+
+    // Put blueprint in package
+    auto depend = pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
+
+    Satellite sat = uni.sat_create();
+
+    // Set the name
+    auto& posTraj = uni.get_reg().get<osp::universe::UCompTransformTraj>(sat);
+    posTraj.m_name = name;
+
+    // Make it into a vehicle
+    auto& typeVehicle = *static_cast<osp::universe::SatVehicle*>(
+        uni.sat_type_find("Vehicle")->second.get());
+    osp::universe::UCompVehicle& compVeh = typeVehicle.add_get_ucomp(sat);
+
+    // Set the SatVehicle's blueprint to the one just made
+    compVeh.m_blueprint = std::move(depend);
+
+    return sat;
 }

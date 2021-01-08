@@ -75,7 +75,7 @@ public:
      * What this is suppose to do in the future:
      * Scan for nearby Satellites and attempt to activate them
      */
-    void update_scan();
+    void update_scan(ActiveScene& rScene);
 
     /**
      * Connect this AreaAssociate to an ActiveArea Satellite. This sets the
@@ -127,8 +127,8 @@ private:
     //std::vector<universe::Satellite> m_activatedSats;
     entt::sparse_set<universe::Satellite> m_activatedSats;
 
-    //UpdateOrderHandle m_updateFloatingOrigin;
-    UpdateOrderHandle m_updateScan;
+    //UpdateOrderHandle_t m_updateFloatingOrigin;
+    UpdateOrderHandle_t m_updateScan;
 
     /**
      * Translate everything in the ActiveScene

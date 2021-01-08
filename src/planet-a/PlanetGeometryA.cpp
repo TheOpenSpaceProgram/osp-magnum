@@ -23,14 +23,13 @@
  * SOFTWARE.
  */
 #include "PlanetGeometryA.h"
-
-#include <Magnum/Math/Functions.h>
-#include <osp/types.h>
-
+#include <iterator>
 #include <algorithm>
 #include <iostream>
 #include <stack>
 #include <array>
+#include <assert.h>
+
 
 // maybe do something about how this file is almost a thousand lines long
 // there's a lot of comments though
@@ -38,21 +37,35 @@
 using namespace planeta;
 
 using osp::Vector3;
+using Magnum::Math::pow;
+using Magnum::Math::abs;
 
-void PlanetGeometryA::initialize(float radius)
+void planeta::update_range_insert(std::vector<UpdateRangeSub>& range,
+                                  UpdateRangeSub insert)
+{
+    // TODO: Merge update ranges to decrease number of glBufferSubData calls
+
+    //UpdateRangeSub merged;
+
+    range.push_back(insert);
+}
+
+void PlanetGeometryA::initialize(std::shared_ptr<IcoSphereTree> sphere,
+                                 unsigned chunkDiv, chindex_t maxChunks,
+                                 vrindex_t maxShared)
 {
     //m_subdivAreaThreshold = 0.02f;
-    m_vrtxSharedMax = 10000;
-    m_chunkMax = 100;
+    m_vrtxSharedMax = maxShared;
+    m_chunkMax = maxChunks;
 
     //m_chunkAreaThreshold = 0.04f;
-    m_chunkWidth = 17; // MUST BE (POWER OF 2) + 1. min: 5
-    m_chunkWidthB = m_chunkWidth - 1; // used often in many calculations
+    m_chunkWidthB = pow(2u, chunkDiv);
+    m_chunkWidth  = m_chunkWidthB + 1; // MUST BE (POWER OF 2) + 1. min: 5
 
-    m_icoTree = std::make_shared<IcoSphereTree>();
-    m_icoTree->initialize(radius);
+    //m_icoTree = std::make_shared<IcoSphereTree>();
+    m_icoTree = std::move(sphere);
 
-    using Magnum::Math::pow;
+    //m_icoTree->initialize(radius);
 
     m_chunkCount = 0;
     m_vrtxSharedCount = 0;
@@ -66,14 +79,16 @@ void PlanetGeometryA::initialize(float radius)
 
     // calculate total max vertices
     m_vrtxMax = m_vrtxSharedMax + m_chunkMax * (m_vrtxPerChunk
-            - m_vrtxSharedPerChunk);
+                                                - m_vrtxSharedPerChunk);
 
     // allocate vectors for dealing with chunks
     m_indxBuffer.resize(m_chunkMax * m_indxPerChunk * 3);
     m_vrtxBuffer.resize(m_vrtxMax * m_vrtxSize);
     m_chunkToTri.resize(m_chunkMax);
     m_vrtxSharedUsers.resize(m_vrtxSharedMax);
-
+    m_vrtxSharedIcoCorners.resize(m_icoTree->get_vertex_buffer().size()
+                                    / m_vrtxSize, gc_invalidVrtx);
+    m_vrtxSharedIcoCornersReverse.resize(m_vrtxSharedMax, gc_invalidBufIndx);
 
     // Calculate m_chunkSharedIndices;  use:
 
@@ -120,7 +135,7 @@ void PlanetGeometryA::initialize(float radius)
         {
             // Only consider the up-pointing triangle
             // All of the shared vertices can still be covered
-            if (!(x % 2))
+            if ((x % 2) == 0)
             {
                 for (int j = 0; j < 3; j ++)
                 {
@@ -151,115 +166,27 @@ void PlanetGeometryA::initialize(float radius)
     }
 
     m_initialized = true;
-
-    // temporary: test chunking
-    //chunk_add(0);
-    m_icoTree->subdivide_add(0); // adds triangles 20, 21, 22, 23
-    //chunk_add(20);
-    m_icoTree->subdivide_add(20); // adds triangles 24, 25, 26, 27
-
-    //chunk_remove(24);
-    //chunk_remove(25);
-    //chunk_remove(26);
-    //chunk_remove(27);
-
-
-    chunk_add(1);
-    chunk_add(2);
-    chunk_add(3);
-    chunk_add(4);
-    chunk_add(5);
-    chunk_add(6);
-    chunk_add(7);
-    chunk_add(8);
-    chunk_add(9);
-    chunk_add(10);
-    chunk_add(11);
-    chunk_add(12);
-    chunk_add(13);
-    chunk_add(14);
-    chunk_add(15);
-    chunk_add(16);
-    chunk_add(17);
-    chunk_add(18);
-    chunk_add(19);
-
-
-    chunk_add(21);
-    chunk_add(22);
-    chunk_add(23);
-
-    chunk_add(24);
-    chunk_add(25);
-    chunk_add(26);
-    chunk_add(27);
-
-
-    // temporary: raise all shared vertices based on shared count
-    if (false)
-    {
-        for (vrindex_t i = 0; i < m_vrtxSharedMax; i ++)
-        {
-            if (m_vrtxSharedUsers[i] == 0)
-            {
-                continue;
-            }
-
-            float raise = (m_vrtxSharedUsers[i] - 1) * 5.0f;
-
-            float *vrtxData = m_vrtxBuffer.data() + i * m_vrtxSize;
-
-            Vector3 &pos = *reinterpret_cast<Vector3*>(
-                                            vrtxData + m_vrtxCompOffsetPos);
-            Vector3 &nrm = *reinterpret_cast<Vector3*>(
-                                            vrtxData + m_vrtxCompOffsetNrm);
-
-            pos += nrm * raise;
-        }
-    }
-
 }
 
 std::pair<PlanetGeometryA::IteratorTriIndexed,
           PlanetGeometryA::IteratorTriIndexed>
 PlanetGeometryA::iterate_chunk(chindex_t c)
 {
-    IteratorTriIndexed begin(m_indxBuffer.begin() + m_indxPerChunk * 3 * c,
+    IteratorTriIndexed begin(std::next(m_indxBuffer.begin(),
+                                       m_indxPerChunk * 3 * c),
                              m_vrtxBuffer);
-    IteratorTriIndexed end(m_indxBuffer.begin() + m_indxPerChunk * 3 * (c + 1),
+    IteratorTriIndexed end(std::next(m_indxBuffer.begin(),
+                                     m_indxPerChunk * 3 * (c + 1)),
                            m_vrtxBuffer);
     return {begin, end};
 }
 
 loindex_t PlanetGeometryA::get_index_ringed(unsigned x, unsigned y) const
 {
-    // || (x == y) ||
-    if (y == m_chunkWidthB)
-    {
-        // Bottom edge
-        return x;
-    }
-    else if (x == 0)
-    {
-        // Left edge
-        return m_chunkWidthB * 2 + y;
-    }
-    else if (x == y)
-    {
-        // Right edge
-        return m_chunkWidthB * 2 - y;
-    }
-    else
-    {
-        // Center
-        return m_vrtxSharedPerChunk + get_index(x - 1, y - 2);
-    }
-
-}
-
-constexpr loindex_t PlanetGeometryA::get_index(int x, int y) const
-{
-    return unsigned(y * (y + 1) / 2 + x);
+    if (y == m_chunkWidthB) return x;           // Bottom edge
+    if (x == 0) return m_chunkWidthB * 2 + y;   // Left edge
+    if (x == y) return m_chunkWidthB * 2 - y;   // Right edge
+    return m_vrtxSharedPerChunk + get_index(x - 1, y - 2); // Center
 }
 
 struct VertexToSubdiv
@@ -268,80 +195,161 @@ struct VertexToSubdiv
     unsigned m_vrtxIndex;
 };
 
-void PlanetGeometryA::chunk_add(trindex_t t)
+// temporary
+float debug_stupid_heightmap(Vector3 pos)
 {
-    SubTriangle& tri = m_icoTree->get_triangle(t);
+    float raise = 0; // add together a bunch of sin waves for terrain
+    raise += (std::sin(pos.x() / 128.0f) + std::sin(pos.y() / 128.0f) + std::sin(pos.z() / 128.0f)) * 64.0f;
+    raise += (std::sin(pos.x() / 500.0f) + std::sin(pos.y() / 500.0f) + std::sin(pos.z() / 500.0f)) * 128.0f;
+    raise += (std::sin(pos.x() / 720.0f) + std::sin(pos.y() / 720.0f) + std::sin(pos.z() / 720.0f)) * 512.0f;
+    return raise * 0.0f; // remove 0.0f for fun on the moon
+}
 
-    trindex_t min = std::max<trindex_t>(m_triangleChunks.size(),
-                                        m_icoTree->triangle_count());
-    m_triangleChunks.resize(min, {gc_invalidChunk, 0, gc_invalidTri, 0, 0});
+void PlanetGeometryA::chunk_add(trindex_t triInd)
+{
+    //std::cout << "chunk_add(" << t << ");\n";
+    chunk_triangle_assure();
 
-    SubTriangleChunk& chunk = m_triangleChunks[t];
+    SubTriangle &rTri = m_icoTree->get_triangle(triInd);
+    SubTriangleChunk &rChunk = m_triangleChunks[triInd];
 
-
-    if (m_chunkCount >= m_chunkMax)
-    {
-        // chunk limit reached
-        return;
-    }
-
-    if (chunk.m_chunk != gc_invalidChunk)
+    if (rChunk.m_chunk != gc_invalidChunk)
     {
         // return if already chunked
         return;
     }
 
-    // Take the space at the end of the chunk buffer
-    chunk.m_chunk = m_chunkCount;
+    // TODO: this function got pretty massive, maybe separate it more some time
+
+    // Step 1: Find a space in the chunk index buffer
+
+    if (m_chunkFree.empty())
+    {
+        if (m_chunkCount >= m_chunkMax)
+        {
+            // chunk limit reached
+            return;
+        }
+
+        // Take the space at the end of the chunk buffer
+        rChunk.m_chunk = m_chunkCount;
+        m_chunkCount ++;
+    }
+    else
+    {
+        // Use empty space available. Get lowest value [last element] to make
+        // it less likely that the data will end up getting moved by chunk_pack
+        // when it's closer to the start of the buffer
+        std::set<chindex_t>::iterator chunkToGet = std::prev(m_chunkFree.end());
+        rChunk.m_chunk = *chunkToGet;
+        m_chunkFree.erase(chunkToGet);
+    }
+
+    // Step 2: Find a space in the vertex buffer
 
     // Keep track of which part of the index buffer refers to which triangle
-    m_chunkToTri[m_chunkCount] = t;
+    m_chunkToTri[rChunk.m_chunk] = triInd;
 
-    if (m_vrtxFree.size() == 0) {
-        chunk.m_dataVrtx
-                = m_vrtxSharedMax
-                + m_chunkCount * (m_vrtxPerChunk - m_vrtxSharedPerChunk);
+    if (m_vrtxFree.empty())
+    {
+        rChunk.m_dataVrtx = m_vrtxSharedMax
+                + rChunk.m_chunk * (m_vrtxPerChunk - m_vrtxSharedPerChunk);
     }
     else
     {
         // Use empty space available in the chunk vertex buffer
-        chunk.m_dataVrtx = m_vrtxFree.back();
+        rChunk.m_dataVrtx = m_vrtxFree.back();
         m_vrtxFree.pop_back();
     }
 
-    // indices to shared and non-shared vertices added when subdividing
-    std::vector<vrindex_t> indices(m_vrtxPerChunk, gc_invalidVrtx);
+    // Step 3: Get neighbours with chunks to share vertices with
+
+    for (int side = 0; side < 3; side ++)
+    {
+        trindex_t neighbourIndex = rTri.m_neighbours[side];
+
+        trindex_t &rNeighbourChunked = rChunk.m_neighbourChunked[side];
+        rNeighbourChunked = gc_invalidTri;
+
+        // Neighbour that may be chunked, contains a chunk, or is part of a
+        // chunk
+        SubTriangle const &neighTri = m_icoTree->get_triangle(neighbourIndex);
+        SubTriangleChunk const &neighChunk = m_triangleChunks[neighbourIndex];
+        TriangleSideTransform &neighTransform = rChunk.m_neighbourTransform[side];
+
+        neighTransform.m_scale = 1.0f;
+        neighTransform.m_translation = 0.0f;
+
+        // Get the neighbour, 3 possible cases:
+        if (tri_is_chunked(neighChunk))
+        {
+            // Neighbour is chunked
+            rNeighbourChunked = neighbourIndex;
+        }
+        else if (neighChunk.m_ancestorChunked != gc_invalidTri)
+        {
+            // Neighbour is part of a chunk
+            rNeighbourChunked = neighChunk.m_ancestorChunked;
+        }
+        else if (neighChunk.m_descendentChunked != 0)
+        {
+            // Neighbour has chunked descendent, but has no chunk itself
+            rNeighbourChunked = neighbourIndex;
+            if (rTri.m_depth == neighTri.m_depth)
+            {
+                // if same depth, then set those descendent's chunked
+                // neighbours to t
+
+                chunk_set_neighbour_recurse(neighbourIndex,
+                                            rTri.m_neighbourSide[side], triInd);
+            }
+        }
+
+        // If a neighbour was found:
+        if (rNeighbourChunked != gc_invalidTri)
+        {
+            SubTriangle &rNeighBTri = m_icoTree->get_triangle(rNeighbourChunked);
+            SubTriangleChunk &rNeighBChunk = m_triangleChunks[rNeighbourChunked];
+
+            neighTransform = m_icoTree->transform_to_ancestor(triInd, side,
+                    rNeighBTri.m_depth);
+
+            triside_t neighbourSide = rTri.m_neighbourSide[side];
+
+            if (rTri.m_depth == rNeighBTri.m_depth)
+            {
+
+                rNeighBChunk.m_neighbourChunked[neighbourSide] = triInd;
+                rNeighBChunk.m_neighbourTransform[side]
+                        = TriangleSideTransform{0.0f, 1.0f};
+            }
+            else if (rTri.m_depth > rNeighBTri.m_depth)
+            {
+                rNeighBChunk.m_neighbourTransform[side]
+                        = TriangleSideTransform{0.0f, 1.0f};
+                if (rNeighBChunk.m_neighbourChunked[neighbourSide] == gc_invalidVrtx)
+                {
+                    rNeighBChunk.m_neighbourChunked[neighbourSide]
+                            = rNeighBTri.m_neighbours[neighbourSide];
+                }
+
+            }
+        }
+    }
+
+    // Step 4.1: Create initial triangle with the first 3 corners of the chunk.
+    //           This either creates new vertices or takes one from a neighbour.
 
     using TriToSubdiv_t = std::array<VertexToSubdiv, 3>;
-
-    //uint8_t neighbourDepths[3];
-    SubTriangle* neighbours[3];
-    SubTriangleChunk* neighbourChunks[3];
-    int neighbourSide[3]; // Side of tri relative to neighbour's
 
     TriToSubdiv_t initTri{VertexToSubdiv{0, 0, 0},
                           VertexToSubdiv{0, m_chunkWidthB, 0},
                           VertexToSubdiv{m_chunkWidthB, m_chunkWidthB, 0}};
 
-    // make sure shared corners can be tracked properly
-    unsigned minSize = std::max({tri.m_corners[0] / m_icoTree->m_vrtxSize + 1,
-                                 tri.m_corners[1] / m_icoTree->m_vrtxSize + 1,
-                                 tri.m_corners[2] / m_icoTree->m_vrtxSize + 1,
-                                 (unsigned) m_vrtxSharedIcoCorners.size()});
-    m_vrtxSharedIcoCorners.resize(minSize, m_vrtxSharedMax);
+    // indices to shared and non-shared vertices added when subdividing
+    std::vector<vrindex_t> indices(m_vrtxPerChunk, gc_invalidVrtx);
 
-    // Get neighbours
-    for (int side = 0; side < 3; side ++)
-    {
-        trindex_t neighbourIndex = tri.m_neighbours[side];
-
-        neighbours[side] = &(m_icoTree->get_triangle(neighbourIndex));
-        neighbourSide[side] = m_icoTree->neighbour_side(*neighbours[side], t);
-        neighbourChunks[side] = &m_triangleChunks[neighbourIndex];
-        //neighbourDepths[i] = (triB->m_bitmask & gc_triangleMaskChunked);
-    }
-
-    // create 3 shared vertices for the first triangle
+    // take from neighbour or create 3 shared vertices for the first triangle
     for (int corner = 0; corner < 3; corner ++)
     {
 
@@ -352,70 +360,99 @@ void PlanetGeometryA::chunk_add(trindex_t t)
         int sideA = (corner + 1) % 3;
         int sideB = (corner + 2) % 3;
 
-        vrindex_t vertIndex;
-        buindex_t &sharedCorner = m_vrtxSharedIcoCorners[
-                                 tri.m_corners[corner] / m_icoTree->m_vrtxSize];
+        vrindex_t vertIndex = gc_invalidVrtx;
 
-        if (sharedCorner < m_vrtxSharedMax)
+        vrindex_t triCorner = rTri.m_corners[corner] / m_icoTree->m_vrtxSize;
+        vrindex_t &rSharedCorner = m_vrtxSharedIcoCorners[triCorner];
+
+        if (rSharedCorner != gc_invalidVrtx)
         {
             // a shared triangle can be taken from a corner
-            vertIndex = sharedCorner;
+            vertIndex = rSharedCorner;
             m_vrtxSharedUsers[vertIndex] ++;
-            std::cout << "Corner taken!\n";
         }
-        else
+
+        if (vertIndex == gc_invalidVrtx)
         {
-            bool dummy = false;
 
             // Get a vertex from either of the sides
 
-            vertIndex  = shared_from_neighbour(t, sideA, m_chunkWidthB, dummy);
+            // try side A
+            vertIndex = shared_from_neighbour(triInd, sideA, m_chunkWidthB);
 
+            // if that fails, try side B
             if (vertIndex == gc_invalidVrtx)
             {
-                vertIndex  = shared_from_neighbour(t, sideB, 0, dummy);
+                vertIndex = shared_from_neighbour(triInd, sideB, 0);
             }
 
-            if (vertIndex == gc_invalidVrtx)
-            {
-                vertIndex = shared_create();
-            }
-            else
+            // success, increment user count and stuff
+            if (vertIndex != gc_invalidVrtx)
             {
                 m_vrtxSharedUsers[vertIndex] ++;
+
+                rSharedCorner = vertIndex;
+                m_vrtxSharedIcoCornersReverse[vertIndex] = triCorner;
             }
-            sharedCorner = vertIndex;
         }
 
-        auto vrtxOffset = m_vrtxBuffer.begin() + vertIndex * m_vrtxSize;
+        // if all sharing attempts fail, then create a new one
+        if (vertIndex == gc_invalidVrtx)
+        {
+            vertIndex = shared_create();
+
+            rSharedCorner = vertIndex;
+            m_vrtxSharedIcoCornersReverse[vertIndex] = triCorner;
+        }
+
+
+        buindex_t vrtxOffset = vertIndex * m_vrtxSize;
+        auto vrtxOffsetIt = std::next(m_vrtxBuffer.begin(), vrtxOffset);
 
         // sideB because local ringed indices start at the bottom left
         indices[sideB * m_chunkWidthB] = vertIndex;
         initTri[corner].m_vrtxIndex = vertIndex;
 
-        float *vrtxDataRead = m_icoTree->get_vertex_pos(tri.m_corners[corner]);
+        //float *vrtxDataRead = m_icoTree->get_vertex_pos(tri.m_corners[corner]);
+        vrindex_t icoCornerVrtx = rTri.m_corners[corner];
 
         // Copy Icotree's position and normal data to vertex buffer
 
-        std::copy(vrtxDataRead + m_icoTree->m_vrtxCompOffsetPos,
-                  vrtxDataRead + m_icoTree->m_vrtxCompOffsetPos + 3,
-                  vrtxOffset + m_vrtxCompOffsetPos);
+        Vector3 const& vrtxPos = Vector3::from(
+                    m_icoTree->get_vertex_pos(icoCornerVrtx));
 
-        std::copy(vrtxDataRead + m_icoTree->m_vrtxCompOffsetNrm,
-                  vrtxDataRead + m_icoTree->m_vrtxCompOffsetNrm + 3,
-                  vrtxOffset + m_vrtxCompOffsetNrm);
+        Vector3 const& vrtxNrm = Vector3::from(
+                    m_icoTree->get_vertex_nrm(icoCornerVrtx));
+
+        Vector3 pos = vrtxPos;
+        Vector3 nrm = pos.normalized();
+
+        // temporary
+        pos = nrm * float(m_icoTree->get_radius());
+        pos += nrm * debug_stupid_heightmap(pos);
+
+        std::copy(pos.data(), pos.data() + pos.Size,
+                  std::next(vrtxOffsetIt, m_vrtxCompOffsetPos));
+
+        std::copy(nrm.data(), nrm.data() + nrm.Size,
+                  std::next(vrtxOffsetIt, m_vrtxCompOffsetNrm));
+
+        // Make sure this data is sent to the GPU eventually
+        update_range_insert(m_gpuUpdVrtxBuffer,
+                            {vrtxOffset, vrtxOffset + m_vrtxSize});
     }
 
-    // subdivide the triangle multiple times
+    // Step 4.2: Subdivide the initial triangle multiple times until the right
+    //           level of detail is reached. This will fill the vertex buffer.
 
     std::stack<TriToSubdiv_t> m_toSubdiv;
 
-    // add the first triangle
-    m_toSubdiv.push(initTri);
+    m_toSubdiv.push(initTri); // add the first triangle
 
     // keep track of the non-shared center chunk vertices
     unsigned centerIndex = 0;
 
+    int iteration = 0; // used for debugging
     while (!m_toSubdiv.empty())
     {
         // top, left, right
@@ -438,7 +475,7 @@ void PlanetGeometryA::chunk_add(trindex_t t)
         //
         // v1         m0         v2
 
-        VertexToSubdiv mid[3];
+        std::array<VertexToSubdiv, 3> mid;
 
         // loop through midverts
         for (int i = 0; i < 3; i ++)
@@ -450,7 +487,6 @@ void PlanetGeometryA::chunk_add(trindex_t t)
             mid[i].m_y = (vrtxSubA.m_y + vrtxSubB.m_y) / 2;
 
             loindex_t localIndex = get_index_ringed(mid[i].m_x, mid[i].m_y);
-            bool between = false;
 
             if (indices[localIndex] != gc_invalidVrtx)
             {
@@ -465,14 +501,13 @@ void PlanetGeometryA::chunk_add(trindex_t t)
                 // existing vertex from a neighbouring triangle
 
                 // Both of these should get optimized into a single div op
-                uint8_t side = localIndex / m_chunkWidthB;
+                triside_t side = localIndex / m_chunkWidthB;
                 loindex_t sideInd = localIndex % m_chunkWidthB;
 
                 // Take a vertex from a neighbour, if possible
 
-
-                vrindex_t share = shared_from_neighbour(
-                                        t, side, sideInd, between);
+                vrindex_t share = shared_from_neighbour(triInd, side, sideInd);
+                //share = gc_invalidVrtx;
                 if (share == gc_invalidVrtx)
                 {
                     share = shared_create();
@@ -488,10 +523,13 @@ void PlanetGeometryA::chunk_add(trindex_t t)
                 // Current vertex is in the center and is not shared
 
                 // Use a vertex from the space defined earler
-                mid[i].m_vrtxIndex = chunk.m_dataVrtx + centerIndex;
+                mid[i].m_vrtxIndex = rChunk.m_dataVrtx + centerIndex;
 
                 // Keep track of which middle index is being looped through
                 centerIndex ++;
+
+                //buindex_t vrtxDataMid = mid[i].m_vrtxIndex * m_vrtxSize;
+
             }
 
             indices[localIndex] = mid[i].m_vrtxIndex;
@@ -501,39 +539,43 @@ void PlanetGeometryA::chunk_add(trindex_t t)
             float const* vrtxDataB = m_vrtxBuffer.data()
                                         + vrtxSubB.m_vrtxIndex * m_vrtxSize;
 
-            Vector3 const& vrtxPosA = *reinterpret_cast<Vector3 const*>(
+            Vector3 const& vrtxPosA = Vector3::from(
                                             vrtxDataA + m_vrtxCompOffsetPos);
-            Vector3 const& vrtxPosB = *reinterpret_cast<Vector3 const*>(
+            Vector3 const& vrtxPosB = Vector3::from(
                                             vrtxDataB + m_vrtxCompOffsetPos);
 
-            Vector3 const& vertNrmA = *reinterpret_cast<Vector3 const*>(
+            Vector3 const& vertNrmA = Vector3::from(
                                             vrtxDataA + m_vrtxCompOffsetNrm);
-            Vector3 const& vertNrmB = *reinterpret_cast<Vector3 const*>(
+            Vector3 const& vertNrmB = Vector3::from(
                                             vrtxDataB + m_vrtxCompOffsetNrm);
 
-            auto vrtxDataMid = m_vrtxBuffer.begin()
-                             + mid[i].m_vrtxIndex * m_vrtxSize;
+            buindex_t vrtxDataMid = mid[i].m_vrtxIndex * m_vrtxSize;
+            auto vrtxDataMidIt = std::next(m_vrtxBuffer.begin(), vrtxDataMid);
 
             Vector3 pos = (vrtxPosA + vrtxPosB) * 0.5f;
             Vector3 nrm = pos.normalized();
 
-            if (!between)
-            {
-                pos = nrm * float(m_icoTree->get_radius());
-            }
+            // temporary
+            pos = nrm * float(m_icoTree->get_radius());
+            pos += nrm * debug_stupid_heightmap(pos);
 
             // Add Position data to vertex buffer
-            std::copy(pos.data(), pos.data() + 3,
-                      vrtxDataMid + m_vrtxCompOffsetPos);
+            std::copy(pos.data(), pos.data() + pos.Size,
+                      std::next(vrtxDataMidIt, m_vrtxCompOffsetPos));
 
             // Add Normal data to vertex buffer
-            std::copy(nrm.data(), nrm.data() + 3,
-                      vrtxDataMid + m_vrtxCompOffsetNrm);
+            std::copy(nrm.data(), nrm.data() + nrm.Size,
+                     std::next(vrtxDataMidIt, m_vrtxCompOffsetNrm));
+
+            // Make sure the GPU knows about this individual vertex change
+            update_range_insert(m_gpuUpdVrtxBuffer,
+                                {vrtxDataMid, vrtxDataMid + m_vrtxSize});
+
         }
 
         // return if not subdividable further, distance between two verts
         // is 1
-        if (Magnum::Math::abs<int>(triSub[1].m_x - triSub[2].m_x) == 2)
+        if (abs<int>(triSub[1].m_x - triSub[2].m_x) == 2)
         {
             continue;
         }
@@ -543,20 +585,28 @@ void PlanetGeometryA::chunk_add(trindex_t t)
         m_toSubdiv.emplace(TriToSubdiv_t{   mid[1], triSub[1],     mid[0]});
         m_toSubdiv.emplace(TriToSubdiv_t{   mid[2],    mid[0],  triSub[2]});
         m_toSubdiv.emplace(TriToSubdiv_t{   mid[0],    mid[2],     mid[1]});
+
+        iteration ++;
     }
 
-    // The data that will be pushed directly into the chunk index buffer
+    // Make sure the newly added center vertices are updated to the GPU
+    update_range_insert(m_gpuUpdVrtxBuffer,
+                        {rChunk.m_dataVrtx,
+                         rChunk.m_dataVrtx + m_vrtxPerChunk * m_vrtxSize});
+
+    // Step 5: Vertices are done now. Connect the dots to fill the index buffer.
+
+    // This data will be pushed directly into the chunk index buffer
     // * 3 because there are 3 indices in a triangle
     std::vector<unsigned> chunkIndData(m_indxPerChunk * 3);
-
     int i = 0;
-    // indices array is now populated, connect the dots!
+
     for (int y = 0; y < int(m_chunkWidthB); y ++)
     {
         for (int x = 0; x < y * 2 + 1; x ++)
         {
             // alternate between true and false
-            if (x % 2)
+            if (x % 2 == 1)
             {
                 // upside down triangle
                 // top, left, right
@@ -584,138 +634,367 @@ void PlanetGeometryA::chunk_add(trindex_t t)
         }
     }
 
+    // Put the index data at the end of the buffer
+    rChunk.m_dataIndx = rChunk.m_chunk * chunkIndData.size();
+    std::copy(chunkIndData.begin(), chunkIndData.end(),
+              std::next(m_indxBuffer.begin(), rChunk.m_dataIndx));
+
+    update_range_insert(m_gpuUpdIndxBuffer,
+                        {rChunk.m_dataIndx,
+                         rChunk.m_dataIndx + m_indxPerChunk * 3});
+
+    // Step 6: Update meta/tracking information for other uses.
+
     // Make sure descendents know that they're part of a chunk
-    if (tri.m_bitmask & gc_triangleMaskSubdivided)
+    if (rTri.m_subdivided)
     {
-        set_chunk_ancestor_recurse(tri.m_children + 0, t);
-        set_chunk_ancestor_recurse(tri.m_children + 1, t);
-        set_chunk_ancestor_recurse(tri.m_children + 2, t);
-        set_chunk_ancestor_recurse(tri.m_children + 3, t);
+        set_chunk_ancestor_recurse(rTri.m_children + 0, triInd);
+        set_chunk_ancestor_recurse(rTri.m_children + 1, triInd);
+        set_chunk_ancestor_recurse(rTri.m_children + 2, triInd);
+        set_chunk_ancestor_recurse(rTri.m_children + 3, triInd);
     }
 
     // Let all ancestors know that one of their descendents had got chunky
-    if (tri.m_depth)
+    // Skip depth 0 because m_parent is invalid
+    if (rTri.m_depth != 0)
     {
-        trindex_t curIndex = tri.m_parent;
-        SubTriangle *curTri;
+        trindex_t curIndex = rTri.m_parent;
+        SubTriangle *pCurTri;
         do
         {
-            curTri = &(m_icoTree->get_triangle(curIndex));
+            pCurTri = &(m_icoTree->get_triangle(curIndex));
+            pCurTri->m_useCount ++;
             m_triangleChunks[curIndex].m_descendentChunked ++;
-            curIndex = curTri->m_parent;
+            curIndex = pCurTri->m_parent;
         }
-        while (curTri->m_depth != 0);
+        while (pCurTri->m_depth != 0);
     }
 
-    // Put the index data at the end of the buffer
-    chunk.m_dataIndx = m_chunkCount * chunkIndData.size();
-    std::copy(chunkIndData.begin(), chunkIndData.end(),
-              m_indxBuffer.begin() + chunk.m_dataIndx);
-    m_chunkCount ++;
+    // This new chunk depends on the IcoSphereTree's SubTriangle, so make sure
+    // it isn't deleted using reference counting.
+    rTri.m_useCount ++;
+
+    // Step 7 (Maybe Temporary): Flatten seams on neighbouring chunks of
+    //                           different levels of detail.
+
+    for (triside_t side = 0; side < 3; side ++)
+    {
+        trindex_t neighInd = rChunk.m_neighbourChunked[side];
+
+        if (neighInd == gc_invalidTri)
+        {
+            continue;
+        }
+
+        SubTriangle const &neighTri = m_icoTree->get_triangle(neighInd);
+        SubTriangleChunk const &neighChunk = m_triangleChunks[neighInd];
+
+        if (neighChunk.m_chunk != gc_invalidChunk)
+        {
+            // Fix own edge to blend with larger chunked neighbour
+            chunk_edge_transition(triInd, side, neighTri.m_depth);
+        }
+        else
+        {
+            // Fix neighbour's edge
+            chunk_edge_transition_recurse(neighInd, rTri.m_neighbourSide[side],
+                                          rTri.m_depth);
+        }
+    }
+    //debug_verify_state();
+}
+
+void PlanetGeometryA::chunk_edge_transition(trindex_t triInd, triside_t side,
+                                            uint8_t depth)
+{
+    SubTriangle const& tri = m_icoTree->get_triangle(triInd);
+    SubTriangleChunk const& chunk = m_triangleChunks[triInd];
+
+    //unsigned start = m_chunkWidthB * unsigned(side);
+    //unsigned stop = start + m_chunkWidthB;
+    unsigned step = (1 << (tri.m_depth - depth));
+
+    for (unsigned i = 0; i < m_chunkWidthB; i += step)
+    {
+        vrindex_t vrtxA = shared_from_tri(chunk, side, i);
+        vrindex_t vrtxB = shared_from_tri(chunk, side, i + step);
+        Vector3 const &posA = get_vertex_component<Vector3>(vrtxA,
+                                                      m_vrtxCompOffsetPos);
+        Vector3 const &posB = get_vertex_component<Vector3>(vrtxB,
+                                                      m_vrtxCompOffsetPos);
+
+        Vector3 dir = (posB - posA) / step;
+
+        //std::cout << "dir: " << dir.length() << "\n";
+
+        for (unsigned j = 1; j < step; j ++)
+        {
+            vrindex_t vrtxMid = shared_from_tri(chunk, side, i + j);
+            auto &posMid = get_vertex_component<Vector3>(
+                                vrtxMid, m_vrtxCompOffsetPos);
+
+            posMid = posA + dir * j;
+            //posMid *= 0;
+
+
+            // Make sure this data is sent to the GPU eventually
+            update_range_insert(m_gpuUpdVrtxBuffer,
+                                {vrtxMid * m_vrtxSize, vrtxMid * (m_vrtxSize + 1)});
+        }
+    }
+}
+
+void PlanetGeometryA::chunk_edge_transition_recurse(
+        trindex_t triInd, triside_t side, uint8_t depth)
+{
+    SubTriangle const &tri = m_icoTree->get_triangle(triInd);
+    SubTriangleChunk const &chunk = m_triangleChunks[triInd];
+
+    if (chunk.m_chunk != gc_invalidChunk)
+    {
+        chunk_edge_transition(triInd, side, depth);
+    }
+    else if (tri.m_subdivided)
+    {
+        // Side 0(bottom) corresponds to child triangle 1(left),  2(right)
+        // Side 1(right)  corresponds to child triangle 2(right), 0(top)
+        // Side 2(left)   corresponds to child triangle 0(top),   1(left)
+        chunk_edge_transition_recurse(tri.m_children + ((side + 1) % 3),
+                                      side, depth);
+        chunk_edge_transition_recurse(tri.m_children + ((side + 2) % 3),
+                                      side, depth);
+    }
+}
+
+void PlanetGeometryA::chunk_set_neighbour_recurse(
+        trindex_t triInd, triside_t side, trindex_t to)
+{
+    SubTriangle const &tri = m_icoTree->get_triangle(triInd);
+    SubTriangleChunk &rChunk = m_triangleChunks[triInd];
+
+    if (rChunk.m_chunk != gc_invalidChunk)
+    {
+        rChunk.m_neighbourChunked[side] = to;
+
+        if (to != gc_invalidTri)
+        {
+            rChunk.m_neighbourTransform[side] = m_icoTree->transform_to_ancestor(
+                        triInd, side, m_icoTree->get_triangle(to).m_depth);
+        }
+        else
+        {
+            rChunk.m_neighbourTransform[side] = TriangleSideTransform{0.0f, 1.0f};
+        }
+        return;
+    }
+    if (tri.m_subdivided)
+    {
+        chunk_set_neighbour_recurse(tri.m_children + ((side + 1) % 3),
+                                    side, to);
+        chunk_set_neighbour_recurse(tri.m_children + ((side + 2) % 3),
+                                    side, to);
+    }
 }
 
 
-void PlanetGeometryA::chunk_remove(trindex_t t)
+void PlanetGeometryA::chunk_triangle_assure()
 {
-    SubTriangle &tri = m_icoTree->get_triangle(t);
-    SubTriangleChunk &chunk = m_triangleChunks[t];
+    trindex_t min = std::max<trindex_t>(m_triangleChunks.size(),
+                                        m_icoTree->triangle_count());
+    m_triangleChunks.resize(min, {gc_invalidChunk, 0, gc_invalidTri, 0, 0,
+                                  {gc_invalidTri, gc_invalidTri, gc_invalidTri},
+                                  {}});
+}
 
 
-    if (chunk.m_chunk == gc_invalidChunk)
+void PlanetGeometryA::chunk_remove(trindex_t triInd)
+{
+    //std::cout << "chunk_remove(" << t << ");\n";
+    SubTriangle &rTri = m_icoTree->get_triangle(triInd);
+    SubTriangleChunk &rChunk = m_triangleChunks[triInd];
+
+
+    if (rChunk.m_chunk == gc_invalidChunk)
     {
         // return if not chunked
         return;
     }
-    // Reduce chunk count. now m_chunkCount is equal to the chindex_t of the
-    // last chunk
-    m_chunkCount --;
 
-    // The last triangle in the chunk index buffer
-    SubTriangle &lastTriangle =
-            m_icoTree->get_triangle(m_chunkToTri[m_chunkCount]);
-    SubTriangleChunk &lastChunk =
-            m_triangleChunks[m_chunkToTri[m_chunkCount]];
-
-    // Get positions in index buffer
-    //unsigned* lastTriIndData = m_indxBuffer.data() + lastChunk.m_dataIndx;
-
-    // Replace tri's domain location with lastTriangle
-    m_chunkToTri[chunk.m_chunk] = m_chunkToTri[m_chunkCount];
 
     // Delete Verticies
 
     // Mark middle vertices for replacement
-    m_vrtxFree.push_back(chunk.m_dataVrtx);
+    m_vrtxFree.push_back(rChunk.m_dataVrtx);
 
     // Now delete shared vertices
 
-    unsigned* triIndData = m_indxBuffer.data() + chunk.m_dataIndx;
-
     for (unsigned i = 0; i < m_vrtxSharedPerChunk; i ++)
     {
-        buindex_t sharedIndex = *(triIndData + m_indToShared[i]);
+        vrindex_t sharedIndex = m_indxBuffer[m_indToShared[i]
+                                             + rChunk.m_dataIndx];
 
         // Decrease number of users
         m_vrtxSharedUsers[sharedIndex] --;
 
+        // If users is zero, then delete
         if (m_vrtxSharedUsers[sharedIndex] == 0)
         {
-            // If users is zero, then delete
-            std::cout << "shared removed\n";
+            //std::cout << "shared removed: " << sharedIndex << "\n";
             m_vrtxSharedFree.push_back(sharedIndex);
             m_vrtxSharedCount --;
+
+            // check if a corner was deleted
+            vrindex_t &rCorner = m_vrtxSharedIcoCornersReverse[sharedIndex];
+
+            if (rCorner != gc_invalidVrtx)
+            {
+                // clear entry in m_vrtxSharedIcoCorners too
+                m_vrtxSharedIcoCorners[rCorner] = gc_invalidVrtx;
+                rCorner = gc_invalidVrtx;
+            }
         }
     }
 
-    // loop through shared corners, to see if
-    for (unsigned i = 0; i < 3; i ++)
+    for (triside_t i = 0; i < 3; i ++)
     {
-        buindex_t &sharedCorner = m_vrtxSharedIcoCorners[
-                                 tri.m_corners[i] / m_icoTree->m_vrtxSize];
-        if (m_vrtxSharedUsers[sharedCorner] == 0)
+        // Remove from neighbours
+        trindex_t &rNeighInd = rChunk.m_neighbourChunked[i];
+
+        if (rNeighInd == gc_invalidTri)
         {
-            // corner was deleted, delete entry in m_vrtxSharedIcoCorners too
-            sharedCorner = m_vrtxSharedMax;
-            std::cout << "corner delete\n";
+            continue;
         }
+
+        SubTriangle const& neighTri = m_icoTree->get_triangle(rNeighInd);
+        //SubTriangleChunk const& neighChunk = m_triangleChunks[rNeighInd];
+
+        if (neighTri.m_depth == rTri.m_depth)
+        {
+            chunk_set_neighbour_recurse(rNeighInd, rTri.m_neighbourSide[i], gc_invalidTri);
+        }
+
+        rNeighInd = gc_invalidTri; // now delete own value
     }
-
-
-    // Setting index data
-
-    // Move lastTri's index data to replace tri's data
-    std::copy(m_indxBuffer.begin() + lastChunk.m_dataIndx,
-              m_indxBuffer.begin() + lastChunk.m_dataIndx + m_indxPerChunk * 3,
-              m_indxBuffer.begin() + chunk.m_dataIndx);
 
     // Make sure descendents know that they're no longer part of a chunk
-    if (tri.m_bitmask & gc_triangleMaskSubdivided)
+    if (rTri.m_subdivided)
     {
-        set_chunk_ancestor_recurse(tri.m_children + 0, gc_invalidTri);
-        set_chunk_ancestor_recurse(tri.m_children + 1, gc_invalidTri);
-        set_chunk_ancestor_recurse(tri.m_children + 2, gc_invalidTri);
-        set_chunk_ancestor_recurse(tri.m_children + 3, gc_invalidTri);
+        set_chunk_ancestor_recurse(rTri.m_children + 0, gc_invalidTri);
+        set_chunk_ancestor_recurse(rTri.m_children + 1, gc_invalidTri);
+        set_chunk_ancestor_recurse(rTri.m_children + 2, gc_invalidTri);
+        set_chunk_ancestor_recurse(rTri.m_children + 3, gc_invalidTri);
     }
 
     // Let all ancestors know that lost one of their chunky descendents
+    if (rTri.m_depth != 0)
     {
-        trindex_t curIndex = tri.m_parent;
-        SubTriangle *curTri;
+        trindex_t curIndex = rTri.m_parent;
+        SubTriangle *pCurrentTri;
         do
         {
-            curTri = &(m_icoTree->get_triangle(curIndex));
+            pCurrentTri = &(m_icoTree->get_triangle(curIndex));
+            pCurrentTri->m_useCount --;
             m_triangleChunks[curIndex].m_descendentChunked --;
-            curIndex = curTri->m_parent;
+            curIndex = pCurrentTri->m_parent;
         }
-        while (curTri->m_depth != 0);
+        while (pCurrentTri->m_depth != 0);
     }
 
-    // Change lastTriangle's chunk index to tri's
-    lastChunk.m_dataIndx = chunk.m_dataIndx;
-    lastChunk.m_chunk = chunk.m_chunk;
+    rTri.m_useCount --;
 
-    // Set chunked
-    chunk.m_chunk = gc_invalidChunk;
+    // mark this chunk for replacement
+    m_chunkFree.emplace(rChunk.m_chunk);
+
+    // set to not chunked
+    rChunk.m_chunk = gc_invalidChunk;
+}
+
+void PlanetGeometryA::chunk_remove_descendents_recurse(trindex_t triInd)
+{
+    SubTriangle const &tri = m_icoTree->get_triangle(triInd);
+    SubTriangleChunk const &chunk = m_triangleChunks[triInd];
+
+    if (chunk.m_chunk != gc_invalidChunk)
+    {
+        chunk_remove(triInd);
+    }
+    else if (chunk.m_descendentChunked != 0)
+    {
+        chunk_remove_descendents_recurse(tri.m_children + 0);
+        chunk_remove_descendents_recurse(tri.m_children + 1);
+        chunk_remove_descendents_recurse(tri.m_children + 2);
+        chunk_remove_descendents_recurse(tri.m_children + 3);
+    }
+}
+
+void PlanetGeometryA::chunk_remove_descendents(trindex_t triInd)
+{
+    SubTriangle const &tri = m_icoTree->get_triangle(triInd);
+    SubTriangleChunk const &chunk = m_triangleChunks[triInd];
+
+    if (chunk.m_descendentChunked != 0)
+    {
+        chunk_remove_descendents_recurse(tri.m_children + 0);
+        chunk_remove_descendents_recurse(tri.m_children + 1);
+        chunk_remove_descendents_recurse(tri.m_children + 2);
+        chunk_remove_descendents_recurse(tri.m_children + 3);
+    }
+}
+
+void PlanetGeometryA::chunk_pack()
+{
+    //std::cout << "chunk_pack();\n";
+    for (chindex_t chunk : m_chunkFree)
+    {
+        m_chunkCount --;
+
+        // Get the associated triangle of removed chunk
+        trindex_t replaceT = m_chunkToTri[chunk];
+
+        // Get chunk and triangle data of removed
+        //SubTriangle &replaceTri = m_icoTree->get_triangle(replaceT);
+        SubTriangleChunk &rReplaceChunk = m_triangleChunks[replaceT];
+
+        if (chunk == m_chunkCount)
+        {
+            // chunk on the end of the buffer was removed. the buffer size
+            // shrinks and nothing happens.
+
+            // Set chunked
+            rReplaceChunk.m_chunk = gc_invalidChunk;
+            continue;
+        }
+
+        // Get the associated triangle of the last chunk in the chunk buffer
+        trindex_t moveT = m_chunkToTri[m_chunkCount];
+
+        // Get chunk and triangle data of to move
+        //SubTriangle &moveTri = m_icoTree->get_triangle(moveT);
+        SubTriangleChunk &moveChunk = m_triangleChunks[moveT];
+
+        // Do move
+
+        // Replace tri's domain location with lastTriangle
+        m_chunkToTri[chunk] = m_chunkToTri[moveChunk.m_chunk];
+
+        // Move lastTri's index data to replace tri's data
+        std::copy(std::next(m_indxBuffer.begin(), moveChunk.m_dataIndx),
+                  std::next(m_indxBuffer.begin(), moveChunk.m_dataIndx
+                                                  + m_indxPerChunk * 3),
+                  std::next(m_indxBuffer.begin(), rReplaceChunk.m_dataIndx));
+
+        update_range_insert(m_gpuUpdIndxBuffer,
+                            {rReplaceChunk.m_dataIndx,
+                             rReplaceChunk.m_dataIndx + m_indxPerChunk * 3});
+
+        // Change lastTriangle's chunk index to tri's
+        moveChunk.m_dataIndx = rReplaceChunk.m_dataIndx;
+        moveChunk.m_chunk = chunk;
+    }
+
+    m_chunkFree.clear();
+
+    //debug_verify_state();
 }
 
 void PlanetGeometryA::set_chunk_ancestor_recurse(trindex_t triInd,
@@ -725,7 +1004,7 @@ void PlanetGeometryA::set_chunk_ancestor_recurse(trindex_t triInd,
 
     m_triangleChunks[triInd].m_ancestorChunked = setTo;
 
-    if (!(tri.m_bitmask & gc_triangleMaskSubdivided))
+    if (!tri.m_subdivided)
     {
         return;
     }
@@ -739,7 +1018,7 @@ void PlanetGeometryA::set_chunk_ancestor_recurse(trindex_t triInd,
 
 
 vrindex_t PlanetGeometryA::shared_from_tri(SubTriangleChunk const& chunk,
-                                           uint8_t side, loindex_t pos)
+                                           triside_t side, loindex_t pos)
 {
     //                  8
     //                9   7
@@ -750,165 +1029,104 @@ vrindex_t PlanetGeometryA::shared_from_tri(SubTriangleChunk const& chunk,
 
     // ie. if side = 1, pos will index {8, 9, 10, 11, 0}
 
-    buindex_t localIndex = (side * m_chunkWidthB + pos) % m_vrtxSharedPerChunk;
+    vrindex_t localIndex = (side * m_chunkWidthB + pos) % m_vrtxSharedPerChunk;
 
-    vrindex_t sharedOut = m_indxBuffer[chunk.m_dataIndx + m_indToShared[localIndex]];
+    vrindex_t sharedOut = m_indxBuffer[
+            chunk.m_dataIndx + m_indToShared[localIndex]];
     //m_vrtxSharedUsers[sharedOut] ++;
 
-    std::cout << "grabbing vertex from side " << side << " pos: " << pos << "\n";
     return sharedOut;
 }
 
-vrindex_t PlanetGeometryA::shared_from_neighbour(trindex_t triInd,
-                                                 uint8_t side, loindex_t posIn, bool &rBetween)
+vrindex_t PlanetGeometryA::shared_from_neighbour(
+        trindex_t triInd, triside_t side, loindex_t posIn)
 {
-    vrindex_t sharedOut;
-
-    // if (neighbour is same depth)
-    //     if (neighbour is chunked)
-    //         call shared_from_tri right away
-    //     else if (neighbour is subdivided and has chunked children)
-    //         set found chunk, and use general algorithm
-    //     else if (neighbour is part of a chunk)
-    //         set found chunk, and use general algorithm
-    //     else
-    //         create new shared vertex
-    // else (if neighbour is less depth, aka: it's larger)
-    //     if (neighbour is chunked)
-    //         set found chunk, and use general algorithm
-    //     else if (neighbour is part of chunk)
-    //         set found chunk, and use general algorithm
-    //     else if (neighbour is subdivided and has chunked children)
-    //         THIS CANT HAPPEN, ERROR!
-    // else if neighbour is more depth (smaller)
-    //     THIS CANT HAPPEN, ERROR!
-
-    // general algorithm
-    // Get a chunked triangle on the neighbour
-    // find parents with same depth
-    // transform pos
-
     SubTriangle& tri = m_icoTree->get_triangle(triInd);
-    SubTriangle& neighbourTri = m_icoTree->get_triangle(tri.m_neighbours[side]);
-    SubTriangleChunk& neighbourChunk = m_triangleChunks[tri.m_neighbours[side]];
+    SubTriangleChunk& chunk = m_triangleChunks[triInd];
 
-    uint8_t neighbourSide = 255;// = m_icoTree->neighbour_side(neighbourTri, t);
+    trindex_t neighInd = chunk.m_neighbourChunked[side];
 
-    trindex_t neighbourWithChunk = gc_invalidTri;
+    if (neighInd == gc_invalidTri)
+    {
+        return gc_invalidVrtx;
+    }
 
+    // Transform side position to 0.0f to 1.0f
     float posTransformed = float(posIn) / float(m_chunkWidthB);
 
-    if (tri.m_depth == neighbourTri.m_depth)
+    trindex_t takeInd;
+    triside_t takeSide = tri.m_neighbourSide[side];
+
     {
-        neighbourSide = m_icoTree->neighbour_side(neighbourTri, triInd);
-        if (neighbourChunk.m_chunk != gc_invalidChunk)
+        SubTriangle const &neighTri = m_icoTree->get_triangle(neighInd);
+        SubTriangleChunk const &neighChunk = m_triangleChunks[neighInd];
+
+        if (neighChunk.m_chunk != gc_invalidChunk)
         {
-            // ideal case, same size and is chunked
-            return shared_from_tri(neighbourChunk, neighbourSide,
-                                   m_chunkWidthB - posIn);
+            takeInd = chunk.m_neighbourChunked[side];
         }
-        else if (neighbourChunk.m_descendentChunked != 0)
+        else // if neigh is same depth and contains chunked descendents.
         {
-            // TODO: deal with 0.5f
-            // has chunked children, grand children, etc... search for them
+            // A subdivided triangle has 4 children. 2 children are exposed on
+            // each edge. Middle child [3] is ignored. A point on the edge can
+            // be part of one of two children, depending on which half of the
+            // edge the point is on "(posChild > 0.5f)"
+            //
             // side 0 (bottom) : children 1->2
             // side 1  (right) : children 2->0
             // side 2   (left) : children 0->1
+            // this is implemented by "(takeSide + 1 + useLatterChild) % 3"
+            //
+            // The following will step down the tree of descendents until a
+            // chunked child is found. Middle points (posTransformed = 0.5)
+            // will never happen due to ico vertex sharing.
 
             float posChild = 1.0f - posTransformed;
 
-            SubTriangleChunk *triChildChunk = &neighbourChunk;
-            SubTriangle *triChildTri = &neighbourTri;
+            SubTriangleChunk const *triChildChunk;
+            SubTriangle const *triChildTri = &neighTri;
             trindex_t triNextChild;
 
             do
             {
-                if (neighbourChunk.m_descendentChunked == 0
-                    || !(triChildTri->m_bitmask & gc_triangleMaskSubdivided))
+                if (!triChildTri->m_subdivided)
                 {
                     return gc_invalidVrtx;
                 }
 
-                bool useLatterChild = posChild > 0.5f;
+                int useLatterChild = int(posChild > 0.5f);
                 triNextChild = triChildTri->m_children
-                             + (neighbourSide + 1 + useLatterChild) % 3;
+                             + (takeSide + 1 + useLatterChild) % 3;
 
                 triChildTri = &(m_icoTree->get_triangle(triNextChild));
                 triChildChunk = &m_triangleChunks[triNextChild];
 
-                posChild -= 0.5f * useLatterChild;
-                posChild *= 2;
+                posChild -= 0.5f * float(useLatterChild);
+                posChild *= 2.0f;
 
             }
             while (triChildChunk->m_chunk == gc_invalidChunk);
 
-            neighbourWithChunk = triNextChild;
-
-        }
-        else if (neighbourChunk.m_ancestorChunked != gc_invalidTri)
-        {
-            // part of a chunk
-            neighbourWithChunk = neighbourChunk.m_ancestorChunked;
-        }
-        else
-        {
-            return gc_invalidVrtx;
+            takeInd = triNextChild;
         }
     }
-    else if (tri.m_depth > neighbourTri.m_depth)
-    {
-        if (neighbourChunk.m_chunk != gc_invalidChunk)
-        {
-            neighbourWithChunk = tri.m_neighbours[side];
-        }
-        else if (neighbourChunk.m_ancestorChunked != gc_invalidTri)
-        {
-            // part of a chunk
-            neighbourWithChunk = neighbourChunk.m_ancestorChunked;
-        }
-        else
-        {
-            return gc_invalidVrtx;
-        }
 
-    }
-    else
-    {
-        // TODO: throw some error here
-        return gc_invalidVrtx;
-    }
-
-    SubTriangle &chunkedNeighbourTri = m_icoTree->get_triangle(neighbourWithChunk);
+    SubTriangle const &takeTri = m_icoTree->get_triangle(takeInd);
+    SubTriangleChunk const &takeChunk = m_triangleChunks[takeInd];
 
     // Detect if trying to get a space between vertices using divisibility by
     // powers of 2
-    if ((tri.m_depth > chunkedNeighbourTri.m_depth))
+    if (tri.m_depth > takeTri.m_depth)
     {
-        if (posIn % (1 << (tri.m_depth - chunkedNeighbourTri.m_depth)) != 0)
+        if (posIn % pow(2, int(tri.m_depth - takeTri.m_depth)) != 0)
         {
-            rBetween = true;
             return gc_invalidVrtx;
         }
     }
 
-    uint8_t commonDepth = std::min(
-                tri.m_depth,
-                chunkedNeighbourTri.m_depth);
+    TriangleSideTransform tranFrom = chunk.m_neighbourTransform[side];
+    TriangleSideTransform tranTo = takeChunk.m_neighbourTransform[takeSide];
 
-    trindex_t ancestor;
-
-    TriangleSideTransform tranFrom = m_icoTree->transform_to_ancestor(triInd, side, commonDepth, &ancestor);
-
-    if (neighbourSide == 255)
-    {
-        neighbourSide = m_icoTree->neighbour_side(chunkedNeighbourTri, ancestor);
-    }
-
-    TriangleSideTransform tranTo = m_icoTree->transform_to_ancestor(neighbourWithChunk, neighbourSide,
-                                     commonDepth);
-
-    // normalize
-    //float posTransformed = float(posIn) / float(m_chunkWidthB);
     // apply transform from
     posTransformed = posTransformed * tranFrom.m_scale + tranFrom.m_translation;
     // invert
@@ -918,8 +1136,9 @@ vrindex_t PlanetGeometryA::shared_from_neighbour(trindex_t triInd,
 
     loindex_t posOut = std::round(posTransformed * m_chunkWidthB);
 
-    return shared_from_tri(m_triangleChunks[neighbourWithChunk], neighbourSide, posOut);
+    return shared_from_tri(takeChunk, takeSide, posOut);
 }
+
 
 vrindex_t PlanetGeometryA::shared_create()
 {
@@ -929,9 +1148,9 @@ vrindex_t PlanetGeometryA::shared_create()
     if (m_vrtxSharedCount + 1 >= m_vrtxSharedMax)
     {
         // TODO: shared vertex buffer full, error!
-        return false;
+        return gc_invalidVrtx;
     }
-    if (m_vrtxSharedFree.size() == 0)
+    if (m_vrtxSharedFree.empty())
     {
         sharedOut = m_vrtxSharedCount;
     }
@@ -944,5 +1163,187 @@ vrindex_t PlanetGeometryA::shared_create()
     m_vrtxSharedCount ++;
     m_vrtxSharedUsers[sharedOut] = 1; // set reference count
 
+    //std::cout << "shared create: " << sharedOut << "\n";
+
     return sharedOut;
+}
+
+void PlanetGeometryA::updates_clear()
+{
+    m_gpuUpdIndxBuffer.clear();
+    m_gpuUpdVrtxBuffer.clear();
+}
+
+
+unsigned PlanetGeometryA::debug_chunk_count_descendents(SubTriangle const& tri)
+{
+    unsigned count = 0;
+
+    if (tri.m_subdivided)
+    {
+        for (trindex_t i = 0; i < 4; i ++)
+        {
+            SubTriangle const &childTri = m_icoTree->get_triangle(tri.m_children + i);
+            SubTriangleChunk const &childChunk = m_triangleChunks[tri.m_children + i];
+
+            if (tri_is_chunked(childChunk))
+            {
+                count ++;
+            }
+
+            count += debug_chunk_count_descendents(childTri);
+        }
+    }
+
+    return count;
+}
+
+bool PlanetGeometryA::debug_verify_state()
+{
+    // Things to do:
+    // Verify shared vertices:
+    // * For all chunked triangles, count shared vertex uses
+    // * Make sure no deleted vertices are being used
+    // Verify that m_chunkCount is the same as number of chunked triangles
+    // Verify chunk hierarchy (m_descendentChunked and m_ancestorChunked):
+    // * Recurse through through all descendents and count chunked ones
+    // * Go up chain of parents and see if there's a chunked one
+    // Verify vertex sharing if chunked
+    // * Loop through shared vertices and make sure the neighbours use them too
+
+    std::cout << "PlanetGeometryA Verify:\n";
+
+    std::vector<uint8_t> recountVrtxSharedUsers(m_vrtxSharedUsers.size(), 0);
+
+    bool error = false;
+
+    unsigned chunkCount = 0;
+
+    for (trindex_t t = 0; t < m_triangleChunks.size(); t ++)
+    {
+        SubTriangle &tri = m_icoTree->get_triangle(t);
+        SubTriangleChunk &chunk = m_triangleChunks[t];
+
+        if (tri.m_deleted)
+        {
+            continue;
+        }
+
+        // Verify chunk hierarchy
+
+        // Count chunked descendents
+
+        unsigned countDescendentChunked = debug_chunk_count_descendents(tri);
+
+        if (countDescendentChunked != chunk.m_descendentChunked)
+        {
+            std::cout << "* Invalid chunk " << t << ": "
+                      << "Incorrect chunked descendent count\n";
+            error = true;
+        }
+
+        // Verify chunked ancestor
+
+        trindex_t ancestorChunked = gc_invalidChunk;
+
+        if (tri.m_depth > 0)
+        {
+            trindex_t curIndex = tri.m_parent;
+            SubTriangle const *curTri;
+            do
+            {
+                curTri = &(m_icoTree->get_triangle(curIndex));
+                if (tri_is_chunked(m_triangleChunks[curIndex]))
+                {
+                    ancestorChunked = curIndex;
+                    break;
+                }
+                curIndex = curTri->m_parent;
+            }
+            while (curTri->m_depth != 0);
+
+            if (ancestorChunked != chunk.m_ancestorChunked)
+            {
+                std::cout << "* Invalid chunk " << t << ": "
+                          << "Incorrect chunked ancestor\n";
+                error = true;
+            }
+        }
+
+        if (tri_is_chunked(chunk))
+        {
+            chunkCount ++;
+
+            // Count shared vertices
+
+            unsigned* triIndData = m_indxBuffer.data() + chunk.m_dataIndx;
+
+            for (unsigned i = 0; i < m_vrtxSharedPerChunk; i ++)
+            {
+                vrindex_t sharedIndex = *(triIndData + m_indToShared[i]);
+                recountVrtxSharedUsers[sharedIndex] ++;
+            }
+        }
+    }
+
+    if (chunkCount + m_chunkFree.size() != m_chunkCount)
+    {
+        std::cout << "* Invalid chunk count\n";
+        error = true;
+    }
+
+    if (recountVrtxSharedUsers != m_vrtxSharedUsers)
+    {
+        std::cout << "* Invalid Shared vertex user count\n";
+        for (unsigned i = 0; i < m_vrtxSharedMax; i ++)
+        {
+            if (m_vrtxSharedUsers[i] != recountVrtxSharedUsers[i])
+            {
+                std::cout << "  * Vertex: " << i << "\n"
+                          << "\n    * Expected: " << int(recountVrtxSharedUsers[i])
+                          << "\n    * Obtained: " << int(m_vrtxSharedUsers[i]);
+            }
+        }
+
+        std::cout << "\n";
+
+        error = true;
+    }
+
+    return error;
+}
+
+void PlanetGeometryA::on_ico_triangles_added(
+        std::vector<trindex_t> const& added)
+{
+    //std::cout << "foo!\n";
+}
+
+void PlanetGeometryA::on_ico_triangles_removed(
+        std::vector<trindex_t> const& removed)
+{
+    //std::cout << "bar!\n";
+    for (trindex_t t : removed)
+    {
+        m_triangleChunks[t].m_ancestorChunked = gc_invalidTri;
+        m_triangleChunks[t].m_descendentChunked = 0;
+
+        // remove some shared corners
+    }
+}
+
+void PlanetGeometryA::on_ico_vertex_removed(
+        std::vector<vrindex_t> const& vrtxRemoved)
+{
+    for (vrindex_t vrtx : vrtxRemoved)
+    {
+        vrindex_t &shared = m_vrtxSharedIcoCorners[vrtx];
+
+        if (shared != gc_invalidVrtx) // some corners are deleted properly
+        {
+            // Mark as deleted from both arrays
+            m_vrtxSharedIcoCornersReverse[shared] = gc_invalidVrtx;
+            shared = gc_invalidVrtx;
+        }
+    }
 }

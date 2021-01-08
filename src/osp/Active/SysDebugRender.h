@@ -56,7 +56,7 @@ public:
 private:
     ActiveScene &m_scene;
 
-    RenderOrderHandle m_renderDebugDraw;
+    RenderOrderHandle_t m_renderDebugDraw;
 };
 
 }

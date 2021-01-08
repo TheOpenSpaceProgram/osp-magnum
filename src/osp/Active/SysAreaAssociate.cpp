@@ -33,16 +33,16 @@ using namespace osp;
 
 const std::string SysAreaAssociate::smc_name = "AreaAssociate";
 
-SysAreaAssociate::SysAreaAssociate(ActiveScene &rScene, Universe &uni) :
-       m_scene(rScene),
-       m_universe(uni),
-       m_updateScan(rScene.get_update_order(), "areascan", "physics", "",
-                    [this] { this->update_scan(); })
+SysAreaAssociate::SysAreaAssociate(ActiveScene &rScene, Universe &uni)
+ : m_scene(rScene)
+ , m_universe(uni)
+ , m_updateScan(rScene.get_update_order(), "areascan", "physics", "",
+                [this] (ActiveScene& rScene) { this->update_scan(rScene); })
 {
 
 }
 
-void SysAreaAssociate::update_scan()
+void SysAreaAssociate::update_scan(ActiveScene& rScene)
 {
     // scan for nearby satellites, maybe move this somewhere else some day
 

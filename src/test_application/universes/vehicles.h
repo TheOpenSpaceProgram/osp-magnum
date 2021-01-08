@@ -27,6 +27,7 @@
 
 #include <osp/Universe.h>
 #include <osp/Resource/Package.h>
+#include <string_view>
 
 namespace testapp
 {
@@ -44,7 +45,7 @@ namespace testapp
  */
 osp::universe::Satellite debug_add_deterministic_vehicle(
         osp::universe::Universe& uni, osp::Package& pkg,
-        std::string const & name);
+        std::string_view name);
 
 /**
  * Creates a vehicle satellite and adds a random mess of 10 part_spamcans to it.
@@ -60,8 +61,21 @@ osp::universe::Satellite debug_add_deterministic_vehicle(
  */
 osp::universe::Satellite debug_add_random_vehicle(
         osp::universe::Universe& uni, osp::Package& pkg,
-        std::string const & name);
+        std::string_view name);
 
+/**
+ * Creates a vehicle satellite and adds a multi-part rocket to it.
+ * This will fetch the parts "ph_capsule", "ph_fuselage", and "ph_engine" (ph
+ * here stands for "placeholder") and link them into a single BlueprintVehicle.
+ *
+ * @param uni [in,out] Universe to create the vehicle in
+ * @param pkg [in,out] Package to search for parts and save the blueprint
+ * @param name [in] Name of the vehicle used for blueprint and satellite
+ * @return Satellite containing UCompVehicle
+ */
+osp::universe::Satellite debug_add_part_vehicle(
+    osp::universe::Universe& uni, osp::Package& pkg,
+    std::string_view name);
 
 // TODO: put test with creating a universe with just vehicles
 

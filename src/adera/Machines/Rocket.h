@@ -51,7 +51,7 @@ public:
 
 private:
 
-    osp::active::UpdateOrderHandle m_updatePhysics;
+    osp::active::UpdateOrderHandle_t m_updatePhysics;
 };
 
 /**

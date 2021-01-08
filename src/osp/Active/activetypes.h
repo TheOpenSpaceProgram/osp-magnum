@@ -43,13 +43,14 @@ struct ACompCamera;
 
 constexpr unsigned gc_heir_physics_level = 1;
 
-using ActiveEnt = entt::entity;
+enum class ActiveEnt: entt::id_type {};
+using ActiveReg_t = entt::basic_registry<ActiveEnt>;
 
-using UpdateOrder = FunctionOrder<void(void)>;
-using UpdateOrderHandle = FunctionOrderHandle<void(void)>;
+using UpdateOrder_t = FunctionOrder<void(ActiveScene&)>;
+using UpdateOrderHandle_t = FunctionOrderHandle<void(ActiveScene&)>;
 
-using RenderOrder = FunctionOrder<void(ACompCamera const&)>;
-using RenderOrderHandle = FunctionOrderHandle<void(ACompCamera const&)>;
+using RenderOrder_t = FunctionOrder<void(ACompCamera const&)>;
+using RenderOrderHandle_t = FunctionOrderHandle<void(ACompCamera const&)>;
 
 struct ACompFloatingOrigin
 {

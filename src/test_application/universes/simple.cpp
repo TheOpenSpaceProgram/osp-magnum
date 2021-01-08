@@ -79,7 +79,8 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
         stationary.add(sat);
     }
 
-    Satellite sat = debug_add_deterministic_vehicle(uni, pkg, "Stomper Mk. I");
+    //Satellite sat = debug_add_deterministic_vehicle(uni, pkg, "Stomper Mk. I");
+    Satellite sat = testapp::debug_add_part_vehicle(uni, pkg, "Placeholder Mk. I");
     auto& posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
     posTraj.m_position = osp::Vector3s(22 * 1024l * 5l, 0l, 0l);
     posTraj.m_dirty = true;
@@ -97,15 +98,19 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
             // assign sat as a planet
             UCompPlanet &planet = typePlanet.add_get_ucomp(sat);
 
-            // set radius
-            planet.m_radius = 128;
+            // Configure planet as a 256m radius sphere of black hole
+            planet.m_radius = 256;
+            planet.m_mass = 7.03E7 * 99999999; // volume of sphere * density
+
+            planet.m_resolutionScreenMax = 0.056f;
+            planet.m_resolutionSurfaceMax = 2.0f;
 
             auto &posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
 
             // space planets 400m apart from each other
             // 1024 units = 1 meter
             posTraj.m_position = {x * 1024l * 400l,
-                                  1024l * -140l,
+                                  1024l * -300l,
                                   z * 1024l * 400l};
         }
     }

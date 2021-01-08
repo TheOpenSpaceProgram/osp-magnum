@@ -24,7 +24,13 @@
  */
 #pragma once
 
+#include <osp/types.h>
+
+#include <array>
 #include <cstdint>
+#include <functional>
+#include <limits>
+#include <list>
 #include <memory>
 #include <vector>
 
@@ -33,17 +39,25 @@ namespace planeta
 
 // Index to a triangle
 using trindex_t = uint32_t;
+constexpr trindex_t gc_invalidTri = std::numeric_limits<trindex_t>::max();
 
 // Index to a buffer
 using buindex_t = uint32_t;
+constexpr buindex_t gc_invalidBufIndx = std::numeric_limits<buindex_t>::max();
+
+// Index to vertex
+using vrindex_t = uint32_t;
+constexpr vrindex_t gc_invalidVrtx = std::numeric_limits<vrindex_t>::max();
+
 
 class IcoSphereTree;
 struct SubTriangle;
 struct TriangleSideTransform;
 
+
 // The 20 faces of the icosahedron (Top, Left, Right)
 // Each number pointing to a vertex
-static constexpr uint8_t sc_icoTemplateTris[20 * 3] {
+inline constexpr uint8_t sc_icoTemplateTris[20 * 3] {
 //  TT  LL  RR   TT  LL  RR   TT  LL  RR   TT  LL  RR   TT  LL  RR
      0,  2,  1,   0,  3,  2,   0,  4,  3,   0,  5,  4,   0,  1,  5,
      8,  1,  2,   2,  7,  8,   7,  2,  3,   3,  6,  7,   6,  3,  4,
@@ -52,7 +66,7 @@ static constexpr uint8_t sc_icoTemplateTris[20 * 3] {
 };
 
 // The 20 faces of the icosahedron (Bottom, Right, Left)
-static constexpr uint8_t sc_icoTemplateneighbours[20 * 3] {
+inline constexpr uint8_t sc_icoTemplateneighbours[20 * 3] {
 //  BB  RR  LL   BB  RR  LL   BB  RR  LL   BB  RR  LL   BB  RR  LL
      5,  4,  1,   7,  0,  2,   9,  1,  3,  11,  2,  4,  13,  3,  0,
      0,  6, 14,  16,  5,  7,   1,  8,  6,  15,  7,  9,   2, 10,  8,
@@ -61,14 +75,108 @@ static constexpr uint8_t sc_icoTemplateneighbours[20 * 3] {
 };
 
 // If these change, then the universe is broken
-static constexpr int gc_icosahedronFaceCount = 20;
-static constexpr int gc_icosahedronVertCount = 12;
+inline constexpr int gc_icosahedronFaceCount = 20;
+inline constexpr int gc_icosahedronVertCount = 12;
 
-static constexpr std::uint8_t gc_triangleMaskSubdivided = 0b0001;
-//static constexpr std::uint8_t gc_triangleMaskChunked    = 0b0010;
+template<typename INT_ENUM_T>
+constexpr INT_ENUM_T cycle3(INT_ENUM_T in, int cycle)
+{
+    return INT_ENUM_T((int(in) + cycle) % 3);
+}
 
-// An icosahedron with subdividable faces
-// it starts with 20 triangles, and each face can be subdivided into 4 more
+using triside_t = int8_t;
+
+enum ETriSibling : std::uint8_t
+{
+    TriSiblingTop       = 0,
+    TriSiblingLeft      = 1,
+    TriSiblingRight     = 2,
+    TriSiblingCenter    = 3
+};
+
+/**
+ * A simple 1D translation and scale
+ */
+struct TriangleSideTransform
+{
+    float m_translation{0.0f};
+    float m_scale{1.0f};
+};
+
+class IcoSphereTreeObserver
+{
+public:
+    using Handle_T = std::list<std::weak_ptr<IcoSphereTreeObserver>>::iterator;
+
+    virtual void on_ico_triangles_added(std::vector<trindex_t> const&) = 0;
+    virtual void on_ico_triangles_removed(std::vector<trindex_t> const&) = 0;
+    virtual void on_ico_vertex_removed(std::vector<vrindex_t> const&) = 0;
+};
+
+/**
+ * A triangle on the IcoSphereTree
+ */
+struct SubTriangle
+{
+    trindex_t m_parent;
+    ETriSibling m_siblingIndex;
+
+    std::array<trindex_t, 3> m_neighbours;
+    std::array<buindex_t, 3> m_corners; // to vertex buffer, 3 corners of triangle
+
+    osp::Vector3 m_center;
+
+    bool m_subdivided{false};
+    bool m_deleted{false};
+
+    // 0 for first 20 triangles of icosahedron. +1 for each depth onwards
+    uint8_t m_depth{0};
+
+    // Data used when subdivided
+
+    // index to first child, always has 4 children if subdivided
+    // Top Left Right Center
+    trindex_t m_children;
+    std::array<buindex_t, 3> m_midVrtxs; // Bottom, Right, Left vertices in index buffer
+    buindex_t m_index; // to index buffer
+
+    // Index to Neighbour's m_neighbours that points to this triangle
+    std::array<triside_t, 3> m_neighbourSide;
+
+    // Number of times this triangle is being used externally
+    // Make sure this number is zero before removing this triangle
+    // Examples of uses
+    // * used by both a separate renderer and a collider generator
+    // * used across multiple scenes
+    unsigned m_useCount;
+
+    constexpr trindex_t get_child(int i) { return m_children + i; }
+
+    /**
+     * Find which side a triangle is on another triangle
+     * @param [in] lookingFor Index of triangle to search for
+     * @return Neighbour index (0 - 2), or bottom, left, or right
+     */
+    constexpr int find_neighbour_side(const trindex_t lookingFor)
+    {
+        // Loop through neighbours on the edges. child 4 (center) is not considered
+        // as all it's neighbours are its siblings
+        if (this->m_neighbours[0] == lookingFor) { return 0; }
+        if (this->m_neighbours[1] == lookingFor) { return 1; }
+        if (this->m_neighbours[2] == lookingFor) { return 2; }
+
+        // Neighbour not found
+        return -1;
+    }
+};
+
+
+
+
+/**
+ * An Icosahedron with subdividable faces
+ * it starts with 20 triangles, and each face can be subdivided into 4 more
+ */
 class IcoSphereTree
 {
 
@@ -90,33 +198,36 @@ public:
 
     void initialize(float radius);
 
+    trindex_t triangle_count() { return m_triangles.size(); }
+
     /**
      * Get triangle from vector of triangles
      * be careful of reallocation!
-     * @param t [in] Index to triangle
+     * @param triInd [in] Index to triangle
      * @return Pointer to triangle
      */
-    SubTriangle& get_triangle(trindex_t t)
+    SubTriangle& get_triangle(trindex_t triInd)
     {
-        return m_triangles[t];
+        return m_triangles[triInd];
     }
 
-    trindex_t triangle_count()
-    {
-        return m_triangles.size();
-    }
-
-    std::vector<float> const& get_vertex_buffer()
+    constexpr std::vector<float> const& get_vertex_buffer()
     {
         return m_vrtxBuffer;
     }
 
-    float* get_vertex_pos(buindex_t vrtOffset)
+    /**
+     * @return Position component of vertex
+     */
+    float* get_vertex_pos(vrindex_t vrtOffset)
     {
         return m_vrtxBuffer.data() + vrtOffset + m_vrtxCompOffsetPos;
     }
 
-    float* get_vertex_nrm(buindex_t nrmOffset)
+    /**
+     * @return Normal component of vertex
+     */
+    float* get_vertex_nrm(vrindex_t nrmOffset)
     {
         return m_vrtxBuffer.data() + nrmOffset + m_vrtxCompOffsetNrm;
     }
@@ -127,73 +238,97 @@ public:
     }
 
     /**
-     * A quick way to set neighbours of a triangle
+     * Calculates and sets m_center of a SubTriangle
      * @param tri [ref] Reference to triangle
-     * @param bot [in] Bottom
-     * @param rte [in] Right
-     * @param lft [in] Left
      */
-    static void set_neighbours(SubTriangle& tri, trindex_t bot,
-                               trindex_t rte, trindex_t lft);
+    void calculate_center(SubTriangle& rTri);
 
     /**
-     * A quick way to set vertices of a triangle
+     * Set a neighbour of a triangle, and apply for all of it's children's
      * @param tri [ref] Reference to triangle
-     * @param top [in] Top
-     * @param lft Left
-     * @param rte Right
+     * @param side [in] Which side to set
+     * @param to [in] Neighbour to operate on
      */
-    static void set_verts(SubTriangle& tri, buindex_t top,
-                          buindex_t lft, buindex_t rte);
+    void set_side_recurse(SubTriangle& rTri, int side, trindex_t to);
 
-    void set_side_recurse(SubTriangle& tri, int side, trindex_t to);
-
-    /**
-     * Find which side a triangle is on another triangle
-     * @param [ref] tri Reference to triangle to be searched
-     * @param [in] lookingFor Index of triangle to search for
-     * @return Neighbour index (0 - 2), or bottom, left, or right
-     */
-    static int neighbour_side(const SubTriangle& tri,
-                              const trindex_t lookingFor);
+    trindex_t ancestor_at_depth(trindex_t start, uint8_t targetDepth);
 
     /**
      * Subdivide a triangle into 4 more
      * @param [in] Triangle to subdivide
+     * @return 0 if subdivision is succesful
      */
-    void subdivide_add(trindex_t t);
+    int subdivide_add(trindex_t triInd);
 
     /**
      * Unsubdivide a triangle.
      * Removes children and sets neighbours of neighbours
      * @param t [in] Index of triangle to unsubdivide
+     * @return 0 if removal is succesful
      */
-    void subdivide_remove(trindex_t t);
+    int subdivide_remove(trindex_t triInd);
 
     /**
-     * Calculates and sets m_center
-     * @param tri [ref] Reference to triangle
+     * Calls subdivide_remove on all triangles that have a 0 m_useCount
      */
-    void calculate_center(SubTriangle& tri);
+    void subdivide_remove_all_unused();
 
-    std::pair<trindex_t, trindex_t> find_neighbouring_ancestors(trindex_t a,
-                                                                trindex_t b);
+    /**
+     * Adds an observer to listen for events
+     * @param observer [in] Observer to notify for events
+     * @return Iterator to observer once added to internal container, intended
+     *         to allow removing the observer later on.
+     */
+    IcoSphereTreeObserver::Handle_T event_add(
+            std::weak_ptr<IcoSphereTreeObserver> observer);
 
-    TriangleSideTransform transform_to_ancestor(trindex_t t, uint8_t side,
-                                                uint8_t targetDepth, trindex_t *pAncestorOut = nullptr);
+    /**
+     * Remove an observer [TODO]
+     * @param observer
+     */
+    void event_remove(IcoSphereTreeObserver::Handle_T observer);
+
+    /**
+     * Notify all observers about changes in triangles and vertices.
+     */
+    void event_notify();
+
+    /**
+     * Create a TriangleSideTransform that converts coordinate space from child
+     * to ancestor. If 0.0 to 1.0 refers to a position along the edge of a
+     * child, then transforming to the parent's coordinate space will result in
+     * a number between 0.0 and 0.5, or 0.5 to 1.0.
+     *
+     * @param t             [in] Triangle with coordinates to transform from
+     * @param side          [in] Which side of that triangle to use
+     * @param targetDepth   [in] Depth of ancestor to transform to
+     * @param pAncestorOut  [out] optional index of ancestor triangle once found
+     * @return A TriangleSideTransform that can be used to transform positions
+     */
+    TriangleSideTransform transform_to_ancestor(
+            trindex_t triInd, triside_t side, uint8_t targetDepth,
+            trindex_t *pAncestorOut = nullptr);
+
+    /**
+     * Checks all triangles for invalid states in order to squash some bugs
+     * @return true when error detected
+     */
+    bool debug_verify_state();
 
 private:
 
-    //PODVector<PlanetWrenderer> m_viewers;
     std::vector<float> m_vrtxBuffer;
     std::vector<SubTriangle> m_triangles; // List of all triangles
+
     // List of indices to deleted triangles in the m_triangles
     std::vector<trindex_t> m_trianglesFree;
     std::vector<buindex_t> m_vrtxFree; // Deleted vertices in m_vertBuf
-    // use "m_indDomain[buindex_t]" to get a triangle index
 
-    uint8_t m_maxDepth;
-    uint8_t m_minDepth; // never subdivide below this
+    std::vector<trindex_t> m_trianglesAdded;
+    std::vector<trindex_t> m_trianglesRemoved;
+    std::vector<trindex_t> m_vrtxRemoved;
+
+    std::list<std::weak_ptr<IcoSphereTreeObserver>> m_observers;
 
     buindex_t m_maxVertice;
     buindex_t m_maxTriangles;
@@ -202,40 +337,4 @@ private:
 
     float m_radius;
 };
-
-
-struct TriangleSideTransform
-{
-    float m_translation;
-    float m_scale;
-};
-
-
-// Triangle on the IcoSphereTree
-struct SubTriangle
-{
-    trindex_t m_parent;
-    uint8_t m_siblingIndex; // 0:Top 1:Left 2:Right 3:Center
-
-    trindex_t m_neighbours[3];
-    buindex_t m_corners[3]; // to vertex buffer, 3 corners of triangle
-
-    //bool subdivided;
-    uint8_t m_bitmask;
-    uint8_t m_depth;
-
-    // Data used when subdivided
-
-    // index to first child, always has 4 children if subdivided
-    // Top Left Right Center
-    trindex_t m_children;
-    buindex_t m_midVrtxs[3]; // Bottom, Right, Left vertices in index buffer
-    buindex_t m_index; // to index buffer
-
-    // Data used when chunked
-    //unsigned m_chunk; // Index to chunk. (First triangle ever chunked will be 0)
-    //buindex_t m_chunkIndx; // Index to index data in the index buffer
-    //buindex_t m_chunkVrtx; // Index to vertex data
-};
-
 }

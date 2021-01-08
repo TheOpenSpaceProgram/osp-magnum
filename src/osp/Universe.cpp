@@ -51,13 +51,13 @@ void Universe::sat_remove(Satellite sat)
 }
 
 
-Vector3s Universe::sat_calc_pos(Satellite referenceFrame, Satellite target)
+Vector3s Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) const
 {
-    auto view = m_registry.view<UCompTransformTraj>();
+    auto const view = m_registry.view<const UCompTransformTraj>();
 
     // TODO: maybe do some checks to make sure they have the components
-    auto &framePosTraj = view.get<UCompTransformTraj>(referenceFrame);
-    auto &targetPosTraj = view.get<UCompTransformTraj>(target);
+    auto const &framePosTraj = view.get<const UCompTransformTraj>(referenceFrame);
+    auto const &targetPosTraj = view.get<const UCompTransformTraj>(target);
 
     if (framePosTraj.m_parent == targetPosTraj.m_parent)
     {
@@ -69,7 +69,7 @@ Vector3s Universe::sat_calc_pos(Satellite referenceFrame, Satellite target)
     return {0, 0, 0};
 }
 
-Vector3 Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target)
+Vector3 Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const
 {
     // 1024 units = 1 meter. this can change
     return Vector3(sat_calc_pos(referenceFrame, target)) / 1024.0f;

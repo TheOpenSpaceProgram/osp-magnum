@@ -31,6 +31,8 @@
 #include <osp/Active/SysForceFields.h>
 #include <osp/Active/activetypes.h>
 
+#include <osp/UserInputHandler.h>
+
 #include <Magnum/Shaders/MeshVisualizer.h>
 #include <Magnum/GL/Mesh.h>
 
@@ -40,7 +42,8 @@ namespace planeta::active
 
 struct ACompPlanet
 {
-    PlanetGeometryA m_planet;
+    std::shared_ptr<IcoSphereTree> m_icoTree;
+    std::shared_ptr<PlanetGeometryA> m_planet;
     Magnum::GL::Mesh m_mesh{};
     Magnum::Shaders::MeshVisualizer3D m_shader{
             Magnum::Shaders::MeshVisualizer3D::Flag::Wireframe
@@ -58,7 +61,8 @@ public:
 
     static const std::string smc_name;
 
-    SysPlanetA(osp::active::ActiveScene &scene);
+    SysPlanetA(osp::active::ActiveScene &scene,
+               osp::UserInputHandler &userInput);
     ~SysPlanetA() = default;
 
     osp::active::StatusActivated activate_sat(
@@ -79,18 +83,22 @@ public:
                                      ACompPlanet &planet,
                                      chindex_t chunk);
 
-    void update_geometry();
+    void planet_update_geometry(osp::active::ActiveEnt planetEnt);
 
-    void update_physics();
+    void update_geometry(osp::active::ActiveScene& rScene);
+
+    void update_physics(osp::active::ActiveScene& rScene);
 
 private:
 
     osp::active::ActiveScene &m_scene;
 
-    osp::active::UpdateOrderHandle m_updateGeometry;
-    osp::active::UpdateOrderHandle m_updatePhysics;
+    osp::active::UpdateOrderHandle_t m_updateGeometry;
+    osp::active::UpdateOrderHandle_t m_updatePhysics;
 
-    osp::active::RenderOrderHandle m_renderPlanetDraw;
+    osp::active::RenderOrderHandle_t m_renderPlanetDraw;
+
+    osp::ButtonControlHandle m_debugUpdate;
 };
 
 }

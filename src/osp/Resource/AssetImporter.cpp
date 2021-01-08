@@ -237,10 +237,21 @@ DependRes<Mesh> osp::AssetImporter::compile_mesh(
     {
         std::cout << "Error: requested MeshData resource \"" << meshData.name()
             << "\" not found\n";
-        return DependRes<Mesh>();
+        return {};
     }
 
     return pkg.add<Mesh>(meshData.name(), Magnum::MeshTools::compile(*meshData));
+}
+
+DependRes<Magnum::GL::Mesh> AssetImporter::compile_mesh(
+    std::string_view meshDataName, Package& srcPackage, Package& dstPackage)
+{
+    DependRes<MeshData> meshData = srcPackage.get<MeshData>(meshDataName);
+    if (meshData.empty())
+    {
+        return {};
+    }
+    return compile_mesh(meshData, dstPackage);
 }
 
 DependRes<Texture2D> osp::AssetImporter::compile_tex(
@@ -254,7 +265,7 @@ DependRes<Texture2D> osp::AssetImporter::compile_tex(
     {
         std::cout << "Error: requested ImageData2D resource \"" << imageData.name()
             << "\" not found\n";
-        return DependRes<Texture2D>();
+        return {};
     }
 
     Magnum::ImageView2D view = *imageData;
@@ -267,6 +278,17 @@ DependRes<Texture2D> osp::AssetImporter::compile_tex(
         .setSubImage(0, {}, view);
 
     return package.add<Texture2D>(imageData.name(), std::move(tex));
+}
+
+DependRes<Magnum::GL::Texture2D> AssetImporter::compile_tex(
+    std::string_view imageDataName, Package& srcPackage, Package& dstPackage)
+{
+    DependRes<ImageData2D> imgData = srcPackage.get<ImageData2D>(imageDataName);
+    if (imgData.empty())
+    {
+        return {};
+    }
+    return compile_tex(imgData, dstPackage);
 }
 
 //either an appendable package, or

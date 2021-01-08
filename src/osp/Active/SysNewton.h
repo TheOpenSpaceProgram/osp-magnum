@@ -102,8 +102,8 @@ public:
     SysNewton(SysNewton&& move) = delete;
 
     ~SysNewton();
-
-    void update_world();
+    
+    void update_world(ActiveScene& rScene);
 
     constexpr ActiveScene& get_scene() noexcept { return m_scene; }
 
@@ -169,9 +169,9 @@ private:
     static void create_body(ActiveScene& rScene, ActiveEnt entity,
                             NewtonWorld const* nwtWorld);
 
-    static void on_body_destruct(entt::registry& reg, ActiveEnt ent);
-    static void on_shape_destruct(entt::registry& reg, ActiveEnt ent);
-    static void on_world_destruct(entt::registry& reg, ActiveEnt ent);
+    static void on_body_destruct(ActiveReg_t& reg, ActiveEnt ent);
+    static void on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent);
+    static void on_world_destruct(ActiveReg_t& reg, ActiveEnt ent);
 
     static NewtonCollision* newton_create_tree_collision(
             const NewtonWorld *newtonWorld, int shapeId);
@@ -184,7 +184,8 @@ private:
             const NewtonCollision* treeCollision,  int optimize);
 
     ActiveScene& m_scene;
-    UpdateOrderHandle m_updatePhysicsWorld;
+
+    UpdateOrderHandle_t m_updatePhysicsWorld;
 };
 
 template<class TRIANGLE_IT_T>
