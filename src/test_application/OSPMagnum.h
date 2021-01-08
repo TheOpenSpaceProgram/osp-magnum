@@ -42,6 +42,8 @@
 
 #include <memory>
 
+#include "osp/UserInputHandler.h"
+
 namespace testapp
 {
 
@@ -91,3 +93,13 @@ private:
 void config_controls(OSPMagnum& rOspApp);
 
 }
+
+/**
+* Parses the control string from the config file. 
+* 
+* A "None" input returns a empty vector.
+* 
+* @param Control string
+* @returns vector of the control created from the string. 
+*/
+std::vector<osp::ButtonVarConfig> parse_control(std::string_view str) noexcept;

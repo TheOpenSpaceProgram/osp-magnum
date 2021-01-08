@@ -291,8 +291,14 @@ public:
      * @param name Name used for identification
      * @param vars Expression needed to activate the control
      */
-    void config_register_control(std::string const& name, bool holdable,
-            std::initializer_list<ButtonVarConfig> vars);
+    void config_register_control(std::string const& name,
+        bool holdable,
+        std::vector<ButtonVarConfig> vars);
+
+    void config_register_control(std::string&& name,
+        bool holdable,
+        std::vector<ButtonVarConfig> vars);
+
 
     /**
      * Fetch a button configuration
