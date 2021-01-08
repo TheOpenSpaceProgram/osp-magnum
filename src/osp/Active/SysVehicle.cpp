@@ -211,10 +211,10 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
     }
 
     // temporary: make the whole thing a single rigid body
-    ACompRigidBody& vehicleBody = scene.reg_emplace<ACompRigidBody>(vehicleEnt);
+    auto& vehicleBody = scene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
     ACompCollisionShape& vehicleShape = scene.reg_emplace<ACompCollisionShape>(vehicleEnt);
     vehicleShape.m_shape = ECollisionShape::COMBINED;
-    scene.dynamic_system_find<SysPhysics>().create_body(vehicleEnt);
+    //scene.dynamic_system_find<SysPhysics>().create_body(vehicleEnt);
 
     return {0, vehicleEnt, true};
 }
@@ -361,7 +361,11 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
         if (vehicleVehicle.m_separationCount)
         {
-            // Separation requestedts
+            // Separation requested
+
+            // mark collider as dirty
+            auto &rVehicleBody = m_scene.reg_get<ACompRigidBody_t>(vehicleEnt);
+            rVehicleBody.m_colliderDirty = true;
 
             // Create the islands vector
             // [0]: current vehicle
@@ -379,7 +383,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                 auto &islandTransform
                         = m_scene.reg_emplace<ACompTransform>(islandEnt);
                 auto &islandBody
-                        = m_scene.reg_emplace<ACompRigidBody>(islandEnt);
+                        = m_scene.reg_emplace<ACompRigidBody_t>(islandEnt);
                 auto &islandShape
                         = m_scene.reg_emplace<ACompCollisionShape>(islandEnt);
                 islandShape.m_shape = ECollisionShape::COMBINED;
@@ -486,7 +490,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
                 islandTransform.m_transform.translation() += comOffset;
 
-                m_scene.dynamic_system_find<SysPhysics>().create_body(islandEnt);
+                //m_scene.dynamic_system_find<SysPhysics>().create_body(islandEnt);
             }
 
         }

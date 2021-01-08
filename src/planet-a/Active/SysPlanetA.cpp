@@ -157,13 +157,13 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
 
     using osp::ECollisionShape;
 
-    auto &physics = m_scene.dynamic_system_find<SysPhysics>();
+    auto &physics = m_scene.dynamic_system_find<SysPhysics_t>();
 
     // Create entity and required components
     ActiveEnt fish = m_scene.hier_create_child(m_scene.hier_get_root());
     auto &fishTransform = m_scene.reg_emplace<ACompTransform>(fish);
     auto &fishShape = m_scene.reg_emplace<ACompCollisionShape>(fish);
-    auto &fishBody = m_scene.reg_emplace<ACompRigidBody>(fish);
+    auto &fishBody = m_scene.reg_emplace<ACompRigidBody_t>(fish);
     m_scene.reg_emplace<ACompFloatingOrigin>(fish);
 
     // Set some stuff
@@ -178,7 +178,7 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
                                          itsChunk.first, itsChunk.second);
 
     // create the rigid body
-    physics.create_body(fish);
+    //physics.create_body(fish);
 }
 
 void SysPlanetA::update_geometry(ActiveScene& rScene)

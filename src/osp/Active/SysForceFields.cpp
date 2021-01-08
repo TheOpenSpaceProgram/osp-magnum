@@ -32,12 +32,9 @@ const std::string SysFFGravity::smc_name = "FFGravity";
 
 SysFFGravity::SysFFGravity(ActiveScene &scene)
  : m_scene(scene)
- , m_physics(scene.dynamic_system_find<SysPhysics>())
  , m_updateForce(scene.get_update_order(), "ff_gravity", "", "physics",
                  [this] (ActiveScene& rScene) { this->update_force(rScene); })
-{
-
-}
+{ }
 
 void SysFFGravity::update_force(ActiveScene& rScene)
 {
@@ -46,7 +43,7 @@ void SysFFGravity::update_force(ActiveScene& rScene)
             .view<ACompFFGravity, ACompTransform>();
 
     auto viewMasses = m_scene.get_registry()
-            .view<ACompRigidBody, ACompTransform>();
+            .view<ACompRigidBody_t, ACompTransform>();
 
     for (ActiveEnt fieldEnt : viewFields)
     {
@@ -60,7 +57,7 @@ void SysFFGravity::update_force(ActiveScene& rScene)
                 continue;
             }
 
-            auto &massBody = viewMasses.get<ACompRigidBody>(massEnt);
+            auto &massBody = viewMasses.get<ACompRigidBody_t>(massEnt);
             auto &massTransform = viewMasses.get<ACompTransform>(massEnt);
 
             Vector3 relativePos = fieldTransform.m_transform.translation()
@@ -70,7 +67,7 @@ void SysFFGravity::update_force(ActiveScene& rScene)
             //               massBody.m_bodyData.m_mass / r;
             // gm1/r = a
 
-            m_physics.body_apply_accel(massBody, accel);
+            SysPhysics_t::body_apply_accel(massBody, accel);
         }
     }
 }

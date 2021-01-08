@@ -74,7 +74,6 @@ private:
 
 
     ActiveScene &m_scene;
-    SysPhysics &m_physics;
 
     UpdateOrderHandle_t m_updateForce;
 };

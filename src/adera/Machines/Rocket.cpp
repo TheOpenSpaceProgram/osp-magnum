@@ -63,7 +63,6 @@ std::vector<WireOutput*> MachineRocket::existing_outputs()
 
 SysMachineRocket::SysMachineRocket(ActiveScene &scene) :
     SysMachine<SysMachineRocket, MachineRocket>(scene),
-    m_physics(scene.dynamic_system_find<SysPhysics>()),
     m_updatePhysics(scene.get_update_order(), "mach_rocket", "wire", "physics",
                     std::bind(&SysMachineRocket::update_physics, this))
 {
@@ -89,14 +88,14 @@ void SysMachineRocket::update_physics()
 
         //std::cout << "updating a rocket\n";
 
-        ACompRigidBody *compRb;
+        ACompRigidBody_t *compRb;
         ACompTransform *compTf;
 
         if (m_scene.get_registry().valid(machine.m_rigidBody))
         {
             // Try to get the ACompRigidBody if valid
             compRb = m_scene.get_registry()
-                            .try_get<ACompRigidBody>(machine.m_rigidBody);
+                            .try_get<ACompRigidBody_t>(machine.m_rigidBody);
             compTf = m_scene.get_registry()
                             .try_get<ACompTransform>(machine.m_rigidBody);
             if (!compRb || !compTf)
@@ -108,18 +107,18 @@ void SysMachineRocket::update_physics()
         else
         {
             // rocket's rigid body not set yet
-            auto body = m_physics.find_rigidbody_ancestor(ent);
+            auto const& [bodyEnt, pBody]
+                    = SysPhysics_t::find_rigidbody_ancestor(m_scene, ent);
 
-            if (body.second == nullptr)
+            if (pBody == nullptr)
             {
                 std::cout << "no rigid body!\n";
                 continue;
             }
 
-            machine.m_rigidBody = body.first;
-            compRb = body.second;
-            compTf = m_scene.get_registry()
-                    .try_get<ACompTransform>(body.first);
+            machine.m_rigidBody = bodyEnt;
+            compRb = pBody;
+            compTf = m_scene.get_registry().try_get<ACompTransform>(bodyEnt);
         }
 
         if (WireData *ignition = machine.m_wiIgnition.connected_value())
@@ -137,8 +136,10 @@ void SysMachineRocket::update_physics()
 
             //std::cout << percent->m_value << "\n";
 
-            m_physics.body_apply_force(*compRb, compTf->m_transform.backward()
-                    * (percent->m_value * thrust));
+            Vector3 thrustVec = compTf->m_transform.backward()
+                                    * (percent->m_value * thrust);
+
+            SysPhysics_t::body_apply_force(*compRb, thrustVec);
         }
 
 
@@ -156,7 +157,7 @@ void SysMachineRocket::update_physics()
 
             localTorque *= 3.0f; // arbitrary
 
-            m_physics.body_apply_torque(*compRb, localTorque);
+            SysPhysics_t::body_apply_torque(*compRb, localTorque);
         }
 
 
