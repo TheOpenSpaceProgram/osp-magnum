@@ -17,6 +17,7 @@ jobs:
 
     - name: Install dependencies
       run: |
+        sudo apt-get update
         sudo apt install -y libglfw3-dev libsdl2-dev libopenal-dev libglvnd-core-dev iwyu clang-tidy clang-tools
 
     - name: Build OSP-Magnum
