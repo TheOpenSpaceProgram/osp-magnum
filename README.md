@@ -42,6 +42,17 @@ Build instructions and more details can be found in the
 * Step 1: Make a space flight simulator
 * Step 2: Bloat it with features
 
+## Compiling for Windows on Visual Studio
+You will need: cmake, Visual Studio
+* Clone the repo with `https://github.com/TheOpenSpaceProgram/osp-magnum`
+* Open the repo `cd osp-magnum`
+* Get submodules `git clone --recursive --shallow-submodules https://github.com/TheOpenSpaceProgram/osp-magnum`
+* Create the build folder `mkdir build && cd build`
+* Download [SDL2 visual studio development binaries](https://www.libsdl.org/release/SDL2-devel-2.0.12-VC.zip), and extract it into the build folder
+* Run the command `SET SDL2_DIR=SDL2-2.0.12 && cmake -DCMAKE_PREFIX_PATH=%SDL2_DIR% -DSDL2_LIBRARY_RELEASE=%SDL2_DIR%/lib/x64/*.lib -DSDL2_INCLUDE_DIR=%SDL2_DIR%/include ..` to create project files
+* Open the solution `OSP-MAGNUM.sln` in file explorer, and visual studio should open up
+* Shift-control-B to build for debug. 
+
 ## Random Notes
 * This project might be codenamed 'adera'. the name of the street the 49 UBC
   bus was at while the project files were first created.
