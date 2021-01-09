@@ -58,6 +58,9 @@
                 "manufacturer" : "ACME Placeholders",
                 "machines" : [
                     {
+                        "type" : "RCSController"
+                    },
+                    {
                         "type" : "Rocket"
                     },
                     {

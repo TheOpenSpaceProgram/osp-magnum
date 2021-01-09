@@ -12,6 +12,7 @@ class SysMachineRCSController :
     public osp::active::SysMachine<SysMachineRCSController, MachineRCSController>
 {
 public:
+    static inline std::string smc_name = "RCSController";
 
     SysMachineRCSController(osp::active::ActiveScene &rScene);
 
@@ -25,7 +26,7 @@ private:
     float thruster_influence(Magnum::Vector3 posOset, Magnum::Vector3 direction,
         Magnum::Vector3 cmdTransl, Magnum::Vector3 cmdRot);
 
-    osp::active::UpdateOrderHandle m_updateControls;
+    osp::active::UpdateOrderHandle_t m_updateControls;
 };
 
 class MachineRCSController : public osp::active::Machine
@@ -34,8 +35,8 @@ class MachineRCSController : public osp::active::Machine
 
 public:
     MachineRCSController();
-    MachineRCSController(MachineRCSController&& move);
-    MachineRCSController& operator=(MachineRCSController&& move);
+    MachineRCSController(MachineRCSController&& move) = default;
+    MachineRCSController& operator=(MachineRCSController&& move) = default;
     ~MachineRCSController() = default;
 
     void propagate_output(osp::active::WireOutput *output) override;

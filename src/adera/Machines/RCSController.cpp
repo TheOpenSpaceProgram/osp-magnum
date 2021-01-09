@@ -17,18 +17,6 @@ MachineRCSController::MachineRCSController()
     m_woThrottle.value() = Percent{0.0f};
 }
 
-MachineRCSController::MachineRCSController(MachineRCSController&& move)
-    : osp::active::Machine(std::move(move)), m_wiCommandOrient(std::move(move.m_wiCommandOrient)), m_woThrottle(std::move(move.m_woThrottle))
-{
-
-}
-
-MachineRCSController& MachineRCSController::operator=(MachineRCSController&& move)
-{
-    m_enable = std::move(move.m_enable);
-    return *this;
-}
-
 void MachineRCSController::propagate_output(WireOutput* output)
 {
 
@@ -57,7 +45,7 @@ std::vector<WireOutput*> MachineRCSController::existing_outputs()
 SysMachineRCSController::SysMachineRCSController(ActiveScene& scene)
     :SysMachine<SysMachineRCSController, MachineRCSController>(scene),
     m_updateControls(scene.get_update_order(), "mach_rcs", "wire", "controls",
-        std::bind(&SysMachineRCSController::update_controls, this))
+        [this](ActiveScene& rScene) { this->update_controls(rScene); })
 {
 }
 
@@ -95,9 +83,9 @@ float SysMachineRCSController::thruster_influence(Vector3 posOset, Vector3 direc
     return clamp(rotInfluence + translInfluence, 0.0f, 1.0f);
 }
 
-void SysMachineRCSController::update_controls()
+void SysMachineRCSController::update_controls(ActiveScene& rScene)
 {
-    auto view = m_scene.get_registry().view<MachineRCSController, ACompTransform>();
+    auto view = m_scene.get_registry().template view<MachineRCSController, ACompTransform>();
 
     for (ActiveEnt ent : view)
     {
