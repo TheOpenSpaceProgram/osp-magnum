@@ -121,6 +121,14 @@ ELSE()
   ENDIF()
 ENDIF()
 
+# Force Runtime output directory into build/bin folder; force multiprocessor compilation for all projects
+IF(MSVC)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG> CACHE PATH "")
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/lib CACHE PATH "")
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/lib CACHE PATH "")
+  add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
+ENDIF()
+
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/" ${CMAKE_MODULE_PATH})
 
 # Process subdirectory full of third-party libraries

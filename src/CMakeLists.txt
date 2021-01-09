@@ -84,6 +84,12 @@ elseif(MINGW)
 
 endif()
 
+# Set the MSVC debug working directory, enforce conformance mode for osp-magnum
+if(MSVC)
+  set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ../../bin)
+  target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
+endif()
+
 # Include ENTT (header only lib)
 target_include_directories(osp-magnum PRIVATE ../3rdparty/entt/src)
 
@@ -125,4 +131,5 @@ if(tidy_path)
                  --checks="clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,readability-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-auto")
 endif()
 
+# Copy root/bin to build/bin
 FILE (COPY "${CMAKE_SOURCE_DIR}/bin/OSPData/adera/" DESTINATION "${CMAKE_BINARY_DIR}/bin/OSPData/adera")
