@@ -35,6 +35,8 @@ PROJECT(OSP-MAGNUM CXX)
 OPTION(OSP_BUILD_SANATIZER          "Build with the address sanatizer" OFF)
 OPTION(OSP_WARNINGS_ARE_ERRORS      "Build with the flag -Werror" OFF)
 OPTION(OSP_ENABLE_COMPILER_WARNINGS "Build with the majority of compiler warnings enabled" OFF)
+OPTION(OSP_ENABLE_IWYU              "Build with warnings from IWYU turned on" OFF)
+OPTION(OSP_ENABLE_CLANG_TIDY        "Build with warnings from clang-tidy turned on" OFF)
 
 # Define target name
 SET(TARGET_NAME OSP-MAGNUM)
