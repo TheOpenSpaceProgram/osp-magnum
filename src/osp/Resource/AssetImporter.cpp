@@ -404,7 +404,7 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
         part.get_strings().push_back(meshName);
 
         MeshObjectData3D& mesh = static_cast<MeshObjectData3D&>(*childData);
-        Pointer<MaterialData> mat = gltfImporter.material(mesh.material());
+        Optional<MaterialData> mat = gltfImporter.material(mesh.material());
 
         if (mat->types() & MaterialType::PbrMetallicRoughness)
         {
