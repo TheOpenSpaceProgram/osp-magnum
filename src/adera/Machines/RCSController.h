@@ -35,8 +35,8 @@ class MachineRCSController : public osp::active::Machine
 
 public:
     MachineRCSController();
-    MachineRCSController(MachineRCSController&& move) = default;
-    MachineRCSController& operator=(MachineRCSController&& move) = default;
+    MachineRCSController(MachineRCSController&& move) noexcept;
+    MachineRCSController& operator=(MachineRCSController&& move) noexcept;
     ~MachineRCSController() = default;
 
     void propagate_output(osp::active::WireOutput *output) override;
@@ -51,5 +51,19 @@ private:
     osp::active::WireInput m_wiCommandOrient;
     osp::active::WireOutput m_woThrottle;
 };
+
+inline MachineRCSController::MachineRCSController(MachineRCSController&& move) noexcept
+    : Machine(std::move(move))
+    , m_wiCommandOrient{this, std::move(move.m_wiCommandOrient)}
+    , m_woThrottle{this, std::move(move.m_woThrottle)}
+{}
+
+inline MachineRCSController& MachineRCSController::operator=(MachineRCSController&& move) noexcept
+{
+    Machine::operator=(std::move(move));
+    m_wiCommandOrient = {this, std::move(move.m_wiCommandOrient)};
+    m_woThrottle = {this, std::move(move.m_woThrottle)};
+    return *this;
+}
 
 } // adera::active::machines
