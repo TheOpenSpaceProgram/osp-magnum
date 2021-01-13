@@ -212,8 +212,8 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
     // temporary: make the whole thing a single rigid body
     auto& vehicleBody = scene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
-    ACompCollisionShape& vehicleShape = scene.reg_emplace<ACompCollisionShape>(vehicleEnt);
-    vehicleShape.m_shape = ECollisionShape::COMBINED;
+    scene.reg_emplace<ACompCollisionShape>(vehicleEnt,
+        nullptr, ECollisionShape::COMBINED);
     //scene.dynamic_system_find<SysPhysics>().create_body(vehicleEnt);
 
     return {0, vehicleEnt, true};
@@ -340,6 +340,8 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
     //CompNewtonBody& nwtBody
     //        = m_scene->get_registry().emplace<CompNewtonBody>(newEntities[0]);
 
+    // Create mass
+    m_scene.reg_emplace<ACompMass>(newEntities[0], part.get_mass());
 
     // return root object
     return newEntities[0];
@@ -356,16 +358,24 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
     for (ActiveEnt vehicleEnt : view)
     {
         ACompVehicle &vehicleVehicle = view.get(vehicleEnt);
-        auto &vehicleTransform = m_scene.reg_get<ACompTransform>(vehicleEnt);
         //std::vector<ActiveEnt> &parts = vehicleVehicle.m_parts;
 
-        if (vehicleVehicle.m_separationCount)
+        if (vehicleVehicle.m_separationCount > 0)
         {
             // Separation requested
 
             // mark collider as dirty
             auto &rVehicleBody = m_scene.reg_get<ACompRigidBody_t>(vehicleEnt);
             rVehicleBody.m_colliderDirty = true;
+
+            // Invalidate all ACompRigidbodyAncestors
+            auto invalidateAncestors = [&rScene](ActiveEnt e)
+            {
+                auto* pRBA = rScene.get_registry().try_get<ACompRigidbodyAncestor>(e);
+                if (pRBA) { pRBA->m_ancestor = entt::null; }
+                return EHierarchyTraverseStatus::Continue;
+            };
+            rScene.hierarchy_traverse(vehicleEnt, invalidateAncestors);
 
             // Create the islands vector
             // [0]: current vehicle
@@ -375,6 +385,8 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
             islands[0] = vehicleEnt;
 
+            // NOTE: vehicleVehicle and vehicleTransform become invalid
+            //       when emplacing new ones.
             for (unsigned i = 1; i < islands.size(); i ++)
             {
                 ActiveEnt islandEnt = m_scene.hier_create_child(
@@ -388,13 +400,11 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                         = m_scene.reg_emplace<ACompCollisionShape>(islandEnt);
                 islandShape.m_shape = ECollisionShape::COMBINED;
 
+                auto &vehicleTransform = m_scene.reg_get<ACompTransform>(vehicleEnt);
                 islandTransform.m_transform = vehicleTransform.m_transform;
                 m_scene.reg_emplace<ACompFloatingOrigin>(islandEnt);
 
                 islands[i] = islandEnt;
-
-                // note: vehicleVehicle and vehicleTransform become invalid
-                //       when emplacing new ones.
             }
 
 

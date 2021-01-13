@@ -32,15 +32,7 @@
 using namespace adera::active::machines;
 using namespace osp::active;
 using Magnum::Vector3;
-
-
-MachineRCSController::MachineRCSController()
-    : Machine(true),
-    m_wiCommandOrient(this, "Orient"),
-    m_woThrottle(this, "Throttle")
-{
-    m_woThrottle.value() = wiretype::Percent{0.0f};
-}
+using Magnum::Matrix4;
 
 void MachineRCSController::propagate_output(WireOutput* output)
 {
@@ -117,27 +109,36 @@ float SysMachineRCSController::thruster_influence(Vector3 posOset, Vector3 direc
 
 void SysMachineRCSController::update_controls(ActiveScene& rScene)
 {
-    auto view = rScene.get_registry().view<MachineRCSController, ACompTransform>();
+    auto view = rScene.get_registry().view<MachineRCSController>();
 
     for (ActiveEnt ent : view)
     {
         auto& machine = view.get<MachineRCSController>(ent);
-        auto& transform = view.get<ACompTransform>(ent);
+        if (!machine.m_enable)
+        {
+            continue;
+        }
 
         using wiretype::AttitudeControl;
         using Magnum::Vector3;
+
+        // Get rigidbody ancestor and its transformation component
+        auto const* pRbAncestor =
+            SysPhysics_t::try_get_or_find_rigidbody_ancestor(rScene, ent);
+        auto const& rCompRb = rScene.reg_get<ACompRigidBody_t>(pRbAncestor->m_ancestor);
+        auto const& rCompTf = rScene.reg_get<ACompTransform>(pRbAncestor->m_ancestor);
 
         if (WireData *gimbal = machine.m_wiCommandOrient.connected_value())
         {
             AttitudeControl *attCtrl = std::get_if<AttitudeControl>(gimbal);
 
+            Matrix4 transform = pRbAncestor->m_relTransform;
+
             // TODO: RCS translation is not currently implemented, only rotation
             Vector3 commandTransl = Vector3{0.0f};
             Vector3 commandRot = attCtrl->m_attitude;
-            // HACK: hard-coded ship CoM, need to compute programmatically
-            Vector3 tmpOset{0.0f, 0.0f, -3.12f};
-            Vector3 thrusterPos = transform.m_transform.translation() - tmpOset;
-            Vector3 thrusterDir = transform.m_transform.rotation() * Vector3{0.0f, 0.0f, 1.0f};
+            Vector3 thrusterPos = transform.translation() - rCompRb.m_centerOfMassOffset;
+            Vector3 thrusterDir = transform.rotation() * Vector3{0.0f, 0.0f, 1.0f};
 
             float influence = 0.0f;
             if (commandRot.length() > 0.0f || commandTransl.length() > 0.0f)

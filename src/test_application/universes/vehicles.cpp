@@ -218,7 +218,7 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
 
     Quaternion idRot;
     Vector3 scl{1};
-    Magnum::Rad qtrTurn(90.0_degf);
+    Magnum::Rad qtrTurn(-90.0_degf);
     Quaternion rotY_090 = Quaternion::rotation(qtrTurn, Vector3{0, 1, 0});
     Quaternion rotZ_090 = Quaternion::rotation(qtrTurn, Vector3{0, 0, 1});
     Quaternion rotZ_180 = Quaternion::rotation(2 * qtrTurn, Vector3{0, 0, 1});
