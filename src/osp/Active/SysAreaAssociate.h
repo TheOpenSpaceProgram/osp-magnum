@@ -108,13 +108,12 @@ public:
      * @param type [in] The type of Satellite that will be passed to the Activator
      * @param activator [in]
      */
-    void activator_add(universe::ITypeSatellite const* type,
-                       IActivator &activator);
+    void activator_add(universe::TypeSatIndex type, IActivator &activator);
 
     constexpr universe::Universe& get_universe() { return m_universe; }
 
     using MapActivators
-            = std::map<universe::ITypeSatellite const*, IActivator*>;
+            = std::map<universe::TypeSatIndex, IActivator*>;
 
 private:
 
@@ -140,8 +139,7 @@ private:
      * Attempt to load a satellite
      * @return status, zero for no error
      */
-    int sat_activate(universe::Satellite sat,
-                     universe::UCompActivatable &satAct);
+    int sat_activate(universe::Satellite sat);
 
     int sat_deactivate(ActiveEnt ent,
                        ACompActivatedSat& entAct);

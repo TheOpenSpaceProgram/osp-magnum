@@ -43,9 +43,3 @@ using Magnum::Matrix4;
 using namespace osp::universe;
 
 const std::string SatActiveArea::smc_name = "ActiveArea";
-
-SatActiveArea::SatActiveArea(Universe& universe) :
-        CommonTypeSat<SatActiveArea, UCompActiveArea>(universe)
-{
-
-}

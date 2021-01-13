@@ -249,9 +249,9 @@ void load_a_bunch_of_stuff()
 void register_universe_types()
 {
     osp::universe::Universe &uni = g_osp.get_universe();
-    uni.type_register<osp::universe::SatActiveArea>(uni);
-    uni.type_register<osp::universe::SatVehicle>(uni);
-    uni.type_register<planeta::universe::SatPlanet>(uni);
+    uni.sat_type_register<osp::universe::SatActiveArea>();
+    uni.sat_type_register<osp::universe::SatVehicle>();
+    uni.sat_type_register<planeta::universe::SatPlanet>();
 }
 
 void debug_print_help()
@@ -355,12 +355,16 @@ void debug_print_hier()
 
 void debug_print_sats()
 {
+    using osp::universe::Universe;
     using osp::universe::UCompTransformTraj;
     using osp::universe::UCompType;
 
-    osp::universe::Universe const &universe = g_osp.get_universe();
+    Universe const &rUni = g_osp.get_universe();
 
-    auto const view = universe.get_reg().view<const UCompTransformTraj,
+    std::vector<std::string_view> const& typeSatNames
+            = g_osp.get_universe().sat_type_get_names();
+
+    auto const view = rUni.get_reg().view<const UCompTransformTraj,
                                               const UCompType>();
 
     for (osp::universe::Satellite sat : view)
@@ -371,9 +375,10 @@ void debug_print_sats()
         osp::Vector3s const &pos = posTraj.m_position;
 
         std::cout << "SATELLITE: \"" << posTraj.m_name << "\" \n";
-        if (type.m_type != nullptr)
+        if (type.m_type != osp::universe::TypeSatIndex::Invalid)
         {
-            std::cout << " * Type: " << type.m_type->get_name() << "\n";
+            std::cout << " * Type: " << typeSatNames[size_t(type.m_type)]
+                      << "\n";
         }
 
         if (posTraj.m_trajectory != nullptr)

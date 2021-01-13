@@ -75,4 +75,14 @@ Vector3 Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target
     return Vector3(sat_calc_pos(referenceFrame, target)) / 1024.0f;
 }
 
+TypeSatIndex Universe::sat_type_find_index(std::string_view name)
+{
+    auto foundIt = m_typeSatIndices.find(name);
 
+    if (foundIt != m_typeSatIndices.end())
+    {
+        return foundIt->second;
+    }
+
+    return TypeSatIndex::Invalid;
+}
