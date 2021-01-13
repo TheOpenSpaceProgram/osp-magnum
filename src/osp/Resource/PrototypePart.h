@@ -129,6 +129,10 @@ public:
     constexpr std::vector<PrototypeMachine> const& get_machines() const
     { return m_machines; }
 
+    constexpr float& get_mass() noexcept
+    { return m_mass; }
+    constexpr float get_mass() const noexcept
+    { return m_mass; }
 
     constexpr std::vector<std::string>& get_strings()
     { return m_strings; }
@@ -143,6 +147,8 @@ private:
     //std::vector<DependRes<MeshData3D> > m_meshDataUsed;
 
     // TODO: more OSP information
+
+    float m_mass;
 
     // std::vector <machines>
 

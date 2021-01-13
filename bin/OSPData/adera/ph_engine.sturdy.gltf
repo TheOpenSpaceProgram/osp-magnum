@@ -68,7 +68,7 @@
                         "type" : "FreeEnergyGenerator"
                     }
                 ],
-                "massdry" : 300,
+                "massdry" : 1000,
                 "name" : "PH-314"
             },
             "name" : "part_phEngine"

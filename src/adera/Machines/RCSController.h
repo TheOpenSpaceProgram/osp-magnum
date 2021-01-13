@@ -82,7 +82,7 @@ private:
         Magnum::Vector3 cmdTransl, Magnum::Vector3 cmdRot);
 
     osp::active::UpdateOrderHandle_t m_updateControls;
-};
+}; // SysMachineRCSController
 
 class MachineRCSController : public osp::active::Machine
 {
@@ -103,14 +103,24 @@ public:
     std::vector<osp::active::WireOutput*> existing_outputs() override;
 
 private:
-    osp::active::WireInput m_wiCommandOrient;
-    osp::active::WireOutput m_woThrottle;
-};
+    osp::active::WireInput m_wiCommandOrient{this, "Orient"};
+    osp::active::WireOutput m_woThrottle{this, "Throttle"};
+
+    osp::active::ActiveEnt m_rigidBody{entt::null};
+}; // MachineRCSController
+
+inline MachineRCSController::MachineRCSController()
+    : Machine(true)
+{
+    m_woThrottle.value() = osp::active::wiretype::Percent{0.0f};
+}
+
 
 inline MachineRCSController::MachineRCSController(MachineRCSController&& move) noexcept
     : Machine(std::move(move))
     , m_wiCommandOrient{this, std::move(move.m_wiCommandOrient)}
     , m_woThrottle{this, std::move(move.m_woThrottle)}
+    , m_rigidBody(std::move(move.m_rigidBody))
 {}
 
 inline MachineRCSController& MachineRCSController::operator=(MachineRCSController&& move) noexcept
@@ -118,6 +128,7 @@ inline MachineRCSController& MachineRCSController::operator=(MachineRCSControlle
     Machine::operator=(std::move(move));
     m_wiCommandOrient = {this, std::move(move.m_wiCommandOrient)};
     m_woThrottle = {this, std::move(move.m_woThrottle)};
+    m_rigidBody = std::exchange(move.m_rigidBody, entt::null);
     return *this;
 }
 

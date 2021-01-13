@@ -38,12 +38,12 @@ class SysMachineRocket :
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "Rocket";
 
     SysMachineRocket(osp::active::ActiveScene &scene);
 
     //void update_sensor();
-    void update_physics();
+    void update_physics(osp::active::ActiveScene& rScene);
 
     /**
      * Attach a visual exhaust plume effect to MachineRocket
@@ -70,7 +70,7 @@ public:
 private:
 
     osp::active::UpdateOrderHandle_t m_updatePhysics;
-};
+}; // SysMachineRocket
 
 /**
  *
@@ -101,7 +101,7 @@ private:
     osp::active::WireInput m_wiThrottle { this, "Throttle" };
 
     osp::active::ActiveEnt m_rigidBody  { entt::null };
-};
+}; // MachineRocket
 
 //-----------------------------------------------------------------------------
 

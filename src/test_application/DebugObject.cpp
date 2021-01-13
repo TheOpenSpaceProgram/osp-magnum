@@ -27,6 +27,7 @@
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/physics.h>
+#include <osp/Active/SysNewton.h>
 
 #include <adera/Machines/UserControl.h>
 
@@ -103,6 +104,7 @@ void DebugCameraController::update_vehicle_mod_pre()
         using osp::active::ACompPart;
 
         auto &tgtVehicle = m_scene.reg_get<ACompVehicle>(m_orbiting);
+        auto& xform = m_scene.reg_get<ACompTransform>(m_orbiting);
 
         // delete the last part
         //auto &partPart = m_scene.reg_get<ACompPart>(tgtVehicle.m_parts.back());
@@ -148,12 +150,13 @@ void DebugCameraController::update_physics_post()
 {
 
     bool targetValid = m_scene.get_registry().valid(m_orbiting);
+    auto& rReg = m_scene.get_registry();
 
     if (m_switch.triggered())
     {
         std::cout << "switch to new vehicle\n";
 
-        auto view = m_scene.get_registry().view<ACompVehicle>();
+        auto view = rReg.view<ACompVehicle>();
         auto it = view.find(m_orbiting);
 
         if (targetValid)
@@ -161,7 +164,8 @@ void DebugCameraController::update_physics_post()
             // disable the first MachineUserControl because switching away
             ActiveEnt firstPart
                     = *(view.get(m_orbiting).m_parts.begin());
-            m_scene.reg_get<MachineUserControl>(firstPart).disable();
+            auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
+            if (pMUserCtrl != nullptr) { pMUserCtrl->disable(); }
         }
 
         if (it == view.end() || it == view.begin())
@@ -176,14 +180,15 @@ void DebugCameraController::update_physics_post()
             std::cout << "next\n";
         }
 
-        targetValid = m_scene.get_registry().valid(m_orbiting);
+        targetValid = rReg.valid(m_orbiting);
 
         if (targetValid)
         {
             // enable the first MachineUserControl
             ActiveEnt firstPart = *(view.get(m_orbiting).m_parts.begin());
 
-            m_scene.reg_get<MachineUserControl>(firstPart).enable();
+            auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
+            if (pMUserCtrl != nullptr) { pMUserCtrl->enable(); }
         }
 
         // pick next entity, or first entity in scene
@@ -207,6 +212,16 @@ void DebugCameraController::update_physics_post()
     Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
     Matrix4 const& xformTgt = m_scene.reg_get<ACompTransform>(m_orbiting).m_transform;
 
+    using osp::active::SysPhysics_t;
+    // Compute Center of Mass of target, if it's a rigid body
+    auto [rbEnt, pCompRb] = SysPhysics_t::find_rigidbody_ancestor(m_scene, m_orbiting);
+    Vector3 comOset{0.0f};
+    if (pCompRb != nullptr)
+    {
+        comOset = xformTgt.transformVector(pCompRb->m_centerOfMassOffset);
+    }
+
+    // Process control inputs
     float keyRotYaw = static_cast<float>(m_rt.trigger_hold() - m_lf.trigger_hold());
     float keyRotPitch = static_cast<float>(m_dn.trigger_hold() - m_up.trigger_hold());
 
@@ -224,7 +239,7 @@ void DebugCameraController::update_physics_post()
             pitch += static_cast<float>(-m_mouseMotion.dySmooth());
         }
 
-        // 100 degrees per step
+        // 1 degrees per step
         constexpr auto rotRate = 1.0_degf;
 
         // rotate it
@@ -248,7 +263,8 @@ void DebugCameraController::update_physics_post()
     xform.translation() = xformTgt.translation() + m_orbitPos;
 
     // look at target
-    xform = Matrix4::lookAt(xform.translation(), xformTgt.translation(), xform[1].xyz());
+    xform = Matrix4::lookAt(xform.translation() + comOset,
+        xformTgt.translation() + comOset, xform[1].xyz());
 }
 
 void DebugCameraController::view_orbit(ActiveEnt ent)
