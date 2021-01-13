@@ -24,8 +24,8 @@
  */
 #pragma once
 
+#include <osp/Satellites/SatActiveArea.h>
 #include <osp/Universe.h>
-
 
 namespace planeta::universe
 {
@@ -57,21 +57,18 @@ struct UCompPlanet
 };
 
 
-class SatPlanet : public osp::universe::CommonTypeSat<
-        SatPlanet, UCompPlanet,
-        osp::universe::UCompActivatable>
+class SatPlanet
+ : osp::universe::CommonTypeSat<SatPlanet, UCompPlanet,
+                                osp::universe::UCompActivatable>
 {
+    using Base_t = osp::universe::CommonTypeSat<SatPlanet, UCompPlanet,
+                                                osp::universe::UCompActivatable>;
 public:
 
     static const std::string smc_name;
 
-    SatPlanet(osp::universe::Universe& universe);
-    ~SatPlanet() = default;
-
-    virtual std::string get_name() { return smc_name; };
-
-private:
-
+    using Base_t::add_get_ucomp;
+    using Base_t::add_get_ucomp_all;
 
 };
 

@@ -29,8 +29,10 @@
 
 #include <entt/entity/registry.hpp>
 
-#include <vector>
 #include <cstdint>
+#include <tuple>
+#include <vector>
+
 
 namespace osp::universe
 {
@@ -38,15 +40,12 @@ namespace osp::universe
 class ISystemTrajectory;
 class ITypeSatellite;
 
-//using Satellite = entt::entity;
-//ENTT_OPAQUE_TYPE(Satellite, uint32_t);
-enum class Satellite: entt::id_type {};
+enum class Satellite : entt::id_type {};
 
-
-using MapSatType = std::map<std::string, std::unique_ptr<ITypeSatellite>>;
-
-//typedef uint64_t Coordinate[3];
-//typedef Math::Vector3<int64_t> Coordinate;
+enum class TypeSatIndex : uint16_t
+{
+    Invalid = std::numeric_limits<uint16_t>::max()
+};
 
 /**
  * A model of deep space. This class stores the data of astronomical objects
@@ -71,7 +70,12 @@ using MapSatType = std::map<std::string, std::unique_ptr<ITypeSatellite>>;
  */
 class Universe
 {
+    using MapTypeSats_t = std::map<std::string_view, TypeSatIndex, std::less<>>;
+
 public:
+
+    using Registry_t = entt::basic_registry<Satellite>;
+
     Universe();
     Universe(Universe const &copy) = delete;
     Universe(Universe &&move) = delete;
@@ -122,27 +126,31 @@ public:
      * @tparam ARGS_T Arguments to forward to TYPESAT_T's constructor
      * @return reference to new TYPESAT_T just created
      */
-    template<typename TYPESAT_T, typename ... ARGS_T>
-    TYPESAT_T& type_register(ARGS_T&& ... args);
+    template<typename TYPESAT_T>
+    TypeSatIndex sat_type_register();
 
     /**
-     * Tries to locate an element in the map of registered Satellites by name.
-     * @param name [in] Name of ITypeSatellite
-     * @return Map iterator directly from std::map::find()
+     * @return Names of registered satellites. Access using a TypeSatIndex
      */
-    MapSatType::iterator sat_type_find(const std::string &name)
-    {
-        return m_satTypes.find(name);
-    }
+    constexpr std::vector<std::string_view> const& sat_type_get_names()
+    { return m_typeSatNames; }
 
     /**
-     * Tries to locate an element in the map of registered Satellite by type,
-     * and casts it to SATTYPE_T
-     * @tparam SATTYPE_T Type of ITypeSatellite to find
-     * @return Reference to satellite type found
+     * Find index of a registered satellite by name
+     * @param name [in] Name of satellite to find
+     * @return Index of type, TypeSatIndex::Invalid if not found.
+     */
+    TypeSatIndex sat_type_find_index(std::string_view name);
+
+    /**
+     * Find index of a registered satellite by type. The type should contain a
+     * static member string named smc_name
+     * @tparam SATTYPE_T Satellite type containing smc_name
+     * @return Index of type, TypeSatIndex::Invalid if not found.
      */
     template<typename SATTYPE_T>
-    SATTYPE_T& sat_type_find();
+    TypeSatIndex sat_type_find_index()
+    { return sat_type_find_index(SATTYPE_T::smc_name); }
 
     /**
      * Create a Trajectory, and add it to the universe.
@@ -152,44 +160,35 @@ public:
     template<typename TRAJECTORY_T, typename ... ARGS_T>
     TRAJECTORY_T& trajectory_create(ARGS_T&& ... args);
 
-    constexpr entt::basic_registry<Satellite>& get_reg() { return m_registry; }
-    constexpr const entt::basic_registry<Satellite>& get_reg() const
+    constexpr Registry_t& get_reg() { return m_registry; }
+    constexpr const Registry_t& get_reg() const
     { return m_registry; }
 
 private:
-
-    //std::vector<Package> m_packages;
-
-    //std::vector<Satellite> m_satellites;
-    //std::vector<PrototypePart> m_prototypes;
 
     Satellite m_root;
 
     std::vector<std::unique_ptr<ISystemTrajectory>> m_trajectories;
 
-    MapSatType m_satTypes;
+    MapTypeSats_t m_typeSatIndices;
+    std::vector<std::string_view> m_typeSatNames;
 
-    entt::basic_registry<Satellite> m_registry;
+    Registry_t m_registry;
 
 };
 
-
-template<typename TYPESAT_T, typename ... ARGS_T>
-TYPESAT_T& Universe::type_register(ARGS_T&& ... args)
+template<typename TYPESAT_T>
+TypeSatIndex Universe::sat_type_register()
 {
-    std::unique_ptr<TYPESAT_T> newType
-            = std::make_unique<TYPESAT_T>(std::forward<ARGS_T>(args)...);
-    TYPESAT_T& toReturn = *newType;
-    m_satTypes[newType->get_name()] = std::move(newType);
-    return toReturn;
-}
-
-template<typename SATTYPE_T>
-SATTYPE_T& Universe::sat_type_find()
-{
-    MapSatType::iterator it = sat_type_find(SATTYPE_T::smc_name);
-    assert(it != m_satTypes.end());
-    return static_cast<SATTYPE_T&>(*it->second);
+    TypeSatIndex newIndex = static_cast<TypeSatIndex>(m_typeSatIndices.size());
+    auto const &[it, success] = m_typeSatIndices.emplace(TYPESAT_T::smc_name,
+                                                         newIndex);
+    if (success)
+    {
+        m_typeSatNames.emplace_back(TYPESAT_T::smc_name);
+        return newIndex;
+    }
+    return TypeSatIndex::Invalid;
 }
 
 template<typename TRAJECTORY_T, typename ... ARGS_T>
@@ -199,7 +198,6 @@ TRAJECTORY_T& Universe::trajectory_create(ARGS_T&& ... args)
                 = std::make_unique<TRAJECTORY_T>(std::forward<ARGS_T>(args)...);
     return static_cast<TRAJECTORY_T&>(*m_trajectories.emplace_back(std::move(newTraj)));
 }
-
 
 // default ECS components needed for the universe
 
@@ -224,12 +222,6 @@ struct UCompTransformTraj
     std::string m_name;
 };
 
-//struct ACompActivated
-//{
-//    // Index to [probably an active area] when activated
-//    Satellite m_area;
-//}
-
 struct UCompVelocity
 {
     Vector3 m_velocity;
@@ -237,99 +229,55 @@ struct UCompVelocity
 
 struct UCompType
 {
-    // maybe use an iterator
-    ITypeSatellite* m_type{nullptr};
+    TypeSatIndex m_type{TypeSatIndex::Invalid};
 };
-
-struct UCompActivatable
-{
-    // put something here some day
-    int m_dummy;
-};
-
 
 /**
- * A specific type of Satellite. A planet, star, vehicle, etc...
+ * Calls rUni.get_reg().emplace<UCOMP_T>(sat), and returns a tuple containing a
+ * reference to the UCOMP_T, or a blank tuple if UCOMP_T is a tag struct.
+ * @tparam UCOMP_T
+ * @param rUni [out] Universe to add new components to
+ * @param sat  [in]  Satellite that is part of rUni
  */
-class ITypeSatellite
+template<typename UCOMP_T>
+constexpr decltype(auto) emplace_filter_tags(Universe& rUni, Satellite sat)
+{
+    if constexpr (std::is_empty<UCOMP_T>::value)
+    {
+        // Return empty tuple if tag struct
+        rUni.get_reg().emplace<UCOMP_T>(sat);
+        return std::forward_as_tuple();
+    }
+    else
+    {
+        // Return reference tuple for normal struct
+        UCOMP_T &comp = rUni.get_reg().emplace<UCOMP_T>(sat);
+        return std::forward_as_tuple(comp);
+    }
+}
+
+template<typename TYPESAT_T, typename ... UCOMP_T>
+class CommonTypeSat
 {
 public:
-    virtual ~ITypeSatellite() = default;
-    virtual std::string get_name() = 0;
+    static decltype(auto) add_get_ucomp_all(Universe& rUni, Satellite sat)
+    {
+        auto& type = rUni.get_reg().get<UCompType>(sat);
 
-    virtual void add(Satellite sat) = 0;
-    virtual void remove(Satellite sat) = 0;
+        assert(type.m_type == TypeSatIndex::Invalid);
+
+        type.m_type = rUni.sat_type_find_index(TYPESAT_T::smc_name);
+        return std::tuple_cat(emplace_filter_tags<UCOMP_T>(rUni, sat) ...);
+    }
+
+     static decltype(auto) add_get_ucomp(Universe& rUni, Satellite sat)
+     {
+         return std::get<0>(add_get_ucomp_all(rUni, sat));
+     }
+
 };
 
-
-/**
- * CRTP to implement common functions of TypeSatellites. add and remove
- * functions will add or remove the component UCOMP_T
- */
-template<typename TYPESAT_T, typename ... UCOMP_T>
-class CommonTypeSat : public ITypeSatellite
-{
-
-public:
-
-
-    CommonTypeSat(Universe& universe) : m_universe(universe) {}
-    ~CommonTypeSat() = default;
-
-    virtual void add(Satellite sat) { add_get_ucomp(sat); };
-    virtual void remove(Satellite sat) override;
-
-    std::tuple<UCOMP_T& ...> add_get_ucomp_all(Satellite sat);
-    auto& add_get_ucomp(Satellite sat);
-
-    constexpr Universe& get_universe() { return m_universe; }
-
-private:
-
-    Universe& m_universe;
-};
-
-template<typename TYPESAT_T, typename ... UCOMP_T>
-std::tuple<UCOMP_T& ...> CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp_all(Satellite sat)
-{
-    auto& type = m_universe.get_reg().get<UCompType>(sat);
-
-    if (type.m_type != nullptr)
-    {
-        //return ;
-    }
-
-    type.m_type = this;
-    return std::forward_as_tuple((m_universe.get_reg().emplace<UCOMP_T>(sat)) ...);
-}
-
-template<typename TYPESAT_T, typename ... UCOMP_T>
-auto& CommonTypeSat<TYPESAT_T, UCOMP_T ...>::add_get_ucomp(Satellite sat)
-{
-    auto& type = m_universe.get_reg().get<UCompType>(sat);
-
-    if (type.m_type != nullptr)
-    {
-        //return ;
-    }
-
-    type.m_type = this;
-    return std::get<0>(std::forward_as_tuple((m_universe.get_reg().emplace<UCOMP_T>(sat)) ...));
-}
-
-template<typename TYPESAT_T, typename ... UCOMP_T>
-void CommonTypeSat<TYPESAT_T, UCOMP_T ...>::remove(Satellite sat)
-{
-    auto& type = m_universe.get_reg().get<UCompType>(sat);
-
-    if (type.m_type != this)
-    {
-        return;
-    }
-
-    type.m_type = nullptr;
-    m_universe.get_reg().remove<UCOMP_T ...>(sat);
-}
+// TODO: move to different files and de-OOPify trajectories too
 
 using TrajectoryType = entt::id_type;
 
