@@ -30,6 +30,7 @@
 
 #include "../types.h"
 #include "activetypes.h"
+#include <Magnum/Math/Vector4.h>
 
 class NewtonBody;
 class NewtonCollision;
@@ -62,6 +63,7 @@ struct DataRigidBody
     float m_mass{1.0f};
     Vector3 m_velocity{0, 0, 0};
     Vector3 m_rotVelocity{0, 0, 0};
+    Vector3 m_centerOfMassOffset{0, 0, 0};
 
     bool m_colliderDirty{false}; // set true if collider is modified
 };
@@ -80,6 +82,12 @@ struct ACompNwtBody : public DataRigidBody
     //ActiveScene &m_scene;
 };
 
+struct ACompRigidbodyAncestor
+{
+    ActiveEnt m_ancestor{entt::null};
+    Matrix4 m_relTransform{};
+};
+
 struct ACompCollisionShape
 {
     NewtonCollision *m_collision{nullptr};
@@ -95,7 +103,7 @@ class SysNewton : public IDynamicSystem
 
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "NewtonPhysics";
 
     SysNewton(ActiveScene &scene);
     SysNewton(SysNewton const& copy) = delete;
@@ -105,16 +113,14 @@ public:
     
     void update_world(ActiveScene& rScene);
 
-    constexpr ActiveScene& get_scene() noexcept { return m_scene; }
-
     static ACompNwtWorld* try_get_physics_world(ActiveScene &rScene);
 
     /**
      * Used to find which rigid body an entity belongs to. This will keep
      * looking up the tree of parents until it finds a rigid body.
      *
-     * @param rScene [in] ActiveScene containing ent
-     * @param ent    [in] ActiveEnt with ACompHierarchy and rigid body ancestor
+     * @param rScene     [in] ActiveScene containing ent
+     * @param ent        [in] ActiveEnt with ACompHierarchy and rigidbody ancestor
      *
      * @return Pair of {level-1 entity, pointer to ACompNwtBody found}. If
      *         hierarchy error, then {entt:null, nullptr}. If no ACompNwtBody
@@ -123,10 +129,45 @@ public:
     static std::pair<ActiveEnt, ACompNwtBody*> find_rigidbody_ancestor(
             ActiveScene& rScene, ActiveEnt ent);
 
+    /**
+     * Finds the transformation of an entity relative to its rigidbody ancestor
+     * 
+     * Identical to find_rigidbody_ancestor(), except returns the transformation
+     * between rigidbody ancestor and the specified entity.
+     * 
+     * @param rScene  [in] ActiveScene containing ent
+     * @param ent     [in] ActiveEnt with ACompHierarchy and rigidbody ancestor
+     * 
+     * @return A Matrix4 representing the transformation
+     */
+    static Matrix4 find_transform_rel_rigidbody_ancestor(
+        ActiveScene& rScene, ActiveEnt ent);
+
+    /**
+     * Helper function for a SysMachine to access a parent rigidbody
+     *
+     * Used by machines which influence the rigidbody to which they're attached.
+     * This function takes a child entity and attempts to retrieve the rigidbody
+     * ancestor of the machine. The function makes use of the
+     * ACompRigidbodyAncestor component; if the specified entity lacks this
+     * component, one is added to it. The component is then used to store the
+     * result of find_rigidbody_ancestor() (the entity which owns the rigidbody)
+     * so that it can be easily accessed later.
+     * 
+     * @param rScene          [in] The scene to search
+     * @param childEntity     [in] An entity whose rigidbody ancestor is sought
+     * 
+     * @return Pair of {pointer to found ACompNwtBody, pointer to ACompTransform
+     *         of the ACompNwtBody entity}. If either component can't be found,
+     *         returns {nullptr, nullptr}
+     */
+    static ACompRigidbodyAncestor* try_get_or_find_rigidbody_ancestor(
+        ActiveScene& rScene, ActiveEnt childEntity);
+
     // most of these are self-explanatory
     static void body_apply_force(ACompRigidBody_t& body, Vector3 force) noexcept;
     static void body_apply_accel(ACompRigidBody_t& body, Vector3 accel) noexcept;
-    static void body_apply_torque(ACompRigidBody_t& body, Vector3 force) noexcept;
+    static void body_apply_torque(ACompRigidBody_t& body, Vector3 torque) noexcept;
 
     /**
      * Create a Newton TreeCollision from a mesh using those weird triangle
@@ -168,6 +209,32 @@ private:
      */
     static void create_body(ActiveScene& rScene, ActiveEnt entity,
                             NewtonWorld const* nwtWorld);
+
+    /**
+    * Recursively compute the center of mass of a hierarchy subtree
+    * 
+    * Takes in a root entity and recurses through its children. Entities which
+    * possess an ACompMass component are used to compute a center of mass for
+    * the entire subtree, treating it as a system of point masses.
+    * 
+    * @param rScene           [in] ActiveScene containing relevant scene data
+    * @param root             [in] Entity at the root of the hierarchy subtree
+    * @param currentTransform [in] Transformation of root with respect to the
+    *                              initial call's root
+    * 
+    * @return A 4-vector containing xyz=CoM, w=total mass
+    */
+    static Magnum::Vector4 compute_body_CoM(ActiveScene& rScene,
+        ActiveEnt root, Matrix4 currentTransform = Matrix4());
+
+    /**
+     * Query Newton for the center of mass of the specified rigidbody
+     * 
+     * @param body [in] ACompNwtBody containing a pointer to a NewtonBody
+     * 
+     * @return a 3-vector representing the CoM offset from the body origin
+     */
+    static Vector3 get_rigidbody_CoM(ACompNwtBody const& body);
 
     static void on_body_destruct(ActiveReg_t& reg, ActiveEnt ent);
     static void on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent);

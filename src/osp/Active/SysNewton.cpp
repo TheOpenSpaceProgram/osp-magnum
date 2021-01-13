@@ -37,7 +37,8 @@ using osp::active::ACompNwtBody;
 using osp::active::ACompNwtWorld;
 using osp::active::ACompTransform;
 
-const std::string SysNewton::smc_name = "NewtonPhysics";
+using Magnum::Vector4;
+using Magnum::Matrix4;
 
 // Callback called for every Rigid Body (even static ones) on NewtonUpdate
 void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
@@ -243,7 +244,7 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt entity,
                             NewtonWorld const* nwtWorld)
 {
 
-    auto const& entHeir      = rScene.reg_get<ACompHierarchy>(entity);
+    auto const& entHier = rScene.reg_get<ACompHierarchy>(entity);
     auto& entTransform = rScene.reg_get<ACompTransform>(entity);
 
     auto& entBody  = rScene.reg_get<ACompNwtBody>(entity);
@@ -266,9 +267,18 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt entity,
 
         //
         NewtonCompoundCollisionBeginAddRemove(rCompound);
-        find_colliders_recurse(rScene, entHeir.m_childFirst, Matrix4(),
+        find_colliders_recurse(rScene, entHier.m_childFirst, Matrix4(),
                                nwtWorld, rCompound);
         NewtonCompoundCollisionEndAddRemove(rCompound);
+
+        // Compute mass, center of mass
+        Vector4 centerOfMass = compute_body_CoM(rScene, entHier.m_childFirst, Matrix4{});
+        entBody.m_centerOfMassOffset = centerOfMass.xyz();
+        /* TODO: mass is left as the default (1.0f) for now; when we have the
+         * logic necesary to represent different thrusts per engine we can
+         * enable this; for now, real masses are too large.
+         */
+        //entBody.m_mass = centerOfMass.w();
 
         // TODO: deal with mass and stuff
 
@@ -289,6 +299,7 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt entity,
                                 entBody.m_intertia.x(),
                                 entBody.m_intertia.x(),
                                 entBody.m_intertia.z());
+        NewtonBodySetCentreOfMass(entBody.m_body, centerOfMass.xyz().data());
 
         break;
     }
@@ -355,27 +366,106 @@ std::pair<ActiveEnt, ACompNwtBody*> SysNewton::find_rigidbody_ancestor(
         ActiveScene& rScene, ActiveEnt ent)
 {
     ActiveEnt prevEnt, currEnt = ent;
-    ACompHierarchy *currHeir = nullptr;
+    ACompHierarchy *pCurrHier = nullptr;
 
     do
     {
+       pCurrHier = rScene.get_registry().try_get<ACompHierarchy>(currEnt);
 
-       currHeir = rScene.get_registry().try_get<ACompHierarchy>(currEnt);
-
-        if (!currHeir)
+        if (!pCurrHier)
         {
             return {entt::null, nullptr};
         }
 
         prevEnt = currEnt;
-        currEnt = currHeir->m_parent;
+        currEnt = pCurrHier->m_parent;
     }
-    while (currHeir->m_level != gc_heir_physics_level);
+    while (pCurrHier->m_level != gc_heir_physics_level);
 
-    auto *body = rScene.get_registry().try_get<ACompNwtBody>(prevEnt);
+    auto *body = rScene.get_registry().try_get<ACompRigidBody_t>(prevEnt);
 
     return {prevEnt, body};
+}
 
+Matrix4 SysNewton::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, ActiveEnt ent)
+{
+    ActiveEnt prevEnt, currEnt = ent;
+    ACompHierarchy *pCurrHier = nullptr;
+    Matrix4 transform;
+
+    do
+    {
+        pCurrHier = &rScene.get_registry().get<ACompHierarchy>(currEnt);
+
+        // Record the local transformation of the current node relative to its parent
+        if (pCurrHier->m_level > gc_heir_physics_level)
+        {
+            Matrix4 localTransform = rScene.reg_get<ACompTransform>(currEnt).m_transform;
+            transform = localTransform * transform;
+        }
+
+        prevEnt = currEnt;
+        currEnt = pCurrHier->m_parent;
+    } while (pCurrHier->m_level != gc_heir_physics_level);
+
+    // Fail if a rigidbody ancestor is not found
+    assert(rScene.get_registry().has<ACompNwtBody>(prevEnt));
+
+    return transform;
+}
+
+osp::active::ACompRigidbodyAncestor* SysNewton::try_get_or_find_rigidbody_ancestor(
+    ActiveScene& rScene, ActiveEnt childEntity)
+{
+    auto& reg = rScene.get_registry();
+    auto* pCompAncestor = reg.try_get<ACompRigidbodyAncestor>(childEntity);
+
+    // Perform first-time initialization of rigidbody ancestor component
+    if (pCompAncestor == nullptr)
+    {
+        auto [ent, compBody] = find_rigidbody_ancestor(rScene, childEntity);
+        if (compBody == nullptr)
+        {
+            // childEntity has no rigidbody ancestor
+            return nullptr;
+        }
+
+        reg.emplace<ACompRigidbodyAncestor>(childEntity);
+    }
+    // childEntity now has an ACompRigidbodyAncestor
+
+    auto& rRbAncestor = reg.get<ACompRigidbodyAncestor>(childEntity);
+    ActiveEnt& rAncestor = rRbAncestor.m_ancestor;
+
+    // Ancestor entity already valid
+    if (reg.valid(rAncestor))
+    {
+        return &rRbAncestor;
+    }
+
+    // Rigidbody ancestor not set yet
+    auto [bodyEnt, compBody] = find_rigidbody_ancestor(rScene, childEntity);
+
+    if (compBody == nullptr)
+    {
+        std::cout << "no rigid body!\n";
+        return nullptr;
+    }
+
+    // Initialize ACompRigidbodyAncestor
+    rAncestor = bodyEnt;
+    rRbAncestor.m_relTransform =
+        find_transform_rel_rigidbody_ancestor(rScene, childEntity);
+    //TODO: this transformation may change and need recalculating
+
+    return &rRbAncestor;
+}
+
+osp::Vector3 SysNewton::get_rigidbody_CoM(ACompNwtBody const& body)
+{
+    Vector3 com;
+    NewtonBodyGetCentreOfMass(body.m_body, com.data());
+    return com;
 }
 
 void SysNewton::body_apply_force(ACompRigidBody_t &body, Vector3 force) noexcept
@@ -391,6 +481,45 @@ void SysNewton::body_apply_accel(ACompRigidBody_t &body, Vector3 accel) noexcept
 void SysNewton::body_apply_torque(ACompRigidBody_t &body, Vector3 torque) noexcept
 {
     body.m_netTorque += torque;
+}
+
+Vector4 SysNewton::compute_body_CoM(ActiveScene& rScene,
+    ActiveEnt root, Matrix4 currentTransform)
+{
+    Vector3 localCoM{0.0f};
+    float localMass = 0.0f;
+
+    for (ActiveEnt nextChild = root; nextChild != entt::null;)
+    {
+        auto const &childHeir = rScene.reg_get<ACompHierarchy>(nextChild);
+        auto const &childTransform = rScene.reg_get<ACompTransform>(nextChild);
+
+        Matrix4 childMatrix = currentTransform * childTransform.m_transform;
+        auto* massComp = rScene.get_registry().try_get<ACompMass>(nextChild);
+
+        if (massComp)
+        {
+            float childMass = rScene.reg_get<ACompMass>(nextChild).m_mass;
+
+            Vector3 offset = childMatrix.translation();
+
+            localCoM += childMass * offset;
+            localMass += childMass;
+        }
+
+        Vector4 subCoM = compute_body_CoM(rScene, childHeir.m_childFirst, childMatrix);
+        localCoM += subCoM.w() * subCoM.xyz();
+        localMass += subCoM.w();
+
+        nextChild = childHeir.m_siblingNext;
+    }
+
+    if (!(localMass > 0.0f))
+    {
+        // Massless subhierarchy, return zero contribution
+        return Vector4{0.0f};
+    }
+    return {localCoM / localMass, localMass};
 }
 
 void SysNewton::on_body_destruct(ActiveReg_t& reg, ActiveEnt ent)

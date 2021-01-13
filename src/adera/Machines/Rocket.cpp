@@ -36,12 +36,11 @@
 #include "adera/Plume.h"
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Math/Color.h>
+#include <Magnum/Math/Matrix4.h>
 
 using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
-
-const std::string SysMachineRocket::smc_name = "Rocket";
 
 void MachineRocket::propagate_output(WireOutput* output)
 {
@@ -68,10 +67,10 @@ std::vector<WireOutput*> MachineRocket::existing_outputs()
     return {};
 }
 
-SysMachineRocket::SysMachineRocket(ActiveScene &scene) :
-    SysMachine<SysMachineRocket, MachineRocket>(scene),
-    m_updatePhysics(scene.get_update_order(), "mach_rocket", "controls", "physics",
-                    std::bind(&SysMachineRocket::update_physics, this))
+SysMachineRocket::SysMachineRocket(ActiveScene &rScene)
+    : SysMachine<SysMachineRocket, MachineRocket>(rScene)
+    , m_updatePhysics(rScene.get_update_order(), "mach_rocket", "controls", "physics",
+        [this](ActiveScene& rScene) { this->update_physics(rScene); })
 {
 
 }
@@ -80,53 +79,25 @@ SysMachineRocket::SysMachineRocket(ActiveScene &scene) :
 //{
 //}
 
-void SysMachineRocket::update_physics()
+void SysMachineRocket::update_physics(ActiveScene& rScene)
 {
-    auto view = m_scene.get_registry().view<MachineRocket>();
+    auto view = m_scene.get_registry().view<MachineRocket, ACompTransform>();
 
     for (ActiveEnt ent : view)
     {
         auto &machine = view.get<MachineRocket>(ent);
-
-        //if (!machine.m_enable)
-        //{
-        //    continue;
-        //}
+        if (!machine.m_enable)
+        {
+            continue;
+        }
 
         //std::cout << "updating a rocket\n";
 
-        ACompRigidBody_t *compRb;
-        ACompTransform *compTf;
-
-        if (m_scene.get_registry().valid(machine.m_rigidBody))
-        {
-            // Try to get the ACompRigidBody if valid
-            compRb = m_scene.get_registry()
-                            .try_get<ACompRigidBody_t>(machine.m_rigidBody);
-            compTf = m_scene.get_registry()
-                            .try_get<ACompTransform>(machine.m_rigidBody);
-            if (!compRb || !compTf)
-            {
-                machine.m_rigidBody = entt::null;
-                continue;
-            }
-        }
-        else
-        {
-            // rocket's rigid body not set yet
-            auto const& [bodyEnt, pBody]
-                    = SysPhysics_t::find_rigidbody_ancestor(m_scene, ent);
-
-            if (pBody == nullptr)
-            {
-                std::cout << "no rigid body!\n";
-                continue;
-            }
-
-            machine.m_rigidBody = bodyEnt;
-            compRb = pBody;
-            compTf = m_scene.get_registry().try_get<ACompTransform>(bodyEnt);
-        }
+        // Get rigidbody ancestor and its transformation component
+        auto const* pRbAncestor =
+            SysPhysics_t::try_get_or_find_rigidbody_ancestor(rScene, ent);
+        auto& rCompRb = rScene.reg_get<ACompRigidBody_t>(pRbAncestor->m_ancestor);
+        auto const& rCompTf = rScene.reg_get<ACompTransform>(pRbAncestor->m_ancestor);
 
         if (WireData *ignition = machine.m_wiIgnition.connected_value())
         {
@@ -135,39 +106,33 @@ void SysMachineRocket::update_physics()
 
         using wiretype::Percent;
 
-        if (WireData *throttle = machine.m_wiThrottle.connected_value())
+        if (WireData *pThrottle = machine.m_wiThrottle.connected_value();
+            pThrottle != nullptr)
         {
-            Percent *percent = std::get_if<Percent>(throttle);
+            Percent *pPercent = std::get_if<Percent>(pThrottle);
+            if (pPercent == nullptr) { continue; }
 
-            float thrust = 10.0f; // temporary
+            float thrustMag = 10.0f; // temporary
 
-            //std::cout << percent->m_value << "\n";
+            Matrix4 relTransform = pRbAncestor->m_relTransform;
 
-            Vector3 thrustVec = compTf->m_transform.backward()
-                                    * (percent->m_value * thrust);
+            /* Compute thrust force
+             * Thrust force is defined to be along +Z by convention.
+             * Obtains thrust vector in rigidbody space
+             */
+            Vector3 thrustDir = relTransform.transformVector(Vector3{0.0f, 0.0f, 1.0f});
+            // Take thrust in rigidbody space and apply to RB in world space
+            Vector3 thrust = thrustMag*pPercent->m_value * thrustDir;
+            Vector3 worldThrust = rCompTf.m_transform.transformVector(thrust);
+            SysPhysics_t::body_apply_force(rCompRb, worldThrust);
 
-            SysPhysics_t::body_apply_force(*compRb, thrustVec);
+            // Obtain point where thrust is applied relative to RB CoM
+            Vector3 location = relTransform.translation();
+            // Compute worldspace torque from engine location, thrust vector
+            Vector3 torque = Magnum::Math::cross(location, thrust);
+            Vector3 worldTorque = rCompTf.m_transform.transformVector(torque);
+            SysPhysics_t::body_apply_torque(rCompRb, worldTorque);
         }
-
-
-
-        // this is suppose to be gimbal, but for now it applies torque
-
-        using wiretype::AttitudeControl;
-
-        if (WireData *gimbal = machine.m_wiGimbal.connected_value())
-        {
-            AttitudeControl *attCtrl = std::get_if<AttitudeControl>(gimbal);
-
-            Vector3 localTorque = compTf->m_transform
-                    .transformVector(attCtrl->m_attitude);
-
-            localTorque *= 3.0f; // arbitrary
-
-            SysPhysics_t::body_apply_torque(*compRb, localTorque);
-        }
-
-
     }
 }
 

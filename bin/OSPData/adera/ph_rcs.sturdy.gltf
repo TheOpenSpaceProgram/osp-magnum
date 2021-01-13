@@ -14,36 +14,37 @@
     ],
     "nodes" : [
         {
-            "name" : "fx_plume_phRCSplume",
-            "rotation" : [
-                0,
-                1,
-                0,
-                -1.6292068494294654e-07
+            "extras" : {
+                "shape" : "cube"
+            },
+            "name" : "col_RCSblk",
+            "scale" : [
+                0.10183212906122208,
+                0.10183212906122208,
+                0.10183212906122208
             ],
             "translation" : [
                 0,
                 0,
-                0.1351655125617981
+                -0.03353360667824745
+            ]
+        },
+        {
+            "name" : "fx_plume_phRCSplume",
+            "translation" : [
+                0,
+                0,
+                -0.1351655125617981
             ]
         },
         {
             "mesh" : 0,
             "name" : "linrcsblk",
             "rotation" : [
-                0,
                 -0.7071068286895752,
                 0,
-                0.7071068286895752
-            ]
-        },
-        {
-            "mesh" : 1,
-            "name" : "linrcsnozzle",
-            "translation" : [
-                0,
-                0,
-                0.1476498246192932
+                -0.7071067690849304,
+                -3.090862321641907e-08
             ]
         },
         {
@@ -57,9 +58,9 @@
                 "description" : "A placeholder linear RCS block",
                 "manufacturer" : "ACME Placeholders",
                 "machines" : [
-                    {
-                        "type" : "RCSController"
-                    },
+                	{
+                		"type" : "RCSController"
+                	},
                     {
                         "type" : "Rocket"
                     },
@@ -87,8 +88,10 @@
                     "index" : 0,
                     "texCoord" : 0
                 },
-                "metallicFactor" : 0,
-                "roughnessFactor" : 0.4000000059604645
+                "metallicRoughnessTexture" : {
+                    "index" : 1,
+                    "texCoord" : 0
+                }
             }
         }
     ],
@@ -106,25 +109,14 @@
                     "material" : 0
                 }
             ]
-        },
-        {
-            "name" : "Cylinder.004",
-            "primitives" : [
-                {
-                    "attributes" : {
-                        "POSITION" : 4,
-                        "NORMAL" : 5,
-                        "TEXCOORD_0" : 6
-                    },
-                    "indices" : 7,
-                    "material" : 0
-                }
-            ]
         }
     ],
     "textures" : [
         {
             "source" : 0
+        },
+        {
+            "source" : 1
         }
     ],
     "images" : [
@@ -132,20 +124,25 @@
             "mimeType" : "image/png",
             "name" : "ph_base",
             "uri" : "ph_base.png"
+        },
+        {
+            "mimeType" : "image/png",
+            "name" : "ph_metal-ph_rough",
+            "uri" : "ph_metal-ph_rough.png"
         }
     ],
     "accessors" : [
         {
             "bufferView" : 0,
             "componentType" : 5126,
-            "count" : 32,
+            "count" : 144,
             "max" : [
-                0.04291259124875069,
+                0.05941193550825119,
                 0.10176695883274078,
                 0.10176695883274078
             ],
             "min" : [
-                -0.05941193550825119,
+                -0.13516558706760406,
                 -0.10176695883274078,
                 -0.10176695883274078
             ],
@@ -154,101 +151,47 @@
         {
             "bufferView" : 1,
             "componentType" : 5126,
-            "count" : 32,
+            "count" : 144,
             "type" : "VEC3"
         },
         {
             "bufferView" : 2,
             "componentType" : 5126,
-            "count" : 32,
+            "count" : 144,
             "type" : "VEC2"
         },
         {
             "bufferView" : 3,
             "componentType" : 5123,
-            "count" : 48,
-            "type" : "SCALAR"
-        },
-        {
-            "bufferView" : 4,
-            "componentType" : 5126,
-            "count" : 120,
-            "max" : [
-                0.06034967675805092,
-                0.06034954637289047,
-                -0.012484176084399223
-            ],
-            "min" : [
-                -0.060349687933921814,
-                -0.06034979596734047,
-                -0.14050965011119843
-            ],
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 5,
-            "componentType" : 5126,
-            "count" : 120,
-            "type" : "VEC3"
-        },
-        {
-            "bufferView" : 6,
-            "componentType" : 5126,
-            "count" : 120,
-            "type" : "VEC2"
-        },
-        {
-            "bufferView" : 7,
-            "componentType" : 5123,
-            "count" : 462,
+            "count" : 510,
             "type" : "SCALAR"
         }
     ],
     "bufferViews" : [
         {
             "buffer" : 0,
-            "byteLength" : 384,
+            "byteLength" : 1728,
             "byteOffset" : 0
         },
         {
             "buffer" : 0,
-            "byteLength" : 384,
-            "byteOffset" : 384
+            "byteLength" : 1728,
+            "byteOffset" : 1728
         },
         {
             "buffer" : 0,
-            "byteLength" : 256,
-            "byteOffset" : 768
+            "byteLength" : 1152,
+            "byteOffset" : 3456
         },
         {
             "buffer" : 0,
-            "byteLength" : 96,
-            "byteOffset" : 1024
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 1440,
-            "byteOffset" : 1120
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 1440,
-            "byteOffset" : 2560
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 960,
-            "byteOffset" : 4000
-        },
-        {
-            "buffer" : 0,
-            "byteLength" : 924,
-            "byteOffset" : 4960
+            "byteLength" : 1020,
+            "byteOffset" : 4608
         }
     ],
     "buffers" : [
         {
-            "byteLength" : 5884,
+            "byteLength" : 5628,
             "uri" : "ph_rcs.sturdy.bin"
         }
     ]
