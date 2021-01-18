@@ -110,7 +110,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     Satellite areaSat = rUni.sat_create();
 
     // assign sat as an ActiveArea
-    UCompActiveArea &area = SatActiveArea::add_get_ucomp(rUni, areaSat);
+    UCompActiveArea &area = SatActiveArea::add_active_area(rUni, areaSat);
 
     // Link ActiveArea to scene using the AreaAssociate
     sysArea.connect(areaSat);

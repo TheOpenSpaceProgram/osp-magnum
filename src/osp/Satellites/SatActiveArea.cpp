@@ -22,24 +22,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <iostream>
-
-#include <Magnum/GL/DefaultFramebuffer.h>
 
 #include "SatActiveArea.h"
 
-#include "../Active/ActiveScene.h"
-#include "../Active/SysNewton.h"
-#include "../Active/SysMachine.h"
+using osp::universe::UCompActiveArea;
+using osp::universe::SatActiveArea;
 
-#include "../Universe.h"
+UCompActiveArea& SatActiveArea::add_active_area(Universe &rUni, Satellite sat)
+{
+    bool typeSetSuccess = rUni.sat_type_try_set(
+                sat, rUni.sat_type_find_index(SatActiveArea::smc_name));
+    assert(typeSetSuccess);
 
-
-// for the 0xrrggbb_rgbf and angle literals
-using namespace Magnum::Math::Literals;
-
-using Magnum::Matrix4;
-
-using namespace osp::universe;
-
-const std::string SatActiveArea::smc_name = "ActiveArea";
+    return rUni.get_reg().emplace<UCompActiveArea>(sat);
+}

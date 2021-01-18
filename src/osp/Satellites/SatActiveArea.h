@@ -65,17 +65,20 @@ struct UCompActiveArea
 };
 
 
-class SatActiveArea : CommonTypeSat<SatActiveArea, UCompActiveArea>
+class SatActiveArea
 {
-    using Base_t = CommonTypeSat<SatActiveArea, UCompActiveArea>;
-
 public:
 
-    static const std::string smc_name;
+    static constexpr std::string_view smc_name = "ActiveArea";
 
-    using Base_t::add_get_ucomp_all;
-    using Base_t::add_get_ucomp;
-
+    /**
+     * Set the type of a Satellite and add a UCompActiveArea to it
+     * @param rUni [out] Universe containing satellite
+     * @param sat  [in] Satellite add a UCompActiveArea to
+     * @return Reference to UCompActiveArea created
+     */
+    static UCompActiveArea& add_active_area(
+        osp::universe::Universe& rUni, osp::universe::Satellite sat);
 };
 
 }
