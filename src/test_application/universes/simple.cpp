@@ -91,15 +91,17 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
         {
             Satellite sat = rUni.sat_create();
 
-            // assign sat as a planet
-            UCompPlanet &planet = SatPlanet::add_get_ucomp(rUni, sat);
-
             // Configure planet as a 256m radius sphere of black hole
-            planet.m_radius = 256;
-            planet.m_mass = 7.03E7 * 99999999; // volume of sphere * density
+            float radius = 256;
+            float mass = 7.03E7 * 99999999; // volume of sphere * density
 
-            planet.m_resolutionScreenMax = 0.056f;
-            planet.m_resolutionSurfaceMax = 2.0f;
+            float resolutionScreenMax = 0.056f;
+            float resolutionSurfaceMax = 2.0f;
+
+            // assign sat as a planet
+            UCompPlanet &planet = SatPlanet::add_planet(
+                        rUni, sat, radius, mass, resolutionSurfaceMax,
+                        resolutionScreenMax);
 
             auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
 

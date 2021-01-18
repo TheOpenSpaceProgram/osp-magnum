@@ -362,7 +362,7 @@ void debug_print_sats()
     Universe const &rUni = g_osp.get_universe();
 
     std::vector<std::string_view> const& typeSatNames
-            = g_osp.get_universe().sat_type_get_names();
+            = rUni.sat_type_get_names();
 
     auto const view = rUni.get_reg().view<const UCompTransformTraj,
                                               const UCompType>();

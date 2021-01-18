@@ -40,15 +40,22 @@ struct UCompVehicle
     DependRes<BlueprintVehicle> m_blueprint;
 };
 
-class SatVehicle : CommonTypeSat<SatVehicle, UCompVehicle, UCompActivatable>
+class SatVehicle
 {
-    using Base_t = CommonTypeSat<SatVehicle, UCompVehicle, UCompActivatable>;
 public:
 
-    static const std::string smc_name;
+    static constexpr std::string_view smc_name = "Vehicle";
 
-    using Base_t::add_get_ucomp;
-    using Base_t::add_get_ucomp_all;
+    /**
+     * Set the type of a Satellite and add a UCompVehicle to it
+     * @param rUni      [out] Universe containing satellite
+     * @param sat       [in] Satellite add a vehicle to
+     * @param blueprint [in] Vehicle data to open when activated
+     * @return Reference to UCompVehicle created
+     */
+    static UCompVehicle& add_vehicle(
+        osp::universe::Universe& rUni, osp::universe::Satellite sat,
+        DependRes<BlueprintVehicle> blueprint);
 };
 
 }

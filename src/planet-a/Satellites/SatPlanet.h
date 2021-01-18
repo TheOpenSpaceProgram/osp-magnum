@@ -27,6 +27,7 @@
 #include <osp/Satellites/SatActiveArea.h>
 #include <osp/Universe.h>
 
+
 namespace planeta::universe
 {
 
@@ -58,18 +59,25 @@ struct UCompPlanet
 
 
 class SatPlanet
- : osp::universe::CommonTypeSat<SatPlanet, UCompPlanet,
-                                osp::universe::UCompActivatable>
 {
-    using Base_t = osp::universe::CommonTypeSat<SatPlanet, UCompPlanet,
-                                                osp::universe::UCompActivatable>;
 public:
 
-    static const std::string smc_name;
+    static constexpr std::string_view smc_name = "Planet";
 
-    using Base_t::add_get_ucomp;
-    using Base_t::add_get_ucomp_all;
-
+    /**
+     * Set the type of a Satellite and add a UCompPlanet to it
+     * @param rUni                 [out] Universe containing satellite
+     * @param sat                  [in] Satellite add a planet to
+     * @param radius               [in] Radius of planet in meters
+     * @param mass                 [in] Mass of planet in kg
+     * @param resolutionSurfaceMax [in] See UCompPlanet definition
+     * @param resolutionScreenMax  [in] See UCompPlanet definition
+     * @return Reference to new UCompPlanet added
+     */
+    static UCompPlanet& add_planet(
+        osp::universe::Universe& rUni, osp::universe::Satellite sat,
+        double radius, float mass, float resolutionSurfaceMax,
+        float resolutionScreenMax);
 };
 
 }

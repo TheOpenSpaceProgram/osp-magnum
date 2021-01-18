@@ -38,7 +38,6 @@ namespace osp::universe
 {
 
 class ISystemTrajectory;
-class ITypeSatellite;
 
 enum class Satellite : entt::id_type {};
 
@@ -103,6 +102,8 @@ public:
      */
     void sat_remove(Satellite sat);
 
+    bool sat_try_set_type(Satellite sat, TypeSatIndex type);
+
     /**
      * Calculate position between two satellites.
      * @param referenceFrame [in]
@@ -132,8 +133,8 @@ public:
     /**
      * @return Names of registered satellites. Access using a TypeSatIndex
      */
-    constexpr std::vector<std::string_view> const& sat_type_get_names()
-    { return m_typeSatNames; }
+    constexpr std::vector<std::string_view> const& sat_type_get_names() const
+    noexcept { return m_typeSatNames; }
 
     /**
      * Find index of a registered satellite by name
@@ -153,6 +154,15 @@ public:
     { return sat_type_find_index(SATTYPE_T::smc_name); }
 
     /**
+     * Attempt to set the type of a Satellite. If a type is already set, then
+     * the type will not be set successfully.
+     * @param sat  [in] Satellite to set type of
+     * @param type [in] Type to set to
+     * @return True if type is set succesfully, or else false
+     */
+    bool sat_type_try_set(Satellite sat, TypeSatIndex type);
+
+    /**
      * Create a Trajectory, and add it to the universe.
      * @tparam TRAJECTORY_T Type of Trajectory to construct
      * @return Reference to new trajectory just created
@@ -160,8 +170,8 @@ public:
     template<typename TRAJECTORY_T, typename ... ARGS_T>
     TRAJECTORY_T& trajectory_create(ARGS_T&& ... args);
 
-    constexpr Registry_t& get_reg() { return m_registry; }
-    constexpr const Registry_t& get_reg() const
+    constexpr Registry_t& get_reg() noexcept { return m_registry; }
+    constexpr const Registry_t& get_reg() const noexcept
     { return m_registry; }
 
 private:
@@ -230,51 +240,6 @@ struct UCompVelocity
 struct UCompType
 {
     TypeSatIndex m_type{TypeSatIndex::Invalid};
-};
-
-/**
- * Calls rUni.get_reg().emplace<UCOMP_T>(sat), and returns a tuple containing a
- * reference to the UCOMP_T, or a blank tuple if UCOMP_T is a tag struct.
- * @tparam UCOMP_T
- * @param rUni [out] Universe to add new components to
- * @param sat  [in]  Satellite that is part of rUni
- */
-template<typename UCOMP_T>
-constexpr decltype(auto) emplace_filter_tags(Universe& rUni, Satellite sat)
-{
-    if constexpr (std::is_empty<UCOMP_T>::value)
-    {
-        // Return empty tuple if tag struct
-        rUni.get_reg().emplace<UCOMP_T>(sat);
-        return std::forward_as_tuple();
-    }
-    else
-    {
-        // Return reference tuple for normal struct
-        UCOMP_T &comp = rUni.get_reg().emplace<UCOMP_T>(sat);
-        return std::forward_as_tuple(comp);
-    }
-}
-
-template<typename TYPESAT_T, typename ... UCOMP_T>
-class CommonTypeSat
-{
-public:
-    static decltype(auto) add_get_ucomp_all(Universe& rUni, Satellite sat)
-    {
-        auto& type = rUni.get_reg().get<UCompType>(sat);
-
-        assert(type.m_type == TypeSatIndex::Invalid);
-
-        type.m_type = rUni.sat_type_find_index(TYPESAT_T::smc_name);
-        return std::tuple_cat(emplace_filter_tags<UCOMP_T>(rUni, sat) ...);
-    }
-
-     static decltype(auto) add_get_ucomp(Universe& rUni, Satellite sat)
-     {
-         return std::get<0>(add_get_ucomp_all(rUni, sat));
-     }
-
 };
 
 // TODO: move to different files and de-OOPify trajectories too
