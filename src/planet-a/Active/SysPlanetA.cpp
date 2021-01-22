@@ -53,6 +53,7 @@ using osp::universe::Satellite;
 
 const std::string SysPlanetA::smc_name = "PlanetA";
 
+/*
 StatusActivated SysPlanetA::activate_sat(
         osp::active::ActiveScene &scene,
         osp::active::SysAreaAssociate &area,
@@ -90,7 +91,7 @@ StatusActivated SysPlanetA::activate_sat(
     rPlanetForceField.m_Gmass = loadMePlanet.m_mass * sc_GravConst;
 
     return {0, planetEnt, false};
-}
+}*/
 
 SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene,
                        osp::UserInputHandler &userInput)
@@ -104,16 +105,6 @@ SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene,
  , m_debugUpdate(userInput.config_get("debug_planet_update"))
 { }
 
-
-int SysPlanetA::deactivate_sat(osp::active::ActiveScene &scene,
-                               osp::active::SysAreaAssociate &area,
-                               osp::universe::Satellite areaSat,
-                               osp::universe::Satellite tgtSat,
-                               osp::active::ActiveEnt tgtEnt)
-{
-    // TODO: Delete the planet entity from the scene
-    return 0;
-}
 
 void SysPlanetA::draw(osp::active::ACompCamera const& camera)
 {
@@ -246,18 +237,18 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
 
         //if (m_debugUpdate.triggered() || true)
 
-        planet_update_geometry(ent);
+        planet_update_geometry(ent, rScene);
     }
 }
 
-void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt)
+void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt,
+                                        osp::active::ActiveScene& rScene)
 {
-    auto &rPlanetPlanet = m_scene.reg_get<ACompPlanet>(planetEnt);
-    auto const &planetTf = m_scene.reg_get<ACompTransform>(planetEnt);
-    auto const &planetActivated = m_scene.reg_get<ACompActivatedSat>(planetEnt);
+    auto &rPlanetPlanet = rScene.reg_get<ACompPlanet>(planetEnt);
+    auto const &planetTf = rScene.reg_get<ACompTransform>(planetEnt);
+    auto const &planetActivated = rScene.reg_get<ACompActivatedSat>(planetEnt);
 
-    // TODO: de-spaghettify systems. make systems entirely stateless
-    osp::universe::Universe const &uni = m_scene.dynamic_system_find<SysAreaAssociate>().get_universe();
+    osp::universe::Universe const &uni = rScene.reg_get<ACompAreaLink>(rScene.hier_get_root()).m_rUniverse;
 
     Satellite planetSat = planetActivated.m_sat;
     auto &planetUComp = uni.get_reg().get<universe::UCompPlanet>(planetSat);
@@ -265,8 +256,8 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt)
     PlanetGeometryA &rPlanetGeo = *(rPlanetPlanet.m_planet);
 
     // Temporary: use the first camera in the scene as the viewer
-    ActiveEnt cam = m_scene.get_registry().view<ACompCamera>().front();
-    auto const &camTf = m_scene.reg_get<ACompTransform>(cam);
+    ActiveEnt cam = rScene.get_registry().view<ACompCamera>().front();
+    auto const &camTf = rScene.reg_get<ACompTransform>(cam);
 
     // Set this somewhere else. Radius at which detail falloff will start
     // This will essentially be the physics area size
