@@ -53,16 +53,12 @@ using planeta::universe::UCompPlanet;
 
 void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
 {
-    Universe &uni = ospApp.get_universe();
+    Universe &rUni = ospApp.get_universe();
     Package &pkg = ospApp.debug_find_package("lzdb");
 
-    // Get the planet system used to create a UCompPlanet
-    SatPlanet &typePlanet = static_cast<planeta::universe::SatPlanet&>(
-            *uni.sat_type_find("Planet")->second);
-
     // Create trajectory that will make things added to the universe stationary
-    auto &stationary = uni.trajectory_create<TrajStationary>(
-                                        uni, uni.sat_root());
+    auto &stationary = rUni.trajectory_create<TrajStationary>(
+                                        rUni, rUni.sat_root());
 
     // Create 10 random vehicles
     /*for (int i = 0; i < 10; i ++)
@@ -80,8 +76,8 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
     }*/
 
     //Satellite sat = debug_add_deterministic_vehicle(uni, pkg, "Stomper Mk. I");
-    Satellite sat = testapp::debug_add_part_vehicle(uni, pkg, "Placeholder Mk. I");
-    auto& posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
+    Satellite sat = testapp::debug_add_part_vehicle(rUni, pkg, "Placeholder Mk. I");
+    auto& posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
     posTraj.m_position = osp::Vector3s(22 * 1024l * 5l, 0l, 0l);
     posTraj.m_dirty = true;
     stationary.add(sat);
@@ -93,19 +89,21 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
     {
         for (int z = -0; z < 1; z ++)
         {
-            Satellite sat = uni.sat_create();
-
-            // assign sat as a planet
-            UCompPlanet &planet = typePlanet.add_get_ucomp(sat);
+            Satellite sat = rUni.sat_create();
 
             // Configure planet as a 256m radius sphere of black hole
-            planet.m_radius = 256;
-            planet.m_mass = 7.03E7 * 99999999; // volume of sphere * density
+            float radius = 256;
+            float mass = 7.03E7 * 99999999; // volume of sphere * density
 
-            planet.m_resolutionScreenMax = 0.056f;
-            planet.m_resolutionSurfaceMax = 2.0f;
+            float resolutionScreenMax = 0.056f;
+            float resolutionSurfaceMax = 2.0f;
 
-            auto &posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
+            // assign sat as a planet
+            UCompPlanet &planet = SatPlanet::add_planet(
+                        rUni, sat, radius, mass, resolutionSurfaceMax,
+                        resolutionScreenMax);
+
+            auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
 
             // space planets 400m apart from each other
             // 1024 units = 1 meter

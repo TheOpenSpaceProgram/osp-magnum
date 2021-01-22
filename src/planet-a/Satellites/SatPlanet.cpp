@@ -22,17 +22,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <iostream>
 
 #include "SatPlanet.h"
 
-using namespace planeta::universe;
+using osp::universe::Universe;
+using osp::universe::Satellite;
+using osp::universe::UCompActivatable;
 
-const std::string SatPlanet::smc_name = "Planet";
+using planeta::universe::UCompPlanet;
+using planeta::universe::SatPlanet;
 
-SatPlanet::SatPlanet(osp::universe::Universe &universe) :
-        CommonTypeSat<SatPlanet, UCompPlanet,
-                      osp::universe::UCompActivatable>(universe)
+UCompPlanet& SatPlanet::add_planet(
+        osp::universe::Universe& rUni, Satellite sat, double radius, float mass,
+        float resolutionSurfaceMax, float resolutionScreenMax)
 {
+    bool typeSetSuccess = rUni.sat_type_try_set(
+                sat, rUni.sat_type_find_index(SatPlanet::smc_name));
+    assert(typeSetSuccess);
 
+    rUni.get_reg().emplace<UCompActivatable>(sat);
+    return rUni.get_reg().emplace<UCompPlanet>(
+                sat, radius, resolutionSurfaceMax, resolutionScreenMax, mass);
 }

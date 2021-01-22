@@ -101,7 +101,7 @@ void SysAreaAssociate::update_scan(ActiveScene& rScene)
 
         // Satellite is near! Attempt to load it
 
-        sat_activate(sat, view.get(sat));
+        sat_activate(sat);
     }
 
 }
@@ -167,8 +167,8 @@ void SysAreaAssociate::sat_transform_update(ActiveEnt ent)
     satPosTraj.m_dirty = true;
 }
 
-void SysAreaAssociate::activator_add(universe::ITypeSatellite const* type,
-                                         IActivator &activator)
+void SysAreaAssociate::activator_add(TypeSatIndex type,
+                                     IActivator &activator)
 {
     m_activators[type] = &activator;
 }
@@ -199,8 +199,7 @@ void SysAreaAssociate::floating_origin_translate(Vector3 translation)
 }
 
 
-int SysAreaAssociate::sat_activate(universe::Satellite sat,
-                                   universe::UCompActivatable &satAct)
+int SysAreaAssociate::sat_activate(universe::Satellite sat)
 {
 
     if (m_activatedSats.find(sat) != m_activatedSats.end())

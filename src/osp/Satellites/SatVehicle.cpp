@@ -24,12 +24,16 @@
  */
 #include "SatVehicle.h"
 
-using namespace osp::universe;
+using osp::universe::UCompVehicle;
+using osp::universe::SatVehicle;
 
-const std::string SatVehicle::smc_name = "Vehicle";
-
-SatVehicle::SatVehicle(Universe& universe) :
-        CommonTypeSat<SatVehicle, UCompVehicle, UCompActivatable>(universe)
+UCompVehicle& SatVehicle::add_vehicle(
+        Universe &rUni, Satellite sat, DependRes<BlueprintVehicle> blueprint)
 {
+    bool typeSetSuccess = rUni.sat_type_try_set(
+                sat, rUni.sat_type_find_index(SatVehicle::smc_name));
+    assert(typeSetSuccess);
 
+    rUni.get_reg().emplace<UCompActivatable>(sat);
+    return rUni.get_reg().emplace<UCompVehicle>(sat, std::move(blueprint));
 }

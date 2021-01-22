@@ -57,8 +57,6 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
     Package &rPkg = ospApp.debug_find_package("lzdb");
 
     // Get the planet system used to create a UCompPlanet
-    SatPlanet &typePlanet = static_cast<planeta::universe::SatPlanet&>(
-            *rUni.sat_type_find("Planet")->second);
 
     // Create trajectory that will make things added to the universe stationary
     auto &stationary = rUni.trajectory_create<TrajStationary>(
@@ -94,15 +92,17 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
         {
             Satellite sat = rUni.sat_create();
 
-            // assign sat as a planet
-            UCompPlanet &planet = typePlanet.add_get_ucomp(sat);
-
             // Create the real world moon
-            planet.m_radius = 1.737E+6;
-            planet.m_mass = 7.347673E+22;
+            float radius = 1.737E+6;
+            float mass = 7.347673E+22;
 
-            planet.m_resolutionScreenMax = 0.056f;
-            planet.m_resolutionSurfaceMax = 12.0f;
+            float resolutionScreenMax = 0.056f;
+            float resolutionSurfaceMax = 12.0f;
+
+            // assign sat as a planet
+            UCompPlanet &planet = SatPlanet::add_planet(
+                        rUni, sat, radius, mass, resolutionSurfaceMax,
+                        resolutionScreenMax);
 
             auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
 

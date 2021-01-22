@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "SatActiveArea.h"
+
 #include "../Universe.h"
 
 #include "../Resource/Resource.h"
@@ -38,17 +40,22 @@ struct UCompVehicle
     DependRes<BlueprintVehicle> m_blueprint;
 };
 
-class SatVehicle : public CommonTypeSat<SatVehicle, UCompVehicle, UCompActivatable>
+class SatVehicle
 {
-
 public:
 
-    static const std::string smc_name;
+    static constexpr std::string_view smc_name = "Vehicle";
 
-    SatVehicle(Universe& universe);
-    ~SatVehicle() = default;
-    virtual std::string get_name() { return smc_name; };
-
+    /**
+     * Set the type of a Satellite and add a UCompVehicle to it
+     * @param rUni      [out] Universe containing satellite
+     * @param sat       [in] Satellite add a vehicle to
+     * @param blueprint [in] Vehicle data to open when activated
+     * @return Reference to UCompVehicle created
+     */
+    static UCompVehicle& add_vehicle(
+        osp::universe::Universe& rUni, osp::universe::Satellite sat,
+        DependRes<BlueprintVehicle> blueprint);
 };
 
 }

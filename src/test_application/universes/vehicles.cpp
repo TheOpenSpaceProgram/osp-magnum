@@ -92,12 +92,8 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
     auto& posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
     posTraj.m_name = name;
 
-    // Make it into a vehicle
-    auto& typeVehicle = *static_cast<SatVehicle*>(
-            uni.sat_type_find("Vehicle")->second.get());
-
-    UCompVehicle &vehicle = typeVehicle.add_get_ucomp(sat);
-    vehicle.m_blueprint = std::move(depend);
+    // Make the satellite into a vehicle
+    SatVehicle::add_vehicle(uni, sat, std::move(depend));
 
     return sat;
 }
@@ -154,13 +150,8 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
     auto &posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
     posTraj.m_name = name;
 
-    // Make it into a vehicle
-    auto &typeVehicle = *static_cast<SatVehicle*>(
-            uni.sat_type_find("Vehicle")->second.get());
-    UCompVehicle &UCompVehicle = typeVehicle.add_get_ucomp(sat);
-
-    // set the SatVehicle's blueprint to the one just made
-    UCompVehicle.m_blueprint = std::move(depend);
+    // Make the satellite into a vehicle
+    SatVehicle::add_vehicle(uni, sat, std::move(depend));
 
     return sat;
 
@@ -293,13 +284,8 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     auto& posTraj = uni.get_reg().get<osp::universe::UCompTransformTraj>(sat);
     posTraj.m_name = name;
 
-    // Make it into a vehicle
-    auto& typeVehicle = *static_cast<osp::universe::SatVehicle*>(
-        uni.sat_type_find("Vehicle")->second.get());
-    osp::universe::UCompVehicle& compVeh = typeVehicle.add_get_ucomp(sat);
-
-    // Set the SatVehicle's blueprint to the one just made
-    compVeh.m_blueprint = std::move(depend);
+    // Make the satellite into a vehicle
+    SatVehicle::add_vehicle(uni, sat, std::move(depend));
 
     return sat;
 }

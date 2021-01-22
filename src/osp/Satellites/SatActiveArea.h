@@ -28,20 +28,11 @@
 
 #include <map>
 
-//#include <Magnum/Math/Color.h>
-//#include <Magnum/PixelFormat.h>
-//#include <Magnum/SceneGraph/Camera.h>
-
 #include "../types.h"
-//#include "../scene.h"
+#include "../Active/activetypes.h"
 
 #include "../Resource/Package.h"
 #include "../Resource/PrototypePart.h"
-
-//#include "../Active/ActiveScene.h"
-//#include "../OSPApplication.h"
-//#include "../UserInputHandler.h"
-//#include "../Active/FtrNewtonBody.h"
 
 namespace osp::universe
 {
@@ -50,57 +41,44 @@ namespace osp::universe
 class OSPMagnum;
 class SatActiveArea;
 
+struct UCompActivatable { };
+
+struct UCompActivationMutable
+{
+    Satellite m_area{entt::null};
+    active::ActiveEnt m_ent{entt::null};
+};
+
+struct UCompActivationRadius
+{
+    float m_radius;
+};
 
 struct UCompActiveArea
 {
-    //active::ActiveEnt m_camera;
 
-    unsigned m_sceneIndex;
+    // for later use
+    //active::MapActiveScene_t::iterator m_scene;
 
     // true when the ActiveArea is moving
     bool m_inMotion;
 };
 
 
-class SatActiveArea : public CommonTypeSat<SatActiveArea, UCompActiveArea>
+class SatActiveArea
 {
-
 public:
 
-    static const std::string smc_name;
-
-    SatActiveArea(Universe& universe);
-    ~SatActiveArea() = default;
+    static constexpr std::string_view smc_name = "ActiveArea";
 
     /**
-     * Setup magnum scene and sets m_loadedActive to true.
-     * @return only 0 for now
+     * Set the type of a Satellite and add a UCompActiveArea to it
+     * @param rUni [out] Universe containing satellite
+     * @param sat  [in] Satellite add a UCompActiveArea to
+     * @return Reference to UCompActiveArea created
      */
-    //int activate(OSPApplication& app);
-
-    /**
-     * Do actual drawing of scene. Call only on context thread.
-     */
-    void draw_gl();
-    
-    /**
-     * Load nearby satellites, Maybe request a floating origin translation,
-     * then calls update_physics of ActiveScene
-     */
-    void update_physics(float deltaTime);
-
-    std::string get_name() { return smc_name; };
-
-private:
-
-    //bool m_loadedActive;
-
-    //ActiveEnt m_camera;
-
-    //std::shared_ptr<ActiveScene> m_scene;
-
-    //UserInputHandler& m_userInput;
-
+    static UCompActiveArea& add_active_area(
+        osp::universe::Universe& rUni, osp::universe::Satellite sat);
 };
 
 }
