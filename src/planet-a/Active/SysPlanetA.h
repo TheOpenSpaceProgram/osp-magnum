@@ -54,8 +54,7 @@ struct ACompPlanet
 };
 
 
-class SysPlanetA : public osp::active::IDynamicSystem,
-                   public osp::active::IActivator
+class SysPlanetA : public osp::active::IDynamicSystem
 {
 public:
 
@@ -65,25 +64,14 @@ public:
                osp::UserInputHandler &userInput);
     ~SysPlanetA() = default;
 
-    osp::active::StatusActivated activate_sat(
-            osp::active::ActiveScene &scene,
-            osp::active::SysAreaAssociate &area,
-            osp::universe::Satellite areaSat,
-            osp::universe::Satellite tgtSat);
-
-    int deactivate_sat(osp::active::ActiveScene &scene,
-                       osp::active::SysAreaAssociate &area,
-                       osp::universe::Satellite areaSat,
-                       osp::universe::Satellite tgtSat,
-                       osp::active::ActiveEnt tgtEnt);
-
     void draw(osp::active::ACompCamera const& camera);
 
     void debug_create_chunk_collider(osp::active::ActiveEnt ent,
                                      ACompPlanet &planet,
                                      chindex_t chunk);
 
-    void planet_update_geometry(osp::active::ActiveEnt planetEnt);
+    static void planet_update_geometry(osp::active::ActiveEnt planetEnt,
+                                osp::active::ActiveScene& rScene);
 
     void update_geometry(osp::active::ActiveScene& rScene);
 
