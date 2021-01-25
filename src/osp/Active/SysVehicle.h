@@ -32,18 +32,6 @@
 #include "../Resource/Package.h"
 #include "../Resource/blueprints.h"
 
-// forward declare
-namespace osp
-{
-    class PrototypePart;
-}
-
-// forward declare
-namespace osp::universe
-{
-    class SatActiveArea;
-}
-
 namespace osp::active
 {
 
@@ -108,15 +96,34 @@ public:
      * @param rootParent Entity to put part into
      * @return Pointer to object created
      */
-    ActiveEnt part_instantiate(PrototypePart& part, ActiveEnt rootParent);
+    static ActiveEnt part_instantiate(ActiveScene& rScene, PrototypePart& part,
+                                      ActiveEnt rootParent);
 
-    // Handle deleted parts and separations
-    void update_vehicle_modification(ActiveScene& rScene);
+    static ActiveEnt activate(ActiveScene &rScene, universe::Universe &rUni,
+                              universe::Satellite areaSat,
+                              universe::Satellite tgtSat);
+
+    static void deactivate(ActiveScene &rScene, universe::Universe &rUni,
+                           universe::Satellite areaSat,
+                           universe::Satellite tgtSat, ActiveEnt tgtEnt);
+
+    /**
+     *
+     * @param rScene
+     */
+    static void update_activate(ActiveScene& rScene);
+
+    /**
+     *
+     * @param rScene [in/out]
+     */
+    static void update_vehicle_modification(ActiveScene& rScene);
 
 private:
-    ActiveScene& m_scene;
+    //ActiveScene& m_scene;
     //AppPackages& m_packages;
 
+    UpdateOrderHandle_t m_updateActivation;
     UpdateOrderHandle_t m_updateVehicleModification;
 };
 

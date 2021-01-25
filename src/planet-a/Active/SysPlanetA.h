@@ -64,6 +64,10 @@ public:
                osp::UserInputHandler &userInput);
     ~SysPlanetA() = default;
 
+    static osp::active::ActiveEnt activate(
+            osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
+            osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat);
+
     void draw(osp::active::ACompCamera const& camera);
 
     void debug_create_chunk_collider(osp::active::ActiveEnt ent,
@@ -73,6 +77,8 @@ public:
     static void planet_update_geometry(osp::active::ActiveEnt planetEnt,
                                 osp::active::ActiveScene& rScene);
 
+    static void update_activate(osp::active::ActiveScene& rScene);
+
     void update_geometry(osp::active::ActiveScene& rScene);
 
     void update_physics(osp::active::ActiveScene& rScene);
@@ -81,6 +87,7 @@ private:
 
     osp::active::ActiveScene &m_scene;
 
+    osp::active::UpdateOrderHandle_t m_updateActivate;
     osp::active::UpdateOrderHandle_t m_updateGeometry;
     osp::active::UpdateOrderHandle_t m_updatePhysics;
 

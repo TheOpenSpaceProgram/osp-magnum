@@ -35,5 +35,7 @@ UCompVehicle& SatVehicle::add_vehicle(
     assert(typeSetSuccess);
 
     rUni.get_reg().emplace<UCompActivatable>(sat);
+    rUni.get_reg().emplace<UCompActivationRadius>(sat);
+
     return rUni.get_reg().emplace<UCompVehicle>(sat, std::move(blueprint));
 }
