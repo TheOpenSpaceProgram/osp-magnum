@@ -34,15 +34,16 @@
 namespace osp::active
 {
 
-struct ActivateSatellites
+struct ActivationTracker
 {
     using MapSatToEnt_t = std::unordered_map<universe::Satellite, ActiveEnt>;
+
     // Satellites that are currently inside the active area
-    //std::unordered_set<universe::Satellite> m_inside;
+    // possibly replace with a single entt sparse_set in ACompAreaLink
     MapSatToEnt_t m_inside;
 
     std::vector<MapSatToEnt_t::iterator> m_enter;
-    std::vector<MapSatToEnt_t::iterator> m_leave;
+    std::vector<std::pair<universe::Satellite, ActiveEnt>> m_leave;
 };
 
 struct ACompAreaLink
@@ -50,12 +51,19 @@ struct ACompAreaLink
     ACompAreaLink(universe::Universe& rUniverse, universe::Satellite areaSat)
      : m_areaSat(areaSat)
      , m_rUniverse(rUniverse)
+     , m_activated(rUniverse.sat_type_count())
     { }
+
+    ActivationTracker& get_tracker(universe::TypeSatIndex type)
+    { return m_activated[std::size_t(type)]; }
+
+    universe::Universe& get_universe() noexcept
+    { return m_rUniverse.get(); }
 
     universe::Satellite m_areaSat;
 
     std::reference_wrapper<universe::Universe> m_rUniverse;
-    std::vector<ActivateSatellites> m_activated;
+    std::vector<ActivationTracker> m_activated;
 
 };
 
@@ -106,13 +114,15 @@ public:
      * Move the ActiveArea satellite, and translate everything in the
      * ActiveScene, aka: floating origin translation
      */
-    void area_move(Vector3s translate);
+    static void area_move(ActiveScene& rScene, Vector3s translate);
 
     /**
      * Update position of ent's associated Satellite in the Universe, based on
-     * it's transform in the ActiveScene.
+     * a transform in ActiveScene.
      */
-    void sat_transform_update(ActiveEnt ent);
+    static void sat_transform_update(
+            universe::Universe& rUni, universe::Satellite areaSat,
+            universe::Satellite tgtSat, Matrix4 transform);
 
 private:
 
@@ -122,7 +132,7 @@ private:
      * Translate everything in the ActiveScene
      * @param translation
      */
-    void floating_origin_translate(Vector3 translation);
+    static void floating_origin_translate(ActiveScene& rScene, Vector3 translation);
 
 };
 

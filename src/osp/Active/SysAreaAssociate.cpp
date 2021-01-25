@@ -30,9 +30,11 @@ using osp::active::SysAreaAssociate;
 
 using osp::active::ACompAreaLink;
 
+using osp::universe::TypeSatIndex;
 using osp::universe::Universe;
 using osp::universe::Satellite;
 
+using osp::universe::UCompType;
 using osp::universe::UCompActivatable;
 using osp::universe::UCompActivationRadius;
 using osp::universe::UCompActiveArea;
@@ -57,77 +59,58 @@ void SysAreaAssociate::update_scan(ActiveScene& rScene)
         return;
     }
 
+    // Clear enter/leave vectors
+    for (ActivationTracker &tracker : pArea->m_activated)
+    {
+        tracker.m_enter.clear();
+        tracker.m_leave.clear();
+    }
+
     Universe &rUni = pArea->m_rUniverse;
     Satellite areaSat = pArea->m_areaSat;
 
     auto &areaUComp = rUni.get_reg().get<UCompActiveArea>(areaSat);
 
-    auto viewActRadius = rUni.get_reg().view<UCompActivationRadius,
-                                             UCompActivatable>();
+    auto viewActRadius = rUni.get_reg().view<
+            UCompActivationRadius, UCompActivatable, UCompType>();
 
     for (Satellite sat : viewActRadius)
     {
         auto satRadius = viewActRadius.get<UCompActivationRadius>(sat);
+        auto satType = viewActRadius.get<UCompType>(sat);
+
+        if (satType.m_type == TypeSatIndex::Invalid)
+        {
+            continue; // Skip satellites that don't have a type (somehow)
+        }
+
+        ActivationTracker &activations = pArea->m_activated[
+                                                    size_t(satType.m_type)];
+
+        // Check if already activated
+        auto found = activations.m_inside.find(sat);
+        bool alreadyInside = (found != activations.m_inside.end());
 
         float distSqr = rUni.sat_calc_pos_meters(areaSat, sat).dot();
         float radius = areaUComp.m_areaRadius + satRadius.m_radius;
 
         if ((radius * radius) > distSqr)
         {
-            std::cout << "nearby!\n";
+            if (alreadyInside)
+            {
+                continue; // Satellite already activated
+            }
+            // Satellite is nearby, activate it!
+            auto entered = activations.m_inside.emplace(sat, entt::null).first;
+            activations.m_enter.emplace_back(entered);
         }
-
+        else if (alreadyInside)
+        {
+            // Satellite exited area
+            activations.m_leave.emplace_back(found->first, found->second);
+            activations.m_inside.erase(found);
+        }
     }
-
-    //for (Satellite sat : view)
-    //{
-//        if (SatelliteObject* obj = sat.get_object())
-//        {
-//            //std::cout << "obj: " << obj->get_id().m_name
-//            //          << ", " << (void*)(&(obj->get_id())) << "\n";
-//        }
-//        else
-//        {
-//            // Satellite has no object, it's empty
-//            continue;
-//        }
-
-//        // if satellite is not loadable or is already activated
-//        if (!sat.is_activatable() || sat.get_loader())
-//        {
-//            //std::cout << "already loaded\n";
-//            continue;
-//        }
-
-
-        // ignore self (unreachable as active areas are unloadable)
-        //if (&sat == m_sat)
-        //{
-        //    continue;
-        //}
-
-        // Calculate distance to satellite
-        // For these long vectors, 1024 units = 1 meter
-        //Vector3s relativePos = m_universe.sat_calc_position(m_areaSat, sat);
-        //Vector3 relativePosMeters = Vector3(relativePos) / 1024.0f;
-
-        //using Magnum::Math::pow;
-
-        // ignore if too far
-        //if (relativePos.dot() > pow(sat.get_load_radius()
-        //    + m_sat->get_load_radius(), 2.0f))
-        //{
-        //    continue;
-        //}
-
-        //std::cout << "is near! dist: " << relativePos.length() << "/"
-        //<< (sat.get_load_radius() + m_sat->get_load_radius()) << "\n";
-
-        // Satellite is near! Attempt to load it
-
-        //sat_activate(sat);
-    //}
-
 }
 
 ACompAreaLink* SysAreaAssociate::try_get_area_link(ActiveScene &rScene)
@@ -144,8 +127,8 @@ void SysAreaAssociate::connect(ActiveScene& rScene, universe::Universe &rUni,
     assert(!rScene.get_registry().has<ACompAreaLink>(root));
 
     // Create Area Link
-    auto &areaLink = rScene.get_registry().emplace<ACompAreaLink>(root, rUni,
-                                                                  areaSat);
+    rScene.get_registry().emplace<ACompAreaLink>(root, rUni, areaSat);
+
 }
 
 void SysAreaAssociate::disconnect(ActiveScene& rScene)
@@ -166,64 +149,65 @@ void SysAreaAssociate::disconnect(ActiveScene& rScene)
 //    m_areaSat = entt::null;
 }
 
-void SysAreaAssociate::area_move(Vector3s translate)
+void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3s translate)
 {
-//    auto &areaPosTraj = m_universe.get_reg()
-//            .get<universe::UCompTransformTraj>(m_areaSat);
+    ACompAreaLink *pArea = try_get_area_link(rScene);
 
-//    areaPosTraj.m_position += translate;
+    if (pArea == nullptr)
+    {
+        return;
+    }
 
-//    Vector3 meters = Vector3(translate) / gc_units_per_meter;
+    auto &areaPosTraj = pArea->get_universe().get_reg()
+            .get<universe::UCompTransformTraj>(pArea->m_areaSat);
 
-//    floating_origin_translate(-meters);
+    areaPosTraj.m_position += translate;
+
+    Vector3 meters = Vector3(translate) / gc_units_per_meter;
+
+    floating_origin_translate(rScene, -meters);
 }
 
-void SysAreaAssociate::sat_transform_update(ActiveEnt ent)
+void SysAreaAssociate::sat_transform_update(
+        universe::Universe& rUni, universe::Satellite areaSat,
+        universe::Satellite tgtSat, Matrix4 transform)
 {
-//    auto const &entAct = m_scene.reg_get<ACompActivatedSat>(ent);
-//    auto const &entTransform = m_scene.reg_get<ACompTransform>(ent);
+    auto &satPosTraj = rUni.get_reg().get<universe::UCompTransformTraj>(tgtSat);
 
-//    Satellite sat = entAct.m_sat;
-//    auto &satPosTraj = m_universe.get_reg()
-//            .get<universe::UCompTransformTraj>(sat);
+    auto const &areaPosTraj = rUni.get_reg()
+            .get<universe::UCompTransformTraj>(areaSat);
 
-//    auto const &areaPosTraj = m_universe.get_reg()
-//            .get<universe::UCompTransformTraj>(m_areaSat);
+    // 1024 units = 1 meter
+    Vector3s posAreaRelative(transform.translation() * gc_units_per_meter);
 
-//    // 1024 units = 1 meter
-//    Vector3s posAreaRelative(entTransform.m_transform.translation()
-//                             * gc_units_per_meter);
-
-
-
-//    satPosTraj.m_position = areaPosTraj.m_position + posAreaRelative;
-//    satPosTraj.m_rotation = Quaternion::
-//            fromMatrix(entTransform.m_transform.rotationScaling());
-//    satPosTraj.m_dirty = true;
+    satPosTraj.m_position = areaPosTraj.m_position + posAreaRelative;
+    satPosTraj.m_rotation = Quaternion::
+            fromMatrix(transform.rotationScaling());
+    satPosTraj.m_dirty = true;
 }
 
-void SysAreaAssociate::floating_origin_translate(Vector3 translation)
+void SysAreaAssociate::floating_origin_translate(ActiveScene& rScene, Vector3 translation)
 {
-//    auto view = m_scene.get_registry()
-//            .view<ACompFloatingOrigin, ACompTransform>();
+    auto view = rScene.get_registry()
+            .view<ACompFloatingOrigin, ACompTransform>();
 
-//    for (ActiveEnt ent : view)
-//    {
-//        auto &entTransform = view.get<ACompTransform>(ent);
-//        //auto &entFloatingOrigin = view.get<ACompFloatingOrigin>(ent);
+    for (ActiveEnt ent : view)
+    {
+        auto &entTransform = view.get<ACompTransform>(ent);
+        //auto &entFloatingOrigin = view.get<ACompFloatingOrigin>(ent);
 
-//        if (entTransform.m_controlled)
-//        {
-//            if (!entTransform.m_mutable)
-//            {
-//                continue;
-//            }
+        if (entTransform.m_controlled)
+        {
+            if (!entTransform.m_mutable)
+            {
+                continue;
+            }
 
-//            entTransform.m_transformDirty = true;
-//        }
+            entTransform.m_transformDirty = true;
+        }
 
-//        entTransform.m_transform.translation() += translation;
-//    }
+        entTransform.m_transform.translation() += translation;
+    }
 }
 
 
