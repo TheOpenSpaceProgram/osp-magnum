@@ -50,8 +50,6 @@ SysAreaAssociate::SysAreaAssociate(ActiveScene &rScene)
 
 void SysAreaAssociate::update_scan(ActiveScene& rScene)
 {
-    // scan for nearby satellites, maybe move this somewhere else some day
-
     ACompAreaLink *pArea = try_get_area_link(rScene);
 
     if (pArea == nullptr)
@@ -59,17 +57,21 @@ void SysAreaAssociate::update_scan(ActiveScene& rScene)
         return;
     }
 
-    // Clear enter/leave vectors
+    Universe &rUni = pArea->m_rUniverse;
+    Satellite areaSat = pArea->m_areaSat;
+    auto &areaUComp = rUni.get_reg().get<UCompActiveArea>(areaSat);
+
+    // Clear enter/leave event vectors
     for (ActivationTracker &tracker : pArea->m_activated)
     {
         tracker.m_enter.clear();
         tracker.m_leave.clear();
     }
 
-    Universe &rUni = pArea->m_rUniverse;
-    Satellite areaSat = pArea->m_areaSat;
-
-    auto &areaUComp = rUni.get_reg().get<UCompActiveArea>(areaSat);
+    // Deal with activating satellites that have a UCompActivationRadius
+    // Satellites that have an Activation Radius have a sphere around them. If
+    // this sphere overlaps the ActiveArea's sphere 'm_areaRadius', then it
+    // will be activated.
 
     auto viewActRadius = rUni.get_reg().view<
             UCompActivationRadius, UCompActivatable, UCompType>();
@@ -91,10 +93,11 @@ void SysAreaAssociate::update_scan(ActiveScene& rScene)
         auto found = activations.m_inside.find(sat);
         bool alreadyInside = (found != activations.m_inside.end());
 
-        float distSqr = rUni.sat_calc_pos_meters(areaSat, sat).dot();
+        // Simple sphere-sphere-intersection check
+        float distanceSquared = rUni.sat_calc_pos_meters(areaSat, sat).dot();
         float radius = areaUComp.m_areaRadius + satRadius.m_radius;
 
-        if ((radius * radius) > distSqr)
+        if ((radius * radius) > distanceSquared)
         {
             if (alreadyInside)
             {
@@ -133,20 +136,9 @@ void SysAreaAssociate::connect(ActiveScene& rScene, universe::Universe &rUni,
 
 void SysAreaAssociate::disconnect(ActiveScene& rScene)
 {
-//    if (!m_activatedSats.empty())
-//    {
-//        // De-activate all satellites
-
-//        auto viewAct = m_scene.get_registry().view<ACompActivatedSat>();
-
-//        for (ActiveEnt ent : viewAct)
-//        {
-//            sat_deactivate(ent, viewAct.get(ent));
-//        }
-
-//    }
-
-//    m_areaSat = entt::null;
+    // TODO: Have a vector of function pointers for each satellite type, that
+    //       are called to de-activate them right away.
+    //       Also delete the ACompAreaLink from the scene
 }
 
 void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3s translate)
@@ -168,14 +160,14 @@ void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3s translate)
     floating_origin_translate(rScene, -meters);
 }
 
-void SysAreaAssociate::sat_transform_update(
-        universe::Universe& rUni, universe::Satellite areaSat,
+void SysAreaAssociate::sat_transform_set_relative(
+        universe::Universe& rUni, universe::Satellite relativeSat,
         universe::Satellite tgtSat, Matrix4 transform)
 {
     auto &satPosTraj = rUni.get_reg().get<universe::UCompTransformTraj>(tgtSat);
 
     auto const &areaPosTraj = rUni.get_reg()
-            .get<universe::UCompTransformTraj>(areaSat);
+            .get<universe::UCompTransformTraj>(relativeSat);
 
     // 1024 units = 1 meter
     Vector3s posAreaRelative(transform.translation() * gc_units_per_meter);
@@ -186,7 +178,8 @@ void SysAreaAssociate::sat_transform_update(
     satPosTraj.m_dirty = true;
 }
 
-void SysAreaAssociate::floating_origin_translate(ActiveScene& rScene, Vector3 translation)
+void SysAreaAssociate::floating_origin_translate(
+        ActiveScene& rScene,Vector3 translation)
 {
     auto view = rScene.get_registry()
             .view<ACompFloatingOrigin, ACompTransform>();

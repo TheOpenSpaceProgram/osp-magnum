@@ -201,11 +201,13 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
     TypeSatIndex type = rUni.sat_type_find_index<universe::SatPlanet>();
     ActivationTracker& activations = pArea->get_tracker(type);
 
+    // Delete planets that have exited the ActiveArea
     for (auto const &[sat, ent] : activations.m_leave)
     {
         rScene.hier_destroy(ent);
     }
 
+    // Activate planets that have just entered the ActiveArea
     for (auto &entered : activations.m_enter)
     {
         Satellite sat = entered->first;

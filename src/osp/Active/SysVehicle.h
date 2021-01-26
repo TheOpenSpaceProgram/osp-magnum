@@ -108,14 +108,17 @@ public:
                            universe::Satellite tgtSat, ActiveEnt tgtEnt);
 
     /**
+     * Deal with activating and deactivating nearby vehicle Satellites in the
+     * Universe, and also update transforms of currently activated vehicles.
      *
-     * @param rScene
+     * @param rScene [in/out] Scene containing vehicles to update
      */
     static void update_activate(ActiveScene& rScene);
 
     /**
+     * Deal with vehicle separations and part deletions
      *
-     * @param rScene [in/out]
+     * @param rScene [in/out] Scene containing vehicles to update
      */
     static void update_vehicle_modification(ActiveScene& rScene);
 
