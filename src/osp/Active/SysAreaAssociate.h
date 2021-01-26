@@ -86,27 +86,34 @@ public:
     ~SysAreaAssociate() = default;
 
     /**
-     * Attempt to activate all the Satellites in the Universe for now.
+     * Scans the universe for Satellites to activate or deactivate, tracking
+     * changes into a ACompAreaLink stored in the scene.
      *
-     * What this is suppose to do in the future:
-     * Scan for nearby Satellites and attempt to activate them
+     * @param rScene [in/out] Scene to update
      */
     static void update_scan(ActiveScene& rScene);
 
+    /**
+     * Attempt to get an ACompAreaLink from an ActiveScene
+     * @return ACompAreaLink in scene, nullptr if not found
+     */
     static ACompAreaLink* try_get_area_link(ActiveScene &rScene);
 
     /**
-     * Connect this AreaAssociate to an ActiveArea Satellite. This sets the
-     * region of space in the universe the ActiveScene will represent
+     * Connect the ActiveScene to the Universe using the scene's ACompAreaLink,
+     * and a Satellite containing a UCompActiveArea.
      *
-     * @param sat [in] Satellite containing a UCompActiveArea
+     * @param rScene  [in/out] Scene containing ACompAreaLink
+     * @param rUni    [ref] Universe the ActiveArea satellite is contained in.
+     *                      This is stored in ACompAreaLink.
+     * @param areaSat [in] ActiveArea Satellite
      */
     static void connect(ActiveScene& rScene, universe::Universe &rUni,
                         universe::Satellite areaSat);
 
     /**
      * Deactivate all Activated Satellites and cut ties with ActiveArea
-     * Satellite
+     * Satellite (TODO)
      */
     static void disconnect(ActiveScene& rScene);
 
@@ -117,11 +124,15 @@ public:
     static void area_move(ActiveScene& rScene, Vector3s translate);
 
     /**
-     * Update position of ent's associated Satellite in the Universe, based on
-     * a transform in ActiveScene.
+     * Set the transform of a Satellite based on a transform (in meters)
+     * Satellite.
+     * @param rUni        [in/out] Universe containing satellites
+     * @param relativeSat [in] Satellite that transform is relative to
+     * @param tgtSat      [in] Satellite to set transform of
+     * @param transform   [in] Transform to set
      */
-    static void sat_transform_update(
-            universe::Universe& rUni, universe::Satellite areaSat,
+    static void sat_transform_set_relative(
+            universe::Universe& rUni, universe::Satellite relativeSat,
             universe::Satellite tgtSat, Matrix4 transform);
 
 private:
@@ -129,8 +140,11 @@ private:
     UpdateOrderHandle_t m_updateScan;
 
     /**
-     * Translate everything in the ActiveScene
-     * @param translation
+     * Translate all entities in an ActiveScene that contain an
+     * ACompFloatingOrigin
+     *
+     * @param rScene      [out] Scene containing entities that can be translated
+     * @param translation [in] Meters to translate entities by
      */
     static void floating_origin_translate(ActiveScene& rScene, Vector3 translation);
 

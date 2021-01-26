@@ -349,24 +349,24 @@ void SysVehicle::update_activate(ActiveScene &rScene)
     TypeSatIndex type = rUni.sat_type_find_index<universe::SatVehicle>();
     ActivationTracker& activations = pArea->get_tracker(type);
 
+    // Delete vehicles that have gone too far from the ActiveArea range
     for (auto const &[sat, ent] : activations.m_leave)
     {
         rScene.hier_destroy(ent);
     }
 
-    //for (auto const &[sat, ent] : activations.m_inside)
-
-    // Update positions of vehicles in universe
+    // Update transforms of already-activated vehicle satellites
     auto view = rScene.get_registry().view<ACompVehicle, ACompTransform,
                                            ACompActivatedSat>();
     for (ActiveEnt vehicleEnt : view)
     {
         auto &vehicleTf = view.get<ACompTransform>(vehicleEnt);
         auto &vehicleSat = view.get<ACompActivatedSat>(vehicleEnt);
-        SysAreaAssociate::sat_transform_update(
+        SysAreaAssociate::sat_transform_set_relative(
             rUni, pArea->m_areaSat, vehicleSat.m_sat, vehicleTf.m_transform);
     }
 
+    // Activate nearby vehicle satellites that have just entered the ActiveArea
     for (auto &entered : activations.m_enter)
     {
         universe::Satellite sat = entered->first;

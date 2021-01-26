@@ -42,7 +42,7 @@ UCompPlanet& SatPlanet::add_planet(
     assert(typeSetSuccess);
 
     rUni.get_reg().emplace<UCompActivatable>(sat);
-    rUni.get_reg().emplace<UCompActivationRadius>(sat, radius);
+    rUni.get_reg().emplace<UCompActivationRadius>(sat, float(radius));
 
     return rUni.get_reg().emplace<UCompPlanet>(
                 sat, radius, resolutionSurfaceMax, resolutionScreenMax, mass);
