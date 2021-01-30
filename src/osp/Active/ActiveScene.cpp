@@ -121,12 +121,14 @@ void ActiveScene::hier_set_parent_child(ActiveEnt parent, ActiveEnt child)
 
 void ActiveScene::hier_destroy(ActiveEnt ent)
 {
-    auto &entHier = m_registry.get<ACompHierarchy>(ent);
+    auto *pEntHier = &m_registry.get<ACompHierarchy>(ent);
 
-    // recurse into children. this can be optimized more but i'm lazy
-    while (entHier.m_childCount)
+    // Destroy children first recursively, if there is any
+    while (pEntHier->m_childCount > 0)
     {
-        hier_destroy(entHier.m_childFirst);
+        hier_destroy(pEntHier->m_childFirst);
+        // previous hier_destroy might have caused a reallocation
+        pEntHier = m_registry.try_get<ACompHierarchy>(ent);
     }
 
     hier_cut(ent);

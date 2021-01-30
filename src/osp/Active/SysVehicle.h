@@ -32,18 +32,6 @@
 #include "../Resource/Package.h"
 #include "../Resource/blueprints.h"
 
-// forward declare
-namespace osp
-{
-    class PrototypePart;
-}
-
-// forward declare
-namespace osp::universe
-{
-    class SatActiveArea;
-}
-
 namespace osp::active
 {
 
@@ -90,7 +78,7 @@ struct ACompPart
     unsigned m_separationIsland{0};
 };
 
-class SysVehicle : public IDynamicSystem, public IActivator
+class SysVehicle : public IDynamicSystem
 {
 public:
 
@@ -101,15 +89,6 @@ public:
     SysVehicle(SysNewton&& move) = delete;
     ~SysVehicle() = default;
 
-    //static int area_activate_vehicle(ActiveScene& scene,
-    //                                 SysAreaAssociate &area,
-    //                                 universe::Satellite areaSat,
-    //                                 universe::Satellite loadMe);
-    StatusActivated activate_sat(ActiveScene &scene, SysAreaAssociate &area,
-            universe::Satellite areaSat, universe::Satellite tgtSat);
-    int deactivate_sat(ActiveScene &scene, SysAreaAssociate &area,
-            universe::Satellite areaSat, universe::Satellite tgtSat,
-            ActiveEnt tgtEnt);
 
     /**
      * Create a Physical Part from a PrototypePart and put it in the world
@@ -117,15 +96,37 @@ public:
      * @param rootParent Entity to put part into
      * @return Pointer to object created
      */
-    ActiveEnt part_instantiate(PrototypePart& part, ActiveEnt rootParent);
+    static ActiveEnt part_instantiate(ActiveScene& rScene, PrototypePart& part,
+                                      ActiveEnt rootParent);
 
-    // Handle deleted parts and separations
-    void update_vehicle_modification(ActiveScene& rScene);
+    static ActiveEnt activate(ActiveScene &rScene, universe::Universe &rUni,
+                              universe::Satellite areaSat,
+                              universe::Satellite tgtSat);
+
+    static void deactivate(ActiveScene &rScene, universe::Universe &rUni,
+                           universe::Satellite areaSat,
+                           universe::Satellite tgtSat, ActiveEnt tgtEnt);
+
+    /**
+     * Deal with activating and deactivating nearby vehicle Satellites in the
+     * Universe, and also update transforms of currently activated vehicles.
+     *
+     * @param rScene [in/out] Scene containing vehicles to update
+     */
+    static void update_activate(ActiveScene& rScene);
+
+    /**
+     * Deal with vehicle separations and part deletions
+     *
+     * @param rScene [in/out] Scene containing vehicles to update
+     */
+    static void update_vehicle_modification(ActiveScene& rScene);
 
 private:
-    ActiveScene& m_scene;
+    //ActiveScene& m_scene;
     //AppPackages& m_packages;
 
+    UpdateOrderHandle_t m_updateActivation;
     UpdateOrderHandle_t m_updateVehicleModification;
 };
 

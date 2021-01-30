@@ -34,125 +34,120 @@
 namespace osp::active
 {
 
-class SysAreaAssociate;
-struct ACompActivatedSat;
-
-struct StatusActivated
+struct ActivationTracker
 {
-    int m_status; // 0 for no errors
-    ActiveEnt m_entity;
-    bool m_mutable;
+    using MapSatToEnt_t = std::unordered_map<universe::Satellite, ActiveEnt>;
+
+    // Satellites that are currently inside the active area
+    // possibly replace with a single entt sparse_set in ACompAreaLink
+    MapSatToEnt_t m_inside;
+
+    std::vector<MapSatToEnt_t::iterator> m_enter;
+    std::vector<std::pair<universe::Satellite, ActiveEnt>> m_leave;
 };
+
+struct ACompAreaLink
+{
+    ACompAreaLink(universe::Universe& rUniverse, universe::Satellite areaSat)
+     : m_areaSat(areaSat)
+     , m_rUniverse(rUniverse)
+     , m_activated(rUniverse.sat_type_count())
+    { }
+
+    ActivationTracker& get_tracker(universe::TypeSatIndex type)
+    { return m_activated[std::size_t(type)]; }
+
+    universe::Universe& get_universe() noexcept
+    { return m_rUniverse.get(); }
+
+    universe::Satellite m_areaSat;
+
+    std::reference_wrapper<universe::Universe> m_rUniverse;
+    std::vector<ActivationTracker> m_activated;
+
+};
+
+struct ACompActivatedSat
+{
+    universe::Satellite m_sat;
+};
+
 
 /**
- * An interface that 'activates' and 'deactivates' a type of ITypeSatellite
- * into an ActiveScene.
+ * System used to associate an ActiveScene to a UCompActiveArea in the Universe
  */
-class IActivator
-{
-public:
-    virtual StatusActivated activate_sat(
-            ActiveScene &scene, SysAreaAssociate &area,
-            universe::Satellite areaSat, universe::Satellite tgtSat) = 0;
-    virtual int deactivate_sat(
-            ActiveScene &scene, SysAreaAssociate &area,
-            universe::Satellite areaSat, universe::Satellite tgtSat,
-            ActiveEnt tgtEnt) = 0;
-};
-
 class SysAreaAssociate : public IDynamicSystem
 {
 public:
 
     static const std::string smc_name;
 
-    SysAreaAssociate(ActiveScene &rScene, universe::Universe &uni);
+    SysAreaAssociate(ActiveScene &rScene);
     ~SysAreaAssociate() = default;
 
     /**
-     * Attempt to activate all the Satellites in the Universe for now.
+     * Scans the universe for Satellites to activate or deactivate, tracking
+     * changes into a ACompAreaLink stored in the scene.
      *
-     * What this is suppose to do in the future:
-     * Scan for nearby Satellites and attempt to activate them
+     * @param rScene [in/out] Scene to update
      */
-    void update_scan(ActiveScene& rScene);
+    static void update_scan(ActiveScene& rScene);
 
     /**
-     * Connect this AreaAssociate to an ActiveArea Satellite. This sets the
-     * region of space in the universe the ActiveScene will represent
-     *
-     * @param sat [in] Satellite containing a UCompActiveArea
+     * Attempt to get an ACompAreaLink from an ActiveScene
+     * @return ACompAreaLink in scene, nullptr if not found
      */
-    void connect(universe::Satellite sat);
+    static ACompAreaLink* try_get_area_link(ActiveScene &rScene);
+
+    /**
+     * Connect the ActiveScene to the Universe using the scene's ACompAreaLink,
+     * and a Satellite containing a UCompActiveArea.
+     *
+     * @param rScene  [in/out] Scene containing ACompAreaLink
+     * @param rUni    [ref] Universe the ActiveArea satellite is contained in.
+     *                      This is stored in ACompAreaLink.
+     * @param areaSat [in] ActiveArea Satellite
+     */
+    static void connect(ActiveScene& rScene, universe::Universe &rUni,
+                        universe::Satellite areaSat);
 
     /**
      * Deactivate all Activated Satellites and cut ties with ActiveArea
-     * Satellite
+     * Satellite (TODO)
      */
-    void disconnect();
+    static void disconnect(ActiveScene& rScene);
 
     /**
      * Move the ActiveArea satellite, and translate everything in the
      * ActiveScene, aka: floating origin translation
      */
-    void area_move(Vector3s translate);
+    static void area_move(ActiveScene& rScene, Vector3s translate);
 
     /**
-     * Update position of ent's associated Satellite in the Universe, based on
-     * it's transform in the ActiveScene.
+     * Set the transform of a Satellite based on a transform (in meters)
+     * Satellite.
+     * @param rUni        [in/out] Universe containing satellites
+     * @param relativeSat [in] Satellite that transform is relative to
+     * @param tgtSat      [in] Satellite to set transform of
+     * @param transform   [in] Transform to set
      */
-    void sat_transform_update(ActiveEnt ent);
-
-    /**
-     * Add an Activator, to add support for a type of satellite
-     * @param type [in] The type of Satellite that will be passed to the Activator
-     * @param activator [in]
-     */
-    void activator_add(universe::TypeSatIndex type, IActivator &activator);
-
-    constexpr universe::Universe& get_universe() { return m_universe; }
-
-    using MapActivators
-            = std::map<universe::TypeSatIndex, IActivator*>;
+    static void sat_transform_set_relative(
+            universe::Universe& rUni, universe::Satellite relativeSat,
+            universe::Satellite tgtSat, Matrix4 transform);
 
 private:
 
-    ActiveScene &m_scene;
-
-    universe::Satellite m_areaSat;
-    universe::Universe &m_universe;
-
-    MapActivators m_activators;
-    //std::vector<universe::Satellite> m_activatedSats;
-    entt::sparse_set<universe::Satellite> m_activatedSats;
-
-    //UpdateOrderHandle_t m_updateFloatingOrigin;
     UpdateOrderHandle_t m_updateScan;
 
     /**
-     * Translate everything in the ActiveScene
-     * @param translation
+     * Translate all entities in an ActiveScene that contain an
+     * ACompFloatingOrigin
+     *
+     * @param rScene      [out] Scene containing entities that can be translated
+     * @param translation [in] Meters to translate entities by
      */
-    void floating_origin_translate(Vector3 translation);
+    static void floating_origin_translate(ActiveScene& rScene, Vector3 translation);
 
-    /**
-     * Attempt to load a satellite
-     * @return status, zero for no error
-     */
-    int sat_activate(universe::Satellite sat);
-
-    int sat_deactivate(ActiveEnt ent,
-                       ACompActivatedSat& entAct);
-};
-
-struct ACompActivatedSat
-{
-    SysAreaAssociate::MapActivators::iterator m_activator;
-    universe::Satellite m_sat;
-
-    // Set true if the Satellite will be modified by the existance of this
-    // entity, such as updating position. TODO: this does nothing yet
-    bool m_mutable;
 };
 
 }

@@ -142,7 +142,7 @@ void DebugCameraController::update_physics_pre()
         std::cout << "Floating origin translation!\n";
 
         // Move the active area to center on the camera
-        m_scene.dynamic_system_find<SysAreaAssociate>().area_move(tra);
+        SysAreaAssociate::area_move(m_scene, tra);
     }
 }
 

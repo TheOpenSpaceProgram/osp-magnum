@@ -137,6 +137,12 @@ public:
     noexcept { return m_typeSatNames; }
 
     /**
+     * @return Number of reistered satellites
+     */
+    std::underlying_type<TypeSatIndex>::type sat_type_count() const noexcept
+    { return m_typeSatIndices.size(); }
+
+    /**
      * Find index of a registered satellite by name
      * @param name [in] Name of satellite to find
      * @return Index of type, TypeSatIndex::Invalid if not found.

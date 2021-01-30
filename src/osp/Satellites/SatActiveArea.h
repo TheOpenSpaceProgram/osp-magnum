@@ -41,27 +41,37 @@ namespace osp::universe
 class OSPMagnum;
 class SatActiveArea;
 
+/**
+ * Tag for satellites that can be activated
+ */
 struct UCompActivatable { };
 
-struct UCompActivationMutable
+/**
+ * Added to a satellite when it is being modified by an ActiveArea
+ */
+struct UCompActivatedMutable
 {
     Satellite m_area{entt::null};
-    active::ActiveEnt m_ent{entt::null};
+    //active::ActiveEnt m_ent{entt::null};
 };
+
+//-----------------------------------------------------------------------------
+
+struct UCompActivationAlways { };
 
 struct UCompActivationRadius
 {
-    float m_radius;
+    float m_radius{ 8.0f };
 };
+
+//-----------------------------------------------------------------------------
 
 struct UCompActiveArea
 {
-
-    // for later use
-    //active::MapActiveScene_t::iterator m_scene;
+    float m_areaRadius{ 1024.0f };
 
     // true when the ActiveArea is moving
-    bool m_inMotion;
+    bool m_inMotion{false};
 };
 
 
