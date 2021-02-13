@@ -80,8 +80,16 @@ namespace osp
 template <class TYPE_T>
 struct Resource
 {
-    Resource(bool loaded) : m_data(), m_loaded(loaded), m_refCount(0) {}
-    Resource(bool loaded, TYPE_T&& data) :  m_data(std::move(data)), m_loaded(loaded), m_refCount(0) {}
+    Resource(bool loaded)
+     : m_data()
+     , m_loaded(loaded)
+     , m_refCount(0)
+    { }
+    Resource(bool loaded, TYPE_T&& data)
+     : m_data(std::move(data))
+     , m_loaded(loaded)
+     , m_refCount(0)
+    { }
     Resource(Resource&& move) = default;
     Resource(const Resource& copy) = delete;
 

@@ -163,7 +163,7 @@ void DebugCameraController::update_physics_post()
         {
             // disable the first MachineUserControl because switching away
             ActiveEnt firstPart
-                    = *(view.get(m_orbiting).m_parts.begin());
+                    = *(view.get<ACompVehicle>(m_orbiting).m_parts.begin());
             auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
             if (pMUserCtrl != nullptr) { pMUserCtrl->disable(); }
         }
@@ -185,7 +185,8 @@ void DebugCameraController::update_physics_post()
         if (targetValid)
         {
             // enable the first MachineUserControl
-            ActiveEnt firstPart = *(view.get(m_orbiting).m_parts.begin());
+            ActiveEnt firstPart
+                    = *(view.get<ACompVehicle>(m_orbiting).m_parts.begin());
 
             auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
             if (pMUserCtrl != nullptr) { pMUserCtrl->enable(); }
