@@ -136,7 +136,7 @@ public:
         std::map<std::string, Resource<TYPE_T>, std::less<>> m_resources;
     };
 
-    ResPrefix_t get_prefix() { return m_prefix; }
+    constexpr ResPrefix_t const& get_prefix() { return m_prefix; }
 
 private:
 
@@ -153,17 +153,17 @@ template<class TYPE_T, typename ... ARGS_T>
 DependRes<TYPE_T> Package::add(std::string_view path,
                                ARGS_T&& ... args)
 {
-    // Runtime generated (global) sequential ID
-    // First resource added is 0, next is 1, then 2, etc...
-    const uint32_t resId = resource_id::type<TYPE_T>;
+    // Runtime generated (global) sequential IDs for every unique type
+    // First unique type added is 0, next is 1, then 2, etc...
+    const uint32_t resTypeId = resource_id::type<TYPE_T>;
 
     // Resize m_groups to ensure that resId a valid index
-    if (m_groups.size() <= resId)
+    if (m_groups.size() <= resTypeId)
     {
-        m_groups.resize(resId + 1);
+        m_groups.resize(resTypeId + 1);
     }
 
-    entt::any &groupAny = m_groups[resId];
+    entt::any &groupAny = m_groups[resTypeId];
     //entt::any groupAny{std::make_unique< GroupType<TYPE_T> >()};
 
     // Initialize GroupType if blank. This only happens for the first TYPE_T
