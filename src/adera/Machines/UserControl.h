@@ -80,7 +80,8 @@ class MachineUserControl : public osp::active::Machine
 public:
     MachineUserControl();
     MachineUserControl(MachineUserControl&& move);
-
+    MachineUserControl(MachineUserControl const&) = delete;
+    MachineUserControl& operator=(MachineUserControl const&) = delete;
     MachineUserControl& operator=(MachineUserControl&& move);
 
     void propagate_output(osp::active::WireOutput* output) override;

@@ -99,8 +99,11 @@ public:
     static inline std::string smc_name = "NewtonPhysics";
 
     SysNewton(ActiveScene &scene);
-    SysNewton(SysNewton const& copy) = delete;
-    SysNewton(SysNewton&& move) = delete;
+
+    SysNewton(SysNewton &&) = default;
+    SysNewton(SysNewton const&) = delete;
+    SysNewton& operator=(SysNewton &&) = default;
+    SysNewton& operator=(SysNewton const&) = delete;
 
     ~SysNewton();
     

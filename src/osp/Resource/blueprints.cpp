@@ -24,7 +24,6 @@
  */
 #include "blueprints.h"
 
-
 using namespace osp;
 
 BlueprintPart& BlueprintVehicle::add_part(
@@ -63,11 +62,11 @@ BlueprintPart& BlueprintVehicle::add_part(
 
     BlueprintPart blueprint
     {
-        partIndex,
+        std::move(machineBPs),
+        scale,
         translation,
         rotation,
-        scale,
-        std::move(machineBPs)
+        partIndex
     };
 
     m_blueprints.push_back(std::move(blueprint));
@@ -75,10 +74,7 @@ BlueprintPart& BlueprintVehicle::add_part(
     return m_blueprints.back();
 }
 
-void BlueprintVehicle::add_wire(
-        unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
-        unsigned toPart, unsigned toMachine, WireInPort toPort)
+void BlueprintVehicle::add_wire(BlueprintWire wire)
 {
-    m_wires.emplace_back(fromPart, fromMachine, fromPort,
-                         toPart, toMachine, toPort);
+    m_wires.push_back(std::move(wire));
 }

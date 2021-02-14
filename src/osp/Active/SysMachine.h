@@ -63,7 +63,7 @@ struct ACompMachines
     ACompMachines() noexcept = default;
     ACompMachines(ACompMachines&& move) noexcept = default;
     ACompMachines(ACompMachines const& move) = delete;
-    ACompMachines& operator=(ACompMachines&& move) = default;
+    ACompMachines& operator=(ACompMachines&& move) noexcept = default;
     ACompMachines& operator=(ACompMachines const& move) = delete;
 
     //LinkedList<Machine> m_machines;

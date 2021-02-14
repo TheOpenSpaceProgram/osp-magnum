@@ -43,14 +43,8 @@ enum class ObjectType
     //ATTACHMENT  //
 };
 
-
-//const uint32_t gc_OBJ_MESH      = 1 << 2;
-//const uint32_t gc_OBJ_COLLIDER  = 1 << 3;
-
-
 struct DrawableData
 {
-
     // index to a PrototypePart.m_meshDataUsed
     unsigned m_mesh;
     std::vector<unsigned> m_textures;
@@ -73,8 +67,6 @@ struct PrototypeObject
     uint32_t m_bitmask;
 
     std::string m_name;
-
-
 
     //Magnum::Matrix4 m_transform;
     // maybe not use magnum types here

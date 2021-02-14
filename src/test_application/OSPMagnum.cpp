@@ -105,8 +105,6 @@ void OSPMagnum::drawEvent()
     redraw();
 }
 
-
-
 void OSPMagnum::keyPressEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
@@ -143,14 +141,7 @@ void OSPMagnum::mouseScrollEvent(MouseScrollEvent & event)
     m_userInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 }
 
-osp::active::ActiveScene& OSPMagnum::scene_create(std::string const& name)
-{
-    auto const& [it, success] =
-        m_scenes.try_emplace(name, m_userInput, m_ospApp, m_glResources);
-    return it->second;
-}
-
-osp::active::ActiveScene& OSPMagnum::scene_create(std::string && name)
+osp::active::ActiveScene& OSPMagnum::scene_create(std::string name)
 {
     auto const& [it, success] =
         m_scenes.try_emplace(std::move(name), m_userInput, m_ospApp, m_glResources);

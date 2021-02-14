@@ -72,8 +72,8 @@ SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandle
         m_yawRt(userControl.config_get("vehicle_yaw_rt")),
         m_rollLf(userControl.config_get("vehicle_roll_lf")),
         m_rollRt(userControl.config_get("vehicle_roll_rt")),
-        m_updateSensor(scene.get_update_order(), "mach_usercontrol", "", "wire",
-                       std::bind(&SysMachineUserControl::update_sensor, this))
+        m_updateSensor{scene.get_update_order().add("mach_usercontrol", "", "wire",
+                       std::bind(&SysMachineUserControl::update_sensor, this))}
 {
 
 }

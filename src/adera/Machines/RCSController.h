@@ -49,6 +49,11 @@ public:
 
     SysMachineRCSController(osp::active::ActiveScene &rScene);
 
+    SysMachineRCSController(SysMachineRCSController &&) = default;
+    SysMachineRCSController(SysMachineRCSController const&) = delete;
+    SysMachineRCSController& operator=(SysMachineRCSController &&) = default;
+    SysMachineRCSController& operator=(SysMachineRCSController const&) = delete;
+
     /**
      * Primary system update function
      * 

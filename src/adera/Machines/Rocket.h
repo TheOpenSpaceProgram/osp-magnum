@@ -114,6 +114,11 @@ public:
 
     SysMachineRocket(osp::active::ActiveScene &scene);
 
+    SysMachineRocket(SysMachineRocket &&) = default;
+    SysMachineRocket(SysMachineRocket const&) = delete;
+    SysMachineRocket& operator=(SysMachineRocket &&) = default;
+    SysMachineRocket& operator=(SysMachineRocket const&) = delete;
+
     //void update_sensor();
     void update_physics(osp::active::ActiveScene& rScene);
 

@@ -53,39 +53,30 @@ class OSPMagnum : public Magnum::Platform::Application
 
 public:
     explicit OSPMagnum(
-            const Magnum::Platform::Application::Arguments& arguments,
+            Magnum::Platform::Application::Arguments const& arguments,
             osp::OSPApplication &ospApp);
-
     ~OSPMagnum();
 
+public: // Public interface
+    osp::active::ActiveScene& scene_create(std::string name);
+    constexpr osp::UserInputHandler& get_input_handler() { return m_userInput; }
+    constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
+
+private: // Implements Magnum::Platform::Application
+    void drawEvent() override;
     void keyPressEvent(KeyEvent& event) override;
     void keyReleaseEvent(KeyEvent& event) override;
-
     void mousePressEvent(MouseEvent& event) override;
     void mouseReleaseEvent(MouseEvent& event) override;
     void mouseMoveEvent(MouseMoveEvent& event) override;
     void mouseScrollEvent(MouseScrollEvent& event) override;
 
-    osp::active::ActiveScene& scene_create(std::string const& name);
-    osp::active::ActiveScene& scene_create(std::string&& name);
-
-    constexpr osp::UserInputHandler& get_input_handler() { return m_userInput; }
-    constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
-
 private:
-
-    void drawEvent() override;
-
     osp::UserInputHandler m_userInput;
-
     MapActiveScene_t m_scenes;
-
     osp::Package m_glResources{"gl", "gl-resources"};
-
     Magnum::Timeline m_timeline;
-
     osp::OSPApplication& m_ospApp;
-
 };
 
 void config_controls(OSPMagnum& rOspApp);

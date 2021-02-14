@@ -48,18 +48,17 @@ struct BlueprintMachine
  * * Transformation
  */
 struct BlueprintPart
-{ 
+{
+    // Configuration of individual machines
+    std::vector<BlueprintMachine> m_machines;
+
+    Vector3 m_scale;
+    Vector3 m_translation;
+    Quaternion m_rotation;
 
     unsigned m_partIndex; // index to BlueprintVehicle's m_partsUsed
 
-    Vector3 m_translation;
-    Quaternion m_rotation;
-    Vector3 m_scale;
-
     // put some sort of config here
-
-    // Configuration of individual machines
-    std::vector<BlueprintMachine> m_machines;
 };
 
 /**
@@ -96,9 +95,7 @@ struct BlueprintWire
  */
 class BlueprintVehicle
 {
-
 public:
-
     BlueprintVehicle() = default;
     BlueprintVehicle(BlueprintVehicle&& move) = default;
 
@@ -118,15 +115,8 @@ public:
 
     /**
      * Emplace a BlueprintWire
-     * @param fromPart
-     * @param fromMachine
-     * @param fromPort
-     * @param toPart
-     * @param toMachine
-     * @param toPort
      */
-    void add_wire(unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
-                  unsigned toPart, unsigned toMachine, WireInPort toPort);
+    void add_wire(BlueprintWire wire);
 
     constexpr std::vector<DependRes<PrototypePart>>& get_prototypes()
     { return m_prototypes; }
@@ -146,7 +136,6 @@ private:
 
     // Wires to connect
     std::vector<BlueprintWire> m_wires;
-
 };
 
 }

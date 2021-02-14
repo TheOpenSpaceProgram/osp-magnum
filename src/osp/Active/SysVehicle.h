@@ -86,9 +86,11 @@ public:
     static const std::string smc_name;
 
     SysVehicle(ActiveScene &scene);
-    SysVehicle(SysNewton const& copy) = delete;
-    SysVehicle(SysNewton&& move) = delete;
-    ~SysVehicle() = default;
+
+    SysVehicle(SysVehicle &&) = default;
+    SysVehicle(SysVehicle const&) = delete;
+    SysVehicle& operator=(SysVehicle &&) = default;
+    SysVehicle& operator=(SysVehicle const&) = delete;
 
     static ActiveEnt activate(ActiveScene &rScene, universe::Universe &rUni,
                               universe::Satellite areaSat,

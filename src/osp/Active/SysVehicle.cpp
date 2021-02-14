@@ -52,18 +52,19 @@ using namespace Magnum::Math::Literals;
 const std::string SysVehicle::smc_name = "Vehicle";
 
 SysVehicle::SysVehicle(ActiveScene &scene)
- : m_updateActivation(
-       scene.get_update_order(), "vehicle_activate", "", "vehicle_modification",
-       &SysVehicle::update_activate)
- , m_updateVehicleModification(
-       scene.get_update_order(), "vehicle_modification", "", "physics",
-       &SysVehicle::update_vehicle_modification)
+ : m_updateActivation{
+       scene.get_update_order().add("vehicle_activate", "", "vehicle_modification",
+       &SysVehicle::update_activate)}
+ , m_updateVehicleModification{
+       scene.get_update_order().add("vehicle_modification", "", "physics",
+       &SysVehicle::update_vehicle_modification)}
 { }
 
 
-ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
-                          universe::Satellite areaSat,
-                          universe::Satellite tgtSat)
+ActiveEnt SysVehicle::activate(ActiveScene &rScene,
+                               universe::Universe &rUni,
+                               universe::Satellite areaSat,
+                               universe::Satellite tgtSat)
 {
 
     std::cout << "loadin a vehicle!\n";
@@ -159,9 +160,9 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 
         // set the transformation
         partTransform.m_transform
-                = Matrix4::from(partBp.m_rotation.toMatrix(),
-                              partBp.m_translation)
-                * Matrix4::scaling(partBp.m_scale);
+                = Matrix4::scaling(partBp.m_scale)
+                * Matrix4::from(partBp.m_rotation.toMatrix(),
+                                partBp.m_translation);
 
         // temporary: initialize the rigid body
         //area.get_scene()->debug_get_newton().create_body(partEntity);

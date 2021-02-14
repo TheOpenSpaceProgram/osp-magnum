@@ -53,7 +53,11 @@ public:
                 osp::active::ActiveEnt ent) noexcept :
             m_scene(scene),
             m_ent(ent) {};
-    virtual ~DebugObject() = default;
+
+    DebugObject(DebugObject &&) = default;
+    DebugObject(DebugObject const&) = delete;
+    DebugObject& operator=(DebugObject &&) = default;
+    DebugObject& operator=(DebugObject const&) = delete;
 
 private:
     osp::active::ActiveScene &m_scene;

@@ -43,8 +43,8 @@ const std::string SysDebugRender::smc_name = "DebugRender";
 
 SysDebugRender::SysDebugRender(ActiveScene &rScene) :
         m_scene(rScene),
-        m_renderDebugDraw(rScene.get_render_order(), "debug", "", "",
-                          std::bind(&SysDebugRender::draw, this, _1))
+        m_renderDebugDraw{rScene.get_render_order().add("debug", "", "",
+                          std::bind(&SysDebugRender::draw, this, _1))}
 {
     Package& glResources = m_scene.get_context_resources();
 

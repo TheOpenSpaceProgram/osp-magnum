@@ -62,8 +62,8 @@ std::vector<WireOutput*> MachineRCSController::existing_outputs()
 
 SysMachineRCSController::SysMachineRCSController(ActiveScene& rScene)
     : SysMachine<SysMachineRCSController, MachineRCSController>(rScene)
-    , m_updateControls(rScene.get_update_order(), "mach_rcs", "wire", "controls",
-        [this](ActiveScene& rScene) { this->update_controls(rScene); })
+    , m_updateControls{rScene.get_update_order().add("mach_rcs", "wire", "controls",
+        [this](ActiveScene& rScene) { this->update_controls(rScene); })}
 {
 }
 

@@ -78,7 +78,6 @@ using planeta::universe::SatPlanet;
 void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
                  osp::OSPApplication& rOspApp, OSPMagnum::Arguments args)
 {
-
     // Get needed variables
     Universe &rUni = rOspApp.get_universe();
 

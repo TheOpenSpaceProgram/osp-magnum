@@ -62,7 +62,10 @@ public:
 
     SysPlanetA(osp::active::ActiveScene &scene,
                osp::UserInputHandler &userInput);
-    ~SysPlanetA() = default;
+    SysPlanetA(SysPlanetA &&) = default;
+    SysPlanetA(SysPlanetA const&) = delete;
+    SysPlanetA& operator=(SysPlanetA &&) = default;
+    SysPlanetA& operator=(SysPlanetA const&) = delete;
 
     static osp::active::ActiveEnt activate(
             osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,

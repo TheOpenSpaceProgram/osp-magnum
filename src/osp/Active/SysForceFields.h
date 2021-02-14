@@ -66,7 +66,11 @@ public:
     static const std::string smc_name;
 
     SysFFGravity(ActiveScene &scene);
-    ~SysFFGravity() = default;
+
+    SysFFGravity(SysFFGravity &&) = default;
+    SysFFGravity(SysFFGravity const&) = delete;
+    SysFFGravity& operator=(SysFFGravity &&) = default;
+    SysFFGravity& operator=(SysFFGravity const&) = delete;
 
     void update_force(ActiveScene& rScene);
 

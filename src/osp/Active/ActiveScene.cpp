@@ -174,10 +174,8 @@ void ActiveScene::on_hierarchy_destruct(ActiveReg_t& reg, ActiveEnt ent)
 
 void ActiveScene::update()
 {
-
     m_updateOrder.call(*this);
 }
-
 
 void ActiveScene::update_hierarchy_transforms()
 {

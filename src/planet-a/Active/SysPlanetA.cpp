@@ -73,14 +73,14 @@ const std::string SysPlanetA::smc_name = "PlanetA";
 SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene,
                        osp::UserInputHandler &userInput)
  : m_scene(scene)
- , m_updateActivate(scene.get_update_order(), "planet_activate", "", "planet_geo",
-            &SysPlanetA::update_activate )
- , m_updateGeometry(scene.get_update_order(), "planet_geo", "", "physics",
-            [this] (ActiveScene& rScene) { this->update_geometry(rScene); } )
- , m_updatePhysics(scene.get_update_order(), "planet_phys", "planet_geo", "",
-            [this] (ActiveScene& rScene) { this->update_physics(rScene); })
- , m_renderPlanetDraw(scene.get_render_order(), "", "", "",
-            [this] (ACompCamera const& camera) { this->draw(camera); })
+ , m_updateActivate{scene.get_update_order().add("planet_activate", "", "planet_geo",
+            &SysPlanetA::update_activate )}
+ , m_updateGeometry{scene.get_update_order().add("planet_geo", "", "physics",
+            [this] (ActiveScene& rScene) { this->update_geometry(rScene); } )}
+ , m_updatePhysics{scene.get_update_order().add("planet_phys", "planet_geo", "",
+            [this] (ActiveScene& rScene) { this->update_physics(rScene); })}
+ , m_renderPlanetDraw{scene.get_render_order().add("", "", "",
+            [this] (ACompCamera const& camera) { this->draw(camera); })}
  , m_debugUpdate(userInput.config_get("debug_planet_update"))
 { }
 

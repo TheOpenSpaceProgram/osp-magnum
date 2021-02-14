@@ -44,8 +44,6 @@
 
 using namespace testapp;
 
-void config_controls();
-
 /**
  * As the name implies. This should only be called once for the entire lifetime
  * of the program.

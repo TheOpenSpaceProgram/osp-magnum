@@ -62,28 +62,32 @@ Vector3 part_offset(
 osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
         Universe& uni, Package& pkg, std::string_view name)
 {
-    // Begin blueprint
-    BlueprintVehicle blueprint;
+    DependRes<BlueprintVehicle> depend = [&](void)
+    {
+        // Begin blueprint
+        BlueprintVehicle blueprint;
 
-    // Part to add
-    DependRes<PrototypePart> rocket = pkg.get<PrototypePart>("part_stomper");
-    blueprint.add_part(rocket, Vector3(0.0f), Quaternion(), Vector3(1.0f));
+        // Part to add
+        DependRes<PrototypePart> rocket = pkg.get<PrototypePart>("part_stomper");
+        blueprint.add_part(rocket, Vector3(0.0f), Quaternion(), Vector3(1.0f));
 
-    // Wire throttle control
-    // from (output): a MachineUserControl m_woThrottle
-    // to    (input): a MachineRocket m_wiThrottle
-    blueprint.add_wire(0, 0, 1,
-        0, 1, 2);
+        // Wire throttle control
+        // from (output): a MachineUserControl m_woThrottle
+        // to    (input): a MachineRocket m_wiThrottle
+        blueprint.add_wire({
+            0, 0, 1,
+            0, 1, 2 });
 
-    // Wire attitude control to gimbal
-    // from (output): a MachineUserControl m_woAttitude
-    // to    (input): a MachineRocket m_wiGimbal
-    blueprint.add_wire(0, 0, 0,
-        0, 1, 0);
+        // Wire attitude control to gimbal
+        // from (output): a MachineUserControl m_woAttitude
+        // to    (input): a MachineRocket m_wiGimbal
+        blueprint.add_wire({
+            0, 0, 0,
+            0, 1, 0 });
 
-    // Save blueprint
-    DependRes<BlueprintVehicle> depend =
-        pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
+        // Save blueprint
+        return pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
+    }();
 
     // Create new satellite
     Satellite sat = uni.sat_create();
@@ -128,14 +132,16 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
     // Wire throttle control
     // from (output): a MachineUserControl m_woThrottle
     // to    (input): a MachineRocket m_wiThrottle
-    blueprint.add_wire(0, 0, 1,
-                       0, 1, 2);
+    blueprint.add_wire({
+        0, 0, 1,
+        0, 1, 2 });
 
     // Wire attitude control to gimbal
     // from (output): a MachineUserControl m_woAttitude
     // to    (input): a MachineRocket m_wiGimbal
-    blueprint.add_wire(0, 0, 0,
-                       0, 1, 0);
+    blueprint.add_wire({
+        0, 0, 0,
+        0, 1, 0 });
 
     // put blueprint in package
     DependRes<BlueprintVehicle> depend =
@@ -259,16 +265,16 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     // Wire throttle control
     // from (output): a MachineUserControl m_woThrottle
     // to    (input): a MachineRocket m_wiThrottle
-    blueprint.add_wire(
+    blueprint.add_wire({
         Parts::CAPSULE, 0, 1,
-        Parts::ENGINE, 0, 2);
+        Parts::ENGINE, 0, 2 });
 
     // Wire attitude contrl to gimbal
     // from (output): a MachineUserControl m_woAttitude
     // to    (input): a MachineRocket m_wiGimbal
-    blueprint.add_wire(
+    blueprint.add_wire({
         Parts::CAPSULE, 0, 0,
-        Parts::ENGINE, 0, 0);
+        Parts::ENGINE, 0, 0 });
 
     // Pipe fuel tank to rocket engine
     // from (output): fuselage MachineContainer m_outputs;
@@ -279,14 +285,17 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     for (auto port : rcsPorts)
     {
         // Attitude control -> RCS Control
-        blueprint.add_wire(Parts::CAPSULE, 0, 0,
-            port, 0, 0);
+        blueprint.add_wire({
+            Parts::CAPSULE, 0, 0,
+            port, 0, 0 });
         // RCS Control -> RCS Rocket
-        blueprint.add_wire(port, 0, 0,
-            port, 1, 2);
+        blueprint.add_wire({
+            port, 0, 0,
+            port, 1, 2 });
         // Fuselage tank -> RCS Rocket
-        blueprint.add_wire(Parts::FUSELAGE, 0, 0,
-            port, 1, 3);
+        blueprint.add_wire({
+            Parts::FUSELAGE, 0, 0,
+            port, 1, 3 });
     }
 
     // Put blueprint in package

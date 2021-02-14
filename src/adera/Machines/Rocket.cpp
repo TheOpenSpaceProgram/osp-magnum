@@ -79,8 +79,8 @@ std::vector<WireOutput*> MachineRocket::existing_outputs()
 
 SysMachineRocket::SysMachineRocket(ActiveScene &rScene)
     : SysMachine<SysMachineRocket, MachineRocket>(rScene)
-    , m_updatePhysics(rScene.get_update_order(), "mach_rocket", "controls", "physics",
-        [this](ActiveScene& rScene) { this->update_physics(rScene); })
+    , m_updatePhysics{rScene.get_update_order().add("mach_rocket", "controls", "physics",
+        [this](ActiveScene& rScene) { this->update_physics(rScene); })}
 {
 
 }

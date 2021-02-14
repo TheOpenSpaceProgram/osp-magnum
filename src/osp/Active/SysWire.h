@@ -301,8 +301,11 @@ public:
     };
 
     SysWire(ActiveScene &scene);
-    SysWire(SysWire const& copy) = delete;
-    SysWire(SysWire&& move) = delete;
+
+    SysWire(SysWire &&) = default;
+    SysWire(SysWire const&) = delete;
+    SysWire& operator=(SysWire &&) = default;
+    SysWire& operator=(SysWire const&) = delete;
 
     void update_propagate(ActiveScene& rScene);
     void connect(WireOutput &wireFrom, WireInput &wireTo);

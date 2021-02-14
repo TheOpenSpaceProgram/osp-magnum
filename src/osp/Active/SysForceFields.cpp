@@ -32,8 +32,8 @@ const std::string SysFFGravity::smc_name = "FFGravity";
 
 SysFFGravity::SysFFGravity(ActiveScene &scene)
  : m_scene(scene)
- , m_updateForce(scene.get_update_order(), "ff_gravity", "", "physics",
-                 [this] (ActiveScene& rScene) { this->update_force(rScene); })
+ , m_updateForce{scene.get_update_order().add("ff_gravity", "", "physics",
+                 [this] (ActiveScene& rScene) { this->update_force(rScene); })}
 { }
 
 void SysFFGravity::update_force(ActiveScene& rScene)

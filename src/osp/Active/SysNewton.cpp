@@ -100,8 +100,8 @@ ACompNwtBody& ACompNwtBody::operator=(ACompNwtBody&& move) noexcept
 
 SysNewton::SysNewton(ActiveScene &scene)
  : m_scene(scene)
- , m_updatePhysicsWorld(scene.get_update_order(), "physics", "wire", "",
-                [this] (ActiveScene& rScene) { this->update_world(rScene); })
+ , m_updatePhysicsWorld{scene.get_update_order().add("physics", "wire", "",
+                [this] (ActiveScene& rScene) { this->update_world(rScene); })}
 {
     //std::cout << "sysnewtoninit\n";
     //NewtonWorldSetUserData(m_nwtWorld, this);

@@ -43,7 +43,11 @@ public:
     static inline std::string smc_name = "ExhaustPlume";
 
     SysExhaustPlume(ActiveScene& rScene);
-    ~SysExhaustPlume() = default;
+
+    SysExhaustPlume(SysExhaustPlume &&) = default;
+    SysExhaustPlume(SysExhaustPlume const&) = delete;
+    SysExhaustPlume& operator=(SysExhaustPlume &&) = default;
+    SysExhaustPlume& operator=(SysExhaustPlume const&) = delete;
 
     /**
      * Initialize plume graphics

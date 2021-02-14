@@ -40,8 +40,8 @@ using osp::universe::UCompActiveArea;
 const std::string SysAreaAssociate::smc_name = "AreaAssociate";
 
 SysAreaAssociate::SysAreaAssociate(ActiveScene &rScene)
- : m_updateScan(rScene.get_update_order(), "areascan", "physics", "",
-                &SysAreaAssociate::update_scan)
+ : m_updateScan{rScene.get_update_order().add("areascan", "physics", "",
+                &SysAreaAssociate::update_scan)}
 {
 
 }

@@ -276,7 +276,7 @@ template<class SYSMACH_T, typename... ARGS_T>
 void ActiveScene::system_machine_create(ARGS_T &&... args)
 {
     system_machine_add(SYSMACH_T::smc_name,
-                       std::make_unique<SYSMACH_T>(*this, args...));
+                       std::make_unique<SYSMACH_T>(*this, std::forward<ARGS_T>(args)...));
 }
 
 

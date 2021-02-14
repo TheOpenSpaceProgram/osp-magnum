@@ -42,8 +42,8 @@ using namespace osp::active;
 SysExhaustPlume::SysExhaustPlume(ActiveScene& rScene)
     : m_scene(rScene)
     , m_time(0.0f),
-    m_updatePlume(rScene.get_update_order(), "exhaust_plume", "mach_rocket", "",
-        [this](ActiveScene& rScene){this->update_plumes(rScene);})
+    m_updatePlume{rScene.get_update_order().add("exhaust_plume", "mach_rocket", "",
+        [this](ActiveScene& rScene){this->update_plumes(rScene);})}
 {}
 
 void SysExhaustPlume::initialize_plume(ActiveEnt node)

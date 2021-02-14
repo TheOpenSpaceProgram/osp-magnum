@@ -155,6 +155,11 @@ public:
 
     SysMachineContainer(osp::active::ActiveScene& rScene);
 
+    SysMachineContainer(SysMachineContainer &&) = default;
+    SysMachineContainer(SysMachineContainer const&) = delete;
+    SysMachineContainer& operator=(SysMachineContainer &&) = default;
+    SysMachineContainer& operator=(SysMachineContainer const&) = delete;
+
     static void update_containers(osp::active::ActiveScene& rScene);
 
     osp::active::Machine& instantiate(
