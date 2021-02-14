@@ -275,7 +275,7 @@ private:
 template<class SYSMACH_T, typename... ARGS_T>
 void ActiveScene::system_machine_create(ARGS_T &&... args)
 {
-    system_machine_add(SYSMACH_T::smc_name,
+    system_machine_add(entt::type_name<SYSMACH_T>::value(),
                        std::make_unique<SYSMACH_T>(*this, args...));
 }
 
@@ -286,7 +286,7 @@ DYNSYS_T& ActiveScene::dynamic_system_create(ARGS_T &&... args)
     auto ptr = std::make_unique<DYNSYS_T>(*this, std::forward<ARGS_T>(args)...);
     DYNSYS_T &refReturn = *ptr;
 
-    auto pair = m_dynamicSys.emplace(DYNSYS_T::smc_name, std::move(ptr));
+    auto pair = m_dynamicSys.emplace(entt::type_name<DYNSYS_T>::value(), std::move(ptr));
 
     return refReturn;
 }
@@ -294,7 +294,7 @@ DYNSYS_T& ActiveScene::dynamic_system_create(ARGS_T &&... args)
 template<class SYSTEM_T>
 SYSTEM_T& ActiveScene::dynamic_system_find()
 {
-    MapDynamicSys_t::iterator it = dynamic_system_find(SYSTEM_T::smc_name);
+    MapDynamicSys_t::iterator it = dynamic_system_find(entt::type_name<SYSTEM_T>::value());
     assert(it != m_dynamicSys.end());
     return static_cast<SYSTEM_T&>(*(it->second));
 }

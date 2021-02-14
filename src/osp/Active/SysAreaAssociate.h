@@ -72,9 +72,6 @@ struct ACompActivatedSat
 class SysAreaAssociate : public IDynamicSystem
 {
 public:
-
-    static const std::string smc_name;
-
     SysAreaAssociate(ActiveScene &rScene);
     ~SysAreaAssociate() = default;
 
@@ -144,3 +141,14 @@ private:
 };
 
 }
+
+namespace entt
+{
+    template<>
+    struct type_name<osp::active::SysAreaAssociate>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "AreaAssociate";
+        }
+    };
+} // namespace entt

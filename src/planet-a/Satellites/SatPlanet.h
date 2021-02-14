@@ -31,9 +31,6 @@
 namespace planeta::universe
 {
 
-//using namespace osp;
-//using namespace osp::universe;
-
 struct UCompPlanet
 {
     double m_radius;
@@ -61,9 +58,6 @@ struct UCompPlanet
 class SatPlanet
 {
 public:
-
-    static constexpr std::string_view smc_name = "Planet";
-
     /**
      * Set the type of a Satellite and add a UCompPlanet to it
      * @param rUni                 [out] Universe containing satellite
@@ -81,3 +75,14 @@ public:
 };
 
 }
+
+namespace entt
+{
+    template<>
+    struct type_name<planeta::universe::SatPlanet>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "Planet";
+        }
+    };
+} // namespace entt

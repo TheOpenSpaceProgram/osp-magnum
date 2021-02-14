@@ -62,22 +62,25 @@ struct ACompFFGravity : public BaseACompFF
 class SysFFGravity : public SysForceField
 {
 public:
-
-    static const std::string smc_name;
-
     SysFFGravity(ActiveScene &scene);
     ~SysFFGravity() = default;
 
     void update_force(ActiveScene& rScene);
 
 private:
-
-
     ActiveScene &m_scene;
-
     UpdateOrderHandle_t m_updateForce;
 };
 
-
-
 }
+
+namespace entt
+{
+    template<>
+    struct type_name<osp::active::SysFFGravity>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "FFGravity";
+        }
+    };
+} // namespace entt

@@ -43,9 +43,6 @@ struct UCompVehicle
 class SatVehicle
 {
 public:
-
-    static constexpr std::string_view smc_name = "Vehicle";
-
     /**
      * Set the type of a Satellite and add a UCompVehicle to it
      * @param rUni      [out] Universe containing satellite
@@ -59,3 +56,14 @@ public:
 };
 
 }
+
+namespace entt
+{
+    template<>
+    struct type_name<osp::universe::SatVehicle>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "Vehicle";
+        }
+    };
+} // namespace entt

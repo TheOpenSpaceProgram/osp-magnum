@@ -82,9 +82,6 @@ struct ACompPart
 class SysVehicle : public IDynamicSystem
 {
 public:
-
-    static const std::string smc_name;
-
     SysVehicle(ActiveScene &scene);
     SysVehicle(SysNewton const& copy) = delete;
     SysVehicle(SysNewton&& move) = delete;
@@ -209,5 +206,15 @@ private:
     UpdateOrderHandle_t m_updateVehicleModification;
 };
 
-
 }
+
+namespace entt
+{
+    template<>
+    struct type_name<osp::active::SysVehicle>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "Vehicle";
+        }
+    };
+} // namespace entt

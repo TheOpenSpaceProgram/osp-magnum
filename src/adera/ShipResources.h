@@ -117,8 +117,6 @@ class SysMachineContainer
     : public osp::active::SysMachine<SysMachineContainer, MachineContainer>
 {
 public:
-    static inline std::string smc_name = "Container";
-
     SysMachineContainer(osp::active::ActiveScene& rScene);
 
     static void update_containers(osp::active::ActiveScene& rScene);
@@ -205,3 +203,14 @@ inline MachineContainer& MachineContainer::operator=(MachineContainer&& move) no
 }
 
 } // namespace adera::active::machines
+
+namespace entt
+{
+    template<>
+    struct type_name<adera::active::machines::SysMachineContainer>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "Container";
+        }
+    };
+} // namespace entt

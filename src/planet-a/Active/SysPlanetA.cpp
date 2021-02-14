@@ -68,8 +68,6 @@ using namespace Magnum::Math::Literals;
 
 using osp::universe::Satellite;
 
-const std::string SysPlanetA::smc_name = "PlanetA";
-
 SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene,
                        osp::UserInputHandler &userInput)
  : m_scene(scene)

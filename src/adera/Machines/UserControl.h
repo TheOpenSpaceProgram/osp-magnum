@@ -40,9 +40,6 @@ class SysMachineUserControl :
         public osp::active::SysMachine<SysMachineUserControl, MachineUserControl>
 {
 public:
-
-    static const std::string smc_name;
-
     SysMachineUserControl(osp::active::ActiveScene &scene,
                           osp::UserInputHandler& userControl);
 
@@ -125,3 +122,14 @@ inline MachineUserControl& MachineUserControl::operator=(MachineUserControl&& mo
 }
 
 } // namespace adera::active::machines
+
+namespace entt
+{
+    template<>
+    struct type_name<adera::active::machines::SysMachineUserControl>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "UserControl";
+        }
+    };
+} // namespace entt

@@ -40,8 +40,6 @@ struct ACompExhaustPlume
 class SysExhaustPlume : public IDynamicSystem
 {
 public:
-    static inline std::string smc_name = "ExhaustPlume";
-
     SysExhaustPlume(ActiveScene& rScene);
     ~SysExhaustPlume() = default;
 
@@ -64,3 +62,14 @@ private:
 };
 
 } // namespace osp::active
+
+namespace entt
+{
+    template<>
+    struct type_name<osp::active::SysExhaustPlume>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "ExhaustPlume";
+        }
+    };
+} // namespace entt

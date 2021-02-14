@@ -273,9 +273,6 @@ private:
 class SysWire : public IDynamicSystem
 {
 public:
-
-    static const std::string smc_name;
-
     struct DependentOutput
     {
         IWireElement *m_element;
@@ -348,3 +345,15 @@ inline WireOutput::WireOutput(IWireElement *element, WireOutput&& move)
 { }
 
 } // namespace osp::active
+
+
+namespace entt
+{
+    template<>
+    struct type_name<osp::active::SysWire>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "Wire";
+        }
+    };
+} // namespace entt

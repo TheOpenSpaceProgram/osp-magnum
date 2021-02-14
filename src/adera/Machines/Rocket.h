@@ -39,9 +39,6 @@ class SysMachineRocket :
         public osp::active::SysMachine<SysMachineRocket, MachineRocket>
 {
 public:
-
-    static inline std::string smc_name = "Rocket";
-
     SysMachineRocket(osp::active::ActiveScene &scene);
 
     //void update_sensor();
@@ -169,3 +166,14 @@ inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
 }
 
 } // namespace adera::active::machines
+
+namespace entt
+{
+    template<>
+    struct type_name<adera::active::machines::SysMachineRocket>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "Rocket";
+        }
+    };
+} // namespace entt

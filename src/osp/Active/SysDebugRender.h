@@ -57,9 +57,6 @@ struct CompVisibleDebug
 class SysDebugRender : public IDynamicSystem
 {
 public:
-
-    static const std::string smc_name;
-
     SysDebugRender(ActiveScene &rScene);
     ~SysDebugRender() = default;
 
@@ -90,3 +87,14 @@ inline void SysDebugRender::draw_group(T& rCollection, ACompCamera const& camera
 }
 
 }
+
+namespace entt
+{
+    template<>
+    struct type_name<osp::active::SysDebugRender>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "DebugRender";
+        }
+    };
+} // namespace entt

@@ -78,9 +78,6 @@ struct UCompActiveArea
 class SatActiveArea
 {
 public:
-
-    static constexpr std::string_view smc_name = "ActiveArea";
-
     /**
      * Set the type of a Satellite and add a UCompActiveArea to it
      * @param rUni [out] Universe containing satellite
@@ -92,3 +89,14 @@ public:
 };
 
 }
+
+namespace entt
+{
+    template<>
+    struct type_name<osp::universe::SatActiveArea>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "ActiveArea";
+        }
+    };
+} // namespace entt

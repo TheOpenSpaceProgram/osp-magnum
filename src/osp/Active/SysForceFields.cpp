@@ -28,8 +28,6 @@
 
 using namespace osp::active;
 
-const std::string SysFFGravity::smc_name = "FFGravity";
-
 SysFFGravity::SysFFGravity(ActiveScene &scene)
  : m_scene(scene)
  , m_updateForce(scene.get_update_order(), "ff_gravity", "", "physics",

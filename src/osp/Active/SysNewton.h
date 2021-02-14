@@ -93,11 +93,7 @@ using ACompPhysicsWorld_t = ACompNwtWorld;
 
 class SysNewton : public IDynamicSystem
 {
-
 public:
-
-    static inline std::string smc_name = "NewtonPhysics";
-
     SysNewton(ActiveScene &scene);
     SysNewton(SysNewton const& copy) = delete;
     SysNewton(SysNewton&& move) = delete;
@@ -310,3 +306,13 @@ using SysPhysics_t = SysNewton;
 
 }
 
+namespace entt
+{
+    template<>
+    struct type_name<osp::active::SysNewton>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "NewtonPhysics";
+        }
+    };
+} // namespace entt

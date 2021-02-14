@@ -45,8 +45,6 @@ class SysMachineRCSController :
     public osp::active::SysMachine<SysMachineRCSController, MachineRCSController>
 {
 public:
-    static inline std::string smc_name = "RCSController";
-
     SysMachineRCSController(osp::active::ActiveScene &rScene);
 
     /**
@@ -135,3 +133,14 @@ inline MachineRCSController& MachineRCSController::operator=(MachineRCSControlle
 }
 
 } // adera::active::machines
+
+namespace entt
+{
+    template<>
+    struct type_name<adera::active::machines::SysMachineRCSController>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "RCSController";
+        }
+    };
+} // namespace entt

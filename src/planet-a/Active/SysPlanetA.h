@@ -57,9 +57,6 @@ struct ACompPlanet
 class SysPlanetA : public osp::active::IDynamicSystem
 {
 public:
-
-    static const std::string smc_name;
-
     SysPlanetA(osp::active::ActiveScene &scene,
                osp::UserInputHandler &userInput);
     ~SysPlanetA() = default;
@@ -97,3 +94,14 @@ private:
 };
 
 }
+
+namespace entt
+{
+    template<>
+    struct type_name<planeta::active::SysPlanetA>
+    {
+        [[nodiscard]] static constexpr std::string_view value() noexcept {
+            return "PlanetA";
+        }
+    };
+} // namespace entt
