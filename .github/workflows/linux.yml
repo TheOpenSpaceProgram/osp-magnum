@@ -24,3 +24,14 @@ jobs:
       run: |
         scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake -B build -DCMAKE_BUILD_TYPE=Release -DOSP_ENABLE_IWYU=y -DOSP_ENABLE_CLANG_TIDY=y
         scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake --build build --parallel --config Release --target osp-magnum
+        
+    - name: Prepare Artifact
+      run: |
+        mv build/3rdparty/newton-dynamics/lib/ build/lib
+        
+    - uses: actions/upload-artifact@v2
+      with: 
+        name: release
+        path: |
+          build/bin
+          build/lib
