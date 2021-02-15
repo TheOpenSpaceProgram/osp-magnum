@@ -136,7 +136,7 @@ public:
         std::map<std::string, Resource<TYPE_T>, std::less<>> m_resources;
     };
 
-    constexpr ResPrefix_t const& get_prefix() { return m_prefix; }
+    constexpr ResPrefix_t const& get_prefix() const { return m_prefix; }
 
 private:
 
@@ -157,7 +157,7 @@ DependRes<TYPE_T> Package::add(std::string_view path,
     // First unique type added is 0, next is 1, then 2, etc...
     const uint32_t resTypeId = resource_id::type<TYPE_T>;
 
-    // Resize m_groups to ensure that resId a valid index
+    // Resize m_groups to ensure that resTypeId a valid index
     if (m_groups.size() <= resTypeId)
     {
         m_groups.resize(resTypeId + 1);
@@ -191,14 +191,14 @@ DependRes<TYPE_T> Package::add(std::string_view path,
 template<class TYPE_T>
 DependRes<TYPE_T> Package::get(std::string_view path) noexcept
 {
-    const uint32_t resId = resource_id::type<TYPE_T>;
+    const uint32_t resTypeId = resource_id::type<TYPE_T>;
 
-    if (m_groups.size() < resId)
+    if (m_groups.size() < resTypeId)
     {
-        return {}; // Return if resId is not a valid index to m_groups
+        return {}; // Return if resTypeId is not a valid index to m_groups
     }
 
-    entt::any &groupAny = m_groups[resId];
+    entt::any &groupAny = m_groups[resTypeId];
 
     if(groupAny.type() != entt::type_id< GroupType<TYPE_T> >())
     {
@@ -222,11 +222,11 @@ DependRes<TYPE_T> Package::get(std::string_view path) noexcept
 template<class TYPE_T>
 void Package::clear() noexcept
 {
-    const uint32_t resId = resource_id::type<TYPE_T>;
+    const uint32_t resTypeId = resource_id::type<TYPE_T>;
     //m_groups.erase(entt::type_info<TYPE_T>::id());
-    if (m_groups.size() > resId)
+    if (m_groups.size() > resTypeId)
     {
-        m_groups[resId] = entt::any{}; // Destruct GroupType
+        m_groups[resTypeId] = entt::any{}; // Destruct GroupType
     }
 }
 

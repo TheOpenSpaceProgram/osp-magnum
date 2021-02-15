@@ -36,12 +36,10 @@ struct Resource
     Resource(bool loaded)
      : m_data()
      , m_loaded(loaded)
-     , m_refCount()
     { }
     Resource(bool loaded, TYPE_T&& data)
      : m_data(std::move(data))
      , m_loaded(loaded)
-     , m_refCount()
     { }
     Resource(Resource&& move) = default;
     Resource(const Resource& copy) = delete;
