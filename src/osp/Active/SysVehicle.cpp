@@ -486,7 +486,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
     for (ActiveEnt vehicleEnt : view)
     {
-        ACompVehicle &vehicleVehicle = view.get(vehicleEnt);
+        auto &vehicleVehicle = view.get<ACompVehicle>(vehicleEnt);
         //std::vector<ActiveEnt> &parts = vehicleVehicle.m_parts;
 
         if (vehicleVehicle.m_separationCount > 0)
@@ -549,7 +549,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             auto removeDestroyed = [&viewParts, &rScene, &islands]
                     (ActiveEnt partEnt) -> bool
             {
-                ACompPart &partPart = viewParts.get(partEnt);
+                auto &partPart = viewParts.get<ACompPart>(partEnt);
                 if (partPart.m_destroy)
                 {
                     // destroy this part
@@ -575,7 +575,8 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
             };
 
-            std::vector<ActiveEnt> &parts = view.get(vehicleEnt).m_parts;
+            std::vector<ActiveEnt> &parts
+                    = view.get<ACompVehicle>(vehicleEnt).m_parts;
 
             parts.erase(std::remove_if(parts.begin(), parts.end(),
                                        removeDestroyed), parts.end());
@@ -584,7 +585,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
             for (ActiveEnt islandEnt : islands)
             {
-                ACompVehicle &islandVehicle = view.get(islandEnt);
+                auto &islandVehicle = view.get<ACompVehicle>(islandEnt);
                 auto &islandTransform
                         = rScene.reg_get<ACompTransform>(islandEnt);
 

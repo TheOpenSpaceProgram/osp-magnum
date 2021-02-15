@@ -184,8 +184,10 @@ private:
 
     Satellite m_root;
 
+    // TODO: change to std::vector<>
     std::vector<std::unique_ptr<ISystemTrajectory>> m_trajectories;
 
+    // TODO: get rid of satellite types entirely, they suck
     MapTypeSats_t m_typeSatIndices;
     std::vector<std::string_view> m_typeSatNames;
 
@@ -250,6 +252,26 @@ struct UCompType
 
 // TODO: move to different files and de-OOPify trajectories too
 
+// Trajectories are satellites that manages the movement of a large group of
+// other satellites. They implement things like:
+// * N-body
+// * Patched Conics
+// * Landed
+//
+// It's possible that each trajectory can have its own coordinate system, but
+// this is still up for discussion.
+//
+// Individual instances of trajectories would also have be called in a certain
+// order.
+//
+// Ideas for more data-oriented trajectories:
+// * Add a UCompTrajectory with:
+//     * vector or entt::sparse_set of associated satellites
+//     * a function pointer to an update function
+//     * a priority number or an entity to refer to another trajectory 'parent'
+//       that must be updated first.
+// * Maybe rename Trajectories to trajectory systems, coordinate systems
+
 using TrajectoryType = entt::id_type;
 
 /**
@@ -265,7 +287,7 @@ public:
     virtual void remove(Satellite sat) = 0;
     virtual Satellite get_center() const = 0;
 
-    virtual TrajectoryType get_type() = 0;
+    //virtual TrajectoryType get_type() = 0;
     virtual std::string const& get_type_name() = 0;
 
 private:
@@ -288,11 +310,11 @@ public:
     virtual void add(Satellite sat) override;
     virtual void remove(Satellite sat) override;
 
-    TrajectoryType get_type() override
-    {
-        static auto id = entt::type_info<TRAJECTORY_T>::id();
-        return id;
-    }
+//    TrajectoryType get_type() override
+//    {
+//        static auto id = entt::type_info<TRAJECTORY_T>::id();
+//        return id;
+//    }
     std::string const& get_type_name() override
     {
         //static auto name = entt::type_info<TRAJECTORY_T>::name();

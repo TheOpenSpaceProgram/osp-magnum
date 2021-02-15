@@ -50,13 +50,6 @@ ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app, Packa
     m_registry.on_destroy<ACompHierarchy>()
                     .connect<&ActiveScene::on_hierarchy_destruct>(*this);
 
-    // "There is no need to store groups around for they are extremely cheap to
-    //  construct, even though they can be copied without problems and reused
-    //  freely. A group performs an initialization step the very first time
-    //  it's requested and this could be quite costly. To avoid it, consider
-    //  creating the group when no components have been assigned yet."
-    m_registry.group<ACompHierarchy, ACompTransform>();
-
     // Create the root entity
 
     m_root = m_registry.create();
@@ -181,45 +174,34 @@ void ActiveScene::on_hierarchy_destruct(ActiveReg_t& reg, ActiveEnt ent)
 
 void ActiveScene::update()
 {
-    // Update machine systems
-    //for (ISysMachine &sysMachine : m_update_sensor)
-    //{
-    //    sysMachine.update_sensor();
-    //}
 
-    //m_wire.update_propigate();
-
-    //for (ISysMachine &sysMachine : m_update_physics)
-    //{
-    //    sysMachine.update_physics(1.0f/60.0f);
-    //}
     m_updateOrder.call(*this);
 }
 
 
 void ActiveScene::update_hierarchy_transforms()
 {
-
-    auto group = m_registry.group<ACompHierarchy, ACompTransform>();
-
     if (m_hierarchyDirty)
     {
-        // Sort by level, so that objects closer to the root are iterated first
-        group.sort<ACompHierarchy>([](ACompHierarchy const& lhs,
-                                     ACompHierarchy const& rhs)
+        // Sort by level, so that objects at the top of the hierarchy are
+        // updated first
+        m_registry.sort<ACompHierarchy>([](ACompHierarchy const& lhs,
+                                           ACompHierarchy const& rhs)
         {
             return lhs.m_level < rhs.m_level;
         }, entt::insertion_sort());
-        //group.sortable();
+
+        m_registry.sort<ACompTransform, ACompHierarchy>();
+
         m_hierarchyDirty = false;
     }
 
-    for(auto entity: group)
-    {
-        //std::cout << "nice: " << group.get<ACompHierarchy>(entity).m_name << "\n";
+    auto view = m_registry.view<ACompHierarchy, ACompTransform>();
 
-        ACompHierarchy& hierarchy = group.get<ACompHierarchy>(entity);
-        ACompTransform& transform = group.get<ACompTransform>(entity);
+    for(ActiveEnt entity : view)
+    {
+        auto& hierarchy = view.get<ACompHierarchy>(entity);
+        auto& transform = view.get<ACompTransform>(entity);
 
         if (hierarchy.m_parent == m_root)
         {
@@ -230,8 +212,8 @@ void ActiveScene::update_hierarchy_transforms()
         }
         else
         {
-            ACompTransform& parentTransform
-                    = group.get<ACompTransform>(hierarchy.m_parent);
+            auto& parentTransform
+                    = view.get<ACompTransform>(hierarchy.m_parent);
 
             // set transform relative to parent
             transform.m_transformWorld = parentTransform.m_transformWorld
