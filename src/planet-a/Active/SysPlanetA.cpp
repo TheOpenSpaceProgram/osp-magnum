@@ -36,6 +36,7 @@
 #include <iostream>
 
 using planeta::active::SysPlanetA;
+using planeta::universe::UCompPlanet;
 
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
@@ -50,11 +51,9 @@ using osp::active::ACompAreaLink;
 using osp::active::ACompActivatedSat;
 using osp::active::SysAreaAssociate;
 using osp::active::SysPhysics_t;
-using osp::active::ActivationTracker;
 
 using osp::universe::Universe;
 using osp::universe::Satellite;
-using osp::universe::TypeSatIndex;
 
 using Magnum::GL::Renderer;
 using osp::Matrix4;
@@ -200,20 +199,29 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
     }
 
     Universe &rUni = pArea->get_universe();
-    TypeSatIndex type = rUni.sat_type_find_index<universe::SatPlanet>();
-    ActivationTracker& activations = pArea->get_tracker(type);
-
+    
     // Delete planets that have exited the ActiveArea
-    for (auto const &[sat, ent] : activations.m_leave)
+    for (auto const &[sat, ent] : pArea->m_leave)
     {
+        if (!rUni.get_reg().has<UCompPlanet>(sat))
+        {
+            continue;
+        }
+
         rScene.hier_destroy(ent);
     }
 
     // Activate planets that have just entered the ActiveArea
-    for (auto &entered : activations.m_enter)
+    for (auto &entered : pArea->m_enter)
     {
         Satellite sat = entered->first;
         ActiveEnt &rEnt = entered->second;
+
+        if (!rUni.get_reg().has<UCompPlanet>(sat))
+        {
+            continue;
+        }
+
         rEnt = activate(rScene, rUni, pArea->m_areaSat, sat);
     }
 }

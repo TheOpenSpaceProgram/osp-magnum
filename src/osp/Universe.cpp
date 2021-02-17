@@ -41,24 +41,12 @@ Satellite Universe::sat_create()
 {
     Satellite sat = m_registry.create();
     m_registry.emplace<UCompTransformTraj>(sat);
-    m_registry.emplace<UCompType>(sat);
     return sat;
 }
 
 void Universe::sat_remove(Satellite sat)
 {
     m_registry.destroy(sat);
-}
-
-bool Universe::sat_try_set_type(Satellite sat, TypeSatIndex type)
-{
-    auto &satType = m_registry.get<UCompType>(sat);
-    if (satType.m_type == TypeSatIndex::Invalid)
-    {
-        satType.m_type = type;
-        return true;
-    }
-    return false; // Type is already set
 }
 
 Vector3s Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) const
@@ -83,28 +71,5 @@ Vector3 Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target
 {
     // 1024 units = 1 meter. this can change
     return Vector3(sat_calc_pos(referenceFrame, target)) / 1024.0f;
-}
-
-TypeSatIndex Universe::sat_type_find_index(std::string_view name)
-{
-    auto foundIt = m_typeSatIndices.find(name);
-
-    if (foundIt != m_typeSatIndices.end())
-    {
-        return foundIt->second;
-    }
-
-    return TypeSatIndex::Invalid;
-}
-
-bool Universe::sat_type_try_set(Satellite sat, TypeSatIndex type)
-{
-    auto &satType = m_registry.get<UCompType>(sat);
-    if (satType.m_type != TypeSatIndex::Invalid)
-    {
-        return false;
-    }
-    satType.m_type = type;
-    return true;
 }
 
