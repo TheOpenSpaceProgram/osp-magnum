@@ -34,28 +34,15 @@
 namespace osp::active
 {
 
-struct ActivationTracker
-{
-    using MapSatToEnt_t = std::unordered_map<universe::Satellite, ActiveEnt>;
-
-    // Satellites that are currently inside the active area
-    // possibly replace with a single entt sparse_set in ACompAreaLink
-    MapSatToEnt_t m_inside;
-
-    std::vector<MapSatToEnt_t::iterator> m_enter;
-    std::vector<std::pair<universe::Satellite, ActiveEnt>> m_leave;
-};
 
 struct ACompAreaLink
 {
+    using MapSatToEnt_t = std::unordered_map<universe::Satellite, ActiveEnt>;
+    
     ACompAreaLink(universe::Universe& rUniverse, universe::Satellite areaSat)
      : m_areaSat(areaSat)
      , m_rUniverse(rUniverse)
-     , m_activated(rUniverse.sat_type_count())
     { }
-
-    ActivationTracker& get_tracker(universe::TypeSatIndex type)
-    { return m_activated[std::size_t(type)]; }
 
     universe::Universe& get_universe() noexcept
     { return m_rUniverse.get(); }
@@ -63,7 +50,13 @@ struct ACompAreaLink
     universe::Satellite m_areaSat;
 
     std::reference_wrapper<universe::Universe> m_rUniverse;
-    std::vector<ActivationTracker> m_activated;
+
+    // Satellites that are currently inside the active area
+    // possibly replace with a single entt sparse_set in ACompAreaLink
+    MapSatToEnt_t m_inside;
+
+    std::vector<MapSatToEnt_t::iterator> m_enter;
+    std::vector<std::pair<universe::Satellite, ActiveEnt>> m_leave;
 
 };
 

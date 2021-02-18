@@ -30,10 +30,6 @@ using osp::universe::SatVehicle;
 UCompVehicle& SatVehicle::add_vehicle(
         Universe &rUni, Satellite sat, DependRes<BlueprintVehicle> blueprint)
 {
-    bool typeSetSuccess = rUni.sat_type_try_set(
-                sat, rUni.sat_type_find_index(SatVehicle::smc_name));
-    assert(typeSetSuccess);
-
     rUni.get_reg().emplace<UCompActivatable>(sat);
     rUni.get_reg().emplace<UCompActivationRadius>(sat);
 

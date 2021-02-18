@@ -30,11 +30,9 @@ using osp::active::SysAreaAssociate;
 
 using osp::active::ACompAreaLink;
 
-using osp::universe::TypeSatIndex;
 using osp::universe::Universe;
 using osp::universe::Satellite;
 
-using osp::universe::UCompType;
 using osp::universe::UCompActivatable;
 using osp::universe::UCompActivationRadius;
 using osp::universe::UCompActiveArea;
@@ -62,11 +60,9 @@ void SysAreaAssociate::update_scan(ActiveScene& rScene)
     auto &areaUComp = rUni.get_reg().get<UCompActiveArea>(areaSat);
 
     // Clear enter/leave event vectors
-    for (ActivationTracker &tracker : pArea->m_activated)
-    {
-        tracker.m_enter.clear();
-        tracker.m_leave.clear();
-    }
+
+    pArea->m_enter.clear();
+    pArea->m_leave.clear();
 
     // Deal with activating satellites that have a UCompActivationRadius
     // Satellites that have an Activation Radius have a sphere around them. If
@@ -74,24 +70,15 @@ void SysAreaAssociate::update_scan(ActiveScene& rScene)
     // will be activated.
 
     auto viewActRadius = rUni.get_reg().view<
-            UCompActivationRadius, UCompActivatable, UCompType>();
+            UCompActivationRadius, UCompActivatable>();
 
     for (Satellite sat : viewActRadius)
     {
         auto satRadius = viewActRadius.get<UCompActivationRadius>(sat);
-        auto satType = viewActRadius.get<UCompType>(sat);
-
-        if (satType.m_type == TypeSatIndex::Invalid)
-        {
-            continue; // Skip satellites that don't have a type (somehow)
-        }
-
-        ActivationTracker &activations = pArea->m_activated[
-                                                    size_t(satType.m_type)];
 
         // Check if already activated
-        auto found = activations.m_inside.find(sat);
-        bool alreadyInside = (found != activations.m_inside.end());
+        auto found = pArea->m_inside.find(sat);
+        bool alreadyInside = (found != pArea->m_inside.end());
 
         // Simple sphere-sphere-intersection check
         float distanceSquared = rUni.sat_calc_pos_meters(areaSat, sat).dot();
@@ -104,14 +91,14 @@ void SysAreaAssociate::update_scan(ActiveScene& rScene)
                 continue; // Satellite already activated
             }
             // Satellite is nearby, activate it!
-            auto entered = activations.m_inside.emplace(sat, entt::null).first;
-            activations.m_enter.emplace_back(entered);
+            auto entered = pArea->m_inside.emplace(sat, entt::null).first;
+            pArea->m_enter.emplace_back(entered);
         }
         else if (alreadyInside)
         {
             // Satellite exited area
-            activations.m_leave.emplace_back(found->first, found->second);
-            activations.m_inside.erase(found);
+            pArea->m_leave.emplace_back(found->first, found->second);
+            pArea->m_inside.erase(found);
         }
     }
 }

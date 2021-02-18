@@ -44,7 +44,7 @@ using namespace osp::active;
 
 using osp::universe::Universe;
 using osp::universe::Satellite;
-using osp::universe::TypeSatIndex;
+using osp::universe::UCompVehicle;
 
 // for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;
@@ -446,12 +446,15 @@ void SysVehicle::update_activate(ActiveScene &rScene)
     }
 
     Universe &rUni = pArea->get_universe();
-    TypeSatIndex type = rUni.sat_type_find_index<universe::SatVehicle>();
-    ActivationTracker& activations = pArea->get_tracker(type);
 
     // Delete vehicles that have gone too far from the ActiveArea range
-    for (auto const &[sat, ent] : activations.m_leave)
+    for (auto const &[sat, ent] : pArea->m_leave)
     {
+        if (!rUni.get_reg().has<UCompVehicle>(sat))
+        {
+            continue;
+        }
+
         rScene.hier_destroy(ent);
     }
 
@@ -467,10 +470,15 @@ void SysVehicle::update_activate(ActiveScene &rScene)
     }
 
     // Activate nearby vehicle satellites that have just entered the ActiveArea
-    for (auto &entered : activations.m_enter)
+    for (auto &entered : pArea->m_enter)
     {
         universe::Satellite sat = entered->first;
         ActiveEnt &rEnt = entered->second;
+
+        if (!rUni.get_reg().has<UCompVehicle>(sat))
+        {
+            continue;
+        }
 
         rEnt = activate(rScene, rUni, pArea->m_areaSat, sat);
     }

@@ -41,11 +41,6 @@ class ISystemTrajectory;
 
 enum class Satellite : entt::id_type {};
 
-enum class TypeSatIndex : uint16_t
-{
-    Invalid = std::numeric_limits<uint16_t>::max()
-};
-
 /**
  * A model of deep space. This class stores the data of astronomical objects
  * represented in the universe, known as Satellites. Planets, stars, comets,
@@ -69,7 +64,6 @@ enum class TypeSatIndex : uint16_t
  */
 class Universe
 {
-    using MapTypeSats_t = std::map<std::string_view, TypeSatIndex, std::less<>>;
 
 public:
 
@@ -102,8 +96,6 @@ public:
      */
     void sat_remove(Satellite sat);
 
-    bool sat_try_set_type(Satellite sat, TypeSatIndex type);
-
     /**
      * Calculate position between two satellites.
      * @param referenceFrame [in]
@@ -121,54 +113,6 @@ public:
     Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const;
 
     /**
-     * Register an ITypeSatellite so the universe can recognize that this type
-     * of Satellite can exist.
-     * @tparam TYPESAT_T Unique ITypeSatellite to register
-     * @tparam ARGS_T Arguments to forward to TYPESAT_T's constructor
-     * @return reference to new TYPESAT_T just created
-     */
-    template<typename TYPESAT_T>
-    TypeSatIndex sat_type_register();
-
-    /**
-     * @return Names of registered satellites. Access using a TypeSatIndex
-     */
-    constexpr std::vector<std::string_view> const& sat_type_get_names() const
-    noexcept { return m_typeSatNames; }
-
-    /**
-     * @return Number of reistered satellites
-     */
-    std::underlying_type<TypeSatIndex>::type sat_type_count() const noexcept
-    { return m_typeSatIndices.size(); }
-
-    /**
-     * Find index of a registered satellite by name
-     * @param name [in] Name of satellite to find
-     * @return Index of type, TypeSatIndex::Invalid if not found.
-     */
-    TypeSatIndex sat_type_find_index(std::string_view name);
-
-    /**
-     * Find index of a registered satellite by type. The type should contain a
-     * static member string named smc_name
-     * @tparam SATTYPE_T Satellite type containing smc_name
-     * @return Index of type, TypeSatIndex::Invalid if not found.
-     */
-    template<typename SATTYPE_T>
-    TypeSatIndex sat_type_find_index()
-    { return sat_type_find_index(SATTYPE_T::smc_name); }
-
-    /**
-     * Attempt to set the type of a Satellite. If a type is already set, then
-     * the type will not be set successfully.
-     * @param sat  [in] Satellite to set type of
-     * @param type [in] Type to set to
-     * @return True if type is set succesfully, or else false
-     */
-    bool sat_type_try_set(Satellite sat, TypeSatIndex type);
-
-    /**
      * Create a Trajectory, and add it to the universe.
      * @tparam TRAJECTORY_T Type of Trajectory to construct
      * @return Reference to new trajectory just created
@@ -184,30 +128,11 @@ private:
 
     Satellite m_root;
 
-    // TODO: change to std::vector<>
     std::vector<std::unique_ptr<ISystemTrajectory>> m_trajectories;
-
-    // TODO: get rid of satellite types entirely, they suck
-    MapTypeSats_t m_typeSatIndices;
-    std::vector<std::string_view> m_typeSatNames;
 
     Registry_t m_registry;
 
 };
-
-template<typename TYPESAT_T>
-TypeSatIndex Universe::sat_type_register()
-{
-    TypeSatIndex newIndex = static_cast<TypeSatIndex>(m_typeSatIndices.size());
-    auto const &[it, success] = m_typeSatIndices.emplace(TYPESAT_T::smc_name,
-                                                         newIndex);
-    if (success)
-    {
-        m_typeSatNames.emplace_back(TYPESAT_T::smc_name);
-        return newIndex;
-    }
-    return TypeSatIndex::Invalid;
-}
 
 template<typename TRAJECTORY_T, typename ... ARGS_T>
 TRAJECTORY_T& Universe::trajectory_create(ARGS_T&& ... args)
@@ -245,10 +170,6 @@ struct UCompVelocity
     Vector3 m_velocity;
 };
 
-struct UCompType
-{
-    TypeSatIndex m_type{TypeSatIndex::Invalid};
-};
 
 // TODO: move to different files and de-OOPify trajectories too
 
