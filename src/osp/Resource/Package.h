@@ -27,8 +27,10 @@
 #include "Resource.h"
 
 #include <entt/core/type_info.hpp>
+#include <entt/core/family.hpp>
+#include <entt/core/any.hpp>
 
-#include <any>
+
 #include <iostream>
 #include <cstdint>
 #include <map>
@@ -38,28 +40,6 @@
 
 namespace osp
 {
-
-//class SturdyFile;
-//class PrototypePart;
-
-//
-// What I think might be a good idea:
-//
-// Packages cache, address, and maybe store all resources usable in the game
-// They have names like "cool-rocket-engines-v2"
-// They also have 4-character unique ASCII prefix to refer to them
-//
-// resources paths look like this:
-// prfx:dirmaybe/resource
-//
-// note: dirs are kind of pointless
-//
-// TODO: Some sort of data-loading strategy/policy: folder, zip, network etc...
-//       For now, packages only store loaded data
-//
-
-
-// supported resources
 
 // Just a string, but typedef'd to indicate that it represents a prefix
 using ResPrefix_t = std::string;
@@ -72,6 +52,7 @@ struct Path
 };
 
 using StrViewPair_t = std::pair<std::string_view, std::string_view>;
+
 /**
  * Split a string_view at the first instance of a delimiter
  *
@@ -90,121 +71,143 @@ StrViewPair_t decompose_str(std::string_view path, const char delim);
  */
 Path decompose_path(std::string_view path);
 
+/**
+ * Stores maps of string to any type. A map is created for each new type added.
+ * Stored  are referred to as Resources, and are reference counted.
+ */
 class Package
 {
+    // Used to generate sequential IDs at runtime
+    using resource_id = entt::family<struct resource_type>;
+
 public:
 
-
+    Package(std::string prefix, std::string packageName);
     Package(Package&& move) = default;
     Package(const Package& copy) = delete;
     Package& operator=(Package const& copy) = delete;
 
-    Package(std::string prefix, std::string packageName);
-
-    //ResourceTable m_resources;
-
-    //virtual Magnum::GL::Mesh* request_mesh(const std::string& path);
-
-    //TypeMap<int>::fish;
-    //std::vector< Resource<Magnum::Trade::ImageData> > g_imageData;
-
-    //constexpr ResourceTable& debug_get_resource_table() { return m_resources; }
-
-//    template<class T>
-//    Resource<T>* debug_add_resource(Resource<T>&& resource);
-
-//    template<class T>
-//    Resource<T>* get_resource(std::string const& path);
-
-//    template<class T>
-//    Resource<T>* get_resource(unsigned resIndex);
-
+    /**
+     * Initialize and add a resource to store in this package.
+     *
+     * @tparam TYPE_T   Type of resource to store
+     *
+     * @param path [in] String used to identify this resource
+     * @param args [in] Arguments to pass to TYPE_T constructor
+     * @return Reference counted dependency to new resource
+     */
     template<class TYPE_T, typename ... ARGS_T>
     DependRes<TYPE_T> add(std::string_view path, ARGS_T&& ... args);
 
+    /**
+     * Get a resource by path identifier
+     *
+     * @tparam TYPE_T   Type of resource to get
+     *
+     * @param path [in] String used to identify the target resource
+     * @return Reference counted dependency to the found resource; empty if not
+     *         found.
+     */
     template<class TYPE_T>
-    DependRes<TYPE_T> get(std::string_view path);
+    DependRes<TYPE_T> get(std::string_view path) noexcept;
 
+    // TODO: function for removing specific resources
+
+    /**
+     * Remove all stored resource of the specified type
+     *
+     * @tparam TYPE_T Type of resource to clear
+     */
     template<class TYPE_T>
-    void clear();
+    void clear() noexcept;
 
+    // Stores maps of resoures of a specified type
+    template<class TYPE_T>
     struct GroupType
     {
-        virtual ~GroupType() = default;
-    };
+        GroupType() noexcept = default;
+        GroupType(GroupType&& move) noexcept = default;
+        GroupType& operator=(GroupType&& move) noexcept = default;
 
-    template<class TYPE_T>
-    struct GroupTypeRes : public GroupType
-    {
-        ~GroupTypeRes() = default;
-        //std::vector<TYPE_T> m_types;
+        // Needs to be copyable to store in entt::any, but copy is not allowed
+        // entt experimental branch allows move-only types.
+        GroupType(GroupType const& copy) { assert(0); };
+
         std::map<std::string, Resource<TYPE_T>, std::less<>> m_resources;
     };
 
-    ResPrefix_t get_prefix() const { return m_prefix; }
+    constexpr ResPrefix_t const& get_prefix() const { return m_prefix; }
 
 private:
 
-    std::map<entt::id_type, std::unique_ptr<GroupType>> m_groups;
+    std::vector<entt::any> m_groups;
 
     std::string m_packageName;
 
     ResPrefix_t m_prefix;
 
     std::string m_displayName;
-
 };
 
 template<class TYPE_T, typename ... ARGS_T>
 DependRes<TYPE_T> Package::add(std::string_view path,
                                ARGS_T&& ... args)
 {
-    // this should create a blank if it doesn't exist yet
-    //std::any& groupAny(m_groups[entt::type_info<TYPE_T>::id()]);
-    std::unique_ptr<GroupType>& groupAny(m_groups[entt::type_info<TYPE_T>::id()]);
+    // Runtime generated (global) sequential IDs for every unique type
+    // First unique type added is 0, next is 1, then 2, etc...
+    const uint32_t resTypeId = resource_id::type<TYPE_T>;
 
-
-
-    // check if blank
-    if(!groupAny)
+    // Resize m_groups to ensure that resTypeId a valid index
+    if (m_groups.size() <= resTypeId)
     {
-        groupAny = std::make_unique<GroupTypeRes<TYPE_T>>();
+        m_groups.resize(resTypeId + 1);
     }
 
-    GroupTypeRes<TYPE_T> &group = *static_cast<GroupTypeRes<TYPE_T>*>(groupAny.get());
+    entt::any &groupAny = m_groups[resTypeId];
+    //entt::any groupAny{std::make_unique< GroupType<TYPE_T> >()};
 
-    // problem: emplace without needing copy constructor
-    //group.m_resources.try_emplace(path, {std::forward<ARGS_T>(args)...}, false, 0);
-    //group.m_resources.emplace(std::piecewise_construct,
-    //                          std::forward_as_tuple(path),
-    //                          std::forward_as_tuple({std::forward<ARGS_T>(args)...}, false, 0));
-    //auto final = group.m_resources.try_emplace(path. );
+    // Initialize GroupType if blank. This only happens for the first TYPE_T
+    // added.
+    if(!groupAny)
+    {
+        groupAny = GroupType<TYPE_T>();
+    }
+
+    GroupType<TYPE_T> &group = entt::any_cast< GroupType<TYPE_T>& >(groupAny);
+
+    // Emplace without needing copy constructor
     auto final = group.m_resources
         .try_emplace(std::string{path}, false, std::forward<ARGS_T>(args)...);
 
+    // check if emplace fails, Resource already exists
     if (!final.second)
     {
-        // resource already exists
-        std::cout << "resource already exists\n";
+        return {}; // return empty if so
     }
 
     return DependRes<TYPE_T>(final.first);
 }
 
 template<class TYPE_T>
-DependRes<TYPE_T> Package::get(std::string_view path)
+DependRes<TYPE_T> Package::get(std::string_view path) noexcept
 {
-    auto itType = m_groups.find(entt::type_info<TYPE_T>::id());
+    const uint32_t resTypeId = resource_id::type<TYPE_T>;
 
-    if (itType == m_groups.end())
+    if (m_groups.size() < resTypeId)
     {
-        // type not found
-        return DependRes<TYPE_T>();
+        return {}; // Return if resTypeId is not a valid index to m_groups
     }
 
-    GroupTypeRes<TYPE_T> &group = *static_cast<GroupTypeRes<TYPE_T>*>(itType->second.get());
+    entt::any &groupAny = m_groups[resTypeId];
 
-    auto resIt = group.m_resources.find(path);
+    if(groupAny.type() != entt::type_id< GroupType<TYPE_T> >())
+    {
+        return {}; // Return if GroupType is not initialized
+    }
+
+    GroupType<TYPE_T> &group = entt::any_cast<GroupType<TYPE_T>&>(groupAny);
+
+    auto resIt = group.m_resources.find(path); // Find resource by path
 
     if (resIt == group.m_resources.end())
     {
@@ -217,9 +220,14 @@ DependRes<TYPE_T> Package::get(std::string_view path)
 }
 
 template<class TYPE_T>
-void Package::clear()
+void Package::clear() noexcept
 {
-    m_groups.erase(entt::type_info<TYPE_T>::id());
+    const uint32_t resTypeId = resource_id::type<TYPE_T>;
+    //m_groups.erase(entt::type_info<TYPE_T>::id());
+    if (m_groups.size() > resTypeId)
+    {
+        m_groups[resTypeId] = entt::any{}; // Destruct GroupType
+    }
 }
 
 }

@@ -30,9 +30,5 @@ using osp::universe::SatActiveArea;
 
 UCompActiveArea& SatActiveArea::add_active_area(Universe &rUni, Satellite sat)
 {
-    bool typeSetSuccess = rUni.sat_type_try_set(
-                sat, rUni.sat_type_find_index(SatActiveArea::smc_name));
-    assert(typeSetSuccess);
-
     return rUni.get_reg().emplace<UCompActiveArea>(sat);
 }

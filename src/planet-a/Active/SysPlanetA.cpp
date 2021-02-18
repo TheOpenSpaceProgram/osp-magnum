@@ -36,6 +36,7 @@
 #include <iostream>
 
 using planeta::active::SysPlanetA;
+using planeta::universe::UCompPlanet;
 
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
@@ -44,16 +45,15 @@ using osp::active::ACompTransform;
 using osp::active::ACompFloatingOrigin;
 using osp::active::ACompRigidBody_t;
 using osp::active::ACompFFGravity;
-using osp::active::ACompCollisionShape;
+using osp::active::ACompShape;
+using osp::active::ACompCollider;
 using osp::active::ACompAreaLink;
 using osp::active::ACompActivatedSat;
 using osp::active::SysAreaAssociate;
 using osp::active::SysPhysics_t;
-using osp::active::ActivationTracker;
 
 using osp::universe::Universe;
 using osp::universe::Satellite;
-using osp::universe::TypeSatIndex;
 
 using Magnum::GL::Renderer;
 using osp::Matrix4;
@@ -169,7 +169,8 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
     // Create entity and required components
     ActiveEnt fish = m_scene.hier_create_child(m_scene.hier_get_root());
     auto &fishTransform = m_scene.reg_emplace<ACompTransform>(fish);
-    auto &fishShape = m_scene.reg_emplace<ACompCollisionShape>(fish);
+    auto &fishShape = m_scene.reg_emplace<ACompShape>(fish);
+    auto &fishCollide = m_scene.reg_emplace<ACompCollider>(fish);
     auto &fishBody = m_scene.reg_emplace<ACompRigidBody_t>(fish);
     m_scene.reg_emplace<ACompFloatingOrigin>(fish);
 
@@ -181,7 +182,7 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
     auto itsChunk = planet.m_planet->iterate_chunk(chunk);
 
     // Send them to the physics engine
-    physics.shape_create_tri_mesh_static(fishShape,
+    physics.shape_create_tri_mesh_static(fishShape, fishCollide,
                                          itsChunk.first, itsChunk.second);
 
     // create the rigid body
@@ -198,20 +199,29 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
     }
 
     Universe &rUni = pArea->get_universe();
-    TypeSatIndex type = rUni.sat_type_find_index<universe::SatPlanet>();
-    ActivationTracker& activations = pArea->get_tracker(type);
-
+    
     // Delete planets that have exited the ActiveArea
-    for (auto const &[sat, ent] : activations.m_leave)
+    for (auto const &[sat, ent] : pArea->m_leave)
     {
+        if (!rUni.get_reg().has<UCompPlanet>(sat))
+        {
+            continue;
+        }
+
         rScene.hier_destroy(ent);
     }
 
     // Activate planets that have just entered the ActiveArea
-    for (auto &entered : activations.m_enter)
+    for (auto &entered : pArea->m_enter)
     {
         Satellite sat = entered->first;
         ActiveEnt &rEnt = entered->second;
+
+        if (!rUni.get_reg().has<UCompPlanet>(sat))
+        {
+            continue;
+        }
+
         rEnt = activate(rScene, rUni, pArea->m_areaSat, sat);
     }
 }

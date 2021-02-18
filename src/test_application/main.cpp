@@ -55,11 +55,6 @@ void config_controls();
 void load_a_bunch_of_stuff();
 
 /**
- * Register satellite types into the universe to add support for them.
- */
-void register_universe_types();
-
-/**
  * Try to everything in the universe
  */
 bool destroy_universe();
@@ -100,7 +95,6 @@ int main(int argc, char** argv)
 
     load_a_bunch_of_stuff();
 
-    register_universe_types();
 
     create_simple_solar_system(g_osp);
 
@@ -244,13 +238,15 @@ void load_a_bunch_of_stuff()
 
     // Load placeholder fuel type
     using adera::active::machines::ShipResourceType;
-    ShipResourceType fuel;
-    fuel.m_identifier = "fuel";
-    fuel.m_displayName = "Rocket fuel";
-    fuel.m_quanta = 16;
-    fuel.m_mass = 1.0f;
-    fuel.m_volume = 0.001f;
-    fuel.m_density = fuel.m_mass / fuel.m_volume;
+    ShipResourceType fuel
+    {
+        "fuel",        // identifier
+        "Rocket fuel", // display name
+        1 << 16,       // quanta per unit
+        1.0f,          // volume per unit (m^3)
+        1000.0f,       // mass per unit (kg)
+        1000.0f        // density (kg/m^3)
+    };
 
     lazyDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
 
@@ -263,14 +259,6 @@ void load_a_bunch_of_stuff()
     //s_partsLoaded = true;
 
     std::cout << "Resource loading complete\n\n";
-}
-
-void register_universe_types()
-{
-    osp::universe::Universe &uni = g_osp.get_universe();
-    uni.sat_type_register<osp::universe::SatActiveArea>();
-    uni.sat_type_register<osp::universe::SatVehicle>();
-    uni.sat_type_register<planeta::universe::SatPlanet>();
 }
 
 void debug_print_help()
@@ -407,38 +395,36 @@ void debug_print_sats()
 {
     using osp::universe::Universe;
     using osp::universe::UCompTransformTraj;
-    using osp::universe::UCompType;
 
     Universe const &rUni = g_osp.get_universe();
 
-    std::vector<std::string_view> const& typeSatNames
-            = rUni.sat_type_get_names();
-
-    auto const view = rUni.get_reg().view<const UCompTransformTraj,
-                                              const UCompType>();
+    Universe::Registry_t const &reg = rUni.get_reg();
+    auto const view = reg.view<const UCompTransformTraj>();
 
     for (osp::universe::Satellite sat : view)
     {
         auto const &posTraj = view.get<const UCompTransformTraj>(sat);
-        auto const &type = view.get<const UCompType>(sat);
 
         osp::Vector3s const &pos = posTraj.m_position;
 
-        std::cout << "SATELLITE: \"" << posTraj.m_name << "\" \n";
-        if (type.m_type != osp::universe::TypeSatIndex::Invalid)
-        {
-            std::cout << " * Type: " << typeSatNames[size_t(type.m_type)]
-                      << "\n";
-        }
+        std::cout << "* SATELLITE: \"" << posTraj.m_name << "\"\n";
+
+        rUni.get_reg().visit(sat, [&reg] (entt::type_info info) {
+            Universe::Registry_t::poly_storage storage = reg.storage(info);
+            std::cout << "  * UComp: " << storage->value_type().name() << "\n";
+        });
 
         if (posTraj.m_trajectory != nullptr)
         {
-            std::cout << " * Trajectory: "
+            std::cout << "  * Trajectory: "
                       << posTraj.m_trajectory->get_type_name() << "\n";
         }
 
-        std::cout << " * Position: ["
-                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "]\n";
+        auto posM = osp::Vector3(pos) / 1024.0f;
+        std::cout << "  * Position: ["
+                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "], ["
+                  << posM.x() << ", " << posM.y() << ", " << posM.z()
+                  << "] meters\n";
     }
 
 

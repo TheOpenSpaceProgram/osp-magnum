@@ -41,11 +41,6 @@ class ISystemTrajectory;
 
 enum class Satellite : entt::id_type {};
 
-enum class TypeSatIndex : uint16_t
-{
-    Invalid = std::numeric_limits<uint16_t>::max()
-};
-
 /**
  * A model of deep space. This class stores the data of astronomical objects
  * represented in the universe, known as Satellites. Planets, stars, comets,
@@ -69,7 +64,6 @@ enum class TypeSatIndex : uint16_t
  */
 class Universe
 {
-    using MapTypeSats_t = std::map<std::string_view, TypeSatIndex, std::less<>>;
 
 public:
 
@@ -102,8 +96,6 @@ public:
      */
     void sat_remove(Satellite sat);
 
-    bool sat_try_set_type(Satellite sat, TypeSatIndex type);
-
     /**
      * Calculate position between two satellites.
      * @param referenceFrame [in]
@@ -119,54 +111,6 @@ public:
      * @return relative position of target in meters
      */
     Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const;
-
-    /**
-     * Register an ITypeSatellite so the universe can recognize that this type
-     * of Satellite can exist.
-     * @tparam TYPESAT_T Unique ITypeSatellite to register
-     * @tparam ARGS_T Arguments to forward to TYPESAT_T's constructor
-     * @return reference to new TYPESAT_T just created
-     */
-    template<typename TYPESAT_T>
-    TypeSatIndex sat_type_register();
-
-    /**
-     * @return Names of registered satellites. Access using a TypeSatIndex
-     */
-    constexpr std::vector<std::string_view> const& sat_type_get_names() const
-    noexcept { return m_typeSatNames; }
-
-    /**
-     * @return Number of reistered satellites
-     */
-    std::underlying_type<TypeSatIndex>::type sat_type_count() const noexcept
-    { return m_typeSatIndices.size(); }
-
-    /**
-     * Find index of a registered satellite by name
-     * @param name [in] Name of satellite to find
-     * @return Index of type, TypeSatIndex::Invalid if not found.
-     */
-    TypeSatIndex sat_type_find_index(std::string_view name);
-
-    /**
-     * Find index of a registered satellite by type. The type should contain a
-     * static member string named smc_name
-     * @tparam SATTYPE_T Satellite type containing smc_name
-     * @return Index of type, TypeSatIndex::Invalid if not found.
-     */
-    template<typename SATTYPE_T>
-    TypeSatIndex sat_type_find_index()
-    { return sat_type_find_index(SATTYPE_T::smc_name); }
-
-    /**
-     * Attempt to set the type of a Satellite. If a type is already set, then
-     * the type will not be set successfully.
-     * @param sat  [in] Satellite to set type of
-     * @param type [in] Type to set to
-     * @return True if type is set succesfully, or else false
-     */
-    bool sat_type_try_set(Satellite sat, TypeSatIndex type);
 
     /**
      * Create a Trajectory, and add it to the universe.
@@ -186,26 +130,9 @@ private:
 
     std::vector<std::unique_ptr<ISystemTrajectory>> m_trajectories;
 
-    MapTypeSats_t m_typeSatIndices;
-    std::vector<std::string_view> m_typeSatNames;
-
     Registry_t m_registry;
 
 };
-
-template<typename TYPESAT_T>
-TypeSatIndex Universe::sat_type_register()
-{
-    TypeSatIndex newIndex = static_cast<TypeSatIndex>(m_typeSatIndices.size());
-    auto const &[it, success] = m_typeSatIndices.emplace(TYPESAT_T::smc_name,
-                                                         newIndex);
-    if (success)
-    {
-        m_typeSatNames.emplace_back(TYPESAT_T::smc_name);
-        return newIndex;
-    }
-    return TypeSatIndex::Invalid;
-}
 
 template<typename TRAJECTORY_T, typename ... ARGS_T>
 TRAJECTORY_T& Universe::trajectory_create(ARGS_T&& ... args)
@@ -243,12 +170,28 @@ struct UCompVelocity
     Vector3 m_velocity;
 };
 
-struct UCompType
-{
-    TypeSatIndex m_type{TypeSatIndex::Invalid};
-};
 
 // TODO: move to different files and de-OOPify trajectories too
+
+// Trajectories are satellites that manages the movement of a large group of
+// other satellites. They implement things like:
+// * N-body
+// * Patched Conics
+// * Landed
+//
+// It's possible that each trajectory can have its own coordinate system, but
+// this is still up for discussion.
+//
+// Individual instances of trajectories would also have be called in a certain
+// order.
+//
+// Ideas for more data-oriented trajectories:
+// * Add a UCompTrajectory with:
+//     * vector or entt::sparse_set of associated satellites
+//     * a function pointer to an update function
+//     * a priority number or an entity to refer to another trajectory 'parent'
+//       that must be updated first.
+// * Maybe rename Trajectories to trajectory systems, coordinate systems
 
 using TrajectoryType = entt::id_type;
 
@@ -265,7 +208,7 @@ public:
     virtual void remove(Satellite sat) = 0;
     virtual Satellite get_center() const = 0;
 
-    virtual TrajectoryType get_type() = 0;
+    //virtual TrajectoryType get_type() = 0;
     virtual std::string const& get_type_name() = 0;
 
 private:
@@ -288,11 +231,11 @@ public:
     virtual void add(Satellite sat) override;
     virtual void remove(Satellite sat) override;
 
-    TrajectoryType get_type() override
-    {
-        static auto id = entt::type_info<TRAJECTORY_T>::id();
-        return id;
-    }
+//    TrajectoryType get_type() override
+//    {
+//        static auto id = entt::type_info<TRAJECTORY_T>::id();
+//        return id;
+//    }
     std::string const& get_type_name() override
     {
         //static auto name = entt::type_info<TRAJECTORY_T>::name();

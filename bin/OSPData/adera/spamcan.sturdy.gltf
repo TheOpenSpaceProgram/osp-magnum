@@ -196,7 +196,8 @@
                     },
                     {
                         "type" : "Rocket",
-                        "thrust" : 1000.0
+                        "thrust" : 1000.0,
+                        "fueltype" : "lzdb:fuel"
                     },
                     {
                         "type" : "FreeEnergyGenerator"

@@ -175,7 +175,7 @@ public:
     constexpr RenderOrder_t& get_render_order() { return m_renderOrder; }
 
     // TODO
-    constexpr float get_time_delta_fixed() { return 1.0f / 60.0f; }
+    constexpr float get_time_delta_fixed() const { return 1.0f / 60.0f; }
 
     /**
      * Add support for a new machine type by adding an ISysMachine

@@ -63,9 +63,9 @@
                 "machines" : [
                     {
                         "type" : "Rocket",
-                        "thrust" : 70000.0,
-                        "Isp" : 310.0,
-                        "fuel" : "lzdb:fuel"
+                        "thrust" : 150000.0,
+                        "Isp" : 100.0,
+                        "fueltype" : "lzdb:fuel"
                     },
                     {
                         "type" : "FreeEnergyGenerator"

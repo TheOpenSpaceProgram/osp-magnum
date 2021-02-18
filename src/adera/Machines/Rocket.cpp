@@ -61,16 +61,15 @@ WireOutput* MachineRocket::request_output(WireOutPort port)
 
 std::vector<WireInput*> MachineRocket::existing_inputs()
 {
-    /*std::vector<WireInput*> inputs;
+    std::vector<WireInput*> inputs;
     inputs.reserve(3 + m_resourceLines.size());
 
     inputs.insert(inputs.begin(), {&m_wiGimbal, &m_wiIgnition, &m_wiThrottle});
     for (auto& resource : m_resourceLines)
     {
-        inputs.push_back(&resource.m_lineIn);
+        inputs.push_back(&resource.m_source);
     }
-    return inputs;*/
-    return {&m_wiGimbal, &m_wiIgnition, &m_wiThrottle};
+    return inputs;
 }
 
 std::vector<WireOutput*> MachineRocket::existing_outputs()
@@ -102,14 +101,16 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
             continue;
         }
 
+        machine.m_powerOutput = 0.0f;  // Will be set later if engine is on
+
         // Check for nonzero throttle, continue otherwise
         WireData *pThrottle = machine.m_wiThrottle.connected_value();
-        wiretype::Percent* pPercent = nullptr;
+        wiretype::Percent* pThrotPercent = nullptr;
         if (pThrottle != nullptr)
         {
             using wiretype::Percent;
-            pPercent = std::get_if<Percent>(pThrottle);
-            if ((pPercent == nullptr) || !(pPercent->m_value > 0.0f))
+            pThrotPercent = std::get_if<Percent>(pThrottle);
+            if ((pThrotPercent == nullptr) || !(pThrotPercent->m_value > 0.0f))
             {
                 continue;
             }
@@ -123,18 +124,23 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         bool fail = false;
         for (auto& resource : machine.m_resourceLines)
         {
-            auto const* src = m_scene.reg_try_get<MachineContainer>(resource.m_sourceEnt);
-            if (!src)
+            if (auto const* pipe = resource.m_source.get_if<wiretype::Pipe>();
+                pipe != nullptr)
             {
-                std::cout << "Error: no source found\n";
-                fail = true;
-                break;
+                
+                if (auto const* src = rScene.reg_try_get<MachineContainer>(pipe->m_source);
+                    src != nullptr)
+                {
+                    uint64_t required = resource_units_required(rScene, machine,
+                        pThrotPercent->m_value, resource);
+                    if (src->check_contents().m_quantity > required)
+                    {
+                        continue;
+                    }
+                }
             }
-            if (!src->check_contents().m_quantity > 0)
-            {
-                fail = true;
-                break;
-            }
+            fail = true;
+            break;
         }
         if (fail)
         {
@@ -157,11 +163,11 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         Matrix4 relTransform = pRbAncestor->m_relTransform;
 
         /* Compute thrust force
-            * Thrust force is defined to be along +Z by convention.
-            * Obtains thrust vector in rigidbody space
-            */
+         * Thrust force is defined to be along +Z by convention.
+         * Obtains thrust vector in rigidbody space
+         */
         Vector3 thrustDir = relTransform.transformVector(Vector3{0.0f, 0.0f, 1.0f});
-        float thrustMag = machine.m_params.m_maxThrust * pPercent->m_value;
+        float thrustMag = machine.m_params.m_maxThrust * pThrotPercent->m_value;
         // Take thrust in rigidbody space and apply to RB in world space
         Vector3 thrust = thrustMag * thrustDir;
         Vector3 worldThrust = rCompTf.m_transform.transformVector(thrust);
@@ -173,20 +179,26 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         Vector3 torque = Magnum::Math::cross(location, thrust);
         Vector3 worldTorque = rCompTf.m_transform.transformVector(torque);
         SysPhysics_t::body_apply_torque(rCompRb, worldTorque);
- 
+        
+        rCompRb.m_inertiaDirty = true;
+
         // Perform resource consumption calculation
-        float massFlowRateTot = thrustMag /
-            (phys::constants::g_0 * machine.m_params.m_specImpulse);
-        for (auto const& resource : machine.m_resourceLines)
+        for (MachineRocket::ResourceInput const& resource : machine.m_resourceLines)
         {
-            float massFlowRate = massFlowRateTot * resource.m_massRateFraction;
-            float massFlow = massFlowRate * m_scene.get_time_delta_fixed();
-            uint64_t required = resource.m_type->resource_quantity(massFlow);
-            auto* src = m_scene.reg_try_get<MachineContainer>(resource.m_sourceEnt);
-            uint64_t consumed = src->request_contents(required);
+            // Pipe must be non-null since we checked earlier
+            const auto& pipe = *resource.m_source.get_if<wiretype::Pipe>();
+            auto& src = rScene.reg_get<MachineContainer>(pipe.m_source);
+
+            uint64_t required = resource_units_required(rScene, machine,
+                pThrotPercent->m_value, resource);
+            uint64_t consumed = src.request_contents(required);
             std::cout << "consumed " << consumed << " units of fuel, "
-                << src->check_contents().m_quantity << " remaining\n";
+                << src.check_contents().m_quantity << " remaining\n";
         }
+
+        // Set output power level (for plume effect)
+        // TODO: later, take into account low fuel pressure, bad mixture, etc.
+        machine.m_powerOutput = pThrotPercent->m_value;
     }
 }
 
@@ -239,39 +251,43 @@ Machine& SysMachineRocket::instantiate(ActiveEnt ent, PrototypeMachine config,
     params.m_maxThrust = std::get<double>(config.m_config["thrust"]);
     params.m_specImpulse = std::get<double>(config.m_config["Isp"]);
 
-    MachineRocket::fuel_list_t inputs;
-    Package& pkg = m_scene.get_application().debug_find_package("lzdb");
-    DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>("fuel");
+    std::string const& fuelIdent = std::get<std::string>(config.m_config["fueltype"]);
+    Path resPath = decompose_path(fuelIdent);
+    Package& pkg = m_scene.get_application().debug_find_package(resPath.prefix);
+    DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>(resPath.identifier);
+
+    std::vector<MachineRocket::input_t> inputs;
     if (!fuel.empty())
     {
-        // TMP: finds the first non-empty fuel tank in the ship
-        // Only works as long as the fuselage is added before the engine
-
-        ActiveEnt foundTank = entt::null;
-        auto find_fuel = [this, &foundTank](ActiveEnt e)
-        {
-            if (auto* fuel = this->m_scene.reg_try_get<MachineContainer>(e);
-                fuel != nullptr && fuel->check_contents().m_quantity > 0)
-            {
-                foundTank = e;
-                return EHierarchyTraverseStatus::Stop;
-            }
-            return EHierarchyTraverseStatus::Continue;
-        };
-        auto const& parent = m_scene.reg_get<ACompHierarchy>(ent);
-        m_scene.hierarchy_traverse(parent.m_parent, find_fuel);
-        // endTMP
-
-        ActiveEnt fuelSource = foundTank;
-        MachineRocket::ResourceInput input = {std::move(fuel), 1.0f, fuelSource};
-        inputs.push_back(std::move(input));
+        inputs.push_back({std::move(fuel), 1.0f});
     }
 
     attach_plume_effect(ent);
-    return m_scene.reg_emplace<MachineRocket>(ent, params, inputs);
+    return m_scene.reg_emplace<MachineRocket>(ent, std::move(params), std::move(inputs));
 }
 
 Machine& SysMachineRocket::get(ActiveEnt ent)
 {
     return m_scene.reg_get<MachineRocket>(ent);//emplace(ent);
+}
+
+uint64_t SysMachineRocket::resource_units_required(
+    osp::active::ActiveScene const& scene,
+    MachineRocket const& machine, float throttle,
+    MachineRocket::ResourceInput const& resource)
+{
+    float massFlowRate = resource_mass_flow_rate(machine,
+        throttle, resource);
+    float massFlow = massFlowRate * scene.get_time_delta_fixed();
+    return resource.m_type->resource_quantity(massFlow);
+}
+
+constexpr float SysMachineRocket::resource_mass_flow_rate(MachineRocket const& machine,
+    float throttle, MachineRocket::ResourceInput const& resource)
+{
+    float thrustMag = machine.m_params.m_maxThrust * throttle;
+    float massFlowRateTot = thrustMag /
+        (phys::constants::g_0 * machine.m_params.m_specImpulse);
+
+    return massFlowRateTot * resource.m_massRateFraction;
 }

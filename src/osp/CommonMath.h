@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright Â© 2019-2020 Open Space Program Project
+ * Copyright © 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -22,33 +22,27 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "Package.h"
+#pragma once
 
+#include "types.h"
+#include <type_traits>
 
-
-namespace osp
+namespace osp::math
 {
 
-Package::Package(std::string prefix, std::string packageName)
- : m_groups()
- , m_packageName(std::move(packageName))
- , m_prefix(std::move(prefix))
-{ }
-
-StrViewPair_t decompose_str(std::string_view path, const char delim)
+template <typename UINT_T>
+constexpr UINT_T uint_2pow(UINT_T exponent)
 {
-    size_t pos = path.find(delim);
-    return {
-        path.substr(0, pos),
-        path.substr(pos + 1, path.length())
-    };
+    static_assert(std::is_integral<UINT_T>::value, "Unsigned int required");
+    return UINT_T(1) << exponent;
 }
 
-Path decompose_path(std::string_view path)
+template <typename UINT_T>
+constexpr bool is_power_of_2(UINT_T value)
 {
-    StrViewPair_t pair = decompose_str(path, ':');
-    return { pair.first, pair.second };
+    static_assert(std::is_integral<UINT_T>::value, "Unsigned int required");
+    // Test to see if the value contains more than 1 set bit
+    return !(value == 0) && !(value & (value - 1));
 }
 
-
-}
+} // namespace osp::math

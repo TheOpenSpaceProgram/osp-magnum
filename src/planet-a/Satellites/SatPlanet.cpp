@@ -37,10 +37,6 @@ UCompPlanet& SatPlanet::add_planet(
         osp::universe::Universe& rUni, Satellite sat, double radius, float mass,
         float resolutionSurfaceMax, float resolutionScreenMax)
 {
-    bool typeSetSuccess = rUni.sat_type_try_set(
-                sat, rUni.sat_type_find_index(SatPlanet::smc_name));
-    assert(typeSetSuccess);
-
     rUni.get_reg().emplace<UCompActivatable>(sat);
     rUni.get_reg().emplace<UCompActivationRadius>(sat, float(radius));
 

@@ -23,3 +23,12 @@ jobs:
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=x64-windows -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
         cmake --build build --parallel --config Release --target osp-magnum
+    
+    - name: Prepare Artifact
+      run: |
+        move build\bin\OSPData build\bin\Release\OSPData
+  
+    - uses: actions/upload-artifact@v2
+      with: 
+        name: release
+        path: build\bin\Release

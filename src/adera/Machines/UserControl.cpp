@@ -106,6 +106,11 @@ void SysMachineUserControl::update_sensor()
         float throttleRate = 0.5f;
         auto delta = throttleRate * m_scene.get_time_delta_fixed();
 
+        if (!machine.m_enable)
+        {
+            continue;
+        }
+
         if (m_throttleMore.trigger_hold())
         {
             throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
@@ -114,11 +119,6 @@ void SysMachineUserControl::update_sensor()
         if (m_throttleLess.trigger_hold())
         {
             throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
-        }
-
-        if (!machine.m_enable)
-        {
-            continue;
         }
 
         if (m_throttleMin.triggered())

@@ -105,13 +105,23 @@ namespace wiretype
     {
         bool m_value;
     };
+
+    /**
+     * Pipe, generically exposes the output entity to the input one
+     */
+    struct Pipe
+    {
+        ActiveEnt m_source;
+    };
+
 } // namespace wiretype
 
 // Supported data types
 using WireData = std::variant<wiretype::Attitude,
                               wiretype::AttitudeControl,
                               wiretype::Percent,
-                              wiretype::Deploy>;
+                              wiretype::Deploy,
+                              wiretype::Pipe>;
 
 //-----------------------------------------------------------------------------
 
@@ -188,7 +198,7 @@ public:
 
     // For use in move constructors / move operators of classes
     // that aggregate WireInput. Use at own risk!!!
-    WireInput(WireInput&& move) noexcept = default;
+    WireInput(WireInput&& move) = default;
     WireInput& operator=(WireInput&& move) = default;
 
     WireInput(WireInput const& copy) = delete;
@@ -208,6 +218,12 @@ public:
      */
     template<typename T>
     T* get_if();
+
+    /**
+     * Get const value from connected WireOutput
+     */
+    template<typename T>
+    const T* get_if() const;
 
 private:
     IWireElement* m_element;
@@ -259,6 +275,7 @@ public:
     }
 
     WireData& value() { return m_value; }
+    const WireData& value() const { return m_value; }
 
 private:
     WireData m_value;
@@ -314,8 +331,22 @@ T* WireInput::get_if()
         return std::get_if<T> (&(list()->value()));
     }
 }
-
 //-----------------------------------------------------------------------------
+
+template<typename T>
+const T* WireInput::get_if() const
+{
+    if (list() == nullptr)
+    {
+        // Not connected to any WireOutput!
+        return nullptr;
+    }
+    else
+    {
+        // Attempt to get value of variant
+        return std::get_if<T>(&(list()->value()));
+    }
+}
 
 inline WireInput::WireInput(IWireElement* element, std::string name) noexcept
  : m_element(element)
