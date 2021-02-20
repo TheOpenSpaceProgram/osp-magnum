@@ -30,7 +30,7 @@
 #include "../FunctonOrder.h"
 
 #include <entt/entity/registry.hpp>
-
+#include <taskflow/taskflow.hpp>
 
 namespace osp::active
 {
@@ -52,11 +52,12 @@ inline std::ostream& operator<<(std::ostream& os, ActiveEnt e)
 
 using ActiveReg_t = entt::basic_registry<ActiveEnt>;
 
-using UpdateOrder_t = FunctionOrder<void(ActiveScene&)>;
-using UpdateOrderHandle_t = FunctionOrderHandle<void(ActiveScene&)>;
+using UpdateOrder_t = tf::Taskflow;
+using UpdateOrderHandle_t = tf::Task;
+using UpdateExecutor_t = tf::Executor;
 
-using RenderOrder_t = FunctionOrder<void(ACompCamera const&)>;
-using RenderOrderHandle_t = FunctionOrderHandle<void(ACompCamera const&)>;
+using RenderOrder_t = tf::Taskflow;
+using RenderOrderHandle_t = tf::Task;
 
 struct ACompFloatingOrigin
 {
@@ -72,5 +73,23 @@ public:
 
 using MapDynamicSys_t = std::map<std::string, std::unique_ptr<IDynamicSystem>,
                                  std::less<> >;
+
+template <typename FUNC_T>
+struct UpdateOrderConstraint
+{
+    std::function<FUNC_T> m_function;
+    std::string m_name;
+    std::string m_succeed;
+    std::string m_precede;
+};
+
+using SysUpdateContraint_t = UpdateOrderConstraint<void(ActiveScene&)>;
+
+template <size_t N>
+using SystemUpdates_t = std::array<SysUpdateContraint_t, N>;
+
+using MapUpdateSystemTasks_t = std::map<std::string,
+    SysUpdateContraint_t, std::less<> >;
+using MapTasks_t = std::map<std::string, tf::Task, std::less<> >;
 
 }

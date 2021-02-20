@@ -71,14 +71,12 @@ SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandle
         m_yawLf(userControl.config_get("vehicle_yaw_lf")),
         m_yawRt(userControl.config_get("vehicle_yaw_rt")),
         m_rollLf(userControl.config_get("vehicle_roll_lf")),
-        m_rollRt(userControl.config_get("vehicle_roll_rt")),
-        m_updateSensor(scene.get_update_order(), "mach_usercontrol", "", "wire",
-                       std::bind(&SysMachineUserControl::update_sensor, this))
+        m_rollRt(userControl.config_get("vehicle_roll_rt"))
 {
 
 }
 
-void SysMachineUserControl::update_sensor()
+void SysMachineUserControl::update_sensor(ActiveScene& rScene)
 {
     //std::cout << "updating all MachineUserControls\n";
     // InputDevice.IsActivated()
@@ -104,7 +102,7 @@ void SysMachineUserControl::update_sensor()
         auto& throttlePos = std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value;
 
         float throttleRate = 0.5f;
-        auto delta = throttleRate * m_scene.get_time_delta_fixed();
+        auto delta = throttleRate * rScene.get_time_delta_fixed();
 
         if (!machine.m_enable)
         {

@@ -72,6 +72,11 @@ private:
     ActiveScene &m_scene;
 
     RenderOrderHandle_t m_renderDebugDraw;
+    // TODO render order
+    /*static inline std::array<SysUpdateContraint_t, 1> smc_update
+    {
+        SysUpdateContraint_t{&SysDebugRender::draw}
+    };*/
 };
 
 template<typename T>

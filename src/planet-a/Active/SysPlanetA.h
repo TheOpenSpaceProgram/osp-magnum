@@ -58,7 +58,7 @@ class SysPlanetA : public osp::active::IDynamicSystem
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "PlanetA";
 
     SysPlanetA(osp::active::ActiveScene &scene,
                osp::UserInputHandler &userInput);
@@ -68,29 +68,34 @@ public:
             osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
             osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat);
 
-    void draw(osp::active::ACompCamera const& camera);
+    static void draw(osp::active::ActiveScene& rScene, osp::active::ACompCamera const& camera);
 
-    void debug_create_chunk_collider(osp::active::ActiveEnt ent,
-                                     ACompPlanet &planet,
-                                     chindex_t chunk);
+    static void debug_create_chunk_collider(osp::active::ActiveScene& rScene,
+        osp::active::ActiveEnt ent,
+        ACompPlanet &planet,
+        chindex_t chunk);
 
     static void planet_update_geometry(osp::active::ActiveEnt planetEnt,
                                 osp::active::ActiveScene& rScene);
 
     static void update_activate(osp::active::ActiveScene& rScene);
 
-    void update_geometry(osp::active::ActiveScene& rScene);
+    static void update_geometry(osp::active::ActiveScene& rScene);
 
-    void update_physics(osp::active::ActiveScene& rScene);
+    static void update_physics(osp::active::ActiveScene& rScene);
 
 private:
+    static inline osp::active::SystemUpdates_t<5> smc_update
+    {
+        osp::active::SysUpdateContraint_t{&SysPlanetA::update_activate,
+            "planet_activate", "", "planet_geo"},
+        osp::active::SysUpdateContraint_t{&SysPlanetA::update_geometry,
+            "planet_geo", "", "physics"},
+        osp::active::SysUpdateContraint_t{&SysPlanetA::update_physics,
+            "planet_phys", "planet_geo", ""}
+    };
 
-    osp::active::ActiveScene &m_scene;
-
-    osp::active::UpdateOrderHandle_t m_updateActivate;
-    osp::active::UpdateOrderHandle_t m_updateGeometry;
-    osp::active::UpdateOrderHandle_t m_updatePhysics;
-
+    // TODO
     osp::active::RenderOrderHandle_t m_renderPlanetDraw;
 
     osp::ButtonControlHandle m_debugUpdate;

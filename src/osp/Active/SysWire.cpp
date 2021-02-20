@@ -30,9 +30,6 @@
 using namespace osp;
 using namespace osp::active;
 
-
-const std::string SysWire::smc_name = "Wire";
-
 WireData* WireInput::connected_value()
 {
     WireOutput* woConnected = list();
@@ -50,13 +47,6 @@ void WireInput::doErase()
 {
      list()->cut(this);
 };
-
-SysWire::SysWire(ActiveScene &scene)
- : m_updateWire(scene.get_update_order(), "wire", "", "",
-                [this] (ActiveScene& rScene) { this->update_propagate(rScene); })
-{
-
-}
 
 
 void SysWire::update_propagate(ActiveScene& rScene)

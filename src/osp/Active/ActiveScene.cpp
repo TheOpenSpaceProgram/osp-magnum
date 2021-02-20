@@ -174,8 +174,7 @@ void ActiveScene::on_hierarchy_destruct(ActiveReg_t& reg, ActiveEnt ent)
 
 void ActiveScene::update()
 {
-
-    m_updateOrder.call(*this);
+    m_updateExec.run(m_updateOrder).wait();
 }
 
 
@@ -236,7 +235,9 @@ void ActiveScene::draw(ActiveEnt camera)
     //cameraProject = cameraComp.m_projection;
     cameraComp.m_inverse = cameraTransform.m_transformWorld.inverted();
 
-    m_renderOrder.call(cameraComp);
+    //TODO update cameras
+
+    m_updateExec.run(m_renderOrder).wait();
 }
 
 MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,

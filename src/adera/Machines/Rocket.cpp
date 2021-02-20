@@ -79,8 +79,6 @@ std::vector<WireOutput*> MachineRocket::existing_outputs()
 
 SysMachineRocket::SysMachineRocket(ActiveScene &rScene)
     : SysMachine<SysMachineRocket, MachineRocket>(rScene)
-    , m_updatePhysics(rScene.get_update_order(), "mach_rocket", "controls", "physics",
-        [this](ActiveScene& rScene) { this->update_physics(rScene); })
 {
 
 }
@@ -91,7 +89,7 @@ SysMachineRocket::SysMachineRocket(ActiveScene &rScene)
 
 void SysMachineRocket::update_physics(ActiveScene& rScene)
 {
-    auto view = m_scene.get_registry().view<MachineRocket, ACompTransform>();
+    auto view = rScene.get_registry().view<MachineRocket, ACompTransform>();
 
     for (ActiveEnt ent : view)
     {

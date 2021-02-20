@@ -252,6 +252,7 @@ private:
     //std::vector<std::reference_wrapper<ISysMachine>> m_update_sensor;
     //std::vector<std::reference_wrapper<ISysMachine>> m_update_physics;
 
+    UpdateExecutor_t m_updateExec;
     UpdateOrder_t m_updateOrder;
     RenderOrder_t m_renderOrder;
 
@@ -286,7 +287,9 @@ DYNSYS_T& ActiveScene::dynamic_system_create(ARGS_T &&... args)
     auto ptr = std::make_unique<DYNSYS_T>(*this, std::forward<ARGS_T>(args)...);
     DYNSYS_T &refReturn = *ptr;
 
-    auto pair = m_dynamicSys.emplace(DYNSYS_T::smc_name, std::move(ptr));
+    m_dynamicSys.emplace(DYNSYS_T::smc_name, std::move(ptr));
+
+
 
     return refReturn;
 }

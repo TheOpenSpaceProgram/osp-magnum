@@ -292,10 +292,7 @@ void debug_print_update_order()
                                               ->second.get_update_order();
 
     std::cout << "Update order:\n";
-    for (auto const& call : order.get_call_list())
-    {
-        std::cout << "* " << call.m_name << "\n";
-    }
+    std::cout << order.dump() << '\n';
 }
 
 void debug_print_machines()

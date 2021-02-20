@@ -63,19 +63,18 @@ class SysFFGravity : public SysForceField
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "FFGravity";
 
-    SysFFGravity(ActiveScene &scene);
+    SysFFGravity() = default;
     ~SysFFGravity() = default;
 
-    void update_force(ActiveScene& rScene);
+    static void update_force(ActiveScene& rScene);
 
 private:
-
-
-    ActiveScene &m_scene;
-
-    UpdateOrderHandle_t m_updateForce;
+    static inline SystemUpdates_t<1> smc_update
+    {
+        {&SysFFGravity::update_force, "ff_gravity", "", "physics"}
+    };
 };
 
 

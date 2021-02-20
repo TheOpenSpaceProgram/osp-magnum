@@ -166,6 +166,11 @@ public:
 
 private:
     osp::active::UpdateOrderHandle_t m_updateContainers;
+    static inline osp::active::SystemUpdates_t<1> smc_update
+    {
+        osp::active::SysUpdateContraint_t{&SysMachineContainer::update_containers,
+            "mach_container", "", "mach_rocket"}
+    };
 }; // class SysMachineContainer
 
 class MachineContainer : public osp::active::Machine

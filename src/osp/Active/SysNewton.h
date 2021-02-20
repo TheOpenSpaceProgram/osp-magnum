@@ -104,7 +104,7 @@ public:
 
     ~SysNewton();
     
-    void update_world(ActiveScene& rScene);
+    static void update_world(ActiveScene& rScene);
 
     static ACompNwtWorld* try_get_physics_world(ActiveScene &rScene);
 
@@ -269,7 +269,10 @@ private:
 
     ActiveScene& m_scene;
 
-    UpdateOrderHandle_t m_updatePhysicsWorld;
+    static inline SystemUpdates_t<1> smc_update
+    {
+        {&SysNewton::update_world, "physics", "wire", ""}
+    };
 };
 
 template<class TRIANGLE_IT_T>

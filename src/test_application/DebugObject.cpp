@@ -72,13 +72,6 @@ DebugCameraController::DebugCameraController(ActiveScene &rScene, ActiveEnt ent)
  , m_orbiting(entt::null)
  , m_orbitPos(0, 0, 1)
  , m_orbitDistance(20.0f)
- , m_updateVehicleModPre(
-       rScene.get_update_order(), "dbg_cam_vmod", "", "vehicle_modification",
-       [this] (ActiveScene&) { this->update_vehicle_mod_pre(); })
- , m_updatePhysicsPre(rScene.get_update_order(), "dbg_cam_pre", "", "physics",
-                      [this] (ActiveScene&) { this->update_physics_pre(); })
- , m_updatePhysicsPost(rScene.get_update_order(), "dbg_cam_post", "physics", "",
-                       [this] (ActiveScene&) { this->update_physics_post(); })
  , m_userInput(rScene.get_user_input())
  , m_mouseMotion(m_userInput.mouse_get())
  , m_scrollInput(m_userInput.scroll_get())

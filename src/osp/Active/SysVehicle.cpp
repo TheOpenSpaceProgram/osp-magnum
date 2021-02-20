@@ -49,18 +49,6 @@ using osp::universe::UCompVehicle;
 // for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;
 
-const std::string SysVehicle::smc_name = "Vehicle";
-
-SysVehicle::SysVehicle(ActiveScene &scene)
- : m_updateActivation(
-       scene.get_update_order(), "vehicle_activate", "", "vehicle_modification",
-       &SysVehicle::update_activate)
- , m_updateVehicleModification(
-       scene.get_update_order(), "vehicle_modification", "", "physics",
-       &SysVehicle::update_vehicle_modification)
-{ }
-
-
 ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
                           universe::Satellite areaSat,
                           universe::Satellite tgtSat)

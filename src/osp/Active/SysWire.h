@@ -291,7 +291,7 @@ class SysWire : public IDynamicSystem
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "Wire";
 
     struct DependentOutput
     {
@@ -300,16 +300,19 @@ public:
         unsigned depth;
     };
 
-    SysWire(ActiveScene &scene);
+    SysWire() = default;
     SysWire(SysWire const& copy) = delete;
     SysWire(SysWire&& move) = delete;
 
-    void update_propagate(ActiveScene& rScene);
+    static void update_propagate(ActiveScene& rScene);
     void connect(WireOutput &wireFrom, WireInput &wireTo);
 
 private:
     std::vector<DependentOutput> m_dependentOutputs;
-    UpdateOrderHandle_t m_updateWire;
+    /*static inline SystemUpdates_t<1> smc_update TODO
+    {
+        {[this](ActiveScene& rScene) { this->update_propagate(rScene); }, "wire", "", "" }
+    };*/
 };
 
 

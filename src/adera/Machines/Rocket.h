@@ -115,7 +115,7 @@ public:
     SysMachineRocket(osp::active::ActiveScene &scene);
 
     //void update_sensor();
-    void update_physics(osp::active::ActiveScene& rScene);
+    static void update_physics(osp::active::ActiveScene& rScene);
 
     /**
      * Attach a visual exhaust plume effect to MachineRocket
@@ -149,7 +149,11 @@ private:
     constexpr static float resource_mass_flow_rate(MachineRocket const& machine,
         float throttle, MachineRocket::ResourceInput const& resource);
 
-    osp::active::UpdateOrderHandle_t m_updatePhysics;
+    static inline osp::active::SystemUpdates_t<1> smc_update
+    {
+        osp::active::SysUpdateContraint_t{&SysMachineRocket::update_physics,
+            "mach_rocket", "controls", "physics"}
+    };
 }; // SysMachineRocket
 
 inline MachineRocket::MachineRocket(Parameters params, std::vector<input_t> resources)

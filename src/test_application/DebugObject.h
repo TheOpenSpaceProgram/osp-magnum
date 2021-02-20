@@ -89,9 +89,15 @@ private:
     osp::Vector3 m_orbitPos;
     float m_orbitDistance;
 
-    osp::active::UpdateOrderHandle_t m_updateVehicleModPre;
-    osp::active::UpdateOrderHandle_t m_updatePhysicsPre;
-    osp::active::UpdateOrderHandle_t m_updatePhysicsPost;
+    /*static inline osp::active::SystemUpdates_t<3> smc_update TODO
+    {
+        osp::active::SysUpdateContraint_t{&DebugCameraController::update_vehicle_mod_pre,
+            "dbg_cam_vmod", "", "vehicle_modification"},
+        osp::active::SysUpdateContraint_t{&DebugCameraController::update_physics_pre,
+            "dbg_cam_pre", "", "physics"},
+        osp::active::SysUpdateContraint_t{&DebugCameraController::update_physics_post,
+            "dbg_cam_post", "", "physics"}
+    };*/
 
     osp::UserInputHandler &m_userInput;
     // Mouse inputs

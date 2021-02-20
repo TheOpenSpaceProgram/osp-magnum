@@ -78,8 +78,6 @@ float MachineContainer::compute_mass() const noexcept
 
 SysMachineContainer::SysMachineContainer(ActiveScene& rScene)
     : SysMachine<SysMachineContainer, MachineContainer>(rScene)
-    , m_updateContainers(rScene.get_update_order(), "mach_container", "", "mach_rocket",
-        [this](ActiveScene& rScene) { this->update_containers(rScene); })
 { }
 
 void SysMachineContainer::update_containers(ActiveScene& rScene)

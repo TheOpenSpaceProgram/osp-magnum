@@ -46,7 +46,7 @@ public:
     SysMachineUserControl(osp::active::ActiveScene &scene,
                           osp::UserInputHandler& userControl);
 
-    void update_sensor();
+    void update_sensor(osp::active::ActiveScene& rScene);
 
     osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
         osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
@@ -67,7 +67,11 @@ private:
     osp::ButtonControlHandle m_rollLf;
     osp::ButtonControlHandle m_rollRt;
 
-    osp::active::UpdateOrderHandle_t m_updateSensor;
+    static inline osp::active::SystemUpdates_t<1> smc_update
+    {
+        osp::active::SysUpdateContraint_t{&SysMachineUserControl::update_sensor,
+            "mach_usercontrol", "", "wire"}
+    };
 };
 
 /**

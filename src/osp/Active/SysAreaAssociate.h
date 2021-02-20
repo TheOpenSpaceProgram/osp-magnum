@@ -73,9 +73,9 @@ class SysAreaAssociate : public IDynamicSystem
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "AreaAssociate";
 
-    SysAreaAssociate(ActiveScene &rScene);
+    SysAreaAssociate() = default;
     ~SysAreaAssociate() = default;
 
     /**
@@ -130,7 +130,11 @@ public:
 
 private:
 
-    UpdateOrderHandle_t m_updateScan;
+    static inline std::array<SysUpdateContraint_t, 1> smc_update
+    {
+        SysUpdateContraint_t{&SysAreaAssociate::update_scan,
+            "areascan", "physics", ""}
+    };
 
     /**
      * Translate all entities in an ActiveScene that contain an

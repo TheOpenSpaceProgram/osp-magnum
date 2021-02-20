@@ -83,9 +83,9 @@ class SysVehicle : public IDynamicSystem
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "Vehicle";
 
-    SysVehicle(ActiveScene &scene);
+    SysVehicle() = default;
     SysVehicle(SysNewton const& copy) = delete;
     SysVehicle(SysNewton&& move) = delete;
     ~SysVehicle() = default;
@@ -202,11 +202,13 @@ private:
         std::vector<MachineDef> const& machineMapping,
         PrototypePart const& part, BlueprintPart const& partBP);
 
-    //ActiveScene& m_scene;
-    //AppPackages& m_packages;
-
-    UpdateOrderHandle_t m_updateActivation;
-    UpdateOrderHandle_t m_updateVehicleModification;
+    static inline std::array<SysUpdateContraint_t, 2> smc_update
+    {
+        SysUpdateContraint_t{&SysVehicle::update_activate,
+            "vehicle_activate", "", "vehicle_modification"},
+        SysUpdateContraint_t{&SysVehicle::update_vehicle_modification,
+            "vehicle_modification", "", "physics"}
+    };
 };
 
 

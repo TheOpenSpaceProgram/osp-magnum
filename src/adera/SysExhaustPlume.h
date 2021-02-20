@@ -42,7 +42,7 @@ class SysExhaustPlume : public IDynamicSystem
 public:
     static inline std::string smc_name = "ExhaustPlume";
 
-    SysExhaustPlume(ActiveScene& rScene);
+    SysExhaustPlume() = default;
     ~SysExhaustPlume() = default;
 
     /**
@@ -52,15 +52,17 @@ public:
      * this function takes such entities, retrieves the appropriate graphics
      * resources, and configures the graphical components
      */
-    void initialize_plume(ActiveEnt e);
+    static void initialize_plume(ActiveScene& rScene, ActiveEnt e);
 
-    void update_plumes(ActiveScene& rScene);
+    static void update_plumes(ActiveScene& rScene);
 
 private:
-    ActiveScene& m_scene;
     float m_time;
 
-    UpdateOrderHandle_t m_updatePlume;
+    static inline SystemUpdates_t<1> smc_update
+    {
+        {&SysExhaustPlume::update_plumes, "exhaust_plume", "mach_rocket", ""}
+    };
 };
 
 } // namespace osp::active
