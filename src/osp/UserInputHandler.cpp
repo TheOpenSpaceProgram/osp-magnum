@@ -239,14 +239,13 @@ bool UserInputHandler::eval_button_expression(
     return totalOn;
 }
 
-
-void UserInputHandler::config_register_control(std::string const& name,
-        bool holdable,
-        std::initializer_list<ButtonVarConfig> vars)
+void UserInputHandler::config_register_control(std::string const& name, bool holdable, std::vector<ButtonVarConfig> vars)
 {
-    std::vector<ButtonVarConfig> varVector(vars);
-    m_controlConfigs[name] = ButtonConfig{std::move(varVector), holdable,
-                                          false, 0};
+    m_controlConfigs.insert_or_assign(name, ButtonConfig{ std::move(vars), holdable, false, 0 });
+}
+void UserInputHandler::config_register_control(std::string&& name, bool holdable, std::vector<ButtonVarConfig> vars)
+{
+    m_controlConfigs.insert_or_assign(std::move(name), ButtonConfig{ std::move(vars), holdable, false, 0 });
 }
 
 ButtonControlHandle UserInputHandler::config_get(std::string const& name)
@@ -257,9 +256,9 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
 
     if (cfgIt == m_controlConfigs.end())
     {
-        // Config not found!
-        std::cout << "config not found!\n";
-        return ButtonControlHandle(nullptr, 0);
+        // Config not found, no way to have an empty key so far, so throw an exception
+        std::cout << "No config for " << name << std::endl;
+        throw std::runtime_error("Error: no config with " + name);
     }
 
     //int index;

@@ -112,6 +112,7 @@ target_link_libraries(osp-magnum PRIVATE
     MagnumPlugins::TinyGltfImporter
     MagnumPlugins::StbImageImporter
     dNewton dScene dModel dVehicle
+    toml11
     )
 
 if(OSP_ENABLE_IWYU)

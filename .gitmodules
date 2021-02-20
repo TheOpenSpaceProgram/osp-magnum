@@ -19,3 +19,6 @@
 [submodule "3rdparty/entt"]
 	path = 3rdparty/entt
 	url = https://github.com/skypjack/entt.git
+[submodule "3rdparty/toml11"]
+	path = 3rdparty/toml11
+	url = https://github.com/ToruNiina/toml11

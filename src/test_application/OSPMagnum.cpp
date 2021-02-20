@@ -31,6 +31,8 @@
 
 #include <iostream>
 
+#include <toml.hpp>
+
 using namespace testapp;
 
 OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
@@ -160,76 +162,157 @@ osp::active::ActiveScene& OSPMagnum::scene_create(std::string && name)
 void testapp::config_controls(OSPMagnum& rOspApp)
 {
     // Configure Controls
+    //Load toml
+    auto data = toml::parse("settings.toml");
+    osp::UserInputHandler& rUserInput = rOspApp.get_input_handler();
+    for (const auto& [k, v] : data.as_table())
+    {
+        std::cout << "Parsing " << k << std::endl;
+        std::string const& primary = toml::find(v, "primary").as_string();
+        std::vector<osp::ButtonVarConfig> controls = parse_control(primary);
 
-    // It should be pretty easy to write a config file parser that calls these
-    // functions.
+        std::string const& secondary = toml::find(v, "secondary").as_string();
+        std::vector<osp::ButtonVarConfig> secondaryKeys = parse_control(secondary);
 
-    using namespace osp;
+        controls.insert(controls.end(), std::make_move_iterator(secondaryKeys.begin()), std::make_move_iterator(secondaryKeys.end()));
 
-    using Key_t = OSPMagnum::KeyEvent::Key;
-    using Mouse_t = OSPMagnum::MouseEvent::Button;
-    using VarOp_t = ButtonVarConfig::VarOperator;
-    using VarTrig_t = ButtonVarConfig::VarTrigger;
 
-    UserInputHandler& rUserInput = rOspApp.get_input_handler();
+        bool holdable = toml::find(v, "holdable").as_boolean();
 
-    // vehicle control, used by MachineUserControl
+        //Add user input
+        rUserInput.config_register_control(k, holdable, std::move(controls));
+    }
+}
 
-    // would help to get an axis for yaw, pitch, and roll, but use individual
-    // axis buttons for now
-    rUserInput.config_register_control("vehicle_pitch_up", true,
-            {{0, (int) Key_t::S, VarTrig_t::PRESSED, false, VarOp_t::AND}});
-    rUserInput.config_register_control("vehicle_pitch_dn", true,
-            {{0, (int) Key_t::W, VarTrig_t::PRESSED, false, VarOp_t::AND}});
-    rUserInput.config_register_control("vehicle_yaw_lf", true,
-            {{0, (int) Key_t::A, VarTrig_t::PRESSED, false, VarOp_t::AND}});
-    rUserInput.config_register_control("vehicle_yaw_rt", true,
-            {{0, (int) Key_t::D, VarTrig_t::PRESSED, false, VarOp_t::AND}});
-    rUserInput.config_register_control("vehicle_roll_lf", true,
-            {{0, (int) Key_t::Q, VarTrig_t::PRESSED, false, VarOp_t::AND}});
-    rUserInput.config_register_control("vehicle_roll_rt", true,
-            {{0, (int) Key_t::E, VarTrig_t::PRESSED, false, VarOp_t::AND}});
 
-    // Set throttle max to Z
-    rUserInput.config_register_control("vehicle_thr_max", false,
-            {{0, (int) Key_t::Z, VarTrig_t::PRESSED, false, VarOp_t::OR}});
-    // Set throttle min to X
-    rUserInput.config_register_control("vehicle_thr_min", false,
-            {{0, (int) Key_t::X, VarTrig_t::PRESSED, false, VarOp_t::OR}});
-    // Set throttle increase to LShift
-    rUserInput.config_register_control("vehicle_thr_more", true,
-	    {{osp::sc_keyboard, (int)Key_t::LeftShift, VarTrig_t::PRESSED, false, VarOp_t::OR}});
-    // Set throttle decrease to LCtrl
-    rUserInput.config_register_control("vehicle_thr_less", true,
-            {{osp::sc_keyboard, (int)Key_t::LeftCtrl, VarTrig_t::PRESSED, false, VarOp_t::OR}});
-    // Set self destruct to LeftCtrl+C or LeftShift+A
-    rUserInput.config_register_control("vehicle_self_destruct", false,
-            {{0, (int) Key_t::LeftCtrl, VarTrig_t::HOLD, false, VarOp_t::AND},
-             {0, (int) Key_t::C, VarTrig_t::PRESSED, false, VarOp_t::OR},
-             {0, (int) Key_t::LeftShift, VarTrig_t::HOLD, false, VarOp_t::AND},
-             {0, (int) Key_t::A, VarTrig_t::PRESSED, false, VarOp_t::OR}});
+//Map for all the keys
+//The tuple is in this order: device, number, and hold/pressed
+using Key_t = OSPMagnum::KeyEvent::Key;
+using Mouse_t = OSPMagnum::MouseEvent::Button;
+using VarOp_t = osp::ButtonVarConfig::VarOperator;
+using VarTrig_t = osp::ButtonVarConfig::VarTrigger;
 
-    // Camera and Game controls, handled in DebugCameraController
+typedef std::tuple<int, int> button_tuple;
+const std::map<std::string_view, button_tuple, std::less<>> buttonMap = {
+    //Keyboard
+    {"LCtrl", {osp::sc_keyboard, (int)Key_t::LeftCtrl}},
+    {"RCtrl", {osp::sc_keyboard, (int)Key_t::RightCtrl }},
+    {"LShift", {osp::sc_keyboard, (int)Key_t::LeftShift }},
+    {"RShift", {osp::sc_keyboard, (int)Key_t::RightShift }},
+    {"LAlt", {osp::sc_keyboard, (int)Key_t::LeftAlt }},
+    {"RAlt", {osp::sc_keyboard, (int)Key_t::RightAlt }},
+    {"Up", {osp::sc_keyboard, (int)Key_t::Up }},
+    {"Down", {osp::sc_keyboard, (int)Key_t::Down }},
+    {"Left", {osp::sc_keyboard, (int)Key_t::Left }},
+    {"Right", {osp::sc_keyboard, (int)Key_t::Right }},
+    {"Esc", {osp::sc_keyboard, (int)Key_t::Esc  }},
+    {"Tab", {osp::sc_keyboard, (int)Key_t::Tab  }},
+    {"Space", {osp::sc_keyboard, (int)Key_t::Space }},
+    {"Backspace", {osp::sc_keyboard, (int)Key_t::Backspace }},
+    {"Backslash", {osp::sc_keyboard, (int)Key_t::Backslash  }},
+    {"Comma", {osp::sc_keyboard, (int)Key_t::Comma  }},
+    {"Delete", {osp::sc_keyboard, (int)Key_t::Delete }},
+    {"Enter", {osp::sc_keyboard, (int)Key_t::Enter }},
+    {"Equal", {osp::sc_keyboard, (int)Key_t::Equal }},
+    {"Insert", {osp::sc_keyboard, (int)Key_t::Insert }},
+    {"Slash", {osp::sc_keyboard, (int)Key_t::Slash }},
 
-    // Switch to next vehicle
-    rUserInput.config_register_control("game_switch", false,
-            {{0, (int) Key_t::V, VarTrig_t::PRESSED, false, VarOp_t::OR}});
+    //Alphabet keys
+    {"A", {osp::sc_keyboard, (int)Key_t::A }},
+    {"B", {osp::sc_keyboard, (int)Key_t::B }},
+    {"C", {osp::sc_keyboard, (int)Key_t::C }},
+    {"D", {osp::sc_keyboard, (int)Key_t::D  }},
+    {"E", {osp::sc_keyboard, (int)Key_t::E  }},
+    {"F", {osp::sc_keyboard, (int)Key_t::F  }},
+    {"G", {osp::sc_keyboard, (int)Key_t::G  }},
+    {"H", {osp::sc_keyboard, (int)Key_t::H  }},
+    {"I", {osp::sc_keyboard, (int)Key_t::I  }},
+    {"J", {osp::sc_keyboard, (int)Key_t::J  }},
+    {"K", {osp::sc_keyboard, (int)Key_t::K  }},
+    {"L", {osp::sc_keyboard, (int)Key_t::L  }},
+    {"M", {osp::sc_keyboard, (int)Key_t::M  }},
+    {"N", {osp::sc_keyboard, (int)Key_t::N  }},
+    {"O", {osp::sc_keyboard, (int)Key_t::O  }},
+    {"P", {osp::sc_keyboard, (int)Key_t::P  }},
+    {"Q", {osp::sc_keyboard, (int)Key_t::Q  }},
+    {"R", {osp::sc_keyboard, (int)Key_t::R  }},
+    {"S", {osp::sc_keyboard, (int)Key_t::S  }},
+    {"T", {osp::sc_keyboard, (int)Key_t::T  }},
+    {"U", {osp::sc_keyboard, (int)Key_t::U  }},
+    {"V", {osp::sc_keyboard, (int)Key_t::V  }},
+    {"W", {osp::sc_keyboard, (int)Key_t::W  }},
+    {"X", {osp::sc_keyboard, (int)Key_t::X  }},
+    {"Y", {osp::sc_keyboard, (int)Key_t::Y  }},
+    {"Z", {osp::sc_keyboard, (int)Key_t::Z  }},
 
-    // Set UI Up/down/left/right to arrow keys. this is used to rotate the view
-    // for now
-    rUserInput.config_register_control("ui_up", true,
-            {{osp::sc_keyboard, (int) Key_t::Up, VarTrig_t::PRESSED, false, VarOp_t::AND}});
-    rUserInput.config_register_control("ui_dn", true,
-            {{osp::sc_keyboard, (int) Key_t::Down, VarTrig_t::PRESSED, false, VarOp_t::AND}});
-    rUserInput.config_register_control("ui_lf", true,
-            {{osp::sc_keyboard, (int) Key_t::Left, VarTrig_t::PRESSED, false, VarOp_t::AND}});
-    rUserInput.config_register_control("ui_rt", true,
-            {{osp::sc_keyboard, (int) Key_t::Right, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    //Number keys
+    {"0", {osp::sc_keyboard, (int)Key_t::NumZero  }},
+    {"1", {osp::sc_keyboard, (int)Key_t::NumOne  }},
+    {"2", {osp::sc_keyboard, (int)Key_t::NumTwo  }},
+    {"3", {osp::sc_keyboard, (int)Key_t::NumThree  }},
+    {"4", {osp::sc_keyboard, (int)Key_t::NumFour  }},
+    {"5", {osp::sc_keyboard, (int)Key_t::NumFive  }},
+    {"6", {osp::sc_keyboard, (int)Key_t::NumSix  }},
+    {"7", {osp::sc_keyboard, (int)Key_t::NumSeven  }},
+    {"8", {osp::sc_keyboard, (int)Key_t::NumEight  }},
+    {"9", {osp::sc_keyboard, (int)Key_t::NumNine  }},
 
-    rUserInput.config_register_control("ui_rmb", true,
-            {{osp::sc_mouse, (int) Mouse_t::Right, VarTrig_t::PRESSED, false, VarOp_t::AND}});
+    //Function keys
+    {"F1", {osp::sc_keyboard, (int)Key_t::F1  }},
+    {"F2", {osp::sc_keyboard, (int)Key_t::F2  }},
+    {"F3", {osp::sc_keyboard, (int)Key_t::F3  }},
+    {"F4", {osp::sc_keyboard, (int)Key_t::F4  }},
+    {"F5", {osp::sc_keyboard, (int)Key_t::F5  }},
+    {"F6", {osp::sc_keyboard, (int)Key_t::F6  }},
+    {"F7", {osp::sc_keyboard, (int)Key_t::F7  }},
+    {"F8", {osp::sc_keyboard, (int)Key_t::F8  }},
+    {"F9", {osp::sc_keyboard, (int)Key_t::F9  }},
+    {"F10", {osp::sc_keyboard, (int)Key_t::F10  }},
+    {"F11", {osp::sc_keyboard, (int)Key_t::F11  }},
+    {"F12", {osp::sc_keyboard, (int)Key_t::F12  }},
 
-    rUserInput.config_register_control("debug_planet_update", false,
-            {{0, (int) Key_t::LeftCtrl, VarTrig_t::HOLD, false, VarOp_t::AND},
-             {0, (int) Key_t::One, VarTrig_t::PRESSED, false, VarOp_t::OR}});
+    //Mouse
+    {"RMouse", {osp::sc_mouse, (int)OSPMagnum::MouseEvent::Button::Right }},
+    {"LMouse", {osp::sc_mouse, (int)OSPMagnum::MouseEvent::Button::Left }},
+    {"MMouse", {osp::sc_mouse, (int)OSPMagnum::MouseEvent::Button::Middle }}
+};
+
+std::vector<osp::ButtonVarConfig> parse_control(std::string_view str) noexcept 
+{
+    std::vector<osp::ButtonVarConfig> handlers;
+
+    //If none, then no actions
+    if (str == "None") {
+        return handlers;
+    }
+
+    static constexpr std::string_view delim = "+";
+    std::cout << str << std::endl;
+
+    auto start = 0U;
+    auto end = str.find(delim);
+    while (end != std::string::npos)
+    {
+        std::string_view sub = str.substr(start, end - start);
+        auto const& it = buttonMap.find(sub);
+        if (it != buttonMap.end()) 
+        {
+            auto const& [device, button] = it->second;
+            handlers.emplace_back(osp::ButtonVarConfig(device, button, VarTrig_t::HOLD, false, VarOp_t::AND));
+            std::cout << sub << " " << device << " " << button << std::endl;
+
+        }
+        start = end + delim.length();
+        end = str.find(delim, start);
+    }
+
+    std::string_view sub = str.substr(start, end);
+    auto const& it = buttonMap.find(sub);
+    if (it != buttonMap.end()) 
+    {
+        auto const& [device, button] = it->second;
+        handlers.emplace_back(osp::ButtonVarConfig(device, button, VarTrig_t::PRESSED, false, VarOp_t::OR));
+        std::cout << sub << " " << device << " " << button << std::endl;
+    }
+    return handlers;
 }
