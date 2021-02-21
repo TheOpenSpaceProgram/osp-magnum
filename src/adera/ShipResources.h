@@ -164,8 +164,6 @@ public:
 
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
-private:
-    osp::active::UpdateOrderHandle_t m_updateContainers;
     static inline osp::active::SystemUpdates_t<1> smc_update
     {
         osp::active::SysUpdateContraint_t{&SysMachineContainer::update_containers,

@@ -222,6 +222,9 @@ public:
     template<class DYNSYS_T, typename... Args>
     DYNSYS_T& dynamic_system_create(Args &&... args);
 
+    template<class DYNSYS_T>
+    void register_rendering_system();
+
     void update_taskflow();
 
     /**
@@ -270,6 +273,10 @@ private:
     MapDynamicSys_t m_dynamicSys;
 
     MapUpdateSystemTasks_t m_updateConstraints;
+    MapUpdateRender_t m_renderSteps;
+    MapTasks_t m_updateTasks;
+    MapTasks_t m_renderTasks;
+    ACompCamera* m_activeCamera{nullptr};
 };
 
 // move these to another file eventually
@@ -279,6 +286,11 @@ void ActiveScene::system_machine_create(ARGS_T &&... args)
 {
     system_machine_add(SYSMACH_T::smc_name,
                        std::make_unique<SYSMACH_T>(*this, args...));
+
+    for (SysUpdateContraint_t& constraint : SYSMACH_T::smc_update)
+    {
+        m_updateConstraints.emplace(constraint.m_name, constraint);
+    }
 }
 
 template<class DYNSYS_T, typename... ARGS_T>
@@ -295,6 +307,19 @@ DYNSYS_T& ActiveScene::dynamic_system_create(ARGS_T &&... args)
     }
 
     return refReturn;
+}
+
+template<class DYNSYS_T>
+inline void ActiveScene::register_rendering_system()
+{
+    if (auto system = m_dynamicSys.find(DYNSYS_T::smc_name);
+        system != m_dynamicSys.end())
+    {
+        for (SysRenderContraint_t& step : DYNSYS_T::smc_render)
+        {
+            m_renderSteps.emplace(step.m_name, step);
+        }
+    }
 }
 
 template<class SYSTEM_T>

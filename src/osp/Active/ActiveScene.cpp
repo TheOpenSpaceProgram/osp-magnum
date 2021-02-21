@@ -233,7 +233,7 @@ void ActiveScene::draw(ActiveEnt camera)
     //cameraProject = cameraComp.m_projection;
     cameraComp.m_inverse = cameraTransform.m_transformWorld.inverted();
 
-    //TODO update cameras
+    //TODO update cameras (for now there's just one)
 
     m_updateExec.run(m_renderOrder).wait();
 }
@@ -271,10 +271,58 @@ bool ActiveScene::system_machine_it_valid(MapSysMachine_t::iterator it)
 
 void ActiveScene::update_taskflow()
 {
-    for (auto& c : m_updateConstraints)
+    m_updateTasks.clear();
+    m_renderTasks.clear();
+    m_updateOrder.clear();
+    m_renderOrder.clear();
+
+    for (auto& [name, constraint] : m_updateConstraints)
     {
-        auto& f = c.second.m_function;
+        std::cout << name << ": " << constraint.m_succeeds << ", self, " << constraint.m_precedes << "\n";
+        auto& f = constraint.m_function;
         auto task = m_updateOrder.emplace([this, f]() { f(*this); });
+        m_updateTasks.emplace(name, std::move(task));
+    }
+
+    for (auto& [name, constraint] : m_updateConstraints)
+    {
+        auto& task = m_updateTasks.at(name);
+
+        if (constraint.m_succeeds != "")
+        {
+            auto& succeed = m_updateTasks.at(constraint.m_succeeds);
+            task.succeed(succeed);
+        }
+
+        if (constraint.m_precedes != "")
+        {
+            auto& precedes = m_updateTasks.at(constraint.m_precedes);
+            task.precede(precedes);
+        }
+    }
+
+    for (auto& [name, constraint] : m_renderSteps)
+    {
+        auto& f = constraint.m_function;
+        auto task = m_renderOrder.emplace([this, f]() { f(*this, *(this->m_activeCamera)); });
+        m_renderTasks.emplace(name, std::move(task));
+    }
+
+    for (auto& [name, constraint] : m_renderSteps)
+    {
+        auto& task = m_renderTasks.at(name);
+
+        if (constraint.m_succeeds != "")
+        {
+            auto& succeeds = m_updateTasks.at(constraint.m_succeeds);
+            task.succeed(succeeds);
+        }
+
+        if (constraint.m_precedes != "")
+        {
+            auto& precedes = m_updateTasks.at(constraint.m_precedes);
+            task.precede(precedes);
+        }
     }
 }
 

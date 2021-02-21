@@ -80,8 +80,8 @@ struct UpdateOrderConstraint
 {
     FUNC_T m_function;
     std::string m_name;
-    std::string m_succeed;
-    std::string m_precede;
+    std::string m_succeeds;
+    std::string m_precedes;
 };
 
 using SysUpdateContraint_t = UpdateOrderConstraint<void(*)(ActiveScene&)>;
@@ -93,8 +93,9 @@ using SystemUpdates_t = std::array<SysUpdateContraint_t, N>;
 template <size_t N>
 using SystemRender_t = std::array<SysRenderContraint_t, N>;
 
-using MapUpdateSystemTasks_t = std::map<std::string,
-    SysUpdateContraint_t, std::less<> >;
+using MapUpdateSystemTasks_t = std::map<std::string, SysUpdateContraint_t, std::less<> >;
+using MapUpdateRender_t = std::map<std::string, SysRenderContraint_t, std::less<> >;
+
 using MapTasks_t = std::map<std::string, tf::Task, std::less<> >;
 
 }

@@ -84,7 +84,7 @@ public:
 
     static void update_physics(osp::active::ActiveScene& rScene);
 
-    static inline osp::active::SystemUpdates_t<5> smc_update
+    static inline osp::active::SystemUpdates_t<3> smc_update
     {
         osp::active::SysUpdateContraint_t{&SysPlanetA::update_activate,
             "planet_activate", "", "planet_geo"},

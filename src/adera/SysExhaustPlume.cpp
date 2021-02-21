@@ -123,7 +123,7 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
         auto& machine = rScene.reg_get<MachineRocket>(plume.m_parentMachineRocket);
         float powerLevel = machine.current_output_power();
 
-        plumeShader.m_currentTime = 0.0f; // m_time; TODO
+        plumeShader.m_currentTime = instance.m_time;
 
         if (powerLevel > 0.0f)
         {

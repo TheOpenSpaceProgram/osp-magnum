@@ -41,7 +41,7 @@ class SysMachineUserControl :
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "UserControl";
 
     struct ACompInstanceData
     {
@@ -68,8 +68,6 @@ public:
         osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
 
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;
-
-private:
 
     static inline osp::active::SystemUpdates_t<1> smc_update
     {

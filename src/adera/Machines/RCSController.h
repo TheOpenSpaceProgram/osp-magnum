@@ -64,6 +64,11 @@ public:
 
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
+    static inline osp::active::SystemUpdates_t<1> smc_update
+    {
+        osp::active::SysUpdateContraint_t{&SysMachineRCSController::update_controls,
+            "mach_rcs", "wire", "physics"}
+    };
 private:
     /**
      * Command-thrust influence calculator
@@ -83,11 +88,6 @@ private:
         Magnum::Vector3 posOset, Magnum::Vector3 direction,
         Magnum::Vector3 cmdTransl, Magnum::Vector3 cmdRot);
 
-    static inline osp::active::SystemUpdates_t<1> smc_update
-    {
-        osp::active::SysUpdateContraint_t{&SysMachineRCSController::update_controls,
-            "mach_rcs", "wire", "controls"}
-    };
 }; // SysMachineRCSController
 
 class MachineRCSController : public osp::active::Machine

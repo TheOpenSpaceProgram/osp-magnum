@@ -140,6 +140,11 @@ public:
 
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
+    static inline osp::active::SystemUpdates_t<1> smc_update
+    {
+        osp::active::SysUpdateContraint_t{&SysMachineRocket::update_physics,
+            "mach_rocket", "mach_usercontrol", "physics"}
+    };
 private:
     static uint64_t resource_units_required(
         osp::active::ActiveScene const& scene,
@@ -149,11 +154,6 @@ private:
     constexpr static float resource_mass_flow_rate(MachineRocket const& machine,
         float throttle, MachineRocket::ResourceInput const& resource);
 
-    static inline osp::active::SystemUpdates_t<1> smc_update
-    {
-        osp::active::SysUpdateContraint_t{&SysMachineRocket::update_physics,
-            "mach_rocket", "controls", "physics"}
-    };
 }; // SysMachineRocket
 
 inline MachineRocket::MachineRocket(Parameters params, std::vector<input_t> resources)
