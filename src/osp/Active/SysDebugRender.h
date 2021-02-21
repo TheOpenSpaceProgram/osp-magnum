@@ -58,39 +58,41 @@ class SysDebugRender : public IDynamicSystem
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "DebugRender";
 
     SysDebugRender(ActiveScene &rScene);
     ~SysDebugRender() = default;
 
-    void draw(ACompCamera const& camera);
+    static void draw(ActiveScene& rScene, ACompCamera const& camera);
 
+    static inline SystemRender_t<1> smc_render
+    {
+        SysRenderContraint_t{&SysDebugRender::draw, "debug", "", ""}
+    };
+
+    static inline SystemUpdates_t<0> smc_update
+    {
+
+    };
 private:
     template <typename T>
-    void draw_group(T& rCollection, ACompCamera const& camera);
+    static void draw_group(ActiveScene& rScene, T& rCollection, ACompCamera const& camera);
 
-    ActiveScene &m_scene;
-
-    RenderOrderHandle_t m_renderDebugDraw;
-    // TODO render order
-    /*static inline std::array<SysUpdateContraint_t, 1> smc_update
-    {
-        SysUpdateContraint_t{&SysDebugRender::draw}
-    };*/
 };
 
 template<typename T>
-inline void SysDebugRender::draw_group(T& rCollection, ACompCamera const& camera)
+inline void SysDebugRender::draw_group(ActiveScene& rScene,
+    T& rCollection, ACompCamera const& camera)
 {
     for (auto entity : rCollection)
     {
         auto& drawable = rCollection.template get<CompDrawableDebug>(entity);
         auto const& transform = rCollection.template get<ACompTransform>(entity);
-        auto const* visible = m_scene.get_registry().try_get<CompVisibleDebug>(entity);
+        auto const* visible = rScene.get_registry().try_get<CompVisibleDebug>(entity);
 
         if (visible && !visible->m_state) { continue; }
 
-        drawable.m_shader_draw(entity, m_scene, *drawable.m_mesh, camera, transform);
+        drawable.m_shader_draw(entity, rScene, *drawable.m_mesh, camera, transform);
     }
 }
 

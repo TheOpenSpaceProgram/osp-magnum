@@ -59,21 +59,21 @@ std::vector<WireOutput*> MachineUserControl::existing_outputs()
     return {&m_woAttitude, &m_woThrottle, &m_woTestPropagate};
 }
 
-SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandler& userControl) :
-        SysMachine<SysMachineUserControl, MachineUserControl>(scene),
-        m_throttleMax(userControl.config_get("vehicle_thr_max")),
-        m_throttleMin(userControl.config_get("vehicle_thr_min")),
-        m_throttleMore(userControl.config_get("vehicle_thr_more")),
-        m_throttleLess(userControl.config_get("vehicle_thr_less")),
-        m_selfDestruct(userControl.config_get("vehicle_self_destruct")),
-        m_pitchUp(userControl.config_get("vehicle_pitch_up")),
-        m_pitchDn(userControl.config_get("vehicle_pitch_dn")),
-        m_yawLf(userControl.config_get("vehicle_yaw_lf")),
-        m_yawRt(userControl.config_get("vehicle_yaw_rt")),
-        m_rollLf(userControl.config_get("vehicle_roll_lf")),
-        m_rollRt(userControl.config_get("vehicle_roll_rt"))
+SysMachineUserControl::SysMachineUserControl(ActiveScene &rScene, UserInputHandler& userControl) :
+        SysMachine<SysMachineUserControl, MachineUserControl>(rScene)
 {
-
+    rScene.reg_emplace_root<SysMachineUserControl::ACompInstanceData>(
+        userControl.config_get("vehicle_thr_max"),
+        userControl.config_get("vehicle_thr_min"),
+        userControl.config_get("vehicle_thr_more"),
+        userControl.config_get("vehicle_thr_less"),
+        userControl.config_get("vehicle_self_destruct"),
+        userControl.config_get("vehicle_pitch_up"),
+        userControl.config_get("vehicle_pitch_dn"),
+        userControl.config_get("vehicle_yaw_lf"),
+        userControl.config_get("vehicle_yaw_rt"),
+        userControl.config_get("vehicle_roll_lf"),
+        userControl.config_get("vehicle_roll_rt"));
 }
 
 void SysMachineUserControl::update_sensor(ActiveScene& rScene)
@@ -81,20 +81,21 @@ void SysMachineUserControl::update_sensor(ActiveScene& rScene)
     //std::cout << "updating all MachineUserControls\n";
     // InputDevice.IsActivated()
     // Combination
-    
 
-    if (m_selfDestruct.triggered())
+    auto& instance = rScene.reg_get_root<ACompInstanceData>();
+
+    if (instance.m_selfDestruct.triggered())
     {
         std::cout << "EXPLOSION BOOM!!!!\n";
     }
 
     // pitch, yaw, roll
     Vector3 attitudeIn(
-            m_pitchDn.trigger_hold() - m_pitchUp.trigger_hold(),
-            m_yawLf.trigger_hold() - m_yawRt.trigger_hold(),
-            m_rollRt.trigger_hold() - m_rollLf.trigger_hold());
+        instance.m_pitchDn.trigger_hold() - instance.m_pitchUp.trigger_hold(),
+        instance.m_yawLf.trigger_hold() - instance.m_yawRt.trigger_hold(),
+        instance.m_rollRt.trigger_hold() - instance.m_rollLf.trigger_hold());
 
-    auto view = m_scene.get_registry().view<MachineUserControl>();
+    auto view = rScene.get_registry().view<MachineUserControl>();
 
     for (ActiveEnt ent : view)
     {
@@ -109,23 +110,23 @@ void SysMachineUserControl::update_sensor(ActiveScene& rScene)
             continue;
         }
 
-        if (m_throttleMore.trigger_hold())
+        if (instance.m_throttleMore.trigger_hold())
         {
             throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
         }
 
-        if (m_throttleLess.trigger_hold())
+        if (instance.m_throttleLess.trigger_hold())
         {
             throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
         }
 
-        if (m_throttleMin.triggered())
+        if (instance.m_throttleMin.triggered())
         {
             //std::cout << "throttle min\n";
             throttlePos = 0.0f;
         }
 
-        if (m_throttleMax.triggered())
+        if (instance.m_throttleMax.triggered())
         {
             //std::cout << "throttle max\n";
             throttlePos = 1.0f;

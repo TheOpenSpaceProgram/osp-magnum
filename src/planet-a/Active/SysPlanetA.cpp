@@ -70,9 +70,7 @@ using osp::universe::Satellite;
 
 SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene,
                        osp::UserInputHandler &userInput)
- : m_renderPlanetDraw(scene.get_render_order(), "", "", "",
-            [this, &scene] (ACompCamera const& camera) { this->draw(scene, camera); })
- , m_debugUpdate(userInput.config_get("debug_planet_update"))
+ : m_debugUpdate(userInput.config_get("debug_planet_update"))
 { }
 
 ActiveEnt SysPlanetA::activate(
@@ -174,7 +172,7 @@ void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveScene& rScene,
     auto itsChunk = planet.m_planet->iterate_chunk(chunk);
 
     // Send them to the physics engine
-    physics.shape_create_tri_mesh_static(fishShape, fishCollide,
+    physics.shape_create_tri_mesh_static(rScene, fishShape, fishCollide,
                                          itsChunk.first, itsChunk.second);
 
     // create the rigid body

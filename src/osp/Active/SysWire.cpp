@@ -48,10 +48,15 @@ void WireInput::doErase()
      list()->cut(this);
 };
 
+SysWire::SysWire(ActiveScene& rScene)
+{
+    rScene.reg_emplace_root<SysWire::ACompInstanceData>();
+}
 
 void SysWire::update_propagate(ActiveScene& rScene)
 {
-    for (DependentOutput &output : m_dependentOutputs)
+    auto& instance = rScene.reg_get_root<SysWire::ACompInstanceData>();
+    for (DependentOutput &output : instance.m_dependentOutputs)
     {
         output.m_element->propagate_output(output.m_output);
     }

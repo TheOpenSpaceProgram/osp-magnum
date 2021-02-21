@@ -65,7 +65,7 @@ void SysAreaAssociate::update_scan(ActiveScene& rScene)
 
     for (Satellite sat : viewActRadius)
     {
-        auto satRadius = viewActRadius.get<UCompActivationRadius>(sat);
+        auto& satRadius = viewActRadius.get<UCompActivationRadius>(sat);
 
         // Check if already activated
         auto found = pArea->m_inside.find(sat);

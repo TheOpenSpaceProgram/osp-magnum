@@ -127,10 +127,13 @@ public:
      */
     template<class T>
     decltype(auto) reg_get(ActiveEnt ent) { return m_registry.get<T>(ent); }
-
     template<class T>
     decltype(auto) reg_get(ActiveEnt ent) const { return m_registry.get<T>(ent); }
 
+    template<class T>
+    decltype(auto) reg_get_root() { return m_registry.get<T>(m_root); }
+    template<class T>
+    decltype(auto) reg_get_root() const { return m_registry.get<T>(m_root); }
 
     /**
      * Shorthand for get_registry().try_get<T>()
@@ -148,6 +151,12 @@ public:
     decltype(auto) reg_emplace(ActiveEnt ent, Args&& ... args)
     {
         return m_registry.emplace<T>(ent, std::forward<Args>(args)...);
+    }
+
+    template<class T, typename... Args>
+    decltype(auto) reg_emplace_root(Args&& ... args)
+    {
+        return m_registry.emplace<T>(m_root, std::forward<Args>(args)...);
     }
 
     /**
@@ -213,6 +222,7 @@ public:
     template<class DYNSYS_T, typename... Args>
     DYNSYS_T& dynamic_system_create(Args &&... args);
 
+    void update_taskflow();
 
     /**
      * Find a registered IDynamicSystem by name. This accesses a map.
@@ -259,19 +269,10 @@ private:
     MapSysMachine_t m_sysMachines; // TODO: Put this in SysVehicle
     MapDynamicSys_t m_dynamicSys;
 
-    // TODO: base class and a list for Systems (or not)
-    //SysDebugRender m_render;
-    //SysPhysics m_physics;
-    //SysWire m_wire;
-    //SysVehicle m_vehicles;
-
-    //SysDebugObject m_debugObj;
-    //std::tuple<SysPhysics, SysWire, SysDebugObject> m_systems;
-
+    MapUpdateSystemTasks_t m_updateConstraints;
 };
 
 // move these to another file eventually
-
 
 template<class SYSMACH_T, typename... ARGS_T>
 void ActiveScene::system_machine_create(ARGS_T &&... args)
@@ -279,7 +280,6 @@ void ActiveScene::system_machine_create(ARGS_T &&... args)
     system_machine_add(SYSMACH_T::smc_name,
                        std::make_unique<SYSMACH_T>(*this, args...));
 }
-
 
 template<class DYNSYS_T, typename... ARGS_T>
 DYNSYS_T& ActiveScene::dynamic_system_create(ARGS_T &&... args)
@@ -289,7 +289,10 @@ DYNSYS_T& ActiveScene::dynamic_system_create(ARGS_T &&... args)
 
     m_dynamicSys.emplace(DYNSYS_T::smc_name, std::move(ptr));
 
-
+    for (SysUpdateContraint_t& constraint : DYNSYS_T::smc_update)
+    {
+        m_updateConstraints.emplace(constraint.m_name, constraint);
+    }
 
     return refReturn;
 }

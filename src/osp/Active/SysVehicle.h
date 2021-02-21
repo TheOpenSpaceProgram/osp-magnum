@@ -85,9 +85,9 @@ public:
 
     static inline std::string smc_name = "Vehicle";
 
-    SysVehicle() = default;
-    SysVehicle(SysNewton const& copy) = delete;
-    SysVehicle(SysNewton&& move) = delete;
+    SysVehicle(ActiveScene&) {}
+    SysVehicle(SysVehicle const& copy) = delete;
+    SysVehicle(SysVehicle&& move) = delete;
     ~SysVehicle() = default;
 
     static ActiveEnt activate(ActiveScene &rScene, universe::Universe &rUni,
@@ -112,6 +112,14 @@ public:
      * @param rScene [in/out] Scene containing vehicles to update
      */
     static void update_vehicle_modification(ActiveScene& rScene);
+    
+    static inline std::array<SysUpdateContraint_t, 2> smc_update
+    {
+        SysUpdateContraint_t{&SysVehicle::update_activate,
+            "vehicle_activate", "", "vehicle_modification"},
+        SysUpdateContraint_t{&SysVehicle::update_vehicle_modification,
+            "vehicle_modification", "", "physics"}
+    };
 
 private:
 
@@ -201,14 +209,6 @@ private:
     static void part_instantiate_machines(ActiveScene& rScene, ActiveEnt partEnt,
         std::vector<MachineDef> const& machineMapping,
         PrototypePart const& part, BlueprintPart const& partBP);
-
-    static inline std::array<SysUpdateContraint_t, 2> smc_update
-    {
-        SysUpdateContraint_t{&SysVehicle::update_activate,
-            "vehicle_activate", "", "vehicle_modification"},
-        SysUpdateContraint_t{&SysVehicle::update_vehicle_modification,
-            "vehicle_modification", "", "physics"}
-    };
 };
 
 

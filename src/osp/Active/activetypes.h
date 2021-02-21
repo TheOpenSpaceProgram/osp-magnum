@@ -58,6 +58,7 @@ using UpdateExecutor_t = tf::Executor;
 
 using RenderOrder_t = tf::Taskflow;
 using RenderOrderHandle_t = tf::Task;
+using RenderExecutor_t = tf::Executor;
 
 struct ACompFloatingOrigin
 {
@@ -77,16 +78,20 @@ using MapDynamicSys_t = std::map<std::string, std::unique_ptr<IDynamicSystem>,
 template <typename FUNC_T>
 struct UpdateOrderConstraint
 {
-    std::function<FUNC_T> m_function;
+    FUNC_T m_function;
     std::string m_name;
     std::string m_succeed;
     std::string m_precede;
 };
 
-using SysUpdateContraint_t = UpdateOrderConstraint<void(ActiveScene&)>;
+using SysUpdateContraint_t = UpdateOrderConstraint<void(*)(ActiveScene&)>;
+using SysRenderContraint_t = UpdateOrderConstraint<void(*)(ActiveScene&, ACompCamera const&)>;
 
 template <size_t N>
 using SystemUpdates_t = std::array<SysUpdateContraint_t, N>;
+
+template <size_t N>
+using SystemRender_t = std::array<SysRenderContraint_t, N>;
 
 using MapUpdateSystemTasks_t = std::map<std::string,
     SysUpdateContraint_t, std::less<> >;

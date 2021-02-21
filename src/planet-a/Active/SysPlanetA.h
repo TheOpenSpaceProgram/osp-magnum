@@ -84,7 +84,6 @@ public:
 
     static void update_physics(osp::active::ActiveScene& rScene);
 
-private:
     static inline osp::active::SystemUpdates_t<5> smc_update
     {
         osp::active::SysUpdateContraint_t{&SysPlanetA::update_activate,
@@ -95,9 +94,13 @@ private:
             "planet_phys", "planet_geo", ""}
     };
 
-    // TODO
-    osp::active::RenderOrderHandle_t m_renderPlanetDraw;
+    static inline osp::active::SystemRender_t<1> smc_render
+    {
+        osp::active::SysRenderContraint_t{&SysPlanetA::draw,
+            "", "", ""}
+    };
 
+private:
     osp::ButtonControlHandle m_debugUpdate;
 };
 

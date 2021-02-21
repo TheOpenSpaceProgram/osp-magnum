@@ -39,6 +39,11 @@
 
 using namespace osp::active;
 
+SysExhaustPlume::SysExhaustPlume(ActiveScene& rScene)
+{
+    rScene.reg_emplace_root<ACompInstanceData>();
+}
+
 void SysExhaustPlume::initialize_plume(ActiveScene& rScene, ActiveEnt node)
 {
     using Magnum::GL::Mesh;
@@ -90,7 +95,8 @@ void SysExhaustPlume::initialize_plume(ActiveScene& rScene, ActiveEnt node)
 
 void SysExhaustPlume::update_plumes(ActiveScene& rScene)
 {
-    //rScene.m_time += rScene.get_time_delta_fixed(); TODO
+    auto& instance = rScene.reg_get_root<ACompInstanceData>();
+    instance.m_time += rScene.get_time_delta_fixed();
 
     using adera::active::machines::MachineRocket;
     using ShaderInstance_t = adera::shader::PlumeShader::ACompPlumeShaderInstance;

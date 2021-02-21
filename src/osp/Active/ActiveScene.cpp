@@ -177,7 +177,6 @@ void ActiveScene::update()
     m_updateExec.run(m_updateOrder).wait();
 }
 
-
 void ActiveScene::update_hierarchy_transforms()
 {
     if (m_hierarchyDirty)
@@ -217,7 +216,6 @@ void ActiveScene::update_hierarchy_transforms()
             // set transform relative to parent
             transform.m_transformWorld = parentTransform.m_transformWorld
                                           * transform.m_transform;
-
         }
     }
 
@@ -271,7 +269,14 @@ bool ActiveScene::system_machine_it_valid(MapSysMachine_t::iterator it)
     return it != m_sysMachines.end();
 }
 
-
+void ActiveScene::update_taskflow()
+{
+    for (auto& c : m_updateConstraints)
+    {
+        auto& f = c.second.m_function;
+        auto task = m_updateOrder.emplace([this, f]() { f(*this); });
+    }
+}
 
 MapDynamicSys_t::iterator ActiveScene::dynamic_system_find(std::string_view name)
 {

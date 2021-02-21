@@ -65,12 +65,11 @@ public:
 
     static inline std::string smc_name = "FFGravity";
 
-    SysFFGravity() = default;
+    SysFFGravity(ActiveScene&) {}
     ~SysFFGravity() = default;
 
     static void update_force(ActiveScene& rScene);
 
-private:
     static inline SystemUpdates_t<1> smc_update
     {
         {&SysFFGravity::update_force, "ff_gravity", "", "physics"}

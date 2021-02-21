@@ -42,7 +42,12 @@ class SysExhaustPlume : public IDynamicSystem
 public:
     static inline std::string smc_name = "ExhaustPlume";
 
-    SysExhaustPlume() = default;
+    struct ACompInstanceData
+    {
+        float m_time{0.0f};
+    };
+
+    SysExhaustPlume(ActiveScene& rScene);
     ~SysExhaustPlume() = default;
 
     /**
@@ -55,9 +60,6 @@ public:
     static void initialize_plume(ActiveScene& rScene, ActiveEnt e);
 
     static void update_plumes(ActiveScene& rScene);
-
-private:
-    float m_time;
 
     static inline SystemUpdates_t<1> smc_update
     {

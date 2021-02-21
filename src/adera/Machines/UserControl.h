@@ -43,10 +43,26 @@ public:
 
     static const std::string smc_name;
 
+    struct ACompInstanceData
+    {
+        osp::ButtonControlHandle m_throttleMax;
+        osp::ButtonControlHandle m_throttleMin;
+        osp::ButtonControlHandle m_throttleMore;
+        osp::ButtonControlHandle m_throttleLess;
+        osp::ButtonControlHandle m_selfDestruct;
+
+        osp::ButtonControlHandle m_pitchUp;
+        osp::ButtonControlHandle m_pitchDn;
+        osp::ButtonControlHandle m_yawLf;
+        osp::ButtonControlHandle m_yawRt;
+        osp::ButtonControlHandle m_rollLf;
+        osp::ButtonControlHandle m_rollRt;
+    };
+
     SysMachineUserControl(osp::active::ActiveScene &scene,
                           osp::UserInputHandler& userControl);
 
-    void update_sensor(osp::active::ActiveScene& rScene);
+    static void update_sensor(osp::active::ActiveScene& rScene);
 
     osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
         osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
@@ -54,18 +70,6 @@ public:
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
 private:
-    osp::ButtonControlHandle m_throttleMax;
-    osp::ButtonControlHandle m_throttleMin;
-    osp::ButtonControlHandle m_throttleMore;
-    osp::ButtonControlHandle m_throttleLess;
-    osp::ButtonControlHandle m_selfDestruct;
-
-    osp::ButtonControlHandle m_pitchUp;
-    osp::ButtonControlHandle m_pitchDn;
-    osp::ButtonControlHandle m_yawLf;
-    osp::ButtonControlHandle m_yawRt;
-    osp::ButtonControlHandle m_rollLf;
-    osp::ButtonControlHandle m_rollRt;
 
     static inline osp::active::SystemUpdates_t<1> smc_update
     {

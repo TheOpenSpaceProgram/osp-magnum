@@ -170,11 +170,16 @@ public:
      * @param end
      */
     template<class TRIANGLE_IT_T>
-    void shape_create_tri_mesh_static(ACompShape &rShape,
+    void shape_create_tri_mesh_static(ActiveScene& rScene,
+                                      ACompShape &rShape,
                                       ACompCollider &rCollider,
                                       TRIANGLE_IT_T const& start,
                                       TRIANGLE_IT_T const& end);
 
+    static inline SystemUpdates_t<1> smc_update
+    {
+        SysUpdateContraint_t{SysNewton::update_world, "physics", "wire", ""}
+    };
 private:
     /**
      * Search descendents for collider components and add NewtonCollisions to a
@@ -268,15 +273,10 @@ private:
             const NewtonCollision* treeCollision,  int optimize);
 
     ActiveScene& m_scene;
-
-    static inline SystemUpdates_t<1> smc_update
-    {
-        {&SysNewton::update_world, "physics", "wire", ""}
-    };
 };
 
 template<class TRIANGLE_IT_T>
-void SysNewton::shape_create_tri_mesh_static(ACompShape& rShape,
+void SysNewton::shape_create_tri_mesh_static(ActiveScene& rScene, ACompShape& rShape,
     ACompCollider& rCollider, TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end)
 {
     // TODO: this is actually horrendously slow and WILL cause issues later on.
@@ -284,7 +284,7 @@ void SysNewton::shape_create_tri_mesh_static(ACompShape& rShape,
     //       manually hacking up serialized data instead of add face, or use
     //       Newton's dgAABBPolygonSoup stuff directly
 
-    ACompNwtWorld* nwtWorldComp = try_get_physics_world(m_scene);
+    ACompNwtWorld* nwtWorldComp = try_get_physics_world(rScene);
     NewtonCollision* tree = newton_create_tree_collision(nwtWorldComp->m_nwtWorld, 0);
 
     newton_tree_collision_begin_build(tree);

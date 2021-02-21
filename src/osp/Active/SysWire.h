@@ -286,7 +286,6 @@ private:
 
 //-----------------------------------------------------------------------------
 
-
 class SysWire : public IDynamicSystem
 {
 public:
@@ -300,19 +299,22 @@ public:
         unsigned depth;
     };
 
-    SysWire() = default;
+    struct ACompInstanceData
+    {
+        std::vector<DependentOutput> m_dependentOutputs;
+    };
+
+    SysWire(ActiveScene& rScene);
     SysWire(SysWire const& copy) = delete;
     SysWire(SysWire&& move) = delete;
 
     static void update_propagate(ActiveScene& rScene);
-    void connect(WireOutput &wireFrom, WireInput &wireTo);
+    static void connect(WireOutput &wireFrom, WireInput &wireTo);
 
-private:
-    std::vector<DependentOutput> m_dependentOutputs;
-    /*static inline SystemUpdates_t<1> smc_update TODO
+    static inline SystemUpdates_t<1> smc_update
     {
-        {[this](ActiveScene& rScene) { this->update_propagate(rScene); }, "wire", "", "" }
-    };*/
+        {&SysWire::update_propagate, "wire", "", ""}
+    };
 };
 
 

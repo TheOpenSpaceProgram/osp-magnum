@@ -65,7 +65,6 @@ struct ACompActivatedSat
     universe::Satellite m_sat;
 };
 
-
 /**
  * System used to associate an ActiveScene to a UCompActiveArea in the Universe
  */
@@ -75,7 +74,7 @@ public:
 
     static inline std::string smc_name = "AreaAssociate";
 
-    SysAreaAssociate() = default;
+    SysAreaAssociate(ActiveScene&) {}
     ~SysAreaAssociate() = default;
 
     /**
@@ -128,14 +127,13 @@ public:
             universe::Universe& rUni, universe::Satellite relativeSat,
             universe::Satellite tgtSat, Matrix4 transform);
 
-private:
-
     static inline std::array<SysUpdateContraint_t, 1> smc_update
     {
         SysUpdateContraint_t{&SysAreaAssociate::update_scan,
             "areascan", "physics", ""}
     };
 
+private:
     /**
      * Translate all entities in an ActiveScene that contain an
      * ACompFloatingOrigin

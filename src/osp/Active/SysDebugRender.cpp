@@ -39,14 +39,9 @@ using namespace std::placeholders;
 // for the 0xrrggbb_rgbf and _deg literals
 using namespace Magnum::Math::Literals;
 
-const std::string SysDebugRender::smc_name = "DebugRender";
-
-SysDebugRender::SysDebugRender(ActiveScene &rScene) :
-        m_scene(rScene),
-        m_renderDebugDraw(rScene.get_render_order(), "debug", "", "",
-                          std::bind(&SysDebugRender::draw, this, _1))
+SysDebugRender::SysDebugRender(ActiveScene &rScene)
 {
-    Package& glResources = m_scene.get_context_resources();
+    Package& glResources = rScene.get_context_resources();
 
     using namespace adera::shader;
 
@@ -56,16 +51,14 @@ SysDebugRender::SysDebugRender(ActiveScene &rScene) :
     glResources.add<PlumeShader>("plume_shader");
 }
 
-void SysDebugRender::draw(ACompCamera const& camera)
+void SysDebugRender::draw(ActiveScene& rScene, ACompCamera const& camera)
 {
     using Magnum::GL::Renderer;
 
-    auto& reg = m_scene.get_registry();
+    auto& reg = rScene.get_registry();
 
     Renderer::enable(Renderer::Feature::DepthTest);
     Renderer::enable(Renderer::Feature::FaceCulling);
-
-
 
     // Get opaque objects
     auto opaqueObjects = reg.view<CompDrawableDebug, ACompTransform>(
@@ -73,10 +66,10 @@ void SysDebugRender::draw(ACompCamera const& camera)
     // Configure blend mode for opaque rendering
     Renderer::disable(Renderer::Feature::Blending);
     // Draw opaque objects
-    draw_group(opaqueObjects, camera);
+    draw_group(rScene, opaqueObjects, camera);
 
     // Get transparent objects
-    auto transparentObjects = m_scene.get_registry()
+    auto transparentObjects = rScene.get_registry()
         .view<CompDrawableDebug, CompVisibleDebug,
         CompTransparentDebug, ACompTransform>();
 
@@ -88,10 +81,10 @@ void SysDebugRender::draw(ACompCamera const& camera)
 
     // Draw backfaces first
     Renderer::setFaceCullingMode(Renderer::PolygonFacing::Front);
-    draw_group(transparentObjects, camera);
+    draw_group(rScene, transparentObjects, camera);
 
     // Then draw frontfaces
     Renderer::setFaceCullingMode(Renderer::PolygonFacing::Back);
-    draw_group(transparentObjects, camera);
+    draw_group(rScene, transparentObjects, camera);
 }
 
