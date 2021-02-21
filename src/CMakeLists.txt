@@ -137,4 +137,4 @@ if(OSP_ENABLE_CLANG_TIDY)
 endif()
 
 # Copy root/bin to build/bin
-FILE (COPY "${CMAKE_SOURCE_DIR}/bin/OSPData/adera/" DESTINATION "${CMAKE_BINARY_DIR}/bin/OSPData/adera")
+FILE (COPY "${CMAKE_SOURCE_DIR}/bin/" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
