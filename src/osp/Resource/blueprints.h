@@ -50,7 +50,7 @@ struct BlueprintMachine
 struct BlueprintPart
 { 
 
-    unsigned m_partIndex; // index to BlueprintVehicle's m_partsUsed
+    uint32_t m_partIndex; // index to BlueprintVehicle's m_partsUsed
 
     Vector3 m_translation;
     Quaternion m_rotation;

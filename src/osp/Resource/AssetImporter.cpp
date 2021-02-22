@@ -79,7 +79,7 @@ void osp::AssetImporter::load_sturdy_file(std::string_view filepath, Package& pk
     gltfImporter.close();
 }
 
-std::vector<unsigned> AssetImporter::load_machines(tinygltf::Value const& extras,
+std::vector<uint32_t> AssetImporter::load_machines(tinygltf::Value const& extras,
     std::vector<PrototypeMachine>& machineArray)
 {
     if (!extras.Has("machines"))
@@ -91,7 +91,7 @@ std::vector<unsigned> AssetImporter::load_machines(tinygltf::Value const& extras
     std::cout << "JSON machines!\n";
     auto const& machArray = machines.Get<tinygltf::Value::Array>();
 
-    std::vector<unsigned> machineIndices;
+    std::vector<uint32_t> machineIndices;
     machineIndices.reserve(machArray.size());
     // Loop through machine configs
     // machArray looks like:
@@ -191,7 +191,7 @@ void osp::AssetImporter::load_plume(TinyGltfImporter& gltfImporter,
 
     // Get mesh data
     Pointer<ObjectData3D> rootNode = gltfImporter.object3D(id);
-    unsigned meshID = gltfImporter.object3D(rootNode->children()[0])->instance();
+    Magnum::Int meshID = gltfImporter.object3D(rootNode->children()[0])->instance();
     std::string meshName = string_concat(resPrefix, gltfImporter.meshName(meshID));
 
     // Get shader params from extras
@@ -457,7 +457,7 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
         // list of strings, and the object's mesh is set to the index to that
         // string.
         obj.m_objectData = DrawableData{
-            static_cast<unsigned>(part.get_strings().size())};
+            static_cast<uint32_t>(part.get_strings().size())};
         part.get_strings().push_back(meshName);
 
         MeshObjectData3D& mesh = static_cast<MeshObjectData3D&>(*childData);
@@ -471,7 +471,7 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
             std::string const& imgName = gltfImporter.image2DName(imgID);
             std::cout << "Base Tex: " << imgName << "\n";
             std::get<DrawableData>(obj.m_objectData).m_textures.push_back(
-                static_cast<unsigned>(part.get_strings().size()));
+                static_cast<uint32_t>(part.get_strings().size()));
             part.get_strings().push_back(imgName);
 
             if (pbr.hasNoneRoughnessMetallicTexture())

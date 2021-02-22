@@ -373,7 +373,7 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt,
 
     // update GPU index buffer
 
-    std::vector<unsigned> const &indxData = rPlanetGeo.get_index_buffer();
+    std::vector<buindex_t> const &indxData = rPlanetGeo.get_index_buffer();
 
     for (UpdateRangeSub updRange : rPlanetGeo.updates_get_index_changes())
     {

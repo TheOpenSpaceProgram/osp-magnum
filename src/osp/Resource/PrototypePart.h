@@ -52,8 +52,8 @@ struct DrawableData
 {
 
     // index to a PrototypePart.m_meshDataUsed
-    unsigned m_mesh;
-    std::vector<unsigned> m_textures;
+    uint32_t m_mesh;
+    std::vector<uint32_t> m_textures;
     //std::string m_mesh;
     //unsigned m_material;
 };

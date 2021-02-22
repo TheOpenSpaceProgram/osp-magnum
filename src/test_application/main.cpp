@@ -353,7 +353,7 @@ void debug_print_hier()
     {
         // print some info about the entitysize() != 0
         auto const &hier = scene.reg_get<ACompHierarchy>(currentEnt);
-        for (unsigned i = 0; i < hier.m_level; i ++)
+        for (uint8_t i = 0; i < hier.m_level; i ++)
         {
             // print arrows to indicate level
             std::cout << "  ->";
