@@ -43,6 +43,8 @@
 #include <planet-a/Active/SysPlanetA.h>
 #include <planet-a/Satellites/SatPlanet.h>
 
+#include <Magnum/ImGuiIntegration/Context.hpp>
+
 using namespace testapp;
 
 using osp::Vector2;
@@ -148,6 +150,67 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Add a ACompDebugObject to camera to manage camObj's lifetime
     scene.reg_emplace<ACompDebugObject>(camera, std::move(camObj));
+
+    // Create GUI definitions
+
+    // Debug FPS
+    scene.get_GUI_elements().push_back(
+        [](osp::active::ActiveScene& rScene)
+        {
+            using namespace Magnum;
+
+            ImGui::Begin("Debug");
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
+                1000.0 / Double(ImGui::GetIO().Framerate), Double(ImGui::GetIO().Framerate));
+            ImGui::End();
+        });
+
+    // Show active MUC velocity
+    scene.get_GUI_elements().push_back(
+        [](osp::active::ActiveScene& rScene)
+        {
+            using adera::active::machines::MachineUserControl;
+            using namespace osp::active;
+
+            ActiveEnt activeShip{entt::null};
+            for (auto [ent, muc] : rScene.get_registry().view<MachineUserControl>().each())
+            {
+                if (muc.is_enabled())
+                {
+                    activeShip = ent;
+                    break;
+                }
+            }
+
+            if (activeShip == entt::null)
+            {
+                ImGui::Begin("Ship Status");
+                ImGui::Text("Ship: null");
+                ImGui::Text("Velocity: null");
+                ImGui::Text("Position: null");
+                ImGui::Text("Orientation: null");
+                ImGui::End();
+                return;
+            }
+
+            ACompRigidbodyAncestor* rba =
+                SysPhysics_t::try_get_or_find_rigidbody_ancestor(rScene, activeShip);
+            ActiveEnt rigidbody = rba->m_ancestor;
+            auto const& rb = rScene.reg_get<ACompRigidBody_t>(rigidbody);
+            auto const& tf = rScene.reg_get<ACompTransform>(rigidbody);
+
+            Vector3 velocity = rb.m_velocity;
+            Vector3 position = tf.m_transformWorld.translation();
+            Vector3 orientation = tf.m_transformWorld.rotation() * Vector3{0.0f, -1.0f, 0.0f};
+
+            ImGui::Begin("Ship Status");
+            ImGui::Text("Ship: %d", static_cast<int>(activeShip));
+            ImGui::Text("Velocity: (%f, %f, %f)", velocity.x(), velocity.y(), velocity.z());
+            ImGui::Text("Position: (%f, %f, %f)", position.x(), position.y(), position.z());
+            ImGui::Text("Orientation: (%f, %f, %f)",
+                orientation.x(), orientation.y(), orientation.z());
+            ImGui::End();
+        });
 
     // Starts the game loop. This function is blocking, and will only return
     // when the window is  closed. See OSPMagnum::drawEvent

@@ -70,13 +70,6 @@ void OSPMagnum::draw_GUI()
 {
     using namespace Magnum;
 
-    m_imgui.newFrame();
-
-    {
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-            1000.0 / Double(ImGui::GetIO().Framerate), Double(ImGui::GetIO().Framerate));
-    }
-
     m_imgui.updateApplicationCursor(*this);
     GL::Renderer::enable(GL::Renderer::Feature::Blending);
     GL::Renderer::enable(GL::Renderer::Feature::ScissorTest);
@@ -91,9 +84,13 @@ void OSPMagnum::draw_GUI()
 
 void OSPMagnum::drawEvent()
 {
+    using Magnum::GL::FramebufferClear;
 
-    Magnum::GL::defaultFramebuffer.clear(Magnum::GL::FramebufferClear::Color
-                                         | Magnum::GL::FramebufferClear::Depth);
+    // Clear framebuffer
+    Magnum::GL::defaultFramebuffer.clear(FramebufferClear::Color | FramebufferClear::Depth);
+
+    // Initialize new GUI frame
+    m_imgui.newFrame();
 
 //    if (m_area)
 //    {
@@ -128,11 +125,12 @@ void OSPMagnum::drawEvent()
     {
         scene.update_hierarchy_transforms();
 
-
         // temporary: draw using first camera component found
         scene.draw(scene.get_registry().view<osp::active::ACompCamera>().front());
-    }
 
+        // Draw GUI
+        scene.drawUI();
+    }
 
     // TODO: GUI and stuff
     draw_GUI();
