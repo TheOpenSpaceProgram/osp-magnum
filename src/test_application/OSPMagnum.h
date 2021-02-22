@@ -39,6 +39,8 @@
 #include <Magnum/Math/Color.h>
 #include <Magnum/Platform/Sdl2Application.h>
 #include <Magnum/Shaders/VertexColor.h>
+#include <Magnum/ImGuiIntegration/Context.hpp>
+#include <implot.h>
 
 #include <memory>
 
@@ -75,6 +77,10 @@ public:
     constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
 
 private:
+    Magnum::ImGuiIntegration::Context m_imgui{Magnum::NoCreate};
+    ImPlotContext* m_implot;
+
+    void draw_GUI();
 
     void drawEvent() override;
 

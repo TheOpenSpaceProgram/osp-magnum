@@ -39,11 +39,16 @@ find_package(MagnumPlugins REQUIRED
     TinyGltfImporter
     StbImageImporter)
 
+find_package(MagnumIntegration REQUIRED ImGui)
 find_package(Threads)
 
 # Gather paths to OSP headers and sources
 file (GLOB_RECURSE CPP_FILES *.cpp)
 file (GLOB_RECURSE H_FILES *.h)
+# Append implot source files
+list (APPEND CPP_FILES
+        ../3rdparty/implot/implot.cpp
+        ../3rdparty/implot/implot_items.cpp)
 set (SOURCE_FILES ${CPP_FILES} ${H_FILES})
 
 add_executable(osp-magnum ${CPP_FILES})
@@ -93,6 +98,9 @@ endif()
 # Include ENTT (header only lib)
 target_include_directories(osp-magnum PRIVATE ../3rdparty/entt/src)
 
+# Include ImPlot (simple library that depends on magnum-integration's imgui)
+target_include_directories(osp-magnum PRIVATE ../3rdparty/implot)
+
 # Put executable in the bin folder
 set_target_properties(osp-magnum PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../bin)
 
@@ -111,6 +119,7 @@ target_link_libraries(osp-magnum PRIVATE
     Magnum::AnyImageImporter
     MagnumPlugins::TinyGltfImporter
     MagnumPlugins::StbImageImporter
+    MagnumIntegration::ImGui
     dNewton dScene dModel dVehicle
     toml11
     )
