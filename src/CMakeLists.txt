@@ -93,6 +93,9 @@ endif()
 # Include ENTT (header only lib)
 target_include_directories(osp-magnum PRIVATE ../3rdparty/entt/src)
 
+# Include taskflow (header only lib)
+target_include_directories(osp-magnum PRIVATE ../3rdparty/taskflow)
+
 # Put executable in the bin folder
 set_target_properties(osp-magnum PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../bin)
 
