@@ -46,6 +46,7 @@ using osp::universe::UCompVehicle;
 using osp::BlueprintVehicle;
 using osp::PrototypePart;
 
+
 /**
  * Utility: computes the displacement between two parts, relative to the
  * specified sub-object (e.g. an attachment node).
@@ -58,6 +59,21 @@ using osp::PrototypePart;
 Vector3 part_offset(
     PrototypePart const& attachTo, std::string_view attachToName,
     PrototypePart const& toAttach, std::string_view toAttachName);
+
+/**
+ * Adds multiple specified parts (RCS thrusters) in the same position, but
+ * rotated 90 degrees of each other along the Z axis for attitude control.
+ *
+ * @param rBlueprint [out] Vehicle blueprint to add RCS block to
+ * @param rRcs       [in] Prototype of RCS thruster
+ * @param rRcsPorts  [out] Vector to put indices of created thrusters into
+ * @param pos        [in] Position of block
+ * @param rot        [in] Rotation of block
+ */
+void blueprint_add_rcs_block(
+        BlueprintVehicle &rBlueprint, DependRes<PrototypePart> rRcs,
+        std::vector<int> &rRcsPorts, Vector3 pos, Quaternion rot);
+
 
 osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
         Universe& uni, Package& pkg, std::string_view name)
@@ -185,11 +201,32 @@ Vector3 part_offset(PrototypePart const& attachTo,
     return oset1 - oset2;
 }
 
+void blueprint_add_rcs_block(
+        BlueprintVehicle &rBlueprint, DependRes<PrototypePart> rRcs,
+        std::vector<int> &rRcsPorts, Vector3 pos, Quaternion rot)
+{
+    using namespace Magnum::Math::Literals;
+
+    Vector3 constexpr scl{1};
+    Vector3 constexpr zAxis{0, 0, 1};
+    int hackypartnum = rBlueprint.get_blueprints().size();
+
+    rBlueprint.add_part(rRcs, pos, Quaternion::rotation(90.0_degf, zAxis) * rot, scl);
+    //rBlueprint.add_part(rRcs, pos, rot, scl);
+    rBlueprint.add_part(rRcs, pos, Quaternion::rotation(-90.0_degf, zAxis) * rot, scl);
+
+    for (int i = 0; i < 2; i ++)
+    {
+        rRcsPorts.push_back(hackypartnum + i);
+    }
+}
+
 osp::universe::Satellite testapp::debug_add_part_vehicle(
     osp::universe::Universe& uni, osp::Package& pkg,
     std::string_view name)
 {
     using namespace Magnum::Math::Literals;
+    using Magnum::Rad;
 
     // Start making the blueprint
     BlueprintVehicle blueprint;
@@ -204,8 +241,7 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
         *fuselage, "attach_top_fuselage");
     Vector3 feOset = part_offset(*fuselage, "attach_bottom_fuselage",
         *engine, "attach_top_eng");
-    Vector3 rcsOsetTop = cfOset + Vector3{1.0f, 0.0f, 2.0f};
-    Vector3 rcsOsetBtm = cfOset + Vector3{1.0f, 0.0f, -2.0f};
+
 
     Quaternion idRot;
     Vector3 scl{1};
@@ -223,38 +259,39 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
 
     auto& engBP = blueprint.add_part(engine, cfOset + feOset, idRot, scl);
 
-    Quaternion yz090 = rotZ_090 * rotY_090;
-    Quaternion yz180 = rotZ_180 * rotY_090;
-    Quaternion yz270 = rotZ_270 * rotY_090;
+    // Add a shit ton of RCS rings
 
-    // Top RCS ring
-    blueprint.add_part(rcs, rcsOsetTop, rotY_090, scl);
-    blueprint.add_part(rcs, rotZ_090.transformVector(rcsOsetTop), yz090, scl);
-    blueprint.add_part(rcs, rotZ_180.transformVector(rcsOsetTop), yz180, scl);
-    blueprint.add_part(rcs, rotZ_270.transformVector(rcsOsetTop), yz270, scl);
+    Rad rcsRingStep     = 90.0_degf;
+    float rcsZMin       = -2.0f;
+    float rcsZMax       = 2.1f;
+    float rcsZStep      = 4.0f;
+    float rcsRadius     = 1.1f;
 
-    // Top RCS ring
-    blueprint.add_part(rcs, rcsOsetBtm, rotY_090, scl);
-    blueprint.add_part(rcs, rotZ_090.transformVector(rcsOsetBtm), yz090, scl);
-    blueprint.add_part(rcs, rotZ_180.transformVector(rcsOsetBtm), yz180, scl);
-    blueprint.add_part(rcs, rotZ_270.transformVector(rcsOsetBtm), yz270, scl);
+    std::vector<int> rcsPorts;
+
+    for (float z = rcsZMin; z < rcsZMax; z += rcsZStep)
+    {
+        Vector3 rcsOset = cfOset + Vector3{rcsRadius, 0.0f, z};
+
+        // Add RCS rings from 0 to 360 degrees
+        for (Rad ang = 0.0_degf; ang < Rad(360.0_degf); ang += rcsRingStep)
+        {
+            Quaternion rotZ = Quaternion::rotation(ang, Vector3{0, 0, 1});
+            blueprint_add_rcs_block(blueprint, rcs, rcsPorts,
+                                    rotZ.transformVector(rcsOset),
+                                    rotZ * rotY_090);
+        }
+    }
 
     enum Parts
     {
         CAPSULE = 0,
         FUSELAGE = 1,
-        ENGINE = 2,
-        RCS1 = 3,
-        RCS2 = 4,
-        RCS3 = 5,
-        RCS4 = 6,
-        RCS5 = 7,
-        RCS6 = 8,
-        RCS7 = 9,
-        RCS8 = 10
+        ENGINE = 2
     };
 
-    std::vector<int> rcsPorts = {RCS1, RCS2, RCS3, RCS4, RCS5, RCS6, RCS7, RCS8};
+    std::cout << "Part vehicle has " << blueprint.get_blueprints().size()
+              << " Parts!\n";
 
     // Wire throttle control
     // from (output): a MachineUserControl m_woThrottle

@@ -28,6 +28,7 @@
 #include <memory>
 
 #include <osp/Active/activetypes.h>
+#include <osp/Universe.h>
 #include <osp/UserInputHandler.h>
 #include <osp/types.h>
 
@@ -82,10 +83,14 @@ public:
     void update_vehicle_mod_pre();
     void update_physics_pre();
     void update_physics_post();
-    void view_orbit(osp::active::ActiveEnt ent);
+
+    bool try_switch_vehicle();
+    osp::active::ActiveEnt try_get_vehicle_ent();
+
 private:
 
-    osp::active::ActiveEnt m_orbiting;
+    //osp::active::ActiveEnt m_orbiting;
+    osp::universe::Satellite m_selected;
     osp::Vector3 m_orbitPos;
     float m_orbitDistance;
 

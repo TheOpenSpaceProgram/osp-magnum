@@ -28,6 +28,9 @@
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/physics.h>
 #include <osp/Active/SysNewton.h>
+#include <osp/Active/SysAreaAssociate.h>
+
+#include <osp/Satellites/SatVehicle.h>
 
 #include <adera/Machines/UserControl.h>
 
@@ -44,11 +47,16 @@ using namespace Magnum::Math::Literals;
 
 using osp::active::ActiveEnt;
 using osp::active::ActiveScene;
+using osp::active::ACompAreaLink;
 using osp::active::ACompCamera;
 using osp::active::ACompTransform;
 using osp::active::ACompVehicle;
 
 using osp::active::SysAreaAssociate;
+
+using osp::universe::Universe;
+using osp::universe::UCompTransformTraj;
+using osp::universe::UCompVehicle;
 
 using adera::active::machines::MachineUserControl;
 
@@ -69,7 +77,7 @@ using adera::active::machines::MachineUserControl;
 
 DebugCameraController::DebugCameraController(ActiveScene &rScene, ActiveEnt ent)
  : DebugObject(rScene, ent)
- , m_orbiting(entt::null)
+ , m_selected(entt::null)
  , m_orbitPos(0, 0, 1)
  , m_orbitDistance(20.0f)
  , m_updateVehicleModPre(
@@ -93,9 +101,11 @@ DebugCameraController::DebugCameraController(ActiveScene &rScene, ActiveEnt ent)
 
 void DebugCameraController::update_vehicle_mod_pre()
 {
-    if (!m_scene.get_registry().valid(m_orbiting))
+    ActiveEnt vehicle = try_get_vehicle_ent();
+
+    if (!m_scene.get_registry().valid(vehicle))
     {
-        return;
+        return; // No vehicle selected
     }
 
     if (m_selfDestruct.triggered())
@@ -103,8 +113,8 @@ void DebugCameraController::update_vehicle_mod_pre()
         using osp::active::ACompVehicle;
         using osp::active::ACompPart;
 
-        auto &tgtVehicle = m_scene.reg_get<ACompVehicle>(m_orbiting);
-        auto& xform = m_scene.reg_get<ACompTransform>(m_orbiting);
+        auto &tgtVehicle = m_scene.reg_get<ACompVehicle>(vehicle);
+        auto& xform = m_scene.reg_get<ACompTransform>(vehicle);
 
         // delete the last part
         //auto &partPart = m_scene.reg_get<ACompPart>(tgtVehicle.m_parts.back());
@@ -125,14 +135,51 @@ void DebugCameraController::update_physics_pre()
 {
     // Floating Origin / Active area movement
 
+    auto &rReg = m_scene.get_registry();
+    ActiveEnt vehicle = try_get_vehicle_ent();
+
+    if (m_switch.triggered())
+    {
+        try_switch_vehicle();
+    }
+
+    if (!rReg.valid(vehicle))
+    {
+        // No vehicle activated in scene, try to find
+
+        ACompAreaLink *areaLink =  SysAreaAssociate::try_get_area_link(m_scene);
+
+        if (areaLink == nullptr)
+        {
+            return; // Scene is not linked to any universe
+        }
+
+        Universe &rUni = areaLink->get_universe();
+
+        if (!rUni.get_reg().valid(m_selected))
+        {
+            return;
+        }
+
+        // Smoothly move towards target satellite
+        Vector3 &rTranslate = m_scene.reg_get<ACompTransform>(m_ent).m_transform.translation();
+        Vector3 diff = rUni.sat_calc_pos_meters(areaLink->m_areaSat, m_selected)
+                     - rTranslate;
+
+        // Move 20% of the distance each frame
+        float distance = diff.length();
+        rTranslate += diff.normalized() * distance * 0.2f;
+    }
+
+
     // When the camera is too far from the origin of the ActiveScene
     const int floatingOriginThreshold = 256;
 
     Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
 
     // round to nearest (floatingOriginThreshold)
-    Vector3s tra(xform.translation() / floatingOriginThreshold);
-    tra *= floatingOriginThreshold;
+    Vector3s tra = Vector3s(xform.translation() / floatingOriginThreshold)
+                 * floatingOriginThreshold;
 
     // convert to space int
     tra *= osp::gc_units_per_meter;
@@ -149,73 +196,27 @@ void DebugCameraController::update_physics_pre()
 void DebugCameraController::update_physics_post()
 {
 
-    bool targetValid = m_scene.get_registry().valid(m_orbiting);
-    auto& rReg = m_scene.get_registry();
+    auto &rReg = m_scene.get_registry();
+    ActiveEnt vehicle = try_get_vehicle_ent();
 
-    if (m_switch.triggered())
-    {
-        std::cout << "switch to new vehicle\n";
-
-        auto view = rReg.view<ACompVehicle>();
-        auto it = view.find(m_orbiting);
-
-        if (targetValid)
-        {
-            // disable the first MachineUserControl because switching away
-            ActiveEnt firstPart
-                    = *(view.get<ACompVehicle>(m_orbiting).m_parts.begin());
-            auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
-            if (pMUserCtrl != nullptr) { pMUserCtrl->disable(); }
-        }
-
-        if (it == view.end() || it == view.begin())
-        {
-            // no vehicle selected, or last vehicle is selected (loop around)
-            m_orbiting = view.back();
-        }
-        else
-        {
-            // pick the next vehicle
-            m_orbiting = *(--it);
-            std::cout << "next\n";
-        }
-
-        targetValid = rReg.valid(m_orbiting);
-
-        if (targetValid)
-        {
-            // enable the first MachineUserControl
-            ActiveEnt firstPart
-                    = *(view.get<ACompVehicle>(m_orbiting).m_parts.begin());
-
-            auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
-            if (pMUserCtrl != nullptr) { pMUserCtrl->enable(); }
-        }
-
-        // pick next entity, or first entity in scene
-        //ActiveEnt search = targetValid
-        //        ? m_scene.reg_get<ACompHierarchy>(m_orbiting).m_siblingNext
-        //        : m_scene.reg_get<ACompHierarchy>(m_scene.hier_get_root())
-        //                 .m_childFirst;
-
-        // keep looping until a vehicle is found
-        //while ((!m_scene.get_registry().has<ACompVehicle>(search)))
-        //{
-        //    search = m_scene.reg_get<ACompHierarchy>(search).m_siblingNext;
-        //}
-    }
-
-    if (!targetValid)
+    if (!rReg.valid(vehicle))
     {
         return;
     }
 
+    // enable the first MachineUserControl
+    ActiveEnt firstPart = *(rReg.get<ACompVehicle>(vehicle).m_parts.begin());
+
+    auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
+    if (pMUserCtrl != nullptr) { pMUserCtrl->enable(); }
+
+
     Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
-    Matrix4 const& xformTgt = m_scene.reg_get<ACompTransform>(m_orbiting).m_transform;
+    Matrix4 const& xformTgt = m_scene.reg_get<ACompTransform>(vehicle).m_transform;
 
     using osp::active::SysPhysics_t;
     // Compute Center of Mass of target, if it's a rigid body
-    auto [rbEnt, pCompRb] = SysPhysics_t::find_rigidbody_ancestor(m_scene, m_orbiting);
+    auto [rbEnt, pCompRb] = SysPhysics_t::find_rigidbody_ancestor(m_scene, vehicle);
     Vector3 comOset{0.0f};
     if (pCompRb != nullptr)
     {
@@ -268,8 +269,88 @@ void DebugCameraController::update_physics_post()
         xformTgt.translation() + comOset, xform[1].xyz());
 }
 
-void DebugCameraController::view_orbit(ActiveEnt ent)
+
+bool DebugCameraController::try_switch_vehicle()
 {
-    m_orbiting = ent;
+    ACompAreaLink *areaLink =  SysAreaAssociate::try_get_area_link(m_scene);
+
+    if (areaLink == nullptr)
+    {
+        return false; // Scene is not linked to any universe
+    }
+
+    ActiveEnt vehicle = try_get_vehicle_ent();
+    Vector3 prevVehiclePos;
+
+    auto& rReg = m_scene.get_registry();
+    auto viewActive = rReg.view<ACompVehicle>();
+
+    if (m_scene.get_registry().valid(vehicle))
+    {
+        // Switching away, disable the first MachineUserControl
+        ActiveEnt firstPart
+                = *(viewActive.get<ACompVehicle>(vehicle).m_parts.begin());
+        auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
+        if (pMUserCtrl != nullptr) { pMUserCtrl->disable(); }
+
+        prevVehiclePos = rReg.get<ACompTransform>(vehicle).m_transform.translation();
+    }
+
+    Universe &rUni = areaLink->get_universe();
+    auto viewUni = rUni.get_reg().view<UCompVehicle>();
+    auto it = viewUni.find(m_selected);
+
+    if (it == viewUni.end() || it == viewUni.begin())
+    {
+        // no vehicle selected, or last vehicle is selected (loop around)
+        m_selected = viewUni.back();
+    }
+    else
+    {
+        // pick the next vehicle
+        m_selected = *(--it);
+    }
+
+    if (rUni.get_reg().valid(m_selected))
+    {
+        std::cout << "Selected: "
+                  << rUni.get_reg().get<UCompTransformTraj>(m_selected).m_name
+                  << "\n";
+
+        return true;
+    }
+
+    return false;
+}
+
+ActiveEnt DebugCameraController::try_get_vehicle_ent()
+{
+    auto& rReg = m_scene.get_registry();
+    auto viewVehicles = rReg.view<ACompVehicle>();
+
+    if (viewVehicles.empty())
+    {
+        // No vehicles in scene!
+        return entt::null;
+    }
+
+    ACompAreaLink *areaLink =  SysAreaAssociate::try_get_area_link(m_scene);
+
+    if (areaLink == nullptr)
+    {
+        return entt::null; // Scene not connected to universe
+    }
+
+    auto findIt = areaLink->m_inside.find(m_selected);
+
+    if (findIt != areaLink->m_inside.end())
+    {
+        ActiveEnt activated = findIt->second;
+        if (rReg.valid(activated))
+        {
+            return activated;
+        }
+    }
+    return entt::null;
 }
 

@@ -62,57 +62,45 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
     auto &stationary = rUni.trajectory_create<TrajStationary>(
                                         rUni, rUni.sat_root());
 
-    // Create 10 random vehicles
-    for (int i = 0; i < 10; i ++)
+    // Create 4 part vehicles
+    for (int i = 0; i < 4; i ++)
     {
-        // Creates a random mess of spamcans as a vehicle
-        Satellite sat = debug_add_random_vehicle(rUni, rPkg, "TestyMcTestFace Mk"
-                                                 + std::to_string(i));
+        Satellite sat = testapp::debug_add_part_vehicle(rUni, rPkg, "Placeholder Mk. I " + std::to_string(i));
 
         auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
 
-        posTraj.m_position = osp::Vector3s(i * 1024l * 5l, 0l, 0l);
+        posTraj.m_position = osp::Vector3s(i * 1024l * 4l, 0l, 0l);
         posTraj.m_dirty = true;
 
         stationary.add(sat);
     }
 
-    Satellite sat = debug_add_deterministic_vehicle(rUni, rPkg, "Stomper Mk. I");
+    /*Satellite sat = debug_add_deterministic_vehicle(rUni, rPkg, "Stomper Mk. I");
     auto& posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
     posTraj.m_position = osp::Vector3s(22 * 1024l * 5l, 0l, 0l);
     posTraj.m_dirty = true;
-    stationary.add(sat);
+    stationary.add(sat);*/
 
 
-    // Add Grid of planets too
+    // Add Moon
 
-    for (int x = -0; x < 1; x ++)
-    {
-        for (int z = -0; z < 1; z ++)
-        {
-            Satellite sat = rUni.sat_create();
+    Satellite moonSat = rUni.sat_create();
 
-            // Create the real world moon
-            float radius = 1.737E+6;
-            float mass = 7.347673E+22;
+    // Create the real world moon
+    float radius = 1.737E+6;
+    float mass = 7.347673E+22;
 
-            float resolutionScreenMax = 0.056f;
-            float resolutionSurfaceMax = 12.0f;
+    float resolutionScreenMax = 0.056f;
+    float resolutionSurfaceMax = 12.0f;
 
-            // assign sat as a planet
-            UCompPlanet &planet = SatPlanet::add_planet(
-                        rUni, sat, radius, mass, resolutionSurfaceMax,
-                        resolutionScreenMax);
+    // assign sat as a planet
+    SatPlanet::add_planet(rUni, moonSat, radius, mass, resolutionSurfaceMax,
+                          resolutionScreenMax);
 
-            auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
+    auto &moonPosTraj = rUni.get_reg().get<UCompTransformTraj>(moonSat);
 
-            // space planets 400m apart from each other
-            // 1024 units = 1 meter
-            posTraj.m_position = {x * 1024l * 400l,
-                                  -1024l * osp::SpaceInt(1.74E+6),
-                                  z * 1024l * 400l};
-        }
-    }
+    // 1024 units = 1 meter
+    moonPosTraj.m_position = {0 * 1024l, 1024l * osp::SpaceInt(1.74E+6), 0 * 1024l};
 
     std::cout << "Created Large Planet umm... moon!\n";
 }

@@ -54,7 +54,7 @@ using planeta::universe::UCompPlanet;
 void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
 {
     Universe &rUni = ospApp.get_universe();
-    Package &pkg = ospApp.debug_find_package("lzdb");
+    Package &rPkg = ospApp.debug_find_package("lzdb");
 
     // Create trajectory that will make things added to the universe stationary
     auto &stationary = rUni.trajectory_create<TrajStationary>(
@@ -64,7 +64,7 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
     for (int i = 0; i < 1; i ++)
     {
         // Creates a random mess of spamcans as a vehicle
-        Satellite sat = debug_add_random_vehicle(rUni, pkg, "TestyMcTestFace Mk"
+        Satellite sat = debug_add_random_vehicle(rUni, rPkg, "TestyMcTestFace Mk"
                                                  + std::to_string(i));
 
         auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
@@ -76,7 +76,7 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
     }
 
     //Satellite sat = debug_add_deterministic_vehicle(uni, pkg, "Stomper Mk. I");
-    Satellite sat = testapp::debug_add_part_vehicle(rUni, pkg, "Placeholder Mk. I");
+    Satellite sat = testapp::debug_add_part_vehicle(rUni, rPkg, "Placeholder Mk. I");
     auto& posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
     posTraj.m_position = osp::Vector3s(22 * 1024l * 5l, 0l, 0l);
     posTraj.m_dirty = true;
@@ -109,7 +109,7 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
             // 1024 units = 1 meter
             posTraj.m_position = {x * 1024l * 400l,
                                   1024l * -300l,
-                                  z * 1024l * 400l};
+                                  z * 1024l * 6000l};
         }
     }
 
