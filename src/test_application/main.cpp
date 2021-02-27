@@ -38,9 +38,11 @@
 
 #include <planet-a/Satellites/SatPlanet.h>
 
-#include <iostream>
+#include <Corrade/Utility/Arguments.h>
+
 #include <memory>
 #include <thread>
+#include <iostream>
 
 using namespace testapp;
 
@@ -89,22 +91,61 @@ char** g_argv;
 
 int main(int argc, char** argv)
 {
+    Corrade::Utility::Arguments args;
+    args.addOption("scene", "simple").setHelp("scene", "Set the scene to launch")
+        .addOption("config").setHelp("config", "path to configuration file to use")
+        .addBooleanOption("repl").setHelp("repl", "enter read, evaluate, print, loop.")
+        .addBooleanOption('v', "verbose").setHelp("verbose", "log verbosely")
+        .setGlobalHelp("Helptext goes here.")
+        .parse(argc, argv);
+
     // just lazily save the arguments
     g_argc = argc;
     g_argv = argv;
 
     load_a_bunch_of_stuff();
 
+    if( ! args.value("scene").empty())
+    {
+        if(args.value("scene") == "simple")
+        {
+            create_simple_solar_system(g_osp);
+        }
+        else if(args.value("scene") == "moon")
+        {
+            create_real_moon(g_osp);
+        }
+        else
+        {
+            std::cerr << "unknown scene" << std::endl;
+            exit(-1);
+        }
 
-    create_simple_solar_system(g_osp);
+        if (g_magnumThread.joinable())
+        {
+            g_magnumThread.join();
+        }
+        std::thread t(test_flight, std::ref(g_ospMagnum), std::ref(g_osp),
+                      OSPMagnum::Arguments{g_argc, g_argv});
+        g_magnumThread.swap(t);
+    }
 
-    // start doing debug cli loop
-    return debug_cli_loop();
+    if(args.isSet("repl"))
+    {
+        // start doing debug cli loop
+        debug_cli_loop();
+    }
+
+    // wait for magnum thread to exit if it exists
+    if (g_magnumThread.joinable())
+    {
+        g_magnumThread.join();
+    }
+    return 0;
 }
 
 int debug_cli_loop()
 {
-
     debug_print_help();
 
     std::string command;
@@ -172,12 +213,6 @@ int debug_cli_loop()
         {
             std::cout << "that doesn't do anything ._.\n";
         }
-    }
-
-    // wait for magnum thread to exit if it exists
-    if (g_magnumThread.joinable())
-    {
-        g_magnumThread.join();
     }
 
     return 0;
