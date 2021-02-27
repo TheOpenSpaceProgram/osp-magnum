@@ -7,9 +7,6 @@
 [submodule "3rdparty/magnum-plugins"]
 	path = 3rdparty/magnum-plugins
 	url = https://github.com/mosra/magnum-plugins.git
-[submodule "magnum-plugins"]
-	path = magnum-plugins
-	url = https://github.com/mosra/magnum-plugins.git
 [submodule "3rdparty/magnum-integration"]
 	path = 3rdparty/magnum-integration
 	url = https://github.com/mosra/magnum-integration.git
@@ -25,3 +22,6 @@
 [submodule "3rdparty/spdlog"]
 	path = 3rdparty/spdlog
 	url = https://github.com/gabime/spdlog
+[submodule "3rdparty/SDL2"]
+	path = 3rdparty/SDL2
+	url = https://github.com/libsdl-org/SDL.git
