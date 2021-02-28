@@ -92,9 +92,10 @@ char** g_argv;
 int main(int argc, char** argv)
 {
     Corrade::Utility::Arguments args;
-    args.addOption("scene", "simple").setHelp("scene", "Set the scene to launch")
+    args.addSkippedPrefix("magnum", "Magnum options")
+        .addOption("scene", "simple").setHelp("scene", "Set the scene to launch")
         .addOption("config").setHelp("config", "path to configuration file to use")
-        .addBooleanOption("repl").setHelp("repl", "enter read, evaluate, print, loop.")
+        .addBooleanOption("norepl").setHelp("norepl", "don't enter read, evaluate, print, loop.")
         .addBooleanOption('v', "verbose").setHelp("verbose", "log verbosely")
         .setGlobalHelp("Helptext goes here.")
         .parse(argc, argv);
@@ -130,7 +131,7 @@ int main(int argc, char** argv)
         g_magnumThread.swap(t);
     }
 
-    if(args.isSet("repl"))
+    if(!args.isSet("norepl"))
     {
         // start doing debug cli loop
         debug_cli_loop();
