@@ -33,10 +33,10 @@ BlueprintPart& BlueprintVehicle::add_part(
         const Quaternion& rotation,
         const Vector3& scale)
 {
-    unsigned partIndex = m_prototypes.size();
+    size_t partIndex = m_prototypes.size();
 
     // check if the part is added already.
-    for (unsigned i = 0; i < partIndex; i ++)
+    for (size_t i = 0; i < partIndex; i ++)
     {
         const DependRes<PrototypePart>& dep = m_prototypes[i];
 
@@ -63,7 +63,7 @@ BlueprintPart& BlueprintVehicle::add_part(
 
     BlueprintPart blueprint
     {
-        partIndex,
+        static_cast<uint32_t>(partIndex),
         translation,
         rotation,
         scale,
@@ -76,8 +76,8 @@ BlueprintPart& BlueprintVehicle::add_part(
 }
 
 void BlueprintVehicle::add_wire(
-        unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
-        unsigned toPart, unsigned toMachine, WireInPort toPort)
+        uint32_t fromPart, uint32_t fromMachine, WireOutPort fromPort,
+        uint32_t toPart, uint32_t toMachine, WireInPort toPort)
 {
     m_wires.emplace_back(fromPart, fromMachine, fromPort,
                          toPart, toMachine, toPort);

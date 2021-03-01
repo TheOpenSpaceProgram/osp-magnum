@@ -219,14 +219,14 @@ void SysVehicle::add_machines_to_object(ActiveScene& rScene,
     ActiveEnt partEnt, ActiveEnt objEnt,
     std::vector<PrototypeMachine> const& protoMachines,
     std::vector<BlueprintMachine> const& blueprintMachines,
-    std::vector<unsigned> const& machineIndices)
+    std::vector<uint32_t> const& machineIndices)
 {
     if (machineIndices.empty()) { return; }
 
     auto &compMachines =
         rScene.get_registry().get_or_emplace<ACompMachines>(partEnt);
 
-    for (unsigned i : machineIndices)
+    for (uint32_t i : machineIndices)
     {
         BlueprintMachine const& bpMachine = blueprintMachines[i];
         PrototypeMachine const& protoMachine = protoMachines[i];
@@ -355,9 +355,9 @@ std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_insta
 
             std::vector<DependRes<Texture2D>> textureResources;
             textureResources.reserve(drawable.m_textures.size());
-            for (unsigned i = 0; i < drawable.m_textures.size(); i++)
+            for (size_t i = 0; i < drawable.m_textures.size(); i++)
             {
-                unsigned texID = drawable.m_textures[i];
+                uint32_t texID = drawable.m_textures[i];
                 std::string const& texName = part.get_strings()[texID];
                 DependRes<Texture2D> texRes = glResources.get<Texture2D>(texName);
 
@@ -524,7 +524,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
             // NOTE: vehicleVehicle and vehicleTransform become invalid
             //       when emplacing new ones.
-            for (unsigned i = 1; i < islands.size(); i ++)
+            for (size_t i = 1; i < islands.size(); i ++)
             {
                 ActiveEnt islandEnt = rScene.hier_create_child(
                             rScene.hier_get_root());

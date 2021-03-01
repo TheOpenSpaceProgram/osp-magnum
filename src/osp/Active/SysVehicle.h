@@ -124,9 +124,9 @@ private:
     struct MachineDef
     {
         ActiveEnt m_machineOwner;
-        std::vector<unsigned> const& m_machineIndices;
+        std::vector<uint32_t> const& m_machineIndices;
 
-        MachineDef(ActiveEnt owner, std::vector<unsigned> const& indexArray)
+        MachineDef(ActiveEnt owner, std::vector<uint32_t> const& indexArray)
             : m_machineOwner(owner)
             , m_machineIndices(indexArray)
         {}

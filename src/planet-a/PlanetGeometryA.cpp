@@ -51,7 +51,7 @@ void planeta::update_range_insert(std::vector<UpdateRangeSub>& range,
 }
 
 void PlanetGeometryA::initialize(std::shared_ptr<IcoSphereTree> sphere,
-                                 unsigned chunkDiv, chindex_t maxChunks,
+                                 uint32_t chunkDiv, chindex_t maxChunks,
                                  vrindex_t maxShared)
 {
     //m_subdivAreaThreshold = 0.02f;
@@ -139,7 +139,7 @@ void PlanetGeometryA::initialize(std::shared_ptr<IcoSphereTree> sphere,
             {
                 for (int j = 0; j < 3; j ++)
                 {
-                    unsigned localIndex;
+                    planeta::loindex_t localIndex;
 
                     switch (j)
                     {
@@ -156,7 +156,7 @@ void PlanetGeometryA::initialize(std::shared_ptr<IcoSphereTree> sphere,
 
                     if (localIndex < m_vrtxSharedPerChunk)
                     {
-                        m_indToShared[localIndex] = unsigned(i + j);
+                        m_indToShared[localIndex] = uint32_t(i + j);
                     }
 
                 }
@@ -181,7 +181,7 @@ PlanetGeometryA::iterate_chunk(chindex_t c)
     return {begin, end};
 }
 
-loindex_t PlanetGeometryA::get_index_ringed(unsigned x, unsigned y) const
+loindex_t PlanetGeometryA::get_index_ringed(loindex_t x, loindex_t y) const
 {
     if (y == m_chunkWidthB) return x;           // Bottom edge
     if (x == 0) return m_chunkWidthB * 2 + y;   // Left edge
@@ -191,8 +191,8 @@ loindex_t PlanetGeometryA::get_index_ringed(unsigned x, unsigned y) const
 
 struct VertexToSubdiv
 {
-    unsigned m_x, m_y;
-    unsigned m_vrtxIndex;
+    loindex_t m_x, m_y;
+    loindex_t m_vrtxIndex;
 };
 
 // temporary
@@ -450,7 +450,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
     m_toSubdiv.push(initTri); // add the first triangle
 
     // keep track of the non-shared center chunk vertices
-    unsigned centerIndex = 0;
+    loindex_t centerIndex = 0;
 
     int iteration = 0; // used for debugging
     while (!m_toSubdiv.empty())
@@ -598,7 +598,7 @@ void PlanetGeometryA::chunk_add(trindex_t triInd)
 
     // This data will be pushed directly into the chunk index buffer
     // * 3 because there are 3 indices in a triangle
-    std::vector<unsigned> chunkIndData(m_indxPerChunk * 3);
+    std::vector<buindex_t> chunkIndData(m_indxPerChunk * 3);
     int i = 0;
 
     for (int y = 0; y < int(m_chunkWidthB); y ++)
@@ -712,9 +712,9 @@ void PlanetGeometryA::chunk_edge_transition(trindex_t triInd, triside_t side,
 
     //unsigned start = m_chunkWidthB * unsigned(side);
     //unsigned stop = start + m_chunkWidthB;
-    unsigned step = (1 << (tri.m_depth - depth));
+    uint32_t step = (1 << (tri.m_depth - depth));
 
-    for (unsigned i = 0; i < m_chunkWidthB; i += step)
+    for (uint32_t i = 0; i < m_chunkWidthB; i += step)
     {
         vrindex_t vrtxA = shared_from_tri(chunk, side, i);
         vrindex_t vrtxB = shared_from_tri(chunk, side, i + step);
@@ -727,7 +727,7 @@ void PlanetGeometryA::chunk_edge_transition(trindex_t triInd, triside_t side,
 
         //std::cout << "dir: " << dir.length() << "\n";
 
-        for (unsigned j = 1; j < step; j ++)
+        for (uint32_t j = 1; j < step; j ++)
         {
             vrindex_t vrtxMid = shared_from_tri(chunk, side, i + j);
             auto &posMid = get_vertex_component<Vector3>(
@@ -828,7 +828,7 @@ void PlanetGeometryA::chunk_remove(trindex_t triInd)
 
     // Now delete shared vertices
 
-    for (unsigned i = 0; i < m_vrtxSharedPerChunk; i ++)
+    for (loindex_t i = 0; i < m_vrtxSharedPerChunk; i ++)
     {
         vrindex_t sharedIndex = m_indxBuffer[m_indToShared[i]
                                              + rChunk.m_dataIndx];
@@ -1175,9 +1175,9 @@ void PlanetGeometryA::updates_clear()
 }
 
 
-unsigned PlanetGeometryA::debug_chunk_count_descendents(SubTriangle const& tri)
+uint32_t PlanetGeometryA::debug_chunk_count_descendents(SubTriangle const& tri)
 {
-    unsigned count = 0;
+    uint32_t count = 0;
 
     if (tri.m_subdivided)
     {
@@ -1217,7 +1217,7 @@ bool PlanetGeometryA::debug_verify_state()
 
     bool error = false;
 
-    unsigned chunkCount = 0;
+    size_t chunkCount = 0;
 
     for (trindex_t t = 0; t < m_triangleChunks.size(); t ++)
     {
@@ -1233,7 +1233,7 @@ bool PlanetGeometryA::debug_verify_state()
 
         // Count chunked descendents
 
-        unsigned countDescendentChunked = debug_chunk_count_descendents(tri);
+        uint32_t countDescendentChunked = debug_chunk_count_descendents(tri);
 
         if (countDescendentChunked != chunk.m_descendentChunked)
         {
@@ -1276,9 +1276,9 @@ bool PlanetGeometryA::debug_verify_state()
 
             // Count shared vertices
 
-            unsigned* triIndData = m_indxBuffer.data() + chunk.m_dataIndx;
+            planeta::trindex_t* triIndData = m_indxBuffer.data() + chunk.m_dataIndx;
 
-            for (unsigned i = 0; i < m_vrtxSharedPerChunk; i ++)
+            for (loindex_t i = 0; i < m_vrtxSharedPerChunk; i ++)
             {
                 vrindex_t sharedIndex = *(triIndData + m_indToShared[i]);
                 recountVrtxSharedUsers[sharedIndex] ++;
@@ -1295,7 +1295,7 @@ bool PlanetGeometryA::debug_verify_state()
     if (recountVrtxSharedUsers != m_vrtxSharedUsers)
     {
         std::cout << "* Invalid Shared vertex user count\n";
-        for (unsigned i = 0; i < m_vrtxSharedMax; i ++)
+        for (planeta::vrindex_t i = 0; i < m_vrtxSharedMax; i ++)
         {
             if (m_vrtxSharedUsers[i] != recountVrtxSharedUsers[i])
             {

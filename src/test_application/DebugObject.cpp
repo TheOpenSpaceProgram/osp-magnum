@@ -112,7 +112,7 @@ void DebugCameraController::update_vehicle_mod_pre()
         //tgtVehicle.m_separationCount = 1;
 
         // separate all parts into their own separation islands
-        for (unsigned i = 0; i < tgtVehicle.m_parts.size(); i ++)
+        for (size_t i = 0; i < tgtVehicle.m_parts.size(); i ++)
         {
             m_scene.reg_get<ACompPart>(tgtVehicle.m_parts[i])
                     .m_separationIsland = i;
