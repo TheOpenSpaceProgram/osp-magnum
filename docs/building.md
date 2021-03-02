@@ -25,7 +25,8 @@ Make sure submodules are up to date.
 
 ```bash
 # clone with --recurse-submodules
-git clone --recurse-submodules https://github.com/TheOpenSpaceProgram/osp-magnum.git```
+git clone --recurse-submodules https://github.com/TheOpenSpaceProgram/osp-magnum.git
+```
 
 or init them if you forgot to do so
 
