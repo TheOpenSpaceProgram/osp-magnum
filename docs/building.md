@@ -17,34 +17,34 @@ Other dependencies are included as submodules in the 3rdparty folder.
 ## Building on Linux
 To build this project do the following steps:
 1. Install cmake and (lib)**sdl2**(-dev) and git
-> > `sudo apt-get install cmake libsdl2-dev git`
+ `sudo apt-get install cmake libsdl2-dev git`
  
 2. Download the repo & cd into it
 
->Make sure submodules are up to date.
+Make sure submodules are up to date.
 
->>```bash
->># clone with --recurse-submodules
->>git clone --recurse-submodules https://github.com/TheOpenSpaceProgram/osp-magnum.git```
+```bash
+# clone with --recurse-submodules
+git clone --recurse-submodules https://github.com/TheOpenSpaceProgram/osp-magnum.git```
 
->or init them if you forgot to do so
+or init them if you forgot to do so
 
->>```bash
->>cd ./osp-magnum
->>git submodule init
->>git submodule update
->>```
+```bash
+cd ./osp-magnum
+git submodule init
+git submodule update
+```
 
 3. Build using CMake, make sure to build into a separate directory or it will not configure.
 
->FIXME: `cmake .` might have to be run twice to properly configure
+FIXME: `cmake .` might have to be run twice to properly configure
 
->Remove the --parallel flag if you don't want 100% of your CPU to be used.
+Remove the --parallel flag if you don't want 100% of your CPU to be used.
 
->>```bash
->>cmake -DCMAKE_BUILD_TYPE=Debug -B build
->>cmake --build build --parallel --config Debug
->>```
+```bash
+cmake -DCMAKE_BUILD_TYPE=Debug -B build
+cmake --build build --parallel --config Debug
+```
 
 This will build the executable in `build/bin/osp-magnum`
 
