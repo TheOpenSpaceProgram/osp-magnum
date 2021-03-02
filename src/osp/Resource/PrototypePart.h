@@ -30,6 +30,7 @@
 #include <variant>
 
 #include "../types.h"
+#include "osp/CommonPhysics.h"
 
 namespace osp
 {
@@ -42,18 +43,6 @@ enum class ObjectType
     //ATTACHMENT  //
 };
 
-enum class ECollisionShape : uint8_t
-{
-    NONE,
-    COMBINED,
-    SPHERE,
-    BOX,
-    CAPSULE,
-    CYLINDER,
-    //MESH,
-    CONVEX_HULL,
-    TERRAIN
-};
 
 //const uint32_t gc_OBJ_MESH      = 1 << 2;
 //const uint32_t gc_OBJ_COLLIDER  = 1 << 3;
@@ -71,7 +60,7 @@ struct DrawableData
 
 struct ColliderData
 {
-    ECollisionShape m_type;
+    phys::ECollisionShape m_type;
     unsigned m_meshData;
 };
 
@@ -98,14 +87,16 @@ struct PrototypeObject
     std::variant<DrawableData, ColliderData> m_objectData;
 
     // Put more OSP-specific data in here
+
+    std::vector<unsigned> m_machineIndices;
 };
 
+using config_node_t = std::variant<double, int, std::string>;
 
 struct PrototypeMachine
 {
     std::string m_type;
-
-    // TODO: some sort of data
+    std::map<std::string, config_node_t> m_config;
 };
 
 /**
@@ -129,6 +120,10 @@ public:
     constexpr std::vector<PrototypeMachine> const& get_machines() const
     { return m_machines; }
 
+    constexpr float& get_mass() noexcept
+    { return m_mass; }
+    constexpr float get_mass() const noexcept
+    { return m_mass; }
 
     constexpr std::vector<std::string>& get_strings()
     { return m_strings; }
@@ -143,6 +138,8 @@ private:
     //std::vector<DependRes<MeshData3D> > m_meshDataUsed;
 
     // TODO: more OSP information
+
+    float m_mass;
 
     // std::vector <machines>
 

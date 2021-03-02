@@ -34,6 +34,8 @@
 
 #include <osp/Satellites/SatVehicle.h>
 
+#include <adera/ShipResources.h>
+
 #include <planet-a/Satellites/SatPlanet.h>
 
 #include <iostream>
@@ -74,6 +76,7 @@ void debug_print_help();
 void debug_print_sats();
 void debug_print_hier();
 void debug_print_update_order();
+void debug_print_machines();
 
 // Deals with the underlying OSP universe, with the satellites and stuff. A
 // Magnum application or OpenGL context is not required for the universe to
@@ -152,6 +155,10 @@ int debug_cli_loop()
         else if (command == "list_ent")
         {
             debug_print_hier();
+        }
+        else if (command == "list_mach")
+        {
+            debug_print_machines();
         }
         else if (command == "list_upd")
         {
@@ -234,8 +241,18 @@ void load_a_bunch_of_stuff()
 
     osp::AssetImporter::load_image(n256path, lazyDebugPack);
     osp::AssetImporter::load_image(n1024path, lazyDebugPack);
-    /*osp::AssetImporter::compile_tex(n256path, lazyDebugPack);
-    osp::AssetImporter::compile_tex(n1024path, lazyDebugPack);*/
+
+    // Load placeholder fuel type
+    using adera::active::machines::ShipResourceType;
+    ShipResourceType fuel;
+    fuel.m_identifier = "fuel";
+    fuel.m_displayName = "Rocket fuel";
+    fuel.m_quanta = 16;
+    fuel.m_mass = 1.0f;
+    fuel.m_volume = 0.001f;
+    fuel.m_density = fuel.m_mass / fuel.m_volume;
+
+    lazyDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
 
     // Add package to the univere
     g_osp.debug_add_package(std::move(lazyDebugPack));
@@ -251,9 +268,9 @@ void load_a_bunch_of_stuff()
 void register_universe_types()
 {
     osp::universe::Universe &uni = g_osp.get_universe();
-    uni.type_register<osp::universe::SatActiveArea>(uni);
-    uni.type_register<osp::universe::SatVehicle>(uni);
-    uni.type_register<planeta::universe::SatPlanet>(uni);
+    uni.sat_type_register<osp::universe::SatActiveArea>();
+    uni.sat_type_register<osp::universe::SatVehicle>();
+    uni.sat_type_register<planeta::universe::SatPlanet>();
 }
 
 void debug_print_help()
@@ -290,6 +307,37 @@ void debug_print_update_order()
     for (auto const& call : order.get_call_list())
     {
         std::cout << "* " << call.m_name << "\n";
+    }
+}
+
+void debug_print_machines()
+{
+    using osp::active::ACompHierarchy;
+    using osp::active::ActiveScene;
+    using osp::active::ActiveEnt;
+    using osp::active::ACompMachines;
+
+    if (!g_ospMagnum)
+    {
+        std::cout << "Can't do that yet, start the magnum application first!\n";
+        return;
+    }
+
+    ActiveScene& scene = g_ospMagnum->get_scenes().begin()->second;
+    auto view = scene.get_registry().view<ACompMachines>();
+
+    for (ActiveEnt ent : view)
+    {
+        ACompHierarchy& hier = scene.reg_get<ACompHierarchy>(ent);
+        std::cout << "[" << int(ent) << "]: " << hier.m_name << "\n";
+
+        auto& machines = scene.reg_get<ACompMachines>(ent);
+        for (ACompMachines::PartMachine const& mach : machines.m_machines)
+        {
+            ActiveEnt machEnt = mach.m_partEnt;
+            std::string const& sysName = mach.m_system->first;
+            std::cout << "  ->[" << int(machEnt) << "]: " << sysName << "\n";
+        }
     }
 }
 
@@ -357,12 +405,16 @@ void debug_print_hier()
 
 void debug_print_sats()
 {
+    using osp::universe::Universe;
     using osp::universe::UCompTransformTraj;
     using osp::universe::UCompType;
 
-    osp::universe::Universe const &universe = g_osp.get_universe();
+    Universe const &rUni = g_osp.get_universe();
 
-    auto const view = universe.get_reg().view<const UCompTransformTraj,
+    std::vector<std::string_view> const& typeSatNames
+            = rUni.sat_type_get_names();
+
+    auto const view = rUni.get_reg().view<const UCompTransformTraj,
                                               const UCompType>();
 
     for (osp::universe::Satellite sat : view)
@@ -373,9 +425,10 @@ void debug_print_sats()
         osp::Vector3s const &pos = posTraj.m_position;
 
         std::cout << "SATELLITE: \"" << posTraj.m_name << "\" \n";
-        if (type.m_type != nullptr)
+        if (type.m_type != osp::universe::TypeSatIndex::Invalid)
         {
-            std::cout << " * Type: " << type.m_type->get_name() << "\n";
+            std::cout << " * Type: " << typeSatNames[size_t(type.m_type)]
+                      << "\n";
         }
 
         if (posTraj.m_trajectory != nullptr)

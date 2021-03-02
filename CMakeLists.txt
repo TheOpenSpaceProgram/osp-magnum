@@ -35,6 +35,8 @@ PROJECT(OSP-MAGNUM CXX)
 OPTION(OSP_BUILD_SANATIZER          "Build with the address sanatizer" OFF)
 OPTION(OSP_WARNINGS_ARE_ERRORS      "Build with the flag -Werror" OFF)
 OPTION(OSP_ENABLE_COMPILER_WARNINGS "Build with the majority of compiler warnings enabled" OFF)
+OPTION(OSP_ENABLE_IWYU              "Build with warnings from IWYU turned on" OFF)
+OPTION(OSP_ENABLE_CLANG_TIDY        "Build with warnings from clang-tidy turned on" OFF)
 
 # Define target name
 SET(TARGET_NAME OSP-MAGNUM)
@@ -119,6 +121,14 @@ ELSE()
   ELSE()
     MESSAGE(STATUS "IPO / LTO not supported: <${error}>")
   ENDIF()
+ENDIF()
+
+# Force Runtime output directory into build/bin folder; force multiprocessor compilation for all projects
+IF(MSVC)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG> CACHE PATH "")
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/lib CACHE PATH "")
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/lib CACHE PATH "")
+  add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
 ENDIF()
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/" ${CMAKE_MODULE_PATH})

@@ -92,12 +92,8 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
     auto& posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
     posTraj.m_name = name;
 
-    // Make it into a vehicle
-    auto& typeVehicle = *static_cast<SatVehicle*>(
-            uni.sat_type_find("Vehicle")->second.get());
-
-    UCompVehicle &vehicle = typeVehicle.add_get_ucomp(sat);
-    vehicle.m_blueprint = std::move(depend);
+    // Make the satellite into a vehicle
+    SatVehicle::add_vehicle(uni, sat, std::move(depend));
 
     return sat;
 }
@@ -154,13 +150,8 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
     auto &posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
     posTraj.m_name = name;
 
-    // Make it into a vehicle
-    auto &typeVehicle = *static_cast<SatVehicle*>(
-            uni.sat_type_find("Vehicle")->second.get());
-    UCompVehicle &UCompVehicle = typeVehicle.add_get_ucomp(sat);
-
-    // set the SatVehicle's blueprint to the one just made
-    UCompVehicle.m_blueprint = std::move(depend);
+    // Make the satellite into a vehicle
+    SatVehicle::add_vehicle(uni, sat, std::move(depend));
 
     return sat;
 
@@ -204,45 +195,48 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     BlueprintVehicle blueprint;
 
     // Parts
-    auto capsule = pkg.get<PrototypePart>("part_phCapsule");
-    auto fuselage = pkg.get<PrototypePart>("part_phFuselage");
-    auto engine = pkg.get<PrototypePart>("part_phEngine");
-    auto rcs = pkg.get<PrototypePart>("part_phLinRCS");
+    DependRes<PrototypePart> capsule = pkg.get<PrototypePart>("part_phCapsule");
+    DependRes<PrototypePart> fuselage = pkg.get<PrototypePart>("part_phFuselage");
+    DependRes<PrototypePart> engine = pkg.get<PrototypePart>("part_phEngine");
+    DependRes<PrototypePart> rcs = pkg.get<PrototypePart>("part_phLinRCS");
 
     Vector3 cfOset = part_offset(*capsule, "attach_bottom_capsule",
         *fuselage, "attach_top_fuselage");
     Vector3 feOset = part_offset(*fuselage, "attach_bottom_fuselage",
         *engine, "attach_top_eng");
-    Vector3 rcsOsetTop = Vector3{1.0f, 0.0f, 2.0f};
-    Vector3 rcsOsetBtm = Vector3{1.0f, 0.0f, -2.0f};
+    Vector3 rcsOsetTop = cfOset + Vector3{1.0f, 0.0f, 2.0f};
+    Vector3 rcsOsetBtm = cfOset + Vector3{1.0f, 0.0f, -2.0f};
 
     Quaternion idRot;
     Vector3 scl{1};
-    Magnum::Rad qtrTurn(90.0_degf);
+    Magnum::Rad qtrTurn(-90.0_degf);
     Quaternion rotY_090 = Quaternion::rotation(qtrTurn, Vector3{0, 1, 0});
     Quaternion rotZ_090 = Quaternion::rotation(qtrTurn, Vector3{0, 0, 1});
     Quaternion rotZ_180 = Quaternion::rotation(2 * qtrTurn, Vector3{0, 0, 1});
     Quaternion rotZ_270 = Quaternion::rotation(3 * qtrTurn, Vector3{0, 0, 1});
 
     blueprint.add_part(capsule, Vector3{0}, idRot, scl);
-    blueprint.add_part(fuselage, cfOset, idRot, scl);
-    blueprint.add_part(engine, cfOset + feOset, idRot, scl);
+
+    auto& fuselageBP = blueprint.add_part(fuselage, cfOset, idRot, scl);
+    fuselageBP.m_machines[1].m_config.emplace("resourcename", "lzdb:fuel");
+
+    auto& engBP = blueprint.add_part(engine, cfOset + feOset, idRot, scl);
 
     Quaternion yz090 = rotZ_090 * rotY_090;
     Quaternion yz180 = rotZ_180 * rotY_090;
     Quaternion yz270 = rotZ_270 * rotY_090;
 
     // Top RCS ring
-    /*blueprint.add_part(rcs, rcsOsetTop, rotY_090, scl);
+    blueprint.add_part(rcs, rcsOsetTop, rotY_090, scl);
     blueprint.add_part(rcs, rotZ_090.transformVector(rcsOsetTop), yz090, scl);
     blueprint.add_part(rcs, rotZ_180.transformVector(rcsOsetTop), yz180, scl);
-    blueprint.add_part(rcs, rotZ_270.transformVector(rcsOsetTop), yz270, scl);*/
+    blueprint.add_part(rcs, rotZ_270.transformVector(rcsOsetTop), yz270, scl);
 
     // Top RCS ring
-    /*blueprint.add_part(rcs, rcsOsetBtm, rotY_090, scl);
+    blueprint.add_part(rcs, rcsOsetBtm, rotY_090, scl);
     blueprint.add_part(rcs, rotZ_090.transformVector(rcsOsetBtm), yz090, scl);
     blueprint.add_part(rcs, rotZ_180.transformVector(rcsOsetBtm), yz180, scl);
-    blueprint.add_part(rcs, rotZ_270.transformVector(rcsOsetBtm), yz270, scl);*/
+    blueprint.add_part(rcs, rotZ_270.transformVector(rcsOsetBtm), yz270, scl);
 
     enum Parts
     {
@@ -275,6 +269,15 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
         Parts::CAPSULE, 0, 0,
         Parts::ENGINE, 0, 0);
 
+    // Wire attitude control to RCS control, and RCS control to RCS rocket
+    for (auto port : rcsPorts)
+    {
+        blueprint.add_wire(Parts::CAPSULE, 0, 0,
+            port, 0, 0);
+        blueprint.add_wire(port, 0, 0,
+            port, 1, 2);
+    }
+
     // Put blueprint in package
     auto depend = pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
 
@@ -284,13 +287,8 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     auto& posTraj = uni.get_reg().get<osp::universe::UCompTransformTraj>(sat);
     posTraj.m_name = name;
 
-    // Make it into a vehicle
-    auto& typeVehicle = *static_cast<osp::universe::SatVehicle*>(
-        uni.sat_type_find("Vehicle")->second.get());
-    osp::universe::UCompVehicle& compVeh = typeVehicle.add_get_ucomp(sat);
-
-    // Set the SatVehicle's blueprint to the one just made
-    compVeh.m_blueprint = std::move(depend);
+    // Make the satellite into a vehicle
+    SatVehicle::add_vehicle(uni, sat, std::move(depend));
 
     return sat;
 }

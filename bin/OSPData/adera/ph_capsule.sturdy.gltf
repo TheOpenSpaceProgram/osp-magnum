@@ -54,7 +54,7 @@
                     }
                 ],
                 "manufacturer" : "ACME Placeholders",
-                "massdry" : 1000,
+                "massdry" : 1000.0,
                 "name" : "P1-ACE \"holder\" capsule"
             },
             "name" : "part_phCapsule"

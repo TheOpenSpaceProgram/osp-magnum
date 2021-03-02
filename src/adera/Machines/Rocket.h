@@ -23,9 +23,11 @@
  * SOFTWARE.
  */
 #pragma once
-
+#include <utility>
 #include <osp/Active/SysMachine.h>
 #include <osp/Active/physics.h>
+#include <osp/Resource/blueprints.h>
+#include "adera/ShipResources.h"
 
 namespace adera::active::machines
 {
@@ -38,12 +40,12 @@ class SysMachineRocket :
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "Rocket";
 
     SysMachineRocket(osp::active::ActiveScene &scene);
 
     //void update_sensor();
-    void update_physics();
+    void update_physics(osp::active::ActiveScene& rScene);
 
     /**
      * Attach a visual exhaust plume effect to MachineRocket
@@ -63,14 +65,15 @@ public:
      * @param ent The entity that owns the MachineRocket
      * @return The new MachineRocket instance
      */
-    osp::active::Machine& instantiate(osp::active::ActiveEnt ent) override;
+    osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
+        osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
 
     osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
 private:
 
     osp::active::UpdateOrderHandle_t m_updatePhysics;
-};
+}; // SysMachineRocket
 
 /**
  *
@@ -78,9 +81,22 @@ private:
 class MachineRocket : public osp::active::Machine
 {
     friend SysMachineRocket;
+    struct ResourceInput
+    {
+        osp::DependRes<ShipResourceType> m_type;
+        float m_massRateFraction;
+        osp::active::ActiveEnt m_sourceEnt;
+    };
+    using fuel_list_t = std::vector<ResourceInput>;
+
+    struct Parameters
+    {
+        float m_maxThrust;
+        float m_specImpulse;
+    };
 
 public:
-    MachineRocket();
+    MachineRocket(Parameters params, fuel_list_t& resources);
     MachineRocket(MachineRocket &&move) noexcept;
     MachineRocket& operator=(MachineRocket&& move) noexcept;
 
@@ -101,20 +117,25 @@ private:
     osp::active::WireInput m_wiThrottle { this, "Throttle" };
 
     osp::active::ActiveEnt m_rigidBody  { entt::null };
-};
+    fuel_list_t m_resourceLines;
 
-//-----------------------------------------------------------------------------
+    Parameters m_params;
+}; // MachineRocket
 
-inline MachineRocket::MachineRocket()
- : Machine(true)
+inline MachineRocket::MachineRocket(Parameters params, fuel_list_t& resources)
+    : Machine(true)
+    , m_params(params)
+    , m_resourceLines(std::move(resources))
 { }
 
 inline MachineRocket::MachineRocket(MachineRocket&& move) noexcept
- : Machine(std::move(move))
- , m_wiGimbal(this, std::move(move.m_wiGimbal))
- , m_wiIgnition(this, std::move(move.m_wiIgnition))
- , m_wiThrottle(this, std::move(move.m_wiThrottle))
- , m_rigidBody(std::move(move.m_rigidBody))
+   : Machine(std::move(move))
+   , m_wiGimbal(this, std::move(move.m_wiGimbal))
+   , m_wiIgnition(this, std::move(move.m_wiIgnition))
+   , m_wiThrottle(this, std::move(move.m_wiThrottle))
+   , m_rigidBody(std::move(move.m_rigidBody))
+   , m_params(std::move(move.m_params))
+   , m_resourceLines(std::move(move.m_resourceLines))
 { }
 
 inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
@@ -124,6 +145,8 @@ inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
     m_wiIgnition = { this, std::move(move.m_wiIgnition) };
     m_wiThrottle = { this, std::move(move.m_wiThrottle) };
     m_rigidBody  = std::move(move.m_rigidBody);
+    m_params = std::move(move.m_params);
+    m_resourceLines = std::move(move.m_resourceLines);
     return *this;
 }
 

@@ -37,6 +37,8 @@
 
 #include <adera/Machines/UserControl.h>
 #include <adera/Machines/Rocket.h>
+#include <adera/Machines/RCSController.h>
+#include <adera/ShipResources.h>
 
 #include <planet-a/Active/SysPlanetA.h>
 #include <planet-a/Satellites/SatPlanet.h>
@@ -67,6 +69,8 @@ using osp::active::ACompFloatingOrigin;
 
 using adera::active::machines::SysMachineUserControl;
 using adera::active::machines::SysMachineRocket;
+using adera::active::machines::SysMachineRCSController;
+using adera::active::machines::SysMachineContainer;
 
 using planeta::universe::SatPlanet;
 
@@ -76,10 +80,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 {
 
     // Get needed variables
-    Universe &uni = rOspApp.get_universe();
-    auto &satAA = uni.sat_type_find<SatActiveArea>();
-    auto &satVehicle = uni.sat_type_find<SatVehicle>();
-    auto &satPlanet = uni.sat_type_find<SatPlanet>();
+    Universe &rUni = rOspApp.get_universe();
 
     // Create the application
     pMagnumApp = std::make_unique<OSPMagnum>(args, rOspApp);
@@ -92,31 +93,33 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Register dynamic systems needed for flight scene
 
-    auto &sysPhysics        = scene.dynamic_system_create<osp::active::SysPhysics_t>();
-    auto &sysWire           = scene.dynamic_system_create<osp::active::SysWire>();
-    auto &sysDebugRender    = scene.dynamic_system_create<osp::active::SysDebugRender>();
-    auto &sysArea           = scene.dynamic_system_create<osp::active::SysAreaAssociate>(uni);
-    auto &sysVehicle        = scene.dynamic_system_create<osp::active::SysVehicle>();
-    auto &sysExhaustPlume   = scene.dynamic_system_create<osp::active::SysExhaustPlume>();
-    auto &sysPlanet         = scene.dynamic_system_create<planeta::active::SysPlanetA>(pMagnumApp->get_input_handler());
-    auto &sysGravity        = scene.dynamic_system_create<osp::active::SysFFGravity>();
+    scene.dynamic_system_create<osp::active::SysPhysics_t>();
+    scene.dynamic_system_create<osp::active::SysWire>();
+    scene.dynamic_system_create<osp::active::SysDebugRender>();
+    scene.dynamic_system_create<osp::active::SysAreaAssociate>();
+    scene.dynamic_system_create<osp::active::SysVehicle>();
+    scene.dynamic_system_create<osp::active::SysExhaustPlume>();
+    scene.dynamic_system_create<planeta::active::SysPlanetA>(pMagnumApp->get_input_handler());
+    scene.dynamic_system_create<osp::active::SysFFGravity>();
 
     // Register machines for that scene
     scene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());
     scene.system_machine_create<SysMachineRocket>();
+    scene.system_machine_create<SysMachineRCSController>();
+    scene.system_machine_create<SysMachineContainer>();
 
     // Make active areas load vehicles and planets
-    sysArea.activator_add(&satVehicle, sysVehicle);
-    sysArea.activator_add(&satPlanet, sysPlanet);
+    //sysArea.activator_add(rUni.sat_type_find_index<SatVehicle>(), sysVehicle);
+    //sysArea.activator_add(rUni.sat_type_find_index<SatPlanet>(), sysPlanet);
 
     // create a Satellite with an ActiveArea
-    Satellite areaSat = uni.sat_create();
+    Satellite areaSat = rUni.sat_create();
 
     // assign sat as an ActiveArea
-    UCompActiveArea &area = satAA.add_get_ucomp(areaSat);
+    UCompActiveArea &area = SatActiveArea::add_active_area(rUni, areaSat);
 
     // Link ActiveArea to scene using the AreaAssociate
-    sysArea.connect(areaSat);
+    osp::active::SysAreaAssociate::connect(scene, rUni, areaSat);
 
     // Add default-constructed physics world to scene
     scene.get_registry().emplace<osp::active::ACompPhysicsWorld_t>(scene.hier_get_root());
@@ -155,7 +158,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     std::cout << "Magnum Application closed\n";
 
     // Disconnect ActiveArea
-    sysArea.disconnect();
+    osp::active::SysAreaAssociate::disconnect(scene);
 
     // destruct the application, this closes the window
     pMagnumApp.reset();

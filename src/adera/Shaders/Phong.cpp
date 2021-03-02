@@ -39,11 +39,17 @@ void Phong::draw_entity(ActiveEnt e,
 
     Magnum::Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;
 
+    /* 4th component indicates light type. A value of 0.0f indicates that the
+     * light is a direction light coming from the specified direction relative
+     * to the camera.
+     */
+    Magnum::Vector4 light = {shaderInstance.m_lightPosition, 0.0f};
+
     shader
         .bindDiffuseTexture(*shaderInstance.m_textures[0])
         .setAmbientColor(shaderInstance.m_ambientColor)
         .setSpecularColor(shaderInstance.m_specularColor)
-        .setLightPosition(shaderInstance.m_lightPosition)
+        .setLightPositions({light})
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
         .setNormalMatrix(entRelative.normalMatrix())

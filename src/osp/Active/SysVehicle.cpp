@@ -42,58 +42,61 @@
 using namespace osp;
 using namespace osp::active;
 
+using osp::universe::Universe;
+using osp::universe::Satellite;
+using osp::universe::TypeSatIndex;
+
 // for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;
 
 const std::string SysVehicle::smc_name = "Vehicle";
 
 SysVehicle::SysVehicle(ActiveScene &scene)
- : m_scene(scene)
+ : m_updateActivation(
+       scene.get_update_order(), "vehicle_activate", "", "vehicle_modification",
+       &SysVehicle::update_activate)
  , m_updateVehicleModification(
        scene.get_update_order(), "vehicle_modification", "", "physics",
-       [this] (ActiveScene& rScene) { this->update_vehicle_modification(rScene); })
+       &SysVehicle::update_vehicle_modification)
 { }
 
-StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
-                                         SysAreaAssociate &area,
-                                         universe::Satellite areaSat,
-                                         universe::Satellite tgtSat)
+
+ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
+                          universe::Satellite areaSat,
+                          universe::Satellite tgtSat)
 {
 
     std::cout << "loadin a vehicle!\n";
 
-    universe::Universe &uni = area.get_universe();
-    //SysVehicle& self = scene.get_system<SysVehicle>();
-    auto &loadMeVehicle
-            = uni.get_reg().get<universe::UCompVehicle>(tgtSat);
-    auto &tgtPosTraj
-            = uni.get_reg().get<universe::UCompTransformTraj>(tgtSat);
+    auto &loadMeVehicle = rUni.get_reg().get<universe::UCompVehicle>(tgtSat);
+    auto &tgtPosTraj = rUni.get_reg().get<universe::UCompTransformTraj>(tgtSat);
 
     // make sure there is vehicle data to load
     if (loadMeVehicle.m_blueprint.empty())
     {
         // no vehicle data to load
-        return {1, entt::null, false};
+        return entt::null;
     }
 
     BlueprintVehicle &vehicleData = *(loadMeVehicle.m_blueprint);
-    ActiveEnt root = scene.hier_get_root();
+    ActiveEnt root = rScene.hier_get_root();
 
     // Create the root entity to add parts to
 
-    ActiveEnt vehicleEnt = scene.hier_create_child(root, "Vehicle");
+    ActiveEnt vehicleEnt = rScene.hier_create_child(root, "Vehicle");
 
-    ACompVehicle& vehicleComp = scene.reg_emplace<ACompVehicle>(vehicleEnt);
+    rScene.reg_emplace<ACompActivatedSat>(vehicleEnt, tgtSat);
+
+    ACompVehicle& vehicleComp = rScene.reg_emplace<ACompVehicle>(vehicleEnt);
 
     // Convert position of the satellite to position in scene
-    Vector3 positionInScene
-            = area.get_universe().sat_calc_pos_meters(areaSat, tgtSat);
+    Vector3 positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat);
 
-    ACompTransform& vehicleTransform = scene.get_registry()
+    ACompTransform& vehicleTransform = rScene.get_registry()
                                         .emplace<ACompTransform>(vehicleEnt);
     vehicleTransform.m_transform
             = Matrix4::from(tgtPosTraj.m_rotation.toMatrix(), positionInScene);
-    scene.reg_emplace<ACompFloatingOrigin>(vehicleEnt);
+    rScene.reg_emplace<ACompFloatingOrigin>(vehicleEnt);
     //vehicleTransform.m_enableFloatingOrigin = true;
 
     // Create the parts
@@ -119,47 +122,39 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
         // Check if the part prototype this depends on still exists
         if (partDepends.empty())
         {
-            return {1, entt::null, false};
+            return entt::null;
         }
 
         PrototypePart &proto = *partDepends;
 
-        ActiveEnt partEntity = this->part_instantiate(proto, vehicleEnt);
+        auto const& [partEntity, machineMapping] = part_instantiate(rScene, proto,
+                        partBp, vehicleEnt);
+
         vehicleComp.m_parts.push_back(partEntity);
 
-        auto& partPart = scene.reg_emplace<ACompPart>(partEntity);
+        auto& partPart = rScene.reg_emplace<ACompPart>(partEntity);
         partPart.m_vehicle = vehicleEnt;
 
         // Part now exists
 
-        // TODO: Deal with blueprint machines instead of prototypes directly
-
-        auto &partMachines = scene.reg_emplace<ACompMachines>(partEntity);
-
-        for (PrototypeMachine& protoMachine : proto.get_machines())
-        {
-            MapSysMachine_t::iterator sysMachine
-                    = scene.system_machine_find(protoMachine.m_type);
-
-            if (!(scene.system_machine_it_valid(sysMachine)))
-            {
-                std::cout << "Machine: " << protoMachine.m_type << " Not found\n";
-                continue;
-            }
-
-            // TODO: pass the blueprint configs into this function
-            Machine& machine = sysMachine->second->instantiate(partEntity);
-
-            // Add the machine to the part
-            partMachines.m_machines.emplace_back(partEntity, sysMachine);
-
-        }
+        /* Deferred machine instantiation
+        * 
+        * Since machines may depend on the existence of other objects in the
+        * part's hierarchy, machine instantiation must be deferred until the
+        * entire hierarchy exists. For instance, a rocket engine's root
+        * "MachineRocket" machine may depend on the existence of a child node
+        * to receive an "ACompExhaustPlume" component that handles graphical
+        * effects related to the rocket machine, but that child node would not
+        * exist in time for the MachineRocket to be instantiated alongside
+        * the root part entity.
+        */
+        part_instantiate_machines(rScene, partEntity, machineMapping, proto, partBp);
 
         //std::cout << "empty? " << partMachines.m_machines.isEmpty() << "\n";
 
         //std::cout << "entity: " << int(partEntity) << "\n";
 
-        ACompTransform& partTransform = scene.get_registry()
+        ACompTransform& partTransform = rScene.get_registry()
                                             .get<ACompTransform>(partEntity);
 
         // set the transformation
@@ -174,7 +169,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
     // Wire the thing up
 
-    SysWire& sysWire = scene.dynamic_system_find<SysWire>();
+    SysWire& sysWire = rScene.dynamic_system_find<SysWire>();
 
     // Loop through wire connections
     for (BlueprintWire& blueprintWire : vehicleData.get_wires())
@@ -183,7 +178,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
         // get wire from
 
-        ACompMachines& fromMachines = scene.reg_get<ACompMachines>(
+        ACompMachines& fromMachines = rScene.reg_get<ACompMachines>(
                 *(vehicleComp.m_parts.begin() + blueprintWire.m_fromPart));
 
         auto fromMachineEntry = fromMachines
@@ -195,7 +190,7 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
 
         // get wire to
 
-        ACompMachines& toMachines = scene.reg_get<ACompMachines>(
+        ACompMachines& toMachines = rScene.reg_get<ACompMachines>(
                 *(vehicleComp.m_parts.begin() + blueprintWire.m_toPart));
 
         auto toMachineEntry = toMachines
@@ -211,36 +206,79 @@ StatusActivated SysVehicle::activate_sat(ActiveScene &scene,
     }
 
     // temporary: make the whole thing a single rigid body
-    auto& vehicleBody = scene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
-    ACompCollisionShape& vehicleShape = scene.reg_emplace<ACompCollisionShape>(vehicleEnt);
-    vehicleShape.m_shape = ECollisionShape::COMBINED;
+    auto& vehicleBody = rScene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
+    rScene.reg_emplace<ACompCollisionShape>(vehicleEnt,
+        nullptr, phys::ECollisionShape::COMBINED);
     //scene.dynamic_system_find<SysPhysics>().create_body(vehicleEnt);
 
-    return {0, vehicleEnt, true};
-}
-
-int SysVehicle::deactivate_sat(ActiveScene &scene, SysAreaAssociate &area,
-        universe::Satellite areaSat, universe::Satellite tgtSat,
-        ActiveEnt tgtEnt)
-{
-    area.sat_transform_update(tgtEnt);
-    return 0;
+    return vehicleEnt;
 }
 
 
-ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
-                                       ActiveEnt rootParent)
+void SysVehicle::add_machines_to_object(ActiveScene& rScene,
+    ActiveEnt partEnt, ActiveEnt objEnt,
+    std::vector<PrototypeMachine> const& protoMachines,
+    std::vector<BlueprintMachine> const& blueprintMachines,
+    std::vector<unsigned> const& machineIndices)
 {
+    if (machineIndices.empty()) { return; }
 
+    auto &compMachines =
+        rScene.get_registry().get_or_emplace<ACompMachines>(partEnt);
+
+    for (unsigned i : machineIndices)
+    {
+        BlueprintMachine const& bpMachine = blueprintMachines[i];
+        PrototypeMachine const& protoMachine = protoMachines[i];
+
+        MapSysMachine_t::iterator sysMachine
+            = rScene.system_machine_find(protoMachine.m_type);
+
+        if (!(rScene.system_machine_it_valid(sysMachine)))
+        {
+            std::cout << "Machine type: " << protoMachine.m_type << " Not found\n";
+            continue;
+        }
+
+        // Instantiate the machine for the object
+        sysMachine->second->instantiate(objEnt, protoMachine, bpMachine);
+
+        // Add a PartMachine definition to the root part's ACompMachines
+        compMachines.m_machines.emplace_back(objEnt, sysMachine);
+    }
+}
+
+void SysVehicle::part_instantiate_machines(ActiveScene& rScene, ActiveEnt partEnt,
+    std::vector<MachineDef> const& machineMapping,
+    PrototypePart const& part, BlueprintPart const& partBP)
+{
+    std::vector<PrototypeMachine> const& protoMachines = part.get_machines();
+    std::vector<BlueprintMachine> const& bpMachines = partBP.m_machines;
+    for (auto const& obj : machineMapping)
+    {
+        add_machines_to_object(rScene, partEnt, obj.m_machineOwner,
+            protoMachines, bpMachines, obj.m_machineIndices);
+    }
+}
+
+std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_instantiate(
+    ActiveScene& rScene, PrototypePart& part, BlueprintPart& blueprint, ActiveEnt rootParent)
+{
     std::vector<PrototypeObject> const& prototypes = part.get_objects();
     std::vector<ActiveEnt> newEntities(prototypes.size());
 
+    /* A list of MachineDefs, which catalog all part machines and the ActiveEnts
+     * that are created to represent the objects that own them
+     */
+    std::vector<MachineDef> machineMapping;
+    machineMapping.reserve(prototypes.size());
+
     //std::cout << "size: " << newEntities.size() << "\n";
 
-    for (unsigned i = 0; i < prototypes.size(); i ++)
+    for (size_t i = 0; i < prototypes.size(); i++)
     {
-        const PrototypeObject& currentPrototype = prototypes[i];
-        ActiveEnt currentEnt, parentEnt;
+        PrototypeObject const& currentPrototype = prototypes[i];
+        ActiveEnt parentEnt;
 
         // Get parent
         if (currentPrototype.m_parentIndex == i)
@@ -256,13 +294,13 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
         }
 
         // Create the new entity
-        currentEnt = m_scene.hier_create_child(parentEnt,
+        ActiveEnt currentEnt = rScene.hier_create_child(parentEnt,
                                                 currentPrototype.m_name);
         newEntities[i] = currentEnt;
 
         // Add and set transform component
         ACompTransform& currentTransform
-                = m_scene.reg_emplace<ACompTransform>(currentEnt);
+                = rScene.reg_emplace<ACompTransform>(currentEnt);
         currentTransform.m_transform
                 = Matrix4::from(currentPrototype.m_rotation.toMatrix(),
                                 currentPrototype.m_translation)
@@ -277,12 +315,12 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
 
             // Current prototype is a mesh, get the mesh and add it
 
-            Package& package = m_scene.get_application().debug_find_package("lzdb");
+            Package& package = rScene.get_application().debug_find_package("lzdb");
             const DrawableData& drawable =
                 std::get<DrawableData>(currentPrototype.m_objectData);
 
             //Mesh* mesh = nullptr;
-            Package& glResources = m_scene.get_context_resources();
+            Package& glResources = rScene.get_context_resources();
             DependRes<Mesh> meshRes = glResources.get<Mesh>(
                                             part.get_strings()[drawable.m_mesh]);
 
@@ -295,6 +333,7 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
             }
 
             std::vector<DependRes<Texture2D>> textureResources;
+            textureResources.reserve(drawable.m_textures.size());
             for (unsigned i = 0; i < drawable.m_textures.size(); i++)
             {
                 unsigned texID = drawable.m_textures[i];
@@ -317,38 +356,76 @@ ActiveEnt SysVehicle::part_instantiate(PrototypePart& part,
             shader.m_lightPosition = Vector3{10.0f, 15.0f, 5.0f};
             shader.m_ambientColor = 0x111111_rgbf;
             shader.m_specularColor = 0x330000_rgbf;
-            m_scene.reg_emplace<Phong::ACompPhongInstance>(currentEnt, std::move(shader));
+            rScene.reg_emplace<Phong::ACompPhongInstance>(currentEnt, std::move(shader));
 
-            CompDrawableDebug& bBocks = m_scene.reg_emplace<CompDrawableDebug>(
+            CompDrawableDebug& bBocks = rScene.reg_emplace<CompDrawableDebug>(
                         currentEnt, meshRes, &Phong::draw_entity, 0x0202EE_rgbf);
 
             //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
         }
         else if (currentPrototype.m_type == ObjectType::COLLIDER)
         {
-            ACompCollisionShape collision = m_scene.reg_emplace<ACompCollisionShape>(currentEnt);
+            ACompCollisionShape& collision = rScene.reg_emplace<ACompCollisionShape>(currentEnt);
             const ColliderData& cd = std::get<ColliderData>(currentPrototype.m_objectData);
             collision.m_shape = cd.m_type;
 
         }
+
+        // Save the list of machines this object owns
+        machineMapping.emplace_back(currentEnt, currentPrototype.m_machineIndices);
     }
 
-
-    // first element is 100% going to be the root object
-
-    // Temporary: add a rigid body root
-    //CompNewtonBody& nwtBody
-    //        = m_scene->get_registry().emplace<CompNewtonBody>(newEntities[0]);
-
+    // Create mass
+    rScene.reg_emplace<ACompMass>(newEntities[0], part.get_mass());
 
     // return root object
-    return newEntities[0];
+    return {newEntities[0], machineMapping};
+}
+
+void SysVehicle::update_activate(ActiveScene &rScene)
+{
+    ACompAreaLink *pArea = SysAreaAssociate::try_get_area_link(rScene);
+
+    if (pArea == nullptr)
+    {
+        return;
+    }
+
+    Universe &rUni = pArea->get_universe();
+    TypeSatIndex type = rUni.sat_type_find_index<universe::SatVehicle>();
+    ActivationTracker& activations = pArea->get_tracker(type);
+
+    // Delete vehicles that have gone too far from the ActiveArea range
+    for (auto const &[sat, ent] : activations.m_leave)
+    {
+        rScene.hier_destroy(ent);
+    }
+
+    // Update transforms of already-activated vehicle satellites
+    auto view = rScene.get_registry().view<ACompVehicle, ACompTransform,
+                                           ACompActivatedSat>();
+    for (ActiveEnt vehicleEnt : view)
+    {
+        auto &vehicleTf = view.get<ACompTransform>(vehicleEnt);
+        auto &vehicleSat = view.get<ACompActivatedSat>(vehicleEnt);
+        SysAreaAssociate::sat_transform_set_relative(
+            rUni, pArea->m_areaSat, vehicleSat.m_sat, vehicleTf.m_transform);
+    }
+
+    // Activate nearby vehicle satellites that have just entered the ActiveArea
+    for (auto &entered : activations.m_enter)
+    {
+        universe::Satellite sat = entered->first;
+        ActiveEnt &rEnt = entered->second;
+
+        rEnt = activate(rScene, rUni, pArea->m_areaSat, sat);
+    }
 }
 
 void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 {
-    auto view = m_scene.get_registry().view<ACompVehicle>();
-    auto viewParts = m_scene.get_registry().view<ACompPart>();
+    auto view = rScene.get_registry().view<ACompVehicle>();
+    auto viewParts = rScene.get_registry().view<ACompPart>();
 
     // this part is sort of temporary and unoptimized. deal with it when it
     // becomes a problem. TODO: use more views
@@ -356,16 +433,24 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
     for (ActiveEnt vehicleEnt : view)
     {
         ACompVehicle &vehicleVehicle = view.get(vehicleEnt);
-        auto &vehicleTransform = m_scene.reg_get<ACompTransform>(vehicleEnt);
         //std::vector<ActiveEnt> &parts = vehicleVehicle.m_parts;
 
-        if (vehicleVehicle.m_separationCount)
+        if (vehicleVehicle.m_separationCount > 0)
         {
             // Separation requested
 
             // mark collider as dirty
-            auto &rVehicleBody = m_scene.reg_get<ACompRigidBody_t>(vehicleEnt);
+            auto &rVehicleBody = rScene.reg_get<ACompRigidBody_t>(vehicleEnt);
             rVehicleBody.m_colliderDirty = true;
+
+            // Invalidate all ACompRigidbodyAncestors
+            auto invalidateAncestors = [&rScene](ActiveEnt e)
+            {
+                auto* pRBA = rScene.get_registry().try_get<ACompRigidbodyAncestor>(e);
+                if (pRBA) { pRBA->m_ancestor = entt::null; }
+                return EHierarchyTraverseStatus::Continue;
+            };
+            rScene.hierarchy_traverse(vehicleEnt, invalidateAncestors);
 
             // Create the islands vector
             // [0]: current vehicle
@@ -375,26 +460,26 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
             islands[0] = vehicleEnt;
 
+            // NOTE: vehicleVehicle and vehicleTransform become invalid
+            //       when emplacing new ones.
             for (unsigned i = 1; i < islands.size(); i ++)
             {
-                ActiveEnt islandEnt = m_scene.hier_create_child(
-                            m_scene.hier_get_root());
-                m_scene.reg_emplace<ACompVehicle>(islandEnt);
+                ActiveEnt islandEnt = rScene.hier_create_child(
+                            rScene.hier_get_root());
+                rScene.reg_emplace<ACompVehicle>(islandEnt);
                 auto &islandTransform
-                        = m_scene.reg_emplace<ACompTransform>(islandEnt);
+                        = rScene.reg_emplace<ACompTransform>(islandEnt);
                 auto &islandBody
-                        = m_scene.reg_emplace<ACompRigidBody_t>(islandEnt);
+                        = rScene.reg_emplace<ACompRigidBody_t>(islandEnt);
                 auto &islandShape
-                        = m_scene.reg_emplace<ACompCollisionShape>(islandEnt);
-                islandShape.m_shape = ECollisionShape::COMBINED;
+                        = rScene.reg_emplace<ACompCollisionShape>(islandEnt);
+                islandShape.m_shape = phys::ECollisionShape::COMBINED;
 
+                auto &vehicleTransform = rScene.reg_get<ACompTransform>(vehicleEnt);
                 islandTransform.m_transform = vehicleTransform.m_transform;
-                m_scene.reg_emplace<ACompFloatingOrigin>(islandEnt);
+                rScene.reg_emplace<ACompFloatingOrigin>(islandEnt);
 
                 islands[i] = islandEnt;
-
-                // note: vehicleVehicle and vehicleTransform become invalid
-                //       when emplacing new ones.
             }
 
 
@@ -403,17 +488,16 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             // * remove parts different islands, and move them to the new
             //   vehicle
 
-            ActiveScene &scene = m_scene;
 
-            entt::basic_registry<ActiveEnt> &reg = m_scene.get_registry();
-            auto removeDestroyed = [&viewParts, &scene, &islands]
+            entt::basic_registry<ActiveEnt> &reg = rScene.get_registry();
+            auto removeDestroyed = [&viewParts, &rScene, &islands]
                     (ActiveEnt partEnt) -> bool
             {
                 ACompPart &partPart = viewParts.get(partEnt);
                 if (partPart.m_destroy)
                 {
                     // destroy this part
-                    scene.hier_destroy(partEnt);
+                    rScene.hier_destroy(partEnt);
                     return true;
                 }
 
@@ -422,11 +506,11 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                     // separate into a new vehicle
 
                     ActiveEnt islandEnt = islands[partPart.m_separationIsland];
-                    auto &islandVehicle = scene.reg_get<ACompVehicle>(
+                    auto &islandVehicle = rScene.reg_get<ACompVehicle>(
                                 islandEnt);
                     islandVehicle.m_parts.push_back(partEnt);
 
-                    scene.hier_set_parent_child(islandEnt, partEnt);
+                    rScene.hier_set_parent_child(islandEnt, partEnt);
 
                     return true;
                 }
@@ -446,7 +530,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             {
                 ACompVehicle &islandVehicle = view.get(islandEnt);
                 auto &islandTransform
-                        = m_scene.reg_get<ACompTransform>(islandEnt);
+                        = rScene.reg_get<ACompTransform>(islandEnt);
 
                 Vector3 comOffset;
                 //float totalMass;
@@ -455,7 +539,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                 {
                     // TODO: deal with part mass
                     auto const &partTransform
-                            = m_scene.reg_get<ACompTransform>(partEnt);
+                            = rScene.reg_get<ACompTransform>(partEnt);
 
                     comOffset += partTransform.m_transform.translation();
 
@@ -467,10 +551,10 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
                 for (ActiveEnt partEnt : islandVehicle.m_parts)
                 {
-                    ActiveEnt child = m_scene.reg_get<ACompHierarchy>(partEnt)
+                    ActiveEnt child = rScene.reg_get<ACompHierarchy>(partEnt)
                                         .m_childFirst;
                     auto &partTransform
-                            = m_scene.reg_get<ACompTransform>(partEnt);
+                            = rScene.reg_get<ACompTransform>(partEnt);
 
                     partTransform.m_transform.translation() -= comOffset;
                 }

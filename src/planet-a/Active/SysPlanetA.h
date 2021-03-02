@@ -54,8 +54,7 @@ struct ACompPlanet
 };
 
 
-class SysPlanetA : public osp::active::IDynamicSystem,
-                   public osp::active::IActivator
+class SysPlanetA : public osp::active::IDynamicSystem
 {
 public:
 
@@ -65,17 +64,9 @@ public:
                osp::UserInputHandler &userInput);
     ~SysPlanetA() = default;
 
-    osp::active::StatusActivated activate_sat(
-            osp::active::ActiveScene &scene,
-            osp::active::SysAreaAssociate &area,
-            osp::universe::Satellite areaSat,
-            osp::universe::Satellite tgtSat);
-
-    int deactivate_sat(osp::active::ActiveScene &scene,
-                       osp::active::SysAreaAssociate &area,
-                       osp::universe::Satellite areaSat,
-                       osp::universe::Satellite tgtSat,
-                       osp::active::ActiveEnt tgtEnt);
+    static osp::active::ActiveEnt activate(
+            osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
+            osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat);
 
     void draw(osp::active::ACompCamera const& camera);
 
@@ -83,7 +74,10 @@ public:
                                      ACompPlanet &planet,
                                      chindex_t chunk);
 
-    void planet_update_geometry(osp::active::ActiveEnt planetEnt);
+    static void planet_update_geometry(osp::active::ActiveEnt planetEnt,
+                                osp::active::ActiveScene& rScene);
+
+    static void update_activate(osp::active::ActiveScene& rScene);
 
     void update_geometry(osp::active::ActiveScene& rScene);
 
@@ -93,6 +87,7 @@ private:
 
     osp::active::ActiveScene &m_scene;
 
+    osp::active::UpdateOrderHandle_t m_updateActivate;
     osp::active::UpdateOrderHandle_t m_updateGeometry;
     osp::active::UpdateOrderHandle_t m_updatePhysics;
 

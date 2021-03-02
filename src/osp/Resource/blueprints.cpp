@@ -27,7 +27,7 @@
 
 using namespace osp;
 
-void BlueprintVehicle::add_part(
+BlueprintPart& BlueprintVehicle::add_part(
         DependRes<PrototypePart>& prototype,
         const Vector3& translation,
         const Quaternion& rotation,
@@ -56,17 +56,28 @@ void BlueprintVehicle::add_part(
 
     // now we have a part index.
 
-    // just create a new part blueprint will all the data
+    // Create and default initialize object blueprint machines
+    size_t numMachines = prototype->get_machines().size();
+    std::vector<BlueprintMachine> machineBPs;
+    machineBPs.resize(numMachines);
 
-    BlueprintPart blueprint{partIndex, translation, rotation, scale};
+    BlueprintPart blueprint
+    {
+        partIndex,
+        translation,
+        rotation,
+        scale,
+        std::move(machineBPs)
+    };
 
     m_blueprints.push_back(std::move(blueprint));
 
+    return m_blueprints.back();
 }
 
 void BlueprintVehicle::add_wire(
         unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
-        unsigned toPart, unsigned toMachine, WireOutPort toPort)
+        unsigned toPart, unsigned toMachine, WireInPort toPort)
 {
     m_wires.emplace_back(fromPart, fromMachine, fromPort,
                          toPart, toMachine, toPort);

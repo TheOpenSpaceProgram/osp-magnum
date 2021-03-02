@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright Â© 2019-2020 Open Space Program Project
+ * Copyright © 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -24,38 +24,9 @@
  */
 #pragma once
 
-#include "SatActiveArea.h"
-
-#include "../Universe.h"
-
-#include "../Resource/Resource.h"
-#include "../Resource/blueprints.h"
-
-
-namespace osp::universe
+namespace osp::phys::constants
 {
 
-struct UCompVehicle
-{
-    DependRes<BlueprintVehicle> m_blueprint;
-};
+constexpr float g_0 = 9.80665f;
 
-class SatVehicle
-{
-public:
-
-    static constexpr std::string_view smc_name = "Vehicle";
-
-    /**
-     * Set the type of a Satellite and add a UCompVehicle to it
-     * @param rUni      [out] Universe containing satellite
-     * @param sat       [in] Satellite add a vehicle to
-     * @param blueprint [in] Vehicle data to open when activated
-     * @return Reference to UCompVehicle created
-     */
-    static UCompVehicle& add_vehicle(
-        osp::universe::Universe& rUni, osp::universe::Satellite sat,
-        DependRes<BlueprintVehicle> blueprint);
-};
-
-}
+} // namespace osp::phys

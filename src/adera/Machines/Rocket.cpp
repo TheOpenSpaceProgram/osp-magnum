@@ -32,16 +32,17 @@
 #include "osp/Resource/AssetImporter.h"
 #include "adera/Shaders/Phong.h"
 #include "adera/Shaders/PlumeShader.h"
+#include "osp/Resource/blueprints.h"
+#include "osp/PhysicsConstants.h"
 #include "adera/SysExhaustPlume.h"
 #include "adera/Plume.h"
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Math/Color.h>
+#include <Magnum/Math/Matrix4.h>
 
 using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
-
-const std::string SysMachineRocket::smc_name = "Rocket";
 
 void MachineRocket::propagate_output(WireOutput* output)
 {
@@ -60,6 +61,15 @@ WireOutput* MachineRocket::request_output(WireOutPort port)
 
 std::vector<WireInput*> MachineRocket::existing_inputs()
 {
+    /*std::vector<WireInput*> inputs;
+    inputs.reserve(3 + m_resourceLines.size());
+
+    inputs.insert(inputs.begin(), {&m_wiGimbal, &m_wiIgnition, &m_wiThrottle});
+    for (auto& resource : m_resourceLines)
+    {
+        inputs.push_back(&resource.m_lineIn);
+    }
+    return inputs;*/
     return {&m_wiGimbal, &m_wiIgnition, &m_wiThrottle};
 }
 
@@ -68,10 +78,10 @@ std::vector<WireOutput*> MachineRocket::existing_outputs()
     return {};
 }
 
-SysMachineRocket::SysMachineRocket(ActiveScene &scene) :
-    SysMachine<SysMachineRocket, MachineRocket>(scene),
-    m_updatePhysics(scene.get_update_order(), "mach_rocket", "wire", "physics",
-                    std::bind(&SysMachineRocket::update_physics, this))
+SysMachineRocket::SysMachineRocket(ActiveScene &rScene)
+    : SysMachine<SysMachineRocket, MachineRocket>(rScene)
+    , m_updatePhysics(rScene.get_update_order(), "mach_rocket", "controls", "physics",
+        [this](ActiveScene& rScene) { this->update_physics(rScene); })
 {
 
 }
@@ -80,94 +90,103 @@ SysMachineRocket::SysMachineRocket(ActiveScene &scene) :
 //{
 //}
 
-void SysMachineRocket::update_physics()
+void SysMachineRocket::update_physics(ActiveScene& rScene)
 {
-    auto view = m_scene.get_registry().view<MachineRocket>();
+    auto view = m_scene.get_registry().view<MachineRocket, ACompTransform>();
 
     for (ActiveEnt ent : view)
     {
         auto &machine = view.get<MachineRocket>(ent);
-
-        //if (!machine.m_enable)
-        //{
-        //    continue;
-        //}
-
-        //std::cout << "updating a rocket\n";
-
-        ACompRigidBody_t *compRb;
-        ACompTransform *compTf;
-
-        if (m_scene.get_registry().valid(machine.m_rigidBody))
+        if (!machine.m_enable)
         {
-            // Try to get the ACompRigidBody if valid
-            compRb = m_scene.get_registry()
-                            .try_get<ACompRigidBody_t>(machine.m_rigidBody);
-            compTf = m_scene.get_registry()
-                            .try_get<ACompTransform>(machine.m_rigidBody);
-            if (!compRb || !compTf)
+            continue;
+        }
+
+        // Check for nonzero throttle, continue otherwise
+        WireData *pThrottle = machine.m_wiThrottle.connected_value();
+        wiretype::Percent* pPercent = nullptr;
+        if (pThrottle != nullptr)
+        {
+            using wiretype::Percent;
+            pPercent = std::get_if<Percent>(pThrottle);
+            if ((pPercent == nullptr) || !(pPercent->m_value > 0.0f))
             {
-                machine.m_rigidBody = entt::null;
                 continue;
             }
         }
         else
         {
-            // rocket's rigid body not set yet
-            auto const& [bodyEnt, pBody]
-                    = SysPhysics_t::find_rigidbody_ancestor(m_scene, ent);
-
-            if (pBody == nullptr)
-            {
-                std::cout << "no rigid body!\n";
-                continue;
-            }
-
-            machine.m_rigidBody = bodyEnt;
-            compRb = pBody;
-            compTf = m_scene.get_registry().try_get<ACompTransform>(bodyEnt);
+            continue;
         }
+
+        // Check for adequate resource inputs
+        bool fail = false;
+        for (auto& resource : machine.m_resourceLines)
+        {
+            auto const* src = m_scene.reg_try_get<MachineContainer>(resource.m_sourceEnt);
+            if (!src)
+            {
+                std::cout << "Error: no source found\n";
+                fail = true;
+                break;
+            }
+            if (!src->check_contents().m_quantity > 0)
+            {
+                fail = true;
+                break;
+            }
+        }
+        if (fail)
+        {
+            continue;
+        }
+
+        // Perform physics calculation
+
+        // Get rigidbody ancestor and its transformation component
+        auto const* pRbAncestor =
+            SysPhysics_t::try_get_or_find_rigidbody_ancestor(rScene, ent);
+        auto& rCompRb = rScene.reg_get<ACompRigidBody_t>(pRbAncestor->m_ancestor);
+        auto const& rCompTf = rScene.reg_get<ACompTransform>(pRbAncestor->m_ancestor);
 
         if (WireData *ignition = machine.m_wiIgnition.connected_value())
         {
 
         }
 
-        using wiretype::Percent;
+        Matrix4 relTransform = pRbAncestor->m_relTransform;
 
-        if (WireData *throttle = machine.m_wiThrottle.connected_value())
+        /* Compute thrust force
+            * Thrust force is defined to be along +Z by convention.
+            * Obtains thrust vector in rigidbody space
+            */
+        Vector3 thrustDir = relTransform.transformVector(Vector3{0.0f, 0.0f, 1.0f});
+        float thrustMag = machine.m_params.m_maxThrust * pPercent->m_value;
+        // Take thrust in rigidbody space and apply to RB in world space
+        Vector3 thrust = thrustMag * thrustDir;
+        Vector3 worldThrust = rCompTf.m_transform.transformVector(thrust);
+        SysPhysics_t::body_apply_force(rCompRb, worldThrust);
+
+        // Obtain point where thrust is applied relative to RB CoM
+        Vector3 location = relTransform.translation();
+        // Compute worldspace torque from engine location, thrust vector
+        Vector3 torque = Magnum::Math::cross(location, thrust);
+        Vector3 worldTorque = rCompTf.m_transform.transformVector(torque);
+        SysPhysics_t::body_apply_torque(rCompRb, worldTorque);
+ 
+        // Perform resource consumption calculation
+        float massFlowRateTot = thrustMag /
+            (phys::constants::g_0 * machine.m_params.m_specImpulse);
+        for (auto const& resource : machine.m_resourceLines)
         {
-            Percent *percent = std::get_if<Percent>(throttle);
-
-            float thrust = 10.0f; // temporary
-
-            //std::cout << percent->m_value << "\n";
-
-            Vector3 thrustVec = compTf->m_transform.backward()
-                                    * (percent->m_value * thrust);
-
-            SysPhysics_t::body_apply_force(*compRb, thrustVec);
+            float massFlowRate = massFlowRateTot * resource.m_massRateFraction;
+            float massFlow = massFlowRate * m_scene.get_time_delta_fixed();
+            uint64_t required = resource.m_type->resource_quantity(massFlow);
+            auto* src = m_scene.reg_try_get<MachineContainer>(resource.m_sourceEnt);
+            uint64_t consumed = src->request_contents(required);
+            std::cout << "consumed " << consumed << " units of fuel, "
+                << src->check_contents().m_quantity << " remaining\n";
         }
-
-
-
-        // this is suppose to be gimbal, but for now it applies torque
-
-        using wiretype::AttitudeControl;
-
-        if (WireData *gimbal = machine.m_wiGimbal.connected_value())
-        {
-            AttitudeControl *attCtrl = std::get_if<AttitudeControl>(gimbal);
-
-            Vector3 localTorque = compTf->m_transform
-                    .transformVector(attCtrl->m_attitude);
-
-            localTorque *= 3.0f; // arbitrary
-
-            SysPhysics_t::body_apply_torque(*compRb, localTorque);
-        }
-
-
     }
 }
 
@@ -212,10 +231,44 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
     m_scene.reg_emplace<ACompExhaustPlume>(plumeNode, ent, plumeEffect);
 }
 
-Machine& SysMachineRocket::instantiate(ActiveEnt ent)
+Machine& SysMachineRocket::instantiate(ActiveEnt ent, PrototypeMachine config,
+    BlueprintMachine settings)
 {
+    // Read engine config
+    MachineRocket::Parameters params;
+    params.m_maxThrust = std::get<double>(config.m_config["thrust"]);
+    params.m_specImpulse = std::get<double>(config.m_config["Isp"]);
+
+    MachineRocket::fuel_list_t inputs;
+    Package& pkg = m_scene.get_application().debug_find_package("lzdb");
+    DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>("fuel");
+    if (!fuel.empty())
+    {
+        // TMP: finds the first non-empty fuel tank in the ship
+        // Only works as long as the fuselage is added before the engine
+
+        ActiveEnt foundTank = entt::null;
+        auto find_fuel = [this, &foundTank](ActiveEnt e)
+        {
+            if (auto* fuel = this->m_scene.reg_try_get<MachineContainer>(e);
+                fuel != nullptr && fuel->check_contents().m_quantity > 0)
+            {
+                foundTank = e;
+                return EHierarchyTraverseStatus::Stop;
+            }
+            return EHierarchyTraverseStatus::Continue;
+        };
+        auto const& parent = m_scene.reg_get<ACompHierarchy>(ent);
+        m_scene.hierarchy_traverse(parent.m_parent, find_fuel);
+        // endTMP
+
+        ActiveEnt fuelSource = foundTank;
+        MachineRocket::ResourceInput input = {std::move(fuel), 1.0f, fuelSource};
+        inputs.push_back(std::move(input));
+    }
+
     attach_plume_effect(ent);
-    return m_scene.reg_emplace<MachineRocket>(ent);
+    return m_scene.reg_emplace<MachineRocket>(ent, params, inputs);
 }
 
 Machine& SysMachineRocket::get(ActiveEnt ent)

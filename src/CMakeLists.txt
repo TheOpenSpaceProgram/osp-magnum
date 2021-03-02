@@ -84,6 +84,12 @@ elseif(MINGW)
 
 endif()
 
+# Set the MSVC debug working directory, enforce conformance mode for osp-magnum
+if(MSVC)
+  set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ../../bin)
+  target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
+endif()
+
 # Include ENTT (header only lib)
 target_include_directories(osp-magnum PRIVATE ../3rdparty/entt/src)
 
@@ -108,21 +114,26 @@ target_link_libraries(osp-magnum PRIVATE
     dNewton dScene dModel dVehicle
     )
 
-find_program(iwyu_path NAMES include-what-you-use iwyu)
-if(iwyu_path)
-    set_property(TARGET osp-magnum
-                 PROPERTY
-                 CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path}
-                 -Xiwyu
-                 --mapping_file=${CMAKE_SOURCE_DIR}/iwyu.imp)
+if(OSP_ENABLE_IWYU)
+  find_program(iwyu_path NAMES include-what-you-use iwyu)
+  if(iwyu_path)
+      set_property(TARGET osp-magnum
+                   PROPERTY
+                   CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path}
+                   -Xiwyu
+                   --mapping_file=${CMAKE_SOURCE_DIR}/iwyu.imp)
+  endif()
 endif()
 
-find_program(tidy_path NAMES clang-tidy)
-if(tidy_path)
-    set_property(TARGET osp-magnum
-                 PROPERTY
-                 CXX_CLANG_TIDY ${tidy_path}
-                 --checks="clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,readability-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-auto")
+if(OSP_ENABLE_CLANG_TIDY)
+  find_program(tidy_path NAMES clang-tidy)
+  if(tidy_path)
+      set_property(TARGET osp-magnum
+                   PROPERTY
+                   CXX_CLANG_TIDY ${tidy_path}
+                   --checks="clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,readability-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-auto")
+  endif()
 endif()
 
+# Copy root/bin to build/bin
 FILE (COPY "${CMAKE_SOURCE_DIR}/bin/OSPData/adera/" DESTINATION "${CMAKE_BINARY_DIR}/bin/OSPData/adera")

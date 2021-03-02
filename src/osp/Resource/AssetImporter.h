@@ -91,6 +91,26 @@ public:
     static DependRes<Magnum::GL::Texture2D> compile_tex(
         std::string_view imageDataName, Package& srcPackage, Package& dstPackage);
 private:
+
+    /**
+     * Load machines from node extras
+     * 
+     * Each node in the glTF tree may possess machines, but only the root
+     * PrototypePart stores them. The PrototypePart's machineArray is passed,
+     * alongside the current node (object)'s machineIndexArray.
+     * PrototypeMachines are added to the PrototypePart's master list, and the
+     * index of each machine is added to the machineIndexArray so that the
+     * current node/object can keep track of which machines belong to it.
+     *
+     * @param extras            [in] An extras node from a glTF file
+     * @param machineArray      [out] A machine array from a PrototypePart
+     * 
+     * @return A machineIndexArray which is used by PrototypeObjects to store
+     * the indices of the machineArray elements which belong to it
+     */
+    static std::vector<unsigned> load_machines(tinygltf::Value const& extras,
+        std::vector<PrototypeMachine>& machineArray);
+
     /**
      * Load only associated config files, and add resource paths to the package
      * But for now, this function just loads everything.
