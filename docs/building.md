@@ -16,6 +16,7 @@ Other dependencies are included as submodules in the 3rdparty folder.
 
 ## Building on Linux
 To build this project do the following steps:
+
 1\. Install cmake, (lib)**sdl2**(-dev) and git:
 `sudo apt-get install cmake libsdl2-dev git`
  
