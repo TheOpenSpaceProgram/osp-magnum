@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#if 0
+
 #include <functional>
 
 #include "osp/Active/activetypes.h"
@@ -31,7 +31,7 @@
 namespace osp::active
 {
 
-struct CompGUIWindow
+struct ACompGUIWindow
 {
     std::function<void(ActiveScene&)> m_function;
 };
@@ -42,14 +42,12 @@ public:
     static inline std::string smc_name = "GUI";
 
     SysGUI(ActiveScene& rScene);
-    ~SysGUI();
+    ~SysGUI() = default;
 
-    static void update_GUI(ActiveScene& rScene);
+    static void draw_GUI(ActiveScene& rScene, ACompCamera const&);
 
 private:
-    UpdateOrderHandle_t m_updateGUI;
     RenderOrderHandle_t m_drawGUI;
 };
 
 } // osp::active
-#endif

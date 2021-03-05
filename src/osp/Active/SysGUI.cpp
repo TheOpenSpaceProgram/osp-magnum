@@ -22,20 +22,21 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#if 0
 #include "SysGUI.h"
+#include <osp/active/ActiveScene.h>
 
 using namespace osp::active;
 
 SysGUI::SysGUI(ActiveScene& rScene)
-{}
-
-SysGUI::~SysGUI()
-{}
-
-void SysGUI::update_GUI(ActiveScene& rScene)
+    : m_drawGUI(rScene.get_render_order(), "gui", "debug", "",
+        [&rScene](ACompCamera const& camera) { draw_GUI(rScene, camera); })
 {}
 
 void SysGUI::draw_GUI(ActiveScene& rScene, ACompCamera const&)
-{}
-#endif
+{
+    for (auto [ent, describeElement]
+        : rScene.get_registry().view<ACompGUIWindow>().each())
+    {
+        describeElement.m_function(rScene);
+    }
+}

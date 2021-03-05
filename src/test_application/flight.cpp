@@ -32,6 +32,7 @@
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/SysForceFields.h>
 #include <osp/Active/SysAreaAssociate.h>
+#include <osp/Active/SysGUI.h>
 
 #include <osp/Satellites/SatVehicle.h>
 
@@ -98,6 +99,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     scene.dynamic_system_create<osp::active::SysPhysics_t>();
     scene.dynamic_system_create<osp::active::SysWire>();
     scene.dynamic_system_create<osp::active::SysDebugRender>();
+    scene.dynamic_system_create<osp::active::SysGUI>();
     scene.dynamic_system_create<osp::active::SysAreaAssociate>();
     scene.dynamic_system_create<osp::active::SysVehicle>();
     scene.dynamic_system_create<osp::active::SysExhaustPlume>();
@@ -154,7 +156,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Create GUI definitions
 
     // Debug FPS
-    scene.get_GUI_elements().push_back(
+    ActiveEnt fpsWindow = scene.get_registry().create();
+    scene.reg_emplace<osp::active::ACompGUIWindow>(fpsWindow,
         [](osp::active::ActiveScene& rScene)
         {
             using namespace Magnum;
@@ -166,7 +169,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
         });
 
     // Show active MUC velocity
-    scene.get_GUI_elements().push_back(
+    ActiveEnt shipStatus = scene.get_registry().create();
+    scene.reg_emplace<osp::active::ACompGUIWindow>(shipStatus,
         [](osp::active::ActiveScene& rScene)
         {
             using adera::active::machines::MachineUserControl;

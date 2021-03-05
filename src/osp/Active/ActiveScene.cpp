@@ -239,14 +239,6 @@ void ActiveScene::draw(ActiveEnt camera)
     m_renderOrder.call(cameraComp);
 }
 
-void ActiveScene::drawUI()
-{
-    for (auto& describeElement : m_GUIelements)
-    {
-        describeElement(*this);
-    }
-}
-
 MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,
         std::unique_ptr<ISysMachine> sysMachine)
 {

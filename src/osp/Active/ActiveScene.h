@@ -169,11 +169,6 @@ public:
      */
     void draw(ActiveEnt camera);
 
-    /**
-     * Draw GUI elements
-     */
-    void drawUI();
-
     constexpr UserInputHandler& get_user_input() { return m_userInput; }
 
     constexpr UpdateOrder_t& get_update_order() { return m_updateOrder; }
@@ -240,7 +235,6 @@ public:
 
     Package& get_context_resources() { return m_context; }
 
-    std::vector<std::function<void(ActiveScene&)>>& get_GUI_elements() { return m_GUIelements; }
 private:
 
     void on_hierarchy_construct(ActiveReg_t& reg, ActiveEnt ent);
@@ -266,7 +260,6 @@ private:
     MapSysMachine_t m_sysMachines; // TODO: Put this in SysVehicle
     MapDynamicSys_t m_dynamicSys;
 
-    std::vector<std::function<void(ActiveScene&)>> m_GUIelements;
     // TODO: base class and a list for Systems (or not)
     //SysDebugRender m_render;
     //SysPhysics m_physics;

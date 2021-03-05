@@ -127,9 +127,6 @@ void OSPMagnum::drawEvent()
 
         // temporary: draw using first camera component found
         scene.draw(scene.get_registry().view<osp::active::ACompCamera>().front());
-
-        // Draw GUI
-        scene.drawUI();
     }
 
     // TODO: GUI and stuff
