@@ -35,6 +35,7 @@
 #include <osp/Satellites/SatVehicle.h>
 
 #include <adera/ShipResources.h>
+#include <adera/Shaders/Phong.h>
 
 #include <planet-a/Satellites/SatPlanet.h>
 
@@ -70,6 +71,7 @@ int debug_cli_loop();
 
 // called only from commands to display information
 void debug_print_help();
+void debug_print_resources();
 void debug_print_sats();
 void debug_print_hier();
 void debug_print_update_order();
@@ -106,7 +108,7 @@ int main(int argc, char** argv)
 
     load_a_bunch_of_stuff();
 
-    if( ! args.value("scene").empty())
+    if(args.value("scene") != "none")
     {
         if(args.value("scene") == "simple")
         {
@@ -184,6 +186,10 @@ int debug_cli_loop()
                           OSPMagnum::Arguments{g_argc, g_argv});
             g_magnumThread.swap(t);
         }
+        else if (command == "list_pkg")
+        {
+            debug_print_resources();
+        }
         else if (command == "list_uni")
         {
             debug_print_sats();
@@ -243,6 +249,8 @@ void load_a_bunch_of_stuff()
 {
     // Create a new package
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
+
+
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};
@@ -309,11 +317,59 @@ void debug_print_help()
         << "* flight    - Create an ActiveArea and start Magnum\n"
         << "\n"
         << "Other things to type:\n"
+        << "* list_pkg  - List Packages and Resources\n"
         << "* list_uni  - List Satellites in the universe\n"
         << "* list_ent  - List Entities in active scene\n"
         << "* list_upd  - List Update order from active scene\n"
         << "* help      - Show this again\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
+}
+
+template <typename RES_T>
+void debug_print_resource_group(osp::Package& rPkg)
+{
+    osp::Package::group_t<RES_T> const &group = rPkg.group_get<RES_T>();
+
+    if (group.empty())
+    {
+        return;
+    }
+
+    std::cout << "  * TYPE: " << entt::type_name<RES_T>().value() << "\n";
+
+    for (auto const& [key, resource] : group)
+    {
+        std::cout << "    * " << (resource.m_data.has_value() ? "LOADED" : "RESERVED") << ": " << key << "\n";
+    }
+}
+
+void debug_print_resources()
+{
+    std::vector<osp::Package*> packages = {
+        &g_osp.debug_find_package("lzdb")};
+
+    if (g_ospMagnum != nullptr)
+    {
+        packages.push_back(&g_ospMagnum->get_context_resources());
+    }
+
+    for (osp::Package* pPkg : packages)
+    {
+        osp::Package &rPkg = *pPkg;
+        std::cout << "* PACKAGE: " << rPkg.get_prefix() << "\n";
+
+        debug_print_resource_group<osp::PrototypePart>(rPkg);
+        debug_print_resource_group<osp::BlueprintVehicle>(rPkg);
+
+        debug_print_resource_group<Magnum::Trade::ImageData2D>(rPkg);
+        debug_print_resource_group<Magnum::Trade::MeshData>(rPkg);
+        debug_print_resource_group<Magnum::GL::Texture2D>(rPkg);
+        debug_print_resource_group<Magnum::GL::Mesh>(rPkg);
+
+        debug_print_resource_group<adera::active::machines::ShipResourceType>(rPkg);
+        debug_print_resource_group<adera::shader::PlumeShader>(rPkg);
+        debug_print_resource_group<adera::shader::Phong>(rPkg);
+    }
 }
 
 void debug_print_update_order()

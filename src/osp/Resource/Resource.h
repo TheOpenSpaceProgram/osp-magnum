@@ -24,29 +24,37 @@
  */
 #pragma once
 
+#include <assert.h>
 #include <map>
+#include <optional>
 #include <string>
 
 namespace osp
 {
 
+struct construct_tag {};
+struct reserve_tag {};
+
 template <class TYPE_T>
 struct Resource
 {
-    Resource(bool loaded)
+    Resource(reserve_tag)
      : m_data()
-     , m_loaded(loaded)
     { }
-    Resource(bool loaded, TYPE_T&& data)
+    Resource(construct_tag)
+     : m_data(TYPE_T())
+    { }
+    Resource(construct_tag, TYPE_T&& data)
      : m_data(std::move(data))
-     , m_loaded(loaded)
     { }
     Resource(Resource&& move) = default;
     Resource(const Resource& copy) = delete;
+    ~Resource()
+    {
+        assert(m_refCount == 0);
+    }
 
-    TYPE_T m_data;
-
-    bool m_loaded;
+    std::optional<TYPE_T> m_data;
 
     int m_refCount{0};
 };
@@ -102,11 +110,11 @@ public:
 
     std::string name() const { return m_it->first; }
 
-    constexpr TYPE_T const& operator*() const noexcept { return m_it->second.m_data; }
-    constexpr TYPE_T& operator*() noexcept { return m_it->second.m_data; }
+    constexpr TYPE_T const& operator*() const noexcept { return m_it->second.m_data.value(); }
+    constexpr TYPE_T& operator*() noexcept { return m_it->second.m_data.value(); }
 
-    constexpr TYPE_T const* operator->() const noexcept { return &m_it->second.m_data; }
-    constexpr TYPE_T* operator->() noexcept { return &m_it->second.m_data; }
+    constexpr TYPE_T const* operator->() const noexcept { return &m_it->second.m_data.value(); }
+    constexpr TYPE_T* operator->() noexcept { return &m_it->second.m_data.value(); }
 private:
     bool m_empty;
     typename std::map<std::string, Resource<TYPE_T>>::iterator m_it;
