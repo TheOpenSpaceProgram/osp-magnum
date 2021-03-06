@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 #include "SysGUI.h"
-#include <osp/active/ActiveScene.h>
+#include "ActiveScene.h"
 
 using namespace osp::active;
 
