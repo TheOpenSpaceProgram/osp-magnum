@@ -26,7 +26,6 @@
 
 #include <utility>
 #include <vector>
-#include <functional>
 #include <stack>
 
 #include "../OSPApplication.h"
@@ -234,7 +233,6 @@ public:
     bool dynamic_system_it_valid(MapDynamicSys_t::iterator it);
 
     Package& get_context_resources() { return m_context; }
-
 private:
 
     void on_hierarchy_construct(ActiveReg_t& reg, ActiveEnt ent);
