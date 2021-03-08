@@ -46,6 +46,8 @@
 
 #include <Magnum/ImGuiIntegration/Context.hpp>
 
+#include <imgui.h>
+
 using namespace testapp;
 
 using osp::Vector2;
@@ -156,22 +158,41 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Create GUI definitions
 
     // Debug FPS
+    std::array<float, 120> times;
+    for (int i = 0; i < 120; i++)
+    {
+        times[i] = static_cast<float>(i);
+    }
     ActiveEnt fpsWindow = scene.get_registry().create();
     scene.reg_emplace<osp::active::ACompGUIWindow>(fpsWindow,
-        [](osp::active::ActiveScene& rScene)
+        [data = std::array<float, 120>{0.0f}, index = 0, &times](osp::active::ActiveScene& rScene) mutable
         {
             using namespace Magnum;
 
             ImGui::Begin("Debug");
+            
+            double framerate = ImGui::GetIO().Framerate;
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                1000.0 / Double(ImGui::GetIO().Framerate), Double(ImGui::GetIO().Framerate));
+                1000.0 / Double(ImGui::GetIO().Framerate), Double(framerate));
+
+            data[index] = framerate;
+            index++;
+            if (index >= 120) { index = 0; }
+
+            if (ImPlot::BeginPlot("Framerate", "t", "fps", {-1, -1}))
+            {
+                //ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
+                //int offset = index;
+                ImPlot::PlotLine("Framerate", times.data(), data.data(), data.size(), 0);
+                ImPlot::EndPlot();
+            }
             ImGui::End();
         });
 
     // Show active MUC velocity
     ActiveEnt shipStatus = scene.get_registry().create();
     scene.reg_emplace<osp::active::ACompGUIWindow>(shipStatus,
-        [](osp::active::ActiveScene& rScene)
+        [] (osp::active::ActiveScene& rScene)
         {
             using adera::active::machines::MachineUserControl;
             using namespace osp::active;
