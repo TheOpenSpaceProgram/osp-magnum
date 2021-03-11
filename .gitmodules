@@ -22,3 +22,9 @@
 [submodule "3rdparty/toml11"]
 	path = 3rdparty/toml11
 	url = https://github.com/ToruNiina/toml11
+[submodule "3rdparty/imgui"]
+	path = 3rdparty/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "3rdparty/implot"]
+	path = 3rdparty/implot
+	url = https://github.com/epezent/implot.git

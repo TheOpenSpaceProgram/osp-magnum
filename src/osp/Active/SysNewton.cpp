@@ -192,6 +192,7 @@ void SysNewton::update_world(ActiveScene& rScene)
             // Get new transform matrix from newton
             NewtonBodyGetMatrix(entBody.m_body,
                                 entTransform.m_transform.data());
+            NewtonBodyGetVelocity(entBody.m_body, entBody.m_velocity.data());
         }
     }
 }

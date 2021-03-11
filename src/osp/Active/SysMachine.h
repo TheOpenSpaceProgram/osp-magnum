@@ -92,6 +92,7 @@ public:
 
     constexpr void enable(void) noexcept;
     constexpr void disable(void) noexcept;
+    constexpr bool is_enabled() const noexcept { return m_enable; }
 
 protected:
     bool m_enable = false;
