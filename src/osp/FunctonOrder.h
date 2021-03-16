@@ -172,7 +172,7 @@ FunctionOrderHandle<FUNC_T>::FunctionOrderHandle(
         std::string const& before,
         ARGS_T&& ... args)
 {
-    to.add(*this, name, after, before, args...);
+    to.add(*this, name, after, before, std::forward<ARGS_T>(args)...);
 }
 
 template<typename FUNC_T>
@@ -228,7 +228,9 @@ void FunctionOrder<FUNC_T>::add(
     // new FunctionOrderCall call can be emplaces somewhere between
     // minPos or maxPos
 
-    handle.m_to = m_calls.insert(maxPos, {name, after, before, args...});
+    handle.m_to = m_calls.insert(
+            maxPos, FunctionOrderCall<FUNC_T>(name, after, before,
+                     std::function<FUNC_T>(std::forward<ARGS_T>(args)...) ));
 
 }
 

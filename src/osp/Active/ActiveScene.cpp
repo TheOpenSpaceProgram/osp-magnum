@@ -60,8 +60,6 @@ ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app, Packa
 
 ActiveScene::~ActiveScene()
 {
-    // destruct dynamic systems before registry
-    m_dynamicSys.clear();
     m_registry.clear();
 }
 
@@ -236,7 +234,7 @@ void ActiveScene::draw(ActiveEnt camera)
     //cameraProject = cameraComp.m_projection;
     cameraComp.m_inverse = cameraTransform.m_transformWorld.inverted();
 
-    m_renderOrder.call(cameraComp);
+    m_renderOrder.call(*this, cameraComp);
 }
 
 MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,
@@ -268,17 +266,5 @@ MapSysMachine_t::iterator ActiveScene::system_machine_find(std::string_view name
 bool ActiveScene::system_machine_it_valid(MapSysMachine_t::iterator it)
 {
     return it != m_sysMachines.end();
-}
-
-
-
-MapDynamicSys_t::iterator ActiveScene::dynamic_system_find(std::string_view name)
-{
-    return m_dynamicSys.find(name);
-}
-
-bool ActiveScene::dynamic_system_it_valid(MapDynamicSys_t::iterator it)
-{
-    return it != m_dynamicSys.end();
 }
 

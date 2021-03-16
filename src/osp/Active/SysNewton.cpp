@@ -98,32 +98,25 @@ ACompNwtBody& ACompNwtBody::operator=(ACompNwtBody&& move) noexcept
     return *this;
 }
 
-SysNewton::SysNewton(ActiveScene &scene)
- : m_scene(scene)
- , m_updatePhysicsWorld(scene.get_update_order(), "physics", "wire", "",
-                [this] (ActiveScene& rScene) { this->update_world(rScene); })
+void SysNewton::add_functions(ActiveScene &rScene)
 {
+    rScene.debug_update_add(rScene.get_update_order(), "physics", "wire", "",
+                            &SysNewton::update_world);
+
     //std::cout << "sysnewtoninit\n";
     //NewtonWorldSetUserData(m_nwtWorld, this);
 
     // Connect signal handlers to destruct Newton objects when components are
     // deleted.
 
-    scene.get_registry().on_destroy<ACompNwtBody>()
+    rScene.get_registry().on_destroy<ACompNwtBody>()
                     .connect<&SysNewton::on_body_destruct>();
 
-    scene.get_registry().on_destroy<ACompCollider>()
+    rScene.get_registry().on_destroy<ACompCollider>()
                     .connect<&SysNewton::on_shape_destruct>();
 
-    scene.get_registry().on_destroy<ACompNwtWorld>()
+    rScene.get_registry().on_destroy<ACompNwtWorld>()
                     .connect<&SysNewton::on_world_destruct>();
-}
-
-SysNewton::~SysNewton()
-{
-    // Clean up newton dynamics stuff
-    m_scene.get_registry().clear<ACompNwtBody>();
-    m_scene.get_registry().clear<ACompCollider>();
 }
 
 void SysNewton::update_world(ActiveScene& rScene)
@@ -609,7 +602,7 @@ std::pair<Matrix3, Vector4> SysNewton::compute_hier_inertia(ActiveScene& rScene,
 void SysNewton::on_body_destruct(ActiveReg_t& reg, ActiveEnt ent)
 {
     NewtonBody const *body = reg.get<ACompNwtBody>(ent).m_body;
-    if (body)
+    if (body != nullptr)
     {
         NewtonDestroyBody(body); // make sure the Newton body is destroyed
     }
@@ -626,10 +619,33 @@ void SysNewton::on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent)
 
 void SysNewton::on_world_destruct(ActiveReg_t& reg, ActiveEnt ent)
 {
+
+
     NewtonWorld const *world = reg.get<ACompNwtWorld>(ent).m_nwtWorld;
     if (world != nullptr)
     {
-        NewtonDestroyAllBodies(world);
+        // delete all collision shapes first to prevent crash
+        auto collisionView = reg.view<ACompCollider>();
+        for (ActiveEnt ent : collisionView)
+        {
+            auto &collider = collisionView.get<ACompCollider>(ent);
+            if (collider.m_collision != nullptr)
+            {
+                NewtonDestroyCollision(std::exchange(collider.m_collision, nullptr));
+            }
+        }
+
+        // delete all rigid bodies too
+        auto bodyView = reg.view<ACompNwtBody>();
+        for (ActiveEnt ent : bodyView)
+        {
+            auto &body = bodyView.get<ACompNwtBody>(ent);
+            if (body.m_body != nullptr)
+            {
+                NewtonDestroyBody(std::exchange(body.m_body, nullptr));
+            }
+        }
+
         NewtonDestroy(world); // make sure the world is destroyed
     }
 }

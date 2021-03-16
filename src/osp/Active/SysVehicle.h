@@ -79,16 +79,11 @@ struct ACompPart
     unsigned m_separationIsland{0};
 };
 
-class SysVehicle : public IDynamicSystem
+class SysVehicle
 {
 public:
 
-    static const std::string smc_name;
-
-    SysVehicle(ActiveScene &scene);
-    SysVehicle(SysNewton const& copy) = delete;
-    SysVehicle(SysNewton&& move) = delete;
-    ~SysVehicle() = default;
+    static void add_functions(ActiveScene &rScene);
 
     static ActiveEnt activate(ActiveScene &rScene, universe::Universe &rUni,
                               universe::Satellite areaSat,
@@ -202,11 +197,6 @@ private:
         std::vector<MachineDef> const& machineMapping,
         PrototypePart const& part, BlueprintPart const& partBP);
 
-    //ActiveScene& m_scene;
-    //AppPackages& m_packages;
-
-    UpdateOrderHandle_t m_updateActivation;
-    UpdateOrderHandle_t m_updateVehicleModification;
 };
 
 
