@@ -39,6 +39,8 @@ find_package(MagnumPlugins REQUIRED
     TinyGltfImporter
     StbImageImporter)
 
+find_package(spdlog)
+
 find_package(Threads)
 
 # Gather paths to OSP headers and sources
@@ -113,6 +115,7 @@ target_link_libraries(osp-magnum PRIVATE
     MagnumPlugins::StbImageImporter
     dNewton dScene dModel dVehicle
     toml11
+    spdlog
     )
 
 if(OSP_ENABLE_IWYU)
