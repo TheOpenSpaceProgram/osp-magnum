@@ -287,11 +287,11 @@ private:
 //-----------------------------------------------------------------------------
 
 
-class SysWire : public IDynamicSystem
+class SysWire
 {
 public:
 
-    static const std::string smc_name;
+    static inline std::string smc_name = "Wire";
 
     struct DependentOutput
     {
@@ -300,12 +300,7 @@ public:
         unsigned depth;
     };
 
-    SysWire(ActiveScene &scene);
-    SysWire(SysWire const& copy) = delete;
-    SysWire(SysWire&& move) = delete;
-
-    void update_propagate(ActiveScene& rScene);
-    void connect(WireOutput &wireFrom, WireInput &wireTo);
+    static void connect(WireOutput &wireFrom, WireInput &wireTo);
 
 private:
     std::vector<DependentOutput> m_dependentOutputs;

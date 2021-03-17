@@ -68,21 +68,18 @@ using namespace Magnum::Math::Literals;
 
 using osp::universe::Satellite;
 
-const std::string SysPlanetA::smc_name = "PlanetA";
+void SysPlanetA::add_functions(osp::active::ActiveScene &rScene)
+{
+    rScene.debug_update_add(rScene.get_update_order(), "planet_activate", "", "planet_geo",
+                            &SysPlanetA::update_activate);
+    rScene.debug_update_add(rScene.get_update_order(), "planet_geo", "", "physics",
+                            &SysPlanetA::update_geometry );
+    rScene.debug_update_add(rScene.get_update_order(), "planet_phys", "planet_geo", "",
+                            &SysPlanetA::update_physics);
+    rScene.debug_render_add(rScene.get_render_order(), "", "", "",
+                            &SysPlanetA::draw);
 
-SysPlanetA::SysPlanetA(osp::active::ActiveScene &scene,
-                       osp::UserInputHandler &userInput)
- : m_scene(scene)
- , m_updateActivate(scene.get_update_order(), "planet_activate", "", "planet_geo",
-            &SysPlanetA::update_activate )
- , m_updateGeometry(scene.get_update_order(), "planet_geo", "", "physics",
-            [this] (ActiveScene& rScene) { this->update_geometry(rScene); } )
- , m_updatePhysics(scene.get_update_order(), "planet_phys", "planet_geo", "",
-            [this] (ActiveScene& rScene) { this->update_physics(rScene); })
- , m_renderPlanetDraw(scene.get_render_order(), "", "", "",
-            [this] (ACompCamera const& camera) { this->draw(camera); })
- , m_debugUpdate(userInput.config_get("debug_planet_update"))
-{ }
+}
 
 ActiveEnt SysPlanetA::activate(
             osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
@@ -122,12 +119,13 @@ ActiveEnt SysPlanetA::activate(
 }
 
 
-void SysPlanetA::draw(osp::active::ACompCamera const& camera)
+void SysPlanetA::draw(osp::active::ActiveScene& rScene,
+                      osp::active::ACompCamera const& camera)
 {
     // TODO: move planet drawing to something more generic, like debug drawable
     //       SysPlanet should NOT be doing rendering
 
-    auto drawGroup = m_scene.get_registry().group<ACompPlanet>(
+    auto drawGroup = rScene.get_registry().group<ACompPlanet>(
                             entt::get<ACompTransform>);
 
     Matrix4 entRelative;
@@ -157,32 +155,32 @@ void SysPlanetA::draw(osp::active::ACompCamera const& camera)
     }
 }
 
-void SysPlanetA::debug_create_chunk_collider(osp::active::ActiveEnt ent,
-                                             ACompPlanet &planet,
-                                             chindex_t chunk)
+void SysPlanetA::debug_create_chunk_collider(
+        osp::active::ActiveScene& rScene,
+        osp::active::ActiveEnt ent,
+        ACompPlanet &planet,
+        chindex_t chunk)
 {
 
     using osp::phys::ECollisionShape;
 
-    auto &physics = m_scene.dynamic_system_find<SysPhysics_t>();
-
     // Create entity and required components
-    ActiveEnt fish = m_scene.hier_create_child(m_scene.hier_get_root());
-    auto &fishTransform = m_scene.reg_emplace<ACompTransform>(fish);
-    auto &fishShape = m_scene.reg_emplace<ACompShape>(fish);
-    auto &fishCollide = m_scene.reg_emplace<ACompCollider>(fish);
-    auto &fishBody = m_scene.reg_emplace<ACompRigidBody_t>(fish);
-    m_scene.reg_emplace<ACompFloatingOrigin>(fish);
+    ActiveEnt fish = rScene.hier_create_child(rScene.hier_get_root());
+    auto &fishTransform = rScene.reg_emplace<ACompTransform>(fish);
+    auto &fishShape = rScene.reg_emplace<ACompShape>(fish);
+    auto &fishCollide = rScene.reg_emplace<ACompCollider>(fish);
+    auto &fishBody = rScene.reg_emplace<ACompRigidBody_t>(fish);
+    rScene.reg_emplace<ACompFloatingOrigin>(fish);
 
     // Set some stuff
     fishShape.m_shape = ECollisionShape::TERRAIN;
-    fishTransform.m_transform = m_scene.reg_get<ACompTransform>(ent).m_transform;
+    fishTransform.m_transform = rScene.reg_get<ACompTransform>(ent).m_transform;
 
     // Get triangle iterators to start and end triangles of the specified chunk
     auto itsChunk = planet.m_planet->iterate_chunk(chunk);
 
     // Send them to the physics engine
-    physics.shape_create_tri_mesh_static(fishShape, fishCollide,
+    SysPhysics_t::shape_create_tri_mesh_static(rScene, fishShape, fishCollide,
                                          itsChunk.first, itsChunk.second);
 
     // create the rigid body
@@ -229,7 +227,7 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
 void SysPlanetA::update_geometry(ActiveScene& rScene)
 {
 
-    auto view = m_scene.get_registry().view<ACompPlanet, ACompTransform>();
+    auto view = rScene.get_registry().view<ACompPlanet, ACompTransform>();
 
     for (osp::active::ActiveEnt ent : view)
     {
@@ -264,7 +262,7 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             // temporary: make colliders for all the chunks
             for (chindex_t i = 0; i < rPlanetGeo.get_chunk_count(); i ++)
             {
-                debug_create_chunk_collider(ent, planet, i);
+                debug_create_chunk_collider(rScene, ent, planet, i);
                 std::cout << "* completed chunk collider: " << i << "\n";
             }
 

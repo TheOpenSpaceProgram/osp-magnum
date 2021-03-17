@@ -37,13 +37,10 @@ using osp::universe::UCompActivatable;
 using osp::universe::UCompActivationRadius;
 using osp::universe::UCompActiveArea;
 
-const std::string SysAreaAssociate::smc_name = "AreaAssociate";
-
-SysAreaAssociate::SysAreaAssociate(ActiveScene &rScene)
- : m_updateScan(rScene.get_update_order(), "areascan", "physics", "",
-                &SysAreaAssociate::update_scan)
+void SysAreaAssociate::add_functions(ActiveScene &rScene)
 {
-
+    rScene.debug_update_add(rScene.get_update_order(), "areascan", "physics", "",
+                            &SysAreaAssociate::update_scan);
 }
 
 void SysAreaAssociate::update_scan(ActiveScene& rScene)

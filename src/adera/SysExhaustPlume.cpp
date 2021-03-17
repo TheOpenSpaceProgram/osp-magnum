@@ -39,14 +39,14 @@
 
 using namespace osp::active;
 
-SysExhaustPlume::SysExhaustPlume(ActiveScene& rScene)
-    : m_scene(rScene)
-    , m_time(0.0f),
-    m_updatePlume(rScene.get_update_order(), "exhaust_plume", "mach_rocket", "",
-        [this](ActiveScene& rScene){this->update_plumes(rScene);})
-{}
+void SysExhaustPlume::add_functions(ActiveScene& rScene)
+{
+    rScene.debug_update_add(rScene.get_update_order(), "exhaust_plume", "mach_rocket", "",
+                            &SysExhaustPlume::update_plumes);
 
-void SysExhaustPlume::initialize_plume(ActiveEnt node)
+}
+
+void SysExhaustPlume::initialize_plume(ActiveScene& rScene, ActiveEnt node)
 {
     using Magnum::GL::Mesh;
     using Magnum::GL::Texture2D;
@@ -55,19 +55,19 @@ void SysExhaustPlume::initialize_plume(ActiveEnt node)
     using adera::shader::PlumeShader;
     using ShaderInstance_t = PlumeShader::ACompPlumeShaderInstance;
 
-    auto const& plume = m_scene.reg_get<ACompExhaustPlume>(node);
+    auto const& plume = rScene.reg_get<ACompExhaustPlume>(node);
 
-    if (m_scene.get_registry().try_get<ShaderInstance_t>(node))
+    if (rScene.get_registry().try_get<ShaderInstance_t>(node))
     {
         return;  // plume already initialized
     }
 
     DependRes<PlumeEffectData> plumeEffect = plume.m_effect;
 
-    Package& pkg = m_scene.get_application().debug_find_package("lzdb");
+    Package& pkg = rScene.get_application().debug_find_package("lzdb");
 
     // Get plume mesh
-    Package& glResources = m_scene.get_context_resources();
+    Package& glResources = rScene.get_context_resources();
     DependRes<Mesh> plumeMesh = glResources.get<Mesh>(plumeEffect->m_meshName);
     if (plumeMesh.empty())
     {
@@ -83,33 +83,36 @@ void SysExhaustPlume::initialize_plume(ActiveEnt node)
     }
 
     // Emplace plume shader instance component from plume effect parameters
-    m_scene.reg_emplace<ShaderInstance_t>(node,
+    rScene.reg_emplace<ShaderInstance_t>(node,
         glResources.get<PlumeShader>("plume_shader"),
         n1024,
         n1024,
         *plumeEffect);
 
-    m_scene.reg_emplace<CompDrawableDebug>(node, plumeMesh,
+    rScene.reg_emplace<CompDrawableDebug>(node, plumeMesh,
         &adera::shader::PlumeShader::draw_plume);
-    m_scene.reg_emplace<CompVisibleDebug>(node, false);
-    m_scene.reg_emplace<CompTransparentDebug>(node, true);
+    rScene.reg_emplace<CompVisibleDebug>(node, false);
+    rScene.reg_emplace<CompTransparentDebug>(node, true);
 }
+
+// TODO: workaround. add an actual way to keep time accessible from ActiveScene
+float g_time = 0;
 
 void SysExhaustPlume::update_plumes(ActiveScene& rScene)
 {
-    m_time += m_scene.get_time_delta_fixed();
+    g_time += rScene.get_time_delta_fixed();
 
     using adera::active::machines::MachineRocket;
     using ShaderInstance_t = adera::shader::PlumeShader::ACompPlumeShaderInstance;
 
-    auto& reg = m_scene.get_registry();
+    auto& reg = rScene.get_registry();
 
     // Initialize any uninitialized plumes
     auto uninitializedComps =
         reg.view<ACompExhaustPlume>(entt::exclude<ShaderInstance_t>);
     for (ActiveEnt plumeEnt : uninitializedComps)
     {
-        initialize_plume(plumeEnt);
+        initialize_plume(rScene, plumeEnt);
     }
 
     // Process plumes
@@ -121,10 +124,10 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
         auto& plumeShader = plumeView.get<ShaderInstance_t>(plumeEnt);
         CompVisibleDebug& visibility = plumeView.get<CompVisibleDebug>(plumeEnt);
 
-        auto& machine = m_scene.reg_get<MachineRocket>(plume.m_parentMachineRocket);
+        auto& machine = rScene.reg_get<MachineRocket>(plume.m_parentMachineRocket);
         float powerLevel = machine.current_output_power();
 
-        plumeShader.m_currentTime = m_time;
+        plumeShader.m_currentTime = g_time;
 
         if (powerLevel > 0.0f)
         {

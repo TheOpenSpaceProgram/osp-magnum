@@ -69,14 +69,11 @@ struct ACompActivatedSat
 /**
  * System used to associate an ActiveScene to a UCompActiveArea in the Universe
  */
-class SysAreaAssociate : public IDynamicSystem
+class SysAreaAssociate
 {
 public:
 
-    static const std::string smc_name;
-
-    SysAreaAssociate(ActiveScene &rScene);
-    ~SysAreaAssociate() = default;
+    static void add_functions(ActiveScene& rScene);
 
     /**
      * Scans the universe for Satellites to activate or deactivate, tracking
@@ -130,7 +127,6 @@ public:
 
 private:
 
-    UpdateOrderHandle_t m_updateScan;
 
     /**
      * Translate all entities in an ActiveScene that contain an

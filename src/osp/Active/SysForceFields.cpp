@@ -28,21 +28,19 @@
 
 using namespace osp::active;
 
-const std::string SysFFGravity::smc_name = "FFGravity";
-
-SysFFGravity::SysFFGravity(ActiveScene &scene)
- : m_scene(scene)
- , m_updateForce(scene.get_update_order(), "ff_gravity", "", "physics",
-                 [this] (ActiveScene& rScene) { this->update_force(rScene); })
-{ }
+void SysFFGravity::add_functions(ActiveScene &rScene)
+{
+    rScene.debug_update_add(rScene.get_update_order(), "ff_gravity", "", "physics",
+                            &SysFFGravity::update_force);
+}
 
 void SysFFGravity::update_force(ActiveScene& rScene)
 {
 
-    auto viewFields = m_scene.get_registry()
+    auto viewFields = rScene.get_registry()
             .view<ACompFFGravity, ACompTransform>();
 
-    auto viewMasses = m_scene.get_registry()
+    auto viewMasses = rScene.get_registry()
             .view<ACompRigidBody_t, ACompTransform>();
 
     for (ActiveEnt fieldEnt : viewFields)

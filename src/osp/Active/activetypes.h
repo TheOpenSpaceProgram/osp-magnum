@@ -55,22 +55,12 @@ using ActiveReg_t = entt::basic_registry<ActiveEnt>;
 using UpdateOrder_t = FunctionOrder<void(ActiveScene&)>;
 using UpdateOrderHandle_t = FunctionOrderHandle<void(ActiveScene&)>;
 
-using RenderOrder_t = FunctionOrder<void(ACompCamera const&)>;
-using RenderOrderHandle_t = FunctionOrderHandle<void(ACompCamera const&)>;
+using RenderOrder_t = FunctionOrder<void(ActiveScene&, ACompCamera const&)>;
+using RenderOrderHandle_t = FunctionOrderHandle<void(ActiveScene&, ACompCamera const&)>;
 
 struct ACompFloatingOrigin
 {
     //bool m_dummy;
 };
-
-// not really sure what else to put in here
-class IDynamicSystem
-{
-public:
-    virtual ~IDynamicSystem() = default;
-};
-
-using MapDynamicSys_t = std::map<std::string, std::unique_ptr<IDynamicSystem>,
-                                 std::less<> >;
 
 }
