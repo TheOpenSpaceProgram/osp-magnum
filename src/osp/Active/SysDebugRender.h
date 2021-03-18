@@ -61,18 +61,11 @@ public:
 
     static void add_functions(ActiveScene& rScene);
 
-    static void draw(ActiveScene& rScene, ACompCamera& camera);
-
-    // TODO staticify
-    void add_pass(std::function<void(ActiveScene&, ACompCamera&)> passDef)
-    { m_renderPasses.push_back(std::move(passDef)); }
+    //static void draw(ActiveScene& rScene, ACompCamera& camera);
 
     template <typename T>
-    static void draw_group(ActiveScene& rScene, T& rCollection, ACompCamera const& camera);
+    static void draw_group(ActiveScene& rScene, T& rCollection, ACompCamera& camera);
     static void render_framebuffer(ActiveScene& rScene, Magnum::GL::Texture2D& rTexture);
-    // TODO
-    std::vector<std::function<void(ActiveScene&, ACompCamera&)>> m_renderPasses;
-
 };
 
 template<typename T>

@@ -26,6 +26,9 @@
 
 #include "ActiveScene.h"
 
+#include <Magnum/GL/Framebuffer.h>
+#include <Magnum/GL/DefaultFramebuffer.h>
+
 using namespace osp;
 using namespace osp::active;
 
@@ -234,7 +237,12 @@ void ActiveScene::draw(ActiveEnt camera)
     //cameraProject = cameraComp.m_projection;
     cameraComp.m_inverse = cameraTransform.m_transformWorld.inverted();
 
-    m_renderOrder.call(*this, cameraComp);
+    for (auto& pass : m_renderQueue)
+    {
+        pass(*this, cameraComp);
+    }
+
+    //m_renderOrder.call(*this, cameraComp);
 }
 
 MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,

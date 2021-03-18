@@ -27,6 +27,8 @@
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Universe.h>
+#include <osp/string_concat.h>
+#include <osp/Active/SysDebugRender.h>
 
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Magnum/Math/Color.h>
@@ -76,9 +78,6 @@ void SysPlanetA::add_functions(osp::active::ActiveScene &rScene)
                             &SysPlanetA::update_geometry );
     rScene.debug_update_add(rScene.get_update_order(), "planet_phys", "planet_geo", "",
                             &SysPlanetA::update_physics);
-    rScene.debug_render_add(rScene.get_render_order(), "", "", "",
-                            &SysPlanetA::draw);
-
 }
 
 ActiveEnt SysPlanetA::activate(
@@ -116,43 +115,6 @@ ActiveEnt SysPlanetA::activate(
     rPlanetForceField.m_Gmass = loadMePlanet.m_mass * sc_GravConst;
 
     return planetEnt;
-}
-
-
-void SysPlanetA::draw(osp::active::ActiveScene& rScene,
-                      osp::active::ACompCamera const& camera)
-{
-    // TODO: move planet drawing to something more generic, like debug drawable
-    //       SysPlanet should NOT be doing rendering
-
-    auto drawGroup = rScene.get_registry().group<ACompPlanet>(
-                            entt::get<ACompTransform>);
-
-    Matrix4 entRelative;
-
-    for(auto entity: drawGroup)
-    {
-        auto& planet = drawGroup.get<ACompPlanet>(entity);
-        auto& transform = drawGroup.get<ACompTransform>(entity);
-
-        if (planet.m_planet == nullptr)
-        {
-            continue;
-        }
-
-        entRelative = camera.m_inverse * transform.m_transformWorld;
-
-        planet.m_shader
-                //.setDiffuseColor(Magnum::Color4{0.2f, 1.0f, 0.2f, 1.0f})
-                //.setLightPosition({10.0f, 15.0f, 5.0f})
-                .setColor(0x2f83cc_rgbf)
-                .setWireframeColor(0xdcdcdc_rgbf)
-                .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
-                .setTransformationMatrix(entRelative)
-                .setNormalMatrix(entRelative.normalMatrix())
-                .setProjectionMatrix(camera.m_projection)
-                .draw(planet.m_mesh);
-    }
 }
 
 void SysPlanetA::debug_create_chunk_collider(
@@ -255,6 +217,41 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
                 return EChunkUpdateAction::Chunk;
             });
 
+            // TEMP: until we have a proper planet shader
+            static auto planetDrawFnc =
+                [](ActiveEnt e, ActiveScene& rScene, Magnum::GL::Mesh& rMesh,
+                    ACompCamera const& camera, ACompTransform const& transform)
+            {
+                using namespace Magnum;
+                auto& glResources = rScene.get_context_resources();
+                osp::DependRes<Shaders::MeshVisualizer3D> shader =
+                    glResources.get<Shaders::MeshVisualizer3D>("mesh_vis_shader");
+
+                auto& planet = rScene.reg_get<ACompPlanet>(e);
+
+                Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;
+
+                (*shader)
+                    .setColor(0x2f83cc_rgbf)
+                    .setWireframeColor(0xdcdcdc_rgbf)
+                    .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
+                    .setTransformationMatrix(entRelative)
+                    .setNormalMatrix(entRelative.normalMatrix())
+                    .setProjectionMatrix(camera.m_projection)
+                    .draw(*planet.m_mesh);
+            };
+
+            osp::Package& glResources = rScene.get_context_resources();
+
+            // Generate mesh resource
+            std::string name = osp::string_concat("planet_mesh_",
+                std::to_string(static_cast<int>(ent)));
+            planet.m_mesh = glResources.add<Magnum::GL::Mesh>(name);
+
+            // Emplace renderable
+            rScene.reg_emplace<osp::active::CompDrawableDebug>(ent,
+                planet.m_mesh, planetDrawFnc);
+
             //planet_update_geometry(ent, planet);
 
             std::cout << "Planet initialized, now making colliders\n";
@@ -277,7 +274,7 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             using Magnum::GL::MeshPrimitive;
             using Magnum::GL::MeshIndexType;
 
-            planet.m_mesh
+            (*planet.m_mesh)
                 .setPrimitive(MeshPrimitive::Triangles)
                 .addVertexBuffer(planet.m_vrtxBufGL, 0,
                                  MeshVisualizer3D::Position{},
@@ -397,7 +394,7 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt,
     //planet.m_indxBufGL.setData(planet.m_planet->get_index_buffer());
     rPlanetGeo.updates_clear();
 
-    rPlanetPlanet.m_mesh.setCount(rPlanetGeo.calc_index_count());
+    rPlanetPlanet.m_mesh->setCount(rPlanetGeo.calc_index_count());
 
     rPlanetGeo.get_ico_tree()->debug_verify_state();
 }

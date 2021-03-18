@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#version 430 core
+//#version 430 core
 
 layout(location = 0, index = 0) out vec3 color;
 
@@ -33,5 +33,5 @@ in vec2 uv;
 
 void main()
 {
-    color = vec3(uv.x, uv.y, 1.0);
+    color = texture(framebuffer, uv).rgb;
 }

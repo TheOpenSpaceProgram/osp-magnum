@@ -30,6 +30,7 @@
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/Mesh.h>
+#include <Magnum/Shaders/MeshVisualizer.h>
 #include <Magnum/Mesh.h>
 #include <Corrade/Containers/ArrayViewStl.h>
 
@@ -56,28 +57,39 @@ void SysDebugRender::add_functions(ActiveScene &rScene)
     Package& glResources = rScene.get_context_resources();
 
     using namespace adera::shader;
+    using Magnum::Shaders::MeshVisualizer3D;
+
+    glResources.add<MeshVisualizer3D>("mesh_vis_shader",
+        MeshVisualizer3D{MeshVisualizer3D::Flag::Wireframe | MeshVisualizer3D::Flag::NormalDirection});
 
     glResources.add<Phong>("phong_shader",
         Phong{Magnum::Shaders::Phong::Flag::DiffuseTexture});
 
     glResources.add<PlumeShader>("plume_shader");
 
+    glResources.add<RenderTexture>("render_texture");
+
     // Generate fullscreen tri for texture rendering
     using namespace Magnum; 
     if (glResources.get<GL::Mesh>("fullscreen_tri").empty())
     {
+        Vector2 screenSize = Vector2{GL::defaultFramebuffer.viewport().size()};
+
+        float aspectRatio = screenSize.x() / screenSize.y();
+
         std::array<float, 12> surfData
         {
             // Vert position    // UV coordinate
             -1.0f,  1.0f,       0.0f,  1.0f,
-            -1.0f, -2.0f,       0.0f, -1.0f,
-             2.0f,  1.0f,       2.0f,  1.0f
+            -1.0f, -3.0f,       0.0f, -1.0f,
+             3.0f,  1.0f,       2.0f,  1.0f
         };
 
         GL::Buffer surface(std::move(surfData), GL::BufferUsage::StaticDraw);
         GL::Mesh surfaceMesh;
         surfaceMesh
             .setPrimitive(Magnum::MeshPrimitive::Triangles)
+            .setCount(3)
             .addVertexBuffer(std::move(surface), 0,
                 RenderTexture::Position{}, RenderTexture::TextureCoordinates{});
         glResources.add<GL::Mesh>("fullscreen_tri", std::move(surfaceMesh));
@@ -85,7 +97,7 @@ void SysDebugRender::add_functions(ActiveScene &rScene)
 
 }
 
-void SysDebugRender::draw(ACompCamera& camera)
+/*void SysDebugRender::draw(ACompCamera& camera)
 {
     GL::AbstractFramebuffer* framebuffer = (camera.m_renderTarget.empty()) ?
         reinterpret_cast<GL::AbstractFramebuffer*>(&GL::defaultFramebuffer)
@@ -102,7 +114,7 @@ void SysDebugRender::draw(ACompCamera& camera)
     {
         pass(m_scene, camera);
     }
-}
+}*/
 
 void SysDebugRender::render_framebuffer(ActiveScene& rScene, Magnum::GL::Texture2D& rTexture)
 {

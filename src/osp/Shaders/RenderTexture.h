@@ -34,7 +34,7 @@ class RenderTexture : public Magnum::GL::AbstractShaderProgram
 public:
     // Vertex attribs
     typedef Magnum::GL::Attribute<0, Magnum::Vector2> Position;
-    typedef Magnum::GL::Attribute<0, Magnum::Vector2> TextureCoordinates;
+    typedef Magnum::GL::Attribute<1, Magnum::Vector2> TextureCoordinates;
 
     // Outputs
     enum : Magnum::UnsignedInt

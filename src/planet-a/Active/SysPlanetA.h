@@ -44,10 +44,7 @@ struct ACompPlanet
 {
     std::shared_ptr<IcoSphereTree> m_icoTree;
     std::shared_ptr<PlanetGeometryA> m_planet;
-    Magnum::GL::Mesh m_mesh{};
-    Magnum::Shaders::MeshVisualizer3D m_shader{
-            Magnum::Shaders::MeshVisualizer3D::Flag::Wireframe
-            | Magnum::Shaders::MeshVisualizer3D::Flag::NormalDirection};
+    osp::DependRes<Magnum::GL::Mesh> m_mesh;
     Magnum::GL::Buffer m_vrtxBufGL{};
     Magnum::GL::Buffer m_indxBufGL{};
     double m_radius;
@@ -63,9 +60,6 @@ public:
     static osp::active::ActiveEnt activate(
             osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
             osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat);
-
-    static void draw(osp::active::ActiveScene& rScene,
-              osp::active::ACompCamera const& camera);
 
     static void debug_create_chunk_collider(
             osp::active::ActiveScene& rScene,
