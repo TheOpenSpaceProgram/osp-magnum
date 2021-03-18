@@ -22,14 +22,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+#include <array>
+
 #include <Magnum/GL/DefaultFramebuffer.h>
+#include <Magnum/GL/Framebuffer.h>
 #include <Magnum/GL/Renderer.h>
+#include <Magnum/GL/Buffer.h>
+#include <Magnum/GL/Mesh.h>
+#include <Magnum/Mesh.h>
+#include <Corrade/Containers/ArrayViewStl.h>
 
 #include "SysDebugRender.h"
 #include "ActiveScene.h"
 #include "adera/Shaders/Phong.h"
 #include "adera/Shaders/PlumeShader.h"
+#include <osp/Shaders/RenderTexture.h>
 
+
+using namespace Magnum;
 
 using namespace osp::active;
 
@@ -51,46 +62,56 @@ void SysDebugRender::add_functions(ActiveScene &rScene)
 
     glResources.add<PlumeShader>("plume_shader");
 
-    rScene.debug_render_add(rScene.get_render_order(), "debug", "", "",
-                            &SysDebugRender::draw);
+    // Generate fullscreen tri for texture rendering
+    using namespace Magnum; 
+    if (glResources.get<GL::Mesh>("fullscreen_tri").empty())
+    {
+        std::array<float, 12> surfData
+        {
+            // Vert position    // UV coordinate
+            -1.0f,  1.0f,       0.0f,  1.0f,
+            -1.0f, -2.0f,       0.0f, -1.0f,
+             2.0f,  1.0f,       2.0f,  1.0f
+        };
+
+        GL::Buffer surface(std::move(surfData), GL::BufferUsage::StaticDraw);
+        GL::Mesh surfaceMesh;
+        surfaceMesh
+            .setPrimitive(Magnum::MeshPrimitive::Triangles)
+            .addVertexBuffer(std::move(surface), 0,
+                RenderTexture::Position{}, RenderTexture::TextureCoordinates{});
+        glResources.add<GL::Mesh>("fullscreen_tri", std::move(surfaceMesh));
+    }
+
 }
 
-void SysDebugRender::draw(ActiveScene &rScene, ACompCamera const& camera)
+void SysDebugRender::draw(ACompCamera& camera)
 {
-    using Magnum::GL::Renderer;
+    GL::AbstractFramebuffer* framebuffer = (camera.m_renderTarget.empty()) ?
+        reinterpret_cast<GL::AbstractFramebuffer*>(&GL::defaultFramebuffer)
+        : reinterpret_cast<GL::AbstractFramebuffer*>(&(*camera.m_renderTarget));
 
-    auto& reg = rScene.get_registry();
+    framebuffer->bind();
 
-    Renderer::enable(Renderer::Feature::DepthTest);
-    Renderer::enable(Renderer::Feature::FaceCulling);
+    framebuffer->clear(
+        GL::FramebufferClear::Color
+        | GL::FramebufferClear::Depth
+        | GL::FramebufferClear::Stencil);
 
-
-
-    // Get opaque objects
-    auto opaqueObjects = reg.view<CompDrawableDebug, ACompTransform>(
-        entt::exclude<CompTransparentDebug>);
-    // Configure blend mode for opaque rendering
-    Renderer::disable(Renderer::Feature::Blending);
-    // Draw opaque objects
-    draw_group(rScene, opaqueObjects, camera);
-
-    // Get transparent objects
-    auto transparentObjects = rScene.get_registry()
-        .view<CompDrawableDebug, CompVisibleDebug,
-        CompTransparentDebug, ACompTransform>();
-
-    // Configure blend mode for transparency
-    Renderer::enable(Renderer::Feature::Blending);
-    Renderer::setBlendFunction(
-        Renderer::BlendFunction::SourceAlpha,
-        Renderer::BlendFunction::OneMinusSourceAlpha);
-
-    // Draw backfaces first
-    Renderer::setFaceCullingMode(Renderer::PolygonFacing::Front);
-    draw_group(rScene, transparentObjects, camera);
-
-    // Then draw frontfaces
-    Renderer::setFaceCullingMode(Renderer::PolygonFacing::Back);
-    draw_group(rScene, transparentObjects, camera);
+    for (auto& pass : m_renderPasses)
+    {
+        pass(m_scene, camera);
+    }
 }
 
+void SysDebugRender::render_framebuffer(ActiveScene& rScene, Magnum::GL::Texture2D& rTexture)
+{
+    using namespace Magnum;
+    
+    auto& glResources = rScene.get_context_resources();
+
+    DependRes<GL::Mesh> surface = glResources.get<GL::Mesh>("fullscreen_tri");
+    DependRes<RenderTexture> shader = glResources.get<RenderTexture>("render_texture");
+
+    shader->render_texure(*surface, rTexture);
+}

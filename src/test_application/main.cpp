@@ -257,7 +257,7 @@ void load_a_bunch_of_stuff()
         "ph_rcs.sturdy.gltf",
         "ph_rcs_plume.sturdy.gltf"
     };
-    for (auto meshName : meshes)
+    for (std::string_view meshName : meshes)
     {
         osp::AssetImporter::load_sturdy_file(
             osp::string_concat(datapath, meshName), lazyDebugPack);

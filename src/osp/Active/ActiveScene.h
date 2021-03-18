@@ -128,7 +128,6 @@ public:
     template<class T>
     decltype(auto) reg_get(ActiveEnt ent) const { return m_registry.get<T>(ent); }
 
-
     /**
      * Shorthand for get_registry().try_get<T>()
      * @tparam T Component to get
@@ -211,6 +210,7 @@ public:
     { m_renderHandles.emplace_back(std::forward<ARGS_T>(args)...); }
 
     Package& get_context_resources() { return m_context; }
+
 private:
 
     void on_hierarchy_construct(ActiveReg_t& reg, ActiveEnt ent);
@@ -305,6 +305,9 @@ struct ACompCamera
 
     Matrix4 m_projection;
     Matrix4 m_inverse;
+
+    // If empty, GL::DefaultFramebuffer is used
+    DependRes<Magnum::GL::Framebuffer> m_renderTarget;
 
     void calculate_projection();
 };

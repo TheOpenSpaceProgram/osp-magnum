@@ -43,6 +43,9 @@
 #include <planet-a/Active/SysPlanetA.h>
 #include <planet-a/Satellites/SatPlanet.h>
 
+#include <Magnum/GL/Renderer.h>
+#include <Magnum/GL/Framebuffer.h>
+
 using namespace testapp;
 
 using osp::Vector2;
@@ -107,6 +110,59 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.system_machine_create<SysMachineRCSController>();
     rScene.system_machine_create<SysMachineContainer>();
 
+    // Define render passes
+
+    // Opaque pass
+    renderer.add_pass(
+        [](osp::active::ActiveScene& rScene, ACompCamera& camera)
+        {
+            using Magnum::GL::Renderer;
+            using namespace osp::active;
+
+            auto& reg = rScene.get_registry();
+
+            Renderer::enable(Renderer::Feature::DepthTest);
+            Renderer::enable(Renderer::Feature::FaceCulling);
+            Renderer::disable(Renderer::Feature::Blending);
+
+            // Fetch opaque objects
+            auto opaqueView = reg.view<CompDrawableDebug, ACompTransform>(
+                entt::exclude<CompTransparentDebug>);
+
+            SysDebugRender::draw_group(rScene, opaqueView, camera);
+        }
+    );
+
+    // Transparent pass
+    renderer.add_pass(
+        [](osp::active::ActiveScene& rScene, ACompCamera& camera)
+        {
+            using Magnum::GL::Renderer;
+            using namespace osp::active;
+
+            auto& reg = rScene.get_registry();
+
+            Renderer::enable(Renderer::Feature::DepthTest);
+            Renderer::enable(Renderer::Feature::FaceCulling);
+            Renderer::enable(Renderer::Feature::Blending);
+            Renderer::setBlendFunction(
+                Renderer::BlendFunction::SourceAlpha,
+                Renderer::BlendFunction::OneMinusSourceAlpha);
+
+            auto transparentView = reg.view<CompDrawableDebug, CompVisibleDebug,
+                CompTransparentDebug, ACompTransform>();
+
+            // Draw backfaces
+            Renderer::setFaceCullingMode(Renderer::PolygonFacing::Front);
+            SysDebugRender::draw_group(rScene, transparentView, camera);
+
+            // Draw frontfaces
+            Renderer::setFaceCullingMode(Renderer::PolygonFacing::Back);
+            SysDebugRender::draw_group(rScene, transparentView, camera);
+        }
+    );
+
+
     // Make active areas load vehicles and planets
     //sysArea.activator_add(rUni.sat_type_find_index<SatVehicle>(), sysVehicle);
     //sysArea.activator_add(rUni.sat_type_find_index<SatPlanet>(), sysPlanet);
@@ -134,11 +190,17 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     rScene.reg_emplace<ACompFloatingOrigin>(camera);
 
+    // Add an offscreen framebuffer
+    using Magnum::GL::Framebuffer;
+    osp::DependRes<Framebuffer> fbo =
+        scene.get_context_resources().add<Framebuffer>("offscreen_fbo");
+
     cameraComp.m_viewport
             = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
     cameraComp.m_far = 1u << 24;
     cameraComp.m_near = 1.0f;
     cameraComp.m_fov = 45.0_degf;
+    cameraComp.m_renderTarget = std::move(fbo);
 
     cameraComp.calculate_projection();
 

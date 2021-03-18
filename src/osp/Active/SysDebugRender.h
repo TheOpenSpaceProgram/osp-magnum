@@ -27,6 +27,7 @@
 #include <variant>
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Mesh.h>
+#include <Magnum/GL/Texture.h>
 
 #include "osp/Resource/Resource.h"
 #include "osp/Active/Shader.h"
@@ -60,16 +61,22 @@ public:
 
     static void add_functions(ActiveScene& rScene);
 
-    static void draw(ActiveScene& rScene, ACompCamera const& camera);
+    static void draw(ActiveScene& rScene, ACompCamera& camera);
 
-private:
+    // TODO staticify
+    void add_pass(std::function<void(ActiveScene&, ACompCamera&)> passDef)
+    { m_renderPasses.push_back(std::move(passDef)); }
+
     template <typename T>
     static void draw_group(ActiveScene& rScene, T& rCollection, ACompCamera const& camera);
+    static void render_framebuffer(ActiveScene& rScene, Magnum::GL::Texture2D& rTexture);
+    // TODO
+    std::vector<std::function<void(ActiveScene&, ACompCamera&)>> m_renderPasses;
 
 };
 
 template<typename T>
-inline void SysDebugRender::draw_group(ActiveScene& rScene, T& rCollection, ACompCamera const& camera)
+inline void SysDebugRender::draw_group(ActiveScene& rScene, T& rCollection, ACompCamera& camera)
 {
     for (auto entity : rCollection)
     {

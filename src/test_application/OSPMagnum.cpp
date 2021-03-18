@@ -57,10 +57,6 @@ OSPMagnum::~OSPMagnum()
 
 void OSPMagnum::drawEvent()
 {
-
-    Magnum::GL::defaultFramebuffer.clear(Magnum::GL::FramebufferClear::Color
-                                         | Magnum::GL::FramebufferClear::Depth);
-
 //    if (m_area)
 //    {
 //        //Scene3D& scene = m_area->get_scene();
