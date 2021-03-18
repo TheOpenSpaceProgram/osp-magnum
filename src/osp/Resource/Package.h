@@ -99,8 +99,8 @@ public:
      * @param args [in] Arguments to pass to TYPE_T constructor
      * @return Reference counted dependency to new resource
      */
-    template<class TYPE_T, typename ... ARGS_T>
-    DependRes<TYPE_T> add(std::string_view path, ARGS_T&& ... args);
+    template<class TYPE_T, class STRING_T, typename ... ARGS_T>
+    DependRes<TYPE_T> add(STRING_T&& path, ARGS_T&& ... args);
 
     /**
      * Get a resource by path identifier
@@ -123,8 +123,8 @@ public:
      * @param path [in] String used to identify the target resource
      * @return Reference counted dependency to the found or unloaded resource
      */
-    template<class TYPE_T>
-    DependRes<TYPE_T> get_or_reserve(std::string_view path) noexcept;
+    template<class TYPE_T, class STRING_T>
+    DependRes<TYPE_T> get_or_reserve(STRING_T&& path) noexcept;
 
     template<class TYPE_T>
     group_t<TYPE_T> const& group_get();
@@ -167,8 +167,8 @@ private:
     std::string m_displayName;
 };
 
-template<class TYPE_T, typename ... ARGS_T>
-DependRes<TYPE_T> Package::add(std::string_view path,
+template<class TYPE_T, class STRING_T, typename ... ARGS_T>
+DependRes<TYPE_T> Package::add(STRING_T&& path,
                                ARGS_T&& ... args)
 {
     // Runtime generated (global) sequential IDs for every unique type
@@ -208,7 +208,8 @@ DependRes<TYPE_T> Package::add(std::string_view path,
 
     // Emplace without needing copy constructor
     auto newIt = group.m_resources
-        .try_emplace(std::string{path}, construct_tag(), std::forward<ARGS_T>(args)...);
+        .try_emplace(std::forward<STRING_T>(path),
+                     std::in_place, std::forward<ARGS_T>(args)...);
 
     // check if emplace fails, Resource already exists
     if (!newIt.second)
@@ -249,8 +250,8 @@ DependRes<TYPE_T> Package::get(std::string_view path) noexcept
     return DependRes<TYPE_T>(resIt);
 }
 
-template<class TYPE_T>
-DependRes<TYPE_T> Package::get_or_reserve(std::string_view path) noexcept
+template<class TYPE_T, class STRING_T>
+DependRes<TYPE_T> Package::get_or_reserve(STRING_T&& path) noexcept
 {
     const uint32_t resTypeId = resource_id::type<TYPE_T>;
 
@@ -271,18 +272,11 @@ DependRes<TYPE_T> Package::get_or_reserve(std::string_view path) noexcept
 
     GroupType<TYPE_T> &group = entt::any_cast<GroupType<TYPE_T>&>(groupAny);
 
-    auto resIt = group.m_resources.find(path); // Find resource by path
+    // Find existing element or emplace a blank reservation if not found
+    auto newIt = group.m_resources.try_emplace(std::forward<STRING_T>(path),
+                                               std::nullopt);
 
-    if (resIt == group.m_resources.end())
-    {
-        // Not found, reserve with m_data as empty optional
-        auto newIt = group.m_resources.try_emplace(std::string{path},
-                                                   reserve_tag());
-        return DependRes<TYPE_T>(newIt.first);
-    }
-
-    // found
-    return DependRes<TYPE_T>(resIt);
+    return DependRes<TYPE_T>(newIt.first);
 }
 
 template<class TYPE_T>

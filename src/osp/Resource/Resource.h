@@ -32,20 +32,15 @@
 namespace osp
 {
 
-struct construct_tag {};
-struct reserve_tag {};
-
 template <class TYPE_T>
 struct Resource
 {
-    Resource(reserve_tag)
-     : m_data()
+    Resource(std::nullopt_t)
+     : m_data(std::nullopt)
     { }
-    Resource(construct_tag)
-     : m_data(TYPE_T())
-    { }
-    Resource(construct_tag, TYPE_T&& data)
-     : m_data(std::move(data))
+    template<typename ... ARGS_T>
+    Resource(std::in_place_t, ARGS_T&& ... args)
+     : m_data(std::in_place, std::forward<ARGS_T>(args)...)
     { }
     Resource(Resource&& move) = default;
     Resource(const Resource& copy) = delete;
