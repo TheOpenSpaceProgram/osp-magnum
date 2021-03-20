@@ -37,12 +37,13 @@
 using namespace testapp;
 
 OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
-                     osp::OSPApplication &rOspApp) :
-        Magnum::Platform::Application{
+                     osp::OSPApplication &rOspApp)
+    : Magnum::Platform::Application{
             arguments,
-            Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
-        m_userInput(12),
-        m_ospApp(rOspApp)
+            Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})}
+    , m_userInput(12)
+    , m_ospApp(rOspApp)
+    , m_implot(ImPlot::CreateContext(), &destroy_implot)
 {
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 
@@ -50,7 +51,6 @@ OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
     m_imgui = Magnum::ImGuiIntegration::Context(
         Magnum::Vector2{windowSize()} / dpiScaling(),
         windowSize(), framebufferSize());
-    m_implot = ImPlot::CreateContext();
 
     m_timeline.start();
 
@@ -60,7 +60,7 @@ OSPMagnum::~OSPMagnum()
 {
     // Free ImPlot
     // ImPlot is not part of Magnum's imgui integration, and is handled manually
-    ImPlot::DestroyContext(m_implot);
+    //ImPlot::DestroyContext(m_implot);
 
     // Clear scene data before GL resources are freed
     m_scenes.clear();

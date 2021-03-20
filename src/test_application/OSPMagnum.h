@@ -78,7 +78,9 @@ public:
 
 private:
     Magnum::ImGuiIntegration::Context m_imgui{Magnum::NoCreate};
-    ImPlotContext* m_implot;
+
+    static void destroy_implot(ImPlotContext* ctx) { ImPlot::DestroyContext(ctx); }
+    std::unique_ptr<ImPlotContext, decltype(&destroy_implot)> m_implot;
 
     void draw_GUI();
 
