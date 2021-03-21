@@ -22,18 +22,39 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#pragma once
 
 #include <functional>
 
 #include "osp/Active/activetypes.h"
 #include <Magnum/ImGuiIntegration/Context.hpp>
+#include <implot.h>
 
 namespace osp::active
 {
 
+// TMP
+struct ACompImGuiContext
+{
+    Magnum::ImGuiIntegration::Context m_imgui;
+};
+
+using ImPlotContext_t = std::unique_ptr<ImPlotContext, std::function<void(ImPlotContext*)>>;
+
+struct ACompImPlotContext
+{
+    ImPlotContext_t m_implot;
+
+    static void free_ctx(ImPlotContext* ctx)
+    {
+        ImPlot::DestroyContext(ctx);
+    }
+};
+
 struct ACompGUIWindow
 {
-    std::function<void(ActiveScene&)> m_function;
+    std::function<void(ActiveScene&, bool&)> m_function;
+    bool m_visible;
 };
 
 class SysGUI : public IDynamicSystem

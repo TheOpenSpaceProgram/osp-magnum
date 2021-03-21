@@ -127,16 +127,33 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Link ActiveArea to scene using the AreaAssociate
     osp::active::SysAreaAssociate::connect(scene, rUni, areaSat);
 
+    ActiveEnt sceneRoot = scene.hier_get_root();
+    auto& reg = scene.get_registry();
+
     // Add default-constructed physics world to scene
-    scene.get_registry().emplace<osp::active::ACompPhysicsWorld_t>(scene.hier_get_root());
+    reg.emplace<osp::active::ACompPhysicsWorld_t>(sceneRoot);
+
+    // Add GUI contexts to scene
+    {
+        auto imguiCtx = Magnum::ImGuiIntegration::Context(
+            Magnum::Vector2{pMagnumApp->windowSize()} / pMagnumApp->dpiScaling(),
+            pMagnumApp->windowSize(), pMagnumApp->framebufferSize());
+        auto& imgui = reg.emplace<osp::active::ACompImGuiContext>(sceneRoot, std::move(imguiCtx));
+
+        pMagnumApp->m_activeImgui = &imgui.m_imgui;
+
+        osp::active::ImPlotContext_t implotCtx = osp::active::ImPlotContext_t(
+            ImPlot::CreateContext(), osp::active::ACompImPlotContext::free_ctx);
+        reg.emplace<osp::active::ACompImPlotContext>(sceneRoot, std::move(implotCtx));
+    }
 
     // Add a camera to the scene
 
     // Create the camera entity
-    ActiveEnt camera = scene.hier_create_child(scene.hier_get_root(),
+    ActiveEnt camera = scene.hier_create_child(sceneRoot,
                                                        "Camera");
     auto &cameraTransform = scene.reg_emplace<ACompTransform>(camera);
-    auto &cameraComp = scene.get_registry().emplace<ACompCamera>(camera);
+    auto &cameraComp = reg.emplace<ACompCamera>(camera);
 
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     scene.reg_emplace<ACompFloatingOrigin>(camera);
@@ -165,7 +182,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     }
     ActiveEnt fpsWindow = scene.get_registry().create();
     scene.reg_emplace<osp::active::ACompGUIWindow>(fpsWindow,
-        [data = std::array<float, 120>{0.0f}, index = 0, &times](osp::active::ActiveScene& rScene) mutable
+        [data = std::array<float, 120>{0.0f}, index = 0, &times]
+        (osp::active::ActiveScene& rScene, bool& visible) mutable
         {
             using namespace Magnum;
 
@@ -192,7 +210,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Show active MUC velocity
     ActiveEnt shipStatus = scene.get_registry().create();
     scene.reg_emplace<osp::active::ACompGUIWindow>(shipStatus,
-        [] (osp::active::ActiveScene& rScene)
+        [] (osp::active::ActiveScene& rScene, bool& visible)
         {
             using adera::active::machines::MachineUserControl;
             using namespace osp::active;

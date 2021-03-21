@@ -34,9 +34,20 @@ SysGUI::SysGUI(ActiveScene& rScene)
 
 void SysGUI::draw_GUI(ActiveScene& rScene, ACompCamera const&)
 {
+    ActiveEnt sceneRoot = rScene.hier_get_root();
+    ACompImGuiContext* imgui = rScene.reg_try_get<ACompImGuiContext>(sceneRoot);
+    if (imgui == nullptr) { return; }
+    ImGui::SetCurrentContext(imgui->m_imgui.context());
+
+    ACompImPlotContext* implot = rScene.reg_try_get<ACompImPlotContext>(sceneRoot);
+    if (implot != nullptr)
+    {
+        ImPlot::SetCurrentContext(implot->m_implot.get());
+    }
+
     for (auto [ent, describeElement]
         : rScene.get_registry().view<ACompGUIWindow>().each())
     {
-        describeElement.m_function(rScene);
+        describeElement.m_function(rScene, describeElement.m_visible);
     }
 }

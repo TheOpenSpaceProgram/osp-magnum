@@ -43,14 +43,8 @@ OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
             Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})}
     , m_userInput(12)
     , m_ospApp(rOspApp)
-    , m_implot(ImPlot::CreateContext(), &destroy_implot)
 {
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
-
-    // Initialize ImGui
-    m_imgui = Magnum::ImGuiIntegration::Context(
-        Magnum::Vector2{windowSize()} / dpiScaling(),
-        windowSize(), framebufferSize());
 
     m_timeline.start();
 
@@ -70,12 +64,12 @@ void OSPMagnum::draw_GUI()
 {
     using namespace Magnum;
 
-    m_imgui.updateApplicationCursor(*this);
+    m_activeImgui->updateApplicationCursor(*this);
     GL::Renderer::enable(GL::Renderer::Feature::Blending);
     GL::Renderer::enable(GL::Renderer::Feature::ScissorTest);
     GL::Renderer::disable(GL::Renderer::Feature::FaceCulling);
     GL::Renderer::disable(GL::Renderer::Feature::DepthTest);
-    m_imgui.drawFrame();
+    m_activeImgui->drawFrame();
     GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
     GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
     GL::Renderer::disable(GL::Renderer::Feature::ScissorTest);
@@ -90,7 +84,7 @@ void OSPMagnum::drawEvent()
     Magnum::GL::defaultFramebuffer.clear(FramebufferClear::Color | FramebufferClear::Depth);
 
     // Initialize new GUI frame
-    m_imgui.newFrame();
+    m_activeImgui->newFrame();
 
 //    if (m_area)
 //    {
@@ -137,12 +131,10 @@ void OSPMagnum::drawEvent()
     redraw();
 }
 
-
-
 void OSPMagnum::keyPressEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
-    if (m_imgui.handleKeyPressEvent(event)) { return; }
+    if (m_activeImgui != nullptr && m_activeImgui->handleKeyPressEvent(event)) { return; }
     m_userInput.event_raw(osp::sc_keyboard, (int) event.key(),
                           osp::UserInputHandler::ButtonRawEvent::PRESSED);
 }
@@ -150,34 +142,34 @@ void OSPMagnum::keyPressEvent(KeyEvent& event)
 void OSPMagnum::keyReleaseEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
-    if (m_imgui.handleKeyReleaseEvent(event)) { return; }
+    if (m_activeImgui != nullptr && m_activeImgui->handleKeyReleaseEvent(event)) { return; }
     m_userInput.event_raw(osp::sc_keyboard, (int) event.key(),
                           osp::UserInputHandler::ButtonRawEvent::RELEASED);
 }
 
 void OSPMagnum::mousePressEvent(MouseEvent& event)
 {
-    if (m_imgui.handleMousePressEvent(event)) { return; }
+    if (m_activeImgui != nullptr && m_activeImgui->handleMousePressEvent(event)) { return; }
     m_userInput.event_raw(osp::sc_mouse, (int) event.button(),
                           osp::UserInputHandler::ButtonRawEvent::PRESSED);
 }
 
 void OSPMagnum::mouseReleaseEvent(MouseEvent& event)
 {
-    if (m_imgui.handleMouseReleaseEvent(event)) { return; }
+    if (m_activeImgui != nullptr && m_activeImgui->handleMouseReleaseEvent(event)) { return; }
     m_userInput.event_raw(osp::sc_mouse, (int) event.button(),
                           osp::UserInputHandler::ButtonRawEvent::RELEASED);
 }
 
 void OSPMagnum::mouseMoveEvent(MouseMoveEvent& event)
 {
-    if (m_imgui.handleMouseMoveEvent(event)) { return; }
+    if (m_activeImgui != nullptr && m_activeImgui->handleMouseMoveEvent(event)) { return; }
     m_userInput.mouse_delta(event.relativePosition());
 }
 
 void OSPMagnum::mouseScrollEvent(MouseScrollEvent & event)
 {
-    if (m_imgui.handleMouseMoveEvent(event)) { return; }
+    if (m_activeImgui != nullptr && m_activeImgui->handleMouseMoveEvent(event)) { return; }
     m_userInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 }
 

@@ -30,6 +30,7 @@
 
 #include "../OSPApplication.h"
 #include "../UserInputHandler.h"
+#include <Magnum/ImGuiIntegration/Context.hpp>
 
 #include "../types.h"
 #include "activetypes.h"
@@ -40,11 +41,11 @@
 #include "SysMachine.h"
 //#include "SysVehicle.h"
 #include "SysWire.h"
+#include "SysGUI.h"
 #include "adera/SysExhaustPlume.h"
 
 namespace osp::active
 {
-
 /**
  * An ECS 3D Game Engine scene that implements a scene graph hierarchy.
  *
@@ -173,6 +174,8 @@ public:
     constexpr UpdateOrder_t& get_update_order() { return m_updateOrder; }
 
     constexpr RenderOrder_t& get_render_order() { return m_renderOrder; }
+
+    ACompImGuiContext* find_GUI_context();
 
     // TODO
     constexpr float get_time_delta_fixed() const { return 1.0f / 60.0f; }

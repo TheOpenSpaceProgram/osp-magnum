@@ -76,11 +76,8 @@ public:
     constexpr osp::UserInputHandler& get_input_handler() { return m_userInput; }
     constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
 
+    Magnum::ImGuiIntegration::Context* m_activeImgui;
 private:
-    Magnum::ImGuiIntegration::Context m_imgui{Magnum::NoCreate};
-
-    static void destroy_implot(ImPlotContext* ctx) { ImPlot::DestroyContext(ctx); }
-    std::unique_ptr<ImPlotContext, decltype(&destroy_implot)> m_implot;
 
     void draw_GUI();
 

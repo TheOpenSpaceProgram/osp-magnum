@@ -239,6 +239,12 @@ void ActiveScene::draw(ActiveEnt camera)
     m_renderOrder.call(cameraComp);
 }
 
+ACompImGuiContext* ActiveScene::find_GUI_context()
+{
+    ActiveEnt sceneRoot = hier_get_root();
+    return m_registry.try_get<ACompImGuiContext>(sceneRoot);
+}
+
 MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,
         std::unique_ptr<ISysMachine> sysMachine)
 {
