@@ -38,16 +38,19 @@ struct ACompImGuiContext
     Magnum::ImGuiIntegration::Context m_imgui;
 };
 
-using ImPlotContext_t = std::unique_ptr<ImPlotContext, std::function<void(ImPlotContext*)>>;
-
 struct ACompImPlotContext
 {
-    ImPlotContext_t m_implot;
-
     static void free_ctx(ImPlotContext* ctx)
     {
         ImPlot::DestroyContext(ctx);
     }
+
+    using ImPlotContext_t = std::unique_ptr<
+        ImPlotContext,
+        decltype(&ACompImPlotContext::free_ctx)>;
+
+    ImPlotContext_t m_implot;
+
 };
 
 struct ACompGUIWindow

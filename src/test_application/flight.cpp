@@ -141,7 +141,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
         auto& imgui = reg.emplace<osp::active::ACompImGuiContext>(sceneRoot, std::move(imguiCtx));
 
         // Initialize ImPlot context
-        osp::active::ImPlotContext_t implotCtx = osp::active::ImPlotContext_t(
+        using ImPlotContext_t = osp::active::ACompImPlotContext::ImPlotContext_t;
+        ImPlotContext_t implotCtx = ImPlotContext_t(
             ImPlot::CreateContext(), osp::active::ACompImPlotContext::free_ctx);
         reg.emplace<osp::active::ACompImPlotContext>(sceneRoot, std::move(implotCtx));
 

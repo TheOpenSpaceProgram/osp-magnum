@@ -38,12 +38,12 @@ void SysGUI::update_GUI(ActiveScene& rScene)
 {
     // Fetch ImGui context from scene root
     ActiveEnt sceneRoot = rScene.hier_get_root();
-    ACompImGuiContext* imgui = rScene.reg_try_get<ACompImGuiContext>(sceneRoot);
+    auto* imgui = rScene.reg_try_get<ACompImGuiContext>(sceneRoot);
     if (imgui == nullptr) { return; }
     ImGui::SetCurrentContext(imgui->m_imgui.context());
 
     // Fetch ImPlot context from scene root, if it exists
-    ACompImPlotContext* implot = rScene.reg_try_get<ACompImPlotContext>(sceneRoot);
+    auto* implot = rScene.reg_try_get<ACompImPlotContext>(sceneRoot);
     if (implot != nullptr)
     {
         ImPlot::SetCurrentContext(implot->m_implot.get());
@@ -63,7 +63,7 @@ void SysGUI::update_GUI(ActiveScene& rScene)
 void SysGUI::render_GUI(ActiveScene& rScene, ACompCamera const& camera)
 {
     ActiveEnt sceneRoot = rScene.hier_get_root();
-    ACompImGuiContext* imgui = rScene.reg_try_get<ACompImGuiContext>(sceneRoot);
+    auto* imgui = rScene.reg_try_get<ACompImGuiContext>(sceneRoot);
     if (imgui == nullptr) { return; }
     ImGui::SetCurrentContext(imgui->m_imgui.context());
 
