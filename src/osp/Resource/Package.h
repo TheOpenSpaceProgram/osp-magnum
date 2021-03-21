@@ -193,7 +193,7 @@ DependRes<TYPE_T> Package::get(std::string_view path) noexcept
 {
     const uint32_t resTypeId = resource_id::type<TYPE_T>;
 
-    if (m_groups.size() < resTypeId)
+    if (m_groups.size() <= resTypeId)
     {
         return {}; // Return if resTypeId is not a valid index to m_groups
     }
