@@ -33,7 +33,6 @@
 namespace osp::active
 {
 
-// TMP
 struct ACompImGuiContext
 {
     Magnum::ImGuiIntegration::Context m_imgui;
@@ -65,9 +64,10 @@ public:
     SysGUI(ActiveScene& rScene);
     ~SysGUI() = default;
 
-    static void draw_GUI(ActiveScene& rScene, ACompCamera const&);
-
+    static void update_GUI(ActiveScene& rScene);
+    static void render_GUI(ActiveScene& rScene, ACompCamera const& camera);
 private:
+    UpdateOrderHandle_t m_updateGUI;
     RenderOrderHandle_t m_drawGUI;
 };
 

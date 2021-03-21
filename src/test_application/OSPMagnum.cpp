@@ -52,28 +52,13 @@ OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
 
 OSPMagnum::~OSPMagnum()
 {
-    // Free ImPlot
-    // ImPlot is not part of Magnum's imgui integration, and is handled manually
-    //ImPlot::DestroyContext(m_implot);
-
     // Clear scene data before GL resources are freed
     m_scenes.clear();
 }
 
-void OSPMagnum::draw_GUI()
+void OSPMagnum::set_active_GUI(osp::active::ActiveScene& rScene)
 {
-    using namespace Magnum;
-
-    m_activeImgui->updateApplicationCursor(*this);
-    GL::Renderer::enable(GL::Renderer::Feature::Blending);
-    GL::Renderer::enable(GL::Renderer::Feature::ScissorTest);
-    GL::Renderer::disable(GL::Renderer::Feature::FaceCulling);
-    GL::Renderer::disable(GL::Renderer::Feature::DepthTest);
-    m_activeImgui->drawFrame();
-    GL::Renderer::enable(GL::Renderer::Feature::DepthTest);
-    GL::Renderer::enable(GL::Renderer::Feature::FaceCulling);
-    GL::Renderer::disable(GL::Renderer::Feature::ScissorTest);
-    GL::Renderer::disable(GL::Renderer::Feature::Blending);
+    m_activeImgui = rScene.try_get_GUI_context();
 }
 
 void OSPMagnum::drawEvent()
@@ -82,9 +67,6 @@ void OSPMagnum::drawEvent()
 
     // Clear framebuffer
     Magnum::GL::defaultFramebuffer.clear(FramebufferClear::Color | FramebufferClear::Depth);
-
-    // Initialize new GUI frame
-    m_activeImgui->newFrame();
 
 //    if (m_area)
 //    {
@@ -123,8 +105,11 @@ void OSPMagnum::drawEvent()
         scene.draw(scene.get_registry().view<osp::active::ACompCamera>().front());
     }
 
-    // TODO: GUI and stuff
-    draw_GUI();
+    // Update the cursor type ("dragging" hand, rescale arrows, text cursor, etc)
+    if (m_activeImgui != nullptr)
+    {
+        m_activeImgui->updateApplicationCursor(*this);
+    }
 
     swapBuffers();
     m_timeline.nextFrame();

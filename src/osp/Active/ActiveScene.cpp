@@ -25,6 +25,7 @@
 #include <iostream>
 
 #include "ActiveScene.h"
+#include "SysGUI.h"
 
 using namespace osp;
 using namespace osp::active;
@@ -239,10 +240,15 @@ void ActiveScene::draw(ActiveEnt camera)
     m_renderOrder.call(cameraComp);
 }
 
-ACompImGuiContext* ActiveScene::find_GUI_context()
+Magnum::ImGuiIntegration::Context* ActiveScene::try_get_GUI_context()
 {
     ActiveEnt sceneRoot = hier_get_root();
-    return m_registry.try_get<ACompImGuiContext>(sceneRoot);
+    auto* compCtxt = m_registry.try_get<ACompImGuiContext>(sceneRoot);
+    if (compCtxt != nullptr)
+    {
+        return &compCtxt->m_imgui;
+    }
+    return nullptr;
 }
 
 MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,

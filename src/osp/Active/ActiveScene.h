@@ -41,7 +41,6 @@
 #include "SysMachine.h"
 //#include "SysVehicle.h"
 #include "SysWire.h"
-#include "SysGUI.h"
 #include "adera/SysExhaustPlume.h"
 
 namespace osp::active
@@ -175,7 +174,7 @@ public:
 
     constexpr RenderOrder_t& get_render_order() { return m_renderOrder; }
 
-    ACompImGuiContext* find_GUI_context();
+    Magnum::ImGuiIntegration::Context* try_get_GUI_context();
 
     // TODO
     constexpr float get_time_delta_fixed() const { return 1.0f / 60.0f; }

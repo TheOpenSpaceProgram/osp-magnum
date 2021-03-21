@@ -24,30 +24,60 @@
  */
 #include "SysGUI.h"
 #include "ActiveScene.h"
-
+#include <Magnum/GL/Renderer.h>
 using namespace osp::active;
 
 SysGUI::SysGUI(ActiveScene& rScene)
-    : m_drawGUI(rScene.get_render_order(), "gui", "debug", "",
-        [&rScene](ACompCamera const& camera) { draw_GUI(rScene, camera); })
+    : m_updateGUI(rScene.get_update_order(), "gui", "physics", "",
+        [](ActiveScene& rScene) { update_GUI(rScene); })
+    , m_drawGUI(rScene.get_render_order(), "gui", "debug", "",
+        [&rScene](ACompCamera const& camera) { render_GUI(rScene, camera); })
 {}
 
-void SysGUI::draw_GUI(ActiveScene& rScene, ACompCamera const&)
+void SysGUI::update_GUI(ActiveScene& rScene)
 {
+    // Fetch ImGui context from scene root
     ActiveEnt sceneRoot = rScene.hier_get_root();
     ACompImGuiContext* imgui = rScene.reg_try_get<ACompImGuiContext>(sceneRoot);
     if (imgui == nullptr) { return; }
     ImGui::SetCurrentContext(imgui->m_imgui.context());
 
+    // Fetch ImPlot context from scene root, if it exists
     ACompImPlotContext* implot = rScene.reg_try_get<ACompImPlotContext>(sceneRoot);
     if (implot != nullptr)
     {
         ImPlot::SetCurrentContext(implot->m_implot.get());
     }
 
+    // Initialize new GUI frame
+    imgui->m_imgui.newFrame();
+
+    // Process GUI elements
     for (auto [ent, describeElement]
         : rScene.get_registry().view<ACompGUIWindow>().each())
     {
         describeElement.m_function(rScene, describeElement.m_visible);
     }
 }
+
+void SysGUI::render_GUI(ActiveScene& rScene, ACompCamera const& camera)
+{
+    ActiveEnt sceneRoot = rScene.hier_get_root();
+    ACompImGuiContext* imgui = rScene.reg_try_get<ACompImGuiContext>(sceneRoot);
+    if (imgui == nullptr) { return; }
+    ImGui::SetCurrentContext(imgui->m_imgui.context());
+
+    using namespace Magnum::GL;
+
+    Renderer::enable(Renderer::Feature::Blending);
+    Renderer::enable(Renderer::Feature::ScissorTest);
+    Renderer::disable(Renderer::Feature::FaceCulling);
+    Renderer::disable(Renderer::Feature::DepthTest);
+    imgui->m_imgui.drawFrame();
+    Renderer::enable(Renderer::Feature::DepthTest);
+    Renderer::enable(Renderer::Feature::FaceCulling);
+    Renderer::disable(Renderer::Feature::ScissorTest);
+    Renderer::disable(Renderer::Feature::Blending);
+}
+
+

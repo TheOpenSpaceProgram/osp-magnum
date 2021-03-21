@@ -40,7 +40,6 @@
 #include <Magnum/Platform/Sdl2Application.h>
 #include <Magnum/Shaders/VertexColor.h>
 #include <Magnum/ImGuiIntegration/Context.hpp>
-#include <implot.h>
 
 #include <memory>
 
@@ -76,14 +75,13 @@ public:
     constexpr osp::UserInputHandler& get_input_handler() { return m_userInput; }
     constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
 
-    Magnum::ImGuiIntegration::Context* m_activeImgui;
+    void set_active_GUI(osp::active::ActiveScene& rScene);
 private:
-
-    void draw_GUI();
-
     void drawEvent() override;
 
     osp::UserInputHandler m_userInput;
+
+    Magnum::ImGuiIntegration::Context* m_activeImgui{nullptr};
 
     MapActiveScene_t m_scenes;
 

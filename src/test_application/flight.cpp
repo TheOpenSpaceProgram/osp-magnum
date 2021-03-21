@@ -45,8 +45,7 @@
 #include <planet-a/Satellites/SatPlanet.h>
 
 #include <Magnum/ImGuiIntegration/Context.hpp>
-
-#include <imgui.h>
+#include <implot.h>
 
 using namespace testapp;
 
@@ -135,23 +134,25 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Add GUI contexts to scene
     {
+        // Initialize ImGui context
         auto imguiCtx = Magnum::ImGuiIntegration::Context(
             Magnum::Vector2{pMagnumApp->windowSize()} / pMagnumApp->dpiScaling(),
             pMagnumApp->windowSize(), pMagnumApp->framebufferSize());
         auto& imgui = reg.emplace<osp::active::ACompImGuiContext>(sceneRoot, std::move(imguiCtx));
 
-        pMagnumApp->m_activeImgui = &imgui.m_imgui;
-
+        // Initialize ImPlot context
         osp::active::ImPlotContext_t implotCtx = osp::active::ImPlotContext_t(
             ImPlot::CreateContext(), osp::active::ACompImPlotContext::free_ctx);
         reg.emplace<osp::active::ACompImPlotContext>(sceneRoot, std::move(implotCtx));
+
+        // Set scene's GUI as active (capture events)
+        pMagnumApp->set_active_GUI(scene);
     }
 
     // Add a camera to the scene
 
     // Create the camera entity
-    ActiveEnt camera = scene.hier_create_child(sceneRoot,
-                                                       "Camera");
+    ActiveEnt camera = scene.hier_create_child(sceneRoot, "Camera");
     auto &cameraTransform = scene.reg_emplace<ACompTransform>(camera);
     auto &cameraComp = reg.emplace<ACompCamera>(camera);
 
@@ -182,12 +183,12 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     }
     ActiveEnt fpsWindow = scene.get_registry().create();
     scene.reg_emplace<osp::active::ACompGUIWindow>(fpsWindow,
-        [data = std::array<float, 120>{0.0f}, index = 0, &times]
+        [data = std::array<float, 120>{0.0f}, index = 0, times]
         (osp::active::ActiveScene& rScene, bool& visible) mutable
         {
             using namespace Magnum;
 
-            ImGui::Begin("Debug");
+            ImGui::Begin("Application Status");
             
             double framerate = ImGui::GetIO().Framerate;
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
@@ -210,7 +211,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Show active MUC velocity
     ActiveEnt shipStatus = scene.get_registry().create();
     scene.reg_emplace<osp::active::ACompGUIWindow>(shipStatus,
-        [] (osp::active::ActiveScene& rScene, bool& visible)
+        [](osp::active::ActiveScene& rScene, bool& visible)
         {
             using adera::active::machines::MachineUserControl;
             using namespace osp::active;
