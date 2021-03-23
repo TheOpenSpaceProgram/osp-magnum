@@ -30,8 +30,7 @@ using namespace osp;
 
 osp::OSPApplication::OSPApplication()
 {
-    m_logger = spdlog::stdout_color_mt("console");
-}
+    m_logger = spdlog::stdout_color_mt("console");}
 
 void OSPApplication::debug_add_package(Package&& p)
 {

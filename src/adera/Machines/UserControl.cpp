@@ -36,7 +36,7 @@ const std::string SysMachineUserControl::smc_name = "UserControl";
 
 void MachineUserControl::propagate_output(WireOutput* output)
 {
-    std::cout << "propagate test: " << output->get_name() << "\n";
+    spdlog::info("Propagate test: {}", output->get_name());
 }
 
 WireInput* MachineUserControl::request_input(WireInPort port)

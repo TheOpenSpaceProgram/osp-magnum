@@ -42,8 +42,6 @@
 
 #include <MagnumExternal/TinyGltf/tiny_gltf.h>
 
-#include <spdlog/sinks/stdout_color_sinks.h>
-
 #include "Package.h"
 #include "AssetImporter.h"
 #include "osp/string_concat.h"
@@ -58,7 +56,7 @@ using Magnum::GL::Mesh;
 using Magnum::UnsignedInt;
 
 
-std::shared_ptr<spdlog::logger> osp::AssetImporter::logger = spdlog::stdout_color_mt("assetimporter");
+std::shared_ptr<spdlog::logger> osp::AssetImporter::logger = nullptr;
 
 namespace osp
 {

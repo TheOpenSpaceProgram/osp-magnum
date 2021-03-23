@@ -69,8 +69,7 @@ void SysWire::update_propagate(ActiveScene& rScene)
 
 void SysWire::connect(WireOutput &wireFrom, WireInput &wireTo)
 {
-    std::cout << "Connected " << wireFrom.get_name() << " to "
-              << wireTo.get_name() << "\n";
+    spdlog::info("Connected {} to {}", wireFrom.get_name(), wireTo.get_name());
     wireFrom.insert(&wireTo);
     // TODO: check for dependent outputs and add to list and sort
 }

@@ -28,6 +28,8 @@
 #include <cmath>
 #include <iostream>
 
+#include <spdlog/spdlog.h>
+
 using namespace planeta;
 
 using osp::Vector3;
@@ -615,15 +617,13 @@ bool IcoSphereTree::debug_verify_state()
                           tri.m_parent - tri.m_parent % 4)
                 !=  m_trianglesFree.end())
             {
-                std::cout << "* Invalid triangle " << t << ": "
-                          << "Parent is deleted\n";
+                spdlog::warn("* Invalid triangle {}: Parent is deleted", t);
                 error = true;
             }
 
             if (parent.m_children + tri.m_siblingIndex != t)
             {
-                std::cout << "* Invalid triangle " << t << ": "
-                          << "Parent does not have child\n";
+                spdlog::warn("* Invalid triangle {}: Parent does not have child", t);
                 error = true;
             }
 
@@ -632,8 +632,7 @@ bool IcoSphereTree::debug_verify_state()
                              tri.m_children)
                 !=  m_trianglesFree.end())
             {
-                std::cout << "* Invalid triangle " << t << ": "
-                          << "Children are deleted\n";
+                spdlog::warn("* Invalid triangle {}: Children are deleted", t);
                 error = true;
             }
         }
@@ -651,22 +650,19 @@ bool IcoSphereTree::debug_verify_state()
 
                 if (side == -1)
                 {
-                    std::cout << "* Invalid triangle " << t << ": "
-                              << "Neighbour " << i  << "does not recognize "
-                              << "this triangle as a neighbour\n";
+
+                    spdlog::warn("* Invalid triangle {}: Neighbour {} does not recognize this triangle as a neighbour\n", t, i);
                     error = true;
                 }
                 else if (side != tri.m_neighbourSide[i])
                 {
-                    std::cout << "* Invalid triangle " << t << ": "
-                              << "Incorrect Neighbour's side";
+                    spdlog::warn("* Invalid triangle {}: Incorrect Neighbour's side\n", t);
                     error = true;
                 }
             }
             else if (tri.m_depth < neighbourTri->m_depth)
             {
-                std::cout << "* Invalid triangle " << t << ": "
-                          << "Neighbour " << i  << "has larger depth\n";
+                spdlog::warn("* Invalid triangle {}: Neighbour {} has larger depth\n", t, i);
                 error = true;
             }
 

@@ -206,7 +206,6 @@ bool UserInputHandler::eval_button_expression(
             break;
         }
 
-        //std::cout << detect << ", ";
         if (prevOp == VarOperator::OR || lastVar)
         {
             // if the previous term contributes to the expression being true
@@ -261,7 +260,7 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
     if (cfgIt == m_controlConfigs.end())
     {
         // Config not found, no way to have an empty key so far, so throw an exception
-        std::cout << "No config for " << name << std::endl;
+        logger->error("No config for{}", name);
         throw std::runtime_error("Error: no config with " + name);
     }
 

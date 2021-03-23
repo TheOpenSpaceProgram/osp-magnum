@@ -34,6 +34,7 @@
 #include <Magnum/Trade/MeshData.h>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "Package.h"
 #include "PrototypePart.h"
@@ -158,7 +159,11 @@ private:
                                Magnum::UnsignedInt parentProtoIndex,
                                Magnum::UnsignedInt childGltfIndex);
 
-    static std::shared_ptr<spdlog::logger> get_logger() {
+    static std::shared_ptr<spdlog::logger> get_logger() 
+    {
+        if (logger == nullptr) {
+            logger = spdlog::stdout_color_mt("assetimporter");
+        }
         return logger;
     }
     /**

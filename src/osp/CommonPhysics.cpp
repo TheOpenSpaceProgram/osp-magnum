@@ -28,6 +28,8 @@
 #include <iostream>
 #include <assert.h>
 
+#include <spdlog/spdlog.h>
+
 namespace osp::phys
 {
 
@@ -52,9 +54,10 @@ float shape_volume(ECollisionShape shape, Vector3 scale)
     case ECollisionShape::TERRAIN:
     case ECollisionShape::COMBINED:
     default:
-        std::cout << "Error: unsupported shape for volume calc\n";
+        spdlog::error("Unsupported shape for volume calc");
+        assert(false);
         return 0;
-    }
+    }   
 }
 
 Matrix3 transform_inertia_tensor(Matrix3 I, float mass, Vector3 translation, Matrix3 rotation)
@@ -100,7 +103,8 @@ Vector3 collider_inertia_tensor(ECollisionShape shape, Vector3 scale, float mass
     case ECollisionShape::TERRAIN:
     case ECollisionShape::COMBINED:
     default:
-        std::cout << "ERROR: unknown collision shape\n";
+        spdlog::info("ERROR: unknown collision shape");
+        assert(false);
         return Vector3{0.0f};
     }
 }

@@ -30,6 +30,8 @@
 #include <array>
 #include <assert.h>
 
+#include <spdlog/spdlog.h>
+
 
 // maybe do something about how this file is almost a thousand lines long
 // there's a lot of comments though
@@ -1203,7 +1205,7 @@ bool PlanetGeometryA::debug_verify_state()
     // Verify vertex sharing if chunked
     // * Loop through shared vertices and make sure the neighbours use them too
 
-    std::cout << "PlanetGeometryA Verify:\n";
+    spdlog::info("PlanetGeometryA Verify:");
 
     std::vector<uint8_t> recountVrtxSharedUsers(m_vrtxSharedUsers.size(), 0);
 
@@ -1229,8 +1231,8 @@ bool PlanetGeometryA::debug_verify_state()
 
         if (countDescendentChunked != chunk.m_descendentChunked)
         {
-            std::cout << "* Invalid chunk " << t << ": "
-                      << "Incorrect chunked descendent count\n";
+
+            spdlog::warn("* Invalid chunk {}: Incorrect chunked descendent count", t);
             error = true;
         }
 
@@ -1256,8 +1258,7 @@ bool PlanetGeometryA::debug_verify_state()
 
             if (ancestorChunked != chunk.m_ancestorChunked)
             {
-                std::cout << "* Invalid chunk " << t << ": "
-                          << "Incorrect chunked ancestor\n";
+                spdlog::warn("* Invalid chunk {}: Incorrect chunked ancestor", t);
                 error = true;
             }
         }
@@ -1280,24 +1281,21 @@ bool PlanetGeometryA::debug_verify_state()
 
     if (chunkCount + m_chunkFree.size() != m_chunkCount)
     {
-        std::cout << "* Invalid chunk count\n";
+        spdlog::warn("* Invalid chunk count");
         error = true;
     }
 
     if (recountVrtxSharedUsers != m_vrtxSharedUsers)
     {
-        std::cout << "* Invalid Shared vertex user count\n";
+        spdlog::warn("* Invalid Shared vertex user count");
+
         for (planeta::vrindex_t i = 0; i < m_vrtxSharedMax; i ++)
         {
             if (m_vrtxSharedUsers[i] != recountVrtxSharedUsers[i])
             {
-                std::cout << "  * Vertex: " << i << "\n"
-                          << "\n    * Expected: " << int(recountVrtxSharedUsers[i])
-                          << "\n    * Obtained: " << int(m_vrtxSharedUsers[i]);
+                spdlog::warn("  * Vertex: {}, expected: {}, obtained: {}", i, int(recountVrtxSharedUsers[i]), int(m_vrtxSharedUsers[i]));
             }
         }
-
-        std::cout << "\n";
 
         error = true;
     }
