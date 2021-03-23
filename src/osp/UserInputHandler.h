@@ -32,6 +32,8 @@
 #include <optional>
 #include "types.h"
 
+#include <spdlog/spdlog.h>
+
 namespace osp
 {
 
@@ -358,6 +360,8 @@ private:
     std::vector<ButtonMap::iterator> m_btnReleased;
 
     //std::map<std::string, int> m_controlActive;
+
+    std::shared_ptr<spdlog::logger> logger;
 };
 
 // temporary-ish

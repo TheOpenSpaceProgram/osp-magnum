@@ -53,7 +53,7 @@ float shape_volume(ECollisionShape shape, Vector3 scale)
     case ECollisionShape::COMBINED:
     default:
         std::cout << "Error: unsupported shape for volume calc\n";
-        assert(false);
+        return 0;
     }
 }
 
@@ -101,7 +101,6 @@ Vector3 collider_inertia_tensor(ECollisionShape shape, Vector3 scale, float mass
     case ECollisionShape::COMBINED:
     default:
         std::cout << "ERROR: unknown collision shape\n";
-        assert(false);
         return Vector3{0.0f};
     }
 }

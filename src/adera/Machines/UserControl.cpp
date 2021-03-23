@@ -80,14 +80,13 @@ SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandle
 
 void SysMachineUserControl::update_sensor()
 {
-    //std::cout << "updating all MachineUserControls\n";
+    m_scene.get_application().get_logger()->trace("Updating all MachineUserControls");
+
     // InputDevice.IsActivated()
     // Combination
-    
-
     if (m_selfDestruct.triggered())
     {
-        std::cout << "EXPLOSION BOOM!!!!\n";
+        m_scene.get_application().get_logger()->info("Self destruct -- EXPLOSION BOOM!!!!");
     }
 
     // pitch, yaw, roll
@@ -123,18 +122,18 @@ void SysMachineUserControl::update_sensor()
 
         if (m_throttleMin.triggered())
         {
-            //std::cout << "throttle min\n";
+            m_scene.get_application().get_logger()->trace("Minimum throttle");
             throttlePos = 0.0f;
         }
 
         if (m_throttleMax.triggered())
         {
-            //std::cout << "throttle max\n";
+            m_scene.get_application().get_logger()->trace("Maximum throttle");
             throttlePos = 1.0f;
         }
 
         std::get<wiretype::AttitudeControl>(machine.m_woAttitude.value()).m_attitude = attitudeIn;
-        //std::cout << "updating control\n";
+        m_scene.get_application().get_logger()->trace("Updating control");
     }
 }
 

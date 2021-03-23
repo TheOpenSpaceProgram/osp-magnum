@@ -223,7 +223,6 @@ trindex_t IcoSphereTree::ancestor_at_depth(trindex_t start, uint8_t targetDepth)
 
 int IcoSphereTree::subdivide_add(trindex_t triInd)
 {
-    //std::cout << "m_icoTree->subdivide_add(" << t << ");\n";
     if (m_vrtxCount + 3 >= m_maxVertice)
     {
         // error! max vertex count exceeded
@@ -464,7 +463,6 @@ int IcoSphereTree::subdivide_remove(trindex_t triInd)
     // try unsubdividing children if any are
     for (trindex_t i = 0; i < 4; i ++)
     {
-        //std::cout << "deleted: " << (tri.m_children + i) << "\n";
         get_triangle(rTri.m_children + i).m_deleted = true;
 
         // Later Notify observers about new triangles removed

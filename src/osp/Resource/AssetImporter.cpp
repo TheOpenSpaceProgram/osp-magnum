@@ -42,6 +42,8 @@
 
 #include <MagnumExternal/TinyGltf/tiny_gltf.h>
 
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 #include "Package.h"
 #include "AssetImporter.h"
 #include "osp/string_concat.h"
@@ -55,9 +57,11 @@ using Magnum::GL::Texture2D;
 using Magnum::GL::Mesh;
 using Magnum::UnsignedInt;
 
+
+std::shared_ptr<spdlog::logger> osp::AssetImporter::logger = spdlog::stdout_color_mt("assetimporter");
+
 namespace osp
 {
-
 void osp::AssetImporter::load_sturdy_file(std::string_view filepath, Package& pkg)
 {
     PluginManager pluginManager;
@@ -67,7 +71,7 @@ void osp::AssetImporter::load_sturdy_file(std::string_view filepath, Package& pk
     gltfImporter.openFile(std::string{filepath});
     if (!gltfImporter.isOpened() || gltfImporter.defaultScene() == -1)
     {
-        std::cout << "Error: couldn't open file: " << filepath << "\n";
+        get_logger()->error("Could not open file {}", filepath);
     }
 
     // repurpose filepath into unique identifier for file resources
@@ -84,11 +88,13 @@ std::vector<uint32_t> AssetImporter::load_machines(tinygltf::Value const& extras
 {
     if (!extras.Has("machines"))
     {
-        std::cout << "Error: no machines found!\n";
+        get_logger()->error("Error: no machines found!");
         return {};
     }
     tinygltf::Value const& machines = extras.Get("machines");
-    std::cout << "JSON machines!\n";
+
+    get_logger()->info("JSON machines!");
+
     auto const& machArray = machines.Get<tinygltf::Value::Array>();
 
     std::vector<uint32_t> machineIndices;
@@ -102,7 +108,8 @@ std::vector<uint32_t> AssetImporter::load_machines(tinygltf::Value const& extras
     for (tinygltf::Value const& value : machArray)
     {
         std::string type = value.Get("type").Get<std::string>();
-        std::cout << "test: " << type << "\n";
+
+        get_logger()->info("test: {}", type);
 
         if (type.empty())
         {
@@ -114,7 +121,8 @@ std::vector<uint32_t> AssetImporter::load_machines(tinygltf::Value const& extras
 
         for (auto const& key : value.Keys())
         {
-            std::cout << "Read config '" << key << "' : ";
+            get_logger()->info("Reading config \'{}\'", key);
+
             tinygltf::Value v = value.Get(key);
             switch (v.Type())
             {
@@ -122,7 +130,7 @@ std::vector<uint32_t> AssetImporter::load_machines(tinygltf::Value const& extras
             {
                 double val = v.Get<double>();
                 machine.m_config.emplace(key, val);
-                std::cout << val << " (real)\n";
+                get_logger()->info("{} is (real)",val);
                 break;
             }
 
@@ -130,18 +138,18 @@ std::vector<uint32_t> AssetImporter::load_machines(tinygltf::Value const& extras
             {
                 int val = v.Get<int>();
                 machine.m_config.emplace(key, val);
-                std::cout << val << " (int)\n";
+                get_logger()->info("{} is (int)", val);
                 break;
             }
             case tinygltf::Type::STRING_TYPE:
             {
                 std::string val = v.Get<std::string>();
                 machine.m_config.emplace(key, std::move(val));
-                std::cout << val << "(string)\n";
+                get_logger()->info("{} is (string)", val);
                 break;
             }
             default:
-                std::cout << "(UNKNOWN)\n";
+                get_logger()->info("(unknown)");
                 break;
             }
         }
@@ -162,7 +170,7 @@ void osp::AssetImporter::load_part(TinyGltfImporter& gltfImporter,
     Package& pkg, UnsignedInt id, std::string_view resPrefix)
 {
     // It's a part
-    std::cout << "PART!\n";
+    get_logger()->info("Part");
 
     // Recursively add child nodes to part
     PrototypePart part;
@@ -186,8 +194,7 @@ void osp::AssetImporter::load_plume(TinyGltfImporter& gltfImporter,
     using Corrade::Containers::Pointer;
     using Magnum::Trade::ObjectData3D;
     using namespace tinygltf;
-
-    std::cout << "Plume! Node \"" << gltfImporter.object3DName(id) << "\"\n";
+    get_logger()->info("Plume! Node \'{}\'", gltfImporter.object3DName(id));
 
     // Get mesh data
     Pointer<ObjectData3D> rootNode = gltfImporter.object3D(id);
@@ -237,11 +244,12 @@ void osp::AssetImporter::load_plume(TinyGltfImporter& gltfImporter,
 void osp::AssetImporter::load_sturdy(TinyGltfImporter& gltfImporter,
         std::string_view resPrefix, Package& pkg)
 {
-    std::cout << "Found " << gltfImporter.object3DCount() << " nodes\n";
+    get_logger()->info("Found {} nodes", gltfImporter.object3DCount());
+
     Optional<SceneData> sceneData = gltfImporter.scene(gltfImporter.defaultScene());
     if (!sceneData)
     {
-        std::cout << "Error: couldn't load scene data\n";
+        get_logger()->error("Error: couldn't load scene data");
         return;
     }
 
@@ -250,7 +258,7 @@ void osp::AssetImporter::load_sturdy(TinyGltfImporter& gltfImporter,
     for (UnsignedInt childID : sceneData->children3D())
     {
         const std::string& nodeName = gltfImporter.object3DName(childID);
-        std::cout << "Found node: " << nodeName << "\n";
+        get_logger()->info("Found node: {}", nodeName);
 
         if (nodeName.compare(0, 5, "part_") == 0)
         {
@@ -270,13 +278,13 @@ void osp::AssetImporter::load_sturdy(TinyGltfImporter& gltfImporter,
 
         std::string const& meshName =
             string_concat(resPrefix, gltfImporter.meshName(i));
-        std::cout << "Mesh: " << meshName << "\n";
+        get_logger()->info("Mesh: {}", meshName);
+
 
         Optional<MeshData> meshData = gltfImporter.mesh(i);
         if (!meshData || (meshData->primitive() != MeshPrimitive::Triangles))
         {
-            std::cout << "Error: mesh " << meshName
-                << " not composed of triangles\n";
+            get_logger()->error("Error: Mesh {} not composed of triangles", meshName);
             continue;
         }
         pkg.add<MeshData>(meshName, std::move(*meshData));
@@ -288,7 +296,7 @@ void osp::AssetImporter::load_sturdy(TinyGltfImporter& gltfImporter,
     {
         auto imgID = gltfImporter.texture(i)->image();
         std::string const& imgName = gltfImporter.image2DName(imgID);
-        std::cout << "Loading image: " << imgName << "\n";
+        get_logger()->info("Loading image: {}", imgName);
 
         Optional<ImageData2D> imgData = gltfImporter.image2D(imgID);
         if (!imgData)
@@ -311,14 +319,14 @@ DependRes<ImageData2D> osp::AssetImporter::load_image(
         = manager.loadAndInstantiate("AnyImageImporter");
     if (!importer || !importer->openFile(filepath))
     {
-        std::cout << "Error: could not open file " << filepath << "\n";
+        get_logger()->error("Could not open file {}", filepath);
         return DependRes<ImageData2D>();
     }
 
     Optional<ImageData2D> image = importer->image2D(0);
     if (!image)
     {
-        std::cout << "Error: could not read image in file " << filepath << "\n";
+        get_logger()->error("Could not read image in file {}", filepath);
         return DependRes<ImageData2D>();
     }
 
@@ -332,8 +340,7 @@ DependRes<Mesh> osp::AssetImporter::compile_mesh(
 
     if (meshData.empty())
     {
-        std::cout << "Error: requested MeshData resource \"" << meshData.name()
-            << "\" not found\n";
+        get_logger()->error("Error: requested MeshData resource \'{}\' not found", meshData.name());
         return {};
     }
 
@@ -360,8 +367,7 @@ DependRes<Texture2D> osp::AssetImporter::compile_tex(
 
     if (imageData.empty())
     {
-        std::cout << "Error: requested ImageData2D resource \"" << imageData.name()
-            << "\" not found\n";
+        get_logger()->error("Error: requested ImageData2D resource \'{}\' not found\n", imageData.name());
         return {};
     }
 
@@ -420,7 +426,7 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
     obj.m_type = ObjectType::NONE;
     obj.m_name = name;
 
-    std::cout << "Adding obj to Part: " << name << "\n";
+    get_logger()->info("Adding obj to Part: {}", name);
     int meshID = childData->instance();
 
     bool hasMesh = (
@@ -441,15 +447,15 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
         const phys::ECollisionShape shape = (shapeName == "cylinder")
             ? phys::ECollisionShape::CYLINDER : phys::ECollisionShape::BOX;
         obj.m_objectData = ColliderData{shape};
-
-        std::cout << "obj: " << name << " is a \"" << shapeName << "\" collider\n";
+        get_logger()->info("obj: {} is a {} collider", name, shapeName);
     }
     else if (hasMesh)
     {
         // It's a drawable mesh
         const std::string& meshName =
             string_concat(resPrefix, gltfImporter.meshName(meshID));
-        std::cout << "obj: " << name << " uses mesh: " << meshName << "\n";
+
+        get_logger()->info("obj: {} use mesh: {}", name, meshName);
         obj.m_type = ObjectType::MESH;
 
         // The way it's currently set up is that the mesh's names are the same
@@ -469,7 +475,8 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
 
             auto imgID = gltfImporter.texture(pbr.baseColorTexture())->image();
             std::string const& imgName = gltfImporter.image2DName(imgID);
-            std::cout << "Base Tex: " << imgName << "\n";
+
+            get_logger()->info("Base Tex: {}", imgName);
             std::get<DrawableData>(obj.m_objectData).m_textures.push_back(
                 static_cast<uint32_t>(part.get_strings().size()));
             part.get_strings().push_back(imgName);
@@ -477,16 +484,16 @@ void AssetImporter::proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
             if (pbr.hasNoneRoughnessMetallicTexture())
             {
                 imgID = gltfImporter.texture(pbr.metalnessTexture())->image();
-                std::cout << "Metal/rough texture: "
-                    << gltfImporter.image2DName(imgID) << "\n";
+
+                get_logger()->info("Metal/rough texture: {}", gltfImporter.image2DName(imgID));
             } else
             {
-                std::cout << "No metal/rough texture found for " << name << "\n";
+                get_logger()->warn("No Metal/rough texture found for: {}", name);
             }
             
         } else
         {
-            std::cout << "Error: unsupported material type\n";
+            get_logger()->error("Unsupported material type");
         }
     }
 

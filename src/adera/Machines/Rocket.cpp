@@ -192,8 +192,9 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
             uint64_t required = resource_units_required(rScene, machine,
                 pThrotPercent->m_value, resource);
             uint64_t consumed = src.request_contents(required);
-            std::cout << "consumed " << consumed << " units of fuel, "
-                << src.check_contents().m_quantity << " remaining\n";
+
+            rScene.get_application().get_logger()->trace("Consumed {} units of fuel, {} remaining",
+                consumed, src.check_contents().m_quantity);
         }
 
         // Set output power level (for plume effect)
@@ -222,12 +223,12 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
 
     if (plumeNode == entt::null)
     {
-        std::cout << "ERROR: could not find plume anchor for MachineRocket "
-            << ent << "\n";
+        m_scene.get_application().get_logger()->error("ERROR: could not find plume anchor for MachineRocket {}", ent);
         return;
     }
-    std::cout << "MachineRocket " << ent << "'s associated plume: "
-        << plumeNode << "\n";
+
+    m_scene.get_application().get_logger()->info("MachineRocket {0}\'s associated plume: {1}", ent, plumeNode);
+   
 
     // Get plume effect
     Package& pkg = m_scene.get_application().debug_find_package("lzdb");
@@ -236,8 +237,8 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
     DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
     if (plumeEffect.empty())
     {
-        std::cout << "ERROR: couldn't find plume effect " << effectName << "!\n";
-        return;
+        m_scene.get_application().get_logger()->error("ERROR: couldn't find plume effect  {}", effectName);
+            return;
     }
 
     m_scene.reg_emplace<ACompExhaustPlume>(plumeNode, ent, plumeEffect);

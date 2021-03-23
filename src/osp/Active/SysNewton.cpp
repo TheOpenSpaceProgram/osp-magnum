@@ -103,7 +103,7 @@ SysNewton::SysNewton(ActiveScene &scene)
  , m_updatePhysicsWorld(scene.get_update_order(), "physics", "wire", "",
                 [this] (ActiveScene& rScene) { this->update_world(rScene); })
 {
-    //std::cout << "sysnewtoninit\n";
+    m_scene.get_application().get_logger()->info("Initing Sysnewton");
     //NewtonWorldSetUserData(m_nwtWorld, this);
 
     // Connect signal handlers to destruct Newton objects when components are
@@ -173,7 +173,7 @@ void SysNewton::update_world(ActiveScene& rScene)
         if (entBody.m_inertiaDirty)
         {
             compute_rigidbody_inertia(rScene, ent);
-            std::cout << "Updating RB: new CoM Z=" << entBody.m_centerOfMassOffset.z() << "\n";
+            rScene.get_application().get_logger()->trace("Updating RB : new CoM Z = {}", entBody.m_centerOfMassOffset.z());
         }
 
     }
@@ -371,7 +371,7 @@ void SysNewton::compute_rigidbody_inertia(ActiveScene& rScene, ActiveEnt entity)
     NewtonBodySetCentreOfMass(entBody.m_body, centerOfMass.xyz().data());
 
     entBody.m_inertiaDirty = false;
-    std::cout << "New mass: " << entBody.m_mass << "\n";
+    rScene.get_application().get_logger()->trace("New mass: {}", entBody.m_mass);
 }
 
 ACompNwtWorld* SysNewton::try_get_physics_world(ActiveScene &rScene)
@@ -465,7 +465,7 @@ osp::active::ACompRigidbodyAncestor* SysNewton::try_get_or_find_rigidbody_ancest
 
     if (compBody == nullptr)
     {
-        std::cout << "no rigid body!\n";
+        rScene.get_application().get_logger()->warn("No rigid body!");
         return nullptr;
     }
 

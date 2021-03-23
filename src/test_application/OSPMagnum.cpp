@@ -33,6 +33,8 @@
 
 #include <toml.hpp>
 
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 using namespace testapp;
 
 OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
@@ -46,7 +48,6 @@ OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 
     m_timeline.start();
-
 }
 
 OSPMagnum::~OSPMagnum()
@@ -167,7 +168,6 @@ void testapp::config_controls(OSPMagnum& rOspApp)
     osp::UserInputHandler& rUserInput = rOspApp.get_input_handler();
     for (const auto& [k, v] : data.as_table())
     {
-        std::cout << "Parsing " << k << std::endl;
         std::string const& primary = toml::find(v, "primary").as_string();
         std::vector<osp::ButtonVarConfig> controls = parse_control(primary);
 
@@ -175,7 +175,6 @@ void testapp::config_controls(OSPMagnum& rOspApp)
         std::vector<osp::ButtonVarConfig> secondaryKeys = parse_control(secondary);
 
         controls.insert(controls.end(), std::make_move_iterator(secondaryKeys.begin()), std::make_move_iterator(secondaryKeys.end()));
-
 
         bool holdable = toml::find(v, "holdable").as_boolean();
 
@@ -287,7 +286,6 @@ std::vector<osp::ButtonVarConfig> parse_control(std::string_view str) noexcept
     }
 
     static constexpr std::string_view delim = "+";
-    std::cout << str << std::endl;
 
     auto start = 0U;
     auto end = str.find(delim);
@@ -299,8 +297,6 @@ std::vector<osp::ButtonVarConfig> parse_control(std::string_view str) noexcept
         {
             auto const& [device, button] = it->second;
             handlers.emplace_back(osp::ButtonVarConfig(device, button, VarTrig_t::HOLD, false, VarOp_t::AND));
-            std::cout << sub << " " << device << " " << button << std::endl;
-
         }
         start = end + delim.length();
         end = str.find(delim, start);
@@ -312,7 +308,6 @@ std::vector<osp::ButtonVarConfig> parse_control(std::string_view str) noexcept
     {
         auto const& [device, button] = it->second;
         handlers.emplace_back(osp::ButtonVarConfig(device, button, VarTrig_t::PRESSED, false, VarOp_t::OR));
-        std::cout << sub << " " << device << " " << button << std::endl;
     }
     return handlers;
 }

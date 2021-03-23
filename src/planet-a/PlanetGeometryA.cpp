@@ -207,7 +207,6 @@ float debug_stupid_heightmap(Vector3 pos)
 
 void PlanetGeometryA::chunk_add(trindex_t triInd)
 {
-    //std::cout << "chunk_add(" << t << ");\n";
     chunk_triangle_assure();
 
     SubTriangle &rTri = m_icoTree->get_triangle(triInd);
@@ -725,8 +724,6 @@ void PlanetGeometryA::chunk_edge_transition(trindex_t triInd, triside_t side,
 
         Vector3 dir = (posB - posA) / step;
 
-        //std::cout << "dir: " << dir.length() << "\n";
-
         for (uint32_t j = 1; j < step; j ++)
         {
             vrindex_t vrtxMid = shared_from_tri(chunk, side, i + j);
@@ -809,7 +806,6 @@ void PlanetGeometryA::chunk_triangle_assure()
 
 void PlanetGeometryA::chunk_remove(trindex_t triInd)
 {
-    //std::cout << "chunk_remove(" << t << ");\n";
     SubTriangle &rTri = m_icoTree->get_triangle(triInd);
     SubTriangleChunk &rChunk = m_triangleChunks[triInd];
 
@@ -839,7 +835,6 @@ void PlanetGeometryA::chunk_remove(trindex_t triInd)
         // If users is zero, then delete
         if (m_vrtxSharedUsers[sharedIndex] == 0)
         {
-            //std::cout << "shared removed: " << sharedIndex << "\n";
             m_vrtxSharedFree.push_back(sharedIndex);
             m_vrtxSharedCount --;
 
@@ -943,7 +938,6 @@ void PlanetGeometryA::chunk_remove_descendents(trindex_t triInd)
 
 void PlanetGeometryA::chunk_pack()
 {
-    //std::cout << "chunk_pack();\n";
     for (chindex_t chunk : m_chunkFree)
     {
         m_chunkCount --;
@@ -1163,8 +1157,6 @@ vrindex_t PlanetGeometryA::shared_create()
     m_vrtxSharedCount ++;
     m_vrtxSharedUsers[sharedOut] = 1; // set reference count
 
-    //std::cout << "shared create: " << sharedOut << "\n";
-
     return sharedOut;
 }
 
@@ -1316,13 +1308,12 @@ bool PlanetGeometryA::debug_verify_state()
 void PlanetGeometryA::on_ico_triangles_added(
         std::vector<trindex_t> const& added)
 {
-    //std::cout << "foo!\n";
+    //Add ico triangle action
 }
 
 void PlanetGeometryA::on_ico_triangles_removed(
         std::vector<trindex_t> const& removed)
 {
-    //std::cout << "bar!\n";
     for (trindex_t t : removed)
     {
         m_triangleChunks[t].m_ancestorChunked = gc_invalidTri;

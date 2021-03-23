@@ -155,7 +155,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Close button has been pressed
 
-    std::cout << "Magnum Application closed\n";
+    scene.get_application().get_logger()->info("Closed Magnum Application");
 
     // Disconnect ActiveArea
     osp::active::SysAreaAssociate::disconnect(scene);

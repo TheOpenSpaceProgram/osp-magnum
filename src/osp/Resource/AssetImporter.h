@@ -33,6 +33,7 @@
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/MeshData.h>
 
+#include <spdlog/spdlog.h>
 
 #include "Package.h"
 #include "PrototypePart.h"
@@ -50,7 +51,7 @@ typedef Corrade::PluginManager::Manager<Magnum::Trade::AbstractImporter>
 PluginManager;
 
 public:
-    AssetImporter() {}
+    AssetImporter() { }
 
     static void load_sturdy_file(std::string_view filepath, Package& package);
 
@@ -157,6 +158,13 @@ private:
                                Magnum::UnsignedInt parentProtoIndex,
                                Magnum::UnsignedInt childGltfIndex);
 
+    static std::shared_ptr<spdlog::logger> get_logger() {
+        return logger;
+    }
+    /**
+    * Unique logger for AssetImporter because it's important
+    */
+    static std::shared_ptr<spdlog::logger> logger;
 };
 
 }
