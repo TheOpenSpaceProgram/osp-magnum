@@ -25,6 +25,8 @@
 #include <iostream>
 
 #include <osp/Active/ActiveScene.h>
+#include <osp/Active/SysVehicle.h>
+#include <osp/Resource/machines.h>
 
 #include "UserControl.h"
 
@@ -32,7 +34,13 @@ using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
 
-const std::string SysMachineUserControl::smc_name = "UserControl";
+void SysMachineUserControl::add_functions(ActiveScene &rScene)
+{
+    rScene.debug_update_add(rScene.get_update_order(), "mach_usercontrol", "", "wire",
+                            &SysMachineUserControl::update_sensor);
+    rScene.debug_update_add(rScene.get_update_order(), "mach_usercontrol_construct", "vehicle_activate", "vehicle_modification",
+                            &SysMachineUserControl::update_construct);
+}
 
 void MachineUserControl::propagate_output(WireOutput* output)
 {
@@ -59,45 +67,53 @@ std::vector<WireOutput*> MachineUserControl::existing_outputs()
     return {&m_woAttitude, &m_woThrottle, &m_woTestPropagate};
 }
 
-SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandler& userControl) :
-        SysMachine<SysMachineUserControl, MachineUserControl>(scene),
-        m_throttleMax(userControl.config_get("vehicle_thr_max")),
-        m_throttleMin(userControl.config_get("vehicle_thr_min")),
-        m_throttleMore(userControl.config_get("vehicle_thr_more")),
-        m_throttleLess(userControl.config_get("vehicle_thr_less")),
-        m_selfDestruct(userControl.config_get("vehicle_self_destruct")),
-        m_pitchUp(userControl.config_get("vehicle_pitch_up")),
-        m_pitchDn(userControl.config_get("vehicle_pitch_dn")),
-        m_yawLf(userControl.config_get("vehicle_yaw_lf")),
-        m_yawRt(userControl.config_get("vehicle_yaw_rt")),
-        m_rollLf(userControl.config_get("vehicle_roll_lf")),
-        m_rollRt(userControl.config_get("vehicle_roll_rt")),
-        m_updateSensor(scene.get_update_order(), "mach_usercontrol", "", "wire",
-                       std::bind(&SysMachineUserControl::update_sensor, this))
+void SysMachineUserControl::update_construct(ActiveScene &rScene)
 {
+    auto view = rScene.get_registry()
+            .view<osp::active::ACompVehicle,
+                  osp::active::ACompVehicleInConstruction>();
 
+    machine_id_t const id = mach_id<SysMachineUserControl>();
+
+    for (auto [vehEnt, rVeh, rVehConstr] : view.each())
+    {
+        // Check if the vehicle blueprint might store UserControls
+        if (rVehConstr.m_blueprint->m_machines.size() <= id)
+        {
+            continue;
+        }
+
+        // Initialize all UserControls in the vehicle
+        for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
+        {
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+            rScene.reg_emplace<MachineUserControl>(partEnt);
+        }
+    }
 }
 
-void SysMachineUserControl::update_sensor()
+void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 {
-    SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+    SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
                       "Updating all MachineUserControls");
 
     // InputDevice.IsActivated()
     // Combination
-    if (m_selfDestruct.triggered())
+    auto const &usrCtrl = rScene.reg_root_get_or_emplace<ACompUserControl>(rScene.get_user_input());
+
+    if (usrCtrl.m_selfDestruct.triggered())
     {
-        SPDLOG_LOGGER_INFO(m_scene.get_application().get_logger(),
+        SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
                         "Self destruct -- EXPLOSION BOOM!!!!");
     }
 
     // pitch, yaw, roll
     Vector3 attitudeIn(
-            m_pitchDn.trigger_hold() - m_pitchUp.trigger_hold(),
-            m_yawLf.trigger_hold() - m_yawRt.trigger_hold(),
-            m_rollRt.trigger_hold() - m_rollLf.trigger_hold());
+            usrCtrl.m_pitchDn.trigger_hold() - usrCtrl.m_pitchUp.trigger_hold(),
+            usrCtrl.m_yawLf.trigger_hold()   - usrCtrl.m_yawRt.trigger_hold(),
+            usrCtrl.m_rollRt.trigger_hold()  - usrCtrl.m_rollLf.trigger_hold());
 
-    auto view = m_scene.get_registry().view<MachineUserControl>();
+    auto view = rScene.get_registry().view<MachineUserControl>();
 
     for (ActiveEnt ent : view)
     {
@@ -105,53 +121,39 @@ void SysMachineUserControl::update_sensor()
         auto& throttlePos = std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value;
 
         float throttleRate = 0.5f;
-        auto delta = throttleRate * m_scene.get_time_delta_fixed();
+        auto delta = throttleRate * rScene.get_time_delta_fixed();
 
         if (!machine.m_enable)
         {
             continue;
         }
 
-        if (m_throttleMore.trigger_hold())
+        if (usrCtrl.m_throttleMore.trigger_hold())
         {
             throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
         }
 
-        if (m_throttleLess.trigger_hold())
+        if (usrCtrl.m_throttleLess.trigger_hold())
         {
             throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
         }
 
-        if (m_throttleMin.triggered())
+        if (usrCtrl.m_throttleMin.triggered())
         {
-            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+            SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
                               "Minimum throttle");
             throttlePos = 0.0f;
         }
 
-        if (m_throttleMax.triggered())
+        if (usrCtrl.m_throttleMax.triggered())
         {
-            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+            SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
                               "Maximum throttle");
             throttlePos = 1.0f;
         }
 
         std::get<wiretype::AttitudeControl>(machine.m_woAttitude.value()).m_attitude = attitudeIn;
-        SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+        SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
                             "Updating control");
     }
-}
-
-
-
-Machine& SysMachineUserControl::instantiate(ActiveEnt ent,
-    PrototypeMachine config, BlueprintMachine settings)
-{
-    return m_scene.reg_emplace<MachineUserControl>(ent);
-}
-
-
-Machine& SysMachineUserControl::get(ActiveEnt ent)
-{
-    return m_scene.reg_get<MachineUserControl>(ent);
 }

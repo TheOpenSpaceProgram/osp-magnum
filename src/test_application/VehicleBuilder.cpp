@@ -22,23 +22,30 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "blueprints.h"
+#include "VehicleBuilder.h"
 
+using testapp::VehicleBuilder;
+using osp::BlueprintPart;
+using osp::BlueprintMachine;
+using osp::PrototypePart;
+using osp::PrototypeMachine;
+using osp::DependRes;
+using osp::Vector3;
+using osp::Quaternion;
+using osp::machine_id_t;
 
-using namespace osp;
-
-BlueprintPart& BlueprintVehicle::add_part(
+BlueprintPart& VehicleBuilder::add_part(
         DependRes<PrototypePart>& prototype,
         const Vector3& translation,
         const Quaternion& rotation,
         const Vector3& scale)
 {
-    uint32_t protoIndex = m_prototypes.size();
+    uint32_t protoIndex = m_vehicle.m_prototypes.size();
 
     // check if the Part Prototype is added already.
     for (size_t i = 0; i < protoIndex; i ++)
     {
-        const DependRes<PrototypePart>& dep = m_prototypes[i];
+        const DependRes<PrototypePart>& dep = m_vehicle.m_prototypes[i];
 
         if (dep == prototype)
         {
@@ -48,15 +55,15 @@ BlueprintPart& BlueprintVehicle::add_part(
         }
     }
 
-    if (protoIndex == m_prototypes.size())
+    if (protoIndex == m_vehicle.m_prototypes.size())
     {
         // Add the unlisted prototype to the end
-        m_prototypes.emplace_back(prototype);
+        m_vehicle.m_prototypes.emplace_back(prototype);
     }
 
     // We now know which part prototype to initialize, create it
-    uint32_t blueprintIndex = m_blueprints.size();
-    BlueprintPart &rPart = m_blueprints.emplace_back(
+    uint32_t blueprintIndex = m_vehicle.m_blueprints.size();
+    BlueprintPart &rPart = m_vehicle.m_blueprints.emplace_back(
                 protoIndex, translation, rotation, scale);
 
     // Add default machines from part prototypes
@@ -66,9 +73,10 @@ BlueprintPart& BlueprintVehicle::add_part(
     for (PrototypeMachine const &protoMach : prototype->m_protoMachines)
     {
         machine_id_t id = protoMach.m_type;
-        m_machines.resize(std::max(m_machines.size(), size_t(id + 1)));
+        m_vehicle.m_machines.resize(std::max(m_vehicle.m_machines.size(),
+                                             size_t(id + 1)));
 
-        BlueprintMachine &rBlueprintMach = m_machines[id].emplace_back();
+        BlueprintMachine &rBlueprintMach = m_vehicle.m_machines[id].emplace_back();
         rBlueprintMach.m_blueprintIndex = blueprintIndex;
         rBlueprintMach.m_config = protoMach.m_config;
     }
@@ -76,10 +84,10 @@ BlueprintPart& BlueprintVehicle::add_part(
     return rPart;
 }
 
-void BlueprintVehicle::add_wire(
-        uint32_t fromPart, uint32_t fromMachine, WireOutPort fromPort,
-        uint32_t toPart, uint32_t toMachine, WireInPort toPort)
+void VehicleBuilder::add_wire(
+        uint32_t fromPart, uint32_t fromMachine, osp::WireOutPort fromPort,
+        uint32_t toPart, uint32_t toMachine, osp::WireInPort toPort)
 {
-    m_wires.emplace_back(fromPart, fromMachine, fromPort,
+    m_vehicle.m_wires.emplace_back(fromPart, fromMachine, fromPort,
                          toPart, toMachine, toPort);
 }

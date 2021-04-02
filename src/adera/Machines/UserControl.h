@@ -32,28 +32,22 @@ namespace adera::active::machines
 
 class MachineUserControl;
 
-/**
- * Gets ButtonControlHandle from a UserInputHandler, and updates
- * MachineUserControls
- */
-class SysMachineUserControl :
-        public osp::active::SysMachine<SysMachineUserControl, MachineUserControl>
+struct ACompUserControl
 {
-public:
+    ACompUserControl(osp::UserInputHandler &rUsrCtrl)
+     : m_throttleMax(   rUsrCtrl.config_get("vehicle_thr_max"))
+     , m_throttleMin(   rUsrCtrl.config_get("vehicle_thr_min"))
+     , m_throttleMore(  rUsrCtrl.config_get("vehicle_thr_more"))
+     , m_throttleLess(  rUsrCtrl.config_get("vehicle_thr_less"))
+     , m_selfDestruct(  rUsrCtrl.config_get("vehicle_self_destruct"))
+     , m_pitchUp(       rUsrCtrl.config_get("vehicle_pitch_up"))
+     , m_pitchDn(       rUsrCtrl.config_get("vehicle_pitch_dn"))
+     , m_yawLf(         rUsrCtrl.config_get("vehicle_yaw_lf"))
+     , m_yawRt(         rUsrCtrl.config_get("vehicle_yaw_rt"))
+     , m_rollLf(        rUsrCtrl.config_get("vehicle_roll_lf"))
+     , m_rollRt(        rUsrCtrl.config_get("vehicle_roll_rt"))
+    { }
 
-    static const std::string smc_name;
-
-    SysMachineUserControl(osp::active::ActiveScene &scene,
-                          osp::UserInputHandler& userControl);
-
-    void update_sensor();
-
-    osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
-        osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
-
-    osp::active::Machine& get(osp::active::ActiveEnt ent) override;
-
-private:
     osp::ButtonControlHandle m_throttleMax;
     osp::ButtonControlHandle m_throttleMin;
     osp::ButtonControlHandle m_throttleMore;
@@ -66,6 +60,30 @@ private:
     osp::ButtonControlHandle m_yawRt;
     osp::ButtonControlHandle m_rollLf;
     osp::ButtonControlHandle m_rollRt;
+};
+
+/**
+ * Gets ButtonControlHandle from a UserInputHandler, and updates
+ * MachineUserControls
+ */
+class SysMachineUserControl
+{
+public:
+
+    static constexpr std::string_view smc_mach_name = "UserControl";
+
+    static void add_functions(osp::active::ActiveScene& rScene);
+
+    SysMachineUserControl(osp::active::ActiveScene &scene,
+                          osp::UserInputHandler& userControl);
+
+    static void update_construct(osp::active::ActiveScene &rScene);
+    static void update_sensor(osp::active::ActiveScene &rScene);
+
+    osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
+        osp::PrototypeMachine config, osp::BlueprintMachine settings);
+
+private:
 
     osp::active::UpdateOrderHandle_t m_updateSensor;
 };

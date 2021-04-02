@@ -35,9 +35,10 @@
 
 #include <osp/Satellites/SatVehicle.h>
 
-#include <adera/Machines/UserControl.h>
-#include <adera/Machines/Rocket.h>
 #include <adera/Machines/RCSController.h>
+#include <adera/Machines/Rocket.h>
+#include <adera/Machines/UserControl.h>
+
 #include <adera/SysExhaustPlume.h>
 #include <adera/ShipResources.h>
 
@@ -99,10 +100,11 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     osp::active::SysAreaAssociate::add_functions(rScene);
     osp::active::SysVehicle::add_functions(rScene);
     osp::active::SysExhaustPlume::add_functions(rScene);
-    planeta::active::SysPlanetA::add_functions(rScene);
     osp::active::SysFFGravity::add_functions(rScene);
 
-    // Register machines for that scene
+    planeta::active::SysPlanetA::add_functions(rScene);
+
+    adera::active::machines::SysMachineUserControl::add_functions(rScene);
     //rScene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());
     //rScene.system_machine_create<SysMachineRocket>();
     //rScene.system_machine_create<SysMachineRCSController>();

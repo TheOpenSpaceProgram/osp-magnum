@@ -24,6 +24,7 @@
  */
 
 #include "vehicles.h"
+#include "../VehicleBuilder.h"
 
 #include <osp/Satellites/SatVehicle.h>
 
@@ -79,7 +80,7 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
         Universe& uni, Package& pkg, std::string_view name)
 {
     // Begin blueprint
-    BlueprintVehicle blueprint;
+    VehicleBuilder blueprint;
 
     // Part to add
     DependRes<PrototypePart> rocket = pkg.get<PrototypePart>("part_stomper");
@@ -99,7 +100,7 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
 
     // Save blueprint
     DependRes<BlueprintVehicle> depend =
-        pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
+        pkg.add<BlueprintVehicle>(std::string{name}, blueprint.export_move());
 
     // Create new satellite
     Satellite sat = uni.sat_create();
@@ -120,7 +121,7 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
 {
 
     // Start making the blueprint
-    BlueprintVehicle blueprint;
+    VehicleBuilder blueprint;
 
     // Part to add, very likely a spamcan
     DependRes<PrototypePart> victim = pkg.get<PrototypePart>("part_spamcan");
@@ -155,7 +156,7 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
 
     // put blueprint in package
     DependRes<BlueprintVehicle> depend =
-        pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
+        pkg.add<BlueprintVehicle>(std::string{name}, blueprint.export_move());
 
     // Create the Satellite containing a SatVehicle
 
@@ -202,14 +203,14 @@ Vector3 part_offset(PrototypePart const& attachTo,
 }
 
 void blueprint_add_rcs_block(
-        BlueprintVehicle &rBlueprint, DependRes<PrototypePart> rRcs,
+        VehicleBuilder &rBlueprint, DependRes<PrototypePart> rRcs,
         std::vector<int> &rRcsPorts, Vector3 pos, Quaternion rot)
 {
     using namespace Magnum::Math::Literals;
 
     Vector3 constexpr scl{1};
     Vector3 constexpr zAxis{0, 0, 1};
-    int hackypartnum = rBlueprint.get_blueprints().size();
+    int hackypartnum = rBlueprint.part_count();
 
     rBlueprint.add_part(rRcs, pos, Quaternion::rotation(90.0_degf, zAxis) * rot, scl);
     //rBlueprint.add_part(rRcs, pos, rot, scl);
@@ -229,7 +230,7 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     using Magnum::Rad;
 
     // Start making the blueprint
-    BlueprintVehicle blueprint;
+    VehicleBuilder blueprint;
 
     // Parts
     DependRes<PrototypePart> capsule = pkg.get<PrototypePart>("part_phCapsule");
@@ -290,7 +291,7 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
         ENGINE = 2
     };
 
-    std::cout << "Part vehicle has " << blueprint.get_blueprints().size()
+    std::cout << "Part vehicle has " << blueprint.part_count()
               << " Parts!\n";
 
     // Wire throttle control
@@ -327,7 +328,8 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     }
 
     // Put blueprint in package
-    auto depend = pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
+    auto depend = pkg.add<BlueprintVehicle>(std::string{name},
+                                            blueprint.export_move());
 
     Satellite sat = uni.sat_create();
 

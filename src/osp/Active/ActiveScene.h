@@ -109,6 +109,13 @@ public:
     constexpr ActiveReg_t& get_registry()
     { return m_registry; }
 
+    template<typename ACOMP_T, typename ... ARGS_T>
+    ACOMP_T& reg_root_get_or_emplace(ARGS_T &&... args)
+    {
+        return m_registry.get_or_emplace<ACOMP_T>(
+                    m_root, std::forward<ARGS_T>(args)...);
+    }
+
     /**
      * Shorthand for get_registry().get<T>()
      * @tparam T Component to get

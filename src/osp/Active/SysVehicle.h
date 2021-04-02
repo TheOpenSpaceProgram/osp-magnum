@@ -65,6 +65,14 @@ struct ACompVehicle
     unsigned m_separationCount{0};
 };
 
+struct ACompVehicleInConstruction
+{
+    ACompVehicleInConstruction(DependRes<BlueprintVehicle>& blueprint)
+     : m_blueprint(blueprint)
+    { }
+    DependRes<BlueprintVehicle> m_blueprint;
+};
+
 struct ACompPart
 {
     ActiveEnt m_vehicle{entt::null};

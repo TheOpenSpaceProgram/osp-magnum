@@ -38,10 +38,13 @@
 
 #include <osp/Satellites/SatVehicle.h>
 
-
 #include <adera/ShipResources.h>
 #include <adera/Shaders/Phong.h>
 #include <adera/Shaders/PlumeShader.h>
+
+#include <adera/Machines/RCSController.h>
+#include <adera/Machines/Rocket.h>
+#include <adera/Machines/UserControl.h>
 
 #include <planet-a/Satellites/SatPlanet.h>
 
@@ -255,15 +258,25 @@ bool destroy_universe()
     return true;
 }
 
+// TODO: move this somewhere else
+template<typename MACH_T>
+constexpr void register_sys_machine(osp::Package &rPkg)
+{
+    rPkg.add<osp::RegisteredMachine>(std::string(MACH_T::smc_mach_name),
+                                     osp::mach_id<MACH_T>());
+}
+
 void load_a_bunch_of_stuff()
 {
     // Create a new package
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
+    using adera::active::machines::SysMachineUserControl;
+
     // Register machines
-    lazyDebugPack.add<osp::RegisteredMachine>("RCSController", 0);
-    lazyDebugPack.add<osp::RegisteredMachine>("Rocket", 1);
-    lazyDebugPack.add<osp::RegisteredMachine>("UserControl", 2);
+    register_sys_machine<SysMachineUserControl>(lazyDebugPack);
+    //lazyDebugPack.add<osp::RegisteredMachine>("Rocket", 1);
+    //lazyDebugPack.add<osp::RegisteredMachine>("UserControl", 2);
 
 
     // Load sturdy glTF files
