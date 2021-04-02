@@ -361,7 +361,7 @@ private:
 
     //std::map<std::string, int> m_controlActive;
 
-    std::shared_ptr<spdlog::logger> logger;
+    std::shared_ptr<spdlog::logger> p_logger;
 };
 
 // temporary-ish

@@ -227,7 +227,7 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
         return;
     }
 
-    m_scene.get_application().get_logger()->info("MachineRocket {0}\'s associated plume: {1}", ent, plumeNode);
+    m_scene.get_application().get_logger()->info("MachineRocket {}\'s associated plume: {}", ent, plumeNode);
    
 
     // Get plume effect
@@ -238,7 +238,7 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
     if (plumeEffect.empty())
     {
         m_scene.get_application().get_logger()->error("ERROR: couldn't find plume effect  {}", effectName);
-            return;
+        return;
     }
 
     m_scene.reg_emplace<ACompExhaustPlume>(plumeNode, ent, plumeEffect);

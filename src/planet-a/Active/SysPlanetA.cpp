@@ -269,7 +269,6 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
 
             rScene.get_application().get_logger()->info("Completed planet colliders");
 
-
             planet.m_vrtxBufGL.setData(rPlanetGeo.get_vertex_buffer());
             planet.m_indxBufGL.setData(rPlanetGeo.get_index_buffer());
 

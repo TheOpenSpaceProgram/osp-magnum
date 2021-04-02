@@ -142,6 +142,9 @@ int main(int argc, char** argv)
     {
         g_magnumThread.join();
     }
+
+    //Kill spdlog
+    spdlog::shutdown();  //>_> -> X.X  *Stab 
     return 0;
 }
 

@@ -56,7 +56,6 @@ float shape_volume(ECollisionShape shape, Vector3 scale)
     default:
         spdlog::error("Unsupported shape for volume calc");
         assert(false);
-        return 0;
     }   
 }
 
