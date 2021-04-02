@@ -106,8 +106,8 @@ public:
     virtual ~ISysMachine() = default;
 
     // TODO: make some config an argument
-    virtual Machine& instantiate(ActiveEnt ent,
-        PrototypeMachine config, BlueprintMachine settings) = 0;
+    //virtual Machine& instantiate(ActiveEnt ent,
+    //    PrototypeMachine config, BlueprintMachine settings) = 0;
 
     virtual Machine& get(ActiveEnt ent) = 0;
 };

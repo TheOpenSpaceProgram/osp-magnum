@@ -180,20 +180,20 @@ Vector3 part_offset(PrototypePart const& attachTo,
     Vector3 oset1{0.0f};
     Vector3 oset2{0.0f};
 
-    for (osp::PrototypeObject const& obj : attachTo.get_objects())
+    for (osp::PCompName const& name : attachTo.m_partName)
     {
-        if (obj.m_name == attachToName)
+        if (name.m_name == attachToName)
         {
-            oset1 = obj.m_translation;
+            oset1 = attachTo.m_partTransform[name.m_entity].m_translation;
             break;
         }
     }
 
-    for (osp::PrototypeObject const& obj : toAttach.get_objects())
+    for (osp::PCompName const& name : toAttach.m_partName)
     {
-        if (obj.m_name == toAttachName)
+        if (name.m_name == toAttachName)
         {
-            oset2 = obj.m_translation;
+            oset2 = toAttach.m_partTransform[name.m_entity].m_translation;
             break;
         }
     }
@@ -254,8 +254,8 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     blueprint.add_part(capsule, Vector3{0}, idRot, scl);
 
     auto& fuselageBP = blueprint.add_part(fuselage, cfOset, idRot, scl);
-    fuselageBP.m_machines[1].m_config.emplace("resourcename", "lzdb:fuel");
-    fuselageBP.m_machines[1].m_config.emplace("fuellevel", 0.5);
+    //fuselageBP.m_machines[1].m_config.emplace("resourcename", "lzdb:fuel");
+    //fuselageBP.m_machines[1].m_config.emplace("fuellevel", 0.5);
 
     auto& engBP = blueprint.add_part(engine, cfOset + feOset, idRot, scl);
 

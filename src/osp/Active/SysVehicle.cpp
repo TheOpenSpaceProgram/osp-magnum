@@ -116,7 +116,7 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
     for (BlueprintPart& partBp : blueprintParts)
     {
         DependRes<PrototypePart>& partDepends =
-                partsUsed[partBp.m_partIndex];
+                partsUsed[partBp.m_protoIndex];
 
         // Check if the part prototype this depends on still exists
         if (partDepends.empty())
@@ -126,7 +126,8 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 
         PrototypePart &proto = *partDepends;
 
-        auto const& [partEntity, machineMapping] = part_instantiate(rScene, proto,
+        // Instantiate the part
+        ActiveEnt partEntity = part_instantiate(rScene, proto,
                         partBp, vehicleEnt);
 
         vehicleComp.m_parts.push_back(partEntity);
@@ -135,19 +136,6 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
         partPart.m_vehicle = vehicleEnt;
 
         // Part now exists
-
-        /* Deferred machine instantiation
-        * 
-        * Since machines may depend on the existence of other objects in the
-        * part's hierarchy, machine instantiation must be deferred until the
-        * entire hierarchy exists. For instance, a rocket engine's root
-        * "MachineRocket" machine may depend on the existence of a child node
-        * to receive an "ACompExhaustPlume" component that handles graphical
-        * effects related to the rocket machine, but that child node would not
-        * exist in time for the MachineRocket to be instantiated alongside
-        * the root part entity.
-        */
-        part_instantiate_machines(rScene, partEntity, machineMapping, proto, partBp);
 
         ACompTransform& partTransform = rScene.get_registry()
                                             .get<ACompTransform>(partEntity);
@@ -158,11 +146,10 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
                               partBp.m_translation)
                 * Matrix4::scaling(partBp.m_scale);
 
-        // temporary: initialize the rigid body
-        //area.get_scene()->debug_get_newton().create_body(partEntity);
     }
 
     // Wire the thing up
+    #if 0
 
     // Loop through wire connections
     for (BlueprintWire& blueprintWire : vehicleData.get_wires())
@@ -170,6 +157,7 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
         // TODO: check if the connections are valid
 
         // get wire from
+
 
         ACompMachines& fromMachines = rScene.reg_get<ACompMachines>(
                 *(vehicleComp.m_parts.begin() + blueprintWire.m_fromPart));
@@ -198,62 +186,14 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
         SysWire::connect(*fromWire, *toWire);
     }
 
+    #endif
+
     // temporary: make the whole thing a single rigid body
     auto& vehicleBody = rScene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
     rScene.reg_emplace<ACompShape>(vehicleEnt, phys::ECollisionShape::COMBINED);
     rScene.reg_emplace<ACompCollider>(vehicleEnt, nullptr);
-    //scene.dynamic_system_find<SysPhysics>().create_body(vehicleEnt);
 
     return vehicleEnt;
-}
-
-
-void SysVehicle::add_machines_to_object(ActiveScene& rScene,
-    ActiveEnt partEnt, ActiveEnt objEnt,
-    std::vector<PrototypeMachine> const& protoMachines,
-    std::vector<BlueprintMachine> const& blueprintMachines,
-    std::vector<uint32_t> const& machineIndices)
-{
-    if (machineIndices.empty()) { return; }
-
-    auto &compMachines =
-        rScene.get_registry().get_or_emplace<ACompMachines>(partEnt);
-
-    for (uint32_t i : machineIndices)
-    {
-        BlueprintMachine const& bpMachine = blueprintMachines[i];
-        PrototypeMachine const& protoMachine = protoMachines[i];
-
-        MapSysMachine_t::iterator sysMachine
-            = rScene.system_machine_find(protoMachine.m_type);
-
-        if (!(rScene.system_machine_it_valid(sysMachine)))
-        {
-            SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                              "Machine type : {} not found",
-                              protoMachine.m_type);
-            continue;
-        }
-
-        // Instantiate the machine for the object
-        sysMachine->second->instantiate(objEnt, protoMachine, bpMachine);
-
-        // Add a PartMachine definition to the root part's ACompMachines
-        compMachines.m_machines.emplace_back(objEnt, sysMachine);
-    }
-}
-
-void SysVehicle::part_instantiate_machines(ActiveScene& rScene, ActiveEnt partEnt,
-    std::vector<MachineDef> const& machineMapping,
-    PrototypePart const& part, BlueprintPart const& partBP)
-{
-    std::vector<PrototypeMachine> const& protoMachines = part.get_machines();
-    std::vector<BlueprintMachine> const& bpMachines = partBP.m_machines;
-    for (auto const& obj : machineMapping)
-    {
-        add_machines_to_object(rScene, partEnt, obj.m_machineOwner,
-            protoMachines, bpMachines, obj.m_machineIndices);
-    }
 }
 
 // Traverses the hierarchy and sums the volume of all ACompShapes it finds
@@ -276,136 +216,144 @@ float SysVehicle::compute_hier_volume(ActiveScene& rScene, ActiveEnt part)
     return volume;
 }
 
-std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_instantiate(
-    ActiveScene& rScene, PrototypePart& part, BlueprintPart& blueprint, ActiveEnt rootParent)
+ActiveEnt SysVehicle::part_instantiate(
+        ActiveScene& rScene, PrototypePart const& part,
+        BlueprintPart const& blueprint, ActiveEnt rootParent)
 {
-    std::vector<PrototypeObject> const& prototypes = part.get_objects();
-    std::vector<ActiveEnt> newEntities(prototypes.size());
+    // TODO: make some changes to ActiveScene for creating multiple entities easier
+
+    std::vector<ActiveEnt> newEntities(part.m_entityCount);
     ActiveEnt& rootEntity = newEntities[0];
 
-    /* A list of MachineDefs, which catalog all part machines and the ActiveEnts
-     * that are created to represent the objects that own them
-     */
-    std::vector<MachineDef> machineMapping;
-    machineMapping.reserve(prototypes.size());
 
-    SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(), "New entities size", newEntities.size());
+    // reserve space for new entities and ACompTransforms to be created
+    rScene.get_registry().reserve(
+                rScene.get_registry().capacity() + part.m_entityCount);
+    rScene.get_registry().reserve<ACompTransform>(
+                rScene.get_registry().capacity<ACompTransform>() + part.m_entityCount);
 
-    for (size_t i = 0; i < prototypes.size(); i++)
+    // Create entities and hierarchy
+    for (size_t i = 0; i < part.m_entityCount; i++)
     {
-        PrototypeObject const& currentPrototype = prototypes[i];
+        PCompHierarchy const &pcompHier = part.m_partHier[i];
         ActiveEnt parentEnt = entt::null;
 
         // Get parent
-        if (currentPrototype.m_parentIndex == i)
+        if (pcompHier.m_parent == i)
         {
-            // if parented to self,
+            // if parented to self (the root)
             parentEnt = rootParent;//m_scene->hier_get_root();
         }
         else
         {
             // since objects were loaded recursively, the parents always load
             // before their children
-            parentEnt = newEntities[currentPrototype.m_parentIndex];
+            parentEnt = newEntities[pcompHier.m_parent];
         }
 
         // Create the new entity
-        ActiveEnt currentEnt = rScene.hier_create_child(parentEnt,
-                                                currentPrototype.m_name);
+        ActiveEnt currentEnt = rScene.hier_create_child(parentEnt);
         newEntities[i] = currentEnt;
 
         // Add and set transform component
-        ACompTransform& currentTransform
-                = rScene.reg_emplace<ACompTransform>(currentEnt);
-        currentTransform.m_transform
-                = Matrix4::from(currentPrototype.m_rotation.toMatrix(),
-                                currentPrototype.m_translation)
-                * Matrix4::scaling(currentPrototype.m_scale);
-
-        if (currentPrototype.m_type == ObjectType::MESH)
-        {
-            using Magnum::GL::Mesh;
-            using Magnum::Trade::MeshData;
-            using Magnum::GL::Texture2D;
-            using Magnum::Trade::ImageData2D;
-
-            // Current prototype is a mesh, get the mesh and add it
-
-            Package& package = rScene.get_application().debug_find_package("lzdb");
-            const DrawableData& drawable =
-                std::get<DrawableData>(currentPrototype.m_objectData);
-
-            //Mesh* mesh = nullptr;
-            Package& glResources = rScene.get_context_resources();
-            DependRes<Mesh> meshRes = glResources.get<Mesh>(
-                                            part.get_strings()[drawable.m_mesh]);
-
-            if (meshRes.empty())
-            {
-                // Mesh isn't compiled yet, now check if mesh data exists
-                std::string const& meshName = part.get_strings()[drawable.m_mesh];
-                DependRes<MeshData> meshData = package.get<MeshData>(meshName);
-                meshRes = AssetImporter::compile_mesh(meshData, glResources);
-            }
-
-            std::vector<DependRes<Texture2D>> textureResources;
-            textureResources.reserve(drawable.m_textures.size());
-            for (size_t i = 0; i < drawable.m_textures.size(); i++)
-            {
-                uint32_t texID = drawable.m_textures[i];
-                std::string const& texName = part.get_strings()[texID];
-                DependRes<Texture2D> texRes = glResources.get<Texture2D>(texName);
-
-                if (texRes.empty())
-                {
-                    DependRes<ImageData2D> imageData = package.get<ImageData2D>(texName);
-                    texRes = AssetImporter::compile_tex(imageData, glResources);
-                }
-                textureResources.push_back(texRes);
-            }
-
-            // by now, the mesh and texture should both exist
-            using adera::shader::Phong;
-            Phong::ACompPhongInstance shader;
-            shader.m_shaderProgram = glResources.get<Phong>("phong_shader");
-            shader.m_textures = std::move(textureResources);
-            shader.m_lightPosition = Vector3{10.0f, 15.0f, 5.0f};
-            shader.m_ambientColor = 0x111111_rgbf;
-            shader.m_specularColor = 0x330000_rgbf;
-            rScene.reg_emplace<Phong::ACompPhongInstance>(currentEnt, std::move(shader));
-
-            CompDrawableDebug& bBocks = rScene.reg_emplace<CompDrawableDebug>(
-                        currentEnt, meshRes, &Phong::draw_entity, 0x0202EE_rgbf);
-
-            //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
-        }
-        else if (currentPrototype.m_type == ObjectType::COLLIDER)
-        {
-            // Emplace collider, collision volume
-            ACompShape& collision = rScene.reg_emplace<ACompShape>(currentEnt);
-            rScene.reg_emplace<ACompCollider>(currentEnt);
-            const ColliderData& cd = std::get<ColliderData>(currentPrototype.m_objectData);
-            collision.m_shape = cd.m_type;
-        }
-
-        // Save the list of machines this object owns
-        machineMapping.emplace_back(currentEnt, currentPrototype.m_machineIndices);
+        PCompTransform const &pcompTransform = part.m_partTransform[i];
+        auto &rCurrentTransform = rScene.reg_emplace<ACompTransform>(currentEnt);
+        rCurrentTransform.m_transform
+                = Matrix4::from(pcompTransform.m_rotation.toMatrix(),
+                                pcompTransform.m_translation)
+                * Matrix4::scaling(pcompTransform.m_scale);
     }
 
-    /* Create masses
-     * 
-     * To allow the physics system to treat all massive objects homogeneously,
-     * the dry mass of the part must be distributed over its child collider
-     * volumes. We assume (for now) that the mass is distributed uniformly over
-     * the volumes.
-     * 
-     * We check the entities for ACompColliders, as we're interested in the
-     * part's physical volume. If we don't check for this component, we would
-     * double-count the volume in regions that also contain other shapes, like
-     * fuel tank volumes.
-     */
+    // TODO: add an ACompName because putting name in hierarchy is pretty stupid
+    for (PCompName const& pcompName : part.m_partName)
+    {
+        auto &hier = rScene.reg_get<ACompHierarchy>(newEntities[pcompName.m_entity]);
+        hier.m_name = pcompName.m_name;
+    }
+
+    rScene.get_registry().reserve<CompDrawableDebug>(
+                rScene.get_registry().capacity<CompDrawableDebug>()
+                + part.m_partDrawable.size());
+
+    // Create drawables
+    for (PCompDrawable const& pcompDrawable : part.m_partDrawable)
+    {
+        using Magnum::GL::Mesh;
+        using Magnum::Trade::MeshData;
+        using Magnum::GL::Texture2D;
+        using Magnum::Trade::ImageData2D;
+
+        Package& package = rScene.get_application().debug_find_package("lzdb");
+
+        Package& glResources = rScene.get_context_resources();
+        DependRes<MeshData> meshData = pcompDrawable.m_mesh;
+        DependRes<Mesh> meshRes = glResources.get<Mesh>(meshData.name());
+
+        if (meshRes.empty())
+        {
+            // Mesh isn't compiled yet, compile it
+            meshRes = AssetImporter::compile_mesh(meshData, glResources);
+        }
+
+        std::vector<DependRes<Texture2D>> textureResources;
+        textureResources.reserve(pcompDrawable.m_textures.size());
+        for (DependRes<ImageData2D> imageData : pcompDrawable.m_textures)
+        {
+            DependRes<Texture2D> texRes = glResources.get<Texture2D>(imageData.name());
+
+            if (texRes.empty())
+            {
+                // Texture isn't compiled yet, compile it
+                texRes = AssetImporter::compile_tex(imageData, glResources);
+            }
+            textureResources.push_back(texRes);
+        }
+
+        // by now, the mesh and texture should both exist
+
+        ActiveEnt currentEnt = newEntities[pcompDrawable.m_entity];
+
+        // TODO: Create components for generic properties of drawables:
+        //       ACompMesh, ACompSolid, ACompRoughnessTexture...
+
+        using adera::shader::Phong;
+        auto &shader = rScene.reg_emplace<Phong::ACompPhongInstance>(currentEnt);
+        shader.m_shaderProgram = glResources.get<Phong>("phong_shader");
+        shader.m_textures = std::move(textureResources);
+        shader.m_lightPosition = Vector3{10.0f, 15.0f, 5.0f};
+        shader.m_ambientColor = 0x111111_rgbf;
+        shader.m_specularColor = 0x330000_rgbf;
+
+        rScene.reg_emplace<CompDrawableDebug>(
+                currentEnt, meshRes, &Phong::draw_entity, 0x0202EE_rgbf);
+    }
+
+    rScene.get_registry().reserve<PCompPrimativeCollider>(
+                rScene.get_registry().capacity<PCompPrimativeCollider>()
+                + part.m_partCollider.size());
+
+    // Create primative colliders
+    for (PCompPrimativeCollider const& pcompCollider : part.m_partCollider)
+    {
+        ActiveEnt currentEnt = newEntities[pcompCollider.m_entity];
+        ACompShape& collision = rScene.reg_emplace<ACompShape>(currentEnt);
+        rScene.reg_emplace<ACompCollider>(currentEnt);
+        collision.m_shape = pcompCollider.m_shape;
+    }
+
+    // TODO: individual glTF nodes can now have masses, but there's no
+    //       implementation for it yet. This is a workaround to keep the old
+    //       system
+
+    // Create masses
+    float totalMass = 0;
+    for (PCompMass const& pcompMass : part.m_partMass)
+    {
+        totalMass += pcompMass.m_mass;
+    }
+
     float partVolume = compute_hier_volume(rScene, rootEntity);
-    float partDensity = part.get_mass() / partVolume;
+    float partDensity = totalMass / partVolume;
 
     auto applyMasses = [&rScene, partDensity](ActiveEnt ent)
     {
@@ -427,8 +375,7 @@ std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_insta
 
     rScene.hierarchy_traverse(rootEntity, applyMasses);
 
-    // return root object
-    return {rootEntity, machineMapping};
+    return rootEntity;
 }
 
 void SysVehicle::update_activate(ActiveScene &rScene)

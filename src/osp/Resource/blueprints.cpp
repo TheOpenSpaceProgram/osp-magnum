@@ -33,46 +33,47 @@ BlueprintPart& BlueprintVehicle::add_part(
         const Quaternion& rotation,
         const Vector3& scale)
 {
-    size_t partIndex = m_prototypes.size();
+    uint32_t protoIndex = m_prototypes.size();
 
-    // check if the part is added already.
-    for (size_t i = 0; i < partIndex; i ++)
+    // check if the Part Prototype is added already.
+    for (size_t i = 0; i < protoIndex; i ++)
     {
         const DependRes<PrototypePart>& dep = m_prototypes[i];
 
         if (dep == prototype)
         {
             // prototype was already added to the list
-            partIndex = i;
+            protoIndex = i;
             break;
         }
     }
 
-    if (partIndex == m_prototypes.size())
+    if (protoIndex == m_prototypes.size())
     {
         // Add the unlisted prototype to the end
         m_prototypes.emplace_back(prototype);
     }
 
-    // now we have a part index.
+    // We now know which part prototype to initialize, create it
+    uint32_t blueprintIndex = m_blueprints.size();
+    BlueprintPart &rPart = m_blueprints.emplace_back(
+                protoIndex, translation, rotation, scale);
 
-    // Create and default initialize object blueprint machines
-    size_t numMachines = prototype->get_machines().size();
-    std::vector<BlueprintMachine> machineBPs;
-    machineBPs.resize(numMachines);
+    // Add default machines from part prototypes
 
-    BlueprintPart blueprint
+    size_t numMachines = prototype->m_protoMachines.size();
+
+    for (PrototypeMachine const &protoMach : prototype->m_protoMachines)
     {
-        static_cast<uint32_t>(partIndex),
-        translation,
-        rotation,
-        scale,
-        std::move(machineBPs)
-    };
+        machine_id_t id = protoMach.m_type;
+        m_machines.resize(std::max(m_machines.size(), size_t(id + 1)));
 
-    m_blueprints.push_back(std::move(blueprint));
+        BlueprintMachine &rBlueprintMach = m_machines[id].emplace_back();
+        rBlueprintMach.m_blueprintIndex = blueprintIndex;
+        rBlueprintMach.m_config = protoMach.m_config;
+    }
 
-    return m_blueprints.back();
+    return rPart;
 }
 
 void BlueprintVehicle::add_wire(

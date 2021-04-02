@@ -24,7 +24,9 @@
  */
 
 #include "RCSController.h"
-#include "osp/Active/ActiveScene.h"
+
+#include <osp/Active/ActiveScene.h>
+#include <osp/Active/physics.h>
 
 #include <Magnum/Math/Vector.h>
 #include <functional>

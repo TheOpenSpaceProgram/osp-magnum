@@ -33,14 +33,6 @@
 
 #include "../types.h"
 #include "activetypes.h"
-//#include "physics.h"
-
-//#include "SysDebugRender.h"
-//#include "SysNewton.h"
-#include "SysMachine.h"
-//#include "SysVehicle.h"
-#include "SysWire.h"
-#include "adera/SysExhaustPlume.h"
 
 namespace osp::active
 {
@@ -174,34 +166,6 @@ public:
     // TODO
     constexpr float get_time_delta_fixed() const { return 1.0f / 60.0f; }
 
-    /**
-     * Add support for a new machine type by adding an ISysMachine
-     * @param name [in] Name to identify this machine type. This is used by part
-     *                  configs to idenfity which machines to use.
-     * @param sysMachine [in] ISysMachine to add. As this will transfer
-     *                        ownership, use std::move()
-     * @return Iterator to new machine added, or invalid iterator to end of map
-     *         if the name already exists.
-     */
-     MapSysMachine_t::iterator system_machine_add(std::string_view name,
-                            std::unique_ptr<ISysMachine> sysMachine);
-
-    /**
-     *
-     * @tparam T
-     */
-    template<class SYSMACH_T, typename... ARGS_T>
-    void system_machine_create(ARGS_T &&... args);
-
-    /**
-     * Find a registered SysMachine by name. This accesses a map.
-     * @param name [in] Name used as a key
-     * @return Iterator to specified SysMachine
-     */
-    MapSysMachine_t::iterator system_machine_find(std::string_view name);
-
-    bool system_machine_it_valid(MapSysMachine_t::iterator it);
-
     template<typename... ARGS_T>
     void debug_update_add(ARGS_T &&... args)
     { m_updateHandles.emplace_back(std::forward<ARGS_T>(args)...); }
@@ -234,19 +198,8 @@ private:
     std::vector<UpdateOrderHandle_t> m_updateHandles;
     std::vector<RenderOrderHandle_t> m_renderHandles;
 
-    MapSysMachine_t m_sysMachines; // TODO: Put this in SysVehicle
-
 };
 
-// move these to another file eventually
-
-
-template<class SYSMACH_T, typename... ARGS_T>
-void ActiveScene::system_machine_create(ARGS_T &&... args)
-{
-    system_machine_add(SYSMACH_T::smc_name,
-                       std::make_unique<SYSMACH_T>(*this, args...));
-}
 
 /**
  * Component for transformation (in meters)

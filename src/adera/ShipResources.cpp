@@ -23,8 +23,10 @@
  * SOFTWARE.
  */
 #include "ShipResources.h"
-#include "osp/Active/ActiveScene.h"
-#include "osp/Resource/PrototypePart.h"
+
+#include <osp/Resource/PrototypePart.h>
+#include <osp/Active/ActiveScene.h>
+#include <osp/Active/physics.h>
 
 using namespace osp;
 using namespace osp::active;

@@ -236,35 +236,3 @@ void ActiveScene::draw(ActiveEnt camera)
 
     m_renderOrder.call(*this, cameraComp);
 }
-
-MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,
-        std::unique_ptr<ISysMachine> sysMachine)
-{
-    auto const& [it, success] = m_sysMachines.emplace(
-            name, std::move(sysMachine));
-    if (success)
-    {
-        return it;
-    }
-    return m_sysMachines.end();
-}
-
-MapSysMachine_t::iterator ActiveScene::system_machine_find(std::string_view name)
-{
-//    MapSysMachine_t::iterator sysIt = m_sysMachines.find(name);
-//    if (sysIt == m_sysMachines.end())
-//    {
-//        return nullptr;
-//    }
-//    else
-//    {
-//        return sysIt->second.get();
-//    }
-    return m_sysMachines.find(name);
-}
-
-bool ActiveScene::system_machine_it_valid(MapSysMachine_t::iterator it)
-{
-    return it != m_sysMachines.end();
-}
-

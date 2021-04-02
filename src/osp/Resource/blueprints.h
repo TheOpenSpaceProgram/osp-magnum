@@ -37,7 +37,8 @@ using WireOutPort = uint16_t;
 
 struct BlueprintMachine
 {
-    // TODO specific settings for a machine
+    // Index to a BlueprintPart in m_blueprints
+    uint32_t m_blueprintIndex;
     std::map<std::string, config_node_t> m_config;
 };
 
@@ -50,7 +51,15 @@ struct BlueprintMachine
 struct BlueprintPart
 { 
 
-    uint32_t m_partIndex; // index to BlueprintVehicle's m_partsUsed
+    BlueprintPart(uint32_t protoIndex, Vector3 translation,
+                         Quaternion rotation, Vector3 scale)
+    : m_protoIndex(protoIndex)
+    , m_translation(translation)
+    , m_rotation(rotation)
+    , m_scale(scale)
+    { }
+
+    uint32_t m_protoIndex; // index to BlueprintVehicle's m_partsUsed
 
     Vector3 m_translation;
     Quaternion m_rotation;
@@ -59,7 +68,7 @@ struct BlueprintPart
     // put some sort of config here
 
     // Configuration of individual machines
-    std::vector<BlueprintMachine> m_machines;
+    //std::vector<BlueprintMachine> m_machines;
 };
 
 /**
@@ -146,6 +155,9 @@ private:
 
     // Wires to connect
     std::vector<BlueprintWire> m_wires;
+
+    // m_machines[machine id]
+    std::vector<std::vector<BlueprintMachine>> m_machines;
 
 };
 
