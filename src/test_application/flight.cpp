@@ -105,6 +105,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     planeta::active::SysPlanetA::add_functions(rScene);
 
     adera::active::machines::SysMachineUserControl::add_functions(rScene);
+    adera::active::machines::SysMachineRocket::add_functions(rScene);
     //rScene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());
     //rScene.system_machine_create<SysMachineRocket>();
     //rScene.system_machine_create<SysMachineRCSController>();

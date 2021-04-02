@@ -62,12 +62,11 @@ std::vector<WireOutput*> MachineRCSController::existing_outputs()
     return {&m_woThrottle};
 }
 
-SysMachineRCSController::SysMachineRCSController(ActiveScene& rScene)
-    : SysMachine<SysMachineRCSController, MachineRCSController>(rScene)
-    , m_updateControls(rScene.get_update_order(), "mach_rcs", "wire", "controls",
-        [this](ActiveScene& rScene) { this->update_controls(rScene); })
-{
-}
+//SysMachineRCSController::SysMachineRCSController(ActiveScene& rScene)
+//    , m_updateControls(rScene.get_update_order(), "mach_rcs", "wire", "controls",
+//        [this](ActiveScene& rScene) { this->update_controls(rScene); })
+//{
+//}
 
 float SysMachineRCSController::thruster_influence(Vector3 posOset, Vector3 direction,
     Vector3 cmdTransl, Vector3 cmdRot)
@@ -154,13 +153,13 @@ void SysMachineRCSController::update_controls(ActiveScene& rScene)
     }
 }
 
-Machine& SysMachineRCSController::instantiate(ActiveEnt ent, PrototypeMachine config,
-    BlueprintMachine settings)
-{
-    return m_scene.reg_emplace<MachineRCSController>(ent);
-}
+//Machine& SysMachineRCSController::instantiate(ActiveEnt ent, PrototypeMachine config,
+//    BlueprintMachine settings)
+//{
+//    return m_scene.reg_emplace<MachineRCSController>(ent);
+//}
 
-Machine& SysMachineRCSController::get(ActiveEnt ent)
-{
-    return m_scene.reg_get<MachineRCSController>(ent);
-}
+//Machine& SysMachineRCSController::get(ActiveEnt ent)
+//{
+//    return m_scene.reg_get<MachineRCSController>(ent);
+//}

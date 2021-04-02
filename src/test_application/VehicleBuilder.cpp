@@ -70,13 +70,15 @@ BlueprintPart& VehicleBuilder::add_part(
 
     size_t numMachines = prototype->m_protoMachines.size();
 
-    for (PrototypeMachine const &protoMach : prototype->m_protoMachines)
+    for (size_t i = 0; i < numMachines; i ++)
     {
+        PrototypeMachine const &protoMach = prototype->m_protoMachines[i];
         machine_id_t id = protoMach.m_type;
         m_vehicle.m_machines.resize(std::max(m_vehicle.m_machines.size(),
                                              size_t(id + 1)));
 
         BlueprintMachine &rBlueprintMach = m_vehicle.m_machines[id].emplace_back();
+        rBlueprintMach.m_protoMachineIndex = i;
         rBlueprintMach.m_blueprintIndex = blueprintIndex;
         rBlueprintMach.m_config = protoMach.m_config;
     }

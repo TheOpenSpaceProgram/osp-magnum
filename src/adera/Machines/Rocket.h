@@ -105,17 +105,16 @@ private:
     float m_powerOutput{0.0f};
 }; // MachineRocket
 
-class SysMachineRocket :
-        public osp::active::SysMachine<SysMachineRocket, MachineRocket>
+class SysMachineRocket
 {
 public:
 
-    static inline std::string smc_name = "Rocket";
+    static inline std::string smc_mach_name = "Rocket";
 
-    SysMachineRocket(osp::active::ActiveScene &scene);
-
+    static void add_functions(osp::active::ActiveScene& rScene);
     //void update_sensor();
-    void update_physics(osp::active::ActiveScene& rScene);
+    static void update_construct(osp::active::ActiveScene &rScene);
+    static void update_physics(osp::active::ActiveScene& rScene);
 
     /**
      * Attach a visual exhaust plume effect to MachineRocket
@@ -126,19 +125,14 @@ public:
      * when it processes the component.
      * @param ent The MachineRocket entity
      */
-    void attach_plume_effect(osp::active::ActiveEnt ent);
+    static void attach_plume_effect(osp::active::ActiveScene& rScene,
+                                    osp::active::ActiveEnt ent);
 
-    /**
-     * Attach a MachineRocket to an entity
-     * 
-     * Also attempts to attach a plume component to the appropriate child node
-     * @param ent The entity that owns the MachineRocket
-     * @return The new MachineRocket instance
-     */
-    osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
-        osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
-
-    osp::active::Machine& get(osp::active::ActiveEnt ent) override;
+    static MachineRocket& instantiate(
+            osp::active::ActiveScene& rScene,
+            osp::active::ActiveEnt ent,
+            osp::PrototypeMachine const& config,
+            osp::BlueprintMachine const& settings);
 
 private:
     static uint64_t resource_units_required(

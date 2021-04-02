@@ -91,7 +91,7 @@ struct PrototypeMachine
     //PartEntity_t m_entity;
     //std::string m_type;
     machine_id_t m_type;
-    std::map<std::string, config_node_t> m_config;
+    std::map<std::string, config_node_t, std::less<>> m_config;
 };
 
 /**

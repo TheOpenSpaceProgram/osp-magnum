@@ -272,9 +272,11 @@ void load_a_bunch_of_stuff()
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
     using adera::active::machines::SysMachineUserControl;
+    using adera::active::machines::SysMachineRocket;
 
     // Register machines
     register_sys_machine<SysMachineUserControl>(lazyDebugPack);
+    register_sys_machine<SysMachineRocket>(lazyDebugPack);
     //lazyDebugPack.add<osp::RegisteredMachine>("Rocket", 1);
     //lazyDebugPack.add<osp::RegisteredMachine>("UserControl", 2);
 

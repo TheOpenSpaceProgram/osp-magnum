@@ -41,13 +41,12 @@ class MachineRCSController;
  * the command module and output as throttle command values, and the
  * MachineRockets associated with the RCS thrusters will fire.
  */
-class SysMachineRCSController :
-    public osp::active::SysMachine<SysMachineRCSController, MachineRCSController>
+class SysMachineRCSController
 {
 public:
     static inline std::string smc_name = "RCSController";
 
-    SysMachineRCSController(osp::active::ActiveScene &rScene);
+    static void add_functions(osp::active::ActiveScene& rScene);
 
     /**
      * Primary system update function
@@ -58,11 +57,6 @@ public:
      * @param rScene [in] - The scene to update
      */
     static void update_controls(osp::active::ActiveScene &rScene);
-
-    osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
-        osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
-
-    osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
 private:
     /**

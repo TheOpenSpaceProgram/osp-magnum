@@ -73,19 +73,8 @@ public:
     static constexpr std::string_view smc_mach_name = "UserControl";
 
     static void add_functions(osp::active::ActiveScene& rScene);
-
-    SysMachineUserControl(osp::active::ActiveScene &scene,
-                          osp::UserInputHandler& userControl);
-
     static void update_construct(osp::active::ActiveScene &rScene);
     static void update_sensor(osp::active::ActiveScene &rScene);
-
-    osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
-        osp::PrototypeMachine config, osp::BlueprintMachine settings);
-
-private:
-
-    osp::active::UpdateOrderHandle_t m_updateSensor;
 };
 
 /**
