@@ -43,13 +43,7 @@
 #include <planet-a/Active/SysPlanetA.h>
 #include <planet-a/Satellites/SatPlanet.h>
 
-#include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/Framebuffer.h>
-#include <Magnum/Math/Range.h>
-#include <Magnum/GL/Renderbuffer.h>
-#include <Magnum/GL/RenderbufferFormat.h>
-#include <Magnum/GL/Texture.h>
-#include <Magnum/GL/TextureFormat.h>
 
 using namespace testapp;
 
@@ -115,91 +109,6 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.system_machine_create<SysMachineRCSController>();
     rScene.system_machine_create<SysMachineContainer>();
 
-    // Define render passes
-
-    // Opaque pass
-    rScene.get_render_queue().push_back(
-        [](osp::active::ActiveScene& rScene, ACompCamera& camera)
-        {
-            using namespace Magnum;
-            using Magnum::GL::Renderer;
-            using namespace osp::active;
-
-            auto& reg = rScene.get_registry();
-
-            camera.m_renderTarget->bind();
-
-            camera.m_renderTarget->clear(
-                GL::FramebufferClear::Color
-                | GL::FramebufferClear::Depth
-                | GL::FramebufferClear::Stencil);
-
-            Renderer::enable(Renderer::Feature::DepthTest);
-            Renderer::enable(Renderer::Feature::FaceCulling);
-            Renderer::disable(Renderer::Feature::Blending);
-
-            // Fetch opaque objects
-            auto opaqueView = reg.view<CompDrawableDebug, ACompTransform>(
-                entt::exclude<CompTransparentDebug>);
-
-            SysDebugRender::draw_group(rScene, opaqueView, camera);
-        }
-    );
-
-    // Transparent pass
-    rScene.get_render_queue().push_back(
-        [](osp::active::ActiveScene& rScene, ACompCamera& camera)
-        {
-            using Magnum::GL::Renderer;
-            using namespace osp::active;
-
-            auto& reg = rScene.get_registry();
-
-            Renderer::enable(Renderer::Feature::DepthTest);
-            Renderer::enable(Renderer::Feature::FaceCulling);
-            Renderer::enable(Renderer::Feature::Blending);
-            Renderer::setBlendFunction(
-                Renderer::BlendFunction::SourceAlpha,
-                Renderer::BlendFunction::OneMinusSourceAlpha);
-
-            auto transparentView = reg.view<CompDrawableDebug, CompVisibleDebug,
-                CompTransparentDebug, ACompTransform>();
-
-            // Draw backfaces
-            Renderer::setFaceCullingMode(Renderer::PolygonFacing::Front);
-            SysDebugRender::draw_group(rScene, transparentView, camera);
-
-            // Draw frontfaces
-            Renderer::setFaceCullingMode(Renderer::PolygonFacing::Back);
-            SysDebugRender::draw_group(rScene, transparentView, camera);
-        }
-    );
-
-    // Render offscreen buffer
-    rScene.get_render_queue().push_back(
-        [](osp::active::ActiveScene& rScene, ACompCamera& camera)
-        {
-            using namespace Magnum;
-            using Magnum::GL::Renderer;
-            using namespace osp::active;
-            using namespace osp;
-
-            GL::defaultFramebuffer.bind();
-            GL::defaultFramebuffer.clear(
-                GL::FramebufferClear::Color
-                | GL::FramebufferClear::Depth
-                | GL::FramebufferClear::Stencil);
-
-            Renderer::disable(Renderer::Feature::DepthTest);
-            Renderer::disable(Renderer::Feature::FaceCulling);
-            Renderer::disable(Renderer::Feature::Blending);
-
-            DependRes<GL::Texture2D> colorTex =
-                rScene.get_context_resources().get<GL::Texture2D>("offscreen_fbo_color");
-            SysDebugRender::render_framebuffer(rScene, *colorTex);
-        }
-    );
-
     // Make active areas load vehicles and planets
     //sysArea.activator_add(rUni.sat_type_find_index<SatVehicle>(), sysVehicle);
     //sysArea.activator_add(rUni.sat_type_find_index<SatPlanet>(), sysPlanet);
@@ -228,35 +137,19 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.reg_emplace<ACompFloatingOrigin>(camera);
 
     {
-        // Add an offscreen framebuffer
-        using namespace Magnum;
+        auto& resources = rScene.get_context_resources();
+        Magnum::Vector2i viewSize = Magnum::GL::defaultFramebuffer.viewport().size();
 
-        auto& glResources = rScene.get_context_resources();
-
-        Vector2i viewSize = GL::defaultFramebuffer.viewport().size();
-
-        GL::Texture2D color;
-        color.setStorage(1, GL::TextureFormat::RGB8, viewSize);
-        osp::DependRes<GL::Texture2D> colorRes = glResources.add<GL::Texture2D>("offscreen_fbo_color", std::move(color));
-
-        GL::Renderbuffer depthStencil;
-        depthStencil.setStorage(GL::RenderbufferFormat::Depth24Stencil8, viewSize);
-        osp::DependRes<GL::Renderbuffer> depthStencilRes =
-            glResources.add<GL::Renderbuffer>("offscreen_fbo_depthStencil", std::move(depthStencil));
-
-        GL::Framebuffer fbo(Range2Di{{0, 0}, viewSize});
-        fbo.attachTexture(GL::Framebuffer::ColorAttachment{0}, *colorRes, 0);
-        fbo.attachRenderbuffer(GL::Framebuffer::BufferAttachment::DepthStencil, *depthStencilRes);
-
-        osp::DependRes<GL::Framebuffer> fboRes =
-            rScene.get_context_resources().add<GL::Framebuffer>("offscreen_fbo", std::move(fbo));
+        // Fetch primary render target (an offscreen FBO)
+        osp::DependRes<Magnum::GL::Framebuffer> fbo =
+            resources.get<Magnum::GL::Framebuffer>("offscreen_fbo");
 
         // Set up camera
         cameraComp.m_viewport = Vector2(viewSize);
         cameraComp.m_far = 1u << 24;
         cameraComp.m_near = 1.0f;
         cameraComp.m_fov = 45.0_degf;
-        cameraComp.m_renderTarget = std::move(fboRes);
+        cameraComp.m_renderTarget = std::move(fbo);
 
         cameraComp.calculate_projection();
     }

@@ -237,12 +237,7 @@ void ActiveScene::draw(ActiveEnt camera)
     //cameraProject = cameraComp.m_projection;
     cameraComp.m_inverse = cameraTransform.m_transformWorld.inverted();
 
-    for (auto& pass : m_renderQueue)
-    {
-        pass(*this, cameraComp);
-    }
-
-    //m_renderOrder.call(*this, cameraComp);
+    m_renderOrder.call(*this, cameraComp);
 }
 
 MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,

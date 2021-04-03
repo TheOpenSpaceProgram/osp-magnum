@@ -27,11 +27,15 @@
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Framebuffer.h>
+#include <Magnum/GL/Renderbuffer.h>
+#include <Magnum/GL/RenderbufferFormat.h>
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/Mesh.h>
+#include <Magnum/GL/TextureFormat.h>
 #include <Magnum/Shaders/MeshVisualizer.h>
 #include <Magnum/Mesh.h>
+#include <Magnum/Math/Range.h>
 #include <Corrade/Containers/ArrayViewStl.h>
 
 #include "SysDebugRender.h"
@@ -54,24 +58,42 @@ using namespace Magnum::Math::Literals;
 
 void SysDebugRender::add_functions(ActiveScene &rScene)
 {
-    Package& glResources = rScene.get_context_resources();
+    initialize_context_resources(rScene);
+    configure_render_passes(rScene);
+}
+
+void SysDebugRender::display_framebuffer(ActiveScene& rScene, GL::Texture2D& rTexture)
+{
+    auto& resources = rScene.get_context_resources();
+
+    DependRes<GL::Mesh> surface = resources.get<GL::Mesh>("fullscreen_tri");
+    DependRes<RenderTexture> shader = resources.get<RenderTexture>("render_texture");
+
+    shader->render_texure(*surface, rTexture);
+}
+
+void SysDebugRender::initialize_context_resources(ActiveScene& rScene)
+{
+    Package& resources = rScene.get_context_resources();
 
     using namespace adera::shader;
     using Magnum::Shaders::MeshVisualizer3D;
 
-    glResources.add<MeshVisualizer3D>("mesh_vis_shader",
+    /* Initialize shader programs */
+
+    resources.add<MeshVisualizer3D>("mesh_vis_shader",
         MeshVisualizer3D{MeshVisualizer3D::Flag::Wireframe | MeshVisualizer3D::Flag::NormalDirection});
 
-    glResources.add<Phong>("phong_shader",
+    resources.add<Phong>("phong_shader",
         Phong{Magnum::Shaders::Phong::Flag::DiffuseTexture});
 
-    glResources.add<PlumeShader>("plume_shader");
+    resources.add<PlumeShader>("plume_shader");
 
-    glResources.add<RenderTexture>("render_texture");
+    resources.add<RenderTexture>("render_texture");
 
     // Generate fullscreen tri for texture rendering
-    using namespace Magnum; 
-    if (glResources.get<GL::Mesh>("fullscreen_tri").empty())
+    using namespace Magnum;
+    if (resources.get<GL::Mesh>("fullscreen_tri").empty())
     {
         Vector2 screenSize = Vector2{GL::defaultFramebuffer.viewport().size()};
 
@@ -92,38 +114,120 @@ void SysDebugRender::add_functions(ActiveScene &rScene)
             .setCount(3)
             .addVertexBuffer(std::move(surface), 0,
                 RenderTexture::Position{}, RenderTexture::TextureCoordinates{});
-        glResources.add<GL::Mesh>("fullscreen_tri", std::move(surfaceMesh));
+        resources.add<GL::Mesh>("fullscreen_tri", std::move(surfaceMesh));
     }
-
 }
 
-/*void SysDebugRender::draw(ACompCamera& camera)
+void SysDebugRender::configure_render_passes(ActiveScene& rScene)
 {
-    GL::AbstractFramebuffer* framebuffer = (camera.m_renderTarget.empty()) ?
-        reinterpret_cast<GL::AbstractFramebuffer*>(&GL::defaultFramebuffer)
-        : reinterpret_cast<GL::AbstractFramebuffer*>(&(*camera.m_renderTarget));
-
-    framebuffer->bind();
-
-    framebuffer->clear(
-        GL::FramebufferClear::Color
-        | GL::FramebufferClear::Depth
-        | GL::FramebufferClear::Stencil);
-
-    for (auto& pass : m_renderPasses)
-    {
-        pass(m_scene, camera);
-    }
-}*/
-
-void SysDebugRender::render_framebuffer(ActiveScene& rScene, Magnum::GL::Texture2D& rTexture)
-{
-    using namespace Magnum;
+    /* Configure pipeline resources */
     
-    auto& glResources = rScene.get_context_resources();
+    // Add an offscreen framebuffer
 
-    DependRes<GL::Mesh> surface = glResources.get<GL::Mesh>("fullscreen_tri");
-    DependRes<RenderTexture> shader = glResources.get<RenderTexture>("render_texture");
+    auto& resources = rScene.get_context_resources();
 
-    shader->render_texure(*surface, rTexture);
+    Vector2i viewSize = GL::defaultFramebuffer.viewport().size();
+
+    GL::Texture2D color;
+    color.setStorage(1, GL::TextureFormat::RGB8, viewSize);
+    DependRes<GL::Texture2D> colorRes =
+        resources.add<GL::Texture2D>("offscreen_fbo_color", std::move(color));
+
+    GL::Renderbuffer depthStencil;
+    depthStencil.setStorage(GL::RenderbufferFormat::Depth24Stencil8, viewSize);
+    DependRes<GL::Renderbuffer> depthStencilRes =
+        resources.add<GL::Renderbuffer>("offscreen_fbo_depthStencil", std::move(depthStencil));
+
+    GL::Framebuffer fbo(Range2Di{{0, 0}, viewSize});
+    fbo.attachTexture(GL::Framebuffer::ColorAttachment{0}, *colorRes, 0);
+    fbo.attachRenderbuffer(GL::Framebuffer::BufferAttachment::DepthStencil, *depthStencilRes);
+
+    resources.add<GL::Framebuffer>("offscreen_fbo", std::move(fbo));
+
+    /* Define render passes */
+
+    // Opaque pass
+    rScene.debug_render_add(rScene.get_render_order(),
+        "opaque_pass", "", "transparent_pass",
+        [](ActiveScene& rScene, ACompCamera& camera)
+        {
+            using namespace Magnum;
+            using Magnum::GL::Renderer;
+
+            auto& reg = rScene.get_registry();
+
+            camera.m_renderTarget->bind();
+
+            camera.m_renderTarget->clear(
+                GL::FramebufferClear::Color
+                | GL::FramebufferClear::Depth
+                | GL::FramebufferClear::Stencil);
+
+            Renderer::enable(Renderer::Feature::DepthTest);
+            Renderer::enable(Renderer::Feature::FaceCulling);
+            Renderer::disable(Renderer::Feature::Blending);
+
+            // Fetch opaque objects
+            auto opaqueView = reg.view<CompDrawableDebug, ACompTransform>(
+                entt::exclude<CompTransparentDebug>);
+
+            SysDebugRender::draw_group(rScene, opaqueView, camera);
+        }
+    );
+
+    // Transparent pass
+    rScene.debug_render_add(rScene.get_render_order(),
+        "transparent_pass", "opaque_pass", "display_framebuffer",
+        [](osp::active::ActiveScene& rScene, ACompCamera& camera)
+        {
+            using Magnum::GL::Renderer;
+            using namespace osp::active;
+
+            auto& reg = rScene.get_registry();
+
+            Renderer::enable(Renderer::Feature::DepthTest);
+            Renderer::enable(Renderer::Feature::FaceCulling);
+            Renderer::enable(Renderer::Feature::Blending);
+            Renderer::setBlendFunction(
+                Renderer::BlendFunction::SourceAlpha,
+                Renderer::BlendFunction::OneMinusSourceAlpha);
+
+            auto transparentView = reg.view<CompDrawableDebug, CompVisibleDebug,
+                CompTransparentDebug, ACompTransform>();
+
+            // Draw backfaces
+            Renderer::setFaceCullingMode(Renderer::PolygonFacing::Front);
+            SysDebugRender::draw_group(rScene, transparentView, camera);
+
+            // Draw frontfaces
+            Renderer::setFaceCullingMode(Renderer::PolygonFacing::Back);
+            SysDebugRender::draw_group(rScene, transparentView, camera);
+        }
+    );
+
+    // Render offscreen buffer
+    rScene.debug_render_add(rScene.get_render_order(),
+        "display_framebuffer", "transparent_pass", "",
+        [](osp::active::ActiveScene& rScene, ACompCamera& camera)
+        {
+            using namespace Magnum;
+            using Magnum::GL::Renderer;
+            using namespace osp::active;
+            using namespace osp;
+
+            GL::defaultFramebuffer.bind();
+            GL::defaultFramebuffer.clear(
+                GL::FramebufferClear::Color
+                | GL::FramebufferClear::Depth
+                | GL::FramebufferClear::Stencil);
+
+            Renderer::disable(Renderer::Feature::DepthTest);
+            Renderer::disable(Renderer::Feature::FaceCulling);
+            Renderer::disable(Renderer::Feature::Blending);
+
+            DependRes<GL::Texture2D> colorTex =
+                rScene.get_context_resources().get<GL::Texture2D>("offscreen_fbo_color");
+            SysDebugRender::display_framebuffer(rScene, *colorTex);
+        }
+    );
 }

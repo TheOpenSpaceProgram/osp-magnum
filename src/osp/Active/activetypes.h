@@ -55,8 +55,8 @@ using ActiveReg_t = entt::basic_registry<ActiveEnt>;
 using UpdateOrder_t = FunctionOrder<void(ActiveScene&)>;
 using UpdateOrderHandle_t = FunctionOrderHandle<void(ActiveScene&)>;
 
-using RenderOrder_t = FunctionOrder<void(ActiveScene&, ACompCamera const&)>;
-using RenderOrderHandle_t = FunctionOrderHandle<void(ActiveScene&, ACompCamera const&)>;
+using RenderOrder_t = FunctionOrder<void(ActiveScene&, ACompCamera&)>;
+using RenderOrderHandle_t = FunctionOrderHandle<void(ActiveScene&, ACompCamera&)>;
 
 struct ACompFloatingOrigin
 {

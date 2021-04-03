@@ -61,11 +61,13 @@ public:
 
     static void add_functions(ActiveScene& rScene);
 
-    //static void draw(ActiveScene& rScene, ACompCamera& camera);
-
     template <typename T>
     static void draw_group(ActiveScene& rScene, T& rCollection, ACompCamera& camera);
-    static void render_framebuffer(ActiveScene& rScene, Magnum::GL::Texture2D& rTexture);
+    static void display_framebuffer(ActiveScene& rScene, Magnum::GL::Texture2D& rTexture);
+
+private:
+    static void initialize_context_resources(ActiveScene& rScene);
+    static void configure_render_passes(ActiveScene& rScene);
 };
 
 template<typename T>
