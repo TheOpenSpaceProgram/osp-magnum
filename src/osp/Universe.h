@@ -165,11 +165,20 @@ struct UCompTransformTraj
     std::string m_name;
 };
 
-struct UCompVelocity
+struct UCompVel
 {
-    Vector3 m_velocity;
+    Vector3d m_velocity;
 };
 
+struct UCompAccel
+{
+    Vector3d m_acceleration;
+};
+
+struct UCompMass
+{
+    double m_mass;
+};
 
 // TODO: move to different files and de-OOPify trajectories too
 

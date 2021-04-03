@@ -42,6 +42,7 @@ using Magnum::Vector2;
 using Magnum::Vector2i;
 
 using Magnum::Vector3;
+using Magnum::Vector3d;
 using Magnum::Vector4;
 using Magnum::Quaternion;
 using Magnum::Matrix3;
