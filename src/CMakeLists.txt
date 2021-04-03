@@ -46,7 +46,20 @@ file (GLOB_RECURSE CPP_FILES *.cpp)
 file (GLOB_RECURSE H_FILES *.h)
 set (SOURCE_FILES ${CPP_FILES} ${H_FILES})
 
-add_executable(osp-magnum ${CPP_FILES})
+if(MSVC)
+	# For some reason, source_group() requires all files to be added to the
+	# executable. I did this conditionally in case it messes up other platforms
+	set(SHADERS_DIR "../bin/OSPData/adera/Shaders")
+  	file (GLOB_RECURSE SHADER_FILES
+  		"${SHADERS_DIR}/*.vert"
+  		"${SHADERS_DIR}/*.frag"
+  		"${SHADERS_DIR}/*.comp"
+  		)
+  	list(APPEND SOURCE_FILES ${SHADER_FILES})
+	add_executable(osp-magnum ${SOURCE_FILES})
+else()
+	add_executable(osp-magnum ${CPP_FILES})
+endif()
 
 target_include_directories(osp-magnum PRIVATE .)
 
@@ -84,10 +97,17 @@ elseif(MINGW)
 
 endif()
 
-# Set the MSVC debug working directory, enforce conformance mode for osp-magnum
+# MSVC quality of life improvements for Visual Studio
 if(MSVC)
-  set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ../../bin)
-  target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
+	# Set the MSVC debug working directory
+  	set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ../../bin)
+
+  	# Enforce conformance mode for osp-magnum
+  	target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
+
+  	# Segregate headers, shaders into filters
+  	source_group("Shader Files" FILES ${SHADER_FILES})
+  	source_group("Header Files" FILES ${H_FILES})
 endif()
 
 # Include ENTT (header only lib)
