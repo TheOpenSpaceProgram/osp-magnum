@@ -35,6 +35,8 @@ namespace osp::universe
 
 struct UCompAsteroid {};
 
+constexpr double G = 6.674e-11;
+
 /*
 Table structure (concept):
 
@@ -127,12 +129,23 @@ private:
 class TrajNBody : public CommonTrajectory<TrajNBody>
 {
 public:
-    static constexpr double sc_timestep = 1'000.0;
+    static constexpr double smc_timestep = 1'000.0;
 
     TrajNBody(Universe& rUni, Satellite center);
     ~TrajNBody() = default;
-    void update();
 
+    // (not yet implemented) Update universe registry data from evolution table
+    //static void update_world();
+
+    // Simulate orbits
+    void update(/*Universe& rUni*/); // TODO make static
+
+private:
+    template <typename VIEW_T, typename SRC_VIEW_T>
+    static void update_full_dynamics_acceleration(VIEW_T& bodyView, SRC_VIEW_T& sources);
+
+    template <typename VIEW_T>
+    static void update_full_dynamics_kinematics(VIEW_T& view);
 };
 
 }

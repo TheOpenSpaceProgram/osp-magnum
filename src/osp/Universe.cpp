@@ -37,6 +37,14 @@ Universe::Universe()
     m_root = sat_create();
 }
 
+void Universe::update()
+{
+    for (auto& traj : m_trajectories)
+    {
+        traj->update();
+    }
+}
+
 Satellite Universe::sat_create()
 {
     Satellite sat = m_registry.create();

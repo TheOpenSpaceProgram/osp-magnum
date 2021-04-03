@@ -145,7 +145,7 @@ void add_body(OSPApplication& ospApp, Satellite sat, PlanetBody body, ISystemTra
 
     //satPlanet.m_radius = body.m_radius;
     satTT.m_name = body.m_name;
-    //satTT.m_color = body.m_color;
+    satTT.m_color = body.m_color;
 
     traj->add(sat);
 }

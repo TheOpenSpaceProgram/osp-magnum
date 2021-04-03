@@ -26,6 +26,7 @@
 
 //#include "Satellite.h"
 #include "types.h"
+#include <Magnum/Math/Color.h>
 
 #include <entt/entity/registry.hpp>
 
@@ -73,6 +74,11 @@ public:
     Universe(Universe const &copy) = delete;
     Universe(Universe &&move) = delete;
     ~Universe() = default;
+
+    /**
+     * Update all trajectories
+     */
+    void update();
 
     /**
      * @return an null satellite
@@ -156,13 +162,16 @@ struct UCompTransformTraj
     Satellite m_parent; // Set only by trajectory
 
     ISystemTrajectory *m_trajectory{nullptr}; // get rid of this some day
-    unsigned m_index; // index in trajectory's vector
+    size_t m_index; // index in trajectory's vector
 
     // set this to true when you modify something the trajectory might use
     bool m_dirty{true};
 
     // move this somewhere else eventually
     std::string m_name;
+
+    // Temporary, for orbit colors
+    Magnum::Color3 m_color;
 };
 
 struct UCompVel
@@ -257,7 +266,7 @@ public:
     constexpr Universe& get_universe() const { return m_universe; }
     constexpr std::vector<Satellite>& get_satellites() { return m_satellites; }
 
-private:
+protected:
 
     Universe& m_universe;
     Satellite m_center;
@@ -269,7 +278,7 @@ void CommonTrajectory<TRAJECTORY_T>::add(Satellite sat)
 {
     auto &posTraj = m_universe.get_reg().get<UCompTransformTraj>(sat);
 
-    if (posTraj.m_trajectory)
+    if (posTraj.m_trajectory != nullptr)
     {
         return; // already part of trajectory
     }

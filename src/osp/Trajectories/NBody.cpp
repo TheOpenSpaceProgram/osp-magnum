@@ -27,14 +27,7 @@
 
 using namespace osp::universe;
 
-TrajNBody::TrajNBody(Universe& rUni, Satellite center)
-    : CommonTrajectory<TrajNBody>(rUni, center)
-{}
-
-void TrajNBody::update()
-{
-
-}
+/* ============ EvolutionTable ============ */
 
 EvolutionTable::EvolutionTable(size_t nBodies, size_t nSteps)
     : m_velocities{nullptr}
@@ -72,3 +65,86 @@ void EvolutionTable::resize(size_t bodies, size_t timesteps)
     // Allocate main table
     m_posTable = table_ptr<double>(3*bodies * timesteps);
 }
+
+/* ============ TrajNBody ============ */
+
+TrajNBody::TrajNBody(Universe& rUni, Satellite center)
+    : CommonTrajectory<TrajNBody>(rUni, center)
+{}
+
+void TrajNBody::update()
+{
+    auto& reg = m_universe.get_reg(); //rUni.get_reg();
+
+    auto view =reg.view<UCompTransformTraj, UCompMass, UCompVel, UCompAccel>(
+        entt::exclude<UCompAsteroid>);
+    auto sourceView = reg.view<UCompTransformTraj, UCompMass>(
+        entt::exclude<UCompAsteroid>);
+
+    // Update accelerations (full dynamics)
+    update_full_dynamics_acceleration(view, sourceView);
+    update_full_dynamics_kinematics(view);
+}
+
+template <typename VIEW_T, typename SRC_VIEW_T>
+void TrajNBody::update_full_dynamics_acceleration(VIEW_T& view, SRC_VIEW_T& inputView)
+{
+    // ### Precompute Gravity Sources ###
+    struct Source
+    {
+        Vector3d pos;  // 24 bytes
+        double mass;   // 8 bytes
+        Satellite sat; // 4 bytes :'(
+    };
+    std::vector<Source> sources;
+    sources.reserve(100);  // TMP magic constant
+    for (Satellite src : inputView)
+    {
+        Source source
+        {
+            static_cast<Vector3d>(inputView.get<UCompTransformTraj>(src).m_position) / 1024.0,
+            inputView.get<UCompMass>(src).m_mass,
+            src
+        };
+        sources.push_back(std::move(source));
+    }
+    sources.shrink_to_fit();
+
+    // ### Update Accelerations ###
+    for (Satellite sat : view)
+    {
+        auto& pos = view.get<UCompTransformTraj>(sat).m_position;
+        Vector3d posD = static_cast<Vector3d>(pos) / 1024.0;
+
+        Vector3d A{0.0};
+        for (Source const& src : sources)
+        {
+            if (src.sat == sat) { continue; }
+            Vector3d r = src.pos - posD;
+            Vector3d rHat = r.normalized();
+            double denom = r.x() * r.x() + r.y() * r.y() + r.z() * r.z();
+            A += (src.mass / denom) * rHat;
+        }
+        A *= 1024.0 * G;
+
+        view.get<UCompAccel>(sat).m_acceleration = A;
+    }
+}
+
+template<typename VIEW_T>
+void TrajNBody::update_full_dynamics_kinematics(VIEW_T& view)
+{
+    constexpr double dt = smc_timestep;
+
+    // Update velocities & positions (full dynamics)
+    for (Satellite sat : view)
+    {
+        auto& acceleration = view.get<UCompAccel>(sat).m_acceleration;
+        auto& vel = view.get<UCompVel>(sat).m_velocity;
+        auto& pos = view.get<UCompTransformTraj>(sat).m_position;
+
+        vel += acceleration * dt;
+        pos += static_cast<Vector3s>(vel * dt);
+    }
+}
+
