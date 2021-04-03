@@ -26,10 +26,60 @@
 
 #include "../Universe.h"
 
+#include <memory>
+
 namespace osp::universe
 {
 
 struct UCompAsteroid {};
+
+/*
+
+Table structure (concept):
+
+| Body 1 | Body 2 |  ...  | Body N |
+| Vxyz,M | Vxyz,M |  ...  | Vxyz,M | Vel, mass, metadata
+|--------|--------|-------|--------|
+| X,Y,Z  | X,Y,Z  |  ...  | X,Y,Z  | Step 1
+| X,Y,Z  | X,Y,Z  |  ...  | X,Y,Z  | Step 2
+|        |        |       |        | ...
+| X,Y,Z  | X,Y,Z  |  ...  | X,Y,Z  | Step N
+
+Table structure (implementation):
+
+| Body 1 | Body 2 |  ...  | Body N | Metadata
+| M      | M      |  ...  | M      | Masses
+| Vxyz   | Vxyz   |  ...  | Vxyz   | Velocities
+
+| X[N] || Y[N] || Z[N] || Step 1   (|| == padding)
+| X[N] || Y[N] || Z[N] || Step 2
+| X[N] || Y[N] || Z[N] || Step 3
+
+*/
+class EvolutionTable
+{
+public:
+    EvolutionTable(size_t nBodies, size_t nSteps);
+    EvolutionTable();
+    ~EvolutionTable() = default;
+    EvolutionTable(EvolutionTable const&) = delete;
+    EvolutionTable(EvolutionTable&& move) = default;
+
+    void resize(size_t bodies, size_t timesteps);
+private:
+    size_t m_nBodies;
+    size_t m_nTimesteps;
+    size_t m_currentStep;
+
+    // Current step only/static values
+
+    std::unique_ptr<Vector3d[], decltype(&_aligned_free)> m_velocities;
+    std::unique_ptr<Vector3d[], decltype(&_aligned_free)> m_accelerations;
+    std::unique_ptr<double[], decltype(&_aligned_free)> m_masses;
+
+    // Table of positions over time
+    std::unique_ptr<Vector3d[], decltype(&_aligned_free)> m_posTable;
+};
 
 /**
  * A not very static universe where everything moves constantly
@@ -42,6 +92,7 @@ public:
     TrajNBody(Universe& rUni, Satellite center);
     ~TrajNBody() = default;
     void update();
+
 };
 
 }
