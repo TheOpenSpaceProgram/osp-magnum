@@ -25,7 +25,9 @@
 #pragma once
 
 #include "../Universe.h"
+#include "../aligned_allocator.h"
 
+#include <type_traits>
 #include <memory>
 
 namespace osp::universe
@@ -34,7 +36,6 @@ namespace osp::universe
 struct UCompAsteroid {};
 
 /*
-
 Table structure (concept):
 
 | Body 1 | Body 2 |  ...  | Body N |
@@ -67,18 +68,57 @@ public:
 
     void resize(size_t bodies, size_t timesteps);
 private:
+    static constexpr size_t AVX2_WIDTH = 256 / 8;  // 256 bits / 8 = 32 Bytes
+
+    // Allocate an aligned array of
+    template <typename T>
+    static T* alloc_aligned(size_t nElements)
+    {
+        static_assert(std::is_arithmetic<T>::value, "Can only allocate arithmetic types");
+
+        constexpr size_t avxLanes = AVX2_WIDTH / sizeof(T);
+        size_t padding = avxLanes - (nElements % avxLanes);
+        size_t allocSize = (nElements + padding) * sizeof(T);
+        return AlignedAllocator<T, AVX2_WIDTH>::allocate(allocSize);
+    }
+
+    // Deleter functions
+    template<typename T>
+    static void del_aligned(T* ptr)
+    {
+        AlignedAllocator<T, AVX2_WIDTH>::deallocate(ptr, sizeof(ptr));
+    }
+
+    // std::unique_ptr alias with custom aligned alloc deleter
+    template <typename T>
+    class table_ptr : public std::unique_ptr<T[], decltype(&del_aligned<T>)>
+    {
+    private:
+        using ptr_type = std::unique_ptr<T[], decltype(&del_aligned<T>)>;
+    public:
+        table_ptr(size_t elements)
+            : ptr_type(
+                alloc_aligned<T>(elements),
+                &del_aligned<T>)
+        {}
+
+        table_ptr(T* ptr) : ptr_type(ptr, &del_aligned<T>) {}
+    };
+
+    // Table dimensions
+
     size_t m_nBodies;
     size_t m_nTimesteps;
     size_t m_currentStep;
 
-    // Current step only/static values
+    // Current step only/static tables
 
-    std::unique_ptr<Vector3d[], decltype(&_aligned_free)> m_velocities;
-    std::unique_ptr<Vector3d[], decltype(&_aligned_free)> m_accelerations;
-    std::unique_ptr<double[], decltype(&_aligned_free)> m_masses;
+    table_ptr<double> m_velocities;
+    table_ptr<double> m_accelerations;
+    table_ptr<double> m_masses;
 
     // Table of positions over time
-    std::unique_ptr<Vector3d[], decltype(&_aligned_free)> m_posTable;
+    table_ptr<double> m_posTable;
 };
 
 /**
