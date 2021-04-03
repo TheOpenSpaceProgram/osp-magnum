@@ -108,12 +108,19 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
 
         BlueprintVehicle const& vehBp = *rVehConstr.m_blueprint;
 
-        // Initialize all UserControls in the vehicle
+        // Initialize all MachineRockets in the vehicle
         for (BlueprintMachine const &mach : vehBp.m_machines[id])
         {
+            // Get part
             ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+
+            // Get machine entity previously reserved by SysVehicle
+            auto& machines = rScene.reg_get<ACompMachines>(partEnt);
+            ActiveEnt machEnt = machines.m_machines[machines.m_numInit];
+            machines.m_numInit ++;
+
             BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_blueprintIndex];
-            instantiate(rScene, partEnt,
+            instantiate(rScene, machEnt,
                         vehBp.m_prototypes[partBp.m_protoIndex]
                                 ->m_protoMachines[mach.m_protoMachineIndex],
                         mach);

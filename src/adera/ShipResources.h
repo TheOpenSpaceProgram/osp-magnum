@@ -148,25 +148,25 @@ struct ShipResource
 class MachineContainer;
 
 class SysMachineContainer
-    : public osp::active::SysMachine<SysMachineContainer, MachineContainer>
 {
 public:
-    static inline std::string smc_name = "Container";
+    static inline std::string smc_mach_name = "Container";
 
-    SysMachineContainer(osp::active::ActiveScene& rScene);
+    static void add_functions(osp::active::ActiveScene& rScene);
+
+    static void update_construct(osp::active::ActiveScene &rScene);
 
     static void update_containers(osp::active::ActiveScene& rScene);
 
-    osp::active::Machine& instantiate(
-        osp::active::ActiveEnt ent,
-        osp::PrototypeMachine config,
-        osp::BlueprintMachine settings) override;
+    static MachineContainer& instantiate(
+            osp::active::ActiveScene& rScene,
+            osp::active::ActiveEnt ent,
+            osp::PrototypeMachine const& config,
+            osp::BlueprintMachine const& settings);
 
-    osp::active::Machine& get(osp::active::ActiveEnt ent) override;
-
-private:
-    osp::active::UpdateOrderHandle_t m_updateContainers;
 }; // class SysMachineContainer
+
+//-----------------------------------------------------------------------------
 
 class MachineContainer : public osp::active::Machine
 {

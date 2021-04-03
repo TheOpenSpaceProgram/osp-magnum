@@ -27,6 +27,7 @@
 #include <osp/Resource/PrototypePart.h>
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/physics.h>
+#include <osp/Active/SysVehicle.h>
 
 using namespace osp;
 using namespace osp::active;
@@ -78,11 +79,13 @@ float MachineContainer::compute_mass() const noexcept
 
 /* SysMachineContainer */
 
-SysMachineContainer::SysMachineContainer(ActiveScene& rScene)
-    : SysMachine<SysMachineContainer, MachineContainer>(rScene)
-    , m_updateContainers(rScene.get_update_order(), "mach_container", "", "mach_rocket",
-        [this](ActiveScene& rScene) { this->update_containers(rScene); })
-{ }
+void SysMachineContainer::add_functions(ActiveScene& rScene)
+{
+    rScene.debug_update_add(rScene.get_update_order(), "mach_container", "", "mach_rocket",
+                            &SysMachineContainer::update_containers);
+    rScene.debug_update_add(rScene.get_update_order(), "mach_container_construct", "vehicle_activate", "vehicle_modification",
+                            &SysMachineContainer::update_construct);
+}
 
 void SysMachineContainer::update_containers(ActiveScene& rScene)
 {
@@ -101,10 +104,13 @@ void SysMachineContainer::update_containers(ActiveScene& rScene)
     }
 }
 
-Machine& SysMachineContainer::instantiate(ActiveEnt ent,
-    PrototypeMachine config, BlueprintMachine settings)
+MachineContainer& SysMachineContainer::instantiate(
+        osp::active::ActiveScene& rScene,
+        osp::active::ActiveEnt ent,
+        osp::PrototypeMachine const& config,
+        osp::BlueprintMachine const& settings)
 {
-    float capacity = std::get<double>(config.m_config["capacity"]);
+    float capacity = std::get<double>(config.m_config.at("capacity"));
 
     ShipResource resource{};
     if (auto resItr = settings.m_config.find("resourcename");
@@ -112,21 +118,49 @@ Machine& SysMachineContainer::instantiate(ActiveEnt ent,
     {
         std::string_view resName = std::get<std::string>(resItr->second);
         Path resPath = decompose_path(resName);
-        Package& pkg = m_scene.get_application().debug_find_package(resPath.prefix);
+        Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
 
         resource.m_type = pkg.get<ShipResourceType>(resPath.identifier);
-        double fuelLevel = std::get<double>(settings.m_config["fuellevel"]);
+        double fuelLevel = std::get<double>(settings.m_config.at("fuellevel"));
         resource.m_quantity = resource.m_type->resource_capacity(capacity * fuelLevel);
     }
 
-    m_scene.reg_emplace<ACompMass>(ent, 0.0f);
+    rScene.reg_emplace<ACompMass>(ent, 0.0f);
     // All tanks are cylindrical for now
-    m_scene.reg_emplace<ACompShape>(ent, phys::ECollisionShape::CYLINDER);
+    rScene.reg_emplace<ACompShape>(ent, phys::ECollisionShape::CYLINDER);
 
-    return m_scene.reg_emplace<MachineContainer>(ent, ent, capacity, resource);
+    return rScene.reg_emplace<MachineContainer>(ent, ent, capacity, resource);
 }
 
-Machine& SysMachineContainer::get(ActiveEnt ent)
+
+void SysMachineContainer::update_construct(ActiveScene &rScene)
 {
-    return m_scene.reg_get<MachineContainer>(ent);
+    auto view = rScene.get_registry()
+            .view<osp::active::ACompVehicle,
+                  osp::active::ACompVehicleInConstruction>();
+
+    machine_id_t const id = mach_id<SysMachineContainer>();
+
+    for (auto [vehEnt, rVeh, rVehConstr] : view.each())
+    {
+        // Check if the vehicle blueprint might store UserControls
+        if (rVehConstr.m_blueprint->m_machines.size() <= id)
+        {
+            continue;
+        }
+
+        // Initialize all UserControls in the vehicle
+        for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
+        {
+            // Get part
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+
+            // Get machine entity previously reserved by SysVehicle
+            auto& machines = rScene.reg_get<ACompMachines>(partEnt);
+            ActiveEnt machEnt = machines.m_machines[machines.m_numInit];
+            machines.m_numInit ++;
+
+            rScene.reg_emplace<SysMachineContainer>(machEnt);
+        }
+    }
 }

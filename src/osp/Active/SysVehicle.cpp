@@ -51,10 +51,10 @@ using namespace Magnum::Math::Literals;
 
 void SysVehicle::add_functions(ActiveScene &rScene)
 {
-    rScene.debug_update_add(rScene.get_update_order(), "vehicle_activate", "", "vehicle_modification",
+    rScene.debug_update_add(rScene.get_update_order(), "vehicle_activate", "vehicle_modification", "",
                             &SysVehicle::update_activate);
 
-    rScene.debug_update_add(rScene.get_update_order(), "vehicle_modification", "", "physics",
+    rScene.debug_update_add(rScene.get_update_order(), "vehicle_modification", "vehicle_activate", "physics",
                             &SysVehicle::update_vehicle_modification);
 
 }
@@ -146,47 +146,28 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
                               partBp.m_translation)
                 * Matrix4::scaling(partBp.m_scale);
 
+        rScene.reg_emplace<ACompMachines>(partEntity);
     }
 
-    // Wire the thing up
-    #if 0
-
-    // Loop through wire connections
-    for (BlueprintWire& blueprintWire : vehicleData.get_wires())
+    // Initialize entities for individual machines. This is done now in one
+    // place, as creating new entities can be problematic for concurrency
+    rScene.get_registry().reserve(rScene.get_registry().capacity()
+                                   + vehicleData.m_machines.size());
+    for (std::vector<BlueprintMachine> machineVecs : vehicleData.m_machines)
     {
-        // TODO: check if the connections are valid
+        for (BlueprintMachine& machBp : machineVecs)
+        {
+            // Get ACompMachines, this component keeps track of which machines
+            // a part has.
+            ActiveEnt partEnt = vehicleComp.m_parts[machBp.m_blueprintIndex];
+            auto &machines = rScene.reg_get<ACompMachines>(partEnt);
 
-        // get wire from
-
-
-        ACompMachines& fromMachines = rScene.reg_get<ACompMachines>(
-                *(vehicleComp.m_parts.begin() + blueprintWire.m_fromPart));
-
-        auto fromMachineEntry = fromMachines
-                .m_machines[blueprintWire.m_fromMachine];
-        Machine &fromMachine = fromMachineEntry.m_system->second
-                ->get(fromMachineEntry.m_partEnt);
-        WireOutput* fromWire =
-                fromMachine.request_output(blueprintWire.m_fromPort);
-
-        // get wire to
-
-        ACompMachines& toMachines = rScene.reg_get<ACompMachines>(
-                *(vehicleComp.m_parts.begin() + blueprintWire.m_toPart));
-
-        auto toMachineEntry = toMachines
-                .m_machines[blueprintWire.m_toMachine];
-        Machine &toMachine = toMachineEntry.m_system->second
-                ->get(toMachineEntry.m_partEnt);
-        WireInput* toWire =
-                toMachine.request_input(blueprintWire.m_toPort);
-
-        // make the connection
-
-        SysWire::connect(*fromWire, *toWire);
+            // In this case, the hierarchy is used to manage the lifetime of the
+            // machines that they'll contain.
+            // TODO: put total machine count in part blueprints for reserve
+            machines.m_machines.push_back(rScene.hier_create_child(partEnt));
+        }
     }
-
-    #endif
 
     // temporary: make the whole thing a single rigid body
     auto& vehicleBody = rScene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
@@ -378,6 +359,50 @@ ActiveEnt SysVehicle::part_instantiate(
     return rootEntity;
 }
 
+void debug_wire_vehicles(ActiveScene &rScene)
+{
+    /*
+    auto view = rScene.get_registry()
+            .view<osp::active::ACompVehicle,
+                  osp::active::ACompVehicleInConstruction>();
+
+    for (auto [vehEnt, rVeh, rVehConstr] : view.each())
+    {
+        // Loop through wire connections
+        for (BlueprintWire& blueprintWire : rVehConstr.m_blueprint->m_wires)
+        {
+            // TODO: check if the connections are valid
+
+            // get wire from
+
+
+            ACompMachines& fromMachines = rScene.reg_get<ACompMachines>(
+                    *(rVeh.m_parts.begin() + blueprintWire.m_fromPart));
+
+            ACompMachines::PartMachine const& fromMachineEntry = fromMachines
+                    .m_machines[blueprintWire.m_fromMachine];
+            Machine &fromMachine = fromMachineEntry.m_get_machine(rScene, fromMachineEntry.m_partEnt);
+            WireOutput* fromWire =
+                    fromMachine.request_output(blueprintWire.m_fromPort);
+
+            // get wire to
+
+            ACompMachines& toMachines = rScene.reg_get<ACompMachines>(
+                    *(rVeh.m_parts.begin() + blueprintWire.m_toPart));
+
+            ACompMachines::PartMachine const& toMachineEntry = toMachines
+                    .m_machines[blueprintWire.m_toMachine];
+            Machine &toMachine = toMachineEntry.m_get_machine(rScene, toMachineEntry.m_partEnt);
+            WireInput* toWire = toMachine.request_input(blueprintWire.m_toPort);
+
+            // make the connection
+
+            SysWire::connect(*fromWire, *toWire);
+        }
+    }
+    */
+}
+
 void SysVehicle::update_activate(ActiveScene &rScene)
 {
     ACompAreaLink *pArea = SysAreaAssociate::try_get_area_link(rScene);
@@ -410,6 +435,10 @@ void SysVehicle::update_activate(ActiveScene &rScene)
         SysAreaAssociate::sat_transform_set_relative(
             rUni, pArea->m_areaSat, vehicleSat.m_sat, vehicleTf.m_transform);
     }
+
+    // Clear queue
+    debug_wire_vehicles(rScene); // but wire the machines first because why not
+    rScene.get_registry().clear<ACompVehicleInConstruction>();
 
     // Activate nearby vehicle satellites that have just entered the ActiveArea
     for (auto &entered : pArea->m_enter)

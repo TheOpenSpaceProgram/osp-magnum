@@ -104,16 +104,10 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     planeta::active::SysPlanetA::add_functions(rScene);
 
-    adera::active::machines::SysMachineUserControl::add_functions(rScene);
+    adera::active::machines::SysMachineContainer::add_functions(rScene);
+    adera::active::machines::SysMachineRCSController::add_functions(rScene);
     adera::active::machines::SysMachineRocket::add_functions(rScene);
-    //rScene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());
-    //rScene.system_machine_create<SysMachineRocket>();
-    //rScene.system_machine_create<SysMachineRCSController>();
-    //rScene.system_machine_create<SysMachineContainer>();
-
-    // Make active areas load vehicles and planets
-    //sysArea.activator_add(rUni.sat_type_find_index<SatVehicle>(), sysVehicle);
-    //sysArea.activator_add(rUni.sat_type_find_index<SatPlanet>(), sysPlanet);
+    adera::active::machines::SysMachineUserControl::add_functions(rScene);
 
     // create a Satellite with an ActiveArea
     Satellite areaSat = rUni.sat_create();

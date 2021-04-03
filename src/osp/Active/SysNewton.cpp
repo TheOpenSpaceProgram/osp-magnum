@@ -199,43 +199,46 @@ void SysNewton::find_colliders_recurse(ActiveScene& rScene, ActiveEnt ent,
     while(nextChild != entt::null)
     {
         auto const &childHeir = rScene.reg_get<ACompHierarchy>(nextChild);
-        auto const &childTransform = rScene.reg_get<ACompTransform>(nextChild);
+        auto const *childTransform = rScene.get_registry().try_get<ACompTransform>(nextChild);
 
-        auto* childCollide = rScene.reg_try_get<ACompCollider>(nextChild);
-
-        Matrix4 childMatrix = transform * childTransform.m_transform;
-
-        if (childCollide != nullptr)
+        if (childTransform != nullptr)
         {
-            NewtonCollision *collision = childCollide->m_collision;
+            auto* childCollide = rScene.reg_try_get<ACompCollider>(nextChild);
 
-            if (collision == nullptr)
+            Matrix4 childMatrix = transform * childTransform->m_transform;
+
+            if (childCollide != nullptr)
             {
-                // Newton collider has not yet been created from component
+                NewtonCollision *collision = childCollide->m_collision;
 
-                // TODO: care about collision shape. for now, everything is a
-                //       sphere
-                collision = NewtonCreateSphere(nwtWorld, 0.5f, 0, NULL);
-                childCollide->m_collision = collision;
+                if (collision == nullptr)
+                {
+                    // Newton collider has not yet been created from component
+
+                    // TODO: care about collision shape. for now, everything is a
+                    //       sphere
+                    collision = NewtonCreateSphere(nwtWorld, 0.5f, 0, NULL);
+                    childCollide->m_collision = collision;
+                }
+
+                //Matrix4 nextTransformNorm = nextTransform.
+
+                // Set transform relative to root body
+                Matrix4 f = Matrix4::translation(childMatrix.translation());
+                NewtonCollisionSetMatrix(collision, f.data());
+
+                // Add body to compound collision
+                NewtonCompoundCollisionAddSubCollision(rCompound, collision);
+            }
+            else
+            {
+                //return;
             }
 
-            //Matrix4 nextTransformNorm = nextTransform.
-
-            // Set transform relative to root body
-            Matrix4 f = Matrix4::translation(childMatrix.translation());
-            NewtonCollisionSetMatrix(collision, f.data());
-
-            // Add body to compound collision
-            NewtonCompoundCollisionAddSubCollision(rCompound, collision);
-
-        }
-        else
-        {
-            //return;
+            find_colliders_recurse(rScene, childHeir.m_childFirst, childMatrix,
+                                   nwtWorld, rCompound);
         }
 
-        find_colliders_recurse(rScene, childHeir.m_childFirst, childMatrix,
-                               nwtWorld, rCompound);
         nextChild = childHeir.m_siblingNext;
     }
 }
@@ -403,6 +406,7 @@ Matrix4 SysNewton::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, Ac
     ACompHierarchy *pCurrHier = nullptr;
     Matrix4 transform;
 
+
     do
     {
         pCurrHier = &rScene.get_registry().get<ACompHierarchy>(currEnt);
@@ -410,8 +414,11 @@ Matrix4 SysNewton::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, Ac
         // Record the local transformation of the current node relative to its parent
         if (pCurrHier->m_level > gc_heir_physics_level)
         {
-            Matrix4 localTransform = rScene.reg_get<ACompTransform>(currEnt).m_transform;
-            transform = localTransform * transform;
+            auto const *localTransform = rScene.get_registry().try_get<ACompTransform>(currEnt);
+            if (localTransform != nullptr)
+            {
+                transform = localTransform->m_transform * transform;
+            }
         }
 
         prevEnt = currEnt;
@@ -516,26 +523,29 @@ Vector4 SysNewton::compute_hier_CoM(ActiveScene& rScene, ActiveEnt root)
         nextChild != entt::null;)
     {
         auto const &childHier = rScene.reg_get<ACompHierarchy>(nextChild);
-        auto const &childTransform = rScene.reg_get<ACompTransform>(nextChild);
+        auto const *childTransform = rScene.get_registry().try_get<ACompTransform>(nextChild);
 
-        Matrix4 childMatrix = childTransform.m_transform;
-        auto* massComp = rScene.get_registry().try_get<ACompMass>(nextChild);
-
-        if (massComp)
+        if (childTransform != nullptr)
         {
-            float childMass = rScene.reg_get<ACompMass>(nextChild).m_mass;
+            Matrix4 childMatrix = childTransform->m_transform;
+            auto* massComp = rScene.get_registry().try_get<ACompMass>(nextChild);
 
-            Vector3 offset = childMatrix.translation();
+            if (massComp)
+            {
+                float childMass = rScene.reg_get<ACompMass>(nextChild).m_mass;
 
-            localCoM += childMass * offset;
-            localMass += childMass;
+                Vector3 offset = childMatrix.translation();
+
+                localCoM += childMass * offset;
+                localMass += childMass;
+            }
+
+            // Recursively call this function to include grandchild masses
+            Vector4 subCoM = compute_hier_CoM(rScene, nextChild);
+            Vector3 childCoMOffset = childMatrix.translation() + subCoM.xyz();
+            localCoM += subCoM.w() * childCoMOffset;
+            localMass += subCoM.w();
         }
-
-        // Recursively call this function to include grandchild masses
-        Vector4 subCoM = compute_hier_CoM(rScene, nextChild);
-        Vector3 childCoMOffset = childMatrix.translation() + subCoM.xyz();
-        localCoM += subCoM.w() * childCoMOffset;
-        localMass += subCoM.w();
 
         nextChild = childHier.m_siblingNext;
     }
@@ -565,13 +575,17 @@ std::pair<Matrix3, Vector4> SysNewton::compute_hier_inertia(ActiveScene& rScene,
         auto const& [childInertia, childCoM] = compute_hier_inertia(rScene, nextChild);
 
         // Use child transformation to transform child inertia and add to sum
-        Matrix4 childTransform = rScene.reg_get<ACompTransform>(nextChild).m_transform;
-        Matrix3 rotation = childTransform.rotation();
-        // Offset is the vector between the ship center of mass and the child CoM
-        Vector3 offset = (childTransform.translation() + childCoM.xyz()) - centerOfMass.xyz();
-        I += phys::transform_inertia_tensor(
-            childInertia, childCoM.w(), offset, rotation);
+        auto const *childTransform = rScene.get_registry().try_get<ACompTransform>(nextChild);
 
+        if (childTransform != nullptr)
+        {
+            Matrix4 const childTransformMat = childTransform->m_transform;
+            Matrix3 const rotation = childTransformMat.rotation();
+            // Offset is the vector between the ship center of mass and the child CoM
+            Vector3 const offset = (childTransformMat.translation() + childCoM.xyz()) - centerOfMass.xyz();
+            I += phys::transform_inertia_tensor(
+                childInertia, childCoM.w(), offset, rotation);
+        }
         nextChild = rScene.reg_get<ACompHierarchy>(nextChild).m_siblingNext;
     }
 

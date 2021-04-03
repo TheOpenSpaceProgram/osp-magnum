@@ -86,8 +86,15 @@ void SysMachineUserControl::update_construct(ActiveScene &rScene)
         // Initialize all UserControls in the vehicle
         for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
         {
+            // Get part
             ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
-            rScene.reg_emplace<MachineUserControl>(partEnt);
+
+            // Get machine entity previously reserved by SysVehicle
+            auto& machines = rScene.reg_get<ACompMachines>(partEnt);
+            ActiveEnt machEnt = machines.m_machines[machines.m_numInit];
+            machines.m_numInit ++;
+
+            rScene.reg_emplace<MachineUserControl>(machEnt);
         }
     }
 }

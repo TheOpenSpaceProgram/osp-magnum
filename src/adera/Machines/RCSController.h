@@ -44,9 +44,11 @@ class MachineRCSController;
 class SysMachineRCSController
 {
 public:
-    static inline std::string smc_name = "RCSController";
+    static inline std::string smc_mach_name = "RCSController";
 
     static void add_functions(osp::active::ActiveScene& rScene);
+
+    static void update_construct(osp::active::ActiveScene &rScene);
 
     /**
      * Primary system update function
@@ -77,7 +79,6 @@ private:
         Magnum::Vector3 posOset, Magnum::Vector3 direction,
         Magnum::Vector3 cmdTransl, Magnum::Vector3 cmdRot);
 
-    osp::active::UpdateOrderHandle_t m_updateControls;
 }; // SysMachineRCSController
 
 class MachineRCSController : public osp::active::Machine

@@ -39,6 +39,7 @@
 #include <osp/Satellites/SatVehicle.h>
 
 #include <adera/ShipResources.h>
+
 #include <adera/Shaders/Phong.h>
 #include <adera/Shaders/PlumeShader.h>
 
@@ -271,15 +272,16 @@ void load_a_bunch_of_stuff()
     // Create a new package
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
-    using adera::active::machines::SysMachineUserControl;
+    using adera::active::machines::SysMachineContainer;
+    using adera::active::machines::SysMachineRCSController;
     using adera::active::machines::SysMachineRocket;
+    using adera::active::machines::SysMachineUserControl;
 
     // Register machines
-    register_sys_machine<SysMachineUserControl>(lazyDebugPack);
+    register_sys_machine<SysMachineContainer>(lazyDebugPack);
+    register_sys_machine<SysMachineRCSController>(lazyDebugPack);
     register_sys_machine<SysMachineRocket>(lazyDebugPack);
-    //lazyDebugPack.add<osp::RegisteredMachine>("Rocket", 1);
-    //lazyDebugPack.add<osp::RegisteredMachine>("UserControl", 2);
-
+    register_sys_machine<SysMachineUserControl>(lazyDebugPack);
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};
