@@ -31,8 +31,20 @@ layout(local_size_x = ORBIT_SAMPLES) in;
 const uint PATH_SAMPLE = gl_GlobalInvocationID.x;
 const uint PATH_ID = gl_GlobalInvocationID.y;
 const uint N_PATHS = gl_NumWorkGroups.y;
+const uvec2 DIMS = gl_WorkGroupSize.xy*gl_NumWorkGroups.xy;
+const uvec2 XY = gl_GlobalInvocationID.xy;
+const uint N_INVOCATIONS = DIMS.x * DIMS.y;
 
-layout(location = 0) uniform uvec4 counts;
+layout(location = 0) uniform uvec4 pathDataCounts;
+const uint N_POINTS = pathDataCounts.x;
+//const uint N_PATHS = pathDataCounts.y;
+const uint N_PATH_VERTS = pathDataCounts.z;
+const uint N_PATH_INDICES = pathDataCounts.w;
+
+layout(binding = 0, std430) readonly buffer RawInput
+{
+    double rawInput[];
+};
 
 struct ColorVert
 {
@@ -40,30 +52,21 @@ struct ColorVert
     vec4 color;
 };
 
-layout(binding = 0, std430) buffer PointLocations
+layout(binding = 1, std430) buffer PointLocations
 {
     ColorVert pointVerts[];
 };
 
-layout(binding = 1, std430) buffer PathData
+layout(binding = 2, std430) buffer PathData
 {
     ColorVert pathData[];
 };
 
-layout(binding = 2, std430) buffer PathIndices
+layout(binding = 3, std430) buffer PathIndices
 {
     uint indices[];
 };
 
-/* The "nextIdx" member warrants some explanation.
- * A path lives in a giant buffer of vertices, which is rendered using indexing.
- * The path is defined by a section of the index array, which is read in order
- * from indices[startIdx] to indices[endIdx]. The values of these indices tell
- * OpenGL a list of vertices in the big vert buffer to turn into a trail.
- * When a new vertex is pushed to the trail, we want it to be in front (nearest
- * the trail emitter). This means it must be the first element in the index
- * list. The vertices themselves can be in any order in the VBO.
-*/
 struct PathMetadata
 {
     uint pointIndex;  // Index of this path's origin in PointLocations
@@ -72,10 +75,22 @@ struct PathMetadata
     uint nextIdx;     // The next vertex index to become the first
 };
 
-layout(binding = 3) buffer PathsInfo
+layout(binding = 4) buffer PathsInfo
 {
     PathMetadata paths[];
 };
+
+void interpret_input_points(uint index)
+{
+    double x_i = rawInput[0*N_POINTS + index];
+    double y_i = rawInput[1*N_POINTS + index];
+    double z_i = rawInput[2*N_POINTS + index];
+
+    const double invUnit = 1.0LF / 1024.0LF;
+    const double scalingFactor = 1e-6LF;
+    vec3 result = vec3(dvec3(x_i, y_i, z_i) * invUnit * scalingFactor);
+    pointVerts[index].position = vec4(result, 1.0);
+}
 
 void fade_color(uint pathID, uint pathVertID)
 {
@@ -84,7 +99,6 @@ void fade_color(uint pathID, uint pathVertID)
     pathData[index].color.a = clamp(alpha - 0.002, 0.0, 1.0);
 }
 
-// To compute-ify
 void inc_index(uint pathID, uint pathVertID)
 {
     // Increment all indices (except the primitive restart one at the end)
@@ -118,15 +132,30 @@ void path_step(uint pathID)
 
 void main()
 {
-    // 0. Fade colors of all existing path verts
+    // 0. Read in raw double position data and convert to point locations
+    // Convert 2D indices into 1D (row-major)
+    const uint THREAD_INDEX_1D = XY.x + DIMS.x*XY.y;
+    const uint REQD_LOOPS = N_POINTS / N_INVOCATIONS;
+    const uint LOOP_REMAINDER = N_POINTS % N_INVOCATIONS; 
+
+    for (uint i = 0; i < REQD_LOOPS; i++)
+    {
+        interpret_input_points(REQD_LOOPS*THREAD_INDEX_1D + i);
+    }
+    if (THREAD_INDEX_1D < LOOP_REMAINDER)
+    {
+        interpret_input_points(N_INVOCATIONS*REQD_LOOPS + THREAD_INDEX_1D);
+    }
+
+    // 1. Fade colors of all existing path verts
     fade_color(PATH_ID, PATH_SAMPLE);
 
-    // 1. Increment all indices
+    // 2. Increment all indices
     inc_index(PATH_ID, PATH_SAMPLE);
 
     // Exit all threads except 1 per path (TODO: try using just the 1st path group)
     if (PATH_SAMPLE > 0) { return; }
 
-    // 2. Use point sprite positions to update paths
+    // 3. Use point sprite positions to update paths
     path_step(PATH_ID);
 }

@@ -28,9 +28,13 @@
 #include <Magnum/GL/Version.h>
 #include <Corrade/Containers/Reference.h>
 
+#include <osp/Universe.h>
+#include <osp/Trajectories/NBody.h>
+
 using namespace Magnum;
 using namespace adera::active;
 using namespace osp::active;
+using namespace osp::universe;
 
 Vector3 SysMap::universe_to_render_space(osp::Vector3s v3s)
 {
@@ -49,6 +53,11 @@ void SysMap::add_functions(ActiveScene& rScene)
 
 void SysMap::update_map(ActiveScene& rScene)
 {
+    auto& rUni = rScene.get_application().get_universe();
+    auto& reg = rUni.get_reg();
+
+    MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
+
 
 }
 
@@ -85,6 +94,12 @@ void MapUpdateCompute::set_uniform_counts(
         Vector4ui{numPoints, numPaths, numPathVerts, numPathIndices});
 }
 
+void MapUpdateCompute::bind_raw_position_data(GL::Buffer& data)
+{
+    data.bind(GL::Buffer::Target::ShaderStorage,
+        static_cast<Int>(EBufferBinding::RawInput));
+}
+
 void MapUpdateCompute::bind_point_locations(GL::Buffer& points)
 {
     points.bind(GL::Buffer::Target::ShaderStorage,
@@ -114,4 +129,46 @@ MapRenderData::MapRenderData(ActiveScene& scene, size_t maxPoints, size_t maxPat
 {
     assert(maxPoints < std::numeric_limits<GLuint>::max());
     assert(maxPathVertices < std::numeric_limits<GLuint>::max());
+}
+
+void ProcessMapCoordsCompute::process(
+    GL::Buffer& rawInput, size_t inputCount,
+    GL::Buffer& dest, size_t destOffset)
+{
+    set_input_counts(inputCount, destOffset);
+    bind_input_buffer(rawInput);
+    bind_output_buffer(dest);
+
+    constexpr size_t blockLength = 32;
+    size_t numBlocks = (inputCount / blockLength)
+        + ((inputCount % blockLength) > 0) ? 1 : 0;
+    dispatchCompute(Vector3ui{numBlocks, 1, 1});
+}
+
+void ProcessMapCoordsCompute::init()
+{
+    GL::Shader prog{GL::Version::GL430, GL::Shader::Type::Compute};
+    prog.addFile("OSPData/adera/Shaders/MapPositionsConverter.comp");
+
+    CORRADE_INTERNAL_ASSERT_OUTPUT(prog.compile());
+    attachShader(prog);
+    CORRADE_INTERNAL_ASSERT_OUTPUT(link());
+}
+
+void ProcessMapCoordsCompute::set_input_counts(size_t nInputPoints, size_t outputOffset)
+{
+    setUniform(static_cast<Int>(UniformPos::Counts),
+        Vector2ui{nInputPoints, outputOffset});
+}
+
+void ProcessMapCoordsCompute::bind_input_buffer(GL::Buffer& input)
+{
+    input.bind(GL::Buffer::Target::ShaderStorage,
+        static_cast<Int>(BufferBinding::RawInput));
+}
+
+void ProcessMapCoordsCompute::bind_output_buffer(GL::Buffer& output)
+{
+    output.bind(GL::Buffer::Target::ShaderStorage,
+        static_cast<Int>(BufferBinding::Output));
 }

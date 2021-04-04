@@ -99,6 +99,36 @@ private:
     std::map<osp::universe::Satellite, GLuint> m_pointMapping;
 };
 
+class ProcessMapCoordsCompute : public Magnum::GL::AbstractShaderProgram
+{
+public:
+    ProcessMapCoordsCompute() { init(); }
+    ~ProcessMapCoordsCompute() = default;
+    ProcessMapCoordsCompute(ProcessMapCoordsCompute const& copy) = delete;
+    ProcessMapCoordsCompute(ProcessMapCoordsCompute&& move) = default;
+
+    void process(
+        Magnum::GL::Buffer& rawInput, size_t inputCount,
+        Magnum::GL::Buffer& dest, size_t destOffset);
+private:
+    void init();
+
+    enum class UniformPos : Magnum::Int
+    {
+        Counts = 0
+    };
+
+    enum class BufferBinding : Magnum::Int
+    {
+        RawInput = 0,
+        Output = 1
+    };
+
+    void set_input_counts(size_t nInputPoints, size_t outputOffset);
+    void bind_input_buffer(Magnum::GL::Buffer& input);
+    void bind_output_buffer(Magnum::GL::Buffer& output);
+};
+
 class MapUpdateCompute : public Magnum::GL::AbstractShaderProgram
 {
 public:
@@ -122,10 +152,11 @@ private:
 
     enum class EBufferBinding : Magnum::Int
     {
-        PointVerts = 0,
-        PathData = 1,
-        PathIndices = 2,
-        PathsInfo = 3
+        RawInput = 0,
+        PointVerts = 1,
+        PathData = 2,
+        PathIndices = 3,
+        PathsInfo = 4
     };
 
     using Magnum::GL::AbstractShaderProgram::draw;
@@ -134,6 +165,7 @@ private:
 
     void set_uniform_counts(size_t numPoints, size_t numPaths,
         size_t numPathVerts, size_t numPathIndices);
+    void bind_raw_position_data(Magnum::GL::Buffer& data);
     void bind_point_locations(Magnum::GL::Buffer& points);
     void bind_path_vert_data(Magnum::GL::Buffer& pathVerts);
     void bind_path_index_data(Magnum::GL::Buffer& pathIndices);

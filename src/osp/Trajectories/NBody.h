@@ -33,7 +33,8 @@
 namespace osp::universe
 {
 
-struct UCompAsteroid {};
+struct UCompEmitsGravity {};
+struct UCompSubjectToGravity {};
 
 constexpr double G = 6.674e-11;
 
