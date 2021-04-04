@@ -1,0 +1,132 @@
+/**
+ * Open Space Program
+ * Copyright © 2019-2020 Open Space Program Project
+ *
+ * MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+#version 430 core
+
+#define ORBIT_SAMPLES 512
+
+layout(local_size_x = ORBIT_SAMPLES) in;
+
+const uint PATH_SAMPLE = gl_GlobalInvocationID.x;
+const uint PATH_ID = gl_GlobalInvocationID.y;
+const uint N_PATHS = gl_NumWorkGroups.y;
+
+layout(location = 0) uniform uvec4 counts;
+
+struct ColorVert
+{
+    vec4 position;
+    vec4 color;
+};
+
+layout(binding = 0, std430) buffer PointLocations
+{
+    ColorVert pointVerts[];
+};
+
+layout(binding = 1, std430) buffer PathData
+{
+    ColorVert pathData[];
+};
+
+layout(binding = 2, std430) buffer PathIndices
+{
+    uint indices[];
+};
+
+/* The "nextIdx" member warrants some explanation.
+ * A path lives in a giant buffer of vertices, which is rendered using indexing.
+ * The path is defined by a section of the index array, which is read in order
+ * from indices[startIdx] to indices[endIdx]. The values of these indices tell
+ * OpenGL a list of vertices in the big vert buffer to turn into a trail.
+ * When a new vertex is pushed to the trail, we want it to be in front (nearest
+ * the trail emitter). This means it must be the first element in the index
+ * list. The vertices themselves can be in any order in the VBO.
+*/
+struct PathMetadata
+{
+    uint pointIndex;  // Index of this path's origin in PointLocations
+    uint startIdx;    // Start of this path's index data in PathIndices
+    uint endIdx;      // End of this path's index data in PathIndices
+    uint nextIdx;     // The next vertex index to become the first
+};
+
+layout(binding = 3) buffer PathsInfo
+{
+    PathMetadata paths[];
+};
+
+void fade_color(uint pathID, uint pathVertID)
+{
+    uint index = pathID*ORBIT_SAMPLES + pathVertID;
+    float alpha = pathData[index].color.a;
+    pathData[index].color.a = clamp(alpha - 0.002, 0.0, 1.0);
+}
+
+// To compute-ify
+void inc_index(uint pathID, uint pathVertID)
+{
+    // Increment all indices (except the primitive restart one at the end)
+    const uint nIndices = ORBIT_SAMPLES + 1;
+    uint index = pathID*nIndices + pathVertID;
+    indices[index]++;
+
+    // Bound check
+    uint begin = paths[pathID].startIdx;
+    uint end = paths[pathID].endIdx;
+    if (indices[index] > end)
+    {
+        indices[index] = begin;
+    }
+}
+
+void path_step(uint pathID)
+{
+    PathMetadata path = paths[pathID];
+
+    vec3 newPos = pointVerts[path.pointIndex].position.xyz;
+    uint newPathVertIdx = indices[path.nextIdx];
+    pathData[newPathVertIdx].position = vec4(newPos, 1.0);
+
+    path.nextIdx++;
+    if (path.nextIdx > path.endIdx)
+    {
+        path.nextIdx = path.startIdx;
+    }
+}
+
+void main()
+{
+    // 0. Fade colors of all existing path verts
+    fade_color(PATH_ID, PATH_SAMPLE);
+
+    // 1. Increment all indices
+    inc_index(PATH_ID, PATH_SAMPLE);
+
+    // Exit all threads except 1 per path (TODO: try using just the 1st path group)
+    if (PATH_SAMPLE > 0) { return; }
+
+    // 2. Use point sprite positions to update paths
+    path_step(PATH_ID);
+}
