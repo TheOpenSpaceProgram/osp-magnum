@@ -58,7 +58,6 @@ void SysMap::update_map(ActiveScene& rScene)
 
     MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
 
-
 }
 
 void MapUpdateCompute::update_map(
@@ -73,7 +72,7 @@ void MapUpdateCompute::update_map(
     bind_path_metadata(pathMetadata);
     set_uniform_counts(numPoints, numPaths, numPathVerts, numPathIndices);
 
-    Vector3ui nGroups{1, numPaths, 1};
+    Vector3ui nGroups{1, static_cast<Magnum::UnsignedInt>(numPaths), 1};
     dispatchCompute(nGroups);
 }
 
@@ -91,7 +90,11 @@ void MapUpdateCompute::set_uniform_counts(
     size_t numPoints, size_t numPaths, size_t numPathVerts, size_t numPathIndices)
 {
     setUniform(static_cast<Int>(EUniformPos::BlockCounts),
-        Vector4ui{numPoints, numPaths, numPathVerts, numPathIndices});
+        Vector4ui{
+            static_cast<UnsignedInt>(numPoints),
+            static_cast<UnsignedInt>(numPaths),
+            static_cast<UnsignedInt>(numPathVerts),
+            static_cast<UnsignedInt>(numPathIndices)});
 }
 
 void MapUpdateCompute::bind_raw_position_data(GL::Buffer& data)
@@ -142,7 +145,7 @@ void ProcessMapCoordsCompute::process(
     constexpr size_t blockLength = 32;
     size_t numBlocks = (inputCount / blockLength)
         + ((inputCount % blockLength) > 0) ? 1 : 0;
-    dispatchCompute(Vector3ui{numBlocks, 1, 1});
+    dispatchCompute(Vector3ui{static_cast<UnsignedInt>(numBlocks), 1, 1});
 }
 
 void ProcessMapCoordsCompute::init()
@@ -158,7 +161,9 @@ void ProcessMapCoordsCompute::init()
 void ProcessMapCoordsCompute::set_input_counts(size_t nInputPoints, size_t outputOffset)
 {
     setUniform(static_cast<Int>(UniformPos::Counts),
-        Vector2ui{nInputPoints, outputOffset});
+        Vector2ui{
+            static_cast<UnsignedInt>(nInputPoints),
+            static_cast<UnsignedInt>(outputOffset)});
 }
 
 void ProcessMapCoordsCompute::bind_input_buffer(GL::Buffer& input)

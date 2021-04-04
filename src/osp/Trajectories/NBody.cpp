@@ -76,10 +76,8 @@ void TrajNBody::update()
 {
     auto& reg = m_universe.get_reg(); //rUni.get_reg();
 
-    auto view =reg.view<UCompTransformTraj, UCompMass, UCompVel, UCompAccel>(
-        entt::exclude<UCompAsteroid>);
-    auto sourceView = reg.view<UCompTransformTraj, UCompMass>(
-        entt::exclude<UCompAsteroid>);
+    auto view = reg.view<UCompTransformTraj, UCompMass, UCompVel, UCompAccel>();
+    auto sourceView = reg.view<UCompTransformTraj, UCompMass, UCompEmitsGravity>();
 
     // Update accelerations (full dynamics)
     update_full_dynamics_acceleration(view, sourceView);

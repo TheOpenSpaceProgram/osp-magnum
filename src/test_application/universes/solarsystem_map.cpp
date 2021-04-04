@@ -39,7 +39,6 @@ using osp::universe::Satellite;
 using osp::universe::UCompTransformTraj;
 using osp::universe::ISystemTrajectory;
 using osp::universe::TrajNBody;
-using osp::universe::UCompAsteroid;
 using osp::universe::UCompVel;
 using osp::universe::UCompAccel;
 using osp::universe::UCompMass;
@@ -198,7 +197,7 @@ void add_asteroids(OSPApplication& ospApp, TrajNBody& traj,
         body.m_initAngle = polarAngle;
         body.m_velOset = {v(gen), v(gen), v(gen)};
         add_body(ospApp, asteroid, body, &traj);
-        rUni.get_reg().emplace<UCompAsteroid>(asteroid);
+        //rUni.get_reg().emplace<UCompAsteroid>(asteroid);
     }
 }
 

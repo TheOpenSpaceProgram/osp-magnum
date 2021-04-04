@@ -56,6 +56,7 @@ public:
     ~MapRenderData() = default;
     MapRenderData(MapRenderData const& copy) = delete;
     MapRenderData(MapRenderData&& move) = default;
+    MapRenderData& operator=(MapRenderData&& move) = default;
 
 private:
     GLuint m_maxPoints;
