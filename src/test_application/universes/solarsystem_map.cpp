@@ -33,7 +33,9 @@
 #include <Magnum/Math/Color.h>
 
 using namespace testapp;
-using namespace osp;
+using osp::OSPApplication;
+using osp::Vector3;
+using osp::Vector3d;
 using osp::universe::Universe;
 using osp::universe::Satellite;
 using osp::universe::UCompTransformTraj;
@@ -42,6 +44,7 @@ using osp::universe::TrajNBody;
 using osp::universe::UCompVel;
 using osp::universe::UCompAccel;
 using osp::universe::UCompMass;
+using osp::universe::UCompEmitsGravity;
 using planeta::universe::SatPlanet;
 using namespace Magnum::Math::Literals;
 
@@ -68,7 +71,7 @@ void add_asteroids(OSPApplication& ospApp, TrajNBody& traj,
 constexpr double g_sunMass = 1.988e30;
 constexpr double g_1AU = 149.6e6;  // Units here are in megameters
 
-void create_solar_system(OSPApplication& ospApp)
+void testapp::create_solar_system(OSPApplication& ospApp)
 {
     Universe& rUni = ospApp.get_universe();
     auto& reg = rUni.get_reg();
@@ -103,11 +106,12 @@ void create_solar_system(OSPApplication& ospApp)
     {
         Satellite sat = rUni.sat_create();
         add_body(ospApp, sat, body, &nbody);
+        reg.emplace<UCompEmitsGravity>(sat);
     }
 
     /* ####### Asteroids ####### */
 
-    add_asteroids(ospApp, nbody, 5'000);
+    //add_asteroids(ospApp, nbody, 5'000);
 }
 
 void add_body(OSPApplication& ospApp, Satellite sat, PlanetBody body, ISystemTrajectory* traj)
@@ -118,6 +122,7 @@ void add_body(OSPApplication& ospApp, Satellite sat, PlanetBody body, ISystemTra
     UCompTransformTraj& satTT = reg.get<UCompTransformTraj>(sat);
     UCompMass& satM = reg.emplace<UCompMass>(sat, body.m_mass);
 
+    Vector3d velocity{0.0};
     if (body.m_parent != nullptr)
     {
         PlanetBody& parent = *body.m_parent;
@@ -128,18 +133,20 @@ void add_body(OSPApplication& ospApp, Satellite sat, PlanetBody body, ISystemTra
         float compositeAngle = body.m_initAngle + parent.m_initAngle;
         satTT.m_position = parentPos + polar_km_to_v3s(body.m_orbitDist, compositeAngle);
 
-        reg.emplace<UCompVel>(sat,
+        velocity = 
             parentVel
             + orbit_vel(body.m_orbitDist, parent.m_mass, body.m_mass, compositeAngle)
-            + body.m_velOset);
+            + body.m_velOset;
     }
     else
     {
         satTT.m_position = polar_km_to_v3s(body.m_orbitDist, body.m_initAngle);
-        reg.emplace<UCompVel>(sat,
+
+        velocity = 
             orbit_vel(body.m_orbitDist, g_sunMass, body.m_mass, body.m_initAngle)
-            + body.m_velOset);
+            + body.m_velOset;
     }
+    reg.emplace<UCompVel>(sat, velocity);
     reg.emplace<UCompAccel>(sat, Vector3d{0.0});
 
     //satPlanet.m_radius = body.m_radius;

@@ -26,19 +26,33 @@
 #include "SysMap.h"
 #include <Magnum/GL/Shader.h>
 #include <Magnum/GL/Version.h>
+#include <Magnum/GL/Renderer.h>
+#include <Magnum/GL/Attribute.h>
+#include <Magnum/GL/DefaultFramebuffer.h>
+#include <Magnum/Shaders/VertexColor.h>
 #include <Corrade/Containers/Reference.h>
+#include <Corrade/Containers/ArrayViewStl.h>
 
 #include <osp/Universe.h>
 #include <osp/Trajectories/NBody.h>
 
-using namespace Magnum;
 using namespace adera::active;
+using namespace osp;
 using namespace osp::active;
 using namespace osp::universe;
+using Magnum::Vector4ui;
+using Magnum::Vector3ui;
+using Magnum::Vector2ui;
+using Magnum::Color4;
+using Magnum::Int;
+using Magnum::UnsignedInt;
+using Magnum::GL::Buffer;
+using Magnum::GL::Shader;
+using Magnum::GL::BufferUsage;
 
 Vector3 SysMap::universe_to_render_space(osp::Vector3s v3s)
 {
-    constexpr int64_t units_per_m = 1024ll;
+    constexpr double units_per_m = 1024.0;
     float x = static_cast<double>(v3s.x() / units_per_m) / 1e6;
     float y = static_cast<double>(v3s.y() / units_per_m) / 1e6;
     float z = static_cast<double>(v3s.z() / units_per_m) / 1e6;
@@ -49,6 +63,52 @@ void SysMap::add_functions(ActiveScene& rScene)
 {
     rScene.debug_update_add(rScene.get_update_order(),
         "SystemMap", "", "", &update_map);
+
+    configure_render_passes(rScene);
+}
+
+void SysMap::configure_render_passes(ActiveScene& rScene)
+{
+    // Temporary setup
+    using Magnum::Shaders::VertexColor3D;
+    rScene.get_context_resources().add<VertexColor3D>("vert_color_shader");
+
+    auto& mapdata = rScene.reg_emplace<MapRenderData>(rScene.hier_get_root(), rScene, 100, 100);
+
+    mapdata.m_points = std::vector<MapRenderData::ColorVert>(0);
+    mapdata.m_pointBuffer.setData(mapdata.m_points);
+    mapdata.m_pointMesh
+        .setPrimitive(Magnum::GL::MeshPrimitive::Points)
+        .setCount(0)
+        .addVertexBuffer(mapdata.m_pointBuffer, 0,
+            VertexColor3D::Position{},
+            VertexColor3D::Color4{});
+
+
+    // Point pass
+    rScene.debug_render_add(rScene.get_render_order(),
+        "points_pass", "", "",
+        [](ActiveScene& rScene, ACompCamera& rCamera)
+        {
+            using namespace Magnum;
+            using Magnum::GL::Renderer;
+
+            GL::defaultFramebuffer.clear(GL::FramebufferClear::Color | GL::FramebufferClear::Depth);
+
+            auto& reg = rScene.get_registry();
+            auto& resources = rScene.get_context_resources();
+
+            auto& data = reg.get<MapRenderData>(rScene.hier_get_root());
+            auto shader = resources.get<VertexColor3D>("vert_color_shader");
+            
+            Renderer::setPointSize(2.0f);
+
+            Matrix4 transform = rCamera.m_projection * rCamera.m_inverse;
+
+            (*shader)
+                .setTransformationProjectionMatrix(transform)
+                .draw(data.m_pointMesh);
+        });
 }
 
 void SysMap::update_map(ActiveScene& rScene)
@@ -58,13 +118,35 @@ void SysMap::update_map(ActiveScene& rScene)
 
     MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
 
+    auto view = reg.view<UCompTransformTraj>();
+    for (auto [sat, traj] : view.each())
+    {
+        size_t pointIndex{0};
+        auto itr = renderData.m_pathMapping.find(sat);
+        if (itr == renderData.m_pathMapping.end())
+        {
+            // Add point
+            pointIndex = renderData.m_points.size();
+            renderData.m_pathMapping.emplace(sat, pointIndex);
+            renderData.m_points.push_back({Vector3{}, Color4{1.0}});
+        }
+        else
+        {
+            pointIndex = itr->second;
+        }
+        renderData.m_points[pointIndex].m_pos =
+            universe_to_render_space(traj.m_position);
+    }
+
+    renderData.m_pointBuffer.setData(renderData.m_points, BufferUsage::DynamicDraw);
+    renderData.m_pointMesh.setCount(renderData.m_points.size());
 }
 
 void MapUpdateCompute::update_map(
-    size_t numPoints, GL::Buffer& pointBuffer,
-    size_t numPaths,  GL::Buffer& pathMetadata,
-    size_t numPathVerts, GL::Buffer& pathVertBuffer,
-    size_t numPathIndices, GL::Buffer& pathIndexBuffer)
+    size_t numPoints, Buffer& pointBuffer,
+    size_t numPaths,  Buffer& pathMetadata,
+    size_t numPathVerts, Buffer& pathVertBuffer,
+    size_t numPathIndices, Buffer& pathIndexBuffer)
 {
     bind_point_locations(pointBuffer);
     bind_path_vert_data(pathVertBuffer);
@@ -78,6 +160,7 @@ void MapUpdateCompute::update_map(
 
 void MapUpdateCompute::init()
 {
+    using namespace Magnum;
     GL::Shader prog{GL::Version::GL430, GL::Shader::Type::Compute};
     prog.addFile("OSPData/adera/Shaders/MapUpdate.comp");
 
@@ -97,33 +180,33 @@ void MapUpdateCompute::set_uniform_counts(
             static_cast<UnsignedInt>(numPathIndices)});
 }
 
-void MapUpdateCompute::bind_raw_position_data(GL::Buffer& data)
+void MapUpdateCompute::bind_raw_position_data(Buffer& data)
 {
-    data.bind(GL::Buffer::Target::ShaderStorage,
+    data.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(EBufferBinding::RawInput));
 }
 
-void MapUpdateCompute::bind_point_locations(GL::Buffer& points)
+void MapUpdateCompute::bind_point_locations(Buffer& points)
 {
-    points.bind(GL::Buffer::Target::ShaderStorage,
+    points.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(EBufferBinding::PointVerts));
 }
 
-void MapUpdateCompute::bind_path_vert_data(GL::Buffer& pathVerts)
+void MapUpdateCompute::bind_path_vert_data(Buffer& pathVerts)
 {
-    pathVerts.bind(GL::Buffer::Target::ShaderStorage,
+    pathVerts.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(EBufferBinding::PathData));
 }
 
-void MapUpdateCompute::bind_path_index_data(GL::Buffer& pathIndices)
+void MapUpdateCompute::bind_path_index_data(Buffer& pathIndices)
 {
-    pathIndices.bind(GL::Buffer::Target::ShaderStorage,
+    pathIndices.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(EBufferBinding::PathIndices));
 }
 
 void MapUpdateCompute::bind_path_metadata(Magnum::GL::Buffer& data)
 {
-    data.bind(GL::Buffer::Target::ShaderStorage,
+    data.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(EBufferBinding::PathsInfo));
 }
 
@@ -135,8 +218,8 @@ MapRenderData::MapRenderData(ActiveScene& scene, size_t maxPoints, size_t maxPat
 }
 
 void ProcessMapCoordsCompute::process(
-    GL::Buffer& rawInput, size_t inputCount,
-    GL::Buffer& dest, size_t destOffset)
+    Buffer& rawInput, size_t inputCount,
+    Buffer& dest, size_t destOffset)
 {
     set_input_counts(inputCount, destOffset);
     bind_input_buffer(rawInput);
@@ -150,6 +233,7 @@ void ProcessMapCoordsCompute::process(
 
 void ProcessMapCoordsCompute::init()
 {
+    using namespace Magnum;
     GL::Shader prog{GL::Version::GL430, GL::Shader::Type::Compute};
     prog.addFile("OSPData/adera/Shaders/MapPositionsConverter.comp");
 
@@ -166,14 +250,14 @@ void ProcessMapCoordsCompute::set_input_counts(size_t nInputPoints, size_t outpu
             static_cast<UnsignedInt>(outputOffset)});
 }
 
-void ProcessMapCoordsCompute::bind_input_buffer(GL::Buffer& input)
+void ProcessMapCoordsCompute::bind_input_buffer(Buffer& input)
 {
-    input.bind(GL::Buffer::Target::ShaderStorage,
+    input.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(BufferBinding::RawInput));
 }
 
-void ProcessMapCoordsCompute::bind_output_buffer(GL::Buffer& output)
+void ProcessMapCoordsCompute::bind_output_buffer(Buffer& output)
 {
-    output.bind(GL::Buffer::Target::ShaderStorage,
+    output.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(BufferBinding::Output));
 }

@@ -83,6 +83,16 @@ primary = "V"
 secondary = "None"
 holdable = false
 
+[game_switch_next]
+primary = "V"
+secondary = "None"
+holdable = false
+
+[game_switch_prev]
+primary = "LShift+V"
+secondary = "None"
+holdable = false
+
 [ui_up]
 primary = "Up"
 secondary = "None"

@@ -48,6 +48,7 @@ shader can increment the index buffer and fade the orbits over time.
 class MapRenderData
 {
     friend class MapUpdateCompute;
+    friend class SysMap;
 public:
     // "Primitive restart" index which signifies to break a line strip at that vertex
     static constexpr GLuint PRIMITIVE_RESTART = std::numeric_limits<GLuint>::max();
@@ -55,20 +56,21 @@ public:
     MapRenderData(osp::active::ActiveScene& scene, size_t maxPoints, size_t maxPathVertices);
     ~MapRenderData() = default;
     MapRenderData(MapRenderData const& copy) = delete;
-    MapRenderData(MapRenderData&& move) = default;
+    MapRenderData(MapRenderData&& move) noexcept = default;
     MapRenderData& operator=(MapRenderData&& move) = default;
 
-private:
+public:
     GLuint m_maxPoints;
     GLuint m_maxPathVerts;
 
-#pragma pack(push, 1)
+//#pragma pack(push, 1)
     struct ColorVert
     {
-        Magnum::Vector4 m_pos;
+        //Magnum::Vector4 m_pos;
+        Magnum::Vector3 m_pos;
         Magnum::Color4 m_color;
     };
-#pragma pack(pop)
+//#pragma pack(pop)
 
     // Path data
     std::vector<GLuint> m_indexData;
@@ -179,9 +181,11 @@ public:
     static void add_functions(osp::active::ActiveScene& rScene);
     static void update_map(osp::active::ActiveScene& rScene);
 
-private:
     static Magnum::Vector3 universe_to_render_space(osp::Vector3s v3s);
+
+private:
     static constexpr size_t m_orbitSamples = 512;
+    static void configure_render_passes(osp::active::ActiveScene& rScene);
 };
 
 } // namespace adera::active

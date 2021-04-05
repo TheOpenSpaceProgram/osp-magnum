@@ -29,9 +29,11 @@
 
 #include "OSPMagnum.h"
 #include "flight.h"
+#include "map.h"
 
 #include "universes/simple.h"
 #include "universes/planets.h"
+#include "universes/solarsystem_map.h"
 
 #include <osp/Resource/AssetImporter.h>
 #include <osp/string_concat.h>
@@ -58,8 +60,6 @@
 #include <iostream>
 
 using namespace testapp;
-
-void config_controls();
 
 /**
  * As the name implies. This should only be called once for the entire lifetime
@@ -119,7 +119,7 @@ int main(int argc, char** argv)
 
     load_a_bunch_of_stuff();
 
-    if(args.value("scene") != "none")
+    /*if(args.value("scene") != "none")
     {
         if(args.value("scene") == "simple")
         {
@@ -142,7 +142,7 @@ int main(int argc, char** argv)
         std::thread t(test_flight, std::ref(g_ospMagnum), std::ref(g_osp),
                       OSPMagnum::Arguments{g_argc, g_argv});
         g_magnumThread.swap(t);
-    }
+    }*/
 
     if(!args.isSet("norepl"))
     {
@@ -203,6 +203,21 @@ int debug_cli_loop()
         else if (command == "list_pkg")
         {
             debug_print_resources();
+        }
+        else if (command == "map")
+        {
+            if (destroy_universe())
+            {
+                create_solar_system(g_osp);
+            }
+
+            if (g_magnumThread.joinable())
+            {
+                g_magnumThread.join();
+            }
+            std::thread t(test_map, std::ref(g_ospMagnum), std::ref(g_osp),
+                OSPMagnum::Arguments{g_argc, g_argv});
+            g_magnumThread.swap(t);
         }
         else if (command == "list_uni")
         {
