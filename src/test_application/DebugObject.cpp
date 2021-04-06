@@ -178,7 +178,7 @@ void DebugCameraController::update_physics_pre()
     Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
 
     // round to nearest (floatingOriginThreshold)
-    Vector3s tra = Vector3s(xform.translation() / floatingOriginThreshold)
+    Vector3s tra = Vector3s((xform.translation() - m_orbitPos) / floatingOriginThreshold)
                  * floatingOriginThreshold;
 
     // convert to space int
