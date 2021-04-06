@@ -124,28 +124,28 @@ bool DebugMapCameraController::try_switch_focus()
 
         if (m_switchNext.triggered())
         {
-            if (itr == satView.end() || itr == --(satView.end()))
-            {
-                // None selected, or at end: loop back to start
-                m_selected = satView.front();
-            }
-            else
-            {
-                // Select next
-                m_selected = *(++itr);
-            }
-        }
-        else if (m_switchPrev.triggered())
-        {
             if (itr == satView.end() || itr == satView.begin())
             {
-                // None selected, or at front: wrap to end
+                // None selected, or at end: loop back to start
                 m_selected = satView.back();
             }
             else
             {
-                // Select previous
+                // Select next
                 m_selected = *(--itr);
+            }
+        }
+        else if (m_switchPrev.triggered())
+        {
+            if (itr == satView.end() || itr == --(satView.end()))
+            {
+                // None selected, or at front: wrap to end
+                m_selected = satView.front();
+            }
+            else
+            {
+                // Select previous
+                m_selected = *(++itr);
             }
         }
     }
