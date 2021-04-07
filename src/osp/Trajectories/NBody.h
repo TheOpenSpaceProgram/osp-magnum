@@ -99,7 +99,6 @@ public:
 
     SystemState get_system_state(size_t timestep);
 
-    void solve(double timestep);
     void copy_step_to_top(size_t timestep);
 private:
     static constexpr size_t AVX2_WIDTH = 256 / 8;  // 256 bits / 8 = 32 Bytes
@@ -197,6 +196,10 @@ private:
 
     template <typename VIEW_T>
     static void update_full_dynamics_kinematics(VIEW_T& view);
+
+    void solve_table();
+
+    void solve_timestep(size_t stepIndex);
 
     EvolutionTable m_data;
 };

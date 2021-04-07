@@ -159,45 +159,6 @@ EvolutionTable::SystemState EvolutionTable::get_system_state(size_t timestep)
     return {xs, ys, zs, masses, nElems, arraySizes};
 }
 
-void EvolutionTable::solve(double dt)
-{
-    for (size_t i = 1; i < m_nTimesteps; i++)
-    {
-        for (size_t m = 0; m < m_nBodies; m++)
-        {
-            Satellite current = get_ID(m);
-            Vector3d currentPos = get_position(m, i - 1);
-            double currentMass = get_mass(m);
-
-            Vector3d A{0.0};
-            for (size_t n = 0; n < m_nBodies; n++)
-            {
-                if (n == m) { continue; }
-
-                Vector3d r = get_position(n, i - 1) - currentPos;
-                double otherMass = get_mass(n);
-                Vector3d rHat = r.normalized();
-                double denom = r.x()*r.x() + r.y()*r.y() + r.z()*r.z();
-                A += (otherMass / denom) * rHat;
-            }
-
-            set_acceleration(m, A*G);
-        }
-
-        for (size_t n = 0; n < m_nBodies; n++)
-        {
-            Vector3d x = get_position(n, i - 1);
-            Vector3d v = get_velocity(n);
-            Vector3d a = get_acceleration(n);
-
-            Vector3d newVel = v + a*dt;
-            Vector3d newPos = x + newVel*dt;
-            set_velocity(n, newVel);
-            set_position(n, i, newPos);
-        }
-    }
-}
-
 void EvolutionTable::copy_step_to_top(size_t timestep)
 {
     size_t rowEntries = m_rowSize / sizeof(double);
@@ -227,15 +188,22 @@ void TrajNBody::update()
     update_full_dynamics_kinematics(view);*/
 
     // Spaghetti
-    if (m_data.m_currentStep == (m_data.m_nTimesteps - 1))
+    /*if (m_data.m_currentStep == (m_data.m_nTimesteps - 1))
     {
         std::cout << "Resolving table\n";
         m_data.copy_step_to_top(m_data.m_nTimesteps - 1);
         m_data.m_currentStep = 0;
-        m_data.solve(smc_timestep);
-    }
+        solve_table();
+    }*/
+
+    solve_timestep(m_data.m_currentStep);
 
     m_data.m_currentStep++;
+
+    if (m_data.m_currentStep == m_data.m_nTimesteps)
+    {
+        m_data.m_currentStep = 0;
+    }
 
     for (size_t i = 0; i < m_data.m_nBodies; i++)
     {
@@ -270,8 +238,60 @@ void TrajNBody::build_table()
         m_data.set_position(i, 0,
             static_cast<Vector3d>(rUni.get<UCompTransformTraj>(sat).m_position) / 1024.0);
     }
-    
-    m_data.solve(smc_timestep);
+
+    solve_table();
+    m_data.m_currentStep = 0;
+}
+
+void TrajNBody::solve_table()
+{
+    for (size_t i = 1; i < m_data.m_nTimesteps; i++)
+    {
+        solve_timestep(i);
+    }
+}
+
+void osp::universe::TrajNBody::solve_timestep(size_t stepIndex)
+{
+    constexpr double dt = smc_timestep;
+
+    assert(stepIndex < m_data.m_nTimesteps);
+
+    // Set previous step, account for table wraparound
+    size_t prevStep = ((stepIndex == 0) ? m_data.m_nTimesteps : stepIndex) - 1;
+
+    for (size_t m = 0; m < m_data.m_nBodies; m++)
+    {
+        Satellite current = m_data.get_ID(m);
+        Vector3d currentPos = m_data.get_position(m, prevStep);
+        double currentMass = m_data.get_mass(m);
+
+        Vector3d A{0.0};
+        for (size_t n = 0; n < m_data.m_nBodies; n++)
+        {
+            if (n == m) { continue; }
+
+            Vector3d r = m_data.get_position(n, prevStep) - currentPos;
+            double otherMass = m_data.get_mass(n);
+            Vector3d rHat = r.normalized();
+            double denom = r.x() * r.x() + r.y() * r.y() + r.z() * r.z();
+            A += (otherMass / denom) * rHat;
+        }
+
+        m_data.set_acceleration(m, A * G);
+    }
+
+    for (size_t n = 0; n < m_data.m_nBodies; n++)
+    {
+        Vector3d x = m_data.get_position(n, prevStep);
+        Vector3d v = m_data.get_velocity(n);
+        Vector3d a = m_data.get_acceleration(n);
+
+        Vector3d newVel = v + a * dt;
+        Vector3d newPos = x + newVel * dt;
+        m_data.set_velocity(n, newVel);
+        m_data.set_position(n, stepIndex, newPos);
+    }
 }
 
 template <typename VIEW_T, typename SRC_VIEW_T>
