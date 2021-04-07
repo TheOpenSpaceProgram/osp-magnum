@@ -120,7 +120,7 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = mach_id<SysMachineRCSController>();
+    machine_id_t const id = mach_id<MachineRCSController>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
@@ -138,10 +138,14 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
 
             // Get machine entity previously reserved by SysVehicle
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
-            ActiveEnt machEnt = machines.m_machines[machines.m_numInit];
-            machines.m_numInit ++;
+            ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
             rScene.reg_emplace<MachineRCSController>(machEnt);
+            rScene.reg_emplace<ACompMachineType>(machEnt, id,
+                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
+                    {
+                        return rScene.reg_get<MachineRCSController>(ent);
+                    });
         }
     }
 }

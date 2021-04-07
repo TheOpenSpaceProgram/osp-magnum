@@ -51,12 +51,10 @@ using namespace Magnum::Math::Literals;
 
 void SysVehicle::add_functions(ActiveScene &rScene)
 {
-    rScene.debug_update_add(rScene.get_update_order(), "vehicle_activate", "vehicle_modification", "",
-                            &SysVehicle::update_activate);
-
     rScene.debug_update_add(rScene.get_update_order(), "vehicle_modification", "vehicle_activate", "physics",
                             &SysVehicle::update_vehicle_modification);
-
+    rScene.debug_update_add(rScene.get_update_order(), "vehicle_activate", "", "vehicle_modification",
+                            &SysVehicle::update_activate);
 }
 
 
@@ -87,6 +85,8 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
     rScene.reg_emplace<ACompActivatedSat>(vehicleEnt, tgtSat);
 
     ACompVehicle& vehicleComp = rScene.reg_emplace<ACompVehicle>(vehicleEnt);
+    rScene.reg_emplace<ACompVehicleInConstruction>(
+                    vehicleEnt, loadMeVehicle.m_blueprint);
 
     // Convert position of the satellite to position in scene
     Vector3 positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat);
@@ -101,18 +101,25 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
     // Create the parts
 
     // Unique part prototypes used in the vehicle
+
     // Access with [blueprintParts.m_partIndex]
-    std::vector<DependRes<PrototypePart> >& partsUsed =
-            vehicleData.get_prototypes();
+
+    std::vector<DependRes<PrototypePart> >& partsUsed = vehicleData.m_prototypes;
+
 
     // All the parts in the vehicle
-    std::vector<BlueprintPart> &blueprintParts = vehicleData.get_blueprints();
+    std::vector<BlueprintPart> &blueprintParts = vehicleData.m_blueprints;
+
+
+    rScene.get_registry().reserve(rScene.get_registry().capacity()
+                                   + vehicleData.m_machines.size());
 
     // Keep track of parts
     //std::vector<ActiveEnt> newEntities;
     vehicleComp.m_parts.reserve(blueprintParts.size());
 
-    // Loop through list of blueprint parts
+    // Loop through list of blueprint parts, and initialize each of them into
+    // the ActiveScene
     for (BlueprintPart& partBp : blueprintParts)
     {
         DependRes<PrototypePart>& partDepends =
@@ -146,26 +153,14 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
                               partBp.m_translation)
                 * Matrix4::scaling(partBp.m_scale);
 
-        rScene.reg_emplace<ACompMachines>(partEntity);
-    }
-
-    // Initialize entities for individual machines. This is done now in one
-    // place, as creating new entities can be problematic for concurrency
-    rScene.get_registry().reserve(rScene.get_registry().capacity()
-                                   + vehicleData.m_machines.size());
-    for (std::vector<BlueprintMachine> machineVecs : vehicleData.m_machines)
-    {
-        for (BlueprintMachine& machBp : machineVecs)
+        // Initialize entities for individual machines. This is done now in one
+        // place, as creating new entities can be problematic for concurrency
+        auto &machines = rScene.reg_emplace<ACompMachines>(partEntity);
+        machines.m_machines.reserve(partBp.m_machineCount);
+        for (int i = 0; i < partBp.m_machineCount; i ++)
         {
-            // Get ACompMachines, this component keeps track of which machines
-            // a part has.
-            ActiveEnt partEnt = vehicleComp.m_parts[machBp.m_blueprintIndex];
-            auto &machines = rScene.reg_get<ACompMachines>(partEnt);
-
-            // In this case, the hierarchy is used to manage the lifetime of the
-            // machines that they'll contain.
-            // TODO: put total machine count in part blueprints for reserve
-            machines.m_machines.push_back(rScene.hier_create_child(partEnt));
+            machines.m_machines.push_back(
+                        rScene.hier_create_child(partEntity, "Machine"));
         }
     }
 
@@ -361,7 +356,6 @@ ActiveEnt SysVehicle::part_instantiate(
 
 void debug_wire_vehicles(ActiveScene &rScene)
 {
-    /*
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
@@ -375,24 +369,23 @@ void debug_wire_vehicles(ActiveScene &rScene)
 
             // get wire from
 
-
             ACompMachines& fromMachines = rScene.reg_get<ACompMachines>(
-                    *(rVeh.m_parts.begin() + blueprintWire.m_fromPart));
+                    rVeh.m_parts[blueprintWire.m_fromPart]);
 
-            ACompMachines::PartMachine const& fromMachineEntry = fromMachines
-                    .m_machines[blueprintWire.m_fromMachine];
-            Machine &fromMachine = fromMachineEntry.m_get_machine(rScene, fromMachineEntry.m_partEnt);
+            ActiveEnt fromEnt = fromMachines.m_machines[blueprintWire.m_fromMachine];
+            Machine &fromMachine = rScene.reg_get<ACompMachineType>(fromEnt)
+                                         .m_get_machine(rScene, fromEnt);
             WireOutput* fromWire =
                     fromMachine.request_output(blueprintWire.m_fromPort);
 
             // get wire to
 
             ACompMachines& toMachines = rScene.reg_get<ACompMachines>(
-                    *(rVeh.m_parts.begin() + blueprintWire.m_toPart));
+                   rVeh.m_parts[blueprintWire.m_toPart]);
 
-            ACompMachines::PartMachine const& toMachineEntry = toMachines
-                    .m_machines[blueprintWire.m_toMachine];
-            Machine &toMachine = toMachineEntry.m_get_machine(rScene, toMachineEntry.m_partEnt);
+            ActiveEnt toEnt = toMachines.m_machines[blueprintWire.m_toMachine];
+            Machine &toMachine = rScene.reg_get<ACompMachineType>(toEnt)
+                                       .m_get_machine(rScene, toEnt);
             WireInput* toWire = toMachine.request_input(blueprintWire.m_toPort);
 
             // make the connection
@@ -400,7 +393,6 @@ void debug_wire_vehicles(ActiveScene &rScene)
             SysWire::connect(*fromWire, *toWire);
         }
     }
-    */
 }
 
 void SysVehicle::update_activate(ActiveScene &rScene)

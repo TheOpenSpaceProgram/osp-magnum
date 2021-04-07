@@ -44,7 +44,6 @@ class MachineRCSController;
 class SysMachineRCSController
 {
 public:
-    static inline std::string smc_mach_name = "RCSController";
 
     static void add_functions(osp::active::ActiveScene& rScene);
 
@@ -86,6 +85,9 @@ class MachineRCSController : public osp::active::Machine
     friend SysMachineRCSController;
 
 public:
+
+    static inline std::string smc_mach_name = "RCSController";
+
     MachineRCSController();
     MachineRCSController(MachineRCSController&& move) noexcept;
     MachineRCSController& operator=(MachineRCSController&& move) noexcept;

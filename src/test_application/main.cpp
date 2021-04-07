@@ -272,16 +272,16 @@ void load_a_bunch_of_stuff()
     // Create a new package
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
-    using adera::active::machines::SysMachineContainer;
-    using adera::active::machines::SysMachineRCSController;
-    using adera::active::machines::SysMachineRocket;
-    using adera::active::machines::SysMachineUserControl;
+    using adera::active::machines::MachineContainer;
+    using adera::active::machines::MachineRCSController;
+    using adera::active::machines::MachineRocket;
+    using adera::active::machines::MachineUserControl;
 
     // Register machines
-    register_sys_machine<SysMachineContainer>(lazyDebugPack);
-    register_sys_machine<SysMachineRCSController>(lazyDebugPack);
-    register_sys_machine<SysMachineRocket>(lazyDebugPack);
-    register_sys_machine<SysMachineUserControl>(lazyDebugPack);
+    register_sys_machine<MachineContainer>(lazyDebugPack);
+    register_sys_machine<MachineRCSController>(lazyDebugPack);
+    register_sys_machine<MachineRocket>(lazyDebugPack);
+    register_sys_machine<MachineUserControl>(lazyDebugPack);
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};

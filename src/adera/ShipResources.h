@@ -150,7 +150,6 @@ class MachineContainer;
 class SysMachineContainer
 {
 public:
-    static inline std::string smc_mach_name = "Container";
 
     static void add_functions(osp::active::ActiveScene& rScene);
 
@@ -173,6 +172,9 @@ class MachineContainer : public osp::active::Machine
     friend SysMachineContainer;
 
 public:
+
+    static inline std::string smc_mach_name = "Container";
+
     MachineContainer(osp::active::ActiveEnt ownID, float capacity, ShipResource resource);
     MachineContainer(MachineContainer&& move) noexcept;
     MachineContainer& operator=(MachineContainer&& move) noexcept;

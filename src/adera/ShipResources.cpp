@@ -139,7 +139,7 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = mach_id<SysMachineContainer>();
+    machine_id_t const id = mach_id<MachineContainer>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
@@ -149,6 +149,8 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
             continue;
         }
 
+        BlueprintVehicle const& vehBp = *rVehConstr.m_blueprint;
+
         // Initialize all UserControls in the vehicle
         for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
         {
@@ -157,10 +159,18 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
 
             // Get machine entity previously reserved by SysVehicle
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
-            ActiveEnt machEnt = machines.m_machines[machines.m_numInit];
-            machines.m_numInit ++;
+            ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
-            rScene.reg_emplace<SysMachineContainer>(machEnt);
+            BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_blueprintIndex];
+            instantiate(rScene, machEnt,
+                        vehBp.m_prototypes[partBp.m_protoIndex]
+                                ->m_protoMachines[mach.m_protoMachineIndex],
+                        mach);
+            rScene.reg_emplace<ACompMachineType>(machEnt, id,
+                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
+                    {
+                        return rScene.reg_get<MachineContainer>(ent);
+                    });
         }
     }
 }

@@ -29,6 +29,9 @@
 namespace testapp
 {
 
+using partindex_t = uint32_t;
+using machindex_t = uint32_t;
+
 /**
  * Used to easily create Vehicle blueprints
  */
@@ -45,7 +48,7 @@ public:
      * @param scale
      * @return Resulting blueprint part
      */
-    osp::BlueprintPart& add_part(osp::DependRes<osp::PrototypePart>& part,
+    partindex_t add_part(osp::DependRes<osp::PrototypePart>& part,
                   const osp::Vector3& translation,
                   const osp::Quaternion& rotation,
                   const osp::Vector3& scale);
@@ -59,10 +62,29 @@ public:
      * @param toMachine
      * @param toPort
      */
-    void add_wire(unsigned fromPart, unsigned fromMachine, osp::WireOutPort fromPort,
-                  unsigned toPart, unsigned toMachine, osp::WireInPort toPort);
+    void add_wire(partindex_t fromPart, machindex_t fromMachine, osp::WireOutPort fromPort,
+                  partindex_t toPart, machindex_t toMachine, osp::WireInPort toPort);
 
-    int part_count() const noexcept { return m_vehicle.m_blueprints.size(); }
+    partindex_t part_count() const noexcept { return m_vehicle.m_blueprints.size(); }
+
+    template<typename MACH_T>
+    osp::BlueprintMachine* find_machine_by_type(partindex_t part)
+    {
+        osp::machine_id_t const id = osp::mach_id<MACH_T>();
+        if (id >= m_vehicle.m_machines.size())
+        {
+            return nullptr; // no machines of type
+        }
+
+        for (osp::BlueprintMachine& machineBp : m_vehicle.m_machines[id])
+        {
+            if (machineBp.m_blueprintIndex == part)
+            {
+                return &machineBp;
+            }
+        }
+        return nullptr;
+    }
 
     osp::BlueprintVehicle&& export_move() { return std::move(m_vehicle); };
     osp::BlueprintVehicle export_copy() { return m_vehicle; };

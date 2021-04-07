@@ -25,6 +25,7 @@
 #include "VehicleBuilder.h"
 
 using testapp::VehicleBuilder;
+using testapp::partindex_t;
 using osp::BlueprintPart;
 using osp::BlueprintMachine;
 using osp::PrototypePart;
@@ -34,7 +35,7 @@ using osp::Vector3;
 using osp::Quaternion;
 using osp::machine_id_t;
 
-BlueprintPart& VehicleBuilder::add_part(
+partindex_t VehicleBuilder::add_part(
         DependRes<PrototypePart>& prototype,
         const Vector3& translation,
         const Quaternion& rotation,
@@ -61,14 +62,14 @@ BlueprintPart& VehicleBuilder::add_part(
         m_vehicle.m_prototypes.emplace_back(prototype);
     }
 
+    size_t numMachines = prototype->m_protoMachines.size();
+
     // We now know which part prototype to initialize, create it
     uint32_t blueprintIndex = m_vehicle.m_blueprints.size();
     BlueprintPart &rPart = m_vehicle.m_blueprints.emplace_back(
-                protoIndex, translation, rotation, scale);
+                protoIndex, numMachines, translation, rotation, scale);
 
     // Add default machines from part prototypes
-
-    size_t numMachines = prototype->m_protoMachines.size();
 
     for (size_t i = 0; i < numMachines; i ++)
     {
@@ -83,7 +84,7 @@ BlueprintPart& VehicleBuilder::add_part(
         rBlueprintMach.m_config = protoMach.m_config;
     }
 
-    return rPart;
+    return blueprintIndex;
 }
 
 void VehicleBuilder::add_wire(

@@ -96,7 +96,7 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = mach_id<SysMachineRocket>();
+    machine_id_t const id = mach_id<MachineRocket>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
@@ -116,14 +116,18 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
 
             // Get machine entity previously reserved by SysVehicle
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
-            ActiveEnt machEnt = machines.m_machines[machines.m_numInit];
-            machines.m_numInit ++;
+            ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
             BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_blueprintIndex];
             instantiate(rScene, machEnt,
                         vehBp.m_prototypes[partBp.m_protoIndex]
                                 ->m_protoMachines[mach.m_protoMachineIndex],
                         mach);
+            rScene.reg_emplace<ACompMachineType>(machEnt, id,
+                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
+                    {
+                        return rScene.reg_get<MachineRocket>(ent);
+                    });
         }
     }
 }
@@ -131,7 +135,7 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
 
 void SysMachineRocket::update_physics(ActiveScene& rScene)
 {
-    auto view = rScene.get_registry().view<MachineRocket, ACompTransform>();
+    auto view = rScene.get_registry().view<MachineRocket>();
 
     for (ActiveEnt ent : view)
     {
@@ -233,7 +237,7 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
                 pThrotPercent->m_value, resource);
             uint64_t consumed = src.request_contents(required);
 
-            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+            SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
                                 "Consumed {} units of fuel, {} remaining",
                 consumed, src.check_contents().m_quantity);
         }
@@ -244,7 +248,8 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
     }
 }
 
-void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt ent)
+void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt part,
+                                           ActiveEnt mach)
 {
     ActiveEnt plumeNode = entt::null;
 
@@ -260,18 +265,17 @@ void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt ent)
         return EHierarchyTraverseStatus::Continue;
     };
 
-    rScene.hierarchy_traverse(ent, findPlumeHandle);
+    rScene.hierarchy_traverse(part, findPlumeHandle);
 
     if (plumeNode == entt::null)
     {
-        SPDLOG_LOGGER_ERROR(m_scene.get_application().get_logger(),
-                          "ERROR: could not find plume anchor for MachineRocket {}", ent);
+        SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
+                          "ERROR: could not find plume anchor for MachineRocket {}", part);
         return;
     }
 
-    SPDLOG_LOGGER_INFO(m_scene.get_application().get_logger(), "MachineRocket {}\'s associated plume: {}",
-        ent, plumeNode);
-   
+    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(), "MachineRocket {}\'s associated plume: {}",
+        part, plumeNode);
 
     // Get plume effect
     Package& pkg = rScene.get_application().debug_find_package("lzdb");
@@ -280,12 +284,12 @@ void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt ent)
     DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
     if (plumeEffect.empty())
     {
-      SPDLOG_LOGGER_ERROR(m_scene.get_application().get_logger(),
+      SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
                           "ERROR: couldn't find plume effect  {}", effectName);
         return;
     }
 
-    rScene.reg_emplace<ACompExhaustPlume>(plumeNode, ent, plumeEffect);
+    rScene.reg_emplace<ACompExhaustPlume>(plumeNode, mach, plumeEffect);
 }
 
 // TODO: come up with a better solution to this, and also replace config maps
@@ -330,7 +334,7 @@ MachineRocket& SysMachineRocket::instantiate(
         inputs.push_back({std::move(fuel), 1.0f});
     }
 
-    attach_plume_effect(rScene, ent);
+    attach_plume_effect(rScene, rScene.reg_get<ACompHierarchy>(ent).m_parent, ent);
     return rScene.reg_emplace<MachineRocket>(ent, std::move(params), std::move(inputs));
 }
 

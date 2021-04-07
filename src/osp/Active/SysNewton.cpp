@@ -524,28 +524,29 @@ Vector4 SysNewton::compute_hier_CoM(ActiveScene& rScene, ActiveEnt root)
     {
         auto const &childHier = rScene.reg_get<ACompHierarchy>(nextChild);
         auto const *childTransform = rScene.get_registry().try_get<ACompTransform>(nextChild);
+        auto const *massComp = rScene.get_registry().try_get<ACompMass>(nextChild);
+        Matrix4 childMatrix{Magnum::Math::IdentityInit};
 
         if (childTransform != nullptr)
         {
-            Matrix4 childMatrix = childTransform->m_transform;
-            auto* massComp = rScene.get_registry().try_get<ACompMass>(nextChild);
-
-            if (massComp)
-            {
-                float childMass = rScene.reg_get<ACompMass>(nextChild).m_mass;
-
-                Vector3 offset = childMatrix.translation();
-
-                localCoM += childMass * offset;
-                localMass += childMass;
-            }
-
-            // Recursively call this function to include grandchild masses
-            Vector4 subCoM = compute_hier_CoM(rScene, nextChild);
-            Vector3 childCoMOffset = childMatrix.translation() + subCoM.xyz();
-            localCoM += subCoM.w() * childCoMOffset;
-            localMass += subCoM.w();
+            childMatrix = childTransform->m_transform;
         }
+
+        if (massComp != nullptr)
+        {
+            float childMass = rScene.reg_get<ACompMass>(nextChild).m_mass;
+
+            Vector3 offset = childMatrix.translation();
+
+            localCoM += childMass * offset;
+            localMass += childMass;
+        }
+
+        // Recursively call this function to include grandchild masses
+        Vector4 subCoM = compute_hier_CoM(rScene, nextChild);
+        Vector3 childCoMOffset = childMatrix.translation() + subCoM.xyz();
+        localCoM += subCoM.w() * childCoMOffset;
+        localMass += subCoM.w();
 
         nextChild = childHier.m_siblingNext;
     }
@@ -571,14 +572,13 @@ std::pair<Matrix3, Vector4> SysNewton::compute_hier_inertia(ActiveScene& rScene,
     for (ActiveEnt nextChild = rScene.reg_get<ACompHierarchy>(entity).m_childFirst;
         nextChild != entt::null;)
     {
-        // Compute the inertia of the child subhierarchy
-        auto const& [childInertia, childCoM] = compute_hier_inertia(rScene, nextChild);
-
         // Use child transformation to transform child inertia and add to sum
         auto const *childTransform = rScene.get_registry().try_get<ACompTransform>(nextChild);
 
         if (childTransform != nullptr)
         {
+            // Compute the inertia of the child subhierarchy
+            auto const& [childInertia, childCoM] = compute_hier_inertia(rScene, nextChild);
             Matrix4 const childTransformMat = childTransform->m_transform;
             Matrix3 const rotation = childTransformMat.rotation();
             // Offset is the vector between the ship center of mass and the child CoM

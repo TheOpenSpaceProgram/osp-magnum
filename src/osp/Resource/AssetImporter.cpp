@@ -118,7 +118,6 @@ void AssetImporter::proto_load_machines(
             continue;
         }
 
-
         //rMachine.m_entity = entity;
 
         // Resolve machine type

@@ -26,6 +26,8 @@
 #include "vehicles.h"
 #include "../VehicleBuilder.h"
 
+#include <adera/ShipResources.h>
+
 #include <osp/Satellites/SatVehicle.h>
 
 using namespace testapp;
@@ -229,6 +231,9 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     using namespace Magnum::Math::Literals;
     using Magnum::Rad;
 
+    using osp::BlueprintMachine;
+    using adera::active::machines::MachineContainer;
+
     // Start making the blueprint
     VehicleBuilder blueprint;
 
@@ -254,11 +259,13 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
 
     blueprint.add_part(capsule, Vector3{0}, idRot, scl);
 
-    auto& fuselageBP = blueprint.add_part(fuselage, cfOset, idRot, scl);
-    //fuselageBP.m_machines[1].m_config.emplace("resourcename", "lzdb:fuel");
-    //fuselageBP.m_machines[1].m_config.emplace("fuellevel", 0.5);
 
-    auto& engBP = blueprint.add_part(engine, cfOset + feOset, idRot, scl);
+    partindex_t fuselageBP = blueprint.add_part(fuselage, cfOset, idRot, scl);
+    BlueprintMachine* fusalageMach= blueprint.find_machine_by_type<MachineContainer>(fuselageBP);
+    fusalageMach->m_config.emplace("resourcename", "lzdb:fuel");
+    fusalageMach->m_config.emplace("fuellevel", 0.5);
+
+    blueprint.add_part(engine, cfOset + feOset, idRot, scl);
 
     // Add a shit ton of RCS rings
 

@@ -49,7 +49,6 @@ class Machine;
  */
 struct ACompMachines
 {
-    size_t m_numInit{0};
     std::vector<ActiveEnt> m_machines;
 };
 
@@ -57,7 +56,17 @@ struct ACompMachines
 
 struct ACompMachineType
 {
+    // TODO: Temporary, remove when new wiring system is added. A well made ECS
+    //       means that all publicly accessible properties of machines are in
+    //       separate components
+    using get_machine_component_t = Machine& (*)(ActiveScene&, ActiveEnt);
+
+    ACompMachineType(machine_id_t type, get_machine_component_t get)
+     : m_type(type)
+     , m_get_machine{get}
+    { }
     machine_id_t m_type;
+    get_machine_component_t m_get_machine;
 };
 
 //-----------------------------------------------------------------------------

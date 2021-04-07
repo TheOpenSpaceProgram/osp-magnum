@@ -61,6 +61,9 @@ class MachineRocket : public osp::active::Machine
     };
 
 public:
+
+    static inline std::string smc_mach_name = "Rocket";
+
     MachineRocket(Parameters params, std::vector<input_t> resources);
     MachineRocket(MachineRocket &&move) noexcept;
     MachineRocket& operator=(MachineRocket&& move) noexcept;
@@ -109,8 +112,6 @@ class SysMachineRocket
 {
 public:
 
-    static inline std::string smc_mach_name = "Rocket";
-
     static void add_functions(osp::active::ActiveScene& rScene);
     //void update_sensor();
     static void update_construct(osp::active::ActiveScene &rScene);
@@ -126,7 +127,8 @@ public:
      * @param ent The MachineRocket entity
      */
     static void attach_plume_effect(osp::active::ActiveScene& rScene,
-                                    osp::active::ActiveEnt ent);
+                                    osp::active::ActiveEnt part,
+                                    osp::active::ActiveEnt mach);
 
     static MachineRocket& instantiate(
             osp::active::ActiveScene& rScene,

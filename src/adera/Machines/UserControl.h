@@ -69,9 +69,6 @@ struct ACompUserControl
 class SysMachineUserControl
 {
 public:
-
-    static constexpr std::string_view smc_mach_name = "UserControl";
-
     static void add_functions(osp::active::ActiveScene& rScene);
     static void update_construct(osp::active::ActiveScene &rScene);
     static void update_sensor(osp::active::ActiveScene &rScene);
@@ -85,6 +82,9 @@ class MachineUserControl : public osp::active::Machine
     friend SysMachineUserControl;
 
 public:
+
+    static constexpr std::string_view smc_mach_name = "UserControl";
+
     MachineUserControl();
     MachineUserControl(MachineUserControl&& move);
 
