@@ -118,8 +118,8 @@ void SysMap::update_map(ActiveScene& rScene)
 
     MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
 
-    auto view = reg.view<UCompTransformTraj>();
-    for (auto [sat, traj] : view.each())
+    auto view = reg.view<UCompTransformTraj, ACompMapVisible>();
+    for (auto [sat, traj, vis] : view.each())
     {
         size_t pointIndex{0};
         auto itr = renderData.m_pathMapping.find(sat);
@@ -128,7 +128,7 @@ void SysMap::update_map(ActiveScene& rScene)
             // Add point
             pointIndex = renderData.m_points.size();
             renderData.m_pathMapping.emplace(sat, pointIndex);
-            renderData.m_points.push_back({Vector3{}, Color4{1.0}});
+            renderData.m_points.push_back({Vector3{}, Color4{traj.m_color, 1.0}});
         }
         else
         {

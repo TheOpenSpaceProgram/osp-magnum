@@ -27,6 +27,7 @@
 #include <osp/OSPApplication.h>
 #include <osp/types.h>
 #include <osp/Trajectories/NBody.h>
+#include <adera/SysMap.h>
 #include <planet-a/Satellites/SatPlanet.h>
 #include <random>
 
@@ -45,6 +46,7 @@ using osp::universe::UCompVel;
 using osp::universe::UCompAccel;
 using osp::universe::UCompMass;
 using osp::universe::UCompEmitsGravity;
+using adera::active::ACompMapVisible;
 using planeta::universe::SatPlanet;
 using namespace Magnum::Math::Literals;
 
@@ -86,6 +88,9 @@ void testapp::create_solar_system(OSPApplication& ospApp)
     sun.m_name = "The sun";
     sun.m_color = 0xFFFFFF_rgbf;
 
+    // Cuz for some reason the first one is a large number and I'm OCD
+    Satellite nullSat = rUni.sat_create();
+
     Satellite sunSat = rUni.sat_create();
 
     /*SatPlanet::add_planet(rUni, sunSat, sun.m_radius, sun.m_mass, )
@@ -95,9 +100,12 @@ void testapp::create_solar_system(OSPApplication& ospApp)
     UCompTransformTraj& sunTT = reg.get<UCompTransformTraj>(sunSat);
     sunTT.m_position = {0ll, 0ll, 0ll};
     sunTT.m_name = sun.m_name;
+    sunTT.m_color = sun.m_color;
     reg.emplace<UCompMass>(sunSat, sun.m_mass);
     reg.emplace<UCompAccel>(sunSat, Vector3d{0.0});
     reg.emplace<UCompVel>(sunSat, Vector3d{0.0});
+    reg.emplace<UCompEmitsGravity>(sunSat);
+    reg.emplace<ACompMapVisible>(sunSat);
     nbody.add(sunSat);
 
     /* ####### Planets ####### */
@@ -112,6 +120,8 @@ void testapp::create_solar_system(OSPApplication& ospApp)
     /* ####### Asteroids ####### */
 
     //add_asteroids(ospApp, nbody, 5'000);
+
+    nbody.build_table();
 }
 
 void add_body(OSPApplication& ospApp, Satellite sat, PlanetBody body, ISystemTrajectory* traj)
@@ -148,6 +158,7 @@ void add_body(OSPApplication& ospApp, Satellite sat, PlanetBody body, ISystemTra
     }
     reg.emplace<UCompVel>(sat, velocity);
     reg.emplace<UCompAccel>(sat, Vector3d{0.0});
+    reg.emplace<ACompMapVisible>(sat);
 
     //satPlanet.m_radius = body.m_radius;
     satTT.m_name = body.m_name;

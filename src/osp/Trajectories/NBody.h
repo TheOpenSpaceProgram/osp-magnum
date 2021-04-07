@@ -62,6 +62,7 @@ Table structure (implementation):
 */
 class EvolutionTable
 {
+    friend class TrajNBody;
 public:
     EvolutionTable(size_t nBodies, size_t nSteps);
     EvolutionTable();
@@ -70,19 +71,62 @@ public:
     EvolutionTable(EvolutionTable&& move) = default;
 
     void resize(size_t bodies, size_t timesteps);
+
+    Satellite get_ID(size_t index);
+    void set_ID(size_t index, Satellite sat);
+
+    double get_mass(size_t index);
+    void set_mass(size_t index, double mass);
+
+    Vector3d get_velocity(size_t index);
+    void set_velocity(size_t index, Vector3d vel);
+
+    Vector3d get_acceleration(size_t index);
+    void set_acceleration(size_t index, Vector3d accel);
+
+    Vector3d get_position(size_t index, size_t timestep);
+    void set_position(size_t index, size_t timestep, Vector3d pos);
+
+    struct SystemState
+    {
+        double* m_xValues;
+        double* m_yValues;
+        double* m_zValues;
+        double* m_masses;
+        size_t m_nElements;
+        size_t m_paddedArraySize;
+    };
+
+    SystemState get_system_state(size_t timestep);
+
+    void solve(double timestep);
+    void copy_step_to_top(size_t timestep);
 private:
     static constexpr size_t AVX2_WIDTH = 256 / 8;  // 256 bits / 8 = 32 Bytes
 
+    template <typename T>
+    static size_t padded_size_aligned(size_t nElements)
+    {
+        constexpr size_t avxLanes = AVX2_WIDTH / sizeof(T);
+        size_t padding = avxLanes - (nElements % avxLanes);
+        return (nElements + padding) * sizeof(T);
+    }
+
     // Allocate an aligned array of
+    template <typename T>
+    static T* alloc_raw(size_t size)
+    {
+        //static_assert(std::is_arithmetic<T>::value, "Can only allocate arithmetic types");
+
+        return AlignedAllocator<T, AVX2_WIDTH>::allocate(size);
+    }
+
     template <typename T>
     static T* alloc_aligned(size_t nElements)
     {
-        static_assert(std::is_arithmetic<T>::value, "Can only allocate arithmetic types");
-
-        constexpr size_t avxLanes = AVX2_WIDTH / sizeof(T);
-        size_t padding = avxLanes - (nElements % avxLanes);
-        size_t allocSize = (nElements + padding) * sizeof(T);
-        return AlignedAllocator<T, AVX2_WIDTH>::allocate(allocSize);
+        //static_assert(std::is_arithmetic<T>::value, "Can only allocate arithmetic types");
+        size_t size = padded_size_aligned<T>(nElements);
+        return AlignedAllocator<T, AVX2_WIDTH>::allocate(size);
     }
 
     // Deleter functions
@@ -110,15 +154,20 @@ private:
 
     // Table dimensions
 
-    size_t m_nBodies;
-    size_t m_nTimesteps;
-    size_t m_currentStep;
+    size_t m_nBodies{0};
+    size_t m_nTimesteps{0};
+    size_t m_currentStep{0};
+
+    size_t m_componentBlockSize;
+    size_t m_rowSize;
 
     // Current step only/static tables
 
+    table_ptr<Satellite> m_ids;
+    table_ptr<double> m_masses;
+
     table_ptr<double> m_velocities;
     table_ptr<double> m_accelerations;
-    table_ptr<double> m_masses;
 
     // Table of positions over time
     table_ptr<double> m_posTable;
@@ -141,12 +190,15 @@ public:
     // Simulate orbits
     void update(/*Universe& rUni*/); // TODO make static
 
+    void build_table();
 private:
     template <typename VIEW_T, typename SRC_VIEW_T>
     static void update_full_dynamics_acceleration(VIEW_T& bodyView, SRC_VIEW_T& sources);
 
     template <typename VIEW_T>
     static void update_full_dynamics_kinematics(VIEW_T& view);
+
+    EvolutionTable m_data;
 };
 
 }

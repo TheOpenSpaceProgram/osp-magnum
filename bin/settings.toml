@@ -84,12 +84,12 @@ secondary = "None"
 holdable = false
 
 [game_switch_next]
-primary = "V"
+primary = "F"
 secondary = "None"
 holdable = false
 
 [game_switch_prev]
-primary = "LShift+V"
+primary = "V"
 secondary = "None"
 holdable = false
 

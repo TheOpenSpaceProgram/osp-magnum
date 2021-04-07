@@ -175,6 +175,11 @@ private:
     void bind_path_metadata(Magnum::GL::Buffer& data);
 };
 
+struct ACompMapVisible
+{
+    bool m_visible{true};
+};
+
 class SysMap
 {
 public:
