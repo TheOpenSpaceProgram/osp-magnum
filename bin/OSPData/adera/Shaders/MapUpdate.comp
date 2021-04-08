@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#version 430 core
+//#version 430 core
 
 #define ORBIT_SAMPLES 512
 
@@ -52,16 +52,36 @@ struct ColorVert
     vec4 color;
 };
 
+/**
+ * A buffer containing the current location of all map bodies
+ * 
+ * This corresponds to MapRenderData::m_pointBuffer and is filled each frame
+ * by passing raw orbital timestep data to the MapPositionsConverter compute
+ * shader which populates the buffer that is then bound here. These point
+ * locations are pushed into the trail buffers by this kernel.
+*/
 layout(binding = 1, std430) buffer PointLocations
 {
     ColorVert pointVerts[];
 };
 
+/**
+ * A buffer containing the vertices used to draw map trails and paths
+ *
+ * Corresponds to MapRenderData::m_vertexBuffer
+ */
 layout(binding = 2, std430) buffer PathData
 {
     ColorVert pathData[];
 };
 
+/**
+ * A buffer containing the indices used to draw map trails and paths
+ *
+ * The path drawing relies on GL's "primitive restart" functionality, which
+ * allows a magic index value to indicate the interruption of the primitive
+ * (e.g. line strip) being drawn. Corresponds to MapRenderData::m_indexBuffer
+ */
 layout(binding = 3, std430) buffer PathIndices
 {
     uint indices[];
@@ -80,18 +100,13 @@ layout(binding = 4) buffer PathsInfo
     PathMetadata paths[];
 };
 
-void interpret_input_points(uint index)
-{
-    double x_i = rawInput[0*N_POINTS + index];
-    double y_i = rawInput[1*N_POINTS + index];
-    double z_i = rawInput[2*N_POINTS + index];
-
-    const double invUnit = 1.0LF / 1024.0LF;
-    const double scalingFactor = 1e-6LF;
-    vec3 result = vec3(dvec3(x_i, y_i, z_i) * invUnit * scalingFactor);
-    pointVerts[index].position = vec4(result, 1.0);
-}
-
+/**
+ * Fade the alpha of all trail vertices
+ *
+ * On each execution, the alpha value of all trail vertices is slightly
+ * reduced, giving a fading effect. Call this before new vertices are pushed,
+ * or you'll be prematurely dimming them.
+ */
 void fade_color(uint pathID, uint pathVertID)
 {
     uint index = pathID*ORBIT_SAMPLES + pathVertID;
@@ -99,6 +114,14 @@ void fade_color(uint pathID, uint pathVertID)
     pathData[index].color.a = clamp(alpha - 0.002, 0.0, 1.0);
 }
 
+/**
+ * Increment all path indices
+ *
+ * On each execution, the path mesh vertices are all incremented (except for
+ * the primitive restart one). With every new vertex that's pushed, the mesh
+ * indices are shifted up one to allow the newly pushed vertex to be the first
+ * one in the trail.
+ */
 void inc_index(uint pathID, uint pathVertID)
 {
     // Increment all indices (except the primitive restart one at the end)
@@ -115,6 +138,12 @@ void inc_index(uint pathID, uint pathVertID)
     }
 }
 
+/**
+ * Push the point vertices onto the trail mesh
+ *
+ * The point locations represent the current location of each body. Their
+ * positions can be used to draw the latest segment of trail.
+ */
 void path_step(uint pathID)
 {
     PathMetadata path = paths[pathID];
@@ -132,21 +161,6 @@ void path_step(uint pathID)
 
 void main()
 {
-    // 0. Read in raw double position data and convert to point locations
-    // Convert 2D indices into 1D (row-major)
-    const uint THREAD_INDEX_1D = XY.x + DIMS.x*XY.y;
-    const uint REQD_LOOPS = N_POINTS / N_INVOCATIONS;
-    const uint LOOP_REMAINDER = N_POINTS % N_INVOCATIONS; 
-
-    for (uint i = 0; i < REQD_LOOPS; i++)
-    {
-        interpret_input_points(REQD_LOOPS*THREAD_INDEX_1D + i);
-    }
-    if (THREAD_INDEX_1D < LOOP_REMAINDER)
-    {
-        interpret_input_points(N_INVOCATIONS*REQD_LOOPS + THREAD_INDEX_1D);
-    }
-
     // 1. Fade colors of all existing path verts
     fade_color(PATH_ID, PATH_SAMPLE);
 

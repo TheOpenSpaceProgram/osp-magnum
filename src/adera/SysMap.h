@@ -73,6 +73,7 @@ public:
 //#pragma pack(pop)
 
     // Path data
+    Magnum::GL::Buffer m_rawState;
     std::vector<GLuint> m_indexData;
     Magnum::GL::Buffer m_indexBuffer;
     std::vector<ColorVert> m_vertexData;
@@ -111,7 +112,7 @@ public:
     ProcessMapCoordsCompute(ProcessMapCoordsCompute&& move) = default;
 
     void process(
-        Magnum::GL::Buffer& rawInput, size_t inputCount,
+        Magnum::GL::Buffer& rawInput, size_t inputCount, size_t inputCountPadded,
         Magnum::GL::Buffer& dest, size_t destOffset);
 private:
     void init();
@@ -127,7 +128,7 @@ private:
         Output = 1
     };
 
-    void set_input_counts(size_t nInputPoints, size_t outputOffset);
+    void set_input_counts(size_t nInputPoints, size_t nInputPointsPadded, size_t outputOffset);
     void bind_input_buffer(Magnum::GL::Buffer& input);
     void bind_output_buffer(Magnum::GL::Buffer& output);
 };

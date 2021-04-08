@@ -184,6 +184,17 @@ EvolutionTable::SystemState EvolutionTable::get_system_state(size_t timestep)
     return {{x, y, z}, {vx, vy, vz}, {ax, ay, az}, masses, nElems, arraySizes};
 }
 
+EvolutionTable::RawStepData EvolutionTable::get_step(size_t timestep)
+{
+    size_t nElementsPadded = m_rowSizeBytes / sizeof(double);
+    size_t rowOffset = timestep * nElementsPadded;
+    return {
+        Corrade::Containers::ArrayView<double>(&m_posTable[rowOffset], nElementsPadded),
+        m_nBodies,
+        nElementsPadded
+    };
+}
+
 void EvolutionTable::copy_step_to_top(size_t timestep)
 {
     size_t rowEntries = m_rowSizeBytes / sizeof(double);
@@ -264,6 +275,11 @@ void TrajNBody::build_table()
     }
 
     solve_table();
+}
+
+EvolutionTable::RawStepData TrajNBody::get_latest_state()
+{
+    return m_data.get_step(m_data.m_currentStep);
 }
 
 void TrajNBody::solve_table()

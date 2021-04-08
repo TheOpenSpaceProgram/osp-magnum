@@ -22,16 +22,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#version 430 core
+//#version 430 core
 
 layout(local_size_x = 32) in;
 
 const uint THREAD_INDEX = gl_GlobalInvocationID.x;
 const uint N_INVOCATIONS = gl_NumWorkGroups.x*gl_WorkGroupSize.x;
 
-layout(location = 0) uniform uvec2 counts;
+layout(location = 0) uniform uvec3 counts;
 const uint N_POINTS = counts.x;
-const uint OUTPUT_OSET = counts.y;
+const uint N_POINTS_PADDED = counts.y;
+const uint OUTPUT_OSET = counts.z;
 
 layout(binding = 0, std430) readonly buffer RawInput
 {
@@ -51,9 +52,9 @@ layout(binding = 1, std430) buffer PointLocations
 
 void interpret_input_points(uint index)
 {
-    double x_i = rawInput[0*N_POINTS + index];
-    double y_i = rawInput[1*N_POINTS + index];
-    double z_i = rawInput[2*N_POINTS + index];
+    double x_i = rawInput[0*N_POINTS_PADDED + index];
+    double y_i = rawInput[1*N_POINTS_PADDED + index];
+    double z_i = rawInput[2*N_POINTS_PADDED + index];
 
     const double invUnit = 1.0LF / 1024.0LF;
     const double scalingFactor = 1e-6LF;

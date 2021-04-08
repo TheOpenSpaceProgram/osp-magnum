@@ -126,6 +126,12 @@ public:
     template<typename TRAJECTORY_T, typename ... ARGS_T>
     TRAJECTORY_T& trajectory_create(ARGS_T&& ... args);
 
+    template<typename TRAJECTORY_T>
+    TRAJECTORY_T* get_traj(size_t i)
+    {
+        return static_cast<TRAJECTORY_T*>(m_trajectories[i].get());
+    }
+
     constexpr Registry_t& get_reg() noexcept { return m_registry; }
     constexpr const Registry_t& get_reg() const noexcept
     { return m_registry; }

@@ -30,6 +30,7 @@
 #include <type_traits>
 #include <memory>
 #include <tuple>
+#include <Corrade/Containers/ArrayView.h>
 
 namespace osp::universe
 {
@@ -101,6 +102,15 @@ public:
     };
 
     SystemState get_system_state(size_t timestep);
+
+    struct RawStepData
+    {
+        Corrade::Containers::ArrayView<double> m_data;
+        size_t m_nElements;
+        size_t m_nElementsPadded;
+    };
+
+    RawStepData get_step(size_t timestep);
 
     void copy_step_to_top(size_t timestep);
 private:
@@ -193,6 +203,8 @@ public:
     void update(/*Universe& rUni*/); // TODO make static
 
     void build_table();
+
+    EvolutionTable::RawStepData get_latest_state();
 private:
     template <typename VIEW_T, typename SRC_VIEW_T>
     static void update_full_dynamics_acceleration(VIEW_T& bodyView, SRC_VIEW_T& sources);
