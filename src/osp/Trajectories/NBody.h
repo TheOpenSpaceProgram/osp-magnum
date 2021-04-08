@@ -29,6 +29,7 @@
 
 #include <type_traits>
 #include <memory>
+#include <tuple>
 
 namespace osp::universe
 {
@@ -89,9 +90,11 @@ public:
 
     struct SystemState
     {
-        double* m_xValues;
-        double* m_yValues;
-        double* m_zValues;
+        struct vec3ptrs { double* x; double* y; double* z; };
+        // Positions
+        vec3ptrs m_position;
+        vec3ptrs m_velocity;
+        vec3ptrs m_acceleration;
         double* m_masses;
         size_t m_nElements;
         size_t m_paddedArraySize;
@@ -157,8 +160,8 @@ private:
     size_t m_nTimesteps{0};
     size_t m_currentStep{0};
 
-    size_t m_componentBlockSize;
-    size_t m_rowSize;
+    size_t m_scalarArraySizeBytes;
+    size_t m_rowSizeBytes;
 
     // Current step only/static tables
 
@@ -200,6 +203,7 @@ private:
     void solve_table();
 
     void solve_timestep(size_t stepIndex);
+    void solve_timestep_AVX(size_t stepIndex);
 
     EvolutionTable m_data;
 };
