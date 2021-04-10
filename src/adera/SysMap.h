@@ -51,17 +51,26 @@ class MapRenderData
     friend class SysMap;
 public:
     // "Primitive restart" index which signifies to break a line strip at that vertex
-    static constexpr GLuint PRIMITIVE_RESTART = std::numeric_limits<GLuint>::max();
+    static constexpr GLuint smc_PRIMITIVE_RESTART = std::numeric_limits<GLuint>::max();
 
-    MapRenderData(osp::active::ActiveScene& scene, size_t maxPoints, size_t maxPathVertices);
+    MapRenderData() {}
     ~MapRenderData() = default;
     MapRenderData(MapRenderData const& copy) = delete;
     MapRenderData(MapRenderData&& move) noexcept = default;
     MapRenderData& operator=(MapRenderData&& move) = default;
 
 public:
-    GLuint m_maxPoints;
-    GLuint m_maxPathVerts;
+    // Temporary flag to check initialization state
+    bool m_isInitialized{false};
+
+    // Number of point markers on the map (representing planets, ships, etc)
+    GLuint m_numPoints{0};
+    // Number of paths
+    GLuint m_numPaths{0};
+    // Number of vertices per path
+    static constexpr GLuint smc_N_VERTS_PER_PATH = 512;
+    // Number of indices per path (1 extra, to store primitive restart index)
+    static constexpr GLuint smc_N_INDICES_PER_PATH = smc_N_VERTS_PER_PATH + 1;
 
 //#pragma pack(push, 1)
     struct ColorVert
@@ -69,6 +78,9 @@ public:
         //Magnum::Vector4 m_pos;
         Magnum::Vector4 m_pos;
         Magnum::Color4 m_color;
+
+        ColorVert(Magnum::Vector4 v, Magnum::Color4 c) : m_pos(v), m_color(c) {}
+        ColorVert() : ColorVert(Magnum::Vector4{}, Magnum::Color4{1.0}) {}
     };
 //#pragma pack(pop)
 
@@ -190,6 +202,7 @@ public:
 private:
     static constexpr size_t m_orbitSamples = 512;
     static void configure_render_passes(osp::active::ActiveScene& rScene);
+    static void register_system(osp::active::ActiveScene& rScene);
 };
 
 } // namespace adera::active

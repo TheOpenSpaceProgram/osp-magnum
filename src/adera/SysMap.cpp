@@ -70,7 +70,6 @@ void SysMap::add_functions(ActiveScene& rScene)
 
 void SysMap::configure_render_passes(ActiveScene& rScene)
 {
-    // Temporary setup
     using Magnum::Shaders::VertexColor3D;
     auto& resources = rScene.get_context_resources();
 
@@ -78,29 +77,9 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
     resources.add<MapUpdateCompute>("map_compute");
     resources.add<ProcessMapCoordsCompute>("map_preproccess");
 
-    auto& mapdata = rScene.reg_emplace<MapRenderData>(rScene.hier_get_root(), rScene, 100, 100);
+    rScene.reg_emplace<MapRenderData>(rScene.hier_get_root());
 
-    mapdata.m_points = std::vector<MapRenderData::ColorVert>(mapdata.m_maxPoints,
-        {Vector4{0.0}, Color4{1.0}});
-    mapdata.m_pointBuffer.setData(mapdata.m_points);
-    mapdata.m_pointMesh
-        .setPrimitive(Magnum::GL::MeshPrimitive::Points)
-        .setCount(mapdata.m_maxPoints)
-        .addVertexBuffer(mapdata.m_pointBuffer, 0,
-            Magnum::GL::Attribute<0, Vector4>{},
-            Magnum::GL::Attribute<2, Color4>{});
-
-    mapdata.m_vertexData = std::vector<MapRenderData::ColorVert>(mapdata.m_maxPathVerts);
-    mapdata.m_indexData = std::vector<GLuint>(mapdata.m_maxPathVerts);
-    mapdata.m_vertexBuffer.setData(mapdata.m_vertexData);
-    mapdata.m_indexBuffer.setData(mapdata.m_indexData);
-    mapdata.m_mesh
-        .setPrimitive(Magnum::GL::MeshPrimitive::LineStrip)
-        .addVertexBuffer(mapdata.m_vertexBuffer, 0,
-            VertexColor3D::Position{},
-            VertexColor3D::Color4{})
-        .setIndexBuffer(mapdata.m_indexBuffer, 0, Magnum::MeshIndexType::UnsignedInt)
-        .setCount(mapdata.m_maxPathVerts);
+    glPrimitiveRestartIndex(MapRenderData::smc_PRIMITIVE_RESTART);
 
     // Path pass
     rScene.debug_render_add(rScene.get_render_order(),
@@ -122,9 +101,13 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
 
             Matrix4 transform = rCamera.m_projection * rCamera.m_inverse;
 
+            glEnable(GL_PRIMITIVE_RESTART);
+
             (*shader)
                 .setTransformationProjectionMatrix(transform)
                 .draw(data.m_mesh);
+
+            glDisable(GL_PRIMITIVE_RESTART);
         });
 
     // Point pass
@@ -151,6 +134,98 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
         });
 }
 
+void SysMap::register_system(ActiveScene& rScene)
+{
+    auto& rUni = rScene.get_application().get_universe();
+    auto& reg = rUni.get_reg();
+    auto& glres = rScene.get_context_resources();
+    MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
+
+    // Clear data
+    renderData.m_points.clear();
+    renderData.m_pointMapping.clear();
+    renderData.m_pathMetadata.clear();
+    renderData.m_pathMapping.clear();
+
+    // Enumerate total number of map objects and paths
+
+    size_t pointIndex = 0;
+    size_t pathIndex = 0;
+    auto view = reg.view<UCompTransformTraj, ACompMapVisible>();
+    for (auto [sat, traj, vis] : view.each())
+    {
+        renderData.m_points.emplace_back(Vector4{0.0}, Color4{traj.m_color, 1.0});
+        renderData.m_pointMapping.emplace(sat, pointIndex);
+
+        if (reg.has<UCompEmitsGravity>(sat))
+        {
+            // Body is fully dynamic; leave trail
+
+            MapRenderData::PathMetadata pathInfo;
+            pathInfo.m_pointIndex = pointIndex;
+            pathInfo.m_startIdx = pathIndex * MapRenderData::smc_N_INDICES_PER_PATH;
+            pathInfo.m_endIdx = pathInfo.m_startIdx + MapRenderData::smc_N_INDICES_PER_PATH;
+            pathInfo.m_nextIdx = pathInfo.m_startIdx;
+
+            renderData.m_pathMetadata.push_back(std::move(pathInfo));
+            renderData.m_pathMapping.emplace(sat, pathIndex);
+
+            pathIndex++;
+        }
+        pointIndex++;
+    }
+    renderData.m_numPoints = pointIndex;
+    renderData.m_numPaths = pathIndex;
+
+    // Create point buffer, mesh
+
+    renderData.m_pointBuffer.setData(renderData.m_points);
+    renderData.m_pointMesh
+        .setPrimitive(Magnum::GL::MeshPrimitive::Points)
+        .setCount(renderData.m_points.size())
+        .addVertexBuffer(renderData.m_pointBuffer, 0,
+            Magnum::GL::Attribute<0, Vector4>{},
+            Magnum::GL::Attribute<2, Color4>{});
+
+    // Size path data
+
+    size_t nTotalPathVerts = renderData.m_numPaths * MapRenderData::smc_N_VERTS_PER_PATH;
+    size_t nTotalPathIndices = renderData.m_numPaths * MapRenderData::smc_N_INDICES_PER_PATH;
+    renderData.m_vertexData = std::vector<MapRenderData::ColorVert>(nTotalPathVerts);
+    renderData.m_indexData.resize(renderData.m_numPaths * MapRenderData::smc_N_INDICES_PER_PATH);
+
+    // Initialize index data
+    for (size_t i = 0; i < renderData.m_indexData.size(); i++)
+    {
+        if ((i % MapRenderData::smc_N_INDICES_PER_PATH) == 0)
+        {
+            renderData.m_indexData[i] = MapRenderData::smc_PRIMITIVE_RESTART;
+        }
+        else
+        {
+            renderData.m_indexData[i] = i;
+        }
+    }
+    using Magnum::Shaders::VertexColor3D;
+
+    // Create path buffers, mesh
+
+    renderData.m_vertexBuffer.setData(renderData.m_vertexData);
+    renderData.m_indexBuffer.setData(renderData.m_indexData);
+    renderData.m_mesh
+        .setPrimitive(Magnum::GL::MeshPrimitive::LineStrip)
+        .addVertexBuffer(renderData.m_vertexBuffer, 0,
+            VertexColor3D::Position{},
+            VertexColor3D::Color4{})
+        .setIndexBuffer(renderData.m_indexBuffer, 0, Magnum::MeshIndexType::UnsignedInt)
+        .setCount(nTotalPathVerts);
+
+    // Create path metadata buffer
+
+    renderData.m_pathMetadataBuffer.setData(
+        renderData.m_pathMetadata, Magnum::GL::BufferUsage::StaticDraw);
+}
+
 #if 1
 void SysMap::update_map(ActiveScene& rScene)
 {
@@ -161,6 +236,12 @@ void SysMap::update_map(ActiveScene& rScene)
     MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
     auto* nbody = rUni.get_traj<TrajNBody>(0);
 
+    if (!renderData.m_isInitialized)
+    {
+        register_system(rScene);
+        renderData.m_isInitialized = true;
+    }
+
     DependRes<ProcessMapCoordsCompute> preproccess =
         glres.get<ProcessMapCoordsCompute>("map_preproccess");
 
@@ -169,14 +250,14 @@ void SysMap::update_map(ActiveScene& rScene)
     preproccess->process(renderData.m_rawState, state.m_nElements, state.m_nElementsPadded,
         renderData.m_pointBuffer, 0);
 
-    /*DependRes<MapUpdateCompute> mapUpdate =
+    DependRes<MapUpdateCompute> mapUpdate =
         glres.get<MapUpdateCompute>("map_compute");
     mapUpdate->update_map(
-        state.m_nElements, renderData.m_pointBuffer,
-        state.m_nElements, renderData.m_pathMetadataBuffer,
-        renderData.m_vertexBuffer.size(), renderData.m_vertexBuffer,
-        renderData.m_indexBuffer.size(), renderData.m_indexBuffer);*/
-
+        renderData.m_numPoints, renderData.m_pointBuffer,
+        renderData.m_numPaths, renderData.m_pathMetadataBuffer,
+        renderData.m_vertexData.size(), renderData.m_vertexBuffer,
+        renderData.m_indexData.size(), renderData.m_indexBuffer
+        );
 }
 #endif
 #if 0
@@ -272,13 +353,6 @@ void MapUpdateCompute::bind_path_metadata(Magnum::GL::Buffer& data)
 {
     data.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(EBufferBinding::PathsInfo));
-}
-
-MapRenderData::MapRenderData(ActiveScene& scene, size_t maxPoints, size_t maxPathVertices)
-    : m_maxPoints(maxPoints), m_maxPathVerts(maxPathVertices)
-{
-    assert(maxPoints < std::numeric_limits<GLuint>::max());
-    assert(maxPathVertices < std::numeric_limits<GLuint>::max());
 }
 
 void ProcessMapCoordsCompute::process(
