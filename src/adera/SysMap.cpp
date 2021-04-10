@@ -80,14 +80,15 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
 
     auto& mapdata = rScene.reg_emplace<MapRenderData>(rScene.hier_get_root(), rScene, 100, 100);
 
-    mapdata.m_points = std::vector<MapRenderData::ColorVert>(0);
+    mapdata.m_points = std::vector<MapRenderData::ColorVert>(mapdata.m_maxPoints,
+        {Vector4{0.0}, Color4{1.0}});
     mapdata.m_pointBuffer.setData(mapdata.m_points);
     mapdata.m_pointMesh
         .setPrimitive(Magnum::GL::MeshPrimitive::Points)
-        .setCount(0)
+        .setCount(mapdata.m_maxPoints)
         .addVertexBuffer(mapdata.m_pointBuffer, 0,
-            VertexColor3D::Position{},
-            VertexColor3D::Color4{});
+            Magnum::GL::Attribute<0, Vector4>{},
+            Magnum::GL::Attribute<2, Color4>{});
 
     mapdata.m_vertexData = std::vector<MapRenderData::ColorVert>(mapdata.m_maxPathVerts);
     mapdata.m_indexData = std::vector<GLuint>(mapdata.m_maxPathVerts);
@@ -150,6 +151,7 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
         });
 }
 
+#if 1
 void SysMap::update_map(ActiveScene& rScene)
 {
     auto& rUni = rScene.get_application().get_universe();
@@ -167,13 +169,24 @@ void SysMap::update_map(ActiveScene& rScene)
     preproccess->process(renderData.m_rawState, state.m_nElements, state.m_nElementsPadded,
         renderData.m_pointBuffer, 0);
 
-    DependRes<MapUpdateCompute> mapUpdate =
+    /*DependRes<MapUpdateCompute> mapUpdate =
         glres.get<MapUpdateCompute>("map_compute");
     mapUpdate->update_map(
         state.m_nElements, renderData.m_pointBuffer,
         state.m_nElements, renderData.m_pathMetadataBuffer,
         renderData.m_vertexBuffer.size(), renderData.m_vertexBuffer,
-        renderData.m_indexBuffer.size(), renderData.m_indexBuffer);
+        renderData.m_indexBuffer.size(), renderData.m_indexBuffer);*/
+
+}
+#endif
+#if 0
+void SysMap::update_map(ActiveScene& rScene)
+{
+    auto& rUni = rScene.get_application().get_universe();
+    auto& reg = rUni.get_reg();
+    auto& glres = rScene.get_context_resources();
+
+    MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
 
     auto view = reg.view<UCompTransformTraj, ACompMapVisible>();
     for (auto [sat, traj, vis] : view.each())
@@ -185,18 +198,19 @@ void SysMap::update_map(ActiveScene& rScene)
             // Add point
             pointIndex = renderData.m_points.size();
             renderData.m_pathMapping.emplace(sat, pointIndex);
-            renderData.m_points.push_back({Vector3{}, Color4{traj.m_color, 1.0}});
+            renderData.m_points.push_back({Vector4{}, Color4{traj.m_color, 1.0}});
         }
         else
         {
             pointIndex = itr->second;
         }
         renderData.m_points[pointIndex].m_pos =
-            universe_to_render_space(traj.m_position);
+            Vector4{universe_to_render_space(traj.m_position), 1.0};
     }
     renderData.m_pointBuffer.setData(renderData.m_points, BufferUsage::DynamicDraw);
     renderData.m_pointMesh.setCount(renderData.m_points.size());
 }
+#endif
 
 void MapUpdateCompute::update_map(
     size_t numPoints, Buffer& pointBuffer,
@@ -234,12 +248,6 @@ void MapUpdateCompute::set_uniform_counts(
             static_cast<UnsignedInt>(numPaths),
             static_cast<UnsignedInt>(numPathVerts),
             static_cast<UnsignedInt>(numPathIndices)});
-}
-
-void MapUpdateCompute::bind_raw_position_data(Buffer& data)
-{
-    data.bind(Buffer::Target::ShaderStorage,
-        static_cast<Int>(EBufferBinding::RawInput));
 }
 
 void MapUpdateCompute::bind_point_locations(Buffer& points)

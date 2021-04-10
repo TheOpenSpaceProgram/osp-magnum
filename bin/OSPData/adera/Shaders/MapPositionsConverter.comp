@@ -58,8 +58,9 @@ void interpret_input_points(uint index)
 
     const double invUnit = 1.0LF / 1024.0LF;
     const double scalingFactor = 1e-6LF;
-    vec3 result = vec3(dvec3(x_i, y_i, z_i) * invUnit * scalingFactor);
+    vec3 result = vec3(dvec3(x_i, y_i, z_i) * scalingFactor);
     pointVerts[OUTPUT_OSET + index].position = vec4(result, 1.0);
+    pointVerts[OUTPUT_OSET + index].color = vec4(1.0);
 }
 
 void main()

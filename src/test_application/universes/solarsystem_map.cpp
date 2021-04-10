@@ -242,6 +242,8 @@ std::vector<PlanetBody> create_solar_system_bodies()
     venus.m_color = 0xFFDF80_rgbf;
     planets.push_back(std::move(venus));
 
+    return planets;
+
     /* ####### Earth ####### */
     PlanetBody earth;
     earth.m_mass = 5.97e24;

@@ -67,7 +67,7 @@ public:
     struct ColorVert
     {
         //Magnum::Vector4 m_pos;
-        Magnum::Vector3 m_pos;
+        Magnum::Vector4 m_pos;
         Magnum::Color4 m_color;
     };
 //#pragma pack(pop)
@@ -156,11 +156,10 @@ private:
 
     enum class EBufferBinding : Magnum::Int
     {
-        RawInput = 0,
-        PointVerts = 1,
-        PathData = 2,
-        PathIndices = 3,
-        PathsInfo = 4
+        PointVerts = 0,
+        PathData = 1,
+        PathIndices = 2,
+        PathsInfo = 3
     };
 
     using Magnum::GL::AbstractShaderProgram::draw;
@@ -169,7 +168,6 @@ private:
 
     void set_uniform_counts(size_t numPoints, size_t numPaths,
         size_t numPathVerts, size_t numPathIndices);
-    void bind_raw_position_data(Magnum::GL::Buffer& data);
     void bind_point_locations(Magnum::GL::Buffer& points);
     void bind_path_vert_data(Magnum::GL::Buffer& pathVerts);
     void bind_path_index_data(Magnum::GL::Buffer& pathIndices);

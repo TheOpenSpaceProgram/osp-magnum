@@ -191,7 +191,7 @@ EvolutionTable::RawStepData EvolutionTable::get_step(size_t timestep)
     return {
         Corrade::Containers::ArrayView<double>(&m_posTable[rowOffset], nElementsPadded),
         m_nBodies,
-        nElementsPadded
+        m_scalarArraySizeBytes / sizeof(double)
     };
 }
 
@@ -248,7 +248,7 @@ void TrajNBody::update()
         Vector3d accel = m_data.get_acceleration(i);
         Vector3d pos = m_data.get_position(i, m_data.m_currentStep);
 
-        reg.get<UCompTransformTraj>(sat).m_position = Vector3s{pos} * 1024ll;
+        reg.get<UCompTransformTraj>(sat).m_position = Vector3s{pos * 1024.0};
         reg.get<UCompVel>(sat).m_velocity = vel;
         reg.get<UCompAccel>(sat).m_acceleration = accel;
     }

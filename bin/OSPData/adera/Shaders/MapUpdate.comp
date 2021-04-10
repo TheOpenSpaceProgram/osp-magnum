@@ -41,11 +41,6 @@ const uint N_POINTS = pathDataCounts.x;
 const uint N_PATH_VERTS = pathDataCounts.z;
 const uint N_PATH_INDICES = pathDataCounts.w;
 
-layout(binding = 0, std430) readonly buffer RawInput
-{
-    double rawInput[];
-};
-
 struct ColorVert
 {
     vec4 position;
@@ -60,7 +55,7 @@ struct ColorVert
  * shader which populates the buffer that is then bound here. These point
  * locations are pushed into the trail buffers by this kernel.
 */
-layout(binding = 1, std430) buffer PointLocations
+layout(binding = 0, std430) buffer PointLocations
 {
     ColorVert pointVerts[];
 };
@@ -70,7 +65,7 @@ layout(binding = 1, std430) buffer PointLocations
  *
  * Corresponds to MapRenderData::m_vertexBuffer
  */
-layout(binding = 2, std430) buffer PathData
+layout(binding = 1, std430) buffer PathData
 {
     ColorVert pathData[];
 };
@@ -82,7 +77,7 @@ layout(binding = 2, std430) buffer PathData
  * allows a magic index value to indicate the interruption of the primitive
  * (e.g. line strip) being drawn. Corresponds to MapRenderData::m_indexBuffer
  */
-layout(binding = 3, std430) buffer PathIndices
+layout(binding = 2, std430) buffer PathIndices
 {
     uint indices[];
 };
@@ -95,7 +90,7 @@ struct PathMetadata
     uint nextIdx;     // The next vertex index to become the first
 };
 
-layout(binding = 4) buffer PathsInfo
+layout(binding = 3) buffer PathsInfo
 {
     PathMetadata paths[];
 };
