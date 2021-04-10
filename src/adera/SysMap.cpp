@@ -164,7 +164,7 @@ void SysMap::register_system(ActiveScene& rScene)
             MapRenderData::PathMetadata pathInfo;
             pathInfo.m_pointIndex = pointIndex;
             pathInfo.m_startIdx = pathIndex * MapRenderData::smc_N_INDICES_PER_PATH;
-            pathInfo.m_endIdx = pathInfo.m_startIdx + MapRenderData::smc_N_INDICES_PER_PATH;
+            pathInfo.m_endIdx = pathInfo.m_startIdx + MapRenderData::smc_N_VERTS_PER_PATH - 1;
             pathInfo.m_nextIdx = pathInfo.m_startIdx;
 
             renderData.m_pathMetadata.push_back(std::move(pathInfo));
@@ -197,7 +197,7 @@ void SysMap::register_system(ActiveScene& rScene)
     // Initialize index data
     for (size_t i = 0; i < renderData.m_indexData.size(); i++)
     {
-        if ((i % MapRenderData::smc_N_INDICES_PER_PATH) == 0)
+        if (i > 0 && ((i+1) % MapRenderData::smc_N_INDICES_PER_PATH) == 0)
         {
             renderData.m_indexData[i] = MapRenderData::smc_PRIMITIVE_RESTART;
         }
