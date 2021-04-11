@@ -242,7 +242,7 @@ void DebugCameraController::update_physics_post()
     if (MachineUserControl *pMUserCtrl = find_user_control(m_scene, vehicle);
         pMUserCtrl != nullptr)
     {
-        pMUserCtrl->enable();
+        //pMUserCtrl->enable();
     }
 
 
@@ -328,7 +328,7 @@ bool DebugCameraController::try_switch_vehicle()
         if (MachineUserControl *pMUserCtrl = find_user_control(m_scene, vehicle);
             pMUserCtrl != nullptr)
         {
-            pMUserCtrl->disable();
+            //pMUserCtrl->disable();
         }
 
         prevVehiclePos = rReg.get<ACompTransform>(vehicle).m_transform.translation();

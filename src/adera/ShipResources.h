@@ -145,6 +145,4 @@ struct ShipResource
     uint64_t m_quantity;
 };
 
-
-
 } // namespace adera::active::machines

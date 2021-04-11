@@ -40,30 +40,6 @@ using namespace osp;
 using Magnum::Vector3;
 using Magnum::Matrix4;
 
-void MachineRCSController::propagate_output(WireOutput* output)
-{
-
-}
-
-WireInput* MachineRCSController::request_input(osp::WireInPort port)
-{
-    return existing_inputs()[port];
-}
-
-WireOutput* MachineRCSController::request_output(osp::WireOutPort port)
-{
-    return existing_outputs()[port];
-}
-
-std::vector<WireInput*> MachineRCSController::existing_inputs()
-{
-    return {&m_wiCommandOrient};
-}
-
-std::vector<WireOutput*> MachineRCSController::existing_outputs()
-{
-    return {&m_woThrottle};
-}
 
 void SysMachineRCSController::add_functions(ActiveScene& rScene)
 {
@@ -141,11 +117,7 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
             rScene.reg_emplace<MachineRCSController>(machEnt);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id,
-                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
-                    {
-                        return rScene.reg_get<MachineRCSController>(ent);
-                    });
+            rScene.reg_emplace<ACompMachineType>(machEnt, id);
         }
     }
 }
@@ -154,6 +126,7 @@ void SysMachineRCSController::update_controls(ActiveScene& rScene)
 {
     auto view = rScene.get_registry().view<MachineRCSController>();
 
+#if 0
     for (ActiveEnt ent : view)
     {
         auto& machine = view.get<MachineRCSController>(ent);
@@ -192,4 +165,5 @@ void SysMachineRCSController::update_controls(ActiveScene& rScene)
             std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = influence;
         }
     }
+#endif
 }

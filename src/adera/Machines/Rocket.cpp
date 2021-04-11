@@ -41,41 +41,6 @@ using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
 
-using adera::active::machines::MachineContainer;
-
-void MachineRocket::propagate_output(WireOutput* output)
-{
-
-}
-
-WireInput* MachineRocket::request_input(WireInPort port)
-{
-    return existing_inputs()[port];
-}
-
-WireOutput* MachineRocket::request_output(WireOutPort port)
-{
-    return existing_outputs()[port];
-}
-
-std::vector<WireInput*> MachineRocket::existing_inputs()
-{
-    std::vector<WireInput*> inputs;
-    inputs.reserve(3 + m_resourceLines.size());
-
-    inputs.insert(inputs.begin(), {&m_wiGimbal, &m_wiIgnition, &m_wiThrottle});
-    for (auto& resource : m_resourceLines)
-    {
-        inputs.push_back(&resource.m_source);
-    }
-    return inputs;
-}
-
-std::vector<WireOutput*> MachineRocket::existing_outputs()
-{
-    return {};
-}
-
 void SysMachineRocket::add_functions(ActiveScene &rScene)
 {
     rScene.debug_update_add(rScene.get_update_order(), "mach_rocket", "controls", "physics",
@@ -83,10 +48,6 @@ void SysMachineRocket::add_functions(ActiveScene &rScene)
     rScene.debug_update_add(rScene.get_update_order(), "mach_rocket_construct", "vehicle_activate", "vehicle_modification",
                             &SysMachineRocket::update_construct);
 }
-
-//void SysMachineRocket::update_sensor()
-//{
-//}
 
 void SysMachineRocket::update_construct(ActiveScene& rScene)
 {
@@ -121,11 +82,7 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
                         vehBp.m_prototypes[partBp.m_protoIndex]
                                 ->m_protoMachines[mach.m_protoMachineIndex],
                         mach);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id,
-                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
-                    {
-                        return rScene.reg_get<MachineRocket>(ent);
-                    });
+            rScene.reg_emplace<ACompMachineType>(machEnt, id);
         }
     }
 }
@@ -135,6 +92,7 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
 {
     auto view = rScene.get_registry().view<MachineRocket>();
 
+#if 0
     for (ActiveEnt ent : view)
     {
         auto &machine = view.get<MachineRocket>(ent);
@@ -244,6 +202,7 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         // TODO: later, take into account low fuel pressure, bad mixture, etc.
         machine.m_powerOutput = pThrotPercent->m_value;
     }
+#endif
 }
 
 void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt part,
@@ -326,33 +285,6 @@ MachineRocket& SysMachineRocket::instantiate(
     Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
     DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>(resPath.identifier);
 
-    std::vector<MachineRocket::input_t> inputs;
-    if (!fuel.empty())
-    {
-        inputs.push_back({std::move(fuel), 1.0f});
-    }
-
     attach_plume_effect(rScene, rScene.reg_get<ACompHierarchy>(ent).m_parent, ent);
-    return rScene.reg_emplace<MachineRocket>(ent, std::move(params), std::move(inputs));
-}
-
-uint64_t SysMachineRocket::resource_units_required(
-    osp::active::ActiveScene const& scene,
-    MachineRocket const& machine, float throttle,
-    MachineRocket::ResourceInput const& resource)
-{
-    float massFlowRate = resource_mass_flow_rate(machine,
-        throttle, resource);
-    float massFlow = massFlowRate * scene.get_time_delta_fixed();
-    return resource.m_type->resource_quantity(massFlow);
-}
-
-constexpr float SysMachineRocket::resource_mass_flow_rate(MachineRocket const& machine,
-    float throttle, MachineRocket::ResourceInput const& resource)
-{
-    float thrustMag = machine.m_params.m_maxThrust * throttle;
-    float massFlowRateTot = thrustMag /
-        (phys::constants::g_0 * machine.m_params.m_specImpulse);
-
-    return massFlowRateTot * resource.m_massRateFraction;
+    return rScene.reg_emplace<MachineRocket>(ent);
 }

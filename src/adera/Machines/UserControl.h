@@ -94,7 +94,7 @@ public:
 /**
  * Interfaces user input into WireOutputs designed for controlling spacecraft.
  */
-class MachineUserControl : public osp::active::Machine
+class MachineUserControl
 {
     friend SysMachineUserControl;
 
@@ -102,50 +102,18 @@ public:
 
     static constexpr std::string_view smc_mach_name = "UserControl";
 
-    MachineUserControl();
-    MachineUserControl(MachineUserControl&& move);
 
-    MachineUserControl& operator=(MachineUserControl&& move);
 
-    void propagate_output(osp::active::WireOutput* output) override;
-
-    osp::active::WireInput* request_input(osp::WireInPort port) override;
-    osp::active::WireOutput* request_output(osp::WireOutPort port) override;
-
-    std::vector<osp::active::WireInput*> existing_inputs() override;
-    std::vector<osp::active::WireOutput*> existing_outputs() override;
 
 private:
-    osp::active::WireInput  m_wiTest          { this, "Test"              };
-    osp::active::WireOutput m_woAttitude      { this, "AttitudeControl"   };
-    osp::active::WireOutput m_woTestPropagate { this, "TestOut", m_wiTest };
-    osp::active::WireOutput m_woThrottle      { this, "Throttle"          };
+    int dummy;
+//    osp::active::WireInput  m_wiTest          { this, "Test"              };
+//    osp::active::WireOutput m_woAttitude      { this, "AttitudeControl"   };
+//    osp::active::WireOutput m_woTestPropagate { this, "TestOut", m_wiTest };
+//    osp::active::WireOutput m_woThrottle      { this, "Throttle"          };
 };
 
 //-----------------------------------------------------------------------------
 
-inline MachineUserControl::MachineUserControl()
-{
-    m_woAttitude.value() = osp::active::wiretype::AttitudeControl{};
-    m_woThrottle.value() = osp::active::wiretype::Percent{0.0f};
-}
-
-inline MachineUserControl::MachineUserControl(MachineUserControl&& move)
- : Machine(std::move(move))
- , m_wiTest(this, std::move(move.m_wiTest))
- , m_woAttitude(this, std::move(move.m_woAttitude))
- , m_woTestPropagate(this, std::move(move.m_woTestPropagate)) // TODO: Why not reference m_wiTest here?
- , m_woThrottle(this, std::move(move.m_woThrottle))
-{ }
-
-inline MachineUserControl& MachineUserControl::operator=(MachineUserControl&& move)
-{
-    Machine::operator=(std::move(move));
-    m_wiTest          = { this, std::move(move.m_wiTest)          };
-    m_woAttitude      = { this, std::move(move.m_woAttitude)      };
-    m_woTestPropagate = { this, std::move(move.m_woTestPropagate) }; // TODO: Why not reference m_wiTest here?
-    m_woThrottle      = { this, std::move(move.m_woThrottle)      };
-    return *this;
-}
 
 } // namespace adera::active::machines

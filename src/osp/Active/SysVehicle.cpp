@@ -352,39 +352,7 @@ void debug_wire_vehicles(ActiveScene &rScene)
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    for (auto [vehEnt, rVeh, rVehConstr] : view.each())
-    {
-        // Loop through wire connections
-        for (BlueprintWire& blueprintWire : rVehConstr.m_blueprint->m_wires)
-        {
-            // TODO: check if the connections are valid
 
-            // get wire from
-
-            ACompMachines& fromMachines = rScene.reg_get<ACompMachines>(
-                    rVeh.m_parts[blueprintWire.m_fromPart]);
-
-            ActiveEnt fromEnt = fromMachines.m_machines[blueprintWire.m_fromMachine];
-            Machine &fromMachine = rScene.reg_get<ACompMachineType>(fromEnt)
-                                         .m_get_machine(rScene, fromEnt);
-            WireOutput* fromWire =
-                    fromMachine.request_output(blueprintWire.m_fromPort);
-
-            // get wire to
-
-            ACompMachines& toMachines = rScene.reg_get<ACompMachines>(
-                   rVeh.m_parts[blueprintWire.m_toPart]);
-
-            ActiveEnt toEnt = toMachines.m_machines[blueprintWire.m_toMachine];
-            Machine &toMachine = rScene.reg_get<ACompMachineType>(toEnt)
-                                       .m_get_machine(rScene, toEnt);
-            WireInput* toWire = toMachine.request_input(blueprintWire.m_toPort);
-
-            // make the connection
-
-            SysWire::connect(*fromWire, *toWire);
-        }
-    }
 }
 
 void SysVehicle::update_activate(ActiveScene &rScene)

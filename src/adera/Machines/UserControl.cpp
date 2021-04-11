@@ -42,31 +42,6 @@ void SysMachineUserControl::add_functions(ActiveScene &rScene)
                             &SysMachineUserControl::update_construct);
 }
 
-void MachineUserControl::propagate_output(WireOutput* output)
-{
-    SPDLOG_LOGGER_INFO(spdlog::get("application"), "Propagate test: {}", output->get_name());
-}
-
-WireInput* MachineUserControl::request_input(WireInPort port)
-{
-    return existing_inputs()[port];
-}
-
-WireOutput* MachineUserControl::request_output(WireOutPort port)
-{
-    return existing_outputs()[port];
-}
-
-std::vector<WireInput*> MachineUserControl::existing_inputs()
-{
-    return {&m_wiTest};
-}
-
-std::vector<WireOutput*> MachineUserControl::existing_outputs()
-{
-    return {&m_woAttitude, &m_woThrottle, &m_woTestPropagate};
-}
-
 void SysMachineUserControl::update_construct(ActiveScene &rScene)
 {
     auto view = rScene.get_registry()
@@ -94,11 +69,7 @@ void SysMachineUserControl::update_construct(ActiveScene &rScene)
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
             rScene.reg_emplace<MachineUserControl>(machEnt);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id,
-                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
-                    {
-                        return rScene.reg_get<MachineUserControl>(ent);
-                    });
+            rScene.reg_emplace<ACompMachineType>(machEnt, id);
         }
     }
 }
@@ -126,6 +97,8 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 
     auto view = rScene.get_registry().view<MachineUserControl>();
 
+
+#if 0
     for (ActiveEnt ent : view)
     {
         MachineUserControl &machine = view.get<MachineUserControl>(ent);
@@ -167,4 +140,6 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
         SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
                             "Updating control");
     }
+
+#endif
 }

@@ -26,33 +26,3 @@
 
 #include "SysWire.h"
 #include "ActiveScene.h"
-
-using namespace osp;
-using namespace osp::active;
-
-WireData* WireInput::connected_value()
-{
-    WireOutput* woConnected = list();
-    if (woConnected)
-    {
-        return &(woConnected->value());
-    }
-    else
-    {
-        return nullptr;
-    }
-}
-
-void WireInput::doErase()
-{
-     list()->cut(this);
-};
-
-
-void SysWire::connect(WireOutput &wireFrom, WireInput &wireTo)
-{
-  SPDLOG_LOGGER_INFO(spdlog::get("application"), "Connected {} to {}", wireFrom.get_name(),
-                      wireTo.get_name());
-    wireFrom.insert(&wireTo);
-    // TODO: check for dependent outputs and add to list and sort
-}

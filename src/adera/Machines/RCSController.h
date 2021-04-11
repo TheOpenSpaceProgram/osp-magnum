@@ -87,7 +87,7 @@ private:
 
 //-----------------------------------------------------------------------------
 
-class MachineRCSController : public osp::active::Machine
+class MachineRCSController
 {
     friend SysMachineRCSController;
 
@@ -95,47 +95,13 @@ public:
 
     static inline std::string smc_mach_name = "RCSController";
 
-    MachineRCSController();
-    MachineRCSController(MachineRCSController&& move) noexcept;
-    MachineRCSController& operator=(MachineRCSController&& move) noexcept;
-    ~MachineRCSController() = default;
-
-    void propagate_output(osp::active::WireOutput *output) override;
-
-    osp::active::WireInput* request_input(osp::WireInPort port) override;
-    osp::active::WireOutput* request_output(osp::WireOutPort port) override;
-
-    std::vector<osp::active::WireInput*> existing_inputs() override;
-    std::vector<osp::active::WireOutput*> existing_outputs() override;
 
 private:
-    osp::active::WireInput m_wiCommandOrient{this, "Orient"};
-    osp::active::WireOutput m_woThrottle{this, "Throttle"};
+    //osp::active::WireInput m_wiCommandOrient{this, "Orient"};
+    //osp::active::WireOutput m_woThrottle{this, "Throttle"};
 
     osp::active::ActiveEnt m_rigidBody{entt::null};
 }; // MachineRCSController
 
-inline MachineRCSController::MachineRCSController()
-    : Machine(true)
-{
-    m_woThrottle.value() = osp::active::wiretype::Percent{0.0f};
-}
-
-
-inline MachineRCSController::MachineRCSController(MachineRCSController&& move) noexcept
-    : Machine(std::move(move))
-    , m_wiCommandOrient{this, std::move(move.m_wiCommandOrient)}
-    , m_woThrottle{this, std::move(move.m_woThrottle)}
-    , m_rigidBody(std::move(move.m_rigidBody))
-{}
-
-inline MachineRCSController& MachineRCSController::operator=(MachineRCSController&& move) noexcept
-{
-    Machine::operator=(std::move(move));
-    m_wiCommandOrient = {this, std::move(move.m_wiCommandOrient)};
-    m_woThrottle = {this, std::move(move.m_woThrottle)};
-    m_rigidBody = std::exchange(move.m_rigidBody, entt::null);
-    return *this;
-}
 
 } // adera::active::machines
