@@ -27,6 +27,7 @@
 #include <osp/Active/ActiveScene.h>
 #include <osp/types.h>
 #include <osp/Universe.h>
+#include <osp/Trajectories/NBody.h>
 
 #include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/Mesh.h>
@@ -68,7 +69,7 @@ public:
     // Number of paths
     GLuint m_numPaths{0};
     // Number of vertices per path
-    static constexpr GLuint smc_N_VERTS_PER_PATH = 999;
+    static constexpr GLuint smc_N_VERTS_PER_PATH = 9;
     // Number of indices per path (1 extra, to store primitive restart index)
     static constexpr GLuint smc_N_INDICES_PER_PATH = smc_N_VERTS_PER_PATH + 1;
 
@@ -124,8 +125,9 @@ public:
     ProcessMapCoordsCompute(ProcessMapCoordsCompute&& move) = default;
 
     void process(
-        Magnum::GL::Buffer& rawInput, size_t inputCount, size_t inputCountPadded,
-        Magnum::GL::Buffer& dest, size_t destOffset);
+        Magnum::GL::Buffer& rawInput, Magnum::GL::Buffer& dest,
+        size_t sigCount, size_t sigCountPadded,
+        size_t insigCount, size_t insigCountPadded);
 private:
     static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{32, 1, 1};
 
@@ -142,7 +144,8 @@ private:
         Output = 1
     };
 
-    void set_input_counts(size_t nInputPoints, size_t nInputPointsPadded, size_t outputOffset);
+    void set_input_counts(size_t nSigPoints, size_t nSigPointsPadded,
+        size_t nInsigPoints, size_t nInsigPointsPadded);
     void bind_input_buffer(Magnum::GL::Buffer& input);
     void bind_output_buffer(Magnum::GL::Buffer& output);
 };
@@ -206,6 +209,8 @@ private:
     static constexpr size_t m_orbitSamples = 512;
     static void configure_render_passes(osp::active::ActiveScene& rScene);
     static void register_system(osp::active::ActiveScene& rScene);
+    static void process_raw_state(osp::active::ActiveScene& rScene,
+        MapRenderData& rMapData, osp::universe::TrajNBody* traj);
 };
 
 } // namespace adera::active

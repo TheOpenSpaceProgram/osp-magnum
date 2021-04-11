@@ -46,6 +46,8 @@ using osp::universe::UCompVel;
 using osp::universe::UCompAccel;
 using osp::universe::UCompMass;
 using osp::universe::UCompEmitsGravity;
+using osp::universe::UCompInsignificantBody;
+using osp::universe::UCompSignificantBody;
 using adera::active::ACompMapVisible;
 using planeta::universe::SatPlanet;
 using namespace Magnum::Math::Literals;
@@ -115,11 +117,12 @@ void testapp::create_solar_system(OSPApplication& ospApp)
         Satellite sat = rUni.sat_create();
         add_body(ospApp, sat, body, &nbody);
         reg.emplace<UCompEmitsGravity>(sat);
+        reg.emplace<UCompSignificantBody>(sat);
     }
 
     /* ####### Asteroids ####### */
 
-    //add_asteroids(ospApp, nbody, 5'000);
+    add_asteroids(ospApp, nbody, 1'000);
 
     nbody.build_table();
 }
@@ -192,16 +195,13 @@ void add_asteroids(OSPApplication& ospApp, TrajNBody& traj,
 {
     Universe& rUni = ospApp.get_universe();
 
-    // Add asteroids
-    constexpr size_t N_ASTEROIDS = 50'000;
-
     std::random_device rd{};
     std::mt19937 gen{rd()};
     std::normal_distribution<> d{meanDist, stdevDist};
     std::uniform_real_distribution<> u{0.0, 2.0 * 3.14159265359};
     std::normal_distribution<> v{0.0, 500.0 * 1024.0};
 
-    for (size_t i = 0; i < N_ASTEROIDS; i++)
+    for (size_t i = 0; i < count; i++)
     {
         Satellite asteroid = rUni.sat_create();
         double orbitalRadius = d(gen) * g_1AU;
@@ -216,6 +216,7 @@ void add_asteroids(OSPApplication& ospApp, TrajNBody& traj,
         body.m_velOset = {v(gen), v(gen), v(gen)};
         add_body(ospApp, asteroid, body, &traj);
         //rUni.get_reg().emplace<UCompAsteroid>(asteroid);
+        rUni.get_reg().emplace<UCompInsignificantBody>(asteroid);
     }
 }
 
@@ -241,8 +242,6 @@ std::vector<PlanetBody> create_solar_system_bodies()
     venus.m_name = "Venus";
     venus.m_color = 0xFFDF80_rgbf;
     planets.push_back(std::move(venus));
-
-    return planets;
 
     /* ####### Earth ####### */
     PlanetBody earth;

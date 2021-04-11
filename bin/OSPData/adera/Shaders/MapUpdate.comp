@@ -96,7 +96,7 @@ layout(binding = 3, std430) buffer PathsInfo
  */
 void fade_color(uint pathID, uint pathVertID)
 {
-    uint index = pathID*VERTS_PER_PATH + pathVertID;
+    uint index = pathID*INDICES_PER_PATH + pathVertID;
     float alpha = pathData[index].color.a;
     float rate = 1.0 / float(VERTS_PER_PATH - 1);
     pathData[index].color.a = clamp(alpha - rate, 0.0, 1.0);

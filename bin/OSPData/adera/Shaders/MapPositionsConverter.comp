@@ -27,12 +27,13 @@
 layout(local_size_x = 32) in;
 
 const uint THREAD_INDEX = gl_GlobalInvocationID.x;
-const uint N_INVOCATIONS = gl_NumWorkGroups.x*gl_WorkGroupSize.x;
 
-layout(location = 0) uniform uvec3 counts;
-const uint N_POINTS = counts.x;
-const uint N_POINTS_PADDED = counts.y;
-const uint OUTPUT_OSET = counts.z;
+layout(location = 0) uniform uvec4 counts;
+const uint N_SIGNFT_POINTS = counts.x;
+const uint N_SIGNFT_POINTS_PADDED = counts.y;
+const uint N_INSIGNFT_POINTS = counts.z;
+const uint N_INSIGNFT_POINTS_PADDED = counts.w;
+const uint TOTAL_SIZE = N_SIGNFT_POINTS + N_INSIGNFT_POINTS;
 
 layout(binding = 0, std430) readonly buffer RawInput
 {
@@ -50,23 +51,60 @@ layout(binding = 1, std430) buffer PointLocations
     ColorVert pointVerts[];
 };
 
-void interpret_input_points(uint index)
+/**
+ * Interpret raw input data subarray as map point positions
+ *
+ * Since the raw position data is not only separated by component and padded
+ * but also seggregated by object type (significant vs. insignificant body), the
+ * data must be reinterpreted for rendering.
+ *
+ * Data layout (p: padding, s: significant, i: insignificant):
+ * |  Xs  |p|  Ys  |p|  Zs  |p|  Xi  |p|  Yi  |p|  Zi  |p|
+ *
+ * @param input - Point index within subarray [0, numPoints)
+ * @param componentSpan - The byte length of each component block, needed to index
+        into the raw data while ignoring padding
+ * @param inputOset - The index of the first subarray element in the raw input
+ * @param outputOset - The index of the first point to write to output
+ */
+void interpret_input_points(uint index, uint componentSpan, uint inputOset, uint outputOset)
 {
-    double x_i = rawInput[0*N_POINTS_PADDED + index];
-    double y_i = rawInput[1*N_POINTS_PADDED + index];
-    double z_i = rawInput[2*N_POINTS_PADDED + index];
+    double x_i = rawInput[inputOset + 0*componentSpan + index];
+    double y_i = rawInput[inputOset + 1*componentSpan + index];
+    double z_i = rawInput[inputOset + 2*componentSpan + index];
 
     const double invUnit = 1.0LF / 1024.0LF;
     const double scalingFactor = 1e-6LF;
     vec3 result = vec3(dvec3(x_i, y_i, z_i) * scalingFactor);
-    pointVerts[OUTPUT_OSET + index].position = vec4(result, 1.0);
-    pointVerts[OUTPUT_OSET + index].color.a = 1.0;
+    pointVerts[outputOset + index].position = vec4(result, 1.0);
+    pointVerts[outputOset + index].color.a = 1.0;
 }
 
 void main()
 {
     // Discard threads that are out of bounds
-    if (THREAD_INDEX > N_POINTS) { return; }
+    if (THREAD_INDEX < N_SIGNFT_POINTS)
+    {
+        // Fully dynamic data segment
+        interpret_input_points(THREAD_INDEX, N_SIGNFT_POINTS_PADDED, 0, 0);
+    }
+    else if (THREAD_INDEX > N_SIGNFT_POINTS && THREAD_INDEX < TOTAL_SIZE)
+    {
+        // Insignificant bodies data segment
 
-    interpret_input_points(THREAD_INDEX);
+        uint relativeIndex = THREAD_INDEX - N_SIGNFT_POINTS;
+        uint firstInputIndex = 3*N_SIGNFT_POINTS_PADDED;
+        uint outputOset = N_SIGNFT_POINTS;
+
+        interpret_input_points(
+            relativeIndex,
+            N_INSIGNFT_POINTS_PADDED,
+            firstInputIndex,
+            outputOset);
+    }
+    else
+    {
+        // Thread index out of bounds or in array padding segments
+        return;
+    }
 }

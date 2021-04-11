@@ -36,7 +36,8 @@ namespace osp::universe
 {
 
 struct UCompEmitsGravity {};
-struct UCompSubjectToGravity {};
+struct UCompSignificantBody {};
+struct UCompInsignificantBody {};
 
 constexpr double G = 6.674e-11;
 
@@ -112,7 +113,7 @@ public:
 
     RawStepData get_step(size_t timestep);
 
-    void copy_step_to_top(size_t timestep);
+    //void copy_step_to_top(size_t timestep);
 private:
     static constexpr size_t AVX2_WIDTH = 256 / 8;  // 256 bits / 8 = 32 Bytes
 
@@ -166,8 +167,8 @@ private:
 
     // Table dimensions
 
-    size_t m_nBodies{0};
-    size_t m_nTimesteps{0};
+    size_t m_numBodies{0};
+    size_t m_numTimesteps{0};
     size_t m_currentStep{0};
 
     size_t m_scalarArraySizeBytes;
@@ -204,7 +205,8 @@ public:
 
     void build_table();
 
-    EvolutionTable::RawStepData get_latest_state();
+    using FullState_t = std::pair<EvolutionTable::RawStepData, EvolutionTable::RawStepData>;
+    FullState_t get_latest_state();
 private:
     template <typename VIEW_T, typename SRC_VIEW_T>
     static void update_full_dynamics_acceleration(VIEW_T& bodyView, SRC_VIEW_T& sources);
@@ -214,10 +216,16 @@ private:
 
     void solve_table();
 
-    void solve_timestep(size_t stepIndex);
-    void solve_timestep_AVX(size_t stepIndex);
+    void solve_nbody_timestep(size_t stepIndex);
+    void solve_nbody_timestep_AVX(size_t stepIndex);
 
-    EvolutionTable m_data;
+    void solve_insignificant_bodies(size_t inputStepIndex);
+    void solve_insignificant_bodies_AVX(size_t inputStepIndex);
+
+    void write_universe_components(EvolutionTable& dataSource);
+
+    EvolutionTable m_nBodyData;
+    EvolutionTable m_insignificantBodyData;
 };
 
 }

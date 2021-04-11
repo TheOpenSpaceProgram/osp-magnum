@@ -158,31 +158,36 @@ void SysMap::register_system(ActiveScene& rScene)
     renderData.m_pathMapping.clear();
 
     // Enumerate total number of map objects and paths
+    // Fully dynamic (significant) bodies come first
 
     size_t pointIndex = 0;
     size_t pathIndex = 0;
-    auto view = reg.view<UCompTransformTraj, ACompMapVisible>();
-    for (auto [sat, traj, vis] : view.each())
+    auto sigView = reg.view<UCompTransformTraj, ACompMapVisible, UCompSignificantBody>();
+    for (auto [sat, traj, vis] : sigView.each())
     {
         Vector3 initPos = universe_to_render_space(traj.m_position);
         renderData.m_points.emplace_back(Vector4{initPos, 1.0}, Color4{traj.m_color, 1.0});
         renderData.m_pointMapping.emplace(sat, pointIndex);
 
-        if (reg.has<UCompEmitsGravity>(sat))
-        {
-            // Body is fully dynamic; leave trail
+        // Body is fully dynamic; leave trail
 
-            MapRenderData::PathMetadata pathInfo;
-            pathInfo.m_pointIndex = pointIndex;
-            pathInfo.m_startIdx = pathIndex * MapRenderData::smc_N_INDICES_PER_PATH;
-            pathInfo.m_endIdx = pathInfo.m_startIdx + MapRenderData::smc_N_VERTS_PER_PATH - 1;
-            pathInfo.m_nextIdx = pathInfo.m_startIdx;
+        MapRenderData::PathMetadata pathInfo;
+        pathInfo.m_pointIndex = pointIndex;
+        pathInfo.m_startIdx = pathIndex * MapRenderData::smc_N_INDICES_PER_PATH;
+        pathInfo.m_endIdx = pathInfo.m_startIdx + MapRenderData::smc_N_VERTS_PER_PATH - 1;
+        pathInfo.m_nextIdx = pathInfo.m_startIdx;
 
-            renderData.m_pathMetadata.push_back(std::move(pathInfo));
-            renderData.m_pathMapping.emplace(sat, pathIndex);
+        renderData.m_pathMetadata.push_back(std::move(pathInfo));
+        renderData.m_pathMapping.emplace(sat, pathIndex);
 
-            pathIndex++;
-        }
+        pathIndex++;
+        pointIndex++;
+    }
+    auto insigView = reg.view<UCompTransformTraj, ACompMapVisible, UCompInsignificantBody>();
+    for (auto [sat, traj, vis] : insigView.each())
+    {
+        renderData.m_points.emplace_back(Vector4{1.0}, Color4{traj.m_color, 1.0});
+        renderData.m_pointMapping.emplace(sat, pointIndex);
         pointIndex++;
     }
     renderData.m_numPoints = pointIndex;
@@ -216,7 +221,10 @@ void SysMap::register_system(ActiveScene& rScene)
         for (size_t i = 0; i < MapRenderData::smc_N_VERTS_PER_PATH; i++)
         {
             renderData.m_indexData[metadata.m_startIdx + i] = metadata.m_endIdx - i;
-            renderData.m_vertexData[metadata.m_startIdx + i].m_pos = initPos;
+            MapRenderData::ColorVert& currentVert =
+                renderData.m_vertexData[metadata.m_startIdx + i];
+            currentVert.m_pos = initPos;
+            currentVert.m_color = Color4{currentVert.m_color.rgb(), 0.0};
         }
         renderData.m_indexData[metadata.m_endIdx + 1] = MapRenderData::smc_PRIMITIVE_RESTART;
     }
@@ -241,6 +249,26 @@ void SysMap::register_system(ActiveScene& rScene)
         renderData.m_pathMetadata, Magnum::GL::BufferUsage::StaticDraw);
 }
 
+void SysMap::process_raw_state(osp::active::ActiveScene& rScene, MapRenderData& rMapData, osp::universe::TrajNBody* traj)
+{
+    auto [nBodyData, insignificantsData] = traj->get_latest_state();
+
+    size_t totalSize = nBodyData.m_data.size() + insignificantsData.m_data.size();
+    auto& rawData = rMapData.m_rawState;
+
+    rawData.setData({nullptr, totalSize * sizeof(double)}, BufferUsage::StreamDraw);
+    rawData.setSubData(0, nBodyData.m_data);
+    rawData.setSubData(sizeof(double) * nBodyData.m_data.size(), insignificantsData.m_data);
+
+    auto& glres = rScene.get_context_resources();
+    DependRes<ProcessMapCoordsCompute> preproccess =
+        glres.get<ProcessMapCoordsCompute>("map_preproccess");
+
+    preproccess->process(rawData, rMapData.m_pointBuffer,
+        nBodyData.m_nElements, nBodyData.m_nElementsPadded,
+        insignificantsData.m_nElements, insignificantsData.m_nElementsPadded);
+}
+
 #if 1
 void SysMap::update_map(ActiveScene& rScene)
 {
@@ -257,13 +285,7 @@ void SysMap::update_map(ActiveScene& rScene)
         renderData.m_isInitialized = true;
     }
 
-    DependRes<ProcessMapCoordsCompute> preproccess =
-        glres.get<ProcessMapCoordsCompute>("map_preproccess");
-
-    EvolutionTable::RawStepData state = nbody->get_latest_state();
-    renderData.m_rawState.setData(state.m_data, Magnum::GL::BufferUsage::DynamicDraw);
-    preproccess->process(renderData.m_rawState, state.m_nElements, state.m_nElementsPadded,
-        renderData.m_pointBuffer, 0);
+    process_raw_state(rScene, renderData, nbody);
 
     DependRes<MapUpdateCompute> mapUpdate =
         glres.get<MapUpdateCompute>("map_compute");
@@ -378,17 +400,20 @@ void MapUpdateCompute::bind_path_metadata(Magnum::GL::Buffer& data)
 }
 
 void ProcessMapCoordsCompute::process(
-    Buffer& rawInput, size_t inputCount, size_t inputCountPadded,
-    Buffer& dest, size_t destOffset)
+    Buffer& rawInput, Buffer& dest,
+    size_t sigCount, size_t sigCountPadded,
+    size_t insigCount, size_t insigCountPadded)
 {
-    set_input_counts(inputCount, inputCountPadded, destOffset);
+    set_input_counts(sigCount, sigCountPadded, insigCount, insigCountPadded);
     bind_input_buffer(rawInput);
     bind_output_buffer(dest);
 
     constexpr size_t blockLength = smc_BLOCK_SIZE.x();
+    size_t totalCount = sigCountPadded + insigCount;
+    using osp::math::num_blocks;
+
     // Allocate just enough blocks to enclose all data
-    size_t numBlocks = (inputCount / blockLength)
-        + ((inputCount % blockLength) > 0) ? 1 : 0;
+    size_t numBlocks = num_blocks(totalCount, blockLength);
     dispatchCompute(Vector3ui{static_cast<UnsignedInt>(numBlocks), 1, 1});
 
     using Magnum::GL::Renderer;
@@ -406,14 +431,15 @@ void ProcessMapCoordsCompute::init()
     CORRADE_INTERNAL_ASSERT_OUTPUT(link());
 }
 
-void ProcessMapCoordsCompute::set_input_counts(size_t nInputPoints, size_t nInputPointsPadded,
-    size_t outputOffset)
+void ProcessMapCoordsCompute::set_input_counts(size_t nSigPoints, size_t nSigPointsPadded,
+    size_t nInsigPoints, size_t nInsigPointsPadded)
 {
     setUniform(static_cast<Int>(UniformPos::Counts),
-        Vector3ui{
-            static_cast<UnsignedInt>(nInputPoints),
-            static_cast<UnsignedInt>(nInputPointsPadded),
-            static_cast<UnsignedInt>(outputOffset)});
+        Vector4ui{
+            static_cast<UnsignedInt>(nSigPoints),
+            static_cast<UnsignedInt>(nSigPointsPadded),
+            static_cast<UnsignedInt>(nInsigPoints),
+            static_cast<UnsignedInt>(nInsigPointsPadded)});
 }
 
 void ProcessMapCoordsCompute::bind_input_buffer(Buffer& input)
