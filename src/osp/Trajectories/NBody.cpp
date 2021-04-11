@@ -235,7 +235,7 @@ void TrajNBody::update()
     }*/
 
     solve_nbody_timestep_AVX(m_nBodyData.m_currentStep);
-    solve_insignificant_bodies(m_nBodyData.m_currentStep);
+    solve_insignificant_bodies_AVX(m_nBodyData.m_currentStep);
 
     m_nBodyData.m_currentStep++;
 
@@ -449,17 +449,6 @@ void TrajNBody::solve_nbody_timestep_AVX(size_t stepIndex)
         m_nBodyData.set_acceleration(n, {data[3], data[2], data[1]});
     }
 
-    /*for (size_t n = 0; n < m_data.m_numBodies; n++)
-    {
-        Vector3d x = m_data.get_position(n, prevStep);
-        Vector3d v = m_data.get_velocity(n);
-        Vector3d a = m_data.get_acceleration(n);
-
-        Vector3d newVel = v + a * dt;
-        Vector3d newPos = x + newVel * dt;
-        m_data.set_velocity(n, newVel);
-        m_data.set_position(n, stepIndex, newPos);
-    }*/
     EvolutionTable::SystemState newState = m_nBodyData.get_system_state(stepIndex);
     __m256d dt_4 = _mm256_set_pd(dt, dt, dt, dt);
     for (size_t i = 0; i < 4 * nLoops; i += 4)
@@ -527,6 +516,135 @@ void TrajNBody::solve_insignificant_bodies(size_t inputStepIndex)
         Vector3d newPos = x + newVel * dt;
         m_insignificantBodyData.set_velocity(n, newVel);
         m_insignificantBodyData.set_position(n, 0, newPos);
+    }
+}
+
+void TrajNBody::solve_insignificant_bodies_AVX(size_t inputStepIndex)
+{
+    constexpr double dt = smc_timestep;
+    assert(inputStepIndex < m_nBodyData.m_numTimesteps);
+
+    __m256d vec4_0 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
+    __m256d vec4_1 = _mm256_set_pd(1.0, 1.0, 1.0, 1.0);
+    constexpr size_t simdWidthBytes = 256 / 8;
+    size_t nLoops = m_nBodyData.m_scalarArraySizeBytes / simdWidthBytes;
+
+    EvolutionTable::SystemState state = m_insignificantBodyData.get_system_state(0);
+    EvolutionTable::SystemState sources = m_nBodyData.get_system_state(inputStepIndex);
+
+    for (size_t m = 0; m < m_insignificantBodyData.m_numBodies; m++)
+    {
+        double posX = state.m_position.x[m];
+        double posY = state.m_position.y[m];
+        double posZ = state.m_position.z[m];
+        __m256d ownPos = _mm256_set_pd(posX, posY, posZ, 0.0);
+        __m256d ownPosxxx = _mm256_set_pd(posX, posX, posX, posX);
+        __m256d ownPosyyy = _mm256_set_pd(posY, posY, posY, posY);
+        __m256d ownPoszzz = _mm256_set_pd(posZ, posZ, posZ, posZ);
+
+        __m256d a = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
+
+        for (size_t n = 0; n < 4 * nLoops; n += 4)
+        {
+            // Fetch next 4 sources
+            __m256d dx = _mm256_load_pd(sources.m_position.x + n);
+            __m256d dy = _mm256_load_pd(sources.m_position.y + n);
+            __m256d dz = _mm256_load_pd(sources.m_position.z + n);
+            __m256d masses = _mm256_load_pd(sources.m_masses + n);
+            // Compute positions rel. to asteroid
+            dx = _mm256_sub_pd(dx, ownPosxxx);
+            dy = _mm256_sub_pd(dy, ownPosyyy);
+            dz = _mm256_sub_pd(dz, ownPoszzz);
+
+            // Square components
+            __m256d x2 = _mm256_mul_pd(dx, dx);
+            __m256d y2 = _mm256_mul_pd(dy, dy);
+            __m256d z2 = _mm256_mul_pd(dz, dz);
+
+            // Sum to get norm squared
+            __m256d normSqd = _mm256_add_pd(x2, y2);
+            normSqd = _mm256_add_pd(normSqd, z2);
+
+            __m256d norm = _mm256_sqrt_pd(normSqd);
+            __m256d invNorm = _mm256_div_pd(vec4_1, norm);
+
+            // Compute gravity coefficients (mass / denom) * (1/norm)
+            __m256d gravCoeff = _mm256_div_pd(masses, normSqd);
+            gravCoeff = _mm256_mul_pd(gravCoeff, invNorm);
+
+            // Compute force components
+            dx = _mm256_mul_pd(dx, gravCoeff);
+            dy = _mm256_mul_pd(dy, gravCoeff);
+            dz = _mm256_mul_pd(dz, gravCoeff);
+
+            /* Horizontal sum into net force
+
+            dx = [F4.x, F3.x, F2.x, F1.x]
+            dy = [F4.y, F3.y, F2.y, F1.y]
+            dz = [F4.z, F3.z, F2.z, F1.z]
+            need [F.x, F.y, F.z, 0]
+            */
+
+            // hsum into [y3+y4, x3+x4, y1+y2, x1+x2]
+            __m256d xy = _mm256_hadd_pd(dx, dy);
+            // permute 3,2,1,0 -> 1,2,0,2
+            // xy becomes [y1+y2, y3+y4, x1+x2, x3+x4]
+            xy = _mm256_permute4x64_pd(xy, 0b01110010);
+
+            // hsum into [z3+z4, z3+z4, z1+z2, z1+z2]
+            __m256d zz = _mm256_hadd_pd(dz, dz);
+            // permute 3,2,1,0 -> 0,2,1,3
+            zz = _mm256_permute4x64_pd(zz, 0b00100111);
+            // produce [x1+x2, x3+x4, z1+z2, z3+z4] from xy, zz
+            __m256d xz = _mm256_permute2f128_pd(xy, zz, 0b00010);
+            // hsum xy [y1+y2, y3+y4, x1+x2, x3+x4]
+            //      xz [x1+x2, x3+x4, z1+z2, z3+z4]
+            //   xyz = [x1234, y1234, z1234, x1234]
+            __m256d xyz = _mm256_hadd_pd(xy, xz);
+
+            // Accumulate acceleration
+            a = _mm256_add_pd(a, xyz);
+        }
+
+        constexpr double convert = G;
+        __m256d c = _mm256_set_pd(convert, convert, convert, convert);
+        a = _mm256_mul_pd(a, c);
+
+        double data[4];
+        _mm256_storeu_pd(data, a);
+        m_insignificantBodyData.set_acceleration(m, {data[3], data[2], data[1]});
+    }
+
+    __m256d dt_4 = _mm256_set_pd(dt, dt, dt, dt);
+    size_t mLoops = m_insignificantBodyData.m_scalarArraySizeBytes / simdWidthBytes;
+    for (size_t i = 0; i < 4 * mLoops; i += 4)
+    {
+        __m256d ax = _mm256_load_pd(state.m_acceleration.x + i);
+        __m256d ay = _mm256_load_pd(state.m_acceleration.y + i);
+        __m256d az = _mm256_load_pd(state.m_acceleration.z + i);
+
+        __m256d vx = _mm256_load_pd(state.m_velocity.x + i);
+        __m256d vy = _mm256_load_pd(state.m_velocity.y + i);
+        __m256d vz = _mm256_load_pd(state.m_velocity.z + i);
+
+        vx = _mm256_fmadd_pd(ax, dt_4, vx);
+        vy = _mm256_fmadd_pd(ay, dt_4, vy);
+        vz = _mm256_fmadd_pd(az, dt_4, vz);
+
+        __m256d x = _mm256_load_pd(state.m_position.x + i);
+        __m256d y = _mm256_load_pd(state.m_position.y + i);
+        __m256d z = _mm256_load_pd(state.m_position.z + i);
+
+        x = _mm256_fmadd_pd(vx, dt_4, x);
+        y = _mm256_fmadd_pd(vy, dt_4, y);
+        z = _mm256_fmadd_pd(vz, dt_4, z);
+
+        _mm256_store_pd(state.m_velocity.x + i, vx);
+        _mm256_store_pd(state.m_velocity.y + i, vy);
+        _mm256_store_pd(state.m_velocity.z + i, vz);
+        _mm256_store_pd(state.m_position.x + i, x);
+        _mm256_store_pd(state.m_position.y + i, y);
+        _mm256_store_pd(state.m_position.z + i, z);
     }
 }
 
