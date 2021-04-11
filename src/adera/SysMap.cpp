@@ -164,7 +164,8 @@ void SysMap::register_system(ActiveScene& rScene)
     auto view = reg.view<UCompTransformTraj, ACompMapVisible>();
     for (auto [sat, traj, vis] : view.each())
     {
-        renderData.m_points.emplace_back(Vector4{0.0}, Color4{traj.m_color, 1.0});
+        Vector3 initPos = universe_to_render_space(traj.m_position);
+        renderData.m_points.emplace_back(Vector4{initPos, 1.0}, Color4{traj.m_color, 1.0});
         renderData.m_pointMapping.emplace(sat, pointIndex);
 
         if (reg.has<UCompEmitsGravity>(sat))
@@ -211,9 +212,11 @@ void SysMap::register_system(ActiveScene& rScene)
     // Initialize index data
     for (auto& metadata : renderData.m_pathMetadata)
     {
-        for (size_t i = metadata.m_startIdx; i < metadata.m_endIdx; i++)
+        Vector4 initPos = renderData.m_points[metadata.m_pointIndex].m_pos;
+        for (size_t i = 0; i < MapRenderData::smc_N_VERTS_PER_PATH; i++)
         {
-            renderData.m_indexData[i] = metadata.m_endIdx - i;
+            renderData.m_indexData[metadata.m_startIdx + i] = metadata.m_endIdx - i;
+            renderData.m_vertexData[metadata.m_startIdx + i].m_pos = initPos;
         }
         renderData.m_indexData[metadata.m_endIdx + 1] = MapRenderData::smc_PRIMITIVE_RESTART;
     }

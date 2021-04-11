@@ -54,7 +54,7 @@ constexpr INT_T num_blocks(INT_T nElements, INT_T blockSize)
     static_assert(std::is_integral<INT_T>::value, "Integral type required");
 
     INT_T remainder = nElements % blockSize;
-    return (nElements / blockSize) + (remainder > 0) ? 1 : 0;
+    return (nElements / blockSize) + ((remainder > 0) ? 1 : 0);
 }
 
 } // namespace osp::math

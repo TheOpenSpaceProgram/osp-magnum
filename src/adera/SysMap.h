@@ -68,7 +68,7 @@ public:
     // Number of paths
     GLuint m_numPaths{0};
     // Number of vertices per path
-    static constexpr GLuint smc_N_VERTS_PER_PATH = 9;
+    static constexpr GLuint smc_N_VERTS_PER_PATH = 999;
     // Number of indices per path (1 extra, to store primitive restart index)
     static constexpr GLuint smc_N_INDICES_PER_PATH = smc_N_VERTS_PER_PATH + 1;
 
