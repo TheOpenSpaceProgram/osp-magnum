@@ -45,4 +45,16 @@ constexpr bool is_power_of_2(UINT_T value)
     return !(value == 0) && !(value & (value - 1));
 }
 
+/**
+ * Calculates the number of blocks of @blockSize elements needed to hold @nElements
+ */
+template <typename INT_T>
+constexpr INT_T num_blocks(INT_T nElements, INT_T blockSize)
+{
+    static_assert(std::is_integral<INT_T>::value, "Integral type required");
+
+    INT_T remainder = nElements % blockSize;
+    return (nElements / blockSize) + (remainder > 0) ? 1 : 0;
+}
+
 } // namespace osp::math

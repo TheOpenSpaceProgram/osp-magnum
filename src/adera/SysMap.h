@@ -127,6 +127,8 @@ public:
         Magnum::GL::Buffer& rawInput, size_t inputCount, size_t inputCountPadded,
         Magnum::GL::Buffer& dest, size_t destOffset);
 private:
+    static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{32, 1, 1};
+
     void init();
 
     enum class UniformPos : Magnum::Int
@@ -154,11 +156,13 @@ public:
     MapUpdateCompute(MapUpdateCompute&& move) = default;
 
     void update_map(
-        size_t numPoints, Magnum::GL::Buffer& pointBuffer,
+        Magnum::GL::Buffer& pointBuffer,
         size_t numPaths, Magnum::GL::Buffer& pathMetadata,
-        size_t numPathVerts, Magnum::GL::Buffer& pathVertBuffer,
-        size_t numPathIndices, Magnum::GL::Buffer& pathIndexBuffer);
+        size_t nVertsPerPath, Magnum::GL::Buffer& pathVertBuffer,
+        size_t nIndicesPerPath, Magnum::GL::Buffer& pathIndexBuffer);
 private:
+    static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{64, 1, 1};
+
     void init();
 
     enum class EUniformPos : Magnum::Int
@@ -178,8 +182,7 @@ private:
     using Magnum::GL::AbstractShaderProgram::drawTransformFeedback;
     using Magnum::GL::AbstractShaderProgram::dispatchCompute;
 
-    void set_uniform_counts(size_t numPoints, size_t numPaths,
-        size_t numPathVerts, size_t numPathIndices);
+    void set_uniform_counts(size_t nVertsPerPath, size_t nIndicesPerPath);
     void bind_point_locations(Magnum::GL::Buffer& points);
     void bind_path_vert_data(Magnum::GL::Buffer& pathVerts);
     void bind_path_index_data(Magnum::GL::Buffer& pathIndices);

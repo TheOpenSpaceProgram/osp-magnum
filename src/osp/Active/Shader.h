@@ -25,7 +25,6 @@
 #pragma once
 
 #include "activetypes.h"
-#include "osp/Active/ActiveScene.h"
 #include <Magnum/GL/Mesh.h>
 
 namespace osp::active

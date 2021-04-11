@@ -24,22 +24,14 @@
  */
 //#version 430 core
 
-#define ORBIT_SAMPLES 512
-
-layout(local_size_x = ORBIT_SAMPLES) in;
+layout(local_size_x = 64, local_size_y = 1) in;
 
 const uint PATH_SAMPLE = gl_GlobalInvocationID.x;
 const uint PATH_ID = gl_GlobalInvocationID.y;
-const uint N_PATHS = gl_NumWorkGroups.y;
-const uvec2 DIMS = gl_WorkGroupSize.xy*gl_NumWorkGroups.xy;
-const uvec2 XY = gl_GlobalInvocationID.xy;
-const uint N_INVOCATIONS = DIMS.x * DIMS.y;
 
 layout(location = 0) uniform uvec4 pathDataCounts;
-const uint N_POINTS = pathDataCounts.x;
-//const uint N_PATHS = pathDataCounts.y;
-const uint N_PATH_VERTS = pathDataCounts.z;
-const uint N_PATH_INDICES = pathDataCounts.w;
+const uint VERTS_PER_PATH = pathDataCounts.x;
+const uint INDICES_PER_PATH = pathDataCounts.y;
 
 struct ColorVert
 {
@@ -90,7 +82,7 @@ struct PathMetadata
     uint nextIdx;     // The next vertex index to become the first
 };
 
-layout(binding = 3) buffer PathsInfo
+layout(binding = 3, std430) buffer PathsInfo
 {
     PathMetadata paths[];
 };
@@ -104,9 +96,10 @@ layout(binding = 3) buffer PathsInfo
  */
 void fade_color(uint pathID, uint pathVertID)
 {
-    uint index = pathID*ORBIT_SAMPLES + pathVertID;
+    uint index = pathID*VERTS_PER_PATH + pathVertID;
     float alpha = pathData[index].color.a;
-    pathData[index].color.a = clamp(alpha - 0.002, 0.0, 1.0);
+    float rate = 1.0 / float(VERTS_PER_PATH - 1);
+    pathData[index].color.a = clamp(alpha - rate, 0.0, 1.0);
 }
 
 /**
@@ -120,8 +113,7 @@ void fade_color(uint pathID, uint pathVertID)
 void inc_index(uint pathID, uint pathVertID)
 {
     // Increment all indices (except the primitive restart one at the end)
-    const uint nIndices = ORBIT_SAMPLES + 1;
-    uint index = pathID*nIndices + pathVertID;
+    uint index = pathID*INDICES_PER_PATH + pathVertID;
     indices[index]++;
 
     // Bound check
@@ -143,19 +135,26 @@ void path_step(uint pathID)
 {
     PathMetadata path = paths[pathID];
 
-    vec3 newPos = pointVerts[path.pointIndex].position.xyz;
-    uint newPathVertIdx = indices[path.nextIdx];
+    ColorVert newVert = pointVerts[path.pointIndex];
+    vec3 newPos = newVert.position.xyz;
+    uint newPathVertIdx = path.nextIdx;// indices[path.nextIdx];
     pathData[newPathVertIdx].position = vec4(newPos, 1.0);
+    pathData[newPathVertIdx].color = newVert.color;
 
     path.nextIdx++;
     if (path.nextIdx > path.endIdx)
     {
         path.nextIdx = path.startIdx;
     }
+    // Write path index back to buffer
+    paths[pathID].nextIdx = path.nextIdx;
 }
 
 void main()
 {
+    // Discard threads that are out of bounds
+    if (PATH_SAMPLE >= VERTS_PER_PATH) { return; }
+
     // 1. Fade colors of all existing path verts
     fade_color(PATH_ID, PATH_SAMPLE);
 

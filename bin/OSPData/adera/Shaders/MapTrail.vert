@@ -24,49 +24,16 @@
  */
 //#version 430 core
 
-layout(local_size_x = 32) in;
+layout(location = 0) in vec4 position;
+layout(location = 1) in vec4 color;
 
-const uint THREAD_INDEX = gl_GlobalInvocationID.x;
-const uint N_INVOCATIONS = gl_NumWorkGroups.x*gl_WorkGroupSize.x;
+out vec4 fragColor;
 
-layout(location = 0) uniform uvec3 counts;
-const uint N_POINTS = counts.x;
-const uint N_POINTS_PADDED = counts.y;
-const uint OUTPUT_OSET = counts.z;
-
-layout(binding = 0, std430) readonly buffer RawInput
-{
-    double rawInput[];
-};
-
-struct ColorVert
-{
-    vec4 position;
-    vec4 color;
-};
-
-layout(binding = 1, std430) buffer PointLocations
-{
-    ColorVert pointVerts[];
-};
-
-void interpret_input_points(uint index)
-{
-    double x_i = rawInput[0*N_POINTS_PADDED + index];
-    double y_i = rawInput[1*N_POINTS_PADDED + index];
-    double z_i = rawInput[2*N_POINTS_PADDED + index];
-
-    const double invUnit = 1.0LF / 1024.0LF;
-    const double scalingFactor = 1e-6LF;
-    vec3 result = vec3(dvec3(x_i, y_i, z_i) * scalingFactor);
-    pointVerts[OUTPUT_OSET + index].position = vec4(result, 1.0);
-    pointVerts[OUTPUT_OSET + index].color.a = 1.0;
-}
+layout(location = 0) uniform mat4 transformation;
 
 void main()
 {
-    // Discard threads that are out of bounds
-    if (THREAD_INDEX > N_POINTS) { return; }
-
-    interpret_input_points(THREAD_INDEX);
+    gl_Position = transformation * position;
+    fragColor = color;
 }
+

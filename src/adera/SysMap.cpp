@@ -36,8 +36,11 @@
 
 #include <osp/Universe.h>
 #include <osp/Trajectories/NBody.h>
+#include <osp/CommonMath.h>
+#include <adera/Shaders/MapTrailShader.h>
 
 using namespace adera::active;
+using namespace adera::shader;
 using namespace osp;
 using namespace osp::active;
 using namespace osp::universe;
@@ -74,6 +77,7 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
     auto& resources = rScene.get_context_resources();
 
     resources.add<VertexColor3D>("vert_color_shader");
+    resources.add<MapTrailShader>("map_trail_shader");
     resources.add<MapUpdateCompute>("map_compute");
     resources.add<ProcessMapCoordsCompute>("map_preproccess");
 
@@ -95,19 +99,25 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
             auto& resources = rScene.get_context_resources();
 
             auto& data = reg.get<MapRenderData>(rScene.hier_get_root());
-            auto shader = resources.get<VertexColor3D>("vert_color_shader");
+            auto shader = resources.get<MapTrailShader>("map_trail_shader");
 
             Renderer::setPointSize(1.0f);
+            Renderer::enable(Renderer::Feature::Blending);
+            Renderer::setBlendFunction(
+                Renderer::BlendFunction::SourceAlpha,
+                Renderer::BlendFunction::OneMinusSourceAlpha);
 
             Matrix4 transform = rCamera.m_projection * rCamera.m_inverse;
 
             glEnable(GL_PRIMITIVE_RESTART);
 
             (*shader)
-                .setTransformationProjectionMatrix(transform)
+                .set_transform_matrix(transform)
                 .draw(data.m_mesh);
 
             glDisable(GL_PRIMITIVE_RESTART);
+
+            Renderer::disable(Renderer::Feature::Blending);
         });
 
     // Point pass
@@ -189,23 +199,25 @@ void SysMap::register_system(ActiveScene& rScene)
 
     // Size path data
 
-    size_t nTotalPathVerts = renderData.m_numPaths * MapRenderData::smc_N_VERTS_PER_PATH;
     size_t nTotalPathIndices = renderData.m_numPaths * MapRenderData::smc_N_INDICES_PER_PATH;
-    renderData.m_vertexData = std::vector<MapRenderData::ColorVert>(nTotalPathVerts);
+    /* Making the number of vertices equal to the number of indices keeps things easy by
+     * making them line up. It wastes one vertex per path, but it's worth it for now.
+     */
+    size_t nTotalPathVerts = nTotalPathIndices;
+    renderData.m_vertexData = std::vector<MapRenderData::ColorVert>(nTotalPathVerts,
+        {Vector4{0.0}, Color4{0.0}});
     renderData.m_indexData.resize(renderData.m_numPaths * MapRenderData::smc_N_INDICES_PER_PATH);
 
     // Initialize index data
-    for (size_t i = 0; i < renderData.m_indexData.size(); i++)
+    for (auto& metadata : renderData.m_pathMetadata)
     {
-        if (i > 0 && ((i+1) % MapRenderData::smc_N_INDICES_PER_PATH) == 0)
+        for (size_t i = metadata.m_startIdx; i < metadata.m_endIdx; i++)
         {
-            renderData.m_indexData[i] = MapRenderData::smc_PRIMITIVE_RESTART;
+            renderData.m_indexData[i] = metadata.m_endIdx - i;
         }
-        else
-        {
-            renderData.m_indexData[i] = i;
-        }
+        renderData.m_indexData[metadata.m_endIdx + 1] = MapRenderData::smc_PRIMITIVE_RESTART;
     }
+    
     using Magnum::Shaders::VertexColor3D;
 
     // Create path buffers, mesh
@@ -214,11 +226,11 @@ void SysMap::register_system(ActiveScene& rScene)
     renderData.m_indexBuffer.setData(renderData.m_indexData);
     renderData.m_mesh
         .setPrimitive(Magnum::GL::MeshPrimitive::LineStrip)
+        .setCount(nTotalPathVerts)
         .addVertexBuffer(renderData.m_vertexBuffer, 0,
-            VertexColor3D::Position{},
-            VertexColor3D::Color4{})
-        .setIndexBuffer(renderData.m_indexBuffer, 0, Magnum::MeshIndexType::UnsignedInt)
-        .setCount(nTotalPathVerts);
+            MapTrailShader::Position{},
+            MapTrailShader::Color{})
+        .setIndexBuffer(renderData.m_indexBuffer, 0, Magnum::MeshIndexType::UnsignedInt);
 
     // Create path metadata buffer
 
@@ -253,10 +265,10 @@ void SysMap::update_map(ActiveScene& rScene)
     DependRes<MapUpdateCompute> mapUpdate =
         glres.get<MapUpdateCompute>("map_compute");
     mapUpdate->update_map(
-        renderData.m_numPoints, renderData.m_pointBuffer,
+        renderData.m_pointBuffer,
         renderData.m_numPaths, renderData.m_pathMetadataBuffer,
-        renderData.m_vertexData.size(), renderData.m_vertexBuffer,
-        renderData.m_indexData.size(), renderData.m_indexBuffer
+        renderData.smc_N_VERTS_PER_PATH, renderData.m_vertexBuffer,
+        renderData.smc_N_INDICES_PER_PATH, renderData.m_indexBuffer
         );
 }
 #endif
@@ -294,19 +306,28 @@ void SysMap::update_map(ActiveScene& rScene)
 #endif
 
 void MapUpdateCompute::update_map(
-    size_t numPoints, Buffer& pointBuffer,
-    size_t numPaths,  Buffer& pathMetadata,
-    size_t numPathVerts, Buffer& pathVertBuffer,
-    size_t numPathIndices, Buffer& pathIndexBuffer)
+    Buffer& pointBuffer,
+    size_t numPaths, Buffer& pathMetadata,
+    size_t nVertsPerPath, Buffer& pathVertBuffer,
+    size_t nIndicesPerPath, Buffer& pathIndexBuffer)
 {
     bind_point_locations(pointBuffer);
     bind_path_vert_data(pathVertBuffer);
     bind_path_index_data(pathIndexBuffer);
     bind_path_metadata(pathMetadata);
-    set_uniform_counts(numPoints, numPaths, numPathVerts, numPathIndices);
+    set_uniform_counts(nVertsPerPath, nIndicesPerPath);
 
-    Vector3ui nGroups{1, static_cast<Magnum::UnsignedInt>(numPaths), 1};
+    using osp::math::num_blocks;
+
+    Vector3ui nGroups{
+        num_blocks(static_cast<Magnum::UnsignedInt>(nVertsPerPath), smc_BLOCK_SIZE.x()),
+        static_cast<Magnum::UnsignedInt>(numPaths),
+        1};
     dispatchCompute(nGroups);
+
+    using Magnum::GL::Renderer;
+    Renderer::setMemoryBarrier(Renderer::MemoryBarrier::VertexAttributeArray);
+    Renderer::setMemoryBarrier(Renderer::MemoryBarrier::ElementArray);
 }
 
 void MapUpdateCompute::init()
@@ -320,15 +341,13 @@ void MapUpdateCompute::init()
     CORRADE_INTERNAL_ASSERT_OUTPUT(link());
 }
 
-void MapUpdateCompute::set_uniform_counts(
-    size_t numPoints, size_t numPaths, size_t numPathVerts, size_t numPathIndices)
+void MapUpdateCompute::set_uniform_counts(size_t nVertsPerPath, size_t nIndicesPerPath)
 {
     setUniform(static_cast<Int>(EUniformPos::BlockCounts),
         Vector4ui{
-            static_cast<UnsignedInt>(numPoints),
-            static_cast<UnsignedInt>(numPaths),
-            static_cast<UnsignedInt>(numPathVerts),
-            static_cast<UnsignedInt>(numPathIndices)});
+            static_cast<UnsignedInt>(nVertsPerPath),
+            static_cast<UnsignedInt>(nIndicesPerPath),
+            0, 0});
 }
 
 void MapUpdateCompute::bind_point_locations(Buffer& points)
@@ -363,10 +382,14 @@ void ProcessMapCoordsCompute::process(
     bind_input_buffer(rawInput);
     bind_output_buffer(dest);
 
-    constexpr size_t blockLength = 32;
+    constexpr size_t blockLength = smc_BLOCK_SIZE.x();
+    // Allocate just enough blocks to enclose all data
     size_t numBlocks = (inputCount / blockLength)
         + ((inputCount % blockLength) > 0) ? 1 : 0;
     dispatchCompute(Vector3ui{static_cast<UnsignedInt>(numBlocks), 1, 1});
+
+    using Magnum::GL::Renderer;
+    Renderer::setMemoryBarrier(Renderer::MemoryBarrier::ShaderStorage);
 }
 
 void ProcessMapCoordsCompute::init()
