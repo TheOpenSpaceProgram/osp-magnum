@@ -261,7 +261,7 @@ std::vector<PlanetBody> create_solar_system_bodies()
     moon.m_orbitDist = 348e3;
     moon.m_name = "Moon";
     moon.m_color = 0xDDDDDD_rgbf;
-    moon.m_parent = &earth;
+    moon.m_parent = earthPtr;
     planets.push_back(std::move(moon));
 
     /* ####### Mars & moons ####### */
