@@ -37,13 +37,11 @@ struct ACompExhaustPlume
     DependRes<PlumeEffectData> m_effect;
 };
 
-class SysExhaustPlume : public IDynamicSystem
+class SysExhaustPlume
 {
 public:
-    static inline std::string smc_name = "ExhaustPlume";
 
-    SysExhaustPlume(ActiveScene& rScene);
-    ~SysExhaustPlume() = default;
+    static void add_functions(ActiveScene& rScene);
 
     /**
      * Initialize plume graphics
@@ -52,15 +50,9 @@ public:
      * this function takes such entities, retrieves the appropriate graphics
      * resources, and configures the graphical components
      */
-    void initialize_plume(ActiveEnt e);
+    static void initialize_plume(ActiveScene& rScene, ActiveEnt e);
 
-    void update_plumes(ActiveScene& rScene);
-
-private:
-    ActiveScene& m_scene;
-    float m_time;
-
-    UpdateOrderHandle_t m_updatePlume;
+    static void update_plumes(ActiveScene& rScene);
 };
 
 } // namespace osp::active

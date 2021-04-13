@@ -44,7 +44,7 @@ namespace osp::active
 //    FORCEFIELD_T m_field;
 //};
 
-class SysForceField : public IDynamicSystem
+class SysForceField
 {
 };
 
@@ -63,19 +63,9 @@ class SysFFGravity : public SysForceField
 {
 public:
 
-    static const std::string smc_name;
+    static void add_functions(ActiveScene& rScene);
 
-    SysFFGravity(ActiveScene &scene);
-    ~SysFFGravity() = default;
-
-    void update_force(ActiveScene& rScene);
-
-private:
-
-
-    ActiveScene &m_scene;
-
-    UpdateOrderHandle_t m_updateForce;
+    static void update_force(ActiveScene& rScene);
 };
 
 

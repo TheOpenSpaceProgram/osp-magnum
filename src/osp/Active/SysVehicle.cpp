@@ -49,21 +49,20 @@ using osp::universe::UCompVehicle;
 // for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;
 
-const std::string SysVehicle::smc_name = "Vehicle";
+void SysVehicle::add_functions(ActiveScene &rScene)
+{
+    rScene.debug_update_add(rScene.get_update_order(), "vehicle_activate", "", "vehicle_modification",
+                            &SysVehicle::update_activate);
 
-SysVehicle::SysVehicle(ActiveScene &scene)
- : m_updateActivation(
-       scene.get_update_order(), "vehicle_activate", "", "vehicle_modification",
-       &SysVehicle::update_activate)
- , m_updateVehicleModification(
-       scene.get_update_order(), "vehicle_modification", "", "physics",
-       &SysVehicle::update_vehicle_modification)
-{ }
+    rScene.debug_update_add(rScene.get_update_order(), "vehicle_modification", "", "physics",
+                            &SysVehicle::update_vehicle_modification);
+
+}
 
 
 ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
                           universe::Satellite areaSat,
-                          universe::Satellite tgtSat)
+                             universe::Satellite tgtSat)
 {
     SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
                       "Loading a vehicle");
@@ -165,8 +164,6 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 
     // Wire the thing up
 
-    SysWire& sysWire = rScene.dynamic_system_find<SysWire>();
-
     // Loop through wire connections
     for (BlueprintWire& blueprintWire : vehicleData.get_wires())
     {
@@ -198,7 +195,7 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 
         // make the connection
 
-        sysWire.connect(*fromWire, *toWire);
+        SysWire::connect(*fromWire, *toWire);
     }
 
     // temporary: make the whole thing a single rigid body

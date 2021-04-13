@@ -89,24 +89,23 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     config_controls(*pMagnumApp);
 
     // Create an ActiveScene
-    osp::active::ActiveScene& scene = pMagnumApp->scene_create("Area 1");
+    osp::active::ActiveScene& rScene = pMagnumApp->scene_create("Area 1");
 
-    // Register dynamic systems needed for flight scene
-
-    scene.dynamic_system_create<osp::active::SysPhysics_t>();
-    scene.dynamic_system_create<osp::active::SysWire>();
-    scene.dynamic_system_create<osp::active::SysDebugRender>();
-    scene.dynamic_system_create<osp::active::SysAreaAssociate>();
-    scene.dynamic_system_create<osp::active::SysVehicle>();
-    scene.dynamic_system_create<osp::active::SysExhaustPlume>();
-    scene.dynamic_system_create<planeta::active::SysPlanetA>(pMagnumApp->get_input_handler());
-    scene.dynamic_system_create<osp::active::SysFFGravity>();
+    // Add system functions needed for flight scene
+    osp::active::SysPhysics_t::add_functions(rScene);
+    //osp::active::SysWire::add_functions(rScene);
+    osp::active::SysDebugRender::add_functions(rScene);
+    osp::active::SysAreaAssociate::add_functions(rScene);
+    osp::active::SysVehicle::add_functions(rScene);
+    osp::active::SysExhaustPlume::add_functions(rScene);
+    planeta::active::SysPlanetA::add_functions(rScene);
+    osp::active::SysFFGravity::add_functions(rScene);
 
     // Register machines for that scene
-    scene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());
-    scene.system_machine_create<SysMachineRocket>();
-    scene.system_machine_create<SysMachineRCSController>();
-    scene.system_machine_create<SysMachineContainer>();
+    rScene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());
+    rScene.system_machine_create<SysMachineRocket>();
+    rScene.system_machine_create<SysMachineRCSController>();
+    rScene.system_machine_create<SysMachineContainer>();
 
     // Make active areas load vehicles and planets
     //sysArea.activator_add(rUni.sat_type_find_index<SatVehicle>(), sysVehicle);
@@ -119,21 +118,21 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     UCompActiveArea &area = SatActiveArea::add_active_area(rUni, areaSat);
 
     // Link ActiveArea to scene using the AreaAssociate
-    osp::active::SysAreaAssociate::connect(scene, rUni, areaSat);
+    osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
 
     // Add default-constructed physics world to scene
-    scene.get_registry().emplace<osp::active::ACompPhysicsWorld_t>(scene.hier_get_root());
+    rScene.get_registry().emplace<osp::active::ACompPhysicsWorld_t>(rScene.hier_get_root());
 
     // Add a camera to the scene
 
     // Create the camera entity
-    ActiveEnt camera = scene.hier_create_child(scene.hier_get_root(),
+    ActiveEnt camera = rScene.hier_create_child(rScene.hier_get_root(),
                                                        "Camera");
-    auto &cameraTransform = scene.reg_emplace<ACompTransform>(camera);
-    auto &cameraComp = scene.get_registry().emplace<ACompCamera>(camera);
+    auto &cameraTransform = rScene.reg_emplace<ACompTransform>(camera);
+    auto &cameraComp = rScene.get_registry().emplace<ACompCamera>(camera);
 
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
-    scene.reg_emplace<ACompFloatingOrigin>(camera);
+    rScene.reg_emplace<ACompFloatingOrigin>(camera);
 
     cameraComp.m_viewport
             = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
@@ -144,10 +143,10 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     cameraComp.calculate_projection();
 
     // Add the debug camera controller to the scene. This adds controls
-    auto camObj = std::make_unique<DebugCameraController>(scene, camera);
+    auto camObj = std::make_unique<DebugCameraController>(rScene, camera);
 
     // Add a ACompDebugObject to camera to manage camObj's lifetime
-    scene.reg_emplace<ACompDebugObject>(camera, std::move(camObj));
+    rScene.reg_emplace<ACompDebugObject>(camera, std::move(camObj));
 
     // Starts the game loop. This function is blocking, and will only return
     // when the window is  closed. See OSPMagnum::drawEvent
@@ -155,11 +154,11 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Close button has been pressed
 
-    SPDLOG_LOGGER_INFO(scene.get_application().get_logger(),
+    SPDLOG_LOGGER_INFO(rOspApp.get_logger(),
                        "Closed Magnum Application");
 
     // Disconnect ActiveArea
-    osp::active::SysAreaAssociate::disconnect(scene);
+    osp::active::SysAreaAssociate::disconnect(rScene);
 
     // destruct the application, this closes the window
     pMagnumApp.reset();

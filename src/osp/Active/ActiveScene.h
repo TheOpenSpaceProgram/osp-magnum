@@ -48,14 +48,11 @@ namespace osp::active
 /**
  * An ECS 3D Game Engine scene that implements a scene graph hierarchy.
  *
- * Components are prefixed with AComp, for "Active Component."
+ * The state of scene is represented with Active Entities (ActiveEnt) which are
+ * compositions of Active Components (AComp-prefixed structs). Behaviours are
+ * added by injecting System functions into the Update Order (a list of
+ * functions called in a specific order, use debug_update_add).
  *
- * Features are added through "Dynamic Systems" (IDynamicSystem), which are
- * classes that add functions to the UpdateOrder.
- *
- *
- * In ECS, "System" refers to the functions; but here, systems refer to the
- * classes containing those functions too.
  */
 class ActiveScene
 {
@@ -196,7 +193,6 @@ public:
     template<class SYSMACH_T, typename... ARGS_T>
     void system_machine_create(ARGS_T &&... args);
 
-
     /**
      * Find a registered SysMachine by name. This accesses a map.
      * @param name [in] Name used as a key
@@ -206,31 +202,13 @@ public:
 
     bool system_machine_it_valid(MapSysMachine_t::iterator it);
 
-    /**
-     *
-     * @tparam T
-     */
-    template<class DYNSYS_T, typename... Args>
-    DYNSYS_T& dynamic_system_create(Args &&... args);
+    template<typename... ARGS_T>
+    void debug_update_add(ARGS_T &&... args)
+    { m_updateHandles.emplace_back(std::forward<ARGS_T>(args)...); }
 
-
-    /**
-     * Find a registered IDynamicSystem by name. This accesses a map.
-     * @param name [in] Name used as a key
-     * @return Iterator to specified IDynamicSys
-     */
-    MapDynamicSys_t::iterator dynamic_system_find(std::string_view name);
-
-    /**
-     * Find a registered IDynamicSystem by type, and cast it to SYSTEM_T. This
-     * accesses a map. If a system isn't found, this will assert.
-     * @tparam SYSTEM_T Type of registered IDynamicSys
-     * @return Reference to specified IDynamicSys
-     */
-    template<class SYSTEM_T>
-    SYSTEM_T& dynamic_system_find();
-
-    bool dynamic_system_it_valid(MapDynamicSys_t::iterator it);
+    template<typename... ARGS_T>
+    void debug_render_add(ARGS_T &&... args)
+    { m_renderHandles.emplace_back(std::forward<ARGS_T>(args)...); }
 
     Package& get_context_resources() { return m_context; }
 private:
@@ -249,23 +227,14 @@ private:
     float m_timescale;
 
     UserInputHandler &m_userInput;
-    //std::vector<std::reference_wrapper<ISysMachine>> m_update_sensor;
-    //std::vector<std::reference_wrapper<ISysMachine>> m_update_physics;
 
     UpdateOrder_t m_updateOrder;
     RenderOrder_t m_renderOrder;
 
+    std::vector<UpdateOrderHandle_t> m_updateHandles;
+    std::vector<RenderOrderHandle_t> m_renderHandles;
+
     MapSysMachine_t m_sysMachines; // TODO: Put this in SysVehicle
-    MapDynamicSys_t m_dynamicSys;
-
-    // TODO: base class and a list for Systems (or not)
-    //SysDebugRender m_render;
-    //SysPhysics m_physics;
-    //SysWire m_wire;
-    //SysVehicle m_vehicles;
-
-    //SysDebugObject m_debugObj;
-    //std::tuple<SysPhysics, SysWire, SysDebugObject> m_systems;
 
 };
 
@@ -277,26 +246,6 @@ void ActiveScene::system_machine_create(ARGS_T &&... args)
 {
     system_machine_add(SYSMACH_T::smc_name,
                        std::make_unique<SYSMACH_T>(*this, args...));
-}
-
-
-template<class DYNSYS_T, typename... ARGS_T>
-DYNSYS_T& ActiveScene::dynamic_system_create(ARGS_T &&... args)
-{
-    auto ptr = std::make_unique<DYNSYS_T>(*this, std::forward<ARGS_T>(args)...);
-    DYNSYS_T &refReturn = *ptr;
-
-    auto pair = m_dynamicSys.emplace(DYNSYS_T::smc_name, std::move(ptr));
-
-    return refReturn;
-}
-
-template<class SYSTEM_T>
-SYSTEM_T& ActiveScene::dynamic_system_find()
-{
-    MapDynamicSys_t::iterator it = dynamic_system_find(SYSTEM_T::smc_name);
-    assert(it != m_dynamicSys.end());
-    return static_cast<SYSTEM_T&>(*(it->second));
 }
 
 /**

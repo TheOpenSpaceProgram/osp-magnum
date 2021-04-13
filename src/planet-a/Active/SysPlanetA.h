@@ -54,46 +54,34 @@ struct ACompPlanet
 };
 
 
-class SysPlanetA : public osp::active::IDynamicSystem
+class SysPlanetA
 {
 public:
 
-    static const std::string smc_name;
-
-    SysPlanetA(osp::active::ActiveScene &scene,
-               osp::UserInputHandler &userInput);
-    ~SysPlanetA() = default;
+    static void add_functions(osp::active::ActiveScene& rScene);
 
     static osp::active::ActiveEnt activate(
             osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
             osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat);
 
-    void draw(osp::active::ACompCamera const& camera);
+    static void draw(osp::active::ActiveScene& rScene,
+              osp::active::ACompCamera const& camera);
 
-    void debug_create_chunk_collider(osp::active::ActiveEnt ent,
-                                     ACompPlanet &planet,
-                                     chindex_t chunk);
+    static void debug_create_chunk_collider(
+            osp::active::ActiveScene& rScene,
+            osp::active::ActiveEnt ent,
+            ACompPlanet &planet,
+            chindex_t chunk);
 
-    static void planet_update_geometry(osp::active::ActiveEnt planetEnt,
-                                osp::active::ActiveScene& rScene);
+    static void planet_update_geometry(
+            osp::active::ActiveEnt planetEnt,
+            osp::active::ActiveScene& rScene);
 
     static void update_activate(osp::active::ActiveScene& rScene);
 
-    void update_geometry(osp::active::ActiveScene& rScene);
+    static void update_geometry(osp::active::ActiveScene& rScene);
 
-    void update_physics(osp::active::ActiveScene& rScene);
-
-private:
-
-    osp::active::ActiveScene &m_scene;
-
-    osp::active::UpdateOrderHandle_t m_updateActivate;
-    osp::active::UpdateOrderHandle_t m_updateGeometry;
-    osp::active::UpdateOrderHandle_t m_updatePhysics;
-
-    osp::active::RenderOrderHandle_t m_renderPlanetDraw;
-
-    osp::ButtonControlHandle m_debugUpdate;
+    static void update_physics(osp::active::ActiveScene& rScene);
 };
 
 }
