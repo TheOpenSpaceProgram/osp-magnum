@@ -393,11 +393,10 @@ void TrajNBody::solve_nbody_timestep_AVX(size_t stepIndex)
             normSqd = _mm256_add_pd(normSqd, z2);
 
             __m256d norm = _mm256_sqrt_pd(normSqd);
-            __m256d invNorm = _mm256_div_pd(vec4_1, norm);
+            __m256d denominator = _mm256_mul_pd(norm, normSqd);
 
-            // Compute gravity coefficients (mass / denom) * (1/norm)
-            __m256d gravCoeff = _mm256_div_pd(masses, normSqd);
-            gravCoeff = _mm256_mul_pd(gravCoeff, invNorm);
+            // Compute gravity coefficients (mass / denom) * (1/norm) = mass / (denom*norm)
+            __m256d gravCoeff = _mm256_div_pd(masses, denominator);
 
             // Check for calculation against self
             __m256i indices = _mm256_set_epi64x(3, 2, 1, 0);
@@ -566,11 +565,10 @@ void TrajNBody::solve_insignificant_bodies_AVX(size_t inputStepIndex)
             normSqd = _mm256_add_pd(normSqd, z2);
 
             __m256d norm = _mm256_sqrt_pd(normSqd);
-            __m256d invNorm = _mm256_div_pd(vec4_1, norm);
+            __m256d denominator = _mm256_mul_pd(norm, normSqd);
 
-            // Compute gravity coefficients (mass / denom) * (1/norm)
-            __m256d gravCoeff = _mm256_div_pd(masses, normSqd);
-            gravCoeff = _mm256_mul_pd(gravCoeff, invNorm);
+            // Compute gravity coefficients (mass / denom) * (1/norm) = mass / (denom*norm)
+            __m256d gravCoeff = _mm256_div_pd(masses, denominator);
 
             // Compute force components
             dx = _mm256_mul_pd(dx, gravCoeff);
