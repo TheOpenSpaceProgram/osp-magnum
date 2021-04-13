@@ -193,7 +193,8 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
                 pThrotPercent->m_value, resource);
             uint64_t consumed = src.request_contents(required);
 
-            rScene.get_application().get_logger()->trace("Consumed {} units of fuel, {} remaining",
+            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                                "Consumed {} units of fuel, {} remaining",
                 consumed, src.check_contents().m_quantity);
         }
 
@@ -223,11 +224,13 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
 
     if (plumeNode == entt::null)
     {
-        m_scene.get_application().get_logger()->error("ERROR: could not find plume anchor for MachineRocket {}", ent);
+        SPDLOG_LOGGER_ERROR(m_scene.get_application().get_logger(),
+                          "ERROR: could not find plume anchor for MachineRocket {}", ent);
         return;
     }
 
-    m_scene.get_application().get_logger()->info("MachineRocket {}\'s associated plume: {}", ent, plumeNode);
+    SPDLOG_LOGGER_INFO(m_scene.get_application().get_logger(), "MachineRocket {}\'s associated plume: {}",
+        ent, plumeNode);
    
 
     // Get plume effect
@@ -237,7 +240,8 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
     DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
     if (plumeEffect.empty())
     {
-        m_scene.get_application().get_logger()->error("ERROR: couldn't find plume effect  {}", effectName);
+      SPDLOG_LOGGER_ERROR(m_scene.get_application().get_logger(),
+                          "ERROR: couldn't find plume effect  {}", effectName);
         return;
     }
 

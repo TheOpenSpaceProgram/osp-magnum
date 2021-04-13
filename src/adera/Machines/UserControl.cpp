@@ -36,7 +36,7 @@ const std::string SysMachineUserControl::smc_name = "UserControl";
 
 void MachineUserControl::propagate_output(WireOutput* output)
 {
-    spdlog::info("Propagate test: {}", output->get_name());
+    SPDLOG_LOGGER_INFO(spdlog::get("application"), "Propagate test: {}", output->get_name());
 }
 
 WireInput* MachineUserControl::request_input(WireInPort port)
@@ -80,13 +80,15 @@ SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandle
 
 void SysMachineUserControl::update_sensor()
 {
-    m_scene.get_application().get_logger()->trace("Updating all MachineUserControls");
+    SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                      "Updating all MachineUserControls");
 
     // InputDevice.IsActivated()
     // Combination
     if (m_selfDestruct.triggered())
     {
-        m_scene.get_application().get_logger()->info("Self destruct -- EXPLOSION BOOM!!!!");
+        SPDLOG_LOGGER_INFO(m_scene.get_application().get_logger(),
+                        "Self destruct -- EXPLOSION BOOM!!!!");
     }
 
     // pitch, yaw, roll
@@ -122,18 +124,21 @@ void SysMachineUserControl::update_sensor()
 
         if (m_throttleMin.triggered())
         {
-            m_scene.get_application().get_logger()->trace("Minimum throttle");
+            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                              "Minimum throttle");
             throttlePos = 0.0f;
         }
 
         if (m_throttleMax.triggered())
         {
-            m_scene.get_application().get_logger()->trace("Maximum throttle");
+            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                              "Maximum throttle");
             throttlePos = 1.0f;
         }
 
         std::get<wiretype::AttitudeControl>(machine.m_woAttitude.value()).m_attitude = attitudeIn;
-        m_scene.get_application().get_logger()->trace("Updating control");
+        SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                            "Updating control");
     }
 }
 

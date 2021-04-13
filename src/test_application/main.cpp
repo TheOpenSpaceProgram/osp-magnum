@@ -23,6 +23,10 @@
  * SOFTWARE.
  */
 
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_INFO
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 #include "OSPMagnum.h"
 #include "flight.h"
 
@@ -227,7 +231,8 @@ bool destroy_universe()
     // Make sure no application is open
     if (g_ospMagnum != nullptr)
     {
-        g_osp.get_logger()->warn("Application must be closed to destroy universe.");
+      SPDLOG_LOGGER_WARN(g_osp.get_logger(),
+                         "Application must be closed to destroy universe.");
         return false;
     }
 
@@ -237,7 +242,7 @@ bool destroy_universe()
     // Destroy blueprints as part of destroying all vehicles
     g_osp.debug_find_package("lzdb").clear<osp::BlueprintVehicle>();
 
-    g_osp.get_logger()->info("explosion* Universe destroyed!");
+    SPDLOG_LOGGER_INFO(g_osp.get_logger(), "explosion* Universe destroyed!");
 
     return true;
 }
@@ -297,7 +302,7 @@ void load_a_bunch_of_stuff()
 
     //s_partsLoaded = true;
 
-    g_osp.get_logger()->warn("Resource loading complete");
+    SPDLOG_LOGGER_INFO(g_osp.get_logger(), "Resource loading complete");
 }
 
 void debug_print_help()

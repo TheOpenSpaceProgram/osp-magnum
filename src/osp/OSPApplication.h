@@ -64,7 +64,7 @@ public:
 
     universe::Universe& get_universe() { return m_universe; }
     
-     std::shared_ptr<spdlog::logger> get_logger() { return m_logger; };
+     const std::shared_ptr<spdlog::logger>& get_logger() { return m_logger; };
 
 private:
     std::map<ResPrefix_t, Package, std::less<>> m_packages;

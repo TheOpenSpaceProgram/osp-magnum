@@ -89,7 +89,8 @@ ActiveEnt SysPlanetA::activate(
             osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat)
 {
 
-    rScene.get_application().get_logger()->info("Activating a planet");
+    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
+                      "Activating a planet");
 
     //SysPlanetA& self = scene.get_system<SysPlanetA>();
     auto &loadMePlanet = rUni.get_reg().get<universe::UCompPlanet>(tgtSat);
@@ -242,7 +243,9 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             PlanetGeometryA &rPlanetGeo = *(planet.m_planet);
 
             // initialize planet if not done so yet
-            rScene.get_application().get_logger()->info("Initializing planet because that was not done for some reason");
+            SPDLOG_LOGGER_INFO(m_scene.get_application().get_logger(),
+                                "Initializing planet because that was not done "
+                                "for some reason");
             planet.m_icoTree = std::make_shared<IcoSphereTree>();
 
             planet.m_icoTree->initialize(planet.m_radius);
@@ -258,16 +261,19 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             });
 
             //planet_update_geometry(ent, planet);
-            rScene.get_application().get_logger()->info("Initialized planet, constructing colliders");
+            SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
+                                "Initialized planet, constructing colliders");
 
             // temporary: make colliders for all the chunks
             for (chindex_t i = 0; i < rPlanetGeo.get_chunk_count(); i ++)
             {
                 debug_create_chunk_collider(ent, planet, i);
-                rScene.get_application().get_logger()->info("* completed chunk collider: {}", i);
+              SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
+                                  "* completed chunk collider: {}", i);
             }
 
-            rScene.get_application().get_logger()->info("Completed planet colliders");
+            SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
+                                "Completed planet colliders");
 
             planet.m_vrtxBufGL.setData(rPlanetGeo.get_vertex_buffer());
             planet.m_indxBufGL.setData(rPlanetGeo.get_index_buffer());

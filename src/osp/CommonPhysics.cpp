@@ -54,7 +54,7 @@ float shape_volume(ECollisionShape shape, Vector3 scale)
     case ECollisionShape::TERRAIN:
     case ECollisionShape::COMBINED:
     default:
-        spdlog::error("Unsupported shape for volume calc");
+        SPDLOG_LOGGER_ERROR(spdlog::get("application"), "Unsupported shape for volume calc");
         assert(false);
     }   
 }
@@ -102,7 +102,8 @@ Vector3 collider_inertia_tensor(ECollisionShape shape, Vector3 scale, float mass
     case ECollisionShape::TERRAIN:
     case ECollisionShape::COMBINED:
     default:
-        spdlog::info("ERROR: unknown collision shape");
+      SPDLOG_LOGGER_ERROR(spdlog::get("application"),
+                          "ERROR: unknown collision shape");
         assert(false);
         return Vector3{0.0f};
     }

@@ -25,7 +25,6 @@
 #include "UserInputHandler.h"
 
 #include <iostream>
-#include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace osp
 {
@@ -44,13 +43,13 @@ namespace osp
 ButtonControlHandle::ButtonControlHandle(UserInputHandler *to, int index) :
         m_to(to), m_index(index)
 {
-    m_to->p_logger->info("ButtonControlHandle created");
+    SPDLOG_LOGGER_INFO(m_to->p_logger, "ButtonControlHandle created");
     m_to->m_controls[index].m_referenceCount ++;
 }
 
 ButtonControlHandle::~ButtonControlHandle()
 {
-    m_to->p_logger->info("ButtonControlHandle is dead");
+    SPDLOG_LOGGER_INFO(m_to->p_logger, "ButtonControlHandle is dead");
     m_to->m_controls[m_index].m_referenceCount --;
 }
 
@@ -66,13 +65,13 @@ bool ButtonControlHandle::trigger_hold()
 
 MouseMovementHandle::MouseMovementHandle(UserInputHandler *to) : m_to(to)
 {
-    m_to->p_logger->info("MouseMovementHandle created");
+    SPDLOG_LOGGER_INFO(m_to->p_logger, "MouseMovementHandle created");
     m_to->m_mouseMotion.m_referenceCount++;
 }
 
 MouseMovementHandle::~MouseMovementHandle()
 {
-    m_to->p_logger->info("MouseMovementHandle is dead");
+    SPDLOG_LOGGER_INFO(m_to->p_logger, "MouseMovementHandle is dead");
     m_to->m_mouseMotion.m_referenceCount--;
 }
 
@@ -98,13 +97,13 @@ int MouseMovementHandle::dyRaw() const
 
 ScrollInputHandle::ScrollInputHandle(UserInputHandler *to) : m_to(to)
 {
-    m_to->p_logger->info("ScrollInputHandle created");
+    SPDLOG_LOGGER_INFO(m_to->p_logger, "ScrollInputHandle created");
     m_to->m_scrollOffset.m_referenceCount++;
 }
 
 ScrollInputHandle::~ScrollInputHandle()
 {
-    m_to->p_logger->info("ScrollInputHandle is dead");
+    SPDLOG_LOGGER_INFO(m_to->p_logger, "ScrollInputHandle is dead");
     m_to->m_scrollOffset.m_referenceCount--;
 }
 
@@ -137,7 +136,7 @@ UserInputHandler::UserInputHandler(int deviceCount) :
 {
     m_controls.reserve(7);
 
-    p_logger = spdlog::stdout_color_mt("userinput");
+    p_logger = spdlog::get("userinput");
 }
 
 bool UserInputHandler::eval_button_expression(
@@ -260,7 +259,7 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
     if (cfgIt == m_controlConfigs.end())
     {
         // Config not found, no way to have an empty key so far, so throw an exception
-        p_logger->error("No config for{}", name);
+        SPDLOG_LOGGER_ERROR(p_logger, "No config for{}", name);
         throw std::runtime_error("Error: no config with " + name);
     }
 
@@ -371,7 +370,7 @@ void UserInputHandler::event_raw(DeviceId deviceId, int buttonEnum,
         return; // button not registered
     }
 
-    p_logger->trace("sensitive button pressed");
+    SPDLOG_LOGGER_TRACE(p_logger, "sensitive button pressed");
         
     ButtonRaw &btnRaw = btnIt->second;
 
@@ -422,7 +421,7 @@ void UserInputHandler::update_controls()
             if (!control.m_held)
             {
                 control.m_exprRelease.clear();
-                p_logger->trace("RELEASE");
+                SPDLOG_LOGGER_TRACE(m_to->p_logger, "RELEASE");
             }
         }
         else if (control.m_triggered)
@@ -430,7 +429,7 @@ void UserInputHandler::update_controls()
             // start holding down the control. control.m_exprRelease should
             // have been generated earlier
             control.m_held = true;
-            p_logger->trace("HOLD");
+            SPDLOG_LOGGER_TRACE(m_to->p_logger, "HOLD");
         }
     }
 

@@ -159,17 +159,13 @@ private:
                                Magnum::UnsignedInt parentProtoIndex,
                                Magnum::UnsignedInt childGltfIndex);
 
-    static std::shared_ptr<spdlog::logger> get_logger() 
-    {
-        if (logger == nullptr) {
-            logger = spdlog::stdout_color_mt("assetimporter");
-        }
-        return logger;
-    }
-    /**
-    * Unique logger for AssetImporter because it's important
+    /*
+    * This cannot be a reference or else spdlog will complain. Don't know why.
     */
-    static std::shared_ptr<spdlog::logger> logger;
+    static const std::shared_ptr<spdlog::logger> get_logger() 
+    {
+        return spdlog::get("assetimporter");
+    }
 };
 
 }

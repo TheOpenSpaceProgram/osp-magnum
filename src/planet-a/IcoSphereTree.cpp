@@ -618,13 +618,14 @@ bool IcoSphereTree::debug_verify_state()
                           tri.m_parent - tri.m_parent % 4)
                 !=  m_trianglesFree.end())
             {
-                spdlog::warn("* Invalid triangle {}: Parent is deleted", t);
+                SPDLOG_LOGGER_WARN(spdlog::get("application"), "* Invalid triangle {}: Parent is deleted", t);
                 error = true;
             }
 
             if (parent.m_children + tri.m_siblingIndex != t)
             {
-                spdlog::warn("* Invalid triangle {}: Parent does not have child", t);
+                SPDLOG_LOGGER_WARN(spdlog::get("application"), "* Invalid triangle {}: Parent does not have child",
+                  t);
                 error = true;
             }
 
@@ -633,7 +634,9 @@ bool IcoSphereTree::debug_verify_state()
                              tri.m_children)
                 !=  m_trianglesFree.end())
             {
-                spdlog::warn("* Invalid triangle {}: Children are deleted", t);
+                SPDLOG_LOGGER_WARN(spdlog::get("application"),
+                                 "* Invalid triangle {}: Children are deleted",
+                                 t);
                 error = true;
             }
         }
@@ -652,18 +655,27 @@ bool IcoSphereTree::debug_verify_state()
                 if (side == -1)
                 {
 
-                    spdlog::warn("* Invalid triangle {}: Neighbour {} does not recognize this triangle as a neighbour\n", t, i);
+                    SPDLOG_LOGGER_WARN(
+                        spdlog::get("application"),
+                        "* Invalid triangle {}: Neighbour {} does not recognize "
+                        "this triangle as a neighbour\n",
+                        t, i);
                     error = true;
                 }
                 else if (side != tri.m_neighbourSide[i])
                 {
-                    spdlog::warn("* Invalid triangle {}: Incorrect Neighbour's side\n", t);
+                    SPDLOG_LOGGER_WARN(
+                        spdlog::get("application"),
+                        "* Invalid triangle {}: Incorrect Neighbour's side\n", t);
                     error = true;
                 }
             }
             else if (tri.m_depth < neighbourTri->m_depth)
             {
-                spdlog::warn("* Invalid triangle {}: Neighbour {} has larger depth\n", t, i);
+                SPDLOG_LOGGER_WARN(
+                    spdlog::get("application"),
+                    "* Invalid triangle {}: Neighbour {} has larger depth\n", t,
+                    i);
                 error = true;
             }
 

@@ -113,5 +113,5 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
         }
     }
 
-    ospApp.get_logger()->info("Created simple solar system");
+    SPDLOG_LOGGER_INFO(ospApp.get_logger(), "Created simple solar system");
 }

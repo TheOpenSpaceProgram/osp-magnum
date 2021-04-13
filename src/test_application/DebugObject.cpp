@@ -186,7 +186,8 @@ void DebugCameraController::update_physics_pre()
 
     if (!tra.isZero())
     {
-        m_scene.get_application().get_logger()->trace("Floating origin translation!");
+      SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                          "Floating origin translation!");
 
         // Move the active area to center on the camera
         SysAreaAssociate::area_move(m_scene, tra);
@@ -313,7 +314,8 @@ bool DebugCameraController::try_switch_vehicle()
     
     if (rUni.get_reg().valid(m_selected))
     {
-        m_scene.get_application().get_logger()->info("Selected: {} ", rUni.get_reg().get<UCompTransformTraj>(m_selected).m_name);
+      SPDLOG_LOGGER_INFO(m_scene.get_application().get_logger(), "Selected: {} ",
+          rUni.get_reg().get<UCompTransformTraj>(m_selected).m_name);
         return true;
     }
 

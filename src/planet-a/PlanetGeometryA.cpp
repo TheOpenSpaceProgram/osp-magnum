@@ -1205,7 +1205,7 @@ bool PlanetGeometryA::debug_verify_state()
     // Verify vertex sharing if chunked
     // * Loop through shared vertices and make sure the neighbours use them too
 
-    spdlog::info("PlanetGeometryA Verify:");
+    SPDLOG_LOGGER_INFO(spdlog::get("application"), "PlanetGeometryA Verify:");
 
     std::vector<uint8_t> recountVrtxSharedUsers(m_vrtxSharedUsers.size(), 0);
 
@@ -1232,7 +1232,9 @@ bool PlanetGeometryA::debug_verify_state()
         if (countDescendentChunked != chunk.m_descendentChunked)
         {
 
-            spdlog::warn("* Invalid chunk {}: Incorrect chunked descendent count", t);
+            SPDLOG_LOGGER_WARN(
+              spdlog::get("application"),
+              "* Invalid chunk {}: Incorrect chunked descendent count", t);
             error = true;
         }
 
@@ -1258,7 +1260,9 @@ bool PlanetGeometryA::debug_verify_state()
 
             if (ancestorChunked != chunk.m_ancestorChunked)
             {
-                spdlog::warn("* Invalid chunk {}: Incorrect chunked ancestor", t);
+                SPDLOG_LOGGER_WARN(
+                    spdlog::get("application"),
+                    "* Invalid chunk {}: Incorrect chunked ancestor", t);
                 error = true;
             }
         }
@@ -1281,19 +1285,23 @@ bool PlanetGeometryA::debug_verify_state()
 
     if (chunkCount + m_chunkFree.size() != m_chunkCount)
     {
-        spdlog::warn("* Invalid chunk count");
+        SPDLOG_LOGGER_WARN(spdlog::get("application"), "* Invalid chunk count");
         error = true;
     }
 
     if (recountVrtxSharedUsers != m_vrtxSharedUsers)
     {
-        spdlog::warn("* Invalid Shared vertex user count");
+        SPDLOG_LOGGER_WARN(spdlog::get("application"),
+                         "* Invalid Shared vertex user count");
 
         for (planeta::vrindex_t i = 0; i < m_vrtxSharedMax; i ++)
         {
             if (m_vrtxSharedUsers[i] != recountVrtxSharedUsers[i])
             {
-                spdlog::warn("  * Vertex: {}, expected: {}, obtained: {}", i, int(recountVrtxSharedUsers[i]), int(m_vrtxSharedUsers[i]));
+                SPDLOG_LOGGER_WARN(spdlog::get("application"),
+                               "  * Vertex: {}, expected: {}, obtained: {}", i,
+                               int(recountVrtxSharedUsers[i]),
+                               int(m_vrtxSharedUsers[i]));
             }
         }
 
