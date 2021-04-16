@@ -28,7 +28,7 @@
 #include "DebugObject.h"
 
 #include <osp/Active/ActiveScene.h>
-#include <osp/Active/SysDebugRender.h>
+#include <osp/Active/SysRender.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/SysForceFields.h>
 #include <osp/Active/SysAreaAssociate.h>
@@ -42,6 +42,10 @@
 
 #include <planet-a/Active/SysPlanetA.h>
 #include <planet-a/Satellites/SatPlanet.h>
+
+#include <osp/Shaders/Phong.h>
+#include <osp/Shaders/FullscreenTriShader.h>
+#include <Magnum/Shaders/MeshVisualizer.h>
 
 using namespace testapp;
 
@@ -67,6 +71,12 @@ using osp::active::ACompTransform;
 using osp::active::ACompCamera;
 using osp::active::ACompFloatingOrigin;
 
+using osp::active::SysRender;
+using osp::active::ACompRenderTarget;
+using osp::active::ACompRenderingAgent;
+using osp::active::ACompPerspective3DView;
+using osp::active::ACompRenderer;
+
 using adera::active::machines::SysMachineUserControl;
 using adera::active::machines::SysMachineRocket;
 using adera::active::machines::SysMachineRCSController;
@@ -74,6 +84,7 @@ using adera::active::machines::SysMachineContainer;
 
 using planeta::universe::SatPlanet;
 
+void load_shaders(osp::active::ActiveScene& rScene);
 
 void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
                  osp::OSPApplication& rOspApp, OSPMagnum::Arguments args)
@@ -94,12 +105,14 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Add system functions needed for flight scene
     osp::active::SysPhysics_t::add_functions(rScene);
     //osp::active::SysWire::add_functions(rScene);
-    osp::active::SysDebugRender::add_functions(rScene);
     osp::active::SysAreaAssociate::add_functions(rScene);
     osp::active::SysVehicle::add_functions(rScene);
     osp::active::SysExhaustPlume::add_functions(rScene);
     planeta::active::SysPlanetA::add_functions(rScene);
     osp::active::SysFFGravity::add_functions(rScene);
+    osp::active::SysRender::setup(rScene);
+
+    load_shaders(rScene);
 
     // Register machines for that scene
     rScene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());
@@ -121,7 +134,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
 
     // Add default-constructed physics world to scene
-    rScene.get_registry().emplace<osp::active::ACompPhysicsWorld_t>(rScene.hier_get_root());
+    rScene.reg_emplace<osp::active::ACompPhysicsWorld_t>(rScene.hier_get_root());
 
     // Add a camera to the scene
 
@@ -129,7 +142,10 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     ActiveEnt camera = rScene.hier_create_child(rScene.hier_get_root(),
                                                        "Camera");
     auto &cameraTransform = rScene.reg_emplace<ACompTransform>(camera);
-    auto &cameraComp = rScene.get_registry().emplace<ACompCamera>(camera);
+    auto &cameraComp = rScene.reg_emplace<ACompCamera>(camera);
+    rScene.reg_emplace<ACompRenderingAgent>(camera, SysRender::get_default_rendertarget(rScene));
+    rScene.reg_emplace<ACompPerspective3DView>(camera, camera);
+    rScene.reg_emplace<ACompRenderer>(camera);
 
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     rScene.reg_emplace<ACompFloatingOrigin>(camera);
@@ -162,4 +178,17 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // destruct the application, this closes the window
     pMagnumApp.reset();
+}
+
+void load_shaders(osp::active::ActiveScene& rScene)
+{
+    using adera::shader::PlumeShader;
+    using Magnum::Shaders::MeshVisualizer3D;
+    auto& resources = rScene.get_context_resources();
+
+    resources.add<PlumeShader>("plume_shader");
+
+    resources.add<MeshVisualizer3D>("mesh_vis_shader",
+        MeshVisualizer3D{MeshVisualizer3D::Flag::Wireframe
+        | MeshVisualizer3D::Flag::NormalDirection});
 }

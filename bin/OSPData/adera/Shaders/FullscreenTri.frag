@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright Â© 2019-2020 Open Space Program Project
+ * Copyright © 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -22,39 +22,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
-#include "osp/Active/physics.h"
-#include "adera/Plume.h"
-#include "adera/Shaders/PlumeShader.h"
-#include "osp/Resource/Resource.h"
 
-namespace osp::active
+//#version 430 core
+
+layout(location = 0, index = 0) out vec3 color;
+
+layout(location = 0) uniform sampler2D framebuffer;
+
+in vec2 uv;
+
+void main()
 {
-
-struct ACompExhaustPlume
-{
-    ActiveEnt m_parentMachineRocket{entt::null};
-    DependRes<PlumeEffectData> m_effect;
-    float m_time{0.0f};
-    float m_powerLevel{0.0f};
-};
-
-class SysExhaustPlume
-{
-public:
-
-    static void add_functions(ActiveScene& rScene);
-
-    /**
-     * Initialize plume graphics
-     * 
-     * SysMachineRocket only attaches ACompExhaustPlume to eligible entities;
-     * this function takes such entities, retrieves the appropriate graphics
-     * resources, and configures the graphical components
-     */
-    static void initialize_plume(ActiveScene& rScene, ActiveEnt e);
-
-    static void update_plumes(ActiveScene& rScene);
-};
-
-} // namespace osp::active
+    color = texture(framebuffer, uv).rgb;
+}

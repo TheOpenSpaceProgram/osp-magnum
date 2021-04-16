@@ -22,22 +22,38 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
+#include <osp/Shaders/FullscreenTriShader.h>
+#include <Magnum/GL/Version.h>
+#include <Magnum/GL/Shader.h>
+#include <Magnum/GL/Texture.h>
+#include <Corrade/Containers/Reference.h>
 
-#include "activetypes.h"
-#include "osp/Active/ActiveScene.h"
-#include <Magnum/GL/Mesh.h>
+using namespace osp::active;
+using namespace Magnum;
 
-namespace osp::active
+FullscreenTriShader::FullscreenTriShader()
 {
-/**
- * A function pointer to a Shader's draw() function
- * @param ActiveEnt - The entity being drawn; used to fetch component data
- * @param ActiveScene - The scene containing the entity's component data
- * @param ACompCamera - Camera used to draw the scene
- */
-using ShaderDrawFnc_t = void (*)(
-    ActiveEnt,
-    ActiveScene&,
-    ACompCamera const&);
+    GL::Shader vert{GL::Version::GL430, GL::Shader::Type::Vertex};
+    GL::Shader frag{GL::Version::GL430, GL::Shader::Type::Fragment};
+    vert.addFile("OSPData/adera/Shaders/FullscreenTri.vert");
+    frag.addFile("OSPData/adera/Shaders/FullscreenTri.frag");
+
+    CORRADE_INTERNAL_ASSERT_OUTPUT(GL::Shader::compile({vert, frag}));
+    attachShaders({vert, frag});
+    CORRADE_INTERNAL_ASSERT_OUTPUT(link());
+
+    setUniform(static_cast<Int>(EUniformPos::FramebufferSampler),
+        static_cast<Int>(ETextureSlot::Framebuffer));
+}
+
+void FullscreenTriShader::display_texure(GL::Mesh& surface, GL::Texture2D& texture)
+{
+    set_framebuffer(texture);
+    draw(surface);
+}
+
+FullscreenTriShader& FullscreenTriShader::set_framebuffer(GL::Texture2D& rTex)
+{
+    rTex.bind(static_cast<Int>(ETextureSlot::Framebuffer));
+    return *this;
 }

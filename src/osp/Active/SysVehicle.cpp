@@ -24,14 +24,13 @@
  */
 #include "ActiveScene.h"
 #include "SysVehicle.h"
-#include "SysDebugRender.h"
+#include "SysRender.h"
 #include "physics.h"
 
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
 #include "../Resource/PrototypePart.h"
 #include "../Resource/AssetImporter.h"
-#include "adera/Shaders/Phong.h"
 
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
@@ -364,20 +363,13 @@ std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_insta
                 textureResources.push_back(texRes);
             }
 
-            // by now, the mesh and texture should both exist
-            using adera::shader::Phong;
-            Phong::ACompPhongInstance shader;
-            shader.m_shaderProgram = glResources.get<Phong>("phong_shader");
-            shader.m_textures = std::move(textureResources);
-            shader.m_lightPosition = Vector3{10.0f, 15.0f, 5.0f};
-            shader.m_ambientColor = 0x111111_rgbf;
-            shader.m_specularColor = 0x330000_rgbf;
-            rScene.reg_emplace<Phong::ACompPhongInstance>(currentEnt, std::move(shader));
-
-            CompDrawableDebug& bBocks = rScene.reg_emplace<CompDrawableDebug>(
-                        currentEnt, meshRes, &Phong::draw_entity, 0x0202EE_rgbf);
-
-            //new DrawablePhongColored(*obj, *m_shader, *mesh, 0xff0000_rgbf, m_drawables);
+            // by now, the mesh and texture should both exist so we emplace them
+            // as components to be consumed by the Phong shader
+            rScene.reg_emplace<ACompVisible>(currentEnt);
+            rScene.reg_emplace<ACompOpaque>(currentEnt);
+            rScene.reg_emplace<ACompShader>(currentEnt);
+            rScene.reg_emplace<ACompMesh>(currentEnt, meshRes);
+            rScene.reg_emplace<ACompDiffuseTex>(currentEnt, std::move(textureResources[0]));
         }
         else if (currentPrototype.m_type == ObjectType::COLLIDER)
         {

@@ -26,12 +26,9 @@
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/physics.h>
-#include <osp/Active/SysDebugRender.h>
 
 #include "Rocket.h"
 #include "osp/Resource/AssetImporter.h"
-#include "adera/Shaders/Phong.h"
-#include "adera/Shaders/PlumeShader.h"
 #include "osp/Resource/blueprints.h"
 #include "osp/PhysicsConstants.h"
 #include "adera/SysExhaustPlume.h"
