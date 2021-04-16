@@ -25,6 +25,7 @@
 #include <iostream>
 
 #include "ActiveScene.h"
+#include "osp/Active/SysRender.h"
 
 using namespace osp;
 using namespace osp::active;
@@ -62,7 +63,6 @@ ActiveScene::~ActiveScene()
 {
     m_registry.clear();
 }
-
 
 ActiveEnt ActiveScene::hier_create_child(ActiveEnt parent,
                                             std::string const& name)
@@ -216,25 +216,33 @@ void ActiveScene::update_hierarchy_transforms()
             // set transform relative to parent
             transform.m_transformWorld = parentTransform.m_transformWorld
                                           * transform.m_transform;
-
         }
     }
-
 }
 
 void ActiveScene::draw(ActiveEnt camera)
 {
-    //Matrix4 cameraProject;
-    //Matrix4 cameraInverse;
+    auto renderView = m_registry.view<ACompRenderingAgent, ACompPerspective3DView, ACompRenderer>();
+    for (auto [e, agent, view, renderer] : renderView.each())
+    {
+        DependRes<RenderPipeline> render =
+            get_context_resources().get<RenderPipeline>(renderer.m_name);
+        auto& camera = reg_get<ACompCamera>(view.m_camera);
+        auto& cameraTransform = reg_get<ACompTransform>(view.m_camera);
+        auto& target = reg_get<ACompRenderTarget>(agent.m_target);
+        target.m_fbo->bind();
+        using Magnum::GL::FramebufferClear;
+        target.m_fbo->clear(
+            FramebufferClear::Color
+            | FramebufferClear::Depth
+            | FramebufferClear::Stencil);
 
-    // TODO: check if camera has the right components
-    ACompCamera& cameraComp = reg_get<ACompCamera>(camera);
-    ACompTransform& cameraTransform = reg_get<ACompTransform>(camera);
+        camera.m_inverse = cameraTransform.m_transformWorld.inverted();
 
-    //cameraProject = cameraComp.m_projection;
-    cameraComp.m_inverse = cameraTransform.m_transformWorld.inverted();
+        render->m_order.call(*this, camera);
+    }
 
-    m_renderOrder.call(*this, cameraComp);
+    SysRender::display_default_rendertarget(*this);
 }
 
 MapSysMachine_t::iterator ActiveScene::system_machine_add(std::string_view name,

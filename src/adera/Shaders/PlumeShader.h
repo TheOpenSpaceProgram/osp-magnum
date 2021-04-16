@@ -58,46 +58,13 @@ public:
 
     PlumeShader();
 
-    struct ACompPlumeShaderInstance
-    {
-        // Parent shader
-        osp::DependRes<PlumeShader> m_shaderProgram;
-
-        // Uniform values
-        float m_minZ;
-        float m_maxZ;
-        osp::DependRes<Magnum::GL::Texture2D> m_nozzleTex;
-        osp::DependRes<Magnum::GL::Texture2D> m_combustionTex;
-        Magnum::Color4 m_color;
-        float m_flowVelocity;
-        float m_currentTime;
-        float m_powerLevel;
-
-        // Constructor to auto-initialize from effect data
-        ACompPlumeShaderInstance(
-            osp::DependRes<PlumeShader> parent,
-            osp::DependRes<Magnum::GL::Texture2D> nozzleTex,
-            osp::DependRes<Magnum::GL::Texture2D> combustionTex,
-            PlumeEffectData const& data)
-            : m_shaderProgram(parent)
-            , m_nozzleTex(nozzleTex)
-            , m_combustionTex(combustionTex)
-            , m_minZ(data.m_zMin)
-            , m_maxZ(data.m_zMax)
-            , m_color(data.m_color)
-            , m_flowVelocity(data.m_flowVelocity)
-            , m_currentTime(0.0f)
-            , m_powerLevel(0.0f)
-        {}
-    };
-
     static void draw_plume(osp::active::ActiveEnt e,
         osp::active::ActiveScene& rScene,
-        Magnum::GL::Mesh& rMesh,
-        osp::active::ACompCamera const& camera,
-        osp::active::ACompTransform const& transform);
+        osp::active::ACompCamera const& camera);
 
 private:
+    constexpr static std::string_view smc_resourceName = "plume_shader";
+
     // GL init
     void init();
 

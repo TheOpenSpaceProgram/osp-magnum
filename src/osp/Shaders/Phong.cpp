@@ -24,18 +24,21 @@
  */
 #include "Phong.h"
 #include <Magnum/Math/Matrix4.h>
+#include "osp/Active/SysRender.h"
 
 using namespace osp::active;
-using namespace adera::shader;
+using namespace osp::shader;
 
 void Phong::draw_entity(ActiveEnt e,
     ActiveScene& rScene, 
-    Magnum::GL::Mesh& rMesh,
-    ACompCamera const& camera,
-    ACompTransform const& transform)
+    ACompCamera const& camera)
 {
-    auto& shaderInstance = rScene.reg_get<ACompPhongInstance>(e);
-    Phong& shader = *shaderInstance.m_shaderProgram;
+    Phong& shader = *rScene.get_context_resources().get<Phong>(smc_resourceName);
+
+    // Collect uniform information
+    auto& transform = rScene.reg_get<ACompTransform>(e);
+    Magnum::GL::Texture2D& rDiffuse = *rScene.reg_get<ACompDiffuseTex>(e).m_tex;
+    Magnum::GL::Mesh& rMesh = *rScene.reg_get<ACompMesh>(e).m_mesh;
 
     Magnum::Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;
 
@@ -43,15 +46,15 @@ void Phong::draw_entity(ActiveEnt e,
      * light is a direction light coming from the specified direction relative
      * to the camera.
      */
-    Magnum::Vector4 light = {shaderInstance.m_lightPosition, 0.0f};
+    Vector4 light = Vector4{1.0f, 0.0f, 0.0f, 0.0f};
 
     shader
-        .bindDiffuseTexture(*shaderInstance.m_textures[0])
-        .setAmbientColor(shaderInstance.m_ambientColor)
-        .setSpecularColor(shaderInstance.m_specularColor)
+        .bindDiffuseTexture(rDiffuse)
+        .setAmbientColor(Magnum::Color4{0.1f})
+        .setSpecularColor(Magnum::Color4{1.0f})
         .setLightPositions({light})
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
-        .setNormalMatrix(entRelative.normalMatrix())
+        .setNormalMatrix(Matrix3{transform.m_transformWorld})
         .draw(rMesh);
 }
