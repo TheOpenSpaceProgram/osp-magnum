@@ -29,6 +29,10 @@
 #include <osp/Active/SysRender.h>
 #include <osp/Resource/AssetImporter.h>
 
+#include <osp/types.h>
+#include <osp/Active/SysRender.h>
+#include <osp/Resource/AssetImporter.h>
+
 #include <Magnum/GL/Version.h>
 #include <Magnum/GL/Shader.h>
 #include <Corrade/Containers/Reference.h>
