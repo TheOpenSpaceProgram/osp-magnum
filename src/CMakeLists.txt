@@ -42,11 +42,22 @@ find_package(MagnumPlugins REQUIRED
 find_package(Threads)
 
 # Gather paths to OSP headers and sources
-file (GLOB_RECURSE CPP_FILES *.cpp)
-file (GLOB_RECURSE H_FILES *.h)
-set (SOURCE_FILES ${CPP_FILES} ${H_FILES})
+add_executable(osp-magnum)
+file (GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
+file (GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
+target_sources(osp-magnum PRIVATE "${CPP_FILES}" "${H_FILES}")
 
-add_executable(osp-magnum ${CPP_FILES})
+# For some reason, source_group() requires all files to be added to the executable
+set(SHADERS_DIR "../bin/OSPData/adera/Shaders")
+file (GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS
+    "${SHADERS_DIR}/*.vert"
+    "${SHADERS_DIR}/*.frag"
+    "${SHADERS_DIR}/*.comp"
+)
+target_sources(osp-magnum PRIVATE "${SHADER_FILES}")
+
+# Set osp-magnum as startup project
+set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT osp-magnum)
 
 target_include_directories(osp-magnum PRIVATE .)
 
@@ -84,11 +95,17 @@ elseif(MINGW)
 
 endif()
 
-# Set the MSVC debug working directory, enforce conformance mode for osp-magnum
-if(MSVC)
-  set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ../../bin)
-  target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
-endif()
+# MSVC quality of life improvements for Visual Studio
+
+# Set the MSVC debug working directory
+set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ../../bin)
+
+# Enforce conformance mode for osp-magnum
+target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
+
+# Segregate headers, shaders into filters
+source_group("Shader Files" FILES ${SHADER_FILES})
+source_group("Header Files" FILES ${H_FILES})
 
 # Include ENTT (header only lib)
 target_include_directories(osp-magnum PRIVATE ../3rdparty/entt/src)
@@ -138,3 +155,4 @@ endif()
 
 # Copy root/bin to build/bin
 FILE (COPY "${CMAKE_SOURCE_DIR}/bin/" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
+
