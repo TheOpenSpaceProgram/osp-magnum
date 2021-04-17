@@ -74,6 +74,8 @@ public:
     constexpr osp::UserInputHandler& get_input_handler() { return m_userInput; }
     constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
 
+    constexpr osp::Package& get_context_resources() { return m_glResources; }
+
 private:
 
     void drawEvent() override;

@@ -82,6 +82,9 @@ class Package
 
 public:
 
+    template<class TYPE_T>
+    using group_t =  std::map<std::string, osp::Resource<TYPE_T>, std::less<>>;
+
     Package(std::string prefix, std::string packageName);
     Package(Package&& move) = default;
     Package(const Package& copy) = delete;
@@ -96,8 +99,8 @@ public:
      * @param args [in] Arguments to pass to TYPE_T constructor
      * @return Reference counted dependency to new resource
      */
-    template<class TYPE_T, typename ... ARGS_T>
-    DependRes<TYPE_T> add(std::string_view path, ARGS_T&& ... args);
+    template<class TYPE_T, class STRING_T, typename ... ARGS_T>
+    DependRes<TYPE_T> add(STRING_T&& path, ARGS_T&& ... args);
 
     /**
      * Get a resource by path identifier
@@ -110,6 +113,21 @@ public:
      */
     template<class TYPE_T>
     DependRes<TYPE_T> get(std::string_view path) noexcept;
+
+    /**
+     * Get a resource by path identifier. If it isn't found, then reserve the
+     * path to be loaded later.
+     *
+     * @tparam TYPE_T Type of resource to get
+     *
+     * @param path [in] String used to identify the target resource
+     * @return Reference counted dependency to the found or unloaded resource
+     */
+    template<class TYPE_T, class STRING_T>
+    DependRes<TYPE_T> get_or_reserve(STRING_T&& path) noexcept;
+
+    template<class TYPE_T>
+    group_t<TYPE_T> const& group_get();
 
     // TODO: function for removing specific resources
 
@@ -133,7 +151,7 @@ public:
         // entt experimental branch allows move-only types.
         GroupType(GroupType const& copy) { assert(0); };
 
-        std::map<std::string, Resource<TYPE_T>, std::less<>> m_resources;
+        group_t<TYPE_T> m_resources;
     };
 
     constexpr ResPrefix_t const& get_prefix() const { return m_prefix; }
@@ -149,8 +167,8 @@ private:
     std::string m_displayName;
 };
 
-template<class TYPE_T, typename ... ARGS_T>
-DependRes<TYPE_T> Package::add(std::string_view path,
+template<class TYPE_T, class STRING_T, typename ... ARGS_T>
+DependRes<TYPE_T> Package::add(STRING_T&& path,
                                ARGS_T&& ... args)
 {
     // Runtime generated (global) sequential IDs for every unique type
@@ -175,17 +193,31 @@ DependRes<TYPE_T> Package::add(std::string_view path,
 
     GroupType<TYPE_T> &group = entt::any_cast< GroupType<TYPE_T>& >(groupAny);
 
+    // Check if resource already exists
+    auto resIt = group.m_resources.find(path); // Find resource by path
+
+    if (resIt != group.m_resources.end())
+    {
+        // Resource already exists, replace if not loaded
+        if (!resIt->second.m_data.has_value())
+        {
+            resIt->second.m_data.emplace(std::forward<ARGS_T>(args)...);
+        }
+        return {};
+    }
+
     // Emplace without needing copy constructor
-    auto final = group.m_resources
-        .try_emplace(std::string{path}, false, std::forward<ARGS_T>(args)...);
+    auto newIt = group.m_resources
+        .try_emplace(std::forward<STRING_T>(path),
+                     std::in_place, std::forward<ARGS_T>(args)...);
 
     // check if emplace fails, Resource already exists
-    if (!final.second)
+    if (!newIt.second)
     {
         return {}; // return empty if so
     }
 
-    return DependRes<TYPE_T>(final.first);
+    return DependRes<TYPE_T>(newIt.first);
 }
 
 template<class TYPE_T>
@@ -211,12 +243,65 @@ DependRes<TYPE_T> Package::get(std::string_view path) noexcept
 
     if (resIt == group.m_resources.end())
     {
-        // resource not found
-        return DependRes<TYPE_T>();
+        return {}; // resource not found
     }
 
     // found
     return DependRes<TYPE_T>(resIt);
+}
+
+template<class TYPE_T, class STRING_T>
+DependRes<TYPE_T> Package::get_or_reserve(STRING_T&& path) noexcept
+{
+    const uint32_t resTypeId = resource_id::type<TYPE_T>;
+
+    // Resize m_groups to ensure that resTypeId a valid index
+    if (m_groups.size() <= resTypeId)
+    {
+        m_groups.resize(resTypeId + 1);
+    }
+
+    entt::any &groupAny = m_groups[resTypeId];
+
+    // Initialize GroupType if blank. This only happens for the first TYPE_T
+    // added.
+    if(!groupAny)
+    {
+        groupAny = GroupType<TYPE_T>();
+    }
+
+    GroupType<TYPE_T> &group = entt::any_cast<GroupType<TYPE_T>&>(groupAny);
+
+    // Find existing element or emplace a blank reservation if not found
+    auto newIt = group.m_resources.try_emplace(std::forward<STRING_T>(path),
+                                               std::nullopt);
+
+    return DependRes<TYPE_T>(newIt.first);
+}
+
+template<class TYPE_T>
+Package::group_t<TYPE_T> const& Package::group_get()
+{
+    const uint32_t resTypeId = resource_id::type<TYPE_T>;
+
+    // Resize m_groups to ensure that resTypeId a valid index
+    if (m_groups.size() <= resTypeId)
+    {
+        m_groups.resize(resTypeId + 1);
+    }
+
+    entt::any &groupAny = m_groups[resTypeId];
+
+    // Initialize GroupType if blank. This only happens for the first TYPE_T
+    // added.
+    if(!groupAny)
+    {
+        groupAny = GroupType<TYPE_T>();
+    }
+
+    GroupType<TYPE_T> &group = entt::any_cast<GroupType<TYPE_T>&>(groupAny);
+
+    return group.m_resources;
 }
 
 template<class TYPE_T>
