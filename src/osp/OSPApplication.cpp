@@ -32,8 +32,12 @@ using namespace osp;
 osp::OSPApplication::OSPApplication() : m_logger(spdlog::stdout_color_mt("application"))
 {
     //Initialize other loggers
-    spdlog::stderr_color_mt("assetimporter");
-    spdlog::stderr_color_mt("userinput");
+    const std::string string = "[%T.%e] [%n] [%^%l%$] [%s:%#] %v";
+    m_logger->set_pattern(string);
+    auto asset_importer = spdlog::stderr_color_mt("assetimporter");
+    asset_importer->set_pattern(string);
+    auto userinput = spdlog::stderr_color_mt("userinput");
+    userinput->set_pattern(string);
 }
 
 void OSPApplication::debug_add_package(Package&& p)
