@@ -419,7 +419,7 @@ Matrix4 SysNewton::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, Ac
     } while (pCurrHier->m_level != gc_heir_physics_level);
 
     // Fail if a rigidbody ancestor is not found
-    assert(rScene.get_registry().has<ACompNwtBody>(prevEnt));
+    assert(rScene.get_registry().all_of<ACompNwtBody>(prevEnt));
 
     return transform;
 }

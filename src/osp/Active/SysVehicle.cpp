@@ -412,7 +412,7 @@ std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_insta
         if (auto const* shape = rScene.reg_try_get<ACompShape>(ent);
             shape != nullptr)
         {
-            if (!rScene.get_registry().has<ACompCollider>(ent))
+            if (!rScene.get_registry().all_of<ACompCollider>(ent))
             {
                 return EHierarchyTraverseStatus::Continue;
             }
@@ -445,7 +445,7 @@ void SysVehicle::update_activate(ActiveScene &rScene)
     // Delete vehicles that have gone too far from the ActiveArea range
     for (auto const &[sat, ent] : pArea->m_leave)
     {
-        if (!rUni.get_reg().has<UCompVehicle>(sat))
+        if (!rUni.get_reg().all_of<UCompVehicle>(sat))
         {
             continue;
         }
@@ -470,7 +470,7 @@ void SysVehicle::update_activate(ActiveScene &rScene)
         universe::Satellite sat = entered->first;
         ActiveEnt &rEnt = entered->second;
 
-        if (!rUni.get_reg().has<UCompVehicle>(sat))
+        if (!rUni.get_reg().all_of<UCompVehicle>(sat))
         {
             continue;
         }
