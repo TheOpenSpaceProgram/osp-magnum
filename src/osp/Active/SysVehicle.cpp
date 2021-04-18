@@ -64,8 +64,8 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
                           universe::Satellite areaSat,
                              universe::Satellite tgtSat)
 {
-
-    std::cout << "loadin a vehicle!\n";
+    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
+                      "Loading a vehicle");
 
     auto &loadMeVehicle = rUni.get_reg().get<universe::UCompVehicle>(tgtSat);
     auto &tgtPosTraj = rUni.get_reg().get<universe::UCompTransformTraj>(tgtSat);
@@ -149,10 +149,6 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
         */
         part_instantiate_machines(rScene, partEntity, machineMapping, proto, partBp);
 
-        //std::cout << "empty? " << partMachines.m_machines.isEmpty() << "\n";
-
-        //std::cout << "entity: " << int(partEntity) << "\n";
-
         ACompTransform& partTransform = rScene.get_registry()
                                             .get<ACompTransform>(partEntity);
 
@@ -233,7 +229,9 @@ void SysVehicle::add_machines_to_object(ActiveScene& rScene,
 
         if (!(rScene.system_machine_it_valid(sysMachine)))
         {
-            std::cout << "Machine type: " << protoMachine.m_type << " Not found\n";
+            SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
+                              "Machine type : {} not found",
+                              protoMachine.m_type);
             continue;
         }
 
@@ -291,7 +289,7 @@ std::pair<ActiveEnt, std::vector<SysVehicle::MachineDef>> SysVehicle::part_insta
     std::vector<MachineDef> machineMapping;
     machineMapping.reserve(prototypes.size());
 
-    //std::cout << "size: " << newEntities.size() << "\n";
+    SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(), "New entities size", newEntities.size());
 
     for (size_t i = 0; i < prototypes.size(); i++)
     {

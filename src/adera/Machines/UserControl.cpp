@@ -36,7 +36,7 @@ const std::string SysMachineUserControl::smc_name = "UserControl";
 
 void MachineUserControl::propagate_output(WireOutput* output)
 {
-    std::cout << "propagate test: " << output->get_name() << "\n";
+    SPDLOG_LOGGER_INFO(spdlog::get("application"), "Propagate test: {}", output->get_name());
 }
 
 WireInput* MachineUserControl::request_input(WireInPort port)
@@ -80,14 +80,15 @@ SysMachineUserControl::SysMachineUserControl(ActiveScene &scene, UserInputHandle
 
 void SysMachineUserControl::update_sensor()
 {
-    //std::cout << "updating all MachineUserControls\n";
+    SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                      "Updating all MachineUserControls");
+
     // InputDevice.IsActivated()
     // Combination
-    
-
     if (m_selfDestruct.triggered())
     {
-        std::cout << "EXPLOSION BOOM!!!!\n";
+        SPDLOG_LOGGER_INFO(m_scene.get_application().get_logger(),
+                        "Self destruct -- EXPLOSION BOOM!!!!");
     }
 
     // pitch, yaw, roll
@@ -123,18 +124,21 @@ void SysMachineUserControl::update_sensor()
 
         if (m_throttleMin.triggered())
         {
-            //std::cout << "throttle min\n";
+            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                              "Minimum throttle");
             throttlePos = 0.0f;
         }
 
         if (m_throttleMax.triggered())
         {
-            //std::cout << "throttle max\n";
+            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                              "Maximum throttle");
             throttlePos = 1.0f;
         }
 
         std::get<wiretype::AttitudeControl>(machine.m_woAttitude.value()).m_attitude = attitudeIn;
-        //std::cout << "updating control\n";
+        SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                            "Updating control");
     }
 }
 

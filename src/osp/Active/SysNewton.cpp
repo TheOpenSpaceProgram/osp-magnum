@@ -100,11 +100,9 @@ ACompNwtBody& ACompNwtBody::operator=(ACompNwtBody&& move) noexcept
 
 void SysNewton::add_functions(ActiveScene &rScene)
 {
-    rScene.debug_update_add(rScene.get_update_order(), "physics", "wire", "",
-                            &SysNewton::update_world);
-
-    //std::cout << "sysnewtoninit\n";
-    //NewtonWorldSetUserData(m_nwtWorld, this);
+    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
+                      "Initing Sysnewton");    rScene.debug_update_add(rScene.get_update_order(), "physics", "wire", "",
+                            &SysNewton::update_world);    //NewtonWorldSetUserData(m_nwtWorld, this);
 
     // Connect signal handlers to destruct Newton objects when components are
     // deleted.
@@ -166,7 +164,8 @@ void SysNewton::update_world(ActiveScene& rScene)
         if (entBody.m_inertiaDirty)
         {
             compute_rigidbody_inertia(rScene, ent);
-            std::cout << "Updating RB: new CoM Z=" << entBody.m_centerOfMassOffset.z() << "\n";
+            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(), "Updating RB : new CoM Z = {}",
+                              entBody.m_centerOfMassOffset.z());
         }
 
     }
@@ -364,7 +363,8 @@ void SysNewton::compute_rigidbody_inertia(ActiveScene& rScene, ActiveEnt entity)
     NewtonBodySetCentreOfMass(entBody.m_body, centerOfMass.xyz().data());
 
     entBody.m_inertiaDirty = false;
-    std::cout << "New mass: " << entBody.m_mass << "\n";
+    SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(), "New mass: {}",
+                        entBody.m_mass);
 }
 
 ACompNwtWorld* SysNewton::try_get_physics_world(ActiveScene &rScene)
@@ -458,7 +458,8 @@ osp::active::ACompRigidbodyAncestor* SysNewton::try_get_or_find_rigidbody_ancest
 
     if (compBody == nullptr)
     {
-        std::cout << "no rigid body!\n";
+        SPDLOG_LOGGER_WARN(rScene.get_application().get_logger(),
+                          "No rigid body!");
         return nullptr;
     }
 

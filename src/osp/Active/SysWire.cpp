@@ -51,8 +51,8 @@ void WireInput::doErase()
 
 void SysWire::connect(WireOutput &wireFrom, WireInput &wireTo)
 {
-    std::cout << "Connected " << wireFrom.get_name() << " to "
-              << wireTo.get_name() << "\n";
+  SPDLOG_LOGGER_INFO(spdlog::get("application"), "Connected {} to {}", wireFrom.get_name(),
+                      wireTo.get_name());
     wireFrom.insert(&wireTo);
     // TODO: check for dependent outputs and add to list and sort
 }

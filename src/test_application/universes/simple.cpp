@@ -113,5 +113,5 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
         }
     }
 
-    std::cout << "Created simple solar system\n";
+    SPDLOG_LOGGER_INFO(ospApp.get_logger(), "Created simple solar system");
 }

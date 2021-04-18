@@ -22,3 +22,6 @@
 [submodule "3rdparty/toml11"]
 	path = 3rdparty/toml11
 	url = https://github.com/ToruNiina/toml11
+[submodule "3rdparty/spdlog"]
+	path = 3rdparty/spdlog
+	url = https://github.com/gabime/spdlog

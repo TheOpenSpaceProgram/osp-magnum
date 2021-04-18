@@ -102,5 +102,5 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
     // 1024 units = 1 meter
     moonPosTraj.m_position = {0 * 1024l, 1024l * osp::SpaceInt(1.74E+6), 0 * 1024l};
 
-    std::cout << "Created Large Planet umm... moon!\n";
+    SPDLOG_LOGGER_INFO(ospApp.get_logger(), "Created large moon");
 }

@@ -24,7 +24,17 @@
  */
 #include "OSPApplication.h"
 
+#include "spdlog/sinks/stdout_color_sinks.h"
+
 using namespace osp;
+
+// Loggers are initialized here because OSP is initialized when the appplication starts, before we can do anything.
+osp::OSPApplication::OSPApplication() : m_logger(spdlog::stdout_color_mt("application"))
+{
+    //Initialize other loggers
+    spdlog::stderr_color_mt("assetimporter");
+    spdlog::stderr_color_mt("userinput");
+}
 
 void OSPApplication::debug_add_package(Package&& p)
 {
