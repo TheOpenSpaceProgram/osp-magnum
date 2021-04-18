@@ -29,6 +29,7 @@
 #include <osp/types.h>
 #include <osp/Universe.h>
 #include <adera/SysMap.h>
+#include <osp/Active/SysRender.h>
 
 using osp::universe::Universe;
 using osp::active::ActiveScene;
@@ -38,6 +39,11 @@ using osp::active::ACompCamera;
 using osp::Matrix4;
 using osp::Vector3;
 using osp::Vector2;
+using osp::active::SysRender;
+using osp::active::ACompRenderingAgent;
+using osp::active::ACompRenderTarget;
+using osp::active::ACompPerspective3DView;
+using osp::active::ACompRenderer;
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
@@ -58,11 +64,16 @@ void testapp::test_map(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Add systems
     adera::active::SysMap::add_functions(rScene);
+    adera::active::SysMap::setup(rScene);
+    osp::active::SysRender::setup(rScene);
 
     // Camera
     ActiveEnt camera = rScene.hier_create_child(rScene.hier_get_root(), "Camera");
     auto& cameraTransform = rScene.reg_emplace<ACompTransform>(camera);
     auto& cameraComp = rScene.reg_emplace<ACompCamera>(camera);
+    rScene.reg_emplace<ACompRenderingAgent>(camera, SysRender::get_default_rendertarget(rScene));
+    rScene.reg_emplace<ACompPerspective3DView>(camera, camera);
+    rScene.reg_emplace<ACompRenderer>(camera, "map");
 
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 2000.0f));
     cameraComp.m_viewport = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());

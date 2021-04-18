@@ -31,9 +31,16 @@
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/Shaders/VertexColor.h>
 #include <Magnum/Mesh.h>
+#include <Magnum/GL/Texture.h>
+#include <Magnum/GL/Framebuffer.h>
+#include <Magnum/GL/Renderbuffer.h>
+#include <Magnum/GL/RenderbufferFormat.h>
+#include <Magnum/GL/TextureFormat.h>
+#include <Magnum/Shaders/VertexColor.h>
 #include <Corrade/Containers/Reference.h>
 #include <Corrade/Containers/ArrayViewStl.h>
 
+#include <osp/Active/activetypes.h>
 #include <osp/Universe.h>
 #include <osp/Trajectories/NBody.h>
 #include <osp/CommonMath.h>
@@ -67,11 +74,9 @@ void SysMap::add_functions(ActiveScene& rScene)
 {
     rScene.debug_update_add(rScene.get_update_order(),
         "SystemMap", "", "", &update_map);
-
-    configure_render_passes(rScene);
 }
 
-void SysMap::configure_render_passes(ActiveScene& rScene)
+void SysMap::setup(ActiveScene & rScene)
 {
     using Magnum::Shaders::VertexColor3D;
     auto& resources = rScene.get_context_resources();
@@ -85,15 +90,22 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
 
     glPrimitiveRestartIndex(MapRenderData::smc_PRIMITIVE_RESTART);
 
+    // Create the default render pipeline
+    resources.add<RenderPipeline>("map", create_map_renderer());
+}
+
+RenderPipeline SysMap::create_map_renderer()
+{
+    RenderOrder_t pipeline;
+    std::vector<RenderOrderHandle_t> handles;
+
     // Path pass
-    rScene.debug_render_add(rScene.get_render_order(),
+    handles.emplace_back(pipeline,
         "paths_pass", "", "",
-        [](ActiveScene& rScene, ACompCamera& rCamera)
+        [](ActiveScene& rScene, ACompCamera const& rCamera)
         {
             using namespace Magnum;
             using Magnum::GL::Renderer;
-
-            GL::defaultFramebuffer.clear(GL::FramebufferClear::Color | GL::FramebufferClear::Depth);
 
             auto& reg = rScene.get_registry();
             auto& resources = rScene.get_context_resources();
@@ -121,9 +133,9 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
         });
 
     // Point pass
-    rScene.debug_render_add(rScene.get_render_order(),
+    handles.emplace_back(pipeline,
         "points_pass", "", "",
-        [](ActiveScene& rScene, ACompCamera& rCamera)
+        [](ActiveScene& rScene, ACompCamera const& rCamera)
         {
             using namespace Magnum;
             using Magnum::GL::Renderer;
@@ -132,7 +144,7 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
             auto& resources = rScene.get_context_resources();
 
             auto& data = reg.get<MapRenderData>(rScene.hier_get_root());
-            auto shader = resources.get<VertexColor3D>("vert_color_shader");
+            auto shader = resources.get<Magnum::Shaders::VertexColor3D>("vert_color_shader");
             
             Renderer::setPointSize(2.0f);
 
@@ -142,6 +154,8 @@ void SysMap::configure_render_passes(ActiveScene& rScene)
                 .setTransformationProjectionMatrix(transform)
                 .draw(data.m_pointMesh);
         });
+
+    return {pipeline};
 }
 
 void SysMap::register_system(ActiveScene& rScene)

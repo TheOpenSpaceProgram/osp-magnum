@@ -28,6 +28,7 @@
 #include <osp/types.h>
 #include <osp/Universe.h>
 #include <osp/Trajectories/NBody.h>
+#include <osp/Active/SysRender.h>
 
 #include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/Mesh.h>
@@ -69,7 +70,7 @@ public:
     // Number of paths
     GLuint m_numPaths{0};
     // Number of vertices per path
-    static constexpr GLuint smc_N_VERTS_PER_PATH = 9;
+    static constexpr GLuint smc_N_VERTS_PER_PATH = 999;
     // Number of indices per path (1 extra, to store primitive restart index)
     static constexpr GLuint smc_N_INDICES_PER_PATH = smc_N_VERTS_PER_PATH + 1;
 
@@ -201,13 +202,15 @@ class SysMap
 {
 public:
     static void add_functions(osp::active::ActiveScene& rScene);
+    static void setup(osp::active::ActiveScene& rScene);
+
     static void update_map(osp::active::ActiveScene& rScene);
 
     static Magnum::Vector3 universe_to_render_space(osp::Vector3s v3s);
 
 private:
-    static constexpr size_t m_orbitSamples = 512;
-    static void configure_render_passes(osp::active::ActiveScene& rScene);
+    //static constexpr size_t m_orbitSamples = 512;
+    static osp::active::RenderPipeline create_map_renderer();
     static void register_system(osp::active::ActiveScene& rScene);
     static void process_raw_state(osp::active::ActiveScene& rScene,
         MapRenderData& rMapData, osp::universe::TrajNBody* traj);

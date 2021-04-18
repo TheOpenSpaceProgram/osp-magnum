@@ -39,6 +39,7 @@
 #include <Magnum/GL/Renderbuffer.h>
 #include <Magnum/GL/RenderbufferFormat.h>
 
+using osp::active::ActiveEnt;
 using osp::active::SysRender;
 using osp::active::RenderPipeline;
 
@@ -163,6 +164,11 @@ RenderPipeline SysRender::create_forward_renderer()
 }
 
 osp::active::ActiveEnt SysRender::get_default_rendertarget(ActiveScene& rScene)
+{
+    return rScene.hier_get_root();
+}
+
+ActiveEnt SysRender::get_default_rendertarget(ActiveScene& rScene)
 {
     return rScene.hier_get_root();
 }
