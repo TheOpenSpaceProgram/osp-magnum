@@ -79,6 +79,13 @@ using osp::active::ACompRenderTarget;
 using osp::active::ACompRenderingAgent;
 using osp::active::ACompPerspective3DView;
 using osp::active::ACompRenderer;
+using osp::active::ACompWire;
+using osp::active::ACompWireNodes;
+
+namespace wiretype
+{
+using namespace osp::active::wiretype;
+}
 
 using adera::active::machines::SysMachineUserControl;
 using adera::active::machines::SysMachineRocket;
@@ -120,6 +127,12 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     adera::active::machines::SysMachineRCSController::add_functions(rScene);
     adera::active::machines::SysMachineRocket::add_functions(rScene);
     adera::active::machines::SysMachineUserControl::add_functions(rScene);
+
+    // Setup wiring
+    auto rWire = rScene.reg_emplace<ACompWire>(rScene.hier_get_root());
+    rScene.reg_emplace< ACompWireNodes<wiretype::AttitudeControl> >(rScene.hier_get_root());
+    rScene.reg_emplace< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
+
 
     // create a Satellite with an ActiveArea
     Satellite areaSat = rUni.sat_create();

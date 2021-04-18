@@ -32,9 +32,6 @@
 namespace osp
 {
 
-using WireInPort = uint16_t;
-using WireOutPort = uint16_t;
-
 struct BlueprintMachine
 {
     NodeMap_t m_config;
@@ -52,7 +49,7 @@ struct BlueprintMachine
  * * Transformation
  */
 struct BlueprintPart
-{ 
+{
 
     BlueprintPart(uint32_t protoIndex, uint16_t machineCount,
                   Vector3 translation, Quaternion rotation, Vector3 scale)
@@ -72,30 +69,30 @@ struct BlueprintPart
     uint16_t m_machineCount;
 };
 
-/**
- * Describes a "from output -> to input" wire connection
- *
- * [  machine  out]--->[in  other machine  ]
- */
-struct BlueprintWire
+struct BlueprintWireLink
 {
-    BlueprintWire(unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
-                  unsigned toPart, unsigned toMachine, WireOutPort toPort) :
-        m_fromPart(fromPart),
-        m_fromMachine(fromMachine),
-        m_fromPort(fromPort),
-        m_toPart(toPart),
-        m_toMachine(toMachine),
-        m_toPort(toPort)
-    {}
+    // ie. Input/output; fuel flow priority
+    NodeMap_t m_config;
 
-    unsigned m_fromPart;
-    unsigned m_fromMachine;
-    WireOutPort m_fromPort;
+    // Index to a BlueprintPart in BlueprintVehicle's m_blueprints
+    uint32_t m_blueprintIndex;
 
-    unsigned m_toPart;
-    unsigned m_toMachine;
-    WireInPort m_toPort;
+    // Machine to link to, index to m_protoMachines in PrototypePart
+    uint16_t m_protoMachineIndex;
+
+    // Machine's port to connect to
+    uint16_t m_port;
+};
+
+/**
+ *
+ */
+struct BlueprintWireNode
+{
+
+    NodeMap_t m_config;
+
+    std::vector<BlueprintWireLink> m_links;
 };
 
 /**
@@ -113,10 +110,12 @@ struct BlueprintVehicle
     std::vector<BlueprintPart> m_blueprints;
 
     // Wires to connect
-    std::vector<BlueprintWire> m_wires;
+    // m_wires[wiretype id]
+    std::vector< std::vector<BlueprintWireNode> > m_wireNodes;
 
+    // All machines in the vehicle
     // m_machines[machine id]
-    std::vector<std::vector<BlueprintMachine>> m_machines;
+    std::vector< std::vector<BlueprintMachine> > m_machines;
 
 };
 

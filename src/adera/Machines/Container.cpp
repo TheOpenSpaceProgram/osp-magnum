@@ -35,31 +35,6 @@ using namespace adera::active::machines;
 
 /* MachineContainer */
 
-void MachineContainer::propagate_output(WireOutput* output)
-{
-
-}
-
-WireInput* MachineContainer::request_input(WireInPort port)
-{
-    return nullptr;
-}
-
-WireOutput* MachineContainer::request_output(WireOutPort port)
-{
-    return &m_outputs;
-}
-
-std::vector<WireInput*> MachineContainer::existing_inputs()
-{
-    return {};
-}
-
-std::vector<WireOutput*> MachineContainer::existing_outputs()
-{
-    return {&m_outputs};
-}
-
 uint64_t MachineContainer::request_contents(uint64_t quantity)
 {
     if (quantity > m_contents.m_quantity)
@@ -166,11 +141,7 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
                         vehBp.m_prototypes[partBp.m_protoIndex]
                                 ->m_protoMachines[mach.m_protoMachineIndex],
                         mach);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id,
-                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
-                    {
-                        return rScene.reg_get<MachineContainer>(ent);
-                    });
+            rScene.reg_emplace<ACompMachineType>(machEnt, id);
         }
     }
 }

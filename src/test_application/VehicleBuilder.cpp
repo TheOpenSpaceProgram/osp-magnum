@@ -24,8 +24,8 @@
  */
 #include "VehicleBuilder.h"
 
-using testapp::VehicleBuilder;
-using testapp::partindex_t;
+using namespace testapp;
+
 using osp::BlueprintPart;
 using osp::BlueprintMachine;
 using osp::PrototypePart;
@@ -35,7 +35,7 @@ using osp::Vector3;
 using osp::Quaternion;
 using osp::machine_id_t;
 
-partindex_t VehicleBuilder::add_part(
+part_t VehicleBuilder::part_add(
         DependRes<PrototypePart>& prototype,
         const Vector3& translation,
         const Quaternion& rotation,
@@ -84,13 +84,113 @@ partindex_t VehicleBuilder::add_part(
         rBlueprintMach.m_config = protoMach.m_config;
     }
 
-    return blueprintIndex;
+    return part_t(blueprintIndex);
 }
 
-void VehicleBuilder::add_wire(
-        uint32_t fromPart, uint32_t fromMachine, osp::WireOutPort fromPort,
-        uint32_t toPart, uint32_t toMachine, osp::WireInPort toPort)
+Vector3 VehicleBuilder::part_offset(
+        PrototypePart const& attachTo, std::string_view attachToName,
+        PrototypePart const& toAttach, std::string_view toAttachName) noexcept
 {
-    m_vehicle.m_wires.emplace_back(fromPart, fromMachine, fromPort,
-                         toPart, toMachine, toPort);
+    Vector3 oset1{0.0f};
+    Vector3 oset2{0.0f};
+
+    for (osp::PCompName const& name : attachTo.m_partName)
+    {
+        if (name.m_name == attachToName)
+        {
+            oset1 = attachTo.m_partTransform[name.m_entity].m_translation;
+            break;
+        }
+    }
+
+    for (osp::PCompName const& name : toAttach.m_partName)
+    {
+        if (name.m_name == toAttachName)
+        {
+            oset2 = toAttach.m_partTransform[name.m_entity].m_translation;
+            break;
+        }
+    }
+
+    return oset1 - oset2;
+}
+
+
+std::pair<mach_t, osp::BlueprintMachine*> VehicleBuilder::machine_find(
+        osp::machine_id_t id, part_t part) noexcept
+{
+    if (id >= m_vehicle.m_machines.size())
+    {
+        return {nullvalue<mach_t>(), nullptr}; // no machines of type
+    }
+
+    for (size_t i = 0; i < m_vehicle.m_machines[id].size(); i ++)
+    {
+        osp::BlueprintMachine& machineBp = m_vehicle.m_machines[id][i];
+        if (machineBp.m_blueprintIndex == uint32_t(part))
+        {
+            // Found
+            return {mach_t(i), &machineBp};
+        }
+    }
+    return {nullvalue<mach_t>(), nullptr};
+}
+
+
+node_t<void> VehicleBuilder::wire_node_add(osp::wire_id_t id,
+                                           osp::NodeMap_t config)
+{
+    // Resize wire type vector if it's too small
+    if (m_vehicle.m_wireNodes.size() <= id)
+    {
+        m_vehicle.m_wireNodes.resize(size_t(id) + 1);
+    }
+
+    // Get vector of nodes
+    std::vector<osp::BlueprintWireNode> &rNodes
+            = m_vehicle.m_wireNodes[size_t(id)];
+    uint32_t index = rNodes.size();
+
+    // Create new node
+    rNodes.emplace_back(osp::BlueprintWireNode{config, {}});
+    return node_t<void>(index);
+}
+
+link_t<void> VehicleBuilder::wire_connect(
+        osp::wire_id_t id, node_t<void> node, osp::NodeMap_t config,
+        part_t part, mach_t mach, port_t<void> port)
+{
+    if (m_vehicle.m_wireNodes.size() <= id)
+    {
+        // No node of type is even registered
+        return nullvalue< link_t<void> >();
+    }
+
+    // Get the BlueprintWireNode
+    std::vector<osp::BlueprintWireNode> &rNodes
+            = m_vehicle.m_wireNodes[size_t(id)];
+    osp::BlueprintWireNode &rNode = rNodes[size_t(node)];
+
+    // Create BlueprintWireLink
+    uint32_t index = rNode.m_links.size();
+    rNode.m_links.emplace_back(
+            osp::BlueprintWireLink{config, uint32_t(part), uint16_t(mach), uint16_t(port)});
+
+    return link_t<void>(index);
+}
+
+node_t<void> VehicleBuilder::wire_connect_signal(osp::wire_id_t id,
+        part_t partOut, mach_t machOut, port_t<void> portOut,
+        part_t partIn, mach_t machIn, port_t<void> portIn)
+{
+    // Create a node
+    node_t<void> node = wire_node_add(id, {});
+
+    // Link the Output first
+    wire_connect(id, node, {{"output", 1}}, partOut, machOut, portOut);
+
+    // Link the Input
+    wire_connect(id, node, {{"input", 1}}, partIn, machIn, portIn);
+
+    return node;
 }

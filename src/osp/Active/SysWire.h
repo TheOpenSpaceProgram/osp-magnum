@@ -33,13 +33,20 @@
 namespace osp::active
 {
 
+
+
 namespace wiretype
 {
+
+    struct Signal
+    {
+        enum class LinkType : uint8_t { Input, Output };
+    };
 
     /**
      * A rotation in global space
      */
-    struct Attitude
+    struct Attitude : public Signal
     {
         Quaternion m_global;
     };
@@ -47,8 +54,9 @@ namespace wiretype
     /**
      * A change in rotation. Separate pitch, yaw and roll
      */
-    struct AttitudeControl
+    struct AttitudeControl : public Signal
     {
+        static inline std::string smc_wire_name = "AttitudeControl";
         //  each (-1.0 .. 1.0)
         // pitch, yaw, roll
         Vector3 m_attitude;
@@ -71,8 +79,9 @@ namespace wiretype
     /**
      * For something like throttle
      */
-    struct Percent
+    struct Percent : public Signal
     {
+        static inline std::string smc_wire_name = "Percent";
         float m_value;
     };
 
@@ -81,7 +90,7 @@ namespace wiretype
     /**
      * Used to turn things on and off or ignite stuff
      */
-    struct Deploy
+    struct Deploy : public Signal
     {
         //int m_stage;
         //bool m_on, m_off, m_toggle;
@@ -91,7 +100,7 @@ namespace wiretype
     /**
      * your typical logic gate boi
      */
-    struct Logic
+    struct Logic : public Signal
     {
         bool m_value;
     };
@@ -99,7 +108,7 @@ namespace wiretype
     /**
      * Pipe, generically exposes the output entity to the input one
      */
-    struct Pipe
+    struct Pipe : public Signal
     {
         ActiveEnt m_source;
     };
@@ -119,7 +128,7 @@ struct WireNode
     {
         ActiveEnt m_entity; // ACompWirePanel<VALUE_T>
         uint32_t m_index;
-        //typename VALUE_T::LinkType m_linktype;
+        typename VALUE_T::LinkType m_linktype;
     };
 
     std::vector<ConnectToPanel> m_connections;
@@ -143,11 +152,47 @@ struct ACompWirePanel
     std::vector<ConnectToNode> m_connections;
 };
 
+/**
+ * Add to Machines when one of their inputs change
+ */
+struct ACompWireNeedUpdate { };
+
+/**
+ * Scene-wide storage for WireNodes
+ */
+template<typename VALUE_T>
+struct ACompWireNodes
+{
+    std::vector< WireNode<VALUE_T> > m_nodes;
+
+    template<typename ARGS_T>
+    uint32_t create_node(ARGS_T&& args...)
+    {
+        uint32_t index = m_nodes.size();
+        m_nodes.emplace_back(args);
+        return index;
+    }
+};
+
+struct ACompWire
+{
+    // TODO: replace with beefier function order
+    using update_func_t = void(*)(ActiveScene&);
+    std::vector<update_func_t> m_updCalculate;
+    std::vector<update_func_t> m_updPropagate;
+};
+
 class SysWire
 {
 public:
+    static void add_functions(ActiveScene& rScene);
+    static void setup_default(ActiveScene& rScene);
 
+    static void update_wire(ActiveScene& rScene);
 
 };
+
+
+
 
 } // namespace osp::active

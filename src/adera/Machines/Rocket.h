@@ -25,6 +25,7 @@
 #pragma once
 #include <utility>
 #include <osp/Active/SysMachine.h>
+
 #include <osp/Active/physics.h>
 #include <osp/Resource/blueprints.h>
 #include "adera/ShipResources.h"
@@ -39,6 +40,8 @@ class MachineRocket
 {
     friend class SysMachineRocket;
 
+    using Percent = osp::active::wiretype::Percent;
+
     struct Parameters
     {
         float m_maxThrust;
@@ -48,6 +51,8 @@ class MachineRocket
 public:
 
     static inline std::string smc_mach_name = "Rocket";
+
+    static constexpr osp::wire_port_t<Percent> smc_wiThrottle{0};
 
     /**
      * Return normalized power output level of the rocket this frame

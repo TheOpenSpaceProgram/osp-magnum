@@ -26,6 +26,7 @@
 
 #include <osp/UserInputHandler.h>
 #include <osp/Active/SysMachine.h>
+#include <osp/Active/SysWire.h>
 
 namespace adera::active::machines
 {
@@ -98,11 +99,13 @@ class MachineUserControl
 {
     friend SysMachineUserControl;
 
+    using Percent = osp::active::wiretype::Percent;
+
 public:
 
     static constexpr std::string_view smc_mach_name = "UserControl";
 
-
+    static constexpr osp::wire_port_t<Percent> smc_woThrottle{0};
 
 
 private:

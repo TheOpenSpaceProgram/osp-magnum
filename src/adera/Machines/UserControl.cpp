@@ -70,6 +70,9 @@ void SysMachineUserControl::update_construct(ActiveScene &rScene)
 
             rScene.reg_emplace<MachineUserControl>(machEnt);
             rScene.reg_emplace<ACompMachineType>(machEnt, id);
+            auto &panelAttCtrl = rScene.reg_emplace<ACompWirePanel<wiretype::AttitudeControl>>(machEnt);
+            auto &panelPercent = rScene.reg_emplace<ACompWirePanel<wiretype::Percent>>(machEnt);
+
         }
     }
 }

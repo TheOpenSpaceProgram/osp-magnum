@@ -36,17 +36,6 @@
 namespace osp::active
 {
 
-struct WireMachineConnection
-{
-    ActiveEnt m_fromPartEnt;
-    unsigned m_fromMachine;
-    WireOutPort m_fromPort;
-
-    ActiveEnt m_toPartEnt;
-    unsigned m_toMachine;
-    WireInPort m_toPort;
-};
-
 struct ACompVehicle
 {
     std::vector<ActiveEnt> m_parts;
