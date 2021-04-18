@@ -202,7 +202,7 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
     // Delete planets that have exited the ActiveArea
     for (auto const &[sat, ent] : pArea->m_leave)
     {
-        if (!rUni.get_reg().has<UCompPlanet>(sat))
+        if (!rUni.get_reg().all_of<UCompPlanet>(sat))
         {
             continue;
         }
@@ -216,7 +216,7 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
         Satellite sat = entered->first;
         ActiveEnt &rEnt = entered->second;
 
-        if (!rUni.get_reg().has<UCompPlanet>(sat))
+        if (!rUni.get_reg().all_of<UCompPlanet>(sat))
         {
             continue;
         }

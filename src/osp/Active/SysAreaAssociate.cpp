@@ -111,7 +111,7 @@ void SysAreaAssociate::connect(ActiveScene& rScene, universe::Universe &rUni,
     ActiveEnt root = rScene.hier_get_root();
 
     // Make sure no ACompAreaLink already exists
-    assert(!rScene.get_registry().has<ACompAreaLink>(root));
+    assert(!rScene.get_registry().all_of<ACompAreaLink>(root));
 
     // Create Area Link
     rScene.get_registry().emplace<ACompAreaLink>(root, rUni, areaSat);
