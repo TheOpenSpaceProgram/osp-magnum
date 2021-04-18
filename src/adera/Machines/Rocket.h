@@ -108,13 +108,28 @@ private:
     float m_powerOutput{0.0f};
 }; // MachineRocket
 
+//-----------------------------------------------------------------------------
+
 class SysMachineRocket
 {
 public:
 
     static void add_functions(osp::active::ActiveScene& rScene);
-    //void update_sensor();
+
+    /**
+     * Constructs MachineRockets for vehicles in-construction
+     *
+     * @param rScene [ref] Scene supporting vehicles
+     */
     static void update_construct(osp::active::ActiveScene &rScene);
+
+    /**
+     * Updates all MachineRockets in the scene
+     *
+     * This function handles draining fuel and applying thrust.
+     *
+     * @param rScene [ref] Scene with MachineRockets to update
+     */
     static void update_physics(osp::active::ActiveScene& rScene);
 
     /**
@@ -124,7 +139,10 @@ public:
      * attaches an ACompExhaustPlume to the rocket's plume node. A graphical
      * exhaust plume effect will be attached to the node by SysExhaustPlume
      * when it processes the component.
-     * @param ent The MachineRocket entity
+     *
+     * @param rScene [ref] Scene containing the following entities
+     * @param part [in] Entity containing a plume in its descendents
+     * @param mach [in] Entity containing MachineRocket
      */
     static void attach_plume_effect(osp::active::ActiveScene& rScene,
                                     osp::active::ActiveEnt part,

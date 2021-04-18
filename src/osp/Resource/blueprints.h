@@ -37,7 +37,7 @@ using WireOutPort = uint16_t;
 
 struct BlueprintMachine
 {
-    std::map<std::string, config_node_t, std::less<>> m_config;
+    NodeMap_t m_config;
 
     // Index to a BlueprintPart in BlueprintVehicle's m_blueprints
     uint32_t m_blueprintIndex;

@@ -32,6 +32,9 @@ namespace adera::active::machines
 
 class MachineUserControl;
 
+/**
+ * Stores ButtonControlHandles for SysMachineUserControl to detect user inputs
+ */
 struct ACompUserControl
 {
     ACompUserControl(osp::UserInputHandler &rUsrCtrl)
@@ -52,6 +55,7 @@ struct ACompUserControl
     osp::ButtonControlHandle m_throttleMin;
     osp::ButtonControlHandle m_throttleMore;
     osp::ButtonControlHandle m_throttleLess;
+
     osp::ButtonControlHandle m_selfDestruct;
 
     osp::ButtonControlHandle m_pitchUp;
@@ -70,7 +74,20 @@ class SysMachineUserControl
 {
 public:
     static void add_functions(osp::active::ActiveScene& rScene);
+
+    /**
+     * Constructs MachineUserControls for vehicles in-construction
+     *
+     * @param rScene [ref] Scene supporting vehicles
+     */
     static void update_construct(osp::active::ActiveScene &rScene);
+
+    /**
+     * Updates MachineUserControls in the world by reading user controls and
+     * setting wire outputs accordingly
+     *
+     * @param rScene [ref] Scene with MachineUserControls to update
+     */
     static void update_sensor(osp::active::ActiveScene &rScene);
 };
 

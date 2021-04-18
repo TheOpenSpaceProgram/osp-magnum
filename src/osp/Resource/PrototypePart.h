@@ -41,7 +41,8 @@ namespace osp
 {
 
 using PartEntity_t = uint32_t;
-using config_node_t = std::variant<double, int, std::string>;
+using ConfigNode_t = std::variant<double, int, std::string>;
+using NodeMap_t = std::map<std::string, ConfigNode_t, std::less<>>;
 
 // Required components
 
@@ -91,7 +92,7 @@ struct PrototypeMachine
     //PartEntity_t m_entity;
     //std::string m_type;
     machine_id_t m_type;
-    std::map<std::string, config_node_t, std::less<>> m_config;
+    NodeMap_t m_config;
 };
 
 /**

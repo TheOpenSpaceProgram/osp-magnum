@@ -158,10 +158,25 @@ private:
     static void load_plume(TinyGltfImporter& gltfImporter,
         Package& package, Magnum::UnsignedInt id, std::string_view resPrefix);
 
+private:
+    /**
+     * Read glTF node as part of a sturdy Part. Write data into a PrototypePart
+     *
+     * This function will recurse through all descendents of the node to include
+     * them all in the PrototypePart
+     *
+     * @param gltfImporter     [in] glTF data to read
+     * @param machinePackage   [in] Package containing RegisteredMachines
+     * @param rPackage         [ref] Package to reserve found resources into
+     * @param resPrefix        [in] Prefix of rPackage
+     * @param part             [out] Prototy pePart to write data into
+     * @param parentProtoIndex [in] PartEntity of current glTF node's parent
+     * @param childGltfIndex   [in] Index of current glTF node
+     */
     static void proto_add_obj_recurse(
             TinyGltfImporter& gltfImporter,
-            Package& rMachinePackage,
-            Package& package,
+            Package& machinePackage,
+            Package& rPackage,
             std::string_view resPrefix,
             PrototypePart& part,
             PartEntity_t parentProtoIndex,

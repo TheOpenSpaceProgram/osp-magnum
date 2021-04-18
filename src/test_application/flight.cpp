@@ -35,6 +35,7 @@
 
 #include <osp/Satellites/SatVehicle.h>
 
+#include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>
 #include <adera/Machines/Rocket.h>
 #include <adera/Machines/UserControl.h>
@@ -99,8 +100,9 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     osp::active::SysDebugRender::add_functions(rScene);
     osp::active::SysAreaAssociate::add_functions(rScene);
     osp::active::SysVehicle::add_functions(rScene);
-    osp::active::SysExhaustPlume::add_functions(rScene);
     osp::active::SysFFGravity::add_functions(rScene);
+
+    adera::active::SysExhaustPlume::add_functions(rScene);
 
     planeta::active::SysPlanetA::add_functions(rScene);
 

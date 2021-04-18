@@ -22,28 +22,27 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <iostream>
+#include "Rocket.h"
+
+#include "Container.h"
+#include "../Plume.h"
+#include "../SysExhaustPlume.h"
+#include "../Shaders/Phong.h"
+#include "../Shaders/PlumeShader.h"
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysDebugRender.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/physics.h>
-
-#include "Rocket.h"
-#include "osp/Resource/AssetImporter.h"
-#include "adera/Shaders/Phong.h"
-#include "adera/Shaders/PlumeShader.h"
-#include "osp/Resource/blueprints.h"
 #include "osp/PhysicsConstants.h"
-#include "adera/SysExhaustPlume.h"
-#include "adera/Plume.h"
-#include <Magnum/Trade/MeshData.h>
-#include <Magnum/Math/Color.h>
-#include <Magnum/Math/Matrix4.h>
+
+#include <iostream>
 
 using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
+
+using adera::active::machines::MachineContainer;
 
 void MachineRocket::propagate_output(WireOutput* output)
 {
@@ -296,13 +295,13 @@ void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt part,
 //       and variants with something else entirely
 template<typename TYPE_T>
 TYPE_T const& config_get_if(
-        std::map<std::string, config_node_t, std::less<>> const& nodeMap,
+        NodeMap_t const& nodeMap,
         std::string_view field, TYPE_T&& defaultValue)
 {
     auto found = nodeMap.find(field);
     if (found == nodeMap.end())
     {
-        return defaultValue;
+        return std::forward<TYPE_T>(defaultValue);
     }
     return std::get<TYPE_T>(found->second);
 //    if (TYPE_T const* value = std::get_if<TYPE_T>(&found->second); value != nullptr)

@@ -43,6 +43,7 @@
 #include <adera/Shaders/Phong.h>
 #include <adera/Shaders/PlumeShader.h>
 
+#include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>
 #include <adera/Machines/Rocket.h>
 #include <adera/Machines/UserControl.h>

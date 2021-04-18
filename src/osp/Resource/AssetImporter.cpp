@@ -124,7 +124,7 @@ void AssetImporter::proto_load_machines(
         DependRes<RegisteredMachine> machineType = rMachinePkg.get<RegisteredMachine>(type);
         if (machineType.empty())
         {
-            std::cout << "Machine not found: " << type << "\n";
+            SPDLOG_LOGGER_ERROR(get_logger(), "Machine Type not found: {}", type);
             continue; // machine type not found
         }
         PrototypeMachine &rMachine = rMachines.emplace_back();
@@ -418,11 +418,10 @@ DependRes<Magnum::GL::Texture2D> AssetImporter::compile_tex(
     return compile_tex(imgData, dstPackage);
 }
 
-//either an appendable package, or
 void AssetImporter::proto_add_obj_recurse(
         TinyGltfImporter& gltfImporter,
         Package& rMachinePkg,
-        Package& package,
+        Package& rPackage,
         std::string_view resPrefix,
         PrototypePart& rPart,
         PartEntity_t parentProtoIndex,
@@ -492,7 +491,7 @@ void AssetImporter::proto_add_obj_recurse(
 
         PCompDrawable &rDrawable = rPart.m_partDrawable.emplace_back();
         rDrawable.m_entity = entity;
-        rDrawable.m_mesh = package.get_or_reserve<MeshData>(meshName);
+        rDrawable.m_mesh = rPackage.get_or_reserve<MeshData>(meshName);
 
         MeshObjectData3D& mesh = static_cast<MeshObjectData3D&>(*childData);
         Optional<MaterialData> mat = gltfImporter.material(mesh.material());
@@ -505,7 +504,7 @@ void AssetImporter::proto_add_obj_recurse(
             std::string const& imgName = gltfImporter.image2DName(imgID);
 
             SPDLOG_LOGGER_INFO(get_logger(), "Base Tex: {}", imgName);
-            rDrawable.m_textures.emplace_back(package.get_or_reserve<ImageData2D>(imgName));
+            rDrawable.m_textures.emplace_back(rPackage.get_or_reserve<ImageData2D>(imgName));
 
             if (pbr.hasNoneRoughnessMetallicTexture())
             {
@@ -536,7 +535,7 @@ void AssetImporter::proto_add_obj_recurse(
     for (UnsignedInt childId: childData->children())
     {
         proto_add_obj_recurse(
-                gltfImporter, rMachinePkg, package, resPrefix, rPart, entity, childId);
+                gltfImporter, rMachinePkg, rPackage, resPrefix, rPart, entity, childId);
     }
 }
 

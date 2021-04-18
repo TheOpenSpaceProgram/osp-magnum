@@ -428,10 +428,6 @@ void SysVehicle::update_activate(ActiveScene &rScene)
             rUni, pArea->m_areaSat, vehicleSat.m_sat, vehicleTf.m_transform);
     }
 
-    // Clear queue
-    debug_wire_vehicles(rScene); // but wire the machines first because why not
-    rScene.get_registry().clear<ACompVehicleInConstruction>();
-
     // Activate nearby vehicle satellites that have just entered the ActiveArea
     for (auto &entered : pArea->m_enter)
     {
@@ -449,6 +445,10 @@ void SysVehicle::update_activate(ActiveScene &rScene)
 
 void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 {
+    // Clear In-construction queue
+    debug_wire_vehicles(rScene); // but wire the machines first because why not
+    rScene.get_registry().clear<ACompVehicleInConstruction>();
+
     auto view = rScene.get_registry().view<ACompVehicle>();
     auto viewParts = rScene.get_registry().view<ACompPart>();
 

@@ -102,38 +102,28 @@ public:
                            universe::Satellite tgtSat, ActiveEnt tgtEnt);
 
     /**
-     * Deal with activating and deactivating nearby vehicle Satellites in the
-     * Universe, and also update transforms of currently activated vehicles.
+     * Activate/Deactivate vehicles that enter/exit the ActiveArea
      *
-     * @param rScene [in/out] Scene containing vehicles to update
+     * Nearby vehicles are detected by SysAreaAssociate, and are added to a
+     * queue. This function reads the queue and activates vehicles accordingly.
+     * Activated vehicles will be in an incomplete "In-Construction" state so
+     * that individual features can be handled by separate systems.
+     *
+     * This function also update Satellites transforms of the currently
+     * activated vehicles in the scene
+     *
+     * @param rScene [ref] Scene containing vehicles to update
      */
     static void update_activate(ActiveScene& rScene);
 
     /**
      * Deal with vehicle separations and part deletions
      *
-     * @param rScene [in/out] Scene containing vehicles to update
+     * @param rScene [ref] Scene containing vehicles to update
      */
     static void update_vehicle_modification(ActiveScene& rScene);
 
 private:
-
-    /* Stores the association between a PrototypeObj entity and the indices of
-     * its owned machines in the PrototypePart array. Stores a const reference
-     * to a vector because the vector is filled with PrototypePart machine data
-     * by part_instantiate() and consumed by part_instantiate_machines(), all
-     * within the activate() function scope within which the index data is stable.
-     */
-    struct MachineDef
-    {
-        ActiveEnt m_machineOwner;
-        std::vector<uint32_t> const& m_machineIndices;
-
-        MachineDef(ActiveEnt owner, std::vector<uint32_t> const& indexArray)
-            : m_machineOwner(owner)
-            , m_machineIndices(indexArray)
-        {}
-    };
 
     /**
      * Compute the volume of a part

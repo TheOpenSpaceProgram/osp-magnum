@@ -27,6 +27,7 @@
 #include "../VehicleBuilder.h"
 
 #include <adera/ShipResources.h>
+#include <adera/Machines/Container.h>
 
 #include <osp/Satellites/SatVehicle.h>
 
