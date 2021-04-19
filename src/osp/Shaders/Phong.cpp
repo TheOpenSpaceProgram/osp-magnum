@@ -31,7 +31,7 @@ using namespace osp::shader;
 
 void Phong::draw_entity(ActiveEnt e,
     ActiveScene& rScene, 
-    ACompCamera const& camera)
+    ACompCamera const& camera) noexcept
 {
     Phong& shader = *rScene.get_context_resources().get<Phong>(smc_resourceName);
 

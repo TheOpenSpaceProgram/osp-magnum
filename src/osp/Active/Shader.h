@@ -39,5 +39,5 @@ namespace osp::active
 using ShaderDrawFnc_t = void (*)(
     ActiveEnt,
     ActiveScene&,
-    ACompCamera const&);
+    ACompCamera const&) noexcept;
 }

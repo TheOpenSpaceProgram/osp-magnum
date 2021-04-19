@@ -60,7 +60,7 @@ public:
 
     static void draw_plume(osp::active::ActiveEnt e,
         osp::active::ActiveScene& rScene,
-        osp::active::ACompCamera const& camera);
+        osp::active::ACompCamera const& camera) noexcept;
 
 private:
     constexpr static std::string_view smc_resourceName = "plume_shader";
