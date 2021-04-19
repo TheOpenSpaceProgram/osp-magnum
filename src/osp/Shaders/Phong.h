@@ -44,7 +44,7 @@ public:
 
     static void draw_entity(osp::active::ActiveEnt e,
         osp::active::ActiveScene& rScene,
-        osp::active::ACompCamera const& camera);
+        osp::active::ACompCamera const& camera) noexcept;
 private:
     friend class SysRender;
     constexpr static std::string_view smc_resourceName = "phong_shader";

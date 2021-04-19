@@ -94,7 +94,7 @@ struct ACompVisible {};
  */
 struct ACompShader
 {
-    ShaderDrawFnc_t m_drawCall{nullptr};
+    ShaderDrawFnc_t m_drawCall{shader::Phong::draw_entity};  // default shader
 };
 
 /**
@@ -133,8 +133,6 @@ public:
     /* Draw the default render target to the screen */
     static void display_default_rendertarget(ActiveScene& rScene);
 private:
-    constexpr static ShaderDrawFnc_t smc_defaultShader = shader::Phong::draw_entity;
-
     /* Define render passes */
     static RenderPipeline create_forward_renderer();
 
@@ -158,14 +156,7 @@ void SysRender::draw_group(ActiveScene& rScene, VIEW_T& drawlist, ACompCamera co
     {
         auto shader = drawlist.template get<ACompShader>(e);
 
-        if (shader.m_drawCall == nullptr)
-        {
-            smc_defaultShader(e, rScene, camera);
-        }
-        else
-        {
-            shader.m_drawCall(e, rScene, camera);
-        }
+        shader.m_drawCall(e, rScene, camera);
     }
 }
 
