@@ -124,7 +124,7 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
-        // Check if the vehicle blueprint might store UserControls
+        // Check if the vehicle blueprint might store MachineRCSControllers
         if (rVehConstr.m_blueprint->m_machines.size() <= id)
         {
             continue;

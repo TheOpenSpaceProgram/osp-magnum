@@ -107,7 +107,7 @@ void SysMachineContainer::update_containers(ActiveScene& rScene)
 MachineContainer& SysMachineContainer::instantiate(
         osp::active::ActiveScene& rScene,
         osp::active::ActiveEnt ent,
-        osp::PrototypeMachine const& config,
+        osp::PCompMachine const& config,
         osp::BlueprintMachine const& settings)
 {
     float capacity = std::get<double>(config.m_config.at("capacity"));
@@ -143,7 +143,7 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
-        // Check if the vehicle blueprint might store UserControls
+        // Check if the vehicle blueprint might store MachineContainers
         if (rVehConstr.m_blueprint->m_machines.size() <= id)
         {
             continue;
@@ -151,7 +151,7 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
 
         BlueprintVehicle const& vehBp = *rVehConstr.m_blueprint;
 
-        // Initialize all UserControls in the vehicle
+        // Initialize all MachineContainers in the vehicle
         for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
         {
             // Get part

@@ -91,9 +91,9 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
     // Convert position of the satellite to position in scene
     Vector3 positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat);
 
-    ACompTransform& vehicleTransform = rScene.get_registry()
+    ACompTransform& rVehicleTransform = rScene.get_registry()
                                         .emplace<ACompTransform>(vehicleEnt);
-    vehicleTransform.m_transform
+    rVehicleTransform.m_transform
             = Matrix4::from(tgtPosTraj.m_rotation.toMatrix(), positionInScene);
     rScene.reg_emplace<ACompFloatingOrigin>(vehicleEnt);
     //vehicleTransform.m_enableFloatingOrigin = true;
@@ -152,17 +152,8 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
                 = Matrix4::from(partBp.m_rotation.toMatrix(),
                               partBp.m_translation)
                 * Matrix4::scaling(partBp.m_scale);
-
-        // Initialize entities for individual machines. This is done now in one
-        // place, as creating new entities can be problematic for concurrency
-        auto &machines = rScene.reg_emplace<ACompMachines>(partEntity);
-        machines.m_machines.reserve(partBp.m_machineCount);
-        for (int i = 0; i < partBp.m_machineCount; i ++)
-        {
-            machines.m_machines.push_back(
-                        rScene.hier_create_child(partEntity, "Machine"));
-        }
     }
+
 
     // temporary: make the whole thing a single rigid body
     auto& vehicleBody = rScene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
@@ -200,7 +191,6 @@ ActiveEnt SysVehicle::part_instantiate(
 
     std::vector<ActiveEnt> newEntities(part.m_entityCount);
     ActiveEnt& rootEntity = newEntities[0];
-
 
     // reserve space for new entities and ACompTransforms to be created
     rScene.get_registry().reserve(
@@ -350,6 +340,19 @@ ActiveEnt SysVehicle::part_instantiate(
     };
 
     rScene.hierarchy_traverse(rootEntity, applyMasses);
+
+    // Initialize entities for individual machines. This is done now in one
+    // place, as creating new entities can be problematic for concurrency
+
+    auto &machines = rScene.reg_emplace<ACompMachines>(rootEntity);
+    machines.m_machines.reserve(part.m_protoMachines.size());
+
+    for (PCompMachine const& pcompMachine : part.m_protoMachines)
+    {
+        ActiveEnt machEnt = newEntities[pcompMachine.m_entity];
+        machines.m_machines.push_back(
+                    rScene.hier_create_child(machEnt, "Machine"));
+    }
 
     return rootEntity;
 }

@@ -109,6 +109,12 @@ public:
     constexpr ActiveReg_t& get_registry()
     { return m_registry; }
 
+    /**
+     * @return Internal entt::registry
+     */
+    constexpr ActiveReg_t const& get_registry() const
+    { return m_registry; }
+
     template<typename ACOMP_T, typename ... ARGS_T>
     ACOMP_T& reg_root_get_or_emplace(ARGS_T &&... args)
     {

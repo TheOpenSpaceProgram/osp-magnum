@@ -101,7 +101,7 @@ private:
      * Each node in the glTF tree may possess machines, but only the root
      * PrototypePart stores them. The PrototypePart's machineArray is passed,
      * alongside the current node (object)'s machineIndexArray.
-     * PrototypeMachines are added to the PrototypePart's master list, and the
+     * PCompMachines are added to the PrototypePart's master list, and the
      * index of each machine is added to the machineIndexArray so that the
      * current node/object can keep track of which machines belong to it.
      *
@@ -112,9 +112,10 @@ private:
      * the indices of the machineArray elements which belong to it
      */
     static void proto_load_machines(
+            PartEntity_t entity,
             Package& rMachinePackage,
             tinygltf::Value const& extras,
-            std::vector<PrototypeMachine>& rMachines);
+            std::vector<PCompMachine>& rMachines);
     /**
      * Load only associated config files, and add resource paths to the package
      * But for now, this function just loads everything.

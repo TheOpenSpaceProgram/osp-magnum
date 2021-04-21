@@ -99,7 +99,7 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
-        // Check if the vehicle blueprint might store UserControls
+        // Check if the vehicle blueprint might store MachineRCSControllers
         if (rVehConstr.m_blueprint->m_machines.size() <= id)
         {
             continue;
@@ -314,7 +314,7 @@ TYPE_T const& config_get_if(
 MachineRocket& SysMachineRocket::instantiate(
         osp::active::ActiveScene& rScene,
         osp::active::ActiveEnt ent,
-        osp::PrototypeMachine const& config,
+        osp::PCompMachine const& config,
         osp::BlueprintMachine const& settings)
 {
     // Read engine config

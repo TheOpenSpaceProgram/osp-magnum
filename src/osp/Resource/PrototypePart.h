@@ -87,9 +87,9 @@ struct PCompName
     std::string m_name;
 };
 
-struct PrototypeMachine
+struct PCompMachine
 {
-    //PartEntity_t m_entity;
+    PartEntity_t m_entity;
     //std::string m_type;
     machine_id_t m_type;
     NodeMap_t m_config;
@@ -113,8 +113,7 @@ struct PrototypePart
     std::vector<PCompPrimativeCollider> m_partCollider;
     std::vector<PCompMass> m_partMass;
     std::vector<PCompName> m_partName;
-
-    std::vector<PrototypeMachine> m_protoMachines;
+    std::vector<PCompMachine> m_protoMachines;
 };
 
 }

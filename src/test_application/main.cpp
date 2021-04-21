@@ -428,6 +428,9 @@ void debug_print_machines()
     using osp::active::ActiveScene;
     using osp::active::ActiveEnt;
     using osp::active::ACompMachines;
+    using osp::active::ACompMachineType;
+    using osp::RegisteredMachine;
+    using regmachs_t = osp::Package::group_t<RegisteredMachine>;
 
     if (!g_ospMagnum)
     {
@@ -435,21 +438,31 @@ void debug_print_machines()
         return;
     }
 
-    ActiveScene& scene = g_ospMagnum->get_scenes().begin()->second;
-    auto view = scene.get_registry().view<ACompMachines>();
+    // Get list of machine names
+    regmachs_t const &group = g_osp.debug_find_package("lzdb").group_get<RegisteredMachine>();
+    std::vector<std::string_view> machNames(group.size());
+    for (auto const& [name, regMach] : group)
+    {
+        machNames[regMach.m_data->m_id] = name;
+    }
+
+    // Loop through every Vehicle
+    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second;
+    auto view = scene.get_registry().view<const ACompMachines>();
 
     for (ActiveEnt ent : view)
     {
-        ACompHierarchy& hier = scene.reg_get<ACompHierarchy>(ent);
+        auto const &hier = scene.reg_get<ACompHierarchy>(ent);
         std::cout << "[" << int(ent) << "]: " << hier.m_name << "\n";
 
-        auto& machines = scene.reg_get<ACompMachines>(ent);
-        //for (ACompMachines::PartMachine const& mach : machines.m_machines)
-        //{
-        //    ActiveEnt machEnt = mach.m_partEnt;
-        //    std::string const& sysName = mach.m_system->first;
-        //    std::cout << "  ->[" << int(machEnt) << "]: " << sysName << "\n";
-        //}
+        // Loop through each of that vehicle's Machines
+        auto const &machines = scene.reg_get<ACompMachines>(ent);
+        for (ActiveEnt machEnt : machines.m_machines)
+        {
+            auto const& type = scene.reg_get<ACompMachineType>(machEnt);
+
+            std::cout << "  ->[" << int(machEnt) << "]: " << machNames[type.m_type] << "\n";
+        }
     }
 }
 

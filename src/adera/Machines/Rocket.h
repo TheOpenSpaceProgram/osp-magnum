@@ -151,7 +151,7 @@ public:
     static MachineRocket& instantiate(
             osp::active::ActiveScene& rScene,
             osp::active::ActiveEnt ent,
-            osp::PrototypeMachine const& config,
+            osp::PCompMachine const& config,
             osp::BlueprintMachine const& settings);
 
 private:

@@ -84,9 +84,10 @@ void osp::AssetImporter::load_sturdy_file(std::string_view filepath, Package& rM
 }
 
 void AssetImporter::proto_load_machines(
+        PartEntity_t entity,
         Package& rMachinePkg,
         tinygltf::Value const& extras,
-        std::vector<PrototypeMachine>& rMachines)
+        std::vector<PCompMachine>& rMachines)
 {
     if (!extras.Has("machines"))
     {
@@ -127,8 +128,9 @@ void AssetImporter::proto_load_machines(
             SPDLOG_LOGGER_ERROR(get_logger(), "Machine Type not found: {}", type);
             continue; // machine type not found
         }
-        PrototypeMachine &rMachine = rMachines.emplace_back();
+        PCompMachine &rMachine = rMachines.emplace_back();
         rMachine.m_type = machineType->m_id;
+        rMachine.m_entity = entity;
 
         for (auto const& key : value.Keys())
         {
@@ -529,7 +531,7 @@ void AssetImporter::proto_add_obj_recurse(
         *static_cast<tinygltf::Node const*>(childData->importerState());
     if (node.extras.Has("machines"))
     {
-        proto_load_machines(rMachinePkg, node.extras, rPart.m_protoMachines);
+        proto_load_machines(entity, rMachinePkg, node.extras, rPart.m_protoMachines);
     }
 
     for (UnsignedInt childId: childData->children())

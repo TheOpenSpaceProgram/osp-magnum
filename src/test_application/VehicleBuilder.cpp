@@ -29,7 +29,7 @@ using testapp::partindex_t;
 using osp::BlueprintPart;
 using osp::BlueprintMachine;
 using osp::PrototypePart;
-using osp::PrototypeMachine;
+using osp::PCompMachine;
 using osp::DependRes;
 using osp::Vector3;
 using osp::Quaternion;
@@ -73,7 +73,7 @@ partindex_t VehicleBuilder::add_part(
 
     for (size_t i = 0; i < numMachines; i ++)
     {
-        PrototypeMachine const &protoMach = prototype->m_protoMachines[i];
+        PCompMachine const &protoMach = prototype->m_protoMachines[i];
         machine_id_t id = protoMach.m_type;
         m_vehicle.m_machines.resize(std::max(m_vehicle.m_machines.size(),
                                              size_t(id + 1)));
