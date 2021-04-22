@@ -187,7 +187,15 @@ void SysMap::register_system(ActiveScene& rScene)
 
         // Body is fully dynamic; leave trail
 
-        size_t numPathVerts = 4999;  // Calculate somehow
+        size_t numPathVerts;
+        if (reg.get<UCompMass>(sat).m_mass > 1e23)
+        {
+            numPathVerts = 4999;
+        }
+        else
+        {
+            numPathVerts = 499;
+        }
 
         MapRenderData::PathMetadata pathInfo;
         pathInfo.m_pointIndex = pointIndex;

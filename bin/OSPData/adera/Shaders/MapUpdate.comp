@@ -128,7 +128,8 @@ void find_work_item()
  */
 void fade_color(uint pathID, uint pathVertID)
 {
-    uint index = pathID*NUM_PATH_INDICES + pathVertID;
+    PathMetadata path = paths[pathID];
+    uint index = path.startIdx + pathVertID;
     float alpha = pathData[index].color.a;
     float rate = 1.0 / float(NUM_PATH_VERTS - 1);
     pathData[index].color.a = clamp(alpha - rate, 0.0, 1.0);
@@ -144,13 +145,13 @@ void fade_color(uint pathID, uint pathVertID)
  */
 void inc_index(uint pathID, uint pathVertID)
 {
-    // Increment all indices (except the primitive restart one at the end)
-    uint index = pathID*NUM_PATH_INDICES + pathVertID;
+    PathMetadata path = paths[pathID];
+    uint index = path.startIdx + pathVertID;
     indices[index]++;
 
     // Bound check
-    uint begin = paths[pathID].startIdx;
-    uint end = paths[pathID].endIdx;
+    uint begin = path.startIdx;
+    uint end = path.endIdx;
     if (indices[index] > end)
     {
         indices[index] = begin;
