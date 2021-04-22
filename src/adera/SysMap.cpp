@@ -172,10 +172,12 @@ void SysMap::register_system(ActiveScene& rScene)
     renderData.m_pathMapping.clear();
 
     // Enumerate total number of map objects and paths
-    // Fully dynamic (significant) bodies come first
+    // Fully dynamic (significant) bodies come first, followed by insignificant
+    // (small) bodies. TODO: extra trails (prediction)
 
     size_t pointIndex = 0;
     size_t pathIndex = 0;
+    size_t nextFreeArrayElement = 0;
     auto sigView = reg.view<UCompTransformTraj, ACompMapVisible, UCompSignificantBody>();
     for (auto [sat, traj, vis] : sigView.each())
     {
@@ -185,10 +187,12 @@ void SysMap::register_system(ActiveScene& rScene)
 
         // Body is fully dynamic; leave trail
 
+        size_t numPathVerts = 4999;  // Calculate somehow
+
         MapRenderData::PathMetadata pathInfo;
         pathInfo.m_pointIndex = pointIndex;
-        pathInfo.m_startIdx = pathIndex * MapRenderData::smc_N_INDICES_PER_PATH;
-        pathInfo.m_endIdx = pathInfo.m_startIdx + MapRenderData::smc_N_VERTS_PER_PATH - 1;
+        pathInfo.m_startIdx = nextFreeArrayElement;
+        pathInfo.m_endIdx = pathInfo.m_startIdx + numPathVerts - 1; // -1 to get inclusive bound
         pathInfo.m_nextIdx = pathInfo.m_startIdx;
 
         renderData.m_pathMetadata.push_back(std::move(pathInfo));
@@ -196,6 +200,7 @@ void SysMap::register_system(ActiveScene& rScene)
 
         pathIndex++;
         pointIndex++;
+        nextFreeArrayElement += numPathVerts + 1;  // Pad for primitive restart
     }
     auto insigView = reg.view<UCompTransformTraj, ACompMapVisible, UCompInsignificantBody>();
     for (auto [sat, traj, vis] : insigView.each())
@@ -219,20 +224,20 @@ void SysMap::register_system(ActiveScene& rScene)
 
     // Size path data
 
-    size_t nTotalPathIndices = renderData.m_numPaths * MapRenderData::smc_N_INDICES_PER_PATH;
+    size_t nTotalPathElements = nextFreeArrayElement;
     /* Making the number of vertices equal to the number of indices keeps things easy by
      * making them line up. It wastes one vertex per path, but it's worth it for now.
      */
-    size_t nTotalPathVerts = nTotalPathIndices;
-    renderData.m_vertexData = std::vector<MapRenderData::ColorVert>(nTotalPathVerts,
+    renderData.m_vertexData = std::vector<MapRenderData::ColorVert>(nTotalPathElements,
         {Vector4{0.0}, Color4{0.0}});
-    renderData.m_indexData.resize(renderData.m_numPaths * MapRenderData::smc_N_INDICES_PER_PATH);
+    renderData.m_indexData.resize(nTotalPathElements);
 
     // Initialize index data
     for (auto& metadata : renderData.m_pathMetadata)
     {
         Vector4 initPos = renderData.m_points[metadata.m_pointIndex].m_pos;
-        for (size_t i = 0; i < MapRenderData::smc_N_VERTS_PER_PATH; i++)
+        size_t numVertices = metadata.m_endIdx - metadata.m_startIdx + 1;
+        for (size_t i = 0; i < numVertices; i++)
         {
             renderData.m_indexData[metadata.m_startIdx + i] = metadata.m_endIdx - i;
             MapRenderData::ColorVert& currentVert =
@@ -251,7 +256,7 @@ void SysMap::register_system(ActiveScene& rScene)
     renderData.m_indexBuffer.setData(renderData.m_indexData);
     renderData.m_mesh
         .setPrimitive(Magnum::GL::MeshPrimitive::LineStrip)
-        .setCount(nTotalPathVerts)
+        .setCount(nTotalPathElements)
         .addVertexBuffer(renderData.m_vertexBuffer, 0,
             MapTrailShader::Position{},
             MapTrailShader::Color{})
@@ -261,6 +266,24 @@ void SysMap::register_system(ActiveScene& rScene)
 
     renderData.m_pathMetadataBuffer.setData(
         renderData.m_pathMetadata, Magnum::GL::BufferUsage::StaticDraw);
+
+    // Bin paths into compute work group IDs
+
+    static constexpr size_t computeGroupSize = 64;
+    std::vector<GLuint> boundaries(renderData.m_numPaths, 0);
+    size_t nextGroupIndex = 0;
+    for (size_t i = 0; i < renderData.m_numPaths; i++)
+    {
+        boundaries[i] = nextGroupIndex;
+
+        MapRenderData::PathMetadata& path = renderData.m_pathMetadata[i];
+        size_t nElements = path.m_endIdx - path.m_startIdx + 1;
+        size_t nGroups = osp::math::num_blocks(nElements, computeGroupSize);
+        nextGroupIndex += nGroups;
+    }
+    renderData.m_pathBoundaries.setData(
+        boundaries, Magnum::GL::BufferUsage::StaticDraw);
+    renderData.m_numComputeBlocks = nextGroupIndex;
 }
 
 void SysMap::process_raw_state(osp::active::ActiveScene& rScene, MapRenderData& rMapData, osp::universe::TrajNBody* traj)
@@ -306,8 +329,8 @@ void SysMap::update_map(ActiveScene& rScene)
     mapUpdate->update_map(
         renderData.m_pointBuffer,
         renderData.m_numPaths, renderData.m_pathMetadataBuffer,
-        renderData.smc_N_VERTS_PER_PATH, renderData.m_vertexBuffer,
-        renderData.smc_N_INDICES_PER_PATH, renderData.m_indexBuffer
+        renderData.m_numComputeBlocks, renderData.m_pathBoundaries,
+        renderData.m_vertexBuffer, renderData.m_indexBuffer
         );
 }
 #endif
@@ -347,21 +370,18 @@ void SysMap::update_map(ActiveScene& rScene)
 void MapUpdateCompute::update_map(
     Buffer& pointBuffer,
     size_t numPaths, Buffer& pathMetadata,
-    size_t nVertsPerPath, Buffer& pathVertBuffer,
-    size_t nIndicesPerPath, Buffer& pathIndexBuffer)
+    size_t numBlocks, Buffer& groupBoundaries,
+    Buffer& pathVertBuffer, Buffer& pathIndexBuffer)
 {
     bind_point_locations(pointBuffer);
     bind_path_vert_data(pathVertBuffer);
     bind_path_index_data(pathIndexBuffer);
     bind_path_metadata(pathMetadata);
-    set_uniform_counts(nVertsPerPath, nIndicesPerPath);
-
-    using osp::math::num_blocks;
+    bind_path_group_boundaries(groupBoundaries);
 
     Vector3ui nGroups{
-        num_blocks(static_cast<Magnum::UnsignedInt>(nVertsPerPath), smc_BLOCK_SIZE.x()),
-        static_cast<Magnum::UnsignedInt>(numPaths),
-        1};
+        static_cast<Magnum::UnsignedInt>(numBlocks),
+        1, 1};
     dispatchCompute(nGroups);
 
     using Magnum::GL::Renderer;
@@ -378,15 +398,6 @@ void MapUpdateCompute::init()
     CORRADE_INTERNAL_ASSERT_OUTPUT(prog.compile());
     attachShader(prog);
     CORRADE_INTERNAL_ASSERT_OUTPUT(link());
-}
-
-void MapUpdateCompute::set_uniform_counts(size_t nVertsPerPath, size_t nIndicesPerPath)
-{
-    setUniform(static_cast<Int>(EUniformPos::BlockCounts),
-        Vector4ui{
-            static_cast<UnsignedInt>(nVertsPerPath),
-            static_cast<UnsignedInt>(nIndicesPerPath),
-            0, 0});
 }
 
 void MapUpdateCompute::bind_point_locations(Buffer& points)
@@ -407,10 +418,16 @@ void MapUpdateCompute::bind_path_index_data(Buffer& pathIndices)
         static_cast<Int>(EBufferBinding::PathIndices));
 }
 
-void MapUpdateCompute::bind_path_metadata(Magnum::GL::Buffer& data)
+void MapUpdateCompute::bind_path_metadata(Buffer& data)
 {
     data.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(EBufferBinding::PathsInfo));
+}
+
+void MapUpdateCompute::bind_path_group_boundaries(Buffer& boundaries)
+{
+    boundaries.bind(Buffer::Target::ShaderStorage,
+        static_cast<Int>(EBufferBinding::PathGroupBoundaries));
 }
 
 void ProcessMapCoordsCompute::process(

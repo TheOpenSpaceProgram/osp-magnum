@@ -168,11 +168,6 @@ osp::active::ActiveEnt SysRender::get_default_rendertarget(ActiveScene& rScene)
     return rScene.hier_get_root();
 }
 
-ActiveEnt SysRender::get_default_rendertarget(ActiveScene& rScene)
-{
-    return rScene.hier_get_root();
-}
-
 void SysRender::display_default_rendertarget(ActiveScene& rScene)
 {
     using Magnum::GL::Renderer;

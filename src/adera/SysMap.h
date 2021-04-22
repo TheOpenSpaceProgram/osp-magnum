@@ -70,9 +70,9 @@ public:
     // Number of paths
     GLuint m_numPaths{0};
     // Number of vertices per path
-    static constexpr GLuint smc_N_VERTS_PER_PATH = 999;
+    //static constexpr GLuint smc_N_VERTS_PER_PATH = 4999;
     // Number of indices per path (1 extra, to store primitive restart index)
-    static constexpr GLuint smc_N_INDICES_PER_PATH = smc_N_VERTS_PER_PATH + 1;
+    //static constexpr GLuint smc_N_INDICES_PER_PATH = smc_N_VERTS_PER_PATH + 1;
 
 //#pragma pack(push, 1)
     struct ColorVert
@@ -86,32 +86,86 @@ public:
     };
 //#pragma pack(pop)
 
-    // Path data
+    /**
+     * Path Data
+     * 
+     * Paths are stored as a single indexed mesh which draws using GL_LINE_STRIP
+     * and uses primitive restart to create breaks in the paths. Vertices and
+     * indices for each path are contiguous in the buffer. The number of
+     * vertices may vary from path to path, and the number of indices in a path
+     * is (num. vertices + 1) to account for the primitive restart index that
+     * terminates each sequence of indices. However, the vertices are padded out
+     * to the same length as the indices, so that the indices line up, which
+     * keeps things eaiser. It wastes one vertex per path, but saves the need
+     * to store extra metadata.
+     */
+
+    /**
+     * STREAM_DRAW buffer used to transmit raw position data from the universe
+     * to the GPU for compute/rendering
+     */
     Magnum::GL::Buffer m_rawState;
+
+    /**
+     * STATIC_DRAW buffer used to delineate the boundaries between paths. This
+     * is necessary for dividing the work up into work groups for compute
+     * shaders in a predictable way. The elements of this buffer are uint
+     * indices which represent the index of the first work group ID per path.
+     * 
+     * example:
+     * Groups: | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+     * Paths:  |       0       |   1   |         2          |
+     * Boundaries: [0, 4, 6]
+     */
+    Magnum::GL::Buffer m_pathBoundaries;
+
+    /**
+     * Number of blocks to dispatch in update
+     * 
+     * For convenient block-wise distribution of workload, the number of blocks
+     * needed is stored on initialization. This number is larger than expected
+     * because paths are allocated on block boundaries, requiring extra padding.
+     */
+    size_t m_numComputeBlocks;
+
+    // Path mesh data
     std::vector<GLuint> m_indexData;
     Magnum::GL::Buffer m_indexBuffer;
     std::vector<ColorVert> m_vertexData;
     Magnum::GL::Buffer m_vertexBuffer;
     Magnum::GL::Mesh m_mesh;
 
+    struct PathMetadata
+    {
+        /**
+         * Stores the index of a point source in the point buffer
+         * 
+         * If the path is a trail, the point source is the current position of 
+         * the marking object, which will be pushed to the trail each update. 
+         * If the path is a prediction, the point source is a slot that stores 
+         * arbitrary points that may be pushed to the front of the path on each 
+         * update.
+         */
+        GLuint m_pointIndex;
+
+        // The index of the first vertex/index element of this path
+        GLuint m_startIdx;
+        // The index of the last vertex/index this path (inclusive)
+        GLuint m_endIdx;
+        // The index of next vertex/index to be updated
+        GLuint m_nextIdx;
+    };
+    // Path metadata
+    std::vector<PathMetadata> m_pathMetadata;
+    Magnum::GL::Buffer m_pathMetadataBuffer;
+
     // Point object data
     std::vector<ColorVert> m_points;
     Magnum::GL::Buffer m_pointBuffer;
     Magnum::GL::Mesh m_pointMesh;
 
-    struct PathMetadata
-    {
-        GLuint m_pointIndex;
-        GLuint m_startIdx;
-        GLuint m_endIdx;
-        GLuint m_nextIdx;
-    };
-
     // Mapping from satellites to path metadata index
     std::map<osp::universe::Satellite, size_t> m_pathMapping;
-    // Path metadata
-    std::vector<PathMetadata> m_pathMetadata;
-    Magnum::GL::Buffer m_pathMetadataBuffer;
 
     // Mapping from satellites to point sprites
     std::map<osp::universe::Satellite, GLuint> m_pointMapping;
@@ -130,7 +184,7 @@ public:
         size_t sigCount, size_t sigCountPadded,
         size_t insigCount, size_t insigCountPadded);
 private:
-    static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{32, 1, 1};
+    static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{64, 1, 1};
 
     void init();
 
@@ -162,35 +216,31 @@ public:
     void update_map(
         Magnum::GL::Buffer& pointBuffer,
         size_t numPaths, Magnum::GL::Buffer& pathMetadata,
-        size_t nVertsPerPath, Magnum::GL::Buffer& pathVertBuffer,
-        size_t nIndicesPerPath, Magnum::GL::Buffer& pathIndexBuffer);
+        size_t numBlocks, Magnum::GL::Buffer& groupBoundaries,
+        Magnum::GL::Buffer& pathVertBuffer, Magnum::GL::Buffer& pathIndexBuffer);
 private:
     static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{64, 1, 1};
 
     void init();
-
-    enum class EUniformPos : Magnum::Int
-    {
-        BlockCounts = 0,
-    };
 
     enum class EBufferBinding : Magnum::Int
     {
         PointVerts = 0,
         PathData = 1,
         PathIndices = 2,
-        PathsInfo = 3
+        PathsInfo = 3,
+        PathGroupBoundaries = 4
     };
 
     using Magnum::GL::AbstractShaderProgram::draw;
     using Magnum::GL::AbstractShaderProgram::drawTransformFeedback;
     using Magnum::GL::AbstractShaderProgram::dispatchCompute;
 
-    void set_uniform_counts(size_t nVertsPerPath, size_t nIndicesPerPath);
     void bind_point_locations(Magnum::GL::Buffer& points);
     void bind_path_vert_data(Magnum::GL::Buffer& pathVerts);
     void bind_path_index_data(Magnum::GL::Buffer& pathIndices);
     void bind_path_metadata(Magnum::GL::Buffer& data);
+    void bind_path_group_boundaries(Magnum::GL::Buffer& boundaries);
 };
 
 struct ACompMapVisible
@@ -209,7 +259,6 @@ public:
     static Magnum::Vector3 universe_to_render_space(osp::Vector3s v3s);
 
 private:
-    //static constexpr size_t m_orbitSamples = 512;
     static osp::active::RenderPipeline create_map_renderer();
     static void register_system(osp::active::ActiveScene& rScene);
     static void process_raw_state(osp::active::ActiveScene& rScene,

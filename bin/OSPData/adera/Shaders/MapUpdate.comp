@@ -26,12 +26,11 @@
 
 layout(local_size_x = 64, local_size_y = 1) in;
 
-const uint PATH_SAMPLE = gl_GlobalInvocationID.x;
-const uint PATH_ID = gl_GlobalInvocationID.y;
-
-layout(location = 0) uniform uvec4 pathDataCounts;
-const uint VERTS_PER_PATH = pathDataCounts.x;
-const uint INDICES_PER_PATH = pathDataCounts.y;
+// Constants to be filled at runtime:
+uint PATH_SAMPLE = 0;
+uint PATH_ID = 0;
+uint NUM_PATH_VERTS = 0;
+uint NUM_PATH_INDICES = 0;
 
 struct ColorVert
 {
@@ -87,6 +86,39 @@ layout(binding = 3, std430) buffer PathsInfo
     PathMetadata paths[];
 };
 
+layout(binding = 4, std430) buffer PathGroupBoundaries
+{
+    uint pathBoundaries[];
+};
+
+/**
+ * Calculates the work item to be handled by this thread.
+ * 
+ * Since paths may have variable lengths, the group must search through a list
+ * of boundaries in order to bin itself into the right path, and calculate the
+ * sample ID of each thread within that path. It also calculates the number of
+ * vertices and indices spanned by that path.
+ */
+void find_work_item()
+{
+    const uint groupID = gl_WorkGroupID.x;
+
+    uint boundaryIdx = 0;
+    for (int i = pathBoundaries.length() - 1; i > 0; i--)
+    {
+        if (groupID >= pathBoundaries[i])
+        {
+            PATH_ID = i;
+            break;
+        }
+    }
+    uint pathSubgroupIndex = groupID - pathBoundaries[PATH_ID];
+    PATH_SAMPLE = gl_LocalInvocationID.x + gl_WorkGroupSize.x * pathSubgroupIndex;
+    PathMetadata path = paths[PATH_ID];
+    NUM_PATH_VERTS = path.endIdx - path.startIdx + 1;
+    NUM_PATH_INDICES = NUM_PATH_VERTS + 1;
+}
+
 /**
  * Fade the alpha of all trail vertices
  *
@@ -96,9 +128,9 @@ layout(binding = 3, std430) buffer PathsInfo
  */
 void fade_color(uint pathID, uint pathVertID)
 {
-    uint index = pathID*INDICES_PER_PATH + pathVertID;
+    uint index = pathID*NUM_PATH_INDICES + pathVertID;
     float alpha = pathData[index].color.a;
-    float rate = 1.0 / float(VERTS_PER_PATH - 1);
+    float rate = 1.0 / float(NUM_PATH_VERTS - 1);
     pathData[index].color.a = clamp(alpha - rate, 0.0, 1.0);
 }
 
@@ -113,7 +145,7 @@ void fade_color(uint pathID, uint pathVertID)
 void inc_index(uint pathID, uint pathVertID)
 {
     // Increment all indices (except the primitive restart one at the end)
-    uint index = pathID*INDICES_PER_PATH + pathVertID;
+    uint index = pathID*NUM_PATH_INDICES + pathVertID;
     indices[index]++;
 
     // Bound check
@@ -131,13 +163,14 @@ void inc_index(uint pathID, uint pathVertID)
  * The point locations represent the current location of each body. Their
  * positions can be used to draw the latest segment of trail.
  */
-void path_step(uint pathID)
+void path_push_step(uint pathID)
 {
     PathMetadata path = paths[pathID];
 
     ColorVert newVert = pointVerts[path.pointIndex];
     vec3 newPos = newVert.position.xyz;
-    uint newPathVertIdx = path.nextIdx;// indices[path.nextIdx];
+    // TODO bug: get index of vertex, not index
+    uint newPathVertIdx = path.nextIdx;
     pathData[newPathVertIdx].position = vec4(newPos, 1.0);
     pathData[newPathVertIdx].color = newVert.color;
 
@@ -150,20 +183,40 @@ void path_step(uint pathID)
     paths[pathID].nextIdx = path.nextIdx;
 }
 
-void main()
+void update_trail(uint pathID, uint sampleID)
 {
-    // Discard threads that are out of bounds
-    if (PATH_SAMPLE >= VERTS_PER_PATH) { return; }
-
     // 1. Fade colors of all existing path verts
-    fade_color(PATH_ID, PATH_SAMPLE);
+    fade_color(pathID, sampleID);
 
     // 2. Increment all indices
-    inc_index(PATH_ID, PATH_SAMPLE);
+    inc_index(pathID, sampleID);
 
     // Exit all threads except 1 per path (TODO: try using just the 1st path group)
-    if (PATH_SAMPLE > 0) { return; }
+    if (sampleID > 0) { return; }
 
     // 3. Use point sprite positions to update paths
-    path_step(PATH_ID);
+    path_push_step(pathID);
+}
+
+void update_predicted_path(uint pathID, uint sampleID)
+{
+    // 1. Increment all indices
+    inc_index(pathID, sampleID);
+
+    // Exit all threads except 1 per path (TODO: try using just the 1st path group)
+    if (sampleID > 0) { return; }
+
+    // 2. Push incremental path update
+    path_push_step(pathID);
+}
+
+void main()
+{
+    // Set up thread
+    find_work_item();
+
+    // Discard threads that are out of bounds
+    if (PATH_SAMPLE >= NUM_PATH_VERTS) { return; }
+
+    update_trail(PATH_ID, PATH_SAMPLE);
 }
