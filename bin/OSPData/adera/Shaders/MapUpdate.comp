@@ -170,7 +170,6 @@ void path_push_step(uint pathID)
 
     ColorVert newVert = pointVerts[path.pointIndex];
     vec3 newPos = newVert.position.xyz;
-    // TODO bug: get index of vertex, not index
     uint newPathVertIdx = path.nextIdx;
     pathData[newPathVertIdx].position = vec4(newPos, 1.0);
     pathData[newPathVertIdx].color = newVert.color;
@@ -186,11 +185,21 @@ void path_push_step(uint pathID)
 
 void update_trail(uint pathID, uint sampleID)
 {
-    // 1. Fade colors of all existing path verts
-    fade_color(pathID, sampleID);
-
-    // 2. Increment all indices
+    // 1. Increment all indices
     inc_index(pathID, sampleID);
+
+    // 2. Fade colors of all existing path verts
+    /* We skip fading the vertex that will become the front vertex this frame.
+       It may seem like a waste to branch on this condition, but since the fade
+       and push operations happen within different work groups, there will be
+       memory coherency issues if they both try to modify the same vertex.
+     */
+    PathMetadata path = paths[pathID];
+    uint frontIndex = path.nextIdx - path.startIdx;
+    if (sampleID != frontIndex)
+    {
+        fade_color(pathID, sampleID);
+    }
 
     // Exit all threads except 1 per path (TODO: try using just the 1st path group)
     if (sampleID > 0) { return; }
