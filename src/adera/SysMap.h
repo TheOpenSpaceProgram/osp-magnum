@@ -39,6 +39,12 @@
 namespace adera::active
 {
 
+struct ACompMapFocus
+{
+    osp::universe::Satellite m_sat{entt::null};
+    bool m_dirty{false};
+};
+
 /*
 Device memory:
 - A buffer of vertices to represent all body positions
@@ -64,15 +70,6 @@ public:
 public:
     // Temporary flag to check initialization state
     bool m_isInitialized{false};
-
-    // Number of point markers on the map (representing planets, ships, etc)
-    GLuint m_numPoints{0};
-    // Number of paths
-    GLuint m_numPaths{0};
-    // Number of vertices per path
-    //static constexpr GLuint smc_N_VERTS_PER_PATH = 4999;
-    // Number of indices per path (1 extra, to store primitive restart index)
-    //static constexpr GLuint smc_N_INDICES_PER_PATH = smc_N_VERTS_PER_PATH + 1;
 
 //#pragma pack(push, 1)
     struct ColorVert
@@ -128,7 +125,9 @@ public:
      */
     size_t m_numComputeBlocks;
 
-    // Path mesh data
+    /* ### Path mesh data ### */
+
+    size_t m_numPaths{0};
     std::vector<GLuint> m_indexData;
     Magnum::GL::Buffer m_indexBuffer;
     std::vector<ColorVert> m_vertexData;
@@ -159,16 +158,24 @@ public:
     std::vector<PathMetadata> m_pathMetadata;
     Magnum::GL::Buffer m_pathMetadataBuffer;
 
-    // Point object data
+    /* ### Point object data ### */
+
+    // Number of point markers on the map (representing planets, ships, etc)
+    size_t m_numDrawablePoints{0};
+    // Number of points in the point buffer, including non-drawing data, e.g.
+    // points for feeding data to predicted trajectories
+    size_t m_numAllPoints{0};
+
     std::vector<ColorVert> m_points;
     Magnum::GL::Buffer m_pointBuffer;
     Magnum::GL::Mesh m_pointMesh;
 
     // Mapping from satellites to path metadata index
-    std::map<osp::universe::Satellite, size_t> m_pathMapping;
+    //std::map<osp::universe::Satellite, size_t> m_trailMapping;
+    size_t m_predictionPathIndex;
 
     // Mapping from satellites to point sprites
-    std::map<osp::universe::Satellite, GLuint> m_pointMapping;
+    //std::map<osp::universe::Satellite, GLuint> m_pointMapping;
 };
 
 class ProcessMapCoordsCompute : public Magnum::GL::AbstractShaderProgram
@@ -257,6 +264,8 @@ public:
     static void update_map(osp::active::ActiveScene& rScene);
 
     static Magnum::Vector3 universe_to_render_space(osp::Vector3s v3s);
+
+    static void select_planet(osp::active::ActiveScene& rScene, osp::universe::Satellite sat);
 
 private:
     static osp::active::RenderPipeline create_map_renderer();

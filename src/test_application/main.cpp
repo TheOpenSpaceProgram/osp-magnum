@@ -206,7 +206,7 @@ int debug_cli_loop()
         }
         else if (command == "map")
         {
-            if (destroy_universe())
+            //if (destroy_universe())
             {
                 create_solar_system(g_osp);
             }

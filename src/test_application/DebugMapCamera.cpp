@@ -115,7 +115,8 @@ bool DebugMapCameraController::try_switch_focus()
 {
     using osp::universe::UCompTransformTraj;
 
-    auto& rUniReg = m_scene.get_application().get_universe().get_reg();
+    auto& rUni = m_scene.get_application().get_universe();
+    auto& rUniReg = rUni.get_reg();
 
     if (m_switchNext.triggered() || m_switchPrev.triggered())
     {
@@ -148,6 +149,10 @@ bool DebugMapCameraController::try_switch_focus()
                 m_selected = *(++itr);
             }
         }
+
+        auto& focus = rUniReg.get<adera::active::ACompMapFocus>(rUni.sat_root());
+        focus.m_sat = m_selected;
+        focus.m_dirty = true;
     }
 
     return rUniReg.valid(m_selected);

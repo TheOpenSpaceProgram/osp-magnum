@@ -31,6 +31,7 @@
 #include <memory>
 #include <tuple>
 #include <Corrade/Containers/ArrayView.h>
+#include <Corrade/Containers/StridedArrayView.h>
 
 namespace osp::universe
 {
@@ -112,6 +113,17 @@ public:
     };
 
     RawStepData get_step(size_t timestep);
+
+    struct TableColumn
+    {
+        Corrade::Containers::StridedArrayView1D<double> m_x;
+        Corrade::Containers::StridedArrayView1D<double> m_y;
+        Corrade::Containers::StridedArrayView1D<double> m_z;
+    };
+
+    TableColumn get_column(size_t index);
+
+    bool is_in_table(Satellite sat);
 
     //void copy_step_to_top(size_t timestep);
 private:
@@ -207,6 +219,10 @@ public:
 
     using FullState_t = std::pair<EvolutionTable::RawStepData, EvolutionTable::RawStepData>;
     FullState_t get_latest_state();
+
+    bool is_in_table(Satellite sat);
+
+    EvolutionTable::TableColumn get_column(Satellite sat);
 private:
     template <typename VIEW_T, typename SRC_VIEW_T>
     static void update_full_dynamics_acceleration(VIEW_T& bodyView, SRC_VIEW_T& sources);

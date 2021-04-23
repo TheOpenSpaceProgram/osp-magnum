@@ -91,7 +91,7 @@ void testapp::create_solar_system(OSPApplication& ospApp)
     sun.m_color = 0xFFFFFF_rgbf;
 
     // Cuz for some reason the first one is a large number and I'm OCD
-    Satellite nullSat = rUni.sat_create();
+    //Satellite nullSat = rUni.sat_create();
 
     Satellite sunSat = rUni.sat_create();
 

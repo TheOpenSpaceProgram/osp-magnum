@@ -26,6 +26,7 @@
 #include "NBody.h"
 #include <iostream>
 #include <immintrin.h>
+#include <assert.h>
 
 using namespace osp::universe;
 using osp::Vector3d;
@@ -195,6 +196,41 @@ EvolutionTable::RawStepData EvolutionTable::get_step(size_t timestep)
     };
 }
 
+EvolutionTable::TableColumn EvolutionTable::get_column(size_t index)
+{
+    size_t componentOffset = m_scalarArraySizeBytes / sizeof(double);
+    size_t rowStride = m_rowSizeBytes / sizeof(double);
+    size_t numTableElements = (rowStride * m_numTimesteps);
+
+    TableColumn column;
+    column.m_x = Corrade::Containers::StridedArrayView1D<double>(
+        Corrade::Containers::ArrayView<double>(m_posTable.get(), numTableElements),
+        &m_posTable[0 * componentOffset + index],
+        m_numTimesteps,
+        rowStride * sizeof(double));
+    column.m_y = Corrade::Containers::StridedArrayView1D<double>(
+        Corrade::Containers::ArrayView<double>(m_posTable.get(), numTableElements),
+        &m_posTable[1 * componentOffset + index],
+        m_numTimesteps,
+        rowStride * sizeof(double));
+    column.m_z = Corrade::Containers::StridedArrayView1D<double>(
+        Corrade::Containers::ArrayView<double>(m_posTable.get(), numTableElements),
+        &m_posTable[2 * componentOffset + index],
+        m_numTimesteps,
+        rowStride * sizeof(double));
+
+    return column;
+}
+
+bool EvolutionTable::is_in_table(Satellite sat)
+{
+    for (size_t i = 0; i < m_numBodies; i++)
+    {
+        if (get_ID(i) == sat) { return true; }
+    }
+    return false;
+}
+
 #if 0
 void EvolutionTable::copy_step_to_top(size_t timestep)
 {
@@ -294,6 +330,27 @@ TrajNBody::FullState_t TrajNBody::get_latest_state()
     return std::make_pair(
         m_nBodyData.get_step(m_nBodyData.m_currentStep),
         m_insignificantBodyData.get_step(0));
+}
+
+bool TrajNBody::is_in_table(Satellite sat)
+{
+    return m_nBodyData.is_in_table(sat);
+}
+
+EvolutionTable::TableColumn TrajNBody::get_column(Satellite sat)
+{
+    int64_t index = -1;
+    for (int64_t i = 0; i < m_nBodyData.m_numBodies; i++)
+    {
+        if (m_nBodyData.get_ID(i) == sat)
+        {
+            index = i;
+            break;
+        }
+    }
+    assert(index > 0);
+
+    return m_nBodyData.get_column(index);
 }
 
 void TrajNBody::solve_table()
