@@ -108,6 +108,7 @@ void testapp::create_solar_system(OSPApplication& ospApp)
     reg.emplace<UCompVel>(sunSat, Vector3d{0.0});
     reg.emplace<UCompEmitsGravity>(sunSat);
     reg.emplace<ACompMapVisible>(sunSat);
+    reg.emplace<UCompSignificantBody>(sunSat);
     nbody.add(sunSat);
 
     /* ####### Planets ####### */

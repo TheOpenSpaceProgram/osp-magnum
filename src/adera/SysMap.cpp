@@ -251,11 +251,11 @@ void SysMap::register_system(ActiveScene& rScene)
         size_t numPathVerts;
         if (reg.get<UCompMass>(sat).m_mass > 1e23)
         {
-            numPathVerts = 49;
+            numPathVerts = 4999;
         }
         else
         {
-            numPathVerts = 9;
+            numPathVerts = 499;
         }
 
         MapRenderData::PathMetadata pathInfo;
