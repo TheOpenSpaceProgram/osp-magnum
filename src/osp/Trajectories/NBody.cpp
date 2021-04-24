@@ -304,7 +304,7 @@ void TrajNBody::build_table()
     {
         significantBodies.push_back(sat);
     }
-    m_nBodyData.resize(significantBodies.size(), 512);
+    m_nBodyData.resize(significantBodies.size(), 1024);
 
     for (size_t i = 0; i < significantBodies.size(); i++)
     {

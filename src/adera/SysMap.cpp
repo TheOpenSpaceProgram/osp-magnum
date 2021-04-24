@@ -123,8 +123,8 @@ void SysMap::select_planet(ActiveScene& rScene, Satellite sat)
     size_t indexOffset = sizeof(GLuint) * path.m_startIdx;
     renderData.m_indexBuffer.setSubData(indexOffset, indices);
 
-    path.m_nextIdx = path.m_startIdx;
-    renderData.m_pathMetadataBuffer.setSubData(renderData.m_predictionPathIndex, {path});
+    renderData.m_pathMetadataBuffer.setSubData(
+        renderData.m_predictionPathIndex * sizeof(MapRenderData::PathMetadata), {path});
 }
 
 void SysMap::add_functions(ActiveScene& rScene)
@@ -291,7 +291,7 @@ void SysMap::register_system(ActiveScene& rScene)
 
         renderData.m_predictionPointIndex = renderData.m_numAllPoints - 1;
 
-        size_t numPathVerts = 512;
+        size_t numPathVerts = 1024;
 
         MapRenderData::PathMetadata predInfo;
         predInfo.m_pointIndex = pointIndex;
@@ -319,7 +319,7 @@ void SysMap::register_system(ActiveScene& rScene)
     renderData.m_pointBuffer.setData(renderData.m_points);
     renderData.m_pointMesh
         .setPrimitive(Magnum::GL::MeshPrimitive::Points)
-        .setCount(renderData.m_points.size())
+        .setCount(renderData.m_numDrawablePoints)
         .addVertexBuffer(renderData.m_pointBuffer, 0,
             Magnum::GL::Attribute<0, Vector4>{},
             Magnum::GL::Attribute<2, Color4>{});
