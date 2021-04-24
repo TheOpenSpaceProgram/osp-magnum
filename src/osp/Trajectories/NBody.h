@@ -119,11 +119,14 @@ public:
         Corrade::Containers::StridedArrayView1D<double> m_x;
         Corrade::Containers::StridedArrayView1D<double> m_y;
         Corrade::Containers::StridedArrayView1D<double> m_z;
+        size_t m_currentStep;
     };
 
     TableColumn get_column(size_t index);
 
     bool is_in_table(Satellite sat);
+
+    size_t get_index(Satellite sat);
 
     //void copy_step_to_top(size_t timestep);
 private:
@@ -223,7 +226,9 @@ public:
     bool is_in_table(Satellite sat);
 
     EvolutionTable::TableColumn get_column(Satellite sat);
-private:
+
+    Vector3d get_futuremost_location(Satellite sat);
+public:
     template <typename VIEW_T, typename SRC_VIEW_T>
     static void update_full_dynamics_acceleration(VIEW_T& bodyView, SRC_VIEW_T& sources);
 

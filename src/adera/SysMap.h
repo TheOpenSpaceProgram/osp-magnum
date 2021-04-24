@@ -45,6 +45,92 @@ struct ACompMapFocus
     bool m_dirty{false};
 };
 
+class ProcessMapCoordsCompute : public Magnum::GL::AbstractShaderProgram
+{
+public:
+    ProcessMapCoordsCompute() { init(); }
+    ~ProcessMapCoordsCompute() = default;
+    ProcessMapCoordsCompute(ProcessMapCoordsCompute const& copy) = delete;
+    ProcessMapCoordsCompute(ProcessMapCoordsCompute&& move) = default;
+
+    void process(
+        Magnum::GL::Buffer& rawInput, Magnum::GL::Buffer& dest,
+        size_t sigCount, size_t sigCountPadded,
+        size_t insigCount, size_t insigCountPadded);
+private:
+    static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{64, 1, 1};
+
+    void init();
+
+    enum class UniformPos : Magnum::Int
+    {
+        Counts = 0
+    };
+
+    enum class BufferBinding : Magnum::Int
+    {
+        RawInput = 0,
+        Output = 1
+    };
+
+    void set_input_counts(size_t nSigPoints, size_t nSigPointsPadded,
+        size_t nInsigPoints, size_t nInsigPointsPadded);
+    void bind_input_buffer(Magnum::GL::Buffer& input);
+    void bind_output_buffer(Magnum::GL::Buffer& output);
+};
+
+class MapUpdateCompute : public Magnum::GL::AbstractShaderProgram
+{
+public:
+    MapUpdateCompute() { init(); }
+    ~MapUpdateCompute() = default;
+    MapUpdateCompute(MapUpdateCompute const& copy) = delete;
+    MapUpdateCompute(MapUpdateCompute&& move) = default;
+
+    void update_map(
+        Magnum::GL::Buffer& pointBuffer,
+        size_t numPaths,
+        Magnum::GL::Buffer& pathMetadata,
+        Magnum::GL::Buffer& pathOperationBuffer,
+        size_t numBlocks,
+        Magnum::GL::Buffer& groupBoundaries,
+        Magnum::GL::Buffer& pathVertBuffer,
+        Magnum::GL::Buffer& pathIndexBuffer);
+
+    enum class EPathOperation : GLuint
+    {
+        Skip = 0,
+        PushVertFromPointSource = 1 << 0,
+        FadeVertices = 1 << 1
+        // other operations? use enum as flags?
+    };
+private:
+    static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{64, 1, 1};
+
+    void init();
+
+    enum class EBufferBinding : Magnum::Int
+    {
+        PointVerts = 0,
+        PathData = 1,
+        PathIndices = 2,
+        PathsInfo = 3,
+        PathGroupBoundaries = 4,
+        PathOperation = 5
+    };
+
+    using Magnum::GL::AbstractShaderProgram::draw;
+    using Magnum::GL::AbstractShaderProgram::drawTransformFeedback;
+    using Magnum::GL::AbstractShaderProgram::dispatchCompute;
+
+    void bind_point_locations(Magnum::GL::Buffer& points);
+    void bind_path_vert_data(Magnum::GL::Buffer& pathVerts);
+    void bind_path_index_data(Magnum::GL::Buffer& pathIndices);
+    void bind_path_metadata(Magnum::GL::Buffer& data);
+    void bind_path_group_boundaries(Magnum::GL::Buffer& boundaries);
+    void bind_path_update_op_buffer(Magnum::GL::Buffer& operations);
+};
+
 /*
 Device memory:
 - A buffer of vertices to represent all body positions
@@ -158,6 +244,10 @@ public:
     std::vector<PathMetadata> m_pathMetadata;
     Magnum::GL::Buffer m_pathMetadataBuffer;
 
+    // TODO documentation; friendly interface?
+    std::vector<GLuint> m_pathUpdateCommands;
+    Magnum::GL::Buffer m_pathUpdateCommandBuffer;
+
     /* ### Point object data ### */
 
     // Number of point markers on the map (representing planets, ships, etc)
@@ -175,79 +265,8 @@ public:
     size_t m_predictionPathIndex;
 
     // Mapping from satellites to point sprites
-    //std::map<osp::universe::Satellite, GLuint> m_pointMapping;
-};
-
-class ProcessMapCoordsCompute : public Magnum::GL::AbstractShaderProgram
-{
-public:
-    ProcessMapCoordsCompute() { init(); }
-    ~ProcessMapCoordsCompute() = default;
-    ProcessMapCoordsCompute(ProcessMapCoordsCompute const& copy) = delete;
-    ProcessMapCoordsCompute(ProcessMapCoordsCompute&& move) = default;
-
-    void process(
-        Magnum::GL::Buffer& rawInput, Magnum::GL::Buffer& dest,
-        size_t sigCount, size_t sigCountPadded,
-        size_t insigCount, size_t insigCountPadded);
-private:
-    static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{64, 1, 1};
-
-    void init();
-
-    enum class UniformPos : Magnum::Int
-    {
-        Counts = 0
-    };
-
-    enum class BufferBinding : Magnum::Int
-    {
-        RawInput = 0,
-        Output = 1
-    };
-
-    void set_input_counts(size_t nSigPoints, size_t nSigPointsPadded,
-        size_t nInsigPoints, size_t nInsigPointsPadded);
-    void bind_input_buffer(Magnum::GL::Buffer& input);
-    void bind_output_buffer(Magnum::GL::Buffer& output);
-};
-
-class MapUpdateCompute : public Magnum::GL::AbstractShaderProgram
-{
-public:
-    MapUpdateCompute() { init(); }
-    ~MapUpdateCompute() = default;
-    MapUpdateCompute(MapUpdateCompute const& copy) = delete;
-    MapUpdateCompute(MapUpdateCompute&& move) = default;
-
-    void update_map(
-        Magnum::GL::Buffer& pointBuffer,
-        size_t numPaths, Magnum::GL::Buffer& pathMetadata,
-        size_t numBlocks, Magnum::GL::Buffer& groupBoundaries,
-        Magnum::GL::Buffer& pathVertBuffer, Magnum::GL::Buffer& pathIndexBuffer);
-private:
-    static constexpr Magnum::Vector3ui smc_BLOCK_SIZE{64, 1, 1};
-
-    void init();
-
-    enum class EBufferBinding : Magnum::Int
-    {
-        PointVerts = 0,
-        PathData = 1,
-        PathIndices = 2,
-        PathsInfo = 3,
-        PathGroupBoundaries = 4
-    };
-
-    using Magnum::GL::AbstractShaderProgram::draw;
-    using Magnum::GL::AbstractShaderProgram::drawTransformFeedback;
-    using Magnum::GL::AbstractShaderProgram::dispatchCompute;
-
-    void bind_point_locations(Magnum::GL::Buffer& points);
-    void bind_path_vert_data(Magnum::GL::Buffer& pathVerts);
-    void bind_path_index_data(Magnum::GL::Buffer& pathIndices);
-    void bind_path_metadata(Magnum::GL::Buffer& data);
-    void bind_path_group_boundaries(Magnum::GL::Buffer& boundaries);
+    std::map<osp::universe::Satellite, GLuint> m_pointMapping;
+    size_t m_predictionPointIndex;
 };
 
 struct ACompMapVisible
@@ -272,6 +291,7 @@ private:
     static void register_system(osp::active::ActiveScene& rScene);
     static void process_raw_state(osp::active::ActiveScene& rScene,
         MapRenderData& rMapData, osp::universe::TrajNBody* traj);
+    static void update_prediction(osp::active::ActiveScene& rScene);
 };
 
 } // namespace adera::active

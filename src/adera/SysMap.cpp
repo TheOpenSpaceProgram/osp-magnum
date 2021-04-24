@@ -87,18 +87,22 @@ void SysMap::select_planet(ActiveScene& rScene, Satellite sat)
     size_t columnRows = column.m_x.size();
     std::vector<MapRenderData::ColorVert> pathData(columnRows, {Vector4{1.0}, Color4{1.0}});
 
+    constexpr double conversionFactor = 1e-6;
 #if 1
     for (size_t i = 0; i < columnRows; i++)
     {
-        pathData[i].m_pos.x() = column.m_x[i];
+        size_t index = (column.m_currentStep + i) % columnRows;
+        pathData[columnRows - i - 1].m_pos.x() = column.m_x[index] * conversionFactor;
     }
     for (size_t i = 0; i < columnRows; i++)
     {
-        pathData[i].m_pos.y() = column.m_y[i];
+        size_t index = (column.m_currentStep + i) % columnRows;
+        pathData[columnRows - i - 1].m_pos.y() = column.m_y[index] * conversionFactor;
     }
     for (size_t i = 0; i < columnRows; i++)
     {
-        pathData[i].m_pos.z() = column.m_z[i];
+        size_t index = (column.m_currentStep + i) % columnRows;
+        pathData[columnRows - i - 1].m_pos.z() = column.m_z[index] * conversionFactor;
     }
 #else
     for (size_t i = 0; i < columnRows; i++)
@@ -114,10 +118,13 @@ void SysMap::select_planet(ActiveScene& rScene, Satellite sat)
     std::vector<GLuint> indices(columnRows, 0);
     for (size_t i = 0; i < columnRows; i++)
     {
-        indices[i] = static_cast<GLuint>(i);
+        indices[i] = path.m_endIdx - static_cast<GLuint>(i);
     }
     size_t indexOffset = sizeof(GLuint) * path.m_startIdx;
     renderData.m_indexBuffer.setSubData(indexOffset, indices);
+
+    path.m_nextIdx = path.m_startIdx;
+    renderData.m_pathMetadataBuffer.setSubData(renderData.m_predictionPathIndex, {path});
 }
 
 void SysMap::add_functions(ActiveScene& rScene)
@@ -220,8 +227,9 @@ void SysMap::register_system(ActiveScene& rScene)
 
     // Clear data
     renderData.m_points.clear();
-    //renderData.m_pointMapping.clear();
+    renderData.m_pointMapping.clear();
     renderData.m_pathMetadata.clear();
+    renderData.m_pathUpdateCommands.clear();
     //renderData.m_trailMapping.clear();
 
     // Enumerate total number of map objects and paths
@@ -257,6 +265,9 @@ void SysMap::register_system(ActiveScene& rScene)
         pathInfo.m_nextIdx = pathInfo.m_startIdx;
 
         renderData.m_pathMetadata.push_back(std::move(pathInfo));
+        renderData.m_pathUpdateCommands.push_back(
+            static_cast<GLuint>(MapUpdateCompute::EPathOperation::PushVertFromPointSource)
+            | static_cast<GLuint>(MapUpdateCompute::EPathOperation::FadeVertices));
         //renderData.m_pathMapping.emplace(sat, pathIndex);
 
         pathIndex++;
@@ -267,7 +278,7 @@ void SysMap::register_system(ActiveScene& rScene)
     for (auto [sat, traj, vis] : insigView.each())
     {
         renderData.m_points.emplace_back(Vector4{1.0}, Color4{traj.m_color, 1.0});
-        //renderData.m_pointMapping.emplace(sat, pointIndex);
+        renderData.m_pointMapping.emplace(sat, pointIndex);
         pointIndex++;
     }
     renderData.m_numDrawablePoints = pointIndex;
@@ -275,8 +286,10 @@ void SysMap::register_system(ActiveScene& rScene)
     // Create an extra point and path used to represent trajectory of the
     // currently selected planet
     {
-        renderData.m_points.emplace_back(Vector4{1.0}, Color4{0.0});
+        renderData.m_points.emplace_back(Vector4{1.0}, Color4{1.0});
         renderData.m_numAllPoints = renderData.m_numDrawablePoints + 1;
+
+        renderData.m_predictionPointIndex = renderData.m_numAllPoints - 1;
 
         size_t numPathVerts = 512;
 
@@ -287,6 +300,8 @@ void SysMap::register_system(ActiveScene& rScene)
         predInfo.m_nextIdx = predInfo.m_startIdx;
 
         renderData.m_pathMetadata.push_back(std::move(predInfo));
+        renderData.m_pathUpdateCommands.push_back(
+            static_cast<GLuint>(MapUpdateCompute::EPathOperation::Skip));
 
         renderData.m_predictionPathIndex = pathIndex;
 
@@ -296,6 +311,8 @@ void SysMap::register_system(ActiveScene& rScene)
     }
 
     renderData.m_numPaths = pathIndex;
+    renderData.m_pathUpdateCommandBuffer.setData(
+        renderData.m_pathUpdateCommands, BufferUsage::StaticDraw);
 
     // Create point buffer, mesh
 
@@ -391,6 +408,24 @@ void SysMap::process_raw_state(osp::active::ActiveScene& rScene, MapRenderData& 
         insignificantsData.m_nElements, insignificantsData.m_nElementsPadded);
 }
 
+void SysMap::update_prediction(ActiveScene& rScene)
+{
+    auto& rUni = rScene.get_application().get_universe();
+    auto& reg = rUni.get_reg();
+    auto& glres = rScene.get_context_resources();
+    MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
+
+    auto* nbody = rUni.get_traj<TrajNBody>(0);
+    MapRenderData::ColorVert newVert{Vector4{1.0f}, Color4{1.0f}};
+
+    Satellite sat = reg.get<ACompMapFocus>(rUni.sat_root()).m_sat;
+
+    newVert.m_pos.xyz() = Vector3{nbody->get_futuremost_location(sat) * 1e-6};
+
+    renderData.m_pointBuffer.setSubData(
+        renderData.m_predictionPointIndex * sizeof(MapRenderData::ColorVert), {newVert});
+}
+
 #if 1
 void SysMap::update_map(ActiveScene& rScene)
 {
@@ -413,6 +448,12 @@ void SysMap::update_map(ActiveScene& rScene)
         select_planet(rScene, focus.m_sat);
         focus.m_dirty = false;
     }
+    else if (nbody->is_in_table(focus.m_sat))
+    {
+        renderData.m_pathUpdateCommandBuffer.setSubData(
+            renderData.m_predictionPathIndex * sizeof(GLuint), {MapUpdateCompute::EPathOperation::PushVertFromPointSource});
+        update_prediction(rScene);
+    }
 
     process_raw_state(rScene, renderData, nbody);
 
@@ -420,10 +461,14 @@ void SysMap::update_map(ActiveScene& rScene)
         glres.get<MapUpdateCompute>("map_compute");
     mapUpdate->update_map(
         renderData.m_pointBuffer,
-        renderData.m_numPaths, renderData.m_pathMetadataBuffer,
-        renderData.m_numComputeBlocks, renderData.m_pathBoundaries,
-        renderData.m_vertexBuffer, renderData.m_indexBuffer
-        );
+        renderData.m_numPaths,
+        renderData.m_pathMetadataBuffer,
+        renderData.m_pathUpdateCommandBuffer,
+        renderData.m_numComputeBlocks,
+        renderData.m_pathBoundaries,
+        renderData.m_vertexBuffer,
+        renderData.m_indexBuffer
+    );
 }
 #endif
 #if 0
@@ -461,15 +506,20 @@ void SysMap::update_map(ActiveScene& rScene)
 
 void MapUpdateCompute::update_map(
     Buffer& pointBuffer,
-    size_t numPaths, Buffer& pathMetadata,
-    size_t numBlocks, Buffer& groupBoundaries,
-    Buffer& pathVertBuffer, Buffer& pathIndexBuffer)
+    size_t numPaths,
+    Buffer& pathMetadata,
+    Buffer& pathOperationBuffer,
+    size_t numBlocks,
+    Buffer& groupBoundaries,
+    Buffer& pathVertBuffer,
+    Buffer& pathIndexBuffer)
 {
     bind_point_locations(pointBuffer);
     bind_path_vert_data(pathVertBuffer);
     bind_path_index_data(pathIndexBuffer);
     bind_path_metadata(pathMetadata);
     bind_path_group_boundaries(groupBoundaries);
+    bind_path_update_op_buffer(pathOperationBuffer);
 
     Vector3ui nGroups{
         static_cast<Magnum::UnsignedInt>(numBlocks),
@@ -520,6 +570,12 @@ void MapUpdateCompute::bind_path_group_boundaries(Buffer& boundaries)
 {
     boundaries.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(EBufferBinding::PathGroupBoundaries));
+}
+
+void MapUpdateCompute::bind_path_update_op_buffer(Buffer& operations)
+{
+    operations.bind(Buffer::Target::ShaderStorage,
+        static_cast<Int>(EBufferBinding::PathOperation));
 }
 
 void ProcessMapCoordsCompute::process(

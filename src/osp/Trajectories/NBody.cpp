@@ -219,6 +219,8 @@ EvolutionTable::TableColumn EvolutionTable::get_column(size_t index)
         m_numTimesteps,
         rowStride * sizeof(double));
 
+    column.m_currentStep = m_currentStep;
+
     return column;
 }
 
@@ -229,6 +231,15 @@ bool EvolutionTable::is_in_table(Satellite sat)
         if (get_ID(i) == sat) { return true; }
     }
     return false;
+}
+
+size_t EvolutionTable::get_index(Satellite sat)
+{
+    for (size_t i = 0; i < m_numBodies; i++)
+    {
+        if (get_ID(i) == sat) { return i; }
+    }
+    assert(false);
 }
 
 #if 0
@@ -339,18 +350,17 @@ bool TrajNBody::is_in_table(Satellite sat)
 
 EvolutionTable::TableColumn TrajNBody::get_column(Satellite sat)
 {
-    int64_t index = -1;
-    for (int64_t i = 0; i < m_nBodyData.m_numBodies; i++)
-    {
-        if (m_nBodyData.get_ID(i) == sat)
-        {
-            index = i;
-            break;
-        }
-    }
-    assert(index > 0);
+    size_t index = m_nBodyData.get_index(sat);
 
     return m_nBodyData.get_column(index);
+}
+
+Magnum::Vector3d TrajNBody::get_futuremost_location(Satellite sat)
+{
+    size_t index = m_nBodyData.get_index(sat);
+    size_t prevStep = ((m_nBodyData.m_currentStep == 0) ?
+        m_nBodyData.m_numTimesteps : m_nBodyData.m_currentStep) - 1;
+    return m_nBodyData.get_position(index, prevStep);
 }
 
 void TrajNBody::solve_table()

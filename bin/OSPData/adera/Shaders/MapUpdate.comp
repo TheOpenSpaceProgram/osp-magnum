@@ -91,6 +91,16 @@ layout(binding = 4, std430) buffer PathGroupBoundaries
     uint pathBoundaries[];
 };
 
+// Operation enum
+#define OP_SKIP 0x0
+#define OP_PUSH 0x1
+#define OP_FADE 0x2
+
+layout(binding = 5, std430) buffer PathOperationBuffer
+{
+    uint operations[];
+};
+
 /**
  * Calculates the work item to be handled by this thread.
  * 
@@ -194,11 +204,14 @@ void update_trail(uint pathID, uint sampleID)
        and push operations happen within different work groups, there will be
        memory coherency issues if they both try to modify the same vertex.
      */
-    PathMetadata path = paths[pathID];
-    uint frontIndex = path.nextIdx - path.startIdx;
-    if (sampleID != frontIndex)
+    if ((operations[pathID] & OP_FADE) > 0)
     {
-        fade_color(pathID, sampleID);
+        PathMetadata path = paths[pathID];
+        uint frontIndex = path.nextIdx - path.startIdx;
+        if (sampleID != frontIndex)
+        {
+            fade_color(pathID, sampleID);
+        }
     }
 
     // Exit all threads except 1 per path (TODO: try using just the 1st path group)
@@ -208,7 +221,7 @@ void update_trail(uint pathID, uint sampleID)
     path_push_step(pathID);
 }
 
-void update_predicted_path(uint pathID, uint sampleID)
+/*void update_predicted_path(uint pathID, uint sampleID)
 {
     // 1. Increment all indices
     inc_index(pathID, sampleID);
@@ -218,15 +231,18 @@ void update_predicted_path(uint pathID, uint sampleID)
 
     // 2. Push incremental path update
     path_push_step(pathID);
-}
+}*/
 
 void main()
 {
     // Set up thread
     find_work_item();
 
-    // Discard threads that are out of bounds
-    if (PATH_SAMPLE >= NUM_PATH_VERTS) { return; }
+    // Discard threads that are out of bounds, or paths that are skipped
+    if ((PATH_SAMPLE >= NUM_PATH_VERTS) || (operations[PATH_ID] & OP_SKIP) > 0)
+    {
+        return;
+    }
 
     update_trail(PATH_ID, PATH_SAMPLE);
 }
