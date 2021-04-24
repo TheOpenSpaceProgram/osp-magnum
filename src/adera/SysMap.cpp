@@ -92,17 +92,17 @@ void SysMap::select_planet(ActiveScene& rScene, Satellite sat)
     for (size_t i = 0; i < columnRows; i++)
     {
         size_t index = (column.m_currentStep + i) % columnRows;
-        pathData[columnRows - i - 1].m_pos.x() = column.m_x[index] * conversionFactor;
+        pathData[i].m_pos.x() = column.m_x[index] * conversionFactor;
     }
     for (size_t i = 0; i < columnRows; i++)
     {
         size_t index = (column.m_currentStep + i) % columnRows;
-        pathData[columnRows - i - 1].m_pos.y() = column.m_y[index] * conversionFactor;
+        pathData[i].m_pos.y() = column.m_y[index] * conversionFactor;
     }
     for (size_t i = 0; i < columnRows; i++)
     {
         size_t index = (column.m_currentStep + i) % columnRows;
-        pathData[columnRows - i - 1].m_pos.z() = column.m_z[index] * conversionFactor;
+        pathData[i].m_pos.z() = column.m_z[index] * conversionFactor;
     }
 #else
     for (size_t i = 0; i < columnRows; i++)
@@ -291,7 +291,7 @@ void SysMap::register_system(ActiveScene& rScene)
 
         renderData.m_predictionPointIndex = renderData.m_numAllPoints - 1;
 
-        size_t numPathVerts = 1024;
+        constexpr size_t numPathVerts = 16384;
 
         MapRenderData::PathMetadata predInfo;
         predInfo.m_pointIndex = pointIndex;
@@ -447,6 +447,8 @@ void SysMap::update_map(ActiveScene& rScene)
     {
         select_planet(rScene, focus.m_sat);
         focus.m_dirty = false;
+        renderData.m_pathUpdateCommandBuffer.setSubData(
+            renderData.m_predictionPathIndex * sizeof(GLuint), {MapUpdateCompute::EPathOperation::Skip});
     }
     else if (nbody->is_in_table(focus.m_sat))
     {

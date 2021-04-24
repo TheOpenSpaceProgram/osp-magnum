@@ -92,7 +92,7 @@ void EvolutionTable::resize(size_t bodies, size_t timesteps)
     }
 }
 
-Satellite EvolutionTable::get_ID(size_t index)
+Satellite EvolutionTable::get_ID(size_t index) const
 {
     return m_ids[index];
 }
@@ -102,7 +102,7 @@ void EvolutionTable::set_ID(size_t index, Satellite sat)
     m_ids[index] = sat;
 }
 
-double EvolutionTable::get_mass(size_t index)
+double EvolutionTable::get_mass(size_t index) const
 {
     return m_masses[index];
 }
@@ -112,7 +112,7 @@ void EvolutionTable::set_mass(size_t index, double mass)
     m_masses[index] = mass;
 }
 
-Vector3d EvolutionTable::get_velocity(size_t index)
+Vector3d EvolutionTable::get_velocity(size_t index) const
 {
     size_t componentOffset = m_scalarArraySizeBytes / sizeof(double);
     double x = m_velocities[0* componentOffset + index];
@@ -129,7 +129,7 @@ void EvolutionTable::set_velocity(size_t index, Vector3d vel)
     m_velocities[2 * componentOffset + index] = vel.z();
 }
 
-Vector3d EvolutionTable::get_acceleration(size_t index)
+Vector3d EvolutionTable::get_acceleration(size_t index) const
 {
     size_t componentOffset = m_scalarArraySizeBytes / sizeof(double);
     double x = m_accelerations[0 * componentOffset + index];
@@ -146,7 +146,7 @@ void EvolutionTable::set_acceleration(size_t index, Vector3d accel)
     m_accelerations[2 * componentOffset + index] = accel.z();
 }
 
-Vector3d EvolutionTable::get_position(size_t index, size_t timestep)
+Vector3d EvolutionTable::get_position(size_t index, size_t timestep) const
 {
     size_t rowOffset = timestep * m_rowSizeBytes / sizeof(double);
     size_t componentOffset = m_scalarArraySizeBytes / sizeof(double);
@@ -224,7 +224,7 @@ EvolutionTable::TableColumn EvolutionTable::get_column(size_t index)
     return column;
 }
 
-bool EvolutionTable::is_in_table(Satellite sat)
+bool EvolutionTable::is_in_table(Satellite sat) const
 {
     for (size_t i = 0; i < m_numBodies; i++)
     {
@@ -233,7 +233,7 @@ bool EvolutionTable::is_in_table(Satellite sat)
     return false;
 }
 
-size_t EvolutionTable::get_index(Satellite sat)
+size_t EvolutionTable::get_index(Satellite sat) const
 {
     for (size_t i = 0; i < m_numBodies; i++)
     {
@@ -299,12 +299,14 @@ void TrajNBody::build_table()
 {
     auto& rUni = m_universe.get_reg();
 
+    constexpr size_t numTimesteps = 16384;
+
     std::vector<Satellite> significantBodies;
     for (auto [sat] : rUni.view<UCompEmitsGravity>().each())
     {
         significantBodies.push_back(sat);
     }
-    m_nBodyData.resize(significantBodies.size(), 1024);
+    m_nBodyData.resize(significantBodies.size(), numTimesteps);
 
     for (size_t i = 0; i < significantBodies.size(); i++)
     {
@@ -355,7 +357,12 @@ EvolutionTable::TableColumn TrajNBody::get_column(Satellite sat)
     return m_nBodyData.get_column(index);
 }
 
-Magnum::Vector3d TrajNBody::get_futuremost_location(Satellite sat)
+size_t TrajNBody::num_future_steps() const
+{
+    return m_nBodyData.m_numTimesteps;
+}
+
+Magnum::Vector3d TrajNBody::get_futuremost_location(Satellite sat) const
 {
     size_t index = m_nBodyData.get_index(sat);
     size_t prevStep = ((m_nBodyData.m_currentStep == 0) ?

@@ -92,9 +92,14 @@ layout(binding = 4, std430) buffer PathGroupBoundaries
 };
 
 // Operation enum
-#define OP_SKIP 0x0
-#define OP_PUSH 0x1
-#define OP_FADE 0x2
+#define OP_SKIP 0x1
+#define OP_PUSH 0x2
+#define OP_FADE 0x4
+
+bool flag_is_set(uint value, uint flag)
+{
+    return (value & flag) > 0;
+}
 
 layout(binding = 5, std430) buffer PathOperationBuffer
 {
@@ -204,7 +209,7 @@ void update_trail(uint pathID, uint sampleID)
        and push operations happen within different work groups, there will be
        memory coherency issues if they both try to modify the same vertex.
      */
-    if ((operations[pathID] & OP_FADE) > 0)
+    if (flag_is_set(operations[pathID], OP_FADE))
     {
         PathMetadata path = paths[pathID];
         uint frontIndex = path.nextIdx - path.startIdx;
@@ -239,7 +244,7 @@ void main()
     find_work_item();
 
     // Discard threads that are out of bounds, or paths that are skipped
-    if ((PATH_SAMPLE >= NUM_PATH_VERTS) || (operations[PATH_ID] & OP_SKIP) > 0)
+    if ((PATH_SAMPLE >= NUM_PATH_VERTS) || flag_is_set(operations[PATH_ID], OP_SKIP))
     {
         return;
     }

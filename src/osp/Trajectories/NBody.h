@@ -76,19 +76,19 @@ public:
 
     void resize(size_t bodies, size_t timesteps);
 
-    Satellite get_ID(size_t index);
+    Satellite get_ID(size_t index) const;
     void set_ID(size_t index, Satellite sat);
 
-    double get_mass(size_t index);
+    double get_mass(size_t index) const;
     void set_mass(size_t index, double mass);
 
-    Vector3d get_velocity(size_t index);
+    Vector3d get_velocity(size_t index) const;
     void set_velocity(size_t index, Vector3d vel);
 
-    Vector3d get_acceleration(size_t index);
+    Vector3d get_acceleration(size_t index) const;
     void set_acceleration(size_t index, Vector3d accel);
 
-    Vector3d get_position(size_t index, size_t timestep);
+    Vector3d get_position(size_t index, size_t timestep) const;
     void set_position(size_t index, size_t timestep, Vector3d pos);
 
     struct SystemState
@@ -124,9 +124,9 @@ public:
 
     TableColumn get_column(size_t index);
 
-    bool is_in_table(Satellite sat);
+    bool is_in_table(Satellite sat) const;
 
-    size_t get_index(Satellite sat);
+    size_t get_index(Satellite sat) const;
 
     //void copy_step_to_top(size_t timestep);
 private:
@@ -227,7 +227,9 @@ public:
 
     EvolutionTable::TableColumn get_column(Satellite sat);
 
-    Vector3d get_futuremost_location(Satellite sat);
+    Vector3d get_futuremost_location(Satellite sat) const;
+
+    size_t num_future_steps() const;
 public:
     template <typename VIEW_T, typename SRC_VIEW_T>
     static void update_full_dynamics_acceleration(VIEW_T& bodyView, SRC_VIEW_T& sources);

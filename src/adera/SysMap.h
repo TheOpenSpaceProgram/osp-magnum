@@ -99,9 +99,9 @@ public:
 
     enum class EPathOperation : GLuint
     {
-        Skip = 0,
-        PushVertFromPointSource = 1 << 0,
-        FadeVertices = 1 << 1
+        Skip = 1,
+        PushVertFromPointSource = 1 << 1,
+        FadeVertices = 1 << 2
         // other operations? use enum as flags?
     };
 private:
