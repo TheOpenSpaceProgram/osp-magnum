@@ -88,7 +88,7 @@ void main()
         // Fully dynamic data segment
         interpret_input_points(THREAD_INDEX, N_SIGNFT_POINTS_PADDED, 0, 0);
     }
-    else if (THREAD_INDEX > N_SIGNFT_POINTS && THREAD_INDEX < TOTAL_SIZE)
+    else if (THREAD_INDEX >= N_SIGNFT_POINTS && THREAD_INDEX < TOTAL_SIZE)
     {
         // Insignificant bodies data segment
 

@@ -78,7 +78,7 @@ void testapp::test_map(std::unique_ptr<OSPMagnum>& pMagnumApp,
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 2000.0f));
     cameraComp.m_viewport = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
     cameraComp.m_far = 1e8f;
-    cameraComp.m_near = 1000.0f;
+    cameraComp.m_near = 1.0f;
     cameraComp.m_fov = 45.0_degf;
     cameraComp.calculate_projection();
 

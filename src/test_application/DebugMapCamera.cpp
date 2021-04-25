@@ -45,17 +45,33 @@ DebugMapCameraController::DebugMapCameraController(ActiveScene& rScene, ActiveEn
     , m_rmb(m_userInput.config_get("ui_rmb"))
     , m_switchNext(m_userInput.config_get("game_switch_next"))
     , m_switchPrev(m_userInput.config_get("game_switch_prev"))
+    , m_warpFaster(m_userInput.config_get("game_time_scale_increase"))
+    , m_warpSlower(m_userInput.config_get("game_time_scale_decrease"))
     , m_update(rScene.get_update_order(),
         "dbg_map_camera", "", "physics", [this](ActiveScene&) { this->update(); })
 {}
 
 void DebugMapCameraController::update()
 {
-
-    auto& rUniReg = m_scene.get_application().get_universe().get_reg();
+    auto& rUni = m_scene.get_application().get_universe();
+    auto& rUniReg = rUni.get_reg();
     bool targetValid = rUniReg.valid(m_selected);
 
     if (!try_switch_focus()) { return; }
+
+    // Adjust timewarp
+    if (m_warpFaster.triggered())
+    {
+        double newScale = 2.0 * rUni.get_time_scale();
+        rUni.set_time_scale(newScale);
+        std::cout << "Timewarp: " << newScale << "\n";
+    }
+    else if (m_warpSlower.triggered())
+    {
+        double newScale = 0.5 * rUni.get_time_scale();
+        rUni.set_time_scale(newScale);
+        std::cout << "Timewarp: " << newScale << "\n";
+    }
 
     // Camera controls
     using osp::Matrix4;
@@ -95,11 +111,11 @@ void DebugMapCameraController::update()
     Vector3 posRelative = xform.translation() - tgtPos;
 
     // set camera orbit distance
-    constexpr float distSensitivity = 5e4f;
+    constexpr float distSensitivity = 1.0f;
     m_orbitDistance += distSensitivity * static_cast<float>(-m_scrollInput.dy());
 
     // Clamp orbit distance to avoid producing a degenerate m_orbitPos vector
-    constexpr float minDist = 2000.0f;
+    constexpr float minDist = 5.0f;
     if (m_orbitDistance < minDist) { m_orbitDistance = minDist; }
 
     m_orbitPos = m_orbitPos.normalized() * m_orbitDistance;

@@ -58,6 +58,8 @@ private:
     // Keyboard input
     osp::ButtonControlHandle m_switchNext;
     osp::ButtonControlHandle m_switchPrev;
+    osp::ButtonControlHandle m_warpFaster;
+    osp::ButtonControlHandle m_warpSlower;
 };
 
 } // namespace testapp

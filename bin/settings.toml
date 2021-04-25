@@ -93,6 +93,16 @@ primary = "V"
 secondary = "None"
 holdable = false
 
+[game_time_scale_increase]
+primary = "Period"
+secondary = "None"
+holdable = false
+
+[game_time_scale_decrease]
+primary = "Comma"
+secondary = "None"
+holdable = false
+
 [ui_up]
 primary = "Up"
 secondary = "None"

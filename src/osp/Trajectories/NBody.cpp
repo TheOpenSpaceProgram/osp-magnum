@@ -263,36 +263,30 @@ TrajNBody::TrajNBody(Universe& rUni, Satellite center)
 
 void TrajNBody::update()
 {
-    auto& reg = m_universe.get_reg(); //rUni.get_reg();
-
-    /*auto view = reg.view<UCompTransformTraj, UCompMass, UCompVel, UCompAccel>();
-    auto sourceView = reg.view<UCompTransformTraj, UCompMass, UCompEmitsGravity>();
-
-    // Update accelerations (full dynamics)
-    update_full_dynamics_acceleration(view, sourceView);
-    update_full_dynamics_kinematics(view);*/
-
-    // Spaghetti
-    /*if (m_data.m_currentStep == (m_data.m_numTimesteps - 1))
+    constexpr double fixedStep = 1.0 / 60.0;
+    double frametime = fixedStep * m_universe.get_time_scale();
+    if (frametime > smc_timestep) { frametime = smc_timestep; }
+    m_timestepElapsed += frametime;
+    if (m_timestepElapsed >= smc_timestep)
     {
-        std::cout << "Resolving table\n";
-        m_data.copy_step_to_top(m_data.m_numTimesteps - 1);
-        m_data.m_currentStep = 0;
-        solve_table();
-    }*/
+        m_timestepElapsed -= smc_timestep;
 
-    solve_nbody_timestep_AVX(m_nBodyData.m_currentStep);
-    solve_insignificant_bodies_AVX(m_nBodyData.m_currentStep);
+        auto& reg = m_universe.get_reg();
 
-    m_nBodyData.m_currentStep++;
+        solve_nbody_timestep_AVX(m_nBodyData.m_currentStep);
+        solve_insignificant_bodies_AVX(m_nBodyData.m_currentStep);
 
-    if (m_nBodyData.m_currentStep == m_nBodyData.m_numTimesteps)
-    {
-        m_nBodyData.m_currentStep = 0;
+        m_nBodyData.m_currentStep++;
+
+        if (m_nBodyData.m_currentStep == m_nBodyData.m_numTimesteps)
+        {
+            m_nBodyData.m_currentStep = 0;
+        }
+
+        write_universe_components(m_nBodyData);
+        write_universe_components(m_insignificantBodyData);
+        return;
     }
-
-    write_universe_components(m_nBodyData);
-    write_universe_components(m_insignificantBodyData);
 }
 
 void TrajNBody::build_table()
@@ -731,6 +725,7 @@ void TrajNBody::write_universe_components(EvolutionTable& dataSource)
         Vector3d accel = dataSource.get_acceleration(i);
         Vector3d pos = dataSource.get_position(i, dataSource.m_currentStep);
 
+        std::cout << "pos: (" << pos.x() << ", " << pos.y() << ", " << pos.z() << ")\n";
         reg.get<UCompTransformTraj>(sat).m_position = Vector3s{pos * 1024.0};
         reg.get<UCompVel>(sat).m_velocity = vel;
         reg.get<UCompAccel>(sat).m_acceleration = accel;

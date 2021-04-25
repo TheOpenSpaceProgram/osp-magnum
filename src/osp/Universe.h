@@ -136,6 +136,8 @@ public:
     constexpr const Registry_t& get_reg() const noexcept
     { return m_registry; }
 
+    constexpr double get_time_scale() const noexcept { return m_timeScaleFactor; }
+    void set_time_scale(double value) noexcept { m_timeScaleFactor = value; }
 private:
 
     Satellite m_root;
@@ -144,6 +146,7 @@ private:
 
     Registry_t m_registry;
 
+    double m_timeScaleFactor{1.0};
 };
 
 template<typename TRAJECTORY_T, typename ... ARGS_T>
