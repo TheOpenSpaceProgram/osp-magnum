@@ -110,9 +110,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     osp::active::SysExhaustPlume::add_functions(rScene);
     planeta::active::SysPlanetA::add_functions(rScene);
     osp::active::SysFFGravity::add_functions(rScene);
-    osp::active::SysRender::setup(rScene);
 
-    load_shaders(rScene);
 
     // Register machines for that scene
     rScene.system_machine_create<SysMachineUserControl>(pMagnumApp->get_input_handler());
@@ -136,20 +134,20 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Add default-constructed physics world to scene
     rScene.reg_emplace<osp::active::ACompPhysicsWorld_t>(rScene.hier_get_root());
 
-    // Add a camera to the scene
+
+    // ##### Add a camera to the scene #####
 
     // Create the camera entity
     ActiveEnt camera = rScene.hier_create_child(rScene.hier_get_root(),
                                                        "Camera");
-    auto &cameraTransform = rScene.reg_emplace<ACompTransform>(camera);
-    auto &cameraComp = rScene.reg_emplace<ACompCamera>(camera);
-    rScene.reg_emplace<ACompRenderingAgent>(camera, SysRender::get_default_rendertarget(rScene));
-    rScene.reg_emplace<ACompPerspective3DView>(camera, camera);
-    rScene.reg_emplace<ACompRenderer>(camera);
 
+    // Configure camera transformation
+    auto &cameraTransform = rScene.reg_emplace<ACompTransform>(camera);
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     rScene.reg_emplace<ACompFloatingOrigin>(camera);
 
+    // Configure camera component, projection
+    auto &cameraComp = rScene.reg_emplace<ACompCamera>(camera);
     cameraComp.m_viewport
             = Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
     cameraComp.m_far = 1u << 24;
@@ -163,6 +161,16 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Add a ACompDebugObject to camera to manage camObj's lifetime
     rScene.reg_emplace<ACompDebugObject>(camera, std::move(camObj));
+
+    // Configure default rendering system
+    osp::active::SysRender::setup(rScene);
+    load_shaders(rScene);
+
+    // Connect camera to rendering system; set up with basic 3D renderer
+    rScene.reg_emplace<ACompRenderingAgent>(camera, SysRender::get_default_rendertarget(rScene));
+    rScene.reg_emplace<ACompPerspective3DView>(camera, camera);
+    rScene.reg_emplace<ACompRenderer>(camera);
+
 
     // Starts the game loop. This function is blocking, and will only return
     // when the window is  closed. See OSPMagnum::drawEvent
