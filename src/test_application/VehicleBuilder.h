@@ -40,20 +40,10 @@ template<class WIRETYPE_T>
 using port_t = osp::wire_port_t<WIRETYPE_T>;
 
 template<class WIRETYPE_T>
-struct WireTypes {
-    enum class link : uint32_t {};
-    enum class node : uint32_t {};
-};
+using node_t = osp::wire_node_t<WIRETYPE_T>;
 
 template<class WIRETYPE_T>
-using node_t = typename WireTypes<WIRETYPE_T>::node;
-
-template<class WIRETYPE_T>
-using link_t = typename WireTypes<WIRETYPE_T>::link;
-
-template<class TYPE_T>
-constexpr TYPE_T nullvalue() { return std::numeric_limits<TYPE_T>::max(); }
-
+using link_t = osp::wire_link_t<WIRETYPE_T>;
 
 /**
  * Used to easily create Vehicle blueprints

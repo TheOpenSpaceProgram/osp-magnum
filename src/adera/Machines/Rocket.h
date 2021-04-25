@@ -25,7 +25,7 @@
 #pragma once
 #include <utility>
 #include <osp/Active/SysMachine.h>
-
+#include <osp/Active/SysWire.h>
 #include <osp/Active/physics.h>
 #include <osp/Resource/blueprints.h>
 #include "adera/ShipResources.h"
@@ -71,10 +71,7 @@ public:
     }
 
 private:
-//    osp::active::WireInput m_wiGimbal{this, "Gimbal"};
-//    osp::active::WireInput m_wiIgnition{this, "Ignition"};
-//    osp::active::WireInput m_wiThrottle{this, "Throttle"};
-//    std::vector<ResourceInput> m_resourceLines;
+
 
     osp::active::ActiveEnt m_rigidBody{entt::null};
     Parameters m_params;
@@ -97,6 +94,18 @@ public:
      * @param rScene [ref] Scene supporting vehicles
      */
     static void update_construct(osp::active::ActiveScene &rScene);
+
+    /**
+     * Read wire inputs and calculate required fuel
+     * @param rScene
+     */
+    static void update_calculate(osp::active::ActiveScene& rScene);
+
+    /**
+     * Request fuel...
+     * @param rScene
+     */
+    static void update_propagate(osp::active::ActiveScene& rScene);
 
     /**
      * Updates all MachineRockets in the scene

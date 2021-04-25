@@ -26,6 +26,8 @@
 
 #include "../ShipResources.h"
 
+#include <osp/Resource/blueprints.h>
+
 namespace adera::active::machines
 {
 

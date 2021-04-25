@@ -24,7 +24,8 @@
  */
 #pragma once
 
-#include "SysWire.h"
+#include "ActiveScene.h"
+#include "../Resource/machines.h"
 
 #include <cstdint>
 #include <iostream>

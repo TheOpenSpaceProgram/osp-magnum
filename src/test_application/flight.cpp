@@ -30,6 +30,7 @@
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysRender.h>
 #include <osp/Active/SysVehicle.h>
+#include <osp/Active/SysWire.h>
 #include <osp/Active/SysForceFields.h>
 #include <osp/Active/SysAreaAssociate.h>
 
@@ -129,7 +130,10 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     adera::active::machines::SysMachineUserControl::add_functions(rScene);
 
     // Setup wiring
-    auto rWire = rScene.reg_emplace<ACompWire>(rScene.hier_get_root());
+    rScene.debug_update_add(rScene.get_update_order(), "wire_percent_construct", "vehicle_activate", "vehicle_modification",
+                            &osp::active::SysWire::update_construct_signal<wiretype::Percent>);
+    osp::active::SysWire::add_functions(rScene);
+    osp::active::SysWire::setup_default(rScene, {&adera::active::machines::SysMachineRocket::update_calculate}, {});
     rScene.reg_emplace< ACompWireNodes<wiretype::AttitudeControl> >(rScene.hier_get_root());
     rScene.reg_emplace< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
 

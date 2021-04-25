@@ -90,6 +90,12 @@ public:
      * @param rScene [ref] Scene with MachineUserControls to update
      */
     static void update_sensor(osp::active::ActiveScene &rScene);
+
+    /**
+     *
+     * @param rScene
+     */
+    static void update_propagate(osp::active::ActiveScene &rScene);
 };
 
 /**

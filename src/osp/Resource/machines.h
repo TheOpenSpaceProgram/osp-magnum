@@ -2,6 +2,8 @@
 
 #include <entt/core/family.hpp>
 
+#include <limits>
+
 namespace osp
 {
 
@@ -36,16 +38,27 @@ constexpr wire_id_t wiretype_id() noexcept
     return wire_family_t::type<WIRETYPE_T>;
 }
 
-
-// Templated enum class for ports, to prevent mixups
+// Templated enum class as integer types to prevent mixups
 
 template<class WIRETYPE_T>
-struct WireTypes {
+struct WireTypes
+{
+    enum class link : uint32_t {};
+    enum class node : uint32_t {};
     enum class port : uint16_t {};
 };
 
 template<class WIRETYPE_T>
+using wire_node_t = typename WireTypes<WIRETYPE_T>::node;
+
+template<class WIRETYPE_T>
+using wire_link_t = typename WireTypes<WIRETYPE_T>::link;
+
+template<class WIRETYPE_T>
 using wire_port_t = typename WireTypes<WIRETYPE_T>::port;
+
+template<class TYPE_T>
+constexpr TYPE_T nullvalue() { return TYPE_T(std::numeric_limits<typename std::underlying_type<TYPE_T>::type>::max()); }
 
 //-----------------------------------------------------------------------------
 

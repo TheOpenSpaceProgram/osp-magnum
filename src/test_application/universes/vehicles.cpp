@@ -76,7 +76,7 @@ using adera::active::machines::MachineUserControl;
  */
 void blueprint_add_rcs_block(
         BlueprintVehicle &rBlueprint, DependRes<PrototypePart> rRcs,
-        std::vector<int> &rRcsPorts, Vector3 pos, Quaternion rot);
+        std::vector<part_t> &rRcsPorts, Vector3 pos, Quaternion rot);
 
 
 osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
@@ -179,22 +179,16 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
 
 void blueprint_add_rcs_block(
         VehicleBuilder &rBlueprint, DependRes<PrototypePart> rRcs,
-        std::vector<int> &rRcsPorts, Vector3 pos, Quaternion rot)
+        std::vector<part_t> &rRcsPorts, Vector3 pos, Quaternion rot)
 {
     using namespace Magnum::Math::Literals;
 
     Vector3 constexpr scl{1};
     Vector3 constexpr zAxis{0, 0, 1};
-    int hackypartnum = rBlueprint.part_count();
 
-    rBlueprint.part_add(rRcs, pos, Quaternion::rotation(90.0_degf, zAxis) * rot, scl);
+    rRcsPorts.push_back(rBlueprint.part_add(rRcs, pos, Quaternion::rotation(90.0_degf, zAxis) * rot, scl));
     //rBlueprint.add_part(rRcs, pos, rot, scl);
-    rBlueprint.part_add(rRcs, pos, Quaternion::rotation(-90.0_degf, zAxis) * rot, scl);
-
-    for (int i = 0; i < 2; i ++)
-    {
-        rRcsPorts.push_back(hackypartnum + i);
-    }
+    rRcsPorts.push_back(rBlueprint.part_add(rRcs, pos, Quaternion::rotation(-90.0_degf, zAxis) * rot, scl));
 }
 
 osp::universe::Satellite testapp::debug_add_part_vehicle(
@@ -244,7 +238,7 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     float rcsZStep      = 4.0f;
     float rcsRadius     = 1.1f;
 
-    std::vector<int> rcsPorts;
+    std::vector<part_t> rcsPorts;
 
     for (float z = rcsZMin; z < rcsZMax; z += rcsZStep)
     {

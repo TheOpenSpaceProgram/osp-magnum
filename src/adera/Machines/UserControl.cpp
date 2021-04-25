@@ -70,8 +70,8 @@ void SysMachineUserControl::update_construct(ActiveScene &rScene)
 
             rScene.reg_emplace<MachineUserControl>(machEnt);
             rScene.reg_emplace<ACompMachineType>(machEnt, id);
-            auto &panelAttCtrl = rScene.reg_emplace<ACompWirePanel<wiretype::AttitudeControl>>(machEnt);
-            auto &panelPercent = rScene.reg_emplace<ACompWirePanel<wiretype::Percent>>(machEnt);
+            rScene.reg_emplace<ACompWirePanel<wiretype::AttitudeControl>>(machEnt, 1);
+            rScene.reg_emplace<ACompWirePanel<wiretype::Percent>>(machEnt, 1);
 
         }
     }
@@ -101,48 +101,55 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
     auto view = rScene.get_registry().view<MachineUserControl>();
 
 
-#if 0
     for (ActiveEnt ent : view)
     {
         MachineUserControl &machine = view.get<MachineUserControl>(ent);
-        auto& throttlePos = std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value;
 
-        float throttleRate = 0.5f;
-        auto delta = throttleRate * rScene.get_time_delta_fixed();
+        // Get the Percent Panel which contains the Throttle Port
+        auto &panelPercent = rScene.reg_get< ACompWirePanel<wiretype::Percent> >(ent);
+        WirePort<wiretype::Percent> &portThrottle = panelPercent.get_port(MachineUserControl::smc_woThrottle);
 
-        if (!machine.m_enable)
+        if (portThrottle.connected())
         {
-            continue;
-        }
+            // Get the connected node and its value
+            auto &nodesPercent = rScene.reg_get< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
+            WireNode<wiretype::Percent> &nodeThrottle = nodesPercent.get_node(portThrottle.m_nodeIndex);
+            float throttlePos = nodeThrottle.m_value.m_value;
 
-        if (usrCtrl.m_throttleMore.trigger_hold())
-        {
-            throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
-        }
+            float throttleRate = 0.5f;
+            auto delta = throttleRate * rScene.get_time_delta_fixed();
 
-        if (usrCtrl.m_throttleLess.trigger_hold())
-        {
-            throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
-        }
+            if (usrCtrl.m_throttleMore.trigger_hold())
+            {
+                throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
+            }
 
-        if (usrCtrl.m_throttleMin.triggered())
-        {
-            SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                              "Minimum throttle");
-            throttlePos = 0.0f;
-        }
+            if (usrCtrl.m_throttleLess.trigger_hold())
+            {
+                throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
+            }
 
-        if (usrCtrl.m_throttleMax.triggered())
-        {
-            SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                              "Maximum throttle");
-            throttlePos = 1.0f;
-        }
+            if (usrCtrl.m_throttleMin.triggered())
+            {
+                SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
+                                  "Minimum throttle");
+                throttlePos = 0.0f;
+            }
 
-        std::get<wiretype::AttitudeControl>(machine.m_woAttitude.value()).m_attitude = attitudeIn;
-        SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                            "Updating control");
+            if (usrCtrl.m_throttleMax.triggered())
+            {
+                SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
+                                  "Maximum throttle");
+                throttlePos = 1.0f;
+            }
+
+            // If throttle value has changed, then notify connected machines
+            if (throttlePos != nodeThrottle.m_value.m_value)
+            {
+                nodeThrottle.m_value.m_value = throttlePos;
+                SysWire::signal_notify(rScene, nodeThrottle);
+            }
+        }
     }
 
-#endif
 }

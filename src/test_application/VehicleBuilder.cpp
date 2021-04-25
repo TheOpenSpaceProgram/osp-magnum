@@ -121,7 +121,7 @@ std::pair<mach_t, osp::BlueprintMachine*> VehicleBuilder::machine_find(
 {
     if (id >= m_vehicle.m_machines.size())
     {
-        return {nullvalue<mach_t>(), nullptr}; // no machines of type
+        return {osp::nullvalue<mach_t>(), nullptr}; // no machines of type
     }
 
     for (size_t i = 0; i < m_vehicle.m_machines[id].size(); i ++)
@@ -133,7 +133,7 @@ std::pair<mach_t, osp::BlueprintMachine*> VehicleBuilder::machine_find(
             return {mach_t(i), &machineBp};
         }
     }
-    return {nullvalue<mach_t>(), nullptr};
+    return {osp::nullvalue<mach_t>(), nullptr};
 }
 
 
@@ -163,7 +163,7 @@ link_t<void> VehicleBuilder::wire_connect(
     if (m_vehicle.m_wireNodes.size() <= id)
     {
         // No node of type is even registered
-        return nullvalue< link_t<void> >();
+        return osp::nullvalue< link_t<void> >();
     }
 
     // Get the BlueprintWireNode
@@ -186,11 +186,11 @@ node_t<void> VehicleBuilder::wire_connect_signal(osp::wire_id_t id,
     // Create a node
     node_t<void> node = wire_node_add(id, {});
 
-    // Link the Output first
-    wire_connect(id, node, {{"output", 1}}, partOut, machOut, portOut);
+    // Link the Output (writes into node) first
+    wire_connect(id, node, {{ }}, partOut, machOut, portOut);
 
-    // Link the Input
-    wire_connect(id, node, {{"input", 1}}, partIn, machIn, portIn);
+    // Link the Input (reads node)
+    wire_connect(id, node, {{ }}, partIn, machIn, portIn);
 
     return node;
 }
