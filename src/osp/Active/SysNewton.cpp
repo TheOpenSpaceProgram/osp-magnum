@@ -531,6 +531,7 @@ Vector4 SysNewton::compute_hier_CoM(ActiveScene& rScene, ActiveEnt root)
         {
             childMatrix = childTransform->m_transform;
         }
+        // Else, assume identity transformation relative to parent
 
         if (massComp != nullptr)
         {
@@ -568,36 +569,67 @@ std::pair<Matrix3, Vector4> SysNewton::compute_hier_inertia(ActiveScene& rScene,
     Vector4 centerOfMass =
         compute_hier_CoM<EIncludeRootMass::Include>(rScene, entity);
 
+    auto& reg = rScene.get_registry();
+
     // Sum inertias of children
-    for (ActiveEnt nextChild = rScene.reg_get<ACompHierarchy>(entity).m_childFirst;
+    for (ActiveEnt nextChild = reg.get<ACompHierarchy>(entity).m_childFirst;
         nextChild != entt::null;)
     {
         // Use child transformation to transform child inertia and add to sum
-        auto const *childTransform = rScene.get_registry().try_get<ACompTransform>(nextChild);
+        auto const *childTransform = reg.try_get<ACompTransform>(nextChild);
+        Matrix4 const childTransformMat = (childTransform != nullptr)
+            ? childTransform->m_transform : Matrix4{Magnum::Math::IdentityInit};
 
-        if (childTransform != nullptr)
+        /* Special case:
+         * Ordinarily, a child without a transformation means that branch of the
+         * hierarchy doesn't have any physics-related data and can be skipped.
+         * However, to minimize the number of transformations needed for
+         * entities like machines which are associated with an immediate parent
+         * and would have an identity transformation, the ACompTransform may be
+         * omitted. A child that has no transformation but still has a mass will
+         * be assumed to have an identity transformation relative to its parent
+         * and processed as usual.
+         */
+        if ((childTransform != nullptr) || reg.has<ACompMass>(nextChild))
         {
             // Compute the inertia of the child subhierarchy
             auto const& [childInertia, childCoM] = compute_hier_inertia(rScene, nextChild);
-            Matrix4 const childTransformMat = childTransform->m_transform;
             Matrix3 const rotation = childTransformMat.rotation();
             // Offset is the vector between the ship center of mass and the child CoM
             Vector3 const offset = (childTransformMat.translation() + childCoM.xyz()) - centerOfMass.xyz();
             I += phys::transform_inertia_tensor(
                 childInertia, childCoM.w(), offset, rotation);
         }
-        nextChild = rScene.reg_get<ACompHierarchy>(nextChild).m_siblingNext;
+        nextChild = reg.get<ACompHierarchy>(nextChild).m_siblingNext;
     }
 
     // Include entity's own inertia, if it has a mass and volume from which to compute it
-    auto const* mass = rScene.reg_try_get<ACompMass>(entity);
-    auto const* shape = rScene.reg_try_get<ACompShape>(entity);
+    auto const* mass = reg.try_get<ACompMass>(entity);
+    auto const* shape = reg.try_get<ACompShape>(entity);
     if ((mass != nullptr) && (shape != nullptr))
     {
-        // Transform used for scale; identity translation between root and itself
-        const Matrix4& transform = rScene.reg_get<ACompTransform>(entity).m_transform;
-        const Vector3 principalAxes = phys::collider_inertia_tensor(
-            shape->m_shape, transform.scaling(), mass->m_mass);
+        auto const* compTransform = reg.try_get<ACompTransform>(entity);
+
+        Vector3 principalAxes;
+        if (compTransform != nullptr)
+        {
+            // Transform used for scale; identity translation between root and itself
+            const Matrix4& transform = rScene.reg_get<ACompTransform>(entity).m_transform;
+            principalAxes = phys::collider_inertia_tensor(
+                shape->m_shape, transform.scaling(), mass->m_mass);
+        }
+        else
+        {
+            /* If entity has both a mass and shape but no transform, it can be
+             * assumed to be a leaf which has an identity transform relative to
+             * its immediate parent. Thus, the parent's transformation is used
+             * to calculate the leaf's scale.
+             */
+            ActiveEnt parent = reg.get<ACompHierarchy>(entity).m_parent;
+            Matrix4 const& parentTransform = reg.get<ACompTransform>(parent).m_transform;
+            principalAxes = phys::collider_inertia_tensor(
+                shape->m_shape, parentTransform.scaling(), mass->m_mass);
+        }
 
         /* We assume that all primitive shapes have diagonal inertia tensors in
          * their default orientation. The moments of inertia about these
