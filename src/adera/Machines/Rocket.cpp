@@ -71,19 +71,18 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
         for (BlueprintMachine const &mach : vehBp.m_machines[id])
         {
             // Get part
-            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_partIndex];
 
             // Get machine entity previously reserved by SysVehicle
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
-            BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_blueprintIndex];
+            BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_partIndex];
             instantiate(rScene, machEnt,
                         vehBp.m_prototypes[partBp.m_protoIndex]
                                 ->m_protoMachines[mach.m_protoMachineIndex],
                         mach);
             rScene.reg_emplace<ACompMachineType>(machEnt, id);
-            rScene.reg_emplace<ACompWirePanel<wiretype::Percent>>(machEnt, 1);
         }
     }
 }
@@ -98,15 +97,15 @@ void SysMachineRocket::update_calculate(ActiveScene& rScene)
 
         // Get the Percent Panel which contains the Throttle Port
         auto &panelPercent = rScene.reg_get< ACompWirePanel<wiretype::Percent> >(ent);
-        WirePort<wiretype::Percent> &portThrottle = panelPercent.get_port(MachineRocket::smc_wiThrottle);
+        WirePort<wiretype::Percent> const *portThrottle = panelPercent.connection(MachineRocket::smc_wiThrottle);
 
         machine.m_powerOutput = 0;
 
-        if (portThrottle.connected())
+        if (portThrottle != nullptr)
         {
             // Get the connected node and its value
             auto &nodesPercent = rScene.reg_get< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
-            WireNode<wiretype::Percent> &nodeThrottle = nodesPercent.get_node(portThrottle.m_nodeIndex);
+            WireNode<wiretype::Percent> &nodeThrottle = nodesPercent.get_node(portThrottle->m_nodeIndex);
             float throttle = nodeThrottle.m_value.m_value;
             machine.m_powerOutput = throttle;
         }

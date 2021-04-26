@@ -49,6 +49,9 @@ void SysWire::update_wire(ActiveScene &rScene)
 {
     auto view = rScene.get_registry().view<ACompWireNeedUpdate>();
 
+    ActiveReg_t::poly_storage t = rScene.get_registry().storage(entt::type_id<ACompWireNeedUpdate>());
+
+
     auto const& wire = rScene.reg_get<ACompWire>(rScene.hier_get_root());
 
     int updateLimit = 16;

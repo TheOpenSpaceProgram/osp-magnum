@@ -143,6 +143,11 @@ public:
     osp::BlueprintVehicle export_copy() { return m_vehicle; };
 
 private:
+
+    // panelIndex = m_panelMap[{id, part, machine}]
+    // panel = m_vehicle.m_wirePanels[panelIndex]
+    std::map<std::tuple<osp::wire_id_t, part_t, mach_t>, uint32_t> m_panelIndexMap;
+
     osp::BlueprintVehicle m_vehicle;
 
 };

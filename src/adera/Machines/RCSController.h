@@ -25,7 +25,6 @@
 #pragma once
 
 #include <osp/Active/SysMachine.h>
-#include <Magnum/Math/Vector3.h>
 #include <osp/Resource/blueprints.h>
 
 namespace adera::active::machines
@@ -62,7 +61,11 @@ public:
      *
      * @param rScene [ref] Scene with MachineRCSControllers to update
      */
-    static void update_controls(osp::active::ActiveScene &rScene);
+    //static void update_controls(osp::active::ActiveScene &rScene);
+
+    static void update_calculate(osp::active::ActiveScene &rScene);
+
+    static void update_propagate(osp::active::ActiveScene &rScene);
 
 private:
     /**
@@ -80,8 +83,8 @@ private:
      * @param cmdRot    [in] Commanded axis of rotation
      */
     static float thruster_influence(
-        Magnum::Vector3 posOset, Magnum::Vector3 direction,
-        Magnum::Vector3 cmdTransl, Magnum::Vector3 cmdRot);
+        osp::Vector3 posOset, osp::Vector3 direction,
+        osp::Vector3 cmdTransl, osp::Vector3 cmdRot);
 
 }; // SysMachineRCSController
 

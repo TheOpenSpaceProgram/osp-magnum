@@ -80,7 +80,7 @@ part_t VehicleBuilder::part_add(
 
         BlueprintMachine &rBlueprintMach = m_vehicle.m_machines[id].emplace_back();
         rBlueprintMach.m_protoMachineIndex = i;
-        rBlueprintMach.m_blueprintIndex = blueprintIndex;
+        rBlueprintMach.m_partIndex = blueprintIndex;
         rBlueprintMach.m_config = protoMach.m_config;
     }
 
@@ -127,7 +127,7 @@ std::pair<mach_t, osp::BlueprintMachine*> VehicleBuilder::machine_find(
     for (size_t i = 0; i < m_vehicle.m_machines[id].size(); i ++)
     {
         osp::BlueprintMachine& machineBp = m_vehicle.m_machines[id][i];
-        if (machineBp.m_blueprintIndex == uint32_t(part))
+        if (machineBp.m_partIndex == uint32_t(part))
         {
             // Found
             return {mach_t(i), &machineBp};
@@ -174,7 +174,35 @@ link_t<void> VehicleBuilder::wire_connect(
     // Create BlueprintWireLink
     uint32_t index = rNode.m_links.size();
     rNode.m_links.emplace_back(
-            osp::BlueprintWireLink{config, uint32_t(part), uint16_t(mach), uint16_t(port)});
+            osp::BlueprintWireLink{config, uint32_t(part), uint16_t(mach),
+                                   uint16_t(port)});
+
+    // Update panel. There's no easy way to find the correct BlueprintWirePanel
+    // from m_vehicle.m_wirePanels from a wire index, part index, and machine
+    // index. We can search the vector if the right panel already exists, but
+    // here we're using a map
+    uint32_t newIndex = m_vehicle.m_wirePanels.size();
+    auto it = m_panelIndexMap.try_emplace({id, part, mach}, newIndex);
+
+    uint16_t minPortCount = uint16_t(port) + 1;
+
+    if (it.second)
+    {
+        // new panel entry added
+        m_vehicle.m_wirePanels.resize(std::max(m_vehicle.m_wirePanels.size(),
+                                               size_t(id + 1)));
+        m_vehicle.m_wirePanels[size_t(id)].emplace_back(
+                    osp::BlueprintWirePanel{uint32_t(part), uint16_t(mach),
+                                            uint16_t(minPortCount)});
+    }
+    else
+    {
+        // update port count of existing entry
+        osp::BlueprintWirePanel &panel
+                = m_vehicle.m_wirePanels[size_t(id)][it.first->second];
+        panel.m_portCount = std::max<uint16_t>(panel.m_portCount,
+                                               uint16_t(minPortCount));
+    }
 
     return link_t<void>(index);
 }

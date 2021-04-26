@@ -43,8 +43,8 @@ using Magnum::Matrix4;
 
 void SysMachineRCSController::add_functions(ActiveScene& rScene)
 {
-    rScene.debug_update_add(rScene.get_update_order(), "mach_rcs", "wire", "controls",
-                            &SysMachineRCSController::update_controls);
+    //rScene.debug_update_add(rScene.get_update_order(), "mach_rcs", "wire", "controls",
+    //                        &SysMachineRCSController::update_controls);
     rScene.debug_update_add(rScene.get_update_order(), "mach_rcs_construct", "vehicle_activate", "vehicle_modification",
                             &SysMachineRCSController::update_construct);
 }
@@ -110,7 +110,7 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
         for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
         {
             // Get part
-            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_partIndex];
 
             // Get machine entity previously reserved by SysVehicle
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
@@ -122,11 +122,12 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
     }
 }
 
+#if 0
 void SysMachineRCSController::update_controls(ActiveScene& rScene)
 {
     auto view = rScene.get_registry().view<MachineRCSController>();
 
-#if 0
+
     for (ActiveEnt ent : view)
     {
         auto& machine = view.get<MachineRCSController>(ent);
@@ -165,5 +166,6 @@ void SysMachineRCSController::update_controls(ActiveScene& rScene)
             std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = influence;
         }
     }
-#endif
+
 }
+#endif

@@ -30,6 +30,7 @@
 #include "../types.h"
 #include "../Resource/blueprints.h"
 
+#include <set>
 #include <vector>
 
 namespace osp::active
@@ -144,7 +145,7 @@ struct WirePort
 {
     wire_node_t<WIRETYPE_T> m_nodeIndex{nullvalue< wire_node_t<WIRETYPE_T> >()};
     //typename WIRETYPE_T::LinkState m_linktype;
-    constexpr bool connected() noexcept
+    constexpr bool connected() const noexcept
     {
         return m_nodeIndex != nullvalue< wire_node_t<WIRETYPE_T> >();
     };
@@ -164,9 +165,15 @@ struct ACompWirePanel
     // Connect to nodes
     std::vector< WirePort<WIRETYPE_T> > m_ports;
 
-    WirePort<WIRETYPE_T>& get_port(wire_port_t<WIRETYPE_T> portIndex) noexcept
+    WirePort<WIRETYPE_T> const* connection(wire_port_t<WIRETYPE_T> portIndex) const noexcept
     {
-        return m_ports[size_t(portIndex)];
+        if (m_ports.size() <= size_t(portIndex))
+        {
+            return nullptr;
+        }
+        WirePort<WIRETYPE_T> const& port = m_ports[size_t(portIndex)];
+
+        return port.connected() ? &port : nullptr;
     }
 };
 
@@ -206,6 +213,9 @@ struct ACompWire
     using update_func_t = void(*)(ActiveScene&);
     std::vector<update_func_t> m_updCalculate;
     std::vector<update_func_t> m_updPropagate;
+
+    entt::basic_sparse_set<ActiveEnt> m_updateNext;
+    entt::basic_sparse_set<ActiveEnt> m_updateNow;
 };
 
 class SysWire
@@ -231,6 +241,18 @@ public:
             std::vector<ACompWire::update_func_t> updPropagate);
 
     static void update_wire(ActiveScene& rScene);
+
+    template<typename WIRETYPE_T>
+    static void construct_panels(
+            ActiveScene& rScene, ActiveEnt vehicleEnt,
+            ACompVehicle const& vehicle,
+            BlueprintVehicle const& vehicleBp);
+
+    template<typename WIRETYPE_T>
+    static void construct_nodes_signal(
+            ActiveScene& rScene, ActiveEnt vehicleEnt,
+            ACompVehicle const& vehicle,
+            BlueprintVehicle const& vehicleBp);
 
     template<typename WIRETYPE_T>
     static void update_construct_signal(ActiveScene& rScene);
@@ -268,10 +290,78 @@ void SysWire::signal_notify(ActiveScene& rScene, WireNode<WIRETYPE_T> const& nod
 }
 
 template<typename WIRETYPE_T>
+void SysWire::construct_panels(
+        ActiveScene& rScene, ActiveEnt vehicleEnt,
+        ACompVehicle const& vehicle, BlueprintVehicle const& vehicleBp)
+{
+    wire_id_t const id = wiretype_id<WIRETYPE_T>();
+
+    // Check if the vehicle blueprint stores the right wire panel type
+    if (vehicleBp.m_wirePanels.size() <= id)
+    {
+        return;
+    }
+
+    // Initialize all Panels in the vehicle
+    for (BlueprintWirePanel const &bpPanel : vehicleBp.m_wirePanels[id])
+    {
+        // Get part entity from vehicle
+        ActiveEnt partEnt = vehicle.m_parts[bpPanel.m_partIndex];
+
+        // Get machine entity from vehicle
+        auto &machines = rScene.reg_get<ACompMachines>(partEnt);
+        ActiveEnt machEnt = machines.m_machines[bpPanel.m_protoMachineIndex];
+
+        // Create the panel supporting the right number of ports
+        rScene.reg_emplace< ACompWirePanel<WIRETYPE_T> >(machEnt,
+                                                         bpPanel.m_portCount);
+    }
+}
+
+template<typename WIRETYPE_T>
+void SysWire::construct_nodes_signal(
+        ActiveScene& rScene, ActiveEnt vehicleEnt,
+        ACompVehicle const& vehicle, BlueprintVehicle const& vehicleBp)
+{
+    wire_id_t const id = wiretype_id<WIRETYPE_T>();
+
+    // Check if the vehicle blueprint stores the right wire node type
+    if (vehicleBp.m_wireNodes.size() <= id)
+    {
+        return;
+    }
+
+    // Initialize all nodes in the vehicle
+    for (BlueprintWireNode const &bpNode : vehicleBp.m_wireNodes[id])
+    {
+        // Create the node
+        auto &nodes = rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(rScene.hier_get_root());
+        auto const &[node, nodeIndex] = nodes.create_node();
+
+        // Create Links
+        for (BlueprintWireLink const &bpLink : bpNode.m_links)
+        {
+            // Get part entity from vehicle
+            ActiveEnt partEnt = vehicle.m_parts[bpLink.m_partIndex];
+
+            // Get machine entity from vehicle
+            auto &machines = rScene.reg_get<ACompMachines>(partEnt);
+            ActiveEnt machEnt = machines.m_machines[bpLink.m_protoMachineIndex];
+
+            // Get panel to connect to
+            auto& panel = rScene.reg_get< ACompWirePanel<WIRETYPE_T> >(machEnt);
+
+            // Link them
+            connect<WIRETYPE_T>(node, nodeIndex, panel, machEnt,
+                                wire_port_t<WIRETYPE_T>(bpLink.m_port),
+                                { });
+        }
+    }
+}
+
+template<typename WIRETYPE_T>
 void SysWire::update_construct_signal(ActiveScene& rScene)
 {
-    using LinkState = wiretype::Signal::LinkState;
-
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
@@ -280,39 +370,11 @@ void SysWire::update_construct_signal(ActiveScene& rScene)
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
-        // Check if the vehicle blueprint stores the right wire type
-        if (rVehConstr.m_blueprint->m_wireNodes.size() <= id)
-        {
-            continue;
-        }
+        construct_panels<WIRETYPE_T>(
+                    rScene, vehEnt, rVeh, *(rVehConstr.m_blueprint));
 
-        // Initialize all nodes in the vehicle
-        for (BlueprintWireNode &bpNode : rVehConstr.m_blueprint->m_wireNodes[id])
-        {
-            // Create the node
-            auto &nodes = rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(rScene.hier_get_root());
-
-            auto const &[node, nodeIndex] = nodes.create_node();
-
-            // Create Links
-            for (BlueprintWireLink &bpLink : bpNode.m_links)
-            {
-                // Get part entity from vehicle
-                ActiveEnt partEnt = rVeh.m_parts[bpLink.m_blueprintIndex];
-
-                // Get machine entity from vehicle
-                auto &machines = rScene.reg_get<ACompMachines>(partEnt);
-                ActiveEnt machEnt = machines.m_machines[bpLink.m_protoMachineIndex];
-
-                // Get panel to connect to
-                auto& panel = rScene.reg_get< ACompWirePanel<WIRETYPE_T> >(machEnt);
-
-                // Link them
-                connect<WIRETYPE_T>(node, nodeIndex, panel, machEnt,
-                                    wire_port_t<WIRETYPE_T>(bpLink.m_port),
-                                    { });
-            }
-        }
+        construct_nodes_signal<WIRETYPE_T>(
+                    rScene, vehEnt, rVeh, *(rVehConstr.m_blueprint));
     }
 }
 

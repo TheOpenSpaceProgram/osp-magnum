@@ -106,12 +106,15 @@ class MachineUserControl
     friend SysMachineUserControl;
 
     using Percent = osp::active::wiretype::Percent;
+    using AttitudeControl = osp::active::wiretype::AttitudeControl;
 
 public:
 
     static constexpr std::string_view smc_mach_name = "UserControl";
 
     static constexpr osp::wire_port_t<Percent> smc_woThrottle{0};
+
+    static constexpr osp::wire_port_t<AttitudeControl> m_woAttitude{0};
 
 
 private:

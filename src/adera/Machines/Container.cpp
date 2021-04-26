@@ -130,13 +130,13 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
         for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
         {
             // Get part
-            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_partIndex];
 
             // Get machine entity previously reserved by SysVehicle
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
-            BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_blueprintIndex];
+            BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_partIndex];
             instantiate(rScene, machEnt,
                         vehBp.m_prototypes[partBp.m_protoIndex]
                                 ->m_protoMachines[mach.m_protoMachineIndex],

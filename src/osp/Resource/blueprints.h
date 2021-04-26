@@ -37,7 +37,7 @@ struct BlueprintMachine
     NodeMap_t m_config;
 
     // Index to a BlueprintPart in BlueprintVehicle's m_blueprints
-    uint32_t m_blueprintIndex;
+    uint32_t m_partIndex;
     // Index to a m_protoMachines in PrototypePart
     uint16_t m_protoMachineIndex;
 };
@@ -75,7 +75,7 @@ struct BlueprintWireLink
     NodeMap_t m_config;
 
     // Index to a BlueprintPart in BlueprintVehicle's m_blueprints
-    uint32_t m_blueprintIndex;
+    uint32_t m_partIndex;
 
     // Machine to link to, index to m_protoMachines in PrototypePart
     uint16_t m_protoMachineIndex;
@@ -95,6 +95,18 @@ struct BlueprintWireNode
     std::vector<BlueprintWireLink> m_links;
 };
 
+struct BlueprintWirePanel
+{
+    // Index to a BlueprintPart in BlueprintVehicle's m_blueprints
+    uint32_t m_partIndex;
+
+    // Machine to link to, index to m_protoMachines in PrototypePart
+    uint16_t m_protoMachineIndex;
+
+    // Number of ports
+    uint16_t m_portCount;
+};
+
 /**
  * Specific information on a vehicle
  * * List of part blueprints
@@ -109,12 +121,16 @@ struct BlueprintVehicle
     // Arrangement of Individual Parts
     std::vector<BlueprintPart> m_blueprints;
 
+    // Wire panels each machine has
+    // panel = m_wirePanels[wiretype id][i]
+    std::vector< std::vector<BlueprintWirePanel> > m_wirePanels;
+
     // Wires to connect
-    // m_wires[wiretype id]
+    // wire = m_wireNodes[wiretype id][i]
     std::vector< std::vector<BlueprintWireNode> > m_wireNodes;
 
     // All machines in the vehicle
-    // m_machines[machine id]
+    // machine = m_machines[machine id][i]
     std::vector< std::vector<BlueprintMachine> > m_machines;
 
 };
