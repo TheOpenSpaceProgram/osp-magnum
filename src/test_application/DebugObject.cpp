@@ -178,7 +178,7 @@ void DebugCameraController::update_physics_pre()
     Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
 
     // round to nearest (floatingOriginThreshold)
-    Vector3s tra = Vector3s(xform.translation() / floatingOriginThreshold)
+    Vector3s tra = Vector3s((xform.translation() - m_orbitPos) / floatingOriginThreshold)
                  * floatingOriginThreshold;
 
     // convert to space int
@@ -253,8 +253,8 @@ void DebugCameraController::update_physics_post()
     Vector3 posRelative = xform.translation() - xformTgt.translation();
 
     // set camera orbit distance
-    constexpr float distSensitivity = 1.0f;
-    m_orbitDistance += distSensitivity * static_cast<float>(-m_scrollInput.dy());
+    constexpr float distSensitivity = 0.3f;
+    m_orbitDistance += m_orbitDistance * distSensitivity * static_cast<float>(-m_scrollInput.dy());
     
     // Clamp orbit distance to avoid producing a degenerate m_orbitPos vector
     constexpr float minDist = 5.0f;
