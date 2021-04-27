@@ -69,7 +69,6 @@ void SysMachineUserControl::update_construct(ActiveScene &rScene)
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
             rScene.reg_emplace<MachineUserControl>(machEnt);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id);
         }
     }
 }

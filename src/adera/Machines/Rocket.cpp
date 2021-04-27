@@ -82,7 +82,6 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
                         vehBp.m_prototypes[partBp.m_protoIndex]
                                 ->m_protoMachines[mach.m_protoMachineIndex],
                         mach);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id);
         }
     }
 }

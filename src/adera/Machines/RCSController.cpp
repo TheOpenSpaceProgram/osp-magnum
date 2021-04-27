@@ -117,7 +117,6 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
             rScene.reg_emplace<MachineRCSController>(machEnt);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id);
         }
     }
 }

@@ -338,9 +338,10 @@ ActiveEnt SysVehicle::part_instantiate(
 
     for (PCompMachine const& pcompMachine : part.m_protoMachines)
     {
-        ActiveEnt machEnt = newEntities[pcompMachine.m_entity];
-        machines.m_machines.push_back(
-                    rScene.hier_create_child(machEnt, "Machine"));
+        ActiveEnt parent = newEntities[pcompMachine.m_entity];
+        ActiveEnt machEnt = machines.m_machines.emplace_back(
+                    rScene.hier_create_child(parent, "Machine"));
+        rScene.reg_emplace<ACompMachineType>(machEnt, pcompMachine.m_type);
     }
 
     return rootEntity;
