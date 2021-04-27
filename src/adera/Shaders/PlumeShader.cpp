@@ -23,32 +23,54 @@
  * SOFTWARE.
  */
 #include "PlumeShader.h"
+#include "../SysExhaustPlume.h"
+
+#include <osp/types.h>
+#include <osp/Active/SysRender.h>
+#include <osp/Resource/AssetImporter.h>
 
 #include <Magnum/GL/Version.h>
 #include <Magnum/GL/Shader.h>
 #include <Corrade/Containers/Reference.h>
 #include <Magnum/GL/Texture.h>
 
-using namespace Magnum;
+using namespace osp;
 using namespace osp::active;
+using namespace adera::active;
 using namespace adera::shader;
 
-void PlumeShader::draw_plume(ActiveEnt e, ActiveScene& rScene, GL::Mesh& rMesh,
-    ACompCamera const& camera, ACompTransform const& transform)
+void PlumeShader::draw_plume(ActiveEnt e,
+    ActiveScene& rScene, ACompCamera const& camera) noexcept
 {
-    auto& shaderInstance = rScene.reg_get<ACompPlumeShaderInstance>(e);
-    PlumeShader& shader = *shaderInstance.m_shaderProgram;
+    auto& resources = rScene.get_context_resources();
+    PlumeShader& shader = *resources.get<PlumeShader>(smc_resourceName);
+
+    using Magnum::GL::Texture2D;
+    using Magnum::GL::Mesh;
+    // Collect uniform data
+    auto& transform = rScene.reg_get<ACompTransform>(e);
+    auto& rPlumeComp = rScene.reg_get<ACompExhaustPlume>(e);
+    auto const& plumedata = *rPlumeComp.m_effect;
+    Mesh& rMesh = *rScene.reg_get<ACompMesh>(e).m_mesh;
+
+    constexpr std::string_view texName = "OSPData/adera/noise1024.png";
+    DependRes<Texture2D> tmpTex = resources.get<Texture2D>(texName);
+    if (tmpTex.empty())
+    {
+        tmpTex = AssetImporter::compile_tex(texName,
+            rScene.get_application().debug_find_package("lzdb"), resources);
+    }
 
     Magnum::Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;
 
     shader
-        .bindNozzleNoiseTexture(*shaderInstance.m_nozzleTex)
-        .bindCombustionNoiseTexture(*shaderInstance.m_combustionTex)
-        .setMeshZBounds(shaderInstance.m_maxZ, shaderInstance.m_minZ)
-        .setBaseColor(shaderInstance.m_color)
-        .setFlowVelocity(shaderInstance.m_flowVelocity)
-        .updateTime(shaderInstance.m_currentTime)
-        .setPower(shaderInstance.m_powerLevel)
+        .bindNozzleNoiseTexture(*tmpTex)
+        .bindCombustionNoiseTexture(*tmpTex)
+        .setMeshZBounds(plumedata.m_zMax, plumedata.m_zMin)
+        .setBaseColor(plumedata.m_color)
+        .setFlowVelocity(plumedata.m_flowVelocity)
+        .updateTime(rPlumeComp.m_time)
+        .setPower(rPlumeComp.m_powerLevel)
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
         .setNormalMatrix(entRelative.normalMatrix())
@@ -57,6 +79,8 @@ void PlumeShader::draw_plume(ActiveEnt e, ActiveScene& rScene, GL::Mesh& rMesh,
 
 void PlumeShader::init()
 {
+    using namespace Magnum;
+
     GL::Shader vert{GL::Version::GL430, GL::Shader::Type::Vertex};
     GL::Shader frag{GL::Version::GL430, GL::Shader::Type::Fragment};
     vert.addFile("OSPData/adera/Shaders/PlumeShader.vert");
@@ -82,61 +106,61 @@ PlumeShader::PlumeShader()
 
 PlumeShader& PlumeShader::setProjectionMatrix(Matrix4 const& matrix)
 {
-    setUniform(static_cast<Int>(UniformPos::ProjMat), matrix);
+    setUniform(static_cast<Magnum::Int>(UniformPos::ProjMat), matrix);
     return *this;
 }
 
 PlumeShader& PlumeShader::setTransformationMatrix(Matrix4 const& matrix)
 {
-    setUniform(static_cast<Int>(UniformPos::ModelTransformMat), matrix);
+    setUniform(static_cast<Magnum::Int>(UniformPos::ModelTransformMat), matrix);
     return *this;
 }
 
-PlumeShader& PlumeShader::setNormalMatrix(Matrix3x3 const& matrix)
+PlumeShader& PlumeShader::setNormalMatrix(Magnum::Matrix3x3 const& matrix)
 {
-    setUniform(static_cast<Int>(UniformPos::NormalMat), matrix);
+    setUniform(static_cast<Magnum::Int>(UniformPos::NormalMat), matrix);
     return *this;
 }
 
 PlumeShader& PlumeShader::setMeshZBounds(float topZ, float bottomZ)
 {
-    setUniform(static_cast<Int>(UniformPos::MeshTopZ), topZ);
-    setUniform(static_cast<Int>(UniformPos::MeshBottomZ), bottomZ);
+    setUniform(static_cast<Magnum::Int>(UniformPos::MeshTopZ), topZ);
+    setUniform(static_cast<Magnum::Int>(UniformPos::MeshBottomZ), bottomZ);
     return *this;
 }
 
 PlumeShader& PlumeShader::bindNozzleNoiseTexture(Magnum::GL::Texture2D& tex)
 {
-    tex.bind(static_cast<Int>(TextureSlot::NozzleNoiseTexUnit));
+    tex.bind(static_cast<Magnum::Int>(TextureSlot::NozzleNoiseTexUnit));
     return *this;
 }
 
 PlumeShader& PlumeShader::bindCombustionNoiseTexture(Magnum::GL::Texture2D& tex)
 {
-    tex.bind(static_cast<Int>(TextureSlot::CombustionNoiseTexUnit));
+    tex.bind(static_cast<Magnum::Int>(TextureSlot::CombustionNoiseTexUnit));
     return *this;
 }
 
 PlumeShader& PlumeShader::setBaseColor(const Magnum::Color4 color)
 {
-    setUniform(static_cast<Int>(UniformPos::BaseColor), color);
+    setUniform(static_cast<Magnum::Int>(UniformPos::BaseColor), color);
     return *this;
 }
 
 PlumeShader& PlumeShader::setFlowVelocity(const float vel)
 {
-    setUniform(static_cast<Int>(UniformPos::FlowVelocity), vel);
+    setUniform(static_cast<Magnum::Int>(UniformPos::FlowVelocity), vel);
     return *this;
 }
 
 PlumeShader& PlumeShader::updateTime(const float currentTime)
 {
-    setUniform(static_cast<Int>(UniformPos::Time), currentTime);
+    setUniform(static_cast<Magnum::Int>(UniformPos::Time), currentTime);
     return *this;
 }
 
 PlumeShader& PlumeShader::setPower(const float power)
 {
-    setUniform(static_cast<Int>(UniformPos::Power), power);
+    setUniform(static_cast<Magnum::Int>(UniformPos::Power), power);
     return *this;
 }

@@ -34,14 +34,10 @@ namespace osp::active
  * A function pointer to a Shader's draw() function
  * @param ActiveEnt - The entity being drawn; used to fetch component data
  * @param ActiveScene - The scene containing the entity's component data
- * @param Mesh - Mesh data to be drawn with the shader
  * @param ACompCamera - Camera used to draw the scene
- * @param ACompTransform - Object transformation data
  */
 using ShaderDrawFnc_t = void (*)(
     ActiveEnt,
     ActiveScene&,
-    Magnum::GL::Mesh&,
-    ACompCamera const&,
-    ACompTransform const&);
+    ACompCamera const&) noexcept;
 }

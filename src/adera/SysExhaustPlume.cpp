@@ -26,7 +26,7 @@
 #include "osp/Active/ActiveScene.h"
 #include "adera/Machines/Rocket.h"
 #include "osp/Resource/AssetImporter.h"
-#include "osp/Active/SysDebugRender.h"
+#include <osp/Active/SysRender.h>
 
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/MeshTools/Compile.h>
@@ -47,9 +47,12 @@ using osp::Package;
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 
-using osp::active::CompDrawableDebug;
-using osp::active::CompTransparentDebug;
-using osp::active::CompVisibleDebug;
+
+using osp::active::ACompMesh;
+using osp::active::ACompShader;
+using osp::active::ACompTransparent;
+using osp::active::ACompVisible;
+
 
 void SysExhaustPlume::add_functions(ActiveScene& rScene)
 {
@@ -65,11 +68,10 @@ void SysExhaustPlume::initialize_plume(ActiveScene& rScene, ActiveEnt node)
     using Magnum::Trade::ImageData2D;
     using namespace Magnum::Math::Literals;
     using adera::shader::PlumeShader;
-    using ShaderInstance_t = PlumeShader::ACompPlumeShaderInstance;
 
     auto const& plume = rScene.reg_get<ACompExhaustPlume>(node);
 
-    if (rScene.get_registry().try_get<ShaderInstance_t>(node))
+    if (rScene.get_registry().all_of<ACompShader>(node))
     {
         return;  // plume already initialized
     }
@@ -86,25 +88,11 @@ void SysExhaustPlume::initialize_plume(ActiveScene& rScene, ActiveEnt node)
         plumeMesh = AssetImporter::compile_mesh(plumeEffect->m_meshName, pkg, glResources);
     }
 
-    // Get plume tex (TEMPORARY: just grab noise1024.png)
-    constexpr std::string_view texName = "OSPData/adera/noise1024.png";
-    DependRes<Texture2D> n1024 = glResources.get<Texture2D>(texName);
-    if (n1024.empty())
-    {
-        n1024 = AssetImporter::compile_tex(texName, pkg, glResources);
-    }
-
-    // Emplace plume shader instance component from plume effect parameters
-    rScene.reg_emplace<ShaderInstance_t>(node,
-        glResources.get<PlumeShader>("plume_shader"),
-        n1024,
-        n1024,
-        *plumeEffect);
-
-    rScene.reg_emplace<CompDrawableDebug>(node, plumeMesh,
-        &adera::shader::PlumeShader::draw_plume);
-    rScene.reg_emplace<CompVisibleDebug>(node, false);
-    rScene.reg_emplace<CompTransparentDebug>(node, true);
+    // Emplace plume shader instance render data
+    rScene.reg_emplace<ACompMesh>(node, plumeMesh);
+    rScene.reg_emplace<ACompVisible>(node);
+    rScene.reg_emplace<ACompTransparent>(node);
+    rScene.reg_emplace<ACompShader>(node, &adera::shader::PlumeShader::draw_plume);
 }
 
 // TODO: workaround. add an actual way to keep time accessible from ActiveScene
@@ -115,40 +103,35 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
     g_time += rScene.get_time_delta_fixed();
 
     using adera::active::machines::MachineRocket;
-    using ShaderInstance_t = adera::shader::PlumeShader::ACompPlumeShaderInstance;
 
     auto& reg = rScene.get_registry();
 
     // Initialize any uninitialized plumes
     auto uninitializedComps =
-        reg.view<ACompExhaustPlume>(entt::exclude<ShaderInstance_t>);
+        reg.view<ACompExhaustPlume>(entt::exclude<ACompShader>);
     for (ActiveEnt plumeEnt : uninitializedComps)
     {
         initialize_plume(rScene, plumeEnt);
     }
 
     // Process plumes
-    auto plumeView =
-        reg.view<ACompExhaustPlume, ShaderInstance_t, CompVisibleDebug>();
+    auto plumeView = reg.view<ACompExhaustPlume>();
     for (ActiveEnt plumeEnt : plumeView)
     {
         auto& plume = plumeView.get<ACompExhaustPlume>(plumeEnt);
-        auto& plumeShader = plumeView.get<ShaderInstance_t>(plumeEnt);
-        CompVisibleDebug& visibility = plumeView.get<CompVisibleDebug>(plumeEnt);
+        plume.m_time = g_time;
 
         auto& machine = rScene.reg_get<MachineRocket>(plume.m_parentMachineRocket);
         float powerLevel = machine.current_output_power();
 
-        plumeShader.m_currentTime = g_time;
-
         if (powerLevel > 0.0f)
         {
-            plumeShader.m_powerLevel = powerLevel;
-            visibility.m_state = true;
+            plume.m_powerLevel = powerLevel;
+            rScene.get_registry().emplace_or_replace<ACompVisible>(plumeEnt);
         }
         else
         {
-            visibility.m_state = false;
+            rScene.get_registry().remove_if_exists<ACompVisible>(plumeEnt);
         }
     }
 }

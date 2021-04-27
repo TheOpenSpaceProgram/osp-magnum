@@ -24,14 +24,13 @@
  */
 #include "ActiveScene.h"
 #include "SysVehicle.h"
-#include "SysDebugRender.h"
+#include "SysRender.h"
 #include "physics.h"
 
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
 #include "../Resource/PrototypePart.h"
 #include "../Resource/AssetImporter.h"
-#include "adera/Shaders/Phong.h"
 
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
@@ -237,10 +236,6 @@ ActiveEnt SysVehicle::part_instantiate(
         hier.m_name = pcompName.m_name;
     }
 
-    rScene.get_registry().reserve<CompDrawableDebug>(
-                rScene.get_registry().capacity<CompDrawableDebug>()
-                + part.m_partDrawable.size());
-
     // Create drawables
     for (PCompDrawable const& pcompDrawable : part.m_partDrawable)
     {
@@ -279,19 +274,13 @@ ActiveEnt SysVehicle::part_instantiate(
 
         ActiveEnt currentEnt = newEntities[pcompDrawable.m_entity];
 
-        // TODO: Create components for generic properties of drawables:
-        //       ACompMesh, ACompSolid, ACompRoughnessTexture...
-
-        using adera::shader::Phong;
-        auto &shader = rScene.reg_emplace<Phong::ACompPhongInstance>(currentEnt);
-        shader.m_shaderProgram = glResources.get<Phong>("phong_shader");
-        shader.m_textures = std::move(textureResources);
-        shader.m_lightPosition = Vector3{10.0f, 15.0f, 5.0f};
-        shader.m_ambientColor = 0x111111_rgbf;
-        shader.m_specularColor = 0x330000_rgbf;
-
-        rScene.reg_emplace<CompDrawableDebug>(
-                currentEnt, meshRes, &Phong::draw_entity, 0x0202EE_rgbf);
+        // by now, the mesh and texture should both exist so we emplace them
+        // as components to be consumed by the Phong shader
+        rScene.reg_emplace<ACompVisible>(currentEnt);
+        rScene.reg_emplace<ACompOpaque>(currentEnt);
+        rScene.reg_emplace<ACompShader>(currentEnt);
+        rScene.reg_emplace<ACompMesh>(currentEnt, meshRes);
+        rScene.reg_emplace<ACompDiffuseTex>(currentEnt, std::move(textureResources[0]));
     }
 
     rScene.get_registry().reserve<PCompPrimativeCollider>(
@@ -326,7 +315,7 @@ ActiveEnt SysVehicle::part_instantiate(
         if (auto const* shape = rScene.reg_try_get<ACompShape>(ent);
             shape != nullptr)
         {
-            if (!rScene.get_registry().has<ACompCollider>(ent))
+            if (!rScene.get_registry().all_of<ACompCollider>(ent))
             {
                 return EHierarchyTraverseStatus::Continue;
             }
@@ -412,7 +401,7 @@ void SysVehicle::update_activate(ActiveScene &rScene)
     // Delete vehicles that have gone too far from the ActiveArea range
     for (auto const &[sat, ent] : pArea->m_leave)
     {
-        if (!rUni.get_reg().has<UCompVehicle>(sat))
+        if (!rUni.get_reg().all_of<UCompVehicle>(sat))
         {
             continue;
         }
@@ -437,7 +426,7 @@ void SysVehicle::update_activate(ActiveScene &rScene)
         universe::Satellite sat = entered->first;
         ActiveEnt &rEnt = entered->second;
 
-        if (!rUni.get_reg().has<UCompVehicle>(sat))
+        if (!rUni.get_reg().all_of<UCompVehicle>(sat))
         {
             continue;
         }

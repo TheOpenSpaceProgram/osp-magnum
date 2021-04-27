@@ -40,7 +40,8 @@
 
 #include <adera/ShipResources.h>
 
-#include <adera/Shaders/Phong.h>
+
+#include <osp/Shaders/Phong.h>
 #include <adera/Shaders/PlumeShader.h>
 
 #include <adera/Machines/Container.h>
@@ -400,7 +401,7 @@ void debug_print_resources()
 
         debug_print_resource_group<adera::active::machines::ShipResourceType>(rPkg);
         debug_print_resource_group<adera::shader::PlumeShader>(rPkg);
-        debug_print_resource_group<adera::shader::Phong>(rPkg);
+        debug_print_resource_group<osp::shader::Phong>(rPkg);
     }
 }
 

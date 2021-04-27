@@ -27,11 +27,10 @@
 #include "Container.h"
 #include "../Plume.h"
 #include "../SysExhaustPlume.h"
-#include "../Shaders/Phong.h"
 #include "../Shaders/PlumeShader.h"
 
 #include <osp/Active/ActiveScene.h>
-#include <osp/Active/SysDebugRender.h>
+#include <osp/Shaders/Phong.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/physics.h>
 #include "osp/PhysicsConstants.h"

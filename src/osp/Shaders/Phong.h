@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright Â© 2019-2020 Open Space Program Project
+ * Copyright © 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -23,40 +23,31 @@
  * SOFTWARE.
  */
 #pragma once
-#include "osp/Active/physics.h"
-#include "adera/Plume.h"
-#include "adera/Shaders/PlumeShader.h"
-#include "osp/Resource/Resource.h"
 
-namespace adera::active
+#include <vector>
+#include <string_view>
+#include <Magnum/Shaders/Phong.h>
+#include <Magnum/GL/Mesh.h>
+#include <Magnum/GL/Texture.h>
+#include <Magnum/Math/Color.h>
+#include <osp/Active/activetypes.h>
+#include <osp/Active/ActiveScene.h>
+#include <osp/Resource/Resource.h>
+
+namespace osp::shader
 {
 
-struct ACompExhaustPlume
-{
-    osp::active::ActiveEnt m_parentMachineRocket{entt::null};
-    osp::DependRes<PlumeEffectData> m_effect;
-
-    float m_time{0.0f};
-    float m_powerLevel{0.0f};
-};
-
-class SysExhaustPlume
+class Phong : protected Magnum::Shaders::Phong
 {
 public:
+    using Magnum::Shaders::Phong::Phong;
 
-    static void add_functions(osp::active::ActiveScene& rScene);
-
-    /**
-     * Initialize plume graphics
-     * 
-     * SysMachineRocket only attaches ACompExhaustPlume to eligible entities;
-     * this function takes such entities, retrieves the appropriate graphics
-     * resources, and configures the graphical components
-     */
-    static void initialize_plume(osp::active::ActiveScene& rScene,
-                                 osp::active::ActiveEnt e);
-
-    static void update_plumes(osp::active::ActiveScene& rScene);
+    static void draw_entity(osp::active::ActiveEnt e,
+        osp::active::ActiveScene& rScene,
+        osp::active::ACompCamera const& camera) noexcept;
+private:
+    friend class SysRender;
+    constexpr static std::string_view smc_resourceName = "phong_shader";
 };
 
-} // namespace adera::active
+} // namespace osp::shader

@@ -22,42 +22,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
 
-#include <vector>
-#include <Magnum/Shaders/Phong.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/GL/Texture.h>
-#include <Magnum/Math/Color.h>
-#include "osp/Active/activetypes.h"
-#include "osp/Active/ActiveScene.h"
-#include "osp/Resource/Resource.h"
+//#version 430 core
 
-namespace adera::shader
+layout(location = 0) in vec2 vertPosition;
+layout(location = 1) in vec2 vertTexCoords;
+
+out vec2 uv;
+
+void main()
 {
-
-
-class Phong : protected Magnum::Shaders::Phong
-{
-public:
-    using Magnum::Shaders::Phong::Phong;
-
-    struct ACompPhongInstance
-    {
-        osp::DependRes<Phong> m_shaderProgram;
-        std::vector<osp::DependRes<Magnum::GL::Texture2D>> m_textures;
-        Magnum::Vector3 m_lightPosition;
-        Magnum::Color3 m_ambientColor;
-        Magnum::Color3 m_specularColor;
-    };
-
-    static void draw_entity(osp::active::ActiveEnt e,
-        osp::active::ActiveScene& rScene,
-        Magnum::GL::Mesh& rMesh,
-        osp::active::ACompCamera const& camera,
-        osp::active::ACompTransform const& transform);
-
-};
-
-
+    gl_Position = vec4(vertPosition, 0.0, 1.0);
+    uv = vertTexCoords;
 }

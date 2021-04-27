@@ -426,7 +426,7 @@ Matrix4 SysNewton::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, Ac
     } while (pCurrHier->m_level != gc_heir_physics_level);
 
     // Fail if a rigidbody ancestor is not found
-    assert(rScene.get_registry().has<ACompNwtBody>(prevEnt));
+    assert(rScene.get_registry().all_of<ACompNwtBody>(prevEnt));
 
     return transform;
 }
@@ -590,7 +590,7 @@ std::pair<Matrix3, Vector4> SysNewton::compute_hier_inertia(ActiveScene& rScene,
          * be assumed to have an identity transformation relative to its parent
          * and processed as usual.
          */
-        if ((childTransform != nullptr) || reg.has<ACompMass>(nextChild))
+        if ((childTransform != nullptr) || reg.all_of<ACompMass>(nextChild))
         {
             // Compute the inertia of the child subhierarchy
             auto const& [childInertia, childCoM] = compute_hier_inertia(rScene, nextChild);

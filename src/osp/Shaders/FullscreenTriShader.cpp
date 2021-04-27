@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright Â© 2019-2020 Open Space Program Project
+ * Copyright © 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -22,36 +22,38 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "Phong.h"
-#include <Magnum/Math/Matrix4.h>
+#include <osp/Shaders/FullscreenTriShader.h>
+#include <Magnum/GL/Version.h>
+#include <Magnum/GL/Shader.h>
+#include <Magnum/GL/Texture.h>
+#include <Corrade/Containers/Reference.h>
 
 using namespace osp::active;
-using namespace adera::shader;
+using namespace Magnum;
 
-void Phong::draw_entity(ActiveEnt e,
-    ActiveScene& rScene, 
-    Magnum::GL::Mesh& rMesh,
-    ACompCamera const& camera,
-    ACompTransform const& transform)
+FullscreenTriShader::FullscreenTriShader()
 {
-    auto& shaderInstance = rScene.reg_get<ACompPhongInstance>(e);
-    Phong& shader = *shaderInstance.m_shaderProgram;
+    GL::Shader vert{GL::Version::GL430, GL::Shader::Type::Vertex};
+    GL::Shader frag{GL::Version::GL430, GL::Shader::Type::Fragment};
+    vert.addFile("OSPData/adera/Shaders/FullscreenTri.vert");
+    frag.addFile("OSPData/adera/Shaders/FullscreenTri.frag");
 
-    Magnum::Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;
+    CORRADE_INTERNAL_ASSERT_OUTPUT(GL::Shader::compile({vert, frag}));
+    attachShaders({vert, frag});
+    CORRADE_INTERNAL_ASSERT_OUTPUT(link());
 
-    /* 4th component indicates light type. A value of 0.0f indicates that the
-     * light is a direction light coming from the specified direction relative
-     * to the camera.
-     */
-    Magnum::Vector4 light = {shaderInstance.m_lightPosition, 0.0f};
+    setUniform(static_cast<Int>(EUniformPos::FramebufferSampler),
+        static_cast<Int>(ETextureSlot::Framebuffer));
+}
 
-    shader
-        .bindDiffuseTexture(*shaderInstance.m_textures[0])
-        .setAmbientColor(shaderInstance.m_ambientColor)
-        .setSpecularColor(shaderInstance.m_specularColor)
-        .setLightPositions({light})
-        .setTransformationMatrix(entRelative)
-        .setProjectionMatrix(camera.m_projection)
-        .setNormalMatrix(entRelative.normalMatrix())
-        .draw(rMesh);
+void FullscreenTriShader::display_texure(GL::Mesh& surface, GL::Texture2D& texture)
+{
+    set_framebuffer(texture);
+    draw(surface);
+}
+
+FullscreenTriShader& FullscreenTriShader::set_framebuffer(GL::Texture2D& rTex)
+{
+    rTex.bind(static_cast<Int>(ETextureSlot::Framebuffer));
+    return *this;
 }
