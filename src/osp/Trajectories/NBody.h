@@ -207,7 +207,7 @@ private:
 class TrajNBody : public CommonTrajectory<TrajNBody>
 {
 public:
-    static constexpr double smc_timestep = 100.0;
+    static constexpr double smc_timestep = 1'000.0;
 
     TrajNBody(Universe& rUni, Satellite center);
     ~TrajNBody() = default;

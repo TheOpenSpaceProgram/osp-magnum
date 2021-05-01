@@ -39,12 +39,6 @@
 namespace adera::active
 {
 
-struct ACompMapFocus
-{
-    osp::universe::Satellite m_sat{entt::null};
-    bool m_dirty{false};
-};
-
 class ProcessMapCoordsCompute : public Magnum::GL::AbstractShaderProgram
 {
 public:
@@ -136,8 +130,9 @@ Device memory:
 - A buffer of vertices to represent all body positions
 - An indexed buffer of vertices to represent orbit paths
 
-Every frame, the buffer will be mmapped and new positions written. A compute
-shader can increment the index buffer and fade the orbits over time.
+Every frame, a buffer of object positions will be written into device memory.
+A compute shader uses those points to push incremental updates to paths on
+the map.
 */
 class MapRenderData
 {
@@ -209,7 +204,7 @@ public:
      * needed is stored on initialization. This number is larger than expected
      * because paths are allocated on block boundaries, requiring extra padding.
      */
-    size_t m_numComputeBlocks;
+    size_t m_numComputeBlocks{0};
 
     /* ### Path mesh data ### */
 
@@ -262,17 +257,43 @@ public:
 
     // Mapping from satellites to path metadata index
     //std::map<osp::universe::Satellite, size_t> m_trailMapping;
-    size_t m_predictionPathIndex;
+    size_t m_predictionPathIndex{0};
 
     // Mapping from satellites to point sprites
     std::map<osp::universe::Satellite, GLuint> m_pointMapping;
-    size_t m_predictionPointIndex;
+    size_t m_predictionPointIndex{0};
 };
 
-struct ACompMapVisible
+struct ACompMapVisible {};
+
+struct ACompMapLeavesTrail
 {
-    bool m_visible{true};
+    uint32_t m_numSamples{0};
 };
+
+struct ACompMapFocus
+{
+    osp::universe::Satellite m_sat{entt::null};
+    bool m_dirty{false};
+};
+
+struct ACompPredictTraj
+{
+    GLuint m_pointIndex;
+    GLuint m_trailIndex;
+};
+
+//struct ACompMapPointSprite
+//{
+//    osp::universe::Satellite m_sat;
+//    GLuint m_index;
+//};
+
+//struct ACompMapTrail
+//{
+//    osp::universe::Satellite m_sat;
+//    GLuint m_index;
+//};
 
 class SysMap
 {

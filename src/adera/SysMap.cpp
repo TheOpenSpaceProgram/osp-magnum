@@ -221,6 +221,7 @@ void SysMap::register_system(ActiveScene& rScene)
 {
     auto& rUni = rScene.get_application().get_universe();
     auto& reg = rUni.get_reg();
+    auto& rSceneReg = rScene.get_registry();
     auto& glres = rScene.get_context_resources();
     MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
 
@@ -229,60 +230,53 @@ void SysMap::register_system(ActiveScene& rScene)
 
     // Clear data
     renderData.m_points.clear();
-    renderData.m_pointMapping.clear();
     renderData.m_pathMetadata.clear();
     renderData.m_pathUpdateCommands.clear();
-    //renderData.m_trailMapping.clear();
 
     // Enumerate total number of map objects and paths
     // Fully dynamic (significant) bodies come first, followed by insignificant
     // (small) bodies, followed by extra paths (e.g. prediction)
 
     size_t pointIndex = 0;
-    size_t pathIndex = 0;
-    size_t nextFreeArrayElement = 0;
-    auto sigView = reg.view<UCompTransformTraj, ACompMapVisible, UCompSignificantBody>();
-    for (auto [sat, traj, vis] : sigView.each())
+    for (auto [sat, traj] :
+        reg.view<UCompTransformTraj, ACompMapVisible, UCompSignificantBody>().each())
     {
         Vector3 initPos = universe_to_render_space(traj.m_position);
         renderData.m_points.emplace_back(Vector4{initPos, 1.0}, Color4{traj.m_color, 1.0});
-        //renderData.m_pointMapping.emplace(sat, pointIndex);
+        renderData.m_pointMapping.emplace(sat, static_cast<GLuint>(pointIndex));
+        pointIndex++;
+    }
+    for (auto [sat, traj] :
+        reg.view<UCompTransformTraj, ACompMapVisible, UCompInsignificantBody>().each())
+    {
+        Vector3 initPos = universe_to_render_space(traj.m_position);
+        renderData.m_points.emplace_back(Vector4{initPos, 1.0}, Color4{traj.m_color, 1.0});
+        renderData.m_pointMapping.emplace(sat, static_cast<GLuint>(pointIndex));
+        pointIndex++;
+    }
 
-        // Body is fully dynamic; leave trail
-
-        size_t numPathVerts;
-        if (reg.get<UCompMass>(sat).m_mass > 1e23)
-        {
-            numPathVerts = 4999;
-        }
-        else
-        {
-            numPathVerts = 499;
-        }
+    size_t pathIndex = 0;
+    size_t nextFreeArrayElement = 0;
+    for (auto [sat, traj, trail] : reg.view<UCompTransformTraj, ACompMapLeavesTrail>().each())
+    {
+        size_t numPathVerts = trail.m_numSamples;
+        GLuint pointIdx = renderData.m_pointMapping[sat];
 
         MapRenderData::PathMetadata pathInfo;
-        pathInfo.m_pointIndex = pointIndex;
+        pathInfo.m_pointIndex = pointIdx;
         pathInfo.m_startIdx = nextFreeArrayElement;
         pathInfo.m_endIdx = pathInfo.m_startIdx + numPathVerts - 1; // -1 to get inclusive bound
         pathInfo.m_nextIdx = pathInfo.m_startIdx;
 
-        renderData.m_pathMetadata.push_back(std::move(pathInfo));
+        renderData.m_pathMetadata.push_back(pathInfo);
         renderData.m_pathUpdateCommands.push_back(
             static_cast<GLuint>(MapUpdateCompute::EPathOperation::PushVertFromPointSource)
             | static_cast<GLuint>(MapUpdateCompute::EPathOperation::FadeVertices));
-        //renderData.m_pathMapping.emplace(sat, pathIndex);
-
+        
         pathIndex++;
-        pointIndex++;
-        nextFreeArrayElement += numPathVerts + 1;  // Pad for primitive restart
+        nextFreeArrayElement += numPathVerts + 1; // pad for primitive restart
     }
-    auto insigView = reg.view<UCompTransformTraj, ACompMapVisible, UCompInsignificantBody>();
-    for (auto [sat, traj, vis] : insigView.each())
-    {
-        renderData.m_points.emplace_back(Vector4{1.0}, Color4{traj.m_color, 1.0});
-        renderData.m_pointMapping.emplace(sat, pointIndex);
-        pointIndex++;
-    }
+
     renderData.m_numDrawablePoints = pointIndex;
     
     // Create an extra point and path used to represent trajectory of the
@@ -307,6 +301,11 @@ void SysMap::register_system(ActiveScene& rScene)
             static_cast<GLuint>(MapUpdateCompute::EPathOperation::Skip));
 
         renderData.m_predictionPathIndex = pathIndex;
+
+        ActiveEnt ent = rScene.hier_create_child(rScene.hier_get_root());
+        rScene.reg_emplace<ACompPredictTraj>(ent,
+            static_cast<GLuint>(renderData.m_predictionPointIndex),
+            static_cast<GLuint>(renderData.m_predictionPathIndex));
 
         pathIndex++;
         pointIndex++;

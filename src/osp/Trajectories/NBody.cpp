@@ -240,6 +240,7 @@ size_t EvolutionTable::get_index(Satellite sat) const
         if (get_ID(i) == sat) { return i; }
     }
     assert(false);
+    return 0;
 }
 
 #if 0
@@ -725,7 +726,7 @@ void TrajNBody::write_universe_components(EvolutionTable& dataSource)
         Vector3d accel = dataSource.get_acceleration(i);
         Vector3d pos = dataSource.get_position(i, dataSource.m_currentStep);
 
-        std::cout << "pos: (" << pos.x() << ", " << pos.y() << ", " << pos.z() << ")\n";
+        //std::cout << "pos: (" << pos.x() << ", " << pos.y() << ", " << pos.z() << ")\n";
         reg.get<UCompTransformTraj>(sat).m_position = Vector3s{pos * 1024.0};
         reg.get<UCompVel>(sat).m_velocity = vel;
         reg.get<UCompAccel>(sat).m_acceleration = accel;

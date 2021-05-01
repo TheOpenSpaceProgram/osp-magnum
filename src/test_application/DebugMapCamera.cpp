@@ -111,11 +111,11 @@ void DebugMapCameraController::update()
     Vector3 posRelative = xform.translation() - tgtPos;
 
     // set camera orbit distance
-    constexpr float distSensitivity = 1.0f;
+    constexpr float distSensitivity = 5e4f;
     m_orbitDistance += distSensitivity * static_cast<float>(-m_scrollInput.dy());
 
     // Clamp orbit distance to avoid producing a degenerate m_orbitPos vector
-    constexpr float minDist = 5.0f;
+    constexpr float minDist = 2000.0f;
     if (m_orbitDistance < minDist) { m_orbitDistance = minDist; }
 
     m_orbitPos = m_orbitPos.normalized() * m_orbitDistance;

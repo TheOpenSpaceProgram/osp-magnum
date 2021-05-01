@@ -49,6 +49,7 @@ using osp::universe::UCompEmitsGravity;
 using osp::universe::UCompInsignificantBody;
 using osp::universe::UCompSignificantBody;
 using adera::active::ACompMapVisible;
+using adera::active::ACompMapLeavesTrail;
 using planeta::universe::SatPlanet;
 using namespace Magnum::Math::Literals;
 
@@ -119,6 +120,7 @@ void testapp::create_solar_system(OSPApplication& ospApp)
         add_body(ospApp, sat, body, &nbody);
         reg.emplace<UCompEmitsGravity>(sat);
         reg.emplace<UCompSignificantBody>(sat);
+        reg.emplace<ACompMapLeavesTrail>(sat, 1999u);
     }
 
     /* ####### Asteroids ####### */
