@@ -268,8 +268,10 @@ void TrajNBody::update()
     double frametime = fixedStep * m_universe.get_time_scale();
     if (frametime > smc_timestep) { frametime = smc_timestep; }
     m_timestepElapsed += frametime;
+    m_updatedLastFrame = false;
     if (m_timestepElapsed >= smc_timestep)
     {
+        m_updatedLastFrame = true;
         m_timestepElapsed -= smc_timestep;
 
         auto& reg = m_universe.get_reg();

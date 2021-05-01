@@ -127,6 +127,20 @@ void testapp::create_solar_system(OSPApplication& ospApp)
 
     add_asteroids(ospApp, nbody, 1'000);
 
+    /* ####### Test ship ####### */
+    Satellite ship = rUni.sat_create();
+    PlanetBody body;
+    body.m_mass = 2e18;
+    body.m_radius = 5.0;
+    body.m_orbitDist = 1.1 * g_1AU;
+    body.m_name = "lonely ship";
+    body.m_color = 0xFFFFFF_rgbf;
+    body.m_initAngle = 0.0;
+    body.m_velOset = {0.0, 0.0, 0.0};
+    add_body(ospApp, ship, body, &nbody);
+    rUni.get_reg().emplace<UCompInsignificantBody>(ship);
+
+    // Build orbital data
     nbody.build_table();
 }
 

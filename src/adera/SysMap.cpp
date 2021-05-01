@@ -61,7 +61,7 @@ using Magnum::GL::Buffer;
 using Magnum::GL::Shader;
 using Magnum::GL::BufferUsage;
 
-constexpr bool DO_PREDICTION = false;
+constexpr bool DO_PREDICTION = true;
 
 Vector3 SysMap::universe_to_render_space(osp::Vector3s v3s)
 {
@@ -278,7 +278,7 @@ void SysMap::register_system(ActiveScene& rScene)
     }
 
     renderData.m_numDrawablePoints = pointIndex;
-    
+
     // Create an extra point and path used to represent trajectory of the
     // currently selected planet
     if constexpr (DO_PREDICTION)
@@ -351,7 +351,7 @@ void SysMap::register_system(ActiveScene& rScene)
         }
         renderData.m_indexData[metadata.m_endIdx + 1] = MapRenderData::smc_PRIMITIVE_RESTART;
     }
-    
+
     using Magnum::Shaders::VertexColor3D;
 
     // Create path buffers, mesh
@@ -434,15 +434,17 @@ void SysMap::update_map(ActiveScene& rScene)
     auto& rUni = rScene.get_application().get_universe();
     auto& reg = rUni.get_reg();
     auto& glres = rScene.get_context_resources();
+    auto* nbody = rUni.get_traj<TrajNBody>(0);
 
     MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
-    auto* nbody = rUni.get_traj<TrajNBody>(0);
 
     if (!renderData.m_isInitialized)
     {
         register_system(rScene);
         renderData.m_isInitialized = true;
     }
+
+    bool systemUpdated = nbody->updated_last_frame();
 
     if constexpr (DO_PREDICTION)
     {
@@ -454,12 +456,17 @@ void SysMap::update_map(ActiveScene& rScene)
             renderData.m_pathUpdateCommandBuffer.setSubData(
                 renderData.m_predictionPathIndex * sizeof(GLuint), {MapUpdateCompute::EPathOperation::Skip});
         }
-        else if (nbody->is_in_table(focus.m_sat))
+        else if (nbody->is_in_table(focus.m_sat) && systemUpdated)
         {
             renderData.m_pathUpdateCommandBuffer.setSubData(
                 renderData.m_predictionPathIndex * sizeof(GLuint), {MapUpdateCompute::EPathOperation::PushVertFromPointSource});
             update_prediction(rScene);
         }
+    }
+
+    if (!systemUpdated)
+    {
+        return;
     }
 
     process_raw_state(rScene, renderData, nbody);

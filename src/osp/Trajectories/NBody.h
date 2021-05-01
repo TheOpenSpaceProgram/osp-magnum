@@ -230,6 +230,8 @@ public:
     Vector3d get_futuremost_location(Satellite sat) const;
 
     size_t num_future_steps() const;
+
+    constexpr bool updated_last_frame() const noexcept { return m_updatedLastFrame; }
 public:
     template <typename VIEW_T, typename SRC_VIEW_T>
     static void update_full_dynamics_acceleration(VIEW_T& bodyView, SRC_VIEW_T& sources);
@@ -250,6 +252,7 @@ public:
     EvolutionTable m_nBodyData;
     EvolutionTable m_insignificantBodyData;
     double m_timestepElapsed{0.0};
+    bool m_updatedLastFrame{true};
 };
 
 }
