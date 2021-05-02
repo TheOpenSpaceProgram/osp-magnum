@@ -42,6 +42,59 @@ struct UCompInsignificantBody {};
 
 constexpr double G = 6.674e-11;
 
+struct TableAllocator
+{
+    static constexpr size_t AVX2_WIDTH = 256 / 8;  // 256 bits / 8 = 32 Bytes
+
+    template <typename T>
+    static size_t padded_size_aligned(size_t nElements)
+    {
+        constexpr size_t avxLanes = AVX2_WIDTH / sizeof(T);
+        size_t padding = avxLanes - (nElements % avxLanes);
+        return (nElements + padding) * sizeof(T);
+    }
+
+    // Allocate an aligned array of
+    template <typename T>
+    static T* alloc_raw(size_t size)
+    {
+        //static_assert(std::is_arithmetic<T>::value, "Can only allocate arithmetic types");
+
+        return AlignedAllocator<T, AVX2_WIDTH>::allocate(size);
+    }
+
+    template <typename T>
+    static T* alloc_aligned(size_t nElements)
+    {
+        //static_assert(std::is_arithmetic<T>::value, "Can only allocate arithmetic types");
+        size_t size = padded_size_aligned<T>(nElements);
+        return AlignedAllocator<T, AVX2_WIDTH>::allocate(size);
+    }
+
+    // Deleter functions
+    template<typename T>
+    static void del_aligned(T* ptr)
+    {
+        AlignedAllocator<T, AVX2_WIDTH>::deallocate(ptr, sizeof(ptr));
+    }
+
+    // std::unique_ptr alias with custom aligned alloc deleter
+    template <typename T>
+    class table_ptr : public std::unique_ptr<T[], decltype(&del_aligned<T>)>
+    {
+    private:
+        using ptr_type = std::unique_ptr<T[], decltype(&del_aligned<T>)>;
+    public:
+        table_ptr(size_t elements)
+            : ptr_type(
+                alloc_aligned<T>(elements),
+                &del_aligned<T>)
+        {}
+
+        table_ptr(T* ptr) : ptr_type(ptr, &del_aligned<T>) {}
+    };
+};
+
 /*
 Table structure (concept):
 
@@ -130,56 +183,6 @@ public:
 
     //void copy_step_to_top(size_t timestep);
 private:
-    static constexpr size_t AVX2_WIDTH = 256 / 8;  // 256 bits / 8 = 32 Bytes
-
-    template <typename T>
-    static size_t padded_size_aligned(size_t nElements)
-    {
-        constexpr size_t avxLanes = AVX2_WIDTH / sizeof(T);
-        size_t padding = avxLanes - (nElements % avxLanes);
-        return (nElements + padding) * sizeof(T);
-    }
-
-    // Allocate an aligned array of
-    template <typename T>
-    static T* alloc_raw(size_t size)
-    {
-        //static_assert(std::is_arithmetic<T>::value, "Can only allocate arithmetic types");
-
-        return AlignedAllocator<T, AVX2_WIDTH>::allocate(size);
-    }
-
-    template <typename T>
-    static T* alloc_aligned(size_t nElements)
-    {
-        //static_assert(std::is_arithmetic<T>::value, "Can only allocate arithmetic types");
-        size_t size = padded_size_aligned<T>(nElements);
-        return AlignedAllocator<T, AVX2_WIDTH>::allocate(size);
-    }
-
-    // Deleter functions
-    template<typename T>
-    static void del_aligned(T* ptr)
-    {
-        AlignedAllocator<T, AVX2_WIDTH>::deallocate(ptr, sizeof(ptr));
-    }
-
-    // std::unique_ptr alias with custom aligned alloc deleter
-    template <typename T>
-    class table_ptr : public std::unique_ptr<T[], decltype(&del_aligned<T>)>
-    {
-    private:
-        using ptr_type = std::unique_ptr<T[], decltype(&del_aligned<T>)>;
-    public:
-        table_ptr(size_t elements)
-            : ptr_type(
-                alloc_aligned<T>(elements),
-                &del_aligned<T>)
-        {}
-
-        table_ptr(T* ptr) : ptr_type(ptr, &del_aligned<T>) {}
-    };
-
     // Table dimensions
 
     size_t m_numBodies{0};
@@ -191,14 +194,52 @@ private:
 
     // Current step only/static tables
 
-    table_ptr<Satellite> m_ids;
-    table_ptr<double> m_masses;
+    TableAllocator::table_ptr<Satellite> m_ids;
+    TableAllocator::table_ptr<double> m_masses;
 
-    table_ptr<double> m_velocities;
-    table_ptr<double> m_accelerations;
+    TableAllocator::table_ptr<double> m_velocities;
+    TableAllocator::table_ptr<double> m_accelerations;
 
     // Table of positions over time
-    table_ptr<double> m_posTable;
+    TableAllocator::table_ptr<double> m_posTable;
+};
+
+class PredictionTable
+{
+    friend class TrajNBody;
+public:
+    PredictionTable(size_t nSteps);
+    PredictionTable();
+    ~PredictionTable() = default;
+    PredictionTable(PredictionTable const& copy) = delete;
+    PredictionTable(PredictionTable&& move) = default;
+    PredictionTable& operator=(PredictionTable&& move) = default;
+
+    void resize(size_t timesteps);
+
+    void clear();
+
+    struct PredictedData
+    {
+        Corrade::Containers::ArrayView<Magnum::Vector4d> m_positions;
+        size_t m_currentStep;
+    };
+
+    PredictedData get_data();
+
+    Vector3d get_pos(size_t timestep) const;
+    void set_pos(size_t timestep, Vector3d pos);
+private:
+    size_t m_numTimesteps{0};
+    size_t m_currentStep{0};
+
+    // Single-element data
+    Satellite m_satID;
+    Vector3d m_velocity;
+    Vector3d m_acceleration;
+
+    // List of positions over time
+    TableAllocator::table_ptr<double> m_posTable;
 };
 
 /**
@@ -223,16 +264,30 @@ public:
     using FullState_t = std::pair<EvolutionTable::RawStepData, EvolutionTable::RawStepData>;
     FullState_t get_latest_state();
 
-    bool is_in_table(Satellite sat);
+    bool is_in_table(Satellite sat) const;
+    bool is_in_prediction_list(Satellite sat) const;
 
     EvolutionTable::TableColumn get_column(Satellite sat);
-
     Vector3d get_futuremost_location(Satellite sat) const;
-
     size_t num_future_steps() const;
+
+    bool predict_insignificant_sat(Satellite sat);
+    bool stop_predicting_insignificant_sat(Satellite sat);
+    PredictionTable::PredictedData get_predicted_path(Satellite sat);
+    std::vector<Satellite> get_predicted_sats() const;
+
+    struct DebugFourVectorD
+    {
+        double x;
+        double y;
+        double z;
+        double w;
+    };
 
     constexpr bool updated_last_frame() const noexcept { return m_updatedLastFrame; }
 public:
+    static constexpr size_t smc_numTimesteps = 16384;
+
     template <typename VIEW_T, typename SRC_VIEW_T>
     static void update_full_dynamics_acceleration(VIEW_T& bodyView, SRC_VIEW_T& sources);
 
@@ -240,6 +295,10 @@ public:
     static void update_full_dynamics_kinematics(VIEW_T& view);
 
     void solve_table();
+
+    size_t get_prediction_slot_index(Satellite sat) const;
+    void solve_prediction_timestep(Satellite sat, size_t predStepIndex, size_t sourceStepIndex);
+    void update_all_predictions(size_t sourceStepIndex);
 
     void solve_nbody_timestep(size_t stepIndex);
     void solve_nbody_timestep_AVX(size_t stepIndex);
@@ -251,6 +310,8 @@ public:
 
     EvolutionTable m_nBodyData;
     EvolutionTable m_insignificantBodyData;
+    std::array<PredictionTable, 8> m_predictionTables;
+    std::array<Satellite, 8> m_predictionTableUsage;
     double m_timestepElapsed{0.0};
     bool m_updatedLastFrame{true};
 };

@@ -130,13 +130,14 @@ void DebugMapCameraController::update()
 bool DebugMapCameraController::try_switch_focus()
 {
     using osp::universe::UCompTransformTraj;
+    using adera::active::ACompMapVisible;
 
     auto& rUni = m_scene.get_application().get_universe();
     auto& rUniReg = rUni.get_reg();
 
     if (m_switchNext.triggered() || m_switchPrev.triggered())
     {
-        auto satView = rUniReg.view<UCompTransformTraj>();
+        auto satView = rUniReg.view<UCompTransformTraj, ACompMapVisible>();
         auto itr = satView.find(m_selected);
 
         if (m_switchNext.triggered())

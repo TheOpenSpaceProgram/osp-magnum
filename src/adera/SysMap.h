@@ -305,13 +305,21 @@ public:
 
     static Magnum::Vector3 universe_to_render_space(osp::Vector3s v3s);
 
-    static void select_planet(osp::active::ActiveScene& rScene, osp::universe::Satellite sat);
 
 private:
     static osp::active::RenderPipeline create_map_renderer();
     static void register_system(osp::active::ActiveScene& rScene);
     static void process_raw_state(osp::active::ActiveScene& rScene,
         MapRenderData& rMapData, osp::universe::TrajNBody* traj);
+
+    static void select_prediction_target(
+        osp::active::ActiveScene& rScene,
+        osp::universe::Satellite sat);
+    static void read_table_prediction_data(
+        osp::active::ActiveScene& rScene, osp::universe::Satellite sat);
+    static void generate_prediction_data(
+        osp::active::ActiveScene& rScene, osp::universe::Satellite sat);
+
     static void update_prediction(osp::active::ActiveScene& rScene);
 };
 

@@ -72,63 +72,6 @@ Vector3 SysMap::universe_to_render_space(osp::Vector3s v3s)
     return Vector3{x, y, z};
 }
 
-void SysMap::select_planet(ActiveScene& rScene, Satellite sat)
-{
-    auto& rUni = rScene.get_application().get_universe();
-    MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
-
-    MapRenderData::PathMetadata& path =
-        renderData.m_pathMetadata[renderData.m_predictionPathIndex];
-
-    auto* nbody = rUni.get_traj<TrajNBody>(0);
-
-    // Exit if body doesn't have predicted data
-    if (!nbody->is_in_table(sat)) { return; }
-
-    auto column = nbody->get_column(sat);
-    size_t columnRows = column.m_x.size();
-    std::vector<MapRenderData::ColorVert> pathData(columnRows, {Vector4{1.0}, Color4{1.0}});
-
-    constexpr double conversionFactor = 1e-6;
-#if 1
-    for (size_t i = 0; i < columnRows; i++)
-    {
-        size_t index = (column.m_currentStep + i) % columnRows;
-        pathData[i].m_pos.x() = column.m_x[index] * conversionFactor;
-    }
-    for (size_t i = 0; i < columnRows; i++)
-    {
-        size_t index = (column.m_currentStep + i) % columnRows;
-        pathData[i].m_pos.y() = column.m_y[index] * conversionFactor;
-    }
-    for (size_t i = 0; i < columnRows; i++)
-    {
-        size_t index = (column.m_currentStep + i) % columnRows;
-        pathData[i].m_pos.z() = column.m_z[index] * conversionFactor;
-    }
-#else
-    for (size_t i = 0; i < columnRows; i++)
-    {
-        pathData[i].m_pos.x() = column.m_x[i];
-        pathData[i].m_pos.y() = column.m_y[i];
-        pathData[i].m_pos.z() = column.m_z[i];
-    }
-#endif
-    size_t vertOffset = sizeof(MapRenderData::ColorVert) * path.m_startIdx;
-    renderData.m_vertexBuffer.setSubData(vertOffset, pathData);
-
-    std::vector<GLuint> indices(columnRows, 0);
-    for (size_t i = 0; i < columnRows; i++)
-    {
-        indices[i] = path.m_endIdx - static_cast<GLuint>(i);
-    }
-    size_t indexOffset = sizeof(GLuint) * path.m_startIdx;
-    renderData.m_indexBuffer.setSubData(indexOffset, indices);
-
-    renderData.m_pathMetadataBuffer.setSubData(
-        renderData.m_predictionPathIndex * sizeof(MapRenderData::PathMetadata), {path});
-}
-
 void SysMap::add_functions(ActiveScene& rScene)
 {
     rScene.debug_update_add(rScene.get_update_order(),
@@ -410,11 +353,129 @@ void SysMap::process_raw_state(osp::active::ActiveScene& rScene, MapRenderData& 
         insignificantsData.m_nElements, insignificantsData.m_nElementsPadded);
 }
 
+void SysMap::select_prediction_target(ActiveScene& rScene, Satellite sat)
+{
+    auto& rUni = rScene.get_application().get_universe();
+    auto* nbody = rUni.get_traj<TrajNBody>(0);
+
+    // If the satellite is in the main orbit table (planets, etc.) read directly,
+    // else compute on the fly
+    if (nbody->is_in_table(sat))
+    {
+        read_table_prediction_data(rScene, sat);
+    }
+    else
+    {
+        generate_prediction_data(rScene, sat);
+    }
+}
+
+void SysMap::read_table_prediction_data(ActiveScene& rScene, Satellite sat)
+{
+    auto& rUni = rScene.get_application().get_universe();
+    MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
+
+    MapRenderData::PathMetadata& path =
+        renderData.m_pathMetadata[renderData.m_predictionPathIndex];
+
+    auto* nbody = rUni.get_traj<TrajNBody>(0);
+
+    auto column = nbody->get_column(sat);
+    size_t columnRows = column.m_x.size();
+    std::vector<MapRenderData::ColorVert> pathData(columnRows, {Vector4{1.0}, Color4{1.0}});
+
+    constexpr double conversionFactor = 1e-6;
+#if 1
+    for (size_t i = 0; i < columnRows; i++)
+    {
+        size_t index = (column.m_currentStep + i) % columnRows;
+        pathData[i].m_pos.x() = column.m_x[index] * conversionFactor;
+    }
+    for (size_t i = 0; i < columnRows; i++)
+    {
+        size_t index = (column.m_currentStep + i) % columnRows;
+        pathData[i].m_pos.y() = column.m_y[index] * conversionFactor;
+    }
+    for (size_t i = 0; i < columnRows; i++)
+    {
+        size_t index = (column.m_currentStep + i) % columnRows;
+        pathData[i].m_pos.z() = column.m_z[index] * conversionFactor;
+    }
+#else
+    for (size_t i = 0; i < columnRows; i++)
+    {
+        pathData[i].m_pos.x() = column.m_x[i];
+        pathData[i].m_pos.y() = column.m_y[i];
+        pathData[i].m_pos.z() = column.m_z[i];
+    }
+#endif
+    size_t vertOffset = sizeof(MapRenderData::ColorVert) * path.m_startIdx;
+    renderData.m_vertexBuffer.setSubData(vertOffset, pathData);
+
+    std::vector<GLuint> indices(columnRows, 0);
+    for (size_t i = 0; i < columnRows; i++)
+    {
+        indices[i] = path.m_endIdx - static_cast<GLuint>(i);
+    }
+    size_t indexOffset = sizeof(GLuint) * path.m_startIdx;
+    renderData.m_indexBuffer.setSubData(indexOffset, indices);
+
+    // Reset path metadata
+    renderData.m_pathMetadataBuffer.setSubData(
+        renderData.m_predictionPathIndex * sizeof(MapRenderData::PathMetadata), {path});
+}
+
+void SysMap::generate_prediction_data(ActiveScene& rScene, Satellite sat)
+{
+    auto& rUni = rScene.get_application().get_universe();
+    MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
+    MapRenderData::PathMetadata& path = renderData.m_pathMetadata[renderData.m_predictionPathIndex];
+    auto* nbody = rUni.get_traj<TrajNBody>(0);
+
+    // TMP: clear all existing sats
+    auto currentlyPredictedSats = nbody->get_predicted_sats();
+    for (Satellite sat : currentlyPredictedSats)
+    {
+        nbody->stop_predicting_insignificant_sat(sat);
+    }
+    // Ensure sat is in prediction list
+    assert(nbody->predict_insignificant_sat(sat));
+
+    // Get prediction table
+    auto table = nbody->get_predicted_path(sat);
+
+    size_t nSteps = table.m_positions.size();
+    std::vector<MapRenderData::ColorVert> pathData(nSteps, {Vector4{1.0}, Color4{1.0}});
+    
+    constexpr double conversionFactor = 1e-6;
+    for (size_t i = 0; i < nSteps; i++)
+    {
+        size_t index = (table.m_currentStep + i) % nSteps;
+        Vector4 transformedPos = Vector4{conversionFactor * table.m_positions[index]};
+        transformedPos.w() = 1.0f;
+        pathData[i].m_pos = transformedPos;
+    }
+
+    size_t vertOffset = sizeof(MapRenderData::ColorVert) * path.m_startIdx;
+    renderData.m_vertexBuffer.setSubData(vertOffset, pathData);
+
+    std::vector<GLuint> indices(nSteps, 0);
+    for (size_t i = 0; i < nSteps; i++)
+    {
+        indices[i] = path.m_endIdx - static_cast<GLuint>(i);
+    }
+    size_t indexOffset = sizeof(GLuint) * path.m_startIdx;
+    renderData.m_indexBuffer.setSubData(indexOffset, indices);
+
+    // Reset path metadata
+    renderData.m_pathMetadataBuffer.setSubData(
+        renderData.m_predictionPathIndex * sizeof(MapRenderData::PathMetadata), {path});
+}
+
 void SysMap::update_prediction(ActiveScene& rScene)
 {
     auto& rUni = rScene.get_application().get_universe();
     auto& reg = rUni.get_reg();
-    auto& glres = rScene.get_context_resources();
     MapRenderData& renderData = rScene.reg_get<MapRenderData>(rScene.hier_get_root());
 
     auto* nbody = rUni.get_traj<TrajNBody>(0);
@@ -451,12 +512,13 @@ void SysMap::update_map(ActiveScene& rScene)
         auto& focus = reg.get<ACompMapFocus>(rUni.sat_root());
         if (focus.m_dirty)
         {
-            select_planet(rScene, focus.m_sat);
+            select_prediction_target(rScene, focus.m_sat);
             focus.m_dirty = false;
             renderData.m_pathUpdateCommandBuffer.setSubData(
                 renderData.m_predictionPathIndex * sizeof(GLuint), {MapUpdateCompute::EPathOperation::Skip});
         }
-        else if (nbody->is_in_table(focus.m_sat) && systemUpdated)
+        else if ((nbody->is_in_table(focus.m_sat) || nbody->is_in_prediction_list(focus.m_sat))
+            && systemUpdated)
         {
             renderData.m_pathUpdateCommandBuffer.setSubData(
                 renderData.m_predictionPathIndex * sizeof(GLuint), {MapUpdateCompute::EPathOperation::PushVertFromPointSource});

@@ -125,7 +125,7 @@ void testapp::create_solar_system(OSPApplication& ospApp)
 
     /* ####### Asteroids ####### */
 
-    add_asteroids(ospApp, nbody, 1'000);
+    //add_asteroids(ospApp, nbody, 1'000);
 
     /* ####### Test ship ####### */
     Satellite ship = rUni.sat_create();
@@ -259,7 +259,7 @@ std::vector<PlanetBody> create_solar_system_bodies()
     venus.m_name = "Venus";
     venus.m_color = 0xFFDF80_rgbf;
     planets.push_back(std::move(venus));
-
+    return planets;
     /* ####### Earth ####### */
     PlanetBody earth;
     earth.m_mass = 5.97e24;

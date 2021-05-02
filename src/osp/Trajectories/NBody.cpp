@@ -59,12 +59,14 @@ void EvolutionTable::resize(size_t bodies, size_t timesteps)
     m_numBodies = bodies;
     m_numTimesteps = timesteps;
 
-    m_scalarArraySizeBytes = EvolutionTable::padded_size_aligned<double>(bodies);
+    m_scalarArraySizeBytes = TableAllocator::padded_size_aligned<double>(bodies);
     m_rowSizeBytes = 3 * m_scalarArraySizeBytes;
 
     // Allocate static/one-step rows
-    m_velocities = table_ptr<double>(alloc_raw<double>(m_rowSizeBytes));
-    m_accelerations = table_ptr<double>(alloc_raw<double>(m_rowSizeBytes));
+    m_velocities = TableAllocator::table_ptr<double>(
+        TableAllocator::alloc_raw<double>(m_rowSizeBytes));
+    m_accelerations = TableAllocator::table_ptr<double>(
+        TableAllocator::alloc_raw<double>(m_rowSizeBytes));
 
     size_t dblPaddedArrayCount = m_scalarArraySizeBytes / sizeof(double);
     for (size_t i = 0; i < 3* dblPaddedArrayCount; i++)
@@ -73,8 +75,8 @@ void EvolutionTable::resize(size_t bodies, size_t timesteps)
         m_accelerations[i] = 0.0;
     }
 
-    m_masses = table_ptr<double>(bodies);
-    m_ids = table_ptr<Satellite>(bodies);
+    m_masses = TableAllocator::table_ptr<double>(bodies);
+    m_ids = TableAllocator::table_ptr<Satellite>(bodies);
 
     for (size_t i = 0; i < dblPaddedArrayCount; i++)
     {
@@ -84,7 +86,8 @@ void EvolutionTable::resize(size_t bodies, size_t timesteps)
     // Allocate main table
 
     size_t fullTableSize = m_rowSizeBytes * timesteps;
-    m_posTable = table_ptr<double>(alloc_raw<double>(fullTableSize));
+    m_posTable = TableAllocator::table_ptr<double>(
+        TableAllocator::alloc_raw<double>(fullTableSize));
 
     for (size_t i = 0; i < 3 * dblPaddedArrayCount * timesteps; i++)
     {
@@ -256,6 +259,79 @@ void EvolutionTable::copy_step_to_top(size_t timestep)
 }
 #endif
 
+/* ============ PredictionTable ============ */
+
+PredictionTable::PredictionTable(size_t nSteps)
+    : m_satID{entt::null}
+    , m_posTable{nullptr}
+{
+    resize(nSteps);
+}
+
+PredictionTable::PredictionTable()
+    : m_satID{entt::null}
+    , m_posTable{nullptr}
+    , m_numTimesteps{0}
+{}
+
+void PredictionTable::resize(size_t timesteps)
+{
+    m_numTimesteps = timesteps;
+
+    size_t fullTableSize = m_numTimesteps * TableAllocator::AVX2_WIDTH; // 4-vector
+    m_posTable = TableAllocator::table_ptr<double>(
+        TableAllocator::alloc_raw<double>(fullTableSize));
+
+    for (size_t i = 0; i < m_numTimesteps * 4; i++)
+    {
+        m_posTable[i] = 1.0;
+    }
+}
+
+void PredictionTable::clear()
+{
+    m_currentStep = 0;
+    m_satID = entt::null;
+    m_velocity = {0.0, 0.0, 0.0};
+    m_acceleration = {0.0, 0.0, 0.0};
+    for (size_t i = 0; i < m_numTimesteps * 4; i++)
+    {
+        m_posTable[i] = 1.0;
+    }
+}
+
+PredictionTable::PredictedData PredictionTable::get_data()
+{
+    PredictedData output;
+    output.m_currentStep = m_currentStep;
+    output.m_positions = Corrade::Containers::ArrayView<Magnum::Vector4d>(
+        reinterpret_cast<Magnum::Vector4d*>(m_posTable.get()),
+        m_numTimesteps);
+
+    return output;
+}
+
+Vector3d PredictionTable::get_pos(size_t timestep) const
+{
+    Vector3d pos;
+    constexpr size_t stride = 4;
+    double* start = &m_posTable[stride * timestep];
+    pos.x() = *(start + 0);
+    pos.y() = *(start + 1);
+    pos.z() = *(start + 2);
+    return pos;
+}
+
+void PredictionTable::set_pos(size_t timestep, Vector3d pos)
+{
+    constexpr size_t stride = 4;
+    double* start = &m_posTable[stride * timestep];
+    *(start + 0) = pos.x();
+    *(start + 1) = pos.y();
+    *(start + 2) = pos.z();
+}
+
+
 /* ============ TrajNBody ============ */
 
 TrajNBody::TrajNBody(Universe& rUni, Satellite center)
@@ -278,6 +354,7 @@ void TrajNBody::update()
 
         solve_nbody_timestep_AVX(m_nBodyData.m_currentStep);
         solve_insignificant_bodies_AVX(m_nBodyData.m_currentStep);
+        update_all_predictions(m_nBodyData.m_currentStep);
 
         m_nBodyData.m_currentStep++;
 
@@ -296,14 +373,12 @@ void TrajNBody::build_table()
 {
     auto& rUni = m_universe.get_reg();
 
-    constexpr size_t numTimesteps = 16384;
-
     std::vector<Satellite> significantBodies;
     for (auto [sat] : rUni.view<UCompEmitsGravity>().each())
     {
         significantBodies.push_back(sat);
     }
-    m_nBodyData.resize(significantBodies.size(), numTimesteps);
+    m_nBodyData.resize(significantBodies.size(), smc_numTimesteps);
 
     for (size_t i = 0; i < significantBodies.size(); i++)
     {
@@ -333,6 +408,14 @@ void TrajNBody::build_table()
         m_insignificantBodyData.set_position(i, 0,
             static_cast<Vector3d>(rUni.get<UCompTransformTraj>(sat).m_position) / 1024.0);
     }
+
+    // Allocate space for 8 predicted orbits
+    constexpr size_t numPredOrbits = 8;
+    for (size_t i = 0; i < numPredOrbits; i++)
+    {
+        m_predictionTables[i].resize(smc_numTimesteps);
+        m_predictionTableUsage[i] = entt::null;
+    }
 }
 
 TrajNBody::FullState_t TrajNBody::get_latest_state()
@@ -342,9 +425,18 @@ TrajNBody::FullState_t TrajNBody::get_latest_state()
         m_insignificantBodyData.get_step(0));
 }
 
-bool TrajNBody::is_in_table(Satellite sat)
+bool TrajNBody::is_in_table(Satellite sat) const
 {
     return m_nBodyData.is_in_table(sat);
+}
+
+bool TrajNBody::is_in_prediction_list(Satellite sat) const
+{
+    for (Satellite predSat : m_predictionTableUsage)
+    {
+        if (predSat == sat) { return true; }
+    }
+    return false;
 }
 
 EvolutionTable::TableColumn TrajNBody::get_column(Satellite sat)
@@ -359,12 +451,98 @@ size_t TrajNBody::num_future_steps() const
     return m_nBodyData.m_numTimesteps;
 }
 
+bool TrajNBody::predict_insignificant_sat(Satellite sat)
+{
+    // TODO: check to ensure sat is not in N-body table
+
+    size_t emptySlot = 0;
+    bool foundEmpty = false;
+    for (Satellite tableSlot : m_predictionTableUsage)
+    {
+        if (tableSlot == entt::null)
+        {
+            foundEmpty = true;
+        }
+
+        if (tableSlot == sat) { return true; }
+
+        if (!foundEmpty) { emptySlot++; }
+    }
+
+    if (!foundEmpty) { return false; }
+
+    m_predictionTableUsage[emptySlot] = sat;
+    PredictionTable& table = m_predictionTables[emptySlot];
+    table.clear();
+
+    // Copy first step
+    auto& sourceData = m_insignificantBodyData;
+    size_t index = sourceData.get_index(sat);
+    Vector3d pos = sourceData.get_position(index, sourceData.m_currentStep);
+    Vector3d vel = sourceData.get_velocity(index);
+
+    table.m_satID = sat;
+    table.set_pos(0, pos);
+    table.m_velocity = vel;
+    table.m_acceleration = Vector3d{0.0};
+
+    // Solve future data
+    for (size_t i = 1; i < smc_numTimesteps; i++)
+    {
+        size_t sourceIndex = (m_nBodyData.m_currentStep + i) % m_nBodyData.m_numTimesteps;
+        solve_prediction_timestep(sat, i, sourceIndex);
+    }
+
+    return true;
+}
+
+bool TrajNBody::stop_predicting_insignificant_sat(Satellite sat)
+{
+    for (Satellite& tableSlot : m_predictionTableUsage)
+    {
+        if (tableSlot == sat)
+        {
+            tableSlot = entt::null;
+            return true;
+        }
+    }
+    return false;
+}
+
+PredictionTable::PredictedData TrajNBody::get_predicted_path(Satellite sat)
+{
+    return m_predictionTables[get_prediction_slot_index(sat)].get_data();
+}
+
+std::vector<Satellite> TrajNBody::get_predicted_sats() const
+{
+    std::vector<Satellite> sats;
+    for (Satellite sat : m_predictionTableUsage)
+    {
+        if (sat != entt::null)
+        {
+            sats.push_back(sat);
+        }
+    }
+    return sats;
+}
+
 Magnum::Vector3d TrajNBody::get_futuremost_location(Satellite sat) const
 {
-    size_t index = m_nBodyData.get_index(sat);
-    size_t prevStep = ((m_nBodyData.m_currentStep == 0) ?
-        m_nBodyData.m_numTimesteps : m_nBodyData.m_currentStep) - 1;
-    return m_nBodyData.get_position(index, prevStep);
+    if (is_in_table(sat))
+    {
+        size_t index = m_nBodyData.get_index(sat);
+        size_t prevStep = ((m_nBodyData.m_currentStep == 0) ?
+            m_nBodyData.m_numTimesteps : m_nBodyData.m_currentStep) - 1;
+        return m_nBodyData.get_position(index, prevStep);
+    }
+    else if (is_in_prediction_list(sat))
+    {
+        PredictionTable const& table = m_predictionTables[get_prediction_slot_index(sat)];
+        size_t prevStep = ((table.m_currentStep == 0) ?
+            table.m_numTimesteps : table.m_currentStep) - 1;
+        return table.get_pos(prevStep);
+    }
 }
 
 void TrajNBody::solve_table()
@@ -375,7 +553,70 @@ void TrajNBody::solve_table()
     }
 }
 
-void osp::universe::TrajNBody::solve_nbody_timestep(size_t stepIndex)
+size_t TrajNBody::get_prediction_slot_index(Satellite sat) const
+{
+    size_t index = 0;
+    for (Satellite tableSat : m_predictionTableUsage)
+    {
+        if (tableSat == sat)
+        {
+            return index;
+        }
+        index++;
+    }
+    assert(false);
+    return 0;
+}
+
+void TrajNBody::solve_prediction_timestep(Satellite sat, size_t predStepIndex, size_t sourceStepIndex)
+{
+    constexpr double dt = smc_timestep;
+
+    PredictionTable& table = m_predictionTables[get_prediction_slot_index(sat)];
+
+    assert(sourceStepIndex < m_nBodyData.m_numTimesteps);
+    size_t prevSrcStep = ((sourceStepIndex == 0) ? m_nBodyData.m_numTimesteps : sourceStepIndex) - 1;
+    size_t prevDstStep = ((predStepIndex == 0) ? table.m_numTimesteps : predStepIndex) - 1;
+
+    Vector3d currentPos = table.get_pos(prevDstStep);
+
+    Vector3d A{0.0};
+    for (size_t n = 0; n < m_nBodyData.m_numBodies; n++)
+    {
+        Vector3d r = m_nBodyData.get_position(n, prevSrcStep) - currentPos;
+        double otherMass = m_nBodyData.get_mass(n);
+        Vector3d rHat = r.normalized();
+        double denom = r.x() * r.x() + r.y() * r.y() + r.z() * r.z();
+        A += (otherMass / denom) * rHat;
+    }
+
+    A *= G;
+    Vector3d v = table.m_velocity;
+    Vector3d newVel = v + A * dt;
+    Vector3d newPos = currentPos + newVel * dt;
+    table.m_velocity = newVel;
+    table.set_pos(predStepIndex, newPos);
+}
+
+void TrajNBody::update_all_predictions(size_t sourceStepIndex)
+{
+    for (size_t i = 0; i < m_predictionTableUsage.size(); i++)
+    {
+        Satellite sat = m_predictionTableUsage[i];
+        if (sat != entt::null)
+        {
+            auto& table = m_predictionTables[i];
+            solve_prediction_timestep(sat, table.m_currentStep, sourceStepIndex);
+            table.m_currentStep++;
+            if (table.m_currentStep >= table.m_numTimesteps)
+            {
+                table.m_currentStep = 0;
+            }
+        }
+    }
+}
+
+void TrajNBody::solve_nbody_timestep(size_t stepIndex)
 {
     constexpr double dt = smc_timestep;
     assert(stepIndex < m_nBodyData.m_numTimesteps);
@@ -556,36 +797,29 @@ void TrajNBody::solve_insignificant_bodies(size_t inputStepIndex)
 {
     constexpr double dt = smc_timestep;
     assert(inputStepIndex < m_nBodyData.m_numTimesteps);
+    size_t prevStep = ((inputStepIndex == 0) ? m_nBodyData.m_numTimesteps : inputStepIndex) - 1;
 
     for (size_t m = 0; m < m_insignificantBodyData.m_numBodies; m++)
     {
         Satellite current = m_insignificantBodyData.get_ID(m);
         Vector3d currentPos = m_insignificantBodyData.get_position(m, 0);
-        double currentMass = m_insignificantBodyData.get_mass(m);
 
         Vector3d A{0.0};
         for (size_t n = 0; n < m_nBodyData.m_numBodies; n++)
         {
-            Vector3d r = m_nBodyData.get_position(n, inputStepIndex) - currentPos;
+            Vector3d r = m_nBodyData.get_position(n, prevStep) - currentPos;
             double otherMass = m_nBodyData.get_mass(n);
             Vector3d rHat = r.normalized();
             double denom = r.x() * r.x() + r.y() * r.y() + r.z() * r.z();
             A += (otherMass / denom) * rHat;
         }
 
-        m_insignificantBodyData.set_acceleration(m, A * G);
-    }
-
-    for (size_t n = 0; n < m_insignificantBodyData.m_numBodies; n++)
-    {
-        Vector3d x = m_insignificantBodyData.get_position(n, 0);
-        Vector3d v = m_insignificantBodyData.get_velocity(n);
-        Vector3d a = m_insignificantBodyData.get_acceleration(n);
-
-        Vector3d newVel = v + a * dt;
-        Vector3d newPos = x + newVel * dt;
-        m_insignificantBodyData.set_velocity(n, newVel);
-        m_insignificantBodyData.set_position(n, 0, newPos);
+        A *= G;
+        Vector3d v = m_insignificantBodyData.get_velocity(m);
+        Vector3d newVel = v + A * dt;
+        Vector3d newPos = currentPos + newVel * dt;
+        m_insignificantBodyData.set_velocity(m, newVel);
+        m_insignificantBodyData.set_position(m, 0, newPos);
     }
 }
 
@@ -593,6 +827,7 @@ void TrajNBody::solve_insignificant_bodies_AVX(size_t inputStepIndex)
 {
     constexpr double dt = smc_timestep;
     assert(inputStepIndex < m_nBodyData.m_numTimesteps);
+    size_t prevStep = ((inputStepIndex == 0) ? m_nBodyData.m_numTimesteps : inputStepIndex) - 1;
 
     __m256d vec4_0 = _mm256_set_pd(0.0, 0.0, 0.0, 0.0);
     __m256d vec4_1 = _mm256_set_pd(1.0, 1.0, 1.0, 1.0);
@@ -600,7 +835,7 @@ void TrajNBody::solve_insignificant_bodies_AVX(size_t inputStepIndex)
     size_t nLoops = m_nBodyData.m_scalarArraySizeBytes / simdWidthBytes;
 
     EvolutionTable::SystemState state = m_insignificantBodyData.get_system_state(0);
-    EvolutionTable::SystemState sources = m_nBodyData.get_system_state(inputStepIndex);
+    EvolutionTable::SystemState sources = m_nBodyData.get_system_state(prevStep);
 
     for (size_t m = 0; m < m_insignificantBodyData.m_numBodies; m++)
     {
@@ -796,4 +1031,3 @@ void TrajNBody::update_full_dynamics_kinematics(VIEW_T& view)
         pos += static_cast<Vector3s>(vel * dt);
     }
 }
-
