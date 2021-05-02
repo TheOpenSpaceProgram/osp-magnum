@@ -192,8 +192,8 @@ ActiveEnt SysVehicle::part_instantiate(
     ActiveEnt& rootEntity = newEntities[0];
 
     // reserve space for new entities and ACompTransforms to be created
-    rScene.get_registry().reserve(
-                rScene.get_registry().capacity() + part.m_entityCount);
+    //rScene.get_registry().reserve(
+    //            rScene.get_registry().capacity() + part.m_entityCount);
     rScene.get_registry().reserve<ACompTransform>(
                 rScene.get_registry().capacity<ACompTransform>() + part.m_entityCount);
 

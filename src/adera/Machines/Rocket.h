@@ -52,7 +52,7 @@ public:
 
     static inline std::string smc_mach_name = "Rocket";
 
-    static constexpr osp::wire_port_t<Percent> smc_wiThrottle{0};
+    static constexpr osp::portindex_t<Percent> smc_wiThrottle{0};
 
     /**
      * Return normalized power output level of the rocket this frame

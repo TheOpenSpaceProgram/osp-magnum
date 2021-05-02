@@ -124,16 +124,19 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     planeta::active::SysPlanetA::add_functions(rScene);
   
-    adera::active::machines::SysMachineContainer::add_functions(rScene);
-    adera::active::machines::SysMachineRCSController::add_functions(rScene);
-    adera::active::machines::SysMachineRocket::add_functions(rScene);
-    adera::active::machines::SysMachineUserControl::add_functions(rScene);
+    SysMachineContainer::add_functions(rScene);
+    SysMachineRCSController::add_functions(rScene);
+    SysMachineRocket::add_functions(rScene);
+    SysMachineUserControl::add_functions(rScene);
 
     // Setup wiring
     rScene.debug_update_add(rScene.get_update_order(), "wire_percent_construct", "vehicle_activate", "vehicle_modification",
-                            &osp::active::SysWire::update_construct_signal<wiretype::Percent>);
+                            &osp::active::SysWire::signal_update_construct<wiretype::Percent>);
     osp::active::SysWire::add_functions(rScene);
-    osp::active::SysWire::setup_default(rScene, {&adera::active::machines::SysMachineRocket::update_calculate}, {});
+    osp::active::SysWire::setup_default(
+            rScene, 5,
+            {&adera::active::machines::SysMachineRocket::update_calculate},
+            {&osp::active::SysWire::signal_update_propagate<wiretype::Percent>});
     rScene.reg_emplace< ACompWireNodes<wiretype::AttitudeControl> >(rScene.hier_get_root());
     rScene.reg_emplace< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
 

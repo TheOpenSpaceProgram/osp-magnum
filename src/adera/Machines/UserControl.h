@@ -90,12 +90,6 @@ public:
      * @param rScene [ref] Scene with MachineUserControls to update
      */
     static void update_sensor(osp::active::ActiveScene &rScene);
-
-    /**
-     *
-     * @param rScene
-     */
-    static void update_propagate(osp::active::ActiveScene &rScene);
 };
 
 /**
@@ -112,9 +106,9 @@ public:
 
     static constexpr std::string_view smc_mach_name = "UserControl";
 
-    static constexpr osp::wire_port_t<Percent> smc_woThrottle{0};
+    static constexpr osp::portindex_t<Percent> smc_woThrottle{0};
 
-    static constexpr osp::wire_port_t<AttitudeControl> m_woAttitude{0};
+    static constexpr osp::portindex_t<AttitudeControl> m_woAttitude{0};
 
 
 private:

@@ -81,6 +81,7 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
     // InputDevice.IsActivated()
     // Combination
     auto const &usrCtrl = rScene.reg_root_get_or_emplace<ACompUserControl>(rScene.get_user_input());
+    auto &rNodesPercent = rScene.reg_get< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
 
     if (usrCtrl.m_selfDestruct.triggered())
     {
@@ -94,8 +95,10 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
             usrCtrl.m_yawLf.trigger_hold()   - usrCtrl.m_yawRt.trigger_hold(),
             usrCtrl.m_rollRt.trigger_hold()  - usrCtrl.m_rollLf.trigger_hold());
 
-    auto view = rScene.get_registry().view<MachineUserControl>();
 
+    std::vector< nodeindex_t<wiretype::Percent> > updPercent;
+
+    auto view = rScene.get_registry().view<MachineUserControl>();
 
     for (ActiveEnt ent : view)
     {
@@ -111,9 +114,8 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
             if (portThrottle != nullptr)
             {
                 // Get the connected node and its value
-                auto &nodesPercent = rScene.reg_get< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
-                WireNode<wiretype::Percent> &nodeThrottle = nodesPercent.get_node(portThrottle->m_nodeIndex);
-                float throttlePos = nodeThrottle.m_value.m_value;
+                WireNode<wiretype::Percent> &nodeThrottle = rNodesPercent.get_node(portThrottle->m_nodeIndex);
+                float throttlePos = nodeThrottle.m_state.m_value.m_percent;
 
                 float throttleRate = 0.5f;
                 auto delta = throttleRate * rScene.get_time_delta_fixed();
@@ -142,13 +144,23 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
                     throttlePos = 1.0f;
                 }
 
-                // If throttle value has changed, then notify connected machines
-                if (throttlePos != nodeThrottle.m_value.m_value)
+                // If throttle value has changed, then notify connected machines/
+                if (throttlePos != nodeThrottle.m_state.m_value.m_percent)
                 {
-                    nodeThrottle.m_value.m_value = throttlePos;
-                    SysWire::signal_notify(rScene, nodeThrottle);
+                    //nodeThrottle.m_value.m_value = throttlePos;
+                    SysWire::signal_assign(
+                                rScene, wiretype::Percent{throttlePos},
+                                nodeThrottle, portThrottle->m_nodeIndex,
+                                MachineUserControl::smc_woThrottle,
+                                updPercent);
                 }
             }
         }
+    }
+
+    if (!updPercent.empty())
+    {
+        rNodesPercent.propagate_request(std::move(updPercent));
+        rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
 }

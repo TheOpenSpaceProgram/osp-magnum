@@ -49,13 +49,13 @@ struct WireTypes
 };
 
 template<class WIRETYPE_T>
-using wire_node_t = typename WireTypes<WIRETYPE_T>::node;
+using nodeindex_t = typename WireTypes<WIRETYPE_T>::node;
 
 template<class WIRETYPE_T>
-using wire_link_t = typename WireTypes<WIRETYPE_T>::link;
+using linkindex_t = typename WireTypes<WIRETYPE_T>::link;
 
 template<class WIRETYPE_T>
-using wire_port_t = typename WireTypes<WIRETYPE_T>::port;
+using portindex_t = typename WireTypes<WIRETYPE_T>::port;
 
 template<class TYPE_T>
 constexpr TYPE_T nullvalue() { return TYPE_T(std::numeric_limits<typename std::underlying_type<TYPE_T>::type>::max()); }

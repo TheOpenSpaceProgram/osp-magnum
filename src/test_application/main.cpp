@@ -509,7 +509,7 @@ void debug_print_hier()
             // print arrows to indicate level
             std::cout << "  ->";
         }
-        std::cout << "[" << int(currentEnt) << "]: " << hier.m_name << "\n";
+        std::cout << "[" << scene.get_registry().entity(currentEnt) << "]: " << hier.m_name << "\n";
 
         if (hier.m_childCount != 0)
         {

@@ -88,9 +88,10 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
 
 void SysMachineRocket::update_calculate(ActiveScene& rScene)
 {
-    auto view = rScene.get_registry().view<MachineRocket, ACompWireNeedUpdate>();
+    auto view = rScene.get_registry().view<MachineRocket>();
+    std::vector<ActiveEnt>& rToUpdate = rScene.reg_get<ACompWire>(rScene.hier_get_root()).m_entToCalculate[mach_id<MachineRocket>()];
 
-    for (ActiveEnt ent : view)
+    for (ActiveEnt ent : rToUpdate)
     {
         auto &machine = view.get<MachineRocket>(ent);
 
@@ -105,11 +106,12 @@ void SysMachineRocket::update_calculate(ActiveScene& rScene)
             // Get the connected node and its value
             auto &nodesPercent = rScene.reg_get< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
             WireNode<wiretype::Percent> &nodeThrottle = nodesPercent.get_node(portThrottle->m_nodeIndex);
-            float throttle = nodeThrottle.m_value.m_value;
+            float throttle = nodeThrottle.m_state.m_value.m_percent;
             machine.m_powerOutput = throttle;
         }
-
     }
+
+    rToUpdate.clear();
 
 }
 

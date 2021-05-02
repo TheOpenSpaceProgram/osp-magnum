@@ -37,13 +37,13 @@ enum class part_t : uint32_t {};
 enum class mach_t : uint32_t {};
 
 template<class WIRETYPE_T>
-using port_t = osp::wire_port_t<WIRETYPE_T>;
+using port_t = osp::portindex_t<WIRETYPE_T>;
 
 template<class WIRETYPE_T>
-using node_t = osp::wire_node_t<WIRETYPE_T>;
+using node_t = osp::nodeindex_t<WIRETYPE_T>;
 
 template<class WIRETYPE_T>
-using link_t = osp::wire_link_t<WIRETYPE_T>;
+using link_t = osp::linkindex_t<WIRETYPE_T>;
 
 /**
  * Used to easily create Vehicle blueprints
