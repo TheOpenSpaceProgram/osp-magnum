@@ -34,6 +34,8 @@ using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
 
+using wiretype::Percent;
+
 void SysMachineUserControl::add_functions(ActiveScene &rScene)
 {
     rScene.debug_update_add(rScene.get_update_order(), "mach_usercontrol", "", "wire",
@@ -81,7 +83,7 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
     // InputDevice.IsActivated()
     // Combination
     auto const &usrCtrl = rScene.reg_root_get_or_emplace<ACompUserControl>(rScene.get_user_input());
-    auto &rNodesPercent = rScene.reg_get< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
+    ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
 
     if (usrCtrl.m_selfDestruct.triggered())
     {
@@ -109,12 +111,12 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 
         if (panelPercent != nullptr)
         {
-            WirePort<wiretype::Percent> const *portThrottle = panelPercent->connection(MachineUserControl::smc_woThrottle);
+            WirePort<Percent> const *portThrottle = panelPercent->port(MachineUserControl::smc_woThrottle);
 
             if (portThrottle != nullptr)
             {
                 // Get the connected node and its value
-                WireNode<wiretype::Percent> &nodeThrottle = rNodesPercent.get_node(portThrottle->m_nodeIndex);
+                WireNode<Percent> &nodeThrottle = rNodesPercent.get_node(portThrottle->m_nodeIndex);
                 float throttlePos = nodeThrottle.m_state.m_value.m_percent;
 
                 float throttleRate = 0.5f;
@@ -144,20 +146,15 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
                     throttlePos = 1.0f;
                 }
 
-                // If throttle value has changed, then notify connected machines/
-                if (throttlePos != nodeThrottle.m_state.m_value.m_percent)
-                {
-                    //nodeThrottle.m_value.m_value = throttlePos;
-                    SysWire::signal_assign(
-                                rScene, wiretype::Percent{throttlePos},
-                                nodeThrottle, portThrottle->m_nodeIndex,
-                                MachineUserControl::smc_woThrottle,
-                                updPercent);
-                }
+                // Write possibly new throttle value to node
+                SysSignal<Percent>::signal_assign(
+                        rScene, {throttlePos}, nodeThrottle,
+                        portThrottle->m_nodeIndex, updPercent);
             }
         }
     }
 
+    // Request propagation if wire nodes were modified
     if (!updPercent.empty())
     {
         rNodesPercent.propagate_request(std::move(updPercent));

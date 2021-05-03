@@ -38,10 +38,19 @@ namespace osp::active
 namespace wiretype
 {
 
+    /**
+     * Template for Signal types
+     *
+     * Signals have Single writers and multiple readers. They are analogous to
+     * voltage levels in digital logic. Values are copied and reassigned without
+     * describing any sort of mass-conserving flow.
+     *
+     * The first Link in a Node writes new values to the node (Machine's Output)
+     * The remaining Links only read values (Connected Machine Inputs)
+     */
     template<typename TYPE_T>
     struct Signal
     {
-        //enum class LinkType : uint8_t { Input, Output };
         struct NodeState
         {
             TYPE_T m_write;
@@ -69,24 +78,10 @@ namespace wiretype
         //  each (-1.0 .. 1.0)
         // pitch, yaw, roll
         Vector3 m_attitude;
-
-        //Quaternion m_precise;
-        //Quaternion m_rot;
-        //Vector3 m_yawpitchroll
     };
 
     /**
-     * A change in rotation in axis angle
-     *
-     */
-    //struct AttitudeControlPrecise
-    //{
-    //    //Quaternion m_precise;
-    //    Vector3 m_axis;
-    //};
-
-    /**
-     * For something like throttle
+     * A percentage for something like throttle
      */
     struct Percent : public Signal<Percent>
     {
@@ -94,8 +89,6 @@ namespace wiretype
 
         Percent() = default;
         constexpr Percent(float value) noexcept : m_percent(value) { }
-//        constexpr bool operator==(Percent const& rhs)
-//        { return m_value == rhs.m_value; }
 
         float m_percent;
     };
@@ -155,7 +148,10 @@ constexpr void vecset_merge(VEC_T& dest, VEC_T const& rSrc)
 
 //-----------------------------------------------------------------------------
 
-
+/**
+ * Stored in a WireNode and describes a connection to a Machine's Panel Port.
+ * Links can optionally store a LinkState specified by the templated wire type.
+ */
 template<typename WIRETYPE_T>
 struct WireLink
 {
@@ -165,7 +161,7 @@ struct WireLink
 };
 
 /**
- * Stores the wire value, and connects to machine's ACompWirePanel
+ * Stores the wire value, and connects multiple Machines using Links
  */
 template<typename WIRETYPE_T>
 struct WireNode
@@ -174,24 +170,28 @@ struct WireNode
     typename WIRETYPE_T::NodeState m_state;
 };
 
+//-----------------------------------------------------------------------------
+
+/**
+ * Stored in a Panel as part of a Machine, used to connect to a Node's Link
+ */
 template<typename WIRETYPE_T>
 struct WirePort
 {
     nodeindex_t<WIRETYPE_T> m_nodeIndex{nullvalue< nodeindex_t<WIRETYPE_T> >()};
-    //typename WIRETYPE_T::LinkState m_linktype;
-    constexpr bool connected() const noexcept
+
+    constexpr bool is_connected() const noexcept
     {
         return m_nodeIndex != nullvalue< nodeindex_t<WIRETYPE_T> >();
     };
 };
 
 /**
- * Connects machines to WireNodes
+ * Added to Machine entities to connect to Nodes
  */
 template<typename WIRETYPE_T>
 struct ACompWirePanel
 {
-
     ACompWirePanel(uint16_t portCount)
      : m_ports(portCount)
     { }
@@ -199,7 +199,12 @@ struct ACompWirePanel
     // Connect to nodes
     std::vector< WirePort<WIRETYPE_T> > m_ports;
 
-    WirePort<WIRETYPE_T> const* connection(portindex_t<WIRETYPE_T> portIndex) const noexcept
+    /**
+     * Try to get an already connected Port
+     * @param portIndex [in] Index of specified port
+     * @return Pointer to Port, or nullptr if unconnected or nonexistent
+     */
+    WirePort<WIRETYPE_T> const* port(portindex_t<WIRETYPE_T> portIndex) const noexcept
     {
         if (m_ports.size() <= size_t(portIndex))
         {
@@ -207,7 +212,7 @@ struct ACompWirePanel
         }
         WirePort<WIRETYPE_T> const& port = m_ports[size_t(portIndex)];
 
-        return port.connected() ? &port : nullptr;
+        return port.is_connected() ? &port : nullptr;
     }
 };
 
@@ -217,11 +222,20 @@ struct ACompWirePanel
 template<typename WIRETYPE_T>
 struct ACompWireNodes
 {
+    // All the WIRETYPE_T node in the scene
     std::vector< WireNode<WIRETYPE_T> > m_nodes;
 
     std::vector< nodeindex_t<WIRETYPE_T> > m_needPropagate;
     std::unique_ptr<std::mutex> m_needPropagateMutex{std::make_unique<std::mutex>()};
 
+    /**
+     * Create a Node
+     *
+     * @param args [in] Arguments passed to WIRETYPE_T::NodeState constructor
+     *                  (not yet implemented)
+     *
+     * @return Reference and Index to newly created node
+     */
     template<typename ... ARGS_T>
     std::pair<WireNode<WIRETYPE_T>&, nodeindex_t<WIRETYPE_T>> create_node(
             ARGS_T&& ... args)
@@ -231,11 +245,20 @@ struct ACompWireNodes
         return {node, nodeindex_t<WIRETYPE_T>(index)};
     }
 
+    /**
+     * Get a Node by index
+     * @param nodeIndex [in] Index to node to get
+     * @return Reference to Node; not in stable memory.
+     */
     WireNode<WIRETYPE_T>& get_node(nodeindex_t<WIRETYPE_T> nodeIndex) noexcept
     {
         return m_nodes[size_t(nodeIndex)];
     }
 
+    /**
+     * Request a propagation update for a set of Nodes. This locks a mutex.
+     * @param request [in] Vector of node indices
+     */
     void propagate_request(std::vector< nodeindex_t<WIRETYPE_T> > request)
     {
         std::sort(request.begin(), request.end());
@@ -252,17 +275,17 @@ struct ACompWire
 {
     // TODO: replace with beefier function order
     using updfunc_t = void(*)(ActiveScene&);
-
     std::vector<updfunc_t> m_updCalculate;
     std::vector<updfunc_t> m_updPropagate;
-    //std::unordered_map<wire_id_t, propagatefunc_t> m_updPropagate;
 
-    // m_entToCalculate[machine id]
     std::vector<std::vector<ActiveEnt>> m_entToCalculate;
     std::vector<std::mutex> m_entToCalculateMutex;
 
     bool m_updateRequest{false};
 
+    /**
+     * Request to start or continue performing wire updates this frame
+     */
     constexpr void request_update()
     {
         if (!m_updateRequest)
@@ -271,24 +294,13 @@ struct ACompWire
         }
     }
 
-    //std::vector<uint8_t> m_entToCalculate;
-    //bool m_requestCalculate{false};
-    //entt::basic_sparse_set<ActiveEnt> m_updateNext;
-    //entt::basic_sparse_set<ActiveEnt> m_updateNow;
-};
+}; // struct ACompWire
+
+//-----------------------------------------------------------------------------
 
 class SysWire
 {
 public:
-
-    template<typename WIRETYPE_T>
-    static bool connect(
-            WireNode<WIRETYPE_T>& node,
-            nodeindex_t<WIRETYPE_T> nodeIndex,
-            ACompWirePanel<WIRETYPE_T>& panel,
-            ActiveEnt machEnt,
-            portindex_t<WIRETYPE_T> port,
-            typename WIRETYPE_T::LinkState link);
 
     static void add_functions(ActiveScene& rScene);
     static void setup_default(
@@ -297,35 +309,62 @@ public:
             std::vector<ACompWire::updfunc_t> updCalculate,
             std::vector<ACompWire::updfunc_t> updPropagate);
 
+    /**
+     * Perform wire updates.
+     *
+     * This calls even more update functions of configured Machines and Nodes
+     * multiple times so that Machines can reliably send data to other Machines
+     * within a single frame.
+     *
+     * @param rScene [ref] Scene supporting Wires
+     */
     static void update_wire(ActiveScene& rScene);
 
+    /**
+     * Construct a vehicle's ACompWirePanels according to their Blueprint
+     *
+     * @param rScene     [ref] Scene supporting Vehicles and the right wire type
+     * @param vehicleEnt [in] Vehicle entity
+     * @param vehicle    [in] Vehicle component used to locate parts
+     * @param vehicleBp  [in] Blueprint of vehicle
+     */
     template<typename WIRETYPE_T>
     static void construct_panels(
             ActiveScene& rScene, ActiveEnt vehicleEnt,
             ACompVehicle const& vehicle,
             BlueprintVehicle const& vehicleBp);
 
+    /**
+     * @return ACompWireNodes<WIRETYPE_T> reference from scene root
+     */
     template<typename WIRETYPE_T>
-    static void signal_assign(
-            ActiveScene& rScene,
-            WIRETYPE_T&& newValue,
-            WireNode<WIRETYPE_T>& rNode,
+    static constexpr ACompWireNodes<WIRETYPE_T>& nodes(ActiveScene& rScene)
+    {
+        return rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(rScene.hier_get_root());
+    }
+
+    /**
+     * Connect a Node to a Machine's Panel
+     *
+     * @param node      [ref] Node to connect
+     * @param nodeIndex [in] Index of node to connect
+     * @param panel     [in] Panel to connect
+     * @param machEnt   [in] Machine entity Panel is part of
+     * @param port      [in] Port number of Panel to connect to
+     * @param link      [in] Optional Link state to store in Link
+     *
+     * @return true if connection is successfully made, false if port is invalid
+     */
+    template<typename WIRETYPE_T>
+    static bool connect(
+            WireNode<WIRETYPE_T>& node,
             nodeindex_t<WIRETYPE_T> nodeIndex,
+            ACompWirePanel<WIRETYPE_T>& panel,
+            ActiveEnt machEnt,
             portindex_t<WIRETYPE_T> port,
-            std::vector< nodeindex_t<WIRETYPE_T> >& needPropagate);
+            typename WIRETYPE_T::LinkState link);
+}; // class SysWire
 
-    template<typename WIRETYPE_T>
-    static void signal_construct_nodes(
-            ActiveScene& rScene, ActiveEnt vehicleEnt,
-            ACompVehicle const& vehicle,
-            BlueprintVehicle const& vehicleBp);
-
-    template<typename WIRETYPE_T>
-    static void signal_update_construct(ActiveScene& rScene);
-
-    template<typename WIRETYPE_T>
-    static void signal_update_propagate(ActiveScene& rScene);
-};
 
 template<typename WIRETYPE_T>
 bool SysWire::connect(
@@ -376,26 +415,85 @@ void SysWire::construct_panels(
     }
 }
 
+//-----------------------------------------------------------------------------
+
 template<typename WIRETYPE_T>
-void SysWire::signal_assign(
+class SysSignal
+{
+public:
+    /**
+     * Assign a new value to a signal Node
+     *
+     * If the value has changed, then the specified node index will be pushed to
+     * the needPropagate vector. The value is written to an 'm_write' member
+     * and changes will only be visible to connected inputs after the
+     * propigation update
+     *
+     * @param rScene        [ref] Scene the Node is part of
+     * @param newValue      [in] New value to assign to Node
+     * @param rNode         [out] Node to assign value of
+     * @param nodeIndex     [in] Index of Node
+     * @param needPropagate [out] Vector for tracking changed nodes
+     */
+    static void signal_assign(
+            ActiveScene& rScene,
+            WIRETYPE_T&& newValue,
+            WireNode<WIRETYPE_T>& rNode,
+            nodeindex_t<WIRETYPE_T> nodeIndex,
+            std::vector< nodeindex_t<WIRETYPE_T> >& needPropagate);
+
+    /**
+     * Read the blueprint of a Vehicle and construct needed Nodes and Links.
+     *
+     * The vehicle must already have fully initialized Panels
+     *
+     * @param rScene     [ref] Scene supporting Vehicles and the right Node type
+     * @param vehicleEnt [in] Vehicle entity
+     * @param vehicle    [in] Vehicle component used to locate parts
+     * @param vehicleBp  [in] Blueprint of vehicle
+     */
+    static void signal_construct_nodes(
+            ActiveScene& rScene, ActiveEnt vehicleEnt,
+            ACompVehicle const& vehicle,
+            BlueprintVehicle const& vehicleBp);
+
+    /**
+     * Scan the scene for vehicles in construction, and construct Nodes and
+     * Panels if their Blueprint specifies it.
+     *
+     * @param rScene [ref] Scene supporting Vehicles and the right Node type
+     */
+    static void signal_update_construct(ActiveScene& rScene);
+
+    /**
+     * Propagate all signal Nodes in the scene.
+     *
+     * This 'applies changes' to Nodes by copying their new values written by
+     * outputs to their current values to be read by connected inputs.
+     *
+     * @param rScene [ref] Scene supporting the right Node type
+     */
+    static void signal_update_propagate(ActiveScene& rScene);
+};
+
+template<typename WIRETYPE_T>
+void SysSignal<WIRETYPE_T>::signal_assign(
         ActiveScene& rScene,
         WIRETYPE_T&& newValue,
         WireNode<WIRETYPE_T>& rNode,
         nodeindex_t<WIRETYPE_T> nodeIndex,
-        portindex_t<WIRETYPE_T> port,
         std::vector< nodeindex_t<WIRETYPE_T> >& needPropagate)
 {
-    rNode.m_state.m_write = std::forward<WIRETYPE_T>(newValue);
-
-    if (std::memcmp(&rNode.m_state.m_value,
-                    &rNode.m_state.m_write, sizeof(WIRETYPE_T)) != 0)
+    // POD comparison
+    if (std::memcmp(&rNode.m_state.m_value, &newValue, sizeof(WIRETYPE_T)) != 0)
     {
+        rNode.m_state.m_write = std::forward<WIRETYPE_T>(newValue);
         needPropagate.push_back(nodeIndex);
     }
 }
 
 template<typename WIRETYPE_T>
-void SysWire::signal_construct_nodes(
+void SysSignal<WIRETYPE_T>::signal_construct_nodes(
         ActiveScene& rScene, ActiveEnt vehicleEnt,
         ACompVehicle const& vehicle, BlueprintVehicle const& vehicleBp)
 {
@@ -428,15 +526,15 @@ void SysWire::signal_construct_nodes(
             auto& panel = rScene.reg_get< ACompWirePanel<WIRETYPE_T> >(machEnt);
 
             // Link them
-            connect<WIRETYPE_T>(node, nodeIndex, panel, machEnt,
-                                portindex_t<WIRETYPE_T>(bpLink.m_port),
-                                typename WIRETYPE_T::LinkState{});
+            SysWire::connect<WIRETYPE_T>(node, nodeIndex, panel, machEnt,
+                                         portindex_t<WIRETYPE_T>(bpLink.m_port),
+                                         typename WIRETYPE_T::LinkState{});
         }
     }
 }
 
 template<typename WIRETYPE_T>
-void SysWire::signal_update_construct(ActiveScene& rScene)
+void SysSignal<WIRETYPE_T>::signal_update_construct(ActiveScene& rScene)
 {
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
@@ -446,31 +544,32 @@ void SysWire::signal_update_construct(ActiveScene& rScene)
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
-        construct_panels<WIRETYPE_T>(
+        SysWire::construct_panels<WIRETYPE_T>(
                     rScene, vehEnt, rVeh, *(rVehConstr.m_blueprint));
 
-        signal_construct_nodes<WIRETYPE_T>(
-                    rScene, vehEnt, rVeh, *(rVehConstr.m_blueprint));
+        signal_construct_nodes(rScene, vehEnt, rVeh, *(rVehConstr.m_blueprint));
     }
 }
 
 template<typename WIRETYPE_T>
-void SysWire::signal_update_propagate(ActiveScene& rScene)
+void SysSignal<WIRETYPE_T>::signal_update_propagate(ActiveScene& rScene)
 {
     auto &rNodes = rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(rScene.hier_get_root());
     auto &rWire = rScene.reg_get<ACompWire>(rScene.hier_get_root());
 
+    // Machines to update accumulated throughout updating nodes
     std::vector<std::vector<ActiveEnt>> machToUpdate(rWire.m_entToCalculate.size());
 
-    std::vector< nodeindex_t<WIRETYPE_T> >& rNeedPropagate = rNodes.m_needPropagate;
-
-    for (nodeindex_t<WIRETYPE_T> nodeIndex : rNeedPropagate)
+    // Loop through all nodes that need to be propagated
+    for (nodeindex_t<WIRETYPE_T> nodeIndex : rNodes.m_needPropagate)
     {
         WireNode<WIRETYPE_T> &rNode = rNodes.get_node(nodeIndex);
 
-
+        // Overwrite value with value to write
         rNode.m_state.m_value = rNode.m_state.m_write;
 
+        // Add connected machine inputs to machToUpdate vectors, as they now
+        // require a calculation update
         for (auto it = std::next(std::begin(rNode.m_links));
              it != std::end(rNode.m_links); it++)
         {
@@ -480,8 +579,9 @@ void SysWire::signal_update_propagate(ActiveScene& rScene)
         }
     }
 
-    rNeedPropagate.clear();
+    rNodes.m_needPropagate.clear();
 
+    // Commit machines to update to the scene-wide vectors
     for (int i = 0; i < machToUpdate.size(); i ++)
     {
         std::vector<ActiveEnt> &rVec = machToUpdate[i];

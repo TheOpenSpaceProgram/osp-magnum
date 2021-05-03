@@ -41,7 +41,7 @@ void SysWire::setup_default(
         std::vector<ACompWire::updfunc_t> updCalculate,
         std::vector<ACompWire::updfunc_t> updPropagate)
 {
-    auto& wire = rScene.reg_emplace<ACompWire>(
+    rScene.reg_emplace<ACompWire>(
             rScene.hier_get_root(),
             ACompWire{std::move(updCalculate),
                       std::move(updPropagate),
@@ -51,8 +51,6 @@ void SysWire::setup_default(
 
 void SysWire::update_wire(ActiveScene &rScene)
 {
-    //auto view = rScene.get_registry().view<ACompWireNeedUpdate>();
-
     auto &wire = rScene.reg_get<ACompWire>(rScene.hier_get_root());
 
     int updateLimit = 16;
@@ -60,21 +58,6 @@ void SysWire::update_wire(ActiveScene &rScene)
     while (wire.m_updateRequest)
     {
         wire.m_updateRequest = false;
-        // Check if any updates are needed
-//        bool needUpdate = false;
-//        for (std::vector<ActiveEnt> const& toUpdate : wire.m_entToCalculate)
-//        {
-//            if (!toUpdate.empty())
-//            {
-//                needUpdate = true;
-//                break;
-//            }
-//        }
-
-//        if (!needUpdate)
-//        {
-//            break; // Break if no updates needed
-//        }
 
         // Perform Calculation update for all Machines
         for (ACompWire::updfunc_t update : wire.m_updCalculate)

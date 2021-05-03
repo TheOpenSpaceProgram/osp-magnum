@@ -97,7 +97,7 @@ void SysMachineRocket::update_calculate(ActiveScene& rScene)
 
         // Get the Percent Panel which contains the Throttle Port
         auto &panelPercent = rScene.reg_get< ACompWirePanel<wiretype::Percent> >(ent);
-        WirePort<wiretype::Percent> const *portThrottle = panelPercent.connection(MachineRocket::smc_wiThrottle);
+        WirePort<wiretype::Percent> const *portThrottle = panelPercent.port(MachineRocket::smc_wiThrottle);
 
         machine.m_powerOutput = 0;
 
