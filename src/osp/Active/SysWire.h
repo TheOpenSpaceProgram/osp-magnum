@@ -75,6 +75,10 @@ namespace wiretype
     struct AttitudeControl : public Signal<AttitudeControl>
     {
         static inline std::string smc_wire_name = "AttitudeControl";
+
+        AttitudeControl() = default;
+        constexpr AttitudeControl(Vector3 value) noexcept : m_attitude(value) { }
+
         //  each (-1.0 .. 1.0)
         // pitch, yaw, roll
         Vector3 m_attitude;
@@ -255,6 +259,11 @@ struct ACompWireNodes
         return m_nodes[size_t(nodeIndex)];
     }
 
+    WireNode<WIRETYPE_T> const& get_node(nodeindex_t<WIRETYPE_T> nodeIndex) const noexcept
+    {
+        return m_nodes[size_t(nodeIndex)];
+    }
+
     /**
      * Request a propagation update for a set of Nodes. This locks a mutex.
      * @param request [in] Vector of node indices
@@ -341,6 +350,15 @@ public:
     static constexpr ACompWireNodes<WIRETYPE_T>& nodes(ActiveScene& rScene)
     {
         return rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(rScene.hier_get_root());
+    }
+
+    /**
+     * @return Vector of entities of a specified machine type to update
+     */
+    template<typename MACH_T>
+    static constexpr std::vector<ActiveEnt>& to_update(ActiveScene& rScene)
+    {
+        return rScene.reg_get<ACompWire>(rScene.hier_get_root()).m_entToCalculate[mach_id<MACH_T>()];
     }
 
     /**

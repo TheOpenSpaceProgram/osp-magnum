@@ -89,25 +89,31 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
 void SysMachineRocket::update_calculate(ActiveScene& rScene)
 {
     auto view = rScene.get_registry().view<MachineRocket>();
-    std::vector<ActiveEnt>& rToUpdate = rScene.reg_get<ACompWire>(rScene.hier_get_root()).m_entToCalculate[mach_id<MachineRocket>()];
+    std::vector<ActiveEnt>& rToUpdate = SysWire::to_update<MachineRocket>(rScene);
 
     for (ActiveEnt ent : rToUpdate)
     {
         auto &machine = view.get<MachineRocket>(ent);
 
-        // Get the Percent Panel which contains the Throttle Port
-        auto &panelPercent = rScene.reg_get< ACompWirePanel<wiretype::Percent> >(ent);
-        WirePort<wiretype::Percent> const *portThrottle = panelPercent.port(MachineRocket::smc_wiThrottle);
-
         machine.m_powerOutput = 0;
 
-        if (portThrottle != nullptr)
+        // Get the Percent Panel which contains the Throttle Port
+        auto const *panelPercent = rScene.get_registry()
+                .try_get< ACompWirePanel<wiretype::Percent> >(ent);
+
+        if (panelPercent != nullptr)
         {
-            // Get the connected node and its value
-            auto &nodesPercent = rScene.reg_get< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
-            WireNode<wiretype::Percent> &nodeThrottle = nodesPercent.get_node(portThrottle->m_nodeIndex);
-            float throttle = nodeThrottle.m_state.m_value.m_percent;
-            machine.m_powerOutput = throttle;
+            WirePort<wiretype::Percent> const *portThrottle
+                    = panelPercent->port(MachineRocket::smc_wiThrottle);
+
+            if (portThrottle != nullptr)
+            {
+                // Get the connected node and its value
+                auto &nodesPercent = rScene.reg_get< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
+                WireNode<wiretype::Percent> &nodeThrottle = nodesPercent.get_node(portThrottle->m_nodeIndex);
+                float throttle = nodeThrottle.m_state.m_value.m_percent;
+                machine.m_powerOutput = throttle;
+            }
         }
     }
 

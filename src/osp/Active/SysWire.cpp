@@ -59,16 +59,22 @@ void SysWire::update_wire(ActiveScene &rScene)
     {
         wire.m_updateRequest = false;
 
+        // Perform Propagation update for all Nodes
+        for (ACompWire::updfunc_t update : wire.m_updPropagate)
+        {
+            update(rScene);
+        }
+
         // Perform Calculation update for all Machines
         for (ACompWire::updfunc_t update : wire.m_updCalculate)
         {
             update(rScene);
         }
 
-        // Perform Propagation update for all Nodes
-        for (ACompWire::updfunc_t update : wire.m_updPropagate)
+        // Clear update queues
+        for (std::vector<ActiveEnt> &toUpdate : wire.m_entToCalculate)
         {
-            update(rScene);
+            toUpdate.clear();
         }
 
         // Stop updating if limit is reached

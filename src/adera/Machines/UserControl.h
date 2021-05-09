@@ -108,7 +108,7 @@ public:
 
     static constexpr osp::portindex_t<Percent> smc_woThrottle{0};
 
-    static constexpr osp::portindex_t<AttitudeControl> m_woAttitude{0};
+    static constexpr osp::portindex_t<AttitudeControl> smc_woAttitude{0};
 
 
 private:

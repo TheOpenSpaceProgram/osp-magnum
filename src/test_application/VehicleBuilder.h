@@ -36,14 +36,9 @@ namespace testapp
 enum class part_t : uint32_t {};
 enum class mach_t : uint32_t {};
 
-template<class WIRETYPE_T>
-using port_t = osp::portindex_t<WIRETYPE_T>;
-
-template<class WIRETYPE_T>
-using node_t = osp::nodeindex_t<WIRETYPE_T>;
-
-template<class WIRETYPE_T>
-using link_t = osp::linkindex_t<WIRETYPE_T>;
+using osp::portindex_t;
+using osp::nodeindex_t;
+using osp::linkindex_t;
 
 /**
  * Used to easily create Vehicle blueprints
@@ -107,36 +102,36 @@ public:
     // Wiring functions
 
 
-    node_t<void> wire_node_add(osp::wire_id_t id, osp::NodeMap_t config);
+    nodeindex_t<void> wire_node_add(osp::wire_id_t id, osp::NodeMap_t config);
 
     template<typename WIRETYPE_T>
-    node_t<WIRETYPE_T> wire_node_add(osp::ConfigNode_t config)
+    nodeindex_t<WIRETYPE_T> wire_node_add(osp::ConfigNode_t config)
     {
         return wire_node_add(osp::wiretype_id<WIRETYPE_T>(), config);
     }
 
-    link_t<void> wire_connect(
-            osp::wire_id_t id, node_t<void> node, osp::NodeMap_t config,
-            part_t part, mach_t mach, port_t<void> port);
+    linkindex_t<void> wire_connect(
+            osp::wire_id_t id, nodeindex_t<void> node, osp::NodeMap_t config,
+            part_t part, mach_t mach, portindex_t<void> port);
 
     template<typename WIRETYPE_T>
-    link_t<WIRETYPE_T> wire_connect(
-            node_t<WIRETYPE_T> node, osp::NodeMap_t config,
-            part_t part, mach_t mach, port_t<WIRETYPE_T> port)
+    linkindex_t<WIRETYPE_T> wire_connect(
+            nodeindex_t<WIRETYPE_T> node, osp::NodeMap_t config,
+            part_t part, mach_t mach, portindex_t<WIRETYPE_T> port)
     {
-        return link_t<WIRETYPE_T>(wire_connect(osp::wiretype_id<WIRETYPE_T>(), config, part, mach, port));
+        return linkindex_t<WIRETYPE_T>(wire_connect(osp::wiretype_id<WIRETYPE_T>(), config, part, mach, port));
     }
 
-    node_t<void> wire_connect_signal(osp::wire_id_t id,
-            part_t partOut, mach_t machOut, port_t<void> portOut,
-            part_t partIn, mach_t machIn, port_t<void> portIn);
+    nodeindex_t<void> wire_connect_signal(osp::wire_id_t id,
+            part_t partOut, mach_t machOut, portindex_t<void> portOut,
+            part_t partIn, mach_t machIn, portindex_t<void> portIn);
 
     template<typename WIRETYPE_T>
-    node_t<WIRETYPE_T> wire_connect_signal(
-            part_t partOut, mach_t machOut, port_t<WIRETYPE_T> portOut,
-            part_t partIn, mach_t machIn, port_t<WIRETYPE_T> portIn)
+    nodeindex_t<WIRETYPE_T> wire_connect_signal(
+            part_t partOut, mach_t machOut, portindex_t<WIRETYPE_T> portOut,
+            part_t partIn, mach_t machIn, portindex_t<WIRETYPE_T> portIn)
     {
-        return node_t<WIRETYPE_T>(wire_connect_signal(osp::wiretype_id<WIRETYPE_T>(), partOut, machOut, port_t<void>(portOut), partIn, machIn, port_t<void>(portIn)));
+        return nodeindex_t<WIRETYPE_T>(wire_connect_signal(osp::wiretype_id<WIRETYPE_T>(), partOut, machOut, portindex_t<void>(portOut), partIn, machIn, portindex_t<void>(portIn)));
     }
 
     osp::BlueprintVehicle&& export_move() { return std::move(m_vehicle); };
@@ -144,9 +139,16 @@ public:
 
 private:
 
+    // Map used to obtain a Machine's Panel
     // panelIndex = m_panelMap[{id, part, machine}]
     // panel = m_vehicle.m_wirePanels[panelIndex]
-    std::map<std::tuple<osp::wire_id_t, part_t, mach_t>, uint32_t> m_panelIndexMap;
+    std::map<std::tuple<osp::wire_id_t, part_t, mach_t>,
+             uint32_t> m_panelIndexMap;
+
+    // Map used to obtain Nodes from part
+    // nodeIndex = m_nodeIndexMap[{id, part, machine, port}]
+    std::map<std::tuple<osp::wire_id_t, part_t, mach_t, portindex_t<void>>,
+             nodeindex_t<void>> m_nodeIndexMap;
 
     osp::BlueprintVehicle m_vehicle;
 

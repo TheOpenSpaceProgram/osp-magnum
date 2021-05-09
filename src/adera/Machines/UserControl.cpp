@@ -34,6 +34,7 @@ using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
 
+using wiretype::AttitudeControl;
 using wiretype::Percent;
 
 void SysMachineUserControl::add_functions(ActiveScene &rScene)
@@ -84,6 +85,10 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
     // Combination
     auto const &usrCtrl = rScene.reg_root_get_or_emplace<ACompUserControl>(rScene.get_user_input());
     ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
+    ACompWireNodes<AttitudeControl> &rNodesAttCtrl = SysWire::nodes<AttitudeControl>(rScene);
+
+    std::vector< nodeindex_t<wiretype::Percent> > propagatePercent;
+    std::vector< nodeindex_t<wiretype::AttitudeControl> > propagateAttCtrl;
 
     if (usrCtrl.m_selfDestruct.triggered())
     {
@@ -97,9 +102,6 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
             usrCtrl.m_yawLf.trigger_hold()   - usrCtrl.m_yawRt.trigger_hold(),
             usrCtrl.m_rollRt.trigger_hold()  - usrCtrl.m_rollLf.trigger_hold());
 
-
-    std::vector< nodeindex_t<wiretype::Percent> > updPercent;
-
     auto view = rScene.get_registry().view<MachineUserControl>();
 
     for (ActiveEnt ent : view)
@@ -107,11 +109,12 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
         MachineUserControl &machine = view.get<MachineUserControl>(ent);
 
         // Get the Percent Panel which contains the Throttle Port
-        auto *panelPercent = rScene.reg_try_get< ACompWirePanel<wiretype::Percent> >(ent);
+        auto *panelPercent = rScene.reg_try_get< ACompWirePanel<Percent> >(ent);
 
         if (panelPercent != nullptr)
         {
-            WirePort<Percent> const *portThrottle = panelPercent->port(MachineUserControl::smc_woThrottle);
+            WirePort<Percent> const *portThrottle
+                    = panelPercent->port(MachineUserControl::smc_woThrottle);
 
             if (portThrottle != nullptr)
             {
@@ -149,15 +152,34 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
                 // Write possibly new throttle value to node
                 SysSignal<Percent>::signal_assign(
                         rScene, {throttlePos}, nodeThrottle,
-                        portThrottle->m_nodeIndex, updPercent);
+                        portThrottle->m_nodeIndex, propagatePercent);
             }
+        }
+
+        // Get the Attitude Control Panel which contains the Throttle Port
+        auto *panelAttCtrl = rScene.reg_try_get< ACompWirePanel<AttitudeControl> >(ent);
+
+        if (panelAttCtrl != nullptr)
+        {
+            WirePort<AttitudeControl> const *portAttitude
+                    = panelAttCtrl->port(MachineUserControl::smc_woAttitude);
+            WireNode<AttitudeControl> &nodeAttCtrl = rNodesAttCtrl.get_node(portAttitude->m_nodeIndex);
+
+            SysSignal<AttitudeControl>::signal_assign(
+                    rScene, {attitudeIn}, nodeAttCtrl,
+                    portAttitude->m_nodeIndex, propagateAttCtrl);
         }
     }
 
     // Request propagation if wire nodes were modified
-    if (!updPercent.empty())
+    if (!propagatePercent.empty())
     {
-        rNodesPercent.propagate_request(std::move(updPercent));
+        rNodesPercent.propagate_request(std::move(propagatePercent));
+        rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
+    }
+    if (!propagateAttCtrl.empty())
+    {
+        rNodesAttCtrl.propagate_request(std::move(propagateAttCtrl));
         rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
 }

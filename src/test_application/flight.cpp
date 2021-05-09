@@ -132,11 +132,15 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Setup wiring
     rScene.debug_update_add(rScene.get_update_order(), "wire_percent_construct", "vehicle_activate", "vehicle_modification",
                             &osp::active::SysSignal<wiretype::Percent>::signal_update_construct);
+    rScene.debug_update_add(rScene.get_update_order(), "wire_attctrl_construct", "vehicle_activate", "vehicle_modification",
+                            &osp::active::SysSignal<wiretype::AttitudeControl>::signal_update_construct);
     osp::active::SysWire::add_functions(rScene);
     osp::active::SysWire::setup_default(
             rScene, 5,
-            {&adera::active::machines::SysMachineRocket::update_calculate},
-            {&osp::active::SysSignal<wiretype::Percent>::signal_update_propagate});
+            {&adera::active::machines::SysMachineRocket::update_calculate,
+             &adera::active::machines::SysMachineRCSController::update_calculate},
+            {&osp::active::SysSignal<wiretype::Percent>::signal_update_propagate,
+             &osp::active::SysSignal<wiretype::AttitudeControl>::signal_update_propagate});
     rScene.reg_emplace< ACompWireNodes<wiretype::AttitudeControl> >(rScene.hier_get_root());
     rScene.reg_emplace< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
 

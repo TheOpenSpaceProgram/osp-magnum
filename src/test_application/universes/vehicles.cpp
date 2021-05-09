@@ -278,14 +278,23 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     //blueprint.add_wire(Parts::FUSELAGE, 0, 0,
     //    Parts::ENGINE, 0, 3);
 
-    for (auto port : rcsPorts)
+    mach_t const partCapsuleUsrCtrl = blueprint.machine_find<MachineUserControl>(partCapsule);
+
+    for (auto partRCS : rcsPorts)
     {
+        mach_t const partRCSRocket = blueprint.machine_find<MachineRocket>(partRCS);
+        mach_t const partRCSCtrl = blueprint.machine_find<MachineRCSController>(partRCS);
+
         // Attitude control -> RCS Control
-        //blueprint.add_wire(Parts::CAPSULE, 0, 0,
-        //    port, 0, 0);
+        blueprint.wire_connect_signal<AttitudeControl>(
+                partCapsule, partCapsuleUsrCtrl, MachineUserControl::smc_woAttitude,
+                partRCS, partRCSCtrl, MachineRCSController::smc_wiCommandOrient);
+
         // RCS Control -> RCS Rocket
-        //blueprint.add_wire(port, 0, 0,
-        //    port, 1, 2);
+        blueprint.wire_connect_signal<Percent>(
+                partRCS, partRCSCtrl, MachineRCSController::m_woThrottle,
+                partRCS, partRCSRocket, MachineRocket::smc_wiThrottle);
+
         // Fuselage tank -> RCS Rocket
         //blueprint.add_wire(Parts::FUSELAGE, 0, 0,
         //    port, 1, 3);

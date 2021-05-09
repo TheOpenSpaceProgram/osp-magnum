@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright Â© 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -22,10 +22,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 #pragma once
 
-#include <osp/Active/SysMachine.h>
 #include <osp/Resource/blueprints.h>
+
+#include <osp/Active/SysWire.h>
 
 namespace adera::active::machines
 {
@@ -65,8 +67,6 @@ public:
 
     static void update_calculate(osp::active::ActiveScene &rScene);
 
-    static void update_propagate(osp::active::ActiveScene &rScene);
-
 private:
     /**
      * Command-thrust influence calculator
@@ -94,14 +94,18 @@ class MachineRCSController
 {
     friend SysMachineRCSController;
 
+    using Percent = osp::active::wiretype::Percent;
+    using AttitudeControl = osp::active::wiretype::AttitudeControl;
+
 public:
 
     static inline std::string smc_mach_name = "RCSController";
 
+    static constexpr osp::portindex_t<AttitudeControl> smc_wiCommandOrient{0};
+
+    static constexpr osp::portindex_t<Percent> m_woThrottle{0};
 
 private:
-    //osp::active::WireInput m_wiCommandOrient{this, "Orient"};
-    //osp::active::WireOutput m_woThrottle{this, "Throttle"};
 
     osp::active::ActiveEnt m_rigidBody{entt::null};
 }; // MachineRCSController
