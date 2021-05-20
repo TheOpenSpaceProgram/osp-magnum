@@ -37,7 +37,22 @@
 #include <Magnum/GL/Sampler.h>
 #include <Magnum/GL/TextureFormat.h>
 
-using namespace osp::active;
+using namespace adera::active;
+
+using osp::AssetImporter;
+
+using osp::DependRes;
+using osp::Package;
+
+using osp::active::ActiveScene;
+using osp::active::ActiveEnt;
+
+
+using osp::active::ACompMesh;
+using osp::active::ACompShader;
+using osp::active::ACompTransparent;
+using osp::active::ACompVisible;
+
 
 void SysExhaustPlume::add_functions(ActiveScene& rScene)
 {

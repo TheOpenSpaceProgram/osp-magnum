@@ -65,6 +65,14 @@ struct ACompVehicle
     unsigned m_separationCount{0};
 };
 
+struct ACompVehicleInConstruction
+{
+    ACompVehicleInConstruction(DependRes<BlueprintVehicle>& blueprint)
+     : m_blueprint(blueprint)
+    { }
+    DependRes<BlueprintVehicle> m_blueprint;
+};
+
 struct ACompPart
 {
     ActiveEnt m_vehicle{entt::null};
@@ -94,38 +102,28 @@ public:
                            universe::Satellite tgtSat, ActiveEnt tgtEnt);
 
     /**
-     * Deal with activating and deactivating nearby vehicle Satellites in the
-     * Universe, and also update transforms of currently activated vehicles.
+     * Activate/Deactivate vehicles that enter/exit the ActiveArea
      *
-     * @param rScene [in/out] Scene containing vehicles to update
+     * Nearby vehicles are detected by SysAreaAssociate, and are added to a
+     * queue. This function reads the queue and activates vehicles accordingly.
+     * Activated vehicles will be in an incomplete "In-Construction" state so
+     * that individual features can be handled by separate systems.
+     *
+     * This function also update Satellites transforms of the currently
+     * activated vehicles in the scene
+     *
+     * @param rScene [ref] Scene containing vehicles to update
      */
     static void update_activate(ActiveScene& rScene);
 
     /**
      * Deal with vehicle separations and part deletions
      *
-     * @param rScene [in/out] Scene containing vehicles to update
+     * @param rScene [ref] Scene containing vehicles to update
      */
     static void update_vehicle_modification(ActiveScene& rScene);
 
 private:
-
-    /* Stores the association between a PrototypeObj entity and the indices of
-     * its owned machines in the PrototypePart array. Stores a const reference
-     * to a vector because the vector is filled with PrototypePart machine data
-     * by part_instantiate() and consumed by part_instantiate_machines(), all
-     * within the activate() function scope within which the index data is stable.
-     */
-    struct MachineDef
-    {
-        ActiveEnt m_machineOwner;
-        std::vector<uint32_t> const& m_machineIndices;
-
-        MachineDef(ActiveEnt owner, std::vector<uint32_t> const& indexArray)
-            : m_machineOwner(owner)
-            , m_machineIndices(indexArray)
-        {}
-    };
 
     /**
      * Compute the volume of a part
@@ -150,52 +148,9 @@ private:
      *
      * @return A pair containing the entity created and the list of part machines
      */
-    static std::pair<ActiveEnt, std::vector<MachineDef>> part_instantiate(
-        ActiveScene& rScene,
-        PrototypePart& part,
-        BlueprintPart& blueprint,
-        ActiveEnt rootParent);
-
-    /**
-     * Add machines to the specified entity
-     *
-     * Receives the master arrays of prototype and blueprint machines from a
-     * prototype/blueprint part, as well as an array of indices that describe
-     * which of the machines from the master list are to be instantiated for
-     * the specified entity.
-     * @param partEnt [in] The part entity which owns the ACompMachines component
-     * @param entity [in] The target entity to receive the machines
-     * @param protoMachines [in] The master array of prototype machines
-     * @param blueprintMachines [in] The master array of machine configs
-     * @param machineIndices [in] The indices of the machines to add to entity
-     */
-    static void add_machines_to_object(ActiveScene& rScene,
-        ActiveEnt partEnt, ActiveEnt entity,
-        std::vector<PrototypeMachine> const& protoMachines,
-        std::vector<BlueprintMachine> const& blueprintMachines,
-        std::vector<unsigned> const& machineIndices);
-
-    /**
-     * Instantiate all part machines
-     *
-     * Machine instantiation requires the part's hierarchy to already exist
-     * in case a sub-object needs information about its peers. Since this means
-     * machines can't be instantiated alongside their associated object, the
-     * association between entities and prototype machines is captured, then used
-     * to call this function after all part children exist to instance all the
-     * machines at once.
-     *
-     * Effectively just calls add_machines_to_object() for each object in the
-     * part.
-     *
-     * @param partEnt [in] The root entity of the part
-     * @param machineMapping [in] The mapping from objects to their machines
-     * @param part [in] The prototype part being created
-     * @param partBP [in] The blueprint configs of the part being created
-     */
-    static void part_instantiate_machines(ActiveScene& rScene, ActiveEnt partEnt,
-        std::vector<MachineDef> const& machineMapping,
-        PrototypePart const& part, BlueprintPart const& partBP);
+    static ActiveEnt part_instantiate(
+            ActiveScene& rScene, PrototypePart const& part,
+            BlueprintPart const& blueprint, ActiveEnt rootParent);
 
 };
 

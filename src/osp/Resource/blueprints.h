@@ -37,8 +37,12 @@ using WireOutPort = uint16_t;
 
 struct BlueprintMachine
 {
-    // TODO specific settings for a machine
-    std::map<std::string, config_node_t> m_config;
+    NodeMap_t m_config;
+
+    // Index to a BlueprintPart in BlueprintVehicle's m_blueprints
+    uint32_t m_blueprintIndex;
+    // Index to a m_protoMachines in PrototypePart
+    uint16_t m_protoMachineIndex;
 };
 
 /**
@@ -50,16 +54,22 @@ struct BlueprintMachine
 struct BlueprintPart
 { 
 
-    uint32_t m_partIndex; // index to BlueprintVehicle's m_partsUsed
+    BlueprintPart(uint32_t protoIndex, uint16_t machineCount,
+                  Vector3 translation, Quaternion rotation, Vector3 scale)
+    : m_protoIndex(protoIndex)
+    , m_translation(translation)
+    , m_rotation(rotation)
+    , m_scale(scale)
+    , m_machineCount(machineCount)
+    { }
+
+    uint32_t m_protoIndex; // index to BlueprintVehicle's m_partsUsed
 
     Vector3 m_translation;
     Quaternion m_rotation;
     Vector3 m_scale;
 
-    // put some sort of config here
-
-    // Configuration of individual machines
-    std::vector<BlueprintMachine> m_machines;
+    uint16_t m_machineCount;
 };
 
 /**
@@ -94,50 +104,8 @@ struct BlueprintWire
  * * Attachments
  * * Wiring
  */
-class BlueprintVehicle
+struct BlueprintVehicle
 {
-
-public:
-
-    BlueprintVehicle() = default;
-    BlueprintVehicle(BlueprintVehicle&& move) = default;
-
-    /**
-     * Emplaces a BlueprintPart. This function searches the prototype vector
-     * to see if the part has been added before.
-     * @param part
-     * @param translation
-     * @param rotation
-     * @param scale
-     * @return Resulting blueprint part
-     */
-    BlueprintPart& add_part(DependRes<PrototypePart>& part,
-                  const Vector3& translation,
-                  const Quaternion& rotation,
-                  const Vector3& scale);
-
-    /**
-     * Emplace a BlueprintWire
-     * @param fromPart
-     * @param fromMachine
-     * @param fromPort
-     * @param toPart
-     * @param toMachine
-     * @param toPort
-     */
-    void add_wire(unsigned fromPart, unsigned fromMachine, WireOutPort fromPort,
-                  unsigned toPart, unsigned toMachine, WireInPort toPort);
-
-    constexpr std::vector<DependRes<PrototypePart>>& get_prototypes()
-    { return m_prototypes; }
-
-    constexpr std::vector<BlueprintPart>& get_blueprints()
-    { return m_blueprints; }
-
-    constexpr std::vector<BlueprintWire>& get_wires()
-    { return m_wires; }
-
-private:
     // Unique part Resources used
     std::vector<DependRes<PrototypePart>> m_prototypes;
 
@@ -146,6 +114,9 @@ private:
 
     // Wires to connect
     std::vector<BlueprintWire> m_wires;
+
+    // m_machines[machine id]
+    std::vector<std::vector<BlueprintMachine>> m_machines;
 
 };
 

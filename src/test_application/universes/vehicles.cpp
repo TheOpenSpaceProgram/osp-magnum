@@ -24,6 +24,10 @@
  */
 
 #include "vehicles.h"
+#include "../VehicleBuilder.h"
+
+#include <adera/ShipResources.h>
+#include <adera/Machines/Container.h>
 
 #include <osp/Satellites/SatVehicle.h>
 
@@ -79,7 +83,7 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
         Universe& uni, Package& pkg, std::string_view name)
 {
     // Begin blueprint
-    BlueprintVehicle blueprint;
+    VehicleBuilder blueprint;
 
     // Part to add
     DependRes<PrototypePart> rocket = pkg.get<PrototypePart>("part_stomper");
@@ -99,7 +103,7 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
 
     // Save blueprint
     DependRes<BlueprintVehicle> depend =
-        pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
+        pkg.add<BlueprintVehicle>(std::string{name}, blueprint.export_move());
 
     // Create new satellite
     Satellite sat = uni.sat_create();
@@ -120,7 +124,7 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
 {
 
     // Start making the blueprint
-    BlueprintVehicle blueprint;
+    VehicleBuilder blueprint;
 
     // Part to add, very likely a spamcan
     DependRes<PrototypePart> victim = pkg.get<PrototypePart>("part_spamcan");
@@ -155,7 +159,7 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
 
     // put blueprint in package
     DependRes<BlueprintVehicle> depend =
-        pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
+        pkg.add<BlueprintVehicle>(std::string{name}, blueprint.export_move());
 
     // Create the Satellite containing a SatVehicle
 
@@ -180,20 +184,20 @@ Vector3 part_offset(PrototypePart const& attachTo,
     Vector3 oset1{0.0f};
     Vector3 oset2{0.0f};
 
-    for (osp::PrototypeObject const& obj : attachTo.get_objects())
+    for (osp::PCompName const& name : attachTo.m_partName)
     {
-        if (obj.m_name == attachToName)
+        if (name.m_name == attachToName)
         {
-            oset1 = obj.m_translation;
+            oset1 = attachTo.m_partTransform[name.m_entity].m_translation;
             break;
         }
     }
 
-    for (osp::PrototypeObject const& obj : toAttach.get_objects())
+    for (osp::PCompName const& name : toAttach.m_partName)
     {
-        if (obj.m_name == toAttachName)
+        if (name.m_name == toAttachName)
         {
-            oset2 = obj.m_translation;
+            oset2 = toAttach.m_partTransform[name.m_entity].m_translation;
             break;
         }
     }
@@ -202,14 +206,14 @@ Vector3 part_offset(PrototypePart const& attachTo,
 }
 
 void blueprint_add_rcs_block(
-        BlueprintVehicle &rBlueprint, DependRes<PrototypePart> rRcs,
+        VehicleBuilder &rBlueprint, DependRes<PrototypePart> rRcs,
         std::vector<int> &rRcsPorts, Vector3 pos, Quaternion rot)
 {
     using namespace Magnum::Math::Literals;
 
     Vector3 constexpr scl{1};
     Vector3 constexpr zAxis{0, 0, 1};
-    int hackypartnum = rBlueprint.get_blueprints().size();
+    int hackypartnum = rBlueprint.part_count();
 
     rBlueprint.add_part(rRcs, pos, Quaternion::rotation(90.0_degf, zAxis) * rot, scl);
     //rBlueprint.add_part(rRcs, pos, rot, scl);
@@ -228,8 +232,11 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     using namespace Magnum::Math::Literals;
     using Magnum::Rad;
 
+    using osp::BlueprintMachine;
+    using adera::active::machines::MachineContainer;
+
     // Start making the blueprint
-    BlueprintVehicle blueprint;
+    VehicleBuilder blueprint;
 
     // Parts
     DependRes<PrototypePart> capsule = pkg.get<PrototypePart>("part_phCapsule");
@@ -253,11 +260,13 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
 
     blueprint.add_part(capsule, Vector3{0}, idRot, scl);
 
-    auto& fuselageBP = blueprint.add_part(fuselage, cfOset, idRot, scl);
-    fuselageBP.m_machines[1].m_config.emplace("resourcename", "lzdb:fuel");
-    fuselageBP.m_machines[1].m_config.emplace("fuellevel", 0.5);
 
-    auto& engBP = blueprint.add_part(engine, cfOset + feOset, idRot, scl);
+    partindex_t fuselageBP = blueprint.add_part(fuselage, cfOset, idRot, scl);
+    BlueprintMachine* fusalageMach= blueprint.find_machine_by_type<MachineContainer>(fuselageBP);
+    fusalageMach->m_config.emplace("resourcename", "lzdb:fuel");
+    fusalageMach->m_config.emplace("fuellevel", 0.5);
+
+    blueprint.add_part(engine, cfOset + feOset, idRot, scl);
 
     // Add a shit ton of RCS rings
 
@@ -290,7 +299,7 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
         ENGINE = 2
     };
 
-    std::cout << "Part vehicle has " << blueprint.get_blueprints().size()
+    std::cout << "Part vehicle has " << blueprint.part_count()
               << " Parts!\n";
 
     // Wire throttle control
@@ -327,7 +336,8 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     }
 
     // Put blueprint in package
-    auto depend = pkg.add<BlueprintVehicle>(std::string{name}, std::move(blueprint));
+    auto depend = pkg.add<BlueprintVehicle>(std::string{name},
+                                            blueprint.export_move());
 
     Satellite sat = uni.sat_create();
 

@@ -26,6 +26,7 @@
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysVehicle.h>
+#include <osp/Active/SysMachine.h>
 #include <osp/Active/physics.h>
 #include <osp/Active/SysNewton.h>
 #include <osp/Active/SysAreaAssociate.h>
@@ -41,6 +42,7 @@ using osp::Vector3s;
 using osp::Quaternion;
 using osp::Matrix3;
 using osp::Matrix4;
+using osp::machine_id_t;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -51,6 +53,8 @@ using osp::active::ACompAreaLink;
 using osp::active::ACompCamera;
 using osp::active::ACompTransform;
 using osp::active::ACompVehicle;
+using osp::active::ACompMachines;
+using osp::active::ACompMachineType;
 
 using osp::active::SysAreaAssociate;
 
@@ -194,6 +198,35 @@ void DebugCameraController::update_physics_pre()
     }
 }
 
+MachineUserControl* find_user_control(ActiveScene& rScene, ActiveEnt vehicle)
+{
+    machine_id_t const id = osp::mach_id<MachineUserControl>();
+    // Search all parts
+    std::vector<ActiveEnt> const& parts = rScene.reg_get<ACompVehicle>(vehicle).m_parts;
+    for (ActiveEnt partEnt : parts)
+    {
+        // Search all machines of that part
+        auto const* machines = rScene.reg_try_get<ACompMachines>(partEnt);
+        if (machines == nullptr)
+        {
+            return nullptr;
+        }
+        for (ActiveEnt machEnt : machines->m_machines)
+        {
+            if (!rScene.get_registry().valid(machEnt))
+            {
+                return nullptr;
+            }
+            if (rScene.reg_get<ACompMachineType>(machEnt).m_type == id)
+            {
+                // Found!
+                return &rScene.reg_get<MachineUserControl>(machEnt);
+            }
+        }
+    }
+    return nullptr;
+}
+
 void DebugCameraController::update_physics_post()
 {
 
@@ -206,10 +239,11 @@ void DebugCameraController::update_physics_post()
     }
 
     // enable the first MachineUserControl
-    ActiveEnt firstPart = *(rReg.get<ACompVehicle>(vehicle).m_parts.begin());
-
-    auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
-    if (pMUserCtrl != nullptr) { pMUserCtrl->enable(); }
+    if (MachineUserControl *pMUserCtrl = find_user_control(m_scene, vehicle);
+        pMUserCtrl != nullptr)
+    {
+        pMUserCtrl->enable();
+    }
 
 
     Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
@@ -291,8 +325,11 @@ bool DebugCameraController::try_switch_vehicle()
         // Switching away, disable the first MachineUserControl
         ActiveEnt firstPart
                 = *(viewActive.get<ACompVehicle>(vehicle).m_parts.begin());
-        auto* pMUserCtrl = rReg.try_get<MachineUserControl>(firstPart);
-        if (pMUserCtrl != nullptr) { pMUserCtrl->disable(); }
+        if (MachineUserControl *pMUserCtrl = find_user_control(m_scene, vehicle);
+            pMUserCtrl != nullptr)
+        {
+            pMUserCtrl->disable();
+        }
 
         prevVehiclePos = rReg.get<ACompTransform>(vehicle).m_transform.translation();
     }

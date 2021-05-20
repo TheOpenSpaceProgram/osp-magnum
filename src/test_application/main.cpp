@@ -39,7 +39,15 @@
 #include <osp/Satellites/SatVehicle.h>
 
 #include <adera/ShipResources.h>
+
+
 #include <osp/Shaders/Phong.h>
+#include <adera/Shaders/PlumeShader.h>
+
+#include <adera/Machines/Container.h>
+#include <adera/Machines/RCSController.h>
+#include <adera/Machines/Rocket.h>
+#include <adera/Machines/UserControl.h>
 
 #include <planet-a/Satellites/SatPlanet.h>
 
@@ -253,12 +261,29 @@ bool destroy_universe()
     return true;
 }
 
+// TODO: move this somewhere else
+template<typename MACH_T>
+constexpr void register_sys_machine(osp::Package &rPkg)
+{
+    rPkg.add<osp::RegisteredMachine>(std::string(MACH_T::smc_mach_name),
+                                     osp::mach_id<MACH_T>());
+}
+
 void load_a_bunch_of_stuff()
 {
     // Create a new package
     osp::Package lazyDebugPack("lzdb", "lazy-debug");
 
+    using adera::active::machines::MachineContainer;
+    using adera::active::machines::MachineRCSController;
+    using adera::active::machines::MachineRocket;
+    using adera::active::machines::MachineUserControl;
 
+    // Register machines
+    register_sys_machine<MachineContainer>(lazyDebugPack);
+    register_sys_machine<MachineRCSController>(lazyDebugPack);
+    register_sys_machine<MachineRocket>(lazyDebugPack);
+    register_sys_machine<MachineUserControl>(lazyDebugPack);
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};
@@ -276,7 +301,7 @@ void load_a_bunch_of_stuff()
     for (auto meshName : meshes)
     {
         osp::AssetImporter::load_sturdy_file(
-            osp::string_concat(datapath, meshName), lazyDebugPack);
+            osp::string_concat(datapath, meshName), lazyDebugPack, lazyDebugPack);
     }
 
     // Load noise textures
@@ -404,6 +429,9 @@ void debug_print_machines()
     using osp::active::ActiveScene;
     using osp::active::ActiveEnt;
     using osp::active::ACompMachines;
+    using osp::active::ACompMachineType;
+    using osp::RegisteredMachine;
+    using regmachs_t = osp::Package::group_t<RegisteredMachine>;
 
     if (!g_ospMagnum)
     {
@@ -411,20 +439,30 @@ void debug_print_machines()
         return;
     }
 
-    ActiveScene& scene = g_ospMagnum->get_scenes().begin()->second;
-    auto view = scene.get_registry().view<ACompMachines>();
+    // Get list of machine names
+    regmachs_t const &group = g_osp.debug_find_package("lzdb").group_get<RegisteredMachine>();
+    std::vector<std::string_view> machNames(group.size());
+    for (auto const& [name, regMach] : group)
+    {
+        machNames[regMach.m_data->m_id] = name;
+    }
+
+    // Loop through every Vehicle
+    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second;
+    auto view = scene.get_registry().view<const ACompMachines>();
 
     for (ActiveEnt ent : view)
     {
-        ACompHierarchy& hier = scene.reg_get<ACompHierarchy>(ent);
+        auto const &hier = scene.reg_get<ACompHierarchy>(ent);
         std::cout << "[" << int(ent) << "]: " << hier.m_name << "\n";
 
-        auto& machines = scene.reg_get<ACompMachines>(ent);
-        for (ACompMachines::PartMachine const& mach : machines.m_machines)
+        // Loop through each of that vehicle's Machines
+        auto const &machines = scene.reg_get<ACompMachines>(ent);
+        for (ActiveEnt machEnt : machines.m_machines)
         {
-            ActiveEnt machEnt = mach.m_partEnt;
-            std::string const& sysName = mach.m_system->first;
-            std::cout << "  ->[" << int(machEnt) << "]: " << sysName << "\n";
+            auto const& type = scene.reg_get<ACompMachineType>(machEnt);
+
+            std::cout << "  ->[" << int(machEnt) << "]: " << machNames[type.m_type] << "\n";
         }
     }
 }

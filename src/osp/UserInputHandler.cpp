@@ -53,12 +53,12 @@ ButtonControlHandle::~ButtonControlHandle()
     m_to->m_controls[m_index].m_referenceCount --;
 }
 
-bool ButtonControlHandle::triggered()
+bool ButtonControlHandle::triggered() const
 {
     return m_to->m_controls[m_index].m_triggered;
 }
 
-bool ButtonControlHandle::trigger_hold()
+bool ButtonControlHandle::trigger_hold() const
 {
     return m_to->m_controls[m_index].m_held;
 }

@@ -54,7 +54,8 @@ PluginManager;
 public:
     AssetImporter() { }
 
-    static void load_sturdy_file(std::string_view filepath, Package& package);
+    static void load_sturdy_file(std::string_view filepath,
+                                 Package& rMachinePkg, Package& package);
 
     /**
      * Load an image from disk at the specified filepath
@@ -100,7 +101,7 @@ private:
      * Each node in the glTF tree may possess machines, but only the root
      * PrototypePart stores them. The PrototypePart's machineArray is passed,
      * alongside the current node (object)'s machineIndexArray.
-     * PrototypeMachines are added to the PrototypePart's master list, and the
+     * PCompMachines are added to the PrototypePart's master list, and the
      * index of each machine is added to the machineIndexArray so that the
      * current node/object can keep track of which machines belong to it.
      *
@@ -110,9 +111,11 @@ private:
      * @return A machineIndexArray which is used by PrototypeObjects to store
      * the indices of the machineArray elements which belong to it
      */
-    static std::vector<unsigned> load_machines(tinygltf::Value const& extras,
-        std::vector<PrototypeMachine>& machineArray);
-
+    static void proto_load_machines(
+            PartEntity_t entity,
+            Package& rMachinePackage,
+            tinygltf::Value const& extras,
+            std::vector<PCompMachine>& rMachines);
     /**
      * Load only associated config files, and add resource paths to the package
      * But for now, this function just loads everything.
@@ -123,7 +126,7 @@ private:
      * @param package [out] Package to put resource paths into
      */
     static void load_sturdy(TinyGltfImporter& gltfImporter,
-            std::string_view resPrefix, Package& package);
+            std::string_view resPrefix, Package& rMachinePackage, Package& package);
 
     /**
      * Load a part from a sturdy
@@ -136,8 +139,12 @@ private:
      * @param id [in] ID of node containing part information
      * @param resPrefix [in] Unique prefix for mesh names (see load_sturdy())
      */
-    static void load_part(TinyGltfImporter& gltfImporter,
-        Package& package, Magnum::UnsignedInt id, std::string_view resPrefix);
+    static void load_part(
+            TinyGltfImporter& gltfImporter,
+            Package& rMachinePackage,
+            Package& package,
+            Magnum::UnsignedInt id,
+            std::string_view resPrefix);
 
     /**
      * Load a plume object from a sturdy
@@ -152,12 +159,29 @@ private:
     static void load_plume(TinyGltfImporter& gltfImporter,
         Package& package, Magnum::UnsignedInt id, std::string_view resPrefix);
 
-    static void proto_add_obj_recurse(TinyGltfImporter& gltfImporter,
-                               Package& package,
-                               std::string_view resPrefix,
-                               PrototypePart& part,
-                               Magnum::UnsignedInt parentProtoIndex,
-                               Magnum::UnsignedInt childGltfIndex);
+private:
+    /**
+     * Read glTF node as part of a sturdy Part. Write data into a PrototypePart
+     *
+     * This function will recurse through all descendents of the node to include
+     * them all in the PrototypePart
+     *
+     * @param gltfImporter     [in] glTF data to read
+     * @param machinePackage   [in] Package containing RegisteredMachines
+     * @param rPackage         [ref] Package to reserve found resources into
+     * @param resPrefix        [in] Prefix of rPackage
+     * @param part             [out] Prototy pePart to write data into
+     * @param parentProtoIndex [in] PartEntity of current glTF node's parent
+     * @param childGltfIndex   [in] Index of current glTF node
+     */
+    static void proto_add_obj_recurse(
+            TinyGltfImporter& gltfImporter,
+            Package& machinePackage,
+            Package& rPackage,
+            std::string_view resPrefix,
+            PrototypePart& part,
+            PartEntity_t parentProtoIndex,
+            Magnum::UnsignedInt childGltfIndex);
 
     /*
     * This cannot be a reference or else spdlog will complain. Don't know why.

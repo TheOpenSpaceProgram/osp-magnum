@@ -24,7 +24,12 @@
  */
 
 #include "RCSController.h"
-#include "osp/Active/ActiveScene.h"
+
+#include <osp/Active/ActiveScene.h>
+#include <osp/Active/SysVehicle.h>
+#include <osp/Active/physics.h>
+
+#include <osp/Resource/machines.h>
 
 #include <Magnum/Math/Vector.h>
 #include <functional>
@@ -60,11 +65,12 @@ std::vector<WireOutput*> MachineRCSController::existing_outputs()
     return {&m_woThrottle};
 }
 
-SysMachineRCSController::SysMachineRCSController(ActiveScene& rScene)
-    : SysMachine<SysMachineRCSController, MachineRCSController>(rScene)
-    , m_updateControls(rScene.get_update_order(), "mach_rcs", "wire", "controls",
-        [this](ActiveScene& rScene) { this->update_controls(rScene); })
+void SysMachineRCSController::add_functions(ActiveScene& rScene)
 {
+    rScene.debug_update_add(rScene.get_update_order(), "mach_rcs", "wire", "controls",
+                            &SysMachineRCSController::update_controls);
+    rScene.debug_update_add(rScene.get_update_order(), "mach_rcs_construct", "vehicle_activate", "vehicle_modification",
+                            &SysMachineRCSController::update_construct);
 }
 
 float SysMachineRCSController::thruster_influence(Vector3 posOset, Vector3 direction,
@@ -106,6 +112,42 @@ float SysMachineRCSController::thruster_influence(Vector3 posOset, Vector3 direc
      * thrusters would pulse on and off in order to deliver reduced thrust
      */
     return std::clamp(rotInfluence + translInfluence, 0.0f, 1.0f);
+}
+
+void SysMachineRCSController::update_construct(ActiveScene &rScene)
+{
+    auto view = rScene.get_registry()
+            .view<osp::active::ACompVehicle,
+                  osp::active::ACompVehicleInConstruction>();
+
+    machine_id_t const id = mach_id<MachineRCSController>();
+
+    for (auto [vehEnt, rVeh, rVehConstr] : view.each())
+    {
+        // Check if the vehicle blueprint might store MachineRCSControllers
+        if (rVehConstr.m_blueprint->m_machines.size() <= id)
+        {
+            continue;
+        }
+
+        // Initialize all MachineRCSControllers in the vehicle
+        for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
+        {
+            // Get part
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+
+            // Get machine entity previously reserved by SysVehicle
+            auto& machines = rScene.reg_get<ACompMachines>(partEnt);
+            ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
+
+            rScene.reg_emplace<MachineRCSController>(machEnt);
+            rScene.reg_emplace<ACompMachineType>(machEnt, id,
+                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
+                    {
+                        return rScene.reg_get<MachineRCSController>(ent);
+                    });
+        }
+    }
 }
 
 void SysMachineRCSController::update_controls(ActiveScene& rScene)
@@ -150,15 +192,4 @@ void SysMachineRCSController::update_controls(ActiveScene& rScene)
             std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = influence;
         }
     }
-}
-
-Machine& SysMachineRCSController::instantiate(ActiveEnt ent, PrototypeMachine config,
-    BlueprintMachine settings)
-{
-    return m_scene.reg_emplace<MachineRCSController>(ent);
-}
-
-Machine& SysMachineRCSController::get(ActiveEnt ent)
-{
-    return m_scene.reg_get<MachineRCSController>(ent);
 }

@@ -61,6 +61,9 @@ class MachineRocket : public osp::active::Machine
     };
 
 public:
+
+    static inline std::string smc_mach_name = "Rocket";
+
     MachineRocket(Parameters params, std::vector<input_t> resources);
     MachineRocket(MachineRocket &&move) noexcept;
     MachineRocket& operator=(MachineRocket&& move) noexcept;
@@ -105,17 +108,29 @@ private:
     float m_powerOutput{0.0f};
 }; // MachineRocket
 
-class SysMachineRocket :
-        public osp::active::SysMachine<SysMachineRocket, MachineRocket>
+//-----------------------------------------------------------------------------
+
+class SysMachineRocket
 {
 public:
 
-    static inline std::string smc_name = "Rocket";
+    static void add_functions(osp::active::ActiveScene& rScene);
 
-    SysMachineRocket(osp::active::ActiveScene &scene);
+    /**
+     * Constructs MachineRockets for vehicles in-construction
+     *
+     * @param rScene [ref] Scene supporting vehicles
+     */
+    static void update_construct(osp::active::ActiveScene &rScene);
 
-    //void update_sensor();
-    void update_physics(osp::active::ActiveScene& rScene);
+    /**
+     * Updates all MachineRockets in the scene
+     *
+     * This function handles draining fuel and applying thrust.
+     *
+     * @param rScene [ref] Scene with MachineRockets to update
+     */
+    static void update_physics(osp::active::ActiveScene& rScene);
 
     /**
      * Attach a visual exhaust plume effect to MachineRocket
@@ -124,21 +139,20 @@ public:
      * attaches an ACompExhaustPlume to the rocket's plume node. A graphical
      * exhaust plume effect will be attached to the node by SysExhaustPlume
      * when it processes the component.
-     * @param ent The MachineRocket entity
+     *
+     * @param rScene [ref] Scene containing the following entities
+     * @param part [in] Entity containing a plume in its descendents
+     * @param mach [in] Entity containing MachineRocket
      */
-    void attach_plume_effect(osp::active::ActiveEnt ent);
+    static void attach_plume_effect(osp::active::ActiveScene& rScene,
+                                    osp::active::ActiveEnt part,
+                                    osp::active::ActiveEnt mach);
 
-    /**
-     * Attach a MachineRocket to an entity
-     * 
-     * Also attempts to attach a plume component to the appropriate child node
-     * @param ent The entity that owns the MachineRocket
-     * @return The new MachineRocket instance
-     */
-    osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
-        osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
-
-    osp::active::Machine& get(osp::active::ActiveEnt ent) override;
+    static MachineRocket& instantiate(
+            osp::active::ActiveScene& rScene,
+            osp::active::ActiveEnt ent,
+            osp::PCompMachine const& config,
+            osp::BlueprintMachine const& settings);
 
 private:
     static uint64_t resource_units_required(

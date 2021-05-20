@@ -28,13 +28,14 @@
 #include "adera/Shaders/PlumeShader.h"
 #include "osp/Resource/Resource.h"
 
-namespace osp::active
+namespace adera::active
 {
 
 struct ACompExhaustPlume
 {
-    ActiveEnt m_parentMachineRocket{entt::null};
-    DependRes<PlumeEffectData> m_effect;
+    osp::active::ActiveEnt m_parentMachineRocket{entt::null};
+    osp::DependRes<PlumeEffectData> m_effect;
+
     float m_time{0.0f};
     float m_powerLevel{0.0f};
 };
@@ -43,7 +44,7 @@ class SysExhaustPlume
 {
 public:
 
-    static void add_functions(ActiveScene& rScene);
+    static void add_functions(osp::active::ActiveScene& rScene);
 
     /**
      * Initialize plume graphics
@@ -52,9 +53,10 @@ public:
      * this function takes such entities, retrieves the appropriate graphics
      * resources, and configures the graphical components
      */
-    static void initialize_plume(ActiveScene& rScene, ActiveEnt e);
+    static void initialize_plume(osp::active::ActiveScene& rScene,
+                                 osp::active::ActiveEnt e);
 
-    static void update_plumes(ActiveScene& rScene);
+    static void update_plumes(osp::active::ActiveScene& rScene);
 };
 
-} // namespace osp::active
+} // namespace adera::active

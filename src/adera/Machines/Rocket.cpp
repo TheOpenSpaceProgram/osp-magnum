@@ -22,24 +22,26 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <iostream>
+#include "Rocket.h"
+
+#include "Container.h"
+#include "../Plume.h"
+#include "../SysExhaustPlume.h"
+#include "../Shaders/PlumeShader.h"
 
 #include <osp/Active/ActiveScene.h>
+#include <osp/Shaders/Phong.h>
+#include <osp/Active/SysVehicle.h>
 #include <osp/Active/physics.h>
-
-#include "Rocket.h"
-#include "osp/Resource/AssetImporter.h"
-#include "osp/Resource/blueprints.h"
 #include "osp/PhysicsConstants.h"
-#include "adera/SysExhaustPlume.h"
-#include "adera/Plume.h"
-#include <Magnum/Trade/MeshData.h>
-#include <Magnum/Math/Color.h>
-#include <Magnum/Math/Matrix4.h>
+
+#include <iostream>
 
 using namespace adera::active::machines;
 using namespace osp::active;
 using namespace osp;
+
+using adera::active::machines::MachineContainer;
 
 void MachineRocket::propagate_output(WireOutput* output)
 {
@@ -74,21 +76,64 @@ std::vector<WireOutput*> MachineRocket::existing_outputs()
     return {};
 }
 
-SysMachineRocket::SysMachineRocket(ActiveScene &rScene)
-    : SysMachine<SysMachineRocket, MachineRocket>(rScene)
-    , m_updatePhysics(rScene.get_update_order(), "mach_rocket", "controls", "physics",
-        [this](ActiveScene& rScene) { this->update_physics(rScene); })
+void SysMachineRocket::add_functions(ActiveScene &rScene)
 {
-
+    rScene.debug_update_add(rScene.get_update_order(), "mach_rocket", "controls", "physics",
+                            &SysMachineRocket::update_physics);
+    rScene.debug_update_add(rScene.get_update_order(), "mach_rocket_construct", "vehicle_activate", "vehicle_modification",
+                            &SysMachineRocket::update_construct);
 }
 
 //void SysMachineRocket::update_sensor()
 //{
 //}
 
+void SysMachineRocket::update_construct(ActiveScene& rScene)
+{
+    auto view = rScene.get_registry()
+            .view<osp::active::ACompVehicle,
+                  osp::active::ACompVehicleInConstruction>();
+
+    machine_id_t const id = mach_id<MachineRocket>();
+
+    for (auto [vehEnt, rVeh, rVehConstr] : view.each())
+    {
+        // Check if the vehicle blueprint might store MachineRCSControllers
+        if (rVehConstr.m_blueprint->m_machines.size() <= id)
+        {
+            continue;
+        }
+
+        BlueprintVehicle const& vehBp = *rVehConstr.m_blueprint;
+
+        // Initialize all MachineRockets in the vehicle
+        for (BlueprintMachine const &mach : vehBp.m_machines[id])
+        {
+            // Get part
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+
+            // Get machine entity previously reserved by SysVehicle
+            auto& machines = rScene.reg_get<ACompMachines>(partEnt);
+            ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
+
+            BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_blueprintIndex];
+            instantiate(rScene, machEnt,
+                        vehBp.m_prototypes[partBp.m_protoIndex]
+                                ->m_protoMachines[mach.m_protoMachineIndex],
+                        mach);
+            rScene.reg_emplace<ACompMachineType>(machEnt, id,
+                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
+                    {
+                        return rScene.reg_get<MachineRocket>(ent);
+                    });
+        }
+    }
+}
+
+
 void SysMachineRocket::update_physics(ActiveScene& rScene)
 {
-    auto view = m_scene.get_registry().view<MachineRocket, ACompTransform>();
+    auto view = rScene.get_registry().view<MachineRocket>();
 
     for (ActiveEnt ent : view)
     {
@@ -190,7 +235,7 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
                 pThrotPercent->m_value, resource);
             uint64_t consumed = src.request_contents(required);
 
-            SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+            SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
                                 "Consumed {} units of fuel, {} remaining",
                 consumed, src.check_contents().m_quantity);
         }
@@ -201,13 +246,14 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
     }
 }
 
-void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
+void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt part,
+                                           ActiveEnt mach)
 {
     ActiveEnt plumeNode = entt::null;
 
-    auto findPlumeHandle = [this, &plumeNode](ActiveEnt ent)
+    auto findPlumeHandle = [&rScene, &plumeNode](ActiveEnt ent)
     {
-        auto const& node = m_scene.reg_get<ACompHierarchy>(ent);
+        auto const& node = rScene.reg_get<ACompHierarchy>(ent);
         static constexpr std::string_view nodePrefix = "fx_plume_";
         if (0 == node.m_name.compare(0, nodePrefix.size(), nodePrefix))
         {
@@ -217,45 +263,67 @@ void SysMachineRocket::attach_plume_effect(ActiveEnt ent)
         return EHierarchyTraverseStatus::Continue;
     };
 
-    m_scene.hierarchy_traverse(ent, findPlumeHandle);
+    rScene.hierarchy_traverse(part, findPlumeHandle);
 
     if (plumeNode == entt::null)
     {
-        SPDLOG_LOGGER_ERROR(m_scene.get_application().get_logger(),
-                          "ERROR: could not find plume anchor for MachineRocket {}", ent);
+        SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
+                          "ERROR: could not find plume anchor for MachineRocket {}", part);
         return;
     }
 
-    SPDLOG_LOGGER_INFO(m_scene.get_application().get_logger(), "MachineRocket {}\'s associated plume: {}",
-        ent, plumeNode);
-   
+    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(), "MachineRocket {}\'s associated plume: {}",
+        part, plumeNode);
 
     // Get plume effect
-    Package& pkg = m_scene.get_application().debug_find_package("lzdb");
-    std::string_view plumeAnchorName = m_scene.reg_get<ACompHierarchy>(plumeNode).m_name;
+    Package& pkg = rScene.get_application().debug_find_package("lzdb");
+    std::string_view plumeAnchorName = rScene.reg_get<ACompHierarchy>(plumeNode).m_name;
     std::string_view effectName = plumeAnchorName.substr(3, plumeAnchorName.length() - 3);
     DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
     if (plumeEffect.empty())
     {
-      SPDLOG_LOGGER_ERROR(m_scene.get_application().get_logger(),
+      SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
                           "ERROR: couldn't find plume effect  {}", effectName);
         return;
     }
 
-    m_scene.reg_emplace<ACompExhaustPlume>(plumeNode, ent, plumeEffect);
+    rScene.reg_emplace<ACompExhaustPlume>(plumeNode, mach, plumeEffect);
 }
 
-Machine& SysMachineRocket::instantiate(ActiveEnt ent, PrototypeMachine config,
-    BlueprintMachine settings)
+// TODO: come up with a better solution to this, and also replace config maps
+//       and variants with something else entirely
+template<typename TYPE_T>
+TYPE_T const& config_get_if(
+        NodeMap_t const& nodeMap,
+        std::string_view field, TYPE_T&& defaultValue)
+{
+    auto found = nodeMap.find(field);
+    if (found == nodeMap.end())
+    {
+        return std::forward<TYPE_T>(defaultValue);
+    }
+    return std::get<TYPE_T>(found->second);
+//    if (TYPE_T const* value = std::get_if<TYPE_T>(&found->second); value != nullptr)
+//    {
+//        return *value;
+//    }
+//    return defaultValue;
+}
+
+MachineRocket& SysMachineRocket::instantiate(
+        osp::active::ActiveScene& rScene,
+        osp::active::ActiveEnt ent,
+        osp::PCompMachine const& config,
+        osp::BlueprintMachine const& settings)
 {
     // Read engine config
     MachineRocket::Parameters params;
-    params.m_maxThrust = std::get<double>(config.m_config["thrust"]);
-    params.m_specImpulse = std::get<double>(config.m_config["Isp"]);
+    params.m_maxThrust = config_get_if<double>(config.m_config, "thrust", 42.0);
+    params.m_specImpulse = config_get_if<double>(config.m_config, "Isp", 42.0);
 
-    std::string const& fuelIdent = std::get<std::string>(config.m_config["fueltype"]);
+    std::string const& fuelIdent = config_get_if<std::string>(config.m_config, "fueltype", "");
     Path resPath = decompose_path(fuelIdent);
-    Package& pkg = m_scene.get_application().debug_find_package(resPath.prefix);
+    Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
     DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>(resPath.identifier);
 
     std::vector<MachineRocket::input_t> inputs;
@@ -264,13 +332,8 @@ Machine& SysMachineRocket::instantiate(ActiveEnt ent, PrototypeMachine config,
         inputs.push_back({std::move(fuel), 1.0f});
     }
 
-    attach_plume_effect(ent);
-    return m_scene.reg_emplace<MachineRocket>(ent, std::move(params), std::move(inputs));
-}
-
-Machine& SysMachineRocket::get(ActiveEnt ent)
-{
-    return m_scene.reg_get<MachineRocket>(ent);//emplace(ent);
+    attach_plume_effect(rScene, rScene.reg_get<ACompHierarchy>(ent).m_parent, ent);
+    return rScene.reg_emplace<MachineRocket>(ent, std::move(params), std::move(inputs));
 }
 
 uint64_t SysMachineRocket::resource_units_required(

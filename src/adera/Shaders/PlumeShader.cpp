@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "PlumeShader.h"
+#include "../SysExhaustPlume.h"
 
 #include <osp/types.h>
 #include <osp/Active/SysRender.h>
@@ -35,6 +36,7 @@
 
 using namespace osp;
 using namespace osp::active;
+using namespace adera::active;
 using namespace adera::shader;
 
 void PlumeShader::draw_plume(ActiveEnt e,

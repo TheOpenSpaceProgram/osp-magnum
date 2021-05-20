@@ -135,8 +135,8 @@ public:
     ButtonControlHandle(UserInputHandler *to, int index);
     ~ButtonControlHandle();
 
-    bool triggered();
-    bool trigger_hold();
+    bool triggered() const;
+    bool trigger_hold() const;
 
 private:
     UserInputHandler *m_to;

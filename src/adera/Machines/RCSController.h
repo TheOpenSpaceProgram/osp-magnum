@@ -41,39 +41,39 @@ class MachineRCSController;
  * the command module and output as throttle command values, and the
  * MachineRockets associated with the RCS thrusters will fire.
  */
-class SysMachineRCSController :
-    public osp::active::SysMachine<SysMachineRCSController, MachineRCSController>
+class SysMachineRCSController
 {
 public:
-    static inline std::string smc_name = "RCSController";
 
-    SysMachineRCSController(osp::active::ActiveScene &rScene);
+    static void add_functions(osp::active::ActiveScene& rScene);
+
+    /**
+     * Constructs MachineRCSControllers for vehicles in-construction
+     *
+     * @param rScene [ref] Scene supporting vehicles
+     */
+    static void update_construct(osp::active::ActiveScene &rScene);
 
     /**
      * Primary system update function
-     * 
+     *
      * Iterates over MachineRCSControllers and issues throttle commands to the
      * associated MachineRocket thrusters via wire
-     * 
-     * @param rScene [in] - The scene to update
+     *
+     * @param rScene [ref] Scene with MachineRCSControllers to update
      */
     static void update_controls(osp::active::ActiveScene &rScene);
-
-    osp::active::Machine& instantiate(osp::active::ActiveEnt ent,
-        osp::PrototypeMachine config, osp::BlueprintMachine settings) override;
-
-    osp::active::Machine& get(osp::active::ActiveEnt ent) override;
 
 private:
     /**
      * Command-thrust influence calculator
-     * 
+     *
      * Given a thruster's orientation and position relative to ship center of
      * mass, and a translation and rotation command, calculates how much
      * influence the thruster has on the commanded motion. Called on all
      * vehicle RCS thrusters to decide which are necessary to respond to the
      * maneuver command.
-     * 
+     *
      * @param posOset   [in] The position of the thruster relative to the ship CoM
      * @param direction [in] Direction that the thruster points
      * @param cmdTransl [in] Commanded translation vector
@@ -83,21 +83,25 @@ private:
         Magnum::Vector3 posOset, Magnum::Vector3 direction,
         Magnum::Vector3 cmdTransl, Magnum::Vector3 cmdRot);
 
-    osp::active::UpdateOrderHandle_t m_updateControls;
 }; // SysMachineRCSController
+
+//-----------------------------------------------------------------------------
 
 class MachineRCSController : public osp::active::Machine
 {
     friend SysMachineRCSController;
 
 public:
+
+    static inline std::string smc_mach_name = "RCSController";
+
     MachineRCSController();
     MachineRCSController(MachineRCSController&& move) noexcept;
     MachineRCSController& operator=(MachineRCSController&& move) noexcept;
     ~MachineRCSController() = default;
 
     void propagate_output(osp::active::WireOutput *output) override;
-    
+
     osp::active::WireInput* request_input(osp::WireInPort port) override;
     osp::active::WireOutput* request_output(osp::WireOutPort port) override;
 

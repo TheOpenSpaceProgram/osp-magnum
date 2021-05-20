@@ -39,35 +39,34 @@ using Corrade::Containers::LinkedListItem;
 class ISysMachine;
 class Machine;
 
-using MapSysMachine_t = std::map<std::string, std::unique_ptr<ISysMachine>,
-                               std::less<> >;
 
 //-----------------------------------------------------------------------------
 
 /**
  * This component is added to a part, and stores a vector that keeps track of
  * all the Machines it uses. Machines are stored in multiple entities, so the
- * vector stores pairs of [Entity, Machine Type (iterator to system class)]
+ * vector keeps track of these.
  */
 struct ACompMachines
 {
-    struct PartMachine
-    {
-        PartMachine(ActiveEnt partEnt, MapSysMachine_t::iterator system) :
-            m_partEnt(partEnt), m_system(system) {}
+    std::vector<ActiveEnt> m_machines;
+};
 
-        ActiveEnt m_partEnt;
-        MapSysMachine_t::iterator m_system;
-    };
+//-----------------------------------------------------------------------------
 
-    ACompMachines() noexcept = default;
-    ACompMachines(ACompMachines&& move) noexcept = default;
-    ACompMachines(ACompMachines const& move) = delete;
-    ACompMachines& operator=(ACompMachines&& move) = default;
-    ACompMachines& operator=(ACompMachines const& move) = delete;
+struct ACompMachineType
+{
+    // TODO: Temporary, remove when new wiring system is added. A well made ECS
+    //       means that all publicly accessible properties of machines are in
+    //       separate components
+    using get_machine_component_t = Machine& (*)(ActiveScene&, ActiveEnt);
 
-    //LinkedList<Machine> m_machines;
-    std::vector<PartMachine> m_machines;
+    ACompMachineType(machine_id_t type, get_machine_component_t get)
+     : m_type(type)
+     , m_get_machine{get}
+    { }
+    machine_id_t m_type;
+    get_machine_component_t m_get_machine;
 };
 
 //-----------------------------------------------------------------------------
@@ -95,41 +94,6 @@ public:
 
 protected:
     bool m_enable = false;
-};
-
-//-----------------------------------------------------------------------------
-
-class ISysMachine
-{
-public:
-
-    virtual ~ISysMachine() = default;
-
-    // TODO: make some config an argument
-    virtual Machine& instantiate(ActiveEnt ent,
-        PrototypeMachine config, BlueprintMachine settings) = 0;
-
-    virtual Machine& get(ActiveEnt ent) = 0;
-};
-
-//-----------------------------------------------------------------------------
-
-// Template for making Machine Systems
-template<class Derived, class MACH_T>
-class SysMachine : public ISysMachine
-{
-    friend Derived;
-
-public:
-    SysMachine(ActiveScene &scene) : m_scene(scene) {}
-    ~SysMachine() = default;
-
-    virtual Machine& instantiate(ActiveEnt ent, 
-        PrototypeMachine config,
-        BlueprintMachine settings) = 0;
-
-private:
-    ActiveScene &m_scene;
 };
 
 //-----------------------------------------------------------------------------
