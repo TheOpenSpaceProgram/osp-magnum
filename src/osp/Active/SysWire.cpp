@@ -39,12 +39,12 @@ void SysWire::setup_default(
         ActiveScene& rScene,
         uint32_t machineTypeCount,
         std::vector<ACompWire::updfunc_t> updCalculate,
-        std::vector<ACompWire::updfunc_t> updPropagate)
+        std::vector<ACompWire::updfunc_t> updNodes)
 {
     rScene.reg_emplace<ACompWire>(
             rScene.hier_get_root(),
             ACompWire{std::move(updCalculate),
-                      std::move(updPropagate),
+                      std::move(updNodes),
                       std::vector<std::vector<ActiveEnt>>(machineTypeCount),
                       std::vector<std::mutex>(machineTypeCount)});
 }
@@ -59,8 +59,8 @@ void SysWire::update_wire(ActiveScene &rScene)
     {
         wire.m_updateRequest = false;
 
-        // Perform Propagation update for all Nodes
-        for (ACompWire::updfunc_t update : wire.m_updPropagate)
+        // Update all Nodes
+        for (ACompWire::updfunc_t update : wire.m_updNodes)
         {
             update(rScene);
         }

@@ -229,8 +229,8 @@ struct ACompWireNodes
     // All the WIRETYPE_T node in the scene
     std::vector< WireNode<WIRETYPE_T> > m_nodes;
 
-    std::vector< nodeindex_t<WIRETYPE_T> > m_needPropagate;
-    std::unique_ptr<std::mutex> m_needPropagateMutex{std::make_unique<std::mutex>()};
+    std::vector< nodeindex_t<WIRETYPE_T> > m_needUpdate;
+    std::unique_ptr<std::mutex> m_needUpdateMutex{std::make_unique<std::mutex>()};
 
     /**
      * Create a Node
@@ -265,16 +265,16 @@ struct ACompWireNodes
     }
 
     /**
-     * Request a propagation update for a set of Nodes. This locks a mutex.
+     * Request to update a set of Nodes. This is thread safe and locks a mutex.
      * @param request [in] Vector of node indices
      */
-    void propagate_request(std::vector< nodeindex_t<WIRETYPE_T> > request)
+    void update_request(std::vector< nodeindex_t<WIRETYPE_T> > request)
     {
         std::sort(request.begin(), request.end());
 
-        std::lock_guard<std::mutex> guard(*m_needPropagateMutex);
+        std::lock_guard<std::mutex> guard(*m_needUpdateMutex);
 
-        vecset_merge(m_needPropagate, request);
+        vecset_merge(m_needUpdate, request);
     }
 };
 
@@ -285,7 +285,7 @@ struct ACompWire
     // TODO: replace with beefier function order
     using updfunc_t = void(*)(ActiveScene&);
     std::vector<updfunc_t> m_updCalculate;
-    std::vector<updfunc_t> m_updPropagate;
+    std::vector<updfunc_t> m_updNodes;
 
     std::vector<std::vector<ActiveEnt>> m_entToCalculate;
     std::vector<std::mutex> m_entToCalculateMutex;
@@ -315,8 +315,8 @@ public:
     static void setup_default(
             ActiveScene& rScene,
             uint32_t machineTypeCount,
-            std::vector<ACompWire::updfunc_t> updCalculate,
-            std::vector<ACompWire::updfunc_t> updPropagate);
+            std::vector<ACompWire::updfunc_t> updMachines,
+            std::vector<ACompWire::updfunc_t> updNodes);
 
     /**
      * Perform wire updates.
@@ -443,22 +443,21 @@ public:
      * Assign a new value to a signal Node
      *
      * If the value has changed, then the specified node index will be pushed to
-     * the needPropagate vector. The value is written to an 'm_write' member
-     * and changes will only be visible to connected inputs after the
-     * propigation update
+     * the updNodes vector. The value is written to an 'm_write' member and
+     * changes will only be visible to connected inputs after the node update
      *
      * @param rScene        [ref] Scene the Node is part of
      * @param newValue      [in] New value to assign to Node
      * @param rNode         [out] Node to assign value of
      * @param nodeIndex     [in] Index of Node
-     * @param needPropagate [out] Vector for tracking changed nodes
+     * @param updNodes      [out] Vector of nodes to update
      */
     static void signal_assign(
             ActiveScene& rScene,
             WIRETYPE_T&& newValue,
             WireNode<WIRETYPE_T>& rNode,
             nodeindex_t<WIRETYPE_T> nodeIndex,
-            std::vector< nodeindex_t<WIRETYPE_T> >& needPropagate);
+            std::vector< nodeindex_t<WIRETYPE_T> >& updNodes);
 
     /**
      * Read the blueprint of a Vehicle and construct needed Nodes and Links.
@@ -484,14 +483,14 @@ public:
     static void signal_update_construct(ActiveScene& rScene);
 
     /**
-     * Propagate all signal Nodes in the scene.
+     * Update all signal Nodes in the scene.
      *
      * This 'applies changes' to Nodes by copying their new values written by
      * outputs to their current values to be read by connected inputs.
      *
      * @param rScene [ref] Scene supporting the right Node type
      */
-    static void signal_update_propagate(ActiveScene& rScene);
+    static void signal_update_nodes(ActiveScene& rScene);
 };
 
 template<typename WIRETYPE_T>
@@ -500,13 +499,13 @@ void SysSignal<WIRETYPE_T>::signal_assign(
         WIRETYPE_T&& newValue,
         WireNode<WIRETYPE_T>& rNode,
         nodeindex_t<WIRETYPE_T> nodeIndex,
-        std::vector< nodeindex_t<WIRETYPE_T> >& needPropagate)
+        std::vector< nodeindex_t<WIRETYPE_T> >& updNodes)
 {
     // POD comparison
     if (std::memcmp(&rNode.m_state.m_value, &newValue, sizeof(WIRETYPE_T)) != 0)
     {
         rNode.m_state.m_write = std::forward<WIRETYPE_T>(newValue);
-        needPropagate.push_back(nodeIndex);
+        updNodes.push_back(nodeIndex);
     }
 }
 
@@ -570,7 +569,7 @@ void SysSignal<WIRETYPE_T>::signal_update_construct(ActiveScene& rScene)
 }
 
 template<typename WIRETYPE_T>
-void SysSignal<WIRETYPE_T>::signal_update_propagate(ActiveScene& rScene)
+void SysSignal<WIRETYPE_T>::signal_update_nodes(ActiveScene& rScene)
 {
     auto &rNodes = rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(rScene.hier_get_root());
     auto &rWire = rScene.reg_get<ACompWire>(rScene.hier_get_root());
@@ -578,8 +577,8 @@ void SysSignal<WIRETYPE_T>::signal_update_propagate(ActiveScene& rScene)
     // Machines to update accumulated throughout updating nodes
     std::vector<std::vector<ActiveEnt>> machToUpdate(rWire.m_entToCalculate.size());
 
-    // Loop through all nodes that need to be propagated
-    for (nodeindex_t<WIRETYPE_T> nodeIndex : rNodes.m_needPropagate)
+    // Loop through all nodes that need to be updated
+    for (nodeindex_t<WIRETYPE_T> nodeIndex : rNodes.m_needUpdate)
     {
         WireNode<WIRETYPE_T> &rNode = rNodes.get_node(nodeIndex);
 
@@ -597,7 +596,7 @@ void SysSignal<WIRETYPE_T>::signal_update_propagate(ActiveScene& rScene)
         }
     }
 
-    rNodes.m_needPropagate.clear();
+    rNodes.m_needUpdate.clear();
 
     // Commit machines to update to the scene-wide vectors
     for (int i = 0; i < machToUpdate.size(); i ++)

@@ -139,8 +139,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
             rScene, 5,
             {&adera::active::machines::SysMachineRocket::update_calculate,
              &adera::active::machines::SysMachineRCSController::update_calculate},
-            {&osp::active::SysSignal<wiretype::Percent>::signal_update_propagate,
-             &osp::active::SysSignal<wiretype::AttitudeControl>::signal_update_propagate});
+            {&osp::active::SysSignal<wiretype::Percent>::signal_update_nodes,
+             &osp::active::SysSignal<wiretype::AttitudeControl>::signal_update_nodes});
     rScene.reg_emplace< ACompWireNodes<wiretype::AttitudeControl> >(rScene.hier_get_root());
     rScene.reg_emplace< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
 

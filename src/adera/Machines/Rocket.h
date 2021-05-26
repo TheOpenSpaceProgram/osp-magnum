@@ -102,12 +102,6 @@ public:
     static void update_calculate(osp::active::ActiveScene& rScene);
 
     /**
-     * Request fuel...
-     * @param rScene
-     */
-    static void update_propagate(osp::active::ActiveScene& rScene);
-
-    /**
      * Updates all MachineRockets in the scene
      *
      * This function handles draining fuel and applying thrust.

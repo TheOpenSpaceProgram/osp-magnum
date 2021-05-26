@@ -105,9 +105,6 @@ public:
 
     static constexpr osp::portindex_t<Percent> m_woThrottle{0};
 
-private:
-
-    osp::active::ActiveEnt m_rigidBody{entt::null};
 }; // MachineRCSController
 
 

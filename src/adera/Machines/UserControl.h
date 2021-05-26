@@ -113,10 +113,6 @@ public:
 
 private:
     int dummy;
-//    osp::active::WireInput  m_wiTest          { this, "Test"              };
-//    osp::active::WireOutput m_woAttitude      { this, "AttitudeControl"   };
-//    osp::active::WireOutput m_woTestPropagate { this, "TestOut", m_wiTest };
-//    osp::active::WireOutput m_woThrottle      { this, "Throttle"          };
 };
 
 //-----------------------------------------------------------------------------

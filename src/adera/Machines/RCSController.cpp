@@ -45,8 +45,6 @@ using osp::active::wiretype::Percent;
 
 void SysMachineRCSController::add_functions(ActiveScene& rScene)
 {
-    //rScene.debug_update_add(rScene.get_update_order(), "mach_rcs", "wire", "controls",
-    //                        &SysMachineRCSController::update_controls);
     rScene.debug_update_add(rScene.get_update_order(), "mach_rcs_construct", "vehicle_activate", "vehicle_modification",
                             &SysMachineRCSController::update_construct);
 }
@@ -130,13 +128,12 @@ void SysMachineRCSController::update_calculate(ActiveScene& rScene)
     std::vector<ActiveEnt>& rToUpdate
             = SysWire::to_update<MachineRCSController>(rScene);
 
-    std::vector< nodeindex_t<wiretype::Percent> > propagatePercent;
+    std::vector< nodeindex_t<wiretype::Percent> > updPercent;
 
     auto view = rScene.get_registry().view<MachineRCSController>();
 
     for (ActiveEnt ent : rToUpdate)
     {
-        auto& machine = view.get<MachineRCSController>(ent);
 
         float influence = 0.0f;
 
@@ -202,15 +199,15 @@ void SysMachineRCSController::update_calculate(ActiveScene& rScene)
                 // Write possibly new throttle value to node
                 SysSignal<Percent>::signal_assign(
                         rScene, {influence}, nodeThrottle,
-                        portThrottle->m_nodeIndex, propagatePercent);
+                        portThrottle->m_nodeIndex, updPercent);
             }
         }
     }
 
-    // Request propagation if wire nodes were modified
-    if (!propagatePercent.empty())
+    // Request to update any wire nodes if they were modified
+    if (!updPercent.empty())
     {
-        rNodesPercent.propagate_request(std::move(propagatePercent));
+        rNodesPercent.update_request(std::move(updPercent));
         rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
 }

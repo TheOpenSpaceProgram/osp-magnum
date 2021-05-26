@@ -87,8 +87,8 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
     ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
     ACompWireNodes<AttitudeControl> &rNodesAttCtrl = SysWire::nodes<AttitudeControl>(rScene);
 
-    std::vector< nodeindex_t<wiretype::Percent> > propagatePercent;
-    std::vector< nodeindex_t<wiretype::AttitudeControl> > propagateAttCtrl;
+    std::vector< nodeindex_t<wiretype::Percent> > updPercent;
+    std::vector< nodeindex_t<wiretype::AttitudeControl> > updAttCtrl;
 
     if (usrCtrl.m_selfDestruct.triggered())
     {
@@ -152,7 +152,7 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
                 // Write possibly new throttle value to node
                 SysSignal<Percent>::signal_assign(
                         rScene, {throttlePos}, nodeThrottle,
-                        portThrottle->m_nodeIndex, propagatePercent);
+                        portThrottle->m_nodeIndex, updPercent);
             }
         }
 
@@ -167,19 +167,19 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 
             SysSignal<AttitudeControl>::signal_assign(
                     rScene, {attitudeIn}, nodeAttCtrl,
-                    portAttitude->m_nodeIndex, propagateAttCtrl);
+                    portAttitude->m_nodeIndex, updAttCtrl);
         }
     }
 
-    // Request propagation if wire nodes were modified
-    if (!propagatePercent.empty())
+    // Request to update any wire nodes if they were modified
+    if (!updPercent.empty())
     {
-        rNodesPercent.propagate_request(std::move(propagatePercent));
+        rNodesPercent.update_request(std::move(updPercent));
         rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
-    if (!propagateAttCtrl.empty())
+    if (!updAttCtrl.empty())
     {
-        rNodesAttCtrl.propagate_request(std::move(propagateAttCtrl));
+        rNodesAttCtrl.update_request(std::move(updAttCtrl));
         rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
 }
