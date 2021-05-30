@@ -48,15 +48,15 @@ namespace osp
  * no out of bounds data access occurs.
  */
 template<class STRING_T>
-constexpr decltype(auto) string_data(const STRING_T& str)
+constexpr auto string_data(STRING_T && str)
 {
     if constexpr(std::is_pointer_v<STRING_T>)
     {
-        return str;
+        return std::forward<STRING_T>(str);
     }
     else
     {
-        return std::data(str);
+        return std::data(std::forward<STRING_T>(str));
     }
 } // string_data()
 
@@ -77,7 +77,7 @@ constexpr decltype(auto) string_data(const STRING_T& str)
  * the result of calling std::size().
  */
 template<class STRING_T>
-constexpr size_t string_size(const STRING_T & str)
+constexpr size_t string_size(STRING_T const& str)
 {
     if constexpr(std::is_pointer_v<STRING_T>)
     {
@@ -100,7 +100,9 @@ constexpr size_t string_size(const STRING_T & str)
 
 /**
  * Effecienctly appends multiple strings together using, at most, a single
- * allocation to reserve the necessary space, via the "reserve" function call.
+ * allocation to reserve the necessary space, via the "resize" function call.
+ *
+ * We'd be able to get slightly improved perf when P1072 resize_and_overwrite() is available.
  *
  * \arg dest   -- The destination where all of the appended strings will be stored
  * \arg others -- The strings to append into the destination.
@@ -110,11 +112,15 @@ constexpr size_t string_size(const STRING_T & str)
 template<typename DESTINATION_T, typename ... STRS_T>
 constexpr void string_append(DESTINATION_T & dest, const STRS_T& ... others)
 {
+    auto const curSize = string_size(dest);
+
     // C++17 fold for summation
-    dest.reserve( ( string_size(dest) + ... + string_size(others) ) );
+    dest.resize( ( curSize + ... + string_size(others) ) );
+
+    auto * p = string_data(dest) + curSize;
 
     // C++17 fold for function calls.
-    ( dest.append(string_data(others), string_size(others)), ... );
+    ( (p = std::copy_n(string_data(others), string_size(others), p)), ... );
 } // string_append()
 
 
@@ -122,21 +128,31 @@ constexpr void string_append(DESTINATION_T & dest, const STRS_T& ... others)
 
 /**
  * Concatinates all of the provided string-like objects into a single
- * string of the type RESULT_T. RESULT_T must have reserve() and append()
+ * string of the type RESULT_T. RESULT_T must have resize() and append()
  * functions.
  *
  * This operation uses a single allocation to acquire storage, via the "reserve" function call.
+ *
+ * We'd be able to get slightly improved perf when P1072 resize_and_overwrite() is available.
  *
  * \arg string -- the strings to concatinate together.
  *
  * \returns A RESULT_T object containing the strings concatinated together.
  */
 template<typename RESULT_T, typename ... STRS_T>
-constexpr RESULT_T basic_string_concat(const STRS_T& ... strings)
+constexpr RESULT_T basic_string_concat(STRS_T const& ... others)
 {
-    RESULT_T result;
-    string_append(result, strings...);
-    return result;
+    RESULT_T dest;
+
+    // C++17 fold for summation
+    dest.resize( ( 0 + ... + string_size(others) ) );
+
+    auto * p = string_data(dest);
+
+    // C++17 fold for function calls.
+    ( (p = std::copy_n(string_data(others), string_size(others), p)), ... );
+
+    return dest;
 } // basic_string_concat()
 
 
@@ -152,9 +168,9 @@ constexpr RESULT_T basic_string_concat(const STRS_T& ... strings)
  * \returns A std::string object containing the strings concatinated together.
  */
 template<typename ... STRS_T>
-constexpr decltype(auto) string_concat(STRS_T && ... strs)
+constexpr auto string_concat(STRS_T const& ... strs)
 {
-    return basic_string_concat<std::string>(std::forward<STRS_T>(strs)...);;
+    return basic_string_concat<std::string>(strs...);
 } // string_concat()
 
 } // namespace osp
