@@ -107,7 +107,7 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 
     // InputDevice.IsActivated()
     // Combination
-    auto const &usrCtrl = rScene.reg_root_get_or_emplace<ACompUserControl>(rScene.get_user_input());
+    auto const &usrCtrl = rScene.reg_get<ACompUserControl>(rScene.hier_get_root());
     ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
     ACompWireNodes<AttitudeControl> &rNodesAttCtrl = SysWire::nodes<AttitudeControl>(rScene);
 

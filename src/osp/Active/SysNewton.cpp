@@ -39,6 +39,8 @@ using osp::active::ACompNwtBody;
 using osp::active::ACompNwtWorld;
 using osp::active::ACompTransform;
 
+using osp::active::ACompTransformMutable;
+
 using namespace osp;
 
 // Callback called for every Rigid Body (even static ones) on NewtonUpdate
@@ -47,6 +49,7 @@ void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
     // Get Scene from Newton World
     ActiveScene* scene = static_cast<ActiveScene*>(
                 NewtonWorldGetUserData(NewtonBodyGetWorld(pBody)));
+    auto &rReg = scene->get_registry();
 
     // Get ACompNwtBody. Every NewtonBody created here is associated with an
     // entity that contains one.
@@ -54,13 +57,13 @@ void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
     auto &rTransformComp = scene->reg_get<ACompTransform>(pBodyComp->m_entity);
 
     // Check if transform has been set externally
-    if (rTransformComp.m_transformDirty)
+    auto &tfMutable = scene->reg_get<ACompTransformMutable>(pBodyComp->m_entity);
+    if (tfMutable.m_dirty)
     {
-
         // Set matrix
         NewtonBodySetMatrix(pBody, rTransformComp.m_transform.data());
 
-        rTransformComp.m_transformDirty = false;
+        tfMutable.m_dirty = false;
     }
 
     // TODO: deal with changing inertia, mass or stuff
@@ -319,7 +322,8 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt entity,
         break;
     }
 
-    entTransform.m_controlled = true;
+    rScene.get_registry().emplace_or_replace<ACompTransformControlled>(entity);
+    rScene.get_registry().emplace_or_replace<ACompTransformMutable>(entity);
     entBody.m_entity = entity;
 
     // Set position/rotation

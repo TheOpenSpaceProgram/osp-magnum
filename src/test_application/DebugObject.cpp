@@ -79,7 +79,8 @@ using adera::active::machines::MachineUserControl;
 //}
 
 
-DebugCameraController::DebugCameraController(ActiveScene &rScene, ActiveEnt ent)
+DebugCameraController::DebugCameraController(ActiveScene &rScene, ActiveEnt ent,
+                                             osp::UserInputHandler &rInput)
  : DebugObject(rScene, ent)
  , m_selected(entt::null)
  , m_orbitPos(0, 0, 1)
@@ -91,16 +92,16 @@ DebugCameraController::DebugCameraController(ActiveScene &rScene, ActiveEnt ent)
                       [this] (ActiveScene&) { this->update_physics_pre(); })
  , m_updatePhysicsPost(rScene.get_update_order(), "dbg_cam_post", "physics", "",
                        [this] (ActiveScene&) { this->update_physics_post(); })
- , m_userInput(rScene.get_user_input())
- , m_mouseMotion(m_userInput.mouse_get())
- , m_scrollInput(m_userInput.scroll_get())
- , m_rmb(m_userInput.config_get("ui_rmb"))
- , m_up(m_userInput.config_get("ui_up"))
- , m_dn(m_userInput.config_get("ui_dn"))
- , m_lf(m_userInput.config_get("ui_lf"))
- , m_rt(m_userInput.config_get("ui_rt"))
- , m_switch(m_userInput.config_get("game_switch"))
- , m_selfDestruct(m_userInput.config_get("vehicle_self_destruct"))
+ , m_userInput(rInput)
+ , m_mouseMotion(rInput.mouse_get())
+ , m_scrollInput(rInput.scroll_get())
+ , m_rmb(rInput.config_get("ui_rmb"))
+ , m_up(rInput.config_get("ui_up"))
+ , m_dn(rInput.config_get("ui_dn"))
+ , m_lf(rInput.config_get("ui_lf"))
+ , m_rt(rInput.config_get("ui_rt"))
+ , m_switch(rInput.config_get("game_switch"))
+ , m_selfDestruct(rInput.config_get("vehicle_self_destruct"))
 { }
 
 void DebugCameraController::update_vehicle_mod_pre()

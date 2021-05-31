@@ -48,8 +48,8 @@ void PlumeShader::draw_plume(ActiveEnt e,
     using Magnum::GL::Texture2D;
     using Magnum::GL::Mesh;
     // Collect uniform data
-    auto& transform = rScene.reg_get<ACompTransform>(e);
-    auto& rPlumeComp = rScene.reg_get<ACompExhaustPlume>(e);
+    auto const& drawTf = rScene.reg_get<ACompDrawTransform>(e);
+    auto const& rPlumeComp = rScene.reg_get<ACompExhaustPlume>(e);
     auto const& plumedata = *rPlumeComp.m_effect;
     Mesh& rMesh = *rScene.reg_get<ACompMesh>(e).m_mesh;
 
@@ -61,7 +61,7 @@ void PlumeShader::draw_plume(ActiveEnt e,
             rScene.get_application().debug_find_package("lzdb"), resources);
     }
 
-    Magnum::Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;
+    Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
     shader
         .bindNozzleNoiseTexture(*tmpTex)

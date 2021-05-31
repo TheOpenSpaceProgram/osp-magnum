@@ -36,11 +36,11 @@ void Phong::draw_entity(ActiveEnt e,
     Phong& shader = *rScene.get_context_resources().get<Phong>(smc_resourceName);
 
     // Collect uniform information
-    auto& transform = rScene.reg_get<ACompTransform>(e);
+    auto& drawTf = rScene.reg_get<ACompDrawTransform>(e);
     Magnum::GL::Texture2D& rDiffuse = *rScene.reg_get<ACompDiffuseTex>(e).m_tex;
     Magnum::GL::Mesh& rMesh = *rScene.reg_get<ACompMesh>(e).m_mesh;
 
-    Magnum::Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;
+    Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
     /* 4th component indicates light type. A value of 0.0f indicates that the
      * light is a direction light coming from the specified direction relative
@@ -55,6 +55,6 @@ void Phong::draw_entity(ActiveEnt e,
         .setLightPositions({light})
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
-        .setNormalMatrix(Matrix3{transform.m_transformWorld})
+        .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
         .draw(rMesh);
 }

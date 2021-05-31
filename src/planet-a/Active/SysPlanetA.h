@@ -31,8 +31,6 @@
 #include <osp/Active/SysForceFields.h>
 #include <osp/Active/activetypes.h>
 
-#include <osp/UserInputHandler.h>
-
 #include <Magnum/Shaders/MeshVisualizer.h>
 #include <Magnum/GL/Mesh.h>
 

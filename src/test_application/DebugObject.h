@@ -78,7 +78,8 @@ class DebugCameraController : public DebugObject<DebugCameraController>
 
 public:
     DebugCameraController(osp::active::ActiveScene &scene,
-                          osp::active::ActiveEnt ent);
+                          osp::active::ActiveEnt ent,
+                          osp::UserInputHandler &rInput);
     ~DebugCameraController() = default;
     void update_vehicle_mod_pre();
     void update_physics_pre();

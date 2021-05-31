@@ -26,6 +26,7 @@
 #include "SysPlanetA.h"
 
 #include <osp/Active/ActiveScene.h>
+#include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysRender.h>
 #include <osp/Universe.h>
 #include <osp/string_concat.h>
@@ -44,6 +45,7 @@ using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 using osp::active::ACompCamera;
 using osp::active::ACompTransform;
+using osp::active::ACompDrawTransform;
 using osp::active::ACompFloatingOrigin;
 using osp::active::ACompRigidBody_t;
 using osp::active::ACompFFGravity;
@@ -51,13 +53,13 @@ using osp::active::ACompShape;
 using osp::active::ACompCollider;
 using osp::active::ACompAreaLink;
 using osp::active::ACompActivatedSat;
+using osp::active::SysHierarchy;
 using osp::active::SysAreaAssociate;
 using osp::active::SysPhysics_t;
 
 using osp::universe::Universe;
 using osp::universe::Satellite;
 
-using Magnum::GL::Renderer;
 using osp::Matrix4;
 using osp::Vector2;
 using osp::Vector3;
@@ -97,7 +99,7 @@ ActiveEnt SysPlanetA::activate(
     // Create planet entity and add components to it
 
     ActiveEnt root = rScene.hier_get_root();
-    ActiveEnt planetEnt = rScene.hier_create_child(root, "Planet");
+    ActiveEnt planetEnt = SysHierarchy::create_child(rScene, root, "Planet");
 
     auto &rPlanetTransform = rScene.get_registry()
                              .emplace<osp::active::ACompTransform>(planetEnt);
@@ -128,7 +130,7 @@ void SysPlanetA::debug_create_chunk_collider(
     using osp::phys::ECollisionShape;
 
     // Create entity and required components
-    ActiveEnt fish = rScene.hier_create_child(rScene.hier_get_root());
+    ActiveEnt fish = SysHierarchy::create_child(rScene, rScene.hier_get_root());
     auto &fishTransform = rScene.reg_emplace<ACompTransform>(fish);
     auto &fishShape = rScene.reg_emplace<ACompShape>(fish);
     auto &fishCollide = rScene.reg_emplace<ACompCollider>(fish);
@@ -169,7 +171,7 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
             continue;
         }
 
-        rScene.hier_destroy(ent);
+        SysHierarchy::destroy(rScene, ent);
     }
 
     // Activate planets that have just entered the ActiveArea
@@ -230,9 +232,9 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
                     glResources.get<Shaders::MeshVisualizer3D>("mesh_vis_shader");
 
                 auto& planet = rScene.reg_get<ACompPlanet>(e);
-                auto& transform = rScene.reg_get<ACompTransform>(e);
+                auto& drawTf = rScene.reg_get<ACompDrawTransform>(e);
 
-                Matrix4 entRelative = camera.m_inverse * transform.m_transformWorld;
+                Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
                 (*shader)
                     .setColor(0x2f83cc_rgbf)
@@ -255,6 +257,7 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             rScene.reg_emplace<osp::active::ACompOpaque>(ent);
             rScene.reg_emplace<osp::active::ACompMesh>(ent, planet.m_mesh);
             rScene.reg_emplace<osp::active::ACompShader>(ent, planetDrawFnc);
+            rScene.reg_emplace<ACompDrawTransform>(ent);
 
             //planet_update_geometry(ent, planet);
             SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),

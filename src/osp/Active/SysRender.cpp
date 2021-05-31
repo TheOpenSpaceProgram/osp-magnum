@@ -194,3 +194,39 @@ void SysRender::display_default_rendertarget(ActiveScene& rScene)
 
     shader->display_texure(*surface, *target.m_tex);
 }
+
+void SysRender::update_hierarchy_transforms(ActiveScene& rScene)
+{
+
+    auto &rReg = rScene.get_registry();
+
+    rReg.sort<ACompDrawTransform, ACompHierarchy>();
+
+    auto viewHier = rReg.view<ACompHierarchy>();
+    auto viewTf = rReg.view<ACompTransform>();
+    auto viewDrawTf = rReg.view<ACompDrawTransform>();
+
+    for(ActiveEnt const entity : viewDrawTf)
+    {
+        auto const &hier = viewHier.get<ACompHierarchy>(entity);
+        auto const &tf = viewTf.get<ACompTransform>(entity);
+        auto &rDrawTf = viewDrawTf.get<ACompDrawTransform>(entity);
+
+        if (hier.m_parent == rScene.hier_get_root())
+        {
+            // top level object, parent is root
+
+            rDrawTf.m_transformWorld = tf.m_transform;
+
+        }
+        else
+        {
+            auto const& parentDrawTf
+                    = viewDrawTf.get<ACompDrawTransform>(hier.m_parent);
+
+            // set transform relative to parent
+            rDrawTf.m_transformWorld = parentDrawTf.m_transformWorld
+                                     * tf.m_transform;
+        }
+    }
+}

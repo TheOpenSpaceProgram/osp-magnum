@@ -28,6 +28,7 @@
 #include "DebugObject.h"
 
 #include <osp/Active/ActiveScene.h>
+#include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysRender.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/SysWire.h>
@@ -77,7 +78,9 @@ using osp::active::ACompTransform;
 using osp::active::ACompCamera;
 using osp::active::ACompFloatingOrigin;
 
+using osp::active::SysHierarchy;
 using osp::active::SysRender;
+using osp::active::ACompDrawTransform;
 using osp::active::ACompRenderTarget;
 using osp::active::ACompRenderingAgent;
 using osp::active::ACompPerspective3DView;
@@ -110,6 +113,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Create an ActiveScene
     osp::active::ActiveScene& rScene = pMagnumApp->scene_create("Area 1");
 
+    SysHierarchy::setup(rScene);
+
     // Add system functions needed for flight scene
     osp::active::SysPhysics_t::add_functions(rScene);
     //osp::active::SysWire::add_functions(rScene);
@@ -125,6 +130,9 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     SysMachineRCSController::add_functions(rScene);
     SysMachineRocket::add_functions(rScene);
     SysMachineUserControl::add_functions(rScene);
+    // Add user controls for SysMachineUserControl
+    rScene.reg_emplace<adera::active::machines::ACompUserControl>(
+                rScene.hier_get_root(), pMagnumApp->get_input_handler());
 
     // Setup wiring
     rScene.debug_update_add(rScene.get_update_order(),"wire_percent_construct", "vehicle_activate", "vehicle_modification",
@@ -158,11 +166,12 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // ##### Add a camera to the scene #####
 
     // Create the camera entity
-    ActiveEnt camera = rScene.hier_create_child(rScene.hier_get_root(),
-                                                       "Camera");
+    ActiveEnt camera = SysHierarchy::create_child(
+                rScene, rScene.hier_get_root(), "Camera");
 
     // Configure camera transformation
     auto &cameraTransform = rScene.reg_emplace<ACompTransform>(camera);
+    rScene.reg_emplace<ACompDrawTransform>(camera);
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     rScene.reg_emplace<ACompFloatingOrigin>(camera);
 
@@ -177,7 +186,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     cameraComp.calculate_projection();
 
     // Add the debug camera controller to the scene. This adds controls
-    auto camObj = std::make_unique<DebugCameraController>(rScene, camera);
+    auto camObj = std::make_unique<DebugCameraController>(
+                rScene, camera, pMagnumApp->get_input_handler());
 
     // Add a ACompDebugObject to camera to manage camObj's lifetime
     rScene.reg_emplace<ACompDebugObject>(camera, std::move(camObj));
