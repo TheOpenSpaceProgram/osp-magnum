@@ -23,12 +23,13 @@
  * SOFTWARE.
  */
 #pragma once
-#include <utility>
+
+#include "../wiretypes.h"
+
 #include <osp/Active/SysMachine.h>
 #include <osp/Active/SysWire.h>
 #include <osp/Active/physics.h>
 #include <osp/Resource/blueprints.h>
-#include "adera/ShipResources.h"
 
 namespace adera::active::machines
 {
@@ -40,7 +41,7 @@ class MachineRocket
 {
     friend class SysMachineRocket;
 
-    using Percent = osp::active::wiretype::Percent;
+    using Percent = wire::Percent;
 
     struct Parameters
     {

@@ -295,8 +295,8 @@ void load_a_bunch_of_stuff()
     register_machine<MachineUserControl>(lazyDebugPack);
 
     // Register wire types
-    register_wiretype<osp::active::wiretype::AttitudeControl>(lazyDebugPack);
-    register_wiretype<osp::active::wiretype::Percent>(lazyDebugPack);
+    register_wiretype<adera::wire::AttitudeControl>(lazyDebugPack);
+    register_wiretype<adera::wire::Percent>(lazyDebugPack);
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};

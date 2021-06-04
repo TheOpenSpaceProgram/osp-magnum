@@ -41,6 +41,8 @@
 #include <adera/Machines/Rocket.h>
 #include <adera/Machines/UserControl.h>
 
+#include <adera/wiretypes.h>
+
 #include <adera/SysExhaustPlume.h>
 #include <adera/ShipResources.h>
 
@@ -82,11 +84,6 @@ using osp::active::ACompPerspective3DView;
 using osp::active::ACompRenderer;
 using osp::active::ACompWire;
 using osp::active::ACompWireNodes;
-
-namespace wiretype
-{
-using namespace osp::active::wiretype;
-}
 
 using adera::active::machines::SysMachineUserControl;
 using adera::active::machines::SysMachineRocket;
@@ -130,19 +127,19 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     SysMachineUserControl::add_functions(rScene);
 
     // Setup wiring
-    rScene.debug_update_add(rScene.get_update_order(), "wire_percent_construct", "vehicle_activate", "vehicle_modification",
-                            &osp::active::SysSignal<wiretype::Percent>::signal_update_construct);
+    rScene.debug_update_add(rScene.get_update_order(),"wire_percent_construct", "vehicle_activate", "vehicle_modification",
+                            &osp::active::SysSignal<adera::wire::Percent>::signal_update_construct);
     rScene.debug_update_add(rScene.get_update_order(), "wire_attctrl_construct", "vehicle_activate", "vehicle_modification",
-                            &osp::active::SysSignal<wiretype::AttitudeControl>::signal_update_construct);
+                            &osp::active::SysSignal<adera::wire::AttitudeControl>::signal_update_construct);
     osp::active::SysWire::add_functions(rScene);
     osp::active::SysWire::setup_default(
             rScene, 5,
             {&adera::active::machines::SysMachineRocket::update_calculate,
              &adera::active::machines::SysMachineRCSController::update_calculate},
-            {&osp::active::SysSignal<wiretype::Percent>::signal_update_nodes,
-             &osp::active::SysSignal<wiretype::AttitudeControl>::signal_update_nodes});
-    rScene.reg_emplace< ACompWireNodes<wiretype::AttitudeControl> >(rScene.hier_get_root());
-    rScene.reg_emplace< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
+            {&osp::active::SysSignal<adera::wire::Percent>::signal_update_nodes,
+             &osp::active::SysSignal<adera::wire::AttitudeControl>::signal_update_nodes});
+    rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
+    rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
 
 
     // create a Satellite with an ActiveArea

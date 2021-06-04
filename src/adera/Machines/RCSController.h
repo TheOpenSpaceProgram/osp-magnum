@@ -27,7 +27,7 @@
 
 #include <osp/Resource/blueprints.h>
 
-#include <osp/Active/SysWire.h>
+#include "../wiretypes.h"
 
 namespace adera::active::machines
 {
@@ -94,8 +94,8 @@ class MachineRCSController
 {
     friend SysMachineRCSController;
 
-    using Percent = osp::active::wiretype::Percent;
-    using AttitudeControl = osp::active::wiretype::AttitudeControl;
+    using Percent = wire::Percent;
+    using AttitudeControl = wire::AttitudeControl;
 
 public:
 

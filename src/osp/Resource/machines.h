@@ -58,7 +58,12 @@ template<class WIRETYPE_T>
 using portindex_t = typename WireTypes<WIRETYPE_T>::port;
 
 template<class TYPE_T>
-constexpr TYPE_T nullvalue() { return TYPE_T(std::numeric_limits<typename std::underlying_type<TYPE_T>::type>::max()); }
+constexpr TYPE_T nullvalue()
+{
+    return TYPE_T(std::numeric_limits<
+                  typename std::underlying_type_t<TYPE_T>
+                  >::max());
+}
 
 //-----------------------------------------------------------------------------
 

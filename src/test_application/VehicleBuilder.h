@@ -71,7 +71,7 @@ public:
      * @param scale
      * @return Resulting blueprint part
      */
-    part_t part_add(osp::DependRes<osp::PrototypePart>& part,
+    part_t part_add(osp::DependRes<osp::PrototypePart>& protoPart,
                   const osp::Vector3& translation,
                   const osp::Quaternion& rotation,
                   const osp::Vector3& scale);

@@ -37,9 +37,37 @@
 
 #include <iostream>
 
-using namespace adera::active::machines;
-using namespace osp::active;
-using namespace osp;
+using adera::active::machines::SysMachineRocket;
+using adera::wire::Percent;
+using adera::active::machines::MachineRocket;
+
+using osp::active::ActiveScene;
+using osp::active::ActiveEnt;
+using osp::active::ACompHierarchy;
+using osp::active::EHierarchyTraverseStatus;
+using osp::active::ACompMachines;
+using osp::active::ACompRigidBody_t;
+using osp::active::ACompTransform;
+using osp::active::SysPhysics_t;
+
+using osp::active::ACompWirePanel;
+using osp::active::ACompWireNodes;
+using osp::active::SysWire;
+using osp::active::WireNode;
+using osp::active::WirePort;
+
+using osp::BlueprintMachine;
+using osp::BlueprintPart;
+using osp::BlueprintVehicle;
+
+using osp::Package;
+using osp::DependRes;
+using osp::Path;
+
+using osp::machine_id_t;
+using osp::NodeMap_t;
+using osp::Matrix4;
+using osp::Vector3;
 
 void SysMachineRocket::add_functions(ActiveScene &rScene)
 {
@@ -55,7 +83,7 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = mach_id<MachineRocket>();
+    machine_id_t const id = osp::mach_id<MachineRocket>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
@@ -98,20 +126,23 @@ void SysMachineRocket::update_calculate(ActiveScene& rScene)
         machine.m_powerOutput = 0;
 
         // Get the Percent Panel which contains the Throttle Port
-        auto const *panelPercent = rScene.get_registry()
-                .try_get< ACompWirePanel<wiretype::Percent> >(ent);
+        auto const *pPanelPercent = rScene.get_registry()
+                .try_get< ACompWirePanel<Percent> >(ent);
 
-        if (panelPercent != nullptr)
+        if (pPanelPercent != nullptr)
         {
-            WirePort<wiretype::Percent> const *portThrottle
-                    = panelPercent->port(MachineRocket::smc_wiThrottle);
+            WirePort<Percent> const *pPortThrottle
+                    = pPanelPercent->port(MachineRocket::smc_wiThrottle);
 
-            if (portThrottle != nullptr)
+            if (pPortThrottle != nullptr)
             {
                 // Get the connected node and its value
-                auto &nodesPercent = rScene.reg_get< ACompWireNodes<wiretype::Percent> >(rScene.hier_get_root());
-                WireNode<wiretype::Percent> &nodeThrottle = nodesPercent.get_node(portThrottle->m_nodeIndex);
-                float throttle = nodeThrottle.m_state.m_value.m_percent;
+                auto const &nodesPercent
+                        = rScene.reg_get< ACompWireNodes<Percent> >(
+                            rScene.hier_get_root());
+                WireNode<Percent> const &nodeThrottle
+                        = nodesPercent.get_node(pPortThrottle->m_nodeIndex);
+                float throttle = nodeThrottle.m_state.m_percent;
                 machine.m_powerOutput = throttle;
             }
         }
@@ -296,7 +327,7 @@ MachineRocket& SysMachineRocket::instantiate(
     rocket.m_params.m_specImpulse = config_get_if<double>(config.m_config, "Isp", 42.0);
 
     std::string const& fuelIdent = config_get_if<std::string>(config.m_config, "fueltype", "");
-    Path resPath = decompose_path(fuelIdent);
+    Path resPath = osp::decompose_path(fuelIdent);
     Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
     DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>(resPath.identifier);
 

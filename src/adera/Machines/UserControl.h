@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "../wiretypes.h"
+
 #include <osp/UserInputHandler.h>
 #include <osp/Active/SysMachine.h>
 #include <osp/Active/SysWire.h>
@@ -95,24 +97,20 @@ public:
 /**
  * Interfaces user input into WireOutputs designed for controlling spacecraft.
  */
-class MachineUserControl
+struct MachineUserControl
 {
-    friend SysMachineUserControl;
-
-    using Percent = osp::active::wiretype::Percent;
-    using AttitudeControl = osp::active::wiretype::AttitudeControl;
-
-public:
+    using Percent = adera::wire::Percent;
+    using AttitudeControl = adera::wire::AttitudeControl;
 
     static constexpr std::string_view smc_mach_name = "UserControl";
 
     static constexpr osp::portindex_t<Percent> smc_woThrottle{0};
-
     static constexpr osp::portindex_t<AttitudeControl> smc_woAttitude{0};
 
-
-private:
-    int dummy;
+    // TODO: Eventually restructure MachineUserControl to instead have controls
+    //       as members that can be written to instead of listening directly
+    //       to a UserInputHandler
+    bool m_enable{false};
 };
 
 //-----------------------------------------------------------------------------

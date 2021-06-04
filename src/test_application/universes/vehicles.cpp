@@ -55,8 +55,8 @@ using osp::BlueprintVehicle;
 using osp::BlueprintMachine;
 using osp::PrototypePart;
 
-using osp::active::wiretype::AttitudeControl;
-using osp::active::wiretype::Percent;
+using adera::wire::AttitudeControl;
+using adera::wire::Percent;
 
 using adera::active::machines::MachineContainer;
 using adera::active::machines::MachineRCSController;
