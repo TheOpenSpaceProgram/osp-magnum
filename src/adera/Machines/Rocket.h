@@ -23,11 +23,13 @@
  * SOFTWARE.
  */
 #pragma once
-#include <utility>
+
+#include "../wiretypes.h"
+
 #include <osp/Active/SysMachine.h>
+#include <osp/Active/SysWire.h>
 #include <osp/Active/physics.h>
 #include <osp/Resource/blueprints.h>
-#include "adera/ShipResources.h"
 
 namespace adera::active::machines
 {
@@ -35,24 +37,11 @@ namespace adera::active::machines
 /**
  *
  */
-class MachineRocket : public osp::active::Machine
+class MachineRocket
 {
     friend class SysMachineRocket;
 
-    using input_t = std::pair<osp::DependRes<ShipResourceType>, float>;
-    struct ResourceInput
-    {
-        ResourceInput(osp::DependRes<ShipResourceType> type,
-            float massRateFraction, osp::active::WireInput source)
-            : m_type(std::move(type))
-            , m_massRateFraction(massRateFraction)
-            , m_source(std::move(source))
-        {}
-
-        osp::DependRes<ShipResourceType> m_type;
-        float m_massRateFraction;
-        osp::active::WireInput m_source;
-    };
+    using Percent = wire::Percent;
 
     struct Parameters
     {
@@ -64,20 +53,7 @@ public:
 
     static inline std::string smc_mach_name = "Rocket";
 
-    MachineRocket(Parameters params, std::vector<input_t> resources);
-    MachineRocket(MachineRocket &&move) noexcept;
-    MachineRocket& operator=(MachineRocket&& move) noexcept;
-
-    MachineRocket(MachineRocket const& copy) = delete;
-    MachineRocket& operator=(MachineRocket const& move) = delete;
-
-    void propagate_output(osp::active::WireOutput *output) override;
-
-    osp::active::WireInput* request_input(osp::WireInPort port) override;
-    osp::active::WireOutput* request_output(osp::WireOutPort port) override;
-
-    std::vector<osp::active::WireInput*> existing_inputs() override;
-    std::vector<osp::active::WireOutput*> existing_outputs() override;
+    static constexpr osp::portindex_t<Percent> smc_wiThrottle{0};
 
     /**
      * Return normalized power output level of the rocket this frame
@@ -96,10 +72,7 @@ public:
     }
 
 private:
-    osp::active::WireInput m_wiGimbal{this, "Gimbal"};
-    osp::active::WireInput m_wiIgnition{this, "Ignition"};
-    osp::active::WireInput m_wiThrottle{this, "Throttle"};
-    std::vector<ResourceInput> m_resourceLines;
+
 
     osp::active::ActiveEnt m_rigidBody{entt::null};
     Parameters m_params;
@@ -122,6 +95,12 @@ public:
      * @param rScene [ref] Scene supporting vehicles
      */
     static void update_construct(osp::active::ActiveScene &rScene);
+
+    /**
+     * Read wire inputs and calculate required fuel
+     * @param rScene
+     */
+    static void update_calculate(osp::active::ActiveScene& rScene);
 
     /**
      * Updates all MachineRockets in the scene
@@ -155,53 +134,8 @@ public:
             osp::BlueprintMachine const& settings);
 
 private:
-    static uint64_t resource_units_required(
-        osp::active::ActiveScene const& scene,
-        MachineRocket const& machine, float throttle,
-        MachineRocket::ResourceInput const& resource);
 
-    constexpr static float resource_mass_flow_rate(MachineRocket const& machine,
-        float throttle, MachineRocket::ResourceInput const& resource);
-
-    osp::active::UpdateOrderHandle_t m_updatePhysics;
 }; // SysMachineRocket
 
-inline MachineRocket::MachineRocket(Parameters params, std::vector<input_t> resources)
-    : Machine(true)
-    , m_params(params)
-{
-    for (input_t& input : std::move(resources))
-    {
-        std::string resName = input.first->m_identifier;
-        m_resourceLines.emplace_back(
-            std::move(input.first),
-            input.second,
-            osp::active::WireInput{this, resName});
-    }
-}
-
-inline MachineRocket::MachineRocket(MachineRocket&& move) noexcept
-   : Machine(std::move(move))
-   , m_wiGimbal(this, std::move(move.m_wiGimbal))
-   , m_wiIgnition(this, std::move(move.m_wiIgnition))
-   , m_wiThrottle(this, std::move(move.m_wiThrottle))
-   , m_rigidBody(std::move(move.m_rigidBody))
-   , m_params(std::move(move.m_params))
-   , m_resourceLines(std::move(move.m_resourceLines))
-   , m_powerOutput(std::exchange(move.m_powerOutput, 0.0f))
-{ }
-
-inline MachineRocket& MachineRocket::operator=(MachineRocket&& move) noexcept
-{
-    Machine::operator=(std::move(move));
-    m_wiGimbal   = { this, std::move(move.m_wiGimbal)   };
-    m_wiIgnition = { this, std::move(move.m_wiIgnition) };
-    m_wiThrottle = { this, std::move(move.m_wiThrottle) };
-    m_rigidBody  = std::move(move.m_rigidBody);
-    m_params = std::move(move.m_params);
-    m_resourceLines = std::move(move.m_resourceLines);
-    m_powerOutput = std::exchange(move.m_powerOutput, 0.0f);
-    return *this;
-}
 
 } // namespace adera::active::machines

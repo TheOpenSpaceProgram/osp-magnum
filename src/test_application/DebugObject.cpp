@@ -242,7 +242,7 @@ void DebugCameraController::update_physics_post()
     if (MachineUserControl *pMUserCtrl = find_user_control(m_scene, vehicle);
         pMUserCtrl != nullptr)
     {
-        pMUserCtrl->enable();
+        pMUserCtrl->m_enable = true;
     }
 
 
@@ -323,12 +323,10 @@ bool DebugCameraController::try_switch_vehicle()
     if (m_scene.get_registry().valid(vehicle))
     {
         // Switching away, disable the first MachineUserControl
-        ActiveEnt firstPart
-                = *(viewActive.get<ACompVehicle>(vehicle).m_parts.begin());
         if (MachineUserControl *pMUserCtrl = find_user_control(m_scene, vehicle);
             pMUserCtrl != nullptr)
         {
-            pMUserCtrl->disable();
+            pMUserCtrl->m_enable = false;
         }
 
         prevVehiclePos = rReg.get<ACompTransform>(vehicle).m_transform.translation();

@@ -37,44 +37,37 @@
 
 #include <iostream>
 
-using namespace adera::active::machines;
-using namespace osp::active;
-using namespace osp;
+using adera::active::machines::SysMachineRocket;
+using adera::wire::Percent;
+using adera::active::machines::MachineRocket;
 
-using adera::active::machines::MachineContainer;
+using osp::active::ActiveScene;
+using osp::active::ActiveEnt;
+using osp::active::ACompHierarchy;
+using osp::active::EHierarchyTraverseStatus;
+using osp::active::ACompMachines;
+using osp::active::ACompRigidBody_t;
+using osp::active::ACompTransform;
+using osp::active::SysPhysics_t;
 
-void MachineRocket::propagate_output(WireOutput* output)
-{
+using osp::active::ACompWirePanel;
+using osp::active::ACompWireNodes;
+using osp::active::SysWire;
+using osp::active::WireNode;
+using osp::active::WirePort;
 
-}
+using osp::BlueprintMachine;
+using osp::BlueprintPart;
+using osp::BlueprintVehicle;
 
-WireInput* MachineRocket::request_input(WireInPort port)
-{
-    return existing_inputs()[port];
-}
+using osp::Package;
+using osp::DependRes;
+using osp::Path;
 
-WireOutput* MachineRocket::request_output(WireOutPort port)
-{
-    return existing_outputs()[port];
-}
-
-std::vector<WireInput*> MachineRocket::existing_inputs()
-{
-    std::vector<WireInput*> inputs;
-    inputs.reserve(3 + m_resourceLines.size());
-
-    inputs.insert(inputs.begin(), {&m_wiGimbal, &m_wiIgnition, &m_wiThrottle});
-    for (auto& resource : m_resourceLines)
-    {
-        inputs.push_back(&resource.m_source);
-    }
-    return inputs;
-}
-
-std::vector<WireOutput*> MachineRocket::existing_outputs()
-{
-    return {};
-}
+using osp::machine_id_t;
+using osp::NodeMap_t;
+using osp::Matrix4;
+using osp::Vector3;
 
 void SysMachineRocket::add_functions(ActiveScene &rScene)
 {
@@ -84,17 +77,13 @@ void SysMachineRocket::add_functions(ActiveScene &rScene)
                             &SysMachineRocket::update_construct);
 }
 
-//void SysMachineRocket::update_sensor()
-//{
-//}
-
 void SysMachineRocket::update_construct(ActiveScene& rScene)
 {
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = mach_id<MachineRocket>();
+    machine_id_t const id = osp::mach_id<MachineRocket>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
@@ -110,58 +99,75 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
         for (BlueprintMachine const &mach : vehBp.m_machines[id])
         {
             // Get part
-            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_partIndex];
 
             // Get machine entity previously reserved by SysVehicle
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
-            BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_blueprintIndex];
+            BlueprintPart const& partBp = vehBp.m_blueprints[mach.m_partIndex];
             instantiate(rScene, machEnt,
                         vehBp.m_prototypes[partBp.m_protoIndex]
                                 ->m_protoMachines[mach.m_protoMachineIndex],
                         mach);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id,
-                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
-                    {
-                        return rScene.reg_get<MachineRocket>(ent);
-                    });
         }
     }
 }
 
+void SysMachineRocket::update_calculate(ActiveScene& rScene)
+{
+    auto view = rScene.get_registry().view<MachineRocket>();
+    std::vector<ActiveEnt>& rToUpdate = SysWire::to_update<MachineRocket>(rScene);
+
+    for (ActiveEnt ent : rToUpdate)
+    {
+        auto &machine = view.get<MachineRocket>(ent);
+
+        machine.m_powerOutput = 0;
+
+        // Get the Percent Panel which contains the Throttle Port
+        auto const *pPanelPercent = rScene.get_registry()
+                .try_get< ACompWirePanel<Percent> >(ent);
+
+        if (pPanelPercent != nullptr)
+        {
+            WirePort<Percent> const *pPortThrottle
+                    = pPanelPercent->port(MachineRocket::smc_wiThrottle);
+
+            if (pPortThrottle != nullptr)
+            {
+                // Get the connected node and its value
+                auto const &nodesPercent
+                        = rScene.reg_get< ACompWireNodes<Percent> >(
+                            rScene.hier_get_root());
+                WireNode<Percent> const &nodeThrottle
+                        = nodesPercent.get_node(pPortThrottle->m_nodeIndex);
+                float throttle = nodeThrottle.m_state.m_percent;
+                machine.m_powerOutput = throttle;
+            }
+        }
+    }
+
+    rToUpdate.clear();
+
+}
 
 void SysMachineRocket::update_physics(ActiveScene& rScene)
 {
     auto view = rScene.get_registry().view<MachineRocket>();
 
+
     for (ActiveEnt ent : view)
     {
         auto &machine = view.get<MachineRocket>(ent);
-        if (!machine.m_enable)
-        {
-            continue;
-        }
-
-        machine.m_powerOutput = 0.0f;  // Will be set later if engine is on
 
         // Check for nonzero throttle, continue otherwise
-        WireData *pThrottle = machine.m_wiThrottle.connected_value();
-        wiretype::Percent* pThrotPercent = nullptr;
-        if (pThrottle != nullptr)
-        {
-            using wiretype::Percent;
-            pThrotPercent = std::get_if<Percent>(pThrottle);
-            if ((pThrotPercent == nullptr) || !(pThrotPercent->m_value > 0.0f))
-            {
-                continue;
-            }
-        }
-        else
+        if (0 >= machine.m_powerOutput)
         {
             continue;
         }
 
+        /*
         // Check for adequate resource inputs
         bool fail = false;
         for (auto& resource : machine.m_resourceLines)
@@ -189,6 +195,8 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
             continue;
         }
 
+        */
+
         // Perform physics calculation
 
         // Get rigidbody ancestor and its transformation component
@@ -197,11 +205,6 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         auto& rCompRb = rScene.reg_get<ACompRigidBody_t>(pRbAncestor->m_ancestor);
         auto const& rCompTf = rScene.reg_get<ACompTransform>(pRbAncestor->m_ancestor);
 
-        if (WireData *ignition = machine.m_wiIgnition.connected_value())
-        {
-
-        }
-
         Matrix4 relTransform = pRbAncestor->m_relTransform;
 
         /* Compute thrust force
@@ -209,7 +212,7 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
          * Obtains thrust vector in rigidbody space
          */
         Vector3 thrustDir = relTransform.transformVector(Vector3{0.0f, 0.0f, 1.0f});
-        float thrustMag = machine.m_params.m_maxThrust * pThrotPercent->m_value;
+        float thrustMag = machine.m_params.m_maxThrust * machine.m_powerOutput;
         // Take thrust in rigidbody space and apply to RB in world space
         Vector3 thrust = thrustMag * thrustDir;
         Vector3 worldThrust = rCompTf.m_transform.transformVector(thrust);
@@ -225,6 +228,7 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         rCompRb.m_inertiaDirty = true;
 
         // Perform resource consumption calculation
+        /*
         for (MachineRocket::ResourceInput const& resource : machine.m_resourceLines)
         {
             // Pipe must be non-null since we checked earlier
@@ -238,12 +242,13 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
             SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
                                 "Consumed {} units of fuel, {} remaining",
                 consumed, src.check_contents().m_quantity);
-        }
+        }*/
 
         // Set output power level (for plume effect)
         // TODO: later, take into account low fuel pressure, bad mixture, etc.
-        machine.m_powerOutput = pThrotPercent->m_value;
+        //machine.m_powerOutput = pThrotPercent->m_value;
     }
+
 }
 
 void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt part,
@@ -316,43 +321,16 @@ MachineRocket& SysMachineRocket::instantiate(
         osp::PCompMachine const& config,
         osp::BlueprintMachine const& settings)
 {
+    auto& rocket = rScene.reg_emplace<MachineRocket>(ent);
     // Read engine config
-    MachineRocket::Parameters params;
-    params.m_maxThrust = config_get_if<double>(config.m_config, "thrust", 42.0);
-    params.m_specImpulse = config_get_if<double>(config.m_config, "Isp", 42.0);
+    rocket.m_params.m_maxThrust = config_get_if<double>(config.m_config, "thrust", 42.0);
+    rocket.m_params.m_specImpulse = config_get_if<double>(config.m_config, "Isp", 42.0);
 
     std::string const& fuelIdent = config_get_if<std::string>(config.m_config, "fueltype", "");
-    Path resPath = decompose_path(fuelIdent);
+    Path resPath = osp::decompose_path(fuelIdent);
     Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
     DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>(resPath.identifier);
 
-    std::vector<MachineRocket::input_t> inputs;
-    if (!fuel.empty())
-    {
-        inputs.push_back({std::move(fuel), 1.0f});
-    }
-
     attach_plume_effect(rScene, rScene.reg_get<ACompHierarchy>(ent).m_parent, ent);
-    return rScene.reg_emplace<MachineRocket>(ent, std::move(params), std::move(inputs));
-}
-
-uint64_t SysMachineRocket::resource_units_required(
-    osp::active::ActiveScene const& scene,
-    MachineRocket const& machine, float throttle,
-    MachineRocket::ResourceInput const& resource)
-{
-    float massFlowRate = resource_mass_flow_rate(machine,
-        throttle, resource);
-    float massFlow = massFlowRate * scene.get_time_delta_fixed();
-    return resource.m_type->resource_quantity(massFlow);
-}
-
-constexpr float SysMachineRocket::resource_mass_flow_rate(MachineRocket const& machine,
-    float throttle, MachineRocket::ResourceInput const& resource)
-{
-    float thrustMag = machine.m_params.m_maxThrust * throttle;
-    float massFlowRateTot = thrustMag /
-        (phys::constants::g_0 * machine.m_params.m_specImpulse);
-
-    return massFlowRateTot * resource.m_massRateFraction;
+    return rocket;
 }

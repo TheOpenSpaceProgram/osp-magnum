@@ -24,7 +24,8 @@
  */
 #pragma once
 
-#include "SysWire.h"
+#include "ActiveScene.h"
+#include "../Resource/machines.h"
 
 #include <cstdint>
 #include <iostream>
@@ -33,8 +34,6 @@
 namespace osp::active
 {
 
-using Corrade::Containers::LinkedList;
-using Corrade::Containers::LinkedListItem;
 
 class ISysMachine;
 class Machine;
@@ -56,61 +55,18 @@ struct ACompMachines
 
 struct ACompMachineType
 {
-    // TODO: Temporary, remove when new wiring system is added. A well made ECS
-    //       means that all publicly accessible properties of machines are in
-    //       separate components
-    using get_machine_component_t = Machine& (*)(ActiveScene&, ActiveEnt);
-
-    ACompMachineType(machine_id_t type, get_machine_component_t get)
+    ACompMachineType(machine_id_t type)
      : m_type(type)
-     , m_get_machine{get}
     { }
     machine_id_t m_type;
-    get_machine_component_t m_get_machine;
 };
 
 //-----------------------------------------------------------------------------
 
-/**
- * Machine Base class. This should tecnically be an AComp Virtual functions are
- * only for wiring; this will probably change soon.
- *
- * Calling updates are handled by SysMachines
- */
-class Machine : public IWireElement
-{
 
-public:
-    constexpr Machine() noexcept = default;
-    constexpr Machine(bool enable) noexcept;
-    constexpr Machine(Machine&& move) noexcept = default;
-    constexpr Machine& operator=(Machine&& move) noexcept = default;
-
-    Machine(Machine const& copy) = delete;
-    Machine& operator=(Machine const& move) = delete;
-
-    constexpr void enable(void) noexcept;
-    constexpr void disable(void) noexcept;
-
-protected:
-    bool m_enable = false;
-};
 
 //-----------------------------------------------------------------------------
 
-constexpr Machine::Machine(bool enable) noexcept
- : m_enable(enable)
-{ }
-
-constexpr void Machine::enable(void) noexcept
-{
-    m_enable = true;
-}
-
-constexpr void Machine::disable(void) noexcept
-{
-    m_enable = false;
-}
 
 
 } // namespace osp::active

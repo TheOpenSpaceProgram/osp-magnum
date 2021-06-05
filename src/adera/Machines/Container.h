@@ -26,6 +26,8 @@
 
 #include "../ShipResources.h"
 
+#include <osp/Resource/blueprints.h>
+
 namespace adera::active::machines
 {
 
@@ -56,7 +58,7 @@ public:
 
 //-----------------------------------------------------------------------------
 
-class MachineContainer : public osp::active::Machine
+class MachineContainer
 {
     friend SysMachineContainer;
 
@@ -65,17 +67,6 @@ public:
     static inline std::string smc_mach_name = "Container";
 
     MachineContainer(osp::active::ActiveEnt ownID, float capacity, ShipResource resource);
-    MachineContainer(MachineContainer&& move) noexcept;
-    MachineContainer& operator=(MachineContainer&& move) noexcept;
-    ~MachineContainer() = default;
-
-    void propagate_output(osp::active::WireOutput *output) override;
-
-    osp::active::WireInput* request_input(osp::WireInPort port) override;
-    osp::active::WireOutput* request_output(osp::WireOutPort port) override;
-
-    std::vector<osp::active::WireInput*> existing_inputs() override;
-    std::vector<osp::active::WireOutput*> existing_outputs() override;
 
     constexpr const ShipResource& check_contents() const
     { return m_contents; }
@@ -100,39 +91,17 @@ public:
      */
     float compute_mass() const noexcept;
 private:
-    //osp::active::WireInput m_inputs;
-    osp::active::WireOutput m_outputs;
 
     float m_capacity;
     ShipResource m_contents;
 }; // class MachineContainer
 
-/* MachineContainer */
 inline MachineContainer::MachineContainer(osp::active::ActiveEnt ownID,
     float capacity, ShipResource resource)
-    : Machine(true)
-    , m_capacity(capacity)
-    , m_contents(resource)
-    , m_outputs(this, "output")
+ : m_capacity(capacity)
+ , m_contents(resource)
 {
-    m_outputs.value() = osp::active::wiretype::Pipe{ownID};
-}
-
-inline MachineContainer::MachineContainer(MachineContainer&& move) noexcept
-    : Machine(std::move(move))
-    , m_capacity(std::move(move.m_capacity))
-    , m_contents(std::move(move.m_contents))
-    , m_outputs(this, std::move(move.m_outputs))
-{}
-
-inline MachineContainer& MachineContainer::operator=(MachineContainer&& move) noexcept
-{
-    m_enable = std::exchange(move.m_enable, false);
-    m_capacity = std::exchange(move.m_capacity, 0.0f);
-    m_contents = std::move(move.m_contents);
-    m_outputs = {this, std::move(move.m_outputs)};
-
-    return *this;
+    //m_outputs.value() = osp::active::wiretype::Pipe{ownID};
 }
 
 } // namespace adera::active::machines

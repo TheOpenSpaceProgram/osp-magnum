@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright Â© 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -22,11 +22,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 #pragma once
 
-#include <osp/Active/SysMachine.h>
-#include <Magnum/Math/Vector3.h>
 #include <osp/Resource/blueprints.h>
+
+#include "../wiretypes.h"
 
 namespace adera::active::machines
 {
@@ -62,7 +63,9 @@ public:
      *
      * @param rScene [ref] Scene with MachineRCSControllers to update
      */
-    static void update_controls(osp::active::ActiveScene &rScene);
+    //static void update_controls(osp::active::ActiveScene &rScene);
+
+    static void update_calculate(osp::active::ActiveScene &rScene);
 
 private:
     /**
@@ -80,62 +83,29 @@ private:
      * @param cmdRot    [in] Commanded axis of rotation
      */
     static float thruster_influence(
-        Magnum::Vector3 posOset, Magnum::Vector3 direction,
-        Magnum::Vector3 cmdTransl, Magnum::Vector3 cmdRot);
+        osp::Vector3 posOset, osp::Vector3 direction,
+        osp::Vector3 cmdTransl, osp::Vector3 cmdRot);
 
 }; // SysMachineRCSController
 
 //-----------------------------------------------------------------------------
 
-class MachineRCSController : public osp::active::Machine
+class MachineRCSController
 {
     friend SysMachineRCSController;
+
+    using Percent = wire::Percent;
+    using AttitudeControl = wire::AttitudeControl;
 
 public:
 
     static inline std::string smc_mach_name = "RCSController";
 
-    MachineRCSController();
-    MachineRCSController(MachineRCSController&& move) noexcept;
-    MachineRCSController& operator=(MachineRCSController&& move) noexcept;
-    ~MachineRCSController() = default;
+    static constexpr osp::portindex_t<AttitudeControl> smc_wiCommandOrient{0};
 
-    void propagate_output(osp::active::WireOutput *output) override;
+    static constexpr osp::portindex_t<Percent> m_woThrottle{0};
 
-    osp::active::WireInput* request_input(osp::WireInPort port) override;
-    osp::active::WireOutput* request_output(osp::WireOutPort port) override;
-
-    std::vector<osp::active::WireInput*> existing_inputs() override;
-    std::vector<osp::active::WireOutput*> existing_outputs() override;
-
-private:
-    osp::active::WireInput m_wiCommandOrient{this, "Orient"};
-    osp::active::WireOutput m_woThrottle{this, "Throttle"};
-
-    osp::active::ActiveEnt m_rigidBody{entt::null};
 }; // MachineRCSController
 
-inline MachineRCSController::MachineRCSController()
-    : Machine(true)
-{
-    m_woThrottle.value() = osp::active::wiretype::Percent{0.0f};
-}
-
-
-inline MachineRCSController::MachineRCSController(MachineRCSController&& move) noexcept
-    : Machine(std::move(move))
-    , m_wiCommandOrient{this, std::move(move.m_wiCommandOrient)}
-    , m_woThrottle{this, std::move(move.m_woThrottle)}
-    , m_rigidBody(std::move(move.m_rigidBody))
-{}
-
-inline MachineRCSController& MachineRCSController::operator=(MachineRCSController&& move) noexcept
-{
-    Machine::operator=(std::move(move));
-    m_wiCommandOrient = {this, std::move(move.m_wiCommandOrient)};
-    m_woThrottle = {this, std::move(move.m_woThrottle)};
-    m_rigidBody = std::exchange(move.m_rigidBody, entt::null);
-    return *this;
-}
 
 } // adera::active::machines

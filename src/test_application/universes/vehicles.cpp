@@ -28,7 +28,11 @@
 
 #include <adera/ShipResources.h>
 #include <adera/Machines/Container.h>
+#include <adera/Machines/RCSController.h>
+#include <adera/Machines/Rocket.h>
+#include <adera/Machines/UserControl.h>
 
+#include <osp/Active/SysWire.h>
 #include <osp/Satellites/SatVehicle.h>
 
 using namespace testapp;
@@ -48,21 +52,17 @@ using osp::universe::UCompTransformTraj;
 using osp::universe::UCompVehicle;
 
 using osp::BlueprintVehicle;
+using osp::BlueprintMachine;
 using osp::PrototypePart;
 
+using adera::wire::AttitudeControl;
+using adera::wire::Percent;
 
-/**
- * Utility: computes the displacement between two parts, relative to the
- * specified sub-object (e.g. an attachment node).
- *
- * @param attachTo [in] The parent part
- * @param attachToName [in] The name of the parent's object/attach point
- * @param toAttach [in] The child part
- * @param toAttachName [in] The name of the child's object/attach point
- */
-Vector3 part_offset(
-    PrototypePart const& attachTo, std::string_view attachToName,
-    PrototypePart const& toAttach, std::string_view toAttachName);
+using adera::active::machines::MachineContainer;
+using adera::active::machines::MachineRCSController;
+using adera::active::machines::MachineRocket;
+using adera::active::machines::MachineUserControl;
+
 
 /**
  * Adds multiple specified parts (RCS thrusters) in the same position, but
@@ -76,7 +76,7 @@ Vector3 part_offset(
  */
 void blueprint_add_rcs_block(
         BlueprintVehicle &rBlueprint, DependRes<PrototypePart> rRcs,
-        std::vector<int> &rRcsPorts, Vector3 pos, Quaternion rot);
+        std::vector<part_t> &rRcsPorts, Vector3 pos, Quaternion rot);
 
 
 osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
@@ -87,19 +87,19 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
 
     // Part to add
     DependRes<PrototypePart> rocket = pkg.get<PrototypePart>("part_stomper");
-    blueprint.add_part(rocket, Vector3(0.0f), Quaternion(), Vector3(1.0f));
+    blueprint.part_add(rocket, Vector3(0.0f), Quaternion(), Vector3(1.0f));
 
     // Wire throttle control
     // from (output): a MachineUserControl m_woThrottle
     // to    (input): a MachineRocket m_wiThrottle
-    blueprint.add_wire(0, 0, 1,
-        0, 1, 2);
+    //blueprint.add_wire(0, 0, 1,
+    //    0, 1, 2);
 
     // Wire attitude control to gimbal
     // from (output): a MachineUserControl m_woAttitude
     // to    (input): a MachineRocket m_wiGimbal
-    blueprint.add_wire(0, 0, 0,
-        0, 1, 0);
+    //blueprint.add_wire(0, 0, 0,
+    //    0, 1, 0);
 
     // Save blueprint
     DependRes<BlueprintVehicle> depend =
@@ -140,7 +140,7 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
         randomvec /= 64.0f;
 
         // Add a new [victim] part
-        blueprint.add_part(victim, randomvec,
+        blueprint.part_add(victim, randomvec,
                            Quaternion(), Vector3(1, 1, 1));
         //std::cout << "random: " <<  << "\n";
     }
@@ -148,14 +148,14 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
     // Wire throttle control
     // from (output): a MachineUserControl m_woThrottle
     // to    (input): a MachineRocket m_wiThrottle
-    blueprint.add_wire(0, 0, 1,
-                       0, 1, 2);
+    //blueprint.add_wire(0, 0, 1,
+    //                   0, 1, 2);
 
     // Wire attitude control to gimbal
     // from (output): a MachineUserControl m_woAttitude
     // to    (input): a MachineRocket m_wiGimbal
-    blueprint.add_wire(0, 0, 0,
-                       0, 1, 0);
+    //blueprint.add_wire(0, 0, 0,
+    //                   0, 1, 0);
 
     // put blueprint in package
     DependRes<BlueprintVehicle> depend =
@@ -177,52 +177,18 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
 
 }
 
-Vector3 part_offset(PrototypePart const& attachTo,
-    std::string_view attachToName, PrototypePart const& toAttach,
-    std::string_view toAttachName)
-{
-    Vector3 oset1{0.0f};
-    Vector3 oset2{0.0f};
-
-    for (osp::PCompName const& name : attachTo.m_partName)
-    {
-        if (name.m_name == attachToName)
-        {
-            oset1 = attachTo.m_partTransform[name.m_entity].m_translation;
-            break;
-        }
-    }
-
-    for (osp::PCompName const& name : toAttach.m_partName)
-    {
-        if (name.m_name == toAttachName)
-        {
-            oset2 = toAttach.m_partTransform[name.m_entity].m_translation;
-            break;
-        }
-    }
-
-    return oset1 - oset2;
-}
-
 void blueprint_add_rcs_block(
         VehicleBuilder &rBlueprint, DependRes<PrototypePart> rRcs,
-        std::vector<int> &rRcsPorts, Vector3 pos, Quaternion rot)
+        std::vector<part_t> &rRcsPorts, Vector3 pos, Quaternion rot)
 {
     using namespace Magnum::Math::Literals;
 
     Vector3 constexpr scl{1};
     Vector3 constexpr zAxis{0, 0, 1};
-    int hackypartnum = rBlueprint.part_count();
 
-    rBlueprint.add_part(rRcs, pos, Quaternion::rotation(90.0_degf, zAxis) * rot, scl);
+    rRcsPorts.push_back(rBlueprint.part_add(rRcs, pos, Quaternion::rotation(90.0_degf, zAxis) * rot, scl));
     //rBlueprint.add_part(rRcs, pos, rot, scl);
-    rBlueprint.add_part(rRcs, pos, Quaternion::rotation(-90.0_degf, zAxis) * rot, scl);
-
-    for (int i = 0; i < 2; i ++)
-    {
-        rRcsPorts.push_back(hackypartnum + i);
-    }
+    rRcsPorts.push_back(rBlueprint.part_add(rRcs, pos, Quaternion::rotation(-90.0_degf, zAxis) * rot, scl));
 }
 
 osp::universe::Satellite testapp::debug_add_part_vehicle(
@@ -231,9 +197,6 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
 {
     using namespace Magnum::Math::Literals;
     using Magnum::Rad;
-
-    using osp::BlueprintMachine;
-    using adera::active::machines::MachineContainer;
 
     // Start making the blueprint
     VehicleBuilder blueprint;
@@ -244,9 +207,9 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     DependRes<PrototypePart> engine = pkg.get<PrototypePart>("part_phEngine");
     DependRes<PrototypePart> rcs = pkg.get<PrototypePart>("part_phLinRCS");
 
-    Vector3 cfOset = part_offset(*capsule, "attach_bottom_capsule",
+    Vector3 cfOset = VehicleBuilder::part_offset(*capsule, "attach_bottom_capsule",
         *fuselage, "attach_top_fuselage");
-    Vector3 feOset = part_offset(*fuselage, "attach_bottom_fuselage",
+    Vector3 feOset = VehicleBuilder::part_offset(*fuselage, "attach_bottom_fuselage",
         *engine, "attach_top_eng");
 
 
@@ -258,15 +221,14 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     Quaternion rotZ_180 = Quaternion::rotation(2 * qtrTurn, Vector3{0, 0, 1});
     Quaternion rotZ_270 = Quaternion::rotation(3 * qtrTurn, Vector3{0, 0, 1});
 
-    blueprint.add_part(capsule, Vector3{0}, idRot, scl);
+    part_t partCapsule = blueprint.part_add(capsule, Vector3{0}, idRot, scl);
 
-
-    partindex_t fuselageBP = blueprint.add_part(fuselage, cfOset, idRot, scl);
-    BlueprintMachine* fusalageMach= blueprint.find_machine_by_type<MachineContainer>(fuselageBP);
+    part_t partFusalage = blueprint.part_add(fuselage, cfOset, idRot, scl);
+    BlueprintMachine* fusalageMach= blueprint.machine_find_ptr<MachineContainer>(partFusalage);
     fusalageMach->m_config.emplace("resourcename", "lzdb:fuel");
     fusalageMach->m_config.emplace("fuellevel", 0.5);
 
-    blueprint.add_part(engine, cfOset + feOset, idRot, scl);
+    part_t partEngine = blueprint.part_add(engine, cfOset + feOset, idRot, scl);
 
     // Add a shit ton of RCS rings
 
@@ -276,7 +238,7 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     float rcsZStep      = 4.0f;
     float rcsRadius     = 1.1f;
 
-    std::vector<int> rcsPorts;
+    std::vector<part_t> rcsPorts;
 
     for (float z = rcsZMin; z < rcsZMax; z += rcsZStep)
     {
@@ -292,12 +254,6 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
         }
     }
 
-    enum Parts
-    {
-        CAPSULE = 0,
-        FUSELAGE = 1,
-        ENGINE = 2
-    };
 
     std::cout << "Part vehicle has " << blueprint.part_count()
               << " Parts!\n";
@@ -305,34 +261,43 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     // Wire throttle control
     // from (output): a MachineUserControl m_woThrottle
     // to    (input): a MachineRocket m_wiThrottle
-    blueprint.add_wire(
-        Parts::CAPSULE, 0, 1,
-        Parts::ENGINE, 0, 2);
+    blueprint.wire_connect_signal<Percent>(
+        partCapsule, blueprint.machine_find<MachineUserControl>(partCapsule), MachineUserControl::smc_woThrottle,
+        partEngine, blueprint.machine_find<MachineRocket>(partEngine), MachineRocket::smc_wiThrottle);
 
     // Wire attitude contrl to gimbal
     // from (output): a MachineUserControl m_woAttitude
     // to    (input): a MachineRocket m_wiGimbal
-    blueprint.add_wire(
-        Parts::CAPSULE, 0, 0,
-        Parts::ENGINE, 0, 0);
+    //blueprint.add_wire(
+    //    Parts::CAPSULE, 0, 0,
+    //    Parts::ENGINE, 0, 0);
 
     // Pipe fuel tank to rocket engine
     // from (output): fuselage MachineContainer m_outputs;
     // to    (input): entine MachineRocket m_resourcesLines[0]
-    blueprint.add_wire(Parts::FUSELAGE, 0, 0,
-        Parts::ENGINE, 0, 3);
+    //blueprint.add_wire(Parts::FUSELAGE, 0, 0,
+    //    Parts::ENGINE, 0, 3);
 
-    for (auto port : rcsPorts)
+    mach_t const partCapsuleUsrCtrl = blueprint.machine_find<MachineUserControl>(partCapsule);
+
+    for (auto partRCS : rcsPorts)
     {
+        mach_t const partRCSRocket = blueprint.machine_find<MachineRocket>(partRCS);
+        mach_t const partRCSCtrl = blueprint.machine_find<MachineRCSController>(partRCS);
+
         // Attitude control -> RCS Control
-        blueprint.add_wire(Parts::CAPSULE, 0, 0,
-            port, 0, 0);
+        blueprint.wire_connect_signal<AttitudeControl>(
+                partCapsule, partCapsuleUsrCtrl, MachineUserControl::smc_woAttitude,
+                partRCS, partRCSCtrl, MachineRCSController::smc_wiCommandOrient);
+
         // RCS Control -> RCS Rocket
-        blueprint.add_wire(port, 0, 0,
-            port, 1, 2);
+        blueprint.wire_connect_signal<Percent>(
+                partRCS, partRCSCtrl, MachineRCSController::m_woThrottle,
+                partRCS, partRCSRocket, MachineRocket::smc_wiThrottle);
+
         // Fuselage tank -> RCS Rocket
-        blueprint.add_wire(Parts::FUSELAGE, 0, 0,
-            port, 1, 3);
+        //blueprint.add_wire(Parts::FUSELAGE, 0, 0,
+        //    port, 1, 3);
     }
 
     // Put blueprint in package

@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright Â© 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -34,41 +34,41 @@
 #include <Magnum/Math/Vector.h>
 #include <functional>
 
-using namespace adera::active::machines;
-using namespace osp::active;
-using namespace osp;
-using Magnum::Vector3;
-using Magnum::Matrix4;
+using adera::active::machines::SysMachineRCSController;
+using adera::active::machines::MachineRCSController;
+using adera::wire::Percent;
+using adera::wire::AttitudeControl;
 
-void MachineRCSController::propagate_output(WireOutput* output)
-{
+using osp::active::ActiveScene;
+using osp::active::ActiveEnt;
+using osp::active::ACompMachines;
+using osp::active::ACompRigidBody_t;
+using osp::active::ACompTransform;
+using osp::active::SysPhysics_t;
 
-}
+using osp::active::ACompWirePanel;
+using osp::active::ACompWireNodes;
+using osp::active::ACompWire;
+using osp::active::SysWire;
+using osp::active::SysSignal;
+using osp::active::WireNode;
+using osp::active::WirePort;
+using osp::active::UpdNodes_t;
+using osp::nodeindex_t;
 
-WireInput* MachineRCSController::request_input(osp::WireInPort port)
-{
-    return existing_inputs()[port];
-}
+using osp::BlueprintMachine;
 
-WireOutput* MachineRCSController::request_output(osp::WireOutPort port)
-{
-    return existing_outputs()[port];
-}
+using osp::Package;
+using osp::DependRes;
+using osp::Path;
 
-std::vector<WireInput*> MachineRCSController::existing_inputs()
-{
-    return {&m_wiCommandOrient};
-}
-
-std::vector<WireOutput*> MachineRCSController::existing_outputs()
-{
-    return {&m_woThrottle};
-}
+using osp::machine_id_t;
+using osp::NodeMap_t;
+using osp::Matrix4;
+using osp::Vector3;
 
 void SysMachineRCSController::add_functions(ActiveScene& rScene)
 {
-    rScene.debug_update_add(rScene.get_update_order(), "mach_rcs", "wire", "controls",
-                            &SysMachineRCSController::update_controls);
     rScene.debug_update_add(rScene.get_update_order(), "mach_rcs_construct", "vehicle_activate", "vehicle_modification",
                             &SysMachineRCSController::update_construct);
 }
@@ -120,7 +120,7 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = mach_id<MachineRCSController>();
+    machine_id_t const id = osp::mach_id<MachineRCSController>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
@@ -134,62 +134,106 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
         for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
         {
             // Get part
-            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_partIndex];
 
             // Get machine entity previously reserved by SysVehicle
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
             rScene.reg_emplace<MachineRCSController>(machEnt);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id,
-                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
-                    {
-                        return rScene.reg_get<MachineRCSController>(ent);
-                    });
         }
     }
 }
 
-void SysMachineRCSController::update_controls(ActiveScene& rScene)
+
+void SysMachineRCSController::update_calculate(ActiveScene& rScene)
 {
+    ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
+    std::vector<ActiveEnt>& rToUpdate
+            = SysWire::to_update<MachineRCSController>(rScene);
+
+    UpdNodes_t<Percent> updPercent;
+
     auto view = rScene.get_registry().view<MachineRCSController>();
 
-    for (ActiveEnt ent : view)
+    for (ActiveEnt ent : rToUpdate)
     {
-        auto& machine = view.get<MachineRCSController>(ent);
-        if (!machine.m_enable)
+
+        float influence = 0.0f;
+
+        auto const *pPanelAtCtrl = rScene.get_registry()
+                .try_get< ACompWirePanel<AttitudeControl> >(ent);
+
+        if (pPanelAtCtrl != nullptr)
         {
-            continue;
-        }
+            WirePort<AttitudeControl> const *pPortCommand
+                    = pPanelAtCtrl->port(MachineRCSController::smc_wiCommandOrient);
 
-        using wiretype::AttitudeControl;
-        using Magnum::Vector3;
-
-        // Get rigidbody ancestor and its transformation component
-        auto const* pRbAncestor =
-            SysPhysics_t::try_get_or_find_rigidbody_ancestor(rScene, ent);
-        auto const& rCompRb = rScene.reg_get<ACompRigidBody_t>(pRbAncestor->m_ancestor);
-        auto const& rCompTf = rScene.reg_get<ACompTransform>(pRbAncestor->m_ancestor);
-
-        if (WireData *gimbal = machine.m_wiCommandOrient.connected_value())
-        {
-            AttitudeControl *attCtrl = std::get_if<AttitudeControl>(gimbal);
-
-            Matrix4 transform = pRbAncestor->m_relTransform;
-
-            // TODO: RCS translation is not currently implemented, only rotation
-            Vector3 commandTransl = Vector3{0.0f};
-            Vector3 commandRot = attCtrl->m_attitude;
-            Vector3 thrusterPos = transform.translation() - rCompRb.m_centerOfMassOffset;
-            Vector3 thrusterDir = transform.rotation() * Vector3{0.0f, 0.0f, 1.0f};
-
-            float influence = 0.0f;
-            if (commandRot.length() > 0.0f || commandTransl.length() > 0.0f)
+            // Read AttitudeControl Command Input
+            if (pPortCommand != nullptr)
             {
-                influence =
-                    thruster_influence(thrusterPos, thrusterDir, commandTransl, commandRot);
+                auto const &nodesAttCtrl
+                        = rScene.reg_get< ACompWireNodes<AttitudeControl> >(
+                            rScene.hier_get_root());
+                WireNode<AttitudeControl> const &nodeCommand
+                        = nodesAttCtrl.get_node(pPortCommand->m_nodeIndex);
+
+                // Get rigidbody ancestor and its transformation component
+                auto const *pRbAncestor
+                        = SysPhysics_t::try_get_or_find_rigidbody_ancestor(
+                            rScene, ent);
+                auto const &compRb = rScene.reg_get<ACompRigidBody_t>(
+                            pRbAncestor->m_ancestor);
+                auto const &compTf = rScene.reg_get<ACompTransform>(
+                            pRbAncestor->m_ancestor);
+
+                Matrix4 transform = pRbAncestor->m_relTransform;
+
+                // TODO: RCS translation is not currently implemented, only
+                // rotation
+                Vector3 commandTransl = Vector3{0.0f};
+                Vector3 commandRot = nodeCommand.m_state.m_attitude;
+                Vector3 thrusterPos = transform.translation()
+                                    - compRb.m_centerOfMassOffset;
+                Vector3 thrusterDir = transform.rotation()
+                                    * Vector3{0.0f, 0.0f, 1.0f};
+
+                if ((commandRot.length() > 0.0f)
+                        || (commandTransl.length() > 0.0f))
+                {
+                    influence = thruster_influence(thrusterPos, thrusterDir,
+                                                   commandTransl, commandRot);
+                }
             }
-            std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value = influence;
         }
+
+        auto const *pPanelPercent = rScene.get_registry()
+                .try_get< ACompWirePanel<Percent> >(ent);
+
+        if (pPanelPercent != nullptr)
+        {
+            WirePort<Percent> const *pPortThrottle
+                    = pPanelPercent->port(MachineRCSController::m_woThrottle);
+
+            // Write to throttle output
+            if (pPortThrottle != nullptr)
+            {
+                WireNode<Percent> const &nodeThrottle
+                        = rNodesPercent.get_node(pPortThrottle->m_nodeIndex);
+
+                // Write possibly new throttle value to node
+                SysSignal<Percent>::signal_assign(
+                        rScene, {influence}, nodeThrottle,
+                        pPortThrottle->m_nodeIndex, updPercent);
+            }
+        }
+    }
+
+    // Request to update any wire nodes if they were modified
+    if (!updPercent.empty())
+    {
+        std::sort(std::begin(updPercent), std::end(updPercent));
+        rNodesPercent.update_write(updPercent);
+        rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
 }

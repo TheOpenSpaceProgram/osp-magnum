@@ -30,6 +30,7 @@
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysRender.h>
 #include <osp/Active/SysVehicle.h>
+#include <osp/Active/SysWire.h>
 #include <osp/Active/SysForceFields.h>
 #include <osp/Active/SysAreaAssociate.h>
 
@@ -39,6 +40,8 @@
 #include <adera/Machines/RCSController.h>
 #include <adera/Machines/Rocket.h>
 #include <adera/Machines/UserControl.h>
+
+#include <adera/wiretypes.h>
 
 #include <adera/SysExhaustPlume.h>
 #include <adera/ShipResources.h>
@@ -79,6 +82,8 @@ using osp::active::ACompRenderTarget;
 using osp::active::ACompRenderingAgent;
 using osp::active::ACompPerspective3DView;
 using osp::active::ACompRenderer;
+using osp::active::ACompWire;
+using osp::active::ACompWireNodes;
 
 using adera::active::machines::SysMachineUserControl;
 using adera::active::machines::SysMachineRocket;
@@ -116,10 +121,26 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     planeta::active::SysPlanetA::add_functions(rScene);
   
-    adera::active::machines::SysMachineContainer::add_functions(rScene);
-    adera::active::machines::SysMachineRCSController::add_functions(rScene);
-    adera::active::machines::SysMachineRocket::add_functions(rScene);
-    adera::active::machines::SysMachineUserControl::add_functions(rScene);
+    SysMachineContainer::add_functions(rScene);
+    SysMachineRCSController::add_functions(rScene);
+    SysMachineRocket::add_functions(rScene);
+    SysMachineUserControl::add_functions(rScene);
+
+    // Setup wiring
+    rScene.debug_update_add(rScene.get_update_order(),"wire_percent_construct", "vehicle_activate", "vehicle_modification",
+                            &osp::active::SysSignal<adera::wire::Percent>::signal_update_construct);
+    rScene.debug_update_add(rScene.get_update_order(), "wire_attctrl_construct", "vehicle_activate", "vehicle_modification",
+                            &osp::active::SysSignal<adera::wire::AttitudeControl>::signal_update_construct);
+    osp::active::SysWire::add_functions(rScene);
+    osp::active::SysWire::setup_default(
+            rScene, 5,
+            {&adera::active::machines::SysMachineRocket::update_calculate,
+             &adera::active::machines::SysMachineRCSController::update_calculate},
+            {&osp::active::SysSignal<adera::wire::Percent>::signal_update_nodes,
+             &osp::active::SysSignal<adera::wire::AttitudeControl>::signal_update_nodes});
+    rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
+    rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
+
 
     // create a Satellite with an ActiveArea
     Satellite areaSat = rUni.sat_create();

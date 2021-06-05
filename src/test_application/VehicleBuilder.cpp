@@ -24,8 +24,8 @@
  */
 #include "VehicleBuilder.h"
 
-using testapp::VehicleBuilder;
-using testapp::partindex_t;
+using namespace testapp;
+
 using osp::BlueprintPart;
 using osp::BlueprintMachine;
 using osp::PrototypePart;
@@ -35,8 +35,8 @@ using osp::Vector3;
 using osp::Quaternion;
 using osp::machine_id_t;
 
-partindex_t VehicleBuilder::add_part(
-        DependRes<PrototypePart>& prototype,
+part_t VehicleBuilder::part_add(
+        DependRes<PrototypePart>& protoPart,
         const Vector3& translation,
         const Quaternion& rotation,
         const Vector3& scale)
@@ -48,7 +48,7 @@ partindex_t VehicleBuilder::add_part(
     {
         const DependRes<PrototypePart>& dep = m_vehicle.m_prototypes[i];
 
-        if (dep == prototype)
+        if (dep == protoPart)
         {
             // prototype was already added to the list
             protoIndex = i;
@@ -59,10 +59,10 @@ partindex_t VehicleBuilder::add_part(
     if (protoIndex == m_vehicle.m_prototypes.size())
     {
         // Add the unlisted prototype to the end
-        m_vehicle.m_prototypes.emplace_back(prototype);
+        m_vehicle.m_prototypes.emplace_back(protoPart);
     }
 
-    size_t numMachines = prototype->m_protoMachines.size();
+    size_t numMachines = protoPart->m_protoMachines.size();
 
     // We now know which part prototype to initialize, create it
     uint32_t blueprintIndex = m_vehicle.m_blueprints.size();
@@ -73,24 +73,170 @@ partindex_t VehicleBuilder::add_part(
 
     for (size_t i = 0; i < numMachines; i ++)
     {
-        PCompMachine const &protoMach = prototype->m_protoMachines[i];
+        PCompMachine const &protoMach = protoPart->m_protoMachines[i];
         machine_id_t id = protoMach.m_type;
         m_vehicle.m_machines.resize(std::max(m_vehicle.m_machines.size(),
                                              size_t(id + 1)));
 
         BlueprintMachine &rBlueprintMach = m_vehicle.m_machines[id].emplace_back();
         rBlueprintMach.m_protoMachineIndex = i;
-        rBlueprintMach.m_blueprintIndex = blueprintIndex;
+        rBlueprintMach.m_partIndex = blueprintIndex;
         rBlueprintMach.m_config = protoMach.m_config;
     }
 
-    return blueprintIndex;
+    return part_t(blueprintIndex);
 }
 
-void VehicleBuilder::add_wire(
-        uint32_t fromPart, uint32_t fromMachine, osp::WireOutPort fromPort,
-        uint32_t toPart, uint32_t toMachine, osp::WireInPort toPort)
+Vector3 VehicleBuilder::part_offset(
+        PrototypePart const& attachTo, std::string_view attachToName,
+        PrototypePart const& toAttach, std::string_view toAttachName) noexcept
 {
-    m_vehicle.m_wires.emplace_back(fromPart, fromMachine, fromPort,
-                         toPart, toMachine, toPort);
+    Vector3 oset1{0.0f};
+    Vector3 oset2{0.0f};
+
+    for (osp::PCompName const& name : attachTo.m_partName)
+    {
+        if (name.m_name == attachToName)
+        {
+            oset1 = attachTo.m_partTransform[name.m_entity].m_translation;
+            break;
+        }
+    }
+
+    for (osp::PCompName const& name : toAttach.m_partName)
+    {
+        if (name.m_name == toAttachName)
+        {
+            oset2 = toAttach.m_partTransform[name.m_entity].m_translation;
+            break;
+        }
+    }
+
+    return oset1 - oset2;
+}
+
+
+std::pair<mach_t, osp::BlueprintMachine*> VehicleBuilder::machine_find(
+        osp::machine_id_t id, part_t part) noexcept
+{
+    if (id >= m_vehicle.m_machines.size())
+    {
+        return {osp::nullvalue<mach_t>(), nullptr}; // no machines of type
+    }
+
+    for(osp::BlueprintMachine& rMachineBp : m_vehicle.m_machines[id])
+    {
+        if (rMachineBp.m_partIndex == uint32_t(part))
+        {
+            // Found
+            return {mach_t(rMachineBp.m_protoMachineIndex), &rMachineBp};
+        }
+    }
+    return {osp::nullvalue<mach_t>(), nullptr};
+}
+
+
+nodeindex_t<void> VehicleBuilder::wire_node_add(osp::wire_id_t id,
+                                           osp::NodeMap_t config)
+{
+    // Resize wire type vector if it's too small
+    if (m_vehicle.m_wireNodes.size() <= id)
+    {
+        m_vehicle.m_wireNodes.resize(size_t(id) + 1);
+    }
+
+    // Get vector of nodes
+    std::vector<osp::BlueprintWireNode> &rNodes
+            = m_vehicle.m_wireNodes[size_t(id)];
+    uint32_t index = rNodes.size();
+
+    // Create new node
+    rNodes.emplace_back(osp::BlueprintWireNode{std::move(config), {}});
+    return nodeindex_t<void>(index);
+}
+
+linkindex_t<void> VehicleBuilder::wire_connect(
+        osp::wire_id_t id, nodeindex_t<void> node, osp::NodeMap_t config,
+        part_t part, mach_t mach, portindex_t<void> port)
+{
+    if (m_vehicle.m_wireNodes.size() <= id)
+    {
+        // No node of type is even registered
+        return osp::nullvalue< linkindex_t<void> >();
+    }
+
+    // Keep track of wire connections
+    auto const& [nodeIt, success]
+            = m_nodeIndexMap.try_emplace({id, part, mach, port}, node);
+    if (!success)
+    {
+        // Error! Port already connected!
+        return osp::nullvalue<linkindex_t<void>>();
+    }
+
+    // Get the BlueprintWireNode
+    std::vector<osp::BlueprintWireNode> &rNodes
+            = m_vehicle.m_wireNodes[size_t(id)];
+    osp::BlueprintWireNode &rNode = rNodes[size_t(node)];
+
+    // Create BlueprintWireLink
+    uint32_t index = rNode.m_links.size();
+    rNode.m_links.emplace_back(
+            osp::BlueprintWireLink{std::move(config), uint32_t(part),
+                                   uint16_t(mach), uint16_t(port)});
+
+    // Update panel. There's no easy way to find the correct BlueprintWirePanel
+    // from m_vehicle.m_wirePanels from a wire index, part index, and machine
+    // index. We can search the vector if the right panel already exists, but
+    // here we're using a map
+    uint32_t newIndex = m_vehicle.m_wirePanels.size();
+    auto const& [panelIt, panelSuccess]
+            = m_panelIndexMap.try_emplace({id, part, mach}, newIndex);
+
+    uint16_t minPortCount = uint16_t(port) + 1;
+
+    if (panelSuccess)
+    {
+        // new panel entry added
+        m_vehicle.m_wirePanels.resize(std::max(m_vehicle.m_wirePanels.size(),
+                                               size_t(id + 1)));
+        m_vehicle.m_wirePanels[size_t(id)].emplace_back(
+                    osp::BlueprintWirePanel{uint32_t(part), uint16_t(mach),
+                                            uint16_t(minPortCount)});
+    }
+    else
+    {
+        // update port count of existing entry
+        osp::BlueprintWirePanel &panel
+                = m_vehicle.m_wirePanels[size_t(id)][panelIt->second];
+        panel.m_portCount = std::max<uint16_t>(panel.m_portCount,
+                                               uint16_t(minPortCount));
+    }
+
+    return linkindex_t<void>(index);
+}
+
+nodeindex_t<void> VehicleBuilder::wire_connect_signal(osp::wire_id_t id,
+        part_t partOut, mach_t machOut, portindex_t<void> portOut,
+        part_t partIn, mach_t machIn, portindex_t<void> portIn)
+{
+    if (m_nodeIndexMap.find({id, partIn, machIn, portIn}) != m_nodeIndexMap.end())
+    {
+        // Input already connected
+        return osp::nullvalue< nodeindex_t<void> >();
+    }
+
+    auto nodeOutIt = m_nodeIndexMap.find({id, partOut, machOut, portOut});
+
+    // Create a or get node
+    nodeindex_t<void> node = (nodeOutIt != m_nodeIndexMap.end())
+                           ? nodeOutIt->second : wire_node_add(id, {});
+
+    // Link the Output (writes into node) first
+    wire_connect(id, node, {{ }}, partOut, machOut, portOut);
+
+    // Link the Input (reads node)
+    wire_connect(id, node, {{ }}, partIn, machIn, portIn);
+
+    return node;
 }

@@ -22,17 +22,44 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <iostream>
-
-#include <osp/Active/ActiveScene.h>
-#include <osp/Active/SysVehicle.h>
-#include <osp/Resource/machines.h>
 
 #include "UserControl.h"
 
-using namespace adera::active::machines;
-using namespace osp::active;
-using namespace osp;
+#include <osp/Active/ActiveScene.h>
+#include <osp/Active/SysSignal.h>
+#include <osp/Active/SysVehicle.h>
+#include <osp/Resource/machines.h>
+
+#include <iostream>
+
+using adera::active::machines::SysMachineUserControl;
+using adera::active::machines::MachineUserControl;
+using adera::wire::Percent;
+using adera::wire::AttitudeControl;
+
+using osp::active::ActiveScene;
+using osp::active::ActiveEnt;
+using osp::active::ACompMachines;
+
+using osp::active::ACompWirePanel;
+using osp::active::ACompWireNodes;
+using osp::active::ACompWire;
+using osp::active::SysWire;
+using osp::active::SysSignal;
+using osp::active::WireNode;
+using osp::active::WirePort;
+using osp::active::UpdNodes_t;
+using osp::nodeindex_t;
+
+using osp::BlueprintMachine;
+
+using osp::Package;
+using osp::DependRes;
+using osp::Path;
+
+using osp::machine_id_t;
+using osp::NodeMap_t;
+using osp::Vector3;
 
 void SysMachineUserControl::add_functions(ActiveScene &rScene)
 {
@@ -42,38 +69,13 @@ void SysMachineUserControl::add_functions(ActiveScene &rScene)
                             &SysMachineUserControl::update_construct);
 }
 
-void MachineUserControl::propagate_output(WireOutput* output)
-{
-    SPDLOG_LOGGER_INFO(spdlog::get("application"), "Propagate test: {}", output->get_name());
-}
-
-WireInput* MachineUserControl::request_input(WireInPort port)
-{
-    return existing_inputs()[port];
-}
-
-WireOutput* MachineUserControl::request_output(WireOutPort port)
-{
-    return existing_outputs()[port];
-}
-
-std::vector<WireInput*> MachineUserControl::existing_inputs()
-{
-    return {&m_wiTest};
-}
-
-std::vector<WireOutput*> MachineUserControl::existing_outputs()
-{
-    return {&m_woAttitude, &m_woThrottle, &m_woTestPropagate};
-}
-
 void SysMachineUserControl::update_construct(ActiveScene &rScene)
 {
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = mach_id<MachineUserControl>();
+    machine_id_t const id = osp::mach_id<MachineUserControl>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
@@ -87,18 +89,13 @@ void SysMachineUserControl::update_construct(ActiveScene &rScene)
         for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
         {
             // Get part
-            ActiveEnt partEnt = rVeh.m_parts[mach.m_blueprintIndex];
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_partIndex];
 
             // Get machine entity previously reserved by SysVehicle
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
             rScene.reg_emplace<MachineUserControl>(machEnt);
-            rScene.reg_emplace<ACompMachineType>(machEnt, id,
-                    [] (ActiveScene &rScene, ActiveEnt ent) -> Machine&
-                    {
-                        return rScene.reg_get<MachineUserControl>(ent);
-                    });
         }
     }
 }
@@ -111,6 +108,11 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
     // InputDevice.IsActivated()
     // Combination
     auto const &usrCtrl = rScene.reg_root_get_or_emplace<ACompUserControl>(rScene.get_user_input());
+    ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
+    ACompWireNodes<AttitudeControl> &rNodesAttCtrl = SysWire::nodes<AttitudeControl>(rScene);
+
+    UpdNodes_t<Percent> updPercent;
+    UpdNodes_t<AttitudeControl> updAttCtrl;
 
     if (usrCtrl.m_selfDestruct.triggered())
     {
@@ -128,43 +130,90 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 
     for (ActiveEnt ent : view)
     {
-        MachineUserControl &machine = view.get<MachineUserControl>(ent);
-        auto& throttlePos = std::get<wiretype::Percent>(machine.m_woThrottle.value()).m_value;
-
-        float throttleRate = 0.5f;
-        auto delta = throttleRate * rScene.get_time_delta_fixed();
+        MachineUserControl const &machine = view.get<MachineUserControl>(ent);
 
         if (!machine.m_enable)
         {
             continue;
         }
 
-        if (usrCtrl.m_throttleMore.trigger_hold())
+        // Get the Percent Panel which contains the Throttle Port
+        auto const *pPanelPercent = rScene.reg_try_get< ACompWirePanel<Percent> >(ent);
+
+        if (pPanelPercent != nullptr)
         {
-            throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
+            WirePort<Percent> const *pPortThrottle
+                    = pPanelPercent->port(MachineUserControl::smc_woThrottle);
+
+            if (pPortThrottle != nullptr)
+            {
+                // Get the connected node and its value
+                WireNode<Percent> const &nodeThrottle
+                        = rNodesPercent.get_node(pPortThrottle->m_nodeIndex);
+                float throttlePos = nodeThrottle.m_state.m_percent;
+
+                float throttleRate = 0.5f;
+                auto delta = throttleRate * rScene.get_time_delta_fixed();
+
+                if (usrCtrl.m_throttleMore.trigger_hold())
+                {
+                    throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
+                }
+
+                if (usrCtrl.m_throttleLess.trigger_hold())
+                {
+                    throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
+                }
+
+                if (usrCtrl.m_throttleMin.triggered())
+                {
+                    SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
+                                      "Minimum throttle");
+                    throttlePos = 0.0f;
+                }
+
+                if (usrCtrl.m_throttleMax.triggered())
+                {
+                    SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
+                                      "Maximum throttle");
+                    throttlePos = 1.0f;
+                }
+
+                // Write possibly new throttle value to node
+                SysSignal<Percent>::signal_assign(
+                        rScene, {throttlePos}, nodeThrottle,
+                        pPortThrottle->m_nodeIndex, updPercent);
+            }
         }
 
-        if (usrCtrl.m_throttleLess.trigger_hold())
-        {
-            throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
-        }
+        // Get the Attitude Control Panel which contains the Throttle Port
+        auto const *pPanelAttCtrl
+                = rScene.reg_try_get< ACompWirePanel<AttitudeControl> >(ent);
 
-        if (usrCtrl.m_throttleMin.triggered())
+        if (pPanelAttCtrl != nullptr)
         {
-            SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                              "Minimum throttle");
-            throttlePos = 0.0f;
-        }
+            WirePort<AttitudeControl> const *pPortAttCtrl
+                    = pPanelAttCtrl->port(MachineUserControl::smc_woAttitude);
+            WireNode<AttitudeControl> &nodeAttCtrl
+                    = rNodesAttCtrl.get_node(pPortAttCtrl->m_nodeIndex);
 
-        if (usrCtrl.m_throttleMax.triggered())
-        {
-            SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                              "Maximum throttle");
-            throttlePos = 1.0f;
+            SysSignal<AttitudeControl>::signal_assign(
+                    rScene, {attitudeIn}, nodeAttCtrl,
+                    pPortAttCtrl->m_nodeIndex, updAttCtrl);
         }
+    }
 
-        std::get<wiretype::AttitudeControl>(machine.m_woAttitude.value()).m_attitude = attitudeIn;
-        SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                            "Updating control");
+    // Request to update any wire nodes if they were modified
+    if (!updPercent.empty())
+    {
+        std::sort(std::begin(updPercent), std::end(updPercent));
+        rNodesPercent.update_write(updPercent);
+        rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
+    }
+    if (!updAttCtrl.empty())
+    {
+        std::sort(std::begin(updAttCtrl), std::end(updAttCtrl));
+        rNodesAttCtrl.update_write(updAttCtrl);
+        rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
 }

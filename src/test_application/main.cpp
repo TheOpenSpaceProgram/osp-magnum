@@ -263,11 +263,20 @@ bool destroy_universe()
 
 // TODO: move this somewhere else
 template<typename MACH_T>
-constexpr void register_sys_machine(osp::Package &rPkg)
+constexpr void register_machine(osp::Package &rPkg)
 {
     rPkg.add<osp::RegisteredMachine>(std::string(MACH_T::smc_mach_name),
                                      osp::mach_id<MACH_T>());
 }
+
+// TODO: move this somewhere else
+template<typename WIRETYPE_T>
+constexpr void register_wiretype(osp::Package &rPkg)
+{
+    rPkg.add<osp::RegisteredWiretype>(std::string(WIRETYPE_T::smc_wire_name),
+                                      osp::wiretype_id<WIRETYPE_T>());
+}
+
 
 void load_a_bunch_of_stuff()
 {
@@ -280,10 +289,14 @@ void load_a_bunch_of_stuff()
     using adera::active::machines::MachineUserControl;
 
     // Register machines
-    register_sys_machine<MachineContainer>(lazyDebugPack);
-    register_sys_machine<MachineRCSController>(lazyDebugPack);
-    register_sys_machine<MachineRocket>(lazyDebugPack);
-    register_sys_machine<MachineUserControl>(lazyDebugPack);
+    register_machine<MachineContainer>(lazyDebugPack);
+    register_machine<MachineRCSController>(lazyDebugPack);
+    register_machine<MachineRocket>(lazyDebugPack);
+    register_machine<MachineUserControl>(lazyDebugPack);
+
+    // Register wire types
+    register_wiretype<adera::wire::AttitudeControl>(lazyDebugPack);
+    register_wiretype<adera::wire::Percent>(lazyDebugPack);
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};
@@ -496,7 +509,7 @@ void debug_print_hier()
             // print arrows to indicate level
             std::cout << "  ->";
         }
-        std::cout << "[" << int(currentEnt) << "]: " << hier.m_name << "\n";
+        std::cout << "[" << scene.get_registry().entity(currentEnt) << "]: " << hier.m_name << "\n";
 
         if (hier.m_childCount != 0)
         {

@@ -24,353 +24,352 @@
  */
 #pragma once
 
+#include "SysVehicle.h"
+
 #include "activetypes.h"
 #include "../types.h"
 #include "../Resource/blueprints.h"
 
-#include <Corrade/Containers/LinkedList.h>
-
-#include <variant>
-#include <string>
+#include <utility>
 #include <vector>
 
 namespace osp::active
 {
 
-using Corrade::Containers::LinkedList;
-using Corrade::Containers::LinkedListItem;
-
-class WireInput;
-class WireOutput;
-
-namespace wiretype
+/**
+ * Merge two sorted vectors and remove duplicates
+ */
+template<typename VEC_T>
+constexpr void vecset_merge(VEC_T& dest, VEC_T const& rSrc)
 {
+    size_t oldSize = dest.size();
 
-    /**
-     * A rotation in global space
-     */
-    struct Attitude
-    {
-        Quaternion m_global;
-    };
+    dest.reserve(oldSize + rSrc.size());
 
-    /**
-     * A change in rotation. Separate pitch, yaw and roll
-     */
-    struct AttitudeControl
-    {
-        //  each (-1.0 .. 1.0)
-        // pitch, yaw, roll
-        Vector3 m_attitude;
+    // insert at end of vector
+    dest.insert(std::end(dest), std::begin(rSrc), std::end(rSrc));
 
-        //Quaternion m_precise;
-        //Quaternion m_rot;
-        //Vector3 m_yawpitchroll
-    };
+    // merge both sorted sections
+    std::inplace_merge(std::begin(dest),
+                       std::next(std::begin(dest), oldSize), std::end(dest));
 
-    /**
-     * A change in rotation in axis angle
-     *
-     */
-    //struct AttitudeControlPrecise
-    //{
-    //    //Quaternion m_precise;
-    //    Vector3 m_axis;
-    //};
-
-    /**
-     * For something like throttle
-     */
-    struct Percent
-    {
-        float m_value;
-    };
-
-    enum class DeployOp : std::uint8_t { NONE, ON, OFF, TOGGLE };
-
-    /**
-     * Used to turn things on and off or ignite stuff
-     */
-    struct Deploy
-    {
-        //int m_stage;
-        //bool m_on, m_off, m_toggle;
-        DeployOp m_op;
-    };
-
-    /**
-     * your typical logic gate boi
-     */
-    struct Logic
-    {
-        bool m_value;
-    };
-
-    /**
-     * Pipe, generically exposes the output entity to the input one
-     */
-    struct Pipe
-    {
-        ActiveEnt m_source;
-    };
-
-} // namespace wiretype
-
-// Supported data types
-using WireData = std::variant<wiretype::Attitude,
-                              wiretype::AttitudeControl,
-                              wiretype::Percent,
-                              wiretype::Deploy,
-                              wiretype::Pipe>;
+    // Remove duplicates
+    dest.erase(std::unique(std::begin(dest), std::end(dest)), std::end(dest));
+}
 
 //-----------------------------------------------------------------------------
-
 
 /**
- * Object that have WireInputs and WireOutputs. So far, just Machines inherit.
- * keep WireInputs and WireOutputs as members. move them explicitly
+ * Stored in a WireNode and describes a connection to a Machine's Panel Port.
+ * Links can optionally store a LinkState specified by the templated wire type.
  */
-class IWireElement
+template<typename WIRETYPE_T>
+struct WireLink
 {
-public:
-    // TODO: maybe get rid of the raw pointers somehow
-
-    /**
-     * Request a Dependent WireOutput's value to update, by reading the
-     * WireInputs it depends on
-     * @param pOutput [in] The output that needs to be updated
-     */
-    virtual void propagate_output(WireOutput* pOutput) = 0;
-
-    /**
-     * Request a WireOutput by port. What happens is up to the implemenation,
-     * this may access a map, array, or maybe even create a WireOutput on the
-     * fly.
-     *
-     * @param port Port to identify the WireOutput
-     * @return Pointer to found WireOutput, nullptr if not found
-     */
-    virtual WireOutput* request_output(WireOutPort port) = 0;
-
-    /**
-     * Request a WireInput by port. What happens is up to the implemenation,
-     * this may access a map, array, or maybe even create a WireInput on the
-     * fly.
-     *
-     * @param port Port to identify the WireInput
-     * @return Pointer to found WireInput, nullptr if not found
-     */
-    virtual WireInput* request_input(WireInPort port) = 0;
-
-    // TODO: maybe return ports too, as the pointers returned here can be
-    //       invalidated when the SysMachine reallocates
-
-    /**
-     * @return Vector of existing WireInputs
-     */
-    virtual std::vector<WireInput*> existing_inputs() = 0;
-
-    /**
-     * @return Vector of existing WireInputs
-     */
-    virtual std::vector<WireOutput*> existing_outputs() = 0;
+    ActiveEnt m_entity;
+    portindex_t<WIRETYPE_T> m_port;
+    typename WIRETYPE_T::LinkState m_state;
 };
 
-
-//-----------------------------------------------------------------------------
-
-
-class WireInput : private LinkedListItem<WireInput, WireOutput>
+/**
+ * Stores the wire value, and connects multiple Machines using Links
+ */
+template<typename WIRETYPE_T>
+struct WireNode
 {
-    friend LinkedListItem<WireInput, WireOutput>;
-    friend LinkedList<WireInput>;
-
-public:
-    WireInput(IWireElement *element, std::string name) noexcept;
-
-    /**
-     * Move with new m_element. Use when this is a member of the WireElement
-     * where m_element becomes invalid on move
-     * @param element
-     * @param move
-     */
-    WireInput(IWireElement *element, WireInput&& move) noexcept;
-
-    // For use in move constructors / move operators of classes
-    // that aggregate WireInput. Use at own risk!!!
-    WireInput(WireInput&& move) = default;
-    WireInput& operator=(WireInput&& move) = default;
-
-    WireInput(WireInput const& copy) = delete;
-    WireInput& operator=(WireInput const& move) = delete;
-
-    void doErase() override;
-
-    //bool is_connected() { return list(); }
-    constexpr std::string const& get_name() { return m_name; }
-
-    WireOutput* connected() { return list(); }
-
-    WireData* connected_value();
-
-    /**
-     * Get value from connected WireOutput
-     */
-    template<typename T>
-    T* get_if();
-
-    /**
-     * Get const value from connected WireOutput
-     */
-    template<typename T>
-    const T* get_if() const;
-
-private:
-    IWireElement* m_element;
-    std::string m_name;
+    std::vector< WireLink<WIRETYPE_T> > m_links;
+    typename WIRETYPE_T::NodeState m_state;
 };
 
 //-----------------------------------------------------------------------------
 
-class WireOutput : private LinkedList<WireInput>
+/**
+ * Stored in a Panel as part of a Machine, used to connect to a Node's Link
+ */
+template<typename WIRETYPE_T>
+struct WirePort
 {
-    friend LinkedList<WireInput>;
-    friend LinkedListItem<WireInput, WireOutput>;
+    nodeindex_t<WIRETYPE_T> m_nodeIndex{nullvalue< nodeindex_t<WIRETYPE_T> >()};
 
-public:
-    /**
-     * Construct a WireOutput
-     * @param element Associated WireElement, usually a Machine
-     * @param name
-     */
-    WireOutput(IWireElement* element, std::string name);
-    WireOutput(IWireElement* element, std::string name, WireInput& propagateDepend);
-
-    /**
-     * Move with new m_element. Use when this is a member of the WireElement
-     * where m_element becomes invalid on move
-     * @param element
-     * @param move
-     */
-    WireOutput(IWireElement *element, WireOutput&& move);
-
-    // For use in move constructors / move operators of classes
-    // that aggregate WireInput. Use at own risk!!!
-    WireOutput(WireOutput&& move) noexcept = default;
-    WireOutput& operator=(WireOutput&& move) = default;
-
-    WireOutput(WireOutput const& copy) = delete;
-    WireOutput& operator=(WireOutput const& move) = delete;
-
-    std::string const& get_name() { return m_name; }
-
-    using LinkedList<WireInput>::insert;
-    using LinkedList<WireInput>::cut;
-
-    void propagate()
+    constexpr bool is_connected() const noexcept
     {
-        //(list()->*m_propagate_output)();
-        //list()->propagate_output(this);
-        //m_element->propagate_output(this);
+        return m_nodeIndex != nullvalue< nodeindex_t<WIRETYPE_T> >();
+    };
+};
+
+/**
+ * Added to Machine entities to connect to Nodes
+ */
+template<typename WIRETYPE_T>
+struct ACompWirePanel
+{
+    ACompWirePanel(uint16_t portCount)
+     : m_ports(portCount)
+    { }
+
+    // Connect to nodes
+    std::vector< WirePort<WIRETYPE_T> > m_ports;
+
+    /**
+     * Try to get an already connected Port
+     * @param portIndex [in] Index of specified port
+     * @return Pointer to Port, or nullptr if unconnected or nonexistent
+     */
+    WirePort<WIRETYPE_T> const* port(portindex_t<WIRETYPE_T> portIndex) const noexcept
+    {
+        if (m_ports.size() <= size_t(portIndex))
+        {
+            return nullptr;
+        }
+        WirePort<WIRETYPE_T> const& port = m_ports[size_t(portIndex)];
+
+        return port.is_connected() ? &port : nullptr;
+    }
+};
+
+//-----------------------------------------------------------------------------
+
+/**
+ * A request to write a new value to a Node, generated during machine calculate
+ * updates
+ */
+template<typename WIRETYPE_T>
+struct UpdNode
+{
+    constexpr UpdNode(nodeindex_t<WIRETYPE_T> node,
+                      typename WIRETYPE_T::WriteValue write)
+     : m_write(write)
+     , m_node(std::underlying_type_t< nodeindex_t<WIRETYPE_T> >(node))
+    { }
+
+    constexpr bool operator<(UpdNode<WIRETYPE_T> const& rhs) const noexcept
+    {
+        return m_node < rhs.m_node;
     }
 
-    WireData& value() { return m_value; }
-    const WireData& value() const { return m_value; }
+    constexpr bool operator==(UpdNode<WIRETYPE_T> const& rhs) const noexcept
+    {
+        return (m_node == rhs.m_node) && (m_write == rhs.m_write);
+    }
 
-private:
-    WireData m_value;
-    IWireElement* m_element;
-    std::string m_name;
+    typename WIRETYPE_T::WriteValue m_write;
+    std::underlying_type_t< nodeindex_t<WIRETYPE_T> > m_node;
 };
 
+template<typename WIRETYPE_T>
+using UpdNodes_t = std::vector< UpdNode<WIRETYPE_T> >;
+
+/**
+ * Scene-wide storage for WireNodes
+ */
+template<typename WIRETYPE_T>
+struct ACompWireNodes
+{
+    // All the WIRETYPE_T node in the scene
+    std::vector< WireNode<WIRETYPE_T> > m_nodes;
+
+    // New values to write during node update
+    // TODO: Use some kind of lock-free queue for future concurrency.
+    UpdNodes_t<WIRETYPE_T> m_writeRequests;
+
+    /**
+     * Create a Node
+     *
+     * @param args [in] Arguments passed to WIRETYPE_T::NodeState constructor
+     *                  (not yet implemented)
+     *0
+     * @return Reference and Index to newly created node
+     */
+    template<typename ... ARGS_T>
+    std::pair<WireNode<WIRETYPE_T>&, nodeindex_t<WIRETYPE_T>> create_node(
+            ARGS_T&& ... args)
+    {
+        uint32_t index = m_nodes.size();
+        WireNode<WIRETYPE_T> &rNode
+                = m_nodes.emplace_back(std::forward<ARGS_T>(args) ...);
+        return {rNode, nodeindex_t<WIRETYPE_T>(index)};
+    }
+
+    /**
+     * Get a Node by index
+     * @param nodeIndex [in] Index to node to get
+     * @return Reference to Node; not in stable memory.
+     */
+    WireNode<WIRETYPE_T>& get_node(nodeindex_t<WIRETYPE_T> nodeIndex) noexcept
+    {
+        return m_nodes[size_t(nodeIndex)];
+    }
+
+    WireNode<WIRETYPE_T> const& get_node(nodeindex_t<WIRETYPE_T> nodeIndex) const noexcept
+    {
+        return m_nodes[size_t(nodeIndex)];
+    }
+
+    /**
+     * Request to write new values to a set of Nodes.
+     * @param request [in] Sorted vector of new node values to write
+     */
+    void update_write(UpdNodes_t<WIRETYPE_T> const& write)
+    {
+        // TODO: Use some kind of lock-free queue for future concurrency
+        m_writeRequests.insert(std::end(m_writeRequests),
+                               std::begin(write), std::end(write));
+    }
+};
 
 //-----------------------------------------------------------------------------
 
+struct ACompWire
+{
+    // TODO: replace with beefier function order
+    using updfunc_t = void(*)(ActiveScene&);
+    std::vector<updfunc_t> m_updCalculate;
+    std::vector<updfunc_t> m_updNodes;
+
+    std::vector<std::vector<ActiveEnt>> m_entToCalculate;
+    std::vector<std::mutex> m_entToCalculateMutex;
+
+    bool m_updateRequest{false};
+
+    /**
+     * Request to start or continue performing wire updates this frame
+     */
+    constexpr void request_update()
+    {
+        if (!m_updateRequest)
+        {
+            m_updateRequest = true;
+        }
+    }
+
+}; // struct ACompWire
+
+//-----------------------------------------------------------------------------
 
 class SysWire
 {
 public:
 
-    static inline std::string smc_name = "Wire";
+    static void add_functions(ActiveScene& rScene);
+    static void setup_default(
+            ActiveScene& rScene,
+            uint32_t machineTypeCount,
+            std::vector<ACompWire::updfunc_t> updCalculate,
+            std::vector<ACompWire::updfunc_t> updNodes);
 
-    struct DependentOutput
+    /**
+     * Perform wire updates.
+     *
+     * This calls even more update functions of configured Machines and Nodes
+     * multiple times so that Machines can reliably send data to other Machines
+     * within a single frame.
+     *
+     * @param rScene [ref] Scene supporting Wires
+     */
+    static void update_wire(ActiveScene& rScene);
+
+    /**
+     * Construct a vehicle's ACompWirePanels according to their Blueprint
+     *
+     * @param rScene     [ref] Scene supporting Vehicles and the right wire type
+     * @param vehicleEnt [in] Vehicle entity
+     * @param vehicle    [in] Vehicle component used to locate parts
+     * @param vehicleBp  [in] Blueprint of vehicle
+     */
+    template<typename WIRETYPE_T>
+    static void construct_panels(
+            ActiveScene& rScene, ActiveEnt vehicleEnt,
+            ACompVehicle const& vehicle,
+            BlueprintVehicle const& vehicleBp);
+
+    /**
+     * @return ACompWireNodes<WIRETYPE_T> reference from scene root
+     */
+    template<typename WIRETYPE_T>
+    static constexpr ACompWireNodes<WIRETYPE_T>& nodes(ActiveScene& rScene)
     {
-        IWireElement *m_element;
-        WireOutput *m_output;
-        unsigned depth;
-    };
-
-    static void connect(WireOutput &wireFrom, WireInput &wireTo);
-
-private:
-    std::vector<DependentOutput> m_dependentOutputs;
-    UpdateOrderHandle_t m_updateWire;
-};
-
-
-//-----------------------------------------------------------------------------
-
-
-// TODO: move this somewhere else
-template<typename T>
-T* WireInput::get_if()
-{
-    if (list() == nullptr)
-    {
-        // Not connected to any WireOutput!
-        return nullptr;
+        return rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(rScene.hier_get_root());
     }
-    else
+
+    /**
+     * @return Vector of entities of a specified machine type to update
+     */
+    template<typename MACH_T>
+    static constexpr std::vector<ActiveEnt>& to_update(ActiveScene& rScene)
     {
-        // Attempt to get value of variant
-        return std::get_if<T> (&(list()->value()));
+        return rScene.reg_get<ACompWire>(rScene.hier_get_root()).m_entToCalculate[mach_id<MACH_T>()];
+    }
+
+    /**
+     * Connect a Node to a Machine's Panel
+     *
+     * @param node      [ref] Node to connect
+     * @param nodeIndex [in] Index of node to connect
+     * @param panel     [in] Panel to connect
+     * @param machEnt   [in] Machine entity Panel is part of
+     * @param port      [in] Port number of Panel to connect to
+     * @param link      [in] Optional Link state to store in Link
+     *
+     * @return true if connection is successfully made, false if port is invalid
+     */
+    template<typename WIRETYPE_T>
+    static bool connect(
+            WireNode<WIRETYPE_T>& node,
+            nodeindex_t<WIRETYPE_T> nodeIndex,
+            ACompWirePanel<WIRETYPE_T>& panel,
+            ActiveEnt machEnt,
+            portindex_t<WIRETYPE_T> port,
+            typename WIRETYPE_T::LinkState link);
+
+}; // class SysWire
+
+
+template<typename WIRETYPE_T>
+bool SysWire::connect(
+        WireNode<WIRETYPE_T>& node,
+        nodeindex_t<WIRETYPE_T> nodeIndex,
+        ACompWirePanel<WIRETYPE_T>& panel,
+        ActiveEnt machEnt,
+        portindex_t<WIRETYPE_T> port,
+        typename WIRETYPE_T::LinkState link)
+{
+    if (panel.m_ports.size() <= size_t(port))
+    {
+        return false; // Invalid port
+    }
+
+    node.m_links.emplace_back(WireLink<WIRETYPE_T>{machEnt, port, link});
+    panel.m_ports[size_t(port)].m_nodeIndex = nodeIndex;
+    return true;
+}
+
+template<typename WIRETYPE_T>
+void SysWire::construct_panels(
+        ActiveScene& rScene, ActiveEnt vehicleEnt,
+        ACompVehicle const& vehicle, BlueprintVehicle const& vehicleBp)
+{
+    wire_id_t const id = wiretype_id<WIRETYPE_T>();
+
+    // Check if the vehicle blueprint stores the right wire panel type
+    if (vehicleBp.m_wirePanels.size() <= id)
+    {
+        return;
+    }
+
+    // Initialize all Panels in the vehicle
+    for (BlueprintWirePanel const &bpPanel : vehicleBp.m_wirePanels[id])
+    {
+        // Get part entity from vehicle
+        ActiveEnt partEnt = vehicle.m_parts[bpPanel.m_partIndex];
+
+        // Get machine entity from vehicle
+        auto &machines = rScene.reg_get<ACompMachines>(partEnt);
+        ActiveEnt machEnt = machines.m_machines[bpPanel.m_protoMachineIndex];
+
+        // Create the panel supporting the right number of ports
+        rScene.reg_emplace< ACompWirePanel<WIRETYPE_T> >(machEnt,
+                                                         bpPanel.m_portCount);
     }
 }
-//-----------------------------------------------------------------------------
-
-template<typename T>
-const T* WireInput::get_if() const
-{
-    if (list() == nullptr)
-    {
-        // Not connected to any WireOutput!
-        return nullptr;
-    }
-    else
-    {
-        // Attempt to get value of variant
-        return std::get_if<T>(&(list()->value()));
-    }
-}
-
-inline WireInput::WireInput(IWireElement* element, std::string name) noexcept
- : m_element(element)
- , m_name(std::move(name))
-{ }
-
-inline WireInput::WireInput(IWireElement *element, WireInput&& move) noexcept
- : LinkedListItem<WireInput, WireOutput>(std::move(move))
- , m_element(element)
- , m_name(std::move(move.m_name))
-{ }
-
-//-----------------------------------------------------------------------------
-
-inline WireOutput::WireOutput(IWireElement* element, std::string name)
- : m_element(element)
- , m_name(std::move(name))
-{ }
-
-inline WireOutput::WireOutput(IWireElement* element, std::string name, WireInput& propagateDepend)
- : m_element(element)
- , m_name(std::move(name))
-{ }
-
-inline WireOutput::WireOutput(IWireElement *element, WireOutput&& move)
- : LinkedList<WireInput>(std::move(move))
- , m_value(std::move(move.m_value))
- , m_element(element)
- , m_name(std::move(move.m_name))
-{ }
 
 } // namespace osp::active
