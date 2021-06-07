@@ -110,11 +110,33 @@ public:
         return m_registry.emplace<T>(ent, std::forward<Args>(args)...);
     }
 
+
+    /**
+     * Mark an entity for deletion
+     *
+     * @param ent [in] Entity to delete
+     */
+    void mark_delete(ActiveEnt ent)
+    {
+        m_registry.emplace_or_replace<ACompDelete>(ent);
+    }
+
     /**
      * Update everything in the update order, including all systems and stuff
      */
     void update();
 
+    /**
+     * Delete entities with ACompDelete
+     *
+     * @param rScene [ref] scene with entities
+     */
+    static void update_delete(ActiveScene& rScene)
+    {
+        ActiveReg_t &rReg = rScene.get_registry();
+        auto view = rReg.view<ACompDelete>();
+        rScene.get_registry().destroy(std::begin(view), std::end(view));
+    }
 
     /**
      * Calculate transformations relative to camera, and draw every

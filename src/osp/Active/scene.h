@@ -37,28 +37,12 @@ namespace osp::active
  */
 struct ACompTransform
 {
-    //Matrix4 m_transformPrev;
     osp::Matrix4 m_transform;
-    //Matrix4 m_transformWorld;
-    //bool m_enableFloatingOrigin;
-
-    // For when transform is controlled by a specific system.
-    // Examples of this behaviour:
-    // * Entities with ACompRigidBody are controlled by SysPhysics, transform
-    //   is updated each frame
-    //bool m_controlled{false};
-
-    // if this is true, then transform can be modified, as long as
-    // m_transformDirty is set afterwards
-    //bool m_mutable{true};
-    //bool m_transformDirty{false};
 };
 
 struct ACompTransformControlled { };
 
 struct ACompTransformMutable{ bool m_dirty{false}; };
-
-//struct ACompTransformDirty{ };
 
 /**
  * Added to an entity to mark it for deletion

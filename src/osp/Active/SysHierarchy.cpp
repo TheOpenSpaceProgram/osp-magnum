@@ -33,7 +33,6 @@ void SysHierarchy::setup(ActiveScene& rScene)
     auto &rReg = rScene.get_registry();
 
     rReg.emplace<ACompHierarchy>(rScene.hier_get_root());
-    //hierarchy.m_name = "Root Entity";
 }
 
 ActiveEnt SysHierarchy::create_child(ActiveScene& rScene, ActiveEnt parent,
@@ -41,14 +40,12 @@ ActiveEnt SysHierarchy::create_child(ActiveScene& rScene, ActiveEnt parent,
 {
     auto &rReg = rScene.get_registry();
     ActiveEnt child = rReg.create();
-    ACompHierarchy& childHierarchy = rReg.emplace<ACompHierarchy>(child);
-    //ACompTransform& transform = m_registry.emplace<ACompTransform>(ent);
+    rReg.emplace<ACompHierarchy>(child);
 
     if (!name.empty())
     {
         rScene.reg_emplace<ACompName>(child, name);
     }
-    //childHierarchy.m_name = name;
 
     set_parent_child(rScene, parent, child);
 
@@ -60,8 +57,6 @@ void SysHierarchy::set_parent_child(ActiveScene& rScene, ActiveEnt parent, Activ
     auto &rReg = rScene.get_registry();
 
     ACompHierarchy& childHierarchy = rReg.get<ACompHierarchy>(child);
-    //ACompTransform& transform = m_registry.emplace<ACompTransform>(ent);
-
     ACompHierarchy& parentHierarchy = rReg.get<ACompHierarchy>(parent);
 
     // if child has an existing parent, cut first
@@ -90,24 +85,6 @@ void SysHierarchy::set_parent_child(ActiveScene& rScene, ActiveEnt parent, Activ
     parentHierarchy.m_childCount ++; // increase child count
 }
 
-void SysHierarchy::destroy(ActiveScene& rScene, ActiveEnt ent)
-{
-    auto &rReg = rScene.get_registry();
-
-    auto *pEntHier = &rReg.get<ACompHierarchy>(ent);
-
-    // Destroy children first recursively, if there is any
-    while (pEntHier->m_childCount > 0)
-    {
-        destroy(rScene, pEntHier->m_childFirst);
-        // previous hier_destroy might have caused a reallocation
-        pEntHier = rReg.try_get<ACompHierarchy>(ent);
-    }
-
-    cut(rScene, ent);
-    rReg.destroy(ent);
-}
-
 void SysHierarchy::cut(ActiveScene& rScene, ActiveEnt ent)
 {
     auto &rReg = rScene.get_registry();
@@ -115,7 +92,7 @@ void SysHierarchy::cut(ActiveScene& rScene, ActiveEnt ent)
 
     // TODO: deal with m_depth
 
-    // Set sibling's sibling's to each other
+    // Unlink siblings by connecting previous and next to each other
 
     if (rReg.valid(entHier.m_siblingNext))
     {
@@ -129,7 +106,7 @@ void SysHierarchy::cut(ActiveScene& rScene, ActiveEnt ent)
                 = entHier.m_siblingNext;
     }
 
-    // deal with parent
+    // Unlink parent
 
     auto &parentHier = rReg.get<ACompHierarchy>(entHier.m_parent);
     parentHier.m_childCount --;
@@ -139,6 +116,7 @@ void SysHierarchy::cut(ActiveScene& rScene, ActiveEnt ent)
         parentHier.m_childFirst = entHier.m_siblingNext;
     }
 
+    entHier.m_level = 0;
     entHier.m_parent = entHier.m_siblingNext = entHier.m_siblingPrev
             = entt::null;
 }
@@ -151,3 +129,25 @@ void SysHierarchy::sort(ActiveScene& rScene)
         return lhs.m_level < rhs.m_level;
     }, entt::insertion_sort());
 }
+
+
+void SysHierarchy::update_delete(ActiveScene& rScene)
+{
+    auto &rReg = rScene.get_registry();
+    auto viewDelHier = rReg.view<ACompDelete, ACompHierarchy>();
+
+    // copy entities to delete into a buffer
+    std::vector<ActiveEnt> toDelete;
+    toDelete.reserve(viewDelHier.size_hint());
+    toDelete.assign(std::begin(viewDelHier), std::end(viewDelHier));
+
+    // Add delete components to descendents of all entities to delete
+    for (ActiveEnt ent : toDelete)
+    {
+        traverse(rScene, ent, [&rScene] (ActiveEnt descendent) {
+            rScene.mark_delete(descendent);
+            return EHierarchyTraverseStatus::Continue;
+        });
+    }
+}
+

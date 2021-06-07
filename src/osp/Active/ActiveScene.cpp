@@ -56,6 +56,11 @@ ActiveScene::~ActiveScene()
 void ActiveScene::update()
 {
     m_updateOrder.call(*this);
+
+    // TODO: FunctionOrder is way too inconvenient to deal with, so for now the
+    //       delete systems are called here
+    SysHierarchy::update_delete(*this);
+    update_delete(*this);
 }
 
 void ActiveScene::draw(ActiveEnt camera)

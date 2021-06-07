@@ -376,7 +376,7 @@ void SysVehicle::update_activate(ActiveScene &rScene)
             continue;
         }
 
-        SysHierarchy::destroy(rScene, ent);
+        SysHierarchy::mark_delete_cut(rScene, ent);
     }
 
     // Update transforms of already-activated vehicle satellites
@@ -487,7 +487,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                 if (partPart.m_destroy)
                 {
                     // destroy this part
-                    SysHierarchy::destroy(rScene, partEnt);
+                    SysHierarchy::mark_delete_cut(rScene, partEnt);
                     return true;
                 }
 

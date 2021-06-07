@@ -32,10 +32,18 @@ namespace osp::active
 class SysHierarchy
 {
 public:
+
+    /**
+     * Add hierarchy component to root entity in scene
+     *
+     * @param rScene [ref] scene with no hierarchy yet
+     */
     static void setup(ActiveScene& rScene);
 
     /**
      * Create a new entity, and add a ACompHierarchy to it
+     *
+     * @param rScene [ref] Scene with hierarchy
      * @param parent [in] Entity to assign as parent
      * @param name   [in] Name of entity
      * @return New entity created
@@ -47,6 +55,7 @@ public:
      * Set parent-child relationship between two nodes containing an
      * ACompHierarchy
      *
+     * @param rScene [ref] Scene with hierarchy
      * @param parent [in]
      * @param child  [in]
      */
@@ -54,13 +63,21 @@ public:
                                  ActiveEnt parent, ActiveEnt child);
 
     /**
-     * @deprecated
+     * Mark a hierarchy entity for deletion, and cut it out of the hierarchy
+     *
+     * @param rScene [ref] Scene with hierarchy
+     * @param ent [in] Entity to delete
      */
-    static void destroy(ActiveScene& rScene, ActiveEnt ent);
+    static void mark_delete_cut(ActiveScene& rScene, ActiveEnt ent)
+    {
+        cut(rScene, ent);
+        rScene.mark_delete(ent);
+    }
 
     /**
-     * Cut an entity out of it's parent. This will leave the entity with no
-     * parent.
+     * Cut an entity out of the hierarchy.
+     *
+     * @param rScene [ref] Scene with hierarchy
      * @param ent [in]
      */
     static void cut(ActiveScene& rScene, ActiveEnt ent);
@@ -69,15 +86,28 @@ public:
      * Traverse the scene hierarchy
      *
      * Calls the specified callable on each entity of the scene hierarchy
+     *
+     * @param rScene [ref] Scene with hierarchy
      * @param root The entity whose sub-tree to traverse
      * @param callable A function that accepts an ActiveEnt as an argument and
      *                 returns false if traversal should stop, true otherwise
      */
     template <typename FUNC_T>
-    static void traverse(ActiveScene& rScene,
-                                   ActiveEnt root, FUNC_T callable);
+    static void traverse(ActiveScene& rScene, ActiveEnt root, FUNC_T callable);
 
+    /**
+     * Sort hierarchy component pool
+     *
+     * @param rScene [ref] Scene with hierarchy
+     */
     static void sort(ActiveScene& rScene);
+
+    /**
+     * Mark descendents of deleted hierarchy entities as deleted too
+     *
+     * @param rScene [ref] Scene with hierarchy
+     */
+    static void update_delete(ActiveScene& rScene);
 };
 
 template<typename FUNC_T>

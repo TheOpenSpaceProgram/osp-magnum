@@ -171,7 +171,7 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
             continue;
         }
 
-        SysHierarchy::destroy(rScene, ent);
+        SysHierarchy::mark_delete_cut(rScene, ent);
     }
 
     // Activate planets that have just entered the ActiveArea

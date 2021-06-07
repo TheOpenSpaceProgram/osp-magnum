@@ -38,9 +38,9 @@ namespace osp::active
  * @param ACompCamera - Camera used to draw the scene
  */
 using ShaderDrawFnc_t = void (*)(
-    ActiveEnt,
-    ActiveScene&,
-    ACompCamera const&) noexcept;
+        ActiveEnt,
+        ActiveScene&,
+        ACompCamera const&) noexcept;
 
 /**
  * Represents an entity which requests the scene to be drawn to m_target
@@ -78,6 +78,10 @@ struct ACompShader
     ShaderDrawFnc_t m_drawCall;
 };
 
+/**
+ * World transform used for rendering. All ascendents of an entity using this
+ * must also have this component
+ */
 struct ACompDrawTransform
 {
     Matrix4 m_transformWorld;
