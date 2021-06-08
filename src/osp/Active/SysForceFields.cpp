@@ -24,6 +24,7 @@
  */
 #include "SysForceFields.h"
 
+#include "SysPhysics.h"
 #include "ActiveScene.h"
 
 using namespace osp::active;
@@ -41,7 +42,7 @@ void SysFFGravity::update_force(ActiveScene& rScene)
             .view<ACompFFGravity, ACompTransform>();
 
     auto viewMasses = rScene.get_registry()
-            .view<ACompRigidBody_t, ACompTransform>();
+            .view<ACompRigidBody, ACompTransform>();
 
     for (ActiveEnt fieldEnt : viewFields)
     {
@@ -55,7 +56,7 @@ void SysFFGravity::update_force(ActiveScene& rScene)
                 continue;
             }
 
-            auto &massBody = viewMasses.get<ACompRigidBody_t>(massEnt);
+            auto &massBody = viewMasses.get<ACompRigidBody>(massEnt);
             auto &massTransform = viewMasses.get<ACompTransform>(massEnt);
 
             Vector3 relativePos = fieldTransform.m_transform.translation()
@@ -65,7 +66,7 @@ void SysFFGravity::update_force(ActiveScene& rScene)
             //               massBody.m_bodyData.m_mass / r;
             // gm1/r = a
 
-            SysPhysics_t::body_apply_accel(massBody, accel);
+            SysPhysics::body_apply_accel(massBody, accel);
         }
     }
 }

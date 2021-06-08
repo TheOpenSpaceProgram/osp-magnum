@@ -24,14 +24,12 @@
  */
 #pragma once
 
-#include <cstdint>
-
-#include "../Resource/PrototypePart.h"
-
-#include "../types.h"
-#include "activetypes.h"
 #include "osp/CommonPhysics.h"
-#include <Magnum/Math/Vector4.h>
+#include "physics.h"
+
+#include "ActiveScene.h"
+
+#include <cstdint>
 
 class NewtonBody;
 class NewtonCollision;
@@ -51,45 +49,31 @@ struct ACompNwtWorld
     float m_timeStep{1.0f / 60.0f};
 };
 
-/**
- * Rigid body with the Newton stuff
- */
-struct ACompNwtBody : public phys::DataRigidBody
+struct ACompNwtBody
 {
-    constexpr ACompNwtBody() = default;
-    ACompNwtBody(ACompNwtBody&& move) noexcept;
-    ACompNwtBody& operator=(ACompNwtBody&& move) noexcept;
+    constexpr ACompNwtBody(NewtonBody const* body) noexcept
+     : m_body(body) { }
 
-    NewtonBody *m_body{nullptr};
-    ActiveEnt m_entity{entt::null};
-    //ActiveScene &m_scene;
-};
+    constexpr NewtonBody const* body() const noexcept { return m_body; }
 
-struct ACompRigidbodyAncestor
-{
-    ActiveEnt m_ancestor{entt::null};
-    Matrix4 m_relTransform{};
-};
-
-/**
- * Represents the shape of an entity
- */
-struct ACompShape
-{
-    phys::ECollisionShape m_shape{phys::ECollisionShape::NONE};
+private:
+    NewtonBody const *m_body;
 };
 
 /**
  * Stores a handle to a NewtonCollision object
  */
-struct ACompCollider
+struct ACompNwtCollider
 {
-    NewtonCollision *m_collision{nullptr};
+    constexpr ACompNwtCollider(NewtonCollision const* collision) noexcept
+     : m_collision(collision) { }
+
+    constexpr NewtonCollision const* collision() const noexcept
+    { return m_collision; }
+
+private:
+    NewtonCollision const *m_collision;
 };
-
-using ACompRigidBody_t = ACompNwtBody;
-
-using ACompPhysicsWorld_t = ACompNwtWorld;
 
 class SysNewton
 {
@@ -103,60 +87,6 @@ public:
     static ACompNwtWorld* try_get_physics_world(ActiveScene &rScene);
 
     /**
-     * Used to find which rigid body an entity belongs to. This will keep
-     * looking up the tree of parents until it finds a rigid body.
-     *
-     * @param rScene     [in] ActiveScene containing ent
-     * @param ent        [in] ActiveEnt with ACompHierarchy and rigidbody ancestor
-     *
-     * @return Pair of {level-1 entity, pointer to ACompNwtBody found}. If
-     *         hierarchy error, then {entt:null, nullptr}. If no ACompNwtBody
-     *         component is found, then {level-1 entity, nullptr}
-     */
-    static std::pair<ActiveEnt, ACompNwtBody*> find_rigidbody_ancestor(
-            ActiveScene& rScene, ActiveEnt ent);
-
-    /**
-     * Finds the transformation of an entity relative to its rigidbody ancestor
-     * 
-     * Identical to find_rigidbody_ancestor(), except returns the transformation
-     * between rigidbody ancestor and the specified entity.
-     * 
-     * @param rScene  [in] ActiveScene containing ent
-     * @param ent     [in] ActiveEnt with ACompHierarchy and rigidbody ancestor
-     * 
-     * @return A Matrix4 representing the transformation
-     */
-    static Matrix4 find_transform_rel_rigidbody_ancestor(
-        ActiveScene& rScene, ActiveEnt ent);
-
-    /**
-     * Helper function for a SysMachine to access a parent rigidbody
-     *
-     * Used by machines which influence the rigidbody to which they're attached.
-     * This function takes a child entity and attempts to retrieve the rigidbody
-     * ancestor of the machine. The function makes use of the
-     * ACompRigidbodyAncestor component; if the specified entity lacks this
-     * component, one is added to it. The component is then used to store the
-     * result of find_rigidbody_ancestor() (the entity which owns the rigidbody)
-     * so that it can be easily accessed later.
-     * 
-     * @param rScene          [in] The scene to search
-     * @param childEntity     [in] An entity whose rigidbody ancestor is sought
-     * 
-     * @return Pair of {pointer to found ACompNwtBody, pointer to ACompTransform
-     *         of the ACompNwtBody entity}. If either component can't be found,
-     *         returns {nullptr, nullptr}
-     */
-    static ACompRigidbodyAncestor* try_get_or_find_rigidbody_ancestor(
-        ActiveScene& rScene, ActiveEnt childEntity);
-
-    // most of these are self-explanatory
-    static void body_apply_force(ACompRigidBody_t& body, Vector3 force) noexcept;
-    static void body_apply_accel(ACompRigidBody_t& body, Vector3 accel) noexcept;
-    static void body_apply_torque(ACompRigidBody_t& body, Vector3 torque) noexcept;
-
-    /**
      * Create a Newton TreeCollision from a mesh using those weird triangle
      * mesh iterators.
      * @param shape Shape component to store NewtonCollision* into
@@ -165,8 +95,10 @@ public:
      */
     template<class TRIANGLE_IT_T>
     static void shape_create_tri_mesh_static(
-            ActiveScene& rScene,ACompShape &rShape, ACompCollider &rCollider,
+            ActiveScene& rScene, ACompShape &rShape, ActiveEnt chunkEnt,
             TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end);
+
+
 
 private:
     /**
@@ -193,7 +125,7 @@ private:
      * @param entity   [in] Entity containing ACompNwtBody
      * @param nwtWorld [in] Newton physics world
      */
-    static void create_body(ActiveScene& rScene, ActiveEnt entity,
+    static void create_body(ActiveScene& rScene, ActiveEnt ent,
                             NewtonWorld const* nwtWorld);
 
     /**
@@ -206,45 +138,6 @@ private:
      */
     static void compute_rigidbody_inertia(ActiveScene& rScene, ActiveEnt entity);
 
-    enum EIncludeRootMass { Ignore, Include };
-    /**
-    * Recursively compute the center of mass of a hierarchy subtree
-    * 
-    * Takes in a root entity and recurses through its children. Entities which 
-    * possess an ACompMass component are used to compute a center of mass for 
-    * the entire subtree, treating it as a system of point masses. By default,
-    * the root entity's mass is not included; to include it, the optional
-    * includeRootMass argument can be set to 'true'.
-    * 
-    * @template CHECK_ROOT_MASS Include or exclude the mass of the root entity
-    * being passed to the function
-    * 
-    * @param rScene           [in] ActiveScene containing relevant scene data
-    * @param root             [in] Entity at the root of the hierarchy subtree
-    * @param includeRootMass  [in] Set to true if the root entity's mass should
-    *                              be included in the calculation
-    * 
-    * @return A 4-vector containing xyz=CoM, w=total mass
-    */
-    template <EIncludeRootMass INCLUDE_ROOT_MASS=EIncludeRootMass::Ignore>
-    static Vector4 compute_hier_CoM(ActiveScene& rScene, ActiveEnt root);
-
-    /**
-     * Compute the moment of inertia of a rigid body
-     *
-     * Searches the child nodes of the root and computes the total moment of
-     * inertia of the body. To contribute to the inertia of the rigidbody, child
-     * entities must posses both an ACompMass and ACompShape component, so that
-     * the mass distribution of the entity may be calculated.
-     *
-     * @param rScene       [in] ActiveScene containing relevant scene data
-     * @param root         [in] The root entity of the rigid body
-     *
-     * @return The inertia tensor of the rigid body about its center of mass, and 
-     *         a 4-vector containing xyz=CoM, w=total mass
-     */
-    static std::pair<Matrix3, Magnum::Vector4> compute_hier_inertia(ActiveScene& rScene,
-        ActiveEnt entity);
 
     static void on_body_destruct(ActiveReg_t& reg, ActiveEnt ent);
     static void on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent);
@@ -262,8 +155,9 @@ private:
 };
 
 template<class TRIANGLE_IT_T>
-void SysNewton::shape_create_tri_mesh_static(ActiveScene& rScene, ACompShape& rShape,
-    ACompCollider& rCollider, TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end)
+void SysNewton::shape_create_tri_mesh_static(
+        ActiveScene& rScene, ACompShape& rShape, ActiveEnt chunkEnt,
+        TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end)
 {
     // TODO: this is actually horrendously slow and WILL cause issues later on.
     //       Tree collisions aren't made for real-time loading. Consider
@@ -292,10 +186,8 @@ void SysNewton::shape_create_tri_mesh_static(ActiveScene& rScene, ACompShape& rS
     newton_tree_collision_end_build(tree, 2);
 
     rShape.m_shape = phys::ECollisionShape::TERRAIN;
-    rCollider.m_collision = tree;
+    rScene.reg_emplace<ACompNwtCollider>(chunkEnt, tree);
 }
-
-using SysPhysics_t = SysNewton;
 
 }
 
