@@ -27,7 +27,6 @@
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysHierarchy.h>
-#include <osp/Active/SysNewton.h>
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysRender.h>
 #include <osp/Universe.h>
@@ -37,6 +36,10 @@
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
+
+// TODO: Decouple when a proper interface for creating static triangle meshes
+//       is made
+#include <newtondynamics_physics/SysNewton.h>
 
 #include <iostream>
 
@@ -149,7 +152,7 @@ void SysPlanetA::debug_create_chunk_collider(
     auto itsChunk = planet.m_planet->iterate_chunk(chunk);
 
     // Send them to the physics engine
-    SysNewton::shape_create_tri_mesh_static(
+    ospnewton::SysNewton::shape_create_tri_mesh_static(
                 rScene, chunkShape, chunkEnt, itsChunk.first, itsChunk.second);
 }
 

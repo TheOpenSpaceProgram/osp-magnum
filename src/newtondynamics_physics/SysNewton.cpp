@@ -24,24 +24,32 @@
  */
 
 #include "SysNewton.h"
-#include "SysPhysics.h"
-#include "SysHierarchy.h"
+
+#include <osp/Active/SysPhysics.h>
+#include <osp/Active/SysHierarchy.h>
 
 #include <Newton.h>
 
-using osp::active::SysNewton;
+using ospnewton::SysNewton;
+using ospnewton::ACompNwtBody;
+using ospnewton::ACompNwtWorld;
 
 using osp::active::ActiveScene;
+using osp::active::ActiveReg_t;
 using osp::active::ActiveEnt;
 
-using osp::active::ACompRigidBody;
-using osp::active::ACompNwtBody;
-using osp::active::ACompNwtWorld;
-using osp::active::ACompTransform;
+using osp::active::SysPhysics;
 
+using osp::active::ACompHierarchy;
+using osp::active::ACompRigidBody;
+using osp::active::ACompShape;
+using osp::active::ACompSolidCollider;
+using osp::active::ACompTransform;
+using osp::active::ACompTransformControlled;
 using osp::active::ACompTransformMutable;
 
-using namespace osp;
+using osp::Matrix4;
+using osp::Vector3;
 
 // Callback called for every Rigid Body (even static ones) on NewtonUpdate
 void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
@@ -240,7 +248,7 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt ent,
 
     switch (entShape->m_shape)
     {
-    case phys::ECollisionShape::COMBINED:
+    case osp::phys::ECollisionShape::COMBINED:
     {
         // Combine collision shapes from descendants
 
@@ -275,7 +283,7 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt ent,
 
         break;
     }
-    case phys::ECollisionShape::TERRAIN:
+    case osp::phys::ECollisionShape::TERRAIN:
     {
         // Get NewtonTreeCollision generated from elsewhere
         // such as SysPlanetA::debug_create_chunk_collider

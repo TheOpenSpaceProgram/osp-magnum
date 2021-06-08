@@ -24,10 +24,9 @@
  */
 #pragma once
 
-#include "osp/CommonPhysics.h"
-#include "physics.h"
-
-#include "ActiveScene.h"
+#include <osp/CommonPhysics.h>
+#include <osp/Active/physics.h>
+#include <osp/Active/ActiveScene.h>
 
 #include <cstdint>
 
@@ -35,10 +34,8 @@ class NewtonBody;
 class NewtonCollision;
 class NewtonWorld;
 
-namespace osp::active
+namespace ospnewton
 {
-
-class ActiveScene;
 
 /**
  * Component that stores the NewtonWorld, only added to the root node.
@@ -80,11 +77,11 @@ class SysNewton
 
 public:
 
-    static void add_functions(ActiveScene &scene);
+    static void add_functions(osp::active::ActiveScene &scene);
     
-    static void update_world(ActiveScene& rScene);
+    static void update_world(osp::active::ActiveScene& rScene);
 
-    static ACompNwtWorld* try_get_physics_world(ActiveScene &rScene);
+    static ACompNwtWorld* try_get_physics_world(osp::active::ActiveScene &rScene);
 
     /**
      * Create a Newton TreeCollision from a mesh using those weird triangle
@@ -95,7 +92,8 @@ public:
      */
     template<class TRIANGLE_IT_T>
     static void shape_create_tri_mesh_static(
-            ActiveScene& rScene, ACompShape &rShape, ActiveEnt chunkEnt,
+            osp::active::ActiveScene& rScene, osp::active::ACompShape &rShape,
+            osp::active::ActiveEnt chunkEnt,
             TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end);
 
 
@@ -112,10 +110,10 @@ private:
      * @param nwtWorld  [in] Newton world from scene
      * @param rCompound [out] Compound collision to add new colliders to
      */
-    static void find_colliders_recurse(ActiveScene& rScene, ActiveEnt ent,
-                                       Matrix4 const &transform,
-                                       NewtonWorld const* nwtWorld,
-                                       NewtonCollision *rCompound);
+    static void find_colliders_recurse(
+            osp::active::ActiveScene& rScene, osp::active::ActiveEnt ent,
+            osp::Matrix4 const &transform,
+            NewtonWorld const* nwtWorld, NewtonCollision *rCompound);
 
     /**
      * Scan children of specified rigid body entity for ACompCollisionShapes,
@@ -125,8 +123,9 @@ private:
      * @param entity   [in] Entity containing ACompNwtBody
      * @param nwtWorld [in] Newton physics world
      */
-    static void create_body(ActiveScene& rScene, ActiveEnt ent,
-                            NewtonWorld const* nwtWorld);
+    static void create_body(
+            osp::active::ActiveScene& rScene, osp::active::ActiveEnt ent,
+            NewtonWorld const* nwtWorld);
 
     /**
      * Update the inertia properties of a rigid body
@@ -136,12 +135,13 @@ private:
      * functions in this class.
      * @param entity [in] The rigid body to update
      */
-    static void compute_rigidbody_inertia(ActiveScene& rScene, ActiveEnt entity);
+    static void compute_rigidbody_inertia(
+            osp::active::ActiveScene& rScene, osp::active::ActiveEnt entity);
 
 
-    static void on_body_destruct(ActiveReg_t& reg, ActiveEnt ent);
-    static void on_shape_destruct(ActiveReg_t& reg, ActiveEnt ent);
-    static void on_world_destruct(ActiveReg_t& reg, ActiveEnt ent);
+    static void on_body_destruct(osp::active::ActiveReg_t& reg, osp::active::ActiveEnt ent);
+    static void on_shape_destruct(osp::active::ActiveReg_t& reg, osp::active::ActiveEnt ent);
+    static void on_world_destruct(osp::active::ActiveReg_t& reg, osp::active::ActiveEnt ent);
 
     static NewtonCollision* newton_create_tree_collision(
             const NewtonWorld *newtonWorld, int shapeId);
@@ -156,13 +156,16 @@ private:
 
 template<class TRIANGLE_IT_T>
 void SysNewton::shape_create_tri_mesh_static(
-        ActiveScene& rScene, ACompShape& rShape, ActiveEnt chunkEnt,
+        osp::active::ActiveScene& rScene, osp::active::ACompShape& rShape,
+        osp::active::ActiveEnt chunkEnt,
         TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end)
 {
     // TODO: this is actually horrendously slow and WILL cause issues later on.
     //       Tree collisions aren't made for real-time loading. Consider
     //       manually hacking up serialized data instead of add face, or use
     //       Newton's dgAABBPolygonSoup stuff directly
+
+    using osp::Vector3;
 
     ACompNwtWorld* nwtWorldComp = try_get_physics_world(rScene);
     NewtonCollision* tree = newton_create_tree_collision(nwtWorldComp->m_nwtWorld, 0);
@@ -185,7 +188,7 @@ void SysNewton::shape_create_tri_mesh_static(
 
     newton_tree_collision_end_build(tree, 2);
 
-    rShape.m_shape = phys::ECollisionShape::TERRAIN;
+    rShape.m_shape = osp::phys::ECollisionShape::TERRAIN;
     rScene.reg_emplace<ACompNwtCollider>(chunkEnt, tree);
 }
 

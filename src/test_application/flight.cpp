@@ -55,7 +55,7 @@
 #include <osp/Shaders/FullscreenTriShader.h>
 #include <Magnum/Shaders/MeshVisualizer.h>
 
-#include <osp/Active/SysNewton.h>
+#include <newtondynamics_physics/SysNewton.h>
 
 using namespace testapp;
 
@@ -124,7 +124,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     SysHierarchy::setup(rScene);
 
     // Add system functions needed for flight scene
-    osp::active::SysNewton::add_functions(rScene);
+    ospnewton::SysNewton::add_functions(rScene);
     osp::active::SysAreaAssociate::add_functions(rScene);
     osp::active::SysVehicle::add_functions(rScene);
     osp::active::SysFFGravity::add_functions(rScene);
@@ -183,7 +183,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
 
     // Add default-constructed physics world to scene
-    rScene.reg_emplace<osp::active::ACompNwtWorld>(rScene.hier_get_root());
+    rScene.reg_emplace<ospnewton::ACompNwtWorld>(rScene.hier_get_root());
 
     // ##### Add a camera to the scene #####
 
