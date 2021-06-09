@@ -52,7 +52,6 @@ class ActiveScene
 public:
 
     ActiveScene(OSPApplication& app, Package& context);
-    ~ActiveScene();
 
     OSPApplication& get_application() { return m_app; };
 
@@ -135,15 +134,13 @@ public:
     {
         ActiveReg_t &rReg = rScene.get_registry();
         auto view = rReg.view<ACompDelete>();
-        rScene.get_registry().destroy(std::begin(view), std::end(view));
+        rReg.destroy(std::begin(view), std::end(view));
     }
 
     /**
-     * Calculate transformations relative to camera, and draw every
-     * CompDrawableDebug
-     * @param camera [in] Entity containing a ACompCamera
+     * Calculate world transformations and draw to all render targets
      */
-    void draw(ActiveEnt camera);
+    void draw();
 
     constexpr UpdateOrder_t& get_update_order() { return m_updateOrder; }
 
@@ -166,14 +163,14 @@ private:
     OSPApplication& m_app;
     Package& m_context;
 
-    ActiveReg_t m_registry;
-    ActiveEnt m_root;
-
     UpdateOrder_t m_updateOrder;
     RenderOrder_t m_renderOrder;
 
     std::vector<UpdateOrderHandle_t> m_updateHandles;
     std::vector<RenderOrderHandle_t> m_renderHandles;
+
+    ActiveReg_t m_registry;
+    ActiveEnt m_root;
 
 };
 

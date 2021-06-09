@@ -150,7 +150,8 @@ void SysHierarchy::traverse(ActiveScene& rScene,
             // is last sibling, move to parent's (or ancestor's) next sibling
             currentEnt = parentNextSibling.top();
             parentNextSibling.pop();
-        } else
+        }
+        else
         {
             break;
         }

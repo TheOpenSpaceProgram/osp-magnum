@@ -167,8 +167,7 @@ void SysAreaAssociate::floating_origin_translate(
 {
     auto &rReg = rScene.get_registry();
 
-    auto view = rScene.get_registry()
-            .view<ACompFloatingOrigin, ACompTransform>();
+    auto view = rReg.view<ACompFloatingOrigin, ACompTransform>();
 
     for (ActiveEnt const ent : view)
     {

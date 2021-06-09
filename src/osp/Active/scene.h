@@ -51,7 +51,7 @@ struct ACompDelete{ };
 
 struct ACompName
 {
-    ACompName(std::string name) : m_name(name) { }
+    ACompName(std::string name) : m_name(std::move(name)) { }
     std::string m_name;
 };
 

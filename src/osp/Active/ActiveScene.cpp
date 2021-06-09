@@ -48,11 +48,6 @@ ActiveScene::ActiveScene(OSPApplication &app, Package& context) :
     m_root = m_registry.create();
 }
 
-ActiveScene::~ActiveScene()
-{
-    m_registry.clear();
-}
-
 void ActiveScene::update()
 {
     m_updateOrder.call(*this);
@@ -63,29 +58,31 @@ void ActiveScene::update()
     update_delete(*this);
 }
 
-void ActiveScene::draw(ActiveEnt camera)
+void ActiveScene::draw()
 {
     SysHierarchy::sort(*this);
     SysRender::update_hierarchy_transforms(*this);
 
-    auto renderView = m_registry.view<ACompRenderingAgent, ACompPerspective3DView, ACompRenderer>();
-    for (auto [e, agent, view, renderer] : renderView.each())
+    auto renderView = m_registry.view<ACompRenderingAgent,
+                                      ACompPerspective3DView, ACompRenderer>();
+    for (auto const& [ent, agent, perspective, renderer] : renderView.each())
     {
         DependRes<RenderPipeline> render =
-            get_context_resources().get<RenderPipeline>(renderer.m_name);
-        auto& camera = reg_get<ACompCamera>(view.m_camera);
-        auto& cameraDrawTransform = reg_get<ACompDrawTransform>(view.m_camera);
-        auto& target = reg_get<ACompRenderTarget>(agent.m_target);
-        target.m_fbo->bind();
+                get_context_resources().get<RenderPipeline>(renderer.m_name);
+        auto &rCamera = reg_get<ACompCamera>(perspective.m_camera);
+        auto const &cameraDrawTf = reg_get<ACompDrawTransform>(perspective.m_camera);
+        auto &rTarget = reg_get<ACompRenderTarget>(agent.m_target);
+
+        rTarget.m_fbo->bind();
         using Magnum::GL::FramebufferClear;
-        target.m_fbo->clear(
-            FramebufferClear::Color
-            | FramebufferClear::Depth
-            | FramebufferClear::Stencil);
+        rTarget.m_fbo->clear(
+                FramebufferClear::Color
+                | FramebufferClear::Depth
+                | FramebufferClear::Stencil);
 
-        camera.m_inverse = cameraDrawTransform.m_transformWorld.inverted();
+        rCamera.m_inverse = cameraDrawTf.m_transformWorld.inverted();
 
-        render->m_order.call(*this, camera);
+        render->m_order.call(*this, rCamera);
     }
 
     SysRender::display_default_rendertarget(*this);
