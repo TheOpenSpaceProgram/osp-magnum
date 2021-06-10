@@ -107,24 +107,23 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 
     // InputDevice.IsActivated()
     // Combination
-    auto const &usrCtrl = rScene.reg_get<ACompUserControl>(rScene.hier_get_root());
     ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
     ACompWireNodes<AttitudeControl> &rNodesAttCtrl = SysWire::nodes<AttitudeControl>(rScene);
 
     UpdNodes_t<Percent> updPercent;
     UpdNodes_t<AttitudeControl> updAttCtrl;
 
-    if (usrCtrl.m_selfDestruct.triggered())
-    {
-        SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                        "Self destruct -- EXPLOSION BOOM!!!!");
-    }
+//    if (usrCtrl.m_selfDestruct.triggered())
+//    {
+//        SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
+//                        "Self destruct -- EXPLOSION BOOM!!!!");
+//    }
 
     // pitch, yaw, roll
-    Vector3 attitudeIn(
-            usrCtrl.m_pitchDn.trigger_hold() - usrCtrl.m_pitchUp.trigger_hold(),
-            usrCtrl.m_yawLf.trigger_hold()   - usrCtrl.m_yawRt.trigger_hold(),
-            usrCtrl.m_rollRt.trigger_hold()  - usrCtrl.m_rollLf.trigger_hold());
+    Vector3 attitudeIn;
+//            usrCtrl.m_pitchDn.trigger_hold() - usrCtrl.m_pitchUp.trigger_hold(),
+//            usrCtrl.m_yawLf.trigger_hold()   - usrCtrl.m_yawRt.trigger_hold(),
+//            usrCtrl.m_rollRt.trigger_hold()  - usrCtrl.m_rollLf.trigger_hold());
 
     auto view = rScene.get_registry().view<MachineUserControl>();
 
@@ -154,30 +153,6 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 
                 float throttleRate = 0.5f;
                 auto delta = throttleRate * rScene.get_time_delta_fixed();
-
-                if (usrCtrl.m_throttleMore.trigger_hold())
-                {
-                    throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
-                }
-
-                if (usrCtrl.m_throttleLess.trigger_hold())
-                {
-                    throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
-                }
-
-                if (usrCtrl.m_throttleMin.triggered())
-                {
-                    SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                                      "Minimum throttle");
-                    throttlePos = 0.0f;
-                }
-
-                if (usrCtrl.m_throttleMax.triggered())
-                {
-                    SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                                      "Maximum throttle");
-                    throttlePos = 1.0f;
-                }
 
                 // Write possibly new throttle value to node
                 SysSignal<Percent>::signal_assign(

@@ -63,23 +63,9 @@ using osp::universe::UCompVehicle;
 
 using adera::active::machines::MachineUserControl;
 
-
-//DebugObject::DebugObject(ActiveScene &scene, ActiveEnt ent) :
-//    m_scene(scene),
-//    m_ent(ent)
-//{
-
-//}
-
-//SysDebugObject::SysDebugObject(ActiveScene &scene) :
-//        m_scene(scene)
-//{
-
-//}
-
-
-DebugCameraController::DebugCameraController(ActiveScene &rScene, ActiveEnt ent,
-                                             osp::UserInputHandler &rInput)
+DebugCameraController::DebugCameraController(
+        ActiveScene &rScene, ActiveEnt ent,
+        osp::input::UserInputHandler &rInput)
  : DebugObject(rScene, ent)
  , m_selected(entt::null)
  , m_orbitPos(0, 0, 1)
@@ -91,16 +77,14 @@ DebugCameraController::DebugCameraController(ActiveScene &rScene, ActiveEnt ent,
                       [this] (ActiveScene&) { this->update_physics_pre(); })
  , m_updatePhysicsPost(rScene.get_update_order(), "dbg_cam_post", "physics", "",
                        [this] (ActiveScene&) { this->update_physics_post(); })
- , m_userInput(rInput)
- , m_mouseMotion(rInput.mouse_get())
- , m_scrollInput(rInput.scroll_get())
- , m_rmb(rInput.config_get("ui_rmb"))
- , m_up(rInput.config_get("ui_up"))
- , m_dn(rInput.config_get("ui_dn"))
- , m_lf(rInput.config_get("ui_lf"))
- , m_rt(rInput.config_get("ui_rt"))
- , m_switch(rInput.config_get("game_switch"))
- , m_selfDestruct(rInput.config_get("vehicle_self_destruct"))
+ , m_controls(&rInput)
+ , m_rmb(m_controls.button_subscribe("ui_rmb"))
+ , m_up(m_controls.button_subscribe("ui_up"))
+ , m_dn(m_controls.button_subscribe("ui_dn"))
+ , m_lf(m_controls.button_subscribe("ui_lf"))
+ , m_rt(m_controls.button_subscribe("ui_rt"))
+ , m_switch(m_controls.button_subscribe("game_switch"))
+ , m_selfDestruct(m_controls.button_subscribe("vehicle_self_destruct"))
 { }
 
 void DebugCameraController::update_vehicle_mod_pre()
@@ -112,7 +96,7 @@ void DebugCameraController::update_vehicle_mod_pre()
         return; // No vehicle selected
     }
 
-    if (m_selfDestruct.triggered())
+    if (m_controls.button_triggered(m_selfDestruct))
     {
         using osp::active::ACompVehicle;
         using osp::active::ACompPart;
@@ -142,7 +126,7 @@ void DebugCameraController::update_physics_pre()
     auto &rReg = m_scene.get_registry();
     ActiveEnt vehicle = try_get_vehicle_ent();
 
-    if (m_switch.triggered())
+    if (m_controls.button_triggered(m_switch))
     {
         try_switch_vehicle();
     }
@@ -259,21 +243,23 @@ void DebugCameraController::update_physics_post()
     }
 
     // Process control inputs
-    float keyRotYaw = static_cast<float>(m_rt.trigger_hold() - m_lf.trigger_hold());
-    float keyRotPitch = static_cast<float>(m_dn.trigger_hold() - m_up.trigger_hold());
+    float keyRotYaw = static_cast<float>(m_controls.button_held(m_rt)
+                                         - m_controls.button_held(m_lf));
+    float keyRotPitch = static_cast<float>(m_controls.button_held(m_dn)
+                                           - m_controls.button_held(m_up));
 
     Quaternion mcFish(Magnum::Math::IdentityInit);
-    if (m_rmb.trigger_hold() || keyRotYaw || keyRotPitch)
+    if (m_controls.button_held(m_rmb) || keyRotYaw || keyRotPitch)
     {
         // 180 degrees per second
         auto keyRotDelta = 180.0_degf * m_scene.get_time_delta_fixed();
 
         float yaw = keyRotYaw * static_cast<float>(keyRotDelta);
         float pitch = keyRotPitch * static_cast<float>(keyRotDelta);
-        if (m_rmb.trigger_hold())
+        if (m_controls.button_held(m_rmb))
         {
-            yaw += static_cast<float>(-m_mouseMotion.dxSmooth());
-            pitch += static_cast<float>(-m_mouseMotion.dySmooth());
+            yaw += static_cast<float>(-m_controls.get_input_handler()->mouse_state().m_smoothDelta.x());
+            pitch += static_cast<float>(-m_controls.get_input_handler()->mouse_state().m_smoothDelta.y());
         }
 
         // 1 degrees per step
@@ -288,7 +274,7 @@ void DebugCameraController::update_physics_post()
 
     // set camera orbit distance
     constexpr float distSensitivity = 0.3f;
-    m_orbitDistance += m_orbitDistance * distSensitivity * static_cast<float>(-m_scrollInput.dy());
+    m_orbitDistance += m_orbitDistance * distSensitivity * static_cast<float>(-m_controls.get_input_handler()->scroll_state().offset.y());
     
     // Clamp orbit distance to avoid producing a degenerate m_orbitPos vector
     constexpr float minDist = 5.0f;

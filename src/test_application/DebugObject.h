@@ -79,7 +79,7 @@ class DebugCameraController : public DebugObject<DebugCameraController>
 public:
     DebugCameraController(osp::active::ActiveScene &scene,
                           osp::active::ActiveEnt ent,
-                          osp::UserInputHandler &rInput);
+                          osp::input::UserInputHandler &rInput);
     ~DebugCameraController() = default;
     void update_vehicle_mod_pre();
     void update_physics_pre();
@@ -99,19 +99,19 @@ private:
     osp::active::UpdateOrderHandle_t m_updatePhysicsPre;
     osp::active::UpdateOrderHandle_t m_updatePhysicsPost;
 
-    osp::UserInputHandler &m_userInput;
+    osp::input::ControlSubscriber m_controls;
     // Mouse inputs
-    osp::MouseMovementHandle m_mouseMotion;
-    osp::ScrollInputHandle m_scrollInput;
-    osp::ButtonControlHandle m_rmb;
+    //osp::MouseMovementHandle m_mouseMotion;
+    //osp::ScrollInputHandle m_scrollInput;
+    osp::input::ButtonControlIndex m_rmb;
     // Keyboard inputs
-    osp::ButtonControlHandle m_up;
-    osp::ButtonControlHandle m_dn;
-    osp::ButtonControlHandle m_lf;
-    osp::ButtonControlHandle m_rt;
-    osp::ButtonControlHandle m_switch;
+    osp::input::ButtonControlIndex m_up;
+    osp::input::ButtonControlIndex m_dn;
+    osp::input::ButtonControlIndex m_lf;
+    osp::input::ButtonControlIndex m_rt;
+    osp::input::ButtonControlIndex m_switch;
 
-    osp::ButtonControlHandle m_selfDestruct;
+    osp::input::ButtonControlIndex m_selfDestruct;
 
 };
 

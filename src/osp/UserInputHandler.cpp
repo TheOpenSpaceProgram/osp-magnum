@@ -23,129 +23,23 @@
  * SOFTWARE.
  */
 #include "UserInputHandler.h"
+#include "string_concat.h"
 
 #include <iostream>
 
-namespace osp
+namespace osp::input
 {
-
-//constexpr ButtonVarConfig::ButtonVarConfig(int device, int devEnum,
-//                                   VarTrigger trigger,  bool invert,
-//                                   VarOperator nextOp) :
-
-//{
-    //m_bits = (uint8_t(trigger) << 0)
-    //       | (uint8_t(invert) << 1);
-    //       | (uint8_t(nextOp) << 2)
-//}
-
-
-ButtonControlHandle::ButtonControlHandle(UserInputHandler *to, int index) :
-        m_to(to), m_index(index)
-{
-    SPDLOG_LOGGER_INFO(m_to->p_logger, "ButtonControlHandle created");
-    m_to->m_controls[index].m_referenceCount ++;
-}
-
-ButtonControlHandle::~ButtonControlHandle()
-{
-    SPDLOG_LOGGER_INFO(m_to->p_logger, "ButtonControlHandle is dead");
-    m_to->m_controls[m_index].m_referenceCount --;
-}
-
-bool ButtonControlHandle::triggered() const
-{
-    return m_to->m_controls[m_index].m_triggered;
-}
-
-bool ButtonControlHandle::trigger_hold() const
-{
-    return m_to->m_controls[m_index].m_held;
-}
-
-MouseMovementHandle::MouseMovementHandle(UserInputHandler *to) : m_to(to)
-{
-    SPDLOG_LOGGER_INFO(m_to->p_logger, "MouseMovementHandle created");
-    m_to->m_mouseMotion.m_referenceCount++;
-}
-
-MouseMovementHandle::~MouseMovementHandle()
-{
-    SPDLOG_LOGGER_INFO(m_to->p_logger, "MouseMovementHandle is dead");
-    m_to->m_mouseMotion.m_referenceCount--;
-}
-
-float MouseMovementHandle::dxSmooth() const
-{
-    return m_to->m_mouseMotion.m_smoothDelta.x();
-}
-
-float MouseMovementHandle::dySmooth() const
-{
-    return m_to->m_mouseMotion.m_smoothDelta.y();
-}
-
-int MouseMovementHandle::dxRaw() const
-{
-    return m_to->m_mouseMotion.m_rawDelta.x();
-}
-
-int MouseMovementHandle::dyRaw() const
-{
-    return m_to->m_mouseMotion.m_rawDelta.y();
-}
-
-ScrollInputHandle::ScrollInputHandle(UserInputHandler *to) : m_to(to)
-{
-    SPDLOG_LOGGER_INFO(m_to->p_logger, "ScrollInputHandle created");
-    m_to->m_scrollOffset.m_referenceCount++;
-}
-
-ScrollInputHandle::~ScrollInputHandle()
-{
-    SPDLOG_LOGGER_INFO(m_to->p_logger, "ScrollInputHandle is dead");
-    m_to->m_scrollOffset.m_referenceCount--;
-}
-
-int ScrollInputHandle::dx() const
-{
-    return m_to->m_scrollOffset.offset.x();
-}
-
-int ScrollInputHandle::dy() const
-{
-    return m_to->m_scrollOffset.offset.y();
-}
-
-ButtonVar::ButtonVar(ButtonMap::iterator button, VarTrigger trigger,
-                     bool invert, VarOperator nextOp) :
-        m_button(button),
-        m_trigger(trigger),
-        m_invert(invert),
-        m_nextOp(nextOp) {}
-
-ButtonVar::ButtonVar(ButtonMap::iterator button, ButtonVarConfig cfg) :
-        m_button(button),
-        m_trigger(cfg.m_trigger),
-        m_invert(cfg.m_invert),
-        m_nextOp(cfg.m_nextOp) {}
-
 
 UserInputHandler::UserInputHandler(int deviceCount) :
     m_deviceToButtonRaw(deviceCount)
 {
-    m_controls.reserve(7);
-
     p_logger = spdlog::get("userinput");
 }
 
 bool UserInputHandler::eval_button_expression(
-        ButtonExpr const& rExpr,
-        ButtonExpr* pReleaseExpr)
+        ButtonExpr_t const& rExpr,
+        ButtonExpr_t* pReleaseExpr)
 {
-
-    using VarOperator = ButtonVar::VarOperator;
-    using VarTrigger = ButtonVar::VarTrigger;
 
     bool totalOn = false;
     bool termOn = false;
@@ -243,54 +137,53 @@ bool UserInputHandler::eval_button_expression(
 
 void UserInputHandler::config_register_control(std::string const& name, bool holdable, std::vector<ButtonVarConfig> vars)
 {
-    m_controlConfigs.insert_or_assign(name, ButtonConfig{ std::move(vars), holdable, false, 0 });
+    m_btnControlCfg.insert_or_assign(name, ButtonConfig{ std::move(vars), holdable, false, 0 });
 }
 void UserInputHandler::config_register_control(std::string&& name, bool holdable, std::vector<ButtonVarConfig> vars)
 {
-    m_controlConfigs.insert_or_assign(std::move(name), ButtonConfig{ std::move(vars), holdable, false, 0 });
+    m_btnControlCfg.insert_or_assign(std::move(name), ButtonConfig{ std::move(vars), holdable, false, 0 });
 }
 
-ButtonControlHandle UserInputHandler::config_get(std::string const& name)
+ButtonControlIndex UserInputHandler::button_subscribe(std::string_view name)
 {
 
     // check if a config exists for the name given
-    auto cfgIt = m_controlConfigs.find(name);
+    auto cfgIt = m_btnControlCfg.find(name);
 
-    if (cfgIt == m_controlConfigs.end())
+    if (cfgIt == m_btnControlCfg.end())
     {
         // Config not found, no way to have an empty key so far, so throw an exception
         SPDLOG_LOGGER_ERROR(p_logger, "No config for{}", name);
-        throw std::runtime_error("Error: no config with " + name);
+        throw std::runtime_error(string_concat("Error: no config with ", name));
     }
-
-    //int index;
 
     // Check if the control was already created before
     if (cfgIt->second.m_enabled)
     {
         // Use existing ButtonControl
-        return ButtonControlHandle(this, cfgIt->second.m_index);
-        //m_controls[index].m_referenceCount ++;
+        size_t index = cfgIt->second.m_index;
+        m_btnControls[index].m_referenceCount ++;
+        return ButtonControlIndex(index);
     }
     else
     {
         // Create a new ButtonControl
 
-        std::vector<ButtonVarConfig> &varConfigs = cfgIt->second.m_press;
-        ButtonControl &control = m_controls.emplace_back();
+        std::vector<ButtonVarConfig> const &varConfigs = cfgIt->second.m_press;
+        ButtonControl &rControl = m_btnControls.emplace_back();
 
-        control.m_holdable = (cfgIt->second.m_holdable);
-        control.m_held = false;
+        rControl.m_holdable = (cfgIt->second.m_holdable);
+        rControl.m_held = false;
 
-        control.m_exprPress.reserve(varConfigs.size());
+        rControl.m_exprPress.reserve(varConfigs.size());
 
-        for (ButtonVarConfig &varCfg : varConfigs)
+        for (ButtonVarConfig const &varCfg : varConfigs)
         {
             // Each loop, create a ButtonVar from the ButtonConfig and emplace
             // it into control.m_vars
 
             // Map of buttons for the specified device
-            ButtonMap &btnMap = m_deviceToButtonRaw[varCfg.m_device];
+            ButtonMap_t &btnMap = m_deviceToButtonRaw[varCfg.m_device];
 
             // try inserting a new button index
             auto btnInsert = btnMap.insert(std::make_pair(varCfg.m_devEnum,
@@ -315,35 +208,36 @@ ButtonControlHandle UserInputHandler::config_get(std::string const& name)
             //             | (uint8_t(varCfg.m_invert) << 1)
             //             | (uint8_t(varCfg.m_nextOp) << 2);
 
-            control.m_exprPress.emplace_back(btnInsert.first, varCfg);
+            rControl.m_exprPress.emplace_back(btnInsert.first, varCfg);
         }
 
         // New control has been created, now return a pointer to it
 
-        return ButtonControlHandle(this, m_controls.size() - 1);
+        return ButtonControlIndex(m_btnControls.size() - 1);
     }
 }
 
-MouseMovementHandle UserInputHandler::mouse_get()
+void UserInputHandler::button_unsubscribe(ButtonControlIndex index)
 {
-    return MouseMovementHandle(this);
-}
+    uint16_t &rRefCount = m_btnControls.at(size_t(index)).m_referenceCount;
+    if (0 == rRefCount)
+    {
+        throw std::runtime_error("Below zero reference count");
+    }
 
-ScrollInputHandle UserInputHandler::scroll_get()
-{
-    return ScrollInputHandle(this);
+    rRefCount --;
 }
 
 void UserInputHandler::clear_events()
 {
     // remove any just pressed / just released flags
 
-    for (ButtonMap::iterator btnIt : m_btnPressed)
+    for (ButtonMap_t::iterator btnIt : m_btnPressed)
     {
         btnIt->second.m_justPressed = false;
     }
 
-    for (ButtonMap::iterator btnIt : m_btnReleased)
+    for (ButtonMap_t::iterator btnIt : m_btnReleased)
     {
         btnIt->second.m_justReleased = false;
     }
@@ -363,7 +257,7 @@ void UserInputHandler::event_raw(DeviceId deviceId, int buttonEnum,
                                  ButtonRawEvent dir)
 {
     // Check if the button is being listened to
-    ButtonMap::iterator btnIt = m_deviceToButtonRaw[deviceId].find(buttonEnum);
+    ButtonMap_t::iterator btnIt = m_deviceToButtonRaw[deviceId].find(buttonEnum);
 
     if (btnIt == m_deviceToButtonRaw[deviceId].end())
     {
@@ -393,9 +287,9 @@ void UserInputHandler::update_controls()
 {
     // Loop through controls and see which ones are triggered
 
-    for (ButtonControl &control : m_controls)
+    for (ButtonControl &control : m_btnControls)
     {
-        ButtonExpr* pExprRelease = nullptr;
+        ButtonExpr_t* pExprRelease = nullptr;
 
         // tell eval_button_expression to generate a release expression,
         // if the control is holdable and is not held
@@ -455,5 +349,24 @@ void UserInputHandler::scroll_delta(Vector2i offset)
 {
     m_scrollOffset.offset = offset;
 }
+
+ControlSubscriber::~ControlSubscriber()
+{
+    for (ButtonControlIndex const index : m_subscribedButtons)
+    {
+        m_pInputHandler->button_unsubscribe(index);
+    }
+}
+
+ButtonControlIndex ControlSubscriber::button_subscribe(std::string_view name)
+{
+    ButtonControlIndex const index = m_pInputHandler->button_subscribe(name);
+    if (ButtonControlIndex::NONE != index)
+    {
+        m_subscribedButtons.push_back(index);
+    }
+    return index;
+}
+
 
 }

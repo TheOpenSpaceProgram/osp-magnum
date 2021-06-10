@@ -71,7 +71,7 @@ public:
     osp::active::ActiveScene& scene_create(std::string const& name);
     osp::active::ActiveScene& scene_create(std::string&& name);
 
-    constexpr osp::UserInputHandler& get_input_handler() { return m_userInput; }
+    constexpr osp::input::UserInputHandler& get_input_handler() { return m_userInput; }
     constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
 
     constexpr osp::Package& get_context_resources() { return m_glResources; }
@@ -80,7 +80,7 @@ private:
 
     void drawEvent() override;
 
-    osp::UserInputHandler m_userInput;
+    osp::input::UserInputHandler m_userInput;
 
     MapActiveScene_t m_scenes;
 
@@ -103,4 +103,4 @@ void config_controls(OSPMagnum& rOspApp);
 * @param Control string
 * @returns vector of the control created from the string. 
 */
-std::vector<osp::ButtonVarConfig> parse_control(std::string_view str) noexcept;
+std::vector<osp::input::ButtonVarConfig> parse_control(std::string_view str) noexcept;

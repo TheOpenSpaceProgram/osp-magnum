@@ -143,8 +143,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // TODO: Eventually restructure MachineUserControl to instead have controls
     //       as members that can be written to instead of listening directly
     //       to a UserInputHandler
-    rScene.reg_emplace<adera::active::machines::ACompUserControl>(
-                rScene.hier_get_root(), pMagnumApp->get_input_handler());
+    //rScene.reg_emplace<adera::active::machines::ACompUserControl>(
+    //            rScene.hier_get_root(), pMagnumApp->get_input_handler());
 
     // ##### Setup Wiring #####
 
