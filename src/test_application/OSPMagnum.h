@@ -103,4 +103,4 @@ void config_controls(OSPMagnum& rOspApp);
 * @param Control string
 * @returns vector of the control created from the string. 
 */
-std::vector<osp::input::ButtonVarConfig> parse_control(std::string_view str) noexcept;
+osp::input::ControlExprConfig_t parse_control(std::string_view str) noexcept;

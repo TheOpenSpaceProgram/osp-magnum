@@ -25,7 +25,7 @@
 
 #include "flight.h"
 
-#include "DebugObject.h"
+#include "CameraController.h"
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysHierarchy.h>
@@ -133,6 +133,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     planeta::active::SysPlanetA::add_functions(rScene);
   
+    testapp::SysCameraController::add_functions(rScene);
+
     // Setup Machine systems
     SysMachineContainer::add_functions(rScene);
     SysMachineRCSController::add_functions(rScene);
@@ -207,12 +209,9 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     cameraComp.calculate_projection();
 
-    // Add the debug camera controller to the scene. This adds controls
-    auto camObj = std::make_unique<DebugCameraController>(
-                rScene, camera, pMagnumApp->get_input_handler());
-
-    // Add a ACompDebugObject to camera to manage camObj's lifetime
-    rScene.reg_emplace<ACompDebugObject>(camera, std::move(camObj));
+    // Add the camera controller to the camera. This adds controls
+    rScene.reg_emplace<ACompCameraController>(
+                camera, pMagnumApp->get_input_handler());
 
     // Configure default rendering system
     osp::active::SysRender::setup(rScene);

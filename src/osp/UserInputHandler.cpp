@@ -37,20 +37,20 @@ UserInputHandler::UserInputHandler(int deviceCount) :
 }
 
 bool UserInputHandler::eval_button_expression(
-        ButtonExpr_t const& rExpr,
-        ButtonExpr_t* pReleaseExpr)
+        ControlExpr_t const& rExpr,
+        ControlExpr_t* pReleaseExpr)
 {
 
     bool totalOn = false;
     bool termOn = false;
 
-    VarOperator prevOp = VarOperator::OR;
+    EVarOperator prevOp = EVarOperator::OR;
     auto termStart = rExpr.begin();
 
     //for (ButtonVar const& var : rExpression)
     for (auto it =  rExpr.begin(); it != rExpr.end(); it ++)
     {
-        ButtonVar const& var = *it;
+        ControlTerm const& var = *it;
         ButtonRaw const& btnRaw = var.m_button->second;
 
         bool varOn;
@@ -58,7 +58,7 @@ bool UserInputHandler::eval_button_expression(
         // Get the value the ButtonVar specifies
         switch(var.m_trigger)
         {
-        case VarTrigger::PRESSED:
+        case EVarTrigger::PRESSED:
             if (var.m_invert)
             {
                 varOn = btnRaw.m_justReleased;
@@ -69,7 +69,7 @@ bool UserInputHandler::eval_button_expression(
             }
 
             break;
-        case VarTrigger::HOLD:
+        case EVarTrigger::HOLD:
             // "boolIn != bool" is a conditional invert
             // 1 != 1 = 0
             // 0 != 1 = 1
@@ -85,7 +85,7 @@ bool UserInputHandler::eval_button_expression(
         // Deal with operations on that value
         switch (prevOp)
         {
-        case VarOperator::OR:
+        case EVarOperator::OR:
             // Current var is the start of a new term.
 
             // Add the previous term to the total
@@ -94,12 +94,12 @@ bool UserInputHandler::eval_button_expression(
             lastVar = true;
 
             break;
-        case VarOperator::AND:
+        case EVarOperator::AND:
             termOn = termOn && varOn;
             break;
         }
 
-        if (prevOp == VarOperator::OR || lastVar)
+        if (prevOp == EVarOperator::OR || lastVar)
         {
             // if the previous term contributes to the expression being true
             // and pReleaseExpr exists
@@ -112,13 +112,13 @@ bool UserInputHandler::eval_button_expression(
                 // just-pressed buttons to trigger the release
                 for (auto itB = termStart; itB != termEnd; itB ++)
                 {
-                    if (itB->m_trigger != VarTrigger::PRESSED)
+                    if (itB->m_trigger != EVarTrigger::PRESSED)
                     {
                         continue;
                     }
                     pReleaseExpr->emplace_back(
-                            itB->m_button, VarTrigger::PRESSED,
-                            !(itB->m_invert), VarOperator::OR);
+                            itB->m_button, EVarTrigger::PRESSED,
+                            !(itB->m_invert), EVarOperator::OR);
                 }
             }
 
@@ -135,16 +135,22 @@ bool UserInputHandler::eval_button_expression(
     return totalOn;
 }
 
-void UserInputHandler::config_register_control(std::string const& name, bool holdable, std::vector<ButtonVarConfig> vars)
+void UserInputHandler::config_register_control(
+        std::string const& name, bool holdable, ControlExprConfig_t vars)
 {
-    m_btnControlCfg.insert_or_assign(name, ButtonConfig{ std::move(vars), holdable, false, 0 });
+    m_btnControlCfg.insert_or_assign(
+                name,
+                ButtonControlConfig{ std::move(vars), holdable, false, 0 });
 }
-void UserInputHandler::config_register_control(std::string&& name, bool holdable, std::vector<ButtonVarConfig> vars)
+void UserInputHandler::config_register_control(
+        std::string&& name, bool holdable, ControlExprConfig_t vars)
 {
-    m_btnControlCfg.insert_or_assign(std::move(name), ButtonConfig{ std::move(vars), holdable, false, 0 });
+    m_btnControlCfg.insert_or_assign(
+                std::move(name),
+                ButtonControlConfig{ std::move(vars), holdable, false, 0 });
 }
 
-ButtonControlIndex UserInputHandler::button_subscribe(std::string_view name)
+EButtonControlIndex UserInputHandler::button_subscribe(std::string_view name)
 {
 
     // check if a config exists for the name given
@@ -163,21 +169,20 @@ ButtonControlIndex UserInputHandler::button_subscribe(std::string_view name)
         // Use existing ButtonControl
         size_t index = cfgIt->second.m_index;
         m_btnControls[index].m_referenceCount ++;
-        return ButtonControlIndex(index);
+        return EButtonControlIndex(index);
     }
     else
     {
         // Create a new ButtonControl
 
-        std::vector<ButtonVarConfig> const &varConfigs = cfgIt->second.m_press;
+        ControlExprConfig_t const &varConfigs = cfgIt->second.m_press;
         ButtonControl &rControl = m_btnControls.emplace_back();
 
         rControl.m_holdable = (cfgIt->second.m_holdable);
-        rControl.m_held = false;
 
         rControl.m_exprPress.reserve(varConfigs.size());
 
-        for (ButtonVarConfig const &varCfg : varConfigs)
+        for (ControlTermConfig const &varCfg : varConfigs)
         {
             // Each loop, create a ButtonVar from the ButtonConfig and emplace
             // it into control.m_vars
@@ -208,16 +213,16 @@ ButtonControlIndex UserInputHandler::button_subscribe(std::string_view name)
             //             | (uint8_t(varCfg.m_invert) << 1)
             //             | (uint8_t(varCfg.m_nextOp) << 2);
 
-            rControl.m_exprPress.emplace_back(btnInsert.first, varCfg);
+            rControl.m_exprPress.emplace_back(varCfg.create(btnInsert.first));
         }
 
         // New control has been created, now return a pointer to it
 
-        return ButtonControlIndex(m_btnControls.size() - 1);
+        return EButtonControlIndex(m_btnControls.size() - 1);
     }
 }
 
-void UserInputHandler::button_unsubscribe(ButtonControlIndex index)
+void UserInputHandler::button_unsubscribe(EButtonControlIndex index)
 {
     uint16_t &rRefCount = m_btnControls.at(size_t(index)).m_referenceCount;
     if (0 == rRefCount)
@@ -242,7 +247,7 @@ void UserInputHandler::clear_events()
         btnIt->second.m_justReleased = false;
     }
 
-    // clear the arrays
+    // Clear the button pressed and released events
     m_btnPressed.clear();
     m_btnReleased.clear();
 
@@ -251,10 +256,13 @@ void UserInputHandler::clear_events()
 
     // Clear scroll offset
     m_scrollOffset.offset = Vector2i(0);
+
+    // Clear control events
+    m_btnControlEvents.clear();
 }
 
 void UserInputHandler::event_raw(DeviceId deviceId, int buttonEnum,
-                                 ButtonRawEvent dir)
+                                 EButtonEvent dir)
 {
     // Check if the button is being listened to
     ButtonMap_t::iterator btnIt = m_deviceToButtonRaw[deviceId].find(buttonEnum);
@@ -270,12 +278,12 @@ void UserInputHandler::event_raw(DeviceId deviceId, int buttonEnum,
 
     switch (dir)
     {
-    case ButtonRawEvent::PRESSED:
+    case EButtonEvent::PRESSED:
         btnRaw.m_pressed = true;
         btnRaw.m_justPressed = true;
         m_btnPressed.push_back(btnIt);
         break;
-    case ButtonRawEvent::RELEASED:
+    case EButtonEvent::RELEASED:
         btnRaw.m_pressed = false;
         btnRaw.m_justReleased = true;
         m_btnReleased.push_back(btnIt);
@@ -285,44 +293,58 @@ void UserInputHandler::event_raw(DeviceId deviceId, int buttonEnum,
 
 void UserInputHandler::update_controls()
 {
+
     // Loop through controls and see which ones are triggered
 
-    for (ButtonControl &control : m_btnControls)
+    for (auto it = std::begin(m_btnControls); it != std::end(m_btnControls);
+         std::advance(it, 1))
     {
-        ButtonExpr_t* pExprRelease = nullptr;
+        ButtonControl &rControl = *it;
+        EButtonControlIndex const index = EButtonControlIndex(
+                    std::distance(it, std::begin(m_btnControls)));
+
+        ControlExpr_t* pExprRelease = nullptr;
 
         // tell eval_button_expression to generate a release expression,
         // if the control is holdable and is not held
-        if (control.m_holdable && !control.m_held)
+        if (rControl.m_holdable && !rControl.m_held)
         {
-            pExprRelease = &(control.m_exprRelease);
+            pExprRelease = &(rControl.m_exprRelease);
         }
 
-        control.m_triggered = eval_button_expression(control.m_exprPress,
+        rControl.m_triggered = eval_button_expression(rControl.m_exprPress,
                                                      pExprRelease);
 
-        if (!control.m_holdable)
+        if (rControl.m_triggered)
+        {
+            m_btnControlEvents.emplace_back(index,
+                                            EButtonControlEvent::TRIGGERED);
+        }
+
+        if (!rControl.m_holdable)
         {
             continue;
         }
 
-        if (control.m_held)
+        if (rControl.m_held)
         {
-            // if currently held
-            control.m_held = !eval_button_expression(control.m_exprRelease);
+            // if currently held, evaluate the release expression
+            rControl.m_held = !eval_button_expression(rControl.m_exprRelease);
 
             // if just released
-            if (!control.m_held)
+            if (!rControl.m_held)
             {
-                control.m_exprRelease.clear();
+                rControl.m_exprRelease.clear();
+                m_btnControlEvents.emplace_back(index,
+                                                EButtonControlEvent::TRIGGERED);
                 SPDLOG_LOGGER_TRACE(m_to->p_logger, "RELEASE");
             }
         }
-        else if (control.m_triggered)
+        else if (rControl.m_triggered)
         {
             // start holding down the control. control.m_exprRelease should
             // have been generated earlier
-            control.m_held = true;
+            rControl.m_held = true;
             SPDLOG_LOGGER_TRACE(m_to->p_logger, "HOLD");
         }
     }
@@ -350,18 +372,20 @@ void UserInputHandler::scroll_delta(Vector2i offset)
     m_scrollOffset.offset = offset;
 }
 
+//-----------------------------------------------------------------------------
+
 ControlSubscriber::~ControlSubscriber()
 {
-    for (ButtonControlIndex const index : m_subscribedButtons)
+    for (EButtonControlIndex const index : m_subscribedButtons)
     {
         m_pInputHandler->button_unsubscribe(index);
     }
 }
 
-ButtonControlIndex ControlSubscriber::button_subscribe(std::string_view name)
+EButtonControlIndex ControlSubscriber::button_subscribe(std::string_view name)
 {
-    ButtonControlIndex const index = m_pInputHandler->button_subscribe(name);
-    if (ButtonControlIndex::NONE != index)
+    EButtonControlIndex const index = m_pInputHandler->button_subscribe(name);
+    if (EButtonControlIndex::NONE != index)
     {
         m_subscribedButtons.push_back(index);
     }

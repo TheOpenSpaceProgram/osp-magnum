@@ -26,7 +26,6 @@
 
 #include "../wiretypes.h"
 
-#include <osp/UserInputHandler.h>
 #include <osp/Active/SysMachine.h>
 #include <osp/Active/SysWire.h>
 
@@ -73,18 +72,9 @@ struct MachineUserControl
     static constexpr osp::portindex_t<Percent> smc_woThrottle{0};
     static constexpr osp::portindex_t<AttitudeControl> smc_woAttitude{0};
 
-    bool m_enable{false};
-
-    float m_throttlePos;
-
+    float m_throttle;
     bool m_selfDestruct;
-
-    bool m_pitchUp;
-    bool m_pitchDn;
-    bool m_yawLf;
-    bool m_yawRt;
-    bool m_rollLf;
-    bool m_rollRt;
+    osp::Vector3 m_attitude; // pitch, yaw, roll
 };
 
 //-----------------------------------------------------------------------------

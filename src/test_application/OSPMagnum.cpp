@@ -44,9 +44,10 @@ using Mouse_t = OSPMagnum::MouseEvent::Button;
 using osp::input::sc_keyboard;
 using osp::input::sc_mouse;
 
-using osp::input::ButtonVarConfig;
-using osp::input::VarTrigger;
-using osp::input::VarOperator;
+using osp::input::ControlTermConfig;
+using osp::input::ControlExprConfig_t;
+using osp::input::EVarTrigger;
+using osp::input::EVarOperator;
 
 OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
                      osp::OSPApplication &rOspApp) :
@@ -101,26 +102,26 @@ void OSPMagnum::keyPressEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
     m_userInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
-                          osp::input::ButtonRawEvent::PRESSED);
+                          osp::input::EButtonEvent::PRESSED);
 }
 
 void OSPMagnum::keyReleaseEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
     m_userInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
-                          osp::input::ButtonRawEvent::RELEASED);
+                          osp::input::EButtonEvent::RELEASED);
 }
 
 void OSPMagnum::mousePressEvent(MouseEvent& event)
 {
     m_userInput.event_raw(osp::input::sc_mouse, (int) event.button(),
-                          osp::input::ButtonRawEvent::PRESSED);
+                          osp::input::EButtonEvent::PRESSED);
 }
 
 void OSPMagnum::mouseReleaseEvent(MouseEvent& event)
 {
     m_userInput.event_raw(osp::input::sc_mouse, (int) event.button(),
-                          osp::input::ButtonRawEvent::RELEASED);
+                          osp::input::EButtonEvent::RELEASED);
 }
 
 void OSPMagnum::mouseMoveEvent(MouseMoveEvent& event)
@@ -156,10 +157,10 @@ void testapp::config_controls(OSPMagnum& rOspApp)
     for (const auto& [k, v] : data.as_table())
     {
         std::string const& primary = toml::find(v, "primary").as_string();
-        std::vector<osp::input::ButtonVarConfig> controls = parse_control(primary);
+        ControlExprConfig_t controls = parse_control(primary);
 
         std::string const& secondary = toml::find(v, "secondary").as_string();
-        std::vector<osp::input::ButtonVarConfig> secondaryKeys = parse_control(secondary);
+        ControlExprConfig_t secondaryKeys = parse_control(secondary);
 
         controls.insert(controls.end(), std::make_move_iterator(secondaryKeys.begin()), std::make_move_iterator(secondaryKeys.end()));
 
@@ -258,9 +259,9 @@ const std::map<std::string_view, button_tuple, std::less<>> buttonMap = {
     {"MMouse", {sc_mouse, (int)OSPMagnum::MouseEvent::Button::Middle }}
 };
 
-std::vector<ButtonVarConfig> parse_control(std::string_view str) noexcept
+ControlExprConfig_t parse_control(std::string_view str) noexcept
 {
-    std::vector<ButtonVarConfig> handlers;
+    ControlExprConfig_t handlers;
 
     //If none, then no actions
     if (str == "None") {
@@ -278,7 +279,7 @@ std::vector<ButtonVarConfig> parse_control(std::string_view str) noexcept
         if (it != buttonMap.end()) 
         {
             auto const& [device, button] = it->second;
-            handlers.emplace_back(device, button, VarTrigger::HOLD, false, VarOperator::AND);
+            handlers.emplace_back(device, button, EVarTrigger::HOLD, false, EVarOperator::AND);
         }
         start = end + delim.length();
         end = str.find(delim, start);
@@ -289,7 +290,7 @@ std::vector<ButtonVarConfig> parse_control(std::string_view str) noexcept
     if (it != buttonMap.end()) 
     {
         auto const& [device, button] = it->second;
-        handlers.emplace_back(device, button, VarTrigger::PRESSED, false, VarOperator::OR);
+        handlers.emplace_back(device, button, EVarTrigger::PRESSED, false, EVarOperator::OR);
     }
     return handlers;
 }
