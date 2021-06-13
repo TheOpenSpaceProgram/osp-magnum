@@ -26,6 +26,7 @@
 
 #include "ActiveScene.h"
 #include "osp/Active/SysRender.h"
+#include "osp/Active/SysHierarchy.h"
 
 using namespace osp;
 using namespace osp::active;
@@ -39,207 +40,49 @@ void ACompCamera::calculate_projection()
 }
 
 
-ActiveScene::ActiveScene(UserInputHandler &userInput, OSPApplication &app, Package& context) :
+ActiveScene::ActiveScene(OSPApplication &app, Package& context) :
         m_app(app),
-        m_context(context),
-        m_hierarchyDirty(false),
-        m_userInput(userInput)
+        m_context(context)
 {
-    m_registry.on_construct<ACompHierarchy>()
-                    .connect<&ActiveScene::on_hierarchy_construct>(*this);
-
-    m_registry.on_destroy<ACompHierarchy>()
-                    .connect<&ActiveScene::on_hierarchy_destruct>(*this);
-
     // Create the root entity
-
     m_root = m_registry.create();
-    ACompHierarchy& hierarchy = m_registry.emplace<ACompHierarchy>(m_root);
-    hierarchy.m_name = "Root Entity";
-
-}
-
-ActiveScene::~ActiveScene()
-{
-    m_registry.clear();
-}
-
-ActiveEnt ActiveScene::hier_create_child(ActiveEnt parent,
-                                            std::string const& name)
-{
-    ActiveEnt child = m_registry.create();
-    ACompHierarchy& childHierarchy = m_registry.emplace<ACompHierarchy>(child);
-    //ACompTransform& transform = m_registry.emplace<ACompTransform>(ent);
-    childHierarchy.m_name = name;
-
-    hier_set_parent_child(parent, child);
-
-    return child;
-}
-
-void ActiveScene::hier_set_parent_child(ActiveEnt parent, ActiveEnt child)
-{
-    ACompHierarchy& childHierarchy = m_registry.get<ACompHierarchy>(child);
-    //ACompTransform& transform = m_registry.emplace<ACompTransform>(ent);
-
-    ACompHierarchy& parentHierarchy = m_registry.get<ACompHierarchy>(parent);
-
-    // if child has an existing parent, cut first
-    if (m_registry.valid(childHierarchy.m_parent))
-    {
-        hier_cut(child);
-    }
-
-    // set new child's parent
-    childHierarchy.m_parent = parent;
-    childHierarchy.m_level = parentHierarchy.m_level + 1;
-
-    // If has siblings (not first child)
-    if (parentHierarchy.m_childCount)
-    {
-        ActiveEnt sibling = parentHierarchy.m_childFirst;
-        auto& siblingHierarchy = m_registry.get<ACompHierarchy>(sibling);
-
-        // Set new child and former first child as siblings
-        siblingHierarchy.m_siblingPrev = child;
-        childHierarchy.m_siblingNext = sibling;
-    }
-
-    // Set parent's first child to new child just created
-    parentHierarchy.m_childFirst = child;
-    parentHierarchy.m_childCount ++; // increase child count
-}
-
-void ActiveScene::hier_destroy(ActiveEnt ent)
-{
-    auto *pEntHier = &m_registry.get<ACompHierarchy>(ent);
-
-    // Destroy children first recursively, if there is any
-    while (pEntHier->m_childCount > 0)
-    {
-        hier_destroy(pEntHier->m_childFirst);
-        // previous hier_destroy might have caused a reallocation
-        pEntHier = m_registry.try_get<ACompHierarchy>(ent);
-    }
-
-    hier_cut(ent);
-    m_registry.destroy(ent);
-}
-
-void ActiveScene::hier_cut(ActiveEnt ent)
-{
-    auto &entHier = m_registry.get<ACompHierarchy>(ent);
-
-    // TODO: deal with m_depth
-
-    // Set sibling's sibling's to each other
-
-    if (m_registry.valid(entHier.m_siblingNext))
-    {
-        m_registry.get<ACompHierarchy>(entHier.m_siblingNext).m_siblingPrev
-                = entHier.m_siblingPrev;
-    }
-
-    if (m_registry.valid(entHier.m_siblingPrev))
-    {
-        m_registry.get<ACompHierarchy>(entHier.m_siblingPrev).m_siblingNext
-                = entHier.m_siblingNext;
-    }
-
-    // deal with parent
-
-    auto &parentHier = m_registry.get<ACompHierarchy>(entHier.m_parent);
-    parentHier.m_childCount --;
-
-    if (parentHier.m_childFirst == ent)
-    {
-        parentHier.m_childFirst = entHier.m_siblingNext;
-    }
-
-    entHier.m_parent = entHier.m_siblingNext = entHier.m_siblingPrev
-            = entt::null;
-}
-
-void ActiveScene::on_hierarchy_construct(ActiveReg_t& reg, ActiveEnt ent)
-{
-    m_hierarchyDirty = true;
-}
-
-void ActiveScene::on_hierarchy_destruct(ActiveReg_t& reg, ActiveEnt ent)
-{
-    m_hierarchyDirty = true;
 }
 
 void ActiveScene::update()
 {
-
     m_updateOrder.call(*this);
+
+    // TODO: FunctionOrder is way too inconvenient to deal with, so for now the
+    //       delete systems are called here
+    SysHierarchy::update_delete(*this);
+    update_delete(*this);
 }
 
-
-void ActiveScene::update_hierarchy_transforms()
+void ActiveScene::draw()
 {
-    if (m_hierarchyDirty)
-    {
-        // Sort by level, so that objects at the top of the hierarchy are
-        // updated first
-        m_registry.sort<ACompHierarchy>([](ACompHierarchy const& lhs,
-                                           ACompHierarchy const& rhs)
-        {
-            return lhs.m_level < rhs.m_level;
-        }, entt::insertion_sort());
+    SysHierarchy::sort(*this);
+    SysRender::update_hierarchy_transforms(*this);
 
-        m_registry.sort<ACompTransform, ACompHierarchy>();
-
-        m_hierarchyDirty = false;
-    }
-
-    auto view = m_registry.view<ACompHierarchy, ACompTransform>();
-
-    for(ActiveEnt entity : view)
-    {
-        auto& hierarchy = view.get<ACompHierarchy>(entity);
-        auto& transform = view.get<ACompTransform>(entity);
-
-        if (hierarchy.m_parent == m_root)
-        {
-            // top level object, parent is root
-
-            transform.m_transformWorld = transform.m_transform;
-
-        }
-        else
-        {
-            auto& parentTransform
-                    = view.get<ACompTransform>(hierarchy.m_parent);
-
-            // set transform relative to parent
-            transform.m_transformWorld = parentTransform.m_transformWorld
-                                          * transform.m_transform;
-        }
-    }
-}
-
-void ActiveScene::draw(ActiveEnt camera)
-{
-    auto renderView = m_registry.view<ACompRenderingAgent, ACompPerspective3DView, ACompRenderer>();
-    for (auto [e, agent, view, renderer] : renderView.each())
+    auto renderView = m_registry.view<ACompRenderingAgent,
+                                      ACompPerspective3DView, ACompRenderer>();
+    for (auto const& [ent, agent, perspective, renderer] : renderView.each())
     {
         DependRes<RenderPipeline> render =
-            get_context_resources().get<RenderPipeline>(renderer.m_name);
-        auto& camera = reg_get<ACompCamera>(view.m_camera);
-        auto& cameraTransform = reg_get<ACompTransform>(view.m_camera);
-        auto& target = reg_get<ACompRenderTarget>(agent.m_target);
-        target.m_fbo->bind();
+                get_context_resources().get<RenderPipeline>(renderer.m_name);
+        auto &rCamera = reg_get<ACompCamera>(perspective.m_camera);
+        auto const &cameraDrawTf = reg_get<ACompDrawTransform>(perspective.m_camera);
+        auto &rTarget = reg_get<ACompRenderTarget>(agent.m_target);
+
+        rTarget.m_fbo->bind();
         using Magnum::GL::FramebufferClear;
-        target.m_fbo->clear(
-            FramebufferClear::Color
-            | FramebufferClear::Depth
-            | FramebufferClear::Stencil);
+        rTarget.m_fbo->clear(
+                FramebufferClear::Color
+                | FramebufferClear::Depth
+                | FramebufferClear::Stencil);
 
-        camera.m_inverse = cameraTransform.m_transformWorld.inverted();
+        rCamera.m_inverse = cameraDrawTf.m_transformWorld.inverted();
 
-        render->m_order.call(*this, camera);
+        render->m_order.call(*this, rCamera);
     }
 
     SysRender::display_default_rendertarget(*this);

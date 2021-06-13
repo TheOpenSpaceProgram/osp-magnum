@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "ActiveScene.h"
+#include "SysHierarchy.h"
 #include "SysVehicle.h"
 #include "SysRender.h"
 #include "physics.h"
@@ -79,11 +80,12 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 
     // Create the root entity to add parts to
 
-    ActiveEnt vehicleEnt = rScene.hier_create_child(root, "Vehicle");
+    ActiveEnt vehicleEnt =  SysHierarchy::create_child(rScene, root, "Vehicle");
 
     rScene.reg_emplace<ACompActivatedSat>(vehicleEnt, tgtSat);
 
     ACompVehicle& vehicleComp = rScene.reg_emplace<ACompVehicle>(vehicleEnt);
+    rScene.reg_emplace<ACompDrawTransform>(vehicleEnt);
     rScene.reg_emplace<ACompVehicleInConstruction>(
                     vehicleEnt, loadMeVehicle.m_blueprint);
 
@@ -177,7 +179,7 @@ float SysVehicle::compute_hier_volume(ActiveScene& rScene, ActiveEnt part)
         return EHierarchyTraverseStatus::Continue;
     };
 
-    rScene.hierarchy_traverse(part, std::move(checkVol));
+    SysHierarchy::traverse(rScene, part, std::move(checkVol));
 
     return volume;
 }
@@ -217,7 +219,7 @@ ActiveEnt SysVehicle::part_instantiate(
         }
 
         // Create the new entity
-        ActiveEnt currentEnt = rScene.hier_create_child(parentEnt);
+        ActiveEnt currentEnt = SysHierarchy::create_child(rScene, parentEnt);
         newEntities[i] = currentEnt;
 
         // Add and set transform component
@@ -227,13 +229,12 @@ ActiveEnt SysVehicle::part_instantiate(
                 = Matrix4::from(pcompTransform.m_rotation.toMatrix(),
                                 pcompTransform.m_translation)
                 * Matrix4::scaling(pcompTransform.m_scale);
+        rScene.reg_emplace<ACompDrawTransform>(currentEnt);
     }
 
-    // TODO: add an ACompName because putting name in hierarchy is pretty stupid
     for (PCompName const& pcompName : part.m_partName)
     {
-        auto &hier = rScene.reg_get<ACompHierarchy>(newEntities[pcompName.m_entity]);
-        hier.m_name = pcompName.m_name;
+        rScene.reg_emplace<ACompName>(newEntities[pcompName.m_entity], pcompName.m_name);
     }
 
     // Create drawables
@@ -278,7 +279,7 @@ ActiveEnt SysVehicle::part_instantiate(
         // as components to be consumed by the Phong shader
         rScene.reg_emplace<ACompVisible>(currentEnt);
         rScene.reg_emplace<ACompOpaque>(currentEnt);
-        rScene.reg_emplace<ACompShader>(currentEnt);
+        rScene.reg_emplace<ACompShader>(currentEnt, SysRender::get_default_shader());
         rScene.reg_emplace<ACompMesh>(currentEnt, meshRes);
         rScene.reg_emplace<ACompDiffuseTex>(currentEnt, std::move(textureResources[0]));
     }
@@ -328,7 +329,7 @@ ActiveEnt SysVehicle::part_instantiate(
         return EHierarchyTraverseStatus::Continue;
     };
 
-    rScene.hierarchy_traverse(rootEntity, applyMasses);
+    SysHierarchy::traverse(rScene, rootEntity, applyMasses);
 
     // Initialize entities for individual machines. This is done now in one
     // place, as creating new entities can be problematic for concurrency
@@ -340,7 +341,7 @@ ActiveEnt SysVehicle::part_instantiate(
     {
         ActiveEnt parent = newEntities[pcompMachine.m_entity];
         ActiveEnt machEnt = machines.m_machines.emplace_back(
-                    rScene.hier_create_child(parent, "Machine"));
+                    SysHierarchy::create_child(rScene, parent, "Machine"));
         rScene.reg_emplace<ACompMachineType>(machEnt, pcompMachine.m_type);
     }
 
@@ -375,7 +376,7 @@ void SysVehicle::update_activate(ActiveScene &rScene)
             continue;
         }
 
-        rScene.hier_destroy(ent);
+        SysHierarchy::mark_delete_cut(rScene, ent);
     }
 
     // Update transforms of already-activated vehicle satellites
@@ -436,7 +437,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                 if (pRBA) { pRBA->m_ancestor = entt::null; }
                 return EHierarchyTraverseStatus::Continue;
             };
-            rScene.hierarchy_traverse(vehicleEnt, invalidateAncestors);
+            SysHierarchy::traverse(rScene, vehicleEnt, invalidateAncestors);
 
             // Create the islands vector
             // [0]: current vehicle
@@ -450,11 +451,12 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             //       when emplacing new ones.
             for (size_t i = 1; i < islands.size(); i ++)
             {
-                ActiveEnt islandEnt = rScene.hier_create_child(
-                            rScene.hier_get_root());
+                ActiveEnt islandEnt = SysHierarchy::create_child(
+                            rScene, rScene.hier_get_root());
                 rScene.reg_emplace<ACompVehicle>(islandEnt);
                 auto &islandTransform
                         = rScene.reg_emplace<ACompTransform>(islandEnt);
+                rScene.reg_emplace<ACompDrawTransform>(islandEnt);
                 auto &islandBody
                         = rScene.reg_emplace<ACompRigidBody_t>(islandEnt);
                 auto &islandShape
@@ -485,7 +487,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                 if (partPart.m_destroy)
                 {
                     // destroy this part
-                    rScene.hier_destroy(partEnt);
+                    SysHierarchy::mark_delete_cut(rScene, partEnt);
                     return true;
                 }
 
@@ -498,7 +500,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                                 islandEnt);
                     islandVehicle.m_parts.push_back(partEnt);
 
-                    rScene.hier_set_parent_child(islandEnt, partEnt);
+                    SysHierarchy::set_parent_child(rScene, islandEnt, partEnt);
 
                     return true;
                 }

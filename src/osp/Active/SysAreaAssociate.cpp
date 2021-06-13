@@ -165,22 +165,24 @@ void SysAreaAssociate::sat_transform_set_relative(
 void SysAreaAssociate::floating_origin_translate(
         ActiveScene& rScene,Vector3 translation)
 {
-    auto view = rScene.get_registry()
-            .view<ACompFloatingOrigin, ACompTransform>();
+    auto &rReg = rScene.get_registry();
 
-    for (ActiveEnt ent : view)
+    auto view = rReg.view<ACompFloatingOrigin, ACompTransform>();
+
+    for (ActiveEnt const ent : view)
     {
         auto &entTransform = view.get<ACompTransform>(ent);
         //auto &entFloatingOrigin = view.get<ACompFloatingOrigin>(ent);
 
-        if (entTransform.m_controlled)
+        if (rReg.all_of<ACompTransformControlled>(ent))
         {
-            if (!entTransform.m_mutable)
+            auto *tfMutable = rReg.try_get<ACompTransformMutable>(ent);
+            if (tfMutable == nullptr)
             {
                 continue;
             }
 
-            entTransform.m_transformDirty = true;
+            tfMutable->m_dirty = true;
         }
 
         entTransform.m_transform.translation() += translation;

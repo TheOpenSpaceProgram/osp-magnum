@@ -25,6 +25,7 @@
 
 #include "OSPMagnum.h"
 #include "osp/types.h"
+#include "osp/Active/SysHierarchy.h"
 
 #include <Magnum/Math/Color.h>
 #include <Magnum/PixelFormat.h>
@@ -62,26 +63,6 @@ void OSPMagnum::drawEvent()
     Magnum::GL::defaultFramebuffer.clear(Magnum::GL::FramebufferClear::Color
                                          | Magnum::GL::FramebufferClear::Depth);
 
-//    if (m_area)
-//    {
-//        //Scene3D& scene = m_area->get_scene();
-//        //if (!m_area->is_loaded_active())
-//        //{
-//        //    // Enable active area if not already done so
-//        //    m_area->activate();
-//        //}
-
-//       // std::cout << "deltaTime: " << m_timeline.previousFrameDuration() << "\n";
-
-//        // TODO: physics update
-//        m_userInput.update_controls();
-//        m_area->update_physics(1.0f / 60.0f);
-//        m_userInput.clear_events();
-//        // end of physics update
-
-//        m_area->draw_gl();
-//    }
-
     m_userInput.update_controls();
 
     for (auto &[name, scene] : m_scenes)
@@ -93,11 +74,7 @@ void OSPMagnum::drawEvent()
 
     for (auto &[name, scene] : m_scenes)
     {
-        scene.update_hierarchy_transforms();
-
-
-        // temporary: draw using first camera component found
-        scene.draw(scene.get_registry().view<osp::active::ACompCamera>().front());
+        scene.draw();
     }
 
 
@@ -149,14 +126,14 @@ void OSPMagnum::mouseScrollEvent(MouseScrollEvent & event)
 osp::active::ActiveScene& OSPMagnum::scene_create(std::string const& name)
 {
     auto const& [it, success] =
-        m_scenes.try_emplace(name, m_userInput, m_ospApp, m_glResources);
+        m_scenes.try_emplace(name, m_ospApp, m_glResources);
     return it->second;
 }
 
 osp::active::ActiveScene& OSPMagnum::scene_create(std::string && name)
 {
     auto const& [it, success] =
-        m_scenes.try_emplace(std::move(name), m_userInput, m_ospApp, m_glResources);
+        m_scenes.try_emplace(std::move(name), m_ospApp, m_glResources);
     return it->second;
 }
 

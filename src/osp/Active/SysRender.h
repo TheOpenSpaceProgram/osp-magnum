@@ -29,6 +29,8 @@
 #include "osp/Active/activetypes.h"
 #include "osp/Shaders/Phong.h"
 
+#include "drawing.h"
+
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
 #include <Magnum/GL/Framebuffer.h>
@@ -36,8 +38,6 @@
 
 namespace osp::active
 {
-
-/* ########## USER COMPONENTS ########## */
 
 /**
  * Stores a mesh to be drawn by the renderer
@@ -62,39 +62,6 @@ struct ACompRenderTarget
 {
     Magnum::Vector2i m_size;
     osp::DependRes<Magnum::GL::Framebuffer> m_fbo;
-};
-
-/**
- * Represents an entity which requests the scene to be drawn to m_target
- */
-struct ACompRenderingAgent
-{
-    ActiveEnt m_target;  // Must have ACompRenderTarget
-};
-
-/**
- * Describes the type of view used by a rendering agent
- */
-struct ACompPerspective3DView
-{
-    ActiveEnt m_camera;
-};
-
-/* An object that is completely opaque */
-struct ACompOpaque {};
-
-/* An object with transparency */
-struct ACompTransparent {};
-
-/* Visibility state of this object */
-struct ACompVisible {};
-
-/**
- * Stores a shader draw function to be used to draw the object
- */
-struct ACompShader
-{
-    ShaderDrawFnc_t m_drawCall{shader::Phong::draw_entity};  // default shader
 };
 
 /**
@@ -132,6 +99,15 @@ public:
 
     /* Draw the default render target to the screen */
     static void display_default_rendertarget(ActiveScene& rScene);
+
+    /**
+     * Update the m_transformWorld of entities with ACompTransform and
+     * ACompHierarchy. Intended for physics interpolation
+     */
+    static void update_hierarchy_transforms(ActiveScene& rScene);
+
+    static ShaderDrawFnc_t get_default_shader() { return shader::Phong::draw_entity; };
+
 private:
     /* Define render passes */
     static RenderPipeline create_forward_renderer();

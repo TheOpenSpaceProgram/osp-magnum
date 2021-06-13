@@ -28,6 +28,7 @@
 #include "DebugObject.h"
 
 #include <osp/Active/ActiveScene.h>
+#include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysRender.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/SysWire.h>
@@ -55,12 +56,6 @@
 
 using namespace testapp;
 
-using osp::Vector2;
-
-using osp::Vector3;
-using osp::Quaternion;
-using osp::Matrix3;
-using osp::Matrix4;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -73,15 +68,21 @@ using osp::universe::SatVehicle;
 using osp::universe::UCompActiveArea;
 
 using osp::active::ActiveEnt;
+using osp::active::ActiveScene;
 using osp::active::ACompTransform;
 using osp::active::ACompCamera;
 using osp::active::ACompFloatingOrigin;
 
+using osp::active::SysHierarchy;
 using osp::active::SysRender;
+using osp::active::ACompDrawTransform;
 using osp::active::ACompRenderTarget;
 using osp::active::ACompRenderingAgent;
 using osp::active::ACompPerspective3DView;
 using osp::active::ACompRenderer;
+
+using osp::active::SysWire;
+using osp::active::SysSignal;
 using osp::active::ACompWire;
 using osp::active::ACompWireNodes;
 
@@ -92,13 +93,19 @@ using adera::active::machines::SysMachineContainer;
 
 using planeta::universe::SatPlanet;
 
+using osp::Vector2;
+using osp::Vector3;
+using osp::Quaternion;
+using osp::Matrix3;
+using osp::Matrix4;
+
 void load_shaders(osp::active::ActiveScene& rScene);
 
 void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
                  osp::OSPApplication& rOspApp, OSPMagnum::Arguments args)
 {
 
-    // Get needed variables
+    // Get Universe
     Universe &rUni = rOspApp.get_universe();
 
     // Create the application
@@ -108,11 +115,13 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     config_controls(*pMagnumApp);
 
     // Create an ActiveScene
-    osp::active::ActiveScene& rScene = pMagnumApp->scene_create("Area 1");
+    ActiveScene& rScene = pMagnumApp->scene_create("Area 1");
+
+    // Setup hierarchy, initialize root entity
+    SysHierarchy::setup(rScene);
 
     // Add system functions needed for flight scene
     osp::active::SysPhysics_t::add_functions(rScene);
-    //osp::active::SysWire::add_functions(rScene);
     osp::active::SysAreaAssociate::add_functions(rScene);
     osp::active::SysVehicle::add_functions(rScene);
     osp::active::SysFFGravity::add_functions(rScene);
@@ -121,26 +130,45 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     planeta::active::SysPlanetA::add_functions(rScene);
   
+    // Setup Machine systems
     SysMachineContainer::add_functions(rScene);
     SysMachineRCSController::add_functions(rScene);
     SysMachineRocket::add_functions(rScene);
     SysMachineUserControl::add_functions(rScene);
 
-    // Setup wiring
-    rScene.debug_update_add(rScene.get_update_order(),"wire_percent_construct", "vehicle_activate", "vehicle_modification",
-                            &osp::active::SysSignal<adera::wire::Percent>::signal_update_construct);
-    rScene.debug_update_add(rScene.get_update_order(), "wire_attctrl_construct", "vehicle_activate", "vehicle_modification",
-                            &osp::active::SysSignal<adera::wire::AttitudeControl>::signal_update_construct);
-    osp::active::SysWire::add_functions(rScene);
-    osp::active::SysWire::setup_default(
+    // Add user controls for SysMachineUserControl
+    // TODO: Eventually restructure MachineUserControl to instead have controls
+    //       as members that can be written to instead of listening directly
+    //       to a UserInputHandler
+    rScene.reg_emplace<adera::active::machines::ACompUserControl>(
+                rScene.hier_get_root(), pMagnumApp->get_input_handler());
+
+    // ##### Setup Wiring #####
+
+    // Add ACompWire to scene with update functions for passing Percent and
+    // AttitudeControl values between Machines
+    SysWire::setup_default(
             rScene, 5,
-            {&adera::active::machines::SysMachineRocket::update_calculate,
-             &adera::active::machines::SysMachineRCSController::update_calculate},
-            {&osp::active::SysSignal<adera::wire::Percent>::signal_update_nodes,
-             &osp::active::SysSignal<adera::wire::AttitudeControl>::signal_update_nodes});
+            {&SysMachineRocket::update_calculate,
+             &SysMachineRCSController::update_calculate},
+            {&SysSignal<adera::wire::Percent>::signal_update_nodes,
+             &SysSignal<adera::wire::AttitudeControl>::signal_update_nodes});
+
+    // Add scene components for storing 'Nodes' used for wiring
     rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
     rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
 
+    SysWire::add_functions(rScene);
+
+    // Add functions to wire vehicles when they're added to the scene
+    rScene.debug_update_add(
+            rScene.get_update_order(),
+            "wire_percent_construct", "vehicle_activate", "vehicle_modification",
+            &SysSignal<adera::wire::Percent>::signal_update_construct);
+    rScene.debug_update_add(
+            rScene.get_update_order(),
+            "wire_attctrl_construct", "vehicle_activate", "vehicle_modification",
+            &SysSignal<adera::wire::AttitudeControl>::signal_update_construct);
 
     // create a Satellite with an ActiveArea
     Satellite areaSat = rUni.sat_create();
@@ -154,15 +182,15 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Add default-constructed physics world to scene
     rScene.reg_emplace<osp::active::ACompPhysicsWorld_t>(rScene.hier_get_root());
 
-
     // ##### Add a camera to the scene #####
 
     // Create the camera entity
-    ActiveEnt camera = rScene.hier_create_child(rScene.hier_get_root(),
-                                                       "Camera");
+    ActiveEnt camera = SysHierarchy::create_child(
+                rScene, rScene.hier_get_root(), "Camera");
 
     // Configure camera transformation
     auto &cameraTransform = rScene.reg_emplace<ACompTransform>(camera);
+    rScene.reg_emplace<ACompDrawTransform>(camera);
     cameraTransform.m_transform = Matrix4::translation(Vector3(0, 0, 25));
     rScene.reg_emplace<ACompFloatingOrigin>(camera);
 
@@ -177,7 +205,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     cameraComp.calculate_projection();
 
     // Add the debug camera controller to the scene. This adds controls
-    auto camObj = std::make_unique<DebugCameraController>(rScene, camera);
+    auto camObj = std::make_unique<DebugCameraController>(
+                rScene, camera, pMagnumApp->get_input_handler());
 
     // Add a ACompDebugObject to camera to manage camObj's lifetime
     rScene.reg_emplace<ACompDebugObject>(camera, std::move(camObj));

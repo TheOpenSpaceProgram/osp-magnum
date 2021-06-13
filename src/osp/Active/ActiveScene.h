@@ -29,10 +29,10 @@
 #include <stack>
 
 #include "../OSPApplication.h"
-#include "../UserInputHandler.h"
 
 #include "../types.h"
 #include "activetypes.h"
+#include "scene.h"
 
 namespace osp::active
 {
@@ -51,8 +51,7 @@ class ActiveScene
 
 public:
 
-    ActiveScene(UserInputHandler &userInput, OSPApplication& app, Package& context);
-    ~ActiveScene();
+    ActiveScene(OSPApplication& app, Package& context);
 
     OSPApplication& get_application() { return m_app; };
 
@@ -60,48 +59,6 @@ public:
      * @return Root entity of the entire scene graph
      */
     constexpr ActiveEnt hier_get_root() const { return m_root; }
-
-    /**
-     * Create a new entity, and add a ACompHierarchy to it
-     * @param parent [in] Entity to assign as parent
-     * @param name   [in] Name of entity
-     * @return New entity created
-     */
-    ActiveEnt hier_create_child(ActiveEnt parent,
-                                std::string const& name = "Innocent Entity");
-
-    /**
-     * Set parent-child relationship between two nodes containing an
-     * ACompHierarchy
-     *
-     * @param parent [in]
-     * @param child  [in]
-     */
-    void hier_set_parent_child(ActiveEnt parent, ActiveEnt child);
-
-    /**
-     * Destroy an entity and all its descendents
-     * @param ent [in]
-     */
-    void hier_destroy(ActiveEnt ent);
-
-    /**
-     * Cut an entity out of it's parent. This will leave the entity with no
-     * parent.
-     * @param ent [in]
-     */
-    void hier_cut(ActiveEnt ent);
-
-    /**
-     * Traverse the scene hierarchy
-     * 
-     * Calls the specified callable on each entity of the scene hierarchy
-     * @param root The entity whose sub-tree to traverse
-     * @param callable A function that accepts an ActiveEnt as an argument and
-     *                 returns false if traversal should stop, true otherwise
-     */
-    template <typename FUNC_T>
-    void hierarchy_traverse(ActiveEnt root, FUNC_T callable);
 
     /**
      * @return Internal entt::registry
@@ -152,25 +109,38 @@ public:
         return m_registry.emplace<T>(ent, std::forward<Args>(args)...);
     }
 
+
+    /**
+     * Mark an entity for deletion
+     *
+     * @param ent [in] Entity to delete
+     */
+    void mark_delete(ActiveEnt ent)
+    {
+        m_registry.emplace_or_replace<ACompDelete>(ent);
+    }
+
     /**
      * Update everything in the update order, including all systems and stuff
      */
     void update();
 
     /**
-     * Update the m_transformWorld of entities with ACompTransform and
-     * ACompHierarchy. Intended for physics interpolation
+     * Delete entities with ACompDelete
+     *
+     * @param rScene [ref] scene with entities
      */
-    void update_hierarchy_transforms();
+    static void update_delete(ActiveScene& rScene)
+    {
+        ActiveReg_t &rReg = rScene.get_registry();
+        auto view = rReg.view<ACompDelete>();
+        rReg.destroy(std::begin(view), std::end(view));
+    }
 
     /**
-     * Calculate transformations relative to camera, and draw every
-     * CompDrawableDebug
-     * @param camera [in] Entity containing a ACompCamera
+     * Calculate world transformations and draw to all render targets
      */
-    void draw(ActiveEnt camera);
-
-    constexpr UserInputHandler& get_user_input() { return m_userInput; }
+    void draw();
 
     constexpr UpdateOrder_t& get_update_order() { return m_updateOrder; }
 
@@ -190,20 +160,8 @@ public:
     Package& get_context_resources() { return m_context; }
 private:
 
-    void on_hierarchy_construct(ActiveReg_t& reg, ActiveEnt ent);
-    void on_hierarchy_destruct(ActiveReg_t& reg, ActiveEnt ent);
-
     OSPApplication& m_app;
     Package& m_context;
-
-    //std::vector<std::vector<ActiveEnt> > m_hierLevels;
-    ActiveReg_t m_registry;
-    ActiveEnt m_root;
-    bool m_hierarchyDirty;
-
-    float m_timescale;
-
-    UserInputHandler &m_userInput;
 
     UpdateOrder_t m_updateOrder;
     RenderOrder_t m_renderOrder;
@@ -211,68 +169,9 @@ private:
     std::vector<UpdateOrderHandle_t> m_updateHandles;
     std::vector<RenderOrderHandle_t> m_renderHandles;
 
-};
+    ActiveReg_t m_registry;
+    ActiveEnt m_root;
 
-
-/**
- * Component for transformation (in meters)
- */
-struct ACompTransform
-{
-    //Matrix4 m_transformPrev;
-    Matrix4 m_transform;
-    Matrix4 m_transformWorld;
-    //bool m_enableFloatingOrigin;
-
-    // For when transform is controlled by a specific system.
-    // Examples of this behaviour:
-    // * Entities with ACompRigidBody are controlled by SysPhysics, transform
-    //   is updated each frame
-    bool m_controlled{false};
-
-    // if this is true, then transform can be modified, as long as
-    // m_transformDirty is set afterwards
-    bool m_mutable{true};
-    bool m_transformDirty{false};
-};
-
-struct ACompHierarchy
-{
-    std::string m_name; // maybe move this somewhere
-
-    //unsigned m_childIndex;
-    unsigned m_level{0}; // 0 for root entity, 1 for root's child, etc...
-    ActiveEnt m_parent{entt::null};
-    ActiveEnt m_siblingNext{entt::null};
-    ActiveEnt m_siblingPrev{entt::null};
-
-    // as a parent
-    unsigned m_childCount{0};
-    ActiveEnt m_childFirst{entt::null};
-
-    // transform relative to parent
-
-};
-
-// Stores the mass of entities
-struct ACompMass
-{
-    float m_mass;
-};
-
-/**
- * Component that represents a camera
- */
-struct ACompCamera
-{
-    float m_near, m_far;
-    Magnum::Deg m_fov;
-    Vector2 m_viewport;
-
-    Matrix4 m_projection;
-    Matrix4 m_inverse;
-
-    void calculate_projection();
 };
 
 enum class EHierarchyTraverseStatus : bool
@@ -280,51 +179,5 @@ enum class EHierarchyTraverseStatus : bool
     Continue = true,
     Stop = false
 };
-
-template<typename FUNC_T>
-void ActiveScene::hierarchy_traverse(ActiveEnt root, FUNC_T callable)
-{
-    using osp::active::ACompHierarchy;
-
-    std::stack<ActiveEnt> parentNextSibling;
-    ActiveEnt currentEnt = root;
-
-    unsigned int rootLevel = reg_get<ACompHierarchy>(root).m_level;
-
-    while (true)
-    {
-        ACompHierarchy &hier = reg_get<ACompHierarchy>(currentEnt);
-
-        if (callable(currentEnt) == EHierarchyTraverseStatus::Stop) { return; }
-
-        if (hier.m_childCount > 0)
-        {
-            // entity has some children
-            currentEnt = hier.m_childFirst;
-
-            // Save next sibling for later if it exists
-            // Don't check siblings of the root node
-            if ((hier.m_siblingNext != entt::null) && (hier.m_level > rootLevel))
-            {
-                parentNextSibling.push(hier.m_siblingNext);
-            }
-        }
-        else if ((hier.m_siblingNext != entt::null) && (hier.m_level > rootLevel))
-        {
-            // no children, move to next sibling
-            currentEnt = hier.m_siblingNext;
-        }
-        else if (parentNextSibling.size() > 0)
-        {
-            // last sibling, and not done yet
-            // is last sibling, move to parent's (or ancestor's) next sibling
-            currentEnt = parentNextSibling.top();
-            parentNextSibling.pop();
-        } else
-        {
-            break;
-        }
-    }
-}
 
 }

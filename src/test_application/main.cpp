@@ -466,8 +466,9 @@ void debug_print_machines()
 
     for (ActiveEnt ent : view)
     {
-        auto const &hier = scene.reg_get<ACompHierarchy>(ent);
-        std::cout << "[" << int(ent) << "]: " << hier.m_name << "\n";
+        auto const *name = scene.get_registry().try_get<osp::active::ACompName>(ent);
+        std::string_view nameview = (name != nullptr) ? std::string_view(name->m_name) : "untitled";
+        std::cout << "[" << int(ent) << "]: " << nameview << "\n";
 
         // Loop through each of that vehicle's Machines
         auto const &machines = scene.reg_get<ACompMachines>(ent);
@@ -509,7 +510,10 @@ void debug_print_hier()
             // print arrows to indicate level
             std::cout << "  ->";
         }
-        std::cout << "[" << scene.get_registry().entity(currentEnt) << "]: " << hier.m_name << "\n";
+        auto const *name = scene.get_registry().try_get<osp::active::ACompName>(currentEnt);
+        std::string_view nameview = (name != nullptr) ? std::string_view(name->m_name) : "untitled";
+        std::cout << "[" << scene.get_registry().entity(currentEnt)
+                     << "]: " << nameview << "\n";
 
         if (hier.m_childCount != 0)
         {

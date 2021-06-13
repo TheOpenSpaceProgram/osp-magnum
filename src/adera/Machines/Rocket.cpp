@@ -30,10 +30,11 @@
 #include "../Shaders/PlumeShader.h"
 
 #include <osp/Active/ActiveScene.h>
-#include <osp/Shaders/Phong.h>
+#include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/physics.h>
-#include "osp/PhysicsConstants.h"
+#include <osp/Shaders/Phong.h>
+#include <osp/PhysicsConstants.h>
 
 #include <iostream>
 
@@ -44,10 +45,12 @@ using adera::active::machines::MachineRocket;
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 using osp::active::ACompHierarchy;
+using osp::active::ACompName;
 using osp::active::EHierarchyTraverseStatus;
 using osp::active::ACompMachines;
 using osp::active::ACompRigidBody_t;
 using osp::active::ACompTransform;
+using osp::active::SysHierarchy;
 using osp::active::SysPhysics_t;
 
 using osp::active::ACompWirePanel;
@@ -258,9 +261,15 @@ void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt part,
 
     auto findPlumeHandle = [&rScene, &plumeNode](ActiveEnt ent)
     {
-        auto const& node = rScene.reg_get<ACompHierarchy>(ent);
-        static constexpr std::string_view nodePrefix = "fx_plume_";
-        if (0 == node.m_name.compare(0, nodePrefix.size(), nodePrefix))
+        static constexpr std::string_view namePrefix = "fx_plume_";
+        auto const* name = rScene.reg_try_get<ACompName>(ent);
+
+        if (nullptr == name)
+        {
+            return EHierarchyTraverseStatus::Continue;
+        }
+
+        if (0 == name->m_name.compare(0, namePrefix.size(), namePrefix))
         {
             plumeNode = ent;
             return EHierarchyTraverseStatus::Stop;  // terminate search
@@ -268,7 +277,7 @@ void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt part,
         return EHierarchyTraverseStatus::Continue;
     };
 
-    rScene.hierarchy_traverse(part, findPlumeHandle);
+    SysHierarchy::traverse(rScene, part, findPlumeHandle);
 
     if (plumeNode == entt::null)
     {
@@ -282,7 +291,7 @@ void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt part,
 
     // Get plume effect
     Package& pkg = rScene.get_application().debug_find_package("lzdb");
-    std::string_view plumeAnchorName = rScene.reg_get<ACompHierarchy>(plumeNode).m_name;
+    std::string_view plumeAnchorName = rScene.reg_get<ACompName>(plumeNode).m_name;
     std::string_view effectName = plumeAnchorName.substr(3, plumeAnchorName.length() - 3);
     DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
     if (plumeEffect.empty())
