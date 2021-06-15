@@ -29,9 +29,9 @@ std::pair<ActiveEnt, ACompRigidBody*> SysPhysics::find_rigidbody_ancestor(
     }
     while (pCurrHier->m_level != gc_heir_physics_level);
 
-    auto *body = rScene.get_registry().try_get<ACompRigidBody>(prevEnt);
+    auto *pBody = rScene.get_registry().try_get<ACompRigidBody>(prevEnt);
 
-    return {prevEnt, body};
+    return {prevEnt, pBody};
 }
 
 Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, ActiveEnt ent)
@@ -39,7 +39,6 @@ Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, A
     ActiveEnt prevEnt, currEnt = ent;
     ACompHierarchy *pCurrHier = nullptr;
     Matrix4 transform;
-
 
     do
     {
@@ -69,28 +68,28 @@ Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, A
 osp::active::ACompRigidbodyAncestor* SysPhysics::try_get_or_find_rigidbody_ancestor(
     ActiveScene& rScene, ActiveEnt childEntity)
 {
-    auto& reg = rScene.get_registry();
-    auto* pCompAncestor = reg.try_get<ACompRigidbodyAncestor>(childEntity);
+    ActiveReg_t &rReg = rScene.get_registry();
+    auto *pCompAncestor = rReg.try_get<ACompRigidbodyAncestor>(childEntity);
 
     // Perform first-time initialization of rigidbody ancestor component
     if (pCompAncestor == nullptr)
     {
-        auto [ent, compBody] = find_rigidbody_ancestor(rScene, childEntity);
-        if (compBody == nullptr)
+        auto [ent, pCompBody] = find_rigidbody_ancestor(rScene, childEntity);
+        if (pCompBody == nullptr)
         {
             // childEntity has no rigidbody ancestor
             return nullptr;
         }
 
-        reg.emplace<ACompRigidbodyAncestor>(childEntity);
+        rReg.emplace<ACompRigidbodyAncestor>(childEntity);
     }
     // childEntity now has an ACompRigidbodyAncestor
 
-    auto& rRbAncestor = reg.get<ACompRigidbodyAncestor>(childEntity);
+    auto& rRbAncestor = rReg.get<ACompRigidbodyAncestor>(childEntity);
     ActiveEnt& rAncestor = rRbAncestor.m_ancestor;
 
     // Ancestor entity already valid
-    if (reg.valid(rAncestor))
+    if (rReg.valid(rAncestor))
     {
         return &rRbAncestor;
     }

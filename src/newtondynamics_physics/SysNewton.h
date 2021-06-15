@@ -48,13 +48,13 @@ struct ACompNwtWorld
 
 struct ACompNwtBody
 {
-    constexpr ACompNwtBody(NewtonBody const* body) noexcept
-     : m_body(body) { }
+    constexpr ACompNwtBody(NewtonBody const* pBody) noexcept
+     : m_pBody(pBody) { }
 
-    constexpr NewtonBody const* body() const noexcept { return m_body; }
+    constexpr NewtonBody const* body() const noexcept { return m_pBody; }
 
 private:
-    NewtonBody const *m_body;
+    NewtonBody const *m_pBody;
 };
 
 /**
@@ -62,14 +62,14 @@ private:
  */
 struct ACompNwtCollider
 {
-    constexpr ACompNwtCollider(NewtonCollision const* collision) noexcept
-     : m_collision(collision) { }
+    constexpr ACompNwtCollider(NewtonCollision const* pCollision) noexcept
+     : m_pCollision(pCollision) { }
 
     constexpr NewtonCollision const* collision() const noexcept
-    { return m_collision; }
+    { return m_pCollision; }
 
 private:
-    NewtonCollision const *m_collision;
+    NewtonCollision const *m_pCollision;
 };
 
 class SysNewton
@@ -77,7 +77,7 @@ class SysNewton
 
 public:
 
-    static void add_functions(osp::active::ActiveScene &scene);
+    static void add_functions(osp::active::ActiveScene& rScene);
     
     static void update_world(osp::active::ActiveScene& rScene);
 
@@ -96,8 +96,6 @@ public:
             osp::active::ActiveEnt chunkEnt,
             TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end);
 
-
-
 private:
     /**
      * Search descendents for collider components and add NewtonCollisions to a
@@ -113,7 +111,7 @@ private:
     static void find_colliders_recurse(
             osp::active::ActiveScene& rScene, osp::active::ActiveEnt ent,
             osp::Matrix4 const &transform,
-            NewtonWorld const* nwtWorld, NewtonCollision *rCompound);
+            NewtonWorld const* pNwtWorld, NewtonCollision *rCompound);
 
     /**
      * Scan children of specified rigid body entity for ACompCollisionShapes,
@@ -125,7 +123,7 @@ private:
      */
     static void create_body(
             osp::active::ActiveScene& rScene, osp::active::ActiveEnt ent,
-            NewtonWorld const* nwtWorld);
+            NewtonWorld const* pNwtWorld);
 
     /**
      * Update the inertia properties of a rigid body
@@ -139,19 +137,19 @@ private:
             osp::active::ActiveScene& rScene, osp::active::ActiveEnt entity);
 
 
-    static void on_body_destruct(osp::active::ActiveReg_t& reg, osp::active::ActiveEnt ent);
-    static void on_shape_destruct(osp::active::ActiveReg_t& reg, osp::active::ActiveEnt ent);
-    static void on_world_destruct(osp::active::ActiveReg_t& reg, osp::active::ActiveEnt ent);
+    static void on_body_destruct(osp::active::ActiveReg_t& rReg, osp::active::ActiveEnt ent);
+    static void on_shape_destruct(osp::active::ActiveReg_t& rReg, osp::active::ActiveEnt ent);
+    static void on_world_destruct(osp::active::ActiveReg_t& rReg, osp::active::ActiveEnt ent);
 
     static NewtonCollision* newton_create_tree_collision(
-            const NewtonWorld *newtonWorld, int shapeId);
+            const NewtonWorld *pNewtonWorld, int shapeId);
     static void newton_tree_collision_add_face(
-            const NewtonCollision* treeCollision, int vertexCount,
+            const NewtonCollision* pTreeCollision, int vertexCount,
             const float* vertexPtr, int strideInBytes, int faceAttribute);
     static void newton_tree_collision_begin_build(
-            const NewtonCollision* treeCollision);
+            const NewtonCollision* pTreeCollision);
     static void newton_tree_collision_end_build(
-            const NewtonCollision* treeCollision,  int optimize);
+            const NewtonCollision* pTreeCollision,  int optimize);
 };
 
 template<class TRIANGLE_IT_T>
@@ -167,10 +165,10 @@ void SysNewton::shape_create_tri_mesh_static(
 
     using osp::Vector3;
 
-    ACompNwtWorld* nwtWorldComp = try_get_physics_world(rScene);
-    NewtonCollision* tree = newton_create_tree_collision(nwtWorldComp->m_nwtWorld, 0);
+    ACompNwtWorld* pNwtWorldComp = try_get_physics_world(rScene);
+    NewtonCollision const* pTree = newton_create_tree_collision(pNwtWorldComp->m_nwtWorld, 0);
 
-    newton_tree_collision_begin_build(tree);
+    newton_tree_collision_begin_build(pTree);
 
     Vector3 triangle[3];
 
@@ -180,16 +178,16 @@ void SysNewton::shape_create_tri_mesh_static(
         triangle[1] = *reinterpret_cast<Vector3 const*>((it + 1).position());
         triangle[2] = *reinterpret_cast<Vector3 const*>((it + 2).position());
 
-        newton_tree_collision_add_face(tree, 3,
+        newton_tree_collision_add_face(pTree, 3,
                                        reinterpret_cast<float*>(triangle),
                                        sizeof(float) * 3, 0);
 
     }
 
-    newton_tree_collision_end_build(tree, 2);
+    newton_tree_collision_end_build(pTree, 2);
 
     rShape.m_shape = osp::phys::ECollisionShape::TERRAIN;
-    rScene.reg_emplace<ACompNwtCollider>(chunkEnt, tree);
+    rScene.reg_emplace<ACompNwtCollider>(chunkEnt, pTree);
 }
 
 }
