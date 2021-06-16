@@ -87,8 +87,6 @@ class SysMachineRocket
 {
 public:
 
-    static void add_functions(osp::active::ActiveScene& rScene);
-
     /**
      * Constructs MachineRockets for vehicles in-construction
      *

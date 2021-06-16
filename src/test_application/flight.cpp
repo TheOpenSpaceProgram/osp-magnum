@@ -104,6 +104,8 @@ using osp::Matrix4;
 
 void load_shaders(osp::active::ActiveScene& rScene);
 
+void update_scene(osp::active::ActiveScene& rScene);
+
 void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
                  osp::OSPApplication& rOspApp, OSPMagnum::Arguments args)
 {
@@ -118,35 +120,10 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     config_controls(*pMagnumApp);
 
     // Create an ActiveScene
-    ActiveScene& rScene = pMagnumApp->scene_create("Area 1");
+    ActiveScene& rScene = pMagnumApp->scene_create("Area 1", &update_scene);
 
     // Setup hierarchy, initialize root entity
     SysHierarchy::setup(rScene);
-
-    // Add system functions needed for flight scene
-    ospnewton::SysNewton::add_functions(rScene);
-    osp::active::SysAreaAssociate::add_functions(rScene);
-    osp::active::SysVehicle::add_functions(rScene);
-    osp::active::SysFFGravity::add_functions(rScene);
-
-    adera::active::SysExhaustPlume::add_functions(rScene);
-
-    planeta::active::SysPlanetA::add_functions(rScene);
-  
-    testapp::SysCameraController::add_functions(rScene);
-
-    // Setup Machine systems
-    SysMachineContainer::add_functions(rScene);
-    SysMachineRCSController::add_functions(rScene);
-    SysMachineRocket::add_functions(rScene);
-    SysMachineUserControl::add_functions(rScene);
-
-    // Add user controls for SysMachineUserControl
-    // TODO: Eventually restructure MachineUserControl to instead have controls
-    //       as members that can be written to instead of listening directly
-    //       to a UserInputHandler
-    //rScene.reg_emplace<adera::active::machines::ACompUserControl>(
-    //            rScene.hier_get_root(), pMagnumApp->get_input_handler());
 
     // ##### Setup Wiring #####
 
@@ -163,18 +140,6 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
     rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
 
-    SysWire::add_functions(rScene);
-
-    // Add functions to wire vehicles when they're added to the scene
-    rScene.debug_update_add(
-            rScene.get_update_order(),
-            "wire_percent_construct", "vehicle_activate", "vehicle_modification",
-            &SysSignal<adera::wire::Percent>::signal_update_construct);
-    rScene.debug_update_add(
-            rScene.get_update_order(),
-            "wire_attctrl_construct", "vehicle_activate", "vehicle_modification",
-            &SysSignal<adera::wire::AttitudeControl>::signal_update_construct);
-
     // create a Satellite with an ActiveArea
     Satellite areaSat = rUni.sat_create();
 
@@ -184,8 +149,15 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Link ActiveArea to scene using the AreaAssociate
     osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
 
-    // Add default-constructed physics world to scene
+    // Setup Newton dynamics physics
+    ospnewton::SysNewton::setup(rScene);
+
+    // Add default-constructed Newton physics world to scene
     rScene.reg_emplace<ospnewton::ACompNwtWorld>(rScene.hier_get_root());
+
+    // workaround: update the scene right away to initialize physics world
+    //             needed by planets for now
+    ospnewton::SysNewton::update_world(rScene);
 
     // ##### Add a camera to the scene #####
 
@@ -237,6 +209,77 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // destruct the application, this closes the window
     pMagnumApp.reset();
+}
+
+void update_scene(osp::active::ActiveScene& rScene)
+{
+    using namespace osp::active;
+    using namespace adera::active;
+    using namespace planeta::active;
+
+    SysCameraController::update_area(rScene);
+
+    // Search Universe for nearby activatable Satellites
+    SysAreaAssociate::update_scan(rScene);
+
+    // Activate or deactivate nearby planets
+    ospnewton::SysNewton::update_world(rScene);
+    SysPlanetA::update_activate(rScene);
+
+    // Activate or deactivate nearby vehicles
+    SysVehicle::update_activate(rScene);
+
+    // Construct components of vehicles. These should be parallelizable
+    SysMachineContainer::update_construct(rScene);
+    SysMachineRCSController::update_construct(rScene);
+    SysMachineRocket::update_construct(rScene);
+    SysMachineUserControl::update_construct(rScene);
+    SysSignal<adera::wire::Percent>::signal_update_construct(rScene);
+    SysSignal<adera::wire::AttitudeControl>::signal_update_construct(rScene);
+
+    // CameraController may tamper with vehicles for debugging reasons
+    SysCameraController::update_vehicle(rScene);
+
+    // Update changed vehicles
+    SysVehicle::update_vehicle_modification(rScene);
+
+    // Write controls into selected vehicle
+    SysCameraController::update_controls(rScene);
+
+    // UserControl reads possibly changed values written by CameraController
+    SysMachineUserControl::update_sensor(rScene);
+
+    // Update wires
+    SysWire::update_wire(rScene);
+
+    // Rockets apply thrust
+    SysMachineRocket::update_physics(rScene);
+
+    // Apply gravity forces
+    SysFFGravity::update_force(rScene);
+
+    // Planets update geometry
+    SysPlanetA::update_geometry(rScene);
+
+    // Containers update mass
+    SysMachineContainer::update_containers(rScene);
+
+    // ** Physics update **
+    ospnewton::SysNewton::update_world(rScene);
+
+    // Update rocket plume effects
+    SysExhaustPlume::update_plumes(rScene);
+
+    // Move the camera
+    // TODO: move this into a drawing function, since interpolation in the
+    //       future may mean multiple frames drawn between physics frames
+    SysCameraController::update_view(rScene);
+
+    // Add ACompDelete to descendents of hierarchy entities with ACompDelete
+    SysHierarchy::update_delete(rScene);
+
+    // Delete entities with ACompDelete
+    ActiveScene::update_delete(rScene);
 }
 
 void load_shaders(osp::active::ActiveScene& rScene)

@@ -80,8 +80,6 @@ class SysVehicle
 {
 public:
 
-    static void add_functions(ActiveScene &rScene);
-
     static ActiveEnt activate(ActiveScene &rScene, universe::Universe &rUni,
                               universe::Satellite areaSat,
                               universe::Satellite tgtSat);

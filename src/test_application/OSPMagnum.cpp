@@ -76,16 +76,18 @@ void OSPMagnum::drawEvent()
 
     m_userInput.update_controls();
 
-    for (auto &[name, scene] : m_scenes)
+    for (auto &[name, entry] : m_scenes)
     {
-        scene.update();
+        auto &[rScene, updateFunc] = entry;
+        updateFunc(rScene);
     }
 
     m_userInput.clear_events();
 
-    for (auto &[name, scene] : m_scenes)
+    for (auto &[name, entry] : m_scenes)
     {
-        scene.draw();
+        auto &[rScene, updateFunc] = entry;
+        rScene.draw();
     }
 
 
@@ -134,18 +136,21 @@ void OSPMagnum::mouseScrollEvent(MouseScrollEvent & event)
     m_userInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 }
 
-osp::active::ActiveScene& OSPMagnum::scene_create(std::string const& name)
+osp::active::ActiveScene& OSPMagnum::scene_create(std::string const& name, SceneUpdate_t upd)
 {
     auto const& [it, success] =
-        m_scenes.try_emplace(name, m_ospApp, m_glResources);
-    return it->second;
+        m_scenes.try_emplace(
+            name, osp::active::ActiveScene{m_ospApp, m_glResources}, upd);
+    return it->second.first;
 }
 
-osp::active::ActiveScene& OSPMagnum::scene_create(std::string && name)
+osp::active::ActiveScene& OSPMagnum::scene_create(std::string && name, SceneUpdate_t upd)
 {
     auto const& [it, success] =
-        m_scenes.try_emplace(std::move(name), m_ospApp, m_glResources);
-    return it->second;
+        m_scenes.try_emplace(
+            std::move(name),
+            osp::active::ActiveScene{m_ospApp, m_glResources}, upd);
+    return it->second.first;
 }
 
 void testapp::config_controls(OSPMagnum& rOspApp)

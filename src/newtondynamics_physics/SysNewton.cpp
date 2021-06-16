@@ -84,12 +84,8 @@ void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
     rBody.m_netTorque = {0.0f, 0.0f, 0.0f};
 }
 
-void SysNewton::add_functions(ActiveScene &rScene)
+void SysNewton::setup(ActiveScene &rScene)
 {
-    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                      "Initing Sysnewton");
-    rScene.debug_update_add(rScene.get_update_order(), "physics", "wire", "",
-                            &SysNewton::update_world);
 
     // Connect signal handlers to destruct Newton objects when components are
     // deleted.

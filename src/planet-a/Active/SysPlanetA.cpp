@@ -80,16 +80,6 @@ using namespace Magnum::Math::Literals;
 
 using osp::universe::Satellite;
 
-void SysPlanetA::add_functions(osp::active::ActiveScene &rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "planet_activate", "", "planet_geo",
-                            &SysPlanetA::update_activate);
-    rScene.debug_update_add(rScene.get_update_order(), "planet_geo", "", "physics",
-                            &SysPlanetA::update_geometry );
-    rScene.debug_update_add(rScene.get_update_order(), "planet_phys", "planet_geo", "",
-                            &SysPlanetA::update_physics);
-}
-
 ActiveEnt SysPlanetA::activate(
             osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
             osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat)

@@ -63,8 +63,6 @@ class SysFFGravity : public SysForceField
 {
 public:
 
-    static void add_functions(ActiveScene& rScene);
-
     static void update_force(ActiveScene& rScene);
 };
 

@@ -40,7 +40,6 @@
 #include <Magnum/GL/RenderbufferFormat.h>
 
 using osp::active::SysRender;
-using osp::active::RenderOrder_t;
 using osp::active::RenderPipeline;
 
 void SysRender::setup(ActiveScene& rScene)
@@ -110,12 +109,10 @@ void SysRender::setup(ActiveScene& rScene)
 RenderPipeline SysRender::create_forward_renderer()
 {
     /* Define render passes */
-    RenderOrder_t pipeline;
-    std::vector<RenderOrderHandle_t> handles;
+    RenderSteps_t pipeline;
 
     // Opaque pass
-    handles.emplace_back(pipeline,
-        "opaque_pass", "", "transparent_pass",
+    pipeline.emplace_back(
         [](ActiveScene& rScene, ACompCamera const& camera)
         {
             using namespace Magnum;
@@ -135,8 +132,7 @@ RenderPipeline SysRender::create_forward_renderer()
     );
 
     // Transparent pass
-    handles.emplace_back(pipeline,
-        "transparent_pass", "opaque_pass", "display_framebuffer",
+    pipeline.emplace_back(
         [](osp::active::ActiveScene& rScene, ACompCamera const& camera)
         {
             using Magnum::GL::Renderer;
@@ -163,7 +159,7 @@ RenderPipeline SysRender::create_forward_renderer()
         }
     );
 
-    return {pipeline};
+    return {std::move(pipeline)};
 }
 
 osp::active::ActiveEnt SysRender::get_default_rendertarget(ActiveScene& rScene)

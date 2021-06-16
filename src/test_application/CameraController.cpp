@@ -62,23 +62,6 @@ using osp::Quaternion;
 using osp::Vector3;
 using osp::Vector3s;
 
-void SysCameraController::add_functions(osp::active::ActiveScene &rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "cam_vehicle", "", "vehicle_modification",
-                            &SysCameraController::update_vehicle);
-
-    rScene.debug_update_add(rScene.get_update_order(), "cam_controls", "", "wire",
-                            &SysCameraController::update_controls);
-
-    rScene.debug_update_add(rScene.get_update_order(), "cam_area", "", "areascan",
-                            &SysCameraController::update_area);
-
-    // TODO: find a better way to make this run just before world transforms
-    //       are calculated
-    rScene.debug_update_add(rScene.get_update_order(), "cam_view", "", "",
-                            &SysCameraController::update_view);
-}
-
 std::pair<ActiveEnt, ACompCameraController&>
 SysCameraController::get_camera_controller(ActiveScene &rScene)
 {

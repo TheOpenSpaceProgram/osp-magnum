@@ -73,13 +73,6 @@ using osp::NodeMap_t;
 using osp::Matrix4;
 using osp::Vector3;
 
-void SysMachineRocket::add_functions(ActiveScene &rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "mach_rocket", "controls", "physics",
-                            &SysMachineRocket::update_physics);
-    rScene.debug_update_add(rScene.get_update_order(), "mach_rocket_construct", "vehicle_activate", "vehicle_modification",
-                            &SysMachineRocket::update_construct);
-}
 
 void SysMachineRocket::update_construct(ActiveScene& rScene)
 {

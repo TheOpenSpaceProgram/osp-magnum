@@ -68,11 +68,6 @@ using osp::NodeMap_t;
 using osp::Matrix4;
 using osp::Vector3;
 
-void SysMachineRCSController::add_functions(ActiveScene& rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "mach_rcs_construct", "vehicle_activate", "vehicle_modification",
-                            &SysMachineRCSController::update_construct);
-}
 
 float SysMachineRCSController::thruster_influence(Vector3 posOset, Vector3 direction,
     Vector3 cmdTransl, Vector3 cmdRot)

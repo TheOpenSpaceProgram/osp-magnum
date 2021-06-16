@@ -86,7 +86,6 @@ void debug_print_help();
 void debug_print_resources();
 void debug_print_sats();
 void debug_print_hier();
-void debug_print_update_order();
 void debug_print_machines();
 
 // Deals with the underlying OSP universe, with the satellites and stuff. A
@@ -216,10 +215,6 @@ int debug_cli_loop()
         else if (command == "list_mach")
         {
             debug_print_machines();
-        }
-        else if (command == "list_upd")
-        {
-            debug_print_update_order();
         }
         else if (command == "exit")
         {
@@ -418,24 +413,6 @@ void debug_print_resources()
     }
 }
 
-void debug_print_update_order()
-{
-    if (!g_ospMagnum)
-    {
-        std::cout << "Can't do that yet, start the magnum application first!\n";
-        return;
-    }
-
-    osp::active::UpdateOrder_t const &order = g_ospMagnum->get_scenes().begin()
-                                              ->second.get_update_order();
-
-    std::cout << "Update order:\n";
-    for (auto const& call : order.get_call_list())
-    {
-        std::cout << "* " << call.m_name << "\n";
-    }
-}
-
 void debug_print_machines()
 {
     using osp::active::ACompHierarchy;
@@ -461,7 +438,7 @@ void debug_print_machines()
     }
 
     // Loop through every Vehicle
-    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second;
+    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second.first;
     auto view = scene.get_registry().view<const ACompMachines>();
 
     for (ActiveEnt ent : view)
@@ -496,7 +473,7 @@ void debug_print_hier()
     std::cout << "ActiveScene Entity Hierarchy:\n";
 
     std::vector<ActiveEnt> parentNextSibling;
-    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second;
+    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second.first;
     ActiveEnt currentEnt = scene.hier_get_root();
 
     parentNextSibling.reserve(16);
@@ -512,7 +489,7 @@ void debug_print_hier()
         }
         auto const *name = scene.get_registry().try_get<osp::active::ACompName>(currentEnt);
         std::string_view nameview = (name != nullptr) ? std::string_view(name->m_name) : "untitled";
-        std::cout << "[" << scene.get_registry().entity(currentEnt)
+        std::cout << "[" << uint32_t(scene.get_registry().entity(currentEnt))
                      << "]: " << nameview << "\n";
 
         if (hier.m_childCount != 0)

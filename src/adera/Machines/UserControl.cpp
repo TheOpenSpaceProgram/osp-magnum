@@ -61,14 +61,6 @@ using osp::machine_id_t;
 using osp::NodeMap_t;
 using osp::Vector3;
 
-void SysMachineUserControl::add_functions(ActiveScene &rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "mach_usercontrol", "", "wire",
-                            &SysMachineUserControl::update_sensor);
-    rScene.debug_update_add(rScene.get_update_order(), "mach_usercontrol_construct", "vehicle_activate", "vehicle_modification",
-                            &SysMachineUserControl::update_construct);
-}
-
 void SysMachineUserControl::update_construct(ActiveScene &rScene)
 {
     auto view = rScene.get_registry()

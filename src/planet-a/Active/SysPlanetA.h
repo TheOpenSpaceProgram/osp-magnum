@@ -53,8 +53,6 @@ class SysPlanetA
 {
 public:
 
-    static void add_functions(osp::active::ActiveScene& rScene);
-
     static osp::active::ActiveEnt activate(
             osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
             osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat);

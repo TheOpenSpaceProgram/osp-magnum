@@ -104,8 +104,6 @@ class SysCameraController
 {
 public:
 
-    static void add_functions(osp::active::ActiveScene &rScene);
-
     static std::pair<osp::active::ActiveEnt, ACompCameraController&>
     get_camera_controller(osp::active::ActiveScene& rScene);
 

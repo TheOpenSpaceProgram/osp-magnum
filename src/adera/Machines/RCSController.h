@@ -46,8 +46,6 @@ class SysMachineRCSController
 {
 public:
 
-    static void add_functions(osp::active::ActiveScene& rScene);
-
     /**
      * Constructs MachineRCSControllers for vehicles in-construction
      *

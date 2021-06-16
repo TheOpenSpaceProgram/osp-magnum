@@ -44,6 +44,8 @@ struct ACompTransformControlled { };
 
 struct ACompTransformMutable{ bool m_dirty{false}; };
 
+struct ACompFloatingOrigin { };
+
 /**
  * Added to an entity to mark it for deletion
  */

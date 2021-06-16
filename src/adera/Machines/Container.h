@@ -37,8 +37,6 @@ class SysMachineContainer
 {
 public:
 
-    static void add_functions(osp::active::ActiveScene& rScene);
-
     /**
      * Constructs MachineContainer for vehicles in-construction
      *

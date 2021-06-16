@@ -40,22 +40,12 @@ void ACompCamera::calculate_projection()
 }
 
 
-ActiveScene::ActiveScene(OSPApplication &app, Package& context) :
-        m_app(app),
-        m_context(context)
+ActiveScene::ActiveScene(OSPApplication& rApp, Package& rContext)
+ : m_app(rApp)
+ , m_context(rContext)
 {
     // Create the root entity
     m_root = m_registry.create();
-}
-
-void ActiveScene::update()
-{
-    m_updateOrder.call(*this);
-
-    // TODO: FunctionOrder is way too inconvenient to deal with, so for now the
-    //       delete systems are called here
-    SysHierarchy::update_delete(*this);
-    update_delete(*this);
 }
 
 void ActiveScene::draw()
@@ -82,7 +72,10 @@ void ActiveScene::draw()
 
         rCamera.m_inverse = cameraDrawTf.m_transformWorld.inverted();
 
-        render->m_order.call(*this, rCamera);
+        for (RenderStep_t step : render->m_order)
+        {
+            step(*this, rCamera);
+        }
     }
 
     SysRender::display_default_rendertarget(*this);
