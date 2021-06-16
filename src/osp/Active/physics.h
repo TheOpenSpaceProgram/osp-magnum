@@ -24,6 +24,50 @@
  */
 #pragma once
 
-// in case Newton Dynamics gets swapped out, one can implement a system class
-// with all the same methods
-#include "SysNewton.h"
+#include "../CommonPhysics.h"
+#include "activetypes.h"
+
+namespace osp::active
+{
+
+/**
+ * Generic Rigid Body physics data
+ *
+ * TODO: possibly split into more components when the time comes
+ */
+struct ACompRigidBody
+{
+    // Modify these
+    Vector3 m_inertia{1, 1, 1};
+    Vector3 m_netForce{0, 0, 0};
+    Vector3 m_netTorque{0, 0, 0};
+
+    float m_mass{1.0f};
+    Vector3 m_velocity{0, 0, 0};
+    Vector3 m_rotVelocity{0, 0, 0};
+    Vector3 m_centerOfMassOffset{0, 0, 0};
+
+    bool m_colliderDirty{false}; // set true if collider is modified
+    bool m_inertiaDirty{false}; // set true if rigidbody is modified
+};
+
+struct ACompRigidbodyAncestor
+{
+    ActiveEnt m_ancestor{entt::null};
+    Matrix4 m_relTransform{};
+};
+
+/**
+ * Represents the shape of an entity
+ */
+struct ACompShape
+{
+    phys::ECollisionShape m_shape{phys::ECollisionShape::NONE};
+};
+
+/**
+ * For entities that are solid colliders for rigid bodies. Relies on ACompShape
+ */
+struct ACompSolidCollider { };
+
+}

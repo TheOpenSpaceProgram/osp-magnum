@@ -27,8 +27,7 @@
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/SysMachine.h>
-#include <osp/Active/physics.h>
-#include <osp/Active/SysNewton.h>
+#include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysAreaAssociate.h>
 
 #include <osp/Satellites/SatVehicle.h>
@@ -250,9 +249,9 @@ void DebugCameraController::update_physics_post()
     Matrix4 &xform = m_scene.reg_get<ACompTransform>(m_ent).m_transform;
     Matrix4 const& xformTgt = m_scene.reg_get<ACompTransform>(vehicle).m_transform;
 
-    using osp::active::SysPhysics_t;
+    using osp::active::SysPhysics;
     // Compute Center of Mass of target, if it's a rigid body
-    auto [rbEnt, pCompRb] = SysPhysics_t::find_rigidbody_ancestor(m_scene, vehicle);
+    auto [rbEnt, pCompRb] = SysPhysics::find_rigidbody_ancestor(m_scene, vehicle);
     Vector3 comOset{0.0f};
     if (pCompRb != nullptr)
     {

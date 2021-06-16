@@ -26,6 +26,7 @@
 #include "RCSController.h"
 
 #include <osp/Active/ActiveScene.h>
+#include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/physics.h>
 
@@ -42,9 +43,9 @@ using adera::wire::AttitudeControl;
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 using osp::active::ACompMachines;
-using osp::active::ACompRigidBody_t;
+using osp::active::ACompRigidBody;
 using osp::active::ACompTransform;
-using osp::active::SysPhysics_t;
+using osp::active::SysPhysics;
 
 using osp::active::ACompWirePanel;
 using osp::active::ACompWireNodes;
@@ -180,9 +181,9 @@ void SysMachineRCSController::update_calculate(ActiveScene& rScene)
 
                 // Get rigidbody ancestor and its transformation component
                 auto const *pRbAncestor
-                        = SysPhysics_t::try_get_or_find_rigidbody_ancestor(
+                        = SysPhysics::try_get_or_find_rigidbody_ancestor(
                             rScene, ent);
-                auto const &compRb = rScene.reg_get<ACompRigidBody_t>(
+                auto const &compRb = rScene.reg_get<ACompRigidBody>(
                             pRbAncestor->m_ancestor);
                 auto const &compTf = rScene.reg_get<ACompTransform>(
                             pRbAncestor->m_ancestor);

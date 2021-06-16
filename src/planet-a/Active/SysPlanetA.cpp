@@ -27,6 +27,7 @@
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysRender.h>
 #include <osp/Universe.h>
 #include <osp/string_concat.h>
@@ -35,6 +36,10 @@
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
+
+// TODO: Decouple when a proper interface for creating static triangle meshes
+//       is made
+#include <newtondynamics_physics/SysNewton.h>
 
 #include <iostream>
 
@@ -47,15 +52,17 @@ using osp::active::ACompCamera;
 using osp::active::ACompTransform;
 using osp::active::ACompDrawTransform;
 using osp::active::ACompFloatingOrigin;
-using osp::active::ACompRigidBody_t;
+using osp::active::ACompRigidBody;
 using osp::active::ACompFFGravity;
 using osp::active::ACompShape;
-using osp::active::ACompCollider;
+using osp::active::ACompSolidCollider;
 using osp::active::ACompAreaLink;
 using osp::active::ACompActivatedSat;
+
 using osp::active::SysHierarchy;
 using osp::active::SysAreaAssociate;
-using osp::active::SysPhysics_t;
+using osp::active::SysPhysics;
+using osp::active::SysNewton;
 
 using osp::universe::Universe;
 using osp::universe::Satellite;
@@ -130,26 +137,23 @@ void SysPlanetA::debug_create_chunk_collider(
     using osp::phys::ECollisionShape;
 
     // Create entity and required components
-    ActiveEnt fish = SysHierarchy::create_child(rScene, rScene.hier_get_root());
-    auto &fishTransform = rScene.reg_emplace<ACompTransform>(fish);
-    auto &fishShape = rScene.reg_emplace<ACompShape>(fish);
-    auto &fishCollide = rScene.reg_emplace<ACompCollider>(fish);
-    auto &fishBody = rScene.reg_emplace<ACompRigidBody_t>(fish);
-    rScene.reg_emplace<ACompFloatingOrigin>(fish);
+    ActiveEnt chunkEnt = SysHierarchy::create_child(rScene, rScene.hier_get_root());
+    auto &chunkTransform = rScene.reg_emplace<ACompTransform>(chunkEnt);
+    auto &chunkShape = rScene.reg_emplace<ACompShape>(chunkEnt);
+    rScene.reg_emplace<ACompSolidCollider>(chunkEnt);
+    rScene.reg_emplace<ACompRigidBody>(chunkEnt);
+    rScene.reg_emplace<ACompFloatingOrigin>(chunkEnt);
 
     // Set some stuff
-    fishShape.m_shape = ECollisionShape::TERRAIN;
-    fishTransform.m_transform = rScene.reg_get<ACompTransform>(ent).m_transform;
+    chunkShape.m_shape = ECollisionShape::TERRAIN;
+    chunkTransform.m_transform = rScene.reg_get<ACompTransform>(ent).m_transform;
 
     // Get triangle iterators to start and end triangles of the specified chunk
     auto itsChunk = planet.m_planet->iterate_chunk(chunk);
 
     // Send them to the physics engine
-    SysPhysics_t::shape_create_tri_mesh_static(rScene, fishShape, fishCollide,
-                                         itsChunk.first, itsChunk.second);
-
-    // create the rigid body
-    //physics.create_body(fish);
+    ospnewton::SysNewton::shape_create_tri_mesh_static(
+                rScene, chunkShape, chunkEnt, itsChunk.first, itsChunk.second);
 }
 
 void SysPlanetA::update_activate(ActiveScene &rScene)

@@ -31,6 +31,7 @@
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/physics.h>
 #include <osp/Shaders/Phong.h>
@@ -48,10 +49,10 @@ using osp::active::ACompHierarchy;
 using osp::active::ACompName;
 using osp::active::EHierarchyTraverseStatus;
 using osp::active::ACompMachines;
-using osp::active::ACompRigidBody_t;
+using osp::active::ACompRigidBody;
 using osp::active::ACompTransform;
 using osp::active::SysHierarchy;
-using osp::active::SysPhysics_t;
+using osp::active::SysPhysics;
 
 using osp::active::ACompWirePanel;
 using osp::active::ACompWireNodes;
@@ -204,8 +205,8 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
 
         // Get rigidbody ancestor and its transformation component
         auto const* pRbAncestor =
-            SysPhysics_t::try_get_or_find_rigidbody_ancestor(rScene, ent);
-        auto& rCompRb = rScene.reg_get<ACompRigidBody_t>(pRbAncestor->m_ancestor);
+            SysPhysics::try_get_or_find_rigidbody_ancestor(rScene, ent);
+        auto& rCompRb = rScene.reg_get<ACompRigidBody>(pRbAncestor->m_ancestor);
         auto const& rCompTf = rScene.reg_get<ACompTransform>(pRbAncestor->m_ancestor);
 
         Matrix4 relTransform = pRbAncestor->m_relTransform;
@@ -219,14 +220,14 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         // Take thrust in rigidbody space and apply to RB in world space
         Vector3 thrust = thrustMag * thrustDir;
         Vector3 worldThrust = rCompTf.m_transform.transformVector(thrust);
-        SysPhysics_t::body_apply_force(rCompRb, worldThrust);
+        SysPhysics::body_apply_force(rCompRb, worldThrust);
 
         // Obtain point where thrust is applied relative to RB CoM
         Vector3 location = relTransform.translation();
         // Compute worldspace torque from engine location, thrust vector
         Vector3 torque = Magnum::Math::cross(location, thrust);
         Vector3 worldTorque = rCompTf.m_transform.transformVector(torque);
-        SysPhysics_t::body_apply_torque(rCompRb, worldTorque);
+        SysPhysics::body_apply_torque(rCompRb, worldTorque);
         
         rCompRb.m_inertiaDirty = true;
 

@@ -62,26 +62,6 @@ enum class ECollisionShape : uint8_t
  */
 float shape_volume(ECollisionShape shape, Vector3 scale);
 
-// Formerly SysNewton
-/**
- * Generic rigid body state
- */
-struct DataRigidBody
-{
-    // Modify these
-    Vector3 m_inertia{1, 1, 1};
-    Vector3 m_netForce{0, 0, 0};
-    Vector3 m_netTorque{0, 0, 0};
-
-    float m_mass{1.0f};
-    Vector3 m_velocity{0, 0, 0};
-    Vector3 m_rotVelocity{0, 0, 0};
-    Vector3 m_centerOfMassOffset{0, 0, 0};
-
-    bool m_colliderDirty{false}; // set true if collider is modified
-    bool m_inertiaDirty{false}; // set true if rigidbody is modified
-};
-
 /**
  * Transform an inertia tensor
  *

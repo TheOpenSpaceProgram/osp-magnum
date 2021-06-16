@@ -24,8 +24,9 @@
  */
 #include "ActiveScene.h"
 #include "SysHierarchy.h"
-#include "SysVehicle.h"
+#include "SysPhysics.h"
 #include "SysRender.h"
+#include "SysVehicle.h"
 #include "physics.h"
 
 #include "../Satellites/SatActiveArea.h"
@@ -157,9 +158,9 @@ ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
 
 
     // temporary: make the whole thing a single rigid body
-    auto& vehicleBody = rScene.reg_emplace<ACompRigidBody_t>(vehicleEnt);
+    auto& vehicleBody = rScene.reg_emplace<ACompRigidBody>(vehicleEnt);
     rScene.reg_emplace<ACompShape>(vehicleEnt, phys::ECollisionShape::COMBINED);
-    rScene.reg_emplace<ACompCollider>(vehicleEnt, nullptr);
+    rScene.reg_emplace<ACompSolidCollider>(vehicleEnt);
 
     return vehicleEnt;
 }
@@ -293,7 +294,7 @@ ActiveEnt SysVehicle::part_instantiate(
     {
         ActiveEnt currentEnt = newEntities[pcompCollider.m_entity];
         ACompShape& collision = rScene.reg_emplace<ACompShape>(currentEnt);
-        rScene.reg_emplace<ACompCollider>(currentEnt);
+        rScene.reg_emplace<ACompSolidCollider>(currentEnt);
         collision.m_shape = pcompCollider.m_shape;
     }
 
@@ -316,7 +317,7 @@ ActiveEnt SysVehicle::part_instantiate(
         if (auto const* shape = rScene.reg_try_get<ACompShape>(ent);
             shape != nullptr)
         {
-            if (!rScene.get_registry().all_of<ACompCollider>(ent))
+            if (!rScene.get_registry().all_of<ACompSolidCollider>(ent))
             {
                 return EHierarchyTraverseStatus::Continue;
             }
@@ -427,7 +428,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             // Separation requested
 
             // mark collider as dirty
-            auto &rVehicleBody = rScene.reg_get<ACompRigidBody_t>(vehicleEnt);
+            auto &rVehicleBody = rScene.reg_get<ACompRigidBody>(vehicleEnt);
             rVehicleBody.m_colliderDirty = true;
 
             // Invalidate all ACompRigidbodyAncestors
@@ -458,11 +459,10 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                         = rScene.reg_emplace<ACompTransform>(islandEnt);
                 rScene.reg_emplace<ACompDrawTransform>(islandEnt);
                 auto &islandBody
-                        = rScene.reg_emplace<ACompRigidBody_t>(islandEnt);
+                        = rScene.reg_emplace<ACompRigidBody>(islandEnt);
                 auto &islandShape
                         = rScene.reg_emplace<ACompShape>(islandEnt);
-                auto &islandCollider
-                        = rScene.reg_emplace<ACompCollider>(islandEnt, nullptr);
+                rScene.reg_emplace<ACompSolidCollider>(islandEnt);
                 islandShape.m_shape = phys::ECollisionShape::COMBINED;
 
                 auto &vehicleTransform = rScene.reg_get<ACompTransform>(vehicleEnt);
