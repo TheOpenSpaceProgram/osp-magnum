@@ -53,7 +53,7 @@
 
 #include <osp/Shaders/Phong.h>
 #include <osp/Shaders/FullscreenTriShader.h>
-#include <Magnum/Shaders/MeshVisualizer.h>
+#include <Magnum/Shaders/MeshVisualizerGL.h>
 
 #include <newtondynamics_physics/SysNewton.h>
 
@@ -243,12 +243,12 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 void load_shaders(osp::active::ActiveScene& rScene)
 {
     using adera::shader::PlumeShader;
-    using Magnum::Shaders::MeshVisualizer3D;
+    using Magnum::Shaders::MeshVisualizerGL3D;
     auto& resources = rScene.get_context_resources();
 
     resources.add<PlumeShader>("plume_shader");
 
-    resources.add<MeshVisualizer3D>("mesh_vis_shader",
-        MeshVisualizer3D{MeshVisualizer3D::Flag::Wireframe
-        | MeshVisualizer3D::Flag::NormalDirection});
+    resources.add<MeshVisualizerGL3D>("mesh_vis_shader",
+        MeshVisualizerGL3D{MeshVisualizerGL3D::Flag::Wireframe
+        | MeshVisualizerGL3D::Flag::NormalDirection});
 }

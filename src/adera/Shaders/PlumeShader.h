@@ -32,7 +32,7 @@
 #include <Magnum/Math/Matrix3.h>
 #include <Magnum/Math/Matrix4.h>
 #include <Magnum/Math/Color.h>
-#include <Magnum/Shaders/Generic.h>
+#include <Magnum/Shaders/GenericGL.h>
 
 #include "adera/Plume.h"
 #include <osp/Resource/Resource.h>
@@ -46,9 +46,9 @@ class PlumeShader : public Magnum::GL::AbstractShaderProgram
 {
 public:
     // Vertex attribs
-    Magnum::Shaders::Generic3D::Position Position;
-    Magnum::Shaders::Generic3D::Normal Normal;
-    Magnum::Shaders::Generic3D::TextureCoordinates TextureCoordinates;
+    Magnum::Shaders::GenericGL3D::Position Position;
+    Magnum::Shaders::GenericGL3D::Normal Normal;
+    Magnum::Shaders::GenericGL3D::TextureCoordinates TextureCoordinates;
 
     // Outputs
     enum : Magnum::UnsignedInt
