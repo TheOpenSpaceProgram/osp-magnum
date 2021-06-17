@@ -39,13 +39,16 @@ namespace osp
  * function simply returns the parameter.
  *
  * If the parameter is neither a char* or char[], then return
- * the result of calling the parameters .data() function.
- *
- * If the parameter has no .data() function, a compile error results.
+ * the result of calling std::data() on the parameter.
  *
  * The returned pointer provides no guarantee on the string being nul
  * terminated. Always use string_data() with string_size() to ensure
  * no out of bounds data access occurs.
+ *
+ * Note that it's important that the str parameter not be taken as const&,
+ * but instead as a forwarding/universal reference. If the parameter were const&
+ * then std::data() would return a const pointer, instead of a pointer that's
+ * const conditionally based on whether the passed in object is const.
  */
 template<class STRING_T>
 constexpr auto string_data(STRING_T && str)

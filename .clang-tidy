@@ -1,0 +1,17 @@
+---
+Checks: '
+	,clang-diagnostic-*,
+	,clang-analyzer-*,
+	,bugprone-*,
+	,performance-*,
+	,readability-*,
+	,modernize-*,
+	,-modernize-use-trailing-return-type,
+	,-modernize-use-auto,
+	,-readability-uppercase-literal-suffix,
+	,-readability-magic-numbers,
+	,-clang-analyzer-cplusplus.InnerPointer,
+	,-cplusplus.InnerPointer,
+'
+WarningsAsErrors: '
+'

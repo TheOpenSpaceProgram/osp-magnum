@@ -151,8 +151,7 @@ if(OSP_ENABLE_CLANG_TIDY)
   if(tidy_path)
       set_property(TARGET osp-magnum
                    PROPERTY
-                   CXX_CLANG_TIDY ${tidy_path}
-                   --checks="clang-diagnostic-*,clang-analyzer-*,bugprone-*,performance-*,readability-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-auto,-readability-uppercase-literal-suffix")
+                   CXX_CLANG_TIDY ${tidy_path})
   endif()
 endif()
 
