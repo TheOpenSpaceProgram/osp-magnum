@@ -35,7 +35,8 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Renderer.h>
-#include <Magnum/GL/DefaultFramebuffer.h>
+#include <Magnum/GL/DefaultFrameBuffer.h>
+#include <Magnum/Shaders/MeshVisualizerGL.h>
 
 // TODO: Decouple when a proper interface for creating static triangle meshes
 //       is made
@@ -232,8 +233,8 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             {
                 using namespace Magnum;
                 auto& glResources = rScene.get_context_resources();
-                osp::DependRes<Shaders::MeshVisualizer3D> shader =
-                    glResources.get<Shaders::MeshVisualizer3D>("mesh_vis_shader");
+                osp::DependRes<Shaders::MeshVisualizerGL3D> shader =
+                    glResources.get<Shaders::MeshVisualizerGL3D>("mesh_vis_shader");
 
                 auto& planet = rScene.reg_get<ACompPlanet>(e);
                 auto& drawTf = rScene.reg_get<ACompDrawTransform>(e);
@@ -283,15 +284,15 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
 
             rPlanetGeo.updates_clear();
 
-            using Magnum::Shaders::MeshVisualizer3D;
+            using Magnum::Shaders::MeshVisualizerGL3D;
             using Magnum::GL::MeshPrimitive;
             using Magnum::GL::MeshIndexType;
 
             (*planet.m_mesh)
                 .setPrimitive(MeshPrimitive::Triangles)
                 .addVertexBuffer(planet.m_vrtxBufGL, 0,
-                                 MeshVisualizer3D::Position{},
-                                 MeshVisualizer3D::Normal{})
+                                 MeshVisualizerGL3D::Position{},
+                                 MeshVisualizerGL3D::Normal{})
                 .setIndexBuffer(planet.m_indxBufGL, 0,
                                 MeshIndexType::UnsignedInt)
                 .setCount(rPlanetGeo.calc_index_count());

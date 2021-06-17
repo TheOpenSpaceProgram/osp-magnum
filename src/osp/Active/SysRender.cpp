@@ -54,7 +54,7 @@ void SysRender::setup(ActiveScene& rScene)
     resources.add<FullscreenTriShader>("fullscreen_tri_shader");
 
     resources.add<Phong>("phong_shader",
-        Phong{Magnum::Shaders::Phong::Flag::DiffuseTexture});
+        Phong{Magnum::Shaders::PhongGL::Flag::DiffuseTexture});
 
     /* Generate fullscreen tri for texture rendering */
     {
