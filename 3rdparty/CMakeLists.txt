@@ -29,6 +29,7 @@ SET(BUILD_DEPRECATED OFF CACHE BOOL "" FORCE)
 SET(BUILD_GMOCK      OFF CACHE BOOL "" FORCE)
 SET(BUILD_STATIC     ON  CACHE BOOL "" FORCE)
 
+if(NOT USE_SYSTEM_SDL)
 # This is the most minimal set of features which still make Sdl2Application
 # work. If you need something from these, remove the setting. The SDL_AUDIO
 # option (and SDL_DLOPEN) should not be needed either as Magnum doesn't use it,
@@ -95,6 +96,7 @@ set(SDL_SHARED ON  CACHE BOOL "" FORCE)
 set(SDL_STATIC OFF CACHE BOOL "" FORCE)
 
 ADD_SUBDIRECTORY(SDL2 EXCLUDE_FROM_ALL)
+endif() # NOT USE_SYSTEM_SDL
 
 ADD_SUBDIRECTORY(corrade EXCLUDE_FROM_ALL)
 

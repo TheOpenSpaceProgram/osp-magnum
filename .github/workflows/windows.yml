@@ -21,7 +21,7 @@ jobs:
 
     - name: Build OSP-Magnum
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=x64-windows -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake
+        cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
         cmake --build build --parallel --config Release --target osp-magnum
     
     - name: Prepare Artifact
