@@ -35,7 +35,7 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Renderer.h>
-#include <Magnum/GL/DefaultFrameBuffer.h>
+#include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/Shaders/MeshVisualizerGL.h>
 
 // TODO: Decouple when a proper interface for creating static triangle meshes
