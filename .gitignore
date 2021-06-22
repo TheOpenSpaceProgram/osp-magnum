@@ -9,4 +9,7 @@ install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
 OSP-MAGNUM.cbp
+CMakeSettings.json
+out/
+.vs/
 
