@@ -37,9 +37,9 @@
 namespace osp::input
 {
 
-enum class EButtonEvent : uint8_t { PRESSED = 0, RELEASED = 1 };
+enum class EButtonEvent : uint8_t { Pressed = 0, Released = 1 };
 
-enum class EButtonControlEvent : uint8_t { TRIGGERED = 0, RELEASED = 1 };
+enum class EButtonControlEvent : uint8_t { Triggered = 0, Released = 1 };
 
 enum class EButtonControlIndex : uint32_t
 {
@@ -90,22 +90,14 @@ struct ScrollRaw
 
 //-----------------------------------------------------------------------------
 
-enum class EVarTrigger : uint8_t { HOLD = 0, PRESSED = 1 };
-enum class EVarOperator : uint8_t { OR = 0, AND = 1 };
+enum class EVarTrigger : uint8_t { Hold = 0, Pressed = 1 };
+enum class EVarOperator : uint8_t { Or = 0, And = 1 };
 
 /**
  * @brief An invidual term in a boolean expression representing a (raw button)
  */
 struct ControlTerm
 {
-    ControlTerm(ButtonMap_t::iterator button, EVarTrigger trigger,
-              bool invert, EVarOperator nextOp) noexcept
-     : m_button(button)
-     , m_trigger(trigger)
-     , m_nextOp(nextOp)
-     , m_invert(invert)
-    { }
-
     ButtonMap_t::iterator m_button;
     EVarTrigger m_trigger;
     EVarOperator m_nextOp;
@@ -117,18 +109,10 @@ struct ControlTerm
  */
 struct ControlTermConfig
 {
-    constexpr ControlTermConfig(int device, int devEnum, EVarTrigger trigger,
-                              bool invert, EVarOperator nextOp) noexcept
-     : m_device(device)
-     , m_devEnum(devEnum)
-     , m_trigger(trigger)
-     , m_nextOp(nextOp)
-     , m_invert(invert)
-    { }
 
     ControlTerm create(ButtonMap_t::iterator button) const
     {
-        return ControlTerm(button, m_trigger, m_invert, m_nextOp);
+        return ControlTerm{button, m_trigger, m_nextOp, m_invert};
     }
 
     int m_device;

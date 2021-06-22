@@ -102,26 +102,26 @@ void OSPMagnum::keyPressEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
     m_userInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
-                          osp::input::EButtonEvent::PRESSED);
+                          osp::input::EButtonEvent::Pressed);
 }
 
 void OSPMagnum::keyReleaseEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
     m_userInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
-                          osp::input::EButtonEvent::RELEASED);
+                          osp::input::EButtonEvent::Released);
 }
 
 void OSPMagnum::mousePressEvent(MouseEvent& event)
 {
     m_userInput.event_raw(osp::input::sc_mouse, (int) event.button(),
-                          osp::input::EButtonEvent::PRESSED);
+                          osp::input::EButtonEvent::Pressed);
 }
 
 void OSPMagnum::mouseReleaseEvent(MouseEvent& event)
 {
     m_userInput.event_raw(osp::input::sc_mouse, (int) event.button(),
-                          osp::input::EButtonEvent::RELEASED);
+                          osp::input::EButtonEvent::Released);
 }
 
 void OSPMagnum::mouseMoveEvent(MouseMoveEvent& event)
@@ -171,11 +171,11 @@ void testapp::config_controls(OSPMagnum& rOspApp)
     }
 }
 
-//Map for all the keys
-//The tuple is in this order: device, number, and hold/pressed
+// Map for all the keys
 
-typedef std::tuple<int, int> button_tuple;
-const std::map<std::string_view, button_tuple, std::less<>> buttonMap = {
+// Pair holds device and enum
+using button_pair_t = std::pair<int, int>;
+const std::map<std::string_view, button_pair_t, std::less<>> gc_buttonMap = {
     //Keyboard
     {"LCtrl", {sc_keyboard, (int)Key_t::LeftCtrl}},
     {"RCtrl", {sc_keyboard, (int)Key_t::RightCtrl }},
@@ -275,22 +275,26 @@ ControlExprConfig_t parse_control(std::string_view str) noexcept
     while (end != std::string::npos)
     {
         std::string_view sub = str.substr(start, end - start);
-        auto const& it = buttonMap.find(sub);
-        if (it != buttonMap.end()) 
+
+        if (auto const& it = gc_buttonMap.find(sub);
+            it != gc_buttonMap.end())
         {
             auto const& [device, button] = it->second;
-            handlers.emplace_back(device, button, EVarTrigger::HOLD, false, EVarOperator::AND);
+            handlers.emplace_back(ControlTermConfig{
+                device, button, EVarTrigger::Hold, EVarOperator::And, false});
         }
         start = end + delim.length();
         end = str.find(delim, start);
     }
 
     std::string_view sub = str.substr(start, end);
-    auto const& it = buttonMap.find(sub);
-    if (it != buttonMap.end()) 
+
+    if (auto const& it = gc_buttonMap.find(sub);
+        it != gc_buttonMap.end())
     {
         auto const& [device, button] = it->second;
-        handlers.emplace_back(device, button, EVarTrigger::PRESSED, false, EVarOperator::OR);
+        handlers.emplace_back(ControlTermConfig{
+            device, button, EVarTrigger::Pressed, EVarOperator::Or, false});
     }
     return handlers;
 }

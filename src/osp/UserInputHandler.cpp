@@ -44,7 +44,7 @@ bool UserInputHandler::eval_button_expression(
     bool totalOn = false;
     bool termOn = false;
 
-    EVarOperator prevOp = EVarOperator::OR;
+    EVarOperator prevOp = EVarOperator::Or;
     auto termStart = rExpr.begin();
 
     //for (ButtonVar const& var : rExpression)
@@ -58,7 +58,7 @@ bool UserInputHandler::eval_button_expression(
         // Get the value the ButtonVar specifies
         switch(var.m_trigger)
         {
-        case EVarTrigger::PRESSED:
+        case EVarTrigger::Pressed:
             if (var.m_invert)
             {
                 varOn = btnRaw.m_justReleased;
@@ -69,7 +69,7 @@ bool UserInputHandler::eval_button_expression(
             }
 
             break;
-        case EVarTrigger::HOLD:
+        case EVarTrigger::Hold:
             // "boolIn != bool" is a conditional invert
             // 1 != 1 = 0
             // 0 != 1 = 1
@@ -85,7 +85,7 @@ bool UserInputHandler::eval_button_expression(
         // Deal with operations on that value
         switch (prevOp)
         {
-        case EVarOperator::OR:
+        case EVarOperator::Or:
             // Current var is the start of a new term.
 
             // Add the previous term to the total
@@ -94,12 +94,12 @@ bool UserInputHandler::eval_button_expression(
             lastVar = true;
 
             break;
-        case EVarOperator::AND:
+        case EVarOperator::And:
             termOn = termOn && varOn;
             break;
         }
 
-        if (prevOp == EVarOperator::OR || lastVar)
+        if (prevOp == EVarOperator::Or || lastVar)
         {
             // if the previous term contributes to the expression being true
             // and pReleaseExpr exists
@@ -112,13 +112,13 @@ bool UserInputHandler::eval_button_expression(
                 // just-pressed buttons to trigger the release
                 for (auto itB = termStart; itB != termEnd; itB ++)
                 {
-                    if (itB->m_trigger != EVarTrigger::PRESSED)
+                    if (itB->m_trigger != EVarTrigger::Pressed)
                     {
                         continue;
                     }
                     pReleaseExpr->emplace_back(
-                            itB->m_button, EVarTrigger::PRESSED,
-                            !(itB->m_invert), EVarOperator::OR);
+                            ControlTerm{itB->m_button, EVarTrigger::Pressed,
+                                        EVarOperator::Or, !(itB->m_invert)});
                 }
             }
 
@@ -167,7 +167,7 @@ EButtonControlIndex UserInputHandler::button_subscribe(std::string_view name)
     if (cfgIt->second.m_enabled)
     {
         // Use existing ButtonControl
-        size_t index = cfgIt->second.m_index;
+        size_t const index = cfgIt->second.m_index;
         m_btnControls[index].m_referenceCount ++;
         return EButtonControlIndex(index);
     }
@@ -278,12 +278,12 @@ void UserInputHandler::event_raw(DeviceId deviceId, int buttonEnum,
 
     switch (dir)
     {
-    case EButtonEvent::PRESSED:
+    case EButtonEvent::Pressed:
         btnRaw.m_pressed = true;
         btnRaw.m_justPressed = true;
         m_btnPressed.push_back(btnIt);
         break;
-    case EButtonEvent::RELEASED:
+    case EButtonEvent::Released:
         btnRaw.m_pressed = false;
         btnRaw.m_justReleased = true;
         m_btnReleased.push_back(btnIt);
@@ -318,7 +318,7 @@ void UserInputHandler::update_controls()
         if (rControl.m_triggered)
         {
             m_btnControlEvents.emplace_back(index,
-                                            EButtonControlEvent::TRIGGERED);
+                                            EButtonControlEvent::Triggered);
         }
 
         if (!rControl.m_holdable)
@@ -336,7 +336,7 @@ void UserInputHandler::update_controls()
             {
                 rControl.m_exprRelease.clear();
                 m_btnControlEvents.emplace_back(index,
-                                                EButtonControlEvent::TRIGGERED);
+                                                EButtonControlEvent::Triggered);
                 SPDLOG_LOGGER_TRACE(m_to->p_logger, "RELEASE");
             }
         }

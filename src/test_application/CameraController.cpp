@@ -40,28 +40,19 @@ using adera::active::machines::MachineUserControl;
 
 using osp::universe::Satellite;
 using osp::universe::Universe;
-using osp::universe::UCompTransformTraj;
-using osp::universe::UCompVehicle;
 
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 using osp::active::ActiveReg_t;
 
-using osp::active::ACompAreaLink;
 using osp::active::ACompTransform;
-
-using osp::active::ACompPart;
-using osp::active::ACompMachines;
-using osp::active::ACompMachineType;
 using osp::active::ACompVehicle;
+using osp::active::ACompAreaLink;
 
 using osp::active::SysAreaAssociate;
 
-using osp::input::UserInputHandler;
 using osp::input::ControlSubscriber;
-using osp::input::ButtonControlEvent;
 
-using osp::machine_id_t;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -98,7 +89,7 @@ SysCameraController::get_camera_controller(ActiveScene &rScene)
 bool SysCameraController::try_switch_vehicle(ActiveScene &rScene,
                                              ACompCameraController &rCamCtrl)
 {
-    ACompAreaLink *pAreaLink =  SysAreaAssociate::try_get_area_link(rScene);
+    ACompAreaLink *pAreaLink = SysAreaAssociate::try_get_area_link(rScene);
 
     if (pAreaLink == nullptr)
     {
@@ -106,7 +97,7 @@ bool SysCameraController::try_switch_vehicle(ActiveScene &rScene,
     }
 
     Universe &rUni = pAreaLink->get_universe();
-    auto const viewUni = rUni.get_reg().view<UCompVehicle>();
+    auto const viewUni = rUni.get_reg().view<osp::universe::UCompVehicle>();
     auto it = viewUni.find(rCamCtrl.m_selected);
 
     if (it == viewUni.end() || it == viewUni.begin())
@@ -123,7 +114,7 @@ bool SysCameraController::try_switch_vehicle(ActiveScene &rScene,
     if (rUni.get_reg().valid(rCamCtrl.m_selected))
     {
       SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(), "Selected: {} ",
-          rUni.get_reg().get<UCompTransformTraj>(rCamCtrl.m_selected).m_name);
+          rUni.get_reg().get<osp::universe::UCompTransformTraj>(rCamCtrl.m_selected).m_name);
         return true;
     }
 
@@ -132,7 +123,7 @@ bool SysCameraController::try_switch_vehicle(ActiveScene &rScene,
 
 void SysCameraController::update_vehicle(ActiveScene &rScene)
 {
-    auto const [ent, rCamCtrl] = get_camera_controller(rScene);
+    auto const& [ent, rCamCtrl] = get_camera_controller(rScene);
 
     if (rCamCtrl.m_controls.button_triggered(rCamCtrl.m_switch))
     {
@@ -171,7 +162,10 @@ void SysCameraController::update_vehicle(ActiveScene &rScene)
 
 MachineUserControl* find_user_control(ActiveScene& rScene, ActiveEnt vehicle)
 {
-    machine_id_t const id = osp::mach_id<MachineUserControl>();
+    using osp::active::ACompMachines;
+    using osp::active::ACompMachineType;
+
+    osp::machine_id_t const id = osp::mach_id<MachineUserControl>();
     // Search all parts
     std::vector<ActiveEnt> const& parts = rScene.reg_get<ACompVehicle>(vehicle).m_parts;
     for (ActiveEnt partEnt : parts)
@@ -246,6 +240,7 @@ void SysCameraController::update_controls(ActiveScene &rScene)
 
 void SysCameraController::update_area(ActiveScene &rScene)
 {
+
     ActiveReg_t &rReg = rScene.get_registry();
     auto const [camEnt, rCamCtrl] = get_camera_controller(rScene);
 
@@ -257,7 +252,7 @@ void SysCameraController::update_area(ActiveScene &rScene)
     {
         // No vehicle activated in scene, try to find
 
-        ACompAreaLink const *areaLink =  SysAreaAssociate::try_get_area_link(rScene);
+        ACompAreaLink const *areaLink = SysAreaAssociate::try_get_area_link(rScene);
 
         if (areaLink == nullptr)
         {
@@ -299,8 +294,8 @@ void SysCameraController::update_area(ActiveScene &rScene)
 
     if (!translate.isZero())
     {
-      SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
-                          "Floating origin translation!");
+        SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
+                            "Floating origin translation!");
 
         // Move the active area to center on the camera
         SysAreaAssociate::area_move(rScene, translate);
@@ -333,38 +328,39 @@ void SysCameraController::update_view(ActiveScene &rScene)
 
     // Process control inputs
 
+    using Magnum::Rad;
+
     ControlSubscriber const& controls = rCamCtrl.m_controls;
 
+    Rad yaw = 0.0_degf;
+    Rad pitch = 0.0_degf;
+
     // Arrow key rotation
-    float keyRotYaw = (controls.button_held(rCamCtrl.m_rt)
-                       - controls.button_held(rCamCtrl.m_lf));
-    float keyRotPitch = (controls.button_held(rCamCtrl.m_dn)
-                         - controls.button_held(rCamCtrl.m_up));
 
-    // Mouse rotation
-    Quaternion camRotate(Magnum::Math::IdentityInit);
-    if (rCamCtrl.m_controls.button_held(rCamCtrl.m_rmb)
-            || keyRotYaw || keyRotPitch)
+    // 180 degrees per second
+    Rad const keyRotDelta = 180.0_degf * rScene.get_time_delta_fixed();
+
+    yaw += (controls.button_held(rCamCtrl.m_rt)
+            - controls.button_held(rCamCtrl.m_lf)) * keyRotDelta;
+    pitch += (controls.button_held(rCamCtrl.m_dn)
+              - controls.button_held(rCamCtrl.m_up)) * keyRotDelta;
+
+    // Mouse rotation, if right mouse button is down
+
+    if (rCamCtrl.m_controls.button_held(rCamCtrl.m_rmb))
     {
-        // 180 degrees per second
-        auto keyRotDelta = 180.0_degf * rScene.get_time_delta_fixed();
-
-        float yaw = keyRotYaw * float(keyRotDelta);
-        float pitch = keyRotPitch * float(keyRotDelta);
-        if (rCamCtrl.m_controls.button_held(rCamCtrl.m_rmb))
-        {
-            yaw -= controls.get_input_handler()->mouse_state().m_smoothDelta.x();
-            pitch -= controls.get_input_handler()->mouse_state().m_smoothDelta.y();
-        }
-
         // 1 degrees per step
-        constexpr auto rotRate = 1.0_degf;
+        constexpr Rad const mouseRotDelta = 1.0_degf;
 
-        // rotate it
-        camRotate = Quaternion::rotation(yaw * rotRate, rCamTf.up())
-            * Quaternion::rotation(pitch * rotRate, rCamTf.right());
+        yaw -= controls.get_input_handler()->mouse_state().m_smoothDelta.x()
+                * mouseRotDelta;
+        pitch -= controls.get_input_handler()->mouse_state().m_smoothDelta.y()
+                  * mouseRotDelta;
     }
 
+    Quaternion const camRotate = Quaternion::rotation(yaw, rCamTf.up())
+                                  * Quaternion::rotation(pitch, rCamTf.right());
+    
     // set camera orbit distance
     constexpr float distSensitivity = 0.3f;
     float const scroll = rCamCtrl.m_controls.get_input_handler()
@@ -391,6 +387,7 @@ void SysCameraController::update_view(ActiveScene &rScene)
 ActiveEnt SysCameraController::find_vehicle_from_sat(
         ActiveScene &rScene, Satellite sat)
 {
+
     ActiveReg_t const& reg = rScene.get_registry();
     auto const viewVehicles = reg.view<const ACompVehicle>();
 
@@ -400,16 +397,15 @@ ActiveEnt SysCameraController::find_vehicle_from_sat(
         return entt::null;
     }
 
-    ACompAreaLink const *pAreaLink =  SysAreaAssociate::try_get_area_link(rScene);
+    ACompAreaLink const *pAreaLink = SysAreaAssociate::try_get_area_link(rScene);
 
     if (pAreaLink == nullptr)
     {
         return entt::null; // Scene not connected to universe
     }
 
-    auto const findIt = pAreaLink->m_inside.find(sat);
-
-    if (findIt != pAreaLink->m_inside.end())
+    if (auto const findIt = pAreaLink->m_inside.find(sat);
+        findIt != pAreaLink->m_inside.end())
     {
         ActiveEnt const activated = findIt->second;
         if (reg.valid(activated))
