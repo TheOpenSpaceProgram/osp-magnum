@@ -47,6 +47,9 @@ struct ACompAreaLink
     universe::Universe& get_universe() noexcept
     { return m_rUniverse.get(); }
 
+    universe::Universe const& get_universe() const noexcept
+    { return m_rUniverse.get(); }
+
     universe::Satellite m_areaSat;
 
     std::reference_wrapper<universe::Universe> m_rUniverse;

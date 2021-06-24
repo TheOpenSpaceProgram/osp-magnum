@@ -107,35 +107,17 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 
     // InputDevice.IsActivated()
     // Combination
-    auto const &usrCtrl = rScene.reg_get<ACompUserControl>(rScene.hier_get_root());
     ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
     ACompWireNodes<AttitudeControl> &rNodesAttCtrl = SysWire::nodes<AttitudeControl>(rScene);
 
     UpdNodes_t<Percent> updPercent;
     UpdNodes_t<AttitudeControl> updAttCtrl;
 
-    if (usrCtrl.m_selfDestruct.triggered())
-    {
-        SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                        "Self destruct -- EXPLOSION BOOM!!!!");
-    }
-
-    // pitch, yaw, roll
-    Vector3 attitudeIn(
-            usrCtrl.m_pitchDn.trigger_hold() - usrCtrl.m_pitchUp.trigger_hold(),
-            usrCtrl.m_yawLf.trigger_hold()   - usrCtrl.m_yawRt.trigger_hold(),
-            usrCtrl.m_rollRt.trigger_hold()  - usrCtrl.m_rollLf.trigger_hold());
-
     auto view = rScene.get_registry().view<MachineUserControl>();
 
     for (ActiveEnt ent : view)
     {
         MachineUserControl const &machine = view.get<MachineUserControl>(ent);
-
-        if (!machine.m_enable)
-        {
-            continue;
-        }
 
         // Get the Percent Panel which contains the Throttle Port
         auto const *pPanelPercent = rScene.reg_try_get< ACompWirePanel<Percent> >(ent);
@@ -150,38 +132,10 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
                 // Get the connected node and its value
                 WireNode<Percent> const &nodeThrottle
                         = rNodesPercent.get_node(pPortThrottle->m_nodeIndex);
-                float throttlePos = nodeThrottle.m_state.m_percent;
-
-                float throttleRate = 0.5f;
-                auto delta = throttleRate * rScene.get_time_delta_fixed();
-
-                if (usrCtrl.m_throttleMore.trigger_hold())
-                {
-                    throttlePos = std::clamp(throttlePos + delta, 0.0f, 1.0f);
-                }
-
-                if (usrCtrl.m_throttleLess.trigger_hold())
-                {
-                    throttlePos = std::clamp(throttlePos - delta, 0.0f, 1.0f);
-                }
-
-                if (usrCtrl.m_throttleMin.triggered())
-                {
-                    SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                                      "Minimum throttle");
-                    throttlePos = 0.0f;
-                }
-
-                if (usrCtrl.m_throttleMax.triggered())
-                {
-                    SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                                      "Maximum throttle");
-                    throttlePos = 1.0f;
-                }
 
                 // Write possibly new throttle value to node
                 SysSignal<Percent>::signal_assign(
-                        rScene, {throttlePos}, nodeThrottle,
+                        rScene, {machine.m_throttle}, nodeThrottle,
                         pPortThrottle->m_nodeIndex, updPercent);
             }
         }
@@ -198,7 +152,7 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
                     = rNodesAttCtrl.get_node(pPortAttCtrl->m_nodeIndex);
 
             SysSignal<AttitudeControl>::signal_assign(
-                    rScene, {attitudeIn}, nodeAttCtrl,
+                    rScene, {machine.m_attitude}, nodeAttCtrl,
                     pPortAttCtrl->m_nodeIndex, updAttCtrl);
         }
     }

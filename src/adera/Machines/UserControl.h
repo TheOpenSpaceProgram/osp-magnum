@@ -26,7 +26,6 @@
 
 #include "../wiretypes.h"
 
-#include <osp/UserInputHandler.h>
 #include <osp/Active/SysMachine.h>
 #include <osp/Active/SysWire.h>
 
@@ -34,40 +33,6 @@ namespace adera::active::machines
 {
 
 class MachineUserControl;
-
-/**
- * Stores ButtonControlHandles for SysMachineUserControl to detect user inputs
- */
-struct ACompUserControl
-{
-    ACompUserControl(osp::UserInputHandler &rUsrCtrl)
-     : m_throttleMax(   rUsrCtrl.config_get("vehicle_thr_max"))
-     , m_throttleMin(   rUsrCtrl.config_get("vehicle_thr_min"))
-     , m_throttleMore(  rUsrCtrl.config_get("vehicle_thr_more"))
-     , m_throttleLess(  rUsrCtrl.config_get("vehicle_thr_less"))
-     , m_selfDestruct(  rUsrCtrl.config_get("vehicle_self_destruct"))
-     , m_pitchUp(       rUsrCtrl.config_get("vehicle_pitch_up"))
-     , m_pitchDn(       rUsrCtrl.config_get("vehicle_pitch_dn"))
-     , m_yawLf(         rUsrCtrl.config_get("vehicle_yaw_lf"))
-     , m_yawRt(         rUsrCtrl.config_get("vehicle_yaw_rt"))
-     , m_rollLf(        rUsrCtrl.config_get("vehicle_roll_lf"))
-     , m_rollRt(        rUsrCtrl.config_get("vehicle_roll_rt"))
-    { }
-
-    osp::ButtonControlHandle m_throttleMax;
-    osp::ButtonControlHandle m_throttleMin;
-    osp::ButtonControlHandle m_throttleMore;
-    osp::ButtonControlHandle m_throttleLess;
-
-    osp::ButtonControlHandle m_selfDestruct;
-
-    osp::ButtonControlHandle m_pitchUp;
-    osp::ButtonControlHandle m_pitchDn;
-    osp::ButtonControlHandle m_yawLf;
-    osp::ButtonControlHandle m_yawRt;
-    osp::ButtonControlHandle m_rollLf;
-    osp::ButtonControlHandle m_rollRt;
-};
 
 /**
  * Gets ButtonControlHandle from a UserInputHandler, and updates
@@ -107,10 +72,9 @@ struct MachineUserControl
     static constexpr osp::portindex_t<Percent> smc_woThrottle{0};
     static constexpr osp::portindex_t<AttitudeControl> smc_woAttitude{0};
 
-    // TODO: Eventually restructure MachineUserControl to instead have controls
-    //       as members that can be written to instead of listening directly
-    //       to a UserInputHandler
-    bool m_enable{false};
+    float m_throttle;
+    bool m_selfDestruct;
+    osp::Vector3 m_attitude; // pitch, yaw, roll
 };
 
 //-----------------------------------------------------------------------------

@@ -34,147 +34,53 @@
 
 #include <spdlog/spdlog.h>
 
-namespace osp
+namespace osp::input
 {
 
-class UserInputHandler;
+enum class EButtonEvent : uint8_t { Pressed = 0, Released = 1 };
 
-struct ButtonVar;
-struct ButtonVarConfig;
-struct ButtonRaw;
+enum class EButtonControlEvent : uint8_t { Triggered = 0, Released = 1 };
 
-using ButtonMap = std::map<int, ButtonRaw>;
-using ButtonExpr = std::vector<ButtonVar>;
+enum class EButtonControlIndex : uint32_t
+{
+    NONE = std::numeric_limits<uint32_t>::max()
+};
 
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief Raw button state mapped directly from a device enum
+ */
 struct ButtonRaw
 {
     bool m_pressed, m_justPressed, m_justReleased;
     uint8_t m_referenceCount;
 };
 
-struct ButtonVar
-{
-    enum class VarTrigger { HOLD = 0, PRESSED = 1 };
-    enum class VarOperator { OR = 0, AND = 1 };
+using ButtonMap_t = std::map<int, ButtonRaw, std::less<>>;
 
-    ButtonVar(ButtonMap::iterator button, VarTrigger trigger,
-               bool invert, VarOperator nextOp);
-
-    ButtonVar(ButtonMap::iterator button, ButtonVarConfig cfg);
-
-    //        m_button(button), m_bits(bits) {}
-
-    // Bit 0: Trigger Mode
-    //   0. Always true when button is held
-    //   1. True only when button had just been pressed
-    // Bit 1: Invert
-    //   0. Detect hold down or pressing down
-    //   1. Invert, detect button up, or unpress instead
-    // Bit 2: Operator
-    //   0. OR with next condition
-    //   1. AND with next condition
-    // Bit 3: Varinate?
-    //   0. Last condition, varinate
-    //   1. Next condition exists
-    //uint8_t m_bits;
-
-    ButtonMap::iterator m_button;
-    VarTrigger m_trigger;
-    bool m_invert;
-    VarOperator m_nextOp;
-};
-
-struct ButtonVarConfig
-{
-    using VarTrigger = ButtonVar::VarTrigger;
-    using VarOperator = ButtonVar::VarOperator;
-
-    constexpr ButtonVarConfig(int device, int devEnum, VarTrigger trigger,
-                               bool invert, VarOperator nextOp) :
-            m_device(device),
-            m_devEnum(devEnum),
-            m_trigger(trigger),
-            m_invert(invert),
-            m_nextOp(nextOp) {}
-
-    int m_device;
-    int m_devEnum;
-    VarTrigger m_trigger;
-    bool m_invert;
-    VarOperator m_nextOp;
-    //uint8_t m_bits;
-};
-
-struct ButtonConfig
-{
-    std::vector<ButtonVarConfig> m_press;
-    bool m_holdable;
-    bool m_enabled;
-    int m_index;
-};
-
-// Primary owner of button state, one per button
-struct ButtonControl
-{
-    uint16_t m_referenceCount;
-
-    // hold is true if just all the hold conditions are true.
-    // ignore the press/releases
-
-    bool m_holdable;
-    bool m_triggered, m_held;
-    //std::array<ButtonVar, 10> m_vars;
-    ButtonExpr m_exprPress;
-    ButtonExpr m_exprRelease;
-};
-
-class ButtonControlHandle
-{
-public:
-    ButtonControlHandle() : m_to(nullptr), m_index(0) {}
-    ButtonControlHandle(UserInputHandler *to, int index);
-    ~ButtonControlHandle();
-
-    bool triggered() const;
-    bool trigger_hold() const;
-
-private:
-    UserInputHandler *m_to;
-    //ButtonMap::iterator m_button;
-    int m_index;
-};
-
+/**
+ * @brief Mouse motion state
+ */
 struct MouseMotion
 {
 public:
     Vector2i m_rawDelta;
+    Vector2 m_smoothDelta{ 0.0f };
 
-    /* 
+    /*
      * Mouse responsiveness - float between (0.0f, 1.0f]
      * larger numbers -> less smooth, smaller numbers -> more floaty
      * Recommend leaving this around 0.5
     */
     float m_responseFactor{ 0.5f };
-    
-    Vector2 m_smoothDelta{ 0.0f };
+
     uint8_t m_referenceCount;
 };
 
-class MouseMovementHandle
-{
-public:
-    MouseMovementHandle() : m_to(nullptr) {}
-    MouseMovementHandle(UserInputHandler *to);
-    ~MouseMovementHandle();
-    
-    float dxSmooth() const;
-    float dySmooth() const;
-    int dxRaw() const;
-    int dyRaw() const;
-private:
-    UserInputHandler *m_to;
-};
-
+/**
+ * @brief Raw scroll state
+ */
 struct ScrollRaw
 {
     Vector2i offset;
@@ -182,19 +88,93 @@ struct ScrollRaw
     uint8_t m_referenceCount;
 };
 
-class ScrollInputHandle
+//-----------------------------------------------------------------------------
+
+enum class EVarTrigger : uint8_t { Hold = 0, Pressed = 1 };
+enum class EVarOperator : uint8_t { Or = 0, And = 1 };
+
+/**
+ * @brief An invidual term in a boolean expression representing a (raw button)
+ */
+struct ControlTerm
 {
-public:
-    ScrollInputHandle() : m_to(nullptr) {}
-    ScrollInputHandle(UserInputHandler *to);
-    ~ScrollInputHandle();
-
-    int dx() const;
-    int dy() const;
-
-private:
-    UserInputHandler *m_to;
+    ButtonMap_t::iterator m_button;
+    EVarTrigger m_trigger;
+    EVarOperator m_nextOp;
+    bool m_invert;
 };
+
+/**
+ * @brief The ButtonVarConfig struct
+ */
+struct ControlTermConfig
+{
+
+    ControlTerm create(ButtonMap_t::iterator button) const
+    {
+        return ControlTerm{button, m_trigger, m_nextOp, m_invert};
+    }
+
+    int m_device;
+    int m_devEnum;
+    EVarTrigger m_trigger;
+    EVarOperator m_nextOp;
+    bool m_invert;
+};
+
+/*
+ * Control expressions describes a boolean expression of conditions that can be
+ * evaluated to check if a control has been triggered.
+ *
+ * ie: undo and redo
+ * undo = (Ctrl Held) AND (Z Pressed) AND (NOT Shift Held)
+ * redo = (Ctrl Held) AND (Z Pressed) AND (Shift Held)
+ */
+using ControlExpr_t = std::vector<ControlTerm>;
+using ControlExprConfig_t = std::vector<ControlTermConfig>;
+
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief Active Button control
+ */
+struct ButtonControl
+{
+    uint16_t m_referenceCount{1};
+
+    // hold is true if just all the hold conditions are true.
+    // ignore the press/releases
+
+    bool m_holdable{false};
+    bool m_triggered{false}, m_held{false};
+
+    ControlExpr_t m_exprPress{};
+    ControlExpr_t m_exprRelease{};
+};
+
+struct ButtonControlConfig
+{
+    std::vector<ControlTermConfig> m_press;
+    bool m_holdable;
+    bool m_enabled;
+    int m_index;
+};
+
+//-----------------------------------------------------------------------------
+
+struct ButtonControlEvent
+{
+    constexpr ButtonControlEvent(EButtonControlIndex index,
+                                 EButtonControlEvent event) noexcept
+     : m_index(index)
+     , m_event(event)
+    { }
+
+    EButtonControlIndex m_index;
+    EButtonControlEvent m_event;
+};
+
+//-----------------------------------------------------------------------------
 
 /**
  * Roughly based on HotkeyHandler.as from urho-osp (but more sane),
@@ -252,19 +232,10 @@ private:
  */
 class UserInputHandler
 {
-    friend ButtonControlHandle;
-    friend MouseMovementHandle;
-    friend ScrollInputHandle;
 
 public:
 
-    typedef int DeviceId;
-
-    enum class ButtonRawEvent
-    {
-        PRESSED,
-        RELEASED
-    };
+    using DeviceId = uint32_t;
 
     UserInputHandler(int deviceCount);
 
@@ -285,8 +256,8 @@ public:
      * @return result of expression
      */
     static bool eval_button_expression(
-            ButtonExpr const& expression,
-            ButtonExpr* pReleaseExpr = nullptr);
+            ControlExpr_t const& expression,
+            ControlExpr_t* pReleaseExpr = nullptr);
 
     /**
      * Register a new control into the config.
@@ -295,25 +266,29 @@ public:
      */
     void config_register_control(std::string const& name,
         bool holdable,
-        std::vector<ButtonVarConfig> vars);
+        std::vector<ControlTermConfig> vars);
 
     void config_register_control(std::string&& name,
         bool holdable,
-        std::vector<ButtonVarConfig> vars);
+        std::vector<ControlTermConfig> vars);
 
+    EButtonControlIndex button_subscribe(std::string_view name);
 
-    /**
-     * Fetch a button configuration
-     * 
-     * Spawns a new ButtonControl to allow 
-     * 
-     * @return ButtonHandle that can be used to read a ButtonControl
-     */
-    ButtonControlHandle config_get(std::string const& name);
+    void button_unsubscribe(EButtonControlIndex index);
 
-    MouseMovementHandle mouse_get();
+    ButtonControl const& button_state(EButtonControlIndex index) const
+    {
+        return m_btnControls.at(size_t(index));
+    }
 
-    ScrollInputHandle scroll_get();
+    constexpr MouseMotion const& mouse_state() const { return m_mouseMotion; }
+
+    constexpr ScrollRaw const& scroll_state() const  { return m_scrollOffset; }
+
+    constexpr std::vector<ButtonControlEvent> const& button_events() const noexcept
+    {
+        return m_btnControlEvents;
+    }
 
     /**
      * Resets per-frame control properties, like button "just pressed" states
@@ -327,7 +302,7 @@ public:
      * @param buttonEnum
      * @param dir
      */
-    void event_raw(DeviceId deviceId, int buttonEnum, ButtonRawEvent dir);
+    void event_raw(DeviceId deviceId, int buttonEnum, EButtonEvent dir);
 
     /**
      *
@@ -348,23 +323,63 @@ public:
 
 private:
 
-    std::vector<ButtonMap> m_deviceToButtonRaw;
-    std::map<std::string, ButtonConfig> m_controlConfigs;
-    std::vector<ButtonControl> m_controls;
+    std::vector<ButtonMap_t> m_deviceToButtonRaw;
+    std::map<std::string, ButtonControlConfig, std::less<> > m_btnControlCfg;
 
     // Mouse inputs
     MouseMotion m_mouseMotion;
     ScrollRaw m_scrollOffset;
 
-    std::vector<ButtonMap::iterator> m_btnPressed;
-    std::vector<ButtonMap::iterator> m_btnReleased;
+    std::vector<ButtonMap_t::iterator> m_btnPressed;
+    std::vector<ButtonMap_t::iterator> m_btnReleased;
 
-    //std::map<std::string, int> m_controlActive;
+    // Currently active controls being listened to
+    std::vector<ButtonControl> m_btnControls;
+
+    std::vector<ButtonControlEvent> m_btnControlEvents;
 
     std::shared_ptr<spdlog::logger> p_logger;
-};
 
-// temporary-ish
+}; // class UserInputHandler
+
+// temporary-ish: fixed device IDs for keyboard and mouse
 const UserInputHandler::DeviceId sc_keyboard = 0;
 const UserInputHandler::DeviceId sc_mouse = 1;
+
+//-----------------------------------------------------------------------------
+
+class ControlSubscriber
+{
+public:
+    ControlSubscriber(UserInputHandler *pInputHandler) noexcept
+     : m_pInputHandler(pInputHandler)
+    { }
+
+    ~ControlSubscriber();
+
+    EButtonControlIndex button_subscribe(std::string_view name);
+    bool button_triggered(EButtonControlIndex index) const
+    {
+        return m_pInputHandler->button_state(index).m_triggered;
+    }
+
+    bool button_held(EButtonControlIndex index) const
+    {
+        return m_pInputHandler->button_state(index).m_held;
+    }
+
+    constexpr std::vector<ButtonControlEvent> const& button_events()
+    {
+        return m_pInputHandler->button_events();
+    }
+
+    UserInputHandler* get_input_handler() noexcept { return m_pInputHandler; };
+    UserInputHandler const* get_input_handler() const noexcept
+    { return m_pInputHandler; };
+
+private:
+    UserInputHandler *m_pInputHandler;
+    std::vector<EButtonControlIndex> m_subscribedButtons;
+};
+
 }
