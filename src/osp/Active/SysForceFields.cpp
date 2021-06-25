@@ -29,11 +29,6 @@
 
 using namespace osp::active;
 
-void SysFFGravity::add_functions(ActiveScene &rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "ff_gravity", "", "physics",
-                            &SysFFGravity::update_force);
-}
 
 void SysFFGravity::update_force(ActiveScene& rScene)
 {

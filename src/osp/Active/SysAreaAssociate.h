@@ -76,8 +76,6 @@ class SysAreaAssociate
 {
 public:
 
-    static void add_functions(ActiveScene& rScene);
-
     /**
      * Scans the universe for Satellites to activate or deactivate, tracking
      * changes into a ACompAreaLink stored in the scene.

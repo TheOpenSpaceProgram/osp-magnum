@@ -41,7 +41,6 @@ class MachineUserControl;
 class SysMachineUserControl
 {
 public:
-    static void add_functions(osp::active::ActiveScene& rScene);
 
     /**
      * Constructs MachineUserControls for vehicles in-construction

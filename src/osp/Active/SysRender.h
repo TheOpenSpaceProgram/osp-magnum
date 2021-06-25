@@ -80,12 +80,15 @@ struct ACompFBOColorAttachment
     DependRes<Magnum::GL::Texture2D> m_tex;
 };
 
+using RenderStep_t = void(*)(ActiveScene&, ACompCamera const&);
+using RenderSteps_t = std::vector<RenderStep_t>;
+
 /**
  * Resource storing the steps of a multipass renderer
  */
 struct RenderPipeline
 {
-    RenderOrder_t m_order;
+    RenderSteps_t m_order;
 };
 
 class SysRender

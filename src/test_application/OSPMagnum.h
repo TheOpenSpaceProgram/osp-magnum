@@ -47,8 +47,12 @@
 namespace testapp
 {
 
-using MapActiveScene_t = std::map<std::string, osp::active::ActiveScene,
-                                  std::less<> >;
+using SceneUpdate_t = std::function<void(osp::active::ActiveScene&)>;
+
+using MapActiveScene_t = std::map<
+        std::string,
+        std::pair<osp::active::ActiveScene, SceneUpdate_t>,
+        std::less<> >;
 
 class OSPMagnum : public Magnum::Platform::Application
 {
@@ -68,8 +72,8 @@ public:
     void mouseMoveEvent(MouseMoveEvent& event) override;
     void mouseScrollEvent(MouseScrollEvent& event) override;
 
-    osp::active::ActiveScene& scene_create(std::string const& name);
-    osp::active::ActiveScene& scene_create(std::string&& name);
+    osp::active::ActiveScene& scene_create(std::string const& name, SceneUpdate_t upd);
+    osp::active::ActiveScene& scene_create(std::string&& name, SceneUpdate_t upd);
 
     constexpr osp::input::UserInputHandler& get_input_handler() { return m_userInput; }
     constexpr MapActiveScene_t& get_scenes() { return m_scenes; }

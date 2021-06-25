@@ -53,14 +53,6 @@ using osp::active::ACompShader;
 using osp::active::ACompTransparent;
 using osp::active::ACompVisible;
 
-
-void SysExhaustPlume::add_functions(ActiveScene& rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "exhaust_plume", "mach_rocket", "",
-                            &SysExhaustPlume::update_plumes);
-
-}
-
 void SysExhaustPlume::initialize_plume(ActiveScene& rScene, ActiveEnt node)
 {
     using Magnum::GL::Mesh;

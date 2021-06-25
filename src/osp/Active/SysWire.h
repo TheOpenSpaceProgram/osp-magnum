@@ -250,7 +250,6 @@ class SysWire
 {
 public:
 
-    static void add_functions(ActiveScene& rScene);
     static void setup_default(
             ActiveScene& rScene,
             uint32_t machineTypeCount,

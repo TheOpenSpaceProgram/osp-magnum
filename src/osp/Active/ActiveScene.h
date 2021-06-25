@@ -37,13 +37,12 @@
 namespace osp::active
 {
 
+
 /**
  * An ECS 3D Game Engine scene that implements a scene graph hierarchy.
  *
  * The state of scene is represented with Active Entities (ActiveEnt) which are
- * compositions of Active Components (AComp-prefixed structs). Behaviours are
- * added by injecting System functions into the Update Order (a list of
- * functions called in a specific order, use debug_update_add).
+ * compositions of Active Components (AComp-prefixed structs).
  *
  */
 class ActiveScene
@@ -51,7 +50,7 @@ class ActiveScene
 
 public:
 
-    ActiveScene(OSPApplication& app, Package& context);
+    ActiveScene(OSPApplication& rApp, Package& rContext);
 
     OSPApplication& get_application() { return m_app; };
 
@@ -121,11 +120,6 @@ public:
     }
 
     /**
-     * Update everything in the update order, including all systems and stuff
-     */
-    void update();
-
-    /**
      * Delete entities with ACompDelete
      *
      * @param rScene [ref] scene with entities
@@ -142,32 +136,14 @@ public:
      */
     void draw();
 
-    constexpr UpdateOrder_t& get_update_order() { return m_updateOrder; }
-
-    constexpr RenderOrder_t& get_render_order() { return m_renderOrder; }
-
     // TODO
     constexpr float get_time_delta_fixed() const { return 1.0f / 60.0f; }
-
-    template<typename... ARGS_T>
-    void debug_update_add(ARGS_T &&... args)
-    { m_updateHandles.emplace_back(std::forward<ARGS_T>(args)...); }
-
-    template<typename... ARGS_T>
-    void debug_render_add(ARGS_T &&... args)
-    { m_renderHandles.emplace_back(std::forward<ARGS_T>(args)...); }
 
     Package& get_context_resources() { return m_context; }
 private:
 
     OSPApplication& m_app;
     Package& m_context;
-
-    UpdateOrder_t m_updateOrder;
-    RenderOrder_t m_renderOrder;
-
-    std::vector<UpdateOrderHandle_t> m_updateHandles;
-    std::vector<RenderOrderHandle_t> m_renderHandles;
 
     ActiveReg_t m_registry;
     ActiveEnt m_root;

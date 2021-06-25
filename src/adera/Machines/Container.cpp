@@ -54,14 +54,6 @@ float MachineContainer::compute_mass() const noexcept
 
 /* SysMachineContainer */
 
-void SysMachineContainer::add_functions(ActiveScene& rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "mach_container", "", "mach_rocket",
-                            &SysMachineContainer::update_containers);
-    rScene.debug_update_add(rScene.get_update_order(), "mach_container_construct", "vehicle_activate", "vehicle_modification",
-                            &SysMachineContainer::update_construct);
-}
-
 void SysMachineContainer::update_containers(ActiveScene& rScene)
 {
     auto view = rScene.get_registry().view<MachineContainer, ACompMass>();

@@ -50,15 +50,6 @@ using osp::universe::UCompVehicle;
 // for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;
 
-void SysVehicle::add_functions(ActiveScene &rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "vehicle_modification", "vehicle_activate", "physics",
-                            &SysVehicle::update_vehicle_modification);
-    rScene.debug_update_add(rScene.get_update_order(), "vehicle_activate", "", "vehicle_modification",
-                            &SysVehicle::update_activate);
-}
-
-
 ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
                           universe::Satellite areaSat,
                              universe::Satellite tgtSat)

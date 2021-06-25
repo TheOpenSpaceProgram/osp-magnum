@@ -37,12 +37,6 @@ using osp::universe::UCompActivatable;
 using osp::universe::UCompActivationRadius;
 using osp::universe::UCompActiveArea;
 
-void SysAreaAssociate::add_functions(ActiveScene &rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "areascan", "physics", "",
-                            &SysAreaAssociate::update_scan);
-}
-
 void SysAreaAssociate::update_scan(ActiveScene& rScene)
 {
     ACompAreaLink *pArea = try_get_area_link(rScene);

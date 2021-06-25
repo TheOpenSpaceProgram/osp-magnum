@@ -44,8 +44,6 @@ class SysExhaustPlume
 {
 public:
 
-    static void add_functions(osp::active::ActiveScene& rScene);
-
     /**
      * Initialize plume graphics
      * 

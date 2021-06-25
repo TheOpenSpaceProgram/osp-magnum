@@ -29,12 +29,6 @@
 
 using osp::active::SysWire;
 
-void SysWire::add_functions(ActiveScene& rScene)
-{
-    rScene.debug_update_add(rScene.get_update_order(), "wire", "vehicle_modification", "physics",
-                            &SysWire::update_wire);
-}
-
 void SysWire::setup_default(
         ActiveScene& rScene,
         uint32_t machineTypeCount,

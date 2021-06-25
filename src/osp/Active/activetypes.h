@@ -27,8 +27,6 @@
 #include <map>
 #include <memory>
 
-#include "../FunctonOrder.h"
-
 #include <entt/entity/registry.hpp>
 
 
@@ -47,20 +45,6 @@ constexpr unsigned gc_heir_physics_level = 1;
 
 enum class ActiveEnt: entt::id_type {};
 
-inline std::ostream& operator<<(std::ostream& os, ActiveEnt e)
-{ return os << static_cast<int>(e); }
-
 using ActiveReg_t = entt::basic_registry<ActiveEnt>;
-
-using UpdateOrder_t = FunctionOrder<void(ActiveScene&)>;
-using UpdateOrderHandle_t = FunctionOrderHandle<void(ActiveScene&)>;
-
-using RenderOrder_t = FunctionOrder<void(ActiveScene&, ACompCamera const&)>;
-using RenderOrderHandle_t = FunctionOrderHandle<void(ActiveScene&, ACompCamera const&)>;
-
-struct ACompFloatingOrigin
-{
-    //bool m_dummy;
-};
 
 }

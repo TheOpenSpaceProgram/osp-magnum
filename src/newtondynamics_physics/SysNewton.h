@@ -77,7 +77,7 @@ class SysNewton
 
 public:
 
-    static void add_functions(osp::active::ActiveScene& rScene);
+    static void setup(osp::active::ActiveScene& rScene);
     
     static void update_world(osp::active::ActiveScene& rScene);
 
