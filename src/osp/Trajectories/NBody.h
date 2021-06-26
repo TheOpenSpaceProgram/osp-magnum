@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#if 0
+
 #include "../Universe.h"
 #include "../aligned_allocator.h"
 
@@ -317,3 +319,5 @@ public:
 };
 
 }
+
+#endif

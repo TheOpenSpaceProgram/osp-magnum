@@ -1,3 +1,5 @@
+#if 0
+
 #include "solarsystem_map.h"
 /**
  * Open Space Program
@@ -511,3 +513,5 @@ std::vector<PlanetBody> create_solar_system_bodies()
 
     return planets;
 }
+
+#endif

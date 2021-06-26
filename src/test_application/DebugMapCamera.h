@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#if 0
+
 #include <osp/Active/activetypes.h>
 #include <osp/Universe.h>
 #include <osp/UserInputHandler.h>
@@ -63,3 +65,6 @@ private:
 };
 
 } // namespace testapp
+
+
+#endif

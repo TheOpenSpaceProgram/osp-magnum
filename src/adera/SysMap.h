@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#if 0
+
 #include <osp/Active/ActiveScene.h>
 #include <osp/types.h>
 #include <osp/Universe.h>
@@ -324,3 +326,5 @@ private:
 };
 
 } // namespace adera::active
+
+#endif

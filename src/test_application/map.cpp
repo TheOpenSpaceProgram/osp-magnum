@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 
+#if 0
+
 #include "map.h"
 #include <memory>
 #include "DebugMapCamera.h"
@@ -96,3 +98,5 @@ void testapp::test_map(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Destruct application
     pMagnumApp.reset();
 }
+
+#endif

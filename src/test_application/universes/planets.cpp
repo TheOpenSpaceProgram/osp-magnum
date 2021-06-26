@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 
+#if 0
+
 #include "planets.h"
 #include "vehicles.h"
 
@@ -126,3 +128,5 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
     // TODO hack
     nbody.build_table();
 }
+
+#endif

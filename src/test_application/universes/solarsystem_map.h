@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#if 0
+
 #include <osp/OSPApplication.h>
 
 namespace testapp
@@ -32,3 +34,5 @@ namespace testapp
 void create_solar_system(osp::OSPApplication& ospApp);
 
 }
+
+#endif

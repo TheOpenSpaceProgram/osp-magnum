@@ -187,7 +187,7 @@ int debug_cli_loop()
         {
             //if (destroy_universe())
             {
-                create_real_moon(g_osp);
+                //create_real_moon(g_osp);
             }
         }
         else if (command == "flight")
@@ -206,6 +206,7 @@ int debug_cli_loop()
         }
         else if (command == "map")
         {
+#if 0
             //if (destroy_universe())
             {
                 create_solar_system(g_osp);
@@ -218,6 +219,7 @@ int debug_cli_loop()
             std::thread t(test_map, std::ref(g_ospMagnum), std::ref(g_osp),
                 OSPMagnum::Arguments{g_argc, g_argv});
             g_magnumThread.swap(t);
+#endif
         }
         else if (command == "list_uni")
         {

@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 
+#if 0
+
 #include "SysMap.h"
 #include <Magnum/GL/Shader.h>
 #include <Magnum/GL/Version.h>
@@ -708,3 +710,5 @@ void ProcessMapCoordsCompute::bind_output_buffer(Buffer& output)
     output.bind(Buffer::Target::ShaderStorage,
         static_cast<Int>(BufferBinding::Output));
 }
+
+#endif

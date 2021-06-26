@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 
+#if 0
+
 #include "NBody.h"
 #include <iostream>
 #include <immintrin.h>
@@ -1031,3 +1033,5 @@ void TrajNBody::update_full_dynamics_kinematics(VIEW_T& view)
         pos += static_cast<Vector3s>(vel * dt);
     }
 }
+
+#endif

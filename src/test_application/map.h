@@ -23,6 +23,10 @@
  * SOFTWARE.
  */
 
+#pragma once
+
+#if 0
+
 #include "OSPMagnum.h"
 
 namespace testapp
@@ -32,3 +36,5 @@ void test_map(std::unique_ptr<OSPMagnum>& pMagnumApp,
     osp::OSPApplication& rOspApp, OSPMagnum::Arguments args);
 
 } // namespace testapp
+
+#endif

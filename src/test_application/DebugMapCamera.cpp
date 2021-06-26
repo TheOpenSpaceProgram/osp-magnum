@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright ? 2019-2020 Open Space Program Project
  *
  * MIT License
  *
@@ -22,6 +22,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+#if 0
+
 #include "DebugMapCamera.h"
 #include <osp/Active/ActiveScene.h>
 #include <osp/Universe.h>
@@ -174,3 +177,5 @@ bool DebugMapCameraController::try_switch_focus()
 
     return rUniReg.valid(m_selected);
 }
+
+#endif
