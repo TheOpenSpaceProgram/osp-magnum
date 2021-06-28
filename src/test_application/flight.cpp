@@ -223,7 +223,6 @@ void update_scene(osp::active::ActiveScene& rScene)
     SysAreaAssociate::update_scan(rScene);
 
     // Activate or deactivate nearby planets
-    ospnewton::SysNewton::update_world(rScene);
     SysPlanetA::update_activate(rScene);
 
     // Activate or deactivate nearby vehicles
