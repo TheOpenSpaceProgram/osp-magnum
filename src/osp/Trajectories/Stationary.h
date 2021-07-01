@@ -29,16 +29,38 @@
 namespace osp::universe
 {
 
-/**
- * A static universe where everything stays still
- */
-class TrajStationary : public CommonTrajectory<TrajStationary>
+struct CoordspaceSimple
+{
+    static void update_views(CoordinateSpace& rSpace, CoordspaceSimple& rData);
+
+    void reserve(size_t n)
+    {
+        m_satellites.reserve(n);
+        m_positions.reserve(n);
+        m_velocities.reserve(n);
+    }
+
+    uint32_t add(Satellite sat, Vector3s pos, Vector3 vel)
+    {
+        uint32_t index = m_satellites.size();
+
+        m_satellites.push_back(sat);
+        m_positions.push_back(pos);
+        m_velocities.push_back(vel);
+
+        return index;
+    }
+
+    std::vector<Satellite> m_satellites;
+    std::vector<Vector3s> m_positions;
+    std::vector<Vector3> m_velocities;
+};
+
+class TrajStationary
 {
 public:
 
-    TrajStationary(Universe& universe, Satellite center);
-    ~TrajStationary() = default;
-    void update() {};
+    static void update(CoordinateSpace& rSpace);
 };
 
 }

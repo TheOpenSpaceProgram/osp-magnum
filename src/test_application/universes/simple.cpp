@@ -43,22 +43,33 @@ using osp::universe::Universe;
 using osp::universe::SatActiveArea;
 using osp::universe::SatVehicle;
 
+using osp::universe::CoordspaceSimple;
 using osp::universe::TrajStationary;
 
+using osp::universe::UCompInCoordspace;
 using osp::universe::UCompTransformTraj;
+using osp::universe::UCompActiveArea;
 
 using planeta::universe::SatPlanet;
 using planeta::universe::UCompPlanet;
 
+using osp::Vector3s;
 
 void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
 {
     Universe &rUni = ospApp.get_universe();
+    Universe::Reg_t &rReg = rUni.get_reg();
     Package &rPkg = ospApp.debug_find_package("lzdb");
 
-    // Create trajectory that will make things added to the universe stationary
-    auto &stationary = rUni.trajectory_create<TrajStationary>(
-                                        rUni, rUni.sat_root());
+    using osp::universe::CoordinateSpace;
+
+    uint32_t const coordspaceIndex = rUni.m_coordSpaces.size();
+    std::optional<CoordinateSpace> &rSpace = rUni.m_coordSpaces.emplace_back(CoordinateSpace{});
+
+    rSpace->m_data.emplace<CoordspaceSimple>();
+    auto *pData = entt::any_cast<CoordspaceSimple>(&rSpace->m_data);
+
+    rSpace->m_center = rUni.sat_root();
 
     // Create 10 random vehicles
     for (int i = 0; i < 1; i ++)
@@ -67,21 +78,22 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
         Satellite sat = debug_add_random_vehicle(rUni, rPkg, "TestyMcTestFace Mk"
                                                  + std::to_string(i));
 
-        auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
 
-        posTraj.m_position = osp::Vector3s(i * 1024l * 5l, 0l, 0l);
-        posTraj.m_dirty = true;
+        auto &posTraj = rReg.get<UCompTransformTraj>(sat);
 
-        stationary.add(sat);
+        uint32_t satIndex = pData->add(sat, {i * 1024l * 5l, 0l, 0l}, {});
+        rReg.emplace<UCompInCoordspace>(
+                    sat, UCompInCoordspace{coordspaceIndex, satIndex});
     }
 
-    //Satellite sat = debug_add_deterministic_vehicle(uni, pkg, "Stomper Mk. I");
-    Satellite sat = testapp::debug_add_part_vehicle(rUni, rPkg, "Placeholder Mk. I");
-    auto& posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
-    posTraj.m_position = osp::Vector3s(22 * 1024l * 5l, 0l, 0l);
-    posTraj.m_dirty = true;
-    stationary.add(sat);
+    {
+        Satellite sat = testapp::debug_add_part_vehicle(rUni, rPkg, "Placeholder Mk. I");
+        auto& posTraj = rReg.get<UCompTransformTraj>(sat);
 
+        uint32_t satIndex = pData->add(sat, {22 * 1024l * 5l, 0l, 0l}, {});
+        rReg.emplace<UCompInCoordspace>(
+                    sat, UCompInCoordspace{coordspaceIndex, satIndex});
+    }
 
     // Add Grid of planets too
 
@@ -103,15 +115,33 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
                         rUni, sat, radius, mass, resolutionSurfaceMax,
                         resolutionScreenMax);
 
-            auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
+            auto &posTraj = rReg.get<UCompTransformTraj>(sat);
 
             // space planets 400m apart from each other
             // 1024 units = 1 meter
-            posTraj.m_position = {x * 1024l * 400l,
-                                  1024l * -300l,
-                                  z * 1024l * 6000l};
+            osp::Vector3s pos{x * 1024l * 400l,
+                              1024l * -300l,
+                              z * 1024l * 6000l};
+
+            uint32_t satIndex = pData->add(sat, pos, {0.0f, 0.0f, 0.0f});
+            rReg.emplace<UCompInCoordspace>(
+                        sat, UCompInCoordspace{coordspaceIndex, satIndex});
         }
     }
+
+    {
+        // create a Satellite with an ActiveArea
+        Satellite sat = rUni.sat_create();
+
+        // assign sat as an ActiveArea
+        UCompActiveArea &area = SatActiveArea::add_active_area(rUni, sat);
+
+        uint32_t satIndex = pData->add(sat, {0l, 0l, 0l}, {});
+        rReg.emplace<UCompInCoordspace>(
+                    sat, UCompInCoordspace{coordspaceIndex, satIndex});
+    }
+
+    CoordspaceSimple::update_views(rSpace.value(), *pData);
 
     SPDLOG_LOGGER_INFO(ospApp.get_logger(), "Created simple solar system");
 }

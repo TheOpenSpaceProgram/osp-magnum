@@ -527,37 +527,40 @@ void debug_print_sats()
 {
     using osp::universe::Universe;
     using osp::universe::UCompTransformTraj;
+    using osp::universe::UCompInCoordspace;
+    using osp::universe::CoordinateSpace;
 
     Universe const &rUni = g_osp.get_universe();
 
-    Universe::Registry_t const &reg = rUni.get_reg();
-    auto const view = reg.view<const UCompTransformTraj>();
+    Universe::Reg_t const &rReg = rUni.get_reg();
 
-    for (osp::universe::Satellite sat : view)
+    rReg.each([&rReg, &rUni] (osp::universe::Satellite sat)
     {
-        auto const &posTraj = view.get<const UCompTransformTraj>(sat);
+        auto const &posTraj = rReg.get<const UCompTransformTraj>(sat);
+        auto const &inCoord = rReg.get<const UCompInCoordspace>(sat);
 
-        osp::Vector3s const &pos = posTraj.m_position;
+        std::optional<CoordinateSpace> const &rSpace
+                = rUni.m_coordSpaces.at(inCoord.m_coordSpace);
+
+        osp::Vector3s const pos{
+            rSpace->ccomp_view<osp::universe::CCompX>()[inCoord.m_myIndex],
+            rSpace->ccomp_view<osp::universe::CCompY>()[inCoord.m_myIndex],
+            rSpace->ccomp_view<osp::universe::CCompZ>()[inCoord.m_myIndex]
+        };
 
         std::cout << "* SATELLITE: \"" << posTraj.m_name << "\"\n";
 
-        rUni.get_reg().visit(sat, [&reg] (entt::type_info info) {
-            Universe::Registry_t::poly_storage storage = reg.storage(info);
+        rReg.visit(sat, [&rReg] (entt::type_info info) {
+            Universe::Reg_t::poly_storage storage = rReg.storage(info);
             std::cout << "  * UComp: " << storage->value_type().name() << "\n";
         });
-
-        if (posTraj.m_trajectory != nullptr)
-        {
-            std::cout << "  * Trajectory: "
-                      << posTraj.m_trajectory->get_type_name() << "\n";
-        }
 
         auto posM = osp::Vector3(pos) / 1024.0f;
         std::cout << "  * Position: ["
                   << pos.x() << ", " << pos.y() << ", " << pos.z() << "], ["
                   << posM.x() << ", " << posM.y() << ", " << posM.z()
                   << "] meters\n";
-    }
+    });
 
 
 }

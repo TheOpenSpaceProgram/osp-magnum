@@ -51,18 +51,33 @@ void Universe::sat_remove(Satellite sat)
 
 Vector3s Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) const
 {
-    auto const view = m_registry.view<const UCompTransformTraj>();
+    auto const view = m_registry.view<const UCompInCoordspace>();
 
     // TODO: maybe do some checks to make sure they have the components
-    auto const &framePosTraj = view.get<const UCompTransformTraj>(referenceFrame);
-    auto const &targetPosTraj = view.get<const UCompTransformTraj>(target);
+    auto const &frameCoord = view.get<const UCompInCoordspace>(referenceFrame);
+    auto const &targetCoord = view.get<const UCompInCoordspace>(target);
 
-    if (framePosTraj.m_parent == targetPosTraj.m_parent)
+    if (frameCoord.m_coordSpace == targetCoord.m_coordSpace)
     {
-        // Same parent, easy calculation
-        return targetPosTraj.m_position - framePosTraj.m_position;
+        // Both Satellites are in the same coordinate system
+
+        std::optional<CoordinateSpace> const &rSpace
+                = m_coordSpaces.at(frameCoord.m_coordSpace);
+
+        ViewCComp_t<CCompX> const& viewX = rSpace->ccomp_view<CCompX>();
+        ViewCComp_t<CCompY> const& viewY = rSpace->ccomp_view<CCompY>();
+        ViewCComp_t<CCompZ> const& viewZ = rSpace->ccomp_view<CCompZ>();
+
+        Vector3s const pos{
+            viewX[targetCoord.m_myIndex] - viewX[frameCoord.m_myIndex],
+            viewY[targetCoord.m_myIndex] - viewY[frameCoord.m_myIndex],
+            viewZ[targetCoord.m_myIndex] - viewZ[frameCoord.m_myIndex],
+        };
+
+        return pos;
     }
-    // TODO: calculation for different parents
+
+    // TODO: calculation for positions across different coordinate spaces
 
     return {0, 0, 0};
 }

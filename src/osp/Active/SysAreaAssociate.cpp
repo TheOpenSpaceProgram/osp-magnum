@@ -131,7 +131,7 @@ void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3s translate)
     auto &areaPosTraj = pArea->get_universe().get_reg()
             .get<universe::UCompTransformTraj>(pArea->m_areaSat);
 
-    areaPosTraj.m_position += translate;
+//    areaPosTraj.m_position += translate;
 
     Vector3 meters = Vector3(translate) / gc_units_per_meter;
 
@@ -150,10 +150,10 @@ void SysAreaAssociate::sat_transform_set_relative(
     // 1024 units = 1 meter
     Vector3s posAreaRelative(transform.translation() * gc_units_per_meter);
 
-    satPosTraj.m_position = areaPosTraj.m_position + posAreaRelative;
-    satPosTraj.m_rotation = Quaternion::
-            fromMatrix(transform.rotationScaling());
-    satPosTraj.m_dirty = true;
+//    satPosTraj.m_position = areaPosTraj.m_position + posAreaRelative;
+//    satPosTraj.m_rotation = Quaternion::
+//            fromMatrix(transform.rotationScaling());
+//    satPosTraj.m_dirty = true;
 }
 
 void SysAreaAssociate::floating_origin_translate(

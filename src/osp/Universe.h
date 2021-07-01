@@ -27,9 +27,13 @@
 //#include "Satellite.h"
 #include "types.h"
 
+#include <Corrade/Containers/StridedArrayView.h>
+
 #include <entt/entity/registry.hpp>
+#include <entt/core/family.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <tuple>
 #include <vector>
 
@@ -37,9 +41,62 @@
 namespace osp::universe
 {
 
-class ISystemTrajectory;
 
 enum class Satellite : entt::id_type {};
+
+using ccomp_family_t = entt::family<struct ccomp_type>;
+using ccomp_id_t = ccomp_family_t::family_type;
+
+using trajectory_family_t = entt::family<struct trajectory_type>;
+using trajectory_id_t = trajectory_family_t::family_type;
+
+struct CCompX { using datatype_t = spaceint_t; };
+struct CCompY { using datatype_t = spaceint_t; };
+struct CCompZ { using datatype_t = spaceint_t; };
+struct CCompSat { using datatype_t = Satellite; };
+
+template <typename CCOMP_T>
+using ViewCComp_t = Corrade::Containers::StridedArrayView1D<typename CCOMP_T::datatype_t>;
+
+template<typename CCOMP_T>
+constexpr ccomp_id_t ccomp_id() noexcept
+{
+    return ccomp_family_t::type<CCOMP_T>;
+}
+
+//struct CoordinateView
+//{
+//    Corrade::Containers::StridedArrayView1D<void> m_data;
+
+    //const void* m_data;
+    //uint16_t m_size;
+    //uint16_t m_stride;
+//};
+
+using CoordinateView_t = std::optional<Corrade::Containers::StridedArrayView1D<void>>;
+
+struct CoordinateSpace
+{
+    entt::any m_data;
+
+    std::vector<CoordinateView_t> m_components;
+
+    std::vector<Satellite> m_toAdd;
+    std::vector<Satellite> m_toRemove;
+
+    Satellite m_center;
+
+    trajectory_id_t m_trajectoryType;
+
+    int16_t m_pow2scale;
+
+    template<typename CCOMP_T>
+    ViewCComp_t<CCOMP_T> const ccomp_view() const
+    {
+        return Corrade::Containers::arrayCast<typename CCOMP_T::datatype_t>(
+                    m_components.at(ccomp_id<CCOMP_T>()).value());
+    }
+};
 
 /**
  * A model of deep space. This class stores the data of astronomical objects
@@ -67,7 +124,7 @@ class Universe
 
 public:
 
-    using Registry_t = entt::basic_registry<Satellite>;
+    using Reg_t = entt::basic_registry<Satellite>;
 
     Universe();
     Universe(Universe const &copy) = delete;
@@ -112,180 +169,35 @@ public:
      */
     Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const;
 
-    /**
-     * Create a Trajectory, and add it to the universe.
-     * @tparam TRAJECTORY_T Type of Trajectory to construct
-     * @return Reference to new trajectory just created
-     */
-    template<typename TRAJECTORY_T, typename ... ARGS_T>
-    TRAJECTORY_T& trajectory_create(ARGS_T&& ... args);
-
-    constexpr Registry_t& get_reg() noexcept { return m_registry; }
-    constexpr const Registry_t& get_reg() const noexcept
+    constexpr Reg_t& get_reg() noexcept { return m_registry; }
+    constexpr const Reg_t& get_reg() const noexcept
     { return m_registry; }
+
+    std::vector< std::optional<CoordinateSpace> > m_coordSpaces;
 
 private:
 
     Satellite m_root;
 
-    std::vector<std::unique_ptr<ISystemTrajectory>> m_trajectories;
-
-    Registry_t m_registry;
+    Reg_t m_registry;
 
 };
 
-template<typename TRAJECTORY_T, typename ... ARGS_T>
-TRAJECTORY_T& Universe::trajectory_create(ARGS_T&& ... args)
-{
-    std::unique_ptr<TRAJECTORY_T> newTraj
-                = std::make_unique<TRAJECTORY_T>(std::forward<ARGS_T>(args)...);
-    return static_cast<TRAJECTORY_T&>(*m_trajectories.emplace_back(std::move(newTraj)));
-}
 
 // default ECS components needed for the universe
 
-
 struct UCompTransformTraj
 {
-    // Relative to m_parent
-    Vector3s m_position;
-
-    // In 'global' space
-    Quaternion m_rotation;
-
-    Satellite m_parent; // Set only by trajectory
-
-    ISystemTrajectory *m_trajectory{nullptr}; // get rid of this some day
-    unsigned m_index; // index in trajectory's vector
-
-    // set this to true when you modify something the trajectory might use
-    bool m_dirty{true};
-
     // move this somewhere else eventually
     std::string m_name;
+
+    Quaternion m_rotation;
 };
 
-struct UCompVelocity
+struct UCompInCoordspace
 {
-    Vector3 m_velocity;
+    uint32_t m_coordSpace;
+    uint32_t m_myIndex;
 };
-
-
-// TODO: move to different files and de-OOPify trajectories too
-
-// Trajectories are satellites that manages the movement of a large group of
-// other satellites. They implement things like:
-// * N-body
-// * Patched Conics
-// * Landed
-//
-// It's possible that each trajectory can have its own coordinate system, but
-// this is still up for discussion.
-//
-// Individual instances of trajectories would also have be called in a certain
-// order.
-//
-// Ideas for more data-oriented trajectories:
-// * Add a UCompTrajectory with:
-//     * vector or entt::sparse_set of associated satellites
-//     * a function pointer to an update function
-//     * a priority number or an entity to refer to another trajectory 'parent'
-//       that must be updated first.
-// * Maybe rename Trajectories to trajectory systems, coordinate systems
-
-using TrajectoryType = entt::id_type;
-
-/**
- * A system that manages the movement of multiple satellites, centered around a
- * single satellite
- */
-class ISystemTrajectory
-{
-public:
-    virtual ~ISystemTrajectory() = default;
-    virtual void update() = 0;
-    virtual void add(Satellite sat) = 0;
-    virtual void remove(Satellite sat) = 0;
-    virtual Satellite get_center() const = 0;
-
-    //virtual TrajectoryType get_type() = 0;
-    virtual std::string const& get_type_name() = 0;
-
-private:
-    //std::vector<Satellite> k;
-};
-
-/**
- * Implement some commmon functions for Trajectories
- */
-template<typename TRAJECTORY_T>
-class CommonTrajectory : public ISystemTrajectory
-{
-public:
-
-    CommonTrajectory(Universe& universe, Satellite center) :
-            m_universe(universe),
-            m_center(center) { };
-    ~CommonTrajectory() = default;
-
-    virtual void add(Satellite sat) override;
-    virtual void remove(Satellite sat) override;
-
-//    TrajectoryType get_type() override
-//    {
-//        static auto id = entt::type_info<TRAJECTORY_T>::id();
-//        return id;
-//    }
-    std::string const& get_type_name() override
-    {
-        //static auto name = entt::type_info<TRAJECTORY_T>::name();
-        static std::string name = typeid(TRAJECTORY_T).name();
-        return name;
-    }
-
-    Satellite get_center() const override { return m_center; };
-
-    constexpr Universe& get_universe() const { return m_universe; }
-    constexpr std::vector<Satellite>& get_satellites() { return m_satellites; }
-
-private:
-
-    Universe& m_universe;
-    Satellite m_center;
-    std::vector<Satellite> m_satellites;
-};
-
-template<typename TRAJECTORY_T>
-void CommonTrajectory<TRAJECTORY_T>::add(Satellite sat)
-{
-    auto &posTraj = m_universe.get_reg().get<UCompTransformTraj>(sat);
-
-    if (posTraj.m_trajectory)
-    {
-        return; // already part of trajectory
-    }
-
-    posTraj.m_trajectory = this;
-    posTraj.m_index = m_satellites.size();
-    posTraj.m_parent = m_center;
-    m_satellites.push_back(sat);
-}
-
-template<typename TRAJECTORY_T>
-void CommonTrajectory<TRAJECTORY_T>::remove(Satellite sat)
-{
-    auto &posTraj = m_universe.get_reg().get<UCompTransformTraj>(sat);
-
-    if (posTraj.m_trajectory != this)
-    {
-        return; // not associated with this satellite
-    }
-
-    m_satellites.erase(m_satellites.begin() + posTraj.m_index);
-
-    // disassociate with this satellite
-    posTraj.m_parent = entt::null;
-    posTraj.m_trajectory = nullptr;
-}
 
 }
