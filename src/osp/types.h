@@ -33,8 +33,6 @@
 #include <Magnum/Math/Matrix4.h>
 #include <Magnum/Math/Matrix3.h>
 
-//typedef KeyMap std::map<Magnum::Platform::Application::KeyEvent>
-
 namespace osp
 {
 
@@ -48,16 +46,5 @@ using Magnum::Matrix3;
 using Magnum::Matrix4;
 
 using Magnum::Rad;
-
-using spaceint_t = int64_t;
-
-// 1024 space units = 1 meter
-// TODO: this should vary by trajectory, but for now it's global
-const float gc_units_per_meter = 1024.0f;
-
-// A Vector3 for space
-
-using Vector3s = Magnum::Math::Vector3<spaceint_t>;
-
 
 }

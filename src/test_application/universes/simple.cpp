@@ -53,7 +53,7 @@ using osp::universe::UCompActiveArea;
 using planeta::universe::SatPlanet;
 using planeta::universe::UCompPlanet;
 
-using osp::Vector3s;
+using osp::universe::Vector3g;
 
 void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
 {
@@ -119,9 +119,10 @@ void testapp::create_simple_solar_system(osp::OSPApplication& ospApp)
 
             // space planets 400m apart from each other
             // 1024 units = 1 meter
-            osp::Vector3s pos{x * 1024l * 400l,
-                              1024l * -300l,
-                              z * 1024l * 6000l};
+            osp::universe::Vector3g pos{
+                x * 1024l * 400l,
+                1024l * -300l,
+                z * 1024l * 6000l};
 
             uint32_t satIndex = pData->add(sat, pos, {0.0f, 0.0f, 0.0f});
             rReg.emplace<UCompInCoordspace>(

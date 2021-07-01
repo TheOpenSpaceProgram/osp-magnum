@@ -49,7 +49,7 @@ void Universe::sat_remove(Satellite sat)
     m_registry.destroy(sat);
 }
 
-Vector3s Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) const
+Vector3g Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) const
 {
     auto const view = m_registry.view<const UCompInCoordspace>();
 
@@ -68,7 +68,7 @@ Vector3s Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) cons
         ViewCComp_t<CCompY> const& viewY = rSpace->ccomp_view<CCompY>();
         ViewCComp_t<CCompZ> const& viewZ = rSpace->ccomp_view<CCompZ>();
 
-        Vector3s const pos{
+        Vector3g const pos{
             viewX[targetCoord.m_myIndex] - viewX[frameCoord.m_myIndex],
             viewY[targetCoord.m_myIndex] - viewY[frameCoord.m_myIndex],
             viewZ[targetCoord.m_myIndex] - viewZ[frameCoord.m_myIndex],

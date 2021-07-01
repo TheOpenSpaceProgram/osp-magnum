@@ -112,7 +112,8 @@ public:
      * Move the ActiveArea satellite, and translate everything in the
      * ActiveScene, aka: floating origin translation
      */
-    static void area_move(ActiveScene& rScene, Vector3s translate);
+    static void area_move(ActiveScene& rScene,
+                          osp::universe::Vector3g translate);
 
     /**
      * Set the transform of a Satellite based on a transform (in meters)

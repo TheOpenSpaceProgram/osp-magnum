@@ -24,7 +24,7 @@
  */
 #pragma once
 
-//#include "Satellite.h"
+#include "coordinates.h"
 #include "types.h"
 
 #include <Corrade/Containers/StridedArrayView.h>
@@ -40,63 +40,6 @@
 
 namespace osp::universe
 {
-
-
-enum class Satellite : entt::id_type {};
-
-using ccomp_family_t = entt::family<struct ccomp_type>;
-using ccomp_id_t = ccomp_family_t::family_type;
-
-using trajectory_family_t = entt::family<struct trajectory_type>;
-using trajectory_id_t = trajectory_family_t::family_type;
-
-struct CCompX { using datatype_t = spaceint_t; };
-struct CCompY { using datatype_t = spaceint_t; };
-struct CCompZ { using datatype_t = spaceint_t; };
-struct CCompSat { using datatype_t = Satellite; };
-
-template <typename CCOMP_T>
-using ViewCComp_t = Corrade::Containers::StridedArrayView1D<typename CCOMP_T::datatype_t>;
-
-template<typename CCOMP_T>
-constexpr ccomp_id_t ccomp_id() noexcept
-{
-    return ccomp_family_t::type<CCOMP_T>;
-}
-
-//struct CoordinateView
-//{
-//    Corrade::Containers::StridedArrayView1D<void> m_data;
-
-    //const void* m_data;
-    //uint16_t m_size;
-    //uint16_t m_stride;
-//};
-
-using CoordinateView_t = std::optional<Corrade::Containers::StridedArrayView1D<void>>;
-
-struct CoordinateSpace
-{
-    entt::any m_data;
-
-    std::vector<CoordinateView_t> m_components;
-
-    std::vector<Satellite> m_toAdd;
-    std::vector<Satellite> m_toRemove;
-
-    Satellite m_center;
-
-    trajectory_id_t m_trajectoryType;
-
-    int16_t m_pow2scale;
-
-    template<typename CCOMP_T>
-    ViewCComp_t<CCOMP_T> const ccomp_view() const
-    {
-        return Corrade::Containers::arrayCast<typename CCOMP_T::datatype_t>(
-                    m_components.at(ccomp_id<CCOMP_T>()).value());
-    }
-};
 
 /**
  * A model of deep space. This class stores the data of astronomical objects
@@ -159,7 +102,7 @@ public:
      * @param target [in]
      * @return relative position of target in SpaceInt vector
      */
-    Vector3s sat_calc_pos(Satellite referenceFrame, Satellite target) const;
+    Vector3g sat_calc_pos(Satellite referenceFrame, Satellite target) const;
 
     /**
      * Calculate position between two satellites.

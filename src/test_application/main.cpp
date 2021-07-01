@@ -542,7 +542,7 @@ void debug_print_sats()
         std::optional<CoordinateSpace> const &rSpace
                 = rUni.m_coordSpaces.at(inCoord.m_coordSpace);
 
-        osp::Vector3s const pos{
+        osp::universe::Vector3g const pos{
             rSpace->ccomp_view<osp::universe::CCompX>()[inCoord.m_myIndex],
             rSpace->ccomp_view<osp::universe::CCompY>()[inCoord.m_myIndex],
             rSpace->ccomp_view<osp::universe::CCompZ>()[inCoord.m_myIndex]

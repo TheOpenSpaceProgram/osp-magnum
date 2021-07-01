@@ -37,6 +37,8 @@ using osp::universe::UCompActivatable;
 using osp::universe::UCompActivationRadius;
 using osp::universe::UCompActiveArea;
 
+using osp::universe::Vector3g;
+
 void SysAreaAssociate::update_scan(ActiveScene& rScene)
 {
     ACompAreaLink *pArea = try_get_area_link(rScene);
@@ -119,7 +121,7 @@ void SysAreaAssociate::disconnect(ActiveScene& rScene)
     //       Also delete the ACompAreaLink from the scene
 }
 
-void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3s translate)
+void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3g translate)
 {
     ACompAreaLink *pArea = try_get_area_link(rScene);
 
@@ -133,7 +135,7 @@ void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3s translate)
 
 //    areaPosTraj.m_position += translate;
 
-    Vector3 meters = Vector3(translate) / gc_units_per_meter;
+    Vector3 meters = Vector3(translate) / universe::gc_units_per_meter;
 
     floating_origin_translate(rScene, -meters);
 }
@@ -148,7 +150,7 @@ void SysAreaAssociate::sat_transform_set_relative(
             .get<universe::UCompTransformTraj>(relativeSat);
 
     // 1024 units = 1 meter
-    Vector3s posAreaRelative(transform.translation() * gc_units_per_meter);
+    Vector3g posAreaRelative(transform.translation() * universe::gc_units_per_meter);
 
 //    satPosTraj.m_position = areaPosTraj.m_position + posAreaRelative;
 //    satPosTraj.m_rotation = Quaternion::
