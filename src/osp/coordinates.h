@@ -33,6 +33,7 @@
 #include <Corrade/Containers/StridedArrayView.h>
 
 #include <optional>
+#include <variant>
 #include <vector>
 
 namespace osp::universe
@@ -41,9 +42,8 @@ namespace osp::universe
 using ccomp_family_t = entt::family<struct ccomp_type>;
 using ccomp_id_t = ccomp_family_t::family_type;
 
-using trajectory_family_t = entt::family<struct trajectory_type>;
-using trajectory_id_t = trajectory_family_t::family_type;
-
+// Coordinate component types (CComp). ccomp_family_t generates IDs for these
+// at runtime, used as indices for CoordinateSpace::m_components
 struct CCompX { using datatype_t = spaceint_t; };
 struct CCompY { using datatype_t = spaceint_t; };
 struct CCompZ { using datatype_t = spaceint_t; };
@@ -60,54 +60,85 @@ constexpr ccomp_id_t ccomp_id() noexcept
 
 using CoordinateView_t = std::optional<Corrade::Containers::StridedArrayView1D<void>>;
 
+/**
+ * @brief Stores positions, velocities, and other related data for Satellites,
+ *        and exposes them through read-only strided array views.
+ *
+ * CoordinateSpaces must be managed by some external system. They can store any
+ * kind of coordinate data, such as Cartesian XYZ or orbital parameters.
+ *
+ * As part of ECS, this is a way to store common components in separate buffers.
+ * that can each be managed by a specific system (simultaneously too).
+ * aka: a non-EnTT but still ECS component pool
+ *
+ */
 struct CoordinateSpace
 {
-    entt::any m_data;
+    using SatToAdd_t = std::tuple<Satellite, Vector3g, Vector3>;
 
-    std::vector<CoordinateView_t> m_components;
+    enum class ECmdOp : uint8_t { Add, Set };
+    enum class ECmdVar : uint8_t { Position, Velocity };
+    using CmdValue_t = std::variant<Vector3, Vector3g>;
 
-    std::vector<Satellite> m_toAdd;
-    std::vector<Satellite> m_toRemove;
+    using Command_t = std::tuple<ECmdOp, ECmdVar, CmdValue_t>;
 
-    Satellite m_center;
+    /**
+     * @brief Request to add a Satellite to this coordinate space
+     *
+     * Every coordinate space must be able to accept Satellites by a position
+     * and a velocity as a common interface. If the CoordinateSpace uses a
+     * non-Cartesian coordinate system like Kepler orbits, then it must be
+     * converted.
+     *
+     * @param sat [in] Satellite to add
+     * @param pos [in] Position in this coordinate system
+     * @param vel [in] Velocity of satellite
+     */
+    void add(Satellite sat, Vector3g pos, Vector3 vel)
+    {
+        m_toAdd.emplace_back(sat, pos, vel);
+    }
 
-    trajectory_id_t m_trajectoryType;
+    /**
+     * @brief TODO - commands to move and accelerate satellites
+     *
+     * @param cmd
+     */
+    void command(Command_t&& cmd)
+    {
+        m_commands.emplace_back(std::move(cmd));
+    }
 
-    int16_t m_pow2scale;
-
+    /**
+     * @brief Access this CoordinateSpace's components
+     *
+     * Use the index from a Satellite's UCompCoordspaceIndex to access this view
+     *
+     * @return A StridedArrayView1D viewing coordinate space component data
+     *
+     * @tparam COMP_T Coordinate component to view
+     */
     template<typename CCOMP_T>
     ViewCComp_t<CCOMP_T> const ccomp_view() const
     {
         return Corrade::Containers::arrayCast<typename CCOMP_T::datatype_t>(
                     m_components.at(ccomp_id<CCOMP_T>()).value());
     }
+
+    // Queues for systems to communicate
+    std::vector<SatToAdd_t> m_toAdd;
+    std::vector<Satellite> m_toRemove;
+    std::vector<Command_t> m_commands;
+
+    // Data and component views are managed by the external system
+    // m_data is usually something like CoordspaceCartesianSimple
+    entt::any m_data;
+    std::vector<CoordinateView_t> m_components;
+
+    Satellite m_center;
+    int16_t m_pow2scale;
 };
 
-struct CoordspaceSimple
-{
-    static void update_views(CoordinateSpace& rSpace, CoordspaceSimple& rData);
 
-    void reserve(size_t n)
-    {
-        m_satellites.reserve(n);
-        m_positions.reserve(n);
-        m_velocities.reserve(n);
-    }
-
-    uint32_t add(Satellite sat, Vector3g pos, Vector3 vel)
-    {
-        uint32_t index = m_satellites.size();
-
-        m_satellites.push_back(sat);
-        m_positions.push_back(pos);
-        m_velocities.push_back(vel);
-
-        return index;
-    }
-
-    std::vector<Satellite> m_satellites;
-    std::vector<Vector3g> m_positions;
-    std::vector<Vector3> m_velocities;
-};
 
 }

@@ -75,42 +75,47 @@ public:
     ~Universe() = default;
 
     /**
-     * @return an null satellite
-     */
-    static constexpr Satellite sat_null() { return entt::null; };
-
-    /**
-     * Create a Satellite with default components, and adds it to the universe.
-     * This Satellite will not be assigned a type.
+     * @brief Create a Satellite with default components
+     *
      * @return The new Satellite just created
      */
     Satellite sat_create();
 
     /**
-     * @return Root Satellite of the universe. This will never change.
+     * @return Root Satellite of the universe
      */
     constexpr Satellite sat_root() { return m_root; };
 
     /**
-     * Remove a satellite
+     * @brief Remove a satellite
      */
     void sat_remove(Satellite sat);
 
     /**
-     * Calculate position between two satellites.
-     * @param referenceFrame [in]
-     * @param target [in]
-     * @return relative position of target in SpaceInt vector
+     * @brief Calculate position between two satellites.
+     *
+     * @param referenceFrame [in] Satellite used as reference frame
+     * @param target         [in] Satellite to calculate position to
+     * @return relative position of target in spaceint_t vector
      */
     Vector3g sat_calc_pos(Satellite referenceFrame, Satellite target) const;
 
     /**
-     * Calculate position between two satellites.
-     * @param referenceFrame [in]
-     * @param target [in]
+     * @brief Calculate position between two satellites.
+     *
+     * @param referenceFrame [in] Satellite used as reference frame
+     * @param target         [in] Satellite to calculate position to
      * @return relative position of target in meters
      */
     Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const;
+
+    /**
+     * @brief Ressign indices in the UCompInCoordspace components of satellites
+     *        in a CoordinateSpace's m_toAdd queue
+     *
+     * @param coordSpace [in] Index to CoordinateSpace in m_coordSpaces
+     */
+    void update_sat_coordspace(uint32_t coordSpace);
 
     constexpr Reg_t& get_reg() noexcept { return m_registry; }
     constexpr const Reg_t& get_reg() const noexcept
@@ -140,6 +145,10 @@ struct UCompTransformTraj
 struct UCompInCoordspace
 {
     uint32_t m_coordSpace;
+};
+
+struct UCompCoordspaceIndex
+{
     uint32_t m_myIndex;
 };
 
