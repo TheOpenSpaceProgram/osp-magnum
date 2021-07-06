@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright Â© 2019-2020 Open Space Program Project
  *
  * MIT License
  *
