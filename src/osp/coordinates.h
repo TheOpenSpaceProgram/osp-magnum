@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -52,13 +52,24 @@ struct CCompSat { using datatype_t = Satellite; };
 template <typename CCOMP_T>
 using ViewCComp_t = Corrade::Containers::StridedArrayView1D<typename CCOMP_T::datatype_t>;
 
-template<typename CCOMP_T>
-constexpr ccomp_id_t ccomp_id() noexcept
-{
-    return ccomp_family_t::type<CCOMP_T>;
-}
+using CoordinateView_t = Corrade::Containers::StridedArrayView1D<void>;
 
-using CoordinateView_t = std::optional<Corrade::Containers::StridedArrayView1D<void>>;
+using coordspace_index_t = uint32_t;
+
+/**
+ * Runtime-generated sequential ID for a CComp
+ */
+template<typename CCOMP_T>
+inline ccomp_id_t ccomp_id = ccomp_family_t::type<CCOMP_T>;
+
+/**
+ * @return Minimum array size needed for a set of CComp IDs to be valid indices
+ */
+template<typename ... CCOMP_T>
+constexpr size_t ccomp_min_size() noexcept
+{
+    return size_t(std::max({ccomp_id<CCOMP_T> ...})) + 1;
+}
 
 /**
  * @brief Stores positions, velocities, and other related data for Satellites,
@@ -104,7 +115,7 @@ struct CoordinateSpace
      *
      * @param cmd
      */
-    void command(Command_t&& cmd)
+    void command(Command_t cmd)
     {
         m_commands.emplace_back(std::move(cmd));
     }
@@ -122,7 +133,7 @@ struct CoordinateSpace
     ViewCComp_t<CCOMP_T> const ccomp_view() const
     {
         return Corrade::Containers::arrayCast<typename CCOMP_T::datatype_t>(
-                    m_components.at(ccomp_id<CCOMP_T>()).value());
+                    m_components.at(ccomp_id<CCOMP_T>).value());
     }
 
     // Queues for systems to communicate
@@ -133,11 +144,12 @@ struct CoordinateSpace
     // Data and component views are managed by the external system
     // m_data is usually something like CoordspaceCartesianSimple
     entt::any m_data;
-    std::vector<CoordinateView_t> m_components;
+    std::vector<std::optional<CoordinateView_t> > m_components;
 
     Satellite m_center;
     int16_t m_pow2scale;
-};
+
+}; // CoordinateSpace
 
 
 

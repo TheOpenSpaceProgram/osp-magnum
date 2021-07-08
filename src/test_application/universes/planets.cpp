@@ -47,39 +47,37 @@ using osp::universe::SatVehicle;
 using osp::universe::CoordspaceCartesianSimple;
 
 using osp::universe::UCompInCoordspace;
-using osp::universe::UCompTransformTraj;
 using osp::universe::UCompActiveArea;
 
 using planeta::universe::SatPlanet;
 using planeta::universe::UCompPlanet;
 
+using osp::universe::Vector3g;
+using osp::universe::spaceint_t;
 
 void testapp::create_real_moon(osp::OSPApplication& ospApp)
 {
     using osp::universe::CoordinateSpace;
 
     Universe &rUni = ospApp.get_universe();
-    Universe::Reg_t &rReg = rUni.get_reg();
     Package &rPkg = ospApp.debug_find_package("lzdb");
 
     // Create a coordinate space used to position Satellites
-    uint32_t const coordspaceIndex = rUni.m_coordSpaces.size();
-    std::optional<CoordinateSpace> &rSpace = rUni.m_coordSpaces.emplace_back(CoordinateSpace{});
-    rSpace->m_center = rUni.sat_root();
+    auto const& [coordIndex, rSpace] = rUni.coordspace_create();
 
     // Use CoordspaceSimple as data, which can store positions and velocities
     // of satellites
-    rSpace->m_data.emplace<CoordspaceCartesianSimple>();
-    auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace->m_data);
+    rSpace.m_data.emplace<CoordspaceCartesianSimple>();
+    auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace.m_data);
 
     // Create 4 part vehicles
     for (int i = 0; i < 4; i ++)
     {
         Satellite sat = testapp::debug_add_part_vehicle(rUni, rPkg, "Placeholder Mk. I " + std::to_string(i));
 
-        auto &posTraj = rReg.get<UCompTransformTraj>(sat);
+        Vector3g pos{i * 1024l * 4l, 0l, 0l};
 
-        rSpace->add(sat, {i * 1024l * 4l, 0l, 0l}, {});
+        rSpace.add(sat, pos, {});
     }
 
     // Add Moon
@@ -97,13 +95,11 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
         SatPlanet::add_planet(rUni, sat, radius, mass, resolutionSurfaceMax,
                               resolutionScreenMax);
 
-        osp::universe::Vector3g pos{
-            0 * 1024l,
-            osp::universe::spaceint_t(1024l * radius),
-            0 * 1024l};
-
+        // Surface will appear 200 meters below the origin
         // 1024 units = 1 meter
-        rSpace->add(sat, pos, {});
+        Vector3g pos{0, 1024l * (spaceint_t(radius) + 200), 0 * 1024l};
+
+        rSpace.add(sat, pos, {});
     }
 
     {
@@ -111,14 +107,16 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
         Satellite sat = rUni.sat_create();
 
         // assign sat as an ActiveArea
-        UCompActiveArea &area = SatActiveArea::add_active_area(rUni, sat);
+        SatActiveArea::add_active_area(rUni, sat);
 
-        rSpace->add(sat, {0l, 0l, 0l}, {});
+        rSpace.add(sat, {}, {});
     }
 
-    rUni.update_sat_coordspace(coordspaceIndex);
-    CoordspaceCartesianSimple::update_exchange(rUni, rSpace.value(), *pData);
-    CoordspaceCartesianSimple::update_views(rSpace.value(), *pData);
+    // Update CoordinateSpace to finish adding the new Satellites
+    rUni.coordspace_update_sats(coordIndex);
+    CoordspaceCartesianSimple::update_exchange(rUni, rSpace, *pData);
+    rSpace.m_toAdd.clear();
+    CoordspaceCartesianSimple::update_views(rSpace, *pData);
 
     SPDLOG_LOGGER_INFO(ospApp.get_logger(), "Created large moon");
 }

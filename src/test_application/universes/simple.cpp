@@ -47,7 +47,6 @@ using osp::universe::SatVehicle;
 using osp::universe::CoordspaceCartesianSimple;
 
 using osp::universe::UCompInCoordspace;
-using osp::universe::UCompTransformTraj;
 using osp::universe::UCompActiveArea;
 
 using planeta::universe::SatPlanet;
@@ -60,18 +59,15 @@ void testapp::create_simple_solar_system(osp::OSPApplication& rOspApp)
     using osp::universe::CoordinateSpace;
 
     Universe &rUni = rOspApp.get_universe();
-    Universe::Reg_t &rReg = rUni.get_reg();
     Package &rPkg = rOspApp.debug_find_package("lzdb");
 
     // Create a coordinate space used to position Satellites
-    uint32_t const coordspaceIndex = rUni.m_coordSpaces.size();
-    std::optional<CoordinateSpace> &rSpace = rUni.m_coordSpaces.emplace_back(CoordinateSpace{});
-    rSpace->m_center = rUni.sat_root();
+    auto const& [coordIndex, rSpace] = rUni.coordspace_create();
 
     // Use CoordspaceSimple as data, which can store positions and velocities
     // of satellites
-    rSpace->m_data.emplace<CoordspaceCartesianSimple>();
-    auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace->m_data);
+    rSpace.m_data.emplace<CoordspaceCartesianSimple>();
+    auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace.m_data);
 
 
     // Create 2 random vehicles
@@ -82,13 +78,15 @@ void testapp::create_simple_solar_system(osp::OSPApplication& rOspApp)
                                                  + std::to_string(i));
 
         // Add it to the CoordspaceSimple directly
-        rSpace->add(sat, {i * 1024l * 5l, 0l, 0l}, {});
+        rSpace.add(sat, {i * 1024l * 5l, 0l, 0l}, {});
     }
 
     {
         Satellite sat = testapp::debug_add_part_vehicle(rUni, rPkg, "Placeholder Mk. I");
 
-        rSpace->add(sat, {22 * 1024l * 5l, 0l, 0l}, {});
+        Vector3g pos{22 * 1024l * 5l, 0l, 0l};
+
+        rSpace.add(sat, pos, {});
     }
 
     // Add Grid of planets too
@@ -117,7 +115,7 @@ void testapp::create_simple_solar_system(osp::OSPApplication& rOspApp)
                 1024l * -300l,
                 z * 1024l * 6000l};
 
-            rSpace->add(sat, pos, {0.0f, 0.0f, 0.0f});
+            rSpace.add(sat, pos, {});
         }
     }
 
@@ -126,14 +124,16 @@ void testapp::create_simple_solar_system(osp::OSPApplication& rOspApp)
         Satellite sat = rUni.sat_create();
 
         // assign sat as an ActiveArea
-        UCompActiveArea &area = SatActiveArea::add_active_area(rUni, sat);
+        SatActiveArea::add_active_area(rUni, sat);
 
-        rSpace->add(sat, {0l, 0l, 0l}, {});
+        rSpace.add(sat, {}, {});
     }
 
-    rUni.update_sat_coordspace(coordspaceIndex);
-    CoordspaceCartesianSimple::update_exchange(rUni, rSpace.value(), *pData);
-    CoordspaceCartesianSimple::update_views(rSpace.value(), *pData);
+    // Update CoordinateSpace to finish adding the new Satellites
+    rUni.coordspace_update_sats(coordIndex);
+    CoordspaceCartesianSimple::update_exchange(rUni, rSpace, *pData);
+    rSpace.m_toAdd.clear();
+    CoordspaceCartesianSimple::update_views(rSpace, *pData);
 
     SPDLOG_LOGGER_INFO(rOspApp.get_logger(), "Created simple solar system");
 }

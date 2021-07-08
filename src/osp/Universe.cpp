@@ -32,11 +32,6 @@
 using namespace osp::universe;
 using namespace osp;
 
-Universe::Universe()
-{
-    m_root = sat_create();
-}
-
 Satellite Universe::sat_create()
 {
     Satellite sat = m_registry.create();
@@ -100,7 +95,15 @@ Vector3 Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target
     return Vector3(sat_calc_pos(referenceFrame, target)) / gc_units_per_meter;
 }
 
-void Universe::update_sat_coordspace(uint32_t coordSpace)
+std::pair<coordspace_index_t, CoordinateSpace&> Universe::coordspace_create()
+{
+    coordspace_index_t const index = m_coordSpaces.size();
+    return {index, *m_coordSpaces.emplace_back(CoordinateSpace{})};
+
+    // TODO: find deleted spaces instead of emplacing back each time
+}
+
+void Universe::coordspace_update_sats(uint32_t coordSpace)
 {
     auto view = m_registry.view<UCompInCoordspace>();
 

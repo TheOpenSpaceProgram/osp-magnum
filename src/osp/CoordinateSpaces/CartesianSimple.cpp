@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -47,36 +47,30 @@ void CoordspaceCartesianSimple::update_exchange(
         rData.m_velocities.push_back(vel);
     }
 
-    rSpace.m_toAdd.clear();
-
     // TODO: handle removal of satellites
 }
 
 void CoordspaceCartesianSimple::update_views(
         CoordinateSpace& rSpace, CoordspaceCartesianSimple& rData)
 {
-
-    size_t const ccompCount = std::max({
-                ccomp_id<CCompSat>(),
-                ccomp_id<CCompX>(), ccomp_id<CCompY>(), ccomp_id<CCompZ>()});
-
     size_t const satCount = rData.m_satellites.size();
 
-    rSpace.m_components.resize(ccompCount + 1);
+    rSpace.m_components.resize(
+                ccomp_min_size<CCompSat, CCompX, CCompY, CCompZ>());
 
-    rSpace.m_components[ccomp_id<CCompSat>()] = {
+    rSpace.m_components[ccomp_id<CCompSat>] = {
                 rData.m_satellites, satCount,
                 sizeof(Satellite)};
 
-    rSpace.m_components[ccomp_id<CCompX>()] = {
+    rSpace.m_components[ccomp_id<CCompX>] = {
             rData.m_positions, &rData.m_positions[0].x(),
             satCount, sizeof (Vector3g)};
 
-    rSpace.m_components[ccomp_id<CCompY>()] = {
+    rSpace.m_components[ccomp_id<CCompY>] = {
             rData.m_positions, &rData.m_positions[0].y(),
             satCount, sizeof (Vector3g)};
 
-    rSpace.m_components[ccomp_id<CCompZ>()] = {
+    rSpace.m_components[ccomp_id<CCompZ>] = {
             rData.m_positions, &rData.m_positions[0].z(),
             satCount, sizeof (Vector3g)};
 }

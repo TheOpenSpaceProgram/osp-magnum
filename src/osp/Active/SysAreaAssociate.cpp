@@ -150,7 +150,8 @@ void SysAreaAssociate::sat_transform_set_relative(
             .get<universe::UCompTransformTraj>(relativeSat);
 
     // 1024 units = 1 meter
-    Vector3g posAreaRelative(transform.translation() * universe::gc_units_per_meter);
+    Vector3g const posAreaRelative(transform.translation()
+                                   * universe::gc_units_per_meter);
 
 //    satPosTraj.m_position = areaPosTraj.m_position + posAreaRelative;
 //    satPosTraj.m_rotation = Quaternion::

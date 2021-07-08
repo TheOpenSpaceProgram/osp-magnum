@@ -69,7 +69,7 @@ public:
 
     using Reg_t = entt::basic_registry<Satellite>;
 
-    Universe();
+    Universe() = default;
     Universe(Universe const &copy) = delete;
     Universe(Universe &&move) = delete;
     ~Universe() = default;
@@ -80,11 +80,6 @@ public:
      * @return The new Satellite just created
      */
     Satellite sat_create();
-
-    /**
-     * @return Root Satellite of the universe
-     */
-    constexpr Satellite sat_root() { return m_root; };
 
     /**
      * @brief Remove a satellite
@@ -110,26 +105,43 @@ public:
     Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const;
 
     /**
+     * @brief Create a coordinate space
+     *
+     * @warning Returned reference is not in stable memory, creating more
+     *          coordinate spaces can cause reallocation.
+     *
+     * @return {Index to coordinate space, Reference to coordinate space}
+     */
+    std::pair<coordspace_index_t, CoordinateSpace&> coordspace_create();
+
+    CoordinateSpace& coordspace_get(coordspace_index_t coordSpace)
+    {
+        return m_coordSpaces.at(coordSpace).value();
+    }
+
+    CoordinateSpace const& coordspace_get(coordspace_index_t coordSpace) const
+    {
+        return m_coordSpaces.at(coordSpace).value();
+    }
+
+    /**
      * @brief Ressign indices in the UCompInCoordspace components of satellites
      *        in a CoordinateSpace's m_toAdd queue
      *
      * @param coordSpace [in] Index to CoordinateSpace in m_coordSpaces
      */
-    void update_sat_coordspace(uint32_t coordSpace);
+    void coordspace_update_sats(coordspace_index_t coordSpace);
 
     constexpr Reg_t& get_reg() noexcept { return m_registry; }
     constexpr const Reg_t& get_reg() const noexcept
     { return m_registry; }
 
-    std::vector< std::optional<CoordinateSpace> > m_coordSpaces;
-
 private:
 
-    Satellite m_root;
-
+    std::vector< std::optional<CoordinateSpace> > m_coordSpaces;
     Reg_t m_registry;
 
-};
+}; // class Universe
 
 
 // default ECS components needed for the universe
@@ -144,7 +156,7 @@ struct UCompTransformTraj
 
 struct UCompInCoordspace
 {
-    uint32_t m_coordSpace;
+    coordspace_index_t m_coordSpace;
 };
 
 struct UCompCoordspaceIndex

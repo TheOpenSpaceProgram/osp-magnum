@@ -541,13 +541,13 @@ void debug_print_sats()
         auto const &inCoord = rReg.get<const UCompInCoordspace>(sat);
         auto const &coordIndex = rReg.get<const UCompCoordspaceIndex>(sat);
 
-        std::optional<CoordinateSpace> const &rSpace
-                = rUni.m_coordSpaces.at(inCoord.m_coordSpace);
+        CoordinateSpace const &rSpace
+                = rUni.coordspace_get(inCoord.m_coordSpace);
 
         osp::universe::Vector3g const pos{
-            rSpace->ccomp_view<osp::universe::CCompX>()[coordIndex.m_myIndex],
-            rSpace->ccomp_view<osp::universe::CCompY>()[coordIndex.m_myIndex],
-            rSpace->ccomp_view<osp::universe::CCompZ>()[coordIndex.m_myIndex]
+            rSpace.ccomp_view<osp::universe::CCompX>()[coordIndex.m_myIndex],
+            rSpace.ccomp_view<osp::universe::CCompY>()[coordIndex.m_myIndex],
+            rSpace.ccomp_view<osp::universe::CCompZ>()[coordIndex.m_myIndex]
         };
 
         std::cout << "* SATELLITE: \"" << posTraj.m_name << "\"\n";
