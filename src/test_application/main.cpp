@@ -123,11 +123,11 @@ int main(int argc, char** argv)
     {
         if(args.value("scene") == "simple")
         {
-            create_simple_solar_system(g_osp);
+            simplesolarsystem::create(g_osp);
         }
         else if(args.value("scene") == "moon")
         {
-            create_real_moon(g_osp);
+            moon::create(g_osp);
         }
         else
         {
@@ -180,14 +180,14 @@ int debug_cli_loop()
         {
             if (destroy_universe())
             {
-                create_simple_solar_system(g_osp);
+                simplesolarsystem::create(g_osp);
             }
         }
         else if (command == "moon")
         {
             if (destroy_universe())
             {
-                create_real_moon(g_osp);
+                moon::create(g_osp);
             }
         }
         else if (command == "flight")
@@ -247,6 +247,8 @@ bool destroy_universe()
 
     // Destroy all satellites
     g_osp.get_universe().get_reg().clear();
+
+    g_osp.get_universe().coordspace_clear();
 
     // Destroy blueprints as part of destroying all vehicles
     g_osp.debug_find_package("lzdb").clear<osp::BlueprintVehicle>();

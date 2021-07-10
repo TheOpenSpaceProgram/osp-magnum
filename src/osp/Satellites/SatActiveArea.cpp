@@ -28,6 +28,48 @@
 using osp::universe::UCompActiveArea;
 using osp::universe::SatActiveArea;
 
+void SatActiveArea::scan(osp::universe::Universe& rUni, Satellite areaSat)
+{
+    auto &rArea = rUni.get_reg().get<UCompActiveArea>(areaSat);
+
+    // Deal with activating satellites that have a UCompActivationRadius
+    // Satellites that have an Activation Radius have a sphere around them. If
+    // this sphere overlaps the ActiveArea's sphere 'm_areaRadius', then it
+    // will be activated.
+
+    auto viewActRadius = rUni.get_reg().view<UCompActivationRadius,
+                                             UCompActivatable>();
+
+    for (Satellite sat : viewActRadius)
+    {
+        auto satRadius = viewActRadius.get<UCompActivationRadius>(sat);
+
+        // Check if already activated
+        bool alreadyInside = rArea.m_inside.contains(sat);
+
+        // Simple sphere-sphere-intersection check
+        float distanceSquared = rUni.sat_calc_pos_meters(areaSat, sat).dot();
+        float radius = rArea.m_areaRadius + satRadius.m_radius;
+
+        if ((radius * radius) > distanceSquared)
+        {
+            if (alreadyInside)
+            {
+                continue; // Satellite already activated
+            }
+            // Satellite is nearby, activate it!
+            rArea.m_inside.emplace(sat);
+            rArea.m_enter.emplace_back(sat);
+        }
+        else if (alreadyInside)
+        {
+            // Satellite exited area
+            rArea.m_inside.erase(sat);
+            rArea.m_leave.emplace_back(sat);
+        }
+    }
+}
+
 UCompActiveArea& SatActiveArea::add_active_area(Universe &rUni, Satellite sat)
 {
     return rUni.get_reg().emplace<UCompActiveArea>(sat);

@@ -70,8 +70,17 @@ struct UCompActiveArea
 {
     float m_areaRadius{ 1024.0f };
 
-    // true when the ActiveArea is moving
-    bool m_inMotion{false};
+    entt::basic_sparse_set<Satellite> m_inside;
+
+    coordspace_index_t m_coordSpace;
+
+    // capture satellite
+    // new satellite
+    //std::vector<Satellite> ;
+
+    // Output queues
+    std::vector<Satellite> m_enter;
+    std::vector<Satellite> m_leave;
 };
 
 
@@ -81,8 +90,11 @@ public:
 
     static constexpr std::string_view smc_name = "ActiveArea";
 
+    static void scan(osp::universe::Universe& rUni, Satellite areaSat);
+
     /**
-     * Set the type of a Satellite and add a UCompActiveArea to it
+     * @brief Set the type of a Satellite and add a UCompActiveArea to it
+     *
      * @param rUni [out] Universe containing satellite
      * @param sat  [in] Satellite add a UCompActiveArea to
      * @return Reference to UCompActiveArea created

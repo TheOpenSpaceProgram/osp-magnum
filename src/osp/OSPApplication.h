@@ -64,13 +64,20 @@ public:
 
     universe::Universe& get_universe() { return m_universe; }
 
-    const std::shared_ptr<spdlog::logger>& get_logger() { return m_logger; };
+    void set_universe_update(std::function<void(universe::Universe&)> func)
+    {
+        m_universeUpdate = func;
+    }
 
-    std::function<void(universe::Universe&)> m_universeUpdate;
+    void update_universe() { m_universeUpdate(m_universe); };
+
+    const std::shared_ptr<spdlog::logger>& get_logger() { return m_logger; };
 
 private:
     std::map<ResPrefix_t, Package, std::less<>> m_packages;
+
     universe::Universe m_universe;
+    std::function<void(universe::Universe&)> m_universeUpdate;
 
     const std::shared_ptr<spdlog::logger> m_logger;
 };

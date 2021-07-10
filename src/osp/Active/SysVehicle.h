@@ -26,9 +26,6 @@
 
 #include "activetypes.h"
 
-#include "SysAreaAssociate.h"
-
-#include "../Universe.h"
 #include "../Resource/Package.h"
 #include "../Resource/blueprints.h"
 #include "osp/Active/SysMachine.h"
@@ -80,37 +77,12 @@ class SysVehicle
 {
 public:
 
-    static ActiveEnt activate(ActiveScene &rScene, universe::Universe &rUni,
-                              universe::Satellite areaSat,
-                              universe::Satellite tgtSat);
-
-    static void deactivate(ActiveScene &rScene, universe::Universe &rUni,
-                           universe::Satellite areaSat,
-                           universe::Satellite tgtSat, ActiveEnt tgtEnt);
-
-    /**
-     * Activate/Deactivate vehicles that enter/exit the ActiveArea
-     *
-     * Nearby vehicles are detected by SysAreaAssociate, and are added to a
-     * queue. This function reads the queue and activates vehicles accordingly.
-     * Activated vehicles will be in an incomplete "In-Construction" state so
-     * that individual features can be handled by separate systems.
-     *
-     * This function also update Satellites transforms of the currently
-     * activated vehicles in the scene
-     *
-     * @param rScene [ref] Scene containing vehicles to update
-     */
-    static void update_activate(ActiveScene& rScene);
-
     /**
      * Deal with vehicle separations and part deletions
      *
      * @param rScene [ref] Scene containing vehicles to update
      */
     static void update_vehicle_modification(ActiveScene& rScene);
-
-private:
 
     /**
      * Compute the volume of a part
@@ -138,7 +110,6 @@ private:
     static ActiveEnt part_instantiate(
             ActiveScene& rScene, PrototypePart const& part,
             BlueprintPart const& blueprint, ActiveEnt rootParent);
-
 };
 
 

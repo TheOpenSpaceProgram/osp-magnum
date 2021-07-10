@@ -31,12 +31,18 @@
 #include <osp/Active/SysForceFields.h>
 #include <osp/Active/activetypes.h>
 
+#include <osp/Active/universe_sync.h>
+
 #include <Magnum/Shaders/MeshVisualizer.h>
 #include <Magnum/GL/Mesh.h>
 
-
 namespace planeta::active
 {
+
+struct SyncPlanets
+{
+    MapSatToEnt_t m_inArea;
+};
 
 struct ACompPlanet
 {

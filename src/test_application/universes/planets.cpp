@@ -44,6 +44,7 @@ using osp::universe::Universe;
 using osp::universe::SatActiveArea;
 using osp::universe::SatVehicle;
 
+using osp::universe::CoordinateSpace;
 using osp::universe::CoordspaceCartesianSimple;
 
 using osp::universe::UCompInCoordspace;
@@ -55,12 +56,10 @@ using planeta::universe::UCompPlanet;
 using osp::universe::Vector3g;
 using osp::universe::spaceint_t;
 
-void testapp::create_real_moon(osp::OSPApplication& ospApp)
+void moon::create(osp::OSPApplication& rOspApp)
 {
-    using osp::universe::CoordinateSpace;
-
-    Universe &rUni = ospApp.get_universe();
-    Package &rPkg = ospApp.debug_find_package("lzdb");
+    Universe &rUni = rOspApp.get_universe();
+    Package &rPkg = rOspApp.debug_find_package("lzdb");
 
     // Create a coordinate space used to position Satellites
     auto const& [coordIndex, rSpace] = rUni.coordspace_create();
@@ -102,21 +101,11 @@ void testapp::create_real_moon(osp::OSPApplication& ospApp)
         rSpace.add(sat, pos, {});
     }
 
-    {
-        // create a Satellite with an ActiveArea
-        Satellite sat = rUni.sat_create();
-
-        // assign sat as an ActiveArea
-        SatActiveArea::add_active_area(rUni, sat);
-
-        rSpace.add(sat, {}, {});
-    }
+    // Add universe update function
+    rOspApp.set_universe_update(generate_simple_universe_update(coordIndex));
 
     // Update CoordinateSpace to finish adding the new Satellites
-    rUni.coordspace_update_sats(coordIndex);
-    CoordspaceCartesianSimple::update_exchange(rUni, rSpace, *pData);
-    rSpace.m_toAdd.clear();
-    CoordspaceCartesianSimple::update_views(rSpace, *pData);
+    rOspApp.update_universe();
 
-    SPDLOG_LOGGER_INFO(ospApp.get_logger(), "Created large moon");
+    SPDLOG_LOGGER_INFO(rOspApp.get_logger(), "Created large moon");
 }

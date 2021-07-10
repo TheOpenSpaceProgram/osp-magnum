@@ -29,8 +29,6 @@
 
 #include "../Satellites/SatActiveArea.h"
 
-#include <unordered_map>
-
 #include <cstdint>
 
 namespace osp::active
@@ -38,9 +36,7 @@ namespace osp::active
 
 
 struct ACompAreaLink
-{
-    using MapSatToEnt_t = std::unordered_map<universe::Satellite, ActiveEnt>;
-
+{    
     ACompAreaLink(universe::Universe& rUniverse, universe::Satellite areaSat)
      : m_areaSat(areaSat)
      , m_rUniverse(rUniverse)
@@ -55,13 +51,6 @@ struct ACompAreaLink
     universe::Satellite m_areaSat;
 
     std::reference_wrapper<universe::Universe> m_rUniverse;
-
-    // Satellites that are currently inside the active area
-    // possibly replace with a single entt sparse_set in ACompAreaLink
-    MapSatToEnt_t m_inside;
-
-    std::vector<MapSatToEnt_t::iterator> m_enter;
-    std::vector<std::pair<universe::Satellite, ActiveEnt>> m_leave;
 
 };
 
@@ -79,12 +68,11 @@ class SysAreaAssociate
 public:
 
     /**
-     * Scans the universe for Satellites to activate or deactivate, tracking
-     * changes into a ACompAreaLink stored in the scene.
+     * Clears queues in associazted UCompActiveArea
      *
      * @param rScene [in/out] Scene to update
      */
-    static void update_scan(ActiveScene& rScene);
+    static void update_clear(ActiveScene& rScene);
 
     /**
      * Attempt to get an ACompAreaLink from an ActiveScene

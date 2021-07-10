@@ -92,7 +92,7 @@ private:
 
     Magnum::Timeline m_timeline;
 
-    osp::OSPApplication& m_ospApp;
+    osp::OSPApplication& m_rOspApp;
 };
 
 void config_controls(OSPMagnum& rOspApp);

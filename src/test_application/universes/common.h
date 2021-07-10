@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -25,17 +25,20 @@
 
 #pragma once
 
-#include "common.h"
+#include <osp/OSPApplication.h>
 
-namespace testapp::simplesolarsystem
+namespace testapp
 {
 
 /**
- * @brief Create a universe with a few unrealistically small planets and some
- *        vehicles
+ * @brief Generate an update function for a universe consisting of just a single
+ *        CoordspaceCartesianSimple coordinate space and no movement
  *
- * @param ospApp [ref] OSP Application to create universe in
+ * @param cartesian [in] Index to cartesian coordinate space
+ *
+ * @return Universe update function
  */
-void create(osp::OSPApplication& rOspApp);
+std::function<void(osp::universe::Universe&)> generate_simple_universe_update(
+        osp::universe::coordspace_index_t cartesian);
 
 }

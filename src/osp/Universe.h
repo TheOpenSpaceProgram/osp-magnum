@@ -124,6 +124,11 @@ public:
         return m_coordSpaces.at(coordSpace).value();
     }
 
+    void coordspace_clear()
+    {
+        m_coordSpaces.clear();
+    };
+
     /**
      * @brief Ressign indices in the UCompInCoordspace components of satellites
      *        in a CoordinateSpace's m_toAdd queue

@@ -26,7 +26,6 @@
 #include "simple.h"
 #include "vehicles.h"
 
-#include <osp/Satellites/SatActiveArea.h>
 #include <osp/Satellites/SatVehicle.h>
 
 #include <osp/CoordinateSpaces/CartesianSimple.h>
@@ -44,6 +43,7 @@ using osp::universe::Universe;
 using osp::universe::SatActiveArea;
 using osp::universe::SatVehicle;
 
+using osp::universe::CoordinateSpace;
 using osp::universe::CoordspaceCartesianSimple;
 
 using osp::universe::UCompInCoordspace;
@@ -54,10 +54,8 @@ using planeta::universe::UCompPlanet;
 
 using osp::universe::Vector3g;
 
-void testapp::create_simple_solar_system(osp::OSPApplication& rOspApp)
+void simplesolarsystem::create(osp::OSPApplication& rOspApp)
 {
-    using osp::universe::CoordinateSpace;
-
     Universe &rUni = rOspApp.get_universe();
     Package &rPkg = rOspApp.debug_find_package("lzdb");
 
@@ -119,21 +117,15 @@ void testapp::create_simple_solar_system(osp::OSPApplication& rOspApp)
         }
     }
 
-    {
-        // create a Satellite with an ActiveArea
-        Satellite sat = rUni.sat_create();
-
-        // assign sat as an ActiveArea
-        SatActiveArea::add_active_area(rUni, sat);
-
-        rSpace.add(sat, {}, {});
-    }
+    // Add universe update function
+    rOspApp.set_universe_update(generate_simple_universe_update(coordIndex));
 
     // Update CoordinateSpace to finish adding the new Satellites
-    rUni.coordspace_update_sats(coordIndex);
-    CoordspaceCartesianSimple::update_exchange(rUni, rSpace, *pData);
-    rSpace.m_toAdd.clear();
-    CoordspaceCartesianSimple::update_views(rSpace, *pData);
+    rOspApp.update_universe();
 
     SPDLOG_LOGGER_INFO(rOspApp.get_logger(), "Created simple solar system");
 }
+
+
+
+

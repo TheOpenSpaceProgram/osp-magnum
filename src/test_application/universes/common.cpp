@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -23,19 +23,43 @@
  * SOFTWARE.
  */
 
-#pragma once
-
 #include "common.h"
 
-namespace testapp::simplesolarsystem
+#include <osp/CoordinateSpaces/CartesianSimple.h>
+#include <osp/Satellites/SatActiveArea.h>
+
+
+using namespace testapp;
+
+using osp::universe::Universe;
+
+using osp::universe::SatActiveArea;
+using osp::universe::UCompActiveArea;
+
+using osp::universe::CoordinateSpace;
+using osp::universe::CoordspaceCartesianSimple;
+
+std::function<void(Universe&)> testapp::generate_simple_universe_update(
+        osp::universe::coordspace_index_t cartesian)
 {
+    return [cartesian] (Universe &rUni) {
 
-/**
- * @brief Create a universe with a few unrealistically small planets and some
- *        vehicles
- *
- * @param ospApp [ref] OSP Application to create universe in
- */
-void create(osp::OSPApplication& rOspApp);
+        CoordinateSpace &rSpace = rUni.coordspace_get(cartesian);
 
+        auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace.m_data);
+
+        rUni.coordspace_update_sats(cartesian);
+        CoordspaceCartesianSimple::update_exchange(rUni, rSpace, *pData);
+        rSpace.m_toAdd.clear();
+        CoordspaceCartesianSimple::update_views(rSpace, *pData);
+
+        // Update ActiveArea if exists
+
+        auto viewAreas = rUni.get_reg().view<UCompActiveArea>();
+
+        if (!viewAreas.empty())
+        {
+            SatActiveArea::scan(rUni, viewAreas.front());
+        }
+    };
 }

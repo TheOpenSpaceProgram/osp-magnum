@@ -32,10 +32,12 @@
 #include <osp/Active/SysRender.h>
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
+#include <osp/Active/SysVehicleSync.h>
 #include <osp/Active/SysWire.h>
 #include <osp/Active/SysForceFields.h>
 #include <osp/Active/SysAreaAssociate.h>
 
+#include <osp/Satellites/SatActiveArea.h>
 #include <osp/Satellites/SatVehicle.h>
 
 #include <adera/Machines/Container.h>
@@ -66,6 +68,7 @@ using namespace Magnum::Math::Literals;
 using osp::universe::Universe;
 using osp::universe::Satellite;
 
+using osp::universe::SatActiveArea;
 using osp::universe::SatVehicle;
 
 using osp::universe::UCompInCoordspace;
@@ -141,9 +144,24 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
     rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
 
+
+    // create a Satellite with an ActiveArea
+    Satellite areaSat = rUni.sat_create();
+
+    // assign sat as an ActiveArea
+    SatActiveArea::add_active_area(rUni, areaSat);
+
+    osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
+
+    // (hacky) Add the new ActiveArea to the coordinate space
+    rUni.coordspace_get(0).add(areaSat, {}, {});
+
+    rOspApp.update_universe();
+
     // Get ActiveArea from scene, and link it to scene using the AreaAssociate
-    osp::active::SysAreaAssociate::connect(
-                rScene, rUni, rUni.get_reg().view<UCompActiveArea>().front());
+
+    rScene.get_registry().set<osp::active::SyncVehicles>();
+    rScene.get_registry().set<planeta::active::SyncPlanets>();
 
     // Setup Newton dynamics physics
     ospnewton::SysNewton::setup(rScene);
@@ -202,6 +220,7 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Disconnect ActiveArea
     osp::active::SysAreaAssociate::disconnect(rScene);
+    rUni.get_reg().destroy(areaSat);
 
     // destruct the application, this closes the window
     pMagnumApp.reset();
@@ -216,13 +235,17 @@ void update_scene(osp::active::ActiveScene& rScene)
     SysCameraController::update_area(rScene);
 
     // Search Universe for nearby activatable Satellites
-    SysAreaAssociate::update_scan(rScene);
+    //SysAreaAssociate::update_scan(rScene);
 
     // Activate or deactivate nearby planets
     SysPlanetA::update_activate(rScene);
 
     // Activate or deactivate nearby vehicles
-    SysVehicle::update_activate(rScene);
+    SysVehicleSync::update_universe_sync(rScene);
+
+    // Clear Satellite enter/exit queues
+    SysAreaAssociate::update_clear(rScene);
+
 
     // Construct components of vehicles. These should be parallelizable
     SysMachineContainer::update_construct(rScene);

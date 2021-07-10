@@ -29,8 +29,6 @@
 #include "SysVehicle.h"
 #include "physics.h"
 
-#include "../Satellites/SatActiveArea.h"
-#include "../Satellites/SatVehicle.h"
 #include "../Resource/PrototypePart.h"
 #include "../Resource/AssetImporter.h"
 
@@ -42,119 +40,6 @@
 
 using namespace osp;
 using namespace osp::active;
-
-using osp::universe::Universe;
-using osp::universe::Satellite;
-using osp::universe::UCompVehicle;
-
-// for the 0xrrggbb_rgbf literalsm
-using namespace Magnum::Math::Literals;
-
-ActiveEnt SysVehicle::activate(ActiveScene &rScene, universe::Universe &rUni,
-                          universe::Satellite areaSat,
-                             universe::Satellite tgtSat)
-{
-    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                      "Loading a vehicle");
-
-    auto &loadMeVehicle = rUni.get_reg().get<universe::UCompVehicle>(tgtSat);
-    auto &tgtPosTraj = rUni.get_reg().get<universe::UCompTransformTraj>(tgtSat);
-
-    // make sure there is vehicle data to load
-    if (loadMeVehicle.m_blueprint.empty())
-    {
-        // no vehicle data to load
-        return entt::null;
-    }
-
-    BlueprintVehicle &vehicleData = *(loadMeVehicle.m_blueprint);
-    ActiveEnt root = rScene.hier_get_root();
-
-    // Create the root entity to add parts to
-
-    ActiveEnt vehicleEnt =  SysHierarchy::create_child(rScene, root, "Vehicle");
-
-    rScene.reg_emplace<ACompActivatedSat>(vehicleEnt, tgtSat);
-
-    ACompVehicle& vehicleComp = rScene.reg_emplace<ACompVehicle>(vehicleEnt);
-    rScene.reg_emplace<ACompDrawTransform>(vehicleEnt);
-    rScene.reg_emplace<ACompVehicleInConstruction>(
-                    vehicleEnt, loadMeVehicle.m_blueprint);
-
-    // Convert position of the satellite to position in scene
-    Vector3 positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat);
-
-    ACompTransform& rVehicleTransform = rScene.get_registry()
-                                        .emplace<ACompTransform>(vehicleEnt);
-    rVehicleTransform.m_transform
-            = Matrix4::from(tgtPosTraj.m_rotation.toMatrix(), positionInScene);
-    rScene.reg_emplace<ACompFloatingOrigin>(vehicleEnt);
-    //vehicleTransform.m_enableFloatingOrigin = true;
-
-    // Create the parts
-
-    // Unique part prototypes used in the vehicle
-
-    // Access with [blueprintParts.m_partIndex]
-
-    std::vector<DependRes<PrototypePart> >& partsUsed = vehicleData.m_prototypes;
-
-
-    // All the parts in the vehicle
-    std::vector<BlueprintPart> &blueprintParts = vehicleData.m_blueprints;
-
-
-    rScene.get_registry().reserve(rScene.get_registry().capacity()
-                                   + vehicleData.m_machines.size());
-
-    // Keep track of parts
-    //std::vector<ActiveEnt> newEntities;
-    vehicleComp.m_parts.reserve(blueprintParts.size());
-
-    // Loop through list of blueprint parts, and initialize each of them into
-    // the ActiveScene
-    for (BlueprintPart& partBp : blueprintParts)
-    {
-        DependRes<PrototypePart>& partDepends =
-                partsUsed[partBp.m_protoIndex];
-
-        // Check if the part prototype this depends on still exists
-        if (partDepends.empty())
-        {
-            return entt::null;
-        }
-
-        PrototypePart &proto = *partDepends;
-
-        // Instantiate the part
-        ActiveEnt partEntity = part_instantiate(rScene, proto,
-                        partBp, vehicleEnt);
-
-        vehicleComp.m_parts.push_back(partEntity);
-
-        auto& partPart = rScene.reg_emplace<ACompPart>(partEntity);
-        partPart.m_vehicle = vehicleEnt;
-
-        // Part now exists
-
-        ACompTransform& partTransform = rScene.get_registry()
-                                            .get<ACompTransform>(partEntity);
-
-        // set the transformation
-        partTransform.m_transform
-                = Matrix4::from(partBp.m_rotation.toMatrix(),
-                              partBp.m_translation)
-                * Matrix4::scaling(partBp.m_scale);
-    }
-
-
-    // temporary: make the whole thing a single rigid body
-    auto& vehicleBody = rScene.reg_emplace<ACompRigidBody>(vehicleEnt);
-    rScene.reg_emplace<ACompShape>(vehicleEnt, phys::ECollisionShape::COMBINED);
-    rScene.reg_emplace<ACompSolidCollider>(vehicleEnt);
-
-    return vehicleEnt;
-}
 
 // Traverses the hierarchy and sums the volume of all ACompShapes it finds
 float SysVehicle::compute_hier_volume(ActiveScene& rScene, ActiveEnt part)
@@ -347,54 +232,6 @@ void debug_wire_vehicles(ActiveScene &rScene)
                   osp::active::ACompVehicleInConstruction>();
 
 
-}
-
-void SysVehicle::update_activate(ActiveScene &rScene)
-{
-    ACompAreaLink *pArea = SysAreaAssociate::try_get_area_link(rScene);
-
-    if (pArea == nullptr)
-    {
-        return;
-    }
-
-    Universe &rUni = pArea->get_universe();
-
-    // Delete vehicles that have gone too far from the ActiveArea range
-    for (auto const &[sat, ent] : pArea->m_leave)
-    {
-        if (!rUni.get_reg().all_of<UCompVehicle>(sat))
-        {
-            continue;
-        }
-
-        SysHierarchy::mark_delete_cut(rScene, ent);
-    }
-
-    // Update transforms of already-activated vehicle satellites
-    auto view = rScene.get_registry().view<ACompVehicle, ACompTransform,
-                                           ACompActivatedSat>();
-    for (ActiveEnt vehicleEnt : view)
-    {
-        auto &vehicleTf = view.get<ACompTransform>(vehicleEnt);
-        auto &vehicleSat = view.get<ACompActivatedSat>(vehicleEnt);
-        SysAreaAssociate::sat_transform_set_relative(
-            rUni, pArea->m_areaSat, vehicleSat.m_sat, vehicleTf.m_transform);
-    }
-
-    // Activate nearby vehicle satellites that have just entered the ActiveArea
-    for (auto &entered : pArea->m_enter)
-    {
-        universe::Satellite sat = entered->first;
-        ActiveEnt &rEnt = entered->second;
-
-        if (!rUni.get_reg().all_of<UCompVehicle>(sat))
-        {
-            continue;
-        }
-
-        rEnt = activate(rScene, rUni, pArea->m_areaSat, sat);
-    }
 }
 
 void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
