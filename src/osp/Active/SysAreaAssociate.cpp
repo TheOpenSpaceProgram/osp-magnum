@@ -39,7 +39,7 @@ using osp::universe::UCompActiveArea;
 
 using osp::universe::Vector3g;
 
-void SysAreaAssociate::update_scan(ActiveScene& rScene)
+void SysAreaAssociate::update_clear(ActiveScene& rScene)
 {
     ACompAreaLink *pArea = try_get_area_link(rScene);
 
@@ -54,46 +54,8 @@ void SysAreaAssociate::update_scan(ActiveScene& rScene)
 
     // Clear enter/leave event vectors
 
-    pArea->m_enter.clear();
-    pArea->m_leave.clear();
-
-    // Deal with activating satellites that have a UCompActivationRadius
-    // Satellites that have an Activation Radius have a sphere around them. If
-    // this sphere overlaps the ActiveArea's sphere 'm_areaRadius', then it
-    // will be activated.
-
-    auto viewActRadius = rUni.get_reg().view<
-            UCompActivationRadius, UCompActivatable>();
-
-    for (Satellite sat : viewActRadius)
-    {
-        auto satRadius = viewActRadius.get<UCompActivationRadius>(sat);
-
-        // Check if already activated
-        auto found = pArea->m_inside.find(sat);
-        bool alreadyInside = (found != pArea->m_inside.end());
-
-        // Simple sphere-sphere-intersection check
-        float distanceSquared = rUni.sat_calc_pos_meters(areaSat, sat).dot();
-        float radius = areaUComp.m_areaRadius + satRadius.m_radius;
-
-        if ((radius * radius) > distanceSquared)
-        {
-            if (alreadyInside)
-            {
-                continue; // Satellite already activated
-            }
-            // Satellite is nearby, activate it!
-            auto entered = pArea->m_inside.emplace(sat, entt::null).first;
-            pArea->m_enter.emplace_back(entered);
-        }
-        else if (alreadyInside)
-        {
-            // Satellite exited area
-            pArea->m_leave.emplace_back(found->first, found->second);
-            pArea->m_inside.erase(found);
-        }
-    }
+    areaUComp.m_enter.clear();
+    areaUComp.m_leave.clear();
 }
 
 ACompAreaLink* SysAreaAssociate::try_get_area_link(ActiveScene &rScene)

@@ -32,6 +32,7 @@
 #include <osp/Active/SysAreaAssociate.h>
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
+#include <osp/Active/SysVehicleSync.h>
 
 using testapp::SysCameraController;
 using testapp::ACompCameraController;
@@ -370,6 +371,7 @@ void SysCameraController::update_view(ActiveScene &rScene)
 ActiveEnt SysCameraController::find_vehicle_from_sat(
         ActiveScene &rScene, Satellite sat)
 {
+    using osp::universe::UCompActiveArea;
 
     ActiveReg_t const& reg = rScene.get_registry();
     auto const viewVehicles = reg.view<const ACompVehicle>();
@@ -380,17 +382,21 @@ ActiveEnt SysCameraController::find_vehicle_from_sat(
         return entt::null;
     }
 
-    ACompAreaLink const *pAreaLink = SysAreaAssociate::try_get_area_link(rScene);
+    ACompAreaLink const *pLink = SysAreaAssociate::try_get_area_link(rScene);
 
-    if (pAreaLink == nullptr)
+    if (pLink == nullptr)
     {
         return entt::null; // Scene not connected to universe
     }
 
-    if (auto const findIt = pAreaLink->m_inside.find(sat);
-        findIt != pAreaLink->m_inside.end())
+    auto &rUni = pLink->m_rUniverse.get();
+    auto &rArea = rUni.get_reg().get<UCompActiveArea>(pLink->m_areaSat);
+    auto &rSync = rScene.get_registry().ctx<osp::active::SyncVehicles>();
+
+    if (auto const findIt = rArea.m_inside.find(sat);
+        findIt != rArea.m_inside.end())
     {
-        ActiveEnt const activated = findIt->second;
+        ActiveEnt const activated = rSync.m_inArea.at(sat);
         if (reg.valid(activated))
         {
             return activated;

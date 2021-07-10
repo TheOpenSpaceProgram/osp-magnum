@@ -55,7 +55,7 @@ OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
             arguments,
             Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
         m_userInput(12),
-        m_ospApp(rOspApp)
+        m_rOspApp(rOspApp)
 {
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 
@@ -73,6 +73,8 @@ void OSPMagnum::drawEvent()
 
     Magnum::GL::defaultFramebuffer.clear(Magnum::GL::FramebufferClear::Color
                                          | Magnum::GL::FramebufferClear::Depth);
+
+    m_rOspApp.update_universe();
 
     m_userInput.update_controls();
 
@@ -140,7 +142,7 @@ osp::active::ActiveScene& OSPMagnum::scene_create(std::string const& name, Scene
 {
     auto const& [it, success] =
         m_scenes.try_emplace(
-            name, osp::active::ActiveScene{m_ospApp, m_glResources}, upd);
+            name, osp::active::ActiveScene{m_rOspApp, m_glResources}, upd);
     return it->second.first;
 }
 
@@ -149,7 +151,7 @@ osp::active::ActiveScene& OSPMagnum::scene_create(std::string && name, SceneUpda
     auto const& [it, success] =
         m_scenes.try_emplace(
             std::move(name),
-            osp::active::ActiveScene{m_ospApp, m_glResources}, upd);
+            osp::active::ActiveScene{m_rOspApp, m_glResources}, upd);
     return it->second.first;
 }
 

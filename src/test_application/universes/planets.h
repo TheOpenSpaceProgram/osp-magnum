@@ -25,11 +25,16 @@
 
 #pragma once
 
-#include <osp/OSPApplication.h>
+#include "common.h"
 
-namespace testapp
+namespace testapp::moon
 {
 
-void create_real_moon(osp::OSPApplication& ospApp);
+/**
+ * @brief Create a universe featuring of a life-sized moon and vehicles
+ *
+ * @param ospApp [ref] OSP Application to create universe in
+ */
+void create(osp::OSPApplication& rOspApp);
 
 }

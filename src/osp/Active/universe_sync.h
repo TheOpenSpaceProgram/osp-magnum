@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,20 +22,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 #pragma once
 
-#include "common.h"
+#include "../Universe.h"
+#include "activetypes.h"
 
-namespace testapp::simplesolarsystem
-{
+#include <unordered_map>
 
-/**
- * @brief Create a universe with a few unrealistically small planets and some
- *        vehicles
- *
- * @param ospApp [ref] OSP Application to create universe in
- */
-void create(osp::OSPApplication& rOspApp);
-
-}
+using MapSatToEnt_t = std::unordered_map<osp::universe::Satellite,
+                                         osp::active::ActiveEnt>;

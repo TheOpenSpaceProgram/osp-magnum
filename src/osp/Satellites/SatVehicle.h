@@ -56,6 +56,9 @@ public:
     static UCompVehicle& add_vehicle(
         osp::universe::Universe& rUni, osp::universe::Satellite sat,
         DependRes<BlueprintVehicle> blueprint);
+
+
+
 };
 
 }

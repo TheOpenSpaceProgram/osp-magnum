@@ -149,6 +149,8 @@ void SysPlanetA::debug_create_chunk_collider(
 
 void SysPlanetA::update_activate(ActiveScene &rScene)
 {
+    using osp::universe::UCompActiveArea;
+
     ACompAreaLink *pArea = SysAreaAssociate::try_get_area_link(rScene);
 
     if (pArea == nullptr)
@@ -157,30 +159,32 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
     }
 
     Universe &rUni = pArea->get_universe();
-    
+    auto &rArea = rUni.get_reg().get<UCompActiveArea>(pArea->m_areaSat);
+    auto &rSync = rScene.get_registry().ctx<SyncPlanets>();
+
     // Delete planets that have exited the ActiveArea
-    for (auto const &[sat, ent] : pArea->m_leave)
+    for (Satellite sat : rArea.m_leave)
     {
         if (!rUni.get_reg().all_of<UCompPlanet>(sat))
         {
             continue;
         }
 
-        SysHierarchy::mark_delete_cut(rScene, ent);
+        auto foundEnt = rSync.m_inArea.find(sat);
+        SysHierarchy::mark_delete_cut(rScene, foundEnt->second);
+        rSync.m_inArea.erase(foundEnt);
     }
 
     // Activate planets that have just entered the ActiveArea
-    for (auto &entered : pArea->m_enter)
+    for (Satellite sat : rArea.m_enter)
     {
-        Satellite sat = entered->first;
-        ActiveEnt &rEnt = entered->second;
-
         if (!rUni.get_reg().all_of<UCompPlanet>(sat))
         {
             continue;
         }
 
-        rEnt = activate(rScene, rUni, pArea->m_areaSat, sat);
+        ActiveEnt ent = activate(rScene, rUni, pArea->m_areaSat, sat);
+        rSync.m_inArea[sat] = ent;
     }
 }
 
