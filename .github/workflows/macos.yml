@@ -1,0 +1,26 @@
+name: macOS
+
+on:
+  pull_request:
+  push:
+  release:
+    types: published
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 1
+        submodules: recursive
+
+    - name: Install dependencies
+      run: brew install cmake
+
+    - name: Build OSP-Magnum
+      shell: bash
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=Release
+        cmake --build build --parallel --config Release --target osp-magnum
