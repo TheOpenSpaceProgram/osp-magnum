@@ -60,7 +60,7 @@ using namespace Magnum::Math::Literals;
 using osp::Matrix4;
 using osp::Quaternion;
 using osp::Vector3;
-using osp::Vector3s;
+using osp::universe::Vector3g;
 
 std::pair<ActiveEnt, ACompCameraController&>
 SysCameraController::get_camera_controller(ActiveScene &rScene)
@@ -268,12 +268,12 @@ void SysCameraController::update_area(ActiveScene &rScene)
     Matrix4 &camTf = rScene.reg_get<ACompTransform>(camEnt).m_transform;
 
     // round to nearest (m_originDistanceThreshold)
-    Vector3s translate = Vector3s((camTf.translation() - rCamCtrl.m_orbitPos)
+    Vector3g translate = Vector3g((camTf.translation() - rCamCtrl.m_orbitPos)
                             / rCamCtrl.m_originDistanceThreshold)
                        * rCamCtrl.m_originDistanceThreshold;
 
     // convert to space int
-    translate *= osp::gc_units_per_meter;
+    translate *= osp::universe::gc_units_per_meter;
 
     if (!translate.isZero())
     {

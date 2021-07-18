@@ -65,9 +65,10 @@ using namespace Magnum::Math::Literals;
 
 using osp::universe::Universe;
 using osp::universe::Satellite;
-using osp::universe::SatActiveArea;
+
 using osp::universe::SatVehicle;
 
+using osp::universe::UCompInCoordspace;
 using osp::universe::UCompActiveArea;
 
 using osp::active::ActiveEnt;
@@ -140,14 +141,9 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
     rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
 
-    // create a Satellite with an ActiveArea
-    Satellite areaSat = rUni.sat_create();
-
-    // assign sat as an ActiveArea
-    UCompActiveArea &area = SatActiveArea::add_active_area(rUni, areaSat);
-
-    // Link ActiveArea to scene using the AreaAssociate
-    osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
+    // Get ActiveArea from scene, and link it to scene using the AreaAssociate
+    osp::active::SysAreaAssociate::connect(
+                rScene, rUni, rUni.get_reg().view<UCompActiveArea>().front());
 
     // Setup Newton dynamics physics
     ospnewton::SysNewton::setup(rScene);

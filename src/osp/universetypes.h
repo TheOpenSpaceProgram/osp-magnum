@@ -24,16 +24,21 @@
  */
 #pragma once
 
-#include "../Universe.h"
+#include <Magnum/Math/Vector3.h>
 
 namespace osp::universe
 {
 
-class TrajStationary
-{
-public:
+enum class Satellite : uint32_t {};
 
-    static void update(CoordinateSpace& rSpace);
-};
+using spaceint_t = int64_t;
+
+// 1024 space units = 1 meter
+// TODO: this should vary by trajectory, but for now it's global
+const float gc_units_per_meter = 1024.0f;
+
+// A Vector3 for space
+using Vector3g = Magnum::Math::Vector3<spaceint_t>;
+
 
 }

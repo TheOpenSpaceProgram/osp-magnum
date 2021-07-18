@@ -29,6 +29,7 @@
 #include <osp/Satellites/SatActiveArea.h>
 #include <osp/Satellites/SatVehicle.h>
 
+#include <osp/CoordinateSpaces/CartesianSimple.h>
 #include <osp/Trajectories/Stationary.h>
 
 #include <planet-a/Satellites/SatPlanet.h>
@@ -43,64 +44,79 @@ using osp::universe::Universe;
 using osp::universe::SatActiveArea;
 using osp::universe::SatVehicle;
 
-using osp::universe::TrajStationary;
+using osp::universe::CoordspaceCartesianSimple;
 
-using osp::universe::UCompTransformTraj;
+using osp::universe::UCompInCoordspace;
+using osp::universe::UCompActiveArea;
 
 using planeta::universe::SatPlanet;
 using planeta::universe::UCompPlanet;
 
+using osp::universe::Vector3g;
+using osp::universe::spaceint_t;
 
 void testapp::create_real_moon(osp::OSPApplication& ospApp)
 {
+    using osp::universe::CoordinateSpace;
+
     Universe &rUni = ospApp.get_universe();
     Package &rPkg = ospApp.debug_find_package("lzdb");
 
-    // Get the planet system used to create a UCompPlanet
+    // Create a coordinate space used to position Satellites
+    auto const& [coordIndex, rSpace] = rUni.coordspace_create();
 
-    // Create trajectory that will make things added to the universe stationary
-    auto &stationary = rUni.trajectory_create<TrajStationary>(
-                                        rUni, rUni.sat_root());
+    // Use CoordspaceSimple as data, which can store positions and velocities
+    // of satellites
+    rSpace.m_data.emplace<CoordspaceCartesianSimple>();
+    auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace.m_data);
 
     // Create 4 part vehicles
     for (int i = 0; i < 4; i ++)
     {
         Satellite sat = testapp::debug_add_part_vehicle(rUni, rPkg, "Placeholder Mk. I " + std::to_string(i));
 
-        auto &posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
+        Vector3g pos{i * 1024l * 4l, 0l, 0l};
 
-        posTraj.m_position = osp::Vector3s(i * 1024l * 4l, 0l, 0l);
-        posTraj.m_dirty = true;
-
-        stationary.add(sat);
+        rSpace.add(sat, pos, {});
     }
 
-    /*Satellite sat = debug_add_deterministic_vehicle(rUni, rPkg, "Stomper Mk. I");
-    auto& posTraj = rUni.get_reg().get<UCompTransformTraj>(sat);
-    posTraj.m_position = osp::Vector3s(22 * 1024l * 5l, 0l, 0l);
-    posTraj.m_dirty = true;
-    stationary.add(sat);*/
-
-
     // Add Moon
+    {
+        Satellite sat = rUni.sat_create();
 
-    Satellite moonSat = rUni.sat_create();
+        // Create the real world moon
+        float radius = 1.737E+6;
+        float mass = 7.347673E+22;
 
-    // Create the real world moon
-    float radius = 1.737E+6;
-    float mass = 7.347673E+22;
+        float resolutionScreenMax = 0.056f;
+        float resolutionSurfaceMax = 12.0f;
 
-    float resolutionScreenMax = 0.056f;
-    float resolutionSurfaceMax = 12.0f;
+        // assign sat as a planet
+        SatPlanet::add_planet(rUni, sat, radius, mass, resolutionSurfaceMax,
+                              resolutionScreenMax);
 
-    // assign sat as a planet
-    SatPlanet::add_planet(rUni, moonSat, radius, mass, resolutionSurfaceMax,
-                          resolutionScreenMax);
+        // Surface will appear 200 meters below the origin
+        // 1024 units = 1 meter
+        Vector3g pos{0, 1024l * (spaceint_t(radius) + 200), 0 * 1024l};
 
-    auto &moonPosTraj = rUni.get_reg().get<UCompTransformTraj>(moonSat);
+        rSpace.add(sat, pos, {});
+    }
 
-    // 1024 units = 1 meter
-    moonPosTraj.m_position = {0 * 1024l, 1024l * osp::SpaceInt(1.74E+6), 0 * 1024l};
+    {
+        // create a Satellite with an ActiveArea
+        Satellite sat = rUni.sat_create();
+
+        // assign sat as an ActiveArea
+        SatActiveArea::add_active_area(rUni, sat);
+
+        rSpace.add(sat, {}, {});
+    }
+
+    // Update CoordinateSpace to finish adding the new Satellites
+    rUni.coordspace_update_sats(coordIndex);
+    CoordspaceCartesianSimple::update_exchange(rUni, rSpace, *pData);
+    rSpace.m_toAdd.clear();
+    CoordspaceCartesianSimple::update_views(rSpace, *pData);
 
     SPDLOG_LOGGER_INFO(ospApp.get_logger(), "Created large moon");
 }
