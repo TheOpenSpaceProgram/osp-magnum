@@ -33,21 +33,47 @@ void CoordspaceCartesianSimple::update_exchange(
         Universe& rUni, CoordinateSpace& rSpace,
         CoordspaceCartesianSimple& rData)
 {
-    rData.reserve(rData.size() + rSpace.m_toAdd.size());
+    rData.reserve(rData.size() + rSpace.m_toAdd.size() - rSpace.m_toRemove.size());
 
-    auto view = rUni.get_reg().view<UCompCoordspaceIndex>();
+    auto coordIndexView = rUni.get_reg().view<UCompCoordspaceIndex>();
 
+    // Sort in descending order. If any of these are the last element, then
+    // then they may get invalidated in the following swaps.
+    sort(std::begin(rSpace.m_toRemove), std::end(rSpace.m_toRemove),
+         std::greater<uint32_t>());
+
+    // Remove using swap-and-pop
+    for (uint32_t index : rSpace.m_toRemove)
+    {
+        Satellite back = rData.m_satellites.back();
+
+        // Swap last element
+        if (rData.m_satellites[index] != back)
+        {
+            rData.m_satellites[index] = back;
+            rData.m_positions[index] = rData.m_positions.back();
+            rData.m_velocities[index] = rData.m_velocities.back();
+
+            // Update index of moved last element
+            coordIndexView.get<UCompCoordspaceIndex>(back).m_myIndex = index;
+        }
+
+        // Pop
+        rData.m_satellites.pop_back();
+        rData.m_positions.pop_back();
+        rData.m_velocities.pop_back();
+    }
+
+    // Add new requested satellites
     for (auto const &[sat, pos, vel] : rSpace.m_toAdd)
     {
-        auto &rCoordIndex = view.get<UCompCoordspaceIndex>(sat);
+        auto &rCoordIndex = coordIndexView.get<UCompCoordspaceIndex>(sat);
         rCoordIndex.m_myIndex = rData.size();
 
         rData.m_satellites.push_back(sat);
         rData.m_positions.push_back(pos);
         rData.m_velocities.push_back(vel);
     }
-
-    // TODO: handle removal of satellites
 }
 
 void CoordspaceCartesianSimple::update_views(

@@ -112,7 +112,7 @@ public:
      *
      * @return {Index to coordinate space, Reference to coordinate space}
      */
-    std::pair<coordspace_index_t, CoordinateSpace&> coordspace_create();
+    std::pair<coordspace_index_t, CoordinateSpace&> coordspace_create(Satellite parentSat);
 
     CoordinateSpace& coordspace_get(coordspace_index_t coordSpace)
     {
@@ -130,12 +130,34 @@ public:
     };
 
     /**
-     * @brief Ressign indices in the UCompInCoordspace components of satellites
+     * @brief Calculate a CoordspaceTransform to transform coordinates from one
+     *        coordinate space to another.
+     *
+     * This function will chain together parent->child and child->parent
+     * transforms until a common ancestor is found.
+     *
+     * @param coordFrom [in]
+     * @param coordTo   [in]
+     * @return Optional CoordspaceTransform. Empty if no common ancestor.
+     */
+    std::optional<CoordspaceTransform> coordspace_transform(
+            CoordinateSpace const &coordFrom, CoordinateSpace const &coordTo);
+
+    /**
+     * @brief Reassign indices in the UCompInCoordspace components of satellites
      *        in a CoordinateSpace's m_toAdd queue
      *
      * @param coordSpace [in] Index to CoordinateSpace in m_coordSpaces
      */
     void coordspace_update_sats(coordspace_index_t coordSpace);
+
+    /**
+     * @brief Update m_depth of coordinate space based on the m_depth of its
+     *        parent
+     *
+     * @param coordSpace [in] Index to CoordinateSpace in m_coordSpaces
+     */
+    void coordspace_update_depth(coordspace_index_t coordSpace);
 
     constexpr Reg_t& get_reg() noexcept { return m_registry; }
     constexpr const Reg_t& get_reg() const noexcept

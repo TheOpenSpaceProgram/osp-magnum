@@ -162,11 +162,10 @@ void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
     }
 
     Universe &rUni = pLink->get_universe();
-    auto &rArea = rUni.get_reg().get<UCompActiveArea>(pLink->m_areaSat);
     auto &rSync = rScene.get_registry().ctx<SyncVehicles>();
 
     // Delete vehicles that have gone too far from the ActiveArea range
-    for (Satellite sat : rArea.m_leave)
+    for (Satellite sat : pLink->m_leave)
     {
         if (!rUni.get_reg().all_of<UCompVehicle>(sat))
         {
@@ -182,20 +181,22 @@ void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
     auto view = rScene.get_registry().view<ACompVehicle, ACompTransform,
                                            ACompActivatedSat>();
     for (ActiveEnt vehicleEnt : view)
-    {
+    {        
         auto &vehicleTf = view.get<ACompTransform>(vehicleEnt);
         auto &vehicleSat = view.get<ACompActivatedSat>(vehicleEnt);
-        SysAreaAssociate::sat_transform_set_relative(
-            rUni, pLink->m_areaSat, vehicleSat.m_sat, vehicleTf.m_transform);
+        // TODO: move the satellite in the ActiveArea capture space
     }
 
     // Activate nearby vehicle satellites that have just entered the ActiveArea
-    for (Satellite sat : rArea.m_enter)
+    for (Satellite sat : pLink->m_enter)
     {
         if (!rUni.get_reg().all_of<UCompVehicle>(sat))
         {
             continue;
         }
+
+        // Move vehicle to Active Area's capture coordinate space
+        universe::SatActiveArea::capture(rUni, pLink->m_areaSat, {&sat, 1});
 
         ActiveEnt ent = activate(rScene, rUni, pLink->m_areaSat, sat);
         rSync.m_inArea[sat] = ent;
