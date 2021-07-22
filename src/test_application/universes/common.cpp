@@ -31,6 +31,7 @@
 
 using namespace testapp;
 
+using osp::universe::Satellite;
 using osp::universe::Universe;
 
 using osp::universe::SatActiveArea;
@@ -44,22 +45,44 @@ std::function<void(Universe&)> testapp::generate_simple_universe_update(
 {
     return [cartesian] (Universe &rUni) {
 
-        CoordinateSpace &rSpace = rUni.coordspace_get(cartesian);
+        Universe::Reg_t &rReg = rUni.get_reg();
 
-        auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace.m_data);
+        auto viewAreas = rReg.view<UCompActiveArea>();
+        bool hasArea = !viewAreas.empty();
 
-        rUni.coordspace_update_sats(cartesian);
-        CoordspaceCartesianSimple::update_exchange(rUni, rSpace, *pData);
-        rSpace.m_toAdd.clear();
-        CoordspaceCartesianSimple::update_views(rSpace, *pData);
+        Satellite areaSat = hasArea ? viewAreas.front() : entt::null;
+        auto *pArea = hasArea ? &rReg.get<UCompActiveArea>(areaSat) : nullptr;
 
-        // Update ActiveArea if exists
-
-        auto viewAreas = rUni.get_reg().view<UCompActiveArea>();
-
-        if (!viewAreas.empty())
         {
-            SatActiveArea::scan(rUni, viewAreas.front());
+            CoordinateSpace &rMainSpace = rUni.coordspace_get(cartesian);
+            auto *pMainData = entt::any_cast<CoordspaceCartesianSimple>(&rMainSpace.m_data);
+
+            rUni.coordspace_update_sats(cartesian);
+            CoordspaceCartesianSimple::update_exchange(rUni, rMainSpace, *pMainData);
+            rMainSpace.exchange_done();
+
+            CoordspaceCartesianSimple::update_views(rMainSpace, *pMainData);
+        }
+
+        if (hasArea)
+        {
+            CoordinateSpace &rCaptureSpace = rUni.coordspace_get(pArea->m_captureSpace);
+            auto *pCaptureData = entt::any_cast<CoordspaceCartesianSimple>(&rCaptureSpace.m_data);
+
+            rUni.coordspace_update_sats(pArea->m_captureSpace);
+            CoordspaceCartesianSimple::update_exchange(rUni, rCaptureSpace, *pCaptureData);
+            rCaptureSpace.exchange_done();
+
+            CoordspaceCartesianSimple::update_views(rCaptureSpace, *pCaptureData);
+        }
+
+        // Trajectory functions and other movement goes here
+
+        // Move ActiveArea and scan for new satellites
+        if (hasArea)
+        {
+            SatActiveArea::move(rUni, areaSat);
+            SatActiveArea::scan_radius(rUni, areaSat);
         }
     };
 }

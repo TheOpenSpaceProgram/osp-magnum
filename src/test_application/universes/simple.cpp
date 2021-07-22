@@ -59,8 +59,11 @@ void simplesolarsystem::create(osp::OSPApplication& rOspApp)
     Universe &rUni = rOspApp.get_universe();
     Package &rPkg = rOspApp.debug_find_package("lzdb");
 
+    Satellite root = rUni.sat_create();
+
     // Create a coordinate space used to position Satellites
-    auto const& [coordIndex, rSpace] = rUni.coordspace_create();
+    auto const& [coordIndex, rSpace] = rUni.coordspace_create(root);
+    rUni.coordspace_update_depth(coordIndex);
 
     // Use CoordspaceSimple as data, which can store positions and velocities
     // of satellites

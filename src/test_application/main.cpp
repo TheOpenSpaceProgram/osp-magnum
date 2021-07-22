@@ -543,15 +543,6 @@ void debug_print_sats()
         auto const &inCoord = rReg.get<const UCompInCoordspace>(sat);
         auto const &coordIndex = rReg.get<const UCompCoordspaceIndex>(sat);
 
-        CoordinateSpace const &rSpace
-                = rUni.coordspace_get(inCoord.m_coordSpace);
-
-        osp::universe::Vector3g const pos{
-            rSpace.ccomp_view<osp::universe::CCompX>()[coordIndex.m_myIndex],
-            rSpace.ccomp_view<osp::universe::CCompY>()[coordIndex.m_myIndex],
-            rSpace.ccomp_view<osp::universe::CCompZ>()[coordIndex.m_myIndex]
-        };
-
         std::cout << "* SATELLITE: \"" << posTraj.m_name << "\"\n";
 
         rReg.visit(sat, [&rReg] (entt::type_info info) {
@@ -559,11 +550,23 @@ void debug_print_sats()
             std::cout << "  * UComp: " << storage->value_type().name() << "\n";
         });
 
-        auto posM = osp::Vector3(pos) / 1024.0f;
-        std::cout << "  * Position: ["
-                  << pos.x() << ", " << pos.y() << ", " << pos.z() << "], ["
-                  << posM.x() << ", " << posM.y() << ", " << posM.z()
-                  << "] meters\n";
+        if (inCoord.m_coordSpace != entt::null)
+        {
+            CoordinateSpace const &rSpace
+                    = rUni.coordspace_get(inCoord.m_coordSpace);
+
+            auto viewPos = rSpace.ccomp_view_tuple<osp::universe::CCompX,
+                                                     osp::universe::CCompY,
+                                                     osp::universe::CCompZ>();
+
+            auto const pos = viewPos->as<osp::universe::Vector3g>(coordIndex.m_myIndex);
+
+            auto posM = osp::Vector3(pos) / 1024.0f;
+            std::cout << "  * Position: ["
+                      << pos.x() << ", " << pos.y() << ", " << pos.z() << "], ["
+                      << posM.x() << ", " << posM.y() << ", " << posM.z()
+                      << "] meters in coordspace " << inCoord.m_coordSpace << "\n";
+        }
     });
 
 

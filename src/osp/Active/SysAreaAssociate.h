@@ -52,6 +52,11 @@ struct ACompAreaLink
 
     std::reference_wrapper<universe::Universe> m_rUniverse;
 
+    std::vector<universe::Satellite> m_enter;
+    std::vector<universe::Satellite> m_leave;
+
+    Vector3 m_move;
+
 };
 
 struct ACompActivatedSat
@@ -68,23 +73,35 @@ class SysAreaAssociate
 public:
 
     /**
-     * Clears queues in associazted UCompActiveArea
+     * @brief Consume data queued in the universe's UCompActiveArea to be used
+     *        by other active systems
      *
-     * @param rScene [in/out] Scene to update
+     * @param rScene [ref] Scene assicated with ActiveArea
      */
-    static void update_clear(ActiveScene& rScene);
+    static void update_consume(ActiveScene& rScene);
 
     /**
-     * Attempt to get an ACompAreaLink from an ActiveScene
+     * @brief Translates all entities with ACompFloatingOrigin based on
+     *        UCompActiveArea::m_moved read during update_consume
+     *
+     * @param rScene [ref] Scene assicated with ActiveArea
+     */
+    static void update_translate(ActiveScene& rScene);
+
+    /**
+     * @brief Attempt to get an ACompAreaLink from an ActiveScene
+     *
+     * @param rScene [ref] Scene assicated with ActiveArea
+     *
      * @return ACompAreaLink in scene, nullptr if not found
      */
     static ACompAreaLink* try_get_area_link(ActiveScene &rScene);
 
     /**
-     * Connect the ActiveScene to the Universe using the scene's ACompAreaLink,
-     * and a Satellite containing a UCompActiveArea.
+     * @brief Connect the ActiveScene to the Universe using the scene's
+     *        ACompAreaLink, and a Satellite containing a UCompActiveArea.
      *
-     * @param rScene  [in/out] Scene containing ACompAreaLink
+     * @param rScene  [ref] Scene assicated with ActiveArea
      * @param rUni    [ref] Universe the ActiveArea satellite is contained in.
      *                      This is stored in ACompAreaLink.
      * @param areaSat [in] ActiveArea Satellite
@@ -93,41 +110,30 @@ public:
                         universe::Satellite areaSat);
 
     /**
-     * Deactivate all Activated Satellites and cut ties with ActiveArea
-     * Satellite (TODO)
+     * @brief Request to move the ActiveArea
+     *
+     * These movements are queued and accumolated, as only the universe is
+     * allowed to directly move Satellites. Once the universe updates, and moves
+     * the area, it writes into UCompActiveArea::m_moved which is read by
+     * update_consume.
+     *
+     * @param rScene    [ref] Scene assicated with ActiveArea
+     * @param translate [in] Amount to translate the area by
      */
-    static void disconnect(ActiveScene& rScene);
-
-    /**
-     * Move the ActiveArea satellite, and translate everything in the
-     * ActiveScene, aka: floating origin translation
-     */
-    static void area_move(ActiveScene& rScene,
-                          osp::universe::Vector3g translate);
-
-    /**
-     * Set the transform of a Satellite based on a transform (in meters)
-     * Satellite.
-     * @param rUni        [in/out] Universe containing satellites
-     * @param relativeSat [in] Satellite that transform is relative to
-     * @param tgtSat      [in] Satellite to set transform of
-     * @param transform   [in] Transform to set
-     */
-    static void sat_transform_set_relative(
-            universe::Universe& rUni, universe::Satellite relativeSat,
-            universe::Satellite tgtSat, Matrix4 transform);
+    static void area_move(ActiveScene& rScene, universe::Vector3g translate);
 
 private:
 
 
     /**
-     * Translate all entities in an ActiveScene that contain an
-     * ACompFloatingOrigin
+     * @brief Translate all entities in an ActiveScene that contain an
+     *        ACompFloatingOrigin
      *
-     * @param rScene      [out] Scene containing entities that can be translated
+     * @param rScene      [ref] Scene containing entities that can be translated
      * @param translation [in] Meters to translate entities by
      */
-    static void floating_origin_translate(ActiveScene& rScene, Vector3 translation);
+    static void floating_origin_translate(ActiveScene& rScene,
+                                          Vector3 translation);
 
 };
 

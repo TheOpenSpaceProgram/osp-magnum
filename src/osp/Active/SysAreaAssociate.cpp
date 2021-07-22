@@ -39,23 +39,40 @@ using osp::universe::UCompActiveArea;
 
 using osp::universe::Vector3g;
 
-void SysAreaAssociate::update_clear(ActiveScene& rScene)
+void SysAreaAssociate::update_consume(ActiveScene& rScene)
 {
-    ACompAreaLink *pArea = try_get_area_link(rScene);
+    ACompAreaLink *pLink = try_get_area_link(rScene);
 
-    if (pArea == nullptr)
+    if (pLink == nullptr)
     {
         return;
     }
 
-    Universe &rUni = pArea->m_rUniverse;
-    Satellite areaSat = pArea->m_areaSat;
-    auto &areaUComp = rUni.get_reg().get<UCompActiveArea>(areaSat);
+    Universe &rUni = pLink->m_rUniverse;
+    Satellite areaSat = pLink->m_areaSat;
+    auto &rAreaUComp = rUni.get_reg().get<UCompActiveArea>(areaSat);
 
-    // Clear enter/leave event vectors
+    pLink->m_enter = std::exchange(rAreaUComp.m_enter, {});
+    pLink->m_leave = std::exchange(rAreaUComp.m_leave, {});
 
-    areaUComp.m_enter.clear();
-    areaUComp.m_leave.clear();
+    Vector3g deltaTotal{};
+
+    for (Vector3g const delta : std::exchange(rAreaUComp.m_moved, {}))
+    {
+        deltaTotal += delta;
+    }
+
+    pLink->m_move = Vector3(deltaTotal) / universe::gc_units_per_meter;
+}
+
+void SysAreaAssociate::update_translate(ActiveScene &rScene)
+{
+    ACompAreaLink const *pLink = try_get_area_link(rScene);
+
+    if ( ! pLink->m_move.isZero())
+    {
+        floating_origin_translate(rScene, pLink->m_move * -1.0f);
+    }
 }
 
 ACompAreaLink* SysAreaAssociate::try_get_area_link(ActiveScene &rScene)
@@ -76,13 +93,6 @@ void SysAreaAssociate::connect(ActiveScene& rScene, universe::Universe &rUni,
 
 }
 
-void SysAreaAssociate::disconnect(ActiveScene& rScene)
-{
-    // TODO: Have a vector of function pointers for each satellite type, that
-    //       are called to de-activate them right away.
-    //       Also delete the ACompAreaLink from the scene
-}
-
 void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3g translate)
 {
     ACompAreaLink *pArea = try_get_area_link(rScene);
@@ -92,37 +102,14 @@ void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3g translate)
         return;
     }
 
-    auto &areaPosTraj = pArea->get_universe().get_reg()
-            .get<universe::UCompTransformTraj>(pArea->m_areaSat);
+    Universe &rUni = pArea->get_universe();
+    auto &rAreaSat = rUni.get_reg().get<UCompActiveArea>(pArea->m_areaSat);
 
-//    areaPosTraj.m_position += translate;
-
-    Vector3 meters = Vector3(translate) / universe::gc_units_per_meter;
-
-    floating_origin_translate(rScene, -meters);
-}
-
-void SysAreaAssociate::sat_transform_set_relative(
-        universe::Universe& rUni, universe::Satellite relativeSat,
-        universe::Satellite tgtSat, Matrix4 transform)
-{
-    auto &satPosTraj = rUni.get_reg().get<universe::UCompTransformTraj>(tgtSat);
-
-    auto const &areaPosTraj = rUni.get_reg()
-            .get<universe::UCompTransformTraj>(relativeSat);
-
-    // 1024 units = 1 meter
-    Vector3g const posAreaRelative(transform.translation()
-                                   * universe::gc_units_per_meter);
-
-//    satPosTraj.m_position = areaPosTraj.m_position + posAreaRelative;
-//    satPosTraj.m_rotation = Quaternion::
-//            fromMatrix(transform.rotationScaling());
-//    satPosTraj.m_dirty = true;
+    rAreaSat.m_requestMove.push_back(translate);
 }
 
 void SysAreaAssociate::floating_origin_translate(
-        ActiveScene& rScene,Vector3 translation)
+        ActiveScene& rScene, Vector3 translation)
 {
     auto &rReg = rScene.get_registry();
 

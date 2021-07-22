@@ -71,6 +71,24 @@ constexpr size_t ccomp_min_size() noexcept
     return size_t(std::max({ccomp_id<CCOMP_T> ...})) + 1;
 }
 
+template <typename ... CCOMP_T>
+struct TupleCComp
+{
+    constexpr TupleCComp(ViewCComp_t<CCOMP_T> ... ccomps) noexcept
+     : m_data{std::forward< ViewCComp_t<CCOMP_T> >(ccomps)...}
+    { }
+
+    template<typename T>
+    constexpr decltype(auto) as(size_t index) const
+    {
+        return std::apply([index] (ViewCComp_t<CCOMP_T> ... ccomps) {
+            return T(ccomps[index] ...);
+        }, m_data);
+    }
+
+    std::tuple<ViewCComp_t<CCOMP_T> ...> m_data;
+};
+
 /**
  * @brief Stores positions, velocities, and other related data for Satellites,
  *        and exposes them through read-only strided array views.
@@ -89,9 +107,15 @@ struct CoordinateSpace
 
     enum class ECmdOp : uint8_t { Add, Set };
     enum class ECmdVar : uint8_t { Position, Velocity };
-    using CmdValue_t = std::variant<Vector3, Vector3g>;
 
-    using Command_t = std::tuple<ECmdOp, ECmdVar, CmdValue_t>;
+    struct CmdPosition { Vector3g m_value; };
+    struct CmdVelocity { Vector3 m_value; };
+
+    using CmdValue_t = std::variant<CmdPosition, CmdVelocity>;
+
+    using Command_t = std::tuple<ECmdOp, CmdValue_t>;
+
+    CoordinateSpace(Satellite parentSat) : m_parentSat(parentSat) { }
 
     /**
      * @brief Request to add a Satellite to this coordinate space
@@ -110,6 +134,17 @@ struct CoordinateSpace
         m_toAdd.emplace_back(sat, pos, vel);
     }
 
+    void remove(uint32_t index)
+    {
+        m_toRemove.emplace_back(index);
+    }
+
+    void exchange_done()
+    {
+        m_toAdd.clear();
+        m_toRemove.clear();
+    }
+
     /**
      * @brief TODO - commands to move and accelerate satellites
      *
@@ -123,9 +158,10 @@ struct CoordinateSpace
     /**
      * @brief Access this CoordinateSpace's components
      *
-     * Use the index from a Satellite's UCompCoordspaceIndex to access this view
+     * Use the index from a Satellite's UCompCoordspaceIndex to access this
+     * view. The CComp must be valid, or else an exception is thrown
      *
-     * @return A StridedArrayView1D viewing coordinate space component data
+     * @return StridedArrayView1D viewing coordinate space component data
      *
      * @tparam COMP_T Coordinate component to view
      */
@@ -136,9 +172,36 @@ struct CoordinateSpace
                     m_components.at(ccomp_id<CCOMP_T>).value());
     }
 
+    /**
+     * @brief Access multiple components using a TupleCComp
+     *
+     * TupleCComp can be used to conveniently pass CComps as arguments
+     *
+     * @tparam COMP_T... Coordinate components to view
+     */
+    template<typename ... CCOMP_T>
+    constexpr std::optional< TupleCComp<CCOMP_T ...> const>ccomp_view_tuple() const noexcept
+    {
+        // Make sure all CComp IDs are valid indices to m_components
+        if (m_components.size() <= std::max({ccomp_id<CCOMP_T> ...}) )
+        {
+            return std::nullopt;
+        }
+
+        // Make sure all CComps are valid
+        if ( ! (m_components.at(ccomp_id<CCOMP_T>).has_value() && ...))
+        {
+            return std::nullopt;
+        }
+
+        return TupleCComp<CCOMP_T ...>(
+                    Corrade::Containers::arrayCast<typename CCOMP_T::datatype_t>(
+                                        m_components.at(ccomp_id<CCOMP_T>).value()) ...);
+    }
+
     // Queues for systems to communicate
     std::vector<SatToAdd_t> m_toAdd;
-    std::vector<Satellite> m_toRemove;
+    std::vector<uint32_t> m_toRemove;
     std::vector<Command_t> m_commands;
 
     // Data and component views are managed by the external system
@@ -146,11 +209,133 @@ struct CoordinateSpace
     entt::any m_data;
     std::vector<std::optional<CoordinateView_t> > m_components;
 
-    Satellite m_center;
-    int16_t m_pow2scale;
+    Satellite m_parentSat;
 
-}; // CoordinateSpace
+    int16_t m_depth{0};
+    int16_t m_pow2scale{10};
 
+}; // struct CoordinateSpace
+
+
+template <typename T>
+constexpr T mulpow2(T in, int16_t pow2) noexcept
+{
+    return (pow2 > 0) ? (in * (1L << pow2)) : (in / (1L << (-pow2)));
+}
+
+
+/**
+ * @brief A functor used to transform coordinates between coordinate spaces
+ *
+ * Transforming coordinates from one space to another is translation and scale.
+ *
+ * Parent to Child: f(x) = (precision difference) * (x - childPos)
+ * Child to Parent: f(x) = (precision difference) * x + childPos
+ *
+ * These two can be re-arranged into a general form:
+ *
+ * f(x) = x * 2^expX + c * 2^expC
+ *
+ */
+struct CoordspaceTransform
+{
+    using Vec_t = Magnum::Math::Vector3<uint64_t>;
+
+    Vector3g operator()(Vector3g in) const noexcept
+    {
+        return mulpow2(in, m_expX) + mulpow2(Vector3g(m_c), m_expC);
+    }
+
+    /**
+     * @brief Substitute another CoordspaceTransform into this transform,
+     *        resulting in a new composite transform.
+     *
+     * With coordinate spaces A, B, and C, transforming from A->B(x) is a,
+     * function and B->C(c) is also a function. This means A->C(x) is equal to
+     * B->C(A->B)
+     *
+     * In general form, the algebra can be worked out like this:
+     *
+     * in(x) = x * 2^expX2  +  c2 * 2^expC2
+     * out(x) = in(x) * 2^expX1  +  c1 * 2^expC1
+     *
+     * plug in(x) into out as x
+     * out(x) = (x * 2^expX2  +  c2 * 2^expC2) * 2^expX1  +  c1 * 2^expC1
+     * out(x) = x*2^(expX1+expX2)  +  c1 * 2^expC1  +  c2 * 2^(expC2+expX1)
+     *
+     * Combine c1 and c2 terms by splitting off one of the exponents, and
+     * multiplying into a c value so that both c1 and c2 have the same exponent
+     *
+     * ie. c*2^expC -> (c*2^expD) * 2^(expC - expD)
+     * out(x) = x*2^(expX1+expX2) + c3 * 2^expC3
+     *
+     * @param in [in] CoordspaceTransform to substitute as X
+     *
+     * @return A new CoordspaceTransform formed from substitution
+     */
+    constexpr CoordspaceTransform operator()(CoordspaceTransform const& in) const noexcept
+    {
+        CoordspaceTransform result;
+
+        result.m_expX = m_expX + in.m_expX;
+
+        int16_t expC1 = m_expC;
+        int16_t expC2 = m_expX + in.m_expC;
+
+        if (expC1 == expC2)
+        {
+            result.m_expC = expC1;
+            result.m_c = m_c + in.m_c;
+        }
+        else if (expC1 > expC2)
+        {
+            // expC1 too high, multiply into m_c
+            result.m_expC = expC2;
+            result.m_c = m_c * 2L * (1 << (expC1-expC2)) + in.m_c;
+
+        }
+        else if (expC1 < expC2)
+        {
+            // expC2 too high, multiply into in.m_c
+            result.m_expC = expC1;
+            result.m_c = m_c + in.m_c * 2L * (1 << (expC2-expC1));
+        }
+
+        return result;
+    }
+
+    int16_t m_expX{0};
+
+    Vec_t m_c{0};
+    int16_t m_expC{0};
+
+}; // struct CoordspaceTransform
+
+namespace transform
+{
+
+constexpr CoordspaceTransform scaled(
+        CoordspaceTransform x, int16_t from, int16_t to) noexcept
+{
+    return CoordspaceTransform{int16_t(x.m_expX + (from - to)), x.m_c, x.m_expC};
+}
+
+constexpr CoordspaceTransform child_to_parent(
+        Vector3g const childPos, int16_t childPrec, int16_t parentPrec) noexcept
+{
+    int16_t exp = childPrec - parentPrec;
+    return CoordspaceTransform{exp, CoordspaceTransform::Vec_t(childPos), 0};
+}
+
+constexpr CoordspaceTransform parent_to_child(
+        Vector3g const childPos, int16_t childPrec, int16_t parentPrec) noexcept
+{
+    int16_t exp = parentPrec - childPrec;
+    // individual vector components is workaround for non-constexpr operator-()
+    return CoordspaceTransform{exp, CoordspaceTransform::Vec_t( -childPos.x(), -childPos.y(), -childPos.z()), exp};
+}
+
+}
 
 
 }

@@ -37,6 +37,8 @@
 #include <osp/Active/SysForceFields.h>
 #include <osp/Active/SysAreaAssociate.h>
 
+#include <osp/CoordinateSpaces/CartesianSimple.h>
+
 #include <osp/Satellites/SatActiveArea.h>
 #include <osp/Satellites/SatVehicle.h>
 
@@ -74,6 +76,8 @@ using osp::universe::SatVehicle;
 using osp::universe::UCompInCoordspace;
 using osp::universe::UCompActiveArea;
 
+using osp::universe::coordspace_index_t;
+
 using osp::active::ActiveEnt;
 using osp::active::ActiveScene;
 using osp::active::ACompTransform;
@@ -106,9 +110,13 @@ using osp::Quaternion;
 using osp::Matrix3;
 using osp::Matrix4;
 
-void load_shaders(osp::active::ActiveScene& rScene);
+void load_shaders(ActiveScene& rScene);
 
-void update_scene(osp::active::ActiveScene& rScene);
+void update_scene(ActiveScene& rScene);
+
+Satellite active_area_create(osp::OSPApplication& rOspApp,
+                             ActiveScene& rScene, Universe &rUni,
+                             coordspace_index_t targetCoordspace);
 
 void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
                  osp::OSPApplication& rOspApp, OSPMagnum::Arguments args)
@@ -144,19 +152,11 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
     rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
 
-
     // create a Satellite with an ActiveArea
-    Satellite areaSat = rUni.sat_create();
-
-    // assign sat as an ActiveArea
-    SatActiveArea::add_active_area(rUni, areaSat);
+    Satellite areaSat = active_area_create(rOspApp, rScene, rUni, 0);
 
     osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
 
-    // (hacky) Add the new ActiveArea to the coordinate space
-    rUni.coordspace_get(0).add(areaSat, {}, {});
-
-    rOspApp.update_universe();
 
     // Get ActiveArea from scene, and link it to scene using the AreaAssociate
 
@@ -219,7 +219,22 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
                        "Closed Magnum Application");
 
     // Disconnect ActiveArea
-    osp::active::SysAreaAssociate::disconnect(rScene);
+
+    osp::universe::CoordinateSpace &rCapture = rUni.coordspace_get(rUni.get_reg().get<UCompActiveArea>(areaSat).m_captureSpace);
+    osp::universe::CoordinateSpace &rMain = rUni.coordspace_get(0);
+    osp::universe::CoordspaceTransform transform = rUni.coordspace_transform(rMain, rCapture).value();
+    auto viewSats = rCapture.ccomp_view<osp::universe::CCompSat>();
+    auto viewPos = rCapture.ccomp_view_tuple<osp::universe::CCompX, osp::universe::CCompY, osp::universe::CCompZ>();
+
+    for (uint32_t i = 0; i < viewSats.size(); i ++)
+    {
+        osp::universe::Vector3g pos = transform(viewPos->as<osp::universe::Vector3g>(i));
+        rCapture.remove(i);
+        rMain.add(viewSats[i], pos, {});
+    }
+
+    rOspApp.update_universe();
+
     rUni.get_reg().destroy(areaSat);
 
     // destruct the application, this closes the window
@@ -237,14 +252,16 @@ void update_scene(osp::active::ActiveScene& rScene)
     // Search Universe for nearby activatable Satellites
     //SysAreaAssociate::update_scan(rScene);
 
+
+    SysAreaAssociate::update_consume(rScene);
+
+    SysAreaAssociate::update_translate(rScene);
+
     // Activate or deactivate nearby planets
     SysPlanetA::update_activate(rScene);
 
     // Activate or deactivate nearby vehicles
     SysVehicleSync::update_universe_sync(rScene);
-
-    // Clear Satellite enter/exit queues
-    SysAreaAssociate::update_clear(rScene);
 
 
     // Construct components of vehicles. These should be parallelizable
@@ -298,6 +315,60 @@ void update_scene(osp::active::ActiveScene& rScene)
 
     // Delete entities with ACompDelete
     ActiveScene::update_delete(rScene);
+}
+
+Satellite active_area_create(osp::OSPApplication& rOspApp,
+                             ActiveScene& rScene, Universe &rUni,
+                             coordspace_index_t targetIndex)
+{
+    using osp::universe::CoordinateSpace;
+    using osp::universe::CoordspaceCartesianSimple;
+
+
+    // create a Satellite
+    Satellite areaSat = rUni.sat_create();
+
+    // assign sat as an ActiveArea
+    auto &rArea = rUni.get_reg().emplace<UCompActiveArea>(areaSat);
+
+    // Create the "ActiveArea Domain" Coordinte Space
+    // This is a CoordinateSpace that acts like a layer overtop of the target
+    // CoordinateSpace. The ActiveArea is free to roam around in this space
+    // unaffected by the target's trajectory function.
+    {
+        // Make the Domain CoordinateSpace identical to the target CoordinateSpace
+        CoordinateSpace const &targetCoord = rUni.coordspace_get(targetIndex);
+
+        // Make the Domain CoordinateSpace identical to the target CoordinateSpace
+        auto const& [domainIndex, rDomainCoord] = rUni.coordspace_create(targetCoord.m_parentSat);
+        rUni.coordspace_update_depth(domainIndex);
+        rDomainCoord.m_pow2scale = targetCoord.m_pow2scale;
+
+        rDomainCoord.m_data.emplace<CoordspaceCartesianSimple>();
+        auto *pDomainData = entt::any_cast<CoordspaceCartesianSimple>(&rDomainCoord.m_data);
+
+        // Add ActiveArea to the Domain Coordinate space
+        rDomainCoord.add(areaSat, {}, {});
+        rUni.coordspace_update_sats(domainIndex);
+        pDomainData->update_exchange(rUni, rDomainCoord, *pDomainData);
+        pDomainData->update_views(rDomainCoord, *pDomainData);
+    }
+
+    // Create the "ActiveArea Capture" CoordinateSpace
+    // This is a coordinate space for Satellites captured inside of the
+    // ActiveArea and can be modified in the ActiveScene, such as Vehicles.
+    {
+        auto const& [captureIndex, rCaptureSpace] = rUni.coordspace_create(areaSat);
+        rUni.coordspace_update_depth(captureIndex);
+        rCaptureSpace.m_data.emplace<CoordspaceCartesianSimple>();
+
+        // Make the ActiveArea aware of the capture space's existance
+        rArea.m_captureSpace = captureIndex;
+    }
+
+    rOspApp.update_universe();
+
+    return areaSat;
 }
 
 void load_shaders(osp::active::ActiveScene& rScene)

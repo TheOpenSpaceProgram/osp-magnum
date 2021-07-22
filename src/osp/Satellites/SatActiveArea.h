@@ -37,28 +37,32 @@
 namespace osp::universe
 {
 
-
 class OSPMagnum;
 class SatActiveArea;
 
 /**
- * Tag for satellites that can be activated
+ * @brief Tag for satellites that can be activated
+ *
+ * Activatable satellites are 'real' physical things that could be 'activated'
+ * into the scene to be interacted with.
+ *
+ * ie: planets, atmospheres, vehicles, stars.
+ *
+ * Non-activatable satellites may be waypoints, barycenters, lagrange points
+ *
  */
 struct UCompActivatable { };
 
-/**
- * Added to a satellite when it is being modified by an ActiveArea
- */
-struct UCompActivatedMutable
-{
-    Satellite m_area{entt::null};
-    //active::ActiveEnt m_ent{entt::null};
-};
-
 //-----------------------------------------------------------------------------
 
+/**
+ * @brief Rule to have this satellite always activated
+ */
 struct UCompActivationAlways { };
 
+/**
+ * @brief Rule to activate a satellite when nearby an ActiveArea
+ */
 struct UCompActivationRadius
 {
     float m_radius{ 8.0f };
@@ -70,17 +74,17 @@ struct UCompActiveArea
 {
     float m_areaRadius{ 1024.0f };
 
-    entt::basic_sparse_set<Satellite> m_inside;
+    entt::basic_sparse_set<Satellite> m_inside{};
 
-    coordspace_index_t m_coordSpace;
+    coordspace_index_t m_captureSpace;
 
-    // capture satellite
-    // new satellite
-    //std::vector<Satellite> ;
+    // Input queues
+    std::vector<Vector3g> m_requestMove;
 
     // Output queues
     std::vector<Satellite> m_enter;
     std::vector<Satellite> m_leave;
+    std::vector<Vector3g> m_moved;
 };
 
 
@@ -90,17 +94,45 @@ public:
 
     static constexpr std::string_view smc_name = "ActiveArea";
 
-    static void scan(osp::universe::Universe& rUni, Satellite areaSat);
+    /**
+     * @brief Move an ActiveArea according to m_requestMove
+     *
+     * @param rUni    [ref] Universe containing ActiveArea satellite
+     * @param areaSat [in] Satellite with UCompActiveArea
+     */
+    static void move(Universe& rUni, Satellite areaSat);
 
     /**
-     * @brief Set the type of a Satellite and add a UCompActiveArea to it
+     * @brief Activate all satellites with UCompActivationAlways
      *
-     * @param rUni [out] Universe containing satellite
-     * @param sat  [in] Satellite add a UCompActiveArea to
-     * @return Reference to UCompActiveArea created
+     * TODO: not yet implemented
+     *
+     * @param rUni    [ref] Universe containing ActiveArea satellite
+     * @param areaSat [in] Satellite with UCompActiveArea
      */
-    static UCompActiveArea& add_active_area(
-        osp::universe::Universe& rUni, osp::universe::Satellite sat);
+    static void scan_always(Universe& rUni, Satellite areaSat);
+
+    /**
+     * @brief Scan for nearby activatable satellites with UCompActivationRadius.
+     *
+     * @param rUni    [ref] Universe containing ActiveArea satellite
+     * @param areaSat [in] Satellite with UCompActiveArea
+     */
+    static void scan_radius(Universe& rUni, Satellite areaSat);
+
+    /**
+     * @brief Request to move a Satellites into the ActiveArea's 'capture'
+     *        coordinate space.
+     *
+     * This will give the ActiveArea full control over the Satellite's
+     * movements.
+     *
+     * @param rUni      [ref] Universe containing ActiveArea satellite
+     * @param areaSat   [in] Satellite with UCompActiveArea
+     * @param toCapture [in] Satellite to capture
+     */
+    static void capture(Universe& rUni, Satellite areaSat,
+                        Corrade::Containers::ArrayView<Satellite> toCapture);
 };
 
 }

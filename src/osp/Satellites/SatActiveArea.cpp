@@ -25,10 +25,34 @@
 
 #include "SatActiveArea.h"
 
-using osp::universe::UCompActiveArea;
-using osp::universe::SatActiveArea;
+#include "../CoordinateSpaces/CartesianSimple.h"
 
-void SatActiveArea::scan(osp::universe::Universe& rUni, Satellite areaSat)
+using osp::universe::SatActiveArea;
+using osp::universe::UCompActiveArea;
+
+
+void SatActiveArea::move(Universe& rUni, Satellite areaSat)
+{
+    Universe::Reg_t &rReg = rUni.get_reg();
+    auto &rArea = rReg.get<UCompActiveArea>(areaSat);
+    auto &rInCoord = rReg.get<UCompInCoordspace>(areaSat);
+    auto &rInCoordIndex = rReg.get<UCompCoordspaceIndex>(areaSat);
+
+    CoordinateSpace& rDomainCoord = rUni.coordspace_get(rInCoord.m_coordSpace);
+    auto *pDomainData = entt::any_cast<CoordspaceCartesianSimple>(&rDomainCoord.m_data);
+
+    Vector3g &rPos = pDomainData->m_positions[rInCoordIndex.m_myIndex];
+
+    std::vector<Vector3g> const toMove = std::exchange(rArea.m_requestMove, {});
+
+    for (Vector3g delta: toMove)
+    {
+        rPos += delta;
+        rArea.m_moved.push_back(delta);
+    }
+}
+
+void SatActiveArea::scan_radius(Universe& rUni, Satellite areaSat)
 {
     auto &rArea = rUni.get_reg().get<UCompActiveArea>(areaSat);
 
@@ -70,7 +94,24 @@ void SatActiveArea::scan(osp::universe::Universe& rUni, Satellite areaSat)
     }
 }
 
-UCompActiveArea& SatActiveArea::add_active_area(Universe &rUni, Satellite sat)
+void SatActiveArea::capture(Universe& rUni, Satellite areaSat,
+                            Corrade::Containers::ArrayView<Satellite> toCapture)
 {
-    return rUni.get_reg().emplace<UCompActiveArea>(sat);
+    auto &rArea = rUni.get_reg().get<UCompActiveArea>(areaSat);
+    CoordinateSpace &rCaptureCoord = rUni.coordspace_get(rArea.m_captureSpace);
+
+    for (Satellite sat : toCapture)
+    {
+        auto const& satInCoord = rUni.get_reg().get<UCompInCoordspace>(sat);
+        auto const& satCoordIndex = rUni.get_reg().get<UCompCoordspaceIndex>(sat);
+        CoordinateSpace &rSatCoord = rUni.coordspace_get(satInCoord.m_coordSpace);
+
+        Vector3g const pos = rUni.sat_calc_pos(areaSat, sat);
+
+        Vector3 const vel{}; // TODO: velocity not yet implemented
+
+        rSatCoord.remove(satCoordIndex.m_myIndex);
+        rCaptureCoord.add(sat, pos, vel);
+
+    }
 }
