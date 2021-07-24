@@ -72,7 +72,7 @@ void SatActiveArea::scan_radius(Universe& rUni, Satellite areaSat)
         bool alreadyInside = rArea.m_inside.contains(sat);
 
         // Simple sphere-sphere-intersection check
-        float distanceSquared = rUni.sat_calc_pos_meters(areaSat, sat).dot();
+        float distanceSquared = rUni.sat_calc_pos_meters(areaSat, sat).value().dot();
         float radius = rArea.m_areaRadius + satRadius.m_radius;
 
         if ((radius * radius) > distanceSquared)
@@ -88,7 +88,7 @@ void SatActiveArea::scan_radius(Universe& rUni, Satellite areaSat)
         else if (alreadyInside)
         {
             // Satellite exited area
-            rArea.m_inside.erase(sat);
+            rArea.m_inside.remove(sat);
             rArea.m_leave.emplace_back(sat);
         }
     }
@@ -106,12 +106,38 @@ void SatActiveArea::capture(Universe& rUni, Satellite areaSat,
         auto const& satCoordIndex = rUni.get_reg().get<UCompCoordspaceIndex>(sat);
         CoordinateSpace &rSatCoord = rUni.coordspace_get(satInCoord.m_coordSpace);
 
-        Vector3g const pos = rUni.sat_calc_pos(areaSat, sat);
+        Vector3g const pos = rUni.sat_calc_pos(areaSat, sat).value();
 
         Vector3 const vel{}; // TODO: velocity not yet implemented
 
         rSatCoord.remove(satCoordIndex.m_myIndex);
         rCaptureCoord.add(sat, pos, vel);
 
+    }
+}
+
+void SatActiveArea::update_capture(Universe& rUni, coordspace_index_t capture)
+{
+    CoordinateSpace &rCoord = rUni.coordspace_get(capture);
+    auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rCoord.m_data);
+    auto viewCoordIndex = rUni.get_reg().view<UCompCoordspaceIndex>();
+
+    for (CoordinateSpace::Command const& cmd : std::exchange(rCoord.m_commands, {}))
+    {
+        std::visit( [pData, &viewCoordIndex, cmd] (auto&& v)
+        {
+            using T = std::decay_t<decltype(v)>;
+
+            auto const& inCoord = viewCoordIndex.get<UCompCoordspaceIndex>(cmd.m_sat);
+
+            if constexpr (std::is_same_v<T, CoordinateSpace::CmdPosition>)
+            {
+                pData->m_positions.at(inCoord.m_myIndex) = v.m_value;
+            }
+            else if constexpr (std::is_same_v<T, CoordinateSpace::CmdVelocity>)
+            {
+                // capture space does not have velocity
+            }
+        }, cmd.m_value);
     }
 }

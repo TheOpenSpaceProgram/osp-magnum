@@ -71,30 +71,36 @@ void simplesolarsystem::create(osp::OSPApplication& rOspApp)
     auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace.m_data);
 
 
-    // Create 2 random vehicles
+    // Create 2 random (non-functional) vehicles
     for (int i = 0; i < 2; i ++)
     {
         // Creates a random mess of spamcans as a vehicle
-        Satellite sat = debug_add_random_vehicle(rUni, rPkg, "TestyMcTestFace Mk"
-                                                 + std::to_string(i));
+        Satellite sat = debug_add_random_vehicle(
+                    rUni, rPkg, "TestyMcTestFace Mk " + std::to_string(i));
+
+        Vector3g pos{i * 1024l * 5l, 0l, -10l * 1024l};
 
         // Add it to the CoordspaceSimple directly
-        rSpace.add(sat, {i * 1024l * 5l, 0l, 0l}, {});
+        rSpace.add(sat, pos, {});
     }
 
+    // Create 10 part-vehicles
+    for (int i = 0; i < 10; i ++)
     {
-        Satellite sat = testapp::debug_add_part_vehicle(rUni, rPkg, "Placeholder Mk. I");
+        Satellite sat = testapp::debug_add_part_vehicle(
+                    rUni, rPkg, "Placeholder Mk. " + std::to_string(i));
 
-        Vector3g pos{22 * 1024l * 5l, 0l, 0l};
+        // stack along the y-axis (vertically)
+        Vector3g pos{0l, i * 1024l * 10l, 0l};
 
         rSpace.add(sat, pos, {});
     }
 
-    // Add Grid of planets too
+    // Add Grid of planets too (3x3)
 
-    for (int x = -0; x < 1; x ++)
+    for (int x = -1; x <= 1; x ++)
     {
-        for (int z = -1; z < 1; z ++)
+        for (int z = -1; z <= 1; z ++)
         {
             Satellite sat = rUni.sat_create();
 
@@ -102,17 +108,18 @@ void simplesolarsystem::create(osp::OSPApplication& rOspApp)
             float radius = 256;
             float mass = 7.03E7 * 99999999; // volume of sphere * density
 
+            float activateRadius = 6000.0f;
             float resolutionScreenMax = 0.056f;
             float resolutionSurfaceMax = 2.0f;
 
             // assign sat as a planet
-            SatPlanet::add_planet(rUni, sat, radius, mass,
+            SatPlanet::add_planet(rUni, sat, radius, mass, activateRadius,
                                   resolutionSurfaceMax, resolutionScreenMax);
 
-            // space planets 400m apart from each other
+            // space planets 6000m apart from each other
             // 1024 units = 1 meter
             osp::universe::Vector3g pos{
-                x * 1024l * 400l,
+                x * 1024l * 6000l,
                 1024l * -300l,
                 z * 1024l * 6000l};
 

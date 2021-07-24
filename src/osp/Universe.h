@@ -87,22 +87,28 @@ public:
     void sat_remove(Satellite sat);
 
     /**
-     * @brief Calculate position between two satellites.
+     * @brief Calculate position between two satellites; works between
+     *        coordinate spaces.
+     *
+     * This function is rather inefficient and only calculates for ONE
+     * satellite. Avoid using this for hot code.
      *
      * @param referenceFrame [in] Satellite used as reference frame
      * @param target         [in] Satellite to calculate position to
+     *
      * @return relative position of target in spaceint_t vector
      */
-    Vector3g sat_calc_pos(Satellite referenceFrame, Satellite target) const;
+    std::optional<Vector3g> sat_calc_pos(
+            Satellite referenceFrame, Satellite target) const;
 
     /**
-     * @brief Calculate position between two satellites.
+     * @brief Calls sat_calc_pos, and converts results to meters
      *
      * @param referenceFrame [in] Satellite used as reference frame
      * @param target         [in] Satellite to calculate position to
      * @return relative position of target in meters
      */
-    Vector3 sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const;
+    std::optional<Vector3> sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const;
 
     /**
      * @brief Create a coordinate space
@@ -141,7 +147,7 @@ public:
      * @return Optional CoordspaceTransform. Empty if no common ancestor.
      */
     std::optional<CoordspaceTransform> coordspace_transform(
-            CoordinateSpace const &coordFrom, CoordinateSpace const &coordTo);
+            CoordinateSpace const &coordFrom, CoordinateSpace const &coordTo) const;
 
     /**
      * @brief Reassign indices in the UCompInCoordspace components of satellites

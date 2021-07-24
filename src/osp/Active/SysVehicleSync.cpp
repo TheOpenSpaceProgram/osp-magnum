@@ -40,6 +40,8 @@ using namespace osp::active;
 using osp::universe::Universe;
 using osp::universe::Satellite;
 
+using osp::universe::CoordinateSpace;
+
 using osp::universe::UCompActiveArea;
 using osp::universe::UCompVehicle;
 
@@ -77,7 +79,7 @@ ActiveEnt SysVehicleSync::activate(ActiveScene &rScene, Universe &rUni,
                     vehicleEnt, loadMeVehicle.m_blueprint);
 
     // Convert position of the satellite to position in scene
-    Vector3 positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat);
+    Vector3 positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat).value();
 
     ACompTransform& rVehicleTransform = rScene.get_registry()
                                         .emplace<ACompTransform>(vehicleEnt);
@@ -164,7 +166,16 @@ void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
     Universe &rUni = pLink->get_universe();
     auto &rSync = rScene.get_registry().ctx<SyncVehicles>();
 
+    auto const& area = rUni.get_reg().get<UCompActiveArea>(pLink->m_areaSat);
+
     // Delete vehicles that have gone too far from the ActiveArea range
+
+    auto viewTf = rScene.get_registry().view<ACompTransform>();
+    CoordinateSpace& rCapture = rUni.coordspace_get(area.m_captureSpace);
+    CoordinateSpace& rRelease = rUni.coordspace_get(area.m_releaseSpace);
+    universe::CoordspaceTransform releaseCoordTf
+            = rUni.coordspace_transform(rCapture, rRelease).value();
+
     for (Satellite sat : pLink->m_leave)
     {
         if (!rUni.get_reg().all_of<UCompVehicle>(sat))
@@ -172,19 +183,42 @@ void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
             continue;
         }
 
-        auto foundEnt = rSync.m_inArea.find(sat);
-        SysHierarchy::mark_delete_cut(rScene, foundEnt->second);
-        rSync.m_inArea.erase(foundEnt);
+        // Get vehicle entity by Satellite
+        auto vehicleIt = rSync.m_inArea.find(sat);
+        ActiveEnt vehicle = vehicleIt->second;
+
+        // Get position in scene, and transform to release coordspace
+        auto const& vehicleTf = viewTf.get<ACompTransform>(vehicle);
+        universe::Vector3g posInScene(vehicleTf.m_transform.translation()
+                                       * universe::gc_units_per_meter);
+        universe::Vector3g posReleased = releaseCoordTf(posInScene);
+
+        // Handoff satellite to release coordinate space
+        auto const& index = rUni.get_reg().get<universe::UCompCoordspaceIndex>(sat);
+        rCapture.remove(index.m_myIndex);
+        rRelease.add(sat, posReleased, {});
+
+        // Mark entity for deletion
+        SysHierarchy::mark_delete_cut(rScene, vehicle);
+        rScene.get_registry().remove<ACompActivatedSat>(vehicle);
+
+        // Remove Satellite-Entity association
+        rSync.m_inArea.erase(vehicleIt);
     }
 
     // Update transforms of already-activated vehicle satellites
-    auto view = rScene.get_registry().view<ACompVehicle, ACompTransform,
-                                           ACompActivatedSat>();
-    for (ActiveEnt vehicleEnt : view)
+
+    auto viewVehicles = rScene.get_registry().view<ACompVehicle,
+                                                   ACompActivatedSat>();
+
+    for (ActiveEnt vehicleEnt : viewVehicles)
     {        
-        auto &vehicleTf = view.get<ACompTransform>(vehicleEnt);
-        auto &vehicleSat = view.get<ACompActivatedSat>(vehicleEnt);
-        // TODO: move the satellite in the ActiveArea capture space
+        auto const &vehicleTf = viewTf.get<ACompTransform>(vehicleEnt);
+        auto const &vehicleSat = viewVehicles.get<ACompActivatedSat>(vehicleEnt);
+
+        universe::Vector3g pos{vehicleTf.m_transform.translation() * universe::gc_units_per_meter};
+        rCapture.command({vehicleSat.m_sat, CoordinateSpace::ECmdOp::Set,
+                          CoordinateSpace::CmdPosition{pos}});
     }
 
     // Activate nearby vehicle satellites that have just entered the ActiveArea
@@ -201,4 +235,5 @@ void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
         ActiveEnt ent = activate(rScene, rUni, pLink->m_areaSat, sat);
         rSync.m_inArea[sat] = ent;
     }
+
 }

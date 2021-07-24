@@ -78,6 +78,11 @@ struct UCompActiveArea
 
     coordspace_index_t m_captureSpace;
 
+    coordspace_index_t m_releaseSpace;
+
+    // maybe have multiple release coordspaces with priorities?
+    //std::vector<coordspace_index_t> m_releaseSpaces;
+
     // Input queues
     std::vector<Vector3g> m_requestMove;
 
@@ -121,7 +126,7 @@ public:
     static void scan_radius(Universe& rUni, Satellite areaSat);
 
     /**
-     * @brief Request to move a Satellites into the ActiveArea's 'capture'
+     * @brief Request to move Satellites into the ActiveArea's 'capture'
      *        coordinate space.
      *
      * This will give the ActiveArea full control over the Satellite's
@@ -133,6 +138,14 @@ public:
      */
     static void capture(Universe& rUni, Satellite areaSat,
                         Corrade::Containers::ArrayView<Satellite> toCapture);
+
+    /**
+     * @brief Update positions of captured objects
+     *
+     * @param rUni    [ref] Universe containing ActiveArea satellite
+     * @param capture [in] Index to capture coordinate space
+     */
+    static void update_capture(Universe& rUni, coordspace_index_t capture);
 };
 
 }

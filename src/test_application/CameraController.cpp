@@ -230,7 +230,8 @@ void SysCameraController::update_area(ActiveScene &rScene)
 
     ActiveEnt const vehicle = find_vehicle_from_sat(rScene, rCamCtrl.m_selected);
 
-    // Floating Origin / Active area movement
+    Matrix4 &rCamTf = rScene.reg_get<ACompTransform>(camEnt).m_transform;
+    Vector3 targetPos = rCamTf.translation() - rCamCtrl.m_orbitPos;
 
     if (!rReg.valid(vehicle))
     {
@@ -251,30 +252,27 @@ void SysCameraController::update_area(ActiveScene &rScene)
         }
 
         // Smoothly move towards target satellite
-        Vector3 &rTranslate = rScene.reg_get<ACompTransform>(camEnt)
-                                    .m_transform.translation();
-        Vector3 const diff
-                = rUni.sat_calc_pos_meters(areaLink->m_areaSat,
-                                           rCamCtrl.m_selected) - rTranslate;
+        Vector3 const diff = rUni.sat_calc_pos_meters(
+                areaLink->m_areaSat, rCamCtrl.m_selected).value() - targetPos;
 
         // Move 20% of the distance each frame
         float const distance = diff.length();
-        rTranslate += diff.normalized() * distance * rCamCtrl.m_travelSpeed;
+        rCamTf.translation() += diff.normalized() * distance
+                                * rCamCtrl.m_travelSpeed;
     }
 
 
     // Trigger floating origin translations if the camera gets too far from
     // the scene origin
 
-    Matrix4 &camTf = rScene.reg_get<ACompTransform>(camEnt).m_transform;
+    // Round position
+    Vector3g const targetPosRounded
+            = Vector3g(targetPos / rCamCtrl.m_originDistanceThreshold)
+            * rCamCtrl.m_originDistanceThreshold;
 
-    // round to nearest (m_originDistanceThreshold)
-    Vector3g translate = Vector3g((camTf.translation() - rCamCtrl.m_orbitPos)
-                            / rCamCtrl.m_originDistanceThreshold)
-                       * rCamCtrl.m_originDistanceThreshold;
-
-    // convert to space int
-    translate *= osp::universe::gc_units_per_meter;
+    // Convert to proper space integer units
+    Vector3g const translate
+            = targetPosRounded * osp::universe::gc_units_per_meter;
 
     if (!translate.isZero())
     {
