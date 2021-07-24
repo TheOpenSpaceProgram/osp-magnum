@@ -89,12 +89,13 @@ void moon::create(osp::OSPApplication& rOspApp)
         float radius = 1.737E+6;
         float mass = 7.347673E+22;
 
+        float activateRadius = radius * 256.0f;
         float resolutionScreenMax = 0.056f;
         float resolutionSurfaceMax = 12.0f;
 
         // assign sat as a planet
-        SatPlanet::add_planet(rUni, sat, radius, mass, resolutionSurfaceMax,
-                              resolutionScreenMax);
+        SatPlanet::add_planet(rUni, sat, radius, mass, activateRadius,
+                              resolutionSurfaceMax, resolutionScreenMax);
 
         // Surface will appear 200 meters below the origin
         // 1024 units = 1 meter

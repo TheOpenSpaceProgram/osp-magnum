@@ -208,7 +208,6 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.reg_emplace<ACompPerspective3DView>(camera, camera);
     rScene.reg_emplace<ACompRenderer>(camera);
 
-
     // Starts the game loop. This function is blocking, and will only return
     // when the window is  closed. See OSPMagnum::drawEvent
     pMagnumApp->exec();
@@ -220,17 +219,20 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Disconnect ActiveArea
 
-    osp::universe::CoordinateSpace &rCapture = rUni.coordspace_get(rUni.get_reg().get<UCompActiveArea>(areaSat).m_captureSpace);
-    osp::universe::CoordinateSpace &rMain = rUni.coordspace_get(0);
-    osp::universe::CoordspaceTransform transform = rUni.coordspace_transform(rMain, rCapture).value();
+    auto &rArea = rUni.get_reg().get<UCompActiveArea>(areaSat);
+    osp::universe::CoordinateSpace &rRelease = rUni.coordspace_get(rArea.m_releaseSpace);
+    osp::universe::CoordinateSpace &rCapture = rUni.coordspace_get(rArea.m_captureSpace);
+    osp::universe::CoordspaceTransform transform = rUni.coordspace_transform(rCapture, rRelease).value();
     auto viewSats = rCapture.ccomp_view<osp::universe::CCompSat>();
     auto viewPos = rCapture.ccomp_view_tuple<osp::universe::CCompX, osp::universe::CCompY, osp::universe::CCompZ>();
+
+    rOspApp.update_universe();
 
     for (uint32_t i = 0; i < viewSats.size(); i ++)
     {
         osp::universe::Vector3g pos = transform(viewPos->as<osp::universe::Vector3g>(i));
         rCapture.remove(i);
-        rMain.add(viewSats[i], pos, {});
+        rRelease.add(viewSats[i], pos, {});
     }
 
     rOspApp.update_universe();
@@ -247,8 +249,6 @@ void update_scene(osp::active::ActiveScene& rScene)
     using namespace adera::active;
     using namespace planeta::active;
 
-    SysCameraController::update_area(rScene);
-
     // Search Universe for nearby activatable Satellites
     //SysAreaAssociate::update_scan(rScene);
 
@@ -263,6 +263,7 @@ void update_scene(osp::active::ActiveScene& rScene)
     // Activate or deactivate nearby vehicles
     SysVehicleSync::update_universe_sync(rScene);
 
+    SysCameraController::update_area(rScene);
 
     // Construct components of vehicles. These should be parallelizable
     SysMachineContainer::update_construct(rScene);
@@ -331,10 +332,13 @@ Satellite active_area_create(osp::OSPApplication& rOspApp,
     // assign sat as an ActiveArea
     auto &rArea = rUni.get_reg().emplace<UCompActiveArea>(areaSat);
 
+    // captured satellites will be put into the target coordspace when released
+    rArea.m_releaseSpace = targetIndex;
+
     // Create the "ActiveArea Domain" Coordinte Space
     // This is a CoordinateSpace that acts like a layer overtop of the target
     // CoordinateSpace. The ActiveArea is free to roam around in this space
-    // unaffected by the target's trajectory function.
+    // unaffected by the target coordspace's trajectory function.
     {
         // Make the Domain CoordinateSpace identical to the target CoordinateSpace
         CoordinateSpace const &targetCoord = rUni.coordspace_get(targetIndex);

@@ -78,10 +78,15 @@ std::function<void(Universe&)> testapp::generate_simple_universe_update(
 
         // Trajectory functions and other movement goes here
 
-        // Move ActiveArea and scan for new satellites
         if (hasArea)
         {
+            // Update moved satellites in capture space
+            SatActiveArea::update_capture(rUni, pArea->m_captureSpace);
+
+            // Move the area itself
             SatActiveArea::move(rUni, areaSat);
+
+            // Scan for nearby satellites
             SatActiveArea::scan_radius(rUni, areaSat);
         }
     };

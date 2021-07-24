@@ -35,10 +35,8 @@ using planeta::universe::SatPlanet;
 
 UCompPlanet& SatPlanet::add_planet(
         osp::universe::Universe& rUni, Satellite sat, double radius, float mass,
-        float resolutionSurfaceMax, float resolutionScreenMax)
+        float activateRadius, float resolutionSurfaceMax, float resolutionScreenMax)
 {
-
-    float activateRadius = float(radius) * 256.0f;
 
     rUni.get_reg().emplace<UCompActivatable>(sat);
     rUni.get_reg().emplace<UCompActivationRadius>(sat, activateRadius);

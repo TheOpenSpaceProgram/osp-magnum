@@ -48,12 +48,11 @@ void Universe::sat_remove(Satellite sat)
     m_registry.destroy(sat);
 }
 
-Vector3g Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) const
+std::optional<Vector3g> Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) const
 {
     auto const viewInCoord = m_registry.view<const UCompInCoordspace>();
     auto const viewCoordIndex = m_registry.view<const UCompCoordspaceIndex>();
 
-    // TODO: maybe do some checks to make sure they have the components
     auto const &frameInCoord
             = viewInCoord.get<const UCompInCoordspace>(referenceFrame);
     auto const &targetInCoord
@@ -67,27 +66,34 @@ Vector3g Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) cons
     CoordinateSpace const& frameCoord = coordspace_get(frameInCoord.m_coordSpace);
     CoordinateSpace const& targetCoord = coordspace_get(targetInCoord.m_coordSpace);
 
-    if (frameCoord.m_parentSat == targetCoord.m_parentSat)
+    std::optional<CoordspaceTransform> transform = coordspace_transform(
+                targetCoord, frameCoord);
+
+    if ( ! transform.has_value())
     {
-        // Both Satellites are positioned relative to the same Satellite
-        // TODO: deal with varrying precisions and possibly rotation
-
-        auto frameView = frameCoord.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
-        auto targetView = targetCoord.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
-
-        return targetView->as<Vector3g>(targetCoordIndex.m_myIndex)
-                - frameView->as<Vector3g>(frameCoordIndex.m_myIndex);
+        return {};
     }
 
-    // TODO: calculation for positions across different coordinate spaces
+    auto framePos = frameCoord.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
+    auto targetPos = targetCoord.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
 
-    return {0, 0, 0};
+    Vector3g targetPosTf = transform.value()(
+                targetPos->as<Vector3g>(targetCoordIndex.m_myIndex));
+
+    return targetPosTf - framePos->as<Vector3g>(frameCoordIndex.m_myIndex);
 }
 
-Vector3 Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const
+std::optional<Vector3> Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const
 {
-    // 1024 units = 1 meter. TODO: will change soon
-    return Vector3(sat_calc_pos(referenceFrame, target)) / gc_units_per_meter;
+    std::optional<Vector3g> pos = sat_calc_pos(referenceFrame, target);
+
+    if (pos.has_value())
+    {
+        // 1024 units = 1 meter. TODO: will change soon
+        return Vector3(pos.value()) / gc_units_per_meter;
+    }
+
+    return std::nullopt;
 }
 
 std::pair<coordspace_index_t, CoordinateSpace&> Universe::coordspace_create(Satellite parentSat)
@@ -102,10 +108,10 @@ std::pair<coordspace_index_t, CoordinateSpace&> Universe::coordspace_create(Sate
 
 
 std::optional<CoordspaceTransform> Universe::coordspace_transform(
-        CoordinateSpace const &fromCoord, CoordinateSpace const &toCoord)
+        CoordinateSpace const &fromCoord, CoordinateSpace const &toCoord) const
 {
 
-    auto get_parent = [this] (CoordinateSpace const* current) -> CoordinateSpace*
+    auto get_parent = [this] (CoordinateSpace const* current) -> CoordinateSpace const*
     {
         coordspace_index_t const parent = m_registry.get<UCompInCoordspace>(current->m_parentSat).m_coordSpace;
         return &coordspace_get(parent);

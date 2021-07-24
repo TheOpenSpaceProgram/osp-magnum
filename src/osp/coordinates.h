@@ -113,7 +113,7 @@ struct CoordinateSpace
 
     using CmdValue_t = std::variant<CmdPosition, CmdVelocity>;
 
-    using Command_t = std::tuple<ECmdOp, CmdValue_t>;
+    struct Command { Satellite m_sat; ECmdOp m_op; CmdValue_t m_value; };
 
     CoordinateSpace(Satellite parentSat) : m_parentSat(parentSat) { }
 
@@ -150,7 +150,7 @@ struct CoordinateSpace
      *
      * @param cmd
      */
-    void command(Command_t cmd)
+    void command(Command cmd)
     {
         m_commands.emplace_back(std::move(cmd));
     }
@@ -202,7 +202,7 @@ struct CoordinateSpace
     // Queues for systems to communicate
     std::vector<SatToAdd_t> m_toAdd;
     std::vector<uint32_t> m_toRemove;
-    std::vector<Command_t> m_commands;
+    std::vector<Command> m_commands;
 
     // Data and component views are managed by the external system
     // m_data is usually something like CoordspaceCartesianSimple

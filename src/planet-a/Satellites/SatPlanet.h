@@ -70,14 +70,15 @@ public:
      * @param sat                  [in] Satellite add a planet to
      * @param radius               [in] Radius of planet in meters
      * @param mass                 [in] Mass of planet in kg
+     * @param activateRadius       [in] Activation radius
      * @param resolutionSurfaceMax [in] See UCompPlanet definition
      * @param resolutionScreenMax  [in] See UCompPlanet definition
      * @return Reference to new UCompPlanet added
      */
     static UCompPlanet& add_planet(
         osp::universe::Universe& rUni, osp::universe::Satellite sat,
-        double radius, float mass, float resolutionSurfaceMax,
-        float resolutionScreenMax);
+        double radius, float mass, float activateRadius,
+        float resolutionSurfaceMax, float resolutionScreenMax);
 };
 
 }

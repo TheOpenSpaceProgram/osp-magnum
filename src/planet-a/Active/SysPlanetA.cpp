@@ -92,7 +92,7 @@ ActiveEnt SysPlanetA::activate(
     auto &loadMePlanet = rUni.get_reg().get<universe::UCompPlanet>(tgtSat);
 
     // Convert position of the satellite to position in scene
-    Vector3 positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat);
+    Vector3 positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat).value();
 
     // Create planet entity and add components to it
 
