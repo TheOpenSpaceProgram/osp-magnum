@@ -29,6 +29,8 @@
 
 #include "../Satellites/SatActiveArea.h"
 
+#include <unordered_map>
+
 #include <cstdint>
 
 namespace osp::active
@@ -38,7 +40,7 @@ namespace osp::active
 struct ACompAreaLink
 {
     using MapSatToEnt_t = std::unordered_map<universe::Satellite, ActiveEnt>;
-    
+
     ACompAreaLink(universe::Universe& rUniverse, universe::Satellite areaSat)
      : m_areaSat(areaSat)
      , m_rUniverse(rUniverse)
