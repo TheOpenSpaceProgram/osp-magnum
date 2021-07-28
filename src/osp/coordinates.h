@@ -26,6 +26,7 @@
 
 #include "universetypes.h"
 #include "types.h"
+#include "CommonMath.h"
 
 #include <entt/core/family.hpp>
 #include <entt/core/any.hpp>
@@ -33,6 +34,7 @@
 #include <Corrade/Containers/StridedArrayView.h>
 
 #include <optional>
+#include <tuple>
 #include <variant>
 #include <vector>
 
@@ -72,22 +74,18 @@ constexpr size_t ccomp_min_size() noexcept
 }
 
 template <typename ... CCOMP_T>
-struct TupleCComp
+using TupleCComp_t = std::tuple<ViewCComp_t<CCOMP_T> ...>;
+
+template<typename T, typename ... VIEW_T>
+constexpr decltype(auto) make_from_ccomp(
+        std::tuple<VIEW_T...> const& tuple, size_t index)
 {
-    constexpr TupleCComp(ViewCComp_t<CCOMP_T> ... ccomps) noexcept
-     : m_data{std::forward< ViewCComp_t<CCOMP_T> >(ccomps)...}
-    { }
-
-    template<typename T>
-    constexpr decltype(auto) as(size_t index) const
+    return std::apply([index](VIEW_T const& ... view)
     {
-        return std::apply([index] (ViewCComp_t<CCOMP_T> ... ccomps) {
-            return T(ccomps[index] ...);
-        }, m_data);
-    }
+        return T(view[index] ...);
+    }, tuple);
+}
 
-    std::tuple<ViewCComp_t<CCOMP_T> ...> m_data;
-};
 
 /**
  * @brief Stores positions, velocities, and other related data for Satellites,
@@ -180,7 +178,7 @@ struct CoordinateSpace
      * @tparam COMP_T... Coordinate components to view
      */
     template<typename ... CCOMP_T>
-    constexpr std::optional< TupleCComp<CCOMP_T ...> const>ccomp_view_tuple() const noexcept
+    constexpr std::optional< TupleCComp_t<CCOMP_T ...> const>ccomp_view_tuple() const noexcept
     {
         // Make sure all CComp IDs are valid indices to m_components
         if (m_components.size() <= std::max({ccomp_id<CCOMP_T> ...}) )
@@ -194,7 +192,7 @@ struct CoordinateSpace
             return std::nullopt;
         }
 
-        return TupleCComp<CCOMP_T ...>(
+        return TupleCComp_t<CCOMP_T ...>(
                     Corrade::Containers::arrayCast<typename CCOMP_T::datatype_t>(
                                         m_components.at(ccomp_id<CCOMP_T>).value()) ...);
     }
@@ -217,13 +215,6 @@ struct CoordinateSpace
 }; // struct CoordinateSpace
 
 
-template <typename T>
-constexpr T mulpow2(T in, int16_t pow2) noexcept
-{
-    return (pow2 > 0) ? (in * (1L << pow2)) : (in / (1L << (-pow2)));
-}
-
-
 /**
  * @brief A functor used to transform coordinates between coordinate spaces
  *
@@ -241,9 +232,18 @@ struct CoordspaceTransform
 {
     using Vec_t = Magnum::Math::Vector3<uint64_t>;
 
+    /**
+     * @brief Transform a Vector3g using this CoordspaceTransform
+     *
+     * @param in [in] Vector3g to transform
+     *
+     * @return Transformed Vector3g
+     */
     Vector3g operator()(Vector3g in) const noexcept
     {
-        return mulpow2(in, m_expX) + mulpow2(Vector3g(m_c), m_expC);
+        using osp::math::mul_2pow;
+        return mul_2pow<Vector3g, spaceint_t>(in, m_expX)
+                + mul_2pow<Vector3g, spaceint_t>(Vector3g(m_c), m_expC);
     }
 
     /**

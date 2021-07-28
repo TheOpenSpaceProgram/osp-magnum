@@ -527,11 +527,7 @@ void debug_print_hier()
 
 void debug_print_sats()
 {
-    using osp::universe::Universe;
-    using osp::universe::UCompTransformTraj;
-    using osp::universe::UCompInCoordspace;
-    using osp::universe::UCompCoordspaceIndex;
-    using osp::universe::CoordinateSpace;
+    using namespace osp::universe;
 
     Universe const &rUni = g_osp.get_universe();
 
@@ -555,11 +551,9 @@ void debug_print_sats()
             CoordinateSpace const &rSpace
                     = rUni.coordspace_get(inCoord.m_coordSpace);
 
-            auto viewPos = rSpace.ccomp_view_tuple<osp::universe::CCompX,
-                                                     osp::universe::CCompY,
-                                                     osp::universe::CCompZ>();
+            auto viewPos = rSpace.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
 
-            auto const pos = viewPos->as<osp::universe::Vector3g>(coordIndex.m_myIndex);
+            auto const pos = make_from_ccomp<Vector3g>(*viewPos, coordIndex.m_myIndex);
 
             auto posM = osp::Vector3(pos) / 1024.0f;
             std::cout << "  * Position: ["
