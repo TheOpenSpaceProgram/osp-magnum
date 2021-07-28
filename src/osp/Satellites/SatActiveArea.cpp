@@ -45,7 +45,7 @@ void SatActiveArea::move(Universe& rUni, Satellite areaSat)
 
     std::vector<Vector3g> const toMove = std::exchange(rArea.m_requestMove, {});
 
-    for (Vector3g delta: toMove)
+    for (Vector3g const& delta: toMove)
     {
         rPos += delta;
         rArea.m_moved.push_back(delta);
@@ -64,16 +64,17 @@ void SatActiveArea::scan_radius(Universe& rUni, Satellite areaSat)
     auto viewActRadius = rUni.get_reg().view<UCompActivationRadius,
                                              UCompActivatable>();
 
-    for (Satellite sat : viewActRadius)
+    for (Satellite const sat : viewActRadius)
     {
-        auto satRadius = viewActRadius.get<UCompActivationRadius>(sat);
+        auto const satRadius = viewActRadius.get<UCompActivationRadius>(sat);
 
         // Check if already activated
         bool alreadyInside = rArea.m_inside.contains(sat);
 
         // Simple sphere-sphere-intersection check
-        float distanceSquared = rUni.sat_calc_pos_meters(areaSat, sat).value().dot();
-        float radius = rArea.m_areaRadius + satRadius.m_radius;
+        float const distanceSquared
+                        = rUni.sat_calc_pos_meters(areaSat, sat).value().dot();
+        float const radius = rArea.m_areaRadius + satRadius.m_radius;
 
         if ((radius * radius) > distanceSquared)
         {

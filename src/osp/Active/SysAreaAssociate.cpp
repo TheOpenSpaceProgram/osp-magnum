@@ -57,7 +57,7 @@ void SysAreaAssociate::update_consume(ActiveScene& rScene)
 
     Vector3g deltaTotal{};
 
-    for (Vector3g const delta : std::exchange(rAreaUComp.m_moved, {}))
+    for (Vector3g const& delta : std::exchange(rAreaUComp.m_moved, {}))
     {
         deltaTotal += delta;
     }
@@ -93,7 +93,7 @@ void SysAreaAssociate::connect(ActiveScene& rScene, universe::Universe &rUni,
 
 }
 
-void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3g translate)
+void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3g const& translate)
 {
     ACompAreaLink *pArea = try_get_area_link(rScene);
 

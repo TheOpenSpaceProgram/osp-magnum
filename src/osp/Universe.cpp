@@ -78,9 +78,12 @@ std::optional<Vector3g> Universe::sat_calc_pos(Satellite referenceFrame, Satelli
     auto targetPos = targetCoord.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
 
     Vector3g targetPosTf = transform.value()(
-                targetPos->as<Vector3g>(targetCoordIndex.m_myIndex));
+                make_from_ccomp<Vector3g>(*targetPos,
+                                          targetCoordIndex.m_myIndex));
 
-    return targetPosTf - framePos->as<Vector3g>(frameCoordIndex.m_myIndex);
+
+    return targetPosTf - make_from_ccomp<Vector3g>(*framePos,
+                                                   frameCoordIndex.m_myIndex);
 }
 
 std::optional<Vector3> Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const
@@ -121,7 +124,7 @@ std::optional<CoordspaceTransform> Universe::coordspace_transform(
     {
         uint32_t const index = m_registry.get<UCompCoordspaceIndex>(current->m_parentSat).m_myIndex;
         auto const posTuple = parent->ccomp_view_tuple<CCompX, CCompY, CCompZ>();
-        return posTuple->as<Vector3g>(index);
+        return make_from_ccomp<Vector3g>(*posTuple, index);
     };
 
     CoordspaceTransform fromTransform;

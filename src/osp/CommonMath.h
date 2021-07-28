@@ -24,25 +24,53 @@
  */
 #pragma once
 
-#include "types.h"
+
+#include <cstdint>
 #include <type_traits>
 
 namespace osp::math
 {
 
-template <typename UINT_T>
-constexpr UINT_T uint_2pow(UINT_T exponent)
+/**
+ * @return Integer 2^exponent
+ */
+template <typename INT_T>
+constexpr INT_T int_2pow(int exponent)
 {
-    static_assert(std::is_integral<UINT_T>::value, "Unsigned int required");
-    return UINT_T(1) << exponent;
+    static_assert(std::is_integral<INT_T>::value, "Integer required");
+    return INT_T(1) << exponent;
 }
 
-template <typename UINT_T>
-constexpr bool is_power_of_2(UINT_T value)
+/**
+ * @return true if value is power of two
+ */
+template <typename INT_T>
+constexpr bool is_power_of_2(INT_T value)
 {
-    static_assert(std::is_integral<UINT_T>::value, "Unsigned int required");
+    static_assert(std::is_integral<INT_T>::value, "Integer required");
     // Test to see if the value contains more than 1 set bit
     return !(value == 0) && !(value & (value - 1));
+}
+
+/**
+ * @brief Multiply a type by a power of two, allowing negative exponents
+ *
+ * @param value    [in] Value to multiply
+ * @param exponent [in] Exponent to raise (or lower) 2 by
+ *
+ * @tparam T     Type to multiply
+ * @tparam INT_T Integer type the power of two will be calculated in
+ *
+ * @return value multiplied by 2^exponent
+ */
+template <typename T, typename INT_T>
+constexpr T mul_2pow(T value, int exponent) noexcept
+{
+    // Multiply by power of two if exponent is positive
+    // Divide by power of two if exponent is negative
+    // exponent = 0 will multiply by 1
+    return (exponent >= 0) ? (value * int_2pow<INT_T>(exponent))
+                          : (value / int_2pow<INT_T>(-exponent));
 }
 
 } // namespace osp::math

@@ -92,16 +92,6 @@ using osp::active::ACompRenderingAgent;
 using osp::active::ACompPerspective3DView;
 using osp::active::ACompRenderer;
 
-using osp::active::SysWire;
-using osp::active::SysSignal;
-using osp::active::ACompWire;
-using osp::active::ACompWireNodes;
-
-using adera::active::machines::SysMachineUserControl;
-using adera::active::machines::SysMachineRocket;
-using adera::active::machines::SysMachineRCSController;
-using adera::active::machines::SysMachineContainer;
-
 using planeta::universe::SatPlanet;
 
 using osp::Vector2;
@@ -114,9 +104,14 @@ void load_shaders(ActiveScene& rScene);
 
 void update_scene(ActiveScene& rScene);
 
-Satellite active_area_create(osp::OSPApplication& rOspApp,
-                             ActiveScene& rScene, Universe &rUni,
-                             coordspace_index_t targetCoordspace);
+void setup_wiring(ActiveScene& rScene);
+
+Satellite active_area_create(
+        osp::OSPApplication& rOspApp, Universe &rUni,
+        coordspace_index_t targetCoordspace);
+
+void active_area_destroy(
+        osp::OSPApplication& rOspApp, Universe &rUni, Satellite areaSat);
 
 void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
                  osp::OSPApplication& rOspApp, OSPMagnum::Arguments args)
@@ -137,29 +132,14 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // Setup hierarchy, initialize root entity
     SysHierarchy::setup(rScene);
 
-    // ##### Setup Wiring #####
+    // Setup wiring
+    setup_wiring(rScene);
 
-    // Add ACompWire to scene with update functions for passing Percent and
-    // AttitudeControl values between Machines
-    SysWire::setup_default(
-            rScene, 5,
-            {&SysMachineRocket::update_calculate,
-             &SysMachineRCSController::update_calculate},
-            {&SysSignal<adera::wire::Percent>::signal_update_nodes,
-             &SysSignal<adera::wire::AttitudeControl>::signal_update_nodes});
-
-    // Add scene components for storing 'Nodes' used for wiring
-    rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
-    rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
-
-    // create a Satellite with an ActiveArea
-    Satellite areaSat = active_area_create(rOspApp, rScene, rUni, 0);
-
+    // create a Satellite with an ActiveArea, then link it to the scene
+    Satellite areaSat = active_area_create(rOspApp, rUni, 0);
     osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
 
-
-    // Get ActiveArea from scene, and link it to scene using the AreaAssociate
-
+    // Setup sync states used by scene systems to sync with the universe
     rScene.get_registry().set<osp::active::SyncVehicles>();
     rScene.get_registry().set<planeta::active::SyncPlanets>();
 
@@ -212,30 +192,15 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     // when the window is  closed. See OSPMagnum::drawEvent
     pMagnumApp->exec();
 
+    rOspApp.update_universe();
+
     // Close button has been pressed
 
     SPDLOG_LOGGER_INFO(rOspApp.get_logger(),
                        "Closed Magnum Application");
 
     // Disconnect ActiveArea
-
-    auto &rArea = rUni.get_reg().get<UCompActiveArea>(areaSat);
-    osp::universe::CoordinateSpace &rRelease = rUni.coordspace_get(rArea.m_releaseSpace);
-    osp::universe::CoordinateSpace &rCapture = rUni.coordspace_get(rArea.m_captureSpace);
-    osp::universe::CoordspaceTransform transform = rUni.coordspace_transform(rCapture, rRelease).value();
-    auto viewSats = rCapture.ccomp_view<osp::universe::CCompSat>();
-    auto viewPos = rCapture.ccomp_view_tuple<osp::universe::CCompX, osp::universe::CCompY, osp::universe::CCompZ>();
-
-    rOspApp.update_universe();
-
-    for (uint32_t i = 0; i < viewSats.size(); i ++)
-    {
-        osp::universe::Vector3g pos = transform(viewPos->as<osp::universe::Vector3g>(i));
-        rCapture.remove(i);
-        rRelease.add(viewSats[i], pos, {});
-    }
-
-    rOspApp.update_universe();
+    active_area_destroy(rOspApp, rUni, areaSat);
 
     rUni.get_reg().destroy(areaSat);
 
@@ -247,6 +212,7 @@ void update_scene(osp::active::ActiveScene& rScene)
 {
     using namespace osp::active;
     using namespace adera::active;
+    using namespace adera::active::machines;
     using namespace planeta::active;
 
     // Search Universe for nearby activatable Satellites
@@ -318,13 +284,31 @@ void update_scene(osp::active::ActiveScene& rScene)
     ActiveScene::update_delete(rScene);
 }
 
-Satellite active_area_create(osp::OSPApplication& rOspApp,
-                             ActiveScene& rScene, Universe &rUni,
-                             coordspace_index_t targetIndex)
+void setup_wiring(ActiveScene& rScene)
 {
-    using osp::universe::CoordinateSpace;
-    using osp::universe::CoordspaceCartesianSimple;
+    using namespace osp::active;
+    using namespace adera::active::machines;
 
+    // Add ACompWire to scene with update functions for passing Percent and
+    // AttitudeControl values between Machines
+    SysWire::setup_default(
+            rScene, 5,
+            {&SysMachineRocket::update_calculate,
+             &SysMachineRCSController::update_calculate},
+            {&SysSignal<adera::wire::Percent>::signal_update_nodes,
+             &SysSignal<adera::wire::AttitudeControl>::signal_update_nodes});
+
+    // Add scene components for storing 'Nodes' used for wiring
+    rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
+    rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
+
+}
+
+Satellite active_area_create(
+        osp::OSPApplication& rOspApp, Universe &rUni,
+        coordspace_index_t targetIndex)
+{
+    using namespace osp::universe;
 
     // create a Satellite
     Satellite areaSat = rUni.sat_create();
@@ -373,6 +357,31 @@ Satellite active_area_create(osp::OSPApplication& rOspApp,
     rOspApp.update_universe();
 
     return areaSat;
+}
+
+void active_area_destroy(
+        osp::OSPApplication& rOspApp, Universe &rUni, Satellite areaSat)
+{
+    using namespace osp::universe;
+
+    auto &rArea = rUni.get_reg().get<UCompActiveArea>(areaSat);
+    CoordinateSpace &rRelease = rUni.coordspace_get(rArea.m_releaseSpace);
+    CoordinateSpace &rCapture = rUni.coordspace_get(rArea.m_captureSpace);
+    auto viewSats = rCapture.ccomp_view<CCompSat>();
+    auto viewPos = rCapture.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
+
+    CoordspaceTransform transform = rUni.coordspace_transform(rCapture, rRelease).value();
+
+    for (uint32_t i = 0; i < viewSats.size(); i ++)
+    {
+
+        auto const posLocal = make_from_ccomp<Vector3g>(*viewPos, i);
+        Vector3g pos = transform(posLocal);
+        rCapture.remove(i);
+        rRelease.add(viewSats[i], pos, {});
+    }
+
+    rOspApp.update_universe();
 }
 
 void load_shaders(osp::active::ActiveScene& rScene)

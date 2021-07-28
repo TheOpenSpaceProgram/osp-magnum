@@ -120,7 +120,7 @@ public:
      * @param rScene    [ref] Scene assicated with ActiveArea
      * @param translate [in] Amount to translate the area by
      */
-    static void area_move(ActiveScene& rScene, universe::Vector3g translate);
+    static void area_move(ActiveScene& rScene, universe::Vector3g const& translate);
 
 private:
 

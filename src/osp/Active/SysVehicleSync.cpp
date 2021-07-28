@@ -79,14 +79,13 @@ ActiveEnt SysVehicleSync::activate(ActiveScene &rScene, Universe &rUni,
                     vehicleEnt, loadMeVehicle.m_blueprint);
 
     // Convert position of the satellite to position in scene
-    Vector3 positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat).value();
+    Vector3 const positionInScene = rUni.sat_calc_pos_meters(areaSat, tgtSat).value();
 
     ACompTransform& rVehicleTransform = rScene.get_registry()
                                         .emplace<ACompTransform>(vehicleEnt);
     rVehicleTransform.m_transform
             = Matrix4::from(tgtPosTraj.m_rotation.toMatrix(), positionInScene);
     rScene.reg_emplace<ACompFloatingOrigin>(vehicleEnt);
-    //vehicleTransform.m_enableFloatingOrigin = true;
 
     // Create the parts
 
@@ -105,12 +104,11 @@ ActiveEnt SysVehicleSync::activate(ActiveScene &rScene, Universe &rUni,
                                    + vehicleData.m_machines.size());
 
     // Keep track of parts
-    //std::vector<ActiveEnt> newEntities;
     vehicleComp.m_parts.reserve(blueprintParts.size());
 
     // Loop through list of blueprint parts, and initialize each of them into
     // the ActiveScene
-    for (BlueprintPart& partBp : blueprintParts)
+    for (BlueprintPart const& partBp : blueprintParts)
     {
         DependRes<PrototypePart>& partDepends =
                 partsUsed[partBp.m_protoIndex];
@@ -216,12 +214,17 @@ void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
         auto const &vehicleTf = viewTf.get<ACompTransform>(vehicleEnt);
         auto const &vehicleSat = viewVehicles.get<ACompActivatedSat>(vehicleEnt);
 
-        universe::Vector3g pos{vehicleTf.m_transform.translation() * universe::gc_units_per_meter};
+        // Position in scene is 1:1 with position in Capture CoordinateSpace
+        universe::Vector3g const pos{vehicleTf.m_transform.translation()
+                                      * universe::gc_units_per_meter};
+
+        // Queue move. This will be applied during universe update
         rCapture.command({vehicleSat.m_sat, CoordinateSpace::ECmdOp::Set,
                           CoordinateSpace::CmdPosition{pos}});
     }
 
     // Activate nearby vehicle satellites that have just entered the ActiveArea
+
     for (Satellite sat : pLink->m_enter)
     {
         if (!rUni.get_reg().all_of<UCompVehicle>(sat))
