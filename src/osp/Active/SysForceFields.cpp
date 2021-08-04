@@ -37,7 +37,7 @@ void SysFFGravity::update_force(ActiveScene& rScene)
             .view<ACompFFGravity, ACompTransform>();
 
     auto viewMasses = rScene.get_registry()
-            .view<ACompRigidBody, ACompTransform>();
+            .view<ACompPhysDynamic, ACompTransform>();
 
     for (ActiveEnt fieldEnt : viewFields)
     {
@@ -51,17 +51,19 @@ void SysFFGravity::update_force(ActiveScene& rScene)
                 continue;
             }
 
-            auto &massBody = viewMasses.get<ACompRigidBody>(massEnt);
+            auto &massBody = viewMasses.get<ACompPhysDynamic>(massEnt);
             auto &massTransform = viewMasses.get<ACompTransform>(massEnt);
 
             Vector3 relativePos = fieldTransform.m_transform.translation()
                                 - massTransform.m_transform.translation();
             float r = relativePos.length();
-            Vector3 accel = relativePos * fieldFFGrav.m_Gmass / (r * r * r);
-            //               massBody.m_bodyData.m_mass / r;
-            // gm1/r = a
+            Vector3 force = relativePos * fieldFFGrav.m_Gmass
+                          * massBody.m_totalMass / (r * r * r);
 
-            SysPhysics::body_apply_accel(massBody, accel);
+            auto &netForce = rScene.get_registry()
+                    .get_or_emplace<ACompPhysNetForce>(massEnt);
+            netForce += force;
+
         }
     }
 }

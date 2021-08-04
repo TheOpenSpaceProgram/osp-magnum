@@ -68,9 +68,12 @@ using osp::active::ACompHierarchy;
 using osp::active::ACompName;
 using osp::active::EHierarchyTraverseStatus;
 using osp::active::ACompMachines;
-using osp::active::ACompRigidBody;
 using osp::active::ACompTransform;
 using osp::active::SysHierarchy;
+
+using osp::active::ACtxPhysics;
+using osp::active::ACompPhysNetForce;
+using osp::active::ACompPhysNetTorque;
 using osp::active::SysPhysics;
 
 using osp::active::ACompWirePanel;
@@ -170,8 +173,9 @@ void SysMachineRocket::update_calculate(ActiveScene& rScene)
 
 void SysMachineRocket::update_physics(ActiveScene& rScene)
 {
-    auto view = rScene.get_registry().view<MachineRocket>();
+    osp::active::ActiveReg_t &rReg = rScene.get_registry();
 
+    auto view = rScene.get_registry().view<MachineRocket>();
 
     for (ActiveEnt ent : view)
     {
@@ -218,7 +222,6 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         // Get rigidbody ancestor and its transformation component
         auto const* pRbAncestor =
             SysPhysics::try_get_or_find_rigidbody_ancestor(rScene, ent);
-        auto& rCompRb = rScene.reg_get<ACompRigidBody>(pRbAncestor->m_ancestor);
         auto const& rCompTf = rScene.reg_get<ACompTransform>(pRbAncestor->m_ancestor);
 
         Matrix4 relTransform = pRbAncestor->m_relTransform;
@@ -232,16 +235,16 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
         // Take thrust in rigidbody space and apply to RB in world space
         Vector3 thrust = thrustMag * thrustDir;
         Vector3 worldThrust = rCompTf.m_transform.transformVector(thrust);
-        SysPhysics::body_apply_force(rCompRb, worldThrust);
+        auto &rNetForce = rReg.get_or_emplace<ACompPhysNetForce>(pRbAncestor->m_ancestor);
+        rNetForce += worldThrust;
 
         // Obtain point where thrust is applied relative to RB CoM
         Vector3 location = relTransform.translation();
         // Compute worldspace torque from engine location, thrust vector
         Vector3 torque = Magnum::Math::cross(location, thrust);
         Vector3 worldTorque = rCompTf.m_transform.transformVector(torque);
-        SysPhysics::body_apply_torque(rCompRb, worldTorque);
-        
-        rCompRb.m_inertiaDirty = true;
+        auto &rNetTorque = rReg.get_or_emplace<ACompPhysNetTorque>(pRbAncestor->m_ancestor);
+        rNetTorque += worldTorque;
 
         // Perform resource consumption calculation
         /*

@@ -191,8 +191,8 @@ void SysNewton::shape_create_tri_mesh_static(
 
     newton_tree_collision_end_build(pTree, 2);
 
-    rShape.m_shape = osp::phys::ECollisionShape::TERRAIN;
     rScene.reg_emplace<ACompNwtCollider>(chunkEnt, pTree);
+
 }
 
 }

@@ -30,27 +30,48 @@
 namespace osp::active
 {
 
-/**
- * Generic Rigid Body physics data
- *
- * TODO: possibly split into more components when the time comes
- */
-struct ACompRigidBody
+using physchanges_t = std::vector<ActiveEnt>;
+
+struct ACtxPhysics
 {
-    // Modify these
-    Vector3 m_inertia{1, 1, 1};
-    Vector3 m_netForce{0, 0, 0};
-    Vector3 m_netTorque{0, 0, 0};
-
-    float m_mass{1.0f};
-    Vector3 m_velocity{0, 0, 0};
-    Vector3 m_rotVelocity{0, 0, 0};
-    Vector3 m_centerOfMassOffset{0, 0, 0};
-
-    bool m_colliderDirty{false}; // set true if collider is modified
-    bool m_inertiaDirty{false}; // set true if rigidbody is modified
+    Vector3 m_originTranslate;
+    physchanges_t m_colliders;
+    physchanges_t m_inertia;
+    physchanges_t m_velocity;
 };
 
+/**
+ * @brief Indicates that an entity is synced with a physics engine
+ */
+struct ACompPhysBody
+{ };
+
+/**
+ * @brief Entity is a non-static dynamic rigid body
+ */
+struct ACompPhysDynamic
+{
+    Vector3 m_inertia{1, 1, 1};
+    Vector3 m_centerOfMassOffset{0, 0, 0};
+    float m_totalMass;
+};
+
+struct ACompLinVelocity : Vector3 { };
+struct ACompRotVelocity : Vector3 { };
+
+/**
+ * @brief Applies force to a dynamic physics entity
+ */
+struct ACompPhysNetForce : Vector3 { };
+
+/**
+ * @brief Applies torque to a dynamic physics entity
+ */
+struct ACompPhysNetTorque : Vector3 { };
+
+/**
+ * @brief Keeps track of which rigid body an entity belongs to
+*/
 struct ACompRigidbodyAncestor
 {
     ActiveEnt m_ancestor{entt::null};
@@ -62,7 +83,7 @@ struct ACompRigidbodyAncestor
  */
 struct ACompShape
 {
-    phys::ECollisionShape m_shape{phys::ECollisionShape::NONE};
+    phys::EShape m_shape{phys::EShape::None};
 };
 
 /**

@@ -8,13 +8,13 @@
 
 using osp::active::SysPhysics;
 using osp::active::ActiveEnt;
-using osp::active::ACompRigidBody;
+using osp::active::ACompPhysBody;
 
 using osp::Matrix4;
 using osp::Matrix3;
 using osp::Vector4;
 
-std::pair<ActiveEnt, ACompRigidBody*> SysPhysics::find_rigidbody_ancestor(
+ActiveEnt SysPhysics::find_rigidbody_ancestor(
         ActiveScene& rScene, ActiveEnt ent)
 {
     ActiveEnt prevEnt;
@@ -27,16 +27,19 @@ std::pair<ActiveEnt, ACompRigidBody*> SysPhysics::find_rigidbody_ancestor(
 
         if(nullptr == pCurrHier)
         {
-            return {entt::null, nullptr};
+            return entt::null;
         }
 
         prevEnt = std::exchange(currEnt, pCurrHier->m_parent);
     }
     while (pCurrHier->m_level != gc_heir_physics_level);
 
-    auto *pBody = rScene.get_registry().try_get<ACompRigidBody>(prevEnt);
+    if ( ! rScene.get_registry().all_of<ACompPhysBody>(prevEnt))
+    {
+        return entt::null; // no Physics body!
+    }
 
-    return {prevEnt, pBody};
+    return prevEnt;
 }
 
 Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, ActiveEnt ent)
@@ -64,7 +67,7 @@ Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, A
     } while (pCurrHier->m_level != gc_heir_physics_level);
 
     // Fail if a rigidbody ancestor is not found
-    assert(rScene.get_registry().all_of<ACompRigidBody>(prevEnt));
+    assert(rScene.get_registry().all_of<ACompPhysBody>(prevEnt));
 
     return transform;
 }
@@ -79,12 +82,7 @@ osp::active::ACompRigidbodyAncestor* SysPhysics::try_get_or_find_rigidbody_ances
     // Perform first-time initialization of rigidbody ancestor component
     if (pCompAncestor == nullptr)
     {
-        auto [ent, pCompBody] = find_rigidbody_ancestor(rScene, childEntity);
-        if (pCompBody == nullptr)
-        {
-            // childEntity has no rigidbody ancestor
-            return nullptr;
-        }
+        auto ent = find_rigidbody_ancestor(rScene, childEntity);
 
         rReg.emplace<ACompRigidbodyAncestor>(childEntity);
     }
@@ -100,14 +98,7 @@ osp::active::ACompRigidbodyAncestor* SysPhysics::try_get_or_find_rigidbody_ances
     }
 
     // Rigidbody ancestor not set yet
-    auto [bodyEnt, compBody] = find_rigidbody_ancestor(rScene, childEntity);
-
-    if (compBody == nullptr)
-    {
-        SPDLOG_LOGGER_WARN(rScene.get_application().get_logger(),
-                          "No rigid body!");
-        return nullptr;
-    }
+    ActiveEnt bodyEnt = find_rigidbody_ancestor(rScene, childEntity);
 
     // Initialize ACompRigidbodyAncestor
     rAncestor = bodyEnt;
@@ -268,19 +259,4 @@ std::pair<Matrix3, Vector4> SysPhysics::compute_hier_inertia(ActiveScene& rScene
     }
 
     return {I, centerOfMass};
-}
-
-void SysPhysics::body_apply_force(ACompRigidBody &body, Vector3 force) noexcept
-{
-    body.m_netForce += force;
-}
-
-void SysPhysics::body_apply_accel(ACompRigidBody &body, Vector3 accel) noexcept
-{
-    body_apply_force(body, accel * body.m_mass);
-}
-
-void SysPhysics::body_apply_torque(ACompRigidBody &body, Vector3 torque) noexcept
-{
-    body.m_netTorque += torque;
 }

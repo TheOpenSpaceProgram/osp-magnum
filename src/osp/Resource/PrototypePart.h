@@ -71,7 +71,7 @@ struct PCompDrawable
 struct PCompPrimativeCollider
 {
     PartEntity_t m_entity;
-    phys::ECollisionShape m_shape;
+    phys::EShape m_shape;
 };
 // if any fancy triangle mesh or convex hull is added, make a new PComp
 

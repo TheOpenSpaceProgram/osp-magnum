@@ -49,6 +49,8 @@ using planeta::universe::UCompPlanet;
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 
+using osp::active::ACompPhysBody;
+
 using osp::active::SysHierarchy;
 using osp::active::SysAreaAssociate;
 using osp::active::SysPhysics;
@@ -110,18 +112,18 @@ void SysPlanetA::debug_create_chunk_collider(
 {
     using namespace osp::active;
 
-    using osp::phys::ECollisionShape;
+    using osp::phys::EShape;
 
     // Create entity and required components
     ActiveEnt chunkEnt = SysHierarchy::create_child(rScene, rScene.hier_get_root());
     auto &chunkTransform = rScene.reg_emplace<ACompTransform>(chunkEnt);
     auto &chunkShape = rScene.reg_emplace<ACompShape>(chunkEnt);
     rScene.reg_emplace<ACompSolidCollider>(chunkEnt);
-    rScene.reg_emplace<ACompRigidBody>(chunkEnt);
+    rScene.reg_emplace<ACompPhysBody>(chunkEnt);
     rScene.reg_emplace<ACompFloatingOrigin>(chunkEnt);
 
     // Set some stuff
-    chunkShape.m_shape = ECollisionShape::TERRAIN;
+    chunkShape.m_shape = EShape::Custom;
     chunkTransform.m_transform = rScene.reg_get<ACompTransform>(ent).m_transform;
 
     // Get triangle iterators to start and end triangles of the specified chunk

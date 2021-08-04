@@ -146,6 +146,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.get_registry().set<osp::active::SyncVehicles>();
     rScene.get_registry().set<planeta::active::SyncPlanets>();
 
+    rScene.get_registry().set<osp::active::ACtxPhysics>();
+
     // Setup Newton dynamics physics
     ospnewton::SysNewton::setup(rScene);
 

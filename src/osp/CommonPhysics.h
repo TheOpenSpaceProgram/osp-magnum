@@ -29,22 +29,22 @@
 namespace osp::phys
 {
 
-// Formerly PrototypePart
-enum class ECollisionShape : uint8_t
+/**
+ * @brief Basic primitive shapes used for collisions and inertia calculations
+ */
+enum class EShape : uint8_t
 {
-    NONE = 0,
-    COMBINED = 1,
-    SPHERE = 2,
-    BOX = 3,
-    CAPSULE = 4,
-    CYLINDER = 5,
-    //MESH = 6,
-    CONVEX_HULL = 7,
-    TERRAIN = 8
+    None = 0,
+    Custom = 1,
+    Combined = 2,
+    Sphere = 3,
+    Box = 4,
+    Capsule = 5,
+    Cylinder = 6
 };
 
 /**
- * Compute the volume of an ECollisionShape
+ * Compute the volume of an EShape
  * 
  * Given the type of shape and the scale in X,Y,Z, computes the volume of the
  * primitive shape. Axis-aligned shapes (e.g. cylinder, capsule) are aligned
@@ -60,7 +60,7 @@ enum class ECollisionShape : uint8_t
  * 
  * @return the volume of the shape in m^3
  */
-float shape_volume(ECollisionShape shape, Vector3 scale);
+float shape_volume(EShape shape, Vector3 scale);
 
 /**
  * Transform an inertia tensor
@@ -91,7 +91,7 @@ Matrix3 transform_inertia_tensor(Matrix3 I, float mass,
  * 
  * @return The moment of inertia about the principle axes (x, y, z)
  */
-Vector3 collider_inertia_tensor(ECollisionShape shape, Vector3 scale, float mass);
+Vector3 collider_inertia_tensor(EShape shape, Vector3 scale, float mass);
 
 /**
  * Compute the inertia tensor for a cylinder

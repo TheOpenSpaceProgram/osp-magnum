@@ -227,18 +227,14 @@ ActiveEnt SysVehicle::part_instantiate(
     return rootEntity;
 }
 
-void debug_wire_vehicles(ActiveScene &rScene)
-{
-    auto view = rScene.get_registry()
-            .view<osp::active::ACompVehicle,
-                  osp::active::ACompVehicleInConstruction>();
-}
-
 void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 {
+    ActiveReg_t &rReg = rScene.get_registry();
+
     // Clear In-construction queue
-    debug_wire_vehicles(rScene); // but wire the machines first because why not
-    rScene.get_registry().clear<ACompVehicleInConstruction>();
+    rReg.clear<ACompVehicleInConstruction>();
+
+    auto &rPhys = rScene.get_registry().ctx<ACtxPhysics>();
 
     auto view = rScene.get_registry().view<ACompVehicle>();
     auto viewParts = rScene.get_registry().view<ACompPart>();
@@ -256,8 +252,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             // Separation requested
 
             // mark collider as dirty
-            auto &rVehicleBody = rScene.reg_get<ACompRigidBody>(vehicleEnt);
-            rVehicleBody.m_colliderDirty = true;
+            rPhys.m_colliders.push_back(vehicleEnt);
 
             // Invalidate all ACompRigidbodyAncestors
             auto invalidateAncestors = [&rScene](ActiveEnt e)
@@ -280,21 +275,18 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             //       when emplacing new ones.
             for (size_t i = 1; i < islands.size(); i ++)
             {
+                auto const &vehicleTransform = rScene.reg_get<ACompTransform>(vehicleEnt);
+
                 ActiveEnt islandEnt = SysHierarchy::create_child(
                             rScene, rScene.hier_get_root());
                 rScene.reg_emplace<ACompVehicle>(islandEnt);
-                auto &islandTransform
-                        = rScene.reg_emplace<ACompTransform>(islandEnt);
+                rScene.reg_emplace<ACompTransform>(
+                        islandEnt, ACompTransform{vehicleTransform.m_transform});
                 rScene.reg_emplace<ACompDrawTransform>(islandEnt);
-                auto &islandBody
-                        = rScene.reg_emplace<ACompRigidBody>(islandEnt);
-                auto &islandShape
-                        = rScene.reg_emplace<ACompShape>(islandEnt);
+                rScene.reg_emplace<ACompPhysBody>(islandEnt);
+                rScene.reg_emplace<ACompPhysDynamic>(islandEnt);
+                rScene.reg_emplace<ACompShape>(islandEnt, ACompShape{phys::EShape::Combined});
                 rScene.reg_emplace<ACompSolidCollider>(islandEnt);
-                islandShape.m_shape = phys::ECollisionShape::COMBINED;
-
-                auto &vehicleTransform = rScene.reg_get<ACompTransform>(vehicleEnt);
-                islandTransform.m_transform = vehicleTransform.m_transform;
                 rScene.reg_emplace<ACompFloatingOrigin>(islandEnt);
 
                 islands[i] = islandEnt;
