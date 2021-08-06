@@ -59,6 +59,8 @@ using osp::active::ActiveEnt;
 
 using osp::active::ACompPhysBody;
 using osp::active::ACompPhysDynamic;
+using osp::active::ACompPhysLinearVel;
+using osp::active::ACompPhysAngularVel;
 using osp::active::ACompPhysNetForce;
 using osp::active::ACompPhysNetTorque;
 using osp::active::ACtxPhysics;
@@ -179,23 +181,24 @@ void SysNewton::update_world(ActiveScene& rScene)
     auto &rPhysCtx = rReg.ctx<ACtxPhysics>();
     auto &rWorldCtx = rReg.ctx<ACtxNwtWorld>();
 
-    NewtonWorld const* nwtWorld = pWorldComp->m_nwtWorld;
+    NewtonWorld const* pNwtWorld = pWorldComp->m_nwtWorld;
 
     // temporary: just delete the Newton Body if colliders change, so it can be
     //            reinitialized with new colliders
-    for (ActiveEnt ent : std::exchange(rPhysCtx.m_colliders, {}))
+    for (ActiveEnt ent : std::exchange(rPhysCtx.m_colliderDirty, {}))
     {
-        rReg.remove<ACompNwtBody>(ent);
+        rReg.remove<ACompNwtCollider>(ent);
+        create_body(rScene, ent, pNwtWorld);
     }
 
     // Iterate rigid bodies that don't have a NewtonBody
     for (ActiveEnt ent : rScene.get_registry().view<ACompPhysBody>(entt::exclude<ACompNwtBody>))
     {
-        create_body(rScene, ent, nwtWorld);
+        create_body(rScene, ent, pNwtWorld);
     }
 
     // Recompute inertia and center of mass if rigidbody has been modified
-    for (ActiveEnt ent : std::exchange(rPhysCtx.m_inertia, {}))
+    for (ActiveEnt ent : std::exchange(rPhysCtx.m_inertiaDirty, {}))
     {
         compute_rigidbody_inertia(rScene, ent);
         SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
@@ -203,21 +206,58 @@ void SysNewton::update_world(ActiveScene& rScene)
                             entBody.m_centerOfMassOffset.z());
     }
 
+    auto viewNwtBody = rReg.view<ACompNwtBody>();
+    auto viewLinVel = rReg.view<ACompPhysLinearVel>();
+    auto viewAngVel = rReg.view<ACompPhysAngularVel>();
+
+    // Apply changed velocities
+    for (auto const& [ent, vel] : std::exchange(rPhysCtx.m_setVelocity, {}))
+    {
+        NewtonBodySetVelocity(viewNwtBody.get<ACompNwtBody>(ent).body(),
+                              vel.data());
+    }
+
+    // Origin translation
+    if (Vector3 const translate = std::exchange(rPhysCtx.m_originTranslate, {});
+        ! translate.isZero())
+    {
+        // Translate every newton body
+        for (NewtonBody const* pBody = NewtonWorldGetFirstBody(pNwtWorld);
+             pBody != nullptr; pBody = NewtonWorldGetNextBody(pNwtWorld, pBody))
+        {
+            Matrix4 matrix;
+            NewtonBodyGetMatrix(pBody, matrix.data());
+            matrix.translation() += translate;
+            NewtonBodySetMatrix(pBody, matrix.data());
+        }
+    }
+
     // Update the world
-    NewtonUpdate(nwtWorld, rScene.get_time_delta_fixed());
+    NewtonUpdate(pNwtWorld, rScene.get_time_delta_fixed());
 
     rReg.clear<ACompPhysNetForce>();
     rReg.clear<ACompPhysNetTorque>();
 
     auto viewTf = rReg.view<ACompTransform>();
+    auto viewDyn = rReg.view<ACompPhysDynamic>();
 
-    // Apply transforms
+
+    // Apply transforms and also velocity
     for (auto &vec : rWorldCtx.m_setTf)
     {
         for (auto const& [ent, pBody] : std::exchange(vec, {}))
         {
             NewtonBodyGetMatrix(
                     pBody, viewTf.get<ACompTransform>(ent).m_transform.data());
+
+            if (viewDyn.contains(ent))
+            {
+                NewtonBodyGetVelocity(
+                        pBody, viewLinVel.get<ACompPhysLinearVel>(ent).data());
+
+                NewtonBodyGetOmega(
+                        pBody, viewAngVel.get<ACompPhysAngularVel>(ent).data());
+            }
         }
     }
 }

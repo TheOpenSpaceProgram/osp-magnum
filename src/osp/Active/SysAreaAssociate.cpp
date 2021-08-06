@@ -26,6 +26,8 @@
 
 #include "ActiveScene.h"
 
+#include "physics.h"
+
 using osp::active::SysAreaAssociate;
 
 using osp::active::ACompAreaLink;
@@ -133,6 +135,9 @@ void SysAreaAssociate::floating_origin_translate(
 
         entTransform.m_transform.translation() += translation;
     }
+
+    // Tell physics engine to translate too
+    rReg.ctx<ACtxPhysics>().m_originTranslate += translation;
 }
 
 

@@ -30,34 +30,44 @@
 namespace osp::active
 {
 
-using physchanges_t = std::vector<ActiveEnt>;
-
+/**
+ * @brief The ACtxPhysics struct
+ */
 struct ACtxPhysics
 {
     Vector3 m_originTranslate;
-    physchanges_t m_colliders;
-    physchanges_t m_inertia;
-    physchanges_t m_velocity;
+
+    // Input queues
+    std::vector<ActiveEnt> m_colliderDirty;
+    std::vector<ActiveEnt> m_inertiaDirty;
+    std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
 };
 
 /**
- * @brief Indicates that an entity is synced with a physics engine
+ * @brief Synchronizes an entity with a physics engine body
  */
 struct ACompPhysBody
 { };
 
 /**
- * @brief Entity is a non-static dynamic rigid body
+ * @brief Adds rigid body dynamics to entities with ACompPhysBody
  */
 struct ACompPhysDynamic
 {
-    Vector3 m_inertia{1, 1, 1};
     Vector3 m_centerOfMassOffset{0, 0, 0};
+    Vector3 m_inertia{1, 1, 1};
     float m_totalMass;
 };
 
-struct ACompLinVelocity : Vector3 { };
-struct ACompRotVelocity : Vector3 { };
+/**
+ * @brief Read-only Linear velocity for entities with ACompPhysDynamic
+ */
+struct ACompPhysLinearVel : Vector3 { };
+
+/**
+ * @brief Read-only Angular velocity for entities with ACompPhysDynamic
+ */
+struct ACompPhysAngularVel : Vector3 { };
 
 /**
  * @brief Applies force to a dynamic physics entity

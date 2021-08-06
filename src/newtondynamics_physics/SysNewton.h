@@ -119,12 +119,11 @@ private:
             NewtonWorld const* pNwtWorld, NewtonCollision *rCompound);
 
     /**
-     * Scan children of specified rigid body entity for ACompCollisionShapes,
-     * then combine it all into a single compound collision
+     * @brief Create Newton bodies and colliders for entities with ACompPhysBody
      *
-     * @param rScene   [in] ActiveScene containing entity and physics world
-     * @param entity   [in] Entity containing ACompNwtBody
-     * @param nwtWorld [in] Newton physics world
+     * @param rScene    [ref] ActiveScene containing entity and physics world
+     * @param entity    [in] Entity containing ACompNwtBody
+     * @param pNwtWorld [in] Newton physics world
      */
     static void create_body(
             osp::active::ActiveScene& rScene, osp::active::ActiveEnt ent,
