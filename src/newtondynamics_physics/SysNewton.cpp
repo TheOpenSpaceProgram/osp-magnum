@@ -24,6 +24,7 @@
  */
 
 #include "SysNewton.h"               // IWYU pragma: associated
+#include "ospnewton.h"
 
 #include <osp/Active/scene.h>        // for ACompHierarchy
 #include <osp/Active/physics.h>      // for ACompRigidBody
@@ -49,9 +50,7 @@
 
 #include <new>
 
-using ospnewton::SysNewton;
-using ospnewton::ACompNwtBody;
-using ospnewton::ACompNwtWorld;
+using namespace ospnewton;
 
 using osp::active::ActiveScene;
 using osp::active::ActiveReg_t;
@@ -75,30 +74,6 @@ using osp::active::ACompTransformMutable;
 
 using osp::Matrix4;
 using osp::Vector3;
-
-// TODO: not compiling, std::hardware_destructive_interference_size not found?
-template<typename T>
-struct alignas(64) CachePadded : T { };
-
-struct ACtxNwtWorld
-{
-    ACtxNwtWorld(ActiveScene &rScene, int threadCount)
-     : m_pScene(&rScene)
-     , m_viewForce(rScene.get_registry().view<ACompPhysNetForce>())
-     , m_viewTorque(rScene.get_registry().view<ACompPhysNetTorque>())
-     , m_setTf(threadCount)
-    { }
-
-    ActiveScene *m_pScene;
-
-
-    entt::basic_view<ActiveEnt, entt::exclude_t<>, ACompPhysNetForce> m_viewForce;
-    entt::basic_view<ActiveEnt, entt::exclude_t<>, ACompPhysNetTorque> m_viewTorque;
-
-    // transformations to set recorded in cb_set_transform
-    using SetTfPair_t = std::pair<ActiveEnt, NewtonBody const* const>;
-    std::vector< CachePadded< std::vector<SetTfPair_t> > > m_setTf;
-};
 
 // Callback called for dynamic rigid bodies for applying force and torque
 void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
@@ -137,51 +112,63 @@ void cb_set_transform(NewtonBody const* const pBody,
     uintptr_t userData = reinterpret_cast<uintptr_t>(NewtonBodyGetUserData(pBody));
     ActiveEnt ent = static_cast<ActiveEnt>(userData);
 
-    pWorldCtx->m_setTf[threadIndex].emplace_back(ent, pBody);
+    pWorldCtx->m_perThread[threadIndex].m_setTf.emplace_back(ent, pBody);
 }
 
 void SysNewton::setup(ActiveScene &rScene)
 {
-    // Connect signal handlers to destruct Newton objects when components are
-    // deleted.
+    int threadCount = 1; // temporary
 
-    rScene.get_registry().on_destroy<ACompNwtBody>()
-                    .connect<&SysNewton::on_body_destruct>();
+    ActiveReg_t &rReg = rScene.get_registry();
 
-    rScene.get_registry().on_destroy<ACompNwtCollider>()
-                    .connect<&SysNewton::on_shape_destruct>();
+    rReg.set<ACtxNwtWorld>(rScene, threadCount);
+}
 
-    rScene.get_registry().on_destroy<ACompNwtWorld>()
-                    .connect<&SysNewton::on_world_destruct>();
+void SysNewton::destroy(ActiveScene &rScene)
+{
+    ActiveReg_t &rReg = rScene.get_registry();
+
+    // delete collision shapes and bodies before deleting the world
+    rReg.clear<ACompNwtCollider>();
+    rReg.clear<ACompNwtBody>();
+
+    // delete world
+    rReg.unset<ACtxNwtWorld>();
+}
+
+void SysNewton::update_translate(ActiveScene& rScene)
+{
+    ActiveReg_t &rReg = rScene.get_registry();
+
+    auto &rPhysCtx = rReg.ctx<ACtxPhysics>();
+    auto &rWorldCtx = rReg.ctx<ACtxNwtWorld>();
+
+    NewtonWorld const* pNwtWorld = rWorldCtx.m_nwtWorld.get();
+
+    // Origin translation
+    if (Vector3 const translate = std::exchange(rPhysCtx.m_originTranslate, {});
+        ! translate.isZero())
+    {
+        // Translate every newton body
+        for (NewtonBody const* pBody = NewtonWorldGetFirstBody(pNwtWorld);
+             pBody != nullptr; pBody = NewtonWorldGetNextBody(pNwtWorld, pBody))
+        {
+            Matrix4 matrix;
+            NewtonBodyGetMatrix(pBody, matrix.data());
+            matrix.translation() += translate;
+            NewtonBodySetMatrix(pBody, matrix.data());
+        }
+    }
 }
 
 void SysNewton::update_world(ActiveScene& rScene)
 {
     ActiveReg_t &rReg = rScene.get_registry();
 
-    // Try getting the newton world from the scene root.
-    // It is very unlikely that multiple physics worlds are ever needed
-    auto *pWorldComp = rReg.try_get<ACompNwtWorld>(rScene.hier_get_root());
-
-    if (pWorldComp == nullptr)
-    {
-        return; // No physics world component
-    }
-
-    if (pWorldComp->m_nwtWorld == nullptr)
-    {
-        // Create world if not yet initialized
-        pWorldComp->m_nwtWorld = NewtonCreate();
-        auto& rWorldCtx = rReg.set<ACtxNwtWorld>(
-                rScene, NewtonGetThreadsCount(pWorldComp->m_nwtWorld));
-
-        NewtonWorldSetUserData(pWorldComp->m_nwtWorld, &rWorldCtx);
-    }
-
     auto &rPhysCtx = rReg.ctx<ACtxPhysics>();
     auto &rWorldCtx = rReg.ctx<ACtxNwtWorld>();
 
-    NewtonWorld const* pNwtWorld = pWorldComp->m_nwtWorld;
+    NewtonWorld const* pNwtWorld = rWorldCtx.m_nwtWorld.get();
 
     // temporary: just delete the Newton Body if colliders change, so it can be
     //            reinitialized with new colliders
@@ -217,20 +204,6 @@ void SysNewton::update_world(ActiveScene& rScene)
                               vel.data());
     }
 
-    // Origin translation
-    if (Vector3 const translate = std::exchange(rPhysCtx.m_originTranslate, {});
-        ! translate.isZero())
-    {
-        // Translate every newton body
-        for (NewtonBody const* pBody = NewtonWorldGetFirstBody(pNwtWorld);
-             pBody != nullptr; pBody = NewtonWorldGetNextBody(pNwtWorld, pBody))
-        {
-            Matrix4 matrix;
-            NewtonBodyGetMatrix(pBody, matrix.data());
-            matrix.translation() += translate;
-            NewtonBodySetMatrix(pBody, matrix.data());
-        }
-    }
 
     // Update the world
     NewtonUpdate(pNwtWorld, rScene.get_time_delta_fixed());
@@ -243,9 +216,9 @@ void SysNewton::update_world(ActiveScene& rScene)
 
 
     // Apply transforms and also velocity
-    for (auto &vec : rWorldCtx.m_setTf)
+    for (auto &rPerThread : rWorldCtx.m_perThread)
     {
-        for (auto const& [ent, pBody] : std::exchange(vec, {}))
+        for (auto const& [ent, pBody] : std::exchange(rPerThread.m_setTf, {}))
         {
             NewtonBodyGetMatrix(
                     pBody, viewTf.get<ACompTransform>(ent).m_transform.data());
@@ -264,7 +237,7 @@ void SysNewton::update_world(ActiveScene& rScene)
 
 void SysNewton::find_colliders_recurse(
         ActiveScene& rScene, ActiveEnt ent, Matrix4 const &transform,
-        NewtonWorld const* pNwtWorld, NewtonCollision *rCompound)
+        NewtonWorld const* pNwtWorld, NewtonCollision *pCompound)
 {
     ActiveReg_t &rReg = rScene.get_registry();
     ActiveEnt nextChild = ent;
@@ -272,8 +245,7 @@ void SysNewton::find_colliders_recurse(
     // iterate through siblings of ent
     while(nextChild != entt::null)
     {
-        auto const &childHeir = rScene.reg_get<ACompHierarchy>(nextChild);
-
+        auto const &rChildHeir = rScene.reg_get<ACompHierarchy>(nextChild);
 
         if (auto const *pChildTransform
                     = rScene.get_registry().try_get<ACompTransform>(nextChild);
@@ -292,7 +264,6 @@ void SysNewton::find_colliders_recurse(
                     // No Newton collider exists yet
                     collision = NewtonCreateSphere(pNwtWorld, 0.5f, 0, nullptr);
                     rReg.emplace<ACompNwtCollider>(nextChild, collision);
-                    ACompNwtCollider f(collision);
                 }
                 else
                 {
@@ -305,14 +276,14 @@ void SysNewton::find_colliders_recurse(
                 NewtonCollisionSetMatrix(collision, f.data());
 
                 // Add body to compound collision
-                NewtonCompoundCollisionAddSubCollision(rCompound, collision);
+                NewtonCompoundCollisionAddSubCollision(pCompound, collision);
             }
 
-            find_colliders_recurse(rScene, childHeir.m_childFirst, childMatrix,
-                                   pNwtWorld, rCompound);
+            find_colliders_recurse(rScene, rChildHeir.m_childFirst, childMatrix,
+                                   pNwtWorld, pCompound);
         }
 
-        nextChild = childHeir.m_siblingNext;
+        nextChild = rChildHeir.m_siblingNext;
     }
 }
 
@@ -454,62 +425,3 @@ void SysNewton::compute_rigidbody_inertia(ActiveScene& rScene, ActiveEnt entity)
     SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(), "New mass: {}",
                         entBody.m_mass);
 }
-
-ACompNwtWorld* SysNewton::try_get_physics_world(ActiveScene &rScene)
-{
-    return rScene.get_registry().try_get<ACompNwtWorld>(rScene.hier_get_root());
-}
-
-void SysNewton::on_body_destruct(ActiveReg_t& rReg, ActiveEnt ent)
-{
-    NewtonBody const *pBody = rReg.get<ACompNwtBody>(ent).body();
-    NewtonDestroyBody(pBody); // make sure the Newton body is destroyed
-}
-
-void SysNewton::on_shape_destruct(ActiveReg_t& rReg, ActiveEnt ent)
-{
-    NewtonCollision const *pShape = rReg.get<ACompNwtCollider>(ent).collision();
-    NewtonDestroyCollision(pShape); // make sure the shape is destroyed
-}
-
-void SysNewton::on_world_destruct(ActiveReg_t& rReg, ActiveEnt ent)
-{
-    NewtonWorld const *pWorld = rReg.get<ACompNwtWorld>(ent).m_nwtWorld;
-    if (pWorld != nullptr)
-    {
-        // delete all collision shapes first to prevent crash
-        rReg.clear<ACompNwtCollider>();
-
-        // delete all rigid bodies too
-        rReg.clear<ACompNwtBody>();
-
-        NewtonDestroy(pWorld); // make sure the world is destroyed
-    }
-}
-
-NewtonCollision* SysNewton::newton_create_tree_collision(
-        const NewtonWorld *pNewtonWorld, int shapeId)
-{
-    return NewtonCreateTreeCollision(pNewtonWorld, shapeId);
-}
-
-void SysNewton::newton_tree_collision_add_face(
-        const NewtonCollision* pTreeCollision, int vertexCount,
-        const float* vertexPtr, int strideInBytes, int faceAttribute)
-{
-    NewtonTreeCollisionAddFace(pTreeCollision, vertexCount, vertexPtr,
-                               strideInBytes, faceAttribute);
-}
-
-void SysNewton::newton_tree_collision_begin_build(
-        const NewtonCollision* pTreeCollision)
-{
-    NewtonTreeCollisionBeginBuild(pTreeCollision);
-}
-
-void SysNewton::newton_tree_collision_end_build(
-        const NewtonCollision* pTreeCollision, int optimize)
-{
-    NewtonTreeCollisionEndBuild(pTreeCollision, optimize);
-}
-

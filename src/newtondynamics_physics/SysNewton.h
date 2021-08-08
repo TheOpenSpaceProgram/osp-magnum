@@ -42,40 +42,7 @@ class NewtonCollision;
 namespace ospnewton
 {
 
-/**
- * Component that stores the NewtonWorld, only added to the root node.
- */
-struct ACompNwtWorld
-{
-    NewtonWorld *m_nwtWorld{nullptr};
-    float m_timeStep{1.0f / 60.0f};
-};
 
-struct ACompNwtBody
-{
-    constexpr ACompNwtBody(NewtonBody const* pBody) noexcept
-     : m_pBody(pBody) { }
-
-    constexpr NewtonBody const* body() const noexcept { return m_pBody; }
-
-private:
-    NewtonBody const *m_pBody;
-};
-
-/**
- * Stores a handle to a NewtonCollision object
- */
-struct ACompNwtCollider
-{
-    constexpr ACompNwtCollider(NewtonCollision const* pCollision) noexcept
-     : m_pCollision(pCollision) { }
-
-    constexpr NewtonCollision const* collision() const noexcept
-    { return m_pCollision; }
-
-private:
-    NewtonCollision const *m_pCollision;
-};
 
 class SysNewton
 {
@@ -83,10 +50,14 @@ class SysNewton
 public:
 
     static void setup(osp::active::ActiveScene& rScene);
+
+    static void destroy(osp::active::ActiveScene& rScene);
     
+    static void update_translate(osp::active::ActiveScene& rScene);
+
     static void update_world(osp::active::ActiveScene& rScene);
 
-    static ACompNwtWorld* try_get_physics_world(osp::active::ActiveScene &rScene);
+    static NewtonWorld const* debug_get_world();
 
     /**
      * Create a Newton TreeCollision from a mesh using those weird triangle
@@ -140,59 +111,7 @@ private:
     static void compute_rigidbody_inertia(
             osp::active::ActiveScene& rScene, osp::active::ActiveEnt entity);
 
-
-    static void on_body_destruct(osp::active::ActiveReg_t& rReg, osp::active::ActiveEnt ent);
-    static void on_shape_destruct(osp::active::ActiveReg_t& rReg, osp::active::ActiveEnt ent);
-    static void on_world_destruct(osp::active::ActiveReg_t& rReg, osp::active::ActiveEnt ent);
-
-    static NewtonCollision* newton_create_tree_collision(
-            const NewtonWorld *pNewtonWorld, int shapeId);
-    static void newton_tree_collision_add_face(
-            const NewtonCollision* pTreeCollision, int vertexCount,
-            const float* vertexPtr, int strideInBytes, int faceAttribute);
-    static void newton_tree_collision_begin_build(
-            const NewtonCollision* pTreeCollision);
-    static void newton_tree_collision_end_build(
-            const NewtonCollision* pTreeCollision,  int optimize);
 };
-
-template<class TRIANGLE_IT_T>
-void SysNewton::shape_create_tri_mesh_static(
-        osp::active::ActiveScene& rScene, osp::active::ACompShape& rShape,
-        osp::active::ActiveEnt chunkEnt,
-        TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end)
-{
-    // TODO: this is actually horrendously slow and WILL cause issues later on.
-    //       Tree collisions aren't made for real-time loading. Consider
-    //       manually hacking up serialized data instead of add face, or use
-    //       Newton's dgAABBPolygonSoup stuff directly
-
-    using osp::Vector3;
-
-    ACompNwtWorld* pNwtWorldComp = try_get_physics_world(rScene);
-    NewtonCollision const* pTree = newton_create_tree_collision(pNwtWorldComp->m_nwtWorld, 0);
-
-    newton_tree_collision_begin_build(pTree);
-
-    Vector3 triangle[3];
-
-    for (TRIANGLE_IT_T it = start; it != end; it += 3)
-    {
-        triangle[0] = *reinterpret_cast<Vector3 const*>((it + 0).position());
-        triangle[1] = *reinterpret_cast<Vector3 const*>((it + 1).position());
-        triangle[2] = *reinterpret_cast<Vector3 const*>((it + 2).position());
-
-        newton_tree_collision_add_face(pTree, 3,
-                                       reinterpret_cast<float*>(triangle),
-                                       sizeof(float) * 3, 0);
-
-    }
-
-    newton_tree_collision_end_build(pTree, 2);
-
-    rScene.reg_emplace<ACompNwtCollider>(chunkEnt, pTree);
-
-}
 
 }
 

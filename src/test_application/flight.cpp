@@ -146,13 +146,11 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.get_registry().set<osp::active::SyncVehicles>();
     rScene.get_registry().set<planeta::active::SyncPlanets>();
 
+    // Setup generic physics interface
     rScene.get_registry().set<osp::active::ACtxPhysics>();
 
     // Setup Newton dynamics physics
     ospnewton::SysNewton::setup(rScene);
-
-    // Add default-constructed Newton physics world to scene
-    rScene.reg_emplace<ospnewton::ACompNwtWorld>(rScene.hier_get_root());
 
     // workaround: update the scene right away to initialize physics world
     //             needed by planets for now
@@ -212,6 +210,9 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     rUni.get_reg().destroy(areaSat);
 
+    // Release Newton resources
+    ospnewton::SysNewton::destroy(rScene);
+
     // destruct the application, this closes the window
     pMagnumApp.reset();
 }
@@ -223,13 +224,10 @@ void update_scene(osp::active::ActiveScene& rScene)
     using namespace adera::active::machines;
     using namespace planeta::active;
 
-    // Search Universe for nearby activatable Satellites
-    //SysAreaAssociate::update_scan(rScene);
-
-
     SysAreaAssociate::update_consume(rScene);
 
     SysAreaAssociate::update_translate(rScene);
+    ospnewton::SysNewton::update_translate(rScene);
 
     // Activate or deactivate nearby planets
     SysPlanetA::update_activate(rScene);

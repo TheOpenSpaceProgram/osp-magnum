@@ -41,7 +41,7 @@
 
 // TODO: Decouple when a proper interface for creating static triangle meshes
 //       is made
-#include <newtondynamics_physics/SysNewton.h>
+#include "temporarynewtonmesh.h"
 
 using planeta::active::SysPlanetA;
 using planeta::universe::UCompPlanet;
@@ -130,8 +130,10 @@ void SysPlanetA::debug_create_chunk_collider(
     auto itsChunk = planet.m_planet->iterate_chunk(chunk);
 
     // Send them to the physics engine
-    ospnewton::SysNewton::shape_create_tri_mesh_static(
+    debug_create_tri_mesh_static(
                 rScene, chunkShape, chunkEnt, itsChunk.first, itsChunk.second);
+
+
 }
 
 void SysPlanetA::update_activate(ActiveScene &rScene)
