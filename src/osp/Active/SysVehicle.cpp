@@ -156,9 +156,11 @@ ActiveEnt SysVehicle::part_instantiate(
         // as components to be consumed by the Phong shader
         rScene.reg_emplace<ACompVisible>(currentEnt);
         rScene.reg_emplace<ACompOpaque>(currentEnt);
-        rScene.reg_emplace<ACompShader>(currentEnt, SysRender::get_default_shader());
         rScene.reg_emplace<ACompMesh>(currentEnt, meshRes);
         rScene.reg_emplace<ACompDiffuseTex>(currentEnt, std::move(textureResources[0]));
+        rScene.reg_emplace<ACompDrawable>(currentEnt,
+                                          make_drawable<DrawableCommon>());
+        rScene.get_registry().ctx<ACtxRenderGroups>().add<DrawableCommon>(currentEnt);
     }
 
     rScene.get_registry().reserve<PCompPrimativeCollider>(

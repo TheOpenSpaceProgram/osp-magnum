@@ -24,13 +24,10 @@
  */
 #include "SysRender.h"
 
-#include "osp/Shaders/Phong.h"
-#include "adera/Shaders/PlumeShader.h"
-#include <Magnum/Shaders/MeshVisualizer.h>
 #include "osp/Shaders/FullscreenTriShader.h"
 
-#include <Magnum/GL/Buffer.h>
 #include <Corrade/Containers/ArrayViewStl.h>
+#include <Magnum/GL/Buffer.h>
 #include <Magnum/Mesh.h>
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
@@ -39,21 +36,19 @@
 #include <Magnum/GL/Renderbuffer.h>
 #include <Magnum/GL/RenderbufferFormat.h>
 
+#include <functional>
+
 using osp::active::SysRender;
 using osp::active::RenderPipeline;
 
 void SysRender::setup(ActiveScene& rScene)
 {
     using namespace osp::shader;
-    using namespace adera::shader;
     using namespace Magnum;
 
     Package& resources = rScene.get_context_resources();
 
     resources.add<FullscreenTriShader>("fullscreen_tri_shader");
-
-    resources.add<Phong>("phong_shader",
-        Phong{Magnum::Shaders::PhongGL::Flag::DiffuseTexture});
 
     /* Generate fullscreen tri for texture rendering */
     {
@@ -102,14 +97,19 @@ void SysRender::setup(ActiveScene& rScene)
         rScene.reg_emplace<ACompFBOColorAttachment>(rScene.hier_get_root(), color);
     }
 
+    // Add render groups
+    auto &rGroups = rScene.get_registry().set<ACtxRenderGroups>();
+    rGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
+    rGroups.m_groups.emplace("fwd_transparent", RenderGroup{}).second;
+
     // Create the default render pipeline
-    resources.add<RenderPipeline>("default", create_forward_renderer());
+    resources.add<RenderPipeline>("default", create_forward_renderer(rScene));
 }
 
-RenderPipeline SysRender::create_forward_renderer()
+RenderPipeline SysRender::create_forward_renderer(ActiveScene& rScene)
 {
     /* Define render passes */
-    RenderSteps_t pipeline;
+    std::vector<RenderStep_t> pipeline;
 
     // Opaque pass
     pipeline.emplace_back(
@@ -189,6 +189,33 @@ void SysRender::display_default_rendertarget(ActiveScene& rScene)
     Renderer::disable(Renderer::Feature::Blending);
 
     shader->display_texure(*surface, *target.m_tex);
+}
+
+void SysRender::update_drawfunc_assign(ActiveScene& rScene)
+{
+    ActiveReg_t &rReg = rScene.get_registry();
+    auto &rGroups = rScene.get_registry().ctx<ACtxRenderGroups>();
+
+    for (auto & [name, rGroup] : rGroups.m_groups)
+    {
+        for (size_t i = 0; i < rGroup.m_assigners.size(); i ++)
+        {
+            // No drawables of this type to assign shaders to
+            if (rGroups.m_dirty[i].empty())
+            {
+                continue;
+            }
+
+            if (RenderGroup::DrawAssigner_t const &assigner
+                    = rGroup.m_assigners[i];
+                bool(assigner) )
+            {
+                assigner(rScene, rGroup.m_entities, rGroups.m_dirty[i]);
+            }
+        }
+
+        rGroups.m_dirty.clear();
+    }
 }
 
 void SysRender::update_hierarchy_transforms(ActiveScene& rScene)
