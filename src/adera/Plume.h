@@ -28,6 +28,11 @@
 #include <Magnum/Math/Color.h>
 #include <Magnum/Magnum.h>
 
+namespace adera::active
+{
+
+struct DrawablePlume { };
+
 struct PlumeEffectData
 {
     float m_flowVelocity;
@@ -37,3 +42,4 @@ struct PlumeEffectData
     std::string m_meshName;
 };
 
+}

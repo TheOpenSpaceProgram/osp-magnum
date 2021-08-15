@@ -23,10 +23,12 @@
  * SOFTWARE.
  */
 #include "SysExhaustPlume.h"
-#include "osp/Active/ActiveScene.h"
 #include "adera/Machines/Rocket.h"
-#include "osp/Resource/AssetImporter.h"
+
+#include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysRender.h>
+#include <osp/Active/SysHierarchy.h>
+#include <osp/Resource/AssetImporter.h>
 
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/MeshTools/Compile.h>
@@ -39,52 +41,137 @@
 
 using namespace adera::active;
 
-using osp::AssetImporter;
-
-using osp::DependRes;
-using osp::Package;
-
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 
-
-using osp::active::ACompMesh;
-using osp::active::ACompShader;
-using osp::active::ACompTransparent;
-using osp::active::ACompVisible;
-
-void SysExhaustPlume::initialize_plume(ActiveScene& rScene, ActiveEnt node)
+/**
+ * Attach a visual exhaust plume effect to MachineRocket
+ *
+ * Searches the hierarchy under the specified MachineRocket entity and
+ * attaches an ACompExhaustPlume to the rocket's plume node. A graphical
+ * exhaust plume effect will be attached to the node by SysExhaustPlume
+ * when it processes the component.
+ *
+ * @param rScene [ref] Scene containing the following entities
+ * @param part [in] Entity containing a plume in its descendents
+ * @param mach [in] Entity containing MachineRocket
+ */
+void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
 {
-    using Magnum::GL::Mesh;
-    using Magnum::GL::Texture2D;
-    using Magnum::Trade::ImageData2D;
-    using namespace Magnum::Math::Literals;
-    using adera::shader::PlumeShader;
+    using osp::active::ACompName;
+    using osp::active::EHierarchyTraverseStatus;
+    using osp::active::SysHierarchy;
 
-    auto const& plume = rScene.reg_get<ACompExhaustPlume>(node);
+    ActiveEnt plumeNode = entt::null;
 
-    if (rScene.get_registry().all_of<ACompShader>(node))
+    auto findPlumeHandle = [&rScene, &plumeNode](ActiveEnt ent)
     {
-        return;  // plume already initialized
+        static constexpr std::string_view namePrefix = "fx_plume_";
+        auto const* name = rScene.reg_try_get<ACompName>(ent);
+
+        if (nullptr == name)
+        {
+            return EHierarchyTraverseStatus::Continue;
+        }
+
+        if (0 == name->m_name.compare(0, namePrefix.size(), namePrefix))
+        {
+            plumeNode = ent;
+            return EHierarchyTraverseStatus::Stop;  // terminate search
+        }
+        return EHierarchyTraverseStatus::Continue;
+    };
+
+    SysHierarchy::traverse(rScene, part, findPlumeHandle);
+
+    if (plumeNode == entt::null)
+    {
+        SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
+                          "ERROR: could not find plume anchor for MachineRocket {}", part);
+        return;
     }
 
-    DependRes<PlumeEffectData> plumeEffect = plume.m_effect;
+    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(), "MachineRocket {}\'s associated plume: {}",
+        part, plumeNode);
+
+    // Get plume effect
+
+    using osp::DependRes;
+    using osp::Package;
 
     Package& pkg = rScene.get_application().debug_find_package("lzdb");
+    std::string_view plumeAnchorName = rScene.reg_get<ACompName>(plumeNode).m_name;
+    std::string_view effectName = plumeAnchorName.substr(3, plumeAnchorName.length() - 3);
+    DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
+    if (plumeEffect.empty())
+    {
+      SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
+                          "ERROR: couldn't find plume effect  {}", effectName);
+        return;
+    }
 
-    // Get plume mesh
+    rScene.reg_emplace<ACompExhaustPlume>(plumeNode, mach, plumeEffect);
+
+    // Add Plume mesh
+
+    using osp::AssetImporter;
+    using Magnum::GL::Mesh;
+
+    using osp::active::ACompMesh;
+    using osp::active::ACompDrawable;
+    using osp::active::ACompTransparent;
+    using osp::active::ACompVisible;
+
     Package& glResources = rScene.get_context_resources();
     DependRes<Mesh> plumeMesh = glResources.get<Mesh>(plumeEffect->m_meshName);
+
+    // Compile the plume mesh if not done so yet
     if (plumeMesh.empty())
     {
         plumeMesh = AssetImporter::compile_mesh(plumeEffect->m_meshName, pkg, glResources);
     }
 
-    // Emplace plume shader instance render data
-    rScene.reg_emplace<ACompMesh>(node, plumeMesh);
-    rScene.reg_emplace<ACompVisible>(node);
-    rScene.reg_emplace<ACompTransparent>(node);
-    rScene.reg_emplace<ACompShader>(node, &adera::shader::PlumeShader::draw_plume);
+    rScene.reg_emplace<ACompMesh>(plumeNode, plumeMesh);
+    rScene.reg_emplace<ACompVisible>(plumeNode);
+    rScene.reg_emplace<ACompTransparent>(plumeNode);
+    rScene.get_registry().ctx<osp::active::ACtxRenderGroups>().add<DrawablePlume>(plumeNode);
+}
+
+void SysExhaustPlume::update_construct(ActiveScene& rScene)
+{
+    // TODO: this is kind of a hacky function, Plumes should be made into
+    //       Machines
+
+
+    auto view = rScene.get_registry()
+            .view<osp::active::ACompVehicle,
+                  osp::active::ACompVehicleInConstruction>();
+
+    osp::machine_id_t const id = osp::mach_id<machines::MachineRocket>();
+
+    for (auto [vehEnt, rVeh, rVehConstr] : view.each())
+    {
+        // Check if the vehicle blueprint might store MachineRockets
+        if (rVehConstr.m_blueprint->m_machines.size() <= id)
+        {
+            continue;
+        }
+
+        osp::BlueprintVehicle const& vehBp = *rVehConstr.m_blueprint;
+
+        // Get all MachineRockets in the vehicle
+        for (osp::BlueprintMachine const &mach : vehBp.m_machines[id])
+        {
+            // Get part
+            ActiveEnt partEnt = rVeh.m_parts[mach.m_partIndex];
+
+            // Get machine entity previously reserved by SysVehicle
+            auto const& machines = rScene.reg_get<osp::active::ACompMachines>(partEnt);
+            ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
+
+            attach_plume_effect(rScene, partEnt, machEnt);
+        }
+    }
 }
 
 // TODO: workaround. add an actual way to keep time accessible from ActiveScene
@@ -95,16 +182,9 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
     g_time += rScene.get_time_delta_fixed();
 
     using adera::active::machines::MachineRocket;
+    using osp::active::ACompVisible;
 
-    auto& reg = rScene.get_registry();
-
-    // Initialize any uninitialized plumes
-    auto uninitializedComps =
-        reg.view<ACompExhaustPlume>(entt::exclude<ACompShader>);
-    for (ActiveEnt plumeEnt : uninitializedComps)
-    {
-        initialize_plume(rScene, plumeEnt);
-    }
+    osp::active::ActiveReg_t& reg = rScene.get_registry();
 
     // Process plumes
     auto plumeView = reg.view<ACompExhaustPlume>();

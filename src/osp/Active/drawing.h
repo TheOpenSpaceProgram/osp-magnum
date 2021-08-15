@@ -162,17 +162,6 @@ struct ACompTransparent {};
 struct ACompVisible {};
 
 /**
- * Stores a shader draw function to be used to draw the object
- */
-struct ACompShader
-{
-    constexpr ACompShader(ShaderDrawFnc_t drawCall) noexcept
-     : m_drawCall(drawCall)
-    { }
-    ShaderDrawFnc_t m_drawCall;
-};
-
-/**
  * World transform used for rendering. All ascendents of an entity using this
  * must also have this component
  */

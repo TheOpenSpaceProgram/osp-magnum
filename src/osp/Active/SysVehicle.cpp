@@ -65,15 +65,16 @@ ActiveEnt SysVehicle::part_instantiate(
         ActiveScene& rScene, PrototypePart const& part,
         BlueprintPart const& blueprint, ActiveEnt rootParent)
 {
-    // TODO: make some changes to ActiveScene for creating multiple entities easier
+    ActiveReg_t &rReg = rScene.get_registry();
 
+    // TODO: make some changes to ActiveScene for creating multiple entities easier
     std::vector<ActiveEnt> newEntities(part.m_entityCount);
     ActiveEnt& rootEntity = newEntities[0];
 
     // reserve space for new entities and ACompTransforms to be created
     //rScene.get_registry().reserve(
     //            rScene.get_registry().capacity() + part.m_entityCount);
-    rScene.get_registry().reserve<ACompTransform>(
+    rReg.reserve<ACompTransform>(
                 rScene.get_registry().capacity<ACompTransform>() + part.m_entityCount);
 
     // Create entities and hierarchy
@@ -113,6 +114,8 @@ ActiveEnt SysVehicle::part_instantiate(
     {
         rScene.reg_emplace<ACompName>(newEntities[pcompName.m_entity], pcompName.m_name);
     }
+
+    auto &rGroups = rReg.ctx<ACtxRenderGroups>();
 
     // Create drawables
     for (PCompDrawable const& pcompDrawable : part.m_partDrawable)
@@ -158,12 +161,10 @@ ActiveEnt SysVehicle::part_instantiate(
         rScene.reg_emplace<ACompOpaque>(currentEnt);
         rScene.reg_emplace<ACompMesh>(currentEnt, meshRes);
         rScene.reg_emplace<ACompDiffuseTex>(currentEnt, std::move(textureResources[0]));
-        rScene.reg_emplace<ACompDrawable>(currentEnt,
-                                          make_drawable<DrawableCommon>());
-        rScene.get_registry().ctx<ACtxRenderGroups>().add<DrawableCommon>(currentEnt);
+        rGroups.add<DrawableCommon>(currentEnt);
     }
 
-    rScene.get_registry().reserve<PCompPrimativeCollider>(
+    rReg.reserve<PCompPrimativeCollider>(
                 rScene.get_registry().capacity<PCompPrimativeCollider>()
                 + part.m_partCollider.size());
 

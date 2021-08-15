@@ -241,6 +241,9 @@ void update_scene(osp::active::ActiveScene& rScene)
     SysSignal<adera::wire::Percent>::signal_update_construct(rScene);
     SysSignal<adera::wire::AttitudeControl>::signal_update_construct(rScene);
 
+    // Plume construction is a bit hacky, and depend on Rockets
+    SysExhaustPlume::update_construct(rScene);
+
     // CameraController may tamper with vehicles for debugging reasons
     SysCameraController::update_vehicle(rScene);
 
@@ -392,6 +395,7 @@ void active_area_destroy(
 void load_shaders(osp::active::ActiveScene& rScene)
 {
     using adera::shader::PlumeShader;
+    using adera::active::DrawablePlume;
     using osp::shader::Phong;
     using namespace osp::active;
     using Magnum::Shaders::MeshVisualizerGL3D;
@@ -405,12 +409,15 @@ void load_shaders(osp::active::ActiveScene& rScene)
                 "textured",Phong{Phong::Flag::DiffuseTexture});
     DependRes<Phong> phongNoTex = rResources.add<Phong>("notexture", Phong{});
 
-    rGroups.resize_to_fit<DrawableCommon>();
+    DependRes<PlumeShader> plume = rResources.add<PlumeShader>("plume_shader");
+
+    rGroups.resize_to_fit<DrawableCommon, DrawablePlume>();
     rGroups.m_groups["fwd_opaque"].set_assigner<DrawableCommon>(
             Phong::gen_assign_phong_opaque( phongNoTex.operator->(),
                                             phongTex.operator->() ));
 
-    rResources.add<PlumeShader>("plume_shader");
+    rGroups.m_groups["fwd_transparent"].set_assigner<DrawablePlume>(
+            PlumeShader::gen_assign_plume( plume.operator->() ));
 
     rResources.add<MeshVisualizerGL3D>("mesh_vis_shader",
         MeshVisualizerGL3D{MeshVisualizerGL3D::Flag::Wireframe

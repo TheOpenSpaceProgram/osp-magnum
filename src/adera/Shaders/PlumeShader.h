@@ -23,6 +23,13 @@
  * SOFTWARE.
  */
 #pragma once
+
+#include "adera/Plume.h"
+#include <osp/Resource/Resource.h>
+#include <osp/Active/activetypes.h>
+#include <osp/Active/ActiveScene.h>
+#include <osp/Active/drawing.h>
+
 #include <Magnum/GL/AbstractShaderProgram.h>
 #include <Magnum/GL/Attribute.h>
 #include <Magnum/GL/Texture.h>
@@ -34,16 +41,14 @@
 #include <Magnum/Math/Color.h>
 #include <Magnum/Shaders/GenericGL.h>
 
-#include "adera/Plume.h"
-#include <osp/Resource/Resource.h>
-#include <osp/Active/activetypes.h>
-#include <osp/Active/ActiveScene.h>
-
 namespace adera::shader
 {
 
 class PlumeShader : public Magnum::GL::AbstractShaderProgram
 {
+
+    using RenderGroup = osp::active::RenderGroup;
+
 public:
     // Vertex attribs
     Magnum::Shaders::GenericGL3D::Position Position;
@@ -58,9 +63,11 @@ public:
 
     PlumeShader();
 
-    static void draw_plume(osp::active::ActiveEnt e,
-        osp::active::ActiveScene& rScene,
-        osp::active::ACompCamera const& camera, void*) noexcept;
+    static void draw_plume(
+            osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,
+            osp::active::ACompCamera const& camera, void* pUserData) noexcept;
+
+    static RenderGroup::DrawAssigner_t gen_assign_plume(PlumeShader* pShader);
 
 private:
     constexpr static std::string_view smc_resourceName = "plume_shader";

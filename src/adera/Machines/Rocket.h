@@ -109,22 +109,6 @@ public:
      */
     static void update_physics(osp::active::ActiveScene& rScene);
 
-    /**
-     * Attach a visual exhaust plume effect to MachineRocket
-     *
-     * Searches the hierarchy under the specified MachineRocket entity and
-     * attaches an ACompExhaustPlume to the rocket's plume node. A graphical
-     * exhaust plume effect will be attached to the node by SysExhaustPlume
-     * when it processes the component.
-     *
-     * @param rScene [ref] Scene containing the following entities
-     * @param part [in] Entity containing a plume in its descendents
-     * @param mach [in] Entity containing MachineRocket
-     */
-    static void attach_plume_effect(osp::active::ActiveScene& rScene,
-                                    osp::active::ActiveEnt part,
-                                    osp::active::ActiveEnt mach);
-
     static MachineRocket& instantiate(
             osp::active::ActiveScene& rScene,
             osp::active::ActiveEnt ent,
