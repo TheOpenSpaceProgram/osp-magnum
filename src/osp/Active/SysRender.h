@@ -92,8 +92,20 @@ struct RenderPipeline
 class SysRender
 {
 public:
-    /* Configure rendering passes, init runtime resources */
-    static void setup(ActiveScene& rScene);
+
+    /**
+     * @brief setup_context
+     *
+     * @param rCtxResources
+     */
+    static void setup_context(Package& rCtxResources);
+
+    /**
+     * @brief Setup Forward Renderer
+     *
+     * @param rScene [ref]
+     */
+    static void setup_forward_renderer(ActiveScene& rScene);
 
     /* Retrieve the entity which possessses the default rendertarget component */
     static ActiveEnt get_default_rendertarget(ActiveScene& rScene);
@@ -116,7 +128,7 @@ public:
 
 private:
     /* Define render passes */
-    static RenderPipeline create_forward_renderer(ActiveScene& rScene);
+    static RenderPipeline create_forward_pipeline(ActiveScene& rScene);
 
 };
 

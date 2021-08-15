@@ -35,7 +35,7 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Renderer.h>
-#include <Magnum/GL/DefaultFramebuffer.h>
+
 #include <Magnum/Shaders/MeshVisualizerGL.h>
 
 // TODO: Decouple when a proper interface for creating static triangle meshes
@@ -49,16 +49,6 @@ using planeta::universe::UCompPlanet;
 
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
-using osp::active::ACompCamera;
-using osp::active::ACompTransform;
-using osp::active::ACompDrawTransform;
-using osp::active::ACompFloatingOrigin;
-using osp::active::ACompRigidBody;
-using osp::active::ACompFFGravity;
-using osp::active::ACompShape;
-using osp::active::ACompSolidCollider;
-using osp::active::ACompAreaLink;
-using osp::active::ACompActivatedSat;
 
 using osp::active::SysHierarchy;
 using osp::active::SysAreaAssociate;
@@ -72,18 +62,13 @@ using osp::Matrix4;
 using osp::Vector2;
 using osp::Vector3;
 
-// for _1, _2, _3, ... std::bind arguments
-using namespace std::placeholders;
-
-// for the 0xrrggbb_rgbf and _deg literals
-using namespace Magnum::Math::Literals;
-
 using osp::universe::Satellite;
 
 ActiveEnt SysPlanetA::activate(
-            osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
-            osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat)
+            ActiveScene &rScene, Universe &rUni,
+            Satellite areaSat, Satellite tgtSat)
 {
+    using namespace osp::active;
 
     SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
                       "Activating a planet");
@@ -100,7 +85,7 @@ ActiveEnt SysPlanetA::activate(
     ActiveEnt planetEnt = SysHierarchy::create_child(rScene, root, "Planet");
 
     auto &rPlanetTransform = rScene.get_registry()
-                             .emplace<osp::active::ACompTransform>(planetEnt);
+                             .emplace<ACompTransform>(planetEnt);
     rPlanetTransform.m_transform = Matrix4::translation(positionInScene);
     rScene.reg_emplace<ACompFloatingOrigin>(planetEnt);
     rScene.reg_emplace<ACompActivatedSat>(planetEnt, tgtSat);
@@ -124,6 +109,7 @@ void SysPlanetA::debug_create_chunk_collider(
         ACompPlanet &planet,
         chindex_t chunk)
 {
+    using namespace osp::active;
 
     using osp::phys::ECollisionShape;
 
@@ -149,9 +135,8 @@ void SysPlanetA::debug_create_chunk_collider(
 
 void SysPlanetA::update_activate(ActiveScene &rScene)
 {
-    using osp::universe::UCompActiveArea;
-
-    ACompAreaLink *pLink = SysAreaAssociate::try_get_area_link(rScene);
+    osp::active::ACompAreaLink *pLink
+            = SysAreaAssociate::try_get_area_link(rScene);
 
     if (pLink == nullptr)
     {
@@ -189,6 +174,7 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
 
 void SysPlanetA::update_geometry(ActiveScene& rScene)
 {
+    using namespace osp::active;
 
     auto view = rScene.get_registry().view<ACompPlanet, ACompTransform>();
 
@@ -220,41 +206,20 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
                 return EChunkUpdateAction::Chunk;
             });
 
-            // TEMP: until we have a proper planet shader
-            static auto planetDrawFnc =
-                [](ActiveEnt e, ActiveScene& rScene, ACompCamera const& camera, void*) noexcept
-            {
-                using namespace Magnum;
-                auto& glResources = rScene.get_context_resources();
-                osp::DependRes<Shaders::MeshVisualizerGL3D> shader =
-                    glResources.get<Shaders::MeshVisualizerGL3D>("mesh_vis_shader");
-
-                auto& planet = rScene.reg_get<ACompPlanet>(e);
-                auto& drawTf = rScene.reg_get<ACompDrawTransform>(e);
-
-                Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
-
-                (*shader)
-                    .setColor(0x2f83cc_rgbf)
-                    .setWireframeColor(0xdcdcdc_rgbf)
-                    .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
-                    .setTransformationMatrix(entRelative)
-                    .setNormalMatrix(entRelative.normalMatrix())
-                    .setProjectionMatrix(camera.m_projection)
-                    .draw(*planet.m_mesh);
-            };
-
             osp::Package& glResources = rScene.get_context_resources();
 
             // Generate mesh resource
+            using Magnum::GL::Mesh;
+
             std::string name = osp::string_concat("planet_mesh_",
                 std::to_string(static_cast<int>(ent)));
-            planet.m_mesh = glResources.add<Magnum::GL::Mesh>(name);
+            osp::DependRes<Mesh> mesh = glResources.add<Mesh>(name);
 
-            rScene.reg_emplace<osp::active::ACompVisible>(ent);
-            rScene.reg_emplace<osp::active::ACompOpaque>(ent);
-            rScene.reg_emplace<osp::active::ACompMesh>(ent, planet.m_mesh);
+            rScene.reg_emplace<ACompVisible>(ent);
+            rScene.reg_emplace<ACompOpaque>(ent);
+            rScene.reg_emplace<ACompMesh>(ent, mesh);
             rScene.reg_emplace<ACompDrawTransform>(ent);
+            rScene.get_registry().ctx<ACtxRenderGroups>().add<MaterialTerrain>(ent);
 
             //planet_update_geometry(ent, planet);
             SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
@@ -280,8 +245,7 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             using Magnum::GL::MeshPrimitive;
             using Magnum::GL::MeshIndexType;
 
-            (*planet.m_mesh)
-                .setPrimitive(MeshPrimitive::Triangles)
+            mesh->setPrimitive(MeshPrimitive::Triangles)
                 .addVertexBuffer(planet.m_vrtxBufGL, 0,
                                  MeshVisualizerGL3D::Position{},
                                  MeshVisualizerGL3D::Normal{})
@@ -290,8 +254,6 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
                 .setCount(rPlanetGeo.calc_index_count());
         }
 
-        //if (m_debugUpdate.triggered() || true)
-
         planet_update_geometry(ent, rScene);
     }
 }
@@ -299,6 +261,8 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
 void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt,
                                         osp::active::ActiveScene& rScene)
 {
+    using namespace osp::active;
+
     auto &rPlanetPlanet = rScene.reg_get<ACompPlanet>(planetEnt);
     auto const &planetTf = rScene.reg_get<ACompTransform>(planetEnt);
     auto const &planetActivated = rScene.reg_get<ACompActivatedSat>(planetEnt);
@@ -400,7 +364,7 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt,
     //planet.m_indxBufGL.setData(planet.m_planet->get_index_buffer());
     rPlanetGeo.updates_clear();
 
-    rPlanetPlanet.m_mesh->setCount(rPlanetGeo.calc_index_count());
+    rScene.reg_get<ACompMesh>(planetEnt).m_mesh->setCount(rPlanetGeo.calc_index_count());
 
     rPlanetGeo.get_ico_tree()->debug_verify_state();
 }

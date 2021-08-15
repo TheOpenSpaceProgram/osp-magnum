@@ -56,6 +56,7 @@
 #include <planet-a/Satellites/SatPlanet.h>
 
 #include <osp/Shaders/Phong.h>
+#include <osp/Shaders/MeshVisualizer.h>
 #include <osp/Shaders/FullscreenTriShader.h>
 #include <Magnum/Shaders/MeshVisualizerGL.h>
 
@@ -180,7 +181,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
                 camera, pMagnumApp->get_input_handler());
 
     // Configure default rendering system
-    osp::active::SysRender::setup(rScene);
+    osp::active::SysRender::setup_context(rScene.get_context_resources());
+    osp::active::SysRender::setup_forward_renderer(rScene);
 
     // Load shaders
     load_shaders(rScene);
@@ -394,11 +396,12 @@ void active_area_destroy(
 
 void load_shaders(osp::active::ActiveScene& rScene)
 {
-    using adera::shader::PlumeShader;
-    using adera::active::DrawablePlume;
-    using osp::shader::Phong;
     using namespace osp::active;
-    using Magnum::Shaders::MeshVisualizerGL3D;
+    using osp::shader::Phong;
+    using osp::shader::MeshVisualizer;
+
+    using adera::shader::PlumeShader;
+    using adera::active::MaterialPlume;
 
     auto &rResources = rScene.get_context_resources();
     auto &rGroups = rScene.get_registry().ctx<ACtxRenderGroups>();
@@ -411,15 +414,31 @@ void load_shaders(osp::active::ActiveScene& rScene)
 
     DependRes<PlumeShader> plume = rResources.add<PlumeShader>("plume_shader");
 
-    rGroups.resize_to_fit<DrawableCommon, DrawablePlume>();
-    rGroups.m_groups["fwd_opaque"].set_assigner<DrawableCommon>(
+    DependRes<MeshVisualizer> visual = rResources.add<MeshVisualizer>(
+            "mesh_vis_shader", MeshVisualizer{
+                MeshVisualizer::Flag::Wireframe
+                 | MeshVisualizer::Flag::NormalDirection});
+
+    rGroups.resize_to_fit<MaterialCommon, MaterialPlume, MaterialTerrain>();
+
+    rGroups.m_groups["fwd_opaque"].set_assigner<MaterialCommon>(
             Phong::gen_assign_phong_opaque( phongNoTex.operator->(),
                                             phongTex.operator->() ));
 
-    rGroups.m_groups["fwd_transparent"].set_assigner<DrawablePlume>(
+    rGroups.m_groups["fwd_transparent"].set_assigner<MaterialPlume>(
             PlumeShader::gen_assign_plume( plume.operator->() ));
 
-    rResources.add<MeshVisualizerGL3D>("mesh_vis_shader",
-        MeshVisualizerGL3D{MeshVisualizerGL3D::Flag::Wireframe
-        | MeshVisualizerGL3D::Flag::NormalDirection});
+    using osp::active::RenderGroup;
+
+    MeshVisualizer *pVisual = visual.operator->();
+    rGroups.m_groups["fwd_opaque"].set_assigner<MaterialTerrain>(
+        [pVisual] (ActiveScene& rScene, RenderGroup::Storage_t& rStorage,
+                   RenderGroup::ArrayView_t entities)
+    {
+        for (ActiveEnt ent : entities)
+        {
+            rStorage.emplace(ent,EntityToDraw{&MeshVisualizer::draw_entity,
+                                              pVisual});
+        }
+    });
 }

@@ -118,7 +118,6 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
     using Magnum::GL::Mesh;
 
     using osp::active::ACompMesh;
-    using osp::active::ACompDrawable;
     using osp::active::ACompTransparent;
     using osp::active::ACompVisible;
 
@@ -134,7 +133,7 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
     rScene.reg_emplace<ACompMesh>(plumeNode, plumeMesh);
     rScene.reg_emplace<ACompVisible>(plumeNode);
     rScene.reg_emplace<ACompTransparent>(plumeNode);
-    rScene.get_registry().ctx<osp::active::ACtxRenderGroups>().add<DrawablePlume>(plumeNode);
+    rScene.get_registry().ctx<osp::active::ACtxRenderGroups>().add<MaterialPlume>(plumeNode);
 }
 
 void SysExhaustPlume::update_construct(ActiveScene& rScene)
