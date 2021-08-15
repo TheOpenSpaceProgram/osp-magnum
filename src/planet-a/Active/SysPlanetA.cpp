@@ -222,7 +222,7 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
 
             // TEMP: until we have a proper planet shader
             static auto planetDrawFnc =
-                [](ActiveEnt e, ActiveScene& rScene, ACompCamera const& camera) noexcept
+                [](ActiveEnt e, ActiveScene& rScene, ACompCamera const& camera, void*) noexcept
             {
                 using namespace Magnum;
                 auto& glResources = rScene.get_context_resources();

@@ -407,7 +407,8 @@ void load_shaders(osp::active::ActiveScene& rScene)
 
     rGroups.resize_to_fit<DrawableCommon>();
     rGroups.m_groups["fwd_opaque"].set_assigner<DrawableCommon>(
-            Phong::gen_assign_phong_opaque( &(*phongNoTex), &(*phongTex)) );
+            Phong::gen_assign_phong_opaque( phongNoTex.operator->(),
+                                            phongTex.operator->() ));
 
     rResources.add<PlumeShader>("plume_shader");
 

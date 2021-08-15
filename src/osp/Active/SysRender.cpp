@@ -118,16 +118,24 @@ RenderPipeline SysRender::create_forward_renderer(ActiveScene& rScene)
             using namespace Magnum;
             using Magnum::GL::Renderer;
 
-            auto& reg = rScene.get_registry();
+            ActiveReg_t &rReg = rScene.get_registry();
 
             Renderer::enable(Renderer::Feature::DepthTest);
             Renderer::enable(Renderer::Feature::FaceCulling);
             Renderer::disable(Renderer::Feature::Blending);
 
-            // Fetch opaque objects
-            auto opaqueView = reg.view<ACompOpaque, ACompVisible, ACompShader>();
+            auto &rGroups = rReg.ctx<ACtxRenderGroups>();
 
-            SysRender::draw_group(rScene, opaqueView, camera);
+            for (auto const& [ent, toDraw]
+                 : rGroups.m_groups["fwd_opaque"].view().each())
+            {
+                toDraw.m_draw(ent, rScene, camera, toDraw.m_data);
+            }
+
+            // Fetch opaque objects
+            auto opaqueView = rReg.view<ACompOpaque, ACompVisible, ACompShader>();
+
+            //SysRender::draw_group(rScene, opaqueView, camera);
         }
     );
 
@@ -196,25 +204,34 @@ void SysRender::update_drawfunc_assign(ActiveScene& rScene)
     ActiveReg_t &rReg = rScene.get_registry();
     auto &rGroups = rScene.get_registry().ctx<ACtxRenderGroups>();
 
+    // Loop through each draw group
     for (auto & [name, rGroup] : rGroups.m_groups)
     {
-        for (size_t i = 0; i < rGroup.m_assigners.size(); i ++)
+        // Loop through each possibly supported Drawable ID
+        // from 0 torGroup.m_assigner.size()
+        for (drawable_id_t i = 0; i < rGroup.m_assigners.size(); i ++)
         {
-            // No drawables of this type to assign shaders to
-            if (rGroups.m_dirty[i].empty())
+            if (rGroups.m_added[i].empty())
             {
-                continue;
+                continue; // No drawables of this type to assign shaders to
             }
 
-            if (RenderGroup::DrawAssigner_t const &assigner
-                    = rGroup.m_assigners[i];
-                bool(assigner) )
+            RenderGroup::DrawAssigner_t const &assigner = rGroup.m_assigners[i];
+
+            if ( ! bool(assigner) )
             {
-                assigner(rScene, rGroup.m_entities, rGroups.m_dirty[i]);
+                continue; // Assigner is null, not set to a function
             }
+
+            // Pass all new drawables (rGroups.m_added[i]) to the assigner.
+            // This adds accepted entities to rGroup.m_entities
+            assigner(rScene, rGroup.m_entities, rGroups.m_added[i]);
         }
+    }
 
-        rGroups.m_dirty.clear();
+    for (std::vector<ActiveEnt> &rVec : rGroups.m_added)
+    {
+        rVec.clear();
     }
 }
 

@@ -143,7 +143,7 @@ void SysRender::draw_group(ActiveScene& rScene, VIEW_T& drawlist, ACompCamera co
     {
         auto shader = drawlist.template get<ACompShader>(e);
 
-        shader.m_drawCall(e, rScene, camera);
+        shader.m_drawCall(e, rScene, camera, nullptr);
     }
 }
 
