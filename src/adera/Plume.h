@@ -31,7 +31,7 @@
 namespace adera::active
 {
 
-struct DrawablePlume { };
+struct MaterialPlume { };
 
 struct PlumeEffectData
 {

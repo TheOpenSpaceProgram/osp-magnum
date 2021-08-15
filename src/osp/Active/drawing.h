@@ -57,10 +57,12 @@ namespace osp::active
 using ShaderDrawFnc_t = void (*)(
         ActiveEnt, ActiveScene&, ACompCamera const&, void*) noexcept;
 
-using drawable_family_t = entt::family<struct drawable_type>;
-using drawable_id_t = drawable_family_t::family_type;
+using material_family_t = entt::family<struct material_type>;
+using material_id_t = material_family_t::family_type;
 
-struct DrawableCommon { };
+struct MaterialCommon { };
+struct MaterialTerrain { };
+struct MaterialSkybox { };
 
 /**
  * @brief Describes a draw function and user data needed to draw a single entity
@@ -81,10 +83,10 @@ struct RenderGroup
     using DrawAssigner_t = std::function<
             void(ActiveScene&, Storage_t&, ArrayView_t) >;
 
-    template<typename DRAWABLE_T>
+    template<typename MATERIAL_T>
     void set_assigner(DrawAssigner_t assigner)
     {
-        drawable_id_t id = drawable_family_t::type<DRAWABLE_T>;
+        material_id_t id = material_family_t::type<MATERIAL_T>;
         m_assigners.resize(std::max(m_assigners.size(), size_t(id + 1)));
         m_assigners[id] = std::move(assigner);
     }
@@ -95,7 +97,7 @@ struct RenderGroup
     }
 
 
-    // index with drawable_id_t
+    // index with material_id_t
     std::vector<DrawAssigner_t> m_assigners;
     Storage_t m_entities;
 
@@ -105,18 +107,18 @@ struct ACtxRenderGroups
 {
     ACtxRenderGroups(ACtxRenderGroups const&) = delete;
 
-    template<typename ... DRAWABLE_T>
+    template<typename ... MATERIAL_T>
     void resize_to_fit()
     {
-        size_t minSize{std::max({drawable_family_t::type<DRAWABLE_T> ...}) + 1};
+        size_t minSize{std::max({material_family_t::type<MATERIAL_T> ...}) + 1};
 
         m_added.resize(minSize);
     }
 
-    template<typename DRAWABLE_T>
+    template<typename MATERIAL_T>
     void add(ActiveEnt ent)
     {
-        m_added[drawable_family_t::type<DRAWABLE_T>].push_back(ent);
+        m_added[material_family_t::type<MATERIAL_T>].push_back(ent);
     }
 
     std::unordered_map< std::string, RenderGroup > m_groups;
@@ -125,16 +127,10 @@ struct ACtxRenderGroups
 
 }; // struct ACtxRenderGroups
 
-struct ACompDrawable
+struct ACompMaterial
 {
-    drawable_id_t m_type;
+    material_id_t m_type;
 };
-
-template<typename DRAWABLE_T>
-ACompDrawable make_drawable()
-{
-    return ACompDrawable{ drawable_family_t::type<DRAWABLE_T> };
-}
 
 /**
  * Represents an entity which requests the scene to be drawn to m_target

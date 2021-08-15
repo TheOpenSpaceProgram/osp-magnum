@@ -37,7 +37,6 @@ void Phong::draw_entity(
 
     // Collect uniform information
     auto& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
-    Magnum::GL::Texture2D& rDiffuse = *rScene.reg_get<ACompDiffuseTex>(ent).m_tex;
     Magnum::GL::Mesh& rMesh = *rScene.reg_get<ACompMesh>(ent).m_mesh;
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
@@ -50,7 +49,7 @@ void Phong::draw_entity(
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {
-        rShader.bindDiffuseTexture(rDiffuse);
+        rShader.bindDiffuseTexture(*rScene.reg_get<ACompDiffuseTex>(ent).m_tex);
     }
 
     rShader
@@ -79,7 +78,7 @@ Phong::RenderGroup::DrawAssigner_t Phong::gen_assign_phong_opaque(
         {
             if (!viewOpaque.contains(ent))
             {
-                continue; // This assigner is for opaque drawables only
+                continue; // This assigner is for opaque materials only
             }
 
             if (viewDiffuse.contains(ent))

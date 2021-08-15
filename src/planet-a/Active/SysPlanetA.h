@@ -48,12 +48,10 @@ struct ACompPlanet
 {
     std::shared_ptr<IcoSphereTree> m_icoTree;
     std::shared_ptr<PlanetGeometryA> m_planet;
-    osp::DependRes<Magnum::GL::Mesh> m_mesh{};
     Magnum::GL::Buffer m_vrtxBufGL{};
     Magnum::GL::Buffer m_indxBufGL{};
     double m_radius;
 };
-
 
 class SysPlanetA
 {

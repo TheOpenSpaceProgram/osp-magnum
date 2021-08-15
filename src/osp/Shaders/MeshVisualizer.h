@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,38 +24,29 @@
  */
 #pragma once
 
-
 #include <osp/Active/activetypes.h>
 #include <osp/Active/drawing.h>
-#include <osp/Resource/Resource.h>
 
-
-#include <Magnum/Shaders/PhongGL.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/GL/Texture.h>
-#include <Magnum/Math/Color.h>
-
-#include <string_view>
-#include <vector>
+#include <Magnum/Shaders/MeshVisualizerGL.h>
 
 namespace osp::shader
 {
 
-class Phong : protected Magnum::Shaders::PhongGL
+class MeshVisualizer : protected Magnum::Shaders::MeshVisualizerGL3D
 {
     using RenderGroup = osp::active::RenderGroup;
 
 public:
 
-    using Magnum::Shaders::PhongGL::PhongGL;
-    using Magnum::Shaders::PhongGL::Flag;
+    using Magnum::Shaders::MeshVisualizerGL3D::MeshVisualizerGL3D;
+    using Magnum::Shaders::MeshVisualizerGL3D::Flag;
 
     static void draw_entity(
             osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,
             osp::active::ACompCamera const& camera, void* pUserData) noexcept;
 
     static RenderGroup::DrawAssigner_t gen_assign_phong_opaque(
-            Phong* pNoTexture, Phong* pTextured);
+            MeshVisualizer* pShader);
 };
 
 } // namespace osp::shader

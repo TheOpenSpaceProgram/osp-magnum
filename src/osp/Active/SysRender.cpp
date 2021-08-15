@@ -41,13 +41,11 @@
 using osp::active::SysRender;
 using osp::active::RenderPipeline;
 
-void SysRender::setup(ActiveScene& rScene)
+void SysRender::setup_context(Package& rCtxResources)
 {
     using namespace Magnum;
 
-    Package& resources = rScene.get_context_resources();
-
-    resources.add<FullscreenTriShader>("fullscreen_tri_shader");
+    rCtxResources.add<FullscreenTriShader>("fullscreen_tri_shader");
 
     /* Generate fullscreen tri for texture rendering */
     {
@@ -71,41 +69,51 @@ void SysRender::setup(ActiveScene& rScene)
             .addVertexBuffer(std::move(surface), 0,
                 FullscreenTriShader::Position{},
                 FullscreenTriShader::TextureCoordinates{});
-        resources.add<GL::Mesh>("fullscreen_tri", std::move(surfaceMesh));
+        rCtxResources.add<GL::Mesh>("fullscreen_tri", std::move(surfaceMesh));
     }
 
     /* Add an offscreen framebuffer */
     {
         Vector2i viewSize = GL::defaultFramebuffer.viewport().size();
 
-        DependRes<GL::Texture2D> color = resources.add<GL::Texture2D>("offscreen_fbo_color");
+        DependRes<GL::Texture2D> color = rCtxResources.add<GL::Texture2D>("offscreen_fbo_color");
         color->setStorage(1, GL::TextureFormat::RGB8, viewSize);
 
         DependRes<GL::Renderbuffer> depthStencil =
-            resources.add<GL::Renderbuffer>("offscreen_fbo_depthStencil");
+            rCtxResources.add<GL::Renderbuffer>("offscreen_fbo_depthStencil");
         depthStencil->setStorage(GL::RenderbufferFormat::Depth24Stencil8, viewSize);
 
         DependRes<GL::Framebuffer> fbo =
-            resources.add<GL::Framebuffer>("offscreen_fbo", Range2Di{{0, 0}, viewSize});
+            rCtxResources.add<GL::Framebuffer>("offscreen_fbo", Range2Di{{0, 0}, viewSize});
         fbo->attachTexture(GL::Framebuffer::ColorAttachment{0}, *color, 0);
         fbo->attachRenderbuffer(GL::Framebuffer::BufferAttachment::DepthStencil, *depthStencil);
-
-
-        rScene.reg_emplace<ACompRenderTarget>(rScene.hier_get_root(),
-            viewSize, std::move(fbo));
-        rScene.reg_emplace<ACompFBOColorAttachment>(rScene.hier_get_root(), color);
     }
+}
+
+
+void SysRender::setup_forward_renderer(ActiveScene &rScene)
+{
+    Package &rCtxResources = rScene.get_context_resources();
+
+    Vector2i viewSize = Magnum::GL::defaultFramebuffer.viewport().size();
+
+    rScene.reg_emplace<ACompRenderTarget>(
+            rScene.hier_get_root(), viewSize,
+            rCtxResources.get<Magnum::GL::Framebuffer>("offscreen_fbo"));
+    rScene.reg_emplace<ACompFBOColorAttachment>(
+            rScene.hier_get_root(),
+            rCtxResources.get<Magnum::GL::Texture2D>("offscreen_fbo_color"));
 
     // Add render groups
     auto &rGroups = rScene.get_registry().set<ACtxRenderGroups>();
     rGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
     rGroups.m_groups.emplace("fwd_transparent", RenderGroup{}).second;
 
-    // Create the default render pipeline
-    resources.add<RenderPipeline>("default", create_forward_renderer(rScene));
+    // Create the default render pipeline (if not already added yet)
+    rCtxResources.add<RenderPipeline>("default", create_forward_pipeline(rScene));
 }
 
-RenderPipeline SysRender::create_forward_renderer(ActiveScene& rScene)
+RenderPipeline SysRender::create_forward_pipeline(ActiveScene& rScene)
 {
     /* Define render passes */
     std::vector<RenderStep_t> pipeline;
@@ -119,6 +127,7 @@ RenderPipeline SysRender::create_forward_renderer(ActiveScene& rScene)
             Renderer::enable(Renderer::Feature::DepthTest);
             Renderer::enable(Renderer::Feature::FaceCulling);
             Renderer::disable(Renderer::Feature::Blending);
+            Renderer::setDepthMask(true);
 
             ActiveReg_t &rReg = rScene.get_registry();
             auto const viewVisible = rReg.view<const ACompVisible>();
@@ -146,9 +155,12 @@ RenderPipeline SysRender::create_forward_renderer(ActiveScene& rScene)
             Renderer::enable(Renderer::Feature::FaceCulling);
             Renderer::enable(Renderer::Feature::Blending);
             Renderer::setBlendFunction(
-                Renderer::BlendFunction::SourceAlpha,
-                Renderer::BlendFunction::OneMinusSourceAlpha);
-            Renderer::setBlendEquation(Renderer::BlendEquation::Add);
+                    Renderer::BlendFunction::SourceAlpha,
+                    Renderer::BlendFunction::OneMinusSourceAlpha);
+
+            // temporary: disabled depth writing makes the plumes look nice, but
+            //            can mess up other transparent objects once added
+            Renderer::setDepthMask(false);
 
             ActiveReg_t &rReg = rScene.get_registry();
             auto const viewVisible = rReg.view<const ACompVisible>();
@@ -193,6 +205,7 @@ void SysRender::display_default_rendertarget(ActiveScene& rScene)
     Renderer::disable(Renderer::Feature::DepthTest);
     Renderer::disable(Renderer::Feature::FaceCulling);
     Renderer::disable(Renderer::Feature::Blending);
+    Renderer::setDepthMask(true);
 
     shader->display_texure(*surface, *target.m_tex);
 }
@@ -202,22 +215,23 @@ void SysRender::update_drawfunc_assign(ActiveScene& rScene)
     ActiveReg_t &rReg = rScene.get_registry();
     auto &rGroups = rScene.get_registry().ctx<ACtxRenderGroups>();
 
-    // TODO: check entities that change their drawable type by checking
-    //       ACompDrawable
+    // TODO: check entities that change their material type by checking
+    //       ACompMaterial
 
     // Loop through each draw group
     for (auto & [name, rGroup] : rGroups.m_groups)
     {
-        // Loop through each possibly supported Drawable ID
+        // Loop through each possibly supported Material ID
         // from 0 torGroup.m_assigner.size()
-        for (drawable_id_t i = 0; i < rGroup.m_assigners.size(); i ++)
+        for (material_id_t i = 0; i < rGroup.m_assigners.size(); i ++)
         {
-            if (rGroups.m_added[i].empty())
+            if (rGroups.m_added.at(i).empty())
             {
                 continue; // No drawables of this type to assign shaders to
             }
 
-            RenderGroup::DrawAssigner_t const &assigner = rGroup.m_assigners[i];
+            RenderGroup::DrawAssigner_t const &assigner
+                    = rGroup.m_assigners.at(i);
 
             if ( ! bool(assigner) )
             {
@@ -226,16 +240,16 @@ void SysRender::update_drawfunc_assign(ActiveScene& rScene)
 
             // Pass all new drawables (rGroups.m_added[i]) to the assigner.
             // This adds accepted entities to rGroup.m_entities
-            assigner(rScene, rGroup.m_entities, rGroups.m_added[i]);
+            assigner(rScene, rGroup.m_entities, rGroups.m_added.at(i));
         }
     }
 
-    // Add ACompDrawable components, and clear m_added queues
-    for (drawable_id_t i = 0; i < rGroups.m_added.size(); i ++)
+    // Add ACompMaterial components, and clear m_added queues
+    for (material_id_t i = 0; i < rGroups.m_added.size(); i ++)
     {
         for ( ActiveEnt ent : std::exchange(rGroups.m_added[i], {}) )
         {
-            rScene.reg_emplace<ACompDrawable>(ent, ACompDrawable{i});
+            rScene.reg_emplace<ACompMaterial>(ent, ACompMaterial{i});
         }
     }
 }

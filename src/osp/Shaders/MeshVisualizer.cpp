@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,40 +22,42 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
 
+#include "MeshVisualizer.h"
 
-#include <osp/Active/activetypes.h>
-#include <osp/Active/drawing.h>
-#include <osp/Resource/Resource.h>
+#include "../Active/SysRender.h"
+#include "../Active/ActiveScene.h"
 
-
-#include <Magnum/Shaders/PhongGL.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/GL/Texture.h>
+#include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/Math/Color.h>
 
-#include <string_view>
-#include <vector>
+// for the 0xrrggbb_rgbf and _deg literals
+using namespace Magnum::Math::Literals;
 
-namespace osp::shader
+using namespace osp::active;
+using namespace osp::shader;
+
+void MeshVisualizer::draw_entity(
+        ActiveEnt ent, ActiveScene &rScene,
+        const ACompCamera &camera, void *pUserData) noexcept
 {
+    using Magnum::Shaders::MeshVisualizerGL3D;
 
-class Phong : protected Magnum::Shaders::PhongGL
-{
-    using RenderGroup = osp::active::RenderGroup;
+    auto &rShader = *reinterpret_cast<MeshVisualizerGL3D*>(pUserData);
 
-public:
+    auto &rMesh = rScene.reg_get<ACompMesh>(ent);
+    auto const& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
 
-    using Magnum::Shaders::PhongGL::PhongGL;
-    using Magnum::Shaders::PhongGL::Flag;
+    Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
-    static void draw_entity(
-            osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,
-            osp::active::ACompCamera const& camera, void* pUserData) noexcept;
+    rShader
+        .setColor(0x2f83cc_rgbf)
+        .setWireframeColor(0xdcdcdc_rgbf)
+        .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
+        .setTransformationMatrix(entRelative)
+        .setNormalMatrix(entRelative.normalMatrix())
+        .setProjectionMatrix(camera.m_projection)
+        .draw(*rMesh.m_mesh);
+}
 
-    static RenderGroup::DrawAssigner_t gen_assign_phong_opaque(
-            Phong* pNoTexture, Phong* pTextured);
-};
 
-} // namespace osp::shader

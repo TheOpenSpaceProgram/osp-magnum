@@ -161,7 +161,7 @@ ActiveEnt SysVehicle::part_instantiate(
         rScene.reg_emplace<ACompOpaque>(currentEnt);
         rScene.reg_emplace<ACompMesh>(currentEnt, meshRes);
         rScene.reg_emplace<ACompDiffuseTex>(currentEnt, std::move(textureResources[0]));
-        rGroups.add<DrawableCommon>(currentEnt);
+        rGroups.add<MaterialCommon>(currentEnt);
     }
 
     rReg.reserve<PCompPrimativeCollider>(
