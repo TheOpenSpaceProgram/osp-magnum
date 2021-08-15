@@ -27,7 +27,6 @@
 #include "osp/Resource/Resource.h"
 #include "osp/Active/Shader.h"
 #include "osp/Active/activetypes.h"
-#include "osp/Shaders/Phong.h"
 
 #include "drawing.h"
 
@@ -105,8 +104,6 @@ public:
     /**
      * @brief
      *
-     * iterate ACompDrawables and assign them shaders
-     *
      * @param rScene
      */
     static void update_drawfunc_assign(ActiveScene& rScene);
@@ -117,34 +114,10 @@ public:
      */
     static void update_hierarchy_transforms(ActiveScene& rScene);
 
-    static ShaderDrawFnc_t get_default_shader() { return shader::Phong::draw_entity; };
-
 private:
     /* Define render passes */
     static RenderPipeline create_forward_renderer(ActiveScene& rScene);
 
-    /*
-     * Draw the specified list of objects from the point of view of a camera
-     * 
-     * @param rScene - The active scene containing the data
-     * @param drawlist - The EnTT view containing a list of drawable objects
-     *                   which possess an ACompShader component
-     * @param camera - The camera whose point of view to render from
-     */
-    template <typename VIEW_T>
-    static void draw_group(ActiveScene& rScene,
-        VIEW_T& drawlist, ACompCamera const& camera);
 };
-
-template<typename VIEW_T>
-void SysRender::draw_group(ActiveScene& rScene, VIEW_T& drawlist, ACompCamera const& camera)
-{
-    for (ActiveEnt e : drawlist)
-    {
-        auto shader = drawlist.template get<ACompShader>(e);
-
-        shader.m_drawCall(e, rScene, camera, nullptr);
-    }
-}
 
 } // namespace osp::active

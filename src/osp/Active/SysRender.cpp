@@ -43,7 +43,6 @@ using osp::active::RenderPipeline;
 
 void SysRender::setup(ActiveScene& rScene)
 {
-    using namespace osp::shader;
     using namespace Magnum;
 
     Package& resources = rScene.get_context_resources();
@@ -115,27 +114,24 @@ RenderPipeline SysRender::create_forward_renderer(ActiveScene& rScene)
     pipeline.emplace_back(
         [](ActiveScene& rScene, ACompCamera const& camera)
         {
-            using namespace Magnum;
             using Magnum::GL::Renderer;
-
-            ActiveReg_t &rReg = rScene.get_registry();
 
             Renderer::enable(Renderer::Feature::DepthTest);
             Renderer::enable(Renderer::Feature::FaceCulling);
             Renderer::disable(Renderer::Feature::Blending);
 
+            ActiveReg_t &rReg = rScene.get_registry();
+            auto const viewVisible = rReg.view<const ACompVisible>();
             auto &rGroups = rReg.ctx<ACtxRenderGroups>();
 
             for (auto const& [ent, toDraw]
                  : rGroups.m_groups["fwd_opaque"].view().each())
             {
-                toDraw.m_draw(ent, rScene, camera, toDraw.m_data);
+                if (viewVisible.contains(ent))
+                {
+                    toDraw.m_draw(ent, rScene, camera, toDraw.m_data);
+                }
             }
-
-            // Fetch opaque objects
-            auto opaqueView = rReg.view<ACompOpaque, ACompVisible, ACompShader>();
-
-            //SysRender::draw_group(rScene, opaqueView, camera);
         }
     );
 
@@ -146,24 +142,26 @@ RenderPipeline SysRender::create_forward_renderer(ActiveScene& rScene)
             using Magnum::GL::Renderer;
             using namespace osp::active;
 
-            auto& reg = rScene.get_registry();
-
             Renderer::enable(Renderer::Feature::DepthTest);
             Renderer::enable(Renderer::Feature::FaceCulling);
             Renderer::enable(Renderer::Feature::Blending);
             Renderer::setBlendFunction(
                 Renderer::BlendFunction::SourceAlpha,
                 Renderer::BlendFunction::OneMinusSourceAlpha);
+            Renderer::setBlendEquation(Renderer::BlendEquation::Add);
 
-            auto transparentView = reg.view<ACompTransparent, ACompVisible, ACompShader>();
+            ActiveReg_t &rReg = rScene.get_registry();
+            auto const viewVisible = rReg.view<const ACompVisible>();
+            auto &rGroups = rReg.ctx<ACtxRenderGroups>();
 
-            // Draw backfaces
-            Renderer::setFaceCullingMode(Renderer::PolygonFacing::Front);
-            SysRender::draw_group(rScene, transparentView, camera);
-
-            // Draw frontfaces
-            Renderer::setFaceCullingMode(Renderer::PolygonFacing::Back);
-            SysRender::draw_group(rScene, transparentView, camera);
+            for (auto const& [ent, toDraw]
+                 : rGroups.m_groups["fwd_transparent"].view().each())
+            {
+                if (viewVisible.contains(ent))
+                {
+                    toDraw.m_draw(ent, rScene, camera, toDraw.m_data);
+                }
+            }
         }
     );
 
@@ -204,6 +202,9 @@ void SysRender::update_drawfunc_assign(ActiveScene& rScene)
     ActiveReg_t &rReg = rScene.get_registry();
     auto &rGroups = rScene.get_registry().ctx<ACtxRenderGroups>();
 
+    // TODO: check entities that change their drawable type by checking
+    //       ACompDrawable
+
     // Loop through each draw group
     for (auto & [name, rGroup] : rGroups.m_groups)
     {
@@ -229,9 +230,13 @@ void SysRender::update_drawfunc_assign(ActiveScene& rScene)
         }
     }
 
-    for (std::vector<ActiveEnt> &rVec : rGroups.m_added)
+    // Add ACompDrawable components, and clear m_added queues
+    for (drawable_id_t i = 0; i < rGroups.m_added.size(); i ++)
     {
-        rVec.clear();
+        for ( ActiveEnt ent : std::exchange(rGroups.m_added[i], {}) )
+        {
+            rScene.reg_emplace<ACompDrawable>(ent, ACompDrawable{i});
+        }
     }
 }
 

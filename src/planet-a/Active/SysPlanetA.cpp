@@ -254,7 +254,6 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             rScene.reg_emplace<osp::active::ACompVisible>(ent);
             rScene.reg_emplace<osp::active::ACompOpaque>(ent);
             rScene.reg_emplace<osp::active::ACompMesh>(ent, planet.m_mesh);
-            rScene.reg_emplace<osp::active::ACompShader>(ent, planetDrawFnc);
             rScene.reg_emplace<ACompDrawTransform>(ent);
 
             //planet_update_geometry(ent, planet);

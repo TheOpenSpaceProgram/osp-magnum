@@ -231,14 +231,14 @@ void osp::AssetImporter::load_plume(TinyGltfImporter& gltfImporter,
     float zMax = extras.Get("zMax").Get<double>();
     float zMin = extras.Get("zMin").Get<double>();
 
-    PlumeEffectData plumeData;
+    adera::active::PlumeEffectData plumeData;
     plumeData.m_meshName = meshName;
     plumeData.m_flowVelocity = flowVel;
     plumeData.m_color = color;
     plumeData.m_zMax = zMax;
     plumeData.m_zMin = zMin;
 
-    pkg.add<PlumeEffectData>(gltfImporter.object3DName(id), std::move(plumeData));
+    pkg.add<adera::active::PlumeEffectData>(gltfImporter.object3DName(id), std::move(plumeData));
 }
 
 /* Explanation of resPrefix:

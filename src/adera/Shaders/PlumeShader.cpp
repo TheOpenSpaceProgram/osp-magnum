@@ -29,41 +29,46 @@
 #include <osp/Active/SysRender.h>
 #include <osp/Resource/AssetImporter.h>
 
-#include <Magnum/GL/Version.h>
+#include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/Shader.h>
-#include <Corrade/Containers/Reference.h>
 #include <Magnum/GL/Texture.h>
+#include <Magnum/GL/Version.h>
+
+#include <Corrade/Containers/Reference.h>
 
 using namespace osp;
 using namespace osp::active;
 using namespace adera::active;
 using namespace adera::shader;
 
-void PlumeShader::draw_plume(ActiveEnt e,
-    ActiveScene& rScene, ACompCamera const& camera, void*) noexcept
+void PlumeShader::draw_plume(
+        ActiveEnt ent, ActiveScene& rScene,
+        ACompCamera const& camera, void* pUserData) noexcept
 {
-    auto& resources = rScene.get_context_resources();
-    PlumeShader& shader = *resources.get<PlumeShader>(smc_resourceName);
-
+    using Magnum::GL::Renderer;
     using Magnum::GL::Texture2D;
     using Magnum::GL::Mesh;
+
+    auto& rResources = rScene.get_context_resources();
+    PlumeShader &rShader = *reinterpret_cast<PlumeShader*>(pUserData);
+
     // Collect uniform data
-    auto const& drawTf = rScene.reg_get<ACompDrawTransform>(e);
-    auto const& rPlumeComp = rScene.reg_get<ACompExhaustPlume>(e);
+    auto const& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
+    auto const& rPlumeComp = rScene.reg_get<ACompExhaustPlume>(ent);
     auto const& plumedata = *rPlumeComp.m_effect;
-    Mesh& rMesh = *rScene.reg_get<ACompMesh>(e).m_mesh;
+    Mesh& rMesh = *rScene.reg_get<ACompMesh>(ent).m_mesh;
 
     constexpr std::string_view texName = "OSPData/adera/noise1024.png";
-    DependRes<Texture2D> tmpTex = resources.get<Texture2D>(texName);
+    DependRes<Texture2D> tmpTex = rResources.get<Texture2D>(texName);
     if (tmpTex.empty())
     {
         tmpTex = AssetImporter::compile_tex(texName,
-            rScene.get_application().debug_find_package("lzdb"), resources);
+            rScene.get_application().debug_find_package("lzdb"), rResources);
     }
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
-    shader
+    rShader
         .bindNozzleNoiseTexture(*tmpTex)
         .bindCombustionNoiseTexture(*tmpTex)
         .setMeshZBounds(plumedata.m_zMax, plumedata.m_zMin)
@@ -73,8 +78,29 @@ void PlumeShader::draw_plume(ActiveEnt e,
         .setPower(rPlumeComp.m_powerLevel)
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
-        .setNormalMatrix(entRelative.normalMatrix())
-        .draw(rMesh);
+        .setNormalMatrix(entRelative.normalMatrix());
+
+    // Draw back face
+    Renderer::setFaceCullingMode(Renderer::PolygonFacing::Front);
+    rShader.draw(rMesh);
+
+    // Draw front face
+    Renderer::setFaceCullingMode(Renderer::PolygonFacing::Back);
+    rShader.draw(rMesh);
+}
+
+PlumeShader::RenderGroup::DrawAssigner_t PlumeShader::gen_assign_plume(
+        PlumeShader *pShader)
+{
+    return [pShader]
+            (ActiveScene& rScene, RenderGroup::Storage_t& rStorage,
+             RenderGroup::ArrayView_t entities)
+    {
+        for (ActiveEnt ent : entities)
+        {
+            rStorage.emplace(ent, EntityToDraw{&draw_plume, pShader});
+        }
+    };
 }
 
 void PlumeShader::init()

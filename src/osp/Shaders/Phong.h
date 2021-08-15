@@ -52,7 +52,7 @@ public:
 
     static void draw_entity(
             osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,
-            osp::active::ACompCamera const& camera, void*) noexcept;
+            osp::active::ACompCamera const& camera, void* pUserData) noexcept;
 
     static RenderGroup::DrawAssigner_t gen_assign_phong_opaque(
             Phong* pNoTexture, Phong* pTextured);

@@ -51,8 +51,7 @@ public:
      * this function takes such entities, retrieves the appropriate graphics
      * resources, and configures the graphical components
      */
-    static void initialize_plume(osp::active::ActiveScene& rScene,
-                                 osp::active::ActiveEnt e);
+    static void update_construct(osp::active::ActiveScene& rScene);
 
     static void update_plumes(osp::active::ActiveScene& rScene);
 };

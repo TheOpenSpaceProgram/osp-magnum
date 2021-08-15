@@ -25,9 +25,6 @@
 #include "Rocket.h"
 
 #include "Container.h"
-#include "../Plume.h"
-#include "../SysExhaustPlume.h"
-#include "../Shaders/PlumeShader.h"
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysHierarchy.h>
@@ -248,56 +245,6 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
 
 }
 
-void SysMachineRocket::attach_plume_effect(ActiveScene &rScene, ActiveEnt part,
-                                           ActiveEnt mach)
-{
-    ActiveEnt plumeNode = entt::null;
-
-    auto findPlumeHandle = [&rScene, &plumeNode](ActiveEnt ent)
-    {
-        static constexpr std::string_view namePrefix = "fx_plume_";
-        auto const* name = rScene.reg_try_get<ACompName>(ent);
-
-        if (nullptr == name)
-        {
-            return EHierarchyTraverseStatus::Continue;
-        }
-
-        if (0 == name->m_name.compare(0, namePrefix.size(), namePrefix))
-        {
-            plumeNode = ent;
-            return EHierarchyTraverseStatus::Stop;  // terminate search
-        }
-        return EHierarchyTraverseStatus::Continue;
-    };
-
-    SysHierarchy::traverse(rScene, part, findPlumeHandle);
-
-    if (plumeNode == entt::null)
-    {
-        SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
-                          "ERROR: could not find plume anchor for MachineRocket {}", part);
-        return;
-    }
-
-    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(), "MachineRocket {}\'s associated plume: {}",
-        part, plumeNode);
-
-    // Get plume effect
-    Package& pkg = rScene.get_application().debug_find_package("lzdb");
-    std::string_view plumeAnchorName = rScene.reg_get<ACompName>(plumeNode).m_name;
-    std::string_view effectName = plumeAnchorName.substr(3, plumeAnchorName.length() - 3);
-    DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
-    if (plumeEffect.empty())
-    {
-      SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
-                          "ERROR: couldn't find plume effect  {}", effectName);
-        return;
-    }
-
-    rScene.reg_emplace<ACompExhaustPlume>(plumeNode, mach, plumeEffect);
-}
-
 // TODO: come up with a better solution to this, and also replace config maps
 //       and variants with something else entirely
 template<typename TYPE_T>
@@ -334,6 +281,5 @@ MachineRocket& SysMachineRocket::instantiate(
     Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
     DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>(resPath.identifier);
 
-    attach_plume_effect(rScene, rScene.reg_get<ACompHierarchy>(ent).m_parent, ent);
     return rocket;
 }

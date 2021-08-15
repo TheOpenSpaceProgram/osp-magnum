@@ -30,9 +30,10 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void Phong::draw_entity(
-        ActiveEnt ent, ActiveScene& rScene, ACompCamera const& camera, void* userData) noexcept
+        ActiveEnt ent, ActiveScene& rScene, ACompCamera const& camera,
+        void* pUserData) noexcept
 {
-    auto &rShader = *reinterpret_cast<Phong*>(userData);
+    auto &rShader = *reinterpret_cast<Phong*>(pUserData);
 
     // Collect uniform information
     auto& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
