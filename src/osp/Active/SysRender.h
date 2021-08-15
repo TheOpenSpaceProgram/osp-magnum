@@ -81,14 +81,13 @@ struct ACompFBOColorAttachment
 };
 
 using RenderStep_t = void(*)(ActiveScene&, ACompCamera const&);
-using RenderSteps_t = std::vector<RenderStep_t>;
 
 /**
  * Resource storing the steps of a multipass renderer
  */
 struct RenderPipeline
 {
-    RenderSteps_t m_order;
+    std::vector<RenderStep_t> m_order;
 };
 
 class SysRender
@@ -104,6 +103,15 @@ public:
     static void display_default_rendertarget(ActiveScene& rScene);
 
     /**
+     * @brief
+     *
+     * iterate ACompDrawables and assign them shaders
+     *
+     * @param rScene
+     */
+    static void update_drawfunc_assign(ActiveScene& rScene);
+
+    /**
      * Update the m_transformWorld of entities with ACompTransform and
      * ACompHierarchy. Intended for physics interpolation
      */
@@ -113,7 +121,7 @@ public:
 
 private:
     /* Define render passes */
-    static RenderPipeline create_forward_renderer();
+    static RenderPipeline create_forward_renderer(ActiveScene& rScene);
 
     /*
      * Draw the specified list of objects from the point of view of a camera

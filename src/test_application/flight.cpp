@@ -181,6 +181,8 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // Configure default rendering system
     osp::active::SysRender::setup(rScene);
+
+    // Load shaders
     load_shaders(rScene);
 
     // Connect camera to rendering system; set up with basic 3D renderer
@@ -250,6 +252,9 @@ void update_scene(osp::active::ActiveScene& rScene)
 
     // UserControl reads possibly changed values written by CameraController
     SysMachineUserControl::update_sensor(rScene);
+
+    // Assign shaders to newly created entities
+    SysRender::update_drawfunc_assign(rScene);
 
     // Update wires
     SysWire::update_wire(rScene);
@@ -387,12 +392,26 @@ void active_area_destroy(
 void load_shaders(osp::active::ActiveScene& rScene)
 {
     using adera::shader::PlumeShader;
+    using osp::shader::Phong;
+    using namespace osp::active;
     using Magnum::Shaders::MeshVisualizerGL3D;
-    auto& resources = rScene.get_context_resources();
 
-    resources.add<PlumeShader>("plume_shader");
+    auto &rResources = rScene.get_context_resources();
+    auto &rGroups = rScene.get_registry().ctx<ACtxRenderGroups>();
 
-    resources.add<MeshVisualizerGL3D>("mesh_vis_shader",
+    using osp::DependRes;
+
+    DependRes<Phong> phongTex = rResources.add<Phong>(
+                "textured",Phong{Phong::Flag::DiffuseTexture});
+    DependRes<Phong> phongNoTex = rResources.add<Phong>("notexture", Phong{});
+
+    rGroups.resize_to_fit<DrawableCommon>();
+    rGroups.m_groups["fwd_opaque"].set_assigner<DrawableCommon>(
+            Phong::gen_assign_phong_opaque( &(*phongNoTex), &(*phongTex)) );
+
+    rResources.add<PlumeShader>("plume_shader");
+
+    rResources.add<MeshVisualizerGL3D>("mesh_vis_shader",
         MeshVisualizerGL3D{MeshVisualizerGL3D::Flag::Wireframe
         | MeshVisualizerGL3D::Flag::NormalDirection});
 }

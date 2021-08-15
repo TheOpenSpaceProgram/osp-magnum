@@ -58,3 +58,34 @@ void Phong::draw_entity(ActiveEnt e,
         .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
         .draw(rMesh);
 }
+
+Phong::RenderGroup::DrawAssigner_t Phong::gen_assign_phong_opaque(
+        Phong* pNoTexture, Phong* pTextured)
+{
+    return [&pNoTexture, &pTextured]
+            (ActiveScene& rScene, RenderGroup::Storage_t& rStorage,
+             RenderGroup::ArrayView_t entities)
+    {
+        ActiveReg_t &rReg = rScene.get_registry();
+
+        auto viewOpaque = rReg.view<ACompOpaque>();
+        auto viewDiffuse = rReg.view<ACompDiffuseTex>();
+
+        for (ActiveEnt ent : entities)
+        {
+            if (!viewOpaque.contains(ent))
+            {
+                continue; // This assigner is for opaque drawables only
+            }
+
+            if (viewDiffuse.contains(ent))
+            {
+                rStorage.emplace(ent, EntityToDraw{&draw_entity, pNoTexture});
+            }
+            else
+            {
+                rStorage.emplace(ent, EntityToDraw{&draw_entity, pTextured});
+            }
+        }
+    };
+}
