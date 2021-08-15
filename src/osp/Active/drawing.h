@@ -35,18 +35,27 @@
 
 namespace osp::active
 {
+    struct EntityToDraw;
+}
+
+template<>
+struct entt::storage_traits<osp::active::ActiveEnt, osp::active::EntityToDraw> {
+    using storage_type = basic_storage<osp::active::ActiveEnt, osp::active::EntityToDraw>;
+};
+
+namespace osp::active
+{
 
 /**
- * A function pointer to a Shader's draw() function
- * @param ActiveEnt - The entity being drawn; used to fetch component data
- * @param ActiveScene - The scene containing the entity's component data
- * @param ACompCamera - Camera used to draw the scene
+ * @brief A function pointer to a Shader's draw() function
+ *
+ * @param ActiveEnt   [in] The entity being drawn; used to fetch component data
+ * @param ActiveScene [ref] The scene containing the entity's component data
+ * @param ACompCamera [in] Camera used to draw the scene
+ * @param void*       [in] User data
  */
 using ShaderDrawFnc_t = void (*)(
-        ActiveEnt,
-        ActiveScene&,
-        ACompCamera const&) noexcept;
-
+        ActiveEnt, ActiveScene&, ACompCamera const&, void*) noexcept;
 
 using drawable_family_t = entt::family<struct drawable_type>;
 using drawable_id_t = drawable_family_t::family_type;
@@ -63,9 +72,10 @@ struct EntityToDraw
     void *m_data;
 };
 
+
 struct RenderGroup
 {
-    using Storage_t = entt::basic_storage<ActiveEnt, EntityToDraw>;
+    using Storage_t = entt::storage_traits<ActiveEnt, EntityToDraw>::storage_type;
     using ArrayView_t = Corrade::Containers::ArrayView<ActiveEnt>;
 
     using DrawAssigner_t = std::function<
@@ -78,6 +88,12 @@ struct RenderGroup
         m_assigners.resize(std::max(m_assigners.size(), size_t(id + 1)));
         m_assigners[id] = std::move(assigner);
     }
+
+    decltype(auto) view()
+    {
+        return entt::basic_view{m_entities};
+    }
+
 
     // index with drawable_id_t
     std::vector<DrawAssigner_t> m_assigners;
@@ -94,18 +110,18 @@ struct ACtxRenderGroups
     {
         size_t minSize{std::max({drawable_family_t::type<DRAWABLE_T> ...}) + 1};
 
-        m_dirty.resize(minSize);
+        m_added.resize(minSize);
     }
 
     template<typename DRAWABLE_T>
     void add(ActiveEnt ent)
     {
-        m_dirty[drawable_family_t::type<DRAWABLE_T>].push_back(ent);
+        m_added[drawable_family_t::type<DRAWABLE_T>].push_back(ent);
     }
 
     std::unordered_map< std::string, RenderGroup > m_groups;
 
-    std::vector< std::vector<ActiveEnt> > m_dirty;
+    std::vector< std::vector<ActiveEnt> > m_added;
 
 }; // struct ACtxRenderGroups
 

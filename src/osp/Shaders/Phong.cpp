@@ -29,16 +29,15 @@
 using namespace osp::active;
 using namespace osp::shader;
 
-void Phong::draw_entity(ActiveEnt e,
-    ActiveScene& rScene, 
-    ACompCamera const& camera) noexcept
+void Phong::draw_entity(
+        ActiveEnt ent, ActiveScene& rScene, ACompCamera const& camera, void* userData) noexcept
 {
-    Phong& shader = *rScene.get_context_resources().get<Phong>(smc_resourceName);
+    auto &rShader = *reinterpret_cast<Phong*>(userData);
 
     // Collect uniform information
-    auto& drawTf = rScene.reg_get<ACompDrawTransform>(e);
-    Magnum::GL::Texture2D& rDiffuse = *rScene.reg_get<ACompDiffuseTex>(e).m_tex;
-    Magnum::GL::Mesh& rMesh = *rScene.reg_get<ACompMesh>(e).m_mesh;
+    auto& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
+    Magnum::GL::Texture2D& rDiffuse = *rScene.reg_get<ACompDiffuseTex>(ent).m_tex;
+    Magnum::GL::Mesh& rMesh = *rScene.reg_get<ACompMesh>(ent).m_mesh;
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
@@ -48,8 +47,12 @@ void Phong::draw_entity(ActiveEnt e,
      */
     Vector4 light = Vector4{1.0f, 0.0f, 0.0f, 0.0f};
 
-    shader
-        .bindDiffuseTexture(rDiffuse)
+    if (rShader.flags() & Flag::DiffuseTexture)
+    {
+        rShader.bindDiffuseTexture(rDiffuse);
+    }
+
+    rShader
         .setAmbientColor(Magnum::Color4{0.1f})
         .setSpecularColor(Magnum::Color4{1.0f})
         .setLightPositions({light})
@@ -62,7 +65,7 @@ void Phong::draw_entity(ActiveEnt e,
 Phong::RenderGroup::DrawAssigner_t Phong::gen_assign_phong_opaque(
         Phong* pNoTexture, Phong* pTextured)
 {
-    return [&pNoTexture, &pTextured]
+    return [pNoTexture, pTextured]
             (ActiveScene& rScene, RenderGroup::Storage_t& rStorage,
              RenderGroup::ArrayView_t entities)
     {
@@ -80,11 +83,11 @@ Phong::RenderGroup::DrawAssigner_t Phong::gen_assign_phong_opaque(
 
             if (viewDiffuse.contains(ent))
             {
-                rStorage.emplace(ent, EntityToDraw{&draw_entity, pNoTexture});
+                rStorage.emplace(ent, EntityToDraw{&draw_entity, pTextured});
             }
             else
             {
-                rStorage.emplace(ent, EntityToDraw{&draw_entity, pTextured});
+                rStorage.emplace(ent, EntityToDraw{&draw_entity, pNoTexture});
             }
         }
     };

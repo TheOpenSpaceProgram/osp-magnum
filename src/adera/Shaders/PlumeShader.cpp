@@ -40,7 +40,7 @@ using namespace adera::active;
 using namespace adera::shader;
 
 void PlumeShader::draw_plume(ActiveEnt e,
-    ActiveScene& rScene, ACompCamera const& camera) noexcept
+    ActiveScene& rScene, ACompCamera const& camera, void*) noexcept
 {
     auto& resources = rScene.get_context_resources();
     PlumeShader& shader = *resources.get<PlumeShader>(smc_resourceName);

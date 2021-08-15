@@ -50,9 +50,9 @@ public:
     using Magnum::Shaders::PhongGL::PhongGL;
     using Magnum::Shaders::PhongGL::Flag;
 
-    static void draw_entity(osp::active::ActiveEnt e,
-        osp::active::ActiveScene& rScene,
-        osp::active::ACompCamera const& camera) noexcept;
+    static void draw_entity(
+            osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,
+            osp::active::ACompCamera const& camera, void*) noexcept;
 
     static RenderGroup::DrawAssigner_t gen_assign_phong_opaque(
             Phong* pNoTexture, Phong* pTextured);
