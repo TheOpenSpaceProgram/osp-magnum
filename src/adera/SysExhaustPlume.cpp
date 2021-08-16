@@ -139,8 +139,7 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
 void SysExhaustPlume::update_construct(ActiveScene& rScene)
 {
     // TODO: this is kind of a hacky function, Plumes should be made into
-    //       Machines
-
+    //       their own Machines
 
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,

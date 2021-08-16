@@ -23,8 +23,11 @@
  * SOFTWARE.
  */
 #include "Phong.h"
+
 #include <Magnum/Math/Matrix4.h>
-#include "osp/Active/SysRender.h"
+
+#include "../Active/ActiveScene.h"
+#include "../Active/SysRender.h"
 
 using namespace osp::active;
 using namespace osp::shader;

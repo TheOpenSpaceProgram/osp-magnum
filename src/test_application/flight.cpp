@@ -290,6 +290,9 @@ void update_scene(osp::active::ActiveScene& rScene)
     // Add ACompDelete to descendents of hierarchy entities with ACompDelete
     SysHierarchy::update_delete(rScene);
 
+    // Delete entities from RenderGroups
+    SysRender::update_drawfunc_delete(rScene);
+
     // Delete entities with ACompDelete
     ActiveScene::update_delete(rScene);
 }
@@ -421,15 +424,16 @@ void load_shaders(osp::active::ActiveScene& rScene)
 
     rGroups.resize_to_fit<MaterialCommon, MaterialPlume, MaterialTerrain>();
 
+    // Use Phong shader for common materials
     rGroups.m_groups["fwd_opaque"].set_assigner<MaterialCommon>(
             Phong::gen_assign_phong_opaque( phongNoTex.operator->(),
                                             phongTex.operator->() ));
 
+    // Use Plume shader for plume materials
     rGroups.m_groups["fwd_transparent"].set_assigner<MaterialPlume>(
             PlumeShader::gen_assign_plume( plume.operator->() ));
 
-    using osp::active::RenderGroup;
-
+    // Use MeshVisualizer for terrain materials
     MeshVisualizer *pVisual = visual.operator->();
     rGroups.m_groups["fwd_opaque"].set_assigner<MaterialTerrain>(
         [pVisual] (ActiveScene& rScene, RenderGroup::Storage_t& rStorage,

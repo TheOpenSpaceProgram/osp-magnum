@@ -24,8 +24,7 @@
  */
 #pragma once
 
-#include "osp/Resource/Resource.h"
-#include "osp/Active/Shader.h"
+#include "osp/Resource/Package.h"
 #include "osp/Active/activetypes.h"
 
 #include "drawing.h"
@@ -94,42 +93,63 @@ class SysRender
 public:
 
     /**
-     * @brief setup_context
+     * @brief Setup essential GL resources
      *
-     * @param rCtxResources
+     * @param rCtxResources [ref] Context resources Package
      */
     static void setup_context(Package& rCtxResources);
 
     /**
-     * @brief Setup Forward Renderer
+     * @brief Setup Render Pipeline, Targets, and Groups for Forward Rendering
      *
-     * @param rScene [ref]
+     * @param rScene [ref] Scene with GL context
      */
     static void setup_forward_renderer(ActiveScene& rScene);
 
-    /* Retrieve the entity which possessses the default rendertarget component */
+    /**
+     * @brief Retrieve the entity which possesses the default ACompRenderTarget
+     *
+     * @param rScene [ref] Scene with render target
+     */
     static ActiveEnt get_default_rendertarget(ActiveScene& rScene);
 
-    /* Draw the default render target to the screen */
+    /**
+     * @brief Draw the default render target to the screen
+     *
+     * @param rScene [ref] Scene with render target
+     */
     static void display_default_rendertarget(ActiveScene& rScene);
 
     /**
-     * @brief
+     * @brief Adds newly created and updated drawables to RenderGroups using
+     *        their DrawAssigners
      *
-     * @param rScene
+     * @param rScene [ref] Scene with ACtxRenderGroups
      */
     static void update_drawfunc_assign(ActiveScene& rScene);
 
     /**
-     * Update the m_transformWorld of entities with ACompTransform and
-     * ACompHierarchy. Intended for physics interpolation
+     * @brief Remove entities from draw functions
+     *
+     * @param rScene [ref] Scene with ACtxRenderGroups
+     */
+    static void update_drawfunc_delete(ActiveScene& rScene);
+
+    /**
+     * @brief Update the m_transformWorld of entities with ACompTransform and
+     *        ACompHierarchy.
+     *
+     * Intended for physics interpolation
      */
     static void update_hierarchy_transforms(ActiveScene& rScene);
 
 private:
-    /* Define render passes */
+
+    /**
+     * @return RenderPipeline for forward rendering
+     */
     static RenderPipeline create_forward_pipeline(ActiveScene& rScene);
 
-};
+}; // class SysRender
 
 } // namespace osp::active

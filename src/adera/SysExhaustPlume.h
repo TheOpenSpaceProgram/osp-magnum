@@ -45,11 +45,9 @@ class SysExhaustPlume
 public:
 
     /**
-     * Initialize plume graphics
-     * 
-     * SysMachineRocket only attaches ACompExhaustPlume to eligible entities;
-     * this function takes such entities, retrieves the appropriate graphics
-     * resources, and configures the graphical components
+     * @brief Add exaust plumes to vehicles in-construction
+     *
+     * @param rScene [ref] Scene containing rockets with exaust plumes
      */
     static void update_construct(osp::active::ActiveScene& rScene);
 

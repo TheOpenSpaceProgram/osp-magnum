@@ -48,7 +48,7 @@ class Phong : protected Magnum::Shaders::PhongGL
 public:
 
     using Magnum::Shaders::PhongGL::PhongGL;
-    using Magnum::Shaders::PhongGL::Flag;
+    using Flag = Magnum::Shaders::PhongGL::Flag;
 
     static void draw_entity(
             osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,

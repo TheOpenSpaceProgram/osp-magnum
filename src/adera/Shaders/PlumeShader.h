@@ -70,7 +70,6 @@ public:
     static RenderGroup::DrawAssigner_t gen_assign_plume(PlumeShader* pShader);
 
 private:
-    constexpr static std::string_view smc_resourceName = "plume_shader";
 
     // GL init
     void init();
