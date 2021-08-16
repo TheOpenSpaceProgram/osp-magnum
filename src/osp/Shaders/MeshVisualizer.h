@@ -39,7 +39,7 @@ class MeshVisualizer : protected Magnum::Shaders::MeshVisualizerGL3D
 public:
 
     using Magnum::Shaders::MeshVisualizerGL3D::MeshVisualizerGL3D;
-    using Magnum::Shaders::MeshVisualizerGL3D::Flag;
+    using Flag = Magnum::Shaders::MeshVisualizerGL3D::Flag;
 
     static void draw_entity(
             osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,

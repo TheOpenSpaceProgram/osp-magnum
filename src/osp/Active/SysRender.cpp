@@ -24,7 +24,8 @@
  */
 #include "SysRender.h"
 
-#include "osp/Shaders/FullscreenTriShader.h"
+#include "../Shaders/FullscreenTriShader.h"
+#include "ActiveScene.h"
 
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Magnum/GL/Buffer.h>
@@ -213,7 +214,7 @@ void SysRender::display_default_rendertarget(ActiveScene& rScene)
 void SysRender::update_drawfunc_assign(ActiveScene& rScene)
 {
     ActiveReg_t &rReg = rScene.get_registry();
-    auto &rGroups = rScene.get_registry().ctx<ACtxRenderGroups>();
+    auto &rGroups = rReg.ctx<ACtxRenderGroups>();
 
     // TODO: check entities that change their material type by checking
     //       ACompMaterial
@@ -252,6 +253,42 @@ void SysRender::update_drawfunc_assign(ActiveScene& rScene)
             rScene.reg_emplace<ACompMaterial>(ent, ACompMaterial{i});
         }
     }
+}
+
+void SysRender::update_drawfunc_delete(ActiveScene& rScene)
+{
+    auto &rReg = rScene.get_registry();
+    auto &rGroups = rReg.ctx<ACtxRenderGroups>();
+    auto viewDelMat = rReg.view<ACompDelete, ACompMaterial>();
+
+
+    // copy entities to delete into a buffer
+    std::vector<ActiveEnt> toDelete;
+    toDelete.reserve(viewDelMat.size_hint());
+
+    for (auto const& [ent, mat] : viewDelMat.each())
+    {
+        toDelete.push_back(ent);
+    }
+
+    if (toDelete.empty())
+    {
+        return;
+    }
+
+    // Delete from each draw group
+    for (auto& [name, rGroup] : rGroups.m_groups)
+    {
+        for (ActiveEnt ent : toDelete)
+        {
+            if (rGroup.m_entities.contains(ent))
+            {
+                rGroup.m_entities.remove(ent);
+            }
+        }
+    }
+
+    rReg.remove<ACompMaterial>(std::begin(toDelete), std::end(toDelete));
 }
 
 void SysRender::update_hierarchy_transforms(ActiveScene& rScene)
