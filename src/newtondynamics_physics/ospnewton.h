@@ -32,48 +32,21 @@
 namespace ospnewton
 {
 
-/**
- * @brief Associates an entity with a NewtonBody and manages its lifetime
- */
-struct ACompNwtBody
+struct DeleterNewtonBody
 {
-
-    ACompNwtBody(NewtonBody const* pBody) noexcept
-     : m_pBody(pBody) { }
-
-    NewtonBody const* body() const noexcept { return m_pBody.get(); }
-
-private:
-    struct Deleter
-    {
-        void operator() (NewtonBody const* pCollision)
-        { NewtonDestroyBody(pCollision); }
-    };
-
-    std::unique_ptr<NewtonBody const, Deleter> m_pBody;
+    void operator() (NewtonBody const* pCollision)
+    { NewtonDestroyBody(pCollision); }
 };
 
-/**
- * @brief Associates an entity with a NewtonCollision and manages its lifetime
- */
-struct ACompNwtCollider
+using ACompNwtBody_t = std::unique_ptr<NewtonBody const, DeleterNewtonBody>;
+
+struct DeleterNewtonCollision
 {
-
-    ACompNwtCollider(NewtonCollision const* pCollision) noexcept
-     : m_pCollision(pCollision) { }
-
-    NewtonCollision const* collision() const noexcept
-    { return m_pCollision.get(); }
-
-private:
-    struct Deleter
-    {
-        void operator() (NewtonCollision const* pCollision)
-        { NewtonDestroyCollision(pCollision); }
-    };
-
-    std::unique_ptr<NewtonCollision const, Deleter> m_pCollision;
+    void operator() (NewtonCollision const* pCollision)
+    { NewtonDestroyCollision(pCollision); }
 };
+
+using ACompNwtCollider_t = std::unique_ptr<NewtonCollision const, DeleterNewtonCollision>;
 
 /**
  * @brief Represents an instance of a Newton physics world in the scane

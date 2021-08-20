@@ -56,7 +56,7 @@ struct ACompPhysDynamic
 {
     Vector3 m_centerOfMassOffset{0, 0, 0};
     Vector3 m_inertia{1, 1, 1};
-    float m_totalMass;
+    float m_totalMass{0.0f};
 };
 
 /**

@@ -63,6 +63,6 @@ void debug_create_tri_mesh_static(
 
     NewtonTreeCollisionEndBuild(pTree, 2);
 
-    rReg.emplace<ospnewton::ACompNwtCollider>(chunkEnt, pTree);
+    rReg.emplace<ospnewton::ACompNwtCollider_t>(chunkEnt, pTree);
 
 }

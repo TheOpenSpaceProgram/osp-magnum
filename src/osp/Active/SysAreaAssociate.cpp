@@ -136,7 +136,7 @@ void SysAreaAssociate::floating_origin_translate(
         entTransform.m_transform.translation() += translation;
     }
 
-    // Tell physics engine to translate too
+    // Tell physics engine to translate its rigid bodies as well
     rReg.ctx<ACtxPhysics>().m_originTranslate += translation;
 }
 

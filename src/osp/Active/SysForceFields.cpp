@@ -33,16 +33,16 @@ using namespace osp::active;
 void SysFFGravity::update_force(ActiveScene& rScene)
 {
 
-    auto viewFields = rScene.get_registry()
-            .view<ACompFFGravity, ACompTransform>();
+    auto const viewFields = rScene.get_registry()
+            .view<const ACompFFGravity, const ACompTransform>();
 
-    auto viewMasses = rScene.get_registry()
-            .view<ACompPhysDynamic, ACompTransform>();
+    auto const viewMasses = rScene.get_registry()
+            .view<const ACompPhysDynamic, const ACompTransform>();
 
     for (ActiveEnt fieldEnt : viewFields)
     {
-        auto &fieldFFGrav = viewFields.get<ACompFFGravity>(fieldEnt);
-        auto &fieldTransform = viewFields.get<ACompTransform>(fieldEnt);
+        auto const &fieldFFGrav = viewFields.get<const ACompFFGravity>(fieldEnt);
+        auto const &fieldTransform = viewFields.get<const ACompTransform>(fieldEnt);
 
         for (ActiveEnt massEnt : viewMasses)
         {
@@ -51,14 +51,15 @@ void SysFFGravity::update_force(ActiveScene& rScene)
                 continue;
             }
 
-            auto &massBody = viewMasses.get<ACompPhysDynamic>(massEnt);
-            auto &massTransform = viewMasses.get<ACompTransform>(massEnt);
+            auto const &massBody = viewMasses.get<const ACompPhysDynamic>(massEnt);
+            auto const &massTransform = viewMasses.get<const ACompTransform>(massEnt);
 
-            Vector3 relativePos = fieldTransform.m_transform.translation()
-                                - massTransform.m_transform.translation();
-            float r = relativePos.length();
-            Vector3 force = relativePos * fieldFFGrav.m_Gmass
-                          * massBody.m_totalMass / (r * r * r);
+            Vector3 const relativePos = fieldTransform.m_transform.translation()
+                                      - massTransform.m_transform.translation();
+            float const r = relativePos.length();
+            Vector3 const force = (relativePos * fieldFFGrav.m_Gmass
+                                               * massBody.m_totalMass)
+                                   / (r * r * r);
 
             auto &netForce = rScene.get_registry()
                     .get_or_emplace<ACompPhysNetForce>(massEnt);

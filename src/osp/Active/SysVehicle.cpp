@@ -36,6 +36,10 @@
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
 
+#include <Corrade/Containers/ArrayViewStl.h>
+
+#include <iostream>
+
 
 using namespace osp;
 using namespace osp::active;
@@ -272,23 +276,26 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
             Vector3 const velocity = rReg.get<ACompPhysLinearVel>(vehicleEnt);
 
-            // NOTE: vehicleVehicle and vehicleTransform become invalid
-            //       when emplacing new ones.
-            for (size_t i = 1; i < islands.size(); i ++)
+            // Loop but skip first element, already set to vehicleEnt
+            for (ActiveEnt& rIslands
+                 : Corrade::Containers::arrayView(islands).suffix(1))
             {
                 auto const &vehicleTransform = rScene.reg_get<ACompTransform>(vehicleEnt);
 
-                ActiveEnt islandEnt = SysHierarchy::create_child(
+                ActiveEnt const islandEnt = SysHierarchy::create_child(
                             rScene, rScene.hier_get_root());
+
+                // NOTE: vehicleVehicle and vehicleTransform can become invalid
+                //       when emplacing new components of the same type
                 rScene.reg_emplace<ACompVehicle>(islandEnt);
+                rScene.reg_emplace<ACompTransform>(
+                        islandEnt, ACompTransform{vehicleTransform.m_transform});
 
                 // temporary:
                 // Make the whole thing a single rigid body. Eventually have a
                 // 'vehicle structure system' do this
                 // Note that there may be future 'structure' implementations
                 // that have multiple rigid bodies per vehicle.
-                rScene.reg_emplace<ACompTransform>(
-                        islandEnt, ACompTransform{vehicleTransform.m_transform});
                 rScene.reg_emplace<ACompDrawTransform>(islandEnt);
                 rScene.reg_emplace<ACompPhysBody>(islandEnt);
                 rScene.reg_emplace<ACompPhysDynamic>(islandEnt);
@@ -298,7 +305,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                 rScene.reg_emplace<ACompSolidCollider>(islandEnt);
                 rPhys.m_setVelocity.emplace_back(islandEnt, velocity);
 
-                islands[i] = islandEnt;
+                rIslands = islandEnt;
             }
 
 
@@ -307,7 +314,6 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             // * remove parts different islands, and move them to the new
             //   vehicle
 
-            entt::basic_registry<ActiveEnt> &reg = rScene.get_registry();
             auto removeDestroyed = [&viewParts, &rScene, &islands]
                     (ActiveEnt partEnt) -> bool
             {
@@ -323,7 +329,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                 {
                     // Separate into an island vehicle created previously
 
-                    ActiveEnt islandEnt = islands[rPart.m_separationIsland];
+                    ActiveEnt const islandEnt = islands[rPart.m_separationIsland];
                     auto &rIslandVehicle = rScene.reg_get<ACompVehicle>(
                                 islandEnt);
                     rIslandVehicle.m_parts.push_back(partEnt);
@@ -343,13 +349,6 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             rParts.erase(std::remove_if(rParts.begin(), rParts.end(),
                                         removeDestroyed), rParts.end());
 
-            // Calculate transforms and center of masses of new islands
-
-            for (ActiveEnt islandEnt : islands)
-            {
-                auto &rIslandVehicle = view.get<ACompVehicle>(islandEnt);
-                auto &rIslandTf = rScene.reg_get<ACompTransform>(islandEnt);
-            }
         }
     }
 }
