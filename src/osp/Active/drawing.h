@@ -38,8 +38,12 @@ namespace osp::active
     struct EntityToDraw;
 }
 
+// Minor optimization:
+// Set storage traits for RenderGroup::Storage_t to not use signals. This is
+// also used by entt::view
 template<>
-struct entt::storage_traits<osp::active::ActiveEnt, osp::active::EntityToDraw> {
+struct entt::storage_traits<osp::active::ActiveEnt, osp::active::EntityToDraw>
+{
     using storage_type = basic_storage<osp::active::ActiveEnt, osp::active::EntityToDraw>;
 };
 
@@ -79,6 +83,13 @@ struct EntityToDraw
      */
     using ShaderDrawFnc_t = void (*)(
             ActiveEnt, ActiveScene&, ACompCamera const&, void*) noexcept;
+
+    constexpr void operator()(
+            ActiveEnt ent, ActiveScene& rScene,
+            ACompCamera const& camera) const noexcept
+    {
+        m_draw(ent, rScene, camera, m_data);
+    }
 
     ShaderDrawFnc_t m_draw;
     // Non-owning user data passed to draw function, such as the shader
@@ -130,6 +141,14 @@ struct RenderGroup
      * @return Iterable view for stored entities
      */
     decltype(auto) view()
+    {
+        return entt::basic_view{m_entities};
+    }
+
+    /**
+     * @return Iterable view for stored entities
+     */
+    decltype(auto) view() const
     {
         return entt::basic_view{m_entities};
     }

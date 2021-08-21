@@ -232,7 +232,7 @@ void osp::AssetImporter::load_plume(TinyGltfImporter& gltfImporter,
     float zMin = extras.Get("zMin").Get<double>();
 
     adera::active::PlumeEffectData plumeData;
-    plumeData.m_meshName = meshName;
+    plumeData.m_meshName = std::move(meshName);
     plumeData.m_flowVelocity = flowVel;
     plumeData.m_color = color;
     plumeData.m_zMax = zMax;

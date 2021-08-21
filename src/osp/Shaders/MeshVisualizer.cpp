@@ -48,7 +48,7 @@ void MeshVisualizer::draw_entity(
     auto &rMesh = rScene.reg_get<ACompMesh>(ent);
     auto const& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
 
-    Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
+    Matrix4 const entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
     rShader
         .setColor(0x2f83cc_rgbf)

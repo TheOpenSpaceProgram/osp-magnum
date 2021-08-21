@@ -96,10 +96,11 @@ void SysRender::setup_forward_renderer(ActiveScene &rScene)
 {
     Package &rCtxResources = rScene.get_context_resources();
 
-    Vector2i viewSize = Magnum::GL::defaultFramebuffer.viewport().size();
+    Vector2i const viewSize = Magnum::GL::defaultFramebuffer.viewport().size();
 
     rScene.reg_emplace<ACompRenderTarget>(
-            rScene.hier_get_root(), viewSize,
+            rScene.hier_get_root(),
+            viewSize,
             rCtxResources.get<Magnum::GL::Framebuffer>("offscreen_fbo"));
     rScene.reg_emplace<ACompFBOColorAttachment>(
             rScene.hier_get_root(),
@@ -108,7 +109,7 @@ void SysRender::setup_forward_renderer(ActiveScene &rScene)
     // Add render groups
     auto &rGroups = rScene.get_registry().set<ACtxRenderGroups>();
     rGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
-    rGroups.m_groups.emplace("fwd_transparent", RenderGroup{}).second;
+    rGroups.m_groups.emplace("fwd_transparent", RenderGroup{});
 
     // Create the default render pipeline (if not already added yet)
     rCtxResources.add<RenderPipeline>("default", create_forward_pipeline(rScene));
@@ -130,16 +131,16 @@ RenderPipeline SysRender::create_forward_pipeline(ActiveScene& rScene)
             Renderer::disable(Renderer::Feature::Blending);
             Renderer::setDepthMask(true);
 
-            ActiveReg_t &rReg = rScene.get_registry();
-            auto const viewVisible = rReg.view<const ACompVisible>();
-            auto &rGroups = rReg.ctx<ACtxRenderGroups>();
+            ActiveReg_t const &reg = rScene.get_registry();
+            auto const viewVisible = reg.view<const ACompVisible>();
+            auto const &groups = reg.ctx<ACtxRenderGroups>();
 
             for (auto const& [ent, toDraw]
-                 : rGroups.m_groups["fwd_opaque"].view().each())
+                 : groups.m_groups.at("fwd_opaque").view().each())
             {
                 if (viewVisible.contains(ent))
                 {
-                    toDraw.m_draw(ent, rScene, camera, toDraw.m_data);
+                    toDraw(ent, rScene, camera);
                 }
             }
         }
@@ -163,16 +164,16 @@ RenderPipeline SysRender::create_forward_pipeline(ActiveScene& rScene)
             //            can mess up other transparent objects once added
             Renderer::setDepthMask(false);
 
-            ActiveReg_t &rReg = rScene.get_registry();
-            auto const viewVisible = rReg.view<const ACompVisible>();
-            auto &rGroups = rReg.ctx<ACtxRenderGroups>();
+            ActiveReg_t const &reg = rScene.get_registry();
+            auto const viewVisible = reg.view<const ACompVisible>();
+            auto const &groups = reg.ctx<ACtxRenderGroups>();
 
             for (auto const& [ent, toDraw]
-                 : rGroups.m_groups["fwd_transparent"].view().each())
+                 : groups.m_groups.at("fwd_transparent").view().each())
             {
                 if (viewVisible.contains(ent))
                 {
-                    toDraw.m_draw(ent, rScene, camera, toDraw.m_data);
+                    toDraw(ent, rScene, camera);
                 }
             }
         }
@@ -277,7 +278,7 @@ void SysRender::update_drawfunc_delete(ActiveScene& rScene)
     }
 
     // Delete from each draw group
-    for (auto& [name, rGroup] : rGroups.m_groups)
+    for ([[maybe_unused]] auto& [name, rGroup] : rGroups.m_groups)
     {
         for (ActiveEnt ent : toDelete)
         {

@@ -86,27 +86,33 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
 
     if (plumeNode == entt::null)
     {
-        SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
-                          "ERROR: could not find plume anchor for MachineRocket {}", part);
+        SPDLOG_LOGGER_ERROR(
+                rScene.get_application().get_logger(),
+                "ERROR: could not find plume anchor for MachineRocket {}",
+                part);
         return;
     }
 
-    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(), "MachineRocket {}\'s associated plume: {}",
-        part, plumeNode);
+    SPDLOG_LOGGER_INFO(
+            rScene.get_application().get_logger(),
+            "MachineRocket {}'s associated plume: {}",
+            part, plumeNode);
 
     // Get plume effect
 
     using osp::DependRes;
     using osp::Package;
 
-    Package& pkg = rScene.get_application().debug_find_package("lzdb");
-    std::string_view plumeAnchorName = rScene.reg_get<ACompName>(plumeNode).m_name;
-    std::string_view effectName = plumeAnchorName.substr(3, plumeAnchorName.length() - 3);
-    DependRes<PlumeEffectData> plumeEffect = pkg.get<PlumeEffectData>(effectName);
+    Package &rPkg = rScene.get_application().debug_find_package("lzdb");
+
+    std::string_view effectName = rScene.reg_get<ACompName>(plumeNode).m_name;
+    effectName.remove_prefix(3); // removes "fx_"
+
+    DependRes<PlumeEffectData> plumeEffect = rPkg.get<PlumeEffectData>(effectName);
     if (plumeEffect.empty())
     {
-      SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
-                          "ERROR: couldn't find plume effect  {}", effectName);
+        SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
+                            "ERROR: couldn't find plume effect  {}", effectName);
         return;
     }
 
@@ -121,13 +127,14 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
     using osp::active::ACompTransparent;
     using osp::active::ACompVisible;
 
-    Package& glResources = rScene.get_context_resources();
-    DependRes<Mesh> plumeMesh = glResources.get<Mesh>(plumeEffect->m_meshName);
+    Package &rGlResources = rScene.get_context_resources();
+    DependRes<Mesh> plumeMesh = rGlResources.get<Mesh>(plumeEffect->m_meshName);
 
     // Compile the plume mesh if not done so yet
     if (plumeMesh.empty())
     {
-        plumeMesh = AssetImporter::compile_mesh(plumeEffect->m_meshName, pkg, glResources);
+        plumeMesh = AssetImporter::compile_mesh(
+                        plumeEffect->m_meshName, rPkg, rGlResources);
     }
 
     rScene.reg_emplace<ACompMesh>(plumeNode, plumeMesh);
@@ -147,7 +154,7 @@ void SysExhaustPlume::update_construct(ActiveScene& rScene)
 
     osp::machine_id_t const id = osp::mach_id<machines::MachineRocket>();
 
-    for (auto [vehEnt, rVeh, rVehConstr] : view.each())
+    for (auto const& [vehEnt, rVeh, rVehConstr] : view.each())
     {
         // Check if the vehicle blueprint might store MachineRockets
         if (rVehConstr.m_blueprint->m_machines.size() <= id)
@@ -161,11 +168,11 @@ void SysExhaustPlume::update_construct(ActiveScene& rScene)
         for (osp::BlueprintMachine const &mach : vehBp.m_machines[id])
         {
             // Get part
-            ActiveEnt partEnt = rVeh.m_parts[mach.m_partIndex];
+            ActiveEnt const partEnt = rVeh.m_parts[mach.m_partIndex];
 
             // Get machine entity previously reserved by SysVehicle
             auto const& machines = rScene.reg_get<osp::active::ACompMachines>(partEnt);
-            ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
+            ActiveEnt const machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
             attach_plume_effect(rScene, partEnt, machEnt);
         }
