@@ -23,7 +23,7 @@
 # SOFTWARE.
 ##
 
-# Set CMake minimum version and CMake policy required by UrhoCommon module
+# Set CMake minimum version and CMake policy
 CMAKE_MINIMUM_REQUIRED(VERSION 3.12.4)
 
 # Enable link time optimization
@@ -51,7 +51,7 @@ SET(CMAKE_CXX_STANDARD 17)
 SET(CMAKE_CXX_EXTENSIONS OFF)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# If the environment has this set we don't want to clear it.
+# If the environment has these set, pull them into proper cariables.
 SET(CLANG_COMPILE_FLAGS "${CLANG_COMPILE_FLAGS}")
 SET(GCC_COMPILE_FLAGS   "${GCC_COMPILE_FLAGS}")
 
@@ -59,57 +59,52 @@ SET(GCC_COMPILE_FLAGS   "${GCC_COMPILE_FLAGS}")
 IF(OSP_ENABLE_COMPILER_WARNINGS)
   # Enable additional warnings.
   # -fno-omit-frame-pointer significantly helps with debugging of the application.
-  SET(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -Wall -Wextra -fno-omit-frame-pointer")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -fno-omit-frame-pointer")
-
-  # Urho3D has unused parameters everywhere. This just makes too much noise.
-  SET(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -Wno-unused-parameter")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
-
-  # Urho3D has poor type aliasing safety everywhere. This just makes too much noise.
-  SET(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -Wno-strict-aliasing")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-strict-aliasing")
+  STRING(APPEND CMAKE_C_FLAGS   " -Wall -Wextra -fno-omit-frame-pointer")
+  STRING(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -fno-omit-frame-pointer")
 
   # These are hand selected warnings that are enabled by -Wextra that tend to be non-issues, so disable them explicitly for sake of avoiding build noise.
-  SET(CLANG_COMPILE_FLAGS "${CLANG_COMPILE_FLAGS} -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-padded -Wno-undefined-func-template -Wno-unused-template")
-  SET(CLANG_COMPILE_FLAGS "${CLANG_COMPILE_FLAGS} -Wno-deprecated -Wno-documentation -Wno-documentation-deprecated-sync -Wno-documentation-unknown-command -Wno-abstract-vbase-init")
-  SET(CLANG_COMPILE_FLAGS "${CLANG_COMPILE_FLAGS} -Wno-switch-enum -Wno-covered-switch-default -Wno-missing-prototypes -Wno-sign-conversion -Wno-float-conversion -Wno-shorten-64-to-32")
-  SET(CLANG_COMPILE_FLAGS "${CLANG_COMPILE_FLAGS} -Wno-shadow -Wno-shadow-field-in-constructor -Wshadow-uncaptured-local -Wno-inconsistent-missing-destructor-override")
-  SET(CLANG_COMPILE_FLAGS "${CLANG_COMPILE_FLAGS} -Wno-global-constructors -Wno-exit-time-destructors  -Wno-weak-vtables -Wno-undef -Wno-disabled-macro-expansion")
+  STRING(APPEND CLANG_COMPILE_FLAGS " -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-padded -Wno-undefined-func-template -Wno-unused-template")
+  STRING(APPEND CLANG_COMPILE_FLAGS " -Wno-deprecated -Wno-documentation -Wno-documentation-deprecated-sync -Wno-documentation-unknown-command -Wno-abstract-vbase-init")
+  STRING(APPEND CLANG_COMPILE_FLAGS " -Wno-switch-enum -Wno-covered-switch-default -Wno-missing-prototypes -Wno-sign-conversion -Wno-float-conversion -Wno-shorten-64-to-32")
+  STRING(APPEND CLANG_COMPILE_FLAGS " -Wno-shadow -Wno-shadow-field-in-constructor -Wshadow-uncaptured-local -Wno-inconsistent-missing-destructor-override")
+  STRING(APPEND CLANG_COMPILE_FLAGS " -Wno-global-constructors -Wno-exit-time-destructors  -Wno-weak-vtables -Wno-undef -Wno-disabled-macro-expansion")
 
   # This relatively rare warning can be emitted because of third party code, and is basically not our problem.
-  SET(GCC_COMPILE_FLAGS "${GCC_COMPILE_FLAGS} -Wno-psabi")
+  STRING(APPEND GCC_COMPILE_FLAGS " -Wno-psabi")
 ENDIF() # OSP_ENABLE_COMPILER_EARNINGS
 
 # Compiler warnings can help find problems in code.
 IF(OSP_WARNINGS_ARE_ERRORS)
-  SET(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -Werror")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+  STRING(APPEND CMAKE_C_FLAGS   " -Werror")
+  STRING(APPEND CMAKE_CXX_FLAGS " -Werror")
 ENDIF() # OSP_WARNINGS_ARE_ERRORS
 
 # The sanatizers provide compile time code instrumentation that drastically improve the ability of programmars to find bugs.
 IF(OSP_BUILD_SANATIZER)
-  SET(GCC_COMPILE_FLAGS "${GCC_COMPILE_FLAGS} -fstack-protector-all -fsanitize=address,bounds,enum,leak,pointer-compare,pointer-subtract -fsanitize-address-use-after-scope")
+  STRING(APPEND GCC_COMPILE_FLAGS " -fstack-protector-all -fsanitize=address,bounds,enum,leak,pointer-compare,pointer-subtract -fsanitize-address-use-after-scope")
 ENDIF() # OSP_BUILD_SANATIZER
 
 IF(CMAKE_C_COMPILER_ID MATCHES "Clang")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CLANG_COMPILE_FLAGS}")
+  STRING(APPEND CMAKE_C_FLAGS " ${CLANG_COMPILE_FLAGS}")
 ENDIF()
 IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CLANG_COMPILE_FLAGS}")
+  STRING(APPEND CMAKE_CXX_FLAGS " ${CLANG_COMPILE_FLAGS}")
 ENDIF()
 
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU")
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${GCC_COMPILE_FLAGS}")
+  STRING(APPEND CMAKE_C_FLAGS " ${GCC_COMPILE_FLAGS}")
 ENDIF()
 IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_COMPILE_FLAGS}")
+  STRING(APPEND CMAKE_CXX_FLAGS " ${GCC_COMPILE_FLAGS}")
 ENDIF()
 
 # In debug builds, disable optimizations (just in case they were enabled by a previous flag, or env variable)
 # and mark the debug symbols to be compressed, which can be a huge saving in terms of file size.
-SET(CMAKE_C_FLAGS_DEBUG   "${CMAKE_C_FLAGS_DEBUG}   -gz -O0")
-SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -gz -O0")
+IF(MSVC)
+ELSE()
+  STRING(APPEND CMAKE_C_FLAGS_DEBUG   " -gz -O0")
+  STRING(APPEND CMAKE_CXX_FLAGS_DEBUG " -gz -O0")
+ENDIF()
 
 IF(CMAKE_BUILD_TYPE MATCHES "Debug")
 # Don't enable LTO in debug builds.
@@ -132,7 +127,7 @@ IF(MSVC)
   add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
 ENDIF()
 
-set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/" ${CMAKE_MODULE_PATH})
+STRING(PREPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/")
 
 # Process subdirectory full of third-party libraries
 ADD_SUBDIRECTORY(3rdparty)
