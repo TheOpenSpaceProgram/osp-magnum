@@ -15,10 +15,21 @@ jobs:
         fetch-depth: 1
         submodules: recursive
 
-    - name: Build OSP-Magnum
+    - name: Configure
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
+
+    - name: Compile OSP-Magnum
+      run: |
         cmake --build build --parallel --config Release --target osp-magnum
+
+    - name: Compile Unit Tests
+      run: |
+        cmake --build build --parallel --config Release --target test
+
+    - name: Run Unit Tests
+      run: |
+        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build/test
     
     - name: Prepare Artifact
       run: |

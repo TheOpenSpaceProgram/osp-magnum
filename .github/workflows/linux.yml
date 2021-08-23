@@ -20,11 +20,22 @@ jobs:
         sudo apt-get update
         sudo apt install -y libglfw3-dev libsdl2-dev libopenal-dev libglvnd-core-dev iwyu clang-tidy clang-tools
 
-    - name: Build OSP-Magnum
+    - name: Configure
       run: |
         scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake -B build -DCMAKE_BUILD_TYPE=Release -DOSP_ENABLE_IWYU=y -DOSP_ENABLE_CLANG_TIDY=y
+
+    - name: Compile OSP-Magnum
+      run: |
         scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake --build build --parallel --config Release --target osp-magnum
-        
+
+    - name: Compile Unit Tests
+      run: |
+        scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake --build build --parallel --config Release --target test
+
+    - name: Run Unit Tests
+      run: |
+        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build/test
+
     - name: Prepare Artifact
       run: |
         mv build/3rdparty/newton-dynamics/lib/ build/lib

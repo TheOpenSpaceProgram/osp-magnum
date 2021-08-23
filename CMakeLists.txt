@@ -135,3 +135,5 @@ ADD_SUBDIRECTORY(3rdparty)
 # Also process the src subdirectory, which describes the source code for the project.
 ADD_SUBDIRECTORY(src)
 
+# Unit Tests
+ADD_SUBDIRECTORY(test)
