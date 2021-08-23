@@ -23,7 +23,6 @@
 # SOFTWARE.
 ##
 
-find_package(Corrade REQUIRED Main)
 find_package(Magnum REQUIRED
     GL
     Shaders
@@ -38,8 +37,6 @@ find_package(Magnum REQUIRED
 find_package(MagnumPlugins REQUIRED
     TinyGltfImporter
     StbImageImporter)
-
-find_package(spdlog)
 
 find_package(Threads)
 

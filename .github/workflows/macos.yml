@@ -19,8 +19,22 @@ jobs:
     - name: Install dependencies
       run: brew install cmake
 
-    - name: Build OSP-Magnum
+    - name: Configure
       shell: bash
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Compile OSP-Magnum
+      shell: bash
+      run: |
         cmake --build build --parallel --config Release --target osp-magnum
+
+    - name: Compile Unit Tests
+      shell: bash
+      run: |
+        cmake --build build --parallel --config Release --target test
+
+    - name: Run Unit Tests
+      shell: bash
+      run: |
+        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build/test

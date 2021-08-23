@@ -26,8 +26,11 @@
 #define INCLUDED_OSP_STRING_CONCAT_H_C0CC2473_002D_406E_99B6_E233565EAA1E
 #pragma once
 
-#include <iterator> // for std::data(), std::size()
-#include <type_traits> // for std::is_pointer<>, std::is_array<>
+#include <iterator>     // for std::data(), std::size()
+#include <algorithm>    // for std::copy_n()
+#include <type_traits>  // for std::is_pointer<>, std::is_array<>
+
+#include <cstddef>      // for std::size_t
 
 namespace osp
 {
@@ -80,7 +83,7 @@ constexpr auto string_data(STRING_T && str)
  * the result of calling std::size().
  */
 template<class STRING_T>
-constexpr size_t string_size(STRING_T const& str)
+constexpr std::size_t string_size(STRING_T const& str)
 {
     if constexpr(std::is_pointer_v<STRING_T>)
     {
@@ -88,8 +91,10 @@ constexpr size_t string_size(STRING_T const& str)
     }
     else if constexpr(std::is_array_v<STRING_T>)
     {
-        // TODO: Throw if the array contains an embedded nul character.
-        // TODO: Return the static size based on template deduction.
+        // While we could deduce the length of the string based only on the static size of the array
+        // that wouldn't work for arrays that have embedded nul-terminators, which would then be
+        // calculated as having a length longer than other string tools like std::string_view would use.
+        // TODO: However, we can detect that discrepancy and assert, in debug builds, to catch mistakes.
         return std::char_traits<std::remove_pointer_t<std::decay_t<STRING_T>>>::length(str);
     }
     else
@@ -146,15 +151,7 @@ template<typename RESULT_T, typename ... STRS_T>
 constexpr RESULT_T basic_string_concat(STRS_T const& ... others)
 {
     RESULT_T dest;
-
-    // C++17 fold for summation
-    dest.resize( ( 0 + ... + string_size(others) ) );
-
-    auto * p = string_data(dest);
-
-    // C++17 fold for function calls.
-    ( (p = std::copy_n(string_data(others), string_size(others), p)), ... );
-
+    string_append(dest, others...);
     return dest;
 } // basic_string_concat()
 
