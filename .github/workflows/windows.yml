@@ -19,6 +19,10 @@ jobs:
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
 
+    - name: Compile Dependencies
+      run: |
+        cmake --build build --parallel --config Release --target osp-magnum-deps
+
     - name: Compile OSP-Magnum
       run: |
         cmake --build build --parallel --config Release --target osp-magnum

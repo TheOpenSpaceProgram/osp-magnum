@@ -181,10 +181,17 @@ private:
 
 //-----------------------------------------------------------------------------
 
+#if __APPLE__
+// Apple's C++17 is missing std::shared_ptr<T[]>...
+using SharedStringLifetime_t = std::shared_ptr<const char>;
+#else
+using SharedStringLifetime_t = std::shared_ptr<const char[]>;
+#endif
+
 /**
  * The concrete implementation.
  */
-using SharedString = BasicSharedString<char, std::shared_ptr<const char[]>>;
+using SharedString = BasicSharedString<char, SharedStringLifetime_t>;
 
 //-----------------------------------------------------------------------------
 // Inlines for BasicSharedString<>
@@ -213,6 +220,8 @@ constexpr BasicSharedString<CHAR_T, LIFETIME_T>::operator std::basic_string<CHAR
     return { ViewBase_t::data(), ViewBase_t::size() };
 }
 
+// TODO: This isn't super generic. Using std::shared_ptr regardless of the LIFETIME_T parameter
+// means that alternative LIFETIME_T params will probably encounted compile failures.
 template<typename CHAR_T, typename LIFETIME_T>
   template<typename IT_T>
 inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T && end) noexcept(false) // allocates
@@ -239,10 +248,10 @@ inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T &&
     }
 
     // Make space to copy the string
-    // TODO: This isn't super generic. Using std::shared_ptr regardless of the LIFETIME_T parameter
-    // means that alternative LIFETIME_T params will probably encounted compile failures.
 #if __cplusplus >= 202002L
     auto buf = std::make_shared_for_overwrite<CHAR_T[]>(static_cast<std::size_t>(len));
+#elif __APPLE__
+    std::shared_ptr<CHAR_T> buf(new CHAR_T[static_cast<std::size_t>(len)]);
 #else
     std::shared_ptr<CHAR_T[]> buf{new CHAR_T[static_cast<std::size_t>(len)]};
 #endif
@@ -252,10 +261,10 @@ inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T &&
 
     // Construct prior to SharedString constructor to avoid
     // ABI specific parameter passing order problems.
-    auto view = ViewBase_t{ buf.get(), static_cast<size_type>(len) };
+    ViewBase_t view{ buf.get(), static_cast<size_type>(len) };
 
     // Make the SharedString
-    return create(view, std::move(buf));
+    return create(std::move(view), std::move(buf));
 }
 
 template<typename CHAR_T, typename LIFETIME_T>

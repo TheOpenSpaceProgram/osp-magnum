@@ -606,6 +606,8 @@ void PlanetGeometryA::chunk_geometry_update_recurse(FUNC_T condition,
             chunk_triangle_assure();
         }
         break;
+    case EChunkUpdateAction::Nothing:
+        break;
     }
 
     if (subdivided && !chunked)

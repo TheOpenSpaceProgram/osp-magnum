@@ -24,6 +24,10 @@ jobs:
       run: |
         scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake -B build -DCMAKE_BUILD_TYPE=Release -DOSP_ENABLE_IWYU=y -DOSP_ENABLE_CLANG_TIDY=y
 
+    - name: Compile Dependencies
+      run: |
+        scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake --build build --parallel --config Release --target osp-magnum-deps
+
     - name: Compile OSP-Magnum
       run: |
         scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake --build build --parallel --config Release --target osp-magnum
