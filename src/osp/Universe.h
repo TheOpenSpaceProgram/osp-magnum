@@ -32,11 +32,11 @@
 #include <entt/entity/registry.hpp>
 #include <entt/core/family.hpp>
 
-#include <cstdint>
-#include <optional>
-#include <tuple>
-#include <vector>
+#include <vector>   // std::vector
+#include <string>   // std::string
+#include <optional> // std::optional
 
+#include <cstdint>  // std::uint32_t
 
 namespace osp::universe
 {
@@ -70,8 +70,10 @@ public:
     using Reg_t = entt::basic_registry<Satellite>;
 
     Universe() = default;
-    Universe(Universe const &copy) = delete;
     Universe(Universe &&move) = delete;
+    Universe(Universe const &copy) = delete;
+    Universe& operator=(Universe &&move) = delete;
+    Universe& operator=(Universe const &copy) = delete;
     ~Universe() = default;
 
     /**

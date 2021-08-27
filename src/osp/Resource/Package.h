@@ -30,12 +30,14 @@
 #include <entt/core/family.hpp>
 #include <entt/core/any.hpp>
 
+#include <map>          // std::map
+#include <memory>       // std::forward
+#include <string>       // std::string
+#include <vector>       // std::vector
+#include <utility>      // std::pair
+#include <string_view>  // std::string_view
 
-#include <iostream>
-#include <cstdint>
-#include <map>
-#include <memory>
-#include <string>
+#include <cstdint>      // std::uint32_t
 
 
 namespace osp
@@ -85,10 +87,18 @@ public:
     template<class TYPE_T>
     using group_t =  std::map<std::string, osp::Resource<TYPE_T>, std::less<>>;
 
+    // disable default construction.
+    Package() = delete;
+
     Package(std::string prefix, std::string packageName);
-    Package(Package&& move) = default;
+
+    // disable copy
     Package(const Package& copy) = delete;
     Package& operator=(Package const& copy) = delete;
+
+    // enable move
+    Package(Package&& move) = default;
+    Package& operator=(Package && move) = default;
 
     /**
      * Initialize and add a resource to store in this package.
@@ -140,16 +150,21 @@ public:
     void clear() noexcept;
 
     // Stores maps of resoures of a specified type
+    // TODO: This used to have noexcept on constructors.
+    // calculate using std::is_nothrow...._v<>
     template<class TYPE_T>
     struct GroupType
     {
-        GroupType() noexcept = default;
-        GroupType(GroupType&& move) noexcept = default;
-        GroupType& operator=(GroupType&& move) noexcept = default;
+        GroupType() = default;
 
         // Needs to be copyable to store in entt::any, but copy is not allowed
         // entt experimental branch allows move-only types.
         GroupType(GroupType const& copy) { assert(0); };
+        GroupType& operator=(GroupType const& copy) = delete;
+
+        GroupType(GroupType&& move) = default;
+        GroupType& operator=(GroupType&& move) = default;
+
 
         group_t<TYPE_T> m_resources;
     };
@@ -168,8 +183,7 @@ private:
 };
 
 template<class TYPE_T, class STRING_T, typename ... ARGS_T>
-DependRes<TYPE_T> Package::add(STRING_T&& path,
-                               ARGS_T&& ... args)
+DependRes<TYPE_T> Package::add(STRING_T&& path, ARGS_T&& ... args)
 {
     // Runtime generated (global) sequential IDs for every unique type
     // First unique type added is 0, next is 1, then 2, etc...

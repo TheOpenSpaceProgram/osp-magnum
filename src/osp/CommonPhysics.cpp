@@ -49,13 +49,10 @@ float shape_volume(ECollisionShape shape, Vector3 scale)
     case ECollisionShape::CYLINDER:
         // Default radius: 1, default height: 2
         return sc_pi * scale.x() * scale.x() * 2.0f*scale.z();
-    case ECollisionShape::CAPSULE:
-    case ECollisionShape::CONVEX_HULL:
-    case ECollisionShape::TERRAIN:
-    case ECollisionShape::COMBINED:
     default:
         SPDLOG_LOGGER_ERROR(spdlog::get("application"), "Unsupported shape for volume calc");
         assert(false);
+        return 0.0f;
     }   
 }
 
