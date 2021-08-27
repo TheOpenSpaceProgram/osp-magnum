@@ -135,26 +135,7 @@ source_group("Header Files" FILES ${H_FILES})
 
 # Put executable in the bin folder
 set_target_properties(osp-magnum PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../bin)
-
-if(OSP_ENABLE_IWYU)
-  find_program(iwyu_path NAMES include-what-you-use iwyu)
-  if(iwyu_path)
-      set_property(TARGET osp-magnum
-                   PROPERTY
-                   CXX_INCLUDE_WHAT_YOU_USE ${iwyu_path}
-                   -Xiwyu
-                   --mapping_file=${CMAKE_SOURCE_DIR}/iwyu.imp)
-  endif()
-endif()
-
-if(OSP_ENABLE_CLANG_TIDY)
-  find_program(tidy_path NAMES clang-tidy)
-  if(tidy_path)
-      set_property(TARGET osp-magnum
-                   PROPERTY
-                   CXX_CLANG_TIDY ${tidy_path})
-  endif()
-endif()
+set_target_properties(osp-magnum PROPERTIES EXPORT_COMPILE_COMMANDS TRUE)
 
 # Copy root/bin to build/bin
 FILE (COPY "${CMAKE_SOURCE_DIR}/bin/" DESTINATION "${CMAKE_BINARY_DIR}/bin/")

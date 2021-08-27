@@ -1,0 +1,51 @@
+name: Analyzers
+
+on:
+  pull_request:
+  push:
+  release:
+    types: published
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        tool: [clang-analyzer, iwyu]
+        config: [Release, Debug]
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 1
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev iwyu clang clang-tidy clang-tools
+        # TODO: Really, this should only be fetching the build dependencies, so we can only use the in-tree version
+        sudo apt install -y libsdl2-dev
+
+    - name: Configure
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=R${{ matrix.config }}
+
+    - name: Download Clang Analysis Driver Scripts
+      run: |
+        wget https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-11.0.1/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
+        wget https://raw.githubusercontent.com/include-what-you-use/include-what-you-use/clang_11/iwyu_tool.py
+        chmod +x run-clang-tidy.py iwyu_tool.py 
+
+    # Implicitly requires build/compile_commands.json to exist
+    - name: Run Clang Analyzer
+      if: ${{ matrix.tool == 'clang-analyzer' }}
+      run: |
+        ./run-clang-tidy.py -p build
+
+    # Implicitly requires build/compile_commands.json to exist
+    - name: Run IWYU
+      if: ${{ matrix.tool == 'iwyu' }}
+      run: |
+        ./iwyu_tool.py -p build -- -Xiwyu --mapping_file=${GITHUB_WORKSPACE}/iwyu.imp

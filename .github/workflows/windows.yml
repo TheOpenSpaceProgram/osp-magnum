@@ -9,37 +9,78 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+
+    strategy:
+      matrix:
+        # ClangCL is known to fail against SDL2-2.0.16 because of the use of -idirafter.
+        # MinGW fails due to incomprehensible linker errors... LTO maybe?
+        # LLVM-Clang fails due to cmake configuration issues in newton-dynamics.
+        # compiler: [msvc, clangcl, mingw, clang]
+        compiler: [msvc]
+        config: [Release, Debug]
+
     steps:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 1
         submodules: recursive
 
-    - name: Configure
+    - uses: egor-tensin/setup-mingw@v2
+      if: ${{ matrix.compiler == 'mingw' }}
+
+    - uses: egor-tensin/setup-clang@v1
+      if: ${{ matrix.compiler == 'clang' }}
+
+    - uses: ashutoshvarma/setup-ninja@v1.1
+      if: ${{ matrix.compiler == 'clang' }}
+
+    - name: Configure (MSVC)
+      if: ${{ matrix.compiler == 'msvc' }}
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
+
+    - name: Configure (ClangCL)
+      if: ${{ matrix.compiler == 'clangcl' }}
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -TClangCL
+
+    - name: Configure (MinGW)
+      if: ${{ matrix.compiler == 'mingw' }}
+      env:
+        CC:  C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\cc.exe
+        CXX: C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\c++.exe
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -G"MinGW Makefiles"
+
+    - name: Configure (Clang)
+      if: ${{ matrix.compiler == 'clang' }}
+      env:
+        CC:  C:\Program Files\LLVM\bin\cc.exe
+        CXX: C:\Program Files\LLVM\bin\c++.exe
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -GNinja
 
     - name: Compile Dependencies
       run: |
-        cmake --build build --parallel --config Release --target osp-magnum-deps
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps
 
     - name: Compile OSP-Magnum
       run: |
-        cmake --build build --parallel --config Release --target osp-magnum
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum
 
     - name: Compile Unit Tests
       run: |
-        cmake --build build --parallel --config Release --target test
+        cmake --build build --parallel --config ${{ matrix.config }} --target test
 
     - name: Run Unit Tests
       run: |
-        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build/test
+        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
     
     - name: Prepare Artifact
       run: |
-        move build\bin\OSPData build\bin\Release\OSPData
+        move build\bin\OSPData build\bin\${{ matrix.config }}\OSPData
   
     - uses: actions/upload-artifact@v2
       with: 
-        name: release
-        path: build\bin\Release
+        name: ${{ matrix.config }}
+        path: build\bin\${{ matrix.config }}
