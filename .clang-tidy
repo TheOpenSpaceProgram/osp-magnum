@@ -1,6 +1,5 @@
 ---
-Checks: '
-	,clang-diagnostic-*,
+Checks: 'clang-diagnostic-*,
 	,clang-analyzer-*,
 	,bugprone-*,
 	,performance-*,
@@ -9,9 +8,7 @@ Checks: '
 	,-modernize-use-trailing-return-type,
 	,-modernize-use-auto,
 	,-readability-uppercase-literal-suffix,
-	,-readability-magic-numbers,
+	,-readability-else-after-return,
 	,-clang-analyzer-cplusplus.InnerPointer,
 	,-cplusplus.InnerPointer,
-'
-WarningsAsErrors: '
 '

@@ -10,6 +10,10 @@ jobs:
   build:
     runs-on: macos-latest
 
+    strategy:
+      matrix:
+        config: [Release, Debug]
+
     steps:
     - uses: actions/checkout@v2
       with:
@@ -27,19 +31,19 @@ jobs:
     - name: Compile Dependencies
       shell: bash
       run: |
-        cmake --build build --parallel --config Release --target osp-magnum-deps
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps
 
     - name: Compile OSP-Magnum
       shell: bash
       run: |
-        cmake --build build --parallel --config Release --target osp-magnum
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum
 
     - name: Compile Unit Tests
       shell: bash
       run: |
-        cmake --build build --parallel --config Release --target test
+        cmake --build build --parallel --config ${{ matrix.config }} --target test
 
     - name: Run Unit Tests
       shell: bash
       run: |
-        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build/test
+        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test

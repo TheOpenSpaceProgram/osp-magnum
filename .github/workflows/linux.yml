@@ -9,6 +9,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        config: [Release, Debug]
+
+    env:
+      CC:  ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang'   }}
+      CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+
     steps:
     - uses: actions/checkout@v2
       with:
@@ -18,27 +28,29 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt install -y libglfw3-dev libsdl2-dev libopenal-dev libglvnd-core-dev iwyu clang-tidy clang-tools
+        sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev iwyu clang clang-tidy clang-tools
+        # TODO: Really, this should only be fetching the build dependencies, so we can only use the in-tree version
+        sudo apt install -y libsdl2-dev
 
     - name: Configure
       run: |
-        scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake -B build -DCMAKE_BUILD_TYPE=Release -DOSP_ENABLE_IWYU=y -DOSP_ENABLE_CLANG_TIDY=y
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DCMAKE_LINK_WHAT_YOU_USE=TRUE
 
     - name: Compile Dependencies
       run: |
-        scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake --build build --parallel --config Release --target osp-magnum-deps
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps
 
     - name: Compile OSP-Magnum
       run: |
-        scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake --build build --parallel --config Release --target osp-magnum
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum
 
     - name: Compile Unit Tests
       run: |
-        scan-build --exclude 3rdparty/newton-dynamics -o scanlogs cmake --build build --parallel --config Release --target test
+        cmake --build build --parallel --config ${{ matrix.config }} --target test
 
     - name: Run Unit Tests
       run: |
-        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build/test
+        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
 
     - name: Prepare Artifact
       run: |
@@ -46,7 +58,7 @@ jobs:
         
     - uses: actions/upload-artifact@v2
       with: 
-        name: release
+        name: ${{ matrix.config }}
         path: |
           build/bin
           build/lib
