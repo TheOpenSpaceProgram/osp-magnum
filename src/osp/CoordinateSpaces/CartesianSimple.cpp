@@ -40,7 +40,7 @@ void CoordspaceCartesianSimple::update_exchange(
     // Sort in descending order. If any of these are the last element, then
     // then they may get invalidated in the following swaps.
     std::sort(std::begin(rSpace.m_toRemove), std::end(rSpace.m_toRemove),
-              std::greater<uint32_t>());
+              std::greater<>());
 
     // Remove using swap-and-pop
     for (uint32_t index : rSpace.m_toRemove)

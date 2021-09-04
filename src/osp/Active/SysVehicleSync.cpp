@@ -34,6 +34,7 @@
 
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
+#include <osp/OSPApplication.h>
 
 using namespace osp::active;
 

@@ -70,7 +70,7 @@ void SysHierarchy::set_parent_child(ActiveScene& rScene, ActiveEnt parent, Activ
     childHierarchy.m_level = parentHierarchy.m_level + 1;
 
     // If has siblings (not first child)
-    if (parentHierarchy.m_childCount)
+    if(0 != parentHierarchy.m_childCount)
     {
         ActiveEnt sibling = parentHierarchy.m_childFirst;
         auto& siblingHierarchy = rReg.get<ACompHierarchy>(sibling);

@@ -24,9 +24,17 @@
  */
 #pragma once
 
-#include "../ShipResources.h"
+#include <osp/Active/activetypes.h>  // for ActiveEnt
+#include <adera/ShipResources.h>
 
-#include <osp/Resource/blueprints.h>
+#include <string>                    // for std::string
+
+#include <cstdint>                   // for std::uint64_t
+
+// Forward declares to avoid unneeded includes
+namespace osp::active { class ActiveScene; }
+namespace osp { struct BlueprintMachine; }
+namespace osp { struct PCompMachine; }
 
 namespace adera::active::machines
 {
@@ -81,13 +89,13 @@ public:
      *
      * @return The amount of resource that was received
      */
-    uint64_t request_contents(uint64_t quantity);
+    std::uint64_t request_contents(std::uint64_t quantity);
 
     /**
      * Compute the current mass of the container contents
      * @return The current mass, in kg
      */
-    float compute_mass() const noexcept;
+    double compute_mass() const noexcept;
 private:
 
     float m_capacity;

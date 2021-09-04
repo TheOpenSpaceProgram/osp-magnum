@@ -48,4 +48,4 @@ jobs:
     - name: Run IWYU
       if: ${{ matrix.tool == 'iwyu' }}
       run: |
-        ./iwyu_tool.py -p build -- -Xiwyu --mapping_file=${GITHUB_WORKSPACE}/iwyu.imp
+        ./iwyu_tool.py -p build -- -Xiwyu --mapping_file=${GITHUB_WORKSPACE}/iwyu-ubuntu.imp

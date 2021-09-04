@@ -24,10 +24,12 @@
  */
 #include "Phong.h"
 
-#include <Magnum/Math/Matrix4.h>
+#include <osp/Active/SysRender.h>
+#include <osp/Active/ActiveScene.h>
 
-#include "../Active/ActiveScene.h"
-#include "../Active/SysRender.h"
+#include <osp/Resource/Package.h>
+
+#include <Magnum/Math/Matrix4.h>
 
 using namespace osp::active;
 using namespace osp::shader;

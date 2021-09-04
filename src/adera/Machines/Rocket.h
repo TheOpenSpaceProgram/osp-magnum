@@ -24,12 +24,19 @@
  */
 #pragma once
 
-#include "../wiretypes.h"
+#include <adera/wiretypes.h>
 
-#include <osp/Active/SysMachine.h>
-#include <osp/Active/SysWire.h>
-#include <osp/Active/physics.h>
-#include <osp/Resource/blueprints.h>
+#include "osp/Active/activetypes.h"  // for ActiveEnt
+
+#include <osp/Resource/machines.h>   // for osp::portindex_t
+
+#include <entt/entity/entity.hpp>    // for entt::null, entt::null_t
+
+#include <string>                    // for std::string
+
+namespace osp::active { class ActiveScene; }
+namespace osp { struct BlueprintMachine; }
+namespace osp { struct PCompMachine; }
 
 namespace adera::active::machines
 {

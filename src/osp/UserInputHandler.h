@@ -237,7 +237,7 @@ public:
 
     using DeviceId = uint32_t;
 
-    UserInputHandler(int deviceCount);
+    UserInputHandler(size_t deviceCount);
 
     // TODO: deal with joystick 1D and 2D axis
     // axis should have different modes:

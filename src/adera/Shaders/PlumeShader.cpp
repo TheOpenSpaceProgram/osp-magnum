@@ -22,19 +22,45 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "PlumeShader.h"
-#include "../SysExhaustPlume.h"
+#include "PlumeShader.h"                  // IWYU pragma: associated
 
-#include <osp/types.h>
-#include <osp/Active/SysRender.h>
-#include <osp/Resource/AssetImporter.h>
+#include <adera/Plume.h>                  // for PlumeEffectData
+#include <adera/SysExhaustPlume.h>        // for ACompExhaustPlume
 
+#include <osp/Resource/Package.h>         // for Package
+#include <osp/Resource/Resource.h>        // for DependRes
+#include <osp/Resource/AssetImporter.h>   // for AssetImporter
+
+#include <osp/Active/scene.h>             // for ACompCamera
+#include <osp/Active/drawing.h>           // for ACompDrawTransform
+#include <osp/Active/SysRender.h>         // for ACompMesh
+#include <osp/Active/ActiveScene.h>       // for ActiveScene
+#include <osp/Active/activetypes.h>       // for basic_sparse_set, ActiveEnt
+
+#include <osp/OSPApplication.h>           // for OSPApplication
+
+#include <Magnum/GL/Shader.h>             // for Shader, Shader::Type
+#include <Magnum/GL/Texture.h>            // for Texture2D
+#include <Magnum/GL/Version.h>            // for Version, Version::GL430
 #include <Magnum/GL/Renderer.h>
-#include <Magnum/GL/Shader.h>
-#include <Magnum/GL/Texture.h>
-#include <Magnum/GL/Version.h>
 
-#include <Corrade/Containers/Reference.h>
+#include <Magnum/Magnum.h>                // for Int, Color4, Matrix3x3, Matrix4
+
+// Needed to make the following line of code compile, for unknown reasons.
+// CORRADE_INTERNAL_ASSERT_OUTPUT(GL::Shader::compile({vert, frag}));
+#include <Corrade/Containers/Reference.h> // IWYU pragma: keep
+#include "Corrade/Containers/ArrayView.h" // for ArrayView
+
+#include <Corrade/Utility/Assert.h>       // for CORRADE_INTERNAL_ASSERT_OUTPUT
+
+#include <string_view>                    // for std::string_view
+
+// IWYU pragma: no_include "osp/types.h"
+
+// IWYU pragma: no_include <memory>
+// IWYU pragma: no_include <cstddef>
+// IWYU pragma: no_include <stdint.h>
+// IWYU pragma: no_include <algorithm>
 
 using namespace osp;
 using namespace osp::active;
@@ -47,7 +73,6 @@ void PlumeShader::draw_plume(
 {
     using Magnum::GL::Renderer;
     using Magnum::GL::Texture2D;
-    using Magnum::GL::Mesh;
 
     auto& rResources = rScene.get_context_resources();
     PlumeShader &rShader = *reinterpret_cast<PlumeShader*>(pUserData);
@@ -56,7 +81,7 @@ void PlumeShader::draw_plume(
     auto const& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
     auto const& rPlumeComp = rScene.reg_get<ACompExhaustPlume>(ent);
     auto const& plumedata = *rPlumeComp.m_effect;
-    Mesh& rMesh = *rScene.reg_get<ACompMesh>(ent).m_mesh;
+    auto& rMesh = *rScene.reg_get<ACompMesh>(ent).m_mesh;
 
     constexpr std::string_view texName = "OSPData/adera/noise1024.png";
     DependRes<Texture2D> tmpTex = rResources.get<Texture2D>(texName);
@@ -130,13 +155,13 @@ PlumeShader::PlumeShader()
     init();
 }
 
-PlumeShader& PlumeShader::setProjectionMatrix(Matrix4 const& matrix)
+PlumeShader& PlumeShader::setProjectionMatrix(Magnum::Matrix4 const& matrix)
 {
     setUniform(static_cast<Magnum::Int>(UniformPos::ProjMat), matrix);
     return *this;
 }
 
-PlumeShader& PlumeShader::setTransformationMatrix(Matrix4 const& matrix)
+PlumeShader& PlumeShader::setTransformationMatrix(Magnum::Matrix4 const& matrix)
 {
     setUniform(static_cast<Magnum::Int>(UniformPos::ModelTransformMat), matrix);
     return *this;

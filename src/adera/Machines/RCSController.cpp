@@ -23,22 +23,38 @@
  * SOFTWARE.
  */
 
-#include "RCSController.h"
+#include "RCSController.h"               // IWYU pragma: associated
 
-#include <osp/Active/ActiveScene.h>
+#include <osp/Active/scene.h>            // for ACompTransform
+#include <osp/Active/SysWire.h>          // for ACompWire, ACompWireNodes
+#include <osp/Active/physics.h>
+#include <osp/Active/SysSignal.h>        // for Signal<>::NodeState, SysSignal
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
-#include <osp/Active/physics.h>
+#include <osp/Active/SysMachine.h>       // for ACompMachines
+#include <osp/Active/ActiveScene.h>
+#include <osp/Active/activetypes.h>      // for ActiveEnt, ActiveReg_t
 
 #include <osp/Resource/machines.h>
+#include <osp/Resource/Resource.h>       // for DependRes
+#include <osp/Resource/blueprints.h>     // for BlueprintMachine, BlueprintV...
+#include <osp/Resource/PrototypePart.h>  // for NodeMap_t
 
-#include <Magnum/Math/Vector.h>
-#include <functional>
+#include <osp/types.h>                   // for Vector3, Matrix4
 
-using adera::active::machines::SysMachineRCSController;
-using adera::active::machines::MachineRCSController;
-using adera::wire::Percent;
-using adera::wire::AttitudeControl;
+#include <vector>                        // for std::vector
+#include <iterator>                      // for std::begin, std::end
+#include <algorithm>                     // for std::clamp, std::sort
+#include <functional>                    // for std::negate
+
+// IWYU pragma: no_include "adera/wiretypes.h"
+
+// IWYU pragma: no_include <cstddef>
+// IWYU pragma: no_include <stdint.h>
+// IWYU pragma: no_include <type_traits>
+
+namespace osp { class Package; }
+namespace osp { struct Path; }
 
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
@@ -68,27 +84,26 @@ using osp::NodeMap_t;
 using osp::Matrix4;
 using osp::Vector3;
 
+namespace adera::active::machines
+{
 
 float SysMachineRCSController::thruster_influence(Vector3 posOset, Vector3 direction,
     Vector3 cmdTransl, Vector3 cmdRot)
 {
-    using Magnum::Math::cross;
-    using Magnum::Math::dot;
-
     // Thrust is applied in opposite direction of thruster nozzle direction
     Vector3 thrust = std::negate{}(direction.normalized());
 
     float rotInfluence = 0.0f;
     if (cmdRot.length() > 0.0f)
     {
-        Vector3 torque = cross(posOset, thrust).normalized();
-        rotInfluence = dot(torque, cmdRot.normalized());
+        Vector3 torque = Magnum::Math::cross(posOset, thrust).normalized();
+        rotInfluence   = Magnum::Math::dot(torque, cmdRot.normalized());
     }
 
     float translInfluence = 0.0f;
     if (cmdTransl.length() > 0.0f)
     {
-        translInfluence = dot(thrust, cmdTransl.normalized());
+        translInfluence = Magnum::Math::dot(thrust, cmdTransl.normalized());
     }
 
     // Total component of thrust in direction of command
@@ -144,17 +159,17 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
 
 void SysMachineRCSController::update_calculate(ActiveScene& rScene)
 {
+    using adera::wire::Percent;
+    using adera::wire::AttitudeControl;
+
     ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
     std::vector<ActiveEnt>& rToUpdate
             = SysWire::to_update<MachineRCSController>(rScene);
 
     UpdNodes_t<Percent> updPercent;
 
-    auto view = rScene.get_registry().view<MachineRCSController>();
-
     for (ActiveEnt ent : rToUpdate)
     {
-
         float influence = 0.0f;
 
         auto const *pPanelAtCtrl = rScene.get_registry()
@@ -233,3 +248,5 @@ void SysMachineRCSController::update_calculate(ActiveScene& rScene)
         rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
 }
+
+} // namespace adera::active::machines

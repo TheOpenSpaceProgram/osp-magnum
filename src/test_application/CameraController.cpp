@@ -33,6 +33,7 @@
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/SysVehicleSync.h>
+#include <osp/OSPApplication.h>
 
 using testapp::SysCameraController;
 using testapp::ACompCameraController;

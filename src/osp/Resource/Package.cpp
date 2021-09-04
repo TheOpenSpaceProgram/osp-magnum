@@ -30,14 +30,13 @@ namespace osp
 {
 
 Package::Package(std::string prefix, std::string packageName)
- : m_groups()
- , m_packageName(std::move(packageName))
+ : m_packageName(std::move(packageName))
  , m_prefix(std::move(prefix))
 { }
 
 StrViewPair_t decompose_str(std::string_view path, const char delim)
 {
-    size_t pos = path.find(delim);
+    std::size_t pos = path.find(delim);
     return {
         path.substr(0, pos),
         path.substr(pos + 1, path.length())

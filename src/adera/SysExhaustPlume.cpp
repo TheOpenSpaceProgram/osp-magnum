@@ -22,22 +22,41 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "SysExhaustPlume.h"
-#include "adera/Machines/Rocket.h"
+#include "SysExhaustPlume.h"             // IWYU pragma: associated
 
-#include <osp/Active/ActiveScene.h>
-#include <osp/Active/SysRender.h>
-#include <osp/Active/SysHierarchy.h>
-#include <osp/Resource/AssetImporter.h>
+#include <adera/Plume.h>                 // for PlumeEffectData
+#include <adera/Machines/Rocket.h>       // for MachineRocket
 
-#include <Magnum/Trade/MeshData.h>
-#include <Magnum/MeshTools/Compile.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/GL/Texture.h>
-#include <Magnum/Trade/ImageData.h>
-#include <Magnum/ImageView.h>
-#include <Magnum/GL/Sampler.h>
-#include <Magnum/GL/TextureFormat.h>
+#include <osp/Resource/Package.h>        // for Package
+#include <osp/Resource/machines.h>       // for mach_id, machine_id_t
+#include <osp/Resource/Resource.h>       // for DependRes
+#include <osp/Resource/blueprints.h>     // for BlueprintMachine, BlueprintV...
+#include <osp/Resource/AssetImporter.h>  // for AssetImporter
+
+#include <osp/Active/scene.h>            // for ACompName
+#include <osp/Active/drawing.h>          // for ACompShader, ACompVisible
+#include <osp/Active/SysRender.h>        // for ACompMesh
+#include <osp/Active/SysMachine.h>       // for ACompMachines
+#include <osp/Active/SysVehicle.h>       // for ACompVehicle
+#include <osp/Active/ActiveScene.h>      // for ActiveScene
+#include <osp/Active/activetypes.h>      // for entt::basic_view, entt::basic_sparse_set
+#include <osp/Active/SysHierarchy.h>     // for osp::active::SysHierarchy
+
+#include <osp/OSPApplication.h>          // for OSPApplication
+
+#include <Magnum/GL/Mesh.h>              // for Mesh
+
+#include <entt/entity/entity.hpp>        // for entt::null_t, entt::null
+
+#include <spdlog/spdlog.h>               // for SPDLOG_LOGGER_ERROR, SPDLOG_...
+
+#include <string_view>                   // for string_view
+
+// IWYU pragma: no_include <vector>
+// IWYU pragma: no_include <string>
+// IWYU pragma: no_include <cstddef>
+// IWYU pragma: no_include <stdint.h>
+// IWYU pragma: no_include <type_traits>
 
 using namespace adera::active;
 
@@ -208,7 +227,7 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
         }
         else
         {
-            rScene.get_registry().remove_if_exists<ACompVisible>(plumeEnt);
+            rScene.get_registry().remove<ACompVisible>(plumeEnt);
         }
     }
 }

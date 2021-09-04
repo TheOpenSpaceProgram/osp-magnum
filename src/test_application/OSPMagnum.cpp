@@ -30,8 +30,6 @@
 #include <Magnum/Math/Color.h>
 #include <Magnum/PixelFormat.h>
 
-#include <iostream>
-
 #include <toml.hpp>
 
 #include <spdlog/sinks/stdout_color_sinks.h>

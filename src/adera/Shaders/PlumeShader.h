@@ -24,22 +24,18 @@
  */
 #pragma once
 
-#include "adera/Plume.h"
-#include <osp/Resource/Resource.h>
-#include <osp/Active/activetypes.h>
-#include <osp/Active/ActiveScene.h>
 #include <osp/Active/drawing.h>
+#include <osp/Active/activetypes.h>
 
-#include <Magnum/GL/AbstractShaderProgram.h>
-#include <Magnum/GL/Attribute.h>
 #include <Magnum/GL/Texture.h>
-#include <Magnum/Math/Vector4.h>
-#include <Magnum/Math/Vector3.h>
-#include <Magnum/Math/Vector2.h>
-#include <Magnum/Math/Matrix3.h>
-#include <Magnum/Math/Matrix4.h>
-#include <Magnum/Math/Color.h>
+#include <Magnum/GL/AbstractShaderProgram.h>
+
 #include <Magnum/Shaders/GenericGL.h>
+
+#include <Magnum/Magnum.h> // for Magnum::Int
+
+namespace osp::active { class ActiveScene; }
+namespace osp::active { struct ACompCamera; }
 
 namespace adera::shader
 {

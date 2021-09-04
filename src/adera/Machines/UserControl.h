@@ -24,15 +24,18 @@
  */
 #pragma once
 
-#include "../wiretypes.h"
+#include "../wiretypes.h"           // for AttitudeControl, Percent
 
-#include <osp/Active/SysMachine.h>
-#include <osp/Active/SysWire.h>
+#include "osp/Resource/machines.h"  // for portindex_t
+
+#include "osp/types.h"              // for Vector3
+
+#include <string_view>              // for string_view
+
+namespace osp::active { class ActiveScene; }
 
 namespace adera::active::machines
 {
-
-class MachineUserControl;
 
 /**
  * Gets ButtonControlHandle from a UserInputHandler, and updates

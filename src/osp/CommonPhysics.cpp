@@ -25,10 +25,10 @@
 
 #include "CommonPhysics.h"
 
-#include <iostream>
-#include <assert.h>
 
 #include <spdlog/spdlog.h>
+
+#include <cassert>
 
 namespace osp::phys
 {

@@ -28,14 +28,13 @@
 #include "SysRender.h"
 #include "SysVehicle.h"
 #include "physics.h"
+#include <osp/OSPApplication.h>
 
 #include "../Resource/PrototypePart.h"
 #include "../Resource/AssetImporter.h"
 
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
-
-#include <iostream>
 
 
 using namespace osp;
@@ -48,7 +47,7 @@ float SysVehicle::compute_hier_volume(ActiveScene& rScene, ActiveEnt part)
     auto checkVol = [&rScene, &volume](ActiveEnt ent)
     {
         auto const* shape = rScene.get_registry().try_get<ACompShape>(ent);
-        if (shape)
+        if(nullptr != shape)
         {
             auto const& xform = rScene.reg_get<ACompTransform>(ent);
             volume += shape_volume(shape->m_shape, xform.m_transform.scaling());
@@ -139,7 +138,7 @@ ActiveEnt SysVehicle::part_instantiate(
 
         std::vector<DependRes<Texture2D>> textureResources;
         textureResources.reserve(pcompDrawable.m_textures.size());
-        for (DependRes<ImageData2D> imageData : pcompDrawable.m_textures)
+        for (DependRes<ImageData2D> const& imageData : pcompDrawable.m_textures)
         {
             DependRes<Texture2D> texRes = glResources.get<Texture2D>(imageData.name());
 
@@ -233,8 +232,6 @@ void debug_wire_vehicles(ActiveScene &rScene)
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
-
-
 }
 
 void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
@@ -265,8 +262,8 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             // Invalidate all ACompRigidbodyAncestors
             auto invalidateAncestors = [&rScene](ActiveEnt e)
             {
-                auto* pRBA = rScene.get_registry().try_get<ACompRigidbodyAncestor>(e);
-                if (pRBA) { pRBA->m_ancestor = entt::null; }
+                auto* const pRBA = rScene.get_registry().try_get<ACompRigidbodyAncestor>(e);
+                if(nullptr != pRBA) { pRBA->m_ancestor = entt::null; }
                 return EHierarchyTraverseStatus::Continue;
             };
             SysHierarchy::traverse(rScene, vehicleEnt, invalidateAncestors);
@@ -322,7 +319,7 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
                     return true;
                 }
 
-                if (partPart.m_separationIsland)
+                if(0 != partPart.m_separationIsland)
                 {
                     // separate into a new vehicle
 
@@ -373,12 +370,10 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
                 for (ActiveEnt partEnt : islandVehicle.m_parts)
                 {
-                    ActiveEnt child = rScene.reg_get<ACompHierarchy>(partEnt)
-                                        .m_childFirst;
-                    auto &partTransform
+                    auto & rPartTransform
                             = rScene.reg_get<ACompTransform>(partEnt);
 
-                    partTransform.m_transform.translation() -= comOffset;
+                    rPartTransform.m_transform.translation() -= comOffset;
                 }
 
 //                ActiveEnt child = m_scene.reg_get<ACompHierarchy>(islandEnt)

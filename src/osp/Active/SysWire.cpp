@@ -22,10 +22,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <iostream>
 
 #include "SysWire.h"
 #include "ActiveScene.h"
+
+#include <osp/OSPApplication.h>
+
+#include <spdlog/spdlog.h>
 
 using osp::active::SysWire;
 

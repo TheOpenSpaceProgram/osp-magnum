@@ -37,12 +37,11 @@
 #include <Magnum/GL/Renderer.h>
 
 #include <Magnum/Shaders/MeshVisualizerGL.h>
+#include <osp/OSPApplication.h>
 
 // TODO: Decouple when a proper interface for creating static triangle meshes
 //       is made
 #include <newtondynamics_physics/SysNewton.h>
-
-#include <iostream>
 
 using planeta::active::SysPlanetA;
 using planeta::universe::UCompPlanet;
@@ -183,7 +182,7 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
         auto &planet = view.get<ACompPlanet>(ent);
         auto &tf = view.get<ACompTransform>(ent);
 
-        if (planet.m_planet.get() == nullptr)
+        if(nullptr == planet.m_planet)
         {
             planet.m_planet = std::make_shared<PlanetGeometryA>();
             PlanetGeometryA &rPlanetGeo = *(planet.m_planet);

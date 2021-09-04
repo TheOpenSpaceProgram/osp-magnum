@@ -25,12 +25,14 @@
 #include "PlanetGeometryA.h"
 #include <iterator>
 #include <algorithm>
-#include <iostream>
 #include <stack>
 #include <array>
-#include <assert.h>
+#include <cassert>
+
+#include <osp/OSPApplication.h>
 
 #include <spdlog/spdlog.h>
+#include <Magnum/Math/Functions.h>
 
 
 // maybe do something about how this file is almost a thousand lines long

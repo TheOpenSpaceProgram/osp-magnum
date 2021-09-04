@@ -26,7 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
+#include <array>
 
 #include <spdlog/spdlog.h>
 
@@ -92,7 +92,7 @@ void IcoSphereTree::initialize(float radius)
     float syA = scl * ( 1.0f/10.0f * sqrt( 10.0f*(5.0f + sqrt(5.0f)) ) );
     float syB = scl * ( 1.0f/10.0f * sqrt( 10.0f*(5.0f - sqrt(5.0f)) ) );
 
-    float icosahedronVerts[] =
+    auto const icosahedronVerts = std::array
     {
         0.0f,   0.0f,    scl, // top point
 
@@ -552,8 +552,11 @@ void IcoSphereTree::event_notify()
 {
     if (!m_trianglesAdded.empty())
     {
-        for (std::weak_ptr<IcoSphereTreeObserver> ob : m_observers)
+        for (std::weak_ptr<IcoSphereTreeObserver> const& ob : m_observers)
         {
+            // TODO: The whole point of weak_ptr is that the thing it points to might not exist anymore.
+            // the result of lock() must be checked for nullptr.
+
             // TODO: get rid of expired ones
             ob.lock()->on_ico_triangles_added(m_trianglesAdded);
         }
@@ -562,8 +565,11 @@ void IcoSphereTree::event_notify()
 
     if (!m_trianglesRemoved.empty())
     {
-        for (std::weak_ptr<IcoSphereTreeObserver> ob : m_observers)
+        for (std::weak_ptr<IcoSphereTreeObserver> const& ob : m_observers)
         {
+            // TODO: The whole point of weak_ptr is that the thing it points to might not exist anymore.
+            // the result of lock() must be checked for nullptr.
+
             // TODO: get rid of expired ones
             ob.lock()->on_ico_triangles_removed(m_trianglesRemoved);
         }
@@ -572,8 +578,11 @@ void IcoSphereTree::event_notify()
 
     if (!m_vrtxRemoved.empty())
     {
-        for (std::weak_ptr<IcoSphereTreeObserver> ob : m_observers)
+        for (std::weak_ptr<IcoSphereTreeObserver> const& ob : m_observers)
         {
+            // TODO: The whole point of weak_ptr is that the thing it points to might not exist anymore.
+            // the result of lock() must be checked for nullptr.
+
             // TODO: get rid of expired ones
             ob.lock()->on_ico_vertex_removed(m_vrtxRemoved);
         }

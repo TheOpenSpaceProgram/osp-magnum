@@ -26,7 +26,6 @@
 
 #include "Satellites/SatActiveArea.h"
 
-#include <iostream>
 #include <iterator>
 
 using namespace osp::universe;

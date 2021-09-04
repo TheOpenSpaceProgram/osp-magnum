@@ -24,27 +24,36 @@
  */
 #pragma once
 
-#include <map>
+// IWYU pragma: begin_exports
+#include <Magnum/Types.h>
 
-#include <Magnum/Magnum.h>
-#include <Magnum/Math/Functions.h>
-#include <Magnum/Math/Vector3.h>
-#include <Magnum/Math/Quaternion.h>
+#include <Magnum/Math/Matrix.h>
 #include <Magnum/Math/Matrix4.h>
 #include <Magnum/Math/Matrix3.h>
+
+#include <Magnum/Math/Vector.h>
+#include <Magnum/Math/Vector2.h>
+#include <Magnum/Math/Vector3.h>
+#include <Magnum/Math/Vector4.h>
+
+#include <Magnum/Math/Quaternion.h>
+// IWYU pragma: end_exports
 
 namespace osp
 {
 
-using Magnum::Vector2;
-using Magnum::Vector2i;
+using Matrix3    = Magnum::Math::Matrix3<Magnum::Float>;
+using Matrix4    = Magnum::Math::Matrix4<Magnum::Float>;
 
-using Magnum::Vector3;
-using Magnum::Vector4;
-using Magnum::Quaternion;
-using Magnum::Matrix3;
-using Magnum::Matrix4;
+using Vector2i   = Magnum::Math::Vector2<Magnum::Int>;
 
-using Magnum::Rad;
+using Vector2    = Magnum::Math::Vector2<Magnum::Float>;
+using Vector3    = Magnum::Math::Vector3<Magnum::Float>;
+using Vector4    = Magnum::Math::Vector4<Magnum::Float>;
+
+using Quaternion = Magnum::Math::Quaternion<Magnum::Float>;
+
+using Rad        = Magnum::Math::Rad<Magnum::Float>;
+using Deg        = Magnum::Math::Deg<Magnum::Float>;
 
 }

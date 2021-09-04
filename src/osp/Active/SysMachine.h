@@ -28,7 +28,6 @@
 #include "../Resource/machines.h"
 
 #include <cstdint>
-#include <iostream>
 #include <vector>
 
 namespace osp::active

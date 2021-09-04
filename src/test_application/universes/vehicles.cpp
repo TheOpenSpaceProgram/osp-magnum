@@ -35,6 +35,8 @@
 #include <osp/Active/SysWire.h>
 #include <osp/Satellites/SatVehicle.h>
 
+#include <iostream>
+
 using namespace testapp;
 
 using osp::Vector2;

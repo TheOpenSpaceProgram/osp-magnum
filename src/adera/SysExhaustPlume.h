@@ -23,10 +23,15 @@
  * SOFTWARE.
  */
 #pragma once
-#include "osp/Active/physics.h"
-#include "adera/Plume.h"
-#include "adera/Shaders/PlumeShader.h"
-#include "osp/Resource/Resource.h"
+#include <adera/Plume.h>             // for PlumeEffectData
+
+#include <osp/Active/activetypes.h>  // for ActiveEnt
+
+#include <osp/Resource/Resource.h>   // for DependRes
+
+#include <entt/entity/entity.hpp>    // for null, null_t
+
+namespace osp { namespace active { class ActiveScene; } }
 
 namespace adera::active
 {

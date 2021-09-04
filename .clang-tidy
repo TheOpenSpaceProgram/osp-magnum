@@ -9,6 +9,7 @@ Checks: 'clang-diagnostic-*,
 	,-modernize-use-auto,
 	,-readability-uppercase-literal-suffix,
 	,-readability-else-after-return,
+        ,-readability-magic-numbers,
 	,-clang-analyzer-cplusplus.InnerPointer,
 	,-cplusplus.InnerPointer,
 '

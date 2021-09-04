@@ -25,19 +25,19 @@
 #include "UserInputHandler.h"
 #include "string_concat.h"
 
-#include <iostream>
+#include <Magnum/Math/Functions.h>
 
 namespace osp::input
 {
 
-UserInputHandler::UserInputHandler(int deviceCount) :
+UserInputHandler::UserInputHandler(std::size_t deviceCount) :
     m_deviceToButtonRaw(deviceCount)
 {
     p_logger = spdlog::get("userinput");
 }
 
 bool UserInputHandler::eval_button_expression(
-        ControlExpr_t const& rExpr,
+        ControlExpr_t const& expression,
         ControlExpr_t* pReleaseExpr)
 {
 
@@ -45,10 +45,10 @@ bool UserInputHandler::eval_button_expression(
     bool termOn = false;
 
     EVarOperator prevOp = EVarOperator::Or;
-    auto termStart = rExpr.begin();
+    auto termStart = expression.begin();
 
-    //for (ButtonVar const& var : rExpression)
-    for (auto it =  rExpr.begin(); it != rExpr.end(); it ++)
+    //for (ButtonVar const& var : expressionession)
+    for (auto it =  expression.begin(); it != expression.end(); it ++)
     {
         ControlTerm const& var = *it;
         ButtonRaw const& btnRaw = var.m_button->second;
@@ -80,7 +80,7 @@ bool UserInputHandler::eval_button_expression(
             break;
         }
 
-        bool lastVar = ((it + 1) == rExpr.end());
+        bool lastVar = ((it + 1) == expression.end());
 
         // Deal with operations on that value
         switch (prevOp)
@@ -103,10 +103,10 @@ bool UserInputHandler::eval_button_expression(
         {
             // if the previous term contributes to the expression being true
             // and pReleaseExpr exists
-            if (termOn && pReleaseExpr)
+            if (termOn && (nullptr != pReleaseExpr))
             {
 
-                auto termEnd = lastVar ? rExpr.end() : it;
+                auto termEnd = lastVar ? expression.end() : it;
 
                 // loop through the previous term, and add inverted
                 // just-pressed buttons to trigger the release

@@ -22,19 +22,35 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <iostream>
 
-#include "ActiveScene.h"
-#include "osp/Active/SysRender.h"
-#include "osp/Active/SysHierarchy.h"
+#include "ActiveScene.h"                    // IWYU pragma: associated
+
+#include <osp/Active/scene.h>               // for ACompCamera
+#include <osp/Active/drawing.h>             // for ACompPerspective3DView
+#include <osp/Active/SysRender.h>           // for ACompRenderTarget
+#include <osp/Active/SysHierarchy.h>        // for SysHierarchy
+
+#include <osp/Resource/Package.h>           // for Package
+#include <osp/Resource/Resource.h>          // for DependRes
+
+#include <osp/types.h>                      // for Matrix4, Vector2, Deg, osp
+
+#include <Magnum/GL/AbstractFramebuffer.h>  // for FramebufferClear, operator|
+#include <Magnum/GL/Framebuffer.h>          // for Framebuffer
+
+#include <Corrade/Containers/EnumSet.h>     // for EnumSet, EnumSet<>::Under...
+
+// IWYU pragma: no_include "osp/Active/activetypes.h"
+
+// IWYU pragma: no_include <string>
+// IWYU pragma: no_include <cstddef>
 
 using namespace osp;
 using namespace osp::active;
 
 void ACompCamera::calculate_projection()
 {
-
-    m_projection = Matrix4::perspectiveProjection(
+    m_projection = osp::Matrix4::perspectiveProjection(
             m_fov, m_viewport.x() / m_viewport.y(),
             m_near, m_far);
 }

@@ -24,15 +24,18 @@
  */
 #pragma once
 
-#include <utility>
-#include <vector>
-#include <stack>
+#include "scene.h"        // for ACompDelete
+#include "activetypes.h"  // for ActiveReg_t
 
-#include "../OSPApplication.h"
+#include <utility>        // for std::forward
+#include <iterator>       // for std::begin, std::end
 
-#include "../types.h"
-#include "activetypes.h"
-#include "scene.h"
+// IWYU pragma: no_include <vector>
+// IWYU pragma: no_include <stdint.h>
+// IWYU pragma: no_include <type_traits>
+
+namespace osp { class Package; }
+namespace osp { class OSPApplication; }
 
 namespace osp::active
 {

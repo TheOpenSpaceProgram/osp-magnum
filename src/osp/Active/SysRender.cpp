@@ -27,15 +27,19 @@
 #include "../Shaders/FullscreenTriShader.h"
 #include "ActiveScene.h"
 
-#include <Corrade/Containers/ArrayViewStl.h>
+#include <osp/Resource/Package.h>
+
 #include <Magnum/GL/Buffer.h>
-#include <Magnum/Mesh.h>
 #include <Magnum/GL/Renderer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Framebuffer.h>
 #include <Magnum/GL/TextureFormat.h>
 #include <Magnum/GL/Renderbuffer.h>
 #include <Magnum/GL/RenderbufferFormat.h>
+
+#include <Magnum/Mesh.h>
+
+#include <Corrade/Containers/ArrayViewStl.h>
 
 #include <functional>
 
@@ -51,8 +55,6 @@ void SysRender::setup_context(Package& rCtxResources)
     /* Generate fullscreen tri for texture rendering */
     {
         Vector2 screenSize = Vector2{GL::defaultFramebuffer.viewport().size()};
-
-        float aspectRatio = screenSize.x() / screenSize.y();
 
         static constexpr std::array<float, 12> surfData
         {

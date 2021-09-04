@@ -24,15 +24,20 @@
  */
 #pragma once
 
-#include <osp/CommonPhysics.h>
-#include <osp/Active/physics.h>
-#include <osp/Active/ActiveScene.h>
+#include <osp/Active/physics.h>      // for ACompShape
+#include <osp/Active/ActiveScene.h>  // for ActiveScene
+#include <osp/Active/activetypes.h>  // for ActiveEnt, ActiveReg_t, basic_sp...
 
-#include <cstdint>
+#include <osp/types.h>               // for Vector3, Matrix4
+#include <osp/CommonPhysics.h>       // for ECollisionShape, ECollisionShape...
+
+// IWYU pragma: no_include <cstdint>
+// IWYU pragma: no_include <stdint.h>
+// IWYU pragma: no_include <type_traits>
 
 class NewtonBody;
-class NewtonCollision;
 class NewtonWorld;
+class NewtonCollision;
 
 namespace ospnewton
 {

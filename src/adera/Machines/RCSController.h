@@ -25,14 +25,18 @@
 
 #pragma once
 
-#include <osp/Resource/blueprints.h>
+#include <adera/wiretypes.h>        // for wire::Percent, wire::AttitudeControl
 
-#include "../wiretypes.h"
+#include <osp/Resource/machines.h>  // for osp::portindex_t
+
+#include <osp/types.h>              // for osp::Vector3
+
+#include <string>                   // for std::string
+
+namespace osp::active { class ActiveScene; }
 
 namespace adera::active::machines
 {
-
-class MachineRCSController;
 
 /**
  * A system which provides the logic that powers Reaction Control Systems.
