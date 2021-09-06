@@ -23,12 +23,29 @@
  * SOFTWARE.
  */
 
-#include "SysNewton.h"
+#include "SysNewton.h"               // IWYU pragma: associated
 
-#include <osp/Active/SysPhysics.h>
-#include <osp/Active/SysHierarchy.h>
+#include <osp/Active/scene.h>        // for ACompHierarchy
+#include <osp/Active/physics.h>      // for ACompRigidBody
+#include <osp/Active/SysPhysics.h>   // for SysPhysics
+#include <osp/Active/ActiveScene.h>  // for ActiveScene
+#include <osp/Active/activetypes.h>  // for ActiveReg_t
 
-#include <Newton.h>
+#include <osp/types.h>               // for Matrix4, Vector3
+#include <osp/CommonPhysics.h>       // for ECollisionShape
+
+#include <entt/signal/sigh.hpp>      // for entt::sink
+#include <entt/entity/entity.hpp>    // for entt::null, entt::null_t
+
+#include <spdlog/spdlog.h>           // for SPDLOG_LOGGER_TRACE
+
+#include <Newton.h>                  // for NewtonBodySetCollision
+
+#include <utility>                   // for std::exchange
+#include <cassert>                   // for assert
+
+// IWYU pragma: no_include <cstddef>
+// IWYU pragma: no_include <type_traits>
 
 using ospnewton::SysNewton;
 using ospnewton::ACompNwtBody;
@@ -86,7 +103,6 @@ void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
 
 void SysNewton::setup(ActiveScene &rScene)
 {
-
     // Connect signal handlers to destruct Newton objects when components are
     // deleted.
 
@@ -132,7 +148,7 @@ void SysNewton::update_world(ActiveScene& rScene)
         // temporary: delete Newton Body if something is dirty
         if (entBody.m_colliderDirty)
         {
-            rReg.remove_if_exists<ACompNwtBody>(ent);
+            rReg.remove<ACompNwtBody>(ent);
             entBody.m_colliderDirty = false;
         }
 
@@ -164,7 +180,10 @@ void SysNewton::update_world(ActiveScene& rScene)
         auto &entNwtBody      = viewNwtBody.get<ACompNwtBody>(ent);
         auto &entTransform    = viewTf.get<ACompTransform>(ent);
 
-        float mass, x, y, z;
+        float mass;
+        float x;
+        float y;
+        float z;
         NewtonBodyGetMass(entNwtBody.body(), &mass, &x, &y, &z);
 
         // Get new transform matrix from newton
@@ -200,7 +219,7 @@ void SysNewton::find_colliders_recurse(
                 if (nullptr == pChildNwtCollider)
                 {
                     // No Newton collider exists yet
-                    collision = NewtonCreateSphere(pNwtWorld, 0.5f, 0, NULL);
+                    collision = NewtonCreateSphere(pNwtWorld, 0.5f, 0, nullptr);
                     rReg.emplace<ACompNwtCollider>(nextChild, collision);
                     ACompNwtCollider f(collision);
                 }
@@ -241,7 +260,7 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt ent,
         return;
     }
 
-    NewtonBody const* pBody;
+    NewtonBody const* pBody = nullptr;
 
     switch (entShape->m_shape)
     {
@@ -303,13 +322,9 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt ent,
                 rReg.emplace<ACompNwtBody>(ent, pBody);
             }
         }
-        else
-        {
-            // make a collision shape somehow
-            pBody = nullptr;
-        }
     }
     default:
+        assert(false);
         break;
     }
 

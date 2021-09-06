@@ -124,7 +124,7 @@ public:
      * @return The inertia tensor of the rigid body about its center of mass, and
      *         a 4-vector containing xyz=CoM, w=total mass
      */
-    static std::pair<Matrix3, Magnum::Vector4> compute_hier_inertia(ActiveScene& rScene,
+    static std::pair<Matrix3, Vector4> compute_hier_inertia(ActiveScene& rScene,
         ActiveEnt entity);
 
 

@@ -23,14 +23,36 @@
  * SOFTWARE.
  */
 
-#include "UserControl.h"
+#include "UserControl.h"                 // IWYU pragma: associated
 
-#include <osp/Active/ActiveScene.h>
-#include <osp/Active/SysSignal.h>
-#include <osp/Active/SysVehicle.h>
-#include <osp/Resource/machines.h>
+#include <osp/Resource/machines.h>       // for mach_id, machine_id_t
+#include <osp/Resource/Resource.h>       // for DependRes
+#include <osp/Resource/blueprints.h>     // for BlueprintMachine
+#include <osp/Resource/PrototypePart.h>  // for NodeMap_t
 
-#include <iostream>
+#include <osp/Active/SysWire.h>          // for ACompWire, UpdNodes_t
+#include <osp/Active/SysSignal.h>        // for SysSignal
+#include <osp/Active/SysVehicle.h>       // for ACompVehicle
+#include <osp/Active/SysMachine.h>       // for ACompMachines
+#include <osp/Active/ActiveScene.h>      // for ActiveScene
+#include <osp/Active/activetypes.h>      // for ActiveEnt, ActiveReg_t
+
+#include <spdlog/spdlog.h>               // for SPDLOG_LOGGER_TRACE
+
+#include <iterator>                      // for std::begin, std::end
+#include <algorithm>                     // for std::sort
+
+// IWYU pragma: no_include "adera/wiretypes.h"
+
+// IWYU pragma: no_include <map>
+// IWYU pragma: no_include <vector>
+// IWYU pragma: no_include <cstddef>
+// IWYU pragma: no_include <stdint.h>
+// IWYU pragma: no_include <type_traits>
+
+namespace osp { class Package; }
+namespace osp { struct Path; }
+
 
 using adera::active::machines::SysMachineUserControl;
 using adera::active::machines::MachineUserControl;

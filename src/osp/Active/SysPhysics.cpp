@@ -1,6 +1,11 @@
 #include "SysPhysics.h"
 #include "ActiveScene.h"
 
+#include <osp/OSPApplication.h>
+
+#include <spdlog/spdlog.h>
+
+
 using osp::active::SysPhysics;
 using osp::active::ActiveEnt;
 using osp::active::ACompRigidBody;
@@ -12,20 +17,20 @@ using osp::Vector4;
 std::pair<ActiveEnt, ACompRigidBody*> SysPhysics::find_rigidbody_ancestor(
         ActiveScene& rScene, ActiveEnt ent)
 {
-    ActiveEnt prevEnt, currEnt = ent;
+    ActiveEnt prevEnt;
+    ActiveEnt currEnt = ent;
     ACompHierarchy *pCurrHier = nullptr;
 
     do
     {
-       pCurrHier = rScene.get_registry().try_get<ACompHierarchy>(currEnt);
+        pCurrHier = rScene.get_registry().try_get<ACompHierarchy>(currEnt);
 
-        if (!pCurrHier)
+        if(nullptr == pCurrHier)
         {
             return {entt::null, nullptr};
         }
 
-        prevEnt = currEnt;
-        currEnt = pCurrHier->m_parent;
+        prevEnt = std::exchange(currEnt, pCurrHier->m_parent);
     }
     while (pCurrHier->m_level != gc_heir_physics_level);
 
@@ -36,7 +41,8 @@ std::pair<ActiveEnt, ACompRigidBody*> SysPhysics::find_rigidbody_ancestor(
 
 Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, ActiveEnt ent)
 {
-    ActiveEnt prevEnt, currEnt = ent;
+    ActiveEnt prevEnt;
+    ActiveEnt currEnt = ent;
     ACompHierarchy *pCurrHier = nullptr;
     Matrix4 transform;
 
@@ -54,8 +60,7 @@ Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, A
             }
         }
 
-        prevEnt = currEnt;
-        currEnt = pCurrHier->m_parent;
+        prevEnt = std::exchange(currEnt, pCurrHier->m_parent);
     } while (pCurrHier->m_level != gc_heir_physics_level);
 
     // Fail if a rigidbody ancestor is not found

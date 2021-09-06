@@ -22,12 +22,32 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "Container.h"
+#include "Container.h"                   // IWYU pragma: associated
 
-#include <osp/Resource/PrototypePart.h>
-#include <osp/Active/ActiveScene.h>
+#include <adera/ShipResources.h>         // for ShipResource, ShipResourceType
+
+#include <osp/Active/scene.h>            // for ACompMass
 #include <osp/Active/physics.h>
 #include <osp/Active/SysVehicle.h>
+#include <osp/Active/SysMachine.h>       // for ACompMachines
+#include <osp/Active/activetypes.h>      // for ActiveEnt, ActiveReg_t, active
+#include <osp/Active/ActiveScene.h>
+
+#include <osp/Resource/Package.h>        // for Path, decompose_path, Package
+#include <osp/Resource/machines.h>       // for mach_id, machine_id_t
+#include <osp/Resource/Resource.h>       // for DependRes
+#include <osp/Resource/blueprints.h>     // for BlueprintMachine, BlueprintV...
+#include <osp/Resource/PrototypePart.h>
+
+#include <osp/CommonPhysics.h>           // for ECollisionShape, ECollisionS...
+#include <osp/OSPApplication.h>          // for OSPApplication
+
+#include <variant>                       // for std::get
+#include <utility>                       // for std::exchange
+
+// IWYU pragma: no_include <map>
+// IWYU pragma: no_include <vector>
+// IWYU pragma: no_include <type_traits>
 
 using namespace osp;
 using namespace osp::active;
@@ -35,7 +55,7 @@ using namespace adera::active::machines;
 
 /* MachineContainer */
 
-uint64_t MachineContainer::request_contents(uint64_t quantity)
+std::uint64_t MachineContainer::request_contents(std::uint64_t quantity)
 {
     if (quantity > m_contents.m_quantity)
     {
@@ -46,7 +66,7 @@ uint64_t MachineContainer::request_contents(uint64_t quantity)
     return quantity;
 }
 
-float MachineContainer::compute_mass() const noexcept
+double MachineContainer::compute_mass() const noexcept
 {
     if (m_contents.m_type.empty()) { return 0.0f; }
     return m_contents.m_type->resource_mass(m_contents.m_quantity);
@@ -67,7 +87,8 @@ void SysMachineContainer::update_containers(ActiveScene& rScene)
         auto& container = view.get<MachineContainer>(ent);
         auto& mass = view.get<ACompMass>(ent);
 
-        mass.m_mass = container.compute_mass();
+        // Surpress narrowing conversion warning.
+        mass.m_mass = static_cast<float>(container.compute_mass());
     }
 }
 
@@ -77,13 +98,13 @@ MachineContainer& SysMachineContainer::instantiate(
         osp::PCompMachine const& config,
         osp::BlueprintMachine const& settings)
 {
-    float capacity = std::get<double>(config.m_config.at("capacity"));
+    double capacity = std::get<double>(config.m_config.at("capacity"));
 
     ShipResource resource{};
     if (auto resItr = settings.m_config.find("resourcename");
         resItr != settings.m_config.end())
     {
-        std::string_view resName = std::get<std::string>(resItr->second);
+        std::string const& resName = std::get<std::string>(resItr->second);
         Path resPath = decompose_path(resName);
         Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
 
@@ -108,7 +129,7 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
 
     machine_id_t const id = mach_id<MachineContainer>();
 
-    for (auto [vehEnt, rVeh, rVehConstr] : view.each())
+    for (auto const& [vehEnt, rVeh, rVehConstr] : view.each())
     {
         // Check if the vehicle blueprint might store MachineContainers
         if (rVehConstr.m_blueprint->m_machines.size() <= id)

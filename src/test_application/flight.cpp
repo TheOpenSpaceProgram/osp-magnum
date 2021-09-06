@@ -47,6 +47,8 @@
 #include <adera/Machines/Rocket.h>
 #include <adera/Machines/UserControl.h>
 
+#include <adera/Shaders/PlumeShader.h>
+
 #include <adera/wiretypes.h>
 
 #include <adera/SysExhaustPlume.h>

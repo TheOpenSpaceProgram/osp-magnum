@@ -29,8 +29,6 @@
 #include "adera/Plume.h"
 #include "machines.h"
 
-#include <iostream>
-
 #include <Corrade/Containers/Optional.h>
 #include <Corrade/PluginManager/Manager.h>
 #include <Magnum/Trade/AbstractImporter.h>

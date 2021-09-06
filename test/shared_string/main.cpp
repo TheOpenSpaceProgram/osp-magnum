@@ -26,6 +26,9 @@
 
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #define COMPARE_EQUAL(LHS, RHS) \
     ASSERT_EQ(LHS, RHS);        \
     ASSERT_EQ(RHS, LHS);        \

@@ -68,7 +68,6 @@ void simplesolarsystem::create(osp::OSPApplication& rOspApp)
     // Use CoordspaceSimple as data, which can store positions and velocities
     // of satellites
     rSpace.m_data.emplace<CoordspaceCartesianSimple>();
-    auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace.m_data);
 
 
     // Create 2 random (non-functional) vehicles

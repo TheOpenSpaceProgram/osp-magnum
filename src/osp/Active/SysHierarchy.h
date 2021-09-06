@@ -26,6 +26,8 @@
 
 #include "ActiveScene.h"
 
+#include <stack>
+
 namespace osp::active
 {
 

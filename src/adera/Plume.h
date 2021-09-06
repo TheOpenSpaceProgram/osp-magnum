@@ -24,9 +24,10 @@
  */
 #pragma once
 
-#include <string>
 #include <Magnum/Math/Color.h>
 #include <Magnum/Magnum.h>
+
+#include <string>
 
 namespace adera::active
 {

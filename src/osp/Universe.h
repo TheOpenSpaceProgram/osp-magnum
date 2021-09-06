@@ -144,12 +144,12 @@ public:
      * This function will chain together parent->child and child->parent
      * transforms until a common ancestor is found.
      *
-     * @param coordFrom [in]
-     * @param coordTo   [in]
+     * @param fromCoord [in]
+     * @param toCoord   [in]
      * @return Optional CoordspaceTransform. Empty if no common ancestor.
      */
     std::optional<CoordspaceTransform> coordspace_transform(
-            CoordinateSpace const &coordFrom, CoordinateSpace const &coordTo) const;
+            CoordinateSpace const &fromCoord, CoordinateSpace const &toCoord) const;
 
     /**
      * @brief Reassign indices in the UCompInCoordspace components of satellites

@@ -30,8 +30,9 @@
 #include "../types.h"
 #include "../Resource/blueprints.h"
 
-#include <utility>
+#include <mutex>
 #include <vector>
+#include <utility>
 
 namespace osp::active
 {

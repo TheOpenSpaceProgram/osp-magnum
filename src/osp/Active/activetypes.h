@@ -24,11 +24,14 @@
  */
 #pragma once
 
-#include <map>
-#include <memory>
+// IWYU pragma: begin_exports
 
-#include <entt/entity/registry.hpp>
+#include <entt/core/fwd.hpp>          // for entt::id_type
+#include <entt/entity/view.hpp>       // for basic_view
+#include <entt/entity/registry.hpp>   // for entt::basic_registry
+#include <entt/entity/sparse_set.hpp> // for entt::sparse_set
 
+// IWYU pragma: end_exports
 
 namespace osp::active
 {
@@ -41,7 +44,7 @@ struct ACompCamera;
 
 struct ACompTransform;
 
-constexpr unsigned gc_heir_physics_level = 1;
+inline constexpr unsigned gc_heir_physics_level = 1;
 
 enum class ActiveEnt: entt::id_type {};
 

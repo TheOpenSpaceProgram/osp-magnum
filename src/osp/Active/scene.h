@@ -29,6 +29,8 @@
 
 #include <entt/entity/entity.hpp>
 
+#include <string>
+
 namespace osp::active
 {
 
@@ -80,8 +82,9 @@ struct ACompMass
  */
 struct ACompCamera
 {
-    float m_near, m_far;
-    Magnum::Deg m_fov;
+    float m_near;
+    float m_far;
+    Deg m_fov;
     Vector2 m_viewport;
 
     Matrix4 m_projection;

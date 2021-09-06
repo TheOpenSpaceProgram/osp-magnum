@@ -22,19 +22,41 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "Rocket.h"
+#include "Rocket.h"                      // IWYU pragma: associated
 
-#include "Container.h"
+#include <adera/ShipResources.h>         // for ShipResourceType
 
-#include <osp/Active/ActiveScene.h>
-#include <osp/Active/SysHierarchy.h>
+#include <osp/Active/scene.h>            // for ACompHierarchy, ACompTransform
+#include <osp/Active/physics.h>
+#include <osp/Active/SysWire.h>          // for ACompWireNodes, ACompWirePanel
+#include <osp/Active/SysSignal.h>        // for Signal<>::NodeState
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
-#include <osp/Active/physics.h>
-#include <osp/Shaders/Phong.h>
-#include <osp/PhysicsConstants.h>
+#include <osp/Active/SysMachine.h>       // for ACompMachines
+#include <osp/Active/ActiveScene.h>
 
-#include <iostream>
+#include <osp/Resource/Package.h>        // for Path, decompose_path
+#include <osp/Resource/Resource.h>       // for DependRes
+#include <osp/Resource/machines.h>       // for mach_id, machine_id_t
+#include <osp/Resource/blueprints.h>     // for BlueprintMachine
+#include <osp/Resource/PrototypePart.h>  // for NodeMap_t, PCompMachine
+
+#include <osp/types.h>                   // for Vector3, Matrix4
+#include <osp/OSPApplication.h>
+
+#include <vector>                        // for std::vector
+#include <utility>                       // for std::forward
+#include <variant>                       // for std::get
+#include <string_view>                   // for std::string_view
+
+// IWYU pragma: no_include "adera/wiretypes.h"
+
+// IWYU pragma: no_include <map>
+// IWYU pragma: no_include <cstddef>
+// IWYU pragma: no_include <stdint.h>
+// IWYU pragma: no_include <type_traits>
+
+namespace osp::active { class SysHierarchy; }
 
 using adera::active::machines::SysMachineRocket;
 using adera::wire::Percent;
@@ -273,8 +295,9 @@ MachineRocket& SysMachineRocket::instantiate(
 {
     auto& rocket = rScene.reg_emplace<MachineRocket>(ent);
     // Read engine config
-    rocket.m_params.m_maxThrust = config_get_if<double>(config.m_config, "thrust", 42.0);
-    rocket.m_params.m_specImpulse = config_get_if<double>(config.m_config, "Isp", 42.0);
+    // cast to surpress narrowing conversion warnings.
+    rocket.m_params.m_maxThrust   = static_cast<float>(config_get_if<double>(config.m_config, "thrust", 42.0));
+    rocket.m_params.m_specImpulse = static_cast<float>(config_get_if<double>(config.m_config, "Isp",    42.0));
 
     std::string const& fuelIdent = config_get_if<std::string>(config.m_config, "fueltype", "");
     Path resPath = osp::decompose_path(fuelIdent);
