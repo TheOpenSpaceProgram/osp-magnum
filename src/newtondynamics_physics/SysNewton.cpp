@@ -322,6 +322,7 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt ent,
                 rReg.emplace<ACompNwtBody>(ent, pBody);
             }
         }
+        break;
     }
     default:
         assert(false);

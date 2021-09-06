@@ -83,17 +83,35 @@ bool SysCameraController::try_switch_vehicle(ActiveScene &rScene,
 
     Universe &rUni = pAreaLink->get_universe();
     auto const viewUni = rUni.get_reg().view<osp::universe::UCompVehicle>();
-    auto it = viewUni.find(rCamCtrl.m_selected);
 
-    if (it == viewUni.end() || it == viewUni.begin())
+    // Select a vehicle. Selection is cycled from back to front, so the newest
+    // vehicle is (usually) picked first.
+
+    if (viewUni.empty())
     {
-        // no vehicle selected, or last vehicle is selected (loop around)
+        return false; // No vehicles exist!
+    }
+
+    if ( ! rUni.get_reg().valid(rCamCtrl.m_selected))
+    {
+        // No vehicle selected, pick [back]
         rCamCtrl.m_selected = viewUni.back();
     }
     else
     {
-        // pick the next vehicle
-        rCamCtrl.m_selected = *std::prev(it);
+        // Some vehicle is already selected, get its iterator
+        auto it = viewUni.find(rCamCtrl.m_selected);
+
+        if (it == std::begin(viewUni) || it == std::end(viewUni))
+        {
+            // [front] or invalid vehicle is currently selected, cycle to [back]
+            rCamCtrl.m_selected = viewUni.back();
+        }
+        else
+        {
+            // Pick the previous vehicle
+            rCamCtrl.m_selected = *std::prev(it);
+        }
     }
 
     if (rUni.get_reg().valid(rCamCtrl.m_selected))
@@ -343,7 +361,7 @@ void SysCameraController::update_view(ActiveScene &rScene)
 
     Quaternion const camRotate = Quaternion::rotation(yaw, rCamTf.up())
                                   * Quaternion::rotation(pitch, rCamTf.right());
-    
+
     // set camera orbit distance
     constexpr float distSensitivity = 0.3f;
     float const scroll = rCamCtrl.m_controls.get_input_handler()
@@ -391,6 +409,11 @@ ActiveEnt SysCameraController::find_vehicle_from_sat(
     auto &rUni = pLink->m_rUniverse.get();
     auto &rArea = rUni.get_reg().get<UCompActiveArea>(pLink->m_areaSat);
     auto &rSync = rScene.get_registry().ctx<osp::active::SyncVehicles>();
+
+    if ( ! rUni.get_reg().valid(sat))
+    {
+        return entt::null; // No vehicle selected
+    }
 
     if (auto const findIt = rArea.m_inside.find(sat);
         findIt != rArea.m_inside.end())
