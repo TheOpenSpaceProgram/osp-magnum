@@ -145,8 +145,11 @@ ActiveEnt SysVehicleSync::activate(ActiveScene &rScene, Universe &rUni,
 
 
     // temporary: make the whole thing a single rigid body
-    auto& vehicleBody = rScene.reg_emplace<ACompRigidBody>(vehicleEnt);
-    rScene.reg_emplace<ACompShape>(vehicleEnt, phys::ECollisionShape::COMBINED);
+    rScene.reg_emplace<ACompPhysBody>(vehicleEnt);
+    rScene.reg_emplace<ACompPhysDynamic>(vehicleEnt);
+    rScene.reg_emplace<ACompPhysLinearVel>(vehicleEnt);
+    rScene.reg_emplace<ACompPhysAngularVel>(vehicleEnt);
+    rScene.reg_emplace<ACompShape>(vehicleEnt, phys::EShape::Combined);
     rScene.reg_emplace<ACompSolidCollider>(vehicleEnt);
 
     return vehicleEnt;

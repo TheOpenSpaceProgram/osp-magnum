@@ -31,26 +31,57 @@ namespace osp::active
 {
 
 /**
- * Generic Rigid Body physics data
- *
- * TODO: possibly split into more components when the time comes
+ * @brief The ACtxPhysics struct
  */
-struct ACompRigidBody
+struct ACtxPhysics
 {
-    // Modify these
-    Vector3 m_inertia{1, 1, 1};
-    Vector3 m_netForce{0, 0, 0};
-    Vector3 m_netTorque{0, 0, 0};
+    Vector3 m_originTranslate;
 
-    float m_mass{1.0f};
-    Vector3 m_velocity{0, 0, 0};
-    Vector3 m_rotVelocity{0, 0, 0};
-    Vector3 m_centerOfMassOffset{0, 0, 0};
-
-    bool m_colliderDirty{false}; // set true if collider is modified
-    bool m_inertiaDirty{false}; // set true if rigidbody is modified
+    // Input queues
+    std::vector<ActiveEnt> m_colliderDirty;
+    std::vector<ActiveEnt> m_inertiaDirty;
+    std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
 };
 
+/**
+ * @brief Synchronizes an entity with a physics engine body
+ */
+struct ACompPhysBody
+{ };
+
+/**
+ * @brief Adds rigid body dynamics to entities with ACompPhysBody
+ */
+struct ACompPhysDynamic
+{
+    Vector3 m_centerOfMassOffset{0, 0, 0};
+    Vector3 m_inertia{1, 1, 1};
+    float m_totalMass{0.0f};
+};
+
+/**
+ * @brief Read-only Linear velocity for entities with ACompPhysDynamic
+ */
+struct ACompPhysLinearVel : Vector3 { };
+
+/**
+ * @brief Read-only Angular velocity for entities with ACompPhysDynamic
+ */
+struct ACompPhysAngularVel : Vector3 { };
+
+/**
+ * @brief Applies force to a dynamic physics entity
+ */
+struct ACompPhysNetForce : Vector3 { };
+
+/**
+ * @brief Applies torque to a dynamic physics entity
+ */
+struct ACompPhysNetTorque : Vector3 { };
+
+/**
+ * @brief Keeps track of which rigid body an entity belongs to
+*/
 struct ACompRigidbodyAncestor
 {
     ActiveEnt m_ancestor{entt::null};
@@ -62,7 +93,7 @@ struct ACompRigidbodyAncestor
  */
 struct ACompShape
 {
-    phys::ECollisionShape m_shape{phys::ECollisionShape::NONE};
+    phys::EShape m_shape{phys::EShape::None};
 };
 
 /**

@@ -33,20 +33,20 @@
 namespace osp::phys
 {
 
-float shape_volume(ECollisionShape shape, Vector3 scale)
+float shape_volume(EShape shape, Vector3 scale)
 {
     static constexpr float sc_pi = Magnum::Math::Constants<Magnum::Float>::pi();
     switch (shape)
     {
-    case ECollisionShape::NONE:
+    case EShape::None:
         return 0.0f;
-    case ECollisionShape::SPHERE:
+    case EShape::Sphere:
         // Default radius: 1
         return (4.0f / 3.0f) * sc_pi * scale.x() * scale.x() * scale.x();
-    case ECollisionShape::BOX:
+    case EShape::Box:
         // Default width: 2
         return 2.0f*scale.x() * 2.0f*scale.y() * 2.0f*scale.z();
-    case ECollisionShape::CYLINDER:
+    case EShape::Cylinder:
         // Default radius: 1, default height: 2
         return sc_pi * scale.x() * scale.x() * 2.0f*scale.z();
     default:
@@ -70,11 +70,11 @@ Matrix3 transform_inertia_tensor(Matrix3 I, float mass, Vector3 translation, Mat
     return I + mass * (dot(r, r) * E3 - outerProductR);
 }
 
-Vector3 collider_inertia_tensor(ECollisionShape shape, Vector3 scale, float mass)
+Vector3 collider_inertia_tensor(EShape shape, Vector3 scale, float mass)
 {
     switch (shape)
     {
-    case ECollisionShape::CYLINDER:
+    case EShape::Cylinder:
     {
         // Default cylinder dimensions: radius 1, height 2
         const float height = 2.0f * scale.z();
@@ -82,22 +82,20 @@ Vector3 collider_inertia_tensor(ECollisionShape shape, Vector3 scale, float mass
         const float radius = scale.x();
         return cylinder_inertia_tensor(radius, height, mass);
     }
-    case ECollisionShape::BOX:
+    case EShape::Box:
     {
         // Default box dimensions: 2x2x2
         const Vector3 dimensions = 2.0f * scale;
         return cuboid_inertia_tensor(dimensions, mass);
     }
-    case ECollisionShape::SPHERE:
+    case EShape::Sphere:
     {
         // Default sphere: radius = 1
         const Vector3 semiaxes = scale;
         return ellipsoid_inertia_tensor(semiaxes, mass);
     }
-    case ECollisionShape::CAPSULE:
-    case ECollisionShape::CONVEX_HULL:
-    case ECollisionShape::TERRAIN:
-    case ECollisionShape::COMBINED:
+    case EShape::Capsule:
+
     default:
       SPDLOG_LOGGER_ERROR(spdlog::get("application"),
                           "ERROR: unknown collision shape");

@@ -319,12 +319,13 @@ void SysCameraController::update_view(ActiveScene &rScene)
     Matrix4 const& vehicleTf = rScene.reg_get<ACompTransform>(vehicle).m_transform;
 
     // Compute Center of Mass of target, if it's a rigid body
-    auto [rbEnt, pCompRb]
+    ActiveEnt rbEnt
             = osp::active::SysPhysics::find_rigidbody_ancestor(rScene, vehicle);
     Vector3 comOset{0.0f};
-    if (pCompRb != nullptr)
+    if (rReg.valid(rbEnt))
     {
-        comOset = vehicleTf.transformVector(pCompRb->m_centerOfMassOffset);
+        auto const& rDyn = rReg.get<osp::active::ACompPhysDynamic>(rbEnt);
+        comOset = vehicleTf.transformVector(rDyn.m_centerOfMassOffset);
     }
 
     // Process control inputs

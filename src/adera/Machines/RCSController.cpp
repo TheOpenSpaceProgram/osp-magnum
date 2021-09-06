@@ -59,7 +59,7 @@ namespace osp { struct Path; }
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 using osp::active::ACompMachines;
-using osp::active::ACompRigidBody;
+using osp::active::ACompPhysDynamic;
 using osp::active::ACompTransform;
 using osp::active::SysPhysics;
 
@@ -193,9 +193,7 @@ void SysMachineRCSController::update_calculate(ActiveScene& rScene)
                 auto const *pRbAncestor
                         = SysPhysics::try_get_or_find_rigidbody_ancestor(
                             rScene, ent);
-                auto const &compRb = rScene.reg_get<ACompRigidBody>(
-                            pRbAncestor->m_ancestor);
-                auto const &compTf = rScene.reg_get<ACompTransform>(
+                auto const &rDyn = rScene.reg_get<ACompPhysDynamic>(
                             pRbAncestor->m_ancestor);
 
                 Matrix4 transform = pRbAncestor->m_relTransform;
@@ -205,7 +203,7 @@ void SysMachineRCSController::update_calculate(ActiveScene& rScene)
                 Vector3 commandTransl = Vector3{0.0f};
                 Vector3 commandRot = nodeCommand.m_state.m_attitude;
                 Vector3 thrusterPos = transform.translation()
-                                    - compRb.m_centerOfMassOffset;
+                                    - rDyn.m_centerOfMassOffset;
                 Vector3 thrusterDir = transform.rotation()
                                     * Vector3{0.0f, 0.0f, 1.0f};
 

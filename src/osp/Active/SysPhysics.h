@@ -43,7 +43,7 @@ public:
      *         hierarchy error, then {entt:null, nullptr}. If no ACompNwtBody
      *         component is found, then {level-1 entity, nullptr}
      */
-    static std::pair<ActiveEnt, ACompRigidBody*> find_rigidbody_ancestor(
+    static ActiveEnt find_rigidbody_ancestor(
             ActiveScene& rScene, ActiveEnt ent);
 
     /**
@@ -81,11 +81,6 @@ public:
      */
     static ACompRigidbodyAncestor* try_get_or_find_rigidbody_ancestor(
         ActiveScene& rScene, ActiveEnt childEntity);
-
-    // most of these are self-explanatory
-    static void body_apply_force(ACompRigidBody& body, Vector3 force) noexcept;
-    static void body_apply_accel(ACompRigidBody& body, Vector3 accel) noexcept;
-    static void body_apply_torque(ACompRigidBody& body, Vector3 torque) noexcept;
 
     enum EIncludeRootMass { Ignore, Include };
     /**

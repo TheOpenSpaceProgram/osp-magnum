@@ -115,7 +115,7 @@ MachineContainer& SysMachineContainer::instantiate(
 
     rScene.reg_emplace<ACompMass>(ent, 0.0f);
     // All tanks are cylindrical for now
-    rScene.reg_emplace<ACompShape>(ent, phys::ECollisionShape::CYLINDER);
+    rScene.reg_emplace<ACompShape>(ent, phys::EShape::Cylinder);
 
     return rScene.reg_emplace<MachineContainer>(ent, ent, capacity, resource);
 }

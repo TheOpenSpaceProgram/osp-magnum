@@ -467,8 +467,8 @@ void AssetImporter::proto_add_obj_recurse(
         // TODO: Add support different collider shapes here!
         std::string const& shapeName = extras.Get("shape").Get<std::string>();
         // change this to some map too
-        const phys::ECollisionShape shape = (shapeName == "cylinder")
-            ? phys::ECollisionShape::CYLINDER : phys::ECollisionShape::BOX;
+        const phys::EShape shape = (shapeName == "cylinder")
+            ? phys::EShape::Cylinder : phys::EShape::Box;
 
         PCompPrimativeCollider &rCollider = rPart.m_partCollider.emplace_back();
         rCollider.m_entity = entity;
