@@ -62,22 +62,10 @@ public:
 
     size_t debug_num_packages() const { return m_packages.size(); }
 
-    universe::Universe& get_universe() { return m_universe; }
-
-    void set_universe_update(std::function<void(universe::Universe&)> func)
-    {
-        m_universeUpdate = func;
-    }
-
-    void update_universe() { m_universeUpdate(m_universe); };
-
     const std::shared_ptr<spdlog::logger>& get_logger() { return m_logger; };
 
 private:
     std::map<ResPrefix_t, Package, std::less<>> m_packages;
-
-    universe::Universe m_universe;
-    std::function<void(universe::Universe&)> m_universeUpdate;
 
     const std::shared_ptr<spdlog::logger> m_logger;
 };

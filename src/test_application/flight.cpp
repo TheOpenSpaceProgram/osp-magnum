@@ -116,15 +116,23 @@ Satellite active_area_create(
 void active_area_destroy(
         osp::OSPApplication& rOspApp, Universe &rUni, Satellite areaSat);
 
-void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
-                 osp::OSPApplication& rOspApp, OSPMagnum::Arguments args)
+void testapp::test_flight(
+        std::unique_ptr<OSPMagnum>& pMagnumApp, osp::OSPApplication& rOspApp,
+        Universe &rUni, universe_update_t& rUniUpd, OSPMagnum::Arguments args)
 {
 
-    // Get Universe
-    Universe &rUni = rOspApp.get_universe();
+    // Create the application, and its draw function
+    pMagnumApp = std::make_unique<OSPMagnum>(
+            args, rOspApp,
+            [&rUniUpd, &rUni] (OSPMagnum& rMagnumApp)
+    {
+        // Update the universe each frame
+        // This likely wouldn't be here in the future
+        rUniUpd(rUni);
 
-    // Create the application
-    pMagnumApp = std::make_unique<OSPMagnum>(args, rOspApp);
+        rMagnumApp.update_scenes(); // Update scenes each frame
+        rMagnumApp.draw_scenes(); // Draw each frame of course
+    });
 
     // Configure the controls
     config_controls(*pMagnumApp);
@@ -140,7 +148,9 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
 
     // create a Satellite with an ActiveArea, then link it to the scene
     Satellite areaSat = active_area_create(rOspApp, rUni, 0);
+    rUniUpd(rUni);
     osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
+
 
     // Setup sync states used by scene systems to sync with the universe
     rScene.get_registry().set<osp::active::SyncVehicles>();
@@ -194,19 +204,19 @@ void testapp::test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
     rScene.reg_emplace<ACompPerspective3DView>(camera, camera);
     rScene.reg_emplace<ACompRenderer>(camera);
 
-    // Starts the game loop. This function is blocking, and will only return
-    // when the window is  closed. See OSPMagnum::drawEvent
+    // Starts the main loop. This function is blocking, and will only return
+    // once the window is closed. See OSPMagnum::drawEvent
     pMagnumApp->exec();
 
-    rOspApp.update_universe();
-
-    // Close button has been pressed
+    // Window has been closed
 
     SPDLOG_LOGGER_INFO(rOspApp.get_logger(),
                        "Closed Magnum Application");
 
-    // Disconnect ActiveArea
-    active_area_destroy(rOspApp, rUni, areaSat);
+    rUniUpd(rUni); // make sure universe is in a valid state
+
+    active_area_destroy(rOspApp, rUni, areaSat); // Disconnect ActiveArea
+    rUniUpd(rUni);
 
     rUni.get_reg().destroy(areaSat);
 
@@ -369,8 +379,6 @@ Satellite active_area_create(
         rArea.m_captureSpace = captureIndex;
     }
 
-    rOspApp.update_universe();
-
     return areaSat;
 }
 
@@ -396,7 +404,6 @@ void active_area_destroy(
         rRelease.add(viewSats[i], pos, {});
     }
 
-    rOspApp.update_universe();
 }
 
 void load_shaders(osp::active::ActiveScene& rScene)

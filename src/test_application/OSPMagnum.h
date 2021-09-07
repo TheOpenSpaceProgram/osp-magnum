@@ -58,9 +58,13 @@ class OSPMagnum : public Magnum::Platform::Application
 {
 
 public:
+
+    using on_draw_t = std::function<void(OSPMagnum&)>;
+
     explicit OSPMagnum(
             const Magnum::Platform::Application::Arguments& arguments,
-            osp::OSPApplication &ospApp);
+            osp::OSPApplication &rOspApp,
+            on_draw_t onDraw);
 
     ~OSPMagnum();
 
@@ -71,6 +75,9 @@ public:
     void mouseReleaseEvent(MouseEvent& event) override;
     void mouseMoveEvent(MouseMoveEvent& event) override;
     void mouseScrollEvent(MouseScrollEvent& event) override;
+
+    void update_scenes();
+    void draw_scenes();
 
     osp::active::ActiveScene& scene_create(std::string const& name, SceneUpdate_t upd);
     osp::active::ActiveScene& scene_create(std::string&& name, SceneUpdate_t upd);
@@ -83,6 +90,8 @@ public:
 private:
 
     void drawEvent() override;
+
+    on_draw_t m_onDraw;
 
     osp::input::UserInputHandler m_userInput;
 

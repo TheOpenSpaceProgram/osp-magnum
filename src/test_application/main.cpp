@@ -88,10 +88,12 @@ void debug_print_sats();
 void debug_print_hier();
 void debug_print_machines();
 
-// Deals with the underlying OSP universe, with the satellites and stuff. A
-// Magnum application or OpenGL context is not required for the universe to
-// exist. This also stores loaded resources in packages.
+// Stores loaded resources in packages.
 osp::OSPApplication g_osp;
+
+// Test application stores 1 universe and its update function
+osp::universe::Universe g_universe;
+universe_update_t g_universeUpdate;
 
 // Deals with the window, OpenGL context, and other game engine stuff that
 // often have "Active" written all over them
@@ -123,11 +125,11 @@ int main(int argc, char** argv)
     {
         if(args.value("scene") == "simple")
         {
-            simplesolarsystem::create(g_osp);
+            simplesolarsystem::create(g_osp, g_universe, g_universeUpdate);
         }
         else if(args.value("scene") == "moon")
         {
-            moon::create(g_osp);
+            moon::create(g_osp, g_universe, g_universeUpdate);
         }
         else
         {
@@ -140,6 +142,7 @@ int main(int argc, char** argv)
             g_magnumThread.join();
         }
         std::thread t(test_flight, std::ref(g_ospMagnum), std::ref(g_osp),
+                      std::ref(g_universe), std::ref(g_universeUpdate),
                       OSPMagnum::Arguments{g_argc, g_argv});
         g_magnumThread.swap(t);
     }
@@ -180,14 +183,14 @@ int debug_cli_loop()
         {
             if (destroy_universe())
             {
-                simplesolarsystem::create(g_osp);
+                simplesolarsystem::create(g_osp, g_universe, g_universeUpdate);
             }
         }
         else if (command == "moon")
         {
             if (destroy_universe())
             {
-                moon::create(g_osp);
+                moon::create(g_osp, g_universe, g_universeUpdate);
             }
         }
         else if (command == "flight")
@@ -197,6 +200,7 @@ int debug_cli_loop()
                 g_magnumThread.join();
             }
             std::thread t(test_flight, std::ref(g_ospMagnum), std::ref(g_osp),
+                          std::ref(g_universe), std::ref(g_universeUpdate),
                           OSPMagnum::Arguments{g_argc, g_argv});
             g_magnumThread.swap(t);
         }
@@ -246,9 +250,8 @@ bool destroy_universe()
     }
 
     // Destroy all satellites
-    g_osp.get_universe().get_reg().clear();
-
-    g_osp.get_universe().coordspace_clear();
+    g_universe.get_reg().clear();
+    g_universe.coordspace_clear();
 
     // Destroy blueprints as part of destroying all vehicles
     g_osp.debug_find_package("lzdb").clear<osp::BlueprintVehicle>();
@@ -273,6 +276,7 @@ constexpr void register_wiretype(osp::Package &rPkg)
     rPkg.add<osp::RegisteredWiretype>(std::string(WIRETYPE_T::smc_wire_name),
                                       osp::wiretype_id<WIRETYPE_T>());
 }
+
 
 
 void load_a_bunch_of_stuff()
@@ -347,6 +351,8 @@ void load_a_bunch_of_stuff()
 
     SPDLOG_LOGGER_INFO(g_osp.get_logger(), "Resource loading complete");
 }
+
+//-----------------------------------------------------------------------------
 
 void debug_print_help()
 {
@@ -529,7 +535,7 @@ void debug_print_sats()
 {
     using namespace osp::universe;
 
-    Universe const &rUni = g_osp.get_universe();
+    Universe const &rUni = g_universe;
 
     Universe::Reg_t const &rReg = rUni.get_reg();
 

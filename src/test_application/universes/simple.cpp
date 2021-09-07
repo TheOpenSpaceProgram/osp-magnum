@@ -54,9 +54,9 @@ using planeta::universe::UCompPlanet;
 
 using osp::universe::Vector3g;
 
-void simplesolarsystem::create(osp::OSPApplication& rOspApp)
+void simplesolarsystem::create(osp::OSPApplication& rOspApp,
+                               Universe& rUni, universe_update_t& rUpdater)
 {
-    Universe &rUni = rOspApp.get_universe();
     Package &rPkg = rOspApp.debug_find_package("lzdb");
 
     Satellite root = rUni.sat_create();
@@ -127,10 +127,10 @@ void simplesolarsystem::create(osp::OSPApplication& rOspApp)
     }
 
     // Add universe update function
-    rOspApp.set_universe_update(generate_simple_universe_update(coordIndex));
+    rUpdater = generate_simple_universe_update(coordIndex);
 
     // Update CoordinateSpace to finish adding the new Satellites
-    rOspApp.update_universe();
+    rUpdater(rUni);
 
     SPDLOG_LOGGER_INFO(rOspApp.get_logger(), "Created simple solar system");
 }
