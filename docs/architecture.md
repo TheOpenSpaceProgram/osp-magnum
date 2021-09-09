@@ -38,21 +38,46 @@ Note that this doesn't mean everything has to be ultra-optimized. It's perfectly
 
 ## Entity Component System (ECS)
 
-ECS is a solution to representing a world that consists of many 'things' that may have common properties with each other. This is perfect for many games and simulations, and is more versatile and performant than class-based inheritance. Universe and ActiveScene both use ECS through the [EnTT](https://github.com/skypjack/entt/) library.
+### Motivation
 
-Confusingly, ECS is not "a system of entities and components" that many mainstream game engines already follow. ECS is better stated as "Entities, Components, and Systems:" three separate concepts that come together to create an elegant architecture.
+Video games are special in that the systems that make a game world "tick" are incredibly varied. Physics, graphics, sounds, menus, AI, and dialogue are just a few examples of the vast spectrum of logic that governs how the game behaves.
+What's more, nearly every entity in the game world expresses a different combination of these behaviors.
+The player character has a graphical appearance, makes sound, carries weapons, is affected by physics, and is controlled by the player, while an AI character shares most of these same properties, but with an AI algorithm responsible for its behavior, rather than the player's inputs.
 
-* **Entity**: A simple unique integer ID linked to the existance of a 'thing'.
-* **Component**: An (optional) property of an entity. Usually a struct stored in a contiguous container that associates it to an Entity.
-* **System**: A function that operates on entities that have a specific set of components. Best described as 'rules' that determine how some components change over time.
+A waypoint marker floating over an objective has a graphical appearance and a position in space, yet is not affected by physics.
+A trigger which detects that the player has reached the objective is nearly identical, but is invisible and thus lacks a graphical appearance.
 
-Entities are still just integers, but are treated as **compositions** of different types of components. Components represent what an entity **has or is made of**, which determines what operations can be done to it by systems. The components themselves don't describe any behaviour.
+This broad spectrum of combinations of behaviors indicates that game objects are best represented by **composition**.
+Rather than attempting to force game objects into a hierarchy of behaviors (e.g. using inheritance to organize "universal" properties that we *assume* will be shared), we would like to make no assumptions, and instead freely attach any behvaior to any object.
 
-As a simple example: any entity with a *Mass component* is affected by the *Gravity system*, any entity with the *Legs component* affected by the *Walk system*. *Mass* or *Legs* don't directly imply any behaviour; it's the world's job to add meaning to them.
+Furthermore, we would like to **decouple** systems from one another, wherever possible.
+The physics logic and rendering logic for an object both may rely on the object's position to do their job, but they need not know any more.
+Decoupling unrelated systems from one another keeps them focused, and easier to work with.
+
+### Solution
+
+These problems are addressed by the **Entity Component System** (ECS) paradigm. Here's how it works:
+
+Everything in your game is an **Entity**. The player is an entity, the terrain is an entity, a projectile in flight is an entity, and so on.
+Under the hood, an entity is represented by nothing more than a unique integer ID.
+
+We may attach **Components** to entities.
+A component represents some behavior or property that the entity possesses, such as a "Position," "Color," "Health," and so on.
+Under the hood, each component type is a `struct` which stores the state data relevant to its function (e.g. a 3D vector representing position, a mesh resource to be drawn, etc.).
+
+**Systems** are responsible for providing the behaviors promised by the components. Systems only process entities which possess the relevant components.
+A physics system would process all entities which a "position" and "velocity" component.
+A graphics system might operate on the "position" and a "mesh" component.
+Entities with a "Mass" component would be handled by the "Gravity" system.
+Any entities which don't possess the right components are simply ignored, and for the entities which *are* processed, any components unrelated to the system are ignored.
+
+This arrangement provides us the decoupling we desired; if we want to add a new behavior to a game object, say, to make it flash colors, we simply create a new function that accesses the "Color" component of any entity which has one, and modifies its color. No other information about the entity is relevant, and the presence of any one component doesn't imply anything about the entity beyond that component's narrow purpose.
+
+## ECS in OSP
+
+In OSP, ECS powers the `Universe` and `ActiveScene` using the [EnTT](https://github.com/skypjack/entt/) library.
 
 Components **never inherit each other**, and all common properties are split into separate components.
-
-As another example, a Planet can be represented by having a Mass, Radius, Atmosphere, and Solid surface component. A Star can share the same Mass, Radius, and Atmosphere, but with a Luminance and Plasma surface component.
 
 ### Encapsulation?
 
@@ -100,25 +125,29 @@ The EnTT library provides many features making iteration convenient.
 
 ### Responsibility of Systems
 
-Ideally, components are raw data that don't describe any behaviour. However, it's acceptable for them to have constructors, destructors, member functions, and RAII members as long as components are only modified by very specific systems. This includes creating and destroying components. Many systems reading the same component is okay.
+It is the sole responsibility of Systems to mutate component state data.
+Ideally, components are raw data (plain-old-data structs) with no behaviors.
+However, it's acceptable for components to have constructors, destructors, member functions, and RAII members as long as components are only modified by very specific systems. This includes creating and destroying components.
 
-EnTT allows polymorphically accessing components, to allow for deleting, copying, and listing all components an entity has. These features should never be used outside of debugging, since they potentially modify components and calls functions outside of their respective systems.
+EnTT allows polymorphically accessing components, to allow for deleting, copying, and listing all components an entity has. These features should never be used outside of debugging, since they potentially modify components or call functions outside of the appropriate system.
 
-In short, **components must only be modified by a few select systems**. There's a few other practical reasons why:
+Many systems *reading* the same component is okay.
+However, **components must only be *modified* by a few select systems**.
+There are several practical reasons why:
 
-* Components may need to be synced with external references: pointers, GPU resourses, or physics engine objects. Some of these require specific threads.
-* Multiple Systems that modify different components can run in parallel without mutexes.
+* Components may need to be synced with external references: pointers, GPU resources, or physics engine objects. Some of these resources must be executed on a specific thread.
+* Systems that don't touch the same components can run in parallel without thread safety hazards, which would require costly synchronization and mutual exclusion.
 
-There's a few important operations that need to be addressed however:
+In particular, there are several important operations worth noting:
 
 * **Deleting entire entities**: Deleting an entity means modifying every component container the entity is associated with. Entities can be marked for deletion with a component, or external queue. 'Deleter' Systems can then delete their respective components near the end of the frame.
 * **Copying entire entities**: It may seem convenient to iterate all of an entity's components and copy them into another entity, but this breaks the rules. Copies of an entity should be created by the same system as the original entity. A dedicated 'mark for copy' and copy systems may be practical depending on the case.
 
 ### A solution to all world state?
 
-Entities and Components are powerful, but cannot solve every single storage use case alone. EnTT specifically, only allows one component of a unique type per entity, and only one container of these components (pool) per world (registry). One case may require a variable number of the same component for an entity, or the problem may not be well suited for entities and components at all.
+Entities and Components are powerful, but cannot solve every single storage use case alone. EnTT, for instance, only allows one component of a unique type per entity, and only one container of these components (pool) per world (registry). One may imagine a situation requiring a variable number of the same component for an entity. The problem may simply not be well suited for entities and components to begin with.
 
-EnTT features customizability and future versions can be more versitile, but either way, ECS is best when combined with other data structures besides just components. For example, queues can be used to pass messages between systems.
+EnTT features customizability and future versions may be more versitile, but either way, ECS is best when combined with other data structures besides just components, such as using queues to pass messages between systems.
 
 ## Universe rundown
 
