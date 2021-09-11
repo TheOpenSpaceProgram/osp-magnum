@@ -30,6 +30,8 @@
 namespace testapp
 {
 
+using universe_update_t = std::function<void(osp::universe::Universe&)>;
+
 /**
  * @brief Generate an update function for a universe consisting of just a single
  *        CoordspaceCartesianSimple coordinate space and no movement

@@ -48,10 +48,11 @@ using osp::input::EVarTrigger;
 using osp::input::EVarOperator;
 
 OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
-                     osp::OSPApplication &rOspApp) :
+                     osp::OSPApplication &rOspApp, on_draw_t onDraw) :
         Magnum::Platform::Application{
             arguments,
             Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
+        m_onDraw(onDraw),
         m_userInput(12),
         m_rOspApp(rOspApp)
 {
@@ -68,37 +69,34 @@ OSPMagnum::~OSPMagnum()
 
 void OSPMagnum::drawEvent()
 {
-
-    Magnum::GL::defaultFramebuffer.clear(Magnum::GL::FramebufferClear::Color
-                                         | Magnum::GL::FramebufferClear::Depth);
-
-    m_rOspApp.update_universe();
-
     m_userInput.update_controls();
 
-    for (auto &[name, entry] : m_scenes)
-    {
-        auto &[rScene, updateFunc] = entry;
-        updateFunc(rScene);
-    }
+    m_onDraw(*this);
 
     m_userInput.clear_events();
-
-    for (auto &[name, entry] : m_scenes)
-    {
-        auto &[rScene, updateFunc] = entry;
-        rScene.draw();
-    }
-
-
-    // TODO: GUI and stuff
 
     swapBuffers();
     m_timeline.nextFrame();
     redraw();
 }
 
+void OSPMagnum::update_scenes()
+{
+    for (auto &[name, entry] : m_scenes)
+    {
+        auto &[rScene, updateFunc] = entry;
+        updateFunc(rScene);
+    }
+}
 
+void OSPMagnum::draw_scenes()
+{
+    for (auto &[name, entry] : m_scenes)
+    {
+        auto &[rScene, updateFunc] = entry;
+        rScene.draw();
+    }
+}
 
 void OSPMagnum::keyPressEvent(KeyEvent& event)
 {

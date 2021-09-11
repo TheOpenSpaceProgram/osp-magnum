@@ -24,6 +24,7 @@
  */
 
 #include "OSPMagnum.h"
+#include "universes/common.h"
 
 #include <thread>
 
@@ -31,16 +32,23 @@ namespace testapp
 {
 
 /**
- * Start flight scene. This will create an ActiveArea in the universe and start
- * a Magnum application with an ActiveScene. All the necessary systems will be
- * registered to this scenes for in-universe flight, such as SysAreaAssociate.
+ * @brief Start flight scene
+ *
+ * This will create an ActiveArea in the universe and start a Magnum application
+ * with an ActiveScene setup for in-universe flight.
+ *
  * This function blocks execution until the window is closed.
  *
- * @param pMagnumApp [out] Magnum application created
- * @param rOspApp [in,out] OSP universe and resources to run the application on
- * @param args [in] Arguments to pass to Magnum
+ * @param pMagnumApp [out] Container for Magnum application to create for
+ *                         external access
+ * @param rOspApp    [ref] OSP Application containing needed resources
+ * @param rUni       [ref] Universe the flight scene will be connected to
+ * @param rUniUpd    [ref] Universe update function to be called per frame
+ * @param args       [in] Arguments to pass to Magnum
  */
 void test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
-                 osp::OSPApplication& rOspApp, OSPMagnum::Arguments args);
+                 osp::OSPApplication& rOspApp,
+                 osp::universe::Universe& rUni, universe_update_t& rUniUpd,
+                 OSPMagnum::Arguments args);
 
 }
