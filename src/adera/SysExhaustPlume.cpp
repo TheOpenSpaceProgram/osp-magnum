@@ -41,6 +41,7 @@
 #include <osp/Active/ActiveScene.h>      // for ActiveScene
 #include <osp/Active/activetypes.h>      // for entt::basic_view, entt::basic_sparse_set
 #include <osp/Active/SysHierarchy.h>     // for osp::active::SysHierarchy
+#include <osp/logging.h>                 // for OSP_LOG_...
 
 #include <osp/OSPApplication.h>          // for OSPApplication
 
@@ -48,7 +49,6 @@
 
 #include <entt/entity/entity.hpp>        // for entt::null_t, entt::null
 
-#include <spdlog/spdlog.h>               // for SPDLOG_LOGGER_ERROR, SPDLOG_...
 
 #include <string_view>                   // for string_view
 
@@ -105,15 +105,13 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
 
     if (plumeNode == entt::null)
     {
-        SPDLOG_LOGGER_ERROR(
-                rScene.get_application().get_logger(),
+        OSP_LOG_ERROR(
                 "ERROR: could not find plume anchor for MachineRocket {}",
                 part);
         return;
     }
 
-    SPDLOG_LOGGER_INFO(
-            rScene.get_application().get_logger(),
+    OSP_LOG_INFO(
             "MachineRocket {}'s associated plume: {}",
             part, plumeNode);
 
@@ -130,8 +128,7 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
     DependRes<PlumeEffectData> plumeEffect = rPkg.get<PlumeEffectData>(effectName);
     if (plumeEffect.empty())
     {
-        SPDLOG_LOGGER_ERROR(rScene.get_application().get_logger(),
-                            "ERROR: couldn't find plume effect  {}", effectName);
+        OSP_LOG_ERROR("ERROR: couldn't find plume effect  {}", effectName);
         return;
     }
 

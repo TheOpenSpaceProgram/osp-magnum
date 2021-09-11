@@ -33,7 +33,8 @@
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/SysVehicleSync.h>
-#include <osp/OSPApplication.h>
+
+#include <osp/logging.h>
 
 using testapp::SysCameraController;
 using testapp::ACompCameraController;
@@ -116,7 +117,7 @@ bool SysCameraController::try_switch_vehicle(ActiveScene &rScene,
 
     if (rUni.get_reg().valid(rCamCtrl.m_selected))
     {
-      SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(), "Selected: {} ",
+      OSP_LOG_INFO("Selected: {} ",
           rUni.get_reg().get<osp::universe::UCompTransformTraj>(rCamCtrl.m_selected).m_name);
         return true;
     }
@@ -295,8 +296,7 @@ void SysCameraController::update_area(ActiveScene &rScene)
 
     if (!translate.isZero())
     {
-        SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
-                            "Floating origin translation!");
+        OSP_LOG_TRACE("Floating origin translation!");
 
         // Move the active area to center on the camera
         SysAreaAssociate::area_move(rScene, translate);

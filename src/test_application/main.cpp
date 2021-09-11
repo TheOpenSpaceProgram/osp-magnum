@@ -34,14 +34,12 @@
 #include "universes/planets.h"
 
 #include <osp/Resource/AssetImporter.h>
-#include <osp/string_concat.h>
-
 #include <osp/Satellites/SatVehicle.h>
+#include <osp/Shaders/Phong.h>
+#include <osp/string_concat.h>
+#include <osp/logging.h>
 
 #include <adera/ShipResources.h>
-
-
-#include <osp/Shaders/Phong.h>
 #include <adera/Shaders/PlumeShader.h>
 
 #include <adera/Machines/Container.h>
@@ -100,6 +98,11 @@ universe_update_t g_universeUpdate;
 std::unique_ptr<OSPMagnum> g_ospMagnum;
 std::thread g_magnumThread;
 
+// Loggers
+std::shared_ptr<spdlog::logger> g_logTestApp;
+std::shared_ptr<spdlog::logger> g_logMagnumApp;
+
+
 // lazily save the arguments to pass to Magnum
 int g_argc;
 char** g_argv;
@@ -118,6 +121,14 @@ int main(int argc, char** argv)
     // just lazily save the arguments
     g_argc = argc;
     g_argv = argv;
+
+    // Setup loggers
+    auto const sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    sink->set_pattern("[%T.%e] [%n] [%^%l%$] [%s:%#] %v");
+    g_logTestApp = std::make_shared<spdlog::logger>("testapp", sink);
+    g_logMagnumApp = std::make_shared<spdlog::logger>("flight", sink);
+
+    osp::set_thread_logger(g_logTestApp); // Set logger for this thread
 
     load_a_bunch_of_stuff();
 
@@ -141,9 +152,12 @@ int main(int argc, char** argv)
         {
             g_magnumThread.join();
         }
-        std::thread t(test_flight, std::ref(g_ospMagnum), std::ref(g_osp),
-                      std::ref(g_universe), std::ref(g_universeUpdate),
-                      OSPMagnum::Arguments{g_argc, g_argv});
+        std::thread t([] {
+            osp::set_thread_logger(g_logMagnumApp);
+            test_flight(std::ref(g_ospMagnum), std::ref(g_osp),
+                        std::ref(g_universe), std::ref(g_universeUpdate),
+                        OSPMagnum::Arguments{g_argc, g_argv});
+        });
         g_magnumThread.swap(t);
     }
 
@@ -199,9 +213,12 @@ int debug_cli_loop()
             {
                 g_magnumThread.join();
             }
-            std::thread t(test_flight, std::ref(g_ospMagnum), std::ref(g_osp),
-                          std::ref(g_universe), std::ref(g_universeUpdate),
-                          OSPMagnum::Arguments{g_argc, g_argv});
+            std::thread t([] {
+                osp::set_thread_logger(g_logMagnumApp);
+                test_flight(std::ref(g_ospMagnum), std::ref(g_osp),
+                            std::ref(g_universe), std::ref(g_universeUpdate),
+                            OSPMagnum::Arguments{g_argc, g_argv});
+            });
             g_magnumThread.swap(t);
         }
         else if (command == "list_pkg")
@@ -244,8 +261,7 @@ bool destroy_universe()
     // Make sure no application is open
     if (g_ospMagnum != nullptr)
     {
-      SPDLOG_LOGGER_WARN(g_osp.get_logger(),
-                         "Application must be closed to destroy universe.");
+      OSP_LOG_WARN("Application must be closed to destroy universe.");
         return false;
     }
 
@@ -256,7 +272,7 @@ bool destroy_universe()
     // Destroy blueprints as part of destroying all vehicles
     g_osp.debug_find_package("lzdb").clear<osp::BlueprintVehicle>();
 
-    SPDLOG_LOGGER_INFO(g_osp.get_logger(), "explosion* Universe destroyed!");
+    OSP_LOG_INFO("explosion* Universe destroyed!");
 
     return true;
 }
@@ -349,7 +365,7 @@ void load_a_bunch_of_stuff()
 
     //s_partsLoaded = true;
 
-    SPDLOG_LOGGER_INFO(g_osp.get_logger(), "Resource loading complete");
+    OSP_LOG_INFO("Resource loading complete");
 }
 
 //-----------------------------------------------------------------------------

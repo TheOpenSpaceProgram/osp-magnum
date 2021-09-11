@@ -32,13 +32,13 @@
 #include <osp/Active/ActiveScene.h>  // for ActiveScene
 #include <osp/Active/activetypes.h>  // for ActiveReg_t
 
+#include <osp/logging.h>
+
 #include <osp/types.h>               // for Matrix4, Vector3
 #include <osp/CommonPhysics.h>       // for ECollisionShape
 
 #include <entt/signal/sigh.hpp>      // for entt::sink
 #include <entt/entity/entity.hpp>    // for entt::null, entt::null_t
-
-#include <spdlog/spdlog.h>           // for SPDLOG_LOGGER_TRACE
 
 #include <Newton.h>                  // for NewtonBodySetCollision
 
@@ -189,9 +189,8 @@ void SysNewton::update_world(ActiveScene& rScene)
     for (ActiveEnt ent : std::exchange(rPhysCtx.m_inertiaDirty, {}))
     {
         compute_rigidbody_inertia(rScene, ent);
-        SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(),
-                            "Updating RB : new CoM Z = {}",
-                            entBody.m_centerOfMassOffset.z());
+        OSP_LOG_TRACE("Updating RB : new CoM Z = {}",
+                      entBody.m_centerOfMassOffset.z());
     }
 
     auto viewNwtBody = rReg.view<ACompNwtBody_t>();
@@ -422,6 +421,5 @@ void SysNewton::compute_rigidbody_inertia(ActiveScene& rScene, ActiveEnt entity)
         rEntDyn.m_inertia.z());
     NewtonBodySetCentreOfMass(rEntNwtBody.get(), centerOfMass.xyz().data());
 
-    SPDLOG_LOGGER_TRACE(m_scene.get_application().get_logger(), "New mass: {}",
-                        entBody.m_mass);
+    OSP_LOG_TRACE("New mass: {}", entBody.m_mass);
 }

@@ -26,9 +26,7 @@
 #include "SysWire.h"
 #include "ActiveScene.h"
 
-#include <osp/OSPApplication.h>
-
-#include <spdlog/spdlog.h>
+#include <osp/logging.h>
 
 using osp::active::SysWire;
 
@@ -78,8 +76,7 @@ void SysWire::update_wire(ActiveScene &rScene)
         updateLimit --;
         if (0 == updateLimit)
         {
-            SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                               "Wire update limit reached");
+            OSP_LOG_INFO("Wire update limit reached");
             break;
         }
     }

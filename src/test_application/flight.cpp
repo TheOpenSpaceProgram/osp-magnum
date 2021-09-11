@@ -42,6 +42,8 @@
 #include <osp/Satellites/SatActiveArea.h>
 #include <osp/Satellites/SatVehicle.h>
 
+#include <osp/logging.h>
+
 #include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>
 #include <adera/Machines/Rocket.h>
@@ -210,8 +212,7 @@ void testapp::test_flight(
 
     // Window has been closed
 
-    SPDLOG_LOGGER_INFO(rOspApp.get_logger(),
-                       "Closed Magnum Application");
+    OSP_LOG_INFO("Closed Magnum Application");
 
     rUniUpd(rUni); // make sure universe is in a valid state
 

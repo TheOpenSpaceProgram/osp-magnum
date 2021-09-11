@@ -34,13 +34,10 @@ namespace osp
 {
 
 
+// TODO: Refactor to more permanent 'package list' or something
 class OSPApplication
 {
 public:
-
-    // put more stuff into here eventually
-
-    OSPApplication();
 
     /**
      * Add a resource package to the application
@@ -62,11 +59,8 @@ public:
 
     size_t debug_num_packages() const { return m_packages.size(); }
 
-    const std::shared_ptr<spdlog::logger>& get_logger() { return m_logger; };
-
 private:
     std::map<ResPrefix_t, Package, std::less<>> m_packages;
 
-    const std::shared_ptr<spdlog::logger> m_logger;
 };
 }

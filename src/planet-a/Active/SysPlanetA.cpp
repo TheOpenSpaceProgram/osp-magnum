@@ -31,13 +31,13 @@
 #include <osp/Active/SysRender.h>
 #include <osp/Universe.h>
 #include <osp/string_concat.h>
+#include <osp/logging.h>
 
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Renderer.h>
 
 #include <Magnum/Shaders/MeshVisualizerGL.h>
-#include <osp/OSPApplication.h>
 
 // TODO: Decouple when a proper interface for creating static triangle meshes
 //       is made
@@ -71,8 +71,7 @@ ActiveEnt SysPlanetA::activate(
 {
     using namespace osp::active;
 
-    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                      "Activating a planet");
+    OSP_LOG_INFO("Activating a planet");
 
     //SysPlanetA& self = scene.get_system<SysPlanetA>();
     auto &loadMePlanet = rUni.get_reg().get<universe::UCompPlanet>(tgtSat);
@@ -192,9 +191,8 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             PlanetGeometryA &rPlanetGeo = *(planet.m_planet);
 
             // initialize planet if not done so yet
-            SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                                "Initializing planet because that was not done "
-                                "for some reason");
+            OSP_LOG_INFO("Initializing planet because that was not done "
+                         "for some reason");
             planet.m_icoTree = std::make_shared<IcoSphereTree>();
 
             planet.m_icoTree->initialize(planet.m_radius);
@@ -225,19 +223,16 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
             rScene.get_registry().ctx<ACtxRenderGroups>().add<MaterialTerrain>(ent);
 
             //planet_update_geometry(ent, planet);
-            SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                                "Initialized planet, constructing colliders");
+            OSP_LOG_INFO("Initialized planet, constructing colliders");
 
             // temporary: make colliders for all the chunks
             for (chindex_t i = 0; i < rPlanetGeo.get_chunk_count(); i ++)
             {
                 debug_create_chunk_collider(rScene, ent, planet, i);
-                SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                                  "* completed chunk collider: {}", i);
+                OSP_LOG_INFO("* completed chunk collider: {}", i);
             }
 
-            SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                                "Completed planet colliders");
+            OSP_LOG_INFO("Completed planet colliders");
 
             planet.m_vrtxBufGL.setData(rPlanetGeo.get_vertex_buffer());
             planet.m_indxBufGL.setData(rPlanetGeo.get_index_buffer());
