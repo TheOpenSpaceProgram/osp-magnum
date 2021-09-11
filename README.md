@@ -4,9 +4,9 @@
 
 ***This project is still deep in the pre-release development phase***
 
-OpenSpaceProgram is an open source initiative with the goal of creating a space flight simulator similar to Kerbal Space Program. This project also works as a general-purpose library for space games and simulations with very large universes.
+OpenSpaceProgram is an open source initiative with the goal of creating a space flight simulator inspired by Kerbal Space Program. This project also works as a general-purpose library for space games and simulations with very large universes and multiple planetary systems.
 
-Written in C++17, this project mainly features a custom game engine and a universe/orbit simulator both relying on [EnTT](https://github.com/skypjack/entt/) and [Magnum](https://github.com/mosra/magnum). The universe and game engine are synchronized for a seamless spaceflight experience from a planet's surface to deep space.
+Written in C++17, this project mainly features a custom game engine and a universe/orbit simulator, both relying on [EnTT](https://github.com/skypjack/entt/) and [Magnum](https://github.com/mosra/magnum). The universe and game engine are synchronized for a seamless spaceflight experience from a planet's surface to deep space.
 
 By taking advantage of Entity Component System (ECS) architectures and Data-Oriented Design, this project achieves simplicity, flexibility, low coupling, and excellent performance. With these techniques in action, we can easily avoid spaghetti code and optimize for a high part count.
 
@@ -20,21 +20,21 @@ By taking advantage of Entity Component System (ECS) architectures and Data-Orie
   * 64-bit integers for coordinates
 * "ActiveScene" Game Engine
   * Scene Graph
-  * Physics interface agnostic of physics engine
+  * Straightforward interface for integrating any physics engine
   * Configurable multipass Renderer
   * Wiring/Connection System
     * Virtual control systems for vehicles (routable user inputs, PID, auto-landing, ...)
     * Resource flow
 * Asset management
-  * Uses Standard glTF as a part model format
-* Can extend bulleted lists
+  * glTF Part Model format
+* Extendable Bulleted List system to briefly present implemented features
 
 ### Extra
 
-* Newton Dynamics Physics Engine integration
+* *Newton Dynamics* Physics Engine integration
 * Rockets, RCS, and Fuel tanks
 * Rocket exhaust plume effects 
-* Icosahedron-based Planet surfaces with Level-of-detail subdivision
+* Planet terrain Icosahedron-based  tessellation
 
 ### Test Application
 
@@ -48,9 +48,9 @@ If you just want to test out the project so far, then see the **Actions** tab to
 
 ## Contributing
 
-Our development team is very small right now. We definitely need more crew to help to launch this project to its first release. Join our [Discord Server](https://discord.gg/7xFsKRg) for the latest discussions, and note that not everyone needs to be professional C++ developer to be involved.
+Our development team is very small right now. We definitely need more crew to help launch this project to its first release. Join our [Discord Server](https://discord.gg/7xFsKRg) for the latest discussions. You don't need to be a professional C++ developer to be involved. Graphics, sounds, game design, and scientific accuracy are important to this project too.
 
-Checkout [Architecture.md](docs/architecture.md) to get started with learning the codebase. Feel free to ask questions (even the stupid ones); this will greatly help with documentation.
+Check out [Architecture.md](docs/architecture.md) to get started with learning the codebase. Feel free to ask questions (even the stupid ones); this will greatly help with documentation.
 
 ## Simplified steps for development
 
@@ -62,5 +62,5 @@ Checkout [Architecture.md](docs/architecture.md) to get started with learning th
   bus was at while the project files were first created.
 * If there are problems with DPI scaling, then run with command line arguments
   `--magnum-dpi-scaling 1.0`
-* As a general-purpose space flight simulator with no reliance on a heavy game engine, this project might have some real applications for aerospace simulation and visualization. Either for education, amature rocketry, or even small aerospace companies.
+* As a general-purpose space flight simulator with no reliance on a heavy game engine, this project might have some real applications for aerospace simulation and visualization. Either for education, amateur rocketry, or even small aerospace companies.
 * This project isn't intended to be much of a "clone" of Kerbal Space Program. As of now, it's mostly a game engine intended for space flight, with no real gameplay yet.

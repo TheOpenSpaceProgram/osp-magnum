@@ -1,12 +1,14 @@
 # Architecture
 
-The core of OSP-Magnum is best described as a library that provides a set of functions and data structures intended to support a space flight simulator. The user is responsible for implementing their own application on the top level, allowing for full control over every feature.
+The core of OSP-Magnum is best described as a library that provides a set of functions and data structures intended to support a space flight simulator. The user's top-level application has full control over every feature and their main loop. We provide a Test Application to act as an out-of-the-box game.
 
 OSP-Magnum provides two distinct worlds the application can manage:
 * **Universe**: A space simulator that can handle massive world sizes with multiple coordinate spaces. Objects in space are referred to as **Satellites**.
 * **ActiveScene**: A typical game engine that can support physics, rendering, etc..
 
 The ActiveScene can be synchronized to represent a small area of the Universe, where in-game representations of nearby Satellites can be added to the scene. This area is referred to as the **ActiveArea** and can follow the user around to seamlessly explore the Universe while also avoiding floating point precision errors.
+
+Multiple ActiveAreas and ActiveScenes are allowed to exist simultaneously. ActiveAreas can also be connected to an entirely different game engine if needed, aside from just ActiveScene.
 
 For performance and flexibility for such a project, we adhere to few techniques that may seem unconventional:
 * Data-oriented Design
@@ -16,7 +18,7 @@ For performance and flexibility for such a project, we adhere to few techniques 
 
 Data-oriented Design is an emerging approach to software architecture, used extensively in OSP-Magnum. By focusing on creating a memory layout for efficient access, DoD greatly reduces complexity and achieves high performance. As counterintuitive as it may seem, this potentially results in (or at least encourages) a greater degree of flexibility compared to class-based OOP.
 
-DoD is not a new idea, but it is incredibly unconventional to most programmers (especially ones adept to OOP). It will be useful to read about or listen to a few presentations before getting started.
+DoD is not a new idea, but it is incredibly unconventional to most programmers (especially ones adept with OOP). It will be useful to read about or listen to a few presentations before getting started.
 
 See [data-oriented-design](https://github.com/dbartolini/data-oriented-design) for plenty of resources.
 
@@ -28,15 +30,17 @@ Important note: When going down the rabbit hole, *Data-oriented programming* and
 
 DoD leads to:
 
-* **Seprated Data and Functions**. This idea is also favored by functional programming. Most classes are only responsible for storing data and their methods only modify their own members. Most operations are free functions that only have a few responsibilities and little side effects.
-* **Structure of Arrays**. Aside from efficiency, data can be organized based on how it's operated on. Data for a single 'object' can be represented across multiple arrays, and each of these arrays can be passed to functions that can run simultaneously. This also leads to a natural separation of concerns.
+* **Separated Data and Functions**. This idea is also favored by functional programming. Most classes are only responsible for storing data, and their methods only modify their own members. Most operations are free functions that only have a few responsibilities and few side effects.
+* **Structure of Arrays**. To represent a group of common objects, their properties can each be stored in individual arrays. For example, a separate position array, and velocity array for a particle system. A function that only reads position won’t need to jump over extraneous data (e.g. velocity).  This leads to improved memory performance and a natural separation of concerns.
 * **Extensive use of contiguous containers**. Dealing with streams of data is the common case. Contiguous containers offer best performance with O(1) access and perfect cache locality. Can't really say `std::vector` is the best, but it is heavily used.
-* **No runtime Polymorphism**. We don't need polymorphism. Instead, prefer a more true form of message passing through shared variables. Two completely different systems can communicate using queues that act as interfaces for example.
+* **No runtime Polymorphism**. We don't need polymorphism. Instead, prefer a more true form of message passing through shared variables. For example, two completely different systems can communicate using queues that act as interfaces.
 * **Less Abstractions**. This is not a bad thing, nor does it mean everything is written in assembly. Along with separate data and functions, the computer has separate RAM and CPU (Objects aren't real!). By following a style that more resembles the computer's architecture, less (unnecessary) abstractions are needed to glue together the 'perfect' interface.
 
 Note that this doesn't mean everything has to be ultra-optimized. It's perfectly acceptable to prefer a more convenient option for paths that aren't performance critical, such as operations called only once per frame or once during setup.
 
 ## Entity Component System (ECS)
+
+See [ecs-faq](https://github.com/SanderMertens/ecs-faq)
 
 ### Motivation
 
@@ -48,7 +52,7 @@ A waypoint marker floating over an objective has a graphical appearance and a po
 A trigger which detects that the player has reached the objective is nearly identical, but is invisible and thus lacks a graphical appearance.
 
 This broad spectrum of combinations of behaviors indicates that game objects are best represented by **composition**.
-Rather than attempting to force game objects into a hierarchy of behaviors (e.g. using inheritance to organize "universal" properties that we *assume* will be shared), we would like to make no assumptions, and instead freely attach any behvaior to any object.
+Rather than attempting to force game objects into a hierarchy of behaviors (e.g. using inheritance to organize "universal" properties that we *assume* will be shared), we would like to make no assumptions, and instead freely attach any behavior to any object.
 
 Furthermore, we would like to **decouple** systems from one another, wherever possible.
 The physics logic and rendering logic for an object both may rely on the object's position to do their job, but they need not know any more.
@@ -62,26 +66,26 @@ Everything in your game is an **Entity**. The player is an entity, the terrain i
 Under the hood, an entity is represented by nothing more than a unique integer ID.
 
 We may attach **Components** to entities.
-A component represents some behavior or property that the entity possesses, such as a "Position," "Color," "Health," and so on.
+A component represents some behavior or property that the entity possesses, such as a "Position," "Color," "Health," and so on. Instead of inheritance, all common properties between entities are made into their own components.
 Under the hood, each component type is a `struct` which stores the state data relevant to its function (e.g. a 3D vector representing position, a mesh resource to be drawn, etc.).
 
 **Systems** are responsible for providing the behaviors promised by the components. Systems only process entities which possess the relevant components.
-A physics system would process all entities which a "position" and "velocity" component.
+A physics system would process all entities with a "position" and "velocity" component.
 A graphics system might operate on the "position" and a "mesh" component.
 Entities with a "Mass" component would be handled by the "Gravity" system.
 Any entities which don't possess the right components are simply ignored, and for the entities which *are* processed, any components unrelated to the system are ignored.
 
 This arrangement provides us the decoupling we desired; if we want to add a new behavior to a game object, say, to make it flash colors, we simply create a new function that accesses the "Color" component of any entity which has one, and modifies its color. No other information about the entity is relevant, and the presence of any one component doesn't imply anything about the entity beyond that component's narrow purpose.
 
-## ECS in OSP
+## ECS Implementation
 
 In OSP, ECS powers the `Universe` and `ActiveScene` using the [EnTT](https://github.com/skypjack/entt/) library.
 
-Components **never inherit each other**, and all common properties are split into separate components.
+EnTT is a *sparse set* ECS, where all instances of each unique component type is kept in a single contiguous container (pools), relying on sparse sets to associate them with entities. Other implementations of ECS exist, such as Archetypes, but those aren't used in OSP.
 
 ### Encapsulation?
 
-Encapsulation is not needed, since it is 100% certain which components a system will read from and write to. Systems are very much analagous to real-world laws of the physics. The real world won't tell a falling apple to update; it's not the apple's responsibility to move itself. The world doesn't care that the apple is even an apple; gravity will affect any object with mass regardless of what it is.
+Encapsulation is not needed, since it is 100% certain which components a system will read from and write to. Systems are very much analogous to the real-world laws of physics. The real world won't tell a falling apple to update; it's not the apple's responsibility to move itself. The world doesn't care that the apple is even an apple; gravity will affect any object with mass regardless of what it is.
 
 ### Updating the world
 
@@ -100,8 +104,8 @@ An ECS engine will more resemble this:
 
 ```
 void world_update(world) {
-    gravity_system(world);
-    move_system(world);
+    gravity_system(world); // Apply forces first
+    move_system(world); // Add velocities to positions
 }
 
 void gravity_system(world) {
@@ -121,7 +125,7 @@ void move_system(world) {
 
 Systems are called in a specific order to update the entire world to the next frame. Some systems may depend on each other, and other systems can run in parallel.
 
-The EnTT library provides many features making iteration convenient.
+The EnTT library provides many features making iteration of entities that have a specific set of components convenient.
 
 ### Responsibility of Systems
 
@@ -147,11 +151,11 @@ In particular, there are several important operations worth noting:
 
 Entities and Components are powerful, but cannot solve every single storage use case alone. EnTT, for instance, only allows one component of a unique type per entity, and only one container of these components (pool) per world (registry). One may imagine a situation requiring a variable number of the same component for an entity. The problem may simply not be well suited for entities and components to begin with.
 
-EnTT features customizability and future versions may be more versitile, but either way, ECS is best when combined with other data structures besides just components, such as using queues to pass messages between systems.
+EnTT features customizability and future versions may be more versatile, but either way, ECS is best when combined with other data structures besides just components, such as using queues to pass messages between systems.
 
 ## Universe rundown
 
-Universe is designed to support many different kinds of Satellites: Planets, Vehicles, Stars, etc... This can be achieved efficiently through Entities and Components, where Satellites are Entities. When considering keeping groups of Satellites in an N-body simulation, patched conics simulation, or just landed on a planet, it also becomes apparent that some weird scheme is needed to position Satellites.
+Universe is designed to support many different kinds of Satellites: Stars, Planets, Moons, Moons of Moons, Asteroids, Stations, Landers, Rovers, and so on. This can be achieved efficiently through Entities and Components, where Satellites are Entities. When considering keeping groups of Satellites in an N-body simulation, patched conics simulation, or just landed on a planet, it also becomes apparent that some weird scheme is needed to position Satellites.
 
 See [test_application/universes/simple.cpp](https://github.com/TheOpenSpaceProgram/osp-magnum/blob/master/src/test_application/universes/simple.cpp) for how a simple universe can be setup.
 
@@ -173,19 +177,19 @@ Therefore, signed 64-bit integers was chosen as space coordinates. They are also
 
 A bunch of satellites in an N-body simulation have nothing to do with a bunch of satellites landed on a planet. The planet also rotates, which moves everything landed on it too. This calls upon the need for CoordinateSpaces.
 
-CooridnateSpaces groups satellites together to be part of the same reference frame, centered around a parent Satellite. A good example is a planet owning a CooridnateSpace for its landed Satellites, which means CoordinateSpaces should be optionally rotatable (not yet implemented). A patched conics implementation may want a CoordinateSpace around every orbit-able Satellite.
+CooridnateSpaces groups satellites together to be part of the same reference frame, centered around a parent Satellite. A good example is a planet owning a CoordinateSpace for its landed Satellites, which means CoordinateSpaces should be optionally rotatable (not yet implemented). A patched conics implementation may want a CoordinateSpace around every orbit-able Satellite.
 
-Satellites can be handed off between CoordinateSpaces. This won't be discusseed in detail here; but in short, the process relies on a few queues.
+Satellites can be handed off between CoordinateSpaces. This won't be discussed in detail here; but in short, the process relies on a few queues.
 
 On a technical level, CoordinateSpaces store contiguous buffers of Satellites integer IDs, positions, and other additional data like velocity that may be needed to calculate trajectories. CoordinateSpaces are free to store data any way they want. This allows them to be specialized for whichever operations are performed on them (such as N-body). Their buffers are exposed through **read-only** [strided array views](https://doc.magnum.graphics/corrade/classCorrade_1_1Containers_1_1StridedArrayView.html) to be accessed externally. These are referred to as **CComp** for coordinate components. All CoordinateSpaces must output CCompX, CCompY, and CCompZ as a common interface, which are Cartesian 64-bit signed integers. 
 
-X, Y, and Z are separated, because SIMD computations favor each to be on their own buffer.
+X, Y, and Z coordinates are stored in separate arrays, because SIMD computations favor a Struct of Arrays data layout.
 
 CoordinateSpaces are stored in the Universe and are addressable with an index.
 
 Two important Universe components are used to track CoordinateSpace data:
 * **UCompInCoordspace**: Stores the index to which CoordinateSpace a Satellite is part of
-* **UCompCoordspaceIndex**: Stores the Satellite's index inside the CoordnateSpace, used to access CComps.
+* **UCompCoordspaceIndex**: Stores the Satellite's index inside the CoordinateSpace, used to access CComps.
 
 See [CartesianSimple.h](https://github.com/TheOpenSpaceProgram/osp-magnum/blob/master/src/osp/CoordinateSpaces/CartesianSimple.h) for how CoordinateSpace data can be stored
 
@@ -195,7 +199,7 @@ See [coordinates.h](https://github.com/TheOpenSpaceProgram/osp-magnum/blob/maste
 
 The ActiveArea is the name given to a small area in the Universe synchronized with the game engine. This is represented as a Satellite with a **UCompActiveArea**. UCompActiveArea stores queues to communicate with the game engine. The game engine can tell the ActiveArea where to move, allowing the user to explore and interact with the universe in-game. This also elegantly solves the floating origin problem.
 
-ActiveArea keeps track of and informs the game engine on Satellites that have entered and exited the area, by determining which ones meet certain conditions to make them visible (such as being nearby). The game engine is responsible for reading the Satellite data, and loading an in-game representation.
+ActiveArea keeps track of and informs the game engine about Satellites that have entered and exited the area, by determining which ones meet certain conditions to make them visible (such as being nearby). The game engine is responsible for reading the Satellite data, and loading an in-game representation.
 
 For example, if the ActiveArea goes near a planet, it will notify the game engine, which will read the Satellite's data and maybe load terrain and an atmosphere. If a vehicle enters the ActiveArea, then the game engine will read the data and create a physical Vehicle.
 
@@ -229,18 +233,20 @@ todo
 
 So far, the test application updates and renders the scene in the same loop. This will likely not be the case in the future.
 
-todo
+TODO
 
 ## Resources and Packages
 
-todo
+No final code is written yet.
+
+TODO
 
 ## Directories
 
 * **`src/osp`**: Core Features with Universe, ActiveScene, and resource management
 * **`src/adera`**: Game-specific fun stuff: Rockets, Plumes, Fuel tanks, etc...
 * **`src/planet-a`**: Planet UComps, LOD terrain for ActiveScene
-* **`src/newtondynamics_physics`**: [Newton Dynamics 3.14](http://newtondynamics.com) physics intergration for ActiveScene
+* **`src/newtondynamics_physics`**: [Newton Dynamics 3.14](http://newtondynamics.com) physics integration for ActiveScene
 * **`src/test_application`**: Runnable application, see below
 
 ### Test Application
