@@ -182,14 +182,6 @@ private:
             PrototypePart& part,
             PartEntity_t parentProtoIndex,
             Magnum::UnsignedInt childGltfIndex);
-
-    /*
-    * This cannot be a reference or else spdlog will complain. Don't know why.
-    */
-    static const std::shared_ptr<spdlog::logger> get_logger() 
-    {
-        return spdlog::get("assetimporter");
-    }
 };
 
 }

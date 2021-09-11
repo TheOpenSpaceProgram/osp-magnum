@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,22 +22,27 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "OSPApplication.h"
+#pragma once
 
-using namespace osp;
+#include <spdlog/spdlog.h>
 
-void OSPApplication::debug_add_package(Package&& p)
+namespace osp
 {
-    auto const& [it, success] = m_packages.emplace(p.get_prefix(), std::move(p));
-    assert(success);
+
+using logger_t = std::shared_ptr<spdlog::logger>;
+
+inline thread_local logger_t t_currentLogger;
+
+inline void set_thread_logger(logger_t const logger)
+{
+    t_currentLogger = std::move(logger);
 }
 
-Package& OSPApplication::debug_find_package(std::string_view prefix)
-{
-    if (auto it = m_packages.find(prefix); it != m_packages.end())
-    {
-        return it->second;
-    }
-    throw std::out_of_range("Package not found");
 }
 
+#define OSP_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(osp::t_currentLogger, __VA_ARGS__)
+#define OSP_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(osp::t_currentLogger, __VA_ARGS__)
+#define OSP_LOG_INFO(...) SPDLOG_LOGGER_INFO(osp::t_currentLogger, __VA_ARGS__)
+#define OSP_LOG_WARN(...) SPDLOG_LOGGER_TRACE(osp::t_currentLogger, __VA_ARGS__)
+#define OSP_LOG_ERROR(...) SPDLOG_LOGGER_TRACE(osp::t_currentLogger, __VA_ARGS__)
+#define OSP_LOG_CRITICAL(...) SPDLOG_LOGGER_TRACE(osp::t_currentLogger, __VA_ARGS__)

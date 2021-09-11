@@ -24,17 +24,16 @@
  */
 #include "UserInputHandler.h"
 #include "string_concat.h"
+#include "logging.h"
 
 #include <Magnum/Math/Functions.h>
 
 namespace osp::input
 {
 
-UserInputHandler::UserInputHandler(std::size_t deviceCount) :
-    m_deviceToButtonRaw(deviceCount)
-{
-    p_logger = spdlog::get("userinput");
-}
+UserInputHandler::UserInputHandler(std::size_t deviceCount)
+ : m_deviceToButtonRaw(deviceCount)
+{ }
 
 bool UserInputHandler::eval_button_expression(
         ControlExpr_t const& expression,
@@ -159,7 +158,7 @@ EButtonControlIndex UserInputHandler::button_subscribe(std::string_view name)
     if (cfgIt == m_btnControlCfg.end())
     {
         // Config not found, no way to have an empty key so far, so throw an exception
-        SPDLOG_LOGGER_ERROR(p_logger, "No config for{}", name);
+        OSP_LOG_ERROR("No config for{}", name);
         throw std::runtime_error(string_concat("Error: no config with ", name));
     }
 
@@ -272,7 +271,7 @@ void UserInputHandler::event_raw(DeviceId deviceId, int buttonEnum,
         return; // button not registered
     }
 
-    SPDLOG_LOGGER_TRACE(p_logger, "sensitive button pressed");
+    OSP_LOG_TRACE("sensitive button pressed");
         
     ButtonRaw &btnRaw = btnIt->second;
 
@@ -337,7 +336,7 @@ void UserInputHandler::update_controls()
                 rControl.m_exprRelease.clear();
                 m_btnControlEvents.emplace_back(index,
                                                 EButtonControlEvent::Triggered);
-                SPDLOG_LOGGER_TRACE(m_to->p_logger, "RELEASE");
+                OSP_LOG_TRACE("RELEASE");
             }
         }
         else if (rControl.m_triggered)
@@ -345,7 +344,7 @@ void UserInputHandler::update_controls()
             // start holding down the control. control.m_exprRelease should
             // have been generated earlier
             rControl.m_held = true;
-            SPDLOG_LOGGER_TRACE(m_to->p_logger, "HOLD");
+            OSP_LOG_TRACE("HOLD");
         }
     }
 

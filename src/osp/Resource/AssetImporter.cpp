@@ -25,9 +25,12 @@
 
 #include "Package.h"
 #include "AssetImporter.h"
-#include "osp/string_concat.h"
-#include "adera/Plume.h"
 #include "machines.h"
+
+#include <adera/Plume.h>
+
+#include "../string_concat.h"
+#include "../logging.h"
 
 #include <Corrade/Containers/Optional.h>
 #include <Corrade/PluginManager/Manager.h>
@@ -69,7 +72,7 @@ void osp::AssetImporter::load_sturdy_file(std::string_view filepath, Package& rM
     gltfImporter.openFile(std::string{filepath});
     if (!gltfImporter.isOpened() || gltfImporter.defaultScene() == -1)
     {
-        SPDLOG_LOGGER_ERROR(get_logger(), "Could not open file {}", filepath);
+        OSP_LOG_ERROR("Could not open file {}", filepath);
     }
 
     // repurpose filepath into unique identifier for file resources
@@ -89,12 +92,12 @@ void AssetImporter::proto_load_machines(
 {
     if (!extras.Has("machines"))
     {
-        SPDLOG_LOGGER_ERROR(get_logger(), "Error: no machines found!");
+        OSP_LOG_ERROR("Error: no machines found!");
         return;
     }
     tinygltf::Value const& machines = extras.Get("machines");
 
-    SPDLOG_LOGGER_INFO(get_logger(), "JSON machines!");
+    OSP_LOG_INFO("JSON machines!");
 
     auto const& machArray = machines.Get<tinygltf::Value::Array>();
 
@@ -110,7 +113,7 @@ void AssetImporter::proto_load_machines(
     {
         std::string type = value.Get("type").Get<std::string>();
 
-        SPDLOG_LOGGER_INFO(get_logger(), "test: {}", type);
+        OSP_LOG_INFO("test: {}", type);
 
         if (type.empty())
         {
@@ -123,7 +126,7 @@ void AssetImporter::proto_load_machines(
         DependRes<RegisteredMachine> machineType = rMachinePkg.get<RegisteredMachine>(type);
         if (machineType.empty())
         {
-            SPDLOG_LOGGER_ERROR(get_logger(), "Machine Type not found: {}", type);
+            OSP_LOG_ERROR("Machine Type not found: {}", type);
             continue; // machine type not found
         }
         PCompMachine &rMachine = rMachines.emplace_back();
@@ -132,7 +135,7 @@ void AssetImporter::proto_load_machines(
 
         for (auto const& key : value.Keys())
         {
-          SPDLOG_LOGGER_INFO(get_logger(), "Reading config \'{}\'", key);
+          OSP_LOG_INFO("Reading config \'{}\'", key);
 
             tinygltf::Value v = value.Get(key);
             switch (v.Type())
@@ -141,7 +144,7 @@ void AssetImporter::proto_load_machines(
             {
                 double val = v.Get<double>();
                 rMachine.m_config.emplace(key, val);
-                SPDLOG_LOGGER_INFO(get_logger(), "{} is (real)", val);
+                OSP_LOG_INFO("{} is (real)", val);
                 break;
             }
 
@@ -149,18 +152,18 @@ void AssetImporter::proto_load_machines(
             {
                 int val = v.Get<int>();
                 rMachine.m_config.emplace(key, val);
-                SPDLOG_LOGGER_INFO(get_logger(), "{} is (int)", val);
+                OSP_LOG_INFO("{} is (int)", val);
                 break;
             }
             case tinygltf::Type::STRING_TYPE:
             {
                 std::string val = v.Get<std::string>();
                 rMachine.m_config.emplace(key, std::move(val));
-                SPDLOG_LOGGER_INFO(get_logger(), "{} is (string)", val);
+                OSP_LOG_INFO("{} is (string)", val);
                 break;
             }
             default:
-                SPDLOG_LOGGER_INFO(get_logger(), "(unknown)");
+                OSP_LOG_INFO("(unknown)");
                 break;
             }
         }
@@ -205,8 +208,7 @@ void osp::AssetImporter::load_plume(TinyGltfImporter& gltfImporter,
     using Corrade::Containers::Pointer;
     using Magnum::Trade::ObjectData3D;
     using namespace tinygltf;
-    SPDLOG_LOGGER_INFO(get_logger(), "Plume! Node \'{}\'",
-                       gltfImporter.object3DName(id));
+    OSP_LOG_INFO("Plume! Node \'{}\'", gltfImporter.object3DName(id));
 
     // Get mesh data
     Pointer<ObjectData3D> rootNode = gltfImporter.object3D(id);
@@ -259,13 +261,12 @@ void osp::AssetImporter::load_sturdy(
         Package& rMachinePkg,
         Package& pkg)
 {
-    SPDLOG_LOGGER_INFO(get_logger(), "Found {} nodes",
-                     gltfImporter.object3DCount());
+    OSP_LOG_INFO("Found {} nodes", gltfImporter.object3DCount());
 
     Optional<SceneData> sceneData = gltfImporter.scene(gltfImporter.defaultScene());
     if (!sceneData)
     {
-        SPDLOG_LOGGER_ERROR(get_logger(), "Error: couldn't load scene data");
+        OSP_LOG_ERROR("Error: couldn't load scene data");
         return;
     }
 
@@ -274,7 +275,7 @@ void osp::AssetImporter::load_sturdy(
     for (UnsignedInt childID : sceneData->children3D())
     {
         const std::string& nodeName = gltfImporter.object3DName(childID);
-        SPDLOG_LOGGER_INFO(get_logger(), "Found node: {}", nodeName);
+        OSP_LOG_INFO("Found node: {}", nodeName);
 
         if (nodeName.compare(0, 5, "part_") == 0)
         {
@@ -294,15 +295,13 @@ void osp::AssetImporter::load_sturdy(
 
         std::string const& meshName =
             string_concat(resPrefix, gltfImporter.meshName(i));
-        SPDLOG_LOGGER_INFO(get_logger(), "Mesh: {}", meshName);
+        OSP_LOG_INFO("Mesh: {}", meshName);
 
 
         Optional<MeshData> meshData = gltfImporter.mesh(i);
         if (!meshData || (meshData->primitive() != MeshPrimitive::Triangles))
         {
-            SPDLOG_LOGGER_ERROR(get_logger(),
-                             "Error: Mesh {} not composed of triangles",
-                             meshName);
+            OSP_LOG_ERROR("Error: Mesh {} not composed of triangles", meshName);
             continue;
         }
         pkg.add<MeshData>(meshName, std::move(*meshData));
@@ -314,7 +313,7 @@ void osp::AssetImporter::load_sturdy(
     {
         auto imgID = gltfImporter.texture(i)->image();
         std::string const& imgName = gltfImporter.image2DName(imgID);
-        SPDLOG_LOGGER_INFO(get_logger(), "Loading image: {}", imgName);
+        OSP_LOG_INFO("Loading image: {}", imgName);
 
         Optional<ImageData2D> imgData = gltfImporter.image2D(imgID);
         if (!imgData)
@@ -337,14 +336,14 @@ DependRes<ImageData2D> osp::AssetImporter::load_image(
         = manager.loadAndInstantiate("AnyImageImporter");
     if (!importer || !importer->openFile(filepath))
     {
-        SPDLOG_LOGGER_ERROR(get_logger(), "Could not open file {}", filepath);
+        OSP_LOG_ERROR("Could not open file {}", filepath);
         return DependRes<ImageData2D>();
     }
 
     Optional<ImageData2D> image = importer->image2D(0);
     if (!image)
     {
-        SPDLOG_LOGGER_ERROR(get_logger(), "Could not read image in file {}",
+        OSP_LOG_ERROR("Could not read image in file {}",
                          filepath);
         return DependRes<ImageData2D>();
     }
@@ -359,9 +358,8 @@ DependRes<Mesh> osp::AssetImporter::compile_mesh(
 
     if (meshData.empty())
     {
-        SPDLOG_LOGGER_ERROR(get_logger(),
-                         "Error: requested MeshData resource \'{}\' not found",
-                         meshData.name());
+        OSP_LOG_ERROR("Error: requested MeshData resource \'{}\' not found",
+                      meshData.name());
         return {};
     }
 
@@ -388,8 +386,7 @@ DependRes<Texture2D> osp::AssetImporter::compile_tex(
 
     if (imageData.empty())
     {
-        SPDLOG_LOGGER_ERROR(
-          get_logger(),
+        OSP_LOG_ERROR(
           "Error: requested ImageData2D resource \'{}\' not found\n",
           imageData.name());
         return {};
@@ -486,8 +483,7 @@ void AssetImporter::proto_add_obj_recurse(
         const std::string& meshName =
             string_concat(resPrefix, gltfImporter.meshName(meshID));
 
-        SPDLOG_LOGGER_INFO(get_logger(), "obj: {} use mesh: {}", name,
-                           meshName);
+        OSP_LOG_INFO("obj: {} use mesh: {}", name, meshName);
 
         PCompDrawable &rDrawable = rPart.m_partDrawable.emplace_back();
         rDrawable.m_entity = entity;
@@ -503,24 +499,23 @@ void AssetImporter::proto_add_obj_recurse(
             auto imgID = gltfImporter.texture(pbr.baseColorTexture())->image();
             std::string const& imgName = gltfImporter.image2DName(imgID);
 
-            SPDLOG_LOGGER_INFO(get_logger(), "Base Tex: {}", imgName);
+            OSP_LOG_INFO("Base Tex: {}", imgName);
             rDrawable.m_textures.emplace_back(rPackage.get_or_reserve<ImageData2D>(imgName));
 
             if (pbr.hasNoneRoughnessMetallicTexture())
             {
                 imgID = gltfImporter.texture(pbr.metalnessTexture())->image();
 
-                SPDLOG_LOGGER_INFO(get_logger(), "Metal/rough texture: {}", gltfImporter.image2DName(imgID));
+                OSP_LOG_INFO("Metal/rough texture: {}", gltfImporter.image2DName(imgID));
             }
             else
             {
-              SPDLOG_LOGGER_WARN(get_logger(),
-                                 "No Metal/rough texture found for: {}", name);
+              OSP_LOG_WARN("No Metal/rough texture found for: {}", name);
             }
             
         } else
         {
-            SPDLOG_LOGGER_ERROR(get_logger(), "Unsupported material type");
+            OSP_LOG_ERROR("Unsupported material type");
         }
     }
 

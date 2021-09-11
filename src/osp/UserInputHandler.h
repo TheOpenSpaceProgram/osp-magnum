@@ -26,13 +26,13 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
+#include <optional>
 #include <map>
 #include <string>
 #include <vector>
-#include <optional>
-#include "types.h"
 
-#include <spdlog/spdlog.h>
+#include "types.h"
 
 namespace osp::input
 {
@@ -337,8 +337,6 @@ private:
     std::vector<ButtonControl> m_btnControls;
 
     std::vector<ButtonControlEvent> m_btnControlEvents;
-
-    std::shared_ptr<spdlog::logger> p_logger;
 
 }; // class UserInputHandler
 

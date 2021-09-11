@@ -34,7 +34,8 @@
 
 #include "../Satellites/SatActiveArea.h"
 #include "../Satellites/SatVehicle.h"
-#include <osp/OSPApplication.h>
+
+#include <osp/logging.h>
 
 using namespace osp::active;
 
@@ -52,8 +53,7 @@ using namespace Magnum::Math::Literals;
 ActiveEnt SysVehicleSync::activate(ActiveScene &rScene, Universe &rUni,
                                    Satellite areaSat, Satellite tgtSat)
 {
-    SPDLOG_LOGGER_INFO(rScene.get_application().get_logger(),
-                      "Loading a vehicle");
+    OSP_LOG_INFO("Loading a vehicle");
 
     auto &loadMeVehicle = rUni.get_reg().get<universe::UCompVehicle>(tgtSat);
     auto &tgtPosTraj = rUni.get_reg().get<universe::UCompTransformTraj>(tgtSat);

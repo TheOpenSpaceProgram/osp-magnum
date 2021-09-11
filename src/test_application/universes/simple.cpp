@@ -30,6 +30,7 @@
 
 #include <osp/CoordinateSpaces/CartesianSimple.h>
 #include <osp/Trajectories/Stationary.h>
+#include <osp/logging.h>
 
 #include <planet-a/Satellites/SatPlanet.h>
 
@@ -132,7 +133,7 @@ void simplesolarsystem::create(osp::OSPApplication& rOspApp,
     // Update CoordinateSpace to finish adding the new Satellites
     rUpdater(rUni);
 
-    SPDLOG_LOGGER_INFO(rOspApp.get_logger(), "Created simple solar system");
+    OSP_LOG_INFO("Created simple solar system");
 }
 
 

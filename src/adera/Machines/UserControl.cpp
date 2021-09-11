@@ -37,7 +37,7 @@
 #include <osp/Active/ActiveScene.h>      // for ActiveScene
 #include <osp/Active/activetypes.h>      // for ActiveEnt, ActiveReg_t
 
-#include <spdlog/spdlog.h>               // for SPDLOG_LOGGER_TRACE
+#include <osp/logging.h>                 // for OSP_LOG_...
 
 #include <iterator>                      // for std::begin, std::end
 #include <algorithm>                     // for std::sort
@@ -116,8 +116,7 @@ void SysMachineUserControl::update_construct(ActiveScene &rScene)
 
 void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 {
-    SPDLOG_LOGGER_TRACE(rScene.get_application().get_logger(),
-                      "Updating all MachineUserControls");
+    OSP_LOG_TRACE("Updating all MachineUserControls");
 
     // InputDevice.IsActivated()
     // Combination
