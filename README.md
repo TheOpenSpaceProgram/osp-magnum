@@ -61,7 +61,7 @@ To act as a temporary menu and scenario loader, a console-based test application
 
 ## Building
 
-These are simplified build instructions for an Ubuntu computer. Windows and Mac OS X build instructions are slightly different. 
+These are simplified build instructions for an Ubuntu computer. Windows and Mac OS X build instructions are slightly different.
 
 See our [GitHub Actions](https://github.com/TheOpenSpaceProgram/osp-magnum/tree/master/.github/workflows) for examples on how to get building for your environment
 
@@ -114,3 +114,4 @@ Checkout [Architecture.md](docs/architecture.md) to get started with learning th
   * Amature rocketry
   * Small aerospace companies
 * This project isn't intended to be much of a "clone" of Kerbal Space Program. As of now, it's mostly a game engine intended for space flight, with no real gameplay yet.
+

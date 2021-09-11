@@ -151,7 +151,6 @@ An ECS engine will more resemble this:
 
 ```
 void world_update(world) {
-<<<<<<< HEAD
     gravity_system(world); // Apply external forces first
     thrust_system(world);  // Apply internal forces next
     move_system(world);    // Add velocities to positions
@@ -241,7 +240,7 @@ A bunch of satellites in an N-body simulation have nothing to do with a bunch of
 
 `Satellites` can be handed off between `CoordinateSpaces`. This won't be discusseed in detail here; but in short, the process relies on a few queues.
 
-On a technical level, CoordinateSpaces store contiguous buffers of `Satellite` Entity IDs, positions, and other additional data like velocity that may be needed to calculate trajectories. `CoordinateSpaces` are free to store data any way they want. This allows them to be specialized for whichever operations are performed on them (such as N-body). Their buffers are exposed through **read-only** [strided array views](https://doc.magnum.graphics/corrade/classCorrade_1_1Containers_1_1StridedArrayView.html) to be accessed externally. These are referred to as **CComp** for coordinate components. All CoordinateSpaces must output CCompX, CCompY, and CCompZ as a common interface, which are Cartesian 64-bit signed integers. 
+On a technical level, CoordinateSpaces store contiguous buffers of `Satellite` Entity IDs, positions, and other additional data like velocity that may be needed to calculate trajectories. `CoordinateSpaces` are free to store data any way they want. This allows them to be specialized for whichever operations are performed on them (such as N-body). Their buffers are exposed through **read-only** [strided array views](https://doc.magnum.graphics/corrade/classCorrade_1_1Containers_1_1StridedArrayView.html) to be accessed externally. These are referred to as **CComp** for coordinate components. All CoordinateSpaces must output CCompX, CCompY, and CCompZ as a common interface, which are Cartesian 64-bit signed integers.
 
 X, Y, and Z coordinates are stored in separate arrays, because SIMD computations favor a Struct of Arrays data layout.
 
