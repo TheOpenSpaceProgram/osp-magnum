@@ -18,12 +18,18 @@ jobs:
     env:
       CC:  ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang'   }}
       CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
     steps:
     - uses: actions/checkout@v2
       with:
         fetch-depth: 1
         submodules: recursive
+
+    - uses: hendrikmuhs/ccache-action@v1
+      with:
+        key: linux-${{ matrix.compiler }}-${{ matrix.config }}
 
     - name: Install dependencies
       run: |
