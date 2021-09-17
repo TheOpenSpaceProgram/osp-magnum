@@ -112,14 +112,14 @@ void update_scene(ActiveScene& rScene);
 void setup_wiring(ActiveScene& rScene);
 
 Satellite active_area_create(
-        osp::OSPApplication& rOspApp, Universe &rUni,
+        osp::PackageRegistry& rOspApp, Universe &rUni,
         coordspace_index_t targetCoordspace);
 
 void active_area_destroy(
-        osp::OSPApplication& rOspApp, Universe &rUni, Satellite areaSat);
+        osp::PackageRegistry& rOspApp, Universe &rUni, Satellite areaSat);
 
 void testapp::test_flight(
-        std::unique_ptr<ActiveApplication>& pMagnumApp, osp::OSPApplication& rOspApp,
+        std::unique_ptr<ActiveApplication>& pMagnumApp, osp::PackageRegistry& rOspApp,
         Universe &rUni, universe_update_t& rUniUpd, ActiveApplication::Arguments args)
 {
 
@@ -331,7 +331,7 @@ void setup_wiring(ActiveScene& rScene)
 }
 
 Satellite active_area_create(
-        osp::OSPApplication& rOspApp, Universe &rUni,
+        osp::PackageRegistry& rOspApp, Universe &rUni,
         coordspace_index_t targetIndex)
 {
     using namespace osp::universe;
@@ -384,7 +384,7 @@ Satellite active_area_create(
 }
 
 void active_area_destroy(
-        osp::OSPApplication& rOspApp, Universe &rUni, Satellite areaSat)
+        osp::PackageRegistry& rOspApp, Universe &rUni, Satellite areaSat)
 {
     using namespace osp::universe;
 

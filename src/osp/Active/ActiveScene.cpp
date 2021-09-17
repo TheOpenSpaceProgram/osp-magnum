@@ -56,7 +56,7 @@ void ACompCamera::calculate_projection()
 }
 
 
-ActiveScene::ActiveScene(OSPApplication& rApp, Package& rContext)
+ActiveScene::ActiveScene(PackageRegistry& rApp, Package& rContext)
  : m_app(rApp)
  , m_context(rContext)
 {

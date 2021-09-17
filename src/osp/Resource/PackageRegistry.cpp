@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,45 +22,22 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
+#include "PackageRegistry.h"
 
-#include <map>
-#include <spdlog/spdlog.h>
+using namespace osp;
 
-#include "Universe.h"
-#include "Resource/Package.h"
-
-namespace osp
+void PackageRegistry::debug_add_package(Package&& p)
 {
-
-
-// TODO: Refactor to more permanent 'package list' or something
-class OSPApplication
-{
-public:
-
-    /**
-     * Add a resource package to the application
-     *
-     * The package should be populated externally, then passed via rvalue
-     * reference so the contents can be moved into the application resources
-     *
-     * @param p [in] The package to add
-     */
-    void debug_add_package(Package&& p);
-
-    /**
-     * Get a resource package by prefix name
-     *
-     * @param prefix [in] The short prefix name of the package
-     * @return The resource package
-     */
-    Package& debug_find_package(std::string_view prefix);
-
-    size_t debug_num_packages() const { return m_packages.size(); }
-
-private:
-    std::map<ResPrefix_t, Package, std::less<>> m_packages;
-
-};
+    auto const& [it, success] = m_packages.emplace(p.get_prefix(), std::move(p));
+    assert(success);
 }
+
+Package& PackageRegistry::debug_find_package(std::string_view prefix)
+{
+    if (auto it = m_packages.find(prefix); it != m_packages.end())
+    {
+        return it->second;
+    }
+    throw std::out_of_range("Package not found");
+}
+

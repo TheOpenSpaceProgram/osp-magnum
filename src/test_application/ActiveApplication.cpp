@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -48,7 +48,7 @@ using osp::input::EVarTrigger;
 using osp::input::EVarOperator;
 
 ActiveApplication::ActiveApplication(const Magnum::Platform::Application::Arguments& arguments,
-                     osp::OSPApplication &rOspApp, on_draw_t onDraw) :
+                     osp::PackageRegistry &rOspApp, on_draw_t onDraw) :
         Magnum::Platform::Application{
             arguments,
             Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},

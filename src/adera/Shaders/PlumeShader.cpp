@@ -37,7 +37,7 @@
 #include <osp/Active/ActiveScene.h>       // for ActiveScene
 #include <osp/Active/activetypes.h>       // for basic_sparse_set, ActiveEnt
 
-#include <osp/OSPApplication.h>           // for OSPApplication
+#include <osp/Resource/PackageRegistry.h> // for PackageRegistry
 
 #include <Magnum/GL/Shader.h>             // for Shader, Shader::Type
 #include <Magnum/GL/Texture.h>            // for Texture2D

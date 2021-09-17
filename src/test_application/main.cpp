@@ -87,7 +87,7 @@ void debug_print_hier();
 void debug_print_machines();
 
 // Stores loaded resources in packages.
-osp::OSPApplication g_osp;
+osp::PackageRegistry g_osp;
 
 // Test application stores 1 universe and its update function
 osp::universe::Universe g_universe;

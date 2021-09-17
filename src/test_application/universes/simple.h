@@ -38,7 +38,7 @@ namespace testapp::simplesolarsystem
  * @param rUni    [ref] Universe to setup; usually this is empty
  * @param rUniUpd [out] Associated universe update function to set
  */
-void create(osp::OSPApplication& rOspApp,
+void create(osp::PackageRegistry& rOspApp,
             osp::universe::Universe& rUni, universe_update_t &rUniUpd);
 
 }

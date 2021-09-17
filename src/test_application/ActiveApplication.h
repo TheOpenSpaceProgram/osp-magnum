@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -25,7 +25,7 @@
 #pragma once
 
 #include <osp/types.h>
-#include <osp/OSPApplication.h>
+#include <osp/Resource/PackageRegistry.h>
 #include <osp/Universe.h>
 #include <osp/UserInputHandler.h>
 #include <osp/Satellites/SatActiveArea.h>
@@ -61,7 +61,7 @@ public:
 
     explicit ActiveApplication(
             const Magnum::Platform::Application::Arguments& arguments,
-            osp::OSPApplication &rOspApp,
+            osp::PackageRegistry &rOspApp,
             on_draw_t onDraw);
 
     ~ActiveApplication();
@@ -99,7 +99,7 @@ private:
 
     Magnum::Timeline m_timeline;
 
-    osp::OSPApplication& m_rOspApp;
+    osp::PackageRegistry& m_rOspApp;
 };
 
 void config_controls(ActiveApplication& rOspApp);

@@ -28,8 +28,8 @@
 #include "SysRender.h"
 #include "SysVehicle.h"
 #include "physics.h"
-#include <osp/OSPApplication.h>
 
+#include "../Resource/PackageRegistry.h"
 #include "../Resource/PrototypePart.h"
 #include "../Resource/AssetImporter.h"
 

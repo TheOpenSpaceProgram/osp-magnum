@@ -47,7 +47,7 @@ namespace testapp
  * @param args       [in] Arguments to pass to Magnum
  */
 void test_flight(std::unique_ptr<ActiveApplication>& pMagnumApp,
-                 osp::OSPApplication& rOspApp,
+                 osp::PackageRegistry& rOspApp,
                  osp::universe::Universe& rUni, universe_update_t& rUniUpd,
                  ActiveApplication::Arguments args);
 

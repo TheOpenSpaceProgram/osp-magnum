@@ -35,7 +35,7 @@
 // IWYU pragma: no_include <type_traits>
 
 namespace osp { class Package; }
-namespace osp { class OSPApplication; }
+namespace osp { class PackageRegistry; }
 
 namespace osp::active
 {
@@ -53,9 +53,9 @@ class ActiveScene
 
 public:
 
-    ActiveScene(OSPApplication& rApp, Package& rContext);
+    ActiveScene(PackageRegistry& rApp, Package& rContext);
 
-    OSPApplication& get_application() { return m_app; };
+    PackageRegistry& get_application() { return m_app; };
 
     /**
      * @return Root entity of the entire scene graph
@@ -145,7 +145,7 @@ public:
     Package& get_context_resources() { return m_context; }
 private:
 
-    OSPApplication& m_app;
+    PackageRegistry& m_app;
     Package& m_context;
 
     ActiveReg_t m_registry;

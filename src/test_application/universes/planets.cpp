@@ -38,6 +38,7 @@
 using namespace testapp;
 
 using osp::Package;
+using osp::PackageRegistry;
 
 using osp::universe::Satellite;
 using osp::universe::Universe;
@@ -57,7 +58,7 @@ using planeta::universe::UCompPlanet;
 using osp::universe::Vector3g;
 using osp::universe::spaceint_t;
 
-void moon::create(osp::OSPApplication& rOspApp,
+void moon::create(PackageRegistry& rOspApp,
                   Universe& rUni, universe_update_t &rUpdater)
 {
     Package &rPkg = rOspApp.debug_find_package("lzdb");

@@ -22,28 +22,28 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "Container.h"                   // IWYU pragma: associated
+#include "Container.h"                    // IWYU pragma: associated
 
-#include <adera/ShipResources.h>         // for ShipResource, ShipResourceType
+#include <adera/ShipResources.h>          // for ShipResource, ShipResourceType
 
-#include <osp/Active/scene.h>            // for ACompMass
+#include <osp/Active/scene.h>             // for ACompMass
 #include <osp/Active/physics.h>
 #include <osp/Active/SysVehicle.h>
-#include <osp/Active/SysMachine.h>       // for ACompMachines
-#include <osp/Active/activetypes.h>      // for ActiveEnt, ActiveReg_t, active
+#include <osp/Active/SysMachine.h>        // for ACompMachines
+#include <osp/Active/activetypes.h>       // for ActiveEnt, ActiveReg_t, active
 #include <osp/Active/ActiveScene.h>
 
-#include <osp/Resource/Package.h>        // for Path, decompose_path, Package
-#include <osp/Resource/machines.h>       // for mach_id, machine_id_t
-#include <osp/Resource/Resource.h>       // for DependRes
-#include <osp/Resource/blueprints.h>     // for BlueprintMachine, BlueprintV...
+#include <osp/Resource/Package.h>         // for Path, decompose_path, Package
+#include <osp/Resource/machines.h>        // for mach_id, machine_id_t
+#include <osp/Resource/Resource.h>        // for DependRes
+#include <osp/Resource/blueprints.h>      // for BlueprintMachine, BlueprintV...
 #include <osp/Resource/PrototypePart.h>
 
-#include <osp/CommonPhysics.h>           // for ECollisionShape, ECollisionS...
-#include <osp/OSPApplication.h>          // for OSPApplication
+#include <osp/CommonPhysics.h>            // for ECollisionShape, ECollisionS...
+#include <osp/Resource/PackageRegistry.h> // for PackageRegistry
 
-#include <variant>                       // for std::get
-#include <utility>                       // for std::exchange
+#include <variant>                        // for std::get
+#include <utility>                        // for std::exchange
 
 // IWYU pragma: no_include <map>
 // IWYU pragma: no_include <vector>
