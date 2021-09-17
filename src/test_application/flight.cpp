@@ -119,14 +119,14 @@ void active_area_destroy(
         osp::OSPApplication& rOspApp, Universe &rUni, Satellite areaSat);
 
 void testapp::test_flight(
-        std::unique_ptr<OSPMagnum>& pMagnumApp, osp::OSPApplication& rOspApp,
-        Universe &rUni, universe_update_t& rUniUpd, OSPMagnum::Arguments args)
+        std::unique_ptr<ActiveApplication>& pMagnumApp, osp::OSPApplication& rOspApp,
+        Universe &rUni, universe_update_t& rUniUpd, ActiveApplication::Arguments args)
 {
 
     // Create the application, and its draw function
-    pMagnumApp = std::make_unique<OSPMagnum>(
+    pMagnumApp = std::make_unique<ActiveApplication>(
             args, rOspApp,
-            [&rUniUpd, &rUni] (OSPMagnum& rMagnumApp)
+            [&rUniUpd, &rUni] (ActiveApplication& rMagnumApp)
     {
         // Update the universe each frame
         // This likely wouldn't be here in the future
@@ -207,7 +207,7 @@ void testapp::test_flight(
     rScene.reg_emplace<ACompRenderer>(camera);
 
     // Starts the main loop. This function is blocking, and will only return
-    // once the window is closed. See OSPMagnum::drawEvent
+    // once the window is closed. See ActiveApplication::drawEvent
     pMagnumApp->exec();
 
     // Window has been closed

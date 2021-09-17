@@ -27,7 +27,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
-#include "OSPMagnum.h"
+#include "ActiveApplication.h"
 #include "flight.h"
 
 #include "universes/simple.h"
@@ -95,7 +95,7 @@ universe_update_t g_universeUpdate;
 
 // Deals with the window, OpenGL context, and other game engine stuff that
 // often have "Active" written all over them
-std::unique_ptr<OSPMagnum> g_ospMagnum;
+std::unique_ptr<ActiveApplication> g_ActiveApplication;
 std::thread g_magnumThread;
 
 // Loggers
@@ -154,9 +154,9 @@ int main(int argc, char** argv)
         }
         std::thread t([] {
             osp::set_thread_logger(g_logMagnumApp);
-            test_flight(std::ref(g_ospMagnum), std::ref(g_osp),
+            test_flight(std::ref(g_ActiveApplication), std::ref(g_osp),
                         std::ref(g_universe), std::ref(g_universeUpdate),
-                        OSPMagnum::Arguments{g_argc, g_argv});
+                        ActiveApplication::Arguments{g_argc, g_argv});
         });
         g_magnumThread.swap(t);
     }
@@ -215,9 +215,9 @@ int debug_cli_loop()
             }
             std::thread t([] {
                 osp::set_thread_logger(g_logMagnumApp);
-                test_flight(std::ref(g_ospMagnum), std::ref(g_osp),
+                test_flight(std::ref(g_ActiveApplication), std::ref(g_osp),
                             std::ref(g_universe), std::ref(g_universeUpdate),
-                            OSPMagnum::Arguments{g_argc, g_argv});
+                            ActiveApplication::Arguments{g_argc, g_argv});
             });
             g_magnumThread.swap(t);
         }
@@ -239,10 +239,10 @@ int debug_cli_loop()
         }
         else if (command == "exit")
         {
-            if (g_ospMagnum)
+            if (g_ActiveApplication)
             {
                 // request exit if application exists
-                g_ospMagnum->exit();
+                g_ActiveApplication->exit();
             }
             destroy_universe();
             break;
@@ -259,7 +259,7 @@ int debug_cli_loop()
 bool destroy_universe()
 {
     // Make sure no application is open
-    if (g_ospMagnum != nullptr)
+    if (g_ActiveApplication != nullptr)
     {
       OSP_LOG_WARN("Application must be closed to destroy universe.");
         return false;
@@ -413,9 +413,9 @@ void debug_print_resources()
     std::vector<osp::Package*> packages = {
         &g_osp.debug_find_package("lzdb")};
 
-    if (g_ospMagnum != nullptr)
+    if (g_ActiveApplication != nullptr)
     {
-        packages.push_back(&g_ospMagnum->get_context_resources());
+        packages.push_back(&g_ActiveApplication->get_context_resources());
     }
 
     for (osp::Package* pPkg : packages)
@@ -447,7 +447,7 @@ void debug_print_machines()
     using osp::RegisteredMachine;
     using regmachs_t = osp::Package::group_t<RegisteredMachine>;
 
-    if (!g_ospMagnum)
+    if (!g_ActiveApplication)
     {
         std::cout << "Can't do that yet, start the magnum application first!\n";
         return;
@@ -462,7 +462,7 @@ void debug_print_machines()
     }
 
     // Loop through every Vehicle
-    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second.first;
+    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
     auto view = scene.get_registry().view<const ACompMachines>();
 
     for (ActiveEnt ent : view)
@@ -488,7 +488,7 @@ void debug_print_hier()
     using osp::active::ActiveScene;
     using osp::active::ActiveEnt;
 
-    if (!g_ospMagnum)
+    if (!g_ActiveApplication)
     {
         std::cout << "Can't do that yet, start the magnum application first!\n";
         return;
@@ -497,7 +497,7 @@ void debug_print_hier()
     std::cout << "ActiveScene Entity Hierarchy:\n";
 
     std::vector<ActiveEnt> parentNextSibling;
-    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second.first;
+    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
     ActiveEnt currentEnt = scene.hier_get_root();
 
     parentNextSibling.reserve(16);

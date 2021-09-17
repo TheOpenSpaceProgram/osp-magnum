@@ -42,8 +42,6 @@
 
 #include <memory>
 
-#include "osp/UserInputHandler.h"
-
 namespace testapp
 {
 
@@ -54,19 +52,19 @@ using MapActiveScene_t = std::map<
         std::pair<osp::active::ActiveScene, SceneUpdate_t>,
         std::less<> >;
 
-class OSPMagnum : public Magnum::Platform::Application
+class ActiveApplication : public Magnum::Platform::Application
 {
 
 public:
 
-    using on_draw_t = std::function<void(OSPMagnum&)>;
+    using on_draw_t = std::function<void(ActiveApplication&)>;
 
-    explicit OSPMagnum(
+    explicit ActiveApplication(
             const Magnum::Platform::Application::Arguments& arguments,
             osp::OSPApplication &rOspApp,
             on_draw_t onDraw);
 
-    ~OSPMagnum();
+    ~ActiveApplication();
 
     void keyPressEvent(KeyEvent& event) override;
     void keyReleaseEvent(KeyEvent& event) override;
@@ -104,7 +102,7 @@ private:
     osp::OSPApplication& m_rOspApp;
 };
 
-void config_controls(OSPMagnum& rOspApp);
+void config_controls(ActiveApplication& rOspApp);
 
 }
 

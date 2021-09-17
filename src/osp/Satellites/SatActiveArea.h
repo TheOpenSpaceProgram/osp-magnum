@@ -37,9 +37,6 @@
 namespace osp::universe
 {
 
-class OSPMagnum;
-class SatActiveArea;
-
 /**
  * @brief Tag for satellites that can be activated
  *
