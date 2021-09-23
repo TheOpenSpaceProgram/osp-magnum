@@ -33,11 +33,11 @@ namespace testapp::moon
 /**
  * @brief Create a universe featuring of a life-sized moon and vehicles
  *
- * @param rOspApp [ref] OSP Application with required resources
+ * @param rPkgs   [ref] Packages containing needed resources
  * @param rUni    [ref] Universe to setup; usually this is empty
  * @param rUniUpd [out] Associated universe update function to set
  */
-void create(osp::PackageRegistry& rOspApp,
+void create(osp::PackageRegistry& rPkgs,
             osp::universe::Universe& rUni, universe_update_t &rUniUpd);
 
 }

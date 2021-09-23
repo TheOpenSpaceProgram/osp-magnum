@@ -106,9 +106,9 @@ MachineContainer& SysMachineContainer::instantiate(
     {
         std::string const& resName = std::get<std::string>(resItr->second);
         Path resPath = decompose_path(resName);
-        Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
+        Package &rPkg = rScene.get_packages().find(resPath.prefix);
 
-        resource.m_type = pkg.get<ShipResourceType>(resPath.identifier);
+        resource.m_type = rPkg.get<ShipResourceType>(resPath.identifier);
         double fuelLevel = std::get<double>(settings.m_config.at("fuellevel"));
         resource.m_quantity = resource.m_type->resource_capacity(capacity * fuelLevel);
     }

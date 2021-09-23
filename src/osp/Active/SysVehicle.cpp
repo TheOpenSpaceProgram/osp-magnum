@@ -128,8 +128,6 @@ ActiveEnt SysVehicle::part_instantiate(
         using Magnum::GL::Texture2D;
         using Magnum::Trade::ImageData2D;
 
-        Package& package = rScene.get_application().debug_find_package("lzdb");
-
         Package& glResources = rScene.get_context_resources();
         DependRes<MeshData> meshData = pcompDrawable.m_mesh;
         DependRes<Mesh> meshRes = glResources.get<Mesh>(meshData.name());

@@ -58,10 +58,10 @@ using planeta::universe::UCompPlanet;
 using osp::universe::Vector3g;
 using osp::universe::spaceint_t;
 
-void moon::create(PackageRegistry& rOspApp,
+void moon::create(PackageRegistry& rPkgs,
                   Universe& rUni, universe_update_t &rUpdater)
 {
-    Package &rPkg = rOspApp.debug_find_package("lzdb");
+    Package &rPkg = rPkgs.find("lzdb");
 
     Satellite root = rUni.sat_create();
 

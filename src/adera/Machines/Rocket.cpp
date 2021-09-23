@@ -304,7 +304,7 @@ MachineRocket& SysMachineRocket::instantiate(
 
     std::string const& fuelIdent = config_get_if<std::string>(config.m_config, "fueltype", "");
     Path resPath = osp::decompose_path(fuelIdent);
-    Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
+    Package& pkg = rScene.get_packages().find(resPath.prefix);
     DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>(resPath.identifier);
 
     return rocket;

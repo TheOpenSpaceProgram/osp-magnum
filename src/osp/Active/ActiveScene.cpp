@@ -56,9 +56,9 @@ void ACompCamera::calculate_projection()
 }
 
 
-ActiveScene::ActiveScene(PackageRegistry& rApp, Package& rContext)
- : m_app(rApp)
- , m_context(rContext)
+ActiveScene::ActiveScene(PackageRegistry& rPkgs, Package& rContext)
+ : m_rPackages(rPkgs)
+ , m_rContext(rContext)
 {
     // Create the root entity
     m_root = m_registry.create();

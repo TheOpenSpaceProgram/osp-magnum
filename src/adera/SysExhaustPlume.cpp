@@ -120,7 +120,7 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
     using osp::DependRes;
     using osp::Package;
 
-    Package &rPkg = rScene.get_application().debug_find_package("lzdb");
+    Package &rPkg = rScene.get_packages().find("lzdb");
 
     std::string_view effectName = rScene.reg_get<ACompName>(plumeNode).m_name;
     effectName.remove_prefix(3); // removes "fx_"

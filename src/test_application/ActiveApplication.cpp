@@ -48,13 +48,13 @@ using osp::input::EVarTrigger;
 using osp::input::EVarOperator;
 
 ActiveApplication::ActiveApplication(const Magnum::Platform::Application::Arguments& arguments,
-                     osp::PackageRegistry &rOspApp, on_draw_t onDraw) :
+                     osp::PackageRegistry &rPkgs, on_draw_t onDraw) :
         Magnum::Platform::Application{
             arguments,
             Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
         m_onDraw(onDraw),
         m_userInput(12),
-        m_rOspApp(rOspApp)
+        m_rPackages(rPkgs)
 {
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 
@@ -138,7 +138,7 @@ osp::active::ActiveScene& ActiveApplication::scene_create(std::string const& nam
 {
     auto const& [it, success] =
         m_scenes.try_emplace(
-            name, osp::active::ActiveScene{m_rOspApp, m_glResources}, upd);
+            name, osp::active::ActiveScene{m_rPackages, m_glResources}, upd);
     return it->second.first;
 }
 
@@ -147,16 +147,16 @@ osp::active::ActiveScene& ActiveApplication::scene_create(std::string && name, S
     auto const& [it, success] =
         m_scenes.try_emplace(
             std::move(name),
-            osp::active::ActiveScene{m_rOspApp, m_glResources}, upd);
+            osp::active::ActiveScene{m_rPackages, m_glResources}, upd);
     return it->second.first;
 }
 
-void testapp::config_controls(ActiveApplication& rOspApp)
+void testapp::config_controls(ActiveApplication& rPkgs)
 {
     // Configure Controls
     //Load toml
     auto data = toml::parse("settings.toml");
-    osp::input::UserInputHandler& rUserInput = rOspApp.get_input_handler();
+    osp::input::UserInputHandler& rUserInput = rPkgs.get_input_handler();
     for (const auto& [k, v] : data.as_table())
     {
         std::string const& primary = toml::find(v, "primary").as_string();

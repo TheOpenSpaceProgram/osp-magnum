@@ -24,15 +24,13 @@
  */
 #pragma once
 
-#include <osp/types.h>
-#include <osp/Resource/PackageRegistry.h>
-#include <osp/Universe.h>
-#include <osp/UserInputHandler.h>
-#include <osp/Satellites/SatActiveArea.h>
 #include <osp/Active/ActiveScene.h>
+#include <osp/Resource/PackageRegistry.h>
+
+#include <osp/types.h>
+#include <osp/UserInputHandler.h>
 
 #include <Magnum/Timeline.h>
-#include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Mesh.h>
@@ -52,6 +50,11 @@ using MapActiveScene_t = std::map<
         std::pair<osp::active::ActiveScene, SceneUpdate_t>,
         std::less<> >;
 
+/**
+ * @brief An interactive Magnum application made for running ActiveScenes
+ *
+ * These scenes can be a flight scene, map view, vehicle editor, or menu.
+ */
 class ActiveApplication : public Magnum::Platform::Application
 {
 
@@ -61,7 +64,7 @@ public:
 
     explicit ActiveApplication(
             const Magnum::Platform::Application::Arguments& arguments,
-            osp::PackageRegistry &rOspApp,
+            osp::PackageRegistry &rPkgs,
             on_draw_t onDraw);
 
     ~ActiveApplication();
@@ -95,14 +98,14 @@ private:
 
     MapActiveScene_t m_scenes;
 
-    osp::Package m_glResources{"gl", "gl-resources"};
+    osp::PackageRegistry &m_rPackages;
+
+    osp::Package m_glResources;
 
     Magnum::Timeline m_timeline;
-
-    osp::PackageRegistry& m_rOspApp;
 };
 
-void config_controls(ActiveApplication& rOspApp);
+void config_controls(ActiveApplication& rPkgs);
 
 }
 

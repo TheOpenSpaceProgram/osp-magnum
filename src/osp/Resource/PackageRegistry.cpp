@@ -26,13 +26,15 @@
 
 using namespace osp;
 
-void PackageRegistry::debug_add_package(Package&& p)
+Package& PackageRegistry::create(ResPrefix_t const prefix)
 {
-    auto const& [it, success] = m_packages.emplace(p.get_prefix(), std::move(p));
+    auto const& [it, success] = m_packages.try_emplace(std::move(prefix));
+
     assert(success);
+    return it->second;
 }
 
-Package& PackageRegistry::debug_find_package(std::string_view prefix)
+Package& PackageRegistry::find(std::string_view const prefix)
 {
     if (auto it = m_packages.find(prefix); it != m_packages.end())
     {

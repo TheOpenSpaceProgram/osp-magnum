@@ -53,9 +53,7 @@ class ActiveScene
 
 public:
 
-    ActiveScene(PackageRegistry& rApp, Package& rContext);
-
-    PackageRegistry& get_application() { return m_app; };
+    ActiveScene(PackageRegistry& rPkgs, Package& rContext);
 
     /**
      * @return Root entity of the entire scene graph
@@ -135,18 +133,27 @@ public:
     }
 
     /**
-     * Calculate world transformations and draw to all render targets
+     * @brief Calculate world transformations and draw to all render targets
+     *
+     * @deprecated Move this to somewhere rendering/application related and
+     *             pass render targets as arguments or something
      */
     void draw();
 
     // TODO
     constexpr float get_time_delta_fixed() const { return 1.0f / 60.0f; }
 
-    Package& get_context_resources() { return m_context; }
+
+    constexpr PackageRegistry& get_packages() { return m_rPackages; };
+    constexpr PackageRegistry& get_packages() const { return m_rPackages; };
+
+    constexpr Package& get_context_resources() { return m_rContext; }
+    constexpr Package& get_context_resources() const { return m_rContext; }
+
 private:
 
-    PackageRegistry& m_app;
-    Package& m_context;
+    PackageRegistry &m_rPackages;
+    Package &m_rContext; // Resources specifically for GPU resources
 
     ActiveReg_t m_registry;
     ActiveEnt m_root;

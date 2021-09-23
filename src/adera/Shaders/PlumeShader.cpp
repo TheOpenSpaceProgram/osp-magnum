@@ -88,7 +88,7 @@ void PlumeShader::draw_plume(
     if (tmpTex.empty())
     {
         tmpTex = AssetImporter::compile_tex(texName,
-            rScene.get_application().debug_find_package("lzdb"), rResources);
+            rScene.get_packages().find("lzdb"), rResources);
     }
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
