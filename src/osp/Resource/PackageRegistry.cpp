@@ -24,6 +24,8 @@
  */
 #include "PackageRegistry.h"
 
+#include <stdexcept>
+
 using namespace osp;
 
 Package& PackageRegistry::create(ResPrefix_t const prefix)

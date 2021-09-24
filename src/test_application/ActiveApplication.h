@@ -35,6 +35,7 @@
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/Math/Color.h>
+#include <cstring> // workaround: memcpy needed by SDL2
 #include <Magnum/Platform/Sdl2Application.h>
 #include <Magnum/Shaders/VertexColorGL.h>
 

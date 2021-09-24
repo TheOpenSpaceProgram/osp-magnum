@@ -148,7 +148,7 @@ public:
     constexpr PackageRegistry& get_packages() const { return m_rPackages; };
 
     constexpr Package& get_context_resources() { return m_rContext; }
-    constexpr Package& get_context_resources() const { return m_rContext; }
+    constexpr Package const& get_context_resources() const { return m_rContext; }
 
 private:
 
