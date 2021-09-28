@@ -22,35 +22,35 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "SysExhaustPlume.h"             // IWYU pragma: associated
+#include "SysExhaustPlume.h"              // IWYU pragma: associated
 
-#include <adera/Plume.h>                 // for PlumeEffectData
-#include <adera/Machines/Rocket.h>       // for MachineRocket
+#include <adera/Plume.h>                  // for PlumeEffectData
+#include <adera/Machines/Rocket.h>        // for MachineRocket
 
-#include <osp/Resource/Package.h>        // for Package
-#include <osp/Resource/machines.h>       // for mach_id, machine_id_t
-#include <osp/Resource/Resource.h>       // for DependRes
-#include <osp/Resource/blueprints.h>     // for BlueprintMachine, BlueprintV...
-#include <osp/Resource/AssetImporter.h>  // for AssetImporter
+#include <osp/Resource/Package.h>         // for Package
+#include <osp/Resource/machines.h>        // for mach_id, machine_id_t
+#include <osp/Resource/Resource.h>        // for DependRes
+#include <osp/Resource/blueprints.h>      // for BlueprintMachine, BlueprintV...
+#include <osp/Resource/AssetImporter.h>   // for AssetImporter
 
-#include <osp/Active/scene.h>            // for ACompName
-#include <osp/Active/drawing.h>          // for ACompShader, ACompVisible
-#include <osp/Active/SysRender.h>        // for ACompMesh
-#include <osp/Active/SysMachine.h>       // for ACompMachines
-#include <osp/Active/SysVehicle.h>       // for ACompVehicle
-#include <osp/Active/ActiveScene.h>      // for ActiveScene
-#include <osp/Active/activetypes.h>      // for entt::basic_view, entt::basic_sparse_set
-#include <osp/Active/SysHierarchy.h>     // for osp::active::SysHierarchy
-#include <osp/logging.h>                 // for OSP_LOG_...
+#include <osp/Active/scene.h>             // for ACompName
+#include <osp/Active/drawing.h>           // for ACompShader, ACompVisible
+#include <osp/Active/SysRender.h>         // for ACompMesh
+#include <osp/Active/SysMachine.h>        // for ACompMachines
+#include <osp/Active/SysVehicle.h>        // for ACompVehicle
+#include <osp/Active/ActiveScene.h>       // for ActiveScene
+#include <osp/Active/activetypes.h>       // for entt::basic_view, entt::basic_sparse_set
+#include <osp/Active/SysHierarchy.h>      // for osp::active::SysHierarchy
+#include <osp/logging.h>                  // for OSP_LOG_...
 
-#include <osp/OSPApplication.h>          // for OSPApplication
+#include <osp/Resource/PackageRegistry.h> // for PackageRegistry
 
-#include <Magnum/GL/Mesh.h>              // for Mesh
+#include <Magnum/GL/Mesh.h>               // for Mesh
 
-#include <entt/entity/entity.hpp>        // for entt::null_t, entt::null
+#include <entt/entity/entity.hpp>         // for entt::null_t, entt::null
 
 
-#include <string_view>                   // for string_view
+#include <string_view>                    // for string_view
 
 // IWYU pragma: no_include <vector>
 // IWYU pragma: no_include <string>
@@ -120,7 +120,7 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
     using osp::DependRes;
     using osp::Package;
 
-    Package &rPkg = rScene.get_application().debug_find_package("lzdb");
+    Package &rPkg = rScene.get_packages().find("lzdb");
 
     std::string_view effectName = rScene.reg_get<ACompName>(plumeNode).m_name;
     effectName.remove_prefix(3); // removes "fx_"

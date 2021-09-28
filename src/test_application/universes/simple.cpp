@@ -37,6 +37,7 @@
 using namespace testapp;
 
 using osp::Package;
+using osp::PackageRegistry;
 
 using osp::universe::Satellite;
 using osp::universe::Universe;
@@ -55,10 +56,10 @@ using planeta::universe::UCompPlanet;
 
 using osp::universe::Vector3g;
 
-void simplesolarsystem::create(osp::OSPApplication& rOspApp,
+void simplesolarsystem::create(PackageRegistry& rPkgs,
                                Universe& rUni, universe_update_t& rUpdater)
 {
-    Package &rPkg = rOspApp.debug_find_package("lzdb");
+    Package &rPkg = rPkgs.find("lzdb");
 
     Satellite root = rUni.sat_create();
 

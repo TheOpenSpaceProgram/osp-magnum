@@ -35,19 +35,19 @@
 #include <osp/Active/SysMachine.h>       // for ACompMachines
 #include <osp/Active/ActiveScene.h>
 
-#include <osp/Resource/Package.h>        // for Path, decompose_path
-#include <osp/Resource/Resource.h>       // for DependRes
-#include <osp/Resource/machines.h>       // for mach_id, machine_id_t
-#include <osp/Resource/blueprints.h>     // for BlueprintMachine
-#include <osp/Resource/PrototypePart.h>  // for NodeMap_t, PCompMachine
+#include <osp/Resource/Package.h>         // for Path, decompose_path
+#include <osp/Resource/PackageRegistry.h> // for PackageRegistry
+#include <osp/Resource/Resource.h>        // for DependRes
+#include <osp/Resource/machines.h>        // for mach_id, machine_id_t
+#include <osp/Resource/blueprints.h>      // for BlueprintMachine
+#include <osp/Resource/PrototypePart.h>   // for NodeMap_t, PCompMachine
 
-#include <osp/types.h>                   // for Vector3, Matrix4
-#include <osp/OSPApplication.h>
+#include <osp/types.h>                    // for Vector3, Matrix4
 
-#include <vector>                        // for std::vector
-#include <utility>                       // for std::forward
-#include <variant>                       // for std::get
-#include <string_view>                   // for std::string_view
+#include <vector>                         // for std::vector
+#include <utility>                        // for std::forward
+#include <variant>                        // for std::get
+#include <string_view>                    // for std::string_view
 
 // IWYU pragma: no_include "adera/wiretypes.h"
 
@@ -304,7 +304,7 @@ MachineRocket& SysMachineRocket::instantiate(
 
     std::string const& fuelIdent = config_get_if<std::string>(config.m_config, "fueltype", "");
     Path resPath = osp::decompose_path(fuelIdent);
-    Package& pkg = rScene.get_application().debug_find_package(resPath.prefix);
+    Package& pkg = rScene.get_packages().find(resPath.prefix);
     DependRes<ShipResourceType> fuel = pkg.get<ShipResourceType>(resPath.identifier);
 
     return rocket;

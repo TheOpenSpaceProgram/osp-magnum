@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,17 +22,21 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "OSPApplication.h"
+#include "PackageRegistry.h"
+
+#include <stdexcept>
 
 using namespace osp;
 
-void OSPApplication::debug_add_package(Package&& p)
+Package& PackageRegistry::create(ResPrefix_t const prefix)
 {
-    auto const& [it, success] = m_packages.emplace(p.get_prefix(), std::move(p));
+    auto const& [it, success] = m_packages.try_emplace(std::move(prefix));
+
     assert(success);
+    return it->second;
 }
 
-Package& OSPApplication::debug_find_package(std::string_view prefix)
+Package& PackageRegistry::find(std::string_view const prefix)
 {
     if (auto it = m_packages.find(prefix); it != m_packages.end())
     {

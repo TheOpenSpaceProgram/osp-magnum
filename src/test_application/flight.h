@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#include "OSPMagnum.h"
+#include "ActiveApplication.h"
 #include "universes/common.h"
 
 #include <thread>
@@ -41,14 +41,14 @@ namespace testapp
  *
  * @param pMagnumApp [out] Container for Magnum application to create for
  *                         external access
- * @param rOspApp    [ref] OSP Application containing needed resources
+ * @param rPkgs      [ref] Packages containing needed resources
  * @param rUni       [ref] Universe the flight scene will be connected to
  * @param rUniUpd    [ref] Universe update function to be called per frame
  * @param args       [in] Arguments to pass to Magnum
  */
-void test_flight(std::unique_ptr<OSPMagnum>& pMagnumApp,
-                 osp::OSPApplication& rOspApp,
+void test_flight(std::unique_ptr<ActiveApplication>& pMagnumApp,
+                 osp::PackageRegistry& rPkgs,
                  osp::universe::Universe& rUni, universe_update_t& rUniUpd,
-                 OSPMagnum::Arguments args);
+                 ActiveApplication::Arguments args);
 
 }

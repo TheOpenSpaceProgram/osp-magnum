@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#include "OSPMagnum.h"
+#include "ActiveApplication.h"
 #include "osp/types.h"
 #include "osp/Active/SysHierarchy.h"
 
@@ -36,8 +36,8 @@
 
 using namespace testapp;
 
-using Key_t = OSPMagnum::KeyEvent::Key;
-using Mouse_t = OSPMagnum::MouseEvent::Button;
+using Key_t = ActiveApplication::KeyEvent::Key;
+using Mouse_t = ActiveApplication::MouseEvent::Button;
 
 using osp::input::sc_keyboard;
 using osp::input::sc_mouse;
@@ -47,27 +47,27 @@ using osp::input::ControlExprConfig_t;
 using osp::input::EVarTrigger;
 using osp::input::EVarOperator;
 
-OSPMagnum::OSPMagnum(const Magnum::Platform::Application::Arguments& arguments,
-                     osp::OSPApplication &rOspApp, on_draw_t onDraw) :
+ActiveApplication::ActiveApplication(const Magnum::Platform::Application::Arguments& arguments,
+                     osp::PackageRegistry &rPkgs, on_draw_t onDraw) :
         Magnum::Platform::Application{
             arguments,
             Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
         m_onDraw(onDraw),
         m_userInput(12),
-        m_rOspApp(rOspApp)
+        m_rPackages(rPkgs)
 {
     //.setWindowFlags(Configuration::WindowFlag::Hidden)
 
     m_timeline.start();
 }
 
-OSPMagnum::~OSPMagnum()
+ActiveApplication::~ActiveApplication()
 {
     // Clear scene data before GL resources are freed
     m_scenes.clear();
 }
 
-void OSPMagnum::drawEvent()
+void ActiveApplication::drawEvent()
 {
     m_userInput.update_controls();
 
@@ -80,7 +80,7 @@ void OSPMagnum::drawEvent()
     redraw();
 }
 
-void OSPMagnum::update_scenes()
+void ActiveApplication::update_scenes()
 {
     for (auto &[name, entry] : m_scenes)
     {
@@ -89,7 +89,7 @@ void OSPMagnum::update_scenes()
     }
 }
 
-void OSPMagnum::draw_scenes()
+void ActiveApplication::draw_scenes()
 {
     for (auto &[name, entry] : m_scenes)
     {
@@ -98,65 +98,65 @@ void OSPMagnum::draw_scenes()
     }
 }
 
-void OSPMagnum::keyPressEvent(KeyEvent& event)
+void ActiveApplication::keyPressEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
     m_userInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
                           osp::input::EButtonEvent::Pressed);
 }
 
-void OSPMagnum::keyReleaseEvent(KeyEvent& event)
+void ActiveApplication::keyReleaseEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
     m_userInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
                           osp::input::EButtonEvent::Released);
 }
 
-void OSPMagnum::mousePressEvent(MouseEvent& event)
+void ActiveApplication::mousePressEvent(MouseEvent& event)
 {
     m_userInput.event_raw(osp::input::sc_mouse, (int) event.button(),
                           osp::input::EButtonEvent::Pressed);
 }
 
-void OSPMagnum::mouseReleaseEvent(MouseEvent& event)
+void ActiveApplication::mouseReleaseEvent(MouseEvent& event)
 {
     m_userInput.event_raw(osp::input::sc_mouse, (int) event.button(),
                           osp::input::EButtonEvent::Released);
 }
 
-void OSPMagnum::mouseMoveEvent(MouseMoveEvent& event)
+void ActiveApplication::mouseMoveEvent(MouseMoveEvent& event)
 {
     m_userInput.mouse_delta(event.relativePosition());
 }
 
-void OSPMagnum::mouseScrollEvent(MouseScrollEvent & event)
+void ActiveApplication::mouseScrollEvent(MouseScrollEvent & event)
 {
     m_userInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 }
 
-osp::active::ActiveScene& OSPMagnum::scene_create(std::string const& name, SceneUpdate_t upd)
+osp::active::ActiveScene& ActiveApplication::scene_create(std::string const& name, SceneUpdate_t upd)
 {
     auto const& [it, success] =
         m_scenes.try_emplace(
-            name, osp::active::ActiveScene{m_rOspApp, m_glResources}, upd);
+            name, osp::active::ActiveScene{m_rPackages, m_glResources}, upd);
     return it->second.first;
 }
 
-osp::active::ActiveScene& OSPMagnum::scene_create(std::string && name, SceneUpdate_t upd)
+osp::active::ActiveScene& ActiveApplication::scene_create(std::string && name, SceneUpdate_t upd)
 {
     auto const& [it, success] =
         m_scenes.try_emplace(
             std::move(name),
-            osp::active::ActiveScene{m_rOspApp, m_glResources}, upd);
+            osp::active::ActiveScene{m_rPackages, m_glResources}, upd);
     return it->second.first;
 }
 
-void testapp::config_controls(OSPMagnum& rOspApp)
+void testapp::config_controls(ActiveApplication& rPkgs)
 {
     // Configure Controls
     //Load toml
     auto data = toml::parse("settings.toml");
-    osp::input::UserInputHandler& rUserInput = rOspApp.get_input_handler();
+    osp::input::UserInputHandler& rUserInput = rPkgs.get_input_handler();
     for (const auto& [k, v] : data.as_table())
     {
         std::string const& primary = toml::find(v, "primary").as_string();
@@ -257,9 +257,9 @@ const std::map<std::string_view, button_pair_t, std::less<>> gc_buttonMap = {
     {"F12", {sc_keyboard, (int)Key_t::F12  }},
 
     //Mouse
-    {"RMouse", {sc_mouse, (int)OSPMagnum::MouseEvent::Button::Right }},
-    {"LMouse", {sc_mouse, (int)OSPMagnum::MouseEvent::Button::Left }},
-    {"MMouse", {sc_mouse, (int)OSPMagnum::MouseEvent::Button::Middle }}
+    {"RMouse", {sc_mouse, (int)ActiveApplication::MouseEvent::Button::Right }},
+    {"LMouse", {sc_mouse, (int)ActiveApplication::MouseEvent::Button::Left }},
+    {"MMouse", {sc_mouse, (int)ActiveApplication::MouseEvent::Button::Middle }}
 };
 
 ControlExprConfig_t parse_control(std::string_view str) noexcept

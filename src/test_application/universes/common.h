@@ -25,7 +25,8 @@
 
 #pragma once
 
-#include <osp/OSPApplication.h>
+#include <osp/Universe.h>
+#include <osp/Resource/PackageRegistry.h>
 
 namespace testapp
 {

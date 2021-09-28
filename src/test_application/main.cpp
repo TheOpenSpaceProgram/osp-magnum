@@ -27,7 +27,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
-#include "OSPMagnum.h"
+#include "ActiveApplication.h"
 #include "flight.h"
 
 #include "universes/simple.h"
@@ -87,7 +87,7 @@ void debug_print_hier();
 void debug_print_machines();
 
 // Stores loaded resources in packages.
-osp::OSPApplication g_osp;
+osp::PackageRegistry g_packages;
 
 // Test application stores 1 universe and its update function
 osp::universe::Universe g_universe;
@@ -95,7 +95,7 @@ universe_update_t g_universeUpdate;
 
 // Deals with the window, OpenGL context, and other game engine stuff that
 // often have "Active" written all over them
-std::unique_ptr<OSPMagnum> g_ospMagnum;
+std::unique_ptr<ActiveApplication> g_ActiveApplication;
 std::thread g_magnumThread;
 
 // Loggers
@@ -136,11 +136,11 @@ int main(int argc, char** argv)
     {
         if(args.value("scene") == "simple")
         {
-            simplesolarsystem::create(g_osp, g_universe, g_universeUpdate);
+            simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
         }
         else if(args.value("scene") == "moon")
         {
-            moon::create(g_osp, g_universe, g_universeUpdate);
+            moon::create(g_packages, g_universe, g_universeUpdate);
         }
         else
         {
@@ -154,9 +154,9 @@ int main(int argc, char** argv)
         }
         std::thread t([] {
             osp::set_thread_logger(g_logMagnumApp);
-            test_flight(std::ref(g_ospMagnum), std::ref(g_osp),
+            test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
                         std::ref(g_universe), std::ref(g_universeUpdate),
-                        OSPMagnum::Arguments{g_argc, g_argv});
+                        ActiveApplication::Arguments{g_argc, g_argv});
         });
         g_magnumThread.swap(t);
     }
@@ -197,14 +197,14 @@ int debug_cli_loop()
         {
             if (destroy_universe())
             {
-                simplesolarsystem::create(g_osp, g_universe, g_universeUpdate);
+                simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
             }
         }
         else if (command == "moon")
         {
             if (destroy_universe())
             {
-                moon::create(g_osp, g_universe, g_universeUpdate);
+                moon::create(g_packages, g_universe, g_universeUpdate);
             }
         }
         else if (command == "flight")
@@ -215,9 +215,9 @@ int debug_cli_loop()
             }
             std::thread t([] {
                 osp::set_thread_logger(g_logMagnumApp);
-                test_flight(std::ref(g_ospMagnum), std::ref(g_osp),
+                test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
                             std::ref(g_universe), std::ref(g_universeUpdate),
-                            OSPMagnum::Arguments{g_argc, g_argv});
+                            ActiveApplication::Arguments{g_argc, g_argv});
             });
             g_magnumThread.swap(t);
         }
@@ -239,10 +239,10 @@ int debug_cli_loop()
         }
         else if (command == "exit")
         {
-            if (g_ospMagnum)
+            if (g_ActiveApplication)
             {
                 // request exit if application exists
-                g_ospMagnum->exit();
+                g_ActiveApplication->exit();
             }
             destroy_universe();
             break;
@@ -259,7 +259,7 @@ int debug_cli_loop()
 bool destroy_universe()
 {
     // Make sure no application is open
-    if (g_ospMagnum != nullptr)
+    if (g_ActiveApplication != nullptr)
     {
       OSP_LOG_WARN("Application must be closed to destroy universe.");
         return false;
@@ -270,7 +270,7 @@ bool destroy_universe()
     g_universe.coordspace_clear();
 
     // Destroy blueprints as part of destroying all vehicles
-    g_osp.debug_find_package("lzdb").clear<osp::BlueprintVehicle>();
+    g_packages.find("lzdb").clear<osp::BlueprintVehicle>();
 
     OSP_LOG_INFO("explosion* Universe destroyed!");
 
@@ -298,7 +298,7 @@ constexpr void register_wiretype(osp::Package &rPkg)
 void load_a_bunch_of_stuff()
 {
     // Create a new package
-    osp::Package lazyDebugPack("lzdb", "lazy-debug");
+    osp::Package &rDebugPack = g_packages.create("lzdb");
 
     using adera::active::machines::MachineContainer;
     using adera::active::machines::MachineRCSController;
@@ -306,14 +306,14 @@ void load_a_bunch_of_stuff()
     using adera::active::machines::MachineUserControl;
 
     // Register machines
-    register_machine<MachineContainer>(lazyDebugPack);
-    register_machine<MachineRCSController>(lazyDebugPack);
-    register_machine<MachineRocket>(lazyDebugPack);
-    register_machine<MachineUserControl>(lazyDebugPack);
+    register_machine<MachineContainer>(rDebugPack);
+    register_machine<MachineRCSController>(rDebugPack);
+    register_machine<MachineRocket>(rDebugPack);
+    register_machine<MachineUserControl>(rDebugPack);
 
     // Register wire types
-    register_wiretype<adera::wire::AttitudeControl>(lazyDebugPack);
-    register_wiretype<adera::wire::Percent>(lazyDebugPack);
+    register_wiretype<adera::wire::AttitudeControl>(rDebugPack);
+    register_wiretype<adera::wire::Percent>(rDebugPack);
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};
@@ -331,7 +331,7 @@ void load_a_bunch_of_stuff()
     for (auto meshName : meshes)
     {
         osp::AssetImporter::load_sturdy_file(
-            osp::string_concat(datapath, meshName), lazyDebugPack, lazyDebugPack);
+            osp::string_concat(datapath, meshName), rDebugPack, rDebugPack);
     }
 
     // Load noise textures
@@ -340,8 +340,8 @@ void load_a_bunch_of_stuff()
     const std::string n256path = osp::string_concat(datapath, noise256, ".png");
     const std::string n1024path = osp::string_concat(datapath, noise1024, ".png");
 
-    osp::AssetImporter::load_image(n256path, lazyDebugPack);
-    osp::AssetImporter::load_image(n1024path, lazyDebugPack);
+    osp::AssetImporter::load_image(n256path, rDebugPack);
+    osp::AssetImporter::load_image(n1024path, rDebugPack);
 
     // Load placeholder fuel type
     using adera::active::machines::ShipResourceType;
@@ -355,15 +355,7 @@ void load_a_bunch_of_stuff()
         1000.0f        // density (kg/m^3)
     };
 
-    lazyDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
-
-    // Add package to the univere
-    g_osp.debug_add_package(std::move(lazyDebugPack));
-
-    // Add 50 vehicles so there's something to load
-    //g_osp.get_universe().get_sats().reserve(64);
-
-    //s_partsLoaded = true;
+    rDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
 
     OSP_LOG_INFO("Resource loading complete");
 }
@@ -391,49 +383,46 @@ void debug_print_help()
 }
 
 template <typename RES_T>
-void debug_print_resource_group(osp::Package& rPkg)
+void debug_print_resource_group(osp::Package const& rPkg)
 {
-    osp::Package::group_t<RES_T> const &group = rPkg.group_get<RES_T>();
+    auto const pGroup = rPkg.group_get<RES_T>();
 
-    if (group.empty())
+    if (pGroup == nullptr)
     {
         return;
     }
 
     std::cout << "  * TYPE: " << entt::type_name<RES_T>().value() << "\n";
 
-    for (auto const& [key, resource] : group)
+    for (auto const& [key, resource] : *pGroup)
     {
         std::cout << "    * " << (resource.m_data.has_value() ? "LOADED" : "RESERVED") << ": " << key << "\n";
     }
 }
 
+void debug_print_package(osp::Package const& rPkg, osp::ResPrefix_t const& prefix)
+{
+    std::cout << "* PACKAGE: " << prefix << "\n";
+
+    // TODO: maybe consider polymorphic access to resources?
+    debug_print_resource_group<osp::PrototypePart>(rPkg);
+    debug_print_resource_group<osp::BlueprintVehicle>(rPkg);
+
+    debug_print_resource_group<Magnum::Trade::ImageData2D>(rPkg);
+    debug_print_resource_group<Magnum::Trade::MeshData>(rPkg);
+    debug_print_resource_group<Magnum::GL::Texture2D>(rPkg);
+    debug_print_resource_group<Magnum::GL::Mesh>(rPkg);
+
+    debug_print_resource_group<adera::active::machines::ShipResourceType>(rPkg);
+    debug_print_resource_group<adera::shader::PlumeShader>(rPkg);
+    debug_print_resource_group<osp::shader::Phong>(rPkg);
+}
+
 void debug_print_resources()
 {
-    std::vector<osp::Package*> packages = {
-        &g_osp.debug_find_package("lzdb")};
-
-    if (g_ospMagnum != nullptr)
+    for (auto const& [prefix, pkg] : g_packages.get_map())
     {
-        packages.push_back(&g_ospMagnum->get_context_resources());
-    }
-
-    for (osp::Package* pPkg : packages)
-    {
-        osp::Package &rPkg = *pPkg;
-        std::cout << "* PACKAGE: " << rPkg.get_prefix() << "\n";
-
-        debug_print_resource_group<osp::PrototypePart>(rPkg);
-        debug_print_resource_group<osp::BlueprintVehicle>(rPkg);
-
-        debug_print_resource_group<Magnum::Trade::ImageData2D>(rPkg);
-        debug_print_resource_group<Magnum::Trade::MeshData>(rPkg);
-        debug_print_resource_group<Magnum::GL::Texture2D>(rPkg);
-        debug_print_resource_group<Magnum::GL::Mesh>(rPkg);
-
-        debug_print_resource_group<adera::active::machines::ShipResourceType>(rPkg);
-        debug_print_resource_group<adera::shader::PlumeShader>(rPkg);
-        debug_print_resource_group<osp::shader::Phong>(rPkg);
+        debug_print_package(pkg, prefix);
     }
 }
 
@@ -447,22 +436,22 @@ void debug_print_machines()
     using osp::RegisteredMachine;
     using regmachs_t = osp::Package::group_t<RegisteredMachine>;
 
-    if (!g_ospMagnum)
+    if (!g_ActiveApplication)
     {
         std::cout << "Can't do that yet, start the magnum application first!\n";
         return;
     }
 
     // Get list of machine names
-    regmachs_t const &group = g_osp.debug_find_package("lzdb").group_get<RegisteredMachine>();
-    std::vector<std::string_view> machNames(group.size());
-    for (auto const& [name, regMach] : group)
+    regmachs_t const* pGroup = g_packages.find("lzdb").group_get<RegisteredMachine>();
+    std::vector<std::string_view> machNames(pGroup->size());
+    for (auto const& [name, regMach] : *pGroup)
     {
         machNames[regMach.m_data->m_id] = name;
     }
 
     // Loop through every Vehicle
-    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second.first;
+    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
     auto view = scene.get_registry().view<const ACompMachines>();
 
     for (ActiveEnt ent : view)
@@ -488,7 +477,7 @@ void debug_print_hier()
     using osp::active::ActiveScene;
     using osp::active::ActiveEnt;
 
-    if (!g_ospMagnum)
+    if (!g_ActiveApplication)
     {
         std::cout << "Can't do that yet, start the magnum application first!\n";
         return;
@@ -497,7 +486,7 @@ void debug_print_hier()
     std::cout << "ActiveScene Entity Hierarchy:\n";
 
     std::vector<ActiveEnt> parentNextSibling;
-    ActiveScene const &scene = g_ospMagnum->get_scenes().begin()->second.first;
+    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
     ActiveEnt currentEnt = scene.hier_get_root();
 
     parentNextSibling.reserve(16);

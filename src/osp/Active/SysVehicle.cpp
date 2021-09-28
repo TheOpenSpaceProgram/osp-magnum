@@ -28,8 +28,8 @@
 #include "SysRender.h"
 #include "SysVehicle.h"
 #include "physics.h"
-#include <osp/OSPApplication.h>
 
+#include "../Resource/PackageRegistry.h"
 #include "../Resource/PrototypePart.h"
 #include "../Resource/AssetImporter.h"
 
@@ -127,8 +127,6 @@ ActiveEnt SysVehicle::part_instantiate(
         using Magnum::Trade::MeshData;
         using Magnum::GL::Texture2D;
         using Magnum::Trade::ImageData2D;
-
-        Package& package = rScene.get_application().debug_find_package("lzdb");
 
         Package& glResources = rScene.get_context_resources();
         DependRes<MeshData> meshData = pcompDrawable.m_mesh;

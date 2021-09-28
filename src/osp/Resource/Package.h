@@ -43,9 +43,6 @@
 namespace osp
 {
 
-// Just a string, but typedef'd to indicate that it represents a prefix
-using ResPrefix_t = std::string;
-
 // Stores a split path as <prefix, rest of path>
 struct Path
 {
@@ -87,10 +84,7 @@ public:
     template<class TYPE_T>
     using group_t =  std::map<std::string, osp::Resource<TYPE_T>, std::less<>>;
 
-    // disable default construction.
-    Package() = delete;
-
-    Package(std::string prefix, std::string packageName);
+    Package() = default;
 
     // disable copy
     Package(const Package& copy) = delete;
@@ -137,7 +131,7 @@ public:
     DependRes<TYPE_T> get_or_reserve(STRING_T&& path) noexcept;
 
     template<class TYPE_T>
-    group_t<TYPE_T> const& group_get();
+    group_t<TYPE_T> const* group_get() const noexcept;
 
     // TODO: function for removing specific resources
 
@@ -169,17 +163,9 @@ public:
         group_t<TYPE_T> m_resources;
     };
 
-    constexpr ResPrefix_t const& get_prefix() const { return m_prefix; }
-
 private:
 
     std::vector<entt::any> m_groups;
-
-    std::string m_packageName;
-
-    ResPrefix_t m_prefix;
-
-    std::string m_displayName;
 };
 
 template<class TYPE_T, class STRING_T, typename ... ARGS_T>
@@ -294,28 +280,23 @@ DependRes<TYPE_T> Package::get_or_reserve(STRING_T&& path) noexcept
 }
 
 template<class TYPE_T>
-Package::group_t<TYPE_T> const& Package::group_get()
+Package::group_t<TYPE_T> const* Package::group_get() const noexcept
 {
     const uint32_t resTypeId = resource_id::type<TYPE_T>;
 
-    // Resize m_groups to ensure that resTypeId a valid index
     if (m_groups.size() <= resTypeId)
     {
-        m_groups.resize(resTypeId + 1);
+        return nullptr; // Resource type is not a valid index
     }
 
-    entt::any &groupAny = m_groups[resTypeId];
+    entt::any const &groupAny = m_groups[resTypeId];
 
-    // Initialize GroupType if blank. This only happens for the first TYPE_T
-    // added.
     if(!groupAny)
     {
-        groupAny = GroupType<TYPE_T>();
+        return nullptr; // Group is not initialized
     }
 
-    GroupType<TYPE_T> &group = entt::any_cast<GroupType<TYPE_T>&>(groupAny);
-
-    return group.m_resources;
+    return &entt::any_cast<GroupType<TYPE_T> const&>(groupAny).m_resources;
 }
 
 template<class TYPE_T>

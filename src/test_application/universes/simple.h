@@ -34,11 +34,11 @@ namespace testapp::simplesolarsystem
  * @brief Create a universe with a few unrealistically small planets and some
  *        vehicles
  *
- * @param rOspApp [ref] OSP Application with required resources
+ * @param rPkgs   [ref] Packages containing needed resources
  * @param rUni    [ref] Universe to setup; usually this is empty
  * @param rUniUpd [out] Associated universe update function to set
  */
-void create(osp::OSPApplication& rOspApp,
+void create(osp::PackageRegistry& rPkgs,
             osp::universe::Universe& rUni, universe_update_t &rUniUpd);
 
 }

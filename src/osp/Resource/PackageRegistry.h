@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,43 +24,58 @@
  */
 #pragma once
 
-#include <map>
-#include <spdlog/spdlog.h>
+#include "Package.h"
 
-#include "Universe.h"
-#include "Resource/Package.h"
+#include <map>
 
 namespace osp
 {
 
+// Prefix for resource paths to indicate which package they're from
+// Ideally, this would be some kind of short string
+using ResPrefix_t = std::string;
 
-// TODO: Refactor to more permanent 'package list' or something
-class OSPApplication
-{
+/**
+ * @brief Stores Packages identifiable through a short prefix
+ *
+ * PackageRegistry is intended to store resources accessible throughout the
+ * entire application, organized by Package.
+ */
+class PackageRegistry
+{    
 public:
 
-    /**
-     * Add a resource package to the application
-     *
-     * The package should be populated externally, then passed via rvalue
-     * reference so the contents can be moved into the application resources
-     *
-     * @param p [in] The package to add
-     */
-    void debug_add_package(Package&& p);
+    using Map_t = std::map<ResPrefix_t, Package, std::less<>>;
 
     /**
-     * Get a resource package by prefix name
+     * @brief Create a new resource package
+     *
+     * @param prefix [in] Prefix of package to add
+     *
+     * @return newly created Package
+     */
+    Package& create(ResPrefix_t const prefix);
+
+    /**
+     * @brief Get a resource package by prefix name
      *
      * @param prefix [in] The short prefix name of the package
      * @return The resource package
      */
-    Package& debug_find_package(std::string_view prefix);
+    Package& find(std::string_view const prefix);
 
-    size_t debug_num_packages() const { return m_packages.size(); }
+    /**
+     * @return Read-only internal map
+     */
+    constexpr Map_t const& get_map() const noexcept { return m_packages; };
+
+    /**
+     * @return Number of registered packages
+     */
+    size_t count() const noexcept { return m_packages.size(); }
 
 private:
-    std::map<ResPrefix_t, Package, std::less<>> m_packages;
+    Map_t m_packages;
 
 };
 }

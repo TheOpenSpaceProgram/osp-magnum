@@ -37,7 +37,7 @@
 #include <osp/Active/ActiveScene.h>       // for ActiveScene
 #include <osp/Active/activetypes.h>       // for basic_sparse_set, ActiveEnt
 
-#include <osp/OSPApplication.h>           // for OSPApplication
+#include <osp/Resource/PackageRegistry.h> // for PackageRegistry
 
 #include <Magnum/GL/Shader.h>             // for Shader, Shader::Type
 #include <Magnum/GL/Texture.h>            // for Texture2D
@@ -88,7 +88,7 @@ void PlumeShader::draw_plume(
     if (tmpTex.empty())
     {
         tmpTex = AssetImporter::compile_tex(texName,
-            rScene.get_application().debug_find_package("lzdb"), rResources);
+            rScene.get_packages().find("lzdb"), rResources);
     }
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;

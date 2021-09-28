@@ -112,21 +112,21 @@ void update_scene(ActiveScene& rScene);
 void setup_wiring(ActiveScene& rScene);
 
 Satellite active_area_create(
-        osp::OSPApplication& rOspApp, Universe &rUni,
+        osp::PackageRegistry& rPkgs, Universe &rUni,
         coordspace_index_t targetCoordspace);
 
 void active_area_destroy(
-        osp::OSPApplication& rOspApp, Universe &rUni, Satellite areaSat);
+        osp::PackageRegistry& rPkgs, Universe &rUni, Satellite areaSat);
 
 void testapp::test_flight(
-        std::unique_ptr<OSPMagnum>& pMagnumApp, osp::OSPApplication& rOspApp,
-        Universe &rUni, universe_update_t& rUniUpd, OSPMagnum::Arguments args)
+        std::unique_ptr<ActiveApplication>& pMagnumApp, osp::PackageRegistry& rPkgs,
+        Universe &rUni, universe_update_t& rUniUpd, ActiveApplication::Arguments args)
 {
 
     // Create the application, and its draw function
-    pMagnumApp = std::make_unique<OSPMagnum>(
-            args, rOspApp,
-            [&rUniUpd, &rUni] (OSPMagnum& rMagnumApp)
+    pMagnumApp = std::make_unique<ActiveApplication>(
+            args, rPkgs,
+            [&rUniUpd, &rUni] (ActiveApplication& rMagnumApp)
     {
         // Update the universe each frame
         // This likely wouldn't be here in the future
@@ -149,7 +149,7 @@ void testapp::test_flight(
     setup_wiring(rScene);
 
     // create a Satellite with an ActiveArea, then link it to the scene
-    Satellite areaSat = active_area_create(rOspApp, rUni, 0);
+    Satellite areaSat = active_area_create(rPkgs, rUni, 0);
     rUniUpd(rUni);
     osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
 
@@ -207,7 +207,7 @@ void testapp::test_flight(
     rScene.reg_emplace<ACompRenderer>(camera);
 
     // Starts the main loop. This function is blocking, and will only return
-    // once the window is closed. See OSPMagnum::drawEvent
+    // once the window is closed. See ActiveApplication::drawEvent
     pMagnumApp->exec();
 
     // Window has been closed
@@ -216,7 +216,7 @@ void testapp::test_flight(
 
     rUniUpd(rUni); // make sure universe is in a valid state
 
-    active_area_destroy(rOspApp, rUni, areaSat); // Disconnect ActiveArea
+    active_area_destroy(rPkgs, rUni, areaSat); // Disconnect ActiveArea
     rUniUpd(rUni);
 
     rUni.get_reg().destroy(areaSat);
@@ -331,7 +331,7 @@ void setup_wiring(ActiveScene& rScene)
 }
 
 Satellite active_area_create(
-        osp::OSPApplication& rOspApp, Universe &rUni,
+        osp::PackageRegistry& rPkgs, Universe &rUni,
         coordspace_index_t targetIndex)
 {
     using namespace osp::universe;
@@ -384,7 +384,7 @@ Satellite active_area_create(
 }
 
 void active_area_destroy(
-        osp::OSPApplication& rOspApp, Universe &rUni, Satellite areaSat)
+        osp::PackageRegistry& rPkgs, Universe &rUni, Satellite areaSat)
 {
     using namespace osp::universe;
 

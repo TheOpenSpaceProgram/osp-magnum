@@ -1,10 +1,7 @@
 #include "SysPhysics.h"
 #include "ActiveScene.h"
 
-#include <osp/OSPApplication.h>
-
-#include <spdlog/spdlog.h>
-
+#include <osp/Resource/PackageRegistry.h>
 
 using osp::active::SysPhysics;
 using osp::active::ActiveEnt;
