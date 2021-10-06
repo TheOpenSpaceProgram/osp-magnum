@@ -42,10 +42,10 @@ jobs:
     - name: Run Clang Analyzer
       if: ${{ matrix.tool == 'clang-analyzer' }}
       run: |
-        ./run-clang-tidy.py -p build
+        ./run-clang-tidy.py -j $(nproc) -p build
 
     # Implicitly requires build/compile_commands.json to exist
     - name: Run IWYU
       if: ${{ matrix.tool == 'iwyu' }}
       run: |
-        ./iwyu_tool.py -p build -- -Xiwyu --mapping_file=${GITHUB_WORKSPACE}/iwyu-ubuntu.imp
+        ./iwyu_tool.py -j $(nproc) -p build -- -Xiwyu --mapping_file=${GITHUB_WORKSPACE}/iwyu-ubuntu.imp
