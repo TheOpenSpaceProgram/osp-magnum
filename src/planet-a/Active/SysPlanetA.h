@@ -24,8 +24,6 @@
  */
 #pragma once
 
-#include "../PlanetGeometryA.h"
-
 #include <osp/Universe.h>
 #include <osp/Active/SysAreaAssociate.h>
 #include <osp/Active/SysForceFields.h>
@@ -46,8 +44,6 @@ struct SyncPlanets
 
 struct ACompPlanet
 {
-    std::shared_ptr<IcoSphereTree> m_icoTree;
-    std::shared_ptr<PlanetGeometryA> m_planet;
     Magnum::GL::Buffer m_vrtxBufGL{};
     Magnum::GL::Buffer m_indxBufGL{};
     double m_radius;
@@ -61,11 +57,6 @@ public:
             osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
             osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat);
 
-    static void debug_create_chunk_collider(
-            osp::active::ActiveScene& rScene,
-            osp::active::ActiveEnt ent,
-            ACompPlanet &planet,
-            chindex_t chunk);
 
     static void planet_update_geometry(
             osp::active::ActiveEnt planetEnt,

@@ -55,25 +55,6 @@ enum class EChunkUpdateAction : uint8_t
 
 struct UpdateRangeSub;
 
-// based on urho-osp PlanetWrenderer.cpp
-// variable names changed:
-// m_chunkCount           -> m_chunkCount
-// m_chunkIndDomain       -> m_chunkToTri
-// m_chunkVertFree        -> m_vrtxFree
-// m_chunkVertFreeShared  -> m_vrtxSharedFree
-// m_chunkVertUsers       -> m_vrtxSharedUsers
-// m_chunkSharedIndices   -> m_indToShared
-// m_chunkVertCountShared -> m_vrtxSharedCount
-// m_chunkMaxVert         -> m_vrtxMax
-// m_chunkMaxVertShared   -> m_vrtxSharedMax
-// m_maxChunks            -> m_chunkMax
-// m_chunkAreaThreshold   -> m_chunkAreaThreshold
-// m_chunkResolution      -> m_chunkWidth
-// m_chunkVertsPerSide    -> m_chunkWidthB
-// m_chunkSharedCount     -> m_vrtxSharedPerChunk
-// m_chunkSize            -> m_vrtxPerChunk
-// m_chunkSizeInd         -> m_indPerChunk
-
 struct SubTriangleChunk
 {
 

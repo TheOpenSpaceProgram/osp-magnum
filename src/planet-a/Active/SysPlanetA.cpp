@@ -37,11 +37,6 @@
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Renderer.h>
 
-#include <Magnum/Shaders/MeshVisualizerGL.h>
-
-// TODO: Decouple when a proper interface for creating static triangle meshes
-//       is made
-#include "temporarynewtonmesh.h"
 
 using planeta::active::SysPlanetA;
 using planeta::universe::UCompPlanet;
@@ -103,38 +98,6 @@ ActiveEnt SysPlanetA::activate(
     return planetEnt;
 }
 
-void SysPlanetA::debug_create_chunk_collider(
-        osp::active::ActiveScene& rScene,
-        osp::active::ActiveEnt ent,
-        ACompPlanet &planet,
-        chindex_t chunk)
-{
-    using namespace osp::active;
-
-    using osp::phys::EShape;
-
-    // Create entity and required components
-    ActiveEnt chunkEnt = SysHierarchy::create_child(rScene, rScene.hier_get_root());
-    auto &chunkTransform = rScene.reg_emplace<ACompTransform>(chunkEnt);
-    auto &chunkShape = rScene.reg_emplace<ACompShape>(chunkEnt);
-    rScene.reg_emplace<ACompSolidCollider>(chunkEnt);
-    rScene.reg_emplace<ACompPhysBody>(chunkEnt);
-    rScene.reg_emplace<ACompFloatingOrigin>(chunkEnt);
-
-    // Set some stuff
-    chunkShape.m_shape = EShape::Custom;
-    chunkTransform.m_transform = rScene.reg_get<ACompTransform>(ent).m_transform;
-
-    // Get triangle iterators to start and end triangles of the specified chunk
-    auto itsChunk = planet.m_planet->iterate_chunk(chunk);
-
-    // Send them to the physics engine
-    debug_create_tri_mesh_static(
-                rScene, chunkShape, chunkEnt, itsChunk.first, itsChunk.second);
-
-
-}
-
 void SysPlanetA::update_activate(ActiveScene &rScene)
 {
     osp::active::ACompAreaLink *pLink
@@ -185,72 +148,6 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
         auto &planet = view.get<ACompPlanet>(ent);
         auto &tf = view.get<ACompTransform>(ent);
 
-        if(nullptr == planet.m_planet)
-        {
-            planet.m_planet = std::make_shared<PlanetGeometryA>();
-            PlanetGeometryA &rPlanetGeo = *(planet.m_planet);
-
-            // initialize planet if not done so yet
-            OSP_LOG_INFO("Initializing planet because that was not done "
-                         "for some reason");
-            planet.m_icoTree = std::make_shared<IcoSphereTree>();
-
-            planet.m_icoTree->initialize(planet.m_radius);
-
-            rPlanetGeo.initialize(planet.m_icoTree, 4, 1u << 9, 1u << 13);
-
-            planet.m_icoTree->event_add(planet.m_planet);
-
-            // Add chunks for the initial 20 triangles of the icosahedron
-            rPlanetGeo.chunk_geometry_update_all([] (...) -> EChunkUpdateAction
-            {
-                return EChunkUpdateAction::Chunk;
-            });
-
-            osp::Package& glResources = rScene.get_context_resources();
-
-            // Generate mesh resource
-            using Magnum::GL::Mesh;
-
-            std::string name = osp::string_concat("planet_mesh_",
-                std::to_string(static_cast<int>(ent)));
-            osp::DependRes<Mesh> mesh = glResources.add<Mesh>(name);
-
-            rScene.reg_emplace<ACompVisible>(ent);
-            rScene.reg_emplace<ACompOpaque>(ent);
-            rScene.reg_emplace<ACompMesh>(ent, mesh);
-            rScene.reg_emplace<ACompDrawTransform>(ent);
-            rScene.get_registry().ctx<ACtxRenderGroups>().add<MaterialTerrain>(ent);
-
-            //planet_update_geometry(ent, planet);
-            OSP_LOG_INFO("Initialized planet, constructing colliders");
-
-            // temporary: make colliders for all the chunks
-            for (chindex_t i = 0; i < rPlanetGeo.get_chunk_count(); i ++)
-            {
-                debug_create_chunk_collider(rScene, ent, planet, i);
-                OSP_LOG_INFO("* completed chunk collider: {}", i);
-            }
-
-            OSP_LOG_INFO("Completed planet colliders");
-
-            planet.m_vrtxBufGL.setData(rPlanetGeo.get_vertex_buffer());
-            planet.m_indxBufGL.setData(rPlanetGeo.get_index_buffer());
-
-            rPlanetGeo.updates_clear();
-
-            using Magnum::Shaders::MeshVisualizerGL3D;
-            using Magnum::GL::MeshPrimitive;
-            using Magnum::GL::MeshIndexType;
-
-            mesh->setPrimitive(MeshPrimitive::Triangles)
-                .addVertexBuffer(planet.m_vrtxBufGL, 0,
-                                 MeshVisualizerGL3D::Position{},
-                                 MeshVisualizerGL3D::Normal{})
-                .setIndexBuffer(planet.m_indxBufGL, 0,
-                                MeshIndexType::UnsignedInt)
-                .setCount(rPlanetGeo.calc_index_count());
-        }
 
         planet_update_geometry(ent, rScene);
     }
@@ -270,101 +167,7 @@ void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt,
     Satellite planetSat = planetActivated.m_sat;
     auto &planetUComp = uni.get_reg().get<universe::UCompPlanet>(planetSat);
 
-    PlanetGeometryA &rPlanetGeo = *(rPlanetPlanet.m_planet);
 
-    // Temporary: use the first camera in the scene as the viewer
-    ActiveEnt cam = rScene.get_registry().view<ACompCamera>().front();
-    auto const &camTf = rScene.reg_get<ACompTransform>(cam);
-
-    // Set this somewhere else. Radius at which detail falloff will start
-    // This will essentially be the physics area size
-    float viewerRadius = 64.0f;
-
-    // camera position relative to planet
-    Vector3 camRelative = camTf.m_transform.translation()
-                        - planetTf.m_transform.translation();
-
-    using Magnum::Math::max;
-    using Magnum::Math::pow;
-    using Magnum::Math::sqrt;
-
-    // Ratio between an icosahedron's edge length and radius
-    static const float sc_icoEdgeRatio = sqrt(10.0f + 2.0f * sqrt(5.0f)) / 4.0f;
-
-    // edge length of largest possible triangle
-    float edgeLengthA = planetUComp.m_radius / sc_icoEdgeRatio
-                        / rPlanetGeo.get_chunk_vertex_width();
-
-    rPlanetGeo.chunk_geometry_update_all(
-            [edgeLengthA, planetUComp, camRelative, viewerRadius] (
-                    SubTriangle const& tri,
-                    SubTriangleChunk const& chunk,
-                    trindex_t index) -> EChunkUpdateAction
-    {
-        // distance between viewer and triangle
-        float dist = (tri.m_center - camRelative).length();
-        dist = max(0.0001f, dist - viewerRadius);
-
-        // approximation of current triangle edge length
-        float edgeLength = edgeLengthA / float(pow(2, int(tri.m_depth)));
-        float screenLength = edgeLength / dist;
-
-        bool tooClose = screenLength > planetUComp.m_resolutionScreenMax;
-        bool canDivideFurther = edgeLength > planetUComp.m_resolutionSurfaceMax;
-
-        if (tooClose && canDivideFurther)
-        {
-            // too close, subdivide it
-            return EChunkUpdateAction::Subdivide;
-        }
-        else
-        {
-            return EChunkUpdateAction::Chunk;
-        }
-    });
-
-    // New triangles were added, notify
-    rPlanetPlanet.m_icoTree->event_notify();
-
-    // Remove unused
-    rPlanetPlanet.m_icoTree->subdivide_remove_all_unused();
-    rPlanetPlanet.m_icoTree->event_notify();
-
-    //planet.m_planet->debug_raise_by_share_count();
-
-    using Corrade::Containers::ArrayView;
-
-    // update GPU index buffer
-
-    std::vector<buindex_t> const &indxData = rPlanetGeo.get_index_buffer();
-
-    for (UpdateRangeSub updRange : rPlanetGeo.updates_get_index_changes())
-    {
-        buindex_t size = updRange.m_end - updRange.m_start;
-        ArrayView arrView(indxData.data() + updRange.m_start, size);
-        rPlanetPlanet.m_indxBufGL.setSubData(
-                updRange.m_start * sizeof(*indxData.data()), arrView);
-    }
-
-    // update GPU vertex buffer
-
-    std::vector<float> const &vrtxData = rPlanetGeo.get_vertex_buffer();
-
-    for (UpdateRangeSub updRange : rPlanetGeo.updates_get_vertex_changes())
-    {
-        buindex_t size = updRange.m_end - updRange.m_start;
-        ArrayView arrView(vrtxData.data() + updRange.m_start, size);
-        rPlanetPlanet.m_vrtxBufGL.setSubData(
-                updRange.m_start * sizeof(*vrtxData.data()), arrView);
-    }
-
-    //planet.m_vrtxBufGL.setData(planet.m_planet->get_vertex_buffer());
-    //planet.m_indxBufGL.setData(planet.m_planet->get_index_buffer());
-    rPlanetGeo.updates_clear();
-
-    rScene.reg_get<ACompMesh>(planetEnt).m_mesh->setCount(rPlanetGeo.calc_index_count());
-
-    rPlanetGeo.get_ico_tree()->debug_verify_state();
 }
 
 void SysPlanetA::update_physics(ActiveScene& rScene)
