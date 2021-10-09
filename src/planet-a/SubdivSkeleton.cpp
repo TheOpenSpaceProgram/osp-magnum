@@ -27,7 +27,17 @@
 
 using namespace planeta;
 
-static SubdivSkeleton create_skeleton_icosahedron(float rad)
+// The 20 faces of the icosahedron (Top, Left, Right)
+// Each number refers to one of 12 initial vertices
+inline constexpr std::array<std::array<uint8_t, 3>, 20> sc_icoTriLUT
+{{
+    { 0,  2,  1},  { 0,  3,  2},  { 0,  4,  3},  { 0,  5,  4},  { 0,  1,  5},
+    { 8,  1,  2},  { 2,  7,  8},  { 7,  2,  3},  { 3,  6,  7},  { 6,  3,  4},
+    { 4,  10, 6},  {10,  4,  5},  { 5,  9, 10},  { 9,  5,  1},  { 1,  8,  9},
+    {11,  7,  6},  {11,  8,  7},  {11,  9,  8},  {11, 10,  9},  {11,  6, 10}
+}};
+
+SubdivTriangleSkeleton create_skeleton_icosahedron(float rad)
 {
     // Create an Icosahedron. Blender style, so there's a vertex directly on
     // top and directly on the bottom. Basicly, a sandwich of two pentagons,
@@ -96,11 +106,38 @@ static SubdivSkeleton create_skeleton_icosahedron(float rad)
 
     // Create the skeleton
 
-    SubdivSkeleton skeleton;
+    SubdivTriangleSkeleton skeleton;
+
+    // Add initial vertices
+
+    // IDs are sequential and always start at 0.
+    // storing them here is 1% extra safety in case that changes.
+    std::vector<SkVrtxId> vertices;
+    vertices.reserve(icosahedronVrtx.size());
 
     for (osp::Vector3 const vec : icosahedronVrtx)
     {
-        VrtxId vrtx = skeleton.m_vrtxTree.add_root();
+        SkVrtxId const vrtxId = skeleton.m_vrtxIdTree.add_root();
+        skeleton.vrtx_resize_fit_ids();
+
+        skeleton.m_vrtxPositions[size_t(vrtxId)] = vec;
+
+        vertices.push_back(vrtxId);
+    }
+
+    // Add initial triangles
+
+    for (std::array<uint8_t, 3> const triEntry : sc_icoTriLUT)
+    {
+        SkTriId const striId = skeleton.m_triIds.create();
+        skeleton.tri_resize_fit_ids();
+
+        SkeletonTriangle &rTri = skeleton.tri_at(striId);
+        rTri.m_parent = striId; // parent it to itself :p
+        rTri.m_vertices =
+        {
+            vertices[triEntry[0]], vertices[triEntry[1]], vertices[triEntry[2]]
+        };
     }
 
     return skeleton;
