@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "../SubdivTriangleMesh.h"
+
 #include <osp/Universe.h>
 #include <osp/Active/SysAreaAssociate.h>
 #include <osp/Active/SysForceFields.h>

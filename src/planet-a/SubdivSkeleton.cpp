@@ -37,7 +37,7 @@ inline constexpr std::array<std::array<uint8_t, 3>, 20> sc_icoTriLUT
     {11,  7,  6},  {11,  8,  7},  {11,  9,  8},  {11, 10,  9},  {11,  6, 10}
 }};
 
-SubdivTriangleSkeleton create_skeleton_icosahedron(float rad)
+SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(float rad)
 {
     // Create an Icosahedron. Blender style, so there's a vertex directly on
     // top and directly on the bottom. Basicly, a sandwich of two pentagons,
@@ -117,23 +117,36 @@ SubdivTriangleSkeleton create_skeleton_icosahedron(float rad)
 
     for (osp::Vector3 const vec : icosahedronVrtx)
     {
-        SkVrtxId const vrtxId = skeleton.m_vrtxIdTree.add_root();
-        skeleton.vrtx_resize_fit_ids();
+        SkVrtxId const vrtxId = skeleton.vrtx_create_root();
 
-        skeleton.m_vrtxPositions[size_t(vrtxId)] = vec;
+        skeleton.vrtx_get_positions()[size_t(vrtxId)] = vec;
 
         vertices.push_back(vrtxId);
     }
 
     // Add initial triangles
 
+    // Create 20 root triangles by forming 5 groups. each group is 4 triangles
+    std::vector<SkTriId> triangles;
+    triangles.reserve(sc_icoTriLUT.size());
+    while (triangles.size() < sc_icoTriLUT.size())
+    {
+        SkTriGroupId const groupId = skeleton.tri_group_create_root();
+
+        triangles.push_back(tri_id(groupId, 0));
+        triangles.push_back(tri_id(groupId, 1));
+        triangles.push_back(tri_id(groupId, 2));
+        triangles.push_back(tri_id(groupId, 3));
+    }
+
+    // Set positions of the 20 new triangles
     for (std::array<uint8_t, 3> const triEntry : sc_icoTriLUT)
     {
-        SkTriId const striId = skeleton.m_triIds.create();
-        skeleton.tri_resize_fit_ids();
+        SkTriId triId = triangles.back();
+        triangles.pop_back();
 
-        SkeletonTriangle &rTri = skeleton.tri_at(striId);
-        rTri.m_parent = striId; // parent it to itself :p
+        SkeletonTriangle &rTri = skeleton.tri_at(triId);
+        rTri.m_parent = triId; // parent it to itself :p
         rTri.m_vertices =
         {
             vertices[triEntry[0]], vertices[triEntry[1]], vertices[triEntry[2]]

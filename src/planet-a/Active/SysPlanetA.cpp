@@ -95,6 +95,12 @@ ActiveEnt SysPlanetA::activate(
 
     rPlanetForceField.m_Gmass = loadMePlanet.m_mass * sc_GravConst;
 
+
+    SubdivTriangleSkeleton skeleton = create_skeleton_icosahedron(loadMePlanet.m_radius);
+
+
+
+
     return planetEnt;
 }
 

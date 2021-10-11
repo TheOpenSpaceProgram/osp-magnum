@@ -28,22 +28,24 @@
 
 #include <Magnum/Mesh.h>
 
+#include <memory>
+#include <variant>
+
 namespace planeta
 {
 
-constexpr inline Magnum::MeshIndexType const gc_meshIndexType = Magnum::MeshIndexType::UnsignedInt;
-using MeshIndx_t = Magnum::UnsignedInt;
+enum class ChunkId : uint16_t {};
+enum class ShVrtxId : uint16_t {};
 
 struct Chunk
 {
     SkTriId m_tri;
-    MeshIndx_t m_start;
-    MeshIndx_t m_end;
 };
 
 struct SubdivTriangleMesh
 {
-    using Vector3Indx_t = Magnum::Math::Vector3<MeshIndx_t>;
+    using Vector3ui_t = Magnum::Math::Vector3<Magnum::UnsignedInt>;
+    using Vector3us_t = Magnum::Math::Vector3<Magnum::UnsignedShort>;
 
     // Vertex and index buffer for GPU
 
@@ -57,7 +59,7 @@ struct SubdivTriangleMesh
     //   shared between them. They are associated with a VrtxId in m_vrtxIdTree
     //
     // [chunk vertices] [chunk vertices] [chunk vertices] .... [shared vertices]
-    std::vector<osp::Vector3> m_meshVrtxBuffer;
+    std::unique_ptr<unsigned char[]> m_vrtxBuffer;
 
     // Index buffer consists of large fixed-size blocks forming a mesh patched
     // overtop of a SkeletonTriangle, known as a Chunk. Each chunk consists of
@@ -65,7 +67,8 @@ struct SubdivTriangleMesh
     // of the chunk, but the triangles along the edges are specially treated as
     // a variable (but limited) number of 'Fan triangles' that may form fan-like
     // structures to smoothly transition to other chunks of a higher detail.
-    std::vector<Vector3Indx_t> m_meshIndxBuffer;
+    std::variant< std::unique_ptr<Vector3us_t[]>,
+                  std::unique_ptr<Vector3ui_t[]> > m_indxBuffer;
 
     // When Chunked vertices, Shared vertices, or Chunks are deleted, then
     // they are simply added to a list of deleted elements in IdRegistry to
@@ -73,6 +76,8 @@ struct SubdivTriangleMesh
 
     // Empty spaces in the buffers are not a problem. For index buffers, use
     // something like glMultiDrawArrays
+
+
 };
 
 }
