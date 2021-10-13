@@ -22,36 +22,38 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#pragma once
 
 #include "SubdivSkeleton.h"
 
-#include <stdexcept>
+#include <osp/types.h>
 
-using namespace planeta;
+#include <vector>
 
-SkTriGroupId SubdivTriangleSkeleton::tri_subdiv(SkTriId triId,
-                                                std::array<SkVrtxId, 3> vrtxMid)
+namespace planeta
 {
-    SkeletonTriangle& rTri = tri_at(triId);
 
-    if ( ! rTri.m_children.has_value())
-    {
-        throw std::runtime_error("SkeletonTriangle is already subdivided");
-    }
+// Fundamental geometric properties of an icosahedron
+inline constexpr int gc_icoVrtxCount = 12;
+inline constexpr int gc_icoTriCount = 20;
 
-    SkTriGroup const parentGroup = m_triData[size_t(tri_group_id(triId))];
+// The 20 faces of the icosahedron {Top, Left, Right}
+// Each number refers to one of 12 initial vertices
+inline constexpr std::array<std::array<uint8_t, 3>, 20> sc_icoTriLUT
+{{
+    { 0,  2,  1},  { 0,  3,  2},  { 0,  4,  3},  { 0,  5,  4},  { 0,  1,  5},
+    { 8,  1,  2},  { 2,  7,  8},  { 7,  2,  3},  { 3,  6,  7},  { 6,  3,  4},
+    { 4,  10, 6},  {10,  4,  5},  { 5,  9, 10},  { 9,  5,  1},  { 1,  8,  9},
+    {11,  7,  6},  {11,  8,  7},  {11,  9,  8},  {11, 10,  9},  {11,  6, 10}
+}};
 
 
-    //std::array<std::array<SkVrtxId, 3>, 4>
-    SkTriGroupId const groupId = tri_group_create(parentGroup.m_depth, triId,
-    {{
-        {},
-        {},
-        {},
-        {}
-    }});
+SubdivTriangleSkeleton create_skeleton_icosahedron(
+        float rad,
+        Corrade::Containers::StaticArrayView<gc_icoVrtxCount, SkVrtxId> vrtxIds,
+        Corrade::Containers::StaticArrayView<gc_icoTriCount, SkTriId> triIds,
+        std::vector<osp::Vector3> &rPositions,
+        std::vector<osp::Vector3> &rNormals);
 
-    rTri.m_children = groupId;
 
-    return groupId;
 }

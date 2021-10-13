@@ -24,8 +24,6 @@
  */
 #pragma once
 
-#include <osp/types.h>
-
 #include <Corrade/Containers/ArrayViewStl.h>
 
 #include <cstdint>
@@ -53,12 +51,21 @@ public:
      */
     id_int_t size_required() const noexcept { return m_exists.size(); }
 
+    size_t capacity() const { return m_exists.capacity(); }
+
+    void reserve(size_t n) { m_exists.reserve(n); }
+
+    void reserve_more(size_t n)
+    {
+        reserve(n + m_exists.size() - m_deleted.size());
+    }
+
     void remove(ID_T id);
 
     bool exists(ID_T id) const noexcept;
 
 private:
-    std::vector<bool> m_exists; // this guy is weird
+    std::vector<bool> m_exists; // this guy is weird, be careful
     std::vector<id_int_t> m_deleted;
 
 }; // class IdRegistry
@@ -101,7 +108,6 @@ public:
 
     using IdRegistry<ID_T>::size_required;
 
-
     ID_T create_root()
     {
         ID_T const id = IdRegistry<ID_T>::create();
@@ -141,6 +147,22 @@ public:
 
     std::pair<ID_T, ID_T> get_parents(ID_T a);
 
+    size_t capacity() const { return capacity(); }
+
+    void reserve(size_t n)
+    {
+        IdRegistry<ID_T>::reserve(n);
+        m_idToParents.reserve(IdRegistry<ID_T>::capacity());
+        m_idChildCount.reserve(IdRegistry<ID_T>::capacity());
+    }
+
+    void reserve_more(size_t n)
+    {
+        IdRegistry<ID_T>::reserve_more(n);
+        m_idToParents.reserve(IdRegistry<ID_T>::capacity());
+        m_idChildCount.reserve(IdRegistry<ID_T>::capacity());
+    }
+
     static constexpr combination_t
     hash_id_combination(id_int_t a, id_int_t b) noexcept
     {
@@ -177,7 +199,6 @@ struct SkeletonTriangle
 {
     std::array<SkVrtxId, 3> m_vertices;
 
-    SkTriId m_parent;
     std::optional<SkTriGroupId> m_children;
 
     uint8_t m_refCount{0};
@@ -185,8 +206,14 @@ struct SkeletonTriangle
 }; // struct SkeletonTriangle
 
 // Skeleton triangles are added and removed in groups of 4
-// 0:Top 1:Left 2:Right 3:Center
-using SkeletonTriangleGroup_t = std::array<SkeletonTriangle, 4>;
+struct SkTriGroup
+{
+    // 0:Top 1:Left 2:Right 3:Center
+    std::array<SkeletonTriangle, 4> m_triangles;
+
+    SkTriId m_parent;
+    uint8_t m_depth;
+};
 
 /**
  * @return Group ID of a SkeletonTriangle's group specified by Id
@@ -229,7 +256,7 @@ public:
     SkVrtxId vrtx_create_root()
     {
         SkVrtxId const vrtxId = m_vrtxIdTree.create_root();
-        vrtx_resize_fit_ids();
+        m_vrtxRefCount.resize(m_vrtxIdTree.size_required());
         m_vrtxRefCount[size_t(vrtxId)] = 0;
         return vrtxId;
     };
@@ -239,68 +266,99 @@ public:
         auto const [vrtxId, created] = m_vrtxIdTree.create_or_get(a, b);
         if (created)
         {
-            vrtx_resize_fit_ids();
+            m_vrtxRefCount.resize(m_vrtxIdTree.size_required());
             m_vrtxRefCount[size_t(vrtxId)] = 0;
         }
         return vrtxId;
     }
 
-    void vrtx_resize_fit_ids()
+    std::array<SkVrtxId, 3> vrtx_create_middles(
+            std::array<SkVrtxId, 3> const& vertices)
     {
-        m_vrtxRefCount.resize(m_vrtxIdTree.size_required());
-        m_vrtxPositions.resize(m_vrtxIdTree.size_required());
-        m_vrtxNormals.resize(m_vrtxIdTree.size_required());
+        return {
+            vrtx_create_or_get_child(vertices[0], vertices[1]),
+            vrtx_create_or_get_child(vertices[1], vertices[2]),
+            vrtx_create_or_get_child(vertices[2], vertices[0])
+        };
+    }
+
+    SubdivIdTree<SkVrtxId> vrtx_ids() const noexcept { return m_vrtxIdTree; }
+
+    void vrtx_reserve(size_t n)
+    {
+        m_vrtxIdTree.reserve(n);
+        m_vrtxRefCount.reserve(m_vrtxIdTree.capacity());
+    }
+
+    void vrtx_reserve_more(size_t n)
+    {
+        m_vrtxIdTree.reserve_more(n);
+        m_vrtxRefCount.reserve(m_vrtxIdTree.capacity());
     }
 
     ArrayView_t<uint8_t> vrtx_get_refcounts() { return m_vrtxRefCount; };
-    ArrayView_t<osp::Vector3> vrtx_get_positions() { return m_vrtxPositions; };
-    ArrayView_t<osp::Vector3> vrtx_get_normals() { return m_vrtxNormals; };
 
     void tri_group_resize_fit_ids()
     {
         m_triData.resize(m_triIds.size_required());
     }
 
-    SkTriGroupId tri_group_create_root()
+    SkTriGroupId tri_group_create(
+            uint8_t depth,
+            SkTriId parent,
+            std::array<std::array<SkVrtxId, 3>, 4> vertices)
     {
-        SkTriGroupId const id = m_triIds.create();
+        SkTriGroupId const groupId = m_triIds.create();
         tri_group_resize_fit_ids();
-        m_triData[size_t(id)] = {};
-        return id;
+
+        SkTriGroup &rGroup = m_triData[size_t(groupId)];
+        rGroup.m_parent = parent;
+        rGroup.m_depth = depth;
+
+        for (int i = 0; i < 4; i ++)
+        {
+            SkeletonTriangle &rTri = rGroup.m_triangles[i];
+            rTri.m_children.reset();
+            rTri.m_refCount = 0;
+            rTri.m_vertices = vertices[i];
+        }
+        return groupId;
     }
 
-    SkeletonTriangle& tri_at(SkTriId id)
+    SkeletonTriangle& tri_at(SkTriId triId)
     {
-        auto groupIndex = size_t(tri_group_id(id));
-        uint8_t siblingIndex = tri_sibling_index(id);
-        return m_triData.at(groupIndex)[siblingIndex];
+        auto groupIndex = size_t(tri_group_id(triId));
+        uint8_t siblingIndex = tri_sibling_index(triId);
+        return m_triData.at(groupIndex).m_triangles[siblingIndex];
+    }
+
+    SkTriGroupId tri_subdiv(SkTriId triId, std::array<SkVrtxId, 3> vrtxMid);
+
+    void tri_group_reserve(size_t n)
+    {
+        m_triIds.reserve(n);
+        m_triData.reserve(m_triIds.capacity());
+    }
+
+    void tri_group_reserve_more(size_t n)
+    {
+        m_triIds.reserve(n);
+        m_triData.reserve(m_triIds.capacity());
     }
 
 private:
     IdRegistry<SkTriGroupId> m_triIds;
 
     // access using SkTriGroupId from m_triIds
-    std::vector<SkeletonTriangleGroup_t> m_triData;
+    std::vector<SkTriGroup> m_triData;
 
     SubdivIdTree<SkVrtxId> m_vrtxIdTree;
 
     // access using VrtxIds from m_vrtxTree
     std::vector<uint8_t> m_vrtxRefCount;
-    std::vector<osp::Vector3> m_vrtxPositions;
-    std::vector<osp::Vector3> m_vrtxNormals;
 
     std::vector<SkVrtxId> m_maybeDelete;
 
 }; // class SubdivTriangleSkeleton
-
-//
-
-struct SkTriToSubdivide
-{
-
-};
-
-
-SubdivTriangleSkeleton create_skeleton_icosahedron(float radius);
 
 }

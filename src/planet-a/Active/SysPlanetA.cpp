@@ -25,6 +25,8 @@
 #include "../Satellites/SatPlanet.h"
 #include "SysPlanetA.h"
 
+#include "../icosahedron.h"
+
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysPhysics.h>
@@ -96,9 +98,14 @@ ActiveEnt SysPlanetA::activate(
     rPlanetForceField.m_Gmass = loadMePlanet.m_mass * sc_GravConst;
 
 
-    SubdivTriangleSkeleton skeleton = create_skeleton_icosahedron(loadMePlanet.m_radius);
+    std::array<planeta::SkVrtxId, 12> icoVrtx;
+    std::array<planeta::SkTriId, 20> icoTri;
+    std::vector<Vector3> positions;
+    std::vector<Vector3> normals;
+    SubdivTriangleSkeleton skeleton = create_skeleton_icosahedron(loadMePlanet.m_radius, icoVrtx, icoTri, positions, normals);
 
-
+    SkeletonTriangle const &tri = skeleton.tri_at(SkTriId(0));
+    skeleton.vrtx_create_or_get_child(tri.m_vertices[0], tri.m_vertices[1]);
 
 
     return planetEnt;
