@@ -35,20 +35,23 @@ ChunkedTriangleMesh planeta::make_subdivtrimesh_general(
 {
     // calculate stuff here
 
+    using std::sqrt;
+    using std::ceil;
+    using std::pow;
+
+    float const C = chunkMax;
+    float const L = subdivLevels;
+
+    // Calculate a fair number of shared vertices, based on a triangular
+    // tiling pattern.
+    // worked out here: https://www.desmos.com/calculator/ffd8lraosl
+    unsigned int const sharedMax
+            = ceil( ( 3.0f*C + sqrt(6.0f)*sqrt(C) ) * pow(2.0f, L-1) - C + 1 );
+
+    unsigned int const fanMax
+            = ChunkedTriangleMesh::smc_minFansVsLevel[subdivLevels] * 2;
+
     // i don't know if this is horrible of acceptable
-    return ChunkedTriangleMesh{
-        chunkMax,
-        {},
-        std::make_unique<Chunk[]>(chunkMax),
-        std::make_unique<SharedVrtxId[]>(420),
-        {},
-        std::make_unique<SharedVertex[]>(69),
-        std::make_unique<unsigned char[]>(69),
-        69,
-        69,
-        69,
-        std::make_unique<ChunkedTriangleMesh::Vector3ui_t[]>(69),
-        69,
-        420
-    };
+    return ChunkedTriangleMesh(chunkMax, subdivLevels, sharedMax, vrtxSize,
+                               fanMax);
 }

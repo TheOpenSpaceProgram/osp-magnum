@@ -111,8 +111,42 @@ ActiveEnt SysPlanetA::activate(
 
     skeleton.tri_subdiv(icoTri[0], middles);
 
+    //size of chunkEdge arrays must be (2^subdivLevel - 2) / 2
+
+    for (planeta::SkTriId tri : icoTri)
+    {
+        auto fish = skeleton.tri_at(tri);
+
+        std::array<SkVrtxId, 31> chunkEdgeA;
+        std::array<SkVrtxId, 31> chunkEdgeB;
+        std::array<SkVrtxId, 31> chunkEdgeC;
+        skeleton.vrtx_create_chunk_edge_recurse(4, fish.m_vertices[0], fish.m_vertices[1], chunkEdgeA);
+        skeleton.vrtx_create_chunk_edge_recurse(4, fish.m_vertices[1], fish.m_vertices[2], chunkEdgeB);
+        skeleton.vrtx_create_chunk_edge_recurse(4, fish.m_vertices[2], fish.m_vertices[0], chunkEdgeC);
+
+        positions.resize(skeleton.vrtx_ids().size_required());
+        normals.resize(skeleton.vrtx_ids().size_required());
+
+        ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, fish.m_vertices[0], fish.m_vertices[1], chunkEdgeA, positions, normals);
+        ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, fish.m_vertices[1], fish.m_vertices[2], chunkEdgeB, positions, normals);
+        ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, fish.m_vertices[2], fish.m_vertices[0], chunkEdgeC, positions, normals);
+
+    }
+
+    std::array<SkVrtxId, 31> chunkEdgeA;
+    std::array<SkVrtxId, 31> chunkEdgeB;
+    std::array<SkVrtxId, 31> chunkEdgeC;
+    skeleton.vrtx_create_chunk_edge_recurse(4, middles[0], middles[1], chunkEdgeA);
+    skeleton.vrtx_create_chunk_edge_recurse(4, middles[1], middles[2], chunkEdgeB);
+    skeleton.vrtx_create_chunk_edge_recurse(4, middles[2], middles[0], chunkEdgeC);
+
     positions.resize(skeleton.vrtx_ids().size_required());
     normals.resize(skeleton.vrtx_ids().size_required());
+
+    ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, middles[0], middles[1], chunkEdgeA, positions, normals);
+    ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, middles[1], middles[2], chunkEdgeB, positions, normals);
+    ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, middles[2], middles[0], chunkEdgeC, positions, normals);
+
 
     ico_calc_middles(loadMePlanet.m_radius, tri.m_vertices, middles, positions, normals);
 
@@ -121,6 +155,10 @@ ActiveEnt SysPlanetA::activate(
     {
         std::cout << "v " << v.x() << " " << v.y() << " " << v.z() << "\n";
     }
+
+    std::cout << "stop\n\n\n";
+
+    ChunkedTriangleMesh a = make_subdivtrimesh_general(10, 4, 6);
 
     return planetEnt;
 }

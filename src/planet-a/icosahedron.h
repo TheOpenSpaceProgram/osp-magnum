@@ -62,5 +62,12 @@ void ico_calc_middles(
         std::vector<osp::Vector3> &rPositions,
         std::vector<osp::Vector3> &rNormals);
 
+void ico_calc_chunk_edge_recurse(
+        float radius, unsigned int level,
+        SkVrtxId a, SkVrtxId b,
+        ArrayView_t<SkVrtxId> vrtxs,
+        std::vector<osp::Vector3> &rPositions,
+        std::vector<osp::Vector3> &rNormals);
+
 
 }

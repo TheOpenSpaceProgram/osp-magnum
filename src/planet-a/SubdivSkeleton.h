@@ -36,6 +36,9 @@
 namespace planeta
 {
 
+template<typename T>
+using ArrayView_t = Corrade::Containers::ArrayView<T>;
+
 /**
  * @brief Generates reusable sequential IDs
  */
@@ -45,6 +48,10 @@ class IdRegistry
     using id_int_t = std::underlying_type_t<ID_T>;
 
 public:
+
+    IdRegistry() = default;
+    IdRegistry(size_t capacity) { m_exists.reserve(capacity); };
+
     ID_T create();
 
     /**
@@ -209,8 +216,6 @@ enum class SkVrtxId : uint32_t {};
  */
 class SubdivSkeleton
 {
-    template<typename T>
-    using ArrayView_t = Corrade::Containers::ArrayView<T>;
 
 public:
 
@@ -351,6 +356,23 @@ public:
             vrtx_create_or_get_child(vertices[1], vertices[2]),
             vrtx_create_or_get_child(vertices[2], vertices[0])
         };
+    }
+
+    void vrtx_create_chunk_edge_recurse(
+            unsigned int level,
+            SkVrtxId a, SkVrtxId b,
+            ArrayView_t<SkVrtxId> rOut)
+    {
+        if (level == 0)
+        {
+            return;
+        }
+
+        SkVrtxId const mid = vrtx_create_or_get_child(a, b);
+        size_t const halfSize = rOut.size() / 2;
+        rOut[halfSize] = mid;
+        vrtx_create_chunk_edge_recurse(level - 1, a, mid, rOut.prefix(halfSize));
+        vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.suffix(halfSize));
     }
 
     void tri_group_resize_fit_ids()

@@ -184,7 +184,7 @@ void planeta::ico_calc_middles(
         std::vector<osp::Vector3> &rNormals)
 {
     auto pos = [&rPositions] (SkVrtxId id) -> osp::Vector3& { return rPositions[size_t(id)]; };
-    auto nrm = [&rPositions] (SkVrtxId id) -> osp::Vector3& { return rPositions[size_t(id)]; };
+    auto nrm = [&rNormals] (SkVrtxId id) -> osp::Vector3& { return rNormals[size_t(id)]; };
 
     subdiv_curvature(radius, pos(vrtxCorner[0]), pos(vrtxCorner[1]),
                      pos(vrtxMid[0]), nrm(vrtxMid[0]));
@@ -195,3 +195,33 @@ void planeta::ico_calc_middles(
     subdiv_curvature(radius, pos(vrtxCorner[2]), pos(vrtxCorner[0]),
                      pos(vrtxMid[2]), nrm(vrtxMid[2]));
 }
+
+
+void planeta::ico_calc_chunk_edge_recurse(
+        float radius, unsigned int level,
+        SkVrtxId a, SkVrtxId b,
+        ArrayView_t<SkVrtxId> vrtxs,
+        std::vector<osp::Vector3> &rPositions,
+        std::vector<osp::Vector3> &rNormals)
+{
+    auto pos = [&rPositions] (SkVrtxId id) -> osp::Vector3& { return rPositions[size_t(id)]; };
+    auto nrm = [&rNormals] (SkVrtxId id) -> osp::Vector3& { return rNormals[size_t(id)]; };
+
+    if (level == 0)
+    {
+        return;
+    }
+
+    size_t const halfSize = vrtxs.size() / 2;
+    SkVrtxId const mid = vrtxs[halfSize];
+
+    subdiv_curvature(radius, pos(a), pos(b),
+                     pos(mid), nrm(mid));
+
+    ico_calc_chunk_edge_recurse(radius, level - 1, a, mid,
+                                vrtxs.prefix(halfSize), rPositions, rNormals);
+    ico_calc_chunk_edge_recurse(radius, level - 1, mid, b,
+                                vrtxs.suffix(halfSize), rPositions, rNormals);
+
+}
+
