@@ -29,7 +29,7 @@
 using namespace planeta;
 
 SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
-        float rad,
+        float radius,
         Corrade::Containers::StaticArrayView<gc_icoVrtxCount, SkVrtxId> vrtxIds,
         Corrade::Containers::StaticArrayView<gc_icoTriCount, SkTriId> triIds,
         std::vector<osp::Vector3> &rPositions,
@@ -74,16 +74,16 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
 
     using std::sqrt; // if only sqrt was constexpr
 
-    float const pnt = rad * ( 2.0f/5.0f * sqrt(5.0f) );
-    float const hei = rad * ( 1.0f / sqrt(5.0f) );
-    float const cxA = rad * ( 1.0f/2.0f - sqrt(5.0f)/10.0f );
-    float const cxB = rad * ( 1.0f/2.0f + sqrt(5)/10.0f );
-    float const syA = rad * ( 1.0f/10.0f * sqrt( 10.0f*(5.0f + sqrt(5.0f)) ) );
-    float const syB = rad * ( 1.0f/10.0f * sqrt( 10.0f*(5.0f - sqrt(5.0f)) ) );
+    float const pnt = 2.0f/5.0f * sqrt(5.0f);
+    float const hei = 1.0f/sqrt(5.0f);
+    float const cxA = 1.0f/2.0f - sqrt(5.0f)/10.0f;
+    float const cxB = 1.0f/2.0f + sqrt(5)/10.0f;
+    float const syA = 1.0f/10.0f * sqrt( 10.0f * (5.0f+sqrt(5.0f)) );
+    float const syB = 1.0f/10.0f * sqrt( 10.0f * (5.0f-sqrt(5.0f)) );
 
     std::array<osp::Vector3, 12> const icosahedronVrtx
     {{
-        {0.0f,   0.0f,    rad}, // top point
+        {0.0f,   0.0f,   1.0f}, // top point
 
         { pnt,   0.0f,    hei}, // 1 top pentagon
         { cxA,   -syA,    hei}, // 2
@@ -97,7 +97,7 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
         { cxB,    syB,   -hei}, // 9
         {-cxA,    syA,   -hei}, // 10
 
-        {0.0f,   0.0f,   -rad}  // 11 bottom point
+        {0.0f,   0.0f,  -1.0f}  // 11 bottom point
     }};
 
     // Create the skeleton
@@ -112,12 +112,14 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
     }
 
     rPositions.resize(skeleton.vrtx_ids().size_required());
+    rNormals.resize(skeleton.vrtx_ids().size_required());
 
-    // Set positions of the new vertices
+    // Set positions and normals of the new vertices
 
     for (int i = 0; i < gc_icoVrtxCount; i ++)
     {
-        rPositions[i] = icosahedronVrtx[i];
+        rPositions[i] = icosahedronVrtx[i] * radius;
+        rNormals[i] = icosahedronVrtx[i];
     }
 
     // Add initial triangles
@@ -161,4 +163,35 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
     }
 
     return skeleton;
+}
+
+void subdiv_curvature(
+        float const radius, osp::Vector3 const a, osp::Vector3 const b,
+        osp::Vector3 &rPos, osp::Vector3 &rNorm) noexcept
+{
+    osp::Vector3 const c = (a + b) * 0.5f;
+    float const cLen = c.length();
+
+    rNorm = c / cLen;
+    rPos = c + rNorm * (radius - cLen);
+}
+
+void planeta::ico_calc_middles(
+        float radius,
+        std::array<SkVrtxId, 3> const vrtxCorner,
+        std::array<SkVrtxId, 3> const vrtxMid,
+        std::vector<osp::Vector3> &rPositions,
+        std::vector<osp::Vector3> &rNormals)
+{
+    auto pos = [&rPositions] (SkVrtxId id) -> osp::Vector3& { return rPositions[size_t(id)]; };
+    auto nrm = [&rPositions] (SkVrtxId id) -> osp::Vector3& { return rPositions[size_t(id)]; };
+
+    subdiv_curvature(radius, pos(vrtxCorner[0]), pos(vrtxCorner[1]),
+                     pos(vrtxMid[0]), nrm(vrtxMid[0]));
+
+    subdiv_curvature(radius, pos(vrtxCorner[1]), pos(vrtxCorner[2]),
+                     pos(vrtxMid[1]), nrm(vrtxMid[1]));
+
+    subdiv_curvature(radius, pos(vrtxCorner[2]), pos(vrtxCorner[0]),
+                     pos(vrtxMid[2]), nrm(vrtxMid[2]));
 }

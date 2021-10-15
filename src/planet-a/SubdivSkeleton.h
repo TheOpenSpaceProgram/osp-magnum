@@ -27,9 +27,10 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 
 #include <cstdint>
-#include <unordered_map>
 #include <optional>
+#include <stdexcept>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace planeta
@@ -38,7 +39,7 @@ namespace planeta
 /**
  * @brief Generates reusable sequential IDs
  */
-template<typename ID_T>
+template<typename ID_T, bool NO_AUTO_RESIZE = false>
 class IdRegistry
 {
     using id_int_t = std::underlying_type_t<ID_T>;
@@ -70,8 +71,8 @@ private:
 
 }; // class IdRegistry
 
-template<typename ID_T>
-ID_T IdRegistry<ID_T>::create()
+template<typename ID_T, bool NO_AUTO_RESIZE>
+ID_T IdRegistry<ID_T, NO_AUTO_RESIZE>::create()
 {
     // Attempt to reuse a deleted ID
     if ( ! m_deleted.empty())
@@ -80,6 +81,14 @@ ID_T IdRegistry<ID_T>::create()
         m_deleted.pop_back();
         m_exists[id] = true;
         return ID_T(id);
+    }
+
+    if constexpr (NO_AUTO_RESIZE)
+    {
+        if (m_exists.size() == m_exists.capacity())
+        {
+            throw std::runtime_error("ID over max capacity with automatic resizing disabled");
+        }
     }
 
     // Create a new Id
@@ -192,11 +201,83 @@ private:
 
 enum class SkVrtxId : uint32_t {};
 
+/**
+ * @brief Uses a SubdivIdTree to manage relationships between Vertex IDs, and
+ *        adds reference counting features.
+ *
+ * This class does NOT store vertex data like positions and normals.
+ */
+class SubdivSkeleton
+{
+    template<typename T>
+    using ArrayView_t = Corrade::Containers::ArrayView<T>;
+
+public:
+
+    SkVrtxId vrtx_create_root()
+    {
+        SkVrtxId const vrtxId = m_vrtxIdTree.create_root();
+        m_vrtxRefCount.resize(m_vrtxIdTree.size_required());
+        m_vrtxRefCount[size_t(vrtxId)] = 0;
+        return vrtxId;
+    };
+
+    SkVrtxId vrtx_create_or_get_child(SkVrtxId a, SkVrtxId b)
+    {
+        auto const [vrtxId, created] = m_vrtxIdTree.create_or_get(a, b);
+        if (created)
+        {
+            m_vrtxRefCount.resize(m_vrtxIdTree.size_required());
+            m_vrtxRefCount[size_t(vrtxId)] = 0;
+        }
+        return vrtxId;
+    }
+
+    SubdivIdTree<SkVrtxId> vrtx_ids() const noexcept { return m_vrtxIdTree; }
+
+    void vrtx_reserve(size_t n)
+    {
+        m_vrtxIdTree.reserve(n);
+        m_vrtxRefCount.reserve(m_vrtxIdTree.capacity());
+    }
+
+    void vrtx_reserve_more(size_t n)
+    {
+        m_vrtxIdTree.reserve_more(n);
+        m_vrtxRefCount.reserve(m_vrtxIdTree.capacity());
+    }
+
+    void vrtx_refcount_add(SkVrtxId id) noexcept { m_vrtxRefCount[size_t(id)] ++; };
+    void vrtx_refcount_remove(SkVrtxId id) { m_vrtxRefCount[size_t(id)] --; };
+
+    ArrayView_t<uint8_t> vrtx_get_refcounts() { return m_vrtxRefCount; };
+
+private:
+
+    SubdivIdTree<SkVrtxId> m_vrtxIdTree;
+
+    // access using VrtxIds from m_vrtxTree
+    std::vector<uint8_t> m_vrtxRefCount;
+
+    std::vector<SkVrtxId> m_maybeDelete;
+
+}; // class SubdivSkeleton
+
+//-----------------------------------------------------------------------------
+
 enum class SkTriId : uint32_t {};
 enum class SkTriGroupId : uint32_t {};
 
 struct SkeletonTriangle
 {
+    // Vertices are ordered counter-clockwise, starting from top:
+    // 0: Top   1: Left   2: Right
+    //       0
+    //      / \
+    //     /   \
+    //    /     \
+    //   1 _____ 2
+    //
     std::array<SkVrtxId, 3> m_vertices;
 
     std::optional<SkTriGroupId> m_children;
@@ -208,7 +289,20 @@ struct SkeletonTriangle
 // Skeleton triangles are added and removed in groups of 4
 struct SkTriGroup
 {
-    // 0:Top 1:Left 2:Right 3:Center
+    // Subdivided triangles are arranged in m_triangles as followed:
+    // 0: Top   1: Left   2: Right   3: Center
+    //
+    //        /\
+    //       /  \
+    //      / t0 \
+    //     /______\
+    //    /\      /\
+    //   /  \ t3 /  \
+    //  / t1 \  / t2 \
+    // /______\/______\
+    //
+    // Center is upside-down, it's 'top' vertex is the bottom-middle one
+    // This arrangement may not apply for root triangles.
     std::array<SkeletonTriangle, 4> m_triangles;
 
     SkTriId m_parent;
@@ -239,38 +333,15 @@ constexpr SkTriId tri_id(SkTriGroupId id, uint8_t siblingIndex) noexcept
     return SkTriId(uint32_t(id) * 4 + siblingIndex);
 }
 
-//constexpr std::array<SkTriId, 4> tri_ids(SkTriGroupId id)
-//{
-//    return {tri_id(id, 0), tri_id(id, 1), tri_id(id, 2), tri_id(id, 3)};
-//}
-
-//-----------------------------------------------------------------------------
-
-class SubdivTriangleSkeleton
+/**
+ * @brief A subdividable mesh with reference counted triangles and vertices;
+ *        A SubdivSkeleton that also features triangles.
+ *
+ * This class does NOT store vertex data like positions and normals.
+ */
+class SubdivTriangleSkeleton : public SubdivSkeleton
 {
-    template<typename T>
-    using ArrayView_t = Corrade::Containers::ArrayView<T>;
-
 public:
-
-    SkVrtxId vrtx_create_root()
-    {
-        SkVrtxId const vrtxId = m_vrtxIdTree.create_root();
-        m_vrtxRefCount.resize(m_vrtxIdTree.size_required());
-        m_vrtxRefCount[size_t(vrtxId)] = 0;
-        return vrtxId;
-    };
-
-    SkVrtxId vrtx_create_or_get_child(SkVrtxId a, SkVrtxId b)
-    {
-        auto const [vrtxId, created] = m_vrtxIdTree.create_or_get(a, b);
-        if (created)
-        {
-            m_vrtxRefCount.resize(m_vrtxIdTree.size_required());
-            m_vrtxRefCount[size_t(vrtxId)] = 0;
-        }
-        return vrtxId;
-    }
 
     std::array<SkVrtxId, 3> vrtx_create_middles(
             std::array<SkVrtxId, 3> const& vertices)
@@ -281,22 +352,6 @@ public:
             vrtx_create_or_get_child(vertices[2], vertices[0])
         };
     }
-
-    SubdivIdTree<SkVrtxId> vrtx_ids() const noexcept { return m_vrtxIdTree; }
-
-    void vrtx_reserve(size_t n)
-    {
-        m_vrtxIdTree.reserve(n);
-        m_vrtxRefCount.reserve(m_vrtxIdTree.capacity());
-    }
-
-    void vrtx_reserve_more(size_t n)
-    {
-        m_vrtxIdTree.reserve_more(n);
-        m_vrtxRefCount.reserve(m_vrtxIdTree.capacity());
-    }
-
-    ArrayView_t<uint8_t> vrtx_get_refcounts() { return m_vrtxRefCount; };
 
     void tri_group_resize_fit_ids()
     {
@@ -318,9 +373,14 @@ public:
         for (int i = 0; i < 4; i ++)
         {
             SkeletonTriangle &rTri = rGroup.m_triangles[i];
-            rTri.m_children.reset();
+            rTri.m_children = std::nullopt;
             rTri.m_refCount = 0;
             rTri.m_vertices = vertices[i];
+
+            for (SkVrtxId vrtxId : vertices[i])
+            {
+                vrtx_refcount_add(vrtxId);
+            }
         }
         return groupId;
     }
@@ -347,18 +407,14 @@ public:
     }
 
 private:
+
     IdRegistry<SkTriGroupId> m_triIds;
 
     // access using SkTriGroupId from m_triIds
     std::vector<SkTriGroup> m_triData;
 
-    SubdivIdTree<SkVrtxId> m_vrtxIdTree;
-
-    // access using VrtxIds from m_vrtxTree
-    std::vector<uint8_t> m_vrtxRefCount;
-
-    std::vector<SkVrtxId> m_maybeDelete;
-
 }; // class SubdivTriangleSkeleton
+
+
 
 }

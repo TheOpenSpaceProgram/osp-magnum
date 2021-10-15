@@ -39,6 +39,7 @@
 #include <Magnum/Math/Color.h>
 #include <Magnum/GL/Renderer.h>
 
+#include <iostream>
 
 using planeta::active::SysPlanetA;
 using planeta::universe::UCompPlanet;
@@ -104,9 +105,22 @@ ActiveEnt SysPlanetA::activate(
     std::vector<Vector3> normals;
     SubdivTriangleSkeleton skeleton = create_skeleton_icosahedron(loadMePlanet.m_radius, icoVrtx, icoTri, positions, normals);
 
-    SkeletonTriangle const &tri = skeleton.tri_at(SkTriId(0));
-    skeleton.vrtx_create_or_get_child(tri.m_vertices[0], tri.m_vertices[1]);
+    SkeletonTriangle const &tri = skeleton.tri_at(icoTri[0]);
 
+    std::array<SkVrtxId, 3> const middles = skeleton.vrtx_create_middles(tri.m_vertices);
+
+    skeleton.tri_subdiv(icoTri[0], middles);
+
+    positions.resize(skeleton.vrtx_ids().size_required());
+    normals.resize(skeleton.vrtx_ids().size_required());
+
+    ico_calc_middles(loadMePlanet.m_radius, tri.m_vertices, middles, positions, normals);
+
+    // output can be pasted into an obj file for viewing
+    for (osp::Vector3 v : positions)
+    {
+        std::cout << "v " << v.x() << " " << v.y() << " " << v.z() << "\n";
+    }
 
     return planetEnt;
 }

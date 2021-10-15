@@ -55,5 +55,12 @@ SubdivTriangleSkeleton create_skeleton_icosahedron(
         std::vector<osp::Vector3> &rPositions,
         std::vector<osp::Vector3> &rNormals);
 
+void ico_calc_middles(
+        float radius,
+        std::array<SkVrtxId, 3> const vrtxCorners,
+        std::array<SkVrtxId, 3> const vrtxMid,
+        std::vector<osp::Vector3> &rPositions,
+        std::vector<osp::Vector3> &rNormals);
+
 
 }

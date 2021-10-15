@@ -25,3 +25,30 @@
 
 #include "SubdivTriangleMesh.h"
 
+#include <Magnum/Math/Vector3.h>
+
+using namespace planeta;
+
+ChunkedTriangleMesh planeta::make_subdivtrimesh_general(
+        unsigned int chunkMax, unsigned int subdivLevels,
+        unsigned int vrtxSize)
+{
+    // calculate stuff here
+
+    // i don't know if this is horrible of acceptable
+    return ChunkedTriangleMesh{
+        chunkMax,
+        {},
+        std::make_unique<Chunk[]>(chunkMax),
+        std::make_unique<SharedVrtxId[]>(420),
+        {},
+        std::make_unique<SharedVertex[]>(69),
+        std::make_unique<unsigned char[]>(69),
+        69,
+        69,
+        69,
+        std::make_unique<ChunkedTriangleMesh::Vector3ui_t[]>(69),
+        69,
+        420
+    };
+}

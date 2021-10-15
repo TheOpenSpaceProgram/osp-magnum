@@ -25,30 +25,46 @@
 
 #include "SubdivSkeleton.h"
 
-#include <stdexcept>
-
 using namespace planeta;
 
 SkTriGroupId SubdivTriangleSkeleton::tri_subdiv(SkTriId triId,
                                                 std::array<SkVrtxId, 3> vrtxMid)
 {
-    SkeletonTriangle& rTri = tri_at(triId);
+    SkeletonTriangle &rTri = tri_at(triId);
 
-    if ( ! rTri.m_children.has_value())
+    if (rTri.m_children.has_value())
     {
         throw std::runtime_error("SkeletonTriangle is already subdivided");
     }
 
     SkTriGroup const parentGroup = m_triData[size_t(tri_group_id(triId))];
 
+    // non-macro shorthands
+    auto corner = [&rTri] (int i) -> SkVrtxId { return rTri.m_vertices[i]; };
+    auto middle = [&vrtxMid] (int i) -> SkVrtxId { return vrtxMid[i]; };
 
-    //std::array<std::array<SkVrtxId, 3>, 4>
-    SkTriGroupId const groupId = tri_group_create(parentGroup.m_depth, triId,
+    // c?: Corner vertex corner(?) aka: rTri.m_vertices[?]
+    // m?: Middle vertex middle(?) aka: vrtxMid[?]
+    // t?: Skeleton Triangle
+    //
+    //          c0
+    //          /\                 Vertex order reminder:
+    //         /  \                0:Top   1:Left   2:Right
+    //        / t0 \                        0
+    //    m0 /______\ m2                   / \
+    //      /\      /\                    /   \
+    //     /  \ t3 /  \                  /     \
+    //    / t1 \  / t2 \                1 _____ 2
+    //   /______\/______\
+    // c1       m1       c2
+    //
+    SkTriGroupId const groupId = tri_group_create(
+            parentGroup.m_depth + 1, triId,
     {{
-        {},
-        {},
-        {},
-        {}
+        { corner(0), middle(0), middle(2) }, // 0: Top
+        { middle(0), corner(1), middle(1) }, // 1: Left
+        { middle(2), middle(1), corner(2) }, // 2: Right
+        { middle(1), middle(2), middle(0) }  // 3: Center
     }});
 
     rTri.m_children = groupId;
