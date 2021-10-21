@@ -43,30 +43,29 @@ inline constexpr std::array<std::array<uint8_t, 3>, 20> sc_icoTriLUT
 {{
     { 0,  2,  1},  { 0,  3,  2},  { 0,  4,  3},  { 0,  5,  4},  { 0,  1,  5},
     { 8,  1,  2},  { 2,  7,  8},  { 7,  2,  3},  { 3,  6,  7},  { 6,  3,  4},
-    { 4,  10, 6},  {10,  4,  5},  { 5,  9, 10},  { 9,  5,  1},  { 1,  8,  9},
+    { 4, 10,  6},  {10,  4,  5},  { 5,  9, 10},  { 9,  5,  1},  { 1,  8,  9},
     {11,  7,  6},  {11,  8,  7},  {11,  9,  8},  {11, 10,  9},  {11,  6, 10}
 }};
 
-
 SubdivTriangleSkeleton create_skeleton_icosahedron(
-        float rad,
+        float rad, int scale,
         Corrade::Containers::StaticArrayView<gc_icoVrtxCount, SkVrtxId> vrtxIds,
         Corrade::Containers::StaticArrayView<gc_icoTriCount, SkTriId> triIds,
-        std::vector<osp::Vector3> &rPositions,
+        std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals);
 
 void ico_calc_middles(
-        float radius,
+        float radius, int scale,
         std::array<SkVrtxId, 3> const vrtxCorners,
         std::array<SkVrtxId, 3> const vrtxMid,
-        std::vector<osp::Vector3> &rPositions,
+        std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals);
 
 void ico_calc_chunk_edge_recurse(
-        float radius, unsigned int level,
+        float radius, int scale, unsigned int level,
         SkVrtxId a, SkVrtxId b,
         ArrayView_t<SkVrtxId> vrtxs,
-        std::vector<osp::Vector3> &rPositions,
+        std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals);
 
 

@@ -253,7 +253,7 @@ public:
     }
 
     void vrtx_refcount_add(SkVrtxId id) noexcept { m_vrtxRefCount[size_t(id)] ++; };
-    void vrtx_refcount_remove(SkVrtxId id) { m_vrtxRefCount[size_t(id)] --; };
+    void vrtx_refcount_remove(SkVrtxId id) noexcept { m_vrtxRefCount[size_t(id)] --; };
 
     ArrayView_t<uint8_t> vrtx_get_refcounts() { return m_vrtxRefCount; };
 
@@ -286,8 +286,6 @@ struct SkeletonTriangle
     std::array<SkVrtxId, 3> m_vertices;
 
     std::optional<SkTriGroupId> m_children;
-
-    uint8_t m_refCount{0};
 
 }; // struct SkeletonTriangle
 
@@ -378,6 +376,7 @@ public:
     void tri_group_resize_fit_ids()
     {
         m_triData.resize(m_triIds.size_required());
+        m_triRefCount.resize(m_triIds.size_required() * 4);
     }
 
     SkTriGroupId tri_group_create(
@@ -396,7 +395,6 @@ public:
         {
             SkeletonTriangle &rTri = rGroup.m_triangles[i];
             rTri.m_children = std::nullopt;
-            rTri.m_refCount = 0;
             rTri.m_vertices = vertices[i];
 
             for (SkVrtxId vrtxId : vertices[i])
@@ -420,13 +418,18 @@ public:
     {
         m_triIds.reserve(n);
         m_triData.reserve(m_triIds.capacity());
+        m_triRefCount.reserve(m_triIds.capacity() * 4);
     }
 
     void tri_group_reserve_more(size_t n)
     {
         m_triIds.reserve(n);
         m_triData.reserve(m_triIds.capacity());
+        m_triRefCount.reserve(m_triIds.capacity() * 4);
     }
+
+    void tri_refcount_add(SkTriId id) noexcept { m_triRefCount[size_t(id)] ++; };
+    void tri_refcount_remove(SkTriId id) noexcept { m_triRefCount[size_t(id)] --; };
 
 private:
 
@@ -434,6 +437,7 @@ private:
 
     // access using SkTriGroupId from m_triIds
     std::vector<SkTriGroup> m_triData;
+    std::vector<uint8_t> m_triRefCount;
 
 }; // class SubdivTriangleSkeleton
 

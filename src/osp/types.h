@@ -47,9 +47,13 @@ using Matrix4    = Magnum::Math::Matrix4<Magnum::Float>;
 
 using Vector2i   = Magnum::Math::Vector2<Magnum::Int>;
 
+using Vector3l   = Magnum::Math::Vector3<Magnum::Long>;
+
 using Vector2    = Magnum::Math::Vector2<Magnum::Float>;
 using Vector3    = Magnum::Math::Vector3<Magnum::Float>;
 using Vector4    = Magnum::Math::Vector4<Magnum::Float>;
+
+using Vector3d   = Magnum::Math::Vector3<Magnum::Double>;
 
 using Quaternion = Magnum::Math::Quaternion<Magnum::Float>;
 

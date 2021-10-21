@@ -61,7 +61,17 @@ using osp::Matrix4;
 using osp::Vector2;
 using osp::Vector3;
 
+using osp::Vector3d;
+
+using osp::Vector3l;
+
 using osp::universe::Satellite;
+
+struct PlanetVertex
+{
+    osp::Vector3 m_position;
+    osp::Vector3 m_normal;
+};
 
 ActiveEnt SysPlanetA::activate(
             ActiveScene &rScene, Universe &rUni,
@@ -99,66 +109,148 @@ ActiveEnt SysPlanetA::activate(
     rPlanetForceField.m_Gmass = loadMePlanet.m_mass * sc_GravConst;
 
 
+
     std::array<planeta::SkVrtxId, 12> icoVrtx;
     std::array<planeta::SkTriId, 20> icoTri;
-    std::vector<Vector3> positions;
+    std::vector<Vector3l> positions;
     std::vector<Vector3> normals;
-    SubdivTriangleSkeleton skeleton = create_skeleton_icosahedron(loadMePlanet.m_radius, icoVrtx, icoTri, positions, normals);
+    int const scale = 10;
+    SubdivTriangleSkeleton skeleton = create_skeleton_icosahedron(loadMePlanet.m_radius, scale, icoVrtx, icoTri, positions, normals);
 
     SkeletonTriangle const &tri = skeleton.tri_at(icoTri[0]);
 
     std::array<SkVrtxId, 3> const middles = skeleton.vrtx_create_middles(tri.m_vertices);
 
-    skeleton.tri_subdiv(icoTri[0], middles);
+    SkTriGroupId triChildren = skeleton.tri_subdiv(icoTri[0], middles);
 
-    //size of chunkEdge arrays must be (2^subdivLevel - 2) / 2
+    constexpr int const c_level = 4;
+    constexpr int const c_edgeCount = (1u << c_level) - 1;
 
     for (planeta::SkTriId tri : icoTri)
     {
         auto fish = skeleton.tri_at(tri);
 
-        std::array<SkVrtxId, 31> chunkEdgeA;
-        std::array<SkVrtxId, 31> chunkEdgeB;
-        std::array<SkVrtxId, 31> chunkEdgeC;
-        skeleton.vrtx_create_chunk_edge_recurse(4, fish.m_vertices[0], fish.m_vertices[1], chunkEdgeA);
-        skeleton.vrtx_create_chunk_edge_recurse(4, fish.m_vertices[1], fish.m_vertices[2], chunkEdgeB);
-        skeleton.vrtx_create_chunk_edge_recurse(4, fish.m_vertices[2], fish.m_vertices[0], chunkEdgeC);
+        std::array<SkVrtxId, c_edgeCount> chunkEdgeA;
+        std::array<SkVrtxId, c_edgeCount> chunkEdgeB;
+        std::array<SkVrtxId, c_edgeCount> chunkEdgeC;
+        skeleton.vrtx_create_chunk_edge_recurse(c_level, fish.m_vertices[0], fish.m_vertices[1], chunkEdgeA);
+        skeleton.vrtx_create_chunk_edge_recurse(c_level, fish.m_vertices[1], fish.m_vertices[2], chunkEdgeB);
+        skeleton.vrtx_create_chunk_edge_recurse(c_level, fish.m_vertices[2], fish.m_vertices[0], chunkEdgeC);
 
         positions.resize(skeleton.vrtx_ids().size_required());
         normals.resize(skeleton.vrtx_ids().size_required());
 
-        ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, fish.m_vertices[0], fish.m_vertices[1], chunkEdgeA, positions, normals);
-        ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, fish.m_vertices[1], fish.m_vertices[2], chunkEdgeB, positions, normals);
-        ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, fish.m_vertices[2], fish.m_vertices[0], chunkEdgeC, positions, normals);
+        ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, scale, c_level, fish.m_vertices[0], fish.m_vertices[1], chunkEdgeA, positions, normals);
+        ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, scale, c_level, fish.m_vertices[1], fish.m_vertices[2], chunkEdgeB, positions, normals);
+        ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, scale, c_level, fish.m_vertices[2], fish.m_vertices[0], chunkEdgeC, positions, normals);
 
     }
 
-    std::array<SkVrtxId, 31> chunkEdgeA;
-    std::array<SkVrtxId, 31> chunkEdgeB;
-    std::array<SkVrtxId, 31> chunkEdgeC;
-    skeleton.vrtx_create_chunk_edge_recurse(4, middles[0], middles[1], chunkEdgeA);
-    skeleton.vrtx_create_chunk_edge_recurse(4, middles[1], middles[2], chunkEdgeB);
-    skeleton.vrtx_create_chunk_edge_recurse(4, middles[2], middles[0], chunkEdgeC);
+    std::array<SkVrtxId, c_edgeCount> chunkEdgeA;
+    std::array<SkVrtxId, c_edgeCount> chunkEdgeB;
+    std::array<SkVrtxId, c_edgeCount> chunkEdgeC;
+    skeleton.vrtx_create_chunk_edge_recurse(c_level, middles[1], middles[2], chunkEdgeA);
+    skeleton.vrtx_create_chunk_edge_recurse(c_level, middles[2], middles[0], chunkEdgeB);
+    skeleton.vrtx_create_chunk_edge_recurse(c_level, middles[0], middles[1], chunkEdgeC);
 
     positions.resize(skeleton.vrtx_ids().size_required());
     normals.resize(skeleton.vrtx_ids().size_required());
 
-    ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, middles[0], middles[1], chunkEdgeA, positions, normals);
-    ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, middles[1], middles[2], chunkEdgeB, positions, normals);
-    ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, 4, middles[2], middles[0], chunkEdgeC, positions, normals);
+    ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, scale, c_level, middles[1], middles[2], chunkEdgeA, positions, normals);
+    ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, scale, c_level, middles[2], middles[0], chunkEdgeB, positions, normals);
+    ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, scale, c_level, middles[0], middles[1], chunkEdgeC, positions, normals);
 
-
-    ico_calc_middles(loadMePlanet.m_radius, tri.m_vertices, middles, positions, normals);
+    ico_calc_middles(loadMePlanet.m_radius, scale, tri.m_vertices, middles, positions, normals);
 
     // output can be pasted into an obj file for viewing
-    for (osp::Vector3 v : positions)
+    float scalepow = std::pow(2.0f, -scale);
+//    for (Vector3l v : positions)
+//    {
+//        std::cout << "v " << (v.x() * scalepow) << " "
+//                          << (v.y() * scalepow) << " "
+//                          << (v.z() * scalepow) << "\n";
+//    }
+
+    ChunkedTriangleMesh a = make_subdivtrimesh_general(10, c_level, sizeof(PlanetVertex), scale);
+
+    ChunkVrtxSubdivLUT chunkVrtxLut(c_level);
+
+    ChunkId chunk = a.chunk_create(skeleton, tri_id(triChildren, 3), chunkEdgeA, chunkEdgeB, chunkEdgeC);
+
+    using Corrade::Containers::arrayCast;
+
+    a.shared_update( [&skeleton, &positions, &scalepow] (
+            ArrayView_t<SharedVrtxId const> newlyAdded,
+            ArrayView_t<SkVrtxId const> sharedToSkel,
+            VertexId sharedOffset,
+            ArrayView_t<unsigned char> vrtxBufferRaw)
     {
-        std::cout << "v " << v.x() << " " << v.y() << " " << v.z() << "\n";
-    }
 
-    std::cout << "stop\n\n\n";
+        ArrayView_t<PlanetVertex> const vrtxBuffer
+                = arrayCast<PlanetVertex>(vrtxBufferRaw);
 
-    ChunkedTriangleMesh a = make_subdivtrimesh_general(10, 4, 6);
+        ArrayView_t<PlanetVertex> const vrtxBufShared
+                = vrtxBuffer.suffix(size_t(sharedOffset));
+
+        for (SharedVrtxId const sharedId : newlyAdded)
+        {
+            SkVrtxId const skelId = sharedToSkel[size_t(sharedId)];
+
+            //Vector3l const translated = positions[size_t(skelId)] + translaton;
+            Vector3d const scaled
+                    = Vector3d(positions[size_t(skelId)]) * scalepow;
+
+            vrtxBufShared[size_t(sharedId)].m_position = Vector3(scaled);
+        }
+    });
+
+    a.chunk_calc_vrtx_fill(chunk, [&chunkVrtxLut] (
+            ChunkId chunkId,
+            ArrayView_t<SharedVrtxId const> chunkShared,
+            uint16_t chunkVrtxFillCount,
+            VertexId sharedOffset,
+            ArrayView_t<unsigned char> vrtxBufferRaw)
+    {
+        ArrayView_t<PlanetVertex> const vrtxBuffer
+                = arrayCast<PlanetVertex>(vrtxBufferRaw);
+
+        ArrayView_t<PlanetVertex> const vrtxBufShared
+                = vrtxBuffer.suffix(size_t(sharedOffset));
+
+        ArrayView_t<PlanetVertex> const vrtxBufChunkFill(
+            vrtxBuffer + size_t(chunkId) * chunkVrtxFillCount,
+            chunkVrtxFillCount
+        );
+
+        for (ChunkVrtxSubdivLUT::ToSubdiv const& toSubdiv : chunkVrtxLut.data())
+        {
+            PlanetVertex const &vrtxA = chunkVrtxLut.get(
+                        toSubdiv.m_vrtxA, chunkShared,
+                        vrtxBufChunkFill, vrtxBufShared);
+
+            PlanetVertex const &vrtxB = chunkVrtxLut.get(
+                        toSubdiv.m_vrtxB, chunkShared,
+                        vrtxBufChunkFill, vrtxBufShared);
+
+            PlanetVertex &vrtxC = vrtxBufChunkFill[size_t(toSubdiv.m_fillOut)];
+
+            vrtxC.m_position = (vrtxA.m_position + vrtxB.m_position) / 2.0f;
+        }
+
+
+        // debugging: print vertices in .obj format
+        for (PlanetVertex v : vrtxBuffer)
+        {
+            if (!v.m_position.isZero())
+            {
+                std::cout << "v " << (v.m_position.x()) << " "
+                                  << (v.m_position.y()) << " "
+                                  << (v.m_position.z()) << "\n";
+            }
+        }
+
+        std::cout << "stop\n\n\n";
+    });
 
     return planetEnt;
 }
