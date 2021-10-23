@@ -31,9 +31,8 @@ using namespace planeta;
 
 
 
-ChunkedTriangleMesh planeta::make_subdivtrimesh_general(
-        unsigned int chunkMax, unsigned int subdivLevels,
-        unsigned int vrtxSize, int pow2scale)
+ChunkedTriangleMeshInfo planeta::make_subdivtrimesh_general(
+        unsigned int chunkMax, unsigned int subdivLevels, int pow2scale)
 {
     // calculate stuff here
 
@@ -51,13 +50,13 @@ ChunkedTriangleMesh planeta::make_subdivtrimesh_general(
             = ceil( ( 3.0f*C + sqrt(6.0f)*sqrt(C) ) * pow(2.0f, L-1) - C + 1 );
 
     unsigned int const fanMax
-            = ChunkedTriangleMesh::smc_minFansVsLevel[subdivLevels] * 2;
+            = ChunkedTriangleMeshInfo::smc_minFansVsLevel[subdivLevels] * 2;
 
-    return ChunkedTriangleMesh(
-                chunkMax, subdivLevels, sharedMax, vrtxSize, fanMax);
+    return ChunkedTriangleMeshInfo(
+                chunkMax, subdivLevels, sharedMax, fanMax);
 }
 
-ChunkId ChunkedTriangleMesh::chunk_create(
+ChunkId ChunkedTriangleMeshInfo::chunk_create(
         SubdivTriangleSkeleton rSkel,
         SkTriId skTri,
         ArrayView_t<SkVrtxId> const edgeRte,
@@ -70,54 +69,40 @@ ChunkId ChunkedTriangleMesh::chunk_create(
     // Increment ref count of triangle
     rSkel.tri_refcount_add(skTri);
 
-    if (   edgeRte.size() != m_chunkEdgeVrtxCount - 1
-        || edgeBtm.size() != m_chunkEdgeVrtxCount - 1
-        || edgeLft.size() != m_chunkEdgeVrtxCount - 1)
+    if (   edgeRte.size() != m_chunkWidth - 1
+        || edgeBtm.size() != m_chunkWidth - 1
+        || edgeLft.size() != m_chunkWidth - 1)
     {
         throw std::runtime_error("Incorrect edge vertex count");
     }
 
     SkeletonTriangle const &tri = rSkel.tri_at(skTri);
 
-    ArrayView_t<SharedVrtxId> const sharedSpace = chunk_shared(chunkId);
+    ArrayView_t<SharedVrtxId> const sharedSpace = chunk_shared_mutable(chunkId);
 
     std::array const edges = {edgeRte, edgeBtm, edgeLft};
 
     for (int i = 0; i < 3; i ++)
     {
-        size_t const cornerOffset = m_chunkEdgeVrtxCount * i;
-        size_t const edgeOffset = m_chunkEdgeVrtxCount * i + 1;
+        size_t const cornerOffset = m_chunkWidth * i;
+        size_t const edgeOffset = m_chunkWidth * i + 1;
 
         ArrayView_t<SkVrtxId> const edge = edges[i];
         {
-            SharedVrtxId const shared = shared_get_or_create(tri.m_vertices[i]);
+            SharedVrtxId const shared = shared_get_or_create(
+                    tri.m_vertices[i], rSkel);
             sharedSpace[cornerOffset] = shared;
             shared_refcount_add(shared);
         }
-        for (unsigned int j = 0; j < m_chunkEdgeVrtxCount - 1; j ++)
+        for (unsigned int j = 0; j < m_chunkWidth - 1; j ++)
         {
-            SharedVrtxId const shared = shared_get_or_create(edge[j]);
+            SharedVrtxId const shared = shared_get_or_create(edge[j], rSkel);
             sharedSpace[edgeOffset + j] = shared;
             shared_refcount_add(shared);
         }
     }
 
     return chunkId;
-}
-
-VertexId ChunkedTriangleMesh::chunk_coord_to_mesh(
-        ChunkId chunkId, uint16_t x, uint16_t y) const noexcept
-{
-
-
-    if (auto const [localId, shared] = try_get_shared(x, y, m_chunkEdgeVrtxCount);
-        shared)
-    {
-        return shared_get_vrtx(chunk_shared(chunkId)[size_t(localId)]);
-    }
-
-    // Center, non-shared chunk vertex
-    return VertexId(m_chunkVrtxFillCount * size_t(chunkId) + xy_to_triangular(x - 1, y - 2));
 }
 
 //-----------------------------------------------------------------------------

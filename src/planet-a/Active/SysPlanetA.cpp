@@ -40,6 +40,7 @@
 #include <Magnum/GL/Renderer.h>
 
 #include <iostream>
+#include <fstream>
 
 using planeta::active::SysPlanetA;
 using planeta::universe::UCompPlanet;
@@ -72,6 +73,8 @@ struct PlanetVertex
     osp::Vector3 m_position;
     osp::Vector3 m_normal;
 };
+
+using Vector3ui = Magnum::Math::Vector3<Magnum::UnsignedInt>;
 
 ActiveEnt SysPlanetA::activate(
             ActiveScene &rScene, Universe &rUni,
@@ -123,7 +126,7 @@ ActiveEnt SysPlanetA::activate(
 
     SkTriGroupId triChildren = skeleton.tri_subdiv(icoTri[0], middles);
 
-    constexpr int const c_level = 4;
+    constexpr int const c_level = 6;
     constexpr int const c_edgeCount = (1u << c_level) - 1;
 
     for (planeta::SkTriId tri : icoTri)
@@ -171,7 +174,12 @@ ActiveEnt SysPlanetA::activate(
 //                          << (v.z() * scalepow) << "\n";
 //    }
 
-    ChunkedTriangleMesh a = make_subdivtrimesh_general(10, c_level, sizeof(PlanetVertex), scale);
+    ChunkedTriangleMeshInfo a = make_subdivtrimesh_general(10, c_level, scale);
+
+    std::vector<PlanetVertex> vrtxBuf(a.vertex_count_max());
+    auto const get_vrtx = [&vrtxBuf] (VertexId vrtxId) -> PlanetVertex& { return vrtxBuf[size_t(vrtxId)]; };
+
+    std::vector<Vector3ui> indxBuf(a.index_count_max());
 
     ChunkVrtxSubdivLUT chunkVrtxLut(c_level);
 
@@ -179,18 +187,22 @@ ActiveEnt SysPlanetA::activate(
 
     using Corrade::Containers::arrayCast;
 
-    a.shared_update( [&skeleton, &positions, &scalepow] (
+    ArrayView_t<PlanetVertex> const vrtxBufShared{
+        &vrtxBuf[a.vertex_offset_shared()],
+        a.shared_count_max()
+    };
+
+    ArrayView_t<PlanetVertex> const vrtxBufChunkFill(
+        &vrtxBuf[a.vertex_offset_fill(chunk)],
+        a.chunk_vrtx_fill_count()
+    );
+
+    // Set positions of shared vertices
+
+    a.shared_update( [&positions, &scalepow, &vrtxBufShared] (
             ArrayView_t<SharedVrtxId const> newlyAdded,
-            ArrayView_t<SkVrtxId const> sharedToSkel,
-            VertexId sharedOffset,
-            ArrayView_t<unsigned char> vrtxBufferRaw)
+            ArrayView_t<SkVrtxId const> sharedToSkel)
     {
-
-        ArrayView_t<PlanetVertex> const vrtxBuffer
-                = arrayCast<PlanetVertex>(vrtxBufferRaw);
-
-        ArrayView_t<PlanetVertex> const vrtxBufShared
-                = vrtxBuffer.suffix(size_t(sharedOffset));
 
         for (SharedVrtxId const sharedId : newlyAdded)
         {
@@ -204,53 +216,155 @@ ActiveEnt SysPlanetA::activate(
         }
     });
 
-    a.chunk_calc_vrtx_fill(chunk, [&chunkVrtxLut] (
-            ChunkId chunkId,
-            ArrayView_t<SharedVrtxId const> chunkShared,
-            uint16_t chunkVrtxFillCount,
-            VertexId sharedOffset,
-            ArrayView_t<unsigned char> vrtxBufferRaw)
+    // Set Positions of fill vertices using LUT
+
+    ArrayView_t<SharedVrtxId const> chunkShared = a.chunk_shared(chunk);
+
+    for (ChunkVrtxSubdivLUT::ToSubdiv const& toSubdiv : chunkVrtxLut.data())
     {
-        ArrayView_t<PlanetVertex> const vrtxBuffer
-                = arrayCast<PlanetVertex>(vrtxBufferRaw);
+        PlanetVertex const &vrtxA = chunkVrtxLut.get(
+                    toSubdiv.m_vrtxA, chunkShared,
+                    vrtxBufChunkFill, vrtxBufShared);
 
-        ArrayView_t<PlanetVertex> const vrtxBufShared
-                = vrtxBuffer.suffix(size_t(sharedOffset));
+        PlanetVertex const &vrtxB = chunkVrtxLut.get(
+                    toSubdiv.m_vrtxB, chunkShared,
+                    vrtxBufChunkFill, vrtxBufShared);
 
-        ArrayView_t<PlanetVertex> const vrtxBufChunkFill(
-            vrtxBuffer + size_t(chunkId) * chunkVrtxFillCount,
-            chunkVrtxFillCount
-        );
 
-        for (ChunkVrtxSubdivLUT::ToSubdiv const& toSubdiv : chunkVrtxLut.data())
+
+        PlanetVertex &rVrtxC = vrtxBufChunkFill[size_t(toSubdiv.m_fillOut)];
+        // Heightmap goes here
+
+        osp::Vector3 const avg = (vrtxA.m_position + vrtxB.m_position) / 2.0f;
+        float const avgLen = avg.length();
+        float const roundness = loadMePlanet.m_radius - avgLen;
+
+        rVrtxC.m_position =  avg + (avg / avgLen) * roundness;
+    }
+
+    // calculate faces and normals
+
+    // future optimization: LUT some of these too
+
+    using Vector2us = ChunkVrtxSubdivLUT::Vector2us;
+
+    uint32_t indexOffset = a.index_chunk_offset(chunk);
+
+    int trisAdded = 0;
+    for (unsigned int y = 0; y < a.chunk_width(); y ++)
+    {
+        for (unsigned int x = 0; x < y * 2 + 1; x ++)
         {
-            PlanetVertex const &vrtxA = chunkVrtxLut.get(
-                        toSubdiv.m_vrtxA, chunkShared,
-                        vrtxBufChunkFill, vrtxBufShared);
+            // alternate between up-pointing and down-pointing triangles
+            bool const upPointing = (x % 2 == 1);
+            auto const coords = upPointing
+                    ? std::array<Vector2us, 3>({
+                        Vector2us(x / 2 + 1, y + 1),
+                        Vector2us(x / 2 + 1, y),
+                        Vector2us(x / 2, y) })
+                    : std::array<Vector2us, 3>({
+                        Vector2us(x / 2, y),
+                        Vector2us(x / 2, y + 1),
+                        Vector2us(x / 2 + 1, y + 1) });
 
-            PlanetVertex const &vrtxB = chunkVrtxLut.get(
-                        toSubdiv.m_vrtxB, chunkShared,
-                        vrtxBufChunkFill, vrtxBufShared);
+            bool const onEdge = (x == 0) || (x == y * 2)
+                                || (!upPointing && y == a.chunk_width() - 1);
 
-            PlanetVertex &vrtxC = vrtxBufChunkFill[size_t(toSubdiv.m_fillOut)];
+            std::array<VertexId, 3> const triVrtxIds{
+                a.chunk_coord_to_vrtx(chunk, coords[0].x(), coords[0].y()),
+                a.chunk_coord_to_vrtx(chunk, coords[1].x(), coords[1].y()),
+                a.chunk_coord_to_vrtx(chunk, coords[2].x(), coords[2].y())};
 
-            vrtxC.m_position = (vrtxA.m_position + vrtxB.m_position) / 2.0f;
-        }
-
-
-        // debugging: print vertices in .obj format
-        for (PlanetVertex v : vrtxBuffer)
-        {
-            if (!v.m_position.isZero())
+            std::array<PlanetVertex*, 3> const triVrtx
             {
-                std::cout << "v " << (v.m_position.x()) << " "
-                                  << (v.m_position.y()) << " "
-                                  << (v.m_position.z()) << "\n";
-            }
-        }
+                &get_vrtx(triVrtxIds[0]),
+                &get_vrtx(triVrtxIds[1]),
+                &get_vrtx(triVrtxIds[2])
+            };
 
-        std::cout << "stop\n\n\n";
-    });
+            // Calculate face normal
+            Vector3 const u = triVrtx[1]->m_position - triVrtx[0]->m_position;
+            Vector3 const v = triVrtx[2]->m_position - triVrtx[0]->m_position;
+            Vector3 const faceNorm = Magnum::Math::cross(u, v).normalized();
+
+            for (int i = 0; i < 3; i ++)
+            {
+                Vector3 &rVrtxNorm = triVrtx[i]->m_normal;
+
+                if (a.vertex_is_shared(triVrtxIds[i]))
+                {
+                    if ( ! onEdge)
+                    {
+                        // Shared vertices can have a variable number of
+                        // connected faces
+
+                        SharedVrtxId const shared = a.vertex_to_shared(triVrtxIds[i]);
+                        uint8_t &rFaceCount = a.shared_face_count(shared);
+
+                        // Add new face normal to the average
+                        rVrtxNorm = (rVrtxNorm * rFaceCount + faceNorm) / (rFaceCount + 1);
+                        rFaceCount ++;
+
+                    }
+                    // edge triangles handled by fans, and are left empty
+                }
+                else
+                {
+                    // All fill vertices have 6 connected faces
+                    // (just look at a picture of a triangular tiling)
+
+                    // Fans with multiple triangles may be connected to a fill
+                    // vertex, but the normals are calculated as if there was
+                    // only one triangle to (potentially) improve blending
+
+                    rVrtxNorm += faceNorm / 6.0f;
+                }
+            }
+
+            if ( ! onEdge)
+            {
+                // Add to the index buffer
+
+                indxBuf[indexOffset + trisAdded]
+                        = {uint32_t(triVrtxIds[0]), uint32_t(triVrtxIds[1]), uint32_t(triVrtxIds[2])};
+                trisAdded ++;
+            }
+
+
+        }
+    }
+
+
+    // debugging: export obj file
+
+    std::ofstream objfile;
+    objfile.open("planetdebug.obj");
+
+    objfile << "o Planet\n";
+
+    for (PlanetVertex v : vrtxBuf)
+    {
+        objfile << "v " << (v.m_position.x()) << " "
+                        << (v.m_position.y()) << " "
+                        << (v.m_position.z()) << "\n";
+    }
+
+    for (PlanetVertex v : vrtxBuf)
+    {
+        objfile << "vn " << (v.m_normal.x()) << " "
+                         << (v.m_normal.y()) << " "
+                         << (v.m_normal.z()) << "\n";
+    }
+
+    for (Vector3ui i : indxBuf)
+    {
+        Vector3ui iB = i + Vector3ui(1, 1, 1); // obj indices start at 1
+        objfile << "f " << iB.x() << "//" << iB.x() << " "
+                        << iB.y() << "//" << iB.y() << " "
+                        << iB.z() << "//" << iB.z() << "\n";
+    }
+
+    objfile.close();
 
     return planetEnt;
 }
