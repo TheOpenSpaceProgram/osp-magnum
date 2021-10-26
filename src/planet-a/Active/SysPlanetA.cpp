@@ -68,13 +68,13 @@ using osp::Vector3l;
 
 using osp::universe::Satellite;
 
+#include <Magnum/Shaders/MeshVisualizerGL.h>
+
 struct PlanetVertex
 {
     osp::Vector3 m_position;
     osp::Vector3 m_normal;
 };
-
-using Vector3ui = Magnum::Math::Vector3<Magnum::UnsignedInt>;
 
 ActiveEnt SysPlanetA::activate(
             ActiveScene &rScene, Universe &rUni,
@@ -101,7 +101,7 @@ ActiveEnt SysPlanetA::activate(
     rScene.reg_emplace<ACompFloatingOrigin>(planetEnt);
     rScene.reg_emplace<ACompActivatedSat>(planetEnt, tgtSat);
 
-    auto &rPlanetPlanet = rScene.reg_emplace<ACompPlanet>(planetEnt);
+    auto &rPlanetPlanet = rScene.reg_emplace<ACompPlanetSurface>(planetEnt);
     rPlanetPlanet.m_radius = loadMePlanet.m_radius;
 
     auto &rPlanetForceField = rScene.reg_emplace<ACompFFGravity>(planetEnt);
@@ -110,8 +110,6 @@ ActiveEnt SysPlanetA::activate(
     static const float sc_GravConst = 6.67408E-11f;
 
     rPlanetForceField.m_Gmass = loadMePlanet.m_mass * sc_GravConst;
-
-
 
     std::array<planeta::SkVrtxId, 12> icoVrtx;
     std::array<planeta::SkTriId, 20> icoTri;
@@ -122,7 +120,8 @@ ActiveEnt SysPlanetA::activate(
 
     SkeletonTriangle const &tri = skeleton.tri_at(icoTri[0]);
 
-    std::array<SkVrtxId, 3> const middles = skeleton.vrtx_create_middles(tri.m_vertices);
+    std::array<SkVrtxId, 3> vertices = {tri.m_vertices[0], tri.m_vertices[1], tri.m_vertices[2]};
+    std::array<SkVrtxId, 3> const middles = skeleton.vrtx_create_middles(vertices);
 
     SkTriGroupId triChildren = skeleton.tri_subdiv(icoTri[0], middles);
 
@@ -131,7 +130,7 @@ ActiveEnt SysPlanetA::activate(
 
     for (planeta::SkTriId tri : icoTri)
     {
-        auto fish = skeleton.tri_at(tri);
+        auto &fish = skeleton.tri_at(tri);
 
         std::array<SkVrtxId, c_edgeCount> chunkEdgeA;
         std::array<SkVrtxId, c_edgeCount> chunkEdgeB;
@@ -163,16 +162,7 @@ ActiveEnt SysPlanetA::activate(
     ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, scale, c_level, middles[2], middles[0], chunkEdgeB, positions, normals);
     ico_calc_chunk_edge_recurse(loadMePlanet.m_radius, scale, c_level, middles[0], middles[1], chunkEdgeC, positions, normals);
 
-    ico_calc_middles(loadMePlanet.m_radius, scale, tri.m_vertices, middles, positions, normals);
-
-    // output can be pasted into an obj file for viewing
-    float scalepow = std::pow(2.0f, -scale);
-//    for (Vector3l v : positions)
-//    {
-//        std::cout << "v " << (v.x() * scalepow) << " "
-//                          << (v.y() * scalepow) << " "
-//                          << (v.z() * scalepow) << "\n";
-//    }
+    ico_calc_middles(loadMePlanet.m_radius, scale, vertices, middles, positions, normals);
 
     ChunkedTriangleMeshInfo a = make_subdivtrimesh_general(10, c_level, scale);
 
@@ -199,9 +189,11 @@ ActiveEnt SysPlanetA::activate(
 
     // Set positions of shared vertices
 
+    float scalepow = std::pow(2.0f, -scale);
+
     a.shared_update( [&positions, &scalepow, &vrtxBufShared] (
             ArrayView_t<SharedVrtxId const> newlyAdded,
-            ArrayView_t<SkVrtxId const> sharedToSkel)
+            ArrayView_t<IdStorage<SkVrtxId> const> sharedToSkel)
     {
 
         for (SharedVrtxId const sharedId : newlyAdded)
@@ -270,35 +262,35 @@ ActiveEnt SysPlanetA::activate(
             bool const onEdge = (x == 0) || (x == y * 2)
                                 || (!upPointing && y == a.chunk_width() - 1);
 
-            std::array<VertexId, 3> const triVrtxIds{
+            std::array<VertexId, 3> const vrtxIds{
                 a.chunk_coord_to_vrtx(chunk, coords[0].x(), coords[0].y()),
                 a.chunk_coord_to_vrtx(chunk, coords[1].x(), coords[1].y()),
                 a.chunk_coord_to_vrtx(chunk, coords[2].x(), coords[2].y())};
 
-            std::array<PlanetVertex*, 3> const triVrtx
+            std::array<PlanetVertex*, 3> const vrtxData
             {
-                &get_vrtx(triVrtxIds[0]),
-                &get_vrtx(triVrtxIds[1]),
-                &get_vrtx(triVrtxIds[2])
+                &get_vrtx(vrtxIds[0]),
+                &get_vrtx(vrtxIds[1]),
+                &get_vrtx(vrtxIds[2])
             };
 
             // Calculate face normal
-            Vector3 const u = triVrtx[1]->m_position - triVrtx[0]->m_position;
-            Vector3 const v = triVrtx[2]->m_position - triVrtx[0]->m_position;
+            Vector3 const u = vrtxData[1]->m_position - vrtxData[0]->m_position;
+            Vector3 const v = vrtxData[2]->m_position - vrtxData[0]->m_position;
             Vector3 const faceNorm = Magnum::Math::cross(u, v).normalized();
 
             for (int i = 0; i < 3; i ++)
             {
-                Vector3 &rVrtxNorm = triVrtx[i]->m_normal;
+                Vector3 &rVrtxNorm = vrtxData[i]->m_normal;
 
-                if (a.vertex_is_shared(triVrtxIds[i]))
+                if (a.vertex_is_shared(vrtxIds[i]))
                 {
                     if ( ! onEdge)
                     {
                         // Shared vertices can have a variable number of
                         // connected faces
 
-                        SharedVrtxId const shared = a.vertex_to_shared(triVrtxIds[i]);
+                        SharedVrtxId const shared = a.vertex_to_shared(vrtxIds[i]);
                         uint8_t &rFaceCount = a.shared_face_count(shared);
 
                         // Add new face normal to the average
@@ -326,13 +318,15 @@ ActiveEnt SysPlanetA::activate(
                 // Add to the index buffer
 
                 indxBuf[indexOffset + trisAdded]
-                        = {uint32_t(triVrtxIds[0]), uint32_t(triVrtxIds[1]), uint32_t(triVrtxIds[2])};
+                        = {uint32_t(vrtxIds[0]), uint32_t(vrtxIds[1]), uint32_t(vrtxIds[2])};
                 trisAdded ++;
             }
 
 
         }
     }
+
+
 
 
     // debugging: export obj file
@@ -366,6 +360,8 @@ ActiveEnt SysPlanetA::activate(
 
     objfile.close();
 
+    a.clear(skeleton);
+
     return planetEnt;
 }
 
@@ -380,7 +376,7 @@ void SysPlanetA::update_activate(ActiveScene &rScene)
     }
 
     Universe &rUni = pLink->get_universe();
-    auto &rSync = rScene.get_registry().ctx<SyncPlanets>();
+    auto &rSync = rScene.get_registry().ctx<ACtxSyncPlanets>();
 
     // Delete planets that have exited the ActiveArea
     for (Satellite sat : pLink->m_leave)
@@ -412,32 +408,12 @@ void SysPlanetA::update_geometry(ActiveScene& rScene)
 {
     using namespace osp::active;
 
-    auto view = rScene.get_registry().view<ACompPlanet, ACompTransform>();
-
-    for (osp::active::ActiveEnt ent : view)
-    {
-        auto &planet = view.get<ACompPlanet>(ent);
-        auto &tf = view.get<ACompTransform>(ent);
-
-
-        planet_update_geometry(ent, rScene);
-    }
 }
 
 void SysPlanetA::planet_update_geometry(osp::active::ActiveEnt planetEnt,
                                         osp::active::ActiveScene& rScene)
 {
     using namespace osp::active;
-
-    auto &rPlanetPlanet = rScene.reg_get<ACompPlanet>(planetEnt);
-    auto const &planetTf = rScene.reg_get<ACompTransform>(planetEnt);
-    auto const &planetActivated = rScene.reg_get<ACompActivatedSat>(planetEnt);
-
-    osp::universe::Universe const &uni = rScene.reg_get<ACompAreaLink>(rScene.hier_get_root()).m_rUniverse;
-
-    Satellite planetSat = planetActivated.m_sat;
-    auto &planetUComp = uni.get_reg().get<universe::UCompPlanet>(planetSat);
-
 
 }
 

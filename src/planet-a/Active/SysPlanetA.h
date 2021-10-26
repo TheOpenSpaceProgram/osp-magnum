@@ -39,17 +39,70 @@
 namespace planeta::active
 {
 
-struct SyncPlanets
+using Vector3ui = Magnum::Math::Vector3<Magnum::UnsignedInt>;
+
+enum class CustomMeshId : uint32_t {};
+
+struct ACtxCustomMeshs
+{
+    IdRegistry<CustomMeshId> m_meshIds;
+    IdRefCount<CustomMeshId> m_meshIdRefs;
+    std::vector< std::optional<Magnum::Trade::MeshData> > m_meshs;
+};
+
+struct ACompGLMesh
+{
+    Magnum::GL::Buffer m_vrtxBufGL{};
+    Magnum::GL::Buffer m_indxBufGL{};
+};
+
+struct ACompCustomMesh
+{
+    CustomMeshId m_id;
+};
+
+struct ACtxSyncPlanets
 {
     MapSatToEnt_t m_inArea;
 };
 
-struct ACompPlanet
+/**
+ * @brief Stores data to store a very large terrain mesh with LOD
+ */
+struct ACompTriTerrain
 {
-    Magnum::GL::Buffer m_vrtxBufGL{};
-    Magnum::GL::Buffer m_indxBufGL{};
+    //SubdivTriangleSkeleton m_skeleton;
+
+    std::vector<osp::Vector3l> m_positions;
+    std::vector<osp::Vector3> m_normals;
+};
+
+/**
+ * @brief Indicates that a ACompTriangleTerrain is a round planet
+ */
+struct ACompPlanetSurface
+{
     double m_radius;
 };
+
+/**
+ * @brief Forms a CustomMesh out of a ACompTriTerrain intended for rendering
+ */
+struct ACompTriTerrainMesh
+{
+    ChunkedTriangleMeshInfo m_chunks;
+    ChunkVrtxSubdivLUT m_chunkVrtxLut;
+
+    // Triangles that are actively being distance-checked
+    std::vector<SkTriId> m_trisWatching;
+
+    osp::Vector3l m_translation;
+    int m_pow2scale;
+
+    float surfaceMaxLength;
+    float screenMaxLength;
+};
+
 
 class SysPlanetA
 {
@@ -67,6 +120,8 @@ public:
     static void update_activate(osp::active::ActiveScene& rScene);
 
     static void update_geometry(osp::active::ActiveScene& rScene);
+
+    static void update_geometry_gl(osp::active::ActiveScene& rScene);
 
     static void update_physics(osp::active::ActiveScene& rScene);
 };

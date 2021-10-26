@@ -151,19 +151,6 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
         triIds[i + 3] = tri_id(groupId, 3);
     }
 
-    // Set vertices of the 20 new triangles
-
-    for (size_t i = 0; i < gc_icoTriCount; i ++)
-    {
-        SkeletonTriangle &rTri = skeleton.tri_at(triIds[i]);
-        rTri.m_vertices =
-        {
-            vrtxIds[ sc_icoTriLUT[i][0] ],
-            vrtxIds[ sc_icoTriLUT[i][1] ],
-            vrtxIds[ sc_icoTriLUT[i][2] ]
-        };
-    }
-
     return skeleton;
 }
 

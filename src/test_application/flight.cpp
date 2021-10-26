@@ -156,7 +156,7 @@ void testapp::test_flight(
 
     // Setup sync states used by scene systems to sync with the universe
     rScene.get_registry().set<osp::active::SyncVehicles>();
-    rScene.get_registry().set<planeta::active::SyncPlanets>();
+    rScene.get_registry().set<planeta::active::ACtxSyncPlanets>();
 
     // Setup generic physics interface
     rScene.get_registry().set<osp::active::ACtxPhysics>();

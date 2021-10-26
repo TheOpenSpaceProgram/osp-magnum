@@ -142,7 +142,7 @@ public:
 
      , m_sharedMax{ sharedMax }
      , m_sharedIds{ sharedMax }
-     , m_sharedSkVrtx{ std::make_unique<SkVrtxId[]>(m_sharedMax) }
+     , m_sharedSkVrtx{ std::make_unique<IdStorage<SkVrtxId>[]>(m_sharedMax) }
      , m_sharedRefCount{ std::make_unique<uint8_t[]>(m_sharedMax) }
      , m_sharedFaceCount{ std::make_unique<uint8_t[]>(m_sharedMax) }
 
@@ -153,7 +153,7 @@ public:
     { };
 
     ChunkId chunk_create(
-            SubdivTriangleSkeleton rSkel,
+            SubdivTriangleSkeleton& rSkel,
             SkTriId skTri,
             ArrayView_t<SkVrtxId> const edgeRte,
             ArrayView_t<SkVrtxId> const edgeBtm,
@@ -205,7 +205,7 @@ public:
     void shared_update(FUNC_T func)
     {
         func(ArrayView_t<SharedVrtxId const>(m_sharedNewlyAdded),
-             ArrayView_t<SkVrtxId const>(m_sharedSkVrtx.get(), m_sharedMax));
+             ArrayView_t<IdStorage<SkVrtxId> const>(m_sharedSkVrtx.get(), m_sharedMax));
 
         m_sharedNewlyAdded.clear();
     }
@@ -247,6 +247,21 @@ public:
         return uint32_t(vrtx) >= m_vrtxSharedOffset;
     }
 
+    void clear(SubdivTriangleSkeleton& rSkel)
+    {
+        // Delete all chunks
+        m_chunkIds.for_each([this] (ChunkId id)
+        {
+
+        });
+
+        // Delete all shared vertices
+        m_sharedIds.for_each([this, &rSkel] (SharedVrtxId id)
+        {
+           rSkel.vrtx_release(m_sharedSkVrtx[size_t(id)]);
+        });
+    }
+
 private:
 
 
@@ -269,7 +284,7 @@ private:
      * @return
      */
     SharedVrtxId shared_get_or_create(SkVrtxId skVrtxId,
-                                      SubdivTriangleSkeleton rSkel)
+                                      SubdivTriangleSkeleton &rSkel)
     {
         auto const& [it, success]
                 = m_skVrtxToShared.try_emplace(skVrtxId, SharedVrtxId(0));
@@ -279,10 +294,8 @@ private:
             it->second = id;
             m_sharedRefCount[size_t(id)] = 0;
             m_sharedFaceCount[size_t(id)] = 0;
-            m_sharedSkVrtx[size_t(id)] = skVrtxId;
+            m_sharedSkVrtx[size_t(id)] = rSkel.vrtx_store(skVrtxId);
             m_sharedNewlyAdded.push_back(id);
-
-            rSkel.vrtx_refcount_add(skVrtxId);
         }
 
         return it->second;
@@ -312,7 +325,7 @@ private:
 
     uint32_t m_sharedMax;
     IdRegistry<SharedVrtxId, true> m_sharedIds;
-    std::unique_ptr<SkVrtxId[]> m_sharedSkVrtx;
+    std::unique_ptr<IdStorage<SkVrtxId>[]> m_sharedSkVrtx;
     std::unique_ptr<uint8_t[]> m_sharedRefCount;
     // Connected face count used for vertex normal calculations
     std::unique_ptr<uint8_t[]> m_sharedFaceCount;

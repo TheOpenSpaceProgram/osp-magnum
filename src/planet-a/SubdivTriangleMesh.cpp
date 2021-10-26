@@ -57,7 +57,7 @@ ChunkedTriangleMeshInfo planeta::make_subdivtrimesh_general(
 }
 
 ChunkId ChunkedTriangleMeshInfo::chunk_create(
-        SubdivTriangleSkeleton rSkel,
+        SubdivTriangleSkeleton& rSkel,
         SkTriId skTri,
         ArrayView_t<SkVrtxId> const edgeRte,
         ArrayView_t<SkVrtxId> const edgeBtm,

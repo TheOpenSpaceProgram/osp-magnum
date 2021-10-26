@@ -34,8 +34,10 @@ namespace planeta
 {
 
 // Fundamental geometric properties of an icosahedron
-inline constexpr int gc_icoVrtxCount = 12;
-inline constexpr int gc_icoTriCount = 20;
+inline constexpr int const gc_icoVrtxCount = 12;
+inline constexpr int const gc_icoTriCount = 20;
+
+inline constexpr float const sc_icoEdgeRatio = 0.95105651629f;
 
 // The 20 faces of the icosahedron {Top, Left, Right}
 // Each number refers to one of 12 initial vertices

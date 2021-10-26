@@ -26,8 +26,10 @@
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
+#include <cassert>
 #include <cstdint>
 #include <optional>
+#include <limits>
 #include <stdexcept>
 #include <type_traits>
 #include <unordered_map>
@@ -61,16 +63,16 @@ public:
 
     size_t capacity() const { return m_exists.capacity(); }
 
-    void reserve(size_t n) { m_exists.reserve(n); }
+    size_t size() const { return m_exists.size() - m_deleted.size(); }
 
-    void reserve_more(size_t n)
-    {
-        reserve(n + m_exists.size() - m_deleted.size());
-    }
+    void reserve(size_t n) { m_exists.reserve(n); }
 
     void remove(ID_T id);
 
     bool exists(ID_T id) const noexcept;
+
+    template <typename FUNC_T>
+    void for_each(FUNC_T func);
 
 private:
     std::vector<bool> m_exists; // this guy is weird, be careful
@@ -104,6 +106,19 @@ ID_T IdRegistry<ID_T, NO_AUTO_RESIZE>::create()
     return ID_T(id);
 }
 
+template<typename ID_T, bool NO_AUTO_RESIZE>
+template <typename FUNC_T>
+void IdRegistry<ID_T, NO_AUTO_RESIZE>::for_each(FUNC_T func)
+{
+    for (size_t i = 0; i < size(); i ++)
+    {
+        if (m_exists[i])
+        {
+            func(ID_T(i));
+        }
+    }
+}
+
 //-----------------------------------------------------------------------------
 
 /**
@@ -123,6 +138,9 @@ class SubdivIdTree : private IdRegistry<ID_T>
 public:
 
     using IdRegistry<ID_T>::size_required;
+
+    using IdRegistry<ID_T>::capacity;
+    using IdRegistry<ID_T>::size;
 
     ID_T create_root()
     {
@@ -163,18 +181,9 @@ public:
 
     std::pair<ID_T, ID_T> get_parents(ID_T a);
 
-    size_t capacity() const { return capacity(); }
-
     void reserve(size_t n)
     {
         IdRegistry<ID_T>::reserve(n);
-        m_idToParents.reserve(IdRegistry<ID_T>::capacity());
-        m_idChildCount.reserve(IdRegistry<ID_T>::capacity());
-    }
-
-    void reserve_more(size_t n)
-    {
-        IdRegistry<ID_T>::reserve_more(n);
         m_idToParents.reserve(IdRegistry<ID_T>::capacity());
         m_idChildCount.reserve(IdRegistry<ID_T>::capacity());
     }
@@ -202,7 +211,138 @@ private:
 
 }; // class SubdivTree
 
+//-----------------------------------------------------------------------------
 
+
+template<class TYPE_T>
+constexpr TYPE_T id_null() noexcept
+{
+    using underlying_t = typename std::underlying_type_t<TYPE_T>;
+    return TYPE_T(std::numeric_limits<underlying_t>::max());
+}
+
+template<typename ID_T> class IdStorage;
+template<typename ID_T, typename COUNT_T = uint8_t> class IdRefCount;
+
+
+template<typename ID_T>
+IdStorage<ID_T> id_ref_add(IdRefCount<ID_T>& rRefCount, ID_T id);
+
+template<typename ID_T>
+void id_ref_release(IdRefCount<ID_T>& rRefCount, IdStorage<ID_T>& rStorage) noexcept;
+
+template<typename ID_T, typename COUNT_T>
+class IdRefCount
+{
+    using id_int_t = std::underlying_type_t<ID_T>;
+
+public:
+
+    ~IdRefCount()
+    {
+        // Make sure ref counts are all zero on destruction
+        assert(isRemainingZero(0));
+    }
+
+    bool isRemainingZero(size_t start) noexcept
+    {
+        for (size_t i = start; i < m_counts.size(); i ++)
+        {
+            if (0 != m_counts[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    size_t size() noexcept { return m_counts.size(); }
+
+    void resize(size_t size)
+    {
+        if (size < m_counts.size())
+        {
+            // sizing down, make sure zeros
+            if (isRemainingZero(size))
+            {
+                throw std::runtime_error("Downsizing non-zero ref counts");
+            }
+        }
+        m_counts.resize(size, 0);
+    }
+
+    friend IdStorage<ID_T> id_ref_add<ID_T>(IdRefCount<ID_T>&, ID_T);
+    friend void id_ref_release<ID_T>(IdRefCount<ID_T>&, IdStorage<ID_T>&) noexcept;
+
+private:
+    std::vector<COUNT_T> m_counts;
+
+}; // class IdRefCount
+
+/**
+ * @brief Long term reference counted storage for IDs
+ */
+template<typename ID_T>
+class IdStorage
+{
+public:
+    IdStorage() : m_id{ id_null<ID_T>() } { }
+    ~IdStorage() { assert( ! has_value() ); }
+
+    // delete copy
+    IdStorage(IdStorage<ID_T> const& copy) = delete;
+    IdStorage<ID_T>& operator=(IdStorage<ID_T> const& copy) = delete;
+
+    IdStorage(IdStorage<ID_T>&& move)
+    {
+        assert( ! has_value() );
+        m_id = std::exchange(move.m_id, id_null<ID_T>());
+    }
+    IdStorage<ID_T>& operator=(IdStorage<ID_T>&& move)
+    {
+        assert( ! has_value() );
+        m_id = std::exchange(move.m_id, id_null<ID_T>());
+        return *this;
+    }
+
+    operator ID_T() const noexcept { return m_id; }
+    constexpr ID_T value() const noexcept { return m_id; }
+    constexpr bool has_value() const noexcept { return m_id != id_null<ID_T>(); }
+
+    friend IdStorage<ID_T> id_ref_add<ID_T>(IdRefCount<ID_T>&, ID_T);
+    friend void id_ref_release<ID_T>(IdRefCount<ID_T>&, IdStorage<ID_T>&) noexcept;
+
+private:
+    IdStorage(ID_T id) : m_id{ id } { }
+
+
+    ID_T m_id;
+
+}; // class IdStorage
+
+template<typename ID_T>
+IdStorage<ID_T> id_ref_add(IdRefCount<ID_T>& rRefCount, ID_T id)
+{
+    auto const idInt = std::underlying_type_t<ID_T>(id);
+    if (rRefCount.size() <= idInt)
+    {
+        rRefCount.resize(idInt + 1);
+    }
+    rRefCount.m_counts[idInt] ++;
+
+    return IdStorage<ID_T>(id);
+}
+
+template<typename ID_T>
+void id_ref_release(IdRefCount<ID_T>& rRefCount, IdStorage<ID_T>& rStorage) noexcept
+{
+    if (rStorage.has_value())
+    {
+        auto const idInt = std::underlying_type_t<ID_T>(rStorage.m_id);
+        rRefCount.m_counts[idInt] --;
+        rStorage.m_id = id_null<ID_T>();
+    }
+}
 
 //-----------------------------------------------------------------------------
 
@@ -219,23 +359,27 @@ class SubdivSkeleton
 
 public:
 
+
     SkVrtxId vrtx_create_root()
     {
         SkVrtxId const vrtxId = m_vrtxIdTree.create_root();
-        m_vrtxRefCount.resize(m_vrtxIdTree.size_required());
-        m_vrtxRefCount[size_t(vrtxId)] = 0;
         return vrtxId;
     };
 
     SkVrtxId vrtx_create_or_get_child(SkVrtxId a, SkVrtxId b)
     {
         auto const [vrtxId, created] = m_vrtxIdTree.create_or_get(a, b);
-        if (created)
-        {
-            m_vrtxRefCount.resize(m_vrtxIdTree.size_required());
-            m_vrtxRefCount[size_t(vrtxId)] = 0;
-        }
         return vrtxId;
+    }
+
+    IdStorage<SkVrtxId> vrtx_store(SkVrtxId vrtxId)
+    {
+        return id_ref_add<SkVrtxId>(m_vrtxRefCount, vrtxId);
+    }
+
+    void vrtx_release(IdStorage<SkVrtxId> &rStorage)
+    {
+        id_ref_release<SkVrtxId>(m_vrtxRefCount, rStorage);
     }
 
     SubdivIdTree<SkVrtxId> vrtx_ids() const noexcept { return m_vrtxIdTree; }
@@ -243,26 +387,15 @@ public:
     void vrtx_reserve(size_t n)
     {
         m_vrtxIdTree.reserve(n);
-        m_vrtxRefCount.reserve(m_vrtxIdTree.capacity());
+        m_vrtxRefCount.resize(m_vrtxIdTree.capacity());
     }
-
-    void vrtx_reserve_more(size_t n)
-    {
-        m_vrtxIdTree.reserve_more(n);
-        m_vrtxRefCount.reserve(m_vrtxIdTree.capacity());
-    }
-
-    void vrtx_refcount_add(SkVrtxId id) noexcept { m_vrtxRefCount[size_t(id)] ++; };
-    void vrtx_refcount_remove(SkVrtxId id) noexcept { m_vrtxRefCount[size_t(id)] --; };
-
-    ArrayView_t<uint8_t> vrtx_get_refcounts() { return m_vrtxRefCount; };
 
 private:
 
     SubdivIdTree<SkVrtxId> m_vrtxIdTree;
 
     // access using VrtxIds from m_vrtxTree
-    std::vector<uint8_t> m_vrtxRefCount;
+    IdRefCount<SkVrtxId> m_vrtxRefCount;
 
     std::vector<SkVrtxId> m_maybeDelete;
 
@@ -283,7 +416,7 @@ struct SkeletonTriangle
     //    /     \
     //   1 _____ 2
     //
-    std::array<SkVrtxId, 3> m_vertices;
+    std::array<IdStorage<SkVrtxId>, 3> m_vertices;
 
     std::optional<SkTriGroupId> m_children;
 
@@ -346,6 +479,26 @@ class SubdivTriangleSkeleton : public SubdivSkeleton
 {
 public:
 
+    SubdivTriangleSkeleton() = default;
+
+    SubdivTriangleSkeleton(SubdivTriangleSkeleton const&) = delete;
+
+    SubdivTriangleSkeleton(SubdivTriangleSkeleton&& move) = default;
+
+    ~SubdivTriangleSkeleton()
+    {
+        m_triIds.for_each([this] (SkTriGroupId id)
+        {
+            for (SkeletonTriangle& rTri : m_triData[size_t(id)].m_triangles)
+            {
+                for (IdStorage<SkVrtxId>& rVrtx : rTri.m_vertices)
+                {
+                    vrtx_release(rVrtx);
+                }
+            }
+        });
+    }
+
     std::array<SkVrtxId, 3> vrtx_create_middles(
             std::array<SkVrtxId, 3> const& vertices)
     {
@@ -359,7 +512,7 @@ public:
     void vrtx_create_chunk_edge_recurse(
             unsigned int level,
             SkVrtxId a, SkVrtxId b,
-            ArrayView_t<SkVrtxId> rOut)
+            ArrayView_t< SkVrtxId > rOut)
     {
         if (level == 0)
         {
@@ -395,12 +548,11 @@ public:
         {
             SkeletonTriangle &rTri = rGroup.m_triangles[i];
             rTri.m_children = std::nullopt;
-            rTri.m_vertices = vertices[i];
-
-            for (SkVrtxId vrtxId : vertices[i])
-            {
-                vrtx_refcount_add(vrtxId);
-            }
+            rTri.m_vertices = {
+                vrtx_store(vertices[i][0]),
+                vrtx_store(vertices[i][1]),
+                vrtx_store(vertices[i][2])
+            };
         }
         return groupId;
     }

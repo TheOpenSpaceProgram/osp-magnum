@@ -37,7 +37,7 @@ SkTriGroupId SubdivTriangleSkeleton::tri_subdiv(SkTriId triId,
         throw std::runtime_error("SkeletonTriangle is already subdivided");
     }
 
-    SkTriGroup const parentGroup = m_triData[size_t(tri_group_id(triId))];
+    SkTriGroup const& parentGroup = m_triData[size_t(tri_group_id(triId))];
 
     // non-macro shorthands
     auto corner = [&rTri] (int i) -> SkVrtxId { return rTri.m_vertices[i]; };
