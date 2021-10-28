@@ -43,10 +43,14 @@ using Vector3ui = Magnum::Math::Vector3<Magnum::UnsignedInt>;
 
 enum class CustomMeshId : uint32_t {};
 
-struct ACtxCustomMeshs
+class ACtxCustomMeshs
 {
-    IdRegistry<CustomMeshId> m_meshIds;
-    IdRefCount<CustomMeshId> m_meshIdRefs;
+
+
+
+private:
+    osp::UniqueIdRegistry<CustomMeshId> m_meshIds;
+    //IdRefCount<CustomMeshId> m_meshIdRefs;
     std::vector< std::optional<Magnum::Trade::MeshData> > m_meshs;
 };
 

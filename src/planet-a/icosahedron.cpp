@@ -127,7 +127,7 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
     // Add initial triangles
 
     // Create 20 root triangles by forming 5 groups. each group is 4 triangles
-    skeleton.tri_group_reserve_more(5);
+    skeleton.tri_group_reserve(skeleton.tri_ids().size() + 5);
 
     auto const vrtx_id_lut = [&vrtxIds] (int i) -> std::array<SkVrtxId, 3>
     {

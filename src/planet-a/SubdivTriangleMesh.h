@@ -52,6 +52,8 @@ enum class ChunkLocalSharedId : uint16_t {};
 // IDs for any chunk's fill vertices; from 0 to m_chunkVrtxSharedCount
 enum class ChunkLocalFillId : uint16_t {};
 
+using SharedVrtxStorage_t = osp::IdRefCount<SharedVrtxId>::Storage_t;
+
 //-----------------------------------------------------------------------------
 
 /**
@@ -97,7 +99,7 @@ constexpr std::pair<ChunkLocalSharedId, bool> coord_to_shared(
 
 struct Chunk
 {
-    SkTriId m_skeletonTri;
+    SkTriStorage_t m_skeletonTri;
 };
 
 class ChunkedTriangleMeshInfo
@@ -134,7 +136,7 @@ public:
 
      , m_chunkVrtxSharedCount{ uint16_t(m_chunkWidth * 3) }
      , m_chunkSharedUsed{
-           std::make_unique<SharedVrtxId[]>(chunkMax * m_chunkVrtxSharedCount) }
+           std::make_unique<SharedVrtxStorage_t[]>(chunkMax * m_chunkVrtxSharedCount) }
 
      , m_chunkIndxFanOffset{ uint32_t(m_chunkWidth)*m_chunkWidth
                              - smc_minFansVsLevel[subdivLevels] }
@@ -142,8 +144,8 @@ public:
 
      , m_sharedMax{ sharedMax }
      , m_sharedIds{ sharedMax }
-     , m_sharedSkVrtx{ std::make_unique<IdStorage<SkVrtxId>[]>(m_sharedMax) }
-     , m_sharedRefCount{ std::make_unique<uint8_t[]>(m_sharedMax) }
+     , m_sharedRefCount{ sharedMax }
+     , m_sharedSkVrtx{ std::make_unique<SkVrtxStorage_t[]>(m_sharedMax) }
      , m_sharedFaceCount{ std::make_unique<uint8_t[]>(m_sharedMax) }
 
      , m_vrtxSharedOffset{ uint32_t(chunkMax)*m_chunkVrtxFillCount }
@@ -189,7 +191,7 @@ public:
      *
      * @return Array view of shared vertices, access using ChunkLocalSharedId
      */
-    ArrayView_t<SharedVrtxId const> chunk_shared(ChunkId chunkId) const noexcept
+    ArrayView_t<SharedVrtxStorage_t const> chunk_shared(ChunkId chunkId) const noexcept
     {
         size_t const offset = size_t(chunkId) * m_chunkVrtxSharedCount;
         return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
@@ -205,7 +207,7 @@ public:
     void shared_update(FUNC_T func)
     {
         func(ArrayView_t<SharedVrtxId const>(m_sharedNewlyAdded),
-             ArrayView_t<IdStorage<SkVrtxId> const>(m_sharedSkVrtx.get(), m_sharedMax));
+             ArrayView_t<SkVrtxStorage_t const>(m_sharedSkVrtx.get(), m_sharedMax));
 
         m_sharedNewlyAdded.clear();
     }
@@ -250,22 +252,30 @@ public:
     void clear(SubdivTriangleSkeleton& rSkel)
     {
         // Delete all chunks
-        m_chunkIds.for_each([this] (ChunkId id)
+        m_chunkIds.for_each([this, &rSkel] (ChunkId chunkId)
         {
+            // Release their associated skeleton triangle
+            rSkel.tri_release(m_chunkData[size_t(chunkId)].m_skeletonTri);
 
+            // Release all of their shared vertices
+            for (SharedVrtxStorage_t& shared : chunk_shared_mutable(chunkId))
+            {
+                shared_release(shared);
+            }
         });
 
         // Delete all shared vertices
-        m_sharedIds.for_each([this, &rSkel] (SharedVrtxId id)
+        m_sharedIds.for_each([this, &rSkel] (SharedVrtxId sharedId)
         {
-           rSkel.vrtx_release(m_sharedSkVrtx[size_t(id)]);
+           // Release associated skeleton vertex
+           rSkel.vrtx_release(m_sharedSkVrtx[size_t(sharedId)]);
         });
     }
 
 private:
 
 
-    ArrayView_t<SharedVrtxId> chunk_shared_mutable(ChunkId chunkId) noexcept
+    ArrayView_t<SharedVrtxStorage_t> chunk_shared_mutable(ChunkId chunkId) noexcept
     {
         size_t const offset = size_t(chunkId) * m_chunkVrtxSharedCount;
         return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
@@ -292,7 +302,6 @@ private:
         {
             SharedVrtxId const id = m_sharedIds.create();
             it->second = id;
-            m_sharedRefCount[size_t(id)] = 0;
             m_sharedFaceCount[size_t(id)] = 0;
             m_sharedSkVrtx[size_t(id)] = rSkel.vrtx_store(skVrtxId);
             m_sharedNewlyAdded.push_back(id);
@@ -301,8 +310,15 @@ private:
         return it->second;
     }
 
-    void shared_refcount_add(SharedVrtxId id) noexcept { m_sharedRefCount[size_t(id)] ++; };
-    void shared_refcount_remove(SharedVrtxId id) noexcept { m_sharedRefCount[size_t(id)] --; };
+    SharedVrtxStorage_t shared_store(SharedVrtxId triId)
+    {
+        return m_sharedRefCount.ref_add(triId);
+    }
+
+    void shared_release(SharedVrtxStorage_t &rStorage) noexcept
+    {
+        m_sharedRefCount.ref_release(rStorage);
+    }
 
     constexpr VertexId shared_get_vrtx(SharedVrtxId sharedId) const
     {
@@ -312,21 +328,21 @@ private:
     uint16_t m_chunkMax;
     uint8_t m_chunkSubdivLevel;
     uint16_t m_chunkWidth;
-    IdRegistry<ChunkId, true> m_chunkIds;
+    osp::IdRegistry<ChunkId, true> m_chunkIds;
     std::unique_ptr<Chunk[]> m_chunkData;
 
     uint16_t m_chunkVrtxFillCount;
 
     uint16_t m_chunkVrtxSharedCount;
-    std::unique_ptr<SharedVrtxId[]> m_chunkSharedUsed;
+    std::unique_ptr<SharedVrtxStorage_t[]> m_chunkSharedUsed;
 
     uint32_t m_chunkIndxFanOffset;
     uint32_t m_chunkIndxFillCount;
 
     uint32_t m_sharedMax;
-    IdRegistry<SharedVrtxId, true> m_sharedIds;
-    std::unique_ptr<IdStorage<SkVrtxId>[]> m_sharedSkVrtx;
-    std::unique_ptr<uint8_t[]> m_sharedRefCount;
+    osp::IdRegistry<SharedVrtxId, true> m_sharedIds;
+    osp::IdRefCount<SharedVrtxId> m_sharedRefCount;
+    std::unique_ptr<SkVrtxStorage_t[]> m_sharedSkVrtx;
     // Connected face count used for vertex normal calculations
     std::unique_ptr<uint8_t[]> m_sharedFaceCount;
     std::unordered_map<SkVrtxId, SharedVrtxId> m_skVrtxToShared;
@@ -423,13 +439,13 @@ public:
     template<typename VRTX_BUF_T>
     constexpr decltype (auto) get(
             LUTVrtx lutVrtx,
-            ArrayView_t<SharedVrtxId const> sharedUsed,
+            ArrayView_t<SharedVrtxStorage_t const> sharedUsed,
             VRTX_BUF_T chunkVrtx,
             VRTX_BUF_T sharedVrtx) const noexcept
     {
         return (uint16_t(lutVrtx) < m_fillVrtxCount)
                 ? chunkVrtx[size_t(lutVrtx)]
-                : sharedVrtx[size_t(sharedUsed[uint16_t(lutVrtx) - m_fillVrtxCount])];
+                : sharedVrtx[size_t(sharedUsed[uint16_t(lutVrtx) - m_fillVrtxCount].value())];
     }
 
     constexpr ArrayView_t<ToSubdiv const> data() const noexcept { return m_data; }

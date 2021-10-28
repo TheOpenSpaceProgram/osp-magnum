@@ -63,12 +63,6 @@ ChunkId ChunkedTriangleMeshInfo::chunk_create(
         ArrayView_t<SkVrtxId> const edgeBtm,
         ArrayView_t<SkVrtxId> const edgeLft)
 {
-    // Create a new chunk ID
-    ChunkId const chunkId = m_chunkIds.create();
-
-    // Increment ref count of triangle
-    rSkel.tri_refcount_add(skTri);
-
     if (   edgeRte.size() != m_chunkWidth - 1
         || edgeBtm.size() != m_chunkWidth - 1
         || edgeLft.size() != m_chunkWidth - 1)
@@ -76,9 +70,15 @@ ChunkId ChunkedTriangleMeshInfo::chunk_create(
         throw std::runtime_error("Incorrect edge vertex count");
     }
 
+    // Create a new chunk ID
+    ChunkId const chunkId = m_chunkIds.create();
+    Chunk &rChunk = m_chunkData[size_t(chunkId)];
+
+    rChunk.m_skeletonTri = rSkel.tri_store(skTri);
+
     SkeletonTriangle const &tri = rSkel.tri_at(skTri);
 
-    ArrayView_t<SharedVrtxId> const sharedSpace = chunk_shared_mutable(chunkId);
+    ArrayView_t<SharedVrtxStorage_t> const sharedSpace = chunk_shared_mutable(chunkId);
 
     std::array const edges = {edgeRte, edgeBtm, edgeLft};
 
@@ -89,16 +89,14 @@ ChunkId ChunkedTriangleMeshInfo::chunk_create(
 
         ArrayView_t<SkVrtxId> const edge = edges[i];
         {
-            SharedVrtxId const shared = shared_get_or_create(
+            SharedVrtxId const sharedId = shared_get_or_create(
                     tri.m_vertices[i], rSkel);
-            sharedSpace[cornerOffset] = shared;
-            shared_refcount_add(shared);
+            sharedSpace[cornerOffset] = shared_store(sharedId);
         }
         for (unsigned int j = 0; j < m_chunkWidth - 1; j ++)
         {
-            SharedVrtxId const shared = shared_get_or_create(edge[j], rSkel);
-            sharedSpace[edgeOffset + j] = shared;
-            shared_refcount_add(shared);
+            SharedVrtxId const sharedId = shared_get_or_create(edge[j], rSkel);
+            sharedSpace[edgeOffset + j] = shared_store(sharedId);
         }
     }
 

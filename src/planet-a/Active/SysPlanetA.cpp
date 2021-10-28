@@ -68,8 +68,6 @@ using osp::Vector3l;
 
 using osp::universe::Satellite;
 
-#include <Magnum/Shaders/MeshVisualizerGL.h>
-
 struct PlanetVertex
 {
     osp::Vector3 m_position;
@@ -193,7 +191,7 @@ ActiveEnt SysPlanetA::activate(
 
     a.shared_update( [&positions, &scalepow, &vrtxBufShared] (
             ArrayView_t<SharedVrtxId const> newlyAdded,
-            ArrayView_t<IdStorage<SkVrtxId> const> sharedToSkel)
+            ArrayView_t<SkVrtxStorage_t const> sharedToSkel)
     {
 
         for (SharedVrtxId const sharedId : newlyAdded)
@@ -210,7 +208,7 @@ ActiveEnt SysPlanetA::activate(
 
     // Set Positions of fill vertices using LUT
 
-    ArrayView_t<SharedVrtxId const> chunkShared = a.chunk_shared(chunk);
+    ArrayView_t<SharedVrtxStorage_t const> chunkShared = a.chunk_shared(chunk);
 
     for (ChunkVrtxSubdivLUT::ToSubdiv const& toSubdiv : chunkVrtxLut.data())
     {
