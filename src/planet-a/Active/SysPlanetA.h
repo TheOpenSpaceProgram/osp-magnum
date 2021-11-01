@@ -26,56 +26,17 @@
 
 #include "../SubdivTriangleMesh.h"
 
-#include <osp/Universe.h>
-#include <osp/Active/SysAreaAssociate.h>
-#include <osp/Active/SysForceFields.h>
 #include <osp/Active/activetypes.h>
-
-#include <osp/Active/universe_sync.h>
-
-#include <Magnum/Shaders/MeshVisualizer.h>
-#include <Magnum/GL/Mesh.h>
 
 namespace planeta::active
 {
-
-using Vector3ui = Magnum::Math::Vector3<Magnum::UnsignedInt>;
-
-enum class CustomMeshId : uint32_t {};
-
-class ACtxCustomMeshs
-{
-
-
-
-private:
-    osp::UniqueIdRegistry<CustomMeshId> m_meshIds;
-    //IdRefCount<CustomMeshId> m_meshIdRefs;
-    std::vector< std::optional<Magnum::Trade::MeshData> > m_meshs;
-};
-
-struct ACompGLMesh
-{
-    Magnum::GL::Buffer m_vrtxBufGL{};
-    Magnum::GL::Buffer m_indxBufGL{};
-};
-
-struct ACompCustomMesh
-{
-    CustomMeshId m_id;
-};
-
-struct ACtxSyncPlanets
-{
-    MapSatToEnt_t m_inArea;
-};
 
 /**
  * @brief Stores data to store a very large terrain mesh with LOD
  */
 struct ACompTriTerrain
 {
-    //SubdivTriangleSkeleton m_skeleton;
+    SubdivTriangleSkeleton m_skeleton;
 
     std::vector<osp::Vector3l> m_positions;
     std::vector<osp::Vector3> m_normals;
@@ -111,11 +72,6 @@ struct ACompTriTerrainMesh
 class SysPlanetA
 {
 public:
-
-    static osp::active::ActiveEnt activate(
-            osp::active::ActiveScene &rScene, osp::universe::Universe &rUni,
-            osp::universe::Satellite areaSat, osp::universe::Satellite tgtSat);
-
 
     static void planet_update_geometry(
             osp::active::ActiveEnt planetEnt,

@@ -28,8 +28,6 @@
 
 #include <osp/types.h>
 
-#include <Magnum/Mesh.h>
-
 #include <memory>
 #include <variant>
 
@@ -217,7 +215,7 @@ public:
      */
     constexpr uint32_t shared_count_max() const noexcept { return m_sharedMax; }
 
-    u_int8_t& shared_face_count(SharedVrtxId sharedId) const noexcept { return m_sharedFaceCount[size_t(sharedId)]; }
+    uint8_t& shared_face_count(SharedVrtxId sharedId) const noexcept { return m_sharedFaceCount[size_t(sharedId)]; }
 
     /**
      * @return Max number of mesh triangles / Required index buffer size.
