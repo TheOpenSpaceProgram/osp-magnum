@@ -108,10 +108,11 @@ constexpr void set_bits(INT_T* pDest, size_t bits) noexcept
 
 class HierarchicalBitset
 {
+    // maybe template these eventually?
+
     using block_int_t = uint64_t;
     using row_index_t = size_t;
 
-    // maybe template these eventually?
     static constexpr int smc_blockSize = sizeof(block_int_t) * 8;
     static constexpr int smc_topLevelMaxBlocks = 1;
     static constexpr int smc_depth = 8;
@@ -142,7 +143,7 @@ public:
         bounds_check(i);
         Pos const pos = at(i);
 
-        return bit_test(m_blocks[pos.m_block], pos.m_bit);
+        return bit_test(m_blocks[m_rows[0].m_offset + pos.m_block], pos.m_bit);
     }
 
     void set() noexcept
@@ -200,25 +201,13 @@ public:
             replacement.set();
         }
 
-        int const copyTopLevel = std::min(replacement.m_topLevel, m_topLevel);
+        // copy row 0 to new replacment
+        copy_bits(&m_blocks[m_rows[0].m_offset],
+                  &replacement.m_blocks[replacement.m_rows[0].m_offset],
+                  std::min(m_size, replacement.m_size));
 
-        for (int i = 0; i < copyTopLevel + 1; i ++)
-        {
-            size_t const bitsSrc = (i != 0) ? m_rows[i - 1].m_size : m_size;
-            size_t const bitsDest = (i != 0) ? replacement.m_rows[i - 1].m_size : replacement.m_size;
-            copy_bits(&m_blocks[m_rows[i].m_offset],
-                      &replacement.m_blocks[replacement.m_rows[i].m_offset],
-                      std::min(bitsSrc, bitsDest));
-        }
-
-        if (fill)
-        {
-            replacement.recount();
-        }
-        else
-        {
-            replacement.m_count = m_count;
-        }
+        replacement.recalc_blocks();
+        replacement.recount();
 
         *this = std::move(replacement);
     }
@@ -367,6 +356,34 @@ private:
         {
             m_count += std::bitset<smc_blockSize>(
                         m_blocks[m_rows[0].m_offset + i]).count();
+        }
+    }
+
+    void recalc_blocks()
+    {
+        for (int i = 0; i < m_topLevel; i ++)
+        {
+            Row const current = m_rows[i + 1];
+            Row const below = m_rows[i];
+
+            for (size_t j = 0; j < current.m_size; j ++)
+            {
+                block_int_t blockNew = 0;
+
+                size_t const belowBlocks = std::min<size_t>(
+                            smc_blockSize, below.m_size - j * smc_blockSize);
+
+                block_int_t currentBit = 1;
+
+                // Evaluate a block for each bit
+                for (int k = 0; k < belowBlocks; k ++)
+                {
+                    blockNew |= currentBit * (m_blocks[below.m_offset + k]);
+                    currentBit <<= 1;
+                }
+
+                m_blocks[current.m_offset + j] = blockNew;
+            }
         }
     }
 
