@@ -52,6 +52,15 @@ std::vector<int> random_ascending(int seed, size_t maximum)
     return testSet;
 }
 
+TEST(HierarchicalBitset, CountTrailingZeros)
+{
+    using osp::ctz;
+
+    EXPECT_EQ( 0,  ctz(uint64_t(1)) );
+    EXPECT_EQ( 20, ctz(uint64_t(1) << 20) );
+    EXPECT_EQ( 63, ctz(uint64_t(1) << 63) );
+}
+
 TEST(HierarchicalBitset, BasicUnaligned)
 {
     HierarchicalBitset bitset(129);
@@ -78,9 +87,9 @@ TEST(HierarchicalBitset, BasicUnaligned)
     toTake.fill(-1); // make sure garbage values don't ruin the test
     int const remainder = bitset.take(toTake.begin(), 11);
 
-    EXPECT_EQ( remainder, 10 );
-    EXPECT_EQ( toTake[0], 42 );
-    EXPECT_EQ( bitset.count(), 0 );
+    EXPECT_EQ( 10, remainder );
+    EXPECT_EQ( 42, toTake[0] );
+    EXPECT_EQ( 0, bitset.count() );
 }
 
 TEST(HierarchicalBitset, BasicAligned)
@@ -102,16 +111,16 @@ TEST(HierarchicalBitset, BasicAligned)
     EXPECT_FALSE( bitset.test(0) );
     EXPECT_TRUE( bitset.test(42) );
     EXPECT_FALSE( bitset.test(127) );
-    EXPECT_EQ( bitset.count(), 1 );
+    EXPECT_EQ( 1, bitset.count() );
 
     // Try taking 11 bits, but there's only 1 left (42)
     std::array<int, 11> toTake;
     toTake.fill(-1); // make sure garbage values don't ruin the test
     int const remainder = bitset.take(toTake.begin(), 11);
 
-    EXPECT_EQ( remainder, 10 );
-    EXPECT_EQ( toTake[0], 42 );
-    EXPECT_EQ( bitset.count(), 0 );
+    EXPECT_EQ( 10, remainder );
+    EXPECT_EQ( 42, toTake[0] );
+    EXPECT_EQ( 0, bitset.count() );
 }
 
 TEST(HierarchicalBitset, TakeRandomSet)
@@ -134,9 +143,10 @@ TEST(HierarchicalBitset, TakeRandomSet)
 
     int const remainder = bitset.take(results.begin(), testSet.size() + 12);
 
-    EXPECT_EQ( remainder, 12 );
+    EXPECT_EQ( 12, remainder );
+    EXPECT_EQ( 0, bitset.count() );
     EXPECT_EQ( results, testSet );
-    EXPECT_EQ( bitset.count(), 0 );
+
 }
 
 TEST(HierarchicalBitset, Resizing)
@@ -149,11 +159,11 @@ TEST(HierarchicalBitset, Resizing)
     bitset.resize(30, true);
 
     EXPECT_TRUE( bitset.test(5) );
-    EXPECT_EQ( bitset.count(), 11 );
+    EXPECT_EQ( 11, bitset.count() );
 
     // Resize down to 6, this removes the 10 bits
     bitset.resize(6);
 
     EXPECT_TRUE( bitset.test(5) );
-    EXPECT_EQ( bitset.count(), 1 );
+    EXPECT_EQ( 1, bitset.count() );
 }

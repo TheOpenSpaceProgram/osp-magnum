@@ -34,8 +34,6 @@
 namespace osp
 {
 
-
-
 template<class TYPE_T>
 constexpr TYPE_T id_null() noexcept
 {
@@ -58,64 +56,115 @@ public:
     IdRegistry() = default;
     IdRegistry(size_t capacity) { reserve(capacity); };
 
+    /**
+     * @brief Create a single ID
+     *
+     * @return A newly created ID
+     */
     [[nodiscard]] ID_T create()
     {
-
+        ID_T output;
+        create(&output, 1);
+        return output;
     }
 
+    /**
+     * @brief Create multiple IDs
+     *
+     * @param out   [out] Iterator out
+     * @param count [in] Number of IDs to generate
+     */
     template<typename IT_T>
-    void create(IT_T out, size_t count)
-    {
-
-    }
+    void create(IT_T out, size_t count);
 
     /**
      * @return Size required to fit all existing IDs, or allocated size if
      *         reserved ahead of time
      */
-    size_t capacity() const noexcept { return m_deleted.size(); }
+    constexpr size_t capacity() const noexcept { return m_deleted.size(); }
 
-    size_t size() const
-    {
-        return 0;
-    }
+    /**
+     * @return Number of registered IDs
+     */
+    constexpr size_t size() const { return capacity() - m_deleted.count(); }
 
+    /**
+     * @brief Allocate space for at least n IDs
+     *
+     * @param n [in] Number of IDs to allocate for
+     */
     void reserve(size_t n)
     {
-
+        m_deleted.resize(n, true);
     }
 
+    /**
+     * @brief Remove an ID. This will mark it for reuse
+     *
+     * @param id [in] ID to remove
+     */
     void remove(ID_T id)
     {
         if ( ! exists(id))
         {
-            throw std::runtime_error("ID over max capacity with automatic resizing disabled");
+            throw std::runtime_error("ID does not exist");
         }
+
+        m_deleted.set(id_int_t(id));
     }
 
+    /**
+     * @brief Check if an ID exists
+     *
+     * @param id [in] ID to check
+     *
+     * @return true if ID exists
+     */
     bool exists(ID_T id) const noexcept
     {
-
+        return ! m_deleted.test(id_int_t(id));
     };
 
     template <typename FUNC_T>
     void for_each(FUNC_T func);
 
 private:
-    HierarchicalBitset m_deleted;
+    HierarchicalBitset<uint64_t> m_deleted;
 
 }; // class IdRegistry
+
+template<typename ID_T, bool NO_AUTO_RESIZE>
+template<typename IT_T>
+void IdRegistry<ID_T, NO_AUTO_RESIZE>::create(IT_T out, size_t count)
+{
+    if (m_deleted.count() < count)
+    {
+        // auto-resize
+        if constexpr (NO_AUTO_RESIZE)
+        {
+            throw std::runtime_error(
+                    "Reached max capacity with automatic resizing disabled");
+        }
+        else
+        {
+            reserve(std::max(capacity() + count, capacity() * 2));
+        }
+    }
+
+    m_deleted.take<IT_T, ID_T>(out, count);
+}
 
 template<typename ID_T, bool NO_AUTO_RESIZE>
 template <typename FUNC_T>
 void IdRegistry<ID_T, NO_AUTO_RESIZE>::for_each(FUNC_T func)
 {
+    // TODO: this is kind of inefficient and doesn't utilize the hierarchy
     for (size_t i = 0; i < size(); i ++)
     {
-        //if (m_exists[i])
-        //{
-        //    func(ID_T(i));
-        //}
+        if ( ! m_deleted.test(i) )
+        {
+            func(ID_T(i));
+        }
     }
 }
 
