@@ -59,14 +59,13 @@ class SubdivIdTree : private osp::IdRegistry<ID_T>
 
 public:
 
-    using base_t::size_required;
     using base_t::capacity;
     using base_t::size;
 
     ID_T create_root()
     {
         ID_T const id = base_t::create();
-        m_idChildCount.resize(size_required());
+        m_idChildCount.resize(capacity());
         m_idChildCount[size_t(id)] = 0;
         return id;
     };
@@ -87,7 +86,7 @@ public:
             it->second = id_int_t(create_root());
 
             // Keep track of the new ID's parents
-            m_idToParents.resize(size_required());
+            m_idToParents.resize(capacity());
             m_idToParents[it->second] = combination;
 
             // Increase child count of the two parents
@@ -172,7 +171,7 @@ public:
         m_vrtxRefCount.ref_release(rStorage);
     }
 
-    SubdivIdTree<SkVrtxId> vrtx_ids() const noexcept { return m_vrtxIdTree; }
+    SubdivIdTree<SkVrtxId> const& vrtx_ids() const noexcept { return m_vrtxIdTree; }
 
     void vrtx_reserve(size_t n)
     {
@@ -320,8 +319,8 @@ public:
 
     void tri_group_resize_fit_ids()
     {
-        m_triData.resize(m_triIds.size_required());
-        m_triRefCount.resize(m_triIds.size_required() * 4);
+        m_triData.resize(m_triIds.capacity());
+        m_triRefCount.resize(m_triIds.capacity() * 4);
     }
 
     SkTriGroupId tri_group_create(

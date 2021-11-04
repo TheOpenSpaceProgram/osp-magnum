@@ -24,15 +24,17 @@
  */
 #pragma once
 
-#include <cstdint>
+#include "hierarchical_bitset.h"
+
 #include <cassert>
 #include <limits>
-#include <stdexcept>
 #include <utility>
 #include <vector>
 
 namespace osp
 {
+
+
 
 template<class TYPE_T>
 constexpr TYPE_T id_null() noexcept
@@ -40,6 +42,8 @@ constexpr TYPE_T id_null() noexcept
     using underlying_t = typename std::underlying_type_t<TYPE_T>;
     return TYPE_T(std::numeric_limits<underlying_t>::max());
 }
+
+//-----------------------------------------------------------------------------
 
 /**
  * @brief Generates reusable sequential IDs
@@ -52,59 +56,55 @@ class IdRegistry
 public:
 
     IdRegistry() = default;
-    IdRegistry(size_t capacity) { m_exists.reserve(capacity); };
+    IdRegistry(size_t capacity) { reserve(capacity); };
 
-    ID_T create();
-
-    /**
-     * @return Array size required to fit all currently existing IDs
-     */
-    id_int_t size_required() const noexcept { return m_exists.size(); }
-
-    size_t capacity() const { return m_exists.capacity(); }
-
-    size_t size() const { return m_exists.size() - m_deleted.size(); }
-
-    void reserve(size_t n) { m_exists.reserve(n); }
-
-    void remove(ID_T id);
-
-    bool exists(ID_T id) const noexcept;
-
-    template <typename FUNC_T>
-    void for_each(FUNC_T func);
-
-private:
-    std::vector<bool> m_exists; // this guy is weird, be careful
-    std::vector<id_int_t> m_deleted;
-
-}; // class IdRegistry
-
-template<typename ID_T, bool NO_AUTO_RESIZE>
-ID_T IdRegistry<ID_T, NO_AUTO_RESIZE>::create()
-{
-    // Attempt to reuse a deleted ID
-    if ( ! m_deleted.empty())
+    [[nodiscard]] ID_T create()
     {
-        id_int_t const id = m_deleted.back();
-        m_deleted.pop_back();
-        m_exists[id] = true;
-        return ID_T(id);
+
     }
 
-    if constexpr (NO_AUTO_RESIZE)
+    template<typename IT_T>
+    void create(IT_T out, size_t count)
     {
-        if (m_exists.size() == m_exists.capacity())
+
+    }
+
+    /**
+     * @return Size required to fit all existing IDs, or allocated size if
+     *         reserved ahead of time
+     */
+    size_t capacity() const noexcept { return m_deleted.size(); }
+
+    size_t size() const
+    {
+        return 0;
+    }
+
+    void reserve(size_t n)
+    {
+
+    }
+
+    void remove(ID_T id)
+    {
+        if ( ! exists(id))
         {
             throw std::runtime_error("ID over max capacity with automatic resizing disabled");
         }
     }
 
-    // Create a new Id
-    id_int_t const id = m_exists.size();
-    m_exists.push_back(true);
-    return ID_T(id);
-}
+    bool exists(ID_T id) const noexcept
+    {
+
+    };
+
+    template <typename FUNC_T>
+    void for_each(FUNC_T func);
+
+private:
+    HierarchicalBitset m_deleted;
+
+}; // class IdRegistry
 
 template<typename ID_T, bool NO_AUTO_RESIZE>
 template <typename FUNC_T>
@@ -112,10 +112,10 @@ void IdRegistry<ID_T, NO_AUTO_RESIZE>::for_each(FUNC_T func)
 {
     for (size_t i = 0; i < size(); i ++)
     {
-        if (m_exists[i])
-        {
-            func(ID_T(i));
-        }
+        //if (m_exists[i])
+        //{
+        //    func(ID_T(i));
+        //}
     }
 }
 
@@ -175,14 +175,13 @@ public:
     using Storage_t = IdStorage<ID_T, UniqueIdRegistry<ID_T, NO_AUTO_RESIZE> >;
 
     using IdRegistry<ID_T, NO_AUTO_RESIZE>::IdRegistry;
-    using base_t::size_required;
     using base_t::capacity;
     using base_t::size;
     using base_t::reserve;
     using base_t::exists;
     using base_t::for_each;
 
-    Storage_t create()
+    [[nodiscard]] Storage_t create()
     {
         return base_t::create();
     }

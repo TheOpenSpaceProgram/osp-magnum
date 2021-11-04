@@ -111,8 +111,8 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
         rVrtxId = skeleton.vrtx_create_root();
     }
 
-    rPositions.resize(skeleton.vrtx_ids().size_required());
-    rNormals.resize(skeleton.vrtx_ids().size_required());
+    rPositions.resize(skeleton.vrtx_ids().capacity());
+    rNormals.resize(skeleton.vrtx_ids().capacity());
 
     // Set positions and normals of the new vertices
 
