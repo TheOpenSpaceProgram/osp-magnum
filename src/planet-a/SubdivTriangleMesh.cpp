@@ -144,7 +144,8 @@ void ChunkVrtxSubdivLUT::fill_tri_recurse(
         Vector2us top, Vector2us lft, Vector2us rte, uint8_t level)
 {
     // calculate midpoints
-    std::array<Vector2us, 3> mid{{
+    std::array<Vector2us, 3> const mid
+    {{
         (top + lft) / 2,
         (lft + rte) / 2,
         (rte + top) / 2

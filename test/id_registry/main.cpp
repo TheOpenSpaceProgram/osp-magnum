@@ -30,6 +30,7 @@
 
 enum class Id : uint64_t { };
 
+// Basic intended use test of managing IDs
 TEST(IdRegistry, ManageIds)
 {
     osp::IdRegistry<Id> registry;
@@ -67,7 +68,8 @@ TEST(IdRegistry, ManageIds)
     EXPECT_EQ( registry.size(), 34 );
 }
 
-
+// A more chaotic test of repeated adding a random amount of new IDs then
+// deleting half of them randomly
 TEST(IdRegistry, RandomCreationAndDeletion)
 {
     constexpr size_t const sc_seed = 69;

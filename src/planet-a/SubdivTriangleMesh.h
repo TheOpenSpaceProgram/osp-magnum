@@ -71,7 +71,7 @@ using SharedVrtxStorage_t = osp::IdRefCount<SharedVrtxId>::Storage_t;
  */
 constexpr int xy_to_triangular(int x, int y) noexcept
 {
-    return y * (y + 1) / 2 + x;
+    return ( y * (y + 1) ) / 2 + x;
 };
 
 constexpr std::pair<ChunkLocalSharedId, bool> coord_to_shared(
@@ -79,15 +79,15 @@ constexpr std::pair<ChunkLocalSharedId, bool> coord_to_shared(
 {
     // Tests if (x,y) lies along right, bottom, or left edges of triangle
     // branchless because why not
-    bool lft = (x == 0);
-    bool btm = !lft && (y == chunkEdgeVrtxCount);
-    bool rte = !btm && (x == y);
+    bool const lft = (x == 0);
+    bool const btm = !lft && (y == chunkEdgeVrtxCount);
+    bool const rte = !btm && (x == y);
 
     // Calculate chunk local shared ID. starts at 0 from the top of the chunk,
     // and increases counterclockwise along the edge
-    uint32_t offset = lft * y
-                    + btm * (chunkEdgeVrtxCount + x)
-                    + rte * (chunkEdgeVrtxCount * 3 - x);
+    uint16_t const offset = lft * y
+                          + btm * (chunkEdgeVrtxCount + x)
+                          + rte * (chunkEdgeVrtxCount * 3 - x);
 
     return {ChunkLocalSharedId(offset), rte || btm || lft};
 }
@@ -114,13 +114,16 @@ public:
     };
 
     /**
-     * @brief ChunkedTriangleMesh
+     * @brief Construct a ChunkedTriangleMesh
+     *
+     * Datatypes chosen are above practical limits, varrying by detail
+     * preferences.
      *
      * @param chunkMax     [in] Max number of chunks
      * @param subdivLevels [in] Number of times a chunk triangle is subdivided.
      *                          Practical limit: ~8
-     * @param sharedMax    [in] Max number of shared vertices
-     * @param fanMax       [in] Max number of Fan triangles reserved for a chunk
+     * @param sharedMax    [in] Max number of vertices shared between chunks
+     * @param fanMax       [in] Max number of Fan triangles reserved per chunk
      */
     ChunkedTriangleMeshInfo(uint16_t chunkMax, uint8_t subdivLevels,
                             uint32_t sharedMax, uint16_t fanMax)
@@ -169,7 +172,7 @@ public:
         }
 
         // Center, non-shared chunk vertex
-        return VertexId(m_chunkVrtxFillCount * size_t(chunkId) + xy_to_triangular(x - 1, y - 2));
+        return VertexId(m_chunkVrtxFillCount * uint32_t(chunkId) + xy_to_triangular(x - 1, y - 2));
     }
 
     /**
@@ -202,9 +205,10 @@ public:
      * Param 2: The index of the first shared vertex in the vertex buffer.
      */
     template<typename FUNC_T>
-    void shared_update(FUNC_T func)
+    void shared_update(FUNC_T&& func)
     {
-        func(ArrayView_t<SharedVrtxId const>(m_sharedNewlyAdded),
+        std::forward<FUNC_T>(func)(
+             ArrayView_t<SharedVrtxId const>(m_sharedNewlyAdded),
              ArrayView_t<SkVrtxStorage_t const>(m_sharedSkVrtx.get(), m_sharedMax));
 
         m_sharedNewlyAdded.clear();
@@ -215,7 +219,7 @@ public:
      */
     constexpr uint32_t shared_count_max() const noexcept { return m_sharedMax; }
 
-    uint8_t& shared_face_count(SharedVrtxId sharedId) const noexcept { return m_sharedFaceCount[size_t(sharedId)]; }
+    uint8_t& shared_face_count(SharedVrtxId sharedId) noexcept { return m_sharedFaceCount[size_t(sharedId)]; }
 
     /**
      * @return Max number of mesh triangles / Required index buffer size.

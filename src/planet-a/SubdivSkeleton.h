@@ -50,9 +50,9 @@ class SubdivIdTree : private osp::IdRegistry<ID_T>
 {
 
     using base_t = osp::IdRegistry<ID_T>;
-    using id_int_t = std::underlying_type_t<ID_T>;
+    using id_int_t = osp::underlying_int_type_t<ID_T>;
 
-    static_assert(std::is_integral<id_int_t>::value && sizeof(ID_T) <= 4,
+    static_assert(std::is_integral_v<id_int_t> && sizeof(ID_T) <= 4,
                   "ID_T must be an integral type, 4 bytes or less in size");
 
     using combination_t = uint64_t;
@@ -62,6 +62,11 @@ public:
     using base_t::capacity;
     using base_t::size;
 
+    /**
+     * @brief Create a single ID with no parents
+     *
+     * @return New ID created
+     */
     ID_T create_root()
     {
         ID_T const id = base_t::create();
@@ -70,7 +75,17 @@ public:
         return id;
     };
 
-    std::pair<ID_T, bool> create_or_get(ID_T a, ID_T b)
+    /**
+     * @brief Create an ID from two parent IDs
+     *
+     * Order of parents does not matter
+     *
+     * @param a [in] Parent A
+     * @param b [in] Parent B
+     *
+     * @return New ID created
+     */
+    ID_T create_or_get(ID_T a, ID_T b)
     {
         combination_t const combination = hash_id_combination(a, b);
 
@@ -94,13 +109,20 @@ public:
             m_idChildCount[size_t(b)] ++;
         }
 
-        return { ID_T(it->second), success };
+        return ID_T(it->second);
     }
+
+    // TODO
 
     ID_T get(ID_T a, ID_T b) const;
 
     std::pair<ID_T, ID_T> get_parents(ID_T a);
 
+    /**
+     * @brief Reserve to fit at least n IDs
+     *
+     * @param n [in] Requested capacity
+     */
     void reserve(size_t n)
     {
         base_t::reserve(n);
@@ -108,23 +130,29 @@ public:
         m_idChildCount.reserve(base_t::capacity());
     }
 
-    static constexpr combination_t
-    hash_id_combination(id_int_t a, id_int_t b) noexcept
-    {
-        id_int_t const ls = (a > b) ? a : b;
-        id_int_t const ms = (a > b) ? b : a;
+private:
 
+    /**
+     * @brief Create a unique hash for two unordered IDs a and b
+     *
+     * @param a [in] ID to hash
+     * @param b [in] ID to hash
+     *
+     * @return Hash unique to combination
+     */
+    static constexpr combination_t
+    hash_id_combination(ID_T a, ID_T b) noexcept
+    {
+        // Sort to make A and B order-independent
+        id_int_t const ls = (a > b) ? id_int_t(a) : id_int_t(b);
+        id_int_t const ms = (a > b) ? id_int_t(b) : id_int_t(a);
+
+        // Concatenate bits of ls and ms into a 2x larger integer
+        // This can be two 32-bit ints being combined into a 64-bit int
         return combination_t(ls)
                 | (combination_t(ms) << (sizeof(id_int_t) * 8));
     }
 
-    static constexpr combination_t
-    hash_id_combination(ID_T a, ID_T b) noexcept
-    {
-        return hash_id_combination( id_int_t(a), id_int_t(b) );
-    }
-
-private:
     std::unordered_map<combination_t, id_int_t> m_parentsToId;
     std::vector<combination_t> m_idToParents;
     std::vector<uint8_t> m_idChildCount;
@@ -148,31 +176,60 @@ class SubdivSkeleton
 
 public:
 
-
+    /**
+     * @brief Create a single Vertex ID with no parents
+     *
+     * @return New Vertex ID created
+     */
     SkVrtxId vrtx_create_root()
     {
         SkVrtxId const vrtxId = m_vrtxIdTree.create_root();
         return vrtxId;
     };
 
+    /**
+     * @brief Create a single Vertex ID from two other Vertex IDs
+     *
+     * @return New Vertex ID created
+     */
     SkVrtxId vrtx_create_or_get_child(SkVrtxId a, SkVrtxId b)
     {
-        auto const [vrtxId, created] = m_vrtxIdTree.create_or_get(a, b);
-        return vrtxId;
+        return m_vrtxIdTree.create_or_get(a, b);
     }
 
+    /**
+     * @brief Store a Vertex ID in ref-counted long term storage
+     *
+     * @param vrtxId [in] ID to store
+     *
+     * @return Vertex ID Storage
+     */
     SkVrtxStorage_t vrtx_store(SkVrtxId vrtxId)
     {
         return m_vrtxRefCount.ref_add(vrtxId);
     }
 
+    /**
+     * @brief Safely cleares the contents of a Vertex ID storage, making it safe
+     *        to destruct.
+     *
+     * @param rStorage [ref] Storage to release
+     */
     void vrtx_release(SkVrtxStorage_t &rStorage)
     {
         m_vrtxRefCount.ref_release(rStorage);
     }
 
+    /**
+     * @return Read-only access to vertex IDs
+     */
     SubdivIdTree<SkVrtxId> const& vrtx_ids() const noexcept { return m_vrtxIdTree; }
 
+    /**
+     * @brief Reserve to fit at least n Vertex IDs
+     *
+     * @param n [in] Requested capacity
+     */
     void vrtx_reserve(size_t n)
     {
         m_vrtxIdTree.reserve(n);
@@ -278,6 +335,7 @@ public:
 
     ~SubdivTriangleSkeleton()
     {
+        // Release the 3 Vertex IDs of each triangle
         m_triIds.for_each([this] (SkTriGroupId id)
         {
             for (SkeletonTriangle& rTri : m_triData[size_t(id)].m_triangles)
@@ -290,6 +348,16 @@ public:
         });
     }
 
+    /**
+     * @brief Get or Create 3 Vertex IDs between the 3 other Vertex IDs
+     *
+     * This is a shorthand to calling vrtx_create_or_get_child 3 times for each
+     * edge of a triangle; intended for subdivision.
+     *
+     * @param vertices [in] 3 Vertex IDs, representing corners of a triangle
+     *
+     * @return 3 newly created or obtained Vertex IDs
+     */
     std::array<SkVrtxId, 3> vrtx_create_middles(
             std::array<SkVrtxId, 3> const& vertices)
     {
@@ -300,29 +368,75 @@ public:
         };
     }
 
+    /**
+     * @brief Create or get a line up of Vertex IDs between two other Vertex IDs
+     *
+     * Given Vertex A and B, each call will create a vertex C by combining
+     * A and B. If required, the function will recurse, calling itself twice
+     * with (A, C), and (C, B) to create more vertices.
+     *
+     * Example:
+     * Creating vertices between Vertex A to B, with level = 3, provided an
+     * array view of 7 Vertex IDs from 0 to 6.
+     *
+     * Geometric representation:
+     * A--0--1--2--3--4--5--6--B
+     *
+     * Recursive calls to fill array view:
+     *
+     * Level                         ID added
+     * 3: ---> A+B                -> 3
+     * 2:    |---> A+3            -> 1
+     * 1:    |   |---> A+1        -> 0
+     * 1:    |   |---> 1+3        -> 2
+     * 2:    |---> 3+B            -> 5
+     * 1:    |   |---> 3+5        -> 4
+     * 1:    |   |---> 5+B        -> 6
+     *
+     * @param level [in] Number of times to subdivide further
+     * @param a     [in] First Vertex ID
+     * @param b     [in] Second Vertex ID
+     * @param rOut  [out] Output Vertex IDs, size must be 2^level-1
+     */
     void vrtx_create_chunk_edge_recurse(
             unsigned int level,
             SkVrtxId a, SkVrtxId b,
             ArrayView_t< SkVrtxId > rOut)
     {
-        if (level == 0)
+        if (rOut.size() != ( (1 << level) - 1) )
         {
-            return;
+            throw std::runtime_error("Incorrect ");
         }
 
         SkVrtxId const mid = vrtx_create_or_get_child(a, b);
         size_t const halfSize = rOut.size() / 2;
         rOut[halfSize] = mid;
-        vrtx_create_chunk_edge_recurse(level - 1, a, mid, rOut.prefix(halfSize));
-        vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.suffix(halfSize));
+
+        if (level > 1)
+        {
+            vrtx_create_chunk_edge_recurse(level - 1, a, mid, rOut.prefix(halfSize));
+            vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.suffix(halfSize));
+        }
     }
 
+    /**
+     * @brief Resize data to fit all possible IDs
+     */
     void tri_group_resize_fit_ids()
     {
         m_triData.resize(m_triIds.capacity());
         m_triRefCount.resize(m_triIds.capacity() * 4);
     }
 
+    /**
+     * @brief Create a triangle group (4 new triangles)
+     *
+     * @param depth    [in] Depth of group to create
+     * @param parent   [in] Parent of group to create
+     * @param vertices [in] Vertices of each of the 4 triangles to create
+     *
+     * @return New Triangle Group ID
+     */
     SkTriGroupId tri_group_create(
             uint8_t depth,
             SkTriId parent,
@@ -348,6 +462,9 @@ public:
         return groupId;
     }
 
+    /**
+     * @return Triangle data from ID
+     */
     SkeletonTriangle& tri_at(SkTriId triId)
     {
         auto groupIndex = size_t(tri_group_id(triId));
@@ -355,10 +472,26 @@ public:
         return m_triData.at(groupIndex).m_triangles[siblingIndex];
     }
 
+    /**
+     * @return Read-only access to Triangle IDs
+     */
     constexpr osp::IdRegistry<SkTriGroupId> const& tri_ids() const { return m_triIds; }
 
+    /**
+     * @brief Subdivide a triangle, creating a new group (4 new triangles)
+     *
+     * @param triId   [in] ID of Triangle to subdivide
+     * @param vrtxMid [in] Vertex IDs between each corner of the triangle
+     *
+     * @return New Triangle Group ID
+     */
     SkTriGroupId tri_subdiv(SkTriId triId, std::array<SkVrtxId, 3> vrtxMid);
 
+    /**
+     * @brief Reserve to fit at least n Triangle groups
+     *
+     * @param n [in] Requested capacity
+     */
     void tri_group_reserve(size_t n)
     {
         m_triIds.reserve(n);
@@ -366,11 +499,22 @@ public:
         m_triRefCount.resize(m_triIds.capacity() * 4);
     }
 
+    /**
+     * @brief Store a Triangle ID in ref-counted long term storage
+     *
+     * @return Triangle
+     */
     SkTriStorage_t tri_store(SkTriId triId)
     {
         return m_triRefCount.ref_add(triId);
     }
 
+    /**
+     * @brief Safely cleares the contents of a Triangle ID storage, making it
+     *        safe to destruct.
+     *
+     * @param rStorage [ref] Storage to release
+     */
     void tri_release(SkTriStorage_t &rStorage)
     {
         m_triRefCount.ref_release(rStorage);

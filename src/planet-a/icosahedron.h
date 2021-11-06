@@ -37,7 +37,9 @@ namespace planeta
 inline constexpr int const gc_icoVrtxCount = 12;
 inline constexpr int const gc_icoTriCount = 20;
 
-inline constexpr float const sc_icoEdgeRatio = 0.95105651629f;
+// Ratio between an icosahedron's edge length and radius
+// = sqrt(10.0 + 2.0 * sqrt(5.0)) / 4.0;
+inline constexpr double const sc_icoEdgeRatio = 0.95105651629f;
 
 // The 20 faces of the icosahedron {Top, Left, Right}
 // Each number refers to one of 12 initial vertices
@@ -49,24 +51,61 @@ inline constexpr std::array<std::array<uint8_t, 3>, 20> sc_icoTriLUT
     {11,  7,  6},  {11,  8,  7},  {11,  9,  8},  {11, 10,  9},  {11,  6, 10}
 }};
 
+/**
+ * @brief Create an icosahedron shaped Triangle Mesh Skeleton
+ *
+ * @param radius        [in] Radius of icosahedron in meters
+ * @param pow2scale     [in] Scale for rPositions, 2^pow2scale units = 1 meter
+ * @param vrtxIds       [out] Vertex IDs out for initial 12 vertices
+ * @param triIds        [out] Triangle IDs out for initial 20 triangles
+ * @param rPositions    [out] Position data to allocate
+ * @param rNormals      [out] Normal data to allocate
+ *
+ * @return SubdivTriangleSkeleton for keeping track of Vertex and Triangle IDs
+ */
 SubdivTriangleSkeleton create_skeleton_icosahedron(
-        float rad, int scale,
+        double radius, int pow2scale,
         Corrade::Containers::StaticArrayView<gc_icoVrtxCount, SkVrtxId> vrtxIds,
         Corrade::Containers::StaticArrayView<gc_icoTriCount, SkTriId> triIds,
         std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals);
 
+/**
+ * @brief Calculate positions and normals for 3 new vertices created when
+ *        subdividing a Triangle along an icosahedron sphere
+ *
+ * @param radius        [in] Radius of icosahedron in meters
+ * @param pow2scale     [in] Scale for rPositions, 2^pow2scale units = 1 meter
+ * @param vrtxCorners   [in] Vertex IDs for the main Triangle's corners
+ * @param vrtxMid       [in] Vertex IDs of the 3 new middle vertices
+ * @param rPositions    [ref] Position data
+ * @param rNormals      [ref] Normal data
+ */
 void ico_calc_middles(
-        float radius, int scale,
+        double radius, int pow2scale,
         std::array<SkVrtxId, 3> const vrtxCorners,
         std::array<SkVrtxId, 3> const vrtxMid,
         std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals);
 
+/**
+ * @brief Calculate positions for vertices along an edge from Vertex A to B
+ *
+ * Corresponds to SubdivTriangleSkeleton::vrtx_create_chunk_edge_recurse
+ *
+ * @param radius        [in] Radius of icosahedron in meters
+ * @param pow2scale     [in] Scale for rPositions, 2^pow2scale units = 1 meter
+ * @param level         [in] Number of times to subdivide
+ * @param a             [in] Vertex ID of A
+ * @param b             [in] Vertex ID of B
+ * @param vrtxs         [in] Vertex IDs of vertices between A and B
+ * @param rPositions    [ref] Position data
+ * @param rNormals      [ref] Normal data
+ */
 void ico_calc_chunk_edge_recurse(
-        float radius, int scale, unsigned int level,
+        double radius, int pow2scale, unsigned int level,
         SkVrtxId a, SkVrtxId b,
-        ArrayView_t<SkVrtxId> vrtxs,
+        ArrayView_t<SkVrtxId const> vrtxs,
         std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals);
 

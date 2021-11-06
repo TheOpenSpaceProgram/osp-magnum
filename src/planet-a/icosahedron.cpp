@@ -29,7 +29,7 @@
 using namespace planeta;
 
 SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
-        float radius, int pow2scale,
+        double radius, int pow2scale,
         Corrade::Containers::StaticArrayView<gc_icoVrtxCount, SkVrtxId> vrtxIds,
         Corrade::Containers::StaticArrayView<gc_icoTriCount, SkTriId> triIds,
         std::vector<osp::Vector3l> &rPositions,
@@ -136,10 +136,10 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
                  vrtxIds[ sc_icoTriLUT[i][2] ] };
     };
 
-    for (size_t i = 0; i < gc_icoTriCount; i += 4)
+    for (int i = 0; i < gc_icoTriCount; i += 4)
     {
         //std::array<std::array<SkVrtxId, 3>, 4> ;
-        SkTriGroupId const groupId = skeleton.tri_group_create(0, SkTriId(0),
+        SkTriGroupId const groupId = skeleton.tri_group_create(0, osp::id_null<SkTriId>(),
         {
             vrtx_id_lut(i + 0), vrtx_id_lut(i + 1),
             vrtx_id_lut(i + 2), vrtx_id_lut(i + 3)
@@ -155,7 +155,7 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
 }
 
 void subdiv_curvature(
-        float const radius, float scale, osp::Vector3l const a, osp::Vector3l const b,
+        double radius, float scale, osp::Vector3l const a, osp::Vector3l const b,
         osp::Vector3l &rPos, osp::Vector3 &rNorm) noexcept
 {
     osp::Vector3l const avg = (a + b) / 2;
@@ -168,7 +168,7 @@ void subdiv_curvature(
 }
 
 void planeta::ico_calc_middles(
-        float radius, int pow2scale,
+        double radius, int pow2scale,
         std::array<SkVrtxId, 3> const vrtxCorner,
         std::array<SkVrtxId, 3> const vrtxMid,
         std::vector<osp::Vector3l> &rPositions,
@@ -191,9 +191,9 @@ void planeta::ico_calc_middles(
 
 
 void planeta::ico_calc_chunk_edge_recurse(
-        float radius, int pow2scale, unsigned int level,
+        double radius, int pow2scale, unsigned int level,
         SkVrtxId a, SkVrtxId b,
-        ArrayView_t<SkVrtxId> vrtxs,
+        ArrayView_t<SkVrtxId const> vrtxs,
         std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals)
 {

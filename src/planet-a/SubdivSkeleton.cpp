@@ -59,13 +59,15 @@ SkTriGroupId SubdivTriangleSkeleton::tri_subdiv(SkTriId triId,
     // c1       m1       c2
     //
     SkTriGroupId const groupId = tri_group_create(
-            parentGroup.m_depth + 1, triId,
-    {{
-        { corner(0), middle(0), middle(2) }, // 0: Top
-        { middle(0), corner(1), middle(1) }, // 1: Left
-        { middle(2), middle(1), corner(2) }, // 2: Right
-        { middle(1), middle(2), middle(0) }  // 3: Center
-    }});
+        parentGroup.m_depth + 1,
+        triId,
+        {{
+            { corner(0), middle(0), middle(2) }, // 0: Top
+            { middle(0), corner(1), middle(1) }, // 1: Left
+            { middle(2), middle(1), corner(2) }, // 2: Right
+            { middle(1), middle(2), middle(0) }  // 3: Center
+        }}
+    );
 
     rTri.m_children = groupId;
 

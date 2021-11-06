@@ -30,6 +30,10 @@
 #include <memory>
 #include <stdexcept>
 
+#if defined(_MSC_VER)
+    #include <intrin.h>
+#endif
+
 namespace osp
 {
 
@@ -39,14 +43,13 @@ namespace osp
 
 #elif defined(_MSC_VER)
 
-    #include <intrin.h>
-
     inline int ctz(uint64_t a) noexcept
     {
         unsigned long int b = 0;
         _BitScanForward64(&b, a);
         return b;
     }
+
 #elif
 
     static_assert(false, "Missing ctz 'count trailing zeros' implementation for this compiler");
@@ -54,23 +57,41 @@ namespace osp
 #endif
 
 /**
- * @brief Divide and round up
+ * @brief Divide two integers and round up
  */
 template<typename NUM_T, typename DENOM_T>
 constexpr decltype(auto) div_ceil(NUM_T num, DENOM_T denom) noexcept
 {
+    static_assert(std::is_integral_v<NUM_T>);
+    static_assert(std::is_integral_v<DENOM_T>);
+
     return (num / denom) + (num % denom != 0);
 }
 
 template<typename INT_T>
 constexpr bool bit_test(INT_T block, int bit)
 {
+    static_assert(std::is_unsigned_v<INT_T>);
     return (block & (INT_T(1) << bit) ) != 0;
 }
 
+/**
+ * @brief Copy a certain number of bits from one int array to another
+ *
+ * This function treats integer arrays as bit arrays. Bits are indexed from
+ * LSB to MSB.
+ *
+ * TODO: maybe add a starting bit offset too?
+ *
+ * @param pSrc   [in] Integer array to copy
+ * @param pDest  [out] Integer array to write into
+ * @param bits   [in] Number of bits to write
+ */
 template<typename INT_T>
 constexpr void copy_bits(INT_T const* pSrc, INT_T* pDest, size_t bits) noexcept
 {
+    static_assert(std::is_unsigned_v<INT_T>);
+
     while (bits >= sizeof(INT_T) * 8)
     {
         *pDest = *pSrc;
@@ -91,16 +112,20 @@ constexpr void copy_bits(INT_T const* pSrc, INT_T* pDest, size_t bits) noexcept
 template<typename INT_T>
 constexpr void set_bits(INT_T* pDest, size_t bits) noexcept
 {
+    static_assert(std::is_unsigned_v<INT_T>);
+
+    constexpr INT_T c_allOnes = ~INT_T(0);
+
     while (bits >= sizeof(INT_T) * 8)
     {
-        *pDest = ~INT_T(0);
+        *pDest = c_allOnes;
         pDest ++;
         bits -= sizeof(INT_T) * 8;
     }
 
     if (bits != 0)
     {
-        *pDest |= ~( (~INT_T(0)) << bits );
+        *pDest |= ~( c_allOnes << bits );
     }
 }
 
@@ -109,20 +134,40 @@ constexpr void set_bits(INT_T* pDest, size_t bits) noexcept
 /**
  * @brief A bitset featuring hierarchical rows for fast iteration over set bits
  *
- * For example, when using 8-bit block sizes, the structure looks like this:
+ * This container requires rows of bits, divided into blocks. This is
+ * represented as an array of unsigned integer types, where each int is a block.
+ *
+ * The main advantage of using an int, is that their bits can be tested for
+ * ones all at once, by comparing the int to zero.
+ *
+ * There are multiple rows. The bottom row [0] is the user's bits that can be
+ * set and reset. For the rest of the rows above, each bit N is set if the row
+ * below's block N is non-zero.
+ *
+ * The bottom row sets the size of the container, and each row above must be
+ * be large enough to have a bit for each block of the row below.
+ *
+ * For example, when using 8-bit block sizes, and 40 bits for container size:
+ *
+ * Row 0 size: 40 bits  (5 blocks needed)
+ * Row 1 size: 5 bits   (1 block)
+ * Row 2 size: 0, not needed
+ * ...
+ *
+ * To represent a set of integers: { 0, 1, 18, 19 }:
  *
  * Row 1: 00000101
  * Row 0: 00000011 00000000 00001100 00000000 00000000
  *
- * Size: 40 bits, determined by Row 0
- * Bits set: { 0, 1, 18, 19 }
+ * * Row 1's first 5 bits corresponds to Row 0's blocks.
+ * * Row 1's bit 0 and bit 2 means Row 0's block 0 and block 2 is non-zero
  *
  * note: Bits are displayed in msb->lsb, but arrays are left->right
  *
- * * Row 1's bit 0 and bit 2 means Row 0's block 0 and block 2 is non-zero
- * * Row 1's last 3 bits are always zero
- * * Container supports sizes that aren't aligned with block sizes, which means
- *   the last bits of Row 0's last block may be ignored
+ * Iterating or searching for set bits on the bottom row is as simple as looking
+ * up the set bits in the blocks the top row, and recursing down.
+ *
+ * This operation is O(number of rows), or O(log n)
  */
 template <typename BLOCK_INT_T = uint64_t>
 class HierarchicalBitset
@@ -147,7 +192,7 @@ public:
     struct Row { size_t m_offset; size_t m_size; };
     using rows_t = std::array<Row, smc_maxRows>;
 
-    HierarchicalBitset() = default;
+    constexpr HierarchicalBitset() = default;
 
     /**
      * @brief Construct with size
@@ -158,10 +203,9 @@ public:
     HierarchicalBitset(size_t size, bool fill = false)
      : m_size{size}
      , m_topLevel{0}
+     , m_blockCount{ calc_blocks_recurse(size, 0, m_topLevel, m_rows) }
+     , m_blocks{ std::make_unique<BLOCK_INT_T[]>(m_blockCount) }
     {
-        m_blockCount = calc_blocks_recurse(size, 0, m_topLevel, m_rows);
-        m_blocks = std::make_unique<BLOCK_INT_T[]>(m_blockCount);
-
         if (fill)
         {
             set();
@@ -175,7 +219,7 @@ public:
      *
      * @return True if bit is set, False if not, 3.14159 if the universe broke
      */
-    bool test(size_t i) const;
+    bool test(size_t bit) const;
 
     /**
      * @brief Set all bits to 1
@@ -206,10 +250,10 @@ public:
      *
      * @param i [in] Bit to set
      */
-    void set(size_t i)
+    void set(size_t bit)
     {
-        bounds_check(i);
-        block_set_recurse(0, bit_at(i));
+        bounds_check(bit);
+        block_set_recurse(0, bit_at(bit));
     }
 
     /**
@@ -217,10 +261,10 @@ public:
      *
      * @param i [in] Bit to reset
      */
-    void reset(size_t i)
+    void reset(size_t bit)
     {
-        bounds_check(i);
-        block_reset_recurse(0, bit_at(i));
+        bounds_check(bit);
+        block_reset_recurse(0, bit_at(bit));
     }
 
     /**
@@ -281,10 +325,10 @@ private:
     /**
      * @brief Convert bit position to a row block number and block bit number
      */
-    static constexpr RowBit bit_at(size_t pos) noexcept
+    static constexpr RowBit bit_at(size_t rowBit) noexcept
     {
-        row_index_t const block = pos / smc_blockSize;
-        int const bit = pos % smc_blockSize;
+        row_index_t const block = rowBit / smc_blockSize;
+        int const bit = rowBit % smc_blockSize;
         return { block, bit };
     }
 
@@ -343,21 +387,21 @@ private:
      */
     void recalc_blocks();
 
-    size_t m_blockCount{0};
-    std::unique_ptr<BLOCK_INT_T[]> m_blocks;
-
     rows_t m_rows;
     size_t m_size{0};
     size_t m_count{0};
     int m_topLevel{0};
+
+    size_t m_blockCount{0};
+    std::unique_ptr<BLOCK_INT_T[]> m_blocks;
 }; // class HierarchicalBitset
 
 
 template <typename BLOCK_INT_T>
-bool HierarchicalBitset<BLOCK_INT_T>::test(size_t i) const
+bool HierarchicalBitset<BLOCK_INT_T>::test(size_t bit) const
 {
-    bounds_check(i);
-    RowBit const pos = bit_at(i);
+    bounds_check(bit);
+    RowBit const pos = bit_at(bit);
 
     return bit_test(m_blocks[m_rows[0].m_offset + pos.m_block], pos.m_bit);
 }

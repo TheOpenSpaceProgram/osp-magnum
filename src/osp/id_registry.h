@@ -34,11 +34,43 @@
 namespace osp
 {
 
+template<typename TYPE_T>
+struct type_identity
+{
+    using type = TYPE_T;
+};
+
+template<typename TYPE_T>
+using type_identity_t = typename type_identity<TYPE_T>::type;
+
+template<typename TYPE_T, typename = void>
+struct underlying_int_type;
+
+template<typename TYPE_T>
+struct underlying_int_type< TYPE_T, std::enable_if_t< std::is_enum_v<TYPE_T> > >
+ : std::underlying_type<TYPE_T>
+{ };
+
+template<typename TYPE_T>
+struct underlying_int_type< TYPE_T, std::enable_if_t< ! std::is_enum_v<TYPE_T> > >
+ : type_identity<TYPE_T>
+{ };
+
+template<typename TYPE_T>
+using underlying_int_type_t = typename underlying_int_type<TYPE_T>::type;
+
+enum class Test : uint32_t {};
+static_assert(std::is_same_v<underlying_int_type_t<int>, int>);
+static_assert(std::is_same_v<underlying_int_type_t<Test>, uint32_t>);
+
+//-----------------------------------------------------------------------------
+
+
 template<class TYPE_T>
 constexpr TYPE_T id_null() noexcept
 {
-    using underlying_t = typename std::underlying_type_t<TYPE_T>;
-    return TYPE_T(std::numeric_limits<underlying_t>::max());
+    using id_int_t = underlying_int_type_t<TYPE_T>;
+    return TYPE_T(std::numeric_limits<id_int_t>::max());
 }
 
 //-----------------------------------------------------------------------------
@@ -49,7 +81,7 @@ constexpr TYPE_T id_null() noexcept
 template<typename ID_T, bool NO_AUTO_RESIZE = false>
 class IdRegistry
 {
-    using id_int_t = std::underlying_type_t<ID_T>;
+    using id_int_t = underlying_int_type_t<ID_T>;
 
 public:
 
@@ -63,7 +95,7 @@ public:
      */
     [[nodiscard]] ID_T create()
     {
-        ID_T output;
+        ID_T output{ id_null<ID_T>() };
         create(&output, 1);
         return output;
     }
@@ -180,18 +212,14 @@ class IdStorage
 
 public:
     IdStorage() : m_id{ id_null<ID_T>() } { }
+    IdStorage(IdStorage&& move) = default;
     ~IdStorage() { assert( ! has_value() ); }
 
     // Delete copy
     IdStorage(IdStorage const& copy) = delete;
     IdStorage& operator=(IdStorage const& copy) = delete;
 
-    // Allow move only if there's no ID stored
-    IdStorage(IdStorage&& move)
-    {
-        assert( ! has_value() );
-        m_id = std::exchange(move.m_id, id_null<ID_T>());
-    }
+    // Allow move assignment only if there's no ID stored
     IdStorage& operator=(IdStorage&& move)
     {
         assert( ! has_value() );
@@ -252,18 +280,14 @@ class RefCount : std::vector<COUNT_T>
 public:
 
     RefCount() = default;
+    RefCount(RefCount&& move) = default;
     RefCount(size_t capacity) { resize(capacity); };
 
     // Delete copy
     RefCount(RefCount const& copy) = delete;
     RefCount& operator=(RefCount const& copy) = delete;
 
-    // Allow move only if all counts are zero
-    RefCount(RefCount&& move)
-    {
-        assert(isRemainingZero(0));
-        base_t(std::move(move));
-    }
+    // Allow move assign only if all counts are zero
     RefCount& operator=(RefCount&& move)
     {
         assert(isRemainingZero(0));
@@ -310,13 +334,15 @@ public:
 template<typename ID_T, typename COUNT_T = uint8_t>
 class IdRefCount : public RefCount<COUNT_T>
 {
+    using id_int_t = underlying_int_type_t<ID_T>;
+
 public:
 
     using Storage_t = IdStorage<ID_T, IdRefCount>;
 
     Storage_t ref_add(ID_T id)
     {
-        auto const idInt = std::underlying_type_t<ID_T>(id);
+        auto const idInt = id_int_t(id);
         if (this->size() <= idInt)
         {
             this->resize(idInt + 1);
@@ -330,7 +356,7 @@ public:
     {
         if (rStorage.has_value())
         {
-            auto const idInt = std::underlying_type_t<ID_T>(rStorage.m_id);
+            auto const idInt = id_int_t(rStorage.m_id);
             (*this)[idInt] --;
             rStorage.m_id = id_null<ID_T>();
         }

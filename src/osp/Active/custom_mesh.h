@@ -68,7 +68,6 @@ struct ACtxCustomMeshes
     template<typename ... ARGS_T>
     CustomMeshStorage_t emplace(ARGS_T&& ... args)
     {
-        // 157
         CustomMeshStorage_t storage = m_meshIds.create();
         size_t const idInt = size_t(storage.value());
 

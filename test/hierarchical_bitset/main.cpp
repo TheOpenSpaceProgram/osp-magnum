@@ -52,17 +52,22 @@ std::vector<int> random_ascending(int seed, size_t maximum)
     return testSet;
 }
 
+// Test count trailing zeros function. This relies on compiler intrinsics.
 TEST(HierarchicalBitset, CountTrailingZeros)
 {
     using osp::ctz;
 
-    EXPECT_EQ( 0,  ctz(uint64_t(1)) );
+    EXPECT_EQ(  0, ctz(uint64_t(1)) );
     EXPECT_EQ( 20, ctz(uint64_t(1) << 20) );
     EXPECT_EQ( 63, ctz(uint64_t(1) << 63) );
+    EXPECT_EQ(  2, ctz(0b0010'1100) );
+    EXPECT_EQ(  4, ctz(0b0101'0000) );
 }
 
+// Test case where the container size is not aligned with its block size
 TEST(HierarchicalBitset, BasicUnaligned)
 {
+    // with a size of 129, only 1 bit is used in the last block
     HierarchicalBitset bitset(129);
 
     bitset.set(0);
@@ -92,6 +97,7 @@ TEST(HierarchicalBitset, BasicUnaligned)
     EXPECT_EQ( 0, bitset.count() );
 }
 
+// Test case where the container size is exactly aligned with its block size
 TEST(HierarchicalBitset, BasicAligned)
 {
     HierarchicalBitset bitset(128);
@@ -123,6 +129,7 @@ TEST(HierarchicalBitset, BasicAligned)
     EXPECT_EQ( 0, bitset.count() );
 }
 
+// Test setting random bits, and taking them all
 TEST(HierarchicalBitset, TakeRandomSet)
 {
     constexpr size_t const sc_max = 13370;
@@ -149,6 +156,7 @@ TEST(HierarchicalBitset, TakeRandomSet)
 
 }
 
+// Test resizing the container up and down
 TEST(HierarchicalBitset, Resizing)
 {
     HierarchicalBitset bitset(20);
