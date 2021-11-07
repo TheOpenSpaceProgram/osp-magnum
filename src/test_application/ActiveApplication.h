@@ -44,13 +44,6 @@
 namespace testapp
 {
 
-using SceneUpdate_t = std::function<void(osp::active::ActiveScene&)>;
-
-using MapActiveScene_t = std::map<
-        std::string,
-        std::pair<osp::active::ActiveScene, SceneUpdate_t>,
-        std::less<> >;
-
 /**
  * @brief An interactive Magnum application made for running ActiveScenes
  *
@@ -81,11 +74,7 @@ public:
     void update_scenes();
     void draw_scenes();
 
-    osp::active::ActiveScene& scene_create(std::string const& name, SceneUpdate_t upd);
-    osp::active::ActiveScene& scene_create(std::string&& name, SceneUpdate_t upd);
-
     constexpr osp::input::UserInputHandler& get_input_handler() { return m_userInput; }
-    constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
 
     constexpr osp::Package& get_context_resources() { return m_glResources; }
 
@@ -96,8 +85,6 @@ private:
     on_draw_t m_onDraw;
 
     osp::input::UserInputHandler m_userInput;
-
-    MapActiveScene_t m_scenes;
 
     osp::PackageRegistry &m_rPackages;
 

@@ -102,9 +102,9 @@ struct WirePort
  * Added to Machine entities to connect to Nodes
  */
 template<typename WIRETYPE_T>
-struct ACompWirePanel
+struct MCompWirePanel
 {
-    ACompWirePanel(uint16_t portCount)
+    MCompWirePanel(uint16_t portCount)
      : m_ports(portCount)
     { }
 
@@ -269,7 +269,7 @@ public:
     static void update_wire(ActiveScene& rScene);
 
     /**
-     * Construct a vehicle's ACompWirePanels according to their Blueprint
+     * Construct a vehicle's MCompWirePanels according to their Blueprint
      *
      * @param rScene     [ref] Scene supporting Vehicles and the right wire type
      * @param vehicleEnt [in] Vehicle entity
@@ -316,7 +316,7 @@ public:
     static bool connect(
             WireNode<WIRETYPE_T>& node,
             nodeindex_t<WIRETYPE_T> nodeIndex,
-            ACompWirePanel<WIRETYPE_T>& panel,
+            MCompWirePanel<WIRETYPE_T>& panel,
             ActiveEnt machEnt,
             portindex_t<WIRETYPE_T> port,
             typename WIRETYPE_T::LinkState link);
@@ -328,7 +328,7 @@ template<typename WIRETYPE_T>
 bool SysWire::connect(
         WireNode<WIRETYPE_T>& node,
         nodeindex_t<WIRETYPE_T> nodeIndex,
-        ACompWirePanel<WIRETYPE_T>& panel,
+        MCompWirePanel<WIRETYPE_T>& panel,
         ActiveEnt machEnt,
         portindex_t<WIRETYPE_T> port,
         typename WIRETYPE_T::LinkState link)
@@ -367,7 +367,7 @@ void SysWire::construct_panels(
         ActiveEnt machEnt = machines.m_machines[bpPanel.m_protoMachineIndex];
 
         // Create the panel supporting the right number of ports
-        rScene.reg_emplace< ACompWirePanel<WIRETYPE_T> >(machEnt,
+        rScene.reg_emplace< MCompWirePanel<WIRETYPE_T> >(machEnt,
                                                          bpPanel.m_portCount);
     }
 }

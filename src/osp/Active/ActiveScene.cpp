@@ -25,7 +25,7 @@
 
 #include "ActiveScene.h"                    // IWYU pragma: associated
 
-#include <osp/Active/scene.h>               // for ACompCamera
+#include <osp/Active/basic.h>               // for ACompCamera
 #include <osp/Active/drawing.h>             // for ACompPerspective3DView
 #include <osp/Active/SysRender.h>           // for ACompRenderTarget
 #include <osp/Active/SysHierarchy.h>        // for SysHierarchy

@@ -223,7 +223,7 @@ ActiveEnt SysVehicle::part_instantiate(
         ActiveEnt parent = newEntities[pcompMachine.m_entity];
         ActiveEnt machEnt = machines.m_machines.emplace_back(
                     SysHierarchy::create_child(rScene, parent, "Machine"));
-        rScene.reg_emplace<ACompMachineType>(machEnt, pcompMachine.m_type);
+        //rScene.reg_emplace<ACompMachineType>(machEnt, pcompMachine.m_type);
     }
 
     return rootEntity;

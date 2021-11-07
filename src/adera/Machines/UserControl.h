@@ -39,24 +39,24 @@ namespace adera::active::machines
 
 /**
  * Gets ButtonControlHandle from a UserInputHandler, and updates
- * MachineUserControls
+ * MCompUserControls
  */
-class SysMachineUserControl
+class SysMCompUserControl
 {
 public:
 
     /**
-     * Constructs MachineUserControls for vehicles in-construction
+     * Constructs MCompUserControls for vehicles in-construction
      *
      * @param rScene [ref] Scene supporting vehicles
      */
     static void update_construct(osp::active::ActiveScene &rScene);
 
     /**
-     * Updates MachineUserControls in the world by reading user controls and
+     * Updates MCompUserControls in the world by reading user controls and
      * setting wire outputs accordingly
      *
-     * @param rScene [ref] Scene with MachineUserControls to update
+     * @param rScene [ref] Scene with MCompUserControls to update
      */
     static void update_sensor(osp::active::ActiveScene &rScene);
 };
@@ -64,7 +64,7 @@ public:
 /**
  * Interfaces user input into WireOutputs designed for controlling spacecraft.
  */
-struct MachineUserControl
+struct MCompUserControl
 {
     using Percent = adera::wire::Percent;
     using AttitudeControl = adera::wire::AttitudeControl;

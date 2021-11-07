@@ -50,4 +50,7 @@ enum class ActiveEnt: entt::id_type {};
 
 using ActiveReg_t = entt::basic_registry<ActiveEnt>;
 
+template<typename COMP_T>
+using acomp_storage_t = entt::basic_storage<ActiveEnt, COMP_T>;
+
 }

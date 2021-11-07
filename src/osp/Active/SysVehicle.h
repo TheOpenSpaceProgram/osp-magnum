@@ -28,7 +28,7 @@
 
 #include "../Resource/Package.h"
 #include "../Resource/blueprints.h"
-#include "osp/Active/SysMachine.h"
+#include "osp/Active/machines.h"
 
 namespace osp::active
 {

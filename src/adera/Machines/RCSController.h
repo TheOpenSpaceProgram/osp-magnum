@@ -44,14 +44,14 @@ namespace adera::active::machines
  * thrusters which need to know whether or not a given maneuver command requires
  * their contribution. Translation and orientation commands are received from
  * the command module and output as throttle command values, and the
- * MachineRockets associated with the RCS thrusters will fire.
+ * MCompRockets associated with the RCS thrusters will fire.
  */
-class SysMachineRCSController
+class SysMCompRCSController
 {
 public:
 
     /**
-     * Constructs MachineRCSControllers for vehicles in-construction
+     * Constructs MCompRCSControllers for vehicles in-construction
      *
      * @param rScene [ref] Scene supporting vehicles
      */
@@ -60,10 +60,10 @@ public:
     /**
      * Primary system update function
      *
-     * Iterates over MachineRCSControllers and issues throttle commands to the
-     * associated MachineRocket thrusters via wire
+     * Iterates over MCompRCSControllers and issues throttle commands to the
+     * associated MCompRocket thrusters via wire
      *
-     * @param rScene [ref] Scene with MachineRCSControllers to update
+     * @param rScene [ref] Scene with MCompRCSControllers to update
      */
     //static void update_controls(osp::active::ActiveScene &rScene);
 
@@ -88,13 +88,13 @@ private:
         osp::Vector3 posOset, osp::Vector3 direction,
         osp::Vector3 cmdTransl, osp::Vector3 cmdRot);
 
-}; // SysMachineRCSController
+}; // SysMCompRCSController
 
 //-----------------------------------------------------------------------------
 
-class MachineRCSController
+class MCompRCSController
 {
-    friend SysMachineRCSController;
+    friend SysMCompRCSController;
 
     using Percent = wire::Percent;
     using AttitudeControl = wire::AttitudeControl;
@@ -107,7 +107,7 @@ public:
 
     static constexpr osp::portindex_t<Percent> m_woThrottle{0};
 
-}; // MachineRCSController
+}; // MCompRCSController
 
 
 } // adera::active::machines

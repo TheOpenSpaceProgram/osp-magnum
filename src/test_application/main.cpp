@@ -36,6 +36,7 @@
 #include <osp/Resource/AssetImporter.h>
 #include <osp/Satellites/SatVehicle.h>
 #include <osp/Shaders/Phong.h>
+#include <osp/scene.h>
 #include <osp/string_concat.h>
 #include <osp/logging.h>
 
@@ -90,8 +91,9 @@ void debug_print_machines();
 osp::PackageRegistry g_packages;
 
 // Test application stores 1 universe and its update function
-osp::universe::Universe g_universe;
-universe_update_t g_universeUpdate;
+//osp::universe::Universe g_universe;
+//universe_update_t g_universeUpdate;
+std::vector<std::shared_ptr<osp::Scene>> m_scenes;
 
 // Deals with the window, OpenGL context, and other game engine stuff that
 // often have "Active" written all over them
@@ -136,11 +138,11 @@ int main(int argc, char** argv)
     {
         if(args.value("scene") == "simple")
         {
-            simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
+            //simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
         }
         else if(args.value("scene") == "moon")
         {
-            moon::create(g_packages, g_universe, g_universeUpdate);
+            //moon::create(g_packages, g_universe, g_universeUpdate);
         }
         else
         {
@@ -152,13 +154,13 @@ int main(int argc, char** argv)
         {
             g_magnumThread.join();
         }
-        std::thread t([] {
-            osp::set_thread_logger(g_logMagnumApp);
-            test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
-                        std::ref(g_universe), std::ref(g_universeUpdate),
-                        ActiveApplication::Arguments{g_argc, g_argv});
-        });
-        g_magnumThread.swap(t);
+//        std::thread t([] {
+//            osp::set_thread_logger(g_logMagnumApp);
+//            test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
+//                        std::ref(g_universe), std::ref(g_universeUpdate),
+//                        ActiveApplication::Arguments{g_argc, g_argv});
+//        });
+//        g_magnumThread.swap(t);
     }
 
     if(!args.isSet("norepl"))
@@ -197,14 +199,14 @@ int debug_cli_loop()
         {
             if (destroy_universe())
             {
-                simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
+                //simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
             }
         }
         else if (command == "moon")
         {
             if (destroy_universe())
             {
-                moon::create(g_packages, g_universe, g_universeUpdate);
+                //moon::create(g_packages, g_universe, g_universeUpdate);
             }
         }
         else if (command == "flight")
@@ -213,13 +215,13 @@ int debug_cli_loop()
             {
                 g_magnumThread.join();
             }
-            std::thread t([] {
-                osp::set_thread_logger(g_logMagnumApp);
-                test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
-                            std::ref(g_universe), std::ref(g_universeUpdate),
-                            ActiveApplication::Arguments{g_argc, g_argv});
-            });
-            g_magnumThread.swap(t);
+//            std::thread t([] {
+//                osp::set_thread_logger(g_logMagnumApp);
+//                test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
+//                            std::ref(g_universe), std::ref(g_universeUpdate),
+//                            ActiveApplication::Arguments{g_argc, g_argv});
+//            });
+//            g_magnumThread.swap(t);
         }
         else if (command == "list_pkg")
         {
@@ -266,8 +268,8 @@ bool destroy_universe()
     }
 
     // Destroy all satellites
-    g_universe.get_reg().clear();
-    g_universe.coordspace_clear();
+    //g_universe.get_reg().clear();
+    //g_universe.coordspace_clear();
 
     // Destroy blueprints as part of destroying all vehicles
     g_packages.find("lzdb").clear<osp::BlueprintVehicle>();
@@ -300,16 +302,16 @@ void load_a_bunch_of_stuff()
     // Create a new package
     osp::Package &rDebugPack = g_packages.create("lzdb");
 
-    using adera::active::machines::MachineContainer;
-    using adera::active::machines::MachineRCSController;
-    using adera::active::machines::MachineRocket;
-    using adera::active::machines::MachineUserControl;
+    using adera::active::machines::MCompContainer;
+    using adera::active::machines::MCompRCSController;
+    using adera::active::machines::MCompRocket;
+    using adera::active::machines::MCompUserControl;
 
     // Register machines
-    register_machine<MachineContainer>(rDebugPack);
-    register_machine<MachineRCSController>(rDebugPack);
-    register_machine<MachineRocket>(rDebugPack);
-    register_machine<MachineUserControl>(rDebugPack);
+    register_machine<MCompContainer>(rDebugPack);
+    register_machine<MCompRCSController>(rDebugPack);
+    register_machine<MCompRocket>(rDebugPack);
+    register_machine<MCompUserControl>(rDebugPack);
 
     // Register wire types
     register_wiretype<adera::wire::AttitudeControl>(rDebugPack);
@@ -451,24 +453,24 @@ void debug_print_machines()
     }
 
     // Loop through every Vehicle
-    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
-    auto view = scene.get_registry().view<const ACompMachines>();
+//    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
+//    auto view = scene.get_registry().view<const ACompMachines>();
 
-    for (ActiveEnt ent : view)
-    {
-        auto const *name = scene.get_registry().try_get<osp::active::ACompName>(ent);
-        std::string_view nameview = (name != nullptr) ? std::string_view(name->m_name) : "untitled";
-        std::cout << "[" << int(ent) << "]: " << nameview << "\n";
+//    for (ActiveEnt ent : view)
+//    {
+//        auto const *name = scene.get_registry().try_get<osp::active::ACompName>(ent);
+//        std::string_view nameview = (name != nullptr) ? std::string_view(name->m_name) : "untitled";
+//        std::cout << "[" << int(ent) << "]: " << nameview << "\n";
 
-        // Loop through each of that vehicle's Machines
-        auto const &machines = scene.reg_get<ACompMachines>(ent);
-        for (ActiveEnt machEnt : machines.m_machines)
-        {
-            auto const& type = scene.reg_get<ACompMachineType>(machEnt);
+//        // Loop through each of that vehicle's Machines
+//        auto const &machines = scene.reg_get<ACompMachines>(ent);
+//        for (ActiveEnt machEnt : machines.m_machines)
+//        {
+//            auto const& type = scene.reg_get<ACompMachineType>(machEnt);
 
-            std::cout << "  ->[" << int(machEnt) << "]: " << machNames[type.m_type] << "\n";
-        }
-    }
+//            std::cout << "  ->[" << int(machEnt) << "]: " << machNames[type.m_type] << "\n";
+//        }
+//    }
 }
 
 void debug_print_hier()
@@ -485,6 +487,7 @@ void debug_print_hier()
 
     std::cout << "ActiveScene Entity Hierarchy:\n";
 
+    /*
     std::vector<ActiveEnt> parentNextSibling;
     ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
     ActiveEnt currentEnt = scene.hier_get_root();
@@ -534,11 +537,14 @@ void debug_print_hier()
             break;
         }
     }
+    */
 }
 
 void debug_print_sats()
 {
     using namespace osp::universe;
+
+    /**
 
     Universe const &rUni = g_universe;
 
@@ -574,5 +580,5 @@ void debug_print_sats()
         }
     });
 
-
+    **/
 }

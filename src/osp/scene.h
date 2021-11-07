@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,48 +24,43 @@
  */
 #pragma once
 
-#include "ActiveScene.h"
-#include "../Resource/machines.h"
+#include <entt/core/any.hpp>
 
-#include <cstdint>
-#include <vector>
-
-namespace osp::active
+namespace osp
 {
 
+    enum class SceneDataId : uint32_t { };
 
-class ISysMachine;
-class Machine;
+    class Scene
+    {
 
+    public:
 
-//-----------------------------------------------------------------------------
+        template<typename TYPE_T>
+        TYPE_T& get(SceneDataId id)
+        {
+            TYPE_T* pData = entt::any_cast<TYPE_T>(&m_data.at(size_t(id)));
 
-/**
- * This component is added to a part, and stores a vector that keeps track of
- * all the Machines it uses. Machines are stored in multiple entities, so the
- * vector keeps track of these.
- */
-struct ACompMachines
-{
-    std::vector<ActiveEnt> m_machines;
-};
+            if (pData == nullptr)
+            {
+                throw std::runtime_error("Incorrect Scene data cast");
+            }
 
-//-----------------------------------------------------------------------------
+            return *pData;
+        }
 
-struct ACompMachineType
-{
-    ACompMachineType(machine_id_t type)
-     : m_type(type)
-    { }
-    machine_id_t m_type;
-};
+        template<typename TYPE_T, typename ... ARGS_T>
+        SceneDataId emplace(ARGS_T&& ... args)
+        {
+            size_t pos = m_data.size();
+            m_data.emplace_back(std::in_place_type<TYPE_T>,
+                                std::forward(args) ...);
+            return SceneDataId(pos);
+        }
 
-//-----------------------------------------------------------------------------
-
-
-
-//-----------------------------------------------------------------------------
-
+    private:
+        std::vector<entt::any> m_data;
 
 
-} // namespace osp::active
+    };
+}

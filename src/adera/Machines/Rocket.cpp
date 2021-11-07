@@ -26,13 +26,13 @@
 
 #include <adera/ShipResources.h>         // for ShipResourceType
 
-#include <osp/Active/scene.h>            // for ACompHierarchy, ACompTransform
+#include <osp/Active/basic.h>            // for ACompHierarchy, ACompTransform
 #include <osp/Active/physics.h>
-#include <osp/Active/SysWire.h>          // for ACompWireNodes, ACompWirePanel
+#include <osp/Active/SysWire.h>          // for ACtxWireNodes, MCompWirePanel
 #include <osp/Active/SysSignal.h>        // for Signal<>::NodeState
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
-#include <osp/Active/SysMachine.h>       // for ACompMachines
+#include <osp/Active/machine.h>       // for ACompMachines
 #include <osp/Active/ActiveScene.h>
 
 #include <osp/Resource/Package.h>         // for Path, decompose_path
@@ -58,9 +58,9 @@
 
 namespace osp::active { class SysHierarchy; }
 
-using adera::active::machines::SysMachineRocket;
+using adera::active::machines::SysMCompRocket;
 using adera::wire::Percent;
-using adera::active::machines::MachineRocket;
+using adera::active::machines::MCompRocket;
 
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
@@ -76,8 +76,8 @@ using osp::active::ACompPhysNetForce;
 using osp::active::ACompPhysNetTorque;
 using osp::active::SysPhysics;
 
-using osp::active::ACompWirePanel;
-using osp::active::ACompWireNodes;
+using osp::active::MCompWirePanel;
+using osp::active::ACtxWireNodes;
 using osp::active::SysWire;
 using osp::active::WireNode;
 using osp::active::WirePort;
@@ -96,17 +96,17 @@ using osp::Matrix4;
 using osp::Vector3;
 
 
-void SysMachineRocket::update_construct(ActiveScene& rScene)
+void SysMCompRocket::update_construct(ActiveScene& rScene)
 {
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = osp::mach_id<MachineRocket>();
+    machine_id_t const id = osp::mach_id<MCompRocket>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
-        // Check if the vehicle blueprint might store MachineRCSControllers
+        // Check if the vehicle blueprint might store MCompRCSControllers
         if (rVehConstr.m_blueprint->m_machines.size() <= id)
         {
             continue;
@@ -114,7 +114,7 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
 
         BlueprintVehicle const& vehBp = *rVehConstr.m_blueprint;
 
-        // Initialize all MachineRockets in the vehicle
+        // Initialize all MCompRockets in the vehicle
         for (BlueprintMachine const &mach : vehBp.m_machines[id])
         {
             // Get part
@@ -133,31 +133,31 @@ void SysMachineRocket::update_construct(ActiveScene& rScene)
     }
 }
 
-void SysMachineRocket::update_calculate(ActiveScene& rScene)
+void SysMCompRocket::update_calculate(ActiveScene& rScene)
 {
-    auto view = rScene.get_registry().view<MachineRocket>();
-    std::vector<ActiveEnt>& rToUpdate = SysWire::to_update<MachineRocket>(rScene);
+    auto view = rScene.get_registry().view<MCompRocket>();
+    std::vector<ActiveEnt>& rToUpdate = SysWire::to_update<MCompRocket>(rScene);
 
     for (ActiveEnt ent : rToUpdate)
     {
-        auto &machine = view.get<MachineRocket>(ent);
+        auto &machine = view.get<MCompRocket>(ent);
 
         machine.m_powerOutput = 0;
 
         // Get the Percent Panel which contains the Throttle Port
         auto const *pPanelPercent = rScene.get_registry()
-                .try_get< ACompWirePanel<Percent> >(ent);
+                .try_get< MCompWirePanel<Percent> >(ent);
 
         if (pPanelPercent != nullptr)
         {
             WirePort<Percent> const *pPortThrottle
-                    = pPanelPercent->port(MachineRocket::smc_wiThrottle);
+                    = pPanelPercent->port(MCompRocket::smc_wiThrottle);
 
             if (pPortThrottle != nullptr)
             {
                 // Get the connected node and its value
                 auto const &nodesPercent
-                        = rScene.reg_get< ACompWireNodes<Percent> >(
+                        = rScene.reg_get< ACtxWireNodes<Percent> >(
                             rScene.hier_get_root());
                 WireNode<Percent> const &nodeThrottle
                         = nodesPercent.get_node(pPortThrottle->m_nodeIndex);
@@ -171,15 +171,15 @@ void SysMachineRocket::update_calculate(ActiveScene& rScene)
 
 }
 
-void SysMachineRocket::update_physics(ActiveScene& rScene)
+void SysMCompRocket::update_physics(ActiveScene& rScene)
 {
     osp::active::ActiveReg_t &rReg = rScene.get_registry();
 
-    auto view = rScene.get_registry().view<MachineRocket>();
+    auto view = rScene.get_registry().view<MCompRocket>();
 
     for (ActiveEnt ent : view)
     {
-        auto &machine = view.get<MachineRocket>(ent);
+        auto &machine = view.get<MCompRocket>(ent);
 
         // Check for nonzero throttle, continue otherwise
         if (0 >= machine.m_powerOutput)
@@ -196,7 +196,7 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
                 pipe != nullptr)
             {
                 
-                if (auto const* src = rScene.reg_try_get<MachineContainer>(pipe->m_source);
+                if (auto const* src = rScene.reg_try_get<MCompContainer>(pipe->m_source);
                     src != nullptr)
                 {
                     uint64_t required = resource_units_required(rScene, machine,
@@ -248,11 +248,11 @@ void SysMachineRocket::update_physics(ActiveScene& rScene)
 
         // Perform resource consumption calculation
         /*
-        for (MachineRocket::ResourceInput const& resource : machine.m_resourceLines)
+        for (MCompRocket::ResourceInput const& resource : machine.m_resourceLines)
         {
             // Pipe must be non-null since we checked earlier
             const auto& pipe = *resource.m_source.get_if<wiretype::Pipe>();
-            auto& src = rScene.reg_get<MachineContainer>(pipe.m_source);
+            auto& src = rScene.reg_get<MCompContainer>(pipe.m_source);
 
             uint64_t required = resource_units_required(rScene, machine,
                 pThrotPercent->m_value, resource);
@@ -290,13 +290,13 @@ TYPE_T const& config_get_if(
 //    return defaultValue;
 }
 
-MachineRocket& SysMachineRocket::instantiate(
+MCompRocket& SysMCompRocket::instantiate(
         osp::active::ActiveScene& rScene,
         osp::active::ActiveEnt ent,
         osp::PCompMachine const& config,
         osp::BlueprintMachine const& settings)
 {
-    auto& rocket = rScene.reg_emplace<MachineRocket>(ent);
+    auto& rocket = rScene.reg_emplace<MCompRocket>(ent);
     // Read engine config
     // cast to surpress narrowing conversion warnings.
     rocket.m_params.m_maxThrust   = static_cast<float>(config_get_if<double>(config.m_config, "thrust", 42.0));

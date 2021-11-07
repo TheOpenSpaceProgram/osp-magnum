@@ -60,10 +60,10 @@ using osp::PrototypePart;
 using adera::wire::AttitudeControl;
 using adera::wire::Percent;
 
-using adera::active::machines::MachineContainer;
-using adera::active::machines::MachineRCSController;
-using adera::active::machines::MachineRocket;
-using adera::active::machines::MachineUserControl;
+using adera::active::machines::MCompContainer;
+using adera::active::machines::MCompRCSController;
+using adera::active::machines::MCompRocket;
+using adera::active::machines::MCompUserControl;
 
 
 /**
@@ -92,14 +92,14 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
     blueprint.part_add(rocket, Vector3(0.0f), Quaternion(), Vector3(1.0f));
 
     // Wire throttle control
-    // from (output): a MachineUserControl m_woThrottle
-    // to    (input): a MachineRocket m_wiThrottle
+    // from (output): a MCompUserControl m_woThrottle
+    // to    (input): a MCompRocket m_wiThrottle
     //blueprint.add_wire(0, 0, 1,
     //    0, 1, 2);
 
     // Wire attitude control to gimbal
-    // from (output): a MachineUserControl m_woAttitude
-    // to    (input): a MachineRocket m_wiGimbal
+    // from (output): a MCompUserControl m_woAttitude
+    // to    (input): a MCompRocket m_wiGimbal
     //blueprint.add_wire(0, 0, 0,
     //    0, 1, 0);
 
@@ -148,14 +148,14 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
     }
 
     // Wire throttle control
-    // from (output): a MachineUserControl m_woThrottle
-    // to    (input): a MachineRocket m_wiThrottle
+    // from (output): a MCompUserControl m_woThrottle
+    // to    (input): a MCompRocket m_wiThrottle
     //blueprint.add_wire(0, 0, 1,
     //                   0, 1, 2);
 
     // Wire attitude control to gimbal
-    // from (output): a MachineUserControl m_woAttitude
-    // to    (input): a MachineRocket m_wiGimbal
+    // from (output): a MCompUserControl m_woAttitude
+    // to    (input): a MCompRocket m_wiGimbal
     //blueprint.add_wire(0, 0, 0,
     //                   0, 1, 0);
 
@@ -226,7 +226,7 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     part_t partCapsule = blueprint.part_add(capsule, Vector3{0}, idRot, scl);
 
     part_t partFusalage = blueprint.part_add(fuselage, cfOset, idRot, scl);
-    BlueprintMachine* fusalageMach= blueprint.machine_find_ptr<MachineContainer>(partFusalage);
+    BlueprintMachine* fusalageMach= blueprint.machine_find_ptr<MCompContainer>(partFusalage);
     fusalageMach->m_config.emplace("resourcename", "lzdb:fuel");
     fusalageMach->m_config.emplace("fuellevel", 0.5);
 
@@ -261,41 +261,41 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
               << " Parts!\n";
 
     // Wire throttle control
-    // from (output): a MachineUserControl m_woThrottle
-    // to    (input): a MachineRocket m_wiThrottle
+    // from (output): a MCompUserControl m_woThrottle
+    // to    (input): a MCompRocket m_wiThrottle
     blueprint.wire_connect_signal<Percent>(
-        partCapsule, blueprint.machine_find<MachineUserControl>(partCapsule), MachineUserControl::smc_woThrottle,
-        partEngine, blueprint.machine_find<MachineRocket>(partEngine), MachineRocket::smc_wiThrottle);
+        partCapsule, blueprint.machine_find<MCompUserControl>(partCapsule), MCompUserControl::smc_woThrottle,
+        partEngine, blueprint.machine_find<MCompRocket>(partEngine), MCompRocket::smc_wiThrottle);
 
     // Wire attitude contrl to gimbal
-    // from (output): a MachineUserControl m_woAttitude
-    // to    (input): a MachineRocket m_wiGimbal
+    // from (output): a MCompUserControl m_woAttitude
+    // to    (input): a MCompRocket m_wiGimbal
     //blueprint.add_wire(
     //    Parts::CAPSULE, 0, 0,
     //    Parts::ENGINE, 0, 0);
 
     // Pipe fuel tank to rocket engine
-    // from (output): fuselage MachineContainer m_outputs;
-    // to    (input): entine MachineRocket m_resourcesLines[0]
+    // from (output): fuselage MCompContainer m_outputs;
+    // to    (input): entine MCompRocket m_resourcesLines[0]
     //blueprint.add_wire(Parts::FUSELAGE, 0, 0,
     //    Parts::ENGINE, 0, 3);
 
-    mach_t const partCapsuleUsrCtrl = blueprint.machine_find<MachineUserControl>(partCapsule);
+    mach_t const partCapsuleUsrCtrl = blueprint.machine_find<MCompUserControl>(partCapsule);
 
     for (auto partRCS : rcsPorts)
     {
-        mach_t const partRCSRocket = blueprint.machine_find<MachineRocket>(partRCS);
-        mach_t const partRCSCtrl = blueprint.machine_find<MachineRCSController>(partRCS);
+        mach_t const partRCSRocket = blueprint.machine_find<MCompRocket>(partRCS);
+        mach_t const partRCSCtrl = blueprint.machine_find<MCompRCSController>(partRCS);
 
         // Attitude control -> RCS Control
         blueprint.wire_connect_signal<AttitudeControl>(
-                partCapsule, partCapsuleUsrCtrl, MachineUserControl::smc_woAttitude,
-                partRCS, partRCSCtrl, MachineRCSController::smc_wiCommandOrient);
+                partCapsule, partCapsuleUsrCtrl, MCompUserControl::smc_woAttitude,
+                partRCS, partRCSCtrl, MCompRCSController::smc_wiCommandOrient);
 
         // RCS Control -> RCS Rocket
         blueprint.wire_connect_signal<Percent>(
-                partRCS, partRCSCtrl, MachineRCSController::m_woThrottle,
-                partRCS, partRCSRocket, MachineRocket::smc_wiThrottle);
+                partRCS, partRCSCtrl, MCompRCSController::m_woThrottle,
+                partRCS, partRCSRocket, MCompRocket::smc_wiThrottle);
 
         // Fuselage tank -> RCS Rocket
         //blueprint.add_wire(Parts::FUSELAGE, 0, 0,

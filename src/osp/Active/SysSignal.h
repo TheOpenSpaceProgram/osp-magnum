@@ -146,7 +146,7 @@ void SysSignal<WIRETYPE_T>::signal_construct_nodes(
     for (BlueprintWireNode const &bpNode : vehicleBp.m_wireNodes[id])
     {
         // Create the node
-        auto &rNodes = rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(
+        auto &rNodes = rScene.reg_get< ACtxWireNodes<WIRETYPE_T> >(
                     rScene.hier_get_root());
         auto const &[node, nodeIndex] = rNodes.create_node();
 
@@ -161,7 +161,7 @@ void SysSignal<WIRETYPE_T>::signal_construct_nodes(
             ActiveEnt machEnt = machines.m_machines[bpLink.m_protoMachineIndex];
 
             // Get panel to connect to
-            auto& panel = rScene.reg_get< ACompWirePanel<WIRETYPE_T> >(machEnt);
+            auto& panel = rScene.reg_get< MCompWirePanel<WIRETYPE_T> >(machEnt);
 
             // Link them
             SysWire::connect<WIRETYPE_T>(node, nodeIndex, panel, machEnt,
@@ -192,7 +192,7 @@ void SysSignal<WIRETYPE_T>::signal_update_construct(ActiveScene& rScene)
 template<typename WIRETYPE_T>
 void SysSignal<WIRETYPE_T>::signal_update_nodes(ActiveScene& rScene)
 {
-    auto &rNodes = rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(
+    auto &rNodes = rScene.reg_get< ACtxWireNodes<WIRETYPE_T> >(
                 rScene.hier_get_root());
     auto &rWire = rScene.reg_get<ACompWire>(rScene.hier_get_root());
 

@@ -26,7 +26,7 @@
 #include "SysNewton.h"               // IWYU pragma: associated
 #include "ospnewton.h"
 
-#include <osp/Active/scene.h>        // for ACompHierarchy
+#include <osp/Active/basic.h>        // for ACompHierarchy
 #include <osp/Active/physics.h>      // for ACompRigidBody
 #include <osp/Active/SysPhysics.h>   // for SysPhysics
 #include <osp/Active/ActiveScene.h>  // for ActiveScene

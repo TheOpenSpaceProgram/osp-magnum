@@ -31,7 +31,7 @@
 #include <osp/Resource/Resource.h>        // for DependRes
 #include <osp/Resource/AssetImporter.h>   // for AssetImporter
 
-#include <osp/Active/scene.h>             // for ACompCamera
+#include <osp/Active/basic.h>             // for ACompCamera
 #include <osp/Active/drawing.h>           // for ACompDrawTransform
 #include <osp/Active/SysRender.h>         // for ACompMesh
 #include <osp/Active/ActiveScene.h>       // for ActiveScene

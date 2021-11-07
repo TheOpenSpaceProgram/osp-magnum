@@ -22,18 +22,31 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "SysMachine.h"
+#pragma once
 
 #include "ActiveScene.h"
+#include "../Resource/machines.h"
 
-using namespace osp::active;
+#include <cstdint>
+#include <vector>
 
-//ISysMachine::ISysMachine(ActiveScene& scene)
-//{
+namespace osp::active
+{
 
-//}
+enum class MachineEnt : uint32_t { };
 
-//void Machine::doErase()
-//{
-//    list()->cut(this);
-//}
+/**
+ * This component is added to a part, and stores a vector that keeps track of
+ * all the Machines it uses. Machines are stored in multiple entities, so the
+ * vector keeps track of these.
+ */
+struct ACompMachines
+{
+    std::vector<ActiveEnt> m_machines;
+};
+
+template<typename COMP_T>
+using mcomp_storage_t = entt::basic_storage<MachineEnt, COMP_T>;
+
+
+} // namespace osp::active

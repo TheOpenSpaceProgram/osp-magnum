@@ -64,7 +64,7 @@ ActiveApplication::ActiveApplication(const Magnum::Platform::Application::Argume
 ActiveApplication::~ActiveApplication()
 {
     // Clear scene data before GL resources are freed
-    m_scenes.clear();
+
 }
 
 void ActiveApplication::drawEvent()
@@ -82,20 +82,12 @@ void ActiveApplication::drawEvent()
 
 void ActiveApplication::update_scenes()
 {
-    for (auto &[name, entry] : m_scenes)
-    {
-        auto &[rScene, updateFunc] = entry;
-        updateFunc(rScene);
-    }
+
 }
 
 void ActiveApplication::draw_scenes()
 {
-    for (auto &[name, entry] : m_scenes)
-    {
-        auto &[rScene, updateFunc] = entry;
-        rScene.draw();
-    }
+
 }
 
 void ActiveApplication::keyPressEvent(KeyEvent& event)
@@ -132,23 +124,6 @@ void ActiveApplication::mouseMoveEvent(MouseMoveEvent& event)
 void ActiveApplication::mouseScrollEvent(MouseScrollEvent & event)
 {
     m_userInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
-}
-
-osp::active::ActiveScene& ActiveApplication::scene_create(std::string const& name, SceneUpdate_t upd)
-{
-    auto const& [it, success] =
-        m_scenes.try_emplace(
-            name, osp::active::ActiveScene{m_rPackages, m_glResources}, upd);
-    return it->second.first;
-}
-
-osp::active::ActiveScene& ActiveApplication::scene_create(std::string && name, SceneUpdate_t upd)
-{
-    auto const& [it, success] =
-        m_scenes.try_emplace(
-            std::move(name),
-            osp::active::ActiveScene{m_rPackages, m_glResources}, upd);
-    return it->second.first;
 }
 
 void testapp::config_controls(ActiveApplication& rPkgs)

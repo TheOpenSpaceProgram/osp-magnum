@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "scene.h"        // for ACompDelete
+#include "basic.h"        // for ACompDelete
 #include "activetypes.h"  // for ActiveReg_t
 
 #include <utility>        // for std::forward

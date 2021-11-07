@@ -44,9 +44,9 @@ namespace adera::active::machines
 /**
  *
  */
-class MachineRocket
+class MCompRocket
 {
-    friend class SysMachineRocket;
+    friend class SysMCompRocket;
 
     using Percent = wire::Percent;
 
@@ -86,16 +86,16 @@ private:
 
     // Rocket power output for the current frame
     float m_powerOutput{0.0f};
-}; // MachineRocket
+}; // MCompRocket
 
 //-----------------------------------------------------------------------------
 
-class SysMachineRocket
+class SysMCompRocket
 {
 public:
 
     /**
-     * Constructs MachineRockets for vehicles in-construction
+     * Constructs MCompRockets for vehicles in-construction
      *
      * @param rScene [ref] Scene supporting vehicles
      */
@@ -108,15 +108,15 @@ public:
     static void update_calculate(osp::active::ActiveScene& rScene);
 
     /**
-     * Updates all MachineRockets in the scene
+     * Updates all MCompRockets in the scene
      *
      * This function handles draining fuel and applying thrust.
      *
-     * @param rScene [ref] Scene with MachineRockets to update
+     * @param rScene [ref] Scene with MCompRockets to update
      */
     static void update_physics(osp::active::ActiveScene& rScene);
 
-    static MachineRocket& instantiate(
+    static MCompRocket& instantiate(
             osp::active::ActiveScene& rScene,
             osp::active::ActiveEnt ent,
             osp::PCompMachine const& config,
@@ -124,7 +124,7 @@ public:
 
 private:
 
-}; // SysMachineRocket
+}; // SysMCompRocket
 
 
 } // namespace adera::active::machines

@@ -43,6 +43,7 @@
 #include <osp/Satellites/SatVehicle.h>
 
 #include <osp/logging.h>
+#include <osp/id_registry.h>
 
 #include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>
@@ -80,7 +81,6 @@ using osp::universe::UCompActiveArea;
 
 using osp::universe::coordspace_index_t;
 
-using osp::active::ActiveEnt;
 using osp::active::ActiveScene;
 using osp::active::ACompTransform;
 using osp::active::ACompCamera;
@@ -136,7 +136,9 @@ void testapp::test_flight(
     config_controls(*pMagnumApp);
 
     // Create an ActiveScene
-    ActiveScene& rScene = pMagnumApp->scene_create("Area 1", &update_scene);
+    //ActiveScene& rScene = pMagnumApp->scene_create("Area 1", &update_scene);
+
+#if 0
 
     // Setup hierarchy, initialize root entity
     SysHierarchy::setup(rScene);
@@ -201,6 +203,8 @@ void testapp::test_flight(
     rScene.reg_emplace<ACompPerspective3DView>(camera, camera);
     rScene.reg_emplace<ACompRenderer>(camera);
 
+#endif
+
     // Starts the main loop. This function is blocking, and will only return
     // once the window is closed. See ActiveApplication::drawEvent
     pMagnumApp->exec();
@@ -211,13 +215,13 @@ void testapp::test_flight(
 
     rUniUpd(rUni); // make sure universe is in a valid state
 
-    active_area_destroy(rPkgs, rUni, areaSat); // Disconnect ActiveArea
+    //active_area_destroy(rPkgs, rUni, areaSat); // Disconnect ActiveArea
     rUniUpd(rUni);
 
-    rUni.get_reg().destroy(areaSat);
+    //rUni.get_reg().destroy(areaSat);
 
     // Release Newton resources
-    ospnewton::SysNewton::destroy(rScene);
+    //ospnewton::SysNewton::destroy(rScene);
 
     // destruct the application, this closes the window
     pMagnumApp.reset();
@@ -228,6 +232,8 @@ void update_scene(osp::active::ActiveScene& rScene)
     using namespace osp::active;
     using namespace adera::active;
     using namespace adera::active::machines;
+
+    rScene.get_registry().create(ActiveEnt(0));
 
     SysAreaAssociate::update_consume(rScene);
 
@@ -240,10 +246,10 @@ void update_scene(osp::active::ActiveScene& rScene)
     SysCameraController::update_area(rScene);
 
     // Construct components of vehicles. These should be parallelizable
-    SysMachineContainer::update_construct(rScene);
-    SysMachineRCSController::update_construct(rScene);
-    SysMachineRocket::update_construct(rScene);
-    SysMachineUserControl::update_construct(rScene);
+    SysMCompContainer::update_construct(rScene);
+    SysMCompRCSController::update_construct(rScene);
+    SysMCompRocket::update_construct(rScene);
+    SysMCompUserControl::update_construct(rScene);
     SysSignal<adera::wire::Percent>::signal_update_construct(rScene);
     SysSignal<adera::wire::AttitudeControl>::signal_update_construct(rScene);
 
@@ -260,7 +266,7 @@ void update_scene(osp::active::ActiveScene& rScene)
     SysCameraController::update_controls(rScene);
 
     // UserControl reads possibly changed values written by CameraController
-    SysMachineUserControl::update_sensor(rScene);
+    SysMCompUserControl::update_sensor(rScene);
 
     // Assign shaders to newly created entities
     SysRender::update_drawfunc_assign(rScene);
@@ -269,13 +275,13 @@ void update_scene(osp::active::ActiveScene& rScene)
     SysWire::update_wire(rScene);
 
     // Rockets apply thrust
-    SysMachineRocket::update_physics(rScene);
+    SysMCompRocket::update_physics(rScene);
 
     // Apply gravity forces
     SysFFGravity::update_force(rScene);
 
     // Containers update mass
-    SysMachineContainer::update_containers(rScene);
+    SysMCompContainer::update_containers(rScene);
 
     // ** Physics update **
     ospnewton::SysNewton::update_world(rScene);
@@ -307,14 +313,14 @@ void setup_wiring(ActiveScene& rScene)
     // AttitudeControl values between Machines
     SysWire::setup_default(
             rScene, 5,
-            {&SysMachineRocket::update_calculate,
-             &SysMachineRCSController::update_calculate},
+            {&SysMCompRocket::update_calculate,
+             &SysMCompRCSController::update_calculate},
             {&SysSignal<adera::wire::Percent>::signal_update_nodes,
              &SysSignal<adera::wire::AttitudeControl>::signal_update_nodes});
 
     // Add scene components for storing 'Nodes' used for wiring
-    rScene.reg_emplace< ACompWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
-    rScene.reg_emplace< ACompWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
+    rScene.reg_emplace< ACtxWireNodes<adera::wire::AttitudeControl> >(rScene.hier_get_root());
+    rScene.reg_emplace< ACtxWireNodes<adera::wire::Percent> >(rScene.hier_get_root());
 
 }
 
