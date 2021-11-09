@@ -25,7 +25,7 @@
 
 #include "flight.h"
 
-#include "CameraController.h"
+#include "scene_active.h"
 
 #include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysHierarchy.h>
@@ -39,23 +39,9 @@
 
 #include <osp/CoordinateSpaces/CartesianSimple.h>
 
-#include <osp/Satellites/SatActiveArea.h>
-#include <osp/Satellites/SatVehicle.h>
-
 #include <osp/logging.h>
-#include <osp/id_registry.h>
-
-#include <adera/Machines/Container.h>
-#include <adera/Machines/RCSController.h>
-#include <adera/Machines/Rocket.h>
-#include <adera/Machines/UserControl.h>
 
 #include <adera/Shaders/PlumeShader.h>
-
-#include <adera/wiretypes.h>
-
-#include <adera/SysExhaustPlume.h>
-#include <adera/ShipResources.h>
 
 #include <osp/Shaders/Phong.h>
 #include <osp/Shaders/MeshVisualizer.h>
@@ -63,9 +49,25 @@
 #include <Magnum/Shaders/MeshVisualizerGL.h>
 
 #include <newtondynamics_physics/SysNewton.h>
+#include <newtondynamics_physics/ospnewton.h>
 
 using namespace testapp;
 
+using osp::active::acomp_storage_t;
+
+std::unique_ptr<FlightScene> testapp::setup_flight_scene()
+{
+    std::unique_ptr<FlightScene> pScene = std::make_unique<FlightScene>();
+
+    pScene->m_nwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(1);
+
+    return std::move(pScene);
+}
+
+void testapp::update_flight_scene(ActiveApplication& rApp, FlightScene &rScene)
+{
+
+}
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -74,9 +76,7 @@ using osp::universe::Universe;
 using osp::universe::Satellite;
 
 using osp::universe::SatActiveArea;
-using osp::universe::SatVehicle;
 
-using osp::universe::UCompInCoordspace;
 using osp::universe::UCompActiveArea;
 
 using osp::universe::coordspace_index_t;
@@ -114,52 +114,9 @@ Satellite active_area_create(
 void active_area_destroy(
         osp::PackageRegistry& rPkgs, Universe &rUni, Satellite areaSat);
 
-void testapp::test_flight(
-        std::unique_ptr<ActiveApplication>& pMagnumApp, osp::PackageRegistry& rPkgs,
-        Universe &rUni, universe_update_t& rUniUpd, ActiveApplication::Arguments args)
-{
-
-    // Create the application, and its draw function
-    pMagnumApp = std::make_unique<ActiveApplication>(
-            args, rPkgs,
-            [&rUniUpd, &rUni] (ActiveApplication& rMagnumApp)
-    {
-        // Update the universe each frame
-        // This likely wouldn't be here in the future
-        rUniUpd(rUni);
-
-        rMagnumApp.update_scenes(); // Update scenes each frame
-        rMagnumApp.draw_scenes(); // Draw each frame of course
-    });
-
-    // Configure the controls
-    config_controls(*pMagnumApp);
-
-    // Create an ActiveScene
-    //ActiveScene& rScene = pMagnumApp->scene_create("Area 1", &update_scene);
-
 #if 0
-
-    // Setup hierarchy, initialize root entity
-    SysHierarchy::setup(rScene);
-
-    // Setup wiring
-    setup_wiring(rScene);
-
-    // create a Satellite with an ActiveArea, then link it to the scene
-    Satellite areaSat = active_area_create(rPkgs, rUni, 0);
-    rUniUpd(rUni);
-    osp::active::SysAreaAssociate::connect(rScene, rUni, areaSat);
-
-
-    // Setup sync states used by scene systems to sync with the universe
-    rScene.get_registry().set<osp::active::SyncVehicles>();
-
-    // Setup generic physics interface
-    rScene.get_registry().set<osp::active::ACtxPhysics>();
-
     // Setup Newton dynamics physics
-    ospnewton::SysNewton::setup(rScene);
+
 
     // workaround: update the scene right away to initialize physics world
     //             needed by planets for now
@@ -205,39 +162,17 @@ void testapp::test_flight(
 
 #endif
 
-    // Starts the main loop. This function is blocking, and will only return
-    // once the window is closed. See ActiveApplication::drawEvent
-    pMagnumApp->exec();
 
-    // Window has been closed
-
-    OSP_LOG_INFO("Closed Magnum Application");
-
-    rUniUpd(rUni); // make sure universe is in a valid state
-
-    //active_area_destroy(rPkgs, rUni, areaSat); // Disconnect ActiveArea
-    rUniUpd(rUni);
-
-    //rUni.get_reg().destroy(areaSat);
-
-    // Release Newton resources
-    //ospnewton::SysNewton::destroy(rScene);
-
-    // destruct the application, this closes the window
-    pMagnumApp.reset();
-}
-
-void update_scene(osp::active::ActiveScene& rScene)
-{
+#if 0
     using namespace osp::active;
     using namespace adera::active;
     using namespace adera::active::machines;
 
-    rScene.get_registry().create(ActiveEnt(0));
 
     SysAreaAssociate::update_consume(rScene);
 
-    SysAreaAssociate::update_translate(rScene);
+    //SysAreaAssociate::update_translate(rScene);
+
     ospnewton::SysNewton::update_translate(rScene);
 
     // Activate or deactivate nearby vehicles
@@ -302,7 +237,7 @@ void update_scene(osp::active::ActiveScene& rScene)
 
     // Delete entities with ACompDelete
     ActiveScene::update_delete(rScene);
-}
+#endif
 
 void setup_wiring(ActiveScene& rScene)
 {
@@ -401,7 +336,8 @@ void active_area_destroy(
 
 }
 
-void load_shaders(osp::active::ActiveScene& rScene)
+void load_shaders(osp::active::ActiveScene& rScene,
+                  osp::active::ACtxRenderGroups &rRenderGroups)
 {
     using namespace osp::active;
     using osp::shader::Phong;

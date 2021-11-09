@@ -33,37 +33,30 @@ using namespace osp;
 
 Satellite Universe::sat_create()
 {
-    Satellite sat = m_registry.create();
-    m_registry.emplace<UCompTransformTraj>(sat);
-    m_registry.emplace<UCompInCoordspace>(
-                sat, UCompInCoordspace{entt::null});
-    m_registry.emplace<UCompCoordspaceIndex>(
-                sat, UCompCoordspaceIndex{entt::null});
+    Satellite sat = m_satIds.create();
+    m_satCoordspace.resize(m_satIds.capacity());
+    m_satIndexInCoordspace.resize(m_satIds.capacity());
+
+    m_satCoordspace[size_t(sat)] = id_null<coordspace_index_t>();
+    m_satIndexInCoordspace[size_t(sat)] = id_null<coordspace_index_t>();
+
     return sat;
 }
 
 void Universe::sat_remove(Satellite sat)
 {
-    m_registry.destroy(sat);
+    m_satCoordspace[size_t(sat)] = id_null<coordspace_index_t>();
+    m_satIndexInCoordspace[size_t(sat)] = id_null<coordspace_index_t>();
+    m_satIds.remove(sat);
 }
 
-std::optional<Vector3g> Universe::sat_calc_pos(Satellite referenceFrame, Satellite target) const
+std::optional<Vector3g> Universe::sat_calc_pos(Satellite observer, Satellite target) const
 {
-    auto const viewInCoord = m_registry.view<const UCompInCoordspace>();
-    auto const viewCoordIndex = m_registry.view<const UCompCoordspaceIndex>();
+    auto const observerIndex = size_t(observer);
+    auto const targetIndex = size_t(observer);
 
-    auto const &frameInCoord
-            = viewInCoord.get<const UCompInCoordspace>(referenceFrame);
-    auto const &targetInCoord
-            = viewInCoord.get<const UCompInCoordspace>(target);
-
-    auto const &frameCoordIndex
-            = viewCoordIndex.get<const UCompCoordspaceIndex>(referenceFrame);
-    auto const &targetCoordIndex
-            = viewCoordIndex.get<const UCompCoordspaceIndex>(target);
-
-    CoordinateSpace const& frameCoord = coordspace_get(frameInCoord.m_coordSpace);
-    CoordinateSpace const& targetCoord = coordspace_get(targetInCoord.m_coordSpace);
+    CoordinateSpace const& frameCoord = coordspace_get(m_satCoordspace[observerIndex]);
+    CoordinateSpace const& targetCoord = coordspace_get(m_satCoordspace[targetIndex]);
 
     std::optional<CoordspaceTransform> transform = coordspace_transform(
                 targetCoord, frameCoord);
@@ -76,13 +69,12 @@ std::optional<Vector3g> Universe::sat_calc_pos(Satellite referenceFrame, Satelli
     auto framePos = frameCoord.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
     auto targetPos = targetCoord.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
 
-    Vector3g targetPosTf = transform.value()(
-                make_from_ccomp<Vector3g>(*targetPos,
-                                          targetCoordIndex.m_myIndex));
+    Vector3g targetPosTf = transform.value()(make_from_ccomp<Vector3g>(
+        *targetPos, m_satIndexInCoordspace[targetIndex]));
 
 
     return targetPosTf - make_from_ccomp<Vector3g>(*framePos,
-                                                   frameCoordIndex.m_myIndex);
+                                                   m_satIndexInCoordspace[observerIndex]);
 }
 
 std::optional<Vector3> Universe::sat_calc_pos_meters(Satellite referenceFrame, Satellite target) const
@@ -115,13 +107,13 @@ std::optional<CoordspaceTransform> Universe::coordspace_transform(
 
     auto get_parent = [this] (CoordinateSpace const* current) -> CoordinateSpace const*
     {
-        coordspace_index_t const parent = m_registry.get<UCompInCoordspace>(current->m_parentSat).m_coordSpace;
+        coordspace_index_t const parent = m_satCoordspace[size_t(current->m_parentSat)];
         return &coordspace_get(parent);
     };
 
     auto get_pos = [this] (CoordinateSpace const* current, CoordinateSpace const* parent) -> Vector3g
     {
-        uint32_t const index = m_registry.get<UCompCoordspaceIndex>(current->m_parentSat).m_myIndex;
+        uint32_t const index = m_satIndexInCoordspace[size_t(current->m_parentSat)];
         auto const posTuple = parent->ccomp_view_tuple<CCompX, CCompY, CCompZ>();
         return make_from_ccomp<Vector3g>(*posTuple, index);
     };
@@ -171,12 +163,9 @@ std::optional<CoordspaceTransform> Universe::coordspace_transform(
 
 void Universe::coordspace_update_sats(uint32_t coordSpace)
 {
-    auto view = m_registry.view<UCompInCoordspace>();
-
     for (auto const &[sat, pos, vel] : m_coordSpaces[coordSpace]->m_toAdd)
     {
-        auto &rInCoordspace = view.get<UCompInCoordspace>(sat);
-        rInCoordspace.m_coordSpace = coordSpace;
+        m_satCoordspace[size_t(sat)] = coordSpace;
     }
 }
 
@@ -184,8 +173,7 @@ void Universe::coordspace_update_depth(coordspace_index_t coordSpace)
 {
     CoordinateSpace &rCoord = coordspace_get(coordSpace);
 
-    coordspace_index_t parentCoord = m_registry.get<UCompInCoordspace>(
-                rCoord.m_parentSat).m_coordSpace;
+    coordspace_index_t parentCoord = m_satCoordspace[size_t(rCoord.m_parentSat)];
 
     if (entt::null == parentCoord)
     {

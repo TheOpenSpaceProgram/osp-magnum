@@ -25,7 +25,9 @@
 #pragma once
 
 #include "coordinates.h"
+#include "id_registry.h"
 #include "types.h"
+
 
 #include <Corrade/Containers/StridedArrayView.h>
 
@@ -66,14 +68,7 @@ class Universe
 {
 
 public:
-
-    using Reg_t = entt::basic_registry<Satellite>;
-
     Universe() = default;
-    Universe(Universe &&move) = delete;
-    Universe(Universe const &copy) = delete;
-    Universe& operator=(Universe &&move) = delete;
-    Universe& operator=(Universe const &copy) = delete;
     ~Universe() = default;
 
     /**
@@ -95,13 +90,13 @@ public:
      * This function is rather inefficient and only calculates for ONE
      * satellite. Avoid using this for hot code.
      *
-     * @param referenceFrame [in] Satellite used as reference frame
+     * @param observer       [in] Satellite used as reference frame
      * @param target         [in] Satellite to calculate position to
      *
      * @return relative position of target in spaceint_t vector
      */
     std::optional<Vector3g> sat_calc_pos(
-            Satellite referenceFrame, Satellite target) const;
+            Satellite observer, Satellite target) const;
 
     /**
      * @brief Calls sat_calc_pos, and converts results to meters
@@ -137,6 +132,8 @@ public:
         m_coordSpaces.clear();
     };
 
+    // TODO: deleting coord spaces
+
     /**
      * @brief Calculate a CoordspaceTransform to transform coordinates from one
      *        coordinate space to another.
@@ -167,36 +164,20 @@ public:
      */
     void coordspace_update_depth(coordspace_index_t coordSpace);
 
-    constexpr Reg_t& get_reg() noexcept { return m_registry; }
-    constexpr const Reg_t& get_reg() const noexcept
-    { return m_registry; }
 
 private:
 
+    osp::IdRegistry<Satellite> m_satIds;
+
+    // CoordinateSpace each Satellite belongs to
+    std::vector< coordspace_index_t > m_satCoordspace;
+
+    // Index of a Satellite within its coordinate space
+    std::vector< uint32_t > m_satIndexInCoordspace;
+
+    // Coordinate spaces
     std::vector< std::optional<CoordinateSpace> > m_coordSpaces;
-    Reg_t m_registry;
 
 }; // class Universe
-
-
-// default ECS components needed for the universe
-
-struct UCompTransformTraj
-{
-    // move this somewhere else eventually
-    std::string m_name;
-
-    Quaternion m_rotation;
-};
-
-struct UCompInCoordspace
-{
-    coordspace_index_t m_coordSpace;
-};
-
-struct UCompCoordspaceIndex
-{
-    uint32_t m_myIndex;
-};
 
 }

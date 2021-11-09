@@ -155,17 +155,9 @@ ActiveEnt SysVehicleSync::activate(ActiveScene &rScene, Universe &rUni,
     return vehicleEnt;
 }
 
-
-void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
+#if 0
+void SysVehicleSync::update_universe_sync(ACtxAreaLink& rLink)
 {
-    ACompAreaLink *pLink = SysAreaAssociate::try_get_area_link(rScene);
-
-    if (pLink == nullptr)
-    {
-        return;
-    }
-
-    Universe &rUni = pLink->get_universe();
     auto &rSync = rScene.get_registry().ctx<SyncVehicles>();
 
     auto const& area = rUni.get_reg().get<UCompActiveArea>(pLink->m_areaSat);
@@ -173,8 +165,8 @@ void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
     // Delete vehicles that have gone too far from the ActiveArea range
 
     auto viewTf = rScene.get_registry().view<ACompTransform>();
-    CoordinateSpace& rCapture = rUni.coordspace_get(area.m_captureSpace);
-    CoordinateSpace& rRelease = rUni.coordspace_get(area.m_releaseSpace);
+    CoordinateSpace &rCapture = rUni.coordspace_get(area.m_captureSpace);
+    CoordinateSpace &rRelease = rUni.coordspace_get(area.m_releaseSpace);
     universe::CoordspaceTransform releaseCoordTf
             = rUni.coordspace_transform(rCapture, rRelease).value();
 
@@ -214,7 +206,7 @@ void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
                                                    ACompActivatedSat>();
 
     for (ActiveEnt vehicleEnt : viewVehicles)
-    {        
+    {
         auto const &vehicleTf = viewTf.get<ACompTransform>(vehicleEnt);
         auto const &vehicleSat = viewVehicles.get<ACompActivatedSat>(vehicleEnt);
 
@@ -242,5 +234,6 @@ void SysVehicleSync::update_universe_sync(ActiveScene &rScene)
         ActiveEnt ent = activate(rScene, rUni, pLink->m_areaSat, sat);
         rSync.m_inArea[sat] = ent;
     }
-
 }
+
+#endif

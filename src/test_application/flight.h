@@ -24,32 +24,24 @@
  */
 
 #include "ActiveApplication.h"
+
 #include "universes/common.h"
 
-#include <thread>
-
+#include <memory>
 
 namespace testapp
 {
 
+struct FlightScene;
+
+std::unique_ptr<FlightScene> setup_flight_scene();
+
+
 /**
- * @brief Start flight scene
  *
- * This will create an ActiveArea in the universe and start a Magnum application
- * with an ActiveScene setup for in-universe flight.
- *
- * This function blocks execution until the window is closed.
- *
- * @param pMagnumApp [out] Container for Magnum application to create for
- *                         external access
- * @param rPkgs      [ref] Packages containing needed resources
- * @param rUni       [ref] Universe the flight scene will be connected to
- * @param rUniUpd    [ref] Universe update function to be called per frame
- * @param args       [in] Arguments to pass to Magnum
  */
-void test_flight(std::unique_ptr<ActiveApplication>& pMagnumApp,
-                 osp::PackageRegistry& rPkgs,
-                 osp::universe::Universe& rUni, universe_update_t& rUniUpd,
-                 ActiveApplication::Arguments args);
+void update_flight_scene(
+        ActiveApplication& rApp,
+        FlightScene &rScene);
 
 }

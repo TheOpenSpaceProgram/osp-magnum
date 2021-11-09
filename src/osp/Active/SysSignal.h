@@ -215,8 +215,8 @@ void SysSignal<WIRETYPE_T>::signal_update_nodes(ActiveScene& rScene)
              it != std::end(rNode.m_links); std::advance(it, 1))
         {
             ActiveEnt ent = it->m_entity;
-            auto const& type = rScene.reg_get<ACompMachineType>(ent);
-            machToUpdate[size_t(type.m_type)].push_back(ent);
+            //auto const& type = rScene.reg_get<ACompMachineType>(ent);
+            //machToUpdate[size_t(type.m_type)].push_back(ent);
         }
     }
 

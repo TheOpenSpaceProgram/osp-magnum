@@ -35,28 +35,18 @@ namespace osp::active
 {
 
 
-struct ACompAreaLink
+struct ACtxAreaLink
 {    
-    ACompAreaLink(universe::Universe& rUniverse, universe::Satellite areaSat)
-     : m_areaSat(areaSat)
-     , m_rUniverse(rUniverse)
-    { }
-
-    universe::Universe& get_universe() noexcept
-    { return m_rUniverse.get(); }
-
-    universe::Universe const& get_universe() const noexcept
-    { return m_rUniverse.get(); }
-
     universe::Satellite m_areaSat;
 
-    std::reference_wrapper<universe::Universe> m_rUniverse;
+    //struct Enter { universe::Satellite m_sat; };
+    //struct Leave { universe::Satellite m_sat; };
+    //std::vector< std::variant<Enter, Leave> > m_satQueue;
 
     std::vector<universe::Satellite> m_enter;
     std::vector<universe::Satellite> m_leave;
 
     Vector3 m_move;
-
 };
 
 struct ACompActivatedSat
@@ -78,7 +68,8 @@ public:
      *
      * @param rScene [ref] Scene assicated with ActiveArea
      */
-    static void update_consume(ActiveScene& rScene);
+    static void update_consume(
+            ACtxAreaLink& rLink, universe::UCompActiveArea& rAreaUComp);
 
     /**
      * @brief Translates all entities with ACompFloatingOrigin based on
@@ -86,16 +77,8 @@ public:
      *
      * @param rScene [ref] Scene assicated with ActiveArea
      */
-    static void update_translate(ActiveScene& rScene);
-
-    /**
-     * @brief Attempt to get an ACompAreaLink from an ActiveScene
-     *
-     * @param rScene [ref] Scene assicated with ActiveArea
-     *
-     * @return ACompAreaLink in scene, nullptr if not found
-     */
-    static ACompAreaLink* try_get_area_link(ActiveScene &rScene);
+    static void update_translate(
+            ACtxAreaLink& rLink, universe::UCompActiveArea& rAreaUComp);
 
     /**
      * @brief Connect the ActiveScene to the Universe using the scene's

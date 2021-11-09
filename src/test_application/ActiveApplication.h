@@ -24,9 +24,6 @@
  */
 #pragma once
 
-#include <osp/Active/ActiveScene.h>
-#include <osp/Resource/PackageRegistry.h>
-
 #include <osp/types.h>
 #include <osp/UserInputHandler.h>
 
@@ -39,15 +36,16 @@
 #include <Magnum/Platform/Sdl2Application.h>
 #include <Magnum/Shaders/VertexColorGL.h>
 
+#include <functional>
 #include <memory>
 
 namespace testapp
 {
 
 /**
- * @brief An interactive Magnum application made for running ActiveScenes
+ * @brief An interactive Magnum application
  *
- * These scenes can be a flight scene, map view, vehicle editor, or menu.
+ * This is intended to run a flight scene, map view, vehicle editor, or menu.
  */
 class ActiveApplication : public Magnum::Platform::Application
 {
@@ -58,7 +56,6 @@ public:
 
     explicit ActiveApplication(
             const Magnum::Platform::Application::Arguments& arguments,
-            osp::PackageRegistry &rPkgs,
             on_draw_t onDraw);
 
     ~ActiveApplication();
@@ -71,12 +68,10 @@ public:
     void mouseMoveEvent(MouseMoveEvent& event) override;
     void mouseScrollEvent(MouseScrollEvent& event) override;
 
-    void update_scenes();
-    void draw_scenes();
-
-    constexpr osp::input::UserInputHandler& get_input_handler() { return m_userInput; }
-
-    constexpr osp::Package& get_context_resources() { return m_glResources; }
+    constexpr osp::input::UserInputHandler& get_input_handler() noexcept
+    {
+        return m_userInput;
+    }
 
 private:
 
@@ -86,14 +81,10 @@ private:
 
     osp::input::UserInputHandler m_userInput;
 
-    osp::PackageRegistry &m_rPackages;
-
-    osp::Package m_glResources;
-
     Magnum::Timeline m_timeline;
 };
 
-void config_controls(ActiveApplication& rPkgs);
+void config_controls(ActiveApplication& rApp);
 
 }
 

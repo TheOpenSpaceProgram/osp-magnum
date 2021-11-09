@@ -30,8 +30,6 @@
 
 using osp::active::SysAreaAssociate;
 
-using osp::active::ACompAreaLink;
-
 using osp::universe::Universe;
 using osp::universe::Satellite;
 
@@ -41,21 +39,13 @@ using osp::universe::UCompActiveArea;
 
 using osp::universe::Vector3g;
 
-void SysAreaAssociate::update_consume(ActiveScene& rScene)
+void SysAreaAssociate::update_consume(
+        ACtxAreaLink &rLink, UCompActiveArea& rAreaUComp)
 {
-    ACompAreaLink *pLink = try_get_area_link(rScene);
+    Satellite areaSat = rLink.m_areaSat;
 
-    if (pLink == nullptr)
-    {
-        return;
-    }
-
-    Universe &rUni = pLink->m_rUniverse;
-    Satellite areaSat = pLink->m_areaSat;
-    auto &rAreaUComp = rUni.get_reg().get<UCompActiveArea>(areaSat);
-
-    pLink->m_enter = std::exchange(rAreaUComp.m_enter, {});
-    pLink->m_leave = std::exchange(rAreaUComp.m_leave, {});
+    rLink.m_enter = std::exchange(rAreaUComp.m_enter, {});
+    rLink.m_leave = std::exchange(rAreaUComp.m_leave, {});
 
     Vector3g deltaTotal{};
 
@@ -64,40 +54,22 @@ void SysAreaAssociate::update_consume(ActiveScene& rScene)
         deltaTotal += delta;
     }
 
-    pLink->m_move = Vector3(deltaTotal) / universe::gc_units_per_meter;
+    rLink.m_move = Vector3(deltaTotal) / universe::gc_units_per_meter;
 }
 
-void SysAreaAssociate::update_translate(ActiveScene &rScene)
+void SysAreaAssociate::update_translate(
+        ACtxAreaLink &rLink, UCompActiveArea& rAreaUComp)
 {
-    ACompAreaLink const *pLink = try_get_area_link(rScene);
 
-    if ( ! pLink->m_move.isZero())
+    if ( ! rLink.m_move.isZero())
     {
-        floating_origin_translate(rScene, pLink->m_move * -1.0f);
+        //floating_origin_translate(rScene, rLink.m_move * -1.0f);
     }
-}
-
-ACompAreaLink* SysAreaAssociate::try_get_area_link(ActiveScene &rScene)
-{
-    return rScene.get_registry().try_get<ACompAreaLink>(rScene.hier_get_root());
-}
-
-void SysAreaAssociate::connect(ActiveScene& rScene, universe::Universe &rUni,
-                               universe::Satellite areaSat)
-{
-    ActiveEnt root = rScene.hier_get_root();
-
-    // Make sure no ACompAreaLink already exists
-    assert(!rScene.get_registry().all_of<ACompAreaLink>(root));
-
-    // Create Area Link
-    rScene.get_registry().emplace<ACompAreaLink>(root, rUni, areaSat);
-
 }
 
 void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3g const& translate)
 {
-    ACompAreaLink *pArea = try_get_area_link(rScene);
+    /*ACompAreaLink *pArea = try_get_area_link(rScene);
 
     if (pArea == nullptr)
     {
@@ -107,7 +79,7 @@ void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3g const& translate)
     Universe &rUni = pArea->get_universe();
     auto &rAreaSat = rUni.get_reg().get<UCompActiveArea>(pArea->m_areaSat);
 
-    rAreaSat.m_requestMove.push_back(translate);
+    rAreaSat.m_requestMove.push_back(translate);*/
 }
 
 void SysAreaAssociate::floating_origin_translate(

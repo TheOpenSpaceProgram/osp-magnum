@@ -29,7 +29,7 @@
 #include <osp/Active/basic.h>             // for ACompMass
 #include <osp/Active/physics.h>
 #include <osp/Active/SysVehicle.h>
-#include <osp/Active/machine.h>        // for ACompMachines
+#include <osp/Active/machines.h>          // for ACompMachines
 #include <osp/Active/activetypes.h>       // for ActiveEnt, ActiveReg_t, active
 #include <osp/Active/ActiveScene.h>
 

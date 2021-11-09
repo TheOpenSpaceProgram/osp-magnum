@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,16 +24,4 @@
  */
 #pragma once
 
-#include "../Universe.h"
 
-namespace osp::universe
-{
-
-class TrajStationary
-{
-public:
-
-    static void update(CoordinateSpace& rSpace);
-};
-
-}

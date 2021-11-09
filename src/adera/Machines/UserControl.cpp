@@ -33,7 +33,7 @@
 #include <osp/Active/SysWire.h>          // for ACompWire, UpdNodes_t
 #include <osp/Active/SysSignal.h>        // for SysSignal
 #include <osp/Active/SysVehicle.h>       // for ACompVehicle
-#include <osp/Active/machine.h>       // for ACompMachines
+#include <osp/Active/machines.h>         // for ACompMachines
 #include <osp/Active/ActiveScene.h>      // for ActiveScene
 #include <osp/Active/activetypes.h>      // for ActiveEnt, ActiveReg_t
 

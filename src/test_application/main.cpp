@@ -58,7 +58,14 @@
 
 using namespace testapp;
 
-void config_controls();
+void start_magnum_async();
+
+/**
+ * The spaghetti command line interface that gets inputs from stdin. This
+ * function will only return once the user exits.
+ * @return An error code maybe
+ */
+int debug_cli_loop();
 
 /**
  * As the name implies. This should only be called once for the entire lifetime
@@ -73,12 +80,7 @@ void load_a_bunch_of_stuff();
  */
 bool destroy_universe();
 
-/**
- * The spaghetti command line interface that gets inputs from stdin. This
- * function will only return once the user exits.
- * @return An error code maybe
- */
-int debug_cli_loop();
+
 
 // called only from commands to display information
 void debug_print_help();
@@ -90,14 +92,16 @@ void debug_print_machines();
 // Stores loaded resources in packages.
 osp::PackageRegistry g_packages;
 
-// Test application stores 1 universe and its update function
-//osp::universe::Universe g_universe;
-//universe_update_t g_universeUpdate;
-std::vector<std::shared_ptr<osp::Scene>> m_scenes;
+// Test application supports 1 Active Scene
+std::optional<osp::Scene> m_activeScene;
+SceneMeta m_activeMeta;
 
-// Deals with the window, OpenGL context, and other game engine stuff that
-// often have "Active" written all over them
-std::unique_ptr<ActiveApplication> g_ActiveApplication;
+// Test application supports 1 Universe
+std::optional<osp::Scene> m_uniScene;
+SceneMeta m_uniMeta;
+
+// Magnum Application deals with window and OpenGL things
+std::optional<ActiveApplication> g_activeApplication;
 std::thread g_magnumThread;
 
 // Loggers
@@ -150,17 +154,7 @@ int main(int argc, char** argv)
             exit(-1);
         }
 
-        if (g_magnumThread.joinable())
-        {
-            g_magnumThread.join();
-        }
-//        std::thread t([] {
-//            osp::set_thread_logger(g_logMagnumApp);
-//            test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
-//                        std::ref(g_universe), std::ref(g_universeUpdate),
-//                        ActiveApplication::Arguments{g_argc, g_argv});
-//        });
-//        g_magnumThread.swap(t);
+        start_magnum_async();
     }
 
     if(!args.isSet("norepl"))
@@ -211,17 +205,7 @@ int debug_cli_loop()
         }
         else if (command == "flight")
         {
-            if (g_magnumThread.joinable())
-            {
-                g_magnumThread.join();
-            }
-//            std::thread t([] {
-//                osp::set_thread_logger(g_logMagnumApp);
-//                test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
-//                            std::ref(g_universe), std::ref(g_universeUpdate),
-//                            ActiveApplication::Arguments{g_argc, g_argv});
-//            });
-//            g_magnumThread.swap(t);
+
         }
         else if (command == "list_pkg")
         {
@@ -241,10 +225,10 @@ int debug_cli_loop()
         }
         else if (command == "exit")
         {
-            if (g_ActiveApplication)
+            if (g_activeApplication)
             {
                 // request exit if application exists
-                g_ActiveApplication->exit();
+                g_activeApplication->exit();
             }
             destroy_universe();
             break;
@@ -258,10 +242,44 @@ int debug_cli_loop()
     return 0;
 }
 
+void start_magnum_async()
+{
+    if (g_magnumThread.joinable())
+    {
+        g_magnumThread.join();
+    }
+    std::thread t([] {
+        osp::set_thread_logger(g_logMagnumApp);
+
+        g_activeApplication.emplace(
+                ActiveApplication::Arguments{g_argc, g_argv},
+                [] (ActiveApplication& rMagnumApp)
+        {
+            // Update the universe each frame
+            // This likely wouldn't be here in the future
+            //rUniUpd(rUni);
+
+        });
+
+        // Configure the controls
+        config_controls(*g_activeApplication);
+
+        // Starts the main loop. This function is blocking, and will only return
+        // once the window is closed. See ActiveApplication::drawEvent
+        g_activeApplication->exec();
+
+        OSP_LOG_INFO("Closed Magnum Application");
+
+        g_activeApplication.reset();
+
+    });
+    g_magnumThread.swap(t);
+}
+
 bool destroy_universe()
 {
     // Make sure no application is open
-    if (g_ActiveApplication != nullptr)
+    if (g_activeApplication.has_value())
     {
       OSP_LOG_WARN("Application must be closed to destroy universe.");
         return false;
@@ -428,157 +446,4 @@ void debug_print_resources()
     }
 }
 
-void debug_print_machines()
-{
-    using osp::active::ACompHierarchy;
-    using osp::active::ActiveScene;
-    using osp::active::ActiveEnt;
-    using osp::active::ACompMachines;
-    using osp::active::ACompMachineType;
-    using osp::RegisteredMachine;
-    using regmachs_t = osp::Package::group_t<RegisteredMachine>;
 
-    if (!g_ActiveApplication)
-    {
-        std::cout << "Can't do that yet, start the magnum application first!\n";
-        return;
-    }
-
-    // Get list of machine names
-    regmachs_t const* pGroup = g_packages.find("lzdb").group_get<RegisteredMachine>();
-    std::vector<std::string_view> machNames(pGroup->size());
-    for (auto const& [name, regMach] : *pGroup)
-    {
-        machNames[regMach.m_data->m_id] = name;
-    }
-
-    // Loop through every Vehicle
-//    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
-//    auto view = scene.get_registry().view<const ACompMachines>();
-
-//    for (ActiveEnt ent : view)
-//    {
-//        auto const *name = scene.get_registry().try_get<osp::active::ACompName>(ent);
-//        std::string_view nameview = (name != nullptr) ? std::string_view(name->m_name) : "untitled";
-//        std::cout << "[" << int(ent) << "]: " << nameview << "\n";
-
-//        // Loop through each of that vehicle's Machines
-//        auto const &machines = scene.reg_get<ACompMachines>(ent);
-//        for (ActiveEnt machEnt : machines.m_machines)
-//        {
-//            auto const& type = scene.reg_get<ACompMachineType>(machEnt);
-
-//            std::cout << "  ->[" << int(machEnt) << "]: " << machNames[type.m_type] << "\n";
-//        }
-//    }
-}
-
-void debug_print_hier()
-{
-    using osp::active::ACompHierarchy;
-    using osp::active::ActiveScene;
-    using osp::active::ActiveEnt;
-
-    if (!g_ActiveApplication)
-    {
-        std::cout << "Can't do that yet, start the magnum application first!\n";
-        return;
-    }
-
-    std::cout << "ActiveScene Entity Hierarchy:\n";
-
-    /*
-    std::vector<ActiveEnt> parentNextSibling;
-    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
-    ActiveEnt currentEnt = scene.hier_get_root();
-
-    parentNextSibling.reserve(16);
-
-    while (true)
-    {
-        // print some info about the entitysize() != 0
-        auto const &hier = scene.reg_get<ACompHierarchy>(currentEnt);
-        for (uint8_t i = 0; i < hier.m_level; i ++)
-        {
-            // print arrows to indicate level
-            std::cout << "  ->";
-        }
-        auto const *name = scene.get_registry().try_get<osp::active::ACompName>(currentEnt);
-        std::string_view nameview = (name != nullptr) ? std::string_view(name->m_name) : "untitled";
-        std::cout << "[" << uint32_t(scene.get_registry().entity(currentEnt))
-                     << "]: " << nameview << "\n";
-
-        if (hier.m_childCount != 0)
-        {
-            // entity has some children
-            currentEnt = hier.m_childFirst;
-
-
-            // save next sibling for later if it exists
-            if (hier.m_siblingNext != entt::null)
-            {
-                parentNextSibling.push_back(hier.m_siblingNext);
-            }
-        }
-        else if (hier.m_siblingNext != entt::null)
-        {
-            // no children, move to next sibling
-            currentEnt = hier.m_siblingNext;
-        }
-        else if (!parentNextSibling.empty())
-        {
-            // last sibling, and not done yet
-            // is last sibling, move to parent's (or ancestor's) next sibling
-            currentEnt = parentNextSibling.back();
-            parentNextSibling.pop_back();
-        }
-        else
-        {
-            break;
-        }
-    }
-    */
-}
-
-void debug_print_sats()
-{
-    using namespace osp::universe;
-
-    /**
-
-    Universe const &rUni = g_universe;
-
-    Universe::Reg_t const &rReg = rUni.get_reg();
-
-    rReg.each([&rReg, &rUni] (osp::universe::Satellite sat)
-    {
-        auto const &posTraj = rReg.get<const UCompTransformTraj>(sat);
-        auto const &inCoord = rReg.get<const UCompInCoordspace>(sat);
-        auto const &coordIndex = rReg.get<const UCompCoordspaceIndex>(sat);
-
-        std::cout << "* SATELLITE: \"" << posTraj.m_name << "\"\n";
-
-        rReg.visit(sat, [&rReg] (entt::type_info info) {
-            Universe::Reg_t::poly_storage storage = rReg.storage(info);
-            std::cout << "  * UComp: " << storage->value_type().name() << "\n";
-        });
-
-        if (inCoord.m_coordSpace != entt::null)
-        {
-            CoordinateSpace const &rSpace
-                    = rUni.coordspace_get(inCoord.m_coordSpace);
-
-            auto viewPos = rSpace.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
-
-            auto const pos = make_from_ccomp<Vector3g>(*viewPos, coordIndex.m_myIndex);
-
-            auto posM = osp::Vector3(pos) / 1024.0f;
-            std::cout << "  * Position: ["
-                      << pos.x() << ", " << pos.y() << ", " << pos.z() << "], ["
-                      << posM.x() << ", " << posM.y() << ", " << posM.z()
-                      << "] meters in coordspace " << inCoord.m_coordSpace << "\n";
-        }
-    });
-
-    **/
-}

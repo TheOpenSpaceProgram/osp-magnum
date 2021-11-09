@@ -29,7 +29,7 @@
 namespace osp::active
 {
 
-struct SyncVehicles
+struct ACtxSyncVehicles
 {
     MapSatToEnt_t m_inArea;
 };

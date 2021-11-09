@@ -164,7 +164,7 @@ using UpdNodes_t = std::vector< UpdNode<WIRETYPE_T> >;
  * Scene-wide storage for WireNodes
  */
 template<typename WIRETYPE_T>
-struct ACompWireNodes
+struct ACtxWireNodes
 {
     // All the WIRETYPE_T node in the scene
     std::vector< WireNode<WIRETYPE_T> > m_nodes;
@@ -283,12 +283,12 @@ public:
             BlueprintVehicle const& vehicleBp);
 
     /**
-     * @return ACompWireNodes<WIRETYPE_T> reference from scene root
+     * @return ACtxWireNodes<WIRETYPE_T> reference from scene root
      */
     template<typename WIRETYPE_T>
-    static constexpr ACompWireNodes<WIRETYPE_T>& nodes(ActiveScene& rScene)
+    static constexpr ACtxWireNodes<WIRETYPE_T>& nodes(ActiveScene& rScene)
     {
-        return rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(rScene.hier_get_root());
+        return rScene.reg_get< ACtxWireNodes<WIRETYPE_T> >(rScene.hier_get_root());
     }
 
     /**

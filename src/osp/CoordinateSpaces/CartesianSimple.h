@@ -43,7 +43,7 @@ struct CoordspaceCartesianSimple
      *          sure to always call update_views before accessing the
      *          CoordinateSpace's components.
      *
-     * @param rUni   [ref]
+     * @param rUni   [ref]-
      * @param rSpace [ref]
      * @param rData  [ref]
      */

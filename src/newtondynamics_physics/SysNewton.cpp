@@ -116,14 +116,6 @@ void cb_set_transform(NewtonBody const* const pBody,
     pWorldCtx->m_perThread[threadIndex].m_setTf.emplace_back(ent, pBody);
 }
 
-void SysNewton::setup(ActiveScene &rScene)
-{
-    int threadCount = 1; // temporary
-
-    ActiveReg_t &rReg = rScene.get_registry();
-
-    rReg.set<ACtxNwtWorld>(rScene, threadCount);
-}
 
 void SysNewton::destroy(ActiveScene &rScene)
 {

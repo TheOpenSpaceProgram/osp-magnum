@@ -118,7 +118,7 @@ public:
     static void update_vehicle(osp::active::ActiveScene& rScene);
 
     /**
-     * @brief Read user inputs, and write controls to MachineUserControl
+     * @brief Read user inputs, and write controls to MCompUserControl
      *
      * @param rScene [ref] Scene with root containing ACompCameraController
      */
