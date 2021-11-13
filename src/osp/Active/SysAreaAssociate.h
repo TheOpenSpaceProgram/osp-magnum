@@ -24,12 +24,13 @@
  */
 #pragma once
 
-#include "activetypes.h"
-#include "../Universe.h"
+#include "physics.h"
+#include "basic.h"
 
-#include "../Satellites/SatActiveArea.h"
+#include "../types.h"
+#include "../universetypes.h"
 
-#include <cstdint>
+namespace osp::universe { struct UCompActiveArea; }
 
 namespace osp::active
 {
@@ -80,31 +81,6 @@ public:
     static void update_translate(
             ACtxAreaLink& rLink, universe::UCompActiveArea& rAreaUComp);
 
-    /**
-     * @brief Connect the ActiveScene to the Universe using the scene's
-     *        ACompAreaLink, and a Satellite containing a UCompActiveArea.
-     *
-     * @param rScene  [ref] Scene assicated with ActiveArea
-     * @param rUni    [ref] Universe the ActiveArea satellite is contained in.
-     *                      This is stored in ACompAreaLink.
-     * @param areaSat [in] ActiveArea Satellite
-     */
-    static void connect(ActiveScene& rScene, universe::Universe &rUni,
-                        universe::Satellite areaSat);
-
-    /**
-     * @brief Request to move the ActiveArea
-     *
-     * These movements are queued and accumolated, as only the universe is
-     * allowed to directly move Satellites. Once the universe updates, and moves
-     * the area, it writes into UCompActiveArea::m_moved which is read by
-     * update_consume.
-     *
-     * @param rScene    [ref] Scene assicated with ActiveArea
-     * @param translate [in] Amount to translate the area by
-     */
-    static void area_move(ActiveScene& rScene, universe::Vector3g const& translate);
-
 private:
 
 
@@ -115,8 +91,13 @@ private:
      * @param rScene      [ref] Scene containing entities that can be translated
      * @param translation [in] Meters to translate entities by
      */
-    static void floating_origin_translate(ActiveScene& rScene,
-                                          Vector3 translation);
+    static void floating_origin_translate(
+            acomp_view_t<ACompFloatingOrigin const> viewFloatingOrigin,
+            acomp_view_t<ACompTransform> viewTf,
+            acomp_view_t<ACompTransformControlled const> viewTfControlled,
+            acomp_view_t<ACompTransformMutable> viewTfMutable,
+            ACtxPhysics& rCtxPhys,
+            Vector3 translation);
 
 };
 

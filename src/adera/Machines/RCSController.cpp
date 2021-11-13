@@ -53,6 +53,8 @@
 // IWYU pragma: no_include <stdint.h>
 // IWYU pragma: no_include <type_traits>
 
+#if 0
+
 namespace osp { class Package; }
 namespace osp { struct Path; }
 
@@ -248,3 +250,5 @@ void SysMCompRCSController::update_calculate(ActiveScene& rScene)
 }
 
 } // namespace adera::active::machines
+
+#endif

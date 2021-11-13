@@ -24,9 +24,8 @@
  */
 #include "SysAreaAssociate.h"
 
-#include "ActiveScene.h"
+#include "../Satellites/SatActiveArea.h"
 
-#include "physics.h"
 
 using osp::active::SysAreaAssociate;
 
@@ -67,49 +66,40 @@ void SysAreaAssociate::update_translate(
     }
 }
 
-void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3g const& translate)
-{
-    /*ACompAreaLink *pArea = try_get_area_link(rScene);
-
-    if (pArea == nullptr)
-    {
-        return;
-    }
-
-    Universe &rUni = pArea->get_universe();
-    auto &rAreaSat = rUni.get_reg().get<UCompActiveArea>(pArea->m_areaSat);
-
-    rAreaSat.m_requestMove.push_back(translate);*/
-}
-
 void SysAreaAssociate::floating_origin_translate(
-        ActiveScene& rScene, Vector3 translation)
+        acomp_view_t<ACompFloatingOrigin const> viewFloatingOrigin,
+        acomp_view_t<ACompTransform> viewTf,
+        acomp_view_t<ACompTransformControlled const> viewTfControlled,
+        acomp_view_t<ACompTransformMutable> viewTfMutable,
+        ACtxPhysics& rCtxPhys,
+        Vector3 translation)
 {
-    auto &rReg = rScene.get_registry();
 
-    auto view = rReg.view<ACompFloatingOrigin, ACompTransform>();
-
-    for (ActiveEnt const ent : view)
+    // Attempt to translate all entities with ACompFloatingOrigin
+    for (ActiveEnt const ent : viewFloatingOrigin)
     {
-        auto &entTransform = view.get<ACompTransform>(ent);
-        //auto &entFloatingOrigin = view.get<ACompFloatingOrigin>(ent);
+        auto &rEntTransform = viewTf.get<ACompTransform>(ent);
 
-        if (rReg.all_of<ACompTransformControlled>(ent))
+        // Check for an ACompTransformControlled. Its existence indicates that
+        // the transform is in control and reserved by another system
+        if (viewTfControlled.contains(ent))
         {
-            auto *tfMutable = rReg.try_get<ACompTransformMutable>(ent);
-            if (tfMutable == nullptr)
+            // Check for a ACompTransformMutable. If not exists, mutation is not
+            // allowed.
+            if ( ! viewTfMutable.contains(ent))
             {
                 continue;
             }
 
-            tfMutable->m_dirty = true;
+            // Mutation is allowed as long as a dirty flag is set
+            viewTfMutable.get<ACompTransformMutable>(ent).m_dirty = true;
         }
 
-        entTransform.m_transform.translation() += translation;
+        rEntTransform.m_transform.translation() += translation;
     }
 
     // Tell physics engine to translate its rigid bodies as well
-    rReg.ctx<ACtxPhysics>().m_originTranslate += translation;
+    rCtxPhys.m_originTranslate += translation;
 }
 
 

@@ -55,6 +55,8 @@ using namespace adera::active::machines;
 
 /* MCompContainer */
 
+#if 0
+
 std::uint64_t MCompContainer::request_contents(std::uint64_t quantity)
 {
     if (quantity > m_contents.m_quantity)
@@ -157,3 +159,5 @@ void SysMCompContainer::update_construct(ActiveScene &rScene)
         }
     }
 }
+
+#endif

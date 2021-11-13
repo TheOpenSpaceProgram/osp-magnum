@@ -24,4 +24,45 @@
  */
 #pragma once
 
+#include <planet-a/Satellites/SatPlanet.h>
 
+#include <osp/Universe.h>
+
+#include <osp/Satellites/SatActiveArea.h>
+#include <osp/Satellites/SatVehicle.h>
+
+namespace testapp
+{
+
+namespace unistate
+{
+using namespace osp::universe;
+
+
+struct Activation
+{
+    ucomp_storage_t< UCompActivatable >         m_activatable;
+    ucomp_storage_t< UCompActivationAlways >    m_activationAlways;
+    ucomp_storage_t< UCompActivationRadius >    m_activationRadius;
+    ucomp_storage_t< UCompActiveArea >          m_activeArea;
+};
+
+using namespace planeta::universe;
+
+struct Solids
+{
+    ucomp_storage_t< UCompVehicle >             m_vehicles;
+    ucomp_storage_t< UCompPlanet >              m_planets;
+};
+
+}
+
+struct UniverseScene
+{
+    osp::universe::Universe     m_universe;
+
+    unistate::Activation        m_activation;
+    unistate::Solids            m_solids;
+};
+
+}

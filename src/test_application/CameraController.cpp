@@ -36,6 +36,8 @@
 
 #include <osp/logging.h>
 
+#if 0
+
 using testapp::SysCameraController;
 using testapp::ACompCameraController;
 
@@ -427,3 +429,6 @@ ActiveEnt SysCameraController::find_vehicle_from_sat(
     }
     return entt::null;
 }
+
+
+#endif

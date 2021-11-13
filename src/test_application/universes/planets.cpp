@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 
+#include "../scene_universe.h"
+
 #include "planets.h"
 #include "vehicles.h"
 
@@ -30,7 +32,6 @@
 #include <osp/Satellites/SatVehicle.h>
 
 #include <osp/CoordinateSpaces/CartesianSimple.h>
-#include <osp/Trajectories/Stationary.h>
 #include <osp/logging.h>
 
 #include <planet-a/Satellites/SatPlanet.h>
@@ -49,7 +50,6 @@ using osp::universe::SatVehicle;
 using osp::universe::CoordinateSpace;
 using osp::universe::CoordspaceCartesianSimple;
 
-using osp::universe::UCompInCoordspace;
 using osp::universe::UCompActiveArea;
 
 using planeta::universe::SatPlanet;
@@ -59,10 +59,11 @@ using osp::universe::Vector3g;
 using osp::universe::spaceint_t;
 
 void moon::create(PackageRegistry& rPkgs,
-                  Universe& rUni, universe_update_t &rUpdater)
+                  UniverseScene& rUniScn, universe_update_t& rUpdater)
 {
     Package &rPkg = rPkgs.find("lzdb");
 
+    Universe &rUni = rUniScn.m_universe;
     Satellite root = rUni.sat_create();
 
     // Create a coordinate space used to position Satellites
@@ -76,7 +77,7 @@ void moon::create(PackageRegistry& rPkgs,
     // Create 4 part vehicles
     for (int i = 0; i < 4; i ++)
     {
-        Satellite sat = testapp::debug_add_part_vehicle(rUni, rPkg, "Placeholder Mk. I " + std::to_string(i));
+        Satellite sat = testapp::debug_add_part_vehicle(rUniScn, rPkg, "Placeholder Mk. I " + std::to_string(i));
 
         Vector3g pos{i * 1024l * 4l, 0l, 0l};
 
@@ -96,8 +97,8 @@ void moon::create(PackageRegistry& rPkgs,
         float resolutionSurfaceMax = 12.0f;
 
         // assign sat as a planet
-        SatPlanet::add_planet(rUni, sat, radius, mass, activateRadius,
-                              resolutionSurfaceMax, resolutionScreenMax);
+        add_planet(rUniScn, sat, radius, mass, activateRadius,
+                   resolutionSurfaceMax, resolutionScreenMax);
 
         // Surface will appear 200 meters below the origin
         // 1024 units = 1 meter
@@ -110,7 +111,7 @@ void moon::create(PackageRegistry& rPkgs,
     rUpdater = generate_simple_universe_update(coordIndex);
 
     // Update CoordinateSpace to finish adding the new Satellites
-    rUpdater(rUni);
+    rUpdater(rUniScn);
 
     OSP_LOG_INFO("Created large moon");
 }

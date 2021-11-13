@@ -33,10 +33,13 @@
 #include "universes/simple.h"
 #include "universes/planets.h"
 
+#include "scene_active.h"
+#include "scene_universe.h"
+
+
 #include <osp/Resource/AssetImporter.h>
 #include <osp/Satellites/SatVehicle.h>
 #include <osp/Shaders/Phong.h>
-#include <osp/scene.h>
 #include <osp/string_concat.h>
 #include <osp/logging.h>
 
@@ -48,7 +51,6 @@
 #include <adera/Machines/Rocket.h>
 #include <adera/Machines/UserControl.h>
 
-#include <planet-a/Satellites/SatPlanet.h>
 
 #include <Corrade/Utility/Arguments.h>
 
@@ -92,13 +94,11 @@ void debug_print_machines();
 // Stores loaded resources in packages.
 osp::PackageRegistry g_packages;
 
-// Test application supports 1 Active Scene
-std::optional<osp::Scene> m_activeScene;
-SceneMeta m_activeMeta;
+// Test application supports 1 Flight scene
+std::unique_ptr<FlightScene> m_flightScene;
 
 // Test application supports 1 Universe
-std::optional<osp::Scene> m_uniScene;
-SceneMeta m_uniMeta;
+std::unique_ptr<UniverseScene> m_universeScene;
 
 // Magnum Application deals with window and OpenGL things
 std::optional<ActiveApplication> g_activeApplication;
@@ -213,15 +213,15 @@ int debug_cli_loop()
         }
         else if (command == "list_uni")
         {
-            debug_print_sats();
+            //debug_print_sats();
         }
         else if (command == "list_ent")
         {
-            debug_print_hier();
+            //debug_print_hier();
         }
         else if (command == "list_mach")
         {
-            debug_print_machines();
+            //debug_print_machines();
         }
         else if (command == "exit")
         {

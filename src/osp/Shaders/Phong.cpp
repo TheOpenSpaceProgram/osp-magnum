@@ -35,14 +35,14 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void Phong::draw_entity(
-        ActiveEnt ent, ActiveScene& rScene, ACompCamera const& camera,
-        void* pUserData) noexcept
+        ActiveEnt ent, ACompCamera const& camera,
+        osp::active::EntityToDraw::UserData_t userData) noexcept
 {
-    auto &rShader = *reinterpret_cast<Phong*>(pUserData);
+    auto &rData = *reinterpret_cast<ACtxPhongData*>(userData[0]);
+    auto &rShader = *reinterpret_cast<Phong*>(userData[1]);
 
     // Collect uniform information
-    auto& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
-    Magnum::GL::Mesh& rMesh = *rScene.reg_get<ACompMesh>(ent).m_mesh;
+    auto const& drawTf = rData.m_viewDrawTf.get<ACompDrawTransform>(ent);
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
@@ -54,7 +54,7 @@ void Phong::draw_entity(
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {
-        rShader.bindDiffuseTexture(*rScene.reg_get<ACompDiffuseTex>(ent).m_tex);
+        rShader.bindDiffuseTexture(*rData.m_diffuseTex.get<ACompDiffuseTex>(ent).m_tex);
     }
 
     rShader
@@ -64,36 +64,34 @@ void Phong::draw_entity(
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
         .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
-        .draw(rMesh);
+        .draw(*rData.m_mesh.get<ACompMesh>(ent).m_mesh);
 }
 
-Phong::RenderGroup::DrawAssigner_t Phong::gen_assign_phong_opaque(
-        Phong* pNoTexture, Phong* pTextured)
+
+void Phong::assign_phong_opaque(
+        RenderGroup::ArrayView_t entities,
+        RenderGroup::Storage_t& rStorage,
+        acomp_view_t<ACompOpaque const> viewOpaque,
+        acomp_view_t<ACompDiffuseTex const> viewDiffuse,
+        ACtxPhongData &rData)
 {
-    return [pNoTexture, pTextured]
-            (ActiveScene& rScene, RenderGroup::Storage_t& rStorage,
-             RenderGroup::ArrayView_t entities)
+
+    for (ActiveEnt ent : entities)
     {
-        ActiveReg_t &rReg = rScene.get_registry();
-
-        auto viewOpaque = rReg.view<ACompOpaque>();
-        auto viewDiffuse = rReg.view<ACompDiffuseTex>();
-
-        for (ActiveEnt ent : entities)
+        if (!viewOpaque.contains(ent))
         {
-            if (!viewOpaque.contains(ent))
-            {
-                continue; // This assigner is for opaque materials only
-            }
-
-            if (viewDiffuse.contains(ent))
-            {
-                rStorage.emplace(ent, EntityToDraw{&draw_entity, pTextured});
-            }
-            else
-            {
-                rStorage.emplace(ent, EntityToDraw{&draw_entity, pNoTexture});
-            }
+            continue; // This assigner is for opaque materials only
         }
-    };
+
+        if (viewDiffuse.contains(ent))
+        {
+            rStorage.emplace(
+                    ent, EntityToDraw{&draw_entity, {&rData, &rData.m_shaderDiffuse} });
+        }
+        else
+        {
+            rStorage.emplace(
+                    ent, EntityToDraw{&draw_entity, {&rData, &rData.m_shaderUntextured} });
+        }
+    }
 }

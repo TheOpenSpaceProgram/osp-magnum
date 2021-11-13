@@ -42,6 +42,8 @@
 #include <iterator>                      // for std::begin, std::end
 #include <algorithm>                     // for std::sort
 
+#if 0
+
 // IWYU pragma: no_include "adera/wiretypes.h"
 
 // IWYU pragma: no_include <map>
@@ -184,3 +186,5 @@ void SysMCompUserControl::update_sensor(ActiveScene &rScene)
         rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
 }
+
+#endif

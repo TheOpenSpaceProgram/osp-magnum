@@ -38,11 +38,11 @@ class SysVehicleSync
 {
 public:
 
-    static ActiveEnt activate(ActiveScene &rScene, universe::Universe &rUni,
+    static ActiveEnt activate(universe::Universe &rUni,
                               universe::Satellite areaSat,
                               universe::Satellite tgtSat);
 
-    static void deactivate(ActiveScene &rScene, universe::Universe &rUni,
+    static void deactivate(universe::Universe &rUni,
                            universe::Satellite areaSat,
                            universe::Satellite tgtSat, ActiveEnt tgtEnt);
 
@@ -59,7 +59,7 @@ public:
      *
      * @param rScene [ref] Scene containing vehicles to update
      */
-    static void update_universe_sync(ActiveScene& rScene);
+    static void update_universe_sync();
 };
 
 }

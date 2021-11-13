@@ -35,10 +35,10 @@ namespace testapp::simplesolarsystem
  *        vehicles
  *
  * @param rPkgs   [ref] Packages containing needed resources
- * @param rUni    [ref] Universe to setup; usually this is empty
+ * @param rUniScn [ref] Universe scene to setup; usually this is empty
  * @param rUniUpd [out] Associated universe update function to set
  */
 void create(osp::PackageRegistry& rPkgs,
-            osp::universe::Universe& rUni, universe_update_t &rUniUpd);
+            UniverseScene& rUniScn, universe_update_t &rUniUpd);
 
 }

@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "ActiveScene.h"
+#include "activetypes.h"
 #include "../Resource/machines.h"
 
 #include <cstdint>
@@ -33,7 +33,7 @@
 namespace osp::active
 {
 
-enum class MachineEnt : uint32_t { };
+enum class MachineEnt : entt::id_type { };
 
 /**
  * This component is added to a part, and stores a vector that keeps track of
@@ -45,8 +45,23 @@ struct ACompMachines
     std::vector<ActiveEnt> m_machines;
 };
 
-template<typename COMP_T>
-using mcomp_storage_t = entt::basic_storage<MachineEnt, COMP_T>;
+}
 
+// Specialize entt::storage_traits to disable signals for storage that uses
+// MachineEnt as entities
+template<typename Type>
+struct entt::storage_traits<osp::active::MachineEnt, Type>
+{
+    using storage_type = basic_storage<osp::active::MachineEnt, Type>;
+};
+
+namespace osp::active
+{
+
+template<typename COMP_T>
+using mcomp_storage_t = typename entt::storage_traits<MachineEnt, COMP_T>::storage_type;
+
+template<typename... COMP_T>
+using mcomp_view_t = entt::basic_view<MachineEnt, entt::exclude_t<>, COMP_T...>;
 
 } // namespace osp::active

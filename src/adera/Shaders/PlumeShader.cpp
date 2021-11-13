@@ -68,64 +68,53 @@ using namespace adera::active;
 using namespace adera::shader;
 
 void PlumeShader::draw_plume(
-        ActiveEnt ent, ActiveScene& rScene,
-        ACompCamera const& camera, void* pUserData) noexcept
+        ActiveEnt ent,
+        ACompCamera const& camera,
+        EntityToDraw::UserData_t userData) noexcept
 {
     using Magnum::GL::Renderer;
     using Magnum::GL::Texture2D;
 
-    auto& rResources = rScene.get_context_resources();
-    PlumeShader &rShader = *reinterpret_cast<PlumeShader*>(pUserData);
+    ACtxPlumeData &rData = *reinterpret_cast<ACtxPlumeData*>(userData[0]);
 
     // Collect uniform data
-    auto const& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
-    auto const& rPlumeComp = rScene.reg_get<ACompExhaustPlume>(ent);
-    auto const& plumedata = *rPlumeComp.m_effect;
-    auto& rMesh = *rScene.reg_get<ACompMesh>(ent).m_mesh;
-
-    constexpr std::string_view texName = "OSPData/adera/noise1024.png";
-    DependRes<Texture2D> tmpTex = rResources.get<Texture2D>(texName);
-    if (tmpTex.empty())
-    {
-        tmpTex = AssetImporter::compile_tex(texName,
-            rScene.get_packages().find("lzdb"), rResources);
-    }
+    auto const &drawTf  = rData.m_viewDrawTf.get<ACompDrawTransform>(ent);
+    auto const &comp    = rData.m_viewExaustPlumes.get<ACompExhaustPlume>(ent);
+    auto const &effect  = *comp.m_effect;
+    auto &rMesh         = *rData.m_mesh.get<ACompMesh>(ent).m_mesh;
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
-    rShader
-        .bindNozzleNoiseTexture(*tmpTex)
-        .bindCombustionNoiseTexture(*tmpTex)
-        .setMeshZBounds(plumedata.m_zMax, plumedata.m_zMin)
-        .setBaseColor(plumedata.m_color)
-        .setFlowVelocity(plumedata.m_flowVelocity)
-        .updateTime(rPlumeComp.m_time)
-        .setPower(rPlumeComp.m_powerLevel)
-        .setTransformationMatrix(entRelative)
-        .setProjectionMatrix(camera.m_projection)
-        .setNormalMatrix(entRelative.normalMatrix());
+    rData.m_shader
+        .bindNozzleNoiseTexture     (*rData.m_tmpTex)
+        .bindCombustionNoiseTexture (*rData.m_tmpTex)
+        .setMeshZBounds             (effect.m_zMax, effect.m_zMin)
+        .setBaseColor               (effect.m_color)
+        .setFlowVelocity            (effect.m_flowVelocity)
+        .updateTime                 (comp.m_time)
+        .setPower                   (comp.m_powerLevel)
+        .setTransformationMatrix    (entRelative)
+        .setProjectionMatrix        (camera.m_projection)
+        .setNormalMatrix            (entRelative.normalMatrix());
 
     // Draw back face
     Renderer::setFaceCullingMode(Renderer::PolygonFacing::Front);
-    rShader.draw(rMesh);
+    rData.m_shader.draw(rMesh);
 
     // Draw front face
     Renderer::setFaceCullingMode(Renderer::PolygonFacing::Back);
-    rShader.draw(rMesh);
+    rData.m_shader.draw(rMesh);
 }
 
-PlumeShader::RenderGroup::DrawAssigner_t PlumeShader::gen_assign_plume(
-        PlumeShader *pShader)
+void PlumeShader::assign_plumes(
+        RenderGroup::ArrayView_t entities,
+        RenderGroup::Storage_t& rStorage,
+        ACtxPlumeData& rData)
 {
-    return [pShader]
-            (ActiveScene& rScene, RenderGroup::Storage_t& rStorage,
-             RenderGroup::ArrayView_t entities)
+    for (ActiveEnt ent : entities)
     {
-        for (ActiveEnt ent : entities)
-        {
-            rStorage.emplace(ent, EntityToDraw{&draw_plume, pShader});
-        }
-    };
+        rStorage.emplace(ent, EntityToDraw{&draw_plume, {&rData} });
+    }
 }
 
 void PlumeShader::init()

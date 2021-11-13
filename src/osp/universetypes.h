@@ -24,12 +24,27 @@
  */
 #pragma once
 
+#include <entt/entity/view.hpp>
+#include <entt/entity/storage.hpp>
+
 #include <Magnum/Math/Vector3.h>
 
 namespace osp::universe
 {
-
 enum class Satellite : uint32_t {};
+}
+
+// Specialize entt::storage_traits to disable signals for storage that uses
+// Satellites as entities
+template<typename Type>
+struct entt::storage_traits<osp::universe::Satellite, Type>
+{
+    using storage_type = basic_storage<osp::universe::Satellite, Type>;
+};
+
+namespace osp::universe
+{
+
 
 using spaceint_t = int64_t;
 
@@ -39,6 +54,14 @@ const float gc_units_per_meter = 1024.0f;
 
 // A Vector3 for space
 using Vector3g = Magnum::Math::Vector3<spaceint_t>;
+
+template<typename COMP_T>
+using ucomp_storage_t = typename entt::storage_traits<Satellite, COMP_T>::storage_type;
+
+using coordspace_index_t = uint32_t;
+
+template<typename... COMP_T>
+using ucomp_view_t = entt::basic_view<Satellite, entt::exclude_t<>, COMP_T...>;
 
 
 }

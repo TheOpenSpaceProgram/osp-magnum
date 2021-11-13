@@ -58,6 +58,8 @@
 // IWYU pragma: no_include <stdint.h>
 // IWYU pragma: no_include <type_traits>
 
+#if 0
+
 using namespace adera::active;
 
 using osp::active::ActiveScene;
@@ -228,3 +230,5 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
         }
     }
 }
+
+#endif

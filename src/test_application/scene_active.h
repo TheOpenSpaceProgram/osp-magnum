@@ -43,13 +43,12 @@
 #include <adera/Machines/Rocket.h>
 #include <adera/Machines/UserControl.h>
 
-// Forward declare physics engine world
-namespace ospnewton { struct ACtxNwtWorld; }
+#include <newtondynamics_physics/ospnewton.h>
 
 namespace testapp
 {
 
-namespace scenestate
+namespace activestate
 {
 
 using namespace osp::active;
@@ -75,22 +74,6 @@ struct Basic
 };
 
 /**
- * @brief Storage for Physics components from osp/Active/physics.h
- */
-struct Physics
-{
-    acomp_storage_t<ACompPhysBody>              m_physBody;
-    acomp_storage_t<ACompPhysDynamic>           m_physDynamic;
-    acomp_storage_t<ACompPhysLinearVel>         m_physLinearVel;
-    acomp_storage_t<ACompPhysAngularVel>        m_physAngularVel;
-    acomp_storage_t<ACompPhysNetForce>          m_physNetForce;
-    acomp_storage_t<ACompPhysNetTorque>         m_physNetTorque;
-    acomp_storage_t<ACompRigidbodyAncestor>     m_rigidbodyAncestor;
-    acomp_storage_t<ACompShape>                 m_shape;
-    acomp_storage_t<ACompSolidCollider>         m_solidCollider;
-};
-
-/**
  * @brief Storage for Drawing components from osp/Active/drawing.h
  */
 struct Drawing
@@ -105,21 +88,12 @@ struct Drawing
 };
 
 /**
- * @brief Storage for Vehicle components from osp/Active/drawing.h
- */
-struct Vehicles
-{
-    acomp_storage_t<ACompMachines>              m_machines;
-    acomp_storage_t<ACompVehicle>               m_vehicle;
-    acomp_storage_t<ACompVehicleInConstruction> m_vehicleInConstruction;
-    acomp_storage_t<ACompPart>                  m_part;
-};
-
-/**
  * @brief Storage for wiring and various machine components
  */
 struct Machines
 {
+    acomp_storage_t<ACompMachines>              m_machines;
+
     mcomp_storage_t<MCompContainer>             m_container;
     mcomp_storage_t<MCompRCSController>         m_rcsController;
     mcomp_storage_t<MCompRocket>                m_rocket;
@@ -151,16 +125,22 @@ struct TestApp
  */
 struct FlightScene
 {
-    scenestate::ActiveIds_t         m_activeIds;
-    scenestate::MachineIds_t        m_machineIds;
+    activestate::ActiveIds_t        m_activeIds;
+    activestate::MachineIds_t       m_machineIds;
 
-    scenestate::Basic               m_basic;
-    scenestate::Physics             m_physics;
-    scenestate::Drawing             m_drawing;
-    scenestate::Vehicles            m_vehicles;
-    scenestate::Machines            m_machines;
+    activestate::Basic              m_basic;
+    activestate::Drawing            m_drawing;
+    activestate::Machines           m_machines;
+
+    osp::active::ACtxPhysics        m_physics;
+    activestate::ACtxVehicle        m_vehicles;
 
     std::unique_ptr<ospnewton::ACtxNwtWorld>    m_nwtWorld;
+};
+
+struct FlightSceneRenderer
+{
+
 };
 
 }

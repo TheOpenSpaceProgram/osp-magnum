@@ -56,6 +56,8 @@
 // IWYU pragma: no_include <stdint.h>
 // IWYU pragma: no_include <type_traits>
 
+#if 0
+
 namespace osp::active { class SysHierarchy; }
 
 using adera::active::machines::SysMCompRocket;
@@ -309,3 +311,5 @@ MCompRocket& SysMCompRocket::instantiate(
 
     return rocket;
 }
+
+#endif

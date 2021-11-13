@@ -24,7 +24,9 @@
  */
 #pragma once
 
-#include <osp/Active/drawing.h>
+#include "../SysExhaustPlume.h"
+
+#include <osp/Active/opengl/SysRenderGL.h>
 #include <osp/Active/activetypes.h>
 
 #include <Magnum/GL/Texture.h>
@@ -39,6 +41,8 @@ namespace osp::active { struct ACompCamera; }
 
 namespace adera::shader
 {
+
+struct ACtxPlumeData;
 
 class PlumeShader : public Magnum::GL::AbstractShaderProgram
 {
@@ -60,10 +64,14 @@ public:
     PlumeShader();
 
     static void draw_plume(
-            osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,
-            osp::active::ACompCamera const& camera, void* pUserData) noexcept;
+            osp::active::ActiveEnt ent,
+            osp::active::ACompCamera const& camera,
+            osp::active::EntityToDraw::UserData_t userData) noexcept;
 
-    static RenderGroup::DrawAssigner_t gen_assign_plume(PlumeShader* pShader);
+    static void assign_plumes(
+            RenderGroup::ArrayView_t entities,
+            RenderGroup::Storage_t& rStorage,
+            ACtxPlumeData& rData);
 
 private:
 
@@ -109,6 +117,23 @@ private:
     PlumeShader& setFlowVelocity(const float vel);
     PlumeShader& updateTime(const float currentTime);
     PlumeShader& setPower(const float power);
+};
+
+/**
+ * @brief Required data for drawing exaust plumes in the scene
+ */
+struct ACtxPlumeData
+{
+    template<typename... COMP_T>
+    using acomp_view_t = typename osp::active::acomp_view_t<COMP_T...>;
+
+    PlumeShader m_shader;
+
+    osp::DependRes<Magnum::GL::Texture2D> m_tmpTex;
+
+    acomp_view_t< osp::active::ACompDrawTransform >     m_viewDrawTf;
+    acomp_view_t< adera::active::ACompExhaustPlume >    m_viewExaustPlumes;
+    acomp_view_t< osp::active::ACompMesh >              m_mesh;
 };
 
 } // namespace adera::shader

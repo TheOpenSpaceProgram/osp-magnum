@@ -38,19 +38,19 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void MeshVisualizer::draw_entity(
-        ActiveEnt ent, ActiveScene &rScene,
-        const ACompCamera &camera, void *pUserData) noexcept
+        ActiveEnt ent, const ACompCamera &camera,
+        EntityToDraw::UserData_t userData) noexcept
 {
     using Magnum::Shaders::MeshVisualizerGL3D;
 
-    auto &rShader = *reinterpret_cast<MeshVisualizerGL3D*>(pUserData);
+    auto &rData = *reinterpret_cast<ACtxMeshVisualizerData*>(userData[0]);
 
-    auto &rMesh = rScene.reg_get<ACompMesh>(ent);
-    auto const& drawTf = rScene.reg_get<ACompDrawTransform>(ent);
+    auto &rMesh = rData.m_mesh.get<ACompMesh>(ent);
+    auto const& drawTf = rData.m_viewDrawTf.get<ACompDrawTransform>(ent);
 
     Matrix4 const entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
-    rShader
+    rData.m_shader
         .setColor(0x2f83cc_rgbf)
         .setWireframeColor(0xdcdcdc_rgbf)
         .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})

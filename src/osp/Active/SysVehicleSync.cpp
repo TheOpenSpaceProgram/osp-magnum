@@ -50,6 +50,7 @@ using osp::universe::UCompVehicle;
 // for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;
 
+#if 0
 ActiveEnt SysVehicleSync::activate(ActiveScene &rScene, Universe &rUni,
                                    Satellite areaSat, Satellite tgtSat)
 {
@@ -154,6 +155,7 @@ ActiveEnt SysVehicleSync::activate(ActiveScene &rScene, Universe &rUni,
 
     return vehicleEnt;
 }
+#endif
 
 #if 0
 void SysVehicleSync::update_universe_sync(ACtxAreaLink& rLink)

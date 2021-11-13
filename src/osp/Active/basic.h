@@ -71,12 +71,6 @@ struct ACompHierarchy
     ActiveEnt m_childFirst{entt::null};
 };
 
-// Stores the mass of entities
-struct ACompMass
-{
-    float m_mass;
-};
-
 /**
  * Component that represents a camera
  */
@@ -90,7 +84,13 @@ struct ACompCamera
     Matrix4 m_projection;
     Matrix4 m_inverse;
 
-    void calculate_projection();
+    void calculate_projection() noexcept
+    {
+        m_projection = osp::Matrix4::perspectiveProjection(
+                m_fov, m_viewport.x() / m_viewport.y(),
+                m_near, m_far);
+    }
 };
+
 
 }

@@ -26,6 +26,8 @@
 #include "vehicles.h"
 #include "../VehicleBuilder.h"
 
+#include "../scene_universe.h"
+
 #include <adera/ShipResources.h>
 #include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>
@@ -50,7 +52,6 @@ using osp::DependRes;
 using osp::universe::Universe;
 using osp::universe::Satellite;
 using osp::universe::SatVehicle;
-using osp::universe::UCompTransformTraj;
 using osp::universe::UCompVehicle;
 
 using osp::BlueprintVehicle;
@@ -82,13 +83,14 @@ void blueprint_add_rcs_block(
 
 
 osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
-        Universe& uni, Package& pkg, std::string_view name)
+        UniverseScene& rUniScn, osp::Package& rPkg, std::string_view name)
 {
+
     // Begin blueprint
     VehicleBuilder blueprint;
 
     // Part to add
-    DependRes<PrototypePart> rocket = pkg.get<PrototypePart>("part_stomper");
+    DependRes<PrototypePart> rocket = rPkg.get<PrototypePart>("part_stomper");
     blueprint.part_add(rocket, Vector3(0.0f), Quaternion(), Vector3(1.0f));
 
     // Wire throttle control
@@ -104,24 +106,24 @@ osp::universe::Satellite testapp::debug_add_deterministic_vehicle(
     //    0, 1, 0);
 
     // Save blueprint
-    DependRes<BlueprintVehicle> depend =
-        pkg.add<BlueprintVehicle>(std::string{name}, blueprint.export_move());
+    DependRes<BlueprintVehicle> depend = rPkg.add<BlueprintVehicle>(
+                std::string{name}, blueprint.export_move());
 
     // Create new satellite
-    Satellite sat = uni.sat_create();
+    Satellite sat = rUniScn.m_universe.sat_create();
 
     // Set name
-    auto& posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
-    posTraj.m_name = name;
+    //auto& posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
+    //posTraj.m_name = name;
 
     // Make the satellite into a vehicle
-    SatVehicle::add_vehicle(uni, sat, std::move(depend));
+    //add_vehicle(uni, sat, std::move(depend));
 
     return sat;
 }
 
 osp::universe::Satellite testapp::debug_add_random_vehicle(
-        osp::universe::Universe& uni, osp::Package& pkg,
+        UniverseScene& rUniScn, osp::Package& rPkg,
         std::string_view name)
 {
 
@@ -129,7 +131,7 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
     VehicleBuilder blueprint;
 
     // Part to add, very likely a spamcan
-    DependRes<PrototypePart> victim = pkg.get<PrototypePart>("part_spamcan");
+    DependRes<PrototypePart> victim = rPkg.get<PrototypePart>("part_spamcan");
 
     // Add 12 parts
     for (int i = 0; i < 12; i ++)
@@ -160,20 +162,20 @@ osp::universe::Satellite testapp::debug_add_random_vehicle(
     //                   0, 1, 0);
 
     // put blueprint in package
-    DependRes<BlueprintVehicle> depend =
-        pkg.add<BlueprintVehicle>(std::string{name}, blueprint.export_move());
+    DependRes<BlueprintVehicle> depend = rPkg.add<BlueprintVehicle>(
+                std::string{name}, blueprint.export_move());
 
     // Create the Satellite containing a SatVehicle
 
     // Create blank satellite
-    Satellite sat = uni.sat_create();
+    Satellite sat = rUniScn.m_universe.sat_create();
 
     // Set the name
-    auto &posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
-    posTraj.m_name = name;
+    //auto &posTraj = uni.get_reg().get<UCompTransformTraj>(sat);
+    //posTraj.m_name = name;
 
     // Make the satellite into a vehicle
-    SatVehicle::add_vehicle(uni, sat, std::move(depend));
+    add_vehicle(rUniScn, sat, std::move(depend));
 
     return sat;
 
@@ -194,7 +196,7 @@ void blueprint_add_rcs_block(
 }
 
 osp::universe::Satellite testapp::debug_add_part_vehicle(
-    osp::universe::Universe& uni, osp::Package& pkg,
+    UniverseScene& rUniScn, osp::Package& rPkg,
     std::string_view name)
 {
     using namespace Magnum::Math::Literals;
@@ -204,10 +206,10 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     VehicleBuilder blueprint;
 
     // Parts
-    DependRes<PrototypePart> capsule = pkg.get<PrototypePart>("part_phCapsule");
-    DependRes<PrototypePart> fuselage = pkg.get<PrototypePart>("part_phFuselage");
-    DependRes<PrototypePart> engine = pkg.get<PrototypePart>("part_phEngine");
-    DependRes<PrototypePart> rcs = pkg.get<PrototypePart>("part_phLinRCS");
+    DependRes<PrototypePart> capsule = rPkg.get<PrototypePart>("part_phCapsule");
+    DependRes<PrototypePart> fuselage = rPkg.get<PrototypePart>("part_phFuselage");
+    DependRes<PrototypePart> engine = rPkg.get<PrototypePart>("part_phEngine");
+    DependRes<PrototypePart> rcs = rPkg.get<PrototypePart>("part_phLinRCS");
 
     Vector3 cfOset = VehicleBuilder::part_offset(*capsule, "attach_bottom_capsule",
         *fuselage, "attach_top_fuselage");
@@ -303,17 +305,17 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
     }
 
     // Put blueprint in package
-    auto depend = pkg.add<BlueprintVehicle>(std::string{name},
+    auto depend = rPkg.add<BlueprintVehicle>(std::string{name},
                                             blueprint.export_move());
 
-    Satellite sat = uni.sat_create();
+    Satellite sat = rUniScn.m_universe.sat_create();
 
     // Set the name
-    auto& posTraj = uni.get_reg().get<osp::universe::UCompTransformTraj>(sat);
-    posTraj.m_name = name;
+    //auto& posTraj = uni.get_reg().get<osp::universe::UCompTransformTraj>(sat);
+    //posTraj.m_name = name;
 
     // Make the satellite into a vehicle
-    SatVehicle::add_vehicle(uni, sat, std::move(depend));
+    add_vehicle(rUniScn, sat, std::move(depend));
 
     return sat;
 }

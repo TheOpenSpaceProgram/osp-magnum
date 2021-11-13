@@ -49,7 +49,7 @@ class SysCustomMeshGL
 {
 public:
 
-    static void update_geometry_gl(ActiveScene& rScene);
+    static void update_geometry_gl();
 
 
 };

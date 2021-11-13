@@ -31,19 +31,6 @@ namespace osp::active
 {
 
 /**
- * @brief The ACtxPhysics struct
- */
-struct ACtxPhysics
-{
-    Vector3 m_originTranslate;
-
-    // Input queues
-    std::vector<ActiveEnt> m_colliderDirty;
-    std::vector<ActiveEnt> m_inertiaDirty;
-    std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
-};
-
-/**
  * @brief Synchronizes an entity with a physics engine body
  */
 struct ACompPhysBody
@@ -96,9 +83,40 @@ struct ACompShape
     phys::EShape m_shape{phys::EShape::None};
 };
 
+// Stores the mass of entities
+struct ACompMass
+{
+    float m_mass;
+};
+
 /**
  * For entities that are solid colliders for rigid bodies. Relies on ACompShape
  */
 struct ACompSolidCollider { };
+
+/**
+ * @brief Physics components and other data needed to support physics in a scene
+ */
+struct ACtxPhysics
+{
+    Vector3 m_originTranslate;
+
+    // Input queues
+    std::vector<ActiveEnt> m_colliderDirty;
+    std::vector<ActiveEnt> m_inertiaDirty;
+    std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
+
+    acomp_storage_t<ACompPhysBody>              m_physBody;
+    acomp_storage_t<ACompPhysDynamic>           m_physDynamic;
+    acomp_storage_t<ACompPhysLinearVel>         m_physLinearVel;
+    acomp_storage_t<ACompPhysAngularVel>        m_physAngularVel;
+    acomp_storage_t<ACompPhysNetForce>          m_physNetForce;
+    acomp_storage_t<ACompPhysNetTorque>         m_physNetTorque;
+    acomp_storage_t<ACompRigidbodyAncestor>     m_rigidbodyAncestor;
+    acomp_storage_t<ACompShape>                 m_shape;
+    acomp_storage_t<ACompMass>                  m_mass;
+    acomp_storage_t<ACompSolidCollider>         m_solidCollider;
+};
+
 
 }

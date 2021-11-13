@@ -30,20 +30,7 @@
 
 using osp::active::SysWire;
 
-void SysWire::setup_default(
-        ActiveScene& rScene,
-        uint32_t machineTypeCount,
-        std::vector<ACompWire::updfunc_t> updCalculate,
-        std::vector<ACompWire::updfunc_t> updNodes)
-{
-    rScene.reg_emplace<ACompWire>(
-            rScene.hier_get_root(),
-            ACompWire{std::move(updCalculate),
-                      std::move(updNodes),
-                      std::vector<std::vector<ActiveEnt>>(machineTypeCount),
-                      std::vector<std::mutex>(machineTypeCount)});
-}
-
+#if 0
 void SysWire::update_wire(ActiveScene &rScene)
 {
     auto &wire = rScene.reg_get<ACompWire>(rScene.hier_get_root());
@@ -81,3 +68,4 @@ void SysWire::update_wire(ActiveScene &rScene)
         }
     }
 }
+#endif

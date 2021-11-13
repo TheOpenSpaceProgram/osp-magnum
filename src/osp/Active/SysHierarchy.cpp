@@ -28,124 +28,115 @@
 using osp::active::SysHierarchy;
 using osp::active::ActiveEnt;
 
-void SysHierarchy::setup(ActiveScene& rScene)
-{
-    auto &rReg = rScene.get_registry();
 
-    rReg.emplace<ACompHierarchy>(rScene.hier_get_root());
-}
-
-ActiveEnt SysHierarchy::create_child(ActiveScene& rScene, ActiveEnt parent,
-                                            std::string const& name)
+ActiveEnt SysHierarchy::create_child(
+        acomp_storage_t<ACompHierarchy>& rHier,
+        acomp_storage_t<ACompName>& rNames,
+        ActiveEnt parent, ActiveEnt child, std::string const& name)
 {
-    auto &rReg = rScene.get_registry();
-    ActiveEnt child = rReg.create();
-    rReg.emplace<ACompHierarchy>(child);
+    rHier.emplace(child);
 
     if (!name.empty())
     {
-        rScene.reg_emplace<ACompName>(child, name);
+        rNames.emplace(child, name);
     }
 
-    set_parent_child(rScene, parent, child);
+    set_parent_child(rHier, parent, child);
 
     return child;
 }
 
-void SysHierarchy::set_parent_child(ActiveScene& rScene, ActiveEnt parent, ActiveEnt child)
+void SysHierarchy::set_parent_child(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt parent, ActiveEnt child)
 {
-    auto &rReg = rScene.get_registry();
-
-    ACompHierarchy& childHierarchy = rReg.get<ACompHierarchy>(child);
-    ACompHierarchy& parentHierarchy = rReg.get<ACompHierarchy>(parent);
+    ACompHierarchy &rChildHier  = viewHier.get<ACompHierarchy>(child);
+    ACompHierarchy &rParentHier = viewHier.get<ACompHierarchy>(parent);
 
     // if child has an existing parent, cut first
-    if (rReg.valid(childHierarchy.m_parent))
+    if (rChildHier.m_parent != entt::null)
     {
-        cut(rScene, child);
+        cut(viewHier, child);
     }
 
     // set new child's parent
-    childHierarchy.m_parent = parent;
-    childHierarchy.m_level = parentHierarchy.m_level + 1;
+    rChildHier.m_parent = parent;
+    rChildHier.m_level = rParentHier.m_level + 1;
 
     // If has siblings (not first child)
-    if(0 != parentHierarchy.m_childCount)
+    if(0 != rParentHier.m_childCount)
     {
-        ActiveEnt sibling = parentHierarchy.m_childFirst;
-        auto& siblingHierarchy = rReg.get<ACompHierarchy>(sibling);
+        ActiveEnt sibling = rParentHier.m_childFirst;
+        auto &rSiblingHier = viewHier.get<ACompHierarchy>(sibling);
 
         // Set new child and former first child as siblings
-        siblingHierarchy.m_siblingPrev = child;
-        childHierarchy.m_siblingNext = sibling;
+        rSiblingHier.m_siblingPrev = child;
+        rChildHier.m_siblingNext = sibling;
     }
 
     // Set parent's first child to new child just created
-    parentHierarchy.m_childFirst = child;
-    parentHierarchy.m_childCount ++; // increase child count
+    rParentHier.m_childFirst = child;
+    rParentHier.m_childCount ++; // increase child count
 }
 
-void SysHierarchy::cut(ActiveScene& rScene, ActiveEnt ent)
+void SysHierarchy::cut(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt ent)
 {
-    auto &rReg = rScene.get_registry();
-    auto &entHier = rReg.get<ACompHierarchy>(ent);
+    auto &rEntHier = viewHier.get<ACompHierarchy>(ent);
 
     // TODO: deal with m_depth
 
     // Unlink siblings by connecting previous and next to each other
 
-    if (rReg.valid(entHier.m_siblingNext))
+    if (rEntHier.m_siblingNext != entt::null)
     {
-        rReg.get<ACompHierarchy>(entHier.m_siblingNext).m_siblingPrev
-                = entHier.m_siblingPrev;
+        viewHier.get<ACompHierarchy>(rEntHier.m_siblingNext).m_siblingPrev
+                = rEntHier.m_siblingPrev;
     }
 
-    if (rReg.valid(entHier.m_siblingPrev))
+    if (rEntHier.m_siblingPrev != entt::null)
     {
-        rReg.get<ACompHierarchy>(entHier.m_siblingPrev).m_siblingNext
-                = entHier.m_siblingNext;
+        viewHier.get<ACompHierarchy>(rEntHier.m_siblingPrev).m_siblingNext
+                = rEntHier.m_siblingNext;
     }
 
     // Unlink parent
 
-    auto &parentHier = rReg.get<ACompHierarchy>(entHier.m_parent);
-    parentHier.m_childCount --;
+    auto &rParentHier = viewHier.get<ACompHierarchy>(rEntHier.m_parent);
+    rParentHier.m_childCount --;
 
-    if (parentHier.m_childFirst == ent)
+    if (rParentHier.m_childFirst == ent)
     {
-        parentHier.m_childFirst = entHier.m_siblingNext;
+        rParentHier.m_childFirst = rEntHier.m_siblingNext;
     }
 
-    entHier.m_level = 0;
-    entHier.m_parent = entHier.m_siblingNext = entHier.m_siblingPrev
-            = entt::null;
+    rEntHier.m_level = 0;
+    rEntHier.m_parent = rEntHier.m_siblingNext = rEntHier.m_siblingPrev
+                      = entt::null;
 }
 
-void SysHierarchy::sort(ActiveScene& rScene)
+void SysHierarchy::sort(acomp_storage_t<ACompHierarchy>& rHier)
 {
-    rScene.get_registry().sort<ACompHierarchy>(
-            [](ACompHierarchy const& lhs, ACompHierarchy const& rhs)
+    rHier.sort( [](ACompHierarchy const& lhs, ACompHierarchy const& rhs)
     {
         return lhs.m_level < rhs.m_level;
     }, entt::insertion_sort());
 }
 
 
-void SysHierarchy::update_delete(ActiveScene& rScene)
+void SysHierarchy::update_delete_descendents(
+        acomp_view_t<ACompHierarchy> viewHier,
+        acomp_storage_t<ACompDelete>& rDelete)
 {
-    auto &rReg = rScene.get_registry();
-    auto viewDelHier = rReg.view<ACompDelete, ACompHierarchy>();
+    auto view = viewHier | entt::basic_view{rDelete};
 
     // copy entities to delete into a buffer
     std::vector<ActiveEnt> toDelete;
-    toDelete.reserve(viewDelHier.size_hint());
-    toDelete.assign(std::begin(viewDelHier), std::end(viewDelHier));
+    toDelete.reserve(view.size_hint());
+    toDelete.assign(std::begin(view), std::end(view));
 
     // Add delete components to descendents of all entities to delete
     for (ActiveEnt ent : toDelete)
     {
-        traverse(rScene, ent, [&rScene] (ActiveEnt descendent) {
-            rScene.mark_delete(descendent);
+        traverse(viewHier, ent, [&rDelete] (ActiveEnt descendent) {
+            rDelete.emplace(descendent);
             return EHierarchyTraverseStatus::Continue;
         });
     }

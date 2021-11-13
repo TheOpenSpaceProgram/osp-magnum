@@ -24,8 +24,8 @@
  */
 #pragma once
 
+#include <osp/Active/opengl/SysRenderGL.h>
 #include <osp/Active/activetypes.h>
-#include <osp/Active/drawing.h>
 
 #include <Magnum/Shaders/MeshVisualizerGL.h>
 
@@ -42,11 +42,18 @@ public:
     using Flag = Magnum::Shaders::MeshVisualizerGL3D::Flag;
 
     static void draw_entity(
-            osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,
-            osp::active::ACompCamera const& camera, void* pUserData) noexcept;
+            active::ActiveEnt ent,
+            active::ACompCamera const& camera,
+            active::EntityToDraw::UserData_t userData) noexcept;
 
-    static RenderGroup::DrawAssigner_t gen_assign_phong_opaque(
-            MeshVisualizer* pShader);
+};
+
+struct ACtxMeshVisualizerData
+{
+    MeshVisualizer m_shader;
+
+    active::acomp_view_t< osp::active::ACompDrawTransform >     m_viewDrawTf;
+    active::acomp_view_t< osp::active::ACompMesh >              m_mesh;
 };
 
 } // namespace osp::shader

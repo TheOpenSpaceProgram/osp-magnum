@@ -25,6 +25,7 @@
 #pragma once
 
 #include "activetypes.h"
+#include "basic.h"
 #include "../types.h"
 
 #include <Corrade/Containers/ArrayView.h>
@@ -73,27 +74,29 @@ struct ACompMaterial
  */
 struct EntityToDraw
 {
+    using UserData_t = std::array<void*, 4>;
+
     /**
      * @brief A function pointer to a Shader's draw() function
      *
      * @param ActiveEnt    [in] The entity being drawn; used to fetch component data
-     * @param ActiveScene& [ref] The scene containing the entity's component data
      * @param ACompCamera  [in] Camera used to draw the scene
      * @param void*        [in] User data
      */
     using ShaderDrawFnc_t = void (*)(
-            ActiveEnt, ActiveScene&, ACompCamera const&, void*) noexcept;
+            ActiveEnt, ACompCamera const&, UserData_t) noexcept;
 
     constexpr void operator()(
-            ActiveEnt ent, ActiveScene& rScene,
+            ActiveEnt ent,
             ACompCamera const& camera) const noexcept
     {
-        m_draw(ent, rScene, camera, m_data);
+        m_draw(ent, camera, m_data);
     }
 
     ShaderDrawFnc_t m_draw;
+
     // Non-owning user data passed to draw function, such as the shader
-    void *m_data;
+    UserData_t m_data;
 
 }; // struct EntityToDraw
 
@@ -116,28 +119,6 @@ struct RenderGroup
     using ArrayView_t = Corrade::Containers::ArrayView<ActiveEnt>;
 
     /**
-     * @brief Assigns drawing functions and user data (like shaders) to entities
-     *        of a certain material type for each RenderGroup
-     *
-     * @param ActiveScene& [ref] Scene the entities are part of
-     * @param Storage_t&   [ref] Storage to add accepted entities and data to
-     * @param ArrayView_t  [in] Entities to consider
-     */
-    using DrawAssigner_t = std::function<
-            void(ActiveScene&, Storage_t&, ArrayView_t) >;
-
-    /**
-     * @brief Set the DrawAssigner function for a certain material type
-     */
-    template<typename MATERIAL_T>
-    void set_assigner(DrawAssigner_t assigner)
-    {
-        material_id_t id = material_family_t::type<MATERIAL_T>;
-        m_assigners.resize(std::max(m_assigners.size(), size_t(id + 1)));
-        m_assigners[id] = std::move(assigner);
-    }
-
-    /**
      * @return Iterable view for stored entities
      */
     decltype(auto) view()
@@ -154,7 +135,6 @@ struct RenderGroup
     }
 
     // index with material_id_t
-    std::vector<DrawAssigner_t> m_assigners;
     Storage_t m_entities;
 
 }; // struct RenderGroup

@@ -26,13 +26,8 @@
 
 #include "coordinates.h"
 #include "id_registry.h"
-#include "types.h"
 
-
-#include <Corrade/Containers/StridedArrayView.h>
-
-#include <entt/entity/registry.hpp>
-#include <entt/core/family.hpp>
+#include <Corrade/Containers/ArrayViewStl.h>
 
 #include <vector>   // std::vector
 #include <string>   // std::string
@@ -44,35 +39,21 @@ namespace osp::universe
 {
 
 /**
- * A model of deep space. This class stores the data of astronomical objects
- * represented in the universe, known as Satellites. Planets, stars, comets,
- * vehicles, etc... are all Satellites.
- *
- * This class uses EnTT ECS, where Satellites are ECS entities. Components are
- * structs prefixed with UComp.
- *
- * Satellites can have types that determine which components they have, see
- * ITypeSatellite. These types are registered at runtime.
- *
- * Positions are stored in 64-bit unsigned int vectors in UCompTransformTraj.
- * 1024 units = 1 meter
- *
- * Moving or any kind of iteration over Satellites, such as Orbits, are handled
- * by Trajectory classes, see ISystemTrajectory.
- *
- * Example of usage:
- * https://github.com/TheOpenSpaceProgram/osp-magnum/wiki/Cpp:-How-to-setup-a-Solar-System
- *
+ * @brief Manages Satellites and Coordinate Spaces
  */
 class Universe
 {
+    template<typename T>
+    using ArrayView_t = Corrade::Containers::ArrayView<T>;
 
 public:
     Universe() = default;
     ~Universe() = default;
 
     /**
-     * @brief Create a Satellite with default components
+     * @brief Create a Satellite
+     *
+     * This satellite will not be associated with any coordinate spaces
      *
      * @return The new Satellite just created
      */
@@ -164,6 +145,15 @@ public:
      */
     void coordspace_update_depth(coordspace_index_t coordSpace);
 
+    constexpr ArrayView_t<coordspace_index_t> sat_coordspaces()
+    {
+        return m_satCoordspace;
+    };
+
+    constexpr ArrayView_t<uint32_t> sat_indices_in_coordspace()
+    {
+        return m_satIndexInCoordspace;
+    };
 
 private:
 

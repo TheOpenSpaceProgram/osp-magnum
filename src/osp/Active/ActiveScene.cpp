@@ -48,21 +48,8 @@
 using namespace osp;
 using namespace osp::active;
 
-void ACompCamera::calculate_projection()
-{
-    m_projection = osp::Matrix4::perspectiveProjection(
-            m_fov, m_viewport.x() / m_viewport.y(),
-            m_near, m_far);
-}
 
-
-ActiveScene::ActiveScene(PackageRegistry& rPkgs, Package& rContext)
- : m_rPackages(rPkgs)
- , m_rContext(rContext)
-{
-    // Create the root entity
-    m_root = m_registry.create();
-}
+#if 0
 
 void ActiveScene::draw()
 {
@@ -96,3 +83,5 @@ void ActiveScene::draw()
 
     SysRender::display_default_rendertarget(*this);
 }
+
+#endif

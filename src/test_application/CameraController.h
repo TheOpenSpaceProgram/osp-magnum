@@ -100,6 +100,8 @@ struct ACompCameraController
     EButtonControlIndex m_rollRt;
 };
 
+#if 0
+
 class SysCameraController
 {
 public:
@@ -143,5 +145,7 @@ public:
             osp::universe::Satellite sat);
 
 };
+
+#endif
 
 }
