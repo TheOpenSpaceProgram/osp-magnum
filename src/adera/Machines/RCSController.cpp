@@ -31,8 +31,7 @@
 #include <osp/Active/SysSignal.h>        // for Signal<>::NodeState, SysSignal
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
-#include <osp/Active/machines.h>       // for ACompMachines
-#include <osp/Active/ActiveScene.h>
+#include <osp/Active/machines.h>         // for ACompMachines
 #include <osp/Active/activetypes.h>      // for ActiveEnt, ActiveReg_t
 
 #include <osp/Resource/machines.h>

@@ -34,7 +34,6 @@
 #include <osp/Active/basic.h>             // for ACompCamera
 #include <osp/Active/drawing.h>           // for ACompDrawTransform
 #include <osp/Active/SysRender.h>         // for ACompMesh
-#include <osp/Active/ActiveScene.h>       // for ActiveScene
 #include <osp/Active/activetypes.h>       // for basic_sparse_set, ActiveEnt
 
 #include <osp/Resource/PackageRegistry.h> // for PackageRegistry

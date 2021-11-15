@@ -25,7 +25,6 @@
 #include "Phong.h"
 
 #include <osp/Active/SysRender.h>
-#include <osp/Active/ActiveScene.h>
 
 #include <osp/Resource/Package.h>
 

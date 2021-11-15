@@ -76,8 +76,6 @@ struct ACtxNwtWorld
         NewtonWorldSetUserData(m_nwtWorld.get(), this);
     }
 
-    //osp::active::ActiveScene *m_pScene;
-
     std::unique_ptr<NewtonWorld, Deleter> m_nwtWorld;
 
     osp::active::acomp_storage_t<ACompNwtBody_t> m_nwtBodies;

@@ -26,7 +26,6 @@
 #include "MeshVisualizer.h"
 
 #include "../Active/SysRender.h"
-#include "../Active/ActiveScene.h"
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/Math/Color.h>

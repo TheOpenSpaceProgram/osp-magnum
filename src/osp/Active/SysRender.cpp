@@ -24,8 +24,6 @@
  */
 #include "SysRender.h"
 
-#include "ActiveScene.h"
-
 #include <osp/Resource/Package.h>
 
 #include <functional>

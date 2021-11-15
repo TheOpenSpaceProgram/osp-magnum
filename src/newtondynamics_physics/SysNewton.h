@@ -25,8 +25,8 @@
 #pragma once
 
 #include <osp/Active/physics.h>      // for ACompShape
-#include <osp/Active/ActiveScene.h>  // for ActiveScene
-#include <osp/Active/activetypes.h>  // for ActiveEnt, ActiveReg_t, basic_sp...
+#include <osp/Active/basic.h>        // for ActiveEnt, ActiveReg_t, basic_sp...
+
 
 #include <osp/types.h>               // for Vector3, Matrix4
 #include <osp/CommonPhysics.h>       // for ECollisionShape, ECollisionShape...

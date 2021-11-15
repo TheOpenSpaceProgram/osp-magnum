@@ -25,7 +25,6 @@
 
 #include "SysVehicleSync.h"
 
-#include "ActiveScene.h"
 #include "SysAreaAssociate.h"
 #include "SysHierarchy.h"
 #include "SysPhysics.h"

@@ -31,7 +31,6 @@
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/machines.h>          // for ACompMachines
 #include <osp/Active/activetypes.h>       // for ActiveEnt, ActiveReg_t, active
-#include <osp/Active/ActiveScene.h>
 
 #include <osp/Resource/Package.h>         // for Path, decompose_path, Package
 #include <osp/Resource/machines.h>        // for mach_id, machine_id_t

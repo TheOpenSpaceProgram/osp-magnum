@@ -29,7 +29,6 @@
 #include <osp/Active/basic.h>        // for ACompHierarchy
 #include <osp/Active/physics.h>      // for ACompRigidBody
 #include <osp/Active/SysPhysics.h>   // for SysPhysics
-#include <osp/Active/ActiveScene.h>  // for ActiveScene
 #include <osp/Active/activetypes.h>  // for ActiveReg_t
 
 #include <osp/logging.h>

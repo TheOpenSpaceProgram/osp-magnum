@@ -33,7 +33,6 @@
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/machines.h>         // for ACompMachines
-#include <osp/Active/ActiveScene.h>
 
 #include <osp/Resource/Package.h>         // for Path, decompose_path
 #include <osp/Resource/PackageRegistry.h> // for PackageRegistry

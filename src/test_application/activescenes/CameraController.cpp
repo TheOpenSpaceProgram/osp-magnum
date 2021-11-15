@@ -28,7 +28,6 @@
 
 #include <osp/Satellites/SatVehicle.h>
 
-#include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysAreaAssociate.h>
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>

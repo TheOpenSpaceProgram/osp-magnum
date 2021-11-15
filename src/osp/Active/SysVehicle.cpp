@@ -22,7 +22,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "ActiveScene.h"
 #include "SysHierarchy.h"
 #include "SysPhysics.h"
 #include "SysRender.h"

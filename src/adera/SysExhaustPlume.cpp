@@ -38,7 +38,6 @@
 #include <osp/Active/SysRender.h>         // for ACompMesh
 #include <osp/Active/machines.h>          // for ACompMachines
 #include <osp/Active/SysVehicle.h>        // for ACompVehicle
-#include <osp/Active/ActiveScene.h>       // for ActiveScene
 #include <osp/Active/activetypes.h>       // for entt::basic_view, entt::basic_sparse_set
 #include <osp/Active/SysHierarchy.h>      // for osp::active::SysHierarchy
 #include <osp/logging.h>                  // for OSP_LOG_...

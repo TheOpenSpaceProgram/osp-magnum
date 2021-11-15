@@ -24,7 +24,6 @@
  */
 
 #include "SysWire.h"
-#include "ActiveScene.h"
 
 #include <osp/logging.h>
 

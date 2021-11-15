@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "ActiveScene.h"
+#include "basic.h"
 
 #include <stack>
 
