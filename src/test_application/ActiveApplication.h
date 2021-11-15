@@ -24,17 +24,16 @@
  */
 #pragma once
 
+#include "activescenes/scenarios.h"
+
 #include <osp/types.h>
 #include <osp/UserInputHandler.h>
+#include <osp/Resource/Package.h>
 
 #include <Magnum/Timeline.h>
-#include <Magnum/GL/Buffer.h>
-#include <Magnum/GL/DefaultFramebuffer.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/Math/Color.h>
+
 #include <cstring> // workaround: memcpy needed by SDL2
 #include <Magnum/Platform/Sdl2Application.h>
-#include <Magnum/Shaders/VertexColorGL.h>
 
 #include <functional>
 #include <memory>
@@ -52,11 +51,8 @@ class ActiveApplication : public Magnum::Platform::Application
 
 public:
 
-    using on_draw_t = std::function<void(ActiveApplication&)>;
-
     explicit ActiveApplication(
-            const Magnum::Platform::Application::Arguments& arguments,
-            on_draw_t onDraw);
+            const Magnum::Platform::Application::Arguments& arguments);
 
     ~ActiveApplication();
 
@@ -68,9 +64,19 @@ public:
     void mouseMoveEvent(MouseMoveEvent& event) override;
     void mouseScrollEvent(MouseScrollEvent& event) override;
 
+    void set_on_draw(on_draw_t onDraw)
+    {
+        m_onDraw = std::move(onDraw);
+    }
+
     constexpr osp::input::UserInputHandler& get_input_handler() noexcept
     {
         return m_userInput;
+    }
+
+    constexpr osp::Package& get_gl_resources() noexcept
+    {
+        return m_glResources;
     }
 
 private:
@@ -82,6 +88,8 @@ private:
     osp::input::UserInputHandler m_userInput;
 
     Magnum::Timeline m_timeline;
+
+    osp::Package m_glResources;
 };
 
 void config_controls(ActiveApplication& rApp);

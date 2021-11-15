@@ -133,7 +133,7 @@ struct ACtxPlumeData
 
     acomp_view_t< osp::active::ACompDrawTransform >     m_viewDrawTf;
     acomp_view_t< adera::active::ACompExhaustPlume >    m_viewExaustPlumes;
-    acomp_view_t< osp::active::ACompMesh >              m_mesh;
+    acomp_view_t< osp::active::ACompMeshGL >            m_mesh;
 };
 
 } // namespace adera::shader

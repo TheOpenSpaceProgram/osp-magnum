@@ -103,13 +103,21 @@ public:
 
     bool empty() const { return m_empty; }
 
+    bool reserve_empty() const { return !(m_it->second.m_data.has_value()); }
+
+    template<typename ... ARGS_T>
+    TYPE_T& reserve_emplace(ARGS_T&& ... args)
+    {
+        return m_it->second.m_data.emplace(std::forward<ARGS_T>(args) ...);
+    }
+
     std::string name() const { return m_it->first; }
 
-    constexpr TYPE_T const& operator*() const noexcept { return m_it->second.m_data.value(); }
-    constexpr TYPE_T& operator*() noexcept { return m_it->second.m_data.value(); }
+    constexpr TYPE_T const& operator*() const { return m_it->second.m_data.value(); }
+    constexpr TYPE_T& operator*() { return m_it->second.m_data.value(); }
 
-    constexpr TYPE_T const* operator->() const noexcept { return &m_it->second.m_data.value(); }
-    constexpr TYPE_T* operator->() noexcept { return &m_it->second.m_data.value(); }
+    constexpr TYPE_T const* operator->() const { return &m_it->second.m_data.value(); }
+    constexpr TYPE_T* operator->() { return &m_it->second.m_data.value(); }
 private:
     bool m_empty;
     typename std::map<std::string, Resource<TYPE_T>>::iterator m_it;

@@ -22,9 +22,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
-#include "../scene_universe.h"
-
 #include "simple.h"
 #include "vehicles.h"
 

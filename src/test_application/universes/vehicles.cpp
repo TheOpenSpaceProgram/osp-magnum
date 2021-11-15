@@ -26,8 +26,6 @@
 #include "vehicles.h"
 #include "../VehicleBuilder.h"
 
-#include "../scene_universe.h"
-
 #include <adera/ShipResources.h>
 #include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>

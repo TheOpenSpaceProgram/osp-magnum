@@ -50,17 +50,14 @@ public:
     //static void setup(acomp_view<ACompHierarchy> viewHier);
 
     /**
-     * Create a new entity, and add a ACompHierarchy to it
+     * @brief Add an ACompHierarchy to an existing hierarchy entity
      *
-     * @param rScene [ref] Scene with hierarchy
-     * @param parent [in] Entity to assign as parent
-     * @param name   [in] Name of entity
      * @return New entity created
      */
-    static ActiveEnt create_child(
+    static void add_parent_child(
             acomp_storage_t<ACompHierarchy>& rHier,
             acomp_storage_t<ACompName>& rNames,
-            ActiveEnt parent, ActiveEnt child, std::string const& name);
+            ActiveEnt parent, ActiveEnt child, std::string const& name = "");
 
     /**
      * Set parent-child relationship between two nodes containing an

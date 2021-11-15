@@ -81,7 +81,7 @@ void PlumeShader::draw_plume(
     auto const &drawTf  = rData.m_viewDrawTf.get<ACompDrawTransform>(ent);
     auto const &comp    = rData.m_viewExaustPlumes.get<ACompExhaustPlume>(ent);
     auto const &effect  = *comp.m_effect;
-    auto &rMesh         = *rData.m_mesh.get<ACompMesh>(ent).m_mesh;
+    auto &rMesh         = *rData.m_mesh.get<ACompMeshGL>(ent).m_mesh;
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 

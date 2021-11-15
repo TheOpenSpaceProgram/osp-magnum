@@ -32,63 +32,16 @@
 
 using osp::active::SysRender;
 
-
-void SysRender::update_material_assign(
-        ACtxRenderGroups& rGroups,
-        acomp_storage_t<ACompMaterial>& rMaterials)
-{
-    // Add ACompMaterial components, and clear m_added queues
-    for (material_id_t i = 0; i < rGroups.m_added.size(); i ++)
-    {
-        for ( ActiveEnt ent : std::exchange(rGroups.m_added[i], {}) )
-        {
-            rMaterials.emplace(ent, ACompMaterial{i});
-        }
-    }
-}
-
-void SysRender::update_material_delete(
-        ACtxRenderGroups& rGroups,
-        acomp_storage_t<ACompMaterial>& rMaterials,
-        acomp_view_t<const ACompDelete> viewDelete)
-{
-    auto viewDelMat = viewDelete | entt::basic_view{rMaterials};
-
-    // copy entities to delete into a buffer
-    std::vector<ActiveEnt> toDelete;
-    toDelete.reserve(viewDelMat.size_hint());
-
-    for (auto const& [ent, mat] : viewDelMat.each())
-    {
-        toDelete.push_back(ent);
-    }
-
-    if (toDelete.empty())
-    {
-        return;
-    }
-
-    // Delete from each draw group
-    for ([[maybe_unused]] auto& [name, rGroup] : rGroups.m_groups)
-    {
-        for (ActiveEnt ent : toDelete)
-        {
-            if (rGroup.m_entities.contains(ent))
-            {
-                rGroup.m_entities.remove(ent);
-            }
-        }
-    }
-
-    rMaterials.erase(std::begin(toDelete), std::end(toDelete));
-}
-
 void SysRender::update_hierarchy_transforms(
         acomp_storage_t<ACompHierarchy> const& hier,
         acomp_view_t<ACompTransform> const& viewTf,
         acomp_storage_t<ACompDrawTransform>& rDrawTf)
 {
-    //rReg.sort<ACompDrawTransform, ACompHierarchy>();
+
+    // TODO: consider using hierarchical bitset as dirty flags to make this
+    //       more efficient. Right now, this recalculates every entity with an
+    //       ACompDrawTransform.
+
     rDrawTf.respect(hier);
 
     auto viewDrawTf = entt::basic_view{rDrawTf};

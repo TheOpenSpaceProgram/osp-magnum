@@ -35,9 +35,14 @@
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
+#include <Magnum/Trade/MeshData.h>
 #include <Magnum/Mesh.h>
+#include <Magnum/MeshTools/Compile.h>
 
-
+using Magnum::Trade::MeshData;
+using Magnum::GL::Mesh;
+using osp::DependRes;
+using osp::Package;
 using osp::active::SysRenderGL;
 
 void SysRenderGL::setup_context(Package& rGlResources)
@@ -87,21 +92,83 @@ void SysRenderGL::setup_context(Package& rGlResources)
     }
 }
 
-void SysRenderGL::setup_forward_renderer(
-        Package& rGlResources, ACtxRenderGroups& rCtxGroups,
-        FBOTarget& rTarget, FBOColorAttachment& rTargetColor)
+void SysRenderGL::setup_forward_renderer(ACtxRenderGroups& rCtxGroups)
 {
-    Vector2i const viewSize = Magnum::GL::defaultFramebuffer.viewport().size();
-
-    rTarget = { viewSize, rGlResources.get<Magnum::GL::Framebuffer>("offscreen_fbo") };
-    rTargetColor = { rGlResources.get<Magnum::GL::Texture2D>("offscreen_fbo_color") };
-
     // Add render groups
     rCtxGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
     rCtxGroups.m_groups.emplace("fwd_transparent", RenderGroup{});
 }
 
-void SysRenderGL::display_rendertarget(Package& rGlResources, FBOColorAttachment& rTargetColor)
+DependRes<Mesh> try_compile_mesh(
+        osp::Package& rGlResources, DependRes<MeshData> const& meshData)
+{
+    DependRes<Mesh> rMeshGlRes = rGlResources.get_or_reserve<Mesh>(meshData.name());
+
+    if (rMeshGlRes.reserve_empty())
+    {
+        // Mesh isn't compiled yet, compile it
+        rMeshGlRes.reserve_emplace(Magnum::MeshTools::compile(*meshData));
+    }
+
+    return std::move(rMeshGlRes);
+}
+
+void SysRenderGL::load_meshes(
+        acomp_view_t<ACompMesh const> viewMeshs,
+        std::vector<ActiveEnt>& rDirty,
+        acomp_storage_t<ACompMeshGL>& rMeshGl,
+        osp::Package& rGlResources)
+{
+
+    for (ActiveEnt ent : std::exchange(rDirty, {}))
+    {
+        if (viewMeshs.contains(ent))
+        {
+            auto const &rEntMesh = viewMeshs.get<ACompMesh const>(ent);
+
+            if (rMeshGl.contains(ent))
+            {
+                // Check if ACompMesh changed
+                ACompMeshGL &rEntMeshGl = rMeshGl.get(ent);
+
+                if (rEntMeshGl.m_mesh.name() != rEntMesh.m_mesh.name())
+                {
+                    // get new mesh
+                    rEntMeshGl.m_mesh = try_compile_mesh(rGlResources, rEntMesh.m_mesh);
+                }
+            }
+            else
+            {
+                // ACompMeshGL component needed
+                rMeshGl.emplace(
+                        ent, ACompMeshGL{try_compile_mesh(rGlResources, rEntMesh.m_mesh)});
+            }
+        }
+        else
+        {
+            if (rMeshGl.contains(ent))
+            {
+                // ACompMesh removed, remove ACompMeshGL too
+                rMeshGl.erase(ent);
+            }
+            else
+            {
+                // Why is this entity here?
+            }
+        }
+    }
+}
+
+void SysRenderGL::load_textures(
+        acomp_view_t<const ACompTexture> viewDiffTex,
+        std::vector<ActiveEnt>& rDirty,
+        acomp_storage_t<ACompTextureGL>& rDiffTexGl,
+        osp::Package& rGlResources)
+{
+    rDirty.clear();
+}
+
+void SysRenderGL::display_rendertarget(Package& rGlResources, Magnum::GL::Texture2D& rTex)
 {
     using Magnum::GL::Renderer;
     using Magnum::GL::Framebuffer;
@@ -119,12 +186,12 @@ void SysRenderGL::display_rendertarget(Package& rGlResources, FBOColorAttachment
     Renderer::disable(Renderer::Feature::Blending);
     Renderer::setDepthMask(true);
 
-    shader->display_texure(*surface, *rTargetColor.m_tex);
+    shader->display_texure(*surface, rTex);
 }
 
 
 void SysRenderGL::render_opaque(
-        ACtxRenderGroups rCtxGroups,
+        ACtxRenderGroups& rCtxGroups,
         acomp_view_t<const ACompVisible> viewVisible,
         ACompCamera const& camera)
 {
@@ -146,7 +213,7 @@ void SysRenderGL::render_opaque(
 }
 
 void SysRenderGL::render_transparent(
-        ACtxRenderGroups rCtxGroups,
+        ACtxRenderGroups& rCtxGroups,
         acomp_view_t<const ACompVisible> viewVisible,
         ACompCamera const& camera)
 {

@@ -24,36 +24,60 @@
  */
 #pragma once
 
-#include <osp/Active/opengl/SysRenderGL.h>
-#include <osp/Active/activetypes.h>
+#include <entt/core/any.hpp>
 
-#include <Magnum/Shaders/MeshVisualizerGL.h>
+#include <osp/Resource/Package.h>
 
-namespace osp::shader
+#include <functional>
+
+namespace testapp
 {
 
-class MeshVisualizer : protected Magnum::Shaders::MeshVisualizerGL3D
+struct ActiveApplication;
+
+using on_draw_t = std::function<void(ActiveApplication&)>;
+
+
+
+namespace flight
 {
-    using RenderGroup = osp::active::RenderGroup;
 
-public:
+struct FlightScene;
 
-    using Magnum::Shaders::MeshVisualizerGL3D::MeshVisualizerGL3D;
-    using Flag = Magnum::Shaders::MeshVisualizerGL3D::Flag;
+/**
+ * @brief Setup a flight scene
+ *
+ * @return
+ */
+entt::any setup_scene();
 
-    static void draw_entity(
-            active::ActiveEnt ent,
-            active::ACompCamera const& camera,
-            active::EntityToDraw::UserData_t userData) noexcept;
+/**
+ * @brief Generate ActiveApplication draw function
+ *
+ * OpenGL context resources as
+ *
+ * @param rScene [in] Flight scene data
+ *
+ * @return
+ */
+on_draw_t gen_draw(FlightScene& rScene, ActiveApplication& rApp);
 
-};
+} // namespace flight
 
-struct ACtxMeshVisualizerData
+
+
+namespace enginetest
 {
-    MeshVisualizer m_shader;
 
-    active::acomp_view_t< osp::active::ACompDrawTransform >     m_viewDrawTf;
-    active::acomp_view_t< osp::active::ACompMeshGL >            m_mesh;
-};
+struct EngineTestScene;
 
-} // namespace osp::shader
+
+entt::any setup_scene(osp::Package &rPkg);
+
+on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp);
+
+void load_gl_resources(ActiveApplication& rApp);
+
+} // namespace enginetest
+
+} // namespace testapp

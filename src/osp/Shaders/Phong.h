@@ -57,18 +57,23 @@ public:
             RenderGroup::ArrayView_t entities,
             RenderGroup::Storage_t& rStorage,
             osp::active::acomp_view_t<osp::active::ACompOpaque const> viewOpaque,
-            osp::active::acomp_view_t<osp::active::ACompDiffuseTex const> viewDiffuse,
+            osp::active::acomp_view_t<osp::active::ACompTextureGL const> viewDiffuse,
             ACtxPhongData &rData);
 };
 
 struct ACtxPhongData
 {
-    Phong m_shaderUntextured;
-    Phong m_shaderDiffuse;
+    struct Views
+    {
+        active::acomp_view_t< osp::active::ACompDrawTransform > m_drawTf;
+        active::acomp_view_t< osp::active::ACompTextureGL >     m_diffuseTexGl;
+        active::acomp_view_t< osp::active::ACompMeshGL >        m_meshGl;
+    };
 
-    active::acomp_view_t< osp::active::ACompDrawTransform > m_viewDrawTf;
-    active::acomp_view_t< osp::active::ACompMesh >          m_mesh;
-    active::acomp_view_t< osp::active::ACompDiffuseTex >    m_diffuseTex;
+    DependRes<Phong> m_shaderUntextured;
+    DependRes<Phong> m_shaderDiffuse;
+
+    std::optional<Views> m_views;
 };
 
 } // namespace osp::shader

@@ -35,10 +35,39 @@
 
 namespace osp { struct BlueprintVehicle; }
 
+namespace testapp::unistate
+{
+
+using namespace osp::universe;
+
+struct Activation
+{
+    ucomp_storage_t< UCompActivatable >         m_activatable;
+    ucomp_storage_t< UCompActivationAlways >    m_activationAlways;
+    ucomp_storage_t< UCompActivationRadius >    m_activationRadius;
+    ucomp_storage_t< UCompActiveArea >          m_activeArea;
+};
+
+using namespace planeta::universe;
+
+struct Solids
+{
+    ucomp_storage_t< UCompVehicle >             m_vehicles;
+    ucomp_storage_t< UCompPlanet >              m_planets;
+};
+
+} // namespace testapp::unistate
+
 namespace testapp
 {
 
-struct UniverseScene;
+struct UniverseScene
+{
+    osp::universe::Universe     m_universe;
+
+    unistate::Activation        m_activation;
+    unistate::Solids            m_solids;
+};
 
 using universe_update_t = std::function<void(UniverseScene&)>;
 
@@ -68,4 +97,5 @@ planeta::universe::UCompPlanet& add_planet(
         UniverseScene &rUniScn, osp::universe::Satellite sat,
         double radius, float mass,
                 float activateRadius, float resolutionSurfaceMax, float resolutionScreenMax);
-}
+
+} // namespace testapp

@@ -42,7 +42,7 @@ void Phong::draw_entity(
     auto &rShader = *reinterpret_cast<Phong*>(userData[1]);
 
     // Collect uniform information
-    auto const& drawTf = rData.m_viewDrawTf.get<ACompDrawTransform>(ent);
+    auto const& drawTf = rData.m_views->m_drawTf.get<ACompDrawTransform>(ent);
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
@@ -50,11 +50,11 @@ void Phong::draw_entity(
      * light is a direction light coming from the specified direction relative
      * to the camera.
      */
-    Vector4 light = Vector4{1.0f, 0.0f, 0.0f, 0.0f};
+    Vector4 light = Vector4{Vector3{0.2f, -1.0f, 0.5f}.normalized(), 0.0f};
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {
-        rShader.bindDiffuseTexture(*rData.m_diffuseTex.get<ACompDiffuseTex>(ent).m_tex);
+        rShader.bindDiffuseTexture(*rData.m_views->m_diffuseTexGl.get<ACompTextureGL>(ent).m_tex);
     }
 
     rShader
@@ -64,7 +64,7 @@ void Phong::draw_entity(
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
         .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
-        .draw(*rData.m_mesh.get<ACompMesh>(ent).m_mesh);
+        .draw(*rData.m_views->m_meshGl.get<ACompMeshGL>(ent).m_mesh);
 }
 
 
@@ -72,7 +72,7 @@ void Phong::assign_phong_opaque(
         RenderGroup::ArrayView_t entities,
         RenderGroup::Storage_t& rStorage,
         acomp_view_t<ACompOpaque const> viewOpaque,
-        acomp_view_t<ACompDiffuseTex const> viewDiffuse,
+        acomp_view_t<ACompTextureGL const> viewDiffuse,
         ACtxPhongData &rData)
 {
 
@@ -86,12 +86,12 @@ void Phong::assign_phong_opaque(
         if (viewDiffuse.contains(ent))
         {
             rStorage.emplace(
-                    ent, EntityToDraw{&draw_entity, {&rData, &rData.m_shaderDiffuse} });
+                    ent, EntityToDraw{&draw_entity, {&rData, &(*rData.m_shaderDiffuse)} });
         }
         else
         {
             rStorage.emplace(
-                    ent, EntityToDraw{&draw_entity, {&rData, &rData.m_shaderUntextured} });
+                    ent, EntityToDraw{&draw_entity, {&rData, &(*rData.m_shaderUntextured)} });
         }
     }
 }

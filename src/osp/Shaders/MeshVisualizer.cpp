@@ -45,7 +45,7 @@ void MeshVisualizer::draw_entity(
 
     auto &rData = *reinterpret_cast<ACtxMeshVisualizerData*>(userData[0]);
 
-    auto &rMesh = rData.m_mesh.get<ACompMesh>(ent);
+    auto &rMesh = rData.m_mesh.get<ACompMeshGL>(ent);
     auto const& drawTf = rData.m_viewDrawTf.get<ACompDrawTransform>(ent);
 
     Matrix4 const entRelative = camera.m_inverse * drawTf.m_transformWorld;

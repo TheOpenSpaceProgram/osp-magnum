@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,26 +22,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#pragma once
 
-#include "ActiveApplication.h"
+#include <unordered_map>
 
-#include "universes/common.h"
-
-#include <memory>
-
-namespace testapp
+namespace osp
 {
 
-struct FlightScene;
+template<typename KEY_T, typename ID_T>
+class IdSet
+{
+public:
+    ID_T id_of(KEY_T key)
+    {
+        auto const& [it, success] = m_data.emplace(key, ID_T(m_data.size()));
+        return it->second;
+    }
 
-std::unique_ptr<FlightScene> setup_flight_scene();
-
-
-/**
- *
- */
-void update_flight_scene(
-        ActiveApplication& rApp,
-        FlightScene &rScene);
+private:
+    std::unordered_map<KEY_T, ID_T> m_data;
+};
 
 }

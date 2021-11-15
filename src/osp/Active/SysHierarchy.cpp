@@ -29,7 +29,7 @@ using osp::active::SysHierarchy;
 using osp::active::ActiveEnt;
 
 
-ActiveEnt SysHierarchy::create_child(
+void SysHierarchy::add_parent_child(
         acomp_storage_t<ACompHierarchy>& rHier,
         acomp_storage_t<ACompName>& rNames,
         ActiveEnt parent, ActiveEnt child, std::string const& name)
@@ -42,8 +42,6 @@ ActiveEnt SysHierarchy::create_child(
     }
 
     set_parent_child(rHier, parent, child);
-
-    return child;
 }
 
 void SysHierarchy::set_parent_child(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt parent, ActiveEnt child)

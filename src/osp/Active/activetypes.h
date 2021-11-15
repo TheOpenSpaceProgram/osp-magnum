@@ -57,6 +57,8 @@ inline constexpr unsigned gc_heir_physics_level = 1;
 
 using ActiveReg_t = entt::basic_registry<ActiveEnt>;
 
+using active_sparse_set_t = entt::basic_sparse_set<ActiveEnt>;
+
 template<typename COMP_T>
 using acomp_storage_t = typename entt::storage_traits<ActiveEnt, COMP_T>::storage_type;
 

@@ -28,39 +28,34 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "ActiveApplication.h"
-#include "flight.h"
+#include "activescenes/scenarios.h"
 
 #include "universes/simple.h"
 #include "universes/planets.h"
 
-#include "scene_active.h"
-#include "scene_universe.h"
-
-
 #include <osp/Resource/AssetImporter.h>
-#include <osp/Satellites/SatVehicle.h>
-#include <osp/Shaders/Phong.h>
 #include <osp/string_concat.h>
 #include <osp/logging.h>
 
 #include <adera/ShipResources.h>
 #include <adera/Shaders/PlumeShader.h>
 
+// TODO: make a forward declaration for these, and maybe an osp::mach_name<>
+//       instead of smc_mach_name. same thing for smc_wire_name
 #include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>
 #include <adera/Machines/Rocket.h>
 #include <adera/Machines/UserControl.h>
 
-
+#include <Magnum/Primitives/Cube.h>
 #include <Corrade/Utility/Arguments.h>
 
+#include <iostream>
 #include <memory>
 #include <thread>
-#include <iostream>
+#include <unordered_map>
 
 using namespace testapp;
-
-void start_magnum_async();
 
 /**
  * The spaghetti command line interface that gets inputs from stdin. This
@@ -68,6 +63,8 @@ void start_magnum_async();
  * @return An error code maybe
  */
 int debug_cli_loop();
+
+void start_magnum_async();
 
 /**
  * As the name implies. This should only be called once for the entire lifetime
@@ -82,23 +79,20 @@ void load_a_bunch_of_stuff();
  */
 bool destroy_universe();
 
-
-
 // called only from commands to display information
 void debug_print_help();
 void debug_print_resources();
-void debug_print_sats();
-void debug_print_hier();
 void debug_print_machines();
 
 // Stores loaded resources in packages.
 osp::PackageRegistry g_packages;
 
-// Test application supports 1 Flight scene
-std::unique_ptr<FlightScene> m_flightScene;
+// Test application supports 1 Active Scene
+entt::any g_activeScene;
+std::function<void(ActiveApplication&)> g_appSetup;
 
 // Test application supports 1 Universe
-std::unique_ptr<UniverseScene> m_universeScene;
+std::optional<UniverseScene> g_universeScene;
 
 // Magnum Application deals with window and OpenGL things
 std::optional<ActiveApplication> g_activeApplication;
@@ -108,10 +102,33 @@ std::thread g_magnumThread;
 std::shared_ptr<spdlog::logger> g_logTestApp;
 std::shared_ptr<spdlog::logger> g_logMagnumApp;
 
-
 // lazily save the arguments to pass to Magnum
 int g_argc;
 char** g_argv;
+
+// Scene options
+struct TestScene
+{
+    std::string_view m_desc;
+    void(*m_run)();
+};
+
+std::unordered_map<std::string_view, TestScene> const g_scenes
+{
+    {"enginetest", {"Demonstrate basic game engine functionality", [] {
+
+        using namespace enginetest;
+        g_activeScene = setup_scene(g_packages.find("lzdb"));
+
+        g_appSetup = [] (ActiveApplication& rApp)
+        {
+            EngineTestScene& rScene
+                    = entt::any_cast<EngineTestScene&>(g_activeScene);
+            rApp.set_on_draw(gen_draw(rScene, rApp));
+            load_gl_resources(*g_activeApplication);
+        };
+    }}}
+};
 
 int main(int argc, char** argv)
 {
@@ -140,19 +157,15 @@ int main(int argc, char** argv)
 
     if(args.value("scene") != "none")
     {
-        if(args.value("scene") == "simple")
-        {
-            //simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
-        }
-        else if(args.value("scene") == "moon")
-        {
-            //moon::create(g_packages, g_universe, g_universeUpdate);
-        }
-        else
+        auto const it = g_scenes.find(args.value("scene"));
+
+        if(it != std::end(g_scenes))
         {
             std::cerr << "unknown scene" << std::endl;
             exit(-1);
         }
+
+        it->second.m_run();
 
         start_magnum_async();
     }
@@ -185,43 +198,20 @@ int debug_cli_loop()
         std::cout << "> ";
         std::cin >> command;
 
-        if (command == "help")
+        if (auto const it = g_scenes.find(command);
+            it != std::end(g_scenes))
+        {
+            std::cout << "Loading scene: " << it->first << "\n";
+            it->second.m_run();
+            start_magnum_async();
+        }
+        else if (command == "help")
         {
             debug_print_help();
-        }
-        else if (command == "simple")
-        {
-            if (destroy_universe())
-            {
-                //simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
-            }
-        }
-        else if (command == "moon")
-        {
-            if (destroy_universe())
-            {
-                //moon::create(g_packages, g_universe, g_universeUpdate);
-            }
-        }
-        else if (command == "flight")
-        {
-
         }
         else if (command == "list_pkg")
         {
             debug_print_resources();
-        }
-        else if (command == "list_uni")
-        {
-            //debug_print_sats();
-        }
-        else if (command == "list_ent")
-        {
-            //debug_print_hier();
-        }
-        else if (command == "list_mach")
-        {
-            //debug_print_machines();
         }
         else if (command == "exit")
         {
@@ -251,18 +241,15 @@ void start_magnum_async()
     std::thread t([] {
         osp::set_thread_logger(g_logMagnumApp);
 
-        g_activeApplication.emplace(
-                ActiveApplication::Arguments{g_argc, g_argv},
-                [] (ActiveApplication& rMagnumApp)
-        {
-            // Update the universe each frame
-            // This likely wouldn't be here in the future
-            //rUniUpd(rUni);
-
-        });
+        g_activeApplication.emplace(ActiveApplication::Arguments{g_argc, g_argv});
 
         // Configure the controls
         config_controls(*g_activeApplication);
+
+        osp::active::SysRenderGL::setup_context(
+                    g_activeApplication->get_gl_resources());
+
+        g_appSetup(*g_activeApplication);
 
         // Starts the main loop. This function is blocking, and will only return
         // once the window is closed. See ActiveApplication::drawEvent
@@ -281,7 +268,7 @@ bool destroy_universe()
     // Make sure no application is open
     if (g_activeApplication.has_value())
     {
-      OSP_LOG_WARN("Application must be closed to destroy universe.");
+        OSP_LOG_WARN("Application must be closed to destroy universe.");
         return false;
     }
 
@@ -377,6 +364,9 @@ void load_a_bunch_of_stuff()
 
     rDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
 
+    // Add a default cube
+    rDebugPack.add<Magnum::Trade::MeshData>("cube", Magnum::Primitives::cubeSolid());
+
     OSP_LOG_INFO("Resource loading complete");
 }
 
@@ -386,18 +376,16 @@ void debug_print_help()
 {
     std::cout
         << "OSP-Magnum Temporary Debug CLI\n"
-        << "Choose a test universe:\n"
-        << "* simple    - Simple test planet and vehicles (default)\n"
-        << "* moon      - Simulate size and gravity of real world moon\n"
-        << "\n"
-        << "Start Application:\n"
-        << "* flight    - Create an ActiveArea and start Magnum\n"
-        << "\n"
-        << "Other things to type:\n"
+        << "Load a scene:\n";
+
+    for (auto const& [name, rTestScn] : g_scenes)
+    {
+        std::cout << "* " << name << " - " << rTestScn.m_desc << "\n";
+    }
+
+    std::cout
+        << "Other commands:\n"
         << "* list_pkg  - List Packages and Resources\n"
-        << "* list_uni  - List Satellites in the universe\n"
-        << "* list_ent  - List Entities in active scene\n"
-        << "* list_upd  - List Update order from active scene\n"
         << "* help      - Show this again\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
 }
@@ -434,8 +422,6 @@ void debug_print_package(osp::Package const& rPkg, osp::ResPrefix_t const& prefi
     debug_print_resource_group<Magnum::GL::Mesh>(rPkg);
 
     debug_print_resource_group<adera::active::machines::ShipResourceType>(rPkg);
-    debug_print_resource_group<adera::shader::PlumeShader>(rPkg);
-    debug_print_resource_group<osp::shader::Phong>(rPkg);
 }
 
 void debug_print_resources()

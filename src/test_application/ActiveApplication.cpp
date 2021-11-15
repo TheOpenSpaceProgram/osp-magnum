@@ -46,11 +46,9 @@ using osp::input::EVarTrigger;
 using osp::input::EVarOperator;
 
 ActiveApplication::ActiveApplication(
-        const Magnum::Platform::Application::Arguments& arguments,
-        on_draw_t onDraw)
+        const Magnum::Platform::Application::Arguments& arguments)
  : Magnum::Platform::Application{
         arguments, Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})}
- , m_onDraw(onDraw)
  , m_userInput(12)
 {
     m_timeline.start();
@@ -58,15 +56,17 @@ ActiveApplication::ActiveApplication(
 
 ActiveApplication::~ActiveApplication()
 {
-    // Clear scene data before GL resources are freed
-
+    m_onDraw = {};
 }
 
 void ActiveApplication::drawEvent()
 {
     m_userInput.update_controls();
 
-    m_onDraw(*this);
+    if (m_onDraw.operator bool())
+    {
+        m_onDraw(*this);
+    }
 
     m_userInput.clear_events();
 

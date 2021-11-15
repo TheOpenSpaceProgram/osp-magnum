@@ -26,7 +26,6 @@
 
 #include "CameraController.h"
 
-#include <osp/Active/activetypes.h>
 #include <osp/Active/basic.h>
 #include <osp/Active/physics.h>
 #include <osp/Active/drawing.h>
@@ -45,52 +44,16 @@
 
 #include <newtondynamics_physics/ospnewton.h>
 
-namespace testapp
-{
-
-namespace activestate
+namespace testapp::activestate
 {
 
 using namespace osp::active;
 using namespace adera::active::machines;
 
-using ActiveIds_t = osp::IdRegistry<ActiveEnt>;
-using MachineIds_t = osp::IdRegistry<MachineEnt>;
-
-/**
- * @brief Storage for basic components from osp/basic.h
- */
-struct Basic
-{
-    acomp_storage_t<ACompTransform>             m_transform;
-    acomp_storage_t<ACompTransformControlled>   m_transformControlled;
-    acomp_storage_t<ACompTransformMutable>      m_transformMutable;
-    acomp_storage_t<ACompFloatingOrigin>        m_floatingOrigin;
-    acomp_storage_t<ACompDelete>                m_delete;
-    acomp_storage_t<ACompName>                  m_name;
-    acomp_storage_t<ACompHierarchy>             m_hierarchy;
-    acomp_storage_t<ACompMass>                  m_mass;
-    acomp_storage_t<ACompCamera>                m_camera;
-};
-
-/**
- * @brief Storage for Drawing components from osp/Active/drawing.h
- */
-struct Drawing
-{
-    acomp_storage_t<ACompMaterial>              m_material;
-    acomp_storage_t<ACompRenderingAgent>        m_renderAgent;
-    acomp_storage_t<ACompPerspective3DView>     m_perspective3dView;
-    acomp_storage_t<ACompOpaque>                m_opaque;
-    acomp_storage_t<ACompTransparent>           m_transparent;
-    acomp_storage_t<ACompVisible>               m_visible;
-    acomp_storage_t<ACompDrawTransform>         m_drawTransform;
-};
-
 /**
  * @brief Storage for wiring and various machine components
  */
-struct Machines
+struct ACtxMachines
 {
     acomp_storage_t<ACompMachines>              m_machines;
 
@@ -106,31 +69,33 @@ struct Machines
 /**
  * @brief Storage needed to synchronize with a Universe
  */
-struct UniverseSync
+struct ACtxUniverseSync
 {
     ACtxSyncVehicles    m_syncVehicles;
-
     ACtxAreaLink        m_areaLink;
 };
 
-struct TestApp
+struct ACtxTestApp
 {
     acomp_storage_t<ACompCameraController> m_cameraController;
 };
 
-}
+} // namespace testapp::scenestate
+
+namespace testapp::flight
+{
 
 /**
  * @brief An entire damn flight scene lol
  */
 struct FlightScene
 {
-    activestate::ActiveIds_t        m_activeIds;
-    activestate::MachineIds_t       m_machineIds;
+    osp::IdRegistry<osp::active::ActiveEnt>     m_activeIds;
+    osp::IdRegistry<osp::active::MachineEnt>    m_machineIds;
 
-    activestate::Basic              m_basic;
-    activestate::Drawing            m_drawing;
-    activestate::Machines           m_machines;
+    osp::active::ACtxBasic          m_basic;
+    osp::active::ACtxDrawing        m_drawing;
+    activestate::ACtxMachines       m_machines;
 
     osp::active::ACtxPhysics        m_physics;
     activestate::ACtxVehicle        m_vehicles;
@@ -138,9 +103,4 @@ struct FlightScene
     std::unique_ptr<ospnewton::ACtxNwtWorld>    m_nwtWorld;
 };
 
-struct FlightSceneRenderer
-{
-
-};
-
-}
+} // namespace testapp::flight

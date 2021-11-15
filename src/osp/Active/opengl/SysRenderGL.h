@@ -25,7 +25,7 @@
 #pragma once
 
 #include "osp/Resource/Package.h"
-#include "../drawing.h"
+#include "../SysRender.h"
 
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
@@ -40,7 +40,7 @@ namespace osp::active
 /**
  * Stores a mesh to be drawn by the renderer
  */
-struct ACompMesh
+struct ACompMeshGL
 {
     osp::DependRes<Magnum::GL::Mesh> m_mesh;
 };
@@ -48,30 +48,22 @@ struct ACompMesh
 /**
  * Diffuse texture component
  */
-struct ACompDiffuseTex
+struct ACompTextureGL
 {
     osp::DependRes<Magnum::GL::Texture2D> m_tex;
 };
 
-/**
- * A surface that can be rendered to
- */
-struct FBOTarget
+struct ACtxRenderGL
 {
-    Magnum::Vector2i m_size;
-    osp::DependRes<Magnum::GL::Framebuffer> m_fbo;
-};
-
-/**
- * Stores a reference to the color attachment texture of a render target entity
- */
-struct FBOColorAttachment
-{
-    DependRes<Magnum::GL::Texture2D> m_tex;
+    acomp_storage_t<ACompMeshGL>        m_meshGl;
+    acomp_storage_t<ACompTextureGL>  m_diffuseTexGl;
 };
 
 class SysRenderGL
 {
+
+public:
+
     /**
      * @brief Setup essential GL resources
      *
@@ -79,9 +71,7 @@ class SysRenderGL
      */
     static void setup_context(Package& rGlResources);
 
-    static void setup_forward_renderer(
-            Package& rGlResources, ACtxRenderGroups& rCtxGroups,
-            FBOTarget& rTarget, FBOColorAttachment& rTargetColor);
+    static void setup_forward_renderer(ACtxRenderGroups& rCtxGroups);
 
 
     /**
@@ -89,16 +79,27 @@ class SysRenderGL
      *
      * @param rScene [ref] Scene with render target
      */
-    static void display_rendertarget(Package& rGlResources, FBOColorAttachment& rTargetColor);
+    static void display_rendertarget(Package& rGlResources, Magnum::GL::Texture2D& rTex);
 
+    static void load_meshes(
+            acomp_view_t<ACompMesh const> viewMeshs,
+            std::vector<ActiveEnt>& rDirty,
+            acomp_storage_t<ACompMeshGL>& rMeshGl,
+            osp::Package& rGlResources);
+
+    static void load_textures(
+            acomp_view_t<ACompTexture const> viewDiffTex,
+            std::vector<ActiveEnt>& rDirty,
+            acomp_storage_t<ACompTextureGL>& rDiffTexGl,
+            osp::Package& rGlResources);
 
     static void render_opaque(
-            ACtxRenderGroups rCtxGroups,
+            ACtxRenderGroups& rCtxGroups,
             acomp_view_t<const ACompVisible> viewVisible,
             ACompCamera const& camera);
 
     static void render_transparent(
-            ACtxRenderGroups rCtxGroups,
+            ACtxRenderGroups& rCtxGroups,
             acomp_view_t<const ACompVisible> viewVisible,
             ACompCamera const& camera);
 };

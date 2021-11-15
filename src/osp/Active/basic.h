@@ -92,5 +92,19 @@ struct ACompCamera
     }
 };
 
+/**
+ * @brief Storage for basic components from osp/basic.h
+ */
+struct ACtxBasic
+{
+    acomp_storage_t<ACompTransform>             m_transform;
+    acomp_storage_t<ACompTransformControlled>   m_transformControlled;
+    acomp_storage_t<ACompTransformMutable>      m_transformMutable;
+    acomp_storage_t<ACompFloatingOrigin>        m_floatingOrigin;
+    acomp_storage_t<ACompDelete>                m_delete;
+    acomp_storage_t<ACompName>                  m_name;
+    acomp_storage_t<ACompHierarchy>             m_hierarchy;
+    acomp_storage_t<ACompCamera>                m_camera;
+};
 
 }

@@ -22,47 +22,26 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
+#include "scenarios.h"
 
-#include <planet-a/Satellites/SatPlanet.h>
+#include "flight.h"
 
-#include <osp/Universe.h>
-
-#include <osp/Satellites/SatActiveArea.h>
-#include <osp/Satellites/SatVehicle.h>
-
-namespace testapp
+namespace testapp::flight
 {
 
-namespace unistate
+entt::any setup_scene()
 {
-using namespace osp::universe;
+    entt::any sceneAny = entt::make_any<FlightScene>();
+    FlightScene &rScene = entt::any_cast<FlightScene&>(sceneAny);
 
+    rScene.m_nwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(1);
 
-struct Activation
-{
-    ucomp_storage_t< UCompActivatable >         m_activatable;
-    ucomp_storage_t< UCompActivationAlways >    m_activationAlways;
-    ucomp_storage_t< UCompActivationRadius >    m_activationRadius;
-    ucomp_storage_t< UCompActiveArea >          m_activeArea;
-};
-
-using namespace planeta::universe;
-
-struct Solids
-{
-    ucomp_storage_t< UCompVehicle >             m_vehicles;
-    ucomp_storage_t< UCompPlanet >              m_planets;
-};
-
+    return std::move(sceneAny);
 }
 
-struct UniverseScene
+on_draw_t gen_draw(FlightScene& rScene, ActiveApplication& rApp)
 {
-    osp::universe::Universe     m_universe;
-
-    unistate::Activation        m_activation;
-    unistate::Solids            m_solids;
-};
-
+    return [] (ActiveApplication& rApp) {};
 }
+
+} // namespace testapp::flight
