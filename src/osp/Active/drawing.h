@@ -33,16 +33,12 @@
 #include <Corrade/Containers/ArrayView.h>
 #include <entt/core/family.hpp>
 
+// MSVC freaks out if these are forward declared
+#include <Magnum/Trade/ImageData.h>
+#include <Magnum/Trade/MeshData.h>
+
 #include <functional>
 #include <unordered_map>
-
-namespace Magnum::Trade
-{
-    class MeshData;
-
-    template<UnsignedInt> class ImageData;
-    typedef ImageData<2> ImageData2D;
-}
 
 namespace osp::active
 {

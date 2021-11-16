@@ -36,6 +36,8 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 
 #include <Magnum/Trade/MeshData.h>
+#include <Magnum/Trade/ImageData.h>
+
 #include <Magnum/Mesh.h>
 #include <Magnum/MeshTools/Compile.h>
 

@@ -24,10 +24,6 @@
  */
 #include "SysRender.h"
 
-#include <osp/Resource/Package.h>
-
-#include <functional>
-
 using osp::active::SysRender;
 
 void SysRender::update_hierarchy_transforms(
