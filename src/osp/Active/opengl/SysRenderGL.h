@@ -35,10 +35,8 @@
 namespace osp::active
 {
 
-
-
 /**
- * Stores a mesh to be drawn by the renderer
+ * @brief Stores a mesh to be drawn by the renderer
  */
 struct ACompMeshGL
 {
@@ -46,19 +44,25 @@ struct ACompMeshGL
 };
 
 /**
- * Diffuse texture component
+ * @brief Diffuse texture component
  */
 struct ACompTextureGL
 {
     osp::DependRes<Magnum::GL::Texture2D> m_tex;
 };
 
+/**
+ * @brief OpenGL specific rendering components
+ */
 struct ACtxRenderGL
 {
-    acomp_storage_t<ACompMeshGL>        m_meshGl;
-    acomp_storage_t<ACompTextureGL>  m_diffuseTexGl;
+    acomp_storage_t<ACompMeshGL>    m_meshGl;
+    acomp_storage_t<ACompTextureGL> m_diffuseTexGl;
 };
 
+/**
+ * @brief OpenGL specific rendering functions
+ */
 class SysRenderGL
 {
 
@@ -67,39 +71,75 @@ public:
     /**
      * @brief Setup essential GL resources
      *
-     * @param rCtxResources [ref] Context resources Package
+     * This sets up an offscreen framebuffer and a fullscreen triangle
+     *
+     * @param rGlResources [ref] Context resources Package
      */
     static void setup_context(Package& rGlResources);
 
-    static void setup_forward_renderer(ACtxRenderGroups& rCtxGroups);
-
+    /**
+     * @brief Display a fullscreen texture to the default framebuffer
+     *
+     * @param rGlResources  [ref] GL resources containing fullscreen triangle
+     * @param rTex          [in] Texture to display
+     */
+    static void display_texture(Package& rGlResources,
+                                Magnum::GL::Texture2D& rTex);
 
     /**
-     * @brief Draw the default render target to the screen
+     * @brief Compile entities with loaded meshes into GPU resources
      *
-     * @param rScene [ref] Scene with render target
+     * Entities with an ACompMesh will be synchronized with an ACompMeshGL
+     *
+     * @param viewMeshs     [in] View for generic mesh components
+     * @param rDirty        [ref] Vector of entities that have updated meshes,
+     *                            this will be cleared.
+     * @param rMeshGl       [ref] Storage for GL mesh components
+     * @param rGlResources  [out] Package to store newly compiled meshes
      */
-    static void display_rendertarget(Package& rGlResources, Magnum::GL::Texture2D& rTex);
-
-    static void load_meshes(
+    static void compile_meshes(
             acomp_view_t<ACompMesh const> viewMeshs,
             std::vector<ActiveEnt>& rDirty,
             acomp_storage_t<ACompMeshGL>& rMeshGl,
             osp::Package& rGlResources);
 
-    static void load_textures(
+    /**
+     * @brief TODO
+     *
+     * @param viewDiffTex
+     * @param rDirty
+     * @param rDiffTexGl
+     * @param rGlResources
+     */
+    static void compile_textures(
             acomp_view_t<ACompTexture const> viewDiffTex,
             std::vector<ActiveEnt>& rDirty,
             acomp_storage_t<ACompTextureGL>& rDiffTexGl,
             osp::Package& rGlResources);
 
+    /**
+     * @brief Call draw functions of a RenderGroup of opaque objects
+     *
+     * @param rGroup        [in] RenderGroup to draw
+     * @param viewVisible   [in] View for visible components
+     * @param camera        [in] Camera to render from
+     */
     static void render_opaque(
-            ACtxRenderGroups& rCtxGroups,
+            RenderGroup const& group,
             acomp_view_t<const ACompVisible> viewVisible,
             ACompCamera const& camera);
 
+    /**
+     * @brief Call draw functions of a RenderGroup of transparent objects
+     *
+     * Consider sorting the render group for correct transparency
+     *
+     * @param rGroup        [in] RenderGroup to draw
+     * @param viewVisible   [in] View for visible components
+     * @param camera        [in] Camera to render from
+     */
     static void render_transparent(
-            ACtxRenderGroups& rCtxGroups,
+            RenderGroup const& group,
             acomp_view_t<const ACompVisible> viewVisible,
             ACompCamera const& camera);
 };

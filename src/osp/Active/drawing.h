@@ -68,11 +68,21 @@ struct ACompDrawTransform
     Matrix4 m_transformWorld;
 };
 
+/**
+ * @brief Mesh that describes the appearance of an entity
+ *
+ * The renderer will synchronize this component with a GPU resource
+ */
 struct ACompMesh
 {
     osp::DependRes<Magnum::Trade::MeshData> m_mesh;
 };
 
+/**
+ * @brief Texture component that describes the appearance of an entity
+ *
+ * The renderer will synchronize this component with a GPU resource
+ */
 struct ACompTexture
 {
     osp::DependRes<Magnum::Trade::ImageData2D> m_texture;
@@ -90,17 +100,19 @@ struct MaterialData
  */
 struct ACtxDrawing
 {
-    std::vector<MaterialData>               m_materials;
     acomp_storage_t<ACompOpaque>            m_opaque;
     acomp_storage_t<ACompTransparent>       m_transparent;
     acomp_storage_t<ACompVisible>           m_visible;
     acomp_storage_t<ACompDrawTransform>     m_drawTransform;
+
     acomp_storage_t<ACompMesh>              m_mesh;
+    std::vector<osp::active::ActiveEnt>     m_meshDirty;
 
     acomp_storage_t<ACompTexture>           m_diffuseTex;
-
-    std::vector<osp::active::ActiveEnt>     m_meshDirty;
     std::vector<osp::active::ActiveEnt>     m_diffuseDirty;
+
+    // Access with m_materials[material ID]
+    std::vector<MaterialData>               m_materials;
 };
 
 } // namespace osp::active

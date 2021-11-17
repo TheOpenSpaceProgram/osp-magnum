@@ -27,7 +27,6 @@
 #include "../ActiveApplication.h"
 
 #include <osp/Active/basic.h>
-#include <osp/Active/physics.h>
 #include <osp/Active/drawing.h>
 
 #include <osp/Active/SysHierarchy.h>
@@ -57,20 +56,29 @@ using namespace Magnum::Math::Literals;
 namespace testapp::enginetest
 {
 
-constexpr int const gc_maxMaterials = 4;
-
+// Materials used by the test scene. A more general application may want to
+// generate IDs at runtime, and map them to named identifiers.
 constexpr int const gc_mat_common      = 0;
 constexpr int const gc_mat_visualizer  = 1;
 
+constexpr int const gc_maxMaterials = 2;
+
+/**
+ * @brief State of the entire engine test scene
+ */
 struct EngineTestScene
 {
+    // ID registry generates entity IDs, and keeps track of which ones exist
     osp::IdRegistry<osp::active::ActiveEnt> m_activeIds;
 
-    osp::active::ACtxBasic          m_basic;
+    // Components and supporting data structures
+    osp::active::ACtxBasic          m_basic;    
     osp::active::ACtxDrawing        m_drawing;
-    osp::active::ACtxPhysics        m_physics;
 
-    osp::active::ActiveEnt          m_rootEntity;
+    // Hierarchy root, needs to exist so all hierarchy entities are connected
+    osp::active::ActiveEnt          m_hierRoot;
+
+    // The rotating cube
     osp::active::ActiveEnt          m_cube;
 };
 
@@ -85,8 +93,8 @@ entt::any setup_scene(osp::Package &rPkg)
     rScene.m_drawing.m_materials.resize(gc_maxMaterials);
 
     // Create hierarchy root entity
-    rScene.m_rootEntity = rScene.m_activeIds.create();
-    rScene.m_basic.m_hierarchy.emplace(rScene.m_rootEntity);
+    rScene.m_hierRoot = rScene.m_activeIds.create();
+    rScene.m_basic.m_hierarchy.emplace(rScene.m_hierRoot);
 
     // Create camera entity
     ActiveEnt camEnt = rScene.m_activeIds.create();
@@ -103,9 +111,8 @@ entt::any setup_scene(osp::Package &rPkg)
     rCamComp.m_fov = 45.0_degf;
 
     // Add camera to hierarchy
-    SysHierarchy::add_parent_child(
-            rScene.m_basic.m_hierarchy, rScene.m_basic.m_name,
-            rScene.m_rootEntity, camEnt, "Camera");
+    SysHierarchy::add_child(
+            rScene.m_basic.m_hierarchy, rScene.m_hierRoot, camEnt);
 
     // Make a cube
     rScene.m_cube = rScene.m_activeIds.create();
@@ -129,13 +136,31 @@ entt::any setup_scene(osp::Package &rPkg)
     rScene.m_drawing.m_visible.emplace(rScene.m_cube);
 
     // Add cube to hierarchy, parented to root
-    SysHierarchy::add_parent_child(
-            rScene.m_basic.m_hierarchy, rScene.m_basic.m_name,
-            rScene.m_rootEntity, rScene.m_cube, "Cube");
+    SysHierarchy::add_child(
+            rScene.m_basic.m_hierarchy, rScene.m_hierRoot, rScene.m_cube);
 
     return std::move(sceneAny);
 }
 
+/**
+ * @brief Update an EngineTestScene, this just rotates the cube
+ *
+ * @param rScene [ref] scene to update
+ */
+void update_test_scene(EngineTestScene& rScene)
+{
+    // Rotate the cube
+    osp::Matrix4 &rCubeTf
+            = rScene.m_basic.m_transform.get(rScene.m_cube).m_transform;
+
+    rCubeTf = Magnum::Matrix4::rotationY(360.0_degf / 60.0f) * rCubeTf;
+}
+
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief Data needed to render the EngineTestScene
+ */
 struct EngineTestRenderer
 {
     osp::active::ACtxRenderGroups m_renderGroups;
@@ -147,107 +172,78 @@ struct EngineTestRenderer
     osp::shader::ACtxPhongData m_phong;
 };
 
+/**
+ * @brief Render an EngineTestScene
+ *
+ * @param rApp      [ref] Application with GL context and resources
+ * @param rScene    [ref] Test scene to render
+ * @param rRenderer [ref] Renderer data for test scene
+ */
 void render_test_scene(
         ActiveApplication& rApp, EngineTestScene& rScene,
         EngineTestRenderer& rRenderer)
 {
     using namespace osp::active;
+    using namespace osp::shader;
     using Magnum::GL::Framebuffer;
     using Magnum::GL::FramebufferClear;
     using Magnum::GL::Texture2D;
 
-    // Calculate hierarchy transforms
+    osp::Package &rGlResources = rApp.get_gl_resources();
 
+    // Assign Phong shader to entities with the gc_mat_common material, and put
+    // results into the fwd_opaque render group
+    RenderGroup &rGroupFwdOpaque
+            = rRenderer.m_renderGroups.m_groups["fwd_opaque"];
+    MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
+    Phong::assign_phong_opaque(
+            rMatCommon.m_added, rGroupFwdOpaque.m_entities,
+            rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexGl,
+            rRenderer.m_phong);
+    rMatCommon.m_added.clear();
+
+    // Load any required meshes
+    SysRenderGL::compile_meshes(
+            rScene.m_drawing.m_mesh, rScene.m_drawing.m_meshDirty,
+            rRenderer.m_renderGl.m_meshGl, rApp.get_gl_resources());
+
+    // Load any required textures
+    SysRenderGL::compile_textures(
+            rScene.m_drawing.m_diffuseTex, rScene.m_drawing.m_diffuseDirty,
+            rRenderer.m_renderGl.m_diffuseTexGl, rApp.get_gl_resources());
+
+    // Calculate hierarchy transforms
     SysHierarchy::sort(rScene.m_basic.m_hierarchy);
-    SysRender::update_hierarchy_transforms(
+    SysRender::update_draw_transforms(
             rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform,
             rScene.m_drawing.m_drawTransform);
 
-    // Get camera
-
+    // Get camera, and calculate projection matrix and inverse transformation
     ACompCamera &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
+    ACompDrawTransform const &cameraDrawTf
+            = rScene.m_drawing.m_drawTransform.get(rRenderer.m_camera);
     rCamera.m_viewport
             = osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
     rCamera.calculate_projection();
-
-    ACompDrawTransform const &cameraDrawTf
-            = rScene.m_drawing.m_drawTransform.get(rRenderer.m_camera);
     rCamera.m_inverse = cameraDrawTf.m_transformWorld.inverted();
 
     // Bind offscreen FBO
-
-    osp::Package &rGlResources = rApp.get_gl_resources();
     Framebuffer &rFbo = *rGlResources.get<Framebuffer>("offscreen_fbo");
-    Texture2D &rFboColor = *rGlResources.get<Texture2D>("offscreen_fbo_color");
-
     rFbo.bind();
+
+    // Clear it
     rFbo.clear( FramebufferClear::Color | FramebufferClear::Depth
                 | FramebufferClear::Stencil);
 
-    // Render scene to FBO
-
+    // Forward Render fwd_opaque group to FBO
     SysRenderGL::render_opaque(
-            rRenderer.m_renderGroups, rScene.m_drawing.m_visible, rCamera);
-    SysRenderGL::render_transparent(
-            rRenderer.m_renderGroups, rScene.m_drawing.m_visible, rCamera);
+            rRenderer.m_renderGroups.m_groups.at("fwd_opaque"),
+            rScene.m_drawing.m_visible, rCamera);
 
     // Display FBO
-
-    SysRenderGL::display_rendertarget(rGlResources, rFboColor);
-}
-
-
-
-on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
-{
-    using namespace osp::active;
-    using namespace osp::shader;
-
-    std::shared_ptr<EngineTestRenderer> pRenderer
-            = std::make_shared<EngineTestRenderer>();
-
-    osp::Package &rGlResources = rApp.get_gl_resources();
-
-    pRenderer->m_phong.m_shaderUntextured
-            = rGlResources.get_or_reserve<Phong>("notexture");
-    pRenderer->m_phong.m_shaderDiffuse
-            = rGlResources.get_or_reserve<Phong>("textured");
-
-    pRenderer->m_phong.m_views.emplace(ACtxPhongData::Views{
-            rScene.m_drawing.m_drawTransform,
-            pRenderer->m_renderGl.m_diffuseTexGl,
-            pRenderer->m_renderGl.m_meshGl});
-
-    // Select first camera for rendering
-    pRenderer->m_camera = rScene.m_basic.m_camera.at(0);
-
-    SysRenderGL::setup_forward_renderer(pRenderer->m_renderGroups);
-
-    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp)
-    {
-        // Rotate the cube
-        osp::Matrix4 &rCubeTf = rScene.m_basic.m_transform.get(rScene.m_cube).m_transform;
-        rCubeTf = Magnum::Matrix4::rotationY(360.0_degf / 60.0f) * rCubeTf;
-
-
-        RenderGroup &rGroupFwdOpaque = pRenderer->m_renderGroups.m_groups["fwd_opaque"];
-        MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
-        Phong::assign_phong_opaque(
-                rMatCommon.m_added, rGroupFwdOpaque.m_entities,
-                rScene.m_drawing.m_opaque, pRenderer->m_renderGl.m_diffuseTexGl,
-                pRenderer->m_phong);
-        rMatCommon.m_added.clear();
-
-        SysRenderGL::load_meshes(
-                rScene.m_drawing.m_mesh, rScene.m_drawing.m_meshDirty,
-                pRenderer->m_renderGl.m_meshGl, rApp.get_gl_resources());
-        SysRenderGL::load_textures(
-                rScene.m_drawing.m_diffuseTex, rScene.m_drawing.m_diffuseDirty,
-                pRenderer->m_renderGl.m_diffuseTexGl, rApp.get_gl_resources());
-
-        render_test_scene(rApp, rScene, *pRenderer);
-    };
+    Texture2D &rFboColor = *rGlResources.get<Texture2D>("offscreen_fbo_color");
+    SysRenderGL::display_texture(rGlResources, rFboColor);
 }
 
 void load_gl_resources(ActiveApplication& rApp)
@@ -265,6 +261,57 @@ void load_gl_resources(ActiveApplication& rApp)
             MeshVisualizer{ MeshVisualizer::Flag::Wireframe
                             | MeshVisualizer::Flag::NormalDirection});
 
+}
+
+on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
+{
+    using namespace osp::active;
+    using namespace osp::shader;
+
+    // Create renderer data. This uses a shared_ptr to allow being stored
+    // inside an std::function, which require copyable types
+    std::shared_ptr<EngineTestRenderer> pRenderer
+            = std::make_shared<EngineTestRenderer>();
+
+    osp::Package &rGlResources = rApp.get_gl_resources();
+
+    // Get or reserve Phong shaders. These are loaded in load_gl_resources,
+    // which can be called before or after this function
+    pRenderer->m_phong.m_shaderUntextured
+            = rGlResources.get_or_reserve<Phong>("notexture");
+    pRenderer->m_phong.m_shaderDiffuse
+            = rGlResources.get_or_reserve<Phong>("textured");
+
+    pRenderer->m_phong.m_views.emplace(ACtxPhongData::Views{
+            rScene.m_drawing.m_drawTransform,
+            pRenderer->m_renderGl.m_diffuseTexGl,
+            pRenderer->m_renderGl.m_meshGl});
+
+    // Select first camera for rendering
+    pRenderer->m_camera = rScene.m_basic.m_camera.at(0);
+
+    // Create render group for forward opaque pass
+    pRenderer->m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
+
+    // Set all materials dirty
+    for (MaterialData &rMat : rScene.m_drawing.m_materials)
+    {
+        rMat.m_added.assign(std::begin(rMat.m_comp), std::end(rMat.m_comp));
+    }
+
+    // Set all meshs dirty
+    auto &rMeshSet = static_cast<active_sparse_set_t&>(rScene.m_drawing.m_mesh);
+    rScene.m_drawing.m_meshDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
+
+    // Set all textures dirty
+    auto &rDiffSet = static_cast<active_sparse_set_t&>(rScene.m_drawing.m_diffuseTex);
+    rScene.m_drawing.m_diffuseDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
+
+    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp)
+    {
+        update_test_scene(rScene);
+        render_test_scene(rApp, rScene, *pRenderer);
+    };
 }
 
 } // namespace testapp::enginetest

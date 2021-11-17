@@ -83,7 +83,7 @@ osp::active::ACompRigidbodyAncestor* SysPhysics::try_get_or_find_rigidbody_ances
     // Perform first-time initialization of rigidbody ancestor component
     if ( ! rCtxPhys.m_rigidbodyAncestor.contains(childEntity))
     {
-        ActiveEnt ent = find_rigidbody_ancestor(viewHier, rCtxPhys, childEntity);
+        find_rigidbody_ancestor(viewHier, rCtxPhys, childEntity);
 
         pRbAncestor = &rCtxPhys.m_rigidbodyAncestor.emplace(childEntity);
     }

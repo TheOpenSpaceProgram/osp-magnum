@@ -49,7 +49,7 @@ class SysNewton
 
 public:
 
-    void destroy(ACtxNwtWorld &rCtxWorld);
+    static void destroy(ACtxNwtWorld &rCtxWorld);
 
     static void update_translate(
             osp::active::ACtxPhysics& rCtxPhys,

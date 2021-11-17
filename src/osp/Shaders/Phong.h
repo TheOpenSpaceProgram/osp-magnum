@@ -53,6 +53,16 @@ public:
             osp::active::ACompCamera const& camera,
             osp::active::EntityToDraw::UserData_t userData) noexcept;
 
+    /**
+     * @brief Assign a Phong shader to a set of entities, and write results to
+     *        a RenderGroup
+     *
+     * @param entities      [in] Entities to consider
+     * @param rStorage      [out] RenderGroup storage
+     * @param viewOpaque    [in] View for opaque component
+     * @param viewDiffuse   [in] View for diffuse texture component
+     * @param rData         [in] Phong shader data, stable memory required
+     */
     static void assign_phong_opaque(
             RenderGroup::ArrayView_t entities,
             RenderGroup::Storage_t& rStorage,
@@ -61,6 +71,9 @@ public:
             ACtxPhongData &rData);
 };
 
+/**
+ * @brief Stores per-scene data needed for Phong shaders to draw
+ */
 struct ACtxPhongData
 {
     struct Views

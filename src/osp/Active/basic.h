@@ -35,30 +35,54 @@ namespace osp::active
 {
 
 /**
- * Component for transformation (in meters)
+ * @brief Component for transformation (in meters)
  */
 struct ACompTransform
 {
     osp::Matrix4 m_transform;
 };
 
+// TODO: this scheme of controlled and mutable likely isn't the best, maybe
+//       consider other options
+
+/**
+ * @brief Indicates that an entity's ACompTransform is owned by some specific
+ *        system, and shouldn't be modified freely.
+ *
+ * This can be used by a physics or animation system, which may set the
+ * transform each frame.
+ */
 struct ACompTransformControlled { };
 
+/**
+ * @brief Allows mutation for entities with ACompTransformControlled, as long as
+ *        a dirty flag is set.
+ */
 struct ACompTransformMutable{ bool m_dirty{false}; };
 
+/**
+ * @brief The ACompFloatingOrigin struct
+ */
 struct ACompFloatingOrigin { };
 
 /**
- * Added to an entity to mark it for deletion
+ * @brief Simple name component
  */
-struct ACompDelete{ };
-
 struct ACompName
 {
-    ACompName(std::string name) : m_name(std::move(name)) { }
     std::string m_name;
 };
 
+/**
+ * @brief Marks an entity for deletion
+ */
+struct ACompDelete { };
+
+/**
+ * @brief Places an entity in a hierarchy
+ *
+ * Stores entity IDs for parent, both siblings, and first child if present
+ */
 struct ACompHierarchy
 {
     unsigned m_level{0}; // 0 for root entity, 1 for root's child, etc...
@@ -72,7 +96,7 @@ struct ACompHierarchy
 };
 
 /**
- * Component that represents a camera
+ * @brief Component that represents a camera
  */
 struct ACompCamera
 {
@@ -93,7 +117,7 @@ struct ACompCamera
 };
 
 /**
- * @brief Storage for basic components from osp/basic.h
+ * @brief Storage for basic components
  */
 struct ACtxBasic
 {
@@ -101,10 +125,9 @@ struct ACtxBasic
     acomp_storage_t<ACompTransformControlled>   m_transformControlled;
     acomp_storage_t<ACompTransformMutable>      m_transformMutable;
     acomp_storage_t<ACompFloatingOrigin>        m_floatingOrigin;
-    acomp_storage_t<ACompDelete>                m_delete;
     acomp_storage_t<ACompName>                  m_name;
     acomp_storage_t<ACompHierarchy>             m_hierarchy;
     acomp_storage_t<ACompCamera>                m_camera;
 };
 
-}
+} // namespace osp::active

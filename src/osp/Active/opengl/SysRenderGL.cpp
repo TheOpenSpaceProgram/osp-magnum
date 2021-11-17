@@ -94,13 +94,6 @@ void SysRenderGL::setup_context(Package& rGlResources)
     }
 }
 
-void SysRenderGL::setup_forward_renderer(ACtxRenderGroups& rCtxGroups)
-{
-    // Add render groups
-    rCtxGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
-    rCtxGroups.m_groups.emplace("fwd_transparent", RenderGroup{});
-}
-
 DependRes<Mesh> try_compile_mesh(
         osp::Package& rGlResources, DependRes<MeshData> const& meshData)
 {
@@ -112,10 +105,10 @@ DependRes<Mesh> try_compile_mesh(
         rMeshGlRes.reserve_emplace(Magnum::MeshTools::compile(*meshData));
     }
 
-    return std::move(rMeshGlRes);
+    return rMeshGlRes;
 }
 
-void SysRenderGL::load_meshes(
+void SysRenderGL::compile_meshes(
         acomp_view_t<ACompMesh const> viewMeshs,
         std::vector<ActiveEnt>& rDirty,
         acomp_storage_t<ACompMeshGL>& rMeshGl,
@@ -161,7 +154,7 @@ void SysRenderGL::load_meshes(
     }
 }
 
-void SysRenderGL::load_textures(
+void SysRenderGL::compile_textures(
         acomp_view_t<const ACompTexture> viewDiffTex,
         std::vector<ActiveEnt>& rDirty,
         acomp_storage_t<ACompTextureGL>& rDiffTexGl,
@@ -170,7 +163,8 @@ void SysRenderGL::load_textures(
     rDirty.clear();
 }
 
-void SysRenderGL::display_rendertarget(Package& rGlResources, Magnum::GL::Texture2D& rTex)
+void SysRenderGL::display_texture(
+        Package& rGlResources, Magnum::GL::Texture2D& rTex)
 {
     using Magnum::GL::Renderer;
     using Magnum::GL::Framebuffer;
@@ -191,9 +185,10 @@ void SysRenderGL::display_rendertarget(Package& rGlResources, Magnum::GL::Textur
     shader->display_texure(*surface, rTex);
 }
 
+// TODO: problem got simpler, maybe generalize these two somehow
 
 void SysRenderGL::render_opaque(
-        ACtxRenderGroups& rCtxGroups,
+        RenderGroup const& rGroup,
         acomp_view_t<const ACompVisible> viewVisible,
         ACompCamera const& camera)
 {
@@ -204,8 +199,7 @@ void SysRenderGL::render_opaque(
     Renderer::disable(Renderer::Feature::Blending);
     Renderer::setDepthMask(true);
 
-    for (auto const& [ent, toDraw]
-         : rCtxGroups.m_groups.at("fwd_opaque").view().each())
+    for (auto const& [ent, toDraw] : rGroup.view().each())
     {
         if (viewVisible.contains(ent))
         {
@@ -215,12 +209,11 @@ void SysRenderGL::render_opaque(
 }
 
 void SysRenderGL::render_transparent(
-        ACtxRenderGroups& rCtxGroups,
+        RenderGroup const& group,
         acomp_view_t<const ACompVisible> viewVisible,
         ACompCamera const& camera)
 {
     using Magnum::GL::Renderer;
-    using namespace osp::active;
 
     Renderer::enable(Renderer::Feature::DepthTest);
     Renderer::enable(Renderer::Feature::FaceCulling);
@@ -233,8 +226,7 @@ void SysRenderGL::render_transparent(
     //            can mess up other transparent objects once added
     Renderer::setDepthMask(false);
 
-    for (auto const& [ent, toDraw]
-         : rCtxGroups.m_groups.at("fwd_transparent").view().each())
+    for (auto const& [ent, toDraw] : group.view().each())
     {
         if (viewVisible.contains(ent))
         {

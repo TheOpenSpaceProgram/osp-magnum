@@ -26,15 +26,11 @@
 
 using osp::active::SysRender;
 
-void SysRender::update_hierarchy_transforms(
+void SysRender::update_draw_transforms(
         acomp_storage_t<ACompHierarchy> const& hier,
         acomp_view_t<ACompTransform> const& viewTf,
         acomp_storage_t<ACompDrawTransform>& rDrawTf)
 {
-
-    // TODO: consider using hierarchical bitset as dirty flags to make this
-    //       more efficient. Right now, this recalculates every entity with an
-    //       ACompDrawTransform.
 
     rDrawTf.respect(hier);
 

@@ -38,7 +38,8 @@ namespace osp::active
 
 enum class ActiveEnt: entt::id_type {};
 
-}
+} // namespace osp::active
+
 
 // Specialize entt::storage_traits to disable signals for storage that uses
 // ActiveEnt as entities
@@ -65,5 +66,5 @@ using acomp_storage_t = typename entt::storage_traits<ActiveEnt, COMP_T>::storag
 template<typename... COMP_T>
 using acomp_view_t = entt::basic_view<ActiveEnt, entt::exclude_t<>, COMP_T...>;
 
-}
+} // namespace osp::active
 

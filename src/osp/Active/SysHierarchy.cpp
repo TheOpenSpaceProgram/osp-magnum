@@ -29,18 +29,11 @@ using osp::active::SysHierarchy;
 using osp::active::ActiveEnt;
 
 
-void SysHierarchy::add_parent_child(
+void SysHierarchy::add_child(
         acomp_storage_t<ACompHierarchy>& rHier,
-        acomp_storage_t<ACompName>& rNames,
-        ActiveEnt parent, ActiveEnt child, std::string const& name)
+        ActiveEnt parent, ActiveEnt child)
 {
     rHier.emplace(child);
-
-    if (!name.empty())
-    {
-        rNames.emplace(child, name);
-    }
-
     set_parent_child(rHier, parent, child);
 }
 
