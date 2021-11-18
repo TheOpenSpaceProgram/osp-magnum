@@ -157,9 +157,6 @@ public:
         return ! m_deleted.test(id_int_t(id));
     };
 
-    template <typename FUNC_T>
-    void for_each(FUNC_T func);
-
 private:
     HierarchicalBitset<uint64_t> m_deleted;
 
@@ -184,20 +181,6 @@ void IdRegistry<ID_T, NO_AUTO_RESIZE>::create(IT_T out, size_t count)
     }
 
     m_deleted.take<IT_T, ID_T>(out, count);
-}
-
-template<typename ID_T, bool NO_AUTO_RESIZE>
-template <typename FUNC_T>
-void IdRegistry<ID_T, NO_AUTO_RESIZE>::for_each(FUNC_T func)
-{
-    // TODO: this is kind of inefficient and doesn't utilize the hierarchy
-    for (size_t i = 0; i < size(); i ++)
-    {
-        if ( ! m_deleted.test(i) )
-        {
-            func(ID_T(i));
-        }
-    }
 }
 
 //-----------------------------------------------------------------------------
@@ -256,7 +239,6 @@ public:
     using base_t::size;
     using base_t::reserve;
     using base_t::exists;
-    using base_t::for_each;
 
     [[nodiscard]] Storage_t create()
     {

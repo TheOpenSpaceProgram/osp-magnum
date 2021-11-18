@@ -336,16 +336,21 @@ public:
     ~SubdivTriangleSkeleton()
     {
         // Release the 3 Vertex IDs of each triangle
-        m_triIds.for_each([this] (SkTriGroupId id)
+        for (uint32_t i = 0; i < m_triIds.capacity(); i ++)
         {
-            for (SkeletonTriangle& rTri : m_triData[size_t(id)].m_triangles)
+            if ( ! m_triIds.exists(SkTriGroupId(i)))
+            {
+                continue;
+            }
+
+            for (SkeletonTriangle& rTri : m_triData[i].m_triangles)
             {
                 for (SkVrtxStorage_t& rVrtx : rTri.m_vertices)
                 {
                     vrtx_release(rVrtx);
                 }
             }
-        });
+        }
     }
 
     /**

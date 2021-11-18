@@ -254,24 +254,34 @@ public:
     void clear(SubdivTriangleSkeleton& rSkel)
     {
         // Delete all chunks
-        m_chunkIds.for_each([this, &rSkel] (ChunkId chunkId)
+        for (uint16_t i = 0; i < m_chunkIds.capacity(); i ++)
         {
+            if ( ! m_chunkIds.exists(ChunkId(i)) )
+            {
+                continue;
+            }
+
             // Release their associated skeleton triangle
-            rSkel.tri_release(m_chunkData[size_t(chunkId)].m_skeletonTri);
+            rSkel.tri_release(m_chunkData[i].m_skeletonTri);
 
             // Release all of their shared vertices
-            for (SharedVrtxStorage_t& shared : chunk_shared_mutable(chunkId))
+            for (SharedVrtxStorage_t& shared : chunk_shared_mutable(ChunkId(i)))
             {
                 shared_release(shared);
             }
-        });
+        }
 
         // Delete all shared vertices
-        m_sharedIds.for_each([this, &rSkel] (SharedVrtxId sharedId)
+        for (uint32_t i = 0; i < m_sharedIds.capacity(); i ++)
         {
-           // Release associated skeleton vertex
-           rSkel.vrtx_release(m_sharedSkVrtx[size_t(sharedId)]);
-        });
+            if ( ! m_sharedIds.exists(SharedVrtxId(i)) )
+            {
+                continue;
+            }
+
+            // Release associated skeleton vertex
+            rSkel.vrtx_release(m_sharedSkVrtx[i]);
+        }
     }
 
 private:
