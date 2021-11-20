@@ -59,6 +59,7 @@ on_draw_t gen_draw(FlightScene& rScene, ActiveApplication& rApp);
 
 } // namespace flight
 
+//-----------------------------------------------------------------------------
 
 namespace enginetest
 {
@@ -95,7 +96,45 @@ void load_gl_resources(ActiveApplication& rApp);
  */
 on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp);
 
-
 } // namespace enginetest
+
+//-----------------------------------------------------------------------------
+
+namespace physicstest
+{
+
+struct PhysicsTestScene;
+
+/**
+ * @brief Setup Physics Test Scene
+ *
+ * @param rPkg [in]
+ *
+ * @return entt::any containing scene data
+ */
+entt::any setup_scene(osp::Package &rPkg);
+
+/**
+ * @brief Load required textures and shaders used to render the physics test
+ *        scene
+ *
+ * @param rApp [ref] Existing ActiveApplication used to store GL resources
+ */
+void load_gl_resources(ActiveApplication& rApp);
+
+/**
+ * @brief Generate ActiveApplication draw function
+ *
+ * This draw function stores renderer data, and is responsible for updating
+ * and drawing the engine test scene.
+ *
+ * @param rScene [ref] Engine test scene. Must be in stable memory.
+ * @param rApp   [ref] Existing ActiveApplication to use GL resources of
+ *
+ * @return ActiveApplication draw function
+ */
+on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp);
+
+} // namespace physicstest
 
 } // namespace testapp

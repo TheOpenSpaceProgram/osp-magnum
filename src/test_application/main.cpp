@@ -127,6 +127,19 @@ std::unordered_map<std::string_view, Option> const g_scenes
             rApp.set_on_draw(gen_draw(rScene, rApp));
             load_gl_resources(*g_activeApplication);
         };
+    }}},
+    {"physicstest", {"Physics lol", [] {
+
+        using namespace physicstest;
+        g_activeScene = setup_scene(g_packages.find("lzdb"));
+
+        g_appSetup = [] (ActiveApplication& rApp)
+        {
+            PhysicsTestScene& rScene
+                    = entt::any_cast<PhysicsTestScene&>(g_activeScene);
+            rApp.set_on_draw(gen_draw(rScene, rApp));
+            load_gl_resources(*g_activeApplication);
+        };
     }}}
 };
 

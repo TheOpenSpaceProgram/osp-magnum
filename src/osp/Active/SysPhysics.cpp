@@ -12,7 +12,7 @@ using osp::Matrix3;
 using osp::Vector4;
 
 ActiveEnt SysPhysics::find_rigidbody_ancestor(
-        acomp_view_t<ACompHierarchy> viewHier, ACtxPhysics& rCtxPhys,
+        acomp_view_t<ACompHierarchy> viewHier,
         ActiveEnt ent)
 {
     ActiveEnt prevEnt;
@@ -32,10 +32,10 @@ ActiveEnt SysPhysics::find_rigidbody_ancestor(
     }
     while (pCurrHier->m_level != gc_heir_physics_level);
 
-    if ( ! rCtxPhys.m_physBody.contains(prevEnt))
-    {
-        return entt::null; // no Physics body!
-    }
+//    if ( ! rCtxPhys.m_physBody.contains(prevEnt))
+//    {
+//        return entt::null; // no Physics body!
+//    }
 
     return prevEnt;
 }
@@ -43,7 +43,7 @@ ActiveEnt SysPhysics::find_rigidbody_ancestor(
 Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(
         acomp_view_t<ACompHierarchy> viewHier,
         acomp_view_t<ACompTransform> viewTf,
-        ACtxPhysics& rCtxPhys, ActiveEnt ent)
+        ActiveEnt ent)
 {
     ActiveEnt prevEnt;
     ActiveEnt currEnt = ent;
@@ -67,7 +67,7 @@ Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(
     } while (pCurrHier->m_level != gc_heir_physics_level);
 
     // Fail if a rigidbody ancestor is not found
-    assert(rCtxPhys.m_physBody.contains(prevEnt));
+    //assert(rCtxPhys.m_physBody.contains(prevEnt));
 
     return transform;
 }
@@ -76,41 +76,42 @@ Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(
 osp::active::ACompRigidbodyAncestor* SysPhysics::try_get_or_find_rigidbody_ancestor(
         acomp_view_t<ACompHierarchy> viewHier,
         acomp_view_t<ACompTransform> viewTf,
-        ACtxPhysics& rCtxPhys, ActiveEnt childEntity)
+        acomp_storage_t<ACompRigidbodyAncestor>& rRbAncestor,
+        ActiveEnt ent)
 {
-    ACompRigidbodyAncestor *pRbAncestor;
+    ACompRigidbodyAncestor *pEntRbAncestor;
 
     // Perform first-time initialization of rigidbody ancestor component
-    if ( ! rCtxPhys.m_rigidbodyAncestor.contains(childEntity))
+    if ( ! rRbAncestor.contains(ent))
     {
-        find_rigidbody_ancestor(viewHier, rCtxPhys, childEntity);
+        find_rigidbody_ancestor(viewHier, ent);
 
-        pRbAncestor = &rCtxPhys.m_rigidbodyAncestor.emplace(childEntity);
+        pEntRbAncestor = &rRbAncestor.emplace(ent);
     }
     else
     {
-        pRbAncestor = &rCtxPhys.m_rigidbodyAncestor.get(childEntity);
+        pEntRbAncestor = &rRbAncestor.get(ent);
     }
     // childEntity now has an ACompRigidbodyAncestor
 
-    ActiveEnt& rAncestor = pRbAncestor->m_ancestor;
+    ActiveEnt& rAncestor = pEntRbAncestor->m_ancestor;
 
     // Ancestor entity already valid
     if (rAncestor != entt::null)
     {
-        return pRbAncestor;
+        return pEntRbAncestor;
     }
 
     // Rigidbody ancestor not set yet
-    ActiveEnt bodyEnt = find_rigidbody_ancestor(viewHier, rCtxPhys, childEntity);
+    ActiveEnt bodyEnt = find_rigidbody_ancestor(viewHier, ent);
 
     // Initialize ACompRigidbodyAncestor
     rAncestor = bodyEnt;
-    pRbAncestor->m_relTransform = find_transform_rel_rigidbody_ancestor(
-                viewHier, viewTf, rCtxPhys, childEntity);
+    pEntRbAncestor->m_relTransform = find_transform_rel_rigidbody_ancestor(
+                viewHier, viewTf, ent);
     //TODO: this transformation may change and need recalculating
 
-    return pRbAncestor;
+    return pEntRbAncestor;
 }
 
 /* Since masses are usually stored in the rigidbody's children instead of the

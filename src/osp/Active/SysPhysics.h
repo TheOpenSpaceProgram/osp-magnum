@@ -47,7 +47,7 @@ public:
      *         component is found, then {level-1 entity, nullptr}
      */
     static ActiveEnt find_rigidbody_ancestor(
-            acomp_view_t<ACompHierarchy> viewHier, ACtxPhysics& rCtxPhys,
+            acomp_view_t<ACompHierarchy> viewHier,
             ActiveEnt ent);
 
     /**
@@ -64,7 +64,7 @@ public:
     static Matrix4 find_transform_rel_rigidbody_ancestor(
             acomp_view_t<ACompHierarchy> viewHier,
             acomp_view_t<ACompTransform> viewTf,
-            ACtxPhysics& rCtxPhys, ActiveEnt ent);
+            ActiveEnt ent);
 
 
     /**
@@ -88,7 +88,8 @@ public:
     static ACompRigidbodyAncestor* try_get_or_find_rigidbody_ancestor(
             acomp_view_t<ACompHierarchy> viewHier,
             acomp_view_t<ACompTransform> viewTf,
-            ACtxPhysics& rCtxPhys, ActiveEnt childEntity);
+            acomp_storage_t<ACompRigidbodyAncestor>& rRbAncestor,
+            ActiveEnt ent);
 
     enum EIncludeRootMass { Ignore, Include };
     /**

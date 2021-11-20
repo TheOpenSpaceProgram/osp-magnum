@@ -27,9 +27,10 @@
 #include <osp/Active/physics.h>      // for ACompShape
 #include <osp/Active/basic.h>        // for ActiveEnt, ActiveReg_t, basic_sp...
 
-
 #include <osp/types.h>               // for Vector3, Matrix4
 #include <osp/CommonPhysics.h>       // for ECollisionShape, ECollisionShape...
+
+#include <Corrade/Containers/ArrayView.h>
 
 // IWYU pragma: no_include <cstdint>
 // IWYU pragma: no_include <stdint.h>
@@ -55,17 +56,24 @@ public:
             osp::active::ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld);
 
+    static void update_colliders(
+            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxNwtWorld& rCtxWorld,
+            std::vector<osp::active::ActiveEnt>& rCollidersDirty);
+
     static void update_world(
             osp::active::ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            osp::active::acomp_view_t<osp::active::ACompHierarchy> viewHier,
-            osp::active::acomp_view_t<osp::active::ACompTransform> viewTf,
-            osp::active::acomp_storage_t<osp::active::ACompTransformControlled> rTfControlled,
-            osp::active::acomp_storage_t<osp::active::ACompTransformMutable> rTfMutable);
+            Corrade::Containers::ArrayView<osp::active::ACtxPhysInputs> inputs,
+            osp::active::acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
+            osp::active::acomp_storage_t<osp::active::ACompTransform>& rTf,
+            osp::active::acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
+            osp::active::acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable);
 
     static NewtonWorld const* debug_get_world();
 
 private:
+
     /**
      * Search descendents for collider components and add NewtonCollisions to a
      * vector. Make sure NewtonCompoundCollisionBeginAddRemove(rCompound) is
@@ -80,9 +88,10 @@ private:
     static void find_colliders_recurse(
             osp::active::ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            osp::active::acomp_view_t<osp::active::ACompHierarchy> viewHier,
-            osp::active::acomp_view_t<osp::active::ACompTransform> viewTf,
+            osp::active::acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
+            osp::active::acomp_storage_t<osp::active::ACompTransform> const& rTf,
             osp::active::ActiveEnt ent,
+            osp::active::ActiveEnt firstChild,
             osp::Matrix4 const& transform,
             NewtonCollision* pCompound);
 
@@ -96,27 +105,12 @@ private:
     static void create_body(
             osp::active::ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            osp::active::acomp_view_t<osp::active::ACompHierarchy> viewHier,
-            osp::active::acomp_view_t<osp::active::ACompTransform> viewTf,
+            osp::active::acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
+            osp::active::acomp_storage_t<osp::active::ACompTransform> const& rTf,
             osp::active::acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
             osp::active::acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable,
             osp::active::ActiveEnt ent,
             NewtonWorld const* pNwtWorld);
-
-    /**
-     * Update the inertia properties of a rigid body
-     *
-     * Given an existing rigid body, computes and updates the mass matrix and
-     * center of mass. Entirely self contained, calls the other inertia
-     * functions in this class.
-     * @param entity [in] The rigid body to update
-     */
-    static void compute_rigidbody_inertia(
-            osp::active::ACtxPhysics& rCtxPhys,
-            ACtxNwtWorld& rCtxWorld,
-            osp::active::acomp_view_t<osp::active::ACompHierarchy> const viewHier,
-            osp::active::acomp_view_t<osp::active::ACompTransform> const viewTf,
-            osp::active::ActiveEnt entity);
 
 };
 

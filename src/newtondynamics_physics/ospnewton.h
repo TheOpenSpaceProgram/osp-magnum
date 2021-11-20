@@ -81,10 +81,13 @@ struct ACtxNwtWorld
     osp::active::acomp_storage_t<ACompNwtBody_t> m_nwtBodies;
     osp::active::acomp_storage_t<ACompNwtCollider_t> m_nwtColliders;
 
-    entt::basic_view<osp::active::ActiveEnt, entt::exclude_t<>,
-                     osp::active::ACompPhysNetForce> m_viewForce;
-    entt::basic_view<osp::active::ActiveEnt, entt::exclude_t<>,
-                     osp::active::ACompPhysNetTorque> m_viewTorque;
+    struct ForceTorqueIn
+    {
+        osp::active::acomp_storage_t<osp::active::ACompPhysNetForce>  m_force;
+        osp::active::acomp_storage_t<osp::active::ACompPhysNetTorque> m_torque;
+    };
+
+    std::vector<ForceTorqueIn> m_forceTorqueIn;
 
     std::vector<PerThread> m_perThread;
 };
