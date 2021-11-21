@@ -150,7 +150,6 @@ void SysNewton::destroy(ACtxNwtWorld &rCtxWorld)
 
 void SysNewton::update_translate(ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld)
 {
-
     NewtonWorld const* pNwtWorld = rCtxWorld.m_nwtWorld.get();
 
     // Origin translation
@@ -264,6 +263,10 @@ void SysNewton::update_world(
     }
 
     // Expose force and torque inputs to Newton callbacks
+    // This swaps their internal pointers with instances accesible from the
+    // cb_force_torque callback function.
+    // The alternative is pointing to the storages from the callback, which
+    // requires additional indirection
     rCtxWorld.m_forceTorqueIn.resize(inputs.size());
     for (int i = 0; i < inputs.size(); i ++)
     {
@@ -325,8 +328,11 @@ void SysNewton::find_colliders_recurse(
                 = rCtxWorld.m_nwtColliders.get(ent).get();
 
         // Set transform relative to root body
-        Matrix4 const relOffset = Matrix4::translation(transform.translation());
-        NewtonCollisionSetMatrix(pCollision, relOffset.data());
+
+        Matrix4 const normScale = Matrix4::from(transform.rotationNormalized(),
+                                                transform.translation());
+
+        NewtonCollisionSetMatrix(pCollision, normScale.data());
 
         Vector3 const scale = transform.scaling();
         NewtonCollisionSetScale(pCollision, scale.x(), scale.y(), scale.z());
@@ -438,8 +444,6 @@ void SysNewton::create_body(
         // This ensures that it is only owned by pBody
         NewtonDestroyCollision(std::exchange(pNwtCollider, nullptr));
     }
-
-    // by now, the Newton rigid body components exist
 
     // Add transform controlled indicators
     if ( ! rTfControlled.contains(ent)) { rTfControlled.emplace(ent); }

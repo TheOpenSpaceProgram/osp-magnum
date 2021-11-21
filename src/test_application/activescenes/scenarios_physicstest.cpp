@@ -77,18 +77,69 @@ struct PhysicsTestScene
     // Components and supporting data structures
     osp::active::ACtxBasic          m_basic;
     osp::active::ACtxDrawing        m_drawing;
-    osp::active::ACtxPhysics        m_physics;
 
+    // Physics
+    std::unique_ptr<ospnewton::ACtxNwtWorld> m_nwtWorld;
+    osp::active::ACtxPhysics        m_physics;
     osp::active::ACtxPhysInputs     m_physIn;
+
+    osp::active::ACtxHierBody       m_hierBody;
 
     // Hierarchy root, needs to exist so all hierarchy entities are connected
     osp::active::ActiveEnt          m_hierRoot;
 
-    // The rotating cube
-    osp::active::ActiveEnt          m_cube;
-
-    std::unique_ptr<ospnewton::ACtxNwtWorld> m_nwtWorld;
 };
+
+void add_rigid_body(PhysicsTestScene& rScene, osp::active::ActiveEnt ent)
+{
+    using namespace osp::active;
+
+    rScene.m_physics.m_physBody.emplace(ent);
+    ACompPhysDynamic &rCubeDyn = rScene.m_physics.m_physDynamic.emplace(ent);
+    rCubeDyn.m_totalMass = 1.0f;
+    rScene.m_physics.m_physLinearVel.emplace(ent);
+    rScene.m_physics.m_physAngularVel.emplace(ent);
+}
+
+osp::active::ActiveEnt make_cube(PhysicsTestScene& rScene, osp::Package &rPkg)
+{
+    using namespace osp::active;
+
+    // Make a cube
+    ActiveEnt cube = rScene.m_activeIds.create();
+
+    // Add cube mesh to cube
+    rScene.m_drawing.m_mesh.emplace(
+            cube, ACompMesh{ rPkg.get<MeshData>("cube") });
+    rScene.m_drawing.m_meshDirty.push_back(cube);
+
+    // Add common material to cube
+    MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
+    rMatCommon.m_comp.emplace(cube);
+    rMatCommon.m_added.push_back(cube);
+
+    // Add transform and draw transform
+    rScene.m_basic.m_transform.emplace(cube);
+    rScene.m_drawing.m_drawTransform.emplace(cube);
+
+    // Add opaque and visible component
+    rScene.m_drawing.m_opaque.emplace(cube);
+    rScene.m_drawing.m_visible.emplace(cube);
+
+    // Add physics stuff
+
+    rScene.m_physics.m_shape.emplace(cube, osp::phys::EShape::Box);
+    //rScene.m_physics.m_mass.emplace(cube, 1.0f);
+    rScene.m_physics.m_solidCollider.emplace(cube);
+
+    rScene.m_physIn.m_colliderDirty.push_back(cube);
+
+    // Add cube to hierarchy, parented to root
+    //SysHierarchy::add_child(
+    //        rScene.m_basic.m_hierarchy, rScene.m_hierRoot, cube);
+
+    return cube;
+}
 
 entt::any setup_scene(osp::Package &rPkg)
 {
@@ -124,43 +175,7 @@ entt::any setup_scene(osp::Package &rPkg)
     SysHierarchy::add_child(
             rScene.m_basic.m_hierarchy, rScene.m_hierRoot, camEnt);
 
-    // Make a cube
-    rScene.m_cube = rScene.m_activeIds.create();
 
-    // Add cube mesh to cube
-    rScene.m_drawing.m_mesh.emplace(
-            rScene.m_cube, ACompMesh{ rPkg.get<MeshData>("cube") });
-    rScene.m_drawing.m_meshDirty.push_back(rScene.m_cube);
-
-    // Add common material to cube
-    MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
-    rMatCommon.m_comp.emplace(rScene.m_cube);
-    rMatCommon.m_added.push_back(rScene.m_cube);
-
-    // Add transform and draw transform
-    rScene.m_basic.m_transform.emplace(rScene.m_cube);
-    rScene.m_drawing.m_drawTransform.emplace(rScene.m_cube);
-
-    // Add opaque and visible component
-    rScene.m_drawing.m_opaque.emplace(rScene.m_cube);
-    rScene.m_drawing.m_visible.emplace(rScene.m_cube);
-
-    // Add physics stuff
-    rScene.m_physics.m_physBody.emplace(rScene.m_cube);
-    ACompPhysDynamic &rCubeDyn = rScene.m_physics.m_physDynamic.emplace(rScene.m_cube);
-    rCubeDyn.m_totalMass = 1.0f;
-    rScene.m_physics.m_physLinearVel.emplace(rScene.m_cube);
-    rScene.m_physics.m_physAngularVel.emplace(rScene.m_cube);
-    rScene.m_physics.m_shape.emplace(rScene.m_cube, osp::phys::EShape::Box);
-    //rScene.m_physics.m_mass.emplace(rScene.m_cube, 1.0f);
-    rScene.m_physics.m_solidCollider.emplace(rScene.m_cube);
-    rScene.m_physics.m_hasColliders.emplace(rScene.m_cube);
-
-    rScene.m_physIn.m_colliderDirty.push_back(rScene.m_cube);
-
-    // Add cube to hierarchy, parented to root
-    SysHierarchy::add_child(
-            rScene.m_basic.m_hierarchy, rScene.m_hierRoot, rScene.m_cube);
 
     return std::move(sceneAny);
 }
@@ -175,15 +190,9 @@ void update_test_scene(PhysicsTestScene& rScene)
     using namespace osp::active;
     using Corrade::Containers::ArrayView;
 
-    // Rotate the cube
-    osp::Matrix4 &rCubeTf
-            = rScene.m_basic.m_transform.get(rScene.m_cube).m_transform;
-
-    rCubeTf = Magnum::Matrix4::rotationY(360.0_degf / 60.0f) * rCubeTf;
-
     using namespace ospnewton;
 
-    rScene.m_physIn.m_physNetTorque.emplace(rScene.m_cube, ACompPhysNetTorque{{5.0f, 0.0f, 0.0f}});
+    //rScene.m_physIn.m_physNetTorque.emplace(cube, ACompPhysNetTorque{{5.0f, 0.0f, 0.0f}});
 
 
     auto physIn = ArrayView<ACtxPhysInputs>(&rScene.m_physIn, 1);
@@ -203,7 +212,7 @@ void update_test_scene(PhysicsTestScene& rScene)
  * @brief Data needed to render the EngineTestScene
  */
 struct PhysicsTestRenderer
-{
+{   
     osp::active::ACtxRenderGroups m_renderGroups;
 
     osp::active::ACtxRenderGL m_renderGl;
@@ -348,7 +357,7 @@ on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp)
     auto &rDiffSet = static_cast<active_sparse_set_t&>(rScene.m_drawing.m_diffuseTex);
     rScene.m_drawing.m_diffuseDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
 
-    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp)
+    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
     {
         update_test_scene(rScene);
         render_test_scene(rApp, rScene, *pRenderer);

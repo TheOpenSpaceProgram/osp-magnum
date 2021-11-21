@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,333 +24,47 @@
  */
 #include "CameraController.h"
 
-#include <adera/Machines/UserControl.h>
-
-#include <osp/Satellites/SatVehicle.h>
-
-#include <osp/Active/SysAreaAssociate.h>
-#include <osp/Active/SysPhysics.h>
-#include <osp/Active/SysVehicle.h>
-#include <osp/Active/SysVehicleSync.h>
+#include <Magnum/Magnum.h>
 
 #include <osp/logging.h>
-
-#if 0
-
-using testapp::SysCameraController;
-using testapp::ACompCameraController;
-
-using adera::active::machines::MCompUserControl;
-
-using osp::universe::Satellite;
-using osp::universe::Universe;
-
-using osp::active::ActiveScene;
-using osp::active::ActiveEnt;
-using osp::active::ActiveReg_t;
-
-using osp::active::ACompTransform;
-using osp::active::ACompVehicle;
-using osp::active::ACompAreaLink;
-
-using osp::active::SysAreaAssociate;
-
-using osp::input::ControlSubscriber;
-
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
+using testapp::SysCameraController;
+using testapp::ACtxCameraController;
+
+using Magnum::Rad;
+
+using osp::input::ControlSubscriber;
+
 using osp::Matrix4;
 using osp::Quaternion;
 using osp::Vector3;
-using osp::universe::Vector3g;
 
-std::pair<ActiveEnt, ACompCameraController&>
-SysCameraController::get_camera_controller(ActiveScene &rScene)
+void SysCameraController::update_view(
+        ACtxCameraController &rCtrl, osp::active::ACompTransform &rCamTf,
+        float delta)
 {
-    ActiveEnt ent = rScene.get_registry().view<ACompCameraController>().front();
-    return {ent, rScene.reg_get<ACompCameraController>(ent)};
-}
-
-bool SysCameraController::try_switch_vehicle(ActiveScene &rScene,
-                                             ACompCameraController &rCamCtrl)
-{
-    ACompAreaLink *pAreaLink = SysAreaAssociate::try_get_area_link(rScene);
-
-    if (pAreaLink == nullptr)
-    {
-        return false; // Scene is not linked to any universe
-    }
-
-    Universe &rUni = pAreaLink->get_universe();
-    auto const viewUni = rUni.get_reg().view<osp::universe::UCompVehicle>();
-
-    // Select a vehicle. Selection is cycled from back to front, so the newest
-    // vehicle is (usually) picked first.
-
-    if (viewUni.empty())
-    {
-        return false; // No vehicles exist!
-    }
-
-    if ( ! rUni.get_reg().valid(rCamCtrl.m_selected))
-    {
-        // No vehicle selected, pick [back]
-        rCamCtrl.m_selected = viewUni.back();
-    }
-    else
-    {
-        // Some vehicle is already selected, get its iterator
-        auto it = viewUni.find(rCamCtrl.m_selected);
-
-        if (it == std::begin(viewUni) || it == std::end(viewUni))
-        {
-            // [front] or invalid vehicle is currently selected, cycle to [back]
-            rCamCtrl.m_selected = viewUni.back();
-        }
-        else
-        {
-            // Pick the previous vehicle
-            rCamCtrl.m_selected = *std::prev(it);
-        }
-    }
-
-    if (rUni.get_reg().valid(rCamCtrl.m_selected))
-    {
-      OSP_LOG_INFO("Selected: {} ",
-          rUni.get_reg().get<osp::universe::UCompTransformTraj>(rCamCtrl.m_selected).m_name);
-        return true;
-    }
-
-    return false;
-}
-
-void SysCameraController::update_vehicle(ActiveScene &rScene)
-{
-    auto const& [ent, rCamCtrl] = get_camera_controller(rScene);
-
-    if (rCamCtrl.m_controls.button_triggered(rCamCtrl.m_switch))
-    {
-        try_switch_vehicle(rScene, rCamCtrl);
-    }
-
-    ActiveEnt const vehicle = find_vehicle_from_sat(rScene, rCamCtrl.m_selected);
-
-    if (!rScene.get_registry().valid(vehicle))
-    {
-        return; // No vehicle selected
-    }
-
-    // Make the craft explode apart when pressing [self destruct]
-    if (rCamCtrl.m_controls.button_triggered(rCamCtrl.m_selfDestruct))
-    {
-        using osp::active::ACompVehicle;
-        using osp::active::ACompPart;
-
-        auto &rTgtVehicle = rScene.reg_get<ACompVehicle>(vehicle);
-
-        // delete the last part
-        //auto &partPart = m_scene.reg_get<ACompPart>(tgtVehicle.m_parts.back());
-        //partPart.m_destroy = true;
-        //tgtVehicle.m_separationCount = 1;
-
-        // separate all parts into their own separation islands
-        for (size_t i = 0; i < rTgtVehicle.m_parts.size(); i ++)
-        {
-            rScene.reg_get<ACompPart>(rTgtVehicle.m_parts[i])
-                    .m_separationIsland = i;
-        }
-        rTgtVehicle.m_separationCount = rTgtVehicle.m_parts.size();
-    }
-}
-
-MCompUserControl* find_user_control(ActiveScene& rScene, ActiveEnt vehicle)
-{
-    using osp::active::ACompMachines;
-    using osp::active::ACompMachineType;
-
-    osp::machine_id_t const id = osp::mach_id<MCompUserControl>();
-    // Search all parts
-    std::vector<ActiveEnt> const& parts = rScene.reg_get<ACompVehicle>(vehicle).m_parts;
-    for (ActiveEnt partEnt : parts)
-    {
-        // Search all machines of that part
-        auto const* pMachines = rScene.reg_try_get<ACompMachines>(partEnt);
-        if (nullptr == pMachines)
-        {
-            return nullptr;
-        }
-
-        for (ActiveEnt machEnt : pMachines->m_machines)
-        {
-            if (!rScene.get_registry().valid(machEnt))
-            {
-                return nullptr;
-            }
-            if (rScene.reg_get<ACompMachineType>(machEnt).m_type == id)
-            {
-                // Found!
-                return &rScene.reg_get<MCompUserControl>(machEnt);
-            }
-        }
-    }
-    return nullptr;
-}
-
-void SysCameraController::update_controls(ActiveScene &rScene)
-{
-    ActiveReg_t &rReg = rScene.get_registry();
-    auto const [camEnt, rCamCtrl] = get_camera_controller(rScene);
-
-    ActiveEnt const vehicle = find_vehicle_from_sat(rScene, rCamCtrl.m_selected);
-
-    if (!rReg.valid(vehicle))
-    {
-        return; // No active vehicle to control
-    }
-
-    MCompUserControl* pUsrCtrl = find_user_control(rScene, vehicle);
-
-    if (nullptr == pUsrCtrl)
-    {
-        return; // No MCompUserControl found
-    }
-
-    ControlSubscriber const& controls = rCamCtrl.m_controls;
-
-    // Assign attitude control
-    pUsrCtrl->m_attitude = Vector3(
-            controls.button_held(rCamCtrl.m_pitchDn)
-                - controls.button_held(rCamCtrl.m_pitchUp),
-            controls.button_held(rCamCtrl.m_yawLf)
-                - controls.button_held(rCamCtrl.m_yawRt),
-            controls.button_held(rCamCtrl.m_rollRt)
-                - controls.button_held(rCamCtrl.m_rollLf));
-
-    // Set Throttle
-
-    float const throttleRate
-            = rCamCtrl.m_throttleRate * rScene.get_time_delta_fixed();
-
-    float const throttleDelta
-            = controls.button_held(rCamCtrl.m_throttleMore) * throttleRate
-            - controls.button_held(rCamCtrl.m_throttleLess) * throttleRate
-            + controls.button_triggered(rCamCtrl.m_throttleMax) * 1.0f
-            - controls.button_triggered(rCamCtrl.m_throttleMin) * 1.0f;
-
-    pUsrCtrl->m_throttle = std::clamp(pUsrCtrl->m_throttle + throttleDelta,
-                                      0.0f, 1.0f);
-}
-
-void SysCameraController::update_area(ActiveScene &rScene)
-{
-
-    ActiveReg_t &rReg = rScene.get_registry();
-    auto const [camEnt, rCamCtrl] = get_camera_controller(rScene);
-
-    ActiveEnt const vehicle = find_vehicle_from_sat(rScene, rCamCtrl.m_selected);
-
-    Matrix4 &rCamTf = rScene.reg_get<ACompTransform>(camEnt).m_transform;
-    Vector3 targetPos = rCamTf.translation() - rCamCtrl.m_orbitPos;
-
-    if (!rReg.valid(vehicle))
-    {
-        // No vehicle activated in scene, try to find
-
-        ACompAreaLink const *areaLink = SysAreaAssociate::try_get_area_link(rScene);
-
-        if (areaLink == nullptr)
-        {
-            return; // Scene is not linked to any universe
-        }
-
-        Universe const &rUni = areaLink->get_universe();
-
-        if (!rUni.get_reg().valid(rCamCtrl.m_selected))
-        {
-            return;
-        }
-
-        // Smoothly move towards target satellite
-        Vector3 const diff = rUni.sat_calc_pos_meters(
-                areaLink->m_areaSat, rCamCtrl.m_selected).value() - targetPos;
-
-        // Move 20% of the distance each frame
-        float const distance = diff.length();
-        rCamTf.translation() += diff.normalized() * distance
-                                * rCamCtrl.m_travelSpeed;
-    }
-
-
-    // Trigger floating origin translations if the camera gets too far from
-    // the scene origin
-
-    // Round position
-    Vector3g const targetPosRounded
-            = Vector3g(targetPos / rCamCtrl.m_originDistanceThreshold)
-            * rCamCtrl.m_originDistanceThreshold;
-
-    // Convert to proper space integer units
-    Vector3g const translate
-            = targetPosRounded * osp::universe::gc_units_per_meter;
-
-    if (!translate.isZero())
-    {
-        OSP_LOG_TRACE("Floating origin translation!");
-
-        // Move the active area to center on the camera
-        SysAreaAssociate::area_move(rScene, translate);
-    }
-}
-
-void SysCameraController::update_view(ActiveScene &rScene)
-{
-    ActiveReg_t &rReg = rScene.get_registry();
-    auto const [camEnt, rCamCtrl] = get_camera_controller(rScene);
-
-    ActiveEnt const vehicle = find_vehicle_from_sat(rScene, rCamCtrl.m_selected);
-
-    if (!rReg.valid(vehicle))
-    {
-        return;
-    }
-
-    Matrix4 &rCamTf = rScene.reg_get<ACompTransform>(camEnt).m_transform;
-    Matrix4 const& vehicleTf = rScene.reg_get<ACompTransform>(vehicle).m_transform;
-
-    // Compute Center of Mass of target, if it's a rigid body
-    ActiveEnt rbEnt
-            = osp::active::SysPhysics::find_rigidbody_ancestor(rScene, vehicle);
-    Vector3 comOset{0.0f};
-    if (rReg.valid(rbEnt))
-    {
-        auto const& rDyn = rReg.get<osp::active::ACompPhysDynamic>(rbEnt);
-        comOset = vehicleTf.transformVector(rDyn.m_centerOfMassOffset);
-    }
-
     // Process control inputs
 
-    using Magnum::Rad;
-
-    ControlSubscriber const& controls = rCamCtrl.m_controls;
+    ControlSubscriber const& controls = rCtrl.m_controls;
 
     Rad yaw = 0.0_degf;
     Rad pitch = 0.0_degf;
 
     // Arrow key rotation
 
-    // 180 degrees per second
-    Rad const keyRotDelta = 180.0_degf * rScene.get_time_delta_fixed();
+    Rad const keyRotDelta = 180.0_degf * delta; // 180 degrees per second
 
-    yaw += (controls.button_held(rCamCtrl.m_rt)
-            - controls.button_held(rCamCtrl.m_lf)) * keyRotDelta;
-    pitch += (controls.button_held(rCamCtrl.m_dn)
-              - controls.button_held(rCamCtrl.m_up)) * keyRotDelta;
+    yaw   += (controls.button_held(rCtrl.m_btnRotRt)
+            - controls.button_held(rCtrl.m_btnRotLf)) * keyRotDelta;
+    pitch += (controls.button_held(rCtrl.m_btnRotDn)
+            - controls.button_held(rCtrl.m_btnRotUp)) * keyRotDelta;
 
     // Mouse rotation, if right mouse button is down
 
-    if (rCamCtrl.m_controls.button_held(rCamCtrl.m_rmb))
+    if (rCtrl.m_controls.button_held(rCtrl.m_btnOrbit))
     {
         // 1 degrees per step
         constexpr Rad const mouseRotDelta = 1.0_degf;
@@ -361,73 +75,85 @@ void SysCameraController::update_view(ActiveScene &rScene)
                   * mouseRotDelta;
     }
 
-    Quaternion const camRotate = Quaternion::rotation(yaw, rCamTf.up())
-                                  * Quaternion::rotation(pitch, rCamTf.right());
+    float const scroll
+            = rCtrl.m_controls.get_input_handler()->scroll_state().offset.y();
 
-    // set camera orbit distance
-    constexpr float distSensitivity = 0.3f;
-    float const scroll = rCamCtrl.m_controls.get_input_handler()
-                                ->scroll_state().offset.y();
-    rCamCtrl.m_orbitDistance -= rCamCtrl.m_orbitDistance * distSensitivity
-                                * scroll;
+    Vector3 const up
+            = rCtrl.m_up.isZero() ? rCamTf.m_transform.up() : rCtrl.m_up;
 
-    // Clamp orbit distance to avoid producing a degenerate m_orbitPos vector
-    constexpr float minDist = 5.0f;
-    rCamCtrl.m_orbitDistance = std::max(rCamCtrl.m_orbitDistance, minDist);
+    // Prevent pitch overshoot if up is defined
+    if ( ! rCtrl.m_up.isZero())
+    {
+        using Magnum::Math::angle;
+        using Magnum::Math::clamp;
 
-    rCamCtrl.m_orbitPos = rCamCtrl.m_orbitPos.normalized() * rCamCtrl.m_orbitDistance;
-    rCamCtrl.m_orbitPos = camRotate.transformVector(rCamCtrl.m_orbitPos);
+        Rad const currentPitch = angle(rCtrl.m_up, -rCamTf.m_transform.backward());
+        Rad const nextPitch = currentPitch - pitch;
 
-    rCamTf.translation() = vehicleTf.translation() + rCamCtrl.m_orbitPos;
+        // Limit from 1 degree (looking down) to 179 degrees (looking up)
+        Rad const clampped  = clamp<Rad>(nextPitch, 1.0_degf, 179.0_degf);
+        Rad const overshoot = clampped - nextPitch;
 
-    // look at target
-    rCamTf = Matrix4::lookAt(
-                rCamTf.translation() + comOset,
-                vehicleTf.translation() + comOset,
-                rCamTf[1].xyz());
+        pitch -= overshoot;
+    }
+
+    if (rCtrl.m_target.has_value())
+    {
+        // Orbit around target
+
+        // Scroll to move in/out
+        constexpr float const distSensitivity = 0.3f;
+        constexpr float const minDist = 5.0f;
+        rCtrl.m_orbitDistance
+                -= rCtrl.m_orbitDistance * distSensitivity * scroll;
+        rCtrl.m_orbitDistance = std::max(rCtrl.m_orbitDistance, minDist);
+
+        // Convert requested rotation to quaternion
+        Quaternion const rotationDelta
+                = Quaternion::rotation(yaw, up)
+                * Quaternion::rotation(pitch, rCamTf.m_transform.right());
+
+        Vector3 const translation
+                = rCtrl.m_target.value()
+                + rotationDelta.transformVector(
+                    rCamTf.m_transform.backward() * rCtrl.m_orbitDistance);
+
+        // look at target
+        rCamTf.m_transform
+                = Matrix4::lookAt( translation, rCtrl.m_target.value(), up);
+    }
+    else
+    {
+        // TODO: No target, Rotate in place
+
+    }
 }
 
-ActiveEnt SysCameraController::find_vehicle_from_sat(
-        ActiveScene &rScene, Satellite sat)
+void SysCameraController::update_move(
+        ACtxCameraController &rCtrl, osp::active::ACompTransform &rCamTf,
+        float delta, bool moveTarget)
 {
-    using osp::universe::UCompActiveArea;
+    ControlSubscriber const& controls = rCtrl.m_controls;
 
-    ActiveReg_t const& reg = rScene.get_registry();
-    auto const viewVehicles = reg.view<const ACompVehicle>();
+    Vector3 const command(
+        controls.button_held(rCtrl.m_btnMovRt)
+         - controls.button_held(rCtrl.m_btnMovLf),
+        controls.button_held(rCtrl.m_btnMovUp)
+         - controls.button_held(rCtrl.m_btnMovDn),
+        controls.button_held(rCtrl.m_btnMovBk)
+         - controls.button_held(rCtrl.m_btnMovFd)
+    );
 
-    if (viewVehicles.empty())
+    Vector3 const translation
+            = (   rCamTf.m_transform.right()    * command.x()
+                + rCamTf.m_transform.up()       * command.y()
+                + rCamTf.m_transform.backward() * command.z())
+            * delta * rCtrl.m_moveSpeed * rCtrl.m_orbitDistance;
+
+    rCamTf.m_transform.translation() += translation;
+
+    if (moveTarget)
     {
-        // No vehicles in scene!
-        return entt::null;
+        rCtrl.m_target.value() += translation;
     }
-
-    ACompAreaLink const *pLink = SysAreaAssociate::try_get_area_link(rScene);
-
-    if (pLink == nullptr)
-    {
-        return entt::null; // Scene not connected to universe
-    }
-
-    auto &rUni = pLink->m_rUniverse.get();
-    auto &rArea = rUni.get_reg().get<UCompActiveArea>(pLink->m_areaSat);
-    auto &rSync = rScene.get_registry().ctx<osp::active::SyncVehicles>();
-
-    if ( ! rUni.get_reg().valid(sat))
-    {
-        return entt::null; // No vehicle selected
-    }
-
-    if (auto const findIt = rArea.m_inside.find(sat);
-        findIt != rArea.m_inside.end())
-    {
-        ActiveEnt const activated = rSync.m_inArea.at(sat);
-        if (reg.valid(activated))
-        {
-            return activated;
-        }
-    }
-    return entt::null;
 }
-
-
-#endif

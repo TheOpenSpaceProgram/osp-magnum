@@ -50,17 +50,46 @@ class SysNewton
 
 public:
 
+    /**
+     * @brief destroy
+     *
+     * @param rCtxWorld
+     */
     static void destroy(ACtxNwtWorld &rCtxWorld);
 
+    /**
+     * @brief update_translate
+     *
+     * @param rCtxPhys
+     * @param rCtxWorld
+     */
     static void update_translate(
             osp::active::ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld);
 
+    /**
+     * @brief update_colliders
+     *
+     * @param rCtxPhys
+     * @param rCtxWorld
+     * @param rCollidersDirty
+     */
     static void update_colliders(
             osp::active::ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
             std::vector<osp::active::ActiveEnt>& rCollidersDirty);
 
+    /**
+     * @brief update_world
+     *
+     * @param rCtxPhys
+     * @param rCtxWorld
+     * @param inputs
+     * @param rHier
+     * @param rTf
+     * @param rTfControlled
+     * @param rTfMutable
+     */
     static void update_world(
             osp::active::ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
@@ -70,20 +99,20 @@ public:
             osp::active::acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
             osp::active::acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable);
 
-    static NewtonWorld const* debug_get_world();
-
 private:
 
     /**
-     * Search descendents for collider components and add NewtonCollisions to a
-     * vector. Make sure NewtonCompoundCollisionBeginAddRemove(rCompound) is
-     * called first.
+     * @brief Find colliders in an entity and its hierarchy, and add them to
+     *        a Newton Compound Collision
      *
-     * @param rScene    [in] ActiveScene containing entity and physics world
-     * @param ent       [in] Entity containing colliders, and recurse into children
-     * @param transform [in] Total transform from Hierarchy
-     * @param nwtWorld  [in] Newton world from scene
-     * @param rCompound [out] Compound collision to add new colliders to
+     * @param rCtxPhys
+     * @param rCtxWorld
+     * @param rHier
+     * @param rTf
+     * @param ent
+     * @param firstChild
+     * @param transform
+     * @param pCompound
      */
     static void find_colliders_recurse(
             osp::active::ACtxPhysics& rCtxPhys,

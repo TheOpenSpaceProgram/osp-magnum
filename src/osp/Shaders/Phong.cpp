@@ -49,7 +49,7 @@ void Phong::draw_entity(
      * light is a direction light coming from the specified direction relative
      * to the camera.
      */
-    Vector4 light = Vector4{Vector3{0.2f, -1.0f, 0.5f}.normalized(), 0.0f};
+    Vector4 light = Vector4{Vector3{0.0f, 1.0f, 0.5f}.normalized(), 0.0f};
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {

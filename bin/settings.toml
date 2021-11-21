@@ -103,8 +103,38 @@ primary = "Right"
 secondary = "None"
 holdable = true
 
-[ui_rmb]
+[cam_orbit]
 primary = "RMouse"
+secondary = "None"
+holdable = true
+
+[cam_fd]
+primary = "W"
+secondary = "None"
+holdable = true
+
+[cam_bk]
+primary = "S"
+secondary = "None"
+holdable = true
+
+[cam_lf]
+primary = "A"
+secondary = "None"
+holdable = true
+
+[cam_rt]
+primary = "D"
+secondary = "None"
+holdable = true
+
+[cam_up]
+primary = "Q"
+secondary = "None"
+holdable = true
+
+[cam_dn]
+primary = "E"
 secondary = "None"
 holdable = true
 
