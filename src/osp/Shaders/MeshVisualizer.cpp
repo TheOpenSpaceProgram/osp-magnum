@@ -44,19 +44,36 @@ void MeshVisualizer::draw_entity(
 
     auto &rData = *reinterpret_cast<ACtxMeshVisualizerData*>(userData[0]);
 
-    auto &rMesh = rData.m_mesh.get<ACompMeshGL>(ent);
-    auto const& drawTf = rData.m_viewDrawTf.get<ACompDrawTransform>(ent);
+    ACompMeshGL &rMesh = rData.m_pMeshGl->get(ent);
+    ACompDrawTransform const& drawTf = rData.m_pDrawTf->get(ent);
 
     Matrix4 const entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
-    rData.m_shader
+
+    MeshVisualizer &rShader = *rData.m_shader;
+
+    if (rShader.flags() & MeshVisualizer::Flag::NormalDirection)
+    {
+        rShader.setNormalMatrix(entRelative.normalMatrix());
+    }
+
+    rShader
         .setColor(0x2f83cc_rgbf)
         .setWireframeColor(0xdcdcdc_rgbf)
         .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
         .setTransformationMatrix(entRelative)
-        .setNormalMatrix(entRelative.normalMatrix())
         .setProjectionMatrix(camera.m_projection)
         .draw(*rMesh.m_mesh);
+}
+
+void MeshVisualizer::assign(
+        RenderGroup::ArrayView_t entities, RenderGroup::Storage_t &rStorage,
+        ACtxMeshVisualizerData &rData)
+{
+    for (ActiveEnt ent : entities)
+    {
+        rStorage.emplace( ent, EntityToDraw{&draw_entity, {&rData} } );
+    }
 }
 
 

@@ -138,6 +138,11 @@ primary = "E"
 secondary = "None"
 holdable = true
 
+[debug_throw]
+primary = "Space"
+secondary = "None"
+holdable = true
+
 [debug_planet_update]
 primary = "LCtrl+1"
 secondary = "None"

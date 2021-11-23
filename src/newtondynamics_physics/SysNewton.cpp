@@ -190,7 +190,7 @@ void SysNewton::update_colliders(
             pNwtCollider = NewtonCreateSphere(pNwtWorld, 1.0f, 0, nullptr);
             break;
         case EShape::Box:
-            pNwtCollider = NewtonCreateBox(pNwtWorld, 1, 1, 1, 0, nullptr);
+            pNwtCollider = NewtonCreateBox(pNwtWorld, 2, 2, 2, 0, nullptr);
             break;
         case EShape::Capsule:
             // TODO
@@ -329,7 +329,7 @@ void SysNewton::find_colliders_recurse(
 
         // Set transform relative to root body
 
-        Matrix4 const normScale = Matrix4::from(transform.rotationNormalized(),
+        Matrix4 const normScale = Matrix4::from(transform.rotation(),
                                                 transform.translation());
 
         NewtonCollisionSetMatrix(pCollision, normScale.data());
@@ -468,7 +468,7 @@ void SysNewton::create_body(
     NewtonBodySetLinearDamping(pBody, 0.0f);
 
     // Make it easier to rotate
-    NewtonBodySetAngularDamping(pBody, Vector3(1.0f, 1.0f, 1.0f).data());
+    //NewtonBodySetAngularDamping(pBody, Vector3(1.0f, 1.0f, 1.0f).data());
 
     // Set callback for applying force and setting transforms
     NewtonBodySetForceAndTorqueCallback(pBody, &cb_force_torque);

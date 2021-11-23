@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "scenarios.h"
+#include "CameraController.h"
 
 #include "../ActiveApplication.h"
 
@@ -52,6 +53,15 @@
 
 using Magnum::Trade::MeshData;
 using Magnum::Trade::ImageData2D;
+
+using osp::active::ActiveEnt;
+using osp::active::active_sparse_set_t;
+
+using osp::phys::EShape;
+
+using osp::Vector3;
+using osp::Matrix3;
+using osp::Matrix4;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -83,62 +93,123 @@ struct PhysicsTestScene
     osp::active::ACtxPhysics        m_physics;
     osp::active::ACtxPhysInputs     m_physIn;
 
+    active_sparse_set_t             m_hasGravity;
+
     osp::active::ACtxHierBody       m_hierBody;
 
     // Hierarchy root, needs to exist so all hierarchy entities are connected
     osp::active::ActiveEnt          m_hierRoot;
 
+    osp::DependRes<MeshData>        m_meshCube;
+    osp::DependRes<MeshData>        m_meshCylinder;
+    osp::DependRes<MeshData>        m_meshSphere;
+
+    float m_ballTimer{0.0f};
+
+    struct BallThrow
+    {
+        Vector3 m_position;
+        Vector3 m_velocity;
+        float m_radius;
+        float m_mass;
+    };
+
+    // Queue for balls to throw
+    std::vector<BallThrow> m_throwBall;
+
 };
 
-void add_rigid_body(PhysicsTestScene& rScene, osp::active::ActiveEnt ent)
+std::optional<osp::active::ACompMesh> mesh_from_shape(PhysicsTestScene& rScene, osp::phys::EShape shape)
 {
-    using namespace osp::active;
+    using osp::active::ACompMesh;
 
-    rScene.m_physics.m_physBody.emplace(ent);
-    ACompPhysDynamic &rCubeDyn = rScene.m_physics.m_physDynamic.emplace(ent);
-    rCubeDyn.m_totalMass = 1.0f;
-    rScene.m_physics.m_physLinearVel.emplace(ent);
-    rScene.m_physics.m_physAngularVel.emplace(ent);
+    switch (shape)
+    {
+    case EShape::Box:
+        return {{ rScene.m_meshCube }};
+    case EShape::Cylinder:
+        return {{ rScene.m_meshCylinder }};
+    case EShape::Sphere:
+        return {{ rScene.m_meshSphere }};
+    default:
+        return std::nullopt;
+    }
 }
 
-osp::active::ActiveEnt make_cube(PhysicsTestScene& rScene, osp::Package &rPkg)
+ActiveEnt add_solid(
+        PhysicsTestScene& rScene, ActiveEnt parent,
+        EShape shape, Matrix4 transform, int material, float mass)
 {
     using namespace osp::active;
 
-    // Make a cube
-    ActiveEnt cube = rScene.m_activeIds.create();
+    // Make entity
+    ActiveEnt ent = rScene.m_activeIds.create();
 
-    // Add cube mesh to cube
+    // Add mesh
     rScene.m_drawing.m_mesh.emplace(
-            cube, ACompMesh{ rPkg.get<MeshData>("cube") });
-    rScene.m_drawing.m_meshDirty.push_back(cube);
+            ent, mesh_from_shape(rScene, shape).value() );
+    rScene.m_drawing.m_meshDirty.push_back(ent);
 
-    // Add common material to cube
-    MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
-    rMatCommon.m_comp.emplace(cube);
-    rMatCommon.m_added.push_back(cube);
+    // Add material to cube
+    MaterialData &rMaterial = rScene.m_drawing.m_materials[material];
+    rMaterial.m_comp.emplace(ent);
+    rMaterial.m_added.push_back(ent);
 
     // Add transform and draw transform
-    rScene.m_basic.m_transform.emplace(cube);
-    rScene.m_drawing.m_drawTransform.emplace(cube);
+    rScene.m_basic.m_transform.emplace(ent, ACompTransform{transform});
+    rScene.m_drawing.m_drawTransform.emplace(ent);
 
     // Add opaque and visible component
-    rScene.m_drawing.m_opaque.emplace(cube);
-    rScene.m_drawing.m_visible.emplace(cube);
+    rScene.m_drawing.m_opaque.emplace(ent);
+    rScene.m_drawing.m_visible.emplace(ent);
 
     // Add physics stuff
+    rScene.m_physics.m_shape.emplace(ent, shape);
+    rScene.m_physics.m_solidCollider.emplace(ent);
+    Vector3 const inertia
+            = osp::phys::collider_inertia_tensor(shape, transform.scaling(), mass);
+    rScene.m_hierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
+    rScene.m_physIn.m_colliderDirty.push_back(ent);
 
-    rScene.m_physics.m_shape.emplace(cube, osp::phys::EShape::Box);
-    //rScene.m_physics.m_mass.emplace(cube, 1.0f);
-    rScene.m_physics.m_solidCollider.emplace(cube);
+    // Add to hierarchy
+    SysHierarchy::add_child(rScene.m_basic.m_hierarchy, parent, ent);
 
-    rScene.m_physIn.m_colliderDirty.push_back(cube);
+    return ent;
+}
 
-    // Add cube to hierarchy, parented to root
-    //SysHierarchy::add_child(
-    //        rScene.m_basic.m_hierarchy, rScene.m_hierRoot, cube);
+ActiveEnt add_quick_ball(PhysicsTestScene &rScene, Vector3 position, Vector3 velocity, float radius, float mass)
+{
+    using namespace osp::active;
 
-    return cube;
+    ActiveEnt ballRoot = rScene.m_activeIds.create();
+
+    // Add transform and draw transform
+    rScene.m_basic.m_transform.emplace(
+            ballRoot, ACompTransform{Matrix4::translation(position)});
+    rScene.m_drawing.m_drawTransform.emplace(ballRoot);
+
+    // Add to hierarchy
+    SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, ballRoot);
+
+    ActiveEnt ballCollider = add_solid(
+            rScene, ballRoot, EShape::Sphere,
+            Matrix4::scaling(Vector3{radius}), gc_mat_visualizer, 0.0f);
+
+    // Make ball root a dynamic rigid body
+    rScene.m_physics.m_hasColliders.emplace(ballRoot);
+    rScene.m_physics.m_physBody.emplace(ballRoot);
+    rScene.m_physics.m_physLinearVel.emplace(ballRoot);
+    rScene.m_physics.m_physAngularVel.emplace(ballRoot);
+    osp::active::ACompPhysDynamic &rDyn = rScene.m_physics.m_physDynamic.emplace(ballRoot);
+    rDyn.m_totalMass = 1.0f;
+
+    // make gravity affect ball
+    rScene.m_hasGravity.emplace(ballRoot);
+
+    // Set velocity
+    rScene.m_physIn.m_setVelocity.emplace_back(ballRoot, velocity);
+
+    return ballRoot;
 }
 
 entt::any setup_scene(osp::Package &rPkg)
@@ -148,7 +219,11 @@ entt::any setup_scene(osp::Package &rPkg)
     entt::any sceneAny = entt::make_any<PhysicsTestScene>();
     PhysicsTestScene &rScene = entt::any_cast<PhysicsTestScene&>(sceneAny);
 
-    rScene.m_nwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(1);
+    rScene.m_nwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(4);
+
+    rScene.m_meshCube       = rPkg.get_or_reserve<MeshData>("cube");
+    rScene.m_meshCylinder   = rPkg.get_or_reserve<MeshData>("cylinder");
+    rScene.m_meshSphere     = rPkg.get_or_reserve<MeshData>("sphere");
 
     // Allocate space to fit all materials
     rScene.m_drawing.m_materials.resize(gc_maxMaterials);
@@ -175,7 +250,57 @@ entt::any setup_scene(osp::Package &rPkg)
     SysHierarchy::add_child(
             rScene.m_basic.m_hierarchy, rScene.m_hierRoot, camEnt);
 
+    // Create floor entity
+    {
+        // Create floor root entity
+        ActiveEnt floorRoot = rScene.m_activeIds.create();
 
+        // Add transform and draw transform to root
+        rScene.m_basic.m_transform.emplace(
+                floorRoot, ACompTransform{Matrix4::rotationX(-90.0_degf)});
+        rScene.m_drawing.m_drawTransform.emplace(floorRoot);
+
+
+        // Create floor mesh entity
+        ActiveEnt floorMesh = rScene.m_activeIds.create();
+
+        // Add grid mesh to floor mesh
+        rScene.m_drawing.m_mesh.emplace(
+                floorMesh, ACompMesh{ rPkg.get<MeshData>("grid64") });
+        rScene.m_drawing.m_meshDirty.push_back(floorMesh);
+
+        // Add mesh visualizer material to floor mesh
+        MaterialData &rMatCommon
+                = rScene.m_drawing.m_materials[gc_mat_visualizer];
+        rMatCommon.m_comp.emplace(floorMesh);
+        rMatCommon.m_added.push_back(floorMesh);
+
+        // Add transform, draw transform, opaque, and visible
+        rScene.m_basic.m_transform.emplace(
+                floorMesh, ACompTransform{Matrix4::scaling({64.0f, 64.0f, 1.0f})});
+        rScene.m_drawing.m_drawTransform.emplace(floorMesh);
+        rScene.m_drawing.m_opaque.emplace(floorMesh);
+        rScene.m_drawing.m_visible.emplace(floorMesh);
+
+        // Add floor root to hierarchy root
+        SysHierarchy::add_child(
+                rScene.m_basic.m_hierarchy, rScene.m_hierRoot, floorRoot);
+
+        // Add floor mesh to floor root
+        SysHierarchy::add_child(
+                rScene.m_basic.m_hierarchy, floorRoot, floorMesh);
+
+        // Add collider (yeah lol it's a big cube)
+        add_solid(rScene, floorRoot, EShape::Box,
+                  Matrix4::scaling({64.0f, 64.0f, 1.0f}) * Matrix4::translation({0.0f, 0.0f, -1.005f}),
+                  gc_mat_common, 0.0f);
+
+        // Make floor root a (non-dynamic) rigid body
+        rScene.m_physics.m_hasColliders.emplace(floorRoot);
+        rScene.m_physics.m_physBody.emplace(floorRoot);
+    }
+
+    // Create ball
 
     return std::move(sceneAny);
 }
@@ -185,7 +310,7 @@ entt::any setup_scene(osp::Package &rPkg)
  *
  * @param rScene [ref] scene to update
  */
-void update_test_scene(PhysicsTestScene& rScene)
+void update_test_scene(PhysicsTestScene& rScene, float delta)
 {
     using namespace osp::active;
     using Corrade::Containers::ArrayView;
@@ -193,13 +318,37 @@ void update_test_scene(PhysicsTestScene& rScene)
     using namespace ospnewton;
 
     //rScene.m_physIn.m_physNetTorque.emplace(cube, ACompPhysNetTorque{{5.0f, 0.0f, 0.0f}});
+    rScene.m_ballTimer += delta;
+    if (rScene.m_ballTimer >= 0.2f)
+    {
+        rScene.m_throwBall.emplace_back(PhysicsTestScene::BallThrow{
+                Vector3{0.0f, 4.0f, 0.0f}, Vector3{0.0f}, 1.0f, 1.0f});
+        rScene.m_ballTimer -= 0.2f;
+    }
 
+    // Ball Thrower consumer
+    for (PhysicsTestScene::BallThrow const &rThrow : std::exchange(rScene.m_throwBall, {}))
+    {
+        add_quick_ball(rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_radius, rThrow.m_mass);
+    }
 
-    auto physIn = ArrayView<ACtxPhysInputs>(&rScene.m_physIn, 1);
+    // Gravity System
+    for (ActiveEnt ent : rScene.m_hasGravity)
+    {
+        acomp_storage_t<ACompPhysNetForce> &rNetForce
+                = rScene.m_physIn.m_physNetForce;
+        ACompPhysNetForce &rEntNetForce = rNetForce.contains(ent)
+                                        ? rNetForce.get(ent)
+                                        : rNetForce.emplace(ent);
 
+        rEntNetForce.y() -= 9.81f;
+    }
 
-    SysNewton::update_colliders(rScene.m_physics, *rScene.m_nwtWorld, rScene.m_physIn.m_colliderDirty);
+    SysNewton::update_colliders(
+            rScene.m_physics, *rScene.m_nwtWorld,
+            rScene.m_physIn.m_colliderDirty);
 
+    auto const physIn = ArrayView<ACtxPhysInputs>(&rScene.m_physIn, 1);
     SysNewton::update_world(
             rScene.m_physics, *rScene.m_nwtWorld, physIn, rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform, rScene.m_basic.m_transformControlled,
@@ -212,14 +361,25 @@ void update_test_scene(PhysicsTestScene& rScene)
  * @brief Data needed to render the EngineTestScene
  */
 struct PhysicsTestRenderer
-{   
+{
+    PhysicsTestRenderer(ActiveApplication &rApp)
+     : m_camCtrl(rApp.get_input_handler())
+     , m_controls(&rApp.get_input_handler())
+     , m_btnThrow(m_controls.button_subscribe("debug_throw"))
+    { }
+
     osp::active::ACtxRenderGroups m_renderGroups;
 
     osp::active::ACtxRenderGL m_renderGl;
 
     osp::active::ActiveEnt m_camera;
+    ACtxCameraController m_camCtrl;
 
     osp::shader::ACtxPhongData m_phong;
+    osp::shader::ACtxMeshVisualizerData m_visualizer;
+
+    osp::input::ControlSubscriber m_controls;
+    osp::input::EButtonControlIndex m_btnThrow;
 };
 
 /**
@@ -241,16 +401,29 @@ void render_test_scene(
 
     osp::Package &rGlResources = rApp.get_gl_resources();
 
-    // Assign Phong shader to entities with the gc_mat_common material, and put
-    // results into the fwd_opaque render group
     RenderGroup &rGroupFwdOpaque
             = rRenderer.m_renderGroups.m_groups["fwd_opaque"];
-    MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
-    Phong::assign_phong_opaque(
-            rMatCommon.m_added, rGroupFwdOpaque.m_entities,
-            rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexGl,
-            rRenderer.m_phong);
-    rMatCommon.m_added.clear();
+
+    // Assign Phong shader to entities with the gc_mat_common material, and put
+    // results into the fwd_opaque render group
+    {
+        MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
+        Phong::assign_phong_opaque(
+                rMatCommon.m_added, rGroupFwdOpaque.m_entities,
+                rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexGl,
+                rRenderer.m_phong);
+        rMatCommon.m_added.clear();
+    }
+
+    // Same thing but with MeshVisualizer and gc_mat_visualizer
+    {
+        MaterialData &rMatVisualizer
+                = rScene.m_drawing.m_materials[gc_mat_visualizer];
+        MeshVisualizer::assign(
+                rMatVisualizer.m_added, rGroupFwdOpaque.m_entities,
+                rRenderer.m_visualizer);
+        rMatVisualizer.m_added.clear();
+    }
 
     // Load any required meshes
     SysRenderGL::compile_meshes(
@@ -308,8 +481,7 @@ void load_gl_resources(ActiveApplication& rApp)
 
     rGlResources.add<MeshVisualizer>(
             "mesh_vis_shader",
-            MeshVisualizer{ MeshVisualizer::Flag::Wireframe
-                            | MeshVisualizer::Flag::NormalDirection});
+            MeshVisualizer{ MeshVisualizer::Flag::Wireframe });
 
 }
 
@@ -321,7 +493,7 @@ on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp)
     // Create renderer data. This uses a shared_ptr to allow being stored
     // inside an std::function, which require copyable types
     std::shared_ptr<PhysicsTestRenderer> pRenderer
-            = std::make_shared<PhysicsTestRenderer>();
+            = std::make_shared<PhysicsTestRenderer>(rApp);
 
     osp::Package &rGlResources = rApp.get_gl_resources();
 
@@ -332,13 +504,22 @@ on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp)
     pRenderer->m_phong.m_shaderDiffuse
             = rGlResources.get_or_reserve<Phong>("textured");
 
-    pRenderer->m_phong.m_views.emplace(ACtxPhongData::Views{
-            rScene.m_drawing.m_drawTransform,
-            pRenderer->m_renderGl.m_diffuseTexGl,
-            pRenderer->m_renderGl.m_meshGl});
+    // Same with mesh visualizer shader
+    pRenderer->m_visualizer.m_shader
+            = rGlResources.get_or_reserve<MeshVisualizer>("mesh_vis_shader");
+
+    pRenderer->m_phong.m_pDrawTf       = &rScene.m_drawing.m_drawTransform;
+    pRenderer->m_phong.m_pDiffuseTexGl = &pRenderer->m_renderGl.m_diffuseTexGl;
+    pRenderer->m_phong.m_pMeshGl       = &pRenderer->m_renderGl.m_meshGl;
+
+    pRenderer->m_visualizer.m_pDrawTf  = &rScene.m_drawing.m_drawTransform;
+    pRenderer->m_visualizer.m_pMeshGl  = &pRenderer->m_renderGl.m_meshGl;
 
     // Select first camera for rendering
     pRenderer->m_camera = rScene.m_basic.m_camera.at(0);
+
+    pRenderer->m_camCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
+    pRenderer->m_camCtrl.m_up = osp::Vector3{0.0f, 1.0f, 0.0f};
 
     // Create render group for forward opaque pass
     pRenderer->m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
@@ -359,7 +540,24 @@ on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp)
 
     return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
     {
-        update_test_scene(rScene);
+        if (pRenderer->m_controls.button_triggered(pRenderer->m_btnThrow))
+        {
+            ACompTransform const &camTf = rScene.m_basic.m_transform.get(pRenderer->m_camera);
+            float const speed = 120;
+            rScene.m_throwBall.emplace_back(PhysicsTestScene::BallThrow{
+                    camTf.m_transform.translation(), -camTf.m_transform.backward() * speed, 1.0f, 1.0f});
+        }
+
+        update_test_scene(rScene, delta);
+
+        SysCameraController::update_view(
+                pRenderer->m_camCtrl,
+                rScene.m_basic.m_transform.get(pRenderer->m_camera), delta);
+        SysCameraController::update_move(
+                pRenderer->m_camCtrl,
+                rScene.m_basic.m_transform.get(pRenderer->m_camera),
+                delta, true);
+
         render_test_scene(rApp, rScene, *pRenderer);
     };
 }

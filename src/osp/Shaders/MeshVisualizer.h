@@ -32,6 +32,8 @@
 namespace osp::shader
 {
 
+struct ACtxMeshVisualizerData;
+
 class MeshVisualizer : protected Magnum::Shaders::MeshVisualizerGL3D
 {
     using RenderGroup = osp::active::RenderGroup;
@@ -46,14 +48,18 @@ public:
             active::ACompCamera const& camera,
             active::EntityToDraw::UserData_t userData) noexcept;
 
+    static void assign(
+            RenderGroup::ArrayView_t entities,
+            RenderGroup::Storage_t& rStorage,
+            ACtxMeshVisualizerData &rData);
 };
 
 struct ACtxMeshVisualizerData
 {
-    MeshVisualizer m_shader;
+    DependRes<MeshVisualizer> m_shader;
 
-    active::acomp_view_t< osp::active::ACompDrawTransform >     m_viewDrawTf;
-    active::acomp_view_t< osp::active::ACompMeshGL >            m_mesh;
+    active::acomp_storage_t< osp::active::ACompDrawTransform >  *m_pDrawTf;
+    active::acomp_storage_t< osp::active::ACompMeshGL >         *m_pMeshGl;
 };
 
 } // namespace osp::shader

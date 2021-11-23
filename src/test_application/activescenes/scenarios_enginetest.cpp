@@ -172,7 +172,7 @@ struct EngineTestRenderer
 
     osp::active::ACtxRenderGL m_renderGl{};
 
-    osp::active::ActiveEnt m_camera{};
+    osp::active::ActiveEnt m_camera;
     ACtxCameraController m_camCtrl;
 
     osp::shader::ACtxPhongData m_phong{};
@@ -266,7 +266,6 @@ void load_gl_resources(ActiveApplication& rApp)
             "mesh_vis_shader",
             MeshVisualizer{ MeshVisualizer::Flag::Wireframe
                             | MeshVisualizer::Flag::NormalDirection});
-
 }
 
 on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
@@ -288,10 +287,9 @@ on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
     pRenderer->m_phong.m_shaderDiffuse
             = rGlResources.get_or_reserve<Phong>("textured");
 
-    pRenderer->m_phong.m_views.emplace(ACtxPhongData::Views{
-            rScene.m_drawing.m_drawTransform,
-            pRenderer->m_renderGl.m_diffuseTexGl,
-            pRenderer->m_renderGl.m_meshGl});
+    pRenderer->m_phong.m_pDrawTf       = &rScene.m_drawing.m_drawTransform;
+    pRenderer->m_phong.m_pDiffuseTexGl = &pRenderer->m_renderGl.m_diffuseTexGl;
+    pRenderer->m_phong.m_pMeshGl       = &pRenderer->m_renderGl.m_meshGl;
 
     // Select first camera for rendering
     pRenderer->m_camera = rScene.m_basic.m_camera.at(0);
@@ -321,6 +319,7 @@ on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
     {
 
         update_test_scene(rScene, delta);
+
         SysCameraController::update_view(
                 pRenderer->m_camCtrl,
                 rScene.m_basic.m_transform.get(pRenderer->m_camera), delta);
