@@ -72,7 +72,7 @@ template<typename INT_T>
 constexpr bool bit_test(INT_T block, int bit)
 {
     static_assert(std::is_unsigned_v<INT_T>);
-    return (block & (INT_T(1) << bit) ) != 0;
+    return (block & (INT_T(0x1) << bit) ) != 0x0;
 }
 
 /**
@@ -102,7 +102,7 @@ constexpr void copy_bits(INT_T const* pSrc, INT_T* pDest, size_t bits) noexcept
 
     if (bits != 0)
     {
-        INT_T const mask = (~INT_T(0)) << bits;
+        INT_T const mask = (~INT_T(0x0)) << bits;
 
         *pDest &= mask;
         *pDest |= ( (~mask) & (*pSrc) );
@@ -114,7 +114,7 @@ constexpr void set_bits(INT_T* pDest, size_t bits) noexcept
 {
     static_assert(std::is_unsigned_v<INT_T>);
 
-    constexpr INT_T c_allOnes = ~INT_T(0);
+    constexpr INT_T c_allOnes = ~INT_T(0x0);
 
     while (bits >= sizeof(INT_T) * 8)
     {
@@ -123,7 +123,7 @@ constexpr void set_bits(INT_T* pDest, size_t bits) noexcept
         bits -= sizeof(INT_T) * 8;
     }
 
-    if (bits != 0)
+    if (bits != 0x0)
     {
         *pDest |= ~( c_allOnes << bits );
     }
@@ -473,17 +473,17 @@ void HierarchicalBitset<BLOCK_INT_T>::block_set_recurse(
     BLOCK_INT_T &rBlock = m_blocks[m_rows[level].m_offset + pos.m_block];
 
     BLOCK_INT_T const blockOld = rBlock;
-    rBlock |= (BLOCK_INT_T(1) << pos.m_bit);
+    rBlock |= (BLOCK_INT_T(0x1) << pos.m_bit);
 
     if ( blockOld != rBlock )
     {
         // something changed
-        if (0 == level)
+        if (0x0 == level)
         {
             m_count ++;
         }
 
-        if ( blockOld == 0 && (level != m_topLevel) )
+        if ( blockOld == 0x0 && (level != m_topLevel) )
         {
             // Recurse, as block was previously zero
             block_set_recurse(level + 1, bit_at(pos.m_block));
@@ -497,7 +497,7 @@ void HierarchicalBitset<BLOCK_INT_T>::block_reset_recurse(
 {
     BLOCK_INT_T &rBlock = m_blocks[m_rows[level].m_offset + pos.m_block];
 
-    if (rBlock == 0)
+    if (rBlock == 0x0)
     {
         return; // block already zero, do nothing
     }
@@ -512,7 +512,7 @@ void HierarchicalBitset<BLOCK_INT_T>::block_reset_recurse(
             m_count --;
         }
 
-        if ( (rBlock == 0) && (level != m_topLevel) )
+        if ( (rBlock == 0x0) && (level != m_topLevel) )
         {
             // Recurse, as block was just made zero
             block_reset_recurse(level + 1, bit_at(pos.m_block));
@@ -528,7 +528,7 @@ constexpr bool HierarchicalBitset<BLOCK_INT_T>::take_recurse(
 {
     BLOCK_INT_T &rBlock = m_blocks[m_rows[level].m_offset + blockNum];
 
-    while (0 != rBlock)
+    while (0x0 != rBlock)
     {
         // Return if enough bits have been taken
         if (0 == rCount)
@@ -557,7 +557,7 @@ constexpr bool HierarchicalBitset<BLOCK_INT_T>::take_recurse(
             }
         }
 
-        rBlock &= ~(BLOCK_INT_T(1) << blockBit); // Clear bit
+        rBlock &= ~(BLOCK_INT_T(0x1) << blockBit); // Clear bit
     }
 
     return false; // Block is zero, no more 1 bits left
@@ -590,7 +590,7 @@ void HierarchicalBitset<BLOCK_INT_T>::recalc_blocks()
             size_t const belowBlocks = std::min<size_t>(
                         smc_blockSize, below.m_size - j * smc_blockSize);
 
-            BLOCK_INT_T currentBit = 1;
+            BLOCK_INT_T currentBit = 0x1;
 
             // Evaluate a block for each bit
             for (int k = 0; k < belowBlocks; k ++)

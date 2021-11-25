@@ -30,6 +30,10 @@
 
 enum class Id : uint64_t { };
 
+// Test osp::underlying_int_type
+static_assert(std::is_same_v<osp::underlying_int_type_t<int>, int>);
+static_assert(std::is_same_v<osp::underlying_int_type_t<Id>, uint64_t>);
+
 // Basic intended use test of managing IDs
 TEST(IdRegistry, ManageIds)
 {

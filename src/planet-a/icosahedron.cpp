@@ -74,8 +74,13 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
 
     using std::sqrt; // if only sqrt was constexpr
 
-    double const pnt = 2.0/5.0 * sqrt(5.0);
+    // Height of pentagon within the icosahedron
     double const hei = 1.0/sqrt(5.0);
+
+    // Circumcircle radius of pentagon
+    double const cmR = 2.0/5.0 * sqrt(5.0);
+
+    // X and Y coordinates of pentagon
     double const cxA = 1.0/2.0 - sqrt(5.0)/10.0;
     double const cxB = 1.0/2.0 + sqrt(5)/10.0;
     double const syA = 1.0/10.0 * sqrt( 10.0 * (5.0+sqrt(5.0)) );
@@ -85,13 +90,13 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
     {{
         { 0.0,    0.0,    1.0}, // top point
 
-        { pnt,   0.0f,    hei}, // 1 top pentagon
+        { cmR,   0.0f,    hei}, // 1 top pentagon
         { cxA,   -syA,    hei}, // 2
         {-cxB,   -syB,    hei}, // 3
         {-cxB,    syB,    hei}, // 4
         { cxA,    syA,    hei}, // 5
 
-        {-pnt,   0.0f,   -hei}, // 6 bottom pentagon
+        {-cmR,   0.0f,   -hei}, // 6 bottom pentagon
         {-cxA,   -syA,   -hei}, // 7
         { cxB,   -syB,   -hei}, // 8
         { cxB,    syB,   -hei}, // 9

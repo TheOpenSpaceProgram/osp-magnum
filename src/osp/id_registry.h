@@ -43,6 +43,15 @@ struct type_identity
 template<typename TYPE_T>
 using type_identity_t = typename type_identity<TYPE_T>::type;
 
+/**
+ * @brief Obtain underlying type if given an enum, or same type if given any
+ *        integer type
+ *
+ * std::underlying_type will cause a compile error if given a normal integer.
+ *
+ * This template struct can be used in cases where a template parameter is
+ * allowed to be an enum or an int.
+ */
 template<typename TYPE_T, typename = void>
 struct underlying_int_type;
 
@@ -58,10 +67,6 @@ struct underlying_int_type< TYPE_T, std::enable_if_t< ! std::is_enum_v<TYPE_T> >
 
 template<typename TYPE_T>
 using underlying_int_type_t = typename underlying_int_type<TYPE_T>::type;
-
-enum class Test : uint32_t {};
-static_assert(std::is_same_v<underlying_int_type_t<int>, int>);
-static_assert(std::is_same_v<underlying_int_type_t<Test>, uint32_t>);
 
 //-----------------------------------------------------------------------------
 
@@ -272,7 +277,7 @@ public:
     // Allow move assign only if all counts are zero
     RefCount& operator=(RefCount&& move)
     {
-        assert(isRemainingZero(0));
+        assert(only_zeros_remaining(0));
         base_t(std::move(move));
         return *this;
     }
@@ -280,10 +285,10 @@ public:
     ~RefCount()
     {
         // Make sure ref counts are all zero on destruction
-        assert(isRemainingZero(0));
+        assert(only_zeros_remaining(0));
     }
 
-    bool isRemainingZero(size_t start) const noexcept
+    bool only_zeros_remaining(size_t start) const noexcept
     {
         for (size_t i = start; i < size(); i ++)
         {
@@ -303,7 +308,7 @@ public:
         if (newSize < size())
         {
             // sizing down, make sure zeros
-            if ( ! isRemainingZero(newSize))
+            if ( ! only_zeros_remaining(newSize))
             {
                 throw std::runtime_error("Downsizing non-zero ref counts");
             }
