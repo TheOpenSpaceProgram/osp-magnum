@@ -56,9 +56,6 @@
 #include <adera/SysExhaustPlume.h>
 #include <adera/ShipResources.h>
 
-#include <planet-a/Active/SysPlanetA.h>
-#include <planet-a/Satellites/SatPlanet.h>
-
 #include <osp/Shaders/Phong.h>
 #include <osp/Shaders/MeshVisualizer.h>
 #include <osp/Shaders/FullscreenTriShader.h>
@@ -97,7 +94,6 @@ using osp::active::ACompRenderingAgent;
 using osp::active::ACompPerspective3DView;
 using osp::active::ACompRenderer;
 
-using planeta::universe::SatPlanet;
 
 using osp::Vector2;
 using osp::Vector3;
@@ -156,7 +152,6 @@ void testapp::test_flight(
 
     // Setup sync states used by scene systems to sync with the universe
     rScene.get_registry().set<osp::active::SyncVehicles>();
-    rScene.get_registry().set<planeta::active::SyncPlanets>();
 
     // Setup generic physics interface
     rScene.get_registry().set<osp::active::ACtxPhysics>();
@@ -233,15 +228,11 @@ void update_scene(osp::active::ActiveScene& rScene)
     using namespace osp::active;
     using namespace adera::active;
     using namespace adera::active::machines;
-    using namespace planeta::active;
 
     SysAreaAssociate::update_consume(rScene);
 
     SysAreaAssociate::update_translate(rScene);
     ospnewton::SysNewton::update_translate(rScene);
-
-    // Activate or deactivate nearby planets
-    SysPlanetA::update_activate(rScene);
 
     // Activate or deactivate nearby vehicles
     SysVehicleSync::update_universe_sync(rScene);
@@ -282,9 +273,6 @@ void update_scene(osp::active::ActiveScene& rScene)
 
     // Apply gravity forces
     SysFFGravity::update_force(rScene);
-
-    // Planets update geometry
-    SysPlanetA::update_geometry(rScene);
 
     // Containers update mass
     SysMachineContainer::update_containers(rScene);

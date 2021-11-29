@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,42 +22,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
 
-// IWYU pragma: begin_exports
-#include <Magnum/Types.h>
+#include "SysCustomMeshGL.h"
 
-#include <Magnum/Math/Matrix.h>
-#include <Magnum/Math/Matrix4.h>
-#include <Magnum/Math/Matrix3.h>
+using namespace osp::active;
 
-#include <Magnum/Math/Vector.h>
-#include <Magnum/Math/Vector2.h>
-#include <Magnum/Math/Vector3.h>
-#include <Magnum/Math/Vector4.h>
-
-#include <Magnum/Math/Quaternion.h>
-// IWYU pragma: end_exports
-
-namespace osp
+void SysCustomMeshGL::update_geometry_gl(ActiveScene &rScene)
 {
-
-using Matrix3    = Magnum::Math::Matrix3<Magnum::Float>;
-using Matrix4    = Magnum::Math::Matrix4<Magnum::Float>;
-
-using Vector2i   = Magnum::Math::Vector2<Magnum::Int>;
-
-using Vector3l   = Magnum::Math::Vector3<Magnum::Long>;
-
-using Vector2    = Magnum::Math::Vector2<Magnum::Float>;
-using Vector3    = Magnum::Math::Vector3<Magnum::Float>;
-using Vector4    = Magnum::Math::Vector4<Magnum::Float>;
-
-using Vector3d   = Magnum::Math::Vector3<Magnum::Double>;
-
-using Quaternion = Magnum::Math::Quaternion<Magnum::Float>;
-
-using Rad        = Magnum::Math::Rad<Magnum::Float>;
-using Deg        = Magnum::Math::Deg<Magnum::Float>;
 
 }
