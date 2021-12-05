@@ -203,7 +203,7 @@ DependRes<TYPE_T> Package::add(STRING_T&& path, ARGS_T&& ... args)
         {
             resIt->second.m_data.emplace(std::forward<ARGS_T>(args)...);
         }
-        return {};
+        return {resIt};
     }
 
     // Emplace without needing copy constructor
