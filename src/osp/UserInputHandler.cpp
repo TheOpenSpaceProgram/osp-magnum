@@ -300,7 +300,7 @@ void UserInputHandler::update_controls()
     {
         ButtonControl &rControl = *it;
         EButtonControlIndex const index = EButtonControlIndex(
-                    std::distance(it, std::begin(m_btnControls)));
+                    std::distance(std::begin(m_btnControls), it));
 
         ControlExpr_t* pExprRelease = nullptr;
 
@@ -335,7 +335,7 @@ void UserInputHandler::update_controls()
             {
                 rControl.m_exprRelease.clear();
                 m_btnControlEvents.emplace_back(index,
-                                                EButtonControlEvent::Triggered);
+                                                EButtonControlEvent::Released);
                 OSP_LOG_TRACE("RELEASE");
             }
         }
