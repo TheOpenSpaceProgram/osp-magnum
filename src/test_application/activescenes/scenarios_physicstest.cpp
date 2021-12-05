@@ -471,8 +471,8 @@ struct PhysicsTestRenderer
     osp::active::ActiveEnt m_camera;
     ACtxCameraController m_camCtrl;
 
-    osp::shader::ACtxPhongData m_phong;
-    osp::shader::ACtxMeshVisualizerData m_visualizer;
+    osp::shader::ACtxDrawPhong m_phong;
+    osp::shader::ACtxDrawMeshVisualizer m_visualizer;
 
     osp::input::ControlSubscriber m_controls;
     osp::input::EButtonControlIndex m_btnThrow;
@@ -504,8 +504,8 @@ void render_test_scene(
     // results into the fwd_opaque render group
     {
         MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
-        Phong::assign_phong_opaque(
-                rMatCommon.m_added, rGroupFwdOpaque.m_entities,
+        assign_phong(
+                rMatCommon.m_added, &rGroupFwdOpaque.m_entities, nullptr,
                 rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexGl,
                 rRenderer.m_phong);
         rMatCommon.m_added.clear();
@@ -515,6 +515,7 @@ void render_test_scene(
     {
         MaterialData &rMatVisualizer
                 = rScene.m_drawing.m_materials[gc_mat_visualizer];
+
         // workaround: Entities that are deleted directly after creation remain
         //             in the m_added queues, which kills MeshVisualizer::assign
         //             so they need to be manually removed
@@ -527,7 +528,7 @@ void render_test_scene(
                 rMatVisualizer.m_added.erase(it);
             }
         }
-        MeshVisualizer::assign(
+        assign_visualizer(
                 rMatVisualizer.m_added, rGroupFwdOpaque.m_entities,
                 rRenderer.m_visualizer);
         rMatVisualizer.m_added.clear();
@@ -584,9 +585,14 @@ void load_gl_resources(ActiveApplication& rApp)
 
     osp::Package &rGlResources = rApp.get_gl_resources();
 
-    rGlResources.add<Phong>("textured", Phong{Phong::Flag::DiffuseTexture});
-    rGlResources.add<Phong>("notexture", Phong{});
+    // Create Phong shaders
+    auto texturedFlags = Phong::Flag::DiffuseTexture
+                       | Phong::Flag::AlphaMask
+                       | Phong::Flag::AmbientTexture;
+    rGlResources.add<Phong>("textured", Phong{texturedFlags, 2});
+    rGlResources.add<Phong>("notexture", Phong{{}, 2});
 
+    // Create MeshVisualizer shader
     rGlResources.add<MeshVisualizer>(
             "mesh_vis_shader",
             MeshVisualizer{ MeshVisualizer::Flag::Wireframe });
