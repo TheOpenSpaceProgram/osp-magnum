@@ -32,34 +32,27 @@
 namespace osp::shader
 {
 
-struct ACtxMeshVisualizerData;
+using MeshVisualizer = Magnum::Shaders::MeshVisualizerGL3D;
 
-class MeshVisualizer : protected Magnum::Shaders::MeshVisualizerGL3D
-{
-    using RenderGroup = osp::active::RenderGroup;
-
-public:
-
-    using Magnum::Shaders::MeshVisualizerGL3D::MeshVisualizerGL3D;
-    using Flag = Magnum::Shaders::MeshVisualizerGL3D::Flag;
-
-    static void draw_entity(
-            active::ActiveEnt ent,
-            active::ACompCamera const& camera,
-            active::EntityToDraw::UserData_t userData) noexcept;
-
-    static void assign(
-            RenderGroup::ArrayView_t entities,
-            RenderGroup::Storage_t& rStorage,
-            ACtxMeshVisualizerData &rData);
-};
-
-struct ACtxMeshVisualizerData
+struct ACtxDrawMeshVisualizer
 {
     DependRes<MeshVisualizer> m_shader;
 
     active::acomp_storage_t< osp::active::ACompDrawTransform >  *m_pDrawTf;
     active::acomp_storage_t< osp::active::ACompMeshGL >         *m_pMeshGl;
+
+    bool m_wireframeOnly{false};
 };
+
+void draw_ent_visualizer(
+        active::ActiveEnt ent,
+        active::ACompCamera const& camera,
+        active::EntityToDraw::UserData_t userData) noexcept;
+
+
+void assign_visualizer(
+        active::RenderGroup::ArrayView_t entities,
+        active::RenderGroup::Storage_t& rStorage,
+        ACtxDrawMeshVisualizer &rData);
 
 } // namespace osp::shader
