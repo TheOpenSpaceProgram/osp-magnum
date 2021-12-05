@@ -27,6 +27,8 @@
 
 #include "../../Shaders/FullscreenTriShader.h"
 
+#include <Magnum/ImageView.h>
+
 #include <Magnum/GL/Buffer.h>
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Renderer.h>
@@ -42,7 +44,11 @@
 #include <Magnum/MeshTools/Compile.h>
 
 using Magnum::Trade::MeshData;
+using Magnum::Trade::ImageData2D;
+
 using Magnum::GL::Mesh;
+using Magnum::GL::Texture2D;
+
 using osp::DependRes;
 using osp::Package;
 using osp::active::SysRenderGL;
@@ -114,7 +120,6 @@ void SysRenderGL::compile_meshes(
         acomp_storage_t<ACompMeshGL>& rMeshGl,
         osp::Package& rGlResources)
 {
-
     for (ActiveEnt ent : std::exchange(rDirty, {}))
     {
         if (viewMeshs.contains(ent))
@@ -154,13 +159,77 @@ void SysRenderGL::compile_meshes(
     }
 }
 
+DependRes<Texture2D> try_compile_texture(
+        osp::Package& rGlResources, DependRes<ImageData2D> const& texData)
+{
+    DependRes<Texture2D> rTexGlRes
+            = rGlResources.get_or_reserve<Texture2D>(texData.name());
+
+    if (rTexGlRes.reserve_empty())
+    {
+        // Texture isn't compiled yet, compile it
+        Texture2D &rTexGl = rTexGlRes.reserve_emplace();
+
+        using Magnum::GL::SamplerWrapping;
+        using Magnum::GL::SamplerFilter;
+        using Magnum::GL::textureFormat;
+
+        Magnum::ImageView2D view = *texData;
+
+        rTexGl.setWrapping(SamplerWrapping::ClampToEdge)
+            .setMagnificationFilter(SamplerFilter::Nearest)
+            .setMinificationFilter(SamplerFilter::Nearest)
+            .setStorage(1, textureFormat((*texData).format()), (*texData).size())
+            .setSubImage(0, {}, view);
+
+    }
+
+    return rTexGlRes;
+}
+
 void SysRenderGL::compile_textures(
-        acomp_view_t<const ACompTexture> viewDiffTex,
+        acomp_view_t<const ACompTexture> viewTex,
         std::vector<ActiveEnt>& rDirty,
-        acomp_storage_t<ACompTextureGL>& rDiffTexGl,
+        acomp_storage_t<ACompTextureGL>& rTexGl,
         osp::Package& rGlResources)
 {
-    rDirty.clear();
+    for (ActiveEnt ent : std::exchange(rDirty, {}))
+    {
+        if (viewTex.contains(ent))
+        {
+            auto const &rEntTex = viewTex.get<ACompTexture const>(ent);
+
+            if (rTexGl.contains(ent))
+            {
+                // Check if ACompTexture changed
+                ACompTextureGL &rEntTexGl = rTexGl.get(ent);
+
+                if (rEntTexGl.m_tex.name() != rEntTexGl.m_tex.name())
+                {
+                    // get new mesh
+                    rEntTexGl.m_tex = try_compile_texture(rGlResources, rEntTex.m_texture);
+                }
+            }
+            else
+            {
+                // ACompMeshGL component needed
+                ACompTextureGL &rEntTexGl = rTexGl.emplace(
+                        ent, ACompTextureGL{try_compile_texture(rGlResources, rEntTex.m_texture)});
+            }
+        }
+        else
+        {
+            if (rTexGl.contains(ent))
+            {
+                // ACompMesh removed, remove ACompMeshGL too
+                rTexGl.erase(ent);
+            }
+            else
+            {
+                // Why is this entity here?
+            }
+        }
+    }
 }
 
 void SysRenderGL::display_texture(
@@ -216,7 +285,7 @@ void SysRenderGL::render_transparent(
     using Magnum::GL::Renderer;
 
     Renderer::enable(Renderer::Feature::DepthTest);
-    Renderer::enable(Renderer::Feature::FaceCulling);
+    Renderer::disable(Renderer::Feature::FaceCulling);
     Renderer::enable(Renderer::Feature::Blending);
     Renderer::setBlendFunction(
             Renderer::BlendFunction::SourceAlpha,
@@ -224,9 +293,23 @@ void SysRenderGL::render_transparent(
 
     // temporary: disabled depth writing makes the plumes look nice, but
     //            can mess up other transparent objects once added
-    Renderer::setDepthMask(false);
+    //Renderer::setDepthMask(false);
 
     for (auto const& [ent, toDraw] : group.view().each())
+    {
+        if (viewVisible.contains(ent))
+        {
+            toDraw(ent, camera);
+        }
+    }
+}
+
+void SysRenderGL::draw_group(
+        RenderGroup const& rGroup,
+        acomp_view_t<const ACompVisible> viewVisible,
+        ACompCamera const& camera)
+{
+    for (auto const& [ent, toDraw] : rGroup.view().each())
     {
         if (viewVisible.contains(ent))
         {

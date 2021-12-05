@@ -142,6 +142,11 @@ public:
             RenderGroup const& group,
             acomp_view_t<const ACompVisible> viewVisible,
             ACompCamera const& camera);
+
+    static void draw_group(
+            RenderGroup const& rGroup,
+            acomp_view_t<const ACompVisible> viewVisible,
+            ACompCamera const& camera);
 };
 
 
