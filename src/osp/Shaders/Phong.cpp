@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Open Space Program
  * Copyright © 2019-2020 Open Space Program Project
  *
@@ -26,18 +26,22 @@
 
 #include <osp/Active/SysRender.h>
 
-#include <osp/Resource/Package.h>
+#include <Magnum/Math/Color.h>
 
-#include <Magnum/Math/Matrix4.h>
+// for the 0xrrggbb_rgbf and angle literals
+using namespace Magnum::Math::Literals;
 
+using namespace osp;
 using namespace osp::active;
 using namespace osp::shader;
 
-void Phong::draw_entity(
+void shader::draw_ent_phong(
         ActiveEnt ent, ACompCamera const& camera,
-        osp::active::EntityToDraw::UserData_t userData) noexcept
+        EntityToDraw::UserData_t userData) noexcept
 {
-    auto &rData = *reinterpret_cast<ACtxPhongData*>(userData[0]);
+    using Flag = Phong::Flag;
+
+    auto &rData = *reinterpret_cast<ACtxDrawPhong*>(userData[0]);
     auto &rShader = *reinterpret_cast<Phong*>(userData[1]);
 
     // Collect uniform information
@@ -49,17 +53,25 @@ void Phong::draw_entity(
      * light is a direction light coming from the specified direction relative
      * to the camera.
      */
-    Vector4 light = Vector4{Vector3{0.0f, 1.0f, 0.5f}.normalized(), 0.0f};
+    //Vector4 light = ;
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {
         rShader.bindDiffuseTexture(*rData.m_pDiffuseTexGl->get(ent).m_tex);
     }
 
+    if (rShader.flags() & (Flag::DiffuseTexture | Flag::AmbientTexture | Flag::AlphaMask))
+    {
+        rShader.bindAmbientTexture(*rData.m_pDiffuseTexGl->get(ent).m_tex);
+    }
+
     rShader
-        .setAmbientColor(Magnum::Color4{0.1f})
-        .setSpecularColor(Magnum::Color4{1.0f})
-        .setLightPositions({light})
+        .setAmbientColor(0x000000ff_rgbaf)
+        .setDiffuseColor(0xffffff00_rgbaf)
+        .setSpecularColor(0xffffff00_rgbaf)
+        .setLightColors({0xfff5ec_rgbf, 0xe4e8ff_rgbf})
+        .setLightPositions({Vector4{Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f},
+                           Vector4{-Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f}})
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
         .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
@@ -67,30 +79,57 @@ void Phong::draw_entity(
 }
 
 
-void Phong::assign_phong_opaque(
+void shader::assign_phong(
         RenderGroup::ArrayView_t entities,
-        RenderGroup::Storage_t& rStorage,
+        RenderGroup::Storage_t *pStorageOpaque,
+        RenderGroup::Storage_t *pStorageTransparent,
         acomp_view_t<ACompOpaque const> viewOpaque,
         acomp_view_t<ACompTextureGL const> viewDiffuse,
-        ACtxPhongData &rData)
+        ACtxDrawPhong &rData)
 {
 
     for (ActiveEnt ent : entities)
     {
-        if (!viewOpaque.contains(ent))
+        if (viewOpaque.contains(ent))
         {
-            continue; // This assigner is for opaque materials only
-        }
+            if (pStorageOpaque == nullptr)
+            {
+                continue;
+            }
 
-        if (viewDiffuse.contains(ent))
-        {
-            rStorage.emplace(
-                    ent, EntityToDraw{&draw_entity, {&rData, &(*rData.m_shaderDiffuse)} });
+            if (viewDiffuse.contains(ent))
+            {
+                pStorageOpaque->emplace(
+                        ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderDiffuse)} });
+            }
+            else
+            {
+                pStorageOpaque->emplace(
+                        ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderUntextured)} });
+            }
         }
         else
         {
-            rStorage.emplace(
-                    ent, EntityToDraw{&draw_entity, {&rData, &(*rData.m_shaderUntextured)} });
+
+            if (pStorageTransparent == nullptr)
+            {
+                continue;
+            }
+
+            if (viewDiffuse.contains(ent))
+            {
+                pStorageTransparent->emplace(
+                        ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderDiffuse)} });
+            }
+            else
+            {
+                pStorageTransparent->emplace(
+                        ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderUntextured)} });
+            }
+
         }
+
+
     }
 }
+

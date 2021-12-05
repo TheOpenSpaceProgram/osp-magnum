@@ -159,6 +159,8 @@ void update_test_scene(EngineTestScene& rScene, float delta)
 
 //-----------------------------------------------------------------------------
 
+// Everything below is for rendering
+
 /**
  * @brief Data needed to render the EngineTestScene
  */
@@ -175,7 +177,7 @@ struct EngineTestRenderer
     osp::active::ActiveEnt m_camera;
     ACtxCameraController m_camCtrl;
 
-    osp::shader::ACtxPhongData m_phong{};
+    osp::shader::ACtxDrawPhong m_phong{};
 };
 
 /**
@@ -202,8 +204,8 @@ void render_test_scene(
     RenderGroup &rGroupFwdOpaque
             = rRenderer.m_renderGroups.m_groups["fwd_opaque"];
     MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
-    Phong::assign_phong_opaque(
-            rMatCommon.m_added, rGroupFwdOpaque.m_entities,
+    assign_phong(
+            rMatCommon.m_added, &rGroupFwdOpaque.m_entities, nullptr,
             rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexGl,
             rRenderer.m_phong);
     rMatCommon.m_added.clear();
@@ -259,8 +261,12 @@ void load_gl_resources(ActiveApplication& rApp)
 
     osp::Package &rGlResources = rApp.get_gl_resources();
 
-    rGlResources.add<Phong>("textured", Phong{Phong::Flag::DiffuseTexture});
-    rGlResources.add<Phong>("notexture", Phong{});
+    // Create Phong shaders
+    auto texturedFlags = Phong::Flag::DiffuseTexture
+                       | Phong::Flag::AlphaMask
+                       | Phong::Flag::AmbientTexture;
+    rGlResources.add<Phong>("textured", Phong{texturedFlags, 2});
+    rGlResources.add<Phong>("notexture", Phong{{}, 2});
 
     rGlResources.add<MeshVisualizer>(
             "mesh_vis_shader",
@@ -280,16 +286,17 @@ on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
 
     osp::Package &rGlResources = rApp.get_gl_resources();
 
-    // Get or reserve Phong shaders. These are loaded in load_gl_resources,
-    // which can be called before or after this function
-    pRenderer->m_phong.m_shaderUntextured
-            = rGlResources.get_or_reserve<Phong>("notexture");
-    pRenderer->m_phong.m_shaderDiffuse
-            = rGlResources.get_or_reserve<Phong>("textured");
-
-    pRenderer->m_phong.m_pDrawTf       = &rScene.m_drawing.m_drawTransform;
-    pRenderer->m_phong.m_pDiffuseTexGl = &pRenderer->m_renderGl.m_diffuseTexGl;
-    pRenderer->m_phong.m_pMeshGl       = &pRenderer->m_renderGl.m_meshGl;
+    // Acquire data needed to draw Phong materials
+    {
+        ACtxDrawPhong &rPhong = pRenderer->m_phong;
+        rPhong.m_shaderUntextured
+                = rGlResources.get_or_reserve<Phong>("notexture");
+        rPhong.m_shaderDiffuse
+                = rGlResources.get_or_reserve<Phong>("textured");
+        rPhong.m_pDrawTf       = &rScene.m_drawing.m_drawTransform;
+        rPhong.m_pDiffuseTexGl = &pRenderer->m_renderGl.m_diffuseTexGl;
+        rPhong.m_pMeshGl       = &pRenderer->m_renderGl.m_meshGl;
+    }
 
     // Select first camera for rendering
     pRenderer->m_camera = rScene.m_basic.m_camera.at(0);

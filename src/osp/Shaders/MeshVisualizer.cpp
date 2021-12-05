@@ -28,21 +28,23 @@
 #include "../Active/SysRender.h"
 
 #include <Magnum/GL/DefaultFramebuffer.h>
+#include <Magnum/GL/Renderer.h>
 #include <Magnum/Math/Color.h>
 
 // for the 0xrrggbb_rgbf and _deg literals
 using namespace Magnum::Math::Literals;
 
+using namespace osp;
 using namespace osp::active;
 using namespace osp::shader;
 
-void MeshVisualizer::draw_entity(
+void shader::draw_ent_visualizer(
         ActiveEnt ent, const ACompCamera &camera,
         EntityToDraw::UserData_t userData) noexcept
 {
     using Magnum::Shaders::MeshVisualizerGL3D;
 
-    auto &rData = *reinterpret_cast<ACtxMeshVisualizerData*>(userData[0]);
+    auto &rData = *reinterpret_cast<ACtxDrawMeshVisualizer*>(userData[0]);
 
     ACompMeshGL &rMesh = rData.m_pMeshGl->get(ent);
     ACompDrawTransform const& drawTf = rData.m_pDrawTf->get(ent);
@@ -57,22 +59,32 @@ void MeshVisualizer::draw_entity(
         rShader.setNormalMatrix(entRelative.normalMatrix());
     }
 
+
+    if (rData.m_wireframeOnly)
+    {
+        rShader.setColor(0x00000000_rgbaf);
+        Magnum::GL::Renderer::setDepthMask(false);
+    }
+
     rShader
-        .setColor(0x2f83cc_rgbf)
-        .setWireframeColor(0xdcdcdc_rgbf)
         .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
         .draw(*rMesh.m_mesh);
+
+    if (rData.m_wireframeOnly)
+    {
+        Magnum::GL::Renderer::setDepthMask(true);
+    }
 }
 
-void MeshVisualizer::assign(
+void shader::assign_visualizer(
         RenderGroup::ArrayView_t entities, RenderGroup::Storage_t &rStorage,
-        ACtxMeshVisualizerData &rData)
+        ACtxDrawMeshVisualizer &rData)
 {
     for (ActiveEnt ent : entities)
     {
-        rStorage.emplace( ent, EntityToDraw{&draw_entity, {&rData} } );
+        rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
     }
 }
 

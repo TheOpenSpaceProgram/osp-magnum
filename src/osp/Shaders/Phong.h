@@ -29,60 +29,50 @@
 #include <osp/Resource/Resource.h>
 
 #include <Magnum/Shaders/PhongGL.h>
-#include <Magnum/Math/Color.h>
 
-#include <string_view>
-#include <vector>
 
 namespace osp::shader
 {
 
-struct ACtxPhongData;
-
-class Phong : protected Magnum::Shaders::PhongGL
-{
-    using RenderGroup = osp::active::RenderGroup;
-
-public:
-
-    using Magnum::Shaders::PhongGL::PhongGL;
-    using Flag = Magnum::Shaders::PhongGL::Flag;
-
-    static void draw_entity(
-            osp::active::ActiveEnt ent,
-            osp::active::ACompCamera const& camera,
-            osp::active::EntityToDraw::UserData_t userData) noexcept;
-
-    /**
-     * @brief Assign a Phong shader to a set of entities, and write results to
-     *        a RenderGroup
-     *
-     * @param entities      [in] Entities to consider
-     * @param rStorage      [out] RenderGroup storage
-     * @param viewOpaque    [in] View for opaque component
-     * @param viewDiffuse   [in] View for diffuse texture component
-     * @param rData         [in] Phong shader data, stable memory required
-     */
-    static void assign_phong_opaque(
-            RenderGroup::ArrayView_t entities,
-            RenderGroup::Storage_t& rStorage,
-            osp::active::acomp_view_t<osp::active::ACompOpaque const> viewOpaque,
-            osp::active::acomp_view_t<osp::active::ACompTextureGL const> viewDiffuse,
-            ACtxPhongData &rData);
-};
+using Phong = Magnum::Shaders::PhongGL;
 
 /**
  * @brief Stores per-scene data needed for Phong shaders to draw
  */
-struct ACtxPhongData
+struct ACtxDrawPhong
 {
 
     DependRes<Phong> m_shaderUntextured;
     DependRes<Phong> m_shaderDiffuse;
 
-    active::acomp_storage_t< osp::active::ACompDrawTransform > *m_pDrawTf;
-    active::acomp_storage_t< osp::active::ACompTextureGL >     *m_pDiffuseTexGl;
-    active::acomp_storage_t< osp::active::ACompMeshGL >        *m_pMeshGl;
+    active::acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf;
+    active::acomp_storage_t<active::ACompTextureGL>     *m_pDiffuseTexGl;
+    active::acomp_storage_t<active::ACompMeshGL>        *m_pMeshGl;
 };
+
+void draw_ent_phong(
+        active::ActiveEnt ent,
+        active::ACompCamera const& camera,
+        active::EntityToDraw::UserData_t userData) noexcept;
+
+/**
+ * @brief Assign a Phong shader to a set of entities, and write results to
+ *        a RenderGroup
+ *
+ * @param entities              [in] Entities to consider
+ * @param pStorageOpaque        [out] Optional RenderGroup storage for opaque
+ * @param pStorageTransparent   [out] Optional RenderGroup storage for transparent
+ * @param viewOpaque            [in] View for opaque component
+ * @param viewDiffuse           [in] View for diffuse texture component
+ * @param rData                 [in] Phong shader data, stable memory required
+ */
+void assign_phong(
+        active::RenderGroup::ArrayView_t entities,
+        active::RenderGroup::Storage_t *pStorageOpaque,
+        active::RenderGroup::Storage_t *pStorageTransparent,
+        active::acomp_view_t<active::ACompOpaque const> viewOpaque,
+        active::acomp_view_t<active::ACompTextureGL const> viewDiffuse,
+        ACtxDrawPhong &rData);
+
 
 } // namespace osp::shader
