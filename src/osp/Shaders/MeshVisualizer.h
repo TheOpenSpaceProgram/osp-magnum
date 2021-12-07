@@ -38,8 +38,8 @@ struct ACtxDrawMeshVisualizer
 {
     DependRes<MeshVisualizer> m_shader;
 
-    active::acomp_storage_t< osp::active::ACompDrawTransform >  *m_pDrawTf;
-    active::acomp_storage_t< osp::active::ACompMeshGL >         *m_pMeshGl;
+    active::acomp_storage_t< active::ACompDrawTransform >  *m_pDrawTf{nullptr};
+    active::acomp_storage_t< active::ACompMeshGL >         *m_pMeshGl{nullptr};
 
     bool m_wireframeOnly{false};
 };

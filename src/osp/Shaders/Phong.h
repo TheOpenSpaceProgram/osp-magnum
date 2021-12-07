@@ -45,9 +45,11 @@ struct ACtxDrawPhong
     DependRes<Phong> m_shaderUntextured;
     DependRes<Phong> m_shaderDiffuse;
 
-    active::acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf;
-    active::acomp_storage_t<active::ACompTextureGL>     *m_pDiffuseTexGl;
-    active::acomp_storage_t<active::ACompMeshGL>        *m_pMeshGl;
+    active::acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf{nullptr};
+    active::acomp_storage_t<active::ACompColor>         *m_pColor{nullptr};
+    active::acomp_storage_t<active::ACompTextureGL>     *m_pDiffuseTexGl{nullptr};
+
+    active::acomp_storage_t<active::ACompMeshGL>        *m_pMeshGl{nullptr};
 };
 
 void draw_ent_phong(
