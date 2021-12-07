@@ -65,9 +65,15 @@ void shader::draw_ent_phong(
         rShader.bindAmbientTexture(*rData.m_pDiffuseTexGl->get(ent).m_tex);
     }
 
+    if (rData.m_pColor != nullptr)
+    {
+        rShader.setDiffuseColor(rData.m_pColor->contains(ent)
+                                ? rData.m_pColor->get(ent)
+                                : 0xffffffff_rgbaf);
+    }
+
     rShader
         .setAmbientColor(0x000000ff_rgbaf)
-        .setDiffuseColor(0xffffff00_rgbaf)
         .setSpecularColor(0xffffff00_rgbaf)
         .setLightColors({0xfff5ec_rgbf, 0xe4e8ff_rgbf})
         .setLightPositions({Vector4{Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f},

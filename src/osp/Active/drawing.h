@@ -33,6 +33,8 @@
 #include <Corrade/Containers/ArrayView.h>
 #include <entt/core/family.hpp>
 
+#include <Magnum/Math/Color.h>
+
 // MSVC freaks out if these are forward declared
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/MeshData.h>
@@ -88,6 +90,8 @@ struct ACompTexture
     osp::DependRes<Magnum::Trade::ImageData2D> m_texture;
 };
 
+struct ACompColor : Magnum::Color4 {};
+
 struct MaterialData
 {
     active_sparse_set_t     m_comp;
@@ -104,6 +108,7 @@ struct ACtxDrawing
     acomp_storage_t<ACompTransparent>       m_transparent;
     acomp_storage_t<ACompVisible>           m_visible;
     acomp_storage_t<ACompDrawTransform>     m_drawTransform;
+    acomp_storage_t<ACompColor>             m_color;
 
     acomp_storage_t<ACompMesh>              m_mesh;
     std::vector<osp::active::ActiveEnt>     m_meshDirty;

@@ -60,8 +60,14 @@ void shader::draw_ent_flat(
         rShader.bindTexture(*rData.m_pDiffuseTexGl->get(ent).m_tex);
     }
 
+    if (rData.m_pColor != nullptr)
+    {
+        rShader.setColor(rData.m_pColor->contains(ent)
+                         ? rData.m_pColor->get(ent)
+                         : 0xffffffff_rgbaf);
+    }
+
     rShader
-        .setColor(0xffffff00_rgbaf)
         .setTransformationProjectionMatrix(camera.m_projection*entRelative)
         .draw(*rData.m_pMeshGl->get(ent).m_mesh);
 }
