@@ -74,11 +74,6 @@ struct ACompName
 };
 
 /**
- * @brief Marks an entity for deletion
- */
-struct ACompDelete { };
-
-/**
  * @brief Places an entity in a hierarchy
  *
  * Stores entity IDs for parent, both siblings, and first child if present
@@ -129,5 +124,29 @@ struct ACtxBasic
     acomp_storage_t<ACompHierarchy>             m_hierarchy;
     acomp_storage_t<ACompCamera>                m_camera;
 };
+
+template<typename IT_T>
+void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T last)
+{
+    rCtxBasic.m_floatingOrigin  .remove(first, last);
+    rCtxBasic.m_name            .remove(first, last);
+    rCtxBasic.m_hierarchy       .remove(first, last);
+    rCtxBasic.m_camera          .remove(first, last);
+
+    while (first != last)
+    {
+        ActiveEnt const ent = *first;
+
+        if (rCtxBasic.m_transform.contains(ent))
+        {
+            rCtxBasic.m_transform           .remove(ent);
+            rCtxBasic.m_transformControlled .remove(ent);
+            rCtxBasic.m_transformMutable    .remove(ent);
+
+        }
+
+        ++first;
+    }
+}
 
 } // namespace osp::active

@@ -110,25 +110,3 @@ void SysHierarchy::sort(acomp_storage_t<ACompHierarchy>& rHier)
         return rHier.get(lhs).m_level < rHier.get(lhs).m_level;
     }, entt::insertion_sort());
 }
-
-void SysHierarchy::update_delete_descendents(
-        acomp_view_t<ACompHierarchy> viewHier,
-        acomp_storage_t<ACompDelete>& rDelete)
-{
-    auto view = viewHier | entt::basic_view{rDelete};
-
-    // copy entities to delete into a buffer
-    std::vector<ActiveEnt> toDelete;
-    toDelete.reserve(view.size_hint());
-    toDelete.assign(std::begin(view), std::end(view));
-
-    // Add delete components to descendents of all entities to delete
-    for (ActiveEnt ent : toDelete)
-    {
-        traverse(viewHier, ent, [&rDelete] (ActiveEnt descendent) {
-            rDelete.emplace(descendent);
-            return EHierarchyTraverseStatus::Continue;
-        });
-    }
-}
-

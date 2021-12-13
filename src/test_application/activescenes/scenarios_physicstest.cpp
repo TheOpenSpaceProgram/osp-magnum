@@ -84,18 +84,23 @@ struct PhysicsTestScene
     // ID registry generates entity IDs, and keeps track of which ones exist
     osp::IdRegistry<osp::active::ActiveEnt> m_activeIds;
 
-    // Components and supporting data structures
+    // Basic and Drawing components
     osp::active::ACtxBasic          m_basic;
     osp::active::ACtxDrawing        m_drawing;
 
-    // Physics
-    std::unique_ptr<ospnewton::ACtxNwtWorld> m_nwtWorld;
+    // Generic physics components and data
     osp::active::ACtxPhysics        m_physics;
     osp::active::ACtxPhysInputs     m_physIn;
-
-    active_sparse_set_t             m_hasGravity;
-
     osp::active::ACtxHierBody       m_hierBody;
+    active_sparse_set_t             m_hasGravity;
+    active_sparse_set_t             m_removeOutOfBounds;
+
+    // Newton Dynamics physics
+    std::unique_ptr<ospnewton::ACtxNwtWorld> m_pNwtWorld;
+
+    // Entity delete list/queue
+    std::vector<ActiveEnt>          m_delete;
+    std::vector<ActiveEnt>          m_deleteTotal;
 
     // Hierarchy root, needs to exist so all hierarchy entities are connected
     osp::active::ActiveEnt          m_hierRoot;
@@ -165,7 +170,7 @@ ActiveEnt add_solid(
 
     // Add physics stuff
     rScene.m_physics.m_shape.emplace(ent, shape);
-    rScene.m_physics.m_solidCollider.emplace(ent);
+    rScene.m_physics.m_solid.emplace(ent);
     Vector3 const inertia
             = osp::phys::collider_inertia_tensor(shape, transform.scaling(), mass);
     rScene.m_hierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
@@ -206,6 +211,9 @@ ActiveEnt add_quick_ball(PhysicsTestScene &rScene, Vector3 position, Vector3 vel
     // make gravity affect ball
     rScene.m_hasGravity.emplace(ballRoot);
 
+    // Remove ball when it goes out of bounds
+    rScene.m_removeOutOfBounds.emplace(ballRoot);
+
     // Set velocity
     rScene.m_physIn.m_setVelocity.emplace_back(ballRoot, velocity);
 
@@ -219,7 +227,7 @@ entt::any setup_scene(osp::Package &rPkg)
     entt::any sceneAny = entt::make_any<PhysicsTestScene>();
     PhysicsTestScene &rScene = entt::any_cast<PhysicsTestScene&>(sceneAny);
 
-    rScene.m_nwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(4);
+    rScene.m_pNwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(4);
 
     rScene.m_meshCube       = rPkg.get_or_reserve<MeshData>("cube");
     rScene.m_meshCylinder   = rPkg.get_or_reserve<MeshData>("cylinder");
@@ -317,6 +325,9 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
 
     using namespace ospnewton;
 
+    // start recording new elements to delete
+    rScene.m_delete.clear();
+
     //rScene.m_physIn.m_physNetTorque.emplace(cube, ACompPhysNetTorque{{5.0f, 0.0f, 0.0f}});
     rScene.m_ballTimer += delta;
     if (rScene.m_ballTimer >= 0.2f)
@@ -345,14 +356,58 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
     }
 
     SysNewton::update_colliders(
-            rScene.m_physics, *rScene.m_nwtWorld,
-            rScene.m_physIn.m_colliderDirty);
+            rScene.m_physics, *rScene.m_pNwtWorld,
+            std::exchange(rScene.m_physIn.m_colliderDirty, {}));
 
     auto const physIn = ArrayView<ACtxPhysInputs>(&rScene.m_physIn, 1);
     SysNewton::update_world(
-            rScene.m_physics, *rScene.m_nwtWorld, physIn, rScene.m_basic.m_hierarchy,
+            rScene.m_physics, *rScene.m_pNwtWorld, physIn, rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform, rScene.m_basic.m_transformControlled,
             rScene.m_basic.m_transformMutable);
+
+    // remove out of bounds
+    for (ActiveEnt const ent : rScene.m_removeOutOfBounds)
+    {
+        ACompTransform const &entTf = rScene.m_basic.m_transform.get(ent);
+        if (entTf.m_transform.translation().y() < -10)
+        {
+            rScene.m_delete.push_back(ent);
+        }
+    }
+
+    // Create a new delete list that includes the descendents of entities to delete
+    rScene.m_deleteTotal = rScene.m_delete;
+    SysHierarchy::update_delete_descendents(
+            rScene.m_basic.m_hierarchy,
+            std::begin(rScene.m_delete), std::end(rScene.m_delete),
+            [&rScene] (ActiveEnt ent)
+    {
+        rScene.m_deleteTotal.push_back(ent);
+    });
+
+    // Delete entities that need to be deleted
+    auto first = std::begin(rScene.m_deleteTotal);
+    auto last = std::end(rScene.m_deleteTotal);
+
+    update_delete_basic                 (rScene.m_basic,        first, last);
+    SysRender::update_delete_drawing    (rScene.m_drawing,      first, last);
+    SysPhysics::update_delete_phys      (rScene.m_physics,      first, last);
+    SysPhysics::update_delete_shapes    (rScene.m_physics,      first, last);
+    SysPhysics::update_delete_hier_body (rScene.m_hierBody,     first, last);
+    SysNewton::update_delete            (*rScene.m_pNwtWorld,   first, last);
+
+    rScene.m_hasGravity         .remove(first, last);
+    rScene.m_removeOutOfBounds  .remove(first, last);
+
+    // Delete IDs
+    for (ActiveEnt const ent : rScene.m_deleteTotal)
+    {
+        if (rScene.m_activeIds.exists(ent))
+        {
+            rScene.m_activeIds.remove(ent);
+        }
+    }
+
 }
 
 //-----------------------------------------------------------------------------
@@ -549,6 +604,9 @@ on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp)
         }
 
         update_test_scene(rScene, delta);
+        SysRender::update_delete_groups(
+                pRenderer->m_renderGroups,
+                    std::begin(rScene.m_deleteTotal), std::end(rScene.m_deleteTotal));
 
         SysCameraController::update_view(
                 pRenderer->m_camCtrl,

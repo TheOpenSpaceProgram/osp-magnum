@@ -139,8 +139,67 @@ public:
             acomp_view_t<ACompShape> const viewShape,
             ActiveEnt entity);
 
+    template<typename IT_T>
+    static void update_delete_phys(
+            ACtxPhysics &rCtxPhys, IT_T first, IT_T last);
+
+    template<typename IT_T>
+    static void update_delete_shapes(
+            ACtxPhysics &rCtxPhys, IT_T first, IT_T last);
+
+    template<typename IT_T>
+    static void update_delete_hier_body(
+            ACtxHierBody &rCtxHierBody, IT_T first, IT_T last);
 
 };
+
+template<typename IT_T>
+void SysPhysics::update_delete_phys(
+        ACtxPhysics &rCtxPhys, IT_T first, IT_T last)
+{
+    while (first != last)
+    {
+        ActiveEnt const ent = *first;
+
+        if (rCtxPhys.m_physBody.contains(ent))
+        {
+            rCtxPhys.m_physBody         .remove(ent);
+            rCtxPhys.m_physDynamic      .remove(ent);
+            rCtxPhys.m_physLinearVel    .remove(ent);
+            rCtxPhys.m_physAngularVel   .remove(ent);
+        }
+
+        ++first;
+    }
+}
+
+template<typename IT_T>
+void SysPhysics::update_delete_shapes(
+        ACtxPhysics &rCtxPhys, IT_T first, IT_T last)
+{
+    rCtxPhys.m_hasColliders.remove(first, last);
+
+    while (first != last)
+    {
+        ActiveEnt const ent = *first;
+
+        if (rCtxPhys.m_shape.contains(ent))
+        {
+            rCtxPhys.m_shape.remove(ent);
+            rCtxPhys.m_solid.remove(ent);
+        }
+
+        ++first;
+    }
+}
+
+template<typename IT_T>
+void SysPhysics::update_delete_hier_body(
+        ACtxHierBody &rCtxHierBody, IT_T first, IT_T last)
+{
+    rCtxHierBody.m_ownDyn.remove(first, last);
+    rCtxHierBody.m_totalDyn.remove(first, last);
+}
 
 
 }

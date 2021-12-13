@@ -68,7 +68,6 @@ using osp::active::SysPhysics;
 
 using osp::active::ACompHierarchy;
 using osp::active::ACompShape;
-using osp::active::ACompSolidCollider;
 using osp::active::ACompTransform;
 using osp::active::ACompTransformControlled;
 using osp::active::ACompTransformMutable;
@@ -170,11 +169,11 @@ void SysNewton::update_translate(ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld)
 
 void SysNewton::update_colliders(
         ACtxPhysics &rCtxPhys, ACtxNwtWorld &rCtxWorld,
-        std::vector<ActiveEnt> &rCollidersDirty)
+        std::vector<ActiveEnt> const &collidersDirty)
 {
     using osp::phys::EShape;
 
-    for (ActiveEnt ent : rCollidersDirty)
+    for (ActiveEnt ent : collidersDirty)
     {
         ACompShape const& shape = rCtxPhys.m_shape.get(ent);
 
@@ -313,6 +312,12 @@ void SysNewton::update_world(
     }
 }
 
+void SysNewton::remove_components(ACtxNwtWorld& rCtxWorld, ActiveEnt ent)
+{
+    rCtxWorld.m_nwtBodies.remove(ent);
+    rCtxWorld.m_nwtColliders.remove(ent);
+}
+
 void SysNewton::find_colliders_recurse(
         ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld,
         acomp_storage_t<ACompHierarchy> const& rHier,
@@ -321,7 +326,7 @@ void SysNewton::find_colliders_recurse(
         Matrix4 const& transform, NewtonCollision* pCompound)
 {
     // Add newton collider if exists
-    if (rCtxPhys.m_solidCollider.contains(ent)
+    if (rCtxPhys.m_solid.contains(ent)
         && rCtxWorld.m_nwtColliders.contains(ent))
     {
         NewtonCollision const *pCollision

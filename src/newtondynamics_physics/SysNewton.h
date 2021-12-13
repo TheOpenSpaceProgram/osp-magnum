@@ -77,7 +77,7 @@ public:
     static void update_colliders(
             osp::active::ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            std::vector<osp::active::ActiveEnt>& rCollidersDirty);
+            std::vector<osp::active::ActiveEnt> const& collidersDirty);
 
     /**
      * @brief update_world
@@ -98,6 +98,20 @@ public:
             osp::active::acomp_storage_t<osp::active::ACompTransform>& rTf,
             osp::active::acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
             osp::active::acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable);
+
+    static void remove_components(
+            ACtxNwtWorld& rCtxWorld, osp::active::ActiveEnt ent);
+
+    template<typename IT_T>
+    static void update_delete(
+            ACtxNwtWorld &rCtxWorld, IT_T first, IT_T last)
+    {
+        while (first != last)
+        {
+            remove_components(rCtxWorld, *first);
+            ++first;
+        }
+    }
 
 private:
 
