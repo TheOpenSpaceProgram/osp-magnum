@@ -7,19 +7,7 @@ on:
     types: published
 
 jobs:
-  skip-duplicates:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          paths_ignore: '["README.md", "**/*.md, docs/**"]'
-
   build:
-    needs: skip-duplicates
     runs-on: macos-latest
 
     strategy:
@@ -31,39 +19,58 @@ jobs:
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
     steps:
+    - id: skip_check
+      continue-on-error: true
+      runs-on: ubuntu-latest
+      outputs:
+        should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      steps:
+        - id: skip_check
+          uses: fkirc/skip-duplicate-actions@master
+          with:
+            paths_ignore: '["README.md", "**/*.md, docs/**"]'
+
     - uses: actions/checkout@v2
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       with:
         fetch-depth: 1
         submodules: recursive
 
     - uses: hendrikmuhs/ccache-action@v1
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       with:
         key: macos-${{ matrix.config }}
 
     - name: Install dependencies
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: brew install cmake
 
     - name: Configure
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       shell: bash
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=Release
 
     - name: Compile Dependencies
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       shell: bash
       run: |
         cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps
 
     - name: Compile OSP-Magnum
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       shell: bash
       run: |
         cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum
 
     - name: Compile Unit Tests
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       shell: bash
       run: |
         cmake --build build --parallel --config ${{ matrix.config }} --target test
 
     - name: Run Unit Tests
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       shell: bash
       run: |
         ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test

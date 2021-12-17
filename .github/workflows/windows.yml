@@ -7,19 +7,7 @@ on:
     types: published
 
 jobs:
-  skip-duplicates:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          paths_ignore: '["README.md", "**/*.md, docs/**"]'
-
   build:
-    needs: skip-duplicates
     runs-on: windows-latest
 
     strategy:
@@ -32,32 +20,44 @@ jobs:
         config: [Release, Debug]
 
     steps:
+    - id: skip_check
+      continue-on-error: true
+      runs-on: ubuntu-latest
+      outputs:
+        should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      steps:
+        - id: skip_check
+          uses: fkirc/skip-duplicate-actions@master
+          with:
+            paths_ignore: '["README.md", "**/*.md, docs/**"]'
+
     - uses: actions/checkout@v2
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       with:
         fetch-depth: 1
         submodules: recursive
 
     - uses: egor-tensin/setup-mingw@v2
-      if: ${{ matrix.compiler == 'mingw' }}
+      if: ${{ matrix.compiler == 'mingw' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
 
     - uses: egor-tensin/setup-clang@v1
-      if: ${{ matrix.compiler == 'clang' }}
+      if: ${{ matrix.compiler == 'clang' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
 
     - uses: ashutoshvarma/setup-ninja@v1.1
-      if: ${{ matrix.compiler == 'clang' }}
+      if: ${{ matrix.compiler == 'clang' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
 
     - name: Configure (MSVC)
-      if: ${{ matrix.compiler == 'msvc' }}
+      if: ${{ matrix.compiler == 'msvc' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
 
     - name: Configure (ClangCL)
-      if: ${{ matrix.compiler == 'clangcl' }}
+      if: ${{ matrix.compiler == 'clangcl' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -TClangCL
 
     - name: Configure (MinGW)
-      if: ${{ matrix.compiler == 'mingw' }}
+      if: ${{ matrix.compiler == 'mingw' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
       env:
         CC:  C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\cc.exe
         CXX: C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\c++.exe
@@ -65,7 +65,7 @@ jobs:
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -G"MinGW Makefiles"
 
     - name: Configure (Clang)
-      if: ${{ matrix.compiler == 'clang' }}
+      if: ${{ matrix.compiler == 'clang' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
       env:
         CC:  C:\Program Files\LLVM\bin\cc.exe
         CXX: C:\Program Files\LLVM\bin\c++.exe
@@ -73,26 +73,32 @@ jobs:
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -GNinja
 
     - name: Compile Dependencies
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps
 
     - name: Compile OSP-Magnum
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum
 
     - name: Compile Unit Tests
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake --build build --parallel --config ${{ matrix.config }} --target test
 
     - name: Run Unit Tests
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
     
     - name: Prepare Artifact
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         move build\bin\OSPData build\bin\${{ matrix.config }}\OSPData
   
     - uses: actions/upload-artifact@v2
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       with: 
         name: ${{ matrix.config }}
         path: build\bin\${{ matrix.config }}

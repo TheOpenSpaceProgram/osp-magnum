@@ -19,7 +19,6 @@ jobs:
           paths_ignore: '["README.md", "**/*.md, docs/**"]'
 
   build:
-    needs: skip-duplicates
     runs-on: ubuntu-latest
 
     strategy:
@@ -34,16 +33,30 @@ jobs:
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
     steps:
+    - id: skip_check
+      continue-on-error: true
+      runs-on: ubuntu-latest
+      outputs:
+        should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      steps:
+        - id: skip_check
+          uses: fkirc/skip-duplicate-actions@master
+          with:
+            paths_ignore: '["README.md", "**/*.md, docs/**"]'
+
     - uses: actions/checkout@v2
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       with:
         fetch-depth: 1
         submodules: recursive
 
     - uses: hendrikmuhs/ccache-action@v1
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       with:
         key: linux-${{ matrix.compiler }}-${{ matrix.config }}
 
     - name: Install dependencies
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         sudo apt-get update
         sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev iwyu clang clang-tidy clang-tools
@@ -51,30 +64,37 @@ jobs:
         sudo apt install -y libsdl2-dev
 
     - name: Configure
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DCMAKE_LINK_WHAT_YOU_USE=TRUE
 
     - name: Compile Dependencies
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps
 
     - name: Compile OSP-Magnum
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum
 
     - name: Compile Unit Tests
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake --build build --parallel --config ${{ matrix.config }} --target test
 
     - name: Run Unit Tests
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
 
     - name: Prepare Artifact
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         mv build/3rdparty/newton-dynamics/lib/ build/lib
         
     - uses: actions/upload-artifact@v2
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       with: 
         name: ${{ matrix.config }}
         path: |

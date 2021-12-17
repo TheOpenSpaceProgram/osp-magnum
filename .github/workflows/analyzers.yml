@@ -7,19 +7,7 @@ on:
     types: published
 
 jobs:
-  skip-duplicates:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          paths_ignore: '["README.md", "**/*.md, docs/**"]'
-
   build:
-    needs: skip-duplicates
     runs-on: ubuntu-latest
 
     strategy:
@@ -28,12 +16,25 @@ jobs:
         config: [Release, Debug]
 
     steps:
+    - id: skip_check
+      continue-on-error: true
+      runs-on: ubuntu-latest
+      outputs:
+        should_skip: ${{ steps.skip_check.outputs.should_skip }}
+      steps:
+        - id: skip_check
+          uses: fkirc/skip-duplicate-actions@master
+          with:
+            paths_ignore: '["README.md", "**/*.md, docs/**"]'
+
     - uses: actions/checkout@v2
-      with:
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
+      with: 
         fetch-depth: 1
         submodules: recursive
 
     - name: Install dependencies
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         sudo apt-get update
         sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev iwyu clang clang-tidy clang-tools
@@ -41,10 +42,12 @@ jobs:
         sudo apt install -y libsdl2-dev
 
     - name: Configure
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=R${{ matrix.config }}
 
     - name: Download Clang Analysis Driver Scripts
+      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         wget https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-11.0.1/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
         wget https://raw.githubusercontent.com/include-what-you-use/include-what-you-use/clang_11/iwyu_tool.py
@@ -52,12 +55,12 @@ jobs:
 
     # Implicitly requires build/compile_commands.json to exist
     - name: Run Clang Analyzer
-      if: ${{ matrix.tool == 'clang-analyzer' }}
+      if: ${{ matrix.tool == 'clang-analyzer' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         ./run-clang-tidy.py -j $(nproc) -p build
 
     # Implicitly requires build/compile_commands.json to exist
     - name: Run IWYU
-      if: ${{ matrix.tool == 'iwyu' }}
+      if: ${{ matrix.tool == 'iwyu' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         ./iwyu_tool.py -j $(nproc) -p build -- -Xiwyu --mapping_file=${GITHUB_WORKSPACE}/iwyu-ubuntu.imp
