@@ -25,14 +25,13 @@
 
 #include "RCSController.h"               // IWYU pragma: associated
 
-#include <osp/Active/scene.h>            // for ACompTransform
-#include <osp/Active/SysWire.h>          // for ACompWire, ACompWireNodes
+#include <osp/Active/basic.h>            // for ACompTransform
+#include <osp/Active/SysWire.h>          // for ACompWire, ACtxWireNodes
 #include <osp/Active/physics.h>
 #include <osp/Active/SysSignal.h>        // for Signal<>::NodeState, SysSignal
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
-#include <osp/Active/SysMachine.h>       // for ACompMachines
-#include <osp/Active/ActiveScene.h>
+#include <osp/Active/machines.h>         // for ACompMachines
 #include <osp/Active/activetypes.h>      // for ActiveEnt, ActiveReg_t
 
 #include <osp/Resource/machines.h>
@@ -53,6 +52,8 @@
 // IWYU pragma: no_include <stdint.h>
 // IWYU pragma: no_include <type_traits>
 
+#if 0
+
 namespace osp { class Package; }
 namespace osp { struct Path; }
 
@@ -63,8 +64,8 @@ using osp::active::ACompPhysDynamic;
 using osp::active::ACompTransform;
 using osp::active::SysPhysics;
 
-using osp::active::ACompWirePanel;
-using osp::active::ACompWireNodes;
+using osp::active::MCompWirePanel;
+using osp::active::ACtxWireNodes;
 using osp::active::ACompWire;
 using osp::active::SysWire;
 using osp::active::SysSignal;
@@ -87,7 +88,7 @@ using osp::Vector3;
 namespace adera::active::machines
 {
 
-float SysMachineRCSController::thruster_influence(Vector3 posOset, Vector3 direction,
+float SysMCompRCSController::thruster_influence(Vector3 posOset, Vector3 direction,
     Vector3 cmdTransl, Vector3 cmdRot)
 {
     // Thrust is applied in opposite direction of thruster nozzle direction
@@ -125,23 +126,23 @@ float SysMachineRCSController::thruster_influence(Vector3 posOset, Vector3 direc
     return std::clamp(rotInfluence + translInfluence, 0.0f, 1.0f);
 }
 
-void SysMachineRCSController::update_construct(ActiveScene &rScene)
+void SysMCompRCSController::update_construct(ActiveScene &rScene)
 {
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = osp::mach_id<MachineRCSController>();
+    machine_id_t const id = osp::mach_id<MCompRCSController>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
-        // Check if the vehicle blueprint might store MachineRCSControllers
+        // Check if the vehicle blueprint might store MCompRCSControllers
         if (rVehConstr.m_blueprint->m_machines.size() <= id)
         {
             continue;
         }
 
-        // Initialize all MachineRCSControllers in the vehicle
+        // Initialize all MCompRCSControllers in the vehicle
         for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
         {
             // Get part
@@ -151,20 +152,20 @@ void SysMachineRCSController::update_construct(ActiveScene &rScene)
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
-            rScene.reg_emplace<MachineRCSController>(machEnt);
+            rScene.reg_emplace<MCompRCSController>(machEnt);
         }
     }
 }
 
 
-void SysMachineRCSController::update_calculate(ActiveScene& rScene)
+void SysMCompRCSController::update_calculate(ActiveScene& rScene)
 {
     using adera::wire::Percent;
     using adera::wire::AttitudeControl;
 
-    ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
+    ACtxWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
     std::vector<ActiveEnt>& rToUpdate
-            = SysWire::to_update<MachineRCSController>(rScene);
+            = SysWire::to_update<MCompRCSController>(rScene);
 
     UpdNodes_t<Percent> updPercent;
 
@@ -173,18 +174,18 @@ void SysMachineRCSController::update_calculate(ActiveScene& rScene)
         float influence = 0.0f;
 
         auto const *pPanelAtCtrl = rScene.get_registry()
-                .try_get< ACompWirePanel<AttitudeControl> >(ent);
+                .try_get< MCompWirePanel<AttitudeControl> >(ent);
 
         if (pPanelAtCtrl != nullptr)
         {
             WirePort<AttitudeControl> const *pPortCommand
-                    = pPanelAtCtrl->port(MachineRCSController::smc_wiCommandOrient);
+                    = pPanelAtCtrl->port(MCompRCSController::smc_wiCommandOrient);
 
             // Read AttitudeControl Command Input
             if (pPortCommand != nullptr)
             {
                 auto const &nodesAttCtrl
-                        = rScene.reg_get< ACompWireNodes<AttitudeControl> >(
+                        = rScene.reg_get< ACtxWireNodes<AttitudeControl> >(
                             rScene.hier_get_root());
                 WireNode<AttitudeControl> const &nodeCommand
                         = nodesAttCtrl.get_node(pPortCommand->m_nodeIndex);
@@ -217,12 +218,12 @@ void SysMachineRCSController::update_calculate(ActiveScene& rScene)
         }
 
         auto const *pPanelPercent = rScene.get_registry()
-                .try_get< ACompWirePanel<Percent> >(ent);
+                .try_get< MCompWirePanel<Percent> >(ent);
 
         if (pPanelPercent != nullptr)
         {
             WirePort<Percent> const *pPortThrottle
-                    = pPanelPercent->port(MachineRCSController::m_woThrottle);
+                    = pPanelPercent->port(MCompRCSController::m_woThrottle);
 
             // Write to throttle output
             if (pPortThrottle != nullptr)
@@ -248,3 +249,5 @@ void SysMachineRCSController::update_calculate(ActiveScene& rScene)
 }
 
 } // namespace adera::active::machines
+
+#endif

@@ -25,14 +25,10 @@
 #pragma once
 
 
-#include <osp/Active/activetypes.h>
-#include <osp/Active/drawing.h>
+#include <osp/Active/opengl/SysRenderGL.h>
 #include <osp/Resource/Resource.h>
 
-
 #include <Magnum/Shaders/PhongGL.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/GL/Texture.h>
 #include <Magnum/Math/Color.h>
 
 #include <string_view>
@@ -40,6 +36,8 @@
 
 namespace osp::shader
 {
+
+struct ACtxPhongData;
 
 class Phong : protected Magnum::Shaders::PhongGL
 {
@@ -51,11 +49,44 @@ public:
     using Flag = Magnum::Shaders::PhongGL::Flag;
 
     static void draw_entity(
-            osp::active::ActiveEnt ent, osp::active::ActiveScene& rScene,
-            osp::active::ACompCamera const& camera, void* pUserData) noexcept;
+            osp::active::ActiveEnt ent,
+            osp::active::ACompCamera const& camera,
+            osp::active::EntityToDraw::UserData_t userData) noexcept;
 
-    static RenderGroup::DrawAssigner_t gen_assign_phong_opaque(
-            Phong* pNoTexture, Phong* pTextured);
+    /**
+     * @brief Assign a Phong shader to a set of entities, and write results to
+     *        a RenderGroup
+     *
+     * @param entities      [in] Entities to consider
+     * @param rStorage      [out] RenderGroup storage
+     * @param viewOpaque    [in] View for opaque component
+     * @param viewDiffuse   [in] View for diffuse texture component
+     * @param rData         [in] Phong shader data, stable memory required
+     */
+    static void assign_phong_opaque(
+            RenderGroup::ArrayView_t entities,
+            RenderGroup::Storage_t& rStorage,
+            osp::active::acomp_view_t<osp::active::ACompOpaque const> viewOpaque,
+            osp::active::acomp_view_t<osp::active::ACompTextureGL const> viewDiffuse,
+            ACtxPhongData &rData);
+};
+
+/**
+ * @brief Stores per-scene data needed for Phong shaders to draw
+ */
+struct ACtxPhongData
+{
+    struct Views
+    {
+        active::acomp_view_t< osp::active::ACompDrawTransform > m_drawTf;
+        active::acomp_view_t< osp::active::ACompTextureGL >     m_diffuseTexGl;
+        active::acomp_view_t< osp::active::ACompMeshGL >        m_meshGl;
+    };
+
+    DependRes<Phong> m_shaderUntextured;
+    DependRes<Phong> m_shaderDiffuse;
+
+    std::optional<Views> m_views;
 };
 
 } // namespace osp::shader

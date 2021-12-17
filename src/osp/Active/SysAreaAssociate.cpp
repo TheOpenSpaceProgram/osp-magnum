@@ -24,13 +24,10 @@
  */
 #include "SysAreaAssociate.h"
 
-#include "ActiveScene.h"
+#include "../Satellites/SatActiveArea.h"
 
-#include "physics.h"
 
 using osp::active::SysAreaAssociate;
-
-using osp::active::ACompAreaLink;
 
 using osp::universe::Universe;
 using osp::universe::Satellite;
@@ -41,21 +38,13 @@ using osp::universe::UCompActiveArea;
 
 using osp::universe::Vector3g;
 
-void SysAreaAssociate::update_consume(ActiveScene& rScene)
+void SysAreaAssociate::update_consume(
+        ACtxAreaLink &rLink, UCompActiveArea& rAreaUComp)
 {
-    ACompAreaLink *pLink = try_get_area_link(rScene);
+    Satellite areaSat = rLink.m_areaSat;
 
-    if (pLink == nullptr)
-    {
-        return;
-    }
-
-    Universe &rUni = pLink->m_rUniverse;
-    Satellite areaSat = pLink->m_areaSat;
-    auto &rAreaUComp = rUni.get_reg().get<UCompActiveArea>(areaSat);
-
-    pLink->m_enter = std::exchange(rAreaUComp.m_enter, {});
-    pLink->m_leave = std::exchange(rAreaUComp.m_leave, {});
+    rLink.m_enter = std::exchange(rAreaUComp.m_enter, {});
+    rLink.m_leave = std::exchange(rAreaUComp.m_leave, {});
 
     Vector3g deltaTotal{};
 
@@ -64,80 +53,53 @@ void SysAreaAssociate::update_consume(ActiveScene& rScene)
         deltaTotal += delta;
     }
 
-    pLink->m_move = Vector3(deltaTotal) / universe::gc_units_per_meter;
+    rLink.m_move = Vector3(deltaTotal) / universe::gc_units_per_meter;
 }
 
-void SysAreaAssociate::update_translate(ActiveScene &rScene)
+void SysAreaAssociate::update_translate(
+        ACtxAreaLink &rLink, UCompActiveArea& rAreaUComp)
 {
-    ACompAreaLink const *pLink = try_get_area_link(rScene);
 
-    if ( ! pLink->m_move.isZero())
+    if ( ! rLink.m_move.isZero())
     {
-        floating_origin_translate(rScene, pLink->m_move * -1.0f);
+        //floating_origin_translate(rScene, rLink.m_move * -1.0f);
     }
-}
-
-ACompAreaLink* SysAreaAssociate::try_get_area_link(ActiveScene &rScene)
-{
-    return rScene.get_registry().try_get<ACompAreaLink>(rScene.hier_get_root());
-}
-
-void SysAreaAssociate::connect(ActiveScene& rScene, universe::Universe &rUni,
-                               universe::Satellite areaSat)
-{
-    ActiveEnt root = rScene.hier_get_root();
-
-    // Make sure no ACompAreaLink already exists
-    assert(!rScene.get_registry().all_of<ACompAreaLink>(root));
-
-    // Create Area Link
-    rScene.get_registry().emplace<ACompAreaLink>(root, rUni, areaSat);
-
-}
-
-void SysAreaAssociate::area_move(ActiveScene& rScene, Vector3g const& translate)
-{
-    ACompAreaLink *pArea = try_get_area_link(rScene);
-
-    if (pArea == nullptr)
-    {
-        return;
-    }
-
-    Universe &rUni = pArea->get_universe();
-    auto &rAreaSat = rUni.get_reg().get<UCompActiveArea>(pArea->m_areaSat);
-
-    rAreaSat.m_requestMove.push_back(translate);
 }
 
 void SysAreaAssociate::floating_origin_translate(
-        ActiveScene& rScene, Vector3 translation)
+        acomp_view_t<ACompFloatingOrigin const> viewFloatingOrigin,
+        acomp_view_t<ACompTransform> viewTf,
+        acomp_view_t<ACompTransformControlled const> viewTfControlled,
+        acomp_view_t<ACompTransformMutable> viewTfMutable,
+        ACtxPhysics& rCtxPhys,
+        Vector3 translation)
 {
-    auto &rReg = rScene.get_registry();
 
-    auto view = rReg.view<ACompFloatingOrigin, ACompTransform>();
-
-    for (ActiveEnt const ent : view)
+    // Attempt to translate all entities with ACompFloatingOrigin
+    for (ActiveEnt const ent : viewFloatingOrigin)
     {
-        auto &entTransform = view.get<ACompTransform>(ent);
-        //auto &entFloatingOrigin = view.get<ACompFloatingOrigin>(ent);
+        auto &rEntTransform = viewTf.get<ACompTransform>(ent);
 
-        if (rReg.all_of<ACompTransformControlled>(ent))
+        // Check for an ACompTransformControlled. Its existence indicates that
+        // the transform is in control and reserved by another system
+        if (viewTfControlled.contains(ent))
         {
-            auto *tfMutable = rReg.try_get<ACompTransformMutable>(ent);
-            if (tfMutable == nullptr)
+            // Check for a ACompTransformMutable. If not exists, mutation is not
+            // allowed.
+            if ( ! viewTfMutable.contains(ent))
             {
                 continue;
             }
 
-            tfMutable->m_dirty = true;
+            // Mutation is allowed as long as a dirty flag is set
+            viewTfMutable.get<ACompTransformMutable>(ent).m_dirty = true;
         }
 
-        entTransform.m_transform.translation() += translation;
+        rEntTransform.m_transform.translation() += translation;
     }
 
     // Tell physics engine to translate its rigid bodies as well
-    rReg.ctx<ACtxPhysics>().m_originTranslate += translation;
+    rCtxPhys.m_originTranslate += translation;
 }
 
 

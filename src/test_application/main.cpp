@@ -28,39 +28,48 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "ActiveApplication.h"
-#include "flight.h"
+#include "activescenes/scenarios.h"
 
 #include "universes/simple.h"
 #include "universes/planets.h"
 
 #include <osp/Resource/AssetImporter.h>
-#include <osp/Satellites/SatVehicle.h>
-#include <osp/Shaders/Phong.h>
 #include <osp/string_concat.h>
 #include <osp/logging.h>
 
 #include <adera/ShipResources.h>
 #include <adera/Shaders/PlumeShader.h>
 
-#include <adera/Machines/Container.h>
-#include <adera/Machines/RCSController.h>
-#include <adera/Machines/Rocket.h>
-#include <adera/Machines/UserControl.h>
-
-#include <planet-a/Satellites/SatPlanet.h>
-
+#include <Magnum/Primitives/Cube.h>
 #include <Corrade/Utility/Arguments.h>
 
+#include <iostream>
 #include <memory>
 #include <thread>
-#include <iostream>
+#include <unordered_map>
 
 using namespace testapp;
 
-void config_controls();
+/**
+ * @brief Starts a spaghetti REPL line interface that gets inputs from stdin
+ *
+ * This interface can be used to run commands and load scenes
+ *
+ * @return An error code maybe
+ */
+int debug_cli_loop();
 
 /**
- * As the name implies. This should only be called once for the entire lifetime
+ * @brief Starts Magnum application (ActiveApplication) thread g_magnumThread
+ *
+ * This initializes an OpenGL context, and opens the window
+ */
+void start_magnum_async();
+
+/**
+ * @brief As the name implies
+ *
+ * This should only be called once for the entire lifetime
  * of the program.
  *
  * prefer not to use names like this anywhere else but main.cpp
@@ -68,44 +77,71 @@ void config_controls();
 void load_a_bunch_of_stuff();
 
 /**
- * Try to everything in the universe
+ * @brief Attempt to destroy everything in the universe
  */
 bool destroy_universe();
-
-/**
- * The spaghetti command line interface that gets inputs from stdin. This
- * function will only return once the user exits.
- * @return An error code maybe
- */
-int debug_cli_loop();
 
 // called only from commands to display information
 void debug_print_help();
 void debug_print_resources();
-void debug_print_sats();
-void debug_print_hier();
-void debug_print_machines();
 
 // Stores loaded resources in packages.
 osp::PackageRegistry g_packages;
 
-// Test application stores 1 universe and its update function
-osp::universe::Universe g_universe;
-universe_update_t g_universeUpdate;
+// Test application supports 1 Active Scene
+entt::any g_activeScene;
+std::function<void(ActiveApplication&)> g_appSetup;
 
-// Deals with the window, OpenGL context, and other game engine stuff that
-// often have "Active" written all over them
-std::unique_ptr<ActiveApplication> g_ActiveApplication;
+// Test application supports 1 Universe
+std::shared_ptr<UniverseScene> g_universeScene;
+
+// Magnum Application deals with window and OpenGL things
+std::optional<ActiveApplication> g_activeApplication;
 std::thread g_magnumThread;
 
 // Loggers
 std::shared_ptr<spdlog::logger> g_logTestApp;
 std::shared_ptr<spdlog::logger> g_logMagnumApp;
 
-
 // lazily save the arguments to pass to Magnum
 int g_argc;
 char** g_argv;
+
+struct Option
+{
+    std::string_view m_desc;
+    void(*m_run)();
+};
+
+std::unordered_map<std::string_view, Option> const g_scenes
+{
+    {"enginetest", {"Demonstrate basic game engine functionality", [] {
+
+        using namespace enginetest;
+        g_activeScene = setup_scene(g_packages.find("lzdb"));
+
+        g_appSetup = [] (ActiveApplication& rApp)
+        {
+            EngineTestScene& rScene
+                    = entt::any_cast<EngineTestScene&>(g_activeScene);
+            rApp.set_on_draw(gen_draw(rScene, rApp));
+            load_gl_resources(*g_activeApplication);
+        };
+    }}},
+    {"physicstest", {"Physics lol", [] {
+
+        using namespace physicstest;
+        g_activeScene = setup_scene(g_packages.find("lzdb"));
+
+        g_appSetup = [] (ActiveApplication& rApp)
+        {
+            PhysicsTestScene& rScene
+                    = entt::any_cast<PhysicsTestScene&>(g_activeScene);
+            rApp.set_on_draw(gen_draw(rScene, rApp));
+            load_gl_resources(*g_activeApplication);
+        };
+    }}}
+};
 
 int main(int argc, char** argv)
 {
@@ -134,31 +170,17 @@ int main(int argc, char** argv)
 
     if(args.value("scene") != "none")
     {
-        if(args.value("scene") == "simple")
-        {
-            simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
-        }
-        else if(args.value("scene") == "moon")
-        {
-            moon::create(g_packages, g_universe, g_universeUpdate);
-        }
-        else
+        auto const it = g_scenes.find(args.value("scene"));
+
+        if(it != std::end(g_scenes))
         {
             std::cerr << "unknown scene" << std::endl;
             exit(-1);
         }
 
-        if (g_magnumThread.joinable())
-        {
-            g_magnumThread.join();
-        }
-        std::thread t([] {
-            osp::set_thread_logger(g_logMagnumApp);
-            test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
-                        std::ref(g_universe), std::ref(g_universeUpdate),
-                        ActiveApplication::Arguments{g_argc, g_argv});
-        });
-        g_magnumThread.swap(t);
+        it->second.m_run();
+
+        start_magnum_async();
     }
 
     if(!args.isSet("norepl"))
@@ -189,60 +211,54 @@ int debug_cli_loop()
         std::cout << "> ";
         std::cin >> command;
 
-        if (command == "help")
+        if (auto const it = g_scenes.find(command);
+            it != std::end(g_scenes))
+        {
+            if (g_activeApplication.has_value())
+            {
+                // TODO: Figure out some way to reload the application while
+                //       its still running.
+                //       ie. Message it to destroy its GL resources and draw
+                //           function, then load new scene
+                std::cout << "Close application before openning new scene\n";
+            }
+            else
+            {
+                std::cout << "Loading scene: " << it->first << "\n";
+                it->second.m_run();
+                start_magnum_async();
+            }
+        }
+        else if (command == "help")
         {
             debug_print_help();
         }
-        else if (command == "simple")
+        else if (command == "reopen")
         {
-            if (destroy_universe())
+            if (g_activeApplication.has_value())
             {
-                simplesolarsystem::create(g_packages, g_universe, g_universeUpdate);
+                std::cout << "Application is already open\n";
             }
-        }
-        else if (command == "moon")
-        {
-            if (destroy_universe())
+            else if ( ! bool(g_activeScene) )
             {
-                moon::create(g_packages, g_universe, g_universeUpdate);
+                std::cout << "No existing scene loaded\n";
             }
-        }
-        else if (command == "flight")
-        {
-            if (g_magnumThread.joinable())
+            else
             {
-                g_magnumThread.join();
+                start_magnum_async();
             }
-            std::thread t([] {
-                osp::set_thread_logger(g_logMagnumApp);
-                test_flight(std::ref(g_ActiveApplication), std::ref(g_packages),
-                            std::ref(g_universe), std::ref(g_universeUpdate),
-                            ActiveApplication::Arguments{g_argc, g_argv});
-            });
-            g_magnumThread.swap(t);
+
         }
         else if (command == "list_pkg")
         {
             debug_print_resources();
         }
-        else if (command == "list_uni")
-        {
-            debug_print_sats();
-        }
-        else if (command == "list_ent")
-        {
-            debug_print_hier();
-        }
-        else if (command == "list_mach")
-        {
-            debug_print_machines();
-        }
         else if (command == "exit")
         {
-            if (g_ActiveApplication)
+            if (g_activeApplication)
             {
                 // request exit if application exists
-                g_ActiveApplication->exit();
+                g_activeApplication->exit();
             }
             destroy_universe();
             break;
@@ -256,18 +272,47 @@ int debug_cli_loop()
     return 0;
 }
 
+void start_magnum_async()
+{
+    if (g_magnumThread.joinable())
+    {
+        g_magnumThread.join();
+    }
+    std::thread t([] {
+        osp::set_thread_logger(g_logMagnumApp);
+
+        g_activeApplication.emplace(ActiveApplication::Arguments{g_argc, g_argv});
+
+        // Configure the controls
+        config_controls(*g_activeApplication);
+
+        osp::active::SysRenderGL::setup_context(
+                    g_activeApplication->get_gl_resources());
+
+        g_appSetup(*g_activeApplication);
+
+        // Starts the main loop. This function is blocking, and will only return
+        // once the window is closed. See ActiveApplication::drawEvent
+        g_activeApplication->exec();
+
+        OSP_LOG_INFO("Closed Magnum Application");
+
+        g_activeApplication.reset();
+
+    });
+    g_magnumThread.swap(t);
+}
+
 bool destroy_universe()
 {
-    // Make sure no application is open
-    if (g_ActiveApplication != nullptr)
+    // Make sure universe isn't in use anywhere else
+    if (g_universeScene.unique())
     {
-      OSP_LOG_WARN("Application must be closed to destroy universe.");
+        OSP_LOG_WARN("Universe is still in use!");
         return false;
     }
 
-    // Destroy all satellites
-    g_universe.get_reg().clear();
-    g_universe.coordspace_clear();
+    g_universeScene.reset();
 
     // Destroy blueprints as part of destroying all vehicles
     g_packages.find("lzdb").clear<osp::BlueprintVehicle>();
@@ -299,21 +344,6 @@ void load_a_bunch_of_stuff()
 {
     // Create a new package
     osp::Package &rDebugPack = g_packages.create("lzdb");
-
-    using adera::active::machines::MachineContainer;
-    using adera::active::machines::MachineRCSController;
-    using adera::active::machines::MachineRocket;
-    using adera::active::machines::MachineUserControl;
-
-    // Register machines
-    register_machine<MachineContainer>(rDebugPack);
-    register_machine<MachineRCSController>(rDebugPack);
-    register_machine<MachineRocket>(rDebugPack);
-    register_machine<MachineUserControl>(rDebugPack);
-
-    // Register wire types
-    register_wiretype<adera::wire::AttitudeControl>(rDebugPack);
-    register_wiretype<adera::wire::Percent>(rDebugPack);
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};
@@ -357,6 +387,9 @@ void load_a_bunch_of_stuff()
 
     rDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
 
+    // Add a default cube
+    rDebugPack.add<Magnum::Trade::MeshData>("cube", Magnum::Primitives::cubeSolid());
+
     OSP_LOG_INFO("Resource loading complete");
 }
 
@@ -366,19 +399,18 @@ void debug_print_help()
 {
     std::cout
         << "OSP-Magnum Temporary Debug CLI\n"
-        << "Choose a test universe:\n"
-        << "* simple    - Simple test planet and vehicles (default)\n"
-        << "* moon      - Simulate size and gravity of real world moon\n"
-        << "\n"
-        << "Start Application:\n"
-        << "* flight    - Create an ActiveArea and start Magnum\n"
-        << "\n"
-        << "Other things to type:\n"
+        << "Open a scene:\n";
+
+    for (auto const& [name, rTestScn] : g_scenes)
+    {
+        std::cout << "* " << name << " - " << rTestScn.m_desc << "\n";
+    }
+
+    std::cout
+        << "Other commands:\n"
         << "* list_pkg  - List Packages and Resources\n"
-        << "* list_uni  - List Satellites in the universe\n"
-        << "* list_ent  - List Entities in active scene\n"
-        << "* list_upd  - List Update order from active scene\n"
         << "* help      - Show this again\n"
+        << "* reopen    - Re-open Magnum Application\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
 }
 
@@ -414,8 +446,6 @@ void debug_print_package(osp::Package const& rPkg, osp::ResPrefix_t const& prefi
     debug_print_resource_group<Magnum::GL::Mesh>(rPkg);
 
     debug_print_resource_group<adera::active::machines::ShipResourceType>(rPkg);
-    debug_print_resource_group<adera::shader::PlumeShader>(rPkg);
-    debug_print_resource_group<osp::shader::Phong>(rPkg);
 }
 
 void debug_print_resources()
@@ -426,153 +456,4 @@ void debug_print_resources()
     }
 }
 
-void debug_print_machines()
-{
-    using osp::active::ACompHierarchy;
-    using osp::active::ActiveScene;
-    using osp::active::ActiveEnt;
-    using osp::active::ACompMachines;
-    using osp::active::ACompMachineType;
-    using osp::RegisteredMachine;
-    using regmachs_t = osp::Package::group_t<RegisteredMachine>;
 
-    if (!g_ActiveApplication)
-    {
-        std::cout << "Can't do that yet, start the magnum application first!\n";
-        return;
-    }
-
-    // Get list of machine names
-    regmachs_t const* pGroup = g_packages.find("lzdb").group_get<RegisteredMachine>();
-    std::vector<std::string_view> machNames(pGroup->size());
-    for (auto const& [name, regMach] : *pGroup)
-    {
-        machNames[regMach.m_data->m_id] = name;
-    }
-
-    // Loop through every Vehicle
-    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
-    auto view = scene.get_registry().view<const ACompMachines>();
-
-    for (ActiveEnt ent : view)
-    {
-        auto const *name = scene.get_registry().try_get<osp::active::ACompName>(ent);
-        std::string_view nameview = (name != nullptr) ? std::string_view(name->m_name) : "untitled";
-        std::cout << "[" << int(ent) << "]: " << nameview << "\n";
-
-        // Loop through each of that vehicle's Machines
-        auto const &machines = scene.reg_get<ACompMachines>(ent);
-        for (ActiveEnt machEnt : machines.m_machines)
-        {
-            auto const& type = scene.reg_get<ACompMachineType>(machEnt);
-
-            std::cout << "  ->[" << int(machEnt) << "]: " << machNames[type.m_type] << "\n";
-        }
-    }
-}
-
-void debug_print_hier()
-{
-    using osp::active::ACompHierarchy;
-    using osp::active::ActiveScene;
-    using osp::active::ActiveEnt;
-
-    if (!g_ActiveApplication)
-    {
-        std::cout << "Can't do that yet, start the magnum application first!\n";
-        return;
-    }
-
-    std::cout << "ActiveScene Entity Hierarchy:\n";
-
-    std::vector<ActiveEnt> parentNextSibling;
-    ActiveScene const &scene = g_ActiveApplication->get_scenes().begin()->second.first;
-    ActiveEnt currentEnt = scene.hier_get_root();
-
-    parentNextSibling.reserve(16);
-
-    while (true)
-    {
-        // print some info about the entitysize() != 0
-        auto const &hier = scene.reg_get<ACompHierarchy>(currentEnt);
-        for (uint8_t i = 0; i < hier.m_level; i ++)
-        {
-            // print arrows to indicate level
-            std::cout << "  ->";
-        }
-        auto const *name = scene.get_registry().try_get<osp::active::ACompName>(currentEnt);
-        std::string_view nameview = (name != nullptr) ? std::string_view(name->m_name) : "untitled";
-        std::cout << "[" << uint32_t(scene.get_registry().entity(currentEnt))
-                     << "]: " << nameview << "\n";
-
-        if (hier.m_childCount != 0)
-        {
-            // entity has some children
-            currentEnt = hier.m_childFirst;
-
-
-            // save next sibling for later if it exists
-            if (hier.m_siblingNext != entt::null)
-            {
-                parentNextSibling.push_back(hier.m_siblingNext);
-            }
-        }
-        else if (hier.m_siblingNext != entt::null)
-        {
-            // no children, move to next sibling
-            currentEnt = hier.m_siblingNext;
-        }
-        else if (!parentNextSibling.empty())
-        {
-            // last sibling, and not done yet
-            // is last sibling, move to parent's (or ancestor's) next sibling
-            currentEnt = parentNextSibling.back();
-            parentNextSibling.pop_back();
-        }
-        else
-        {
-            break;
-        }
-    }
-}
-
-void debug_print_sats()
-{
-    using namespace osp::universe;
-
-    Universe const &rUni = g_universe;
-
-    Universe::Reg_t const &rReg = rUni.get_reg();
-
-    rReg.each([&rReg, &rUni] (osp::universe::Satellite sat)
-    {
-        auto const &posTraj = rReg.get<const UCompTransformTraj>(sat);
-        auto const &inCoord = rReg.get<const UCompInCoordspace>(sat);
-        auto const &coordIndex = rReg.get<const UCompCoordspaceIndex>(sat);
-
-        std::cout << "* SATELLITE: \"" << posTraj.m_name << "\"\n";
-
-        rReg.visit(sat, [&rReg] (entt::type_info info) {
-            Universe::Reg_t::poly_storage storage = rReg.storage(info);
-            std::cout << "  * UComp: " << storage->value_type().name() << "\n";
-        });
-
-        if (inCoord.m_coordSpace != entt::null)
-        {
-            CoordinateSpace const &rSpace
-                    = rUni.coordspace_get(inCoord.m_coordSpace);
-
-            auto viewPos = rSpace.ccomp_view_tuple<CCompX, CCompY, CCompZ>();
-
-            auto const pos = make_from_ccomp<Vector3g>(*viewPos, coordIndex.m_myIndex);
-
-            auto posM = osp::Vector3(pos) / 1024.0f;
-            std::cout << "  * Position: ["
-                      << pos.x() << ", " << pos.y() << ", " << pos.z() << "], ["
-                      << posM.x() << ", " << posM.y() << ", " << posM.z()
-                      << "] meters in coordspace " << inCoord.m_coordSpace << "\n";
-        }
-    });
-
-
-}

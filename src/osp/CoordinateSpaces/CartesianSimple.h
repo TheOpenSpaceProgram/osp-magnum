@@ -24,7 +24,8 @@
  */
 #pragma once
 
-#include "../Universe.h"
+#include "../universetypes.h"
+#include "../coordinates.h"
 
 namespace osp::universe
 {
@@ -43,12 +44,13 @@ struct CoordspaceCartesianSimple
      *          sure to always call update_views before accessing the
      *          CoordinateSpace's components.
      *
-     * @param rUni   [ref]
-     * @param rSpace [ref]
-     * @param rData  [ref]
+     * @param satCoordspace [ref]
+     * @param rSpace        [ref]
+     * @param rData         [ref]
      */
     static void update_exchange(
-            Universe& rUni, CoordinateSpace& rSpace,
+            Corrade::Containers::ArrayView<coordspace_index_t> satCoordspace,
+            CoordinateSpace& rSpace,
             CoordspaceCartesianSimple& rData);
 
     /**

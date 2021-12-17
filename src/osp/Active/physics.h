@@ -31,19 +31,6 @@ namespace osp::active
 {
 
 /**
- * @brief The ACtxPhysics struct
- */
-struct ACtxPhysics
-{
-    Vector3 m_originTranslate;
-
-    // Input queues
-    std::vector<ActiveEnt> m_colliderDirty;
-    std::vector<ActiveEnt> m_inertiaDirty;
-    std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
-};
-
-/**
  * @brief Synchronizes an entity with a physics engine body
  */
 struct ACompPhysBody
@@ -79,6 +66,7 @@ struct ACompPhysNetForce : Vector3 { };
  */
 struct ACompPhysNetTorque : Vector3 { };
 
+
 /**
  * @brief Keeps track of which rigid body an entity belongs to
 */
@@ -89,7 +77,7 @@ struct ACompRigidbodyAncestor
 };
 
 /**
- * Represents the shape of an entity
+ * @brief Represents the shape of an entity
  */
 struct ACompShape
 {
@@ -97,8 +85,70 @@ struct ACompShape
 };
 
 /**
- * For entities that are solid colliders for rigid bodies. Relies on ACompShape
+ * @brief Stores the mass of entities
+ */
+struct ACompMass { float m_mass; };
+
+/**
+ * @brief Tells the physics system that entity will be used as a collider.
+ *
+ * Relies on ACompShape
  */
 struct ACompSolidCollider { };
+
+struct ACompSubBody
+{
+    Vector3 m_inertia;
+    float m_mass;
+};
+
+/**
+ * @brief Physics components and other data needed to support physics in a scene
+ */
+struct ACtxPhysics
+{
+    Vector3 m_originTranslate;
+
+    acomp_storage_t<ACompPhysBody>          m_physBody;
+    acomp_storage_t<ACompPhysDynamic>       m_physDynamic;
+    acomp_storage_t<ACompPhysLinearVel>     m_physLinearVel;
+    acomp_storage_t<ACompPhysAngularVel>    m_physAngularVel;
+
+    acomp_storage_t<ACompShape>             m_shape;
+    acomp_storage_t<ACompSolidCollider>     m_solidCollider;
+    active_sparse_set_t                     m_hasColliders;
+
+}; // struct ACtxPhysics
+
+/**
+ * @brief Inputs to physics engine
+ *
+ * Intended use is to make one of these for each thread that interacts with
+ * physics, then passed to a physics update all at once.
+ *
+ */
+struct ACtxPhysInputs
+{
+    std::vector<ActiveEnt> m_bodyDirty;
+    std::vector<ActiveEnt> m_colliderDirty;
+    std::vector<ActiveEnt> m_inertiaDirty;
+    std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
+
+    acomp_storage_t<ACompPhysNetForce>  m_physNetForce;
+    acomp_storage_t<ACompPhysNetTorque> m_physNetTorque;
+
+}; // struct ACtxPhysInputs
+
+/**
+ * @brief Mass and inertia of individual entities and totals from descendants
+ *
+ * Intended to easily calculate total mass, inertia, and center of mass of an
+ * entire hierarchy for ACompPhysBody
+ */
+struct ACtxHierBody
+{
+    acomp_storage_t<ACompSubBody> m_ownDyn;
+    acomp_storage_t<ACompSubBody> m_totalDyn;
+};
 
 }

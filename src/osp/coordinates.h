@@ -56,8 +56,6 @@ using ViewCComp_t = Corrade::Containers::StridedArrayView1D<typename CCOMP_T::da
 
 using CoordinateView_t = Corrade::Containers::StridedArrayView1D<void>;
 
-using coordspace_index_t = uint32_t;
-
 /**
  * Runtime-generated sequential ID for a CComp
  */

@@ -38,7 +38,7 @@ namespace adera::active
 
 struct ACompExhaustPlume
 {
-    osp::active::ActiveEnt m_parentMachineRocket{entt::null};
+    osp::active::ActiveEnt m_parentMCompRocket{entt::null};
     osp::DependRes<PlumeEffectData> m_effect;
 
     float m_time{0.0f};

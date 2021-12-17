@@ -24,11 +24,11 @@
  */
 #pragma once
 
-#include "activetypes.h"
+#include "basic.h"
 
 #include "../Resource/Package.h"
 #include "../Resource/blueprints.h"
-#include "osp/Active/SysMachine.h"
+#include "osp/Active/machines.h"
 
 namespace osp::active
 {
@@ -73,6 +73,21 @@ struct ACompPart
     unsigned m_separationIsland{0};
 };
 
+
+/**
+ * @brief Storage for Vehicle components
+ */
+struct ACtxVehicle
+{
+    acomp_storage_t<ACompVehicle>               m_vehicle;
+    acomp_storage_t<ACompVehicleInConstruction> m_vehicleInConstruction;
+    acomp_storage_t<ACompPart>                  m_part;
+};
+
+struct ACtxPhysics;
+
+struct ACompRigidbodyAncestor;
+
 class SysVehicle
 {
 public:
@@ -82,7 +97,14 @@ public:
      *
      * @param rScene [ref] Scene containing vehicles to update
      */
-    static void update_vehicle_modification(ActiveScene& rScene);
+    static void update_vehicle_modification(
+            ACtxVehicle& rCtx,
+            ACtxPhysics& rPhys,
+            acomp_view_t<ACompTransform> viewTf,
+            acomp_view_t<ACompHierarchy> viewHier,
+            acomp_view_t<ACompRigidbodyAncestor> viewRBA);
+
+#if 0
 
     /**
      * Compute the volume of a part
@@ -110,6 +132,7 @@ public:
     static ActiveEnt part_instantiate(
             ActiveScene& rScene, PrototypePart const& part,
             BlueprintPart const& blueprint, ActiveEnt rootParent);
+#endif
 };
 
 

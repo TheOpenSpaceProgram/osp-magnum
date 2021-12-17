@@ -26,12 +26,11 @@
 
 #include <adera/ShipResources.h>          // for ShipResource, ShipResourceType
 
-#include <osp/Active/scene.h>             // for ACompMass
+#include <osp/Active/basic.h>             // for ACompMass
 #include <osp/Active/physics.h>
 #include <osp/Active/SysVehicle.h>
-#include <osp/Active/SysMachine.h>        // for ACompMachines
+#include <osp/Active/machines.h>          // for ACompMachines
 #include <osp/Active/activetypes.h>       // for ActiveEnt, ActiveReg_t, active
-#include <osp/Active/ActiveScene.h>
 
 #include <osp/Resource/Package.h>         // for Path, decompose_path, Package
 #include <osp/Resource/machines.h>        // for mach_id, machine_id_t
@@ -53,9 +52,11 @@ using namespace osp;
 using namespace osp::active;
 using namespace adera::active::machines;
 
-/* MachineContainer */
+/* MCompContainer */
 
-std::uint64_t MachineContainer::request_contents(std::uint64_t quantity)
+#if 0
+
+std::uint64_t MCompContainer::request_contents(std::uint64_t quantity)
 {
     if (quantity > m_contents.m_quantity)
     {
@@ -66,17 +67,17 @@ std::uint64_t MachineContainer::request_contents(std::uint64_t quantity)
     return quantity;
 }
 
-double MachineContainer::compute_mass() const noexcept
+double MCompContainer::compute_mass() const noexcept
 {
     if (m_contents.m_type.empty()) { return 0.0f; }
     return m_contents.m_type->resource_mass(m_contents.m_quantity);
 }
 
-/* SysMachineContainer */
+/* SysMCompContainer */
 
-void SysMachineContainer::update_containers(ActiveScene& rScene)
+void SysMCompContainer::update_containers(ActiveScene& rScene)
 {
-    auto view = rScene.get_registry().view<MachineContainer, ACompMass>();
+    auto view = rScene.get_registry().view<MCompContainer, ACompMass>();
 
     /* Currently, the only thing to do is to compute the mass of the container
      * from the contents.
@@ -84,7 +85,7 @@ void SysMachineContainer::update_containers(ActiveScene& rScene)
      */
     for (ActiveEnt ent : view)
     {
-        auto& container = view.get<MachineContainer>(ent);
+        auto& container = view.get<MCompContainer>(ent);
         auto& mass = view.get<ACompMass>(ent);
 
         // Surpress narrowing conversion warning.
@@ -92,7 +93,7 @@ void SysMachineContainer::update_containers(ActiveScene& rScene)
     }
 }
 
-MachineContainer& SysMachineContainer::instantiate(
+MCompContainer& SysMCompContainer::instantiate(
         osp::active::ActiveScene& rScene,
         osp::active::ActiveEnt ent,
         osp::PCompMachine const& config,
@@ -117,21 +118,21 @@ MachineContainer& SysMachineContainer::instantiate(
     // All tanks are cylindrical for now
     rScene.reg_emplace<ACompShape>(ent, phys::EShape::Cylinder);
 
-    return rScene.reg_emplace<MachineContainer>(ent, ent, capacity, resource);
+    return rScene.reg_emplace<MCompContainer>(ent, ent, capacity, resource);
 }
 
 
-void SysMachineContainer::update_construct(ActiveScene &rScene)
+void SysMCompContainer::update_construct(ActiveScene &rScene)
 {
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = mach_id<MachineContainer>();
+    machine_id_t const id = mach_id<MCompContainer>();
 
     for (auto const& [vehEnt, rVeh, rVehConstr] : view.each())
     {
-        // Check if the vehicle blueprint might store MachineContainers
+        // Check if the vehicle blueprint might store MCompContainers
         if (rVehConstr.m_blueprint->m_machines.size() <= id)
         {
             continue;
@@ -139,7 +140,7 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
 
         BlueprintVehicle const& vehBp = *rVehConstr.m_blueprint;
 
-        // Initialize all MachineContainers in the vehicle
+        // Initialize all MCompContainers in the vehicle
         for (BlueprintMachine &mach : rVehConstr.m_blueprint->m_machines[id])
         {
             // Get part
@@ -157,3 +158,5 @@ void SysMachineContainer::update_construct(ActiveScene &rScene)
         }
     }
 }
+
+#endif

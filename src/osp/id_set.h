@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,17 +22,25 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "Stationary.h"
+#pragma once
 
+#include <unordered_map>
 
-using namespace osp::universe;
-
-void TrajStationary::update(CoordinateSpace& rSpace)
+namespace osp
 {
 
+template<typename KEY_T, typename ID_T>
+class IdSet
+{
+public:
+    ID_T id_of(KEY_T key)
+    {
+        auto const& [it, success] = m_data.emplace(key, ID_T(m_data.size()));
+        return it->second;
+    }
+
+private:
+    std::unordered_map<KEY_T, ID_T> m_data;
+};
 
 }
-
-
-
-

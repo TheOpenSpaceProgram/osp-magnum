@@ -34,13 +34,12 @@ namespace osp::phys
  */
 enum class EShape : uint8_t
 {
-    None = 0,
-    Custom = 1,
-    Combined = 2,
-    Sphere = 3,
-    Box = 4,
-    Capsule = 5,
-    Cylinder = 6
+    None        = 0,
+    Custom      = 1,
+    Sphere      = 2,
+    Box         = 3,
+    Capsule     = 4,
+    Cylinder    = 5
 };
 
 /**

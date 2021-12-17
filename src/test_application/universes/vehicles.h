@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include "common.h"
+
 #include <osp/Universe.h>
 #include <osp/Resource/Package.h>
 #include <string_view>
@@ -44,7 +46,7 @@ namespace testapp
  * @return Satellite containing UCompVehicle
  */
 osp::universe::Satellite debug_add_deterministic_vehicle(
-        osp::universe::Universe& uni, osp::Package& pkg,
+        UniverseScene& rUniScn, osp::Package& rPkg,
         std::string_view name);
 
 /**
@@ -60,7 +62,7 @@ osp::universe::Satellite debug_add_deterministic_vehicle(
  * @return Satellite containing UCompVehicle
  */
 osp::universe::Satellite debug_add_random_vehicle(
-        osp::universe::Universe& uni, osp::Package& pkg,
+        UniverseScene& rUniScn, osp::Package& rPkg,
         std::string_view name);
 
 /**
@@ -74,7 +76,7 @@ osp::universe::Satellite debug_add_random_vehicle(
  * @return Satellite containing UCompVehicle
  */
 osp::universe::Satellite debug_add_part_vehicle(
-    osp::universe::Universe& uni, osp::Package& pkg,
+    UniverseScene& rUniScn, osp::Package& rPkg,
     std::string_view name);
 
 // TODO: put test with creating a universe with just vehicles

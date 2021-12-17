@@ -25,6 +25,7 @@
 #pragma once
 
 #include "physics.h"
+#include "basic.h"
 
 namespace osp::active
 {
@@ -63,7 +64,11 @@ class SysFFGravity : public SysForceField
 {
 public:
 
-    static void update_force(ActiveScene& rScene);
+    static void update_force(
+            acomp_view_t<ACompFFGravity const> viewGrav,
+            acomp_view_t<ACompTransform const> viewTf,
+            acomp_view_t<ACompPhysDynamic const> viewDyn,
+            acomp_storage_t<ACompPhysNetForce>& rNetForce);
 };
 
 

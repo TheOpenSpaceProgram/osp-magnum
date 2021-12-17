@@ -30,12 +30,10 @@
 using namespace osp::universe;
 
 void CoordspaceCartesianSimple::update_exchange(
-        Universe& rUni, CoordinateSpace& rSpace,
+        Corrade::Containers::ArrayView<coordspace_index_t> satCoordspace, CoordinateSpace& rSpace,
         CoordspaceCartesianSimple& rData)
 {
     rData.reserve(rData.size() + rSpace.m_toAdd.size() - rSpace.m_toRemove.size());
-
-    auto coordIndexView = rUni.get_reg().view<UCompCoordspaceIndex>();
 
     // Sort in descending order. If any of these are the last element, then
     // then they may get invalidated in the following swaps.
@@ -55,7 +53,7 @@ void CoordspaceCartesianSimple::update_exchange(
             rData.m_velocities[index] = rData.m_velocities.back();
 
             // Update index of moved last element
-            coordIndexView.get<UCompCoordspaceIndex>(back).m_myIndex = index;
+            satCoordspace[size_t(back)] = index;
         }
 
         // Pop
@@ -67,8 +65,7 @@ void CoordspaceCartesianSimple::update_exchange(
     // Add new requested satellites
     for (auto const &[sat, pos, vel] : rSpace.m_toAdd)
     {
-        auto &rCoordIndex = coordIndexView.get<UCompCoordspaceIndex>(sat);
-        rCoordIndex.m_myIndex = rData.size();
+        satCoordspace[size_t(sat)] = rData.size();
 
         rData.m_satellites.push_back(sat);
         rData.m_positions.push_back(pos);

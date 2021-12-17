@@ -26,10 +26,9 @@
 #include "SysNewton.h"               // IWYU pragma: associated
 #include "ospnewton.h"
 
-#include <osp/Active/scene.h>        // for ACompHierarchy
+#include <osp/Active/basic.h>        // for ACompHierarchy
 #include <osp/Active/physics.h>      // for ACompRigidBody
 #include <osp/Active/SysPhysics.h>   // for SysPhysics
-#include <osp/Active/ActiveScene.h>  // for ActiveScene
 #include <osp/Active/activetypes.h>  // for ActiveReg_t
 
 #include <osp/logging.h>
@@ -52,8 +51,9 @@
 
 using namespace ospnewton;
 
-using osp::active::ActiveScene;
-using osp::active::ActiveReg_t;
+using osp::active::acomp_view_t;
+using osp::active::acomp_storage_t;
+
 using osp::active::ActiveEnt;
 
 using osp::active::ACompPhysBody;
@@ -63,6 +63,7 @@ using osp::active::ACompPhysAngularVel;
 using osp::active::ACompPhysNetForce;
 using osp::active::ACompPhysNetTorque;
 using osp::active::ACtxPhysics;
+using osp::active::ACtxPhysInputs;
 using osp::active::SysPhysics;
 
 using osp::active::ACompHierarchy;
@@ -88,17 +89,37 @@ void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
     ActiveEnt const ent = static_cast<ActiveEnt>(userData);
 
     // Apply force
-    if (pWorldCtx->m_viewForce.contains(ent))
+
+    Vector3 force;
+    bool hasForce = false;
+
+    Vector3 torque;
+    bool hasTorque = false;
+
+    for (ACtxNwtWorld::ForceTorqueIn const& forceTorque
+         : pWorldCtx->m_forceTorqueIn)
     {
-        NewtonBodySetForce(
-                pBody, pWorldCtx->m_viewForce.get<ACompPhysNetForce>(ent).data());
+        if (forceTorque.m_force.contains(ent))
+        {
+            force += forceTorque.m_force.get(ent);
+            hasForce = true;
+        }
+
+        if (forceTorque.m_torque.contains(ent))
+        {
+            torque += forceTorque.m_torque.get(ent);
+            hasTorque = true;
+        }
     }
 
-    // Apply torque
-    if (pWorldCtx->m_viewTorque.contains(ent))
+    if (hasForce)
     {
-        NewtonBodySetTorque(
-                pBody, pWorldCtx->m_viewTorque.get<ACompPhysNetTorque>(ent).data());
+        NewtonBodySetForce(pBody, force.data());
+    }
+
+    if (hasTorque)
+    {
+        NewtonBodySetTorque(pBody, torque.data());
     }
 }
 
@@ -116,38 +137,24 @@ void cb_set_transform(NewtonBody const* const pBody,
     pWorldCtx->m_perThread[threadIndex].m_setTf.emplace_back(ent, pBody);
 }
 
-void SysNewton::setup(ActiveScene &rScene)
+
+void SysNewton::destroy(ACtxNwtWorld &rCtxWorld)
 {
-    int threadCount = 1; // temporary
-
-    ActiveReg_t &rReg = rScene.get_registry();
-
-    rReg.set<ACtxNwtWorld>(rScene, threadCount);
-}
-
-void SysNewton::destroy(ActiveScene &rScene)
-{
-    ActiveReg_t &rReg = rScene.get_registry();
-
     // delete collision shapes and bodies before deleting the world
-    rReg.clear<ACompNwtCollider_t>();
-    rReg.clear<ACompNwtBody_t>();
+    rCtxWorld.m_nwtColliders.clear();
+    rCtxWorld.m_nwtBodies.clear();
 
     // delete world
-    rReg.unset<ACtxNwtWorld>();
+    rCtxWorld.m_nwtWorld.reset();
 }
 
-void SysNewton::update_translate(ActiveScene& rScene)
+void SysNewton::update_translate(ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld)
 {
-    ActiveReg_t &rReg = rScene.get_registry();
 
-    auto &rPhysCtx = rReg.ctx<ACtxPhysics>();
-    auto &rWorldCtx = rReg.ctx<ACtxNwtWorld>();
-
-    NewtonWorld const* pNwtWorld = rWorldCtx.m_nwtWorld.get();
+    NewtonWorld const* pNwtWorld = rCtxWorld.m_nwtWorld.get();
 
     // Origin translation
-    if (Vector3 const translate = std::exchange(rPhysCtx.m_originTranslate, {});
+    if (Vector3 const translate = std::exchange(rCtxPhys.m_originTranslate, {});
         ! translate.isZero())
     {
         // Translate every newton body
@@ -162,223 +169,292 @@ void SysNewton::update_translate(ActiveScene& rScene)
     }
 }
 
-void SysNewton::update_world(ActiveScene& rScene)
+void SysNewton::update_colliders(
+        ACtxPhysics &rCtxPhys, ACtxNwtWorld &rCtxWorld,
+        std::vector<ActiveEnt> &rCollidersDirty)
 {
-    ActiveReg_t &rReg = rScene.get_registry();
+    using osp::phys::EShape;
 
-    auto &rPhysCtx = rReg.ctx<ACtxPhysics>();
-    auto &rWorldCtx = rReg.ctx<ACtxNwtWorld>();
+    for (ActiveEnt ent : rCollidersDirty)
+    {
+        ACompShape const& shape = rCtxPhys.m_shape.get(ent);
 
-    NewtonWorld const* pNwtWorld = rWorldCtx.m_nwtWorld.get();
+        NewtonWorld const *pNwtWorld = rCtxWorld.m_nwtWorld.get();
+        NewtonCollision *pNwtCollider = nullptr;
+
+        switch (shape.m_shape)
+        {
+        case EShape::Custom:
+            // TODO
+            break;
+        case EShape::Sphere:
+            pNwtCollider = NewtonCreateSphere(pNwtWorld, 1.0f, 0, nullptr);
+            break;
+        case EShape::Box:
+            pNwtCollider = NewtonCreateBox(pNwtWorld, 1, 1, 1, 0, nullptr);
+            break;
+        case EShape::Capsule:
+            // TODO
+            break;
+        case EShape::Cylinder:
+            // TODO
+            break;
+        default:
+
+            break;
+        }
+
+        if (nullptr != pNwtCollider)
+        {
+            if (rCtxWorld.m_nwtColliders.contains(ent))
+            {
+                // Replace existing Newton collider component
+                rCtxWorld.m_nwtColliders.get(ent).reset(pNwtCollider);
+            }
+            else
+            {
+                // Add new Newton collider component
+                rCtxWorld.m_nwtColliders.emplace(ent, pNwtCollider);
+            }
+
+        }
+    }
+}
+
+using Corrade::Containers::ArrayView;
+
+void SysNewton::update_world(
+        ACtxPhysics& rCtxPhys,
+        ACtxNwtWorld& rCtxWorld,
+        ArrayView<ACtxPhysInputs> inputs,
+        acomp_storage_t<ACompHierarchy> const& rHier,
+        acomp_storage_t<ACompTransform>& rTf,
+        acomp_storage_t<ACompTransformControlled>& rTfControlled,
+        acomp_storage_t<ACompTransformMutable>& rTfMutable)
+{
+
+    NewtonWorld const* pNwtWorld = rCtxWorld.m_nwtWorld.get();
 
     // temporary: just delete the Newton Body if colliders change, so it can be
     //            reinitialized with new colliders
-    for (ActiveEnt ent : std::exchange(rPhysCtx.m_colliderDirty, {}))
-    {
-        rReg.remove<ACompNwtCollider_t>(ent);
-        create_body(rScene, ent, pNwtWorld);
-    }
+//    for (ActiveEnt ent : std::exchange(rCtxPhys.m_colliderDirty, {}))
+//    {
+//        rCtxWorld.m_nwtColliders.remove(ent);
+//        create_body(rCtxPhys, rCtxWorld, viewHier, viewTf, rTfControlled,
+//                    rTfMutable, ent, pNwtWorld);
+//    }
 
     // Iterate rigid bodies that don't have a NewtonBody
-    for (ActiveEnt ent : rScene.get_registry().view<ACompPhysBody>(entt::exclude<ACompNwtBody_t>))
-    {
-        create_body(rScene, ent, pNwtWorld);
-    }
 
-    // Recompute inertia and center of mass if rigidbody has been modified
-    for (ActiveEnt ent : std::exchange(rPhysCtx.m_inertiaDirty, {}))
-    {
-        compute_rigidbody_inertia(rScene, ent);
-        OSP_LOG_TRACE("Updating RB : new CoM Z = {}",
-                      entBody.m_centerOfMassOffset.z());
-    }
+    entt::basic_view<ActiveEnt, entt::exclude_t<ACompNwtBody_t>, ACompPhysBody> view{rCtxPhys.m_physBody, rCtxWorld.m_nwtBodies};
 
-    auto viewNwtBody = rReg.view<ACompNwtBody_t>();
-    auto viewLinVel = rReg.view<ACompPhysLinearVel>();
-    auto viewAngVel = rReg.view<ACompPhysAngularVel>();
+    for (ActiveEnt ent : view)
+    {
+        create_body(rCtxPhys, rCtxWorld, rHier, rTf, rTfControlled,
+                    rTfMutable, ent, pNwtWorld);
+    }
 
     // Apply changed velocities
-    for (auto const& [ent, vel] : std::exchange(rPhysCtx.m_setVelocity, {}))
+    for (ACtxPhysInputs &rInputs : inputs)
     {
-        NewtonBodySetVelocity(viewNwtBody.get<ACompNwtBody_t>(ent).get(),
-                              vel.data());
+        for (auto const& [ent, vel] : std::exchange(rInputs.m_setVelocity, {}))
+        {
+            NewtonBodySetVelocity(rCtxWorld.m_nwtBodies.get(ent).get(), vel.data());
+        }
     }
 
+    // Expose force and torque inputs to Newton callbacks
+    rCtxWorld.m_forceTorqueIn.resize(inputs.size());
+    for (int i = 0; i < inputs.size(); i ++)
+    {
+        std::swap(rCtxWorld.m_forceTorqueIn[i].m_force, inputs[i].m_physNetForce);
+        std::swap(rCtxWorld.m_forceTorqueIn[i].m_torque, inputs[i].m_physNetTorque);
+    }
 
     // Update the world
-    NewtonUpdate(pNwtWorld, rScene.get_time_delta_fixed());
+    NewtonUpdate(pNwtWorld, 1.0f / 60.0f);
 
-    rReg.clear<ACompPhysNetForce>();
-    rReg.clear<ACompPhysNetTorque>();
+    // Return force and torques, then clear
+    for (int i = 0; i < inputs.size(); i ++)
+    {
+        std::swap(rCtxWorld.m_forceTorqueIn[i].m_force, inputs[i].m_physNetForce);
+        std::swap(rCtxWorld.m_forceTorqueIn[i].m_torque, inputs[i].m_physNetTorque);
 
-    auto viewTf = rReg.view<ACompTransform>();
-    auto viewDyn = rReg.view<ACompPhysDynamic>();
+        inputs[i].m_physNetForce.clear();
+        inputs[i].m_physNetTorque.clear();
+    }
 
+    for (ACtxPhysInputs &rInputs : inputs)
+    {
+        rInputs.m_physNetForce.clear();
+        rInputs.m_physNetTorque.clear();
+    }
 
     // Apply transforms and also velocity
-    for (auto &rPerThread : rWorldCtx.m_perThread)
+    for (auto &rPerThread : rCtxWorld.m_perThread)
     {
         for (auto const& [ent, pBody] : std::exchange(rPerThread.m_setTf, {}))
         {
             NewtonBodyGetMatrix(
-                    pBody, viewTf.get<ACompTransform>(ent).m_transform.data());
+                    pBody, rTf.get(ent).m_transform.data());
 
-            if (viewDyn.contains(ent))
+            if (rCtxPhys.m_physDynamic.contains(ent))
             {
                 NewtonBodyGetVelocity(
-                        pBody, viewLinVel.get<ACompPhysLinearVel>(ent).data());
+                        pBody, rCtxPhys.m_physLinearVel.get(ent).data());
 
                 NewtonBodyGetOmega(
-                        pBody, viewAngVel.get<ACompPhysAngularVel>(ent).data());
+                        pBody, rCtxPhys.m_physAngularVel.get(ent).data());
             }
         }
     }
 }
 
 void SysNewton::find_colliders_recurse(
-        ActiveScene& rScene, ActiveEnt ent, Matrix4 const &transform,
-        NewtonWorld const* pNwtWorld, NewtonCollision *pCompound)
+        ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld,
+        acomp_storage_t<ACompHierarchy> const& rHier,
+        acomp_storage_t<ACompTransform> const& rTf,
+        ActiveEnt ent, ActiveEnt firstChild,
+        Matrix4 const& transform, NewtonCollision* pCompound)
 {
-    ActiveReg_t &rReg = rScene.get_registry();
-    ActiveEnt nextChild = ent;
-
-    // iterate through siblings of ent
-    while(nextChild != entt::null)
+    // Add newton collider if exists
+    if (rCtxPhys.m_solidCollider.contains(ent)
+        && rCtxWorld.m_nwtColliders.contains(ent))
     {
-        auto const &rChildHeir = rScene.reg_get<ACompHierarchy>(nextChild);
+        NewtonCollision const *pCollision
+                = rCtxWorld.m_nwtColliders.get(ent).get();
 
-        if (auto const *pChildTransform
-                    = rScene.get_registry().try_get<ACompTransform>(nextChild);
-            pChildTransform != nullptr)
+        // Set transform relative to root body
+        Matrix4 const relOffset = Matrix4::translation(transform.translation());
+        NewtonCollisionSetMatrix(pCollision, relOffset.data());
+
+        Vector3 const scale = transform.scaling();
+        NewtonCollisionSetScale(pCollision, scale.x(), scale.y(), scale.z());
+
+        // Add body to compound collision
+        NewtonCompoundCollisionAddSubCollision(pCompound, pCollision);
+    }
+
+    if ( ! rCtxPhys.m_hasColliders.contains(ent))
+    {
+        return;
+    }
+
+    // Recurse into children if there are more colliders
+
+    ActiveEnt currentChild = firstChild;
+
+    while(currentChild != entt::null)
+    {
+        ACompHierarchy const &rChildHeir = rHier.get(currentChild);
+
+        if (rTf.contains(currentChild))
         {
-            Matrix4 childMatrix = transform * pChildTransform->m_transform;
+            ACompTransform const &rChildTransform = rTf.get(currentChild);
 
-            if (rReg.all_of<ACompSolidCollider>(nextChild))
-            {
-                auto* pChildNwtCollider = rReg.try_get<ACompNwtCollider_t>(nextChild);
+            Matrix4 const childMatrix = transform * rChildTransform.m_transform;
 
-                NewtonCollision const *collision;
-
-                if (nullptr == pChildNwtCollider)
-                {
-                    // No Newton collider exists yet
-                    collision = NewtonCreateSphere(pNwtWorld, 0.5f, 0, nullptr);
-                    rReg.emplace<ACompNwtCollider_t>(nextChild, collision);
-                }
-                else
-                {
-                    // Already has Newton collider
-                    collision = pChildNwtCollider->get();
-                }
-
-                // Set transform relative to root body
-                Matrix4 f = Matrix4::translation(childMatrix.translation());
-                NewtonCollisionSetMatrix(collision, f.data());
-
-                // Add body to compound collision
-                NewtonCompoundCollisionAddSubCollision(pCompound, collision);
-            }
-
-            find_colliders_recurse(rScene, rChildHeir.m_childFirst, childMatrix,
-                                   pNwtWorld, pCompound);
+            find_colliders_recurse(
+                    rCtxPhys, rCtxWorld, rHier, rTf, currentChild,
+                    rChildHeir.m_childFirst, childMatrix, pCompound);
         }
 
-        nextChild = rChildHeir.m_siblingNext;
+        // Select next child
+        currentChild = rChildHeir.m_siblingNext;
     }
 }
 
-void SysNewton::create_body(ActiveScene& rScene, ActiveEnt ent,
-                            NewtonWorld const* pNwtWorld)
+void SysNewton::create_body(
+        ACtxPhysics& rCtxPhys,
+        ACtxNwtWorld& rCtxWorld,
+        acomp_storage_t<ACompHierarchy> const& rHier,
+        acomp_storage_t<ACompTransform> const& rTf,
+        acomp_storage_t<ACompTransformControlled>& rTfControlled,
+        acomp_storage_t<ACompTransformMutable>& rTfMutable,
+        ActiveEnt ent,
+        NewtonWorld const* pNwtWorld)
 {
-    ActiveReg_t &rReg = rScene.get_registry();
 
-    auto const& entHier = rReg.get<ACompHierarchy>(ent);
-    auto const& entTransform = rReg.get<ACompTransform>(ent);
-    auto const* entShape = rReg.try_get<ACompShape>(ent);
+    ACompHierarchy const& entHier = rHier.get(ent);
+    ACompTransform const& entTransform = rTf.get(ent);
 
-    if (( ! rReg.all_of<ACompSolidCollider>(ent)) || (entShape == nullptr))
+    // 1. Figure out colliders
+
+    NewtonCollision const *pNwtCollider;
+    bool owningNwtCollider = false;
+
+    if (rCtxPhys.m_hasColliders.contains(ent))
     {
-        // Entity must have a collision shape to define the collision volume
+        // Create compound collision
+
+        NewtonCollision *pCompound = NewtonCreateCompoundCollision(pNwtWorld, 0);
+
+        // Collect all colliders from hierarchy.
+        NewtonCompoundCollisionBeginAddRemove(pCompound);
+        find_colliders_recurse(
+                rCtxPhys, rCtxWorld, rHier, rTf, ent, entHier.m_childFirst,
+                Matrix4{}, pCompound);
+        NewtonCompoundCollisionEndAddRemove(pCompound);
+
+        pNwtCollider = pCompound;
+        owningNwtCollider = true;
+    }
+    else if (rCtxWorld.m_nwtColliders.contains(ent))
+    {
+        // Get single collider from component
+        pNwtCollider = rCtxWorld.m_nwtColliders.get(ent).get();
+    }
+    else
+    {
+        assert(1); // physics body with no collider!
         return;
     }
 
-    NewtonBody const* pBody = nullptr;
+    // from here, pNwtCollider exists
 
-    switch (entShape->m_shape)
+    // 2. Create/Get Newton body, and add collider to it
+
+    NewtonBody const* pBody;
+
+    if (rCtxWorld.m_nwtBodies.contains(ent))
     {
-    case osp::phys::EShape::Combined:
-    {
-        // Combine collision shapes from descendants
-
-        NewtonCollision* rCompound
-                = NewtonCreateCompoundCollision(pNwtWorld, 0);
-
-        NewtonCompoundCollisionBeginAddRemove(rCompound);
-        find_colliders_recurse(rScene, entHier.m_childFirst, Matrix4{},
-                               pNwtWorld, rCompound);
-        NewtonCompoundCollisionEndAddRemove(rCompound);
-
-        if (auto* entNwtBody = rReg.try_get<ACompNwtBody_t>(ent);
-            nullptr != entNwtBody)
-        {
-            pBody = entNwtBody->get();
-            NewtonBodySetCollision(pBody, rCompound);
-        }
-        else
-        {
-            Matrix4 identity{};
-
-            pBody = NewtonCreateDynamicBody(
-                        pNwtWorld, rCompound, identity.data());
-            rReg.emplace<ACompNwtBody_t>(ent, pBody);
-        }
-
-        // this doesn't actually destroy, it decrements a reference count
-        NewtonDestroyCollision(rCompound);
-
-        // Update center of mass, moments of inertia
-        compute_rigidbody_inertia(rScene, ent);
-
-        break;
+        // Already had NewtonBody, update its collider
+        pBody = rCtxWorld.m_nwtBodies.get(ent).get();
+        NewtonBodySetCollision(pBody, pNwtCollider);
     }
-    case osp::phys::EShape::Custom:
+    else
     {
-        // Get NewtonCollision
+        // Make a new NewtonBody
+        Matrix4 identity{};
 
-        if (auto const* pEntNwtCollider = rReg.try_get<ACompNwtCollider_t>(ent);
-            nullptr != pEntNwtCollider)
-        {
-            if (auto const* pEntNwtBody = rReg.try_get<ACompNwtBody_t>(ent);
-                nullptr != pEntNwtBody)
-            {
-                pBody = pEntNwtBody->get();
-                NewtonBodySetCollision(pBody, pEntNwtCollider->get());
-            }
-            else
-            {
-                Matrix4 identity{};
-
-                pBody = NewtonCreateDynamicBody(
-                        pNwtWorld, pEntNwtCollider->get(), identity.data());
-                rReg.emplace<ACompNwtBody_t>(ent, pBody);
-            }
-        }
-        else
-        {
-            // make a collision shape somehow
-            pBody = nullptr;
-        }
-        break;
+        pBody = NewtonCreateDynamicBody(
+                rCtxWorld.m_nwtWorld.get(), pNwtCollider, identity.data());
+        rCtxWorld.m_nwtBodies.emplace(ent, pBody);
     }
-    default:
-        assert(false);
-        return;
+
+    if (owningNwtCollider)
+    {
+        // Decrement Newton ref count if it was created in this function
+        // This ensures that it is only owned by pBody
+        NewtonDestroyCollision(std::exchange(pNwtCollider, nullptr));
     }
 
     // by now, the Newton rigid body components exist
 
-    rScene.get_registry().emplace_or_replace<ACompTransformControlled>(ent);
-    rScene.get_registry().emplace_or_replace<ACompTransformMutable>(ent);
+    // Add transform controlled indicators
+    if ( ! rTfControlled.contains(ent)) { rTfControlled.emplace(ent); }
+    if ( ! rTfMutable.contains(ent)) { rTfMutable.emplace(ent); }
+
+    if (rCtxPhys.m_physDynamic.contains(ent))
+    {
+        ACompPhysDynamic const& entDyn = rCtxPhys.m_physDynamic.get(ent);
+        // Set mass
+        NewtonBodySetMassMatrix(pBody, entDyn.m_totalMass,
+                entDyn.m_inertia.x(),
+                entDyn.m_inertia.y(),
+                entDyn.m_inertia.z());
+    }
+
 
     // Set position/rotation
     NewtonBodySetMatrix(pBody, entTransform.m_transform.data());
@@ -399,27 +475,3 @@ void SysNewton::create_body(ActiveScene& rScene, ActiveEnt ent,
     NewtonBodySetUserData(pBody, reinterpret_cast<void*>(ent));
 }
 
-void SysNewton::compute_rigidbody_inertia(ActiveScene& rScene, ActiveEnt entity)
-{
-    auto &rEntDyn = rScene.reg_get<ACompPhysDynamic>(entity);
-    auto &rEntNwtBody = rScene.reg_get<ACompNwtBody_t>(entity);
-
-    // Compute moments of inertia, mass, and center of mass
-    auto const& [inertia, centerOfMass]
-            = SysPhysics::compute_hier_inertia(rScene, entity);
-    rEntDyn.m_centerOfMassOffset = centerOfMass.xyz();
-
-    // Set inertia and mass
-    rEntDyn.m_totalMass = centerOfMass.w();
-    rEntDyn.m_inertia.x() = inertia[0][0];  // Ixx
-    rEntDyn.m_inertia.y() = inertia[1][1];  // Iyy
-    rEntDyn.m_inertia.z() = inertia[2][2];  // Izz
-
-    NewtonBodySetMassMatrix(rEntNwtBody.get(), rEntDyn.m_totalMass,
-        rEntDyn.m_inertia.x(),
-        rEntDyn.m_inertia.y(),
-        rEntDyn.m_inertia.z());
-    NewtonBodySetCentreOfMass(rEntNwtBody.get(), centerOfMass.xyz().data());
-
-    OSP_LOG_TRACE("New mass: {}", entBody.m_mass);
-}

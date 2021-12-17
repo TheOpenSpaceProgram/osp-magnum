@@ -24,73 +24,44 @@
  */
 #pragma once
 
-#include "../types.h"
 #include "activetypes.h"
+#include "../Resource/machines.h"
 
-#include <entt/entity/entity.hpp>
-
-#include <string>
+#include <cstdint>
+#include <vector>
 
 namespace osp::active
 {
 
-/**
- * Component for transformation (in meters)
- */
-struct ACompTransform
-{
-    osp::Matrix4 m_transform;
-};
-
-struct ACompTransformControlled { };
-
-struct ACompTransformMutable{ bool m_dirty{false}; };
-
-struct ACompFloatingOrigin { };
+enum class MachineEnt : entt::id_type { };
 
 /**
- * Added to an entity to mark it for deletion
+ * This component is added to a part, and stores a vector that keeps track of
+ * all the Machines it uses. Machines are stored in multiple entities, so the
+ * vector keeps track of these.
  */
-struct ACompDelete{ };
-
-struct ACompName
+struct ACompMachines
 {
-    ACompName(std::string name) : m_name(std::move(name)) { }
-    std::string m_name;
-};
-
-struct ACompHierarchy
-{
-    unsigned m_level{0}; // 0 for root entity, 1 for root's child, etc...
-    ActiveEnt m_parent{entt::null};
-    ActiveEnt m_siblingNext{entt::null};
-    ActiveEnt m_siblingPrev{entt::null};
-
-    // as a parent
-    unsigned m_childCount{0};
-    ActiveEnt m_childFirst{entt::null};
-};
-
-// Stores the mass of entities
-struct ACompMass
-{
-    float m_mass;
-};
-
-/**
- * Component that represents a camera
- */
-struct ACompCamera
-{
-    float m_near;
-    float m_far;
-    Deg m_fov;
-    Vector2 m_viewport;
-
-    Matrix4 m_projection;
-    Matrix4 m_inverse;
-
-    void calculate_projection();
+    std::vector<ActiveEnt> m_machines;
 };
 
 }
+
+// Specialize entt::storage_traits to disable signals for storage that uses
+// MachineEnt as entities
+template<typename Type>
+struct entt::storage_traits<osp::active::MachineEnt, Type>
+{
+    using storage_type = basic_storage<osp::active::MachineEnt, Type>;
+};
+
+namespace osp::active
+{
+
+template<typename COMP_T>
+using mcomp_storage_t = typename entt::storage_traits<MachineEnt, COMP_T>::storage_type;
+
+template<typename... COMP_T>
+using mcomp_view_t = entt::basic_view<MachineEnt, entt::exclude_t<>, COMP_T...>;
+
+} // namespace osp::active

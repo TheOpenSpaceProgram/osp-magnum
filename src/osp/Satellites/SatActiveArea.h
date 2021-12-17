@@ -102,7 +102,7 @@ public:
      * @param rUni    [ref] Universe containing ActiveArea satellite
      * @param areaSat [in] Satellite with UCompActiveArea
      */
-    static void move(Universe& rUni, Satellite areaSat);
+    static void move(Universe& rUni, Satellite areaSat, UCompActiveArea& rArea);
 
     /**
      * @brief Activate all satellites with UCompActivationAlways
@@ -120,7 +120,9 @@ public:
      * @param rUni    [ref] Universe containing ActiveArea satellite
      * @param areaSat [in] Satellite with UCompActiveArea
      */
-    static void scan_radius(Universe& rUni, Satellite areaSat);
+    static void scan_radius(
+            Universe& rUni,  Satellite areaSat, UCompActiveArea& rArea,
+            ucomp_view_t<UCompActivationRadius const> viewActRadius);
 
     /**
      * @brief Request to move Satellites into the ActiveArea's 'capture'
@@ -133,8 +135,9 @@ public:
      * @param areaSat   [in] Satellite with UCompActiveArea
      * @param toCapture [in] Satellite to capture
      */
-    static void capture(Universe& rUni, Satellite areaSat,
-                        Corrade::Containers::ArrayView<Satellite> toCapture);
+    static void capture(
+            Universe& rUni, Satellite areaSat, UCompActiveArea& rArea,
+            Corrade::Containers::ArrayView<Satellite> toCapture);
 
     /**
      * @brief Update positions of captured objects

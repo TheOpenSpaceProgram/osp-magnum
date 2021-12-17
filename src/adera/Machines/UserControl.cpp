@@ -33,14 +33,15 @@
 #include <osp/Active/SysWire.h>          // for ACompWire, UpdNodes_t
 #include <osp/Active/SysSignal.h>        // for SysSignal
 #include <osp/Active/SysVehicle.h>       // for ACompVehicle
-#include <osp/Active/SysMachine.h>       // for ACompMachines
-#include <osp/Active/ActiveScene.h>      // for ActiveScene
+#include <osp/Active/machines.h>         // for ACompMachines
 #include <osp/Active/activetypes.h>      // for ActiveEnt, ActiveReg_t
 
 #include <osp/logging.h>                 // for OSP_LOG_...
 
 #include <iterator>                      // for std::begin, std::end
 #include <algorithm>                     // for std::sort
+
+#if 0
 
 // IWYU pragma: no_include "adera/wiretypes.h"
 
@@ -54,8 +55,8 @@ namespace osp { class Package; }
 namespace osp { struct Path; }
 
 
-using adera::active::machines::SysMachineUserControl;
-using adera::active::machines::MachineUserControl;
+using adera::active::machines::SysMCompUserControl;
+using adera::active::machines::MCompUserControl;
 using adera::wire::Percent;
 using adera::wire::AttitudeControl;
 
@@ -63,8 +64,8 @@ using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 using osp::active::ACompMachines;
 
-using osp::active::ACompWirePanel;
-using osp::active::ACompWireNodes;
+using osp::active::MCompWirePanel;
+using osp::active::ACtxWireNodes;
 using osp::active::ACompWire;
 using osp::active::SysWire;
 using osp::active::SysSignal;
@@ -83,13 +84,13 @@ using osp::machine_id_t;
 using osp::NodeMap_t;
 using osp::Vector3;
 
-void SysMachineUserControl::update_construct(ActiveScene &rScene)
+void SysMCompUserControl::update_construct(ActiveScene &rScene)
 {
     auto view = rScene.get_registry()
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    machine_id_t const id = osp::mach_id<MachineUserControl>();
+    machine_id_t const id = osp::mach_id<MCompUserControl>();
 
     for (auto [vehEnt, rVeh, rVehConstr] : view.each())
     {
@@ -109,36 +110,36 @@ void SysMachineUserControl::update_construct(ActiveScene &rScene)
             auto& machines = rScene.reg_get<ACompMachines>(partEnt);
             ActiveEnt machEnt = machines.m_machines[mach.m_protoMachineIndex];
 
-            rScene.reg_emplace<MachineUserControl>(machEnt);
+            rScene.reg_emplace<MCompUserControl>(machEnt);
         }
     }
 }
 
-void SysMachineUserControl::update_sensor(ActiveScene &rScene)
+void SysMCompUserControl::update_sensor(ActiveScene &rScene)
 {
-    OSP_LOG_TRACE("Updating all MachineUserControls");
+    OSP_LOG_TRACE("Updating all MCompUserControls");
 
     // InputDevice.IsActivated()
     // Combination
-    ACompWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
-    ACompWireNodes<AttitudeControl> &rNodesAttCtrl = SysWire::nodes<AttitudeControl>(rScene);
+    ACtxWireNodes<Percent> &rNodesPercent = SysWire::nodes<Percent>(rScene);
+    ACtxWireNodes<AttitudeControl> &rNodesAttCtrl = SysWire::nodes<AttitudeControl>(rScene);
 
     UpdNodes_t<Percent> updPercent;
     UpdNodes_t<AttitudeControl> updAttCtrl;
 
-    auto view = rScene.get_registry().view<MachineUserControl>();
+    auto view = rScene.get_registry().view<MCompUserControl>();
 
     for (ActiveEnt ent : view)
     {
-        MachineUserControl const &machine = view.get<MachineUserControl>(ent);
+        MCompUserControl const &machine = view.get<MCompUserControl>(ent);
 
         // Get the Percent Panel which contains the Throttle Port
-        auto const *pPanelPercent = rScene.reg_try_get< ACompWirePanel<Percent> >(ent);
+        auto const *pPanelPercent = rScene.reg_try_get< MCompWirePanel<Percent> >(ent);
 
         if (pPanelPercent != nullptr)
         {
             WirePort<Percent> const *pPortThrottle
-                    = pPanelPercent->port(MachineUserControl::smc_woThrottle);
+                    = pPanelPercent->port(MCompUserControl::smc_woThrottle);
 
             if (pPortThrottle != nullptr)
             {
@@ -155,12 +156,12 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
 
         // Get the Attitude Control Panel which contains the Throttle Port
         auto const *pPanelAttCtrl
-                = rScene.reg_try_get< ACompWirePanel<AttitudeControl> >(ent);
+                = rScene.reg_try_get< MCompWirePanel<AttitudeControl> >(ent);
 
         if (pPanelAttCtrl != nullptr)
         {
             WirePort<AttitudeControl> const *pPortAttCtrl
-                    = pPanelAttCtrl->port(MachineUserControl::smc_woAttitude);
+                    = pPanelAttCtrl->port(MCompUserControl::smc_woAttitude);
             WireNode<AttitudeControl> &nodeAttCtrl
                     = rNodesAttCtrl.get_node(pPortAttCtrl->m_nodeIndex);
 
@@ -184,3 +185,5 @@ void SysMachineUserControl::update_sensor(ActiveScene &rScene)
         rScene.reg_get<ACompWire>(rScene.hier_get_root()).request_update();
     }
 }
+
+#endif

@@ -24,96 +24,85 @@
  */
 #pragma once
 
-#include "ActiveScene.h"
+#include "basic.h"
 
 #include <stack>
 
 namespace osp::active
 {
 
+enum class EHierarchyTraverseStatus : bool
+{
+    Continue = true,
+    Stop = false
+};
+
+
 class SysHierarchy
 {
 public:
 
     /**
-     * Add hierarchy component to root entity in scene
+     * @brief Add an ACompHierarchy to an entity that already has ACompHierarchy
      *
-     * @param rScene [ref] scene with no hierarchy yet
+     * @param rHier     [ref] Storage for hierarchy components
+     * @param parent    [in] Parent entity containing ACompHierarchy
+     * @param child     [in] Child entity to add ACompHierarchy to
      */
-    static void setup(ActiveScene& rScene);
+    static void add_child(
+            acomp_storage_t<ACompHierarchy>& rHier,
+            ActiveEnt parent, ActiveEnt child);
 
     /**
-     * Create a new entity, and add a ACompHierarchy to it
+     * @brief Set parent-child relationship between two entities with
+     *        ACompHierarchy
      *
-     * @param rScene [ref] Scene with hierarchy
-     * @param parent [in] Entity to assign as parent
-     * @param name   [in] Name of entity
-     * @return New entity created
+     * @param viewHier  [ref] View for hierarchy components
+     * @param parent    [in] Parent entity
+     * @param child     [in] Child entity
      */
-    static ActiveEnt create_child(ActiveScene& rScene, ActiveEnt parent,
-                                  std::string const& name = {});
-
-    /**
-     * Set parent-child relationship between two nodes containing an
-     * ACompHierarchy
-     *
-     * @param rScene [ref] Scene with hierarchy
-     * @param parent [in]
-     * @param child  [in]
-     */
-    static void set_parent_child(ActiveScene& rScene,
+    static void set_parent_child(acomp_view_t<ACompHierarchy> viewHier,
                                  ActiveEnt parent, ActiveEnt child);
 
     /**
-     * Mark a hierarchy entity for deletion, and cut it out of the hierarchy
+     * @brief Cut an entity out of the hierarchy.
      *
-     * @param rScene [ref] Scene with hierarchy
-     * @param ent [in] Entity to delete
+     * @param viewHier  [ref] View for hierarchy components
+     * @param ent       [in] Entity to remove from hierarchy
      */
-    static void mark_delete_cut(ActiveScene& rScene, ActiveEnt ent)
-    {
-        cut(rScene, ent);
-        rScene.mark_delete(ent);
-    }
+    static void cut(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt ent);
 
     /**
-     * Cut an entity out of the hierarchy.
-     *
-     * @param rScene [ref] Scene with hierarchy
-     * @param ent [in]
-     */
-    static void cut(ActiveScene& rScene, ActiveEnt ent);
-
-    /**
-     * Traverse the scene hierarchy
+     * @brief Traverse the scene hierarchy
      *
      * Calls the specified callable on each entity of the scene hierarchy
      *
-     * @param rScene [ref] Scene with hierarchy
-     * @param root The entity whose sub-tree to traverse
-     * @param callable A function that accepts an ActiveEnt as an argument and
-     *                 returns false if traversal should stop, true otherwise
+     * @param viewHier  [ref] View for hierarchy components
+     * @param root      [in] The entity whose sub-tree to traverse
+     * @param callable  [in] A function that accepts an ActiveEnt, and returns
+     *                       a status stop or continue traversing
      */
     template <typename FUNC_T>
-    static void traverse(ActiveScene& rScene, ActiveEnt root, FUNC_T callable);
+    static void traverse(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt root, FUNC_T callable);
 
     /**
-     * Sort hierarchy component pool
+     * @brief Sort hierarchy component pool
      *
-     * @param rScene [ref] Scene with hierarchy
+     * @param rHier     [ref] Storage for hierarchy components
      */
-    static void sort(ActiveScene& rScene);
+    static void sort(acomp_storage_t<ACompHierarchy>& rHier);
 
     /**
-     * Mark descendents of deleted hierarchy entities as deleted too
+     * @brief Mark descendents of deleted hierarchy entities as deleted too
      *
-     * @param rScene [ref] Scene with hierarchy
+     * @param viewHier  [ref] View for hierarchy components
+     * @param rDelete   [ref] Storage for delete components
      */
-    static void update_delete(ActiveScene& rScene);
+    static void update_delete_descendents(acomp_view_t<ACompHierarchy> viewHier, acomp_storage_t<ACompDelete>& rDelete);
 };
 
 template<typename FUNC_T>
-void SysHierarchy::traverse(ActiveScene& rScene,
+void SysHierarchy::traverse(acomp_view_t<ACompHierarchy> viewHier,
                                       ActiveEnt root, FUNC_T callable)
 {
     using osp::active::ACompHierarchy;
@@ -121,11 +110,11 @@ void SysHierarchy::traverse(ActiveScene& rScene,
     std::stack<ActiveEnt> parentNextSibling;
     ActiveEnt currentEnt = root;
 
-    unsigned int rootLevel = rScene.reg_get<ACompHierarchy>(root).m_level;
+    unsigned int rootLevel = viewHier.get<ACompHierarchy>(root).m_level;
 
     while (true)
     {
-        ACompHierarchy &hier = rScene.reg_get<ACompHierarchy>(currentEnt);
+        ACompHierarchy &hier = viewHier.get<ACompHierarchy>(currentEnt);
 
         if (callable(currentEnt) == EHierarchyTraverseStatus::Stop) { return; }
 

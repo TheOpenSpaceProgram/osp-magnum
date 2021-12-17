@@ -27,11 +27,3 @@
 using osp::universe::UCompVehicle;
 using osp::universe::SatVehicle;
 
-UCompVehicle& SatVehicle::add_vehicle(
-        Universe &rUni, Satellite sat, DependRes<BlueprintVehicle> blueprint)
-{
-    rUni.get_reg().emplace<UCompActivatable>(sat);
-    rUni.get_reg().emplace<UCompActivationRadius>(sat);
-
-    return rUni.get_reg().emplace<UCompVehicle>(sat, std::move(blueprint));
-}

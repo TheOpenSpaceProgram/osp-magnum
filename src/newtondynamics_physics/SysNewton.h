@@ -25,11 +25,12 @@
 #pragma once
 
 #include <osp/Active/physics.h>      // for ACompShape
-#include <osp/Active/ActiveScene.h>  // for ActiveScene
-#include <osp/Active/activetypes.h>  // for ActiveEnt, ActiveReg_t, basic_sp...
+#include <osp/Active/basic.h>        // for ActiveEnt, ActiveReg_t, basic_sp...
 
 #include <osp/types.h>               // for Vector3, Matrix4
 #include <osp/CommonPhysics.h>       // for ECollisionShape, ECollisionShape...
+
+#include <Corrade/Containers/ArrayView.h>
 
 // IWYU pragma: no_include <cstdint>
 // IWYU pragma: no_include <stdint.h>
@@ -42,37 +43,37 @@ class NewtonCollision;
 namespace ospnewton
 {
 
-
+struct ACtxNwtWorld;
 
 class SysNewton
 {
 
 public:
 
-    static void setup(osp::active::ActiveScene& rScene);
+    static void destroy(ACtxNwtWorld &rCtxWorld);
 
-    static void destroy(osp::active::ActiveScene& rScene);
-    
-    static void update_translate(osp::active::ActiveScene& rScene);
+    static void update_translate(
+            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxNwtWorld& rCtxWorld);
 
-    static void update_world(osp::active::ActiveScene& rScene);
+    static void update_colliders(
+            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxNwtWorld& rCtxWorld,
+            std::vector<osp::active::ActiveEnt>& rCollidersDirty);
+
+    static void update_world(
+            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxNwtWorld& rCtxWorld,
+            Corrade::Containers::ArrayView<osp::active::ACtxPhysInputs> inputs,
+            osp::active::acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
+            osp::active::acomp_storage_t<osp::active::ACompTransform>& rTf,
+            osp::active::acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
+            osp::active::acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable);
 
     static NewtonWorld const* debug_get_world();
 
-    /**
-     * Create a Newton TreeCollision from a mesh using those weird triangle
-     * mesh iterators.
-     * @param shape Shape component to store NewtonCollision* into
-     * @param start
-     * @param end
-     */
-    template<class TRIANGLE_IT_T>
-    static void shape_create_tri_mesh_static(
-            osp::active::ActiveScene& rScene, osp::active::ACompShape &rShape,
-            osp::active::ActiveEnt chunkEnt,
-            TRIANGLE_IT_T const& start, TRIANGLE_IT_T const& end);
-
 private:
+
     /**
      * Search descendents for collider components and add NewtonCollisions to a
      * vector. Make sure NewtonCompoundCollisionBeginAddRemove(rCompound) is
@@ -85,9 +86,14 @@ private:
      * @param rCompound [out] Compound collision to add new colliders to
      */
     static void find_colliders_recurse(
-            osp::active::ActiveScene& rScene, osp::active::ActiveEnt ent,
-            osp::Matrix4 const &transform,
-            NewtonWorld const* pNwtWorld, NewtonCollision *rCompound);
+            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxNwtWorld& rCtxWorld,
+            osp::active::acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
+            osp::active::acomp_storage_t<osp::active::ACompTransform> const& rTf,
+            osp::active::ActiveEnt ent,
+            osp::active::ActiveEnt firstChild,
+            osp::Matrix4 const& transform,
+            NewtonCollision* pCompound);
 
     /**
      * @brief Create Newton bodies and colliders for entities with ACompPhysBody
@@ -97,19 +103,14 @@ private:
      * @param pNwtWorld [in] Newton physics world
      */
     static void create_body(
-            osp::active::ActiveScene& rScene, osp::active::ActiveEnt ent,
+            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxNwtWorld& rCtxWorld,
+            osp::active::acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
+            osp::active::acomp_storage_t<osp::active::ACompTransform> const& rTf,
+            osp::active::acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
+            osp::active::acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable,
+            osp::active::ActiveEnt ent,
             NewtonWorld const* pNwtWorld);
-
-    /**
-     * Update the inertia properties of a rigid body
-     *
-     * Given an existing rigid body, computes and updates the mass matrix and
-     * center of mass. Entirely self contained, calls the other inertia
-     * functions in this class.
-     * @param entity [in] The rigid body to update
-     */
-    static void compute_rigidbody_inertia(
-            osp::active::ActiveScene& rScene, osp::active::ActiveEnt entity);
 
 };
 

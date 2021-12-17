@@ -29,6 +29,9 @@
 namespace osp::active
 {
 
+struct ACompHierarchy;
+struct ACompTransform;
+
 class SysPhysics
 {
 public:
@@ -44,7 +47,8 @@ public:
      *         component is found, then {level-1 entity, nullptr}
      */
     static ActiveEnt find_rigidbody_ancestor(
-            ActiveScene& rScene, ActiveEnt ent);
+            acomp_view_t<ACompHierarchy> viewHier,
+            ActiveEnt ent);
 
     /**
      * Finds the transformation of an entity relative to its rigidbody ancestor
@@ -58,7 +62,9 @@ public:
      * @return A Matrix4 representing the transformation
      */
     static Matrix4 find_transform_rel_rigidbody_ancestor(
-        ActiveScene& rScene, ActiveEnt ent);
+            acomp_view_t<ACompHierarchy> viewHier,
+            acomp_view_t<ACompTransform> viewTf,
+            ActiveEnt ent);
 
 
     /**
@@ -80,7 +86,10 @@ public:
      *         returns {nullptr, nullptr}
      */
     static ACompRigidbodyAncestor* try_get_or_find_rigidbody_ancestor(
-        ActiveScene& rScene, ActiveEnt childEntity);
+            acomp_view_t<ACompHierarchy> viewHier,
+            acomp_view_t<ACompTransform> viewTf,
+            acomp_storage_t<ACompRigidbodyAncestor>& rRbAncestor,
+            ActiveEnt ent);
 
     enum EIncludeRootMass { Ignore, Include };
     /**
@@ -103,7 +112,11 @@ public:
     * @return A 4-vector containing xyz=CoM, w=total mass
     */
     template <EIncludeRootMass INCLUDE_ROOT_MASS=EIncludeRootMass::Ignore>
-    static Vector4 compute_hier_CoM(ActiveScene& rScene, ActiveEnt root);
+    static Vector4 compute_hier_CoM(
+            acomp_view_t<ACompHierarchy> const viewHier,
+            acomp_view_t<ACompTransform> const viewTf,
+            acomp_view_t<ACompMass> const viewMass,
+            ActiveEnt root);
 
     /**
      * Compute the moment of inertia of a rigid body
@@ -119,8 +132,12 @@ public:
      * @return The inertia tensor of the rigid body about its center of mass, and
      *         a 4-vector containing xyz=CoM, w=total mass
      */
-    static std::pair<Matrix3, Vector4> compute_hier_inertia(ActiveScene& rScene,
-        ActiveEnt entity);
+    static std::pair<Matrix3, Vector4> compute_hier_inertia(
+            acomp_view_t<ACompHierarchy> const viewHier,
+            acomp_view_t<ACompTransform> const viewTf,
+            acomp_view_t<ACompMass> const viewMass,
+            acomp_view_t<ACompShape> const viewShape,
+            ActiveEnt entity);
 
 
 };
