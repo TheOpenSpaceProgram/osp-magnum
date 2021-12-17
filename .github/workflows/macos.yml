@@ -7,7 +7,19 @@ on:
     types: published
 
 jobs:
+  skip-duplicates:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
+        with:
+          paths_ignore: '["README.md", "**/*.md, docs/**"]'
+
   build:
+    needs: skip-duplicates
     runs-on: macos-latest
 
     strategy:
