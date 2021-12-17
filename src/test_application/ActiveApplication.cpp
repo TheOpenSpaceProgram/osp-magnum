@@ -25,14 +25,12 @@
 
 #include "ActiveApplication.h"
 #include "osp/types.h"
-#include "osp/Active/SysHierarchy.h"
 
 #include <Magnum/Math/Color.h>
 #include <Magnum/PixelFormat.h>
 
 #include <toml.hpp>
 
-#include <spdlog/sinks/stdout_color_sinks.h>
 
 using namespace testapp;
 
@@ -47,55 +45,34 @@ using osp::input::ControlExprConfig_t;
 using osp::input::EVarTrigger;
 using osp::input::EVarOperator;
 
-ActiveApplication::ActiveApplication(const Magnum::Platform::Application::Arguments& arguments,
-                     osp::PackageRegistry &rPkgs, on_draw_t onDraw) :
-        Magnum::Platform::Application{
-            arguments,
-            Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})},
-        m_onDraw(onDraw),
-        m_userInput(12),
-        m_rPackages(rPkgs)
+ActiveApplication::ActiveApplication(
+        const Magnum::Platform::Application::Arguments& arguments)
+ : Magnum::Platform::Application{
+        arguments, Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})}
+ , m_userInput(12)
 {
-    //.setWindowFlags(Configuration::WindowFlag::Hidden)
-
     m_timeline.start();
 }
 
 ActiveApplication::~ActiveApplication()
 {
-    // Clear scene data before GL resources are freed
-    m_scenes.clear();
+    m_onDraw = {};
 }
 
 void ActiveApplication::drawEvent()
 {
     m_userInput.update_controls();
 
-    m_onDraw(*this);
+    if (m_onDraw.operator bool())
+    {
+        m_onDraw(*this);
+    }
 
     m_userInput.clear_events();
 
     swapBuffers();
     m_timeline.nextFrame();
     redraw();
-}
-
-void ActiveApplication::update_scenes()
-{
-    for (auto &[name, entry] : m_scenes)
-    {
-        auto &[rScene, updateFunc] = entry;
-        updateFunc(rScene);
-    }
-}
-
-void ActiveApplication::draw_scenes()
-{
-    for (auto &[name, entry] : m_scenes)
-    {
-        auto &[rScene, updateFunc] = entry;
-        rScene.draw();
-    }
 }
 
 void ActiveApplication::keyPressEvent(KeyEvent& event)
@@ -134,29 +111,12 @@ void ActiveApplication::mouseScrollEvent(MouseScrollEvent & event)
     m_userInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 }
 
-osp::active::ActiveScene& ActiveApplication::scene_create(std::string const& name, SceneUpdate_t upd)
-{
-    auto const& [it, success] =
-        m_scenes.try_emplace(
-            name, osp::active::ActiveScene{m_rPackages, m_glResources}, upd);
-    return it->second.first;
-}
-
-osp::active::ActiveScene& ActiveApplication::scene_create(std::string && name, SceneUpdate_t upd)
-{
-    auto const& [it, success] =
-        m_scenes.try_emplace(
-            std::move(name),
-            osp::active::ActiveScene{m_rPackages, m_glResources}, upd);
-    return it->second.first;
-}
-
-void testapp::config_controls(ActiveApplication& rPkgs)
+void testapp::config_controls(ActiveApplication& rApp)
 {
     // Configure Controls
     //Load toml
     auto data = toml::parse("settings.toml");
-    osp::input::UserInputHandler& rUserInput = rPkgs.get_input_handler();
+    osp::input::UserInputHandler &rUserInput = rApp.get_input_handler();
     for (const auto& [k, v] : data.as_table())
     {
         std::string const& primary = toml::find(v, "primary").as_string();

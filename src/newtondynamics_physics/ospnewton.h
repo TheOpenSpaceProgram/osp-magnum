@@ -24,8 +24,8 @@
  */
 #pragma once
 
+#include <osp/Active/activetypes.h>
 #include <osp/Active/SysPhysics.h>
-#include <osp/Active/ActiveScene.h>
 
 #include <Newton.h>
 
@@ -69,24 +69,25 @@ struct ACtxNwtWorld
         void operator() (NewtonWorld* pNwtWorld) { NewtonDestroy(pNwtWorld); }
     };
 
-    ACtxNwtWorld(osp::active::ActiveScene &rScene, int threadCount)
-     : m_pScene(&rScene)
-     , m_nwtWorld(NewtonCreate())
-     , m_viewForce(rScene.get_registry().view<osp::active::ACompPhysNetForce>())
-     , m_viewTorque(rScene.get_registry().view<osp::active::ACompPhysNetTorque>())
+    ACtxNwtWorld(int threadCount)
+     : m_nwtWorld(NewtonCreate())
      , m_perThread(threadCount)
     {
         NewtonWorldSetUserData(m_nwtWorld.get(), this);
     }
 
-    osp::active::ActiveScene *m_pScene;
-
     std::unique_ptr<NewtonWorld, Deleter> m_nwtWorld;
 
-    entt::basic_view<osp::active::ActiveEnt, entt::exclude_t<>,
-                     osp::active::ACompPhysNetForce> m_viewForce;
-    entt::basic_view<osp::active::ActiveEnt, entt::exclude_t<>,
-                     osp::active::ACompPhysNetTorque> m_viewTorque;
+    osp::active::acomp_storage_t<ACompNwtBody_t> m_nwtBodies;
+    osp::active::acomp_storage_t<ACompNwtCollider_t> m_nwtColliders;
+
+    struct ForceTorqueIn
+    {
+        osp::active::acomp_storage_t<osp::active::ACompPhysNetForce>  m_force;
+        osp::active::acomp_storage_t<osp::active::ACompPhysNetTorque> m_torque;
+    };
+
+    std::vector<ForceTorqueIn> m_forceTorqueIn;
 
     std::vector<PerThread> m_perThread;
 };

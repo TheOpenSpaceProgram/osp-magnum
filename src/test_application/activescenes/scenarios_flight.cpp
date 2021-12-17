@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,18 +22,26 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
+#include "scenarios.h"
 
-#include "../Universe.h"
+#include "flight.h"
 
-namespace osp::universe
+namespace testapp::flight
 {
 
-class TrajStationary
+entt::any setup_scene()
 {
-public:
+    entt::any sceneAny = entt::make_any<FlightScene>();
+    FlightScene &rScene = entt::any_cast<FlightScene&>(sceneAny);
 
-    static void update(CoordinateSpace& rSpace);
-};
+    rScene.m_nwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(1);
 
+    return std::move(sceneAny);
 }
+
+on_draw_t gen_draw(FlightScene& rScene, ActiveApplication& rApp)
+{
+    return [] (ActiveApplication& rApp) {};
+}
+
+} // namespace testapp::flight

@@ -25,7 +25,7 @@
 #include "SysExhaustPlume.h"              // IWYU pragma: associated
 
 #include <adera/Plume.h>                  // for PlumeEffectData
-#include <adera/Machines/Rocket.h>        // for MachineRocket
+#include <adera/Machines/Rocket.h>        // for MCompRocket
 
 #include <osp/Resource/Package.h>         // for Package
 #include <osp/Resource/machines.h>        // for mach_id, machine_id_t
@@ -33,12 +33,11 @@
 #include <osp/Resource/blueprints.h>      // for BlueprintMachine, BlueprintV...
 #include <osp/Resource/AssetImporter.h>   // for AssetImporter
 
-#include <osp/Active/scene.h>             // for ACompName
+#include <osp/Active/basic.h>             // for ACompName
 #include <osp/Active/drawing.h>           // for ACompShader, ACompVisible
 #include <osp/Active/SysRender.h>         // for ACompMesh
-#include <osp/Active/SysMachine.h>        // for ACompMachines
+#include <osp/Active/machines.h>          // for ACompMachines
 #include <osp/Active/SysVehicle.h>        // for ACompVehicle
-#include <osp/Active/ActiveScene.h>       // for ActiveScene
 #include <osp/Active/activetypes.h>       // for entt::basic_view, entt::basic_sparse_set
 #include <osp/Active/SysHierarchy.h>      // for osp::active::SysHierarchy
 #include <osp/logging.h>                  // for OSP_LOG_...
@@ -58,22 +57,24 @@
 // IWYU pragma: no_include <stdint.h>
 // IWYU pragma: no_include <type_traits>
 
+#if 0
+
 using namespace adera::active;
 
 using osp::active::ActiveScene;
 using osp::active::ActiveEnt;
 
 /**
- * Attach a visual exhaust plume effect to MachineRocket
+ * Attach a visual exhaust plume effect to MCompRocket
  *
- * Searches the hierarchy under the specified MachineRocket entity and
+ * Searches the hierarchy under the specified MCompRocket entity and
  * attaches an ACompExhaustPlume to the rocket's plume node. A graphical
  * exhaust plume effect will be attached to the node by SysExhaustPlume
  * when it processes the component.
  *
  * @param rScene [ref] Scene containing the following entities
  * @param part [in] Entity containing a plume in its descendents
- * @param mach [in] Entity containing MachineRocket
+ * @param mach [in] Entity containing MCompRocket
  */
 void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
 {
@@ -106,13 +107,13 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
     if (plumeNode == entt::null)
     {
         OSP_LOG_ERROR(
-                "ERROR: could not find plume anchor for MachineRocket {}",
+                "ERROR: could not find plume anchor for MCompRocket {}",
                 part);
         return;
     }
 
     OSP_LOG_INFO(
-            "MachineRocket {}'s associated plume: {}",
+            "MCompRocket {}'s associated plume: {}",
             part, plumeNode);
 
     // Get plume effect
@@ -168,11 +169,11 @@ void SysExhaustPlume::update_construct(ActiveScene& rScene)
             .view<osp::active::ACompVehicle,
                   osp::active::ACompVehicleInConstruction>();
 
-    osp::machine_id_t const id = osp::mach_id<machines::MachineRocket>();
+    osp::machine_id_t const id = osp::mach_id<machines::MCompRocket>();
 
     for (auto const& [vehEnt, rVeh, rVehConstr] : view.each())
     {
-        // Check if the vehicle blueprint might store MachineRockets
+        // Check if the vehicle blueprint might store MCompRockets
         if (rVehConstr.m_blueprint->m_machines.size() <= id)
         {
             continue;
@@ -180,7 +181,7 @@ void SysExhaustPlume::update_construct(ActiveScene& rScene)
 
         osp::BlueprintVehicle const& vehBp = *rVehConstr.m_blueprint;
 
-        // Get all MachineRockets in the vehicle
+        // Get all MCompRockets in the vehicle
         for (osp::BlueprintMachine const &mach : vehBp.m_machines[id])
         {
             // Get part
@@ -202,7 +203,7 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
 {
     g_time += rScene.get_time_delta_fixed();
 
-    using adera::active::machines::MachineRocket;
+    using adera::active::machines::MCompRocket;
     using osp::active::ACompVisible;
 
     osp::active::ActiveReg_t& reg = rScene.get_registry();
@@ -214,7 +215,7 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
         auto& plume = plumeView.get<ACompExhaustPlume>(plumeEnt);
         plume.m_time = g_time;
 
-        auto& machine = rScene.reg_get<MachineRocket>(plume.m_parentMachineRocket);
+        auto& machine = rScene.reg_get<MCompRocket>(plume.m_parentMCompRocket);
         float powerLevel = machine.current_output_power();
 
         if (powerLevel > 0.0f)
@@ -228,3 +229,5 @@ void SysExhaustPlume::update_plumes(ActiveScene& rScene)
         }
     }
 }
+
+#endif

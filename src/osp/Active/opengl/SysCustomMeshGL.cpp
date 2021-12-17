@@ -27,7 +27,7 @@
 
 using namespace osp::active;
 
-void SysCustomMeshGL::update_geometry_gl(ActiveScene &rScene)
+void SysCustomMeshGL::update_geometry_gl()
 {
 
 }

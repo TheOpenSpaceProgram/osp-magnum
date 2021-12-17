@@ -72,7 +72,6 @@ public:
      * @param updNodes      [out] Vector of nodes to update
      */
     static void signal_assign(
-            ActiveScene& rScene,
             WIRETYPE_T&& newValue,
             WireNode<WIRETYPE_T> const& rNode,
             nodeindex_t<WIRETYPE_T> nodeIndex,
@@ -89,9 +88,10 @@ public:
      * @param vehicleBp  [in] Blueprint of vehicle
      */
     static void signal_construct_nodes(
-            ActiveScene& rScene, ActiveEnt vehicleEnt,
-            ACompVehicle const& vehicle,
-            BlueprintVehicle const& vehicleBp);
+            acomp_view_t<ACompMachines> const viewMachines,
+            mcomp_view_t< MCompWirePanel<WIRETYPE_T> > viewPanels,
+            ACtxWireNodes<WIRETYPE_T>& rNodes, ActiveEnt vehicleEnt,
+            ACompVehicle const& vehicle, BlueprintVehicle const& vehicleBp);
 
     /**
      * Scan the scene for vehicles in construction, and construct Nodes and
@@ -99,7 +99,7 @@ public:
      *
      * @param rScene [ref] Scene supporting Vehicles and the right Node type
      */
-    static void signal_update_construct(ActiveScene& rScene);
+    //static void signal_update_construct(ActiveScene& rScene);
 
     /**
      * Update all signal Nodes in the scene.
@@ -109,13 +109,12 @@ public:
      *
      * @param rScene [ref] Scene supporting the right Node type
      */
-    static void signal_update_nodes(ActiveScene& rScene);
+    //static void signal_update_nodes(ActiveScene& rScene);
 
 }; // class SysSignal
 
 template<typename WIRETYPE_T>
 void SysSignal<WIRETYPE_T>::signal_assign(
-        ActiveScene& rScene,
         WIRETYPE_T&& newValue,
         WireNode<WIRETYPE_T> const& rNode,
         nodeindex_t<WIRETYPE_T> nodeIndex,
@@ -131,7 +130,9 @@ void SysSignal<WIRETYPE_T>::signal_assign(
 
 template<typename WIRETYPE_T>
 void SysSignal<WIRETYPE_T>::signal_construct_nodes(
-        ActiveScene& rScene, ActiveEnt vehicleEnt,
+        acomp_view_t<ACompMachines> const viewMachines,
+        mcomp_view_t< MCompWirePanel<WIRETYPE_T> > viewPanels,
+        ACtxWireNodes<WIRETYPE_T>& rNodes, ActiveEnt vehicleEnt,
         ACompVehicle const& vehicle, BlueprintVehicle const& vehicleBp)
 {
     wire_id_t const id = wiretype_id<WIRETYPE_T>();
@@ -146,8 +147,6 @@ void SysSignal<WIRETYPE_T>::signal_construct_nodes(
     for (BlueprintWireNode const &bpNode : vehicleBp.m_wireNodes[id])
     {
         // Create the node
-        auto &rNodes = rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(
-                    rScene.hier_get_root());
         auto const &[node, nodeIndex] = rNodes.create_node();
 
         // Create Links
@@ -157,11 +156,11 @@ void SysSignal<WIRETYPE_T>::signal_construct_nodes(
             ActiveEnt partEnt = vehicle.m_parts[bpLink.m_partIndex];
 
             // Get machine entity from vehicle
-            auto &machines = rScene.reg_get<ACompMachines>(partEnt);
+            auto const &machines = viewMachines.get<ACompMachines>(partEnt);
             ActiveEnt machEnt = machines.m_machines[bpLink.m_protoMachineIndex];
 
             // Get panel to connect to
-            auto& panel = rScene.reg_get< ACompWirePanel<WIRETYPE_T> >(machEnt);
+            auto& panel = viewPanels.template get< MCompWirePanel<WIRETYPE_T> >(machEnt);
 
             // Link them
             SysWire::connect<WIRETYPE_T>(node, nodeIndex, panel, machEnt,
@@ -171,6 +170,7 @@ void SysSignal<WIRETYPE_T>::signal_construct_nodes(
     }
 }
 
+#if 0
 template<typename WIRETYPE_T>
 void SysSignal<WIRETYPE_T>::signal_update_construct(ActiveScene& rScene)
 {
@@ -192,7 +192,7 @@ void SysSignal<WIRETYPE_T>::signal_update_construct(ActiveScene& rScene)
 template<typename WIRETYPE_T>
 void SysSignal<WIRETYPE_T>::signal_update_nodes(ActiveScene& rScene)
 {
-    auto &rNodes = rScene.reg_get< ACompWireNodes<WIRETYPE_T> >(
+    auto &rNodes = rScene.reg_get< ACtxWireNodes<WIRETYPE_T> >(
                 rScene.hier_get_root());
     auto &rWire = rScene.reg_get<ACompWire>(rScene.hier_get_root());
 
@@ -215,8 +215,8 @@ void SysSignal<WIRETYPE_T>::signal_update_nodes(ActiveScene& rScene)
              it != std::end(rNode.m_links); std::advance(it, 1))
         {
             ActiveEnt ent = it->m_entity;
-            auto const& type = rScene.reg_get<ACompMachineType>(ent);
-            machToUpdate[size_t(type.m_type)].push_back(ent);
+            //auto const& type = rScene.reg_get<ACompMachineType>(ent);
+            //machToUpdate[size_t(type.m_type)].push_back(ent);
         }
     }
 
@@ -235,5 +235,6 @@ void SysSignal<WIRETYPE_T>::signal_update_nodes(ActiveScene& rScene)
         }
     }
 }
+#endif
 
 }

@@ -28,7 +28,6 @@
 
 #include <osp/Satellites/SatVehicle.h>
 
-#include <osp/Active/ActiveScene.h>
 #include <osp/Active/SysAreaAssociate.h>
 #include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysVehicle.h>
@@ -36,10 +35,12 @@
 
 #include <osp/logging.h>
 
+#if 0
+
 using testapp::SysCameraController;
 using testapp::ACompCameraController;
 
-using adera::active::machines::MachineUserControl;
+using adera::active::machines::MCompUserControl;
 
 using osp::universe::Satellite;
 using osp::universe::Universe;
@@ -164,12 +165,12 @@ void SysCameraController::update_vehicle(ActiveScene &rScene)
     }
 }
 
-MachineUserControl* find_user_control(ActiveScene& rScene, ActiveEnt vehicle)
+MCompUserControl* find_user_control(ActiveScene& rScene, ActiveEnt vehicle)
 {
     using osp::active::ACompMachines;
     using osp::active::ACompMachineType;
 
-    osp::machine_id_t const id = osp::mach_id<MachineUserControl>();
+    osp::machine_id_t const id = osp::mach_id<MCompUserControl>();
     // Search all parts
     std::vector<ActiveEnt> const& parts = rScene.reg_get<ACompVehicle>(vehicle).m_parts;
     for (ActiveEnt partEnt : parts)
@@ -190,7 +191,7 @@ MachineUserControl* find_user_control(ActiveScene& rScene, ActiveEnt vehicle)
             if (rScene.reg_get<ACompMachineType>(machEnt).m_type == id)
             {
                 // Found!
-                return &rScene.reg_get<MachineUserControl>(machEnt);
+                return &rScene.reg_get<MCompUserControl>(machEnt);
             }
         }
     }
@@ -209,11 +210,11 @@ void SysCameraController::update_controls(ActiveScene &rScene)
         return; // No active vehicle to control
     }
 
-    MachineUserControl* pUsrCtrl = find_user_control(rScene, vehicle);
+    MCompUserControl* pUsrCtrl = find_user_control(rScene, vehicle);
 
     if (nullptr == pUsrCtrl)
     {
-        return; // No MachineUserControl found
+        return; // No MCompUserControl found
     }
 
     ControlSubscriber const& controls = rCamCtrl.m_controls;
@@ -427,3 +428,6 @@ ActiveEnt SysCameraController::find_vehicle_from_sat(
     }
     return entt::null;
 }
+
+
+#endif

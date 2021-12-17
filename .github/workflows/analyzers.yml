@@ -7,12 +7,12 @@ on:
     types: published
 
 jobs:
-  build:
+  analyze-linux:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        tool: [clang-analyzer, iwyu]
+        tool: [clang-analyzer, iwyu, CodeQL]
         config: [Release, Debug]
 
     steps:
@@ -41,10 +41,16 @@ jobs:
         # TODO: Really, this should only be fetching the build dependencies, so we can only use the in-tree version
         sudo apt install -y libsdl2-dev
 
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v1
+      if: ${{ matrix.tool == 'CodeQL' }}
+      with:
+        languages: cpp
+
     - name: Configure
       if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=R${{ matrix.config }}
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
 
     - name: Download Clang Analysis Driver Scripts
       if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
@@ -53,14 +59,57 @@ jobs:
         wget https://raw.githubusercontent.com/include-what-you-use/include-what-you-use/clang_11/iwyu_tool.py
         chmod +x run-clang-tidy.py iwyu_tool.py 
 
+    - name: Perform CodeQL Analysis
+      if: ${{ matrix.tool == 'CodeQL' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
+      uses: github/codeql-action/analyze@v1
+
     # Implicitly requires build/compile_commands.json to exist
     - name: Run Clang Analyzer
       if: ${{ matrix.tool == 'clang-analyzer' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
+        wget https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-11.0.1/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
+        chmod +x run-clang-tidy.py
         ./run-clang-tidy.py -j $(nproc) -p build
 
     # Implicitly requires build/compile_commands.json to exist
     - name: Run IWYU
       if: ${{ matrix.tool == 'iwyu' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
       run: |
+        wget https://raw.githubusercontent.com/include-what-you-use/include-what-you-use/clang_11/iwyu_tool.py
+        chmod +x iwyu_tool.py 
         ./iwyu_tool.py -j $(nproc) -p build -- -Xiwyu --mapping_file=${GITHUB_WORKSPACE}/iwyu-ubuntu.imp
+
+  analyze-windows:
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        tool: [msvc-code-analysis]
+        config: [Release, Debug]
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 1
+        submodules: recursive
+
+    - name: Configure (MSVC)
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
+
+    - name: Initialize MSVC Code Analysis
+      uses: microsoft/msvc-code-analysis-action@04825f6d9e00f87422d6bf04e1a38b1f3ed60d99
+      # Provide a unique ID to access the sarif output path
+      id: run-analysis
+      with:
+        cmakeBuildDirectory: build
+        # Ruleset file that will determine what checks will be run
+        ruleset: NativeRecommendedRules.ruleset
+        ignoredTargetPaths: 3rdparty
+        ignoredIncludePaths: 3rdparty
+
+      # Upload SARIF file to GitHub Code Scanning Alerts
+    - name: Upload SARIF to GitHub
+      uses: github/codeql-action/upload-sarif@v1
+      with:
+        sarif_file: ${{ steps.run-analysis.outputs.sarif }}

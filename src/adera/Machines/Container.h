@@ -39,14 +39,14 @@ namespace osp { struct PCompMachine; }
 namespace adera::active::machines
 {
 
-class MachineContainer;
+class MCompContainer;
 
-class SysMachineContainer
+class SysMCompContainer
 {
 public:
 
     /**
-     * Constructs MachineContainer for vehicles in-construction
+     * Constructs MCompContainer for vehicles in-construction
      *
      * @param rScene [ref] Scene supporting vehicles
      */
@@ -54,25 +54,25 @@ public:
 
     static void update_containers(osp::active::ActiveScene& rScene);
 
-    static MachineContainer& instantiate(
+    static MCompContainer& instantiate(
             osp::active::ActiveScene& rScene,
             osp::active::ActiveEnt ent,
             osp::PCompMachine const& config,
             osp::BlueprintMachine const& settings);
 
-}; // class SysMachineContainer
+}; // class SysMCompContainer
 
 //-----------------------------------------------------------------------------
 
-class MachineContainer
+class MCompContainer
 {
-    friend SysMachineContainer;
+    friend SysMCompContainer;
 
 public:
 
     static inline std::string smc_mach_name = "Container";
 
-    MachineContainer(osp::active::ActiveEnt ownID, float capacity, ShipResource resource);
+    MCompContainer(osp::active::ActiveEnt ownID, float capacity, ShipResource resource);
 
     constexpr const ShipResource& check_contents() const
     { return m_contents; }
@@ -100,9 +100,9 @@ private:
 
     float m_capacity;
     ShipResource m_contents;
-}; // class MachineContainer
+}; // class MCompContainer
 
-inline MachineContainer::MachineContainer(osp::active::ActiveEnt ownID,
+inline MCompContainer::MCompContainer(osp::active::ActiveEnt ownID,
     float capacity, ShipResource resource)
  : m_capacity(capacity)
  , m_contents(resource)

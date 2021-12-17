@@ -24,49 +24,35 @@
  */
 #pragma once
 
-#include <osp/Active/ActiveScene.h>
-#include <osp/Resource/PackageRegistry.h>
+#include "activescenes/scenarios.h"
 
 #include <osp/types.h>
 #include <osp/UserInputHandler.h>
+#include <osp/Resource/Package.h>
 
 #include <Magnum/Timeline.h>
-#include <Magnum/GL/Buffer.h>
-#include <Magnum/GL/DefaultFramebuffer.h>
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/Math/Color.h>
+
 #include <cstring> // workaround: memcpy needed by SDL2
 #include <Magnum/Platform/Sdl2Application.h>
-#include <Magnum/Shaders/VertexColorGL.h>
 
+#include <functional>
 #include <memory>
 
 namespace testapp
 {
 
-using SceneUpdate_t = std::function<void(osp::active::ActiveScene&)>;
-
-using MapActiveScene_t = std::map<
-        std::string,
-        std::pair<osp::active::ActiveScene, SceneUpdate_t>,
-        std::less<> >;
-
 /**
- * @brief An interactive Magnum application made for running ActiveScenes
+ * @brief An interactive Magnum application
  *
- * These scenes can be a flight scene, map view, vehicle editor, or menu.
+ * This is intended to run a flight scene, map view, vehicle editor, or menu.
  */
 class ActiveApplication : public Magnum::Platform::Application
 {
 
 public:
 
-    using on_draw_t = std::function<void(ActiveApplication&)>;
-
     explicit ActiveApplication(
-            const Magnum::Platform::Application::Arguments& arguments,
-            osp::PackageRegistry &rPkgs,
-            on_draw_t onDraw);
+            const Magnum::Platform::Application::Arguments& arguments);
 
     ~ActiveApplication();
 
@@ -78,16 +64,20 @@ public:
     void mouseMoveEvent(MouseMoveEvent& event) override;
     void mouseScrollEvent(MouseScrollEvent& event) override;
 
-    void update_scenes();
-    void draw_scenes();
+    void set_on_draw(on_draw_t onDraw)
+    {
+        m_onDraw = std::move(onDraw);
+    }
 
-    osp::active::ActiveScene& scene_create(std::string const& name, SceneUpdate_t upd);
-    osp::active::ActiveScene& scene_create(std::string&& name, SceneUpdate_t upd);
+    constexpr osp::input::UserInputHandler& get_input_handler() noexcept
+    {
+        return m_userInput;
+    }
 
-    constexpr osp::input::UserInputHandler& get_input_handler() { return m_userInput; }
-    constexpr MapActiveScene_t& get_scenes() { return m_scenes; }
-
-    constexpr osp::Package& get_context_resources() { return m_glResources; }
+    constexpr osp::Package& get_gl_resources() noexcept
+    {
+        return m_glResources;
+    }
 
 private:
 
@@ -97,16 +87,12 @@ private:
 
     osp::input::UserInputHandler m_userInput;
 
-    MapActiveScene_t m_scenes;
-
-    osp::PackageRegistry &m_rPackages;
+    Magnum::Timeline m_timeline;
 
     osp::Package m_glResources;
-
-    Magnum::Timeline m_timeline;
 };
 
-void config_controls(ActiveApplication& rPkgs);
+void config_controls(ActiveApplication& rApp);
 
 }
 

@@ -22,14 +22,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 #include "simple.h"
 #include "vehicles.h"
 
 #include <osp/Satellites/SatVehicle.h>
 
 #include <osp/CoordinateSpaces/CartesianSimple.h>
-#include <osp/Trajectories/Stationary.h>
 #include <osp/logging.h>
 
 #include <planet-a/Satellites/SatPlanet.h>
@@ -48,7 +46,6 @@ using osp::universe::SatVehicle;
 using osp::universe::CoordinateSpace;
 using osp::universe::CoordspaceCartesianSimple;
 
-using osp::universe::UCompInCoordspace;
 using osp::universe::UCompActiveArea;
 
 using planeta::universe::SatPlanet;
@@ -57,10 +54,11 @@ using planeta::universe::UCompPlanet;
 using osp::universe::Vector3g;
 
 void simplesolarsystem::create(PackageRegistry& rPkgs,
-                               Universe& rUni, universe_update_t& rUpdater)
+                               UniverseScene& rUniScn, universe_update_t& rUpdater)
 {
     Package &rPkg = rPkgs.find("lzdb");
 
+    Universe &rUni = rUniScn.m_universe;
     Satellite root = rUni.sat_create();
 
     // Create a coordinate space used to position Satellites
@@ -77,7 +75,7 @@ void simplesolarsystem::create(PackageRegistry& rPkgs,
     {
         // Creates a random mess of spamcans as a vehicle
         Satellite sat = debug_add_random_vehicle(
-                    rUni, rPkg, "TestyMcTestFace Mk " + std::to_string(i));
+                rUniScn, rPkg, "TestyMcTestFace Mk " + std::to_string(i));
 
         Vector3g pos{i * 1024l * 5l, 0l, -10l * 1024l};
 
@@ -89,7 +87,7 @@ void simplesolarsystem::create(PackageRegistry& rPkgs,
     for (int i = 0; i < 10; i ++)
     {
         Satellite sat = testapp::debug_add_part_vehicle(
-                    rUni, rPkg, "Placeholder Mk. " + std::to_string(i));
+                rUniScn, rPkg, "Placeholder Mk. " + std::to_string(i));
 
         // stack along the y-axis (vertically)
         Vector3g pos{0l, i * 1024l * 10l, 0l};
@@ -114,7 +112,7 @@ void simplesolarsystem::create(PackageRegistry& rPkgs,
             float resolutionSurfaceMax = 2.0f;
 
             // assign sat as a planet
-            SatPlanet::add_planet(rUni, sat, radius, mass, activateRadius,
+            add_planet(rUniScn, sat, radius, mass, activateRadius,
                                   resolutionSurfaceMax, resolutionScreenMax);
 
             // space planets 6000m apart from each other
@@ -132,7 +130,7 @@ void simplesolarsystem::create(PackageRegistry& rPkgs,
     rUpdater = generate_simple_universe_update(coordIndex);
 
     // Update CoordinateSpace to finish adding the new Satellites
-    rUpdater(rUni);
+    rUpdater(rUniScn);
 
     OSP_LOG_INFO("Created simple solar system");
 }

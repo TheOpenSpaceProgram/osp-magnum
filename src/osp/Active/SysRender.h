@@ -24,68 +24,79 @@
  */
 #pragma once
 
-#include "osp/Resource/Package.h"
-#include "osp/Active/activetypes.h"
-
 #include "drawing.h"
-
-#include <Magnum/GL/Mesh.h>
-#include <Magnum/GL/Texture.h>
-#include <Magnum/GL/Framebuffer.h>
-#include <Magnum/GL/Renderbuffer.h>
 
 namespace osp::active
 {
 
 /**
- * Stores a mesh to be drawn by the renderer
+ * @brief Stores a draw function and user data needed to draw a single entity
  */
-struct ACompMesh
+struct EntityToDraw
 {
-    osp::DependRes<Magnum::GL::Mesh> m_mesh;
-};
+    using UserData_t = std::array<void*, 4>;
+
+    /**
+     * @brief A function pointer to a Shader's draw() function
+     *
+     * @param ActiveEnt    [in] The entity being drawn
+     * @param ACompCamera  [in] Camera used to draw the scene
+     * @param UserData_t   [in] Non-owning user data
+     */
+    using ShaderDrawFnc_t = void (*)(
+            ActiveEnt, ACompCamera const&, UserData_t) noexcept;
+
+    constexpr void operator()(
+            ActiveEnt ent,
+            ACompCamera const& camera) const noexcept
+    {
+        m_draw(ent, camera, m_data);
+    }
+
+    ShaderDrawFnc_t m_draw;
+
+    // Non-owning user data passed to draw function, such as the shader
+    UserData_t m_data;
+
+}; // struct EntityToDraw
 
 /**
- * Diffuse texture component
+ * @brief Tracks a set of entities and their assigned drawing functions
+ *
+ * RenderGroups are intended to be associated with certain rendering techniques
+ * like Forward, Deferred, and Shadow mapping.
+ *
+ * This also works with game-specific modes like Thermal Imaging.
  */
-struct ACompDiffuseTex
+struct RenderGroup
 {
-    osp::DependRes<Magnum::GL::Texture2D> m_tex;
-};
+    using Storage_t = entt::storage_traits<ActiveEnt, EntityToDraw>::storage_type;
+    using ArrayView_t = Corrade::Containers::ArrayView<ActiveEnt>;
 
-/**
- * A surface that can be rendered to
- */
-struct ACompRenderTarget
+    /**
+     * @return Iterable view for stored entities
+     */
+    decltype(auto) view()
+    {
+        return entt::basic_view{m_entities};
+    }
+
+    /**
+     * @return Iterable view for stored entities
+     */
+    decltype(auto) view() const
+    {
+        return entt::basic_view{m_entities};
+    }
+
+    Storage_t m_entities;
+
+}; // struct RenderGroup
+
+struct ACtxRenderGroups
 {
-    Magnum::Vector2i m_size;
-    osp::DependRes<Magnum::GL::Framebuffer> m_fbo;
-};
+    std::unordered_map< std::string, RenderGroup > m_groups;
 
-/**
- * Stores the name of the renderer to be used by a rendering agent
- */
-struct ACompRenderer
-{
-    std::string m_name{"default"};
-};
-
-/**
- * Stores a reference to the color attachment texture of a render target entity
- */
-struct ACompFBOColorAttachment
-{
-    DependRes<Magnum::GL::Texture2D> m_tex;
-};
-
-using RenderStep_t = void(*)(ActiveScene&, ACompCamera const&);
-
-/**
- * Resource storing the steps of a multipass renderer
- */
-struct RenderPipeline
-{
-    std::vector<RenderStep_t> m_order;
 };
 
 class SysRender
@@ -93,62 +104,21 @@ class SysRender
 public:
 
     /**
-     * @brief Setup essential GL resources
+     * @brief Update draw ACompDrawTransform according to the hierarchy of
+     *        ACompTransforms
      *
-     * @param rCtxResources [ref] Context resources Package
-     */
-    static void setup_context(Package& rCtxResources);
-
-    /**
-     * @brief Setup Render Pipeline, Targets, and Groups for Forward Rendering
+     * TODO: this is a rather expensive operation that recalculates ALL draw
+     *       transforms, regardless of if they changed or not. Consider adding
+     *       dirty flags or similar.
      *
-     * @param rScene [ref] Scene with GL context
+     * @param hier      [in] Storage for hierarchy components
+     * @param viewTf    [in] View for local-space transform components
+     * @param rDrawTf   [out] Storage for world-space draw transform components
      */
-    static void setup_forward_renderer(ActiveScene& rScene);
-
-    /**
-     * @brief Retrieve the entity which possesses the default ACompRenderTarget
-     *
-     * @param rScene [ref] Scene with render target
-     */
-    static ActiveEnt get_default_rendertarget(ActiveScene& rScene);
-
-    /**
-     * @brief Draw the default render target to the screen
-     *
-     * @param rScene [ref] Scene with render target
-     */
-    static void display_default_rendertarget(ActiveScene& rScene);
-
-    /**
-     * @brief Adds newly created and updated drawables to RenderGroups using
-     *        their DrawAssigners
-     *
-     * @param rScene [ref] Scene with ACtxRenderGroups
-     */
-    static void update_drawfunc_assign(ActiveScene& rScene);
-
-    /**
-     * @brief Remove entities from draw functions
-     *
-     * @param rScene [ref] Scene with ACtxRenderGroups
-     */
-    static void update_drawfunc_delete(ActiveScene& rScene);
-
-    /**
-     * @brief Update the m_transformWorld of entities with ACompTransform and
-     *        ACompHierarchy.
-     *
-     * Intended for physics interpolation
-     */
-    static void update_hierarchy_transforms(ActiveScene& rScene);
-
-private:
-
-    /**
-     * @return RenderPipeline for forward rendering
-     */
-    static RenderPipeline create_forward_pipeline(ActiveScene& rScene);
+    static void update_draw_transforms(
+            acomp_storage_t<ACompHierarchy> const& hier,
+            acomp_view_t<ACompTransform> const& viewTf,
+            acomp_storage_t<ACompDrawTransform>& rDrawTf);
 
 }; // class SysRender
 

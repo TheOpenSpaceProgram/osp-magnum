@@ -24,25 +24,23 @@
  */
 #include "SysForceFields.h"
 
-#include "SysPhysics.h"
-#include "ActiveScene.h"
-
 using namespace osp::active;
 
 
-void SysFFGravity::update_force(ActiveScene& rScene)
+void SysFFGravity::update_force(
+        acomp_view_t<ACompFFGravity const> viewGrav,
+        acomp_view_t<ACompTransform const> viewTf,
+        acomp_view_t<ACompPhysDynamic const> viewDyn,
+        acomp_storage_t<ACompPhysNetForce>& rNetForce)
 {
 
-    auto const viewFields = rScene.get_registry()
-            .view<const ACompFFGravity, const ACompTransform>();
-
-    auto const viewMasses = rScene.get_registry()
-            .view<const ACompPhysDynamic, const ACompTransform>();
+    auto const viewFields = viewGrav | viewTf;
+    auto const viewMasses = viewDyn | viewTf;
 
     for (ActiveEnt fieldEnt : viewFields)
     {
-        auto const &fieldFFGrav = viewFields.get<const ACompFFGravity>(fieldEnt);
-        auto const &fieldTransform = viewFields.get<const ACompTransform>(fieldEnt);
+        auto const &fieldFFGrav = viewFields.get<ACompFFGravity const>(fieldEnt);
+        auto const &fieldTransform = viewFields.get<ACompTransform const>(fieldEnt);
 
         for (ActiveEnt massEnt : viewMasses)
         {
@@ -61,9 +59,11 @@ void SysFFGravity::update_force(ActiveScene& rScene)
                                                * massBody.m_totalMass)
                                    / (r * r * r);
 
-            auto &netForce = rScene.get_registry()
-                    .get_or_emplace<ACompPhysNetForce>(massEnt);
-            netForce += force;
+
+            ACompPhysNetForce &rEntNetForce = rNetForce.contains(massEnt)
+                                            ? rNetForce.get(massEnt)
+                                            : rNetForce.emplace(massEnt);
+            rEntNetForce += force;
 
         }
     }

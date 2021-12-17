@@ -24,39 +24,30 @@
  */
 #pragma once
 
-#include "activetypes.h"
-#include "../Universe.h"
+#include "physics.h"
+#include "basic.h"
 
-#include "../Satellites/SatActiveArea.h"
+#include "../types.h"
+#include "../universetypes.h"
 
-#include <cstdint>
+namespace osp::universe { struct UCompActiveArea; }
 
 namespace osp::active
 {
 
 
-struct ACompAreaLink
+struct ACtxAreaLink
 {    
-    ACompAreaLink(universe::Universe& rUniverse, universe::Satellite areaSat)
-     : m_areaSat(areaSat)
-     , m_rUniverse(rUniverse)
-    { }
-
-    universe::Universe& get_universe() noexcept
-    { return m_rUniverse.get(); }
-
-    universe::Universe const& get_universe() const noexcept
-    { return m_rUniverse.get(); }
-
     universe::Satellite m_areaSat;
 
-    std::reference_wrapper<universe::Universe> m_rUniverse;
+    //struct Enter { universe::Satellite m_sat; };
+    //struct Leave { universe::Satellite m_sat; };
+    //std::vector< std::variant<Enter, Leave> > m_satQueue;
 
     std::vector<universe::Satellite> m_enter;
     std::vector<universe::Satellite> m_leave;
 
     Vector3 m_move;
-
 };
 
 struct ACompActivatedSat
@@ -78,7 +69,8 @@ public:
      *
      * @param rScene [ref] Scene assicated with ActiveArea
      */
-    static void update_consume(ActiveScene& rScene);
+    static void update_consume(
+            ACtxAreaLink& rLink, universe::UCompActiveArea& rAreaUComp);
 
     /**
      * @brief Translates all entities with ACompFloatingOrigin based on
@@ -86,41 +78,8 @@ public:
      *
      * @param rScene [ref] Scene assicated with ActiveArea
      */
-    static void update_translate(ActiveScene& rScene);
-
-    /**
-     * @brief Attempt to get an ACompAreaLink from an ActiveScene
-     *
-     * @param rScene [ref] Scene assicated with ActiveArea
-     *
-     * @return ACompAreaLink in scene, nullptr if not found
-     */
-    static ACompAreaLink* try_get_area_link(ActiveScene &rScene);
-
-    /**
-     * @brief Connect the ActiveScene to the Universe using the scene's
-     *        ACompAreaLink, and a Satellite containing a UCompActiveArea.
-     *
-     * @param rScene  [ref] Scene assicated with ActiveArea
-     * @param rUni    [ref] Universe the ActiveArea satellite is contained in.
-     *                      This is stored in ACompAreaLink.
-     * @param areaSat [in] ActiveArea Satellite
-     */
-    static void connect(ActiveScene& rScene, universe::Universe &rUni,
-                        universe::Satellite areaSat);
-
-    /**
-     * @brief Request to move the ActiveArea
-     *
-     * These movements are queued and accumolated, as only the universe is
-     * allowed to directly move Satellites. Once the universe updates, and moves
-     * the area, it writes into UCompActiveArea::m_moved which is read by
-     * update_consume.
-     *
-     * @param rScene    [ref] Scene assicated with ActiveArea
-     * @param translate [in] Amount to translate the area by
-     */
-    static void area_move(ActiveScene& rScene, universe::Vector3g const& translate);
+    static void update_translate(
+            ACtxAreaLink& rLink, universe::UCompActiveArea& rAreaUComp);
 
 private:
 
@@ -132,8 +91,13 @@ private:
      * @param rScene      [ref] Scene containing entities that can be translated
      * @param translation [in] Meters to translate entities by
      */
-    static void floating_origin_translate(ActiveScene& rScene,
-                                          Vector3 translation);
+    static void floating_origin_translate(
+            acomp_view_t<ACompFloatingOrigin const> viewFloatingOrigin,
+            acomp_view_t<ACompTransform> viewTf,
+            acomp_view_t<ACompTransformControlled const> viewTfControlled,
+            acomp_view_t<ACompTransformMutable> viewTfMutable,
+            ACtxPhysics& rCtxPhys,
+            Vector3 translation);
 
 };
 

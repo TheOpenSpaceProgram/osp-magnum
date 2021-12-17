@@ -1,5 +1,5 @@
 #include "SysPhysics.h"
-#include "ActiveScene.h"
+#include "basic.h"
 
 #include <osp/Resource/PackageRegistry.h>
 
@@ -12,7 +12,8 @@ using osp::Matrix3;
 using osp::Vector4;
 
 ActiveEnt SysPhysics::find_rigidbody_ancestor(
-        ActiveScene& rScene, ActiveEnt ent)
+        acomp_view_t<ACompHierarchy> viewHier,
+        ActiveEnt ent)
 {
     ActiveEnt prevEnt;
     ActiveEnt currEnt = ent;
@@ -20,26 +21,29 @@ ActiveEnt SysPhysics::find_rigidbody_ancestor(
 
     do
     {
-        pCurrHier = rScene.get_registry().try_get<ACompHierarchy>(currEnt);
-
-        if(nullptr == pCurrHier)
+        if( ! viewHier.contains(currEnt) )
         {
             return entt::null;
         }
+
+        pCurrHier = &viewHier.get<ACompHierarchy>(currEnt);
 
         prevEnt = std::exchange(currEnt, pCurrHier->m_parent);
     }
     while (pCurrHier->m_level != gc_heir_physics_level);
 
-    if ( ! rScene.get_registry().all_of<ACompPhysBody>(prevEnt))
-    {
-        return entt::null; // no Physics body!
-    }
+//    if ( ! rCtxPhys.m_physBody.contains(prevEnt))
+//    {
+//        return entt::null; // no Physics body!
+//    }
 
     return prevEnt;
 }
 
-Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, ActiveEnt ent)
+Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(
+        acomp_view_t<ACompHierarchy> viewHier,
+        acomp_view_t<ACompTransform> viewTf,
+        ActiveEnt ent)
 {
     ActiveEnt prevEnt;
     ActiveEnt currEnt = ent;
@@ -48,15 +52,14 @@ Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, A
 
     do
     {
-        pCurrHier = &rScene.get_registry().get<ACompHierarchy>(currEnt);
+        pCurrHier = &viewHier.get<ACompHierarchy>(currEnt);
 
         // Record the local transformation of the current node relative to its parent
         if (pCurrHier->m_level > gc_heir_physics_level)
         {
-            auto const *localTransform = rScene.get_registry().try_get<ACompTransform>(currEnt);
-            if (localTransform != nullptr)
+            if (viewTf.contains(currEnt))
             {
-                transform = localTransform->m_transform * transform;
+                transform = viewTf.get<ACompTransform>(currEnt).m_transform * transform;
             }
         }
 
@@ -64,46 +67,51 @@ Matrix4 SysPhysics::find_transform_rel_rigidbody_ancestor(ActiveScene& rScene, A
     } while (pCurrHier->m_level != gc_heir_physics_level);
 
     // Fail if a rigidbody ancestor is not found
-    assert(rScene.get_registry().all_of<ACompPhysBody>(prevEnt));
+    //assert(rCtxPhys.m_physBody.contains(prevEnt));
 
     return transform;
 }
 
 
 osp::active::ACompRigidbodyAncestor* SysPhysics::try_get_or_find_rigidbody_ancestor(
-    ActiveScene& rScene, ActiveEnt childEntity)
+        acomp_view_t<ACompHierarchy> viewHier,
+        acomp_view_t<ACompTransform> viewTf,
+        acomp_storage_t<ACompRigidbodyAncestor>& rRbAncestor,
+        ActiveEnt ent)
 {
-    ActiveReg_t &rReg = rScene.get_registry();
-    auto *pCompAncestor = rReg.try_get<ACompRigidbodyAncestor>(childEntity);
+    ACompRigidbodyAncestor *pEntRbAncestor;
 
     // Perform first-time initialization of rigidbody ancestor component
-    if (pCompAncestor == nullptr)
+    if ( ! rRbAncestor.contains(ent))
     {
-        auto ent = find_rigidbody_ancestor(rScene, childEntity);
+        find_rigidbody_ancestor(viewHier, ent);
 
-        rReg.emplace<ACompRigidbodyAncestor>(childEntity);
+        pEntRbAncestor = &rRbAncestor.emplace(ent);
+    }
+    else
+    {
+        pEntRbAncestor = &rRbAncestor.get(ent);
     }
     // childEntity now has an ACompRigidbodyAncestor
 
-    auto& rRbAncestor = rReg.get<ACompRigidbodyAncestor>(childEntity);
-    ActiveEnt& rAncestor = rRbAncestor.m_ancestor;
+    ActiveEnt& rAncestor = pEntRbAncestor->m_ancestor;
 
     // Ancestor entity already valid
-    if (rReg.valid(rAncestor))
+    if (rAncestor != entt::null)
     {
-        return &rRbAncestor;
+        return pEntRbAncestor;
     }
 
     // Rigidbody ancestor not set yet
-    ActiveEnt bodyEnt = find_rigidbody_ancestor(rScene, childEntity);
+    ActiveEnt bodyEnt = find_rigidbody_ancestor(viewHier, ent);
 
     // Initialize ACompRigidbodyAncestor
     rAncestor = bodyEnt;
-    rRbAncestor.m_relTransform =
-        find_transform_rel_rigidbody_ancestor(rScene, childEntity);
+    pEntRbAncestor->m_relTransform = find_transform_rel_rigidbody_ancestor(
+                viewHier, viewTf, ent);
     //TODO: this transformation may change and need recalculating
 
-    return &rRbAncestor;
+    return pEntRbAncestor;
 }
 
 /* Since masses are usually stored in the rigidbody's children instead of the
@@ -116,7 +124,10 @@ osp::active::ACompRigidbodyAncestor* SysPhysics::try_get_or_find_rigidbody_ances
  * mechanical behaviors of the rigidbody.
  */
 template <SysPhysics::EIncludeRootMass INCLUDE_ROOT_MASS>
-Vector4 SysPhysics::compute_hier_CoM(ActiveScene& rScene, ActiveEnt root)
+Vector4 SysPhysics::compute_hier_CoM(
+        acomp_view_t<ACompHierarchy> const viewHier,
+        acomp_view_t<ACompTransform> const viewTf,
+        acomp_view_t<ACompMass> const viewMass, ActiveEnt root)
 {
     Vector3 localCoM{0.0f};
     float localMass = 0.0f;
@@ -127,27 +138,27 @@ Vector4 SysPhysics::compute_hier_CoM(ActiveScene& rScene, ActiveEnt root)
      */
     if constexpr (INCLUDE_ROOT_MASS)
     {
-        auto const* rootMass = rScene.reg_try_get<ACompMass>(root);
-        if (rootMass != nullptr) { localMass += rootMass->m_mass; }
+        if (viewMass.contains(root))
+        {
+            localMass += viewMass.get<ACompMass>(root).m_mass;
+        }
     }
 
-    for (ActiveEnt nextChild = rScene.reg_get<ACompHierarchy>(root).m_childFirst;
+    for (ActiveEnt nextChild = viewHier.get<ACompHierarchy>(root).m_childFirst;
         nextChild != entt::null;)
     {
-        auto const &childHier = rScene.reg_get<ACompHierarchy>(nextChild);
-        auto const *childTransform = rScene.get_registry().try_get<ACompTransform>(nextChild);
-        auto const *massComp = rScene.get_registry().try_get<ACompMass>(nextChild);
+        auto const &childHier = viewHier.get<ACompHierarchy>(nextChild);
         Matrix4 childMatrix{Magnum::Math::IdentityInit};
 
-        if (childTransform != nullptr)
+        if (viewTf.contains(nextChild))
         {
-            childMatrix = childTransform->m_transform;
+            childMatrix = viewTf.get<ACompTransform>(nextChild).m_transform;
         }
         // Else, assume identity transformation relative to parent
 
-        if (massComp != nullptr)
+        if (viewMass.contains(nextChild))
         {
-            float childMass = rScene.reg_get<ACompMass>(nextChild).m_mass;
+            float childMass = viewMass.get<ACompMass>(root).m_mass;
 
             Vector3 offset = childMatrix.translation();
 
@@ -156,7 +167,7 @@ Vector4 SysPhysics::compute_hier_CoM(ActiveScene& rScene, ActiveEnt root)
         }
 
         // Recursively call this function to include grandchild masses
-        Vector4 subCoM = compute_hier_CoM(rScene, nextChild);
+        Vector4 subCoM = compute_hier_CoM(viewHier, viewTf, viewMass, nextChild);
         Vector3 childCoMOffset = childMatrix.translation() + subCoM.xyz();
         localCoM += subCoM.w() * childCoMOffset;
         localMass += subCoM.w();
@@ -174,23 +185,26 @@ Vector4 SysPhysics::compute_hier_CoM(ActiveScene& rScene, ActiveEnt root)
     return {localCoM / localMass, localMass};
 }
 
-std::pair<Matrix3, Vector4> SysPhysics::compute_hier_inertia(ActiveScene& rScene,
-    ActiveEnt entity)
+std::pair<Matrix3, Vector4> SysPhysics::compute_hier_inertia(
+        acomp_view_t<ACompHierarchy> const viewHier,
+        acomp_view_t<ACompTransform> const viewTf,
+        acomp_view_t<ACompMass> const viewMass,
+        acomp_view_t<ACompShape> const viewShape,
+        ActiveEnt entity)
 {
     Matrix3 I{0.0f};
-    Vector4 centerOfMass =
-        compute_hier_CoM<EIncludeRootMass::Include>(rScene, entity);
-
-    auto& reg = rScene.get_registry();
+    Vector4 centerOfMass = compute_hier_CoM<EIncludeRootMass::Include>(viewHier, viewTf, viewMass, entity);
 
     // Sum inertias of children
-    for (ActiveEnt nextChild = reg.get<ACompHierarchy>(entity).m_childFirst;
+    for (ActiveEnt nextChild = viewHier.get<ACompHierarchy>(entity).m_childFirst;
         nextChild != entt::null;)
     {
         // Use child transformation to transform child inertia and add to sum
-        auto const *childTransform = reg.try_get<ACompTransform>(nextChild);
-        Matrix4 const childTransformMat = (childTransform != nullptr)
-            ? childTransform->m_transform : Matrix4{Magnum::Math::IdentityInit};
+        bool childHasTf = viewTf.contains(nextChild);
+
+        Matrix4 const childTransformMat = childHasTf
+                ? viewTf.get<ACompTransform>(nextChild).m_transform
+                : Matrix4{Magnum::Math::IdentityInit};
 
         /* Special case:
          * Ordinarily, a child without a transformation means that branch of the
@@ -202,33 +216,36 @@ std::pair<Matrix3, Vector4> SysPhysics::compute_hier_inertia(ActiveScene& rScene
          * be assumed to have an identity transformation relative to its parent
          * and processed as usual.
          */
-        if ((childTransform != nullptr) || reg.all_of<ACompMass>(nextChild))
+        if (childHasTf || viewMass.contains(nextChild))
         {
             // Compute the inertia of the child subhierarchy
-            auto const& [childInertia, childCoM] = compute_hier_inertia(rScene, nextChild);
+            auto const& [childInertia, childCoM] = compute_hier_inertia(
+                    viewHier, viewTf, viewMass, viewShape, nextChild);
+
             Matrix3 const rotation = childTransformMat.rotation();
             // Offset is the vector between the ship center of mass and the child CoM
             Vector3 const offset = (childTransformMat.translation() + childCoM.xyz()) - centerOfMass.xyz();
+
             I += phys::transform_inertia_tensor(
                 childInertia, childCoM.w(), offset, rotation);
         }
-        nextChild = reg.get<ACompHierarchy>(nextChild).m_siblingNext;
+        nextChild = viewHier.get<ACompHierarchy>(nextChild).m_siblingNext;
     }
 
     // Include entity's own inertia, if it has a mass and volume from which to compute it
-    auto const* mass = reg.try_get<ACompMass>(entity);
-    auto const* shape = reg.try_get<ACompShape>(entity);
-    if ((mass != nullptr) && (shape != nullptr))
+    if (viewMass.contains(entity) && viewShape.contains(entity))
     {
-        auto const* compTransform = reg.try_get<ACompTransform>(entity);
+        auto const &mass = viewMass.get<ACompMass>(entity);
+        auto const &shape = viewShape.get<ACompShape>(entity);
+        //auto const &compTransform = reg.try_get<ACompTransform>(entity);
 
         Vector3 principalAxes;
-        if (compTransform != nullptr)
+        if (viewTf.contains(entity))
         {
             // Transform used for scale; identity translation between root and itself
-            const Matrix4& transform = rScene.reg_get<ACompTransform>(entity).m_transform;
+            const Matrix4& transform = viewTf.get<ACompTransform>(entity).m_transform;
             principalAxes = phys::collider_inertia_tensor(
-                shape->m_shape, transform.scaling(), mass->m_mass);
+                    shape.m_shape, transform.scaling(), mass.m_mass);
         }
         else
         {
@@ -237,10 +254,10 @@ std::pair<Matrix3, Vector4> SysPhysics::compute_hier_inertia(ActiveScene& rScene
              * its immediate parent. Thus, the parent's transformation is used
              * to calculate the leaf's scale.
              */
-            ActiveEnt parent = reg.get<ACompHierarchy>(entity).m_parent;
-            Matrix4 const& parentTransform = reg.get<ACompTransform>(parent).m_transform;
+            ActiveEnt parent = viewHier.get<ACompHierarchy>(entity).m_parent;
+            Matrix4 const& parentTransform = viewTf.get<ACompTransform>(parent).m_transform;
             principalAxes = phys::collider_inertia_tensor(
-                shape->m_shape, parentTransform.scaling(), mass->m_mass);
+                shape.m_shape, parentTransform.scaling(), mass.m_mass);
         }
 
         /* We assume that all primitive shapes have diagonal inertia tensors in

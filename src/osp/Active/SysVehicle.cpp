@@ -22,7 +22,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "ActiveScene.h"
 #include "SysHierarchy.h"
 #include "SysPhysics.h"
 #include "SysRender.h"
@@ -43,6 +42,8 @@
 
 using namespace osp;
 using namespace osp::active;
+
+#if 0
 
 // Traverses the hierarchy and sums the volume of all ACompShapes it finds
 float SysVehicle::compute_hier_volume(ActiveScene& rScene, ActiveEnt part)
@@ -223,30 +224,31 @@ ActiveEnt SysVehicle::part_instantiate(
         ActiveEnt parent = newEntities[pcompMachine.m_entity];
         ActiveEnt machEnt = machines.m_machines.emplace_back(
                     SysHierarchy::create_child(rScene, parent, "Machine"));
-        rScene.reg_emplace<ACompMachineType>(machEnt, pcompMachine.m_type);
+        //rScene.reg_emplace<ACompMachineType>(machEnt, pcompMachine.m_type);
     }
 
     return rootEntity;
 }
 
-void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
+void SysVehicle::update_vehicle_modification(
+        ACtxVehicle& rCtx,
+        ACtxPhysics& rPhys,
+        acomp_view_t<ACompTransform> viewTf,
+        acomp_view_t<ACompHierarchy> viewHier,
+        acomp_view_t<ACompRigidbodyAncestor> viewRBA)
 {
-    ActiveReg_t &rReg = rScene.get_registry();
-
     // Clear In-construction queue
-    rReg.clear<ACompVehicleInConstruction>();
+    rCtx.m_vehicleInConstruction.clear();
 
-    auto &rPhys = rScene.get_registry().ctx<ACtxPhysics>();
-
-    auto view = rScene.get_registry().view<ACompVehicle>();
-    auto viewParts = rScene.get_registry().view<ACompPart>();
+    auto viewVehicles   = entt::basic_view{rCtx.m_vehicle};
+    auto viewParts      = entt::basic_view{rCtx.m_part};
 
     // this part is sort of temporary and unoptimized. deal with it when it
     // becomes a problem. TODO: use more views
 
-    for (ActiveEnt vehicleEnt : view)
+    for (ActiveEnt vehicleEnt : viewVehicles)
     {
-        auto &vehicleVehicle = view.get<ACompVehicle>(vehicleEnt);
+        auto &vehicleVehicle = viewVehicles.get<ACompVehicle>(vehicleEnt);
 
         if (vehicleVehicle.m_separationCount > 0)
         {
@@ -256,13 +258,16 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
             rPhys.m_colliderDirty.push_back(vehicleEnt);
 
             // Invalidate all ACompRigidbodyAncestors
-            auto invalidateAncestors = [&rScene](ActiveEnt e)
+            auto invalidateAncestors = [&viewRBA](ActiveEnt ent)
             {
-                auto* const pRBA = rScene.get_registry().try_get<ACompRigidbodyAncestor>(e);
-                if(nullptr != pRBA) { pRBA->m_ancestor = entt::null; }
+                if (viewRBA.contains(ent))
+                {
+                    viewRBA.get<ACompRigidbodyAncestor>(ent).m_ancestor = entt::null;
+                }
+
                 return EHierarchyTraverseStatus::Continue;
             };
-            SysHierarchy::traverse(rScene, vehicleEnt, invalidateAncestors);
+            SysHierarchy::traverse(viewHier, vehicleEnt, invalidateAncestors);
 
             // Create the islands vector
             // [0]: current vehicle
@@ -272,13 +277,13 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
 
             islands[0] = vehicleEnt;
 
-            Vector3 const velocity = rReg.get<ACompPhysLinearVel>(vehicleEnt);
+            Vector3 const velocity = rPhys.m_physLinearVel.get(vehicleEnt);
 
             // Loop but skip first element, already set to vehicleEnt
             for (ActiveEnt& rIslands
                  : Corrade::Containers::arrayView(islands).suffix(1))
             {
-                auto const &vehicleTransform = rScene.reg_get<ACompTransform>(vehicleEnt);
+                auto const &vehicleTransform = viewTf.get<ACompTransform>(vehicleEnt);
 
                 ActiveEnt const islandEnt = SysHierarchy::create_child(
                             rScene, rScene.hier_get_root());
@@ -350,4 +355,6 @@ void SysVehicle::update_vehicle_modification(ActiveScene& rScene)
         }
     }
 }
+
+#endif
 

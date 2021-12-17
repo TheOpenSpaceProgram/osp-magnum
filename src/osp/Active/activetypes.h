@@ -28,7 +28,7 @@
 
 #include <entt/core/fwd.hpp>          // for entt::id_type
 #include <entt/entity/view.hpp>       // for basic_view
-#include <entt/entity/registry.hpp>   // for entt::basic_registry
+#include <entt/entity/storage.hpp>    // for entt::basic_storage
 #include <entt/entity/sparse_set.hpp> // for entt::sparse_set
 
 // IWYU pragma: end_exports
@@ -36,18 +36,35 @@
 namespace osp::active
 {
 
-class SysNewton;
+enum class ActiveEnt: entt::id_type {};
 
-class ActiveScene;
+} // namespace osp::active
 
-struct ACompCamera;
 
-struct ACompTransform;
+// Specialize entt::storage_traits to disable signals for storage that uses
+// ActiveEnt as entities
+template<typename Type>
+struct entt::storage_traits<osp::active::ActiveEnt, Type>
+{
+    using storage_type = basic_storage<osp::active::ActiveEnt, Type>;
+};
+
+
+namespace osp::active
+{
+
 
 inline constexpr unsigned gc_heir_physics_level = 1;
 
-enum class ActiveEnt: entt::id_type {};
-
 using ActiveReg_t = entt::basic_registry<ActiveEnt>;
 
-}
+using active_sparse_set_t = entt::basic_sparse_set<ActiveEnt>;
+
+template<typename COMP_T>
+using acomp_storage_t = typename entt::storage_traits<ActiveEnt, COMP_T>::storage_type;
+
+template<typename... COMP_T>
+using acomp_view_t = entt::basic_view<ActiveEnt, entt::exclude_t<>, COMP_T...>;
+
+} // namespace osp::active
+
