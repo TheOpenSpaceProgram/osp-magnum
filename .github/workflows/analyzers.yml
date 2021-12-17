@@ -17,15 +17,9 @@ jobs:
 
     steps:
     - id: skip_check
-      continue-on-error: true
-      runs-on: ubuntu-latest
-      outputs:
-        should_skip: ${{ steps.skip_check.outputs.should_skip }}
-      steps:
-        - id: skip_check
-          uses: fkirc/skip-duplicate-actions@master
-          with:
-            paths_ignore: '["README.md", "**/*.md, docs/**"]'
+        uses: fkirc/skip-duplicate-actions@master
+        with:
+          paths_ignore: '["README.md", "**/*.md, docs/**"]'
 
     - uses: actions/checkout@v2
       if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
