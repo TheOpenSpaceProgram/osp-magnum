@@ -32,26 +32,26 @@ jobs:
         submodules: recursive
 
     - uses: egor-tensin/setup-mingw@v2
-      if: ${{ matrix.compiler == 'mingw' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
+      if: ${{ matrix.compiler == 'mingw' && steps.skip_check.outputs.should_skip != 'true' }}
 
     - uses: egor-tensin/setup-clang@v1
-      if: ${{ matrix.compiler == 'clang' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
+      if: ${{ matrix.compiler == 'clang' && steps.skip_check.outputs.should_skip != 'true' }}
 
     - uses: ashutoshvarma/setup-ninja@v1.1
-      if: ${{ matrix.compiler == 'clang' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
+      if: ${{ matrix.compiler == 'clang' && steps.skip_check.outputs.should_skip != 'true' }}
 
     - name: Configure (MSVC)
-      if: ${{ matrix.compiler == 'msvc' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
+      if: ${{ matrix.compiler == 'msvc' && steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
 
     - name: Configure (ClangCL)
-      if: ${{ matrix.compiler == 'clangcl' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
+      if: ${{ matrix.compiler == 'clangcl' && steps.skip_check.outputs.should_skip != 'true' }}
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -TClangCL
 
     - name: Configure (MinGW)
-      if: ${{ matrix.compiler == 'mingw' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
+      if: ${{ matrix.compiler == 'mingw' && steps.skip_check.outputs.should_skip != 'true' }}
       env:
         CC:  C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\cc.exe
         CXX: C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64\bin\c++.exe
@@ -59,7 +59,7 @@ jobs:
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -G"MinGW Makefiles"
 
     - name: Configure (Clang)
-      if: ${{ matrix.compiler == 'clang' }} && ${{ steps.skip_check.outputs.should_skip != 'true' }}
+      if: ${{ matrix.compiler == 'clang' && steps.skip_check.outputs.should_skip != 'true' }}
       env:
         CC:  C:\Program Files\LLVM\bin\cc.exe
         CXX: C:\Program Files\LLVM\bin\c++.exe
