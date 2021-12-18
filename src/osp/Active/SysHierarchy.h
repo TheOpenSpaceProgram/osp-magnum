@@ -93,12 +93,30 @@ public:
     static void sort(acomp_storage_t<ACompHierarchy>& rHier);
 
     /**
+     * @brief Cut entities to delete out of the hierarchy
+     */
+    template<typename IT_T>
+    static void update_delete_cut(
+            acomp_storage_t<ACompHierarchy>& rHier, IT_T first, IT_T last);
+
+    /**
      * @brief Mark descendents of deleted hierarchy entities as deleted too
      */
     template<typename IT_T, typename FUNC_T>
     static void update_delete_descendents(
             acomp_storage_t<ACompHierarchy> const& hier, IT_T first, IT_T last, FUNC_T&& deleteEnt);
 };
+
+template<typename IT_T>
+void SysHierarchy::update_delete_cut(
+        acomp_storage_t<ACompHierarchy>& rHier, IT_T first, IT_T last)
+{
+    while (first != last)
+    {
+        cut(rHier, *first);
+        ++first;
+    }
+}
 
 template<typename IT_T, typename FUNC_T>
 void SysHierarchy::update_delete_descendents(

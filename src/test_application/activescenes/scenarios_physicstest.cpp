@@ -109,18 +109,20 @@ struct PhysicsTestScene
     osp::DependRes<MeshData>        m_meshCylinder;
     osp::DependRes<MeshData>        m_meshSphere;
 
-    float m_ballTimer{0.0f};
+    float m_boxTimer{0.0f};
+    float m_cylinderTimer{0.0f};
 
-    struct BallThrow
+    struct ThrowShape
     {
         Vector3 m_position;
         Vector3 m_velocity;
-        float m_radius;
+        Vector3 m_size;
         float m_mass;
+        EShape m_shape;
     };
 
     // Queue for balls to throw
-    std::vector<BallThrow> m_throwBall;
+    std::vector<ThrowShape> m_toThrow;
 
 };
 
@@ -182,42 +184,55 @@ ActiveEnt add_solid(
     return ent;
 }
 
-ActiveEnt add_quick_ball(PhysicsTestScene &rScene, Vector3 position, Vector3 velocity, float radius, float mass)
+/**
+ * @brief Quick function to throw a drawable physics entity of a single
+ *        primative shape
+ *
+ * @return Root of shape entity
+ */
+ActiveEnt add_quick_shape(
+        PhysicsTestScene &rScene, Vector3 position, Vector3 velocity,
+        float mass, EShape shape, Vector3 size)
 {
     using namespace osp::active;
 
-    ActiveEnt ballRoot = rScene.m_activeIds.create();
+    // Root is needed to act as the rigid body entity
+    // Scale of root entity must be (1, 1, 1). Descendents that act as colliders
+    // are allowed to have different scales
+    ActiveEnt root = rScene.m_activeIds.create();
 
     // Add transform and draw transform
     rScene.m_basic.m_transform.emplace(
-            ballRoot, ACompTransform{Matrix4::translation(position)});
-    rScene.m_drawing.m_drawTransform.emplace(ballRoot);
+            root, ACompTransform{Matrix4::translation(position)});
+    rScene.m_drawing.m_drawTransform.emplace(root);
 
-    // Add to hierarchy
-    SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, ballRoot);
+    // Add root entity to hierarchy
+    SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, root);
 
-    ActiveEnt ballCollider = add_solid(
-            rScene, ballRoot, EShape::Sphere,
-            Matrix4::scaling(Vector3{radius}), gc_mat_visualizer, 0.0f);
+    // Create collider / drawable to the root entity
+    ActiveEnt collider = add_solid(
+            rScene, root, shape,
+            Matrix4::scaling(size),
+            gc_mat_visualizer, 0.0f);
 
     // Make ball root a dynamic rigid body
-    rScene.m_physics.m_hasColliders.emplace(ballRoot);
-    rScene.m_physics.m_physBody.emplace(ballRoot);
-    rScene.m_physics.m_physLinearVel.emplace(ballRoot);
-    rScene.m_physics.m_physAngularVel.emplace(ballRoot);
-    osp::active::ACompPhysDynamic &rDyn = rScene.m_physics.m_physDynamic.emplace(ballRoot);
+    rScene.m_physics.m_hasColliders.emplace(root);
+    rScene.m_physics.m_physBody.emplace(root);
+    rScene.m_physics.m_physLinearVel.emplace(root);
+    rScene.m_physics.m_physAngularVel.emplace(root);
+    osp::active::ACompPhysDynamic &rDyn = rScene.m_physics.m_physDynamic.emplace(root);
     rDyn.m_totalMass = 1.0f;
 
     // make gravity affect ball
-    rScene.m_hasGravity.emplace(ballRoot);
+    rScene.m_hasGravity.emplace(root);
 
     // Remove ball when it goes out of bounds
-    rScene.m_removeOutOfBounds.emplace(ballRoot);
+    rScene.m_removeOutOfBounds.emplace(root);
 
     // Set velocity
-    rScene.m_physIn.m_setVelocity.emplace_back(ballRoot, velocity);
+    rScene.m_physIn.m_setVelocity.emplace_back(root, velocity);
 
-    return ballRoot;
+    return root;
 }
 
 entt::any setup_scene(osp::Package &rPkg)
@@ -328,19 +343,38 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
     // start recording new elements to delete
     rScene.m_delete.clear();
 
-    //rScene.m_physIn.m_physNetTorque.emplace(cube, ACompPhysNetTorque{{5.0f, 0.0f, 0.0f}});
-    rScene.m_ballTimer += delta;
-    if (rScene.m_ballTimer >= 0.2f)
+    // Create boxes every 2 seconds
+    rScene.m_boxTimer += delta;
+    if (rScene.m_boxTimer >= 2.0f)
     {
-        rScene.m_throwBall.emplace_back(PhysicsTestScene::BallThrow{
-                Vector3{0.0f, 4.0f, 0.0f}, Vector3{0.0f}, 1.0f, 1.0f});
-        rScene.m_ballTimer -= 0.2f;
+        rScene.m_boxTimer -= 2.0f;
+
+        rScene.m_toThrow.emplace_back(PhysicsTestScene::ThrowShape{
+                Vector3{10.0f, 30.0f, 0.0f},  // position
+                Vector3{0.0f}, // velocity
+                Vector3{2.0f, 1.0f, 2.0f}, // size
+                1.0f, // mass
+                EShape::Box}); // shape
+    }
+
+    // Create cylinders every 2 seconds
+    rScene.m_cylinderTimer += delta;
+    if (rScene.m_cylinderTimer >= 2.0f)
+    {
+        rScene.m_cylinderTimer -= 2.0f;
+
+        rScene.m_toThrow.emplace_back(PhysicsTestScene::ThrowShape{
+                Vector3{-10.0f, 30.0f, 0.0f},  // position
+                Vector3{0.0f}, // velocity
+                Vector3{1.0f, 1.5f, 1.0f}, // size
+                1.0f, // mass
+                EShape::Cylinder}); // shape
     }
 
     // Ball Thrower consumer
-    for (PhysicsTestScene::BallThrow const &rThrow : std::exchange(rScene.m_throwBall, {}))
+    for (PhysicsTestScene::ThrowShape const &rThrow : std::exchange(rScene.m_toThrow, {}))
     {
-        add_quick_ball(rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_radius, rThrow.m_mass);
+        add_quick_shape(rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_mass, rThrow.m_shape, rThrow.m_size);
     }
 
     // Gravity System
@@ -375,6 +409,10 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
         }
     }
 
+    SysHierarchy::update_delete_cut(
+            rScene.m_basic.m_hierarchy,
+            std::begin(rScene.m_delete), std::end(rScene.m_delete));
+
     // Create a new delete list that includes the descendents of entities to delete
     rScene.m_deleteTotal = rScene.m_delete;
     SysHierarchy::update_delete_descendents(
@@ -397,7 +435,7 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
     SysNewton::update_delete            (*rScene.m_pNwtWorld,   first, last);
 
     rScene.m_hasGravity         .remove(first, last);
-    rScene.m_removeOutOfBounds  .remove(first, last);
+    rScene.m_removeOutOfBounds  .remove(first, last);  
 
     // Delete IDs
     for (ActiveEnt const ent : rScene.m_deleteTotal)
@@ -474,6 +512,18 @@ void render_test_scene(
     {
         MaterialData &rMatVisualizer
                 = rScene.m_drawing.m_materials[gc_mat_visualizer];
+        // workaround: Entities that are deleted directly after creation remain
+        //             in the m_added queues, which kills MeshVisualizer::assign
+        //             so they need to be manually removed
+        for (ActiveEnt const ent : rScene.m_deleteTotal)
+        {
+            auto it = std::find(std::begin(rMatVisualizer.m_added),
+                                std::end(rMatVisualizer.m_added), ent);
+            if (it != std::end(rMatVisualizer.m_added))
+            {
+                rMatVisualizer.m_added.erase(it);
+            }
+        }
         MeshVisualizer::assign(
                 rMatVisualizer.m_added, rGroupFwdOpaque.m_entities,
                 rRenderer.m_visualizer);
@@ -595,12 +645,18 @@ on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp)
 
     return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
     {
+        // Throw a sphere when the throw button is pressed
         if (pRenderer->m_controls.button_triggered(pRenderer->m_btnThrow))
         {
-            ACompTransform const &camTf = rScene.m_basic.m_transform.get(pRenderer->m_camera);
+            Matrix4 const &camTf = rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform;
             float const speed = 120;
-            rScene.m_throwBall.emplace_back(PhysicsTestScene::BallThrow{
-                    camTf.m_transform.translation(), -camTf.m_transform.backward() * speed, 1.0f, 1.0f});
+            float const dist = 5.0f; // Distance from camera to spawn spheres
+            rScene.m_toThrow.emplace_back(PhysicsTestScene::ThrowShape{
+                    camTf.translation() - camTf.backward() * dist, // position
+                    -camTf.backward() * speed, // velocity
+                    Vector3{1.0f}, // size (radius)
+                    100.0f, // mass
+                    EShape::Sphere}); // shape
         }
 
         update_test_scene(rScene, delta);

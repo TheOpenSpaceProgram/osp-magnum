@@ -47,9 +47,12 @@
 // IWYU pragma: no_include <cstddef>
 // IWYU pragma: no_include <type_traits>
 
-#include <new>
-
 using namespace ospnewton;
+
+// for the 0xrrggbb_rgbf and angle literals
+using namespace Magnum::Math::Literals;
+
+using osp::phys::EShape;
 
 using osp::active::acomp_view_t;
 using osp::active::acomp_storage_t;
@@ -72,6 +75,7 @@ using osp::active::ACompTransform;
 using osp::active::ACompTransformControlled;
 using osp::active::ACompTransformMutable;
 
+using osp::Matrix3;
 using osp::Matrix4;
 using osp::Vector3;
 
@@ -171,8 +175,6 @@ void SysNewton::update_colliders(
         ACtxPhysics &rCtxPhys, ACtxNwtWorld &rCtxWorld,
         std::vector<ActiveEnt> const &collidersDirty)
 {
-    using osp::phys::EShape;
-
     for (ActiveEnt ent : collidersDirty)
     {
         ACompShape const& shape = rCtxPhys.m_shape.get(ent);
@@ -195,7 +197,7 @@ void SysNewton::update_colliders(
             // TODO
             break;
         case EShape::Cylinder:
-            // TODO
+            pNwtCollider = NewtonCreateCylinder(pNwtWorld, 1, 1, 2, 0, nullptr);
             break;
         default:
 
@@ -334,12 +336,17 @@ void SysNewton::find_colliders_recurse(
 
         // Set transform relative to root body
 
-        Matrix4 const normScale = Matrix4::from(transform.rotation(),
-                                                transform.translation());
+        // cylinder needs to be rotated 90 degrees Z to aligned with Y axis
+        // TODO: replace this with something more sophisticated some time
+        Matrix4 const &colliderTf
+                = (rCtxPhys.m_shape.get(ent).m_shape != EShape::Cylinder)
+                ? transform : transform * Matrix4::rotationZ(90.0_degf);
+
+        Matrix4 const normScale = Matrix4::from(colliderTf.rotation(), colliderTf.translation());
 
         NewtonCollisionSetMatrix(pCollision, normScale.data());
 
-        Vector3 const scale = transform.scaling();
+        Vector3 const scale = colliderTf.scaling();
         NewtonCollisionSetScale(pCollision, scale.x(), scale.y(), scale.z());
 
         // Add body to compound collision

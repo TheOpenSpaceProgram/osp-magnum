@@ -40,6 +40,7 @@
 #include <adera/ShipResources.h>
 #include <adera/Shaders/PlumeShader.h>
 
+#include <Magnum/MeshTools/Transform.h>
 #include <Magnum/Primitives/Cylinder.h>
 #include <Magnum/Primitives/Cube.h>
 #include <Magnum/Primitives/Grid.h>
@@ -390,13 +391,18 @@ void load_a_bunch_of_stuff()
 
     rDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
 
+    using namespace Magnum;
+    using Primitives::CylinderFlag;
+
     // Add a default primitives
-    rDebugPack.add<Magnum::Trade::MeshData>("cube", Magnum::Primitives::cubeSolid());
-    rDebugPack.add<Magnum::Trade::MeshData>("cylinder", Magnum::Primitives::cylinderSolid(3, 24, 1.0f));
-    rDebugPack.add<Magnum::Trade::MeshData>("sphere", Magnum::Primitives::icosphereSolid(2));
+    rDebugPack.add<Trade::MeshData>("cube", Primitives::cubeSolid());
+    rDebugPack.add<Trade::MeshData>("sphere", Primitives::icosphereSolid(2));
+    rDebugPack.add<Trade::MeshData>(
+            "cylinder",
+            Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds));
 
     // Add grids
-    rDebugPack.add<Magnum::Trade::MeshData>("grid64", Magnum::Primitives::grid3DSolid({64, 64}));
+    rDebugPack.add<Trade::MeshData>("grid64", Primitives::grid3DSolid({64, 64}));
 
     OSP_LOG_INFO("Resource loading complete");
 }
