@@ -46,13 +46,6 @@ jobs:
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
 
-    - name: Download Clang Analysis Driver Scripts
-      if: ${{ steps.skip_check.outputs.should_skip != 'true' }}
-      run: |
-        wget https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-11.0.1/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
-        wget https://raw.githubusercontent.com/include-what-you-use/include-what-you-use/clang_11/iwyu_tool.py
-        chmod +x run-clang-tidy.py iwyu_tool.py 
-
     - name: Perform CodeQL Analysis
       if: ${{ matrix.tool == 'CodeQL' && steps.skip_check.outputs.should_skip != 'true' }}
       uses: github/codeql-action/analyze@v1
