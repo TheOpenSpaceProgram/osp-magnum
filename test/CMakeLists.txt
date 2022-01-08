@@ -44,7 +44,5 @@ function(ADD_TEST_DIRECTORY NAME)
 endfunction()
 
 ADD_CUSTOM_TARGET(test)
-ADD_SUBDIRECTORY(id_registry)
-ADD_SUBDIRECTORY(hierarchical_bitset)
 ADD_SUBDIRECTORY(string_concat)
 ADD_SUBDIRECTORY(shared_string)

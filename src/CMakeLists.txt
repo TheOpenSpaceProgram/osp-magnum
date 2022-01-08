@@ -95,6 +95,7 @@ target_link_libraries(osp-magnum-deps PUBLIC
     dNewton dScene dModel dVehicle
     toml11
     spdlog
+    longeron
     )
 
 # Gather paths to OSP headers and sources
