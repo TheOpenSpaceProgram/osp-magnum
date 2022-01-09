@@ -61,7 +61,7 @@ using ucomp_storage_t = typename entt::storage_traits<Satellite, COMP_T>::storag
 using coordspace_index_t = uint32_t;
 
 template<typename... COMP_T>
-using ucomp_view_t = entt::basic_view<Satellite, entt::exclude_t<>, COMP_T...>;
+using ucomp_view_t = entt::basic_view<Satellite, entt::get_t<COMP_T...>, entt::exclude_t<>>;
 
 
 }
