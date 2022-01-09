@@ -64,7 +64,7 @@ template<typename COMP_T>
 using acomp_storage_t = typename entt::storage_traits<ActiveEnt, COMP_T>::storage_type;
 
 template<typename... COMP_T>
-using acomp_view_t = entt::basic_view<ActiveEnt, entt::exclude_t<>, COMP_T...>;
+using acomp_view_t = entt::basic_view<ActiveEnt, entt::get_t<COMP_T...>, entt::exclude_t<>>;
 
 } // namespace osp::active
 

@@ -105,12 +105,11 @@ void SysHierarchy::cut(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt ent)
 
 void SysHierarchy::sort(acomp_storage_t<ACompHierarchy>& rHier)
 {
-    rHier.sort( [](ACompHierarchy const& lhs, ACompHierarchy const& rhs)
+    rHier.sort( [&rHier](ActiveEnt lhs, ActiveEnt rhs)
     {
-        return lhs.m_level < rhs.m_level;
+        return rHier.get(lhs).m_level < rHier.get(lhs).m_level;
     }, entt::insertion_sort());
 }
-
 
 void SysHierarchy::update_delete_descendents(
         acomp_view_t<ACompHierarchy> viewHier,

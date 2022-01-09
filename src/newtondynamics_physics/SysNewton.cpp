@@ -246,7 +246,7 @@ void SysNewton::update_world(
 
     // Iterate rigid bodies that don't have a NewtonBody
 
-    entt::basic_view<ActiveEnt, entt::exclude_t<ACompNwtBody_t>, ACompPhysBody> view{rCtxPhys.m_physBody, rCtxWorld.m_nwtBodies};
+    entt::basic_view<ActiveEnt, entt::get_t<ACompPhysBody>, entt::exclude_t<ACompNwtBody_t>> view{rCtxPhys.m_physBody, rCtxWorld.m_nwtBodies};
 
     for (ActiveEnt ent : view)
     {
