@@ -25,6 +25,8 @@
 
 #include "RCSController.h"               // IWYU pragma: associated
 
+#if 0
+
 #include <osp/Active/basic.h>            // for ACompTransform
 #include <osp/Active/SysWire.h>          // for ACompWire, ACtxWireNodes
 #include <osp/Active/physics.h>
@@ -52,7 +54,6 @@
 // IWYU pragma: no_include <stdint.h>
 // IWYU pragma: no_include <type_traits>
 
-#if 0
 
 namespace osp { class Package; }
 namespace osp { struct Path; }

@@ -24,6 +24,8 @@
  */
 #include "SysExhaustPlume.h"              // IWYU pragma: associated
 
+#if 0
+
 #include <adera/Plume.h>                  // for PlumeEffectData
 #include <adera/Machines/Rocket.h>        // for MCompRocket
 
@@ -56,8 +58,6 @@
 // IWYU pragma: no_include <cstddef>
 // IWYU pragma: no_include <stdint.h>
 // IWYU pragma: no_include <type_traits>
-
-#if 0
 
 using namespace adera::active;
 
