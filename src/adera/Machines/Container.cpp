@@ -24,6 +24,8 @@
  */
 #include "Container.h"                    // IWYU pragma: associated
 
+#if 0
+
 #include <adera/ShipResources.h>          // for ShipResource, ShipResourceType
 
 #include <osp/Active/basic.h>             // for ACompMass
@@ -54,7 +56,7 @@ using namespace adera::active::machines;
 
 /* MCompContainer */
 
-#if 0
+
 
 std::uint64_t MCompContainer::request_contents(std::uint64_t quantity)
 {

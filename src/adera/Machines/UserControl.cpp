@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 
+#if 0
+
 #include "UserControl.h"                 // IWYU pragma: associated
 
 #include <osp/Resource/machines.h>       // for mach_id, machine_id_t
@@ -41,7 +43,6 @@
 #include <iterator>                      // for std::begin, std::end
 #include <algorithm>                     // for std::sort
 
-#if 0
 
 // IWYU pragma: no_include "adera/wiretypes.h"
 

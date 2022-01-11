@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 
+#if 0
+
 #include "SysVehicleSync.h"
 
 #include "SysAreaAssociate.h"
@@ -49,7 +51,6 @@ using osp::universe::UCompVehicle;
 // for the 0xrrggbb_rgbf literalsm
 using namespace Magnum::Math::Literals;
 
-#if 0
 ActiveEnt SysVehicleSync::activate(ActiveScene &rScene, Universe &rUni,
                                    Satellite areaSat, Satellite tgtSat)
 {

@@ -32,7 +32,6 @@
 #include <osp/Active/machines.h>
 
 #include <osp/Active/SysAreaAssociate.h>
-#include <osp/Active/SysVehicle.h>
 #include <osp/Active/SysVehicleSync.h>
 
 #include <adera/Machines/Container.h>
@@ -62,8 +61,8 @@ struct ACtxMachines
     mcomp_storage_t<MCompRocket>                m_rocket;
     mcomp_storage_t<MCompUserControl>           m_userControl;
 
-    ACtxWireNodes<adera::wire::AttitudeControl> m_wireAttitudeControl;
-    ACtxWireNodes<adera::wire::Percent>         m_wirePercent;
+    //ACtxWireNodes<adera::wire::AttitudeControl> m_wireAttitudeControl;
+    //ACtxWireNodes<adera::wire::Percent>         m_wirePercent;
 };
 
 /**
@@ -93,7 +92,6 @@ struct FlightScene
     activestate::ACtxMachines       m_machines;
 
     osp::active::ACtxPhysics        m_physics;
-    activestate::ACtxVehicle        m_vehicles;
 
     std::unique_ptr<ospnewton::ACtxNwtWorld>    m_nwtWorld;
 };

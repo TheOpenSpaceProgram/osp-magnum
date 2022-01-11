@@ -24,8 +24,6 @@
  */
 #pragma once
 
-#include "SysVehicle.h"
-
 #include "activetypes.h"
 #include "../types.h"
 #include "../Resource/blueprints.h"
@@ -225,22 +223,6 @@ class SysWire
 public:
 
     /**
-     * Construct a vehicle's MCompWirePanels according to their Blueprint
-     *
-     * @param rScene     [ref] Scene supporting Vehicles and the right wire type
-     * @param vehicleEnt [in] Vehicle entity
-     * @param vehicle    [in] Vehicle component used to locate parts
-     * @param vehicleBp  [in] Blueprint of vehicle
-     */
-    template<typename WIRETYPE_T>
-    static void construct_panels(
-            acomp_view_t<ACompMachines> viewMachines,
-            mcomp_storage_t< MCompWirePanel<WIRETYPE_T> >& rPanels,
-            ActiveEnt vehicleEnt,
-            ACompVehicle const& vehicle,
-            BlueprintVehicle const& vehicleBp);
-
-    /**
      * Connect a Node to a Machine's Panel
      *
      * @param node      [ref] Node to connect
@@ -281,36 +263,6 @@ bool SysWire::connect(
     node.m_links.emplace_back(WireLink<WIRETYPE_T>{machEnt, port, link});
     panel.m_ports[size_t(port)].m_nodeIndex = nodeIndex;
     return true;
-}
-
-template<typename WIRETYPE_T>
-void SysWire::construct_panels(
-        acomp_view_t<ACompMachines> machines,
-        mcomp_storage_t< MCompWirePanel<WIRETYPE_T> >& rPanels,
-        ActiveEnt vehicleEnt,
-        ACompVehicle const& vehicle, BlueprintVehicle const& vehicleBp)
-{
-    wire_id_t const id = wiretype_id<WIRETYPE_T>();
-
-    // Check if the vehicle blueprint stores the right wire panel type
-    if (vehicleBp.m_wirePanels.size() <= id)
-    {
-        return;
-    }
-
-    // Initialize all Panels in the vehicle
-    for (BlueprintWirePanel const &bpPanel : vehicleBp.m_wirePanels[id])
-    {
-        // Get part entity from vehicle
-        ActiveEnt partEnt = vehicle.m_parts[bpPanel.m_partIndex];
-
-        // Get machine entity from vehicle
-        auto &rVehicleMachines = machines.get<ACompMachines>(partEnt);
-        ActiveEnt machEnt = rVehicleMachines.m_machines[bpPanel.m_protoMachineIndex];
-
-        // Create the panel supporting the right number of ports
-        rPanels.emplace(machEnt, bpPanel.m_portCount);
-    }
 }
 
 } // namespace osp::active
