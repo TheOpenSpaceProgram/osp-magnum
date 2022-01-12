@@ -110,6 +110,6 @@ void SysHierarchy::sort(acomp_storage_t<ACompHierarchy>& rHierarchy)
 {
     rHierarchy.sort( [&rHierarchy](ActiveEnt lhs, ActiveEnt rhs)
     {
-        return rHierarchy.get(lhs).m_level < rHierarchy.get(lhs).m_level;
+        return rHierarchy.get(lhs).m_level < rHierarchy.get(rhs).m_level;
     }, entt::insertion_sort());
 }
