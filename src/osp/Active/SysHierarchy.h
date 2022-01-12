@@ -50,27 +50,28 @@ public:
      * @param child     [in] Child entity to add ACompHierarchy to
      */
     static void add_child(
-            acomp_storage_t<ACompHierarchy>& rHier,
+            acomp_storage_t<ACompHierarchy>& rHierarchy,
             ActiveEnt parent, ActiveEnt child);
 
     /**
      * @brief Set parent-child relationship between two entities with
      *        ACompHierarchy
      *
-     * @param viewHier  [ref] View for hierarchy components
+     * @param hierarchy [ref] Storage for hierarchy components
      * @param parent    [in] Parent entity
      * @param child     [in] Child entity
      */
-    static void set_parent_child(acomp_view_t<ACompHierarchy> viewHier,
-                                 ActiveEnt parent, ActiveEnt child);
+    static void set_parent_child(
+            acomp_storage_t<ACompHierarchy>& rHierarchy,
+            ActiveEnt parent, ActiveEnt child);
 
     /**
      * @brief Cut an entity out of the hierarchy.
      *
-     * @param viewHier  [ref] View for hierarchy components
+     * @param hierarchy [ref] Storage for hierarchy components
      * @param ent       [in] Entity to remove from hierarchy
      */
-    static void cut(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt ent);
+    static void cut(acomp_storage_t<ACompHierarchy>& hierarchy, ActiveEnt ent);
 
     /**
      * @brief Traverse the scene hierarchy
@@ -90,7 +91,7 @@ public:
      *
      * @param rHier     [ref] Storage for hierarchy components
      */
-    static void sort(acomp_storage_t<ACompHierarchy>& rHier);
+    static void sort(acomp_storage_t<ACompHierarchy>& rHierarchy);
 
     /**
      * @brief Cut entities to delete out of the hierarchy

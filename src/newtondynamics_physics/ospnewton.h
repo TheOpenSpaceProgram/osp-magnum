@@ -78,6 +78,9 @@ struct ACtxNwtWorld
 
     std::unique_ptr<NewtonWorld, Deleter> m_nwtWorld;
 
+    // note: important that m_nwtBodies and m_nwtColliders are destructed
+    //       before m_nwtWorld
+
     osp::active::acomp_storage_t<ACompNwtBody_t> m_nwtBodies;
     osp::active::acomp_storage_t<ACompNwtCollider_t> m_nwtColliders;
 
@@ -87,6 +90,8 @@ struct ACtxNwtWorld
         osp::active::acomp_storage_t<osp::active::ACompPhysNetTorque> m_torque;
     };
 
+    // Forces and torques swapped in during SysNewton::update_world to be read
+    // by multiple Newton threads during cb_force_torque
     std::vector<ForceTorqueIn> m_forceTorqueIn;
 
     std::vector<PerThread> m_perThread;

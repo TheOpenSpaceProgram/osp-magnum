@@ -73,8 +73,9 @@ namespace testapp::physicstest
 // generate IDs at runtime, and map them to named identifiers.
 constexpr int const gc_mat_common      = 0;
 constexpr int const gc_mat_visualizer  = 1;
-
 constexpr int const gc_maxMaterials = 2;
+
+constexpr float gc_physTimestep = 1.0 / 60.0f;
 
 /**
  * @brief State of the entire engine test scene
@@ -395,7 +396,8 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
 
     auto const physIn = ArrayView<ACtxPhysInputs>(&rScene.m_physIn, 1);
     SysNewton::update_world(
-            rScene.m_physics, *rScene.m_pNwtWorld, physIn, rScene.m_basic.m_hierarchy,
+            rScene.m_physics, *rScene.m_pNwtWorld, gc_physTimestep, physIn,
+            rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform, rScene.m_basic.m_transformControlled,
             rScene.m_basic.m_transformMutable);
 

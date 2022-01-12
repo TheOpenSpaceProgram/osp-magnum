@@ -69,11 +69,8 @@ using osp::active::ACtxPhysics;
 using osp::active::ACtxPhysInputs;
 using osp::active::SysPhysics;
 
-using osp::active::ACompHierarchy;
 using osp::active::ACompShape;
-using osp::active::ACompTransform;
-using osp::active::ACompTransformControlled;
-using osp::active::ACompTransformMutable;
+
 
 using osp::Matrix3;
 using osp::Matrix4;
@@ -138,17 +135,6 @@ void cb_set_transform(NewtonBody const* const pBody,
     ActiveEnt const ent = static_cast<ActiveEnt>(userData);
 
     pWorldCtx->m_perThread[threadIndex].m_setTf.emplace_back(ent, pBody);
-}
-
-
-void SysNewton::destroy(ACtxNwtWorld &rCtxWorld)
-{
-    // delete collision shapes and bodies before deleting the world
-    rCtxWorld.m_nwtColliders.clear();
-    rCtxWorld.m_nwtBodies.clear();
-
-    // delete world
-    rCtxWorld.m_nwtWorld.reset();
 }
 
 void SysNewton::update_translate(ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld)
@@ -226,6 +212,7 @@ using Corrade::Containers::ArrayView;
 void SysNewton::update_world(
         ACtxPhysics& rCtxPhys,
         ACtxNwtWorld& rCtxWorld,
+        float timestep,
         ArrayView<ACtxPhysInputs> inputs,
         acomp_storage_t<ACompHierarchy> const& rHier,
         acomp_storage_t<ACompTransform>& rTf,
@@ -234,15 +221,6 @@ void SysNewton::update_world(
 {
 
     NewtonWorld const* pNwtWorld = rCtxWorld.m_nwtWorld.get();
-
-    // temporary: just delete the Newton Body if colliders change, so it can be
-    //            reinitialized with new colliders
-//    for (ActiveEnt ent : std::exchange(rCtxPhys.m_colliderDirty, {}))
-//    {
-//        rCtxWorld.m_nwtColliders.remove(ent);
-//        create_body(rCtxPhys, rCtxWorld, viewHier, viewTf, rTfControlled,
-//                    rTfMutable, ent, pNwtWorld);
-//    }
 
     // Iterate rigid bodies that don't have a NewtonBody
 
@@ -276,7 +254,7 @@ void SysNewton::update_world(
     }
 
     // Update the world
-    NewtonUpdate(pNwtWorld, 1.0f / 60.0f);
+    NewtonUpdate(pNwtWorld, timestep);
 
     // Return force and torques, then clear
     for (int i = 0; i < inputs.size(); i ++)
@@ -321,7 +299,7 @@ void SysNewton::remove_components(ACtxNwtWorld& rCtxWorld, ActiveEnt ent)
 }
 
 void SysNewton::find_colliders_recurse(
-        ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld,
+        ACtxPhysics const& rCtxPhys, ACtxNwtWorld& rCtxWorld,
         acomp_storage_t<ACompHierarchy> const& rHier,
         acomp_storage_t<ACompTransform> const& rTf,
         ActiveEnt ent, ActiveEnt firstChild,
@@ -383,7 +361,7 @@ void SysNewton::find_colliders_recurse(
 }
 
 void SysNewton::create_body(
-        ACtxPhysics& rCtxPhys,
+        ACtxPhysics const& rCtxPhys,
         ACtxNwtWorld& rCtxWorld,
         acomp_storage_t<ACompHierarchy> const& rHier,
         acomp_storage_t<ACompTransform> const& rTf,

@@ -85,10 +85,8 @@ struct ACompShape
 };
 
 /**
- * @brief Stores the mass of entities
+ * @brief Generic Mass and inertia intended for entities
  */
-struct ACompMass { float m_mass; };
-
 struct ACompSubBody
 {
     Vector3 m_inertia;

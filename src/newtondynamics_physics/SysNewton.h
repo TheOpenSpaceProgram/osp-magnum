@@ -47,60 +47,63 @@ struct ACtxNwtWorld;
 
 class SysNewton
 {
+    template<typename COMP_T>
+    using acomp_storage_t           = osp::active::acomp_storage_t<COMP_T>;
 
+    using ActiveEnt                 = osp::active::ActiveEnt;
+    using ACtxPhysics               = osp::active::ACtxPhysics;
+    using ACompHierarchy            = osp::active::ACompHierarchy;
+    using ACompTransform            = osp::active::ACompTransform;
+    using ACompTransformControlled  = osp::active::ACompTransformControlled;
+    using ACompTransformMutable     = osp::active::ACompTransformMutable;
 public:
 
     /**
-     * @brief destroy
+     * @brief Respond to scene origin shifts by translating all rigid bodies
      *
-     * @param rCtxWorld
-     */
-    static void destroy(ACtxNwtWorld &rCtxWorld);
-
-    /**
-     * @brief update_translate
-     *
-     * @param rCtxPhys
-     * @param rCtxWorld
+     * @param rCtxPhys      [ref] Generic physics context with m_originTranslate
+     * @param rCtxWorld     [ref] Newton World
      */
     static void update_translate(
-            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld);
 
     /**
-     * @brief update_colliders
+     * @brief Synchronize generic physics colliders with Newton colliders
      *
-     * @param rCtxPhys
-     * @param rCtxWorld
-     * @param rCollidersDirty
+     * @param rCtxPhys          [ref] Generic physics context
+     * @param rCtxWorld         [ref] Newton World
+     * @param rCollidersDirty   [in] Colliders to update
      */
     static void update_colliders(
-            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            std::vector<osp::active::ActiveEnt> const& collidersDirty);
+            std::vector<ActiveEnt> const& collidersDirty);
 
     /**
-     * @brief update_world
+     * @brief Step the entire Newton World forward in time
      *
-     * @param rCtxPhys
-     * @param rCtxWorld
-     * @param inputs
-     * @param rHier
-     * @param rTf
-     * @param rTfControlled
-     * @param rTfMutable
+     * @param rCtxPhys      [ref] Generic Physics context. Updates linear and angular velocity.
+     * @param rCtxWorld     [ref] Newton world to update
+     * @param timestep      [in] Time to step world, passed to Newton update
+     * @param inputs        [ref] Physics inputs (from different threads)
+     * @param rHier         [in] Storage for Hierarchy components
+     * @param rTf           [ref] Relative transforms used by rigid bodies
+     * @param rTfControlled [ref] Flags for controlled transforms
+     * @param rTfMutable    [ref] Flags for mutable transforms
      */
     static void update_world(
-            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
+            float timestep,
             Corrade::Containers::ArrayView<osp::active::ACtxPhysInputs> inputs,
-            osp::active::acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
-            osp::active::acomp_storage_t<osp::active::ACompTransform>& rTf,
-            osp::active::acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
-            osp::active::acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable);
+            acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
+            acomp_storage_t<osp::active::ACompTransform>& rTf,
+            acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
+            acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable);
 
     static void remove_components(
-            ACtxNwtWorld& rCtxWorld, osp::active::ActiveEnt ent);
+            ACtxNwtWorld& rCtxWorld, ActiveEnt ent);
 
     template<typename IT_T>
     static void update_delete(
@@ -119,22 +122,22 @@ private:
      * @brief Find colliders in an entity and its hierarchy, and add them to
      *        a Newton Compound Collision
      *
-     * @param rCtxPhys
-     * @param rCtxWorld
-     * @param rHier
-     * @param rTf
-     * @param ent
-     * @param firstChild
-     * @param transform
-     * @param pCompound
+     * @param rCtxPhys      [in] Generic Physics context.
+     * @param rCtxWorld     [ref] Newton world
+     * @param rHier         [in] Storage for hierarchy components
+     * @param rTf           [in] Storage for relative hierarchy transforms
+     * @param ent           [in] Entity to search
+     * @param firstChild    [in] First child of ent (to reduce rHier accesses)
+     * @param transform     [in] Transform relative to root (part of recursion)
+     * @param pCompound     [out] NewtonCompoundCollision to add colliders to
      */
     static void find_colliders_recurse(
-            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxPhysics const& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            osp::active::acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
-            osp::active::acomp_storage_t<osp::active::ACompTransform> const& rTf,
-            osp::active::ActiveEnt ent,
-            osp::active::ActiveEnt firstChild,
+            acomp_storage_t<ACompHierarchy> const& rHier,
+            acomp_storage_t<ACompTransform> const& rTf,
+            ActiveEnt ent,
+            ActiveEnt firstChild,
             osp::Matrix4 const& transform,
             NewtonCollision* pCompound);
 
@@ -146,13 +149,13 @@ private:
      * @param pNwtWorld [in] Newton physics world
      */
     static void create_body(
-            osp::active::ACtxPhysics& rCtxPhys,
+            ACtxPhysics const& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            osp::active::acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
-            osp::active::acomp_storage_t<osp::active::ACompTransform> const& rTf,
-            osp::active::acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
-            osp::active::acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable,
-            osp::active::ActiveEnt ent,
+            acomp_storage_t<ACompHierarchy> const& rHier,
+            acomp_storage_t<ACompTransform> const& rTf,
+            acomp_storage_t<ACompTransformControlled>& rTfControlled,
+            acomp_storage_t<ACompTransformMutable>& rTfMutable,
+            ActiveEnt ent,
             NewtonWorld const* pNwtWorld);
 
 };

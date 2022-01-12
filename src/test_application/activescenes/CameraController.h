@@ -85,10 +85,28 @@ struct ACtxCameraController
 class SysCameraController
 {
 public:
+
+    /**
+     * @brief Read rotation controls and orientation around its target
+     *
+     * @param rCtrl     [in] Camera Controller state
+     * @param rCamTf    [out] Camera transform output
+     * @param delta     [in] Time used to calculate displacement
+     */
     static void update_view(
             ACtxCameraController &rCtrl, osp::active::ACompTransform &rCamTf,
             float delta);
 
+    /**
+     * @brief Read translation controls and move the camera accordingly
+     *
+     * @param rCtrl         [in] Camera Controller state
+     * @param rCamTf        [out] Camera transform output
+     * @param delta         [in] Time used to calculate displacement
+     * @param moveTarget    [in] Option to move the target position as well.
+     *                           Leave this as always true for now, as different
+     *                           camera modes are not yet finalized.
+     */
     static void update_move(
             ACtxCameraController &rCtrl, osp::active::ACompTransform &rCamTf,
             float delta, bool moveTarget);
