@@ -115,16 +115,16 @@ DependRes<Mesh> try_compile_mesh(
 }
 
 void SysRenderGL::compile_meshes(
-        acomp_view_t<ACompMesh const> viewMeshs,
+        acomp_storage_t<ACompMesh> const& meshes,
         std::vector<ActiveEnt>& rDirty,
         acomp_storage_t<ACompMeshGL>& rMeshGl,
         osp::Package& rGlResources)
 {
     for (ActiveEnt ent : std::exchange(rDirty, {}))
     {
-        if (viewMeshs.contains(ent))
+        if (meshes.contains(ent))
         {
-            auto const &rEntMesh = viewMeshs.get<ACompMesh const>(ent);
+            ACompMesh const &rEntMesh = meshes.get(ent);
 
             if (rMeshGl.contains(ent))
             {
@@ -188,16 +188,16 @@ DependRes<Texture2D> try_compile_texture(
 }
 
 void SysRenderGL::compile_textures(
-        acomp_view_t<const ACompTexture> viewTex,
+        acomp_storage_t<ACompTexture> const& textures,
         std::vector<ActiveEnt>& rDirty,
         acomp_storage_t<ACompTextureGL>& rTexGl,
         osp::Package& rGlResources)
 {
     for (ActiveEnt ent : std::exchange(rDirty, {}))
     {
-        if (viewTex.contains(ent))
+        if (textures.contains(ent))
         {
-            auto const &rEntTex = viewTex.get<ACompTexture const>(ent);
+            ACompTexture const &rEntTex = textures.get(ent);
 
             if (rTexGl.contains(ent))
             {

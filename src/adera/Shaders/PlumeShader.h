@@ -124,16 +124,19 @@ private:
  */
 struct ACtxPlumeData
 {
-    template<typename... COMP_T>
-    using acomp_view_t = typename osp::active::acomp_view_t<COMP_T...>;
+    template<typename COMP_T>
+    using acomp_storage_t       = typename osp::active::acomp_storage_t<COMP_T>;
+    using ACompDrawTransform    = osp::active::ACompDrawTransform;
+    using ACompMeshGL           = osp::active::ACompMeshGL;
+    using ACompExhaustPlume     = adera::active::ACompExhaustPlume;
 
     PlumeShader m_shader;
 
     osp::DependRes<Magnum::GL::Texture2D> m_tmpTex;
 
-    acomp_view_t< osp::active::ACompDrawTransform >     m_viewDrawTf;
-    acomp_view_t< adera::active::ACompExhaustPlume >    m_viewExaustPlumes;
-    acomp_view_t< osp::active::ACompMeshGL >            m_mesh;
+    acomp_storage_t<ACompDrawTransform> *m_pDrawTf{nullptr};
+    acomp_storage_t<ACompExhaustPlume>  *m_pExaustPlumes{nullptr};
+    acomp_storage_t<ACompMeshGL>        *m_pMesh{nullptr};
 };
 
 } // namespace adera::shader

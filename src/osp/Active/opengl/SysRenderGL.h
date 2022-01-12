@@ -87,32 +87,35 @@ public:
                                 Magnum::GL::Texture2D& rTex);
 
     /**
-     * @brief Compile entities with loaded meshes into GPU resources
+     * @brief Compile and assign GPU mesh components to entities with mesh
+     *        data components
      *
      * Entities with an ACompMesh will be synchronized with an ACompMeshGL
      *
-     * @param viewMeshs     [in] View for generic mesh components
+     * @param meshes        [in] Storage for generic mesh components
      * @param rDirty        [ref] Vector of entities that have updated meshes,
      *                            this will be cleared.
      * @param rMeshGl       [ref] Storage for GL mesh components
      * @param rGlResources  [out] Package to store newly compiled meshes
      */
     static void compile_meshes(
-            acomp_view_t<ACompMesh const> viewMeshs,
+            acomp_storage_t<ACompMesh> const& meshes,
             std::vector<ActiveEnt>& rDirty,
             acomp_storage_t<ACompMeshGL>& rMeshGl,
             osp::Package& rGlResources);
 
     /**
-     * @brief TODO
+     * @brief Compile and assign GPU texture components to entities with
+     *        texture data components
      *
-     * @param viewDiffTex
-     * @param rDirty
-     * @param rDiffTexGl
-     * @param rGlResources
+     * @param textures      [in] Storage for generic texture data components
+     * @param rDirty        [ref] Vector of entities that have updated meshes,
+     *                            this will be cleared.
+     * @param rDiffTexGl    [ref] Storage for GL texture components
+     * @param rGlResources  [out] Package to store newly compiled textures
      */
     static void compile_textures(
-            acomp_view_t<ACompTexture const> viewDiffTex,
+            acomp_storage_t<ACompTexture> const& textures,
             std::vector<ActiveEnt>& rDirty,
             acomp_storage_t<ACompTextureGL>& rDiffTexGl,
             osp::Package& rGlResources);
