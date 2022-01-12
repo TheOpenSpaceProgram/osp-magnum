@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "scenarios.h"
+#include "CameraController.h"
 
 #include "../ActiveApplication.h"
 
@@ -147,13 +148,13 @@ entt::any setup_scene(osp::Package &rPkg)
  *
  * @param rScene [ref] scene to update
  */
-void update_test_scene(EngineTestScene& rScene)
+void update_test_scene(EngineTestScene& rScene, float delta)
 {
     // Rotate the cube
     osp::Matrix4 &rCubeTf
             = rScene.m_basic.m_transform.get(rScene.m_cube).m_transform;
 
-    rCubeTf = Magnum::Matrix4::rotationY(360.0_degf / 60.0f) * rCubeTf;
+    rCubeTf = Magnum::Matrix4::rotationY(90.0_degf * delta) * rCubeTf;
 }
 
 //-----------------------------------------------------------------------------
@@ -163,13 +164,18 @@ void update_test_scene(EngineTestScene& rScene)
  */
 struct EngineTestRenderer
 {
-    osp::active::ACtxRenderGroups m_renderGroups;
+    EngineTestRenderer(ActiveApplication &rApp)
+     : m_camCtrl(rApp.get_input_handler())
+    { }
 
-    osp::active::ACtxRenderGL m_renderGl;
+    osp::active::ACtxRenderGroups m_renderGroups{};
+
+    osp::active::ACtxRenderGL m_renderGl{};
 
     osp::active::ActiveEnt m_camera;
+    ACtxCameraController m_camCtrl;
 
-    osp::shader::ACtxPhongData m_phong;
+    osp::shader::ACtxPhongData m_phong{};
 };
 
 /**
@@ -260,7 +266,6 @@ void load_gl_resources(ActiveApplication& rApp)
             "mesh_vis_shader",
             MeshVisualizer{ MeshVisualizer::Flag::Wireframe
                             | MeshVisualizer::Flag::NormalDirection});
-
 }
 
 on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
@@ -271,7 +276,7 @@ on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
     // Create renderer data. This uses a shared_ptr to allow being stored
     // inside an std::function, which require copyable types
     std::shared_ptr<EngineTestRenderer> pRenderer
-            = std::make_shared<EngineTestRenderer>();
+            = std::make_shared<EngineTestRenderer>(rApp);
 
     osp::Package &rGlResources = rApp.get_gl_resources();
 
@@ -282,13 +287,15 @@ on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
     pRenderer->m_phong.m_shaderDiffuse
             = rGlResources.get_or_reserve<Phong>("textured");
 
-    pRenderer->m_phong.m_views.emplace(ACtxPhongData::Views{
-            rScene.m_drawing.m_drawTransform,
-            pRenderer->m_renderGl.m_diffuseTexGl,
-            pRenderer->m_renderGl.m_meshGl});
+    pRenderer->m_phong.m_pDrawTf       = &rScene.m_drawing.m_drawTransform;
+    pRenderer->m_phong.m_pDiffuseTexGl = &pRenderer->m_renderGl.m_diffuseTexGl;
+    pRenderer->m_phong.m_pMeshGl       = &pRenderer->m_renderGl.m_meshGl;
 
     // Select first camera for rendering
     pRenderer->m_camera = rScene.m_basic.m_camera.at(0);
+
+    pRenderer->m_camCtrl.m_target = osp::Vector3{};
+    pRenderer->m_camCtrl.m_up = osp::Vector3{0.0f, 1.0f, 0.0f};
 
     // Create render group for forward opaque pass
     pRenderer->m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
@@ -307,9 +314,20 @@ on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
     auto &rDiffSet = static_cast<active_sparse_set_t&>(rScene.m_drawing.m_diffuseTex);
     rScene.m_drawing.m_diffuseDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
 
-    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp)
+    return [&rScene, pRenderer = std::move(pRenderer)] (
+            ActiveApplication& rApp, float delta)
     {
-        update_test_scene(rScene);
+
+        update_test_scene(rScene, delta);
+
+        SysCameraController::update_view(
+                pRenderer->m_camCtrl,
+                rScene.m_basic.m_transform.get(pRenderer->m_camera), delta);
+        SysCameraController::update_move(
+                pRenderer->m_camCtrl,
+                rScene.m_basic.m_transform.get(pRenderer->m_camera),
+                delta, true);
+
         render_test_scene(rApp, rScene, *pRenderer);
     };
 }

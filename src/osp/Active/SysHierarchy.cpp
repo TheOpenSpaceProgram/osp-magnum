@@ -30,22 +30,24 @@ using osp::active::ActiveEnt;
 
 
 void SysHierarchy::add_child(
-        acomp_storage_t<ACompHierarchy>& rHier,
+        acomp_storage_t<ACompHierarchy>& rHierarchy,
         ActiveEnt parent, ActiveEnt child)
 {
-    rHier.emplace(child);
-    set_parent_child(rHier, parent, child);
+    rHierarchy.emplace(child);
+    set_parent_child(rHierarchy, parent, child);
 }
 
-void SysHierarchy::set_parent_child(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt parent, ActiveEnt child)
+void SysHierarchy::set_parent_child(
+        acomp_storage_t<ACompHierarchy>& rHierarchy,
+        ActiveEnt parent, ActiveEnt child)
 {
-    ACompHierarchy &rChildHier  = viewHier.get<ACompHierarchy>(child);
-    ACompHierarchy &rParentHier = viewHier.get<ACompHierarchy>(parent);
+    ACompHierarchy &rChildHier  = rHierarchy.get(child);
+    ACompHierarchy &rParentHier = rHierarchy.get(parent);
 
     // if child has an existing parent, cut first
     if (rChildHier.m_parent != entt::null)
     {
-        cut(viewHier, child);
+        cut(rHierarchy, child);
     }
 
     // set new child's parent
@@ -56,7 +58,7 @@ void SysHierarchy::set_parent_child(acomp_view_t<ACompHierarchy> viewHier, Activ
     if(0 != rParentHier.m_childCount)
     {
         ActiveEnt sibling = rParentHier.m_childFirst;
-        auto &rSiblingHier = viewHier.get<ACompHierarchy>(sibling);
+        auto &rSiblingHier = rHierarchy.get(sibling);
 
         // Set new child and former first child as siblings
         rSiblingHier.m_siblingPrev = child;
@@ -68,9 +70,10 @@ void SysHierarchy::set_parent_child(acomp_view_t<ACompHierarchy> viewHier, Activ
     rParentHier.m_childCount ++; // increase child count
 }
 
-void SysHierarchy::cut(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt ent)
+void SysHierarchy::cut(
+        acomp_storage_t<ACompHierarchy>& rHierarchy, ActiveEnt ent)
 {
-    auto &rEntHier = viewHier.get<ACompHierarchy>(ent);
+    ACompHierarchy &rEntHier = rHierarchy.get(ent);
 
     // TODO: deal with m_depth
 
@@ -78,19 +81,19 @@ void SysHierarchy::cut(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt ent)
 
     if (rEntHier.m_siblingNext != entt::null)
     {
-        viewHier.get<ACompHierarchy>(rEntHier.m_siblingNext).m_siblingPrev
+        rHierarchy.get(rEntHier.m_siblingNext).m_siblingPrev
                 = rEntHier.m_siblingPrev;
     }
 
     if (rEntHier.m_siblingPrev != entt::null)
     {
-        viewHier.get<ACompHierarchy>(rEntHier.m_siblingPrev).m_siblingNext
+        rHierarchy.get(rEntHier.m_siblingPrev).m_siblingNext
                 = rEntHier.m_siblingNext;
     }
 
     // Unlink parent
 
-    auto &rParentHier = viewHier.get<ACompHierarchy>(rEntHier.m_parent);
+    ACompHierarchy &rParentHier = rHierarchy.get(rEntHier.m_parent);
     rParentHier.m_childCount --;
 
     if (rParentHier.m_childFirst == ent)
@@ -103,32 +106,10 @@ void SysHierarchy::cut(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt ent)
                       = entt::null;
 }
 
-void SysHierarchy::sort(acomp_storage_t<ACompHierarchy>& rHier)
+void SysHierarchy::sort(acomp_storage_t<ACompHierarchy>& rHierarchy)
 {
-    rHier.sort( [&rHier](ActiveEnt lhs, ActiveEnt rhs)
+    rHierarchy.sort( [&rHierarchy](ActiveEnt lhs, ActiveEnt rhs)
     {
-        return rHier.get(lhs).m_level < rHier.get(lhs).m_level;
+        return rHierarchy.get(lhs).m_level < rHierarchy.get(lhs).m_level;
     }, entt::insertion_sort());
 }
-
-void SysHierarchy::update_delete_descendents(
-        acomp_view_t<ACompHierarchy> viewHier,
-        acomp_storage_t<ACompDelete>& rDelete)
-{
-    auto view = viewHier | entt::basic_view{rDelete};
-
-    // copy entities to delete into a buffer
-    std::vector<ActiveEnt> toDelete;
-    toDelete.reserve(view.size_hint());
-    toDelete.assign(std::begin(view), std::end(view));
-
-    // Add delete components to descendents of all entities to delete
-    for (ActiveEnt ent : toDelete)
-    {
-        traverse(viewHier, ent, [&rDelete] (ActiveEnt descendent) {
-            rDelete.emplace(descendent);
-            return EHierarchyTraverseStatus::Continue;
-        });
-    }
-}
-

@@ -120,6 +120,46 @@ public:
             acomp_view_t<ACompTransform> const& viewTf,
             acomp_storage_t<ACompDrawTransform>& rDrawTf);
 
+    template<typename IT_T>
+    static void update_delete_drawing(
+            ACtxDrawing &rCtxDraw, IT_T first, IT_T last);
+
+    template<typename IT_T>
+    static void update_delete_groups(
+            ACtxRenderGroups &rCtxGroups, IT_T first, IT_T last);
+
 }; // class SysRender
+
+
+template<typename IT_T>
+void SysRender::update_delete_drawing(
+        ACtxDrawing &rCtxDraw, IT_T first, IT_T last)
+{
+    rCtxDraw.m_opaque           .remove(first, last);
+    rCtxDraw.m_transparent      .remove(first, last);
+    rCtxDraw.m_visible          .remove(first, last);
+    rCtxDraw.m_drawTransform    .remove(first, last);
+    rCtxDraw.m_mesh             .remove(first, last);
+    rCtxDraw.m_diffuseTex       .remove(first, last);
+
+    for (MaterialData& rMat : rCtxDraw.m_materials)
+    {
+        rMat.m_comp.remove(first, last);
+    }
+}
+
+template<typename IT_T>
+void SysRender::update_delete_groups(
+        ACtxRenderGroups &rCtxGroups, IT_T first, IT_T last)
+{
+    if (first == last)
+    {
+        return;
+    }
+    for (auto& [_, rGroup] : rCtxGroups.m_groups)
+    {
+        rGroup.m_entities.remove(first, last);
+    }
+}
 
 } // namespace osp::active

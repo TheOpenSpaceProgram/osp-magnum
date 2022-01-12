@@ -75,11 +75,6 @@ struct ACtxUniverseSync
     ACtxAreaLink        m_areaLink;
 };
 
-struct ACtxTestApp
-{
-    acomp_storage_t<ACompCameraController> m_cameraController;
-};
-
 } // namespace testapp::scenestate
 
 namespace testapp::flight

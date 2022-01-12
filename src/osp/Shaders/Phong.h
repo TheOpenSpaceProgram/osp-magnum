@@ -76,17 +76,13 @@ public:
  */
 struct ACtxPhongData
 {
-    struct Views
-    {
-        active::acomp_view_t< osp::active::ACompDrawTransform > m_drawTf;
-        active::acomp_view_t< osp::active::ACompTextureGL >     m_diffuseTexGl;
-        active::acomp_view_t< osp::active::ACompMeshGL >        m_meshGl;
-    };
 
     DependRes<Phong> m_shaderUntextured;
     DependRes<Phong> m_shaderDiffuse;
 
-    std::optional<Views> m_views;
+    active::acomp_storage_t< osp::active::ACompDrawTransform > *m_pDrawTf;
+    active::acomp_storage_t< osp::active::ACompTextureGL >     *m_pDiffuseTexGl;
+    active::acomp_storage_t< osp::active::ACompMeshGL >        *m_pMeshGl;
 };
 
 } // namespace osp::shader

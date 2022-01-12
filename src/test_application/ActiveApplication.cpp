@@ -65,7 +65,7 @@ void ActiveApplication::drawEvent()
 
     if (m_onDraw.operator bool())
     {
-        m_onDraw(*this);
+        m_onDraw(*this, m_timeline.previousFrameDuration());
     }
 
     m_userInput.clear_events();

@@ -35,112 +35,105 @@ struct ACompTransform;
 class SysPhysics
 {
 public:
+
     /**
-     * Used to find which rigid body an entity belongs to. This will keep
-     * looking up the tree of parents until it finds a rigid body.
+     * @brief Find which rigid body an entity belongs to
      *
-     * @param rScene     [in] ActiveScene containing ent
-     * @param ent        [in] ActiveEnt with ACompHierarchy and rigidbody ancestor
+     * This function will follow an entity's chain parents until it reaches
+     * the hierarchy level at which rigid bodies exist.
      *
-     * @return Pair of {level-1 entity, pointer to ACompNwtBody found}. If
-     *         hierarchy error, then {entt:null, nullptr}. If no ACompNwtBody
-     *         component is found, then {level-1 entity, nullptr}
+     * @param hierarchy [in] Hierarchy component storage
+     * @param ent       [in] Entity to find rigid body transform of
+     *
+     * @return Entity at rigid body hierarchy level
      */
     static ActiveEnt find_rigidbody_ancestor(
-            acomp_view_t<ACompHierarchy> viewHier,
+            acomp_storage_t<ACompHierarchy> const& hier,
             ActiveEnt ent);
 
     /**
-     * Finds the transformation of an entity relative to its rigidbody ancestor
+     * @brief Calculates the transformation of an entity relative to its
+     *        rigidbody ancestor
      *
      * Identical to find_rigidbody_ancestor(), except returns the transformation
      * between rigidbody ancestor and the specified entity.
      *
-     * @param rScene  [in] ActiveScene containing ent
-     * @param ent     [in] ActiveEnt with ACompHierarchy and rigidbody ancestor
+     * @param hierarchy     [in] Hierarchy component storage
+     * @param transforms    [in] Transform component storage
+     * @param ent           [in] Entity to calculate
      *
      * @return A Matrix4 representing the transformation
      */
-    static Matrix4 find_transform_rel_rigidbody_ancestor(
-            acomp_view_t<ACompHierarchy> viewHier,
-            acomp_view_t<ACompTransform> viewTf,
-            ActiveEnt ent);
-
-
-    /**
-     * Helper function for a SysMachine to access a parent rigidbody
-     *
-     * Used by machines which influence the rigidbody to which they're attached.
-     * This function takes a child entity and attempts to retrieve the rigidbody
-     * ancestor of the machine. The function makes use of the
-     * ACompRigidbodyAncestor component; if the specified entity lacks this
-     * component, one is added to it. The component is then used to store the
-     * result of find_rigidbody_ancestor() (the entity which owns the rigidbody)
-     * so that it can be easily accessed later.
-     *
-     * @param rScene          [in] The scene to search
-     * @param childEntity     [in] An entity whose rigidbody ancestor is sought
-     *
-     * @return Pair of {pointer to found ACompNwtBody, pointer to ACompTransform
-     *         of the ACompNwtBody entity}. If either component can't be found,
-     *         returns {nullptr, nullptr}
-     */
-    static ACompRigidbodyAncestor* try_get_or_find_rigidbody_ancestor(
-            acomp_view_t<ACompHierarchy> viewHier,
-            acomp_view_t<ACompTransform> viewTf,
-            acomp_storage_t<ACompRigidbodyAncestor>& rRbAncestor,
+    static Matrix4 calc_transform_rel_rigidbody_ancestor(
+            acomp_storage_t<ACompHierarchy> const& hierarchy,
+            acomp_storage_t<ACompTransform> const& transform,
             ActiveEnt ent);
 
     enum EIncludeRootMass { Ignore, Include };
-    /**
-    * Recursively compute the center of mass of a hierarchy subtree
-    *
-    * Takes in a root entity and recurses through its children. Entities which
-    * possess an ACompMass component are used to compute a center of mass for
-    * the entire subtree, treating it as a system of point masses. By default,
-    * the root entity's mass is not included; to include it, the optional
-    * includeRootMass argument can be set to 'true'.
-    *
-    * @template CHECK_ROOT_MASS Include or exclude the mass of the root entity
-    * being passed to the function
-    *
-    * @param rScene           [in] ActiveScene containing relevant scene data
-    * @param root             [in] Entity at the root of the hierarchy subtree
-    * @param includeRootMass  [in] Set to true if the root entity's mass should
-    *                              be included in the calculation
-    *
-    * @return A 4-vector containing xyz=CoM, w=total mass
-    */
-    template <EIncludeRootMass INCLUDE_ROOT_MASS=EIncludeRootMass::Ignore>
-    static Vector4 compute_hier_CoM(
-            acomp_view_t<ACompHierarchy> const viewHier,
-            acomp_view_t<ACompTransform> const viewTf,
-            acomp_view_t<ACompMass> const viewMass,
-            ActiveEnt root);
 
-    /**
-     * Compute the moment of inertia of a rigid body
-     *
-     * Searches the child nodes of the root and computes the total moment of
-     * inertia of the body. To contribute to the inertia of the rigidbody, child
-     * entities must posses both an ACompMass and ACompShape component, so that
-     * the mass distribution of the entity may be calculated.
-     *
-     * @param rScene       [in] ActiveScene containing relevant scene data
-     * @param root         [in] The root entity of the rigid body
-     *
-     * @return The inertia tensor of the rigid body about its center of mass, and
-     *         a 4-vector containing xyz=CoM, w=total mass
-     */
-    static std::pair<Matrix3, Vector4> compute_hier_inertia(
-            acomp_view_t<ACompHierarchy> const viewHier,
-            acomp_view_t<ACompTransform> const viewTf,
-            acomp_view_t<ACompMass> const viewMass,
-            acomp_view_t<ACompShape> const viewShape,
-            ActiveEnt entity);
+    // TODO: rewrite hierarchy inertia calculations for new mass/inertia system
 
+    template<typename IT_T>
+    static void update_delete_phys(
+            ACtxPhysics &rCtxPhys, IT_T first, IT_T last);
+
+    template<typename IT_T>
+    static void update_delete_shapes(
+            ACtxPhysics &rCtxPhys, IT_T first, IT_T last);
+
+    template<typename IT_T>
+    static void update_delete_hier_body(
+            ACtxHierBody &rCtxHierBody, IT_T first, IT_T last);
 
 };
+
+template<typename IT_T>
+void SysPhysics::update_delete_phys(
+        ACtxPhysics &rCtxPhys, IT_T first, IT_T last)
+{
+    while (first != last)
+    {
+        ActiveEnt const ent = *first;
+
+        if (rCtxPhys.m_physBody.contains(ent))
+        {
+            rCtxPhys.m_physBody         .remove(ent);
+            rCtxPhys.m_physDynamic      .remove(ent);
+            rCtxPhys.m_physLinearVel    .remove(ent);
+            rCtxPhys.m_physAngularVel   .remove(ent);
+        }
+
+        ++first;
+    }
+}
+
+template<typename IT_T>
+void SysPhysics::update_delete_shapes(
+        ACtxPhysics &rCtxPhys, IT_T first, IT_T last)
+{
+    rCtxPhys.m_hasColliders.remove(first, last);
+
+    while (first != last)
+    {
+        ActiveEnt const ent = *first;
+
+        if (rCtxPhys.m_shape.contains(ent))
+        {
+            rCtxPhys.m_shape.remove(ent);
+            rCtxPhys.m_solid.remove(ent);
+        }
+
+        ++first;
+    }
+}
+
+template<typename IT_T>
+void SysPhysics::update_delete_hier_body(
+        ACtxHierBody &rCtxHierBody, IT_T first, IT_T last)
+{
+    rCtxHierBody.m_ownDyn.remove(first, last);
+    rCtxHierBody.m_totalDyn.remove(first, last);
+}
 
 
 }

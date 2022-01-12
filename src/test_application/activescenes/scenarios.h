@@ -35,7 +35,7 @@ namespace testapp
 
 class ActiveApplication;
 
-using on_draw_t = std::function<void(ActiveApplication&)>;
+using on_draw_t = std::function<void(ActiveApplication&, float delta)>;
 
 
 namespace flight

@@ -85,17 +85,8 @@ struct ACompShape
 };
 
 /**
- * @brief Stores the mass of entities
+ * @brief Generic Mass and inertia intended for entities
  */
-struct ACompMass { float m_mass; };
-
-/**
- * @brief Tells the physics system that entity will be used as a collider.
- *
- * Relies on ACompShape
- */
-struct ACompSolidCollider { };
-
 struct ACompSubBody
 {
     Vector3 m_inertia;
@@ -115,7 +106,7 @@ struct ACtxPhysics
     acomp_storage_t<ACompPhysAngularVel>    m_physAngularVel;
 
     acomp_storage_t<ACompShape>             m_shape;
-    acomp_storage_t<ACompSolidCollider>     m_solidCollider;
+    active_sparse_set_t                     m_solid;
     active_sparse_set_t                     m_hasColliders;
 
 }; // struct ACtxPhysics

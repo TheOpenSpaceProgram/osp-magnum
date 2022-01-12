@@ -50,96 +50,136 @@ public:
      * @param child     [in] Child entity to add ACompHierarchy to
      */
     static void add_child(
-            acomp_storage_t<ACompHierarchy>& rHier,
+            acomp_storage_t<ACompHierarchy>& rHierarchy,
             ActiveEnt parent, ActiveEnt child);
 
     /**
      * @brief Set parent-child relationship between two entities with
      *        ACompHierarchy
      *
-     * @param viewHier  [ref] View for hierarchy components
+     * @param hierarchy [ref] Storage for hierarchy components
      * @param parent    [in] Parent entity
      * @param child     [in] Child entity
      */
-    static void set_parent_child(acomp_view_t<ACompHierarchy> viewHier,
-                                 ActiveEnt parent, ActiveEnt child);
+    static void set_parent_child(
+            acomp_storage_t<ACompHierarchy>& rHierarchy,
+            ActiveEnt parent, ActiveEnt child);
 
     /**
      * @brief Cut an entity out of the hierarchy.
      *
-     * @param viewHier  [ref] View for hierarchy components
+     * @param hierarchy [ref] Storage for hierarchy components
      * @param ent       [in] Entity to remove from hierarchy
      */
-    static void cut(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt ent);
+    static void cut(acomp_storage_t<ACompHierarchy>& hierarchy, ActiveEnt ent);
 
     /**
      * @brief Traverse the scene hierarchy
      *
      * Calls the specified callable on each entity of the scene hierarchy
      *
-     * @param viewHier  [ref] View for hierarchy components
+     * @param rHier     [ref] Storage for hierarchy components
      * @param root      [in] The entity whose sub-tree to traverse
      * @param callable  [in] A function that accepts an ActiveEnt, and returns
      *                       a status stop or continue traversing
      */
     template <typename FUNC_T>
-    static void traverse(acomp_view_t<ACompHierarchy> viewHier, ActiveEnt root, FUNC_T callable);
+    static void traverse(acomp_storage_t<ACompHierarchy> const& hier, ActiveEnt root, FUNC_T&& callable);
 
     /**
      * @brief Sort hierarchy component pool
      *
      * @param rHier     [ref] Storage for hierarchy components
      */
-    static void sort(acomp_storage_t<ACompHierarchy>& rHier);
+    static void sort(acomp_storage_t<ACompHierarchy>& rHierarchy);
+
+    /**
+     * @brief Cut entities to delete out of the hierarchy
+     */
+    template<typename IT_T>
+    static void update_delete_cut(
+            acomp_storage_t<ACompHierarchy>& rHier, IT_T first, IT_T last);
 
     /**
      * @brief Mark descendents of deleted hierarchy entities as deleted too
-     *
-     * @param viewHier  [ref] View for hierarchy components
-     * @param rDelete   [ref] Storage for delete components
      */
-    static void update_delete_descendents(acomp_view_t<ACompHierarchy> viewHier, acomp_storage_t<ACompDelete>& rDelete);
+    template<typename IT_T, typename FUNC_T>
+    static void update_delete_descendents(
+            acomp_storage_t<ACompHierarchy> const& hier, IT_T first, IT_T last, FUNC_T&& deleteEnt);
 };
 
+template<typename IT_T>
+void SysHierarchy::update_delete_cut(
+        acomp_storage_t<ACompHierarchy>& rHier, IT_T first, IT_T last)
+{
+    while (first != last)
+    {
+        cut(rHier, *first);
+        ++first;
+    }
+}
+
+template<typename IT_T, typename FUNC_T>
+void SysHierarchy::update_delete_descendents(
+        acomp_storage_t<ACompHierarchy> const& hier, IT_T first, IT_T last,
+        FUNC_T&& deleteEnt)
+{
+    while (first != last)
+    {
+        ActiveEnt const ent = *first;
+
+        traverse(hier, ent, [&deleteEnt] (ActiveEnt descendent) {
+            deleteEnt(descendent);
+            return EHierarchyTraverseStatus::Continue;
+        });
+
+        ++first;
+    }
+}
+
 template<typename FUNC_T>
-void SysHierarchy::traverse(acomp_view_t<ACompHierarchy> viewHier,
-                                      ActiveEnt root, FUNC_T callable)
+void SysHierarchy::traverse(
+        acomp_storage_t<ACompHierarchy> const& hier, ActiveEnt root,
+        FUNC_T&& callable)
 {
     using osp::active::ACompHierarchy;
 
     std::stack<ActiveEnt> parentNextSibling;
-    ActiveEnt currentEnt = root;
+    ActiveEnt currEnt = root;
 
-    unsigned int rootLevel = viewHier.get<ACompHierarchy>(root).m_level;
+    unsigned int rootLevel = hier.get(root).m_level;
 
     while (true)
     {
-        ACompHierarchy &hier = viewHier.get<ACompHierarchy>(currentEnt);
+        ACompHierarchy const &currHier = hier.get(currEnt);
 
-        if (callable(currentEnt) == EHierarchyTraverseStatus::Stop) { return; }
+        if (callable(currEnt) == EHierarchyTraverseStatus::Stop)
+        {
+            return;
+        }
 
-        if (hier.m_childCount > 0)
+        if (currHier.m_childCount > 0)
         {
             // entity has some children
-            currentEnt = hier.m_childFirst;
+            currEnt = currHier.m_childFirst;
 
             // Save next sibling for later if it exists
             // Don't check siblings of the root node
-            if ((hier.m_siblingNext != entt::null) && (hier.m_level > rootLevel))
+            if ((currHier.m_siblingNext != entt::null) && (currHier.m_level > rootLevel))
             {
-                parentNextSibling.push(hier.m_siblingNext);
+                parentNextSibling.push(currHier.m_siblingNext);
             }
         }
-        else if ((hier.m_siblingNext != entt::null) && (hier.m_level > rootLevel))
+        else if ((currHier.m_siblingNext != entt::null) && (currHier.m_level > rootLevel))
         {
             // no children, move to next sibling
-            currentEnt = hier.m_siblingNext;
+            currEnt = currHier.m_siblingNext;
         }
         else if (parentNextSibling.size() > 0)
         {
             // last sibling, and not done yet
             // is last sibling, move to parent's (or ancestor's) next sibling
-            currentEnt = parentNextSibling.top();
+            currEnt = parentNextSibling.top();
             parentNextSibling.pop();
         }
         else

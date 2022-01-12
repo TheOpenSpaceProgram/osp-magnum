@@ -41,7 +41,7 @@ void Phong::draw_entity(
     auto &rShader = *reinterpret_cast<Phong*>(userData[1]);
 
     // Collect uniform information
-    auto const& drawTf = rData.m_views->m_drawTf.get<ACompDrawTransform>(ent);
+    ACompDrawTransform const &drawTf = rData.m_pDrawTf->get(ent);
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
@@ -49,11 +49,11 @@ void Phong::draw_entity(
      * light is a direction light coming from the specified direction relative
      * to the camera.
      */
-    Vector4 light = Vector4{Vector3{0.2f, -1.0f, 0.5f}.normalized(), 0.0f};
+    Vector4 light = Vector4{Vector3{0.0f, 1.0f, 0.5f}.normalized(), 0.0f};
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {
-        rShader.bindDiffuseTexture(*rData.m_views->m_diffuseTexGl.get<ACompTextureGL>(ent).m_tex);
+        rShader.bindDiffuseTexture(*rData.m_pDiffuseTexGl->get(ent).m_tex);
     }
 
     rShader
@@ -63,7 +63,7 @@ void Phong::draw_entity(
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(camera.m_projection)
         .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
-        .draw(*rData.m_views->m_meshGl.get<ACompMeshGL>(ent).m_mesh);
+        .draw(*rData.m_pMeshGl->get(ent).m_mesh);
 }
 
 

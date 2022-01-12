@@ -40,7 +40,11 @@
 #include <adera/ShipResources.h>
 #include <adera/Shaders/PlumeShader.h>
 
+#include <Magnum/MeshTools/Transform.h>
+#include <Magnum/Primitives/Cylinder.h>
 #include <Magnum/Primitives/Cube.h>
+#include <Magnum/Primitives/Grid.h>
+#include <Magnum/Primitives/Icosphere.h>
 #include <Corrade/Utility/Arguments.h>
 
 #include <iostream>
@@ -387,8 +391,18 @@ void load_a_bunch_of_stuff()
 
     rDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
 
-    // Add a default cube
-    rDebugPack.add<Magnum::Trade::MeshData>("cube", Magnum::Primitives::cubeSolid());
+    using namespace Magnum;
+    using Primitives::CylinderFlag;
+
+    // Add a default primitives
+    rDebugPack.add<Trade::MeshData>("cube", Primitives::cubeSolid());
+    rDebugPack.add<Trade::MeshData>("sphere", Primitives::icosphereSolid(2));
+    rDebugPack.add<Trade::MeshData>(
+            "cylinder",
+            Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds));
+
+    // Add grids
+    rDebugPack.add<Trade::MeshData>("grid64", Primitives::grid3DSolid({64, 64}));
 
     OSP_LOG_INFO("Resource loading complete");
 }

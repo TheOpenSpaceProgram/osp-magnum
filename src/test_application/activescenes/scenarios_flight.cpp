@@ -41,7 +41,7 @@ entt::any setup_scene()
 
 on_draw_t gen_draw(FlightScene& rScene, ActiveApplication& rApp)
 {
-    return [] (ActiveApplication& rApp) {};
+    return [] (ActiveApplication& rApp, float delta) {};
 }
 
 } // namespace testapp::flight
