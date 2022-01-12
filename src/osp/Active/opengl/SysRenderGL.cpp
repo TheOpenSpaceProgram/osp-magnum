@@ -254,11 +254,9 @@ void SysRenderGL::display_texture(
     shader->display_texure(*surface, rTex);
 }
 
-// TODO: problem got simpler, maybe generalize these two somehow
-
 void SysRenderGL::render_opaque(
-        RenderGroup const& rGroup,
-        acomp_view_t<const ACompVisible> viewVisible,
+        RenderGroup const& group,
+        acomp_storage_t<ACompVisible> const& visible,
         ACompCamera const& camera)
 {
     using Magnum::GL::Renderer;
@@ -268,18 +266,12 @@ void SysRenderGL::render_opaque(
     Renderer::disable(Renderer::Feature::Blending);
     Renderer::setDepthMask(true);
 
-    for (auto const& [ent, toDraw] : rGroup.view().each())
-    {
-        if (viewVisible.contains(ent))
-        {
-            toDraw(ent, camera);
-        }
-    }
+    draw_group(group, visible, camera);
 }
 
 void SysRenderGL::render_transparent(
         RenderGroup const& group,
-        acomp_view_t<const ACompVisible> viewVisible,
+        acomp_storage_t<ACompVisible> const& visible,
         ACompCamera const& camera)
 {
     using Magnum::GL::Renderer;
@@ -295,23 +287,17 @@ void SysRenderGL::render_transparent(
     //            can mess up other transparent objects once added
     //Renderer::setDepthMask(false);
 
-    for (auto const& [ent, toDraw] : group.view().each())
-    {
-        if (viewVisible.contains(ent))
-        {
-            toDraw(ent, camera);
-        }
-    }
+    draw_group(group, visible, camera);
 }
 
 void SysRenderGL::draw_group(
-        RenderGroup const& rGroup,
-        acomp_view_t<const ACompVisible> viewVisible,
+        RenderGroup const& group,
+        acomp_storage_t<ACompVisible> const& visible,
         ACompCamera const& camera)
 {
-    for (auto const& [ent, toDraw] : rGroup.view().each())
+    for (auto const& [ent, toDraw] : group.view().each())
     {
-        if (viewVisible.contains(ent))
+        if (visible.contains(ent))
         {
             toDraw(ent, camera);
         }

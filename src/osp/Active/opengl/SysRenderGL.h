@@ -120,13 +120,13 @@ public:
     /**
      * @brief Call draw functions of a RenderGroup of opaque objects
      *
-     * @param rGroup        [in] RenderGroup to draw
-     * @param viewVisible   [in] View for visible components
+     * @param group         [in] RenderGroup to draw
+     * @param visible       [in] Storage for visible components
      * @param camera        [in] Camera to render from
      */
     static void render_opaque(
             RenderGroup const& group,
-            acomp_view_t<const ACompVisible> viewVisible,
+            acomp_storage_t<ACompVisible> const& visible,
             ACompCamera const& camera);
 
     /**
@@ -134,18 +134,18 @@ public:
      *
      * Consider sorting the render group for correct transparency
      *
-     * @param rGroup        [in] RenderGroup to draw
-     * @param viewVisible   [in] View for visible components
+     * @param group         [in] RenderGroup to draw
+     * @param visible       [in] Storage for visible components
      * @param camera        [in] Camera to render from
      */
     static void render_transparent(
             RenderGroup const& group,
-            acomp_view_t<const ACompVisible> viewVisible,
+            acomp_storage_t<ACompVisible> const& visible,
             ACompCamera const& camera);
 
     static void draw_group(
-            RenderGroup const& rGroup,
-            acomp_view_t<const ACompVisible> viewVisible,
+            RenderGroup const& group,
+            acomp_storage_t<ACompVisible> const& visible,
             ACompCamera const& camera);
 };
 
