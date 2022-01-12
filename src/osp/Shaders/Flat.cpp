@@ -49,12 +49,6 @@ void shader::draw_ent_flat(
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
-    /* 4th component indicates light type. A value of 0.0f indicates that the
-     * light is a direction light coming from the specified direction relative
-     * to the camera.
-     */
-    //Vector4 light = ;
-
     if (rShader.flags() & Flag::Textured)
     {
         rShader.bindTexture(*rData.m_pDiffuseTexGl->get(ent).m_tex);
@@ -77,21 +71,21 @@ void shader::assign_flat(
         RenderGroup::ArrayView_t entities,
         RenderGroup::Storage_t *pStorageOpaque,
         RenderGroup::Storage_t *pStorageTransparent,
-        acomp_view_t<ACompOpaque const> viewOpaque,
-        acomp_view_t<ACompTextureGL const> viewDiffuse,
+        acomp_storage_t<active::ACompOpaque> const& opaque,
+        acomp_storage_t<ACompTextureGL> const& diffuse,
         ACtxDrawFlat &rData)
 {
 
     for (ActiveEnt ent : entities)
     {
-        if (viewOpaque.contains(ent))
+        if (opaque.contains(ent))
         {
             if (pStorageOpaque == nullptr)
             {
                 continue;
             }
 
-            if (viewDiffuse.contains(ent))
+            if (diffuse.contains(ent))
             {
                 pStorageOpaque->emplace(
                         ent, EntityToDraw{&draw_ent_flat, {&rData, &(*rData.m_shaderDiffuse)} });
@@ -110,7 +104,7 @@ void shader::assign_flat(
                 continue;
             }
 
-            if (viewDiffuse.contains(ent))
+            if (diffuse.contains(ent))
             {
                 pStorageTransparent->emplace(
                         ent, EntityToDraw{&draw_ent_flat, {&rData, &(*rData.m_shaderDiffuse)} });

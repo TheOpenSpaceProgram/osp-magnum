@@ -89,21 +89,21 @@ void shader::assign_phong(
         RenderGroup::ArrayView_t entities,
         RenderGroup::Storage_t *pStorageOpaque,
         RenderGroup::Storage_t *pStorageTransparent,
-        acomp_view_t<ACompOpaque const> viewOpaque,
-        acomp_view_t<ACompTextureGL const> viewDiffuse,
+        acomp_storage_t<ACompOpaque> const& opaque,
+        acomp_storage_t<ACompTextureGL> const& diffuse,
         ACtxDrawPhong &rData)
 {
 
     for (ActiveEnt ent : entities)
     {
-        if (viewOpaque.contains(ent))
+        if (opaque.contains(ent))
         {
             if (pStorageOpaque == nullptr)
             {
                 continue;
             }
 
-            if (viewDiffuse.contains(ent))
+            if (diffuse.contains(ent))
             {
                 pStorageOpaque->emplace(
                         ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderDiffuse)} });
@@ -122,7 +122,7 @@ void shader::assign_phong(
                 continue;
             }
 
-            if (viewDiffuse.contains(ent))
+            if (diffuse.contains(ent))
             {
                 pStorageTransparent->emplace(
                         ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderDiffuse)} });

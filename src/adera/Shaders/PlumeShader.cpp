@@ -77,10 +77,10 @@ void PlumeShader::draw_plume(
     ACtxPlumeData &rData = *reinterpret_cast<ACtxPlumeData*>(userData[0]);
 
     // Collect uniform data
-    auto const &drawTf  = rData.m_viewDrawTf.get<ACompDrawTransform>(ent);
-    auto const &comp    = rData.m_viewExaustPlumes.get<ACompExhaustPlume>(ent);
-    auto const &effect  = *comp.m_effect;
-    auto &rMesh         = *rData.m_mesh.get<ACompMeshGL>(ent).m_mesh;
+    ACompDrawTransform const &drawTf    = rData.m_pDrawTf->get(ent);
+    ACompExhaustPlume const &comp       = rData.m_pExaustPlumes->get(ent);
+    PlumeEffectData const &effect       = *comp.m_effect;
+    Magnum::GL::Mesh &rMesh             = *rData.m_pMesh->get(ent).m_mesh;
 
     Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 

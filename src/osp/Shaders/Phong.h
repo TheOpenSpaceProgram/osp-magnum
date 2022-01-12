@@ -64,16 +64,16 @@ void draw_ent_phong(
  * @param entities              [in] Entities to consider
  * @param pStorageOpaque        [out] Optional RenderGroup storage for opaque
  * @param pStorageTransparent   [out] Optional RenderGroup storage for transparent
- * @param viewOpaque            [in] View for opaque component
- * @param viewDiffuse           [in] View for diffuse texture component
+ * @param opaque            [in] Storage for opaque component
+ * @param diffuse           [in] Storage for diffuse texture component
  * @param rData                 [in] Phong shader data, stable memory required
  */
 void assign_phong(
         active::RenderGroup::ArrayView_t entities,
         active::RenderGroup::Storage_t *pStorageOpaque,
         active::RenderGroup::Storage_t *pStorageTransparent,
-        active::acomp_view_t<active::ACompOpaque const> viewOpaque,
-        active::acomp_view_t<active::ACompTextureGL const> viewDiffuse,
+        active::acomp_storage_t<active::ACompOpaque> const& opaque,
+        active::acomp_storage_t<active::ACompTextureGL> const& diffuse,
         ACtxDrawPhong &rData);
 
 
