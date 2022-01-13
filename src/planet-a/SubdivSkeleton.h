@@ -24,7 +24,8 @@
  */
 #pragma once
 
-#include <osp/id_registry.h>
+#include <longeron/id_management/registry.hpp>
+#include <longeron/id_management/refcount.hpp>
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
@@ -46,11 +47,11 @@ using ArrayView_t = Corrade::Containers::ArrayView<T>;
  *        be created from two other parent IDs.
  */
 template<typename ID_T>
-class SubdivIdTree : private osp::IdRegistry<ID_T>
+class SubdivIdTree : private lgrn::IdRegistry<ID_T>
 {
 
-    using base_t = osp::IdRegistry<ID_T>;
-    using id_int_t = osp::underlying_int_type_t<ID_T>;
+    using base_t = lgrn::IdRegistry<ID_T>;
+    using id_int_t = lgrn::underlying_int_type_t<ID_T>;
 
     static_assert(std::is_integral_v<id_int_t> && sizeof(ID_T) <= 4,
                   "ID_T must be an integral type, 4 bytes or less in size");
@@ -163,7 +164,7 @@ private:
 
 enum class SkVrtxId : uint32_t {};
 
-using SkVrtxStorage_t = osp::IdRefCount<SkVrtxId>::Storage_t;
+using SkVrtxStorage_t = lgrn::IdRefCount<SkVrtxId>::Storage_t;
 
 /**
  * @brief Uses a SubdivIdTree to manage relationships between Vertex IDs, and
@@ -241,7 +242,7 @@ private:
     SubdivIdTree<SkVrtxId> m_vrtxIdTree;
 
     // access using VrtxIds from m_vrtxTree
-    osp::IdRefCount<SkVrtxId> m_vrtxRefCount;
+    lgrn::IdRefCount<SkVrtxId> m_vrtxRefCount;
 
     std::vector<SkVrtxId> m_maybeDelete;
 
@@ -252,7 +253,7 @@ private:
 enum class SkTriId : uint32_t {};
 enum class SkTriGroupId : uint32_t {};
 
-using SkTriStorage_t = osp::IdRefCount<SkTriId>::Storage_t;
+using SkTriStorage_t = lgrn::IdRefCount<SkTriId>::Storage_t;
 
 struct SkeletonTriangle
 {
@@ -480,7 +481,7 @@ public:
     /**
      * @return Read-only access to Triangle IDs
      */
-    constexpr osp::IdRegistry<SkTriGroupId> const& tri_ids() const { return m_triIds; }
+    constexpr lgrn::IdRegistry<SkTriGroupId> const& tri_ids() const { return m_triIds; }
 
     /**
      * @brief Subdivide a triangle, creating a new group (4 new triangles)
@@ -527,8 +528,8 @@ public:
 
 private:
 
-    osp::IdRegistry<SkTriGroupId> m_triIds;
-    osp::IdRefCount<SkTriId> m_triRefCount;
+    lgrn::IdRegistry<SkTriGroupId> m_triIds;
+    lgrn::IdRefCount<SkTriId> m_triRefCount;
 
     // access using SkTriGroupId from m_triIds
     std::vector<SkTriGroup> m_triData;

@@ -24,7 +24,9 @@
  */
 #pragma once
 
-#include <osp/id_registry.h>
+#include <longeron/id_management/registry.hpp>
+#include <longeron/id_management/unique_registry.hpp>
+
 
 #include <Magnum/Trade/MeshData.h>
 
@@ -36,7 +38,7 @@ namespace osp::active
 {
 
 enum class CustomMeshId : uint32_t {};
-using CustomMeshStorage_t = osp::UniqueIdRegistry<CustomMeshId>::Storage_t;
+using CustomMeshStorage_t = lgrn::UniqueIdRegistry<CustomMeshId>::Storage_t;
 
 struct ACtxCustomMeshes
 {
@@ -78,7 +80,7 @@ struct ACtxCustomMeshes
     }
 
     std::vector<Command_t> m_commands;
-    osp::UniqueIdRegistry<CustomMeshId> m_meshIds;
+    lgrn::UniqueIdRegistry<CustomMeshId> m_meshIds;
     //IdRefCount<CustomMeshId> m_meshIdRefs;
     std::vector< std::optional<Magnum::Trade::MeshData> > m_meshDatas;
 };

@@ -50,7 +50,7 @@ enum class ChunkLocalSharedId : uint16_t {};
 // IDs for any chunk's fill vertices; from 0 to m_chunkVrtxSharedCount
 enum class ChunkLocalFillId : uint16_t {};
 
-using SharedVrtxStorage_t = osp::IdRefCount<SharedVrtxId>::Storage_t;
+using SharedVrtxStorage_t = lgrn::IdRefCount<SharedVrtxId>::Storage_t;
 
 //-----------------------------------------------------------------------------
 
@@ -340,7 +340,7 @@ private:
     uint16_t m_chunkMax;
     uint8_t m_chunkSubdivLevel;
     uint16_t m_chunkWidth;
-    osp::IdRegistry<ChunkId, true> m_chunkIds;
+    lgrn::IdRegistry<ChunkId, true> m_chunkIds;
     std::unique_ptr<Chunk[]> m_chunkData;
 
     uint16_t m_chunkVrtxFillCount;
@@ -352,8 +352,8 @@ private:
     uint32_t m_chunkIndxFillCount;
 
     uint32_t m_sharedMax;
-    osp::IdRegistry<SharedVrtxId, true> m_sharedIds;
-    osp::IdRefCount<SharedVrtxId> m_sharedRefCount;
+    lgrn::IdRegistry<SharedVrtxId, true> m_sharedIds;
+    lgrn::IdRefCount<SharedVrtxId> m_sharedRefCount;
     std::unique_ptr<SkVrtxStorage_t[]> m_sharedSkVrtx;
     // Connected face count used for vertex normal calculations
     std::unique_ptr<uint8_t[]> m_sharedFaceCount;

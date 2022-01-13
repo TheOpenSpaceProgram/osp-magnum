@@ -25,9 +25,11 @@
 #pragma once
 
 #include "coordinates.h"
-#include "id_registry.h"
+
+#include <longeron/id_management/registry.hpp>
 
 #include <Corrade/Containers/ArrayViewStl.h>
+
 
 #include <vector>   // std::vector
 #include <string>   // std::string
@@ -157,7 +159,7 @@ public:
 
 private:
 
-    osp::IdRegistry<Satellite> m_satIds;
+    lgrn::IdRegistry<Satellite> m_satIds;
 
     // CoordinateSpace each Satellite belongs to
     std::vector< coordspace_index_t > m_satCoordspace;

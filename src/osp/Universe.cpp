@@ -37,16 +37,16 @@ Satellite Universe::sat_create()
     m_satCoordspace.resize(m_satIds.capacity());
     m_satIndexInCoordspace.resize(m_satIds.capacity());
 
-    m_satCoordspace[size_t(sat)] = id_null<coordspace_index_t>();
-    m_satIndexInCoordspace[size_t(sat)] = id_null<coordspace_index_t>();
+    m_satCoordspace[size_t(sat)] = lgrn::id_null<coordspace_index_t>();
+    m_satIndexInCoordspace[size_t(sat)] = lgrn::id_null<coordspace_index_t>();
 
     return sat;
 }
 
 void Universe::sat_remove(Satellite sat)
 {
-    m_satCoordspace[size_t(sat)] = id_null<coordspace_index_t>();
-    m_satIndexInCoordspace[size_t(sat)] = id_null<coordspace_index_t>();
+    m_satCoordspace[size_t(sat)] = lgrn::id_null<coordspace_index_t>();
+    m_satIndexInCoordspace[size_t(sat)] = lgrn::id_null<coordspace_index_t>();
     m_satIds.remove(sat);
 }
 
