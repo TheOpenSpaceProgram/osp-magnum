@@ -35,12 +35,12 @@
 #include <osp/Active/SysVehicle.h>
 #include <osp/Active/SysVehicleSync.h>
 
-#include <osp/id_registry.h>
-
 #include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>
 #include <adera/Machines/Rocket.h>
 #include <adera/Machines/UserControl.h>
+
+#include <longeron/id_management/registry.hpp>
 
 #include <newtondynamics_physics/ospnewton.h>
 
@@ -85,8 +85,8 @@ namespace testapp::flight
  */
 struct FlightScene
 {
-    osp::IdRegistry<osp::active::ActiveEnt>     m_activeIds;
-    osp::IdRegistry<osp::active::MachineEnt>    m_machineIds;
+    lgrn::IdRegistry<osp::active::ActiveEnt>     m_activeIds;
+    lgrn::IdRegistry<osp::active::MachineEnt>    m_machineIds;
 
     osp::active::ACtxBasic          m_basic;
     osp::active::ACtxDrawing        m_drawing;

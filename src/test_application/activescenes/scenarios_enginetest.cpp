@@ -38,8 +38,9 @@
 #include <osp/Shaders/Phong.h>
 #include <osp/Shaders/MeshVisualizer.h>
 
-#include <osp/id_registry.h>
 #include <osp/Resource/Package.h>
+
+#include <longeron/id_management/registry.hpp>
 
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/ImageData.h>
@@ -70,7 +71,7 @@ constexpr int const gc_maxMaterials = 2;
 struct EngineTestScene
 {
     // ID registry generates entity IDs, and keeps track of which ones exist
-    osp::IdRegistry<osp::active::ActiveEnt> m_activeIds;
+    lgrn::IdRegistry<osp::active::ActiveEnt> m_activeIds;
 
     // Components and supporting data structures
     osp::active::ACtxBasic          m_basic;    

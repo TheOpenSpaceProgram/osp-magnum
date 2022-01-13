@@ -38,8 +38,9 @@
 #include <osp/Shaders/Phong.h>
 #include <osp/Shaders/MeshVisualizer.h>
 
-#include <osp/id_registry.h>
 #include <osp/Resource/Package.h>
+
+#include <longeron/id_management/registry.hpp>
 
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/ImageData.h>
@@ -83,7 +84,7 @@ constexpr float gc_physTimestep = 1.0 / 60.0f;
 struct PhysicsTestScene
 {
     // ID registry generates entity IDs, and keeps track of which ones exist
-    osp::IdRegistry<osp::active::ActiveEnt> m_activeIds;
+    lgrn::IdRegistry<osp::active::ActiveEnt> m_activeIds;
 
     // Basic and Drawing components
     osp::active::ACtxBasic          m_basic;

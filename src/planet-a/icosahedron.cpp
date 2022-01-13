@@ -144,7 +144,7 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
     for (int i = 0; i < gc_icoTriCount; i += 4)
     {
         //std::array<std::array<SkVrtxId, 3>, 4> ;
-        SkTriGroupId const groupId = skeleton.tri_group_create(0, osp::id_null<SkTriId>(),
+        SkTriGroupId const groupId = skeleton.tri_group_create(0, lgrn::id_null<SkTriId>(),
         {
             vrtx_id_lut(i + 0), vrtx_id_lut(i + 1),
             vrtx_id_lut(i + 2), vrtx_id_lut(i + 3)
