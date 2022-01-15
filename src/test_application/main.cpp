@@ -176,7 +176,7 @@ int main(int argc, char** argv)
     {
         auto const it = g_scenes.find(args.value("scene"));
 
-        if(it != std::end(g_scenes))
+        if(it == std::end(g_scenes))
         {
             std::cerr << "unknown scene" << std::endl;
             exit(-1);
