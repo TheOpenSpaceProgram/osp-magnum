@@ -68,7 +68,7 @@ using namespace adera::shader;
 
 void PlumeShader::draw_plume(
         ActiveEnt ent,
-        ACompCamera const& camera,
+        ViewProjMatrix const& viewProj,
         EntityToDraw::UserData_t userData) noexcept
 {
     using Magnum::GL::Renderer;
@@ -82,7 +82,7 @@ void PlumeShader::draw_plume(
     PlumeEffectData const &effect       = *comp.m_effect;
     Magnum::GL::Mesh &rMesh             = *rData.m_pMesh->get(ent).m_mesh;
 
-    Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
+    Magnum::Matrix4 entRelative = viewProj.m_view * drawTf.m_transformWorld;
 
     rData.m_shader
         .bindNozzleNoiseTexture     (*rData.m_tmpTex)
@@ -93,7 +93,7 @@ void PlumeShader::draw_plume(
         .updateTime                 (comp.m_time)
         .setPower                   (comp.m_powerLevel)
         .setTransformationMatrix    (entRelative)
-        .setProjectionMatrix        (camera.m_projection)
+        .setProjectionMatrix        (viewProj.m_proj)
         .setNormalMatrix            (entRelative.normalMatrix());
 
     // Draw back face

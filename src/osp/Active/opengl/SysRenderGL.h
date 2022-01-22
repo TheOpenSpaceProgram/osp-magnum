@@ -56,8 +56,9 @@ struct ACompTextureGL
  */
 struct ACtxRenderGL
 {
-    acomp_storage_t<ACompMeshGL>    m_meshGl;
-    acomp_storage_t<ACompTextureGL> m_diffuseTexGl;
+    acomp_storage_t<ACompMeshGL>            m_meshGl;
+    acomp_storage_t<ACompTextureGL>         m_diffuseTexGl;
+    acomp_storage_t<ACompDrawTransform>     m_drawTransform;
 };
 
 /**
@@ -93,14 +94,13 @@ public:
      * Entities with an ACompMesh will be synchronized with an ACompMeshGL
      *
      * @param meshes        [in] Storage for generic mesh components
-     * @param rDirty        [ref] Vector of entities that have updated meshes,
-     *                            this will be cleared.
+     * @param dirty         [in] Vector of entities that have updated meshes
      * @param rMeshGl       [ref] Storage for GL mesh components
      * @param rGlResources  [out] Package to store newly compiled meshes
      */
     static void compile_meshes(
             acomp_storage_t<ACompMesh> const& meshes,
-            std::vector<ActiveEnt>& rDirty,
+            std::vector<ActiveEnt> const& dirty,
             acomp_storage_t<ACompMeshGL>& rMeshGl,
             osp::Package& rGlResources);
 
@@ -109,48 +109,60 @@ public:
      *        texture data components
      *
      * @param textures      [in] Storage for generic texture data components
-     * @param rDirty        [ref] Vector of entities that have updated meshes,
-     *                            this will be cleared.
+     * @param dirty         [in] Vector of entities that have updated textures
      * @param rDiffTexGl    [ref] Storage for GL texture components
      * @param rGlResources  [out] Package to store newly compiled textures
      */
     static void compile_textures(
             acomp_storage_t<ACompTexture> const& textures,
-            std::vector<ActiveEnt>& rDirty,
+            std::vector<ActiveEnt> const& dirty,
             acomp_storage_t<ACompTextureGL>& rDiffTexGl,
             osp::Package& rGlResources);
 
     /**
      * @brief Call draw functions of a RenderGroup of opaque objects
      *
-     * @param group         [in] RenderGroup to draw
-     * @param visible       [in] Storage for visible components
-     * @param camera        [in] Camera to render from
+     * @param group     [in] RenderGroup to draw
+     * @param visible   [in] Storage for visible components
+     * @param viewProj  [in] View and projection matrix
      */
     static void render_opaque(
             RenderGroup const& group,
             acomp_storage_t<ACompVisible> const& visible,
-            ACompCamera const& camera);
+            ViewProjMatrix const& viewProj);
 
     /**
      * @brief Call draw functions of a RenderGroup of transparent objects
      *
      * Consider sorting the render group for correct transparency
      *
-     * @param group         [in] RenderGroup to draw
-     * @param visible       [in] Storage for visible components
-     * @param camera        [in] Camera to render from
+     * @param group     [in] RenderGroup to draw
+     * @param visible   [in] Storage for visible components
+     * @param viewProj  [in] View and projection matrix
      */
     static void render_transparent(
             RenderGroup const& group,
             acomp_storage_t<ACompVisible> const& visible,
-            ACompCamera const& camera);
+            ViewProjMatrix const& viewProj);
 
     static void draw_group(
             RenderGroup const& group,
             acomp_storage_t<ACompVisible> const& visible,
-            ACompCamera const& camera);
+            ViewProjMatrix const& viewProj);
+
+    template<typename IT_T>
+    static void update_delete(
+            ACtxRenderGL &rCtxRenderGl, IT_T first, IT_T last);
 };
+
+template<typename IT_T>
+void SysRenderGL::update_delete(
+        ACtxRenderGL &rCtxRenderGl, IT_T first, IT_T last)
+{
+    rCtxRenderGl.m_meshGl           .remove(first, last);
+    rCtxRenderGl.m_diffuseTexGl     .remove(first, last);
+    rCtxRenderGl.m_drawTransform    .remove(first, last);
+}
 
 
 

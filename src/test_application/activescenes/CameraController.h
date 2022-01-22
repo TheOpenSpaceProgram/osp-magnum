@@ -53,9 +53,9 @@ struct ACtxCameraController
      , m_btnMovDn(      m_controls.button_subscribe("cam_dn"))
     { }
 
-    osp::Vector3 m_up{};
+    osp::Vector3 m_up{0.0f, 1.0f, 0.0f};
 
-    std::optional<osp::Vector3> m_target;
+    std::optional<osp::Vector3> m_target{osp::Vector3{}};
     float m_orbitDistance{20.0f};
 
     float m_moveSpeed{1.0f};

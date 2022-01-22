@@ -50,7 +50,7 @@ struct ACtxDrawFlat
 
 void draw_ent_flat(
         active::ActiveEnt ent,
-        active::ACompCamera const& camera,
+        active::ViewProjMatrix const& viewProj,
         active::EntityToDraw::UserData_t userData) noexcept;
 
 /**

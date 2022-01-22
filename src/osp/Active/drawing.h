@@ -107,7 +107,6 @@ struct ACtxDrawing
     acomp_storage_t<ACompOpaque>            m_opaque;
     acomp_storage_t<ACompTransparent>       m_transparent;
     acomp_storage_t<ACompVisible>           m_visible;
-    acomp_storage_t<ACompDrawTransform>     m_drawTransform;
     acomp_storage_t<ACompColor>             m_color;
 
     acomp_storage_t<ACompMesh>              m_mesh;

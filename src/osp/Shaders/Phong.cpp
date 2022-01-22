@@ -36,7 +36,7 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_phong(
-        ActiveEnt ent, ACompCamera const& camera,
+        ActiveEnt ent, ViewProjMatrix const& viewProj,
         EntityToDraw::UserData_t userData) noexcept
 {
     using Flag = Phong::Flag;
@@ -47,7 +47,7 @@ void shader::draw_ent_phong(
     // Collect uniform information
     ACompDrawTransform const &drawTf = rData.m_pDrawTf->get(ent);
 
-    Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
+    Magnum::Matrix4 entRelative = viewProj.m_view * drawTf.m_transformWorld;
 
     /* 4th component indicates light type. A value of 0.0f indicates that the
      * light is a direction light coming from the specified direction relative
@@ -79,14 +79,14 @@ void shader::draw_ent_phong(
         .setLightPositions({Vector4{Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f},
                            Vector4{-Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f}})
         .setTransformationMatrix(entRelative)
-        .setProjectionMatrix(camera.m_projection)
+        .setProjectionMatrix(viewProj.m_proj)
         .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
         .draw(*rData.m_pMeshGl->get(ent).m_mesh);
 }
 
 
 void shader::assign_phong(
-        RenderGroup::ArrayView_t entities,
+        RenderGroup::ArrayView_t const entities,
         RenderGroup::Storage_t *pStorageOpaque,
         RenderGroup::Storage_t *pStorageTransparent,
         acomp_storage_t<ACompOpaque> const& opaque,

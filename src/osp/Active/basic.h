@@ -97,16 +97,18 @@ struct ACompCamera
 {
     float m_near;
     float m_far;
+    float m_aspectRatio;
     Deg m_fov;
-    Vector2 m_viewport;
 
-    Matrix4 m_projection;
-    Matrix4 m_inverse;
-
-    void calculate_projection() noexcept
+    constexpr void set_aspect_ratio(Vector2 const viewport) noexcept
     {
-        m_projection = osp::Matrix4::perspectiveProjection(
-                m_fov, m_viewport.x() / m_viewport.y(),
+        m_aspectRatio = viewport.x() / viewport.y();
+    }
+
+    Matrix4 calculate_projection() const noexcept
+    {
+        return osp::Matrix4::perspectiveProjection(
+                m_fov, m_aspectRatio,
                 m_near, m_far);
     }
 };

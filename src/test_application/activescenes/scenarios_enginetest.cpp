@@ -104,7 +104,6 @@ entt::any setup_scene(osp::Package &rPkg)
     // Create camera transform and draw transform
     ACompTransform &rCamTf = rScene.m_basic.m_transform.emplace(camEnt);
     rCamTf.m_transform.translation().z() = 25;
-    rScene.m_drawing.m_drawTransform.emplace(camEnt);
 
     // Create camera component
     ACompCamera &rCamComp = rScene.m_basic.m_camera.emplace(camEnt);
@@ -131,7 +130,6 @@ entt::any setup_scene(osp::Package &rPkg)
 
     // Add transform and draw transform
     rScene.m_basic.m_transform.emplace(rScene.m_cube);
-    rScene.m_drawing.m_drawTransform.emplace(rScene.m_cube);
 
     // Add opaque and visible component
     rScene.m_drawing.m_opaque.emplace(rScene.m_cube);
@@ -156,6 +154,9 @@ void update_test_scene(EngineTestScene& rScene, float delta)
             = rScene.m_basic.m_transform.get(rScene.m_cube).m_transform;
 
     rCubeTf = Magnum::Matrix4::rotationY(90.0_degf * delta) * rCubeTf;
+
+    // Sort hierarchy, required by renderer
+    osp::active::SysHierarchy::sort(rScene.m_basic.m_hierarchy);
 }
 
 //-----------------------------------------------------------------------------
@@ -189,7 +190,7 @@ struct EngineTestRenderer
  * @param rRenderer [ref] Renderer data for test scene
  */
 void render_test_scene(
-        ActiveApplication& rApp, EngineTestScene& rScene,
+        ActiveApplication& rApp, EngineTestScene const& rScene,
         EngineTestRenderer& rRenderer)
 {
     using namespace osp::active;
@@ -204,12 +205,16 @@ void render_test_scene(
     // results into the fwd_opaque render group
     RenderGroup &rGroupFwdOpaque
             = rRenderer.m_renderGroups.m_groups["fwd_opaque"];
-    MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
+    MaterialData const &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
     assign_phong(
             rMatCommon.m_added, &rGroupFwdOpaque.m_entities, nullptr,
             rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexGl,
             rRenderer.m_phong);
-    rMatCommon.m_added.clear();
+    SysRender::assure_draw_transforms(
+                rScene.m_basic.m_hierarchy,
+                rRenderer.m_renderGl.m_drawTransform,
+                std::cbegin(rMatCommon.m_added),
+                std::cend(rMatCommon.m_added));
 
     // Load any required meshes
     SysRenderGL::compile_meshes(
@@ -222,20 +227,18 @@ void render_test_scene(
             rRenderer.m_renderGl.m_diffuseTexGl, rApp.get_gl_resources());
 
     // Calculate hierarchy transforms
-    SysHierarchy::sort(rScene.m_basic.m_hierarchy);
     SysRender::update_draw_transforms(
             rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform,
-            rScene.m_drawing.m_drawTransform);
+            rRenderer.m_renderGl.m_drawTransform);
 
-    // Get camera, and calculate projection matrix and inverse transformation
-    ACompCamera &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
+    // Get camera to calculate view and projection matrix
+    ACompCamera const &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
     ACompDrawTransform const &cameraDrawTf
-            = rScene.m_drawing.m_drawTransform.get(rRenderer.m_camera);
-    rCamera.m_viewport
-            = osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
-    rCamera.calculate_projection();
-    rCamera.m_inverse = cameraDrawTf.m_transformWorld.inverted();
+            = rRenderer.m_renderGl.m_drawTransform.get(rRenderer.m_camera);
+    ViewProjMatrix viewProj{
+            cameraDrawTf.m_transformWorld.inverted(),
+            rCamera.calculate_projection()};
 
     // Bind offscreen FBO
     Framebuffer &rFbo = *rGlResources.get<Framebuffer>("offscreen_fbo");
@@ -248,7 +251,7 @@ void render_test_scene(
     // Forward Render fwd_opaque group to FBO
     SysRenderGL::render_opaque(
             rRenderer.m_renderGroups.m_groups.at("fwd_opaque"),
-            rScene.m_drawing.m_visible, rCamera);
+            rScene.m_drawing.m_visible, viewProj);
 
     // Display FBO
     Texture2D &rFboColor = *rGlResources.get<Texture2D>("offscreen_fbo_color");
@@ -275,35 +278,37 @@ void load_gl_resources(ActiveApplication& rApp)
                             | MeshVisualizer::Flag::NormalDirection});
 }
 
-on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
+on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
 {
     using namespace osp::active;
     using namespace osp::shader;
+
+    osp::Package &rGlResources = rApp.get_gl_resources();
 
     // Create renderer data. This uses a shared_ptr to allow being stored
     // inside an std::function, which require copyable types
     std::shared_ptr<EngineTestRenderer> pRenderer
             = std::make_shared<EngineTestRenderer>(rApp);
 
-    osp::Package &rGlResources = rApp.get_gl_resources();
+    // Get or reserve shader resources. These are loaded in load_gl_resources,
+    // which can be called before or after this function
+    pRenderer->m_phong.m_shaderUntextured
+            = rGlResources.get_or_reserve<Phong>("notexture");
+    pRenderer->m_phong.m_shaderDiffuse
+            = rGlResources.get_or_reserve<Phong>("textured");
 
-    // Acquire data needed to draw Phong materials
-    {
-        ACtxDrawPhong &rPhong = pRenderer->m_phong;
-        rPhong.m_shaderUntextured
-                = rGlResources.get_or_reserve<Phong>("notexture");
-        rPhong.m_shaderDiffuse
-                = rGlResources.get_or_reserve<Phong>("textured");
-        rPhong.m_pDrawTf       = &rScene.m_drawing.m_drawTransform;
-        rPhong.m_pDiffuseTexGl = &pRenderer->m_renderGl.m_diffuseTexGl;
-        rPhong.m_pMeshGl       = &pRenderer->m_renderGl.m_meshGl;
-    }
+    // Set component storage pointers, so that they can be accessed by shaders
+    pRenderer->m_phong.assign_pointers(pRenderer->m_renderGl);
 
     // Select first camera for rendering
-    pRenderer->m_camera = rScene.m_basic.m_camera.at(0);
-
-    pRenderer->m_camCtrl.m_target = osp::Vector3{};
-    pRenderer->m_camCtrl.m_up = osp::Vector3{0.0f, 1.0f, 0.0f};
+    ActiveEnt const camEnt = rScene.m_basic.m_camera.at(0);
+    pRenderer->m_camera = camEnt;
+    rScene.m_basic.m_camera.get(camEnt).set_aspect_ratio(
+            osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size()));
+    SysRender::add_draw_transforms_recurse(
+            rScene.m_basic.m_hierarchy,
+            pRenderer->m_renderGl.m_drawTransform,
+            camEnt);
 
     // Create render group for forward opaque pass
     pRenderer->m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
@@ -325,9 +330,9 @@ on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
     return [&rScene, pRenderer = std::move(pRenderer)] (
             ActiveApplication& rApp, float delta)
     {
-
         update_test_scene(rScene, delta);
 
+        // Rotate and move the camera based on user inputs
         SysCameraController::update_view(
                 pRenderer->m_camCtrl,
                 rScene.m_basic.m_transform.get(pRenderer->m_camera), delta);
@@ -337,6 +342,8 @@ on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp)
                 delta, true);
 
         render_test_scene(rApp, rScene, *pRenderer);
+
+        SysRender::clear_dirty_materials(rScene.m_drawing.m_materials);
     };
 }
 
