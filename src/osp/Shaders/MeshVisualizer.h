@@ -42,11 +42,17 @@ struct ACtxDrawMeshVisualizer
     active::acomp_storage_t< active::ACompMeshGL >         *m_pMeshGl{nullptr};
 
     bool m_wireframeOnly{false};
+
+    constexpr void assign_pointers(active::ACtxRenderGL& rCtxRenderGl) noexcept
+    {
+        m_pDrawTf   = &rCtxRenderGl.m_drawTransform;
+        m_pMeshGl   = &rCtxRenderGl.m_meshGl;
+    }
 };
 
 void draw_ent_visualizer(
         active::ActiveEnt ent,
-        active::ACompCamera const& camera,
+        active::ViewProjMatrix const& viewProj,
         active::EntityToDraw::UserData_t userData) noexcept;
 
 

@@ -30,6 +30,22 @@ namespace osp::active
 {
 
 /**
+ * @brief View and Projection matrix
+ */
+struct ViewProjMatrix
+{
+    ViewProjMatrix(Matrix4 const& view, Matrix4 const& proj)
+     : m_viewProj{proj * view}
+     , m_view{view}
+     , m_proj{proj}
+    { }
+
+    Matrix4 m_viewProj;
+    Matrix4 m_view;
+    Matrix4 m_proj;
+};
+
+/**
  * @brief Stores a draw function and user data needed to draw a single entity
  */
 struct EntityToDraw
@@ -39,18 +55,18 @@ struct EntityToDraw
     /**
      * @brief A function pointer to a Shader's draw() function
      *
-     * @param ActiveEnt    [in] The entity being drawn
-     * @param ACompCamera  [in] Camera used to draw the scene
-     * @param UserData_t   [in] Non-owning user data
+     * @param ActiveEnt         [in] The entity being drawn
+     * @param ViewProjMatrix    [in] View and projection matrix
+     * @param UserData_t        [in] Non-owning user data
      */
     using ShaderDrawFnc_t = void (*)(
-            ActiveEnt, ACompCamera const&, UserData_t) noexcept;
+            ActiveEnt, ViewProjMatrix const&, UserData_t) noexcept;
 
     constexpr void operator()(
             ActiveEnt ent,
-            ACompCamera const& camera) const noexcept
+            ViewProjMatrix const& viewProj) const noexcept
     {
-        m_draw(ent, camera, m_data);
+        m_draw(ent, viewProj, m_data);
     }
 
     ShaderDrawFnc_t m_draw;
@@ -71,7 +87,7 @@ struct EntityToDraw
 struct RenderGroup
 {
     using Storage_t = entt::storage_traits<ActiveEnt, EntityToDraw>::storage_type;
-    using ArrayView_t = Corrade::Containers::ArrayView<ActiveEnt>;
+    using ArrayView_t = Corrade::Containers::ArrayView<const ActiveEnt>;
 
     /**
      * @return Iterable view for stored entities
@@ -103,6 +119,17 @@ class SysRender
 {
 public:
 
+    inline static void add_draw_transforms_recurse(
+            acomp_storage_t<ACompHierarchy> const& hier,
+            acomp_storage_t<ACompDrawTransform>& rDrawTf,
+            ActiveEnt ent);
+
+    template<typename IT_T>
+    static void assure_draw_transforms(
+            acomp_storage_t<ACompHierarchy> const& hier,
+            acomp_storage_t<ACompDrawTransform>& rDrawTf,
+            IT_T first, IT_T last);
+
     /**
      * @brief Update draw ACompDrawTransform according to the hierarchy of
      *        ACompTransforms
@@ -112,13 +139,20 @@ public:
      *       dirty flags or similar.
      *
      * @param hier      [in] Storage for hierarchy components
-     * @param viewTf    [in] View for local-space transform components
+     * @param transform [in] Storage for local-space transform components
      * @param rDrawTf   [out] Storage for world-space draw transform components
      */
     static void update_draw_transforms(
             acomp_storage_t<ACompHierarchy> const& hier,
-            acomp_view_t<ACompTransform> const& viewTf,
+            acomp_storage_t<ACompTransform> const& transform,
             acomp_storage_t<ACompDrawTransform>& rDrawTf);
+
+    /**
+     * @brief Clear dirty vectors (m_added, m_removed) of all materials
+     *
+     * @param rMaterials [ref] Materials vector with vectors to clear
+     */
+    static void clear_dirty_materials(std::vector<MaterialData> &rMaterials);
 
     template<typename IT_T>
     static void update_delete_drawing(
@@ -128,8 +162,45 @@ public:
     static void update_delete_groups(
             ACtxRenderGroups &rCtxGroups, IT_T first, IT_T last);
 
+private:
+
+
 }; // class SysRender
 
+void SysRender::add_draw_transforms_recurse(
+        acomp_storage_t<ACompHierarchy> const& hier,
+        acomp_storage_t<ACompDrawTransform>& rDrawTf, ActiveEnt ent)
+{
+    if (rDrawTf.contains(ent))
+    {
+        return;
+    }
+
+    rDrawTf.emplace(ent); // Emplace the component
+
+    ACompHierarchy const &currHier = hier.get(ent);
+
+    if (currHier.m_level <= 1)
+    {
+        return; // Stop recursing when about to reach root
+    }
+
+    // Tail recurse into parent
+    add_draw_transforms_recurse(hier, rDrawTf, currHier.m_parent);
+}
+
+template<typename IT_T>
+void SysRender::assure_draw_transforms(
+        acomp_storage_t<ACompHierarchy> const& hier,
+        acomp_storage_t<ACompDrawTransform>& rDrawTf,
+        IT_T first, IT_T last)
+{
+    while (first != last)
+    {
+        add_draw_transforms_recurse(hier, rDrawTf, *first);
+        std::advance(first, 1);
+    }
+}
 
 template<typename IT_T>
 void SysRender::update_delete_drawing(
@@ -138,7 +209,6 @@ void SysRender::update_delete_drawing(
     rCtxDraw.m_opaque           .remove(first, last);
     rCtxDraw.m_transparent      .remove(first, last);
     rCtxDraw.m_visible          .remove(first, last);
-    rCtxDraw.m_drawTransform    .remove(first, last);
     rCtxDraw.m_mesh             .remove(first, last);
     rCtxDraw.m_diffuseTex       .remove(first, last);
 

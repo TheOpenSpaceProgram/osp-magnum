@@ -28,7 +28,7 @@ using osp::active::SysRender;
 
 void SysRender::update_draw_transforms(
         acomp_storage_t<ACompHierarchy> const& hier,
-        acomp_view_t<ACompTransform> const& viewTf,
+        acomp_storage_t<ACompTransform> const& transform,
         acomp_storage_t<ACompDrawTransform>& rDrawTf)
 {
 
@@ -38,22 +38,32 @@ void SysRender::update_draw_transforms(
 
     for(ActiveEnt const entity : viewDrawTf)
     {
-        ACompHierarchy const &entHier = hier.get(entity);
-        auto const &entTf = viewTf.get<ACompTransform>(entity);
-        auto &entDrawTf = viewDrawTf.get<ACompDrawTransform>(entity);
+        ACompHierarchy const &entHier   = hier.get(entity);
+        ACompTransform const &entTf     = transform.get(entity);
+        ACompDrawTransform &rEntDrawTf  = rDrawTf.get(entity);
 
         if (entHier.m_level == 1)
         {
             // top level object, parent is root
-            entDrawTf.m_transformWorld = entTf.m_transform;
+            rEntDrawTf.m_transformWorld = entTf.m_transform;
         }
         else
         {
             ACompDrawTransform const& parentDrawTf = rDrawTf.get(entHier.m_parent);
 
             // set transform relative to parent
-            entDrawTf.m_transformWorld = parentDrawTf.m_transformWorld
-                                       * entTf.m_transform;
+            rEntDrawTf.m_transformWorld = parentDrawTf.m_transformWorld
+                                        * entTf.m_transform;
         }
     }
 }
+
+void SysRender::clear_dirty_materials(std::vector<MaterialData> &rMaterials)
+{
+    for (MaterialData &rMat : rMaterials)
+    {
+        rMat.m_added.clear();
+        rMat.m_removed.clear();
+    }
+}
+

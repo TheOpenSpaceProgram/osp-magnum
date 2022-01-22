@@ -55,7 +55,7 @@ entt::any setup_scene();
  *
  * @return
  */
-on_draw_t gen_draw(FlightScene& rScene, ActiveApplication& rApp);
+on_draw_t generate_draw_func(FlightScene& rScene, ActiveApplication& rApp);
 
 } // namespace flight
 
@@ -94,7 +94,7 @@ void load_gl_resources(ActiveApplication& rApp);
  *
  * @return ActiveApplication draw function
  */
-on_draw_t gen_draw(EngineTestScene& rScene, ActiveApplication& rApp);
+on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp);
 
 } // namespace enginetest
 
@@ -133,7 +133,7 @@ void load_gl_resources(ActiveApplication& rApp);
  *
  * @return ActiveApplication draw function
  */
-on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp);
+on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp);
 
 } // namespace physicstest
 

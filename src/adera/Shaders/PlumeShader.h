@@ -65,7 +65,7 @@ public:
 
     static void draw_plume(
             osp::active::ActiveEnt ent,
-            osp::active::ACompCamera const& camera,
+            osp::active::ViewProjMatrix const& viewProj,
             osp::active::EntityToDraw::UserData_t userData) noexcept;
 
     static void assign_plumes(

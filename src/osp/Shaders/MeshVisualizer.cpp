@@ -39,7 +39,7 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_visualizer(
-        ActiveEnt ent, const ACompCamera &camera,
+        ActiveEnt ent, const ViewProjMatrix &viewProj,
         EntityToDraw::UserData_t userData) noexcept
 {
     using Magnum::Shaders::MeshVisualizerGL3D;
@@ -49,8 +49,7 @@ void shader::draw_ent_visualizer(
     ACompMeshGL &rMesh = rData.m_pMeshGl->get(ent);
     ACompDrawTransform const& drawTf = rData.m_pDrawTf->get(ent);
 
-    Matrix4 const entRelative = camera.m_inverse * drawTf.m_transformWorld;
-
+    Matrix4 const entRelative = viewProj.m_view * drawTf.m_transformWorld;
 
     MeshVisualizer &rShader = *rData.m_shader;
 
@@ -69,7 +68,7 @@ void shader::draw_ent_visualizer(
     rShader
         .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
         .setTransformationMatrix(entRelative)
-        .setProjectionMatrix(camera.m_projection)
+        .setProjectionMatrix(viewProj.m_proj)
         .draw(*rMesh.m_mesh);
 
     if (rData.m_wireframeOnly)

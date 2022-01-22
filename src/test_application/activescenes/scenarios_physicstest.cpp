@@ -107,10 +107,12 @@ struct PhysicsTestScene
     // Hierarchy root, needs to exist so all hierarchy entities are connected
     osp::active::ActiveEnt          m_hierRoot;
 
+    // Meshes used in the scene
     osp::DependRes<MeshData>        m_meshCube;
     osp::DependRes<MeshData>        m_meshCylinder;
     osp::DependRes<MeshData>        m_meshSphere;
 
+    // Timers for when to create boxes and cylinders
     float m_boxTimer{0.0f};
     float m_cylinderTimer{0.0f};
 
@@ -164,9 +166,8 @@ ActiveEnt add_solid(
     rMaterial.m_comp.emplace(ent);
     rMaterial.m_added.push_back(ent);
 
-    // Add transform and draw transform
+    // Add transform
     rScene.m_basic.m_transform.emplace(ent, ACompTransform{transform});
-    rScene.m_drawing.m_drawTransform.emplace(ent);
 
     // Add opaque and visible component
     rScene.m_drawing.m_opaque.emplace(ent);
@@ -203,10 +204,9 @@ ActiveEnt add_quick_shape(
     // are allowed to have different scales
     ActiveEnt root = rScene.m_activeIds.create();
 
-    // Add transform and draw transform
+    // Add transform
     rScene.m_basic.m_transform.emplace(
             root, ACompTransform{Matrix4::translation(position)});
-    rScene.m_drawing.m_drawTransform.emplace(root);
 
     // Add root entity to hierarchy
     SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, root);
@@ -244,8 +244,10 @@ entt::any setup_scene(osp::Package &rPkg)
     entt::any sceneAny = entt::make_any<PhysicsTestScene>();
     PhysicsTestScene &rScene = entt::any_cast<PhysicsTestScene&>(sceneAny);
 
+    // Create Newton physics world that uses 4 threads to update
     rScene.m_pNwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(4);
 
+    // Acquire mesh resources from Package
     rScene.m_meshCube       = rPkg.get_or_reserve<MeshData>("cube");
     rScene.m_meshCylinder   = rPkg.get_or_reserve<MeshData>("cylinder");
     rScene.m_meshSphere     = rPkg.get_or_reserve<MeshData>("sphere");
@@ -263,7 +265,6 @@ entt::any setup_scene(osp::Package &rPkg)
     // Create camera transform and draw transform
     ACompTransform &rCamTf = rScene.m_basic.m_transform.emplace(camEnt);
     rCamTf.m_transform.translation().z() = 25;
-    rScene.m_drawing.m_drawTransform.emplace(camEnt);
 
     // Create camera component
     ACompCamera &rCamComp = rScene.m_basic.m_camera.emplace(camEnt);
@@ -283,8 +284,6 @@ entt::any setup_scene(osp::Package &rPkg)
         // Add transform and draw transform to root
         rScene.m_basic.m_transform.emplace(
                 floorRoot, ACompTransform{Matrix4::rotationX(-90.0_degf)});
-        rScene.m_drawing.m_drawTransform.emplace(floorRoot);
-
 
         // Create floor mesh entity
         ActiveEnt floorMesh = rScene.m_activeIds.create();
@@ -303,7 +302,6 @@ entt::any setup_scene(osp::Package &rPkg)
         // Add transform, draw transform, opaque, and visible
         rScene.m_basic.m_transform.emplace(
                 floorMesh, ACompTransform{Matrix4::scaling({64.0f, 64.0f, 1.0f})});
-        rScene.m_drawing.m_drawTransform.emplace(floorMesh);
         rScene.m_drawing.m_opaque.emplace(floorMesh);
         rScene.m_drawing.m_visible.emplace(floorMesh);
 
@@ -330,6 +328,49 @@ entt::any setup_scene(osp::Package &rPkg)
     return std::move(sceneAny);
 }
 
+void update_test_scene_delete(PhysicsTestScene& rScene)
+{
+    using namespace osp::active;
+    // Cut deleted entities out of the hierarchy
+    SysHierarchy::update_delete_cut(
+            rScene.m_basic.m_hierarchy,
+            std::cbegin(rScene.m_delete), std::cend(rScene.m_delete));
+
+    // Create a new delete vector that includes the descendents of our current
+    // vector of entities to delete
+    rScene.m_deleteTotal = rScene.m_delete;
+    SysHierarchy::update_delete_descendents(
+            rScene.m_basic.m_hierarchy,
+            std::cbegin(rScene.m_delete), std::cend(rScene.m_delete),
+            [&rScene] (ActiveEnt ent)
+    {
+        rScene.m_deleteTotal.push_back(ent);
+    });
+
+    auto first = std::cbegin(rScene.m_deleteTotal);
+    auto last = std::cend(rScene.m_deleteTotal);
+
+    // Delete components of total entities to delete
+    update_delete_basic                 (rScene.m_basic,        first, last);
+    SysRender::update_delete_drawing    (rScene.m_drawing,      first, last);
+    SysPhysics::update_delete_phys      (rScene.m_physics,      first, last);
+    SysPhysics::update_delete_shapes    (rScene.m_physics,      first, last);
+    SysPhysics::update_delete_hier_body (rScene.m_hierBody,     first, last);
+    ospnewton::SysNewton::update_delete (*rScene.m_pNwtWorld,   first, last);
+
+    rScene.m_hasGravity         .remove(first, last);
+    rScene.m_removeOutOfBounds  .remove(first, last);
+
+    // Delete entity IDs
+    for (ActiveEnt const ent : rScene.m_deleteTotal)
+    {
+        if (rScene.m_activeIds.exists(ent))
+        {
+            rScene.m_activeIds.remove(ent);
+        }
+    }
+}
+
 /**
  * @brief Update an EngineTestScene, this just rotates the cube
  *
@@ -341,9 +382,6 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
     using Corrade::Containers::ArrayView;
 
     using namespace ospnewton;
-
-    // start recording new elements to delete
-    rScene.m_delete.clear();
 
     // Create boxes every 2 seconds
     rScene.m_boxTimer += delta;
@@ -373,13 +411,7 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
                 EShape::Cylinder}); // shape
     }
 
-    // Ball Thrower consumer
-    for (PhysicsTestScene::ThrowShape const &rThrow : std::exchange(rScene.m_toThrow, {}))
-    {
-        add_quick_shape(rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_mass, rThrow.m_shape, rThrow.m_size);
-    }
-
-    // Gravity System
+    // Gravity System, applies a 9.81N force downwards (-Y) for select entities
     for (ActiveEnt ent : rScene.m_hasGravity)
     {
         acomp_storage_t<ACompPhysNetForce> &rNetForce
@@ -390,6 +422,8 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
 
         rEntNetForce.y() -= 9.81f;
     }
+
+    // Physics update
 
     SysNewton::update_colliders(
             rScene.m_physics, *rScene.m_pNwtWorld,
@@ -402,7 +436,11 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
             rScene.m_basic.m_transform, rScene.m_basic.m_transformControlled,
             rScene.m_basic.m_transformMutable);
 
-    // remove out of bounds
+    // Start recording new elements to delete
+    rScene.m_delete.clear();
+
+    // Check position of all entities with the out-of-bounds component
+    // Delete the ones that go out of bounds
     for (ActiveEnt const ent : rScene.m_removeOutOfBounds)
     {
         ACompTransform const &entTf = rScene.m_basic.m_transform.get(ent);
@@ -412,43 +450,24 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
         }
     }
 
-    SysHierarchy::update_delete_cut(
-            rScene.m_basic.m_hierarchy,
-            std::begin(rScene.m_delete), std::end(rScene.m_delete));
+    // Delete entities in m_delete, their descendants, and components
+    update_test_scene_delete(rScene);
 
-    // Create a new delete list that includes the descendents of entities to delete
-    rScene.m_deleteTotal = rScene.m_delete;
-    SysHierarchy::update_delete_descendents(
-            rScene.m_basic.m_hierarchy,
-            std::begin(rScene.m_delete), std::end(rScene.m_delete),
-            [&rScene] (ActiveEnt ent)
+    // Note: Prefer creating entities near the end of the update after physics
+    //       and delete systems. This allows their initial state to be rendered
+    //       in a frame and avoids some possible synchronization issues from
+    //       when entities are created and deleted right away.
+
+    // Shape Thrower system, consumes rScene.m_toThrow and creates shapes
+    for (PhysicsTestScene::ThrowShape const &rThrow : std::exchange(rScene.m_toThrow, {}))
     {
-        rScene.m_deleteTotal.push_back(ent);
-    });
-
-    // Delete entities that need to be deleted
-    auto first = std::begin(rScene.m_deleteTotal);
-    auto last = std::end(rScene.m_deleteTotal);
-
-    update_delete_basic                 (rScene.m_basic,        first, last);
-    SysRender::update_delete_drawing    (rScene.m_drawing,      first, last);
-    SysPhysics::update_delete_phys      (rScene.m_physics,      first, last);
-    SysPhysics::update_delete_shapes    (rScene.m_physics,      first, last);
-    SysPhysics::update_delete_hier_body (rScene.m_hierBody,     first, last);
-    SysNewton::update_delete            (*rScene.m_pNwtWorld,   first, last);
-
-    rScene.m_hasGravity         .remove(first, last);
-    rScene.m_removeOutOfBounds  .remove(first, last);  
-
-    // Delete IDs
-    for (ActiveEnt const ent : rScene.m_deleteTotal)
-    {
-        if (rScene.m_activeIds.exists(ent))
-        {
-            rScene.m_activeIds.remove(ent);
-        }
+        ActiveEnt const shape = add_quick_shape(
+                rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_mass,
+                rThrow.m_shape, rThrow.m_size);
     }
 
+    // Sort hierarchy, required by renderer
+    SysHierarchy::sort(rScene.m_basic.m_hierarchy);
 }
 
 //-----------------------------------------------------------------------------
@@ -486,7 +505,7 @@ struct PhysicsTestRenderer
  * @param rRenderer [ref] Renderer data for test scene
  */
 void render_test_scene(
-        ActiveApplication& rApp, PhysicsTestScene& rScene,
+        ActiveApplication& rApp, PhysicsTestScene const& rScene,
         PhysicsTestRenderer& rRenderer)
 {
     using namespace osp::active;
@@ -503,35 +522,31 @@ void render_test_scene(
     // Assign Phong shader to entities with the gc_mat_common material, and put
     // results into the fwd_opaque render group
     {
-        MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
+        MaterialData const &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
         assign_phong(
                 rMatCommon.m_added, &rGroupFwdOpaque.m_entities, nullptr,
                 rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexGl,
                 rRenderer.m_phong);
-        rMatCommon.m_added.clear();
+        SysRender::assure_draw_transforms(
+                    rScene.m_basic.m_hierarchy,
+                    rRenderer.m_renderGl.m_drawTransform,
+                    std::cbegin(rMatCommon.m_added),
+                    std::cend(rMatCommon.m_added));
     }
 
     // Same thing but with MeshVisualizer and gc_mat_visualizer
     {
-        MaterialData &rMatVisualizer
+        MaterialData const &rMatVisualizer
                 = rScene.m_drawing.m_materials[gc_mat_visualizer];
 
-        // workaround: Entities that are deleted directly after creation remain
-        //             in the m_added queues, which kills MeshVisualizer::assign
-        //             so they need to be manually removed
-        for (ActiveEnt const ent : rScene.m_deleteTotal)
-        {
-            auto it = std::find(std::begin(rMatVisualizer.m_added),
-                                std::end(rMatVisualizer.m_added), ent);
-            if (it != std::end(rMatVisualizer.m_added))
-            {
-                rMatVisualizer.m_added.erase(it);
-            }
-        }
         assign_visualizer(
                 rMatVisualizer.m_added, rGroupFwdOpaque.m_entities,
                 rRenderer.m_visualizer);
-        rMatVisualizer.m_added.clear();
+        SysRender::assure_draw_transforms(
+                    rScene.m_basic.m_hierarchy,
+                    rRenderer.m_renderGl.m_drawTransform,
+                    std::cbegin(rMatVisualizer.m_added),
+                    std::cend(rMatVisualizer.m_added));
     }
 
     // Load any required meshes
@@ -545,20 +560,18 @@ void render_test_scene(
             rRenderer.m_renderGl.m_diffuseTexGl, rApp.get_gl_resources());
 
     // Calculate hierarchy transforms
-    SysHierarchy::sort(rScene.m_basic.m_hierarchy);
     SysRender::update_draw_transforms(
             rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform,
-            rScene.m_drawing.m_drawTransform);
+            rRenderer.m_renderGl.m_drawTransform);
 
-    // Get camera, and calculate projection matrix and inverse transformation
-    ACompCamera &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
+    // Get camera to calculate view and projection matrix
+    ACompCamera const &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
     ACompDrawTransform const &cameraDrawTf
-            = rScene.m_drawing.m_drawTransform.get(rRenderer.m_camera);
-    rCamera.m_viewport
-            = osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size());
-    rCamera.calculate_projection();
-    rCamera.m_inverse = cameraDrawTf.m_transformWorld.inverted();
+            = rRenderer.m_renderGl.m_drawTransform.get(rRenderer.m_camera);
+    ViewProjMatrix viewProj{
+            cameraDrawTf.m_transformWorld.inverted(),
+            rCamera.calculate_projection()};
 
     // Bind offscreen FBO
     Framebuffer &rFbo = *rGlResources.get<Framebuffer>("offscreen_fbo");
@@ -571,7 +584,7 @@ void render_test_scene(
     // Forward Render fwd_opaque group to FBO
     SysRenderGL::render_opaque(
             rRenderer.m_renderGroups.m_groups.at("fwd_opaque"),
-            rScene.m_drawing.m_visible, rCamera);
+            rScene.m_drawing.m_visible, viewProj);
 
     // Display FBO
     Texture2D &rFboColor = *rGlResources.get<Texture2D>("offscreen_fbo_color");
@@ -599,41 +612,43 @@ void load_gl_resources(ActiveApplication& rApp)
 
 }
 
-on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp)
+on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
 {
     using namespace osp::active;
     using namespace osp::shader;
+
+    osp::Package &rGlResources = rApp.get_gl_resources();
 
     // Create renderer data. This uses a shared_ptr to allow being stored
     // inside an std::function, which require copyable types
     std::shared_ptr<PhysicsTestRenderer> pRenderer
             = std::make_shared<PhysicsTestRenderer>(rApp);
 
-    osp::Package &rGlResources = rApp.get_gl_resources();
-
-    // Get or reserve Phong shaders. These are loaded in load_gl_resources,
+    // Get or reserve shader resources. These are loaded in load_gl_resources,
     // which can be called before or after this function
     pRenderer->m_phong.m_shaderUntextured
             = rGlResources.get_or_reserve<Phong>("notexture");
     pRenderer->m_phong.m_shaderDiffuse
             = rGlResources.get_or_reserve<Phong>("textured");
-
-    // Same with mesh visualizer shader
     pRenderer->m_visualizer.m_shader
             = rGlResources.get_or_reserve<MeshVisualizer>("mesh_vis_shader");
 
-    pRenderer->m_phong.m_pDrawTf       = &rScene.m_drawing.m_drawTransform;
-    pRenderer->m_phong.m_pDiffuseTexGl = &pRenderer->m_renderGl.m_diffuseTexGl;
-    pRenderer->m_phong.m_pMeshGl       = &pRenderer->m_renderGl.m_meshGl;
-
-    pRenderer->m_visualizer.m_pDrawTf  = &rScene.m_drawing.m_drawTransform;
-    pRenderer->m_visualizer.m_pMeshGl  = &pRenderer->m_renderGl.m_meshGl;
+    // Set component storage pointers, so that they can be accessed by shaders
+    pRenderer->m_phong.assign_pointers(pRenderer->m_renderGl);
+    pRenderer->m_visualizer.assign_pointers(pRenderer->m_renderGl);
 
     // Select first camera for rendering
-    pRenderer->m_camera = rScene.m_basic.m_camera.at(0);
+    ActiveEnt const camEnt = rScene.m_basic.m_camera.at(0);
+    pRenderer->m_camera = camEnt;
+    rScene.m_basic.m_camera.get(camEnt).set_aspect_ratio(
+            osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size()));
+    SysRender::add_draw_transforms_recurse(
+            rScene.m_basic.m_hierarchy,
+            pRenderer->m_renderGl.m_drawTransform,
+            camEnt);
 
+    // Set initial position of camera slightly above the ground
     pRenderer->m_camCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
-    pRenderer->m_camCtrl.m_up = osp::Vector3{0.0f, 1.0f, 0.0f};
 
     // Create render group for forward opaque pass
     pRenderer->m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
@@ -669,10 +684,14 @@ on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp)
         }
 
         update_test_scene(rScene, delta);
-        SysRender::update_delete_groups(
-                pRenderer->m_renderGroups,
-                    std::begin(rScene.m_deleteTotal), std::end(rScene.m_deleteTotal));
 
+        // Delete components of deleted entities on renderer's side
+        auto first = std::cbegin(rScene.m_deleteTotal);
+        auto last = std::cend(rScene.m_deleteTotal);
+        SysRender::update_delete_groups(pRenderer->m_renderGroups, first, last);
+        SysRenderGL::update_delete(pRenderer->m_renderGl, first, last);
+
+        // Rotate and move the camera based on user inputs
         SysCameraController::update_view(
                 pRenderer->m_camCtrl,
                 rScene.m_basic.m_transform.get(pRenderer->m_camera), delta);
@@ -682,6 +701,8 @@ on_draw_t gen_draw(PhysicsTestScene& rScene, ActiveApplication& rApp)
                 delta, true);
 
         render_test_scene(rApp, rScene, *pRenderer);
+
+        SysRender::clear_dirty_materials(rScene.m_drawing.m_materials);
     };
 }
 

@@ -116,11 +116,11 @@ DependRes<Mesh> try_compile_mesh(
 
 void SysRenderGL::compile_meshes(
         acomp_storage_t<ACompMesh> const& meshes,
-        std::vector<ActiveEnt>& rDirty,
+        std::vector<ActiveEnt> const& dirty,
         acomp_storage_t<ACompMeshGL>& rMeshGl,
         osp::Package& rGlResources)
 {
-    for (ActiveEnt ent : std::exchange(rDirty, {}))
+    for (ActiveEnt ent : dirty)
     {
         if (meshes.contains(ent))
         {
@@ -189,11 +189,11 @@ DependRes<Texture2D> try_compile_texture(
 
 void SysRenderGL::compile_textures(
         acomp_storage_t<ACompTexture> const& textures,
-        std::vector<ActiveEnt>& rDirty,
+        std::vector<ActiveEnt> const& dirty,
         acomp_storage_t<ACompTextureGL>& rTexGl,
         osp::Package& rGlResources)
 {
-    for (ActiveEnt ent : std::exchange(rDirty, {}))
+    for (ActiveEnt ent : dirty)
     {
         if (textures.contains(ent))
         {
@@ -257,7 +257,7 @@ void SysRenderGL::display_texture(
 void SysRenderGL::render_opaque(
         RenderGroup const& group,
         acomp_storage_t<ACompVisible> const& visible,
-        ACompCamera const& camera)
+        ViewProjMatrix const& viewProj)
 {
     using Magnum::GL::Renderer;
 
@@ -266,13 +266,13 @@ void SysRenderGL::render_opaque(
     Renderer::disable(Renderer::Feature::Blending);
     Renderer::setDepthMask(true);
 
-    draw_group(group, visible, camera);
+    draw_group(group, visible, viewProj);
 }
 
 void SysRenderGL::render_transparent(
         RenderGroup const& group,
         acomp_storage_t<ACompVisible> const& visible,
-        ACompCamera const& camera)
+        ViewProjMatrix const& viewProj)
 {
     using Magnum::GL::Renderer;
 
@@ -287,19 +287,19 @@ void SysRenderGL::render_transparent(
     //            can mess up other transparent objects once added
     //Renderer::setDepthMask(false);
 
-    draw_group(group, visible, camera);
+    draw_group(group, visible, viewProj);
 }
 
 void SysRenderGL::draw_group(
         RenderGroup const& group,
         acomp_storage_t<ACompVisible> const& visible,
-        ACompCamera const& camera)
+        ViewProjMatrix const& viewProj)
 {
     for (auto const& [ent, toDraw] : group.view().each())
     {
         if (visible.contains(ent))
         {
-            toDraw(ent, camera);
+            toDraw(ent, viewProj);
         }
     }
 }

@@ -36,7 +36,7 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_flat(
-        ActiveEnt ent, ACompCamera const& camera,
+        ActiveEnt ent, ViewProjMatrix const& viewProj,
         EntityToDraw::UserData_t userData) noexcept
 {
     using Flag = Flat::Flag;
@@ -46,8 +46,6 @@ void shader::draw_ent_flat(
 
     // Collect uniform information
     ACompDrawTransform const &drawTf = rData.m_pDrawTf->get(ent);
-
-    Magnum::Matrix4 entRelative = camera.m_inverse * drawTf.m_transformWorld;
 
     if (rShader.flags() & Flag::Textured)
     {
@@ -62,7 +60,7 @@ void shader::draw_ent_flat(
     }
 
     rShader
-        .setTransformationProjectionMatrix(camera.m_projection*entRelative)
+        .setTransformationProjectionMatrix(viewProj.m_viewProj * drawTf.m_transformWorld)
         .draw(*rData.m_pMeshGl->get(ent).m_mesh);
 }
 

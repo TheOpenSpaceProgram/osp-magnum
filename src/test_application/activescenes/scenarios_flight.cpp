@@ -39,7 +39,7 @@ entt::any setup_scene()
     return std::move(sceneAny);
 }
 
-on_draw_t gen_draw(FlightScene& rScene, ActiveApplication& rApp)
+on_draw_t generate_draw_func(FlightScene& rScene, ActiveApplication& rApp)
 {
     return [] (ActiveApplication& rApp, float delta) {};
 }
