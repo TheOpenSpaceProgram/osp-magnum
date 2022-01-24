@@ -31,3 +31,9 @@
 [submodule "3rdparty/longeronpp"]
 	path = 3rdparty/longeronpp
 	url = https://github.com/Capital-Asterisk/longeronpp.git
+[submodule "3rdparty/RmlUi"]
+	path = 3rdparty/RmlUi
+	url = https://github.com/mikke89/RmlUi
+[submodule "3rdparty/freetype"]
+	path = 3rdparty/freetype
+	url = https://github.com/freetype/freetype
