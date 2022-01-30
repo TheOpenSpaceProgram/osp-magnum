@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include "../shared_string.h"
 #include "resourcetypes.h"
 
 #include <longeron/id_management/registry.hpp>
@@ -52,14 +53,18 @@ class Resources
         std::vector<res_data_type_t>    m_resDataTypes;
         std::vector<entt::any>          m_resData;
 
-        // keys of m_nameToResId point to elements of m_resNames
-        std::vector<std::string>                        m_resNames;
-        std::unordered_map< std::string_view, ResId >   m_nameToResId;
+        // Pointed to by PerPkgResType::m_nameToResId
+        std::vector<SharedString>       m_resNames;
     };
 
     struct PerPkgResType
     {
         lgrn::HierarchicalBitset<uint64_t> m_owned;
+
+        // String views point to elements of PerResType::m_resNames
+        // Using string_view here prevents the need to allocate a SharedString
+        // when accessed
+        std::unordered_map< std::string_view, ResId > m_nameToResId;
     };
 
     struct PerPkg

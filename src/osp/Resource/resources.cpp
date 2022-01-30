@@ -45,9 +45,9 @@ ResId Resources::create(ResTypeId typeId, PkgId pkgId, std::string_view name)
 
     // Track name
     rPerResType.m_resNames.resize(rPerResType.m_resIds.capacity());
-    std::string& resName = rPerResType.m_resNames[std::size_t(newResId)];
-    resName = name; // allocates name
-    auto newIt = rPerResType.m_nameToResId.emplace(resName, newResId);
+    SharedString& rResName = rPerResType.m_resNames[std::size_t(newResId)];
+    rResName = SharedString::create(name); // allocates name
+    [[maybe_unused]] auto newIt = rPkgType.m_nameToResId.emplace(rResName, newResId);
     assert(newIt.second); // emplace should always succeed
 
     return newResId;
@@ -57,9 +57,14 @@ ResId Resources::find(ResTypeId typeId, PkgId pkgId, std::string_view name) cons
 {
     PerResType const &rPerResType = get_type(typeId);
 
-    auto findIt = rPerResType.m_nameToResId.find(name);
+    assert(m_pkgData.size() > std::size_t(pkgId));
+    PerPkg const &rPkg = m_pkgData[std::size_t(pkgId)];
+    assert(rPkg.m_resTypeOwn.size() > std::size_t(typeId));
+    PerPkgResType const &rPkgType = rPkg.m_resTypeOwn[std::size_t(typeId)];
 
-    if (findIt == rPerResType.m_nameToResId.end())
+    auto findIt = rPkgType.m_nameToResId.find(name);
+
+    if (findIt == rPkgType.m_nameToResId.end())
     {
         return lgrn::id_null<ResId>(); // not found
     }
