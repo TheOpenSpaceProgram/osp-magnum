@@ -29,6 +29,14 @@ SET(BUILD_DEPRECATED OFF CACHE BOOL "" FORCE)
 SET(BUILD_GMOCK      OFF CACHE BOOL "" FORCE)
 SET(BUILD_STATIC     ON  CACHE BOOL "" FORCE)
 
+# Disable all the freetype things
+SET(FT_DISABLE_ZLIB     ON CACHE BOOL "" FORCE)
+SET(FT_DISABLE_BZIP2    ON CACHE BOOL "" FORCE)
+SET(FT_DISABLE_PNG      ON CACHE BOOL "" FORCE)
+SET(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+SET(FT_DISABLE_BROTLI   ON CACHE BOOL "" FORCE)
+ADD_SUBDIRECTORY(freetype EXCLUDE_FROM_ALL)
+
 if(NOT OSP_USE_SYSTEM_SDL)
   # This is the most minimal set of features which still make Sdl2Application
   # work. If you need something from these, remove the setting. The SDL_AUDIO
@@ -126,3 +134,5 @@ ADD_SUBDIRECTORY(longeronpp EXCLUDE_FROM_ALL)
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 SET(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 ADD_SUBDIRECTORY(googletest EXCLUDE_FROM_ALL)
+
+ADD_SUBDIRECTORY(RmlUi EXCLUDE_FROM_ALL)

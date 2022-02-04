@@ -96,6 +96,8 @@ target_link_libraries(osp-magnum-deps PUBLIC
     toml11
     spdlog
     longeron
+    freetype
+    RmlCore
     )
 
 # Gather paths to OSP headers and sources
