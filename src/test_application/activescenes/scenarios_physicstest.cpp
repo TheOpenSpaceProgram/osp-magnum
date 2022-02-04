@@ -485,7 +485,7 @@ struct PhysicsTestRenderer
 
     osp::active::ACtxRenderGroups m_renderGroups;
 
-    osp::active::ACtxRenderGL m_renderGl;
+    osp::active::ACtxSceneRenderGL m_renderGl;
 
     osp::active::ActiveEnt m_camera;
     ACtxCameraController m_camCtrl;

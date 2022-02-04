@@ -24,40 +24,88 @@
  */
 #pragma once
 
-#include "osp/Resource/Package.h"
 #include "../SysRender.h"
+#include "../../Shaders/FullscreenTriShader.h"
 
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
 #include <Magnum/GL/Framebuffer.h>
 #include <Magnum/GL/Renderbuffer.h>
 
+#include <longeron/id_management/registry.hpp>
+
 namespace osp::active
 {
 
+enum class TexIdGL : uint32_t { };
+enum class MeshIdGL : uint32_t { };
+
 /**
- * @brief Stores a mesh to be drawn by the renderer
+ * @brief Essential GL resources
+ *
+ * This may be shared between scenes
  */
-struct ACompMeshGL
+struct RenderGL
 {
-    osp::DependRes<Magnum::GL::Mesh> m_mesh;
+    // Fullscreen Triangle
+    MeshIdGL            m_fullscreenTri;
+    FullscreenTriShader m_fullscreenTriShader;
+
+    // Offscreen Framebuffer
+    TexIdGL                     m_fboColor;
+    Magnum::GL::Renderbuffer    m_fboDepthStencil{Corrade::NoCreate};
+    Magnum::GL::Framebuffer     m_fbo{Corrade::NoCreate};
+
+    // Addressable Textures
+    lgrn::IdRegistry<TexIdGL>           m_texIds;
+    std::vector<Magnum::GL::Texture2D>  m_texGl;
+
+    // Addressable Meshes
+    lgrn::IdRegistry<MeshIdGL>          m_meshIds;
+    std::vector<Magnum::GL::Mesh>       m_meshGl;
+
+    // Meshes and textures associated with new Resources (in other PR)
+    //std::unordered_map<ResId, TexIdGL>  m_resToTex;
+    //std::unordered_map<ResId, MeshIdGL> m_resToMesh;
+
+    // TEMPORARY!!!  Meshes and textures associated with Packages
+    std::unordered_map<std::string, TexIdGL>  m_oldResToTex;
+    std::unordered_map<std::string, MeshIdGL> m_oldResToMesh;
+
+    inline TexIdGL create_tex()
+    {
+        TexIdGL const texId = m_texIds.create();
+        m_texGl.resize(
+                m_texIds.capacity(), Magnum::GL::Texture2D(Corrade::NoCreate));
+        return texId;
+    }
+
+    inline Magnum::GL::Texture2D& get_tex(TexIdGL texId) noexcept
+    {
+        return m_texGl[std::size_t(texId)];
+    }
+
+    inline MeshIdGL create_mesh()
+    {
+        MeshIdGL const meshId = m_meshIds.create();
+        m_meshGl.resize(
+                m_meshIds.capacity(), Magnum::GL::Mesh(Corrade::NoCreate));
+        return meshId;
+    }
+
+    inline Magnum::GL::Mesh& get_mesh(MeshIdGL meshId) noexcept
+    {
+        return m_meshGl[std::size_t(meshId)];
+    }
 };
 
 /**
- * @brief Diffuse texture component
+ * @brief OpenGL specific rendering components for rendering a scene
  */
-struct ACompTextureGL
+struct ACtxSceneRenderGL
 {
-    osp::DependRes<Magnum::GL::Texture2D> m_tex;
-};
-
-/**
- * @brief OpenGL specific rendering components
- */
-struct ACtxRenderGL
-{
-    acomp_storage_t<ACompMeshGL>            m_meshGl;
-    acomp_storage_t<ACompTextureGL>         m_diffuseTexGl;
+    acomp_storage_t<MeshIdGL>               m_meshGl;
+    acomp_storage_t<TexIdGL>                m_diffuseTexGl;
     acomp_storage_t<ACompDrawTransform>     m_drawTransform;
 };
 
@@ -74,9 +122,9 @@ public:
      *
      * This sets up an offscreen framebuffer and a fullscreen triangle
      *
-     * @param rGlResources [ref] Context resources Package
+     * @param rRenderGl [ref]
      */
-    static void setup_context(Package& rGlResources);
+    static void setup_context(RenderGL& rRenderGl);
 
     /**
      * @brief Display a fullscreen texture to the default framebuffer
@@ -84,8 +132,8 @@ public:
      * @param rGlResources  [ref] GL resources containing fullscreen triangle
      * @param rTex          [in] Texture to display
      */
-    static void display_texture(Package& rGlResources,
-                                Magnum::GL::Texture2D& rTex);
+    static void display_texture(
+            RenderGL& rRenderGl, Magnum::GL::Texture2D& rTex);
 
     /**
      * @brief Compile and assign GPU mesh components to entities with mesh
@@ -101,8 +149,8 @@ public:
     static void compile_meshes(
             acomp_storage_t<ACompMesh> const& meshes,
             std::vector<ActiveEnt> const& dirty,
-            acomp_storage_t<ACompMeshGL>& rMeshGl,
-            osp::Package& rGlResources);
+            acomp_storage_t<MeshIdGL>& rMeshGl,
+            RenderGL& rRenderGl);
 
     /**
      * @brief Compile and assign GPU texture components to entities with
@@ -110,14 +158,14 @@ public:
      *
      * @param textures      [in] Storage for generic texture data components
      * @param dirty         [in] Vector of entities that have updated textures
-     * @param rDiffTexGl    [ref] Storage for GL texture components
+     * @param rTexGl        [ref] Storage for GL texture components
      * @param rGlResources  [out] Package to store newly compiled textures
      */
     static void compile_textures(
             acomp_storage_t<ACompTexture> const& textures,
             std::vector<ActiveEnt> const& dirty,
-            acomp_storage_t<ACompTextureGL>& rDiffTexGl,
-            osp::Package& rGlResources);
+            acomp_storage_t<TexIdGL>& rTexGl,
+            RenderGL& rRenderGl);
 
     /**
      * @brief Call draw functions of a RenderGroup of opaque objects
@@ -152,12 +200,12 @@ public:
 
     template<typename IT_T>
     static void update_delete(
-            ACtxRenderGL &rCtxRenderGl, IT_T first, IT_T last);
+            ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T last);
 };
 
 template<typename IT_T>
 void SysRenderGL::update_delete(
-        ACtxRenderGL &rCtxRenderGl, IT_T first, IT_T last)
+        ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T last)
 {
     rCtxRenderGl.m_meshGl           .remove(first, last);
     rCtxRenderGl.m_diffuseTexGl     .remove(first, last);

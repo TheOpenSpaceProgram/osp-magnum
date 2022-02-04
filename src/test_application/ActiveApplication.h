@@ -28,7 +28,8 @@
 
 #include <osp/types.h>
 #include <osp/UserInputHandler.h>
-#include <osp/Resource/Package.h>
+
+#include <osp/Active/opengl/SysRenderGL.h>
 
 #include <Magnum/Timeline.h>
 
@@ -74,9 +75,9 @@ public:
         return m_userInput;
     }
 
-    constexpr osp::Package& get_gl_resources() noexcept
+    constexpr osp::active::RenderGL& get_renderer() noexcept
     {
-        return m_glResources;
+        return m_renderer;
     }
 
 private:
@@ -89,7 +90,8 @@ private:
 
     Magnum::Timeline m_timeline;
 
-    osp::Package m_glResources;
+    osp::active::RenderGL m_renderer;
+
 };
 
 void config_controls(ActiveApplication& rApp);
