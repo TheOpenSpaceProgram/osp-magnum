@@ -255,11 +255,6 @@ void render_test_scene(
     SysRenderGL::display_texture(rApp.get_render_gl(), rFboColor);
 }
 
-void load_gl_resources(ActiveApplication& rApp)
-{
-
-}
-
 on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
 {
     using namespace osp::active;

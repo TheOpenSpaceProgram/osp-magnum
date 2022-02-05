@@ -589,14 +589,6 @@ void render_test_scene(
     SysRenderGL::display_texture(rApp.get_render_gl(), rFboColor);
 }
 
-void load_gl_resources(ActiveApplication& rApp)
-{
-    using osp::shader::Phong;
-    using osp::shader::MeshVisualizer;
-
-
-}
-
 on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
 {
     using namespace osp::active;

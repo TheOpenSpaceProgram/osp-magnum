@@ -76,14 +76,6 @@ struct EngineTestScene;
 entt::any setup_scene(osp::Package &rPkg);
 
 /**
- * @brief Load required textures and shaders used to render the engine test
- *        scene
- *
- * @param rApp [ref] Existing ActiveApplication used to store GL resources
- */
-void load_gl_resources(ActiveApplication& rApp);
-
-/**
  * @brief Generate ActiveApplication draw function
  *
  * This draw function stores renderer data, and is responsible for updating
@@ -113,14 +105,6 @@ struct PhysicsTestScene;
  * @return entt::any containing scene data
  */
 entt::any setup_scene(osp::Package &rPkg);
-
-/**
- * @brief Load required textures and shaders used to render the physics test
- *        scene
- *
- * @param rApp [ref] Existing ActiveApplication used to store GL resources
- */
-void load_gl_resources(ActiveApplication& rApp);
 
 /**
  * @brief Generate ActiveApplication draw function

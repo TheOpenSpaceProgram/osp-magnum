@@ -129,7 +129,6 @@ std::unordered_map<std::string_view, Option> const g_scenes
             EngineTestScene& rScene
                     = entt::any_cast<EngineTestScene&>(g_activeScene);
             rApp.set_on_draw(generate_draw_func(rScene, rApp));
-            load_gl_resources(*g_activeApplication);
         };
     }}},
     {"physicstest", {"Physics lol", [] {
@@ -142,7 +141,6 @@ std::unordered_map<std::string_view, Option> const g_scenes
             PhysicsTestScene& rScene
                     = entt::any_cast<PhysicsTestScene&>(g_activeScene);
             rApp.set_on_draw(generate_draw_func(rScene, rApp));
-            load_gl_resources(*g_activeApplication);
         };
     }}}
 };
