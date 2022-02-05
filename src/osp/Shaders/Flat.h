@@ -44,8 +44,12 @@ struct ACtxDrawFlat
 
     active::acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf{nullptr};
     active::acomp_storage_t<active::ACompColor>         *m_pColor{nullptr};
-    active::acomp_storage_t<active::ACompTextureGL>     *m_pDiffuseTexGl{nullptr};
-    active::acomp_storage_t<active::ACompMeshGL>        *m_pMeshGl{nullptr};
+
+    osp::active::acomp_storage_t<osp::active::TexGlId>  *m_pDiffuseTexId{nullptr};
+    osp::active::TexGlStorage_t                         *m_pTexGl{nullptr};
+
+    osp::active::acomp_storage_t<osp::active::MeshGlId> *m_pMeshId{nullptr};
+    osp::active::MeshGlStorage_t                        *m_pMeshGl{nullptr};
 };
 
 void draw_ent_flat(
@@ -69,7 +73,7 @@ void assign_flat(
         active::RenderGroup::Storage_t *pStorageOpaque,
         active::RenderGroup::Storage_t *pStorageTransparent,
         active::acomp_storage_t<active::ACompOpaque> const& opaque,
-        active::acomp_storage_t<active::ACompTextureGL> const& diffuse,
+        active::acomp_storage_t<active::TexGlId> const& diffuse,
         ACtxDrawFlat &rData);
 
 

@@ -127,8 +127,8 @@ struct ACtxPlumeData
     template<typename COMP_T>
     using acomp_storage_t       = typename osp::active::acomp_storage_t<COMP_T>;
     using ACompDrawTransform    = osp::active::ACompDrawTransform;
-    using ACompMeshGL           = osp::active::ACompMeshGL;
     using ACompExhaustPlume     = adera::active::ACompExhaustPlume;
+    using MeshGlId              = osp::active::MeshGlId;
 
     PlumeShader m_shader;
 
@@ -136,7 +136,8 @@ struct ACtxPlumeData
 
     acomp_storage_t<ACompDrawTransform> *m_pDrawTf{nullptr};
     acomp_storage_t<ACompExhaustPlume>  *m_pExaustPlumes{nullptr};
-    acomp_storage_t<ACompMeshGL>        *m_pMesh{nullptr};
+    acomp_storage_t<MeshGlId>           *m_pMeshId{nullptr};
+    osp::active::MeshGlStorage_t        *m_pMeshGl{nullptr};
 };
 
 } // namespace adera::shader

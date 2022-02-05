@@ -36,17 +36,20 @@ using MeshVisualizer = Magnum::Shaders::MeshVisualizerGL3D;
 
 struct ACtxDrawMeshVisualizer
 {
-    DependRes<MeshVisualizer> m_shader;
+    MeshVisualizer m_shader{Corrade::NoCreate};
 
-    active::acomp_storage_t< active::ACompDrawTransform >  *m_pDrawTf{nullptr};
-    active::acomp_storage_t< active::ACompMeshGL >         *m_pMeshGl{nullptr};
+    active::acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf{nullptr};
+    osp::active::acomp_storage_t<osp::active::MeshGlId> *m_pMeshId{nullptr};
+    osp::active::MeshGlStorage_t                        *m_pMeshGl{nullptr};
 
     bool m_wireframeOnly{false};
 
-    constexpr void assign_pointers(active::ACtxRenderGL& rCtxRenderGl) noexcept
+    constexpr void assign_pointers(active::ACtxSceneRenderGL& rCtxScnGl,
+                                   active::RenderGL& rRenderGl) noexcept
     {
-        m_pDrawTf   = &rCtxRenderGl.m_drawTransform;
-        m_pMeshGl   = &rCtxRenderGl.m_meshGl;
+        m_pDrawTf   = &rCtxScnGl.m_drawTransform;
+        m_pMeshId   = &rCtxScnGl.m_meshId;
+        m_pMeshGl   = &rRenderGl.m_meshGl;
     }
 };
 

@@ -290,6 +290,10 @@ void start_magnum_async()
         // Configure the controls
         config_controls(*g_activeApplication);
 
+        // Setup GL resources
+        osp::active::SysRenderGL::setup_context(g_activeApplication->get_render_gl());
+
+        // Setup scene-specific renderer
         g_appSetup(*g_activeApplication);
 
         // Starts the main loop. This function is blocking, and will only return

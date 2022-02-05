@@ -46,12 +46,11 @@ void shader::draw_ent_visualizer(
 
     auto &rData = *reinterpret_cast<ACtxDrawMeshVisualizer*>(userData[0]);
 
-    ACompMeshGL &rMesh = rData.m_pMeshGl->get(ent);
     ACompDrawTransform const& drawTf = rData.m_pDrawTf->get(ent);
 
     Matrix4 const entRelative = viewProj.m_view * drawTf.m_transformWorld;
 
-    MeshVisualizer &rShader = *rData.m_shader;
+    MeshVisualizer &rShader = rData.m_shader;
 
     if (rShader.flags() & MeshVisualizer::Flag::NormalDirection)
     {
@@ -69,7 +68,7 @@ void shader::draw_ent_visualizer(
         .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(viewProj.m_proj)
-        .draw(*rMesh.m_mesh);
+        .draw(rData.m_pMeshGl->get(rData.m_pMeshId->get(ent)));
 
     if (rData.m_wireframeOnly)
     {

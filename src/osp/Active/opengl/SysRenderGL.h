@@ -37,8 +37,11 @@
 namespace osp::active
 {
 
-enum class TexIdGL : uint32_t { };
-enum class MeshIdGL : uint32_t { };
+enum class TexGlId : uint32_t { };
+enum class MeshGlId : uint32_t { };
+
+using TexGlStorage_t    = entt::basic_storage<TexGlId, Magnum::GL::Texture2D>;
+using MeshGlStorage_t   = entt::basic_storage<MeshGlId, Magnum::GL::Mesh>;
 
 /**
  * @brief Essential GL resources
@@ -48,55 +51,29 @@ enum class MeshIdGL : uint32_t { };
 struct RenderGL
 {
     // Fullscreen Triangle
-    MeshIdGL            m_fullscreenTri;
+    MeshGlId            m_fullscreenTri;
     FullscreenTriShader m_fullscreenTriShader;
 
     // Offscreen Framebuffer
-    TexIdGL                     m_fboColor;
+    TexGlId                     m_fboColor;
     Magnum::GL::Renderbuffer    m_fboDepthStencil{Corrade::NoCreate};
     Magnum::GL::Framebuffer     m_fbo{Corrade::NoCreate};
 
     // Addressable Textures
-    lgrn::IdRegistry<TexIdGL>           m_texIds;
-    std::vector<Magnum::GL::Texture2D>  m_texGl;
+    lgrn::IdRegistry<TexGlId>   m_texIds;
+    TexGlStorage_t              m_texGl;
 
     // Addressable Meshes
-    lgrn::IdRegistry<MeshIdGL>          m_meshIds;
-    std::vector<Magnum::GL::Mesh>       m_meshGl;
+    lgrn::IdRegistry<MeshGlId>  m_meshIds;
+    MeshGlStorage_t             m_meshGl;
 
     // Meshes and textures associated with new Resources (in other PR)
-    //std::unordered_map<ResId, TexIdGL>  m_resToTex;
-    //std::unordered_map<ResId, MeshIdGL> m_resToMesh;
+    //std::unordered_map<ResId, TexGlId>  m_resToTex;
+    //std::unordered_map<ResId, MeshGlId> m_resToMesh;
 
     // TEMPORARY!!!  Meshes and textures associated with Packages
-    std::unordered_map<std::string, TexIdGL>  m_oldResToTex;
-    std::unordered_map<std::string, MeshIdGL> m_oldResToMesh;
-
-    inline TexIdGL create_tex()
-    {
-        TexIdGL const texId = m_texIds.create();
-        m_texGl.resize(
-                m_texIds.capacity(), Magnum::GL::Texture2D(Corrade::NoCreate));
-        return texId;
-    }
-
-    inline Magnum::GL::Texture2D& get_tex(TexIdGL texId) noexcept
-    {
-        return m_texGl[std::size_t(texId)];
-    }
-
-    inline MeshIdGL create_mesh()
-    {
-        MeshIdGL const meshId = m_meshIds.create();
-        m_meshGl.resize(
-                m_meshIds.capacity(), Magnum::GL::Mesh(Corrade::NoCreate));
-        return meshId;
-    }
-
-    inline Magnum::GL::Mesh& get_mesh(MeshIdGL meshId) noexcept
-    {
-        return m_meshGl[std::size_t(meshId)];
-    }
+    std::unordered_map<std::string, TexGlId>  m_oldResToTex;
+    std::unordered_map<std::string, MeshGlId> m_oldResToMesh;
 };
 
 /**
@@ -104,8 +81,8 @@ struct RenderGL
  */
 struct ACtxSceneRenderGL
 {
-    acomp_storage_t<MeshIdGL>               m_meshGl;
-    acomp_storage_t<TexIdGL>                m_diffuseTexGl;
+    acomp_storage_t<MeshGlId>               m_meshId;
+    acomp_storage_t<TexGlId>                m_diffuseTexId;
     acomp_storage_t<ACompDrawTransform>     m_drawTransform;
 };
 
@@ -149,7 +126,7 @@ public:
     static void compile_meshes(
             acomp_storage_t<ACompMesh> const& meshes,
             std::vector<ActiveEnt> const& dirty,
-            acomp_storage_t<MeshIdGL>& rMeshGl,
+            acomp_storage_t<MeshGlId>& rMeshGl,
             RenderGL& rRenderGl);
 
     /**
@@ -164,7 +141,7 @@ public:
     static void compile_textures(
             acomp_storage_t<ACompTexture> const& textures,
             std::vector<ActiveEnt> const& dirty,
-            acomp_storage_t<TexIdGL>& rTexGl,
+            acomp_storage_t<TexGlId>& rTexGl,
             RenderGL& rRenderGl);
 
     /**
@@ -207,8 +184,8 @@ template<typename IT_T>
 void SysRenderGL::update_delete(
         ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T last)
 {
-    rCtxRenderGl.m_meshGl           .remove(first, last);
-    rCtxRenderGl.m_diffuseTexGl     .remove(first, last);
+    rCtxRenderGl.m_meshId           .remove(first, last);
+    rCtxRenderGl.m_diffuseTexId     .remove(first, last);
     rCtxRenderGl.m_drawTransform    .remove(first, last);
 }
 

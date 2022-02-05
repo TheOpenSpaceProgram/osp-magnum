@@ -75,9 +75,9 @@ public:
         return m_userInput;
     }
 
-    constexpr osp::active::RenderGL& get_renderer() noexcept
+    constexpr osp::active::RenderGL& get_render_gl() noexcept
     {
-        return m_renderer;
+        return m_renderGl;
     }
 
 private:
@@ -90,7 +90,7 @@ private:
 
     Magnum::Timeline m_timeline;
 
-    osp::active::RenderGL m_renderer;
+    osp::active::RenderGL m_renderGl;
 
 };
 

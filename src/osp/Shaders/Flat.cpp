@@ -49,7 +49,7 @@ void shader::draw_ent_flat(
 
     if (rShader.flags() & Flag::Textured)
     {
-        rShader.bindTexture(*rData.m_pDiffuseTexGl->get(ent).m_tex);
+        rShader.bindTexture(rData.m_pTexGl->get(rData.m_pDiffuseTexId->get(ent)));
     }
 
     if (rData.m_pColor != nullptr)
@@ -61,7 +61,7 @@ void shader::draw_ent_flat(
 
     rShader
         .setTransformationProjectionMatrix(viewProj.m_viewProj * drawTf.m_transformWorld)
-        .draw(*rData.m_pMeshGl->get(ent).m_mesh);
+        .draw(rData.m_pMeshGl->get(rData.m_pMeshId->get(ent)));
 }
 
 
@@ -70,7 +70,7 @@ void shader::assign_flat(
         RenderGroup::Storage_t *pStorageOpaque,
         RenderGroup::Storage_t *pStorageTransparent,
         acomp_storage_t<active::ACompOpaque> const& opaque,
-        acomp_storage_t<ACompTextureGL> const& diffuse,
+        acomp_storage_t<active::TexGlId> const& diffuse,
         ACtxDrawFlat &rData)
 {
 

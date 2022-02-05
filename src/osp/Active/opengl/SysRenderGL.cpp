@@ -54,8 +54,8 @@ using osp::DependRes;
 using osp::active::SysRenderGL;
 using osp::active::RenderGL;
 
-using osp::active::TexIdGL;
-using osp::active::MeshIdGL;
+using osp::active::TexGlId;
+using osp::active::MeshGlId;
 
 void SysRenderGL::setup_context(RenderGL& rCtxGl)
 {
@@ -74,9 +74,9 @@ void SysRenderGL::setup_context(RenderGL& rCtxGl)
         };
 
         GL::Buffer surface(surfData, GL::BufferUsage::StaticDraw);
-        rCtxGl.m_fullscreenTri = rCtxGl.create_mesh();
+        rCtxGl.m_fullscreenTri = rCtxGl.m_meshIds.create();
 
-        rCtxGl.get_mesh(rCtxGl.m_fullscreenTri)
+        rCtxGl.m_meshGl.emplace(rCtxGl.m_fullscreenTri)
             .setPrimitive(Magnum::MeshPrimitive::Triangles)
             .setCount(3)
             .addVertexBuffer(std::move(surface), 0,
@@ -88,16 +88,20 @@ void SysRenderGL::setup_context(RenderGL& rCtxGl)
     {
         Vector2i const viewSize = GL::defaultFramebuffer.viewport().size();
 
-        rCtxGl.m_fboColor = rCtxGl.create_tex();
-        GL::Texture2D &rFboColor = rCtxGl.get_tex(rCtxGl.m_fboColor);
+        rCtxGl.m_fboColor = rCtxGl.m_texIds.create();
+        GL::Texture2D &rFboColor = rCtxGl.m_texGl.emplace(rCtxGl.m_fboColor);
         rFboColor.setStorage(1, GL::TextureFormat::RGB8, viewSize);
+
+        rCtxGl.m_fboDepthStencil = Magnum::GL::Renderbuffer{};
         rCtxGl.m_fboDepthStencil.setStorage(GL::RenderbufferFormat::Depth24Stencil8, viewSize);
+
+        rCtxGl.m_fbo = GL::Framebuffer{ Range2Di{{0, 0}, viewSize} };
         rCtxGl.m_fbo.attachTexture(GL::Framebuffer::ColorAttachment{0}, rFboColor, 0);
         rCtxGl.m_fbo.attachRenderbuffer(GL::Framebuffer::BufferAttachment::DepthStencil, rCtxGl.m_fboDepthStencil);
     }
 }
 
-MeshIdGL try_compile_mesh(
+MeshGlId try_compile_mesh(
         RenderGL& rRenderGl, DependRes<MeshData> const& meshData)
 {
     auto foundIt = rRenderGl.m_oldResToMesh.find(meshData.name());
@@ -105,8 +109,8 @@ MeshIdGL try_compile_mesh(
     if (foundIt == rRenderGl.m_oldResToMesh.end())
     {
         // Mesh isn't compiled yet, compile it
-        MeshIdGL newId = rRenderGl.create_mesh();
-        rRenderGl.get_mesh(newId) = Magnum::MeshTools::compile(*meshData);
+        MeshGlId newId = rRenderGl.m_meshIds.create();
+        rRenderGl.m_meshGl.emplace(newId, Magnum::MeshTools::compile(*meshData));
         rRenderGl.m_oldResToMesh.emplace(meshData.name(), newId);
         return newId;
     }
@@ -117,7 +121,7 @@ MeshIdGL try_compile_mesh(
 void SysRenderGL::compile_meshes(
         acomp_storage_t<ACompMesh> const& meshes,
         std::vector<ActiveEnt> const& dirty,
-        acomp_storage_t<MeshIdGL>& rMeshGl,
+        acomp_storage_t<MeshGlId>& rMeshGl,
         RenderGL& rRenderGl)
 {
     for (ActiveEnt ent : dirty)
@@ -129,7 +133,7 @@ void SysRenderGL::compile_meshes(
             if (rMeshGl.contains(ent))
             {
                 // Check if ACompMesh changed
-                MeshIdGL &rEntMeshGl = rMeshGl.get(ent);
+                MeshGlId &rEntMeshGl = rMeshGl.get(ent);
 
                 if (rRenderGl.m_oldResToMesh.at(rEntMesh.m_mesh.name()) != rEntMeshGl)
                 {
@@ -159,7 +163,7 @@ void SysRenderGL::compile_meshes(
     }
 }
 
-TexIdGL try_compile_texture(
+TexGlId try_compile_texture(
         RenderGL& rRenderGl, DependRes<ImageData2D> const& texData)
 {
     auto foundIt = rRenderGl.m_oldResToTex.find(texData.name());
@@ -167,10 +171,9 @@ TexIdGL try_compile_texture(
     if (foundIt == rRenderGl.m_oldResToTex.end())
     {
         // Texture isn't compiled yet, compile it
-        TexIdGL newId = rRenderGl.create_tex();
+        TexGlId newId = rRenderGl.m_texIds.create();
 
-        Texture2D &rTexGl = rRenderGl.get_tex(newId);
-        rTexGl = Texture2D{};
+        Texture2D &rTexGl = rRenderGl.m_texGl.emplace(newId);
         
         using Magnum::GL::SamplerWrapping;
         using Magnum::GL::SamplerFilter;
@@ -194,7 +197,7 @@ TexIdGL try_compile_texture(
 void SysRenderGL::compile_textures(
         acomp_storage_t<ACompTexture> const& textures,
         std::vector<ActiveEnt> const& dirty,
-        acomp_storage_t<TexIdGL>& rTexGl,
+        acomp_storage_t<TexGlId>& rTexGl,
         RenderGL& rRenderGl)
 {
     for (ActiveEnt ent : dirty)
@@ -206,7 +209,7 @@ void SysRenderGL::compile_textures(
             if (rTexGl.contains(ent))
             {
                 // Check if ACompTexture changed
-                TexIdGL &rEntTexGl = rTexGl.get(ent);
+                TexGlId &rEntTexGl = rTexGl.get(ent);
 
                 if (rRenderGl.m_oldResToTex.at(rEntTex.m_texture.name()) != rEntTexGl)
                 {
@@ -252,8 +255,8 @@ void SysRenderGL::display_texture(
     Renderer::setDepthMask(true);
 
     rRenderGl.m_fullscreenTriShader.display_texure(
-            rRenderGl.get_mesh(rRenderGl.m_fullscreenTri),
-            rRenderGl.get_tex(rRenderGl.m_fboColor));
+            rRenderGl.m_meshGl.get(rRenderGl.m_fullscreenTri),
+            rRenderGl.m_texGl.get(rRenderGl.m_fboColor));
 }
 
 void SysRenderGL::render_opaque(
