@@ -5,10 +5,20 @@
 #   concatenation of the variables:
 
 if(TARGET freetype)
-    get_target_property(FREETYPE_SOURCE_DIR freetype SOURCE_DIR)
-    get_target_property(FREETYPE_INCLUDE_DIRS freetype INCLUDE_DIRECTORIES)
+include(FindPackageHandleStandardArgs)
+get_target_property(FREETYPE_SOURCE_DIR freetype SOURCE_DIR)
+find_package(Freetype QUIET NO_MODULE HINTS ${FREETYPE_SOURCE_DIR})
+find_package_handle_standard_args(
+  Freetype DEFAULT_MSG FREETYPE_SOURCE_DIR
+)
+
+    #get_target_property(FREETYPE_INCLUDE_DIRS freetype INCLUDE_DIRECTORIES)
+    get_target_property(FREETYPE_BIN freetype PROJECT_BINARY_DIR)
     set(FREETYPE_LIBRARIES Freetype::Freetype)
+    message("Stuff: ${FREETYPE_INCLUDE_DIRS}" FREETYPE_INCLUDE_DIRS)
+    add_library(Freetype::Freetype ALIAS freetype)
     set(Freetype_FOUND TRUE)
+    #print_target_properties(freetype)
 else()
 set(FREETYPE_FIND_ARGS
   HINTS

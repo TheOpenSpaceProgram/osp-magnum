@@ -96,7 +96,6 @@ target_link_libraries(osp-magnum-deps PUBLIC
     toml11
     spdlog
     longeron
-    freetype
     RmlCore
     )
 
