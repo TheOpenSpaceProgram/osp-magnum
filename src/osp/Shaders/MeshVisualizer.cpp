@@ -64,11 +64,14 @@ void shader::draw_ent_visualizer(
         Magnum::GL::Renderer::setDepthMask(false);
     }
 
+    MeshGlId const meshId = rData.m_pMeshId->get(ent);
+    Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
+
     rShader
         .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(viewProj.m_proj)
-        .draw(rData.m_pMeshGl->get(rData.m_pMeshId->get(ent)));
+        .draw(rMesh);
 
     if (rData.m_wireframeOnly)
     {

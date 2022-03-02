@@ -188,7 +188,6 @@ TexGlId try_compile_texture(
             .setSubImage(0, {}, view);
 
         return newId;
-
     }
 
     return foundIt->second;

@@ -59,9 +59,12 @@ void shader::draw_ent_flat(
                          : 0xffffffff_rgbaf);
     }
 
+    MeshGlId const meshId = rData.m_pMeshId->get(ent);
+    Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
+
     rShader
         .setTransformationProjectionMatrix(viewProj.m_viewProj * drawTf.m_transformWorld)
-        .draw(rData.m_pMeshGl->get(rData.m_pMeshId->get(ent)));
+        .draw(rMesh);
 }
 
 

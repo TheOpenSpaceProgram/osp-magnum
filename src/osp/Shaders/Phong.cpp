@@ -64,9 +64,7 @@ void shader::draw_ent_phong(
         {
             rShader.bindAmbientTexture(rTexture);
         }
-
     }
-
 
     if (rData.m_pColor != nullptr)
     {
@@ -74,6 +72,9 @@ void shader::draw_ent_phong(
                                 ? rData.m_pColor->get(ent)
                                 : 0xffffffff_rgbaf);
     }
+
+    MeshGlId const meshId = rData.m_pMeshId->get(ent);
+    Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
     rShader
         .setAmbientColor(0x000000ff_rgbaf)
@@ -84,7 +85,7 @@ void shader::draw_ent_phong(
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(viewProj.m_proj)
         .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
-        .draw(rData.m_pMeshGl->get(rData.m_pMeshId->get(ent)));
+        .draw(rMesh);
 }
 
 
