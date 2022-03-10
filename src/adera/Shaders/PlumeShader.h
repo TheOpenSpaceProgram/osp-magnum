@@ -129,15 +129,17 @@ struct ACtxPlumeData
     using ACompDrawTransform    = osp::active::ACompDrawTransform;
     using ACompExhaustPlume     = adera::active::ACompExhaustPlume;
     using MeshGlId              = osp::active::MeshGlId;
+    using TexGlId               = osp::active::TexGlId;
 
     PlumeShader m_shader;
 
-    osp::DependRes<Magnum::GL::Texture2D> m_tmpTex;
+    TexGlId m_tmpTex;
 
     acomp_storage_t<ACompDrawTransform> *m_pDrawTf{nullptr};
     acomp_storage_t<ACompExhaustPlume>  *m_pExaustPlumes{nullptr};
     acomp_storage_t<MeshGlId>           *m_pMeshId{nullptr};
     osp::active::MeshGlStorage_t        *m_pMeshGl{nullptr};
+    osp::active::TexGlStorage_t         *m_pTexGl{nullptr};
 };
 
 } // namespace adera::shader
