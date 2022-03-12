@@ -71,24 +71,25 @@ ResId Resources::find(ResTypeId typeId, PkgId pkgId, std::string_view name) cons
     return findIt->second;
 }
 
-void Resources::store(ResTypeId typeId, ResId resId, ResIdStorage_t &rStorage) noexcept
+ResIdOwner_t Resources::owner_create(ResTypeId typeId, ResId resId) noexcept
 {
-    assert(!rStorage.has_value());
     PerResType &rPerResType = get_type(typeId);
     rPerResType.m_resRefs[std::size_t(resId)] ++;
-    rStorage.m_id = resId;
+    ResIdOwner_t owner;
+    owner.m_id = resId;
+    return owner;
 }
 
-void Resources::release(ResTypeId typeId, ResIdStorage_t &rStorage) noexcept
+void Resources::owner_destroy(ResTypeId typeId, ResIdOwner_t&& rOwner) noexcept
 {
-    if (!rStorage.has_value())
+    if (!rOwner.has_value())
     {
         return;
     }
     PerResType &rPerResType = get_type(typeId);
-    int &rCount = rPerResType.m_resRefs[std::size_t(rStorage.m_id)];
+    int &rCount = rPerResType.m_resRefs[std::size_t(rOwner.m_id)];
     rCount --;
-    rStorage.m_id = lgrn::id_null<ResId>();
+    rOwner.m_id = ResIdOwner_t{};
 }
 
 PkgId Resources::pkg_create()

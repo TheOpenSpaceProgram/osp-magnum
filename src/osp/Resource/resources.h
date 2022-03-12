@@ -97,9 +97,9 @@ public:
 
     ResId find(ResTypeId typeId, PkgId pkgId, std::string_view name) const noexcept;
 
-    void store(ResTypeId typeId, ResId resId, ResIdStorage_t &rStorage) noexcept;
+    [[nodiscard]] ResIdOwner_t owner_create(ResTypeId typeId, ResId resId) noexcept;
 
-    void release(ResTypeId typeId, ResIdStorage_t &rStorage) noexcept;
+    void owner_destroy(ResTypeId typeId, ResIdOwner_t&& rOwner) noexcept;
 
     /**
      * @brief Register a datatype to a resource Id
