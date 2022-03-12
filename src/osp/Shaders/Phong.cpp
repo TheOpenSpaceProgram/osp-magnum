@@ -57,12 +57,13 @@ void shader::draw_ent_phong(
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {
-        rShader.bindDiffuseTexture(*rData.m_pDiffuseTexGl->get(ent).m_tex);
-    }
+        Magnum::GL::Texture2D &rTexture = rData.m_pTexGl->get(rData.m_pDiffuseTexId->get(ent));
+        rShader.bindDiffuseTexture(rTexture);
 
-    if (rShader.flags() & (Flag::DiffuseTexture | Flag::AmbientTexture | Flag::AlphaMask))
-    {
-        rShader.bindAmbientTexture(*rData.m_pDiffuseTexGl->get(ent).m_tex);
+        if (rShader.flags() & (Flag::AmbientTexture | Flag::AlphaMask))
+        {
+            rShader.bindAmbientTexture(rTexture);
+        }
     }
 
     if (rData.m_pColor != nullptr)
@@ -71,6 +72,9 @@ void shader::draw_ent_phong(
                                 ? rData.m_pColor->get(ent)
                                 : 0xffffffff_rgbaf);
     }
+
+    MeshGlId const meshId = rData.m_pMeshId->get(ent);
+    Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
     rShader
         .setAmbientColor(0x000000ff_rgbaf)
@@ -81,7 +85,7 @@ void shader::draw_ent_phong(
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(viewProj.m_proj)
         .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
-        .draw(*rData.m_pMeshGl->get(ent).m_mesh);
+        .draw(rMesh);
 }
 
 
@@ -90,7 +94,7 @@ void shader::assign_phong(
         RenderGroup::Storage_t *pStorageOpaque,
         RenderGroup::Storage_t *pStorageTransparent,
         acomp_storage_t<ACompOpaque> const& opaque,
-        acomp_storage_t<ACompTextureGL> const& diffuse,
+        acomp_storage_t<active::TexGlId> const& diffuse,
         ACtxDrawPhong &rData)
 {
 
@@ -106,12 +110,12 @@ void shader::assign_phong(
             if (diffuse.contains(ent))
             {
                 pStorageOpaque->emplace(
-                        ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderDiffuse)} });
+                        ent, EntityToDraw{&draw_ent_phong, {&rData, &rData.m_shaderDiffuse} });
             }
             else
             {
                 pStorageOpaque->emplace(
-                        ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderUntextured)} });
+                        ent, EntityToDraw{&draw_ent_phong, {&rData, &rData.m_shaderUntextured} });
             }
         }
         else
@@ -125,12 +129,12 @@ void shader::assign_phong(
             if (diffuse.contains(ent))
             {
                 pStorageTransparent->emplace(
-                        ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderDiffuse)} });
+                        ent, EntityToDraw{&draw_ent_phong, {&rData, &rData.m_shaderDiffuse} });
             }
             else
             {
                 pStorageTransparent->emplace(
-                        ent, EntityToDraw{&draw_ent_phong, {&rData, &(*rData.m_shaderUntextured)} });
+                        ent, EntityToDraw{&draw_ent_phong, {&rData, &rData.m_shaderUntextured} });
             }
 
         }

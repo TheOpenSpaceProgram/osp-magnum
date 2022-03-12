@@ -32,8 +32,6 @@
 namespace adera::active
 {
 
-struct MaterialPlume { };
-
 struct PlumeEffectData
 {
     float m_flowVelocity;

@@ -36,7 +36,6 @@
 #include <osp/Active/opengl/SysRenderGL.h>
 
 #include <osp/Shaders/Phong.h>
-#include <osp/Shaders/MeshVisualizer.h>
 
 #include <osp/Resource/Package.h>
 
@@ -174,7 +173,7 @@ struct EngineTestRenderer
 
     osp::active::ACtxRenderGroups m_renderGroups{};
 
-    osp::active::ACtxRenderGL m_renderGl{};
+    osp::active::ACtxSceneRenderGL m_renderGl{};
 
     osp::active::ActiveEnt m_camera;
     ACtxCameraController m_camCtrl;
@@ -199,8 +198,6 @@ void render_test_scene(
     using Magnum::GL::FramebufferClear;
     using Magnum::GL::Texture2D;
 
-    osp::Package &rGlResources = rApp.get_gl_resources();
-
     // Assign Phong shader to entities with the gc_mat_common material, and put
     // results into the fwd_opaque render group
     RenderGroup &rGroupFwdOpaque
@@ -208,7 +205,7 @@ void render_test_scene(
     MaterialData const &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
     assign_phong(
             rMatCommon.m_added, &rGroupFwdOpaque.m_entities, nullptr,
-            rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexGl,
+            rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexId,
             rRenderer.m_phong);
     SysRender::assure_draw_transforms(
                 rScene.m_basic.m_hierarchy,
@@ -219,12 +216,12 @@ void render_test_scene(
     // Load any required meshes
     SysRenderGL::compile_meshes(
             rScene.m_drawing.m_mesh, rScene.m_drawing.m_meshDirty,
-            rRenderer.m_renderGl.m_meshGl, rApp.get_gl_resources());
+            rRenderer.m_renderGl.m_meshId, rApp.get_render_gl());
 
     // Load any required textures
     SysRenderGL::compile_textures(
             rScene.m_drawing.m_diffuseTex, rScene.m_drawing.m_diffuseDirty,
-            rRenderer.m_renderGl.m_diffuseTexGl, rApp.get_gl_resources());
+            rRenderer.m_renderGl.m_diffuseTexId, rApp.get_render_gl());
 
     // Calculate hierarchy transforms
     SysRender::update_draw_transforms(
@@ -241,7 +238,7 @@ void render_test_scene(
             rCamera.calculate_projection()};
 
     // Bind offscreen FBO
-    Framebuffer &rFbo = *rGlResources.get<Framebuffer>("offscreen_fbo");
+    Framebuffer &rFbo = rApp.get_render_gl().m_fbo;
     rFbo.bind();
 
     // Clear it
@@ -254,28 +251,8 @@ void render_test_scene(
             rScene.m_drawing.m_visible, viewProj);
 
     // Display FBO
-    Texture2D &rFboColor = *rGlResources.get<Texture2D>("offscreen_fbo_color");
-    SysRenderGL::display_texture(rGlResources, rFboColor);
-}
-
-void load_gl_resources(ActiveApplication& rApp)
-{
-    using osp::shader::Phong;
-    using osp::shader::MeshVisualizer;
-
-    osp::Package &rGlResources = rApp.get_gl_resources();
-
-    // Create Phong shaders
-    auto texturedFlags = Phong::Flag::DiffuseTexture
-                       | Phong::Flag::AlphaMask
-                       | Phong::Flag::AmbientTexture;
-    rGlResources.add<Phong>("textured", Phong{texturedFlags, 2});
-    rGlResources.add<Phong>("notexture", Phong{{}, 2});
-
-    rGlResources.add<MeshVisualizer>(
-            "mesh_vis_shader",
-            MeshVisualizer{ MeshVisualizer::Flag::Wireframe
-                            | MeshVisualizer::Flag::NormalDirection});
+    Texture2D &rFboColor = rApp.get_render_gl().m_texGl.get(rApp.get_render_gl().m_fboColor);
+    SysRenderGL::display_texture(rApp.get_render_gl(), rFboColor);
 }
 
 on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
@@ -283,22 +260,19 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
     using namespace osp::active;
     using namespace osp::shader;
 
-    osp::Package &rGlResources = rApp.get_gl_resources();
-
     // Create renderer data. This uses a shared_ptr to allow being stored
     // inside an std::function, which require copyable types
     std::shared_ptr<EngineTestRenderer> pRenderer
             = std::make_shared<EngineTestRenderer>(rApp);
 
-    // Get or reserve shader resources. These are loaded in load_gl_resources,
-    // which can be called before or after this function
-    pRenderer->m_phong.m_shaderUntextured
-            = rGlResources.get_or_reserve<Phong>("notexture");
-    pRenderer->m_phong.m_shaderDiffuse
-            = rGlResources.get_or_reserve<Phong>("textured");
-
-    // Set component storage pointers, so that they can be accessed by shaders
-    pRenderer->m_phong.assign_pointers(pRenderer->m_renderGl);
+    // Create Phong shaders
+    auto const texturedFlags
+            = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask
+            | Phong::Flag::AmbientTexture;
+    pRenderer->m_phong.m_shaderDiffuse      = Phong{texturedFlags, 2};
+    pRenderer->m_phong.m_shaderUntextured   = Phong{{}, 2};
+    pRenderer->m_phong.assign_pointers(
+            pRenderer->m_renderGl, rApp.get_render_gl());
 
     // Select first camera for rendering
     ActiveEnt const camEnt = rScene.m_basic.m_camera.at(0);

@@ -27,8 +27,6 @@
 
 #include <osp/Active/activetypes.h>  // for ActiveEnt
 
-#include <osp/Resource/Resource.h>   // for DependRes
-
 #include <entt/entity/entity.hpp>    // for null, null_t
 
 namespace osp { namespace active { class ActiveScene; } }
@@ -39,7 +37,7 @@ namespace adera::active
 struct ACompExhaustPlume
 {
     osp::active::ActiveEnt m_parentMCompRocket{entt::null};
-    osp::DependRes<PlumeEffectData> m_effect;
+    PlumeEffectData m_effect;
 
     float m_time{0.0f};
     float m_powerLevel{0.0f};

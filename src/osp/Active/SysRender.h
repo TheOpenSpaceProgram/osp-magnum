@@ -124,11 +124,11 @@ public:
             acomp_storage_t<ACompDrawTransform>& rDrawTf,
             ActiveEnt ent);
 
-    template<typename IT_T>
+    template<typename ITA_T, typename ITB_T>
     static void assure_draw_transforms(
             acomp_storage_t<ACompHierarchy> const& hier,
             acomp_storage_t<ACompDrawTransform>& rDrawTf,
-            IT_T first, IT_T last);
+            ITA_T first, ITB_T last);
 
     /**
      * @brief Update draw ACompDrawTransform according to the hierarchy of
@@ -189,11 +189,11 @@ void SysRender::add_draw_transforms_recurse(
     add_draw_transforms_recurse(hier, rDrawTf, currHier.m_parent);
 }
 
-template<typename IT_T>
+template<typename ITA_T, typename ITB_T>
 void SysRender::assure_draw_transforms(
         acomp_storage_t<ACompHierarchy> const& hier,
         acomp_storage_t<ACompDrawTransform>& rDrawTf,
-        IT_T first, IT_T last)
+        ITA_T first, ITB_T last)
 {
     while (first != last)
     {

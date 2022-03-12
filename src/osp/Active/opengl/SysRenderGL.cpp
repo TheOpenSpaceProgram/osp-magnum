@@ -50,14 +50,16 @@ using Magnum::GL::Mesh;
 using Magnum::GL::Texture2D;
 
 using osp::DependRes;
-using osp::Package;
-using osp::active::SysRenderGL;
 
-void SysRenderGL::setup_context(Package& rGlResources)
+using osp::active::SysRenderGL;
+using osp::active::RenderGL;
+
+using osp::active::TexGlId;
+using osp::active::MeshGlId;
+
+void SysRenderGL::setup_context(RenderGL& rCtxGl)
 {
     using namespace Magnum;
-
-    rGlResources.add<FullscreenTriShader>("fullscreen_tri_shader");
 
     /* Generate fullscreen tri for texture rendering */
     {
@@ -72,53 +74,55 @@ void SysRenderGL::setup_context(Package& rGlResources)
         };
 
         GL::Buffer surface(surfData, GL::BufferUsage::StaticDraw);
-        GL::Mesh surfaceMesh;
-        surfaceMesh
+        rCtxGl.m_fullscreenTri = rCtxGl.m_meshIds.create();
+
+        rCtxGl.m_meshGl.emplace(rCtxGl.m_fullscreenTri)
             .setPrimitive(Magnum::MeshPrimitive::Triangles)
             .setCount(3)
             .addVertexBuffer(std::move(surface), 0,
                 FullscreenTriShader::Position{},
                 FullscreenTriShader::TextureCoordinates{});
-        rGlResources.add<GL::Mesh>("fullscreen_tri", std::move(surfaceMesh));
     }
 
     /* Add an offscreen framebuffer */
     {
-        Vector2i viewSize = GL::defaultFramebuffer.viewport().size();
+        Vector2i const viewSize = GL::defaultFramebuffer.viewport().size();
 
-        DependRes<GL::Texture2D> color = rGlResources.add<GL::Texture2D>("offscreen_fbo_color");
-        color->setStorage(1, GL::TextureFormat::RGB8, viewSize);
+        rCtxGl.m_fboColor = rCtxGl.m_texIds.create();
+        GL::Texture2D &rFboColor = rCtxGl.m_texGl.emplace(rCtxGl.m_fboColor);
+        rFboColor.setStorage(1, GL::TextureFormat::RGB8, viewSize);
 
-        DependRes<GL::Renderbuffer> depthStencil
-                = rGlResources.add<GL::Renderbuffer>("offscreen_fbo_depthStencil");
-        depthStencil->setStorage(GL::RenderbufferFormat::Depth24Stencil8, viewSize);
+        rCtxGl.m_fboDepthStencil = Magnum::GL::Renderbuffer{};
+        rCtxGl.m_fboDepthStencil.setStorage(GL::RenderbufferFormat::Depth24Stencil8, viewSize);
 
-        DependRes<GL::Framebuffer> fbo
-                = rGlResources.add<GL::Framebuffer>("offscreen_fbo", Range2Di{{0, 0}, viewSize});
-        fbo->attachTexture(GL::Framebuffer::ColorAttachment{0}, *color, 0);
-        fbo->attachRenderbuffer(GL::Framebuffer::BufferAttachment::DepthStencil, *depthStencil);
+        rCtxGl.m_fbo = GL::Framebuffer{ Range2Di{{0, 0}, viewSize} };
+        rCtxGl.m_fbo.attachTexture(GL::Framebuffer::ColorAttachment{0}, rFboColor, 0);
+        rCtxGl.m_fbo.attachRenderbuffer(GL::Framebuffer::BufferAttachment::DepthStencil, rCtxGl.m_fboDepthStencil);
     }
 }
 
-DependRes<Mesh> try_compile_mesh(
-        osp::Package& rGlResources, DependRes<MeshData> const& meshData)
+MeshGlId try_compile_mesh(
+        RenderGL& rRenderGl, DependRes<MeshData> const& meshData)
 {
-    DependRes<Mesh> rMeshGlRes = rGlResources.get_or_reserve<Mesh>(meshData.name());
+    auto foundIt = rRenderGl.m_oldResToMesh.find(meshData.name());
 
-    if (rMeshGlRes.reserve_empty())
+    if (foundIt == rRenderGl.m_oldResToMesh.end())
     {
         // Mesh isn't compiled yet, compile it
-        rMeshGlRes.reserve_emplace(Magnum::MeshTools::compile(*meshData));
+        MeshGlId newId = rRenderGl.m_meshIds.create();
+        rRenderGl.m_meshGl.emplace(newId, Magnum::MeshTools::compile(*meshData));
+        rRenderGl.m_oldResToMesh.emplace(meshData.name(), newId);
+        return newId;
     }
 
-    return rMeshGlRes;
+    return foundIt->second;
 }
 
 void SysRenderGL::compile_meshes(
         acomp_storage_t<ACompMesh> const& meshes,
         std::vector<ActiveEnt> const& dirty,
-        acomp_storage_t<ACompMeshGL>& rMeshGl,
-        osp::Package& rGlResources)
+        acomp_storage_t<MeshGlId>& rMeshGl,
+        RenderGL& rRenderGl)
 {
     for (ActiveEnt ent : dirty)
     {
@@ -129,19 +133,19 @@ void SysRenderGL::compile_meshes(
             if (rMeshGl.contains(ent))
             {
                 // Check if ACompMesh changed
-                ACompMeshGL &rEntMeshGl = rMeshGl.get(ent);
+                MeshGlId &rEntMeshGl = rMeshGl.get(ent);
 
-                if (rEntMeshGl.m_mesh.name() != rEntMesh.m_mesh.name())
+                if (rRenderGl.m_oldResToMesh.at(rEntMesh.m_mesh.name()) != rEntMeshGl)
                 {
                     // get new mesh
-                    rEntMeshGl.m_mesh = try_compile_mesh(rGlResources, rEntMesh.m_mesh);
+                    rEntMeshGl = try_compile_mesh(rRenderGl, rEntMesh.m_mesh);
                 }
             }
             else
             {
                 // ACompMeshGL component needed
                 rMeshGl.emplace(
-                        ent, ACompMeshGL{try_compile_mesh(rGlResources, rEntMesh.m_mesh)});
+                        ent, try_compile_mesh(rRenderGl, rEntMesh.m_mesh));
             }
         }
         else
@@ -159,17 +163,18 @@ void SysRenderGL::compile_meshes(
     }
 }
 
-DependRes<Texture2D> try_compile_texture(
-        osp::Package& rGlResources, DependRes<ImageData2D> const& texData)
+TexGlId try_compile_texture(
+        RenderGL& rRenderGl, DependRes<ImageData2D> const& texData)
 {
-    DependRes<Texture2D> rTexGlRes
-            = rGlResources.get_or_reserve<Texture2D>(texData.name());
+    auto foundIt = rRenderGl.m_oldResToTex.find(texData.name());
 
-    if (rTexGlRes.reserve_empty())
+    if (foundIt == rRenderGl.m_oldResToTex.end())
     {
         // Texture isn't compiled yet, compile it
-        Texture2D &rTexGl = rTexGlRes.reserve_emplace();
+        TexGlId newId = rRenderGl.m_texIds.create();
 
+        Texture2D &rTexGl = rRenderGl.m_texGl.emplace(newId);
+        
         using Magnum::GL::SamplerWrapping;
         using Magnum::GL::SamplerFilter;
         using Magnum::GL::textureFormat;
@@ -182,16 +187,17 @@ DependRes<Texture2D> try_compile_texture(
             .setStorage(1, textureFormat((*texData).format()), (*texData).size())
             .setSubImage(0, {}, view);
 
+        return newId;
     }
 
-    return rTexGlRes;
+    return foundIt->second;
 }
 
 void SysRenderGL::compile_textures(
         acomp_storage_t<ACompTexture> const& textures,
         std::vector<ActiveEnt> const& dirty,
-        acomp_storage_t<ACompTextureGL>& rTexGl,
-        osp::Package& rGlResources)
+        acomp_storage_t<TexGlId>& rTexGl,
+        RenderGL& rRenderGl)
 {
     for (ActiveEnt ent : dirty)
     {
@@ -202,19 +208,19 @@ void SysRenderGL::compile_textures(
             if (rTexGl.contains(ent))
             {
                 // Check if ACompTexture changed
-                ACompTextureGL &rEntTexGl = rTexGl.get(ent);
+                TexGlId &rEntTexGl = rTexGl.get(ent);
 
-                if (rEntTexGl.m_tex.name() != rEntTexGl.m_tex.name())
+                if (rRenderGl.m_oldResToTex.at(rEntTex.m_texture.name()) != rEntTexGl)
                 {
                     // get new mesh
-                    rEntTexGl.m_tex = try_compile_texture(rGlResources, rEntTex.m_texture);
+                    rEntTexGl = try_compile_texture(rRenderGl, rEntTex.m_texture);
                 }
             }
             else
             {
                 // ACompMeshGL component needed
-                ACompTextureGL &rEntTexGl = rTexGl.emplace(
-                        ent, ACompTextureGL{try_compile_texture(rGlResources, rEntTex.m_texture)});
+                rTexGl.emplace(
+                        ent, try_compile_texture(rRenderGl, rEntTex.m_texture));
             }
         }
         else
@@ -233,16 +239,12 @@ void SysRenderGL::compile_textures(
 }
 
 void SysRenderGL::display_texture(
-        Package& rGlResources, Magnum::GL::Texture2D& rTex)
+        RenderGL& rRenderGl, Magnum::GL::Texture2D& rTex)
 {
     using Magnum::GL::Renderer;
     using Magnum::GL::Framebuffer;
     using Magnum::GL::FramebufferClear;
     using Magnum::GL::Mesh;
-
-    DependRes<FullscreenTriShader> shader
-            = rGlResources.get<FullscreenTriShader>("fullscreen_tri_shader");
-    DependRes<Mesh> surface = rGlResources.get<Mesh>("fullscreen_tri");
 
     Magnum::GL::defaultFramebuffer.bind();
 
@@ -251,7 +253,9 @@ void SysRenderGL::display_texture(
     Renderer::disable(Renderer::Feature::Blending);
     Renderer::setDepthMask(true);
 
-    shader->display_texure(*surface, rTex);
+    rRenderGl.m_fullscreenTriShader.display_texure(
+            rRenderGl.m_meshGl.get(rRenderGl.m_fullscreenTri),
+            rRenderGl.m_texGl.get(rRenderGl.m_fboColor));
 }
 
 void SysRenderGL::render_opaque(

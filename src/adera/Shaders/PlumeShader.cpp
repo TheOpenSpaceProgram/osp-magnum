@@ -27,16 +27,10 @@
 #include <adera/Plume.h>                  // for PlumeEffectData
 #include <adera/SysExhaustPlume.h>        // for ACompExhaustPlume
 
-#include <osp/Resource/Package.h>         // for Package
-#include <osp/Resource/Resource.h>        // for DependRes
-#include <osp/Resource/AssetImporter.h>   // for AssetImporter
-
 #include <osp/Active/basic.h>             // for ACompCamera
 #include <osp/Active/drawing.h>           // for ACompDrawTransform
 #include <osp/Active/SysRender.h>         // for ACompMesh
 #include <osp/Active/activetypes.h>       // for basic_sparse_set, ActiveEnt
-
-#include <osp/Resource/PackageRegistry.h> // for PackageRegistry
 
 #include <Magnum/GL/Shader.h>             // for Shader, Shader::Type
 #include <Magnum/GL/Texture.h>            // for Texture2D
@@ -79,14 +73,16 @@ void PlumeShader::draw_plume(
     // Collect uniform data
     ACompDrawTransform const &drawTf    = rData.m_pDrawTf->get(ent);
     ACompExhaustPlume const &comp       = rData.m_pExaustPlumes->get(ent);
-    PlumeEffectData const &effect       = *comp.m_effect;
-    Magnum::GL::Mesh &rMesh             = *rData.m_pMesh->get(ent).m_mesh;
+    PlumeEffectData const &effect       = comp.m_effect;
+    MeshGlId const meshId               = rData.m_pMeshId->get(ent);
+    Magnum::GL::Mesh &rMesh             = rData.m_pMeshGl->get(meshId);
+    Magnum::GL::Texture2D &rTmpTex      = rData.m_pTexGl->get(rData.m_tmpTex);
 
     Magnum::Matrix4 entRelative = viewProj.m_view * drawTf.m_transformWorld;
 
     rData.m_shader
-        .bindNozzleNoiseTexture     (*rData.m_tmpTex)
-        .bindCombustionNoiseTexture (*rData.m_tmpTex)
+        .bindNozzleNoiseTexture     (rTmpTex)
+        .bindCombustionNoiseTexture (rTmpTex)
         .setMeshZBounds             (effect.m_zMax, effect.m_zMin)
         .setBaseColor               (effect.m_color)
         .setFlowVelocity            (effect.m_flowVelocity)

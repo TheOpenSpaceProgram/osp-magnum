@@ -42,19 +42,29 @@ using Phong = Magnum::Shaders::PhongGL;
 struct ACtxDrawPhong
 {
 
-    DependRes<Phong> m_shaderUntextured;
-    DependRes<Phong> m_shaderDiffuse;
+    Phong m_shaderUntextured{Corrade::NoCreate};
+    Phong m_shaderDiffuse{Corrade::NoCreate};
 
     active::acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf{nullptr};
     active::acomp_storage_t<active::ACompColor>         *m_pColor{nullptr};
-    active::acomp_storage_t<active::ACompTextureGL>     *m_pDiffuseTexGl{nullptr};
-    active::acomp_storage_t<active::ACompMeshGL>        *m_pMeshGl{nullptr};
 
-    constexpr void assign_pointers(active::ACtxRenderGL& rCtxRenderGl) noexcept
+    osp::active::acomp_storage_t<osp::active::TexGlId>  *m_pDiffuseTexId{nullptr};
+    osp::active::TexGlStorage_t                         *m_pTexGl{nullptr};
+
+    osp::active::acomp_storage_t<osp::active::MeshGlId> *m_pMeshId{nullptr};
+    osp::active::MeshGlStorage_t                        *m_pMeshGl{nullptr};
+
+    constexpr void assign_pointers(active::ACtxSceneRenderGL& rCtxScnGl,
+                                   active::RenderGL& rRenderGl) noexcept
     {
-        m_pDrawTf       = &rCtxRenderGl.m_drawTransform;
-        m_pDiffuseTexGl = &rCtxRenderGl.m_diffuseTexGl;
-        m_pMeshGl       = &rCtxRenderGl.m_meshGl;
+        m_pDrawTf       = &rCtxScnGl.m_drawTransform;
+        // TODO: ACompColor
+
+        m_pDiffuseTexId = &rCtxScnGl.m_diffuseTexId;
+        m_pTexGl        = &rRenderGl.m_texGl;
+
+        m_pMeshId       = &rCtxScnGl.m_meshId;
+        m_pMeshGl       = &rRenderGl.m_meshGl;
     }
 };
 
@@ -70,8 +80,8 @@ void draw_ent_phong(
  * @param entities              [in] Entities to consider
  * @param pStorageOpaque        [out] Optional RenderGroup storage for opaque
  * @param pStorageTransparent   [out] Optional RenderGroup storage for transparent
- * @param opaque            [in] Storage for opaque component
- * @param diffuse           [in] Storage for diffuse texture component
+ * @param opaque                [in] Storage for opaque component
+ * @param diffuse               [in] Storage for diffuse texture component
  * @param rData                 [in] Phong shader data, stable memory required
  */
 void assign_phong(
@@ -79,7 +89,7 @@ void assign_phong(
         active::RenderGroup::Storage_t *pStorageOpaque,
         active::RenderGroup::Storage_t *pStorageTransparent,
         active::acomp_storage_t<active::ACompOpaque> const& opaque,
-        active::acomp_storage_t<active::ACompTextureGL> const& diffuse,
+        active::acomp_storage_t<active::TexGlId> const& diffuse,
         ACtxDrawPhong &rData);
 
 
