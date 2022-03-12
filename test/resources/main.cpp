@@ -38,7 +38,7 @@ Resources setup_basic()
     Resources res;
 
     // Size needed to fit all stock IDs in osp::restypes
-    res.resize_types(gc_resTypeCount);
+    res.resize_types(resource_type_count());
 
     res.data_register<ImageData>    (restypes::gc_image);
 
@@ -103,11 +103,11 @@ TEST(Resources, RefCounting)
         PkgId pkgA = res.pkg_create();
 
         ResId id = res.create(restypes::gc_image, pkgA, "Image0");
-        ResIdStorage_t storage;
+        ResIdOwner_t storage;
         EXPECT_FALSE(storage.has_value());
-        res.store(restypes::gc_image, id, storage);
+        storage = res.owner_create(restypes::gc_image, id);
         EXPECT_TRUE(storage.has_value());
-        res.release(restypes::gc_image, storage);
+        res.owner_destroy(restypes::gc_image, std::move(storage));
         EXPECT_FALSE(storage.has_value());
     }
 
@@ -115,28 +115,27 @@ TEST(Resources, RefCounting)
         GTEST_SKIP(); // following death tests use asserts
     #endif
 
-    // Destruct ResIdStorage_t while it holds a value
+    // Destruct ResIdOwner_t while it holds a value
     EXPECT_DEATH({
         Resources res = setup_basic();
         PkgId pkgA = res.pkg_create();
 
         ResId id = res.create(restypes::gc_image, pkgA, "Image0");
         {
-            ResIdStorage_t storage;
-            res.store(restypes::gc_image, id, storage);
+            ResIdOwner_t storage = res.owner_create(restypes::gc_image, id);
         }
     }, "has_value\\(\\)");
 
     // Destruct Resources with non-zero reference counts
     EXPECT_DEATH({
-        ResIdStorage_t storage;
+        ResIdOwner_t storage;
 
         {
             Resources res = setup_basic();
             PkgId pkgA = res.pkg_create();
             ResId id = res.create(restypes::gc_image, pkgA, "Image0");
 
-            res.store(restypes::gc_image, id, storage);
+            storage = res.owner_create(restypes::gc_image, id);
         }
     }, "only_zeros_remaining\\(0\\)");
 
