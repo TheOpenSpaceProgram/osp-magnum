@@ -27,17 +27,15 @@
 #include "activetypes.h"
 #include "basic.h"
 #include "../types.h"
+#include "../id_map.h"
 
-#include "../Resource/Resource.h"
+#include "../Resource/resourcetypes.h"
 
-#include <Corrade/Containers/ArrayView.h>
-#include <entt/core/family.hpp>
-
+#include <Magnum/Magnum.h>
 #include <Magnum/Math/Color.h>
 
-// MSVC freaks out if these are forward declared
-#include <Magnum/Trade/ImageData.h>
-#include <Magnum/Trade/MeshData.h>
+#include <longeron/id_management/registry.hpp>
+#include <longeron/id_management/refcount.hpp>
 
 #include <functional>
 #include <unordered_map>
@@ -75,20 +73,14 @@ struct ACompDrawTransform
  *
  * The renderer will synchronize this component with a GPU resource
  */
-struct ACompMesh
-{
-    osp::DependRes<Magnum::Trade::MeshData> m_mesh;
-};
+enum class MeshId : uint32_t { };
 
 /**
  * @brief Texture component that describes the appearance of an entity
  *
  * The renderer will synchronize this component with a GPU resource
  */
-struct ACompTexture
-{
-    osp::DependRes<Magnum::Trade::ImageData2D> m_texture;
-};
+enum class TexId : uint32_t { };
 
 struct ACompColor : Magnum::Color4 {};
 
@@ -100,24 +92,51 @@ struct MaterialData
 };
 
 /**
- * @brief Storage for Drawing components
+ * @brief Mesh Ids, texture Ids, and storage for drawing-related components
  */
 struct ACtxDrawing
 {
+    // Drawing Components
     acomp_storage_t<ACompOpaque>            m_opaque;
     acomp_storage_t<ACompTransparent>       m_transparent;
     acomp_storage_t<ACompVisible>           m_visible;
     acomp_storage_t<ACompColor>             m_color;
 
-    acomp_storage_t<ACompMesh>              m_mesh;
-    std::vector<osp::active::ActiveEnt>     m_meshDirty;
+    // Data needed by each unique material Id: assigned entities and
+    // added/removed queues. Access with m_materials[material ID]
+    std::vector<MaterialData>               m_materials;
 
-    acomp_storage_t<ACompTexture>           m_diffuseTex;
+    // Scene-space Meshes
+    lgrn::IdRegistry<MeshId>                m_meshIds;
+    lgrn::IdRefCount<MeshId>                m_meshRefCounts;
+
+    // Scene-space Textures
+    lgrn::IdRegistry<TexId>                 m_texIds;
+    lgrn::IdRefCount<TexId>                 m_texRefCounts;
+
+    // Meshes and textures assigned to ActiveEnts
+    acomp_storage_t<TexId>                  m_diffuseTex;
     std::vector<osp::active::ActiveEnt>     m_diffuseDirty;
 
-    // Access with m_materials[material ID]
-    std::vector<MaterialData>               m_materials;
+    acomp_storage_t<MeshId>                 m_mesh;
+    std::vector<osp::active::ActiveEnt>     m_meshDirty;
 };
+
+/**
+ * @brief Associates mesh/texture resources Ids from ACtxDrawing with Resources
+ */
+struct ACtxDrawingRes
+{
+    // Associate Texture Ids with resources
+    IdMap_t<ResId, TexId>                   m_resToTex;
+    IdMap_t<TexId, ResIdOwner_t>            m_texToRes;
+
+    // Associate Mesh Ids with resources
+    IdMap_t<ResId, MeshId>                  m_resToMesh;
+    IdMap_t<MeshId, ResIdOwner_t>           m_meshToRes;
+};
+
+//
 
 } // namespace osp::active
 
