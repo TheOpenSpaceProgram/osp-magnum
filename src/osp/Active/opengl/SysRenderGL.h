@@ -25,12 +25,16 @@
 #pragma once
 
 #include "../SysRender.h"
+#include "../../id_map.h"
 #include "../../Shaders/FullscreenTriShader.h"
 
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
 #include <Magnum/GL/Framebuffer.h>
 #include <Magnum/GL/Renderbuffer.h>
+
+#include <Magnum/Trade/MeshData.h>
+#include <Magnum/Trade/ImageData.h>
 
 #include <longeron/id_management/registry.hpp>
 
@@ -44,36 +48,52 @@ using TexGlStorage_t    = entt::basic_storage<TexGlId, Magnum::GL::Texture2D>;
 using MeshGlStorage_t   = entt::basic_storage<MeshGlId, Magnum::GL::Mesh>;
 
 /**
- * @brief Essential GL resources
+ * @brief Main renderer state and essential GL resources
  *
  * This may be shared between scenes
  */
 struct RenderGL
 {
+
     // Fullscreen Triangle
-    MeshGlId            m_fullscreenTri;
-    FullscreenTriShader m_fullscreenTriShader;
+    MeshGlId                            m_fullscreenTri;
+    FullscreenTriShader                 m_fullscreenTriShader;
 
     // Offscreen Framebuffer
-    TexGlId                     m_fboColor;
-    Magnum::GL::Renderbuffer    m_fboDepthStencil{Corrade::NoCreate};
-    Magnum::GL::Framebuffer     m_fbo{Corrade::NoCreate};
+    TexGlId                             m_fboColor;
+    Magnum::GL::Renderbuffer            m_fboDepthStencil{Corrade::NoCreate};
+    Magnum::GL::Framebuffer             m_fbo{Corrade::NoCreate};
 
-    // Addressable Textures
-    lgrn::IdRegistry<TexGlId>   m_texIds;
-    TexGlStorage_t              m_texGl;
+    // Renderer-space GL Textures
+    lgrn::IdRegistry<TexGlId>           m_texIds;
+    TexGlStorage_t                      m_texGl;
 
-    // Addressable Meshes
-    lgrn::IdRegistry<MeshGlId>  m_meshIds;
-    MeshGlStorage_t             m_meshGl;
+    // Renderer-space GL Meshes
+    lgrn::IdRegistry<MeshGlId>          m_meshIds;
+    MeshGlStorage_t                     m_meshGl;
 
-    // Meshes and textures associated with new Resources (in other PR)
-    //std::unordered_map<ResId, TexGlId>  m_resToTex;
-    //std::unordered_map<ResId, MeshGlId> m_resToMesh;
 
-    // TEMPORARY!!!  Meshes and textures associated with Packages
-    std::unordered_map<std::string, TexGlId>  m_oldResToTex;
-    std::unordered_map<std::string, MeshGlId> m_oldResToMesh;
+
+    // Associate GL Texture Ids with resources
+    IdMap_t<ResId, TexGlId>             m_resToTex;
+    IdMap_t<TexGlId, ResIdOwner_t>      m_texToRes;
+
+    // Associate GL Mesh Ids with resources
+    IdMap_t<ResId, MeshGlId>            m_resToMesh;
+    IdMap_t<MeshGlId, ResIdOwner_t>     m_meshToRes;
+
+};
+
+struct ACompTexGl
+{
+    TexId       m_scnId     {lgrn::id_null<TexId>()};
+    TexGlId     m_glId      {lgrn::id_null<TexGlId>()};
+};
+
+struct ACompMeshGl
+{
+    MeshId      m_scnId     {lgrn::id_null<MeshId>()};
+    MeshGlId    m_glId      {lgrn::id_null<MeshGlId>()};
 };
 
 /**
@@ -81,8 +101,8 @@ struct RenderGL
  */
 struct ACtxSceneRenderGL
 {
-    acomp_storage_t<MeshGlId>               m_meshId;
-    acomp_storage_t<TexGlId>                m_diffuseTexId;
+    acomp_storage_t<ACompMeshGl>            m_meshId;
+    acomp_storage_t<ACompTexGl>             m_diffuseTexId;
     acomp_storage_t<ACompDrawTransform>     m_drawTransform;
 };
 
@@ -99,49 +119,62 @@ public:
      *
      * This sets up an offscreen framebuffer and a fullscreen triangle
      *
-     * @param rRenderGl [ref]
+     * @param rRenderGl [ref] Fresh default-constructed renderer state
      */
     static void setup_context(RenderGL& rRenderGl);
 
     /**
      * @brief Display a fullscreen texture to the default framebuffer
      *
-     * @param rGlResources  [ref] GL resources containing fullscreen triangle
-     * @param rTex          [in] Texture to display
+     * @param rRenderGl [ref] Renderer state including fullscreen triangle
+     * @param rTex      [in] Texture to display
      */
     static void display_texture(
             RenderGL& rRenderGl, Magnum::GL::Texture2D& rTex);
 
     /**
-     * @brief Compile and assign GPU mesh components to entities with mesh
-     *        data components
+     * @brief Compile required meshes and textures resources used by a scene
      *
-     * Entities with an ACompMesh will be synchronized with an ACompMeshGL
-     *
-     * @param meshes        [in] Storage for generic mesh components
-     * @param dirty         [in] Vector of entities that have updated meshes
-     * @param rMeshGl       [ref] Storage for GL mesh components
-     * @param rGlResources  [out] Package to store newly compiled meshes
+     * @param rCtxDrawRes   [in] Resources used by the scene
+     * @param rResources    [ref] Application Resources shared with the scene.
+     *                            New resource owners may be created.
+     * @param rRenderGl     [ref] Renderer state
      */
-    static void compile_meshes(
-            acomp_storage_t<ACompMesh> const& meshes,
-            std::vector<ActiveEnt> const& dirty,
-            acomp_storage_t<MeshGlId>& rMeshGl,
+    static void sync_scene_resources(
+            ACtxDrawingRes const& rCtxDrawRes,
+            Resources& rResources,
             RenderGL& rRenderGl);
 
     /**
-     * @brief Compile and assign GPU texture components to entities with
-     *        texture data components
+     * @brief Synchronize entities with a MeshId component to an ACompMeshGl
      *
-     * @param textures      [in] Storage for generic texture data components
-     * @param dirty         [in] Vector of entities that have updated textures
-     * @param rTexGl        [ref] Storage for GL texture components
-     * @param rGlResources  [out] Package to store newly compiled textures
+     * @param cmpMeshIds    [in] Scene Mesh Id component
+     * @param meshToRes     [in] Scene's Mesh Id to Resource Id
+     * @param entsDirty     [in] Entities to synchronize
+     * @param rCmpMeshGl    [ref] Renderer-side ACompMeshGl components
+     * @param rRenderGl     [ref] Renderer state
      */
-    static void compile_textures(
-            acomp_storage_t<ACompTexture> const& textures,
-            std::vector<ActiveEnt> const& dirty,
-            acomp_storage_t<TexGlId>& rTexGl,
+    static void assign_meshes(
+            acomp_storage_t<MeshId> const& cmpMeshIds,
+            IdMap_t<MeshId, ResIdOwner_t> const& meshToRes,
+            std::vector<ActiveEnt> const& entsDirty,
+            acomp_storage_t<ACompMeshGl>& rCmpMeshGl,
+            RenderGL& rRenderGl);
+
+    /**
+     * @brief Synchronize entities with a TexId component to an ACompTexGl
+     *
+     * @param cmpTexIds     [in] Scene Texture Id component
+     * @param meshToRes     [in] Scene's Texture Id to Resource Id
+     * @param entsDirty     [in] Entities to synchronize
+     * @param rCmpTexGl     [ref] Renderer-side ACompTexGl components
+     * @param rRenderGl     [ref] Renderer state
+     */
+    static void assign_textures(
+            acomp_storage_t<TexId> const& cmpTexIds,
+            IdMap_t<TexId, ResIdOwner_t> const& texToRes,
+            std::vector<ActiveEnt> const& entsDirty,
+            acomp_storage_t<ACompTexGl>& rCmpTexGl,
             RenderGL& rRenderGl);
 
     /**
