@@ -49,7 +49,8 @@ void shader::draw_ent_flat(
 
     if (rShader.flags() & Flag::Textured)
     {
-        rShader.bindTexture(rData.m_pTexGl->get(rData.m_pDiffuseTexId->get(ent)));
+        TexGlId const texGlId = rData.m_pDiffuseTexId->get(ent).m_glId;
+        rShader.bindTexture(rData.m_pTexGl->get(texGlId));
     }
 
     if (rData.m_pColor != nullptr)
@@ -59,7 +60,7 @@ void shader::draw_ent_flat(
                          : 0xffffffff_rgbaf);
     }
 
-    MeshGlId const meshId = rData.m_pMeshId->get(ent);
+    MeshGlId const meshId = rData.m_pMeshId->get(ent).m_glId;
     Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
     rShader
@@ -73,7 +74,7 @@ void shader::assign_flat(
         RenderGroup::Storage_t *pStorageOpaque,
         RenderGroup::Storage_t *pStorageTransparent,
         acomp_storage_t<active::ACompOpaque> const& opaque,
-        acomp_storage_t<active::TexGlId> const& diffuse,
+        acomp_storage_t<active::ACompTexGl> const& diffuse,
         ACtxDrawFlat &rData)
 {
 
@@ -89,12 +90,12 @@ void shader::assign_flat(
             if (diffuse.contains(ent))
             {
                 pStorageOpaque->emplace(
-                        ent, EntityToDraw{&draw_ent_flat, {&rData, &(*rData.m_shaderDiffuse)} });
+                        ent, EntityToDraw{&draw_ent_flat, {&rData, &rData.m_shaderDiffuse} });
             }
             else
             {
                 pStorageOpaque->emplace(
-                        ent, EntityToDraw{&draw_ent_flat, {&rData, &(*rData.m_shaderUntextured)} });
+                        ent, EntityToDraw{&draw_ent_flat, {&rData, &rData.m_shaderUntextured} });
             }
         }
         else
@@ -108,12 +109,12 @@ void shader::assign_flat(
             if (diffuse.contains(ent))
             {
                 pStorageTransparent->emplace(
-                        ent, EntityToDraw{&draw_ent_flat, {&rData, &(*rData.m_shaderDiffuse)} });
+                        ent, EntityToDraw{&draw_ent_flat, {&rData, &rData.m_shaderDiffuse} });
             }
             else
             {
                 pStorageTransparent->emplace(
-                        ent, EntityToDraw{&draw_ent_flat, {&rData, &(*rData.m_shaderUntextured)} });
+                        ent, EntityToDraw{&draw_ent_flat, {&rData, &rData.m_shaderUntextured} });
             }
 
         }

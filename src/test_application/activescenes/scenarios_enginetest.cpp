@@ -37,7 +37,7 @@
 
 #include <osp/Shaders/Phong.h>
 
-#include <osp/Resource/Package.h>
+#include <osp/Resource/resources.h>
 
 #include <longeron/id_management/registry.hpp>
 
@@ -69,26 +69,46 @@ constexpr int const gc_maxMaterials = 2;
  */
 struct EngineTestScene
 {
+    ~EngineTestScene()
+    {
+        osp::active::SysRender::clear_owners(m_drawing);
+        osp::active::SysRender::clear_resource_owners(m_drawing, m_drawingRes, *m_pResources);
+        m_drawing.m_meshRefCounts.ref_release(m_meshCube);
+    }
+
+    osp::Resources *m_pResources;
+
     // ID registry generates entity IDs, and keeps track of which ones exist
     lgrn::IdRegistry<osp::active::ActiveEnt> m_activeIds;
 
     // Components and supporting data structures
     osp::active::ACtxBasic          m_basic;    
     osp::active::ACtxDrawing        m_drawing;
+    osp::active::ACtxDrawingRes     m_drawingRes;
 
     // Hierarchy root, needs to exist so all hierarchy entities are connected
     osp::active::ActiveEnt          m_hierRoot;
 
     // The rotating cube
     osp::active::ActiveEnt          m_cube;
+
+    osp::active::MeshIdOwner_t      m_meshCube;
 };
 
-entt::any setup_scene(osp::Package &rPkg)
+entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
 {
     using namespace osp::active;
 
     entt::any sceneAny = entt::make_any<EngineTestScene>();
     EngineTestScene &rScene = entt::any_cast<EngineTestScene&>(sceneAny);
+
+    rScene.m_pResources = &rResources;
+
+    // Take ownership of cube mesh
+    osp::ResId const resCube = rResources.find(osp::restypes::gc_mesh, pkg, "cube");
+    assert(resCube != lgrn::id_null<osp::ResId>());
+    MeshId const meshCube = SysRender::own_mesh_resource(rScene.m_drawing, rScene.m_drawingRes, rResources, resCube);
+    rScene.m_meshCube = rScene.m_drawing.m_meshRefCounts.ref_add(meshCube);
 
     // Allocate space to fit all materials
     rScene.m_drawing.m_materials.resize(gc_maxMaterials);
@@ -119,7 +139,7 @@ entt::any setup_scene(osp::Package &rPkg)
 
     // Add cube mesh to cube
     rScene.m_drawing.m_mesh.emplace(
-            rScene.m_cube, ACompMesh{ rPkg.get<MeshData>("cube") });
+            rScene.m_cube, rScene.m_drawing.m_meshRefCounts.ref_add(rScene.m_meshCube));
     rScene.m_drawing.m_meshDirty.push_back(rScene.m_cube);
 
     // Add common material to cube
@@ -213,14 +233,16 @@ void render_test_scene(
                 std::cbegin(rMatCommon.m_added),
                 std::cend(rMatCommon.m_added));
 
+    SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rApp.get_render_gl());
+
     // Load any required meshes
-    SysRenderGL::compile_meshes(
-            rScene.m_drawing.m_mesh, rScene.m_drawing.m_meshDirty,
+    SysRenderGL::assign_meshes(
+            rScene.m_drawing.m_mesh, rScene.m_drawingRes.m_meshToRes, rScene.m_drawing.m_meshDirty,
             rRenderer.m_renderGl.m_meshId, rApp.get_render_gl());
 
     // Load any required textures
-    SysRenderGL::compile_textures(
-            rScene.m_drawing.m_diffuseTex, rScene.m_drawing.m_diffuseDirty,
+    SysRenderGL::assign_textures(
+            rScene.m_drawing.m_diffuseTex, rScene.m_drawingRes.m_texToRes, rScene.m_drawing.m_diffuseDirty,
             rRenderer.m_renderGl.m_diffuseTexId, rApp.get_render_gl());
 
     // Calculate hierarchy transforms

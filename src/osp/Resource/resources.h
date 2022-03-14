@@ -219,7 +219,7 @@ T& Resources::data_add(ResTypeId typeId, ResId resId, ARGS_T&& ... args)
     PerResType &rPerResType = get_type(typeId);
 
     // Ensure resource ID exists
-    assert(rPerResType.m_resIds.capacity() > std::size_t(typeId));
+    assert(rPerResType.m_resIds.capacity() > std::size_t(resId));
     assert(rPerResType.m_resIds.exists(resId));
 
     res_container_t<T> &rContainer = get_container<T>(rPerResType, typeId);

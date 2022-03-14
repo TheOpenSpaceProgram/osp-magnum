@@ -26,7 +26,7 @@
 
 #include <entt/core/any.hpp>
 
-#include <osp/Resource/Package.h>
+#include <osp/Resource/resourcetypes.h>
 
 #include <functional>
 
@@ -69,11 +69,12 @@ struct EngineTestScene;
 /**
  * @brief Setup Engine Test Scene
  *
- * @param rPkg [in] Package containing cube mesh used by test scene
+ * @param rResources    [ref] Application Resources containing cube mesh
+ * @param pkg           [in] Package Id the cube mesh is under
  *
  * @return entt::any containing scene data
  */
-entt::any setup_scene(osp::Package &rPkg);
+entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
 
 /**
  * @brief Generate ActiveApplication draw function
@@ -100,11 +101,12 @@ struct PhysicsTestScene;
 /**
  * @brief Setup Physics Test Scene
  *
- * @param rPkg [in]
+ * @param rResources    [ref] Application Resources containing mesh primatives
+ * @param pkg           [in] Package Id the mesh primatives are under
  *
  * @return entt::any containing scene data
  */
-entt::any setup_scene(osp::Package &rPkg);
+entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
 
 /**
  * @brief Generate ActiveApplication draw function

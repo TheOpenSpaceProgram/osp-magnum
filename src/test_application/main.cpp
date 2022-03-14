@@ -34,6 +34,7 @@
 #include "universes/planets.h"
 
 #include <osp/Resource/AssetImporter.h>
+#include <osp/Resource/resources.h>
 #include <osp/string_concat.h>
 #include <osp/logging.h>
 
@@ -89,8 +90,9 @@ bool destroy_universe();
 void debug_print_help();
 void debug_print_resources();
 
-// Stores loaded resources in packages.
-osp::PackageRegistry g_packages;
+// Stores loaded resources
+osp::Resources g_resources;
+osp::PkgId g_defaultPkg;
 
 // Test application supports 1 Active Scene
 entt::any g_activeScene;
@@ -119,10 +121,11 @@ struct Option
 
 std::unordered_map<std::string_view, Option> const g_scenes
 {
+
     {"enginetest", {"Demonstrate basic game engine functionality", [] {
 
         using namespace enginetest;
-        g_activeScene = setup_scene(g_packages.find("lzdb"));
+        g_activeScene = setup_scene(g_resources, g_defaultPkg);
 
         g_appSetup = [] (ActiveApplication& rApp)
         {
@@ -130,7 +133,9 @@ std::unordered_map<std::string_view, Option> const g_scenes
                     = entt::any_cast<EngineTestScene&>(g_activeScene);
             rApp.set_on_draw(generate_draw_func(rScene, rApp));
         };
-    }}},
+    }}}
+#if 0
+    ,
     {"physicstest", {"Physics lol", [] {
 
         using namespace physicstest;
@@ -143,6 +148,7 @@ std::unordered_map<std::string_view, Option> const g_scenes
             rApp.set_on_draw(generate_draw_func(rScene, rApp));
         };
     }}}
+#endif
 };
 
 int main(int argc, char** argv)
@@ -300,6 +306,8 @@ void start_magnum_async()
 
         OSP_LOG_INFO("Closed Magnum Application");
 
+        osp::active::SysRenderGL::clear_resource_owners(g_activeApplication->get_render_gl(), g_resources);
+
         g_activeApplication.reset();
 
     });
@@ -317,40 +325,25 @@ bool destroy_universe()
 
     g_universeScene.reset();
 
-    // Destroy blueprints as part of destroying all vehicles
-    g_packages.find("lzdb").clear<osp::BlueprintVehicle>();
-
     OSP_LOG_INFO("explosion* Universe destroyed!");
 
     return true;
 }
 
-// TODO: move this somewhere else
-template<typename MACH_T>
-constexpr void register_machine(osp::Package &rPkg)
-{
-    rPkg.add<osp::RegisteredMachine>(std::string(MACH_T::smc_mach_name),
-                                     osp::mach_id<MACH_T>());
-}
-
-// TODO: move this somewhere else
-template<typename WIRETYPE_T>
-constexpr void register_wiretype(osp::Package &rPkg)
-{
-    rPkg.add<osp::RegisteredWiretype>(std::string(WIRETYPE_T::smc_wire_name),
-                                      osp::wiretype_id<WIRETYPE_T>());
-}
-
-
 
 void load_a_bunch_of_stuff()
 {
-    // Create a new package
-    osp::Package &rDebugPack = g_packages.create("lzdb");
+    using namespace osp::restypes;
+    using namespace Magnum;
+    using Primitives::CylinderFlag;
+
+    g_resources.resize_types(osp::resource_type_count());
+    g_resources.data_register<Trade::MeshData>(gc_mesh);
+    g_defaultPkg = g_resources.pkg_create();
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};
-    const std::vector<std::string_view> meshes = 
+    const std::vector<std::string_view> meshes =
     {
         "spamcan.sturdy.gltf",
         "stomper.sturdy.gltf",
@@ -361,47 +354,27 @@ void load_a_bunch_of_stuff()
         "ph_rcs.sturdy.gltf",
         "ph_rcs_plume.sturdy.gltf"
     };
-    for (auto meshName : meshes)
-    {
-        osp::AssetImporter::load_sturdy_file(
-            osp::string_concat(datapath, meshName), rDebugPack, rDebugPack);
-    }
 
-    // Load noise textures
-    const std::string noise256 = "noise256";
-    const std::string noise1024 = "noise1024";
-    const std::string n256path = osp::string_concat(datapath, noise256, ".png");
-    const std::string n1024path = osp::string_concat(datapath, noise1024, ".png");
+    // TODO: Make new gltf loader. This will read gltf files and dump meshes,
+    //       images, textures, and other relevant data into osp::Resources
+//    for (auto meshName : meshes)
+//    {
+//        osp::AssetImporter::load_sturdy_file(
+//            osp::string_concat(datapath, meshName), rDebugPack, rDebugPack);
+//    }
 
-    osp::AssetImporter::load_image(n256path, rDebugPack);
-    osp::AssetImporter::load_image(n1024path, rDebugPack);
-
-    // Load placeholder fuel type
-    using adera::active::machines::ShipResourceType;
-    ShipResourceType fuel
-    {
-        "fuel",        // identifier
-        "Rocket fuel", // display name
-        1 << 16,       // quanta per unit
-        1.0f,          // volume per unit (m^3)
-        1000.0f,       // mass per unit (kg)
-        1000.0f        // density (kg/m^3)
-    };
-
-    rDebugPack.add<ShipResourceType>("fuel", std::move(fuel));
-
-    using namespace Magnum;
-    using Primitives::CylinderFlag;
 
     // Add a default primitives
-    rDebugPack.add<Trade::MeshData>("cube", Primitives::cubeSolid());
-    rDebugPack.add<Trade::MeshData>("sphere", Primitives::icosphereSolid(2));
-    rDebugPack.add<Trade::MeshData>(
-            "cylinder",
-            Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds));
+    auto add_mesh_quick = [] (std::string_view name, Trade::MeshData&& data)
+    {
+        osp::ResId const meshId = g_resources.create(gc_mesh, g_defaultPkg, name);
+        g_resources.data_add<Trade::MeshData>(gc_mesh, meshId, std::forward<Trade::MeshData>(data));
+    };
 
-    // Add grids
-    rDebugPack.add<Trade::MeshData>("grid64", Primitives::grid3DSolid({64, 64}));
+    add_mesh_quick("cube", Primitives::cubeSolid());
+    add_mesh_quick("sphere", Primitives::icosphereSolid(2));
+    add_mesh_quick("cylinder", Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds));
+    add_mesh_quick("grid64solid", Primitives::grid3DSolid({63, 63}));
 
     OSP_LOG_INFO("Resource loading complete");
 }
@@ -463,10 +436,8 @@ void debug_print_package(osp::Package const& rPkg, osp::ResPrefix_t const& prefi
 
 void debug_print_resources()
 {
-    for (auto const& [prefix, pkg] : g_packages.get_map())
-    {
-        debug_print_package(pkg, prefix);
-    }
+    // TODO: Add features to list resources in osp::Resources
+    std::cout << "Not yet implemented!\n";
 }
 
 

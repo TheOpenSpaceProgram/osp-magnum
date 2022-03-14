@@ -64,7 +64,7 @@ void shader::draw_ent_visualizer(
         Magnum::GL::Renderer::setDepthMask(false);
     }
 
-    MeshGlId const meshId = rData.m_pMeshId->get(ent);
+    MeshGlId const meshId = rData.m_pMeshId->get(ent).m_glId;
     Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
     rShader

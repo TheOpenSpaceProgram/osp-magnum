@@ -27,6 +27,10 @@
 
 #include "../../Shaders/FullscreenTriShader.h"
 
+#include "../../Resource/resources.h"
+
+#include "../../logging.h"
+
 #include <Magnum/ImageView.h>
 
 #include <Magnum/GL/Buffer.h>
@@ -49,7 +53,7 @@ using Magnum::Trade::ImageData2D;
 using Magnum::GL::Mesh;
 using Magnum::GL::Texture2D;
 
-using osp::DependRes;
+using osp::ResId;
 
 using osp::active::SysRenderGL;
 using osp::active::RenderGL;
@@ -101,59 +105,112 @@ void SysRenderGL::setup_context(RenderGL& rCtxGl)
     }
 }
 
-MeshGlId try_compile_mesh(
-        RenderGL& rRenderGl, DependRes<MeshData> const& meshData)
+void SysRenderGL::sync_scene_resources(
+        const ACtxDrawingRes &rCtxDrawRes,
+        Resources &rResources,
+        RenderGL &rRenderGl)
 {
-    auto foundIt = rRenderGl.m_oldResToMesh.find(meshData.name());
+    // TODO: Eventually have dirty flags instead of checking every entry.
 
-    if (foundIt == rRenderGl.m_oldResToMesh.end())
+    // Compile required texture resources
+    for (auto const & [_, scnOwner] : rCtxDrawRes.m_texToRes)
     {
-        // Mesh isn't compiled yet, compile it
-        MeshGlId newId = rRenderGl.m_meshIds.create();
-        rRenderGl.m_meshGl.emplace(newId, Magnum::MeshTools::compile(*meshData));
-        rRenderGl.m_oldResToMesh.emplace(meshData.name(), newId);
-        return newId;
+        ResId const texRes = scnOwner.value();
+
+        // New element will be emplaced if it isn't present yet
+        auto const [it, success] = rRenderGl.m_resToTex.try_emplace(texRes);
+        if ( ! success)
+        {
+            return;
+        }
+
+        // New element emplaced, this means we've just found a resource that
+        // isn't synchronized yet.
+
+        // TODO!!!!
     }
 
-    return foundIt->second;
+    // Compile required mesh resources
+    for (auto const & [_, scnOwner] : rCtxDrawRes.m_meshToRes)
+    {
+        ResId const meshRes = scnOwner.value();
+
+        // New element will be emplaced if it isn't present yet
+        auto const [it, success] = rRenderGl.m_resToMesh.try_emplace(meshRes);
+        if ( ! success)
+        {
+            return;
+        }
+
+        // New element emplaced, this means we've just found a resource that
+        // isn't synchronized yet.
+
+        // Create new Mesh GL Id
+        MeshGlId const newId = rRenderGl.m_meshIds.create();
+
+        // Create owner, this adds to the resource's reference count
+        ResIdOwner_t renderOwner
+                = rResources.owner_create(restypes::gc_mesh, meshRes);
+
+        // Track with two-way map and store owner
+        rRenderGl.m_meshToRes.emplace(newId, std::move(renderOwner));
+        it->second = newId;
+
+        // Get mesh data
+        MeshData const &meshData = rResources.data_get<MeshData>(restypes::gc_mesh, meshRes);
+
+        // Compile and store mesh
+        rRenderGl.m_meshGl.emplace(newId, Magnum::MeshTools::compile(meshData));
+    }
 }
 
-void SysRenderGL::compile_meshes(
-        acomp_storage_t<ACompMesh> const& meshes,
-        std::vector<ActiveEnt> const& dirty,
-        acomp_storage_t<MeshGlId>& rMeshGl,
+void SysRenderGL::assign_meshes(
+        acomp_storage_t<MeshIdOwner_t> const& cmpMeshIds,
+        IdMap_t<MeshId, ResIdOwner_t> const& meshToRes,
+        std::vector<ActiveEnt> const& entsDirty,
+        acomp_storage_t<ACompMeshGl>& rCmpMeshGl,
         RenderGL& rRenderGl)
 {
-    for (ActiveEnt ent : dirty)
+    for (ActiveEnt ent : entsDirty)
     {
-        if (meshes.contains(ent))
+        // Make sure dirty entity has a MeshId component
+        if (cmpMeshIds.contains(ent))
         {
-            ACompMesh const &rEntMesh = meshes.get(ent);
+            MeshId const entMeshScnId = cmpMeshIds.get(ent);
 
-            if (rMeshGl.contains(ent))
+            ACompMeshGl &rEntMeshGl = rCmpMeshGl.contains(ent)
+                                    ? rCmpMeshGl.get(ent)
+                                    : rCmpMeshGl.emplace(ent);
+
+            // Check if scene mesh ID is properly synchronized
+            if (rEntMeshGl.m_scnId == entMeshScnId)
             {
-                // Check if ACompMesh changed
-                MeshGlId &rEntMeshGl = rMeshGl.get(ent);
+                continue; // No changes needed
+            }
 
-                if (rRenderGl.m_oldResToMesh.at(rEntMesh.m_mesh.name()) != rEntMeshGl)
-                {
-                    // get new mesh
-                    rEntMeshGl = try_compile_mesh(rRenderGl, rEntMesh.m_mesh);
-                }
+            rEntMeshGl.m_scnId = entMeshScnId;
+
+            // Check if MeshId is associated with a resource
+            if (auto found = meshToRes.find(entMeshScnId);
+                found != meshToRes.end())
+            {
+                ResId const meshResId = found->second;
+
+                // Mesh should have been loaded beforehand, assign it!
+                rEntMeshGl.m_glId = rRenderGl.m_resToMesh.at(meshResId);
             }
             else
             {
-                // ACompMeshGL component needed
-                rMeshGl.emplace(
-                        ent, try_compile_mesh(rRenderGl, rEntMesh.m_mesh));
+                OSP_LOG_WARN("No mesh data found for Mesh {} from Entity {}",
+                             std::size_t(entMeshScnId), std::size_t(ent));
             }
         }
         else
         {
-            if (rMeshGl.contains(ent))
+            if (rCmpMeshGl.contains(ent))
             {
                 // ACompMesh removed, remove ACompMeshGL too
-                rMeshGl.erase(ent);
+                rCmpMeshGl.erase(ent);
             }
             else
             {
@@ -163,79 +220,14 @@ void SysRenderGL::compile_meshes(
     }
 }
 
-TexGlId try_compile_texture(
-        RenderGL& rRenderGl, DependRes<ImageData2D> const& texData)
-{
-    auto foundIt = rRenderGl.m_oldResToTex.find(texData.name());
-
-    if (foundIt == rRenderGl.m_oldResToTex.end())
-    {
-        // Texture isn't compiled yet, compile it
-        TexGlId newId = rRenderGl.m_texIds.create();
-
-        Texture2D &rTexGl = rRenderGl.m_texGl.emplace(newId);
-        
-        using Magnum::GL::SamplerWrapping;
-        using Magnum::GL::SamplerFilter;
-        using Magnum::GL::textureFormat;
-
-        Magnum::ImageView2D view = *texData;
-
-        rTexGl.setWrapping(SamplerWrapping::ClampToEdge)
-            .setMagnificationFilter(SamplerFilter::Nearest)
-            .setMinificationFilter(SamplerFilter::Nearest)
-            .setStorage(1, textureFormat((*texData).format()), (*texData).size())
-            .setSubImage(0, {}, view);
-
-        return newId;
-    }
-
-    return foundIt->second;
-}
-
-void SysRenderGL::compile_textures(
-        acomp_storage_t<ACompTexture> const& textures,
-        std::vector<ActiveEnt> const& dirty,
-        acomp_storage_t<TexGlId>& rTexGl,
+void SysRenderGL::assign_textures(
+        acomp_storage_t<TexIdOwner_t> const& cmpTexIds,
+        IdMap_t<TexId, ResIdOwner_t> const& texToRes,
+        std::vector<ActiveEnt> const& entsDirty,
+        acomp_storage_t<ACompTexGl>& rCmpTexGl,
         RenderGL& rRenderGl)
 {
-    for (ActiveEnt ent : dirty)
-    {
-        if (textures.contains(ent))
-        {
-            ACompTexture const &rEntTex = textures.get(ent);
-
-            if (rTexGl.contains(ent))
-            {
-                // Check if ACompTexture changed
-                TexGlId &rEntTexGl = rTexGl.get(ent);
-
-                if (rRenderGl.m_oldResToTex.at(rEntTex.m_texture.name()) != rEntTexGl)
-                {
-                    // get new mesh
-                    rEntTexGl = try_compile_texture(rRenderGl, rEntTex.m_texture);
-                }
-            }
-            else
-            {
-                // ACompMeshGL component needed
-                rTexGl.emplace(
-                        ent, try_compile_texture(rRenderGl, rEntTex.m_texture));
-            }
-        }
-        else
-        {
-            if (rTexGl.contains(ent))
-            {
-                // ACompMesh removed, remove ACompMeshGL too
-                rTexGl.erase(ent);
-            }
-            else
-            {
-                // Why is this entity here?
-            }
-        }
-    }
+    // TODO
 }
 
 void SysRenderGL::display_texture(
@@ -256,6 +248,21 @@ void SysRenderGL::display_texture(
     rRenderGl.m_fullscreenTriShader.display_texure(
             rRenderGl.m_meshGl.get(rRenderGl.m_fullscreenTri),
             rRenderGl.m_texGl.get(rRenderGl.m_fboColor));
+}
+
+void SysRenderGL::clear_resource_owners(RenderGL& rRenderGl, Resources& rResources)
+{
+    for (auto & [_, rOwner] : std::exchange(rRenderGl.m_texToRes, {}))
+    {
+        rResources.owner_destroy(restypes::gc_texture, std::move(rOwner));
+    }
+    rRenderGl.m_resToTex.clear();
+
+    for (auto & [_, rOwner] : std::exchange(rRenderGl.m_meshToRes, {}))
+    {
+        rResources.owner_destroy(restypes::gc_mesh, std::move(rOwner));
+    }
+    rRenderGl.m_resToMesh.clear();
 }
 
 void SysRenderGL::render_opaque(

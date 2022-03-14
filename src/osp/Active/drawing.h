@@ -37,9 +37,6 @@
 #include <longeron/id_management/registry.hpp>
 #include <longeron/id_management/refcount.hpp>
 
-#include <functional>
-#include <unordered_map>
-
 namespace osp::active
 {
 
@@ -91,11 +88,18 @@ struct MaterialData
     std::vector<ActiveEnt>  m_removed;
 };
 
+using MeshRefCount_t    = lgrn::IdRefCount<MeshId>;
+using MeshIdOwner_t     = MeshRefCount_t::Storage_t;
+
+using TexRefCount_t     = lgrn::IdRefCount<TexId>;
+using TexIdOwner_t      = TexRefCount_t::Storage_t;
+
 /**
  * @brief Mesh Ids, texture Ids, and storage for drawing-related components
  */
 struct ACtxDrawing
 {
+
     // Drawing Components
     acomp_storage_t<ACompOpaque>            m_opaque;
     acomp_storage_t<ACompTransparent>       m_transparent;
@@ -108,17 +112,17 @@ struct ACtxDrawing
 
     // Scene-space Meshes
     lgrn::IdRegistry<MeshId>                m_meshIds;
-    lgrn::IdRefCount<MeshId>                m_meshRefCounts;
+    MeshRefCount_t                          m_meshRefCounts;
 
     // Scene-space Textures
     lgrn::IdRegistry<TexId>                 m_texIds;
-    lgrn::IdRefCount<TexId>                 m_texRefCounts;
+    TexRefCount_t                           m_texRefCounts;
 
     // Meshes and textures assigned to ActiveEnts
-    acomp_storage_t<TexId>                  m_diffuseTex;
+    acomp_storage_t<TexIdOwner_t>           m_diffuseTex;
     std::vector<osp::active::ActiveEnt>     m_diffuseDirty;
 
-    acomp_storage_t<MeshId>                 m_mesh;
+    acomp_storage_t<MeshIdOwner_t>          m_mesh;
     std::vector<osp::active::ActiveEnt>     m_meshDirty;
 };
 

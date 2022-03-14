@@ -26,7 +26,6 @@
 
 
 #include <osp/Active/opengl/SysRenderGL.h>
-#include <osp/Resource/Resource.h>
 
 #include <Magnum/Shaders/FlatGL.h>
 
@@ -38,18 +37,31 @@ using Flat = Magnum::Shaders::FlatGL3D;
 
 struct ACtxDrawFlat
 {
+    template <typename T>
+    using acomp_storage_t = osp::active::acomp_storage_t<T>;
 
-    DependRes<Flat> m_shaderUntextured;
-    DependRes<Flat> m_shaderDiffuse;
+    Flat m_shaderUntextured     {Corrade::NoCreate};
+    Flat m_shaderDiffuse        {Corrade::NoCreate};
 
-    active::acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf{nullptr};
-    active::acomp_storage_t<active::ACompColor>         *m_pColor{nullptr};
+    acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf{nullptr};
+    acomp_storage_t<active::ACompColor>         *m_pColor{nullptr};
+    osp::active::ACompTexGlStorage_t            *m_pDiffuseTexId{nullptr};
+    osp::active::ACompMeshGlStorage_t           *m_pMeshId{nullptr};
 
-    osp::active::acomp_storage_t<osp::active::TexGlId>  *m_pDiffuseTexId{nullptr};
-    osp::active::TexGlStorage_t                         *m_pTexGl{nullptr};
+    osp::active::TexGlStorage_t                 *m_pTexGl{nullptr};
+    osp::active::MeshGlStorage_t                *m_pMeshGl{nullptr};
 
-    osp::active::acomp_storage_t<osp::active::MeshGlId> *m_pMeshId{nullptr};
-    osp::active::MeshGlStorage_t                        *m_pMeshGl{nullptr};
+    constexpr void assign_pointers(active::ACtxSceneRenderGL& rCtxScnGl,
+                                   active::RenderGL& rRenderGl) noexcept
+    {
+        m_pDrawTf       = &rCtxScnGl.m_drawTransform;
+        // TODO: ACompColor
+        m_pDiffuseTexId = &rCtxScnGl.m_diffuseTexId;
+        m_pMeshId       = &rCtxScnGl.m_meshId;
+
+        m_pTexGl        = &rRenderGl.m_texGl;
+        m_pMeshGl       = &rRenderGl.m_meshGl;
+    }
 };
 
 void draw_ent_flat(
@@ -73,7 +85,7 @@ void assign_flat(
         active::RenderGroup::Storage_t *pStorageOpaque,
         active::RenderGroup::Storage_t *pStorageTransparent,
         active::acomp_storage_t<active::ACompOpaque> const& opaque,
-        active::acomp_storage_t<active::TexGlId> const& diffuse,
+        active::acomp_storage_t<active::ACompTexGl> const& diffuse,
         ACtxDrawFlat &rData);
 
 
