@@ -26,6 +26,7 @@
 
 #include <longeron/id_management/storage.hpp>
 
+#include <cassert>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -93,19 +94,40 @@ struct res_container
 template <typename T>
 using res_container_t = typename res_container<T>::type;
 
+// Resource Owner
+
 class Resources;
 
-using ResIdStorage_t = lgrn::IdStorage<ResId, Resources>;
+using ResIdOwner_t = lgrn::IdStorage<ResId, Resources>;
+
+
+// Resource Type Ids
+
+struct GenResTypeId
+{
+    friend inline ResTypeId resource_type_next() noexcept;
+    friend inline int resource_type_count() noexcept;
+private:
+    static inline int count{0};
+};
+
+inline ResTypeId resource_type_next() noexcept
+{
+    return ResTypeId(GenResTypeId::count++);
+}
+
+inline int resource_type_count() noexcept
+{
+    return GenResTypeId::count;
+}
 
 namespace restypes
 {
 
-constexpr inline ResTypeId const gc_image       = ResTypeId(0);
-constexpr inline ResTypeId const gc_texture     = ResTypeId(1);
-constexpr inline ResTypeId const gc_mesh        = ResTypeId(2);
+inline ResTypeId const gc_image         = resource_type_next();
+inline ResTypeId const gc_texture       = resource_type_next();
+inline ResTypeId const gc_mesh          = resource_type_next();
 
 } // namespace restypes
-
-constexpr inline std::size_t const gc_resTypeCount = 3;
 
 } // namespace osp

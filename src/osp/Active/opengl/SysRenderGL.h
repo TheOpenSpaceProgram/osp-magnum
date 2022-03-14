@@ -96,13 +96,16 @@ struct ACompMeshGl
     MeshGlId    m_glId      {lgrn::id_null<MeshGlId>()};
 };
 
+using ACompMeshGlStorage_t = acomp_storage_t<ACompMeshGl>;
+using ACompTexGlStorage_t = acomp_storage_t<ACompTexGl>;
+
 /**
  * @brief OpenGL specific rendering components for rendering a scene
  */
 struct ACtxSceneRenderGL
 {
-    acomp_storage_t<ACompMeshGl>            m_meshId;
-    acomp_storage_t<ACompTexGl>             m_diffuseTexId;
+    ACompMeshGlStorage_t                    m_meshId;
+    ACompTexGlStorage_t                     m_diffuseTexId;
     acomp_storage_t<ACompDrawTransform>     m_drawTransform;
 };
 
@@ -132,6 +135,8 @@ public:
     static void display_texture(
             RenderGL& rRenderGl, Magnum::GL::Texture2D& rTex);
 
+    static void clear_resource_owners(RenderGL& rRenderGl, Resources& rResources);
+
     /**
      * @brief Compile required meshes and textures resources used by a scene
      *
@@ -155,7 +160,7 @@ public:
      * @param rRenderGl     [ref] Renderer state
      */
     static void assign_meshes(
-            acomp_storage_t<MeshId> const& cmpMeshIds,
+            acomp_storage_t<MeshIdOwner_t> const& cmpMeshIds,
             IdMap_t<MeshId, ResIdOwner_t> const& meshToRes,
             std::vector<ActiveEnt> const& entsDirty,
             acomp_storage_t<ACompMeshGl>& rCmpMeshGl,
@@ -171,7 +176,7 @@ public:
      * @param rRenderGl     [ref] Renderer state
      */
     static void assign_textures(
-            acomp_storage_t<TexId> const& cmpTexIds,
+            acomp_storage_t<TexIdOwner_t> const& cmpTexIds,
             IdMap_t<TexId, ResIdOwner_t> const& texToRes,
             std::vector<ActiveEnt> const& entsDirty,
             acomp_storage_t<ACompTexGl>& rCmpTexGl,

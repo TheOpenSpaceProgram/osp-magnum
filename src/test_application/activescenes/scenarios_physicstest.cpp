@@ -130,6 +130,8 @@ struct PhysicsTestScene
 
 };
 
+#if 0
+
 std::optional<osp::active::ACompMesh> mesh_from_shape(PhysicsTestScene& rScene, osp::phys::EShape shape)
 {
     using osp::active::ACompMesh;
@@ -682,5 +684,7 @@ on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
         SysRender::clear_dirty_materials(rScene.m_drawing.m_materials);
     };
 }
+
+#endif
 
 } // namespace testapp::physicstest

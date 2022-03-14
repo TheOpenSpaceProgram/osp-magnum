@@ -40,7 +40,7 @@ ResId Resources::create(ResTypeId typeId, PkgId pkgId, std::string_view name)
     PerPkg &rPkg = m_pkgData[std::size_t(pkgId)];
     assert(rPkg.m_resTypeOwn.size() > std::size_t(typeId));
     PerPkgResType &rPkgType = rPkg.m_resTypeOwn[std::size_t(typeId)];
-    rPkgType.m_owned.resize(m_perResType.size());
+    rPkgType.m_owned.resize(rPerResType.m_resIds.capacity());
     rPkgType.m_owned.set(std::size_t(newResId));
 
     // Track name

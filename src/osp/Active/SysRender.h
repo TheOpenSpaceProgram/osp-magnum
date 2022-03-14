@@ -119,6 +119,12 @@ class SysRender
 {
 public:
 
+    static MeshId own_mesh_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources, ResId resId);
+
+    static void clear_owners(ACtxDrawing& rCtxDrawing);
+
+    static void clear_resource_owners(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources);
+
     inline static void add_draw_transforms_recurse(
             acomp_storage_t<ACompHierarchy> const& hier,
             acomp_storage_t<ACompDrawTransform>& rDrawTf,

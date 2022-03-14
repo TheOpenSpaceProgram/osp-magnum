@@ -24,7 +24,52 @@
  */
 #include "SysRender.h"
 
-using osp::active::SysRender;
+#include "../Resource/resources.h"
+
+using namespace osp;
+using namespace osp::active;
+
+MeshId SysRender::own_mesh_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources, ResId resId)
+{
+    auto [it, success] = rCtxDrawingRes.m_resToMesh.try_emplace(resId);
+    if (success)
+    {
+        ResIdOwner_t owner = rResources.owner_create(restypes::gc_mesh, resId);
+        MeshId const meshId = rCtxDrawing.m_meshIds.create();
+        rCtxDrawingRes.m_meshToRes.emplace(meshId, std::move(owner));
+        it->second = meshId;
+        return meshId;
+    }
+    return it->second;
+};
+
+void SysRender::clear_owners(ACtxDrawing& rCtxDrawing)
+{
+    for (TexIdOwner_t &rOwner : std::exchange(rCtxDrawing.m_diffuseTex, {}))
+    {
+        rCtxDrawing.m_texRefCounts.ref_release(rOwner);
+    }
+
+    for (MeshIdOwner_t &rOwner : std::exchange(rCtxDrawing.m_mesh, {}))
+    {
+        rCtxDrawing.m_meshRefCounts.ref_release(rOwner);
+    }
+}
+
+void SysRender::clear_resource_owners(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources)
+{
+    for (auto & [_, rOwner] : std::exchange(rCtxDrawingRes.m_texToRes, {}))
+    {
+        rResources.owner_destroy(restypes::gc_texture, std::move(rOwner));
+    }
+    rCtxDrawingRes.m_resToTex.clear();
+
+    for (auto & [_, rOwner] : std::exchange(rCtxDrawingRes.m_meshToRes, {}))
+    {
+        rResources.owner_destroy(restypes::gc_mesh, std::move(rOwner));
+    }
+    rCtxDrawingRes.m_resToMesh.clear();
+}
 
 void SysRender::update_draw_transforms(
         acomp_storage_t<ACompHierarchy> const& hier,

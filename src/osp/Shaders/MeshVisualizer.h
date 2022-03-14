@@ -39,7 +39,7 @@ struct ACtxDrawMeshVisualizer
     MeshVisualizer m_shader{Corrade::NoCreate};
 
     active::acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf{nullptr};
-    osp::active::acomp_storage_t<osp::active::MeshGlId> *m_pMeshId{nullptr};
+    osp::active::ACompMeshGlStorage_t                   *m_pMeshId{nullptr};
     osp::active::MeshGlStorage_t                        *m_pMeshGl{nullptr};
 
     bool m_wireframeOnly{false};
