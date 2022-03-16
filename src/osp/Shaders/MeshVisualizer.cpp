@@ -25,11 +25,8 @@
 
 #include "MeshVisualizer.h"
 
-#include "../Active/SysRender.h"
-
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Renderer.h>
-#include <Magnum/Math/Color.h>
 
 // for the 0xrrggbb_rgbf and _deg literals
 using namespace Magnum::Math::Literals;

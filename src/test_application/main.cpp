@@ -134,12 +134,11 @@ std::unordered_map<std::string_view, Option> const g_scenes
             rApp.set_on_draw(generate_draw_func(rScene, rApp));
         };
     }}}
-#if 0
     ,
     {"physicstest", {"Physics lol", [] {
 
         using namespace physicstest;
-        g_activeScene = setup_scene(g_packages.find("lzdb"));
+        g_activeScene = setup_scene(g_resources, g_defaultPkg);
 
         g_appSetup = [] (ActiveApplication& rApp)
         {
@@ -148,7 +147,6 @@ std::unordered_map<std::string_view, Option> const g_scenes
             rApp.set_on_draw(generate_draw_func(rScene, rApp));
         };
     }}}
-#endif
 };
 
 int main(int argc, char** argv)

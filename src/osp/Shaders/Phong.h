@@ -24,12 +24,9 @@
  */
 #pragma once
 
-
 #include <osp/Active/opengl/SysRenderGL.h>
-#include <osp/Resource/Resource.h>
 
 #include <Magnum/Shaders/PhongGL.h>
-
 
 namespace osp::shader
 {

@@ -208,19 +208,42 @@ void SysRender::assure_draw_transforms(
     }
 }
 
+template<typename STORAGE_T, typename REFCOUNT_T>
+void remove_refcounted(
+        ActiveEnt ent, STORAGE_T &rStorage, REFCOUNT_T &rRefcount)
+{
+    if (rStorage.contains(ent))
+    {
+        auto &rOwner = rStorage.get(ent);
+        if (rOwner.has_value())
+        {
+            rRefcount.ref_release(rOwner);
+        }
+        rStorage.erase(ent);
+    }
+}
+
 template<typename IT_T>
 void SysRender::update_delete_drawing(
         ACtxDrawing &rCtxDraw, IT_T first, IT_T last)
 {
-    rCtxDraw.m_opaque           .remove(first, last);
-    rCtxDraw.m_transparent      .remove(first, last);
-    rCtxDraw.m_visible          .remove(first, last);
-    rCtxDraw.m_mesh             .remove(first, last);
-    rCtxDraw.m_diffuseTex       .remove(first, last);
-
-    for (MaterialData& rMat : rCtxDraw.m_materials)
+    while (first != last)
     {
-        rMat.m_comp.remove(first, last);
+        ActiveEnt const ent = *first;
+        rCtxDraw.m_opaque       .remove(ent);
+        rCtxDraw.m_transparent  .remove(ent);
+        rCtxDraw.m_visible      .remove(ent);
+
+        // Textures and meshes are reference counted
+        remove_refcounted(ent, rCtxDraw.m_diffuseTex, rCtxDraw.m_texRefCounts);
+        remove_refcounted(ent, rCtxDraw.m_mesh, rCtxDraw.m_meshRefCounts);
+
+        for (MaterialData& rMat : rCtxDraw.m_materials)
+        {
+            rMat.m_comp.remove(ent);
+        }
+
+        std::advance(first, 1);
     }
 }
 

@@ -38,7 +38,7 @@
 #include <osp/Shaders/Phong.h>
 #include <osp/Shaders/MeshVisualizer.h>
 
-#include <osp/Resource/Package.h>
+#include <osp/Resource/resources.h>
 
 #include <longeron/id_management/registry.hpp>
 
@@ -64,6 +64,8 @@ using osp::Vector3;
 using osp::Matrix3;
 using osp::Matrix4;
 
+using osp::active::MeshIdOwner_t;
+
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
@@ -83,12 +85,23 @@ constexpr float gc_physTimestep = 1.0 / 60.0f;
  */
 struct PhysicsTestScene
 {
+    ~PhysicsTestScene()
+    {
+        osp::active::SysRender::clear_owners(m_drawing);
+        osp::active::SysRender::clear_resource_owners(m_drawing, m_drawingRes, *m_pResources);
+        m_drawing.m_meshRefCounts.ref_release(m_meshCube);
+    }
+
+    osp::Resources *m_pResources;
+
     // ID registry generates entity IDs, and keeps track of which ones exist
     lgrn::IdRegistry<osp::active::ActiveEnt> m_activeIds;
 
     // Basic and Drawing components
     osp::active::ACtxBasic          m_basic;
     osp::active::ACtxDrawing        m_drawing;
+    osp::active::ACtxDrawingRes     m_drawingRes;
+
 
     // Generic physics components and data
     osp::active::ACtxPhysics        m_physics;
@@ -108,9 +121,8 @@ struct PhysicsTestScene
     osp::active::ActiveEnt          m_hierRoot;
 
     // Meshes used in the scene
-    osp::DependRes<MeshData>        m_meshCube;
-    osp::DependRes<MeshData>        m_meshCylinder;
-    osp::DependRes<MeshData>        m_meshSphere;
+    entt::dense_hash_map<EShape, MeshIdOwner_t> m_shapeToMesh;
+    MeshIdOwner_t m_meshCube;
 
     // Timers for when to create boxes and cylinders
     float m_boxTimer{0.0f};
@@ -130,25 +142,6 @@ struct PhysicsTestScene
 
 };
 
-#if 0
-
-std::optional<osp::active::ACompMesh> mesh_from_shape(PhysicsTestScene& rScene, osp::phys::EShape shape)
-{
-    using osp::active::ACompMesh;
-
-    switch (shape)
-    {
-    case EShape::Box:
-        return {{ rScene.m_meshCube }};
-    case EShape::Cylinder:
-        return {{ rScene.m_meshCylinder }};
-    case EShape::Sphere:
-        return {{ rScene.m_meshSphere }};
-    default:
-        return std::nullopt;
-    }
-}
-
 ActiveEnt add_solid(
         PhysicsTestScene& rScene, ActiveEnt parent,
         EShape shape, Matrix4 transform, int material, float mass)
@@ -160,7 +153,7 @@ ActiveEnt add_solid(
 
     // Add mesh
     rScene.m_drawing.m_mesh.emplace(
-            ent, mesh_from_shape(rScene, shape).value() );
+            ent, rScene.m_drawing.m_meshRefCounts.ref_add(rScene.m_shapeToMesh.at(shape)) );
     rScene.m_drawing.m_meshDirty.push_back(ent);
 
     // Add material to cube
@@ -239,20 +232,31 @@ ActiveEnt add_quick_shape(
     return root;
 }
 
-entt::any setup_scene(osp::Package &rPkg)
+entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
 {
     using namespace osp::active;
 
     entt::any sceneAny = entt::make_any<PhysicsTestScene>();
     PhysicsTestScene &rScene = entt::any_cast<PhysicsTestScene&>(sceneAny);
 
+    rScene.m_pResources = &rResources;
+
+    auto const quick_add_mesh = [&rScene, &rResources, pkg] (std::string_view name) -> MeshIdOwner_t
+    {
+        osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
+        assert(res != lgrn::id_null<osp::ResId>());
+        MeshId const meshId = SysRender::own_mesh_resource(rScene.m_drawing, rScene.m_drawingRes, rResources, res);
+        return rScene.m_drawing.m_meshRefCounts.ref_add(meshId);
+    };
+
     // Create Newton physics world that uses 4 threads to update
     rScene.m_pNwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(4);
 
     // Acquire mesh resources from Package
-    rScene.m_meshCube       = rPkg.get_or_reserve<MeshData>("cube");
-    rScene.m_meshCylinder   = rPkg.get_or_reserve<MeshData>("cylinder");
-    rScene.m_meshSphere     = rPkg.get_or_reserve<MeshData>("sphere");
+    rScene.m_shapeToMesh.emplace(EShape::Box,       quick_add_mesh("cube"));
+    rScene.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
+    rScene.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
+    rScene.m_meshCube = quick_add_mesh("grid64solid");
 
     // Allocate space to fit all materials
     rScene.m_drawing.m_materials.resize(gc_maxMaterials);
@@ -292,7 +296,7 @@ entt::any setup_scene(osp::Package &rPkg)
 
         // Add grid mesh to floor mesh
         rScene.m_drawing.m_mesh.emplace(
-                floorMesh, ACompMesh{ rPkg.get<MeshData>("grid64") });
+                floorMesh, rScene.m_drawing.m_meshRefCounts.ref_add(rScene.m_meshCube));
         rScene.m_drawing.m_meshDirty.push_back(floorMesh);
 
         // Add mesh visualizer material to floor mesh
@@ -549,14 +553,16 @@ void render_test_scene(
                     std::cend(rMatVisualizer.m_added));
     }
 
+    SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rApp.get_render_gl());
+
     // Load any required meshes
-    SysRenderGL::compile_meshes(
-            rScene.m_drawing.m_mesh, rScene.m_drawing.m_meshDirty,
+    SysRenderGL::assign_meshes(
+            rScene.m_drawing.m_mesh, rScene.m_drawingRes.m_meshToRes, rScene.m_drawing.m_meshDirty,
             rRenderer.m_renderGl.m_meshId, rApp.get_render_gl());
 
     // Load any required textures
-    SysRenderGL::compile_textures(
-            rScene.m_drawing.m_diffuseTex, rScene.m_drawing.m_diffuseDirty,
+    SysRenderGL::assign_textures(
+            rScene.m_drawing.m_diffuseTex, rScene.m_drawingRes.m_texToRes, rScene.m_drawing.m_diffuseDirty,
             rRenderer.m_renderGl.m_diffuseTexId, rApp.get_render_gl());
 
     // Calculate hierarchy transforms
@@ -684,7 +690,5 @@ on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
         SysRender::clear_dirty_materials(rScene.m_drawing.m_materials);
     };
 }
-
-#endif
 
 } // namespace testapp::physicstest
