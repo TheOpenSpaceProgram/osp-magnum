@@ -24,10 +24,6 @@
  */
 #include "Flat.h"
 
-#include <osp/Active/SysRender.h>
-
-#include <Magnum/Math/Color.h>
-
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 

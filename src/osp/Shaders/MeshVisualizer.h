@@ -25,7 +25,6 @@
 #pragma once
 
 #include <osp/Active/opengl/SysRenderGL.h>
-#include <osp/Active/activetypes.h>
 
 #include <Magnum/Shaders/MeshVisualizerGL.h>
 
