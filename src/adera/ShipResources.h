@@ -26,7 +26,6 @@
 #include <string>
 #include <assert.h>
 
-#include <osp/Resource/Resource.h>
 #include <osp/Active/machines.h>
 #include <osp/CommonMath.h>
 #include <osp/CommonPhysics.h>
@@ -141,7 +140,7 @@ struct ShipResourceType
 
 struct ShipResource
 {
-    osp::DependRes<ShipResourceType> m_type;
+    //osp::DependRes<ShipResourceType> m_type;
     uint64_t m_quantity;
 };
 

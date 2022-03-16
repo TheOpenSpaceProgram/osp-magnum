@@ -25,6 +25,8 @@
 
 #pragma once
 
+#if 0
+
 #include "common.h"
 
 #include <osp/Universe.h>
@@ -82,3 +84,5 @@ osp::universe::Satellite debug_add_part_vehicle(
 // TODO: put test with creating a universe with just vehicles
 
 }
+
+#endif

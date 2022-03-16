@@ -185,7 +185,7 @@ void testapp::active_area_destroy(
 
 UCompVehicle& testapp::add_vehicle(
         UniverseScene &rUniScn, osp::universe::Satellite sat,
-        osp::DependRes<osp::BlueprintVehicle> blueprint)
+        osp::ResIdOwner_t blueprint)
 {
     rUniScn.m_activation.m_activatable.emplace(sat);
     rUniScn.m_activation.m_activationRadius.emplace(sat);

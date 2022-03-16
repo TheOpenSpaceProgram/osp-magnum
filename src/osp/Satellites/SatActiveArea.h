@@ -26,13 +26,7 @@
 
 #include "../Universe.h"
 
-#include <map>
-
 #include "../types.h"
-#include "../Active/activetypes.h"
-
-#include "../Resource/Package.h"
-#include "../Resource/PrototypePart.h"
 
 namespace osp::universe
 {

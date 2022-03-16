@@ -27,6 +27,8 @@
 #include "activetypes.h"
 #include "../types.h"
 #include "../Resource/blueprints.h"
+#include "../Resource/machines.h"
+
 
 #include <mutex>
 #include <vector>

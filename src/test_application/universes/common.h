@@ -27,9 +27,10 @@
 
 #include <planet-a/Satellites/SatPlanet.h>
 
+#include <osp/Resource/resourcetypes.h>
+
 #include <osp/universetypes.h>
 #include <osp/Satellites/SatVehicle.h>
-#include <osp/Resource/PackageRegistry.h>
 
 #include <functional>
 
@@ -91,7 +92,7 @@ void active_area_destroy(UniverseScene &rUniScn, osp::universe::Satellite areaSa
 
 osp::universe::UCompVehicle& add_vehicle(
         UniverseScene &rUniScn, osp::universe::Satellite sat,
-        osp::DependRes<osp::BlueprintVehicle> blueprint);
+        osp::ResIdOwner_t blueprint);
 
 planeta::universe::UCompPlanet& add_planet(
         UniverseScene &rUniScn, osp::universe::Satellite sat,

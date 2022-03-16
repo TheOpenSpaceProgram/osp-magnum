@@ -34,9 +34,6 @@
 
 using namespace testapp;
 
-using osp::Package;
-using osp::PackageRegistry;
-
 using osp::universe::Satellite;
 using osp::universe::Universe;
 
@@ -53,11 +50,9 @@ using planeta::universe::UCompPlanet;
 
 using osp::universe::Vector3g;
 
-void simplesolarsystem::create(PackageRegistry& rPkgs,
+void simplesolarsystem::create(osp::Resources& rResources, osp::PkgId pkg,
                                UniverseScene& rUniScn, universe_update_t& rUpdater)
 {
-    Package &rPkg = rPkgs.find("lzdb");
-
     Universe &rUni = rUniScn.m_universe;
     Satellite root = rUni.sat_create();
 
@@ -69,6 +64,7 @@ void simplesolarsystem::create(PackageRegistry& rPkgs,
     // of satellites
     rSpace.m_data.emplace<CoordspaceCartesianSimple>();
 
+#if 0
 
     // Create 2 random (non-functional) vehicles
     for (int i = 0; i < 2; i ++)
@@ -125,6 +121,8 @@ void simplesolarsystem::create(PackageRegistry& rPkgs,
             rSpace.add(sat, pos, {});
         }
     }
+
+#endif
 
     // Add universe update function
     rUpdater = generate_simple_universe_update(coordIndex);
