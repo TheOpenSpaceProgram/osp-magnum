@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 
+#if 0
+
 #include "vehicles.h"
 #include "../VehicleBuilder.h"
 
@@ -317,3 +319,5 @@ osp::universe::Satellite testapp::debug_add_part_vehicle(
 
     return sat;
 }
+
+#endif

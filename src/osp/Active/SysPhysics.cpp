@@ -1,8 +1,6 @@
 #include "SysPhysics.h"
 #include "basic.h"
 
-#include <osp/Resource/PackageRegistry.h>
-
 using osp::active::SysPhysics;
 using osp::active::ActiveEnt;
 using osp::active::ACompPhysBody;

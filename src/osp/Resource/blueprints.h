@@ -26,15 +26,14 @@
 
 #include "../types.h"
 
-#include "Resource.h"
-#include "PrototypePart.h"
+#include "resources.h"
 
 namespace osp
 {
 
 struct BlueprintMachine
 {
-    NodeMap_t m_config;
+    //NodeMap_t m_config;
 
     // Index to a BlueprintPart in BlueprintVehicle's m_blueprints
     uint32_t m_partIndex;
@@ -72,7 +71,7 @@ struct BlueprintPart
 struct BlueprintWireLink
 {
     // ie. Input/output; fuel flow priority
-    NodeMap_t m_config;
+    //NodeMap_t m_config;
 
     // Index to a BlueprintPart in BlueprintVehicle's m_blueprints
     uint32_t m_partIndex;
@@ -90,7 +89,7 @@ struct BlueprintWireLink
 struct BlueprintWireNode
 {
 
-    NodeMap_t m_config;
+    //NodeMap_t m_config;
 
     std::vector<BlueprintWireLink> m_links;
 };
@@ -116,7 +115,7 @@ struct BlueprintWirePanel
 struct BlueprintVehicle
 {
     // Unique part Resources used
-    std::vector<DependRes<PrototypePart>> m_prototypes;
+    std::vector<ResIdOwner_t> m_prototypes;
 
     // Arrangement of Individual Parts
     std::vector<BlueprintPart> m_blueprints;

@@ -34,11 +34,12 @@ namespace testapp::simplesolarsystem
  * @brief Create a universe with a few unrealistically small planets and some
  *        vehicles
  *
- * @param rPkgs   [ref] Packages containing needed resources
- * @param rUniScn [ref] Universe scene to setup; usually this is empty
- * @param rUniUpd [out] Associated universe update function to set
+ * @param rResources    [ref] Application Resources
+ * @param pkg           [in] Package Id
+ * @param rUniScn       [ref] Universe scene to setup; usually this is empty
+ * @param rUniUpd       [out] Associated universe update function to set
  */
-void create(osp::PackageRegistry& rPkgs,
+void create(osp::Resources& rResources, osp::PkgId pkg,
             UniverseScene& rUniScn, universe_update_t &rUniUpd);
 
 }

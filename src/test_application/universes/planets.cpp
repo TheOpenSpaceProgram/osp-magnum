@@ -35,9 +35,6 @@
 
 using namespace testapp;
 
-using osp::Package;
-using osp::PackageRegistry;
-
 using osp::universe::Satellite;
 using osp::universe::Universe;
 
@@ -55,11 +52,9 @@ using planeta::universe::UCompPlanet;
 using osp::universe::Vector3g;
 using osp::universe::spaceint_t;
 
-void moon::create(PackageRegistry& rPkgs,
+void moon::create(osp::Resources& rResources, osp::PkgId pkg,
                   UniverseScene& rUniScn, universe_update_t& rUpdater)
 {
-    Package &rPkg = rPkgs.find("lzdb");
-
     Universe &rUni = rUniScn.m_universe;
     Satellite root = rUni.sat_create();
 
@@ -71,6 +66,7 @@ void moon::create(PackageRegistry& rPkgs,
     rSpace.m_data.emplace<CoordspaceCartesianSimple>();
     auto *pData = entt::any_cast<CoordspaceCartesianSimple>(&rSpace.m_data);
 
+#if 0
     // Create 4 part vehicles
     for (int i = 0; i < 4; i ++)
     {
@@ -80,6 +76,7 @@ void moon::create(PackageRegistry& rPkgs,
 
         rSpace.add(sat, pos, {});
     }
+#endif
 
     // Add Moon
     {

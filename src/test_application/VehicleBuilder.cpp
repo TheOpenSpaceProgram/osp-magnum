@@ -24,6 +24,8 @@
  */
 #include "VehicleBuilder.h"
 
+#if 0
+
 using namespace testapp;
 
 using osp::BlueprintPart;
@@ -240,3 +242,5 @@ nodeindex_t<void> VehicleBuilder::wire_connect_signal(osp::wire_id_t id,
 
     return node;
 }
+
+#endif
