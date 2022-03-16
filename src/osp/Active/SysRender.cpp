@@ -56,7 +56,7 @@ void SysRender::clear_owners(ACtxDrawing& rCtxDrawing)
     }
 }
 
-void SysRender::clear_resource_owners(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources)
+void SysRender::clear_resource_owners(ACtxDrawingRes& rCtxDrawingRes, Resources &rResources)
 {
     for (auto & [_, rOwner] : std::exchange(rCtxDrawingRes.m_texToRes, {}))
     {

@@ -33,13 +33,9 @@
 #include "universes/simple.h"
 #include "universes/planets.h"
 
-#include <osp/Resource/AssetImporter.h>
 #include <osp/Resource/resources.h>
 #include <osp/string_concat.h>
 #include <osp/logging.h>
-
-#include <adera/ShipResources.h>
-#include <adera/Shaders/PlumeShader.h>
 
 #include <Magnum/MeshTools/Transform.h>
 #include <Magnum/Primitives/Cylinder.h>
@@ -363,7 +359,7 @@ void load_a_bunch_of_stuff()
 
 
     // Add a default primitives
-    auto add_mesh_quick = [] (std::string_view name, Trade::MeshData&& data)
+    auto const add_mesh_quick = [] (std::string_view name, Trade::MeshData&& data)
     {
         osp::ResId const meshId = g_resources.create(gc_mesh, g_defaultPkg, name);
         g_resources.data_add<Trade::MeshData>(gc_mesh, meshId, std::forward<Trade::MeshData>(data));
@@ -396,40 +392,6 @@ void debug_print_help()
         << "* help      - Show this again\n"
         << "* reopen    - Re-open Magnum Application\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
-}
-
-template <typename RES_T>
-void debug_print_resource_group(osp::Package const& rPkg)
-{
-    auto const pGroup = rPkg.group_get<RES_T>();
-
-    if (pGroup == nullptr)
-    {
-        return;
-    }
-
-    std::cout << "  * TYPE: " << entt::type_name<RES_T>().value() << "\n";
-
-    for (auto const& [key, resource] : *pGroup)
-    {
-        std::cout << "    * " << (resource.m_data.has_value() ? "LOADED" : "RESERVED") << ": " << key << "\n";
-    }
-}
-
-void debug_print_package(osp::Package const& rPkg, osp::ResPrefix_t const& prefix)
-{
-    std::cout << "* PACKAGE: " << prefix << "\n";
-
-    // TODO: maybe consider polymorphic access to resources?
-    debug_print_resource_group<osp::PrototypePart>(rPkg);
-    debug_print_resource_group<osp::BlueprintVehicle>(rPkg);
-
-    debug_print_resource_group<Magnum::Trade::ImageData2D>(rPkg);
-    debug_print_resource_group<Magnum::Trade::MeshData>(rPkg);
-    debug_print_resource_group<Magnum::GL::Texture2D>(rPkg);
-    debug_print_resource_group<Magnum::GL::Mesh>(rPkg);
-
-    debug_print_resource_group<adera::active::machines::ShipResourceType>(rPkg);
 }
 
 void debug_print_resources()

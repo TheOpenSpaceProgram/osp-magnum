@@ -88,7 +88,7 @@ struct PhysicsTestScene
     ~PhysicsTestScene()
     {
         osp::active::SysRender::clear_owners(m_drawing);
-        osp::active::SysRender::clear_resource_owners(m_drawing, m_drawingRes, *m_pResources);
+        osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
         m_drawing.m_meshRefCounts.ref_release(m_meshCube);
     }
 
@@ -553,14 +553,15 @@ void render_test_scene(
                     std::cend(rMatVisualizer.m_added));
     }
 
+    // Load required meshes and textures into OpenGL
     SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rApp.get_render_gl());
 
-    // Load any required meshes
+    // Assign GL meshes to entities with a mesh component
     SysRenderGL::assign_meshes(
             rScene.m_drawing.m_mesh, rScene.m_drawingRes.m_meshToRes, rScene.m_drawing.m_meshDirty,
             rRenderer.m_renderGl.m_meshId, rApp.get_render_gl());
 
-    // Load any required textures
+    // Assign GL textures to entities with a texture component
     SysRenderGL::assign_textures(
             rScene.m_drawing.m_diffuseTex, rScene.m_drawingRes.m_texToRes, rScene.m_drawing.m_diffuseDirty,
             rRenderer.m_renderGl.m_diffuseTexId, rApp.get_render_gl());

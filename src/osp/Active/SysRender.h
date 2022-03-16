@@ -119,11 +119,38 @@ class SysRender
 {
 public:
 
-    static MeshId own_mesh_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources, ResId resId);
+    /**
+     * @brief Attempt to create a scene mesh associated with a resource
+     *
+     * @param rCtxDrawing       [ref] Drawing data
+     * @param rCtxDrawingRes    [ref] Resource drawing data
+     * @param rResources        [ref] Application Resources containing meshes
+     * @param resId             [in] Mesh Resource Id
+     *
+     * @return Id of new mesh, existing mesh Id if it already exists.
+     */
+    static MeshId own_mesh_resource(
+            ACtxDrawing& rCtxDrawing,
+            ACtxDrawingRes& rCtxDrawingRes,
+            Resources &rResources,
+            ResId resId);
 
+    /**
+     * @brief Remove all mesh and texture components, aware of refcounts
+     *
+     * @param rCtxDrawing       [ref] Drawing data
+     */
     static void clear_owners(ACtxDrawing& rCtxDrawing);
 
-    static void clear_resource_owners(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources);
+    /**
+     * @brief Dissociate resources from the scene's meshes and textures
+     *
+     * @param rCtxDrawingRes    [ref] Resource drawing data
+     * @param rResources        [ref] Application Resources
+     */
+    static void clear_resource_owners(
+            ACtxDrawingRes& rCtxDrawingRes,
+            Resources &rResources);
 
     inline static void add_draw_transforms_recurse(
             acomp_storage_t<ACompHierarchy> const& hier,
