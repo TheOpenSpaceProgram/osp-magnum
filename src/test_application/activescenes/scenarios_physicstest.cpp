@@ -90,6 +90,10 @@ struct PhysicsTestScene
         osp::active::SysRender::clear_owners(m_drawing);
         osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
         m_drawing.m_meshRefCounts.ref_release(m_meshCube);
+        for (auto & [_, rOwner] : std::exchange(m_shapeToMesh, {}))
+        {
+            m_drawing.m_meshRefCounts.ref_release(rOwner);
+        }
     }
 
     osp::Resources *m_pResources;
