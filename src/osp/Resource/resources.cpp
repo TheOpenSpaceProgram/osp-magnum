@@ -71,6 +71,11 @@ ResId Resources::find(ResTypeId typeId, PkgId pkgId, std::string_view name) cons
     return findIt->second;
 }
 
+lgrn::IdRegistry<ResId> const& Resources::ids(ResTypeId typeId) const noexcept
+{
+    return get_type(typeId).m_resIds;
+}
+
 ResIdOwner_t Resources::owner_create(ResTypeId typeId, ResId resId) noexcept
 {
     PerResType &rPerResType = get_type(typeId);

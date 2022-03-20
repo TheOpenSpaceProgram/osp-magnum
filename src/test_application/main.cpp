@@ -35,7 +35,10 @@
 #include "universes/simple.h"
 #include "universes/planets.h"
 
+#include <osp/Resource/load_tinygltf.h>
 #include <osp/Resource/resources.h>
+#include <osp/Resource/ImporterData.h>
+
 #include <osp/string_concat.h>
 #include <osp/logging.h>
 
@@ -44,6 +47,11 @@
 #include <Magnum/Primitives/Cube.h>
 #include <Magnum/Primitives/Grid.h>
 #include <Magnum/Primitives/Icosphere.h>
+
+#include <Magnum/Trade/ImageData.h>
+#include <Magnum/Trade/TextureData.h>
+#include <Magnum/Trade/MeshData.h>
+
 #include <Corrade/Utility/Arguments.h>
 
 #include <iostream>
@@ -89,6 +97,11 @@ void setup_common_scene();
  * @brief Attempt to destroy everything in the universe
  */
 bool destroy_universe();
+
+/**
+ * @brief Deal with resource reference counts for a clean termination
+ */
+void clear_resource_owners();
 
 // called only from commands to display information
 void debug_print_help();
@@ -176,6 +189,7 @@ int main(int argc, char** argv)
         if(it == std::end(g_scenes))
         {
             std::cerr << "unknown scene" << std::endl;
+            clear_resource_owners();
             exit(-1);
         }
 
@@ -270,6 +284,8 @@ int debug_cli_loop()
         }
     }
 
+    clear_resource_owners();
+
     return 0;
 }
 
@@ -348,7 +364,12 @@ void load_a_bunch_of_stuff()
     using Primitives::CylinderFlag;
 
     g_resources.resize_types(osp::resource_type_count());
+
+    g_resources.data_register<Trade::ImageData2D>(gc_image);
+    g_resources.data_register<Trade::TextureData>(gc_texture);
+    g_resources.data_register<osp::TextureImgSource>(gc_texture);
     g_resources.data_register<Trade::MeshData>(gc_mesh);
+    g_resources.data_register<osp::ImporterData>(gc_importer);
     g_defaultPkg = g_resources.pkg_create();
 
     // Load sturdy glTF files
@@ -367,11 +388,10 @@ void load_a_bunch_of_stuff()
 
     // TODO: Make new gltf loader. This will read gltf files and dump meshes,
     //       images, textures, and other relevant data into osp::Resources
-//    for (auto meshName : meshes)
-//    {
-//        osp::AssetImporter::load_sturdy_file(
-//            osp::string_concat(datapath, meshName), rDebugPack, rDebugPack);
-//    }
+    for (auto meshName : meshes)
+    {
+        osp::load_tinygltf_file(osp::string_concat(datapath, meshName), g_resources, g_defaultPkg);
+    }
 
 
     // Add a default primitives
@@ -387,6 +407,63 @@ void load_a_bunch_of_stuff()
     add_mesh_quick("grid64solid", Primitives::grid3DSolid({63, 63}));
 
     OSP_LOG_INFO("Resource loading complete");
+}
+
+static void resource_for_each_type(osp::ResTypeId type, void(*do_thing)(osp::ResId))
+{
+    lgrn::IdRegistry<osp::ResId> const &rReg = g_resources.ids(type);
+    for (std::size_t i = 0; i < rReg.capacity(); ++i)
+    {
+        if (rReg.exists(osp::ResId(i)))
+        {
+            do_thing(osp::ResId(i));
+        }
+    }
+}
+
+void clear_resource_owners()
+{
+    using namespace osp::restypes;
+
+    // Texture resources contain osp::TextureImgSource, which refererence counts
+    // their associated image data
+    resource_for_each_type(gc_texture, [] (osp::ResId id)
+    {
+        auto *pData = g_resources
+                .data_try_get<osp::TextureImgSource>(gc_texture, id);
+        if (pData == nullptr)
+        {
+            return;
+        }
+
+        g_resources.owner_destroy(gc_image, std::move(*pData));
+    });
+
+    // Importer data own a lot of other resources
+    resource_for_each_type(gc_importer, [] (osp::ResId id)
+    {
+        auto *pData = g_resources
+                .data_try_get<osp::ImporterData>(gc_importer, id);
+        if (pData == nullptr)
+        {
+            return;
+        }
+
+        for (osp::ResIdOwner_t &rOwner : pData->m_images)
+        {
+            g_resources.owner_destroy(gc_image, std::move(rOwner));
+        }
+
+        for (osp::ResIdOwner_t &rOwner : pData->m_textures)
+        {
+            g_resources.owner_destroy(gc_texture, std::move(rOwner));
+        }
+
+        for (osp::ResIdOwner_t &rOwner : pData->m_meshes)
+        {
+            g_resources.owner_destroy(gc_mesh, std::move(rOwner));
+        }
+    });
 }
 
 //-----------------------------------------------------------------------------
