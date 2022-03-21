@@ -26,6 +26,8 @@
 
 #include "drawing.h"
 
+#include <unordered_map>
+
 namespace osp::active
 {
 
