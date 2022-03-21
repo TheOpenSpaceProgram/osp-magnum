@@ -27,9 +27,13 @@
 #include "../types.h"
 #include "resourcetypes.h"
 
-#include <Magnum/Trade/SceneData.h>
 #include <Magnum/Trade/MaterialData.h>
 
+#include <Corrade/Containers/Optional.h>
+
+#include <longeron/containers/intarray_multimap.hpp>
+
+#include <string_view>
 #include <vector>
 
 namespace osp
@@ -37,17 +41,39 @@ namespace osp
 
 struct TextureImgSource : public ResIdOwner_t { };
 
+struct NodeTransform
+{
+    Vector3     m_translation;
+    Quaternion  m_rotation;
+    Vector3     m_scale;
+};
+
 struct ImporterData
 {
-    std::vector<ResIdOwner_t> m_images;
-    std::vector<ResIdOwner_t> m_textures;
-    std::vector<ResIdOwner_t> m_meshes;
-    std::vector<Magnum::Trade::MaterialData> m_materials;
+    using OptMaterialData_t = Corrade::Containers::Optional<Magnum::Trade::MaterialData>;
 
-    std::vector<std::string_view> m_nodeNames;
-    std::vector<int> m_nodeMeshes;
+    // Owned resources
+    std::vector<ResIdOwner_t>           m_images;
+    std::vector<ResIdOwner_t>           m_textures;
+    std::vector<ResIdOwner_t>           m_meshes;
 
-    std::vector<Magnum::Trade::SceneData> m_scenes;
+    std::vector<OptMaterialData_t>      m_materials;
+
+    // [sceneId][child]
+    lgrn::IntArrayMultiMap<int, int>    m_scenes;
+
+    // Object data
+    // note: terminology for 'things' vary
+    // * Magnum: Object       * glTF: Node       * OSP & EnTT: Entity
+
+    std::vector<int>                    m_objParents;
+    lgrn::IntArrayMultiMap<int, int>    m_objChildren;
+
+    std::vector<std::string_view>       m_objNames;
+    std::vector<NodeTransform>          m_objTransforms;
+
+    std::vector<int>                    m_objMeshes;
+    std::vector<int>                    m_objMaterials;
 };
 
 } // namespace osp

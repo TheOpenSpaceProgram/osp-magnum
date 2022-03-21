@@ -370,6 +370,7 @@ void load_a_bunch_of_stuff()
     g_resources.data_register<osp::TextureImgSource>(gc_texture);
     g_resources.data_register<Trade::MeshData>(gc_mesh);
     g_resources.data_register<osp::ImporterData>(gc_importer);
+    osp::register_tinygltf_resources(g_resources);
     g_defaultPkg = g_resources.pkg_create();
 
     // Load sturdy glTF files

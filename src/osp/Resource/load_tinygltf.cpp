@@ -38,6 +38,8 @@
 #include <Magnum/Trade/TextureData.h>
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/ObjectData3D.h>
+#include <Magnum/Trade/MeshObjectData3D.h>
+#include <Magnum/Trade/SceneData.h>
 
 #include <Corrade/PluginManager/Manager.h>
 
@@ -48,7 +50,13 @@ using Magnum::Trade::TinyGltfImporter;
 using Magnum::Trade::ImageData2D;
 using Magnum::Trade::TextureData;
 using Magnum::Trade::MeshData;
+using Magnum::Trade::MeshObjectData3D;
+using Magnum::Trade::MaterialData;
 using Magnum::Trade::ObjectData3D;
+using Magnum::Trade::SceneData;
+
+
+using Magnum::Trade::ObjectInstanceType3D;
 
 using Magnum::UnsignedInt;
 
@@ -57,6 +65,11 @@ using Corrade::Containers::Optional;
 using Corrade::Containers::Pointer;
 
 using TinyGltfNodeExtras_t = std::vector<tinygltf::Value>;
+
+void osp::register_tinygltf_resources(Resources &rResources)
+{
+    rResources.data_register<TinyGltfNodeExtras_t>(restypes::gc_importer);
+}
 
 static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view name, Resources &rResources, PkgId pkg)
 {
@@ -85,7 +98,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
 
     using namespace restypes;
 
-    // Load images
+    // Store images
     rImportData.m_images.resize(rImporter.image2DCount());
     for (UnsignedInt i = 0; i < rImporter.image2DCount(); i ++)
     {
@@ -104,7 +117,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
         rResources.data_add<ImageData2D>(gc_image, imgRes, std::move(*img));
     }
 
-    // Load textures
+    // Store textures
     rImportData.m_textures.resize(rImporter.textureCount());
     for (UnsignedInt i = 0; i < rImporter.textureCount(); i ++)
     {
@@ -131,7 +144,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
         }
     }
 
-    // load meshes
+    // Store meshes
     rImportData.m_meshes.resize(rImporter.meshCount());
     for (UnsignedInt i = 0; i < rImporter.meshCount(); i ++)
     {
@@ -147,25 +160,101 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
         rImportData.m_meshes[i] = rResources.owner_create(gc_mesh, meshRes);
     }
 
-    // copy custom properties
-    TinyGltfNodeExtras_t nodeExtras;
-    nodeExtras.resize(rImporter.object3DCount());
-    for (UnsignedInt i = 0; i < rImporter.object3DCount(); i ++)
+    // Store materials
+    rImportData.m_materials.reserve(rImporter.materialCount());
+    for (UnsignedInt i = 0; i < rImporter.materialCount(); i ++)
     {
-        Pointer<ObjectData3D> obj = rImporter.object3D(i);
+        rImportData.m_materials.emplace_back(rImporter.material(i));
+    }
+
+    // Store various node data
+
+    auto &rNodeExtras = rResources.data_add<TinyGltfNodeExtras_t>(
+                                restypes::gc_importer, res);
+
+    UnsignedInt parentsSet = 0;
+
+    UnsignedInt const objCount = rImporter.object3DCount();
+    rNodeExtras                 .resize(objCount);
+    rImportData.m_objNames      .resize(objCount);
+    rImportData.m_objMeshes     .resize(objCount);
+    rImportData.m_objMaterials  .resize(objCount);
+    rImportData.m_objTransforms .resize(objCount);
+    rImportData.m_objParents    .resize(objCount);
+    rImportData.m_objChildren   .ids_reserve(objCount);
+    rImportData.m_objChildren   .data_reserve(objCount);
+
+    for (UnsignedInt i = 0; i < objCount; i ++)
+    {
+        Pointer<ObjectData3D const> obj         = rImporter.object3D(i);
+        int const instance                      = obj->instance();
+        ObjectInstanceType3D const instanceType = obj->instanceType();
 
         if ( obj == nullptr )
         {
             continue;
         }
 
-        tinygltf::Node const *pNode = static_cast<tinygltf::Node const*>(obj->importerState());
+        rImportData.m_objNames[i] = rImporter.object3DName(i);
+        rImportData.m_objTransforms[i] = NodeTransform
+        {
+            obj->translation(), obj->rotation(), obj->scaling()
+        };
 
-        nodeExtras[i] = pNode->extras;
+        // Store hierarchy data
+
+        auto const& children = obj->children();
+        for (UnsignedInt childId : children)
+        {
+            ++parentsSet;
+            rImportData.m_objParents[childId] = i;
+        }
+        rImportData.m_objChildren.emplace(i, children.begin(), children.end());
+
+        // Store drawable data if present
+
+        bool const hasMesh = (instanceType == ObjectInstanceType3D::Mesh)
+                             && (instance != -1);
+
+        MeshObjectData3D const *pObjMesh
+                = hasMesh ? static_cast<MeshObjectData3D const*>(obj.get())
+                          : nullptr;
+
+        rImportData.m_objMeshes[i]     = hasMesh ? instance : -1;
+        rImportData.m_objMaterials[i]  = hasMesh ? pObjMesh->material() : -1;
+
+        // Store custom properties
+
+        tinygltf::Node const *pNode
+                = static_cast<tinygltf::Node const*>(obj->importerState());
+        rNodeExtras[i] = pNode->extras;
 
     }
 
-    rImporter.object3DCount();
+    // Store scenes
+    rImportData.m_scenes.ids_reserve(rImporter.sceneCount());
+
+    // Use number of unparented nodes as the number of scene-level nodes
+    // getting a bit 'clever' here but too bad
+    UnsignedInt const unparentedNodes = objCount - parentsSet;
+    rImportData.m_scenes.data_reserve(unparentedNodes);
+
+    for (UnsignedInt i = 0; i < rImporter.sceneCount(); i ++)
+    {
+        Optional<SceneData> const scene = rImporter.scene(i);
+
+        if (bool(scene))
+        {
+            auto const& children = scene->children3D();
+            rImportData.m_scenes.emplace(i, children.begin(), children.end());
+        }
+        else
+        {
+            rImportData.m_scenes.emplace(i, {});
+        }
+    }
+
+    rImportData.m_objNames.resize(objCount);
 }
 
 ResId osp::load_tinygltf_file(std::string_view filepath, Resources &rResources, PkgId pkg)
