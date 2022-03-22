@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 #include "scenarios.h"
+#include "common_scene.h"
+#include "common_renderer_gl.h"
 #include "CameraController.h"
 
 #include "../ActiveApplication.h"
@@ -31,12 +33,6 @@
 #include <osp/Active/drawing.h>
 
 #include <osp/Active/SysHierarchy.h>
-
-#include <osp/Active/SysRender.h>
-#include <osp/Active/opengl/SysRenderGL.h>
-
-#include <osp/Shaders/Phong.h>
-#include <osp/Shaders/MeshVisualizer.h>
 
 #include <osp/Resource/resources.h>
 
@@ -72,40 +68,22 @@ using namespace Magnum::Math::Literals;
 namespace testapp::physicstest
 {
 
-// Materials used by the test scene. A more general application may want to
-// generate IDs at runtime, and map them to named identifiers.
-constexpr int const gc_mat_common      = 0;
-constexpr int const gc_mat_visualizer  = 1;
-constexpr int const gc_maxMaterials = 2;
 
 constexpr float gc_physTimestep = 1.0 / 60.0f;
 
 /**
  * @brief State of the entire engine test scene
  */
-struct PhysicsTestScene
+struct PhysicsTestScene : CommonTestScene
 {
     ~PhysicsTestScene()
     {
-        osp::active::SysRender::clear_owners(m_drawing);
-        osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
         m_drawing.m_meshRefCounts.ref_release(m_meshCube);
         for (auto & [_, rOwner] : std::exchange(m_shapeToMesh, {}))
         {
             m_drawing.m_meshRefCounts.ref_release(rOwner);
         }
     }
-
-    osp::Resources *m_pResources;
-
-    // ID registry generates entity IDs, and keeps track of which ones exist
-    lgrn::IdRegistry<osp::active::ActiveEnt> m_activeIds;
-
-    // Basic and Drawing components
-    osp::active::ACtxBasic          m_basic;
-    osp::active::ACtxDrawing        m_drawing;
-    osp::active::ACtxDrawingRes     m_drawingRes;
-
 
     // Generic physics components and data
     osp::active::ACtxPhysics        m_physics;
@@ -116,13 +94,6 @@ struct PhysicsTestScene
 
     // Newton Dynamics physics
     std::unique_ptr<ospnewton::ACtxNwtWorld> m_pNwtWorld;
-
-    // Entity delete list/queue
-    std::vector<ActiveEnt>          m_delete;
-    std::vector<ActiveEnt>          m_deleteTotal;
-
-    // Hierarchy root, needs to exist so all hierarchy entities are connected
-    osp::active::ActiveEnt          m_hierRoot{lgrn::id_null<ActiveEnt>()};
 
     // Meshes used in the scene
     entt::dense_hash_map<EShape, MeshIdOwner_t> m_shapeToMesh;
@@ -214,7 +185,7 @@ ActiveEnt add_quick_shape(
     ActiveEnt collider = add_solid(
             rScene, root, shape,
             Matrix4::scaling(size),
-            gc_mat_visualizer, 0.0f);
+            rScene.m_matVisualizer, 0.0f);
 
     // Make ball root a dynamic rigid body
     rScene.m_physics.m_hasColliders.emplace(root);
@@ -263,7 +234,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
     rScene.m_meshCube = quick_add_mesh("grid64solid");
 
     // Allocate space to fit all materials
-    rScene.m_drawing.m_materials.resize(gc_maxMaterials);
+    rScene.m_drawing.m_materials.resize(rScene.m_materialCount);
 
     // Create hierarchy root entity
     rScene.m_hierRoot = rScene.m_activeIds.create();
@@ -305,7 +276,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
 
         // Add mesh visualizer material to floor mesh
         MaterialData &rMatCommon
-                = rScene.m_drawing.m_materials[gc_mat_visualizer];
+                = rScene.m_drawing.m_materials[rScene.m_matVisualizer];
         rMatCommon.m_comp.emplace(floorMesh);
         rMatCommon.m_added.push_back(floorMesh);
 
@@ -326,7 +297,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
         // Add collider (yeah lol it's a big cube)
         add_solid(rScene, floorRoot, EShape::Box,
                   Matrix4::scaling({64.0f, 64.0f, 1.0f}) * Matrix4::translation({0.0f, 0.0f, -1.005f}),
-                  gc_mat_common, 0.0f);
+                  rScene.m_matCommon, 0.0f);
 
         // Make floor root a (non-dynamic) rigid body
         rScene.m_physics.m_hasColliders.emplace(floorRoot);
@@ -341,28 +312,13 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
 void update_test_scene_delete(PhysicsTestScene& rScene)
 {
     using namespace osp::active;
-    // Cut deleted entities out of the hierarchy
-    SysHierarchy::update_delete_cut(
-            rScene.m_basic.m_hierarchy,
-            std::cbegin(rScene.m_delete), std::cend(rScene.m_delete));
 
-    // Create a new delete vector that includes the descendents of our current
-    // vector of entities to delete
-    rScene.m_deleteTotal = rScene.m_delete;
-    SysHierarchy::update_delete_descendents(
-            rScene.m_basic.m_hierarchy,
-            std::cbegin(rScene.m_delete), std::cend(rScene.m_delete),
-            [&rScene] (ActiveEnt ent)
-    {
-        rScene.m_deleteTotal.push_back(ent);
-    });
+    rScene.update_total_delete();
 
     auto first = std::cbegin(rScene.m_deleteTotal);
     auto last = std::cend(rScene.m_deleteTotal);
 
     // Delete components of total entities to delete
-    update_delete_basic                 (rScene.m_basic,        first, last);
-    SysRender::update_delete_drawing    (rScene.m_drawing,      first, last);
     SysPhysics::update_delete_phys      (rScene.m_physics,      first, last);
     SysPhysics::update_delete_shapes    (rScene.m_physics,      first, last);
     SysPhysics::update_delete_hier_body (rScene.m_hierBody,     first, last);
@@ -371,14 +327,8 @@ void update_test_scene_delete(PhysicsTestScene& rScene)
     rScene.m_hasGravity         .remove(first, last);
     rScene.m_removeOutOfBounds  .remove(first, last);
 
-    // Delete entity IDs
-    for (ActiveEnt const ent : rScene.m_deleteTotal)
-    {
-        if (rScene.m_activeIds.exists(ent))
-        {
-            rScene.m_activeIds.remove(ent);
-        }
-    }
+    rScene.update_delete();
+
 }
 
 /**
@@ -485,7 +435,7 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
 /**
  * @brief Data needed to render the EngineTestScene
  */
-struct PhysicsTestRenderer
+struct PhysicsTestRenderer : CommonRendererGL
 {
     PhysicsTestRenderer(ActiveApplication &rApp)
      : m_camCtrl(rApp.get_input_handler())
@@ -493,114 +443,11 @@ struct PhysicsTestRenderer
      , m_btnThrow(m_controls.button_subscribe("debug_throw"))
     { }
 
-    osp::active::ACtxRenderGroups m_renderGroups;
-
-    osp::active::ACtxSceneRenderGL m_renderGl;
-
-    osp::active::ActiveEnt m_camera;
     ACtxCameraController m_camCtrl;
-
-    osp::shader::ACtxDrawPhong m_phong;
-    osp::shader::ACtxDrawMeshVisualizer m_visualizer;
 
     osp::input::ControlSubscriber m_controls;
     osp::input::EButtonControlIndex m_btnThrow;
 };
-
-/**
- * @brief Render a PhysicsTestScene
- *
- * @param rApp      [ref] Application with GL context and resources
- * @param rScene    [ref] Test scene to render
- * @param rRenderer [ref] Renderer data for test scene
- */
-void render_test_scene(
-        ActiveApplication& rApp, PhysicsTestScene const& rScene,
-        PhysicsTestRenderer& rRenderer)
-{
-    using namespace osp::active;
-    using namespace osp::shader;
-    using Magnum::GL::Framebuffer;
-    using Magnum::GL::FramebufferClear;
-    using Magnum::GL::Texture2D;
-
-    RenderGroup &rGroupFwdOpaque
-            = rRenderer.m_renderGroups.m_groups["fwd_opaque"];
-
-    // Assign Phong shader to entities with the gc_mat_common material, and put
-    // results into the fwd_opaque render group
-    {
-        MaterialData const &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
-        assign_phong(
-                rMatCommon.m_added, &rGroupFwdOpaque.m_entities, nullptr,
-                rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexId,
-                rRenderer.m_phong);
-        SysRender::assure_draw_transforms(
-                    rScene.m_basic.m_hierarchy,
-                    rRenderer.m_renderGl.m_drawTransform,
-                    std::cbegin(rMatCommon.m_added),
-                    std::cend(rMatCommon.m_added));
-    }
-
-    // Same thing but with MeshVisualizer and gc_mat_visualizer
-    {
-        MaterialData const &rMatVisualizer
-                = rScene.m_drawing.m_materials[gc_mat_visualizer];
-
-        assign_visualizer(
-                rMatVisualizer.m_added, rGroupFwdOpaque.m_entities,
-                rRenderer.m_visualizer);
-        SysRender::assure_draw_transforms(
-                    rScene.m_basic.m_hierarchy,
-                    rRenderer.m_renderGl.m_drawTransform,
-                    std::cbegin(rMatVisualizer.m_added),
-                    std::cend(rMatVisualizer.m_added));
-    }
-
-    // Load required meshes and textures into OpenGL
-    SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rApp.get_render_gl());
-
-    // Assign GL meshes to entities with a mesh component
-    SysRenderGL::assign_meshes(
-            rScene.m_drawing.m_mesh, rScene.m_drawingRes.m_meshToRes, rScene.m_drawing.m_meshDirty,
-            rRenderer.m_renderGl.m_meshId, rApp.get_render_gl());
-
-    // Assign GL textures to entities with a texture component
-    SysRenderGL::assign_textures(
-            rScene.m_drawing.m_diffuseTex, rScene.m_drawingRes.m_texToRes, rScene.m_drawing.m_diffuseDirty,
-            rRenderer.m_renderGl.m_diffuseTexId, rApp.get_render_gl());
-
-    // Calculate hierarchy transforms
-    SysRender::update_draw_transforms(
-            rScene.m_basic.m_hierarchy,
-            rScene.m_basic.m_transform,
-            rRenderer.m_renderGl.m_drawTransform);
-
-    // Get camera to calculate view and projection matrix
-    ACompCamera const &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
-    ACompDrawTransform const &cameraDrawTf
-            = rRenderer.m_renderGl.m_drawTransform.get(rRenderer.m_camera);
-    ViewProjMatrix viewProj{
-            cameraDrawTf.m_transformWorld.inverted(),
-            rCamera.calculate_projection()};
-
-    // Bind offscreen FBO
-    Framebuffer &rFbo = rApp.get_render_gl().m_fbo;
-    rFbo.bind();
-
-    // Clear it
-    rFbo.clear( FramebufferClear::Color | FramebufferClear::Depth
-                | FramebufferClear::Stencil);
-
-    // Forward Render fwd_opaque group to FBO
-    SysRenderGL::render_opaque(
-            rRenderer.m_renderGroups.m_groups.at("fwd_opaque"),
-            rScene.m_drawing.m_visible, viewProj);
-
-    // Display FBO
-    Texture2D &rFboColor = rApp.get_render_gl().m_texGl.get(rApp.get_render_gl().m_fboColor);
-    SysRenderGL::display_texture(rApp.get_render_gl(), rFboColor);
-}
 
 on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
 {
@@ -612,20 +459,7 @@ on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
     std::shared_ptr<PhysicsTestRenderer> pRenderer
             = std::make_shared<PhysicsTestRenderer>(rApp);
 
-    // Setup Phong shaders
-    auto const texturedFlags
-            = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask
-            | Phong::Flag::AmbientTexture;
-    pRenderer->m_phong.m_shaderDiffuse      = Phong{texturedFlags, 2};
-    pRenderer->m_phong.m_shaderUntextured   = Phong{{}, 2};
-    pRenderer->m_phong.assign_pointers(
-            pRenderer->m_renderGl, rApp.get_render_gl());
-
-    // Setup Mesh Visualizer shader
-    pRenderer->m_visualizer.m_shader
-            = MeshVisualizer{ MeshVisualizer::Flag::Wireframe };
-    pRenderer->m_visualizer.assign_pointers(
-            pRenderer->m_renderGl, rApp.get_render_gl());
+    pRenderer->setup(rApp, rScene);
 
     // Select first camera for rendering
     ActiveEnt const camEnt = rScene.m_basic.m_camera.at(0);
@@ -640,22 +474,8 @@ on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
     // Set initial position of camera slightly above the ground
     pRenderer->m_camCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
 
-    // Create render group for forward opaque pass
-    pRenderer->m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
-
     // Set all materials dirty
-    for (MaterialData &rMat : rScene.m_drawing.m_materials)
-    {
-        rMat.m_added.assign(std::begin(rMat.m_comp), std::end(rMat.m_comp));
-    }
-
-    // Set all meshs dirty
-    auto &rMeshSet = static_cast<active_sparse_set_t&>(rScene.m_drawing.m_mesh);
-    rScene.m_drawing.m_meshDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
-
-    // Set all textures dirty
-    auto &rDiffSet = static_cast<active_sparse_set_t&>(rScene.m_drawing.m_diffuseTex);
-    rScene.m_drawing.m_diffuseDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
+    rScene.set_all_dirty();
 
     return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
     {
@@ -676,10 +496,7 @@ on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
         update_test_scene(rScene, delta);
 
         // Delete components of deleted entities on renderer's side
-        auto first = std::cbegin(rScene.m_deleteTotal);
-        auto last = std::cend(rScene.m_deleteTotal);
-        SysRender::update_delete_groups(pRenderer->m_renderGroups, first, last);
-        SysRenderGL::update_delete(pRenderer->m_renderGl, first, last);
+        pRenderer->update_delete(rScene.m_deleteTotal);
 
         // Rotate and move the camera based on user inputs
         SysCameraController::update_view(
@@ -690,7 +507,7 @@ on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
                 rScene.m_basic.m_transform.get(pRenderer->m_camera),
                 delta, true);
 
-        render_test_scene(rApp, rScene, *pRenderer);
+        pRenderer->render(rApp, rScene);
 
         SysRender::clear_dirty_materials(rScene.m_drawing.m_materials);
     };
