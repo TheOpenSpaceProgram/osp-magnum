@@ -134,7 +134,7 @@ public:
     static MeshId own_mesh_resource(
             ACtxDrawing& rCtxDrawing,
             ACtxDrawingRes& rCtxDrawingRes,
-            Resources &rResources,
+            Resources& rResources,
             ResId resId);
 
     /**
@@ -152,7 +152,7 @@ public:
      */
     static void clear_resource_owners(
             ACtxDrawingRes& rCtxDrawingRes,
-            Resources &rResources);
+            Resources& rResources);
 
     inline static void add_draw_transforms_recurse(
             acomp_storage_t<ACompHierarchy> const& hier,
@@ -191,11 +191,11 @@ public:
 
     template<typename IT_T>
     static void update_delete_drawing(
-            ACtxDrawing &rCtxDraw, IT_T first, IT_T last);
+            ACtxDrawing& rCtxDraw, IT_T first, IT_T last);
 
     template<typename IT_T>
     static void update_delete_groups(
-            ACtxRenderGroups &rCtxGroups, IT_T first, IT_T last);
+            ACtxRenderGroups& rCtxGroups, IT_T first, IT_T last);
 
 private:
 
@@ -254,7 +254,7 @@ void remove_refcounted(
 
 template<typename IT_T>
 void SysRender::update_delete_drawing(
-        ACtxDrawing &rCtxDraw, IT_T first, IT_T last)
+        ACtxDrawing& rCtxDraw, IT_T first, IT_T last)
 {
     while (first != last)
     {
@@ -278,7 +278,7 @@ void SysRender::update_delete_drawing(
 
 template<typename IT_T>
 void SysRender::update_delete_groups(
-        ACtxRenderGroups &rCtxGroups, IT_T first, IT_T last)
+        ACtxRenderGroups& rCtxGroups, IT_T first, IT_T last)
 {
     if (first == last)
     {

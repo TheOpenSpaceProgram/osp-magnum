@@ -48,6 +48,8 @@
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
+using osp::active::ActiveEnt;
+
 using Magnum::Trade::MeshData;
 using Magnum::Trade::ImageData2D;
 
@@ -79,7 +81,7 @@ struct EngineTestScene
     osp::Resources *m_pResources;
 
     // ID registry generates entity IDs, and keeps track of which ones exist
-    lgrn::IdRegistry<osp::active::ActiveEnt> m_activeIds;
+    lgrn::IdRegistry<ActiveEnt> m_activeIds;
 
     // Components and supporting data structures
     osp::active::ACtxBasic          m_basic;    
@@ -87,10 +89,10 @@ struct EngineTestScene
     osp::active::ACtxDrawingRes     m_drawingRes;
 
     // Hierarchy root, needs to exist so all hierarchy entities are connected
-    osp::active::ActiveEnt          m_hierRoot;
+    ActiveEnt                       m_hierRoot{lgrn::id_null<ActiveEnt>()};
 
     // The rotating cube
-    osp::active::ActiveEnt          m_cube;
+    ActiveEnt                       m_cube{lgrn::id_null<ActiveEnt>()};
 
     osp::active::MeshIdOwner_t      m_meshCube;
 };
@@ -195,7 +197,7 @@ struct EngineTestRenderer
 
     osp::active::ACtxSceneRenderGL m_renderGl{};
 
-    osp::active::ActiveEnt m_camera;
+    ActiveEnt m_camera{lgrn::id_null<ActiveEnt>()};
     ACtxCameraController m_camCtrl;
 
     osp::shader::ACtxDrawPhong m_phong{};
