@@ -118,7 +118,7 @@ struct PhysicsTestScene
     std::vector<ActiveEnt>          m_deleteTotal;
 
     // Hierarchy root, needs to exist so all hierarchy entities are connected
-    osp::active::ActiveEnt          m_hierRoot;
+    osp::active::ActiveEnt          m_hierRoot{lgrn::id_null<ActiveEnt>()};
 
     // Meshes used in the scene
     entt::dense_hash_map<EShape, MeshIdOwner_t> m_shapeToMesh;
