@@ -33,6 +33,7 @@
 namespace testapp
 {
 
+struct CommonTestScene;
 class ActiveApplication;
 
 using on_draw_t = std::function<void(ActiveApplication&, float delta)>;
@@ -96,17 +97,14 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp);
 namespace physicstest
 {
 
-struct PhysicsTestScene;
-
 /**
  * @brief Setup Physics Test Scene
  *
- * @param rResources    [ref] Application Resources containing mesh primatives
  * @param pkg           [in] Package Id the mesh primatives are under
  *
  * @return entt::any containing scene data
  */
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
+void setup_scene(CommonTestScene &rScene, osp::PkgId pkg);
 
 /**
  * @brief Generate ActiveApplication draw function
@@ -119,7 +117,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
  *
  * @return ActiveApplication draw function
  */
-on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp);
+on_draw_t generate_draw_func(CommonTestScene& rScene, ActiveApplication& rApp);
 
 } // namespace physicstest
 

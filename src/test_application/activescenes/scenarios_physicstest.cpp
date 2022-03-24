@@ -31,6 +31,7 @@
 
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
+#include <osp/Active/physics.h>
 
 #include <osp/Active/SysHierarchy.h>
 
@@ -68,32 +69,29 @@ using namespace Magnum::Math::Literals;
 namespace testapp::physicstest
 {
 
-
 constexpr float gc_physTimestep = 1.0 / 60.0f;
+constexpr int gc_threadCount = 4; // note: not yet passed to Newton
 
 /**
- * @brief State of the entire engine test scene
+ * @brief Data needed to support physics in any scene
  */
-struct PhysicsTestScene : CommonTestScene
+struct PhysicsData
 {
-    ~PhysicsTestScene()
-    {
-        m_drawing.m_meshRefCounts.ref_release(m_meshCube);
-        for (auto & [_, rOwner] : std::exchange(m_shapeToMesh, {}))
-        {
-            m_drawing.m_meshRefCounts.ref_release(rOwner);
-        }
-    }
-
     // Generic physics components and data
     osp::active::ACtxPhysics        m_physics;
-    osp::active::ACtxPhysInputs     m_physIn;
     osp::active::ACtxHierBody       m_hierBody;
+
+    // 'Per-thread' inputs fed into the physics engine. Only one here for now
+    osp::active::ACtxPhysInputs     m_physIn;
+};
+
+/**
+ * @brief Data used specifically by the physics test scene
+ */
+struct PhysicsTestData
+{
     active_sparse_set_t             m_hasGravity;
     active_sparse_set_t             m_removeOutOfBounds;
-
-    // Newton Dynamics physics
-    std::unique_ptr<ospnewton::ACtxNwtWorld> m_pNwtWorld;
 
     // Meshes used in the scene
     entt::dense_hash_map<EShape, MeshIdOwner_t> m_shapeToMesh;
@@ -114,21 +112,23 @@ struct PhysicsTestScene : CommonTestScene
 
     // Queue for balls to throw
     std::vector<ThrowShape> m_toThrow;
-
 };
 
-ActiveEnt add_solid(
-        PhysicsTestScene& rScene, ActiveEnt parent,
+static ActiveEnt add_solid(
+        CommonTestScene& rScene, ActiveEnt parent,
         EShape shape, Matrix4 transform, int material, float mass)
 {
     using namespace osp::active;
+
+    auto &rScnTest = rScene.get<PhysicsTestData>();
+    auto &rScnPhys = rScene.get<PhysicsData>();
 
     // Make entity
     ActiveEnt ent = rScene.m_activeIds.create();
 
     // Add mesh
     rScene.m_drawing.m_mesh.emplace(
-            ent, rScene.m_drawing.m_meshRefCounts.ref_add(rScene.m_shapeToMesh.at(shape)) );
+            ent, rScene.m_drawing.m_meshRefCounts.ref_add(rScnTest.m_shapeToMesh.at(shape)) );
     rScene.m_drawing.m_meshDirty.push_back(ent);
 
     // Add material to cube
@@ -144,12 +144,13 @@ ActiveEnt add_solid(
     rScene.m_drawing.m_visible.emplace(ent);
 
     // Add physics stuff
-    rScene.m_physics.m_shape.emplace(ent, shape);
-    rScene.m_physics.m_solid.emplace(ent);
+    rScnPhys.m_physics.m_shape.emplace(ent, shape);
+    rScnPhys.m_physics.m_solid.emplace(ent);
     Vector3 const inertia
             = osp::phys::collider_inertia_tensor(shape, transform.scaling(), mass);
-    rScene.m_hierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
-    rScene.m_physIn.m_colliderDirty.push_back(ent);
+    rScnPhys.m_hierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
+
+    rScnPhys.m_physIn.m_colliderDirty.push_back(ent);
 
     // Add to hierarchy
     SysHierarchy::add_child(rScene.m_basic.m_hierarchy, parent, ent);
@@ -163,11 +164,14 @@ ActiveEnt add_solid(
  *
  * @return Root of shape entity
  */
-ActiveEnt add_quick_shape(
-        PhysicsTestScene &rScene, Vector3 position, Vector3 velocity,
+static ActiveEnt add_quick_shape(
+        CommonTestScene &rScene, Vector3 position, Vector3 velocity,
         float mass, EShape shape, Vector3 size)
 {
     using namespace osp::active;
+
+    auto &rScnTest = rScene.get<PhysicsTestData>();
+    auto &rScnPhys = rScene.get<PhysicsData>();
 
     // Root is needed to act as the rigid body entity
     // Scale of root entity must be (1, 1, 1). Descendents that act as colliders
@@ -188,34 +192,54 @@ ActiveEnt add_quick_shape(
             rScene.m_matVisualizer, 0.0f);
 
     // Make ball root a dynamic rigid body
-    rScene.m_physics.m_hasColliders.emplace(root);
-    rScene.m_physics.m_physBody.emplace(root);
-    rScene.m_physics.m_physLinearVel.emplace(root);
-    rScene.m_physics.m_physAngularVel.emplace(root);
-    osp::active::ACompPhysDynamic &rDyn = rScene.m_physics.m_physDynamic.emplace(root);
+    rScnPhys.m_physics.m_hasColliders.emplace(root);
+    rScnPhys.m_physics.m_physBody.emplace(root);
+    rScnPhys.m_physics.m_physLinearVel.emplace(root);
+    rScnPhys.m_physics.m_physAngularVel.emplace(root);
+    osp::active::ACompPhysDynamic &rDyn = rScnPhys.m_physics.m_physDynamic.emplace(root);
     rDyn.m_totalMass = 1.0f;
 
     // make gravity affect ball
-    rScene.m_hasGravity.emplace(root);
+    rScnTest.m_hasGravity.emplace(root);
 
     // Remove ball when it goes out of bounds
-    rScene.m_removeOutOfBounds.emplace(root);
+    rScnTest.m_removeOutOfBounds.emplace(root);
 
     // Set velocity
-    rScene.m_physIn.m_setVelocity.emplace_back(root, velocity);
+    rScnPhys.m_physIn.m_setVelocity.emplace_back(root, velocity);
 
     return root;
 }
 
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
+void setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
 {
     using namespace osp::active;
 
-    entt::any sceneAny = entt::make_any<PhysicsTestScene>();
-    PhysicsTestScene &rScene = entt::any_cast<PhysicsTestScene&>(sceneAny);
+    // It should be clear that the physics test scene is a composition of:
+    // * PhysicsData:       Generic physics data
+    // * ACtxNwtWorld:      Newton Dynamics Physics engine
+    // * PhysicsTestData:   Additional scene-specific data, ie. dropping blocks
+    auto &rScnPhys  = rScene.emplace<PhysicsData>();
+    auto &rScnNwt   = rScene.emplace<ospnewton::ACtxNwtWorld>(gc_threadCount);
+    auto &rScnTest  = rScene.emplace<PhysicsTestData>();
 
-    rScene.m_pResources = &rResources;
+    // Add cleanup function to deal with reference counts
+    // Note: The problem with destructors, is that REQUIRE storing pointers in
+    //       the data, which is uglier to deal with
+    rScene.m_onCleanup.push_back([] (CommonTestScene &rScene)
+    {
+        auto &rScnTest = rScene.get<PhysicsTestData>();
 
+        rScene.m_drawing.m_meshRefCounts.ref_release(rScnTest.m_meshCube);
+        for (auto & [_, rOwner] : std::exchange(rScnTest.m_shapeToMesh, {}))
+        {
+            rScene.m_drawing.m_meshRefCounts.ref_release(rOwner);
+        }
+    });
+
+    osp::Resources &rResources = *rScene.m_pResources;
+
+    // Convenient function to get a reference-counted mesh owner
     auto const quick_add_mesh = [&rScene, &rResources, pkg] (std::string_view name) -> MeshIdOwner_t
     {
         osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
@@ -224,14 +248,11 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
         return rScene.m_drawing.m_meshRefCounts.ref_add(meshId);
     };
 
-    // Create Newton physics world that uses 4 threads to update
-    rScene.m_pNwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(4);
-
     // Acquire mesh resources from Package
-    rScene.m_shapeToMesh.emplace(EShape::Box,       quick_add_mesh("cube"));
-    rScene.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
-    rScene.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
-    rScene.m_meshCube = quick_add_mesh("grid64solid");
+    rScnTest.m_shapeToMesh.emplace(EShape::Box,       quick_add_mesh("cube"));
+    rScnTest.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
+    rScnTest.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
+    rScnTest.m_meshCube = quick_add_mesh("grid64solid");
 
     // Allocate space to fit all materials
     rScene.m_drawing.m_materials.resize(rScene.m_materialCount);
@@ -271,7 +292,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
 
         // Add grid mesh to floor mesh
         rScene.m_drawing.m_mesh.emplace(
-                floorMesh, rScene.m_drawing.m_meshRefCounts.ref_add(rScene.m_meshCube));
+                floorMesh, rScene.m_drawing.m_meshRefCounts.ref_add(rScnTest.m_meshCube));
         rScene.m_drawing.m_meshDirty.push_back(floorMesh);
 
         // Add mesh visualizer material to floor mesh
@@ -300,18 +321,18 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
                   rScene.m_matCommon, 0.0f);
 
         // Make floor root a (non-dynamic) rigid body
-        rScene.m_physics.m_hasColliders.emplace(floorRoot);
-        rScene.m_physics.m_physBody.emplace(floorRoot);
+        rScnPhys.m_physics.m_hasColliders.emplace(floorRoot);
+        rScnPhys.m_physics.m_physBody.emplace(floorRoot);
     }
-
-    // Create ball
-
-    return std::move(sceneAny);
 }
 
-void update_test_scene_delete(PhysicsTestScene& rScene)
+void update_test_scene_delete(CommonTestScene &rScene)
 {
     using namespace osp::active;
+
+    auto &rScnTest  = rScene.get<PhysicsTestData>();
+    auto &rScnPhys  = rScene.get<PhysicsData>();
+    auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
 
     rScene.update_total_delete();
 
@@ -319,37 +340,40 @@ void update_test_scene_delete(PhysicsTestScene& rScene)
     auto last = std::cend(rScene.m_deleteTotal);
 
     // Delete components of total entities to delete
-    SysPhysics::update_delete_phys      (rScene.m_physics,      first, last);
-    SysPhysics::update_delete_shapes    (rScene.m_physics,      first, last);
-    SysPhysics::update_delete_hier_body (rScene.m_hierBody,     first, last);
-    ospnewton::SysNewton::update_delete (*rScene.m_pNwtWorld,   first, last);
+    SysPhysics::update_delete_phys      (rScnPhys.m_physics,    first, last);
+    SysPhysics::update_delete_shapes    (rScnPhys.m_physics,    first, last);
+    SysPhysics::update_delete_hier_body (rScnPhys.m_hierBody,   first, last);
+    ospnewton::SysNewton::update_delete (rScnNwt,               first, last);
 
-    rScene.m_hasGravity         .remove(first, last);
-    rScene.m_removeOutOfBounds  .remove(first, last);
+    rScnTest.m_hasGravity         .remove(first, last);
+    rScnTest.m_removeOutOfBounds  .remove(first, last);
 
     rScene.update_delete();
 
 }
 
 /**
- * @brief Update an EngineTestScene, this just rotates the cube
+ * @brief Update CommonTestScene containing physics test
  *
  * @param rScene [ref] scene to update
  */
-void update_test_scene(PhysicsTestScene& rScene, float delta)
+static void update_test_scene(CommonTestScene& rScene, float delta)
 {
     using namespace osp::active;
+    using namespace ospnewton;
     using Corrade::Containers::ArrayView;
 
-    using namespace ospnewton;
+    auto &rScnTest  = rScene.get<PhysicsTestData>();
+    auto &rScnPhys  = rScene.get<PhysicsData>();
+    auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
 
     // Create boxes every 2 seconds
-    rScene.m_boxTimer += delta;
-    if (rScene.m_boxTimer >= 2.0f)
+    rScnTest.m_boxTimer += delta;
+    if (rScnTest.m_boxTimer >= 2.0f)
     {
-        rScene.m_boxTimer -= 2.0f;
+        rScnTest.m_boxTimer -= 2.0f;
 
-        rScene.m_toThrow.emplace_back(PhysicsTestScene::ThrowShape{
+        rScnTest.m_toThrow.emplace_back(PhysicsTestData::ThrowShape{
                 Vector3{10.0f, 30.0f, 0.0f},  // position
                 Vector3{0.0f}, // velocity
                 Vector3{2.0f, 1.0f, 2.0f}, // size
@@ -358,12 +382,12 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
     }
 
     // Create cylinders every 2 seconds
-    rScene.m_cylinderTimer += delta;
-    if (rScene.m_cylinderTimer >= 2.0f)
+    rScnTest.m_cylinderTimer += delta;
+    if (rScnTest.m_cylinderTimer >= 2.0f)
     {
-        rScene.m_cylinderTimer -= 2.0f;
+        rScnTest.m_cylinderTimer -= 2.0f;
 
-        rScene.m_toThrow.emplace_back(PhysicsTestScene::ThrowShape{
+        rScnTest.m_toThrow.emplace_back(PhysicsTestData::ThrowShape{
                 Vector3{-10.0f, 30.0f, 0.0f},  // position
                 Vector3{0.0f}, // velocity
                 Vector3{1.0f, 1.5f, 1.0f}, // size
@@ -372,10 +396,10 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
     }
 
     // Gravity System, applies a 9.81N force downwards (-Y) for select entities
-    for (ActiveEnt ent : rScene.m_hasGravity)
+    for (ActiveEnt ent : rScnTest.m_hasGravity)
     {
         acomp_storage_t<ACompPhysNetForce> &rNetForce
-                = rScene.m_physIn.m_physNetForce;
+                = rScnPhys.m_physIn.m_physNetForce;
         ACompPhysNetForce &rEntNetForce = rNetForce.contains(ent)
                                         ? rNetForce.get(ent)
                                         : rNetForce.emplace(ent);
@@ -386,12 +410,12 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
     // Physics update
 
     SysNewton::update_colliders(
-            rScene.m_physics, *rScene.m_pNwtWorld,
-            std::exchange(rScene.m_physIn.m_colliderDirty, {}));
+            rScnPhys.m_physics, rScnNwt,
+            std::exchange(rScnPhys.m_physIn.m_colliderDirty, {}));
 
-    auto const physIn = ArrayView<ACtxPhysInputs>(&rScene.m_physIn, 1);
+    auto const physIn = ArrayView<ACtxPhysInputs>(&rScnPhys.m_physIn, 1);
     SysNewton::update_world(
-            rScene.m_physics, *rScene.m_pNwtWorld, gc_physTimestep, physIn,
+            rScnPhys.m_physics, rScnNwt, gc_physTimestep, physIn,
             rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform, rScene.m_basic.m_transformControlled,
             rScene.m_basic.m_transformMutable);
@@ -401,7 +425,7 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
 
     // Check position of all entities with the out-of-bounds component
     // Delete the ones that go out of bounds
-    for (ActiveEnt const ent : rScene.m_removeOutOfBounds)
+    for (ActiveEnt const ent : rScnTest.m_removeOutOfBounds)
     {
         ACompTransform const &entTf = rScene.m_basic.m_transform.get(ent);
         if (entTf.m_transform.translation().y() < -10)
@@ -419,7 +443,7 @@ void update_test_scene(PhysicsTestScene& rScene, float delta)
     //       when entities are created and deleted right away.
 
     // Shape Thrower system, consumes rScene.m_toThrow and creates shapes
-    for (PhysicsTestScene::ThrowShape const &rThrow : std::exchange(rScene.m_toThrow, {}))
+    for (PhysicsTestData::ThrowShape const &rThrow : std::exchange(rScnTest.m_toThrow, {}))
     {
         ActiveEnt const shape = add_quick_shape(
                 rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_mass,
@@ -449,7 +473,7 @@ struct PhysicsTestRenderer : CommonRendererGL
     osp::input::EButtonControlIndex m_btnThrow;
 };
 
-on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
+on_draw_t generate_draw_func(CommonTestScene& rScene, ActiveApplication& rApp)
 {
     using namespace osp::active;
     using namespace osp::shader;
@@ -479,13 +503,15 @@ on_draw_t generate_draw_func(PhysicsTestScene& rScene, ActiveApplication& rApp)
 
     return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
     {
+        auto &rScnTest = rScene.get<PhysicsTestData>();
+
         // Throw a sphere when the throw button is pressed
         if (pRenderer->m_controls.button_triggered(pRenderer->m_btnThrow))
         {
             Matrix4 const &camTf = rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform;
             float const speed = 120;
             float const dist = 5.0f; // Distance from camera to spawn spheres
-            rScene.m_toThrow.emplace_back(PhysicsTestScene::ThrowShape{
+            rScnTest.m_toThrow.emplace_back(PhysicsTestData::ThrowShape{
                     camTf.translation() - camTf.backward() * dist, // position
                     -camTf.backward() * speed, // velocity
                     Vector3{1.0f}, // size (radius)

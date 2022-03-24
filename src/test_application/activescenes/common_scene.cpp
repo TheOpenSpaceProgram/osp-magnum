@@ -33,6 +33,12 @@ namespace testapp
 
 CommonTestScene::~CommonTestScene()
 {
+    // Clear data first
+    for (on_cleanup_t *cleanup : m_onCleanup)
+    {
+        cleanup(*this);
+    }
+
     osp::active::SysRender::clear_owners(m_drawing);
     osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
 }
