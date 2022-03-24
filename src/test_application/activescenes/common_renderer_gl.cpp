@@ -31,7 +31,7 @@
 namespace testapp
 {
 
-void CommonRendererGL::setup(ActiveApplication& rApp, CommonTestScene& rScene)
+void CommonSceneRendererGL::setup(ActiveApplication& rApp, CommonTestScene& rScene)
 {
     using namespace osp::active;
     using namespace osp::shader;
@@ -56,7 +56,7 @@ void CommonRendererGL::setup(ActiveApplication& rApp, CommonTestScene& rScene)
 
 }
 
-void CommonRendererGL::render(ActiveApplication& rApp, CommonTestScene& rScene)
+void CommonSceneRendererGL::render(ActiveApplication& rApp, CommonTestScene& rScene)
 {
     using namespace osp::active;
     using namespace osp::shader;
@@ -142,7 +142,7 @@ void CommonRendererGL::render(ActiveApplication& rApp, CommonTestScene& rScene)
     SysRenderGL::display_texture(rApp.get_render_gl(), rFboColor);
 }
 
-void CommonRendererGL::update_delete(std::vector<osp::active::ActiveEnt> const& toDelete)
+void CommonSceneRendererGL::update_delete(std::vector<osp::active::ActiveEnt> const& toDelete)
 {
     auto first = std::cbegin(toDelete);
     auto last = std::cend(toDelete);

@@ -186,7 +186,7 @@ static ActiveEnt add_quick_shape(
     SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, root);
 
     // Create collider / drawable to the root entity
-    ActiveEnt collider = add_solid(
+    add_solid(
             rScene, root, shape,
             Matrix4::scaling(size),
             rScene.m_matVisualizer, 0.0f);
@@ -334,7 +334,7 @@ void update_test_scene_delete(CommonTestScene &rScene)
     auto &rScnPhys  = rScene.get<PhysicsData>();
     auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
 
-    rScene.update_total_delete();
+    rScene.update_hierarchy_delete();
 
     auto first = std::cbegin(rScene.m_deleteTotal);
     auto last = std::cend(rScene.m_deleteTotal);
@@ -445,7 +445,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     // Shape Thrower system, consumes rScene.m_toThrow and creates shapes
     for (PhysicsTestData::ThrowShape const &rThrow : std::exchange(rScnTest.m_toThrow, {}))
     {
-        ActiveEnt const shape = add_quick_shape(
+        add_quick_shape(
                 rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_mass,
                 rThrow.m_shape, rThrow.m_size);
     }
@@ -456,20 +456,15 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
 
 //-----------------------------------------------------------------------------
 
-/**
- * @brief Data needed to render the EngineTestScene
- */
-struct PhysicsTestRenderer : CommonRendererGL
+struct PhysicsTestControls
 {
-    PhysicsTestRenderer(ActiveApplication &rApp)
+    PhysicsTestControls(ActiveApplication &rApp)
      : m_camCtrl(rApp.get_input_handler())
-     , m_controls(&rApp.get_input_handler())
-     , m_btnThrow(m_controls.button_subscribe("debug_throw"))
+     , m_btnThrow(m_camCtrl.m_controls.button_subscribe("debug_throw"))
     { }
 
     ACtxCameraController m_camCtrl;
 
-    osp::input::ControlSubscriber m_controls;
     osp::input::EButtonControlIndex m_btnThrow;
 };
 
@@ -480,8 +475,11 @@ on_draw_t generate_draw_func(CommonTestScene& rScene, ActiveApplication& rApp)
 
     // Create renderer data. This uses a shared_ptr to allow being stored
     // inside an std::function, which require copyable types
-    std::shared_ptr<PhysicsTestRenderer> pRenderer
-            = std::make_shared<PhysicsTestRenderer>(rApp);
+    std::shared_ptr<CommonSceneRendererGL> pRenderer
+            = std::make_shared<CommonSceneRendererGL>();
+
+    CommonSceneRendererGL &rRenderer = *pRenderer;
+    auto &rControls = rRenderer.emplace<PhysicsTestControls>(rApp);
 
     pRenderer->setup(rApp, rScene);
 
@@ -496,7 +494,7 @@ on_draw_t generate_draw_func(CommonTestScene& rScene, ActiveApplication& rApp)
             camEnt);
 
     // Set initial position of camera slightly above the ground
-    pRenderer->m_camCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
+    rControls.m_camCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
 
     // Set all materials dirty
     rScene.set_all_dirty();
@@ -504,9 +502,10 @@ on_draw_t generate_draw_func(CommonTestScene& rScene, ActiveApplication& rApp)
     return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
     {
         auto &rScnTest = rScene.get<PhysicsTestData>();
+        auto &rControls = pRenderer->get<PhysicsTestControls>();
 
         // Throw a sphere when the throw button is pressed
-        if (pRenderer->m_controls.button_triggered(pRenderer->m_btnThrow))
+        if (rControls.m_camCtrl.m_controls.button_triggered(rControls.m_btnThrow))
         {
             Matrix4 const &camTf = rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform;
             float const speed = 120;
@@ -526,13 +525,14 @@ on_draw_t generate_draw_func(CommonTestScene& rScene, ActiveApplication& rApp)
 
         // Rotate and move the camera based on user inputs
         SysCameraController::update_view(
-                pRenderer->m_camCtrl,
+                rControls.m_camCtrl,
                 rScene.m_basic.m_transform.get(pRenderer->m_camera), delta);
         SysCameraController::update_move(
-                pRenderer->m_camCtrl,
+                rControls.m_camCtrl,
                 rScene.m_basic.m_transform.get(pRenderer->m_camera),
                 delta, true);
 
+        // Do common render
         pRenderer->render(rApp, rScene);
 
         SysRender::clear_dirty_materials(rScene.m_drawing.m_materials);
