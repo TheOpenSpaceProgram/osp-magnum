@@ -35,7 +35,7 @@ namespace testapp
 {
 
 /**
- * @brief An array of entt::any intended for unique types
+ * @brief An array of entt::any intended for storing unique types
  */
 struct MultiAny
 {
@@ -49,6 +49,38 @@ struct MultiAny
     template <typename T>
     T& get();
 };
+
+template <typename T, typename ... ARGS_T>
+T& MultiAny::emplace(ARGS_T&& ... args)
+{
+    Array_t::iterator found = std::find_if(std::begin(m_data), std::end(m_data),
+                              [] (entt::any const &any)
+    {
+        return ! bool(any);
+    });
+
+    assert (found != std::end(m_data));
+
+    found->emplace<T>(std::forward<ARGS_T>(args) ...);
+
+    return entt::any_cast<T&>(*found);
+}
+
+template <typename T>
+T& MultiAny::get()
+{
+    Array_t::iterator found = std::find_if(std::begin(m_data), std::end(m_data),
+                              [] (entt::any const &any)
+    {
+        return any.type() == entt::type_id<T>();
+    });
+
+    assert (found != std::end(m_data));
+
+    return entt::any_cast<T&>(*found);
+}
+
+//-----------------------------------------------------------------------------
 
 struct CommonTestScene : MultiAny
 {
@@ -83,41 +115,26 @@ struct CommonTestScene : MultiAny
     int     m_matCommon         {m_materialCount++};
     int     m_matVisualizer     {m_materialCount++};
 
-    void update_total_delete();
+    /**
+     * @brief Delete descendents of entities to delete
+     *
+     * Reads m_delete, and populates m_deleteTotal with existing m_delete and
+     * descendents added
+     */
+    void update_hierarchy_delete();
+
+    /**
+     * @brief Delete components of deleted entities in m_deleteTotal
+     */
     void update_delete();
+
+    /**
+     * @brief Set all meshes, textures, and materials as dirty
+     *
+     * Intended to synchronize a newly added renderer
+     */
     void set_all_dirty();
 };
-
-template <typename T, typename ... ARGS_T>
-T& MultiAny::emplace(ARGS_T&& ... args)
-{
-    // Find an empty any
-    Array_t::iterator found = std::find_if(std::begin(m_data), std::end(m_data),
-                              [] (entt::any const &any)
-    {
-        return ! bool(any);
-    });
-
-    assert (found != std::end(m_data));
-
-    found->emplace<T>(std::forward<ARGS_T>(args) ...);
-
-    return entt::any_cast<T&>(*found);
-}
-
-template <typename T>
-T& MultiAny::get()
-{
-    Array_t::iterator found = std::find_if(std::begin(m_data), std::end(m_data),
-                              [] (entt::any const &any)
-    {
-        return any.type() == entt::type_id<T>();
-    });
-
-    assert (found != std::end(m_data));
-
-    return entt::any_cast<T&>(*found);
-}
 
 
 } // namespace testapp

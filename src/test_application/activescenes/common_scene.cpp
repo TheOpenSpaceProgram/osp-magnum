@@ -43,7 +43,7 @@ CommonTestScene::~CommonTestScene()
     osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
 }
 
-void CommonTestScene::update_total_delete()
+void CommonTestScene::update_hierarchy_delete()
 {
     using namespace osp::active;
     // Cut deleted entities out of the hierarchy

@@ -36,27 +36,45 @@
 namespace testapp
 {
 
-struct CommonRendererGL : MultiAny
+/**
+ * @brief Common data needed to render a scene
+ *
+ * Note: GPU resources and application-level rendering data can be found in
+ *       osp::active::RenderGL
+ *
+ */
+struct CommonSceneRendererGL : MultiAny
 {
-    osp::active::ACtxRenderGroups m_renderGroups;
-
     osp::active::ACtxSceneRenderGL m_renderGl;
+
+    osp::active::ACtxRenderGroups m_renderGroups;
 
     osp::shader::ACtxDrawPhong m_phong;
     osp::shader::ACtxDrawMeshVisualizer m_visualizer;
 
     osp::active::ActiveEnt m_camera;
 
+    /**
+     * @brief Setup default shaders and render groups
+     *
+     * @param rApp      [ref] Application with GL context
+     * @param rScene    [ref] Test scene to render
+     */
     void setup(ActiveApplication& rApp, CommonTestScene& rScene);
 
     /**
      * @brief Render a CommonTestScene
      *
-     * @param rApp      [ref] Application with GL context and resources
+     * @param rApp      [ref] Application with GL context
      * @param rScene    [ref] Test scene to render
-     * @param rRenderer [ref] Renderer data for test scene
      */
     void render(ActiveApplication& rApp, CommonTestScene& rScene);
+
+    /**
+     * @brief Delete components of entities to delete
+     *
+     * @param toDelete  [in] Vector of deleted entities
+     */
     void update_delete(std::vector<osp::active::ActiveEnt> const& toDelete);
 };
 
