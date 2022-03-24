@@ -27,16 +27,42 @@
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
 
+//#include <entt/core/any.hpp>
+
+#include <array>
 
 namespace testapp
 {
-struct CommonTestScene
+
+/**
+ * @brief An array of entt::any intended for unique types
+ */
+struct MultiAny
 {
+    using Array_t = std::array<entt::any, 8>;
+
+    Array_t m_data;
+
+    template <typename T, typename ... ARGS_T>
+    T& emplace(ARGS_T&& ... args);
+
+    template <typename T>
+    T& get();
+};
+
+struct CommonTestScene : MultiAny
+{
+    using on_cleanup_t = void(CommonTestScene&);
     using ActiveEnt = osp::active::ActiveEnt;
 
+    CommonTestScene(osp::Resources &rResources)
+     : m_pResources{&rResources}
+    { }
     ~CommonTestScene();
 
     osp::Resources *m_pResources;
+
+    std::vector<on_cleanup_t*> m_onCleanup;
 
     // ID registry generates entity IDs, and keeps track of which ones exist
     lgrn::IdRegistry<osp::active::ActiveEnt> m_activeIds;
@@ -51,7 +77,7 @@ struct CommonTestScene
     std::vector<ActiveEnt>          m_deleteTotal;
 
     // Hierarchy root, needs to exist so all hierarchy entities are connected
-    ActiveEnt                       m_hierRoot;
+    ActiveEnt                       m_hierRoot{lgrn::id_null<ActiveEnt>()};
 
     int     m_materialCount     {0};
     int     m_matCommon         {m_materialCount++};
@@ -61,5 +87,37 @@ struct CommonTestScene
     void update_delete();
     void set_all_dirty();
 };
+
+template <typename T, typename ... ARGS_T>
+T& MultiAny::emplace(ARGS_T&& ... args)
+{
+    // Find an empty any
+    Array_t::iterator found = std::find_if(std::begin(m_data), std::end(m_data),
+                              [] (entt::any const &any)
+    {
+        return ! bool(any);
+    });
+
+    assert (found != std::end(m_data));
+
+    found->emplace<T>(std::forward<ARGS_T>(args) ...);
+
+    return entt::any_cast<T&>(*found);
+}
+
+template <typename T>
+T& MultiAny::get()
+{
+    Array_t::iterator found = std::find_if(std::begin(m_data), std::end(m_data),
+                              [] (entt::any const &any)
+    {
+        return any.type() == entt::type_id<T>();
+    });
+
+    assert (found != std::end(m_data));
+
+    return entt::any_cast<T&>(*found);
+}
+
 
 } // namespace testapp

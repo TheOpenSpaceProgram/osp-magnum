@@ -36,7 +36,7 @@
 namespace testapp
 {
 
-struct CommonRendererGL
+struct CommonRendererGL : MultiAny
 {
     osp::active::ACtxRenderGroups m_renderGroups;
 

@@ -29,6 +29,7 @@
 
 #include "ActiveApplication.h"
 #include "activescenes/scenarios.h"
+#include "activescenes/common_scene.h"
 
 #include "universes/simple.h"
 #include "universes/planets.h"
@@ -133,14 +134,16 @@ std::unordered_map<std::string_view, Option> const g_scenes
     ,
     {"physicstest", {"Physics lol", [] {
 
-        using namespace physicstest;
-        g_activeScene = setup_scene(g_resources, g_defaultPkg);
+        g_activeScene.emplace<testapp::CommonTestScene>(g_resources);
+        auto &rScene = entt::any_cast<CommonTestScene&>(g_activeScene);
+
+        physicstest::setup_scene(rScene, g_defaultPkg);
 
         g_appSetup = [] (ActiveApplication& rApp)
         {
-            PhysicsTestScene& rScene
-                    = entt::any_cast<PhysicsTestScene&>(g_activeScene);
-            rApp.set_on_draw(generate_draw_func(rScene, rApp));
+            auto& rScene
+                    = entt::any_cast<CommonTestScene&>(g_activeScene);
+            rApp.set_on_draw(physicstest::generate_draw_func(rScene, rApp));
         };
     }}}
 };
