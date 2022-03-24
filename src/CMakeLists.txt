@@ -124,9 +124,6 @@ target_include_directories(osp-magnum PRIVATE .)
 
 # MSVC quality of life improvements for Visual Studio
 
-# Set the MSVC debug working directory
-set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY ../../bin)
-
 # Enforce conformance mode for osp-magnum
 target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
 
@@ -135,9 +132,10 @@ source_group("Shader Files" FILES ${SHADER_FILES})
 source_group("Header Files" FILES ${H_FILES})
 
 # Put executable in the bin folder
-set_target_properties(osp-magnum PROPERTIES RUNTIME_OUTPUT_DIRECTORY ../bin)
 set_target_properties(osp-magnum PROPERTIES EXPORT_COMPILE_COMMANDS TRUE)
 
 # Copy root/bin to build/bin
-FILE (COPY "${CMAKE_SOURCE_DIR}/bin/" DESTINATION "${CMAKE_BINARY_DIR}/bin/")
-
+add_custom_command(TARGET osp-magnum
+                    POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../bin" "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
+                    VERBATIM)
