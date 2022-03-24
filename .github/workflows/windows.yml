@@ -87,12 +87,8 @@ jobs:
     - name: Run Unit Tests
       run: |
         ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
-    
-    - name: Prepare Artifact
-      run: |
-        move build\bin\OSPData build\bin\${{ matrix.config }}\OSPData
   
     - uses: actions/upload-artifact@v2
       with: 
         name: ${{ matrix.config }}
-        path: build\bin\${{ matrix.config }}
+        path: build\bin\Release\${{ matrix.config }}
