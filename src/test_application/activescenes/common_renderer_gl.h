@@ -45,6 +45,14 @@ namespace testapp
  */
 struct CommonSceneRendererGL : MultiAny
 {
+    using on_custom_draw_t = void(*)(CommonSceneRendererGL&, CommonTestScene&,
+                                     ActiveApplication&, float);
+
+    // Most test scenes will be drawn in the exact same way: by calling the
+    // draw functions of shaders.
+    // For more sophistication, make a custom on_draw_t instead
+    on_custom_draw_t m_onCustomDraw{nullptr};
+
     osp::active::ACtxSceneRenderGL m_renderGl;
 
     osp::active::ACtxRenderGroups m_renderGroups;
@@ -60,15 +68,23 @@ struct CommonSceneRendererGL : MultiAny
      * @param rApp      [ref] Application with GL context
      * @param rScene    [ref] Test scene to render
      */
-    void setup(ActiveApplication& rApp, CommonTestScene& rScene);
+    void setup(ActiveApplication& rApp, CommonTestScene const& rScene);
 
     /**
-     * @brief Render a CommonTestScene
+     * @brief Sync GL resources with scene meshes, textures, and materials
      *
      * @param rApp      [ref] Application with GL context
      * @param rScene    [ref] Test scene to render
      */
-    void render(ActiveApplication& rApp, CommonTestScene& rScene);
+    void sync(ActiveApplication& rApp, CommonTestScene const& rScene);
+
+    /**
+     * @brief Render to default framebuffer
+     *
+     * @param rApp      [ref] Application with GL context
+     * @param rScene    [ref] Test scene to render
+     */
+    void render(ActiveApplication& rApp, CommonTestScene const& rScene);
 
     /**
      * @brief Delete components of entities to delete
@@ -77,5 +93,23 @@ struct CommonSceneRendererGL : MultiAny
      */
     void update_delete(std::vector<osp::active::ActiveEnt> const& toDelete);
 };
+
+
+using setup_renderer_t = void(*)(CommonSceneRendererGL&, CommonTestScene&, ActiveApplication&);
+
+/**
+ * @brief Generate a draw function for drawing a single common scene
+ *
+ * @param rScene [ref] Common scene to draw. Must be in stable memory.
+ * @param rApp   [ref] Application with GL context
+ * @param setup  [in] Scene-specific setup function
+ *
+ * @return ActiveApplication draw function
+ */
+on_draw_t generate_common_draw(
+        CommonTestScene& rScene,
+        ActiveApplication& rApp,
+        setup_renderer_t setup);
+
 
 } // namespace testapp

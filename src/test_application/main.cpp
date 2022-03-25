@@ -30,6 +30,7 @@
 #include "ActiveApplication.h"
 #include "activescenes/scenarios.h"
 #include "activescenes/common_scene.h"
+#include "activescenes/common_renderer_gl.h"
 
 #include "universes/simple.h"
 #include "universes/planets.h"
@@ -77,6 +78,12 @@ void start_magnum_async();
  * prefer not to use names like this anywhere else but main.cpp
  */
 void load_a_bunch_of_stuff();
+
+/**
+ * @brief Setup a scene that uses CommonTestScene
+ */
+template <typename SCENE_T>
+void setup_common_scene();
 
 /**
  * @brief Attempt to destroy everything in the universe
@@ -133,18 +140,7 @@ std::unordered_map<std::string_view, Option> const g_scenes
     }}}
     ,
     {"physicstest", {"Physics lol", [] {
-
-        g_activeScene.emplace<testapp::CommonTestScene>(g_resources);
-        auto &rScene = entt::any_cast<CommonTestScene&>(g_activeScene);
-
-        physicstest::setup_scene(rScene, g_defaultPkg);
-
-        g_appSetup = [] (ActiveApplication& rApp)
-        {
-            auto& rScene
-                    = entt::any_cast<CommonTestScene&>(g_activeScene);
-            rApp.set_on_draw(physicstest::generate_draw_func(rScene, rApp));
-        };
+        setup_common_scene<scenes::PhysicsTest>();
     }}}
 };
 
@@ -309,6 +305,23 @@ void start_magnum_async()
 
     });
     g_magnumThread.swap(t);
+}
+
+template <typename SCENE_T>
+void setup_common_scene()
+{
+    g_activeScene.emplace<testapp::CommonTestScene>(g_resources);
+    auto &rScene = entt::any_cast<CommonTestScene&>(g_activeScene);
+
+    SCENE_T::setup_scene(rScene, g_defaultPkg);
+
+    // Renderer and draw function is created when g_appSetup is invoked
+    g_appSetup = [] (ActiveApplication& rApp)
+    {
+        auto& rScene
+                = entt::any_cast<CommonTestScene&>(g_activeScene);
+        rApp.set_on_draw(generate_common_draw(rScene, rApp, &SCENE_T::setup_renderer_gl));
+    };
 }
 
 bool destroy_universe()

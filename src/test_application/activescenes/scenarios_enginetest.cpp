@@ -170,6 +170,9 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
  */
 void update_test_scene(EngineTestScene& rScene, float delta)
 {
+    // Clear drawing-related dirty flags/vectors
+    osp::active::SysRender::clear_dirty_all(rScene.m_drawing);
+
     // Rotate the cube
     osp::Matrix4 &rCubeTf
             = rScene.m_basic.m_transform.get(rScene.m_cube).m_transform;
@@ -203,22 +206,12 @@ struct EngineTestRenderer
     osp::shader::ACtxDrawPhong m_phong{};
 };
 
-/**
- * @brief Render an EngineTestScene
- *
- * @param rApp      [ref] Application with GL context and resources
- * @param rScene    [ref] Test scene to render
- * @param rRenderer [ref] Renderer data for test scene
- */
-void render_test_scene(
+void sync_test_scene(
         ActiveApplication& rApp, EngineTestScene const& rScene,
         EngineTestRenderer& rRenderer)
 {
     using namespace osp::active;
     using namespace osp::shader;
-    using Magnum::GL::Framebuffer;
-    using Magnum::GL::FramebufferClear;
-    using Magnum::GL::Texture2D;
 
     // Assign Phong shader to entities with the gc_mat_common material, and put
     // results into the fwd_opaque render group
@@ -253,6 +246,23 @@ void render_test_scene(
             rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform,
             rRenderer.m_renderGl.m_drawTransform);
+}
+
+/**
+ * @brief Render an EngineTestScene
+ *
+ * @param rApp      [ref] Application with GL context and resources
+ * @param rScene    [ref] Test scene to render
+ * @param rRenderer [ref] Renderer data for test scene
+ */
+void render_test_scene(
+        ActiveApplication& rApp, EngineTestScene const& rScene,
+        EngineTestRenderer& rRenderer)
+{
+    using namespace osp::active;
+    using Magnum::GL::Framebuffer;
+    using Magnum::GL::FramebufferClear;
+    using Magnum::GL::Texture2D;
 
     // Get camera to calculate view and projection matrix
     ACompCamera const &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
@@ -312,19 +322,10 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
     // Create render group for forward opaque pass
     pRenderer->m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
 
-    // Set all materials dirty
-    for (MaterialData &rMat : rScene.m_drawing.m_materials)
-    {
-        rMat.m_added.assign(std::begin(rMat.m_comp), std::end(rMat.m_comp));
-    }
-
-    // Set all meshs dirty
-    auto &rMeshSet = static_cast<active_sparse_set_t&>(rScene.m_drawing.m_mesh);
-    rScene.m_drawing.m_meshDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
-
-    // Set all textures dirty
-    auto &rDiffSet = static_cast<active_sparse_set_t&>(rScene.m_drawing.m_diffuseTex);
-    rScene.m_drawing.m_diffuseDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
+    // Set all drawing stuff dirty then sync with renderer.
+    // This allows clean re-openning of the scene
+    SysRender::set_dirty_all(rScene.m_drawing);
+    sync_test_scene(rApp, rScene, *pRenderer);
 
     return [&rScene, pRenderer = std::move(pRenderer)] (
             ActiveApplication& rApp, float delta)
@@ -340,9 +341,8 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
                 rScene.m_basic.m_transform.get(pRenderer->m_camera),
                 delta, true);
 
+        sync_test_scene(rApp, rScene, *pRenderer);
         render_test_scene(rApp, rScene, *pRenderer);
-
-        SysRender::clear_dirty_materials(rScene.m_drawing.m_materials);
     };
 }
 

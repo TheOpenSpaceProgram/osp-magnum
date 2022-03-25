@@ -183,11 +183,18 @@ public:
             acomp_storage_t<ACompDrawTransform>& rDrawTf);
 
     /**
-     * @brief Clear dirty vectors (m_added, m_removed) of all materials
+     * @brief Set all dirty flags/vectors
      *
-     * @param rMaterials [ref] Materials vector with vectors to clear
+     * @param rCtxDrawing [ref] Drawing data
      */
-    static void clear_dirty_materials(std::vector<MaterialData> &rMaterials);
+    static void set_dirty_all(ACtxDrawing& rCtxDrawing);
+
+    /**
+     * @brief Clear all dirty flags/vectors
+     *
+     * @param rCtxDrawing [ref] Drawing data
+     */
+    static void clear_dirty_all(ACtxDrawing& rCtxDrawing);
 
     template<typename IT_T>
     static void update_delete_drawing(

@@ -66,7 +66,7 @@ using osp::active::MeshIdOwner_t;
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
-namespace testapp::physicstest
+namespace testapp::scenes
 {
 
 constexpr float gc_physTimestep = 1.0 / 60.0f;
@@ -211,7 +211,7 @@ static ActiveEnt add_quick_shape(
     return root;
 }
 
-void setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
+void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
 {
     using namespace osp::active;
 
@@ -367,6 +367,9 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     auto &rScnPhys  = rScene.get<PhysicsData>();
     auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
 
+    // Clear all drawing-related dirty flags
+    SysRender::clear_dirty_all(rScene.m_drawing);
+
     // Create boxes every 2 seconds
     rScnTest.m_boxTimer += delta;
     if (rScnTest.m_boxTimer >= 2.0f)
@@ -415,7 +418,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
 
     auto const physIn = ArrayView<ACtxPhysInputs>(&rScnPhys.m_physIn, 1);
     SysNewton::update_world(
-            rScnPhys.m_physics, rScnNwt, gc_physTimestep, physIn,
+            rScnPhys.m_physics, rScnNwt, delta, physIn,
             rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform, rScene.m_basic.m_transformControlled,
             rScene.m_basic.m_transformMutable);
@@ -468,46 +471,36 @@ struct PhysicsTestControls
     osp::input::EButtonControlIndex m_btnThrow;
 };
 
-on_draw_t generate_draw_func(CommonTestScene& rScene, ActiveApplication& rApp)
+void PhysicsTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp)
 {
     using namespace osp::active;
-    using namespace osp::shader;
 
-    // Create renderer data. This uses a shared_ptr to allow being stored
-    // inside an std::function, which require copyable types
-    std::shared_ptr<CommonSceneRendererGL> pRenderer
-            = std::make_shared<CommonSceneRendererGL>();
-
-    CommonSceneRendererGL &rRenderer = *pRenderer;
     auto &rControls = rRenderer.emplace<PhysicsTestControls>(rApp);
-
-    pRenderer->setup(rApp, rScene);
 
     // Select first camera for rendering
     ActiveEnt const camEnt = rScene.m_basic.m_camera.at(0);
-    pRenderer->m_camera = camEnt;
+    rRenderer.m_camera = camEnt;
     rScene.m_basic.m_camera.get(camEnt).set_aspect_ratio(
             osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size()));
     SysRender::add_draw_transforms_recurse(
             rScene.m_basic.m_hierarchy,
-            pRenderer->m_renderGl.m_drawTransform,
+            rRenderer.m_renderGl.m_drawTransform,
             camEnt);
 
     // Set initial position of camera slightly above the ground
     rControls.m_camCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
 
-    // Set all materials dirty
-    rScene.set_all_dirty();
-
-    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
+    rRenderer.m_onCustomDraw = [] (
+            CommonSceneRendererGL& rRenderer, CommonTestScene& rScene,
+            ActiveApplication& rApp, float delta)
     {
         auto &rScnTest = rScene.get<PhysicsTestData>();
-        auto &rControls = pRenderer->get<PhysicsTestControls>();
+        auto &rControls = rRenderer.get<PhysicsTestControls>();
 
         // Throw a sphere when the throw button is pressed
         if (rControls.m_camCtrl.m_controls.button_triggered(rControls.m_btnThrow))
         {
-            Matrix4 const &camTf = rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform;
+            Matrix4 const &camTf = rScene.m_basic.m_transform.get(rRenderer.m_camera).m_transform;
             float const speed = 120;
             float const dist = 5.0f; // Distance from camera to spawn spheres
             rScnTest.m_toThrow.emplace_back(PhysicsTestData::ThrowShape{
@@ -518,24 +511,17 @@ on_draw_t generate_draw_func(CommonTestScene& rScene, ActiveApplication& rApp)
                     EShape::Sphere}); // shape
         }
 
-        update_test_scene(rScene, delta);
-
-        // Delete components of deleted entities on renderer's side
-        pRenderer->update_delete(rScene.m_deleteTotal);
+        // Update the scene directly in the drawing function :)
+        update_test_scene(rScene, gc_physTimestep);
 
         // Rotate and move the camera based on user inputs
         SysCameraController::update_view(
                 rControls.m_camCtrl,
-                rScene.m_basic.m_transform.get(pRenderer->m_camera), delta);
+                rScene.m_basic.m_transform.get(rRenderer.m_camera), delta);
         SysCameraController::update_move(
                 rControls.m_camCtrl,
-                rScene.m_basic.m_transform.get(pRenderer->m_camera),
+                rScene.m_basic.m_transform.get(rRenderer.m_camera),
                 delta, true);
-
-        // Do common render
-        pRenderer->render(rApp, rScene);
-
-        SysRender::clear_dirty_materials(rScene.m_drawing.m_materials);
     };
 }
 

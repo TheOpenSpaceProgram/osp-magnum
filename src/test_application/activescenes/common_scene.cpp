@@ -80,22 +80,4 @@ void CommonTestScene::update_delete()
     }
 }
 
-void CommonTestScene::set_all_dirty()
-{
-    using osp::active::active_sparse_set_t;
-
-    for (osp::active::MaterialData &rMat : m_drawing.m_materials)
-    {
-        rMat.m_added.assign(std::begin(rMat.m_comp), std::end(rMat.m_comp));
-    }
-
-    // Set all meshs dirty
-    auto &rMeshSet = static_cast<active_sparse_set_t&>(m_drawing.m_mesh);
-    m_drawing.m_meshDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
-
-    // Set all textures dirty
-    auto &rDiffSet = static_cast<active_sparse_set_t&>(m_drawing.m_diffuseTex);
-    m_drawing.m_diffuseDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
-}
-
 } // namespace testapp
