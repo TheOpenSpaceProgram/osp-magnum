@@ -31,7 +31,7 @@
 namespace testapp
 {
 
-void CommonSceneRendererGL::setup(ActiveApplication& rApp, CommonTestScene& rScene)
+void CommonSceneRendererGL::setup(ActiveApplication& rApp, CommonTestScene const& rScene)
 {
     using namespace osp::active;
     using namespace osp::shader;
@@ -56,13 +56,10 @@ void CommonSceneRendererGL::setup(ActiveApplication& rApp, CommonTestScene& rSce
 
 }
 
-void CommonSceneRendererGL::render(ActiveApplication& rApp, CommonTestScene& rScene)
+void CommonSceneRendererGL::sync(ActiveApplication& rApp, CommonTestScene const& rScene)
 {
     using namespace osp::active;
     using namespace osp::shader;
-    using Magnum::GL::Framebuffer;
-    using Magnum::GL::FramebufferClear;
-    using Magnum::GL::Texture2D;
 
     RenderGroup &rGroupFwdOpaque
             = m_renderGroups.m_groups["fwd_opaque"];
@@ -115,6 +112,14 @@ void CommonSceneRendererGL::render(ActiveApplication& rApp, CommonTestScene& rSc
             rScene.m_basic.m_hierarchy,
             rScene.m_basic.m_transform,
             m_renderGl.m_drawTransform);
+}
+
+void CommonSceneRendererGL::render(ActiveApplication& rApp, CommonTestScene const& rScene)
+{
+    using namespace osp::active;
+    using Magnum::GL::Framebuffer;
+    using Magnum::GL::FramebufferClear;
+    using Magnum::GL::Texture2D;
 
     // Get camera to calculate view and projection matrix
     ACompCamera const &rCamera = rScene.m_basic.m_camera.get(m_camera);
@@ -149,5 +154,35 @@ void CommonSceneRendererGL::update_delete(std::vector<osp::active::ActiveEnt> co
     osp::active::SysRender::update_delete_groups(m_renderGroups, first, last);
     osp::active::SysRenderGL::update_delete(m_renderGl, first, last);
 }
+
+on_draw_t generate_common_draw(CommonTestScene& rScene, ActiveApplication& rApp, setup_renderer_t setup_scene)
+{
+    std::shared_ptr<CommonSceneRendererGL> pRenderer
+            = std::make_shared<CommonSceneRendererGL>();
+
+    // Setup default resources
+    pRenderer->setup(rApp, rScene);
+
+    // Setup scene-specifc stuff
+    setup_scene(*pRenderer, rScene, rApp);
+
+    // Set all drawing stuff dirty then sync with renderer.
+    // This allows clean re-openning of the scene
+    osp::active::SysRender::set_dirty_all(rScene.m_drawing);
+    pRenderer->sync(rApp, rScene);
+
+    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
+    {
+        pRenderer->m_onCustomDraw(*pRenderer, rScene, rApp, delta);
+
+        // Delete components of deleted entities on renderer's side
+        pRenderer->update_delete(rScene.m_deleteTotal);
+
+        pRenderer->sync(rApp, rScene);
+
+        // Render to screen
+        pRenderer->render(rApp, rScene);
+    };
+};
 
 } // namespace testapp
