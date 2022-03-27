@@ -91,5 +91,5 @@ jobs:
   
     - uses: actions/upload-artifact@v2
       with: 
-        name: ${{ matrix.config }}
-        path: build\bin\${{ matrix.config }}
+        name: OSP-windows-${{ matrix.config }}-${{ matrix.compiler }}
+        path: build\${{ matrix.config }}

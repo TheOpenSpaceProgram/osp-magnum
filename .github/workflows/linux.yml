@@ -69,14 +69,8 @@ jobs:
     - name: Run Unit Tests
       run: |
         ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
-
-    - name: Prepare Artifact
-      run: |
-        mv build/3rdparty/newton-dynamics/lib/ build/lib
         
     - uses: actions/upload-artifact@v2
       with: 
-        name: ${{ matrix.config }}
-        path: |
-          build/bin
-          build/lib
+        name: OSP-linux-${{ matrix.config }}-${{ matrix.compiler }}
+        path: build/${{ matrix.config }}

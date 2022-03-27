@@ -96,46 +96,45 @@ target_link_libraries(osp-magnum-deps PUBLIC
     toml11
     spdlog
     longeron
-    )
+)
 
-# Gather paths to OSP headers and sources
 add_executable(osp-magnum)
+
+target_include_directories(osp-magnum PRIVATE .)
 
 # Link it to the interface library that describes the dependencies
 target_link_libraries(osp-magnum PRIVATE osp-magnum-deps)
 
+# Gather paths to OSP headers and sources
 file (GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
 file (GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
 target_sources(osp-magnum PRIVATE "${CPP_FILES}" "${H_FILES}")
 
-# For some reason, source_group() requires all files to be added to the executable
+# Add shaders to IDE project
 set(SHADERS_DIR "../bin/OSPData/adera/Shaders")
 file (GLOB_RECURSE SHADER_FILES CONFIGURE_DEPENDS
     "${SHADERS_DIR}/*.vert"
     "${SHADERS_DIR}/*.frag"
     "${SHADERS_DIR}/*.comp"
 )
+# For some reason, source_group() requires all files to be added to the executable
 target_sources(osp-magnum PRIVATE "${SHADER_FILES}")
-
-# Set osp-magnum as startup project
-set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT osp-magnum)
-
-target_include_directories(osp-magnum PRIVATE .)
-
-# MSVC quality of life improvements for Visual Studio
-
-# Enforce conformance mode for osp-magnum
-target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
 
 # Segregate headers, shaders into filters
 source_group("Shader Files" FILES ${SHADER_FILES})
 source_group("Header Files" FILES ${H_FILES})
 
-# Put executable in the bin folder
-set_target_properties(osp-magnum PROPERTIES EXPORT_COMPILE_COMMANDS TRUE)
+# Enforce conformance mode for osp-magnum
+target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)
 
-# Copy root/bin to build/bin
+set_target_properties(osp-magnum PROPERTIES
+    EXPORT_COMPILE_COMMANDS TRUE
+    INSTALL_RPATH "$ORIGIN/lib"
+)
+
+# Copy root/bin to build/bin after building
 add_custom_command(TARGET osp-magnum
-                    POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../bin" "${CMAKE_BINARY_DIR}/bin/$<CONFIG>"
-                    VERBATIM)
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../bin" "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    VERBATIM
+)
