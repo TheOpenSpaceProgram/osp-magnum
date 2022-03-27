@@ -219,7 +219,7 @@ void planeta::ico_calc_chunk_edge_recurse(
     ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, a, mid,
                                 vrtxs.prefix(halfSize), rPositions, rNormals);
     ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, mid, b,
-                                vrtxs.suffix(halfSize), rPositions, rNormals);
+                                vrtxs.exceptPrefix(halfSize), rPositions, rNormals);
 
 }
 
