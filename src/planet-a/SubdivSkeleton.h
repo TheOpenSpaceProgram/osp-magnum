@@ -421,7 +421,7 @@ public:
         if (level > 1)
         {
             vrtx_create_chunk_edge_recurse(level - 1, a, mid, rOut.prefix(halfSize));
-            vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.suffix(halfSize));
+            vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.exceptPrefix(halfSize));
         }
     }
 
