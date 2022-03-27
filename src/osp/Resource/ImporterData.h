@@ -41,13 +41,6 @@ namespace osp
 
 struct TextureImgSource : public ResIdOwner_t { };
 
-struct NodeTransform
-{
-    Vector3     m_translation;
-    Quaternion  m_rotation;
-    Vector3     m_scale;
-};
-
 struct ImporterData
 {
     using OptMaterialData_t = Corrade::Containers::Optional<Magnum::Trade::MaterialData>;
@@ -60,7 +53,7 @@ struct ImporterData
     std::vector<OptMaterialData_t>      m_materials;
 
     // [sceneId][child]
-    lgrn::IntArrayMultiMap<int, int>    m_scenes;
+    lgrn::IntArrayMultiMap<int, int>    m_scnTopLevel;
 
     // Object data
     // note: terminology for 'things' vary
@@ -70,7 +63,7 @@ struct ImporterData
     lgrn::IntArrayMultiMap<int, int>    m_objChildren;
 
     std::vector<std::string_view>       m_objNames;
-    std::vector<NodeTransform>          m_objTransforms;
+    std::vector<Matrix4>                m_objTransforms;
 
     std::vector<int>                    m_objMeshes;
     std::vector<int>                    m_objMaterials;

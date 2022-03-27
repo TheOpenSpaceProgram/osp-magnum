@@ -37,11 +37,12 @@
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/TextureData.h>
 #include <Magnum/Trade/MeshData.h>
-#include <Magnum/Trade/ObjectData3D.h>
-#include <Magnum/Trade/MeshObjectData3D.h>
 #include <Magnum/Trade/SceneData.h>
 
 #include <Corrade/PluginManager/Manager.h>
+#include <Corrade/Containers/StringStlView.h>
+#include <Corrade/Containers/Pair.h>
+#include <Corrade/Containers/PairStl.h>
 
 using namespace osp;
 
@@ -50,19 +51,19 @@ using Magnum::Trade::TinyGltfImporter;
 using Magnum::Trade::ImageData2D;
 using Magnum::Trade::TextureData;
 using Magnum::Trade::MeshData;
-using Magnum::Trade::MeshObjectData3D;
 using Magnum::Trade::MaterialData;
-using Magnum::Trade::ObjectData3D;
 using Magnum::Trade::SceneData;
+using Magnum::Trade::SceneField;
 
-
-using Magnum::Trade::ObjectInstanceType3D;
-
+using Magnum::Int;
 using Magnum::UnsignedInt;
 
 using PluginManager = Corrade::PluginManager::Manager<Magnum::Trade::AbstractImporter>;
 using Corrade::Containers::Optional;
 using Corrade::Containers::Pointer;
+using Corrade::Containers::Array;
+using Corrade::Containers::StridedArrayView1D;
+using Corrade::Containers::Pair;
 
 using TinyGltfNodeExtras_t = std::vector<tinygltf::Value>;
 
@@ -171,102 +172,150 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
 
     auto &rNodeExtras = rResources.data_add<TinyGltfNodeExtras_t>(
                                 restypes::gc_importer, res);
-
     UnsignedInt parentsSet = 0;
 
-    UnsignedInt const objCount = rImporter.object3DCount();
+    UnsignedInt const objCount = rImporter.objectCount();
     rNodeExtras                 .resize(objCount);
     rImportData.m_objNames      .resize(objCount);
-    rImportData.m_objMeshes     .resize(objCount);
-    rImportData.m_objMaterials  .resize(objCount);
+    rImportData.m_objMeshes     .resize(objCount, -1);
+    rImportData.m_objMaterials  .resize(objCount, -1);
     rImportData.m_objTransforms .resize(objCount);
-    rImportData.m_objParents    .resize(objCount);
-    rImportData.m_objChildren   .ids_reserve(objCount);
-    rImportData.m_objChildren   .data_reserve(objCount);
+    rImportData.m_objParents    .resize(objCount, -1);
 
-    for (UnsignedInt i = 0; i < objCount; i ++)
+    // Keep track of children. temporary as rImportData.m_objChildren stores
+    // child count
+    Array<int> objChildCount(Corrade::ValueInit, objCount);
+
+    // Allocate for storing top-level nodes
+    rImportData.m_scnTopLevel.ids_reserve(rImporter.sceneCount());
+    rImportData.m_scnTopLevel.data_reserve(rImporter.objectCount());
+    std::vector<int> topLevel;
+    topLevel.reserve(rImporter.objectCount());
+
+    // Iterate scenes and their objects
+    for (UnsignedInt scn = 0; scn < rImporter.sceneCount(); scn ++)
     {
-        Pointer<ObjectData3D const> obj         = rImporter.object3D(i);
-        int const instance                      = obj->instance();
-        ObjectInstanceType3D const instanceType = obj->instanceType();
+        Optional<SceneData> const scene = rImporter.scene(scn);
 
-        if ( obj == nullptr )
+        if ( ! bool(scene))
         {
+            rImportData.m_scnTopLevel.emplace(scn, {});
             continue;
         }
 
-        rImportData.m_objNames[i] = rImporter.object3DName(i);
-        rImportData.m_objTransforms[i] = NodeTransform
-        {
-            obj->translation(), obj->rotation(), obj->scaling()
-        };
+        // Iterate scene objects with parents
 
-        // Store hierarchy data
-
-        auto const& children = obj->children();
-        for (UnsignedInt childId : children)
         {
-            ++parentsSet;
-            rImportData.m_objParents[childId] = i;
+            StridedArrayView1D<UnsignedInt const> const parentsMap
+                    = scene->mapping<UnsignedInt>(SceneField::Parent);
+            StridedArrayView1D<Int const> const parents
+                    = scene->field<Int>(SceneField::Parent);
+
+            for (UnsignedInt j = 0; j < parentsMap.size(); j ++)
+            {
+                UnsignedInt const   obj         = parentsMap[j];
+                Int const           objParent   = parents[j];
+
+                // Store object parents
+                rImportData.m_objParents[obj] = objParent;
+
+                if (objParent != -1)
+                {
+                    objChildCount[objParent] ++;
+                }
+                else
+                {
+                    topLevel.push_back(obj);
+                }
+            }
+
+            // Store top-level objects
+            rImportData.m_scnTopLevel.emplace(
+                    scn, std::begin(topLevel), std::end(topLevel));
+            topLevel.clear();
         }
-        rImportData.m_objChildren.emplace(i, children.begin(), children.end());
 
-        // Store drawable data if present
+        // Iterate scene objects with meshes and materials
+        {
 
-        bool const hasMesh = (instanceType == ObjectInstanceType3D::Mesh)
-                             && (instance != -1);
+            StridedArrayView1D<UnsignedInt const> const meshMap
+                    = scene->mapping<UnsignedInt>(SceneField::Mesh);
 
-        MeshObjectData3D const *pObjMesh
-                = hasMesh ? static_cast<MeshObjectData3D const*>(obj.get())
-                          : nullptr;
+            // Assign meshes if present
+            if (Optional<UnsignedInt> const meshesFieldId
+                        = scene->findFieldId(SceneField::Mesh);
+                bool(meshesFieldId))
+            {
+                StridedArrayView1D<UnsignedInt const> const meshes
+                        = scene->field<UnsignedInt>(SceneField::Mesh);
+                for (UnsignedInt j = 0; j < meshMap.size(); j ++)
+                {
+                    rImportData.m_objMeshes[meshMap[j]] = meshes[j];
+                }
+            }
 
-        rImportData.m_objMeshes[i]     = hasMesh ? instance : -1;
-        rImportData.m_objMaterials[i]  = hasMesh ? pObjMesh->material() : -1;
+            // Assign materials if present
+            if (Optional<UnsignedInt> const matsFieldId
+                        = scene->findFieldId(SceneField::MeshMaterial);
+                bool(matsFieldId))
+            {
+                StridedArrayView1D<Int const> const materials
+                        = scene->field<Int>(SceneField::MeshMaterial);
 
-        // Store custom properties
+                for (UnsignedInt j = 0; j < meshMap.size(); j ++)
+                {
+                    rImportData.m_objMaterials[meshMap[j]] = materials[j];
+                }
+            }
 
-        tinygltf::Node const *pNode
-                = static_cast<tinygltf::Node const*>(obj->importerState());
-        rNodeExtras[i] = pNode->extras;
+        }
 
     }
 
-    // Store scenes
-    rImportData.m_scenes.ids_reserve(rImporter.sceneCount());
+    // Store parent to children multimap
+    rImportData.m_objChildren.ids_reserve(objCount);
+    rImportData.m_objChildren.data_reserve(objCount);
 
-    // Use number of unparented nodes as the number of scene-level nodes
-    // getting a bit 'clever' here but too bad
-    UnsignedInt const unparentedNodes = objCount - parentsSet;
-    rImportData.m_scenes.data_reserve(unparentedNodes);
-
-    for (UnsignedInt i = 0; i < rImporter.sceneCount(); i ++)
+    // Allocate partitions for all objects with children, initialize to -1
+    for (UnsignedInt obj = 0; obj < objCount; obj ++)
     {
-        Optional<SceneData> const scene = rImporter.scene(i);
-
-        if (bool(scene))
+        if (int childCount = objChildCount[obj];
+            childCount != 0)
         {
-            auto const& children = scene->children3D();
-            rImportData.m_scenes.emplace(i, children.begin(), children.end());
-        }
-        else
-        {
-            rImportData.m_scenes.emplace(i, {});
+            int *pChildren = rImportData.m_objChildren.emplace(obj, childCount);
+            std::fill_n(pChildren, childCount, -1);
         }
     }
 
-    rImportData.m_objNames.resize(objCount);
+    // Add children to their parent's list of children
+    for (UnsignedInt obj = 0; obj < objCount; obj ++)
+    {
+        if (int objParent = rImportData.m_objParents[obj];
+            objParent != -1)
+        {
+            // Get parent's span of children
+            auto siblings = rImportData.m_objChildren[objParent];
+
+            // Linear search for an empty spot (-1)
+            auto pSpot = std::find(std::begin(siblings), std::end(siblings), -1);
+            assert(pSpot != std::end(siblings));
+
+            *pSpot = obj; // add self to parent's children
+        }
+    }
 }
+
 
 ResId osp::load_tinygltf_file(std::string_view filepath, Resources &rResources, PkgId pkg)
 {
     PluginManager pluginManager;
 
+
     // Create Importer resource
     ResId const res = rResources.create(restypes::gc_importer, pkg, filepath);
     TinyGltfImporter importer{pluginManager};
 
-    // note: Magnum master branch has a Corrade StringView version of this function
-    importer.openFile(std::string{filepath});
+    importer.openFile(filepath);
 
     if (!importer.isOpened() || importer.defaultScene() == -1)
     {
