@@ -73,6 +73,9 @@ IF(OSP_ENABLE_COMPILER_WARNINGS)
   STRING(APPEND GCC_COMPILE_FLAGS " -Wno-psabi")
 ENDIF() # OSP_ENABLE_COMPILER_EARNINGS
 
+# Set OSP as default startup project in Visual Studio
+set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT OSP-MAGNUM)
+
 # Compiler warnings can help find problems in code.
 IF(OSP_WARNINGS_ARE_ERRORS)
   STRING(APPEND CMAKE_C_FLAGS   " -Werror")
@@ -119,11 +122,17 @@ ELSE()
   ENDIF()
 ENDIF()
 
-# Force Runtime output directory into build/bin folder; force multiprocessor compilation for all projects
+# Force Runtime output directory into Debug or Release folder
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG> CACHE PATH "")
 IF(MSVC)
-  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG> CACHE PATH "")
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/$<CONFIG> CACHE PATH "")
+  # Put shared libraries in the same directory as the executable on windows
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG> CACHE PATH "")
+  # Force multiprocessor compilation for all projects
   add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
+ELSEIF(UNIX)
+  # Put shared libraries in ./lib, and use RPATH
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/lib CACHE PATH "")
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 ENDIF()
 
 STRING(PREPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/")
