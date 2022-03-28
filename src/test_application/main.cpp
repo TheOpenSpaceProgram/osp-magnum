@@ -45,6 +45,7 @@
 #include <Corrade/Utility/Arguments.h>
 
 #include <RmlUi/Core.h>
+#include "TestSystemInterface.h"
 
 #include <iostream>
 #include <memory>
