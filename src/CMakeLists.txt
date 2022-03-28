@@ -23,6 +23,8 @@
 # SOFTWARE.
 ##
 
+SET(RMLUI_SKIP_INSTALL ON)
+
 find_package(Magnum REQUIRED
     GL
     Shaders
@@ -96,6 +98,8 @@ target_link_libraries(osp-magnum-deps PUBLIC
     toml11
     spdlog
     longeron
+    RmlCore
+    freetype
     )
 
 # Gather paths to OSP headers and sources

@@ -44,6 +44,8 @@
 #include <Magnum/Primitives/Icosphere.h>
 #include <Corrade/Utility/Arguments.h>
 
+#include <RmlUi/Core.h>
+
 #include <iostream>
 #include <memory>
 #include <thread>
