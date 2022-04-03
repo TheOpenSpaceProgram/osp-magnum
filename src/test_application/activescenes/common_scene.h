@@ -53,6 +53,7 @@ struct MultiAny
 template <typename T, typename ... ARGS_T>
 T& MultiAny::emplace(ARGS_T&& ... args)
 {
+    // search for an empty spot in m_data, to emplace T into
     Array_t::iterator found = std::find_if(std::begin(m_data), std::end(m_data),
                               [] (entt::any const &any)
     {

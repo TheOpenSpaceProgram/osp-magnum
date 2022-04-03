@@ -57,7 +57,7 @@ void CommonTestScene::update_hierarchy_delete()
     SysHierarchy::update_delete_descendents(
             m_basic.m_hierarchy,
             std::cbegin(m_delete), std::cend(m_delete),
-            [=] (ActiveEnt ent)
+            [this] (ActiveEnt ent)
     {
         m_deleteTotal.push_back(ent);
     });

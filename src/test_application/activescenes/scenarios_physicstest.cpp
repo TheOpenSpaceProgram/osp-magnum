@@ -471,7 +471,7 @@ struct PhysicsTestControls
     osp::input::EButtonControlIndex m_btnThrow;
 };
 
-void PhysicsTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp)
+void PhysicsTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp) noexcept
 {
     using namespace osp::active;
 
@@ -492,7 +492,7 @@ void PhysicsTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
 
     rRenderer.m_onCustomDraw = [] (
             CommonSceneRendererGL& rRenderer, CommonTestScene& rScene,
-            ActiveApplication& rApp, float delta)
+            ActiveApplication& rApp, float delta) noexcept
     {
         auto &rScnTest = rScene.get<PhysicsTestData>();
         auto &rControls = rRenderer.get<PhysicsTestControls>();

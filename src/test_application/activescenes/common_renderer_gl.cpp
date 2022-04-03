@@ -28,12 +28,13 @@
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
+using namespace osp::active;
+
 namespace testapp
 {
 
-void CommonSceneRendererGL::setup(ActiveApplication& rApp, CommonTestScene const& rScene)
+void CommonSceneRendererGL::setup(ActiveApplication& rApp)
 {
-    using namespace osp::active;
     using namespace osp::shader;
 
     // Setup Phong shaders
@@ -58,7 +59,6 @@ void CommonSceneRendererGL::setup(ActiveApplication& rApp, CommonTestScene const
 
 void CommonSceneRendererGL::sync(ActiveApplication& rApp, CommonTestScene const& rScene)
 {
-    using namespace osp::active;
     using namespace osp::shader;
 
     RenderGroup &rGroupFwdOpaque
@@ -116,7 +116,6 @@ void CommonSceneRendererGL::sync(ActiveApplication& rApp, CommonTestScene const&
 
 void CommonSceneRendererGL::render(ActiveApplication& rApp, CommonTestScene const& rScene)
 {
-    using namespace osp::active;
     using Magnum::GL::Framebuffer;
     using Magnum::GL::FramebufferClear;
     using Magnum::GL::Texture2D;
@@ -147,28 +146,27 @@ void CommonSceneRendererGL::render(ActiveApplication& rApp, CommonTestScene cons
     SysRenderGL::display_texture(rApp.get_render_gl(), rFboColor);
 }
 
-void CommonSceneRendererGL::update_delete(std::vector<osp::active::ActiveEnt> const& toDelete)
+void CommonSceneRendererGL::update_delete(std::vector<ActiveEnt> const& toDelete)
 {
     auto first = std::cbegin(toDelete);
     auto last = std::cend(toDelete);
-    osp::active::SysRender::update_delete_groups(m_renderGroups, first, last);
-    osp::active::SysRenderGL::update_delete(m_renderGl, first, last);
+    SysRender::update_delete_groups(m_renderGroups, first, last);
+    SysRenderGL::update_delete(m_renderGl, first, last);
 }
 
 on_draw_t generate_common_draw(CommonTestScene& rScene, ActiveApplication& rApp, setup_renderer_t setup_scene)
 {
-    std::shared_ptr<CommonSceneRendererGL> pRenderer
-            = std::make_shared<CommonSceneRendererGL>();
+    auto pRenderer = std::make_shared<CommonSceneRendererGL>();
 
     // Setup default resources
-    pRenderer->setup(rApp, rScene);
+    pRenderer->setup(rApp);
 
     // Setup scene-specifc stuff
     setup_scene(*pRenderer, rScene, rApp);
 
     // Set all drawing stuff dirty then sync with renderer.
     // This allows clean re-openning of the scene
-    osp::active::SysRender::set_dirty_all(rScene.m_drawing);
+    SysRender::set_dirty_all(rScene.m_drawing);
     pRenderer->sync(rApp, rScene);
 
     return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
