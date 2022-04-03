@@ -410,7 +410,9 @@ void load_a_bunch_of_stuff()
     OSP_LOG_INFO("Resource loading complete");
 }
 
-static void resource_for_each_type(osp::ResTypeId type, void(*do_thing)(osp::ResId))
+using each_res_id_t = void(*)(osp::ResId);
+
+static void resource_for_each_type(osp::ResTypeId type, each_res_id_t do_thing)
 {
     lgrn::IdRegistry<osp::ResId> const &rReg = g_resources.ids(type);
     for (std::size_t i = 0; i < rReg.capacity(); ++i)
@@ -432,12 +434,10 @@ void clear_resource_owners()
     {
         auto *pData = g_resources
                 .data_try_get<osp::TextureImgSource>(gc_texture, id);
-        if (pData == nullptr)
+        if (pData != nullptr)
         {
-            return;
+            g_resources.owner_destroy(gc_image, std::move(*pData));
         }
-
-        g_resources.owner_destroy(gc_image, std::move(*pData));
     });
 
     // Importer data own a lot of other resources
@@ -445,24 +445,22 @@ void clear_resource_owners()
     {
         auto *pData = g_resources
                 .data_try_get<osp::ImporterData>(gc_importer, id);
-        if (pData == nullptr)
+        if (pData != nullptr)
         {
-            return;
-        }
+            for (osp::ResIdOwner_t &rOwner : pData->m_images)
+            {
+                g_resources.owner_destroy(gc_image, std::move(rOwner));
+            }
 
-        for (osp::ResIdOwner_t &rOwner : pData->m_images)
-        {
-            g_resources.owner_destroy(gc_image, std::move(rOwner));
-        }
+            for (osp::ResIdOwner_t &rOwner : pData->m_textures)
+            {
+                g_resources.owner_destroy(gc_texture, std::move(rOwner));
+            }
 
-        for (osp::ResIdOwner_t &rOwner : pData->m_textures)
-        {
-            g_resources.owner_destroy(gc_texture, std::move(rOwner));
-        }
-
-        for (osp::ResIdOwner_t &rOwner : pData->m_meshes)
-        {
-            g_resources.owner_destroy(gc_mesh, std::move(rOwner));
+            for (osp::ResIdOwner_t &rOwner : pData->m_meshes)
+            {
+                g_resources.owner_destroy(gc_mesh, std::move(rOwner));
+            }
         }
     });
 }

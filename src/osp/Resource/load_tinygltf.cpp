@@ -74,7 +74,7 @@ void osp::register_tinygltf_resources(Resources &rResources)
 
 static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view name, Resources &rResources, PkgId pkg)
 {
-    ImporterData &rImportData = rResources.data_add<ImporterData>(restypes::gc_importer, res);
+    using namespace restypes;
 
     // Combine resource names. Maybe make this customizable
     // ie: name = "dir/file.gltf" and resName = "mytexture"
@@ -97,10 +97,35 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
         return tempStr;
     };
 
-    using namespace restypes;
+    auto &rImportData = rResources.data_add<ImporterData>(restypes::gc_importer, res);
+    auto &rNodeExtras = rResources.data_add<TinyGltfNodeExtras_t>(restypes::gc_importer, res);
+
+    // Allocate various data
+    rImportData.m_images        .resize(rImporter.image2DCount());
+    rImportData.m_textures      .resize(rImporter.textureCount());
+    rImportData.m_meshes        .resize(rImporter.meshCount());
+    rImportData.m_materials     .resize(rImporter.materialCount());
+
+    // Allocate object data
+    UnsignedInt const objCount = rImporter.objectCount();
+    rNodeExtras                 .resize(objCount);
+    rImportData.m_objNames      .resize(objCount);
+    rImportData.m_objMeshes     .resize(objCount, -1);
+    rImportData.m_objMaterials  .resize(objCount, -1);
+    rImportData.m_objTransforms .resize(objCount);
+    rImportData.m_objParents    .resize(objCount, -1);
+
+    // Allocate object parent to children multimap
+    rImportData.m_objChildren.ids_reserve(objCount);
+    rImportData.m_objChildren.data_reserve(objCount);
+
+    // Allocate for storing top-level nodes for each scene
+    rImportData.m_scnTopLevel.ids_reserve(rImporter.sceneCount());
+    rImportData.m_scnTopLevel.data_reserve(rImporter.objectCount());
+
+
 
     // Store images
-    rImportData.m_images.resize(rImporter.image2DCount());
     for (UnsignedInt i = 0; i < rImporter.image2DCount(); i ++)
     {
         Optional<ImageData2D> img = rImporter.image2D(i);
@@ -119,7 +144,6 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
     }
 
     // Store textures
-    rImportData.m_textures.resize(rImporter.textureCount());
     for (UnsignedInt i = 0; i < rImporter.textureCount(); i ++)
     {
         Optional<TextureData> tex = rImporter.texture(i);
@@ -146,7 +170,6 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
     }
 
     // Store meshes
-    rImportData.m_meshes.resize(rImporter.meshCount());
     for (UnsignedInt i = 0; i < rImporter.meshCount(); i ++)
     {
         Optional<MeshData> mesh = rImporter.mesh(i);
@@ -162,41 +185,26 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
     }
 
     // Store materials
-    rImportData.m_materials.reserve(rImporter.materialCount());
     for (UnsignedInt i = 0; i < rImporter.materialCount(); i ++)
     {
-        rImportData.m_materials.emplace_back(rImporter.material(i));
+        rImportData.m_materials[i] = rImporter.material(i);
     }
 
-    // Store various node data
-
-    auto &rNodeExtras = rResources.data_add<TinyGltfNodeExtras_t>(
-                                restypes::gc_importer, res);
-    UnsignedInt parentsSet = 0;
-
-    UnsignedInt const objCount = rImporter.objectCount();
-    rNodeExtras                 .resize(objCount);
-    rImportData.m_objNames      .resize(objCount);
-    rImportData.m_objMeshes     .resize(objCount, -1);
-    rImportData.m_objMaterials  .resize(objCount, -1);
-    rImportData.m_objTransforms .resize(objCount);
-    rImportData.m_objParents    .resize(objCount, -1);
-
-    // Keep track of children. temporary as rImportData.m_objChildren stores
-    // child count
-    Array<int> objChildCount(Corrade::ValueInit, objCount);
-
-    // Allocate for storing top-level nodes
-    rImportData.m_scnTopLevel.ids_reserve(rImporter.sceneCount());
-    rImportData.m_scnTopLevel.data_reserve(rImporter.objectCount());
-    std::vector<int> topLevel;
-    topLevel.reserve(rImporter.objectCount());
-
-    // Iterate all objects
+    // Iterate objects to store names and custom properties
     for (UnsignedInt obj = 0; obj < rImporter.objectCount(); obj ++)
     {
+        tinygltf::Model const *pModel = rImporter.importerState();
+
         rImportData.m_objNames[obj] = rImporter.objectName(obj);
+        rNodeExtras[obj] = pModel->nodes[obj].extras;
     }
+
+    // Temporary child count of each object. Later stored in m_objChildren
+    Array<int> objChildCount(Corrade::ValueInit, objCount);
+
+    // Temporary vector of children for current object being iterated
+    std::vector<int> topLevel;
+    topLevel.reserve(rImporter.objectCount());
 
     // Iterate scenes and their objects
     for (UnsignedInt scn = 0; scn < rImporter.sceneCount(); scn ++)
@@ -210,7 +218,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
         }
 
         // Iterate scene objects with parents
-
+        // Stores parents, transforms, and top-level objects for this scene
         {
             StridedArrayView1D<UnsignedInt const> const parentsMap
                     = scene->mapping<UnsignedInt>(SceneField::Parent);
@@ -285,11 +293,9 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
 
     }
 
-    // Store parent to children multimap
-    rImportData.m_objChildren.ids_reserve(objCount);
-    rImportData.m_objChildren.data_reserve(objCount);
 
-    // Allocate partitions for all objects with children, initialize to -1
+
+    // Reserve partitions for all objects with children, initialize to -1
     for (UnsignedInt obj = 0; obj < objCount; obj ++)
     {
         if (int childCount = objChildCount[obj];
