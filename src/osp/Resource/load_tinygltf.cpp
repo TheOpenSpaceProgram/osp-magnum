@@ -192,6 +192,12 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
     std::vector<int> topLevel;
     topLevel.reserve(rImporter.objectCount());
 
+    // Iterate all objects
+    for (UnsignedInt obj = 0; obj < rImporter.objectCount(); obj ++)
+    {
+        rImportData.m_objNames[obj] = rImporter.objectName(obj);
+    }
+
     // Iterate scenes and their objects
     for (UnsignedInt scn = 0; scn < rImporter.sceneCount(); scn ++)
     {
@@ -226,6 +232,13 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
                 else
                 {
                     topLevel.push_back(obj);
+                }
+
+                // Also store transforms here
+                if (Optional<Matrix4> objTf = scene->transformation3DFor(obj);
+                    bool(objTf))
+                {
+                    rImportData.m_objTransforms[obj] = *objTf;
                 }
             }
 

@@ -30,6 +30,7 @@
 #include <Magnum/Trade/MaterialData.h>
 
 #include <Corrade/Containers/Optional.h>
+#include <Corrade/Containers/String.h>
 
 #include <longeron/containers/intarray_multimap.hpp>
 
@@ -41,9 +42,15 @@ namespace osp
 
 struct TextureImgSource : public ResIdOwner_t { };
 
+/**
+ * @brief Describes a set of scene graphs that share data with each other
+ *
+ * Intended to be loaded from glTF files through any Magnum glTF loader
+ */
 struct ImporterData
 {
     using OptMaterialData_t = Corrade::Containers::Optional<Magnum::Trade::MaterialData>;
+    using String = Corrade::Containers::String;
 
     // Owned resources
     std::vector<ResIdOwner_t>           m_images;
@@ -52,7 +59,8 @@ struct ImporterData
 
     std::vector<OptMaterialData_t>      m_materials;
 
-    // [sceneId][child]
+    // Top-level nodes of each scene
+    // [scene Id][child object]
     lgrn::IntArrayMultiMap<int, int>    m_scnTopLevel;
 
     // Object data
@@ -62,11 +70,20 @@ struct ImporterData
     std::vector<int>                    m_objParents;
     lgrn::IntArrayMultiMap<int, int>    m_objChildren;
 
-    std::vector<std::string_view>       m_objNames;
+    std::vector<String>                 m_objNames;
     std::vector<Matrix4>                m_objTransforms;
 
     std::vector<int>                    m_objMeshes;
     std::vector<int>                    m_objMaterials;
+};
+
+/**
+ * @brief Groups objects in an ImporterData intended to make them instantiable
+ */
+struct Prefabs
+{
+    // [prefab Id][object]
+    lgrn::IntArrayMultiMap<int, int>    m_prefabs;
 };
 
 } // namespace osp
