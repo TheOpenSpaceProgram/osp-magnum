@@ -46,7 +46,7 @@ namespace testapp
 struct CommonSceneRendererGL : MultiAny
 {
     using on_custom_draw_t = void(*)(CommonSceneRendererGL&, CommonTestScene&,
-                                     ActiveApplication&, float);
+                                     ActiveApplication&, float) noexcept;
 
     // Most test scenes will be drawn in the exact same way: by calling the
     // draw functions of shaders.
@@ -66,9 +66,8 @@ struct CommonSceneRendererGL : MultiAny
      * @brief Setup default shaders and render groups
      *
      * @param rApp      [ref] Application with GL context
-     * @param rScene    [ref] Test scene to render
      */
-    void setup(ActiveApplication& rApp, CommonTestScene const& rScene);
+    void setup(ActiveApplication& rApp);
 
     /**
      * @brief Sync GL resources with scene meshes, textures, and materials
@@ -95,7 +94,7 @@ struct CommonSceneRendererGL : MultiAny
 };
 
 
-using setup_renderer_t = void(*)(CommonSceneRendererGL&, CommonTestScene&, ActiveApplication&);
+using setup_renderer_t = void(*)(CommonSceneRendererGL&, CommonTestScene&, ActiveApplication&) noexcept;
 
 /**
  * @brief Generate a draw function for drawing a single common scene
