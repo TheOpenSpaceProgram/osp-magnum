@@ -50,12 +50,12 @@ jobs:
       if: ${{ matrix.compiler == 'msvc' }}
       # Current version of Corrade requires the MSVC2019_COMPATIBILITY flag to compile properly
       run: |
-        cmake -B build -DMSVC2019_COMPATIBILITY=ON -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
+        cmake -B build -DMSVC2019_COMPATIBILITY=ON -DCMAKE_CONFIGURATION_TYPES=${{ matrix.config }} -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
 
     - name: Configure (ClangCL)
       if: ${{ matrix.compiler == 'clangcl' }}
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -TClangCL
+        cmake -B build -DCMAKE_CONFIGURATION_TYPES=${{ matrix.config }} -TClangCL
 
     - name: Configure (MinGW)
       if: ${{ matrix.compiler == 'mingw' }}
