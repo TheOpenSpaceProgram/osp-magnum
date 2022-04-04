@@ -56,7 +56,8 @@ namespace osp
 template<class STRING_T>
 constexpr auto string_data(STRING_T && str)
 {
-    if constexpr(std::is_pointer_v<STRING_T>)
+    using Type_t = std::remove_reference_t<STRING_T>;
+    if constexpr(std::is_pointer_v<Type_t>)
     {
         return std::forward<STRING_T>(str);
     }
@@ -83,13 +84,14 @@ constexpr auto string_data(STRING_T && str)
  * the result of calling std::size().
  */
 template<class STRING_T>
-constexpr std::size_t string_size(STRING_T const& str)
+constexpr std::size_t string_size(STRING_T && str)
 {
-    if constexpr(std::is_pointer_v<STRING_T>)
+    using Type_t = std::remove_reference_t<STRING_T>;
+    if constexpr(std::is_pointer_v<Type_t>)
     {
         return std::char_traits<std::remove_pointer_t<STRING_T>>::length(str);
     }
-    else if constexpr(std::is_array_v<STRING_T>)
+    else if constexpr(std::is_array_v<Type_t>)
     {
         // While we could deduce the length of the string based only on the static size of the array
         // that wouldn't work for arrays that have embedded nul-terminators, which would then be
@@ -99,7 +101,7 @@ constexpr std::size_t string_size(STRING_T const& str)
     }
     else
     {
-        return std::size(str);
+        return std::size(std::forward<STRING_T>(str));
     }
 } // string_size()
 
@@ -118,9 +120,27 @@ constexpr std::size_t string_size(STRING_T const& str)
  * \returns Nothing.
  */
 template<typename DESTINATION_T, typename ... STRS_T>
-constexpr void string_append(DESTINATION_T & dest, const STRS_T& ... others)
+constexpr void string_append(DESTINATION_T & dest, STRS_T const& ... others)
 {
-    auto const curSize = string_size(dest);
+    auto const curSize   = string_size(dest);
+    auto const totalSize = ( curSize + ... + string_size(others) );
+
+#if defined(__cpp_lib_string_resize_and_overwrite)
+
+    dest.resize_and_overwrite(
+        totalSize,
+        [&](char* pData, int n)
+        {
+			pData += curSize;
+
+            // C++17 fold for function calls.
+            ( ( pData = std::copy_n( string_data(others),
+                                     string_size(others),
+                                     pData ) ), ... );
+            return n;
+        });
+
+#else
 
     // C++17 fold for summation
     dest.resize( ( curSize + ... + string_size(others) ) );
@@ -129,23 +149,26 @@ constexpr void string_append(DESTINATION_T & dest, const STRS_T& ... others)
 
     // C++17 fold for function calls.
     ( (p = std::copy_n(string_data(others), string_size(others), p)), ... );
+
+#endif
+
 } // string_append()
 
 
 //-----------------------------------------------------------------------------
 
 /**
- * Concatinates all of the provided string-like objects into a single
+ * Concatenates all of the provided string-like objects into a single
  * string of the type RESULT_T. RESULT_T must have resize() and append()
  * functions.
  *
- * This operation uses a single allocation to acquire storage, via the "reserve" function call.
+ * This operation uses a single allocation to acquire storage, via the "resize" function call.
  *
  * We'd be able to get slightly improved perf when P1072 resize_and_overwrite() is available.
  *
  * \arg string -- the strings to concatinate together.
  *
- * \returns A RESULT_T object containing the strings concatinated together.
+ * \returns A RESULT_T object containing the strings concatenated together.
  */
 template<typename RESULT_T, typename ... STRS_T>
 constexpr RESULT_T basic_string_concat(STRS_T const& ... others)
@@ -159,13 +182,13 @@ constexpr RESULT_T basic_string_concat(STRS_T const& ... others)
 //-----------------------------------------------------------------------------
 
 /**
- * Concatinates all of the provided string-like objects into a single std::string.
+ * Concatenates all of the provided string-like objects into a single std::string.
  *
- * This operation uses a single allocation to acquire storage, via the "reserve" function call.
+ * This operation uses a single allocation to acquire storage, via the "resize" function call.
  *
  * \arg string -- the strings to concatinate together.
  *
- * \returns A std::string object containing the strings concatinated together.
+ * \returns A std::string object containing the strings concatenated together.
  */
 template<typename ... STRS_T>
 constexpr auto string_concat(STRS_T const& ... strs)
