@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "scenarios.h"
+#include "scene_physics.h"
 #include "common_scene.h"
 #include "common_renderer_gl.h"
 #include "CameraController.h"
@@ -39,18 +40,12 @@
 
 #include <longeron/id_management/registry.hpp>
 
-#include <Magnum/Trade/MeshData.h>
-#include <Magnum/Trade/ImageData.h>
-
 #include <Magnum/GL/DefaultFramebuffer.h>
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
 #include <newtondynamics_physics/ospnewton.h>
 #include <newtondynamics_physics/SysNewton.h>
-
-using Magnum::Trade::MeshData;
-using Magnum::Trade::ImageData2D;
 
 using osp::active::ActiveEnt;
 using osp::active::active_sparse_set_t;
@@ -72,18 +67,6 @@ namespace testapp::scenes
 constexpr float gc_physTimestep = 1.0 / 60.0f;
 constexpr int gc_threadCount = 4; // note: not yet passed to Newton
 
-/**
- * @brief Data needed to support physics in any scene
- */
-struct PhysicsData
-{
-    // Generic physics components and data
-    osp::active::ACtxPhysics        m_physics;
-    osp::active::ACtxHierBody       m_hierBody;
-
-    // 'Per-thread' inputs fed into the physics engine. Only one here for now
-    osp::active::ACtxPhysInputs     m_physIn;
-};
 
 /**
  * @brief Data used specifically by the physics test scene
@@ -92,10 +75,6 @@ struct PhysicsTestData
 {
     active_sparse_set_t             m_hasGravity;
     active_sparse_set_t             m_removeOutOfBounds;
-
-    // Meshes used in the scene
-    entt::dense_hash_map<EShape, MeshIdOwner_t> m_shapeToMesh;
-    MeshIdOwner_t m_meshCube;
 
     // Timers for when to create boxes and cylinders
     float m_boxTimer{0.0f};
@@ -114,102 +93,6 @@ struct PhysicsTestData
     std::vector<ThrowShape> m_toThrow;
 };
 
-static ActiveEnt add_solid(
-        CommonTestScene& rScene, ActiveEnt parent,
-        EShape shape, Matrix4 transform, int material, float mass)
-{
-    using namespace osp::active;
-
-    auto &rScnTest = rScene.get<PhysicsTestData>();
-    auto &rScnPhys = rScene.get<PhysicsData>();
-
-    // Make entity
-    ActiveEnt ent = rScene.m_activeIds.create();
-
-    // Add mesh
-    rScene.m_drawing.m_mesh.emplace(
-            ent, rScene.m_drawing.m_meshRefCounts.ref_add(rScnTest.m_shapeToMesh.at(shape)) );
-    rScene.m_drawing.m_meshDirty.push_back(ent);
-
-    // Add material to cube
-    MaterialData &rMaterial = rScene.m_drawing.m_materials[material];
-    rMaterial.m_comp.emplace(ent);
-    rMaterial.m_added.push_back(ent);
-
-    // Add transform
-    rScene.m_basic.m_transform.emplace(ent, ACompTransform{transform});
-
-    // Add opaque and visible component
-    rScene.m_drawing.m_opaque.emplace(ent);
-    rScene.m_drawing.m_visible.emplace(ent);
-
-    // Add physics stuff
-    rScnPhys.m_physics.m_shape.emplace(ent, shape);
-    rScnPhys.m_physics.m_solid.emplace(ent);
-    Vector3 const inertia
-            = osp::phys::collider_inertia_tensor(shape, transform.scaling(), mass);
-    rScnPhys.m_hierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
-
-    rScnPhys.m_physIn.m_colliderDirty.push_back(ent);
-
-    // Add to hierarchy
-    SysHierarchy::add_child(rScene.m_basic.m_hierarchy, parent, ent);
-
-    return ent;
-}
-
-/**
- * @brief Quick function to throw a drawable physics entity of a single
- *        primative shape
- *
- * @return Root of shape entity
- */
-static ActiveEnt add_quick_shape(
-        CommonTestScene &rScene, Vector3 position, Vector3 velocity,
-        float mass, EShape shape, Vector3 size)
-{
-    using namespace osp::active;
-
-    auto &rScnTest = rScene.get<PhysicsTestData>();
-    auto &rScnPhys = rScene.get<PhysicsData>();
-
-    // Root is needed to act as the rigid body entity
-    // Scale of root entity must be (1, 1, 1). Descendents that act as colliders
-    // are allowed to have different scales
-    ActiveEnt root = rScene.m_activeIds.create();
-
-    // Add transform
-    rScene.m_basic.m_transform.emplace(
-            root, ACompTransform{Matrix4::translation(position)});
-
-    // Add root entity to hierarchy
-    SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, root);
-
-    // Create collider / drawable to the root entity
-    add_solid(
-            rScene, root, shape,
-            Matrix4::scaling(size),
-            rScene.m_matVisualizer, 0.0f);
-
-    // Make ball root a dynamic rigid body
-    rScnPhys.m_physics.m_hasColliders.emplace(root);
-    rScnPhys.m_physics.m_physBody.emplace(root);
-    rScnPhys.m_physics.m_physLinearVel.emplace(root);
-    rScnPhys.m_physics.m_physAngularVel.emplace(root);
-    osp::active::ACompPhysDynamic &rDyn = rScnPhys.m_physics.m_physDynamic.emplace(root);
-    rDyn.m_totalMass = 1.0f;
-
-    // make gravity affect ball
-    rScnTest.m_hasGravity.emplace(root);
-
-    // Remove ball when it goes out of bounds
-    rScnTest.m_removeOutOfBounds.emplace(root);
-
-    // Set velocity
-    rScnPhys.m_physIn.m_setVelocity.emplace_back(root, velocity);
-
-    return root;
-}
 
 void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
 {
@@ -226,16 +109,7 @@ void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     // Add cleanup function to deal with reference counts
     // Note: The problem with destructors, is that REQUIRE storing pointers in
     //       the data, which is uglier to deal with
-    rScene.m_onCleanup.push_back([] (CommonTestScene &rScene)
-    {
-        auto &rScnTest = rScene.get<PhysicsTestData>();
-
-        rScene.m_drawing.m_meshRefCounts.ref_release(rScnTest.m_meshCube);
-        for (auto & [_, rOwner] : std::exchange(rScnTest.m_shapeToMesh, {}))
-        {
-            rScene.m_drawing.m_meshRefCounts.ref_release(rOwner);
-        }
-    });
+    rScene.m_onCleanup.push_back(&PhysicsData::cleanup);
 
     osp::Resources &rResources = *rScene.m_pResources;
 
@@ -249,10 +123,10 @@ void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     };
 
     // Acquire mesh resources from Package
-    rScnTest.m_shapeToMesh.emplace(EShape::Box,       quick_add_mesh("cube"));
-    rScnTest.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
-    rScnTest.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
-    rScnTest.m_meshCube = quick_add_mesh("grid64solid");
+    rScnPhys.m_shapeToMesh.emplace(EShape::Box,       quick_add_mesh("cube"));
+    rScnPhys.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
+    rScnPhys.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
+    rScnPhys.m_namedMeshs.emplace("floor", quick_add_mesh("grid64solid"));
 
     // Allocate space to fit all materials
     rScene.m_drawing.m_materials.resize(rScene.m_materialCount);
@@ -278,52 +152,55 @@ void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     SysHierarchy::add_child(
             rScene.m_basic.m_hierarchy, rScene.m_hierRoot, camEnt);
 
-    // Create floor entity
-    {
-        // Create floor root entity
-        ActiveEnt floorRoot = rScene.m_activeIds.create();
+    // start making floor
 
-        // Add transform and draw transform to root
-        rScene.m_basic.m_transform.emplace(
-                floorRoot, ACompTransform{Matrix4::rotationX(-90.0_degf)});
+    static constexpr Vector3 const sc_floorSize{64.0f, 64.0f, 1.0f};
+    static constexpr Vector3 const sc_floorPos{0.0f, 0.0f, -1.005f};
 
-        // Create floor mesh entity
-        ActiveEnt floorMesh = rScene.m_activeIds.create();
+    // Create floor root entity
+    ActiveEnt const floorRootEnt = rScene.m_activeIds.create();
 
-        // Add grid mesh to floor mesh
-        rScene.m_drawing.m_mesh.emplace(
-                floorMesh, rScene.m_drawing.m_meshRefCounts.ref_add(rScnTest.m_meshCube));
-        rScene.m_drawing.m_meshDirty.push_back(floorMesh);
+    // Add transform and draw transform to root
+    rScene.m_basic.m_transform.emplace(
+            floorRootEnt, ACompTransform{Matrix4::rotationX(-90.0_degf)});
 
-        // Add mesh visualizer material to floor mesh
-        MaterialData &rMatCommon
-                = rScene.m_drawing.m_materials[rScene.m_matVisualizer];
-        rMatCommon.m_comp.emplace(floorMesh);
-        rMatCommon.m_added.push_back(floorMesh);
+    // Create floor mesh entity
+    ActiveEnt const floorMeshEnt = rScene.m_activeIds.create();
 
-        // Add transform, draw transform, opaque, and visible
-        rScene.m_basic.m_transform.emplace(
-                floorMesh, ACompTransform{Matrix4::scaling({64.0f, 64.0f, 1.0f})});
-        rScene.m_drawing.m_opaque.emplace(floorMesh);
-        rScene.m_drawing.m_visible.emplace(floorMesh);
+    // Add mesh to floor mesh entity
+    rScene.m_drawing.m_mesh.emplace(floorMeshEnt, quick_add_mesh("grid64solid"));
+    rScene.m_drawing.m_meshDirty.push_back(floorMeshEnt);
 
-        // Add floor root to hierarchy root
-        SysHierarchy::add_child(
-                rScene.m_basic.m_hierarchy, rScene.m_hierRoot, floorRoot);
+    // Add mesh visualizer material to floor mesh entity
+    MaterialData &rMatCommon
+            = rScene.m_drawing.m_materials[rScene.m_matVisualizer];
+    rMatCommon.m_comp.emplace(floorMeshEnt);
+    rMatCommon.m_added.push_back(floorMeshEnt);
 
-        // Add floor mesh to floor root
-        SysHierarchy::add_child(
-                rScene.m_basic.m_hierarchy, floorRoot, floorMesh);
+    // Add transform, draw transform, opaque, and visible entity
+    rScene.m_basic.m_transform.emplace(
+            floorMeshEnt, ACompTransform{Matrix4::scaling(sc_floorSize)});
+    rScene.m_drawing.m_opaque.emplace(floorMeshEnt);
+    rScene.m_drawing.m_visible.emplace(floorMeshEnt);
 
-        // Add collider (yeah lol it's a big cube)
-        add_solid(rScene, floorRoot, EShape::Box,
-                  Matrix4::scaling({64.0f, 64.0f, 1.0f}) * Matrix4::translation({0.0f, 0.0f, -1.005f}),
-                  rScene.m_matCommon, 0.0f);
+    // Add floor root to hierarchy root
+    SysHierarchy::add_child(
+            rScene.m_basic.m_hierarchy, rScene.m_hierRoot, floorRootEnt);
 
-        // Make floor root a (non-dynamic) rigid body
-        rScnPhys.m_physics.m_hasColliders.emplace(floorRoot);
-        rScnPhys.m_physics.m_physBody.emplace(floorRoot);
-    }
+    // Parent floor mesh entity to floor root entity
+    SysHierarchy::add_child(
+            rScene.m_basic.m_hierarchy, floorRootEnt, floorMeshEnt);
+
+    // Add collider to floor root entity (yeah lol it's a big cube)
+    Matrix4 const floorTf = Matrix4::scaling(sc_floorSize)
+                          * Matrix4::translation(sc_floorPos);
+    add_solid_quick(rScene, floorRootEnt, EShape::Box, floorTf,
+                    rScene.m_matCommon, 0.0f);
+
+    // Make floor entity a (non-dynamic) rigid body
+    rScnPhys.m_physics.m_hasColliders.emplace(floorRootEnt);
+    rScnPhys.m_physics.m_physBody.emplace(floorRootEnt);
+
 }
 
 void update_test_scene_delete(CommonTestScene &rScene)
@@ -448,9 +325,15 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     // Shape Thrower system, consumes rScene.m_toThrow and creates shapes
     for (PhysicsTestData::ThrowShape const &rThrow : std::exchange(rScnTest.m_toThrow, {}))
     {
-        add_quick_shape(
+        ActiveEnt shapeEnt = add_rigid_body_quick(
                 rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_mass,
                 rThrow.m_shape, rThrow.m_size);
+
+        // Make gravity affect entity
+        rScnTest.m_hasGravity.emplace(shapeEnt);
+
+        // Remove when it goes out of bounds
+        rScnTest.m_removeOutOfBounds.emplace(shapeEnt);
     }
 
     // Sort hierarchy, required by renderer
@@ -498,7 +381,7 @@ void PhysicsTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
         auto &rControls = rRenderer.get<PhysicsTestControls>();
 
         // Throw a sphere when the throw button is pressed
-        if (rControls.m_camCtrl.m_controls.button_triggered(rControls.m_btnThrow))
+        if (rControls.m_camCtrl.m_controls.button_held(rControls.m_btnThrow))
         {
             Matrix4 const &camTf = rScene.m_basic.m_transform.get(rRenderer.m_camera).m_transform;
             float const speed = 120;
