@@ -34,4 +34,14 @@ namespace osp
 void register_tinygltf_resources(Resources &rResources);
 ResId load_tinygltf_file(std::string_view filepath, Resources &rResources, PkgId pkg);
 
+/**
+ * @brief Assign prefabs (potentially Parts) and add physical properties to an
+ *        ImporterData loaded from tinygltf
+ *
+ * @param rResources
+ * @param pkg
+ * @param importer
+ */
+void assigns_prefabs_tinygltf(Resources &rResources, ResId importer);
+
 }

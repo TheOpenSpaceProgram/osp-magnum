@@ -25,6 +25,7 @@
 #pragma once
 
 #include "../types.h"
+#include "../CommonPhysics.h"
 #include "resourcetypes.h"
 
 #include <Magnum/Trade/MaterialData.h>
@@ -83,7 +84,9 @@ struct ImporterData
 struct Prefabs
 {
     // [prefab Id][object]
-    lgrn::IntArrayMultiMap<int, int>    m_prefabs;
+    lgrn::IntArrayMultiMap<int, int>    m_prefabs{};
+    std::vector<phys::EShape>           m_objShape;
+    std::vector<float>                  m_objMass;
 };
 
 } // namespace osp

@@ -350,3 +350,103 @@ ResId osp::load_tinygltf_file(std::string_view filepath, Resources &rResources, 
     return res;
 }
 
+static phys::EShape shape_from_name(std::string_view name) noexcept
+{
+    using phys::EShape;
+
+    if (name == "cube")             { return EShape::Box; }
+    else if (name == "cylinder")    { return EShape::Cylinder; }
+
+    OSP_LOG_WARN("Unknown shape: {}" name);
+    return EShape::None;
+}
+
+void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
+{
+
+    auto const *pImportData = rResources.data_try_get<ImporterData>(restypes::gc_importer, importer);
+    auto const *pNodeExtras = rResources.data_try_get<TinyGltfNodeExtras_t>(restypes::gc_importer, importer);
+
+    if (pImportData == nullptr || pNodeExtras == nullptr)
+    {
+        OSP_LOG_WARN("Resource {} (gc_importer #{}) does not contain the correct data for loading prefabs.",
+                     rResources.name(restypes::gc_importer, importer), std::size_t(importer));
+        OSP_LOG_WARN("* has ImporterData: {}", pImportData != nullptr);
+        OSP_LOG_WARN("* has TinyGltf Extras: {}", pNodeExtras != nullptr);
+        return;
+    }
+
+    if (pImportData->m_scnTopLevel.ids_count() == 0)
+    {
+        OSP_LOG_WARN("Resource {} (gc_importer #{}) has no scenes!");
+        return;
+    }
+
+    auto const topLevelSpan = pImportData->m_scnTopLevel[0];
+
+    auto &rPrefabs = rResources.data_add<Prefabs>(restypes::gc_importer, importer);
+
+    int const objCount = pImportData->m_objParents.size();
+    rPrefabs.m_objMass      .resize(objCount, 0.0f);
+    rPrefabs.m_objShape     .resize(objCount, phys::EShape::None);
+
+    rPrefabs.m_prefabs      .data_reserve(objCount);
+    rPrefabs.m_prefabs      .ids_reserve(topLevelSpan.size());
+
+    // OSP parts are specified as top-level gltf nodes on the first scene
+    // with a name that starts with "part_"
+    // these rules may change
+
+    std::vector<int> prefabObjs;
+    prefabObjs.reserve(objCount);
+
+    auto const process_obj_recurse = [&prefabObjs, &rPrefabs, &rNodeExtras = *pNodeExtras, &rImportData = *pImportData] (auto&& self, int obj) -> void
+    {
+        auto const &name = rImportData.m_objNames[obj];
+        tinygltf::Value const &extras = rNodeExtras[obj];
+
+        if (extras.IsObject())
+        {
+            if (name.hasPrefix("col_"))
+            {
+                // is Collider
+                std::string_view const shapeName = extras.Get("shape").Get<std::string>();
+
+                rPrefabs.m_objShape[obj] = shape_from_name(shapeName);
+            }
+
+
+            if (tinygltf::Value massValue = extras.Get("massdry");
+                massValue.IsReal())
+            {
+                rPrefabs.m_objMass[obj] = massValue.GetNumberAsDouble();
+            }
+        }
+
+        prefabObjs.push_back(obj);
+        // recurse into children
+        for (int child : rImportData.m_objChildren[obj])
+        {
+            self(self, child);
+        }
+    };
+
+    int prefabIdNext = 0;
+
+    for (int const obj : topLevelSpan)
+    {
+        auto const &name = pImportData->m_objNames[obj];
+        if ( ! name.hasPrefix("part_"))
+        {
+            continue;
+        }
+
+        process_obj_recurse(process_obj_recurse, obj);
+
+        rPrefabs.m_prefabs.emplace(
+                prefabIdNext, std::begin(prefabObjs), std::end(prefabObjs));
+        ++prefabIdNext;
+
+        prefabObjs.clear();
+    }
+}

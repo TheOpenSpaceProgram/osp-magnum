@@ -370,6 +370,7 @@ void load_a_bunch_of_stuff()
     g_resources.data_register<osp::TextureImgSource>(gc_texture);
     g_resources.data_register<Trade::MeshData>(gc_mesh);
     g_resources.data_register<osp::ImporterData>(gc_importer);
+    g_resources.data_register<osp::Prefabs>(gc_importer);
     osp::register_tinygltf_resources(g_resources);
     g_defaultPkg = g_resources.pkg_create();
 
@@ -391,7 +392,8 @@ void load_a_bunch_of_stuff()
     //       images, textures, and other relevant data into osp::Resources
     for (auto meshName : meshes)
     {
-        osp::load_tinygltf_file(osp::string_concat(datapath, meshName), g_resources, g_defaultPkg);
+        osp::ResId res = osp::load_tinygltf_file(osp::string_concat(datapath, meshName), g_resources, g_defaultPkg);
+        osp::assigns_prefabs_tinygltf(g_resources, res);
     }
 
 

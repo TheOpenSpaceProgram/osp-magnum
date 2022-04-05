@@ -97,6 +97,15 @@ public:
 
     ResId find(ResTypeId typeId, PkgId pkgId, std::string_view name) const noexcept;
 
+    /**
+     * @brief Get name of Resource Id
+     *
+     * @param typeId
+     * @param resId
+     * @return
+     */
+    std::string_view name(ResTypeId typeId, ResId resId) const noexcept;
+
     lgrn::IdRegistry<ResId> const& ids(ResTypeId typeId) const noexcept;
 
     [[nodiscard]] ResIdOwner_t owner_create(ResTypeId typeId, ResId resId) noexcept;
@@ -270,7 +279,7 @@ T* Resources::data_try_get(ResTypeId typeId, ResId resId)
     PerResType &rPerResType = get_type(typeId);
 
     // Ensure resource ID exists
-    assert(rPerResType.m_resIds.capacity() > std::size_t(typeId));
+    assert(rPerResType.m_resIds.capacity() > std::size_t(resId));
     assert(rPerResType.m_resIds.exists(resId));
 
     if constexpr (std::is_const_v<T>)
