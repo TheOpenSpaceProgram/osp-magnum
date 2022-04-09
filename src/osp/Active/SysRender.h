@@ -137,6 +137,12 @@ public:
             Resources& rResources,
             ResId resId);
 
+    static TexId own_texture_resource(
+            ACtxDrawing& rCtxDrawing,
+            ACtxDrawingRes& rCtxDrawingRes,
+            Resources& rResources,
+            ResId resId);
+
     /**
      * @brief Remove all mesh and texture components, aware of refcounts
      *
