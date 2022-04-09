@@ -85,6 +85,8 @@ struct Prefabs
 {
     // [prefab Id][object]
     lgrn::IntArrayMultiMap<int, int>    m_prefabs{};
+    lgrn::IntArrayMultiMap<int, int>    m_prefabParents{};
+
     std::vector<phys::EShape>           m_objShape;
     std::vector<float>                  m_objMass;
 };

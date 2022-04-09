@@ -393,14 +393,19 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
     rPrefabs.m_prefabs      .data_reserve(objCount);
     rPrefabs.m_prefabs      .ids_reserve(topLevelSpan.size());
 
+    rPrefabs.m_prefabParents.data_reserve(objCount);
+    rPrefabs.m_prefabParents.ids_reserve(topLevelSpan.size());
+
     // OSP parts are specified as top-level gltf nodes on the first scene
     // with a name that starts with "part_"
     // these rules may change
 
     std::vector<int> prefabObjs;
+    std::vector<int> prefabParents;
     prefabObjs.reserve(objCount);
+    prefabParents.reserve(objCount);
 
-    auto const process_obj_recurse = [&prefabObjs, &rPrefabs, &rNodeExtras = *pNodeExtras, &rImportData = *pImportData] (auto&& self, int obj) -> void
+    auto const process_obj_recurse = [&prefabObjs, &prefabParents, &rPrefabs, &rNodeExtras = *pNodeExtras, &rImportData = *pImportData] (auto&& self, int obj, int parent) -> void
     {
         auto const &name = rImportData.m_objNames[obj];
         tinygltf::Value const &extras = rNodeExtras[obj];
@@ -417,17 +422,20 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
 
 
             if (tinygltf::Value massValue = extras.Get("massdry");
-                massValue.IsReal())
+                massValue.IsNumber())
             {
                 rPrefabs.m_objMass[obj] = massValue.GetNumberAsDouble();
             }
         }
 
+        int const prefabIndex = prefabParents.size();
+        prefabParents.push_back(parent);
         prefabObjs.push_back(obj);
+
         // recurse into children
         for (int child : rImportData.m_objChildren[obj])
         {
-            self(self, child);
+            self(self, child, prefabIndex);
         }
     };
 
@@ -441,12 +449,15 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
             continue;
         }
 
-        process_obj_recurse(process_obj_recurse, obj);
+        process_obj_recurse(process_obj_recurse, obj, -1);
 
         rPrefabs.m_prefabs.emplace(
                 prefabIdNext, std::begin(prefabObjs), std::end(prefabObjs));
+        rPrefabs.m_prefabParents.emplace(
+                prefabIdNext, std::begin(prefabParents), std::end(prefabParents));
         ++prefabIdNext;
 
         prefabObjs.clear();
+        prefabParents.clear();
     }
 }
