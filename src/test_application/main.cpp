@@ -154,6 +154,9 @@ std::unordered_map<std::string_view, Option> const g_scenes
     ,
     {"physicstest", {"Physics lol", [] {
         setup_common_scene<scenes::PhysicsTest>();
+    }}},
+    {"vehicletest", {"Vehicle and glTF", [] {
+        setup_common_scene<scenes::VehicleTest>();
     }}}
 };
 
@@ -383,9 +386,9 @@ void load_a_bunch_of_stuff()
         "ph_capsule.sturdy.gltf",
         "ph_fuselage.sturdy.gltf",
         "ph_engine.sturdy.gltf",
-        "ph_plume.sturdy.gltf",
-        "ph_rcs.sturdy.gltf",
-        "ph_rcs_plume.sturdy.gltf"
+        //"ph_plume.sturdy.gltf",
+        "ph_rcs.sturdy.gltf"
+        //"ph_rcs_plume.sturdy.gltf"
     };
 
     // TODO: Make new gltf loader. This will read gltf files and dump meshes,
