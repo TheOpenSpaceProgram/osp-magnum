@@ -97,6 +97,8 @@ public:
 
     ResId find(ResTypeId typeId, PkgId pkgId, std::string_view name) const noexcept;
 
+    lgrn::IdRegistry<ResId> const& ids(ResTypeId typeId) const noexcept;
+
     [[nodiscard]] ResIdOwner_t owner_create(ResTypeId typeId, ResId resId) noexcept;
 
     void owner_destroy(ResTypeId typeId, ResIdOwner_t&& rOwner) noexcept;
