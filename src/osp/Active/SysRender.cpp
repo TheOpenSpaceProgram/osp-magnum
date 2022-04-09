@@ -43,6 +43,20 @@ MeshId SysRender::own_mesh_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rC
     return it->second;
 };
 
+TexId SysRender::own_texture_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources, ResId resId)
+{
+    auto [it, success] = rCtxDrawingRes.m_resToTex.try_emplace(resId);
+    if (success)
+    {
+        ResIdOwner_t owner = rResources.owner_create(restypes::gc_mesh, resId);
+        TexId const texId = rCtxDrawing.m_texIds.create();
+        rCtxDrawingRes.m_texToRes.emplace(texId, std::move(owner));
+        it->second = texId;
+        return texId;
+    }
+    return it->second;
+};
+
 void SysRender::clear_owners(ACtxDrawing& rCtxDrawing)
 {
     for (TexIdOwner_t &rOwner : std::exchange(rCtxDrawing.m_diffuseTex, {}))

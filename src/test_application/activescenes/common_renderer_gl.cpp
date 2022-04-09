@@ -64,6 +64,19 @@ void CommonSceneRendererGL::sync(ActiveApplication& rApp, CommonTestScene const&
     RenderGroup &rGroupFwdOpaque
             = m_renderGroups.m_groups["fwd_opaque"];
 
+    // Load required meshes and textures into OpenGL
+    SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rApp.get_render_gl());
+
+    // Assign GL meshes to entities with a mesh component
+    SysRenderGL::assign_meshes(
+            rScene.m_drawing.m_mesh, rScene.m_drawingRes.m_meshToRes, rScene.m_drawing.m_meshDirty,
+            m_renderGl.m_meshId, rApp.get_render_gl());
+
+    // Assign GL textures to entities with a texture component
+    SysRenderGL::assign_textures(
+            rScene.m_drawing.m_diffuseTex, rScene.m_drawingRes.m_texToRes, rScene.m_drawing.m_diffuseDirty,
+            m_renderGl.m_diffuseTexId, rApp.get_render_gl());
+
     // Assign Phong shader to entities with the gc_mat_common material, and put
     // results into the fwd_opaque render group
     {
@@ -93,19 +106,6 @@ void CommonSceneRendererGL::sync(ActiveApplication& rApp, CommonTestScene const&
                     std::cbegin(rMatVisualizer.m_added),
                     std::cend(rMatVisualizer.m_added));
     }
-
-    // Load required meshes and textures into OpenGL
-    SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rApp.get_render_gl());
-
-    // Assign GL meshes to entities with a mesh component
-    SysRenderGL::assign_meshes(
-            rScene.m_drawing.m_mesh, rScene.m_drawingRes.m_meshToRes, rScene.m_drawing.m_meshDirty,
-            m_renderGl.m_meshId, rApp.get_render_gl());
-
-    // Assign GL textures to entities with a texture component
-    SysRenderGL::assign_textures(
-            rScene.m_drawing.m_diffuseTex, rScene.m_drawingRes.m_texToRes, rScene.m_drawing.m_diffuseDirty,
-            m_renderGl.m_diffuseTexId, rApp.get_render_gl());
 
     // Calculate hierarchy transforms
     SysRender::update_draw_transforms(
