@@ -161,7 +161,7 @@ int main(int argc, char** argv)
 {
     Corrade::Utility::Arguments args;
     args.addSkippedPrefix("magnum", "Magnum options")
-        .addOption("scene", "simple").setHelp("scene", "Set the scene to launch")
+        .addOption("scene", "none").setHelp("scene", "Set the scene to launch")
         .addOption("config").setHelp("config", "path to configuration file to use")
         .addBooleanOption("norepl").setHelp("norepl", "don't enter read, evaluate, print, loop.")
         .addBooleanOption('v', "verbose").setHelp("verbose", "log verbosely")
