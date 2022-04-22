@@ -24,17 +24,15 @@
  */
 #pragma once
 
-#include <osp/Active/SysSignal.h>
+#include <osp/types.h>
 
 namespace adera::wire
 {
     /**
      * Rotation command with pitch, yaw and roll components
      */
-    struct AttitudeControl : public osp::active::Signal<AttitudeControl>
+    struct AttitudeControl
     {
-        static inline std::string smc_wire_name = "AttitudeControl";
-
         AttitudeControl() = default;
         constexpr AttitudeControl(osp::Vector3 value) noexcept : m_attitude(value) { }
 
@@ -56,10 +54,8 @@ namespace adera::wire
     /**
      * A percentage for something like throttle
      */
-    struct Percent : public osp::active::Signal<Percent>
+    struct Percent
     {
-        static inline std::string smc_wire_name = "Percent";
-
         Percent() = default;
         constexpr Percent(float value) noexcept : m_percent(value) { }
 
@@ -79,7 +75,7 @@ namespace adera::wire
     /**
      * Boolean signal for logic gates
      */
-    struct Logic : public osp::active::Signal<Logic>
+    struct Logic
     {
         bool m_value;
     };

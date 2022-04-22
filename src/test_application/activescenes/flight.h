@@ -32,7 +32,6 @@
 #include <osp/Active/machines.h>
 
 #include <osp/Active/SysAreaAssociate.h>
-#include <osp/Active/SysVehicleSync.h>
 
 #include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>
@@ -70,7 +69,6 @@ struct ACtxMachines
  */
 struct ACtxUniverseSync
 {
-    ACtxSyncVehicles    m_syncVehicles;
     ACtxAreaLink        m_areaLink;
 };
 
