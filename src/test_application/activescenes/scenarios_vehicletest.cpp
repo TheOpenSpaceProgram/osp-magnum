@@ -29,6 +29,7 @@
 #include "CameraController.h"
 
 #include "../ActiveApplication.h"
+#include "test_application/VehicleBuilder.h"
 
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
@@ -51,6 +52,7 @@
 #include <newtondynamics_physics/SysNewton.h>
 
 #include <iostream>
+#include <optional>
 
 using osp::active::ActiveEnt;
 using osp::active::active_sparse_set_t;
@@ -72,12 +74,54 @@ namespace testapp::scenes
 constexpr float gc_physTimestep = 1.0 / 60.0f;
 constexpr int gc_threadCount = 4; // note: not yet passed to Newton
 
+using PartEnt_t = uint32_t;
+using RigidGroup_t = uint32_t;
+
+//struct VehicleData
+//{
+//    lgrn::IdRegistry<RigidGroup_t>  m_rigids;
+//    std::vector<Matrix4>            m_rigidCom;
+
+//    std::vector<Matrix4>            m_partTransformRigid;
+//    std::vector<RigidGroup_t>       m_partRigids;
+
+//    std::vector<osp::ResIdOwner_t>  m_partPrefabs;
+//};
+
+struct ACtxParts
+{
+    lgrn::IdRegistry<PartEnt_t>     m_partIds;
+
+    lgrn::IdRegistry<RigidGroup_t>  m_rigids;
+    lgrn::IntArrayMultiMap<RigidGroup_t, PartEnt_t> m_rigidParts;
+
+    std::vector<Matrix4>            m_partTransformRigid;
+    std::vector<RigidGroup_t>       m_partRigids;
+
+    std::vector<osp::PrefabPair>    m_partPrefabs;
+
+    std::vector<PartEnt_t>          m_activeToPart;
+    std::vector<ActiveEnt>          m_partToActive;
+};
+
 struct PrefabInit
 {
     osp::ResId m_res;
     int m_id;
 
+    // m_partIds
+
+    ActiveEnt m_parent;
+
     std::vector<ActiveEnt> m_prefabToEnt;
+
+    Matrix4 const* m_pTransform;
+};
+
+struct PartInit
+{
+    PartEnt_t m_part;
+    int m_initPrefabs;
 };
 
 /**
@@ -91,6 +135,7 @@ struct VehicleTestData
     // Timers for when to create boxes and cylinders
     float m_boxTimer{0.0f};
     float m_cylinderTimer{0.0f};
+    float m_vehicleTimer{0.0f};
 
     struct ThrowShape
     {
@@ -106,7 +151,13 @@ struct VehicleTestData
     // Queue for balls to throw
     std::vector<ThrowShape> m_toThrow;
 
-    std::vector<PrefabInit> m_prefabInit;
+    std::vector<PrefabInit> m_initPrefabs;
+    std::vector<PartInit> m_initParts;
+
+    std::vector<RigidGroup_t> m_rigidDirty;
+    std::vector<ActiveEnt> m_rigidEnts;
+
+    std::optional<VehicleBuilder> m_builder;
 };
 
 
@@ -121,6 +172,7 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     auto &rScnPhys  = rScene.emplace<PhysicsData>();
     auto &rScnNwt   = rScene.emplace<ospnewton::ACtxNwtWorld>(gc_threadCount);
     auto &rScnTest  = rScene.emplace<VehicleTestData>();
+    auto &rScnParts = rScene.emplace<ACtxParts>();
 
     // Add cleanup function to deal with reference counts
     // Note: The problem with destructors, is that REQUIRE storing pointers in
@@ -217,6 +269,23 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     rScnPhys.m_physics.m_hasColliders.emplace(floorRootEnt);
     rScnPhys.m_physics.m_physBody.emplace(floorRootEnt);
 
+
+    // Start making test vehicle
+
+    VehicleBuilder &rBuilder = rScnTest.m_builder.emplace(rScene.m_pResources);
+
+    auto const [ capsule, fueltank, engine ] = rBuilder.create_parts<3>();
+    rBuilder.set_prefabs({
+        { capsule,  "phCapsule" },
+        { fueltank, "phFuselage" },
+        { engine,   "phEngine" },
+    });
+
+    rBuilder.set_transform({
+       { capsule,  Matrix4::translation({0, 0, 3}) },
+       { fueltank, Matrix4::translation({0, 0, 0}) },
+       { engine,   Matrix4::translation({0, 0, -3}) },
+    });
 }
 
 static void update_test_scene_delete(CommonTestScene &rScene)
@@ -259,6 +328,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     auto &rScnTest  = rScene.get<VehicleTestData>();
     auto &rScnPhys  = rScene.get<PhysicsData>();
     auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
+    auto &rScnParts = rScene.get<ACtxParts>();
 
     // Clear all drawing-related dirty flags
     SysRender::clear_dirty_all(rScene.m_drawing);
@@ -333,24 +403,81 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     // Delete entities in m_delete, their descendants, and components
     update_test_scene_delete(rScene);
 
+    rScnTest.m_initPrefabs.clear();
+    rScnTest.m_initParts.clear();
+    rScnTest.m_rigidDirty.clear();
+
     using osp::restypes::gc_importer;
 
-    static int haha = 0, foo = 0;
-    haha += 1;
-    if (haha >= 6)
-    {
-        haha = 0;
-        if (rScene.m_pResources->ids(gc_importer).exists(osp::ResId(foo)))
-        {
-            rScnTest.m_prefabInit.emplace_back(PrefabInit{osp::ResId(foo), 0, {}});
-        }
+    static Matrix4 const identity{};
 
-        foo ++;
-        foo %= rScene.m_pResources->ids(gc_importer).capacity();
+    rScnTest.m_vehicleTimer += delta;
+    if (rScnTest.m_vehicleTimer >= 0.5f)
+    {
+        rScnTest.m_vehicleTimer -= 0.5f;
+
+        VehicleData const &data = rScnTest.m_builder->data();
+
+        ActiveEnt const rigidEnt = rScene.m_activeIds.create();
+        RigidGroup_t const rigid = rScnParts.m_rigids.create();
+
+        rScnTest.m_rigidEnts.resize(rScnParts.m_rigids.capacity());
+        rScnTest.m_rigidDirty.push_back(rigid);
+        rScnParts.m_rigidParts.ids_reserve(rScnParts.m_rigids.capacity());
+        rScnParts.m_rigidParts.data_reserve(rScnParts.m_rigidParts.data_capacity() + data.m_partIds.size());
+
+        // setup root entity
+        SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, rigidEnt);
+        rScene.m_basic.m_transform.emplace(rigidEnt, Matrix4::translation({0.0f, 5.0f, 0.0f}));
+        rScnPhys.m_physics.m_hasColliders.emplace(rigidEnt);
+        rScnPhys.m_physics.m_solid.emplace(rigidEnt);
+        rScnPhys.m_physics.m_physBody.emplace(rigidEnt);
+        rScnPhys.m_physics.m_physLinearVel.emplace(rigidEnt);
+        rScnPhys.m_physics.m_physAngularVel.emplace(rigidEnt);
+        osp::active::ACompPhysDynamic &rDyn = rScnPhys.m_physics.m_physDynamic.emplace(rigidEnt);
+        rDyn.m_totalMass = 1.0f; // TODO
+        rDyn.m_inertia = {1.0f, 1.0f, 1.0f};
+
+        // Make gravity affect entity
+        rScnTest.m_hasGravity.emplace(rigidEnt);
+        //rScnTest.m_removeOutOfBounds.emplace(rigidEnt);
+        rScnTest.m_rigidEnts[rigid] = rigidEnt;
+
+        PartEnt_t *pRigidPart = rScnParts.m_rigidParts.emplace(rigid, data.m_partIds.size());
+
+        for (unsigned int i = 0; i < data.m_partIds.size(); ++i)
+        {
+            if ( ! data.m_partIds.exists(PartId(i)) )
+            {
+                continue;
+            }
+
+            PartEnt_t const part = rScnParts.m_partIds.create();
+
+            rScnParts.m_partPrefabs.resize(rScnParts.m_partIds.capacity());
+            rScnParts.m_partRigids.resize(rScnParts.m_partIds.capacity());
+            rScnParts.m_partTransformRigid.resize(rScnParts.m_partIds.capacity());
+
+            osp::PrefabPair const& prefabPair = data.m_partPrefabs[i];
+
+            rScnParts.m_partPrefabs[part] = osp::PrefabPair{rScene.m_pResources->owner_create(gc_importer, prefabPair.m_importer), prefabPair.m_prefabId};
+            rScnParts.m_partRigids[part] = rigid;
+            rScnParts.m_partTransformRigid[part] = data.m_partTransforms[i];
+
+            *pRigidPart = part;
+            ++pRigidPart;
+
+            rScnTest.m_initParts.emplace_back(PartInit{part, int(rScnTest.m_initPrefabs.size())});
+            PrefabInit &rInitPf = rScnTest.m_initPrefabs.emplace_back();
+            rInitPf.m_res = prefabPair.m_importer;
+            rInitPf.m_id = prefabPair.m_prefabId;
+            rInitPf.m_pTransform = &data.m_partTransforms[i];
+            rInitPf.m_parent = rigidEnt;
+        }
     }
 
     // Initialize prefab entities
-    for (PrefabInit& rPrefab : rScnTest.m_prefabInit)
+    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
     {
 
         //auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
@@ -363,10 +490,22 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
         rScene.m_activeIds.create(std::begin(rPrefab.m_prefabToEnt), objects.size());
     }
 
+    rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
+    rScnParts.m_activeToPart.resize(rScene.m_activeIds.capacity());
+
+    // Set Part entities, now that the prefabs exist
+    for (PartInit& rPartInit : rScnTest.m_initParts)
+    {
+        ActiveEnt const root = rScnTest.m_initPrefabs[rPartInit.m_initPrefabs].m_prefabToEnt.front();
+
+        rScnParts.m_partToActive[rPartInit.m_part] = root;
+        rScnParts.m_activeToPart[std::size_t(root)] = rPartInit.m_part;
+    }
+
     //std::cout << "Entity count: " << rScene.m_activeIds.size() << "/" << rScene.m_activeIds.capacity() << "\n";
 
     // Init prefab hierarchy: Add hierarchy components
-    for (PrefabInit& rPrefab : rScnTest.m_prefabInit)
+    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
     {
         auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
         auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
@@ -378,7 +517,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
         {
             int const prefabParent = parents[i];
             ActiveEnt const parent = (prefabParent == -1)
-                    ? rScene.m_hierRoot
+                    ? rPrefab.m_parent
                     : rPrefab.m_prefabToEnt[prefabParent];
 
             ActiveEnt const child = rPrefab.m_prefabToEnt[i];
@@ -388,25 +527,26 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     }
 
     // Init prefab transforms: Add transform components
-    for (PrefabInit& rPrefab : rScnTest.m_prefabInit)
+    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
     {
         auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
         auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
 
         auto const objects = rPrefabData.m_prefabs[rPrefab.m_id];
+        auto const parents = rPrefabData.m_prefabParents[rPrefab.m_id];
 
         for (int i = 0; i < objects.size(); ++i)
         {
-            rScene.m_basic.m_transform.emplace(rPrefab.m_prefabToEnt[i], rImportData.m_objTransforms[objects[i]]);
+            Matrix4 const& transform = (parents[i] == -1)
+                    ? *rPrefab.m_pTransform
+                    : rImportData.m_objTransforms[objects[i]];
+            rScene.m_basic.m_transform.emplace(
+                    rPrefab.m_prefabToEnt[i], transform);
         }
-
-        // move root up because why not
-        rScene.m_basic.m_transform.get(rPrefab.m_prefabToEnt[0]).m_transform.translation().y() += 5;
     }
 
-
     // init prefab drawables
-    for (PrefabInit& rPrefab : rScnTest.m_prefabInit)
+    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
     {
         auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
         auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
@@ -459,19 +599,21 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     }
 
     // Init prefab physics
-    for (PrefabInit& rPrefab : rScnTest.m_prefabInit)
+    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
     {
         auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
         auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
 
         auto const objects = rPrefabData.m_prefabs[rPrefab.m_id];
 
-        float totalMass = 0.0f;
-        Vector3 totalInertia{0.0f}; // ultra-accurate calculation :)
-
         for (int i = 0; i < objects.size(); ++i)
         {
             ActiveEnt const ent = rPrefab.m_prefabToEnt[i];
+
+            // TODO: hasColliders should be set for each entity that has
+            //       colliders, or descendents have colliders.
+            //       For now, all entities are set.
+            rScnPhys.m_physics.m_hasColliders.emplace(ent);
 
             EShape const shape = rPrefabData.m_objShape[objects[i]];
 
@@ -485,34 +627,14 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
             if (float mass = rPrefabData.m_objMass[objects[i]];
                mass != 0.0f)
             {
-
                 osp::Vector3 const inertia
                         = osp::phys::collider_inertia_tensor(shape != EShape::None ? shape : EShape::Sphere, rImportData.m_objTransforms[objects[i]].scaling(), mass);
                 rScnPhys.m_hierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
-                totalMass += mass;
-                totalInertia += inertia;
             }
         }
 
-        // temporary: make root a rigid body
 
-        ActiveEnt const root = rPrefab.m_prefabToEnt[0];
-
-        rScnPhys.m_physics.m_hasColliders.emplace(root);
-        rScnPhys.m_physics.m_physBody.emplace(root);
-        rScnPhys.m_physics.m_physLinearVel.emplace(root);
-        rScnPhys.m_physics.m_physAngularVel.emplace(root);
-        osp::active::ACompPhysDynamic &rDyn = rScnPhys.m_physics.m_physDynamic.emplace(root);
-        rDyn.m_totalMass = totalMass;
-        rDyn.m_inertia = totalInertia;
-
-        // Make gravity affect entity
-        rScnTest.m_hasGravity.emplace(root);
-        rScnTest.m_removeOutOfBounds.emplace(root);
     }
-
-    rScnTest.m_prefabInit.clear();
-
 
     // Note: Prefer creating entities near the end of the update after physics
     //       and delete systems. This allows their initial state to be rendered
