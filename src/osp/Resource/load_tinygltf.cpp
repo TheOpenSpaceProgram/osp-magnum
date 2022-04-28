@@ -396,6 +396,8 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
     rPrefabs.m_prefabParents.data_reserve(objCount);
     rPrefabs.m_prefabParents.ids_reserve(topLevelSpan.size());
 
+    rPrefabs.m_prefabNames  .reserve(topLevelSpan.size());
+
     // OSP parts are specified as top-level gltf nodes on the first scene
     // with a name that starts with "part_"
     // these rules may change
@@ -449,6 +451,9 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
             continue;
         }
 
+        rPrefabs.m_prefabNames.emplace_back(name.exceptPrefix("part_"));
+
+        // Read children and populate prefabObjs and prefabParents
         process_obj_recurse(process_obj_recurse, obj, -1);
 
         rPrefabs.m_prefabs.emplace(
