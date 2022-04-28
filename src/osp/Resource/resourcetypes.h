@@ -128,8 +128,13 @@ inline ResTypeId const gc_image         = resource_type_next();
 inline ResTypeId const gc_texture       = resource_type_next();
 inline ResTypeId const gc_mesh          = resource_type_next();
 inline ResTypeId const gc_importer      = resource_type_next();
-inline ResTypeId const gc_prefab        = resource_type_next();
 
 } // namespace restypes
+
+struct PrefabPair
+{
+    ResIdOwner_t m_importer;
+    int m_prefabId;
+};
 
 } // namespace osp
