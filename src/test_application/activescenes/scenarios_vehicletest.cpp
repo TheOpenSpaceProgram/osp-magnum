@@ -34,6 +34,7 @@
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
+#include <osp/Active/parts.h>
 
 #include <osp/Active/SysHierarchy.h>
 
@@ -57,6 +58,9 @@
 using osp::active::ActiveEnt;
 using osp::active::active_sparse_set_t;
 
+using osp::active::PartEnt_t;
+using osp::active::RigidGroup_t;
+
 using osp::phys::EShape;
 
 using osp::Vector3;
@@ -74,35 +78,6 @@ namespace testapp::scenes
 constexpr float gc_physTimestep = 1.0 / 60.0f;
 constexpr int gc_threadCount = 4; // note: not yet passed to Newton
 
-using PartEnt_t = uint32_t;
-using RigidGroup_t = uint32_t;
-
-//struct VehicleData
-//{
-//    lgrn::IdRegistry<RigidGroup_t>  m_rigids;
-//    std::vector<Matrix4>            m_rigidCom;
-
-//    std::vector<Matrix4>            m_partTransformRigid;
-//    std::vector<RigidGroup_t>       m_partRigids;
-
-//    std::vector<osp::ResIdOwner_t>  m_partPrefabs;
-//};
-
-struct ACtxParts
-{
-    lgrn::IdRegistry<PartEnt_t>     m_partIds;
-
-    lgrn::IdRegistry<RigidGroup_t>  m_rigids;
-    lgrn::IntArrayMultiMap<RigidGroup_t, PartEnt_t> m_rigidParts;
-
-    std::vector<Matrix4>            m_partTransformRigid;
-    std::vector<RigidGroup_t>       m_partRigids;
-
-    std::vector<osp::PrefabPair>    m_partPrefabs;
-
-    std::vector<PartEnt_t>          m_activeToPart;
-    std::vector<ActiveEnt>          m_partToActive;
-};
 
 struct PrefabInit
 {
@@ -419,11 +394,11 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
         VehicleData const &data = rScnTest.m_builder->data();
 
         ActiveEnt const rigidEnt = rScene.m_activeIds.create();
-        RigidGroup_t const rigid = rScnParts.m_rigids.create();
+        RigidGroup_t const rigid = rScnParts.m_rigidIds.create();
 
-        rScnTest.m_rigidEnts.resize(rScnParts.m_rigids.capacity());
+        rScnTest.m_rigidEnts.resize(rScnParts.m_rigidIds.capacity());
         rScnTest.m_rigidDirty.push_back(rigid);
-        rScnParts.m_rigidParts.ids_reserve(rScnParts.m_rigids.capacity());
+        rScnParts.m_rigidParts.ids_reserve(rScnParts.m_rigidIds.capacity());
         rScnParts.m_rigidParts.data_reserve(rScnParts.m_rigidParts.data_capacity() + data.m_partIds.size());
 
         // setup root entity
@@ -479,8 +454,6 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     // Initialize prefab entities
     for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
     {
-
-        //auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
         auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
 
         auto const objects = rPrefabData.m_prefabs[rPrefab.m_id];
@@ -501,8 +474,6 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
         rScnParts.m_partToActive[rPartInit.m_part] = root;
         rScnParts.m_activeToPart[std::size_t(root)] = rPartInit.m_part;
     }
-
-    //std::cout << "Entity count: " << rScene.m_activeIds.size() << "/" << rScene.m_activeIds.capacity() << "\n";
 
     // Init prefab hierarchy: Add hierarchy components
     for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
