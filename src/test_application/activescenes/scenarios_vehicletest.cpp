@@ -37,6 +37,7 @@
 #include <osp/Active/parts.h>
 
 #include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysPrefabInit.h>
 
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
@@ -60,6 +61,8 @@ using osp::active::active_sparse_set_t;
 
 using osp::active::PartEnt_t;
 using osp::active::RigidGroup_t;
+using osp::active::TmpPrefabInit;
+
 
 using osp::phys::EShape;
 
@@ -77,21 +80,6 @@ namespace testapp::scenes
 
 constexpr float gc_physTimestep = 1.0 / 60.0f;
 constexpr int gc_threadCount = 4; // note: not yet passed to Newton
-
-
-struct PrefabInit
-{
-    osp::ResId m_res;
-    int m_id;
-
-    // m_partIds
-
-    ActiveEnt m_parent;
-
-    std::vector<ActiveEnt> m_prefabToEnt;
-
-    Matrix4 const* m_pTransform;
-};
 
 struct PartInit
 {
@@ -126,7 +114,8 @@ struct VehicleTestData
     // Queue for balls to throw
     std::vector<ThrowShape> m_toThrow;
 
-    std::vector<PrefabInit> m_initPrefabs;
+    std::vector<TmpPrefabInit> m_initPrefabs;
+    std::vector<ActiveEnt> m_initPrefabEnts;
     std::vector<PartInit> m_initParts;
 
     std::vector<RigidGroup_t> m_rigidDirty;
@@ -153,6 +142,15 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     // Note: The problem with destructors, is that REQUIRE storing pointers in
     //       the data, which is uglier to deal with
     rScene.m_onCleanup.push_back(&PhysicsData::cleanup);
+    rScene.m_onCleanup.push_back([] (CommonTestScene& rScene) -> void
+    {
+        auto &rScnParts = rScene.get<ACtxParts>();
+        for (osp::PrefabPair &rPrefabPair : rScnParts.m_partPrefabs)
+        {
+            rScene.m_pResources->owner_destroy(
+                    osp::restypes::gc_importer, std::move(rPrefabPair.m_importer));
+        }
+    });
 
     osp::Resources &rResources = *rScene.m_pResources;
 
@@ -443,30 +441,42 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
             ++pRigidPart;
 
             rScnTest.m_initParts.emplace_back(PartInit{part, int(rScnTest.m_initPrefabs.size())});
-            PrefabInit &rInitPf = rScnTest.m_initPrefabs.emplace_back();
-            rInitPf.m_res = prefabPair.m_importer;
-            rInitPf.m_id = prefabPair.m_prefabId;
+            TmpPrefabInit &rInitPf = rScnTest.m_initPrefabs.emplace_back();
+            rInitPf.m_importerRes = prefabPair.m_importer;
+            rInitPf.m_prefabId = prefabPair.m_prefabId;
             rInitPf.m_pTransform = &data.m_partTransforms[i];
             rInitPf.m_parent = rigidEnt;
         }
     }
 
-    // Initialize prefab entities
-    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
+    // Count total number of entities needed to be created for prefabs
+    std::size_t totalEnts = 0;
+    for (TmpPrefabInit& rPrefab : rScnTest.m_initPrefabs)
     {
-        auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
+        auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_importerRes);
+        auto const objects = rPrefabData.m_prefabs[rPrefab.m_prefabId];
 
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_id];
-
-        rPrefab.m_prefabToEnt.resize(objects.size());
-
-        rScene.m_activeIds.create(std::begin(rPrefab.m_prefabToEnt), objects.size());
+        totalEnts += objects.size();
     }
 
-    rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
-    rScnParts.m_activeToPart.resize(rScene.m_activeIds.capacity());
+    // Initialize prefab entities
+    rScnTest.m_initPrefabEnts.resize(totalEnts);
+    std::size_t pos = 0;
+    for (TmpPrefabInit& rPrefab : rScnTest.m_initPrefabs)
+    {
+        auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_importerRes);
+        auto const objects = rPrefabData.m_prefabs[rPrefab.m_prefabId];
+
+        ActiveEnt *pEnts = &rScnTest.m_initPrefabEnts.data()[pos];
+
+        rScene.m_activeIds.create(pEnts, objects.size());
+        rPrefab.m_prefabToEnt = {pEnts, objects.size()};
+        pos += objects.size();
+    }
 
     // Set Part entities, now that the prefabs exist
+    rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
+    rScnParts.m_activeToPart.resize(rScene.m_activeIds.capacity());
     for (PartInit& rPartInit : rScnTest.m_initParts)
     {
         ActiveEnt const root = rScnTest.m_initPrefabs[rPartInit.m_initPrefabs].m_prefabToEnt.front();
@@ -476,136 +486,16 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     }
 
     // Init prefab hierarchy: Add hierarchy components
-    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
-    {
-        auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
-        auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
-
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_id];
-        auto const parents = rPrefabData.m_prefabParents[rPrefab.m_id];
-
-        for (int i = 0; i < objects.size(); ++i)
-        {
-            int const prefabParent = parents[i];
-            ActiveEnt const parent = (prefabParent == -1)
-                    ? rPrefab.m_parent
-                    : rPrefab.m_prefabToEnt[prefabParent];
-
-            ActiveEnt const child = rPrefab.m_prefabToEnt[i];
-
-            SysHierarchy::add_child(rScene.m_basic.m_hierarchy, parent, child);
-        }
-    }
+    SysPrefabInit::init_hierarchy(rScnTest.m_initPrefabs, *rScene.m_pResources, rScene.m_basic.m_hierarchy);
 
     // Init prefab transforms: Add transform components
-    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
-    {
-        auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
-        auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
-
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_id];
-        auto const parents = rPrefabData.m_prefabParents[rPrefab.m_id];
-
-        for (int i = 0; i < objects.size(); ++i)
-        {
-            Matrix4 const& transform = (parents[i] == -1)
-                    ? *rPrefab.m_pTransform
-                    : rImportData.m_objTransforms[objects[i]];
-            rScene.m_basic.m_transform.emplace(
-                    rPrefab.m_prefabToEnt[i], transform);
-        }
-    }
+    SysPrefabInit::init_transforms(rScnTest.m_initPrefabs, *rScene.m_pResources, rScene.m_basic.m_transform);
 
     // init prefab drawables
-    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
-    {
-        auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
-        auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
-
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_id];
-
-        for (int i = 0; i < objects.size(); ++i)
-        {
-            if (int const meshImportId = rImportData.m_objMeshes[objects[i]];
-               meshImportId != -1)
-            {
-                //
-                // has mesh
-
-                ActiveEnt const ent = rPrefab.m_prefabToEnt[i];
-
-                osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
-                MeshId const meshId = SysRender::own_mesh_resource(rScene.m_drawing, rScene.m_drawingRes, *rScene.m_pResources, meshRes);
-                rScene.m_drawing.m_mesh.emplace(ent, rScene.m_drawing.m_meshRefCounts.ref_add(meshId));
-                rScene.m_drawing.m_meshDirty.push_back(ent);
-
-                int const matImportId = rImportData.m_objMaterials[objects[i]];
-
-                if (Magnum::Trade::MaterialData const &mat = *rImportData.m_materials.at(matImportId);
-                    mat.types() & Magnum::Trade::MaterialType::PbrMetallicRoughness)
-                {
-                    auto const& matPbr = mat.as<Magnum::Trade::PbrMetallicRoughnessMaterialData>();
-                    if (int const baseColor = matPbr.baseColorTexture();
-                        baseColor != -1)
-                    {
-                        osp::ResId const texRes = rImportData.m_textures[baseColor];
-                        TexId const texId = SysRender::own_texture_resource(rScene.m_drawing, rScene.m_drawingRes, *rScene.m_pResources, texRes);
-                        rScene.m_drawing.m_diffuseTex.emplace(ent, rScene.m_drawing.m_texRefCounts.ref_add(texId));
-                        rScene.m_drawing.m_diffuseDirty.push_back(ent);
-                    }
-
-                }
-
-
-                MaterialData &rMaterial = rScene.m_drawing.m_materials[rScene.m_matCommon];
-                rMaterial.m_comp.emplace(ent);
-                rMaterial.m_added.push_back(ent);
-
-                rScene.m_drawing.m_opaque.emplace(ent);
-                rScene.m_drawing.m_visible.emplace(ent);
-
-
-            }
-        }
-    }
+    SysPrefabInit::init_drawing(rScnTest.m_initPrefabs, *rScene.m_pResources, rScene.m_drawing, rScene.m_drawingRes, rScene.m_matCommon);
 
     // Init prefab physics
-    for (PrefabInit& rPrefab : rScnTest.m_initPrefabs)
-    {
-        auto const &rImportData = rScene.m_pResources->data_get<osp::ImporterData>(gc_importer, rPrefab.m_res);
-        auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_res);
-
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_id];
-
-        for (int i = 0; i < objects.size(); ++i)
-        {
-            ActiveEnt const ent = rPrefab.m_prefabToEnt[i];
-
-            // TODO: hasColliders should be set for each entity that has
-            //       colliders, or descendents have colliders.
-            //       For now, all entities are set.
-            rScnPhys.m_physics.m_hasColliders.emplace(ent);
-
-            EShape const shape = rPrefabData.m_objShape[objects[i]];
-
-            if (shape != EShape::None)
-            {
-                rScnPhys.m_physics.m_shape.emplace(ent, shape);
-                rScnPhys.m_physics.m_solid.emplace(ent);
-                rScnPhys.m_physIn.m_colliderDirty.push_back(ent);
-            }
-
-            if (float mass = rPrefabData.m_objMass[objects[i]];
-               mass != 0.0f)
-            {
-                osp::Vector3 const inertia
-                        = osp::phys::collider_inertia_tensor(shape != EShape::None ? shape : EShape::Sphere, rImportData.m_objTransforms[objects[i]].scaling(), mass);
-                rScnPhys.m_hierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
-            }
-        }
-
-
-    }
+    SysPrefabInit::init_physics(rScnTest.m_initPrefabs, *rScene.m_pResources, rScnPhys.m_physIn, rScnPhys.m_physics, rScnPhys.m_hierBody);
 
     // Note: Prefer creating entities near the end of the update after physics
     //       and delete systems. This allows their initial state to be rendered
