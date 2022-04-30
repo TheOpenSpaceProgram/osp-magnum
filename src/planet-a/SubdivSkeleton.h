@@ -164,7 +164,7 @@ private:
 
 enum class SkVrtxId : uint32_t {};
 
-using SkVrtxStorage_t = lgrn::IdRefCount<SkVrtxId>::Storage_t;
+using SkVrtxStorage_t = lgrn::IdRefCount<SkVrtxId>::Owner_t;
 
 /**
  * @brief Uses a SubdivIdTree to manage relationships between Vertex IDs, and
@@ -218,7 +218,7 @@ public:
      */
     void vrtx_release(SkVrtxStorage_t &rStorage)
     {
-        m_vrtxRefCount.ref_release(rStorage);
+        m_vrtxRefCount.ref_release(std::move(rStorage));
     }
 
     /**
@@ -253,7 +253,7 @@ private:
 enum class SkTriId : uint32_t {};
 enum class SkTriGroupId : uint32_t {};
 
-using SkTriStorage_t = lgrn::IdRefCount<SkTriId>::Storage_t;
+using SkTriStorage_t = lgrn::IdRefCount<SkTriId>::Owner_t;
 
 struct SkeletonTriangle
 {
@@ -523,7 +523,7 @@ public:
      */
     void tri_release(SkTriStorage_t &rStorage)
     {
-        m_triRefCount.ref_release(rStorage);
+        m_triRefCount.ref_release(std::move(rStorage));
     }
 
 private:

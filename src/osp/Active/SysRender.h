@@ -259,7 +259,7 @@ void remove_refcounted(
         auto &rOwner = rStorage.get(ent);
         if (rOwner.has_value())
         {
-            rRefcount.ref_release(rOwner);
+            rRefcount.ref_release(std::move(rOwner));
         }
         rStorage.erase(ent);
     }
