@@ -75,7 +75,7 @@ struct EngineTestScene
     {
         osp::active::SysRender::clear_owners(m_drawing);
         osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
-        m_drawing.m_meshRefCounts.ref_release(m_meshCube);
+        m_drawing.m_meshRefCounts.ref_release(std::move(m_meshCube));
     }
 
     osp::Resources *m_pResources;

@@ -61,12 +61,12 @@ void SysRender::clear_owners(ACtxDrawing& rCtxDrawing)
 {
     for (TexIdOwner_t &rOwner : std::exchange(rCtxDrawing.m_diffuseTex, {}))
     {
-        rCtxDrawing.m_texRefCounts.ref_release(rOwner);
+        rCtxDrawing.m_texRefCounts.ref_release(std::move(rOwner));
     }
 
     for (MeshIdOwner_t &rOwner : std::exchange(rCtxDrawing.m_mesh, {}))
     {
-        rCtxDrawing.m_meshRefCounts.ref_release(rOwner);
+        rCtxDrawing.m_meshRefCounts.ref_release(std::move(rOwner));
     }
 }
 

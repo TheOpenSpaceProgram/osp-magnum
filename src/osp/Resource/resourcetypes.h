@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include <longeron/id_management/storage.hpp>
+#include <longeron/id_management/owner.hpp>
 
 #include <cassert>
 #include <cstdint>
@@ -98,7 +98,7 @@ using res_container_t = typename res_container<T>::type;
 
 class Resources;
 
-using ResIdOwner_t = lgrn::IdStorage<ResId, Resources>;
+using ResIdOwner_t = lgrn::IdOwner<ResId, Resources>;
 
 
 // Resource Type Ids
