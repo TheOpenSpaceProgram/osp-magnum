@@ -29,7 +29,9 @@
 #include "../Resource/resourcetypes.h"
 #include "../types.h"
 
-#include <longeron/id_management/registry.hpp>
+#include "../link/machines.h"
+
+#include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>
 
 namespace osp::active
@@ -65,7 +67,7 @@ using RigidGroup_t = uint32_t;
 struct ACtxParts
 {
     // Every part that exists is assigned an ID
-    lgrn::IdRegistry<PartEnt_t>                         m_partIds;
+    lgrn::IdRegistryStl<PartEnt_t>                      m_partIds;
 
     // Associate with a Prefab
     std::vector<PrefabPair>                             m_partPrefabs;
@@ -73,10 +75,14 @@ struct ACtxParts
     std::vector<PartEnt_t>                              m_activeToPart;
 
     // Rigid Groups
-    lgrn::IdRegistry<RigidGroup_t>                      m_rigidIds;
+    lgrn::IdRegistryStl<RigidGroup_t>                   m_rigidIds;
     lgrn::IntArrayMultiMap<RigidGroup_t, PartEnt_t>     m_rigidParts;
     std::vector<Matrix4>                                m_partTransformRigid;
     std::vector<RigidGroup_t>                           m_partRigids;
+
+    // Machines
+    link::Machines                                      m_machines;
+    lgrn::IntArrayMultiMap<PartEnt_t, link::MachAnyId>  m_partMachines;
 };
 
 } // namespace osp::active

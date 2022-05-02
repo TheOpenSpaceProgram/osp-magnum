@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2022 Open Space Program Project
  *
  * MIT License
  *
@@ -24,44 +24,22 @@
  */
 #pragma once
 
-#include "activetypes.h"
-#include "../Resource/machines.h"
+#include "machines.h"
 
-#include <cstdint>
-#include <vector>
-
-namespace osp::active
+namespace osp::link
 {
 
-enum class MachineEnt : entt::id_type { };
-
-/**
- * This component is added to a part, and stores a vector that keeps track of
- * all the Machines it uses. Machines are stored in multiple entities, so the
- * vector keeps track of these.
- */
-struct ACompMachines
+template <typename VALUE_T>
+struct UpdateNodes
 {
-    std::vector<ActiveEnt> m_machines;
+    BitVector_t                             m_nodeDirty;
+    std::vector<VALUE_T>                    m_nodeNewValues;
+
+    void assign(NodeId node, VALUE_T&& value)
+    {
+        m_nodeDirty.set(node);
+        m_nodeNewValues[node] = std::forward<VALUE_T>(value);
+    }
 };
 
-}
-
-// Specialize entt::storage_traits to disable signals for storage that uses
-// MachineEnt as entities
-template<typename Type>
-struct entt::storage_traits<osp::active::MachineEnt, Type>
-{
-    using storage_type = basic_storage<osp::active::MachineEnt, Type>;
-};
-
-namespace osp::active
-{
-
-template<typename COMP_T>
-using mcomp_storage_t = typename entt::storage_traits<MachineEnt, COMP_T>::storage_type;
-
-template<typename... COMP_T>
-using mcomp_view_t = entt::basic_view<MachineEnt, entt::exclude_t<>, COMP_T...>;
-
-} // namespace osp::active
+} // namespace osp::wire
