@@ -29,6 +29,7 @@
 #include "resourcetypes.h"
 
 #include <Magnum/Trade/MaterialData.h>
+#include <Magnum/Magnum.h>
 
 #include <Corrade/Containers/Optional.h>
 #include <Corrade/Containers/String.h>
@@ -54,28 +55,28 @@ struct ImporterData
     using String = Corrade::Containers::String;
 
     // Owned resources
-    std::vector<ResIdOwner_t>           m_images;
-    std::vector<ResIdOwner_t>           m_textures;
-    std::vector<ResIdOwner_t>           m_meshes;
+    std::vector<ResIdOwner_t>               m_images;
+    std::vector<ResIdOwner_t>               m_textures;
+    std::vector<ResIdOwner_t>               m_meshes;
 
-    std::vector<OptMaterialData_t>      m_materials;
-
-    // Top-level nodes of each scene
-    // [scene Id][child object]
-    lgrn::IntArrayMultiMap<int, int>    m_scnTopLevel;
+    std::vector<OptMaterialData_t>          m_materials;
 
     // Object data
     // note: terminology for 'things' vary
     // * Magnum: Object       * glTF: Node       * OSP & EnTT: Entity
 
-    std::vector<int>                    m_objParents;
-    lgrn::IntArrayMultiMap<int, int>    m_objChildren;
+    // Top-level nodes of each scene
+    // [scene Id][child object]
+    lgrn::IntArrayMultiMap<int, ObjId>      m_scnTopLevel;
 
-    std::vector<String>                 m_objNames;
-    std::vector<Matrix4>                m_objTransforms;
+    std::vector<ObjId>                      m_objParents;
+    lgrn::IntArrayMultiMap<ObjId, ObjId>    m_objChildren;
 
-    std::vector<int>                    m_objMeshes;
-    std::vector<int>                    m_objMaterials;
+    std::vector<String>                     m_objNames;
+    std::vector<Matrix4>                    m_objTransforms;
+
+    std::vector<int>                        m_objMeshes;
+    std::vector<int>                        m_objMaterials;
 };
 
 /**
@@ -84,12 +85,14 @@ struct ImporterData
 struct Prefabs
 {
     // [prefab Id][object]
-    lgrn::IntArrayMultiMap<int, int>    m_prefabs{};
-    lgrn::IntArrayMultiMap<int, int>    m_prefabParents{};
-    std::vector<std::string_view>       m_prefabNames;
+    lgrn::IntArrayMultiMap<PrefabId, ObjId> m_prefabs;
+    lgrn::IntArrayMultiMap<PrefabId, ObjId> m_prefabParents;
 
-    std::vector<phys::EShape>           m_objShape;
-    std::vector<float>                  m_objMass;
+    // Points to ImporterData::m_objNames
+    std::vector<std::string_view>           m_prefabNames;
+
+    std::vector<phys::EShape>               m_objShape;
+    std::vector<float>                      m_objMass;
 };
 
 } // namespace osp

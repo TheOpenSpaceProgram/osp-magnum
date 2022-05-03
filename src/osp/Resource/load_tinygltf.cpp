@@ -301,7 +301,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
         if (int childCount = objChildCount[obj];
             childCount != 0)
         {
-            int *pChildren = rImportData.m_objChildren.emplace(obj, childCount);
+            ObjId *pChildren = rImportData.m_objChildren.emplace(obj, childCount);
             std::fill_n(pChildren, childCount, -1);
         }
     }
@@ -309,7 +309,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
     // Add children to their parent's list of children
     for (UnsignedInt obj = 0; obj < objCount; obj ++)
     {
-        if (int objParent = rImportData.m_objParents[obj];
+        if (ObjId objParent = rImportData.m_objParents[obj];
             objParent != -1)
         {
             // Get parent's span of children
@@ -402,12 +402,15 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
     // with a name that starts with "part_"
     // these rules may change
 
-    std::vector<int> prefabObjs;
-    std::vector<int> prefabParents;
+    std::vector<ObjId> prefabObjs;
+    std::vector<ObjId> prefabParents;
     prefabObjs.reserve(objCount);
     prefabParents.reserve(objCount);
 
-    auto const process_obj_recurse = [&prefabObjs, &prefabParents, &rPrefabs, &rNodeExtras = *pNodeExtras, &rImportData = *pImportData] (auto&& self, int obj, int parent) -> void
+    auto const process_obj_recurse
+            = [&prefabObjs, &prefabParents, &rPrefabs,
+               &rNodeExtras = *pNodeExtras, &rImportData = *pImportData]
+              (auto&& self, ObjId obj, ObjId parent) -> void
     {
         auto const &name = rImportData.m_objNames[obj];
         tinygltf::Value const &extras = rNodeExtras[obj];
@@ -417,7 +420,7 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
             if (name.hasPrefix("col_"))
             {
                 // is Collider
-                std::string_view const shapeName = extras.Get("shape").Get<std::string>();
+                auto const &shapeName = extras.Get("shape").Get<std::string>();
 
                 rPrefabs.m_objShape[obj] = shape_from_name(shapeName);
             }
@@ -435,15 +438,15 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
         prefabObjs.push_back(obj);
 
         // recurse into children
-        for (int child : rImportData.m_objChildren[obj])
+        for (ObjId child : rImportData.m_objChildren[obj])
         {
             self(self, child, prefabIndex);
         }
     };
 
-    int prefabIdNext = 0;
+    PrefabId prefabIdNext = 0;
 
-    for (int const obj : topLevelSpan)
+    for (ObjId const obj : topLevelSpan)
     {
         auto const &name = pImportData->m_objNames[obj];
         if ( ! name.hasPrefix("part_"))

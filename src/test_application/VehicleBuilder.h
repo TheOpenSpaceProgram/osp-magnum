@@ -111,7 +111,7 @@ private:
 
 
 template <std::size_t N>
-[[nodiscard]] std::array<PartId, N> VehicleBuilder::create_parts()
+std::array<PartId, N> VehicleBuilder::create_parts()
 {
     std::array<PartId, N> out;
     m_data.m_partIds.create(std::begin(out), N);

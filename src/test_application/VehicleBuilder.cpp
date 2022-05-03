@@ -49,10 +49,11 @@ VehicleBuilder::~VehicleBuilder()
 
 void VehicleBuilder::set_prefabs(std::initializer_list<SetPrefab> setPrefabs)
 {
+    auto const endIt = std::end(m_prefabs);
     for (SetPrefab const& set : setPrefabs)
     {
         auto const foundIt = m_prefabs.find(set.m_prefabName);
-        if (foundIt != std::end(m_prefabs))
+        if (foundIt != endIt)
         {
             auto &rPrefabPair = m_data.m_partPrefabs[std::size_t(set.m_part)];
             rPrefabPair.m_prefabId = foundIt->second.m_prefabId;
