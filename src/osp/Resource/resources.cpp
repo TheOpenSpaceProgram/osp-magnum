@@ -71,7 +71,7 @@ ResId Resources::find(ResTypeId typeId, PkgId pkgId, std::string_view name) cons
     return findIt->second;
 }
 
-std::string_view Resources::name(ResTypeId typeId, ResId resId) const noexcept
+SharedString const& Resources::name(ResTypeId typeId, ResId resId) const noexcept
 {
     PerResType const &rPerResType = get_type(typeId);
 

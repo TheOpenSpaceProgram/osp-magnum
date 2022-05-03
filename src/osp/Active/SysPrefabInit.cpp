@@ -53,12 +53,12 @@ void SysPrefabInit::init_hierarchy(
         auto &rPrefabData = rResources.data_get<osp::Prefabs const>(
                 gc_importer, rPrefab.m_importerRes);
 
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_prefabId];
+        std::size_t const objCount = rPrefabData.m_prefabs[rPrefab.m_prefabId].size();
         auto const parents = rPrefabData.m_prefabParents[rPrefab.m_prefabId];
 
-        for (int i = 0; i < objects.size(); ++i)
+        for (int i = 0; i < objCount; ++i)
         {
-            int const prefabParent = parents[i];
+            ObjId const prefabParent = parents[i];
             ActiveEnt const parent = (prefabParent == -1)
                     ? rPrefab.m_parent
                     : rPrefab.m_prefabToEnt[prefabParent];
@@ -190,8 +190,10 @@ void SysPrefabInit::init_physics(
             if (float mass = rPrefabData.m_objMass[objects[i]];
                mass != 0.0f)
             {
-                osp::Vector3 const inertia
-                        = osp::phys::collider_inertia_tensor(shape != EShape::None ? shape : EShape::Sphere, rImportData.m_objTransforms[objects[i]].scaling(), mass);
+                osp::Vector3 const inertia = osp::phys::collider_inertia_tensor(
+                        shape != EShape::None ? shape : EShape::Sphere,
+                        rImportData.m_objTransforms[objects[i]].scaling(),
+                        mass);
                 rCtxHierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
             }
         }

@@ -131,6 +131,10 @@ inline ResTypeId const gc_importer      = resource_type_next();
 
 } // namespace restypes
 
+
+using ObjId     = int32_t;
+using PrefabId  = uint32_t;
+
 struct PrefabPair
 {
     ResIdOwner_t m_importer;

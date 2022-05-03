@@ -93,20 +93,21 @@ public:
      *
      * @return Newly created Resource Id
      */
-    ResId create(ResTypeId typeId, PkgId pkgId, std::string_view name);
+    [[nodiscard]] ResId create(ResTypeId typeId, PkgId pkgId, std::string_view name);
 
-    ResId find(ResTypeId typeId, PkgId pkgId, std::string_view name) const noexcept;
+    [[nodiscard]] ResId find(ResTypeId typeId, PkgId pkgId, std::string_view name) const noexcept;
 
     /**
      * @brief Get name of Resource Id
      *
-     * @param typeId
-     * @param resId
-     * @return
+     * @param typeId    [in] Resource Type Id
+     * @param resId     [in] Resource Id
+     *
+     * @return Name of resources assigned in create(), unique to a single Package
      */
-    std::string_view name(ResTypeId typeId, ResId resId) const noexcept;
+    [[nodiscard]] SharedString const& name(ResTypeId typeId, ResId resId) const noexcept;
 
-    lgrn::IdRegistry<ResId> const& ids(ResTypeId typeId) const noexcept;
+    [[nodiscard]] lgrn::IdRegistry<ResId> const& ids(ResTypeId typeId) const noexcept;
 
     [[nodiscard]] ResIdOwner_t owner_create(ResTypeId typeId, ResId resId) noexcept;
 
@@ -148,13 +149,13 @@ public:
      * @return Reference to found data
      */
     template<typename T>
-    T& data_get(ResTypeId typeId, ResId resId);
+    [[nodiscard]] T& data_get(ResTypeId typeId, ResId resId);
 
     /**
      * @copydoc Resources::data_get(typeId, resId)
      */
     template<typename T>
-    T const& data_get(ResTypeId typeId, ResId resId) const;
+    [[nodiscard]] T const& data_get(ResTypeId typeId, ResId resId) const;
 
     /**
      * @brief Get pointer to data type to associated with a resource
@@ -165,13 +166,13 @@ public:
      * @return Pointer to found data, nullptr if not found
      */
     template<typename T>
-    T* data_try_get(ResTypeId typeId, ResId resId);
+    [[nodiscard]] T* data_try_get(ResTypeId typeId, ResId resId);
 
     /**
      * @copydoc Resources::data_get(typeId, resId)
      */
     template<typename T>
-    T const* data_try_get(ResTypeId typeId, ResId resId) const;
+    [[nodiscard]] T const* data_try_get(ResTypeId typeId, ResId resId) const;
 
     /**
      * @brief Create a new package
@@ -182,7 +183,7 @@ public:
      *
      * @return Package Id for newly created package
      */
-    PkgId pkg_create();
+     [[nodiscard]] PkgId pkg_create();
 
 private:
 

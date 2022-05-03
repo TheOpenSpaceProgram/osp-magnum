@@ -48,14 +48,14 @@ namespace osp::active
  */
 struct TmpPrefabInit
 {
-    osp::ResId m_importerRes;
-    int m_prefabId;
+    ResId m_importerRes{lgrn::id_null<ResId>()};
+    PrefabId m_prefabId;
 
     // Entities that make up the prefab
     Corrade::Containers::ArrayView<ActiveEnt const> m_prefabToEnt;
 
     // Parent and transform to assign root objects in the prefab
-    ActiveEnt m_parent;
+    ActiveEnt m_parent{lgrn::id_null<ActiveEnt>()};
     Matrix4 const* m_pTransform{nullptr};
 };
 
