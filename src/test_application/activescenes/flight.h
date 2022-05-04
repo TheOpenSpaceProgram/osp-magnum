@@ -29,7 +29,6 @@
 #include <osp/Active/basic.h>
 #include <osp/Active/physics.h>
 #include <osp/Active/drawing.h>
-#include <osp/Active/machines.h>
 
 #include <osp/Active/SysAreaAssociate.h>
 
@@ -48,21 +47,6 @@ namespace testapp::activestate
 using namespace osp::active;
 using namespace adera::active::machines;
 
-/**
- * @brief Storage for wiring and various machine components
- */
-struct ACtxMachines
-{
-    acomp_storage_t<ACompMachines>              m_machines;
-
-    mcomp_storage_t<MCompContainer>             m_container;
-    mcomp_storage_t<MCompRCSController>         m_rcsController;
-    mcomp_storage_t<MCompRocket>                m_rocket;
-    mcomp_storage_t<MCompUserControl>           m_userControl;
-
-    //ACtxWireNodes<adera::wire::AttitudeControl> m_wireAttitudeControl;
-    //ACtxWireNodes<adera::wire::Percent>         m_wirePercent;
-};
 
 /**
  * @brief Storage needed to synchronize with a Universe
@@ -83,11 +67,9 @@ namespace testapp::flight
 struct FlightScene
 {
     lgrn::IdRegistry<osp::active::ActiveEnt>     m_activeIds;
-    lgrn::IdRegistry<osp::active::MachineEnt>    m_machineIds;
 
     osp::active::ACtxBasic          m_basic;
     osp::active::ACtxDrawing        m_drawing;
-    activestate::ACtxMachines       m_machines;
 
     osp::active::ACtxPhysics        m_physics;
 
