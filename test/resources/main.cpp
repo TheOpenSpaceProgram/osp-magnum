@@ -38,7 +38,7 @@ Resources setup_basic()
     Resources res;
 
     // Size needed to fit all stock IDs in osp::restypes
-    res.resize_types(resource_type_count());
+    res.resize_types(ResTypeIdReg_t::size());
 
     res.data_register<ImageData>    (restypes::gc_image);
 

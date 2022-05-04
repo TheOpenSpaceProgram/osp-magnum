@@ -366,7 +366,7 @@ void load_a_bunch_of_stuff()
     using namespace Magnum;
     using Primitives::CylinderFlag;
 
-    g_resources.resize_types(osp::resource_type_count());
+    g_resources.resize_types(osp::ResTypeIdReg_t::size());
 
     g_resources.data_register<Trade::ImageData2D>(gc_image);
     g_resources.data_register<Trade::TextureData>(gc_texture);
