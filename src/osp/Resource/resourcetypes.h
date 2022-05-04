@@ -25,6 +25,7 @@
 #pragma once
 
 #include <longeron/id_management/owner.hpp>
+#include "../global_id.h"
 
 #include <cassert>
 #include <cstdint>
@@ -103,31 +104,15 @@ using ResIdOwner_t = lgrn::IdOwner<ResId, Resources>;
 
 // Resource Type Ids
 
-struct GenResTypeId
-{
-    friend inline ResTypeId resource_type_next() noexcept;
-    friend inline int resource_type_count() noexcept;
-private:
-    static inline int count{0};
-};
-
-inline ResTypeId resource_type_next() noexcept
-{
-    return ResTypeId(GenResTypeId::count++);
-}
-
-inline int resource_type_count() noexcept
-{
-    return GenResTypeId::count;
-}
+using ResTypeIdReg_t = GlobalIdReg<ResTypeId>;
 
 namespace restypes
 {
 
-inline ResTypeId const gc_image         = resource_type_next();
-inline ResTypeId const gc_texture       = resource_type_next();
-inline ResTypeId const gc_mesh          = resource_type_next();
-inline ResTypeId const gc_importer      = resource_type_next();
+inline ResTypeId const gc_image         = ResTypeIdReg_t::create();
+inline ResTypeId const gc_texture       = ResTypeIdReg_t::create();
+inline ResTypeId const gc_mesh          = ResTypeIdReg_t::create();
+inline ResTypeId const gc_importer      = ResTypeIdReg_t::create();
 
 } // namespace restypes
 
