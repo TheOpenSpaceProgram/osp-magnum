@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "../global_id.h"
+
 #include <longeron/containers/intarray_multimap.hpp>
 #include <longeron/containers/bit_view.hpp>
 #include <longeron/id_management/registry_stl.hpp>
@@ -35,12 +37,18 @@ namespace osp::link
 
 using BitVector_t = lgrn::BitView< std::vector<uint64_t> >;
 
+using MachTypeId    = uint16_t;
 using MachAnyId     = uint32_t;
 using MachLocalId   = uint32_t;
-using MachTypeId    = uint16_t;
 
 using NodeTypeId    = uint16_t;
 using NodeId        = uint32_t;
+
+using PortId        = uint16_t;
+using JunctionId    = uint16_t;
+
+using MachTypeReg_t = GlobalIdReg<MachLocalId>;
+using NodeTypeReg_t = GlobalIdReg<NodeTypeId>;
 
 /**
  * @brief Keeps track of Machines of a certain type that exists
@@ -69,8 +77,8 @@ struct Machines
  */
 struct MachinePair
 {
-    MachLocalId     m_id;
-    MachTypeId      m_type;
+    MachLocalId     m_id{lgrn::id_null<MachLocalId>()};
+    MachTypeId      m_type{lgrn::id_null<MachTypeId>()};
 };
 
 struct UpdateMach
@@ -103,7 +111,10 @@ struct Nodes
     MachToNode_t                        m_machToNode;
 };
 
-// [NodeTypeId]
-using NodesPerType_t = std::vector<Nodes>;
+struct Port
+{
+    NodeTypeId m_type;
+    PortId m_port;
+};
 
 } // namespace osp::wire

@@ -101,5 +101,113 @@ void VehicleBuilder::index_prefabs()
     }
 }
 
+osp::link::MachAnyId VehicleBuilder::create_machine(PartId part, MachTypeId machType, std::initializer_list<Connection> connections)
+{
+    osp::link::PerMachType &rPerMachType = m_data.m_machines.m_perType[machType];
+
+    MachTypeId const mach = m_data.m_machines.m_ids.create();
+
+    std::size_t const capacity = m_data.m_machines.m_ids.capacity();
+    m_data.m_machines.m_machTypes.resize(capacity);
+    m_data.m_machines.m_machToLocal.resize(capacity);
+    for (PerNodeType &rPerNodeType : m_data.m_nodePerType)
+    {
+        rPerNodeType.m_machToNode.ids_reserve(capacity);
+    }
+
+    MachTypeId const local = rPerMachType.m_localIds.create();
+    rPerMachType.m_localToAny.resize(rPerMachType.m_localIds.capacity());
+
+    m_data.m_machines.m_machTypes[mach] = machType;
+
+    m_data.m_machines.m_machToLocal[mach] = local;
+    rPerMachType.m_localToAny[local] = mach;
+
+    connect(mach, connections);
+
+    return mach;
+}
+
+void VehicleBuilder::connect(MachAnyId mach, std::initializer_list<Connection> connections)
+{
+    // get max port count for each node type
+    std::vector<int> nodePortMax(m_data.m_nodePerType.size(), 0);
+    for (Connection const& connect : connections)
+    {
+        int &rPortMax = nodePortMax[connect.m_port.m_type];
+        rPortMax = std::max<int>(rPortMax, connect.m_port.m_port + 1);
+    }
+
+    for (NodeTypeId nodeType = 0; nodeType < m_data.m_nodePerType.size(); ++nodeType)
+    {
+        int const portMax = nodePortMax[nodeType];
+        PerNodeType &rPerNodeType = m_data.m_nodePerType[nodeType];
+        if (portMax != 0)
+        {
+            // reallocate each time :)
+            rPerNodeType.m_machToNode.data_reserve(rPerNodeType.m_machToNode.data_capacity() + portMax);
+
+            // emplace and fill with null
+            rPerNodeType.m_machToNode.emplace(mach, portMax);
+            lgrn::Span<NodeId> portSpan = rPerNodeType.m_machToNode[mach];
+            std::fill(std::begin(portSpan), std::end(portSpan), lgrn::id_null<NodeId>());
+
+            for (Connection const& connect : connections)
+            {
+                if (connect.m_port.m_type == nodeType)
+                {
+                    portSpan[connect.m_port.m_port] = connect.m_node;
+                    rPerNodeType.m_nodeConnectCount[connect.m_node] ++;
+                    rPerNodeType.m_connectCountTotal ++;
+                }
+            }
+        }
+    }
+}
+
+using osp::link::MachinePair;
+using osp::link::MachLocalId;
+
+void VehicleBuilder::finalize_machines()
+{
+    for (NodeTypeId nodeType = 0; nodeType < m_data.m_nodePerType.size(); ++nodeType)
+    {
+        PerNodeType &rPerNodeType = m_data.m_nodePerType[nodeType];
+
+        // reserve node-to-machine partitions
+        rPerNodeType.m_nodeToMach.data_reserve(rPerNodeType.m_connectCountTotal);
+        for (NodeId node : rPerNodeType.m_nodeIds.bitview().zeros())
+        {
+            rPerNodeType.m_nodeToMach.emplace(node, rPerNodeType.m_nodeConnectCount[node]);
+            lgrn::Span<MachinePair> junction = rPerNodeType.m_nodeToMach[node];
+            std::fill(std::begin(junction), std::end(junction), MachinePair{});
+        }
+
+        // assign node-to-machine
+        for (MachAnyId mach : m_data.m_machines.m_ids.bitview().zeros())
+        {
+            lgrn::Span<NodeId> connectedNodes = rPerNodeType.m_machToNode[mach];
+            for (NodeId node : connectedNodes)
+            {
+                lgrn::Span<MachinePair> junction = rPerNodeType.m_nodeToMach[node];
+
+                // find empty spot
+                // should always succeed, as they were reserved a few lines ago
+                auto found = std::find_if(
+                        std::begin(junction), std::end(junction),
+                        [] (MachinePair const pair)
+                {
+                    return pair.m_type == lgrn::id_null<MachTypeId>();
+                });
+                assert(found != std::end(junction));
+
+                MachTypeId const type = m_data.m_machines.m_machTypes[mach];
+                MachLocalId const local = m_data.m_machines.m_machToLocal[mach];
+
+                *found = {local, type};
+            }
+        }
+    }
+}
 
 } // namespace testapp

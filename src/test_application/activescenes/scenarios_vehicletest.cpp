@@ -92,6 +92,11 @@ struct PartInit
  */
 struct VehicleTestData
 {
+    // Required for std::is_copy_assignable to work properly inside of entt::any
+    VehicleTestData() = default;
+    VehicleTestData(VehicleTestData const& copy) = delete;
+    VehicleTestData(VehicleTestData&& move) = default;
+
     active_sparse_set_t             m_hasGravity;
     active_sparse_set_t             m_removeOutOfBounds;
 
@@ -124,6 +129,21 @@ struct VehicleTestData
     std::optional<VehicleBuilder> m_builder;
 };
 
+osp::link::NodeTypeId const gc_number = osp::link::NodeTypeReg_t::create();
+osp::link::MachTypeId const gc_usercontrol = osp::link::MachTypeReg_t::create();
+
+namespace ports_usrctrl
+{
+    osp::link::Port const smc_throttle  { gc_number, 0 };
+    osp::link::Port const smc_pitch     { gc_number, 1 };
+    osp::link::Port const smc_yaw       { gc_number, 2 };
+    osp::link::Port const smc_roll      { gc_number, 3 };
+}
+
+struct MachUserControl
+{
+
+};
 
 void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
 {
@@ -259,6 +279,17 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
        { fueltank, Matrix4::translation({0, 0, 0}) },
        { engine,   Matrix4::translation({0, 0, -3}) },
     });
+
+    auto const [ pitch, yaw, roll, throttle ] = rBuilder.create_nodes<4>(gc_number);
+
+    auto controls = rBuilder.create_machine(capsule, 0, {
+        { ports_usrctrl::smc_throttle,  throttle },
+        { ports_usrctrl::smc_pitch,     pitch },
+        { ports_usrctrl::smc_yaw,       yaw },
+        { ports_usrctrl::smc_roll,      roll }
+    } );
+
+    rBuilder.finalize_machines();
 }
 
 static void update_test_scene_delete(CommonTestScene &rScene)
