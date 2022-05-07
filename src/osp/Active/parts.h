@@ -83,6 +83,7 @@ struct ACtxParts
     // Machines
     link::Machines                                      m_machines;
     lgrn::IntArrayMultiMap<PartEnt_t, link::MachAnyId>  m_partMachines;
+    std::vector<link::Nodes>                            m_nodePerType;
 };
 
 } // namespace osp::active
