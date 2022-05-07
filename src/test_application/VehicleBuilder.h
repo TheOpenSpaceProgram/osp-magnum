@@ -29,7 +29,7 @@
 
 #include <longeron/id_management/registry.hpp>
 
-#include <entt/container/dense_hash_map.hpp>
+#include <entt/container/dense_map.hpp>
 
 #include <cstdint>
 #include <array>
@@ -102,7 +102,7 @@ private:
 
     osp::Resources *m_pResources;
 
-    entt::dense_hash_map< std::string_view, osp::PrefabPair > m_prefabs;
+    entt::dense_map< std::string_view, osp::PrefabPair > m_prefabs;
 
     VehicleData m_data;
 

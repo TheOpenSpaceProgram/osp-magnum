@@ -72,13 +72,13 @@ void SysRender::clear_owners(ACtxDrawing& rCtxDrawing)
 
 void SysRender::clear_resource_owners(ACtxDrawingRes& rCtxDrawingRes, Resources &rResources)
 {
-    for (auto & [_, rOwner] : std::exchange(rCtxDrawingRes.m_texToRes, {}))
+    for (auto && [_, rOwner] : std::exchange(rCtxDrawingRes.m_texToRes, {}))
     {
         rResources.owner_destroy(restypes::gc_texture, std::move(rOwner));
     }
     rCtxDrawingRes.m_resToTex.clear();
 
-    for (auto & [_, rOwner] : std::exchange(rCtxDrawingRes.m_meshToRes, {}))
+    for (auto && [_, rOwner] : std::exchange(rCtxDrawingRes.m_meshToRes, {}))
     {
         rResources.owner_destroy(restypes::gc_mesh, std::move(rOwner));
     }

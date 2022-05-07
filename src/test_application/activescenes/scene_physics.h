@@ -28,7 +28,7 @@
 
 #include <osp/Active/physics.h>
 
-#include <entt/container/dense_hash_map.hpp>
+#include <entt/container/dense_map.hpp>
 
 #include <string_view>
 
@@ -50,10 +50,10 @@ struct PhysicsData
     // 'Per-thread' inputs fed into the physics engine. Only one here for now
     osp::active::ACtxPhysInputs     m_physIn;
 
-    entt::dense_hash_map<osp::phys::EShape,
-                         osp::active::MeshIdOwner_t> m_shapeToMesh;
-    entt::dense_hash_map<std::string_view,
-                         osp::active::MeshIdOwner_t> m_namedMeshs;
+    entt::dense_map<osp::phys::EShape,
+                    osp::active::MeshIdOwner_t> m_shapeToMesh;
+    entt::dense_map<std::string_view,
+                    osp::active::MeshIdOwner_t> m_namedMeshs;
 
     /**
      * @brief Clean up reference counted resource owners
