@@ -20,7 +20,6 @@ jobs:
 
   build:
     needs: skip-duplicates
-    runs-on: windows-latest
 
     strategy:
       matrix:
@@ -30,9 +29,12 @@ jobs:
         # compiler: [msvc, clangcl, mingw, clang]
         compiler: [msvc]
         config: [Release, Debug]
+        image: [windows-2019, windows-2022]
+
+    runs-on: ${{ matrix.image }}
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 1
         submodules: recursive
@@ -48,9 +50,8 @@ jobs:
 
     - name: Configure (MSVC)
       if: ${{ matrix.compiler == 'msvc' }}
-      # Current version of Corrade requires the MSVC2019_COMPATIBILITY flag to compile properly
       run: |
-        cmake -B build -DMSVC2019_COMPATIBILITY=ON -DCMAKE_CONFIGURATION_TYPES=${{ matrix.config }} -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
+        cmake -B build -DCMAKE_CONFIGURATION_TYPES=${{ matrix.config }}
 
     - name: Configure (ClangCL)
       if: ${{ matrix.compiler == 'clangcl' }}
@@ -88,8 +89,8 @@ jobs:
     - name: Run Unit Tests
       run: |
         ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
-  
+
     - uses: actions/upload-artifact@v2
-      with: 
-        name: OSP-windows-${{ matrix.config }}-${{ matrix.compiler }}
+      with:
+        name: OSP-${{ matrix.image }}-${{ matrix.config }}-${{ matrix.compiler }}
         path: build\${{ matrix.config }}
