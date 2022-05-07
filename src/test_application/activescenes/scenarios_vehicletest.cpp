@@ -131,19 +131,25 @@ struct VehicleTestData
 
 osp::link::NodeTypeId const gc_number = osp::link::NodeTypeReg_t::create();
 osp::link::MachTypeId const gc_usercontrol = osp::link::MachTypeReg_t::create();
+osp::link::MachTypeId const gc_rocket = osp::link::MachTypeReg_t::create();
 
 namespace ports_usrctrl
 {
-    osp::link::Port const smc_throttle  { gc_number, 0 };
-    osp::link::Port const smc_pitch     { gc_number, 1 };
-    osp::link::Port const smc_yaw       { gc_number, 2 };
-    osp::link::Port const smc_roll      { gc_number, 3 };
+using osp::link::Port;
+
+Port const smc_throttle { gc_number, 0 };
+Port const smc_pitch    { gc_number, 1 };
+Port const smc_yaw      { gc_number, 2 };
+Port const smc_roll     { gc_number, 3 };
 }
 
-struct MachUserControl
+namespace ports_rocket
 {
+using osp::link::Port;
 
-};
+Port const smc_throttle { gc_number, 0 };
+}
+
 
 void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
 {
@@ -171,6 +177,9 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
                     osp::restypes::gc_importer, std::move(rPrefabPair.m_importer));
         }
     });
+
+    rScnParts.m_machines.m_perType.resize(osp::link::MachTypeReg_t::size());
+    rScnParts.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
 
     osp::Resources &rResources = *rScene.m_pResources;
 
@@ -282,11 +291,15 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
 
     auto const [ pitch, yaw, roll, throttle ] = rBuilder.create_nodes<4>(gc_number);
 
-    auto controls = rBuilder.create_machine(capsule, 0, {
+    auto controls = rBuilder.create_machine(capsule, gc_usercontrol, {
         { ports_usrctrl::smc_throttle,  throttle },
         { ports_usrctrl::smc_pitch,     pitch },
         { ports_usrctrl::smc_yaw,       yaw },
         { ports_usrctrl::smc_roll,      roll }
+    } );
+
+    auto rocket = rBuilder.create_machine(capsule, gc_rocket, {
+        { ports_rocket::smc_throttle,  throttle }
     } );
 
     rBuilder.finalize_machines();
@@ -316,6 +329,94 @@ static void update_test_scene_delete(CommonTestScene &rScene)
 
     rScene.update_delete();
 
+}
+
+
+static void copy_machines(osp::link::Machines const &rSrc, osp::link::Machines &rDst, Corrade::Containers::ArrayView<osp::link::MachAnyId> remapMach)
+{
+    using namespace osp::link;
+
+    for (MachAnyId srcMach : rSrc.m_ids.bitview().zeros())
+    {
+        MachTypeId const srcType = rSrc.m_machTypes[srcMach];
+        PerMachType &rDstPerMach = rDst.m_perType[srcType];
+
+        // TODO: optimize multiple calls to IdRegistryStl::create()
+        //       (linear search for non-zero uint64_t is done each call)
+        MachAnyId const dstMach = rDst.m_ids.create();
+        MachLocalId const dstLocal = rDstPerMach.m_localIds.create();
+
+        // TODO: allocate once before this for loop
+        rDst.m_machToLocal.resize(rDst.m_ids.capacity());
+        rDst.m_machTypes.resize(rDst.m_ids.capacity());
+        rDstPerMach.m_localToAny.resize(rDstPerMach.m_localIds.capacity());
+
+        rDstPerMach.m_localToAny[dstLocal] = dstMach;
+        rDst.m_machToLocal[dstMach] = dstLocal;
+        remapMach[srcMach] = dstMach;
+    }
+}
+
+static void copy_nodes(osp::link::Nodes const &rSrcNodes, osp::link::Machines const &rSrcMach, Corrade::Containers::ArrayView<osp::link::MachAnyId const> remapMach, osp::link::Nodes &rDstNodes, osp::link::Machines &rDstMach, Corrade::Containers::ArrayView<osp::link::NodeId> remapNode)
+{
+    using namespace osp::link;
+    using lgrn::Span;
+
+    // Create new node IDs
+    for (NodeId srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
+    {
+        NodeId const dstNode = rDstNodes.m_nodeIds.create();
+        remapNode[srcNode] = dstNode;
+    }
+
+    // Copy node-to-machine connections
+    rDstNodes.m_nodeToMach.ids_reserve(rDstNodes.m_nodeIds.capacity());
+    rDstNodes.m_nodeToMach.data_reserve(rDstNodes.m_nodeToMach.data_size()
+                                        + rSrcNodes.m_nodeToMach.data_size());
+    for (NodeId srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
+    {
+        NodeId const dstNode = remapNode[srcNode];
+        Span<MachinePair const> srcJunction = rSrcNodes.m_nodeToMach[srcNode];
+        rDstNodes.m_nodeToMach.emplace(dstNode, srcJunction.size());
+        Span<MachinePair> dstJuncton = rDstNodes.m_nodeToMach[dstNode];
+
+        auto dstPairIt = std::begin(dstJuncton);
+        for (MachinePair const& srcPair : srcJunction)
+        {
+            MachTypeId const machType = srcPair.m_type;
+            MachAnyId const srcMach = rSrcMach.m_perType[machType].m_localToAny[srcPair.m_id];
+            MachAnyId const dstMach = remapMach[srcMach];
+            MachLocalId const dstLocal = rDstMach.m_machToLocal[dstMach];
+
+            dstPairIt->m_id     = dstLocal;
+            dstPairIt->m_type   = machType;
+
+            std::advance(dstPairIt, 1);
+        }
+    }
+
+    // copy mach-to-node connections
+    rDstNodes.m_machToNode.ids_reserve(rDstMach.m_ids.capacity());
+    rDstNodes.m_machToNode.data_reserve(rDstNodes.m_machToNode.data_size()
+                                        + rSrcNodes.m_machToNode.data_size());
+    for (MachAnyId srcMach : rSrcMach.m_ids.bitview().zeros())
+    {
+        if (rSrcNodes.m_machToNode.contains(srcMach))
+        {
+            Span<NodeId const> srcPorts = rSrcNodes.m_machToNode[srcMach];
+            MachAnyId const dstMach = remapMach[srcMach];
+            rDstNodes.m_machToNode.emplace(dstMach, srcPorts.size());
+            Span<NodeId> dstPorts = rDstNodes.m_machToNode[dstMach];
+
+            auto dstPortIt = std::begin(dstPorts);
+            for (NodeId const srcNode : srcPorts)
+            {
+                *dstPortIt = remapNode[srcNode];
+
+                std::advance(dstPortIt, 1);
+            }
+        }
+    }
 }
 
 /**
@@ -478,6 +579,20 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
             rInitPf.m_pTransform = &data.m_partTransforms[i];
             rInitPf.m_parent = rigidEnt;
         }
+
+        using namespace osp::link;
+
+        // remapMach[source MachAnyId] -> destination MachAnyId
+        std::vector<MachAnyId> remapMach(data.m_machines.m_ids.capacity(), lgrn::id_null<MachAnyId>());
+
+        // Make new machines in dst for each machine in source
+        copy_machines(data.m_machines, rScnParts.m_machines, remapMach);
+
+        // Do the same for nodes
+        std::vector<NodeId> remapNodes(data.m_nodePerType[gc_number].m_nodeIds.capacity(), lgrn::id_null<NodeId>());
+        copy_nodes(data.m_nodePerType[gc_number], data.m_machines, remapMach, rScnParts.m_nodePerType[gc_number], rScnParts.m_machines, remapNodes);
+
+
     }
 
     // Count total number of entities needed to be created for prefabs
