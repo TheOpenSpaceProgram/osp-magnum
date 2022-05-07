@@ -26,8 +26,21 @@
 # Set CMake minimum version and CMake policy
 CMAKE_MINIMUM_REQUIRED(VERSION 3.12.4)
 
+# Add the module search directory
+LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/modules/")
+
 # Enable link time optimization
 CMAKE_POLICY(SET CMP0069 NEW)
+
+IF(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_SYSTEM_VERSION)
+    MESSAGE("- CMAKE_SYSTEM_VERSION is not set. This setting controls which version of the Windows SDK to use. If it is not set, then OSP-MAGNUM will automatically select 10.0.18362.0.")
+    MESSAGE("- OSP-MAGNUMs CMake configuration automatically sets this value because Microsoft has decided to not repair Windows SDK versions from 10.0.17763.0 or older to work with C++17")
+    MESSAGE("- So we must set this value to an SDK version higher than that, or you'll get compile failures. However, CMake does not have any mechanism to automatically detect the available")
+    MESSAGE("- SDK versions and select an appropriate one to use out of what's available. And the only way to find out what SDK version will be used by default is to enable the C or CXX languages")
+    MESSAGE("- But once those languages are enabled, the SDK version can no longer be changed from what CMake selected. As a result, we have no choice but to set this version if one isn't supplied")
+    MESSAGE("- If your system has a newer version of the SDK, then pass the -DCMAKE_SYSTEM_VERSION="Version String Goes Here" parameter to CMake during the configuration stage.")
+    SET(CMAKE_SYSTEM_VERSION "10.0.18362.0" CACHE INTERNAL "" FORCE)
+ENDIF()
 
 # Set project name
 PROJECT(OSP-MAGNUM CXX)
@@ -51,7 +64,7 @@ SET(CMAKE_CXX_STANDARD 20)
 SET(CMAKE_CXX_EXTENSIONS OFF)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# If the environment has these set, pull them into proper cariables.
+# If the environment has these set, pull them into proper variables.
 SET(CLANG_COMPILE_FLAGS "${CLANG_COMPILE_FLAGS}")
 SET(GCC_COMPILE_FLAGS   "${GCC_COMPILE_FLAGS}")
 
@@ -134,8 +147,6 @@ ELSEIF(UNIX)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/lib CACHE PATH "")
   set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 ENDIF()
-
-STRING(PREPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/modules/")
 
 # Process subdirectory full of third-party libraries
 ADD_SUBDIRECTORY(3rdparty)
