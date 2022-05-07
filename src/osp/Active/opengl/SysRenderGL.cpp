@@ -334,13 +334,13 @@ void SysRenderGL::display_texture(
 
 void SysRenderGL::clear_resource_owners(RenderGL& rRenderGl, Resources& rResources)
 {
-    for (auto & [_, rOwner] : std::exchange(rRenderGl.m_texToRes, {}))
+    for (auto && [_, rOwner] : std::exchange(rRenderGl.m_texToRes, {}))
     {
         rResources.owner_destroy(restypes::gc_texture, std::move(rOwner));
     }
     rRenderGl.m_resToTex.clear();
 
-    for (auto & [_, rOwner] : std::exchange(rRenderGl.m_meshToRes, {}))
+    for (auto && [_, rOwner] : std::exchange(rRenderGl.m_meshToRes, {}))
     {
         rResources.owner_destroy(restypes::gc_mesh, std::move(rOwner));
     }

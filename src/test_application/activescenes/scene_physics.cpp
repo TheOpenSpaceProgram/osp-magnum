@@ -40,12 +40,12 @@ void PhysicsData::cleanup(CommonTestScene& rScene)
 {
     auto &rScnPhys = rScene.get<PhysicsData>();
 
-    for (auto & [_, rOwner] : std::exchange(rScnPhys.m_shapeToMesh, {}))
+    for (auto && [_, rOwner] : std::exchange(rScnPhys.m_shapeToMesh, {}))
     {
         rScene.m_drawing.m_meshRefCounts.ref_release(rOwner);
     }
 
-    for (auto & [_, rOwner] : std::exchange(rScnPhys.m_namedMeshs, {}))
+    for (auto && [_, rOwner] : std::exchange(rScnPhys.m_namedMeshs, {}))
     {
         rScene.m_drawing.m_meshRefCounts.ref_release(rOwner);
     }

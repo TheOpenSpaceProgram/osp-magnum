@@ -36,12 +36,12 @@ using osp::restypes::gc_importer;
 VehicleBuilder::~VehicleBuilder()
 {
     // clear resource owners
-    for (auto & [_, value] : m_prefabs)
+    for (auto && [_, value] : std::exchange(m_prefabs, {}))
     {
         m_pResources->owner_destroy(gc_importer, std::move(value.m_importer));
     }
 
-    for (osp::PrefabPair &rPrefabPair : m_data.m_partPrefabs)
+    for (auto && rPrefabPair : std::exchange(m_data.m_partPrefabs, {}))
     {
         m_pResources->owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
     }
