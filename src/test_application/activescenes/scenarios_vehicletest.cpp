@@ -31,6 +31,8 @@
 #include "../ActiveApplication.h"
 #include "test_application/VehicleBuilder.h"
 
+#include <osp/logging.h>
+
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
@@ -38,6 +40,8 @@
 
 #include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysPrefabInit.h>
+
+#include <osp/link/signal.h>
 
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
@@ -103,7 +107,7 @@ struct VehicleTestData
     // Timers for when to create boxes and cylinders
     float m_boxTimer{0.0f};
     float m_cylinderTimer{0.0f};
-    float m_vehicleTimer{0.0f};
+    float m_vehicleTimer{25.0f};
 
     struct ThrowShape
     {
@@ -116,6 +120,8 @@ struct VehicleTestData
 
     osp::ResId m_prefab;
 
+    std::optional<VehicleBuilder> m_builder;
+
     // Queue for balls to throw
     std::vector<ThrowShape> m_toThrow;
 
@@ -126,7 +132,10 @@ struct VehicleTestData
     std::vector<RigidGroup_t> m_rigidDirty;
     std::vector<ActiveEnt> m_rigidEnts;
 
-    std::optional<VehicleBuilder> m_builder;
+    osp::link::SignalValues_t<float> m_nodeNumValues;
+
+    osp::link::UpdMachPerType_t m_updMachTypes;
+    osp::link::UpdateNodes<float> m_updNodeNum;
 };
 
 osp::link::NodeTypeId const gc_number = osp::link::NodeTypeReg_t::create();
@@ -135,19 +144,19 @@ osp::link::MachTypeId const gc_rocket = osp::link::MachTypeReg_t::create();
 
 namespace ports_usrctrl
 {
-using osp::link::Port;
+using namespace osp::link;
 
-Port const smc_throttle { gc_number, 0 };
-Port const smc_pitch    { gc_number, 1 };
-Port const smc_yaw      { gc_number, 2 };
-Port const smc_roll     { gc_number, 3 };
+PortEntry const gc_throttleOut      { gc_number, 0, gc_sigOut };
+PortEntry const gc_pitchOut         { gc_number, 1, gc_sigOut };
+PortEntry const gc_yawOut           { gc_number, 2, gc_sigOut };
+PortEntry const gc_rollOut          { gc_number, 3, gc_sigOut };
 }
 
 namespace ports_rocket
 {
-using osp::link::Port;
+using namespace osp::link;
 
-Port const smc_throttle { gc_number, 0 };
+PortEntry const gc_throttleIn       { gc_number, 0, gc_sigIn };
 }
 
 
@@ -291,15 +300,15 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
 
     auto const [ pitch, yaw, roll, throttle ] = rBuilder.create_nodes<4>(gc_number);
 
-    auto controls = rBuilder.create_machine(capsule, gc_usercontrol, {
-        { ports_usrctrl::smc_throttle,  throttle },
-        { ports_usrctrl::smc_pitch,     pitch },
-        { ports_usrctrl::smc_yaw,       yaw },
-        { ports_usrctrl::smc_roll,      roll }
+    rBuilder.create_machine(capsule, gc_usercontrol, {
+        { ports_usrctrl::gc_throttleOut,    throttle },
+        { ports_usrctrl::gc_pitchOut,       pitch },
+        { ports_usrctrl::gc_yawOut,         yaw },
+        { ports_usrctrl::gc_rollOut,        roll }
     } );
 
-    auto rocket = rBuilder.create_machine(capsule, gc_rocket, {
-        { ports_rocket::smc_throttle,  throttle }
+    rBuilder.create_machine(engine, gc_rocket, {
+        { ports_rocket::gc_throttleIn,      throttle }
     } );
 
     rBuilder.finalize_machines();
@@ -329,94 +338,6 @@ static void update_test_scene_delete(CommonTestScene &rScene)
 
     rScene.update_delete();
 
-}
-
-
-static void copy_machines(osp::link::Machines const &rSrc, osp::link::Machines &rDst, Corrade::Containers::ArrayView<osp::link::MachAnyId> remapMach)
-{
-    using namespace osp::link;
-
-    for (MachAnyId srcMach : rSrc.m_ids.bitview().zeros())
-    {
-        MachTypeId const srcType = rSrc.m_machTypes[srcMach];
-        PerMachType &rDstPerMach = rDst.m_perType[srcType];
-
-        // TODO: optimize multiple calls to IdRegistryStl::create()
-        //       (linear search for non-zero uint64_t is done each call)
-        MachAnyId const dstMach = rDst.m_ids.create();
-        MachLocalId const dstLocal = rDstPerMach.m_localIds.create();
-
-        // TODO: allocate once before this for loop
-        rDst.m_machToLocal.resize(rDst.m_ids.capacity());
-        rDst.m_machTypes.resize(rDst.m_ids.capacity());
-        rDstPerMach.m_localToAny.resize(rDstPerMach.m_localIds.capacity());
-
-        rDstPerMach.m_localToAny[dstLocal] = dstMach;
-        rDst.m_machToLocal[dstMach] = dstLocal;
-        remapMach[srcMach] = dstMach;
-    }
-}
-
-static void copy_nodes(osp::link::Nodes const &rSrcNodes, osp::link::Machines const &rSrcMach, Corrade::Containers::ArrayView<osp::link::MachAnyId const> remapMach, osp::link::Nodes &rDstNodes, osp::link::Machines &rDstMach, Corrade::Containers::ArrayView<osp::link::NodeId> remapNode)
-{
-    using namespace osp::link;
-    using lgrn::Span;
-
-    // Create new node IDs
-    for (NodeId srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
-    {
-        NodeId const dstNode = rDstNodes.m_nodeIds.create();
-        remapNode[srcNode] = dstNode;
-    }
-
-    // Copy node-to-machine connections
-    rDstNodes.m_nodeToMach.ids_reserve(rDstNodes.m_nodeIds.capacity());
-    rDstNodes.m_nodeToMach.data_reserve(rDstNodes.m_nodeToMach.data_size()
-                                        + rSrcNodes.m_nodeToMach.data_size());
-    for (NodeId srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
-    {
-        NodeId const dstNode = remapNode[srcNode];
-        Span<MachinePair const> srcJunction = rSrcNodes.m_nodeToMach[srcNode];
-        rDstNodes.m_nodeToMach.emplace(dstNode, srcJunction.size());
-        Span<MachinePair> dstJuncton = rDstNodes.m_nodeToMach[dstNode];
-
-        auto dstPairIt = std::begin(dstJuncton);
-        for (MachinePair const& srcPair : srcJunction)
-        {
-            MachTypeId const machType = srcPair.m_type;
-            MachAnyId const srcMach = rSrcMach.m_perType[machType].m_localToAny[srcPair.m_id];
-            MachAnyId const dstMach = remapMach[srcMach];
-            MachLocalId const dstLocal = rDstMach.m_machToLocal[dstMach];
-
-            dstPairIt->m_id     = dstLocal;
-            dstPairIt->m_type   = machType;
-
-            std::advance(dstPairIt, 1);
-        }
-    }
-
-    // copy mach-to-node connections
-    rDstNodes.m_machToNode.ids_reserve(rDstMach.m_ids.capacity());
-    rDstNodes.m_machToNode.data_reserve(rDstNodes.m_machToNode.data_size()
-                                        + rSrcNodes.m_machToNode.data_size());
-    for (MachAnyId srcMach : rSrcMach.m_ids.bitview().zeros())
-    {
-        if (rSrcNodes.m_machToNode.contains(srcMach))
-        {
-            Span<NodeId const> srcPorts = rSrcNodes.m_machToNode[srcMach];
-            MachAnyId const dstMach = remapMach[srcMach];
-            rDstNodes.m_machToNode.emplace(dstMach, srcPorts.size());
-            Span<NodeId> dstPorts = rDstNodes.m_machToNode[dstMach];
-
-            auto dstPortIt = std::begin(dstPorts);
-            for (NodeId const srcNode : srcPorts)
-            {
-                *dstPortIt = remapNode[srcNode];
-
-                std::advance(dstPortIt, 1);
-            }
-        }
-    }
 }
 
 /**
@@ -517,9 +438,9 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     static Matrix4 const identity{};
 
     rScnTest.m_vehicleTimer += delta;
-    if (rScnTest.m_vehicleTimer >= 0.5f)
+    if (rScnTest.m_vehicleTimer >= 30.0f)
     {
-        rScnTest.m_vehicleTimer -= 0.5f;
+        rScnTest.m_vehicleTimer -= 30.0f;
 
         VehicleData const &data = rScnTest.m_builder->data();
 
@@ -588,11 +509,20 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
         // Make new machines in dst for each machine in source
         copy_machines(data.m_machines, rScnParts.m_machines, remapMach);
 
+        rScnParts.m_machineToPart.resize(rScnParts.m_machines.m_ids.capacity());
+        for (MachAnyId srcMach : data.m_machines.m_ids.bitview().zeros())
+        {
+            MachAnyId const dstMach = remapMach[srcMach];
+            rScnParts.m_machineToPart[dstMach] = PartEnt_t(data.m_machToPart[srcMach]);
+        }
+
         // Do the same for nodes
         std::vector<NodeId> remapNodes(data.m_nodePerType[gc_number].m_nodeIds.capacity(), lgrn::id_null<NodeId>());
         copy_nodes(data.m_nodePerType[gc_number], data.m_machines, remapMach, rScnParts.m_nodePerType[gc_number], rScnParts.m_machines, remapNodes);
 
+        // todo: copy node values
 
+        rScnTest.m_nodeNumValues.resize(rScnParts.m_nodePerType[gc_number].m_nodeIds.size());
     }
 
     // Count total number of entities needed to be created for prefabs
@@ -673,11 +603,25 @@ struct VehicleTestControls
     VehicleTestControls(ActiveApplication &rApp)
      : m_camCtrl(rApp.get_input_handler())
      , m_btnThrow(m_camCtrl.m_controls.button_subscribe("debug_throw"))
+     , m_btnSwitch(m_camCtrl.m_controls.button_subscribe("game_switch"))
+     , m_btnThrMax(m_camCtrl.m_controls.button_subscribe("vehicle_thr_max"))
+     , m_btnThrMin(m_camCtrl.m_controls.button_subscribe("vehicle_thr_min"))
+     , m_btnThrMore(m_camCtrl.m_controls.button_subscribe("vehicle_thr_more"))
+     , m_btnThrLess(m_camCtrl.m_controls.button_subscribe("vehicle_thr_less"))
     { }
 
     ACtxCameraController m_camCtrl;
 
     osp::input::EButtonControlIndex m_btnThrow;
+
+    osp::input::EButtonControlIndex m_btnSwitch;
+
+    osp::input::EButtonControlIndex m_btnThrMax;
+    osp::input::EButtonControlIndex m_btnThrMin;
+    osp::input::EButtonControlIndex m_btnThrMore;
+    osp::input::EButtonControlIndex m_btnThrLess;
+
+    osp::link::MachLocalId m_selectedUsrCtrl{lgrn::id_null<osp::link::MachLocalId>()};
 };
 
 void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp) noexcept
@@ -718,6 +662,120 @@ void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
                     Vector3{1.0f}, // size (radius)
                     700.0f, // mass
                     EShape::Sphere}); // shape
+        }
+
+        auto &rScnParts = rScene.get<ACtxParts>();
+        using namespace osp::link;
+
+        Nodes &rNumberNodes = rScnParts.m_nodePerType[gc_number];
+        PerMachType &rUsrCtrl = rScnParts.m_machines.m_perType[gc_usercontrol];
+        PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_rocket];
+
+
+        // clear and resize updates
+        rScnTest.m_updMachTypes.resize(rScnParts.m_machines.m_perType.size());
+        auto perMachTypeIt = std::begin(rScnParts.m_machines.m_perType);
+        for (UpdateMach &rUpdMach : rScnTest.m_updMachTypes)
+        {
+            rUpdMach.m_localDirty.reset();
+            rUpdMach.m_localDirty.ints().resize(perMachTypeIt->m_localIds.vec().size());
+
+            std::advance(perMachTypeIt, 1);
+        }
+        rScnTest.m_updNodeNum.m_nodeDirty.reset();
+        rScnTest.m_updNodeNum.m_nodeDirty.ints().resize(rNumberNodes.m_nodeIds.vec().size());
+        rScnTest.m_updNodeNum.m_nodeNewValues.resize(rNumberNodes.m_nodeIds.capacity());
+
+        // do controls
+
+        osp::input::ControlSubscriber const &ctrlSub = rControls.m_camCtrl.m_controls;
+
+        if (ctrlSub.button_triggered(rControls.m_btnSwitch))
+        {
+            ++rControls.m_selectedUsrCtrl;
+            bool found = false;
+            for (MachLocalId local = rControls.m_selectedUsrCtrl; local < rUsrCtrl.m_localIds.capacity(); ++local)
+            {
+                if (rUsrCtrl.m_localIds.exists(local))
+                {
+                    found = true;
+                    rControls.m_selectedUsrCtrl = local;
+                    break;
+                }
+            }
+
+            // next id not found, set to null
+            if ( ! found )
+            {
+                rControls.m_selectedUsrCtrl = lgrn::id_null<MachLocalId>();
+                OSP_LOG_INFO("Unselected vehicles");
+            }
+            else
+            {
+                OSP_LOG_INFO("Selected User Control: {}", rControls.m_selectedUsrCtrl);
+            }
+        }
+
+
+        float const thrRate = delta;
+        float const thrChange =
+                  float(ctrlSub.button_held(rControls.m_btnThrMore)) * thrRate
+                - float(ctrlSub.button_held(rControls.m_btnThrLess)) * thrRate
+                + float(ctrlSub.button_triggered(rControls.m_btnThrMax))
+                - float(ctrlSub.button_triggered(rControls.m_btnThrMin));
+
+        if (rControls.m_selectedUsrCtrl != lgrn::id_null<MachLocalId>())
+        {
+            MachAnyId const mach = rUsrCtrl.m_localToAny[rControls.m_selectedUsrCtrl];
+            lgrn::Span<NodeId> portSpan = rNumberNodes.m_machToNode[mach];
+
+            if (thrChange != 0.0f)
+            {
+                if (ports_usrctrl::gc_throttleOut.m_port < portSpan.size())
+                {
+                    NodeId const thrNode = portSpan[ports_usrctrl::gc_throttleOut.m_port];
+
+                    if (thrNode != lgrn::id_null<NodeId>())
+                    {
+                        float const thrCurr = rScnTest.m_nodeNumValues[thrNode];
+                        float const thrNew = Magnum::Math::clamp(thrCurr + thrChange, 0.0f, 1.0f);
+
+                        if (thrCurr != thrNew)
+                        {
+                            // value changed!
+                            rScnTest.m_updNodeNum.m_nodeDirty.set(thrNode);
+                            rScnTest.m_updNodeNum.m_nodeNewValues[thrNode] = thrNew;
+                        }
+                    }
+                }
+            }
+        }
+
+        auto nodesDirty = rScnTest.m_updNodeNum.m_nodeDirty.ones();
+
+        update_signal_nodes<float>(
+                rScnTest.m_updNodeNum.m_nodeDirty.ones(),
+                rNumberNodes.m_nodeToMach,
+                rScnParts.m_machines,
+                Corrade::Containers::arrayView(rScnTest.m_updNodeNum.m_nodeNewValues),
+                rScnTest.m_nodeNumValues,
+                rScnTest.m_updMachTypes);
+
+        for (MachLocalId local : rScnTest.m_updMachTypes[gc_rocket].m_localDirty.ones())
+        {
+            MachAnyId const mach = rRockets.m_localToAny[local];
+            lgrn::Span<NodeId> portSpan = rNumberNodes.m_machToNode[mach];
+
+            if (ports_rocket::gc_throttleIn.m_port < portSpan.size())
+            {
+                NodeId const thrNode = portSpan[ports_rocket::gc_throttleIn.m_port];
+
+                if (thrNode != lgrn::id_null<NodeId>())
+                {
+                    float const thrNew = rScnTest.m_nodeNumValues[thrNode];
+                    OSP_LOG_INFO("Rocket {} reading node {} = {}", local, thrNode, thrNew);
+                }
+            }
         }
 
         // Update the scene directly in the drawing function :)

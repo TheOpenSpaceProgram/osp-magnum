@@ -30,6 +30,8 @@
 #include <longeron/containers/bit_view.hpp>
 #include <longeron/id_management/registry_stl.hpp>
 
+#include <Corrade/Containers/ArrayView.h>
+
 #include <vector>
 
 namespace osp::link
@@ -46,6 +48,7 @@ using NodeId        = uint32_t;
 
 using PortId        = uint16_t;
 using JunctionId    = uint16_t;
+using JuncCustom    = uint16_t;
 
 using MachTypeReg_t = GlobalIdReg<MachLocalId>;
 using NodeTypeReg_t = GlobalIdReg<NodeTypeId>;
@@ -72,15 +75,6 @@ struct Machines
     std::vector<PerMachType>            m_perType;
 };
 
-/**
- * @brief Refers to an Machine using Type and Local Id instead of an Machine Id
- */
-struct MachinePair
-{
-    MachLocalId     m_id{lgrn::id_null<MachLocalId>()};
-    MachTypeId      m_type{lgrn::id_null<MachTypeId>()};
-};
-
 struct UpdateMach
 {
     BitVector_t m_localDirty;
@@ -89,6 +83,12 @@ struct UpdateMach
 // [MachTypeId].m_locaDirty[MachLocalId]
 using UpdMachPerType_t = std::vector<UpdateMach>;
 
+struct Junction
+{
+    MachLocalId     m_local{lgrn::id_null<MachLocalId>()};
+    MachTypeId      m_type{lgrn::id_null<MachTypeId>()};
+    JuncCustom      m_custom{0};
+};
 
 /**
  * @brief Connects Machines together with intermediate Nodes
@@ -97,24 +97,39 @@ struct Nodes
 {
     // reminder: IntArrayMultiMap is kind of like an
     //           std::vector< std::vector<...> > but more memory efficient
-    using NodeToMach_t = lgrn::IntArrayMultiMap<NodeId, MachinePair>;
+    using NodeToMach_t = lgrn::IntArrayMultiMap<NodeId, Junction>;
     using MachToNode_t = lgrn::IntArrayMultiMap<MachAnyId, NodeId>;
 
     lgrn::IdRegistryStl<NodeId>         m_nodeIds;
 
     // Node-to-Machine connections
-    // [NodeId][JunctionIndex] -> MachineId
+    // [NodeId][JunctionIndex] -> Junction (type, MachLocalId, custom int)
     NodeToMach_t                        m_nodeToMach;
 
     // Corresponding Machine-to-Node connections
-    // [MachineId][PortIndex] -> NodeId
+    // [MachAnyId][PortIndex] -> NodeId
     MachToNode_t                        m_machToNode;
 };
 
-struct Port
+struct PortEntry
 {
-    NodeTypeId m_type;
-    PortId m_port;
+    NodeTypeId  m_type;
+    PortId      m_port;
+    JuncCustom  m_custom;
 };
+
+void copy_machines(
+        Machines const &rSrc,
+        Machines &rDst,
+        Corrade::Containers::ArrayView<MachAnyId> remapMach);
+
+void copy_nodes(
+        Nodes const &rSrcNodes,
+        Machines const &rSrcMach,
+        Corrade::Containers::ArrayView<MachAnyId const> remapMach,
+        Nodes &rDstNodes,
+        Machines &rDstMach,
+        Corrade::Containers::ArrayView<NodeId> remapNode);
+
 
 } // namespace osp::wire

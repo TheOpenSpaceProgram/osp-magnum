@@ -26,14 +26,22 @@
 
 #include "machines.h"
 
+#include <Corrade/Containers/ArrayView.h>
+
 namespace osp::link
 {
+
+constexpr JuncCustom const gc_sigIn = 0;
+constexpr JuncCustom const gc_sigOut = 1;
+
+template <typename VALUE_T>
+using SignalValues_t = std::vector<VALUE_T>;
 
 template <typename VALUE_T>
 struct UpdateNodes
 {
-    BitVector_t                             m_nodeDirty;
-    std::vector<VALUE_T>                    m_nodeNewValues;
+    BitVector_t                 m_nodeDirty;
+    SignalValues_t<VALUE_T>     m_nodeNewValues;
 
     void assign(NodeId node, VALUE_T&& value)
     {
@@ -41,5 +49,35 @@ struct UpdateNodes
         m_nodeNewValues[node] = std::forward<VALUE_T>(value);
     }
 };
+
+template <typename VALUE_T, typename RANGE_T>
+bool update_signal_nodes(
+        RANGE_T&&                                       toUpdate,
+        Nodes::NodeToMach_t const&                      nodeToMach,
+        Machines const&                                 machines,
+        Corrade::Containers::ArrayView<VALUE_T const>   newValues,
+        Corrade::Containers::ArrayView<VALUE_T>         currentValues,
+        UpdMachPerType_t&                               rUpdMach)
+{
+    bool somethingNotified = false;
+
+    for (uint32_t node : toUpdate)
+    {
+        // Apply node value changes
+        currentValues[node] = newValues[node];
+
+        // Notify connected inputs
+        for (Junction junc : nodeToMach[node])
+        {
+            if (junc.m_custom == gc_sigIn)
+            {
+                somethingNotified = true;
+                rUpdMach[junc.m_type].m_localDirty.set(junc.m_local);
+            }
+        }
+    }
+
+    return somethingNotified;
+}
 
 } // namespace osp::wire
