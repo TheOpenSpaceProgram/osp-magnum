@@ -76,7 +76,7 @@ struct ACtxParts
 
     // Rigid Groups
     lgrn::IdRegistryStl<RigidGroup_t>                   m_rigidIds;
-    lgrn::IntArrayMultiMap<RigidGroup_t, PartEnt_t>     m_rigidParts;
+    lgrn::IntArrayMultiMap<RigidGroup_t, PartEnt_t>     m_rigidToParts;
     std::vector<Matrix4>                                m_partTransformRigid;
     std::vector<RigidGroup_t>                           m_partRigids;
 

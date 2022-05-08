@@ -118,6 +118,11 @@ struct PortEntry
     JuncCustom  m_custom;
 };
 
+inline NodeId connected_node(lgrn::Span<NodeId const> portSpan, PortId port) noexcept
+{
+    return (portSpan.size() > port) ? portSpan[port] : lgrn::id_null<NodeId>();
+}
+
 void copy_machines(
         Machines const &rSrc,
         Machines &rDst,
