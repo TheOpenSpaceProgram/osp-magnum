@@ -82,7 +82,8 @@ struct ACtxParts
 
     // Machines
     link::Machines                                      m_machines;
-    lgrn::IntArrayMultiMap<PartEnt_t, link::MachAnyId>  m_partMachines;
+    std::vector<PartEnt_t>                              m_machineToPart;
+    lgrn::IntArrayMultiMap<PartEnt_t, link::MachAnyId>  m_partToMachines;
     std::vector<link::Nodes>                            m_nodePerType;
 };
 

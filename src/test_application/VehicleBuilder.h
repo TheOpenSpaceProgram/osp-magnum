@@ -51,9 +51,13 @@ struct StructureLink
 
 struct PerNodeType : osp::link::Nodes
 {
-    entt::any m_nodeValues;
-    std::vector<int> m_nodeConnectCount;
-    int m_connectCountTotal{0};
+    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
+                                                      osp::link::JuncCustom>;
+
+    MachToNodeCustom_t      m_machToNodeCustom; // parallel with m_machToNode
+    entt::any               m_nodeValues;
+    std::vector<int>        m_nodeConnectCount;
+    int                     m_connectCountTotal{0};
 };
 
 struct VehicleData
@@ -67,6 +71,7 @@ struct VehicleData
     std::vector<StructureLink>          m_attachLinks;
 
     osp::link::Machines                 m_machines;
+    std::vector<PartId>                 m_machToPart;
 
     std::vector<PerNodeType>            m_nodePerType;
 };
@@ -80,6 +85,7 @@ class VehicleBuilder
     using MachTypeId    = osp::link::MachTypeId;
     using NodeId        = osp::link::NodeId;
     using NodeTypeId    = osp::link::NodeTypeId;
+    using PortEntry     = osp::link::PortEntry;
 
 public:
 
@@ -115,21 +121,12 @@ public:
     osp::Matrix4 align_attach(PartId partA, std::string_view attachA,
                               PartId partB, std::string_view attachB);
 
-
-
-
-//    struct NodePair
-//    {
-//        osp::link::NodeId m_node;
-//        osp::link::NodeTypeId m_type;
-//    };
-
     template <std::size_t N>
     [[nodiscard]] std::array<NodeId, N> create_nodes(NodeTypeId nodeType);
 
     struct Connection
     {
-        osp::link::Port m_port;
+        PortEntry m_port;
         NodeId m_node;
     };
 
