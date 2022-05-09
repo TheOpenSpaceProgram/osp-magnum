@@ -31,6 +31,8 @@
 #include "../ActiveApplication.h"
 #include "test_application/VehicleBuilder.h"
 
+#include <adera/machines/links.h>
+
 #include <osp/logging.h>
 
 #include <osp/Active/basic.h>
@@ -51,7 +53,6 @@
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/Trade/PbrMetallicRoughnessMaterialData.h>
 
-
 #include <Corrade/Containers/ArrayViewStl.h>
 
 #include <newtondynamics_physics/ospnewton.h>
@@ -59,6 +60,10 @@
 
 #include <iostream>
 #include <optional>
+
+using adera::gc_mtMagicRocket;
+using adera::gc_mtUserCtrl;
+using osp::link::gc_ntNumber;
 
 using osp::active::ActiveEnt;
 using osp::active::active_sparse_set_t;
@@ -139,27 +144,6 @@ struct VehicleTestData
     osp::link::UpdMachPerType_t m_updMachTypes;
     osp::link::UpdateNodes<float> m_updNodeNum;
 };
-
-osp::link::NodeTypeId const gc_number = osp::link::NodeTypeReg_t::create();
-osp::link::MachTypeId const gc_usercontrol = osp::link::MachTypeReg_t::create();
-osp::link::MachTypeId const gc_rocket = osp::link::MachTypeReg_t::create();
-
-namespace ports_usrctrl
-{
-using namespace osp::link;
-
-PortEntry const gc_throttleOut      { gc_number, 0, gc_sigOut };
-PortEntry const gc_pitchOut         { gc_number, 1, gc_sigOut };
-PortEntry const gc_yawOut           { gc_number, 2, gc_sigOut };
-PortEntry const gc_rollOut          { gc_number, 3, gc_sigOut };
-}
-
-namespace ports_rocket
-{
-using namespace osp::link;
-
-PortEntry const gc_throttleIn       { gc_number, 0, gc_sigIn };
-}
 
 
 void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
@@ -300,17 +284,21 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
        { engine,   Matrix4::translation({0, 0, -3}) },
     });
 
-    auto const [ pitch, yaw, roll, throttle ] = rBuilder.create_nodes<4>(gc_number);
 
-    rBuilder.create_machine(capsule, gc_usercontrol, {
-        { ports_usrctrl::gc_throttleOut,    throttle },
-        { ports_usrctrl::gc_pitchOut,       pitch },
-        { ports_usrctrl::gc_yawOut,         yaw },
-        { ports_usrctrl::gc_rollOut,        roll }
+    namespace ports_magicrocket = adera::ports_magicrocket;
+    namespace ports_userctrl = adera::ports_userctrl;
+
+    auto const [ pitch, yaw, roll, throttle ] = rBuilder.create_nodes<4>(gc_ntNumber);
+
+    rBuilder.create_machine(capsule, gc_mtUserCtrl, {
+        { ports_userctrl::gc_throttleOut,   throttle },
+        { ports_userctrl::gc_pitchOut,      pitch },
+        { ports_userctrl::gc_yawOut,        yaw },
+        { ports_userctrl::gc_rollOut,       roll }
     } );
 
-    rBuilder.create_machine(engine, gc_rocket, {
-        { ports_rocket::gc_throttleIn,      throttle }
+    rBuilder.create_machine(engine, gc_mtMagicRocket, {
+        { ports_magicrocket::gc_throttleIn, throttle }
     } );
 
     rBuilder.finalize_machines();
@@ -349,8 +337,8 @@ static void update_links(CommonTestScene& rScene)
     auto &rScnTest  = rScene.get<VehicleTestData>();
     auto &rScnParts = rScene.get<osp::active::ACtxParts>();
 
-    Nodes const &rNumberNodes = rScnParts.m_nodePerType[gc_number];
-    PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_rocket];
+    Nodes const &rNumberNodes = rScnParts.m_nodePerType[gc_ntNumber];
+    PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
 
     update_signal_nodes<float>(
             rScnTest.m_updNodeNum.m_nodeDirty.ones(),
@@ -360,12 +348,12 @@ static void update_links(CommonTestScene& rScene)
             rScnTest.m_nodeNumValues,
             rScnTest.m_updMachTypes);
 
-    for (MachLocalId local : rScnTest.m_updMachTypes[gc_rocket].m_localDirty.ones())
+    for (MachLocalId local : rScnTest.m_updMachTypes[gc_mtMagicRocket].m_localDirty.ones())
     {
         MachAnyId const mach = rRockets.m_localToAny[local];
         lgrn::Span<NodeId const> portSpan = rNumberNodes.m_machToNode[mach];
 
-        if (NodeId const thrNode = connected_node(portSpan, ports_rocket::gc_throttleIn.m_port);
+        if (NodeId const thrNode = connected_node(portSpan, adera::ports_magicrocket::gc_throttleIn.m_port);
             thrNode != lgrn::id_null<NodeId>())
         {
             if (thrNode != lgrn::id_null<NodeId>())
@@ -468,16 +456,16 @@ static void spawn_vehicle(CommonTestScene& rScene, VehicleData const &data)
     }
 
     // Do the same for nodes
-    std::vector<NodeId> remapNodes(data.m_nodePerType[gc_number].m_nodeIds.capacity());
+    std::vector<NodeId> remapNodes(data.m_nodePerType[gc_ntNumber].m_nodeIds.capacity());
     copy_nodes(
-            data.m_nodePerType[gc_number],
+            data.m_nodePerType[gc_ntNumber],
             data.m_machines,
             remapMach,
-            rScnParts.m_nodePerType[gc_number],
+            rScnParts.m_nodePerType[gc_ntNumber],
             rScnParts.m_machines, remapNodes);
 
     // TODO: copy node values
-    rScnTest.m_nodeNumValues.resize(rScnParts.m_nodePerType[gc_number].m_nodeIds.size());
+    rScnTest.m_nodeNumValues.resize(rScnParts.m_nodePerType[gc_ntNumber].m_nodeIds.size());
 }
 
 /**
@@ -712,8 +700,8 @@ void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
         auto &rControls = rRenderer.get<VehicleTestControls>();
         auto &rScnParts = rScene.get<ACtxParts>();
 
-        Nodes const &rNumberNodes = rScnParts.m_nodePerType[gc_number];
-        PerMachType &rUsrCtrl = rScnParts.m_machines.m_perType[gc_usercontrol];
+        Nodes const &rNumberNodes = rScnParts.m_nodePerType[gc_ntNumber];
+        PerMachType &rUsrCtrl = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
 
         // Clear and resize Machine and Node updates
         rScnTest.m_updMachTypes.resize(rScnParts.m_machines.m_perType.size());
@@ -770,7 +758,7 @@ void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
             MachAnyId const mach = rUsrCtrl.m_localToAny[rControls.m_selectedUsrCtrl];
             lgrn::Span<NodeId const> portSpan = rNumberNodes.m_machToNode[mach];
 
-            if (NodeId const thrNode = connected_node(portSpan, ports_usrctrl::gc_throttleOut.m_port);
+            if (NodeId const thrNode = connected_node(portSpan, adera::ports_userctrl::gc_throttleOut.m_port);
                 thrNode != lgrn::id_null<NodeId>())
             {
                 float const thrCurr = rScnTest.m_nodeNumValues[thrNode];

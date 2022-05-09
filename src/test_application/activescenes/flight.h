@@ -32,11 +32,6 @@
 
 #include <osp/Active/SysAreaAssociate.h>
 
-#include <adera/Machines/Container.h>
-#include <adera/Machines/RCSController.h>
-#include <adera/Machines/Rocket.h>
-#include <adera/Machines/UserControl.h>
-
 #include <longeron/id_management/registry.hpp>
 
 #include <newtondynamics_physics/ospnewton.h>
@@ -45,7 +40,6 @@ namespace testapp::activestate
 {
 
 using namespace osp::active;
-using namespace adera::active::machines;
 
 
 /**
