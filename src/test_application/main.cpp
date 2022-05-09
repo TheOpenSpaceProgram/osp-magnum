@@ -346,7 +346,7 @@ void setup_common_scene()
 bool destroy_universe()
 {
     // Make sure universe isn't in use anywhere else
-    if (g_universeScene.unique())
+    if (1 == g_universeScene.use_count())
     {
         OSP_LOG_WARN("Universe is still in use!");
         return false;
