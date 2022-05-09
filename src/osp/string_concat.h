@@ -26,6 +26,7 @@
 #define INCLUDED_OSP_STRING_CONCAT_H_C0CC2473_002D_406E_99B6_E233565EAA1E
 #pragma once
 
+#include <string>       // for std::string
 #include <iterator>     // for std::data(), std::size()
 #include <algorithm>    // for std::copy_n()
 #include <type_traits>  // for std::is_pointer<>, std::is_array<>
