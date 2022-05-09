@@ -27,6 +27,8 @@
 namespace osp::link
 {
 
+NodeTypeId const gc_ntNumber = NodeTypeReg_t::create();
+
 void copy_machines(
         Machines const &rSrc,
         Machines &rDst,
