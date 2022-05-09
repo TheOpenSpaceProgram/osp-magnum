@@ -31,8 +31,6 @@
 #include <osp/Active/drawing.h>
 #include <osp/Active/machines.h>
 
-#include <osp/Active/SysAreaAssociate.h>
-
 #include <adera/Machines/Container.h>
 #include <adera/Machines/RCSController.h>
 #include <adera/Machines/Rocket.h>
@@ -69,7 +67,6 @@ struct ACtxMachines
  */
 struct ACtxUniverseSync
 {
-    ACtxAreaLink        m_areaLink;
 };
 
 } // namespace testapp::scenestate
