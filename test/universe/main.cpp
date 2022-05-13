@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2022 Open Space Program Project
  *
  * MIT License
  *
@@ -22,45 +22,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
+#include <osp/universe/universe.h>
 
-#include <entt/entity/storage.hpp>
+#include <gtest/gtest.h>
 
-#include <Magnum/Math/Vector3.h>
-
-#include <cstdint>
-
-namespace osp::universe
-{
-enum class SatId : uint32_t {};
-enum class CoSpaceId : uint32_t {};
-
-}
-
-// Specialize entt::storage_traits to disable signals for storage that uses
-// Satellites as entities
-template<typename Type>
-struct entt::storage_traits<osp::universe::SatId, Type>
-{
-    using storage_type = basic_storage<osp::universe::SatId, Type>;
-};
-
-namespace osp::universe
+// Test basic usage
+TEST(Universe, Basic)
 {
 
-
-using spaceint_t = int64_t;
-
-// 1024 space units = 1 meter
-// TODO: this should vary by trajectory, but for now it's global
-const float gc_units_per_meter = 1024.0f;
-
-// A Vector3 for space
-using Vector3g = Magnum::Math::Vector3<spaceint_t>;
-
-template<typename COMP_T>
-using ucomp_storage_t = typename entt::storage_traits<SatId, COMP_T>::storage_type;
-
-using coordspace_index_t = uint32_t;
-
+    EXPECT_TRUE(true);
 }
