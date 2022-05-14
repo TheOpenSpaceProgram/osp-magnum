@@ -7,21 +7,9 @@ on:
     types: published
 
 jobs:
-  skip-duplicates:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          paths_ignore: '["README.md", "**/*.md, docs/**"]'
-
   build:
-    needs: skip-duplicates
-
     strategy:
+      fail-fast: false
       matrix:
         # ClangCL is known to fail against SDL2-2.0.16 because of the use of -idirafter.
         # MinGW fails due to incomprehensible linker errors... LTO maybe?
@@ -38,6 +26,10 @@ jobs:
       with:
         fetch-depth: 1
         submodules: recursive
+
+    - uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        Key: windows-${{ matrix.image }}-${{ matrix.config }}
 
     - uses: egor-tensin/setup-mingw@v2
       if: ${{ matrix.compiler == 'mingw' }}
@@ -76,7 +68,7 @@ jobs:
 
     - name: Compile Dependencies
       run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps test-deps
 
     - name: Compile OSP-Magnum
       run: |
@@ -84,8 +76,9 @@ jobs:
 
     - name: Compile Unit Tests
       run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target test
+        cmake --build build --parallel --config ${{ matrix.config }} --target compile-tests
 
+    # MSVC Generator doesn't support the special target "test" like Ninja generator does on linux.
     - name: Run Unit Tests
       run: |
         ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test

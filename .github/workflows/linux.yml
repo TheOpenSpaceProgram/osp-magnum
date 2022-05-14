@@ -7,25 +7,15 @@ on:
     types: published
 
 jobs:
-  skip-duplicates:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          paths_ignore: '["README.md", "**/*.md, docs/**"]'
-
   build:
-    needs: skip-duplicates
-    runs-on: ubuntu-latest
-
     strategy:
+      fail-fast: false
       matrix:
         compiler: [gcc, clang]
         config: [Release, Debug]
+        image: [ubuntu-18.04, ubuntu-20.04]
+
+    runs-on: ${{ matrix.image }}
 
     env:
       CC:  ${{ matrix.compiler == 'gcc' && 'gcc' || 'clang'   }}
@@ -34,21 +24,37 @@ jobs:
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 1
         submodules: recursive
 
     - uses: hendrikmuhs/ccache-action@v1
       with:
-        key: linux-${{ matrix.compiler }}-${{ matrix.config }}
+        key: linux-${{ matrix.image }}-${{ matrix.compiler }}-${{ matrix.config }}
+
+    - name: Update Compiler (GCC)
+      if: ${{ matrix.image == 'ubuntu-18.04' && matrix.compiler == 'gcc' }}
+      run: |
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        sudo apt update
+        sudo apt install g++-10 gcc-10
+        sudo update-alternatives --verbose --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
+        sudo update-alternatives --verbose --install /usr/bin/g++ g++ /usr/bin/g++-10 100
+
+    - name: Update Compiler (Clang)
+      if: ${{ matrix.image == 'ubuntu-18.04' && matrix.compiler == 'clang' }}
+      run: |
+        sudo apt update
+        sudo apt install clang-10 clang++-10
+        sudo update-alternatives --verbose --install /usr/bin/clang   clang   /usr/bin/clang-10   100
+        sudo update-alternatives --verbose --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 100
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev iwyu clang clang-tidy clang-tools
-        # TODO: Really, this should only be fetching the build dependencies, so we can only use the in-tree version
-        sudo apt install -y libsdl2-dev
+        sudo apt update
+        # TODO: Better to only install dependencies of these packages instead
+        sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev libsdl2-dev
 
     - name: Configure
       run: |
@@ -56,7 +62,7 @@ jobs:
 
     - name: Compile Dependencies
       run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps test-deps
 
     - name: Compile OSP-Magnum
       run: |
@@ -64,13 +70,14 @@ jobs:
 
     - name: Compile Unit Tests
       run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target test
+        cmake --build build --parallel --config ${{ matrix.config }} --target compile-tests
 
+    # TODO: Why doesn't the "test" target execute tests?
     - name: Run Unit Tests
       run: |
         ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
-        
+
     - uses: actions/upload-artifact@v2
-      with: 
-        name: OSP-linux-${{ matrix.config }}-${{ matrix.compiler }}
+      with:
+        name: OSP-linux-${{ matrix.image}}-${{ matrix.config }}-${{ matrix.compiler }}
         path: build/${{ matrix.config }}

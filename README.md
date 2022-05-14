@@ -21,7 +21,7 @@ By taking advantage of Entity Component System (ECS) architectures and Data-Orie
   * Support for Universes that use a hierarchical coordinate system, allowing sizes that can be described as:
     * Big. Really big. You just won't believe how vastly, hugely, mindbogglingly big it is. I mean, you may think it's a long way down the road to the chemist's, but that's just peanuts.
   * Arbitrary sized integers for coordinates within a particular layer of the hierarchy
-    * We use 64-bit integrer coordinates by default, but we're interested to we what people try out!
+    * We use 64-bit integrer coordinates by default, but we're interested to see what people try out!
   * Optimal data layout to support pluggable oribial mechanics algorithms, which includes
     * Patched conics simulations -- like Kerbal Space Program's gameplay
     * N-Body simulations -- like the KSP mod 'Principia'
@@ -30,7 +30,7 @@ By taking advantage of Entity Component System (ECS) architectures and Data-Orie
   * Scene Graph
   * Configurable multipass Renderer
   * Straightforward interface for integrating any physics engine
-    * Out of the box we integrate with Newton Dynamics 3.14.
+    * Out of the box we integrate with Newton Dynamics 3.14c.
     * PRs to support other physics engines welcome!!!
   * Wiring/Connection System
     * Resource flow between ship components
@@ -78,7 +78,7 @@ cmake --build build-osp-magnum --parallel --config Release --target osp-magnum
 Run the unit tests!
 
 ```bash
-cmake --build build-osp-magnum --parallel --config Release --target test
+cmake --build build-osp-magnum --parallel --config Release --target compile-tests
 ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build/test
 ```
 
@@ -114,4 +114,3 @@ Checkout [Architecture.md](docs/architecture.md) to get started with learning th
   * Amature rocketry
   * Small aerospace companies
 * This project isn't intended to be much of a "clone" of Kerbal Space Program. As of now, it's mostly a game engine intended for space flight, with no real gameplay yet.
-

@@ -7,38 +7,28 @@ on:
     types: published
 
 jobs:
-  skip-duplicates:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          paths_ignore: '["README.md", "**/*.md, docs/**"]'
-
   build:
-    needs: skip-duplicates
-    runs-on: macos-latest
-
     strategy:
+      fail-fast: false
       matrix:
         config: [Release, Debug]
+        image: [macos-10.15, macos-11, macos-12]
+
+    runs-on: ${{ matrix.image }}
 
     env:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 1
         submodules: recursive
 
     - uses: hendrikmuhs/ccache-action@v1
       with:
-        key: macos-${{ matrix.config }}
+        key: macos-${{ matrix.image }}-${{ matrix.image}}-${{ matrix.config }}
 
     - name: Install dependencies
       run: brew install cmake
@@ -51,7 +41,7 @@ jobs:
     - name: Compile Dependencies
       shell: bash
       run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps test-deps
 
     - name: Compile OSP-Magnum
       shell: bash
@@ -61,8 +51,9 @@ jobs:
     - name: Compile Unit Tests
       shell: bash
       run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target test
+        cmake --build build --parallel --config ${{ matrix.config }} --target compile-tests
 
+    # TODO: Why doesn't the "test" target execute tests?
     - name: Run Unit Tests
       shell: bash
       run: |
