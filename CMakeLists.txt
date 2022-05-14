@@ -38,7 +38,7 @@ IF(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_SYSTEM_VERSION)
     MESSAGE("- So we must set this value to an SDK version higher than that, or you'll get compile failures. However, CMake does not have any mechanism to automatically detect the available")
     MESSAGE("- SDK versions and select an appropriate one to use out of what's available. And the only way to find out what SDK version will be used by default is to enable the C or CXX languages")
     MESSAGE("- But once those languages are enabled, the SDK version can no longer be changed from what CMake selected. As a result, we have no choice but to set this version if one isn't supplied")
-    MESSAGE("- If your system has a newer version of the SDK, then pass the -DCMAKE_SYSTEM_VERSION="Version String Goes Here" parameter to CMake during the configuration stage.")
+    MESSAGE("- If your system has a newer version of the SDK, then pass the -DCMAKE_SYSTEM_VERSION=\"Version String Goes Here\" parameter to CMake during the configuration stage.")
     SET(CMAKE_SYSTEM_VERSION "10.0.18362.0" CACHE INTERNAL "" FORCE)
 ENDIF()
 

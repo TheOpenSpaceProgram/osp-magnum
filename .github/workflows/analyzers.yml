@@ -7,28 +7,21 @@ on:
     types: published
 
 jobs:
-  skip-duplicates:
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          paths_ignore: '["README.md", "**/*.md, docs/**"]'
-
   analyze-linux:
-    needs: skip-duplicates
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         tool: [clang-analyzer, iwyu, CodeQL]
         config: [Release, Debug]
 
+    permissions:
+      # required for all codeql to report detected outcomes
+      security-events: write
+
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 1
         submodules: recursive
@@ -40,19 +33,36 @@ jobs:
         # TODO: Really, this should only be fetching the build dependencies, so we can only use the in-tree version
         sudo apt install -y libsdl2-dev
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v1
-      if: ${{ matrix.tool == 'CodeQL' }}
-      with:
-        languages: cpp
-
     - name: Configure
       run: |
         cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
 
+    # Compile deps before initializing codeql, to avoid unnecessary analysis.
+    - name: Compile Dependencies
+      if: ${{ matrix.tool == 'CodeQL' }}
+      run: |
+        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps test-deps
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      if: ${{ matrix.tool == 'CodeQL' }}
+      with:
+        languages: cpp
+
+    - name: Reconfigure for CodeQL
+      if: ${{ matrix.tool == 'CodeQL' }}
+      run: |
+        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+
+    - name: Compile for CodeQL
+      if: ${{ matrix.tool == 'CodeQL' }}
+      run: |
+        cmake --build build --parallel --target osp-magnum
+
+    # Unlike clang-analyzer and include-what-you-use, CodeQL can't operate on just the config step. Need to actually build everything.
     - name: Perform CodeQL Analysis
       if: ${{ matrix.tool == 'CodeQL' }}
-      uses: github/codeql-action/analyze@v1
+      uses: github/codeql-action/analyze@v2
 
     # Implicitly requires build/compile_commands.json to exist
     - name: Run Clang Analyzer
@@ -67,27 +77,27 @@ jobs:
       if: ${{ matrix.tool == 'iwyu' }}
       run: |
         wget https://raw.githubusercontent.com/include-what-you-use/include-what-you-use/clang_11/iwyu_tool.py
-        chmod +x iwyu_tool.py 
+        chmod +x iwyu_tool.py
         ./iwyu_tool.py -j $(nproc) -p build -- -Xiwyu --mapping_file=${GITHUB_WORKSPACE}/iwyu-ubuntu.imp
 
   analyze-windows:
-    needs: skip-duplicates
     runs-on: windows-latest
 
     strategy:
+      fail-fast: false
       matrix:
         tool: [msvc-code-analysis]
         config: [Release, Debug]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 1
         submodules: recursive
 
     - name: Configure (MSVC)
       run: |
-        cmake -B build -DCMAKE_CONFIGURATION_TYPES=${{ matrix.config }} -DCMAKE_SYSTEM_VERSION="10.0.19041.0"
+        cmake -B build -DCMAKE_CONFIGURATION_TYPES=${{ matrix.config }}
 
     - name: Initialize MSVC Code Analysis
       uses: microsoft/msvc-code-analysis-action@v0.1.0
