@@ -31,6 +31,10 @@
 #include "../ActiveApplication.h"
 #include "test_application/VehicleBuilder.h"
 
+#include <adera/machines/links.h>
+
+#include <osp/logging.h>
+
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
@@ -38,6 +42,8 @@
 
 #include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysPrefabInit.h>
+
+#include <osp/link/signal.h>
 
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
@@ -47,7 +53,6 @@
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/Trade/PbrMetallicRoughnessMaterialData.h>
 
-
 #include <Corrade/Containers/ArrayViewStl.h>
 
 #include <newtondynamics_physics/ospnewton.h>
@@ -56,6 +61,10 @@
 #include <iostream>
 #include <optional>
 
+using adera::gc_mtMagicRocket;
+using adera::gc_mtUserCtrl;
+using osp::link::gc_ntNumber;
+
 using osp::active::ActiveEnt;
 using osp::active::active_sparse_set_t;
 
@@ -63,14 +72,16 @@ using osp::active::PartEnt_t;
 using osp::active::RigidGroup_t;
 using osp::active::TmpPrefabInit;
 
+using osp::active::MeshIdOwner_t;
 
 using osp::phys::EShape;
+
+using osp::restypes::gc_importer;
 
 using osp::Vector3;
 using osp::Matrix3;
 using osp::Matrix4;
 
-using osp::active::MeshIdOwner_t;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -92,13 +103,18 @@ struct PartInit
  */
 struct VehicleTestData
 {
+    // Required for std::is_copy_assignable to work properly inside of entt::any
+    VehicleTestData() = default;
+    VehicleTestData(VehicleTestData const& copy) = delete;
+    VehicleTestData(VehicleTestData&& move) = default;
+
     active_sparse_set_t             m_hasGravity;
     active_sparse_set_t             m_removeOutOfBounds;
 
     // Timers for when to create boxes and cylinders
     float m_boxTimer{0.0f};
     float m_cylinderTimer{0.0f};
-    float m_vehicleTimer{0.0f};
+    float m_vehicleTimer{9.0f};
 
     struct ThrowShape
     {
@@ -111,6 +127,8 @@ struct VehicleTestData
 
     osp::ResId m_prefab;
 
+    std::optional<VehicleBuilder> m_builder;
+
     // Queue for balls to throw
     std::vector<ThrowShape> m_toThrow;
 
@@ -119,9 +137,12 @@ struct VehicleTestData
     std::vector<PartInit> m_initParts;
 
     std::vector<RigidGroup_t> m_rigidDirty;
-    std::vector<ActiveEnt> m_rigidEnts;
+    std::vector<ActiveEnt> m_rigidToActive;
 
-    std::optional<VehicleBuilder> m_builder;
+    osp::link::SignalValues_t<float> m_nodeNumValues;
+
+    osp::link::UpdMachPerType_t m_updMachTypes;
+    osp::link::UpdateNodes<float> m_updNodeNum;
 };
 
 
@@ -151,6 +172,9 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
                     osp::restypes::gc_importer, std::move(rPrefabPair.m_importer));
         }
     });
+
+    rScnParts.m_machines.m_perType.resize(osp::link::MachTypeReg_t::size());
+    rScnParts.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
 
     osp::Resources &rResources = *rScene.m_pResources;
 
@@ -259,6 +283,25 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
        { fueltank, Matrix4::translation({0, 0, 0}) },
        { engine,   Matrix4::translation({0, 0, -3}) },
     });
+
+
+    namespace ports_magicrocket = adera::ports_magicrocket;
+    namespace ports_userctrl = adera::ports_userctrl;
+
+    auto const [ pitch, yaw, roll, throttle ] = rBuilder.create_nodes<4>(gc_ntNumber);
+
+    rBuilder.create_machine(capsule, gc_mtUserCtrl, {
+        { ports_userctrl::gc_throttleOut,   throttle },
+        { ports_userctrl::gc_pitchOut,      pitch },
+        { ports_userctrl::gc_yawOut,        yaw },
+        { ports_userctrl::gc_rollOut,       roll }
+    } );
+
+    rBuilder.create_machine(engine, gc_mtMagicRocket, {
+        { ports_magicrocket::gc_throttleIn, throttle }
+    } );
+
+    rBuilder.finalize_machines();
 }
 
 static void update_test_scene_delete(CommonTestScene &rScene)
@@ -287,6 +330,144 @@ static void update_test_scene_delete(CommonTestScene &rScene)
 
 }
 
+static void update_links(CommonTestScene& rScene)
+{
+    using namespace osp::link;
+
+    auto &rScnTest  = rScene.get<VehicleTestData>();
+    auto &rScnParts = rScene.get<osp::active::ACtxParts>();
+
+    Nodes const &rNumberNodes = rScnParts.m_nodePerType[gc_ntNumber];
+    PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
+
+    update_signal_nodes<float>(
+            rScnTest.m_updNodeNum.m_nodeDirty.ones(),
+            rNumberNodes.m_nodeToMach,
+            rScnParts.m_machines,
+            Corrade::Containers::arrayView(rScnTest.m_updNodeNum.m_nodeNewValues),
+            rScnTest.m_nodeNumValues,
+            rScnTest.m_updMachTypes);
+
+    for (MachLocalId local : rScnTest.m_updMachTypes[gc_mtMagicRocket].m_localDirty.ones())
+    {
+        MachAnyId const mach = rRockets.m_localToAny[local];
+        lgrn::Span<NodeId const> portSpan = rNumberNodes.m_machToNode[mach];
+
+        if (NodeId const thrNode = connected_node(portSpan, adera::ports_magicrocket::gc_throttleIn.m_port);
+            thrNode != lgrn::id_null<NodeId>())
+        {
+            if (thrNode != lgrn::id_null<NodeId>())
+            {
+                float const thrNew = rScnTest.m_nodeNumValues[thrNode];
+                OSP_LOG_INFO("Rocket {} reading node {} = {}", local, thrNode, thrNew);
+            }
+        }
+    }
+}
+
+static void spawn_vehicle(CommonTestScene& rScene, VehicleData const &data)
+{
+    using namespace osp::active;
+
+    auto &rScnTest  = rScene.get<VehicleTestData>();
+    auto &rScnPhys  = rScene.get<PhysicsData>();
+    auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
+    auto &rScnParts = rScene.get<ACtxParts>();
+
+    Matrix4 const rootTf = Matrix4::translation({0.0f, 5.0f, 0.0f});
+
+    // Setup vehicle's root entity as a single rigid body (for now)
+    ActiveEnt const rigidEnt = rScene.m_activeIds.create();
+    SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, rigidEnt);
+    rScene.m_basic.m_transform                  .emplace(rigidEnt, rootTf);
+    rScnPhys.m_physics.m_hasColliders           .emplace(rigidEnt);
+    rScnPhys.m_physics.m_solid                  .emplace(rigidEnt);
+    rScnPhys.m_physics.m_physBody               .emplace(rigidEnt);
+    rScnPhys.m_physics.m_physLinearVel          .emplace(rigidEnt);
+    rScnPhys.m_physics.m_physAngularVel         .emplace(rigidEnt);
+    rScnTest.m_hasGravity                       .emplace(rigidEnt);
+    //rScnTest.m_removeOutOfBounds.emplace(rigidEnt);
+    osp::active::ACompPhysDynamic &rDyn
+            = rScnPhys.m_physics.m_physDynamic  .emplace(rigidEnt);
+    rDyn.m_totalMass    = 1.0f; // TODO
+    rDyn.m_inertia      = {1.0f, 1.0f, 1.0f};
+
+    // Put all parts into a single rigid group
+    RigidGroup_t const rigid = rScnParts.m_rigidIds.create();
+    rScnTest.m_rigidToActive     .resize(rScnParts.m_rigidIds.capacity());
+    rScnParts.m_rigidToParts.ids_reserve(rScnParts.m_rigidIds.capacity());
+    rScnParts.m_rigidToParts.data_reserve(
+            rScnParts.m_rigidToParts.data_capacity() + data.m_partIds.size());
+
+    rScnTest.m_rigidToActive[rigid] = rigidEnt;
+    rScnTest.m_rigidDirty.push_back(rigid);
+
+    // Create part entities
+    rScnParts.m_rigidToParts.emplace(rigid, data.m_partIds.size());
+    lgrn::Span<PartEnt_t> rigidPartsSpan = rScnParts.m_rigidToParts[rigid];
+    rScnParts.m_partIds.create(std::begin(rigidPartsSpan), std::end(rigidPartsSpan));
+    rScnParts.m_partPrefabs         .resize(rScnParts.m_partIds.capacity());
+    rScnParts.m_partTransformRigid  .resize(rScnParts.m_partIds.capacity());
+    rScnParts.m_partRigids          .resize(rScnParts.m_partIds.capacity());
+
+    std::vector<PartEnt_t> remapPart(data.m_partIds.capacity());
+
+    // Copy Part data from VehicleBuilder to scene
+    auto dstPartIt = std::begin(rigidPartsSpan);
+    for (uint32_t srcPart : data.m_partIds.bitview().zeros())
+    {
+        PartEnt_t const dstPart = *dstPartIt;
+        std::advance(dstPartIt, 1);
+
+        remapPart[srcPart] = dstPart;
+
+        osp::PrefabPair const& prefabPairSrc = data.m_partPrefabs[srcPart];
+        osp::PrefabPair prefabPairDst{
+            rScene.m_pResources->owner_create(gc_importer, prefabPairSrc.m_importer),
+            prefabPairSrc.m_prefabId
+        };
+        rScnParts.m_partPrefabs[dstPart]        = std::move(prefabPairDst);
+        rScnParts.m_partTransformRigid[dstPart] = data.m_partTransforms[srcPart];
+        rScnParts.m_partRigids[dstPart]         = rigid;
+
+        // Add Prefab and Part init events
+        int initPfIndex         = rScnTest.m_initPrefabs.size();
+        TmpPrefabInit &rInitPf  = rScnTest.m_initPrefabs.emplace_back();
+        rInitPf.m_importerRes   = prefabPairSrc.m_importer;
+        rInitPf.m_prefabId      = prefabPairSrc.m_prefabId;
+        rInitPf.m_pTransform    = &data.m_partTransforms[srcPart];
+        rInitPf.m_parent        = rigidEnt;
+        rScnTest.m_initParts.emplace_back(PartInit{dstPart, initPfIndex});
+    }
+
+    using namespace osp::link;
+
+    // remapMach[source MachAnyId] -> destination MachAnyId
+    std::vector<MachAnyId> remapMach(data.m_machines.m_ids.capacity());
+
+    // Make new machines in dst for each machine in source
+    copy_machines(data.m_machines, rScnParts.m_machines, remapMach);
+
+    rScnParts.m_machineToPart.resize(rScnParts.m_machines.m_ids.capacity());
+    for (MachAnyId srcMach : data.m_machines.m_ids.bitview().zeros())
+    {
+        MachAnyId const dstMach = remapMach[srcMach];
+        rScnParts.m_machineToPart[dstMach] = remapPart[std::size_t(data.m_machToPart[srcMach])];
+    }
+
+    // Do the same for nodes
+    std::vector<NodeId> remapNodes(data.m_nodePerType[gc_ntNumber].m_nodeIds.capacity());
+    copy_nodes(
+            data.m_nodePerType[gc_ntNumber],
+            data.m_machines,
+            remapMach,
+            rScnParts.m_nodePerType[gc_ntNumber],
+            rScnParts.m_machines, remapNodes);
+
+    // TODO: copy node values
+    rScnTest.m_nodeNumValues.resize(rScnParts.m_nodePerType[gc_ntNumber].m_nodeIds.size());
+}
+
 /**
  * @brief Update CommonTestScene containing physics test
  *
@@ -302,6 +483,43 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     auto &rScnPhys  = rScene.get<PhysicsData>();
     auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
     auto &rScnParts = rScene.get<ACtxParts>();
+
+    update_links(rScene);
+
+    // Physics update
+
+    SysNewton::update_colliders(
+            rScnPhys.m_physics, rScnNwt,
+            std::exchange(rScnPhys.m_physIn.m_colliderDirty, {}));
+
+    auto const physIn = ArrayView<ACtxPhysInputs>(&rScnPhys.m_physIn, 1);
+    SysNewton::update_world(
+            rScnPhys.m_physics, rScnNwt, delta, physIn,
+            rScene.m_basic.m_hierarchy,
+            rScene.m_basic.m_transform, rScene.m_basic.m_transformControlled,
+            rScene.m_basic.m_transformMutable);
+
+    // Start recording new elements to delete
+    rScene.m_delete.clear();
+
+    // Check position of all entities with the out-of-bounds component
+    // Delete the ones that go out of bounds
+    for (ActiveEnt const ent : rScnTest.m_removeOutOfBounds)
+    {
+        ACompTransform const &entTf = rScene.m_basic.m_transform.get(ent);
+        if (entTf.m_transform.translation().y() < -10)
+        {
+            rScene.m_delete.push_back(ent);
+        }
+    }
+
+    // Delete entities in m_delete, their descendants, and components
+    update_test_scene_delete(rScene);
+
+    // Note: Prefer creating entities near the end of the update after physics
+    //       and delete systems. This allows their initial state to be rendered
+    //       in a frame and avoids some possible synchronization issues from
+    //       when entities are created and deleted right away.
 
     // Clear all drawing-related dirty flags
     SysRender::clear_dirty_all(rScene.m_drawing);
@@ -346,107 +564,17 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
         rEntNetForce.y() -= 9.81f * rScnPhys.m_physics.m_physDynamic.get(ent).m_totalMass;
     }
 
-    // Physics update
-
-    SysNewton::update_colliders(
-            rScnPhys.m_physics, rScnNwt,
-            std::exchange(rScnPhys.m_physIn.m_colliderDirty, {}));
-
-    auto const physIn = ArrayView<ACtxPhysInputs>(&rScnPhys.m_physIn, 1);
-    SysNewton::update_world(
-            rScnPhys.m_physics, rScnNwt, delta, physIn,
-            rScene.m_basic.m_hierarchy,
-            rScene.m_basic.m_transform, rScene.m_basic.m_transformControlled,
-            rScene.m_basic.m_transformMutable);
-
-    // Start recording new elements to delete
-    rScene.m_delete.clear();
-
-    // Check position of all entities with the out-of-bounds component
-    // Delete the ones that go out of bounds
-    for (ActiveEnt const ent : rScnTest.m_removeOutOfBounds)
-    {
-        ACompTransform const &entTf = rScene.m_basic.m_transform.get(ent);
-        if (entTf.m_transform.translation().y() < -10)
-        {
-            rScene.m_delete.push_back(ent);
-        }
-    }
-
-    // Delete entities in m_delete, their descendants, and components
-    update_test_scene_delete(rScene);
-
     rScnTest.m_initPrefabs.clear();
     rScnTest.m_initParts.clear();
     rScnTest.m_rigidDirty.clear();
 
-    using osp::restypes::gc_importer;
-
-    static Matrix4 const identity{};
-
+    // Create a vehicle every 10 seconds
     rScnTest.m_vehicleTimer += delta;
-    if (rScnTest.m_vehicleTimer >= 0.5f)
+    if (rScnTest.m_vehicleTimer >= 10.0f)
     {
-        rScnTest.m_vehicleTimer -= 0.5f;
+        rScnTest.m_vehicleTimer -= 10.0f;
 
-        VehicleData const &data = rScnTest.m_builder->data();
-
-        ActiveEnt const rigidEnt = rScene.m_activeIds.create();
-        RigidGroup_t const rigid = rScnParts.m_rigidIds.create();
-
-        rScnTest.m_rigidEnts.resize(rScnParts.m_rigidIds.capacity());
-        rScnTest.m_rigidDirty.push_back(rigid);
-        rScnParts.m_rigidParts.ids_reserve(rScnParts.m_rigidIds.capacity());
-        rScnParts.m_rigidParts.data_reserve(rScnParts.m_rigidParts.data_capacity() + data.m_partIds.size());
-
-        // setup root entity
-        SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, rigidEnt);
-        rScene.m_basic.m_transform.emplace(rigidEnt, Matrix4::translation({0.0f, 5.0f, 0.0f}));
-        rScnPhys.m_physics.m_hasColliders.emplace(rigidEnt);
-        rScnPhys.m_physics.m_solid.emplace(rigidEnt);
-        rScnPhys.m_physics.m_physBody.emplace(rigidEnt);
-        rScnPhys.m_physics.m_physLinearVel.emplace(rigidEnt);
-        rScnPhys.m_physics.m_physAngularVel.emplace(rigidEnt);
-        osp::active::ACompPhysDynamic &rDyn = rScnPhys.m_physics.m_physDynamic.emplace(rigidEnt);
-        rDyn.m_totalMass = 1.0f; // TODO
-        rDyn.m_inertia = {1.0f, 1.0f, 1.0f};
-
-        // Make gravity affect entity
-        rScnTest.m_hasGravity.emplace(rigidEnt);
-        //rScnTest.m_removeOutOfBounds.emplace(rigidEnt);
-        rScnTest.m_rigidEnts[rigid] = rigidEnt;
-
-        PartEnt_t *pRigidPart = rScnParts.m_rigidParts.emplace(rigid, data.m_partIds.size());
-
-        for (unsigned int i = 0; i < data.m_partIds.size(); ++i)
-        {
-            if ( ! data.m_partIds.exists(PartId(i)) )
-            {
-                continue;
-            }
-
-            PartEnt_t const part = rScnParts.m_partIds.create();
-
-            rScnParts.m_partPrefabs.resize(rScnParts.m_partIds.capacity());
-            rScnParts.m_partRigids.resize(rScnParts.m_partIds.capacity());
-            rScnParts.m_partTransformRigid.resize(rScnParts.m_partIds.capacity());
-
-            osp::PrefabPair const& prefabPair = data.m_partPrefabs[i];
-
-            rScnParts.m_partPrefabs[part] = osp::PrefabPair{rScene.m_pResources->owner_create(gc_importer, prefabPair.m_importer), prefabPair.m_prefabId};
-            rScnParts.m_partRigids[part] = rigid;
-            rScnParts.m_partTransformRigid[part] = data.m_partTransforms[i];
-
-            *pRigidPart = part;
-            ++pRigidPart;
-
-            rScnTest.m_initParts.emplace_back(PartInit{part, int(rScnTest.m_initPrefabs.size())});
-            TmpPrefabInit &rInitPf = rScnTest.m_initPrefabs.emplace_back();
-            rInitPf.m_importerRes = prefabPair.m_importer;
-            rInitPf.m_prefabId = prefabPair.m_prefabId;
-            rInitPf.m_pTransform = &data.m_partTransforms[i];
-            rInitPf.m_parent = rigidEnt;
-        }
+        spawn_vehicle(rScene, rScnTest.m_builder->data());
     }
 
     // Count total number of entities needed to be created for prefabs
@@ -474,7 +602,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
         pos += objects.size();
     }
 
-    // Set Part entities, now that the prefabs exist
+    // Populate PartEnt<->ActiveEnt mmapping, now that the prefabs exist
     rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
     rScnParts.m_activeToPart.resize(rScene.m_activeIds.capacity());
     for (PartInit& rPartInit : rScnTest.m_initParts)
@@ -496,11 +624,6 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
 
     // Init prefab physics
     SysPrefabInit::init_physics(rScnTest.m_initPrefabs, *rScene.m_pResources, rScnPhys.m_physIn, rScnPhys.m_physics, rScnPhys.m_hierBody);
-
-    // Note: Prefer creating entities near the end of the update after physics
-    //       and delete systems. This allows their initial state to be rendered
-    //       in a frame and avoids some possible synchronization issues from
-    //       when entities are created and deleted right away.
 
     // Shape Thrower system, consumes rScene.m_toThrow and creates shapes
     for (VehicleTestData::ThrowShape const &rThrow : std::exchange(rScnTest.m_toThrow, {}))
@@ -527,11 +650,25 @@ struct VehicleTestControls
     VehicleTestControls(ActiveApplication &rApp)
      : m_camCtrl(rApp.get_input_handler())
      , m_btnThrow(m_camCtrl.m_controls.button_subscribe("debug_throw"))
+     , m_btnSwitch(m_camCtrl.m_controls.button_subscribe("game_switch"))
+     , m_btnThrMax(m_camCtrl.m_controls.button_subscribe("vehicle_thr_max"))
+     , m_btnThrMin(m_camCtrl.m_controls.button_subscribe("vehicle_thr_min"))
+     , m_btnThrMore(m_camCtrl.m_controls.button_subscribe("vehicle_thr_more"))
+     , m_btnThrLess(m_camCtrl.m_controls.button_subscribe("vehicle_thr_less"))
     { }
 
     ACtxCameraController m_camCtrl;
 
     osp::input::EButtonControlIndex m_btnThrow;
+
+    osp::input::EButtonControlIndex m_btnSwitch;
+
+    osp::input::EButtonControlIndex m_btnThrMax;
+    osp::input::EButtonControlIndex m_btnThrMin;
+    osp::input::EButtonControlIndex m_btnThrMore;
+    osp::input::EButtonControlIndex m_btnThrLess;
+
+    osp::link::MachLocalId m_selectedUsrCtrl{lgrn::id_null<osp::link::MachLocalId>()};
 };
 
 void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp) noexcept
@@ -557,34 +694,125 @@ void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
             CommonSceneRendererGL& rRenderer, CommonTestScene& rScene,
             ActiveApplication& rApp, float delta) noexcept
     {
+        using namespace osp::link;
+
         auto &rScnTest = rScene.get<VehicleTestData>();
         auto &rControls = rRenderer.get<VehicleTestControls>();
+        auto &rScnParts = rScene.get<ACtxParts>();
+
+        Nodes const &rNumberNodes = rScnParts.m_nodePerType[gc_ntNumber];
+        PerMachType &rUsrCtrl = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
+
+        // Clear and resize Machine and Node updates
+        rScnTest.m_updMachTypes.resize(rScnParts.m_machines.m_perType.size());
+        auto perMachTypeIt = std::begin(rScnParts.m_machines.m_perType);
+        for (UpdateMach &rUpdMach : rScnTest.m_updMachTypes)
+        {
+            rUpdMach.m_localDirty.reset();
+            rUpdMach.m_localDirty.ints().resize(perMachTypeIt->m_localIds.vec().size());
+            std::advance(perMachTypeIt, 1);
+        }
+        rScnTest.m_updNodeNum.m_nodeDirty.reset();
+        rScnTest.m_updNodeNum.m_nodeDirty.ints().resize(rNumberNodes.m_nodeIds.vec().size());
+        rScnTest.m_updNodeNum.m_nodeNewValues.resize(rNumberNodes.m_nodeIds.capacity());
+
+
+        osp::input::ControlSubscriber const &ctrlSub = rControls.m_camCtrl.m_controls;
+
+        // Select a UsrCtrl machine when pressing the switch button
+        if (ctrlSub.button_triggered(rControls.m_btnSwitch))
+        {
+            ++rControls.m_selectedUsrCtrl;
+            bool found = false;
+            for (MachLocalId local = rControls.m_selectedUsrCtrl; local < rUsrCtrl.m_localIds.capacity(); ++local)
+            {
+                if (rUsrCtrl.m_localIds.exists(local))
+                {
+                    found = true;
+                    rControls.m_selectedUsrCtrl = local;
+                    break;
+                }
+            }
+
+            if ( ! found )
+            {
+                rControls.m_selectedUsrCtrl = lgrn::id_null<MachLocalId>();
+                OSP_LOG_INFO("Unselected vehicles");
+            }
+            else
+            {
+                OSP_LOG_INFO("Selected User Control: {}", rControls.m_selectedUsrCtrl);
+            }
+        }
+
+        // Control selected UsrCtrl machine
+        if (rControls.m_selectedUsrCtrl != lgrn::id_null<MachLocalId>())
+        {
+            float const thrRate = delta;
+            float const thrChange =
+                      float(ctrlSub.button_held(rControls.m_btnThrMore)) * thrRate
+                    - float(ctrlSub.button_held(rControls.m_btnThrLess)) * thrRate
+                    + float(ctrlSub.button_triggered(rControls.m_btnThrMax))
+                    - float(ctrlSub.button_triggered(rControls.m_btnThrMin));
+
+            MachAnyId const mach = rUsrCtrl.m_localToAny[rControls.m_selectedUsrCtrl];
+            lgrn::Span<NodeId const> portSpan = rNumberNodes.m_machToNode[mach];
+
+            if (NodeId const thrNode = connected_node(portSpan, adera::ports_userctrl::gc_throttleOut.m_port);
+                thrNode != lgrn::id_null<NodeId>())
+            {
+                float const thrCurr = rScnTest.m_nodeNumValues[thrNode];
+                float const thrNew = Magnum::Math::clamp(thrCurr + thrChange, 0.0f, 1.0f);
+
+                if (thrCurr != thrNew)
+                {
+                    rScnTest.m_updNodeNum.m_nodeDirty.set(thrNode);
+                    rScnTest.m_updNodeNum.m_nodeNewValues[thrNode] = thrNew;
+                }
+            }
+        }
 
         // Throw a sphere when the throw button is pressed
         if (rControls.m_camCtrl.m_controls.button_held(rControls.m_btnThrow))
         {
             Matrix4 const &camTf = rScene.m_basic.m_transform.get(rRenderer.m_camera).m_transform;
             float const speed = 120;
-            float const dist = 8.0f; // Distance from camera to spawn spheres
+            float const dist = 8.0f;
             rScnTest.m_toThrow.emplace_back(VehicleTestData::ThrowShape{
-                    camTf.translation() - camTf.backward() * dist, // position
-                    -camTf.backward() * speed, // velocity
-                    Vector3{1.0f}, // size (radius)
-                    700.0f, // mass
-                    EShape::Sphere}); // shape
+                /* Position */      camTf.translation() - camTf.backward() * dist,
+                /* Velocity */      -camTf.backward() * speed,
+                /* Size/Radius */   Vector3{1.0f},
+                /* Mass */          700.0f,
+                /* Shape */         EShape::Sphere});
+        }
+
+        // Move camera freely when no vehicle is selected
+        if (rControls.m_selectedUsrCtrl == lgrn::id_null<MachLocalId>())
+        {
+            SysCameraController::update_move(
+                    rControls.m_camCtrl,
+                    rScene.m_basic.m_transform.get(rRenderer.m_camera),
+                    delta, true);
         }
 
         // Update the scene directly in the drawing function :)
         update_test_scene(rScene, gc_physTimestep);
 
-        // Rotate and move the camera based on user inputs
+        // Follow selected UsrCtrl machine's entity
+        if (rControls.m_selectedUsrCtrl != lgrn::id_null<MachLocalId>())
+        {
+            MachAnyId const mach        = rUsrCtrl.m_localToAny[rControls.m_selectedUsrCtrl];
+            PartEnt_t const part        = rScnParts.m_machineToPart[mach];
+            RigidGroup_t const rigid    = rScnParts.m_partRigids[part];
+            ActiveEnt const ent         = rScnTest.m_rigidToActive[rigid];
+
+            rControls.m_camCtrl.m_target.value() = rScene.m_basic.m_transform.get(ent).m_transform.translation();
+        }
+
+        // Rotate camera
         SysCameraController::update_view(
                 rControls.m_camCtrl,
                 rScene.m_basic.m_transform.get(rRenderer.m_camera), delta);
-        SysCameraController::update_move(
-                rControls.m_camCtrl,
-                rScene.m_basic.m_transform.get(rRenderer.m_camera),
-                delta, true);
     };
 }
 

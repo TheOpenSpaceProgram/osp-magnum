@@ -235,6 +235,7 @@ inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T &&
         // One could argue that it's not necessary to detect this and throw
         // as the std::copy() below requires end to be reachable from begin,
         // and thus passing in invalid iterators is a precondition violation
+        // but we don't skip the check, so as to provide meaningful errors.
         if(len < 0)
         {
             throw std::invalid_argument("End must be reachable from begin.");
@@ -248,12 +249,12 @@ inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T &&
     }
 
     // Make space to copy the string
-#if __cplusplus >= 202002L
+#if defined(__cpp_lib_smart_ptr_for_overwrite)
     auto buf = std::make_shared_for_overwrite<CHAR_T[]>(static_cast<std::size_t>(len));
-#elif __APPLE__
-    std::shared_ptr<CHAR_T> buf(new CHAR_T[static_cast<std::size_t>(len)]);
-#else
+#elif defined(__cpp_lib_shared_ptr_arrays)
     std::shared_ptr<CHAR_T[]> buf{new CHAR_T[static_cast<std::size_t>(len)]};
+#else
+    std::shared_ptr<CHAR_T> buf(new CHAR_T[static_cast<std::size_t>(len)]);
 #endif
 
     // Do the copy

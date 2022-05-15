@@ -1,6 +1,7 @@
+
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,44 +25,23 @@
  */
 #pragma once
 
-#include "activetypes.h"
-#include "../Resource/machines.h"
-
-#include <cstdint>
-#include <vector>
-
-namespace osp::active
+namespace osp
 {
 
-enum class MachineEnt : entt::id_type { };
-
-/**
- * This component is added to a part, and stores a vector that keeps track of
- * all the Machines it uses. Machines are stored in multiple entities, so the
- * vector keeps track of these.
- */
-struct ACompMachines
+template <typename ID_T, typename DUMMY_T = void>
+struct GlobalIdReg
 {
-    std::vector<ActiveEnt> m_machines;
+    [[nodiscard]] static inline ID_T create() noexcept
+    {
+        return ID_T(sm_count++);
+    }
+    [[nodiscard]] static inline int size() noexcept
+    {
+        return sm_count;
+    }
+
+private:
+    static inline int sm_count{0};
 };
 
-}
-
-// Specialize entt::storage_traits to disable signals for storage that uses
-// MachineEnt as entities
-template<typename Type>
-struct entt::storage_traits<osp::active::MachineEnt, Type>
-{
-    using storage_type = basic_storage<osp::active::MachineEnt, Type>;
-};
-
-namespace osp::active
-{
-
-template<typename COMP_T>
-using mcomp_storage_t = typename entt::storage_traits<MachineEnt, COMP_T>::storage_type;
-
-template<typename... COMP_T>
-using mcomp_view_t = entt::basic_view<MachineEnt, entt::exclude_t<>, COMP_T...>;
-
-} // namespace osp::active
+} // namespace osp

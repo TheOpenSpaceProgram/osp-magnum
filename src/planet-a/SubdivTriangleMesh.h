@@ -50,7 +50,7 @@ enum class ChunkLocalSharedId : uint16_t {};
 // IDs for any chunk's fill vertices; from 0 to m_chunkVrtxSharedCount
 enum class ChunkLocalFillId : uint16_t {};
 
-using SharedVrtxStorage_t = lgrn::IdRefCount<SharedVrtxId>::Storage_t;
+using SharedVrtxStorage_t = lgrn::IdRefCount<SharedVrtxId>::Owner_t;
 
 //-----------------------------------------------------------------------------
 
@@ -329,7 +329,7 @@ private:
 
     void shared_release(SharedVrtxStorage_t &rStorage) noexcept
     {
-        m_sharedRefCount.ref_release(rStorage);
+        m_sharedRefCount.ref_release(std::move(rStorage));
     }
 
     constexpr VertexId shared_get_vrtx(SharedVrtxId sharedId) const

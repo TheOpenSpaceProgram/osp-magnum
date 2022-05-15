@@ -89,10 +89,10 @@ struct MaterialData
 };
 
 using MeshRefCount_t    = lgrn::IdRefCount<MeshId>;
-using MeshIdOwner_t     = MeshRefCount_t::Storage_t;
+using MeshIdOwner_t     = MeshRefCount_t::Owner_t;
 
 using TexRefCount_t     = lgrn::IdRefCount<TexId>;
-using TexIdOwner_t      = TexRefCount_t::Storage_t;
+using TexIdOwner_t      = TexRefCount_t::Owner_t;
 
 /**
  * @brief Mesh Ids, texture Ids, and storage for drawing-related components

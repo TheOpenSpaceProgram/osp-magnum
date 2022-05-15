@@ -26,9 +26,11 @@
 
 #include "osp/Resource/resourcetypes.h"
 #include "osp/types.h"
+#include "osp/link/machines.h"
 
-#include <longeron/id_management/registry.hpp>
+#include <longeron/id_management/registry_stl.hpp>
 
+#include <entt/core/any.hpp>
 #include <entt/container/dense_map.hpp>
 
 #include <cstdint>
@@ -47,14 +49,31 @@ struct StructureLink
     PartId m_less;
 };
 
+struct PerNodeType : osp::link::Nodes
+{
+    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
+                                                      osp::link::JuncCustom>;
+
+    MachToNodeCustom_t      m_machToNodeCustom; // parallel with m_machToNode
+    entt::any               m_nodeValues;
+    std::vector<int>        m_nodeConnectCount;
+    int                     m_connectCountTotal{0};
+};
+
 struct VehicleData
 {
-    lgrn::IdRegistry<PartId>            m_partIds;
+    lgrn::IdRegistryStl<PartId>         m_partIds;
     std::vector<osp::Matrix4>           m_partTransforms;
     std::vector<osp::PrefabPair>        m_partPrefabs;
+    std::vector<uint16_t>               m_partMachCount;
 
-    lgrn::IdRegistry<AttachId>          m_attachments;
+    lgrn::IdRegistryStl<AttachId>       m_attachments;
     std::vector<StructureLink>          m_attachLinks;
+
+    osp::link::Machines                 m_machines;
+    std::vector<PartId>                 m_machToPart;
+
+    std::vector<PerNodeType>            m_nodePerType;
 };
 
 /**
@@ -62,11 +81,19 @@ struct VehicleData
  */
 class VehicleBuilder
 {
+    using MachAnyId     = osp::link::MachAnyId;
+    using MachTypeId    = osp::link::MachTypeId;
+    using NodeId        = osp::link::NodeId;
+    using NodeTypeId    = osp::link::NodeTypeId;
+    using PortEntry     = osp::link::PortEntry;
+
 public:
 
     VehicleBuilder(osp::Resources *pResources)
      : m_pResources{pResources}
     {
+        m_data.m_machines.m_perType.resize(osp::link::MachTypeReg_t::size());
+        m_data.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
         index_prefabs();
     };
 
@@ -94,6 +121,21 @@ public:
     osp::Matrix4 align_attach(PartId partA, std::string_view attachA,
                               PartId partB, std::string_view attachB);
 
+    template <std::size_t N>
+    [[nodiscard]] std::array<NodeId, N> create_nodes(NodeTypeId nodeType);
+
+    struct Connection
+    {
+        PortEntry m_port;
+        NodeId m_node;
+    };
+
+    MachAnyId create_machine(PartId part, MachTypeId machType, std::initializer_list<Connection> connections);
+
+    void connect(MachAnyId mach, std::initializer_list<Connection> connections);
+
+    void finalize_machines();
+
     VehicleData const& data() const noexcept { return m_data; }
 
 private:
@@ -114,12 +156,31 @@ template <std::size_t N>
 std::array<PartId, N> VehicleBuilder::create_parts()
 {
     std::array<PartId, N> out;
-    m_data.m_partIds.create(std::begin(out), N);
+    m_data.m_partIds.create(std::begin(out), std::end(out));
 
-    m_data.m_partPrefabs.resize(m_data.m_partIds.capacity());
-    m_data.m_partTransforms.resize(m_data.m_partIds.capacity());
+    std::size_t const capacity = m_data.m_partIds.capacity();
+    m_data.m_partMachCount.resize(capacity);
+    m_data.m_partPrefabs.resize(capacity);
+    m_data.m_partTransforms.resize(capacity);
 
     return out;
 }
+
+
+template <std::size_t N>
+std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId nodeType)
+{
+    std::array<NodeId, N> out;
+
+    PerNodeType &rPerNodeType = m_data.m_nodePerType[nodeType];
+
+    rPerNodeType.m_nodeIds.create(std::begin(out), std::end(out));
+    std::size_t const capacity = rPerNodeType.m_nodeIds.capacity();
+    rPerNodeType.m_nodeToMach.ids_reserve(rPerNodeType.m_nodeIds.capacity());
+    rPerNodeType.m_nodeConnectCount.resize(capacity, 0);
+
+    return out;
+}
+
 
 } // namespace testapp
