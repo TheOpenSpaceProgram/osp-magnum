@@ -32,9 +32,6 @@
 #include "activescenes/common_scene.h"
 #include "activescenes/common_renderer_gl.h"
 
-#include "universes/simple.h"
-#include "universes/planets.h"
-
 #include <osp/Resource/load_tinygltf.h>
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
@@ -54,8 +51,11 @@
 
 #include <Corrade/Utility/Arguments.h>
 
+#include <entt/core/any.hpp>
+
 #include <iostream>
 #include <memory>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 
@@ -116,7 +116,7 @@ entt::any g_activeScene;
 std::function<void(ActiveApplication&)> g_appSetup;
 
 // Test application supports 1 Universe
-std::shared_ptr<UniverseScene> g_universeScene;
+//std::shared_ptr<UniverseScene> g_universeScene;
 
 // Magnum Application deals with window and OpenGL things
 std::optional<ActiveApplication> g_activeApplication;
@@ -346,13 +346,6 @@ void setup_common_scene()
 bool destroy_universe()
 {
     // Make sure universe isn't in use anywhere else
-    if (1 == g_universeScene.use_count())
-    {
-        OSP_LOG_WARN("Universe is still in use!");
-        return false;
-    }
-
-    g_universeScene.reset();
 
     OSP_LOG_INFO("explosion* Universe destroyed!");
 

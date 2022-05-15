@@ -30,8 +30,6 @@
 #include <osp/Active/physics.h>
 #include <osp/Active/drawing.h>
 
-#include <osp/Active/SysAreaAssociate.h>
-
 #include <longeron/id_management/registry.hpp>
 
 #include <newtondynamics_physics/ospnewton.h>
@@ -47,7 +45,6 @@ using namespace osp::active;
  */
 struct ACtxUniverseSync
 {
-    ACtxAreaLink        m_areaLink;
 };
 
 } // namespace testapp::scenestate
