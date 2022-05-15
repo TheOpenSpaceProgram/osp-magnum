@@ -24,139 +24,188 @@
  */
 #pragma once
 
-#include "universetypes.h"
+#include "universe.h"
 #include "../types.h"
 #include "../CommonMath.h"
-
-#include <optional>
-#include <tuple>
-#include <variant>
-#include <vector>
 
 namespace osp::universe
 {
 
 /**
- * @brief A functor used to transform positions between coordinate spaces
+ * @brief Describes a mathematical function used to transform positions between
+ *        coordinate spaces
  *
- * Transforming coordinates from one space to another is translation and scale.
+ * 2D example:
  *
- * Parent to Child: f(x) = (precision difference) * (x - childPos)
- * Child to Parent: f(x) = (precision difference) * x + childPos
+ * Parent: ... -O-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|
+ *              0     1     2     3     4     5     6     7     8     9    10
  *
- * These two can be re-arranged into a general form:
+ *              |--|--|--|--|--|--|--|--|--|--O--|--|--|--|--|--|--|--|--|--|
+ * Child:     -10 -9 -8 -7 -6 -5 -4 -3 -2 -1  0  1  2  3  4  5  6  7  8  9 10
  *
- * f(x) = x * 2^expX + c * 2^expC
+ * * Child's precision is 1 unit higher than parent.    precDiff = 1
+ * * Child position: 5 (relative to parent)             childPos = 5
  *
+ * From inspection, we can write functions to transform coordinates between
+ * these spaces:
+ *
+ * To transform Parent-to-Child:    P->C(x) = 2^(precDiff) * (x - childPos)
+ * For Child-to-Parent (inverse):   C->P(x) = 2^(-precDiff) * x + childPos
+ *
+ * * i.e. P->C(5) = 0,  P->C(3) = -4,   P->C(10) = 10
+ *        C->P(0) = 5,  C->P(-4) = 3,   C->P(10) = 10
+ *
+ * Both equations can be re-arranged into a common form: f(x) = x*2^n + c*2^m
+ *
+ * P->C(x) = 2^(precDiff) * (x - childPos)
+ * P->C(x) = x * 2^(precDiff) - childPos * 2^(precDiff)
+ *           substitute:    n = m = precDiff;    c = -childPos
+ * P->C(x) = x * 2^n + c * 2^m
+ *
+ * C->P(x) = 2^(-precDiff) * x + childPos
+ *           substitute:    n = -precDiff;       c = childPos;     m = 0;
+ * C->P(x) = x * 2^n * + c * 2^m
+ *
+ * This form generalizes both operations, as well as make them easier to
+ * combine.
+ *
+ * The c * 2^m term may seem redundant, as they can be merged into a single
+ * variable; however, keeping them separate is less susceptible to overflow
+ * errors. This allows flawless transforms across intermediate coordinate
+ * spaces of varrying precisions.
  */
-struct CoordspaceTransform
+struct CoordTransformer
 {
-    using Vec_t = Magnum::Math::Vector3<uint64_t>;
+    Quaterniond     m_rotate;
+    Vector3g        m_c;
+    int             m_n;
+    int             m_m;
 
-    /**
-     * @brief Transform a Vector3g using this CoordspaceTransform
-     *
-     * @param in [in] Vector3g to transform
-     *
-     * @return Transformed Vector3g
-     */
-    Vector3g operator()(Vector3g in) const noexcept
+    Vector3g transform_position(Vector3g in) const noexcept
     {
+        // TODO: rotation
+
         using osp::math::mul_2pow;
-        return mul_2pow<Vector3g, spaceint_t>(in, m_expX)
-                + mul_2pow<Vector3g, spaceint_t>(Vector3g(m_c), m_expC);
+        return mul_2pow<Vector3g, spaceint_t>(in, m_n)
+                + mul_2pow<Vector3g, spaceint_t>(Vector3g(m_c), m_m);
     }
 
-    /**
-     * @brief Substitute another CoordspaceTransform into this transform,
-     *        resulting in a new composite transform.
-     *
-     * With coordinate spaces A, B, and C, transforming from A->B(x) is a,
-     * function and B->C(c) is also a function. This means A->C(x) is equal to
-     * B->C(A->B)
-     *
-     * In general form, the algebra can be worked out like this:
-     *
-     * in(x) = x * 2^expX2  +  c2 * 2^expC2
-     * out(x) = in(x) * 2^expX1  +  c1 * 2^expC1
-     *
-     * plug in(x) into out as x
-     * out(x) = (x * 2^expX2  +  c2 * 2^expC2) * 2^expX1  +  c1 * 2^expC1
-     * out(x) = x*2^(expX1+expX2)  +  c1 * 2^expC1  +  c2 * 2^(expC2+expX1)
-     *
-     * Combine c1 and c2 terms by splitting off one of the exponents, and
-     * multiplying into a c value so that both c1 and c2 have the same exponent
-     *
-     * ie. c*2^expC -> (c*2^expD) * 2^(expC - expD)
-     * out(x) = x*2^(expX1+expX2) + c3 * 2^expC3
-     *
-     * @param in [in] CoordspaceTransform to substitute as X
-     *
-     * @return A new CoordspaceTransform formed from substitution
-     */
-    constexpr CoordspaceTransform operator()(CoordspaceTransform const& in) const noexcept
+    constexpr bool is_identity() const noexcept
     {
-        CoordspaceTransform result;
+        return m_n == 0 && m_c.isZero();
+    }
+};
 
-        result.m_expX = m_expX + in.m_expX;
+/**
+ * @brief Composite together two CoordTransformers
+ *
+ * Manually chaining transforms between spaces of different precisions can lead
+ * to loss of information due to rounding.
+ * ie. High precision -> Low precision (rounded!) -> High precision (oof!)
+ *
+ * Compositing the CoordTransformers prevents these errors, and only needs to
+ * be calculated once when transforming multiple positions.
+ *
+ * For coordinate spaces A, B, and C, there exists transform functions
+ * A->B(x) and B->C(x).
+ *
+ * A->C(x) can be formed by substituting functions into each other:
+ *
+ * A->C(x) = B->C(A->B(x))
+ *
+ * Algebra goes like this:
+ *
+ * given:    f1(x)  =  x * 2^n1  +  c1 * 2^m1
+ * given:    f2(x)  =  x * 2^n2  +  c2 * 2^m2
+ * unknown:  f3(x)  =  x * 2^n3  +  c3 * 2^m3  =  f1( f2(x) )
+ *
+ * f3(x)   =   f1( f2(x) )
+ * f3(x)   =   f2(x)                    * 2^n1          +   c1 * 2^m1
+ * f3(x)   =   ( x * 2^n2 + c2 * 2^m2 ) * 2^n1          +   c1 * 2^m1
+ * f3(x)   =   x * 2^n2 * 2^n1   +   c2 * 2^m2 * 2^n1   +   c1 * 2^m1
+ * f3(x)   =   x * 2^(n1+n2)     +   c2 * 2^(m2+n1)     +   c1 * 2^m1
+ *               n3 = n1+n2
+ * f3(x)   =   x * 2^n3          +   c2 * 2^(m2+n1)     +   c1 * 2^m1
+ *
+ * To combine the c2 and c1 terms, their exponents need to be the same. Either
+ * term needs to be modified to match the other term. To avoid rounding losses,
+ * we avoid splitting off a negative exponent.
+ *
+ * Exponent change:     2^u + 2^v  ->  2^(u-v+v) + 2^v  ->  2^(u-v)*2^(v) + b^v
+ *                   -> (2^(u-v) + b)^v
+ *
+ * let d = (m2+n1) - m1
+ *
+ * if (d == 0):  both exponents are safe to combine
+ *     c3 = (c2+c1)             m3 = m1 or (m2 + n1)
+ *
+ * if (d > 0):   c2*2^(m2+n1) + c1*2^m1  ->  c2*(2^d)*(2^m1) + c1*2^m1
+ *     c3 = c2*(2^d) + c1;      m3 = m1
+ *
+ * if (d < 0):   c2*2^(m2+n1) + c1*2^m1  ->  c2*2^(m2+n1) + c1*2^(-d)*(m2+n1)
+ *     c3 = c2 + c1*2^(-d);     m3 = m2+n1
+ *
+ * All variables are now known: h(x)  =  x * 2^n3  +  c3 * 2^m3
+ *
+ * @param f1 [in] Outer function to composite
+ * @param f2 [in] Inner function to composite
+ *
+ * @return Composite CoordTransformer f1( f2(x) )
+ */
+inline CoordTransformer coord_composite(
+        CoordTransformer const& f1, CoordTransformer const& f2) noexcept
+{
+    Vector3g c3;
+    int m3;
 
-        int16_t expC1 = m_expC;
-        int16_t expC2 = m_expX + in.m_expC;
+    int const d = f2.m_m + f1.m_n - f1.m_m;
 
-        if (expC1 == expC2)
-        {
-            result.m_expC = expC1;
-            result.m_c = m_c + in.m_c;
-        }
-        else if (expC1 > expC2)
-        {
-            // expC1 too high, multiply into m_c
-            result.m_expC = expC2;
-            result.m_c = m_c * 2L * (1 << (expC1-expC2)) + in.m_c;
-
-        }
-        else if (expC1 < expC2)
-        {
-            // expC2 too high, multiply into in.m_c
-            result.m_expC = expC1;
-            result.m_c = m_c + in.m_c * 2L * (1 << (expC2-expC1));
-        }
-
-        return result;
+    if (d == 0)
+    {
+        c3 = f2.m_c + f1.m_c;
+        m3 = f1.m_m;
+    }
+    else if (d > 0)
+    {
+        c3 = f2.m_c * math::int_2pow<spaceint_t>(d) + f1.m_c;
+        m3 = f1.m_m;
+    }
+    else // if (d < 0)
+    {
+        c3 = f2.m_c + f1.m_c * math::int_2pow<spaceint_t>(-d);
+        m3 = f2.m_m + f1.m_n;
     }
 
-    int16_t m_expX{0};
-
-    Vec_t m_c{0};
-    int16_t m_expC{0};
-
-}; // struct CoordspaceTransform
-
-namespace transform
-{
-
-constexpr CoordspaceTransform scaled(
-        CoordspaceTransform x, int16_t from, int16_t to) noexcept
-{
-    return CoordspaceTransform{int16_t(x.m_expX + (from - to)), x.m_c, x.m_expC};
+    return {
+        .m_rotate   = f2.m_rotate * f1.m_rotate,
+        .m_c        = c3,
+        .m_n        = f1.m_n + f2.m_n,
+        .m_m        = m3
+    };
 }
 
-constexpr CoordspaceTransform child_to_parent(
-        Vector3g const childPos, int16_t childPrec, int16_t parentPrec) noexcept
+inline CoordTransformer coord_parent_to_child(
+        CoSpaceTransform const& parent, CoSpaceTransform const& child) noexcept
 {
-    int16_t exp = childPrec - parentPrec;
-    return CoordspaceTransform{exp, CoordspaceTransform::Vec_t(childPos), 0};
+    int const precisionDiff = child.m_precision - parent.m_precision;
+    return {
+        .m_rotate   = child.m_rotation.inverted(),
+        .m_c        = -child.m_position,
+        .m_n        = precisionDiff,
+        .m_m        = precisionDiff
+    };
 }
 
-constexpr CoordspaceTransform parent_to_child(
-        Vector3g const childPos, int16_t childPrec, int16_t parentPrec) noexcept
+inline CoordTransformer coord_child_to_parent(
+        CoSpaceTransform const& parent, CoSpaceTransform const& child) noexcept
 {
-    int16_t exp = parentPrec - childPrec;
-    // individual vector components is workaround for non-constexpr operator-()
-    return CoordspaceTransform{exp, CoordspaceTransform::Vec_t( -childPos.x(), -childPos.y(), -childPos.z()), exp};
+    int const precisionDiff = child.m_precision - parent.m_precision;
+    return {
+        .m_rotate   = child.m_rotation,
+        .m_c        = child.m_position,
+        .m_n        = -precisionDiff,
+        .m_m        = 0
+    };
 }
-
-}
-
 
 }
