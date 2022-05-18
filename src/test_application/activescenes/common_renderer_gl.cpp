@@ -114,19 +114,10 @@ void CommonSceneRendererGL::sync(ActiveApplication& rApp, CommonTestScene const&
             m_renderGl.m_drawTransform);
 }
 
-void CommonSceneRendererGL::render(ActiveApplication& rApp, CommonTestScene const& rScene)
+void CommonSceneRendererGL::prepare_fbo(ActiveApplication& rApp)
 {
     using Magnum::GL::Framebuffer;
     using Magnum::GL::FramebufferClear;
-    using Magnum::GL::Texture2D;
-
-    // Get camera to calculate view and projection matrix
-    ACompCamera const &rCamera = rScene.m_basic.m_camera.get(m_camera);
-    ACompDrawTransform const &cameraDrawTf
-            = m_renderGl.m_drawTransform.get(m_camera);
-    ViewProjMatrix viewProj{
-            cameraDrawTf.m_transformWorld.inverted(),
-            rCamera.calculate_projection()};
 
     // Bind offscreen FBO
     Framebuffer &rFbo = rApp.get_render_gl().m_fbo;
@@ -135,13 +126,27 @@ void CommonSceneRendererGL::render(ActiveApplication& rApp, CommonTestScene cons
     // Clear it
     rFbo.clear( FramebufferClear::Color | FramebufferClear::Depth
                 | FramebufferClear::Stencil);
+}
+
+void CommonSceneRendererGL::draw_entities(ActiveApplication& rApp, CommonTestScene const& rScene)
+{
+    ACompCamera const &rCamera = rScene.m_basic.m_camera.get(m_camera);
+    ACompDrawTransform const &cameraDrawTf
+            = m_renderGl.m_drawTransform.get(m_camera);
+    ViewProjMatrix viewProj{
+            cameraDrawTf.m_transformWorld.inverted(),
+            rCamera.calculate_projection()};
 
     // Forward Render fwd_opaque group to FBO
     SysRenderGL::render_opaque(
             m_renderGroups.m_groups.at("fwd_opaque"),
             rScene.m_drawing.m_visible, viewProj);
+}
 
-    // Display FBO
+void CommonSceneRendererGL::display(ActiveApplication& rApp)
+{
+    using Magnum::GL::Texture2D;
+
     Texture2D &rFboColor = rApp.get_render_gl().m_texGl.get(rApp.get_render_gl().m_fboColor);
     SysRenderGL::display_texture(rApp.get_render_gl(), rFboColor);
 }
@@ -171,15 +176,7 @@ on_draw_t generate_common_draw(CommonTestScene& rScene, ActiveApplication& rApp,
 
     return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
     {
-        pRenderer->m_onCustomDraw(*pRenderer, rScene, rApp, delta);
-
-        // Delete components of deleted entities on renderer's side
-        pRenderer->update_delete(rScene.m_deleteTotal);
-
-        pRenderer->sync(rApp, rScene);
-
-        // Render to screen
-        pRenderer->render(rApp, rScene);
+        pRenderer->m_onDraw(*pRenderer, rScene, rApp, delta);
     };
 };
 
