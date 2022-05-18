@@ -45,13 +45,10 @@ namespace testapp
  */
 struct CommonSceneRendererGL : MultiAny
 {
-    using on_custom_draw_t = void(*)(CommonSceneRendererGL&, CommonTestScene&,
-                                     ActiveApplication&, float) noexcept;
+    using on_draw_t = void(*)(CommonSceneRendererGL&, CommonTestScene&,
+                              ActiveApplication&, float) noexcept;
 
-    // Most test scenes will be drawn in the exact same way: by calling the
-    // draw functions of shaders.
-    // For more sophistication, make a custom on_draw_t instead
-    on_custom_draw_t m_onCustomDraw{nullptr};
+    on_draw_t m_onDraw{nullptr};
 
     osp::active::ACtxSceneRenderGL m_renderGl;
 
@@ -73,17 +70,31 @@ struct CommonSceneRendererGL : MultiAny
      * @brief Sync GL resources with scene meshes, textures, and materials
      *
      * @param rApp      [ref] Application with GL context
-     * @param rScene    [ref] Test scene to render
+     * @param rScene    [ref] Associated test scene to render
      */
     void sync(ActiveApplication& rApp, CommonTestScene const& rScene);
 
     /**
-     * @brief Render to default framebuffer
+     * @brief Bind and clear off-screen framebuffer object
      *
      * @param rApp      [ref] Application with GL context
-     * @param rScene    [ref] Test scene to render
      */
-    void render(ActiveApplication& rApp, CommonTestScene const& rScene);
+    void prepare_fbo(ActiveApplication& rApp);
+
+    /**
+     * @brief Calls draw functions of entities in the fwd_opaque RenderGroup
+     *
+     * @param rApp      [ref] Application with GL context
+     * @param rScene    [ref] Associated test scene to render
+     */
+    void draw_entities(ActiveApplication& rApp, CommonTestScene const& rScene);
+
+    /**
+     * @brief Display framebuffer texture to window
+     *
+     * @param rApp      [ref] Application with GL context
+     */
+    void display(ActiveApplication& rApp);
 
     /**
      * @brief Delete components of entities to delete

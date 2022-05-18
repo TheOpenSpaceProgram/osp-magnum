@@ -690,7 +690,7 @@ void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
     // Set initial position of camera slightly above the ground
     rControls.m_camCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
 
-    rRenderer.m_onCustomDraw = [] (
+    rRenderer.m_onDraw = [] (
             CommonSceneRendererGL& rRenderer, CommonTestScene& rScene,
             ActiveApplication& rApp, float delta) noexcept
     {
@@ -813,6 +813,12 @@ void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
         SysCameraController::update_view(
                 rControls.m_camCtrl,
                 rScene.m_basic.m_transform.get(rRenderer.m_camera), delta);
+
+        rRenderer.update_delete(rScene.m_deleteTotal);
+        rRenderer.sync(rApp, rScene);
+        rRenderer.prepare_fbo(rApp);
+        rRenderer.draw_entities(rApp, rScene);
+        rRenderer.display(rApp);
     };
 }
 
