@@ -115,6 +115,13 @@ struct VehicleTest
 };
 
 
+struct UniverseTest
+{
+    static void setup_scene(CommonTestScene &rScene, osp::PkgId pkg);
+    static void setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp) noexcept;
+};
+
+
 } // namespace scenes
 
 
