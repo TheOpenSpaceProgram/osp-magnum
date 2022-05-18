@@ -157,6 +157,9 @@ std::unordered_map<std::string_view, Option> const g_scenes
     }}},
     {"vehicletest", {"Vehicle and glTF", [] {
         setup_common_scene<scenes::VehicleTest>();
+    }}},
+    {"universetest", {"Vehicle and glTF", [] {
+        setup_common_scene<scenes::UniverseTest>();
     }}}
 };
 
