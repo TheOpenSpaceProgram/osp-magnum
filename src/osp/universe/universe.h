@@ -84,6 +84,13 @@ constexpr VEC_T to_vec(INDEX_T i, RANGE_T&& ... args) noexcept
     return {args[std::size_t(i)] ...};
 }
 
+
+struct CoSpaceHierarchy
+{
+    CoSpaceId       m_parent{lgrn::id_null<CoSpaceId>()};
+    SatId           m_parentSat{lgrn::id_null<SatId>()};
+};
+
 /**
  * @brief Get StridedArrayView1Ds from all components of a SatVectorDesc
  *
@@ -111,12 +118,6 @@ constexpr auto sat_views(
         return std::array{ satVec.view(Corrade::Containers::arrayView(rData), satCount, COUNT_T) ... };
     }
 }
-
-struct CoSpaceHierarchy
-{
-    CoSpaceId       m_parent{lgrn::id_null<CoSpaceId>()};
-    SatId           m_parentSat{lgrn::id_null<SatId>()};
-};
 
 struct CoSpaceTransform
 {

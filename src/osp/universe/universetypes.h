@@ -61,6 +61,4 @@ using Vector3g = Magnum::Math::Vector3<spaceint_t>;
 template<typename COMP_T>
 using ucomp_storage_t = typename entt::storage_traits<SatId, COMP_T>::storage_type;
 
-using coordspace_index_t = uint32_t;
-
 }
