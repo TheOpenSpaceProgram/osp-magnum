@@ -35,7 +35,7 @@
 #include <osp/Active/physics.h>
 #include <osp/Active/SysHierarchy.h>
 
-//#include <osp/universe/universe.h>
+#include <osp/universe/universe.h>
 
 #include <osp/Resource/resources.h>
 
@@ -92,6 +92,8 @@ struct UniverseTestData
 
     // Queue for balls to throw
     std::vector<ThrowShape> m_toThrow;
+
+    osp::universe::Universe m_universe;
 };
 
 
@@ -202,6 +204,49 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     rScnPhys.m_physics.m_hasColliders.emplace(floorRootEnt);
     rScnPhys.m_physics.m_physBody.emplace(floorRootEnt);
 
+    // Setup universe
+    using namespace osp::universe;
+
+    Universe &rUni = rScnTest.m_universe;
+    using Corrade::Containers::Array;
+
+
+    CoSpaceId const mainId = rUni.m_coordIds.create();
+    rUni.m_coordCommon.resize(rUni.m_coordIds.capacity());
+    CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(mainId)];
+
+    rMainSpace.m_satCount = 64;
+    rMainSpace.m_satCapacity = 64;
+    std::size_t const dataSize = (sizeof(float) * 3 + sizeof(spaceint_t) * 3) * rMainSpace.m_satCapacity;
+
+    // TODO: alignment. also see Corrade alignedAlloc
+    rMainSpace.m_data = Array<unsigned char>{dataSize};
+
+    // Arrange position and velocity in XXXXX... YYYYY... ZZZZZ...
+
+    std::size_t const posStart = 0;
+    std::size_t const posComp = sizeof(spaceint_t) * rMainSpace.m_satCapacity;
+    rMainSpace.m_satPositions = {
+        .m_offsets = {posStart + posComp * 0,
+                      posStart + posComp * 1,
+                      posStart + posComp * 2},
+        .m_stride  = sizeof(spaceint_t) };
+
+    std::size_t const velStart = posComp * 3;
+    std::size_t const velComp = sizeof(float) * rMainSpace.m_satCapacity;
+    rMainSpace.m_satVelocities = {
+        .m_offsets = {velStart + velComp * 0,
+                      velStart + velComp * 1,
+                      velStart + velComp * 2},
+        .m_stride  = sizeof(float) };
+
+    auto a = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+
+    auto [x, y, z] = a;
+
+    CoSpaceCommon const &rMainSpaceC = rMainSpace;
+
+    auto const [xc, yc, zc] = sat_views(rMainSpace.m_satPositions, rMainSpaceC.m_data, rMainSpace.m_satCount);
 }
 
 static void update_test_scene_delete(CommonTestScene &rScene)
@@ -351,6 +396,7 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
             ActiveApplication& rApp, float delta) noexcept
     {
         auto &rScnTest = rScene.get<UniverseTestData>();
+        auto &rScnPhys = rScene.get<PhysicsData>();
         auto &rControls = rRenderer.get<UniverseTestRenderer>();
 
         // Throw a sphere when the throw button is pressed
@@ -378,6 +424,34 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
                 rControls.m_camCtrl,
                 rScene.m_basic.m_transform.get(rRenderer.m_camera),
                 delta, true);
+
+        rRenderer.update_delete(rScene.m_deleteTotal);
+        rRenderer.sync(rApp, rScene);
+        rRenderer.prepare_fbo(rApp);
+        rRenderer.draw_entities(rApp, rScene);
+
+        using Magnum::GL::Mesh;
+
+        RenderGL &rRenderGl         = rApp.get_render_gl();
+        MeshId const meshId         = rScnPhys.m_shapeToMesh.at(EShape::Box);
+        osp::ResId const meshRes    = rScene.m_drawingRes.m_meshToRes.at(meshId);
+        MeshGlId const meshGlId     = rRenderGl.m_resToMesh.at(meshRes);
+        Mesh &rMeshGl               = rRenderGl.m_meshGl.get(meshGlId);
+
+        ACompCamera const &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
+        ACompDrawTransform const &cameraDrawTf
+                = rRenderer.m_renderGl.m_drawTransform.get(rRenderer.m_camera);
+        ViewProjMatrix viewProj{
+                cameraDrawTf.m_transformWorld.inverted(),
+                rCamera.calculate_projection()};
+
+        auto &rShader = rRenderer.m_phong.m_shaderUntextured;
+        rShader.setDiffuseColor(0xFFFFFF_rgbf)
+               .setTransformationMatrix(viewProj.m_view * Matrix4::translation(rControls.m_camCtrl.m_target.value()))
+               .setProjectionMatrix(viewProj.m_proj)
+               .draw(rMeshGl);
+
+        rRenderer.display(rApp);
     };
 }
 
