@@ -28,6 +28,7 @@
 #include "common_renderer_gl.h"
 #include "CameraController.h"
 
+
 #include "../ActiveApplication.h"
 
 #include <osp/Active/basic.h>
@@ -39,6 +40,8 @@
 
 #include <osp/Resource/resources.h>
 
+#include <osp/CommonMath.h>
+
 #include <longeron/id_management/registry.hpp>
 
 #include <Magnum/GL/DefaultFramebuffer.h>
@@ -47,6 +50,8 @@
 
 #include <newtondynamics_physics/ospnewton.h>
 #include <newtondynamics_physics/SysNewton.h>
+
+#include <random>
 
 using osp::active::ActiveEnt;
 using osp::active::active_sparse_set_t;
@@ -93,7 +98,14 @@ struct UniverseTestData
     // Queue for balls to throw
     std::vector<ThrowShape> m_toThrow;
 
+
+    // Universe
     osp::universe::Universe m_universe;
+    osp::universe::CoSpaceId m_space{lgrn::id_null<osp::universe::CoSpaceId>()};
+
+    // Active area stuff
+    osp::universe::CoSpaceId m_areaSpace{lgrn::id_null<osp::universe::CoSpaceId>()};
+    bool m_areaRotating;
 };
 
 
@@ -211,9 +223,9 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     using Corrade::Containers::Array;
 
 
-    CoSpaceId const mainId = rUni.m_coordIds.create();
+    rScnTest.m_space = rUni.m_coordIds.create();
     rUni.m_coordCommon.resize(rUni.m_coordIds.capacity());
-    CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(mainId)];
+    CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_space)];
 
     rMainSpace.m_satCount = 64;
     rMainSpace.m_satCapacity = 64;
@@ -240,13 +252,28 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
                       velStart + velComp * 2},
         .m_stride  = sizeof(float) };
 
-    auto a = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+    auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+    auto const [vx, vy, vz] = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, rMainSpace.m_satCount);
 
-    auto [x, y, z] = a;
+    constexpr int c_seed            = 1337;
+    constexpr spaceint_t c_maxDist  = 20000ul << 10;
+    constexpr float c_maxVel        = 800.0f;
 
-    CoSpaceCommon const &rMainSpaceC = rMainSpace;
+    std::mt19937 gen(c_seed);
+    std::uniform_int_distribution<spaceint_t> posDist(-c_maxDist, c_maxDist);
+    std::uniform_real_distribution<float> velDist(-c_maxVel, c_maxVel);
 
-    auto const [xc, yc, zc] = sat_views(rMainSpace.m_satPositions, rMainSpaceC.m_data, rMainSpace.m_satCount);
+
+    for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+    {
+        x[i] = posDist(gen);
+        y[i] = posDist(gen);
+        z[i] = posDist(gen);
+        vx[i] = velDist(gen);
+        vy[i] = velDist(gen);
+        vz[i] = velDist(gen);
+    }
+
 }
 
 static void update_test_scene_delete(CommonTestScene &rScene)
@@ -358,6 +385,42 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     SysHierarchy::sort(rScene.m_basic.m_hierarchy);
 }
 
+static void update_universe(CommonTestScene& rScene, float delta)
+{
+    using namespace osp::universe;
+    using Magnum::Math::sqrt;
+
+    auto &rScnTest = rScene.get<UniverseTestData>();
+    Universe &rUni = rScnTest.m_universe;
+    CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_space)];
+
+    // Phase 1: Move satellites
+    auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+    auto const [vx, vy, vz] = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, rMainSpace.m_satCount);
+
+    float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
+    float const scaleDelta = delta / scale;
+
+    for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+    {
+        x[i] += vx[i] * scaleDelta;
+        y[i] += vy[i] * scaleDelta;
+        z[i] += vz[i] * scaleDelta;
+
+        // Apply arbitrary inverse-square gravity towards origin
+
+        Vector3 const pos       = Vector3( Vector3g( x[i], y[i], z[i] ) ) * scale;
+        float const r           = pos.length();
+        float const c_gm        = 10000000000.0f;
+        Vector3 const accel     = -pos * delta * c_gm / (r * r * r);
+
+        vx[i] += accel.x();
+        vy[i] += accel.y();
+        vz[i] += accel.z();
+    }
+
+}
+
 //-----------------------------------------------------------------------------
 
 struct UniverseTestRenderer
@@ -413,6 +476,8 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
                     EShape::Sphere}); // shape
         }
 
+        update_universe(rScene, gc_physTimestep);
+
         // Update the scene directly in the drawing function :)
         update_test_scene(rScene, gc_physTimestep);
 
@@ -450,6 +515,18 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
                .setTransformationMatrix(viewProj.m_view * Matrix4::translation(rControls.m_camCtrl.m_target.value()))
                .setProjectionMatrix(viewProj.m_proj)
                .draw(rMeshGl);
+
+        using namespace osp::universe;
+        Universe &rUni = rScnTest.m_universe;
+        CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_space)];
+        auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+
+        for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+        {
+            float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
+            rShader.setTransformationMatrix(viewProj.m_view * Matrix4::translation( {x[i] * scale, y[i] * scale, z[i] * scale} ) * Matrix4::scaling({200, 200, 200}) )
+                   .draw(rMeshGl);
+        }
 
         rRenderer.display(rApp);
     };
