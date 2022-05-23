@@ -125,6 +125,7 @@ struct CoSpaceTransform
     // Ignore and use m_parentSat's position and rotation instead if non-null
     Quaterniond     m_rotation;
     Vector3g        m_position;
+
     int             m_precision{10}; // 1 meter = 2^m_precision
 };
 
