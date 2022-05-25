@@ -28,7 +28,6 @@
 #include "common_renderer_gl.h"
 #include "CameraController.h"
 
-
 #include "../ActiveApplication.h"
 
 #include <osp/Active/basic.h>
@@ -37,10 +36,14 @@
 #include <osp/Active/SysHierarchy.h>
 
 #include <osp/universe/universe.h>
+#include <osp/universe/coordinates.h>
+
 
 #include <osp/Resource/resources.h>
 
 #include <osp/CommonMath.h>
+
+#include <osp/logging.h>
 
 #include <longeron/id_management/registry.hpp>
 
@@ -67,6 +70,8 @@ using osp::active::MeshIdOwner_t;
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
+using Corrade::Containers::Array;
+
 namespace testapp::scenes
 {
 
@@ -75,7 +80,7 @@ constexpr int gc_threadCount = 4; // note: not yet passed to Newton
 
 
 /**
- * @brief Data used specifically by the physics test scene
+ * @brief Data used specifically by the universe test scene
  */
 struct UniverseTestData
 {
@@ -98,13 +103,15 @@ struct UniverseTestData
     // Queue for balls to throw
     std::vector<ThrowShape> m_toThrow;
 
-
-    // Universe
+    // Universe is stored directly in the test scene for now
     osp::universe::Universe m_universe;
-    osp::universe::CoSpaceId m_space{lgrn::id_null<osp::universe::CoSpaceId>()};
+    osp::universe::CoSpaceId m_mainSpace{lgrn::id_null<osp::universe::CoSpaceId>()};
+    std::vector<osp::universe::CoSpaceId> m_mainSatLanded;
 
     // Active area stuff
-    osp::universe::CoSpaceId m_areaSpace{lgrn::id_null<osp::universe::CoSpaceId>()};
+    // Non-centralized universe allows coordinate spaces to be stored externally
+    osp::universe::CoSpaceCommon m_areaSpace;
+    osp::universe::Vector3g m_areaCenter;
     bool m_areaRotating;
 };
 
@@ -113,17 +120,10 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
 {
     using namespace osp::active;
 
-    // It should be clear that the physics test scene is a composition of:
-    // * PhysicsData:       Generic physics data
-    // * ACtxNwtWorld:      Newton Dynamics Physics engine
-    // * UniverseTestData:   Additional scene-specific data, ie. dropping blocks
     auto &rScnPhys  = rScene.emplace<PhysicsData>();
     auto &rScnNwt   = rScene.emplace<ospnewton::ACtxNwtWorld>(gc_threadCount);
     auto &rScnTest  = rScene.emplace<UniverseTestData>();
 
-    // Add cleanup function to deal with reference counts
-    // Note: The problem with destructors, is that REQUIRE storing pointers in
-    //       the data, which is uglier to deal with
     rScene.m_onCleanup.push_back(&PhysicsData::cleanup);
 
     osp::Resources &rResources = *rScene.m_pResources;
@@ -219,23 +219,29 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     // Setup universe
     using namespace osp::universe;
 
+    constexpr int planetCount       = 64;
+    constexpr int c_seed            = 1337;
+    constexpr spaceint_t c_maxDist  = 20000ul << 10;
+    constexpr float c_maxVel        = 800.0f;
+
     Universe &rUni = rScnTest.m_universe;
-    using Corrade::Containers::Array;
 
-
-    rScnTest.m_space = rUni.m_coordIds.create();
+    // Create Coordinate Spaces
+    rScnTest.m_mainSpace = rUni.m_coordIds.create();
+    rScnTest.m_mainSatLanded.resize(planetCount);
+    rUni.m_coordIds.create(std::begin(rScnTest.m_mainSatLanded), std::end(rScnTest.m_mainSatLanded));
     rUni.m_coordCommon.resize(rUni.m_coordIds.capacity());
-    CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_space)];
 
-    rMainSpace.m_satCount = 64;
-    rMainSpace.m_satCapacity = 64;
-    std::size_t const dataSize = (sizeof(float) * 3 + sizeof(spaceint_t) * 3) * rMainSpace.m_satCapacity;
+    // Setup Main coordinate space
+    CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_mainSpace)];
+    rMainSpace.m_satCount = planetCount;
+    rMainSpace.m_satCapacity = planetCount;
 
     // TODO: alignment. also see Corrade alignedAlloc
+    std::size_t const dataSize = (sizeof(float) * 3 + sizeof(spaceint_t) * 3) * rMainSpace.m_satCapacity;
     rMainSpace.m_data = Array<unsigned char>{dataSize};
 
     // Arrange position and velocity in XXXXX... YYYYY... ZZZZZ...
-
     std::size_t const posStart = 0;
     std::size_t const posComp = sizeof(spaceint_t) * rMainSpace.m_satCapacity;
     rMainSpace.m_satPositions = {
@@ -252,28 +258,32 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
                       velStart + velComp * 2},
         .m_stride  = sizeof(float) };
 
-    auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
-    auto const [vx, vy, vz] = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, rMainSpace.m_satCount);
-
-    constexpr int c_seed            = 1337;
-    constexpr spaceint_t c_maxDist  = 20000ul << 10;
-    constexpr float c_maxVel        = 800.0f;
+    auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, planetCount);
+    auto const [vx, vy, vz] = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, planetCount);
 
     std::mt19937 gen(c_seed);
     std::uniform_int_distribution<spaceint_t> posDist(-c_maxDist, c_maxDist);
     std::uniform_real_distribution<float> velDist(-c_maxVel, c_maxVel);
 
-
-    for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+    for (std::size_t i = 0; i < planetCount; ++i)
     {
+        // Assign each planet random ositions and velocities
         x[i] = posDist(gen);
         y[i] = posDist(gen);
         z[i] = posDist(gen);
         vx[i] = velDist(gen);
         vy[i] = velDist(gen);
         vz[i] = velDist(gen);
+
+        // Setup Landed coordinate space for this planet
+        CoSpaceId const id = rScnTest.m_mainSatLanded[i];
+        CoSpaceCommon &rLanded = rUni.m_coordCommon[std::size_t(id)];
+        rLanded.m_parent = rScnTest.m_mainSpace;
+        rLanded.m_parentSat = SatId(i);
     }
 
+    rScnTest.m_areaSpace.m_parent = rScnTest.m_mainSpace;
+    rScnTest.m_areaSpace.m_position = Vector3g{400, 400, 400} * 1024;
 }
 
 static void update_test_scene_delete(CommonTestScene &rScene)
@@ -362,11 +372,6 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     // Delete entities in m_delete, their descendants, and components
     update_test_scene_delete(rScene);
 
-    // Note: Prefer creating entities near the end of the update after physics
-    //       and delete systems. This allows their initial state to be rendered
-    //       in a frame and avoids some possible synchronization issues from
-    //       when entities are created and deleted right away.
-
     // Shape Thrower system, consumes rScene.m_toThrow and creates shapes
     for (UniverseTestData::ThrowShape const &rThrow : std::exchange(rScnTest.m_toThrow, {}))
     {
@@ -391,15 +396,17 @@ static void update_universe(CommonTestScene& rScene, float delta)
     using Magnum::Math::sqrt;
 
     auto &rScnTest = rScene.get<UniverseTestData>();
+    auto &rScnPhys = rScene.get<PhysicsData>();
     Universe &rUni = rScnTest.m_universe;
-    CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_space)];
-
-    // Phase 1: Move satellites
-    auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
-    auto const [vx, vy, vz] = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, rMainSpace.m_satCount);
+    CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_mainSpace)];
 
     float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
     float const scaleDelta = delta / scale;
+
+    auto const [x, y, z]    = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+    auto const [vx, vy, vz] = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, rMainSpace.m_satCount);
+
+    // Phase 1: Move satellites
 
     for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
     {
@@ -408,7 +415,6 @@ static void update_universe(CommonTestScene& rScene, float delta)
         z[i] += vz[i] * scaleDelta;
 
         // Apply arbitrary inverse-square gravity towards origin
-
         Vector3 const pos       = Vector3( Vector3g( x[i], y[i], z[i] ) ) * scale;
         float const r           = pos.length();
         float const c_gm        = 10000000000.0f;
@@ -419,6 +425,70 @@ static void update_universe(CommonTestScene& rScene, float delta)
         vz[i] += accel.z();
     }
 
+    // Phase 2: Transfers and stuff
+
+    constexpr float captureDist = 500.0f;
+
+    CoSpaceCommon &rAreaSpace = rScnTest.m_areaSpace;
+
+    Vector3g const areaPos = rAreaSpace.m_position + rScnTest.m_areaCenter;
+    if (rAreaSpace.m_parent == rScnTest.m_mainSpace)
+    {
+        // Not captured within planet, search for nearby planet
+        std::size_t nearbyPlanet = lgrn::id_null<std::size_t>();
+        for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+        {
+            Vector3 const diff = (Vector3( x[i], y[i], z[i] ) - Vector3(areaPos)) * scale;
+            if (diff.length() < captureDist)
+            {
+                nearbyPlanet = i;
+                break;
+            }
+        }
+
+        if (nearbyPlanet != lgrn::id_null<std::size_t>())
+        {
+            OSP_LOG_INFO("Captured into Satellite {} under CoordSpace {}",
+                         nearbyPlanet, int(rScnTest.m_mainSatLanded[nearbyPlanet]));
+
+            CoSpaceId const landedId = rScnTest.m_mainSatLanded[nearbyPlanet];
+            CoSpaceCommon &rLanded = rUni.m_coordCommon[std::size_t(landedId)];
+
+            assert(rLanded.m_parentSat != lgrn::id_null<SatId>());
+            CoSpaceTransform const landedTf{
+                .m_position = to_vec<Vector3g>(rLanded.m_parentSat, x, y, z)
+            };
+
+            CoordTransformer const mainToLanded = coord_parent_to_child(rMainSpace, landedTf);
+
+            // do the transfer
+            rAreaSpace.m_parent = landedId;
+            rAreaSpace.m_position = mainToLanded.transform_position(rAreaSpace.m_position);
+        }
+    }
+    else
+    {
+        // Currently within planet, try to escape planet
+        Vector3 const diff = Vector3(areaPos) * scale;
+        if (diff.length() > captureDist)
+        {
+            OSP_LOG_INFO("Leaving planet");
+
+            CoSpaceId const landedId = rScnTest.m_areaSpace.m_parent;
+            CoSpaceCommon &rLanded = rUni.m_coordCommon[std::size_t(landedId)];
+
+            assert(rLanded.m_parentSat != lgrn::id_null<SatId>());
+            CoSpaceTransform const landedTf{
+                .m_position = to_vec<Vector3g>(rLanded.m_parentSat, x, y, z)
+            };
+
+            CoordTransformer const landedToMain = coord_child_to_parent(rMainSpace, landedTf);
+
+            // do the transfer
+            rAreaSpace.m_parent = rScnTest.m_mainSpace;
+            rAreaSpace.m_position = landedToMain.transform_position(rAreaSpace.m_position);
+        }
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -489,6 +559,10 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
                 rControls.m_camCtrl,
                 rScene.m_basic.m_transform.get(rRenderer.m_camera),
                 delta, true);
+        rScnTest.m_areaCenter = osp::universe::Vector3g(
+                osp::math::mul_2pow<Vector3, int>(
+                    rControls.m_camCtrl.m_target.value(),
+                    rScnTest.m_areaSpace.m_precision));
 
         rRenderer.update_delete(rScene.m_deleteTotal);
         rRenderer.sync(rApp, rScene);
@@ -497,11 +571,16 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
 
         using Magnum::GL::Mesh;
 
-        RenderGL &rRenderGl         = rApp.get_render_gl();
-        MeshId const meshId         = rScnPhys.m_shapeToMesh.at(EShape::Box);
-        osp::ResId const meshRes    = rScene.m_drawingRes.m_meshToRes.at(meshId);
-        MeshGlId const meshGlId     = rRenderGl.m_resToMesh.at(meshRes);
-        Mesh &rMeshGl               = rRenderGl.m_meshGl.get(meshGlId);
+        RenderGL &rRenderGl = rApp.get_render_gl();
+        auto const mesh_from_id = [&rScnPhys, &rScene, &rRenderGl] (MeshId const meshId) -> Mesh&
+        {
+            osp::ResId const meshRes    = rScene.m_drawingRes.m_meshToRes.at(meshId);
+            MeshGlId const meshGlId     = rRenderGl.m_resToMesh.at(meshRes);
+            return rRenderGl.m_meshGl.get(meshGlId);
+        };
+
+        Mesh &rBox      = mesh_from_id(rScnPhys.m_shapeToMesh.at(EShape::Box));
+        Mesh &rSphere   = mesh_from_id(rScnPhys.m_shapeToMesh.at(EShape::Sphere));
 
         ACompCamera const &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
         ACompDrawTransform const &cameraDrawTf
@@ -511,22 +590,72 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
                 rCamera.calculate_projection()};
 
         auto &rShader = rRenderer.m_phong.m_shaderUntextured;
+
+        // Cursor
         rShader.setDiffuseColor(0xFFFFFF_rgbf)
+               .setNormalMatrix(Matrix3{})
                .setTransformationMatrix(viewProj.m_view * Matrix4::translation(rControls.m_camCtrl.m_target.value()))
                .setProjectionMatrix(viewProj.m_proj)
-               .draw(rMeshGl);
+               .draw(rBox);
+
+        // Origin indicator
+        rShader.setDiffuseColor(0xFF0000_rgbf)
+               .setTransformationMatrix(viewProj.m_view * Matrix4::scaling({400, 10, 10}))
+               .draw(rBox);
+        rShader.setDiffuseColor(0x00FF00_rgbf)
+               .setTransformationMatrix(viewProj.m_view * Matrix4::scaling({10, 400, 10}))
+               .draw(rBox);
+        rShader.setDiffuseColor(0x0000FF_rgbf)
+               .setTransformationMatrix(viewProj.m_view * Matrix4::scaling({10, 10, 400}))
+               .draw(rBox);
 
         using namespace osp::universe;
         Universe &rUni = rScnTest.m_universe;
-        CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_space)];
+        CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_mainSpace)];
         auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
 
+        // Calculate transform from universe to area/local-space for rendering
+        // This can be generalized by finding a common ancestor within the tree
+        // of coordinate spaces. Since there's only two possibilities, an if
+        // statement works.
+        CoordTransformer mainToArea;
+        if (rScnTest.m_areaSpace.m_parent == rScnTest.m_mainSpace)
+        {
+            mainToArea = coord_parent_to_child(rMainSpace, rScnTest.m_areaSpace);
+        }
+        else
+        {
+            CoSpaceId const landedId = rScnTest.m_areaSpace.m_parent;
+            CoSpaceCommon &rLanded = rUni.m_coordCommon[std::size_t(landedId)];
+
+            assert(rLanded.m_parentSat != lgrn::id_null<SatId>());
+            CoSpaceTransform const landedTf{
+                .m_position = to_vec<Vector3g>(rLanded.m_parentSat, x, y, z)
+            };
+            CoordTransformer const mainToLanded = coord_parent_to_child(rMainSpace, landedTf);
+            CoordTransformer const landedToArea = coord_parent_to_child(landedTf, rScnTest.m_areaSpace);
+
+            mainToArea = coord_composite(landedToArea, mainToLanded);
+        }
+
+        float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
+
+        // Draw planets
+        rShader.setDiffuseColor(0xFFFFFF_rgbf);
         for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
         {
-            float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
-            rShader.setTransformationMatrix(viewProj.m_view * Matrix4::translation( {x[i] * scale, y[i] * scale, z[i] * scale} ) * Matrix4::scaling({200, 200, 200}) )
-                   .draw(rMeshGl);
+            Vector3g const relative = mainToArea.transform_position({x[i], y[i], z[i]});
+            Vector3 const relativeMeters = Vector3(relative) * scale;
+
+            rShader.setTransformationMatrix(viewProj.m_view * Matrix4::translation(relativeMeters) * Matrix4::scaling({200, 200, 200}) )
+                   .draw(rSphere);
         }
+
+        // Draw black hole
+        Vector3 const blackHolePos = Vector3(mainToArea.transform_position({})) * scale;
+        rShader.setDiffuseColor(0x000000_rgbf)
+               .setTransformationMatrix(viewProj.m_view * Matrix4::translation(blackHolePos) * Matrix4::scaling({200, 200, 200}) )
+               .draw(rSphere);
 
         rRenderer.display(rApp);
     };
