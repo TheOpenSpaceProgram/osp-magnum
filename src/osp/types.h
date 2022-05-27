@@ -55,7 +55,8 @@ using Vector4    = Magnum::Math::Vector4<Magnum::Float>;
 
 using Vector3d   = Magnum::Math::Vector3<Magnum::Double>;
 
-using Quaternion = Magnum::Math::Quaternion<Magnum::Float>;
+using Quaternion    = Magnum::Math::Quaternion<Magnum::Float>;
+using Quaterniond   = Magnum::Math::Quaternion<Magnum::Double>;
 
 using Rad        = Magnum::Math::Rad<Magnum::Float>;
 using Deg        = Magnum::Math::Deg<Magnum::Float>;
