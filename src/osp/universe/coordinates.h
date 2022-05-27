@@ -31,6 +31,18 @@
 namespace osp::universe
 {
 
+inline Vector3g rotate_vector3g(Vector3g const in, Quaterniond const rot) noexcept
+{
+    return Vector3g(rot.transformVector(Vector3d(in)));
+}
+
+constexpr bool quat_non_zero(Quaterniond const in) noexcept
+{
+    // scalar = cos(angle / 2); no angle means scalar = 1
+    return in.scalar() != 1.0;
+}
+
+
 /**
  * @brief Describes a mathematical function used to transform positions between
  *        coordinate spaces
@@ -73,26 +85,50 @@ namespace osp::universe
  * variable; however, keeping them separate is less susceptible to overflow
  * errors. This allows flawless transforms across intermediate coordinate
  * spaces of varrying precisions.
+ *
+ * Rotations add a bit more complexity. The two main parent-child operations
+ * apply rotations in different areas, outer rotation R
+ *
+ * P->C(x) = rotate-1(2^(precDiff) * (x - childPos))
+ * C->P(x) = 2^(-precDiff) * rotate(x) + childPos
+ *
+ * Converting between forms will require multiplying c, which ruins precision
+ * at large ranges. The common form can instead feature both inner and outer
+ * rotations. Denoted R for outer, and r for inner:
+ *
+ * f(x) = R(r(x)*2^n + c*2^m)
  */
 struct CoordTransformer
 {
-    Quaterniond     m_rotate;
+    Quaterniond     m_rotOut;
+    Quaterniond     m_rotIn;
     Vector3g        m_c;
-    int             m_n;
-    int             m_m;
+    int             m_n{0};
+    int             m_m{0};
 
     Vector3g transform_position(Vector3g in) const noexcept
     {
-        // TODO: rotation
-
         using osp::math::mul_2pow;
-        return mul_2pow<Vector3g, spaceint_t>(in, m_n)
-                + mul_2pow<Vector3g, spaceint_t>(Vector3g(m_c), m_m);
+
+        if (quat_non_zero(m_rotIn))
+        {
+            in = rotate_vector3g(in, m_rotIn);
+        }
+
+        Vector3g out = mul_2pow<Vector3g, spaceint_t>(in, m_n)
+                     + mul_2pow<Vector3g, spaceint_t>(Vector3g(m_c), m_m);
+
+        if (quat_non_zero(m_rotOut))
+        {
+            out = rotate_vector3g(out, m_rotOut);
+        }
+
+        return out;
     }
 
     constexpr bool is_identity() const noexcept
     {
-        return m_n == 0 && m_c.isZero();
+        return (m_n == 0) && m_c.isZero();
     }
 };
 
@@ -147,6 +183,31 @@ struct CoordTransformer
  *
  * All variables are now known: h(x)  =  x * 2^n3  +  c3 * 2^m3
  *
+ *
+ * Accounting for rotations is a bit messier:
+ *
+ * f3(x)  =  R1[ r1( R2[ r2(x) * 2^n2 + c2 * 2^m2] ) * 2^n1 + c1 * 2^m1  ]
+ *
+ * Rotate functions are linear maps, with additivity and homogeneity:
+ *  * f(U + V) = f(U) + f(V)
+ *  * f(aU) = af(U)
+ * Steps are similar to without rotations, so skipping over...
+ *
+ * f3(x)  =  R1[ r1(R2[r2(x)]) * 2^n3  +  r1(R2[c2]) * 2^(m2+n1)  +  c1 * 2^m1 ]
+ *
+ * To combine c1 and c2 terms, 2^ terms are dealt with previously (m3), but now
+ * rotations must also match.
+ *
+ * Either rotate c2 by r1(R2[x]):
+ * f3(x)  =  R1[   r1(R2[r2(x)]) * 2^n3   +   (r1(R2[c2]) + c1) * 2^m3   ]
+ *           R3(x) = R1(x);      r3(x) = r1(R2[x])   c3 = (r1(R2[c2]) + c1)
+ *
+ * Or rotate all terms by inverse of r1(R2[x]):
+ * f3(x)  =  R1[r1(R2[     r2(x) * 2^n3   +  (c2 + R2(r1-1[c2])) * 2^m3     ])]
+ *           R3 = R1[r1(R2[x])]  r3(x) = r2(x)       c3 = (c2 + R2-1(r1-1[c1]))
+ *
+ * If r1(R2[x]) is an identity function, just ignore it.
+ *
  * @param f1 [in] Outer function to composite
  * @param f2 [in] Inner function to composite
  *
@@ -155,30 +216,60 @@ struct CoordTransformer
 inline CoordTransformer coord_composite(
         CoordTransformer const& f1, CoordTransformer const& f2) noexcept
 {
-    Vector3g c3;
+    Vector3g c1;
+    Vector3g c2;
     int m3;
 
     int const d = f2.m_m + f1.m_n - f1.m_m;
 
     if (d == 0)
     {
-        c3 = f2.m_c + f1.m_c;
+        c1 = f1.m_c;
+        c2 = f2.m_c;
         m3 = f1.m_m;
     }
     else if (d > 0)
     {
-        c3 = f2.m_c * math::int_2pow<spaceint_t>(d) + f1.m_c;
+        c1 = f1.m_c;
+        c2 = f2.m_c * math::int_2pow<spaceint_t>(d);
         m3 = f1.m_m;
     }
     else // if (d < 0)
     {
-        c3 = f2.m_c + f1.m_c * math::int_2pow<spaceint_t>(-d);
+        c1 = f1.m_c * math::int_2pow<spaceint_t>(-d);
+        c2 = f2.m_c;
         m3 = f2.m_m + f1.m_n;
     }
 
+    Quaterniond const in1Out2 = f1.m_rotIn * f2.m_rotOut;
+    Quaterniond out3;
+    Quaterniond in3;
+
+    if (quat_non_zero(in1Out2))
+    {
+        if (c1 > c2)
+        {
+            c2 = rotate_vector3g(c2, in1Out2);
+            out3 = f1.m_rotOut;
+            in3 = in1Out2 * f2.m_rotIn;
+        }
+        else
+        {
+            c1 = rotate_vector3g(c1, in1Out2.inverted());
+            out3 = f1.m_rotOut * in1Out2;
+            in3 = f2.m_rotIn;
+        }
+    }
+    else
+    {
+        out3 = f1.m_rotOut;
+        in3 = f2.m_rotIn;
+    }
+
     return {
-        .m_rotate   = f2.m_rotate * f1.m_rotate,
-        .m_c        = c3,
+        .m_rotOut   = out3,
+        .m_rotIn    = in3,
+        .m_c        = c1 + c2,
         .m_n        = f1.m_n + f2.m_n,
         .m_m        = m3
     };
@@ -188,8 +279,9 @@ inline CoordTransformer coord_parent_to_child(
         CoSpaceTransform const& parent, CoSpaceTransform const& child) noexcept
 {
     int const precisionDiff = child.m_precision - parent.m_precision;
+
     return {
-        .m_rotate   = child.m_rotation.inverted(),
+        .m_rotOut   = child.m_rotation.inverted(),
         .m_c        = -child.m_position,
         .m_n        = precisionDiff,
         .m_m        = precisionDiff
@@ -200,8 +292,9 @@ inline CoordTransformer coord_child_to_parent(
         CoSpaceTransform const& parent, CoSpaceTransform const& child) noexcept
 {
     int const precisionDiff = child.m_precision - parent.m_precision;
+
     return {
-        .m_rotate   = child.m_rotation,
+        .m_rotIn    = child.m_rotation,
         .m_c        = child.m_position,
         .m_n        = -precisionDiff,
         .m_m        = 0

@@ -28,11 +28,16 @@
 
 #include <Magnum/Math/Functions.h>
 
-
 #include <gtest/gtest.h>
 
-
+using namespace osp;
 using namespace osp::universe;
+
+using osp::math::int_2pow;
+using osp::math::mul_2pow;
+
+// for the 0xrrggbb_rgbf and angle literals
+using namespace Magnum::Math::Literals;
 
 constexpr Vector3g const gc_v3gZero{0, 0, 0};
 
@@ -53,7 +58,6 @@ static void expect_near_vec(Vector3g a, Vector3g b, spaceint_t maxError)
 
 static Vector3g change_precision(Vector3g in, int precFrom, int precTo)
 {
-    using osp::math::mul_2pow;
     return mul_2pow<Vector3g, spaceint_t>(in, precTo - precFrom);
 }
 
@@ -62,24 +66,29 @@ static Vector3g change_precision(Vector3g in, int precFrom, int precTo)
  */
 static void expect_inverse(CoordTransformer const& a, CoordTransformer const& b)
 {
-    EXPECT_TRUE(coord_composite(a, b).is_identity());
-    EXPECT_TRUE(coord_composite(b, a).is_identity());
+    CoordTransformer const c = coord_composite(a, b);
+    CoordTransformer const d = coord_composite(b, a);
+    EXPECT_TRUE(c.is_identity());
+    EXPECT_TRUE(d.is_identity());
 }
+
 
 // Test transforming positions between coordinate spaces using CoordTransformer
 TEST(Universe, CoordTransformer)
 {
     // Example solar system, similar scale to real life Sun-Earth-Moon
-    CoSpaceTransform sun{
+    CoSpaceTransform sun
+    {
         .m_precision = 10 // 2^10 units = 1 meter
     };
-    CoSpaceTransform planet{
-        .m_position  = {sci64(150, 9, 10), sci64(42, 0, 10), sci64(150, 9, 10)},
+    CoSpaceTransform planet
+    {
+        .m_position  = {sci64(150, 9, 10), sci64(150, 9, 10), sci64(42, 0, 10) },
         .m_precision = 12 // 2^12 units = 1 meter
     };
     CoSpaceTransform moon
     {
-        .m_position  = {sci64(280, 6, 12), sci64(69, 0, 12), sci64(280, 6, 12)},
+        .m_position  = {sci64(280, 6, 12), sci64(280, 6, 12), sci64(69, 3, 12) },
         .m_precision = 15 // 2^15 units = 1 meter
     };
     // Moon is parented to Planet, Planet is parented to Sun.
@@ -87,12 +96,12 @@ TEST(Universe, CoordTransformer)
     // coord_child_to_parent, which don't care about m_parent
 
     // Point 100000m above planet in 3 different coordinate spaces
-    Vector3g const abovePlanetPlanet = {0, sci64(100, 3, 12), 0};
+    Vector3g const abovePlanetPlanet = {0, 0, sci64(100, 3, 12)};
     Vector3g const abovePlanetSun    = planet.m_position + change_precision(abovePlanetPlanet, 12, 10);
     Vector3g const abovePlanetMoon   = change_precision(-moon.m_position, 12, 15) + change_precision(abovePlanetPlanet, 12, 15);
 
     // Point 100000m above moon in 3 different coordinate spaces
-    Vector3g const aboveMoonMoon   = {0, sci64(100, 3, 15), 0};
+    Vector3g const aboveMoonMoon   = {0, 0, sci64(100, 3, 15)};
     Vector3g const aboveMoonPlanet = moon.m_position   + change_precision(aboveMoonMoon,   15, 12);
     Vector3g const aboveMoonSun    = planet.m_position + change_precision(aboveMoonPlanet, 12, 10);
 
@@ -127,6 +136,73 @@ TEST(Universe, CoordTransformer)
     EXPECT_EQ(moonToPlanet.transform_position(aboveMoonMoon), aboveMoonPlanet);
     EXPECT_EQ(sunToMoon.transform_position(aboveMoonSun), aboveMoonMoon);
     EXPECT_EQ(moonToSun.transform_position(aboveMoonMoon), aboveMoonSun);
-
-    // TODO: rotation
 }
+
+// Test CoordTransformer with rotated coordinate spaces
+TEST(Universe, CoordTransformerRotations)
+{
+    CoSpaceTransform sun
+    {
+        .m_precision = 10 // 2^10 units = 1 meter
+    };
+    CoSpaceTransform planet
+    {
+        .m_rotation = Quaterniond::rotation(90.0_deg, {0.0f, 0.0f, 1.0f}),
+        .m_position  = {sci64(150, 9, 10), sci64(150, 9, 10), sci64(42, 0, 10)},
+        .m_precision = 13 // 2^10 units = 1 meter
+    };
+    CoSpaceTransform moon
+    {
+        .m_position  = {sci64(160, 9, 10), sci64(170, 9, 10), sci64(69, 3, 10)},
+        .m_precision = 15 // 2^10 units = 1 meter
+    };
+    // Planet and Moon are parented to Sun. Different from previous test!!!
+
+    // Moon's X points at the planet (like a tidal lock)
+    Vector3d const diff = Vector3d(planet.m_position - moon.m_position) / int_2pow<int>(10);
+    Vector3d const forward{1.0, 0.0, 0.0};
+    auto ang  = Magnum::Math::angle(diff.normalized(), forward);
+    auto axis = Magnum::Math::cross(forward, diff.normalized()).normalized();
+    moon.m_rotation = Quaterniond::rotation(ang, axis);
+
+    // Point +X of planet. due to 90deg CCW rotation, sun-space sees +Y
+    Vector3g const aheadPlanetPlanet = {sci64(200, 3, 13), 0, 0};
+    Vector3g const aheadPlanetSun    = planet.m_position + Vector3g{0, sci64(200, 3, 10), 0};
+
+    CoordTransformer const sunToPlanet  = coord_parent_to_child(sun, planet);
+    CoordTransformer const planetToSun  = coord_child_to_parent(sun, planet);
+    CoordTransformer const sunToMoon    = coord_parent_to_child(sun, moon);
+    CoordTransformer const moonToSun    = coord_child_to_parent(sun, moon);
+    CoordTransformer const planetToMoon = coord_composite(sunToMoon, planetToSun);
+    CoordTransformer const moonToPlanet = coord_composite(sunToPlanet, moonToSun);
+
+    expect_inverse(sunToPlanet,     planetToSun);
+    expect_inverse(sunToMoon,       moonToSun);
+    expect_inverse(planetToMoon,    moonToPlanet);
+
+    // Confirm point ahead of planet is properly rotated
+    EXPECT_EQ(planetToSun.transform_position(aheadPlanetPlanet), aheadPlanetSun);
+    EXPECT_EQ(sunToPlanet.transform_position(aheadPlanetSun), aheadPlanetPlanet);
+
+    // Confirm distance between planet and moon are consistent
+    double const dist           = diff.length();
+    double const distSunPlanet  = Vector3d(sunToPlanet.transform_position(moon.m_position)).length() / int_2pow<int>(13);
+    double const distSunMoon    = Vector3d(sunToMoon.transform_position(planet.m_position)).length() / int_2pow<int>(15);
+    double const distMoonPlanet = Vector3d(moonToPlanet.transform_position({})).length() / int_2pow<int>(13);
+    double const distPlanetMoon = Vector3d(planetToMoon.transform_position({})).length() / int_2pow<int>(15);
+
+    EXPECT_NEAR(dist, distSunPlanet,  0.1f);
+    EXPECT_NEAR(dist, distSunMoon,    0.1f);
+    EXPECT_NEAR(dist, distPlanetMoon, 0.1f);
+    EXPECT_NEAR(dist, distMoonPlanet, 0.1f);
+
+    // Moon's +X points directly at the planet. Expect X coordinate = distance
+    EXPECT_NEAR(dist, double(planetToMoon.transform_position({}).x()) / int_2pow<int>(15), 0.1f);
+
+    // Expect (dist) meters +X of moon to be the Planet's position
+    Vector3g const moonRay{spaceint_t(dist * int_2pow<int>(15)), 0, 0};
+    expect_near_vec(moonToPlanet.transform_position(moonRay), {}, 4);
+    expect_near_vec(moonToSun.transform_position(moonRay), planet.m_position, 4);
+}
+
+// TODO: Test CoordTransformer for hopping across nested rotated coordinate spaces
