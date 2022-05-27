@@ -87,7 +87,7 @@ constexpr bool quat_non_zero(Quaterniond const in) noexcept
  * spaces of varrying precisions.
  *
  * Rotations add a bit more complexity. The two main parent-child operations
- * apply rotations in different areas, outer rotation R
+ * apply rotations in different places:
  *
  * P->C(x) = rotate-1(2^(precDiff) * (x - childPos))
  * C->P(x) = 2^(-precDiff) * rotate(x) + childPos
@@ -96,7 +96,7 @@ constexpr bool quat_non_zero(Quaterniond const in) noexcept
  * at large ranges. The common form can instead feature both inner and outer
  * rotations. Denoted R for outer, and r for inner:
  *
- * f(x) = R(r(x)*2^n + c*2^m)
+ * f(x) = R( r(x)*2^n + c*2^m )
  */
 struct CoordTransformer
 {
