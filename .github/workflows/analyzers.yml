@@ -41,7 +41,7 @@ jobs:
     - name: Compile Dependencies
       if: ${{ matrix.tool == 'CodeQL' }}
       run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps test-deps
+        cmake --build build --parallel --config ${{ matrix.config }} --target compile-osp-magnum-deps compile-test-deps
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
@@ -57,7 +57,7 @@ jobs:
     - name: Compile for CodeQL
       if: ${{ matrix.tool == 'CodeQL' }}
       run: |
-        cmake --build build --parallel --target osp-magnum
+        cmake --build build --parallel --target osp-magnum compile-tests
 
     # Unlike clang-analyzer and include-what-you-use, CodeQL can't operate on just the config step. Need to actually build everything.
     - name: Perform CodeQL Analysis

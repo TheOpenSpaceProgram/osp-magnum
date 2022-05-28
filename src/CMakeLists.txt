@@ -38,10 +38,14 @@ find_package(MagnumPlugins REQUIRED
     TinyGltfImporter
     StbImageImporter)
 
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads)
+if(NOT Threads_FOUND)
+    message(FATAL_ERROR "Can't find a thread library to use!")
+endif()
 
-add_library(osp-magnum-deps STATIC)
-target_sources(osp-magnum-deps PRIVATE static_library_dummy_file.cpp)
+add_library(osp-magnum-deps INTERFACE)
+add_custom_target(compile-osp-magnum-deps)
 
 # Include Newton Dynamics to the project
 
@@ -50,64 +54,68 @@ target_sources(osp-magnum-deps PRIVATE static_library_dummy_file.cpp)
 #       This section was based on Newton Dynamic's CMakeLists.txt
 if(UNIX)
     if (BUILD_64)
-        target_compile_definitions(osp-magnum-deps PUBLIC -D_POSIX_VER_64)
+        target_compile_definitions(osp-magnum-deps INTERFACE -D_POSIX_VER_64)
     else (BUILD_64)
-        target_compile_definitions(osp-magnum-deps PUBLIC -D_POSIX_VER)
+        target_compile_definitions(osp-magnum-deps INTERFACE -D_POSIX_VER)
     endif (BUILD_64)
 
 elseif(MSVC)
     if(WIN32)
         if(CMAKE_CL_64)
-            target_compile_definitions(osp-magnum-deps PUBLIC -D_WIN_64_VER)
+            target_compile_definitions(osp-magnum-deps INTERFACE -D_WIN_64_VER)
         else()
-            target_compile_definitions(osp-magnum-deps PUBLIC -D_WIN_32_VER)
+            target_compile_definitions(osp-magnum-deps INTERFACE -D_WIN_32_VER)
         endif()
     else()
-        target_compile_definitions(osp-magnum-deps PUBLIC -D_ARM_VER)
+        target_compile_definitions(osp-magnum-deps INTERFACE -D_ARM_VER)
     endif()
 
 elseif(MINGW)
     if(CMAKE_CL_64)
-        target_compile_definitions(osp-magnum-deps PUBLIC -D_MINGW_64_VER)
-        target_compile_definitions(osp-magnum-deps PUBLIC -D_WIN_64_VER)
+        target_compile_definitions(osp-magnum-deps INTERFACE -D_MINGW_64_VER)
+        target_compile_definitions(osp-magnum-deps INTERFACE -D_WIN_64_VER)
     else()
-        target_compile_definitions(osp-magnum-deps PUBLIC -D_MINGW_32_VER)
-        target_compile_definitions(osp-magnum-deps PUBLIC -D_WIN_32_VER)
+        target_compile_definitions(osp-magnum-deps INTERFACE -D_MINGW_32_VER)
+        target_compile_definitions(osp-magnum-deps INTERFACE -D_WIN_32_VER)
     endif()
-
 endif()
 
-target_link_libraries(osp-magnum-deps PUBLIC
-    ${CMAKE_THREAD_LIBS_INIT}
-    EnTT::EnTT
-    Corrade::Main
-    Magnum::Application
-    Magnum::GL
-    Magnum::Magnum
-    Magnum::MeshTools
-    Magnum::Primitives
-    #Magnum::SceneGraph
-    Magnum::Shaders
-    Magnum::Trade
-    Magnum::AnyImageImporter
-    MagnumPlugins::TinyGltfImporter
-    MagnumPlugins::StbImageImporter
-    dNewton dScene dModel dVehicle
-    toml11
-    spdlog
-    longeron
-)
+# TODO: This list shouldn't be required, but there appears to be a bug in cmake where
+# the add_custom_target() command, pointing to an INTERFACE dependency, doesn't
+# result in the dependencies of the interface building.
+# See: https://gitlab.kitware.com/cmake/cmake/-/issues/23569
+SET(OSP_MAGNUM_DEPS_LIBS
+            Threads::Threads
+            EnTT::EnTT
+            Corrade::Main
+            Magnum::Application
+            Magnum::GL
+            Magnum::Magnum
+            Magnum::MeshTools
+            Magnum::Primitives
+            #Magnum::SceneGraph
+            Magnum::Shaders
+            Magnum::Trade
+            Magnum::AnyImageImporter
+            MagnumPlugins::TinyGltfImporter
+            MagnumPlugins::StbImageImporter
+            dNewton dScene dModel dVehicle
+            toml11
+            spdlog
+            longeron)
+target_link_libraries(osp-magnum-deps INTERFACE ${OSP_MAGNUM_DEPS_LIBS})
+add_dependencies(compile-osp-magnum-deps ${OSP_MAGNUM_DEPS_LIBS})
 
 add_executable(osp-magnum)
 
-target_include_directories(osp-magnum PRIVATE .)
+target_include_directories(osp-magnum PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Link it to the interface library that describes the dependencies
 target_link_libraries(osp-magnum PRIVATE osp-magnum-deps)
 
 # Gather paths to OSP headers and sources
-file (GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
-file (GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
+file(GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
+file(GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
 target_sources(osp-magnum PRIVATE "${CPP_FILES}" "${H_FILES}")
 
 # Add shaders to IDE project

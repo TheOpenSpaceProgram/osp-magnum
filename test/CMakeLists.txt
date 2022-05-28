@@ -26,31 +26,38 @@ include(ProcessorCount)
 ProcessorCount(MACHINE_PARALLEL_LEVEL)
 set(CMAKE_CTEST_ARGUMENTS --schedule-random --progress --output-on-failure --parallel=${MACHINE_PARLLEL_LEVEL} --no-tests error)
 
-ENABLE_TESTING()
-INCLUDE(GoogleTest)
+include(GoogleTest)
 
 # Target to force any dependencies of tests (aka google test) to be compiled
-ADD_CUSTOM_TARGET(test-deps DEPENDS gtest_main)
+add_library(test-deps INTERFACE)
+add_custom_target(compile-test-deps)
+
+set(TEST_DEPS_LIBRARIES gtest_main longeron EnTT::EnTT Magnum::Magnum)
+target_link_libraries(test-deps INTERFACE ${TEST_DEPS_LIBRARIES})
+add_dependencies(compile-test-deps ${TEST_DEPS_LIBRARIES})
 
 # Target to force the unit tests to be compiled without being executed
-ADD_CUSTOM_TARGET(compile-tests)
+add_custom_target(compile-tests)
 
 function(ADD_TEST_DIRECTORY NAME)
-    ADD_EXECUTABLE(${NAME} EXCLUDE_FROM_ALL)
-    ADD_DEPENDENCIES(compile-tests ${NAME})
+    add_executable(${NAME} EXCLUDE_FROM_ALL)
+    add_dependencies(compile-tests ${NAME})
 
-    FILE(GLOB H_FILES   CONFIGURE_DEPENDS "*.h")
-    FILE(GLOB CPP_FILES CONFIGURE_DEPENDS "*.cpp")
-    TARGET_SOURCES(${NAME} PRIVATE ${H_FILES} ${CPP_FILES})
+    file(GLOB H_FILES   CONFIGURE_DEPENDS "*.h")
+    file(GLOB CPP_FILES CONFIGURE_DEPENDS "*.cpp")
+    target_sources(${NAME} PRIVATE ${H_FILES} ${CPP_FILES})
 
-    TARGET_INCLUDE_DIRECTORIES(${NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/")
+    target_include_directories(${NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src/")
 
-    TARGET_LINK_LIBRARIES(${NAME} gtest_main)
-    SET_TARGET_PROPERTIES(${NAME} PROPERTIES EXPORT_COMPILE_COMMANDS TRUE)
+    target_link_libraries(${NAME} PRIVATE test-deps)
+    set_target_properties(${NAME} PROPERTIES EXPORT_COMPILE_COMMANDS TRUE)
 
-    GTEST_DISCOVER_TESTS(${NAME})
+    add_test(NAME ${NAME} COMMAND ${NAME})
 
-    ADD_TEST(NAME ${NAME} COMMAND ${NAME})
+    # Something is wrong with this function. It's executing prior to the program being compiled
+    # which causes it to say it can't execute the program. Which, I think we can all agree,
+    # is an obvious consequence...
+    #gtest_discover_tests(${NAME})
 endfunction()
 
 ADD_SUBDIRECTORY(resources)

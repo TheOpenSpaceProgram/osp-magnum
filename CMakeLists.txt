@@ -26,11 +26,11 @@
 # Set CMake minimum version and CMake policy
 CMAKE_MINIMUM_REQUIRED(VERSION 3.12.4)
 
-# Add the module search directory
-LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/modules/")
-
 # Enable link time optimization
 CMAKE_POLICY(SET CMP0069 NEW)
+
+# Add the module search directory
+LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/modules/")
 
 IF(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_SYSTEM_VERSION)
     MESSAGE("- CMAKE_SYSTEM_VERSION is not set. This setting controls which version of the Windows SDK to use. If it is not set, then OSP-MAGNUM will automatically select 10.0.18362.0.")
@@ -44,6 +44,9 @@ ENDIF()
 
 # Set project name
 PROJECT(OSP-MAGNUM CXX)
+
+# Setup things for the test subdir below
+enable_testing()
 
 OPTION(OSP_BUILD_SANATIZER          "Build with the address sanatizer" OFF)
 OPTION(OSP_WARNINGS_ARE_ERRORS      "Build with the flag -Werror" OFF)
@@ -65,25 +68,26 @@ SET(CMAKE_CXX_EXTENSIONS OFF)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # If the environment has these set, pull them into proper variables.
-SET(CLANG_COMPILE_FLAGS "${CLANG_COMPILE_FLAGS}")
-SET(GCC_COMPILE_FLAGS   "${GCC_COMPILE_FLAGS}")
+SET(CLANG_COMPILE_FLAGS ${CLANG_COMPILE_FLAGS})
+SET(GCC_COMPILE_FLAGS   ${GCC_COMPILE_FLAGS})
+
+# -fno-omit-frame-pointer significantly helps with debugging of the application if built with optimizations
+add_compile_options(-fno-omit-frame-pointer)
 
 # Compiler warnings can help find problems in code.
 IF(OSP_ENABLE_COMPILER_WARNINGS)
   # Enable additional warnings.
-  # -fno-omit-frame-pointer significantly helps with debugging of the application.
-  STRING(APPEND CMAKE_C_FLAGS   " -Wall -Wextra -fno-omit-frame-pointer")
-  STRING(APPEND CMAKE_CXX_FLAGS " -Wall -Wextra -fno-omit-frame-pointer")
+  add_compile_options(-Wall -Wextra)
 
   # These are hand selected warnings that are enabled by -Wextra that tend to be non-issues, so disable them explicitly for sake of avoiding build noise.
-  STRING(APPEND CLANG_COMPILE_FLAGS " -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-padded -Wno-undefined-func-template -Wno-unused-template")
-  STRING(APPEND CLANG_COMPILE_FLAGS " -Wno-deprecated -Wno-documentation -Wno-documentation-deprecated-sync -Wno-documentation-unknown-command -Wno-abstract-vbase-init")
-  STRING(APPEND CLANG_COMPILE_FLAGS " -Wno-switch-enum -Wno-covered-switch-default -Wno-missing-prototypes -Wno-sign-conversion -Wno-float-conversion -Wno-shorten-64-to-32")
-  STRING(APPEND CLANG_COMPILE_FLAGS " -Wno-shadow -Wno-shadow-field-in-constructor -Wshadow-uncaptured-local -Wno-inconsistent-missing-destructor-override")
-  STRING(APPEND CLANG_COMPILE_FLAGS " -Wno-global-constructors -Wno-exit-time-destructors  -Wno-weak-vtables -Wno-undef -Wno-disabled-macro-expansion")
+  LIST(APPEND CLANG_COMPILE_FLAGS -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-padded -Wno-undefined-func-template -Wno-unused-template)
+  LIST(APPEND CLANG_COMPILE_FLAGS -Wno-deprecated -Wno-documentation -Wno-documentation-deprecated-sync -Wno-documentation-unknown-command -Wno-abstract-vbase-init)
+  LIST(APPEND CLANG_COMPILE_FLAGS -Wno-switch-enum -Wno-covered-switch-default -Wno-missing-prototypes -Wno-sign-conversion -Wno-float-conversion -Wno-shorten-64-to-32)
+  LIST(APPEND CLANG_COMPILE_FLAGS -Wno-shadow -Wno-shadow-field-in-constructor -Wshadow-uncaptured-local -Wno-inconsistent-missing-destructor-override)
+  LIST(APPEND CLANG_COMPILE_FLAGS -Wno-global-constructors -Wno-exit-time-destructors  -Wno-weak-vtables -Wno-undef -Wno-disabled-macro-expansion)
 
   # This relatively rare warning can be emitted because of third party code, and is basically not our problem.
-  STRING(APPEND GCC_COMPILE_FLAGS " -Wno-psabi")
+  LIST(APPEND GCC_COMPILE_FLAGS -Wno-psabi)
 ENDIF() # OSP_ENABLE_COMPILER_EARNINGS
 
 # Set OSP as default startup project in Visual Studio
@@ -91,35 +95,34 @@ set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT OSP-MAGNU
 
 # Compiler warnings can help find problems in code.
 IF(OSP_WARNINGS_ARE_ERRORS)
-  STRING(APPEND CMAKE_C_FLAGS   " -Werror")
-  STRING(APPEND CMAKE_CXX_FLAGS " -Werror")
+  add_compile_options(-Werror)
 ENDIF() # OSP_WARNINGS_ARE_ERRORS
 
 # The sanatizers provide compile time code instrumentation that drastically improve the ability of programmars to find bugs.
 IF(OSP_BUILD_SANATIZER)
-  STRING(APPEND GCC_COMPILE_FLAGS " -fstack-protector-all -fsanitize=address,bounds,enum,leak,pointer-compare,pointer-subtract -fsanitize-address-use-after-scope")
+  LIST(APPEND GCC_COMPILE_FLAGS -fstack-protector-all -fsanitize=address,bounds,enum,leak,pointer-compare,pointer-subtract -fsanitize-address-use-after-scope)
 ENDIF() # OSP_BUILD_SANATIZER
 
-IF(CMAKE_C_COMPILER_ID MATCHES "Clang")
-  STRING(APPEND CMAKE_C_FLAGS " ${CLANG_COMPILE_FLAGS}")
+IF(CLANG_COMPILE_FLAGS AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+  add_compile_options($<$<COMPILE_LANGUAGE:C>:${CLANG_COMPILE_FLAGS}>)
 ENDIF()
-IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  STRING(APPEND CMAKE_CXX_FLAGS " ${CLANG_COMPILE_FLAGS}")
+IF(CLANG_COMPILE_FLAGS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${CLANG_COMPILE_FLAGS}>)
 ENDIF()
 
-IF(CMAKE_C_COMPILER_ID MATCHES "GNU")
-  STRING(APPEND CMAKE_C_FLAGS " ${GCC_COMPILE_FLAGS}")
+IF(GCC_COMPILE_FLAGS AND CMAKE_C_COMPILER_ID MATCHES "GNU")
+  add_compile_options($<$<COMPILE_LANGUAGE:C>:${GCC_COMPILE_FLAGS}>)
 ENDIF()
-IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  STRING(APPEND CMAKE_CXX_FLAGS " ${GCC_COMPILE_FLAGS}")
+IF(GCC_COMPILE_FLAGS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${GCC_COMPILE_FLAGS}>)
 ENDIF()
 
 # In debug builds, disable optimizations (just in case they were enabled by a previous flag, or env variable)
 # and mark the debug symbols to be compressed, which can be a huge saving in terms of file size.
 IF(MSVC)
 ELSE()
-  STRING(APPEND CMAKE_C_FLAGS_DEBUG   " -gz -O0")
-  STRING(APPEND CMAKE_CXX_FLAGS_DEBUG " -gz -O0")
+add_compile_options($<$<CONFIG:Debug>:-O0>)
+add_compile_options($<$<CONFIG:Debug>:-gz>)
 ENDIF()
 
 IF(CMAKE_BUILD_TYPE MATCHES "Debug")
