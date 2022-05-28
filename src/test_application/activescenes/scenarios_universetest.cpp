@@ -38,11 +38,8 @@
 #include <osp/universe/universe.h>
 #include <osp/universe/coordinates.h>
 
-
 #include <osp/Resource/resources.h>
-
 #include <osp/CommonMath.h>
-
 #include <osp/logging.h>
 
 #include <longeron/id_management/registry.hpp>
@@ -58,14 +55,16 @@
 
 using osp::active::ActiveEnt;
 using osp::active::active_sparse_set_t;
+using osp::active::MeshIdOwner_t;
 
 using osp::phys::EShape;
 
 using osp::Vector3;
+using osp::Vector3d;
+using osp::Quaternion;
+using osp::Quaterniond;
 using osp::Matrix3;
 using osp::Matrix4;
-
-using osp::active::MeshIdOwner_t;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -238,7 +237,7 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     rMainSpace.m_satCapacity = planetCount;
 
     // TODO: alignment. also see Corrade alignedAlloc
-    std::size_t const dataSize = (sizeof(float) * 3 + sizeof(spaceint_t) * 3) * rMainSpace.m_satCapacity;
+    std::size_t const dataSize = (sizeof(double) * (3 + 4) + sizeof(spaceint_t) * 3) * rMainSpace.m_satCapacity;
     rMainSpace.m_data = Array<unsigned char>{dataSize};
 
     // Arrange position and velocity in XXXXX... YYYYY... ZZZZZ...
@@ -250,20 +249,30 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
                       posStart + posComp * 2},
         .m_stride  = sizeof(spaceint_t) };
 
-    std::size_t const velStart = posComp * 3;
-    std::size_t const velComp = sizeof(float) * rMainSpace.m_satCapacity;
+    std::size_t const velStart = posStart + posComp * 3;
+    std::size_t const velComp = sizeof(double) * rMainSpace.m_satCapacity;
     rMainSpace.m_satVelocities = {
         .m_offsets = {velStart + velComp * 0,
                       velStart + velComp * 1,
                       velStart + velComp * 2},
-        .m_stride  = sizeof(float) };
+        .m_stride  = sizeof(double) };
 
-    auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, planetCount);
-    auto const [vx, vy, vz] = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, planetCount);
+    // Quaternion rotation as XYZW XYZW XYZW
+    std::size_t const rotStart = velStart + velComp * 3;
+    rMainSpace.m_satRotations = {
+        .m_offsets = {rotStart + sizeof(double) * 0,
+                      rotStart + sizeof(double) * 1,
+                      rotStart + sizeof(double) * 2,
+                      rotStart + sizeof(double) * 3},
+        .m_stride  = sizeof(double) * 4 };
+
+    auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, planetCount);
+    auto const [vx, vy, vz]     = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, planetCount);
+    auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, planetCount);
 
     std::mt19937 gen(c_seed);
     std::uniform_int_distribution<spaceint_t> posDist(-c_maxDist, c_maxDist);
-    std::uniform_real_distribution<float> velDist(-c_maxVel, c_maxVel);
+    std::uniform_real_distribution<double> velDist(-c_maxVel, c_maxVel);
 
     for (std::size_t i = 0; i < planetCount; ++i)
     {
@@ -274,6 +283,12 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
         vx[i] = velDist(gen);
         vy[i] = velDist(gen);
         vz[i] = velDist(gen);
+
+        // No rotation
+        qx[i] = 0.0;
+        qy[i] = 0.0;
+        qz[i] = 0.0;
+        qw[i] = 1.0;
 
         // Setup Landed coordinate space for this planet
         CoSpaceId const id = rScnTest.m_mainSatLanded[i];
@@ -390,10 +405,10 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     SysHierarchy::sort(rScene.m_basic.m_hierarchy);
 }
 
+
 static void update_universe(CommonTestScene& rScene, float delta)
 {
     using namespace osp::universe;
-    using Magnum::Math::sqrt;
 
     auto &rScnTest = rScene.get<UniverseTestData>();
     auto &rScnPhys = rScene.get<PhysicsData>();
@@ -403,8 +418,9 @@ static void update_universe(CommonTestScene& rScene, float delta)
     float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
     float const scaleDelta = delta / scale;
 
-    auto const [x, y, z]    = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
-    auto const [vx, vy, vz] = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, rMainSpace.m_satCount);
+    auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+    auto const [vx, vy, vz]     = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, rMainSpace.m_satCount);
+    auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
 
     // Phase 1: Move satellites
 
@@ -415,14 +431,25 @@ static void update_universe(CommonTestScene& rScene, float delta)
         z[i] += vz[i] * scaleDelta;
 
         // Apply arbitrary inverse-square gravity towards origin
-        Vector3 const pos       = Vector3( Vector3g( x[i], y[i], z[i] ) ) * scale;
+        Vector3d const pos       = Vector3d( Vector3g( x[i], y[i], z[i] ) ) * scale;
         float const r           = pos.length();
         float const c_gm        = 10000000000.0f;
-        Vector3 const accel     = -pos * delta * c_gm / (r * r * r);
+        Vector3d const accel     = -pos * delta * c_gm / (r * r * r);
 
         vx[i] += accel.x();
         vy[i] += accel.y();
         vz[i] += accel.z();
+
+        // Rotate based on i, semi-random
+        Vector3d const axis = Vector3d{std::sin(i), std::cos(i), double(i % 8 - 4)}.normalized();
+        Magnum::Radd const speed{(i % 16) / 16.0};
+
+        Quaterniond rot{{qx[i], qy[i], qz[i]}, qw[i]};
+        rot = (rot * Quaterniond::rotation(speed * delta, axis));
+        qx[i] = rot.vector().x();
+        qy[i] = rot.vector().y();
+        qz[i] = rot.vector().z();
+        qw[i] = rot.scalar();
     }
 
     // Phase 2: Transfers and stuff
@@ -431,11 +458,13 @@ static void update_universe(CommonTestScene& rScene, float delta)
 
     CoSpaceCommon &rAreaSpace = rScnTest.m_areaSpace;
 
-    Vector3g const areaPos = rAreaSpace.m_position + rScnTest.m_areaCenter;
+    Vector3g const cameraPos{rAreaSpace.m_rotation.transformVector(Vector3d(rScnTest.m_areaCenter))};
+    Vector3g const areaPos{rAreaSpace.m_position + cameraPos};
+
     if (rAreaSpace.m_parent == rScnTest.m_mainSpace)
     {
         // Not captured within planet, search for nearby planet
-        std::size_t nearbyPlanet = lgrn::id_null<std::size_t>();
+        std::size_t nearbyPlanet = rMainSpace.m_satCount;
         for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
         {
             Vector3 const diff = (Vector3( x[i], y[i], z[i] ) - Vector3(areaPos)) * scale;
@@ -446,7 +475,7 @@ static void update_universe(CommonTestScene& rScene, float delta)
             }
         }
 
-        if (nearbyPlanet != lgrn::id_null<std::size_t>())
+        if (nearbyPlanet < rMainSpace.m_satCount)
         {
             OSP_LOG_INFO("Captured into Satellite {} under CoordSpace {}",
                          nearbyPlanet, int(rScnTest.m_mainSatLanded[nearbyPlanet]));
@@ -454,16 +483,13 @@ static void update_universe(CommonTestScene& rScene, float delta)
             CoSpaceId const landedId = rScnTest.m_mainSatLanded[nearbyPlanet];
             CoSpaceCommon &rLanded = rUni.m_coordCommon[std::size_t(landedId)];
 
-            assert(rLanded.m_parentSat != lgrn::id_null<SatId>());
-            CoSpaceTransform const landedTf{
-                .m_position = to_vec<Vector3g>(rLanded.m_parentSat, x, y, z)
-            };
-
+            CoSpaceTransform const landedTf = coord_get_transform(rLanded, rLanded, x, y, z, qx, qy, qz, qw);
             CoordTransformer const mainToLanded = coord_parent_to_child(rMainSpace, landedTf);
 
-            // do the transfer
+            // Transfer area from Main to Landed
             rAreaSpace.m_parent = landedId;
             rAreaSpace.m_position = mainToLanded.transform_position(rAreaSpace.m_position);
+            rAreaSpace.m_rotation = mainToLanded.rotation() * rAreaSpace.m_rotation;
         }
     }
     else
@@ -477,16 +503,13 @@ static void update_universe(CommonTestScene& rScene, float delta)
             CoSpaceId const landedId = rScnTest.m_areaSpace.m_parent;
             CoSpaceCommon &rLanded = rUni.m_coordCommon[std::size_t(landedId)];
 
-            assert(rLanded.m_parentSat != lgrn::id_null<SatId>());
-            CoSpaceTransform const landedTf{
-                .m_position = to_vec<Vector3g>(rLanded.m_parentSat, x, y, z)
-            };
-
+            CoSpaceTransform const landedTf = coord_get_transform(rLanded, rLanded, x, y, z, qx, qy, qz, qw);
             CoordTransformer const landedToMain = coord_child_to_parent(rMainSpace, landedTf);
 
-            // do the transfer
+            // Transfer area from Landed to Main
             rAreaSpace.m_parent = rScnTest.m_mainSpace;
             rAreaSpace.m_position = landedToMain.transform_position(rAreaSpace.m_position);
+            rAreaSpace.m_rotation = landedToMain.rotation() * rAreaSpace.m_rotation;
         }
     }
 }
@@ -589,32 +612,35 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
                 cameraDrawTf.m_transformWorld.inverted(),
                 rCamera.calculate_projection()};
 
-        auto &rShader = rRenderer.m_phong.m_shaderUntextured;
+        auto &rPhong = rRenderer.m_phong.m_shaderUntextured;
+        auto &rVisualizer = rRenderer.m_visualizer.m_shader;
 
         // Cursor
-        rShader.setDiffuseColor(0xFFFFFF_rgbf)
-               .setNormalMatrix(Matrix3{})
-               .setTransformationMatrix(viewProj.m_view * Matrix4::translation(rControls.m_camCtrl.m_target.value()))
-               .setProjectionMatrix(viewProj.m_proj)
-               .draw(rBox);
+        rPhong.setDiffuseColor(0xFFFFFF_rgbf)
+              .setNormalMatrix(Matrix3{})
+              .setTransformationMatrix(viewProj.m_view * Matrix4::translation(rControls.m_camCtrl.m_target.value()))
+              .setProjectionMatrix(viewProj.m_proj)
+              .draw(rBox);
 
         // Origin indicator
-        rShader.setDiffuseColor(0xFF0000_rgbf)
-               .setTransformationMatrix(viewProj.m_view * Matrix4::scaling({400, 10, 10}))
-               .draw(rBox);
-        rShader.setDiffuseColor(0x00FF00_rgbf)
-               .setTransformationMatrix(viewProj.m_view * Matrix4::scaling({10, 400, 10}))
-               .draw(rBox);
-        rShader.setDiffuseColor(0x0000FF_rgbf)
-               .setTransformationMatrix(viewProj.m_view * Matrix4::scaling({10, 10, 400}))
-               .draw(rBox);
+        rPhong.setDiffuseColor(0xFF0000_rgbf)
+              .setTransformationMatrix(viewProj.m_view * Matrix4::scaling({400, 10, 10}))
+              .draw(rBox);
+        rPhong.setDiffuseColor(0x00FF00_rgbf)
+              .setTransformationMatrix(viewProj.m_view * Matrix4::scaling({10, 400, 10}))
+              .draw(rBox);
+        rPhong.setDiffuseColor(0x0000FF_rgbf)
+              .setTransformationMatrix(viewProj.m_view * Matrix4::scaling({10, 10, 400}))
+              .draw(rBox);
 
         using namespace osp::universe;
         Universe &rUni = rScnTest.m_universe;
+
         CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_mainSpace)];
         auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+        auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
 
-        // Calculate transform from universe to area/local-space for rendering
+        // Calculate transform from universe to area/local-space for rendering.
         // This can be generalized by finding a common ancestor within the tree
         // of coordinate spaces. Since there's only two possibilities, an if
         // statement works.
@@ -628,34 +654,45 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
             CoSpaceId const landedId = rScnTest.m_areaSpace.m_parent;
             CoSpaceCommon &rLanded = rUni.m_coordCommon[std::size_t(landedId)];
 
-            assert(rLanded.m_parentSat != lgrn::id_null<SatId>());
-            CoSpaceTransform const landedTf{
-                .m_position = to_vec<Vector3g>(rLanded.m_parentSat, x, y, z)
-            };
+            CoSpaceTransform const landedTf = coord_get_transform(rLanded, rLanded, x, y, z, qx, qy, qz, qw);
             CoordTransformer const mainToLanded = coord_parent_to_child(rMainSpace, landedTf);
             CoordTransformer const landedToArea = coord_parent_to_child(landedTf, rScnTest.m_areaSpace);
 
             mainToArea = coord_composite(landedToArea, mainToLanded);
         }
+        osp::Quaternion const mainToAreaRot{mainToArea.rotation()};
 
         float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
 
+        // Draw black hole
+        Vector3 const blackHolePos = Vector3(mainToArea.transform_position({})) * scale;
+        rVisualizer
+            .setColor(0x0E0E0E_rgbf)
+            .setTransformationMatrix(
+                    viewProj.m_view
+                    * Matrix4::translation(blackHolePos)
+                    * Matrix4::scaling({200, 200, 200})
+                    * Matrix4{mainToAreaRot.toMatrix()} )
+            .draw(rSphere);
+
         // Draw planets
-        rShader.setDiffuseColor(0xFFFFFF_rgbf);
+        rVisualizer.setColor(0xFFFFFF_rgbf);
         for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
         {
             Vector3g const relative = mainToArea.transform_position({x[i], y[i], z[i]});
             Vector3 const relativeMeters = Vector3(relative) * scale;
 
-            rShader.setTransformationMatrix(viewProj.m_view * Matrix4::translation(relativeMeters) * Matrix4::scaling({200, 200, 200}) )
-                   .draw(rSphere);
-        }
+            Quaterniond const rot{{qx[i], qy[i], qz[i]}, qw[i]};
 
-        // Draw black hole
-        Vector3 const blackHolePos = Vector3(mainToArea.transform_position({})) * scale;
-        rShader.setDiffuseColor(0x000000_rgbf)
-               .setTransformationMatrix(viewProj.m_view * Matrix4::translation(blackHolePos) * Matrix4::scaling({200, 200, 200}) )
-               .draw(rSphere);
+            rVisualizer
+                .setColor(0xFFFFFF_rgbf)
+                .setTransformationMatrix(
+                        viewProj.m_view
+                        * Matrix4::translation(relativeMeters)
+                        * Matrix4::scaling({200, 200, 200})
+                        * Matrix4{(mainToAreaRot * Quaternion{rot}).toMatrix()} )
+                .draw(rSphere);
+        }
 
         rRenderer.display(rApp);
     };

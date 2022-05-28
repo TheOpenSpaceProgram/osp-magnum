@@ -126,6 +126,11 @@ struct CoordTransformer
         return out;
     }
 
+    Quaterniond rotation() const noexcept
+    {
+        return m_rotOut * m_rotIn;
+    }
+
     constexpr bool is_identity() const noexcept
     {
         return (m_n == 0) && m_c.isZero();
