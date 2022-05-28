@@ -146,3 +146,7 @@ add_custom_command(TARGET osp-magnum
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../bin" "${CMAKE_BINARY_DIR}/$<CONFIG>"
     VERBATIM
 )
+
+add_custom_target(run-osp-magnum
+		  COMMAND $<TARGET_FILE:osp-magnum>
+		  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>)
