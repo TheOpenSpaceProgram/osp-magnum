@@ -65,17 +65,66 @@ struct SatVectorDesc
 
     constexpr View_t view(Data_t data, std::size_t count, int dimension) const
     {
-        using namespace Corrade::Containers;
         auto first = reinterpret_cast<T*>((data.exceptPrefix(m_offsets[dimension])).data());
         return {data, first, count, m_stride};
     }
 
     constexpr ViewConst_t view(DataConst_t data, std::size_t count, int dimension) const
     {
-        using namespace Corrade::Containers;
         auto first = reinterpret_cast<T const*>((data.exceptPrefix(m_offsets[dimension])).data());
         return {data, first, count, m_stride};
     }
+};
+
+struct CoSpaceHierarchy
+{
+    CoSpaceId       m_parent{lgrn::id_null<CoSpaceId>()};
+    SatId           m_parentSat{lgrn::id_null<SatId>()};
+};
+
+struct CoSpaceTransform
+{
+    // Position and rotation is relative to m_parent
+    // Ignore and use m_parentSat's position and rotation instead if non-null
+    Quaterniond     m_rotation;
+    Vector3g        m_position;
+
+    int             m_precision{10}; // 1 meter = 2^m_precision
+};
+
+struct CoSpaceSatData
+{
+    uint32_t        m_satCount;
+    uint32_t        m_satCapacity;
+
+    Corrade::Containers::Array<unsigned char> m_data;
+    SatVectorDesc<spaceint_t, 3>    m_satPositions;
+    SatVectorDesc<double, 3>        m_satVelocities;
+    SatVectorDesc<double, 4>        m_satRotations;
+};
+
+struct CoSpaceCommon : CoSpaceTransform, CoSpaceHierarchy, CoSpaceSatData { };
+
+struct RedesignateSat
+{
+    SatId m_old;
+    SatId m_new;
+};
+
+struct TransferSat
+{
+    SatId m_satOld;
+    SatId m_satNew;
+
+    CoSpaceId m_coordOld;
+    CoSpaceId m_coordNew;
+};
+
+struct Universe
+{
+    lgrn::IdRegistryStl<CoSpaceId>   m_coordIds;
+
+    std::vector<CoSpaceCommon>     m_coordCommon;
 };
 
 template <typename VEC_T, typename INDEX_T, typename ... RANGE_T>
@@ -83,6 +132,7 @@ constexpr VEC_T to_vec(INDEX_T i, RANGE_T&& ... args) noexcept
 {
     return {args[std::size_t(i)] ...};
 }
+
 
 /**
  * @brief Get StridedArrayView1Ds from all components of a SatVectorDesc
@@ -112,55 +162,23 @@ constexpr auto sat_views(
     }
 }
 
-struct CoSpaceHierarchy
+/**
+ * @brief Get transform of a coordinate space, but if a parent satellite exists,
+ *        use parent satellite's transform instead.
+ */
+template<typename POSVIEW_T, typename ROTVIEW_T>
+constexpr CoSpaceTransform coord_get_transform(
+        CoSpaceHierarchy coordHier, CoSpaceTransform coordOrig,
+        POSVIEW_T const& x, POSVIEW_T const& y, POSVIEW_T const& z,
+        ROTVIEW_T const& qx, ROTVIEW_T const& qy, ROTVIEW_T const& qz, ROTVIEW_T const& qw) noexcept
 {
-    CoSpaceId       m_parent{lgrn::id_null<CoSpaceId>()};
-    SatId           m_parentSat{lgrn::id_null<SatId>()};
-};
-
-struct CoSpaceTransform
-{
-    // Position and rotation is relative to m_parent
-    // Ignore and use m_parentSat's position and rotation instead if non-null
-    Quaterniond     m_rotation;
-    Vector3g        m_position;
-
-    int             m_precision{10}; // 1 meter = 2^m_precision
-};
-
-
-struct CoSpaceSatData
-{
-    uint32_t        m_satCount;
-    uint32_t        m_satCapacity;
-
-    Corrade::Containers::Array<unsigned char> m_data;
-    SatVectorDesc<spaceint_t, 3>    m_satPositions;
-    SatVectorDesc<float, 3>         m_satVelocities;
-};
-
-struct CoSpaceCommon : CoSpaceTransform, CoSpaceHierarchy, CoSpaceSatData { };
-
-struct RedesignateSat
-{
-    SatId m_old;
-    SatId m_new;
-};
-
-struct TransferSat
-{
-    SatId m_satOld;
-    SatId m_satNew;
-
-    CoSpaceId m_coordOld;
-    CoSpaceId m_coordNew;
-};
-
-struct Universe
-{
-    lgrn::IdRegistryStl<CoSpaceId>   m_coordIds;
-
-    std::vector<CoSpaceCommon>     m_coordCommon;
-};
+    SatId const sat = coordHier.m_parentSat;
+    return (sat == lgrn::id_null<SatId>())
+        ? coordOrig
+        : CoSpaceTransform{
+            .m_rotation = {to_vec<Vector3d>(sat, qx, qy, qz), qw[std::size_t(sat)]},
+            .m_position = to_vec<Vector3g>(sat, x, y, z),
+            .m_precision = coordOrig.m_precision };
+}
 
 } // namespace osp::universe
