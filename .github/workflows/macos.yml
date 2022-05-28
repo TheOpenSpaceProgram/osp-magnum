@@ -41,7 +41,7 @@ jobs:
     - name: Compile Dependencies
       shell: bash
       run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps test-deps
+        cmake --build build --parallel --config ${{ matrix.config }} --target compile-osp-magnum-deps compile-test-deps
 
     - name: Compile OSP-Magnum
       shell: bash
@@ -57,4 +57,4 @@ jobs:
     - name: Run Unit Tests
       shell: bash
       run: |
-        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
+        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build

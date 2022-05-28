@@ -25,5 +25,4 @@
 PROJECT(test_universe CXX)
 ADD_TEST_DIRECTORY(${PROJECT_NAME})
 
-TARGET_LINK_LIBRARIES(test_universe longeron EnTT::EnTT Magnum::Magnum)
-TARGET_SOURCES(test_universe PRIVATE)
+TARGET_LINK_LIBRARIES(test_universe PRIVATE longeron EnTT::EnTT Magnum::Magnum)

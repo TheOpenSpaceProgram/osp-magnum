@@ -68,7 +68,7 @@ jobs:
 
     - name: Compile Dependencies
       run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target osp-magnum-deps test-deps
+        cmake --build build --parallel --config ${{ matrix.config }} --target compile-osp-magnum-deps compile-test-deps
 
     - name: Compile OSP-Magnum
       run: |
@@ -81,7 +81,7 @@ jobs:
     # MSVC Generator doesn't support the special target "test" like Ninja generator does on linux.
     - name: Run Unit Tests
       run: |
-        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build/test
+        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build
 
     - uses: actions/upload-artifact@v2
       with:
