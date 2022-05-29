@@ -72,7 +72,9 @@ SET(CLANG_COMPILE_FLAGS ${CLANG_COMPILE_FLAGS})
 SET(GCC_COMPILE_FLAGS   ${GCC_COMPILE_FLAGS})
 
 # -fno-omit-frame-pointer significantly helps with debugging of the application if built with optimizations
-add_compile_options(-fno-omit-frame-pointer)
+if(NOT MSVC)
+    add_compile_options(-fno-omit-frame-pointer)
+endif()
 
 # Compiler warnings can help find problems in code.
 IF(OSP_ENABLE_COMPILER_WARNINGS)
