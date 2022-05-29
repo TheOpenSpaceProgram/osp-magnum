@@ -159,7 +159,9 @@ ELSEIF(UNIX)
   set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
   # Make sure that newer toolchains, like ubuntu 22.04, don't
   # use runpath, and use rpath instead.
-  add_link_options(LINKER:--disable-new-dtags)
+  IF(NOT APPLE)
+    add_link_options(LINKER:--disable-new-dtags)
+  ENDIF()
 ENDIF()
 
 # Process subdirectory full of third-party libraries
