@@ -46,11 +46,12 @@ ENDIF()
 PROJECT(OSP-MAGNUM CXX)
 
 # Can't check for MSVC until after the first `project()` call...
-if(NOT MSVC) #SDL2 doesn't like MSVC's LTO behavior yet
+if(NOT MSVC) #SDL2 doesn't like MSVC's LTO behavior yet: https://github.com/libsdl-org/SDL/issues/5732
     set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 endif()
 
 # Setup things for the test subdir below
+# Has to be in toplevel CMakeLists.txt or ctest gets mad.
 enable_testing()
 
 OPTION(OSP_BUILD_SANATIZER          "Build with the address sanatizer" OFF)
@@ -59,9 +60,6 @@ OPTION(OSP_ENABLE_COMPILER_WARNINGS "Build with the majority of compiler warning
 OPTION(OSP_ENABLE_IWYU              "Build with warnings from IWYU turned on" OFF)
 OPTION(OSP_ENABLE_CLANG_TIDY        "Build with warnings from clang-tidy turned on" OFF)
 OPTION(OSP_USE_SYSTEM_SDL           "Build with SDL that you provide if turned on, compiles SDL if turned off. Off by default" OFF)
-
-# Define target name
-SET(TARGET_NAME OSP-MAGNUM)
 
 # Set the explicit standard revision for C and C++ code.
 SET(CMAKE_C_STANDARD 11)
@@ -128,8 +126,8 @@ ENDIF()
 # and mark the debug symbols to be compressed, which can be a huge saving in terms of file size.
 IF(MSVC)
 ELSE()
-add_compile_options($<$<CONFIG:Debug>:-O0>)
-add_compile_options($<$<CONFIG:Debug>:-gz>)
+  add_compile_options($<$<CONFIG:Debug>:-O0>)
+  add_compile_options($<$<CONFIG:Debug>:-gz>)
 ENDIF()
 
 IF(CMAKE_BUILD_TYPE MATCHES "Debug")
@@ -140,22 +138,28 @@ ELSE()
   IF( lto_supported )
     MESSAGE(STATUS "IPO / LTO enabled")
     SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION_DEBUG FALSE)
   ELSE()
     MESSAGE(STATUS "IPO / LTO not supported: <${error}>")
   ENDIF()
 ENDIF()
 
 # Force Runtime output directory into Debug or Release folder
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG> CACHE PATH "")
+SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG> CACHE PATH "")
 IF(MSVC)
   # Put shared libraries in the same directory as the executable on windows
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG> CACHE PATH "")
   # Force multiprocessor compilation for all projects
   add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
+  # Don't generate a blah.manifest file for each build target.
+  add_link_options(LINKER:/MANIFEST:NO)
 ELSEIF(UNIX)
   # Put shared libraries in ./lib, and use RPATH
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/lib CACHE PATH "")
   set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+  # Make sure that newer toolchains, like ubuntu 22.04, don't
+  # use runpath, and use rpath instead.
+  add_link_options(LINKER:--disable-new-dtags)
 ENDIF()
 
 # Process subdirectory full of third-party libraries
