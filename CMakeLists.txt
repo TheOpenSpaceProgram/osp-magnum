@@ -28,7 +28,9 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.12.4)
 
 # Enable link time optimization
 CMAKE_POLICY(SET CMP0069 NEW)
-set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
+if(NOT MSVC) #SDL2 doesn't like MSVC's LTO behavior yet
+    set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
+endif()
 
 # Add the module search directory
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/modules/")
