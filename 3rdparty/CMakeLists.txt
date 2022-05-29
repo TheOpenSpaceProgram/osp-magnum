@@ -96,9 +96,11 @@ if(NOT OSP_USE_SYSTEM_SDL)
   SET(SDL_DIRECTFB           OFF CACHE BOOL "" FORCE)
   SET(SDL_DIRECTX            OFF CACHE BOOL "" FORCE) # DirectX is windows specific. Lets stick with multiplatform.
   SET(SDL_RENDER_D3D         OFF CACHE BOOL "" FORCE) # Ancient DirectX?
-  SET(SDL_COCOA              OFF CACHE BOOL "" FORCE) # Cocoa is mac specific. Lets stick with multiplatform.
-  SET(SDL_METAL              OFF CACHE BOOL "" FORCE) # Metal is mac specific. Lets stick with multiplatform.
-  SET(SDL_RENDER_METAL       OFF CACHE BOOL "" FORCE) # Metal is mac specific. Lets stick with multiplatform.
+  if(NOT APPLE)
+    SET(SDL_COCOA              OFF CACHE BOOL "" FORCE) # Cocoa is mac specific. Lets stick with multiplatform.
+    SET(SDL_METAL              OFF CACHE BOOL "" FORCE) # Metal is mac specific. Lets stick with multiplatform.
+    SET(SDL_RENDER_METAL       OFF CACHE BOOL "" FORCE) # Metal is mac specific. Lets stick with multiplatform.
+  endif()
   SET(SDL_RPI                OFF CACHE BOOL "" FORCE) # Raspberry PI is not multiplatform. It supports OpenGL.
   SET(SDL_WAYLAND            OFF CACHE BOOL "" FORCE)
   SET(SDL_WAYLAND_QT_TOUCH   OFF CACHE BOOL "" FORCE)
