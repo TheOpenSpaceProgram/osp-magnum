@@ -179,7 +179,7 @@ void VehicleTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     osp::Resources &rResources = *rScene.m_pResources;
 
     // Convenient function to get a reference-counted mesh owner
-    auto const quick_add_mesh = [&rScene, &rResources, pkg] (std::string_view name) -> MeshIdOwner_t
+    auto const quick_add_mesh = [&rScene, &rResources, pkg] (std::string_view const name) -> MeshIdOwner_t
     {
         osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
         assert(res != lgrn::id_null<osp::ResId>());
@@ -314,8 +314,8 @@ static void update_test_scene_delete(CommonTestScene &rScene)
 
     rScene.update_hierarchy_delete();
 
-    auto first = std::cbegin(rScene.m_deleteTotal);
-    auto last = std::cend(rScene.m_deleteTotal);
+    auto const& first = std::cbegin(rScene.m_deleteTotal);
+    auto const& last = std::cend(rScene.m_deleteTotal);
 
     // Delete components of total entities to delete
     SysPhysics::update_delete_phys      (rScnPhys.m_physics,    first, last);
@@ -348,10 +348,10 @@ static void update_links(CommonTestScene& rScene)
             rScnTest.m_nodeNumValues,
             rScnTest.m_updMachTypes);
 
-    for (MachLocalId local : rScnTest.m_updMachTypes[gc_mtMagicRocket].m_localDirty.ones())
+    for (MachLocalId const local : rScnTest.m_updMachTypes[gc_mtMagicRocket].m_localDirty.ones())
     {
         MachAnyId const mach = rRockets.m_localToAny[local];
-        lgrn::Span<NodeId const> portSpan = rNumberNodes.m_machToNode[mach];
+        lgrn::Span<NodeId const> const portSpan = rNumberNodes.m_machToNode[mach];
 
         if (NodeId const thrNode = connected_node(portSpan, adera::ports_magicrocket::gc_throttleIn.m_port);
             thrNode != lgrn::id_null<NodeId>())
@@ -365,7 +365,7 @@ static void update_links(CommonTestScene& rScene)
     }
 }
 
-static void spawn_vehicle(CommonTestScene& rScene, VehicleData const &data)
+static void spawn_vehicle(CommonTestScene& rScene, VehicleData const& data)
 {
     using namespace osp::active;
 
@@ -404,7 +404,7 @@ static void spawn_vehicle(CommonTestScene& rScene, VehicleData const &data)
 
     // Create part entities
     rScnParts.m_rigidToParts.emplace(rigid, data.m_partIds.size());
-    lgrn::Span<PartEnt_t> rigidPartsSpan = rScnParts.m_rigidToParts[rigid];
+    lgrn::Span<PartEnt_t> const& rigidPartsSpan = rScnParts.m_rigidToParts[rigid];
     rScnParts.m_partIds.create(std::begin(rigidPartsSpan), std::end(rigidPartsSpan));
     rScnParts.m_partPrefabs         .resize(rScnParts.m_partIds.capacity());
     rScnParts.m_partTransformRigid  .resize(rScnParts.m_partIds.capacity());
@@ -431,7 +431,7 @@ static void spawn_vehicle(CommonTestScene& rScene, VehicleData const &data)
         rScnParts.m_partRigids[dstPart]         = rigid;
 
         // Add Prefab and Part init events
-        int initPfIndex         = rScnTest.m_initPrefabs.size();
+        int const& initPfIndex  = rScnTest.m_initPrefabs.size();
         TmpPrefabInit &rInitPf  = rScnTest.m_initPrefabs.emplace_back();
         rInitPf.m_importerRes   = prefabPairSrc.m_importer;
         rInitPf.m_prefabId      = prefabPairSrc.m_prefabId;
@@ -449,7 +449,7 @@ static void spawn_vehicle(CommonTestScene& rScene, VehicleData const &data)
     copy_machines(data.m_machines, rScnParts.m_machines, remapMach);
 
     rScnParts.m_machineToPart.resize(rScnParts.m_machines.m_ids.capacity());
-    for (MachAnyId srcMach : data.m_machines.m_ids.bitview().zeros())
+    for (MachAnyId const srcMach : data.m_machines.m_ids.bitview().zeros())
     {
         MachAnyId const dstMach = remapMach[srcMach];
         rScnParts.m_machineToPart[dstMach] = remapPart[std::size_t(data.m_machToPart[srcMach])];
@@ -460,9 +460,10 @@ static void spawn_vehicle(CommonTestScene& rScene, VehicleData const &data)
     copy_nodes(
             data.m_nodePerType[gc_ntNumber],
             data.m_machines,
-            remapMach,
+            std::move(remapMach),
             rScnParts.m_nodePerType[gc_ntNumber],
-            rScnParts.m_machines, remapNodes);
+            rScnParts.m_machines,
+            std::move(remapNodes));
 
     // TODO: copy node values
     rScnTest.m_nodeNumValues.resize(rScnParts.m_nodePerType[gc_ntNumber].m_nodeIds.size());
@@ -473,7 +474,7 @@ static void spawn_vehicle(CommonTestScene& rScene, VehicleData const &data)
  *
  * @param rScene [ref] scene to update
  */
-static void update_test_scene(CommonTestScene& rScene, float delta)
+static void update_test_scene(CommonTestScene& rScene, float const delta)
 {
     using namespace osp::active;
     using namespace ospnewton;
@@ -553,7 +554,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     }
 
     // Gravity System, applies a 9.81N force downwards (-Y) for select entities
-    for (ActiveEnt ent : rScnTest.m_hasGravity)
+    for (ActiveEnt const ent : rScnTest.m_hasGravity)
     {
         acomp_storage_t<ACompPhysNetForce> &rNetForce
                 = rScnPhys.m_physIn.m_physNetForce;
@@ -581,8 +582,8 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     std::size_t totalEnts = 0;
     for (TmpPrefabInit& rPrefab : rScnTest.m_initPrefabs)
     {
-        auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_importerRes);
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_prefabId];
+        auto const& rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_importerRes);
+        auto const& objects     = rPrefabData.m_prefabs[rPrefab.m_prefabId];
 
         totalEnts += objects.size();
     }
@@ -592,10 +593,10 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     std::size_t pos = 0;
     for (TmpPrefabInit& rPrefab : rScnTest.m_initPrefabs)
     {
-        auto const &rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_importerRes);
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_prefabId];
+        auto const& rPrefabData = rScene.m_pResources->data_get<osp::Prefabs>(gc_importer, rPrefab.m_importerRes);
+        auto const& objects     = rPrefabData.m_prefabs[rPrefab.m_prefabId];
 
-        ActiveEnt *pEnts = &rScnTest.m_initPrefabEnts.data()[pos];
+        ActiveEnt * const pEnts = &rScnTest.m_initPrefabEnts.data()[pos];
 
         rScene.m_activeIds.create(pEnts, objects.size());
         rPrefab.m_prefabToEnt = {pEnts, objects.size()};
@@ -756,7 +757,7 @@ void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
                     - float(ctrlSub.button_triggered(rControls.m_btnThrMin));
 
             MachAnyId const mach = rUsrCtrl.m_localToAny[rControls.m_selectedUsrCtrl];
-            lgrn::Span<NodeId const> portSpan = rNumberNodes.m_machToNode[mach];
+            lgrn::Span<NodeId const> const portSpan = rNumberNodes.m_machToNode[mach];
 
             if (NodeId const thrNode = connected_node(portSpan, adera::ports_userctrl::gc_throttleOut.m_port);
                 thrNode != lgrn::id_null<NodeId>())

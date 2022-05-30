@@ -98,30 +98,30 @@ public:
      */
     template<typename IT_T>
     static void update_delete_cut(
-            acomp_storage_t<ACompHierarchy>& rHier, IT_T first, IT_T last);
+            acomp_storage_t<ACompHierarchy>& rHier, IT_T first, IT_T const& last);
 
     /**
      * @brief Mark descendents of deleted hierarchy entities as deleted too
      */
     template<typename IT_T, typename FUNC_T>
     static void update_delete_descendents(
-            acomp_storage_t<ACompHierarchy> const& hier, IT_T first, IT_T last, FUNC_T&& deleteEnt);
+            acomp_storage_t<ACompHierarchy> const& hier, IT_T first, IT_T const& last, FUNC_T&& deleteEnt);
 };
 
 template<typename IT_T>
 void SysHierarchy::update_delete_cut(
-        acomp_storage_t<ACompHierarchy>& rHier, IT_T first, IT_T last)
+        acomp_storage_t<ACompHierarchy>& rHier, IT_T first, IT_T const& last)
 {
     while (first != last)
     {
         cut(rHier, *first);
-        ++first;
+        std::advance(first, 1);
     }
 }
 
 template<typename IT_T, typename FUNC_T>
 void SysHierarchy::update_delete_descendents(
-        acomp_storage_t<ACompHierarchy> const& hier, IT_T first, IT_T last,
+        acomp_storage_t<ACompHierarchy> const& hier, IT_T first, IT_T const& last,
         FUNC_T&& deleteEnt)
 {
     while (first != last)
@@ -133,7 +133,7 @@ void SysHierarchy::update_delete_descendents(
             return EHierarchyTraverseStatus::Continue;
         });
 
-        ++first;
+        std::advance(first, 1);
     }
 }
 

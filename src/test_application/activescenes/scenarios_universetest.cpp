@@ -115,7 +115,7 @@ struct UniverseTestData
 };
 
 
-void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
+void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId const pkg)
 {
     using namespace osp::active;
 
@@ -128,7 +128,7 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     osp::Resources &rResources = *rScene.m_pResources;
 
     // Convenient function to get a reference-counted mesh owner
-    auto const quick_add_mesh = [&rScene, &rResources, pkg] (std::string_view name) -> MeshIdOwner_t
+    auto const quick_add_mesh = [&rScene, &rResources, pkg] (std::string_view const name) -> MeshIdOwner_t
     {
         osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
         assert(res != lgrn::id_null<osp::ResId>());
@@ -150,7 +150,7 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     rScene.m_basic.m_hierarchy.emplace(rScene.m_hierRoot);
 
     // Create camera entity
-    ActiveEnt camEnt = rScene.m_activeIds.create();
+    ActiveEnt const camEnt = rScene.m_activeIds.create();
 
     // Create camera transform and draw transform
     ACompTransform &rCamTf = rScene.m_basic.m_transform.emplace(camEnt);
@@ -266,9 +266,9 @@ void UniverseTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
                       rotStart + sizeof(double) * 3},
         .m_stride  = sizeof(double) * 4 };
 
-    auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, planetCount);
+    auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions,  rMainSpace.m_data, planetCount);
     auto const [vx, vy, vz]     = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, planetCount);
-    auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, planetCount);
+    auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations,  rMainSpace.m_data, planetCount);
 
     std::mt19937 gen(c_seed);
     std::uniform_int_distribution<spaceint_t> posDist(-c_maxDist, c_maxDist);
@@ -311,8 +311,8 @@ static void update_test_scene_delete(CommonTestScene &rScene)
 
     rScene.update_hierarchy_delete();
 
-    auto first = std::cbegin(rScene.m_deleteTotal);
-    auto last = std::cend(rScene.m_deleteTotal);
+    auto const& first = std::cbegin(rScene.m_deleteTotal);
+    auto const& last  = std::cend(rScene.m_deleteTotal);
 
     // Delete components of total entities to delete
     SysPhysics::update_delete_phys      (rScnPhys.m_physics,    first, last);
@@ -332,7 +332,7 @@ static void update_test_scene_delete(CommonTestScene &rScene)
  *
  * @param rScene [ref] scene to update
  */
-static void update_test_scene(CommonTestScene& rScene, float delta)
+static void update_test_scene(CommonTestScene& rScene, float const delta)
 {
     using namespace osp::active;
     using namespace ospnewton;
@@ -346,7 +346,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     SysRender::clear_dirty_all(rScene.m_drawing);
 
     // Gravity System, applies a 9.81N force downwards (-Y) for select entities
-    for (ActiveEnt ent : rScnTest.m_hasGravity)
+    for (ActiveEnt const ent : rScnTest.m_hasGravity)
     {
         acomp_storage_t<ACompPhysNetForce> &rNetForce
                 = rScnPhys.m_physIn.m_physNetForce;
@@ -390,7 +390,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     // Shape Thrower system, consumes rScene.m_toThrow and creates shapes
     for (UniverseTestData::ThrowShape const &rThrow : std::exchange(rScnTest.m_toThrow, {}))
     {
-        ActiveEnt shapeEnt = add_rigid_body_quick(
+        ActiveEnt const shapeEnt = add_rigid_body_quick(
                 rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_mass,
                 rThrow.m_shape, rThrow.m_size);
 
@@ -406,7 +406,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
 }
 
 
-static void update_universe(CommonTestScene& rScene, float delta)
+static void update_universe(CommonTestScene& rScene, float  const delta)
 {
     using namespace osp::universe;
 
@@ -418,9 +418,9 @@ static void update_universe(CommonTestScene& rScene, float delta)
     float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
     float const scaleDelta = delta / scale;
 
-    auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+    auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions,  rMainSpace.m_data, rMainSpace.m_satCount);
     auto const [vx, vy, vz]     = sat_views(rMainSpace.m_satVelocities, rMainSpace.m_data, rMainSpace.m_satCount);
-    auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
+    auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations,  rMainSpace.m_data, rMainSpace.m_satCount);
 
     // Phase 1: Move satellites
 
@@ -444,8 +444,8 @@ static void update_universe(CommonTestScene& rScene, float delta)
         Vector3d const axis = Vector3d{std::sin(i), std::cos(i), double(i % 8 - 4)}.normalized();
         Magnum::Radd const speed{(i % 16) / 16.0};
 
-        Quaterniond rot{{qx[i], qy[i], qz[i]}, qw[i]};
-        rot = (rot * Quaterniond::rotation(speed * delta, axis));
+        Quaterniond const rot =   Quaterniond{{qx[i], qy[i], qz[i]}, qw[i]}
+                                * Quaterniond::rotation(speed * delta, axis);
         qx[i] = rot.vector().x();
         qy[i] = rot.vector().y();
         qz[i] = rot.vector().z();
@@ -637,7 +637,7 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
         Universe &rUni = rScnTest.m_universe;
 
         CoSpaceCommon &rMainSpace = rUni.m_coordCommon[std::size_t(rScnTest.m_mainSpace)];
-        auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+        auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
         auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
 
         // Calculate transform from universe to area/local-space for rendering.

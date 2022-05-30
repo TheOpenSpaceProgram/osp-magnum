@@ -81,7 +81,7 @@ struct EngineTestScene
     osp::Resources *m_pResources;
 
     // ID registry generates entity IDs, and keeps track of which ones exist
-    lgrn::IdRegistry<ActiveEnt> m_activeIds;
+    lgrn::IdRegistry<ActiveEnt>     m_activeIds;
 
     // Components and supporting data structures
     osp::active::ACtxBasic          m_basic;    
@@ -97,7 +97,7 @@ struct EngineTestScene
     osp::active::MeshIdOwner_t      m_meshCube;
 };
 
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
+entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 {
     using namespace osp::active;
 
@@ -120,7 +120,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
     rScene.m_basic.m_hierarchy.emplace(rScene.m_hierRoot);
 
     // Create camera entity
-    ActiveEnt camEnt = rScene.m_activeIds.create();
+    ActiveEnt const camEnt = rScene.m_activeIds.create();
 
     // Create camera transform and draw transform
     ACompTransform &rCamTf = rScene.m_basic.m_transform.emplace(camEnt);
@@ -160,7 +160,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
     SysHierarchy::add_child(
             rScene.m_basic.m_hierarchy, rScene.m_hierRoot, rScene.m_cube);
 
-    return std::move(sceneAny);
+    return sceneAny;
 }
 
 /**
@@ -168,7 +168,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg)
  *
  * @param rScene [ref] scene to update
  */
-void update_test_scene(EngineTestScene& rScene, float delta)
+void update_test_scene(EngineTestScene& rScene, float const delta)
 {
     // Clear drawing-related dirty flags/vectors
     osp::active::SysRender::clear_dirty_all(rScene.m_drawing);
@@ -268,7 +268,7 @@ void render_test_scene(
     ACompCamera const &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
     ACompDrawTransform const &cameraDrawTf
             = rRenderer.m_renderGl.m_drawTransform.get(rRenderer.m_camera);
-    ViewProjMatrix viewProj{
+    ViewProjMatrix const viewProj{
             cameraDrawTf.m_transformWorld.inverted(),
             rCamera.calculate_projection()};
 

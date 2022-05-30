@@ -72,7 +72,7 @@ void SysRenderGL::setup_context(RenderGL& rCtxGl)
     {
         Vector2 screenSize = Vector2{GL::defaultFramebuffer.viewport().size()};
 
-        static constexpr std::array<float, 12> surfData
+        static constexpr auto surfData = std::array
         {
             // Vert position    // UV coordinate
             -1.0f,  1.0f,       0.0f,  1.0f,
@@ -116,7 +116,7 @@ void SysRenderGL::sync_scene_resources(
     // TODO: Eventually have dirty flags instead of checking every entry.
 
     // Compile required texture resources
-    for (auto const & [_, scnOwner] : rCtxDrawRes.m_texToRes)
+    for ([[maybe_unused]] auto const & [_, scnOwner] : rCtxDrawRes.m_texToRes)
     {
         ResId const texRes = scnOwner.value();
 
@@ -167,7 +167,7 @@ void SysRenderGL::sync_scene_resources(
     }
 
     // Compile required mesh resources
-    for (auto const & [_, scnOwner] : rCtxDrawRes.m_meshToRes)
+    for ([[maybe_unused]] auto const & [_, scnOwner] : rCtxDrawRes.m_meshToRes)
     {
         ResId const meshRes = scnOwner.value();
 
@@ -207,7 +207,7 @@ void SysRenderGL::assign_meshes(
         acomp_storage_t<ACompMeshGl>& rCmpMeshGl,
         RenderGL& rRenderGl)
 {
-    for (ActiveEnt ent : entsDirty)
+    for (ActiveEnt const ent : entsDirty)
     {
         // Make sure dirty entity has a MeshId component
         if (cmpMeshIds.contains(ent))
@@ -227,10 +227,10 @@ void SysRenderGL::assign_meshes(
             rEntMeshGl.m_scnId = entMeshScnId;
 
             // Check if MeshId is associated with a resource
-            if (auto found = meshToRes.find(entMeshScnId);
-                found != meshToRes.end())
+            if (auto const& foundIt = meshToRes.find(entMeshScnId);
+                foundIt != meshToRes.end())
             {
-                ResId const meshResId = found->second;
+                ResId const meshResId = foundIt->second;
 
                 // Mesh should have been loaded beforehand, assign it!
                 rEntMeshGl.m_glId = rRenderGl.m_resToMesh.at(meshResId);
@@ -263,7 +263,7 @@ void SysRenderGL::assign_textures(
         acomp_storage_t<ACompTexGl>& rCmpTexGl,
         RenderGL& rRenderGl)
 {
-    for (ActiveEnt ent : entsDirty)
+    for (ActiveEnt const ent : entsDirty)
     {
         // Make sure dirty entity has a MeshId component
         if (cmpTexIds.contains(ent))
@@ -283,10 +283,10 @@ void SysRenderGL::assign_textures(
             rEntTexGl.m_scnId = entTexScnId;
 
             // Check if MeshId is associated with a resource
-            if (auto found = texToRes.find(entTexScnId);
-                found != texToRes.end())
+            if (auto const& foundIt = texToRes.find(entTexScnId);
+                foundIt != texToRes.end())
             {
-                ResId const texResId = found->second;
+                ResId const texResId = foundIt->second;
 
                 // Mesh should have been loaded beforehand, assign it!
                 rEntTexGl.m_glId = rRenderGl.m_resToTex.at(texResId);
@@ -334,13 +334,13 @@ void SysRenderGL::display_texture(
 
 void SysRenderGL::clear_resource_owners(RenderGL& rRenderGl, Resources& rResources)
 {
-    for (auto && [_, rOwner] : std::exchange(rRenderGl.m_texToRes, {}))
+    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rRenderGl.m_texToRes, {}))
     {
         rResources.owner_destroy(restypes::gc_texture, std::move(rOwner));
     }
     rRenderGl.m_resToTex.clear();
 
-    for (auto && [_, rOwner] : std::exchange(rRenderGl.m_meshToRes, {}))
+    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rRenderGl.m_meshToRes, {}))
     {
         rResources.owner_destroy(restypes::gc_mesh, std::move(rOwner));
     }

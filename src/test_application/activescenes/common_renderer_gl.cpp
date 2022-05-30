@@ -153,8 +153,8 @@ void CommonSceneRendererGL::display(ActiveApplication& rApp)
 
 void CommonSceneRendererGL::update_delete(std::vector<ActiveEnt> const& toDelete)
 {
-    auto first = std::cbegin(toDelete);
-    auto last = std::cend(toDelete);
+    auto const& first = std::cbegin(toDelete);
+    auto const& last = std::cend(toDelete);
     SysRender::update_delete_groups(m_renderGroups, first, last);
     SysRenderGL::update_delete(m_renderGl, first, last);
 }
@@ -174,7 +174,7 @@ on_draw_t generate_common_draw(CommonTestScene& rScene, ActiveApplication& rApp,
     SysRender::set_dirty_all(rScene.m_drawing);
     pRenderer->sync(rApp, rScene);
 
-    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float delta)
+    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float const delta)
     {
         pRenderer->m_onDraw(*pRenderer, rScene, rApp, delta);
     };

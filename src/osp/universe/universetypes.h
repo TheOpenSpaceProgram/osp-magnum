@@ -32,7 +32,8 @@
 
 namespace osp::universe
 {
-enum class SatId : uint32_t {};
+
+enum class SatId     : uint32_t {};
 enum class CoSpaceId : uint32_t {};
 
 }
@@ -48,12 +49,11 @@ struct entt::storage_traits<osp::universe::SatId, Type>
 namespace osp::universe
 {
 
-
 using spaceint_t = int64_t;
 
 // 1024 space units = 1 meter
 // TODO: this should vary by trajectory, but for now it's global
-const float gc_units_per_meter = 1024.0f;
+constexpr float gc_units_per_meter = 1024.0f;
 
 // A Vector3 for space
 using Vector3g = Magnum::Math::Vector3<spaceint_t>;

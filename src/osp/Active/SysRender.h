@@ -169,7 +169,7 @@ public:
     static void assure_draw_transforms(
             acomp_storage_t<ACompHierarchy> const& hier,
             acomp_storage_t<ACompDrawTransform>& rDrawTf,
-            ITA_T first, ITB_T last);
+            ITA_T first, ITB_T const& last);
 
     /**
      * @brief Update draw ACompDrawTransform according to the hierarchy of
@@ -204,11 +204,11 @@ public:
 
     template<typename IT_T>
     static void update_delete_drawing(
-            ACtxDrawing& rCtxDraw, IT_T first, IT_T last);
+            ACtxDrawing& rCtxDraw, IT_T first, IT_T const& last);
 
     template<typename IT_T>
     static void update_delete_groups(
-            ACtxRenderGroups& rCtxGroups, IT_T first, IT_T last);
+            ACtxRenderGroups& rCtxGroups, IT_T first, IT_T const& last);
 
 private:
 
@@ -217,7 +217,7 @@ private:
 
 void SysRender::add_draw_transforms_recurse(
         acomp_storage_t<ACompHierarchy> const& hier,
-        acomp_storage_t<ACompDrawTransform>& rDrawTf, ActiveEnt ent)
+        acomp_storage_t<ACompDrawTransform>& rDrawTf, ActiveEnt const ent)
 {
     if (rDrawTf.contains(ent))
     {
@@ -241,7 +241,7 @@ template<typename ITA_T, typename ITB_T>
 void SysRender::assure_draw_transforms(
         acomp_storage_t<ACompHierarchy> const& hier,
         acomp_storage_t<ACompDrawTransform>& rDrawTf,
-        ITA_T first, ITB_T last)
+        ITA_T first, ITB_T const& last)
 {
     while (first != last)
     {
@@ -252,7 +252,7 @@ void SysRender::assure_draw_transforms(
 
 template<typename STORAGE_T, typename REFCOUNT_T>
 void remove_refcounted(
-        ActiveEnt ent, STORAGE_T &rStorage, REFCOUNT_T &rRefcount)
+        ActiveEnt const ent, STORAGE_T &rStorage, REFCOUNT_T &rRefcount)
 {
     if (rStorage.contains(ent))
     {
@@ -267,7 +267,7 @@ void remove_refcounted(
 
 template<typename IT_T>
 void SysRender::update_delete_drawing(
-        ACtxDrawing& rCtxDraw, IT_T first, IT_T last)
+        ACtxDrawing& rCtxDraw, IT_T first, IT_T const& last)
 {
     while (first != last)
     {
@@ -291,13 +291,13 @@ void SysRender::update_delete_drawing(
 
 template<typename IT_T>
 void SysRender::update_delete_groups(
-        ACtxRenderGroups& rCtxGroups, IT_T first, IT_T last)
+        ACtxRenderGroups& rCtxGroups, IT_T first, IT_T const& last)
 {
     if (first == last)
     {
         return;
     }
-    for (auto& [_, rGroup] : rCtxGroups.m_groups)
+    for ([[maybe_unused]] auto& [_, rGroup] : rCtxGroups.m_groups)
     {
         rGroup.m_entities.remove(first, last);
     }

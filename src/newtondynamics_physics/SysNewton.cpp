@@ -76,8 +76,11 @@ using osp::Matrix3;
 using osp::Matrix4;
 using osp::Vector3;
 
+namespace
+{
+
 // Callback called for dynamic rigid bodies for applying force and torque
-void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
+static void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
 {
     // Get context from Newton World
     auto const *const pWorldCtx = static_cast<ACtxNwtWorld*>(
@@ -121,10 +124,10 @@ void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
     {
         NewtonBodySetTorque(pBody, torque.data());
     }
-}
+} // cb_force_torque()
 
-void cb_set_transform(NewtonBody const* const pBody,
-                      const dFloat* const pMatrix, int threadIndex)
+static void cb_set_transform(NewtonBody const* const pBody,
+                            const dFloat* const pMatrix, int threadIndex)
 {
     // Get context from Newton World
     ACtxNwtWorld* pWorldCtx = static_cast<ACtxNwtWorld*>(
@@ -135,9 +138,11 @@ void cb_set_transform(NewtonBody const* const pBody,
     ActiveEnt const ent = static_cast<ActiveEnt>(userData);
 
     pWorldCtx->m_perThread[threadIndex].m_setTf.emplace_back(ent, pBody);
-}
+} // cb_set_transform()
 
-void SysNewton::update_translate(ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld)
+} // namespace ()
+
+void SysNewton::update_translate(ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld) noexcept
 {
     NewtonWorld const* pNwtWorld = rCtxWorld.m_nwtWorld.get();
 
@@ -159,7 +164,7 @@ void SysNewton::update_translate(ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld)
 
 void SysNewton::update_colliders(
         ACtxPhysics &rCtxPhys, ACtxNwtWorld &rCtxWorld,
-        std::vector<ActiveEnt> const &collidersDirty)
+        std::vector<ActiveEnt> const &collidersDirty) noexcept
 {
     for (ActiveEnt ent : collidersDirty)
     {
@@ -217,7 +222,7 @@ void SysNewton::update_world(
         acomp_storage_t<ACompHierarchy> const& rHier,
         acomp_storage_t<ACompTransform>& rTf,
         acomp_storage_t<ACompTransformControlled>& rTfControlled,
-        acomp_storage_t<ACompTransformMutable>& rTfMutable)
+        acomp_storage_t<ACompTransformMutable>& rTfMutable) noexcept
 {
 
     NewtonWorld const* pNwtWorld = rCtxWorld.m_nwtWorld.get();
@@ -259,11 +264,8 @@ void SysNewton::update_world(
     // Return force and torques, then clear
     for (int i = 0; i < inputs.size(); i ++)
     {
-        std::swap(rCtxWorld.m_forceTorqueIn[i].m_force, inputs[i].m_physNetForce);
-        std::swap(rCtxWorld.m_forceTorqueIn[i].m_torque, inputs[i].m_physNetTorque);
-
-        inputs[i].m_physNetForce.clear();
-        inputs[i].m_physNetTorque.clear();
+        rCtxWorld.m_forceTorqueIn[i].m_force  = std::move(inputs[i].m_physNetForce);
+        rCtxWorld.m_forceTorqueIn[i].m_torque = std::move(inputs[i].m_physNetTorque);
     }
 
     for (ACtxPhysInputs &rInputs : inputs)
@@ -292,7 +294,7 @@ void SysNewton::update_world(
     }
 }
 
-void SysNewton::remove_components(ACtxNwtWorld& rCtxWorld, ActiveEnt ent)
+void SysNewton::remove_components(ACtxNwtWorld& rCtxWorld, ActiveEnt ent) noexcept
 {
     rCtxWorld.m_nwtBodies.remove(ent);
     rCtxWorld.m_nwtColliders.remove(ent);
@@ -303,7 +305,7 @@ void SysNewton::find_colliders_recurse(
         acomp_storage_t<ACompHierarchy> const& rHier,
         acomp_storage_t<ACompTransform> const& rTf,
         ActiveEnt ent, ActiveEnt firstChild,
-        Matrix4 const& transform, NewtonCollision* pCompound)
+        Matrix4 const& transform, NewtonCollision* pCompound) noexcept
 {
     // Add newton collider if exists
     if (rCtxPhys.m_solid.contains(ent)
@@ -368,7 +370,7 @@ void SysNewton::create_body(
         acomp_storage_t<ACompTransformControlled>& rTfControlled,
         acomp_storage_t<ACompTransformMutable>& rTfMutable,
         ActiveEnt ent,
-        NewtonWorld const* pNwtWorld)
+        NewtonWorld const* pNwtWorld) noexcept
 {
 
     ACompHierarchy const& entHier = rHier.get(ent);
@@ -461,8 +463,8 @@ void SysNewton::create_body(
     //NewtonBodySetAngularDamping(pBody, Vector3(1.0f, 1.0f, 1.0f).data());
 
     // Set callback for applying force and setting transforms
-    NewtonBodySetForceAndTorqueCallback(pBody, &cb_force_torque);
-    NewtonBodySetTransformCallback(pBody, &cb_set_transform);
+    NewtonBodySetForceAndTorqueCallback(pBody, &::cb_force_torque);
+    NewtonBodySetTransformCallback(pBody, &::cb_set_transform);
 
     // Set user data to entity
     // note: void* used as storing an ActiveEnt (uint32_t) by value

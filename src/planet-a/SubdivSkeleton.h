@@ -86,7 +86,7 @@ public:
      *
      * @return New ID created
      */
-    ID_T create_or_get(ID_T a, ID_T b)
+    ID_T create_or_get(ID_T const a, ID_T const b)
     {
         combination_t const combination = hash_id_combination(a, b);
 
@@ -142,11 +142,11 @@ private:
      * @return Hash unique to combination
      */
     static constexpr combination_t
-    hash_id_combination(ID_T a, ID_T b) noexcept
+    hash_id_combination(ID_T const a, ID_T const b) noexcept
     {
         // Sort to make A and B order-independent
-        id_int_t const ls = (a > b) ? id_int_t(a) : id_int_t(b);
-        id_int_t const ms = (a > b) ? id_int_t(b) : id_int_t(a);
+        id_int_t const ls = id_int_t(std::max(a, b));
+        id_int_t const ms = id_int_t(std::max(a, b));
 
         // Concatenate bits of ls and ms into a 2x larger integer
         // This can be two 32-bit ints being combined into a 64-bit int
@@ -193,7 +193,7 @@ public:
      *
      * @return New Vertex ID created
      */
-    SkVrtxId vrtx_create_or_get_child(SkVrtxId a, SkVrtxId b)
+    SkVrtxId vrtx_create_or_get_child(SkVrtxId const a, SkVrtxId const b)
     {
         return m_vrtxIdTree.create_or_get(a, b);
     }
@@ -205,7 +205,7 @@ public:
      *
      * @return Vertex ID Storage
      */
-    SkVrtxStorage_t vrtx_store(SkVrtxId vrtxId)
+    SkVrtxStorage_t vrtx_store(SkVrtxId const vrtxId)
     {
         return m_vrtxRefCount.ref_add(vrtxId);
     }
@@ -231,7 +231,7 @@ public:
      *
      * @param n [in] Requested capacity
      */
-    void vrtx_reserve(size_t n)
+    void vrtx_reserve(size_t const n)
     {
         m_vrtxIdTree.reserve(n);
         m_vrtxRefCount.resize(m_vrtxIdTree.capacity());
@@ -297,7 +297,7 @@ struct SkTriGroup
 /**
  * @return Group ID of a SkeletonTriangle's group specified by Id
  */
-constexpr SkTriGroupId tri_group_id(SkTriId id) noexcept
+constexpr SkTriGroupId tri_group_id(SkTriId const id) noexcept
 {
     return SkTriGroupId( uint32_t(id) / 4 );
 }
@@ -305,7 +305,7 @@ constexpr SkTriGroupId tri_group_id(SkTriId id) noexcept
 /**
  * @return Sibling index of a SkeletonTriangle by Id
  */
-constexpr uint8_t tri_sibling_index(SkTriId id) noexcept
+constexpr uint8_t tri_sibling_index(SkTriId const id) noexcept
 {
     return uint32_t(id) % 4;
 }
@@ -313,7 +313,7 @@ constexpr uint8_t tri_sibling_index(SkTriId id) noexcept
 /**
  * @return Id of a SkeletonTriangle from it's group Id and sibling index
  */
-constexpr SkTriId tri_id(SkTriGroupId id, uint8_t siblingIndex) noexcept
+constexpr SkTriId tri_id(SkTriGroupId const id, uint8_t const siblingIndex) noexcept
 {
     return SkTriId(uint32_t(id) * 4 + siblingIndex);
 }
@@ -331,7 +331,6 @@ public:
     SubdivTriangleSkeleton() = default;
 
     SubdivTriangleSkeleton(SubdivTriangleSkeleton const&) = delete;
-
     SubdivTriangleSkeleton(SubdivTriangleSkeleton&& move) = default;
 
     ~SubdivTriangleSkeleton()
@@ -405,7 +404,7 @@ public:
      * @param rOut  [out] Output Vertex IDs, size must be 2^level-1
      */
     void vrtx_create_chunk_edge_recurse(
-            unsigned int level,
+            unsigned int const level,
             SkVrtxId a, SkVrtxId b,
             ArrayView_t< SkVrtxId > rOut)
     {
@@ -444,9 +443,9 @@ public:
      * @return New Triangle Group ID
      */
     SkTriGroupId tri_group_create(
-            uint8_t depth,
-            SkTriId parent,
-            std::array<std::array<SkVrtxId, 3>, 4> vertices)
+            uint8_t const depth,
+            SkTriId const parent,
+            std::array<std::array<SkVrtxId, 3>, 4> const vertices)
     {
         SkTriGroupId const groupId = m_triIds.create();
         tri_group_resize_fit_ids();
@@ -471,7 +470,7 @@ public:
     /**
      * @return Triangle data from ID
      */
-    SkeletonTriangle& tri_at(SkTriId triId)
+    SkeletonTriangle& tri_at(SkTriId const triId)
     {
         auto groupIndex = size_t(tri_group_id(triId));
         uint8_t siblingIndex = tri_sibling_index(triId);
@@ -498,7 +497,7 @@ public:
      *
      * @param n [in] Requested capacity
      */
-    void tri_group_reserve(size_t n)
+    void tri_group_reserve(size_t const n)
     {
         m_triIds.reserve(n);
         m_triData.reserve(m_triIds.capacity());
@@ -510,7 +509,7 @@ public:
      *
      * @return Triangle
      */
-    SkTriStorage_t tri_store(SkTriId triId)
+    SkTriStorage_t tri_store(SkTriId const triId)
     {
         return m_triRefCount.ref_add(triId);
     }
@@ -533,10 +532,7 @@ private:
 
     // access using SkTriGroupId from m_triIds
     std::vector<SkTriGroup> m_triData;
-
-
 }; // class SubdivTriangleSkeleton
-
 
 
 }

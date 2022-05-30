@@ -75,21 +75,21 @@ public:
 
     template<typename IT_T>
     static void update_delete_phys(
-            ACtxPhysics &rCtxPhys, IT_T first, IT_T last);
+            ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last);
 
     template<typename IT_T>
     static void update_delete_shapes(
-            ACtxPhysics &rCtxPhys, IT_T first, IT_T last);
+            ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last);
 
     template<typename IT_T>
     static void update_delete_hier_body(
-            ACtxHierBody &rCtxHierBody, IT_T first, IT_T last);
+            ACtxHierBody &rCtxHierBody, IT_T first, IT_T const& last);
 
 };
 
 template<typename IT_T>
 void SysPhysics::update_delete_phys(
-        ACtxPhysics &rCtxPhys, IT_T first, IT_T last)
+        ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last)
 {
     while (first != last)
     {
@@ -103,13 +103,13 @@ void SysPhysics::update_delete_phys(
             rCtxPhys.m_physAngularVel   .remove(ent);
         }
 
-        ++first;
+        std::advance(first, 1);
     }
 }
 
 template<typename IT_T>
 void SysPhysics::update_delete_shapes(
-        ACtxPhysics &rCtxPhys, IT_T first, IT_T last)
+        ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last)
 {
     rCtxPhys.m_hasColliders.remove(first, last);
 
@@ -123,13 +123,13 @@ void SysPhysics::update_delete_shapes(
             rCtxPhys.m_solid.remove(ent);
         }
 
-        ++first;
+        std::advance(first, 1);
     }
 }
 
 template<typename IT_T>
 void SysPhysics::update_delete_hier_body(
-        ACtxHierBody &rCtxHierBody, IT_T first, IT_T last)
+        ACtxHierBody &rCtxHierBody, IT_T first, IT_T const& last)
 {
     rCtxHierBody.m_ownDyn.remove(first, last);
     rCtxHierBody.m_totalDyn.remove(first, last);

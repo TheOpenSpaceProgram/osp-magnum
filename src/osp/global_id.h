@@ -25,6 +25,8 @@
  */
 #pragma once
 
+#include <cstddef>
+
 namespace osp
 {
 
@@ -35,13 +37,14 @@ struct GlobalIdReg
     {
         return ID_T(sm_count++);
     }
-    [[nodiscard]] static inline int size() noexcept
+
+    [[nodiscard]] static inline std::size_t size() noexcept
     {
         return sm_count;
     }
 
 private:
-    static inline int sm_count{0};
+    static inline std::size_t sm_count{0};
 };
 
 } // namespace osp

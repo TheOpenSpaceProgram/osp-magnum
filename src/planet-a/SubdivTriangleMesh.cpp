@@ -32,7 +32,7 @@ using namespace planeta;
 
 
 ChunkedTriangleMeshInfo planeta::make_subdivtrimesh_general(
-        unsigned int chunkMax, unsigned int subdivLevels, int pow2scale)
+        unsigned int const chunkMax, unsigned int const subdivLevels, int const pow2scale)
 {
     // calculate stuff here
 
@@ -105,7 +105,7 @@ ChunkId ChunkedTriangleMeshInfo::chunk_create(
 
 //-----------------------------------------------------------------------------
 
-ChunkVrtxSubdivLUT::ChunkVrtxSubdivLUT(uint8_t subdivLevel)
+ChunkVrtxSubdivLUT::ChunkVrtxSubdivLUT(uint8_t const subdivLevel)
 {
     m_edgeVrtxCount = 1u << subdivLevel;
     m_fillVrtxCount = (m_edgeVrtxCount-2) * (m_edgeVrtxCount-1) / 2;
@@ -124,11 +124,11 @@ ChunkVrtxSubdivLUT::ChunkVrtxSubdivLUT(uint8_t subdivLevel)
 }
 
 void ChunkVrtxSubdivLUT::subdiv_line_recurse(
-        Vector2us a, Vector2us b, uint8_t level)
+        Vector2us const a, Vector2us const b, uint8_t const level)
 {
     Vector2us const mid = (a + b) / 2;
 
-    ChunkLocalSharedId out = ChunkLocalSharedId(xy_to_triangular(mid.x() - 1, mid.y() - 2));
+    ChunkLocalSharedId const out = ChunkLocalSharedId(xy_to_triangular(mid.x() - 1, mid.y() - 2));
 
     m_data.emplace_back(ToSubdiv{id_at(a), id_at(b), out});
 
@@ -141,7 +141,7 @@ void ChunkVrtxSubdivLUT::subdiv_line_recurse(
 }
 
 void ChunkVrtxSubdivLUT::fill_tri_recurse(
-        Vector2us top, Vector2us lft, Vector2us rte, uint8_t level)
+        Vector2us const top, Vector2us const lft, Vector2us const rte, uint8_t const level)
 {
     // calculate midpoints
     std::array<Vector2us, 3> const mid

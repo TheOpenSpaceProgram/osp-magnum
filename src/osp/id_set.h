@@ -35,12 +35,12 @@ class IdSet
 public:
     ID_T id_of(KEY_T key)
     {
-        auto const& [it, success] = m_data.emplace(key, ID_T(m_data.size()));
+        [[maybe_unused]] auto const& [it, success] = m_data.emplace(std::move(key), ID_T(m_data.size()));
         return it->second;
     }
 
 private:
-    std::unordered_map<KEY_T, ID_T> m_data;
+    std::unordered_map<KEY_T, ID_T, std::less<>> m_data;
 };
 
 }

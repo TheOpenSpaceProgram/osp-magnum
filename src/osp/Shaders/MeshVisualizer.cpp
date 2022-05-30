@@ -41,7 +41,9 @@ void shader::draw_ent_visualizer(
 {
     using Magnum::Shaders::MeshVisualizerGL3D;
 
-    auto &rData = *reinterpret_cast<ACtxDrawMeshVisualizer*>(userData[0]);
+    void* const pData = std::get<0>(userData);
+    assert(pData != nullptr);
+    auto &rData = *reinterpret_cast<ACtxDrawMeshVisualizer*>(pData);
 
     ACompDrawTransform const& drawTf = rData.m_pDrawTf->get(ent);
 
@@ -80,7 +82,7 @@ void shader::assign_visualizer(
         RenderGroup::ArrayView_t entities, RenderGroup::Storage_t &rStorage,
         ACtxDrawMeshVisualizer &rData)
 {
-    for (ActiveEnt ent : entities)
+    for (ActiveEnt const ent : entities)
     {
         rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
     }

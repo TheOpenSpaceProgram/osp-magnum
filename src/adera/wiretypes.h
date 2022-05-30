@@ -40,15 +40,7 @@ namespace adera::wire
         // pitch, yaw, roll
         osp::Vector3 m_attitude;
 
-        bool operator==(AttitudeControl const& rhs) const
-        {
-            return m_attitude == rhs.m_attitude;
-        }
-
-        bool operator!=(AttitudeControl const& rhs) const
-        {
-            return m_attitude != rhs.m_attitude;
-        }
+        friend bool operator==(AttitudeControl const& lhs, AttitudeControl const& rhs) noexcept = default;
     };
 
     /**
@@ -61,15 +53,7 @@ namespace adera::wire
 
         float m_percent;
 
-        constexpr bool operator==(Percent const& rhs) const
-        {
-            return m_percent == rhs.m_percent;
-        }
-
-        constexpr bool operator!=(Percent const& rhs) const
-        {
-            return m_percent != rhs.m_percent;
-        }
+        friend constexpr bool operator==(Percent const& lhs, Percent const& rhs) noexcept = default;
     };
 
     /**

@@ -44,7 +44,7 @@ using osp::Vector3;
 
 void SysCameraController::update_view(
         ACtxCameraController &rCtrl, osp::active::ACompTransform &rCamTf,
-        float delta)
+        float const delta)
 {
     // Process control inputs
 
@@ -125,13 +125,12 @@ void SysCameraController::update_view(
     else
     {
         // TODO: No target, Rotate in place
-
     }
 }
 
 void SysCameraController::update_move(
         ACtxCameraController &rCtrl, osp::active::ACompTransform &rCamTf,
-        float delta, bool moveTarget)
+        float const delta, bool const moveTarget)
 {
     ControlSubscriber const& controls = rCtrl.m_controls;
 

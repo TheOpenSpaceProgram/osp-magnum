@@ -237,7 +237,7 @@ ControlExprConfig_t parse_control(std::string_view str) noexcept
     auto end = str.find(delim);
     while (end != std::string::npos)
     {
-        std::string_view sub = str.substr(start, end - start);
+        std::string_view const sub = str.substr(start, end - start);
 
         if (auto const& it = gc_buttonMap.find(sub);
             it != gc_buttonMap.end())
@@ -250,7 +250,7 @@ ControlExprConfig_t parse_control(std::string_view str) noexcept
         end = str.find(delim, start);
     }
 
-    std::string_view sub = str.substr(start, end);
+    std::string_view const sub = str.substr(start, end);
 
     if (auto const& it = gc_buttonMap.find(sub);
         it != gc_buttonMap.end())

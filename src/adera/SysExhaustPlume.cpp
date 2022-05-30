@@ -160,7 +160,7 @@ void attach_plume_effect(ActiveScene &rScene, ActiveEnt part, ActiveEnt mach)
     rScene.get_registry().ctx<osp::active::ACtxRenderGroups>().add<MaterialPlume>(plumeNode);
 }
 
-void SysExhaustPlume::update_construct(ActiveScene& rScene)
+void SysExhaustPlume::update_construct(ActiveScene& rScene) noexcept
 {
     // TODO: this is kind of a hacky function, Plumes should be made into
     //       their own Machines
@@ -199,7 +199,7 @@ void SysExhaustPlume::update_construct(ActiveScene& rScene)
 // TODO: workaround. add an actual way to keep time accessible from ActiveScene
 float g_time = 0;
 
-void SysExhaustPlume::update_plumes(ActiveScene& rScene)
+void SysExhaustPlume::update_plumes(ActiveScene& rScene) noexcept
 {
     g_time += rScene.get_time_delta_fixed();
 

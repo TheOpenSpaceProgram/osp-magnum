@@ -128,7 +128,7 @@ struct ACtxBasic
 };
 
 template<typename IT_T>
-void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T last)
+void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
 {
     rCtxBasic.m_floatingOrigin  .remove(first, last);
     rCtxBasic.m_name            .remove(first, last);
@@ -147,7 +147,7 @@ void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T last)
 
         }
 
-        ++first;
+        std::advance(first, 1);
     }
 }
 

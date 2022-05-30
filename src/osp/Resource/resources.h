@@ -60,11 +60,7 @@ class Resources
     struct PerPkgResType
     {
         lgrn::HierarchicalBitset<uint64_t> m_owned;
-
-        // String views point to elements of PerResType::m_resNames
-        // Using string_view here prevents the need to allocate a SharedString
-        // when accessed
-        std::unordered_map< std::string_view, ResId > m_nameToResId;
+        std::unordered_map< SharedString, ResId, std::hash<SharedString>, std::equal_to<> > m_nameToResId;
     };
 
     struct PerPkg
@@ -93,7 +89,7 @@ public:
      *
      * @return Newly created Resource Id
      */
-    [[nodiscard]] ResId create(ResTypeId typeId, PkgId pkgId, std::string_view name);
+    [[nodiscard]] ResId create(ResTypeId typeId, PkgId pkgId, SharedString name);
 
     [[nodiscard]] ResId find(ResTypeId typeId, PkgId pkgId, std::string_view name) const noexcept;
 

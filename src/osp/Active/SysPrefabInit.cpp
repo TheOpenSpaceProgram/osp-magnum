@@ -114,41 +114,42 @@ void SysPrefabInit::init_drawing(
         for (int i = 0; i < objects.size(); ++i)
         {
             // Check if object has mesh
-            if (int const meshImportId = rImportData.m_objMeshes[objects[i]];
-               meshImportId != -1)
+            int const meshImportId = rImportData.m_objMeshes[objects[i]];
+            if (meshImportId == -1)
             {
-                ActiveEnt const ent = rPrefab.m_prefabToEnt[i];
+                continue;
+            }
 
-                osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
-                MeshId const meshId = SysRender::own_mesh_resource(rCtxDraw, rCtxDrawRes, rResources, meshRes);
-                rCtxDraw.m_mesh.emplace(ent, rCtxDraw.m_meshRefCounts.ref_add(meshId));
-                rCtxDraw.m_meshDirty.push_back(ent);
+            ActiveEnt const ent = rPrefab.m_prefabToEnt[i];
 
-                int const matImportId = rImportData.m_objMaterials[objects[i]];
+            osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
+            MeshId const meshId = SysRender::own_mesh_resource(rCtxDraw, rCtxDrawRes, rResources, meshRes);
+            rCtxDraw.m_mesh.emplace(ent, rCtxDraw.m_meshRefCounts.ref_add(meshId));
+            rCtxDraw.m_meshDirty.push_back(ent);
 
-                if (Magnum::Trade::MaterialData const &mat = *rImportData.m_materials.at(matImportId);
-                    mat.types() & Magnum::Trade::MaterialType::PbrMetallicRoughness)
+            int const matImportId = rImportData.m_objMaterials[objects[i]];
+
+            if (Magnum::Trade::MaterialData const &mat = *rImportData.m_materials.at(matImportId);
+                mat.types() & Magnum::Trade::MaterialType::PbrMetallicRoughness)
+            {
+                auto const& matPbr = mat.as<Magnum::Trade::PbrMetallicRoughnessMaterialData>();
+                if (int const baseColor = matPbr.baseColorTexture();
+                    baseColor != -1)
                 {
-                    auto const& matPbr = mat.as<Magnum::Trade::PbrMetallicRoughnessMaterialData>();
-                    if (int const baseColor = matPbr.baseColorTexture();
-                        baseColor != -1)
-                    {
-                        osp::ResId const texRes = rImportData.m_textures[baseColor];
-                        TexId const texId = SysRender::own_texture_resource(rCtxDraw, rCtxDrawRes, rResources, texRes);
-                        rCtxDraw.m_diffuseTex.emplace(ent, rCtxDraw.m_texRefCounts.ref_add(texId));
-                        rCtxDraw.m_diffuseDirty.push_back(ent);
-                    }
-
+                    osp::ResId const texRes = rImportData.m_textures[baseColor];
+                    TexId const texId = SysRender::own_texture_resource(rCtxDraw, rCtxDrawRes, rResources, texRes);
+                    rCtxDraw.m_diffuseTex.emplace(ent, rCtxDraw.m_texRefCounts.ref_add(texId));
+                    rCtxDraw.m_diffuseDirty.push_back(ent);
                 }
 
-
-                MaterialData &rMaterial = rCtxDraw.m_materials[materialId];
-                rMaterial.m_comp.emplace(ent);
-                rMaterial.m_added.push_back(ent);
-
-                rCtxDraw.m_opaque.emplace(ent);
-                rCtxDraw.m_visible.emplace(ent);
             }
+
+            MaterialData &rMaterial = rCtxDraw.m_materials[materialId];
+            rMaterial.m_comp.emplace(ent);
+            rMaterial.m_added.push_back(ent);
+
+            rCtxDraw.m_opaque.emplace(ent);
+            rCtxDraw.m_visible.emplace(ent);
         }
     }
 }
@@ -187,7 +188,7 @@ void SysPrefabInit::init_physics(
                 rPhysIn.m_colliderDirty.push_back(ent);
             }
 
-            if (float mass = rPrefabData.m_objMass[objects[i]];
+            if (float const mass = rPrefabData.m_objMass[objects[i]];
                mass != 0.0f)
             {
                 osp::Vector3 const inertia = osp::phys::collider_inertia_tensor(

@@ -29,9 +29,9 @@
 using namespace planeta;
 
 SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
-        double radius, int pow2scale,
-        Corrade::Containers::StaticArrayView<gc_icoVrtxCount, SkVrtxId> vrtxIds,
-        Corrade::Containers::StaticArrayView<gc_icoTriCount, SkTriId> triIds,
+        double const radius, int const pow2scale,
+        Corrade::Containers::StaticArrayView<gc_icoVrtxCount, SkVrtxId> const vrtxIds,
+        Corrade::Containers::StaticArrayView<gc_icoTriCount, SkTriId> const triIds,
         std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals)
 {
@@ -160,7 +160,7 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
 }
 
 void subdiv_curvature(
-        double radius, float scale, osp::Vector3l const a, osp::Vector3l const b,
+        double const radius, float const scale, osp::Vector3l const a, osp::Vector3l const b,
         osp::Vector3l &rPos, osp::Vector3 &rNorm) noexcept
 {
     osp::Vector3l const avg = (a + b) / 2;
@@ -173,14 +173,14 @@ void subdiv_curvature(
 }
 
 void planeta::ico_calc_middles(
-        double radius, int pow2scale,
+        double const radius, int const pow2scale,
         std::array<SkVrtxId, 3> const vrtxCorner,
         std::array<SkVrtxId, 3> const vrtxMid,
         std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals)
 {
-    auto pos = [&rPositions] (SkVrtxId id) -> osp::Vector3l& { return rPositions[size_t(id)]; };
-    auto nrm = [&rNormals] (SkVrtxId id) -> osp::Vector3& { return rNormals[size_t(id)]; };
+    auto const pos = [&rPositions] (SkVrtxId const id) -> osp::Vector3l& { return rPositions[size_t(id)]; };
+    auto const nrm = [&rNormals]   (SkVrtxId const id) -> osp::Vector3&  { return rNormals[size_t(id)];   };
 
     float const scale = std::pow(2.0f, pow2scale);
 
@@ -196,19 +196,19 @@ void planeta::ico_calc_middles(
 
 
 void planeta::ico_calc_chunk_edge_recurse(
-        double radius, int pow2scale, unsigned int level,
-        SkVrtxId a, SkVrtxId b,
-        ArrayView_t<SkVrtxId const> vrtxs,
+        double const radius, int const pow2scale, unsigned int const level,
+        SkVrtxId const a, SkVrtxId const b,
+        ArrayView_t<SkVrtxId const> const vrtxs,
         std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals)
 {
-    auto pos = [&rPositions] (SkVrtxId id) -> osp::Vector3l& { return rPositions[size_t(id)]; };
-    auto nrm = [&rNormals] (SkVrtxId id) -> osp::Vector3& { return rNormals[size_t(id)]; };
-
     if (level == 0)
     {
         return;
     }
+
+    auto const pos = [&rPositions] (SkVrtxId const id) -> osp::Vector3l& { return rPositions[size_t(id)]; };
+    auto const nrm = [&rNormals]   (SkVrtxId const id) -> osp::Vector3&  { return rNormals[size_t(id)];   };
 
     size_t const halfSize = vrtxs.size() / 2;
     SkVrtxId const mid = vrtxs[halfSize];

@@ -37,8 +37,13 @@ void shader::draw_ent_phong(
 {
     using Flag = Phong::Flag;
 
-    auto &rData = *reinterpret_cast<ACtxDrawPhong*>(userData[0]);
-    auto &rShader = *reinterpret_cast<Phong*>(userData[1]);
+    void* const pData   = std::get<0>(userData);
+    void* const pShader = std::get<1>(userData);
+    assert(pData   != nullptr);
+    assert(pShader != nullptr);
+
+    auto &rData   = *reinterpret_cast<ACtxDrawPhong*>(pData);
+    auto &rShader = *reinterpret_cast<Phong*>(pShader);
 
     // Collect uniform information
     ACompDrawTransform const &drawTf = rData.m_pDrawTf->get(ent);
@@ -77,8 +82,8 @@ void shader::draw_ent_phong(
         .setAmbientColor(0x000000ff_rgbaf)
         .setSpecularColor(0xffffff00_rgbaf)
         .setLightColors({0xfff5ec_rgbf, 0xe4e8ff_rgbf})
-        .setLightPositions({Vector4{Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f},
-                           Vector4{-Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f}})
+        .setLightPositions({ Vector4{ Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f},
+                             Vector4{-Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f} })
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(viewProj.m_proj)
         .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
@@ -94,8 +99,7 @@ void shader::assign_phong(
         acomp_storage_t<active::ACompTexGl> const& diffuse,
         ACtxDrawPhong &rData)
 {
-
-    for (ActiveEnt ent : entities)
+    for (ActiveEnt const ent : entities)
     {
         if (opaque.contains(ent))
         {
@@ -117,7 +121,6 @@ void shader::assign_phong(
         }
         else
         {
-
             if (pStorageTransparent == nullptr)
             {
                 continue;
@@ -133,10 +136,7 @@ void shader::assign_phong(
                 pStorageTransparent->emplace(
                         ent, EntityToDraw{&draw_ent_phong, {&rData, &rData.m_shaderUntextured} });
             }
-
         }
-
-
     }
 }
 

@@ -53,7 +53,9 @@ enum class EButtonControlIndex : uint32_t
  */
 struct ButtonRaw
 {
-    bool m_pressed, m_justPressed, m_justReleased;
+    bool m_pressed;
+    bool m_justPressed;
+    bool m_justReleased;
     uint8_t m_referenceCount;
 };
 
@@ -64,7 +66,6 @@ using ButtonMap_t = std::map<int, ButtonRaw, std::less<>>;
  */
 struct MouseMotion
 {
-public:
     Vector2i m_rawDelta;
     Vector2 m_smoothDelta{ 0.0f };
 
@@ -145,8 +146,9 @@ struct ButtonControl
     // hold is true if just all the hold conditions are true.
     // ignore the press/releases
 
+    bool m_held{false};
     bool m_holdable{false};
-    bool m_triggered{false}, m_held{false};
+    bool m_triggered{false};
 
     ControlExpr_t m_exprPress{};
     ControlExpr_t m_exprRelease{};
@@ -164,12 +166,6 @@ struct ButtonControlConfig
 
 struct ButtonControlEvent
 {
-    constexpr ButtonControlEvent(EButtonControlIndex index,
-                                 EButtonControlEvent event) noexcept
-     : m_index(index)
-     , m_event(event)
-    { }
-
     EButtonControlIndex m_index;
     EButtonControlEvent m_event;
 };
