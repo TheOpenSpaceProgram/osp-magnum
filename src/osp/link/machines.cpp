@@ -35,7 +35,7 @@ void copy_machines(
         Corrade::Containers::ArrayView<MachAnyId> remapMach)
 {
 
-    for (MachAnyId srcMach : rSrc.m_ids.bitview().zeros())
+    for (MachAnyId const srcMach : rSrc.m_ids.bitview().zeros())
     {
         MachTypeId const srcType = rSrc.m_machTypes[srcMach];
         PerMachType &rDstPerMach = rDst.m_perType[srcType];
@@ -67,7 +67,7 @@ void copy_nodes(
     using lgrn::Span;
 
     // Create new node IDs
-    for (NodeId srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
+    for (NodeId const srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
     {
         NodeId const dstNode = rDstNodes.m_nodeIds.create();
         remapNode[srcNode] = dstNode;
@@ -77,7 +77,7 @@ void copy_nodes(
     rDstNodes.m_nodeToMach.ids_reserve(rDstNodes.m_nodeIds.capacity());
     rDstNodes.m_nodeToMach.data_reserve(rDstNodes.m_nodeToMach.data_size()
                                         + rSrcNodes.m_nodeToMach.data_size());
-    for (NodeId srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
+    for (NodeId const srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
     {
         NodeId const dstNode = remapNode[srcNode];
         Span<Junction const> srcJunction = rSrcNodes.m_nodeToMach[srcNode];
@@ -104,7 +104,7 @@ void copy_nodes(
     rDstNodes.m_machToNode.ids_reserve(rDstMach.m_ids.capacity());
     rDstNodes.m_machToNode.data_reserve(rDstNodes.m_machToNode.data_size()
                                         + rSrcNodes.m_machToNode.data_size());
-    for (MachAnyId srcMach : rSrcMach.m_ids.bitview().zeros())
+    for (MachAnyId const srcMach : rSrcMach.m_ids.bitview().zeros())
     {
         if (rSrcNodes.m_machToNode.contains(srcMach))
         {
@@ -123,7 +123,5 @@ void copy_nodes(
         }
     }
 }
-
-
 
 } // namespace osp::link

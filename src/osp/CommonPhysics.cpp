@@ -62,12 +62,11 @@ Matrix3 transform_inertia_tensor(Matrix3 I, float mass, Vector3 translation, Mat
     I = rotation.transposed() * I * rotation;
 
     // Translate via tensor generalized parallel axis theorem
-    using Magnum::Math::dot;
     const Vector3 r = translation;
     const Matrix3 outerProductR = {r * r.x(), r * r.y(), r * r.z()};
     const Matrix3 E3 = Matrix3{};
 
-    return I + mass * (dot(r, r) * E3 - outerProductR);
+    return I + mass * (Magnum::Math::dot(r, r) * E3 - outerProductR);
 }
 
 Vector3 collider_inertia_tensor(EShape shape, Vector3 scale, float mass)
@@ -97,8 +96,8 @@ Vector3 collider_inertia_tensor(EShape shape, Vector3 scale, float mass)
     case EShape::Capsule:
 
     default:
-      SPDLOG_LOGGER_ERROR(spdlog::get("application"),
-                          "ERROR: unknown collision shape");
+        SPDLOG_LOGGER_ERROR(spdlog::get("application"),
+                            "ERROR: unknown collision shape");
         assert(false);
         return Vector3{0.0f};
     }

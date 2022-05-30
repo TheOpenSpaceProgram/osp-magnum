@@ -36,12 +36,12 @@ entt::any setup_scene()
 
     rScene.m_nwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(1);
 
-    return std::move(sceneAny);
+    return sceneAny;
 }
 
 on_draw_t generate_draw_func(FlightScene& rScene, ActiveApplication& rApp)
 {
-    return [] (ActiveApplication& rApp, float delta) {};
+    return [] (ActiveApplication& rApp, float const delta) {};
 }
 
 } // namespace testapp::flight

@@ -37,8 +37,13 @@ void shader::draw_ent_flat(
 {
     using Flag = Flat::Flag;
 
-    auto &rData = *reinterpret_cast<ACtxDrawFlat*>(userData[0]);
-    auto &rShader = *reinterpret_cast<Flat*>(userData[1]);
+    void* const pData   = std::get<0>(userData);
+    void* const pShader = std::get<1>(userData);
+    assert(pData   != nullptr);
+    assert(pShader != nullptr);
+
+    auto &rData   = *reinterpret_cast<ACtxDrawFlat*>(pData);
+    auto &rShader = *reinterpret_cast<Flat*>(pShader);
 
     // Collect uniform information
     ACompDrawTransform const &drawTf = rData.m_pDrawTf->get(ent);
@@ -73,8 +78,7 @@ void shader::assign_flat(
         acomp_storage_t<active::ACompTexGl> const& diffuse,
         ACtxDrawFlat &rData)
 {
-
-    for (ActiveEnt ent : entities)
+    for (ActiveEnt const ent : entities)
     {
         if (opaque.contains(ent))
         {
@@ -96,7 +100,6 @@ void shader::assign_flat(
         }
         else
         {
-
             if (pStorageTransparent == nullptr)
             {
                 continue;
@@ -112,10 +115,7 @@ void shader::assign_flat(
                 pStorageTransparent->emplace(
                         ent, EntityToDraw{&draw_ent_flat, {&rData, &rData.m_shaderUntextured} });
             }
-
         }
-
-
     }
 }
 

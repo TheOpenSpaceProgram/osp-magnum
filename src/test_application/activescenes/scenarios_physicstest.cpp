@@ -94,7 +94,7 @@ struct PhysicsTestData
 };
 
 
-void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
+void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId const pkg)
 {
     using namespace osp::active;
 
@@ -114,7 +114,7 @@ void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId pkg)
     osp::Resources &rResources = *rScene.m_pResources;
 
     // Convenient function to get a reference-counted mesh owner
-    auto const quick_add_mesh = [&rScene, &rResources, pkg] (std::string_view name) -> MeshIdOwner_t
+    auto const quick_add_mesh = [&rScene, &rResources, pkg] (std::string_view const name) -> MeshIdOwner_t
     {
         osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
         assert(res != lgrn::id_null<osp::ResId>());
@@ -213,8 +213,8 @@ static void update_test_scene_delete(CommonTestScene &rScene)
 
     rScene.update_hierarchy_delete();
 
-    auto first = std::cbegin(rScene.m_deleteTotal);
-    auto last = std::cend(rScene.m_deleteTotal);
+    auto const& first = std::cbegin(rScene.m_deleteTotal);
+    auto const& last = std::cend(rScene.m_deleteTotal);
 
     // Delete components of total entities to delete
     SysPhysics::update_delete_phys      (rScnPhys.m_physics,    first, last);
@@ -234,7 +234,7 @@ static void update_test_scene_delete(CommonTestScene &rScene)
  *
  * @param rScene [ref] scene to update
  */
-static void update_test_scene(CommonTestScene& rScene, float delta)
+static void update_test_scene(CommonTestScene& rScene, float const delta)
 {
     using namespace osp::active;
     using namespace ospnewton;
@@ -276,7 +276,7 @@ static void update_test_scene(CommonTestScene& rScene, float delta)
     }
 
     // Gravity System, applies a 9.81N force downwards (-Y) for select entities
-    for (ActiveEnt ent : rScnTest.m_hasGravity)
+    for (ActiveEnt const ent : rScnTest.m_hasGravity)
     {
         acomp_storage_t<ACompPhysNetForce> &rNetForce
                 = rScnPhys.m_physIn.m_physNetForce;

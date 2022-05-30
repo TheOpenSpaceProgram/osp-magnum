@@ -40,27 +40,27 @@ void PhysicsData::cleanup(CommonTestScene& rScene)
 {
     auto &rScnPhys = rScene.get<PhysicsData>();
 
-    for (auto && [_, rOwner] : std::exchange(rScnPhys.m_shapeToMesh, {}))
+    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rScnPhys.m_shapeToMesh, {}))
     {
         rScene.m_drawing.m_meshRefCounts.ref_release(std::move(rOwner));
     }
 
-    for (auto && [_, rOwner] : std::exchange(rScnPhys.m_namedMeshs, {}))
+    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rScnPhys.m_namedMeshs, {}))
     {
         rScene.m_drawing.m_meshRefCounts.ref_release(std::move(rOwner));
     }
 }
 
 ActiveEnt add_solid_quick(
-        CommonTestScene& rScene, ActiveEnt parent, osp::phys::EShape shape,
-        osp::Matrix4 transform, int material, float mass)
+        CommonTestScene& rScene, ActiveEnt const parent, osp::phys::EShape const shape,
+        osp::Matrix4 const transform, int const material, float const mass)
 {
     using namespace osp::active;
 
     auto &rScnPhys = rScene.get<PhysicsData>();
 
     // Make entity
-    ActiveEnt ent = rScene.m_activeIds.create();
+    ActiveEnt const ent = rScene.m_activeIds.create();
 
     // Add mesh
     rScene.m_drawing.m_mesh.emplace(
@@ -95,8 +95,8 @@ ActiveEnt add_solid_quick(
 }
 
 ActiveEnt add_rigid_body_quick(
-        CommonTestScene &rScene, osp::Vector3 position, osp::Vector3 velocity,
-        float mass, osp::phys::EShape shape, osp::Vector3 size)
+        CommonTestScene &rScene, osp::Vector3 const position, osp::Vector3 const velocity,
+        float const mass, osp::phys::EShape const shape, osp::Vector3 const size)
 {
     using namespace osp::active;
 
@@ -105,7 +105,7 @@ ActiveEnt add_rigid_body_quick(
     // Root is needed to act as the rigid body entity
     // Scale of root entity must be (1, 1, 1). Descendents that act as colliders
     // are allowed to have different scales
-    ActiveEnt root = rScene.m_activeIds.create();
+    ActiveEnt const root = rScene.m_activeIds.create();
 
     // Add transform
     rScene.m_basic.m_transform.emplace(

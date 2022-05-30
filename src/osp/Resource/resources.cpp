@@ -26,7 +26,7 @@
 
 using namespace osp;
 
-ResId Resources::create(ResTypeId typeId, PkgId pkgId, std::string_view name)
+ResId Resources::create(ResTypeId const typeId, PkgId const pkgId, SharedString name)
 {
     // Create ResId associated to specified ResTypeId
     PerResType &rPerResType = get_type(typeId);
@@ -44,16 +44,17 @@ ResId Resources::create(ResTypeId typeId, PkgId pkgId, std::string_view name)
     rPkgType.m_owned.set(std::size_t(newResId));
 
     // Track name
+    auto const& [newIt, success] = rPkgType.m_nameToResId.emplace(std::move(name), newResId);
+    auto const& [key, value]     = *newIt;
+    assert(success); // emplace should always succeed
+
     rPerResType.m_resNames.resize(rPerResType.m_resIds.capacity());
-    SharedString& rResName = rPerResType.m_resNames[std::size_t(newResId)];
-    rResName = SharedString::create(name); // allocates name
-    [[maybe_unused]] auto newIt = rPkgType.m_nameToResId.emplace(rResName, newResId);
-    assert(newIt.second); // emplace should always succeed
+    rPerResType.m_resNames[std::size_t(value)] = key;
 
     return newResId;
 }
 
-ResId Resources::find(ResTypeId typeId, PkgId pkgId, std::string_view name) const noexcept
+ResId Resources::find(ResTypeId const typeId, PkgId const pkgId, std::string_view const name) const noexcept
 {
     PerResType const &rPerResType = get_type(typeId);
 
@@ -62,28 +63,27 @@ ResId Resources::find(ResTypeId typeId, PkgId pkgId, std::string_view name) cons
     assert(rPkg.m_resTypeOwn.size() > std::size_t(typeId));
     PerPkgResType const &rPkgType = rPkg.m_resTypeOwn[std::size_t(typeId)];
 
-    auto findIt = rPkgType.m_nameToResId.find(name);
-
-    if (findIt == rPkgType.m_nameToResId.end())
+    if(auto const& findIt = rPkgType.m_nameToResId.find(name);
+       findIt != rPkgType.m_nameToResId.end())
     {
-        return lgrn::id_null<ResId>(); // not found
+        return findIt->second;
     }
-    return findIt->second;
+    return lgrn::id_null<ResId>(); // not found
 }
 
-SharedString const& Resources::name(ResTypeId typeId, ResId resId) const noexcept
+SharedString const& Resources::name(ResTypeId const typeId, ResId const resId) const noexcept
 {
     PerResType const &rPerResType = get_type(typeId);
 
     return rPerResType.m_resNames[std::size_t(resId)];
 }
 
-lgrn::IdRegistry<ResId> const& Resources::ids(ResTypeId typeId) const noexcept
+lgrn::IdRegistry<ResId> const& Resources::ids(ResTypeId const typeId) const noexcept
 {
     return get_type(typeId).m_resIds;
 }
 
-ResIdOwner_t Resources::owner_create(ResTypeId typeId, ResId resId) noexcept
+ResIdOwner_t Resources::owner_create(ResTypeId const typeId, ResId const resId) noexcept
 {
     PerResType &rPerResType = get_type(typeId);
     rPerResType.m_resRefs[std::size_t(resId)] ++;
@@ -92,7 +92,7 @@ ResIdOwner_t Resources::owner_create(ResTypeId typeId, ResId resId) noexcept
     return owner;
 }
 
-void Resources::owner_destroy(ResTypeId typeId, ResIdOwner_t&& rOwner) noexcept
+void Resources::owner_destroy(ResTypeId const typeId, ResIdOwner_t&& rOwner) noexcept
 {
     if (!rOwner.has_value())
     {
@@ -100,7 +100,7 @@ void Resources::owner_destroy(ResTypeId typeId, ResIdOwner_t&& rOwner) noexcept
     }
     PerResType &rPerResType = get_type(typeId);
     int &rCount = rPerResType.m_resRefs[std::size_t(rOwner.m_id)];
-    rCount --;
+    -- rCount;
     rOwner.m_id = ResIdOwner_t{};
 }
 

@@ -108,7 +108,7 @@ public:
         std::string_view m_prefabName;
     };
 
-    void set_prefabs(std::initializer_list<SetPrefab> setPrefab);
+    void set_prefabs(std::initializer_list<SetPrefab> const& setPrefab);
 
     struct SetTransform
     {
@@ -116,7 +116,7 @@ public:
         osp::Matrix4 const& m_transform;
     };
 
-    void set_transform(std::initializer_list<SetTransform> setTransform);
+    void set_transform(std::initializer_list<SetTransform> const& setTransform);
 
     osp::Matrix4 align_attach(PartId partA, std::string_view attachA,
                               PartId partB, std::string_view attachB);
@@ -130,9 +130,9 @@ public:
         NodeId m_node;
     };
 
-    MachAnyId create_machine(PartId part, MachTypeId machType, std::initializer_list<Connection> connections);
+    MachAnyId create_machine(PartId part, MachTypeId machType, std::initializer_list<Connection> const& connections);
 
-    void connect(MachAnyId mach, std::initializer_list<Connection> connections);
+    void connect(MachAnyId mach, std::initializer_list<Connection> const& connections);
 
     void finalize_machines();
 
@@ -168,7 +168,7 @@ std::array<PartId, N> VehicleBuilder::create_parts()
 
 
 template <std::size_t N>
-std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId nodeType)
+std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId const nodeType)
 {
     std::array<NodeId, N> out;
 

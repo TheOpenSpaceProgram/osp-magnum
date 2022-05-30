@@ -29,6 +29,7 @@
 #include <memory>       // for std::shared_ptr
 #include <utility>      // for std::forward
 #include <stdexcept>    // for std::invalid_argument
+#include <functional>   // for std::hash
 #include <string_view>  // for std::basic_string_view
 #include <type_traits>  // for std::is_nothrow_default_constructible_v, etc
 
@@ -164,6 +165,37 @@ public:
     static constexpr BasicSharedString create_reference(ViewBase_t)
         noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> );
 
+    /**
+     * @brief threeway comparison operator for shared strings. Only compares string data, not lifetime.
+     */
+    friend constexpr decltype(auto) operator<=>(BasicSharedString const& lhs, BasicSharedString const& rhs)
+    {
+        return ViewBase_t(lhs) <=> ViewBase_t(rhs);
+    }
+
+    /**
+     * @brief threeway comparison operator for shared strings. Only compares string data, not lifetime.
+     */
+    friend constexpr decltype(auto) operator<=>(BasicSharedString const& lhs, ViewBase_t const& rhs)
+    {
+        return ViewBase_t(lhs) <=> rhs;
+    }
+
+    /**
+     * @brief Equality operator for shared strings. Only compares string data, not lifetime.
+     */
+    friend constexpr bool operator==(BasicSharedString const& lhs, BasicSharedString const& rhs)
+    {
+        return ViewBase_t(lhs) == ViewBase_t(rhs);
+    }
+
+    /**
+     * @brief Equality operator for shared strings. Only compares string data, not lifetime.
+     */
+    friend constexpr bool operator==(BasicSharedString const& lhs, ViewBase_t const& rhs)
+    {
+        return ViewBase_t(lhs) == rhs;
+    }
 
 protected:
     constexpr BasicSharedString(ViewBase_t view) noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> )
@@ -176,16 +208,16 @@ protected:
     { }
 
 private:
-    LIFETIME_T m_lifetime;
+    [[no_unique_address]] LIFETIME_T m_lifetime;
 }; // class BasicSharedString
 
 //-----------------------------------------------------------------------------
 
-#if __APPLE__
-// Apple's C++17 is missing std::shared_ptr<T[]>...
-using SharedStringLifetime_t = std::shared_ptr<const char>;
-#else
+#if defined(__cpp_lib_shared_ptr_arrays) && 201707 <= __cpp_lib_shared_ptr_arrays
 using SharedStringLifetime_t = std::shared_ptr<const char[]>;
+#else
+// missing std::shared_ptr<T[]>...
+using SharedStringLifetime_t = std::shared_ptr<const char>;
 #endif
 
 /**
@@ -221,7 +253,7 @@ constexpr BasicSharedString<CHAR_T, LIFETIME_T>::operator std::basic_string<CHAR
 }
 
 // TODO: This isn't super generic. Using std::shared_ptr regardless of the LIFETIME_T parameter
-// means that alternative LIFETIME_T params will probably encounted compile failures.
+// means that alternative LIFETIME_T params will probably encounter compile failures.
 template<typename CHAR_T, typename LIFETIME_T>
   template<typename IT_T>
 inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T && end) noexcept(false) // allocates
@@ -242,7 +274,9 @@ inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T &&
         }
     }
 
-    if(len == 0)
+    size_type const size = static_cast<size_type>(len);
+
+    if(size == 0u)
     {
         // No data to copy, return empty SharedString
         return {};
@@ -250,19 +284,20 @@ inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T &&
 
     // Make space to copy the string
 #if defined(__cpp_lib_smart_ptr_for_overwrite)
-    auto buf = std::make_shared_for_overwrite<CHAR_T[]>(static_cast<std::size_t>(len));
-#elif defined(__cpp_lib_shared_ptr_arrays)
-    std::shared_ptr<CHAR_T[]> buf{new CHAR_T[static_cast<std::size_t>(len)]};
+    auto buf = std::make_shared_for_overwrite<CHAR_T[]>(size);
+#elif defined(__cpp_lib_shared_ptr_arrays) && 201707 <= __cpp_lib_shared_ptr_arrays
+    // avoid initilization of allocated array...
+    std::shared_ptr<CHAR_T[]> buf{new CHAR_T[size]};
 #else
-    std::shared_ptr<CHAR_T> buf(new CHAR_T[static_cast<std::size_t>(len)]);
+    std::shared_ptr<CHAR_T> buf(new CHAR_T[size]);
 #endif
 
     // Do the copy
-    std::copy(std::forward<IT_T>(begin), std::forward<IT_T>(end), buf.get());
+    std::copy_n(std::forward<IT_T>(begin), size, buf.get());
 
     // Construct prior to SharedString constructor to avoid
     // ABI specific parameter passing order problems.
-    ViewBase_t view{ buf.get(), static_cast<size_type>(len) };
+    ViewBase_t view{ buf.get(), size };
 
     // Make the SharedString
     return create(std::move(view), std::move(buf));
@@ -301,5 +336,21 @@ constexpr auto BasicSharedString<CHAR_T, LIFETIME_T>::create_reference(ViewBase_
 }
 
 } // namespace osp
+
+// custom specialization of std::hash can be injected in namespace std
+// Inherit from the std::basic_string_view std::hash implementation.
+// This is needed to support using osp::BasicSharedString as the
+// key type in a hashmap.
+template<typename CHAR_T, typename LIFETIME_T>
+struct std::hash<osp::BasicSharedString<CHAR_T, LIFETIME_T>>
+{
+    using ViewType_t = std::basic_string_view<CHAR_T>;
+
+    using is_transparent = std::true_type;
+    decltype(auto) operator()(ViewType_t const s) const noexcept
+    {
+        return std::hash<ViewType_t>{}(s);
+    }
+};
 
 #endif // defined INCLUDED_OSP_SHARED_STRING_H_56F463BF_C8A5_4633_B906_D7250C06E2DB

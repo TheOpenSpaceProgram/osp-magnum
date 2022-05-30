@@ -33,6 +33,7 @@ namespace osp::universe
 
 inline Vector3g rotate_vector3g(Vector3g const in, Quaterniond const rot) noexcept
 {
+    // transformVector isn't constexpr.
     return Vector3g(rot.transformVector(Vector3d(in)));
 }
 
@@ -287,7 +288,7 @@ inline CoordTransformer coord_parent_to_child(
 
     return {
         .m_rotOut   = child.m_rotation.inverted(),
-        .m_c        = -child.m_position,
+        .m_c        = std::negate{}(child.m_position),
         .m_n        = precisionDiff,
         .m_m        = precisionDiff
     };
@@ -301,7 +302,7 @@ inline CoordTransformer coord_child_to_parent(
     return {
         .m_rotIn    = child.m_rotation,
         .m_c        = child.m_position,
-        .m_n        = -precisionDiff,
+        .m_n        = std::negate{}(precisionDiff),
         .m_m        = 0
     };
 }

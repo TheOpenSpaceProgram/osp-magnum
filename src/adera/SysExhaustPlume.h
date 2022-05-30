@@ -52,9 +52,9 @@ public:
      *
      * @param rScene [ref] Scene containing rockets with exaust plumes
      */
-    static void update_construct(osp::active::ActiveScene& rScene);
+    static void update_construct(osp::active::ActiveScene& rScene) noexcept;
 
-    static void update_plumes(osp::active::ActiveScene& rScene);
+    static void update_plumes(osp::active::ActiveScene& rScene) noexcept;
 };
 
 } // namespace adera::active

@@ -27,8 +27,8 @@
 
 using namespace planeta;
 
-SkTriGroupId SubdivTriangleSkeleton::tri_subdiv(SkTriId triId,
-                                                std::array<SkVrtxId, 3> vrtxMid)
+SkTriGroupId SubdivTriangleSkeleton::tri_subdiv(SkTriId const triId,
+                                                std::array<SkVrtxId, 3> const vrtxMid)
 {
     SkeletonTriangle &rTri = tri_at(triId);
 

@@ -34,7 +34,7 @@ namespace testapp
 CommonTestScene::~CommonTestScene()
 {
     // Clear data first
-    for (on_cleanup_t *cleanup : m_onCleanup)
+    for (on_cleanup_t * const cleanup : m_onCleanup)
     {
         cleanup(*this);
     }
@@ -57,7 +57,7 @@ void CommonTestScene::update_hierarchy_delete()
     SysHierarchy::update_delete_descendents(
             m_basic.m_hierarchy,
             std::cbegin(m_delete), std::cend(m_delete),
-            [this] (ActiveEnt ent)
+            [this] (ActiveEnt const ent)
     {
         m_deleteTotal.push_back(ent);
     });
@@ -65,8 +65,8 @@ void CommonTestScene::update_hierarchy_delete()
 
 void CommonTestScene::update_delete()
 {
-    auto first = std::cbegin(m_deleteTotal);
-    auto last = std::cend(m_deleteTotal);
+    auto const& first = std::cbegin(m_deleteTotal);
+    auto const& last = std::cend(m_deleteTotal);
     osp::active::update_delete_basic                (m_basic,   first, last);
     osp::active::SysRender::update_delete_drawing   (m_drawing, first, last);
 

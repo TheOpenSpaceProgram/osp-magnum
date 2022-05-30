@@ -47,7 +47,7 @@ namespace osp::universe
  * * { XYZ XYZ XYZ XYZ XYZ XYZ ... }
  * * { XYZ ??? XYZ ??? XYZ ??? ... }
  */
-template <typename T, int DIMENSIONS_T>
+template <typename T, std::size_t DIMENSIONS_T>
 struct SatVectorDesc
 {
     using View_t        = Corrade::Containers::StridedArrayView1D<T>;
@@ -55,7 +55,7 @@ struct SatVectorDesc
     using Data_t        = Corrade::Containers::ArrayView<unsigned char>;
     using DataConst_t   = Corrade::Containers::ArrayView<unsigned char const>;
 
-    static constexpr int smc_dimensions = DIMENSIONS_T;
+    static constexpr std::size_t smc_dimensions = DIMENSIONS_T;
 
     // Offsets of xyz components in bytes
     std::array<std::size_t, DIMENSIONS_T> m_offsets;
@@ -63,13 +63,13 @@ struct SatVectorDesc
     // Assuming xyz all have the same stride
     std::ptrdiff_t m_stride;
 
-    constexpr View_t view(Data_t data, std::size_t count, int dimension) const
+    constexpr View_t view(Data_t data, std::size_t count, std::size_t dimension) const
     {
         auto first = reinterpret_cast<T*>((data.exceptPrefix(m_offsets[dimension])).data());
         return {data, first, count, m_stride};
     }
 
-    constexpr ViewConst_t view(DataConst_t data, std::size_t count, int dimension) const
+    constexpr ViewConst_t view(DataConst_t data, std::size_t count, std::size_t dimension) const
     {
         auto first = reinterpret_cast<T const*>((data.exceptPrefix(m_offsets[dimension])).data());
         return {data, first, count, m_stride};
@@ -124,13 +124,17 @@ struct Universe
 {
     lgrn::IdRegistryStl<CoSpaceId>   m_coordIds;
 
-    std::vector<CoSpaceCommon>     m_coordCommon;
+    std::vector<CoSpaceCommon>       m_coordCommon;
 };
 
+// INDEX_T is a template parameter to allow passing in "strong typedef" types,
+// like enum classes and having them converted without warning to size_t.
+// This is a limitation of the enum class feature in C++, in that
+// it cant have an implicit conversion operator.
 template <typename VEC_T, typename INDEX_T, typename ... RANGE_T>
 constexpr VEC_T to_vec(INDEX_T i, RANGE_T&& ... args) noexcept
 {
-    return {args[std::size_t(i)] ...};
+    return {std::forward<RANGE_T>(args)[std::size_t(i)] ...};
 }
 
 
@@ -143,7 +147,7 @@ constexpr VEC_T to_vec(INDEX_T i, RANGE_T&& ... args) noexcept
  *
  * @return std::array of views, intended to work with structured bindings
  */
-template <typename T, int DIMENSIONS_T, typename DATA_T, int ... COUNT_T>
+template <typename T, std::size_t DIMENSIONS_T, typename DATA_T, std::size_t ... COUNT_T>
 constexpr auto sat_views(
         SatVectorDesc<T, DIMENSIONS_T> const& satVec,
         DATA_T &rData,
@@ -169,15 +173,22 @@ constexpr auto sat_views(
 template<typename POSVIEW_T, typename ROTVIEW_T>
 constexpr CoSpaceTransform coord_get_transform(
         CoSpaceHierarchy coordHier, CoSpaceTransform coordOrig,
-        POSVIEW_T const& x, POSVIEW_T const& y, POSVIEW_T const& z,
-        ROTVIEW_T const& qx, ROTVIEW_T const& qy, ROTVIEW_T const& qz, ROTVIEW_T const& qw) noexcept
+        POSVIEW_T && x,  POSVIEW_T && y,  POSVIEW_T && z,
+        ROTVIEW_T && qx, ROTVIEW_T && qy, ROTVIEW_T && qz, ROTVIEW_T && qw) noexcept
 {
     SatId const sat = coordHier.m_parentSat;
     return (sat == lgrn::id_null<SatId>())
         ? coordOrig
         : CoSpaceTransform{
-            .m_rotation = {to_vec<Vector3d>(sat, qx, qy, qz), qw[std::size_t(sat)]},
-            .m_position = to_vec<Vector3g>(sat, x, y, z),
+            .m_rotation = {to_vec<Vector3d>(sat,
+                                            std::forward<ROTVIEW_T>(qx),
+                                            std::forward<ROTVIEW_T>(qy),
+                                            std::forward<ROTVIEW_T>(qz)),
+                           std::forward<ROTVIEW_T>(qw)[std::size_t(sat)]},
+            .m_position = to_vec<Vector3g>(sat,
+                                           std::forward<POSVIEW_T>(x),
+                                           std::forward<POSVIEW_T>(y),
+                                           std::forward<POSVIEW_T>(z)),
             .m_precision = coordOrig.m_precision };
 }
 

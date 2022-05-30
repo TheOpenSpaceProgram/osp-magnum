@@ -31,7 +31,7 @@ using osp::active::ActiveEnt;
 
 void SysHierarchy::add_child(
         acomp_storage_t<ACompHierarchy>& rHierarchy,
-        ActiveEnt parent, ActiveEnt child)
+        ActiveEnt const parent, ActiveEnt const child)
 {
     rHierarchy.emplace(child);
     set_parent_child(rHierarchy, parent, child);
@@ -39,7 +39,7 @@ void SysHierarchy::add_child(
 
 void SysHierarchy::set_parent_child(
         acomp_storage_t<ACompHierarchy>& rHierarchy,
-        ActiveEnt parent, ActiveEnt child)
+        ActiveEnt const parent, ActiveEnt const child)
 {
     ACompHierarchy &rChildHier  = rHierarchy.get(child);
     ACompHierarchy &rParentHier = rHierarchy.get(parent);
@@ -71,7 +71,7 @@ void SysHierarchy::set_parent_child(
 }
 
 void SysHierarchy::cut(
-        acomp_storage_t<ACompHierarchy>& rHierarchy, ActiveEnt ent)
+        acomp_storage_t<ACompHierarchy>& rHierarchy, ActiveEnt const ent)
 {
     ACompHierarchy &rEntHier = rHierarchy.get(ent);
 
@@ -94,7 +94,7 @@ void SysHierarchy::cut(
     // Unlink parent
 
     ACompHierarchy &rParentHier = rHierarchy.get(rEntHier.m_parent);
-    rParentHier.m_childCount --;
+    -- rParentHier.m_childCount;
 
     if (rParentHier.m_childFirst == ent)
     {

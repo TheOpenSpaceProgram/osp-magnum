@@ -29,9 +29,9 @@
 using namespace osp;
 using namespace osp::active;
 
-MeshId SysRender::own_mesh_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources, ResId resId)
+MeshId SysRender::own_mesh_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources, ResId const resId)
 {
-    auto [it, success] = rCtxDrawingRes.m_resToMesh.try_emplace(resId);
+    auto const& [it, success] = rCtxDrawingRes.m_resToMesh.try_emplace(resId);
     if (success)
     {
         ResIdOwner_t owner = rResources.owner_create(restypes::gc_mesh, resId);
@@ -43,9 +43,9 @@ MeshId SysRender::own_mesh_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rC
     return it->second;
 };
 
-TexId SysRender::own_texture_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources, ResId resId)
+TexId SysRender::own_texture_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources, ResId const resId)
 {
-    auto [it, success] = rCtxDrawingRes.m_resToTex.try_emplace(resId);
+    auto const& [it, success] = rCtxDrawingRes.m_resToTex.try_emplace(resId);
     if (success)
     {
         ResIdOwner_t owner = rResources.owner_create(restypes::gc_mesh, resId);
@@ -72,13 +72,13 @@ void SysRender::clear_owners(ACtxDrawing& rCtxDrawing)
 
 void SysRender::clear_resource_owners(ACtxDrawingRes& rCtxDrawingRes, Resources &rResources)
 {
-    for (auto && [_, rOwner] : std::exchange(rCtxDrawingRes.m_texToRes, {}))
+    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rCtxDrawingRes.m_texToRes, {}))
     {
         rResources.owner_destroy(restypes::gc_texture, std::move(rOwner));
     }
     rCtxDrawingRes.m_resToTex.clear();
 
-    for (auto && [_, rOwner] : std::exchange(rCtxDrawingRes.m_meshToRes, {}))
+    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rCtxDrawingRes.m_meshToRes, {}))
     {
         rResources.owner_destroy(restypes::gc_mesh, std::move(rOwner));
     }
@@ -90,7 +90,6 @@ void SysRender::update_draw_transforms(
         acomp_storage_t<ACompTransform> const& transform,
         acomp_storage_t<ACompDrawTransform>& rDrawTf)
 {
-
     rDrawTf.respect(hier);
 
     auto viewDrawTf = entt::basic_view{rDrawTf};

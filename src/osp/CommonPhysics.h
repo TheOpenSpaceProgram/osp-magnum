@@ -101,13 +101,14 @@ Vector3 collider_inertia_tensor(EShape shape, Vector3 scale, float mass);
  *
  * @return The moment of inertia about the 3 principal axes (x, y, z)
  */
-constexpr Vector3 cylinder_inertia_tensor(float radius, float height, float mass)
+constexpr Vector3 cylinder_inertia_tensor(float radius, float height, float mass) noexcept
 {
-    float r2 = radius * radius;
-    float h2 = height * height;
-    float xx = (1.0f / 12.0f) * (3.0f*r2 + h2);
-    float yy = xx;
-    float zz = r2 / 2.0f;
+    float const r2 = radius * radius;
+    float const h2 = height * height;
+
+    float const xx = (1.0f / 12.0f) * (3.0f*r2 + h2);
+    float const yy = xx;
+    float const zz = r2 / 2.0f;
 
     return Vector3{mass*xx, mass*yy, mass*zz};
 }
@@ -123,18 +124,18 @@ constexpr Vector3 cylinder_inertia_tensor(float radius, float height, float mass
  *
  * @return The moment of inertia about the 3 principal axes (x, y, z)
  */
-constexpr Vector3 cuboid_inertia_tensor(const Vector3 dimensions, float mass)
+constexpr Vector3 cuboid_inertia_tensor(const Vector3 dimensions, float mass) noexcept
 {
-    float x2 = dimensions.x() * dimensions.x();
-    float y2 = dimensions.y() * dimensions.y();
-    float z2 = dimensions.z() * dimensions.z();
+    float const x2 = dimensions.x() * dimensions.x();
+    float const y2 = dimensions.y() * dimensions.y();
+    float const z2 = dimensions.z() * dimensions.z();
 
-    float xx = y2 + z2;
-    float yy = x2 + z2;
-    float zz = x2 + y2;
+    float const xx = y2 + z2;
+    float const yy = x2 + z2;
+    float const zz = x2 + y2;
 
     // Pre-multiply constant to avoid non-constexpr operator*(float, Vector3)
-    float c = (1.0f / 12.0f) * mass;
+    float const c = (1.0f / 12.0f) * mass;
     return Vector3{c*xx, c*yy, c*zz};
 }
 
@@ -149,18 +150,18 @@ constexpr Vector3 cuboid_inertia_tensor(const Vector3 dimensions, float mass)
  * 
  * @return The moment of inertia about the 3 principle axes (x, y, z)
  */
-constexpr Vector3 ellipsoid_inertia_tensor(const Vector3 semiaxes, float mass)
+constexpr Vector3 ellipsoid_inertia_tensor(const Vector3 semiaxes, float mass) noexcept
 {
-    float a2 = semiaxes.x() * semiaxes.x();
-    float b2 = semiaxes.y() * semiaxes.y();
-    float c2 = semiaxes.z() * semiaxes.z();
+    float const a2 = semiaxes.x() * semiaxes.x();
+    float const b2 = semiaxes.y() * semiaxes.y();
+    float const c2 = semiaxes.z() * semiaxes.z();
 
-    float xx = b2 + c2;
-    float yy = a2 + c2;
-    float zz = a2 + b2;
+    float const xx = b2 + c2;
+    float const yy = a2 + c2;
+    float const zz = a2 + b2;
 
     // Pre-multiply constant to avoid non-constexpr operator*(float, Vector3)
-    float c = (1.0f / 5.0f) * mass;
+    float const c = (1.0f / 5.0f) * mass;
     return Vector3{c*xx, c*yy, c*zz};
 }
 

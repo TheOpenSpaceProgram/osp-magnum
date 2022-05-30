@@ -36,23 +36,23 @@ using osp::restypes::gc_importer;
 VehicleBuilder::~VehicleBuilder()
 {
     // clear resource owners
-    for (auto && [_, value] : std::exchange(m_prefabs, {}))
+    for ([[maybe_unused]] auto && [_, value] : std::exchange(m_prefabs, {}))
     {
         m_pResources->owner_destroy(gc_importer, std::move(value.m_importer));
     }
 
-    for (auto && rPrefabPair : std::exchange(m_data.m_partPrefabs, {}))
+    for ([[maybe_unused]] auto && rPrefabPair : std::exchange(m_data.m_partPrefabs, {}))
     {
         m_pResources->owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
     }
 }
 
-void VehicleBuilder::set_prefabs(std::initializer_list<SetPrefab> setPrefabs)
+void VehicleBuilder::set_prefabs(std::initializer_list<SetPrefab> const& setPrefabs)
 {
-    auto const endIt = std::end(m_prefabs);
+    auto const& endIt = std::end(m_prefabs);
     for (SetPrefab const& set : setPrefabs)
     {
-        auto const foundIt = m_prefabs.find(set.m_prefabName);
+        auto const& foundIt = m_prefabs.find(set.m_prefabName);
         if (foundIt != endIt)
         {
             auto &rPrefabPair = m_data.m_partPrefabs[std::size_t(set.m_part)];
@@ -66,7 +66,7 @@ void VehicleBuilder::set_prefabs(std::initializer_list<SetPrefab> setPrefabs)
     }
 }
 
-void VehicleBuilder::set_transform(std::initializer_list<SetTransform> setTransform)
+void VehicleBuilder::set_transform(std::initializer_list<SetTransform> const& setTransform)
 {
     for (SetTransform const& set : setTransform)
     {
@@ -78,14 +78,13 @@ void VehicleBuilder::index_prefabs()
 {
     for (unsigned int i = 0; i < m_pResources->ids(gc_importer).capacity(); ++i)
     {
-        auto resId = osp::ResId(i);
+        auto const resId = osp::ResId(i);
         if ( ! m_pResources->ids(gc_importer).exists(resId))
         {
             continue;
         }
 
         auto const *pPrefabData = m_pResources->data_try_get<osp::Prefabs>(gc_importer, resId);
-
         if (pPrefabData == nullptr)
         {
             continue; // No prefab data
@@ -101,7 +100,9 @@ void VehicleBuilder::index_prefabs()
     }
 }
 
-osp::link::MachAnyId VehicleBuilder::create_machine(PartId part, MachTypeId machType, std::initializer_list<Connection> connections)
+osp::link::MachAnyId VehicleBuilder::create_machine(PartId const part,
+                                                    MachTypeId const machType,
+                                                    std::initializer_list<Connection> const& connections)
 {
     osp::link::PerMachType &rPerMachType = m_data.m_machines.m_perType[machType];
 
@@ -121,7 +122,6 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId part, MachTypeId mach
     rPerMachType.m_localToAny.resize(rPerMachType.m_localIds.capacity());
 
     m_data.m_machines.m_machTypes[mach] = machType;
-
     m_data.m_machines.m_machToLocal[mach] = local;
     rPerMachType.m_localToAny[local] = mach;
 
@@ -133,7 +133,7 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId part, MachTypeId mach
     return mach;
 }
 
-void VehicleBuilder::connect(MachAnyId mach, std::initializer_list<Connection> connections)
+void VehicleBuilder::connect(MachAnyId const mach, std::initializer_list<Connection> const& connections)
 {
     // get max port count for each node type
     std::vector<int> nodePortMax(m_data.m_nodePerType.size(), 0);
@@ -155,10 +155,10 @@ void VehicleBuilder::connect(MachAnyId mach, std::initializer_list<Connection> c
 
             // emplace and fill with null
             rPerNodeType.m_machToNode.emplace(mach, portMax);
-            lgrn::Span<NodeId> portSpan = rPerNodeType.m_machToNode[mach];
+            lgrn::Span<NodeId> const portSpan = rPerNodeType.m_machToNode[mach];
             std::fill(std::begin(portSpan), std::end(portSpan), lgrn::id_null<NodeId>());
             rPerNodeType.m_machToNodeCustom.emplace(mach, portMax);
-            lgrn::Span<uint16_t> customSpan = rPerNodeType.m_machToNodeCustom[mach];
+            lgrn::Span<uint16_t> const customSpan = rPerNodeType.m_machToNodeCustom[mach];
             std::fill(std::begin(customSpan), std::end(customSpan), 0);
 
             for (Connection const& connect : connections)
@@ -195,7 +195,7 @@ void VehicleBuilder::finalize_machines()
         }
 
         // assign node-to-machine
-        for (MachAnyId mach : m_data.m_machines.m_ids.bitview().zeros())
+        for (MachAnyId const mach : m_data.m_machines.m_ids.bitview().zeros())
         {
             lgrn::Span<NodeId> portSpan = rPerNodeType.m_machToNode[mach];
             lgrn::Span<JuncCustom> customSpan = rPerNodeType.m_machToNodeCustom[mach];
@@ -203,13 +203,13 @@ void VehicleBuilder::finalize_machines()
             auto customIt = std::begin(customSpan);
             for (NodeId node : portSpan)
             {
-                lgrn::Span<Junction> juncSpan = rPerNodeType.m_nodeToMach[node];
+                lgrn::Span<Junction> const juncSpan = rPerNodeType.m_nodeToMach[node];
 
                 // find empty spot
                 // should always succeed, as they were reserved a few lines ago
                 auto found = std::find_if(
                         std::begin(juncSpan), std::end(juncSpan),
-                        [] (Junction const pair)
+                        [] (Junction const& pair)
                 {
                     return pair.m_type == lgrn::id_null<MachTypeId>();
                 });

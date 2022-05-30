@@ -179,10 +179,12 @@ int main(int argc, char** argv)
     g_argv = argv;
 
     // Setup loggers
-    auto const sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    sink->set_pattern("[%T.%e] [%n] [%^%l%$] [%s:%#] %v");
-    g_logTestApp = std::make_shared<spdlog::logger>("testapp", sink);
-    g_logMagnumApp = std::make_shared<spdlog::logger>("flight", sink);
+    {
+        auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        pSink->set_pattern("[%T.%e] [%n] [%^%l%$] [%s:%#] %v");
+        g_logTestApp = std::make_shared<spdlog::logger>("testapp", pSink);
+        g_logMagnumApp = std::make_shared<spdlog::logger>("flight", std::move(pSink));
+    }
 
     osp::set_thread_logger(g_logTestApp); // Set logger for this thread
 
@@ -191,7 +193,6 @@ int main(int argc, char** argv)
     if(args.value("scene") != "none")
     {
         auto const it = g_scenes.find(args.value("scene"));
-
         if(it == std::end(g_scenes))
         {
             std::cerr << "unknown scene" << std::endl;
@@ -389,7 +390,7 @@ void load_a_bunch_of_stuff()
 
     // TODO: Make new gltf loader. This will read gltf files and dump meshes,
     //       images, textures, and other relevant data into osp::Resources
-    for (auto meshName : meshes)
+    for (auto const& meshName : meshes)
     {
         osp::ResId res = osp::load_tinygltf_file(osp::string_concat(datapath, meshName), g_resources, g_defaultPkg);
         osp::assigns_prefabs_tinygltf(g_resources, res);
@@ -397,10 +398,10 @@ void load_a_bunch_of_stuff()
 
 
     // Add a default primitives
-    auto const add_mesh_quick = [] (std::string_view name, Trade::MeshData&& data)
+    auto const add_mesh_quick = [] (std::string_view const name, Trade::MeshData&& data)
     {
-        osp::ResId const meshId = g_resources.create(gc_mesh, g_defaultPkg, name);
-        g_resources.data_add<Trade::MeshData>(gc_mesh, meshId, std::forward<Trade::MeshData>(data));
+        osp::ResId const meshId = g_resources.create(gc_mesh, g_defaultPkg, osp::SharedString::create(name));
+        g_resources.data_add<Trade::MeshData>(gc_mesh, meshId, std::move(data));
     };
 
     add_mesh_quick("cube", Primitives::cubeSolid());
@@ -413,7 +414,7 @@ void load_a_bunch_of_stuff()
 
 using each_res_id_t = void(*)(osp::ResId);
 
-static void resource_for_each_type(osp::ResTypeId type, each_res_id_t do_thing)
+static void resource_for_each_type(osp::ResTypeId const type, each_res_id_t const do_thing)
 {
     lgrn::IdRegistry<osp::ResId> const &rReg = g_resources.ids(type);
     for (std::size_t i = 0; i < rReg.capacity(); ++i)
@@ -431,9 +432,9 @@ void clear_resource_owners()
 
     // Texture resources contain osp::TextureImgSource, which refererence counts
     // their associated image data
-    resource_for_each_type(gc_texture, [] (osp::ResId id)
+    resource_for_each_type(gc_texture, [] (osp::ResId const id)
     {
-        auto *pData = g_resources
+        auto * const pData = g_resources
                 .data_try_get<osp::TextureImgSource>(gc_texture, id);
         if (pData != nullptr)
         {
@@ -442,23 +443,23 @@ void clear_resource_owners()
     });
 
     // Importer data own a lot of other resources
-    resource_for_each_type(gc_importer, [] (osp::ResId id)
+    resource_for_each_type(gc_importer, [] (osp::ResId const id)
     {
-        auto *pData = g_resources
+        auto * const pData = g_resources
                 .data_try_get<osp::ImporterData>(gc_importer, id);
         if (pData != nullptr)
         {
-            for (osp::ResIdOwner_t &rOwner : pData->m_images)
+            for (osp::ResIdOwner_t &rOwner : std::move(pData->m_images))
             {
                 g_resources.owner_destroy(gc_image, std::move(rOwner));
             }
 
-            for (osp::ResIdOwner_t &rOwner : pData->m_textures)
+            for (osp::ResIdOwner_t &rOwner : std::move(pData->m_textures))
             {
                 g_resources.owner_destroy(gc_texture, std::move(rOwner));
             }
 
-            for (osp::ResIdOwner_t &rOwner : pData->m_meshes)
+            for (osp::ResIdOwner_t &rOwner : std::move(pData->m_meshes))
             {
                 g_resources.owner_destroy(gc_mesh, std::move(rOwner));
             }

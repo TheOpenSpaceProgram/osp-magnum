@@ -72,8 +72,6 @@ struct RenderGL
     lgrn::IdRegistry<MeshGlId>          m_meshIds;
     MeshGlStorage_t                     m_meshGl;
 
-
-
     // Associate GL Texture Ids with resources
     IdMap_t<ResId, TexGlId>             m_resToTex;
     IdMap_t<TexGlId, ResIdOwner_t>      m_texToRes;
@@ -215,12 +213,12 @@ public:
 
     template<typename IT_T>
     static void update_delete(
-            ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T last);
+            ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T const& last);
 };
 
 template<typename IT_T>
 void SysRenderGL::update_delete(
-        ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T last)
+        ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T const& last)
 {
     rCtxRenderGl.m_meshId           .remove(first, last);
     rCtxRenderGl.m_diffuseTexId     .remove(first, last);

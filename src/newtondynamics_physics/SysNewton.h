@@ -66,7 +66,7 @@ public:
      */
     static void update_translate(
             ACtxPhysics& rCtxPhys,
-            ACtxNwtWorld& rCtxWorld);
+            ACtxNwtWorld& rCtxWorld) noexcept;
 
     /**
      * @brief Synchronize generic physics colliders with Newton colliders
@@ -78,7 +78,7 @@ public:
     static void update_colliders(
             ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            std::vector<ActiveEnt> const& collidersDirty);
+            std::vector<ActiveEnt> const& collidersDirty) noexcept;
 
     /**
      * @brief Step the entire Newton World forward in time
@@ -100,19 +100,19 @@ public:
             acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
             acomp_storage_t<osp::active::ACompTransform>& rTf,
             acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
-            acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable);
+            acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable) noexcept;
 
     static void remove_components(
-            ACtxNwtWorld& rCtxWorld, ActiveEnt ent);
+            ACtxNwtWorld& rCtxWorld, ActiveEnt ent) noexcept;
 
     template<typename IT_T>
     static void update_delete(
-            ACtxNwtWorld &rCtxWorld, IT_T first, IT_T last)
+            ACtxNwtWorld &rCtxWorld, IT_T first, IT_T const& last) noexcept
     {
         while (first != last)
         {
             remove_components(rCtxWorld, *first);
-            ++first;
+            std::advance(first, 1);
         }
     }
 
@@ -139,7 +139,7 @@ private:
             ActiveEnt ent,
             ActiveEnt firstChild,
             osp::Matrix4 const& transform,
-            NewtonCollision* pCompound);
+            NewtonCollision* pCompound) noexcept;
 
     /**
      * @brief Create Newton bodies and colliders for entities with ACompPhysBody
@@ -156,7 +156,7 @@ private:
             acomp_storage_t<ACompTransformControlled>& rTfControlled,
             acomp_storage_t<ACompTransformMutable>& rTfMutable,
             ActiveEnt ent,
-            NewtonWorld const* pNwtWorld);
+            NewtonWorld const* pNwtWorld) noexcept;
 
 };
 

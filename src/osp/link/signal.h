@@ -31,8 +31,8 @@
 namespace osp::link
 {
 
-constexpr JuncCustom const gc_sigIn = 0;
-constexpr JuncCustom const gc_sigOut = 1;
+constexpr JuncCustom gc_sigIn  = 0;
+constexpr JuncCustom gc_sigOut = 1;
 
 template <typename VALUE_T>
 using SignalValues_t = std::vector<VALUE_T>;
@@ -52,7 +52,7 @@ struct UpdateNodes
 
 template <typename VALUE_T, typename RANGE_T>
 bool update_signal_nodes(
-        RANGE_T&&                                       toUpdate,
+        RANGE_T const&                                  toUpdate,
         Nodes::NodeToMach_t const&                      nodeToMach,
         Machines const&                                 machines,
         Corrade::Containers::ArrayView<VALUE_T const>   newValues,
@@ -61,7 +61,7 @@ bool update_signal_nodes(
 {
     bool somethingNotified = false;
 
-    for (uint32_t node : toUpdate)
+    for (uint32_t const node : toUpdate)
     {
         // Apply node value changes
         currentValues[node] = newValues[node];
