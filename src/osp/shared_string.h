@@ -175,6 +175,7 @@ public:
     static constexpr BasicSharedString create_reference(ViewBase_t)
         noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> );
 
+#if defined(__cpp_impl_three_way_comparison)
     /**
      * @brief threeway comparison operator for shared strings. Only compares string data, not lifetime.
      */
@@ -190,6 +191,7 @@ public:
     {
         return ViewBase_t(lhs) <=> rhs;
     }
+#endif // defined(__cpp_impl_three_way_comparison)
 
     /**
      * @brief Equality operator for shared strings. Only compares string data, not lifetime.
@@ -318,7 +320,7 @@ template<typename CHAR_T, typename LIFETIME_T>
 inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create_from_parts(STRS_T && ... strs) noexcept(false) // allocates
     -> BasicSharedString
 {
-    size_type const size = ( 0u + ... + string_size(strs) );
+    size_type const size = static_cast<size_type>( ( 0u + ... + string_size(strs) ) );
 
     if(size == 0u)
     {
