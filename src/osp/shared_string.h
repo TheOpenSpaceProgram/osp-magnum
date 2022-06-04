@@ -179,34 +179,34 @@ public:
     /**
      * @brief threeway comparison operator for shared strings. Only compares string data, not lifetime.
      */
-    friend constexpr decltype(auto) operator<=>(BasicSharedString const& lhs, BasicSharedString const& rhs)
+    constexpr decltype(auto) operator<=>(BasicSharedString const& rhs)
     {
-        return ViewBase_t(lhs) <=> ViewBase_t(rhs);
+        return ViewBase_t(*this) <=> ViewBase_t(rhs);
     }
 
     /**
      * @brief threeway comparison operator for shared strings. Only compares string data, not lifetime.
      */
-    friend constexpr decltype(auto) operator<=>(BasicSharedString const& lhs, ViewBase_t const& rhs)
+    constexpr decltype(auto) operator<=>(ViewBase_t const& rhs)
     {
-        return ViewBase_t(lhs) <=> rhs;
+        return ViewBase_t(*this) <=> rhs;
     }
 #endif // defined(__cpp_impl_three_way_comparison)
 
     /**
      * @brief Equality operator for shared strings. Only compares string data, not lifetime.
      */
-    friend constexpr bool operator==(BasicSharedString const& lhs, BasicSharedString const& rhs)
+    constexpr bool operator==(BasicSharedString const& rhs)
     {
-        return ViewBase_t(lhs) == ViewBase_t(rhs);
+        return ViewBase_t(*this) == ViewBase_t(rhs);
     }
 
     /**
      * @brief Equality operator for shared strings. Only compares string data, not lifetime.
      */
-    friend constexpr bool operator==(BasicSharedString const& lhs, ViewBase_t const& rhs)
+    constexpr bool operator==(ViewBase_t const& rhs)
     {
-        return ViewBase_t(lhs) == rhs;
+        return ViewBase_t(*this) == rhs;
     }
 
 protected:
