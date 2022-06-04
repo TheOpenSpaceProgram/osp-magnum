@@ -166,11 +166,15 @@ struct ButtonControlConfig
 
 struct ButtonControlEvent
 {
+// This constructor should only be needed if aggregate initialization via
+// parenthesis isn't supported by the compiler.
+#if ! defined( __cpp_aggregate_paren_init )
     constexpr ButtonControlEvent(EButtonControlIndex index,
                                  EButtonControlEvent event) noexcept
      : m_index(index)
      , m_event(event)
     { }
+#endif // ! defined( __cpp_aggregate_paren_init )
 
     EButtonControlIndex m_index;
     EButtonControlEvent m_event;
