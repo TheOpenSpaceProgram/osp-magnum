@@ -63,7 +63,9 @@ ResId Resources::find(ResTypeId const typeId, PkgId const pkgId, std::string_vie
     assert(rPkg.m_resTypeOwn.size() > std::size_t(typeId));
     PerPkgResType const &rPkgType = rPkg.m_resTypeOwn[std::size_t(typeId)];
 
-    if(auto const& findIt = rPkgType.m_nameToResId.find(name);
+    // TODO: The call to SharedString::create_reference() shouldn't be necessary
+    // but transparent comparitors for std::unordered_map don't work very well.
+    if(auto const& findIt = rPkgType.m_nameToResId.find(SharedString::create_reference(name));
        findIt != rPkgType.m_nameToResId.end())
     {
         return findIt->second;
