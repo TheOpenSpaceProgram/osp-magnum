@@ -173,22 +173,15 @@ constexpr auto sat_views(
 template<typename POSVIEW_T, typename ROTVIEW_T>
 constexpr CoSpaceTransform coord_get_transform(
         CoSpaceHierarchy coordHier, CoSpaceTransform coordOrig,
-        POSVIEW_T && x,  POSVIEW_T && y,  POSVIEW_T && z,
-        ROTVIEW_T && qx, ROTVIEW_T && qy, ROTVIEW_T && qz, ROTVIEW_T && qw) noexcept
+        POSVIEW_T const& x,  POSVIEW_T const& y,  POSVIEW_T const& z,
+        ROTVIEW_T const& qx, ROTVIEW_T const& qy, ROTVIEW_T const& qz, ROTVIEW_T const& qw) noexcept
 {
     SatId const sat = coordHier.m_parentSat;
     return (sat == lgrn::id_null<SatId>())
         ? coordOrig
         : CoSpaceTransform{
-            .m_rotation = {to_vec<Vector3d>(sat,
-                                            std::forward<ROTVIEW_T>(qx),
-                                            std::forward<ROTVIEW_T>(qy),
-                                            std::forward<ROTVIEW_T>(qz)),
-                           std::forward<ROTVIEW_T>(qw)[std::size_t(sat)]},
-            .m_position = to_vec<Vector3g>(sat,
-                                           std::forward<POSVIEW_T>(x),
-                                           std::forward<POSVIEW_T>(y),
-                                           std::forward<POSVIEW_T>(z)),
+            .m_rotation = {to_vec<Vector3d>(sat, qx, qy, qz), qw[std::size_t(sat)]},
+            .m_position = to_vec<Vector3g>(sat, x, y, z),
             .m_precision = coordOrig.m_precision };
 }
 
