@@ -60,7 +60,7 @@ TEST(Resources, Basic)
 
     // Add resources
     {
-        ResId imageId = res.create(restypes::gc_image, pkgA, "Image0");
+        ResId imageId = res.create(restypes::gc_image, pkgA, SharedString::create_reference("Image0"));
 
         EXPECT_EQ(res.data_try_get<ImageData>(restypes::gc_image, imageId), nullptr);
         auto &rImageData = res.data_add<ImageData>(restypes::gc_image, imageId, ImageData{42});
@@ -76,7 +76,7 @@ TEST(Resources, Basic)
 
     // Get resources by name
     {
-        ResId imageId = res.find(restypes::gc_image, pkgA, "Image0");
+        ResId imageId = res.find(restypes::gc_image, pkgA, SharedString::create_reference("Image0"));
         EXPECT_NE(imageId, lgrn::id_null<ResId>());
 
         auto &rImageData = res.data_get<ImageData>(restypes::gc_image, imageId);
@@ -86,7 +86,7 @@ TEST(Resources, Basic)
     // Const access
     {
         Resources const& resConst = res;
-        ResId imageId = resConst.find(restypes::gc_image, pkgA, "Image0");
+        ResId imageId = resConst.find(restypes::gc_image, pkgA, SharedString::create_reference("Image0"));
         EXPECT_NE(imageId, lgrn::id_null<ResId>());
 
         auto const &rImageData = resConst.data_get<ImageData const>(restypes::gc_image, imageId);
@@ -102,7 +102,7 @@ TEST(Resources, RefCounting)
         Resources res = setup_basic();
         PkgId pkgA = res.pkg_create();
 
-        ResId id = res.create(restypes::gc_image, pkgA, "Image0");
+        ResId id = res.create(restypes::gc_image, pkgA, SharedString::create_reference("Image0"));
         ResIdOwner_t storage;
         EXPECT_FALSE(storage.has_value());
         storage = res.owner_create(restypes::gc_image, id);
@@ -120,7 +120,7 @@ TEST(Resources, RefCounting)
         Resources res = setup_basic();
         PkgId pkgA = res.pkg_create();
 
-        ResId id = res.create(restypes::gc_image, pkgA, "Image0");
+        ResId id = res.create(restypes::gc_image, pkgA, SharedString::create_reference("Image0"));
         {
             ResIdOwner_t storage = res.owner_create(restypes::gc_image, id);
         }
@@ -133,7 +133,7 @@ TEST(Resources, RefCounting)
         {
             Resources res = setup_basic();
             PkgId pkgA = res.pkg_create();
-            ResId id = res.create(restypes::gc_image, pkgA, "Image0");
+            ResId id = res.create(restypes::gc_image, pkgA, SharedString::create_reference("Image0"));
 
             storage = res.owner_create(restypes::gc_image, id);
         }
