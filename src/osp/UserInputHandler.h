@@ -166,6 +166,12 @@ struct ButtonControlConfig
 
 struct ButtonControlEvent
 {
+    constexpr ButtonControlEvent(EButtonControlIndex index,
+                                 EButtonControlEvent event) noexcept
+     : m_index(index)
+     , m_event(event)
+    { }
+
     EButtonControlIndex m_index;
     EButtonControlEvent m_event;
 };
