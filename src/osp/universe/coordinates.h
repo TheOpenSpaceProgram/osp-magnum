@@ -288,7 +288,7 @@ inline CoordTransformer coord_parent_to_child(
 
     return {
         .m_rotOut   = child.m_rotation.inverted(),
-        .m_c        = std::negate{}(child.m_position),
+        .m_c        = -child.m_position,
         .m_n        = precisionDiff,
         .m_m        = precisionDiff
     };
@@ -302,7 +302,7 @@ inline CoordTransformer coord_child_to_parent(
     return {
         .m_rotIn    = child.m_rotation,
         .m_c        = child.m_position,
-        .m_n        = std::negate{}(precisionDiff),
+        .m_n        = -precisionDiff,
         .m_m        = 0
     };
 }

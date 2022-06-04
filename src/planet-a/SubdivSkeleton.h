@@ -145,7 +145,7 @@ private:
     hash_id_combination(ID_T const a, ID_T const b) noexcept
     {
         // Sort to make A and B order-independent
-        id_int_t const ls = id_int_t(std::max(a, b));
+        id_int_t const ls = id_int_t(std::min(a, b));
         id_int_t const ms = id_int_t(std::max(a, b));
 
         // Concatenate bits of ls and ms into a 2x larger integer

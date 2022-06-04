@@ -26,14 +26,16 @@
 #define INCLUDED_OSP_SHARED_STRING_H_56F463BF_C8A5_4633_B906_D7250C06E2DB
 #pragma once
 
-#include <memory>       // for std::shared_ptr
-#include <utility>      // for std::forward
-#include <stdexcept>    // for std::invalid_argument
-#include <functional>   // for std::hash
-#include <string_view>  // for std::basic_string_view
-#include <type_traits>  // for std::is_nothrow_default_constructible_v, etc
+#include "string_concat.h"  // for string_data(), string_size()
 
-#include <cstddef>      // for std::size_t
+#include <memory>           // for std::shared_ptr
+#include <utility>          // for std::forward
+#include <stdexcept>        // for std::invalid_argument
+#include <functional>       // for std::hash
+#include <string_view>      // for std::basic_string_view
+#include <type_traits>      // for std::is_nothrow_default_constructible_v, etc
+
+#include <cstddef>          // for std::size_t
 
 namespace osp
 {
@@ -156,6 +158,14 @@ public:
      */
     static constexpr BasicSharedString create(ViewBase_t, LIFETIME_T)
         noexcept( std::is_nothrow_move_constructible_v<LIFETIME_T> );
+
+    /**
+     * @brief create_from_parts
+     * @param strs
+     * @brief Constructs a new SharedString with newly allocated storage initialized with the provided data.
+     */
+    template<typename ... STRS_T>
+    static BasicSharedString create_from_parts(STRS_T && ... strs) noexcept(false); // allocates
 
     /**
      * @brief create_reference
@@ -294,6 +304,45 @@ inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T &&
 
     // Do the copy
     std::copy_n(std::forward<IT_T>(begin), size, buf.get());
+
+    // Construct prior to SharedString constructor to avoid
+    // ABI specific parameter passing order problems.
+    ViewBase_t view{ buf.get(), size };
+
+    // Make the SharedString
+    return create(std::move(view), std::move(buf));
+}
+
+template<typename CHAR_T, typename LIFETIME_T>
+  template<typename ... STRS_T>
+inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create_from_parts(STRS_T && ... strs) noexcept(false) // allocates
+    -> BasicSharedString
+{
+    size_type const size = ( 0u + ... + string_size(strs) );
+
+    if(size == 0u)
+    {
+        // No data to copy, return empty SharedString
+        return {};
+    }
+
+    // Make space to copy the string
+#if defined(__cpp_lib_smart_ptr_for_overwrite)
+    auto buf = std::make_shared_for_overwrite<CHAR_T[]>(size);
+#elif defined(__cpp_lib_shared_ptr_arrays) && 201707 <= __cpp_lib_shared_ptr_arrays
+    // avoid initilization of allocated array...
+    std::shared_ptr<CHAR_T[]> buf{new CHAR_T[size]};
+#else
+    std::shared_ptr<CHAR_T> buf(new CHAR_T[size]);
+#endif
+
+    {
+        auto * p = buf.get();
+
+        // Do the copy
+        // C++17 fold for function calls.
+        ( (p = std::copy_n(string_data(strs), string_size(strs), p)), ... );
+    }
 
     // Construct prior to SharedString constructor to avoid
     // ABI specific parameter passing order problems.

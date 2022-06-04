@@ -80,21 +80,17 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
     // ie: name = "dir/file.gltf" and resName = "mytexture"
     // "dir/file.gltf:mytexture"
     // "unnamed-[id]" is used as the resource name if it's empty
-    auto format_name = [tempStr = std::string{}, name]
-            (std::string_view resName, UnsignedInt id) mutable -> std::string const&
+    auto format_name = [name](std::string_view resName, UnsignedInt id)
     {
-        tempStr.clear();
         if ( ! resName.empty())
         {
-            string_append(tempStr, name, ":", resName);
+            return SharedString::create_from_parts(name, ":", resName);
         }
         else
         {
             // i don't like std::to_string but screw it, fix it later
-            string_append(tempStr, name, ":unnamed-", std::to_string(id));
+            return SharedString::create_from_parts(name, ":unnamed-", std::to_string(id));
         }
-
-        return tempStr;
     };
 
     auto &rImportData = rResources.data_add<ImporterData>(restypes::gc_importer, res);
@@ -123,8 +119,6 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
     rImportData.m_scnTopLevel.ids_reserve(rImporter.sceneCount());
     rImportData.m_scnTopLevel.data_reserve(rImporter.objectCount());
 
-
-
     // Store images
     for (UnsignedInt i = 0; i < rImporter.image2DCount(); i ++)
     {
@@ -136,7 +130,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
         }
 
         // Create and keep track of resource Id
-        ResId const imgRes = rResources.create(gc_image, pkg, SharedString::create(format_name(rImporter.image2DName(i), i)));
+        ResId const imgRes = rResources.create(gc_image, pkg, format_name(rImporter.image2DName(i), i));
         rImportData.m_images[i] = rResources.owner_create(gc_image, imgRes);
 
         // Add image data to resource
@@ -154,7 +148,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
         }
 
         // Create and keep track of resource Id
-        ResId const texRes = rResources.create(gc_texture, pkg, SharedString::create(format_name(rImporter.textureName(i), i)));
+        ResId const texRes = rResources.create(gc_texture, pkg, format_name(rImporter.textureName(i), i));
         rImportData.m_textures[i] = rResources.owner_create(gc_texture, texRes);
 
         // Add data to resource
@@ -179,7 +173,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
             continue;
         }
 
-        ResId const meshRes = rResources.create(gc_mesh, pkg, SharedString::create(format_name(rImporter.meshName(i), i)));
+        ResId const meshRes = rResources.create(gc_mesh, pkg, format_name(rImporter.meshName(i), i));
         rResources.data_add<MeshData>(gc_mesh, meshRes, std::move(*mesh));
         rImportData.m_meshes[i] = rResources.owner_create(gc_mesh, meshRes);
     }
