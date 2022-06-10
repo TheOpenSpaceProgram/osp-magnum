@@ -36,8 +36,8 @@ namespace planeta
 {
 
 // Fundamental geometric properties of an icosahedron
-inline constexpr std::size_t const gc_icoVrtxCount = 12;
-inline constexpr std::size_t const gc_icoTriCount = 20;
+inline constexpr std::uint8_t const gc_icoVrtxCount = 12;
+inline constexpr std::uint8_t const gc_icoTriCount = 20;
 
 // Ratio between an icosahedron's edge length and radius
 // = sqrt(10.0 + 2.0 * sqrt(5.0)) / 4.0;
