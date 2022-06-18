@@ -27,6 +27,7 @@
 #include <longeron/id_management/registry_stl.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 namespace osp
@@ -36,26 +37,25 @@ namespace osp
 struct TaskTags
 {
     enum class Task     : uint32_t {};
-    enum class Fulfill  : uint32_t {};
-    enum class Limited  : uint32_t {};
+    enum class Tag      : uint32_t {};
 
-    lgrn::IdRegistryStl<Task>           m_tasks;
-    lgrn::IdRegistryStl<Fulfill, true>  m_fulfillTags;
-    lgrn::IdRegistryStl<Limited, true>  m_limitedTags;
+    lgrn::IdRegistryStl<Task>       m_tasks;
+    lgrn::IdRegistryStl<Tag, true>  m_tags;
 
-    std::vector<uint64_t> m_taskFulfill;
-    std::vector<uint64_t> m_taskDepends;
-    std::vector<uint64_t> m_taskLimited;
+    std::vector<unsigned int>       m_tagLimits;
+    std::vector<Tag>                m_tagDepends;
+    std::size_t                     m_tagDependsPerTag{8};
 
-    std::size_t fulfill_int_size() const noexcept { return m_fulfillTags.vec().capacity(); }
-    std::size_t limited_int_size() const noexcept { return m_limitedTags.vec().capacity(); }
+    std::vector<uint64_t>           m_taskTags;
+
+    std::size_t tag_ints_per_task() const noexcept { return m_tags.vec().capacity(); }
 };
 
 struct WorkerContext
 {
     struct LimitSlot
     {
-        TaskTags::Limited m_tag;
+        TaskTags::Tag m_tag;
         int m_slot;
     };
 
@@ -70,5 +70,10 @@ struct TaskFunctions
     std::vector<Func_t> m_taskFunctions;
 };
 
+
+struct ExecutionContext
+{
+    //std::vector<unsigned int>
+};
 
 } // namespace osp

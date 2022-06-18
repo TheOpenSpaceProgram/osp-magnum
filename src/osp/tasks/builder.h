@@ -39,17 +39,17 @@ namespace osp
 {
 
 inline void set_tags(
-        Corrade::Containers::ArrayView<uint32_t const>  tags,
-        Corrade::Containers::ArrayView<uint64_t>        taskTagInts,
-        std::size_t const                               intsPerTask,
-        TaskTags::Task const                            task) noexcept
+        Corrade::Containers::ArrayView<uint32_t const>  tagsIn,
+        Corrade::Containers::ArrayView<uint64_t>        taggedInts,
+        std::size_t const                               taggedSize,
+        std::size_t const                               taggedId) noexcept
 {
-    std::size_t const offset = std::size_t(task) * intsPerTask;
-    auto tagBits = lgrn::BitView(taskTagInts.slice(offset, offset + intsPerTask));
+    std::size_t const offset = taggedId * taggedSize;
+    auto taggedBits = lgrn::BitView(taggedInts.slice(offset, offset + taggedSize));
 
-    for (uint32_t const tag : tags)
+    for (uint32_t const tag : tagsIn)
     {
-        tagBits.set(tag);
+        taggedBits.set(tag);
     }
 }
 
@@ -58,66 +58,81 @@ class TaskBuilder
 {
     using Functions_t = TaskFunctions<ARGS_T...>;
     using Func_t = typename Functions_t::Func_t;
+    using Tags_t = Corrade::Containers::ArrayView<TaskTags::Tag const>;
+
 public:
 
-    struct TaskRefSpec
+    struct TaskRef
     {
-        using FulfillTags_t = Corrade::Containers::ArrayView<TaskTags::Fulfill const>;
-        using LimitedTags_t = Corrade::Containers::ArrayView<TaskTags::Limited const>;
-
-        TaskRefSpec& fulfills(FulfillTags_t const tags) noexcept
+        TaskRef& assign(Tags_t const tags) noexcept
         {
             set_tags(Corrade::Containers::arrayCast<uint32_t const>(tags),
-                     m_rTags.m_taskFulfill,
-                     m_rTags.fulfill_int_size(),
-                     m_id);
+                     m_rTags.m_taskTags,
+                     m_rTags.tag_ints_per_task(),
+                     std::size_t(m_taskId));
             return *this;
         }
 
-        TaskRefSpec& fulfills(std::initializer_list<TaskTags::Fulfill> tags) noexcept
+        TaskRef& assign(std::initializer_list<TaskTags::Tag> tags) noexcept
         {
-            return fulfills(Corrade::Containers::arrayView(tags));
+            return assign(Corrade::Containers::arrayView(tags));
         }
 
-        TaskRefSpec& depends(FulfillTags_t const tags) noexcept
+        TaskRef& function(Func_t&& func) noexcept
         {
-            set_tags(Corrade::Containers::arrayCast<uint32_t const>(tags),
-                     m_rTags.m_taskDepends,
-                     m_rTags.fulfill_int_size(),
-                     m_id);
+            m_rFunctions.m_taskFunctions[std::size_t(m_taskId)] = std::move(func);
             return *this;
         }
 
-        TaskRefSpec& depends(std::initializer_list<TaskTags::Fulfill> tags) noexcept
-        {
-            return depends(Corrade::Containers::arrayView(tags));
-        }
-
-        TaskRefSpec& limited(FulfillTags_t const tags) noexcept
-        {
-            set_tags(Corrade::Containers::arrayCast<uint32_t const>(tags),
-                     m_rTags.m_taskLimited,
-                     m_rTags.limited_int_size(),
-                     m_id);
-            return *this;
-        }
-
-        TaskRefSpec& limited(std::initializer_list<TaskTags::Fulfill> tags) noexcept
-        {
-            return limited(Corrade::Containers::arrayView(tags));
-        }
-
-        TaskRefSpec& function(Func_t&& func) noexcept
-        {
-            m_rFunctions.m_taskFunctions[std::size_t(m_id)] = std::move(func);
-            return *this;
-        }
-
-        TaskTags::Task const m_id;
+        TaskTags::Task const m_taskId;
         TaskTags &m_rTags;
         Functions_t &m_rFunctions;
 
     }; // struct TaskRefSpec
+
+    struct TagRef
+    {
+
+        TagRef& depend_on(Tags_t tags) noexcept
+        {
+            std::size_t const offset = std::size_t(m_tagId) * m_rTags.m_tagDependsPerTag;
+            auto depends = Corrade::Containers::arrayView(m_rTags.m_tagDepends)
+                            .slice(offset, offset + m_rTags.m_tagDependsPerTag);
+            auto const depBegin = std::begin(depends);
+            auto const depEnd   = std::end(depends);
+
+            for (TaskTags::Tag const tag : tags)
+            {
+                // Find first empty spot or already-added dependency
+                auto dependIt = std::find_if(
+                        depBegin, depEnd, [tag] (TaskTags::Tag const lhs)
+                {
+                    return (lhs == lgrn::id_null<TaskTags::Tag>()) || (lhs == tag);
+                });
+
+                // No space left for any dependencies
+                assert(dependIt != depEnd);
+
+                *dependIt = tag;
+            }
+
+            return *this;
+        }
+
+        TagRef& depend_on(std::initializer_list<TaskTags::Tag> tags) noexcept
+        {
+            return depend_on(Corrade::Containers::arrayView(tags));
+        }
+
+        TagRef& limit(unsigned int lim)
+        {
+            m_rTags.m_tagLimits[std::size_t(m_tagId)] = lim;
+            return *this;
+        }
+
+        TaskTags::Tag const m_tagId;
+        TaskTags &m_rTags;
+    };
 
     constexpr TaskBuilder(TaskTags& rTags, Functions_t& rFunctions)
      : m_rTags{rTags}
@@ -125,52 +140,47 @@ public:
     { }
 
     template <std::size_t N>
-    std::array<TaskTags::Fulfill, N> fulfill_tags()
+    std::array<TaskTags::Tag, N> create_tags()
     {
-        std::array<TaskTags::Fulfill, N> out;
+        std::array<TaskTags::Tag, N> out;
 
         [[maybe_unused]] auto const it
-                = m_rTags.m_fulfillTags.create(std::begin(out), std::end(out));
+                = m_rTags.m_tags.create(std::begin(out), std::end(out));
 
         assert(it == std::end(out)); // Auto-resizing tags not (yet?) supported
 
         return out;
     }
 
-    template <std::size_t N>
-    std::array<TaskTags::Limited, N> limit_tags()
+    TagRef tag(TaskTags::Tag const tagId)
     {
-        std::array<TaskTags::Limited, N> out;
-
-        [[maybe_unused]] auto const it
-                = m_rTags.m_limitedTags.create(std::begin(out), std::end(out));
-
-        assert(it == std::end(out)); // Auto-resizing tags not (yet?) supported
-
-        return out;
+        return {
+            .m_tagId = tagId,
+            .m_rTags = m_rTags
+        };
     }
 
-    TaskRefSpec task()
+    TaskRef task()
     {
-        TaskTags::Task const task = m_rTags.m_tasks.create();
+        TaskTags::Task const taskId = m_rTags.m_tasks.create();
 
         std::size_t const capacity = m_rTags.m_tasks.capacity();
-        std::size_t const fulfillCapacity = capacity * m_rTags.fulfill_int_size();
-        std::size_t const limitedCapacity = capacity * m_rTags.limited_int_size();
-
         m_rFunctions.m_taskFunctions.resize(capacity);
 
-        m_rTags.m_taskFulfill.resize(fulfillCapacity);
-        m_rTags.m_taskDepends.resize(fulfillCapacity);
-        m_rTags.m_taskLimited.resize(limitedCapacity);
+        std::size_t const tagCapacity = capacity * m_rTags.tag_ints_per_task();
+        m_rTags.m_taskTags.resize(tagCapacity);
 
+        return task(taskId);
+    };
+
+    constexpr TaskRef task(TaskTags::Task const taskId) noexcept
+    {
         return {
-            .m_id           = task,
+            .m_taskId       = taskId,
             .m_rTags        = m_rTags,
             .m_rFunctions   = m_rFunctions
         };
-
-    };
+    }
 
 private:
     TaskTags &m_rTags;
