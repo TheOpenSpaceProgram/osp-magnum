@@ -47,7 +47,7 @@ struct TaskTags
     lgrn::IdRegistryStl<Tag, true>  m_tags;
 
     // Dependency tags restricts a task from running until all tasks containing
-    // tags it depends on are compelete.
+    // tags it depends on are complete.
     // m_tagDepends is partitioned based on m_tagDependsPerTag: AAAABBBBCCCCDDDD
     // lgrn::null<Tag> used as null, or termination per-tag
     std::vector<Tag>                m_tagDepends;
