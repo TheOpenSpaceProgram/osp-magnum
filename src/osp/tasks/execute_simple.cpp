@@ -38,7 +38,7 @@ void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t 
     std::size_t const tagIntSize = tags.tag_ints_per_task();
     assert(query.size() == tagIntSize);
 
-    auto taskTagInts = Corrade::Containers::arrayView(tags.m_taskTags);
+    auto const taskTagInts = Corrade::Containers::arrayView(tags.m_taskTags);
 
     for (uint32_t const currTask : tags.m_tasks.bitview().zeros())
     {
@@ -48,7 +48,7 @@ void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t 
         {
             // Task not yet queued, check if any tags match the query
             std::size_t const offset = currTask * tagIntSize;
-            auto currTaskTagInts = taskTagInts.slice(offset, offset + tagIntSize);
+            auto const currTaskTagInts = taskTagInts.slice(offset, offset + tagIntSize);
 
             bool anyTagMatches = false;
             auto taskTagIntIt = std::begin(currTaskTagInts);
@@ -66,7 +66,8 @@ void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t 
             if (anyTagMatches)
             {
                 rQueuedCount = 1;
-                for (uint32_t const tag : lgrn::bit_view(currTaskTagInts).ones())
+                auto const view = lgrn::bit_view(currTaskTagInts);
+                for (uint32_t const tag : view.ones())
                 {
                     rExec.m_tagIncompleteCounts[tag] ++;
                 }
@@ -165,7 +166,8 @@ void task_start(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task co
     std::size_t const offset = std::size_t(task) * tagIntSize;
     auto currTaskTagInts = taskTagInts.slice(offset, offset + tagIntSize);
 
-    for (uint32_t const tag : lgrn::bit_view(currTaskTagInts).ones())
+    auto const view = lgrn::bit_view(currTaskTagInts);
+    for (uint32_t const tag : view.ones())
     {
         rExec.m_tagRunningCounts[tag] ++;
     }
@@ -180,7 +182,8 @@ void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task c
 
     rExec.m_taskQueuedCounts[std::size_t(task)] --;
 
-    for (uint32_t const tag : lgrn::bit_view(currTaskTagInts).ones())
+    auto const view = lgrn::bit_view(currTaskTagInts);
+    for (uint32_t const tag : view.ones())
     {
         rExec.m_tagRunningCounts[tag] --;
         rExec.m_tagIncompleteCounts[tag] --;
