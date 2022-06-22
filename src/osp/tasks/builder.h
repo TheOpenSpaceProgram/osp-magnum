@@ -25,6 +25,7 @@
 #pragma once
 
 #include "tasks.h"
+#include "tasks.h"
 
 #include <longeron/containers/bit_view.hpp>
 
@@ -40,7 +41,7 @@ namespace osp
 
 inline void set_tags(
         Corrade::Containers::ArrayView<uint32_t const>  tagsIn,
-        Corrade::Containers::ArrayView<uint64_t>        taggedInts,
+        BitSpan_t                                       taggedInts,
         std::size_t const                               taggedSize,
         std::size_t const                               taggedId) noexcept
 {
@@ -53,11 +54,13 @@ inline void set_tags(
     }
 }
 
-template <typename ... ARGS_T>
+/**
+ * @brief A convenient interface for setting up TaskTags and TaskFunctions
+ */
+template <typename FUNC_T>
 class TaskBuilder
 {
-    using Functions_t = TaskFunctions<ARGS_T...>;
-    using Func_t = typename Functions_t::Func_t;
+    using Functions_t = TaskFunctions<FUNC_T>;
     using Tags_t = Corrade::Containers::ArrayView<TaskTags::Tag const>;
 
 public:
@@ -78,7 +81,7 @@ public:
             return assign(Corrade::Containers::arrayView(tags));
         }
 
-        TaskRef& function(Func_t&& func) noexcept
+        TaskRef& function(FUNC_T&& func) noexcept
         {
             m_rFunctions.m_taskFunctions[std::size_t(m_taskId)] = std::move(func);
             return *this;
@@ -132,7 +135,8 @@ public:
 
         TaskTags::Tag const m_tagId;
         TaskTags &m_rTags;
-    };
+
+    }; // struct TagRef
 
     constexpr TaskBuilder(TaskTags& rTags, Functions_t& rFunctions)
      : m_rTags{rTags}

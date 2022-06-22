@@ -26,12 +26,16 @@
 
 #include <longeron/id_management/registry_stl.hpp>
 
+#include <Corrade/Containers/ArrayView.h>
+
 #include <cstdint>
-#include <functional>
 #include <vector>
 
 namespace osp
 {
+
+using BitSpan_t = Corrade::Containers::ArrayView<uint64_t>;
+using BitSpanConst_t = Corrade::Containers::ArrayView<uint64_t const>;
 
 
 struct TaskTags
@@ -42,38 +46,52 @@ struct TaskTags
     lgrn::IdRegistryStl<Task>       m_tasks;
     lgrn::IdRegistryStl<Tag, true>  m_tags;
 
-    std::vector<unsigned int>       m_tagLimits;
+    // Dependency tags restricts a task from running until all tasks containing
+    // tags it depends on are compelete.
+    // m_tagDepends is partitioned based on m_tagDependsPerTag: AAAABBBBCCCCDDDD
+    // lgrn::null<Tag> used as null, or termination per-tag
     std::vector<Tag>                m_tagDepends;
     std::size_t                     m_tagDependsPerTag{8};
 
+    // Limit sets how many tasks using a certain tag can run simultaneously
+    std::vector<unsigned int>       m_tagLimits;
+
+    // Bit positions are used to store which tags a task contains
+    // partitioned based on tag_ints_per_task(): AAAABBBBCCCCDDDD
     std::vector<uint64_t>           m_taskTags;
 
     std::size_t tag_ints_per_task() const noexcept { return m_tags.vec().capacity(); }
-};
 
-struct WorkerContext
-{
-    struct LimitSlot
-    {
-        TaskTags::Tag m_tag;
-        int m_slot;
-    };
+}; // struct TaskTags
 
-    std::vector<LimitSlot> m_limitSlots;
-};
 
-template <typename ... ARGS_T>
+template <typename FUNC_T>
 struct TaskFunctions
 {
-    using Func_t = std::function<void(WorkerContext, ARGS_T ...)>;
+    std::vector<FUNC_T> m_taskFunctions;
 
-    std::vector<Func_t> m_taskFunctions;
-};
-
+}; // struct TaskFunctions
 
 struct ExecutionContext
 {
-    //std::vector<unsigned int>
-};
+    // Tag counts from running or queued tasks; used for Dependencies
+    std::vector<unsigned int> m_tagIncompleteCounts;
+    // Tag counts from running tasks; used for Limits
+    std::vector<unsigned int> m_tagRunningCounts;
+
+    // Number of times each task is queued to run
+    std::vector<unsigned int> m_taskQueuedCounts;
+    //std::vector<uint64_t>     m_taskQueuedBits;
+
+    // TODO: Consider multithreading. something something work stealing...
+    //  * Allow multiple threads to search for and execute tasks. Atomic access
+    //    for ExecutionContext? Might be messy to implement.
+    //  * Only allow one thread to search for tasks, assign tasks to other
+    //    threads if they're available before running own task. Another thread
+    //    can take over once it completes its task. May be faster as only one
+    //    thread is modifying ExecutionContext, and easier to implement.
+    //  * Plug into an existing work queue library?
+
+}; // struct ExecutionContext
 
 } // namespace osp
