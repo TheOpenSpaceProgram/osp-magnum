@@ -26,6 +26,8 @@
 
 #include <Corrade/Containers/ArrayView.h>
 
+#include <entt/core/fwd.hpp>
+
 #include <cstdint>
 
 namespace osp
@@ -41,5 +43,8 @@ struct WorkerContext
 
     Corrade::Containers::ArrayView<LimitSlot> m_limitSlots;
 };
+
+// Used as a function argument, non-owning using entt::any::as_ref
+using TaskSharedData_t = Corrade::Containers::ArrayView<entt::any>;
 
 } // namespace osp

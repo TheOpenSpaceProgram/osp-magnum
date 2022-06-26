@@ -80,13 +80,13 @@ TEST(Tasks, SingleThreaded)
     // Calculate forces needed by the physics update
     builder.task()
         .assign({updWorld, forces})
-        .function([] (World& rWorld)
+        .data([] (World& rWorld)
     {
         rWorld.m_forces += 42 * rWorld.m_deltaTimeIn;
     });
     builder.task()
         .assign({updWorld, forces})
-        .function([] (World& rWorld)
+        .data([] (World& rWorld)
     {
         rWorld.m_forces += 1337 * rWorld.m_deltaTimeIn;
     });
@@ -94,7 +94,7 @@ TEST(Tasks, SingleThreaded)
     // Main Physics update
     builder.task()
         .assign({updWorld, physics})
-        .function([] (World& rWorld)
+        .data([] (World& rWorld)
     {
         EXPECT_EQ(rWorld.m_forces, 1337 + 42);
         rWorld.m_positions += rWorld.m_forces;
@@ -103,8 +103,8 @@ TEST(Tasks, SingleThreaded)
     // Physics update can be split into many smaller tasks. Tasks tagged with
     // 'needPhysics' will run once ALL tasks tagged with 'physics' are done.
     builder.task()
-            .assign({updWorld, physics})
-            .function([] (World& rWorld)
+        .assign({updWorld, physics})
+        .data([] (World& rWorld)
     {
         rWorld.m_deltaTimeIn = 0;
     });
@@ -113,7 +113,7 @@ TEST(Tasks, SingleThreaded)
     // this will still run, as no 'needPhysics' tasks are incomplete
     builder.task()
         .assign({updRender, needPhysics, draw})
-        .function([] (World& rWorld)
+        .data([] (World& rWorld)
     {
         EXPECT_EQ(rWorld.m_positions, 1337 + 42);
         rWorld.m_canvas.emplace("Physics Cube");
@@ -123,7 +123,7 @@ TEST(Tasks, SingleThreaded)
     // to run
     builder.task()
         .assign({updRender, draw})
-        .function([] (World& rWorld)
+        .data([] (World& rWorld)
     {
         rWorld.m_canvas.emplace("Terrain");
     });

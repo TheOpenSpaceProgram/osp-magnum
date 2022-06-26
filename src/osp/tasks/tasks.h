@@ -72,6 +72,14 @@ struct TaskFunctions
 
 }; // struct TaskFunctions
 
+template <typename FUNC_T, typename FUNCB_T>
+void task_data(TaskFunctions<FUNC_T> &rFunctions, TaskTags::Task const task, FUNCB_T&& func)
+{
+    rFunctions.m_taskFunctions.resize(
+            std::max(rFunctions.m_taskFunctions.size(), std::size_t(task) + 1));
+    rFunctions.m_taskFunctions[std::size_t(task)] = std::forward<FUNCB_T>(func);
+}
+
 struct ExecutionContext
 {
     // Tag counts from running or queued tasks; used for Dependencies

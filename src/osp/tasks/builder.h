@@ -25,7 +25,6 @@
 #pragma once
 
 #include "tasks.h"
-#include "tasks.h"
 
 #include <longeron/containers/bit_view.hpp>
 
@@ -55,12 +54,11 @@ inline void set_tags(
 }
 
 /**
- * @brief A convenient interface for setting up TaskTags and TaskFunctions
+ * @brief A convenient interface for setting up TaskTags and required task data
  */
-template <typename FUNC_T>
+template <typename DATA_T>
 class TaskBuilder
 {
-    using Functions_t = TaskFunctions<FUNC_T>;
     using Tags_t = Corrade::Containers::ArrayView<TaskTags::Tag const>;
 
 public:
@@ -81,15 +79,16 @@ public:
             return assign(Corrade::Containers::arrayView(tags));
         }
 
-        TaskRef& function(FUNC_T&& func) noexcept
+        template <typename ... ARGS_T>
+        TaskRef& data(ARGS_T&& ... args) noexcept
         {
-            m_rFunctions.m_taskFunctions[std::size_t(m_taskId)] = std::move(func);
+            task_data(m_rData, m_taskId, std::forward<ARGS_T>(args) ...);
             return *this;
         }
 
         TaskTags::Task const m_taskId;
         TaskTags &m_rTags;
-        Functions_t &m_rFunctions;
+        DATA_T &m_rData;
 
     }; // struct TaskRefSpec
 
@@ -138,9 +137,9 @@ public:
 
     }; // struct TagRef
 
-    constexpr TaskBuilder(TaskTags& rTags, Functions_t& rFunctions)
+    constexpr TaskBuilder(TaskTags& rTags, DATA_T& rData)
      : m_rTags{rTags}
-     , m_rFunctions{rFunctions}
+     , m_rData{rData}
     { }
 
     template <std::size_t N>
@@ -169,10 +168,8 @@ public:
         TaskTags::Task const taskId = m_rTags.m_tasks.create();
 
         std::size_t const capacity = m_rTags.m_tasks.capacity();
-        m_rFunctions.m_taskFunctions.resize(capacity);
 
-        std::size_t const tagCapacity = capacity * m_rTags.tag_ints_per_task();
-        m_rTags.m_taskTags.resize(tagCapacity);
+        m_rTags.m_taskTags.resize(capacity * m_rTags.tag_ints_per_task());
 
         return task(taskId);
     };
@@ -182,13 +179,13 @@ public:
         return {
             .m_taskId       = taskId,
             .m_rTags        = m_rTags,
-            .m_rFunctions   = m_rFunctions
+            .m_rData        = m_rData
         };
     }
 
 private:
     TaskTags &m_rTags;
-    Functions_t &m_rFunctions;
+    DATA_T &m_rData;
 
 }; // class TaskBuilder
 
