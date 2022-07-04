@@ -65,19 +65,19 @@ struct TaskTags
 }; // struct TaskTags
 
 
-template <typename FUNC_T>
-struct TaskFunctions
+template <typename DATA_T>
+struct TaskDataVec
 {
-    std::vector<FUNC_T> m_taskFunctions;
+    std::vector<DATA_T> m_taskData;
 
-}; // struct TaskFunctions
+}; // struct TaskDataVec
 
 template <typename FUNC_T, typename FUNCB_T>
-void task_data(TaskFunctions<FUNC_T> &rFunctions, TaskTags::Task const task, FUNCB_T&& func)
+void task_data(TaskDataVec<FUNC_T> &rData, TaskTags::Task const task, FUNCB_T&& func)
 {
-    rFunctions.m_taskFunctions.resize(
-            std::max(rFunctions.m_taskFunctions.size(), std::size_t(task) + 1));
-    rFunctions.m_taskFunctions[std::size_t(task)] = std::forward<FUNCB_T>(func);
+    rData.m_taskFunctions.resize(
+            std::max(rData.m_taskFunctions.size(), std::size_t(task) + 1));
+    rData.m_taskFunctions[std::size_t(task)] = std::forward<FUNCB_T>(func);
 }
 
 struct ExecutionContext
