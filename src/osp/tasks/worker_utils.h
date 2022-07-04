@@ -24,31 +24,51 @@
  */
 #pragma once
 
-#include <Corrade/Containers/ArrayView.h>
+#include "worker.h"
 
-#include <entt/core/fwd.hpp>
+#include <entt/core/any.hpp>
 
+#include <algorithm>
 #include <cstdint>
 
 namespace osp
 {
 
-using MainDataId = uint32_t;
 
-struct WorkerContext
+template <typename T>
+struct MainDataPair
 {
-    struct LimitSlot
-    {
-        uint32_t m_tag;
-        int m_slot;
-    };
-
-    Corrade::Containers::ArrayView<LimitSlot> m_limitSlots;
+    T &m_rData;
+    MainDataId m_id;
 };
 
-using MainDataSpan_t = Corrade::Containers::ArrayView<entt::any>;
-using MainDataIt_t = entt::any*;
 
-using MainTaskFunc_t = void(*)(WorkerContext&, MainDataSpan_t);
+template <typename T, typename ... ARGS_T>
+MainDataPair<T> main_emplace(MainDataSpan_t mainData, MainDataIt_t& rItCurr, ARGS_T&& ... args)
+{
+    MainDataIt_t const itFirst = std::begin(mainData);
+    MainDataIt_t const itLast = std::end(mainData);
+
+    // search for next empty spot in mainData to emplace T into
+    rItCurr = std::find_if(rItCurr, itLast, [] (entt::any const &any)
+    {
+        return ! bool(any);
+    });
+
+    // Expected to always contain an empty entt::any
+    assert(rItCurr != itLast);
+
+    T& rData = rItCurr->emplace<T>(std::forward<ARGS_T>(args) ...);
+
+    return {rData, std::distance(itFirst, rItCurr)};
+}
+
+
+template <typename T>
+T& main_get(MainDataSpan_t mainData, MainDataId const id)
+{
+    return entt::any_cast<T&>(mainData[id]);
+}
+
 
 } // namespace osp

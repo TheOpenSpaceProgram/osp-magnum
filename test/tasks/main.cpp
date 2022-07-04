@@ -56,7 +56,7 @@ TEST(Tasks, SingleThreaded)
                              lgrn::id_null<TaskTags::Tag>());
     tags.m_tagLimits.resize(tags.m_tags.capacity());
 
-    TaskFunctions<std::function<void(World&)>> functions;
+    TaskDataVec<std::function<void(World&)>> functions;
 
     // Create tags and set relationships between them
 
