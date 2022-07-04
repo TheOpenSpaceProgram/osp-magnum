@@ -28,6 +28,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.12.4)
 
 # Enable link time optimization
 CMAKE_POLICY(SET CMP0069 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 
 # Add the module search directory
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/modules/")
@@ -44,11 +45,6 @@ ENDIF()
 
 # Set project name
 PROJECT(OSP-MAGNUM CXX)
-
-# Can't check for MSVC until after the first `project()` call...
-if(NOT MSVC) #SDL2 doesn't like MSVC's LTO behavior yet: https://github.com/libsdl-org/SDL/issues/5732
-    set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
-endif()
 
 # Setup things for the test subdir below
 # Has to be in toplevel CMakeLists.txt or ctest gets mad.
