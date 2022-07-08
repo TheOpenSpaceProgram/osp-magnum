@@ -56,7 +56,7 @@ void CommonSceneRendererGL::setup(ActiveApplication& rApp)
     m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
 
 }
-
+#if 0
 void CommonSceneRendererGL::sync(ActiveApplication& rApp, CommonTestScene const& rScene)
 {
     using namespace osp::shader;
@@ -113,6 +113,7 @@ void CommonSceneRendererGL::sync(ActiveApplication& rApp, CommonTestScene const&
             rScene.m_basic.m_transform,
             m_renderGl.m_drawTransform);
 }
+#endif
 
 void CommonSceneRendererGL::prepare_fbo(ActiveApplication& rApp)
 {
@@ -128,6 +129,7 @@ void CommonSceneRendererGL::prepare_fbo(ActiveApplication& rApp)
                 | FramebufferClear::Stencil);
 }
 
+#if 0
 void CommonSceneRendererGL::draw_entities(ActiveApplication& rApp, CommonTestScene const& rScene)
 {
     ACompCamera const &rCamera = rScene.m_basic.m_camera.get(m_camera);
@@ -158,25 +160,26 @@ void CommonSceneRendererGL::update_delete(std::vector<ActiveEnt> const& toDelete
     SysRender::update_delete_groups(m_renderGroups, first, last);
     SysRenderGL::update_delete(m_renderGl, first, last);
 }
+#endif
 
 on_draw_t generate_common_draw(CommonTestScene& rScene, ActiveApplication& rApp, setup_renderer_t setup_scene)
 {
-    auto pRenderer = std::make_shared<CommonSceneRendererGL>();
+    //auto pRenderer = std::make_shared<CommonSceneRendererGL>();
 
     // Setup default resources
-    pRenderer->setup(rApp);
+    //pRenderer->setup(rApp);
 
     // Setup scene-specifc stuff
-    setup_scene(*pRenderer, rScene, rApp);
+    //setup_scene(*pRenderer, rScene, rApp);
 
     // Set all drawing stuff dirty then sync with renderer.
     // This allows clean re-openning of the scene
-    SysRender::set_dirty_all(rScene.m_drawing);
-    pRenderer->sync(rApp, rScene);
+    //SysRender::set_dirty_all(rScene.m_drawing);
+    //pRenderer->sync(rApp, rScene);
 
-    return [&rScene, pRenderer = std::move(pRenderer)] (ActiveApplication& rApp, float const delta)
+    return [&rScene] (ActiveApplication& rApp, float const delta)
     {
-        pRenderer->m_onDraw(*pRenderer, rScene, rApp, delta);
+        //pRenderer->m_onDraw(*pRenderer, rScene, rApp, delta);
     };
 };
 

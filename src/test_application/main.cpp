@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 
+#include "osp/tasks/worker_utils.h"
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_INFO
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -35,6 +36,9 @@
 #include <osp/Resource/load_tinygltf.h>
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
+
+#include <osp/tasks/tasks.h>
+#include <osp/tasks/tasks_main.h>
 
 #include <osp/string_concat.h>
 #include <osp/logging.h>
@@ -49,6 +53,7 @@
 #include <Magnum/Trade/TextureData.h>
 #include <Magnum/Trade/MeshData.h>
 
+#include <Corrade/Containers/ArrayViewStl.h>
 #include <Corrade/Utility/Arguments.h>
 
 #include <entt/core/any.hpp>
@@ -107,20 +112,21 @@ void clear_resource_owners();
 void debug_print_help();
 void debug_print_resources();
 
-// Stores loaded resources
-osp::Resources g_resources;
+// Application state
+osp::TaskTags g_tasks;
+osp::MainTaskDataVec_t g_taskData;
+osp::MainData_t g_mainData;
+
+// Stores loaded resources in g_mainData
+osp::MainDataId g_resourcesId;
 osp::PkgId g_defaultPkg;
-
-// Test application supports 1 Active Scene
-entt::any g_activeScene;
-std::function<void(ActiveApplication&)> g_appSetup;
-
-// Test application supports 1 Universe
-//std::shared_ptr<UniverseScene> g_universeScene;
 
 // Magnum Application deals with window and OpenGL things
 std::optional<ActiveApplication> g_activeApplication;
 std::thread g_magnumThread;
+
+// Called when openning a Magnum Application
+std::function<void(ActiveApplication&)> g_appSetup;
 
 // Loggers
 std::shared_ptr<spdlog::logger> g_logTestApp;
@@ -141,14 +147,13 @@ std::unordered_map<std::string_view, Option> const g_scenes
 
     {"enginetest", {"Demonstrate basic game engine functionality", [] {
 
-        using namespace enginetest;
-        g_activeScene = setup_scene(g_resources, g_defaultPkg);
+        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
+        g_mainData.emplace_back(enginetest::setup_scene(rResources, g_defaultPkg));
 
         g_appSetup = [] (ActiveApplication& rApp)
         {
-            EngineTestScene& rScene
-                    = entt::any_cast<EngineTestScene&>(g_activeScene);
-            rApp.set_on_draw(generate_draw_func(rScene, rApp));
+            auto& rScene = entt::any_cast<enginetest::EngineTestScene&>(g_mainData.front());
+            rApp.set_on_draw(enginetest::generate_draw_func(rScene, rApp));
         };
     }}}
     ,
@@ -156,10 +161,10 @@ std::unordered_map<std::string_view, Option> const g_scenes
         setup_common_scene<scenes::PhysicsTest>();
     }}},
     {"vehicletest", {"Vehicle and glTF", [] {
-        setup_common_scene<scenes::VehicleTest>();
+        //setup_common_scene<scenes::VehicleTest>();
     }}},
     {"universetest", {"Vehicle and glTF", [] {
-        setup_common_scene<scenes::UniverseTest>();
+        //setup_common_scene<scenes::UniverseTest>();
     }}}
 };
 
@@ -218,7 +223,7 @@ int main(int argc, char** argv)
     }
 
     //Kill spdlog
-    spdlog::shutdown();  //>_> -> X.X  *Stab 
+    spdlog::shutdown();  //>_> -> X.X  *Stab
     return 0;
 }
 
@@ -261,7 +266,7 @@ int debug_cli_loop()
             {
                 std::cout << "Application is already open\n";
             }
-            else if ( ! bool(g_activeScene) )
+            else if ( ! bool(g_appSetup) )
             {
                 std::cout << "No existing scene loaded\n";
             }
@@ -322,7 +327,8 @@ void start_magnum_async()
 
         OSP_LOG_INFO("Closed Magnum Application");
 
-        osp::active::SysRenderGL::clear_resource_owners(g_activeApplication->get_render_gl(), g_resources);
+        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
+        osp::active::SysRenderGL::clear_resource_owners(g_activeApplication->get_render_gl(), rResources);
 
         g_activeApplication.reset();
 
@@ -333,17 +339,27 @@ void start_magnum_async()
 template <typename SCENE_T>
 void setup_common_scene()
 {
-    g_activeScene.emplace<testapp::CommonTestScene>(g_resources);
-    auto &rScene = entt::any_cast<CommonTestScene&>(g_activeScene);
+    //g_sharedData = { entt::make_any<testapp::CommonTestScene>(g_resources) };
+    //auto &rScene = entt::any_cast<CommonTestScene&>(g_activeScene);
 
-    SCENE_T::setup_scene(rScene, g_defaultPkg);
+    MainView mainView
+    {
+        .m_rMainData    = g_mainData,
+        .m_rTasks       = g_tasks,
+        .m_rTaskData    = g_taskData,
+        .m_resourcesId  = g_resourcesId
+    };
+
+    std::vector<osp::MainDataId> dataIds(24);
+    std::vector<osp::TaskTags::Tag> tagIds(24);
+    SCENE_T::setup_scene(mainView, g_defaultPkg, dataIds, tagIds);
 
     // Renderer and draw function is created when g_appSetup is invoked
     g_appSetup = [] (ActiveApplication& rApp)
     {
-        auto& rScene
-                = entt::any_cast<CommonTestScene&>(g_activeScene);
-        rApp.set_on_draw(generate_common_draw(rScene, rApp, &SCENE_T::setup_renderer_gl));
+        //auto& rScene
+        //        = entt::any_cast<CommonTestScene&>(g_activeScene);
+        //rApp.set_on_draw(generate_common_draw(rScene, rApp, &SCENE_T::setup_renderer_gl));
     };
 }
 
@@ -356,6 +372,7 @@ bool destroy_universe()
     return true;
 }
 
+using Corrade::Containers::arrayView;
 
 void load_a_bunch_of_stuff()
 {
@@ -363,16 +380,21 @@ void load_a_bunch_of_stuff()
     using namespace Magnum;
     using Primitives::CylinderFlag;
 
-    g_resources.resize_types(osp::ResTypeIdReg_t::size());
+    g_mainData.resize(64);
+    auto fish = std::begin(arrayView(g_mainData));
+    auto [rResources, resId] = osp::main_emplace<osp::Resources>(arrayView(g_mainData), fish);
+    g_resourcesId = resId;
 
-    g_resources.data_register<Trade::ImageData2D>(gc_image);
-    g_resources.data_register<Trade::TextureData>(gc_texture);
-    g_resources.data_register<osp::TextureImgSource>(gc_texture);
-    g_resources.data_register<Trade::MeshData>(gc_mesh);
-    g_resources.data_register<osp::ImporterData>(gc_importer);
-    g_resources.data_register<osp::Prefabs>(gc_importer);
-    osp::register_tinygltf_resources(g_resources);
-    g_defaultPkg = g_resources.pkg_create();
+    rResources.resize_types(osp::ResTypeIdReg_t::size());
+
+    rResources.data_register<Trade::ImageData2D>(gc_image);
+    rResources.data_register<Trade::TextureData>(gc_texture);
+    rResources.data_register<osp::TextureImgSource>(gc_texture);
+    rResources.data_register<Trade::MeshData>(gc_mesh);
+    rResources.data_register<osp::ImporterData>(gc_importer);
+    rResources.data_register<osp::Prefabs>(gc_importer);
+    osp::register_tinygltf_resources(rResources);
+    g_defaultPkg = rResources.pkg_create();
 
     // Load sturdy glTF files
     const std::string_view datapath = {"OSPData/adera/"};
@@ -392,16 +414,16 @@ void load_a_bunch_of_stuff()
     //       images, textures, and other relevant data into osp::Resources
     for (auto const& meshName : meshes)
     {
-        osp::ResId res = osp::load_tinygltf_file(osp::string_concat(datapath, meshName), g_resources, g_defaultPkg);
-        osp::assigns_prefabs_tinygltf(g_resources, res);
+        osp::ResId res = osp::load_tinygltf_file(osp::string_concat(datapath, meshName), rResources, g_defaultPkg);
+        osp::assigns_prefabs_tinygltf(rResources, res);
     }
 
 
     // Add a default primitives
-    auto const add_mesh_quick = [] (std::string_view const name, Trade::MeshData&& data)
+    auto const add_mesh_quick = [&rResources = rResources] (std::string_view const name, Trade::MeshData&& data)
     {
-        osp::ResId const meshId = g_resources.create(gc_mesh, g_defaultPkg, osp::SharedString::create(name));
-        g_resources.data_add<Trade::MeshData>(gc_mesh, meshId, std::move(data));
+        osp::ResId const meshId = rResources.create(gc_mesh, g_defaultPkg, osp::SharedString::create(name));
+        rResources.data_add<Trade::MeshData>(gc_mesh, meshId, std::move(data));
     };
 
     add_mesh_quick("cube", Primitives::cubeSolid());
@@ -416,7 +438,8 @@ using each_res_id_t = void(*)(osp::ResId);
 
 static void resource_for_each_type(osp::ResTypeId const type, each_res_id_t const do_thing)
 {
-    lgrn::IdRegistry<osp::ResId> const &rReg = g_resources.ids(type);
+    auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
+    lgrn::IdRegistry<osp::ResId> const &rReg = rResources.ids(type);
     for (std::size_t i = 0; i < rReg.capacity(); ++i)
     {
         if (rReg.exists(osp::ResId(i)))
@@ -434,34 +457,38 @@ void clear_resource_owners()
     // their associated image data
     resource_for_each_type(gc_texture, [] (osp::ResId const id)
     {
-        auto * const pData = g_resources
+        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
+
+        auto * const pData = rResources
                 .data_try_get<osp::TextureImgSource>(gc_texture, id);
         if (pData != nullptr)
         {
-            g_resources.owner_destroy(gc_image, std::move(*pData));
+            rResources.owner_destroy(gc_image, std::move(*pData));
         }
     });
 
     // Importer data own a lot of other resources
     resource_for_each_type(gc_importer, [] (osp::ResId const id)
     {
-        auto * const pData = g_resources
+        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
+
+        auto * const pData = rResources
                 .data_try_get<osp::ImporterData>(gc_importer, id);
         if (pData != nullptr)
         {
             for (osp::ResIdOwner_t &rOwner : std::move(pData->m_images))
             {
-                g_resources.owner_destroy(gc_image, std::move(rOwner));
+                rResources.owner_destroy(gc_image, std::move(rOwner));
             }
 
             for (osp::ResIdOwner_t &rOwner : std::move(pData->m_textures))
             {
-                g_resources.owner_destroy(gc_texture, std::move(rOwner));
+                rResources.owner_destroy(gc_texture, std::move(rOwner));
             }
 
             for (osp::ResIdOwner_t &rOwner : std::move(pData->m_meshes))
             {
-                g_resources.owner_destroy(gc_mesh, std::move(rOwner));
+                rResources.owner_destroy(gc_mesh, std::move(rOwner));
             }
         }
     });

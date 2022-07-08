@@ -26,7 +26,10 @@
 
 #include "common_scene.h"
 
+#include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
+
+#include <longeron/id_management/registry_stl.hpp>
 
 #include <entt/container/dense_map.hpp>
 
@@ -41,7 +44,7 @@ namespace testapp::scenes
  * Specific physics engine used (ake Newton world) is stored separately in
  * CommonScene. ie: rScene.get<ospnewton::ACtxNwtWorld>();
  */
-struct PhysicsData
+struct ACtxTestPhys
 {
     // Generic physics components and data
     osp::active::ACtxPhysics        m_physics;
@@ -50,16 +53,32 @@ struct PhysicsData
     // 'Per-thread' inputs fed into the physics engine. Only one here for now
     osp::active::ACtxPhysInputs     m_physIn;
 
-    entt::dense_map<osp::phys::EShape,
-                    osp::active::MeshIdOwner_t> m_shapeToMesh;
-    entt::dense_map<std::string_view,
-                    osp::active::MeshIdOwner_t> m_namedMeshs;
-
     /**
      * @brief Clean up reference counted resource owners
      */
     static void cleanup(CommonTestScene& rScene);
+};
 
+struct NamedMeshes
+{
+    // Required for std::is_copy_assignable to work properly inside of entt::any
+    NamedMeshes() = default;
+    NamedMeshes(NamedMeshes const& copy) = delete;
+    NamedMeshes(NamedMeshes&& move) = default;
+
+    entt::dense_map<osp::phys::EShape,
+                    osp::active::MeshIdOwner_t> m_shapeToMesh;
+    entt::dense_map<std::string_view,
+                    osp::active::MeshIdOwner_t> m_namedMeshs;
+};
+
+struct QuickPhysSceneRef
+{
+    lgrn::IdRegistryStl<osp::active::ActiveEnt> &m_rActiveIds;
+    osp::active::ACtxBasic      &m_rBasic;
+    ACtxTestPhys                &m_rTPhys;
+    NamedMeshes const           &m_rNMesh;
+    osp::active::ACtxDrawing    &m_rDrawing;
 };
 
 /**
@@ -68,12 +87,12 @@ struct PhysicsData
  * @return Newly created entity
  */
 osp::active::ActiveEnt add_solid_quick(
-        CommonTestScene& rScene,
-        osp::active::ActiveEnt parent,
-        osp::phys::EShape shape,
-        osp::Matrix4 transform,
-        int material,
-        float mass);
+        QuickPhysSceneRef               rScene,
+        osp::active::ActiveEnt const    parent,
+        osp::phys::EShape const         shape,
+        osp::Matrix4 const              transform,
+        int const                       material,
+        float const                     mass);
 
 /**
  * @brief Convenient function to create and throw a drawable physics entity of
@@ -82,12 +101,14 @@ osp::active::ActiveEnt add_solid_quick(
  * @return Newly created entity
  */
 osp::active::ActiveEnt add_rigid_body_quick(
-        CommonTestScene &rScene,
-        osp::Vector3 position,
-        osp::Vector3 velocity,
-        float mass,
-        osp::phys::EShape shape,
-        osp::Vector3 size);
+        QuickPhysSceneRef               rScene,
+        osp::active::ActiveEnt const    parent,
+        osp::Vector3 const              position,
+        osp::Vector3 const              velocity,
+        int const                       material,
+        float const                     mass,
+        osp::phys::EShape const         shape,
+        osp::Vector3 const              size);
 
 
 } // namespace testapp::scenes

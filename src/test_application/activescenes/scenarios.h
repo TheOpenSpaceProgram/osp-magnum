@@ -28,6 +28,9 @@
 
 #include <osp/Resource/resourcetypes.h>
 
+#include <osp/tasks/tasks.h>
+#include <osp/tasks/tasks_main.h>
+
 #include <functional>
 
 namespace testapp
@@ -40,6 +43,14 @@ class ActiveApplication;
 // Stored inside an ActiveApplicaton to use as a main draw function.
 // Renderer state can be stored in lambda capture
 using on_draw_t = std::function<void(ActiveApplication&, float delta)>;
+
+struct MainView
+{
+    osp::MainDataSpan_t     m_rMainData;
+    osp::TaskTags           &m_rTasks;
+    osp::MainTaskDataVec_t  &m_rTaskData;
+    osp::MainDataId         m_resourcesId;
+};
 
 namespace flight
 {
@@ -104,8 +115,8 @@ namespace scenes
 
 struct PhysicsTest
 {
-    static void setup_scene(CommonTestScene &rScene, osp::PkgId pkg);
-    static void setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp) noexcept;
+    static void setup_scene(MainView mainView, osp::PkgId pkg, osp::MainDataIdSpan_t dataOut, osp::TagSpan_t tagsOut);
+    static void setup_renderer_gl(MainView mainView, ActiveApplication& rApp) noexcept;
 };
 
 struct VehicleTest
