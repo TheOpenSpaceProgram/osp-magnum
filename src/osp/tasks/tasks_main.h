@@ -24,56 +24,22 @@
  */
 #pragma once
 
+#include "tasks.h"
 #include "worker.h"
 
-#include <entt/core/any.hpp>
-
-#include <algorithm>
-#include <cstdint>
+#include <vector>
 
 namespace osp
 {
 
-
-template <typename T>
-struct MainDataPair
+struct MainTask
 {
-    T &m_rData;
-    MainDataId m_id;
-
-    T& operator->()
-    {
-        return m_rData;
-    }
+    MainTaskFunc_t m_func;
+    std::vector<MainDataId> m_dataUsed;
 };
 
+using MainData_t = std::vector<entt::any>;
 
-template <typename T, typename ... ARGS_T>
-[[nodiscard]] MainDataPair<T> main_emplace(MainDataSpan_t mainData, MainDataIt_t& rItCurr, ARGS_T&& ... args)
-{
-    MainDataIt_t const itFirst = std::begin(mainData);
-    MainDataIt_t const itLast = std::end(mainData);
-
-    // search for next empty spot in mainData to emplace T into
-    rItCurr = std::find_if(rItCurr, itLast, [] (entt::any const &any)
-    {
-        return ! bool(any);
-    });
-
-    // Expected to always contain an empty entt::any
-    assert(rItCurr != itLast);
-
-    rItCurr->emplace<T>(std::forward<ARGS_T>(args) ...);
-
-    return {entt::any_cast<T&>(*rItCurr), MainDataId(std::distance(itFirst, rItCurr))};
-}
-
-
-template <typename T>
-[[nodiscard]] T& main_get(MainDataSpan_t mainData, MainDataId const id)
-{
-    return entt::any_cast<T&>(mainData[id]);
-}
-
+using MainTaskDataVec_t = TaskDataVec<MainTask>;
 
 } // namespace osp

@@ -173,7 +173,7 @@ TEST(Tasks, SingleThreaded)
             auto const task = TaskTags::Task(*std::next(tasksToRunBits.ones().begin(), choice));
 
             task_start(tags, exec, task);
-            functions.m_taskFunctions[std::size_t(task)](world);
+            functions.m_taskData[std::size_t(task)](world);
             task_finish(tags, exec, task);
         }
 
