@@ -131,6 +131,11 @@ struct ACtxDrawing
  */
 struct ACtxDrawingRes
 {
+    // Required for std::is_copy_assignable to work properly inside of entt::any
+    ACtxDrawingRes() = default;
+    ACtxDrawingRes(ACtxDrawingRes const& copy) = delete;
+    ACtxDrawingRes(ACtxDrawingRes&& move) = default;
+
     // Associate Texture Ids with resources
     IdMap_t<ResId, TexId>                   m_resToTex;
     IdMap_t<TexId, ResIdOwner_t>            m_texToRes;

@@ -1,3 +1,4 @@
+#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2022 Open Space Program Project
@@ -824,3 +825,4 @@ void VehicleTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
 }
 
 } // namespace testapp::VehicleTest
+#endif

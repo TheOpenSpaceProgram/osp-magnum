@@ -36,9 +36,11 @@
 
 #include <osp/Active/SysHierarchy.h>
 
+#include <osp/tasks/worker_utils.h>
+
 #include <osp/Resource/resources.h>
 
-#include <longeron/id_management/registry.hpp>
+#include <longeron/id_management/registry_stl.hpp>
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 
@@ -93,64 +95,76 @@ struct PhysicsTestData
     std::vector<ThrowShape> m_toThrow;
 };
 
-
-void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId const pkg)
+void PhysicsTest::setup_scene(MainView mainView, osp::PkgId pkg, osp::MainDataIdSpan_t dataOut, osp::TagSpan_t tagsOut)
 {
     using namespace osp::active;
+    using ospnewton::ACtxNwtWorld;
+    using osp::main_emplace;
+    using osp::main_get;
 
-    // It should be clear that the physics test scene is a composition of:
-    // * PhysicsData:       Generic physics data
-    // * ACtxNwtWorld:      Newton Dynamics Physics engine
-    // * PhysicsTestData:   Additional scene-specific data, ie. dropping blocks
-    auto &rScnPhys  = rScene.emplace<PhysicsData>();
-    auto &rScnNwt   = rScene.emplace<ospnewton::ACtxNwtWorld>(gc_threadCount);
-    auto &rScnTest  = rScene.emplace<PhysicsTestData>();
+    auto &rResources = main_get<osp::Resources>(mainView.m_rMainData, mainView.m_resourcesId);
+    osp::MainDataSpan_t &rMainData = mainView.m_rMainData;
 
-    // Add cleanup function to deal with reference counts
-    // Note: The problem with destructors, is that REQUIRE storing pointers in
-    //       the data, which is uglier to deal with
-    rScene.m_onCleanup.push_back(&PhysicsData::cleanup);
+    // Add required scene data. This populates rMainData
 
-    osp::Resources &rResources = *rScene.m_pResources;
+    osp::MainDataIt_t itCurr = std::begin(mainView.m_rMainData);
+
+    auto [rActiveIds, idActiveIds]      = main_emplace< lgrn::IdRegistryStl<ActiveEnt> >    (rMainData, itCurr);
+    auto [rBasic, idBasic]              = main_emplace< ACtxBasic >                         (rMainData, itCurr);
+    auto [rDrawing, idDrawing]          = main_emplace< ACtxDrawing >                       (rMainData, itCurr);
+    auto [rDrawingRes, idDrawingRes]    = main_emplace< ACtxDrawingRes >                    (rMainData, itCurr);
+    auto [rComMats, idComMats]          = main_emplace< CommonMaterials >                   (rMainData, itCurr);
+    auto [rDelete, idDelete]            = main_emplace< std::vector<ActiveEnt> >            (rMainData, itCurr);
+    auto [rDeleteTotal, idDeleteTotal]  = main_emplace< std::vector<ActiveEnt> >            (rMainData, itCurr);
+    auto [rTPhys, idTPhys]              = main_emplace< ACtxTestPhys >                      (rMainData, itCurr);
+    auto [rNMesh, idNMeshId]            = main_emplace< NamedMeshes >                       (rMainData, itCurr);
+    auto [rNwt, idNwt]                  = main_emplace< ACtxNwtWorld >                      (rMainData, itCurr, gc_threadCount);
+    auto [rTest, idTest]                = main_emplace< PhysicsTestData >                   (rMainData, itCurr);
+
+    // Write IDs of data to dataOut
+    auto const dataOutInit = {idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats, idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest};
+    std::copy(std::begin(dataOutInit), std::end(dataOutInit), std::begin(dataOut));
+
+    // Setup the scene
 
     // Convenient function to get a reference-counted mesh owner
-    auto const quick_add_mesh = [&rScene, &rResources, pkg] (std::string_view const name) -> MeshIdOwner_t
+    auto const quick_add_mesh = [&rResources, &rDrawing = rDrawing, &rDrawingRes = rDrawingRes, pkg] (std::string_view const name) -> MeshIdOwner_t
     {
         osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
         assert(res != lgrn::id_null<osp::ResId>());
-        MeshId const meshId = SysRender::own_mesh_resource(rScene.m_drawing, rScene.m_drawingRes, rResources, res);
-        return rScene.m_drawing.m_meshRefCounts.ref_add(meshId);
+        MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, res);
+        return rDrawing.m_meshRefCounts.ref_add(meshId);
     };
 
     // Acquire mesh resources from Package
-    rScnPhys.m_shapeToMesh.emplace(EShape::Box,       quick_add_mesh("cube"));
-    rScnPhys.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
-    rScnPhys.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
-    rScnPhys.m_namedMeshs.emplace("floor", quick_add_mesh("grid64solid"));
+    rNMesh.m_shapeToMesh.emplace(EShape::Box,       quick_add_mesh("cube"));
+    rNMesh.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
+    rNMesh.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
+    rNMesh.m_namedMeshs.emplace("floor", quick_add_mesh("grid64solid"));
 
     // Allocate space to fit all materials
-    rScene.m_drawing.m_materials.resize(rScene.m_materialCount);
+    rDrawing.m_materials.resize(rComMats.m_materialCount);
 
     // Create hierarchy root entity
-    rScene.m_hierRoot = rScene.m_activeIds.create();
-    rScene.m_basic.m_hierarchy.emplace(rScene.m_hierRoot);
+    rBasic.m_hierRoot = rActiveIds.create();
+    rBasic.m_hierarchy.emplace(rBasic.m_hierRoot);
 
     // Create camera entity
-    ActiveEnt camEnt = rScene.m_activeIds.create();
+    ActiveEnt camEnt = rActiveIds.create();
 
     // Create camera transform and draw transform
-    ACompTransform &rCamTf = rScene.m_basic.m_transform.emplace(camEnt);
+    ACompTransform &rCamTf = rBasic.m_transform.emplace(camEnt);
     rCamTf.m_transform.translation().z() = 25;
 
     // Create camera component
-    ACompCamera &rCamComp = rScene.m_basic.m_camera.emplace(camEnt);
+    ACompCamera &rCamComp = rBasic.m_camera.emplace(camEnt);
     rCamComp.m_far = 1u << 24;
     rCamComp.m_near = 1.0f;
     rCamComp.m_fov = 45.0_degf;
 
     // Add camera to hierarchy
     SysHierarchy::add_child(
-            rScene.m_basic.m_hierarchy, rScene.m_hierRoot, camEnt);
+            rBasic.m_hierarchy, rBasic.m_hierRoot, camEnt);
 
     // start making floor
 
@@ -158,48 +172,48 @@ void PhysicsTest::setup_scene(CommonTestScene &rScene, osp::PkgId const pkg)
     static constexpr Vector3 const sc_floorPos{0.0f, 0.0f, -1.005f};
 
     // Create floor root entity
-    ActiveEnt const floorRootEnt = rScene.m_activeIds.create();
+    ActiveEnt const floorRootEnt = rActiveIds.create();
 
     // Add transform and draw transform to root
-    rScene.m_basic.m_transform.emplace(
+    rBasic.m_transform.emplace(
             floorRootEnt, ACompTransform{Matrix4::rotationX(-90.0_degf)});
 
     // Create floor mesh entity
-    ActiveEnt const floorMeshEnt = rScene.m_activeIds.create();
+    ActiveEnt const floorMeshEnt = rActiveIds.create();
 
     // Add mesh to floor mesh entity
-    rScene.m_drawing.m_mesh.emplace(floorMeshEnt, quick_add_mesh("grid64solid"));
-    rScene.m_drawing.m_meshDirty.push_back(floorMeshEnt);
+    rDrawing.m_mesh.emplace(floorMeshEnt, quick_add_mesh("grid64solid"));
+    rDrawing.m_meshDirty.push_back(floorMeshEnt);
 
     // Add mesh visualizer material to floor mesh entity
     MaterialData &rMatCommon
-            = rScene.m_drawing.m_materials[rScene.m_matVisualizer];
+            = rDrawing.m_materials[rComMats.m_matVisualizer];
     rMatCommon.m_comp.emplace(floorMeshEnt);
     rMatCommon.m_added.push_back(floorMeshEnt);
 
     // Add transform, draw transform, opaque, and visible entity
-    rScene.m_basic.m_transform.emplace(
+    rBasic.m_transform.emplace(
             floorMeshEnt, ACompTransform{Matrix4::scaling(sc_floorSize)});
-    rScene.m_drawing.m_opaque.emplace(floorMeshEnt);
-    rScene.m_drawing.m_visible.emplace(floorMeshEnt);
+    rDrawing.m_opaque.emplace(floorMeshEnt);
+    rDrawing.m_visible.emplace(floorMeshEnt);
 
     // Add floor root to hierarchy root
     SysHierarchy::add_child(
-            rScene.m_basic.m_hierarchy, rScene.m_hierRoot, floorRootEnt);
+            rBasic.m_hierarchy, rBasic.m_hierRoot, floorRootEnt);
 
     // Parent floor mesh entity to floor root entity
     SysHierarchy::add_child(
-            rScene.m_basic.m_hierarchy, floorRootEnt, floorMeshEnt);
+            rBasic.m_hierarchy, floorRootEnt, floorMeshEnt);
 
     // Add collider to floor root entity (yeah lol it's a big cube)
     Matrix4 const floorTf = Matrix4::scaling(sc_floorSize)
                           * Matrix4::translation(sc_floorPos);
-    add_solid_quick(rScene, floorRootEnt, EShape::Box, floorTf,
-                    rScene.m_matCommon, 0.0f);
+    add_solid_quick({rActiveIds, rBasic, rTPhys, rNMesh, rDrawing}, floorRootEnt, EShape::Box, floorTf,
+                    rComMats.m_matCommon, 0.0f);
 
     // Make floor entity a (non-dynamic) rigid body
-    rScnPhys.m_physics.m_hasColliders.emplace(floorRootEnt);
-    rScnPhys.m_physics.m_physBody.emplace(floorRootEnt);
+    rTPhys.m_physics.m_hasColliders.emplace(floorRootEnt);
+    rTPhys.m_physics.m_physBody.emplace(floorRootEnt);
 
 }
 
@@ -207,6 +221,7 @@ static void update_test_scene_delete(CommonTestScene &rScene)
 {
     using namespace osp::active;
 
+    /*
     auto &rScnTest  = rScene.get<PhysicsTestData>();
     auto &rScnPhys  = rScene.get<PhysicsData>();
     auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
@@ -226,9 +241,11 @@ static void update_test_scene_delete(CommonTestScene &rScene)
     rScnTest.m_removeOutOfBounds  .remove(first, last);
 
     rScene.update_delete();
+    */
 
 }
 
+#if 0
 /**
  * @brief Update CommonTestScene containing physics test
  *
@@ -340,6 +357,8 @@ static void update_test_scene(CommonTestScene& rScene, float const delta)
     SysHierarchy::sort(rScene.m_basic.m_hierarchy);
 }
 
+#endif
+
 //-----------------------------------------------------------------------------
 
 struct PhysicsTestControls
@@ -354,10 +373,13 @@ struct PhysicsTestControls
     osp::input::EButtonControlIndex m_btnThrow;
 };
 
-void PhysicsTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp) noexcept
+void PhysicsTest::setup_renderer_gl(MainView mainView, ActiveApplication& rApp) noexcept
 {
+
+
     using namespace osp::active;
 
+    /*
     auto &rControls = rRenderer.emplace<PhysicsTestControls>(rApp);
 
     // Select first camera for rendering
@@ -372,6 +394,7 @@ void PhysicsTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
 
     // Set initial position of camera slightly above the ground
     rControls.m_camCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
+
 
     rRenderer.m_onDraw = [] (
             CommonSceneRendererGL& rRenderer, CommonTestScene& rScene,
@@ -412,6 +435,7 @@ void PhysicsTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTest
         rRenderer.draw_entities(rApp, rScene);
         rRenderer.display(rApp);
     };
+    */
 }
 
 } // namespace testapp::physicstest

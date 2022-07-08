@@ -24,97 +24,39 @@
  */
 #pragma once
 
-#include <osp/Active/basic.h>
-#include <osp/Active/drawing.h>
-
-//#include <entt/core/any.hpp>
-
-#include <array>
+#include <osp/tasks/worker.h>
 
 namespace testapp
 {
 
-/**
- * @brief An array of entt::any intended for storing unique types
- */
-struct MultiAny
+struct CommonMaterials
 {
-    using Array_t = std::array<entt::any, 8>;
-
-    Array_t m_data;
-
-    template <typename T, typename ... ARGS_T>
-    T& emplace(ARGS_T&& ... args);
-
-    template <typename T>
-    T& get();
-};
-
-template <typename T, typename ... ARGS_T>
-T& MultiAny::emplace(ARGS_T&& ... args)
-{
-    // search for an empty spot in m_data, to emplace T into
-    Array_t::iterator found = std::find_if(std::begin(m_data), std::end(m_data),
-                              [] (entt::any const &any)
-    {
-        return ! bool(any);
-    });
-
-    assert (found != std::end(m_data));
-
-    found->emplace<T>(std::forward<ARGS_T>(args) ...);
-
-    return entt::any_cast<T&>(*found);
-}
-
-template <typename T>
-T& MultiAny::get()
-{
-    Array_t::iterator found = std::find_if(std::begin(m_data), std::end(m_data),
-                              [] (entt::any const &any)
-    {
-        return any.type() == entt::type_id<T>();
-    });
-
-    assert (found != std::end(m_data));
-
-    return entt::any_cast<T&>(*found);
-}
-
-//-----------------------------------------------------------------------------
-
-struct CommonTestScene : MultiAny
-{
-    using on_cleanup_t = void(CommonTestScene&);
-    using ActiveEnt = osp::active::ActiveEnt;
-
-    CommonTestScene(osp::Resources &rResources)
-     : m_pResources{&rResources}
-    { }
-    ~CommonTestScene();
-
-    osp::Resources *m_pResources;
-
-    std::vector<on_cleanup_t*> m_onCleanup;
-
-    // ID registry generates entity IDs, and keeps track of which ones exist
-    lgrn::IdRegistry<osp::active::ActiveEnt> m_activeIds;
-
-    // Basic and Drawing components
-    osp::active::ACtxBasic          m_basic;
-    osp::active::ACtxDrawing        m_drawing;
-    osp::active::ACtxDrawingRes     m_drawingRes;
-
-    // Entity delete list/queue
-    std::vector<ActiveEnt>          m_delete;
-    std::vector<ActiveEnt>          m_deleteTotal;
-
-    // Hierarchy root, needs to exist so all hierarchy entities are connected
-    ActiveEnt                       m_hierRoot{lgrn::id_null<ActiveEnt>()};
-
     int     m_materialCount     {0};
     int     m_matCommon         {m_materialCount++};
     int     m_matVisualizer     {m_materialCount++};
+};
+
+struct CommonTestSceneTags
+{
+    // ID registry generates entity IDs, and keeps track of which ones exist
+    osp::MainDataId m_activeIds;
+
+    // Basic and Drawing components
+    osp::MainDataId m_basic;
+    osp::MainDataId m_drawing;
+    osp::MainDataId m_drawingRes;
+    osp::MainDataId m_materials;
+
+    // Entity delete list/queue
+    osp::MainDataId m_delete;
+    osp::MainDataId m_deleteTotal;
+};
+
+struct CommonTestScene
+{
+    static CommonTestSceneTags setup_data(osp::MainDataSpan_t& rMainData, osp::MainDataIt_t& rItCurr);
+
+
 
     /**
      * @brief Delete descendents of entities to delete

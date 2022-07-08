@@ -22,6 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#if 0
 #include "scenarios.h"
 #include "scene_physics.h"
 #include "common_scene.h"
@@ -699,3 +700,4 @@ void UniverseTest::setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTes
 }
 
 } // namespace testapp::UniverseTest
+#endif

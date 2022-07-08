@@ -125,6 +125,8 @@ struct ACtxBasic
     acomp_storage_t<ACompName>                  m_name;
     acomp_storage_t<ACompHierarchy>             m_hierarchy;
     acomp_storage_t<ACompCamera>                m_camera;
+
+    ActiveEnt m_hierRoot;
 };
 
 template<typename IT_T>

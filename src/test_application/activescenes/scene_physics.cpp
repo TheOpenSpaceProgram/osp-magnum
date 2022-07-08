@@ -29,107 +29,110 @@
 #include <osp/Active/physics.h>
 #include <osp/Active/SysHierarchy.h>
 
-
-using osp::active::ActiveEnt;
+using namespace osp;
+using namespace osp::active;
 
 
 namespace testapp::scenes
 {
 
-void PhysicsData::cleanup(CommonTestScene& rScene)
-{
-    auto &rScnPhys = rScene.get<PhysicsData>();
+//void PhysicsData::cleanup(CommonTestScene& rScene)
+//{
+    //auto &rScnPhys = rScene.get<PhysicsData>();
 
-    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rScnPhys.m_shapeToMesh, {}))
-    {
-        rScene.m_drawing.m_meshRefCounts.ref_release(std::move(rOwner));
-    }
+//    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rScnPhys.m_shapeToMesh, {}))
+//    {
+//        rScene.m_drawing.m_meshRefCounts.ref_release(std::move(rOwner));
+//    }
 
-    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rScnPhys.m_namedMeshs, {}))
-    {
-        rScene.m_drawing.m_meshRefCounts.ref_release(std::move(rOwner));
-    }
-}
+//    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rScnPhys.m_namedMeshs, {}))
+//    {
+//        rScene.m_drawing.m_meshRefCounts.ref_release(std::move(rOwner));
+//    }
+//}
 
 ActiveEnt add_solid_quick(
-        CommonTestScene& rScene, ActiveEnt const parent, osp::phys::EShape const shape,
-        osp::Matrix4 const transform, int const material, float const mass)
+        QuickPhysSceneRef               rScene,
+        ActiveEnt const                 parent,
+        phys::EShape const              shape,
+        Matrix4 const                   transform,
+        int const                       material,
+        float const                     mass)
 {
-    using namespace osp::active;
-
-    auto &rScnPhys = rScene.get<PhysicsData>();
+    auto const [rActiveIds, rBasic, rTPhys, rNMesh, rDrawing] = rScene;
 
     // Make entity
-    ActiveEnt const ent = rScene.m_activeIds.create();
+    ActiveEnt const ent = rActiveIds.create();
 
     // Add mesh
-    rScene.m_drawing.m_mesh.emplace(
-            ent, rScene.m_drawing.m_meshRefCounts.ref_add(rScnPhys.m_shapeToMesh.at(shape)) );
-    rScene.m_drawing.m_meshDirty.push_back(ent);
+    rDrawing.m_mesh.emplace(
+            ent, rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(shape)) );
+    rDrawing.m_meshDirty.push_back(ent);
 
     // Add material to cube
-    MaterialData &rMaterial = rScene.m_drawing.m_materials[material];
+    MaterialData &rMaterial = rDrawing.m_materials[material];
     rMaterial.m_comp.emplace(ent);
     rMaterial.m_added.push_back(ent);
 
     // Add transform
-    rScene.m_basic.m_transform.emplace(ent, ACompTransform{transform});
+    rBasic.m_transform.emplace(ent, ACompTransform{transform});
 
     // Add opaque and visible component
-    rScene.m_drawing.m_opaque.emplace(ent);
-    rScene.m_drawing.m_visible.emplace(ent);
+    rDrawing.m_opaque.emplace(ent);
+    rDrawing.m_visible.emplace(ent);
 
     // Add physics stuff
-    rScnPhys.m_physics.m_shape.emplace(ent, shape);
-    rScnPhys.m_physics.m_solid.emplace(ent);
+    rTPhys.m_physics.m_shape.emplace(ent, shape);
+    rTPhys.m_physics.m_solid.emplace(ent);
     osp::Vector3 const inertia
             = osp::phys::collider_inertia_tensor(shape, transform.scaling(), mass);
-    rScnPhys.m_hierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
+    rTPhys.m_hierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
 
-    rScnPhys.m_physIn.m_colliderDirty.push_back(ent);
+    rTPhys.m_physIn.m_colliderDirty.push_back(ent);
 
     // Add to hierarchy
-    SysHierarchy::add_child(rScene.m_basic.m_hierarchy, parent, ent);
+    SysHierarchy::add_child(rBasic.m_hierarchy, parent, ent);
 
     return ent;
 }
 
 ActiveEnt add_rigid_body_quick(
-        CommonTestScene &rScene, osp::Vector3 const position, osp::Vector3 const velocity,
-        float const mass, osp::phys::EShape const shape, osp::Vector3 const size)
+        QuickPhysSceneRef               rScene,
+        ActiveEnt const                 parent,
+        Vector3 const                   position,
+        Vector3 const                   velocity,
+        int const                       material,
+        float const                     mass,
+        phys::EShape const              shape,
+        Vector3 const                   size)
 {
-    using namespace osp::active;
-
-    auto &rScnPhys = rScene.get<PhysicsData>();
+    auto const [rActiveIds, rBasic, rTPhys, rNMesh, rDrawing] = rScene;
 
     // Root is needed to act as the rigid body entity
     // Scale of root entity must be (1, 1, 1). Descendents that act as colliders
     // are allowed to have different scales
-    ActiveEnt const root = rScene.m_activeIds.create();
+    ActiveEnt const root = rActiveIds.create();
 
     // Add transform
-    rScene.m_basic.m_transform.emplace(
+    rBasic.m_transform.emplace(
             root, ACompTransform{osp::Matrix4::translation(position)});
 
     // Add root entity to hierarchy
-    SysHierarchy::add_child(rScene.m_basic.m_hierarchy, rScene.m_hierRoot, root);
+    SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, root);
 
     // Create collider / drawable to the root entity
-    add_solid_quick(
-            rScene, root, shape,
-            osp::Matrix4::scaling(size),
-            rScene.m_matVisualizer, 0.0f);
+    add_solid_quick(rScene, root, shape, Matrix4::scaling(size), material, 0.0f);
 
     // Make ball root a dynamic rigid body
-    rScnPhys.m_physics.m_hasColliders.emplace(root);
-    rScnPhys.m_physics.m_physBody.emplace(root);
-    rScnPhys.m_physics.m_physLinearVel.emplace(root);
-    rScnPhys.m_physics.m_physAngularVel.emplace(root);
-    osp::active::ACompPhysDynamic &rDyn = rScnPhys.m_physics.m_physDynamic.emplace(root);
+    rTPhys.m_physics.m_hasColliders.emplace(root);
+    rTPhys.m_physics.m_physBody.emplace(root);
+    rTPhys.m_physics.m_physLinearVel.emplace(root);
+    rTPhys.m_physics.m_physAngularVel.emplace(root);
+    osp::active::ACompPhysDynamic &rDyn = rTPhys.m_physics.m_physDynamic.emplace(root);
     rDyn.m_totalMass = 1.0f;
 
     // Set velocity
-    rScnPhys.m_physIn.m_setVelocity.emplace_back(root, velocity);
+    rTPhys.m_physIn.m_setVelocity.emplace_back(root, velocity);
 
     return root;
 }

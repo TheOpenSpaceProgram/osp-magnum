@@ -43,13 +43,8 @@ namespace testapp
  *       osp::active::RenderGL
  *
  */
-struct CommonSceneRendererGL : MultiAny
+struct CommonSceneRendererGL
 {
-    using on_draw_t = void(*)(CommonSceneRendererGL&, CommonTestScene&,
-                              ActiveApplication&, float) noexcept;
-
-    on_draw_t m_onDraw{nullptr};
-
     osp::active::ACtxSceneRenderGL m_renderGl;
 
     osp::active::ACtxRenderGroups m_renderGroups;

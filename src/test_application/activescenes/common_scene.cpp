@@ -24,13 +24,22 @@
  */
 #include "common_scene.h"
 
-#include <osp/Active/SysRender.h>
+#include <osp/tasks/worker_utils.h>
 
+#include <osp/Active/basic.h>
+#include <osp/Active/drawing.h>
+#include <osp/Active/SysRender.h>
 #include <osp/Active/SysHierarchy.h>
+
+#include <longeron/id_management/registry_stl.hpp>
+
+#include <vector>
 
 namespace testapp
 {
 
+
+/*
 CommonTestScene::~CommonTestScene()
 {
     // Clear data first
@@ -79,5 +88,6 @@ void CommonTestScene::update_delete()
         }
     }
 }
+*/
 
 } // namespace testapp
