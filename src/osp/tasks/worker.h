@@ -46,9 +46,9 @@ struct WorkerContext
     Corrade::Containers::ArrayView<LimitSlot> m_limitSlots;
 };
 
-using MainDataSpan_t = Corrade::Containers::ArrayView<entt::any>;
-using MainDataIt_t = entt::any*;
-
-using MainTaskFunc_t = void(*)(WorkerContext&, MainDataSpan_t);
+using MainDataIdSpan_t  = Corrade::Containers::ArrayView<MainDataId>;
+using MainDataSpan_t    = Corrade::Containers::ArrayView<entt::any>;
+using MainDataIt_t      = entt::any*;
+using MainTaskFunc_t    = void(*)(WorkerContext&, MainDataSpan_t);
 
 } // namespace osp

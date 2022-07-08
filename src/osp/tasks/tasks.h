@@ -37,7 +37,6 @@ namespace osp
 using BitSpan_t = Corrade::Containers::ArrayView<uint64_t>;
 using BitSpanConst_t = Corrade::Containers::ArrayView<uint64_t const>;
 
-
 struct TaskTags
 {
     enum class Task     : uint32_t {};
@@ -64,6 +63,7 @@ struct TaskTags
 
 }; // struct TaskTags
 
+using TagSpan_t = Corrade::Containers::ArrayView<TaskTags::Tag>;
 
 template <typename DATA_T>
 struct TaskDataVec
@@ -75,9 +75,9 @@ struct TaskDataVec
 template <typename FUNC_T, typename FUNCB_T>
 void task_data(TaskDataVec<FUNC_T> &rData, TaskTags::Task const task, FUNCB_T&& func)
 {
-    rData.m_taskFunctions.resize(
-            std::max(rData.m_taskFunctions.size(), std::size_t(task) + 1));
-    rData.m_taskFunctions[std::size_t(task)] = std::forward<FUNCB_T>(func);
+    rData.m_taskData.resize(
+            std::max(rData.m_taskData.size(), std::size_t(task) + 1));
+    rData.m_taskData[std::size_t(task)] = std::forward<FUNCB_T>(func);
 }
 
 struct ExecutionContext
