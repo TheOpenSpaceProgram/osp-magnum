@@ -24,10 +24,18 @@
  */
 #pragma once
 
+
 #include <osp/tasks/worker.h>
+
+#include <osp/Active/activetypes.h>
+
+#include <longeron/id_management/registry_stl.hpp>
+
 
 namespace testapp
 {
+
+using ActiveReg_t = lgrn::IdRegistryStl<osp::active::ActiveEnt>;
 
 struct CommonMaterials
 {
@@ -54,10 +62,6 @@ struct CommonTestSceneTags
 
 struct CommonTestScene
 {
-    static CommonTestSceneTags setup_data(osp::MainDataSpan_t& rMainData, osp::MainDataIt_t& rItCurr);
-
-
-
     /**
      * @brief Delete descendents of entities to delete
      *
