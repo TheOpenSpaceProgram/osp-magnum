@@ -352,6 +352,8 @@ void setup_common_scene()
 
     std::vector<osp::MainDataId> dataIds(24);
     std::vector<osp::TaskTags::Tag> tagIds(24);
+    osp::main_find_empty(g_mainData, 0, std::begin(dataIds), std::end(dataIds));
+
     SCENE_T::setup_scene(mainView, g_defaultPkg, dataIds, tagIds);
 
     // Renderer and draw function is created when g_appSetup is invoked
@@ -381,8 +383,8 @@ void load_a_bunch_of_stuff()
     using Primitives::CylinderFlag;
 
     g_mainData.resize(64);
-    auto fish = std::begin(arrayView(g_mainData));
-    auto [rResources, resId] = osp::main_emplace<osp::Resources>(arrayView(g_mainData), fish);
+    osp::MainDataId const resId = osp::main_find_empty(g_mainData);
+    auto &rResources = osp::main_emplace<osp::Resources>(g_mainData, resId);
     g_resourcesId = resId;
 
     rResources.resize_types(osp::ResTypeIdReg_t::size());

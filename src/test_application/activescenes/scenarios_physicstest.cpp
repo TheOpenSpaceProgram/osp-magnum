@@ -40,8 +40,6 @@
 
 #include <osp/Resource/resources.h>
 
-#include <longeron/id_management/registry_stl.hpp>
-
 #include <Magnum/GL/DefaultFramebuffer.h>
 
 #include <Corrade/Containers/ArrayViewStl.h>
@@ -95,7 +93,7 @@ struct PhysicsTestData
     std::vector<ThrowShape> m_toThrow;
 };
 
-void PhysicsTest::setup_scene(MainView mainView, osp::PkgId pkg, osp::MainDataIdSpan_t dataOut, osp::TagSpan_t tagsOut)
+void PhysicsTest::setup_scene(MainView mainView, osp::PkgId pkg, osp::MainDataIdSpan_t dataIds, osp::TagSpan_t tagsOut)
 {
     using namespace osp::active;
     using ospnewton::ACtxNwtWorld;
@@ -107,23 +105,21 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId pkg, osp::MainDataId
 
     // Add required scene data. This populates rMainData
 
-    osp::MainDataIt_t itCurr = std::begin(mainView.m_rMainData);
+    auto [idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats,
+          idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest]
+            = osp::unpack<11>(dataIds);
 
-    auto [rActiveIds, idActiveIds]      = main_emplace< lgrn::IdRegistryStl<ActiveEnt> >    (rMainData, itCurr);
-    auto [rBasic, idBasic]              = main_emplace< ACtxBasic >                         (rMainData, itCurr);
-    auto [rDrawing, idDrawing]          = main_emplace< ACtxDrawing >                       (rMainData, itCurr);
-    auto [rDrawingRes, idDrawingRes]    = main_emplace< ACtxDrawingRes >                    (rMainData, itCurr);
-    auto [rComMats, idComMats]          = main_emplace< CommonMaterials >                   (rMainData, itCurr);
-    auto [rDelete, idDelete]            = main_emplace< std::vector<ActiveEnt> >            (rMainData, itCurr);
-    auto [rDeleteTotal, idDeleteTotal]  = main_emplace< std::vector<ActiveEnt> >            (rMainData, itCurr);
-    auto [rTPhys, idTPhys]              = main_emplace< ACtxTestPhys >                      (rMainData, itCurr);
-    auto [rNMesh, idNMeshId]            = main_emplace< NamedMeshes >                       (rMainData, itCurr);
-    auto [rNwt, idNwt]                  = main_emplace< ACtxNwtWorld >                      (rMainData, itCurr, gc_threadCount);
-    auto [rTest, idTest]                = main_emplace< PhysicsTestData >                   (rMainData, itCurr);
-
-    // Write IDs of data to dataOut
-    auto const dataOutInit = {idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats, idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest};
-    std::copy(std::begin(dataOutInit), std::end(dataOutInit), std::begin(dataOut));
+    auto &rActiveIds    = main_emplace< ActiveReg_t >           (rMainData, idActiveIds);
+    auto &rBasic        = main_emplace< ACtxBasic >             (rMainData, idBasic);
+    auto &rDrawing      = main_emplace< ACtxDrawing >           (rMainData, idDrawing);
+    auto &rDrawingRes   = main_emplace< ACtxDrawingRes >        (rMainData, idDrawingRes);
+    auto &rComMats      = main_emplace< CommonMaterials >       (rMainData, idComMats);
+    auto &rDelete       = main_emplace< std::vector<ActiveEnt> >(rMainData, idDelete);
+    auto &rDeleteTotal  = main_emplace< std::vector<ActiveEnt> >(rMainData, idDeleteTotal);
+    auto &rTPhys        = main_emplace< ACtxTestPhys >          (rMainData, idTPhys);
+    auto &rNMesh        = main_emplace< NamedMeshes >           (rMainData, idNMeshId);
+    auto &rNwt          = main_emplace< ACtxNwtWorld >          (rMainData, idNwt, gc_threadCount);
+    auto &rTest         = main_emplace< PhysicsTestData >       (rMainData, idTest);
 
     // Setup the scene
 

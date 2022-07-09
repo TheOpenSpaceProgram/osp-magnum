@@ -34,40 +34,50 @@
 namespace osp
 {
 
-
-template <typename T>
-struct MainDataPair
+template<std::size_t N, typename T>
+auto& unpack(Corrade::Containers::ArrayView<T> in)
 {
-    T &m_rData;
-    MainDataId m_id;
-
-    T& operator->()
-    {
-        return m_rData;
-    }
-};
-
-
-template <typename T, typename ... ARGS_T>
-[[nodiscard]] MainDataPair<T> main_emplace(MainDataSpan_t mainData, MainDataIt_t& rItCurr, ARGS_T&& ... args)
-{
-    MainDataIt_t const itFirst = std::begin(mainData);
-    MainDataIt_t const itLast = std::end(mainData);
-
-    // search for next empty spot in mainData to emplace T into
-    rItCurr = std::find_if(rItCurr, itLast, [] (entt::any const &any)
-    {
-        return ! bool(any);
-    });
-
-    // Expected to always contain an empty entt::any
-    assert(rItCurr != itLast);
-
-    rItCurr->emplace<T>(std::forward<ARGS_T>(args) ...);
-
-    return {entt::any_cast<T&>(*rItCurr), MainDataId(std::distance(itFirst, rItCurr))};
+    return *reinterpret_cast<T(*)[N]>(in.data());
 }
 
+[[nodiscard]] inline MainDataId main_find_empty(MainDataSpan_t const mainData, MainDataId current = 0)
+{
+    while ( bool(mainData[current]) && (current < mainData.size()) )
+    {
+        ++current;
+    }
+    return current;
+}
+
+template <typename IT_T, typename ITB_T>
+MainDataId main_find_empty(MainDataSpan_t mainData, MainDataId current, IT_T destFirst, const ITB_T destLast)
+{
+    while (destFirst != destLast)
+    {
+        current = main_find_empty(mainData, current);
+
+        if (current < mainData.size())
+        {
+            *destFirst = current;
+            ++current;
+            std::advance(destFirst, 1);
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return current;
+}
+
+template <typename T, typename ... ARGS_T>
+[[nodiscard]] T& main_emplace(MainDataSpan_t mainData, MainDataId id, ARGS_T&& ... args)
+{
+    entt::any &rData = mainData[std::size_t(id)];
+    rData.emplace<T>(std::forward<ARGS_T>(args) ...);
+    return entt::any_cast<T&>(rData);
+}
 
 template <typename T>
 [[nodiscard]] T& main_get(MainDataSpan_t mainData, MainDataId const id)
