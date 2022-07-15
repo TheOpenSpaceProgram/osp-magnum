@@ -46,10 +46,16 @@ using on_draw_t = std::function<void(ActiveApplication&, float delta)>;
 
 struct MainView
 {
-    osp::MainDataSpan_t     m_rMainData;
-    osp::TaskTags           &m_rTasks;
-    osp::MainTaskDataVec_t  &m_rTaskData;
-    osp::MainDataId         m_resourcesId;
+    osp::ArrayView<entt::any>   m_rMainData;
+    osp::TaskTags&              m_rTasks;
+    osp::MainTaskDataVec_t&     m_rTaskData;
+    osp::MainDataId             m_resourcesId;
+};
+
+struct Session
+{
+    std::vector<osp::MainDataId> m_dataIds;
+    std::vector<osp::TaskTags::Tag> m_tags;
 };
 
 namespace flight
@@ -113,10 +119,16 @@ namespace scenes
 // Note: Use generate_common_draw to setup common scenes
 //       in common_renderer_gl.h
 
+
 struct PhysicsTest
 {
-    static void setup_scene(MainView mainView, osp::PkgId pkg, osp::MainDataIdSpan_t dataOut, osp::TagSpan_t tagsOut);
-    static void setup_renderer_gl(MainView mainView, ActiveApplication& rApp) noexcept;
+    static void setup_scene(MainView mainView, osp::PkgId pkg, Session const& sceneOut);
+    static void setup_renderer_gl(
+            MainView mainView,
+            ActiveApplication& rApp,
+            osp::ArrayView<osp::TaskTags::Tag const> appTags,
+            Session const& sceneIn,
+            Session const& rendererOut) noexcept;
 };
 
 struct VehicleTest

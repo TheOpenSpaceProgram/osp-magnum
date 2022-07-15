@@ -113,6 +113,11 @@ struct RenderGroup
 
 struct ACtxRenderGroups
 {
+    // Required for std::is_copy_assignable to work properly inside of entt::any
+    ACtxRenderGroups() = default;
+    ACtxRenderGroups(ACtxRenderGroups const& copy) = delete;
+    ACtxRenderGroups(ACtxRenderGroups&& move) = default;
+
     std::unordered_map< std::string, RenderGroup > m_groups;
 
 };

@@ -33,7 +33,10 @@
 namespace osp
 {
 
+using Corrade::Containers::ArrayView;
 using MainDataId = uint32_t;
+
+using MainDataIds_t = std::initializer_list<osp::MainDataId>;
 
 struct WorkerContext
 {
@@ -46,8 +49,6 @@ struct WorkerContext
     Corrade::Containers::ArrayView<LimitSlot> m_limitSlots;
 };
 
-using MainDataIdSpan_t  = Corrade::Containers::ArrayView<MainDataId>;
-using MainDataSpan_t    = Corrade::Containers::ArrayView<entt::any>;
-using MainTaskFunc_t    = void(*)(WorkerContext&, MainDataSpan_t);
+using MainTaskFunc_t = void(*)(WorkerContext&, ArrayView<entt::any>);
 
 } // namespace osp

@@ -27,12 +27,17 @@
 #include "worker.h"
 #include "tasks.h"
 
+#include <Corrade/Containers/ArrayView.h>
+
 #include <cstdint>
 #include <vector>
 
 
 namespace osp
 {
+
+using BitSpan_t = Corrade::Containers::ArrayView<uint64_t>;
+using BitSpanConst_t = Corrade::Containers::ArrayView<uint64_t const>;
 
 /**
  * @brief Convert a range of ints or enums to bit positions
@@ -69,7 +74,7 @@ BitSpan_t to_bitspan(std::initializer_list<T> tags, BitSpan_t out) noexcept
  * @param rExec     [ref] ExecutionContext to record queued tasks into
  * @param query     [in] Bit positions of tags used to select tasks
  */
-void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t const query);
+void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t query);
 
 /**
  * @brief List all available tasks that are currently allowed to run
@@ -87,7 +92,7 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
  * @param rExec     [ref] ExecutionContext to record running tasks
  * @param task      [in] Id of task to start running
  */
-void task_start(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task const task);
+void task_start(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task task);
 
 /**
  * @brief Mark a task as finished in an ExecutionContext
@@ -96,6 +101,6 @@ void task_start(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task co
  * @param rExec     [ref] ExecutionContext to record running tasks
  * @param task      [in] Id of task to finish
  */
-void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task const task);
+void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task task);
 
 } // namespace osp

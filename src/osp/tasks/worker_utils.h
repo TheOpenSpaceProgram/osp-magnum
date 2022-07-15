@@ -30,17 +30,13 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <type_traits>
 
 namespace osp
 {
 
-template<std::size_t N, typename T>
-auto& unpack(Corrade::Containers::ArrayView<T> in)
-{
-    return *reinterpret_cast<T(*)[N]>(in.data());
-}
-
-[[nodiscard]] inline MainDataId main_find_empty(MainDataSpan_t const mainData, MainDataId current = 0)
+[[nodiscard]] inline MainDataId main_find_empty(
+        ArrayView<entt::any const> const mainData, MainDataId current = 0)
 {
     while ( bool(mainData[current]) && (current < mainData.size()) )
     {
@@ -50,7 +46,9 @@ auto& unpack(Corrade::Containers::ArrayView<T> in)
 }
 
 template <typename IT_T, typename ITB_T>
-MainDataId main_find_empty(MainDataSpan_t mainData, MainDataId current, IT_T destFirst, const ITB_T destLast)
+MainDataId main_find_empty(
+        ArrayView<entt::any const> const mainData, MainDataId current,
+        IT_T destFirst, const ITB_T destLast)
 {
     while (destFirst != destLast)
     {
@@ -72,7 +70,7 @@ MainDataId main_find_empty(MainDataSpan_t mainData, MainDataId current, IT_T des
 }
 
 template <typename T, typename ... ARGS_T>
-[[nodiscard]] T& main_emplace(MainDataSpan_t mainData, MainDataId id, ARGS_T&& ... args)
+T& main_emplace(ArrayView<entt::any> const mainData, MainDataId id, ARGS_T&& ... args)
 {
     entt::any &rData = mainData[std::size_t(id)];
     rData.emplace<T>(std::forward<ARGS_T>(args) ...);
@@ -80,7 +78,7 @@ template <typename T, typename ... ARGS_T>
 }
 
 template <typename T>
-[[nodiscard]] T& main_get(MainDataSpan_t mainData, MainDataId const id)
+[[nodiscard]] T& main_get(ArrayView<entt::any> const mainData, MainDataId const id)
 {
     return entt::any_cast<T&>(mainData[id]);
 }

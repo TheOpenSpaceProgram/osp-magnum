@@ -52,6 +52,8 @@ struct ACtxCameraController
      , m_btnMovUp(      m_controls.button_subscribe("cam_up"))
      , m_btnMovDn(      m_controls.button_subscribe("cam_dn"))
     { }
+    ACtxCameraController(ACtxCameraController const& copy) = delete;
+    ACtxCameraController(ACtxCameraController&& move) = default;
 
     osp::Vector3 m_up{0.0f, 1.0f, 0.0f};
 

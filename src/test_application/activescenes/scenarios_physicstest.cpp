@@ -36,9 +36,12 @@
 
 #include <osp/Active/SysHierarchy.h>
 
+#include <osp/tasks/builder.h>
 #include <osp/tasks/worker_utils.h>
 
 #include <osp/Resource/resources.h>
+
+#include <osp/unpack.h>
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 
@@ -47,16 +50,14 @@
 #include <newtondynamics_physics/ospnewton.h>
 #include <newtondynamics_physics/SysNewton.h>
 
-using osp::active::ActiveEnt;
-using osp::active::active_sparse_set_t;
-
+using namespace osp::active;
+using ospnewton::ACtxNwtWorld;
 using osp::phys::EShape;
-
+using osp::main_emplace;
+using osp::main_get;
 using osp::Vector3;
 using osp::Matrix3;
 using osp::Matrix4;
-
-using osp::active::MeshIdOwner_t;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -93,21 +94,16 @@ struct PhysicsTestData
     std::vector<ThrowShape> m_toThrow;
 };
 
-void PhysicsTest::setup_scene(MainView mainView, osp::PkgId pkg, osp::MainDataIdSpan_t dataIds, osp::TagSpan_t tagsOut)
+void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session const& sceneOut)
 {
-    using namespace osp::active;
-    using ospnewton::ACtxNwtWorld;
-    using osp::main_emplace;
-    using osp::main_get;
-
-    auto &rResources = main_get<osp::Resources>(mainView.m_rMainData, mainView.m_resourcesId);
-    osp::MainDataSpan_t &rMainData = mainView.m_rMainData;
+    auto &rResources = osp::main_get<osp::Resources>(mainView.m_rMainData, mainView.m_resourcesId);
+    auto &rMainData = mainView.m_rMainData;
 
     // Add required scene data. This populates rMainData
 
-    auto [idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats,
-          idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest]
-            = osp::unpack<11>(dataIds);
+    auto const [idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats,
+                idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest]
+               = osp::unpack<11>(sceneOut.m_dataIds);
 
     auto &rActiveIds    = main_emplace< ActiveReg_t >           (rMainData, idActiveIds);
     auto &rBasic        = main_emplace< ACtxBasic >             (rMainData, idBasic);
@@ -124,7 +120,7 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId pkg, osp::MainDataId
     // Setup the scene
 
     // Convenient function to get a reference-counted mesh owner
-    auto const quick_add_mesh = [&rResources, &rDrawing = rDrawing, &rDrawingRes = rDrawingRes, pkg] (std::string_view const name) -> MeshIdOwner_t
+    auto const quick_add_mesh = [&rResources, &rDrawing, &rDrawingRes, pkg] (std::string_view const name) -> MeshIdOwner_t
     {
         osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
         assert(res != lgrn::id_null<osp::ResId>());
@@ -359,39 +355,75 @@ static void update_test_scene(CommonTestScene& rScene, float const delta)
 
 struct PhysicsTestControls
 {
-    PhysicsTestControls(ActiveApplication &rApp)
-     : m_camCtrl(rApp.get_input_handler())
-     , m_btnThrow(m_camCtrl.m_controls.button_subscribe("debug_throw"))
+    PhysicsTestControls(osp::input::UserInputHandler &rInputs)
+     :  m_btnThrow(rInputs.button_subscribe("debug_throw"))
     { }
-
-    ACtxCameraController m_camCtrl;
 
     osp::input::EButtonControlIndex m_btnThrow;
 };
 
-void PhysicsTest::setup_renderer_gl(MainView mainView, ActiveApplication& rApp) noexcept
+void PhysicsTest::setup_renderer_gl(
+        MainView                                        mainView,
+        ActiveApplication&                              rApp,
+        osp::ArrayView<osp::TaskTags::Tag const> const  appTags,
+        Session const&                                  sceneIn,
+        Session const&                                  rendererOut) noexcept
 {
+    using namespace osp::shader;
 
+    auto const [idScnRender, idGroups, idDrawPhong, idDrawVisual, idCamEnt, idCamCtrl, idControls]
+            = osp::unpack<7>(rendererOut.m_dataIds);
+    auto &rMainData = mainView.m_rMainData;
 
-    using namespace osp::active;
+    auto &rScnRender    = main_emplace< ACtxSceneRenderGL >     (rMainData, idScnRender);
+    auto &rGroups       = main_emplace< ACtxRenderGroups >      (rMainData, idGroups);
+    auto &rDrawPhong    = main_emplace< ACtxDrawPhong >         (rMainData, idDrawPhong);
+    auto &rDrawVisual   = main_emplace< ACtxDrawMeshVisualizer >(rMainData, idDrawVisual);
+    auto &rCamEnt       = main_emplace< ActiveEnt >             (rMainData, idCamEnt);
+    auto &rCamCtrl      = main_emplace< ACtxCameraController >  (rMainData, idCamCtrl, rApp.get_input_handler());
+    auto &rControls     = main_emplace< PhysicsTestControls  >  (rMainData, idControls, rApp.get_input_handler());
 
-    /*
-    auto &rControls = rRenderer.emplace<PhysicsTestControls>(rApp);
+    // Setup Phong shaders
+    auto const texturedFlags        = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask | Phong::Flag::AmbientTexture;
+    rDrawPhong.m_shaderDiffuse      = Phong{texturedFlags, 2};
+    rDrawPhong.m_shaderUntextured   = Phong{{}, 2};
+    rDrawPhong.assign_pointers(rScnRender, rApp.get_render_gl());
+
+    // Setup Mesh Visualizer shader
+    rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Flag::Wireframe };
+    rDrawVisual.assign_pointers(rScnRender, rApp.get_render_gl());
+
+    // Create render group for forward opaque pass
+    rGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
+
+    [[maybe_unused]]
+    auto const [idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats,
+                idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest]
+               = osp::unpack<11>(sceneIn.m_dataIds);
+
+    auto &rBasic = main_get< ACtxBasic >(rMainData, idBasic);
 
     // Select first camera for rendering
-    ActiveEnt const camEnt = rScene.m_basic.m_camera.at(0);
-    rRenderer.m_camera = camEnt;
-    rScene.m_basic.m_camera.get(camEnt).set_aspect_ratio(
+    rCamEnt = rBasic.m_camera.at(0);
+    rBasic.m_camera.get(rCamEnt).set_aspect_ratio(
             osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size()));
     SysRender::add_draw_transforms_recurse(
-            rScene.m_basic.m_hierarchy,
-            rRenderer.m_renderGl.m_drawTransform,
-            camEnt);
+            rBasic.m_hierarchy, rScnRender.m_drawTransform, rCamEnt);
 
     // Set initial position of camera slightly above the ground
-    rControls.m_camCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
+    rCamCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
 
+    auto builder = osp::TaskBuilder{mainView.m_rTasks, mainView.m_rTaskData};
 
+    auto const [updRender, updInputs] = osp::unpack<2>(appTags);
+
+    builder.task().data(
+        osp::MainDataIds_t{idScnRender},
+        [] (osp::WorkerContext& rCtx, osp::ArrayView<entt::any> mainData)
+    {
+
+    });
+    /*
     rRenderer.m_onDraw = [] (
             CommonSceneRendererGL& rRenderer, CommonTestScene& rScene,
             ActiveApplication& rApp, float delta) noexcept
