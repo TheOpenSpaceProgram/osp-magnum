@@ -113,16 +113,18 @@ void debug_print_help();
 void debug_print_resources();
 
 // Application state
+Session g_scene;
+Session g_renderer;
 osp::TaskTags g_tasks;
 osp::MainTaskDataVec_t g_taskData;
 osp::MainData_t g_mainData;
 
 // Stores loaded resources in g_mainData
-osp::MainDataId g_resourcesId;
+osp::MainDataId g_mdiResources{lgrn::id_null<osp::MainDataId>()};
 osp::PkgId g_defaultPkg;
 
 // Magnum Application deals with window and OpenGL things
-std::optional<ActiveApplication> g_activeApplication;
+osp::MainDataId mdiApplication{lgrn::id_null<osp::MainDataId>()};
 std::thread g_magnumThread;
 
 // Called when openning a Magnum Application
@@ -142,17 +144,27 @@ struct Option
     void(*m_run)();
 };
 
+static ActiveApplication& get_application()
+{
+    return entt::any_cast<ActiveApplication&>(g_mainData.at(std::size_t(mdiApplication)));
+}
+
+static osp::Resources& get_resources()
+{
+    return entt::any_cast<osp::Resources&>(g_mainData.at(std::size_t(g_mdiResources)));
+}
+
 std::unordered_map<std::string_view, Option> const g_scenes
 {
 
     {"enginetest", {"Demonstrate basic game engine functionality", [] {
-
-        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
-        g_mainData.emplace_back(enginetest::setup_scene(rResources, g_defaultPkg));
+        osp::MainDataId const mdiScene = osp::main_find_empty(g_mainData);
+        g_scene.m_dataIds = {mdiScene};
+        g_mainData[mdiScene] = enginetest::setup_scene(get_resources(), g_defaultPkg);
 
         g_appSetup = [] (ActiveApplication& rApp)
         {
-            auto& rScene = entt::any_cast<enginetest::EngineTestScene&>(g_mainData.front());
+            auto& rScene = osp::main_get<enginetest::EngineTestScene>(g_mainData, g_scene.m_dataIds[0]);
             rApp.set_on_draw(enginetest::generate_draw_func(rScene, rApp));
         };
     }}}
@@ -167,6 +179,7 @@ std::unordered_map<std::string_view, Option> const g_scenes
         //setup_common_scene<scenes::UniverseTest>();
     }}}
 };
+
 
 int main(int argc, char** argv)
 {
@@ -193,6 +206,7 @@ int main(int argc, char** argv)
 
     osp::set_thread_logger(g_logTestApp); // Set logger for this thread
 
+    g_mainData.resize(64);
     load_a_bunch_of_stuff();
 
     if(args.value("scene") != "none")
@@ -238,10 +252,11 @@ int debug_cli_loop()
         std::cout << "> ";
         std::cin >> command;
 
+        bool appOpen = mdiApplication != lgrn::id_null<osp::MainDataId>();
         if (auto const it = g_scenes.find(command);
             it != std::end(g_scenes))
         {
-            if (g_activeApplication.has_value())
+            if (mdiApplication != lgrn::id_null<osp::MainDataId>())
             {
                 // TODO: Figure out some way to reload the application while
                 //       its still running.
@@ -262,7 +277,7 @@ int debug_cli_loop()
         }
         else if (command == "reopen")
         {
-            if (g_activeApplication.has_value())
+            if (appOpen)
             {
                 std::cout << "Application is already open\n";
             }
@@ -282,10 +297,10 @@ int debug_cli_loop()
         }
         else if (command == "exit")
         {
-            if (g_activeApplication)
+            if (appOpen)
             {
                 // request exit if application exists
-                g_activeApplication->exit();
+                get_application().exit();
             }
             destroy_universe();
             break;
@@ -308,29 +323,33 @@ void start_magnum_async()
         g_magnumThread.join();
     }
     std::thread t([] {
+
         osp::set_thread_logger(g_logMagnumApp);
 
-        g_activeApplication.emplace(ActiveApplication::Arguments{g_argc, g_argv});
+        mdiApplication = osp::main_find_empty(g_mainData);
+        auto &rApplication = osp::main_emplace<ActiveApplication>(g_mainData, mdiApplication, ActiveApplication::Arguments{g_argc, g_argv});
 
         // Configure the controls
-        config_controls(*g_activeApplication);
+        config_controls(rApplication);
 
         // Setup GL resources
-        osp::active::SysRenderGL::setup_context(g_activeApplication->get_render_gl());
+        osp::active::SysRenderGL::setup_context(rApplication.get_render_gl());
 
         // Setup scene-specific renderer
-        g_appSetup(*g_activeApplication);
+        g_appSetup(rApplication);
 
         // Starts the main loop. This function is blocking, and will only return
         // once the window is closed. See ActiveApplication::drawEvent
-        g_activeApplication->exec();
+        rApplication.exec();
 
         OSP_LOG_INFO("Closed Magnum Application");
 
-        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
-        osp::active::SysRenderGL::clear_resource_owners(g_activeApplication->get_render_gl(), rResources);
+        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_mdiResources);
+        osp::active::SysRenderGL::clear_resource_owners(rApplication.get_render_gl(), rResources);
 
-        g_activeApplication.reset();
+        // Destroy applocation
+        g_mainData[mdiApplication].reset();
+        mdiApplication = lgrn::id_null<osp::MainDataId>();
 
     });
     g_magnumThread.swap(t);
@@ -339,7 +358,7 @@ void start_magnum_async()
 template <typename SCENE_T>
 void setup_common_scene()
 {
-    //g_sharedData = { entt::make_any<testapp::CommonTestScene>(g_resources) };
+    //g_sharedData = { entt::make_any<testapp::CommonTestScene>(g_mdiResources) };
     //auto &rScene = entt::any_cast<CommonTestScene&>(g_activeScene);
 
     MainView mainView
@@ -347,14 +366,14 @@ void setup_common_scene()
         .m_rMainData    = g_mainData,
         .m_rTasks       = g_tasks,
         .m_rTaskData    = g_taskData,
-        .m_resourcesId  = g_resourcesId
+        .m_resourcesId  = g_mdiResources
     };
 
-    std::vector<osp::MainDataId> dataIds(24);
-    std::vector<osp::TaskTags::Tag> tagIds(24);
-    osp::main_find_empty(g_mainData, 0, std::begin(dataIds), std::end(dataIds));
+    g_scene.m_dataIds.clear();
+    g_scene.m_dataIds.resize(24);
+    osp::main_find_empty(g_mainData, 0, std::begin(g_scene.m_dataIds), std::end(g_scene.m_dataIds));
 
-    SCENE_T::setup_scene(mainView, g_defaultPkg, dataIds, tagIds);
+    SCENE_T::setup_scene(mainView, g_defaultPkg, g_scene);
 
     // Renderer and draw function is created when g_appSetup is invoked
     g_appSetup = [] (ActiveApplication& rApp)
@@ -382,10 +401,8 @@ void load_a_bunch_of_stuff()
     using namespace Magnum;
     using Primitives::CylinderFlag;
 
-    g_mainData.resize(64);
-    osp::MainDataId const resId = osp::main_find_empty(g_mainData);
-    auto &rResources = osp::main_emplace<osp::Resources>(g_mainData, resId);
-    g_resourcesId = resId;
+    g_mdiResources = osp::main_find_empty(g_mainData);
+    auto &rResources = osp::main_emplace<osp::Resources>(g_mainData, g_mdiResources);
 
     rResources.resize_types(osp::ResTypeIdReg_t::size());
 
@@ -440,7 +457,7 @@ using each_res_id_t = void(*)(osp::ResId);
 
 static void resource_for_each_type(osp::ResTypeId const type, each_res_id_t const do_thing)
 {
-    auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
+    auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_mdiResources);
     lgrn::IdRegistry<osp::ResId> const &rReg = rResources.ids(type);
     for (std::size_t i = 0; i < rReg.capacity(); ++i)
     {
@@ -459,7 +476,7 @@ void clear_resource_owners()
     // their associated image data
     resource_for_each_type(gc_texture, [] (osp::ResId const id)
     {
-        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
+        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_mdiResources);
 
         auto * const pData = rResources
                 .data_try_get<osp::TextureImgSource>(gc_texture, id);
@@ -472,7 +489,7 @@ void clear_resource_owners()
     // Importer data own a lot of other resources
     resource_for_each_type(gc_importer, [] (osp::ResId const id)
     {
-        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_resourcesId);
+        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_mdiResources);
 
         auto * const pData = rResources
                 .data_try_get<osp::ImporterData>(gc_importer, id);

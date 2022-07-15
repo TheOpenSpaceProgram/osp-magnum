@@ -38,9 +38,11 @@
 namespace osp
 {
 
+using Corrade::Containers::ArrayView;
+
 inline void set_tags(
         Corrade::Containers::ArrayView<uint32_t const>  tagsIn,
-        BitSpan_t                                       taggedInts,
+        ArrayView<uint64_t>                             taggedInts,
         std::size_t const                               taggedSize,
         std::size_t const                               taggedId) noexcept
 {

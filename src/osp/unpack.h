@@ -24,31 +24,26 @@
  */
 #pragma once
 
-#include "tasks.h"
-#include "worker.h"
-
-#include <vector>
+#include <cassert>
+#include <type_traits>
 
 namespace osp
 {
 
-struct MainTask
+/**
+ * @brief Create a structured binding-compatible type from a contiguous
+ *        container. A c-array is used.
+ */
+template<std::size_t N, typename RANGE_T>
+constexpr auto& unpack(RANGE_T &rIn)
 {
-    std::vector<MainDataId> m_dataUsed;
-    MainTaskFunc_t m_func;
-};
+    using ptr_t = decltype(rIn.data());
+    using type_t = std::remove_pointer_t<ptr_t>;
 
-inline void task_data(TaskDataVec<MainTask> &rData, TaskTags::Task const task, std::initializer_list<MainDataId> dataUsed, MainTaskFunc_t func)
-{
-    rData.m_taskData.resize(
-            std::max(rData.m_taskData.size(), std::size_t(task) + 1));
-    auto &rMainTask = rData.m_taskData[std::size_t(task)];
-    rMainTask.m_dataUsed = dataUsed;
-    rMainTask.m_func = func;
+    assert(N < rIn.size());
+    return *reinterpret_cast<type_t(*)[N]>(rIn.data());
 }
 
-using MainData_t = std::vector<entt::any>;
 
-using MainTaskDataVec_t = TaskDataVec<MainTask>;
+}
 
-} // namespace osp

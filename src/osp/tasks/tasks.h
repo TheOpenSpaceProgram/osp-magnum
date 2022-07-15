@@ -26,16 +26,11 @@
 
 #include <longeron/id_management/registry_stl.hpp>
 
-#include <Corrade/Containers/ArrayView.h>
-
 #include <cstdint>
 #include <vector>
 
 namespace osp
 {
-
-using BitSpan_t = Corrade::Containers::ArrayView<uint64_t>;
-using BitSpanConst_t = Corrade::Containers::ArrayView<uint64_t const>;
 
 struct TaskTags
 {
@@ -59,11 +54,9 @@ struct TaskTags
     // partitioned based on tag_ints_per_task(): AAAABBBBCCCCDDDD
     std::vector<uint64_t>           m_taskTags;
 
-    std::size_t tag_ints_per_task() const noexcept { return m_tags.vec().capacity(); }
+    [[nodiscard]] std::size_t tag_ints_per_task() const noexcept { return m_tags.vec().capacity(); }
 
 }; // struct TaskTags
-
-using TagSpan_t = Corrade::Containers::ArrayView<TaskTags::Tag>;
 
 template <typename DATA_T>
 struct TaskDataVec
@@ -72,12 +65,12 @@ struct TaskDataVec
 
 }; // struct TaskDataVec
 
-template <typename FUNC_T, typename FUNCB_T>
-void task_data(TaskDataVec<FUNC_T> &rData, TaskTags::Task const task, FUNCB_T&& func)
+template <typename DATA_T, typename RHS_T>
+void task_data(TaskDataVec<DATA_T> &rData, TaskTags::Task const task, RHS_T&& rhs)
 {
     rData.m_taskData.resize(
             std::max(rData.m_taskData.size(), std::size_t(task) + 1));
-    rData.m_taskData[std::size_t(task)] = std::forward<FUNCB_T>(func);
+    rData.m_taskData[std::size_t(task)] = std::forward<RHS_T>(rhs);
 }
 
 struct ExecutionContext
