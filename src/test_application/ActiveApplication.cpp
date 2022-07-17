@@ -40,16 +40,18 @@ using Mouse_t = ActiveApplication::MouseEvent::Button;
 using osp::input::sc_keyboard;
 using osp::input::sc_mouse;
 
+using osp::input::UserInputHandler;
 using osp::input::ControlTermConfig;
 using osp::input::ControlExprConfig_t;
 using osp::input::EVarTrigger;
 using osp::input::EVarOperator;
 
-ActiveApplication::ActiveApplication(
-        const Magnum::Platform::Application::Arguments& arguments)
- : Magnum::Platform::Application{
-        arguments, Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})}
- , m_userInput(12)
+using Magnum::Platform::Application;
+
+ActiveApplication::ActiveApplication(const Application::Arguments& arguments,
+                                     UserInputHandler& rUserInput)
+ : Application{arguments, Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})}
+ , m_rUserInput(rUserInput)
 {
     m_timeline.start();
 }
@@ -57,18 +59,19 @@ ActiveApplication::ActiveApplication(
 ActiveApplication::~ActiveApplication()
 {
     m_onDraw = {};
+    m_onDestruct();
 }
 
 void ActiveApplication::drawEvent()
 {
-    m_userInput.update_controls();
+    m_rUserInput.update_controls();
 
     if (m_onDraw.operator bool())
     {
         m_onDraw(*this, m_timeline.previousFrameDuration());
     }
 
-    m_userInput.clear_events();
+    m_rUserInput.clear_events();
 
     swapBuffers();
     m_timeline.nextFrame();
@@ -78,45 +81,44 @@ void ActiveApplication::drawEvent()
 void ActiveApplication::keyPressEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
-    m_userInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
-                          osp::input::EButtonEvent::Pressed);
+    m_rUserInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
+                           osp::input::EButtonEvent::Pressed);
 }
 
 void ActiveApplication::keyReleaseEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
-    m_userInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
-                          osp::input::EButtonEvent::Released);
+    m_rUserInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
+                           osp::input::EButtonEvent::Released);
 }
 
 void ActiveApplication::mousePressEvent(MouseEvent& event)
 {
-    m_userInput.event_raw(osp::input::sc_mouse, (int) event.button(),
-                          osp::input::EButtonEvent::Pressed);
+    m_rUserInput.event_raw(osp::input::sc_mouse, (int) event.button(),
+                           osp::input::EButtonEvent::Pressed);
 }
 
 void ActiveApplication::mouseReleaseEvent(MouseEvent& event)
 {
-    m_userInput.event_raw(osp::input::sc_mouse, (int) event.button(),
-                          osp::input::EButtonEvent::Released);
+    m_rUserInput.event_raw(osp::input::sc_mouse, (int) event.button(),
+                           osp::input::EButtonEvent::Released);
 }
 
 void ActiveApplication::mouseMoveEvent(MouseMoveEvent& event)
 {
-    m_userInput.mouse_delta(event.relativePosition());
+    m_rUserInput.mouse_delta(event.relativePosition());
 }
 
 void ActiveApplication::mouseScrollEvent(MouseScrollEvent & event)
 {
-    m_userInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
+    m_rUserInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 }
 
-void testapp::config_controls(ActiveApplication& rApp)
+void testapp::config_controls(UserInputHandler& rUserInput)
 {
     // Configure Controls
     //Load toml
     auto data = toml::parse("settings.toml");
-    osp::input::UserInputHandler &rUserInput = rApp.get_input_handler();
     for (const auto& [k, v] : data.as_table())
     {
         std::string const& primary = toml::find(v, "primary").as_string();

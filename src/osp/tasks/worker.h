@@ -38,6 +38,8 @@ using MainDataId = uint32_t;
 
 using MainDataIds_t = std::initializer_list<osp::MainDataId>;
 
+struct Reserved {};
+
 struct WorkerContext
 {
     struct LimitSlot

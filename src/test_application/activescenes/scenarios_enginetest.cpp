@@ -49,6 +49,8 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 
 using osp::active::ActiveEnt;
+using osp::active::RenderGL;
+using osp::input::UserInputHandler;
 
 using Magnum::Trade::MeshData;
 using Magnum::Trade::ImageData2D;
@@ -192,8 +194,8 @@ void update_test_scene(EngineTestScene& rScene, float const delta)
  */
 struct EngineTestRenderer
 {
-    EngineTestRenderer(ActiveApplication &rApp)
-     : m_camCtrl(rApp.get_input_handler())
+    EngineTestRenderer(UserInputHandler &rInputs)
+     : m_camCtrl(rInputs)
     { }
 
     osp::active::ACtxRenderGroups m_renderGroups{};
@@ -207,7 +209,7 @@ struct EngineTestRenderer
 };
 
 void sync_test_scene(
-        ActiveApplication& rApp, EngineTestScene const& rScene,
+        RenderGL& rRenderGl, EngineTestScene const& rScene,
         EngineTestRenderer& rRenderer)
 {
     using namespace osp::active;
@@ -229,17 +231,17 @@ void sync_test_scene(
                 std::cend(rMatCommon.m_added));
 
     // Load required meshes and textures into OpenGL
-    SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rApp.get_render_gl());
+    SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rRenderGl);
 
     // Assign GL meshes to entities with a mesh component
     SysRenderGL::assign_meshes(
             rScene.m_drawing.m_mesh, rScene.m_drawingRes.m_meshToRes, rScene.m_drawing.m_meshDirty,
-            rRenderer.m_renderGl.m_meshId, rApp.get_render_gl());
+            rRenderer.m_renderGl.m_meshId, rRenderGl);
 
     // Assign GL textures to entities with a texture component
     SysRenderGL::assign_textures(
             rScene.m_drawing.m_diffuseTex, rScene.m_drawingRes.m_texToRes, rScene.m_drawing.m_diffuseDirty,
-            rRenderer.m_renderGl.m_diffuseTexId, rApp.get_render_gl());
+            rRenderer.m_renderGl.m_diffuseTexId, rRenderGl);
 
     // Calculate hierarchy transforms
     SysRender::update_draw_transforms(
@@ -256,7 +258,7 @@ void sync_test_scene(
  * @param rRenderer [ref] Renderer data for test scene
  */
 void render_test_scene(
-        ActiveApplication& rApp, EngineTestScene const& rScene,
+        RenderGL& rRenderGl, EngineTestScene const& rScene,
         EngineTestRenderer& rRenderer)
 {
     using namespace osp::active;
@@ -273,7 +275,7 @@ void render_test_scene(
             rCamera.calculate_projection()};
 
     // Bind offscreen FBO
-    Framebuffer &rFbo = rApp.get_render_gl().m_fbo;
+    Framebuffer &rFbo = rRenderGl.m_fbo;
     rFbo.bind();
 
     // Clear it
@@ -286,11 +288,11 @@ void render_test_scene(
             rScene.m_drawing.m_visible, viewProj);
 
     // Display FBO
-    Texture2D &rFboColor = rApp.get_render_gl().m_texGl.get(rApp.get_render_gl().m_fboColor);
-    SysRenderGL::display_texture(rApp.get_render_gl(), rFboColor);
+    Texture2D &rFboColor = rRenderGl.m_texGl.get(rRenderGl.m_fboColor);
+    SysRenderGL::display_texture(rRenderGl, rFboColor);
 }
 
-on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
+on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
 {
     using namespace osp::active;
     using namespace osp::shader;
@@ -298,7 +300,7 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
     // Create renderer data. This uses a shared_ptr to allow being stored
     // inside an std::function, which require copyable types
     std::shared_ptr<EngineTestRenderer> pRenderer
-            = std::make_shared<EngineTestRenderer>(rApp);
+            = std::make_shared<EngineTestRenderer>(rUserInput);
 
     // Create Phong shaders
     auto const texturedFlags
@@ -306,8 +308,7 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
             | Phong::Flag::AmbientTexture;
     pRenderer->m_phong.m_shaderDiffuse      = Phong{texturedFlags, 2};
     pRenderer->m_phong.m_shaderUntextured   = Phong{{}, 2};
-    pRenderer->m_phong.assign_pointers(
-            pRenderer->m_renderGl, rApp.get_render_gl());
+    pRenderer->m_phong.assign_pointers(pRenderer->m_renderGl, rRenderGl);
 
     // Select first camera for rendering
     ActiveEnt const camEnt = rScene.m_basic.m_camera.at(0);
@@ -325,9 +326,9 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
     // Set all drawing stuff dirty then sync with renderer.
     // This allows clean re-openning of the scene
     SysRender::set_dirty_all(rScene.m_drawing);
-    sync_test_scene(rApp, rScene, *pRenderer);
+    sync_test_scene(rRenderGl, rScene, *pRenderer);
 
-    return [&rScene, pRenderer = std::move(pRenderer)] (
+    return [&rScene, pRenderer = std::move(pRenderer), &rRenderGl] (
             ActiveApplication& rApp, float delta)
     {
         update_test_scene(rScene, delta);
@@ -341,8 +342,8 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp)
                 rScene.m_basic.m_transform.get(pRenderer->m_camera),
                 delta, true);
 
-        sync_test_scene(rApp, rScene, *pRenderer);
-        render_test_scene(rApp, rScene, *pRenderer);
+        sync_test_scene(rRenderGl, rScene, *pRenderer);
+        render_test_scene(rRenderGl, rScene, *pRenderer);
     };
 }
 

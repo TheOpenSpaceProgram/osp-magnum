@@ -33,6 +33,9 @@
 
 #include <functional>
 
+namespace osp::active { struct RenderGL; }
+namespace osp::input { class UserInputHandler; }
+
 namespace testapp
 {
 
@@ -107,7 +110,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
  *
  * @return ActiveApplication draw function
  */
-on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp);
+on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp, osp::active::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
 
 } // namespace enginetest
 
@@ -128,6 +131,7 @@ struct PhysicsTest
             ActiveApplication& rApp,
             osp::ArrayView<osp::TaskTags::Tag const> appTags,
             Session const& sceneIn,
+            Session const& magnumIn,
             Session const& rendererOut) noexcept;
 };
 
