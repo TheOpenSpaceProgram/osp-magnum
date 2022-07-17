@@ -29,8 +29,6 @@
 #include <osp/types.h>
 #include <osp/UserInputHandler.h>
 
-#include <osp/Active/opengl/SysRenderGL.h>
-
 #include <Magnum/Timeline.h>
 
 #include <cstring> // workaround: memcpy needed by SDL2
@@ -53,7 +51,8 @@ class ActiveApplication : public Magnum::Platform::Application
 public:
 
     explicit ActiveApplication(
-            const Magnum::Platform::Application::Arguments& arguments);
+            const Magnum::Platform::Application::Arguments& arguments,
+            osp::input::UserInputHandler& rUserInput);
 
     ~ActiveApplication();
 
@@ -70,14 +69,9 @@ public:
         m_onDraw = std::move(onDraw);
     }
 
-    constexpr osp::input::UserInputHandler& get_input_handler() noexcept
+    void set_on_destruct(std::function<void()> onDestruct)
     {
-        return m_userInput;
-    }
-
-    constexpr osp::active::RenderGL& get_render_gl() noexcept
-    {
-        return m_renderGl;
+        m_onDestruct = std::move(onDestruct);
     }
 
 private:
@@ -85,16 +79,15 @@ private:
     void drawEvent() override;
 
     on_draw_t m_onDraw;
+    std::function<void()> m_onDestruct;
 
-    osp::input::UserInputHandler m_userInput;
+    osp::input::UserInputHandler &m_rUserInput;
 
     Magnum::Timeline m_timeline;
 
-    osp::active::RenderGL m_renderGl;
-
 };
 
-void config_controls(ActiveApplication& rApp);
+void config_controls(osp::input::UserInputHandler& rUserInput);
 
 }
 

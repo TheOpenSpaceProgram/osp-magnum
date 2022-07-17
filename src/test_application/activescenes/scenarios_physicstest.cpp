@@ -28,8 +28,6 @@
 #include "common_renderer_gl.h"
 #include "CameraController.h"
 
-#include "../ActiveApplication.h"
-
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
@@ -52,6 +50,7 @@
 
 using namespace osp::active;
 using ospnewton::ACtxNwtWorld;
+using osp::input::UserInputHandler;
 using osp::phys::EShape;
 using osp::main_emplace;
 using osp::main_get;
@@ -367,31 +366,37 @@ void PhysicsTest::setup_renderer_gl(
         ActiveApplication&                              rApp,
         osp::ArrayView<osp::TaskTags::Tag const> const  appTags,
         Session const&                                  sceneIn,
+        Session const&                                  magnumIn,
         Session const&                                  rendererOut) noexcept
 {
     using namespace osp::shader;
 
-    auto const [idScnRender, idGroups, idDrawPhong, idDrawVisual, idCamEnt, idCamCtrl, idControls]
-            = osp::unpack<7>(rendererOut.m_dataIds);
+
     auto &rMainData = mainView.m_rMainData;
 
+    auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(magnumIn.m_dataIds);
+    auto &rRenderGl     = osp::main_get<RenderGL>(rMainData, idRenderGl);
+    auto &rUserInput    = osp::main_get<UserInputHandler>(rMainData, idRenderGl);
+
+    auto const [idScnRender, idGroups, idDrawPhong, idDrawVisual, idCamEnt, idCamCtrl, idControls]
+            = osp::unpack<7>(rendererOut.m_dataIds);
     auto &rScnRender    = main_emplace< ACtxSceneRenderGL >     (rMainData, idScnRender);
     auto &rGroups       = main_emplace< ACtxRenderGroups >      (rMainData, idGroups);
     auto &rDrawPhong    = main_emplace< ACtxDrawPhong >         (rMainData, idDrawPhong);
     auto &rDrawVisual   = main_emplace< ACtxDrawMeshVisualizer >(rMainData, idDrawVisual);
     auto &rCamEnt       = main_emplace< ActiveEnt >             (rMainData, idCamEnt);
-    auto &rCamCtrl      = main_emplace< ACtxCameraController >  (rMainData, idCamCtrl, rApp.get_input_handler());
-    auto &rControls     = main_emplace< PhysicsTestControls  >  (rMainData, idControls, rApp.get_input_handler());
+    auto &rCamCtrl      = main_emplace< ACtxCameraController >  (rMainData, idCamCtrl, rUserInput);
+    auto &rControls     = main_emplace< PhysicsTestControls  >  (rMainData, idControls, rUserInput);
 
     // Setup Phong shaders
     auto const texturedFlags        = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask | Phong::Flag::AmbientTexture;
     rDrawPhong.m_shaderDiffuse      = Phong{texturedFlags, 2};
     rDrawPhong.m_shaderUntextured   = Phong{{}, 2};
-    rDrawPhong.assign_pointers(rScnRender, rApp.get_render_gl());
+    rDrawPhong.assign_pointers(rScnRender, rRenderGl);
 
     // Setup Mesh Visualizer shader
     rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Flag::Wireframe };
-    rDrawVisual.assign_pointers(rScnRender, rApp.get_render_gl());
+    rDrawVisual.assign_pointers(rScnRender, rRenderGl);
 
     // Create render group for forward opaque pass
     rGroups.m_groups.emplace("fwd_opaque", RenderGroup{});

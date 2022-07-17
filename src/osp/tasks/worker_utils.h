@@ -35,24 +35,30 @@
 namespace osp
 {
 
-[[nodiscard]] inline MainDataId main_find_empty(
-        ArrayView<entt::any const> const mainData, MainDataId current = 0)
+[[nodiscard]] inline MainDataId main_reserve(
+        ArrayView<entt::any> const mainData, MainDataId current = 0)
 {
     while ( bool(mainData[current]) && (current < mainData.size()) )
     {
         ++current;
     }
+
+    if (current < mainData.size())
+    {
+        mainData[current].emplace<Reserved>();
+    }
+
     return current;
 }
 
 template <typename IT_T, typename ITB_T>
-MainDataId main_find_empty(
-        ArrayView<entt::any const> const mainData, MainDataId current,
+MainDataId main_reserve(
+        ArrayView<entt::any> const mainData, MainDataId current,
         IT_T destFirst, const ITB_T destLast)
 {
     while (destFirst != destLast)
     {
-        current = main_find_empty(mainData, current);
+        current = main_reserve(mainData, current);
 
         if (current < mainData.size())
         {

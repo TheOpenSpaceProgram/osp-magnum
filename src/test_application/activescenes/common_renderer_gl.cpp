@@ -33,7 +33,7 @@ using namespace osp::active;
 namespace testapp
 {
 
-void CommonSceneRendererGL::setup(ActiveApplication& rApp)
+void CommonSceneRendererGL::setup(osp::active::RenderGL& rRenderGl)
 {
     using namespace osp::shader;
 
@@ -43,14 +43,12 @@ void CommonSceneRendererGL::setup(ActiveApplication& rApp)
             | Phong::Flag::AmbientTexture;
     m_phong.m_shaderDiffuse      = Phong{texturedFlags, 2};
     m_phong.m_shaderUntextured   = Phong{{}, 2};
-    m_phong.assign_pointers(
-            m_renderGl, rApp.get_render_gl());
+    m_phong.assign_pointers(m_scnRenderGl, rRenderGl);
 
     // Setup Mesh Visualizer shader
     m_visualizer.m_shader
             = MeshVisualizer{ MeshVisualizer::Flag::Wireframe };
-    m_visualizer.assign_pointers(
-            m_renderGl, rApp.get_render_gl());
+    m_visualizer.assign_pointers(m_scnRenderGl, rRenderGl);
 
     // Create render group for forward opaque pass
     m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
@@ -115,13 +113,13 @@ void CommonSceneRendererGL::sync(ActiveApplication& rApp, CommonTestScene const&
 }
 #endif
 
-void CommonSceneRendererGL::prepare_fbo(ActiveApplication& rApp)
+void CommonSceneRendererGL::prepare_fbo(osp::active::RenderGL& rRenderGl)
 {
     using Magnum::GL::Framebuffer;
     using Magnum::GL::FramebufferClear;
 
     // Bind offscreen FBO
-    Framebuffer &rFbo = rApp.get_render_gl().m_fbo;
+    Framebuffer &rFbo = rRenderGl.m_fbo;
     rFbo.bind();
 
     // Clear it
@@ -161,26 +159,5 @@ void CommonSceneRendererGL::update_delete(std::vector<ActiveEnt> const& toDelete
     SysRenderGL::update_delete(m_renderGl, first, last);
 }
 #endif
-
-on_draw_t generate_common_draw(CommonTestScene& rScene, ActiveApplication& rApp, setup_renderer_t setup_scene)
-{
-    //auto pRenderer = std::make_shared<CommonSceneRendererGL>();
-
-    // Setup default resources
-    //pRenderer->setup(rApp);
-
-    // Setup scene-specifc stuff
-    //setup_scene(*pRenderer, rScene, rApp);
-
-    // Set all drawing stuff dirty then sync with renderer.
-    // This allows clean re-openning of the scene
-    //SysRender::set_dirty_all(rScene.m_drawing);
-    //pRenderer->sync(rApp, rScene);
-
-    return [&rScene] (ActiveApplication& rApp, float const delta)
-    {
-        //pRenderer->m_onDraw(*pRenderer, rScene, rApp, delta);
-    };
-};
 
 } // namespace testapp

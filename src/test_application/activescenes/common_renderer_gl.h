@@ -26,8 +26,6 @@
 
 #include "common_scene.h"
 
-#include "../ActiveApplication.h"
-
 #include <osp/Active/opengl/SysRenderGL.h>
 
 #include <osp/Shaders/Phong.h>
@@ -45,7 +43,7 @@ namespace testapp
  */
 struct CommonSceneRendererGL
 {
-    osp::active::ACtxSceneRenderGL m_renderGl;
+    osp::active::ACtxSceneRenderGL m_scnRenderGl;
 
     osp::active::ACtxRenderGroups m_renderGroups;
 
@@ -57,39 +55,39 @@ struct CommonSceneRendererGL
     /**
      * @brief Setup default shaders and render groups
      *
-     * @param rApp      [ref] Application with GL context
+     * @param rRenderGl [ref] Application GL renderer
      */
-    void setup(ActiveApplication& rApp);
+    void setup(osp::active::RenderGL& rRenderGl);
 
     /**
      * @brief Sync GL resources with scene meshes, textures, and materials
      *
-     * @param rApp      [ref] Application with GL context
+     * @param rRenderGl [ref] Application GL renderer
      * @param rScene    [ref] Associated test scene to render
      */
-    void sync(ActiveApplication& rApp, CommonTestScene const& rScene);
+    void sync(osp::active::RenderGL& rRenderGl, CommonTestScene const& rScene);
 
     /**
      * @brief Bind and clear off-screen framebuffer object
      *
-     * @param rApp      [ref] Application with GL context
+     * @param rRenderGl [ref] Application GL renderer
      */
-    void prepare_fbo(ActiveApplication& rApp);
+    void prepare_fbo(osp::active::RenderGL& rRenderGl);
 
     /**
      * @brief Calls draw functions of entities in the fwd_opaque RenderGroup
      *
-     * @param rApp      [ref] Application with GL context
+     * @param rRenderGl [ref] Application GL renderer
      * @param rScene    [ref] Associated test scene to render
      */
-    void draw_entities(ActiveApplication& rApp, CommonTestScene const& rScene);
+    void draw_entities(osp::active::RenderGL& rRenderGl, CommonTestScene const& rScene);
 
     /**
      * @brief Display framebuffer texture to window
      *
-     * @param rApp      [ref] Application with GL context
+     * @param rRenderGl [ref] Application GL renderer
      */
-    void display(ActiveApplication& rApp);
+    void display(osp::active::RenderGL& rRenderGl);
 
     /**
      * @brief Delete components of entities to delete
@@ -99,22 +97,6 @@ struct CommonSceneRendererGL
     void update_delete(std::vector<osp::active::ActiveEnt> const& toDelete);
 };
 
-
-using setup_renderer_t = void(*)(CommonSceneRendererGL&, CommonTestScene&, ActiveApplication&) noexcept;
-
-/**
- * @brief Generate a draw function for drawing a single common scene
- *
- * @param rScene [ref] Common scene to draw. Must be in stable memory.
- * @param rApp   [ref] Application with GL context
- * @param setup  [in] Scene-specific setup function
- *
- * @return ActiveApplication draw function
- */
-on_draw_t generate_common_draw(
-        CommonTestScene& rScene,
-        ActiveApplication& rApp,
-        setup_renderer_t setup);
 
 
 } // namespace testapp

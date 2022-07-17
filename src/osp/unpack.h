@@ -40,7 +40,7 @@ constexpr auto& unpack(RANGE_T &rIn)
     using ptr_t = decltype(rIn.data());
     using type_t = std::remove_pointer_t<ptr_t>;
 
-    assert(N < rIn.size());
+    assert(N <= rIn.size());
     return *reinterpret_cast<type_t(*)[N]>(rIn.data());
 }
 
