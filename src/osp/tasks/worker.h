@@ -51,6 +51,13 @@ struct WorkerContext
     Corrade::Containers::ArrayView<LimitSlot> m_limitSlots;
 };
 
-using MainTaskFunc_t = void(*)(WorkerContext&, ArrayView<entt::any>);
+enum class MainTaskStatus : uint8_t
+{
+    Success     = 0,
+    Failed      = 1,
+    DidNothing  = 2
+};
+
+using MainTaskFunc_t = MainTaskStatus(*)(WorkerContext&, ArrayView<entt::any>) noexcept;
 
 } // namespace osp
