@@ -376,7 +376,7 @@ void PhysicsTest::setup_renderer_gl(
 
     auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(magnumIn.m_dataIds);
     auto &rRenderGl     = osp::main_get<RenderGL>(rMainData, idRenderGl);
-    auto &rUserInput    = osp::main_get<UserInputHandler>(rMainData, idRenderGl);
+    auto &rUserInput    = osp::main_get<UserInputHandler>(rMainData, idUserInput);
 
     auto const [idScnRender, idGroups, idDrawPhong, idDrawVisual, idCamEnt, idCamCtrl, idControls]
             = osp::unpack<7>(rendererOut.m_dataIds);
@@ -422,12 +422,13 @@ void PhysicsTest::setup_renderer_gl(
 
     auto const [updRender, updInputs] = osp::unpack<2>(appTags);
 
-    builder.task().data(
-        osp::MainDataIds_t{idScnRender},
-        [] (osp::WorkerContext& rCtx, osp::ArrayView<entt::any> mainData)
+    builder.task().assign({updRender})
+            .data(osp::MainDataIds_t{idScnRender, idUserInput},
+                osp::wrap_args([] (ACtxSceneRenderGL& rScnRender, UserInputHandler& rUserInput) noexcept -> osp::MainTaskStatus
     {
-
-    });
+        int hi = rScnRender.m_drawTransform.size();
+        return osp::MainTaskStatus::Success;
+    }));
     /*
     rRenderer.m_onDraw = [] (
             CommonSceneRendererGL& rRenderer, CommonTestScene& rScene,

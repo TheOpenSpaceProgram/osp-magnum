@@ -39,6 +39,7 @@
 
 #include <osp/tasks/tasks.h>
 #include <osp/tasks/tasks_main.h>
+#include <osp/tasks/execute_simple.h>
 
 #include <osp/string_concat.h>
 #include <osp/logging.h>
@@ -60,6 +61,7 @@
 
 #include <entt/core/any.hpp>
 
+#include <array>
 #include <iostream>
 #include <memory>
 #include <string_view>
@@ -118,6 +120,9 @@ void debug_print_resources();
 osp::TaskTags g_tasks;
 osp::MainTaskDataVec_t g_taskData;
 osp::MainData_t g_mainData;
+osp::ExecutionContext g_exec;
+std::array<osp::TaskTags::Tag, 2> g_appTags;
+
 Session g_application;
 Session g_magnum;
 Session g_scene;
@@ -376,6 +381,7 @@ void start_magnum_async()
         // once the window is closed. See ActiveApplication::drawEvent
         rActiveApp.exec();
 
+        session_close(g_renderer);
         session_close(g_magnum);
 
         OSP_LOG_INFO("Closed Magnum Application");
@@ -403,12 +409,63 @@ void setup_common_scene()
 
     SCENE_T::setup_scene(mainView, g_defaultPkg, g_scene);
 
+
     // Renderer and draw function is created when g_appSetup is invoked
-    g_appSetup = [] ()
+    g_appSetup = [mainView] () mutable
     {
-        //auto& rScene
-        //        = entt::any_cast<CommonTestScene&>(g_activeScene);
-        //rApp.set_on_draw(generate_common_draw(rScene, rApp, &SCENE_T::setup_renderer_gl));
+        auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(g_magnum.m_dataIds);
+        auto &rActiveApp = osp::main_get<ActiveApplication>(g_mainData, idActiveApp);
+
+        auto &rDataIds = g_renderer.m_dataIds;
+        rDataIds.resize(16);
+        osp::main_reserve(g_mainData, 0, std::begin(rDataIds), std::end(rDataIds));
+
+        SCENE_T::setup_renderer_gl(mainView, rActiveApp, g_appTags, g_scene, g_magnum, g_renderer);
+
+        g_exec.m_tagIncompleteCounts  .resize(g_tasks.m_tags.capacity(), 0);
+        g_exec.m_tagRunningCounts     .resize(g_tasks.m_tags.capacity(), 0);
+        g_exec.m_taskQueuedCounts     .resize(g_tasks.m_tasks.capacity(), 0);
+
+        rActiveApp.set_on_draw( [] (ActiveApplication& rApp, float delta)
+        {
+            auto const [updRender, updInputs] = osp::unpack<2>(g_appTags);
+            std::vector<uint64_t> tagsToRun(g_tasks.m_tags.vec().size());
+            osp::to_bitspan({updRender, updInputs}, tagsToRun);
+            osp::task_enqueue(g_tasks, g_exec, tagsToRun);
+
+            std::vector<entt::any> dataRefs;
+            osp::WorkerContext context;
+
+            // Run until there's no tasks left to run
+            while (true)
+            {
+                std::vector<uint64_t> tasksToRun(g_tasks.m_tasks.vec().size());
+                task_list_available(g_tasks, g_exec, tasksToRun);
+                auto const tasksToRunBits = lgrn::bit_view(tasksToRun);
+                unsigned int const availableCount = tasksToRunBits.count();
+
+                if (availableCount == 0)
+                {
+                    break;
+                }
+
+                // Choose a random available task
+                auto const task = osp::TaskTags::Task(*tasksToRunBits.ones().begin());
+
+                task_start(g_tasks, g_exec, task);
+
+                osp::MainTask &rMainTask = g_taskData.m_taskData.at(std::size_t(task));
+                dataRefs.resize(rMainTask.m_dataUsed.size());
+                for (int i = 0; i < rMainTask.m_dataUsed.size(); ++i)
+                {
+                    dataRefs.at(i) = g_mainData.at(rMainTask.m_dataUsed[i]).as_ref();
+                }
+
+                rMainTask.m_func(context, dataRefs);
+
+                task_finish(g_tasks, g_exec, task);
+            }
+        });
     };
 }
 
@@ -428,6 +485,12 @@ void load_a_bunch_of_stuff()
     using namespace osp::restypes;
     using namespace Magnum;
     using Primitives::CylinderFlag;
+
+    g_tasks.m_tags.create(std::begin(g_appTags), std::end(g_appTags));
+    g_tasks.m_tags.reserve(128); // Max 128 tags, aka: just two 64-bit integers
+    g_tasks.m_tagDepends.resize(g_tasks.m_tags.capacity() * g_tasks.m_tagDependsPerTag,
+                                lgrn::id_null<osp::TaskTags::Tag>());
+    g_tasks.m_tagLimits.resize(g_tasks.m_tags.capacity());
 
     g_application.m_dataIds = { osp::main_reserve(g_mainData) };
     auto &rResources = osp::main_emplace<osp::Resources>(g_mainData, g_application.m_dataIds[0]);

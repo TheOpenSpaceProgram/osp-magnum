@@ -28,9 +28,9 @@
 
 #include <entt/core/any.hpp>
 
-#include <algorithm>
-#include <cstdint>
+#include <cassert>
 #include <type_traits>
+#include <utility>
 
 namespace osp
 {
@@ -87,6 +87,62 @@ template <typename T>
 [[nodiscard]] T& main_get(ArrayView<entt::any> const mainData, MainDataId const id)
 {
     return entt::any_cast<T&>(mainData[id]);
+}
+
+
+
+template<typename FUNCTOR_T>
+struct wrap_args_trait
+{
+    template<typename ... ARGS_T, std::size_t ... INDEX_T>
+    static constexpr MainTaskStatus apply(ArrayView<entt::any> mainData, std::integer_sequence<std::size_t, INDEX_T...> indices) noexcept
+    {
+        return FUNCTOR_T{}(entt::any_cast<ARGS_T&>(mainData[INDEX_T]) ...);
+    }
+
+    template<typename ... ARGS_T>
+    static MainTaskStatus wrapper(WorkerContext& rCtx, ArrayView<entt::any> mainData) noexcept
+    {
+        assert(mainData.size() == sizeof...(ARGS_T));
+
+        return apply<ARGS_T ...>(mainData, std::make_integer_sequence<std::size_t, sizeof...(ARGS_T)>{});
+    }
+
+    template<typename ... ARGS_T>
+    static constexpr MainTaskFunc_t unpack(MainTaskStatus(*func)(ARGS_T...))
+    {
+        // Parameter pack used to extract function arguments, func is discarded
+        return &wrapper<ARGS_T ...>;
+    }
+};
+
+/**
+ * @brief Wrap a function with arbitrary arguments into a MainTaskFunc_t
+ *
+ * A regular MainTaskFunc_t accepts a ArrayView<entt::any> for passing data of
+ * arbitrary types. This needs to be manually casted.
+ *
+ * wrap_args creates a wrapper function that will automatically cast the
+ * entt::anys and call the underlying function.
+ *
+ * @param a[in]
+ *
+ * @return MainTaskFunc_t function pointer to wrapper
+ */
+template<typename FUNC_T>
+constexpr MainTaskFunc_t wrap_args(FUNC_T const&& funcArg)
+{
+    // TODO: wrap function pointers into a functor
+    static_assert ( ! std::is_function_v<FUNC_T>, "Support for function pointers not yet implemented");
+
+    using static_lambda_t = std::remove_cvref_t<decltype(funcArg)>;
+    auto const functionPtr = +funcArg;
+
+    static_assert(std::is_function_v< std::remove_pointer_t<decltype(functionPtr)> >);
+
+    // The original funcArg is discarded, but will be reconstructed in
+    // wrap_args_trait::apply, as static_lambda_t is stored in the type
+    return wrap_args_trait<static_lambda_t>::unpack(functionPtr);
 }
 
 
