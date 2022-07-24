@@ -27,7 +27,7 @@
 #include "../types.h"
 #include "activetypes.h"
 
-#include <entt/entity/entity.hpp>
+#include <longeron/id_management/null.hpp>
 
 #include <string>
 
@@ -126,7 +126,7 @@ struct ACtxBasic
     acomp_storage_t<ACompHierarchy>             m_hierarchy;
     acomp_storage_t<ACompCamera>                m_camera;
 
-    ActiveEnt m_hierRoot;
+    ActiveEnt m_hierRoot{lgrn::id_null<ActiveEnt>()};
 };
 
 template<typename IT_T>

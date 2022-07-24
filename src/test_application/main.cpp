@@ -121,12 +121,11 @@ osp::TaskTags g_tasks;
 osp::MainTaskDataVec_t g_taskData;
 osp::MainData_t g_mainData;
 osp::ExecutionContext g_exec;
-std::array<osp::TaskTags::Tag, 2> g_appTags;
 
 Session g_application;
 Session g_magnum;
 Session g_scene;
-Session g_renderer;
+Session g_sceneRender;
 
 // Stores loaded resources in g_mainData
 osp::PkgId g_defaultPkg;
@@ -263,7 +262,13 @@ static void session_close(Session &rSession)
         }
     }
 
-
+    for (osp::TaskTags::Tag const tag : std::exchange(rSession.m_tags, {}))
+    {
+        if (tag != lgrn::id_null<osp::TaskTags::Tag>())
+        {
+            g_tasks.m_tags.remove(tag);
+        }
+    }
 }
 
 int debug_cli_loop()
@@ -356,6 +361,8 @@ void start_magnum_async()
         rDataIds.resize(3);
         osp::main_reserve(g_mainData, 0, std::begin(rDataIds), std::end(rDataIds));
         auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(rDataIds);
+        g_magnum.m_tags.resize(3);
+        g_tasks.m_tags.create(std::begin(g_magnum.m_tags), std::end(g_magnum.m_tags));
 
         // Order-dependent; ActiveApplication construction starts OpenGL context
         auto &rUserInput    = osp::main_emplace<osp::input::UserInputHandler>(g_mainData, idUserInput, 12);
@@ -381,7 +388,7 @@ void start_magnum_async()
         // once the window is closed. See ActiveApplication::drawEvent
         rActiveApp.exec();
 
-        session_close(g_renderer);
+        session_close(g_sceneRender);
         session_close(g_magnum);
 
         OSP_LOG_INFO("Closed Magnum Application");
@@ -392,9 +399,6 @@ void start_magnum_async()
 template <typename SCENE_T>
 void setup_common_scene()
 {
-    //g_sharedData = { entt::make_any<testapp::CommonTestScene>(g_mdResources) };
-    //auto &rScene = entt::any_cast<CommonTestScene&>(g_activeScene);
-
     MainView mainView
     {
         .m_rMainData    = g_mainData,
@@ -416,11 +420,14 @@ void setup_common_scene()
         auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(g_magnum.m_dataIds);
         auto &rActiveApp = osp::main_get<ActiveApplication>(g_mainData, idActiveApp);
 
-        auto &rDataIds = g_renderer.m_dataIds;
+        auto &rDataIds = g_sceneRender.m_dataIds;
         rDataIds.resize(16);
         osp::main_reserve(g_mainData, 0, std::begin(rDataIds), std::end(rDataIds));
 
-        SCENE_T::setup_renderer_gl(mainView, rActiveApp, g_appTags, g_scene, g_magnum, g_renderer);
+        g_sceneRender.m_tags.resize(16);
+        g_tasks.m_tags.create(std::begin(g_sceneRender.m_tags), std::end(g_sceneRender.m_tags));
+
+        SCENE_T::setup_renderer_gl(mainView, g_application, g_scene, g_magnum, g_sceneRender);
 
         g_exec.m_tagIncompleteCounts  .resize(g_tasks.m_tags.capacity(), 0);
         g_exec.m_tagRunningCounts     .resize(g_tasks.m_tags.capacity(), 0);
@@ -428,9 +435,9 @@ void setup_common_scene()
 
         rActiveApp.set_on_draw( [] (ActiveApplication& rApp, float delta)
         {
-            auto const [updRender, updInputs] = osp::unpack<2>(g_appTags);
+            auto const [tgUpdRender, tgUpdInputs, tgUpdSync] = osp::unpack<3>(g_magnum.m_tags);
             std::vector<uint64_t> tagsToRun(g_tasks.m_tags.vec().size());
-            osp::to_bitspan({updRender, updInputs}, tagsToRun);
+            osp::to_bitspan({tgUpdRender, tgUpdInputs}, tagsToRun);
             osp::task_enqueue(g_tasks, g_exec, tagsToRun);
 
             std::vector<entt::any> dataRefs;
@@ -486,13 +493,13 @@ void load_a_bunch_of_stuff()
     using namespace Magnum;
     using Primitives::CylinderFlag;
 
-    g_tasks.m_tags.create(std::begin(g_appTags), std::end(g_appTags));
     g_tasks.m_tags.reserve(128); // Max 128 tags, aka: just two 64-bit integers
     g_tasks.m_tagDepends.resize(g_tasks.m_tags.capacity() * g_tasks.m_tagDependsPerTag,
                                 lgrn::id_null<osp::TaskTags::Tag>());
     g_tasks.m_tagLimits.resize(g_tasks.m_tags.capacity());
 
     g_application.m_dataIds = { osp::main_reserve(g_mainData) };
+
     auto &rResources = osp::main_emplace<osp::Resources>(g_mainData, g_application.m_dataIds[0]);
 
     rResources.resize_types(osp::ResTypeIdReg_t::size());

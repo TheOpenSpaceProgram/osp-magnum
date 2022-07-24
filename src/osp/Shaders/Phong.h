@@ -74,20 +74,70 @@ void draw_ent_phong(
  * @brief Assign a Phong shader to a set of entities, and write results to
  *        a RenderGroup
  *
- * @param entities              [in] Entities to consider
+ * @param dirtyFirst            [in] Iterator to first entity to sync
+ * @param dirtyLast             [in] Iterator to last entity to sync
+ * @param hasMaterial           [in] Which entities a phong material is assigned to
  * @param pStorageOpaque        [out] Optional RenderGroup storage for opaque
  * @param pStorageTransparent   [out] Optional RenderGroup storage for transparent
  * @param opaque                [in] Storage for opaque component
  * @param diffuse               [in] Storage for diffuse texture component
  * @param rData                 [in] Phong shader data, stable memory required
  */
-void assign_phong(
-        active::RenderGroup::ArrayView_t entities,
-        active::RenderGroup::Storage_t *pStorageOpaque,
-        active::RenderGroup::Storage_t *pStorageTransparent,
+template<typename ITA_T, typename ITB_T>
+void sync_phong(
+        ITA_T dirtyFirst, ITB_T const& dirtyLast,
+        active::EntSet_t const& hasMaterial,
+        active::RenderGroup::Storage_t *const pStorageOpaque,
+        active::RenderGroup::Storage_t *const pStorageTransparent,
         active::acomp_storage_t<active::ACompOpaque> const& opaque,
         active::acomp_storage_t<active::ACompTexGl> const& diffuse,
-        ACtxDrawPhong &rData);
+        ACtxDrawPhong &rData)
+{
+    using namespace active;
+
+    while (dirtyFirst != dirtyLast)
+    {
+        ActiveEnt const ent = *dirtyFirst;
+
+        // Erase from group if they exist
+        if (pStorageOpaque != nullptr)
+        {
+            pStorageOpaque->remove(ent);
+        }
+        if (pStorageTransparent != nullptr)
+        {
+            pStorageTransparent->remove(ent);
+        }
+
+        if ( ! hasMaterial.test(std::size_t(ent)))
+        {
+            continue; // Phong material is not assigned to this entity
+        }
+
+        Phong *pShader = diffuse.contains(ent) ? &rData.m_shaderDiffuse : &rData.m_shaderUntextured;
+
+        if (opaque.contains(ent))
+        {
+            if (pStorageOpaque == nullptr)
+            {
+                continue;
+            }
+
+            pStorageOpaque->emplace(ent, EntityToDraw{&draw_ent_phong, {&rData, pShader} });
+        }
+        else
+        {
+            if (pStorageTransparent == nullptr)
+            {
+                continue;
+            }
+
+            pStorageTransparent->emplace(ent, EntityToDraw{&draw_ent_phong, {&rData, pShader} });
+        }
+
+        std::advance(dirtyFirst, 1);
+    }
+}
 
 
 } // namespace osp::shader

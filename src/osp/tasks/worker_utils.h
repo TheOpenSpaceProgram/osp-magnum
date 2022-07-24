@@ -95,6 +95,22 @@ template<typename FUNCTOR_T>
 struct wrap_args_trait
 {
     template<typename ... ARGS_T, std::size_t ... INDEX_T>
+    static constexpr void apply_void(ArrayView<entt::any> mainData, std::integer_sequence<std::size_t, INDEX_T...> indices) noexcept
+    {
+        FUNCTOR_T{}(entt::any_cast<ARGS_T&>(mainData[INDEX_T]) ...);
+    }
+
+    template<typename ... ARGS_T>
+    static MainTaskStatus wrapper_void(WorkerContext& rCtx, ArrayView<entt::any> mainData) noexcept
+    {
+        assert(mainData.size() == sizeof...(ARGS_T));
+
+        apply_void<ARGS_T ...>(mainData, std::make_integer_sequence<std::size_t, sizeof...(ARGS_T)>{});
+
+        return MainTaskStatus::Success;
+    }
+
+    template<typename ... ARGS_T, std::size_t ... INDEX_T>
     static constexpr MainTaskStatus apply(ArrayView<entt::any> mainData, std::integer_sequence<std::size_t, INDEX_T...> indices) noexcept
     {
         return FUNCTOR_T{}(entt::any_cast<ARGS_T&>(mainData[INDEX_T]) ...);
@@ -109,10 +125,17 @@ struct wrap_args_trait
     }
 
     template<typename ... ARGS_T>
-    static constexpr MainTaskFunc_t unpack(MainTaskStatus(*func)(ARGS_T...))
+    static constexpr MainTaskFunc_t unpack([[maybe_unused]] MainTaskStatus(*func)(ARGS_T...))
     {
         // Parameter pack used to extract function arguments, func is discarded
         return &wrapper<ARGS_T ...>;
+    }
+
+    template<typename ... ARGS_T>
+    static constexpr MainTaskFunc_t unpack([[maybe_unused]] void(*func)(ARGS_T...))
+    {
+        // Parameter pack used to extract function arguments, func is discarded
+        return &wrapper_void<ARGS_T ...>;
     }
 };
 

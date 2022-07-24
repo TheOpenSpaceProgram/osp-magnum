@@ -29,9 +29,7 @@
 
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
-
 #include <osp/Active/SysHierarchy.h>
-
 #include <osp/Active/SysRender.h>
 #include <osp/Active/opengl/SysRenderGL.h>
 
@@ -39,7 +37,7 @@
 
 #include <osp/Resource/resources.h>
 
-#include <longeron/id_management/registry.hpp>
+#include <longeron/id_management/registry_stl.hpp>
 
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/ImageData.h>
@@ -61,43 +59,61 @@ using namespace Magnum::Math::Literals;
 namespace testapp::enginetest
 {
 
-// Materials used by the test scene. A more general application may want to
-// generate IDs at runtime, and map them to named identifiers.
-constexpr int const gc_mat_common      = 0;
-constexpr int const gc_mat_visualizer  = 1;
-
-constexpr int const gc_maxMaterials = 2;
-
 /**
- * @brief State of the entire engine test scene
+ * @brief State of the entire engine test scene all in one struct
+ *
+ * This is a simplified example of how OSP scenes are organized.
+ * Other test scenes use 'MainData' (aka: std::vector<entt::any>) instead of a
+ * big struct.
  */
 struct EngineTestScene
 {
-    ~EngineTestScene()
-    {
-        osp::active::SysRender::clear_owners(m_drawing);
-        osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
-        m_drawing.m_meshRefCounts.ref_release(std::move(m_meshCube));
-    }
+    ~EngineTestScene();
 
+    // Global Resources, owned by the top-level application
+    // Note that multiple scenes are intended to be supported
     osp::Resources *m_pResources;
 
     // ID registry generates entity IDs, and keeps track of which ones exist
-    lgrn::IdRegistry<ActiveEnt>     m_activeIds;
+    lgrn::IdRegistryStl<ActiveEnt>  m_activeIds;
 
-    // Components and supporting data structures
-    osp::active::ACtxBasic          m_basic;    
+    // Supports transforms, hierarchy, cameras, and other components assignable
+    // to ActiveEnts
+    osp::active::ACtxBasic          m_basic;
+
+    // Support for 'scene-space' meshes and textures, drawing components for
+    // ActiveEnt such as visible, opaque, and diffuse texture.
     osp::active::ACtxDrawing        m_drawing;
-    osp::active::ACtxDrawingRes     m_drawingRes;
 
-    // Hierarchy root, needs to exist so all hierarchy entities are connected
-    ActiveEnt                       m_hierRoot{lgrn::id_null<ActiveEnt>()};
+    // Support for associating scene-space meshes/textures with Resources
+    // Meshes/textures can span 3 different spaces, with their own ID types:
+    // * Resources  (ResId)            Loaded data, from files or generated
+    // * Renderer   (MeshGlId/TexGlId) Shared between scenes, used by GPU
+    // * Scene      (MeshId/TexId)     Local to one scene
+    // ACtxDrawingRes is a two-way mapping between MeshId/TexId <--> ResId
+    osp::active::ACtxDrawingRes     m_drawingRes;
 
     // The rotating cube
     ActiveEnt                       m_cube{lgrn::id_null<ActiveEnt>()};
 
-    osp::active::MeshIdOwner_t      m_meshCube;
+    // Set of ActiveEnts that are assigned a Phong material
+    osp::active::EntSet_t           m_matPhong;
+    osp::active::EntVector_t        m_matPhongDirty;
 };
+
+EngineTestScene::~EngineTestScene()
+{
+    // A bit of manual cleanup is needed on destruction (for good reason)
+
+    // 'lgrn::IdOwner's cleared here are reference-counted integer IDs.
+    // Unlike typical RAII types like std::shared_ptr, IdOwners don't store
+    // an internal pointer to their reference count, and are simply just a
+    // single integer internally.
+    // Cleanup must be manual, but this has the advantage of having no side
+    // effects, and practically zero runtime overhead.
+    osp::active::SysRender::clear_owners(m_drawing);
+    osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
+}
 
 entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 {
@@ -108,18 +124,9 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     rScene.m_pResources = &rResources;
 
-    // Take ownership of cube mesh
-    osp::ResId const resCube = rResources.find(osp::restypes::gc_mesh, pkg, "cube");
-    assert(resCube != lgrn::id_null<osp::ResId>());
-    MeshId const meshCube = SysRender::own_mesh_resource(rScene.m_drawing, rScene.m_drawingRes, rResources, resCube);
-    rScene.m_meshCube = rScene.m_drawing.m_meshRefCounts.ref_add(meshCube);
-
-    // Allocate space to fit all materials
-    rScene.m_drawing.m_materials.resize(gc_maxMaterials);
-
     // Create hierarchy root entity
-    rScene.m_hierRoot = rScene.m_activeIds.create();
-    rScene.m_basic.m_hierarchy.emplace(rScene.m_hierRoot);
+    rScene.m_basic.m_hierRoot = rScene.m_activeIds.create();
+    rScene.m_basic.m_hierarchy.emplace(rScene.m_basic.m_hierRoot);
 
     // Create camera entity
     ActiveEnt const camEnt = rScene.m_activeIds.create();
@@ -136,20 +143,26 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     // Add camera to hierarchy
     SysHierarchy::add_child(
-            rScene.m_basic.m_hierarchy, rScene.m_hierRoot, camEnt);
+            rScene.m_basic.m_hierarchy, rScene.m_basic.m_hierRoot, camEnt);
 
     // Make a cube
     rScene.m_cube = rScene.m_activeIds.create();
 
+    // Take ownership of the cube mesh Resource. This will create a scene-space
+    // MeshId that we can assign to ActiveEnts
+    osp::ResId const resCube = rResources.find(osp::restypes::gc_mesh, pkg, "cube");
+    assert(resCube != lgrn::id_null<osp::ResId>());
+    MeshId const meshCube = SysRender::own_mesh_resource(rScene.m_drawing, rScene.m_drawingRes, rResources, resCube);
+
     // Add cube mesh to cube
     rScene.m_drawing.m_mesh.emplace(
-            rScene.m_cube, rScene.m_drawing.m_meshRefCounts.ref_add(rScene.m_meshCube));
+            rScene.m_cube, rScene.m_drawing.m_meshRefCounts.ref_add(meshCube));
     rScene.m_drawing.m_meshDirty.push_back(rScene.m_cube);
 
-    // Add common material to cube
-    MaterialData &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
-    rMatCommon.m_comp.emplace(rScene.m_cube);
-    rMatCommon.m_added.push_back(rScene.m_cube);
+    // Add phong material to cube
+    rScene.m_matPhong.ints().resize(rScene.m_activeIds.vec().capacity());
+    rScene.m_matPhong.set(std::size_t(rScene.m_cube));
+    rScene.m_matPhongDirty.push_back(rScene.m_cube);
 
     // Add transform and draw transform
     rScene.m_basic.m_transform.emplace(rScene.m_cube);
@@ -160,7 +173,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     // Add cube to hierarchy, parented to root
     SysHierarchy::add_child(
-            rScene.m_basic.m_hierarchy, rScene.m_hierRoot, rScene.m_cube);
+            rScene.m_basic.m_hierarchy, rScene.m_basic.m_hierRoot, rScene.m_cube);
 
     return sceneAny;
 }
@@ -174,6 +187,7 @@ void update_test_scene(EngineTestScene& rScene, float const delta)
 {
     // Clear drawing-related dirty flags/vectors
     osp::active::SysRender::clear_dirty_all(rScene.m_drawing);
+    rScene.m_matPhongDirty.clear();
 
     // Rotate the cube
     osp::Matrix4 &rCubeTf
@@ -191,6 +205,9 @@ void update_test_scene(EngineTestScene& rScene, float const delta)
 
 /**
  * @brief Data needed to render the EngineTestScene
+ *
+ * This will only exist when the window is open, and will be destructed when it
+ * closes.
  */
 struct EngineTestRenderer
 {
@@ -198,16 +215,29 @@ struct EngineTestRenderer
      : m_camCtrl(rInputs)
     { }
 
-    osp::active::ACtxRenderGroups m_renderGroups{};
-
+    // Support for assigning render-space GL meshes/textures and transforms
+    // for ActiveEnts
     osp::active::ACtxSceneRenderGL m_renderGl{};
 
+    // Pre-built easy camera controls
     ActiveEnt m_camera{lgrn::id_null<ActiveEnt>()};
     ACtxCameraController m_camCtrl;
 
+    // Phong shaders and their required data
     osp::shader::ACtxDrawPhong m_phong{};
+
+    // An ordered set of entities and draw function pointers intended to be
+    // forward-rendered
+    osp::active::RenderGroup m_groupFwdOpaque;
 };
 
+/**
+ * @brief Keeps the EngineTestRenderer up-to-date with the EngineTestScene
+ *
+ * @param rRenderGl [ref] Application-level GL renderer data
+ * @param rScene    [in] Test scene to render
+ * @param rRenderer [ref] Renderer data for test scene
+ */
 void sync_test_scene(
         RenderGL& rRenderGl, EngineTestScene const& rScene,
         EngineTestRenderer& rRenderer)
@@ -215,20 +245,20 @@ void sync_test_scene(
     using namespace osp::active;
     using namespace osp::shader;
 
-    // Assign Phong shader to entities with the gc_mat_common material, and put
-    // results into the fwd_opaque render group
-    RenderGroup &rGroupFwdOpaque
-            = rRenderer.m_renderGroups.m_groups["fwd_opaque"];
-    MaterialData const &rMatCommon = rScene.m_drawing.m_materials[gc_mat_common];
-    assign_phong(
-            rMatCommon.m_added, &rGroupFwdOpaque.m_entities, nullptr,
+    // Assign or remove phong shaders from entities marked dirty
+    sync_phong(
+            std::cbegin(rScene.m_matPhongDirty),
+            std::cend(rScene.m_matPhongDirty),
+            rScene.m_matPhong, &rRenderer.m_groupFwdOpaque.m_entities, nullptr,
             rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexId,
             rRenderer.m_phong);
+
+    // Make sure that all drawable entities are also given a draw transform
     SysRender::assure_draw_transforms(
-                rScene.m_basic.m_hierarchy,
-                rRenderer.m_renderGl.m_drawTransform,
-                std::cbegin(rMatCommon.m_added),
-                std::cend(rMatCommon.m_added));
+            rScene.m_basic.m_hierarchy,
+            rRenderer.m_renderGl.m_drawTransform,
+            std::cbegin(rScene.m_matPhongDirty),
+            std::cend(rScene.m_matPhongDirty));
 
     // Load required meshes and textures into OpenGL
     SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rRenderGl);
@@ -253,8 +283,8 @@ void sync_test_scene(
 /**
  * @brief Render an EngineTestScene
  *
- * @param rApp      [ref] Application with GL context and resources
- * @param rScene    [ref] Test scene to render
+ * @param rRenderGl [ref] Application-level GL renderer data
+ * @param rScene    [in] Test scene to render
  * @param rRenderer [ref] Renderer data for test scene
  */
 void render_test_scene(
@@ -284,7 +314,7 @@ void render_test_scene(
 
     // Forward Render fwd_opaque group to FBO
     SysRenderGL::render_opaque(
-            rRenderer.m_renderGroups.m_groups.at("fwd_opaque"),
+            rRenderer.m_groupFwdOpaque,
             rScene.m_drawing.m_visible, viewProj);
 
     // Display FBO
@@ -320,12 +350,14 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication &rApp, R
             pRenderer->m_renderGl.m_drawTransform,
             camEnt);
 
-    // Create render group for forward opaque pass
-    pRenderer->m_renderGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
-
     // Set all drawing stuff dirty then sync with renderer.
     // This allows clean re-openning of the scene
     SysRender::set_dirty_all(rScene.m_drawing);
+    for (std::size_t const entInt : rScene.m_matPhong.ones())
+    {
+        rScene.m_matPhongDirty.push_back(ActiveEnt(entInt));
+    }
+
     sync_test_scene(rRenderGl, rScene, *pRenderer);
 
     return [&rScene, pRenderer = std::move(pRenderer), &rRenderGl] (

@@ -285,10 +285,6 @@ void SysRender::update_delete_drawing(
         remove_refcounted(ent, rCtxDraw.m_diffuseTex, rCtxDraw.m_texRefCounts);
         remove_refcounted(ent, rCtxDraw.m_mesh, rCtxDraw.m_meshRefCounts);
 
-        for (MaterialData& rMat : rCtxDraw.m_materials)
-        {
-            rMat.m_comp.remove(ent);
-        }
 
         std::advance(first, 1);
     }

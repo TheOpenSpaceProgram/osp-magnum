@@ -81,13 +81,6 @@ enum class TexId : uint32_t { };
 
 struct ACompColor : Magnum::Color4 {};
 
-struct MaterialData
-{
-    active_sparse_set_t     m_comp;
-    std::vector<ActiveEnt>  m_added;
-    std::vector<ActiveEnt>  m_removed;
-};
-
 using MeshRefCount_t    = lgrn::IdRefCount<MeshId>;
 using MeshIdOwner_t     = MeshRefCount_t::Owner_t;
 
@@ -105,10 +98,6 @@ struct ACtxDrawing
     acomp_storage_t<ACompTransparent>       m_transparent;
     acomp_storage_t<ACompVisible>           m_visible;
     acomp_storage_t<ACompColor>             m_color;
-
-    // Data needed by each unique material Id: assigned entities and
-    // added/removed queues. Access with m_materials[material ID]
-    std::vector<MaterialData>               m_materials;
 
     // Scene-space Meshes
     lgrn::IdRegistry<MeshId>                m_meshIds;
