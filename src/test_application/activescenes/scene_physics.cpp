@@ -70,9 +70,9 @@ ActiveEnt add_solid_quick(
     rDrawing.m_meshDirty.push_back(ent);
 
     // Add material to cube
-    MaterialData &rMaterial = rDrawing.m_materials[material];
-    rMaterial.m_comp.emplace(ent);
-    rMaterial.m_added.push_back(ent);
+    //MaterialData &rMaterial = rDrawing.m_materials[material];
+    //rMaterial.m_comp.emplace(ent);
+    //rMaterial.m_added.push_back(ent);
 
     // Add transform
     rBasic.m_transform.emplace(ent, ACompTransform{transform});

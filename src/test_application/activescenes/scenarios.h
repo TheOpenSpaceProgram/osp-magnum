@@ -127,12 +127,11 @@ struct PhysicsTest
 {
     static void setup_scene(MainView mainView, osp::PkgId pkg, Session const& sceneOut);
     static void setup_renderer_gl(
-            MainView mainView,
-            ActiveApplication& rApp,
-            osp::ArrayView<osp::TaskTags::Tag const> appTags,
-            Session const& sceneIn,
-            Session const& magnumIn,
-            Session const& rendererOut) noexcept;
+            MainView        mainView,
+            Session const&  appIn,
+            Session const&  sceneIn,
+            Session const&  magnumIn,
+            Session const&  sceneRenderOut) noexcept;
 };
 
 struct VehicleTest

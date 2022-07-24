@@ -52,11 +52,15 @@ using namespace osp::active;
 using ospnewton::ACtxNwtWorld;
 using osp::input::UserInputHandler;
 using osp::phys::EShape;
-using osp::main_emplace;
-using osp::main_get;
+using osp::MainDataIds_t;
+using osp::MainTaskStatus;
 using osp::Vector3;
 using osp::Matrix3;
 using osp::Matrix4;
+
+using osp::main_emplace;
+using osp::main_get;
+using osp::wrap_args;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -134,7 +138,7 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session c
     rNMesh.m_namedMeshs.emplace("floor", quick_add_mesh("grid64solid"));
 
     // Allocate space to fit all materials
-    rDrawing.m_materials.resize(rComMats.m_materialCount);
+    //rDrawing.m_materials.resize(rComMats.m_materialCount);
 
     // Create hierarchy root entity
     rBasic.m_hierRoot = rActiveIds.create();
@@ -177,10 +181,10 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session c
     rDrawing.m_meshDirty.push_back(floorMeshEnt);
 
     // Add mesh visualizer material to floor mesh entity
-    MaterialData &rMatCommon
-            = rDrawing.m_materials[rComMats.m_matVisualizer];
-    rMatCommon.m_comp.emplace(floorMeshEnt);
-    rMatCommon.m_added.push_back(floorMeshEnt);
+    //MaterialData &rMatCommon
+    //        = rDrawing.m_materials[rComMats.m_matVisualizer];
+    //rMatCommon.m_comp.emplace(floorMeshEnt);
+    //rMatCommon.m_added.push_back(floorMeshEnt);
 
     // Add transform, draw transform, opaque, and visible entity
     rBasic.m_transform.emplace(
@@ -362,12 +366,11 @@ struct PhysicsTestControls
 };
 
 void PhysicsTest::setup_renderer_gl(
-        MainView                                        mainView,
-        ActiveApplication&                              rApp,
-        osp::ArrayView<osp::TaskTags::Tag const> const  appTags,
-        Session const&                                  sceneIn,
-        Session const&                                  magnumIn,
-        Session const&                                  rendererOut) noexcept
+        MainView        mainView,
+        Session const&  appIn,
+        Session const&  sceneIn,
+        Session const&  magnumIn,
+        Session const&  sceneRenderOut) noexcept
 {
     using namespace osp::shader;
 
@@ -379,7 +382,7 @@ void PhysicsTest::setup_renderer_gl(
     auto &rUserInput    = osp::main_get<UserInputHandler>(rMainData, idUserInput);
 
     auto const [idScnRender, idGroups, idDrawPhong, idDrawVisual, idCamEnt, idCamCtrl, idControls]
-            = osp::unpack<7>(rendererOut.m_dataIds);
+            = osp::unpack<7>(sceneRenderOut.m_dataIds);
     auto &rScnRender    = main_emplace< ACtxSceneRenderGL >     (rMainData, idScnRender);
     auto &rGroups       = main_emplace< ACtxRenderGroups >      (rMainData, idGroups);
     auto &rDrawPhong    = main_emplace< ACtxDrawPhong >         (rMainData, idDrawPhong);
@@ -408,6 +411,8 @@ void PhysicsTest::setup_renderer_gl(
 
     auto &rBasic = main_get< ACtxBasic >(rMainData, idBasic);
 
+    auto const [idResources] = osp::unpack<1>(appIn.m_dataIds);
+
     // Select first camera for rendering
     rCamEnt = rBasic.m_camera.at(0);
     rBasic.m_camera.get(rCamEnt).set_aspect_ratio(
@@ -420,15 +425,34 @@ void PhysicsTest::setup_renderer_gl(
 
     auto builder = osp::TaskBuilder{mainView.m_rTasks, mainView.m_rTaskData};
 
-    auto const [updRender, updInputs] = osp::unpack<2>(appTags);
+    auto const [tgUpdRender, tgUpdInputs, tgUpdSync, tgUsesGL] = osp::unpack<4>(magnumIn.m_tags);
 
-    builder.task().assign({updRender})
-            .data(osp::MainDataIds_t{idScnRender, idUserInput},
-                osp::wrap_args([] (ACtxSceneRenderGL& rScnRender, UserInputHandler& rUserInput) noexcept -> osp::MainTaskStatus
+    auto const [tgCompileMesh, tgCompileTex, tgNeedMesh, tgNeedTex] = osp::unpack<4>(sceneRenderOut.m_tags);
+
+    builder.task().assign({tgUpdSync, tgUsesGL, tgCompileMesh, tgCompileTex}).data(
+            MainDataIds_t{idDrawingRes, idResources, idRenderGl},
+            wrap_args([] (ACtxDrawingRes& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
     {
-        int hi = rScnRender.m_drawTransform.size();
-        return osp::MainTaskStatus::Success;
+        SysRenderGL::sync_scene_resources(rDrawingRes, rResources, rRenderGl);
     }));
+
+    builder.task().assign({tgUpdSync, tgNeedTex}).data(
+            MainDataIds_t{idDrawing, idResources, idRenderGl},
+            wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, osp::Resources& rResources, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+    {
+        SysRenderGL::assign_textures(rDrawing.m_diffuseTex, rDrawingRes.m_texToRes, rDrawing.m_diffuseDirty, rScnRender.m_diffuseTexId, rRenderGl);
+    }));
+
+    builder.task().assign({tgUpdSync, tgNeedMesh}).data(
+            MainDataIds_t{idDrawing, idResources, idRenderGl},
+            wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, osp::Resources& rResources, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+    {
+        SysRenderGL::assign_meshes(rDrawing.m_mesh, rDrawingRes.m_meshToRes, rDrawing.m_meshDirty, rScnRender.m_meshId, rRenderGl);
+    }));
+
+
+
+
     /*
     rRenderer.m_onDraw = [] (
             CommonSceneRendererGL& rRenderer, CommonTestScene& rScene,

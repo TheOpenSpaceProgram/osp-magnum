@@ -120,11 +120,6 @@ void SysRender::set_dirty_all(ACtxDrawing &rCtxDrawing)
 {
     using osp::active::active_sparse_set_t;
 
-    for (osp::active::MaterialData &rMat : rCtxDrawing.m_materials)
-    {
-        rMat.m_added.assign(std::begin(rMat.m_comp), std::end(rMat.m_comp));
-    }
-
     // Set all meshs dirty
     auto &rMeshSet = static_cast<active_sparse_set_t&>(rCtxDrawing.m_mesh);
     rCtxDrawing.m_meshDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
@@ -136,11 +131,6 @@ void SysRender::set_dirty_all(ACtxDrawing &rCtxDrawing)
 
 void SysRender::clear_dirty_all(ACtxDrawing& rCtxDrawing)
 {
-    for (MaterialData &rMat : rCtxDrawing.m_materials)
-    {
-        rMat.m_added.clear();
-        rMat.m_removed.clear();
-    }
     rCtxDrawing.m_meshDirty.clear();
     rCtxDrawing.m_diffuseDirty.clear();
 }

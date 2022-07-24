@@ -34,69 +34,6 @@
 namespace testapp
 {
 
-/**
- * @brief Common data needed to render a scene
- *
- * Note: GPU resources and application-level rendering data can be found in
- *       osp::active::RenderGL
- *
- */
-struct CommonSceneRendererGL
-{
-    osp::active::ACtxSceneRenderGL m_scnRenderGl;
-
-    osp::active::ACtxRenderGroups m_renderGroups;
-
-    osp::shader::ACtxDrawPhong m_phong;
-    osp::shader::ACtxDrawMeshVisualizer m_visualizer;
-
-    osp::active::ActiveEnt m_camera;
-
-    /**
-     * @brief Setup default shaders and render groups
-     *
-     * @param rRenderGl [ref] Application GL renderer
-     */
-    void setup(osp::active::RenderGL& rRenderGl);
-
-    /**
-     * @brief Sync GL resources with scene meshes, textures, and materials
-     *
-     * @param rRenderGl [ref] Application GL renderer
-     * @param rScene    [ref] Associated test scene to render
-     */
-    void sync(osp::active::RenderGL& rRenderGl, CommonTestScene const& rScene);
-
-    /**
-     * @brief Bind and clear off-screen framebuffer object
-     *
-     * @param rRenderGl [ref] Application GL renderer
-     */
-    void prepare_fbo(osp::active::RenderGL& rRenderGl);
-
-    /**
-     * @brief Calls draw functions of entities in the fwd_opaque RenderGroup
-     *
-     * @param rRenderGl [ref] Application GL renderer
-     * @param rScene    [ref] Associated test scene to render
-     */
-    void draw_entities(osp::active::RenderGL& rRenderGl, CommonTestScene const& rScene);
-
-    /**
-     * @brief Display framebuffer texture to window
-     *
-     * @param rRenderGl [ref] Application GL renderer
-     */
-    void display(osp::active::RenderGL& rRenderGl);
-
-    /**
-     * @brief Delete components of entities to delete
-     *
-     * @param toDelete  [in] Vector of deleted entities
-     */
-    void update_delete(std::vector<osp::active::ActiveEnt> const& toDelete);
-};
-
 
 
 } // namespace testapp
