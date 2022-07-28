@@ -24,14 +24,13 @@
  */
 #pragma once
 
-#include "worker.h"
 #include "tasks.h"
 
-#include <Corrade/Containers/ArrayView.h>
+#include <Corrade/Containers/ArrayViewStl.h>
+#include <Corrade/Containers/StridedArrayView.h>
 
-#include <cstdint>
+#include <cassert>
 #include <vector>
-
 
 namespace osp
 {
@@ -66,6 +65,25 @@ BitSpan_t to_bitspan(std::initializer_list<T> tags, BitSpan_t out) noexcept
 {
     return to_bitspan(Corrade::Containers::arrayView(tags), out);
 }
+
+template <typename FUNC_T>
+constexpr void task_for_each(TaskTags const& tags, FUNC_T&& func)
+{
+    using Corrade::Containers::StridedArrayView2D;
+    using Corrade::Containers::arrayView;
+
+    std::size_t const tagIntSize = tags.tag_ints_per_task();
+
+    StridedArrayView2D<uint64_t const> const taskTags2d{
+            arrayView(tags.m_taskTags), {tags.m_tasks.capacity(), tagIntSize}};
+
+    for (uint32_t const currTask : tags.m_tasks.bitview().zeros())
+    {
+        func(currTask, taskTags2d[currTask].asContiguous());
+    }
+}
+
+bool any_bits_match(BitSpanConst_t lhs, BitSpanConst_t rhs);
 
 /**
  * @brief Enqueue all tasks that contain any specified tag

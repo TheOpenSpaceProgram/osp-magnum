@@ -25,58 +25,55 @@
 
 #include "execute_simple.h"
 
-#include <Corrade/Containers/ArrayViewStl.h>
+
 
 #include <algorithm>
-#include <cassert>
+#include <cstdint>
+
+using Corrade::Containers::ArrayView;
+using Corrade::Containers::StridedArrayView2D;
+using Corrade::Containers::arrayView;
 
 namespace osp
 {
 
+bool any_bits_match(BitSpanConst_t const lhs, BitSpanConst_t const rhs)
+{
+    return ! std::equal(
+            std::cbegin(lhs), std::cend(lhs),
+            std::cbegin(rhs), std::cend(rhs),
+            [] (uint64_t const lhsInt, uint64_t const rhsInt)
+    {
+        return (lhsInt & rhsInt) == 0;
+    });
+}
+
 void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t const query)
 {
-    std::size_t const tagIntSize = tags.tag_ints_per_task();
-    assert(query.size() == tagIntSize);
+    assert(query.size() == tags.tag_ints_per_task());
 
-    auto const taskTagInts = Corrade::Containers::arrayView(tags.m_taskTags);
-
-    for (uint32_t const currTask : tags.m_tasks.bitview().zeros())
+    task_for_each(tags, [&rExec, &query]
+            (uint32_t const currTask, ArrayView<uint64_t const> const currTags)
     {
         unsigned int &rQueuedCount = rExec.m_taskQueuedCounts[currTask];
 
-        if (rQueuedCount == 0)
+        if ( (rQueuedCount != 0) || ( ! any_bits_match(query, currTags) ) )
         {
-            // Task not yet queued, check if any tags match the query
-            std::size_t const offset = currTask * tagIntSize;
-            auto const currTaskTagInts = taskTagInts.slice(offset, offset + tagIntSize);
-
-            bool anyTagMatches = false;
-            auto taskTagIntIt = std::begin(currTaskTagInts);
-
-            for (uint64_t const queryInt : query)
-            {
-                if ((queryInt & *taskTagIntIt) != 0)
-                {
-                    anyTagMatches = true;
-                    break;
-                }
-                std::advance(taskTagIntIt, 1);
-            }
-
-            if (anyTagMatches)
-            {
-                rQueuedCount = 1;
-                auto const view = lgrn::bit_view(currTaskTagInts);
-                for (uint32_t const tag : view.ones())
-                {
-                    rExec.m_tagIncompleteCounts[tag] ++;
-                }
-            }
+            return; // Ignore already-queued tasks, or if tags do not match query
         }
-    }
+
+        rQueuedCount = 1; // All good, now queue the task
+
+        // Add the task's tags to the incomplete counts
+        auto const view = lgrn::bit_view(currTags);
+        for (uint32_t const tag : view.ones())
+        {
+            rExec.m_tagIncompleteCounts[tag] ++;
+        }
+    });
 }
 
-static bool compare_tags(BitSpanConst_t const mask, BitSpanConst_t const taskTags) noexcept
+static bool tags_present(BitSpanConst_t const mask, BitSpanConst_t const taskTags) noexcept
 {
     auto taskTagIntIt = std::begin(taskTags);
     for (uint64_t const maskInt : mask)
@@ -104,15 +101,17 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
     std::vector<uint64_t> mask(tags.m_tags.vec().size(), ~uint64_t(0));
     auto maskBits = lgrn::bit_view(mask);
 
+    StridedArrayView2D<TaskTags::Tag const> const tagDepends2d{
+            arrayView(tags.m_tagDepends), {tags.m_tags.capacity(), tags.m_tagDependsPerTag}};
+
     // Check dependencies of each tag
     // Set them 0 (disallow) in the mask if the tag has incomplete dependencies
-    auto dependsView = Corrade::Containers::arrayView<TaskTags::Tag const>(tags.m_tagDepends);
-    auto currDepends = dependsView;
     for (uint32_t const currTag : tags.m_tags.bitview().zeros())
     {
         bool satisfied = true;
+        auto const currTagDepends = tagDepends2d[currTag].asContiguous();
 
-        for (TaskTags::Tag const dependTag : currDepends.prefix(tags.m_tagDependsPerTag))
+        for (TaskTags::Tag const dependTag : currTagDepends)
         {
             if (dependTag == lgrn::id_null<TaskTags::Tag>())
             {
@@ -130,8 +129,6 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
         {
             maskBits.reset(currTag);
         }
-
-        currDepends = currDepends.exceptPrefix(tags.m_tagDependsPerTag);
     }
 
     // TODO: Check Limits with exec.m_tagRunningCounts
@@ -152,7 +149,7 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
         std::size_t const offset = currTask * tagIntSize;
         auto const currTaskTagInts = taskTagInts.slice(offset, offset + tagIntSize);
 
-        if (compare_tags(mask, currTaskTagInts))
+        if (tags_present(mask, currTaskTagInts))
         {
             tasksOutBits.set(currTask);
         }
