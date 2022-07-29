@@ -63,7 +63,7 @@ namespace testapp::enginetest
  * @brief State of the entire engine test scene all in one struct
  *
  * This is a simplified example of how OSP scenes are organized.
- * Other test scenes use 'MainData' (aka: std::vector<entt::any>) instead of a
+ * Other test scenes use 'TopData' (aka: std::vector<entt::any>) instead of a
  * big struct.
  */
 struct EngineTestScene

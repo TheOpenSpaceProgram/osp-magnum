@@ -33,7 +33,9 @@
 
 // IWYU pragma: end_exports
 
-#include <longeron/containers/bit_view.hpp>
+#include <longeron/id_management/registry_stl.hpp>      // for lgrn::IdRegistryStl
+#include <longeron/containers/bit_view.hpp>             // for lgrn::BitView
+
 #include <vector>
 
 namespace osp::active
@@ -59,6 +61,7 @@ namespace osp::active
 
 inline constexpr unsigned gc_heir_physics_level = 1;
 
+using ActiveReg_t = lgrn::IdRegistryStl<osp::active::ActiveEnt>;
 
 using EntVector_t = std::vector<ActiveEnt>;
 using EntSet_t = lgrn::BitView< std::vector<uint64_t> >;

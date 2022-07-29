@@ -24,8 +24,6 @@
  */
 #pragma once
 
-#include "common_scene.h"
-
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
 
@@ -52,11 +50,6 @@ struct ACtxTestPhys
 
     // 'Per-thread' inputs fed into the physics engine. Only one here for now
     osp::active::ACtxPhysInputs     m_physIn;
-
-    /**
-     * @brief Clean up reference counted resource owners
-     */
-    static void cleanup(CommonTestScene& rScene);
 };
 
 struct NamedMeshes

@@ -29,7 +29,7 @@
 #include <osp/Resource/resourcetypes.h>
 
 #include <osp/tasks/tasks.h>
-#include <osp/tasks/tasks_main.h>
+#include <osp/tasks/top_tasks.h>
 
 #include <functional>
 
@@ -49,15 +49,15 @@ using on_draw_t = std::function<void(ActiveApplication&, float delta)>;
 
 struct MainView
 {
-    osp::ArrayView<entt::any>   m_rMainData;
+    osp::ArrayView<entt::any>   m_topData;
     osp::TaskTags&              m_rTasks;
-    osp::MainTaskDataVec_t&     m_rTaskData;
-    osp::MainDataId             m_resourcesId;
+    osp::TopTaskDataVec_t&      m_rTaskData;
+    osp::TopDataId              m_resourcesId;
 };
 
 struct Session
 {
-    std::vector<osp::MainDataId> m_dataIds;
+    std::vector<osp::TopDataId> m_dataIds;
     std::vector<osp::TaskTags::Tag> m_tags;
 };
 
