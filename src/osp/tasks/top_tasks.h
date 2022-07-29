@@ -24,40 +24,29 @@
  */
 #pragma once
 
-#include <Corrade/Containers/ArrayView.h>
+#include "tasks.h"
+#include "top_worker.h"
 
-#include <entt/core/fwd.hpp>
-
-#include <cstdint>
+#include <vector>
 
 namespace osp
 {
 
-using Corrade::Containers::ArrayView;
-using MainDataId = uint32_t;
-
-using MainDataIds_t = std::initializer_list<osp::MainDataId>;
-
-struct Reserved {};
-
-struct WorkerContext
+struct TopTask
 {
-    struct LimitSlot
-    {
-        uint32_t m_tag;
-        int m_slot;
-    };
-
-    Corrade::Containers::ArrayView<LimitSlot> m_limitSlots;
+    std::vector<TopDataId> m_dataUsed;
+    TopTaskFunc_t m_func;
 };
 
-enum class MainTaskStatus : uint8_t
+inline void task_data(TaskDataVec<TopTask> &rData, TaskTags::Task const task, std::initializer_list<TopDataId> dataUsed, TopTaskFunc_t func)
 {
-    Success     = 0,
-    Failed      = 1,
-    DidNothing  = 2
-};
+    rData.m_taskData.resize(
+            std::max(rData.m_taskData.size(), std::size_t(task) + 1));
+    auto &rTopTask = rData.m_taskData[std::size_t(task)];
+    rTopTask.m_dataUsed = dataUsed;
+    rTopTask.m_func = func;
+}
 
-using MainTaskFunc_t = MainTaskStatus(*)(WorkerContext&, ArrayView<entt::any>) noexcept;
+using TopTaskDataVec_t = TaskDataVec<TopTask>;
 
 } // namespace osp

@@ -24,16 +24,39 @@
  */
 #pragma once
 
-#include "common_scene.h"
+#include <Corrade/Containers/ArrayView.h>
 
-#include <osp/Active/opengl/SysRenderGL.h>
+#include <entt/core/fwd.hpp>
 
-#include <osp/Shaders/Phong.h>
-#include <osp/Shaders/MeshVisualizer.h>
+#include <cstdint>
 
-namespace testapp
+namespace osp
 {
 
+using Corrade::Containers::ArrayView;
+using TopDataId = uint32_t;
+using TopDataIds_t = std::initializer_list<TopDataId>;
 
+struct Reserved {};
 
-} // namespace testapp
+struct WorkerContext
+{
+    struct LimitSlot
+    {
+        uint32_t m_tag;
+        int m_slot;
+    };
+
+    Corrade::Containers::ArrayView<LimitSlot> m_limitSlots;
+};
+
+enum class TopTaskStatus : uint8_t
+{
+    Success     = 0,
+    Failed      = 1,
+    DidNothing  = 2
+};
+
+using TopTaskFunc_t = TopTaskStatus(*)(WorkerContext&, ArrayView<entt::any>) noexcept;
+
+} // namespace osp

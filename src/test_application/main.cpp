@@ -23,22 +23,23 @@
  * SOFTWARE.
  */
 
-#include "osp/tasks/worker_utils.h"
+#include "osp/tasks/top_utils.h"
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_INFO
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "ActiveApplication.h"
 #include "activescenes/scenarios.h"
-#include "activescenes/common_scene.h"
-#include "activescenes/common_renderer_gl.h"
+
+#include <osp/Active/opengl/SysRenderGL.h>
 
 #include <osp/Resource/load_tinygltf.h>
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
 
 #include <osp/tasks/tasks.h>
-#include <osp/tasks/tasks_main.h>
+#include <osp/tasks/top_tasks.h>
+#include <osp/tasks/top_execute.h>
 #include <osp/tasks/execute_simple.h>
 
 #include <osp/string_concat.h>
@@ -117,17 +118,17 @@ void debug_print_help();
 void debug_print_resources();
 
 // Application state
-osp::TaskTags g_tasks;
-osp::MainTaskDataVec_t g_taskData;
-osp::MainData_t g_mainData;
-osp::ExecutionContext g_exec;
+osp::TaskTags           g_tasks;
+osp::TopTaskDataVec_t   g_taskData;
+std::vector<entt::any>  g_appTopData;
+osp::ExecutionContext   g_exec;
 
 Session g_application;
 Session g_magnum;
 Session g_scene;
 Session g_sceneRender;
 
-// Stores loaded resources in g_mainData
+// Stores loaded resources in g_appTopData
 osp::PkgId g_defaultPkg;
 
 // Magnum Application deals with window and OpenGL things
@@ -152,30 +153,30 @@ struct Option
 
 static ActiveApplication& get_magnum_application()
 {
-    return entt::any_cast<ActiveApplication&>(g_mainData.at(std::size_t(g_magnum.m_dataIds[0])));
+    return entt::any_cast<ActiveApplication&>(g_appTopData.at(std::size_t(g_magnum.m_dataIds[0])));
 }
 
 static osp::Resources& get_resources()
 {
-    return entt::any_cast<osp::Resources&>(g_mainData.at(std::size_t(g_application.m_dataIds[0])));
+    return entt::any_cast<osp::Resources&>(g_appTopData.at(std::size_t(g_application.m_dataIds[0])));
 }
 
 std::unordered_map<std::string_view, Option> const g_scenes
 {
 
     {"enginetest", {"Demonstrate basic game engine functionality", [] {
-        osp::MainDataId const mdiScene = osp::main_reserve(g_mainData);
+        osp::TopDataId const mdiScene = osp::top_reserve(g_appTopData);
         g_scene.m_dataIds = {mdiScene};
-        g_mainData[mdiScene] = enginetest::setup_scene(get_resources(), g_defaultPkg);
+        g_appTopData[mdiScene] = enginetest::setup_scene(get_resources(), g_defaultPkg);
 
         g_appSetup = [] ()
         {
-            auto& rScene = osp::main_get<enginetest::EngineTestScene>(g_mainData, g_scene.m_dataIds[0]);
+            auto& rScene = osp::top_get<enginetest::EngineTestScene>(g_appTopData, g_scene.m_dataIds[0]);
 
             auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(g_magnum.m_dataIds);
-            auto &rActiveApp    = osp::main_get<ActiveApplication>(g_mainData, idActiveApp);
-            auto &rRenderGl     = osp::main_get<osp::active::RenderGL>(g_mainData, idRenderGl);
-            auto &rUserInput    = osp::main_get<osp::input::UserInputHandler>(g_mainData, idUserInput);
+            auto &rActiveApp    = osp::top_get<ActiveApplication>(g_appTopData, idActiveApp);
+            auto &rRenderGl     = osp::top_get<osp::active::RenderGL>(g_appTopData, idRenderGl);
+            auto &rUserInput    = osp::top_get<osp::input::UserInputHandler>(g_appTopData, idUserInput);
 
             rActiveApp.set_on_draw(enginetest::generate_draw_func(rScene, rActiveApp, rRenderGl, rUserInput));
         };
@@ -218,7 +219,7 @@ int main(int argc, char** argv)
 
     osp::set_thread_logger(g_logTestApp); // Set logger for this thread
 
-    g_mainData.resize(64);
+    g_appTopData.resize(64);
     load_a_bunch_of_stuff();
 
     if(args.value("scene") != "none")
@@ -254,14 +255,31 @@ int main(int argc, char** argv)
 }
 static void session_close(Session &rSession)
 {
-    for (osp::MainDataId const id : std::exchange(rSession.m_dataIds, {}))
+    // Clear session's TopData
+    for (osp::TopDataId const id : std::exchange(rSession.m_dataIds, {}))
     {
-        if (id != lgrn::id_null<osp::MainDataId>())
+        if (id != lgrn::id_null<osp::TopDataId>())
         {
-            g_mainData.at(std::size_t(id)).reset();
+            g_appTopData.at(std::size_t(id)).reset();
         }
     }
 
+    // Get this session's tags, and clear its tasks
+    std::vector<uint64_t> tagsOwnedBits(g_tasks.m_tags.vec().size());
+    osp::to_bitspan(rSession.m_tags, tagsOwnedBits);
+    osp::task_for_each(g_tasks, [&tagsOwnedBits]
+            (uint32_t const currTask, osp::ArrayView<uint64_t const> const currTags)
+    {
+        if (osp::any_bits_match(tagsOwnedBits, currTags))
+        {
+            g_tasks.m_tasks.remove(osp::TaskTags::Task(currTask));
+            osp::TopTask &rTaskData = g_taskData.m_taskData[currTask];
+            rTaskData.m_dataUsed.clear();
+            rTaskData.m_func = nullptr;
+        }
+    });
+
+    // Clear tags
     for (osp::TaskTags::Tag const tag : std::exchange(rSession.m_tags, {}))
     {
         if (tag != lgrn::id_null<osp::TaskTags::Tag>())
@@ -359,15 +377,15 @@ void start_magnum_async()
 
         auto &rDataIds = g_magnum.m_dataIds;
         rDataIds.resize(3);
-        osp::main_reserve(g_mainData, 0, std::begin(rDataIds), std::end(rDataIds));
+        osp::top_reserve(g_appTopData, 0, std::begin(rDataIds), std::end(rDataIds));
         auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(rDataIds);
-        g_magnum.m_tags.resize(3);
+        g_magnum.m_tags.resize(4);
         g_tasks.m_tags.create(std::begin(g_magnum.m_tags), std::end(g_magnum.m_tags));
 
         // Order-dependent; ActiveApplication construction starts OpenGL context
-        auto &rUserInput    = osp::main_emplace<osp::input::UserInputHandler>(g_mainData, idUserInput, 12);
-        auto &rActiveApp    = osp::main_emplace<ActiveApplication>(g_mainData, idActiveApp, ActiveApplication::Arguments{g_argc, g_argv}, rUserInput);
-        auto &rRenderGl     = osp::main_emplace<osp::active::RenderGL>(g_mainData, idRenderGl);
+        auto &rUserInput    = osp::top_emplace<osp::input::UserInputHandler>(g_appTopData, idUserInput, 12);
+        auto &rActiveApp    = osp::top_emplace<ActiveApplication>(g_appTopData, idActiveApp, ActiveApplication::Arguments{g_argc, g_argv}, rUserInput);
+        auto &rRenderGl     = osp::top_emplace<osp::active::RenderGL>(g_appTopData, idRenderGl);
 
         // Configure the controls
         config_controls(rUserInput);
@@ -378,7 +396,7 @@ void start_magnum_async()
         rActiveApp.set_on_destruct([&rRenderGl, idRenderGl = idRenderGl] ()
         {
             osp::active::SysRenderGL::clear_resource_owners(rRenderGl, get_resources());
-            g_mainData[std::size_t(idRenderGl)].reset();
+            g_appTopData[std::size_t(idRenderGl)].reset();
         });
 
         // Setup scene-specific renderer
@@ -401,7 +419,7 @@ void setup_common_scene()
 {
     MainView mainView
     {
-        .m_rMainData    = g_mainData,
+        .m_topData    = g_appTopData,
         .m_rTasks       = g_tasks,
         .m_rTaskData    = g_taskData,
         .m_resourcesId  = g_application.m_dataIds[0]
@@ -409,69 +427,38 @@ void setup_common_scene()
 
     g_scene.m_dataIds.clear();
     g_scene.m_dataIds.resize(24);
-    osp::main_reserve(g_mainData, 0, std::begin(g_scene.m_dataIds), std::end(g_scene.m_dataIds));
+    osp::top_reserve(g_appTopData, 0, std::begin(g_scene.m_dataIds), std::end(g_scene.m_dataIds));
+
+    g_scene.m_tags.resize(16);
+    g_tasks.m_tags.create(std::begin(g_scene.m_tags), std::end(g_scene.m_tags));
 
     SCENE_T::setup_scene(mainView, g_defaultPkg, g_scene);
-
 
     // Renderer and draw function is created when g_appSetup is invoked
     g_appSetup = [mainView] () mutable
     {
         auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(g_magnum.m_dataIds);
-        auto &rActiveApp = osp::main_get<ActiveApplication>(g_mainData, idActiveApp);
+        auto &rActiveApp = osp::top_get<ActiveApplication>(g_appTopData, idActiveApp);
 
         auto &rDataIds = g_sceneRender.m_dataIds;
         rDataIds.resize(16);
-        osp::main_reserve(g_mainData, 0, std::begin(rDataIds), std::end(rDataIds));
+        osp::top_reserve(g_appTopData, 0, std::begin(rDataIds), std::end(rDataIds));
 
         g_sceneRender.m_tags.resize(16);
         g_tasks.m_tags.create(std::begin(g_sceneRender.m_tags), std::end(g_sceneRender.m_tags));
 
         SCENE_T::setup_renderer_gl(mainView, g_application, g_scene, g_magnum, g_sceneRender);
 
-        g_exec.m_tagIncompleteCounts  .resize(g_tasks.m_tags.capacity(), 0);
-        g_exec.m_tagRunningCounts     .resize(g_tasks.m_tags.capacity(), 0);
-        g_exec.m_taskQueuedCounts     .resize(g_tasks.m_tasks.capacity(), 0);
+        auto const [tgUpdRender, tgUpdInputs, tgUsesGL] = osp::unpack<3>(g_magnum.m_tags);
+        auto const [tgUpdScene, tgUpdTime, tgUpdSync, tgUpdResync] = osp::unpack<4>(g_scene.m_tags);
 
-        rActiveApp.set_on_draw( [] (ActiveApplication& rApp, float delta)
+        osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec, Corrade::Containers::arrayView({tgUpdSync, tgUpdResync}));
+
+        std::vector<osp::TaskTags::Tag> tags = {tgUpdScene, tgUpdTime, tgUpdSync, tgUpdRender, tgUpdInputs};
+
+        rActiveApp.set_on_draw( [tags = std::move(tags)] (ActiveApplication& rApp, float delta)
         {
-            auto const [tgUpdRender, tgUpdInputs, tgUpdSync] = osp::unpack<3>(g_magnum.m_tags);
-            std::vector<uint64_t> tagsToRun(g_tasks.m_tags.vec().size());
-            osp::to_bitspan({tgUpdRender, tgUpdInputs}, tagsToRun);
-            osp::task_enqueue(g_tasks, g_exec, tagsToRun);
-
-            std::vector<entt::any> dataRefs;
-            osp::WorkerContext context;
-
-            // Run until there's no tasks left to run
-            while (true)
-            {
-                std::vector<uint64_t> tasksToRun(g_tasks.m_tasks.vec().size());
-                task_list_available(g_tasks, g_exec, tasksToRun);
-                auto const tasksToRunBits = lgrn::bit_view(tasksToRun);
-                unsigned int const availableCount = tasksToRunBits.count();
-
-                if (availableCount == 0)
-                {
-                    break;
-                }
-
-                // Choose a random available task
-                auto const task = osp::TaskTags::Task(*tasksToRunBits.ones().begin());
-
-                task_start(g_tasks, g_exec, task);
-
-                osp::MainTask &rMainTask = g_taskData.m_taskData.at(std::size_t(task));
-                dataRefs.resize(rMainTask.m_dataUsed.size());
-                for (int i = 0; i < rMainTask.m_dataUsed.size(); ++i)
-                {
-                    dataRefs.at(i) = g_mainData.at(rMainTask.m_dataUsed[i]).as_ref();
-                }
-
-                rMainTask.m_func(context, dataRefs);
-
-                task_finish(g_tasks, g_exec, task);
-            }
+            osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec, tags);
         });
     };
 }
@@ -498,9 +485,9 @@ void load_a_bunch_of_stuff()
                                 lgrn::id_null<osp::TaskTags::Tag>());
     g_tasks.m_tagLimits.resize(g_tasks.m_tags.capacity());
 
-    g_application.m_dataIds = { osp::main_reserve(g_mainData) };
+    g_application.m_dataIds = { osp::top_reserve(g_appTopData) };
 
-    auto &rResources = osp::main_emplace<osp::Resources>(g_mainData, g_application.m_dataIds[0]);
+    auto &rResources = osp::top_emplace<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
 
     rResources.resize_types(osp::ResTypeIdReg_t::size());
 
@@ -555,7 +542,7 @@ using each_res_id_t = void(*)(osp::ResId);
 
 static void resource_for_each_type(osp::ResTypeId const type, each_res_id_t const do_thing)
 {
-    auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_application.m_dataIds[0]);
+    auto &rResources = osp::top_get<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
     lgrn::IdRegistry<osp::ResId> const &rReg = rResources.ids(type);
     for (std::size_t i = 0; i < rReg.capacity(); ++i)
     {
@@ -574,7 +561,7 @@ void clear_resource_owners()
     // their associated image data
     resource_for_each_type(gc_texture, [] (osp::ResId const id)
     {
-        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_application.m_dataIds[0]);
+        auto &rResources = osp::top_get<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
 
         auto * const pData = rResources
                 .data_try_get<osp::TextureImgSource>(gc_texture, id);
@@ -587,7 +574,7 @@ void clear_resource_owners()
     // Importer data own a lot of other resources
     resource_for_each_type(gc_importer, [] (osp::ResId const id)
     {
-        auto &rResources = osp::main_get<osp::Resources>(g_mainData, g_application.m_dataIds[0]);
+        auto &rResources = osp::top_get<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
 
         auto * const pData = rResources
                 .data_try_get<osp::ImporterData>(gc_importer, id);

@@ -25,30 +25,11 @@
 #pragma once
 
 #include "tasks.h"
-#include "worker.h"
-
-#include <vector>
+#include "top_tasks.h"
 
 namespace osp
 {
 
-struct MainTask
-{
-    std::vector<MainDataId> m_dataUsed;
-    MainTaskFunc_t m_func;
-};
+void top_run_blocking(TaskTags& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec, ArrayView<TaskTags::Tag const> tags);
 
-inline void task_data(TaskDataVec<MainTask> &rData, TaskTags::Task const task, std::initializer_list<MainDataId> dataUsed, MainTaskFunc_t func)
-{
-    rData.m_taskData.resize(
-            std::max(rData.m_taskData.size(), std::size_t(task) + 1));
-    auto &rMainTask = rData.m_taskData[std::size_t(task)];
-    rMainTask.m_dataUsed = dataUsed;
-    rMainTask.m_func = func;
-}
-
-using MainData_t = std::vector<entt::any>;
-
-using MainTaskDataVec_t = TaskDataVec<MainTask>;
-
-} // namespace osp
+} // namespace testapp

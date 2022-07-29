@@ -24,8 +24,6 @@
  */
 #include "scenarios.h"
 #include "scene_physics.h"
-#include "common_scene.h"
-#include "common_renderer_gl.h"
 #include "CameraController.h"
 
 #include <osp/Active/basic.h>
@@ -35,31 +33,39 @@
 #include <osp/Active/SysHierarchy.h>
 
 #include <osp/tasks/builder.h>
-#include <osp/tasks/worker_utils.h>
+#include <osp/tasks/top_utils.h>
 
 #include <osp/Resource/resources.h>
 
 #include <osp/unpack.h>
-
-#include <Magnum/GL/DefaultFramebuffer.h>
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
 #include <newtondynamics_physics/ospnewton.h>
 #include <newtondynamics_physics/SysNewton.h>
 
+// TODO: move to renderer
+
+#include <Magnum/GL/DefaultFramebuffer.h>
+#include <osp/Active/SysRender.h>
+#include <osp/Active/opengl/SysRenderGL.h>
+#include <osp/Shaders/MeshVisualizer.h>
+#include <osp/Shaders/Flat.h>
+#include <osp/Shaders/Phong.h>
+
+
 using namespace osp::active;
 using ospnewton::ACtxNwtWorld;
 using osp::input::UserInputHandler;
 using osp::phys::EShape;
-using osp::MainDataIds_t;
-using osp::MainTaskStatus;
+using osp::TopDataIds_t;
+using osp::TopTaskStatus;
 using osp::Vector3;
 using osp::Matrix3;
 using osp::Matrix4;
 
-using osp::main_emplace;
-using osp::main_get;
+using osp::top_emplace;
+using osp::top_get;
 using osp::wrap_args;
 
 // for the 0xrrggbb_rgbf and angle literals
@@ -99,26 +105,66 @@ struct PhysicsTestData
 
 void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session const& sceneOut)
 {
-    auto &rResources = osp::main_get<osp::Resources>(mainView.m_rMainData, mainView.m_resourcesId);
-    auto &rMainData = mainView.m_rMainData;
+    auto &rResources = osp::top_get<osp::Resources>(mainView.m_topData, mainView.m_resourcesId);
+    auto &rTopData = mainView.m_topData;
 
-    // Add required scene data. This populates rMainData
+    // Add required scene data. This populates rTopData
 
     auto const [idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats,
-                idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest]
-               = osp::unpack<11>(sceneOut.m_dataIds);
+                idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest,
+                idPhong, idPhongDirty, idVisual, idVisualDirty]
+               = osp::unpack<15>(sceneOut.m_dataIds);
 
-    auto &rActiveIds    = main_emplace< ActiveReg_t >           (rMainData, idActiveIds);
-    auto &rBasic        = main_emplace< ACtxBasic >             (rMainData, idBasic);
-    auto &rDrawing      = main_emplace< ACtxDrawing >           (rMainData, idDrawing);
-    auto &rDrawingRes   = main_emplace< ACtxDrawingRes >        (rMainData, idDrawingRes);
-    auto &rComMats      = main_emplace< CommonMaterials >       (rMainData, idComMats);
-    auto &rDelete       = main_emplace< std::vector<ActiveEnt> >(rMainData, idDelete);
-    auto &rDeleteTotal  = main_emplace< std::vector<ActiveEnt> >(rMainData, idDeleteTotal);
-    auto &rTPhys        = main_emplace< ACtxTestPhys >          (rMainData, idTPhys);
-    auto &rNMesh        = main_emplace< NamedMeshes >           (rMainData, idNMeshId);
-    auto &rNwt          = main_emplace< ACtxNwtWorld >          (rMainData, idNwt, gc_threadCount);
-    auto &rTest         = main_emplace< PhysicsTestData >       (rMainData, idTest);
+    auto &rActiveIds    = top_emplace< ActiveReg_t >    (rTopData, idActiveIds);
+    auto &rBasic        = top_emplace< ACtxBasic >      (rTopData, idBasic);
+    auto &rDrawing      = top_emplace< ACtxDrawing >    (rTopData, idDrawing);
+    auto &rDrawingRes   = top_emplace< ACtxDrawingRes > (rTopData, idDrawingRes);
+    auto &rDelete       = top_emplace< EntVector_t >    (rTopData, idDelete);
+    auto &rDeleteTotal  = top_emplace< EntVector_t >    (rTopData, idDeleteTotal);
+    auto &rTPhys        = top_emplace< ACtxTestPhys >   (rTopData, idTPhys);
+    auto &rNMesh        = top_emplace< NamedMeshes >    (rTopData, idNMeshId);
+    auto &rNwt          = top_emplace< ACtxNwtWorld >   (rTopData, idNwt, gc_threadCount);
+    auto &rTest         = top_emplace< PhysicsTestData >(rTopData, idTest);
+    auto &rPhong        = top_emplace< EntSet_t >       (rTopData, idPhong);
+    auto &rPhongDirty   = top_emplace< EntVector_t >    (rTopData, idPhongDirty);
+    auto &rVisual       = top_emplace< EntSet_t >       (rTopData, idVisual);
+    auto &rVisualDirty  = top_emplace< EntVector_t >    (rTopData, idVisualDirty);
+
+    auto builder = osp::TaskBuilder{mainView.m_rTasks, mainView.m_rTaskData};
+
+
+    auto const [tgUpdScene, tgUpdTime, tgUpdSync, tgUpdResync,
+                tgStartVisualDirty, tgFactorVisualDirty, tgNeedVisualDirty]
+               = osp::unpack<7>(sceneOut.m_tags);
+
+    builder.tag(tgFactorVisualDirty)    .depend_on({tgStartVisualDirty});
+    builder.tag(tgNeedVisualDirty)      .depend_on({tgStartVisualDirty, tgFactorVisualDirty});
+
+    builder.task().assign({tgUpdScene, tgStartVisualDirty}).data(
+            TopDataIds_t{            idVisualDirty},
+            wrap_args([] (EntVector_t& rDirty) noexcept
+    {
+        rDirty.clear();
+    }));
+
+    builder.task().assign({tgUpdResync}).data(
+            TopDataIds_t{             idDrawing},
+            wrap_args([] (ACtxDrawing& rDrawing) noexcept
+    {
+        SysRender::set_dirty_all(rDrawing);
+    }));
+
+    static auto const resync_material = wrap_args([] (EntSet_t const& hasMaterial, EntVector_t& rDirty) noexcept
+    {
+        for (std::size_t const entInt : hasMaterial.ones())
+        {
+            rDirty.push_back(ActiveEnt(entInt));
+        }
+    });
+
+    builder.task().assign({tgUpdResync}).data(TopDataIds_t{idPhong, idPhongDirty}, resync_material);
+    builder.task().assign({tgUpdResync}).data(TopDataIds_t{idVisual, idVisualDirty}, resync_material);
+
 
     // Setup the scene
 
@@ -145,7 +191,7 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session c
     rBasic.m_hierarchy.emplace(rBasic.m_hierRoot);
 
     // Create camera entity
-    ActiveEnt camEnt = rActiveIds.create();
+    ActiveEnt const camEnt = rActiveIds.create();
 
     // Create camera transform and draw transform
     ACompTransform &rCamTf = rBasic.m_transform.emplace(camEnt);
@@ -181,10 +227,9 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session c
     rDrawing.m_meshDirty.push_back(floorMeshEnt);
 
     // Add mesh visualizer material to floor mesh entity
-    //MaterialData &rMatCommon
-    //        = rDrawing.m_materials[rComMats.m_matVisualizer];
-    //rMatCommon.m_comp.emplace(floorMeshEnt);
-    //rMatCommon.m_added.push_back(floorMeshEnt);
+    rVisual.ints().resize(rActiveIds.vec().capacity());
+    rVisual.set(std::size_t(floorMeshEnt));
+    rVisualDirty.push_back(floorMeshEnt);
 
     // Add transform, draw transform, opaque, and visible entity
     rBasic.m_transform.emplace(
@@ -204,7 +249,7 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session c
     Matrix4 const floorTf = Matrix4::scaling(sc_floorSize)
                           * Matrix4::translation(sc_floorPos);
     add_solid_quick({rActiveIds, rBasic, rTPhys, rNMesh, rDrawing}, floorRootEnt, EShape::Box, floorTf,
-                    rComMats.m_matCommon, 0.0f);
+                    0, 0.0f);
 
     // Make floor entity a (non-dynamic) rigid body
     rTPhys.m_physics.m_hasColliders.emplace(floorRootEnt);
@@ -212,147 +257,6 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session c
 
 }
 
-static void update_test_scene_delete(CommonTestScene &rScene)
-{
-    using namespace osp::active;
-
-    /*
-    auto &rScnTest  = rScene.get<PhysicsTestData>();
-    auto &rScnPhys  = rScene.get<PhysicsData>();
-    auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
-
-    rScene.update_hierarchy_delete();
-
-    auto const& first = std::cbegin(rScene.m_deleteTotal);
-    auto const& last = std::cend(rScene.m_deleteTotal);
-
-    // Delete components of total entities to delete
-    SysPhysics::update_delete_phys      (rScnPhys.m_physics,    first, last);
-    SysPhysics::update_delete_shapes    (rScnPhys.m_physics,    first, last);
-    SysPhysics::update_delete_hier_body (rScnPhys.m_hierBody,   first, last);
-    ospnewton::SysNewton::update_delete (rScnNwt,               first, last);
-
-    rScnTest.m_hasGravity         .remove(first, last);
-    rScnTest.m_removeOutOfBounds  .remove(first, last);
-
-    rScene.update_delete();
-    */
-
-}
-
-#if 0
-/**
- * @brief Update CommonTestScene containing physics test
- *
- * @param rScene [ref] scene to update
- */
-static void update_test_scene(CommonTestScene& rScene, float const delta)
-{
-    using namespace osp::active;
-    using namespace ospnewton;
-    using Corrade::Containers::ArrayView;
-
-    auto &rScnTest  = rScene.get<PhysicsTestData>();
-    auto &rScnPhys  = rScene.get<PhysicsData>();
-    auto &rScnNwt   = rScene.get<ospnewton::ACtxNwtWorld>();
-
-    // Clear all drawing-related dirty flags
-    SysRender::clear_dirty_all(rScene.m_drawing);
-
-    // Create boxes every 2 seconds
-    rScnTest.m_boxTimer += delta;
-    if (rScnTest.m_boxTimer >= 2.0f)
-    {
-        rScnTest.m_boxTimer -= 2.0f;
-
-        rScnTest.m_toThrow.emplace_back(PhysicsTestData::ThrowShape{
-                Vector3{10.0f, 30.0f, 0.0f},  // position
-                Vector3{0.0f}, // velocity
-                Vector3{2.0f, 1.0f, 2.0f}, // size
-                1.0f, // mass
-                EShape::Box}); // shape
-    }
-
-    // Create cylinders every 2 seconds
-    rScnTest.m_cylinderTimer += delta;
-    if (rScnTest.m_cylinderTimer >= 2.0f)
-    {
-        rScnTest.m_cylinderTimer -= 2.0f;
-
-        rScnTest.m_toThrow.emplace_back(PhysicsTestData::ThrowShape{
-                Vector3{-10.0f, 30.0f, 0.0f},  // position
-                Vector3{0.0f}, // velocity
-                Vector3{1.0f, 1.5f, 1.0f}, // size
-                1.0f, // mass
-                EShape::Cylinder}); // shape
-    }
-
-    // Gravity System, applies a 9.81N force downwards (-Y) for select entities
-    for (ActiveEnt const ent : rScnTest.m_hasGravity)
-    {
-        acomp_storage_t<ACompPhysNetForce> &rNetForce
-                = rScnPhys.m_physIn.m_physNetForce;
-        ACompPhysNetForce &rEntNetForce = rNetForce.contains(ent)
-                                        ? rNetForce.get(ent)
-                                        : rNetForce.emplace(ent);
-
-        rEntNetForce.y() -= 9.81f;
-    }
-
-    // Physics update
-
-    SysNewton::update_colliders(
-            rScnPhys.m_physics, rScnNwt,
-            std::exchange(rScnPhys.m_physIn.m_colliderDirty, {}));
-
-    auto const physIn = ArrayView<ACtxPhysInputs>(&rScnPhys.m_physIn, 1);
-    SysNewton::update_world(
-            rScnPhys.m_physics, rScnNwt, delta, physIn,
-            rScene.m_basic.m_hierarchy,
-            rScene.m_basic.m_transform, rScene.m_basic.m_transformControlled,
-            rScene.m_basic.m_transformMutable);
-
-    // Start recording new elements to delete
-    rScene.m_delete.clear();
-
-    // Check position of all entities with the out-of-bounds component
-    // Delete the ones that go out of bounds
-    for (ActiveEnt const ent : rScnTest.m_removeOutOfBounds)
-    {
-        ACompTransform const &entTf = rScene.m_basic.m_transform.get(ent);
-        if (entTf.m_transform.translation().y() < -10)
-        {
-            rScene.m_delete.push_back(ent);
-        }
-    }
-
-    // Delete entities in m_delete, their descendants, and components
-    update_test_scene_delete(rScene);
-
-    // Note: Prefer creating entities near the end of the update after physics
-    //       and delete systems. This allows their initial state to be rendered
-    //       in a frame and avoids some possible synchronization issues from
-    //       when entities are created and deleted right away.
-
-    // Shape Thrower system, consumes rScene.m_toThrow and creates shapes
-    for (PhysicsTestData::ThrowShape const &rThrow : std::exchange(rScnTest.m_toThrow, {}))
-    {
-        ActiveEnt shapeEnt = add_rigid_body_quick(
-                rScene, rThrow.m_position, rThrow.m_velocity, rThrow.m_mass,
-                rThrow.m_shape, rThrow.m_size);
-
-        // Make gravity affect entity
-        rScnTest.m_hasGravity.emplace(shapeEnt);
-
-        // Remove when it goes out of bounds
-        rScnTest.m_removeOutOfBounds.emplace(shapeEnt);
-    }
-
-    // Sort hierarchy, required by renderer
-    SysHierarchy::sort(rScene.m_basic.m_hierarchy);
-}
-
-#endif
 
 //-----------------------------------------------------------------------------
 
@@ -374,22 +278,21 @@ void PhysicsTest::setup_renderer_gl(
 {
     using namespace osp::shader;
 
-
-    auto &rMainData = mainView.m_rMainData;
+    auto &rTopData = mainView.m_topData;
 
     auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(magnumIn.m_dataIds);
-    auto &rRenderGl     = osp::main_get<RenderGL>(rMainData, idRenderGl);
-    auto &rUserInput    = osp::main_get<UserInputHandler>(rMainData, idUserInput);
+    auto &rRenderGl     = osp::top_get<RenderGL>(rTopData, idRenderGl);
+    auto &rUserInput    = osp::top_get<UserInputHandler>(rTopData, idUserInput);
 
-    auto const [idScnRender, idGroups, idDrawPhong, idDrawVisual, idCamEnt, idCamCtrl, idControls]
+    auto const [idScnRender, idGroupFwd, idDrawPhong, idDrawVisual, idCamEnt, idCamCtrl, idControls]
             = osp::unpack<7>(sceneRenderOut.m_dataIds);
-    auto &rScnRender    = main_emplace< ACtxSceneRenderGL >     (rMainData, idScnRender);
-    auto &rGroups       = main_emplace< ACtxRenderGroups >      (rMainData, idGroups);
-    auto &rDrawPhong    = main_emplace< ACtxDrawPhong >         (rMainData, idDrawPhong);
-    auto &rDrawVisual   = main_emplace< ACtxDrawMeshVisualizer >(rMainData, idDrawVisual);
-    auto &rCamEnt       = main_emplace< ActiveEnt >             (rMainData, idCamEnt);
-    auto &rCamCtrl      = main_emplace< ACtxCameraController >  (rMainData, idCamCtrl, rUserInput);
-    auto &rControls     = main_emplace< PhysicsTestControls  >  (rMainData, idControls, rUserInput);
+    auto &rScnRender    = top_emplace< ACtxSceneRenderGL >     (rTopData, idScnRender);
+    auto &rGroupFwd     = top_emplace< RenderGroup >           (rTopData, idGroupFwd);
+    auto &rDrawPhong    = top_emplace< ACtxDrawPhong >         (rTopData, idDrawPhong);
+    auto &rDrawVisual   = top_emplace< ACtxDrawMeshVisualizer >(rTopData, idDrawVisual);
+    auto &rCamEnt       = top_emplace< ActiveEnt >             (rTopData, idCamEnt);
+    auto &rCamCtrl      = top_emplace< ACtxCameraController >  (rTopData, idCamCtrl, rUserInput);
+    auto &rControls     = top_emplace< PhysicsTestControls  >  (rTopData, idControls, rUserInput);
 
     // Setup Phong shaders
     auto const texturedFlags        = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask | Phong::Flag::AmbientTexture;
@@ -401,15 +304,12 @@ void PhysicsTest::setup_renderer_gl(
     rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Flag::Wireframe };
     rDrawVisual.assign_pointers(rScnRender, rRenderGl);
 
-    // Create render group for forward opaque pass
-    rGroups.m_groups.emplace("fwd_opaque", RenderGroup{});
-
     [[maybe_unused]]
     auto const [idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats,
-                idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest]
-               = osp::unpack<11>(sceneIn.m_dataIds);
-
-    auto &rBasic = main_get< ACtxBasic >(rMainData, idBasic);
+                idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest,
+                idPhong, idPhongDirty, idVisual, idVisualDirty]
+               = osp::unpack<15>(sceneIn.m_dataIds);
+    auto &rBasic = top_get< ACtxBasic >(rTopData, idBasic);
 
     auto const [idResources] = osp::unpack<1>(appIn.m_dataIds);
 
@@ -425,75 +325,108 @@ void PhysicsTest::setup_renderer_gl(
 
     auto builder = osp::TaskBuilder{mainView.m_rTasks, mainView.m_rTaskData};
 
-    auto const [tgUpdRender, tgUpdInputs, tgUpdSync, tgUsesGL] = osp::unpack<4>(magnumIn.m_tags);
+    auto const [tgUpdRender, tgUpdInputs, tgUsesGL] = osp::unpack<3>(magnumIn.m_tags);
 
-    auto const [tgCompileMesh, tgCompileTex, tgNeedMesh, tgNeedTex] = osp::unpack<4>(sceneRenderOut.m_tags);
+    auto const [tgUpdScene, tgUpdTime, tgUpdSync,
+                tgStartVisualDirty, tgFactorVisualDirty, tgNeedVisualDirty]
+               = osp::unpack<6>(sceneIn.m_tags);
+
+    auto const [tgCompileMesh,          tgNeedMesh,
+                tgCompileTex,           tgNeedTex,
+                tgFactorEntTex,         tgNeedEntTex,
+                tgFactorEntMesh,        tgNeedEntMesh,
+                tgFactorGroupFwd,       tgNeedGroupFwd,
+                tgFactorDrawTransform,  tgNeedDrawTransform]
+                = osp::unpack<12>(sceneRenderOut.m_tags);
+
+    builder.tag(tgNeedMesh)             .depend_on({tgCompileMesh});
+    builder.tag(tgNeedTex)              .depend_on({tgCompileTex});
+    builder.tag(tgNeedEntTex)           .depend_on({tgFactorEntTex});
+    builder.tag(tgNeedEntMesh)          .depend_on({tgFactorEntMesh});
+    builder.tag(tgNeedGroupFwd)         .depend_on({tgFactorGroupFwd});
+    builder.tag(tgNeedDrawTransform)    .depend_on({tgFactorDrawTransform});
+
+
+    builder.task().assign({tgUpdInputs}).data(
+            TopDataIds_t{           idBasic,                      idCamCtrl,                idCamEnt},
+            wrap_args([] (ACtxBasic& rBasic, ACtxCameraController& rCamCtrl, ActiveEnt const camEnt) noexcept
+    {
+                    float delta = 1.0f/60.0f;
+        SysCameraController::update_view(rCamCtrl,
+                rBasic.m_transform.get(camEnt), delta);
+        SysCameraController::update_move(
+                rCamCtrl,
+                rBasic.m_transform.get(camEnt),
+                delta, true);
+    }));
 
     builder.task().assign({tgUpdSync, tgUsesGL, tgCompileMesh, tgCompileTex}).data(
-            MainDataIds_t{idDrawingRes, idResources, idRenderGl},
-            wrap_args([] (ACtxDrawingRes& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
+            TopDataIds_t{                      idDrawingRes,                idResources,          idRenderGl},
+            wrap_args([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::sync_scene_resources(rDrawingRes, rResources, rRenderGl);
     }));
 
-    builder.task().assign({tgUpdSync, tgNeedTex}).data(
-            MainDataIds_t{idDrawing, idResources, idRenderGl},
-            wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, osp::Resources& rResources, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+    builder.task().assign({tgUpdSync, tgNeedTex, tgFactorEntTex}).data(
+            TopDataIds_t{             idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl},
+            wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::assign_textures(rDrawing.m_diffuseTex, rDrawingRes.m_texToRes, rDrawing.m_diffuseDirty, rScnRender.m_diffuseTexId, rRenderGl);
     }));
 
-    builder.task().assign({tgUpdSync, tgNeedMesh}).data(
-            MainDataIds_t{idDrawing, idResources, idRenderGl},
-            wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, osp::Resources& rResources, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+    builder.task().assign({tgUpdSync, tgNeedMesh, tgFactorEntMesh}).data(
+            TopDataIds_t{             idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl},
+            wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::assign_meshes(rDrawing.m_mesh, rDrawingRes.m_meshToRes, rDrawing.m_meshDirty, rScnRender.m_meshId, rRenderGl);
     }));
 
-
-
-
-    /*
-    rRenderer.m_onDraw = [] (
-            CommonSceneRendererGL& rRenderer, CommonTestScene& rScene,
-            ActiveApplication& rApp, float delta) noexcept
+    builder.task().assign({tgUpdSync, tgNeedVisualDirty, tgFactorGroupFwd}).data(
+            TopDataIds_t{                   idVisualDirty,          idVisual,               idGroupFwd,                     idDrawVisual},
+            wrap_args([] (EntVector_t const& rDirty, EntSet_t const& rMaterial, RenderGroup& rGroup, ACtxDrawMeshVisualizer& rVisualizer) noexcept
     {
-        auto &rScnTest = rScene.get<PhysicsTestData>();
-        auto &rControls = rRenderer.get<PhysicsTestControls>();
+        sync_visualizer(std::cbegin(rDirty), std::cend(rDirty), rMaterial, rGroup.m_entities, rVisualizer);
+    }));
 
-        // Throw a sphere when the throw button is pressed
-        if (rControls.m_camCtrl.m_controls.button_held(rControls.m_btnThrow))
-        {
-            Matrix4 const &camTf = rScene.m_basic.m_transform.get(rRenderer.m_camera).m_transform;
-            float const speed = 120;
-            float const dist = 5.0f; // Distance from camera to spawn spheres
-            rScnTest.m_toThrow.emplace_back(PhysicsTestData::ThrowShape{
-                    camTf.translation() - camTf.backward() * dist, // position
-                    -camTf.backward() * speed, // velocity
-                    Vector3{1.0f}, // size (radius)
-                    100.0f, // mass
-                    EShape::Sphere}); // shape
-        }
+    // TODO: phong shader
 
-        // Update the scene directly in the drawing function :)
-        update_test_scene(rScene, gc_physTimestep);
+    builder.task().assign({tgUpdSync, tgNeedVisualDirty, tgFactorDrawTransform}).data(
+            TopDataIds_t{                 idBasic,                   idVisualDirty,                   idScnRender},
+            wrap_args([] (ACtxBasic const& rBasic, EntVector_t const& rVisualDirty, ACtxSceneRenderGL& rScnRender) noexcept
+    {
+        SysRender::assure_draw_transforms(rBasic.m_hierarchy, rScnRender.m_drawTransform, std::cbegin(rVisualDirty), std::cend(rVisualDirty));
+        SysRender::update_draw_transforms(rBasic.m_hierarchy, rBasic.m_transform, rScnRender.m_drawTransform);
+    }));
 
-        // Rotate and move the camera based on user inputs
-        SysCameraController::update_view(
-                rControls.m_camCtrl,
-                rScene.m_basic.m_transform.get(rRenderer.m_camera), delta);
-        SysCameraController::update_move(
-                rControls.m_camCtrl,
-                rScene.m_basic.m_transform.get(rRenderer.m_camera),
-                delta, true);
+    builder.task().assign({tgUpdRender, tgUsesGL, tgFactorEntTex, tgFactorEntMesh, tgNeedDrawTransform, tgNeedGroupFwd}).data(
+            TopDataIds_t{                 idBasic,                   idDrawing,                   idScnRender,          idRenderGl,                   idGroupFwd,                idCamEnt},
+            wrap_args([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, ActiveEnt const camEnt) noexcept
+    {
+        using Magnum::GL::Framebuffer;
+        using Magnum::GL::FramebufferClear;
+        using Magnum::GL::Texture2D;
 
-        rRenderer.update_delete(rScene.m_deleteTotal);
-        rRenderer.sync(rApp, rScene);
-        rRenderer.prepare_fbo(rApp);
-        rRenderer.draw_entities(rApp, rScene);
-        rRenderer.display(rApp);
-    };
-    */
+        // Bind offscreen FBO
+        Framebuffer &rFbo = rRenderGl.m_fbo;
+        rFbo.bind();
+
+        // Clear it
+        rFbo.clear( FramebufferClear::Color | FramebufferClear::Depth
+                    | FramebufferClear::Stencil);
+
+        ACompCamera const &rCamera = rBasic.m_camera.get(camEnt);
+        ACompDrawTransform const &cameraDrawTf
+                = rScnRender.m_drawTransform.get(camEnt);
+        ViewProjMatrix viewProj{
+                cameraDrawTf.m_transformWorld.inverted(),
+                rCamera.calculate_projection()};
+
+        // Forward Render fwd_opaque group to FBO
+        SysRenderGL::render_opaque(rGroupFwd, rDrawing.m_visible, viewProj);
+
+        Texture2D &rFboColor = rRenderGl.m_texGl.get(rRenderGl.m_fboColor);
+        SysRenderGL::display_texture(rRenderGl, rFboColor);
+    }));
 }
 
 } // namespace testapp::physicstest

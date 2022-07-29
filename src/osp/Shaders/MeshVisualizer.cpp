@@ -78,14 +78,3 @@ void shader::draw_ent_visualizer(
     }
 }
 
-void shader::assign_visualizer(
-        RenderGroup::ArrayView_t entities, RenderGroup::Storage_t &rStorage,
-        ACtxDrawMeshVisualizer &rData)
-{
-    for (ActiveEnt const ent : entities)
-    {
-        rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
-    }
-}
-
-

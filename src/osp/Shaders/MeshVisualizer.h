@@ -57,10 +57,38 @@ void draw_ent_visualizer(
         active::ViewProjMatrix const& viewProj,
         active::EntityToDraw::UserData_t userData) noexcept;
 
-
-void assign_visualizer(
-        active::RenderGroup::ArrayView_t entities,
+template<typename ITA_T, typename ITB_T>
+void sync_visualizer(
+        ITA_T dirtyFirst, ITB_T const& dirtyLast,
+        active::EntSet_t const& hasMaterial,
         active::RenderGroup::Storage_t& rStorage,
-        ACtxDrawMeshVisualizer &rData);
+        ACtxDrawMeshVisualizer &rData)
+{
+    using namespace active;
+
+    while (dirtyFirst != dirtyLast)
+    {
+        ActiveEnt const ent = *dirtyFirst;
+        bool alreadyAdded = rStorage.contains(ent);
+        if (hasMaterial.test(std::size_t(ent)))
+        {
+            if ( ! alreadyAdded)
+            {
+                rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
+            }
+        }
+        else
+        {
+            if (alreadyAdded)
+            {
+                rStorage.erase(ent);
+            }
+        }
+
+        std::advance(dirtyFirst, 1);
+    }
+
+
+}
 
 } // namespace osp::shader
