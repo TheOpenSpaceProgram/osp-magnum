@@ -52,13 +52,15 @@ struct MainView
     osp::ArrayView<entt::any>   m_topData;
     osp::TaskTags&              m_rTasks;
     osp::TopTaskDataVec_t&      m_rTaskData;
-    osp::TopDataId              m_resourcesId;
+    osp::TopDataId              m_idResources;
 };
 
 struct Session
 {
     std::vector<osp::TopDataId> m_dataIds;
     std::vector<osp::TaskTags::Tag> m_tags;
+
+    osp::TaskTags::Tag m_onCleanup{lgrn::id_null<osp::TaskTags::Tag>()};
 };
 
 namespace flight

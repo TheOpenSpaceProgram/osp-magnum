@@ -55,6 +55,7 @@ TEST(Tasks, SingleThreaded)
     tags.m_tagDepends.resize(tags.m_tags.capacity() * tags.m_tagDependsPerTag,
                              lgrn::id_null<TaskTags::Tag>());
     tags.m_tagLimits.resize(tags.m_tags.capacity());
+    tags.m_tagExtern.resize(tags.m_tags.capacity());
 
     TaskDataVec<std::function<void(World&)>> functions;
 
@@ -174,7 +175,7 @@ TEST(Tasks, SingleThreaded)
 
             task_start(tags, exec, task);
             functions.m_taskData[std::size_t(task)](world);
-            task_finish(tags, exec, task);
+            task_finish(tags, exec, task, {});
         }
 
         ASSERT_TRUE(world.m_canvas.contains("Physics Cube"));

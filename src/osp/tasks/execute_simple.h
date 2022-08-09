@@ -94,6 +94,8 @@ bool any_bits_match(BitSpanConst_t lhs, BitSpanConst_t rhs);
  */
 void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t query);
 
+void task_extern_set(ExecutionContext &rExec, TaskTags::Tag const tag, bool value);
+
 /**
  * @brief List all available tasks that are currently allowed to run
  *
@@ -113,12 +115,15 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
 void task_start(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task task);
 
 /**
- * @brief Mark a task as finished in an ExecutionContext
+ * @brief Mark a task as finished in an ExecutionContext, and potentially
+ *        enqueue more tasks if the finished task has enqueue tags
  *
- * @param tags      [in] Tasks and Tags
- * @param rExec     [ref] ExecutionContext to record running tasks
- * @param task      [in] Id of task to finish
+ * @param tags          [in] Tasks and Tags
+ * @param rExec         [ref] ExecutionContext to record running tasks
+ * @param task          [in] Id of task to finish
+ * @param tmpEnqueue    [ref] Temporary bit buffer for tasks to enqueue. Pass
+ *                            empty to disable any enqueues
  */
-void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task task);
+void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task task, BitSpan_t tmpEnqueue);
 
 } // namespace osp
