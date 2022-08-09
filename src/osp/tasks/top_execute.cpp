@@ -48,6 +48,8 @@ void top_run_blocking(TaskTags& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<e
     std::vector<entt::any> dataRefs;
     WorkerContext context;
 
+    std::vector<uint64_t> tmpEnqueue(rTasks.m_tags.vec().size());
+
     // Run until there's no tasks left to run
     while (true)
     {
@@ -73,9 +75,11 @@ void top_run_blocking(TaskTags& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<e
             dataRefs.at(i) = topData[rTopTask.m_dataUsed[i]].as_ref();
         }
 
-        rTopTask.m_func(context, dataRefs);
+        TopTaskStatus const status = rTopTask.m_func(context, dataRefs);
 
-        task_finish(rTasks, rExec, task);
+        BitSpan_t enqueue = (status == TopTaskStatus::Success) ? tmpEnqueue : BitSpan_t{};
+
+        task_finish(rTasks, rExec, task, enqueue);
     }
 }
 

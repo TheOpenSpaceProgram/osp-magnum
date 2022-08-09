@@ -50,6 +50,13 @@ struct TaskTags
     // Limit sets how many tasks using a certain tag can run simultaneously
     std::vector<unsigned int>       m_tagLimits;
 
+    // Enqueues another tag when finished succesfully
+    std::vector<Tag>                m_tagEnqueues;
+
+    // Restricts associated enqueued tasks from running until externally set
+    // Resets once all associated tasks are complete
+    std::vector<uint64_t>           m_tagExtern;
+
     // Bit positions are used to store which tags a task contains
     // partitioned based on tag_ints_per_task(): AAAABBBBCCCCDDDD
     std::vector<uint64_t>           m_taskTags;
@@ -79,6 +86,8 @@ struct ExecutionContext
     std::vector<unsigned int> m_tagIncompleteCounts;
     // Tag counts from running tasks; used for Limits
     std::vector<unsigned int> m_tagRunningCounts;
+    // External tags
+    std::vector<uint64_t> m_tagExternTriggers;
 
     // Number of times each task is queued to run
     std::vector<unsigned int> m_taskQueuedCounts;

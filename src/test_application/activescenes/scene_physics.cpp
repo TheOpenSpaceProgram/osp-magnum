@@ -36,20 +36,6 @@ using namespace osp::active;
 namespace testapp::scenes
 {
 
-//void PhysicsData::cleanup(CommonTestScene& rScene)
-//{
-    //auto &rScnPhys = rScene.get<PhysicsData>();
-
-//    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rScnPhys.m_shapeToMesh, {}))
-//    {
-//        rScene.m_drawing.m_meshRefCounts.ref_release(std::move(rOwner));
-//    }
-
-//    for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rScnPhys.m_namedMeshs, {}))
-//    {
-//        rScene.m_drawing.m_meshRefCounts.ref_release(std::move(rOwner));
-//    }
-//}
 
 ActiveEnt add_solid_quick(
         QuickPhysSceneRef               rScene,

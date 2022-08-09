@@ -134,6 +134,26 @@ public:
             return *this;
         }
 
+        TagRef& set_external(bool value)
+        {
+            auto bitView = lgrn::bit_view(m_rTags.m_tagExtern);
+            if (value)
+            {
+                bitView.set(std::size_t(m_tagId));
+            }
+            else
+            {
+                bitView.reset(std::size_t(m_tagId));
+            }
+            return *this;
+        }
+
+        TagRef& enqueues(TaskTags::Tag enqueueTag)
+        {
+            m_rTags.m_tagEnqueues[std::size_t(m_tagId)] = enqueueTag;
+            return *this;
+        }
+
         TaskTags::Tag const m_tagId;
         TaskTags &m_rTags;
 

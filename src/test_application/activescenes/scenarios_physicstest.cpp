@@ -38,6 +38,7 @@
 #include <osp/Resource/resources.h>
 
 #include <osp/unpack.h>
+#include <osp/logging.h>
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
@@ -58,6 +59,7 @@ using namespace osp::active;
 using ospnewton::ACtxNwtWorld;
 using osp::input::UserInputHandler;
 using osp::phys::EShape;
+using osp::Resources;
 using osp::TopDataIds_t;
 using osp::TopTaskStatus;
 using osp::Vector3;
@@ -68,6 +70,8 @@ using osp::top_emplace;
 using osp::top_get;
 using osp::wrap_args;
 
+using Corrade::Containers::arrayView;
+
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
@@ -77,6 +81,16 @@ namespace testapp::scenes
 constexpr float gc_physTimestep = 1.0 / 60.0f;
 constexpr int gc_threadCount = 4; // note: not yet passed to Newton
 
+struct SpawnShape
+{
+    Vector3 m_position;
+    Vector3 m_velocity;
+    Vector3 m_size;
+    float m_mass;
+    EShape m_shape;
+};
+
+using SpawnerVec_t = std::vector<SpawnShape>;
 
 /**
  * @brief Data used specifically by the physics test scene
@@ -90,57 +104,107 @@ struct PhysicsTestData
     float m_boxTimer{0.0f};
     float m_cylinderTimer{0.0f};
 
-    struct ThrowShape
-    {
-        Vector3 m_position;
-        Vector3 m_velocity;
-        Vector3 m_size;
-        float m_mass;
-        EShape m_shape;
-    };
-
-    // Queue for balls to throw
-    std::vector<ThrowShape> m_toThrow;
 };
 
 void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session const& sceneOut)
 {
-    auto &rResources = osp::top_get<osp::Resources>(mainView.m_topData, mainView.m_resourcesId);
+    auto &idResources = mainView.m_idResources;
+    auto &rResources = top_get<Resources>(mainView.m_topData, idResources);
     auto &rTopData = mainView.m_topData;
 
     // Add required scene data. This populates rTopData
 
     auto const [idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats,
-                idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest,
-                idPhong, idPhongDirty, idVisual, idVisualDirty]
-               = osp::unpack<15>(sceneOut.m_dataIds);
+                idDelEnts, idDelTotal, idTPhys, idNMesh, idNwt, idTest,
+                idPhong, idPhongDirty, idVisual, idVisualDirty,
+                idSpawner, idSpawnerEnts, idGravity, idBounds]
+               = osp::unpack<19>(sceneOut.m_dataIds);
 
     auto &rActiveIds    = top_emplace< ActiveReg_t >    (rTopData, idActiveIds);
     auto &rBasic        = top_emplace< ACtxBasic >      (rTopData, idBasic);
     auto &rDrawing      = top_emplace< ACtxDrawing >    (rTopData, idDrawing);
     auto &rDrawingRes   = top_emplace< ACtxDrawingRes > (rTopData, idDrawingRes);
-    auto &rDelete       = top_emplace< EntVector_t >    (rTopData, idDelete);
-    auto &rDeleteTotal  = top_emplace< EntVector_t >    (rTopData, idDeleteTotal);
+    auto &rDelEnts      = top_emplace< EntVector_t >    (rTopData, idDelEnts);
+    auto &rDelTotal     = top_emplace< EntVector_t >    (rTopData, idDelTotal);
     auto &rTPhys        = top_emplace< ACtxTestPhys >   (rTopData, idTPhys);
-    auto &rNMesh        = top_emplace< NamedMeshes >    (rTopData, idNMeshId);
+    auto &rNMesh        = top_emplace< NamedMeshes >    (rTopData, idNMesh);
     auto &rNwt          = top_emplace< ACtxNwtWorld >   (rTopData, idNwt, gc_threadCount);
     auto &rTest         = top_emplace< PhysicsTestData >(rTopData, idTest);
     auto &rPhong        = top_emplace< EntSet_t >       (rTopData, idPhong);
     auto &rPhongDirty   = top_emplace< EntVector_t >    (rTopData, idPhongDirty);
     auto &rVisual       = top_emplace< EntSet_t >       (rTopData, idVisual);
     auto &rVisualDirty  = top_emplace< EntVector_t >    (rTopData, idVisualDirty);
+    auto &rSpawner      = top_emplace< SpawnerVec_t >   (rTopData, idSpawner);
+    auto &rSpawnerEnts  = top_emplace< EntVector_t >    (rTopData, idSpawnerEnts);
+    auto &rGravity      = top_emplace< EntSet_t >       (rTopData, idGravity);
+    auto &rBounds       = top_emplace< EntSet_t >       (rTopData, idBounds);
 
     auto builder = osp::TaskBuilder{mainView.m_rTasks, mainView.m_rTaskData};
 
+    // Each tag is just 1 bit in a 64-bit int
+    auto const [tgUpdScene, tgUpdTime, tgUpdSync, tgUpdResync, tgUpdCleanup, tgUpdSpawn,
+                tgPrereqActiveIds, tgFactorActiveIds, tgNeedActiveIds, tgUsesActiveIds,
+                tgPrereqHier, tgFactorHier, tgUsesHier, tgFinishHier, tgNeedHier,
+                tgPrereqTransform, tgFactorTransform, tgNeedTransform,
+                tgPrereqMesh, tgFactorMesh, tgNeedMesh,
+                tgPrereqTex, tgFactorTex, tgNeedTex,
+                tgStartMeshDirty, tgFactorMeshDirty, tgNeedMeshDirty,
+                tgStartVisualDirty, tgFactorVisualDirty, tgNeedVisualDirty,
+                tgStartCollideDirty, tgFactorCollideDirty, tgNeedCollideDirty,
+                tgFactorPhysForces, tgNeedPhysForces,
+                tgApplyGravity, tgFactorGravity,
+                tgPrereqPhysMod, tgFactorPhysMod, tgNeedPhysMod,
+                tgProvideCollide, tgNeedCollide,
+                tgStartSpawn, tgFactorSpawn, tgNeedSpawn,
+                tgProvideSpawnEnt, tgNeedSpawnEnt,
+                tgStartDelEnts, tgFactorDelEnts, tgNeedDelEnts,
+                tgProvideDelTotal, tgNeedDelTotal]
+               = osp::unpack<52>(sceneOut.m_tags);
 
-    auto const [tgUpdScene, tgUpdTime, tgUpdSync, tgUpdResync,
-                tgStartVisualDirty, tgFactorVisualDirty, tgNeedVisualDirty]
-               = osp::unpack<7>(sceneOut.m_tags);
+    builder.tag(tgFactorActiveIds)      .depend_on({tgPrereqActiveIds});
+    builder.tag(tgNeedActiveIds)        .depend_on({tgPrereqActiveIds, tgFactorActiveIds});
+
+    builder.tag(tgFinishHier)           .depend_on({tgPrereqHier, tgFactorHier});
+    builder.tag(tgNeedHier)             .depend_on({tgPrereqHier, tgFinishHier, tgFactorHier});
+
+    builder.tag(tgFactorTransform)      .depend_on({tgPrereqTransform});
+    builder.tag(tgNeedTransform)        .depend_on({tgPrereqTransform, tgFactorTransform});
+
+    builder.tag(tgFactorMesh)           .depend_on({tgPrereqMesh});
+    builder.tag(tgNeedMesh)             .depend_on({tgPrereqMesh, tgFactorMesh});
+
+    builder.tag(tgFactorTex)            .depend_on({tgPrereqTex});
+    builder.tag(tgNeedTex)              .depend_on({tgPrereqTex, tgFactorTex});
+
+    builder.tag(tgFactorMeshDirty)      .depend_on({tgStartMeshDirty});
+    builder.tag(tgNeedMeshDirty)        .depend_on({tgStartMeshDirty, tgFactorMeshDirty});
 
     builder.tag(tgFactorVisualDirty)    .depend_on({tgStartVisualDirty});
     builder.tag(tgNeedVisualDirty)      .depend_on({tgStartVisualDirty, tgFactorVisualDirty});
 
+    builder.tag(tgFactorCollideDirty)   .depend_on({tgStartCollideDirty});
+    builder.tag(tgNeedCollideDirty)     .depend_on({tgStartCollideDirty, tgFactorCollideDirty});
+    builder.tag(tgNeedCollide)          .depend_on({tgProvideCollide});
+
+    builder.tag(tgFactorGravity)        .depend_on({tgApplyGravity});
+
+    builder.tag(tgNeedPhysForces)       .depend_on({tgFactorPhysForces});
+
+    builder.tag(tgFactorPhysMod)        .depend_on({tgPrereqPhysMod});
+    builder.tag(tgNeedPhysMod)          .depend_on({tgPrereqPhysMod, tgFactorPhysMod});
+
+    builder.tag(tgFactorSpawn)          .depend_on({tgStartSpawn}).enqueues(tgUpdSpawn);
+    builder.tag(tgNeedSpawn)            .depend_on({tgStartSpawn, tgFactorSpawn});
+    builder.tag(tgNeedSpawnEnt)         .depend_on({tgProvideSpawnEnt, tgStartSpawn});
+
+    builder.tag(tgFactorDelEnts)        .depend_on({tgStartDelEnts});
+    builder.tag(tgNeedDelEnts)          .depend_on({tgStartDelEnts, tgFactorDelEnts});
+
+    builder.tag(tgNeedDelTotal)         .depend_on({tgProvideDelTotal});
+
+
     builder.task().assign({tgUpdScene, tgStartVisualDirty}).data(
+            "Clear dirty vectors for MeshVisualizer shader",
             TopDataIds_t{            idVisualDirty},
             wrap_args([] (EntVector_t& rDirty) noexcept
     {
@@ -148,6 +212,7 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session c
     }));
 
     builder.task().assign({tgUpdResync}).data(
+            "Set entity meshes and textures dirty",
             TopDataIds_t{             idDrawing},
             wrap_args([] (ACtxDrawing& rDrawing) noexcept
     {
@@ -162,9 +227,282 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session c
         }
     });
 
-    builder.task().assign({tgUpdResync}).data(TopDataIds_t{idPhong, idPhongDirty}, resync_material);
-    builder.task().assign({tgUpdResync}).data(TopDataIds_t{idVisual, idVisualDirty}, resync_material);
+    builder.task().assign({tgUpdResync}).data(
+            "Set all Phong material entities as dirty",
+            TopDataIds_t{idPhong, idPhongDirty}, resync_material);
 
+    builder.task().assign({tgUpdResync}).data(
+            "Set all MeshVisualizer material entities as dirty",
+            TopDataIds_t{idVisual, idVisualDirty}, resync_material);
+
+    builder.task().assign({tgUpdCleanup}).data(
+            TopDataIds_t{             idDrawing,             idNMesh},
+            wrap_args([] (ACtxDrawing& rDrawing, NamedMeshes& rNMesh) noexcept
+    {
+        for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rNMesh.m_shapeToMesh, {}))
+        {
+            rDrawing.m_meshRefCounts.ref_release(std::move(rOwner));
+        }
+
+        for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rNMesh.m_namedMeshs, {}))
+        {
+            rDrawing.m_meshRefCounts.ref_release(std::move(rOwner));
+        }
+    }));
+
+    builder.task().assign({tgUpdCleanup}).data(
+            "Clear scene and resource owners on cleanup",
+            TopDataIds_t{             idDrawing,                idDrawingRes,           idResources},
+            wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources) noexcept
+    {
+        SysRender::clear_owners(rDrawing);
+        SysRender::clear_resource_owners(rDrawingRes, rResources);
+    }));
+
+
+    builder.task().assign({tgUpdScene, tgFinishHier}).data(
+            "Sort hierarchy (needed by renderer) after possible modifications",
+            TopDataIds_t{           idBasic},
+            wrap_args([] (ACtxBasic& rBasic) noexcept
+    {
+        SysHierarchy::sort(rBasic.m_hierarchy);
+    }));
+
+    builder.task().assign({tgUpdScene, tgStartDelEnts}).data(
+            "Clear delete vector to start deleting new entities this frame",
+            TopDataIds_t{             idDelEnts},
+            wrap_args([] (EntVector_t& rDelEnts) noexcept
+    {
+        rDelEnts.clear();
+    }));
+
+    builder.task().assign({tgUpdScene, tgNeedDelEnts, tgProvideDelTotal}).data(
+            "Create DeleteTotal vector, which includes descendents of deleted hierarchy entities",
+            TopDataIds_t{           idBasic,                   idDelEnts,             idDelTotal},
+            wrap_args([] (ACtxBasic& rBasic, EntVector_t const& rDelEnts, EntVector_t& rDelTotal) noexcept
+    {
+        auto const &delFirst    = std::cbegin(rDelEnts);
+        auto const &delLast     = std::cend(rDelEnts);
+
+        // Cut deleted entities out of the hierarchy
+        SysHierarchy::update_delete_cut(rBasic.m_hierarchy, delFirst, delLast);
+
+        rDelTotal.assign(delFirst, delLast);
+
+        SysHierarchy::update_delete_descendents(
+                rBasic.m_hierarchy, delFirst, delLast,
+                [&rDelTotal] (ActiveEnt const ent)
+        {
+            rDelTotal.push_back(ent);
+        });
+    }));
+
+    builder.task().assign({tgUpdScene, tgNeedDelTotal, tgPrereqTransform, tgPrereqHier}).data(
+            "Delete basic components",
+            TopDataIds_t{           idBasic,                   idDelTotal},
+            wrap_args([] (ACtxBasic& rBasic, EntVector_t const& rDelTotal) noexcept
+    {
+        update_delete_basic(rBasic, std::cbegin(rDelTotal), std::cend(rDelTotal));
+    }));
+
+    builder.task().assign({tgUpdScene, tgNeedDelTotal, tgPrereqMesh, tgPrereqTex}).data(
+            "Delete drawing components",
+            TopDataIds_t{              idDrawing,                  idDelTotal},
+            wrap_args([] (ACtxDrawing& rDrawing, EntVector_t const& rDelTotal) noexcept
+    {
+        SysRender::update_delete_drawing(rDrawing, std::cbegin(rDelTotal), std::cend(rDelTotal));
+    }));
+
+    builder.task().assign({tgUpdScene, tgNeedDelTotal, tgPrereqActiveIds}).data(
+            "Delete Entity IDs",
+            TopDataIds_t{             idActiveIds,                    idDelTotal},
+            wrap_args([] (ActiveReg_t& rActiveIds, EntVector_t const& rDelTotal) noexcept
+    {
+        for (ActiveEnt const ent : rDelTotal)
+        {
+            if (rActiveIds.exists(ent))
+            {
+                rActiveIds.remove(ent);
+            }
+        }
+    }));
+
+    builder.task().assign({tgUpdScene, tgNeedDelTotal, tgPrereqPhysMod}).data(
+            "Delete Physics components",
+            TopDataIds_t{              idTPhys,              idNwt,                   idDelTotal},
+            wrap_args([] (ACtxTestPhys& rTPhys, ACtxNwtWorld& rNwt, EntVector_t const& rDelTotal) noexcept
+    {
+        auto const &delFirst    = std::cbegin(rDelTotal);
+        auto const &delLast     = std::cend(rDelTotal);
+
+        SysPhysics::update_delete_phys      (rTPhys.m_physics,  delFirst, delLast);
+        SysPhysics::update_delete_shapes    (rTPhys.m_physics,  delFirst, delLast);
+        SysPhysics::update_delete_hier_body (rTPhys.m_hierBody, delFirst, delLast);
+        ospnewton::SysNewton::update_delete (rNwt,              delFirst, delLast);
+    }));
+
+    static auto const delete_ent_set = wrap_args([] (EntSet_t& set, EntVector_t const& rDelTotal) noexcept
+    {
+        for (ActiveEnt const ent : rDelTotal)
+        {
+            set.reset(std::size_t(ent));
+        }
+    });
+
+    builder.task().assign({tgUpdScene, tgNeedDelTotal}).data(
+            "Delete gravity components",
+            TopDataIds_t{idGravity, idDelTotal}, delete_ent_set);
+
+    builder.task().assign({tgUpdScene, tgNeedDelTotal}).data(
+            "Delete bounds components",
+            TopDataIds_t{idBounds, idDelTotal}, delete_ent_set);
+
+    builder.task().assign({tgUpdScene, tgApplyGravity}).data(
+            "Apply gravity (-Y 9.81N force) to entities in the rGravity set",
+            TopDataIds_t{              idTPhys,          idGravity   },
+            wrap_args([] (ACtxTestPhys& rTPhys, EntSet_t& rGravity) noexcept
+    {
+        acomp_storage_t<ACompPhysNetForce> &rNetForce
+                = rTPhys.m_physIn.m_physNetForce;
+        for (std::size_t const entInt : rGravity.ones())
+        {
+            ActiveEnt const ent = ActiveEnt(entInt);
+            ACompPhysNetForce &rEntNetForce = rNetForce.contains(ent)
+                                            ? rNetForce.get(ent)
+                                            : rNetForce.emplace(ent);
+
+            rEntNetForce.y() -= 9.81f * rTPhys.m_physics.m_physDynamic.get(ent).m_totalMass;
+        }
+    }));
+
+    builder.task().assign({tgUpdScene, tgNeedCollideDirty, tgNeedPhysMod, tgProvideCollide}).data(
+            "Update Entities with Newton colliders",
+            TopDataIds_t{              idTPhys,               idNwt },
+            wrap_args([] (ACtxTestPhys& rTPhys, ACtxNwtWorld& rNwt) noexcept
+    {
+        ospnewton::SysNewton::update_colliders(
+                rTPhys.m_physics, rNwt,
+                std::exchange(rTPhys.m_physIn.m_colliderDirty, {}));
+    }));
+
+    builder.task().assign({tgUpdScene, tgUpdTime, tgNeedCollide, tgNeedPhysForces, tgFactorTransform}).data(
+            "Update Newton world",
+            TopDataIds_t{           idBasic,              idTPhys,              idNwt },
+            wrap_args([] (ACtxBasic& rBasic, ACtxTestPhys& rTPhys, ACtxNwtWorld& rNwt) noexcept
+    {
+        constexpr float delta = 1.0f / 60.0f;
+        auto const physIn = osp::ArrayView<ACtxPhysInputs>(&rTPhys.m_physIn, 1);
+        ospnewton::SysNewton::update_world(
+                rTPhys.m_physics, rNwt, delta, physIn,
+                rBasic.m_hierarchy,
+                rBasic.m_transform, rBasic.m_transformControlled,
+                rBasic.m_transformMutable);
+    }));
+
+    // Shape spawning
+    builder.task().assign({tgUpdScene, tgStartSpawn}).data(
+            "Clear Shape Spawning vector to start adding new elements",
+            TopDataIds_t{              idSpawner,             idSpawnerEnts },
+            wrap_args([] (SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
+    {
+        rSpawner.clear();
+        //rSpawnerEnts.clear();
+    }));
+
+    builder.task().assign({tgUpdSpawn, tgNeedSpawn, tgFactorActiveIds, tgProvideSpawnEnt}).data(
+            "Create entities for requested shapes to spawn",
+            TopDataIds_t{             idActiveIds,              idSpawner,             idSpawnerEnts },
+            wrap_args([] (ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
+    {
+        rSpawnerEnts.resize(rSpawner.size() * 2);
+        rActiveIds.create(std::begin(rSpawnerEnts), std::end(rSpawnerEnts));
+    }));
+
+    builder.task().assign({tgUpdSpawn, tgNeedSpawnEnt, tgFactorTransform, tgFactorHier}).data(
+            "Add hierarchy and transform to spawned shapes",
+            TopDataIds_t{           idBasic,              idSpawner,             idSpawnerEnts },
+            wrap_args([] (ACtxBasic& rBasic, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
+    {
+        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        {
+            SpawnShape const &spawn = rSpawner[i * 2];
+            ActiveEnt const root    = rSpawnerEnts[i * 2];
+            ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
+
+            rBasic.m_transform.emplace(root, ACompTransform{osp::Matrix4::translation(spawn.m_position)});
+            rBasic.m_transform.emplace(child, ACompTransform{Matrix4::scaling(spawn.m_size)});
+            SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, root);
+            SysHierarchy::add_child(rBasic.m_hierarchy, root, child);
+        }
+    }));
+
+    builder.task().assign({tgUpdSpawn, tgNeedSpawnEnt, tgFactorVisualDirty, tgFactorMeshDirty, tgFactorMesh}).data(
+            "Add mesh and material to spawned shapes",
+            TopDataIds_t{             idDrawing,              idSpawner,             idSpawnerEnts,             idNMesh,          idVisual,          idVisualDirty,                idActiveIds},
+            wrap_args([] (ACtxDrawing& rDrawing, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, NamedMeshes& rNMesh, EntSet_t& rMat, EntVector_t& rMatDirty, ActiveReg_t const& rActiveIds ) noexcept
+    {
+        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        {
+            SpawnShape const &spawn = rSpawner[i * 2];
+            ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
+
+            rDrawing.m_mesh.emplace( child, rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape)) );
+            rDrawing.m_meshDirty.push_back(child);
+
+            rMat.ints().resize(rActiveIds.vec().capacity());
+            rMat.set(std::size_t(child));
+            rMatDirty.push_back(child);
+
+            rDrawing.m_visible.emplace(child);
+            rDrawing.m_opaque.emplace(child);
+        }
+    }));
+
+    builder.task().assign({tgUpdSpawn, tgNeedSpawnEnt, tgFactorTransform, tgFactorHier, tgFactorPhysMod}).data(
+            "Add physics to spawned shapes",
+            TopDataIds_t{              idSpawner,             idSpawnerEnts,              idTPhys },
+            wrap_args([] (SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxTestPhys& rTPhys) noexcept
+    {
+        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        {
+            SpawnShape const &spawn = rSpawner[i * 2];
+            ActiveEnt const root    = rSpawnerEnts[i * 2];
+            ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
+
+            rTPhys.m_physics.m_hasColliders.emplace(root);
+            rTPhys.m_physics.m_physBody.emplace(root);
+            rTPhys.m_physics.m_physLinearVel.emplace(root);
+            rTPhys.m_physics.m_physAngularVel.emplace(root);
+            ACompPhysDynamic &rDyn = rTPhys.m_physics.m_physDynamic.emplace(root);
+            rDyn.m_totalMass = 1.0f;
+
+            rTPhys.m_physIn.m_setVelocity.emplace_back(root, spawn.m_velocity);
+
+            rTPhys.m_physics.m_shape.emplace(child, spawn.m_shape);
+            rTPhys.m_physics.m_solid.emplace(child);
+            osp::Vector3 const inertia
+                    = osp::phys::collider_inertia_tensor(spawn.m_shape, spawn.m_size, spawn.m_mass);
+            rTPhys.m_hierBody.m_ownDyn.emplace( child, ACompSubBody{ inertia, spawn.m_mass } );
+
+            rTPhys.m_physIn.m_colliderDirty.push_back(child);
+        }
+    }));
+
+
+    builder.task().assign({tgUpdSpawn, tgNeedSpawnEnt, tgFactorGravity}).data(
+            "Add gravity to spawned shapes",
+            TopDataIds_t{                    idSpawner,                   idSpawnerEnts,          idGravity,                   idActiveIds },
+            wrap_args([] (SpawnerVec_t const& rSpawner, EntVector_t const& rSpawnerEnts, EntSet_t& rGravity, ActiveReg_t const& rActiveIds) noexcept
+    {
+        rGravity.ints().resize(rActiveIds.vec().capacity());
+
+        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        {
+            ActiveEnt const root    = rSpawnerEnts[i * 2];
+
+            rGravity.set(std::size_t(root));
+        }
+    }));
 
     // Setup the scene
 
@@ -182,9 +520,6 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session c
     rNMesh.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
     rNMesh.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
     rNMesh.m_namedMeshs.emplace("floor", quick_add_mesh("grid64solid"));
-
-    // Allocate space to fit all materials
-    //rDrawing.m_materials.resize(rComMats.m_materialCount);
 
     // Create hierarchy root entity
     rBasic.m_hierRoot = rActiveIds.create();
@@ -306,9 +641,11 @@ void PhysicsTest::setup_renderer_gl(
 
     [[maybe_unused]]
     auto const [idActiveIds, idBasic, idDrawing, idDrawingRes, idComMats,
-                idDelete, idDeleteTotal, idTPhys, idNMeshId, idNwt, idTest,
-                idPhong, idPhongDirty, idVisual, idVisualDirty]
-               = osp::unpack<15>(sceneIn.m_dataIds);
+                idDelEnts, idDelTotal, idTPhys, idNMesh, idNwt, idTest,
+                idPhong, idPhongDirty, idVisual, idVisualDirty,
+                idSpawner, idSpawnerEnts, idGravity, idBounds]
+               = osp::unpack<19>(sceneIn.m_dataIds);
+
     auto &rBasic = top_get< ACtxBasic >(rTopData, idBasic);
 
     auto const [idResources] = osp::unpack<1>(appIn.m_dataIds);
@@ -327,20 +664,35 @@ void PhysicsTest::setup_renderer_gl(
 
     auto const [tgUpdRender, tgUpdInputs, tgUsesGL] = osp::unpack<3>(magnumIn.m_tags);
 
-    auto const [tgUpdScene, tgUpdTime, tgUpdSync,
-                tgStartVisualDirty, tgFactorVisualDirty, tgNeedVisualDirty]
-               = osp::unpack<6>(sceneIn.m_tags);
+    auto const [tgUpdScene, tgUpdTime, tgUpdSync, tgUpdResync, tgUpdCleanup, tgUpdSpawn,
+                tgPrereqActiveIds, tgFactorActiveIds, tgNeedActiveIds, tgUsesActiveIds,
+                tgPrereqHier, tgFactorHier, tgUsesHier, tgFinishHier, tgNeedHier,
+                tgPrereqTransform, tgFactorTransform, tgNeedTransform,
+                tgPrereqMesh, tgFactorMesh, tgNeedMesh,
+                tgPrereqTex, tgFactorTex, tgNeedTex,
+                tgStartMeshDirty, tgFactorMeshDirty, tgNeedMeshDirty,
+                tgStartVisualDirty, tgFactorVisualDirty, tgNeedVisualDirty,
+                tgStartCollideDirty, tgFactorCollideDirty, tgNeedCollideDirty,
+                tgFactorPhysForces, tgNeedPhysForces,
+                tgApplyGravity, tgFactorGravity,
+                tgPrereqPhysMod, tgFactorPhysMod, tgNeedPhysMod,
+                tgProvideCollide, tgNeedCollide,
+                tgStartSpawn, tgFactorSpawn, tgNeedSpawn,
+                tgProvideSpawnEnt, tgNeedSpawnEnt,
+                tgStartDelEnts, tgFactorDelEnts, tgNeedDelEnts,
+                tgProvideDelTotal, tgNeedDelTotal]
+               = osp::unpack<52>(sceneIn.m_tags);
 
-    auto const [tgCompileMesh,          tgNeedMesh,
-                tgCompileTex,           tgNeedTex,
+    auto const [tgCompileMeshGl,        tgNeedMeshGl,
+                tgCompileTexGl,         tgNeedTexGl,
                 tgFactorEntTex,         tgNeedEntTex,
                 tgFactorEntMesh,        tgNeedEntMesh,
                 tgFactorGroupFwd,       tgNeedGroupFwd,
                 tgFactorDrawTransform,  tgNeedDrawTransform]
                 = osp::unpack<12>(sceneRenderOut.m_tags);
 
-    builder.tag(tgNeedMesh)             .depend_on({tgCompileMesh});
-    builder.tag(tgNeedTex)              .depend_on({tgCompileTex});
+    builder.tag(tgNeedMeshGl)           .depend_on({tgCompileMeshGl});
+    builder.tag(tgNeedTexGl)            .depend_on({tgCompileTexGl});
     builder.tag(tgNeedEntTex)           .depend_on({tgFactorEntTex});
     builder.tag(tgNeedEntMesh)          .depend_on({tgFactorEntMesh});
     builder.tag(tgNeedGroupFwd)         .depend_on({tgFactorGroupFwd});
@@ -360,21 +712,21 @@ void PhysicsTest::setup_renderer_gl(
                 delta, true);
     }));
 
-    builder.task().assign({tgUpdSync, tgUsesGL, tgCompileMesh, tgCompileTex}).data(
+    builder.task().assign({tgUpdSync, tgUsesGL, tgCompileTexGl, tgCompileTexGl}).data(
             TopDataIds_t{                      idDrawingRes,                idResources,          idRenderGl},
             wrap_args([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::sync_scene_resources(rDrawingRes, rResources, rRenderGl);
     }));
 
-    builder.task().assign({tgUpdSync, tgNeedTex, tgFactorEntTex}).data(
+    builder.task().assign({tgUpdSync, tgNeedTexGl, tgFactorEntTex}).data(
             TopDataIds_t{             idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl},
             wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::assign_textures(rDrawing.m_diffuseTex, rDrawingRes.m_texToRes, rDrawing.m_diffuseDirty, rScnRender.m_diffuseTexId, rRenderGl);
     }));
 
-    builder.task().assign({tgUpdSync, tgNeedMesh, tgFactorEntMesh}).data(
+    builder.task().assign({tgUpdSync, tgNeedTexGl, tgFactorEntMesh, tgNeedMeshDirty}).data(
             TopDataIds_t{             idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl},
             wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
     {
@@ -390,7 +742,7 @@ void PhysicsTest::setup_renderer_gl(
 
     // TODO: phong shader
 
-    builder.task().assign({tgUpdSync, tgNeedVisualDirty, tgFactorDrawTransform}).data(
+    builder.task().assign({tgUpdSync, tgNeedVisualDirty, tgNeedHier, tgNeedTransform, tgFactorDrawTransform}).data(
             TopDataIds_t{                 idBasic,                   idVisualDirty,                   idScnRender},
             wrap_args([] (ACtxBasic const& rBasic, EntVector_t const& rVisualDirty, ACtxSceneRenderGL& rScnRender) noexcept
     {
@@ -426,6 +778,29 @@ void PhysicsTest::setup_renderer_gl(
 
         Texture2D &rFboColor = rRenderGl.m_texGl.get(rRenderGl.m_fboColor);
         SysRenderGL::display_texture(rRenderGl, rFboColor);
+    }));
+
+    // space to throw
+    builder.task().assign({tgUpdInputs, tgFactorSpawn}).data(
+            TopDataIds_t{                 idBasic,              idSpawner,         idCamEnt,                      idCamCtrl,                     idControls},
+            wrap_args([] (ACtxBasic const& rBasic, SpawnerVec_t& rSpawner, ActiveEnt camEnt, ACtxCameraController& rCamCtrl, PhysicsTestControls& rControls) noexcept
+    {
+        // Throw a sphere when the throw button is pressed
+        if (rCamCtrl.m_controls.button_held(rControls.m_btnThrow))
+        {
+            Matrix4 const &camTf = rBasic.m_transform.get(camEnt).m_transform;
+            float const speed = 120;
+            float const dist = 8.0f;
+            rSpawner.emplace_back(SpawnShape{
+                .m_position = camTf.translation() - camTf.backward() * dist,
+                .m_velocity = -camTf.backward() * speed,
+                .m_size     = Vector3{1.0f},
+                .m_mass     = 700.0f,
+                .m_shape    = EShape::Sphere
+            });
+            return osp::TopTaskStatus::Success;
+        }
+        return osp::TopTaskStatus::Success;
     }));
 }
 

@@ -73,6 +73,20 @@ void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t 
     });
 }
 
+void task_extern_set(ExecutionContext &rExec, TaskTags::Tag const tag, bool value)
+{
+    auto bitView = lgrn::bit_view(rExec.m_tagExternTriggers);
+    if (value)
+    {
+        bitView.set(std::size_t(tag));
+    }
+    else
+    {
+        bitView.reset(std::size_t(tag));
+    }
+}
+
+
 static bool tags_present(BitSpanConst_t const mask, BitSpanConst_t const taskTags) noexcept
 {
     auto taskTagIntIt = std::begin(taskTags);
@@ -98,7 +112,8 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
     // 1 = allowed (default), 0 = not allowed
     // All tags of a task must be allowed for the entire task to run.
     // aka: All ones in a task's bits must corrolate to a one in the mask
-    std::vector<uint64_t> mask(tags.m_tags.vec().size(), ~uint64_t(0));
+    std::size_t const maskSize = tags.m_tags.vec().size();
+    std::vector<uint64_t> mask(maskSize, ~uint64_t(0));
     auto maskBits = lgrn::bit_view(mask);
 
     StridedArrayView2D<TaskTags::Tag const> const tagDepends2d{
@@ -129,6 +144,13 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
         {
             maskBits.reset(currTag);
         }
+    }
+
+    // Check external dependencies
+    std::size_t const externSize = std::min({tags.m_tagExtern.size(), exec.m_tagExternTriggers.size(), maskSize});
+    for (std::size_t i = 0; i < externSize; ++i)
+    {
+        mask[i] &= ~(tags.m_tagExtern[i] & exec.m_tagExternTriggers[i]);
     }
 
     // TODO: Check Limits with exec.m_tagRunningCounts
@@ -170,20 +192,49 @@ void task_start(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task co
     }
 }
 
-void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task const task)
+void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task const task, BitSpan_t tmpEnqueue)
 {
     auto taskTagInts = Corrade::Containers::arrayView(tags.m_taskTags);
     std::size_t const tagIntSize = tags.tag_ints_per_task();
     std::size_t const offset = std::size_t(task) * tagIntSize;
     auto currTaskTagInts = taskTagInts.slice(offset, offset + tagIntSize);
 
+    auto const externBits = lgrn::bit_view(tags.m_tagExtern);
+
     rExec.m_taskQueuedCounts[std::size_t(task)] --;
+
+    auto enqueueBits = lgrn::bit_view(tmpEnqueue);
+    bool somethingEnqueued = false;
 
     auto const view = lgrn::bit_view(currTaskTagInts);
     for (uint32_t const tag : view.ones())
     {
         rExec.m_tagRunningCounts[tag] --;
         rExec.m_tagIncompleteCounts[tag] --;
+
+        // Reset external dependency tags if all associated tasks finish
+        if (rExec.m_tagIncompleteCounts[tag] == 0
+            && externBits.test(tag))
+        {
+            task_extern_set(rExec, TaskTags::Tag(tag), false);
+        }
+
+        // Handle enqueue tags
+        if ( ! tmpEnqueue.isEmpty() )
+        {
+            TaskTags::Tag const enqueue = tags.m_tagEnqueues[tag];
+            if ((enqueue != lgrn::id_null<TaskTags::Tag>()) )
+            {
+                somethingEnqueued = true;
+                enqueueBits.set(std::size_t(enqueue));
+            }
+        }
+    }
+
+    if (somethingEnqueued)
+    {
+        task_enqueue(tags, rExec, tmpEnqueue);
+        enqueueBits.reset();
     }
 }
 
