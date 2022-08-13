@@ -30,15 +30,27 @@
 namespace osp
 {
 
-void top_run_blocking(TaskTags& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec);
-
-void top_enqueue_quick(TaskTags& rTasks, ExecutionContext& rExec, ArrayView<TaskTags::Tag const> tags);
-
-inline void top_enqueue_quick(TaskTags& rTasks, ExecutionContext& rExec, std::initializer_list<TaskTags::Tag const> tags)
+struct Session
 {
-    return top_enqueue_quick(rTasks, rExec, Corrade::Containers::arrayView(tags));
+    std::vector<TopDataId> m_dataIds;
+    std::vector<TagId> m_tags;
+    std::vector<TaskId> m_initTags;
+
+    TagId m_onCleanup{lgrn::id_null<TagId>()};
+};
+
+void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec);
+
+void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, ArrayView<TagId const> tagsEnq);
+
+inline void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, std::initializer_list<TagId const> tagsEnq)
+{
+    return top_enqueue_quick(tags, tasks, rExec, Corrade::Containers::arrayView(tagsEnq));
 }
 
-bool debug_top_verify(TaskTags const& tags, TopTaskDataVec_t const& taskData);
+bool debug_top_verify(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData);
+
+
+void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec, Session &rSession);
 
 } // namespace testapp

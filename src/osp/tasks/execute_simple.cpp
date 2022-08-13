@@ -25,8 +25,6 @@
 
 #include "execute_simple.h"
 
-
-
 #include <algorithm>
 #include <cstdint>
 
@@ -48,11 +46,11 @@ bool any_bits_match(BitSpanConst_t const lhs, BitSpanConst_t const rhs)
     });
 }
 
-void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t const query)
+void task_enqueue(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, BitSpanConst_t const query)
 {
     assert(query.size() == tags.tag_ints_per_task());
 
-    task_for_each(tags, [&rExec, &query]
+    task_for_each(tags, tasks, [&rExec, &query]
             (uint32_t const currTask, ArrayView<uint64_t const> const currTags)
     {
         unsigned int &rQueuedCount = rExec.m_taskQueuedCounts[currTask];
@@ -73,7 +71,7 @@ void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t 
     });
 }
 
-void task_extern_set(ExecutionContext &rExec, TaskTags::Tag const tag, bool value)
+void task_extern_set(ExecutionContext &rExec, TagId const tag, bool value)
 {
     auto bitView = lgrn::bit_view(rExec.m_tagExternTriggers);
     if (value)
@@ -104,9 +102,9 @@ static bool tags_present(BitSpanConst_t const mask, BitSpanConst_t const taskTag
     return true;
 }
 
-void task_list_available(TaskTags const& tags, ExecutionContext const& exec, BitSpan_t tasksOut)
+void task_list_available(Tags const& tags, Tasks const& tasks, ExecutionContext const& exec, BitSpan_t tasksOut)
 {
-    assert(tasksOut.size() == tags.m_tasks.vec().size());
+    assert(tasksOut.size() == tasks.m_tasks.vec().size());
 
     // Bitmask makes it easy to compare the tags of a task
     // 1 = allowed (default), 0 = not allowed
@@ -116,8 +114,7 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
     std::vector<uint64_t> mask(maskSize, ~uint64_t(0));
     auto maskBits = lgrn::bit_view(mask);
 
-    StridedArrayView2D<TaskTags::Tag const> const tagDepends2d{
-            arrayView(tags.m_tagDepends), {tags.m_tags.capacity(), tags.m_tagDependsPerTag}};
+    auto tagDepends2d = tag_depends_2d(tags);
 
     // Check dependencies of each tag
     // Set them 0 (disallow) in the mask if the tag has incomplete dependencies
@@ -126,9 +123,9 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
         bool satisfied = true;
         auto const currTagDepends = tagDepends2d[currTag].asContiguous();
 
-        for (TaskTags::Tag const dependTag : currTagDepends)
+        for (TagId const dependTag : currTagDepends)
         {
-            if (dependTag == lgrn::id_null<TaskTags::Tag>())
+            if (dependTag == lgrn::id_null<TagId>())
             {
                 break;
             }
@@ -158,10 +155,10 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
     auto tasksOutBits = lgrn::bit_view(tasksOut);
 
     std::size_t const tagIntSize = tags.tag_ints_per_task();
-    BitSpanConst_t const taskTagInts = Corrade::Containers::arrayView(tags.m_taskTags);
+    BitSpanConst_t const taskTagInts = Corrade::Containers::arrayView(tasks.m_taskTags);
 
     // Iterate all tasks and use mask to match which ones can run
-    for (uint32_t const currTask : tags.m_tasks.bitview().zeros())
+    for (uint32_t const currTask : tasks.m_tasks.bitview().zeros())
     {
         if (exec.m_taskQueuedCounts[currTask] == 0)
         {
@@ -178,12 +175,9 @@ void task_list_available(TaskTags const& tags, ExecutionContext const& exec, Bit
     }
 }
 
-void task_start(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task const task)
+void task_start(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId const task)
 {
-    auto taskTagInts = Corrade::Containers::arrayView(tags.m_taskTags);
-    std::size_t const tagIntSize = tags.tag_ints_per_task();
-    std::size_t const offset = std::size_t(task) * tagIntSize;
-    auto currTaskTagInts = taskTagInts.slice(offset, offset + tagIntSize);
+    auto currTaskTagInts = task_tags_2d(tags, tasks)[std::size_t(task)].asContiguous();
 
     auto const view = lgrn::bit_view(currTaskTagInts);
     for (uint32_t const tag : view.ones())
@@ -192,12 +186,9 @@ void task_start(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task co
     }
 }
 
-void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task const task, BitSpan_t tmpEnqueue)
+void task_finish(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId const task, BitSpan_t tmpEnqueue)
 {
-    auto taskTagInts = Corrade::Containers::arrayView(tags.m_taskTags);
-    std::size_t const tagIntSize = tags.tag_ints_per_task();
-    std::size_t const offset = std::size_t(task) * tagIntSize;
-    auto currTaskTagInts = taskTagInts.slice(offset, offset + tagIntSize);
+    auto currTaskTagInts = task_tags_2d(tags, tasks)[std::size_t(task)].asContiguous();
 
     auto const externBits = lgrn::bit_view(tags.m_tagExtern);
 
@@ -218,14 +209,14 @@ void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task c
             // Reset external dependency bit
             if (externBits.test(tag))
             {
-                task_extern_set(rExec, TaskTags::Tag(tag), false);
+                task_extern_set(rExec, TagId(tag), false);
             }
 
             // Handle enqueue tags
             if ( ! tmpEnqueue.isEmpty() )
             {
-                TaskTags::Tag const enqueue = tags.m_tagEnqueues[tag];
-                if ((enqueue != lgrn::id_null<TaskTags::Tag>()) )
+                TagId const enqueue = tags.m_tagEnqueues[tag];
+                if ((enqueue != lgrn::id_null<TagId>()) )
                 {
                     somethingEnqueued = true;
                     enqueueBits.set(std::size_t(enqueue));
@@ -236,7 +227,7 @@ void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task c
 
     if (somethingEnqueued)
     {
-        task_enqueue(tags, rExec, tmpEnqueue);
+        task_enqueue(tags, tasks, rExec, tmpEnqueue);
         enqueueBits.reset();
     }
 }

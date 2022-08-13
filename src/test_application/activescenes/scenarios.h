@@ -30,6 +30,7 @@
 
 #include <osp/tasks/tasks.h>
 #include <osp/tasks/top_tasks.h>
+#include <osp/tasks/top_execute.h>
 
 #include <functional>
 
@@ -50,18 +51,10 @@ using on_draw_t = std::function<void(ActiveApplication&, float delta)>;
 struct MainView
 {
     osp::ArrayView<entt::any>   m_topData;
-    osp::TaskTags&              m_rTasks;
-    osp::TopTaskDataVec_t&      m_rTaskData;
+    osp::Tags                   &m_rTags;
+    osp::Tasks                  &m_rTasks;
+    osp::TopTaskDataVec_t       &m_rTaskData;
     osp::TopDataId              m_idResources;
-};
-
-struct Session
-{
-    std::vector<osp::TopDataId> m_dataIds;
-    std::vector<osp::TaskTags::Tag> m_tags;
-    std::vector<osp::TaskTags::Tag> m_initTags;
-
-    osp::TaskTags::Tag m_onCleanup{lgrn::id_null<osp::TaskTags::Tag>()};
 };
 
 namespace flight
@@ -128,13 +121,13 @@ namespace scenes
 
 struct PhysicsTest
 {
-    static void setup_scene(MainView mainView, osp::PkgId pkg, Session& sceneOut);
+    static void setup_scene(MainView mainView, osp::PkgId pkg, osp::Session& sceneOut);
     static void setup_renderer_gl(
             MainView        mainView,
-            Session const&  appIn,
-            Session const&  sceneIn,
-            Session const&  magnumIn,
-            Session const&  sceneRenderOut) noexcept;
+            osp::Session const&  appIn,
+            osp::Session const&  sceneIn,
+            osp::Session const&  magnumIn,
+            osp::Session const&  sceneRenderOut) noexcept;
 };
 
 struct VehicleTest

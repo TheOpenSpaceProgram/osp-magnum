@@ -50,10 +50,11 @@ TEST(Tasks, SingleThreaded)
 
     // Setup structs for storing tasks and tags
 
-    TaskTags tags;
+    Tags tags;
+    Tasks tasks;
     tags.m_tags.reserve(128); // Max 128 tags, aka: just two 64-bit integers
     tags.m_tagDepends.resize(tags.m_tags.capacity() * tags.m_tagDependsPerTag,
-                             lgrn::id_null<TaskTags::Tag>());
+                             lgrn::id_null<TagId>());
     tags.m_tagLimits.resize(tags.m_tags.capacity());
     tags.m_tagExtern.resize(tags.m_tags.capacity());
 
@@ -61,7 +62,7 @@ TEST(Tasks, SingleThreaded)
 
     // Create tags and set relationships between them
 
-    auto builder = TaskBuilder{tags, functions};
+    auto builder = TaskBuilder{tags, tasks, functions};
 
     // Tags are simply enum class integers
     auto const [updWorld, updRender, forces, physics, needPhysics, draw]
@@ -134,7 +135,7 @@ TEST(Tasks, SingleThreaded)
     ExecutionContext exec;
     exec.m_tagIncompleteCounts  .resize(tags.m_tags.capacity(), 0);
     exec.m_tagRunningCounts     .resize(tags.m_tags.capacity(), 0);
-    exec.m_taskQueuedCounts     .resize(tags.m_tasks.capacity(), 0);
+    exec.m_taskQueuedCounts     .resize(tasks.m_tasks.capacity(), 0);
 
     std::mt19937 gen(sc_seed);
 
@@ -147,7 +148,7 @@ TEST(Tasks, SingleThreaded)
     for (int i = 0; i < sc_repetitions; ++i)
     {
         // Enqueue all tasks tagged with updWorld and updRender
-        task_enqueue(tags, exec, tagsToRun);
+        task_enqueue(tags, tasks, exec, tagsToRun);
 
         // Its best to pass all external information (such as delta time) into
         // the systems instead of leaving them to figure it out.
@@ -159,8 +160,8 @@ TEST(Tasks, SingleThreaded)
         // Run until there's no tasks left to run
         while (true)
         {
-            std::vector<uint64_t> tasksToRun(tags.m_tasks.vec().size());
-            task_list_available(tags, exec, tasksToRun);
+            std::vector<uint64_t> tasksToRun(tasks.m_tasks.vec().size());
+            task_list_available(tags, tasks, exec, tasksToRun);
             auto const tasksToRunBits = lgrn::bit_view(tasksToRun);
             unsigned int const availableCount = tasksToRunBits.count();
 
@@ -171,11 +172,11 @@ TEST(Tasks, SingleThreaded)
 
             // Choose a random available task
             auto const choice = std::uniform_int_distribution<unsigned int>{0, availableCount - 1}(gen);
-            auto const task = TaskTags::Task(*std::next(tasksToRunBits.ones().begin(), choice));
+            auto const task = TaskId(*std::next(tasksToRunBits.ones().begin(), choice));
 
-            task_start(tags, exec, task);
+            task_start(tags, tasks, exec, task);
             functions.m_taskData[std::size_t(task)](world);
-            task_finish(tags, exec, task, {});
+            task_finish(tags, tasks, exec, task, {});
         }
 
         ASSERT_TRUE(world.m_canvas.contains("Physics Cube"));
