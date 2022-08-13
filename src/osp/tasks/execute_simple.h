@@ -67,17 +67,11 @@ BitSpan_t to_bitspan(std::initializer_list<T> tags, BitSpan_t out) noexcept
 }
 
 template <typename FUNC_T>
-constexpr void task_for_each(TaskTags const& tags, FUNC_T&& func)
+constexpr void task_for_each(Tags const& tags, Tasks const& tasks, FUNC_T&& func)
 {
-    using Corrade::Containers::StridedArrayView2D;
-    using Corrade::Containers::arrayView;
+    auto const taskTags2d = task_tags_2d(tags, tasks);
 
-    std::size_t const tagIntSize = tags.tag_ints_per_task();
-
-    StridedArrayView2D<uint64_t const> const taskTags2d{
-            arrayView(tags.m_taskTags), {tags.m_tasks.capacity(), tagIntSize}};
-
-    for (uint32_t const currTask : tags.m_tasks.bitview().zeros())
+    for (uint32_t const currTask : tasks.m_tasks.bitview().zeros())
     {
         func(currTask, taskTags2d[currTask].asContiguous());
     }
@@ -88,42 +82,46 @@ bool any_bits_match(BitSpanConst_t lhs, BitSpanConst_t rhs);
 /**
  * @brief Enqueue all tasks that contain any specified tag
  *
- * @param tags      [in] Tasks and Tags
+ * @param tags      [in] Tags
+ * @param tasks     [in] Tasks
  * @param rExec     [ref] ExecutionContext to record queued tasks into
  * @param query     [in] Bit positions of tags used to select tasks
  */
-void task_enqueue(TaskTags const& tags, ExecutionContext &rExec, BitSpanConst_t query);
+void task_enqueue(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, BitSpanConst_t query);
 
-void task_extern_set(ExecutionContext &rExec, TaskTags::Tag const tag, bool value);
+void task_extern_set(ExecutionContext &rExec, TagId tag, bool value);
 
 /**
  * @brief List all available tasks that are currently allowed to run
  *
- * @param tags      [in] Tasks and Tags
+ * @param tags      [in] Tags
+ * @param tasks     [in] Tasks
  * @param rExec     [in] ExecutionContext indicating tasks available
  * @param tasksOut  [out] Available tasks as bit positions
  */
-void task_list_available(TaskTags const& tags, ExecutionContext const& exec, BitSpan_t tasksOut);
+void task_list_available(Tags const& tags, Tasks const& tasks, ExecutionContext const& exec, BitSpan_t tasksOut);
 
 /**
  * @brief Mark a task as running in an ExecutionContext
  *
- * @param tags      [in] Tasks and Tags
+ * @param tags      [in] Tags
+ * @param tasks     [in] Tasks
  * @param rExec     [ref] ExecutionContext to record running tasks
  * @param task      [in] Id of task to start running
  */
-void task_start(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task task);
+void task_start(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId task);
 
 /**
  * @brief Mark a task as finished in an ExecutionContext, and potentially
  *        enqueue more tasks if the finished task has enqueue tags
  *
- * @param tags          [in] Tasks and Tags
+ * @param tags          [in] Tags
+ * @param tasks         [in] Tasks
  * @param rExec         [ref] ExecutionContext to record running tasks
  * @param task          [in] Id of task to finish
  * @param tmpEnqueue    [ref] Temporary bit buffer for tasks to enqueue. Pass
  *                            empty to disable any enqueues
  */
-void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task task, BitSpan_t tmpEnqueue);
+void task_finish(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId task, BitSpan_t tmpEnqueue);
 
 } // namespace osp

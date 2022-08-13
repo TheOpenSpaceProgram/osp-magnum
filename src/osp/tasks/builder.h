@@ -42,7 +42,7 @@ using Corrade::Containers::ArrayView;
 
 inline void set_tags(
         Corrade::Containers::ArrayView<uint32_t const>  tagsIn,
-        ArrayView<uint64_t>                             taggedInts,
+        ArrayView<bit_int_t>                            taggedInts,
         std::size_t const                               taggedSize,
         std::size_t const                               taggedId) noexcept
 {
@@ -61,7 +61,7 @@ inline void set_tags(
 template <typename DATA_T>
 class TaskBuilder
 {
-    using Tags_t = Corrade::Containers::ArrayView<TaskTags::Tag const>;
+    using Tags_t = Corrade::Containers::ArrayView<TagId const>;
 
 public:
 
@@ -70,13 +70,13 @@ public:
         TaskRef& assign(Tags_t const tags) noexcept
         {
             set_tags(Corrade::Containers::arrayCast<uint32_t const>(tags),
-                     m_rTags.m_taskTags,
+                     m_rTasks.m_taskTags,
                      m_rTags.tag_ints_per_task(),
                      std::size_t(m_taskId));
             return *this;
         }
 
-        TaskRef& assign(std::initializer_list<TaskTags::Tag> tags) noexcept
+        TaskRef& assign(std::initializer_list<TagId> tags) noexcept
         {
             return assign(Corrade::Containers::arrayView(tags));
         }
@@ -88,9 +88,10 @@ public:
             return *this;
         }
 
-        TaskTags::Task const m_taskId;
-        TaskTags &m_rTags;
-        DATA_T &m_rData;
+        TaskId const    m_taskId;
+        Tags            &m_rTags;
+        Tasks           &m_rTasks;
+        DATA_T          &m_rData;
 
     }; // struct TaskRefSpec
 
@@ -105,13 +106,13 @@ public:
             auto const depBegin = std::begin(depends);
             auto const depEnd   = std::end(depends);
 
-            for (TaskTags::Tag const tag : tags)
+            for (TagId const tag : tags)
             {
                 // Find first empty spot or already-added dependency
                 auto dependIt = std::find_if(
-                        depBegin, depEnd, [tag] (TaskTags::Tag const lhs)
+                        depBegin, depEnd, [tag] (TagId const lhs)
                 {
-                    return (lhs == lgrn::id_null<TaskTags::Tag>()) || (lhs == tag);
+                    return (lhs == lgrn::id_null<TagId>()) || (lhs == tag);
                 });
 
                 // No space left for any dependencies
@@ -123,7 +124,7 @@ public:
             return *this;
         }
 
-        TagRef& depend_on(std::initializer_list<TaskTags::Tag> tags) noexcept
+        TagRef& depend_on(std::initializer_list<TagId> tags) noexcept
         {
             return depend_on(Corrade::Containers::arrayView(tags));
         }
@@ -148,26 +149,27 @@ public:
             return *this;
         }
 
-        TagRef& enqueues(TaskTags::Tag enqueueTag)
+        TagRef& enqueues(TagId enqueueTag)
         {
             m_rTags.m_tagEnqueues[std::size_t(m_tagId)] = enqueueTag;
             return *this;
         }
 
-        TaskTags::Tag const m_tagId;
-        TaskTags &m_rTags;
+        TagId const m_tagId;
+        Tags        &m_rTags;
 
     }; // struct TagRef
 
-    constexpr TaskBuilder(TaskTags& rTags, DATA_T& rData)
+    constexpr TaskBuilder(Tags& rTags, Tasks& rTasks, DATA_T& rData)
      : m_rTags{rTags}
+     , m_rTasks{rTasks}
      , m_rData{rData}
     { }
 
     template <std::size_t N>
-    std::array<TaskTags::Tag, N> create_tags()
+    std::array<TagId, N> create_tags()
     {
-        std::array<TaskTags::Tag, N> out;
+        std::array<TagId, N> out;
 
         [[maybe_unused]] auto const it
                 = m_rTags.m_tags.create(std::begin(out), std::end(out));
@@ -177,7 +179,7 @@ public:
         return out;
     }
 
-    TagRef tag(TaskTags::Tag const tagId)
+    TagRef tag(TagId const tagId)
     {
         return {
             .m_tagId = tagId,
@@ -187,27 +189,29 @@ public:
 
     TaskRef task()
     {
-        TaskTags::Task const taskId = m_rTags.m_tasks.create();
+        TaskId const taskId = m_rTasks.m_tasks.create();
 
-        std::size_t const capacity = m_rTags.m_tasks.capacity();
+        std::size_t const capacity = m_rTasks.m_tasks.capacity();
 
-        m_rTags.m_taskTags.resize(capacity * m_rTags.tag_ints_per_task());
+        m_rTasks.m_taskTags.resize(capacity * m_rTags.tag_ints_per_task());
 
         return task(taskId);
     };
 
-    constexpr TaskRef task(TaskTags::Task const taskId) noexcept
+    constexpr TaskRef task(TaskId const taskId) noexcept
     {
         return {
             .m_taskId       = taskId,
             .m_rTags        = m_rTags,
+            .m_rTasks       = m_rTasks,
             .m_rData        = m_rData
         };
     }
 
 private:
-    TaskTags &m_rTags;
-    DATA_T &m_rData;
+    Tags    &m_rTags;
+    Tasks   &m_rTasks;
+    DATA_T  &m_rData;
 
 }; // class TaskBuilder
 

@@ -105,7 +105,7 @@ struct PhysicsTestData
 
 };
 
-void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session& sceneOut)
+void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, osp::Session& sceneOut)
 {
     auto &idResources = mainView.m_idResources;
     auto &rResources = top_get<Resources>(mainView.m_topData, idResources);
@@ -142,7 +142,7 @@ void PhysicsTest::setup_scene(MainView mainView, osp::PkgId const pkg, Session& 
     auto &rSpawnTimerA  = top_emplace< float >          (rTopData, idSpawnTimerA, 0.0f);
     auto &rSpawnTimerB  = top_emplace< float >          (rTopData, idSpawnTimerB, 0.0f);
 
-    auto builder = osp::TaskBuilder{mainView.m_rTasks, mainView.m_rTaskData};
+    auto builder = osp::TaskBuilder{mainView.m_rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
     // Each corresponds to a bit in a 64-bit int
     auto const
@@ -704,11 +704,11 @@ struct PhysicsTestControls
 };
 
 void PhysicsTest::setup_renderer_gl(
-        MainView        mainView,
-        Session const&  appIn,
-        Session const&  sceneIn,
-        Session const&  magnumIn,
-        Session const&  sceneRenderOut) noexcept
+        MainView            mainView,
+        osp::Session const& appIn,
+        osp::Session const& sceneIn,
+        osp::Session const& magnumIn,
+        osp::Session const& sceneRenderOut) noexcept
 {
     using namespace osp::shader;
 
@@ -762,7 +762,7 @@ void PhysicsTest::setup_renderer_gl(
     // Set initial position of camera slightly above the ground
     rCamCtrl.m_target = osp::Vector3{0.0f, 2.0f, 0.0f};
 
-    auto builder = osp::TaskBuilder{mainView.m_rTasks, mainView.m_rTaskData};
+    auto builder = osp::TaskBuilder{mainView.m_rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
     auto const
     [

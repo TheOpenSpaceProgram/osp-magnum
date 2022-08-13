@@ -43,7 +43,7 @@ struct TopTask
 };
 
 
-inline void task_data(TaskDataVec<TopTask> &rData, TaskTags::Task const task, std::string_view debugName, std::initializer_list<TopDataId> dataUsed, TopTaskFunc_t func)
+inline void task_data(TaskDataVec<TopTask> &rData, TaskId const task, std::string_view debugName, std::initializer_list<TopDataId> dataUsed, TopTaskFunc_t func)
 {
     rData.m_taskData.resize(
             std::max(rData.m_taskData.size(), std::size_t(task) + 1));
@@ -53,7 +53,7 @@ inline void task_data(TaskDataVec<TopTask> &rData, TaskTags::Task const task, st
     rTopTask.m_func = func;
 }
 
-inline void task_data(TaskDataVec<TopTask> &rData, TaskTags::Task const task, std::initializer_list<TopDataId> dataUsed, TopTaskFunc_t func)
+inline void task_data(TaskDataVec<TopTask> &rData, TaskId const task, std::initializer_list<TopDataId> dataUsed, TopTaskFunc_t func)
 {
     task_data(rData, task, "Untitled Top Task", dataUsed, func);
 }

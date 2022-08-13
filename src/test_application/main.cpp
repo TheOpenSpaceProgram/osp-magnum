@@ -116,15 +116,16 @@ void debug_print_help();
 void debug_print_resources();
 
 // Application state
-osp::TaskTags           g_tasks;
+osp::Tags               g_tags;
+osp::Tasks              g_tasks;
 osp::TopTaskDataVec_t   g_taskData;
 std::vector<entt::any>  g_appTopData;
 osp::ExecutionContext   g_exec;
 
-Session g_application;
-Session g_magnum;
-Session g_scene;
-Session g_sceneRender;
+osp::Session g_application;
+osp::Session g_magnum;
+osp::Session g_scene;
+osp::Session g_sceneRender;
 
 // Stores loaded resources in g_appTopData
 osp::PkgId g_defaultPkg;
@@ -251,51 +252,12 @@ int main(int argc, char** argv)
     spdlog::shutdown();  //>_> -> X.X  *Stab
     return 0;
 }
-static void session_close(Session &rSession)
+
+void close_session(osp::Session &rSession)
 {
-    using Task = osp::TaskTags::Task;
-    using Tag = osp::TaskTags::Tag;
-
-    if (Tag const tgCleanup = std::exchange(rSession.m_onCleanup, lgrn::id_null<Tag>());
-        tgCleanup != lgrn::id_null<Tag>())
-    {
-        osp::top_enqueue_quick(g_tasks, g_exec, {tgCleanup});
-        osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec);
-    }
-
-    // Clear session's TopData
-    for (osp::TopDataId const id : std::exchange(rSession.m_dataIds, {}))
-    {
-        if (id != lgrn::id_null<osp::TopDataId>())
-        {
-            g_appTopData.at(std::size_t(id)).reset();
-        }
-    }
-
-    // Get this session's tags, and clear its tasks
-    std::vector<uint64_t> tagsOwnedBits(g_tasks.m_tags.vec().size());
-    osp::to_bitspan(rSession.m_tags, tagsOwnedBits);
-    osp::task_for_each(g_tasks, [&tagsOwnedBits]
-            (uint32_t const currTask, osp::ArrayView<uint64_t const> const currTags)
-    {
-        if (osp::any_bits_match(tagsOwnedBits, currTags))
-        {
-            g_tasks.m_tasks.remove(Task(currTask));
-            osp::TopTask &rTaskData = g_taskData.m_taskData[currTask];
-            rTaskData.m_dataUsed.clear();
-            rTaskData.m_func = nullptr;
-        }
-    });
-
-    // Clear tags
-    for (osp::TaskTags::Tag const tag : std::exchange(rSession.m_tags, {}))
-    {
-        if (tag != lgrn::id_null<Tag>())
-        {
-            g_tasks.m_tags.remove(tag);
-        }
-    }
+    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, rSession);
 }
+
 
 int debug_cli_loop()
 {
@@ -323,7 +285,8 @@ int debug_cli_loop()
             else
             {
                 std::cout << "Loading scene: " << it->first << "\n";
-                session_close(g_scene); // close existing scene
+                // close existing scene
+                close_session(g_scene);
                 it->second.m_run();
                 start_magnum_async();
             }
@@ -388,7 +351,7 @@ void start_magnum_async()
         osp::top_reserve(g_appTopData, 0, std::begin(rDataIds), std::end(rDataIds));
         auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(rDataIds);
         g_magnum.m_tags.resize(4);
-        g_tasks.m_tags.create(std::begin(g_magnum.m_tags), std::end(g_magnum.m_tags));
+        g_tags.m_tags.create(std::begin(g_magnum.m_tags), std::end(g_magnum.m_tags));
 
         // Order-dependent; ActiveApplication construction starts OpenGL context
         auto &rUserInput    = osp::top_emplace<osp::input::UserInputHandler>(g_appTopData, idUserInput, 12);
@@ -414,8 +377,8 @@ void start_magnum_async()
         // once the window is closed. See ActiveApplication::drawEvent
         rActiveApp.exec();
 
-        session_close(g_sceneRender);
-        session_close(g_magnum);
+        close_session(g_sceneRender);
+        close_session(g_magnum);
 
         OSP_LOG_INFO("Closed Magnum Application");
     });
@@ -428,6 +391,7 @@ void setup_common_scene()
     MainView mainView
     {
         .m_topData      = g_appTopData,
+        .m_rTags        = g_tags,
         .m_rTasks       = g_tasks,
         .m_rTaskData    = g_taskData,
         .m_idResources  = g_application.m_dataIds[0]
@@ -438,7 +402,7 @@ void setup_common_scene()
     osp::top_reserve(g_appTopData, 0, std::begin(g_scene.m_dataIds), std::end(g_scene.m_dataIds));
 
     g_scene.m_tags.resize(64);
-    g_tasks.m_tags.create(std::begin(g_scene.m_tags), std::end(g_scene.m_tags));
+    g_tags.m_tags.create(std::begin(g_scene.m_tags), std::end(g_scene.m_tags));
 
     SCENE_T::setup_scene(mainView, g_defaultPkg, g_scene);
 
@@ -453,7 +417,7 @@ void setup_common_scene()
         osp::top_reserve(g_appTopData, 0, std::begin(rDataIds), std::end(rDataIds));
 
         g_sceneRender.m_tags.resize(24);
-        g_tasks.m_tags.create(std::begin(g_sceneRender.m_tags), std::end(g_sceneRender.m_tags));
+        g_tags.m_tags.create(std::begin(g_sceneRender.m_tags), std::end(g_sceneRender.m_tags));
 
         SCENE_T::setup_renderer_gl(mainView, g_application, g_scene, g_magnum, g_sceneRender);
 
@@ -462,22 +426,22 @@ void setup_common_scene()
 
         g_scene.m_onCleanup = tgCleanupEvt;
 
-        if ( ! osp::debug_top_verify(g_tasks, g_taskData))
+        if ( ! osp::debug_top_verify(g_tags, g_tasks, g_taskData))
         {
             get_magnum_application().exit();
             OSP_LOG_INFO("Errors detected, scene closed.");
             return;
         }
 
-        osp::top_enqueue_quick(g_tasks, g_exec, {tgSyncEvt, tgResyncEvt});
-        osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec);
+        osp::top_enqueue_quick(g_tags, g_tasks, g_exec, {tgSyncEvt, tgResyncEvt});
+        osp::top_run_blocking(g_tags, g_tasks, g_taskData, g_appTopData, g_exec);
 
         auto const runTags = {tgSyncEvt, tgSceneEvt, tgTimeEvt, tgRenderEvt, tgInputEvt};
 
-        rActiveApp.set_on_draw( [runTagsVec = std::vector<osp::TaskTags::Tag>(runTags)] (ActiveApplication& rApp, float delta)
+        rActiveApp.set_on_draw( [runTagsVec = std::vector<osp::TagId>(runTags)] (ActiveApplication& rApp, float delta)
         {
-            osp::top_enqueue_quick(g_tasks, g_exec, runTagsVec);
-            osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec);
+            osp::top_enqueue_quick(g_tags, g_tasks, g_exec, runTagsVec);
+            osp::top_run_blocking(g_tags, g_tasks, g_taskData, g_appTopData, g_exec);
         });
     };
 }
@@ -502,12 +466,12 @@ void load_a_bunch_of_stuff()
     std::size_t const maxTags = 128; // aka: just two 64-bit integers
     std::size_t const maxTagsInts = maxTags / 64;
 
-    g_tasks.m_tags.reserve(maxTags);
-    g_tasks.m_tagDepends.resize(maxTags * g_tasks.m_tagDependsPerTag,
-                                lgrn::id_null<osp::TaskTags::Tag>());
-    g_tasks.m_tagLimits.resize(maxTagsInts);
-    g_tasks.m_tagExtern.resize(maxTagsInts);
-    g_tasks.m_tagEnqueues.resize(maxTags, lgrn::id_null<osp::TaskTags::Tag>());
+    g_tags.m_tags.reserve(maxTags);
+    g_tags.m_tagDepends.resize(maxTags * g_tags.m_tagDependsPerTag,
+                               lgrn::id_null<osp::TagId>());
+    g_tags.m_tagLimits.resize(maxTagsInts);
+    g_tags.m_tagExtern.resize(maxTagsInts);
+    g_tags.m_tagEnqueues.resize(maxTags, lgrn::id_null<osp::TagId>());
 
     g_application.m_dataIds = { osp::top_reserve(g_appTopData) };
 

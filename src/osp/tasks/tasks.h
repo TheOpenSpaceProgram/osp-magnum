@@ -26,44 +26,78 @@
 
 #include <longeron/id_management/registry_stl.hpp>
 
+#include <Corrade/Containers/StridedArrayView.h>
+
 #include <cstdint>
 #include <vector>
 
 namespace osp
 {
 
-struct TaskTags
-{
-    enum class Task     : uint32_t {};
-    enum class Tag      : uint32_t {};
+using bit_int_t = uint64_t;
 
-    lgrn::IdRegistryStl<Task>       m_tasks;
-    lgrn::IdRegistryStl<Tag, true>  m_tags;
+enum class TaskId : uint32_t {};
+enum class TagId  : uint32_t {};
+
+struct Tags
+{
+    lgrn::IdRegistryStl<TagId, true>    m_tags;
 
     // Dependency tags restricts a task from running until all tasks containing
     // tags it depends on are complete.
-    // m_tagDepends is partitioned based on m_tagDependsPerTag: AAAABBBBCCCCDDDD
+    // 2D with m_tagDependsPerTag elements per row, [tag][dependency]
     // lgrn::null<Tag> used as null, or termination per-tag
-    std::vector<Tag>                m_tagDepends;
-    std::size_t                     m_tagDependsPerTag{8};
+    std::vector<TagId>                  m_tagDepends;
+    std::size_t                         m_tagDependsPerTag{8};
 
     // Limit sets how many tasks using a certain tag can run simultaneously
-    std::vector<unsigned int>       m_tagLimits;
+    std::vector<unsigned int>           m_tagLimits;
 
     // Enqueues another tag when all task finish
-    std::vector<Tag>                m_tagEnqueues;
+    std::vector<TagId>                  m_tagEnqueues;
 
     // Restricts associated enqueued tasks from running until externally set
     // Resets once all associated tasks are complete
-    std::vector<uint64_t>           m_tagExtern;
+    std::vector<bit_int_t>              m_tagExtern;
 
-    // Bit positions are used to store which tags a task contains
-    // partitioned based on tag_ints_per_task(): AAAABBBBCCCCDDDD
-    std::vector<uint64_t>           m_taskTags;
+    [[nodiscard]] std::size_t constexpr tag_ints_per_task() const noexcept { return m_tags.vec().size(); }
 
-    [[nodiscard]] std::size_t tag_ints_per_task() const noexcept { return m_tags.vec().capacity(); }
+}; // struct Tags
 
-}; // struct TaskTags
+struct Tasks
+{
+    lgrn::IdRegistryStl<TaskId>         m_tasks;
+
+    // Bit positions are used to store which tags a task contains.
+    // 2D with Tags::m_tags.vec().size() elements per row. [task][tagsInt]
+    // partitioned based on Tags::tag_ints_per_task(): AAAABBBBCCCCDDDD
+    std::vector<bit_int_t>              m_taskTags;
+
+}; // struct Tasks
+
+constexpr Corrade::Containers::StridedArrayView2D<TagId> tag_depends_2d(Tags& rTags) noexcept
+{
+    return {Corrade::Containers::arrayView(rTags.m_tagDepends.data(), rTags.m_tagDepends.size()),
+            {rTags.m_tags.capacity(), rTags.m_tagDependsPerTag}};
+}
+
+constexpr Corrade::Containers::StridedArrayView2D<TagId const> tag_depends_2d(Tags const& rTags) noexcept
+{
+    return {Corrade::Containers::arrayView(rTags.m_tagDepends.data(), rTags.m_tagDepends.size()),
+            {rTags.m_tags.capacity(), rTags.m_tagDependsPerTag}};
+}
+
+constexpr Corrade::Containers::StridedArrayView2D<bit_int_t> task_tags_2d(Tags const& rTags, Tasks &rTasks) noexcept
+{
+    return {Corrade::Containers::arrayView(rTasks.m_taskTags.data(), rTasks.m_taskTags.size()),
+            {rTasks.m_tasks.capacity(), rTags.tag_ints_per_task()}};
+}
+
+constexpr Corrade::Containers::StridedArrayView2D<bit_int_t const> task_tags_2d(Tags const& rTags, Tasks const &rTasks) noexcept
+{
+    return {Corrade::Containers::arrayView(rTasks.m_taskTags.data(), rTasks.m_taskTags.size()),
+            {rTasks.m_tasks.capacity(), rTags.tag_ints_per_task()}};
+}
 
 template <typename DATA_T>
 struct TaskDataVec
@@ -73,7 +107,7 @@ struct TaskDataVec
 }; // struct TaskDataVec
 
 template <typename DATA_T, typename RHS_T>
-void task_data(TaskDataVec<DATA_T> &rData, TaskTags::Task const task, RHS_T&& rhs)
+void task_data(TaskDataVec<DATA_T> &rData, TaskId const task, RHS_T&& rhs)
 {
     rData.m_taskData.resize(
             std::max(rData.m_taskData.size(), std::size_t(task) + 1));
