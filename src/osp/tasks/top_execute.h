@@ -30,12 +30,15 @@
 namespace osp
 {
 
-void top_run_blocking(TaskTags& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec, ArrayView<TaskTags::Tag const> tags);
+void top_run_blocking(TaskTags& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec);
 
-inline void top_run_blocking(TaskTags& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec, std::initializer_list<TaskTags::Tag const> tags)
+void top_enqueue_quick(TaskTags& rTasks, ExecutionContext& rExec, ArrayView<TaskTags::Tag const> tags);
+
+inline void top_enqueue_quick(TaskTags& rTasks, ExecutionContext& rExec, std::initializer_list<TaskTags::Tag const> tags)
 {
-    return top_run_blocking(rTasks, rTaskData, topData, rExec, Corrade::Containers::arrayView(tags));
+    return top_enqueue_quick(rTasks, rExec, Corrade::Containers::arrayView(tags));
 }
 
+bool debug_top_verify(TaskTags const& tags, TopTaskDataVec_t const& taskData);
 
 } // namespace testapp

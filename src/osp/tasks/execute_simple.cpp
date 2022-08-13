@@ -212,21 +212,24 @@ void task_finish(TaskTags const& tags, ExecutionContext &rExec, TaskTags::Task c
         rExec.m_tagRunningCounts[tag] --;
         rExec.m_tagIncompleteCounts[tag] --;
 
-        // Reset external dependency tags if all associated tasks finish
-        if (rExec.m_tagIncompleteCounts[tag] == 0
-            && externBits.test(tag))
+        // If last task to finish with this tag
+        if (rExec.m_tagIncompleteCounts[tag] == 0)
         {
-            task_extern_set(rExec, TaskTags::Tag(tag), false);
-        }
-
-        // Handle enqueue tags
-        if ( ! tmpEnqueue.isEmpty() )
-        {
-            TaskTags::Tag const enqueue = tags.m_tagEnqueues[tag];
-            if ((enqueue != lgrn::id_null<TaskTags::Tag>()) )
+            // Reset external dependency bit
+            if (externBits.test(tag))
             {
-                somethingEnqueued = true;
-                enqueueBits.set(std::size_t(enqueue));
+                task_extern_set(rExec, TaskTags::Tag(tag), false);
+            }
+
+            // Handle enqueue tags
+            if ( ! tmpEnqueue.isEmpty() )
+            {
+                TaskTags::Tag const enqueue = tags.m_tagEnqueues[tag];
+                if ((enqueue != lgrn::id_null<TaskTags::Tag>()) )
+                {
+                    somethingEnqueued = true;
+                    enqueueBits.set(std::size_t(enqueue));
+                }
             }
         }
     }

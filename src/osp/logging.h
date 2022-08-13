@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_INFO
 #include <spdlog/spdlog.h>
 
 namespace osp
@@ -44,5 +45,5 @@ inline void set_thread_logger(logger_t const logger)
 #define OSP_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(osp::t_currentLogger, __VA_ARGS__)
 #define OSP_LOG_INFO(...) SPDLOG_LOGGER_INFO(osp::t_currentLogger, __VA_ARGS__)
 #define OSP_LOG_WARN(...) SPDLOG_LOGGER_TRACE(osp::t_currentLogger, __VA_ARGS__)
-#define OSP_LOG_ERROR(...) SPDLOG_LOGGER_TRACE(osp::t_currentLogger, __VA_ARGS__)
-#define OSP_LOG_CRITICAL(...) SPDLOG_LOGGER_TRACE(osp::t_currentLogger, __VA_ARGS__)
+#define OSP_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(osp::t_currentLogger, __VA_ARGS__)
+#define OSP_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(osp::t_currentLogger, __VA_ARGS__)
