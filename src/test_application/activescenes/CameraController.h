@@ -55,7 +55,7 @@ struct ACtxCameraController
     ACtxCameraController(ACtxCameraController const& copy) = delete;
     ACtxCameraController(ACtxCameraController&& move) = default;
 
-    osp::Vector3 m_up{0.0f, 1.0f, 0.0f};
+    osp::Vector3 m_up{0.0f, 0.0f, 1.0f};
 
     std::optional<osp::Vector3> m_target{osp::Vector3{}};
     float m_orbitDistance{20.0f};

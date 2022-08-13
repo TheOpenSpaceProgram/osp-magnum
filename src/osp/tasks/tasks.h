@@ -50,7 +50,7 @@ struct TaskTags
     // Limit sets how many tasks using a certain tag can run simultaneously
     std::vector<unsigned int>       m_tagLimits;
 
-    // Enqueues another tag when finished succesfully
+    // Enqueues another tag when all task finish
     std::vector<Tag>                m_tagEnqueues;
 
     // Restricts associated enqueued tasks from running until externally set

@@ -24,8 +24,6 @@
  */
 
 #include "osp/tasks/top_utils.h"
-#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_INFO
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "ActiveApplication.h"
@@ -261,7 +259,8 @@ static void session_close(Session &rSession)
     if (Tag const tgCleanup = std::exchange(rSession.m_onCleanup, lgrn::id_null<Tag>());
         tgCleanup != lgrn::id_null<Tag>())
     {
-        osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec, {tgCleanup});
+        osp::top_enqueue_quick(g_tasks, g_exec, {tgCleanup});
+        osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec);
     }
 
     // Clear session's TopData
@@ -453,23 +452,32 @@ void setup_common_scene()
         rDataIds.resize(16);
         osp::top_reserve(g_appTopData, 0, std::begin(rDataIds), std::end(rDataIds));
 
-        g_sceneRender.m_tags.resize(16);
+        g_sceneRender.m_tags.resize(24);
         g_tasks.m_tags.create(std::begin(g_sceneRender.m_tags), std::end(g_sceneRender.m_tags));
 
         SCENE_T::setup_renderer_gl(mainView, g_application, g_scene, g_magnum, g_sceneRender);
 
-        auto const [tgUpdRender, tgUpdInputs, tgUsesGL] = osp::unpack<3>(g_magnum.m_tags);
-        auto const [tgUpdScene, tgUpdTime, tgUpdSync, tgUpdResync, tgUpdCleanup] = osp::unpack<5>(g_scene.m_tags);
+        auto const [tgRenderEvt, tgInputEvt, tgGlUse] = osp::unpack<3>(g_magnum.m_tags);
+        auto const [tgCleanupEvt, tgResyncEvt, tgSyncEvt, tgSceneEvt, tgTimeEvt] = osp::unpack<5>(g_scene.m_tags);
 
-        g_scene.m_onCleanup = tgUpdCleanup;
+        g_scene.m_onCleanup = tgCleanupEvt;
 
-        osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec, Corrade::Containers::arrayView({tgUpdSync, tgUpdResync}));
-
-        std::vector<osp::TaskTags::Tag> tags = {tgUpdScene, tgUpdTime, tgUpdSync, tgUpdRender, tgUpdInputs};
-
-        rActiveApp.set_on_draw( [tags = std::move(tags)] (ActiveApplication& rApp, float delta)
+        if ( ! osp::debug_top_verify(g_tasks, g_taskData))
         {
-            osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec, tags);
+            get_magnum_application().exit();
+            OSP_LOG_INFO("Errors detected, scene closed.");
+            return;
+        }
+
+        osp::top_enqueue_quick(g_tasks, g_exec, {tgSyncEvt, tgResyncEvt});
+        osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec);
+
+        auto const runTags = {tgSyncEvt, tgSceneEvt, tgTimeEvt, tgRenderEvt, tgInputEvt};
+
+        rActiveApp.set_on_draw( [runTagsVec = std::vector<osp::TaskTags::Tag>(runTags)] (ActiveApplication& rApp, float delta)
+        {
+            osp::top_enqueue_quick(g_tasks, g_exec, runTagsVec);
+            osp::top_run_blocking(g_tasks, g_taskData, g_appTopData, g_exec);
         });
     };
 }

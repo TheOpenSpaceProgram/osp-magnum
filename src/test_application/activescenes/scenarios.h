@@ -59,6 +59,7 @@ struct Session
 {
     std::vector<osp::TopDataId> m_dataIds;
     std::vector<osp::TaskTags::Tag> m_tags;
+    std::vector<osp::TaskTags::Tag> m_initTags;
 
     osp::TaskTags::Tag m_onCleanup{lgrn::id_null<osp::TaskTags::Tag>()};
 };
@@ -127,7 +128,7 @@ namespace scenes
 
 struct PhysicsTest
 {
-    static void setup_scene(MainView mainView, osp::PkgId pkg, Session const& sceneOut);
+    static void setup_scene(MainView mainView, osp::PkgId pkg, Session& sceneOut);
     static void setup_renderer_gl(
             MainView        mainView,
             Session const&  appIn,

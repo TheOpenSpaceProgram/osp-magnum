@@ -65,43 +65,6 @@ struct NamedMeshes
                     osp::active::MeshIdOwner_t> m_namedMeshs;
 };
 
-struct QuickPhysSceneRef
-{
-    lgrn::IdRegistryStl<osp::active::ActiveEnt> &m_rActiveIds;
-    osp::active::ACtxBasic      &m_rBasic;
-    ACtxTestPhys                &m_rTPhys;
-    NamedMeshes const           &m_rNMesh;
-    osp::active::ACtxDrawing    &m_rDrawing;
-};
-
-/**
- * @brief Convenient function to add a drawable and collidable primitive shape
- *
- * @return Newly created entity
- */
-osp::active::ActiveEnt add_solid_quick(
-        QuickPhysSceneRef               rScene,
-        osp::active::ActiveEnt const    parent,
-        osp::phys::EShape const         shape,
-        osp::Matrix4 const              transform,
-        int const                       material,
-        float const                     mass);
-
-/**
- * @brief Convenient function to create and throw a drawable physics entity of
- *        a single primative shape
- *
- * @return Newly created entity
- */
-osp::active::ActiveEnt add_rigid_body_quick(
-        QuickPhysSceneRef               rScene,
-        osp::active::ActiveEnt const    parent,
-        osp::Vector3 const              position,
-        osp::Vector3 const              velocity,
-        int const                       material,
-        float const                     mass,
-        osp::phys::EShape const         shape,
-        osp::Vector3 const              size);
 
 
 } // namespace testapp::scenes
