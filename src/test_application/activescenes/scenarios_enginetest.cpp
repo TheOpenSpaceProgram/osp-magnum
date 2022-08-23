@@ -22,7 +22,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "scenarios.h"
 #include "CameraController.h"
 
 #include "../ActiveApplication.h"
@@ -368,10 +367,10 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication &rApp, R
         // Rotate and move the camera based on user inputs
         SysCameraController::update_view(
                 pRenderer->m_camCtrl,
-                rScene.m_basic.m_transform.get(pRenderer->m_camera), delta);
+                rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform, delta);
         SysCameraController::update_move(
                 pRenderer->m_camCtrl,
-                rScene.m_basic.m_transform.get(pRenderer->m_camera),
+                rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform,
                 delta, true);
 
         sync_test_scene(rRenderGl, rScene, *pRenderer);

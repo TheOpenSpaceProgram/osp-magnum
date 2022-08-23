@@ -60,7 +60,7 @@ struct Tags
     // Resets once all associated tasks are complete
     std::vector<bit_int_t>              m_tagExtern;
 
-    [[nodiscard]] std::size_t constexpr tag_ints_per_task() const noexcept { return m_tags.vec().size(); }
+    [[nodiscard]] std::size_t tag_ints_per_task() const noexcept { return m_tags.vec().size(); }
 
 }; // struct Tags
 
@@ -75,25 +75,25 @@ struct Tasks
 
 }; // struct Tasks
 
-constexpr Corrade::Containers::StridedArrayView2D<TagId> tag_depends_2d(Tags& rTags) noexcept
+inline Corrade::Containers::StridedArrayView2D<TagId> tag_depends_2d(Tags& rTags) noexcept
 {
     return {Corrade::Containers::arrayView(rTags.m_tagDepends.data(), rTags.m_tagDepends.size()),
             {rTags.m_tags.capacity(), rTags.m_tagDependsPerTag}};
 }
 
-constexpr Corrade::Containers::StridedArrayView2D<TagId const> tag_depends_2d(Tags const& rTags) noexcept
+inline Corrade::Containers::StridedArrayView2D<TagId const> tag_depends_2d(Tags const& rTags) noexcept
 {
     return {Corrade::Containers::arrayView(rTags.m_tagDepends.data(), rTags.m_tagDepends.size()),
             {rTags.m_tags.capacity(), rTags.m_tagDependsPerTag}};
 }
 
-constexpr Corrade::Containers::StridedArrayView2D<bit_int_t> task_tags_2d(Tags const& rTags, Tasks &rTasks) noexcept
+inline Corrade::Containers::StridedArrayView2D<bit_int_t> task_tags_2d(Tags const& rTags, Tasks &rTasks) noexcept
 {
     return {Corrade::Containers::arrayView(rTasks.m_taskTags.data(), rTasks.m_taskTags.size()),
             {rTasks.m_tasks.capacity(), rTags.tag_ints_per_task()}};
 }
 
-constexpr Corrade::Containers::StridedArrayView2D<bit_int_t const> task_tags_2d(Tags const& rTags, Tasks const &rTasks) noexcept
+inline Corrade::Containers::StridedArrayView2D<bit_int_t const> task_tags_2d(Tags const& rTags, Tasks const &rTasks) noexcept
 {
     return {Corrade::Containers::arrayView(rTasks.m_taskTags.data(), rTasks.m_taskTags.size()),
             {rTasks.m_tasks.capacity(), rTags.tag_ints_per_task()}};

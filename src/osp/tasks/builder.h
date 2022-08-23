@@ -67,6 +67,11 @@ public:
 
     struct TaskRef
     {
+        constexpr operator TaskId() noexcept
+        {
+            return m_taskId;
+        }
+
         TaskRef& assign(Tags_t const tags) noexcept
         {
             set_tags(Corrade::Containers::arrayCast<uint32_t const>(tags),

@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2021 Open Space Program Project
+ * Copyright © 2019-2022 Open Space Program Project
  *
  * MIT License
  *
@@ -22,26 +22,37 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "scenarios.h"
+#pragma once
 
-#include "flight.h"
+#include "../ActiveApplication.h"
 
-namespace testapp::flight
+namespace testapp::enginetest
 {
 
-entt::any setup_scene()
-{
-    entt::any sceneAny = entt::make_any<FlightScene>();
-    FlightScene &rScene = entt::any_cast<FlightScene&>(sceneAny);
+struct EngineTestScene;
 
-    rScene.m_nwtWorld = std::make_unique<ospnewton::ACtxNwtWorld>(1);
+/**
+ * @brief Setup Engine Test Scene
+ *
+ * @param rResources    [ref] Application Resources containing cube mesh
+ * @param pkg           [in] Package Id the cube mesh is under
+ *
+ * @return entt::any containing scene data
+ */
+entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
 
-    return sceneAny;
-}
+/**
+ * @brief Generate ActiveApplication draw function
+ *
+ * This draw function stores renderer data, and is responsible for updating
+ * and drawing the engine test scene.
+ *
+ * @param rScene [ref] Engine test scene. Must be in stable memory.
+ * @param rApp   [ref] Existing ActiveApplication to use GL resources of
+ *
+ * @return ActiveApplication draw function
+ */
+on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp, osp::active::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
 
-on_draw_t generate_draw_func(FlightScene& rScene, ActiveApplication& rApp)
-{
-    return [] (ActiveApplication& rApp, float const delta) {};
-}
 
-} // namespace testapp::flight
+} // namespace testapp::enginetest
