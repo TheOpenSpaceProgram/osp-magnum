@@ -96,7 +96,7 @@ public:
      * @param delta     [in] Time used to calculate displacement
      */
     static void update_view(
-            ACtxCameraController &rCtrl, osp::active::ACompTransform &rCamTf,
+            ACtxCameraController &rCtrl, osp::Matrix4 &rCamTf,
             float delta);
 
     /**
@@ -110,7 +110,7 @@ public:
      *                           camera modes are not yet finalized.
      */
     static void update_move(
-            ACtxCameraController &rCtrl, osp::active::ACompTransform &rCamTf,
+            ACtxCameraController &rCtrl, osp::Matrix4 &rCamTf,
             float delta, bool moveTarget);
 };
 

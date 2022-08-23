@@ -24,24 +24,35 @@
  */
 #pragma once
 
-#include "tasks.h"
-#include "top_tasks.h"
+#include "scenarios.h"
 
-#include <vector>
 
-namespace osp
+namespace testapp::scenes
 {
 
+osp::Session setup_scene_renderer(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& magnum,
+        osp::Session const& scene,
+        osp::TopDataId const idResources);
 
-void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec);
+osp::Session setup_simple_camera(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& magnum,
+        osp::Session const& scene,
+        osp::Session const& renderer);
 
-void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, ArrayView<TagId const> tagsEnq);
+osp::Session setup_shader_visualizer(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& magnum,
+        osp::Session const& scene,
+        osp::Session const& renderer,
+        osp::Session const& material);
 
-inline void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, std::initializer_list<TagId const> tagsEnq)
-{
-    return top_enqueue_quick(tags, tasks, rExec, Corrade::Containers::arrayView(tagsEnq));
 }
-
-bool debug_top_verify(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData);
-
-} // namespace testapp

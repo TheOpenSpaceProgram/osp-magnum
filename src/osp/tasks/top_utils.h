@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include "tasks.h"
 #include "top_worker.h"
 
 #include <entt/core/any.hpp>
@@ -31,6 +32,7 @@
 #include <cassert>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace osp
 {
@@ -82,6 +84,15 @@ T& top_emplace(ArrayView<entt::any> const topData, TopDataId id, ARGS_T&& ... ar
     rData.emplace<T>(std::forward<ARGS_T>(args) ...);
     return entt::any_cast<T&>(rData);
 }
+
+template <typename T, typename ANY_T>
+T& top_assign(ArrayView<entt::any> const topData, TopDataId id, ANY_T&& any)
+{
+    entt::any &rData = topData[std::size_t(id)];
+    rData = std::forward<ANY_T>(any);
+    return entt::any_cast<T&>(rData);
+}
+
 
 template <typename T>
 [[nodiscard]] T& top_get(ArrayView<entt::any> const topData, TopDataId const id)
@@ -167,5 +178,6 @@ constexpr TopTaskFunc_t wrap_args(FUNC_T const&& funcArg)
     // wrap_args_trait::apply, as static_lambda_t is stored in the type
     return wrap_args_trait<static_lambda_t>::unpack(functionPtr);
 }
+
 
 } // namespace osp

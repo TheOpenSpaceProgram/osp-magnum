@@ -134,7 +134,25 @@ struct ACtxDrawingRes
     IdMap_t<MeshId, ResIdOwner_t>           m_meshToRes;
 };
 
-//
+struct Camera
+{
+    Matrix4 m_transform;
+
+    float m_near;
+    float m_far;
+    float m_aspectRatio;
+    Deg m_fov;
+
+    constexpr void set_aspect_ratio(Vector2 const viewport) noexcept
+    {
+        m_aspectRatio = viewport.x() / viewport.y();
+    }
+
+    [[nodiscard]] Matrix4 perspective() const noexcept
+    {
+        return Matrix4::perspectiveProjection(m_fov, m_aspectRatio, m_near, m_far);
+    }
+};
 
 } // namespace osp::active
 

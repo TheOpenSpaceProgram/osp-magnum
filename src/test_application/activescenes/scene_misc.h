@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2021 Open Space Program Project
+ * Copyright © 2019-2022 Open Space Program Project
  *
  * MIT License
  *
@@ -24,47 +24,33 @@
  */
 #pragma once
 
-#include "CameraController.h"
+#include "scenarios.h"
 
-#include <osp/Active/basic.h>
-#include <osp/Active/physics.h>
-#include <osp/Active/drawing.h>
-
-#include <longeron/id_management/registry.hpp>
-
-#include <newtondynamics_physics/ospnewton.h>
-
-namespace testapp::activestate
+namespace testapp::scenes
 {
 
-using namespace osp::active;
+void add_floor(
+        osp::ArrayView<entt::any> topData,
+        osp::Session const& scnCommon,
+        osp::Session const& material,
+        osp::Session const& shapeSpawn,
+        osp::TopDataId idResources,
+        osp::PkgId pkg);
 
+osp::Session setup_thrower(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& magnum,
+        osp::Session const& renderer,
+        osp::Session const& simpleCamera,
+        osp::Session const& shapeSpawn);
 
-/**
- * @brief Storage needed to synchronize with a Universe
- */
-struct ACtxUniverseSync
-{
-};
+osp::Session setup_droppers(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::Session const& shapeSpawn);
 
-} // namespace testapp::scenestate
-
-namespace testapp::flight
-{
-
-/**
- * @brief An entire damn flight scene lol
- */
-struct FlightScene
-{
-    lgrn::IdRegistry<osp::active::ActiveEnt>     m_activeIds;
-
-    osp::active::ACtxBasic          m_basic;
-    osp::active::ACtxDrawing        m_drawing;
-
-    osp::active::ACtxPhysics        m_physics;
-
-    std::unique_ptr<ospnewton::ACtxNwtWorld>    m_nwtWorld;
-};
-
-} // namespace testapp::flight
+}

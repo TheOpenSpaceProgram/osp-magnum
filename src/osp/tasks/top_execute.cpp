@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "top_execute.h"
+#include "top_session.h"
 #include "top_worker.h"
 #include "execute_simple.h"
 
@@ -163,50 +164,6 @@ bool debug_top_verify(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t con
     }
 
     return good;
-}
-
-void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec, Session &rSession)
-{
-    // Run cleanup tasks
-    if (TagId const tgCleanup = std::exchange(rSession.m_onCleanup, lgrn::id_null<TagId>());
-        tgCleanup != lgrn::id_null<TagId>())
-    {
-        top_enqueue_quick(rTags, rTasks, rExec, {tgCleanup});
-        top_run_blocking(rTags, rTasks, rTaskData, topData, rExec);
-    }
-
-    // Clear session's TopData
-    for (TopDataId const id : std::exchange(rSession.m_dataIds, {}))
-    {
-        if (id != lgrn::id_null<TopDataId>())
-        {
-            topData[std::size_t(id)].reset();
-        }
-    }
-
-    // Get this session's tags, and clear its tasks
-    std::vector<uint64_t> tagsOwnedBits(rTags.m_tags.vec().size());
-    to_bitspan(rSession.m_tags, tagsOwnedBits);
-    task_for_each(rTags, rTasks, [&tagsOwnedBits, &rTasks, &rTaskData]
-            (uint32_t const currTask, ArrayView<uint64_t const> const currTags)
-    {
-        if (any_bits_match(tagsOwnedBits, currTags))
-        {
-            rTasks.m_tasks.remove(TaskId(currTask));
-            TopTask &rCurrTaskData = rTaskData.m_taskData[currTask];
-            rCurrTaskData.m_dataUsed.clear();
-            rCurrTaskData.m_func = nullptr;
-        }
-    });
-
-    // Clear tags
-    for (TagId const tag : std::exchange(rSession.m_tags, {}))
-    {
-        if (tag != lgrn::id_null<TagId>())
-        {
-            rTags.m_tags.remove(tag);
-        }
-    }
 }
 
 } // namespace testapp

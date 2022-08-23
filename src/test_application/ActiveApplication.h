@@ -40,6 +40,12 @@
 namespace testapp
 {
 
+class ActiveApplication;
+
+// Stored inside an ActiveApplicaton to use as a main draw function.
+// Renderer state can be stored in lambda capture
+using on_draw_t = std::function<void(ActiveApplication&, float delta)>;
+
 /**
  * @brief An interactive Magnum application
  *

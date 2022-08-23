@@ -25,6 +25,7 @@
 #pragma once
 
 #include <cassert>
+#include <iterator>
 #include <type_traits>
 
 namespace osp
@@ -41,7 +42,7 @@ constexpr auto& unpack(RANGE_T &rIn)
     using type_t = std::remove_pointer_t<ptr_t>;
 
     assert(N <= rIn.size());
-    return *reinterpret_cast<type_t(*)[N]>(rIn.data());
+    return *reinterpret_cast<type_t(*)[N]>(std::data(rIn));
 }
 
 

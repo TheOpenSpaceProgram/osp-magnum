@@ -102,11 +102,6 @@ template <typename SCENE_T>
 void setup_common_scene();
 
 /**
- * @brief Attempt to destroy everything in the universe
- */
-bool destroy_universe();
-
-/**
  * @brief Deal with resource reference counts for a clean termination
  */
 void clear_resource_owners();
@@ -122,10 +117,10 @@ osp::TopTaskDataVec_t   g_taskData;
 std::vector<entt::any>  g_appTopData;
 osp::ExecutionContext   g_exec;
 
-osp::Session g_application;
-osp::Session g_magnum;
-osp::Session g_scene;
-osp::Session g_sceneRender;
+osp::Session            g_application;
+osp::Session            g_magnum;
+Sessions_t              g_sceneSessions;
+Sessions_t              g_renderSessions;
 
 // Stores loaded resources in g_appTopData
 osp::PkgId g_defaultPkg;
@@ -134,7 +129,7 @@ osp::PkgId g_defaultPkg;
 std::thread g_magnumThread;
 
 // Called when openning a Magnum Application
-std::function<void()> g_appSetup;
+RendererSetup_t g_rendererSetup;
 
 // Loggers
 std::shared_ptr<spdlog::logger> g_logTestApp;
@@ -144,11 +139,7 @@ std::shared_ptr<spdlog::logger> g_logMagnumApp;
 int g_argc;
 char** g_argv;
 
-struct Option
-{
-    std::string_view m_desc;
-    void(*m_run)();
-};
+
 
 static ActiveApplication& get_magnum_application()
 {
@@ -160,37 +151,17 @@ static osp::Resources& get_resources()
     return entt::any_cast<osp::Resources&>(g_appTopData.at(std::size_t(g_application.m_dataIds[0])));
 }
 
-std::unordered_map<std::string_view, Option> const g_scenes
+static MainView get_main_view()
 {
-
-    {"enginetest", {"Demonstrate basic game engine functionality", [] {
-        osp::TopDataId const mdiScene = osp::top_reserve(g_appTopData);
-        g_scene.m_dataIds = {mdiScene};
-        g_appTopData[mdiScene] = enginetest::setup_scene(get_resources(), g_defaultPkg);
-
-        g_appSetup = [] ()
-        {
-            auto& rScene = osp::top_get<enginetest::EngineTestScene>(g_appTopData, g_scene.m_dataIds[0]);
-
-            auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(g_magnum.m_dataIds);
-            auto &rActiveApp    = osp::top_get<ActiveApplication>(g_appTopData, idActiveApp);
-            auto &rRenderGl     = osp::top_get<osp::active::RenderGL>(g_appTopData, idRenderGl);
-            auto &rUserInput    = osp::top_get<osp::input::UserInputHandler>(g_appTopData, idUserInput);
-
-            rActiveApp.set_on_draw(enginetest::generate_draw_func(rScene, rActiveApp, rRenderGl, rUserInput));
-        };
-    }}}
-    ,
-    {"physicstest", {"Physics lol", [] {
-        setup_common_scene<scenes::PhysicsTest>();
-    }}},
-    {"vehicletest", {"Vehicle and glTF", [] {
-        //setup_common_scene<scenes::VehicleTest>();
-    }}},
-    {"universetest", {"Vehicle and glTF", [] {
-        //setup_common_scene<scenes::UniverseTest>();
-    }}}
-};
+    return {
+        .m_topData      = g_appTopData,
+        .m_rTags        = g_tags,
+        .m_rTasks       = g_tasks,
+        .m_rExec        = g_exec,
+        .m_rTaskData    = g_taskData,
+        .m_idResources  = g_application.m_dataIds[0],
+    };
+}
 
 
 int main(int argc, char** argv)
@@ -223,15 +194,15 @@ int main(int argc, char** argv)
 
     if(args.value("scene") != "none")
     {
-        auto const it = g_scenes.find(args.value("scene"));
-        if(it == std::end(g_scenes))
+        auto const it = scenarios().find(args.value("scene"));
+        if(it == std::end(scenarios()))
         {
             std::cerr << "unknown scene" << std::endl;
             clear_resource_owners();
             exit(-1);
         }
 
-        it->second.m_run();
+        g_rendererSetup = it->second.m_setup(get_main_view(), g_defaultPkg, g_sceneSessions);
 
         start_magnum_async();
     }
@@ -253,9 +224,15 @@ int main(int argc, char** argv)
     return 0;
 }
 
+void close_sessions(Sessions_t &rSessions)
+{
+    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, rSessions);
+    rSessions.clear();
+}
+
 void close_session(osp::Session &rSession)
 {
-    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, rSession);
+    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, osp::ArrayView<osp::Session>(&rSession, 1));
 }
 
 
@@ -271,8 +248,8 @@ int debug_cli_loop()
         std::cin >> command;
 
         bool magnumOpen = ! g_magnum.m_dataIds.empty();
-        if (auto const it = g_scenes.find(command);
-            it != std::end(g_scenes))
+        if (auto const it = scenarios().find(command);
+            it != std::end(scenarios()))
         {
             if (magnumOpen)
             {
@@ -285,9 +262,10 @@ int debug_cli_loop()
             else
             {
                 std::cout << "Loading scene: " << it->first << "\n";
-                // close existing scene
-                close_session(g_scene);
-                it->second.m_run();
+
+                close_sessions(g_sceneSessions); // Close existing scene
+
+                g_rendererSetup = it->second.m_setup(get_main_view(), g_defaultPkg, g_sceneSessions);
                 start_magnum_async();
             }
         }
@@ -301,7 +279,7 @@ int debug_cli_loop()
             {
                 std::cout << "Application is already open\n";
             }
-            else if ( ! bool(g_appSetup) )
+            else if ( ! bool(g_rendererSetup) )
             {
                 std::cout << "No existing scene loaded\n";
             }
@@ -322,7 +300,7 @@ int debug_cli_loop()
                 // request exit if application exists
                 get_magnum_application().exit();
             }
-            destroy_universe();
+
             break;
         }
         else
@@ -350,8 +328,8 @@ void start_magnum_async()
         rDataIds.resize(3);
         osp::top_reserve(g_appTopData, 0, std::begin(rDataIds), std::end(rDataIds));
         auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(rDataIds);
-        g_magnum.m_tags.resize(4);
-        g_tags.m_tags.create(std::begin(g_magnum.m_tags), std::end(g_magnum.m_tags));
+        g_magnum.m_tagIds.resize(4);
+        g_tags.m_tags.create(std::begin(g_magnum.m_tagIds), std::end(g_magnum.m_tagIds));
 
         // Order-dependent; ActiveApplication construction starts OpenGL context
         auto &rUserInput    = osp::top_emplace<osp::input::UserInputHandler>(g_appTopData, idUserInput, 12);
@@ -371,13 +349,13 @@ void start_magnum_async()
         });
 
         // Setup scene-specific renderer
-        g_appSetup();
+        g_rendererSetup(get_main_view(), g_magnum, g_sceneSessions, g_renderSessions);
 
         // Starts the main loop. This function is blocking, and will only return
         // once the window is closed. See ActiveApplication::drawEvent
         rActiveApp.exec();
 
-        close_session(g_sceneRender);
+        close_sessions(g_renderSessions);
         close_session(g_magnum);
 
         OSP_LOG_INFO("Closed Magnum Application");
@@ -385,75 +363,6 @@ void start_magnum_async()
     g_magnumThread.swap(t);
 }
 
-template <typename SCENE_T>
-void setup_common_scene()
-{
-    MainView mainView
-    {
-        .m_topData      = g_appTopData,
-        .m_rTags        = g_tags,
-        .m_rTasks       = g_tasks,
-        .m_rTaskData    = g_taskData,
-        .m_idResources  = g_application.m_dataIds[0]
-    };
-
-    g_scene.m_dataIds.clear();
-    g_scene.m_dataIds.resize(24);
-    osp::top_reserve(g_appTopData, 0, std::begin(g_scene.m_dataIds), std::end(g_scene.m_dataIds));
-
-    g_scene.m_tags.resize(64);
-    g_tags.m_tags.create(std::begin(g_scene.m_tags), std::end(g_scene.m_tags));
-
-    SCENE_T::setup_scene(mainView, g_defaultPkg, g_scene);
-
-    // Renderer and draw function is created when g_appSetup is invoked
-    g_appSetup = [mainView] () mutable
-    {
-        auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(g_magnum.m_dataIds);
-        auto &rActiveApp = osp::top_get<ActiveApplication>(g_appTopData, idActiveApp);
-
-        auto &rDataIds = g_sceneRender.m_dataIds;
-        rDataIds.resize(16);
-        osp::top_reserve(g_appTopData, 0, std::begin(rDataIds), std::end(rDataIds));
-
-        g_sceneRender.m_tags.resize(24);
-        g_tags.m_tags.create(std::begin(g_sceneRender.m_tags), std::end(g_sceneRender.m_tags));
-
-        SCENE_T::setup_renderer_gl(mainView, g_application, g_scene, g_magnum, g_sceneRender);
-
-        auto const [tgRenderEvt, tgInputEvt, tgGlUse] = osp::unpack<3>(g_magnum.m_tags);
-        auto const [tgCleanupEvt, tgResyncEvt, tgSyncEvt, tgSceneEvt, tgTimeEvt] = osp::unpack<5>(g_scene.m_tags);
-
-        g_scene.m_onCleanup = tgCleanupEvt;
-
-        if ( ! osp::debug_top_verify(g_tags, g_tasks, g_taskData))
-        {
-            get_magnum_application().exit();
-            OSP_LOG_INFO("Errors detected, scene closed.");
-            return;
-        }
-
-        osp::top_enqueue_quick(g_tags, g_tasks, g_exec, {tgSyncEvt, tgResyncEvt});
-        osp::top_run_blocking(g_tags, g_tasks, g_taskData, g_appTopData, g_exec);
-
-        auto const runTags = {tgSyncEvt, tgSceneEvt, tgTimeEvt, tgRenderEvt, tgInputEvt};
-
-        rActiveApp.set_on_draw( [runTagsVec = std::vector<osp::TagId>(runTags)] (ActiveApplication& rApp, float delta)
-        {
-            osp::top_enqueue_quick(g_tags, g_tasks, g_exec, runTagsVec);
-            osp::top_run_blocking(g_tags, g_tasks, g_taskData, g_appTopData, g_exec);
-        });
-    };
-}
-
-bool destroy_universe()
-{
-    // Make sure universe isn't in use anywhere else
-
-    OSP_LOG_INFO("explosion* Universe destroyed!");
-
-    return true;
-}
 
 using Corrade::Containers::arrayView;
 
@@ -594,7 +503,7 @@ void debug_print_help()
         << "OSP-Magnum Temporary Debug CLI\n"
         << "Open a scene:\n";
 
-    for (auto const& [name, rTestScn] : g_scenes)
+    for (auto const& [name, rTestScn] : scenarios())
     {
         std::cout << "* " << name << " - " << rTestScn.m_desc << "\n";
     }

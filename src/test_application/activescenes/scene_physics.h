@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "scenarios.h"
+
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
 
@@ -65,6 +67,56 @@ struct NamedMeshes
                     osp::active::MeshIdOwner_t> m_namedMeshs;
 };
 
+struct SpawnShape
+{
+    osp::Vector3 m_position;
+    osp::Vector3 m_velocity;
+    osp::Vector3 m_size;
+    float m_mass;
+    osp::phys::EShape m_shape;
+};
+
+using SpawnerVec_t = std::vector<SpawnShape>;
+
+
+osp::Session setup_physics(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::TopDataId idResources,
+        osp::PkgId pkg);
+
+osp::Session setup_newton_physics(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::Session const& physics);
+
+osp::Session setup_shape_spawn(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::Session const& physics,
+        osp::Session const& material);
+
+osp::Session setup_gravity(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::Session const& physics,
+        osp::Session const& shapeSpawn);
+
+osp::Session setup_bounds(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::Session const& physics,
+        osp::Session const& shapeSpawn);
 
 
 } // namespace testapp::scenes

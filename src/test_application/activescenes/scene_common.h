@@ -24,24 +24,30 @@
  */
 #pragma once
 
-#include "tasks.h"
-#include "top_tasks.h"
+#include "osp/Active/activetypes.h"
+#include "scenarios.h"
 
-#include <vector>
-
-namespace osp
+namespace testapp::scenes
 {
 
-
-void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec);
-
-void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, ArrayView<TagId const> tagsEnq);
-
-inline void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, std::initializer_list<TagId const> tagsEnq)
+inline auto const delete_ent_set = osp::wrap_args([] (osp::active::EntSet_t& rSet, osp::active::EntVector_t const& rDelTotal) noexcept
 {
-    return top_enqueue_quick(tags, tasks, rExec, Corrade::Containers::arrayView(tagsEnq));
+    for (osp::active::ActiveEnt const ent : rDelTotal)
+    {
+        rSet.reset(std::size_t(ent));
+    }
+});
+
+osp::Session setup_common_scene(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::TopDataId idResources);
+
+osp::Session setup_material(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> const topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon);
+
 }
-
-bool debug_top_verify(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData);
-
-} // namespace testapp

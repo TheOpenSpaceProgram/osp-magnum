@@ -31,8 +31,12 @@
 #include <osp/tasks/tasks.h>
 #include <osp/tasks/top_tasks.h>
 #include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/tasks/builder.h>
 
 #include <functional>
+#include <string_view>
+#include <unordered_map>
 
 namespace osp::active { struct RenderGL; }
 namespace osp::input { class UserInputHandler; }
@@ -40,111 +44,33 @@ namespace osp::input { class UserInputHandler; }
 namespace testapp
 {
 
-struct CommonTestScene;
-struct CommonSceneRendererGL;
-class ActiveApplication;
-
-// Stored inside an ActiveApplicaton to use as a main draw function.
-// Renderer state can be stored in lambda capture
-using on_draw_t = std::function<void(ActiveApplication&, float delta)>;
-
 struct MainView
 {
     osp::ArrayView<entt::any>   m_topData;
     osp::Tags                   &m_rTags;
     osp::Tasks                  &m_rTasks;
+    osp::ExecutionContext       &m_rExec;
     osp::TopTaskDataVec_t       &m_rTaskData;
     osp::TopDataId              m_idResources;
 };
 
-namespace flight
+using Builder_t         = osp::TaskBuilder<osp::TopTaskDataVec_t>;
+using TagSpan_t         = osp::ArrayView<const osp::TagId>;
+using TopDataSpan_t     = osp::ArrayView<const osp::TopDataId>;
+using Sessions_t        = std::vector<osp::Session>;
+
+using RendererSetup_t   = void(*)(MainView, osp::Session const&, Sessions_t const&, Sessions_t&);
+using SceneSetup_t      = RendererSetup_t(*)(MainView, osp::PkgId, Sessions_t&);
+
+struct ScenarioOption
 {
-
-struct FlightScene;
-
-/**
- * @brief TODO
- *
- * @return
- */
-entt::any setup_scene();
-
-/**
- * @brief TODO
- *
- * @return
- */
-on_draw_t generate_draw_func(FlightScene& rScene, ActiveApplication& rApp);
-
-} // namespace flight
-
-//-----------------------------------------------------------------------------
-
-namespace enginetest
-{
-
-struct EngineTestScene;
-
-/**
- * @brief Setup Engine Test Scene
- *
- * @param rResources    [ref] Application Resources containing cube mesh
- * @param pkg           [in] Package Id the cube mesh is under
- *
- * @return entt::any containing scene data
- */
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
-
-/**
- * @brief Generate ActiveApplication draw function
- *
- * This draw function stores renderer data, and is responsible for updating
- * and drawing the engine test scene.
- *
- * @param rScene [ref] Engine test scene. Must be in stable memory.
- * @param rApp   [ref] Existing ActiveApplication to use GL resources of
- *
- * @return ActiveApplication draw function
- */
-on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp, osp::active::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
-
-} // namespace enginetest
-
-//-----------------------------------------------------------------------------
-
-namespace scenes
-{
-
-// Note: Use generate_common_draw to setup common scenes
-//       in common_renderer_gl.h
-
-
-struct PhysicsTest
-{
-    static void setup_scene(MainView mainView, osp::PkgId pkg, osp::Session& sceneOut);
-    static void setup_renderer_gl(
-            MainView        mainView,
-            osp::Session const&  appIn,
-            osp::Session const&  sceneIn,
-            osp::Session const&  magnumIn,
-            osp::Session const&  sceneRenderOut) noexcept;
+    std::string_view m_desc;
+    SceneSetup_t m_setup;
 };
 
-struct VehicleTest
-{
-    static void setup_scene(CommonTestScene &rScene, osp::PkgId pkg);
-    static void setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp) noexcept;
-};
+using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
 
-
-struct UniverseTest
-{
-    static void setup_scene(CommonTestScene &rScene, osp::PkgId pkg);
-    static void setup_renderer_gl(CommonSceneRendererGL& rRenderer, CommonTestScene& rScene, ActiveApplication& rApp) noexcept;
-};
-
-
-} // namespace scenes
+ScenarioMap_t const& scenarios();
 
 
 } // namespace testapp
