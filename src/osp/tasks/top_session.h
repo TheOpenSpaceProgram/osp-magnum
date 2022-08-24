@@ -37,14 +37,15 @@
 
 #include <osp/unpack.h>
 
-#define _OSP_AUTO_STRUCTURE_B(outerFunc, inner, count, ...) auto const [__VA_ARGS__] = outerFunc<count>(inner)
-#define _OSP_AUTO_STRUCTURE_A(outerFunc, inner, name) _OSP_AUTO_STRUCTURE_B(outerFunc, inner, name)
+#define OSP_STRUCT_BIND_C(outerFunc, inner, count, ...) auto const [__VA_ARGS__] = outerFunc<count>(inner)
+#define OSP_STRUCT_BIND_B(x) x
+#define OSP_STRUCT_BIND_A(...) OSP_STRUCT_BIND_B(OSP_STRUCT_BIND_C(__VA_ARGS__))
 
-#define OSP_SESSION_UNPACK_TAGS(session, name)  _OSP_AUTO_STRUCTURE_A(osp::unpack, (session).m_tagIds, OSP_TAGS_##name);
-#define OSP_SESSION_UNPACK_DATA(session, name)  _OSP_AUTO_STRUCTURE_A(osp::unpack, (session).m_dataIds, OSP_DATA_##name);
+#define OSP_SESSION_UNPACK_TAGS(session, name) OSP_STRUCT_BIND_A(osp::unpack, (session).m_tagIds, OSP_TAGS_##name);
+#define OSP_SESSION_UNPACK_DATA(session, name) OSP_STRUCT_BIND_A(osp::unpack, (session).m_dataIds, OSP_DATA_##name);
 
-#define OSP_SESSION_ACQUIRE_TAGS(session, tags, name) _OSP_AUTO_STRUCTURE_A((session).acquire_tags, (tags), OSP_TAGS_##name);
-#define OSP_SESSION_ACQUIRE_DATA(session, topData, name) _OSP_AUTO_STRUCTURE_A((session).acquire_data, (topData), OSP_DATA_##name);
+#define OSP_SESSION_ACQUIRE_TAGS(session, tags, name) OSP_STRUCT_BIND_A((session).acquire_tags, (tags), OSP_TAGS_##name);
+#define OSP_SESSION_ACQUIRE_DATA(session, topData, name) OSP_STRUCT_BIND_A((session).acquire_data, (topData), OSP_DATA_##name);
 
 namespace osp
 {
