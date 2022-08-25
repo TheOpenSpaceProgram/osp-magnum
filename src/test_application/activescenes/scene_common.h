@@ -46,7 +46,7 @@ osp::Session setup_common_scene(
 
 osp::Session setup_material(
         Builder_t& rBuilder,
-        osp::ArrayView<entt::any> const topData,
+        osp::ArrayView<entt::any> topData,
         osp::Tags& rTags,
         osp::Session const& scnCommon);
 

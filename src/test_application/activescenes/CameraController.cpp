@@ -57,10 +57,10 @@ void SysCameraController::update_view(
 
     Rad const keyRotDelta = 180.0_degf * delta; // 180 degrees per second
 
-    yaw   += (controls.button_held(rCtrl.m_btnRotRt)
-            - controls.button_held(rCtrl.m_btnRotLf)) * keyRotDelta;
-    pitch += (controls.button_held(rCtrl.m_btnRotDn)
-            - controls.button_held(rCtrl.m_btnRotUp)) * keyRotDelta;
+    yaw   += (  float(controls.button_held(rCtrl.m_btnRotRt))
+              - float(controls.button_held(rCtrl.m_btnRotLf)) ) * keyRotDelta;
+    pitch += (  float(controls.button_held(rCtrl.m_btnRotDn))
+              - float(controls.button_held(rCtrl.m_btnRotUp)) ) * keyRotDelta;
 
     // Mouse rotation, if right mouse button is down
 
@@ -75,8 +75,8 @@ void SysCameraController::update_view(
                   * mouseRotDelta;
     }
 
-    float const scroll
-            = rCtrl.m_controls.get_input_handler()->scroll_state().offset.y();
+    auto const scroll = float(rCtrl.m_controls.get_input_handler()
+                              ->scroll_state().offset.y());
 
     Vector3 const up
             = rCtrl.m_up.isZero() ? rCamTf.up() : rCtrl.m_up;
@@ -134,12 +134,12 @@ void SysCameraController::update_move(
     ControlSubscriber const& controls = rCtrl.m_controls;
 
     Vector3 const command(
-        controls.button_held(rCtrl.m_btnMovRt)
-         - controls.button_held(rCtrl.m_btnMovLf),
-        controls.button_held(rCtrl.m_btnMovUp)
-         - controls.button_held(rCtrl.m_btnMovDn),
-        controls.button_held(rCtrl.m_btnMovBk)
-         - controls.button_held(rCtrl.m_btnMovFd)
+        float(    controls.button_held(rCtrl.m_btnMovRt))
+         - float( controls.button_held(rCtrl.m_btnMovLf)),
+        float(    controls.button_held(rCtrl.m_btnMovUp))
+         - float( controls.button_held(rCtrl.m_btnMovDn)),
+        float(    controls.button_held(rCtrl.m_btnMovBk))
+         - float( controls.button_held(rCtrl.m_btnMovFd))
     );
 
     Vector3 const translation

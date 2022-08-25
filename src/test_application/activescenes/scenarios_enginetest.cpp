@@ -119,7 +119,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
     using namespace osp::active;
 
     entt::any sceneAny = entt::make_any<EngineTestScene>();
-    EngineTestScene &rScene = entt::any_cast<EngineTestScene&>(sceneAny);
+    auto &rScene = entt::any_cast<EngineTestScene&>(sceneAny);
 
     rScene.m_pResources = &rResources;
 

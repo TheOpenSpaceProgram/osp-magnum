@@ -90,12 +90,15 @@ static ScenarioMap_t make_scenarios()
         scenarioMap.emplace(name, ScenarioOption{desc, run});
     };
 
-    add_scenario("enginetest", "Demonstrate basic game engine functionality",
+    add_scenario("enginetest", "Demonstrate basic game engine functions without using TopTasks",
                  [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
     {
         sceneOut.resize(1);
         TopDataId const idSceneData = sceneOut.front().acquire_data<1>(mainView.m_topData).front();
         auto &rResources = top_get<Resources>(mainView.m_topData, mainView.m_idResources);
+
+        // enginetest::setup_scene returns an entt::any containing one big
+        // struct containing all the scene data.
         top_assign<enginetest::EngineTestScene>(mainView.m_topData, idSceneData, enginetest::setup_scene(rResources, pkg));
 
         return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
@@ -103,7 +106,7 @@ static ScenarioMap_t make_scenarios()
             TopDataId const idSceneData = scene.front().m_dataIds.front();
             auto& rScene = top_get<enginetest::EngineTestScene>(mainView.m_topData, idSceneData);
 
-            auto const [idActiveApp, idRenderGl, idUserInput] = unpack<3>(magnum.m_dataIds);
+            OSP_SESSION_UNPACK_DATA(magnum, TESTAPP_MAGNUMAPP);
             auto &rActiveApp    = top_get< ActiveApplication >      (mainView.m_topData, idActiveApp);
             auto &rRenderGl     = top_get< active::RenderGL >       (mainView.m_topData, idRenderGl);
             auto &rUserInput    = top_get< input::UserInputHandler >(mainView.m_topData, idUserInput);
@@ -115,16 +118,17 @@ static ScenarioMap_t make_scenarios()
     add_scenario("physicstest", "Physics lol",
                  [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
     {
-        auto &rTopData = mainView.m_topData;
-        auto &rTags = mainView.m_rTags;
-        auto const idResources = mainView.m_idResources;
-        Builder_t builder{mainView.m_rTags, mainView.m_rTasks, mainView.m_rTaskData};
+        using namespace testapp::scenes;
+
+        auto const idResources  = mainView.m_idResources;
+        auto &rTopData          = mainView.m_topData;
+        auto &rTags             = mainView.m_rTags;
+        Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
         sceneOut.resize(9);
         auto & [scnCommon, matVisual, physics, newton, shapeSpawn, droppers, gravity, bounds, thrower] = unpack<9>(sceneOut);
 
-        using namespace testapp::scenes;
-
+        // Compose together lots of Sessions
         scnCommon   = setup_common_scene    (builder, rTopData, rTags, idResources);
         matVisual   = setup_material        (builder, rTopData, rTags, scnCommon);
         physics     = setup_physics         (builder, rTopData, rTags, scnCommon, idResources, pkg);

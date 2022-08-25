@@ -28,6 +28,7 @@
 
 #include "ActiveApplication.h"
 #include "activescenes/scenarios.h"
+#include "activescenes/identifiers.h"
 
 #include <osp/Active/opengl/SysRenderGL.h>
 
@@ -42,8 +43,6 @@
 
 #include <osp/string_concat.h>
 #include <osp/logging.h>
-
-#include <osp/unpack.h>
 
 #include <Magnum/MeshTools/Transform.h>
 #include <Magnum/Primitives/Cylinder.h>
@@ -96,12 +95,6 @@ void start_magnum_async();
 void load_a_bunch_of_stuff();
 
 /**
- * @brief Setup a scene that uses CommonTestScene
- */
-template <typename SCENE_T>
-void setup_common_scene();
-
-/**
  * @brief Deal with resource reference counts for a clean termination
  */
 void clear_resource_owners();
@@ -110,26 +103,40 @@ void clear_resource_owners();
 void debug_print_help();
 void debug_print_resources();
 
-// Application state
-osp::Tags               g_tags;
+// TopData stores most application state, addressed using a TopDataId
+std::vector<entt::any>  g_appTopData;
+
+// TopTasks and are organized with Tags to form task graphs and events.
+// Each TopTask is given a vector of TopDataIds its allowed to access
 osp::Tasks              g_tasks;
 osp::TopTaskDataVec_t   g_taskData;
-std::vector<entt::any>  g_appTopData;
+osp::Tags               g_tags;
+
+// Current execution state of TopTasks
+// g_tasks, g_taskData, and g_tags stay constant during execution
 osp::ExecutionContext   g_exec;
 
+// Sessions bundle together and own TopDataIds, TopTaskIds, and TagsIds
+// Sessions intend to add support for something to exist in the world
+// eg, Adding support for physics or supporting a certain shader
+
+// Refers to TopData with static duration, stores the Resources class
 osp::Session            g_application;
-osp::Session            g_magnum;
+// Default Package in Resources
+osp::PkgId              g_defaultPkg;
+
+// Sessions that make up the current scene
 Sessions_t              g_sceneSessions;
+
+// Sessions for rendering. These only exist when the Magnum Application is open
+osp::Session            g_magnum;
 Sessions_t              g_renderSessions;
 
-// Stores loaded resources in g_appTopData
-osp::PkgId g_defaultPkg;
-
 // Magnum Application deals with window and OpenGL things
-std::thread g_magnumThread;
+std::thread             g_magnumThread;
 
 // Called when openning a Magnum Application
-RendererSetup_t g_rendererSetup;
+RendererSetup_t         g_rendererSetup;
 
 // Loggers
 std::shared_ptr<spdlog::logger> g_logTestApp;
@@ -140,15 +147,25 @@ int g_argc;
 char** g_argv;
 
 
-
 static ActiveApplication& get_magnum_application()
 {
-    return entt::any_cast<ActiveApplication&>(g_appTopData.at(std::size_t(g_magnum.m_dataIds[0])));
+    return osp::top_get<ActiveApplication>(g_appTopData, g_magnum.m_dataIds[0]);
 }
 
 static osp::Resources& get_resources()
 {
-    return entt::any_cast<osp::Resources&>(g_appTopData.at(std::size_t(g_application.m_dataIds[0])));
+    return osp::top_get<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
+}
+
+static void close_sessions(Sessions_t &rSessions)
+{
+    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, rSessions);
+    rSessions.clear();
+}
+
+static void close_session(osp::Session &rSession)
+{
+    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, osp::ArrayView<osp::Session>(&rSession, 1));
 }
 
 static MainView get_main_view()
@@ -223,18 +240,6 @@ int main(int argc, char** argv)
     spdlog::shutdown();  //>_> -> X.X  *Stab
     return 0;
 }
-
-void close_sessions(Sessions_t &rSessions)
-{
-    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, rSessions);
-    rSessions.clear();
-}
-
-void close_session(osp::Session &rSession)
-{
-    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, osp::ArrayView<osp::Session>(&rSession, 1));
-}
-
 
 int debug_cli_loop()
 {
@@ -324,13 +329,19 @@ void start_magnum_async()
 
         osp::set_thread_logger(g_logMagnumApp);
 
-        auto &rDataIds = g_magnum.m_dataIds;
-        rDataIds.resize(3);
-        osp::top_reserve(g_appTopData, 0, std::begin(rDataIds), std::end(rDataIds));
-        auto const [idActiveApp, idRenderGl, idUserInput] = osp::unpack<3>(rDataIds);
-        g_magnum.m_tagIds.resize(4);
-        g_tags.m_tags.create(std::begin(g_magnum.m_tagIds), std::end(g_magnum.m_tagIds));
+        // Acquire data for Magnum Session. This will search for empty spaces in
+        // g_appTopData, and add their indices to g_magnum.m_dataIds, and
+        // declare them as variables: idUserInput, idActiveApp, idRenderGl
+        // see OSP_DATA_TESTAPP_MAGNUMAPP in identifiers.h
+        OSP_SESSION_ACQUIRE_DATA(g_magnum, g_appTopData, TESTAPP_MAGNUMAPP);
 
+        // Acquire tags will reserve unique integer TagIds from g_tags, and
+        // add them to g_magnum.m_tagIds. Variables are declared here too, but
+        // are not used.
+        // see OSP_TAGS_TESTAPP_MAGNUMAPP in identifiers.h
+        [[maybe_unused]] OSP_SESSION_ACQUIRE_TAGS(g_magnum, g_tags, TESTAPP_MAGNUMAPP);
+
+        // We now have reserved spaces in g_appTopData we can add data to
         // Order-dependent; ActiveApplication construction starts OpenGL context
         auto &rUserInput    = osp::top_emplace<osp::input::UserInputHandler>(g_appTopData, idUserInput, 12);
         auto &rActiveApp    = osp::top_emplace<ActiveApplication>(g_appTopData, idActiveApp, ActiveApplication::Arguments{g_argc, g_argv}, rUserInput);
@@ -342,19 +353,23 @@ void start_magnum_async()
         // Setup GL resources
         osp::active::SysRenderGL::setup_context(rRenderGl);
 
+        // Call important cleanup functions when the window closes
+        // TODO: This is a bit hacky, Add a cleanup tag so custom tasks can be
+        //       added here.
         rActiveApp.set_on_destruct([&rRenderGl, idRenderGl = idRenderGl] ()
         {
             osp::active::SysRenderGL::clear_resource_owners(rRenderGl, get_resources());
             g_appTopData[std::size_t(idRenderGl)].reset();
         });
 
-        // Setup scene-specific renderer
+        // Setup renderer sessions
         g_rendererSetup(get_main_view(), g_magnum, g_sceneSessions, g_renderSessions);
 
         // Starts the main loop. This function is blocking, and will only return
         // once the window is closed. See ActiveApplication::drawEvent
         rActiveApp.exec();
 
+        // Closing sessions will delete their associated TopData and Tags
         close_sessions(g_renderSessions);
         close_session(g_magnum);
 
@@ -364,7 +379,6 @@ void start_magnum_async()
 }
 
 
-using Corrade::Containers::arrayView;
 
 void load_a_bunch_of_stuff()
 {
@@ -418,7 +432,6 @@ void load_a_bunch_of_stuff()
         osp::ResId res = osp::load_tinygltf_file(osp::string_concat(datapath, meshName), rResources, g_defaultPkg);
         osp::assigns_prefabs_tinygltf(rResources, res);
     }
-
 
     // Add a default primitives
     auto const add_mesh_quick = [&rResources = rResources] (std::string_view const name, Trade::MeshData&& data)

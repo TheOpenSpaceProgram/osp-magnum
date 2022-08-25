@@ -138,9 +138,9 @@ struct Camera
 {
     Matrix4 m_transform;
 
-    float m_near;
-    float m_far;
-    float m_aspectRatio;
+    float m_near{0.25f};
+    float m_far{1024.0f};
+    float m_aspectRatio{1.0f};
     Deg m_fov;
 
     constexpr void set_aspect_ratio(Vector2 const viewport) noexcept
