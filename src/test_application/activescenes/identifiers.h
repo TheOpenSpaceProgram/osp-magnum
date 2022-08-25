@@ -24,6 +24,9 @@
  */
 #pragma once
 
+// Identifiers made for OSP_ACQUIRE_* and OSP_UNPACK_* macros
+// Used to set counts and declare variable names for TopDataIds and TagIds
+// #define OSP_[DATA/TAGS]_NAME <# of identifiers>, a, b, c, d, ...
 
 // Scene sessions
 
@@ -105,7 +108,6 @@
 
 #define OSP_TAGS_TESTAPP_MAGNUMAPP 3, \
     tgRenderEvt, tgInputEvt, tgGlUse
-
 
 
 #define OSP_DATA_TESTAPP_COMMON_RENDERER 3, \

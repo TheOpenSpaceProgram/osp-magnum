@@ -36,7 +36,7 @@ osp::Session setup_scene_renderer(
         osp::Tags& rTags,
         osp::Session const& magnum,
         osp::Session const& scene,
-        osp::TopDataId const idResources);
+        osp::TopDataId idResources);
 
 osp::Session setup_simple_camera(
         Builder_t& rBuilder,

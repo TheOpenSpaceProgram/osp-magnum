@@ -39,7 +39,7 @@ struct TopTask
 {
     std::string m_debugName;
     std::vector<TopDataId> m_dataUsed;
-    TopTaskFunc_t m_func;
+    TopTaskFunc_t m_func{nullptr};
 };
 
 

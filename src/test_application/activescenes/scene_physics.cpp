@@ -303,7 +303,7 @@ Session setup_gravity(Builder_t& rBuilder, ArrayView<entt::any> const topData, T
                 = rTPhys.m_physIn.m_physNetForce;
         for (std::size_t const entInt : rGravity.ones())
         {
-            ActiveEnt const ent = ActiveEnt(entInt);
+            auto const ent = ActiveEnt(entInt);
             ACompPhysNetForce &rEntNetForce = rNetForce.contains(ent)
                                             ? rNetForce.get(ent)
                                             : rNetForce.emplace(ent);
