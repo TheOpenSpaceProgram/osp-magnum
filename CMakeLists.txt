@@ -91,9 +91,6 @@ IF(OSP_ENABLE_COMPILER_WARNINGS)
   LIST(APPEND GCC_COMPILE_FLAGS -Wno-psabi)
 ENDIF() # OSP_ENABLE_COMPILER_EARNINGS
 
-# Set OSP as default startup project in Visual Studio
-set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT OSP-MAGNUM)
-
 # Compiler warnings can help find problems in code.
 IF(OSP_WARNINGS_ARE_ERRORS)
   add_compile_options(-Werror)
@@ -168,3 +165,8 @@ ADD_SUBDIRECTORY(src)
 
 # Unit Tests
 ADD_SUBDIRECTORY(test)
+
+# Set OSP as default startup project in Visual Studio
+set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT osp-magnum)
+# Set execution directory of osp-magnum so that we don't have to copy the files
+set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
