@@ -27,6 +27,7 @@ jobs:
         fetch-depth: 1
         submodules: recursive
 
+    # Don't change this to use v1. It doesn't work correctly with the github "major version" auto-magic
     - uses: hendrikmuhs/ccache-action@v1.2
       with:
         Key: windows-${{ matrix.image }}-${{ matrix.config }}
