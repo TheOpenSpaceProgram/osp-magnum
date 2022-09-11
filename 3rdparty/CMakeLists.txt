@@ -42,7 +42,6 @@ if(NOT OSP_USE_SYSTEM_SDL)
   SET(SDL_POWER             OFF CACHE BOOL "" FORCE)
   SET(SDL_RENDER            OFF CACHE BOOL "" FORCE)
   SET(SDL_SENSOR            OFF CACHE BOOL "" FORCE)
-  SET(SDL_THREADS           OFF CACHE BOOL "" FORCE)
   SET(SDL_TIMERS            OFF CACHE BOOL "" FORCE)
   SET(SDL_ALTIVEC           OFF CACHE BOOL "" FORCE) # POWERPC exclusive, not supported by osp-magnum
   SET(SDL_3DNOW             OFF CACHE BOOL "" FORCE) # Old 32bit x86 chips only, not supported by osp-magnum.
@@ -88,7 +87,7 @@ if(NOT OSP_USE_SYSTEM_SDL)
 
   # Enabled video settings
   SET(SDL_OPENGL             ON  CACHE BOOL "" FORCE)
-  
+
   # Disabled video settings
   SET(SDL_DUMMYVIDEO         OFF CACHE BOOL "" FORCE)
   SET(SDL_VULKAN             OFF CACHE BOOL "" FORCE) # Vulkan is cool and all, but one project at a time.
@@ -116,6 +115,7 @@ if(NOT OSP_USE_SYSTEM_SDL)
   SET(LIBSAMPLERATE_SHARED   ON  CACHE BOOL "" FORCE)
 
   SET(SDL_EVENTS             ON  CACHE BOOL "" FORCE)
+  SET(SDL_THREADS            ON  CACHE BOOL "" FORCE)
 
   # This assumes you want to have SDL as a static library. If not, set SDL_STATIC
   # to OFF instead.
