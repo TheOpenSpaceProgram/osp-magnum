@@ -27,7 +27,7 @@ jobs:
         fetch-depth: 1
         submodules: recursive
 
-    - uses: hendrikmuhs/ccache-action@v1.2
+    - uses: hendrikmuhs/ccache-action@v1
       with:
         Key: windows-${{ matrix.image }}-${{ matrix.config }}
 
