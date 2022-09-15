@@ -332,14 +332,14 @@ void start_magnum_async()
         // Acquire data for Magnum Session. This will search for empty spaces in
         // g_appTopData, and add their indices to g_magnum.m_dataIds, and
         // declare them as variables: idUserInput, idActiveApp, idRenderGl
-        // see OSP_DATA_TESTAPP_MAGNUMAPP in identifiers.h
-        OSP_SESSION_ACQUIRE_DATA(g_magnum, g_appTopData, TESTAPP_MAGNUMAPP);
+        // see OSP_DATA_TESTAPP_APP_MAGNUM in identifiers.h
+        OSP_SESSION_ACQUIRE_DATA(g_magnum, g_appTopData, TESTAPP_APP_MAGNUM);
 
         // Acquire tags will reserve unique integer TagIds from g_tags, and
         // add them to g_magnum.m_tagIds. Variables are declared here too, but
         // are not used.
-        // see OSP_TAGS_TESTAPP_MAGNUMAPP in identifiers.h
-        [[maybe_unused]] OSP_SESSION_ACQUIRE_TAGS(g_magnum, g_tags, TESTAPP_MAGNUMAPP);
+        // see OSP_TAGS_TESTAPP_APP_MAGNUM in identifiers.h
+        [[maybe_unused]] OSP_SESSION_ACQUIRE_TAGS(g_magnum, g_tags, TESTAPP_APP_MAGNUM);
 
         // We now have reserved spaces in g_appTopData we can add data to
         // Order-dependent; ActiveApplication construction starts OpenGL context

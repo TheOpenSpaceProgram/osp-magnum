@@ -37,6 +37,15 @@ void add_floor(
         osp::TopDataId idResources,
         osp::PkgId pkg);
 
+osp::Session setup_camera_free(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& app,
+        osp::Session const& scnCommon,
+        osp::Session const& renderer,
+        osp::Session const& camera);
+
 osp::Session setup_thrower(
         Builder_t& rBuilder,
         osp::ArrayView<entt::any> topData,

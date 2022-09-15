@@ -143,12 +143,36 @@ void add_floor(ArrayView<entt::any> const topData, Session const& scnCommon, Ses
     });
 }
 
+Session setup_camera_free(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnCommon, Session const& renderer, Session const& camera)
+{
+    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
+    OSP_SESSION_UNPACK_DATA(camera,     TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_DATA(renderer,   TESTAPP_COMMON_RENDERER);
+
+    Session cameraFree;
+
+    cameraFree.task() = rBuilder.task().assign({tgInputEvt}).data(
+            "Move Camera",
+            TopDataIds_t{                      idCamCtrl,        idCamera,           idDeltaTimeIn},
+            wrap_args([] (ACtxCameraController& rCamCtrl, Camera& rCamera, float const deltaTimeIn) noexcept
+    {
+        SysCameraController::update_view(rCamCtrl,
+                rCamera.m_transform, deltaTimeIn);
+        SysCameraController::update_move(
+                rCamCtrl,
+                rCamera.m_transform,
+                deltaTimeIn, true);
+    }));
+
+    return cameraFree;
+}
 
 Session setup_thrower(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& renderer, Session const& simpleCamera, Session const& shapeSpawn)
 {
     OSP_SESSION_UNPACK_DATA(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_MAGNUMAPP);
+    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
     OSP_SESSION_UNPACK_DATA(renderer,       TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_DATA(simpleCamera,   TESTAPP_CAMERA_CTRL);
 

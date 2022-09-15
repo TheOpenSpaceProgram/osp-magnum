@@ -84,6 +84,15 @@
 
 
 
+#define OSP_DATA_TESTAPP_PREFABS 1, \
+    idPrefabInit
+
+#define OSP_TAGS_TESTAPP_PREFABS 5, \
+    tgPrefabMod,        tgPrefabReq,        tgPrefabClr,        \
+    tgPrefabEntMod,     tgPrefabEntReq
+
+
+
 #define OSP_DATA_TESTAPP_GRAVITY 1, \
     idGravity
 
@@ -99,15 +108,40 @@
     tgBoundsReq,        tgBoundsDel,        tgBoundsNew
 
 
+
+#define OSP_DATA_TESTAPP_PARTS 3, \
+    idScnParts, idPartInit, idUpdMachines
+
+#define OSP_TAGS_TESTAPP_PARTS 3, \
+    tgPartInitMod,      tgPartInitReq,      tgPartInitClr
+
+
+
+#define OSP_DATA_TESTAPP_SIGNALS_FLOAT 2, \
+    idSigValFloat,      idSigUpdFloat
+
+#define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 3, \
+    tgP
+
+
 //-----------------------------------------------------------------------------
 
 // Renderer sessions, tend to exist only when the window is open
 
-#define OSP_DATA_TESTAPP_MAGNUMAPP 3, \
-    idActiveApp, idRenderGl, idUserInput
+#define OSP_DATA_TESTAPP_APP 1, \
+    idUserInput
 
-#define OSP_TAGS_TESTAPP_MAGNUMAPP 3, \
+#define OSP_TAGS_TESTAPP_APP 2, \
+    tgRenderEvt, tgInputEvt
+
+
+
+#define OSP_DATA_TESTAPP_APP_MAGNUM 3, \
+    idUserInput, idActiveApp, idRenderGl
+
+#define OSP_TAGS_TESTAPP_APP_MAGNUM 3, \
     tgRenderEvt, tgInputEvt, tgGlUse
+
 
 
 #define OSP_DATA_TESTAPP_COMMON_RENDERER 3, \

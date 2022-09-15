@@ -22,7 +22,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "scene_common.h"
 #include "scenarios.h"
 #include "identifiers.h"
 
@@ -51,8 +50,8 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
 {
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_MAGNUMAPP);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_MAGNUMAPP);
+    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
 
     Session renderer;
     OSP_SESSION_ACQUIRE_DATA(renderer, topData, TESTAPP_COMMON_RENDERER);
@@ -161,43 +160,24 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
 }
 
 
-Session setup_simple_camera(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnCommon, Session const& renderer)
+Session setup_camera_magnum(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_MAGNUMAPP);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_MAGNUMAPP);
-    OSP_SESSION_UNPACK_DATA(renderer,   TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
     auto &rUserInput = top_get< UserInputHandler >(topData, idUserInput);
 
     Session simpleCamera;
     OSP_SESSION_ACQUIRE_DATA(simpleCamera, topData, TESTAPP_CAMERA_CTRL);
 
-    auto &rCamCtrl = top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
-    rCamCtrl.m_target = {0.0f, 0.0f, 1.0f};
-
-    simpleCamera.task() = rBuilder.task().assign({tgInputEvt, tgGlUse}).data(
-            "Move Camera",
-            TopDataIds_t{                      idCamCtrl,        idCamera,           idDeltaTimeIn},
-            wrap_args([] (ACtxCameraController& rCamCtrl, Camera& rCamera, float const deltaTimeIn) noexcept
-    {
-        SysCameraController::update_view(rCamCtrl,
-                rCamera.m_transform, deltaTimeIn);
-        SysCameraController::update_move(
-                rCamCtrl,
-                rCamera.m_transform,
-                deltaTimeIn, true);
-    }));
+    top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
 
     return simpleCamera;
 }
-
-
 
 Session setup_shader_visualizer(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnCommon, Session const& renderer, Session const& material)
 {
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_MAGNUMAPP);
+    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
     OSP_SESSION_UNPACK_TAGS(renderer,   TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_DATA(renderer,   TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);

@@ -32,6 +32,10 @@
 #include "scene_physics.h"
 #include "scene_misc.h"
 
+#include <osp/Active/basic.h>
+#include <osp/Active/SysPrefabInit.h>
+#include <osp/Resource/resources.h>
+
 #include "../ActiveApplication.h"
 
 #include <osp/logging.h>
@@ -47,8 +51,8 @@ static void setup_magnum_draw(MainView mainView, Session const& magnum, Session 
 {
     OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_MAGNUMAPP);
-    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_MAGNUMAPP);
+    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_APP_MAGNUM);
 
     Tags                    &rTags      = mainView.m_rTags;
     Tasks                   &rTasks     = mainView.m_rTasks;
@@ -106,7 +110,7 @@ static ScenarioMap_t make_scenarios()
             TopDataId const idSceneData = scene.front().m_dataIds.front();
             auto& rScene = top_get<enginetest::EngineTestScene>(mainView.m_topData, idSceneData);
 
-            OSP_SESSION_UNPACK_DATA(magnum, TESTAPP_MAGNUMAPP);
+            OSP_SESSION_UNPACK_DATA(magnum, TESTAPP_APP_MAGNUM);
             auto &rActiveApp    = top_get< ActiveApplication >      (mainView.m_topData, idActiveApp);
             auto &rRenderGl     = top_get< active::RenderGL >       (mainView.m_topData, idRenderGl);
             auto &rUserInput    = top_get< input::UserInputHandler >(mainView.m_topData, idUserInput);
@@ -148,20 +152,81 @@ static ScenarioMap_t make_scenarios()
 
             auto const& [scnCommon, matVisual, physics, newton, shapeSpawn, gravity, bounds, thrower] = unpack<8>(scene);
 
-            rendererOut.resize(4);
-
             using namespace testapp::scenes;
 
-            auto & [scnRender, simpleCam, shVisual, camThrow] = unpack<4>(rendererOut);
+            rendererOut.resize(5);
+            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow] = unpack<5>(rendererOut);
             scnRender   = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
-            simpleCam   = setup_simple_camera       (builder, rTopData, rTags, magnum, scnCommon, scnRender);
+            cameraCtrl  = setup_camera_magnum       (builder, rTopData, rTags, magnum);
+            cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, scnRender, cameraCtrl);
             shVisual    = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
-            camThrow    = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, simpleCam, shapeSpawn);
+            camThrow    = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
 
             setup_magnum_draw(mainView, magnum, scnCommon, scnRender);
         };
     });
 
+    add_scenario("vehicletest", "Vehicles, gwah!",
+                 [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
+    {
+        using namespace testapp::scenes;
+
+        auto const idResources  = mainView.m_idResources;
+        auto &rTopData          = mainView.m_topData;
+        auto &rTags             = mainView.m_rTags;
+        Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
+
+        sceneOut.resize(10);
+        auto & [scnCommon, matVisual, physics, newton, shapeSpawn, prefabs, droppers, gravity, bounds, thrower] = unpack<10>(sceneOut);
+
+        // Compose together lots of Sessions
+        scnCommon   = setup_common_scene    (builder, rTopData, rTags, idResources);
+        matVisual   = setup_material        (builder, rTopData, rTags, scnCommon);
+        physics     = setup_physics         (builder, rTopData, rTags, scnCommon, idResources, pkg);
+        newton      = setup_newton_physics  (builder, rTopData, rTags, scnCommon, physics);
+        shapeSpawn  = setup_shape_spawn     (builder, rTopData, rTags, scnCommon, physics, matVisual);
+        prefabs     = setup_prefabs         (builder, rTopData, rTags, scnCommon, physics, matVisual, idResources);
+        droppers    = setup_droppers        (builder, rTopData, rTags, scnCommon, shapeSpawn);
+        gravity     = setup_gravity         (builder, rTopData, rTags, scnCommon, physics, shapeSpawn);
+        bounds      = setup_bounds          (builder, rTopData, rTags, scnCommon, physics, shapeSpawn);
+
+        OSP_SESSION_UNPACK_DATA(scnCommon, TESTAPP_COMMON_SCENE);
+        add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, pkg);
+
+        Resources &rResources = top_get<Resources>(rTopData, idResources);
+
+        static Matrix4 uppy = Matrix4::translation({0.0f, 0.0f, 4.0f});
+
+        top_get<osp::active::ACtxPrefabInit>(rTopData, prefabs.m_dataIds[0]).m_basic.push_back(osp::active::TmpPrefabInitBasic{
+            .m_importerRes = rResources.find(restypes::gc_importer, pkg, "OSPData/adera/stomper.sturdy.gltf"),
+            .m_prefabId = 0,
+            .m_parent = top_get<osp::active::ACtxBasic>(rTopData, idBasic).m_hierRoot,
+            .m_pTransform = &uppy
+        });
+
+        return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
+        {
+            auto &rTopData = mainView.m_topData;
+            auto &rTags = mainView.m_rTags;
+            Builder_t builder{mainView.m_rTags, mainView.m_rTasks, mainView.m_rTaskData};
+
+            auto const& [scnCommon, matVisual, physics, newton, shapeSpawn, gravity, bounds, thrower] = unpack<8>(scene);
+
+            rendererOut.resize(4);
+
+            using namespace testapp::scenes;
+
+            rendererOut.resize(5);
+            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow] = unpack<5>(rendererOut);
+            scnRender   = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
+            cameraCtrl  = setup_camera_magnum       (builder, rTopData, rTags, magnum);
+            cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, scnRender, cameraCtrl);
+            shVisual    = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
+            camThrow    = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
+
+            setup_magnum_draw(mainView, magnum, scnCommon, scnRender);
+        };
+    });
 
     return scenarioMap;
 }
