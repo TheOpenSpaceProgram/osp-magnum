@@ -31,20 +31,22 @@
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
 #include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysPrefabInit.h>
 #include <osp/Active/SysRender.h>
-#include <osp/Active/SysPhysics.h>
 
+#include <osp/Resource/ImporterData.h>
 #include <osp/Resource/resources.h>
+#include <osp/Resource/resourcetypes.h>
 
 #include <newtondynamics_physics/ospnewton.h>
 #include <newtondynamics_physics/SysNewton.h>
 
-
 using namespace osp;
 using namespace osp::active;
+using osp::restypes::gc_importer;
 using osp::phys::EShape;
 using ospnewton::ACtxNwtWorld;
-
+using Corrade::Containers::arrayView;
 
 namespace testapp::scenes
 {
@@ -274,6 +276,122 @@ Session setup_shape_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topDat
     }));
 
     return shapeSpawn;
+}
+
+
+Session setup_prefabs(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& physics, Session const& material, TopDataId const idResources)
+{
+    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(physics,    TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
+
+    Session prefabs;
+    OSP_SESSION_ACQUIRE_DATA(prefabs, topData,  TESTAPP_PREFABS);
+    OSP_SESSION_ACQUIRE_TAGS(prefabs, rTags,    TESTAPP_PREFABS);
+
+    rBuilder.tag(tgPrefabReq)       .depend_on({tgPrefabMod});
+    rBuilder.tag(tgPrefabClr)       .depend_on({tgPrefabMod, tgPrefabReq});
+
+    rBuilder.tag(tgPrefabEntReq)    .depend_on({tgPrefabEntMod});
+
+    top_emplace< ACtxPrefabInit > (topData, idPrefabInit);
+
+    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntMod, tgEntNew}).data(
+            "Create Prefab entities",
+            TopDataIds_t{             idActiveIds,                idPrefabInit,           idResources },
+            wrap_args([] (ActiveReg_t& rActiveIds, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
+    {
+        // Count number of entities needed to be created
+        std::size_t totalEnts = 0;
+        for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
+        {
+            auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
+            auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
+
+            totalEnts += objects.size();
+        }
+
+        // Create entities
+        rPrefabInit.m_newEnts.resize(totalEnts);
+        rActiveIds.create(std::begin(rPrefabInit.m_newEnts), std::end(rPrefabInit.m_newEnts));
+
+
+        // Assign new entities to each prefab to create
+        rPrefabInit.m_ents.resize(rPrefabInit.m_basic.size());
+        auto itPfEnts = std::begin(rPrefabInit.m_ents);
+        ArrayView<ActiveEnt const> entsAvailable{rPrefabInit.m_newEnts};
+        for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.m_basic)
+        {
+            auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
+            auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
+
+            (*itPfEnts)             = entsAvailable.prefix(objects.size());
+            entsAvailable           = entsAvailable.exceptPrefix(objects.size());
+
+            std::advance(itPfEnts, 1);
+        }
+    }));
+
+    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgHierNew}).data(
+            "Init Prefab hierarchy",
+            TopDataIds_t{                idPrefabInit,           idResources,           idBasic },
+            wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxBasic& rBasic) noexcept
+    {
+        SysPrefabInit::init_hierarchy(rPrefabInit, rResources, rBasic.m_hierarchy);
+    }));
+
+    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgTransformNew}).data(
+            "Init Prefab transforms",
+            TopDataIds_t{                idPrefabInit,           idResources,           idBasic },
+            wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxBasic& rBasic) noexcept
+    {
+        SysPrefabInit::init_transforms(rPrefabInit, rResources, rBasic.m_transform);
+    }));
+
+    if (material.m_dataIds.empty())
+    {
+        prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod}).data(
+                "Init Prefab drawables (no material)",
+                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes },
+                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes) noexcept
+        {
+            SysPrefabInit::init_drawing(rPrefabInit, rResources, rDrawing, rDrawingRes, {});
+        }));
+    }
+    else
+    {
+        OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
+        OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
+
+        prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod, tgMatMod}).data(
+                "Init Prefab drawables (single material)",
+                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,             idMatDirty },
+                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, EntVector_t& rMatDirty) noexcept
+        {
+            SysPrefabInit::init_drawing(rPrefabInit, rResources, rDrawing, rDrawingRes, {{rMatEnts, rMatDirty}});
+        }));
+    }
+
+    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgPhysBodyMod}).data(
+            "Init Prefab physics",
+            TopDataIds_t{                idPrefabInit,           idResources,           idTPhys },
+            wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxTestPhys& rTPhys) noexcept
+    {
+        SysPrefabInit::init_physics(rPrefabInit, rResources, rTPhys.m_physIn, rTPhys.m_physics, rTPhys.m_hierBody);
+    }));
+
+
+    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabClr}).data(
+            "Clear Prefab vector",
+            TopDataIds_t{                idPrefabInit },
+            wrap_args([] (ACtxPrefabInit& rPrefabInit) noexcept
+    {
+        rPrefabInit.m_basic.clear();
+    }));
+
+
+    return prefabs;
 }
 
 Session setup_gravity(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& physics, Session const& shapeSpawn)

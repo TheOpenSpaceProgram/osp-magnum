@@ -102,6 +102,15 @@ osp::Session setup_shape_spawn(
         osp::Session const& physics,
         osp::Session const& material);
 
+osp::Session setup_prefabs(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::Session const& physics,
+        osp::Session const& material,
+        osp::TopDataId idResources);
+
 osp::Session setup_gravity(
         Builder_t& rBuilder,
         osp::ArrayView<entt::any> topData,
