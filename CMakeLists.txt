@@ -57,15 +57,6 @@ OPTION(OSP_ENABLE_IWYU              "Build with warnings from IWYU turned on" OF
 OPTION(OSP_ENABLE_CLANG_TIDY        "Build with warnings from clang-tidy turned on" OFF)
 OPTION(OSP_USE_SYSTEM_SDL           "Build with SDL that you provide if turned on, compiles SDL if turned off. Off by default" OFF)
 
-# Set the explicit standard revision for C and C++ code.
-SET(CMAKE_C_STANDARD 11)
-SET(CMAKE_C_EXTENSIONS ON)
-SET(CMAKE_C_STANDARD_REQUIRED ON)
-
-SET(CMAKE_CXX_STANDARD 20)
-SET(CMAKE_CXX_EXTENSIONS OFF)
-SET(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 # If the environment has these set, pull them into proper variables.
 SET(CLANG_COMPILE_FLAGS ${CLANG_COMPILE_FLAGS})
 SET(GCC_COMPILE_FLAGS   ${GCC_COMPILE_FLAGS})
