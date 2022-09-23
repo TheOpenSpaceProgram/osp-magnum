@@ -59,7 +59,8 @@ void draw_ent_visualizer(
 
 template<typename ITA_T, typename ITB_T>
 void sync_visualizer(
-        ITA_T dirtyFirst, ITB_T const& dirtyLast,
+        ITA_T dirtyFirst,
+        ITB_T const& dirtyLast,
         active::EntSet_t const& hasMaterial,
         active::RenderGroup::Storage_t& rStorage,
         ACtxDrawMeshVisualizer &rData)

@@ -37,13 +37,17 @@ namespace osp
 
 bool any_bits_match(BitSpanConst_t const lhs, BitSpanConst_t const rhs)
 {
-    return ! std::equal(
-            std::cbegin(lhs), std::cend(lhs),
-            std::cbegin(rhs), std::cend(rhs),
-            [] (uint64_t const lhsInt, uint64_t const rhsInt)
+    auto itRhsInt = std::begin(rhs);
+    for (bit_int_t const lhsInt : lhs)
     {
-        return (lhsInt & rhsInt) == 0;
-    });
+        if ((lhsInt & (*itRhsInt)) != 0)
+        {
+            return true;
+        }
+        std::advance(itRhsInt, 1);
+    }
+
+    return false;
 }
 
 void task_enqueue(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, BitSpanConst_t const query)

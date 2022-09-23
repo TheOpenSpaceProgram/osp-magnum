@@ -144,10 +144,6 @@ void SysPrefabInit::init_drawing(
 
             }
 
-            //MaterialData &rMaterial = rCtxDraw.m_materials[materialId];
-            //rMaterial.m_comp.emplace(ent);
-            //rMaterial.m_added.push_back(ent);
-
             rCtxDraw.m_opaque.emplace(ent);
             rCtxDraw.m_visible.emplace(ent);
         }

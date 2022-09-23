@@ -47,10 +47,10 @@ namespace testapp
 struct MainView
 {
     osp::ArrayView<entt::any>   m_topData;
-    osp::Tags                   &m_rTags;
-    osp::Tasks                  &m_rTasks;
-    osp::ExecutionContext       &m_rExec;
-    osp::TopTaskDataVec_t       &m_rTaskData;
+    osp::Tags                   & m_rTags;
+    osp::Tasks                  & m_rTasks;
+    osp::ExecutionContext       & m_rExec;
+    osp::TopTaskDataVec_t       & m_rTaskData;
     osp::TopDataId              m_idResources;
 };
 

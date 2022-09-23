@@ -35,8 +35,8 @@
 namespace osp
 {
 
-using BitSpan_t = Corrade::Containers::ArrayView<uint64_t>;
-using BitSpanConst_t = Corrade::Containers::ArrayView<uint64_t const>;
+using BitSpan_t = Corrade::Containers::ArrayView<bit_int_t>;
+using BitSpanConst_t = Corrade::Containers::ArrayView<bit_int_t const>;
 
 /**
  * @brief Convert a range of ints or enums to bit positions

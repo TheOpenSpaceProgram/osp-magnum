@@ -42,7 +42,7 @@ void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, 
 {
     // Run cleanup tasks
     {
-        // Accumolate together all cleanup tags from all sessons
+        // Accumulate together all cleanup tags from all sessons
         std::vector<bit_int_t> tagsToRun(rTags.m_tags.vec().size());
         auto tagsToRunBits = lgrn::bit_view(tagsToRun);
         for (Session &rSession : sessions)
