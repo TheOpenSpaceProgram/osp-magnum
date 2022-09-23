@@ -108,6 +108,8 @@ add_dependencies(compile-osp-magnum-deps ${OSP_MAGNUM_DEPS_LIBS})
 
 add_executable(osp-magnum)
 
+target_compile_features(osp-magnum PUBLIC cxx_std_20)
+
 target_include_directories(osp-magnum PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Link it to the interface library that describes the dependencies
@@ -138,6 +140,10 @@ target_compile_options(osp-magnum PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive-
 set_target_properties(osp-magnum PROPERTIES
     EXPORT_COMPILE_COMMANDS TRUE
     INSTALL_RPATH "$ORIGIN/lib"
+    C_EXTENSIONS OFF
+    C_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+    CXX_STANDARD_REQUIRED ON
 )
 
 # Copy root/bin to build/bin after building

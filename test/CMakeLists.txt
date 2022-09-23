@@ -43,6 +43,8 @@ function(ADD_TEST_DIRECTORY NAME)
     add_executable(${NAME} EXCLUDE_FROM_ALL)
     add_dependencies(compile-tests ${NAME})
 
+	target_compile_features(${NAME} PUBLIC cxx_std_20)
+
     file(GLOB H_FILES   CONFIGURE_DEPENDS "*.h")
     file(GLOB CPP_FILES CONFIGURE_DEPENDS "*.cpp")
     target_sources(${NAME} PRIVATE ${H_FILES} ${CPP_FILES})
