@@ -30,6 +30,7 @@
 #include <entt/core/any.hpp>
 
 #include <cassert>
+#include <functional>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -106,9 +107,9 @@ template<typename FUNCTOR_T>
 struct wrap_args_trait
 {
     template<typename ... ARGS_T, std::size_t ... INDEX_T>
-    static constexpr void apply_void(ArrayView<entt::any> topData, [[maybe_unused]] std::integer_sequence<std::size_t, INDEX_T...> indices) noexcept
+    static constexpr void apply_void(ArrayView<entt::any> topData, [[maybe_unused]] std::index_sequence<INDEX_T...> indices) noexcept
     {
-        FUNCTOR_T{}(entt::any_cast<ARGS_T&>(topData[INDEX_T]) ...);
+        std::invoke(FUNCTOR_T{}, entt::any_cast<ARGS_T&>(topData[INDEX_T]) ...);
     }
 
     template<typename ... ARGS_T>
@@ -116,13 +117,13 @@ struct wrap_args_trait
     {
         assert(topData.size() == sizeof...(ARGS_T));
 
-        apply_void<ARGS_T ...>(topData, std::make_integer_sequence<std::size_t, sizeof...(ARGS_T)>{});
+        apply_void<ARGS_T ...>(topData, std::make_index_sequence<sizeof...(ARGS_T)>{});
 
         return TopTaskStatus::Success;
     }
 
     template<typename ... ARGS_T, std::size_t ... INDEX_T>
-    static constexpr TopTaskStatus apply(ArrayView<entt::any> topData, [[maybe_unused]] std::integer_sequence<std::size_t, INDEX_T...> indices) noexcept
+    static constexpr TopTaskStatus apply(ArrayView<entt::any> topData, [[maybe_unused]] std::index_sequence<INDEX_T...> indices) noexcept
     {
         return FUNCTOR_T{}(entt::any_cast<ARGS_T&>(topData[INDEX_T]) ...);
     }
@@ -132,7 +133,7 @@ struct wrap_args_trait
     {
         assert(topData.size() == sizeof...(ARGS_T));
 
-        return apply<ARGS_T ...>(topData, std::make_integer_sequence<std::size_t, sizeof...(ARGS_T)>{});
+        return apply<ARGS_T ...>(topData, std::make_index_sequence<sizeof...(ARGS_T)>{});
     }
 
     template<typename ... ARGS_T>
@@ -164,19 +165,18 @@ struct wrap_args_trait
  * @return TopTaskFunc_t function pointer to wrapper
  */
 template<typename FUNC_T>
-constexpr TopTaskFunc_t wrap_args(FUNC_T const&& funcArg)
+constexpr TopTaskFunc_t wrap_args(FUNC_T funcArg)
 {
     // TODO: wrap function pointers into a functor
     static_assert ( ! std::is_function_v<FUNC_T>, "Support for function pointers not yet implemented");
 
-    using static_lambda_t = std::remove_cvref_t<decltype(funcArg)>;
     auto const functionPtr = +funcArg;
 
     static_assert(std::is_function_v< std::remove_pointer_t<decltype(functionPtr)> >);
 
     // The original funcArg is discarded, but will be reconstructed in
     // wrap_args_trait::apply, as static_lambda_t is stored in the type
-    return wrap_args_trait<static_lambda_t>::unpack(functionPtr);
+    return wrap_args_trait<FUNC_T>::unpack(functionPtr);
 }
 
 

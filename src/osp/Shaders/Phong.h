@@ -85,7 +85,8 @@ void draw_ent_phong(
  */
 template<typename ITA_T, typename ITB_T>
 void sync_phong(
-        ITA_T dirtyFirst, ITB_T const& dirtyLast,
+        ITA_T dirtyFirst,
+        ITB_T const& dirtyLast,
         active::EntSet_t const& hasMaterial,
         active::RenderGroup::Storage_t *const pStorageOpaque,
         active::RenderGroup::Storage_t *const pStorageTransparent,

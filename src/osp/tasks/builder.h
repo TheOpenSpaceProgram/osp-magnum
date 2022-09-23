@@ -94,9 +94,9 @@ public:
         }
 
         TaskId const    m_taskId;
-        Tags            &m_rTags;
-        Tasks           &m_rTasks;
-        DATA_T          &m_rData;
+        Tags            & m_rTags;
+        Tasks           & m_rTasks;
+        DATA_T          & m_rData;
 
     }; // struct TaskRefSpec
 
@@ -161,7 +161,7 @@ public:
         }
 
         TagId const m_tagId;
-        Tags        &m_rTags;
+        Tags        & m_rTags;
 
     }; // struct TagRef
 
@@ -214,9 +214,9 @@ public:
     }
 
 private:
-    Tags    &m_rTags;
-    Tasks   &m_rTasks;
-    DATA_T  &m_rData;
+    Tags    & m_rTags;
+    Tasks   & m_rTasks;
+    DATA_T  & m_rData;
 
 }; // class TaskBuilder
 
