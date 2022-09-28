@@ -184,8 +184,9 @@ Session setup_shape_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topDat
 
     rBuilder.tag(tgSpawnReq)        .depend_on({tgSpawnMod});
     rBuilder.tag(tgSpawnClr)        .depend_on({tgSpawnMod, tgSpawnReq});
+    rBuilder.tag(tgSpawnEntReq)     .depend_on({tgSpawnEntMod});
 
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgEntNew}).data(
+    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgEntNew, tgSpawnEntMod}).data(
             "Create entities for requested shapes to spawn",
             TopDataIds_t{             idActiveIds,              idSpawner,             idSpawnerEnts },
             wrap_args([] (ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
@@ -194,7 +195,7 @@ Session setup_shape_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topDat
         rActiveIds.create(std::begin(rSpawnerEnts), std::end(rSpawnerEnts));
     }));
 
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgTransformNew, tgHierNew}).data(
+    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgTransformNew, tgHierNew}).data(
             "Add hierarchy and transform to spawned shapes",
             TopDataIds_t{           idBasic,              idSpawner,             idSpawnerEnts },
             wrap_args([] (ACtxBasic& rBasic, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
@@ -212,7 +213,7 @@ Session setup_shape_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topDat
         }
     }));
 
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgMeshMod, tgDrawMod, tgMatMod}).data(
+    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgMeshMod, tgDrawMod, tgMatMod}).data(
             "Add mesh and material to spawned shapes",
             TopDataIds_t{             idDrawing,              idSpawner,             idSpawnerEnts,             idNMesh,          idMatEnts,             idMatDirty,                idActiveIds},
             wrap_args([] (ACtxDrawing& rDrawing, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, NamedMeshes& rNMesh, EntSet_t& rMatEnts, EntVector_t& rMatDirty, ActiveReg_t const& rActiveIds ) noexcept
@@ -234,7 +235,7 @@ Session setup_shape_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topDat
         }
     }));
 
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgPhysBodyMod}).data(
+    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgPhysBodyMod}).data(
             "Add physics to spawned shapes",
             TopDataIds_t{              idSpawner,             idSpawnerEnts,              idTPhys },
             wrap_args([] (SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxTestPhys& rTPhys) noexcept
@@ -259,7 +260,6 @@ Session setup_shape_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topDat
                         = osp::phys::collider_inertia_tensor(spawn.m_shape, spawn.m_size, spawn.m_mass);
                 rTPhys.m_hierBody.m_ownDyn.emplace( child, ACompSubBody{ inertia, spawn.m_mass } );
             }
-
 
             rTPhys.m_physics.m_shape.emplace(child, spawn.m_shape);
             rTPhys.m_physics.m_solid.emplace(child);
@@ -292,6 +292,7 @@ Session setup_prefabs(Builder_t& rBuilder, ArrayView<entt::any> const topData, T
 
     rBuilder.tag(tgPrefabReq)       .depend_on({tgPrefabMod});
     rBuilder.tag(tgPrefabClr)       .depend_on({tgPrefabMod, tgPrefabReq});
+    rBuilder.tag(tgPfParentHierReq) .depend_on({tgPfParentHierMod});
 
     rBuilder.tag(tgPrefabEntReq)    .depend_on({tgPrefabEntMod});
 
@@ -316,24 +317,25 @@ Session setup_prefabs(Builder_t& rBuilder, ArrayView<entt::any> const topData, T
         rPrefabInit.m_newEnts.resize(totalEnts);
         rActiveIds.create(std::begin(rPrefabInit.m_newEnts), std::end(rPrefabInit.m_newEnts));
 
-
         // Assign new entities to each prefab to create
         rPrefabInit.m_ents.resize(rPrefabInit.m_basic.size());
-        auto itPfEnts = std::begin(rPrefabInit.m_ents);
-        ArrayView<ActiveEnt const> entsAvailable{rPrefabInit.m_newEnts};
+        auto itEntAvailable = std::begin(rPrefabInit.m_newEnts);
+        auto itPfEntSpanOut = std::begin(rPrefabInit.m_ents);
         for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.m_basic)
         {
             auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
             auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
 
-            (*itPfEnts)             = entsAvailable.prefix(objects.size());
-            entsAvailable           = entsAvailable.exceptPrefix(objects.size());
+            (*itPfEntSpanOut) = { &(*itEntAvailable), objects.size() };
 
-            std::advance(itPfEnts, 1);
+            std::advance(itEntAvailable, objects.size());
+            std::advance(itPfEntSpanOut, 1);
         }
+
+        assert(itEntAvailable == std::end(rPrefabInit.m_newEnts));
     }));
 
-    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgHierNew}).data(
+    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgHierNew, tgPfParentHierReq}).data(
             "Init Prefab hierarchy",
             TopDataIds_t{                idPrefabInit,           idResources,           idBasic },
             wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxBasic& rBasic) noexcept
@@ -430,7 +432,7 @@ Session setup_gravity(Builder_t& rBuilder, ArrayView<entt::any> const topData, T
         }
     }));
 
-    gravity.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgGravityNew}).data(
+    gravity.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgGravityNew}).data(
             "Add gravity to spawned shapes",
             TopDataIds_t{                    idSpawner,                   idSpawnerEnts,          idGravity,                   idActiveIds },
             wrap_args([] (SpawnerVec_t const& rSpawner, EntVector_t const& rSpawnerEnts, EntSet_t& rGravity, ActiveReg_t const& rActiveIds) noexcept

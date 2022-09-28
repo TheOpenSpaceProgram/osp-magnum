@@ -28,15 +28,19 @@
 #include "identifiers.h"
 
 #include "scene_common.h"
-#include "scene_renderer.h"
 #include "scene_physics.h"
 #include "scene_misc.h"
-
-#include <osp/Active/basic.h>
-#include <osp/Active/SysPrefabInit.h>
-#include <osp/Resource/resources.h>
+#include "scene_renderer.h"
+#include "scene_vehicles.h"
 
 #include "../ActiveApplication.h"
+#include "../VehicleBuilder.h"
+
+#include <osp/Active/basic.h>
+#include <osp/Active/parts.h>
+#include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysPrefabInit.h>
+#include <osp/Resource/resources.h>
 
 #include <osp/logging.h>
 
@@ -176,33 +180,49 @@ static ScenarioMap_t make_scenarios()
         auto &rTags             = mainView.m_rTags;
         Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
-        sceneOut.resize(10);
-        auto & [scnCommon, matVisual, physics, newton, shapeSpawn, prefabs, droppers, gravity, bounds, thrower] = unpack<10>(sceneOut);
+        sceneOut.resize(15);
+        auto & [scnCommon, matVisual, physics, newton, shapeSpawn, prefabs, parts, vehicleSpawn, vehicleSpawnRgd, vehicleSpawnVB, testVehicles, droppers, gravity, bounds, thrower] = unpack<15>(sceneOut);
 
         // Compose together lots of Sessions
-        scnCommon   = setup_common_scene    (builder, rTopData, rTags, idResources);
-        matVisual   = setup_material        (builder, rTopData, rTags, scnCommon);
-        physics     = setup_physics         (builder, rTopData, rTags, scnCommon, idResources, pkg);
-        newton      = setup_newton_physics  (builder, rTopData, rTags, scnCommon, physics);
-        shapeSpawn  = setup_shape_spawn     (builder, rTopData, rTags, scnCommon, physics, matVisual);
-        prefabs     = setup_prefabs         (builder, rTopData, rTags, scnCommon, physics, matVisual, idResources);
-        droppers    = setup_droppers        (builder, rTopData, rTags, scnCommon, shapeSpawn);
-        gravity     = setup_gravity         (builder, rTopData, rTags, scnCommon, physics, shapeSpawn);
-        bounds      = setup_bounds          (builder, rTopData, rTags, scnCommon, physics, shapeSpawn);
+        scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources);
+        matVisual       = setup_material            (builder, rTopData, rTags, scnCommon);
+        physics         = setup_physics             (builder, rTopData, rTags, scnCommon, idResources, pkg);
+        newton          = setup_newton_physics      (builder, rTopData, rTags, scnCommon, physics);
+        shapeSpawn      = setup_shape_spawn         (builder, rTopData, rTags, scnCommon, physics, matVisual);
+        prefabs         = setup_prefabs             (builder, rTopData, rTags, scnCommon, physics, matVisual, idResources);
+        parts           = setup_parts               (builder, rTopData, rTags, scnCommon, idResources);
+        vehicleSpawn    = setup_vehicle_spawn       (builder, rTopData, rTags, scnCommon, parts);
+        vehicleSpawnVB  = setup_vehicle_spawn_vb    (builder, rTopData, rTags, scnCommon, prefabs, parts, vehicleSpawn, idResources);
+        vehicleSpawnRgd = setup_vehicle_spawn_rigid (builder, rTopData, rTags, scnCommon, physics, prefabs, parts, vehicleSpawn);
+        testVehicles    = setup_test_vehicles       (builder, rTopData, rTags, scnCommon, idResources);
+        droppers        = setup_droppers            (builder, rTopData, rTags, scnCommon, shapeSpawn);
+        gravity         = setup_gravity             (builder, rTopData, rTags, scnCommon, physics, shapeSpawn);
+        bounds          = setup_bounds              (builder, rTopData, rTags, scnCommon, physics, shapeSpawn);
 
-        OSP_SESSION_UNPACK_DATA(scnCommon, TESTAPP_COMMON_SCENE);
+        OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+        OSP_SESSION_UNPACK_DATA(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
+        OSP_SESSION_UNPACK_DATA(vehicleSpawnVB, TESTAPP_VEHICLE_SPAWN_VB);
+        OSP_SESSION_UNPACK_DATA(testVehicles,   TESTAPP_TEST_VEHICLES);
+        OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
         add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, pkg);
 
         Resources &rResources = top_get<Resources>(rTopData, idResources);
 
-        static Matrix4 uppy = Matrix4::translation({0.0f, 0.0f, 4.0f});
+        //static Matrix4 uppy = Matrix4::translation({0.0f, 0.0f, 4.0f});
 
-        top_get<osp::active::ACtxPrefabInit>(rTopData, prefabs.m_dataIds[0]).m_basic.push_back(osp::active::TmpPrefabInitBasic{
-            .m_importerRes = rResources.find(restypes::gc_importer, pkg, "OSPData/adera/stomper.sturdy.gltf"),
-            .m_prefabId = 0,
-            .m_parent = top_get<osp::active::ACtxBasic>(rTopData, idBasic).m_hierRoot,
-            .m_pTransform = &uppy
-        });
+        using osp::active::ACtxVehicleSpawn;
+
+        auto &rTVPartVehicle    = top_get<VehicleData>(rTopData, idTVPartVehicle);
+        auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>(rTopData, idVehicleSpawn);
+        auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>(rTopData, idVehicleSpawnVB);
+
+        rVehicleSpawn.m_basic.emplace_back(ACtxVehicleSpawn::TmpToInit{{0.0f, 0.0f, 10.0f}, {0.0f, 0.0f, 0.0f}, {}});
+        rVehicleSpawnVB.m_dataVB.push_back(&rTVPartVehicle);
+
+        osp::active::ActiveEnt const rooot = top_get<osp::active::ActiveReg_t>(rTopData, idActiveIds).create();
+
+        auto &rBasic = top_get<active::ACtxBasic>(rTopData, idBasic);
+        auto &rTPhys = top_get<ACtxTestPhys>(rTopData, idTPhys);
 
         return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
         {
@@ -211,8 +231,6 @@ static ScenarioMap_t make_scenarios()
             Builder_t builder{mainView.m_rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
             auto const& [scnCommon, matVisual, physics, newton, shapeSpawn, gravity, bounds, thrower] = unpack<8>(scene);
-
-            rendererOut.resize(4);
 
             using namespace testapp::scenes;
 

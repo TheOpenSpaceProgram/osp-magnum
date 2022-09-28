@@ -79,17 +79,19 @@
 #define OSP_DATA_TESTAPP_SHAPE_SPAWN 2, \
     idSpawner, idSpawnerEnts
 
-#define OSP_TAGS_TESTAPP_SHAPE_SPAWN 3, \
-    tgSpawnMod,         tgSpawnReq,         tgSpawnClr
+#define OSP_TAGS_TESTAPP_SHAPE_SPAWN 5, \
+    tgSpawnMod,         tgSpawnReq,         tgSpawnClr,         \
+    tgSpawnEntMod,      tgSpawnEntReq
 
 
 
 #define OSP_DATA_TESTAPP_PREFABS 1, \
     idPrefabInit
 
-#define OSP_TAGS_TESTAPP_PREFABS 5, \
+#define OSP_TAGS_TESTAPP_PREFABS 7, \
     tgPrefabMod,        tgPrefabReq,        tgPrefabClr,        \
-    tgPrefabEntMod,     tgPrefabEntReq
+    tgPrefabEntMod,     tgPrefabEntReq,                         \
+    tgPfParentHierMod,  tgPfParentHierReq
 
 
 
@@ -117,11 +119,38 @@
 
 
 
+#define OSP_DATA_TESTAPP_VEHICLE_SPAWN 1, \
+    idVehicleSpawn
+
+#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN 9, \
+    tgVehicleSpawnMod,  tgVehicleSpawnReq,  tgVehicleSpawnClr,  \
+    tgVSpawnRgdMod,     tgVSpawnRgdReq,                         \
+    tgVSpawnRgdEntMod,  tgVSpawnRgdEntReq,                      \
+    tgVSpawnPartMod,    tgVSpawnPartReq
+
+
+
+
+#define OSP_DATA_TESTAPP_VEHICLE_SPAWN_VB 1, \
+    idVehicleSpawnVB
+
+
+#define OSP_DATA_TESTAPP_VEHICLE_SPAWN_RIGID 1, \
+    idVehicleSpawnRgd
+
+
+
+#define OSP_DATA_TESTAPP_TEST_VEHICLES 1, \
+    idTVPartVehicle
+
+
+
 #define OSP_DATA_TESTAPP_SIGNALS_FLOAT 2, \
     idSigValFloat,      idSigUpdFloat
 
 #define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 3, \
     tgP
+
 
 
 //-----------------------------------------------------------------------------

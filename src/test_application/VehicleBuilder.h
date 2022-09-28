@@ -24,9 +24,10 @@
  */
 #pragma once
 
-#include "osp/Resource/resourcetypes.h"
-#include "osp/types.h"
-#include "osp/link/machines.h"
+#include <osp/Active/parts.h>
+#include <osp/Resource/resourcetypes.h>
+#include <osp/types.h>
+#include <osp/link/machines.h>
 
 #include <longeron/id_management/registry_stl.hpp>
 
@@ -35,6 +36,7 @@
 
 #include <cstdint>
 #include <array>
+#include <optional>
 #include <vector>
 
 namespace testapp
@@ -62,6 +64,11 @@ struct PerNodeType : osp::link::Nodes
 
 struct VehicleData
 {
+    VehicleData() = default;
+    VehicleData(VehicleData const& copy) = delete;
+    VehicleData(VehicleData&& move) = default;
+
+
     lgrn::IdRegistryStl<PartId>         m_partIds;
     std::vector<osp::Matrix4>           m_partTransforms;
     std::vector<osp::PrefabPair>        m_partPrefabs;
@@ -92,8 +99,9 @@ public:
     VehicleBuilder(osp::Resources *pResources)
      : m_pResources{pResources}
     {
-        m_data.m_machines.m_perType.resize(osp::link::MachTypeReg_t::size());
-        m_data.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
+        auto &rData = m_data.emplace();
+        rData.m_machines.m_perType.resize(osp::link::MachTypeReg_t::size());
+        rData.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
         index_prefabs();
     };
 
@@ -134,9 +142,7 @@ public:
 
     void connect(MachAnyId mach, std::initializer_list<Connection> const& connections);
 
-    void finalize_machines();
-
-    VehicleData const& data() const noexcept { return m_data; }
+    [[nodiscard]] VehicleData finalize_release();
 
 private:
 
@@ -146,7 +152,7 @@ private:
 
     entt::dense_map< std::string_view, osp::PrefabPair > m_prefabs;
 
-    VehicleData m_data;
+    std::optional<VehicleData> m_data;
 
     // put more attachment data here
 };
@@ -156,12 +162,12 @@ template <std::size_t N>
 std::array<PartId, N> VehicleBuilder::create_parts()
 {
     std::array<PartId, N> out;
-    m_data.m_partIds.create(std::begin(out), std::end(out));
+    m_data->m_partIds.create(std::begin(out), std::end(out));
 
-    std::size_t const capacity = m_data.m_partIds.capacity();
-    m_data.m_partMachCount.resize(capacity);
-    m_data.m_partPrefabs.resize(capacity);
-    m_data.m_partTransforms.resize(capacity);
+    std::size_t const capacity = m_data->m_partIds.capacity();
+    m_data->m_partMachCount.resize(capacity);
+    m_data->m_partPrefabs.resize(capacity);
+    m_data->m_partTransforms.resize(capacity);
 
     return out;
 }
@@ -172,7 +178,7 @@ std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId const n
 {
     std::array<NodeId, N> out;
 
-    PerNodeType &rPerNodeType = m_data.m_nodePerType[nodeType];
+    PerNodeType &rPerNodeType = m_data->m_nodePerType[nodeType];
 
     rPerNodeType.m_nodeIds.create(std::begin(out), std::end(out));
     std::size_t const capacity = rPerNodeType.m_nodeIds.capacity();
@@ -182,5 +188,10 @@ std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId const n
     return out;
 }
 
+struct ACtxVehicleSpawnVB
+{
+    std::vector<VehicleData const*> m_dataVB;
+
+};
 
 } // namespace testapp

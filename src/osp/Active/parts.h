@@ -77,6 +77,8 @@ struct ACtxParts
     // Rigid Groups
     lgrn::IdRegistryStl<RigidGroup_t>                   m_rigidIds;
     lgrn::IntArrayMultiMap<RigidGroup_t, PartEnt_t>     m_rigidToParts;
+    std::vector<RigidGroup_t>                           m_rigidDirty;
+    std::vector<ActiveEnt>                              m_rigidToEnt;
     std::vector<Matrix4>                                m_partTransformRigid;
     std::vector<RigidGroup_t>                           m_partRigids;
 
@@ -85,6 +87,41 @@ struct ACtxParts
     std::vector<PartEnt_t>                              m_machineToPart;
     lgrn::IntArrayMultiMap<PartEnt_t, link::MachAnyId>  m_partToMachines;
     std::vector<link::Nodes>                            m_nodePerType;
+};
+
+
+struct ACtxVehicleSpawn
+{
+    struct TmpToInit
+    {
+        Vector3    m_position;
+        Vector3    m_velocity;
+        Quaternion m_rotation;
+    };
+
+    /**
+     * @return Number of vehicles requested to spawn
+     */
+    std::size_t vehicle_count() const noexcept
+    {
+        return m_basic.size();
+    }
+
+    std::vector<TmpToInit> m_basic;
+    std::vector< Corrade::Containers::ArrayView<PartEnt_t const> > m_parts;
+    std::vector<PartEnt_t> m_newParts;
+};
+
+struct ACtxVehicleSpawnRigid
+{
+    struct TmpToInit
+    {
+        RigidGroup_t m_rigid;
+    };
+
+    std::vector<TmpToInit> m_basic;
+    std::vector<RigidGroup_t> m_rigidGroups;
+    std::vector<ActiveEnt> m_rigidGroupEnt;
 };
 
 } // namespace osp::active

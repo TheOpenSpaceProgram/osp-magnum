@@ -53,7 +53,7 @@ using JuncCustom    = uint16_t;
 using MachTypeReg_t = GlobalIdReg<MachLocalId>;
 using NodeTypeReg_t = GlobalIdReg<NodeTypeId>;
 
-extern NodeTypeId const gc_ntNumber;
+extern NodeTypeId const gc_ntSigFloat;
 
 /**
  * @brief Keeps track of Machines of a certain type that exists
