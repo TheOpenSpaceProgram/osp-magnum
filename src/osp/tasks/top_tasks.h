@@ -42,7 +42,6 @@ struct TopTask
     TopTaskFunc_t m_func{nullptr};
 };
 
-
 inline void task_data(TaskDataVec<TopTask> &rData, TaskId const task, std::string_view debugName, std::initializer_list<TopDataId> dataUsed, TopTaskFunc_t func)
 {
     rData.m_taskData.resize(

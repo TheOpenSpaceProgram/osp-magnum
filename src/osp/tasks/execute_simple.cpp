@@ -190,19 +190,14 @@ void task_start(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, T
     }
 }
 
-void task_finish(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId const task, BitSpan_t tmpEnqueue)
+void task_finish(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId const task)
 {
-    auto currTaskTagInts = task_tags_2d(tags, tasks)[std::size_t(task)].asContiguous();
-
     auto const externBits = lgrn::bit_view(tags.m_tagExtern);
 
-    rExec.m_taskQueuedCounts[std::size_t(task)] --;
+    auto taskTagInts = task_tags_2d(tags, tasks)[std::size_t(task)].asContiguous();
+    auto const taskTags = lgrn::bit_view(taskTagInts);
 
-    auto enqueueBits = lgrn::bit_view(tmpEnqueue);
-    bool somethingEnqueued = false;
-
-    auto const view = lgrn::bit_view(currTaskTagInts);
-    for (uint32_t const tag : view.ones())
+    for (uint32_t const tag : taskTags.ones())
     {
         rExec.m_tagRunningCounts[tag] --;
         rExec.m_tagIncompleteCounts[tag] --;
@@ -215,25 +210,10 @@ void task_finish(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, 
             {
                 task_extern_set(rExec, TagId(tag), false);
             }
-
-            // Handle enqueue tags
-            if ( ! tmpEnqueue.isEmpty() )
-            {
-                TagId const enqueue = tags.m_tagEnqueues[tag];
-                if ((enqueue != lgrn::id_null<TagId>()) )
-                {
-                    somethingEnqueued = true;
-                    enqueueBits.set(std::size_t(enqueue));
-                }
-            }
         }
     }
 
-    if (somethingEnqueued)
-    {
-        task_enqueue(tags, tasks, rExec, tmpEnqueue);
-        enqueueBits.reset();
-    }
+    rExec.m_taskQueuedCounts[std::size_t(task)] --;
 }
 
 } // namespace osp

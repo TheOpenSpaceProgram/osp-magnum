@@ -23,7 +23,6 @@
  * SOFTWARE.
  */
 #include "top_execute.h"
-#include "top_session.h"
 #include "top_worker.h"
 #include "execute_simple.h"
 
@@ -45,16 +44,19 @@ namespace osp
 
 void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec)
 {
-    std::vector<entt::any> dataRefs;
-    WorkerContext context;
+    std::vector<entt::any> topDataRefs;
 
-    std::vector<uint64_t> tmpEnqueue(tags.m_tags.vec().size());
+    std::vector<uint64_t> enqueue(tags.m_tags.vec().size());
+
+    std::vector<uint64_t> tasksToRun(tasks.m_tasks.vec().size());
+
 
     // Run until there's no tasks left to run
     while (true)
     {
-        std::vector<uint64_t> tasksToRun(tasks.m_tasks.vec().size());
+        std::ranges::fill(tasksToRun, 0u);
         task_list_available(tags, tasks, rExec, tasksToRun);
+
         auto const tasksToRunBits = lgrn::bit_view(tasksToRun);
         unsigned int const availableCount = tasksToRunBits.count();
 
@@ -69,17 +71,29 @@ void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rT
         task_start(tags, tasks, rExec, task);
 
         TopTask &rTopTask = rTaskData.m_taskData.at(std::size_t(task));
-        dataRefs.resize(rTopTask.m_dataUsed.size());
-        for (std::size_t i = 0; i < rTopTask.m_dataUsed.size(); ++i)
+
+        topDataRefs.clear();
+        topDataRefs.reserve(rTopTask.m_dataUsed.size());
+        for (TopDataId const dataId : rTopTask.m_dataUsed)
         {
-            dataRefs.at(i) = topData[rTopTask.m_dataUsed[i]].as_ref();
+
+            topDataRefs.push_back((dataId != lgrn::id_null<TopDataId>())
+                                   ? topData[dataId].as_ref()
+                                   : entt::any{});
         }
 
-        TopTaskStatus const status = rTopTask.m_func(context, dataRefs);
+        bool enqueueHappened = false;
 
-        BitSpan_t enqueue = (status == TopTaskStatus::Success) ? tmpEnqueue : BitSpan_t{};
+        // Task actually runs here. Results are not yet used for anything.
+        rTopTask.m_func(WorkerContext{{}, {enqueue}, enqueueHappened}, topDataRefs);
 
-        task_finish(tags, tasks, rExec, task, enqueue);
+        if (enqueueHappened)
+        {
+            task_enqueue(tags, tasks, rExec, enqueue);
+            std::ranges::fill(enqueue, 0u);
+        }
+
+        task_finish(tags, tasks, rExec, task);
     }
 }
 

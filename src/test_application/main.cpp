@@ -394,7 +394,6 @@ void load_a_bunch_of_stuff()
                                lgrn::id_null<osp::TagId>());
     g_tags.m_tagLimits.resize(maxTagsInts);
     g_tags.m_tagExtern.resize(maxTagsInts);
-    g_tags.m_tagEnqueues.resize(maxTags, lgrn::id_null<osp::TagId>());
 
     g_application.m_dataIds = { osp::top_reserve(g_appTopData) };
 
