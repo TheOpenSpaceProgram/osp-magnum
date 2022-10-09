@@ -68,9 +68,9 @@ static void setup_magnum_draw(MainView mainView, Session const& magnum, Session 
 
     if ( ! debug_top_verify(rTags, rTasks, rTaskData))
     {
-        rActiveApp.exit();
-        OSP_LOG_INFO("Errors detected, scene closed.");
-        return;
+        //rActiveApp.exit();
+        //OSP_LOG_INFO("Errors detected, scene closed.");
+        //return;
     }
 
     auto &rCamera = top_get<active::Camera>(topData, idCamera);
@@ -86,6 +86,11 @@ static void setup_magnum_draw(MainView mainView, Session const& magnum, Session 
     {
         top_enqueue_quick(rTags, rTasks, rExec, runTagsVec);
         top_run_blocking(rTags, rTasks, rTaskData, topData, rExec);
+
+        if (std::ranges::all_of(rExec.m_taskQueuedCounts, [] (unsigned int n) { return n == 0; }))
+        {
+            OSP_LOG_WARN("Deadlock detected!");
+        }
     });
 }
 
@@ -180,8 +185,15 @@ static ScenarioMap_t make_scenarios()
         auto &rTags             = mainView.m_rTags;
         Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
-        sceneOut.resize(15);
-        auto & [scnCommon, matVisual, physics, newton, shapeSpawn, prefabs, parts, vehicleSpawn, vehicleSpawnRgd, vehicleSpawnVB, testVehicles, droppers, gravity, bounds, thrower] = unpack<15>(sceneOut);
+        sceneOut.resize(17);
+        auto &
+        [
+            scnCommon, matVisual, physics, newton, shapeSpawn,
+            prefabs, parts,
+            vehicleSpawn, vehicleSpawnVB, vehicleSpawnRgd,
+            signalsFloat, machRocket,
+            testVehicles, droppers, gravity, bounds, thrower
+        ] = unpack<17>(sceneOut);
 
         // Compose together lots of Sessions
         scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources);
@@ -194,6 +206,8 @@ static ScenarioMap_t make_scenarios()
         vehicleSpawn    = setup_vehicle_spawn       (builder, rTopData, rTags, scnCommon, parts);
         vehicleSpawnVB  = setup_vehicle_spawn_vb    (builder, rTopData, rTags, scnCommon, prefabs, parts, vehicleSpawn, idResources);
         vehicleSpawnRgd = setup_vehicle_spawn_rigid (builder, rTopData, rTags, scnCommon, physics, prefabs, parts, vehicleSpawn);
+        signalsFloat    = setup_signals_float       (builder, rTopData, rTags, scnCommon, parts);
+        machRocket      = setup_mach_rocket         (builder, rTopData, rTags, scnCommon, parts, signalsFloat);
         testVehicles    = setup_test_vehicles       (builder, rTopData, rTags, scnCommon, idResources);
         droppers        = setup_droppers            (builder, rTopData, rTags, scnCommon, shapeSpawn);
         gravity         = setup_gravity             (builder, rTopData, rTags, scnCommon, physics, shapeSpawn);
@@ -230,17 +244,25 @@ static ScenarioMap_t make_scenarios()
             auto &rTags = mainView.m_rTags;
             Builder_t builder{mainView.m_rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
-            auto const& [scnCommon, matVisual, physics, newton, shapeSpawn, gravity, bounds, thrower] = unpack<8>(scene);
+            auto const&
+            [
+                scnCommon, matVisual, physics, newton, shapeSpawn,
+                prefabs, parts,
+                vehicleSpawn, vehicleSpawnVB, vehicleSpawnRgd,
+                signalsFloat, machRocket,
+                testVehicles, droppers, gravity, bounds, thrower
+            ] = unpack<17>(scene);
 
             using namespace testapp::scenes;
 
-            rendererOut.resize(5);
-            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow] = unpack<5>(rendererOut);
+            rendererOut.resize(6);
+            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow, vehicleCtrl] = unpack<6>(rendererOut);
             scnRender   = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
             cameraCtrl  = setup_camera_magnum       (builder, rTopData, rTags, magnum);
             cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, scnRender, cameraCtrl);
             shVisual    = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
             camThrow    = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
+            vehicleCtrl = setup_vehicle_control     (builder, rTopData, rTags, scnCommon, parts, signalsFloat, magnum);
 
             setup_magnum_draw(mainView, magnum, scnCommon, scnRender);
         };

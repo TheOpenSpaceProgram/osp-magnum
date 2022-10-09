@@ -108,8 +108,9 @@ struct ACtxVehicleSpawn
     }
 
     std::vector<TmpToInit> m_basic;
-    std::vector< Corrade::Containers::ArrayView<PartEnt_t const> > m_parts;
+
     std::vector<PartEnt_t> m_newParts;
+    std::vector< ArrayView<PartEnt_t const> > m_parts;
 };
 
 struct ACtxVehicleSpawnRigid

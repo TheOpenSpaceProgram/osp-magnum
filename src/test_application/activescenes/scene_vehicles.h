@@ -31,12 +31,29 @@ namespace testapp { struct VehicleData; }
 namespace testapp::scenes
 {
 
+using MachTypeToEvt_t = std::vector<osp::TagId>;
+
 osp::Session setup_parts(
         Builder_t& rBuilder,
         osp::ArrayView<entt::any> const topData,
         osp::Tags& rTags,
         osp::Session const& scnCommon,
         osp::TopDataId const idResources);
+
+osp::Session setup_signals_float(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> const topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::Session const& parts);
+
+osp::Session setup_mach_rocket(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> const topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::Session const& parts,
+        osp::Session const& signalsFloat);
 
 osp::Session setup_vehicle_spawn(
         Builder_t& rBuilder,
@@ -71,5 +88,15 @@ osp::Session setup_test_vehicles(
         osp::Tags& rTags,
         osp::Session const& scnCommon,
         osp::TopDataId const idResources);
+
+osp::Session setup_vehicle_control(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> const topData,
+        osp::Tags& rTags,
+        osp::Session const& scnCommon,
+        osp::Session const& parts,
+        osp::Session const& signalsFloat,
+        osp::Session const& app);
+
 
 }

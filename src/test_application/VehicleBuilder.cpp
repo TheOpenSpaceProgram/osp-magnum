@@ -90,7 +90,7 @@ void VehicleBuilder::index_prefabs()
             continue; // No prefab data
         }
 
-        for (int j = 0; j < pPrefabData->m_prefabNames.size(); ++j)
+        for (osp::PrefabId j = 0; j < pPrefabData->m_prefabNames.size(); ++j)
         {
             osp::ResIdOwner_t owner = m_pResources->owner_create(gc_importer, resId);
 

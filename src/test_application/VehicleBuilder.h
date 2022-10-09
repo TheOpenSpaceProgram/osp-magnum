@@ -192,6 +192,11 @@ struct ACtxVehicleSpawnVB
 {
     std::vector<VehicleData const*> m_dataVB;
 
+    std::vector<osp::active::PartEnt_t> m_remapPartAll;
+    std::vector<std::size_t>            m_remapPartOffsets;
+
+    std::vector<osp::link::MachAnyId>   m_remapMachAll;
+    std::vector<std::size_t>            m_remapMachOffsets;
 };
 
 } // namespace testapp

@@ -32,7 +32,6 @@
 
 #define OSP_DATA_TESTAPP_COMMON_SCENE 7, \
     idDeltaTimeIn, idActiveIds, idBasic, idDrawing, idDrawingRes, idDelEnts, idDelTotal
-
 #define OSP_TAGS_TESTAPP_COMMON_SCENE 34, \
     tgCleanupEvt,       tgResyncEvt,        tgSyncEvt,          tgSceneEvt,         tgTimeEvt,  \
     tgEntDel,           tgEntNew,           tgEntReq,                                           \
@@ -48,7 +47,6 @@
 
 #define OSP_DATA_TESTAPP_MATERIAL 2, \
     idMatEnts, idMatDirty
-
 #define OSP_TAGS_TESTAPP_MATERIAL 4, \
     tgMatDel, tgMatMod, tgMatReq, tgMatClr
 
@@ -56,7 +54,6 @@
 
 #define OSP_DATA_TESTAPP_MATERIAL 2, \
     idMatEnts, idMatDirty
-
 #define OSP_TAGS_TESTAPP_MATERIAL 4, \
     tgMatDel, tgMatMod, tgMatReq, tgMatClr
 
@@ -64,7 +61,6 @@
 
 #define OSP_DATA_TESTAPP_PHYSICS 2, \
     idTPhys, idNMesh
-
 #define OSP_TAGS_TESTAPP_PHYSICS 5, \
     tgPhysBodyDel,      tgPhysBodyMod,      tgPhysBodyReq,      \
     tgPhysMod,          tgPhysReq
@@ -78,7 +74,6 @@
 
 #define OSP_DATA_TESTAPP_SHAPE_SPAWN 2, \
     idSpawner, idSpawnerEnts
-
 #define OSP_TAGS_TESTAPP_SHAPE_SPAWN 5, \
     tgSpawnMod,         tgSpawnReq,         tgSpawnClr,         \
     tgSpawnEntMod,      tgSpawnEntReq
@@ -87,7 +82,6 @@
 
 #define OSP_DATA_TESTAPP_PREFABS 1, \
     idPrefabInit
-
 #define OSP_TAGS_TESTAPP_PREFABS 7, \
     tgPrefabMod,        tgPrefabReq,        tgPrefabClr,        \
     tgPrefabEntMod,     tgPrefabEntReq,                         \
@@ -97,7 +91,6 @@
 
 #define OSP_DATA_TESTAPP_GRAVITY 1, \
     idGravity
-
 #define OSP_TAGS_TESTAPP_GRAVITY 3, \
     tgGravityReq,       tgGravityDel,       tgGravityNew
 
@@ -105,23 +98,22 @@
 
 #define OSP_DATA_TESTAPP_BOUNDS 1, \
     idBounds
-
 #define OSP_TAGS_TESTAPP_BOUNDS 3, \
     tgBoundsReq,        tgBoundsDel,        tgBoundsNew
 
 
 
-#define OSP_DATA_TESTAPP_PARTS 3, \
-    idScnParts, idPartInit, idUpdMachines
-
-#define OSP_TAGS_TESTAPP_PARTS 3, \
-    tgPartInitMod,      tgPartInitReq,      tgPartInitClr
+#define OSP_DATA_TESTAPP_PARTS 4, \
+    idScnParts, idPartInit, idUpdMach, idMachEvtTags
+#define OSP_TAGS_TESTAPP_PARTS 7, \
+    tgPartInitMod,      tgPartInitReq,      tgPartInitClr,      \
+    tgLinkMod,          tgLinkReq,                              \
+    tgLinkMhUpdMod,     tgLinkMhUpdReq
 
 
 
 #define OSP_DATA_TESTAPP_VEHICLE_SPAWN 1, \
     idVehicleSpawn
-
 #define OSP_TAGS_TESTAPP_VEHICLE_SPAWN 9, \
     tgVehicleSpawnMod,  tgVehicleSpawnReq,  tgVehicleSpawnClr,  \
     tgVSpawnRgdMod,     tgVSpawnRgdReq,                         \
@@ -130,9 +122,9 @@
 
 
 
-
 #define OSP_DATA_TESTAPP_VEHICLE_SPAWN_VB 1, \
     idVehicleSpawnVB
+
 
 
 #define OSP_DATA_TESTAPP_VEHICLE_SPAWN_RIGID 1, \
@@ -145,11 +137,19 @@
 
 
 
-#define OSP_DATA_TESTAPP_SIGNALS_FLOAT 2, \
-    idSigValFloat,      idSigUpdFloat
+#define OSP_DATA_TESTAPP_SIGNALS_FLOAT 3, \
+    idSigValFloat,      idSigUpdFloat,      idTgSigFloatUpdEvt
+#define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 7, \
+    tgSigFloatLinkMod,  tgSigFloatLinkReq,                      \
+    tgSigFloatValMod,   tgSigFloatValReq,   tgSigFloatUpdEvt,   \
+    tgSigFloatUpdMod,   tgSigFloatUpdReq
 
-#define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 3, \
-    tgP
+
+
+#define OSP_DATA_TESTAPP_MACH_ROCKET 1, \
+    idDummy
+#define OSP_TAGS_TESTAPP_MACH_ROCKET 1, \
+    tgMhRocketEvt
 
 
 
@@ -159,7 +159,6 @@
 
 #define OSP_DATA_TESTAPP_APP 1, \
     idUserInput
-
 #define OSP_TAGS_TESTAPP_APP 2, \
     tgRenderEvt, tgInputEvt
 
@@ -167,7 +166,6 @@
 
 #define OSP_DATA_TESTAPP_APP_MAGNUM 3, \
     idUserInput, idActiveApp, idRenderGl
-
 #define OSP_TAGS_TESTAPP_APP_MAGNUM 3, \
     tgRenderEvt, tgInputEvt, tgGlUse
 
@@ -175,7 +173,6 @@
 
 #define OSP_DATA_TESTAPP_COMMON_RENDERER 3, \
     idScnRender, idGroupFwd, idCamera
-
 #define OSP_TAGS_TESTAPP_COMMON_RENDERER 18, \
     tgDrawGlDel,        tgDrawGlMod,        tgDrawGlReq,        \
     tgMeshGlMod,        tgMeshGlReq,                            \
@@ -186,12 +183,20 @@
     tgDrawTransformDel, tgDrawTransformNew, tgDrawTransformMod, tgDrawTransformReq
 
 
+
 #define OSP_DATA_TESTAPP_CAMERA_CTRL 1, \
     idCamCtrl
 
+
+
 #define OSP_DATA_TESTAPP_SHADER_VISUALIZER 1, \
     idDrawVisual
-
 #define OSP_TAGS_TESTAPP_SHADER_VISUALIZER 3, \
     tgRenderEvt, tgInputEvt, tgGlUse
 
+
+
+#define OSP_DATA_TESTAPP_VEHICLE_CONTROL 1, \
+    idVhControls
+#define OSP_TAGS_TESTAPP_VEHICLE_CONTROL 2, \
+    tgSelUsrCtrlMod,    tgSelUsrCtrlReq

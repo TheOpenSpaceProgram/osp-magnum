@@ -34,6 +34,11 @@
 
 #include <vector>
 
+namespace osp
+{
+using Corrade::Containers::ArrayView;
+}
+
 namespace osp::link
 {
 
@@ -77,13 +82,13 @@ struct Machines
     std::vector<PerMachType>            m_perType;
 };
 
-struct UpdateMach
+struct UpdMachPerType
 {
-    BitVector_t m_localDirty;
-};
+    BitVector_t m_machTypesDirty;
 
-// [MachTypeId].m_locaDirty[MachLocalId]
-using UpdMachPerType_t = std::vector<UpdateMach>;
+    // [MachTypeId][MachLocalId]
+    std::vector<BitVector_t> m_localDirty;
+};
 
 struct Junction
 {
@@ -128,7 +133,7 @@ inline NodeId connected_node(lgrn::Span<NodeId const> portSpan, PortId port) noe
 void copy_machines(
         Machines const &rSrc,
         Machines &rDst,
-        Corrade::Containers::ArrayView<MachAnyId> remapMach);
+        Corrade::Containers::ArrayView<MachAnyId> remapMachOut);
 
 void copy_nodes(
         Nodes const &rSrcNodes,
@@ -136,7 +141,7 @@ void copy_nodes(
         Corrade::Containers::ArrayView<MachAnyId const> remapMach,
         Nodes &rDstNodes,
         Machines &rDstMach,
-        Corrade::Containers::ArrayView<NodeId> remapNode);
+        Corrade::Containers::ArrayView<NodeId> remapNodeOut);
 
 
 } // namespace osp::wire

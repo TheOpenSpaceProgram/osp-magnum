@@ -22,6 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include "scene_vehicles.h"
 #include "scenarios.h"
 #include "identifiers.h"
 #include "scene_physics.h"
@@ -34,6 +35,8 @@
 
 #include <osp/link/machines.h>
 #include <osp/link/signal.h>
+
+#include <osp/UserInputHandler.h>
 
 #include <osp/Resource/resources.h>
 
@@ -75,12 +78,20 @@ Session setup_parts(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tag
     OSP_SESSION_ACQUIRE_TAGS(parts, rTags,   TESTAPP_PARTS);
     parts.m_tgCleanupEvt = tgCleanupEvt;
 
-    auto &rScnParts = top_emplace< ACtxParts >  (topData, idScnParts);
-    top_emplace< UpdMachPerType_t >             (topData, idUpdMachines);
-    top_emplace< std::vector<TmpPartInit> >     (topData, idPartInit);
+    rBuilder.tag(tgPartInitReq)         .depend_on({tgPartInitMod});
+    rBuilder.tag(tgPartInitClr)         .depend_on({tgPartInitMod, tgPartInitReq});
+    rBuilder.tag(tgLinkReq)             .depend_on({tgLinkMod});
+    rBuilder.tag(tgLinkMhUpdReq)        .depend_on({tgLinkMhUpdMod});
 
-    rScnParts.m_machines.m_perType.resize(osp::link::MachTypeReg_t::size());
-    rScnParts.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
+    auto &rScnParts = top_emplace< ACtxParts >      (topData, idScnParts);
+    auto &rUpdMach = top_emplace< UpdMachPerType >  (topData, idUpdMach);
+    top_emplace< std::vector<TmpPartInit> >         (topData, idPartInit);
+    top_emplace< MachTypeToEvt_t >                  (topData, idMachEvtTags, MachTypeReg_t::size());
+
+    rUpdMach.m_machTypesDirty.ints().resize(MachTypeReg_t::size() + 1);
+    rUpdMach.m_localDirty.resize(MachTypeReg_t::size());
+    rScnParts.m_machines.m_perType.resize(MachTypeReg_t::size());
+    rScnParts.m_nodePerType.resize(NodeTypeReg_t::size());
 
     parts.task() = rBuilder.task().assign({tgCleanupEvt}).data(
             "Clean up Part prefab owners",
@@ -93,79 +104,105 @@ Session setup_parts(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tag
         }
     }));
 
+
+
     return parts;
 }
 
 Session setup_signals_float(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& parts)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(parts,      TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_TAGS(parts,      TESTAPP_PARTS);
 
     Session signalsFloat;
     OSP_SESSION_ACQUIRE_DATA(signalsFloat, topData, TESTAPP_SIGNALS_FLOAT);
+    OSP_SESSION_ACQUIRE_TAGS(signalsFloat, rTags,   TESTAPP_SIGNALS_FLOAT);
+
+    rBuilder.tag(tgSigFloatLinkReq)         .depend_on({tgSigFloatLinkMod});
+    rBuilder.tag(tgSigFloatValReq)          .depend_on({tgSigFloatLinkMod, tgSigFloatValMod});
+    rBuilder.tag(tgSigFloatUpdReq)          .depend_on({tgSigFloatLinkMod, tgSigFloatUpdMod});
 
     top_emplace< SignalValues_t<float> >    (topData, idSigValFloat);
     top_emplace< UpdateNodes<float> >       (topData, idSigUpdFloat);
+    top_emplace< TagId >                    (topData, idTgSigFloatUpdEvt, tgSigFloatUpdEvt);
 
     // note: Eventually have an array of UpdateNodes to allow multiple threads
     //       to update nodes in parallel. Tag limits would be handy here
 
-    signalsFloat.task() = rBuilder.task().assign({}).data(
-            "Update Signal-Float Nodes",
-            TopDataIds_t{                    },
-            wrap_args([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, ACtxParts const& rScnParts, UpdMachPerType_t& rUpdMachines) noexcept
-    {
-        Nodes const &rFloatNodes = rScnParts.m_nodePerType[osp::link::gc_ntSigFloat];
+    auto const idNull = lgrn::id_null<TopDataId>();
 
+    signalsFloat.task() = rBuilder.task().assign({tgSigFloatUpdEvt, tgSigFloatValMod, tgSigFloatUpdReq}).data(
+            "Update Signal-Float Nodes",
+            TopDataIds_t{            idNull,                    idSigUpdFloat,                       idSigValFloat,                 idScnParts,                idUpdMach,                       idMachEvtTags  },
+            wrap_args([] (WorkerContext ctx, UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, ACtxParts const& rScnParts, UpdMachPerType& rUpdMach, MachTypeToEvt_t const& rMachEvtTags) noexcept
+    {
+        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
+
+        rUpdMach.m_machTypesDirty.reset();
         update_signal_nodes<float>(
                 rSigUpdFloat.m_nodeDirty.ones(),
                 rFloatNodes.m_nodeToMach,
                 rScnParts.m_machines,
                 arrayView(rSigUpdFloat.m_nodeNewValues),
                 rSigValFloat,
-                rUpdMachines);
+                rUpdMach);
+
+        for (MachTypeId const type : rUpdMach.m_machTypesDirty.ones())
+        {
+            ctx.m_rEnqueueHappened = true;
+            TagId const tag = rMachEvtTags[type];
+            lgrn::bit_view(ctx.m_enqueue).set(std::size_t(tag));
+        }
     }));
 
-    signalsFloat.task() = rBuilder.task().assign({}).data(
-            "Update PartEnt<->ActiveEnt mapping",
-            TopDataIds_t{  },
-            wrap_args([] (ACtxParts& rScnParts, ActiveReg_t const& rActiveIds, std::vector<TmpPartInit>& rPartInit, ACtxPrefabInit& rPrefabInit) noexcept
+    signalsFloat.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgSigFloatLinkMod}).data(
+            "Allocate Signal-Float Node Values",
+            TopDataIds_t{                    idSigUpdFloat,                       idSigValFloat,                 idScnParts  },
+            wrap_args([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, ACtxParts const& rScnParts) noexcept
     {
-        // Populate PartEnt<->ActiveEnt mmapping, now that the prefabs exist
-        rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
-        rScnParts.m_activeToPart.resize(rActiveIds.capacity());
-        for (TmpPartInit& rPartInit : rPartInit)
-        {
-            ActiveEnt const root = rPrefabInit.m_ents[rPartInit.m_initPrefabs].front();
-
-            rScnParts.m_partToActive[rPartInit.m_part] = root;
-            rScnParts.m_activeToPart[std::size_t(root)] = rPartInit.m_part;
-        }
+        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
+        rSigUpdFloat.m_nodeNewValues.resize(rFloatNodes.m_nodeIds.capacity());
+        rSigUpdFloat.m_nodeDirty.ints().resize(rFloatNodes.m_nodeIds.vec().capacity());
+        rSigValFloat.resize(rFloatNodes.m_nodeIds.capacity());
 
     }));
 
     return signalsFloat;
 }
 
-Session setup_mach_magic_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnCommon, Session const& renderer, Session const& camera)
+Session setup_mach_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& parts, Session const& signalsFloat)
 {
-    using adera::gc_mtMagicRocket;
+    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
+    OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
+    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
 
-    Session magicRockets;
+    using namespace adera;
+
+    Session machRocket;
+    OSP_SESSION_ACQUIRE_DATA(machRocket, topData, TESTAPP_MACH_ROCKET);
+    OSP_SESSION_ACQUIRE_TAGS(machRocket, rTags,   TESTAPP_MACH_ROCKET);
+
+    top_get< MachTypeToEvt_t >(topData, idMachEvtTags).at(gc_mtMagicRocket) = tgMhRocketEvt;
 
     // after Update Signal-Float Nodes
-    magicRockets.task() = rBuilder.task().assign({}).data(
-            "Update machines",
-            TopDataIds_t{  },
-            wrap_args([] (ACtxParts& rScnParts, UpdMachPerType_t const& rUpdMachines, SignalValues_t<float>& rSigValFloat) noexcept
+    machRocket.task() = rBuilder.task().assign({tgMhRocketEvt, tgSigFloatValReq}).data(
+            "Update Rockets Machines",
+            TopDataIds_t{           idScnParts,                      idUpdMach,                       idSigValFloat },
+            wrap_args([] (ACtxParts& rScnParts, UpdMachPerType const& rUpdMach, SignalValues_t<float>& rSigValFloat) noexcept
     {
-        Nodes const &rFloatNodes = rScnParts.m_nodePerType[osp::link::gc_ntSigFloat];
+        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
         PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
 
-        for (MachLocalId const local : rUpdMachines[gc_mtMagicRocket].m_localDirty.ones())
+        for (MachLocalId const local : rUpdMach.m_localDirty[gc_mtMagicRocket].ones())
         {
             MachAnyId const mach = rRockets.m_localToAny[local];
             lgrn::Span<NodeId const> const portSpan = rFloatNodes.m_machToNode[mach];
-            if (NodeId const thrNode = connected_node(portSpan, adera::ports_magicrocket::gc_throttleIn.m_port);
+            if (NodeId const thrNode = connected_node(portSpan, ports_magicrocket::gc_throttleIn.m_port);
                 thrNode != lgrn::id_null<NodeId>())
             {
                 if (thrNode != lgrn::id_null<NodeId>())
@@ -177,9 +214,16 @@ Session setup_mach_magic_rocket(Builder_t& rBuilder, ArrayView<entt::any> const 
         }
     }));
 
-    return magicRockets;
-}
+    machRocket.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgLinkMhUpdMod}).data(
+            "Allocate machine update stuff",
+            TopDataIds_t{           idScnParts,                idUpdMach },
+            wrap_args([] (ACtxParts& rScnParts, UpdMachPerType& rUpdMach) noexcept
+    {
+        rUpdMach.m_localDirty[gc_mtMagicRocket].ints().resize(rScnParts.m_machines.m_perType[gc_mtMagicRocket].m_localIds.vec().capacity());
+    }));
 
+    return machRocket;
+}
 
 Session setup_vehicle_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& parts)
 {
@@ -208,6 +252,7 @@ Session setup_vehicle_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topD
         rVehicleSpawn.m_basic.clear();
     }));
 
+
     return vehicleSpawn;
 }
 
@@ -229,55 +274,87 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
 
     vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnPartMod}).data(
             "Create parts for vehicle",
-            TopDataIds_t{                  idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts},
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
+            TopDataIds_t{                  idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts},
+            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
         if (rVehicleSpawn.vehicle_count() == 0)
         {
             return;
         }
 
-        // Count the total number of parts to create
-        std::size_t countTotal = 0;
-        for (VehicleData const* pVehicle : rVehicleSpawnVB.m_dataVB)
+        rVehicleSpawnVB.m_remapPartOffsets.resize(rVehicleSpawn.vehicle_count());
+
+        // Count parts and calculate offsets Part ID remap vector
+
+        std::size_t partCount = 0;
+        std::size_t offsetTotal = 0;
+
         {
-            if (pVehicle == nullptr)
+            auto itRemapPartOffset = std::begin(rVehicleSpawnVB.m_remapPartOffsets);
+
+            for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
             {
-                continue;
+                if (pVData == nullptr)
+                {
+                    continue;
+                }
+
+                // TODO: eventually use "highest ID + 1" for bounds
+                // Capacity is the bit size of the internal uint64 vector: a
+                // number greater than all IDs and is a multiple of 64.
+                std::size_t const bounds = pVData->m_partIds.capacity();
+                (*itRemapPartOffset) = offsetTotal;
+                offsetTotal += bounds;
+
+                // Exact number of part IDs, size() counts the ones bits
+                partCount += pVData->m_partIds.size();
+
+                std::advance(itRemapPartOffset, 1);
             }
 
-            // TODO: size here is O(N), maybe optimize later?
-            countTotal += pVehicle->m_partIds.size();
+            rVehicleSpawnVB.m_remapPartAll.resize(offsetTotal, lgrn::id_null<PartEnt_t>());
+            rVehicleSpawn.m_newParts.resize(partCount);
         }
 
         // Create the part IDs
-        rVehicleSpawn.m_newParts.resize(countTotal);
-        rScnParts.m_partIds.create(std::begin(rVehicleSpawn.m_newParts), std::end(rVehicleSpawn.m_newParts));
+        rScnParts.m_partIds.create(std::begin(rVehicleSpawn.m_newParts),
+                                     std::end(rVehicleSpawn.m_newParts));
 
         // Resize some containers to account for newly created part IDs
         rScnParts.m_partPrefabs         .resize(rScnParts.m_partIds.capacity());
         rScnParts.m_partTransformRigid  .resize(rScnParts.m_partIds.capacity());
         rScnParts.m_partRigids          .resize(rScnParts.m_partIds.capacity());
-        rScnParts.m_rigidToParts        .data_reserve(rScnParts.m_partIds.capacity());
+        rScnParts.m_rigidToParts  .data_reserve(rScnParts.m_partIds.capacity());
 
         // Assign the part IDs to each vehicle to initialize
         // Populates rVehicleSpawn.m_parts
         rVehicleSpawn.m_parts.resize(rVehicleSpawn.m_basic.size());
         auto itPartAvailable    = std::begin(rVehicleSpawn.m_newParts);
         auto itVehiclePartsOut  = std::begin(rVehicleSpawn.m_parts);
-        for (VehicleData const* pVehicle : rVehicleSpawnVB.m_dataVB)
+        auto itRemapPartOffset  = std::cbegin(rVehicleSpawnVB.m_remapPartOffsets);
+        for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
         {
-            if (pVehicle == nullptr)
+            if (pVData == nullptr)
             {
                 continue;
             }
 
-            std::size_t const count = pVehicle->m_partIds.size();
+            std::size_t const count = pVData->m_partIds.size();
 
-            (*itVehiclePartsOut) = { &(*itPartAvailable), count };
+            (*itVehiclePartsOut) = ArrayView{ &(*itPartAvailable), count };
+
+            // Generate Part ID remap vector. Maybe this can be a separate task?
+            std::size_t const offset = *itRemapPartOffset;
+            auto dstPartIt = std::cbegin(*itVehiclePartsOut);
+            for (uint32_t srcPart : pVData->m_partIds.bitview().zeros())
+            {
+                rVehicleSpawnVB.m_remapPartAll[offset + srcPart] = *dstPartIt;
+                std::advance(dstPartIt, 1);
+            }
 
             std::advance(itPartAvailable, count);
             std::advance(itVehiclePartsOut, 1);
+            std::advance(itRemapPartOffset, 1);
         }
 
         assert(itPartAvailable == std::end(rVehicleSpawn.m_newParts));
@@ -293,46 +370,123 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
             return;
         }
 
-        auto itVehicleParts = std::begin(rVehicleSpawn.m_parts);
+        auto itVehicleParts = std::cbegin(rVehicleSpawn.m_parts);
 
-        for (VehicleData const* pVehicle : rVehicleSpawnVB.m_dataVB)
+        for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
         {
-            std::vector<PartEnt_t> remapPart(pVehicle->m_partIds.capacity());
+            if (pVData == nullptr)
+            {
+                continue;
+            }
 
             // Copy Part data from VehicleBuilder to scene
-            auto dstPartIt = std::begin(*itVehicleParts);
-            for (uint32_t srcPart : pVehicle->m_partIds.bitview().zeros())
+            auto dstPartIt = std::cbegin(*itVehicleParts);
+            for (uint32_t srcPart : pVData->m_partIds.bitview().zeros())
             {
                 PartEnt_t const dstPart = *dstPartIt;
                 std::advance(dstPartIt, 1);
 
-                remapPart[srcPart] = dstPart;
-
-                PrefabPair const& prefabPairSrc = pVehicle->m_partPrefabs[srcPart];
+                PrefabPair const& prefabPairSrc = pVData->m_partPrefabs[srcPart];
                 PrefabPair prefabPairDst{
                     rResources.owner_create(gc_importer, prefabPairSrc.m_importer),
                     prefabPairSrc.m_prefabId
                 };
                 rScnParts.m_partPrefabs[dstPart]        = std::move(prefabPairDst);
-                rScnParts.m_partTransformRigid[dstPart] = pVehicle->m_partTransforms[srcPart];
+                rScnParts.m_partTransformRigid[dstPart] = pVData->m_partTransforms[srcPart];
 
                 RigidGroup_t const rigid = rScnParts.m_partRigids[dstPart];
                 ActiveEnt const rigidEnt = rScnParts.m_rigidToEnt[rigid];
 
                 // Add Prefab and Part init events
                 int const& initPfIndex  = rPrefabInit.m_basic.size();
-                //TmpPrefabInitBasic &rInitPf  = rPrefabInit.m_basic.emplace_back();
-                //rScnTest.m_initParts.emplace_back(PartInit{dstPart, initPfIndex});
 
                 rPrefabInit.m_basic.push_back(TmpPrefabInitBasic{
                     .m_importerRes = prefabPairSrc.m_importer,
                     .m_prefabId = prefabPairSrc.m_prefabId,
                     .m_parent = rigidEnt,
-                    .m_pTransform = &pVehicle->m_partTransforms[srcPart]
+                    .m_pTransform = &pVData->m_partTransforms[srcPart]
                 });
             }
 
             std::advance(itVehicleParts, 1);
+        }
+
+    }));
+
+    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVSpawnRgdEntReq, tgVSpawnPartReq, tgLinkMod}).data(
+            "Copy machines from VehicleBuilder",
+            TopDataIds_t{                  idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts,                idPrefabInit,           idResources},
+            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
+    {
+        if (rVehicleSpawn.vehicle_count() == 0)
+        {
+            return;
+        }
+
+        // Count total number of machines to make
+        {
+            std::size_t machCount = 0;
+            std::size_t offsetTotal = 0;
+
+            rVehicleSpawnVB.m_remapMachOffsets.resize(rVehicleSpawn.vehicle_count());
+            auto itRemapMachOffset = std::begin(rVehicleSpawnVB.m_remapMachOffsets);
+
+            for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
+            {
+                if (pVData == nullptr)
+                {
+                    continue;
+                }
+
+                std::size_t const bounds = pVData->m_machines.m_ids.capacity();
+                (*itRemapMachOffset) = offsetTotal;
+                offsetTotal += bounds;
+                machCount += pVData->m_machines.m_ids.size();
+
+                std::advance(itRemapMachOffset, 1);
+            }
+
+        }
+
+
+        auto itVehicleParts = std::cbegin(rVehicleSpawn.m_parts);
+        auto itRemapPartOffset = std::begin(rVehicleSpawnVB.m_remapPartOffsets);
+
+        for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
+        {
+            if (pVData == nullptr)
+            {
+                continue;
+            }
+
+            auto remapPart = arrayView(rVehicleSpawnVB.m_remapPartAll).exceptPrefix(*itRemapPartOffset);
+
+            // remapMach[source MachAnyId] -> destination MachAnyId
+            std::vector<MachAnyId> remapMach(pVData->m_machines.m_ids.capacity());
+
+            copy_machines(pVData->m_machines, rScnParts.m_machines, remapMach);
+
+            rScnParts.m_machineToPart.resize(rScnParts.m_machines.m_ids.capacity());
+            for (MachAnyId const srcMach : pVData->m_machines.m_ids.bitview().zeros())
+            {
+                MachAnyId const dstMach = remapMach[srcMach];
+                rScnParts.m_machineToPart[dstMach] = remapPart[std::size_t(pVData->m_machToPart[srcMach])];
+            }
+
+            // Do the same for nodes
+            auto itDstNodeType = std::begin(rScnParts.m_nodePerType);
+            for (PerNodeType const &rSrcNodeType : pVData->m_nodePerType)
+            {
+                std::vector<NodeId> remapNodes(rSrcNodeType.m_nodeIds.capacity());
+                copy_nodes(rSrcNodeType, pVData->m_machines, remapMach,
+                           *itDstNodeType, rScnParts.m_machines, remapNodes);
+                std::advance(itDstNodeType, 1);
+            }
+
+            // TODO: copy node values
+
+            std::advance(itVehicleParts, 1);
+            std::advance(itRemapPartOffset, 1);
         }
 
     }));
@@ -346,6 +500,7 @@ Session setup_vehicle_spawn_rigid(Builder_t& rBuilder, ArrayView<entt::any> cons
     OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
     OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_DATA(prefabs,        TESTAPP_PREFABS);
     OSP_SESSION_UNPACK_TAGS(prefabs,        TESTAPP_PREFABS);
     OSP_SESSION_UNPACK_DATA(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
@@ -473,6 +628,24 @@ Session setup_vehicle_spawn_rigid(Builder_t& rBuilder, ArrayView<entt::any> cons
         }
     }));
 
+    vehicleSpawnRgd.task() = rBuilder.task().assign({}).data(
+            "Update PartEnt<->ActiveEnt mapping",
+            TopDataIds_t{           idScnParts,                   idActiveIds,                          idPartInit,                idPrefabInit },
+            wrap_args([] (ACtxParts& rScnParts, ActiveReg_t const& rActiveIds, std::vector<TmpPartInit>& rPartInit, ACtxPrefabInit& rPrefabInit) noexcept
+    {
+        // Populate PartEnt<->ActiveEnt mmapping, now that the prefabs exist
+        rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
+        rScnParts.m_activeToPart.resize(rActiveIds.capacity());
+        for (TmpPartInit& rPartInit : rPartInit)
+        {
+            ActiveEnt const root = rPrefabInit.m_ents[rPartInit.m_initPrefabs].front();
+
+            rScnParts.m_partToActive[rPartInit.m_part] = root;
+            rScnParts.m_activeToPart[std::size_t(root)] = rPartInit.m_part;
+        }
+
+    }));
+
     return vehicleSpawnRgd;
 }
 
@@ -539,77 +712,115 @@ Session setup_test_vehicles(Builder_t& rBuilder, ArrayView<entt::any> const topD
     return testVehicles;
 }
 
-/*
-
-static void spawn_vehicle(osp::active::ACtxBasic& rBasic)
+struct VehicleTestControls
 {
-    using namespace osp::active;
+    MachLocalId m_selectedUsrCtrl{lgrn::id_null<MachLocalId>()};
 
-    Matrix4 const rootTf = Matrix4::translation({0.0f, 5.0f, 0.0f});
+    input::EButtonControlIndex m_btnSwitch;
+    input::EButtonControlIndex m_btnThrMax;
+    input::EButtonControlIndex m_btnThrMin;
+    input::EButtonControlIndex m_btnThrMore;
+    input::EButtonControlIndex m_btnThrLess;
+};
 
-    // Setup vehicle's root entity as a single rigid body (for now)
+Session setup_vehicle_control(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& parts, Session const& signalsFloat, Session const& app)
+{
+    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
+    OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
+    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_DATA(app,            TESTAPP_APP);
+    OSP_SESSION_UNPACK_TAGS(app,            TESTAPP_APP);
 
+    using namespace adera;
 
+    Session vehicleCtrl;
+    OSP_SESSION_ACQUIRE_DATA(vehicleCtrl, topData, TESTAPP_VEHICLE_CONTROL);
+    OSP_SESSION_ACQUIRE_TAGS(vehicleCtrl, rTags,   TESTAPP_VEHICLE_CONTROL);
 
+    rBuilder.tag(tgSelUsrCtrlReq).depend_on({tgSelUsrCtrlMod});
 
-    std::vector<PartEnt_t> remapPart(data.m_partIds.capacity());
+    auto &rUserInput = top_get< input::UserInputHandler >(topData, idUserInput);
 
-    // Copy Part data from VehicleBuilder to scene
-    auto dstPartIt = std::begin(rigidPartsSpan);
-    for (uint32_t srcPart : data.m_partIds.bitview().zeros())
+    // TODO: add cleanup task
+    top_emplace<VehicleTestControls>(topData, idVhControls, VehicleTestControls{
+        .m_btnSwitch    = rUserInput.button_subscribe("game_switch"),
+        .m_btnThrMax    = rUserInput.button_subscribe("vehicle_thr_max"),
+        .m_btnThrMin    = rUserInput.button_subscribe("vehicle_thr_min"),
+        .m_btnThrMore   = rUserInput.button_subscribe("vehicle_thr_more"),
+        .m_btnThrLess   = rUserInput.button_subscribe("vehicle_thr_less")
+    });
+
+    auto const idNull = lgrn::id_null<TopDataId>();
+
+    vehicleCtrl.task() = rBuilder.task().assign({tgInputEvt, tgSigFloatValReq, tgSigFloatUpdMod}).data(
+            "Write inputs to UserControl Machines",
+            TopDataIds_t{             idNull,           idScnParts,                       idSigValFloat,                    idSigUpdFloat,           idTgSigFloatUpdEvt,                               idUserInput,                     idVhControls,           idDeltaTimeIn },
+            wrap_args([] (WorkerContext ctx,  ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, TagId const tgSigFloatUpdEvt, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls, float const deltaTimeIn) noexcept
     {
-        PartEnt_t const dstPart = *dstPartIt;
-        std::advance(dstPartIt, 1);
+        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
+        PerMachType &rUsrCtrl    = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
 
-        remapPart[srcPart] = dstPart;
+        // Select a UsrCtrl machine when pressing the switch button
+        if (rUserInput.button_state(rVhControls.m_btnSwitch).m_triggered)
+        {
+            ++rVhControls.m_selectedUsrCtrl;
+            bool found = false;
+            for (MachLocalId local = rVhControls.m_selectedUsrCtrl; local < rUsrCtrl.m_localIds.capacity(); ++local)
+            {
+                if (rUsrCtrl.m_localIds.exists(local))
+                {
+                    found = true;
+                    rVhControls.m_selectedUsrCtrl = local;
+                    break;
+                }
+            }
 
-        osp::PrefabPair const& prefabPairSrc = data.m_partPrefabs[srcPart];
-        osp::PrefabPair prefabPairDst{
-            rScene.m_pResources->owner_create(gc_importer, prefabPairSrc.m_importer),
-            prefabPairSrc.m_prefabId
-        };
-        rScnParts.m_partPrefabs[dstPart]        = std::move(prefabPairDst);
-        rScnParts.m_partTransformRigid[dstPart] = data.m_partTransforms[srcPart];
-        rScnParts.m_partRigids[dstPart]         = rigid;
+            if ( ! found )
+            {
+                rVhControls.m_selectedUsrCtrl = lgrn::id_null<MachLocalId>();
+                OSP_LOG_INFO("Unselected vehicles");
+            }
+            else
+            {
+                OSP_LOG_INFO("Selected User Control: {}", rVhControls.m_selectedUsrCtrl);
+            }
+        }
 
-        // Add Prefab and Part init events
-        int const& initPfIndex  = rScnTest.m_initPrefabs.size();
-        TmpPrefabInit &rInitPf  = rScnTest.m_initPrefabs.emplace_back();
-        rInitPf.m_importerRes   = prefabPairSrc.m_importer;
-        rInitPf.m_prefabId      = prefabPairSrc.m_prefabId;
-        rInitPf.m_pTransform    = &data.m_partTransforms[srcPart];
-        rInitPf.m_parent        = rigidEnt;
-        rScnTest.m_initParts.emplace_back(PartInit{dstPart, initPfIndex});
-    }
+        // Control selected UsrCtrl machine
+        if (rVhControls.m_selectedUsrCtrl != lgrn::id_null<MachLocalId>())
+        {
+            float const thrRate = deltaTimeIn;
+            float const thrChange =
+                      float(rUserInput.button_state(rVhControls.m_btnThrMore).m_held) * thrRate
+                    - float(rUserInput.button_state(rVhControls.m_btnThrLess).m_held) * thrRate
+                    + float(rUserInput.button_state(rVhControls.m_btnThrMax).m_triggered)
+                    - float(rUserInput.button_state(rVhControls.m_btnThrMin).m_triggered);
 
-    using namespace osp::link;
+            MachAnyId const mach = rUsrCtrl.m_localToAny[rVhControls.m_selectedUsrCtrl];
+            lgrn::Span<NodeId const> const portSpan = rFloatNodes.m_machToNode[mach];
 
-    // remapMach[source MachAnyId] -> destination MachAnyId
-    std::vector<MachAnyId> remapMach(data.m_machines.m_ids.capacity());
+            if (NodeId const thrNode = connected_node(portSpan, adera::ports_userctrl::gc_throttleOut.m_port);
+                thrNode != lgrn::id_null<NodeId>())
+            {
+                float const thrCurr = rSigValFloat[thrNode];
+                float const thrNew = Magnum::Math::clamp(thrCurr + thrChange, 0.0f, 1.0f);
 
-    // Make new machines in dst for each machine in source
-    copy_machines(data.m_machines, rScnParts.m_machines, remapMach);
+                if (thrCurr != thrNew)
+                {
+                    rSigUpdFloat.m_nodeDirty.set(thrNode);
+                    rSigUpdFloat.m_nodeNewValues[thrNode] = thrNew;
 
-    rScnParts.m_machineToPart.resize(rScnParts.m_machines.m_ids.capacity());
-    for (MachAnyId const srcMach : data.m_machines.m_ids.bitview().zeros())
-    {
-        MachAnyId const dstMach = remapMach[srcMach];
-        rScnParts.m_machineToPart[dstMach] = remapPart[std::size_t(data.m_machToPart[srcMach])];
-    }
+                    ctx.m_rEnqueueHappened = true;
+                    lgrn::bit_view(ctx.m_enqueue).set(std::size_t(tgSigFloatUpdEvt));
+                }
+            }
+        }
 
-    // Do the same for nodes
-    std::vector<NodeId> remapNodes(data.m_nodePerType[gc_ntNumber].m_nodeIds.capacity());
-    copy_nodes(
-            data.m_nodePerType[gc_ntNumber],
-            data.m_machines,
-            std::move(remapMach),
-            rScnParts.m_nodePerType[gc_ntNumber],
-            rScnParts.m_machines,
-            std::move(remapNodes));
+    }));
 
-    // TODO: copy node values
-    rScnTest.m_nodeNumValues.resize(rScnParts.m_nodePerType[gc_ntNumber].m_nodeIds.size());
+    return vehicleCtrl;
 }
-*/
 
-}
+} // namespace testapp::scenes
