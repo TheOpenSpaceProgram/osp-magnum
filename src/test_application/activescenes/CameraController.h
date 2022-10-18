@@ -58,6 +58,8 @@ struct ACtxCameraController
     osp::Vector3 m_up{0.0f, 0.0f, 1.0f};
 
     std::optional<osp::Vector3> m_target{osp::Vector3{}};
+    osp::Matrix4 m_transform;
+
     float m_orbitDistance{20.0f};
 
     float m_moveSpeed{1.0f};
@@ -92,26 +94,20 @@ public:
      * @brief Read rotation controls and orientation around its target
      *
      * @param rCtrl     [in] Camera Controller state
-     * @param rCamTf    [out] Camera transform output
      * @param delta     [in] Time used to calculate displacement
      */
-    static void update_view(
-            ACtxCameraController &rCtrl, osp::Matrix4 &rCamTf,
-            float delta);
+    static void update_view(ACtxCameraController &rCtrl, float delta);
 
     /**
      * @brief Read translation controls and move the camera accordingly
      *
      * @param rCtrl         [in] Camera Controller state
-     * @param rCamTf        [out] Camera transform output
      * @param delta         [in] Time used to calculate displacement
      * @param moveTarget    [in] Option to move the target position as well.
      *                           Leave this as always true for now, as different
      *                           camera modes are not yet finalized.
      */
-    static void update_move(
-            ACtxCameraController &rCtrl, osp::Matrix4 &rCamTf,
-            float delta, bool moveTarget);
+    static void update_move(ACtxCameraController &rCtrl, float delta, bool moveTarget);
 };
 
 

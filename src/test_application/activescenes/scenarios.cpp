@@ -103,7 +103,7 @@ static ScenarioMap_t make_scenarios()
         scenarioMap.emplace(name, ScenarioOption{desc, run});
     };
 
-    add_scenario("enginetest", "Demonstrate basic game engine functions without using TopTasks",
+    add_scenario("enginetest", "Basic game engine and drawing scenario (without using TopTasks)",
                  [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
     {
         sceneOut.resize(1);
@@ -124,11 +124,12 @@ static ScenarioMap_t make_scenarios()
             auto &rRenderGl     = top_get< active::RenderGL >       (mainView.m_topData, idRenderGl);
             auto &rUserInput    = top_get< input::UserInputHandler >(mainView.m_topData, idUserInput);
 
+            // Renderer state is stored as lambda capture
             rActiveApp.set_on_draw(enginetest::generate_draw_func(rScene, rActiveApp, rRenderGl, rUserInput));
         };
     });
 
-    add_scenario("physicstest", "Physics lol",
+    add_scenario("physics", "Newton Dynamics integration test scenario",
                  [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
     {
         using namespace testapp::scenes;
@@ -166,8 +167,8 @@ static ScenarioMap_t make_scenarios()
             rendererOut.resize(5);
             auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow] = unpack<5>(rendererOut);
             scnRender   = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
-            cameraCtrl  = setup_camera_magnum       (builder, rTopData, rTags, magnum);
-            cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, scnRender, cameraCtrl);
+            cameraCtrl  = setup_camera_magnum       (builder, rTopData, rTags, magnum, scnRender);
+            cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, cameraCtrl);
             shVisual    = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
             camThrow    = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
 
@@ -175,7 +176,7 @@ static ScenarioMap_t make_scenarios()
         };
     });
 
-    add_scenario("vehicletest", "Vehicles, gwah!",
+    add_scenario("vehicles", "Physics scenario but with Vehicles",
                  [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
     {
         using namespace testapp::scenes;
@@ -195,7 +196,6 @@ static ScenarioMap_t make_scenarios()
             testVehicles, droppers, gravity, bounds, thrower
         ] = unpack<17>(sceneOut);
 
-        // Compose together lots of Sessions
         scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources);
         matVisual       = setup_material            (builder, rTopData, rTags, scnCommon);
         physics         = setup_physics             (builder, rTopData, rTags, scnCommon, idResources, pkg);
@@ -218,25 +218,23 @@ static ScenarioMap_t make_scenarios()
         OSP_SESSION_UNPACK_DATA(vehicleSpawnVB, TESTAPP_VEHICLE_SPAWN_VB);
         OSP_SESSION_UNPACK_DATA(testVehicles,   TESTAPP_TEST_VEHICLES);
         OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
+
         add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, pkg);
 
-        Resources &rResources = top_get<Resources>(rTopData, idResources);
+        using namespace osp::active;
 
-        //static Matrix4 uppy = Matrix4::translation({0.0f, 0.0f, 4.0f});
+        auto &rActiveIds        = top_get<ActiveReg_t>          (rTopData, idActiveIds);
+        auto &rTVPartVehicle    = top_get<VehicleData>          (rTopData, idTVPartVehicle);
+        auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
+        auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
 
-        using osp::active::ACtxVehicleSpawn;
-
-        auto &rTVPartVehicle    = top_get<VehicleData>(rTopData, idTVPartVehicle);
-        auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>(rTopData, idVehicleSpawn);
-        auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>(rTopData, idVehicleSpawnVB);
-
-        rVehicleSpawn.m_basic.emplace_back(ACtxVehicleSpawn::TmpToInit{{0.0f, 0.0f, 10.0f}, {0.0f, 0.0f, 0.0f}, {}});
+        // Spawn two vehicles
+        rVehicleSpawn.m_basic.emplace_back(ACtxVehicleSpawn::TmpToInit{{0.0f,  2.0f, 10.0f}, {0.0f, 0.0f, 0.0f}, {}});
+        rVehicleSpawnVB.m_dataVB.push_back(&rTVPartVehicle);
+        rVehicleSpawn.m_basic.emplace_back(ACtxVehicleSpawn::TmpToInit{{0.0f, -2.0f, 10.0f}, {0.0f, 0.0f, 0.0f}, {}});
         rVehicleSpawnVB.m_dataVB.push_back(&rTVPartVehicle);
 
-        osp::active::ActiveEnt const rooot = top_get<osp::active::ActiveReg_t>(rTopData, idActiveIds).create();
-
-        auto &rBasic = top_get<active::ACtxBasic>(rTopData, idBasic);
-        auto &rTPhys = top_get<ACtxTestPhys>(rTopData, idTPhys);
+        ActiveEnt const rooot = rActiveIds.create();
 
         return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
         {
@@ -256,13 +254,14 @@ static ScenarioMap_t make_scenarios()
             using namespace testapp::scenes;
 
             rendererOut.resize(6);
-            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow, vehicleCtrl] = unpack<6>(rendererOut);
-            scnRender   = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
-            cameraCtrl  = setup_camera_magnum       (builder, rTopData, rTags, magnum);
-            cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, scnRender, cameraCtrl);
-            shVisual    = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
-            camThrow    = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
-            vehicleCtrl = setup_vehicle_control     (builder, rTopData, rTags, scnCommon, parts, signalsFloat, magnum);
+            auto & [scnRender, cameraCtrl, shVisual, camThrow, vehicleCtrl, cameraVehicle] = unpack<6>(rendererOut);
+            scnRender       = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
+            cameraCtrl      = setup_camera_magnum       (builder, rTopData, rTags, magnum, scnRender);
+            shVisual        = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
+            camThrow        = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
+            vehicleCtrl     = setup_vehicle_control     (builder, rTopData, rTags, scnCommon, parts, signalsFloat, magnum);
+            cameraVehicle   = setup_camera_vehicle      (builder, rTopData, rTags, magnum, scnCommon, parts, physics, cameraCtrl, vehicleCtrl);
+
 
             setup_magnum_draw(mainView, magnum, scnCommon, scnRender);
         };

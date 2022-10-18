@@ -173,12 +173,13 @@
 
 #define OSP_DATA_TESTAPP_COMMON_RENDERER 3, \
     idScnRender, idGroupFwd, idCamera
-#define OSP_TAGS_TESTAPP_COMMON_RENDERER 18, \
+#define OSP_TAGS_TESTAPP_COMMON_RENDERER 20, \
     tgDrawGlDel,        tgDrawGlMod,        tgDrawGlReq,        \
     tgMeshGlMod,        tgMeshGlReq,                            \
     tgTexGlMod,         tgTexGlReq,                             \
     tgEntTexMod,        tgEntTexReq,                            \
     tgEntMeshMod,       tgEntMeshReq,                           \
+    tgCameraMod,        tgCameraReq,                            \
     tgGroupFwdDel,      tgGroupFwdMod,      tgGroupFwdReq,      \
     tgDrawTransformDel, tgDrawTransformNew, tgDrawTransformMod, tgDrawTransformReq
 
@@ -186,6 +187,8 @@
 
 #define OSP_DATA_TESTAPP_CAMERA_CTRL 1, \
     idCamCtrl
+#define OSP_TAGS_TESTAPP_CAMERA_CTRL 2, \
+    tgCamCtrlMod,       tgCamCtrlReq
 
 
 

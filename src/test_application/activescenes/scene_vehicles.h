@@ -98,5 +98,16 @@ osp::Session setup_vehicle_control(
         osp::Session const& signalsFloat,
         osp::Session const& app);
 
+osp::Session setup_camera_vehicle(
+        Builder_t& rBuilder,
+        osp::ArrayView<entt::any> const topData,
+        osp::Tags& rTags,
+        osp::Session const& app,
+        osp::Session const& scnCommon,
+        osp::Session const& parts,
+        osp::Session const& physics,
+        osp::Session const& camera,
+        osp::Session const& vehicleControl);
+
 
 }

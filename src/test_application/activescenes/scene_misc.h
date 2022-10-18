@@ -43,7 +43,6 @@ osp::Session setup_camera_free(
         osp::Tags& rTags,
         osp::Session const& app,
         osp::Session const& scnCommon,
-        osp::Session const& renderer,
         osp::Session const& camera);
 
 osp::Session setup_thrower(

@@ -72,6 +72,7 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
     rBuilder.tag(tgTexGlReq)            .depend_on({tgTexGlMod});
     rBuilder.tag(tgEntTexReq)           .depend_on({tgEntTexMod});
     rBuilder.tag(tgEntMeshReq)          .depend_on({tgEntMeshMod});
+    rBuilder.tag(tgCameraReq)           .depend_on({tgCameraMod});
     rBuilder.tag(tgGroupFwdMod)         .depend_on({tgGroupFwdDel});
     rBuilder.tag(tgGroupFwdReq)         .depend_on({tgGroupFwdDel, tgGroupFwdMod});
     rBuilder.tag(tgDrawTransformNew)    .depend_on({tgDrawTransformDel});
@@ -104,7 +105,7 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
     }));
 
 
-    renderer.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgDrawTransformReq, tgGroupFwdReq, tgDrawReq, tgEntTexMod, tgEntMeshMod}).data(
+    renderer.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgDrawTransformReq, tgGroupFwdReq, tgDrawReq, tgCameraReq, tgEntTexMod, tgEntMeshMod}).data(
             "Render and display scene",
             TopDataIds_t{                   idDrawing,          idRenderGl,                   idGroupFwd,              idCamera},
             wrap_args([] (ACtxDrawing const& rDrawing, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera) noexcept
@@ -160,26 +161,40 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
 }
 
 
-Session setup_camera_magnum(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum)
+Session setup_camera_magnum(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnRender)
 {
     OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
     auto &rUserInput = top_get< UserInputHandler >(topData, idUserInput);
 
     Session simpleCamera;
     OSP_SESSION_ACQUIRE_DATA(simpleCamera, topData, TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_ACQUIRE_TAGS(simpleCamera, rTags,   TESTAPP_CAMERA_CTRL);
+
+    rBuilder.tag(tgCamCtrlReq).depend_on({tgCamCtrlMod});
 
     top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
+
+    simpleCamera.task() = rBuilder.task().assign({tgRenderEvt, tgCamCtrlReq, tgCameraMod}).data(
+            "Align Rendering Camera according to Camera Controller",
+            TopDataIds_t{                            idCamCtrl,        idCamera},
+            wrap_args([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
+    {
+        rCamera.m_transform = rCamCtrl.m_transform;
+    }));
 
     return simpleCamera;
 }
 
-Session setup_shader_visualizer(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnCommon, Session const& renderer, Session const& material)
+Session setup_shader_visualizer(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnCommon, Session const& scnRender, Session const& material)
 {
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_TAGS(renderer,   TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_DATA(renderer,   TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
     OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
     auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);

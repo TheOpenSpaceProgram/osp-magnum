@@ -26,12 +26,15 @@
 #include "scenarios.h"
 #include "identifiers.h"
 #include "scene_physics.h"
+#include "CameraController.h"
 #include "../VehicleBuilder.h"
 
 #include <osp/Active/parts.h>
 #include <osp/Active/physics.h>
 #include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysPrefabInit.h>
+
+#include <osp/Active/opengl/SysRenderGL.h>
 
 #include <osp/link/machines.h>
 #include <osp/link/signal.h>
@@ -85,7 +88,7 @@ Session setup_parts(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tag
 
     auto &rScnParts = top_emplace< ACtxParts >      (topData, idScnParts);
     auto &rUpdMach = top_emplace< UpdMachPerType >  (topData, idUpdMach);
-    top_emplace< std::vector<TmpPartInit> >         (topData, idPartInit);
+    //top_emplace< std::vector<TmpPartInit> >         (topData, idPartInit);
     top_emplace< MachTypeToEvt_t >                  (topData, idMachEvtTags, MachTypeReg_t::size());
 
     rUpdMach.m_machTypesDirty.ints().resize(MachTypeReg_t::size() + 1);
@@ -176,6 +179,8 @@ Session setup_mach_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topDat
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    //OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
+    //OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
     OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
     OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
     OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
@@ -190,7 +195,7 @@ Session setup_mach_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topDat
     top_get< MachTypeToEvt_t >(topData, idMachEvtTags).at(gc_mtMagicRocket) = tgMhRocketEvt;
 
     // after Update Signal-Float Nodes
-    machRocket.task() = rBuilder.task().assign({tgMhRocketEvt, tgSigFloatValReq}).data(
+    machRocket.task() = rBuilder.task().assign({tgMhRocketEvt, tgSigFloatUpdReq, tgSigFloatValReq}).data(
             "Update Rockets Machines",
             TopDataIds_t{           idScnParts,                      idUpdMach,                       idSigValFloat },
             wrap_args([] (ACtxParts& rScnParts, UpdMachPerType const& rUpdMach, SignalValues_t<float>& rSigValFloat) noexcept
@@ -213,6 +218,8 @@ Session setup_mach_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topDat
             }
         }
     }));
+
+
 
     machRocket.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgLinkMhUpdMod}).data(
             "Allocate machine update stuff",
@@ -294,11 +301,6 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
 
             for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
             {
-                if (pVData == nullptr)
-                {
-                    continue;
-                }
-
                 // TODO: eventually use "highest ID + 1" for bounds
                 // Capacity is the bit size of the internal uint64 vector: a
                 // number greater than all IDs and is a multiple of 64.
@@ -313,12 +315,14 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
             }
 
             rVehicleSpawnVB.m_remapPartAll.resize(offsetTotal, lgrn::id_null<PartEnt_t>());
-            rVehicleSpawn.m_newParts.resize(partCount);
+            rVehicleSpawn.m_partEnts.resize(partCount);
+            rVehicleSpawn.m_partPrefabs.resize(partCount);
         }
 
         // Create the part IDs
-        rScnParts.m_partIds.create(std::begin(rVehicleSpawn.m_newParts),
-                                     std::end(rVehicleSpawn.m_newParts));
+        // Populates rVehicleSpawn.m_partEnts
+        rScnParts.m_partIds.create(std::begin(rVehicleSpawn.m_partEnts),
+                                     std::end(rVehicleSpawn.m_partEnts));
 
         // Resize some containers to account for newly created part IDs
         rScnParts.m_partPrefabs         .resize(rScnParts.m_partIds.capacity());
@@ -327,37 +331,45 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
         rScnParts.m_rigidToParts  .data_reserve(rScnParts.m_partIds.capacity());
 
         // Assign the part IDs to each vehicle to initialize
-        // Populates rVehicleSpawn.m_parts
-        rVehicleSpawn.m_parts.resize(rVehicleSpawn.m_basic.size());
-        auto itPartAvailable    = std::begin(rVehicleSpawn.m_newParts);
-        auto itVehiclePartsOut  = std::begin(rVehicleSpawn.m_parts);
-        auto itRemapPartOffset  = std::cbegin(rVehicleSpawnVB.m_remapPartOffsets);
-        for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
+        // Populates rVehicleSpawn.m_offsetParts
         {
-            if (pVData == nullptr)
+            rVehicleSpawn.m_offsetParts.resize(rVehicleSpawn.m_basic.size());
+            auto itOffsetPartsOut         = std::begin(rVehicleSpawn.m_offsetParts);
+            auto const itPartEntsFirst    = std::cbegin(rVehicleSpawn.m_partEnts);
+            auto itPartEnts               = std::cbegin(rVehicleSpawn.m_partEnts);
+            for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
             {
-                continue;
+                std::size_t const count = pVData->m_partIds.size();
+
+                (*itOffsetPartsOut) = std::distance(itPartEntsFirst, itPartEnts);
+
+                std::advance(itPartEnts, count);
+                std::advance(itOffsetPartsOut, 1);
             }
-
-            std::size_t const count = pVData->m_partIds.size();
-
-            (*itVehiclePartsOut) = ArrayView{ &(*itPartAvailable), count };
-
-            // Generate Part ID remap vector. Maybe this can be a separate task?
-            std::size_t const offset = *itRemapPartOffset;
-            auto dstPartIt = std::cbegin(*itVehiclePartsOut);
-            for (uint32_t srcPart : pVData->m_partIds.bitview().zeros())
-            {
-                rVehicleSpawnVB.m_remapPartAll[offset + srcPart] = *dstPartIt;
-                std::advance(dstPartIt, 1);
-            }
-
-            std::advance(itPartAvailable, count);
-            std::advance(itVehiclePartsOut, 1);
-            std::advance(itRemapPartOffset, 1);
+            // All parts should always be used up
+            assert(itPartEnts == std::end(rVehicleSpawn.m_partEnts));
         }
 
-        assert(itPartAvailable == std::end(rVehicleSpawn.m_newParts));
+        // Generate "VehicleData Part -> Scene Part" remap vector
+        // Populates rVehicleSpawn.m_remapPartOffsets
+        {
+            auto itRemapPartOffset  = std::cbegin(rVehicleSpawnVB.m_remapPartOffsets);
+            auto itDstPartEnts      = std::cbegin(rVehicleSpawn.m_partEnts);
+
+            for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
+            {
+                std::size_t const remapOffset = *itRemapPartOffset;
+
+                for (uint32_t srcPart : pVData->m_partIds.bitview().zeros())
+                {
+                    rVehicleSpawnVB.m_remapPartAll[remapOffset + srcPart] = *itDstPartEnts;
+                    std::advance(itDstPartEnts, 1);
+                }
+
+                std::advance(itRemapPartOffset, 1);
+            }
+        }
+
     }));
 
     vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdReq, tgVSpawnRgdEntReq, tgVSpawnPartReq, tgPrefabMod}).data(
@@ -370,21 +382,16 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
             return;
         }
 
-        auto itVehicleParts = std::cbegin(rVehicleSpawn.m_parts);
+        auto itDstPartEnts = std::cbegin(rVehicleSpawn.m_partEnts);
+        auto itPrefabOut   = std::begin(rVehicleSpawn.m_partPrefabs);
 
         for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
         {
-            if (pVData == nullptr)
-            {
-                continue;
-            }
-
             // Copy Part data from VehicleBuilder to scene
-            auto dstPartIt = std::cbegin(*itVehicleParts);
             for (uint32_t srcPart : pVData->m_partIds.bitview().zeros())
             {
-                PartEnt_t const dstPart = *dstPartIt;
-                std::advance(dstPartIt, 1);
+                PartEnt_t const dstPart = *itDstPartEnts;
+                std::advance(itDstPartEnts, 1);
 
                 PrefabPair const& prefabPairSrc = pVData->m_partPrefabs[srcPart];
                 PrefabPair prefabPairDst{
@@ -398,7 +405,8 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
                 ActiveEnt const rigidEnt = rScnParts.m_rigidToEnt[rigid];
 
                 // Add Prefab and Part init events
-                int const& initPfIndex  = rPrefabInit.m_basic.size();
+                (*itPrefabOut) = rPrefabInit.m_basic.size();
+                std::advance(itPrefabOut, 1);
 
                 rPrefabInit.m_basic.push_back(TmpPrefabInitBasic{
                     .m_importerRes = prefabPairSrc.m_importer,
@@ -407,8 +415,6 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
                     .m_pTransform = &pVData->m_partTransforms[srcPart]
                 });
             }
-
-            std::advance(itVehicleParts, 1);
         }
 
     }));
@@ -449,7 +455,6 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
         }
 
 
-        auto itVehicleParts = std::cbegin(rVehicleSpawn.m_parts);
         auto itRemapPartOffset = std::begin(rVehicleSpawnVB.m_remapPartOffsets);
 
         for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
@@ -485,8 +490,32 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
 
             // TODO: copy node values
 
-            std::advance(itVehicleParts, 1);
             std::advance(itRemapPartOffset, 1);
+        }
+
+    }));
+
+
+    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgPrefabEntReq}).data(
+            "Update PartEnt<->ActiveEnt mapping",
+            TopDataIds_t{                  idVehicleSpawn,           idScnParts,                   idActiveIds,                 idPrefabInit },
+            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts, ActiveReg_t const& rActiveIds,  ACtxPrefabInit& rPrefabInit) noexcept
+    {
+        rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
+        rScnParts.m_activeToPart.resize(rActiveIds.capacity());
+
+        // Populate PartEnt<->ActiveEnt mmapping, now that the prefabs exist
+
+        auto itPrefab = std::begin(rVehicleSpawn.m_partPrefabs);
+
+        for (PartEnt_t const partEnt : rVehicleSpawn.m_partEnts)
+        {
+            ActiveEnt const root = rPrefabInit.m_ents[*itPrefab].front();
+
+            rScnParts.m_partToActive[partEnt]           = root;
+            rScnParts.m_activeToPart[std::size_t(root)] = partEnt;
+
+            std::advance(itPrefab, 1);
         }
 
     }));
@@ -545,18 +574,19 @@ Session setup_vehicle_spawn_rigid(Builder_t& rBuilder, ArrayView<entt::any> cons
             return;
         }
 
-        auto itVehicleRgdGroup  = std::begin(rVehicleSpawnRgd.m_rigidGroups);
-        auto itVehicleParts     = std::begin(rVehicleSpawn.m_parts);
+        auto itRgdGroup    = std::begin(rVehicleSpawnRgd.m_rigidGroups);
+        auto itOffsetParts = std::cbegin(rVehicleSpawn.m_offsetParts);
         for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
         {
             // Add parts of each vehicle to its corresponding rigid group
-            rScnParts.m_rigidToParts.emplace(*itVehicleRgdGroup, std::begin(*itVehicleParts), std::end(*itVehicleParts));
-            std::ranges::for_each(*itVehicleParts, [&rScnParts, rigid = *itVehicleRgdGroup] (PartEnt_t const part)
+            auto vehicleParts = arrayView(rVehicleSpawn.m_partEnts).exceptPrefix(*itOffsetParts);
+            rScnParts.m_rigidToParts.emplace(*itRgdGroup, std::begin(vehicleParts), std::end(vehicleParts));
+            std::ranges::for_each(vehicleParts, [&rScnParts, rigid = *itRgdGroup] (PartEnt_t const part)
             {
                 rScnParts.m_partRigids[part] = rigid;
             });
-            std::advance(itVehicleRgdGroup, 1);
-            std::advance(itVehicleParts, 1);
+            std::advance(itRgdGroup, 1);
+            std::advance(itOffsetParts, 1);
         }
     }));
 
@@ -592,6 +622,7 @@ Session setup_vehicle_spawn_rigid(Builder_t& rBuilder, ArrayView<entt::any> cons
         {
             ActiveEnt const rigidEnt = *itRigidEnt;
             SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, rigidEnt);
+            std::advance(itRigidEnt, 1);
         }
     }));
 
@@ -626,24 +657,6 @@ Session setup_vehicle_spawn_rigid(Builder_t& rBuilder, ArrayView<entt::any> cons
                 .m_totalMass = 1.0f,
             });
         }
-    }));
-
-    vehicleSpawnRgd.task() = rBuilder.task().assign({}).data(
-            "Update PartEnt<->ActiveEnt mapping",
-            TopDataIds_t{           idScnParts,                   idActiveIds,                          idPartInit,                idPrefabInit },
-            wrap_args([] (ACtxParts& rScnParts, ActiveReg_t const& rActiveIds, std::vector<TmpPartInit>& rPartInit, ACtxPrefabInit& rPrefabInit) noexcept
-    {
-        // Populate PartEnt<->ActiveEnt mmapping, now that the prefabs exist
-        rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
-        rScnParts.m_activeToPart.resize(rActiveIds.capacity());
-        for (TmpPartInit& rPartInit : rPartInit)
-        {
-            ActiveEnt const root = rPrefabInit.m_ents[rPartInit.m_initPrefabs].front();
-
-            rScnParts.m_partToActive[rPartInit.m_part] = root;
-            rScnParts.m_activeToPart[std::size_t(root)] = rPartInit.m_part;
-        }
-
     }));
 
     return vehicleSpawnRgd;
@@ -821,6 +834,58 @@ Session setup_vehicle_control(Builder_t& rBuilder, ArrayView<entt::any> const to
     }));
 
     return vehicleCtrl;
+}
+
+Session setup_camera_vehicle(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnCommon, Session const& parts, Session const& physics, Session const& camera, Session const& vehicleControl)
+{
+    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_TAGS(app,            TESTAPP_APP);
+    OSP_SESSION_UNPACK_DATA(camera,         TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_TAGS(camera,         TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_DATA(vehicleControl, TESTAPP_VEHICLE_CONTROL);
+    OSP_SESSION_UNPACK_TAGS(vehicleControl, TESTAPP_VEHICLE_CONTROL);
+
+    Session cameraFree;
+
+    cameraFree.task() = rBuilder.task().assign({tgInputEvt, tgSelUsrCtrlReq, tgPhysReq, tgCamCtrlMod}).data(
+            "Update vehicle camera",
+            TopDataIds_t{                      idCamCtrl,           idDeltaTimeIn,                 idBasic,                     idVhControls,                 idScnParts },
+            wrap_args([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleTestControls& rVhControls, ACtxParts const& rScnParts) noexcept
+    {
+        if (MachLocalId const selectedLocal = rVhControls.m_selectedUsrCtrl;
+            selectedLocal != lgrn::id_null<MachLocalId>())
+        {
+            // Follow selected UserControl machine
+
+            // Obtain associated ActiveEnt
+            // MachLocalId -> MachAnyId -> PartId -> RigidGroup -> ActiveEnt
+            PerMachType const& rUsrCtrls = rScnParts.m_machines.m_perType.at(adera::gc_mtUserCtrl);
+            MachAnyId const selectedMach = rUsrCtrls.m_localToAny.at(selectedLocal);
+            PartEnt_t const selectedPart = rScnParts.m_machineToPart.at(selectedMach);
+            RigidGroup_t const rigid     = rScnParts.m_partRigids.at(selectedPart);
+            ActiveEnt const selectedEnt  = rScnParts.m_rigidToEnt.at(rigid);
+
+            if (rBasic.m_transform.contains(selectedEnt))
+            {
+                rCamCtrl.m_target = rBasic.m_transform.get(selectedEnt).m_transform.translation();
+            }
+        }
+        else
+        {
+            // Free cam when no vehicle selected
+            SysCameraController::update_move(
+                    rCamCtrl,
+                    deltaTimeIn, true);
+        }
+
+        SysCameraController::update_view(rCamCtrl, deltaTimeIn);
+    }));
+
+    return cameraFree;
 }
 
 } // namespace testapp::scenes

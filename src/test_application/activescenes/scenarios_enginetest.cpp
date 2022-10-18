@@ -365,13 +365,9 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication &rApp, R
         update_test_scene(rScene, delta);
 
         // Rotate and move the camera based on user inputs
-        SysCameraController::update_view(
-                pRenderer->m_camCtrl,
-                rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform, delta);
-        SysCameraController::update_move(
-                pRenderer->m_camCtrl,
-                rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform,
-                delta, true);
+        SysCameraController::update_view(pRenderer->m_camCtrl, delta);
+        SysCameraController::update_move(pRenderer->m_camCtrl, delta, true);
+        rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform = pRenderer->m_camCtrl.m_transform;
 
         sync_test_scene(rRenderGl, rScene, *pRenderer);
         render_test_scene(rRenderGl, rScene, *pRenderer);

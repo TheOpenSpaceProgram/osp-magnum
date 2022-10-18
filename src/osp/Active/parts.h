@@ -43,22 +43,25 @@ using RigidGroup_t = uint32_t;
 /**
  * @brief Data to support Parts in a scene
  *
- * 'Part' refers to a more complex physical 'thing' in a scene, such as a
- * rocket engine, fuel tank, or a capsule.
- *
  * ACtxParts provides the following feature:
  * * Basic structural connections using 'RigidGroups'
  * * A physical model for visual and colliders using a Prefab
+ * * Machines and Links
  *
- * Rigid groups
- * * Parts that are structurally fixed together make a RigidGroup.
- * * Parts within the same rigid group store transforms relative to the same
+ * 'Part' refers to a more complex physical 'thing' in a scene, such as a
+ * rocket engine, fuel tank, or a capsule.
+ *
+ * What are Rigid groups?
+ * * An integer ID representing parts that are structurally fixed together.
+ * * Parts within the same RigidGroup store transforms relative to the same
  *   (arbitrary) origin.
- * * Storing potentially messy 'part-to-part' transforms are not required.
+ * * Avoids storing potentially messy 'part-to-part' transforms.
  * * Parts can retain their original transform after separations or other.
  *   structural modifications, preventing precision errors from accumolating
  * * An external system can use RigidGroups to generate physics constraints
  *   or parent together Prefabs.
+ *
+ * Machines
  *
  * Additional features are added in other structs.
  *
@@ -78,9 +81,13 @@ struct ACtxParts
     lgrn::IdRegistryStl<RigidGroup_t>                   m_rigidIds;
     lgrn::IntArrayMultiMap<RigidGroup_t, PartEnt_t>     m_rigidToParts;
     std::vector<RigidGroup_t>                           m_rigidDirty;
-    std::vector<ActiveEnt>                              m_rigidToEnt;
     std::vector<Matrix4>                                m_partTransformRigid;
     std::vector<RigidGroup_t>                           m_partRigids;
+
+    // For now, each RigidGroup corresponds with a single entity with rigid body
+    // physics. This may change in the future if a more complex structural
+    // system is implemented.
+    std::vector<ActiveEnt>                              m_rigidToEnt;
 
     // Machines
     link::Machines                                      m_machines;
@@ -107,10 +114,12 @@ struct ACtxVehicleSpawn
         return m_basic.size();
     }
 
-    std::vector<TmpToInit> m_basic;
+    std::vector<TmpToInit>      m_basic;
+    std::vector<std::size_t>    m_offsetParts;
 
-    std::vector<PartEnt_t> m_newParts;
-    std::vector< ArrayView<PartEnt_t const> > m_parts;
+    std::vector<PartEnt_t>      m_partEnts;
+    std::vector<std::size_t>    m_partPrefabs;
+
 };
 
 struct ACtxVehicleSpawnRigid

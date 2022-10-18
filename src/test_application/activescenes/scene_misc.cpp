@@ -143,26 +143,22 @@ void add_floor(ArrayView<entt::any> const topData, Session const& scnCommon, Ses
     });
 }
 
-Session setup_camera_free(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnCommon, Session const& renderer, Session const& camera)
+Session setup_camera_free(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnCommon, Session const& camera)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
     OSP_SESSION_UNPACK_DATA(camera,     TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_DATA(renderer,   TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_TAGS(camera,     TESTAPP_CAMERA_CTRL);
 
     Session cameraFree;
 
-    cameraFree.task() = rBuilder.task().assign({tgInputEvt}).data(
+    cameraFree.task() = rBuilder.task().assign({tgInputEvt, tgCamCtrlMod}).data(
             "Move Camera",
-            TopDataIds_t{                      idCamCtrl,        idCamera,           idDeltaTimeIn},
-            wrap_args([] (ACtxCameraController& rCamCtrl, Camera& rCamera, float const deltaTimeIn) noexcept
+            TopDataIds_t{                      idCamCtrl,           idDeltaTimeIn},
+            wrap_args([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
     {
-        SysCameraController::update_view(rCamCtrl,
-                rCamera.m_transform, deltaTimeIn);
-        SysCameraController::update_move(
-                rCamCtrl,
-                rCamera.m_transform,
-                deltaTimeIn, true);
+        SysCameraController::update_view(rCamCtrl, deltaTimeIn);
+        SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
     }));
 
     return cameraFree;
@@ -173,8 +169,8 @@ Session setup_thrower(Builder_t& rBuilder, ArrayView<entt::any> const topData, T
     OSP_SESSION_UNPACK_DATA(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_DATA(renderer,       TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_DATA(simpleCamera,   TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_TAGS(simpleCamera,   TESTAPP_CAMERA_CTRL);
 
     auto &rCamCtrl = top_get< ACtxCameraController > (topData, idCamCtrl);
 
@@ -183,15 +179,15 @@ Session setup_thrower(Builder_t& rBuilder, ArrayView<entt::any> const topData, T
 
     top_emplace< EButtonControlIndex > (topData, idBtnThrow, rCamCtrl.m_controls.button_subscribe("debug_throw"));
 
-    thrower.task() = rBuilder.task().assign({tgInputEvt, tgSpawnMod}).data(
+    thrower.task() = rBuilder.task().assign({tgInputEvt, tgSpawnMod, tgCamCtrlReq}).data(
             "Throw spheres when pressing space",
-            TopDataIds_t{                      idCamCtrl,        idCamera,              idSpawner,                   idBtnThrow},
-            wrap_args([] (ACtxCameraController& rCamCtrl, Camera& rCamera, SpawnerVec_t& rSpawner, EButtonControlIndex btnThrow) noexcept
+            TopDataIds_t{                      idCamCtrl,              idSpawner,                   idBtnThrow},
+            wrap_args([] (ACtxCameraController& rCamCtrl, SpawnerVec_t& rSpawner, EButtonControlIndex btnThrow) noexcept
     {
         // Throw a sphere when the throw button is pressed
         if (rCamCtrl.m_controls.button_held(btnThrow))
         {
-            Matrix4 const &camTf = rCamera.m_transform;
+            Matrix4 const &camTf = rCamCtrl.m_transform;
             float const speed = 120;
             float const dist = 8.0f;
             rSpawner.emplace_back(SpawnShape{
