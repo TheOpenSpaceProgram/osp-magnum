@@ -108,8 +108,13 @@ void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& r
     task_enqueue(tags, tasks, rExec, tagsToRun);
 }
 
-static void check_task_dependencies(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, std::vector<uint32_t> &rPath, uint32_t const task, bool& rGood)
+static void check_task_dependencies(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, ExecutionContext const &rExec, std::vector<uint32_t> &rPath, uint32_t const task, bool& rGood)
 {
+    if (rExec.m_taskQueuedCounts.at(task) == 0)
+    {
+        return; // Only consider queued tasks
+    }
+
     rPath.push_back(task);
 
     auto const taskTags2d   = task_tags_2d(tags, tasks);
@@ -144,7 +149,7 @@ static void check_task_dependencies(Tags const& tags, Tasks const& tasks, TopTas
             auto const &last = std::end(rPath);
             if (last == std::find(std::begin(rPath), last, currTask))
             {
-                check_task_dependencies(tags, tasks, taskData, rPath, currTask, rGood);
+                check_task_dependencies(tags, tasks, taskData, rExec, rPath, currTask, rGood);
             }
             else
             {
@@ -165,7 +170,7 @@ static void check_task_dependencies(Tags const& tags, Tasks const& tasks, TopTas
     rPath.pop_back();
 }
 
-bool debug_top_verify(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData)
+bool debug_top_print_deadlock(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, ExecutionContext const &rExec)
 {
     std::vector<uint32_t> path;
 
@@ -174,7 +179,7 @@ bool debug_top_verify(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t con
     // Iterate all tasks
     for (uint32_t const currTask : tasks.m_tasks.bitview().zeros())
     {
-        check_task_dependencies(tags, tasks, taskData, path, currTask, good);
+        check_task_dependencies(tags, tasks, taskData, rExec, path, currTask, good);
     }
 
     return good;

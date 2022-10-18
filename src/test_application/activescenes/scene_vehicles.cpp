@@ -179,8 +179,6 @@ Session setup_mach_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topDat
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
-    //OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
-    //OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
     OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
     OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
     OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
@@ -194,9 +192,11 @@ Session setup_mach_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topDat
 
     top_get< MachTypeToEvt_t >(topData, idMachEvtTags).at(gc_mtMagicRocket) = tgMhRocketEvt;
 
-    // after Update Signal-Float Nodes
+    // TODO: This session is not needed? Architecture prefers fine grained
+    //       individual sessions: thrust, plume FX, sounds, etc...
+
     machRocket.task() = rBuilder.task().assign({tgMhRocketEvt, tgSigFloatUpdReq, tgSigFloatValReq}).data(
-            "Update Rockets Machines",
+            "MagicRockets print throttle input values",
             TopDataIds_t{           idScnParts,                      idUpdMach,                       idSigValFloat },
             wrap_args([] (ACtxParts& rScnParts, UpdMachPerType const& rUpdMach, SignalValues_t<float>& rSigValFloat) noexcept
     {
@@ -219,8 +219,8 @@ Session setup_mach_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topDat
         }
     }));
 
-
-
+    // TODO: Make this a template. All machines that read inputs will just have
+    //       a different gc_mtMachineName variable
     machRocket.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgLinkMhUpdMod}).data(
             "Allocate machine update stuff",
             TopDataIds_t{           idScnParts,                idUpdMach },

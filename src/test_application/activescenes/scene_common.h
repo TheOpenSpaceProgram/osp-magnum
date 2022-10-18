@@ -38,12 +38,20 @@ inline auto const delete_ent_set = osp::wrap_args([] (osp::active::EntSet_t& rSe
     }
 });
 
+/**
+ * @brief Support for Time, ActiveEnts, Hierarchy, Transforms, Drawing, and more...
+ */
 osp::Session setup_common_scene(
         Builder_t& rBuilder,
         osp::ArrayView<entt::any> topData,
         osp::Tags& rTags,
         osp::TopDataId idResources);
 
+/**
+ * @brief Support a single material, aka: a Set of ActiveEnts and dirty flags
+ *
+ * Multiple material sessions can be setup for each material
+ */
 osp::Session setup_material(
         Builder_t& rBuilder,
         osp::ArrayView<entt::any> topData,

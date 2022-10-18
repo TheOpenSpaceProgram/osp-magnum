@@ -511,13 +511,21 @@ void clear_resource_owners()
 
 void debug_print_help()
 {
+
+    std::size_t longestName = 0;
+    for (auto const& [name, rTestScn] : scenarios())
+    {
+        longestName = std::max(name.size(), longestName);
+    }
+
     std::cout
         << "OSP-Magnum Temporary Debug CLI\n"
-        << "Open a scene:\n";
+        << "Open a scenario:\n";
 
     for (auto const& [name, rTestScn] : scenarios())
     {
-        std::cout << "* " << name << " - " << rTestScn.m_desc << "\n";
+        std::string spaces(longestName - name.length(), ' ');
+        std::cout << "* " << name << spaces << " - " << rTestScn.m_desc << "\n";
     }
 
     std::cout

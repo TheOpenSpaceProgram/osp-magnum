@@ -38,13 +38,6 @@ osp::Session setup_scene_renderer(
         osp::Session const& scene,
         osp::TopDataId idResources);
 
-osp::Session setup_camera_magnum(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& magnum,
-        osp::Session const& scnRender);
-
 osp::Session setup_shader_visualizer(
         Builder_t& rBuilder,
         osp::ArrayView<entt::any> topData,

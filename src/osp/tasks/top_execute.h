@@ -42,6 +42,6 @@ inline void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionCon
     return top_enqueue_quick(tags, tasks, rExec, Corrade::Containers::arrayView(tagsEnq));
 }
 
-bool debug_top_verify(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData);
+bool debug_top_print_deadlock(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, ExecutionContext const &rExec);
 
 } // namespace testapp

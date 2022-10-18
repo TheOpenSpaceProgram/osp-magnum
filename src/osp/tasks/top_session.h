@@ -50,6 +50,13 @@
 namespace osp
 {
 
+/**
+ * @brief A convenient group of TopData, Tasks, and Tags that work together to
+ *        support a certain feature.
+ *
+ * Sessions only store vectors of integer IDs, and don't does not handle
+ * ownership on its own. Close using osp::top_close_session before destruction.
+ */
 struct Session
 {
     template <std::size_t N>
@@ -82,6 +89,9 @@ struct Session
     TagId m_tgCleanupEvt{lgrn::id_null<TagId>()};
 };
 
+/**
+ * @brief Close sessions, delete all their associated TopData, Tasks, and Tags.
+ */
 void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec, ArrayView<Session> sessions);
 
 

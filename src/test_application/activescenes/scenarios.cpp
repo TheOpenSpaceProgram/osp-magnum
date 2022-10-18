@@ -66,13 +66,6 @@ static void setup_magnum_draw(MainView mainView, Session const& magnum, Session 
 
     auto &rActiveApp = top_get<ActiveApplication>(topData, idActiveApp);
 
-    if ( ! debug_top_verify(rTags, rTasks, rTaskData))
-    {
-        //rActiveApp.exit();
-        //OSP_LOG_INFO("Errors detected, scene closed.");
-        //return;
-    }
-
     auto &rCamera = top_get<active::Camera>(topData, idCamera);
     rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
@@ -82,14 +75,20 @@ static void setup_magnum_draw(MainView mainView, Session const& magnum, Session 
 
     auto const runTags = {tgSyncEvt, tgSceneEvt, tgTimeEvt, tgRenderEvt, tgInputEvt};
 
-    rActiveApp.set_on_draw( [&rTags, &rTasks, &rExec, &rTaskData, topData, runTagsVec = std::vector<TagId>(runTags)] (ActiveApplication& rApp, float delta)
+    rActiveApp.set_on_draw( [&rTags, &rTasks, &rExec, &rTaskData, topData, runTagsVec = std::vector<TagId>(runTags)]
+                            (ActiveApplication& rApp, float delta)
     {
+        // Magnum Application's main loop is here
+
         top_enqueue_quick(rTags, rTasks, rExec, runTagsVec);
         top_run_blocking(rTags, rTasks, rTaskData, topData, rExec);
 
-        if (std::ranges::all_of(rExec.m_taskQueuedCounts, [] (unsigned int n) { return n == 0; }))
+        // Enqueued tasks that don't run indicate a deadlock
+        if ( ! std::ranges::all_of(rExec.m_taskQueuedCounts, [] (unsigned int n) { return n == 0; }))
         {
-            OSP_LOG_WARN("Deadlock detected!");
+            OSP_LOG_ERROR("Deadlock detected!");
+            debug_top_print_deadlock(rTags, rTasks, rTaskData, rExec);
+            std::abort();
         }
     });
 }
@@ -167,7 +166,7 @@ static ScenarioMap_t make_scenarios()
             rendererOut.resize(5);
             auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow] = unpack<5>(rendererOut);
             scnRender   = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
-            cameraCtrl  = setup_camera_magnum       (builder, rTopData, rTags, magnum, scnRender);
+            cameraCtrl  = setup_camera_ctrl         (builder, rTopData, rTags, magnum, scnRender);
             cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, cameraCtrl);
             shVisual    = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
             camThrow    = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
@@ -256,7 +255,7 @@ static ScenarioMap_t make_scenarios()
             rendererOut.resize(6);
             auto & [scnRender, cameraCtrl, shVisual, camThrow, vehicleCtrl, cameraVehicle] = unpack<6>(rendererOut);
             scnRender       = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
-            cameraCtrl      = setup_camera_magnum       (builder, rTopData, rTags, magnum, scnRender);
+            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, rTags, magnum, scnRender);
             shVisual        = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
             camThrow        = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
             vehicleCtrl     = setup_vehicle_control     (builder, rTopData, rTags, scnCommon, parts, signalsFloat, magnum);

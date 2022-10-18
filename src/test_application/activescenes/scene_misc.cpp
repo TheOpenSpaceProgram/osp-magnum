@@ -143,6 +143,33 @@ void add_floor(ArrayView<entt::any> const topData, Session const& scnCommon, Ses
     });
 }
 
+Session setup_camera_ctrl(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnRender)
+{
+    OSP_SESSION_UNPACK_DATA(app,        TESTAPP_APP);
+    OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
+    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
+    auto &rUserInput = top_get< osp::input::UserInputHandler >(topData, idUserInput);
+
+    Session cameraCtrl;
+    OSP_SESSION_ACQUIRE_DATA(cameraCtrl, topData, TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_ACQUIRE_TAGS(cameraCtrl, rTags,   TESTAPP_CAMERA_CTRL);
+
+    rBuilder.tag(tgCamCtrlReq).depend_on({tgCamCtrlMod});
+
+    top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
+
+    cameraCtrl.task() = rBuilder.task().assign({tgRenderEvt, tgCamCtrlReq, tgCameraMod}).data(
+            "Position Rendering Camera according to Camera Controller",
+            TopDataIds_t{                            idCamCtrl,        idCamera},
+            wrap_args([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
+    {
+        rCamera.m_transform = rCamCtrl.m_transform;
+    }));
+
+    return cameraCtrl;
+}
+
 Session setup_camera_free(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnCommon, Session const& camera)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
