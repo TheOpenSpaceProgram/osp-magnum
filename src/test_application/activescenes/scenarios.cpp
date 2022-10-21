@@ -46,6 +46,8 @@
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 
+#include <algorithm>
+
 using namespace osp;
 
 namespace testapp

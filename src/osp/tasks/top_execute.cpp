@@ -32,6 +32,7 @@
 
 #include <entt/core/any.hpp>
 
+#include <algorithm>
 #include <sstream>
 #include <vector>
 
