@@ -33,81 +33,111 @@ namespace testapp::scenes
 
 using MachTypeToEvt_t = std::vector<osp::TagId>;
 
+/**
+ * @brief Support for Parts and their Machines
+ */
 osp::Session setup_parts(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> const topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon,
-        osp::TopDataId const idResources);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::TopDataId const        idResources);
 
+/**
+ * @brief Float Signal Links, allowing Machines to pass floats to each other
+ */
 osp::Session setup_signals_float(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> const topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon,
-        osp::Session const& parts);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         parts);
 
+/**
+ * @brief 'Rockets' that print values to the console
+ */
 osp::Session setup_mach_rocket(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> const topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon,
-        osp::Session const& parts,
-        osp::Session const& signalsFloat);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat);
 
+/**
+ * @brief Logic and queues for spawning vehicles
+ *
+ * Note that vehicles don't really exist in the scene, and are just collections
+ * of conencted Parts
+ */
 osp::Session setup_vehicle_spawn(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon,
-        osp::Session const& parts);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         parts);
 
+/**
+ * @brief Support VehicleBuilder data to be used to spawn vehicles
+ */
 osp::Session setup_vehicle_spawn_vb(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon,
-        osp::Session const& prefabs,
-        osp::Session const& parts,
-        osp::Session const& vehicleSpawn,
-        osp::TopDataId const idResources);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         prefabs,
+        osp::Session const&         parts,
+        osp::Session const&         vehicleSpawn,
+        osp::TopDataId const        idResources);
 
+/**
+ * @brief Connect spawned vehicles together into a same rigid body
+ */
 osp::Session setup_vehicle_spawn_rigid(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon,
-        osp::Session const& physics,
-        osp::Session const& prefabs,
-        osp::Session const& parts,
-        osp::Session const& vehicleSpawn);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         physics,
+        osp::Session const&         prefabs,
+        osp::Session const&         parts,
+        osp::Session const&         vehicleSpawn);
 
+/**
+ * @brief Build "Test Vehicle" data, so they can be spawned
+ */
 osp::Session setup_test_vehicles(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon,
-        osp::TopDataId const idResources);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::TopDataId const        idResources);
 
+/**
+ * @brief Controls to select and control a UserControl Machine
+ */
 osp::Session setup_vehicle_control(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> const topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon,
-        osp::Session const& parts,
-        osp::Session const& signalsFloat,
-        osp::Session const& app);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat,
+        osp::Session const&         app);
 
+/**
+ * @brief Camera which can free cam or follow a selected vehicle
+ */
 osp::Session setup_camera_vehicle(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> const topData,
-        osp::Tags& rTags,
-        osp::Session const& app,
-        osp::Session const& scnCommon,
-        osp::Session const& parts,
-        osp::Session const& physics,
-        osp::Session const& camera,
-        osp::Session const& vehicleControl);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         app,
+        osp::Session const&         scnCommon,
+        osp::Session const&         parts,
+        osp::Session const&         physics,
+        osp::Session const&         camera,
+        osp::Session const&         vehicleControl);
 
 
 }

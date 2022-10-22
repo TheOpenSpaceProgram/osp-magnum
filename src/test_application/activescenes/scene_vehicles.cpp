@@ -25,7 +25,6 @@
 #include "scene_vehicles.h"
 #include "scenarios.h"
 #include "identifiers.h"
-#include "scene_physics.h"
 #include "CameraController.h"
 #include "../VehicleBuilder.h"
 
@@ -71,7 +70,12 @@ struct TmpPartInit
 };
 
 
-Session setup_parts(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, TopDataId const idResources)
+Session setup_parts(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        TopDataId const             idResources)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
@@ -107,12 +111,15 @@ Session setup_parts(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tag
         }
     }));
 
-
-
     return parts;
 }
 
-Session setup_signals_float(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& parts)
+Session setup_signals_float(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              parts)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
@@ -175,7 +182,13 @@ Session setup_signals_float(Builder_t& rBuilder, ArrayView<entt::any> const topD
     return signalsFloat;
 }
 
-Session setup_mach_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& parts, Session const& signalsFloat)
+Session setup_mach_rocket(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              parts,
+        Session const&              signalsFloat)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
@@ -232,7 +245,12 @@ Session setup_mach_rocket(Builder_t& rBuilder, ArrayView<entt::any> const topDat
     return machRocket;
 }
 
-Session setup_vehicle_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& parts)
+Session setup_vehicle_spawn(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              parts)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
@@ -263,7 +281,15 @@ Session setup_vehicle_spawn(Builder_t& rBuilder, ArrayView<entt::any> const topD
     return vehicleSpawn;
 }
 
-Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& prefabs, Session const& parts, Session const& vehicleSpawn, TopDataId const idResources)
+Session setup_vehicle_spawn_vb(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              prefabs,
+        Session const&              parts,
+        Session const&              vehicleSpawn,
+        TopDataId const             idResources)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
@@ -523,7 +549,15 @@ Session setup_vehicle_spawn_vb(Builder_t& rBuilder, ArrayView<entt::any> const t
     return vehicleSpawnVB;
 }
 
-Session setup_vehicle_spawn_rigid(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& physics, Session const& prefabs, Session const& parts, Session const& vehicleSpawn)
+Session setup_vehicle_spawn_rigid(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              physics,
+        Session const&              prefabs,
+        Session const&              parts,
+        Session const&              vehicleSpawn)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
@@ -628,8 +662,8 @@ Session setup_vehicle_spawn_rigid(Builder_t& rBuilder, ArrayView<entt::any> cons
 
     vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq}).data(
             "Add physics to rigid group entities",
-            TopDataIds_t{           idBasic,              idTPhys,                        idVehicleSpawn,                             idVehicleSpawnRgd,                 idScnParts  },
-            wrap_args([] (ACtxBasic& rBasic, ACtxTestPhys& rTPhys, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxParts const& rScnParts) noexcept
+            TopDataIds_t{           idBasic,             idPhys,                        idVehicleSpawn,                             idVehicleSpawnRgd,                 idScnParts  },
+            wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxParts const& rScnParts) noexcept
     {
         if (rVehicleSpawn.vehicle_count() == 0)
         {
@@ -644,13 +678,13 @@ Session setup_vehicle_spawn_rigid(Builder_t& rBuilder, ArrayView<entt::any> cons
             std::advance(itRigidEnt, 1);
 
             auto const transform = Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position);
-            rBasic.m_transform                  .emplace(rigidEnt, transform);
-            rTPhys.m_physics.m_hasColliders     .emplace(rigidEnt);
-            rTPhys.m_physics.m_solid            .emplace(rigidEnt);
-            rTPhys.m_physics.m_physBody         .emplace(rigidEnt);
-            rTPhys.m_physics.m_physLinearVel    .emplace(rigidEnt);
-            rTPhys.m_physics.m_physAngularVel   .emplace(rigidEnt);
-            rTPhys.m_physics.m_physDynamic      .emplace(rigidEnt, ACompPhysDynamic
+            rBasic.m_transform      .emplace(rigidEnt, transform);
+            rPhys.m_hasColliders    .emplace(rigidEnt);
+            rPhys.m_solid           .emplace(rigidEnt);
+            rPhys.m_physBody        .emplace(rigidEnt);
+            rPhys.m_physLinearVel   .emplace(rigidEnt);
+            rPhys.m_physAngularVel  .emplace(rigidEnt);
+            rPhys.m_physDynamic     .emplace(rigidEnt, ACompPhysDynamic
             {
                 .m_centerOfMassOffset = {0.0f, 0.0f, 0.0f},
                 .m_inertia = {1.0f, 1.0f, 1.0f},
@@ -662,7 +696,12 @@ Session setup_vehicle_spawn_rigid(Builder_t& rBuilder, ArrayView<entt::any> cons
     return vehicleSpawnRgd;
 }
 
-Session setup_test_vehicles(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, TopDataId const idResources)
+Session setup_test_vehicles(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        TopDataId const             idResources)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
@@ -736,7 +775,14 @@ struct VehicleTestControls
     input::EButtonControlIndex m_btnThrLess;
 };
 
-Session setup_vehicle_control(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& parts, Session const& signalsFloat, Session const& app)
+Session setup_vehicle_control(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              parts,
+        Session const&              signalsFloat,
+        Session const&              app)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
@@ -836,7 +882,16 @@ Session setup_vehicle_control(Builder_t& rBuilder, ArrayView<entt::any> const to
     return vehicleCtrl;
 }
 
-Session setup_camera_vehicle(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnCommon, Session const& parts, Session const& physics, Session const& camera, Session const& vehicleControl)
+Session setup_camera_vehicle(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              app,
+        Session const&              scnCommon,
+        Session const&              parts,
+        Session const&              physics,
+        Session const&              camera,
+        Session const&              vehicleControl)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);

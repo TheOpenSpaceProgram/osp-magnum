@@ -32,6 +32,8 @@
 #include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysRender.h>
 
+#include <osp/Resource/resources.h>
+
 #include <osp/unpack.h>
 
 using namespace osp;
@@ -40,21 +42,29 @@ using namespace osp::active;
 namespace testapp::scenes
 {
 
-Session setup_common_scene(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, TopDataId const idResources)
+Session setup_common_scene(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        TopDataId const             idResources,
+        PkgId const                 pkg)
 {
+    auto &rResources    = top_get< Resources >      (topData, idResources);
+
     Session scnCommon;
     OSP_SESSION_ACQUIRE_DATA(scnCommon, topData,    TESTAPP_COMMON_SCENE);
     OSP_SESSION_ACQUIRE_TAGS(scnCommon, rTags,      TESTAPP_COMMON_SCENE);
     scnCommon.m_tgCleanupEvt = tgCleanupEvt;
 
     top_emplace< float >            (topData, idDeltaTimeIn, 1.0f / 60.0f);
-    top_emplace< ACtxDrawing >      (topData, idDrawing);
-    top_emplace< ACtxDrawingRes >   (topData, idDrawingRes);
     top_emplace< EntVector_t >      (topData, idDelEnts);
     top_emplace< EntVector_t >      (topData, idDelTotal);
 
     auto &rBasic        = top_emplace< ACtxBasic >      (topData, idBasic);
     auto &rActiveIds    = top_emplace< ActiveReg_t >    (topData, idActiveIds);
+    auto &rDrawing      = top_emplace< ACtxDrawing >    (topData, idDrawing);
+    auto &rDrawingRes   = top_emplace< ACtxDrawingRes > (topData, idDrawingRes);
+    auto &rNMesh        = top_emplace< NamedMeshes >    (topData, idNMesh);
 
     rBuilder.tag(tgEntNew)          .depend_on({tgEntDel});
     rBuilder.tag(tgEntReq)          .depend_on({tgEntDel, tgEntNew});
@@ -173,10 +183,48 @@ Session setup_common_scene(Builder_t& rBuilder, ArrayView<entt::any> const topDa
         SysRender::clear_resource_owners(rDrawingRes, rResources);
     }));
 
+
+    // Convenient function to get a reference-counted mesh owner
+    auto const quick_add_mesh = [&rResources, &rDrawing, &rDrawingRes, pkg] (std::string_view const name) -> MeshIdOwner_t
+    {
+        osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
+        assert(res != lgrn::id_null<osp::ResId>());
+        MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, res);
+        return rDrawing.m_meshRefCounts.ref_add(meshId);
+    };
+
+    scnCommon.task() = rBuilder.task().assign({tgCleanupEvt}).data(
+            "Clean up NamedMeshes mesh and texture owners",
+            TopDataIds_t{             idDrawing,             idNMesh},
+            wrap_args([] (ACtxDrawing& rDrawing, NamedMeshes& rNMesh) noexcept
+    {
+        for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rNMesh.m_shapeToMesh, {}))
+        {
+            rDrawing.m_meshRefCounts.ref_release(std::move(rOwner));
+        }
+
+        for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rNMesh.m_namedMeshs, {}))
+        {
+            rDrawing.m_meshRefCounts.ref_release(std::move(rOwner));
+        }
+    }));
+
+    // Acquire mesh resources from Package
+    using osp::phys::EShape;
+    rNMesh.m_shapeToMesh.emplace(EShape::Box,       quick_add_mesh("cube"));
+    rNMesh.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
+    rNMesh.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
+    rNMesh.m_namedMeshs.emplace("floor", quick_add_mesh("grid64solid"));
+
+
     return scnCommon;
 }
 
-Session setup_material(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon)
+Session setup_material(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon, TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon, TESTAPP_COMMON_SCENE);

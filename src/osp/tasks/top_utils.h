@@ -134,7 +134,7 @@ struct wrap_args_trait
             cast_args<ARGS_T ...>(topData, ctx, std::make_index_sequence<sizeof...(ARGS_T)>{});
             return TopTaskStatus::Success;
         }
-        else if (std::is_same_v<RETURN_T, TopTaskStatus>)
+        else if constexpr (std::is_same_v<RETURN_T, TopTaskStatus>)
         {
             return cast_args<ARGS_T ...>(topData, ctx, std::make_index_sequence<sizeof...(ARGS_T)>{});
         }

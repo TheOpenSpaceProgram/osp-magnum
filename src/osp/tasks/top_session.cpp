@@ -31,6 +31,8 @@
 
 #include <longeron/containers/bit_view.hpp>
 
+#include <algorithm>
+
 using Corrade::Containers::ArrayView;
 using Corrade::Containers::StridedArrayView2D;
 using Corrade::Containers::arrayView;
@@ -100,7 +102,7 @@ void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, 
                 rTags.m_tags.remove(tag);
 
                 auto tagDepends = depends2d[std::size_t(tag)].asContiguous();
-                std::fill(std::begin(tagDepends), std::end(tagDepends), lgrn::id_null<TagId>());
+                std::ranges::fill(tagDepends, lgrn::id_null<TagId>());
             }
         }
     }

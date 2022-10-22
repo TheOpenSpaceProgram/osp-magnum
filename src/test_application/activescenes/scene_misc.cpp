@@ -51,7 +51,13 @@ using namespace Magnum::Math::Literals;
 namespace testapp::scenes
 {
 
-void add_floor(ArrayView<entt::any> const topData, Session const& scnCommon, Session const& material, Session const& shapeSpawn, TopDataId const idResources, PkgId const pkg)
+void add_floor(
+        ArrayView<entt::any> const  topData,
+        Session const&              scnCommon,
+        Session const&              material,
+        Session const&              shapeSpawn,
+        TopDataId const             idResources,
+        PkgId const                 pkg)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
@@ -143,7 +149,12 @@ void add_floor(ArrayView<entt::any> const topData, Session const& scnCommon, Ses
     });
 }
 
-Session setup_camera_ctrl(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnRender)
+Session setup_camera_ctrl(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              app,
+        Session const&              scnRender)
 {
     OSP_SESSION_UNPACK_DATA(app,        TESTAPP_APP);
     OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
@@ -170,7 +181,13 @@ Session setup_camera_ctrl(Builder_t& rBuilder, ArrayView<entt::any> const topDat
     return cameraCtrl;
 }
 
-Session setup_camera_free(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& app, Session const& scnCommon, Session const& camera)
+Session setup_camera_free(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              app,
+        Session const&              scnCommon,
+        Session const&              camera)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
@@ -191,7 +208,14 @@ Session setup_camera_free(Builder_t& rBuilder, ArrayView<entt::any> const topDat
     return cameraFree;
 }
 
-Session setup_thrower(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& renderer, Session const& simpleCamera, Session const& shapeSpawn)
+Session setup_thrower(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              magnum,
+        Session const&              renderer,
+        Session const&              simpleCamera,
+        Session const&              shapeSpawn)
 {
     OSP_SESSION_UNPACK_DATA(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
@@ -232,7 +256,12 @@ Session setup_thrower(Builder_t& rBuilder, ArrayView<entt::any> const topData, T
     return thrower;
 }
 
-Session setup_droppers(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& shapeSpawn)
+Session setup_droppers(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              shapeSpawn)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);

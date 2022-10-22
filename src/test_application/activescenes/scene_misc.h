@@ -30,54 +30,54 @@ namespace testapp::scenes
 {
 
 void add_floor(
-        osp::ArrayView<entt::any> topData,
-        osp::Session const& scnCommon,
-        osp::Session const& material,
-        osp::Session const& shapeSpawn,
-        osp::TopDataId idResources,
-        osp::PkgId pkg);
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         scnCommon,
+        osp::Session const&         material,
+        osp::Session const&         shapeSpawn,
+        osp::TopDataId              idResources,
+        osp::PkgId                  pkg);
 
 /**
  * @brief Create CameraController connected to an app's UserInputHandler
  */
 osp::Session setup_camera_ctrl(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& app,
-        osp::Session const& scnRender);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         app,
+        osp::Session const&         scnRender);
 
 /**
  * @brief Adds free cam controls to a CameraController
  */
 osp::Session setup_camera_free(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& app,
-        osp::Session const& scnCommon,
-        osp::Session const& camera);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         app,
+        osp::Session const&         scnCommon,
+        osp::Session const&         camera);
 
 /**
  * @brief Throws spheres when pressing space
  */
 osp::Session setup_thrower(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& magnum,
-        osp::Session const& renderer,
-        osp::Session const& simpleCamera,
-        osp::Session const& shapeSpawn);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         magnum,
+        osp::Session const&         renderer,
+        osp::Session const&         simpleCamera,
+        osp::Session const&         shapeSpawn);
 
 /**
  * @brief Spawn blocks every 2 seconds and spheres every 1 second
  */
 osp::Session setup_droppers(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon,
-        osp::Session const& shapeSpawn);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         shapeSpawn);
 
 }

@@ -45,7 +45,13 @@ namespace testapp::scenes
 {
 
 
-Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnCommon, TopDataId const idResources)
+Session setup_scene_renderer(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              magnum,
+        Session const&              scnCommon,
+        TopDataId const             idResources)
 {
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
@@ -103,6 +109,8 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
         SysRenderGL::assign_meshes(rDrawing.m_mesh, rDrawingRes.m_meshToRes, rDrawing.m_meshDirty, rScnRender.m_meshId, rRenderGl);
     }));
 
+    // TODO: Separate forward renderer into different tasks to allow other
+    //       rendering techniques
 
     renderer.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgDrawTransformReq, tgGroupFwdReq, tgDrawReq, tgCameraReq, tgEntTexMod, tgEntMeshMod}).data(
             "Render and display scene",
@@ -159,7 +167,14 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
     return renderer;
 }
 
-Session setup_shader_visualizer(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnCommon, Session const& scnRender, Session const& material)
+Session setup_shader_visualizer(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              magnum,
+        Session const&              scnCommon,
+        Session const&              scnRender,
+        Session const&              material)
 {
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);

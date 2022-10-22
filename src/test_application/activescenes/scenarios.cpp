@@ -144,9 +144,9 @@ static ScenarioMap_t make_scenarios()
         auto & [scnCommon, matVisual, physics, newton, shapeSpawn, droppers, gravity, bounds, thrower] = unpack<9>(sceneOut);
 
         // Compose together lots of Sessions
-        scnCommon   = setup_common_scene    (builder, rTopData, rTags, idResources);
+        scnCommon   = setup_common_scene    (builder, rTopData, rTags, idResources, pkg);
         matVisual   = setup_material        (builder, rTopData, rTags, scnCommon);
-        physics     = setup_physics         (builder, rTopData, rTags, scnCommon, idResources, pkg);
+        physics     = setup_physics         (builder, rTopData, rTags, scnCommon);
         newton      = setup_newton_physics  (builder, rTopData, rTags, scnCommon, physics);
         shapeSpawn  = setup_shape_spawn     (builder, rTopData, rTags, scnCommon, physics, matVisual);
         droppers    = setup_droppers        (builder, rTopData, rTags, scnCommon, shapeSpawn);
@@ -197,9 +197,9 @@ static ScenarioMap_t make_scenarios()
             testVehicles, droppers, gravity, bounds, thrower
         ] = unpack<17>(sceneOut);
 
-        scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources);
+        scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources, pkg);
         matVisual       = setup_material            (builder, rTopData, rTags, scnCommon);
-        physics         = setup_physics             (builder, rTopData, rTags, scnCommon, idResources, pkg);
+        physics         = setup_physics             (builder, rTopData, rTags, scnCommon);
         newton          = setup_newton_physics      (builder, rTopData, rTags, scnCommon, physics);
         shapeSpawn      = setup_shape_spawn         (builder, rTopData, rTags, scnCommon, physics, matVisual);
         prefabs         = setup_prefabs             (builder, rTopData, rTags, scnCommon, physics, matVisual, idResources);

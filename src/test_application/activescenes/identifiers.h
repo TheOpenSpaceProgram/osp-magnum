@@ -30,17 +30,17 @@
 
 // Scene sessions
 
-#define OSP_DATA_TESTAPP_COMMON_SCENE 7, \
-    idDeltaTimeIn, idActiveIds, idBasic, idDrawing, idDrawingRes, idDelEnts, idDelTotal
+#define OSP_DATA_TESTAPP_COMMON_SCENE 8, \
+    idDeltaTimeIn, idActiveIds, idBasic, idDrawing, idDrawingRes, idDelEnts, idDelTotal, idNMesh
 #define OSP_TAGS_TESTAPP_COMMON_SCENE 34, \
-    tgCleanupEvt,       tgResyncEvt,        tgSyncEvt,          tgSceneEvt,         tgTimeEvt,  \
-    tgEntDel,           tgEntNew,           tgEntReq,                                           \
-    tgDelEntMod,        tgDelEntReq,        tgDelEntClr,                                        \
-    tgDelTotalMod,      tgDelTotalReq,      tgDelTotalClr,                                      \
-    tgTransformMod,     tgTransformDel,     tgTransformNew,     tgTransformReq,                 \
-    tgHierMod,          tgHierModEnd,       tgHierDel,          tgHierNew,          tgHierReq,  \
-    tgDrawDel,          tgDrawMod,          tgDrawReq,                                          \
-    tgMeshDel,          tgMeshMod,          tgMeshReq,          tgMeshClr,                      \
+    tgCleanupEvt,       tgResyncEvt,        tgSyncEvt,          tgSceneEvt,         tgTimeEvt,      \
+    tgEntDel,           tgEntNew,           tgEntReq,                                               \
+    tgDelEntMod,        tgDelEntReq,        tgDelEntClr,                                            \
+    tgDelTotalMod,      tgDelTotalReq,      tgDelTotalClr,                                          \
+    tgTransformMod,     tgTransformDel,     tgTransformNew,     tgTransformReq,                     \
+    tgHierMod,          tgHierModEnd,       tgHierDel,          tgHierNew,          tgHierReq,      \
+    tgDrawDel,          tgDrawMod,          tgDrawReq,                                              \
+    tgMeshDel,          tgMeshMod,          tgMeshReq,          tgMeshClr,                          \
     tgTexDel,           tgTexMod,           tgTexReq,           tgTexClr
 
 
@@ -59,8 +59,8 @@
 
 
 
-#define OSP_DATA_TESTAPP_PHYSICS 2, \
-    idTPhys, idNMesh
+#define OSP_DATA_TESTAPP_PHYSICS 3, \
+    idPhys, idHierBody, idPhysIn
 #define OSP_TAGS_TESTAPP_PHYSICS 5, \
     tgPhysBodyDel,      tgPhysBodyMod,      tgPhysBodyReq,      \
     tgPhysMod,          tgPhysReq
