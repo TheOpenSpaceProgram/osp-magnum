@@ -81,27 +81,6 @@ void add_floor(
         return rDrawing.m_meshRefCounts.ref_add(meshId);
     };
 
-    // Create hierarchy root entity
-    rBasic.m_hierRoot = rActiveIds.create();
-    rBasic.m_hierarchy.emplace(rBasic.m_hierRoot);
-
-    // Create camera entity
-    ActiveEnt const camEnt = rActiveIds.create();
-
-    // Create camera transform and draw transform
-    ACompTransform &rCamTf = rBasic.m_transform.emplace(camEnt);
-    rCamTf.m_transform.translation().z() = 25;
-
-    // Create camera component
-    ACompCamera &rCamComp = rBasic.m_camera.emplace(camEnt);
-    rCamComp.m_far = 1u << 24;
-    rCamComp.m_near = 1.0f;
-    rCamComp.m_fov = 45.0_degf;
-
-    // Add camera to hierarchy
-    SysHierarchy::add_child(
-            rBasic.m_hierarchy, rBasic.m_hierRoot, camEnt);
-
     // start making floor
 
     static constexpr Vector3 const sc_floorSize{64.0f, 64.0f, 1.0f};

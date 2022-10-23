@@ -25,6 +25,7 @@
 #include "scene_renderer.h"
 #include "scenarios.h"
 #include "identifiers.h"
+#include "../ActiveApplication.h"
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <osp/Active/SysRender.h>
@@ -43,6 +44,38 @@ using osp::input::UserInputHandler;
 
 namespace testapp::scenes
 {
+
+Session setup_magnum_application(
+        Builder_t&                      rBuilder,
+        ArrayView<entt::any> const      topData,
+        Tags&                           rTags,
+        TopDataId const                 idResources,
+        ActiveApplication::Arguments    args)
+{
+    Session magnum;
+    OSP_SESSION_ACQUIRE_DATA(magnum, topData,   TESTAPP_APP_MAGNUM);
+    OSP_SESSION_ACQUIRE_TAGS(magnum, rTags,     TESTAPP_APP_MAGNUM);
+
+    // Order-dependent; ActiveApplication construction starts OpenGL context
+    auto &rUserInput    = osp::top_emplace<UserInputHandler>(topData, idUserInput, 12);
+    osp::top_emplace<ActiveApplication>                     (topData, idActiveApp, args, rUserInput);
+    auto &rRenderGl     = osp::top_emplace<RenderGL>        (topData, idRenderGl);
+
+    config_controls(rUserInput);
+    SysRenderGL::setup_context(rRenderGl);
+
+    magnum.task() = rBuilder.task().assign({tgCleanupMagnumEvt, tgGlUse}).data(
+            "Clean up Magnum renderer",
+            TopDataIds_t{           idResources,          idRenderGl},
+            wrap_args([] (Resources& rResources, RenderGL& rRenderGl) noexcept
+    {
+        SysRenderGL::clear_resource_owners(rRenderGl, rResources);
+        rRenderGl = {}; // Needs the OpenGL thread for destruction
+    }));
+    magnum.m_tgCleanupEvt = tgCleanupMagnumEvt;
+
+    return magnum;
+}
 
 
 Session setup_scene_renderer(

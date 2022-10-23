@@ -141,7 +141,7 @@ struct Camera
     float m_near{0.25f};
     float m_far{1024.0f};
     float m_aspectRatio{1.0f};
-    Deg m_fov;
+    Deg m_fov{45.0f};
 
     constexpr void set_aspect_ratio(Vector2 const viewport) noexcept
     {

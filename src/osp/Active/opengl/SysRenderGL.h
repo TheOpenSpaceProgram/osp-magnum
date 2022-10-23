@@ -57,7 +57,7 @@ struct RenderGL
 
     // Fullscreen Triangle
     MeshGlId                            m_fullscreenTri;
-    FullscreenTriShader                 m_fullscreenTriShader;
+    FullscreenTriShader                 m_fullscreenTriShader{Corrade::NoCreate};
 
     // Offscreen Framebuffer
     TexGlId                             m_fboColor;

@@ -90,28 +90,6 @@ struct ACompHierarchy
     ActiveEnt m_childFirst{entt::null};
 };
 
-/**
- * @brief Component that represents a camera
- */
-struct ACompCamera
-{
-    float m_near;
-    float m_far;
-    float m_aspectRatio;
-    Deg m_fov;
-
-    constexpr void set_aspect_ratio(Vector2 const viewport) noexcept
-    {
-        m_aspectRatio = viewport.x() / viewport.y();
-    }
-
-    Matrix4 calculate_projection() const noexcept
-    {
-        return osp::Matrix4::perspectiveProjection(
-                m_fov, m_aspectRatio,
-                m_near, m_far);
-    }
-};
 
 /**
  * @brief Storage for basic components
@@ -124,7 +102,6 @@ struct ACtxBasic
     acomp_storage_t<ACompFloatingOrigin>        m_floatingOrigin;
     acomp_storage_t<ACompName>                  m_name;
     acomp_storage_t<ACompHierarchy>             m_hierarchy;
-    acomp_storage_t<ACompCamera>                m_camera;
 
     ActiveEnt m_hierRoot{lgrn::id_null<ActiveEnt>()};
 };
@@ -135,7 +112,6 @@ void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
     rCtxBasic.m_floatingOrigin  .remove(first, last);
     rCtxBasic.m_name            .remove(first, last);
     rCtxBasic.m_hierarchy       .remove(first, last);
-    rCtxBasic.m_camera          .remove(first, last);
 
     while (first != last)
     {

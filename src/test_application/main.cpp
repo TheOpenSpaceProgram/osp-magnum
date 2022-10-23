@@ -29,8 +29,7 @@
 #include "ActiveApplication.h"
 #include "activescenes/scenarios.h"
 #include "activescenes/identifiers.h"
-
-#include <osp/Active/opengl/SysRenderGL.h>
+#include "activescenes/scene_renderer.h"
 
 #include <osp/Resource/load_tinygltf.h>
 #include <osp/Resource/resources.h>
@@ -120,8 +119,11 @@ osp::ExecutionContext   g_exec;
 // Sessions intend to add support for something to exist in the world
 // eg, Adding support for physics or supporting a certain shader
 
-// Refers to TopData with static duration, stores the Resources class
+// Application Session lasts the lifetime of the program.
+// It stores the Resources class, addressable by a TopDataId
 osp::Session            g_application;
+osp::TopDataId          g_idResources{lgrn::id_null<osp::TopDataId>()};
+
 // Default Package in Resources
 osp::PkgId              g_defaultPkg;
 
@@ -146,17 +148,6 @@ std::shared_ptr<spdlog::logger> g_logMagnumApp;
 int g_argc;
 char** g_argv;
 
-
-static ActiveApplication& get_magnum_application()
-{
-    return osp::top_get<ActiveApplication>(g_appTopData, g_magnum.m_dataIds[0]);
-}
-
-static osp::Resources& get_resources()
-{
-    return osp::top_get<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
-}
-
 static void close_sessions(Sessions_t &rSessions)
 {
     osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, rSessions);
@@ -176,7 +167,7 @@ static MainView get_main_view()
         .m_rTasks       = g_tasks,
         .m_rExec        = g_exec,
         .m_rTaskData    = g_taskData,
-        .m_idResources  = g_application.m_dataIds[0],
+        .m_idResources  = g_idResources,
     };
 }
 
@@ -302,8 +293,9 @@ int debug_cli_loop()
         {
             if (magnumOpen)
             {
-                // request exit if application exists
-                get_magnum_application().exit();
+                // Request exit if application exists
+                OSP_SESSION_UNPACK_DATA(g_magnum, TESTAPP_APP_MAGNUM); // declares idActiveApp
+                osp::top_get<ActiveApplication>(g_appTopData, idActiveApp).exit();
             }
 
             break;
@@ -329,38 +321,11 @@ void start_magnum_async()
 
         osp::set_thread_logger(g_logMagnumApp);
 
-        // Acquire data for Magnum Session. This will search for empty spaces in
-        // g_appTopData, and add their indices to g_magnum.m_dataIds, and
-        // declare them as variables: idUserInput, idActiveApp, idRenderGl
-        // see OSP_DATA_TESTAPP_APP_MAGNUM in identifiers.h
-        OSP_SESSION_ACQUIRE_DATA(g_magnum, g_appTopData, TESTAPP_APP_MAGNUM);
-
-        // Acquire tags will reserve unique integer TagIds from g_tags, and
-        // add them to g_magnum.m_tagIds. Variables are declared here too, but
-        // are not used.
-        // see OSP_TAGS_TESTAPP_APP_MAGNUM in identifiers.h
-        [[maybe_unused]] OSP_SESSION_ACQUIRE_TAGS(g_magnum, g_tags, TESTAPP_APP_MAGNUM);
-
-        // We now have reserved spaces in g_appTopData we can add data to
-        // Order-dependent; ActiveApplication construction starts OpenGL context
-        auto &rUserInput    = osp::top_emplace<osp::input::UserInputHandler>(g_appTopData, idUserInput, 12);
-        auto &rActiveApp    = osp::top_emplace<ActiveApplication>(g_appTopData, idActiveApp, ActiveApplication::Arguments{g_argc, g_argv}, rUserInput);
-        auto &rRenderGl     = osp::top_emplace<osp::active::RenderGL>(g_appTopData, idRenderGl);
-
-        // Configure the controls
-        config_controls(rUserInput);
-
-        // Setup GL resources
-        osp::active::SysRenderGL::setup_context(rRenderGl);
-
-        // Call important cleanup functions when the window closes
-        // TODO: This is a bit hacky, Add a cleanup tag so custom tasks can be
-        //       added here.
-        rActiveApp.set_on_destruct([&rRenderGl, idRenderGl = idRenderGl] ()
-        {
-            osp::active::SysRenderGL::clear_resource_owners(rRenderGl, get_resources());
-            g_appTopData[std::size_t(idRenderGl)].reset();
-        });
+        // Start Magnum application session
+        Builder_t builder{g_tags, g_tasks, g_taskData};
+        g_magnum = scenes::setup_magnum_application(builder, g_appTopData, g_tags, g_idResources, {g_argc, g_argv});
+        OSP_SESSION_UNPACK_DATA(g_magnum, TESTAPP_APP_MAGNUM); // declares idActiveApp
+        auto &rActiveApp = osp::top_get<ActiveApplication>(g_appTopData, idActiveApp);
 
         // Setup renderer sessions
         g_rendererSetup(get_main_view(), g_magnum, g_sceneSessions, g_renderSessions);
@@ -369,6 +334,10 @@ void start_magnum_async()
         // once the window is closed. See ActiveApplication::drawEvent
         rActiveApp.exec();
 
+        // Destruct draw function lambda first
+        // EngineTest stores the entire renderer in here (if it's active)
+        rActiveApp.set_on_draw({});
+        
         // Closing sessions will delete their associated TopData and Tags
         close_sessions(g_renderSessions);
         close_session(g_magnum);
@@ -395,9 +364,11 @@ void load_a_bunch_of_stuff()
     g_tags.m_tagLimits.resize(maxTagsInts);
     g_tags.m_tagExtern.resize(maxTagsInts);
 
-    g_application.m_dataIds = { osp::top_reserve(g_appTopData) };
 
-    auto &rResources = osp::top_emplace<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
+    auto const [idResources] = g_application.acquire_data<1>(g_appTopData);
+    g_idResources = idResources;
+
+    auto &rResources = osp::top_emplace<osp::Resources>(g_appTopData, idResources);
 
     rResources.resize_types(osp::ResTypeIdReg_t::size());
 
@@ -451,7 +422,7 @@ using each_res_id_t = void(*)(osp::ResId);
 
 static void resource_for_each_type(osp::ResTypeId const type, each_res_id_t const do_thing)
 {
-    auto &rResources = osp::top_get<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
+    auto &rResources = osp::top_get<osp::Resources>(g_appTopData, g_idResources);
     lgrn::IdRegistry<osp::ResId> const &rReg = rResources.ids(type);
     for (std::size_t i = 0; i < rReg.capacity(); ++i)
     {
@@ -470,7 +441,7 @@ void clear_resource_owners()
     // their associated image data
     resource_for_each_type(gc_texture, [] (osp::ResId const id)
     {
-        auto &rResources = osp::top_get<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
+        auto &rResources = osp::top_get<osp::Resources>(g_appTopData, g_idResources);
 
         auto * const pData = rResources
                 .data_try_get<osp::TextureImgSource>(gc_texture, id);
@@ -483,7 +454,7 @@ void clear_resource_owners()
     // Importer data own a lot of other resources
     resource_for_each_type(gc_importer, [] (osp::ResId const id)
     {
-        auto &rResources = osp::top_get<osp::Resources>(g_appTopData, g_application.m_dataIds[0]);
+        auto &rResources = osp::top_get<osp::Resources>(g_appTopData, g_idResources);
 
         auto * const pData = rResources
                 .data_try_get<osp::ImporterData>(gc_importer, id);

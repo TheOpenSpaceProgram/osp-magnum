@@ -166,8 +166,8 @@
 
 #define OSP_DATA_TESTAPP_APP_MAGNUM 3, \
     idUserInput, idActiveApp, idRenderGl
-#define OSP_TAGS_TESTAPP_APP_MAGNUM 3, \
-    tgRenderEvt, tgInputEvt, tgGlUse
+#define OSP_TAGS_TESTAPP_APP_MAGNUM 4, \
+    tgRenderEvt, tgInputEvt, tgGlUse, tgCleanupMagnumEvt
 
 
 
