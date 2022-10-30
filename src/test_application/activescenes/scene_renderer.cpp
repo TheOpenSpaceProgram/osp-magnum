@@ -186,7 +186,7 @@ Session setup_scene_renderer(
             TopDataIds_t{                 idBasic,                   idScnRender},
             wrap_args([] (ACtxBasic const& rBasic, ACtxSceneRenderGL& rScnRender) noexcept
     {
-        SysRender::update_draw_transforms(rBasic.m_hierarchy, rBasic.m_transform, rScnRender.m_drawTransform);
+        //SysRender::update_draw_transforms(rBasic.m_hierarchy, rBasic.m_transform, rScnRender.m_drawTransform);
     }));
 
     renderer.task() = rBuilder.task().assign({tgSyncEvt, tgDelTotalReq, tgGroupFwdDel}).data(
@@ -239,7 +239,7 @@ Session setup_shader_visualizer(
             TopDataIds_t{                 idBasic,                   idMatDirty,                      idScnRender},
             wrap_args([] (ACtxBasic const& rBasic, EntVector_t const& rMatDirty, ACtxSceneRenderGL& rScnRender) noexcept
     {
-        SysRender::assure_draw_transforms(rBasic.m_hierarchy, rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
+        //SysRender::assure_draw_transforms(rBasic.m_hierarchy, rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
     }));
 
 

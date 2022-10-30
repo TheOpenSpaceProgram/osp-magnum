@@ -38,7 +38,6 @@
 
 #include <osp/Active/basic.h>
 #include <osp/Active/parts.h>
-#include <osp/Active/SysHierarchy.h>
 #include <osp/Active/SysPrefabInit.h>
 #include <osp/Resource/resources.h>
 

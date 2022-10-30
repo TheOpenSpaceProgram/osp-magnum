@@ -102,9 +102,9 @@ using ACompTexGlStorage_t = acomp_storage_t<ACompTexGl>;
  */
 struct ACtxSceneRenderGL
 {
-    ACompMeshGlStorage_t                    m_meshId;
-    ACompTexGlStorage_t                     m_diffuseTexId;
-    acomp_storage_t<ACompDrawTransform>     m_drawTransform;
+    ACompMeshGlStorage_t        m_meshId;
+    ACompTexGlStorage_t         m_diffuseTexId;
+    acomp_storage_t<Matrix4>    m_drawTransform;
 };
 
 /**

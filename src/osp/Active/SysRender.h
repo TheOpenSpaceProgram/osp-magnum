@@ -165,33 +165,19 @@ public:
             ACtxDrawingRes& rCtxDrawingRes,
             Resources& rResources);
 
-    inline static void add_draw_transforms_recurse(
-            acomp_storage_t<ACompHierarchy> const& hier,
-            acomp_storage_t<ACompDrawTransform>& rDrawTf,
-            ActiveEnt ent);
 
     template<typename ITA_T, typename ITB_T>
     static void assure_draw_transforms(
-            acomp_storage_t<ACompHierarchy> const& hier,
-            acomp_storage_t<ACompDrawTransform>& rDrawTf,
-            ITA_T first, ITB_T const& last);
+            acomp_storage_t<Matrix4>& rDrawTf, ITA_T first, ITB_T const& last);
 
-    /**
-     * @brief Update draw ACompDrawTransform according to the hierarchy of
-     *        ACompTransforms
-     *
-     * TODO: this is a rather expensive operation that recalculates ALL draw
-     *       transforms, regardless of if they changed or not. Consider adding
-     *       dirty flags or similar.
-     *
-     * @param hier      [in] Storage for hierarchy components
-     * @param transform [in] Storage for local-space transform components
-     * @param rDrawTf   [out] Storage for world-space draw transform components
-     */
+    template<typename IT_T, typename ITB_T>
     static void update_draw_transforms(
-            acomp_storage_t<ACompHierarchy> const& hier,
-            acomp_storage_t<ACompTransform> const& transform,
-            acomp_storage_t<ACompDrawTransform>& rDrawTf);
+            ACtxSceneGraph const&                   rScnGraph,
+            acomp_storage_t<ACompTransform> const&  transform,
+            acomp_storage_t<Matrix4>&               rDrawTf,
+            EntSet_t const&                         rDrawable,
+            IT_T                                    first,
+            ITB_T const&                            last);
 
     /**
      * @brief Set all dirty flags/vectors
@@ -216,44 +202,50 @@ public:
             ACtxRenderGroups& rCtxGroups, IT_T first, IT_T const& last);
 
 private:
-
+    static void update_draw_transforms_recurse(
+            ACtxSceneGraph const&                   rScnGraph,
+            acomp_storage_t<ACompTransform> const&  rTf,
+            acomp_storage_t<Matrix4>&               rDrawTf,
+            EntSet_t const&                         rDrawable,
+            ActiveEnt                               ent,
+            Matrix4 const&                          parentTf,
+            bool                                    root);
 
 }; // class SysRender
 
-void SysRender::add_draw_transforms_recurse(
-        acomp_storage_t<ACompHierarchy> const& hier,
-        acomp_storage_t<ACompDrawTransform>& rDrawTf, ActiveEnt const ent)
-{
-    if (rDrawTf.contains(ent))
-    {
-        return;
-    }
-
-    rDrawTf.emplace(ent); // Emplace the component
-
-    ACompHierarchy const &currHier = hier.get(ent);
-
-    if (currHier.m_level <= 1)
-    {
-        return; // Stop recursing when about to reach root
-    }
-
-    // Tail recurse into parent
-    add_draw_transforms_recurse(hier, rDrawTf, currHier.m_parent);
-}
-
 template<typename ITA_T, typename ITB_T>
 void SysRender::assure_draw_transforms(
-        acomp_storage_t<ACompHierarchy> const& hier,
-        acomp_storage_t<ACompDrawTransform>& rDrawTf,
-        ITA_T first, ITB_T const& last)
+        acomp_storage_t<Matrix4>& rDrawTf, ITA_T first, ITB_T const& last)
 {
     while (first != last)
     {
-        add_draw_transforms_recurse(hier, rDrawTf, *first);
+        if ( ! rDrawTf.contains(*first))
+        {
+            rDrawTf.emplace(*first);
+        }
         std::advance(first, 1);
     }
 }
+
+template<typename IT_T, typename ITB_T>
+void SysRender::update_draw_transforms(
+        ACtxSceneGraph const&                   rScnGraph,
+        acomp_storage_t<ACompTransform> const&  rTf,
+        acomp_storage_t<Matrix4>&               rDrawTf,
+        EntSet_t const&                         rDrawable,
+        IT_T                                    first,
+        ITB_T const&                            last)
+{
+    static Matrix4 const identity{};
+
+    while (first != last)
+    {
+        update_draw_transforms_recurse(rScnGraph, rTf, rDrawTf, rDrawable, *first, identity, true);
+
+        std::advance(first, 1);
+    }
+}
+
 
 template<typename STORAGE_T, typename REFCOUNT_T>
 void remove_refcounted(

@@ -52,7 +52,7 @@ class SysNewton
 
     using ActiveEnt                 = osp::active::ActiveEnt;
     using ACtxPhysics               = osp::active::ACtxPhysics;
-    using ACompHierarchy            = osp::active::ACompHierarchy;
+    using ACtxSceneGraph            = osp::active::ACtxSceneGraph;
     using ACompTransform            = osp::active::ACompTransform;
     using ACompTransformControlled  = osp::active::ACompTransformControlled;
     using ACompTransformMutable     = osp::active::ACompTransformMutable;
@@ -97,7 +97,7 @@ public:
             ACtxNwtWorld& rCtxWorld,
             float timestep,
             Corrade::Containers::ArrayView<osp::active::ACtxPhysInputs> inputs,
-            acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
+            ACtxSceneGraph const& rScnGraph,
             acomp_storage_t<osp::active::ACompTransform>& rTf,
             acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
             acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable) noexcept;
@@ -134,7 +134,7 @@ private:
     static void find_colliders_recurse(
             ACtxPhysics const& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            acomp_storage_t<ACompHierarchy> const& rHier,
+            ACtxSceneGraph const& rScnGraph,
             acomp_storage_t<ACompTransform> const& rTf,
             ActiveEnt ent,
             ActiveEnt firstChild,
@@ -151,7 +151,7 @@ private:
     static void create_body(
             ACtxPhysics const& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            acomp_storage_t<ACompHierarchy> const& rHier,
+            ACtxSceneGraph const& rScnGraph,
             acomp_storage_t<ACompTransform> const& rTf,
             acomp_storage_t<ACompTransformControlled>& rTfControlled,
             acomp_storage_t<ACompTransformMutable>& rTfMutable,

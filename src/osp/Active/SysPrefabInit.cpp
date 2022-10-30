@@ -24,7 +24,8 @@
  */
 #include "SysPrefabInit.h"
 #include "SysRender.h"
-#include "SysHierarchy.h"
+#include "SysSceneGraph.h"
+#include "SysSceneGraph.h"
 
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
@@ -41,13 +42,14 @@ using osp::phys::EShape;
 namespace osp::active
 {
 
-void SysPrefabInit::init_hierarchy(
+void SysPrefabInit::init_subtrees(
         ACtxPrefabInit const&               rPrefabInit,
         Resources const&                    rResources,
-        acomp_storage_t<ACompHierarchy>&    rHier) noexcept
+        ACtxSceneGraph&                     rScnGraph) noexcept
 {
     auto itPfEnts = std::begin(rPrefabInit.m_ents);
 
+    /*
     for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
     {
         auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
@@ -55,6 +57,8 @@ void SysPrefabInit::init_hierarchy(
 
         std::size_t const objCount = rPrefabData.m_prefabs[rPfBasic.m_prefabId].size();
         auto const parents = rPrefabData.m_prefabParents[rPfBasic.m_prefabId];
+
+        SubtreeBuilder builder = SysSceneGraph::create_subtree(rScnGraph, rPfBasic.m_parent, );
 
         for (std::size_t i = 0; i < objCount; ++i)
         {
@@ -70,6 +74,7 @@ void SysPrefabInit::init_hierarchy(
 
         std::advance(itPfEnts, 1);
     }
+    */
 }
 
 void SysPrefabInit::init_transforms(

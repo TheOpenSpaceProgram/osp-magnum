@@ -46,9 +46,9 @@ void shader::draw_ent_phong(
     auto &rShader = *reinterpret_cast<Phong*>(pShader);
 
     // Collect uniform information
-    ACompDrawTransform const &drawTf = rData.m_pDrawTf->get(ent);
+    Matrix4 const &drawTf = rData.m_pDrawTf->get(ent);
 
-    Magnum::Matrix4 entRelative = viewProj.m_view * drawTf.m_transformWorld;
+    Magnum::Matrix4 entRelative = viewProj.m_view * drawTf;
 
     /* 4th component indicates light type. A value of 0.0f indicates that the
      * light is a direction light coming from the specified direction relative
@@ -86,7 +86,7 @@ void shader::draw_ent_phong(
                              Vector4{-Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f} })
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(viewProj.m_proj)
-        .setNormalMatrix(Matrix3{drawTf.m_transformWorld})
+        .setNormalMatrix(Matrix3{drawTf})
         .draw(rMesh);
 }
 

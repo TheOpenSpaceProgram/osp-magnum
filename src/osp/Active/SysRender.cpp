@@ -23,6 +23,8 @@
  * SOFTWARE.
  */
 #include "SysRender.h"
+#include "SysSceneGraph.h"
+
 
 #include "../Resource/resources.h"
 
@@ -85,37 +87,6 @@ void SysRender::clear_resource_owners(ACtxDrawingRes& rCtxDrawingRes, Resources 
     rCtxDrawingRes.m_resToMesh.clear();
 }
 
-void SysRender::update_draw_transforms(
-        acomp_storage_t<ACompHierarchy> const& hier,
-        acomp_storage_t<ACompTransform> const& transform,
-        acomp_storage_t<ACompDrawTransform>& rDrawTf)
-{
-    rDrawTf.respect(hier);
-
-    auto viewDrawTf = entt::basic_view{rDrawTf};
-
-    for(ActiveEnt const entity : viewDrawTf)
-    {
-        ACompHierarchy const &entHier   = hier.get(entity);
-        ACompTransform const &entTf     = transform.get(entity);
-        ACompDrawTransform &rEntDrawTf  = rDrawTf.get(entity);
-
-        if (entHier.m_level == 1)
-        {
-            // top level object, parent is root
-            rEntDrawTf.m_transformWorld = entTf.m_transform;
-        }
-        else
-        {
-            ACompDrawTransform const& parentDrawTf = rDrawTf.get(entHier.m_parent);
-
-            // set transform relative to parent
-            rEntDrawTf.m_transformWorld = parentDrawTf.m_transformWorld
-                                        * entTf.m_transform;
-        }
-    }
-}
-
 void SysRender::set_dirty_all(ACtxDrawing &rCtxDrawing)
 {
     using osp::active::active_sparse_set_t;
@@ -133,5 +104,34 @@ void SysRender::clear_dirty_all(ACtxDrawing& rCtxDrawing)
 {
     rCtxDrawing.m_meshDirty.clear();
     rCtxDrawing.m_diffuseDirty.clear();
+}
+
+
+void SysRender::update_draw_transforms_recurse(
+        ACtxSceneGraph const&                   rScnGraph,
+        acomp_storage_t<ACompTransform> const&  rTf,
+        acomp_storage_t<Matrix4>&               rDrawTf,
+        EntSet_t const&                         rDrawable,
+        ActiveEnt                               ent,
+        Matrix4 const&                          parentTf,
+        bool                                    root)
+{
+    Matrix4 const& entTf = rTf.get(ent).m_transform;
+    Matrix4 const& entDrawTf = root ? (entTf) : (parentTf * entTf);
+
+    if (rDrawTf.contains(ent))
+    {
+        rDrawTf.get(ent) = entDrawTf;
+    }
+
+    for (ActiveEnt entChild : SysSceneGraph::children(rScnGraph, ent))
+    {
+        if (rDrawable.test(std::size_t(entChild)))
+        {
+            update_draw_transforms_recurse(rScnGraph, rTf, rDrawTf, rDrawable, entChild, entDrawTf, false);
+        }
+    }
+
+    //parentTf.
 }
 

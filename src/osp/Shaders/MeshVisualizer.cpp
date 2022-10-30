@@ -45,9 +45,9 @@ void shader::draw_ent_visualizer(
     assert(pData != nullptr);
     auto &rData = *reinterpret_cast<ACtxDrawMeshVisualizer*>(pData);
 
-    ACompDrawTransform const& drawTf = rData.m_pDrawTf->get(ent);
+    Matrix4 const& drawTf = rData.m_pDrawTf->get(ent);
 
-    Matrix4 const entRelative = viewProj.m_view * drawTf.m_transformWorld;
+    Matrix4 const entRelative = viewProj.m_view * drawTf;
 
     MeshVisualizer &rShader = rData.m_shader;
 

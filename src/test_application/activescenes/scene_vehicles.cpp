@@ -30,7 +30,7 @@
 
 #include <osp/Active/parts.h>
 #include <osp/Active/physics.h>
-#include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/SysPrefabInit.h>
 
 #include <osp/Active/opengl/SysRenderGL.h>
@@ -656,7 +656,7 @@ Session setup_vehicle_spawn_rigid(
         for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
         {
             ActiveEnt const rigidEnt = *itRigidEnt;
-            SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, rigidEnt);
+            //SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, rigidEnt);
             std::advance(itRigidEnt, 1);
         }
     }));

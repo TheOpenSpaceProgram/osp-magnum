@@ -32,7 +32,7 @@
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
 
-#include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/SysRender.h>
 
 #include <osp/Resource/resources.h>
@@ -111,12 +111,12 @@ void add_floor(
     rDrawing.m_visible.emplace(floorMeshEnt);
 
     // Add floor root to hierarchy root
-    SysHierarchy::add_child(
-            rBasic.m_hierarchy, rBasic.m_hierRoot, floorRootEnt);
+    //SysHierarchy::add_child(
+    //        rBasic.m_hierarchy, rBasic.m_hierRoot, floorRootEnt);
 
     // Parent floor mesh entity to floor root entity
-    SysHierarchy::add_child(
-            rBasic.m_hierarchy, floorRootEnt, floorMeshEnt);
+    //SysHierarchy::add_child(
+    //        rBasic.m_hierarchy, floorRootEnt, floorMeshEnt);
 
     // Add collider to floor root entity
     rSpawner.emplace_back(SpawnShape{

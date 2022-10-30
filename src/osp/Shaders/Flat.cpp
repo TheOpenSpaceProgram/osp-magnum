@@ -46,7 +46,7 @@ void shader::draw_ent_flat(
     auto &rShader = *reinterpret_cast<Flat*>(pShader);
 
     // Collect uniform information
-    ACompDrawTransform const &drawTf = rData.m_pDrawTf->get(ent);
+    Matrix4 const &drawTf = rData.m_pDrawTf->get(ent);
 
     if (rShader.flags() & Flag::Textured)
     {
@@ -65,7 +65,7 @@ void shader::draw_ent_flat(
     Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
     rShader
-        .setTransformationProjectionMatrix(viewProj.m_viewProj * drawTf.m_transformWorld)
+        .setTransformationProjectionMatrix(viewProj.m_viewProj * drawTf)
         .draw(rMesh);
 }
 

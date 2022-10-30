@@ -26,6 +26,7 @@
 
 #include "../types.h"
 #include "activetypes.h"
+#include "scene_graph.h"
 
 #include <longeron/id_management/null.hpp>
 
@@ -74,34 +75,17 @@ struct ACompName
 };
 
 /**
- * @brief Places an entity in a hierarchy
- *
- * Stores entity IDs for parent, both siblings, and first child if present
- */
-struct ACompHierarchy
-{
-    unsigned m_level{0}; // 0 for root entity, 1 for root's child, etc...
-    ActiveEnt m_parent{entt::null};
-    ActiveEnt m_siblingNext{entt::null};
-    ActiveEnt m_siblingPrev{entt::null};
-
-    // as a parent
-    unsigned m_childCount{0};
-    ActiveEnt m_childFirst{entt::null};
-};
-
-
-/**
  * @brief Storage for basic components
  */
 struct ACtxBasic
 {
+    ACtxSceneGraph m_scnGraph;
+
     acomp_storage_t<ACompTransform>             m_transform;
     acomp_storage_t<ACompTransformControlled>   m_transformControlled;
     acomp_storage_t<ACompTransformMutable>      m_transformMutable;
     acomp_storage_t<ACompFloatingOrigin>        m_floatingOrigin;
     acomp_storage_t<ACompName>                  m_name;
-    acomp_storage_t<ACompHierarchy>             m_hierarchy;
 
     ActiveEnt m_hierRoot{lgrn::id_null<ActiveEnt>()};
 };
@@ -111,7 +95,6 @@ void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
 {
     rCtxBasic.m_floatingOrigin  .remove(first, last);
     rCtxBasic.m_name            .remove(first, last);
-    rCtxBasic.m_hierarchy       .remove(first, last);
 
     while (first != last)
     {

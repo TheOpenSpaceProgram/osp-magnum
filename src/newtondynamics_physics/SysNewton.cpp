@@ -219,12 +219,12 @@ void SysNewton::update_world(
         ACtxNwtWorld& rCtxWorld,
         float timestep,
         ArrayView<ACtxPhysInputs> inputs,
-        acomp_storage_t<ACompHierarchy> const& rHier,
+        ACtxSceneGraph const& rScnGraph,
         acomp_storage_t<ACompTransform>& rTf,
         acomp_storage_t<ACompTransformControlled>& rTfControlled,
         acomp_storage_t<ACompTransformMutable>& rTfMutable) noexcept
 {
-
+#if 0
     NewtonWorld const* pNwtWorld = rCtxWorld.m_nwtWorld.get();
 
     // Iterate rigid bodies that don't have a NewtonBody
@@ -292,6 +292,7 @@ void SysNewton::update_world(
             }
         }
     }
+#endif
 }
 
 void SysNewton::remove_components(ACtxNwtWorld& rCtxWorld, ActiveEnt ent) noexcept
@@ -302,11 +303,12 @@ void SysNewton::remove_components(ACtxNwtWorld& rCtxWorld, ActiveEnt ent) noexce
 
 void SysNewton::find_colliders_recurse(
         ACtxPhysics const& rCtxPhys, ACtxNwtWorld& rCtxWorld,
-        acomp_storage_t<ACompHierarchy> const& rHier,
+        ACtxSceneGraph const& rScnGraph,
         acomp_storage_t<ACompTransform> const& rTf,
         ActiveEnt ent, ActiveEnt firstChild,
         Matrix4 const& transform, NewtonCollision* pCompound) noexcept
 {
+#if 0
     // Add newton collider if exists
     if (rCtxPhys.m_solid.contains(ent)
         && rCtxWorld.m_nwtColliders.contains(ent))
@@ -360,19 +362,20 @@ void SysNewton::find_colliders_recurse(
         // Select next child
         currentChild = rChildHeir.m_siblingNext;
     }
+#endif
 }
 
 void SysNewton::create_body(
         ACtxPhysics const& rCtxPhys,
         ACtxNwtWorld& rCtxWorld,
-        acomp_storage_t<ACompHierarchy> const& rHier,
+        ACtxSceneGraph const& rScnGraph,
         acomp_storage_t<ACompTransform> const& rTf,
         acomp_storage_t<ACompTransformControlled>& rTfControlled,
         acomp_storage_t<ACompTransformMutable>& rTfMutable,
         ActiveEnt ent,
         NewtonWorld const* pNwtWorld) noexcept
 {
-
+#if 0
     ACompHierarchy const& entHier = rHier.get(ent);
     ACompTransform const& entTransform = rTf.get(ent);
 
@@ -469,5 +472,6 @@ void SysNewton::create_body(
     // Set user data to entity
     // note: void* used as storing an ActiveEnt (uint32_t) by value
     NewtonBodySetUserData(pBody, reinterpret_cast<void*>(ent));
+#endif
 }
 

@@ -78,10 +78,10 @@ class SysPrefabInit
 {
 public:
 
-    static void init_hierarchy(
+    static void init_subtrees(
             ACtxPrefabInit const&               rPrefabInit,
             Resources const&                    rResources,
-            acomp_storage_t<ACompHierarchy>&    rHier) noexcept;
+            ACtxSceneGraph&                     rScnGraph) noexcept;
 
     static void init_transforms(
             ACtxPrefabInit const&               rPrefabInit,

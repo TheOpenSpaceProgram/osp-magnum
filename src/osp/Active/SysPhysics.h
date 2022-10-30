@@ -29,45 +29,11 @@
 namespace osp::active
 {
 
-struct ACompHierarchy;
 struct ACompTransform;
 
 class SysPhysics
 {
 public:
-
-    /**
-     * @brief Find which rigid body an entity belongs to
-     *
-     * This function will follow an entity's chain parents until it reaches
-     * the hierarchy level at which rigid bodies exist.
-     *
-     * @param hierarchy [in] Hierarchy component storage
-     * @param ent       [in] Entity to find rigid body transform of
-     *
-     * @return Entity at rigid body hierarchy level
-     */
-    static ActiveEnt find_rigidbody_ancestor(
-            acomp_storage_t<ACompHierarchy> const& hier,
-            ActiveEnt ent);
-
-    /**
-     * @brief Calculates the transformation of an entity relative to its
-     *        rigidbody ancestor
-     *
-     * Identical to find_rigidbody_ancestor(), except returns the transformation
-     * between rigidbody ancestor and the specified entity.
-     *
-     * @param hierarchy     [in] Hierarchy component storage
-     * @param transforms    [in] Transform component storage
-     * @param ent           [in] Entity to calculate
-     *
-     * @return A Matrix4 representing the transformation
-     */
-    static Matrix4 calc_transform_rel_rigidbody_ancestor(
-            acomp_storage_t<ACompHierarchy> const& hierarchy,
-            acomp_storage_t<ACompTransform> const& transform,
-            ActiveEnt ent);
 
     enum EIncludeRootMass { Ignore, Include };
 

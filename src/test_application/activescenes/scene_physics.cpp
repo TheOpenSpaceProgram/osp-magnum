@@ -30,7 +30,7 @@
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
-#include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/SysPrefabInit.h>
 #include <osp/Active/SysRender.h>
 
@@ -133,10 +133,10 @@ Session setup_newton_physics(
             wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, ACtxNwtWorld& rNwt, float const deltaTimeIn) noexcept
     {
         auto const physIn = osp::ArrayView<ACtxPhysInputs>(&rPhysIn, 1);
-        SysNewton::update_world(
-                rPhys, rNwt, deltaTimeIn, physIn, rBasic.m_hierarchy,
-                rBasic.m_transform, rBasic.m_transformControlled,
-                rBasic.m_transformMutable);
+        //SysNewton::update_world(
+        //        rPhys, rNwt, deltaTimeIn, physIn, rBasic.m_hierarchy,
+        //        rBasic.m_transform, rBasic.m_transformControlled,
+        //        rBasic.m_transformMutable);
     }));
 
     top_emplace< ACtxNwtWorld >(topData, idNwt, 2);
@@ -193,8 +193,8 @@ Session setup_shape_spawn(
 
             rBasic.m_transform.emplace(root, ACompTransform{osp::Matrix4::translation(spawn.m_position)});
             rBasic.m_transform.emplace(child, ACompTransform{Matrix4::scaling(spawn.m_size)});
-            SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, root);
-            SysHierarchy::add_child(rBasic.m_hierarchy, root, child);
+            //SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, root);
+            //SysHierarchy::add_child(rBasic.m_hierarchy, root, child);
         }
     }));
 
@@ -331,7 +331,7 @@ Session setup_prefabs(
             TopDataIds_t{                idPrefabInit,           idResources,           idBasic },
             wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxBasic& rBasic) noexcept
     {
-        SysPrefabInit::init_hierarchy(rPrefabInit, rResources, rBasic.m_hierarchy);
+        //SysPrefabInit::init_hierarchy(rPrefabInit, rResources, rBasic.m_hierarchy);
     }));
 
     prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgTransformNew}).data(

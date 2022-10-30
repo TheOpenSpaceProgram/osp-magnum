@@ -29,7 +29,7 @@
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
 
-#include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/SysRender.h>
 
 #include <osp/Resource/resources.h>
@@ -88,7 +88,7 @@ Session setup_common_scene(
 
     // Create hierarchy root entity
     rBasic.m_hierRoot = rActiveIds.create();
-    rBasic.m_hierarchy.emplace(rBasic.m_hierRoot);
+    //rBasic.m_hierarchy.emplace(rBasic.m_hierRoot);
 
     scnCommon.task() = rBuilder.task().assign({tgResyncEvt}).data(
             "Set entity meshes and textures dirty",
@@ -103,7 +103,7 @@ Session setup_common_scene(
             TopDataIds_t{           idBasic},
             wrap_args([] (ACtxBasic& rBasic) noexcept
     {
-        SysHierarchy::sort(rBasic.m_hierarchy);
+        //SysHierarchy::sort(rBasic.m_hierarchy);
     }));
 
 
@@ -117,12 +117,12 @@ Session setup_common_scene(
 
         rDelTotal.assign(delFirst, delLast);
 
-        SysHierarchy::update_delete_descendents(
-                rBasic.m_hierarchy, delFirst, delLast,
-                [&rDelTotal] (ActiveEnt const ent)
-        {
-            rDelTotal.push_back(ent);
-        });
+        //SysHierarchy::update_delete_descendents(
+        //        rBasic.m_hierarchy, delFirst, delLast,
+        //        [&rDelTotal] (ActiveEnt const ent)
+        //{
+        //    rDelTotal.push_back(ent);
+        //});
     }));
 
     scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelEntReq, tgHierMod}).data(
@@ -133,7 +133,7 @@ Session setup_common_scene(
         auto const &delFirst    = std::cbegin(rDelEnts);
         auto const &delLast     = std::cend(rDelEnts);
 
-        SysHierarchy::update_delete_cut(rBasic.m_hierarchy, delFirst, delLast);
+        //SysHierarchy::update_delete_cut(rBasic.m_hierarchy, delFirst, delLast);
     }));
 
     scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgEntDel}).data(
