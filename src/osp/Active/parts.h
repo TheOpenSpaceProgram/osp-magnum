@@ -118,7 +118,8 @@ struct ACtxVehicleSpawn
     std::vector<std::size_t>    m_offsetParts;
 
     std::vector<PartEnt_t>      m_partEnts;
-    std::vector<std::size_t>    m_partPrefabs;
+    // index to ACtxPrefabInit::m_basic and m_ents
+    std::vector<uint32_t>       m_partPrefabs;
 
 };
 

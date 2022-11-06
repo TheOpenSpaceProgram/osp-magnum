@@ -86,10 +86,6 @@ Session setup_common_scene(
     rBuilder.tag(tgTexReq)          .depend_on({tgTexDel, tgTexMod});
     rBuilder.tag(tgTexClr)          .depend_on({tgTexDel, tgTexMod, tgTexReq});
 
-    // Create hierarchy root entity
-    rBasic.m_hierRoot = rActiveIds.create();
-    //rBasic.m_hierarchy.emplace(rBasic.m_hierRoot);
-
     scnCommon.task() = rBuilder.task().assign({tgResyncEvt}).data(
             "Set entity meshes and textures dirty",
             TopDataIds_t{             idDrawing},
@@ -97,15 +93,6 @@ Session setup_common_scene(
     {
         SysRender::set_dirty_all(rDrawing);
     }));
-
-    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgSyncEvt, tgHierModEnd}).data(
-            "Sort hierarchy (needed by renderer) after possible modifications",
-            TopDataIds_t{           idBasic},
-            wrap_args([] (ACtxBasic& rBasic) noexcept
-    {
-        //SysHierarchy::sort(rBasic.m_hierarchy);
-    }));
-
 
     scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelEntReq, tgDelTotalMod}).data(
             "Create DeleteTotal vector, which includes descendents of deleted hierarchy entities",
@@ -117,12 +104,13 @@ Session setup_common_scene(
 
         rDelTotal.assign(delFirst, delLast);
 
-        //SysHierarchy::update_delete_descendents(
-        //        rBasic.m_hierarchy, delFirst, delLast,
-        //        [&rDelTotal] (ActiveEnt const ent)
-        //{
-        //    rDelTotal.push_back(ent);
-        //});
+        for (ActiveEnt root : rDelEnts)
+        {
+            for (ActiveEnt descendant : SysSceneGraph::descendants(rBasic.m_scnGraph, root))
+            {
+                rDelTotal.push_back(descendant);
+            }
+        }
     }));
 
     scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelEntReq, tgHierMod}).data(
@@ -133,7 +121,7 @@ Session setup_common_scene(
         auto const &delFirst    = std::cbegin(rDelEnts);
         auto const &delLast     = std::cend(rDelEnts);
 
-        //SysHierarchy::update_delete_cut(rBasic.m_hierarchy, delFirst, delLast);
+        SysSceneGraph::cut(rBasic.m_scnGraph, delFirst, delLast);
     }));
 
     scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgEntDel}).data(

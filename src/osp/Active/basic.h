@@ -26,7 +26,6 @@
 
 #include "../types.h"
 #include "activetypes.h"
-#include "scene_graph.h"
 
 #include <longeron/id_management/null.hpp>
 
@@ -74,6 +73,30 @@ struct ACompName
     std::string m_name;
 };
 
+using TreePos_t = uint32_t;
+
+struct ACtxSceneGraph
+{
+    // Tree structure stored using an array of descendant count in parallel with
+    // identificaton (entities)
+    // A(B(C(D)), E(F(G(H,I)))) -> [A,B,C,D,E,F,G,H,I] and [8,2,1,0,4,3,2,0,0]
+    std::vector<ActiveEnt>  m_treeToEnt{lgrn::id_null<ActiveEnt>()};
+    std::vector<uint32_t>   m_treeDescendants{std::initializer_list<uint32_t>{0}};
+
+    std::vector<ActiveEnt>  m_entParent;
+    std::vector<TreePos_t>  m_entToTreePos;
+
+    std::vector<TreePos_t>  m_delete;
+
+    void resize(std::size_t ents)
+    {
+        m_treeToEnt         .reserve(ents);
+        m_treeDescendants   .reserve(ents);
+        m_entParent         .resize(ents);
+        m_entToTreePos      .resize(ents);
+    }
+};
+
 /**
  * @brief Storage for basic components
  */
@@ -86,8 +109,6 @@ struct ACtxBasic
     acomp_storage_t<ACompTransformMutable>      m_transformMutable;
     acomp_storage_t<ACompFloatingOrigin>        m_floatingOrigin;
     acomp_storage_t<ACompName>                  m_name;
-
-    ActiveEnt m_hierRoot{lgrn::id_null<ActiveEnt>()};
 };
 
 template<typename IT_T>

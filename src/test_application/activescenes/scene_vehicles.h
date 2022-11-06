@@ -101,7 +101,8 @@ osp::Session setup_vehicle_spawn_rigid(
         osp::Session const&         physics,
         osp::Session const&         prefabs,
         osp::Session const&         parts,
-        osp::Session const&         vehicleSpawn);
+        osp::Session const&         vehicleSpawn,
+        osp::TopDataId const        idResources);
 
 /**
  * @brief Build "Test Vehicle" data, so they can be spawned

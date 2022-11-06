@@ -86,14 +86,16 @@ void add_floor(
     static constexpr Vector3 const sc_floorSize{64.0f, 64.0f, 1.0f};
     static constexpr Vector3 const sc_floorPos{0.0f, 0.0f, -1.005f};
 
-    // Create floor root entity
+    // Create floor root and mesh entity
     ActiveEnt const floorRootEnt = rActiveIds.create();
+    ActiveEnt const floorMeshEnt = rActiveIds.create();
+
+    // Resize some containers to fit all existing entities
+    rDrawing.m_drawable.ints().resize(rActiveIds.vec().capacity());
+    rBasic.m_scnGraph.resize(rActiveIds.capacity());
 
     // Add transform and draw transform to root
     rBasic.m_transform.emplace(floorRootEnt);
-
-    // Create floor mesh entity
-    ActiveEnt const floorMeshEnt = rActiveIds.create();
 
     // Add mesh to floor mesh entity
     rDrawing.m_mesh.emplace(floorMeshEnt, quick_add_mesh("grid64solid"));
@@ -110,13 +112,16 @@ void add_floor(
     rDrawing.m_opaque.emplace(floorMeshEnt);
     rDrawing.m_visible.emplace(floorMeshEnt);
 
+    rDrawing.m_drawable.set(std::size_t(floorRootEnt));
+    rDrawing.m_drawable.set(std::size_t(floorMeshEnt));
+
+    SubtreeBuilder builder = SysSceneGraph::add_descendants(rBasic.m_scnGraph, 2);
+
     // Add floor root to hierarchy root
-    //SysHierarchy::add_child(
-    //        rBasic.m_hierarchy, rBasic.m_hierRoot, floorRootEnt);
+    SubtreeBuilder bldFloorRoot = builder.add_child(floorRootEnt, 1);
 
     // Parent floor mesh entity to floor root entity
-    //SysHierarchy::add_child(
-    //        rBasic.m_hierarchy, floorRootEnt, floorMeshEnt);
+    bldFloorRoot.add_child(floorMeshEnt);
 
     // Add collider to floor root entity
     rSpawner.emplace_back(SpawnShape{

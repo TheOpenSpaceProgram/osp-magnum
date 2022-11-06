@@ -369,8 +369,8 @@ Session setup_vehicle_spawn_vb(
 
                 (*itOffsetPartsOut) = std::distance(itPartEntsFirst, itPartEnts);
 
-                std::advance(itPartEnts, count);
                 std::advance(itOffsetPartsOut, 1);
+                std::advance(itPartEnts, count);
             }
             // All parts should always be used up
             assert(itPartEnts == std::end(rVehicleSpawn.m_partEnts));
@@ -428,7 +428,6 @@ Session setup_vehicle_spawn_vb(
                 rScnParts.m_partTransformRigid[dstPart] = pVData->m_partTransforms[srcPart];
 
                 RigidGroup_t const rigid = rScnParts.m_partRigids[dstPart];
-                ActiveEnt const rigidEnt = rScnParts.m_rigidToEnt[rigid];
 
                 // Add Prefab and Part init events
                 (*itPrefabOut) = rPrefabInit.m_basic.size();
@@ -437,7 +436,6 @@ Session setup_vehicle_spawn_vb(
                 rPrefabInit.m_basic.push_back(TmpPrefabInitBasic{
                     .m_importerRes = prefabPairSrc.m_importer,
                     .m_prefabId = prefabPairSrc.m_prefabId,
-                    .m_parent = rigidEnt,
                     .m_pTransform = &pVData->m_partTransforms[srcPart]
                 });
             }
@@ -557,7 +555,8 @@ Session setup_vehicle_spawn_rigid(
         Session const&              physics,
         Session const&              prefabs,
         Session const&              parts,
-        Session const&              vehicleSpawn)
+        Session const&              vehicleSpawn,
+        TopDataId const             idResources)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
@@ -612,22 +611,32 @@ Session setup_vehicle_spawn_rigid(
         auto itOffsetParts = std::cbegin(rVehicleSpawn.m_offsetParts);
         for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
         {
+            auto const itOffsetPartsNext = std::next(itOffsetParts);
+
             // Add parts of each vehicle to its corresponding rigid group
-            auto vehicleParts = arrayView(rVehicleSpawn.m_partEnts).exceptPrefix(*itOffsetParts);
+
+            std::size_t const offsetPartsNext
+                    = (itOffsetPartsNext != std::end(rVehicleSpawn.m_offsetParts))
+                    ? (*itOffsetPartsNext)
+                    : rVehicleSpawn.m_partPrefabs.size();
+
+            auto vehicleParts = arrayView(rVehicleSpawn.m_partEnts).slice(*itOffsetParts, offsetPartsNext);
+
             rScnParts.m_rigidToParts.emplace(*itRgdGroup, std::begin(vehicleParts), std::end(vehicleParts));
             std::for_each(std::begin(vehicleParts), std::end(vehicleParts),
                           [&rScnParts, rigid = *itRgdGroup] (PartEnt_t const part)
             {
                 rScnParts.m_partRigids[part] = rigid;
             });
+
             std::advance(itRgdGroup, 1);
-            std::advance(itOffsetParts, 1);
+            itOffsetParts = itOffsetPartsNext;
         }
     }));
 
     vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgEntNew, tgVehicleSpawnReq, tgVSpawnRgdReq, tgVSpawnRgdEntMod}).data(
             "Create entity for each rigid group",
-            TopDataIds_t{             idActiveIds,                  idVehicleSpawn,                       idVehicleSpawnRgd,          idScnParts },
+            TopDataIds_t{             idActiveIds,                  idVehicleSpawn,                       idVehicleSpawnRgd,           idScnParts },
             wrap_args([] (ActiveReg_t& rActiveIds, ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnRigid& rVehicleSpawnRgd, ACtxParts& rScnParts) noexcept
     {
         if (rVehicleSpawn.vehicle_count() == 0)
@@ -647,24 +656,57 @@ Session setup_vehicle_spawn_rigid(
         }
     }));
 
-    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierMod}).data(
-            "Add hierarchy to rigid group entities",
-            TopDataIds_t{           idBasic,                        idVehicleSpawn,                             idVehicleSpawnRgd},
-            wrap_args([] (ACtxBasic& rBasic, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd) noexcept
+    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierMod, tgPrefabEntReq, tgHierMod}).data(
+            "Add vehicle entities to Scene Graph",
+            TopDataIds_t{           idBasic,                   idActiveIds,                        idVehicleSpawn,                             idVehicleSpawnRgd,                idPrefabInit,           idResources },
+            wrap_args([] (ACtxBasic& rBasic, ActiveReg_t const& rActiveIds, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
     {
-        auto itRigidEnt = std::begin(rVehicleSpawnRgd.m_rigidGroupEnt);
+        std::size_t const totalEnts = rVehicleSpawnRgd.m_rigidGroupEnt.size() + rPrefabInit.m_newEnts.size();
+
+        auto itRigidEnt     = std::begin(rVehicleSpawnRgd.m_rigidGroupEnt);
+        auto itOffsetParts  = std::begin(rVehicleSpawn.m_offsetParts);
+
+        rBasic.m_scnGraph.resize(rActiveIds.capacity());
+
         for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
         {
-            ActiveEnt const rigidEnt = *itRigidEnt;
-            //SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, rigidEnt);
+            auto const itOffsetPartsNext = std::next(itOffsetParts);
+
+            std::size_t const offsetPartsNext
+                    = (itOffsetPartsNext != std::end(rVehicleSpawn.m_offsetParts))
+                    ? (*itOffsetPartsNext)
+                    : rVehicleSpawn.m_partPrefabs.size();
+
+            // Count entities in this vehicle
+            std::size_t totalVehicleEnts = 0;
+            for (std::size_t i = *itOffsetParts; i < offsetPartsNext; ++i)
+            {
+                uint32_t const prefabInit = rVehicleSpawn.m_partPrefabs[i];
+                totalVehicleEnts += rPrefabInit.m_ents[prefabInit].size();
+            }
+
+            SubtreeBuilder bldRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, totalVehicleEnts + 1);
+            SubtreeBuilder bldRigid = bldRoot.add_child(*itRigidEnt, totalVehicleEnts);
+
+            // Add entities to scene graph
+            for (std::size_t i = *itOffsetParts; i < offsetPartsNext; ++i)
+            {
+                uint32_t const prefabInit   = rVehicleSpawn.m_partPrefabs[i];
+                auto const& basic           = rPrefabInit.m_basic[prefabInit];
+                auto const& ents            = rPrefabInit.m_ents[prefabInit];
+
+                SysPrefabInit::add_to_subtree(basic, ents, rResources, bldRigid);
+            }
+
+            itOffsetParts = itOffsetPartsNext;
             std::advance(itRigidEnt, 1);
         }
     }));
 
     vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq}).data(
             "Add physics to rigid group entities",
-            TopDataIds_t{           idBasic,             idPhys,                        idVehicleSpawn,                             idVehicleSpawnRgd,                 idScnParts  },
-            wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxParts const& rScnParts) noexcept
+            TopDataIds_t{           idBasic,             idPhys,                idPhysIn,                        idVehicleSpawn,                             idVehicleSpawnRgd,                 idScnParts  },
+            wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxParts const& rScnParts) noexcept
     {
         if (rVehicleSpawn.vehicle_count() == 0)
         {
@@ -691,6 +733,7 @@ Session setup_vehicle_spawn_rigid(
                 .m_inertia = {1.0f, 1.0f, 1.0f},
                 .m_totalMass = 1.0f,
             });
+            rPhysIn.m_setVelocity.emplace_back(rigidEnt, toInit.m_velocity);
         }
     }));
 

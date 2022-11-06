@@ -133,10 +133,10 @@ Session setup_newton_physics(
             wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, ACtxNwtWorld& rNwt, float const deltaTimeIn) noexcept
     {
         auto const physIn = osp::ArrayView<ACtxPhysInputs>(&rPhysIn, 1);
-        //SysNewton::update_world(
-        //        rPhys, rNwt, deltaTimeIn, physIn, rBasic.m_hierarchy,
-        //        rBasic.m_transform, rBasic.m_transformControlled,
-        //        rBasic.m_transformMutable);
+        SysNewton::update_world(
+                rPhys, rNwt, deltaTimeIn, physIn, rBasic.m_scnGraph,
+                rBasic.m_transform, rBasic.m_transformControlled,
+                rBasic.m_transformMutable);
     }));
 
     top_emplace< ACtxNwtWorld >(topData, idNwt, 2);
@@ -173,11 +173,18 @@ Session setup_shape_spawn(
 
     shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgEntNew, tgSpawnEntMod}).data(
             "Create entities for requested shapes to spawn",
-            TopDataIds_t{             idActiveIds,              idSpawner,             idSpawnerEnts },
-            wrap_args([] (ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
+            TopDataIds_t{           idBasic,             idActiveIds,              idSpawner,             idSpawnerEnts },
+            wrap_args([] (ACtxBasic& rBasic, ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
     {
+        if (rSpawner.size() == 0)
+        {
+            return;
+        }
+
         rSpawnerEnts.resize(rSpawner.size() * 2);
         rActiveIds.create(std::begin(rSpawnerEnts), std::end(rSpawnerEnts));
+
+        rBasic.m_scnGraph.resize(rActiveIds.capacity());
     }));
 
     shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgTransformNew, tgHierNew}).data(
@@ -185,6 +192,13 @@ Session setup_shape_spawn(
             TopDataIds_t{           idBasic,              idSpawner,             idSpawnerEnts },
             wrap_args([] (ACtxBasic& rBasic, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
     {
+        if (rSpawner.size() == 0)
+        {
+            return;
+        }
+
+        SubtreeBuilder bldScnRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, rSpawner.size() * 2);
+
         for (std::size_t i = 0; i < rSpawner.size(); ++i)
         {
             SpawnShape const &spawn = rSpawner[i];
@@ -193,8 +207,8 @@ Session setup_shape_spawn(
 
             rBasic.m_transform.emplace(root, ACompTransform{osp::Matrix4::translation(spawn.m_position)});
             rBasic.m_transform.emplace(child, ACompTransform{Matrix4::scaling(spawn.m_size)});
-            //SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, root);
-            //SysHierarchy::add_child(rBasic.m_hierarchy, root, child);
+            SubtreeBuilder bldRoot = bldScnRoot.add_child(root, 1);
+            bldRoot.add_child(child);
         }
     }));
 
@@ -203,20 +217,30 @@ Session setup_shape_spawn(
             TopDataIds_t{             idDrawing,              idSpawner,             idSpawnerEnts,             idNMesh,          idMatEnts,             idMatDirty,                idActiveIds},
             wrap_args([] (ACtxDrawing& rDrawing, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, NamedMeshes& rNMesh, EntSet_t& rMatEnts, EntVector_t& rMatDirty, ActiveReg_t const& rActiveIds ) noexcept
     {
+        if (rSpawner.size() == 0)
+        {
+            return;
+        }
+        rMatEnts.ints().resize(rActiveIds.vec().capacity());
+        rDrawing.m_drawable.ints().resize(rActiveIds.vec().capacity());
+
         for (std::size_t i = 0; i < rSpawner.size(); ++i)
         {
             SpawnShape const &spawn = rSpawner[i];
+            ActiveEnt const root    = rSpawnerEnts[i * 2];
             ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
 
             rDrawing.m_mesh.emplace( child, rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape)) );
             rDrawing.m_meshDirty.push_back(child);
 
-            rMatEnts.ints().resize(rActiveIds.vec().capacity());
             rMatEnts.set(std::size_t(child));
             rMatDirty.push_back(child);
 
             rDrawing.m_visible.emplace(child);
             rDrawing.m_opaque.emplace(child);
+
+            rDrawing.m_drawable.set(std::size_t(root));
+            rDrawing.m_drawable.set(std::size_t(child));
         }
     }));
 
@@ -359,9 +383,11 @@ Session setup_prefabs(
 
         prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod, tgMatMod}).data(
                 "Init Prefab drawables (single material)",
-                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,             idMatDirty },
-                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, EntVector_t& rMatDirty) noexcept
+                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,             idMatDirty,                   idActiveIds },
+                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, EntVector_t& rMatDirty, ActiveReg_t const& rActiveIds) noexcept
         {
+            rDrawing.m_drawable.ints().resize(rActiveIds.vec().capacity());
+            rMatEnts.ints().resize(rActiveIds.vec().capacity());
             SysPrefabInit::init_drawing(rPrefabInit, rResources, rDrawing, rDrawingRes, {{rMatEnts, rMatDirty}});
         }));
     }

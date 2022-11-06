@@ -29,6 +29,7 @@
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <osp/Active/SysRender.h>
+#include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/opengl/SysRenderGL.h>
 #include <osp/Shaders/MeshVisualizer.h>
 #include <osp/Shaders/Flat.h>
@@ -183,10 +184,11 @@ Session setup_scene_renderer(
 
     renderer.task() = rBuilder.task().assign({tgSyncEvt, tgHierReq, tgTransformReq, tgDrawTransformMod}).data(
             "Calculate draw transforms",
-            TopDataIds_t{                 idBasic,                   idScnRender},
-            wrap_args([] (ACtxBasic const& rBasic, ACtxSceneRenderGL& rScnRender) noexcept
+            TopDataIds_t{                 idBasic,                   idDrawing,                   idScnRender},
+            wrap_args([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
     {
-        //SysRender::update_draw_transforms(rBasic.m_hierarchy, rBasic.m_transform, rScnRender.m_drawTransform);
+        auto rootChildren = SysSceneGraph::children(rBasic.m_scnGraph);
+        SysRender::update_draw_transforms(rBasic.m_scnGraph, rBasic.m_transform, rScnRender.m_drawTransform, rDrawing.m_drawable, std::begin(rootChildren), std::end(rootChildren));
     }));
 
     renderer.task() = rBuilder.task().assign({tgSyncEvt, tgDelTotalReq, tgGroupFwdDel}).data(
@@ -236,10 +238,10 @@ Session setup_shader_visualizer(
 
     visualizer.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgHierReq, tgTransformReq, tgDrawTransformNew}).data(
             "Add draw transforms to mesh visualizer",
-            TopDataIds_t{                 idBasic,                   idMatDirty,                      idScnRender},
-            wrap_args([] (ACtxBasic const& rBasic, EntVector_t const& rMatDirty, ACtxSceneRenderGL& rScnRender) noexcept
+            TopDataIds_t{                   idMatDirty,                   idScnRender},
+            wrap_args([] (EntVector_t const& rMatDirty, ACtxSceneRenderGL& rScnRender) noexcept
     {
-        //SysRender::assure_draw_transforms(rBasic.m_hierarchy, rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
+        SysRender::assure_draw_transforms(rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
     }));
 
 

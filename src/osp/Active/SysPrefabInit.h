@@ -28,6 +28,7 @@
 #include "basic.h"
 #include "drawing.h"
 #include "physics.h"
+#include "SysSceneGraph.h"
 
 #include "../types.h"
 #include "../Resource/resourcetypes.h"
@@ -58,9 +59,6 @@ struct TmpPrefabInitBasic
 {
     ResId m_importerRes{lgrn::id_null<ResId>()};
     PrefabId m_prefabId;
-
-    // Parent and transform to assign root objects in the prefab
-    ActiveEnt m_parent{lgrn::id_null<ActiveEnt>()};
     Matrix4 const* m_pTransform{nullptr};
 };
 
@@ -78,10 +76,11 @@ class SysPrefabInit
 {
 public:
 
-    static void init_subtrees(
-            ACtxPrefabInit const&               rPrefabInit,
+    static void add_to_subtree(
+            TmpPrefabInitBasic const&           basic,
+            ArrayView<ActiveEnt const>          ents,
             Resources const&                    rResources,
-            ACtxSceneGraph&                     rScnGraph) noexcept;
+            SubtreeBuilder&                     rSubtree) noexcept;
 
     static void init_transforms(
             ACtxPrefabInit const&               rPrefabInit,
@@ -91,7 +90,7 @@ public:
     static void init_drawing(
             ACtxPrefabInit const&               rPrefabInit,
             Resources&                          rResources,
-            ACtxDrawing&                        rCtxDraw,
+            ACtxDrawing&                        rDrawing,
             ACtxDrawingRes&                     rCtxDrawRes,
             std::optional<EntSetPair>           material) noexcept;
 

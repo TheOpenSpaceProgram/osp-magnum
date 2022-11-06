@@ -29,6 +29,7 @@
 #include <osp/Active/basic.h>        // for ACompHierarchy
 #include <osp/Active/physics.h>      // for ACompRigidBody
 #include <osp/Active/SysPhysics.h>   // for SysPhysics
+#include <osp/Active/SysSceneGraph.h>// for SysSceneGraph
 #include <osp/Active/activetypes.h>  // for ActiveReg_t
 
 #include <osp/logging.h>
@@ -68,6 +69,7 @@ using osp::active::ACompPhysNetTorque;
 using osp::active::ACtxPhysics;
 using osp::active::ACtxPhysInputs;
 using osp::active::SysPhysics;
+using osp::active::SysSceneGraph;
 
 using osp::active::ACompShape;
 
@@ -224,7 +226,6 @@ void SysNewton::update_world(
         acomp_storage_t<ACompTransformControlled>& rTfControlled,
         acomp_storage_t<ACompTransformMutable>& rTfMutable) noexcept
 {
-#if 0
     NewtonWorld const* pNwtWorld = rCtxWorld.m_nwtWorld.get();
 
     // Iterate rigid bodies that don't have a NewtonBody
@@ -233,7 +234,7 @@ void SysNewton::update_world(
 
     for (ActiveEnt ent : view)
     {
-        create_body(rCtxPhys, rCtxWorld, rHier, rTf, rTfControlled,
+        create_body(rCtxPhys, rCtxWorld, rScnGraph, rTf, rTfControlled,
                     rTfMutable, ent, pNwtWorld);
     }
 
@@ -292,7 +293,6 @@ void SysNewton::update_world(
             }
         }
     }
-#endif
 }
 
 void SysNewton::remove_components(ACtxNwtWorld& rCtxWorld, ActiveEnt ent) noexcept
@@ -302,13 +302,14 @@ void SysNewton::remove_components(ACtxNwtWorld& rCtxWorld, ActiveEnt ent) noexce
 }
 
 void SysNewton::find_colliders_recurse(
-        ACtxPhysics const& rCtxPhys, ACtxNwtWorld& rCtxWorld,
-        ACtxSceneGraph const& rScnGraph,
-        acomp_storage_t<ACompTransform> const& rTf,
-        ActiveEnt ent, ActiveEnt firstChild,
-        Matrix4 const& transform, NewtonCollision* pCompound) noexcept
+        ACtxPhysics const&                      rCtxPhys,
+        ACtxNwtWorld&                           rCtxWorld,
+        ACtxSceneGraph const&                   rScnGraph,
+        acomp_storage_t<ACompTransform> const&  rTf,
+        ActiveEnt                               ent,
+        Matrix4 const&                          transform,
+        NewtonCollision*                        pCompound) noexcept
 {
-#if 0
     // Add newton collider if exists
     if (rCtxPhys.m_solid.contains(ent)
         && rCtxWorld.m_nwtColliders.contains(ent))
@@ -341,28 +342,18 @@ void SysNewton::find_colliders_recurse(
     }
 
     // Recurse into children if there are more colliders
-
-    ActiveEnt currentChild = firstChild;
-
-    while(currentChild != entt::null)
+    for (ActiveEnt child : SysSceneGraph::children(rScnGraph, ent))
     {
-        ACompHierarchy const &rChildHeir = rHier.get(currentChild);
-
-        if (rTf.contains(currentChild))
+        if (rTf.contains(child))
         {
-            ACompTransform const &rChildTransform = rTf.get(currentChild);
+            ACompTransform const &rChildTransform = rTf.get(child);
 
             Matrix4 const childMatrix = transform * rChildTransform.m_transform;
 
             find_colliders_recurse(
-                    rCtxPhys, rCtxWorld, rHier, rTf, currentChild,
-                    rChildHeir.m_childFirst, childMatrix, pCompound);
+                    rCtxPhys, rCtxWorld, rScnGraph, rTf, child, childMatrix, pCompound);
         }
-
-        // Select next child
-        currentChild = rChildHeir.m_siblingNext;
     }
-#endif
 }
 
 void SysNewton::create_body(
@@ -375,8 +366,6 @@ void SysNewton::create_body(
         ActiveEnt ent,
         NewtonWorld const* pNwtWorld) noexcept
 {
-#if 0
-    ACompHierarchy const& entHier = rHier.get(ent);
     ACompTransform const& entTransform = rTf.get(ent);
 
     // 1. Figure out colliders
@@ -393,7 +382,7 @@ void SysNewton::create_body(
         // Collect all colliders from hierarchy.
         NewtonCompoundCollisionBeginAddRemove(pCompound);
         find_colliders_recurse(
-                rCtxPhys, rCtxWorld, rHier, rTf, ent, entHier.m_childFirst,
+                rCtxPhys, rCtxWorld, rScnGraph, rTf, ent,
                 Matrix4{}, pCompound);
         NewtonCompoundCollisionEndAddRemove(pCompound);
 
@@ -472,6 +461,5 @@ void SysNewton::create_body(
     // Set user data to entity
     // note: void* used as storing an ActiveEnt (uint32_t) by value
     NewtonBodySetUserData(pBody, reinterpret_cast<void*>(ent));
-#endif
 }
 

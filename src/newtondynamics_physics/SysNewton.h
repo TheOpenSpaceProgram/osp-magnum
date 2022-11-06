@@ -127,19 +127,17 @@ private:
      * @param rHier         [in] Storage for hierarchy components
      * @param rTf           [in] Storage for relative hierarchy transforms
      * @param ent           [in] Entity to search
-     * @param firstChild    [in] First child of ent (to reduce rHier accesses)
      * @param transform     [in] Transform relative to root (part of recursion)
      * @param pCompound     [out] NewtonCompoundCollision to add colliders to
      */
     static void find_colliders_recurse(
-            ACtxPhysics const& rCtxPhys,
-            ACtxNwtWorld& rCtxWorld,
-            ACtxSceneGraph const& rScnGraph,
-            acomp_storage_t<ACompTransform> const& rTf,
-            ActiveEnt ent,
-            ActiveEnt firstChild,
-            osp::Matrix4 const& transform,
-            NewtonCollision* pCompound) noexcept;
+            ACtxPhysics const&                      rCtxPhys,
+            ACtxNwtWorld&                           rCtxWorld,
+            ACtxSceneGraph const&                   rScnGraph,
+            acomp_storage_t<ACompTransform> const&  rTf,
+            ActiveEnt                               ent,
+            osp::Matrix4 const&                     transform,
+            NewtonCollision*                        pCompound) noexcept;
 
     /**
      * @brief Create Newton bodies and colliders for entities with ACompPhysBody

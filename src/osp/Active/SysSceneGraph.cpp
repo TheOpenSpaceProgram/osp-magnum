@@ -35,10 +35,10 @@ using Corrade::Containers::arrayView;
 SubtreeBuilder SubtreeBuilder::add_child(ActiveEnt ent, uint32_t descendentCount)
 {
     // Place ent into tree at m_first
-    m_rScnGraph.m_treeToEnt.at(m_first)             = ent;
-    m_rScnGraph.m_treeDescendents.at(m_first)       = descendentCount;
-    m_rScnGraph.m_entParent.at(std::size_t(ent))    = m_root;
-    m_rScnGraph.m_entToTreePos.at(std::size_t(ent)) = m_first;
+    m_rScnGraph.m_treeToEnt[m_first]                = ent;
+    m_rScnGraph.m_treeDescendants[m_first]          = descendentCount;
+    m_rScnGraph.m_entParent[std::size_t(ent)]       = m_root;
+    m_rScnGraph.m_entToTreePos[std::size_t(ent)]    = m_first;
 
     TreePos_t const childFirst = m_first + 1;
     TreePos_t const childLast  = childFirst + descendentCount;
@@ -48,25 +48,25 @@ SubtreeBuilder SubtreeBuilder::add_child(ActiveEnt ent, uint32_t descendentCount
     return SubtreeBuilder(m_rScnGraph, ent, childFirst, childLast);
 }
 
-SubtreeBuilder SysSceneGraph::add_descendants(ACtxSceneGraph& rScnGraph, uint32_t descendentCount, ActiveEnt parent)
+SubtreeBuilder SysSceneGraph::add_descendants(ACtxSceneGraph& rScnGraph, uint32_t descendentCount, ActiveEnt root)
 {
-    TreePos_t const parentPos       = (parent == lgrn::id_null<ActiveEnt>())
+    TreePos_t const rootPos         = (root == lgrn::id_null<ActiveEnt>())
                                     ? 0
-                                    : rScnGraph.m_entToTreePos.at(std::size_t(parent));
-    uint32_t &rParentDescendents    = rScnGraph.m_treeDescendents.at(parentPos);
+                                    : rScnGraph.m_entToTreePos[std::size_t(root)];
 
-    TreePos_t const subFirst        = parentPos + 1 + rParentDescendents;
+
+    uint32_t rootDescendents        = rScnGraph.m_treeDescendants[rootPos];
+
+    TreePos_t const subFirst        = rootPos + 1 + rootDescendents;
     TreePos_t const subLast         = subFirst + descendentCount;
 
-    rParentDescendents += descendentCount;
-
-    TreePos_t const treeOldSize     = rScnGraph.m_treeToEnt.size();
+    TreePos_t const treeOldSize     = rScnGraph.m_treeDescendants[0] + 1;
     TreePos_t const treeNewSize     = treeOldSize + descendentCount;
 
     rScnGraph.m_treeToEnt.resize(treeNewSize);
-    rScnGraph.m_treeDescendents.resize(treeNewSize);
+    rScnGraph.m_treeDescendants.resize(treeNewSize);
 
-    SubtreeBuilder out(rScnGraph, parent, subFirst, subLast);
+    SubtreeBuilder out(rScnGraph, root, subFirst, subLast);
 
     if (subFirst != treeOldSize)
     {
@@ -80,39 +80,129 @@ SubtreeBuilder SysSceneGraph::add_descendants(ACtxSceneGraph& rScnGraph, uint32_
         std::shift_right(rScnGraph.m_treeToEnt.begin() + subFirst,
                          rScnGraph.m_treeToEnt.end(),
                          descendentCount);
-        std::shift_right(rScnGraph.m_treeDescendents.begin() + subFirst,
-                         rScnGraph.m_treeDescendents.end(),
+        std::shift_right(rScnGraph.m_treeDescendants.begin() + subFirst,
+                         rScnGraph.m_treeDescendants.end(),
                          descendentCount);
     }
     // else, subtree was inserted at end. no shifting required.
 
+    // Update descendant counts of this and ancestors
+    ActiveEnt parent = root;
+    bool parentNotNull = true;
+    while (parentNotNull)
+    {
+        parentNotNull = (parent != lgrn::id_null<ActiveEnt>());
+        TreePos_t const parentPos = parentNotNull ? rScnGraph.m_entToTreePos[std::size_t(parent)] : 0;
+        rScnGraph.m_treeDescendants[parentPos] += descendentCount;
+        parent = parentNotNull ? rScnGraph.m_entParent[std::size_t(parent)] : parent;
+    }
+
+
     return out;
 }
 
-ArrayView<ActiveEnt const> SysSceneGraph::descendants(ACtxSceneGraph const& rScnGraph, ActiveEnt parent)
+ArrayView<ActiveEnt const> SysSceneGraph::descendants(ACtxSceneGraph const& rScnGraph, ActiveEnt root)
 {
-    TreePos_t const parentPos   = rScnGraph.m_entToTreePos.at(std::size_t(parent));
-    uint32_t const descendants  = rScnGraph.m_treeDescendents[parentPos];
+    TreePos_t const rootPos = rScnGraph.m_entToTreePos[std::size_t(root)];
+    return descendants(rScnGraph, rootPos);
+}
+
+ArrayView<ActiveEnt const> SysSceneGraph::descendants(ACtxSceneGraph const& rScnGraph, TreePos_t rootPos)
+{
+    uint32_t const descendants  = rScnGraph.m_treeDescendants[rootPos];
 
     return (descendants == 0)
             ? ArrayView<ActiveEnt const>{}
-            : arrayView(rScnGraph.m_treeToEnt).slice(parentPos + 1, parentPos + descendants + 1);
+            : arrayView(rScnGraph.m_treeToEnt).slice(rootPos + 1, rootPos + descendants + 1);
 }
 
-std::vector<ActiveEnt> SysSceneGraph::children(ACtxSceneGraph const& rScnGraph, ActiveEnt parent)
+
+ChildRange_t SysSceneGraph::children(ACtxSceneGraph const& rScnGraph, ActiveEnt parent)
 {
-    std::vector<ActiveEnt> out;
+    TreePos_t const parentPos = (parent == lgrn::id_null<ActiveEnt>())
+                              ? 0
+                              : rScnGraph.m_entToTreePos[std::size_t(parent)];
+    TreePos_t const childFirst = parentPos + 1;
+    TreePos_t const childLast = parentPos + 1 + rScnGraph.m_treeDescendants[parentPos];
 
-    TreePos_t const parentPos = rScnGraph.m_entToTreePos.at(std::size_t(parent));
-    TreePos_t const childLast = parentPos + 1 + rScnGraph.m_treeDescendents[parentPos];
+    return ChildRange_t{ChildIterator{&rScnGraph, childFirst},
+                        ChildIterator{&rScnGraph, childLast}};
+}
 
-    for (TreePos_t childPos = parentPos + 1;
-         childPos < childLast;
-         childPos += rScnGraph.m_treeDescendents[childPos] + 1)
+void SysSceneGraph::do_delete(ACtxSceneGraph& rScnGraph)
+{
+    // Delete subtrees by carefully shifting elements left
+    // Operation being a single left->right swoop, which should be pretty fast
+
+    std::sort(rScnGraph.m_delete.begin(), rScnGraph.m_delete.end());
+
+    TreePos_t const treeLast = 1 + rScnGraph.m_treeDescendants[0];
+
+    auto const& itTreeDescFirst = rScnGraph.m_treeDescendants.begin();
+    auto const& itTreeEntsFirst = rScnGraph.m_treeToEnt.begin();
+
+    auto const& itDelFirst  = rScnGraph.m_delete.begin();
+    auto const& itDelLast   = rScnGraph.m_delete.end();
+    auto itDel              = itDelFirst;
+
+    TreePos_t const untouched = (*itDel);
+    TreePos_t done = untouched;
+
+    while (itDel != itDelLast)
     {
-        out.push_back(rScnGraph.m_treeToEnt[childPos]);
+        auto const itDelNext = std::next(itDel);
+        bool const notLast = (itDelNext != itDelLast);
+
+        std::size_t const removeTotal = 1 + rScnGraph.m_treeDescendants[*itDel];
+
+        // State of array each iteration:
+        //
+        // [Done] [Prev. shifted] [Delete] [Keep] [Delete Next] ....
+        //        <--------SHIFT-----------|----|
+
+        TreePos_t const keepFirst   = (*itDel) + removeTotal;
+        TreePos_t const keepLast    = (notLast) ? (*itDelNext) : (treeLast);
+        assert(keepFirst <= keepLast);
+
+        std::size_t const shift     = keepFirst - done;
+
+        // Update descendant count of ancestors
+        ActiveEnt parent = rScnGraph.m_treeToEnt[*itDel];
+        bool parentNotNull = true;
+        while (parentNotNull)
+        {
+            parent = rScnGraph.m_entParent[std::size_t(parent)];
+            parentNotNull = (parent != lgrn::id_null<ActiveEnt>());
+            TreePos_t const parentPos = parentNotNull ? rScnGraph.m_entToTreePos[std::size_t(parent)] : 0;
+            rScnGraph.m_treeDescendants[parentPos] -= removeTotal;
+        }
+
+        // Clear values for entities to delete
+        std::for_each(itTreeEntsFirst + (*itDel), itTreeEntsFirst + (*itDel + removeTotal),
+                      [&rScnGraph] (ActiveEnt const ent)
+        {
+            rScnGraph.m_entParent[std::size_t(ent)]     = lgrn::id_null<ActiveEnt>();
+            rScnGraph.m_entToTreePos[std::size_t(ent)]  = lgrn::id_null<TreePos_t>();
+        });
+
+        // Update tree positions for elements to shift
+        std::for_each(itTreeEntsFirst + keepFirst, itTreeEntsFirst + keepLast,
+                      [&rScnGraph, shift] (ActiveEnt const ent)
+        {
+            rScnGraph.m_entToTreePos[std::size_t(ent)] -= shift;
+        });
+
+        // Shift over tree data
+        std::shift_left(itTreeDescFirst + done, itTreeDescFirst + keepLast, shift);
+        std::shift_left(itTreeEntsFirst + done, itTreeEntsFirst + keepLast, shift);
+
+
+        done += keepLast - keepFirst;
+        itDel = itDelNext;
     }
 
-    return out;
-}
+    rScnGraph.m_treeToEnt      .resize(done);
+    rScnGraph.m_treeDescendants.resize(done);
 
+    rScnGraph.m_delete.clear();
+}

@@ -42,39 +42,47 @@ using osp::phys::EShape;
 namespace osp::active
 {
 
-void SysPrefabInit::init_subtrees(
-        ACtxPrefabInit const&               rPrefabInit,
+void SysPrefabInit::add_to_subtree(
+        TmpPrefabInitBasic const&           basic,
+        ArrayView<ActiveEnt const>          ents,
         Resources const&                    rResources,
-        ACtxSceneGraph&                     rScnGraph) noexcept
+        SubtreeBuilder&                     bldPrefab) noexcept
 {
-    auto itPfEnts = std::begin(rPrefabInit.m_ents);
+    auto const &rImportData = rResources.data_get<osp::ImporterData const>(
+            gc_importer, basic.m_importerRes);
+    auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
+            gc_importer, basic.m_importerRes);
 
-    /*
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
+    auto const objs     = rPrefabData.m_prefabs[basic.m_prefabId];
+    auto const parents  = rPrefabData.m_prefabParents[basic.m_prefabId];
+
+    //assert(objs.size() == bldPrefab.remaining());
+
+    auto itObj      = std::begin(objs);
+    auto itEnt      = std::begin(ents);
+    //auto itParent   = std::begin(parents);
+
+    auto const add_child_recurse
+            = [&rImportData, &itObj, &itEnt, &parents] (auto&& self, SubtreeBuilder& bldParent) -> void
     {
-        auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
-                gc_importer, rPfBasic.m_importerRes);
+        std::size_t const descendants   = rImportData.m_objDescendants[*itObj];
+        auto bldChildren = bldParent.add_child(*itEnt, descendants);
+        auto children = rImportData.m_objChildren[*itObj];
 
-        std::size_t const objCount = rPrefabData.m_prefabs[rPfBasic.m_prefabId].size();
-        auto const parents = rPrefabData.m_prefabParents[rPfBasic.m_prefabId];
+        std::advance(itObj, 1);
+        std::advance(itEnt, 1);
+        //std::advance(itParent, 1);
 
-        SubtreeBuilder builder = SysSceneGraph::create_subtree(rScnGraph, rPfBasic.m_parent, );
-
-        for (std::size_t i = 0; i < objCount; ++i)
+        for ([[maybe_unused]] ObjId const child : children)
         {
-            ObjId const prefabParent = parents[i];
-            ActiveEnt const parent = (prefabParent == -1)
-                    ? rPfBasic.m_parent
-                    : (*itPfEnts)[prefabParent];
-
-            ActiveEnt const child = (*itPfEnts)[i];
-
-            SysHierarchy::add_child(rHier, parent, child);
+            self(self, bldChildren);
         }
+    };
 
-        std::advance(itPfEnts, 1);
-    }
-    */
+    add_child_recurse(add_child_recurse, bldPrefab);
+
+    assert(itObj == std::end(objs));
+    assert(itEnt == std::end(ents));
 }
 
 void SysPrefabInit::init_transforms(
@@ -109,8 +117,8 @@ void SysPrefabInit::init_transforms(
 void SysPrefabInit::init_drawing(
         ACtxPrefabInit const&               rPrefabInit,
         Resources&                          rResources,
-        ACtxDrawing&                        rCtxDraw,
-        ACtxDrawingRes&                     rCtxDrawRes,
+        ACtxDrawing&                        rDrawing,
+        ACtxDrawingRes&                     rDrawingRes,
         std::optional<EntSetPair>           material) noexcept
 {
     auto itPfEnts = std::begin(rPrefabInit.m_ents);
@@ -126,6 +134,14 @@ void SysPrefabInit::init_drawing(
 
         for (std::size_t i = 0; i < objects.size(); ++i)
         {
+            ActiveEnt const ent = (*itPfEnts)[i];
+
+            // TODO: Don't actually do this. This marks every entity as drawable,
+            //       which considers them for draw transformations.
+            //       Only set drawable for entities that have a mesh or is an
+            //       ancestor of an entity with a mesh.
+            rDrawing.m_drawable.set(std::size_t(ent));
+
             // Check if object has mesh
             int const meshImportId = rImportData.m_objMeshes[objects[i]];
             if (meshImportId == -1)
@@ -133,12 +149,10 @@ void SysPrefabInit::init_drawing(
                 continue;
             }
 
-            ActiveEnt const ent = (*itPfEnts)[i];
-
             osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
-            MeshId const meshId = SysRender::own_mesh_resource(rCtxDraw, rCtxDrawRes, rResources, meshRes);
-            rCtxDraw.m_mesh.emplace(ent, rCtxDraw.m_meshRefCounts.ref_add(meshId));
-            rCtxDraw.m_meshDirty.push_back(ent);
+            MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, meshRes);
+            rDrawing.m_mesh.emplace(ent, rDrawing.m_meshRefCounts.ref_add(meshId));
+            rDrawing.m_meshDirty.push_back(ent);
 
             int const matImportId = rImportData.m_objMaterials[objects[i]];
 
@@ -150,15 +164,15 @@ void SysPrefabInit::init_drawing(
                     baseColor != -1)
                 {
                     osp::ResId const texRes = rImportData.m_textures[baseColor];
-                    TexId const texId = SysRender::own_texture_resource(rCtxDraw, rCtxDrawRes, rResources, texRes);
-                    rCtxDraw.m_diffuseTex.emplace(ent, rCtxDraw.m_texRefCounts.ref_add(texId));
-                    rCtxDraw.m_diffuseDirty.push_back(ent);
+                    TexId const texId = SysRender::own_texture_resource(rDrawing, rDrawingRes, rResources, texRes);
+                    rDrawing.m_diffuseTex.emplace(ent, rDrawing.m_texRefCounts.ref_add(texId));
+                    rDrawing.m_diffuseDirty.push_back(ent);
                 }
 
             }
 
-            rCtxDraw.m_opaque.emplace(ent);
-            rCtxDraw.m_visible.emplace(ent);
+            rDrawing.m_opaque.emplace(ent);
+            rDrawing.m_visible.emplace(ent);
 
             if (material.has_value())
             {

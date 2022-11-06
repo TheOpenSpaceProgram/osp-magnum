@@ -207,7 +207,7 @@ static ScenarioMap_t make_scenarios()
         parts           = setup_parts               (builder, rTopData, rTags, scnCommon, idResources);
         vehicleSpawn    = setup_vehicle_spawn       (builder, rTopData, rTags, scnCommon, parts);
         vehicleSpawnVB  = setup_vehicle_spawn_vb    (builder, rTopData, rTags, scnCommon, prefabs, parts, vehicleSpawn, idResources);
-        vehicleSpawnRgd = setup_vehicle_spawn_rigid (builder, rTopData, rTags, scnCommon, physics, prefabs, parts, vehicleSpawn);
+        vehicleSpawnRgd = setup_vehicle_spawn_rigid (builder, rTopData, rTags, scnCommon, physics, prefabs, parts, vehicleSpawn, idResources);
         signalsFloat    = setup_signals_float       (builder, rTopData, rTags, scnCommon, parts);
         machRocket      = setup_mach_rocket         (builder, rTopData, rTags, scnCommon, parts, signalsFloat);
         testVehicles    = setup_test_vehicles       (builder, rTopData, rTags, scnCommon, idResources);
@@ -230,11 +230,13 @@ static ScenarioMap_t make_scenarios()
         auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
         auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
 
-        // Spawn two vehicles
-        rVehicleSpawn.m_basic.emplace_back(ACtxVehicleSpawn::TmpToInit{{0.0f,  2.0f, 10.0f}, {0.0f, 0.0f, 0.0f}, {}});
-        rVehicleSpawnVB.m_dataVB.push_back(&rTVPartVehicle);
-        rVehicleSpawn.m_basic.emplace_back(ACtxVehicleSpawn::TmpToInit{{0.0f, -2.0f, 10.0f}, {0.0f, 0.0f, 0.0f}, {}});
-        rVehicleSpawnVB.m_dataVB.push_back(&rTVPartVehicle);
+        for (int i = 0; i < 32; ++i)
+        {
+            rVehicleSpawn.m_basic.emplace_back(ACtxVehicleSpawn::TmpToInit{{float(i - 16) * 8.0f, -10.0f, 10.0f}, {0.0, 0.0f, 0.0f}, {}});
+            rVehicleSpawnVB.m_dataVB.push_back(&rTVPartVehicle);
+        }
+
+
 
         ActiveEnt const rooot = rActiveIds.create();
 
