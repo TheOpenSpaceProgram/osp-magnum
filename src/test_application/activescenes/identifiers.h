@@ -71,7 +71,6 @@
     idNwt
 
 
-
 #define OSP_DATA_TESTAPP_SHAPE_SPAWN 2, \
     idSpawner, idSpawnerEnts
 #define OSP_TAGS_TESTAPP_SHAPE_SPAWN 5, \

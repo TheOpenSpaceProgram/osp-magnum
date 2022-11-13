@@ -236,8 +236,6 @@ static ScenarioMap_t make_scenarios()
             rVehicleSpawnVB.m_dataVB.push_back(&rTVPartVehicle);
         }
 
-
-
         ActiveEnt const rooot = rActiveIds.create();
 
         return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)

@@ -128,11 +128,11 @@ osp::TopDataId          g_idResources{lgrn::id_null<osp::TopDataId>()};
 osp::PkgId              g_defaultPkg;
 
 // Sessions that make up the current scene
-Sessions_t              g_sceneSessions;
+osp::Sessions_t         g_sceneSessions;
 
 // Sessions for rendering. These only exist when the Magnum Application is open
 osp::Session            g_magnum;
-Sessions_t              g_renderSessions;
+osp::Sessions_t         g_renderSessions;
 
 // Magnum Application deals with window and OpenGL things
 std::thread             g_magnumThread;
@@ -148,7 +148,7 @@ std::shared_ptr<spdlog::logger> g_logMagnumApp;
 int g_argc;
 char** g_argv;
 
-static void close_sessions(Sessions_t &rSessions)
+static void close_sessions(osp::Sessions_t &rSessions)
 {
     osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, rSessions);
     rSessions.clear();

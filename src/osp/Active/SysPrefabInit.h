@@ -97,9 +97,7 @@ public:
     static void init_physics(
             ACtxPrefabInit const&               rPrefabInit,
             Resources const&                    rResources,
-            ACtxPhysInputs&                     rPhysIn,
-            ACtxPhysics&                        rCtxPhys,
-            ACtxHierBody&                       rCtxHierBody) noexcept;
+            ACtxPhysics&                        rCtxPhys) noexcept;
 };
 
 

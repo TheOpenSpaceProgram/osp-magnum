@@ -24,57 +24,16 @@
  */
 #pragma once
 
-#include "../CommonPhysics.h"
 #include "activetypes.h"
+
+#include "../CommonPhysics.h"
+#include "../types.h"
+#include "../id_map.h"
 
 namespace osp::active
 {
 
-/**
- * @brief Synchronizes an entity with a physics engine body
- */
-struct ACompPhysBody
-{ };
-
-/**
- * @brief Adds rigid body dynamics to entities with ACompPhysBody
- */
-struct ACompPhysDynamic
-{
-    Vector3 m_centerOfMassOffset{0, 0, 0};
-    Vector3 m_inertia{1, 1, 1};
-    float m_totalMass{0.0f};
-};
-
-/**
- * @brief Read-only Linear velocity for entities with ACompPhysDynamic
- */
-struct ACompPhysLinearVel : Vector3 { };
-
-/**
- * @brief Read-only Angular velocity for entities with ACompPhysDynamic
- */
-struct ACompPhysAngularVel : Vector3 { };
-
-/**
- * @brief Applies force to a dynamic physics entity
- */
-struct ACompPhysNetForce : Vector3 { };
-
-/**
- * @brief Applies torque to a dynamic physics entity
- */
-struct ACompPhysNetTorque : Vector3 { };
-
-
-/**
- * @brief Keeps track of which rigid body an entity belongs to
-*/
-struct ACompRigidbodyAncestor
-{
-    ActiveEnt m_ancestor{entt::null};
-    Matrix4 m_relTransform{};
-};
+//using RigidBodyId_t = uint32_t;
 
 /**
  * @brief Represents the shape of an entity
@@ -89,6 +48,7 @@ struct ACompShape
  */
 struct ACompSubBody
 {
+    Vector3 m_offset;
     Vector3 m_inertia;
     float m_mass;
 };
@@ -98,48 +58,31 @@ struct ACompSubBody
  */
 struct ACtxPhysics
 {
-    Vector3 m_originTranslate;
+//    lgrn::IdRegistryStl<RigidBodyId_t>      m_rigidBodyIds;
 
-    acomp_storage_t<ACompPhysBody>          m_physBody;
-    acomp_storage_t<ACompPhysDynamic>       m_physDynamic;
-    acomp_storage_t<ACompPhysLinearVel>     m_physLinearVel;
-    acomp_storage_t<ACompPhysAngularVel>    m_physAngularVel;
+//    // Each rigid body is given 128 bits to enable/disable 'Factors'
+//    // Factors determine which physics calculations are required for a certain
+//    // rigid body, such as gravity, thurst, lift, and/or drag.
+//    static constexpr std::size_t            smc_intsPerFactor = 2;
+//    std::vector<uint64_t>                   m_rigidBodyFactors;
 
-    acomp_storage_t<ACompShape>             m_shape;
-    active_sparse_set_t                     m_solid;
-    active_sparse_set_t                     m_hasColliders;
+//    IdMap_t<ActiveEnt, RigidBodyId_t>       m_entToRigidBody;
+//    std::vector<ActiveEnt>                  m_rigidBodyToEnt;
+
+    std::vector<phys::EShape>       m_shape;
+    EntSet_t                        m_hasColliders;
+
+    acomp_storage_t<ACompSubBody>   m_ownDyn;
+    acomp_storage_t<ACompSubBody>   m_totalDyn;
+
+    Vector3                         m_originTranslate;
+    EntVector_t                     m_bodyDirty;
+    EntVector_t                     m_colliderDirty;
+    EntVector_t                     m_inertiaDirty;
+
+    std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
 
 }; // struct ACtxPhysics
 
-/**
- * @brief Inputs to physics engine
- *
- * Intended use is to make one of these for each thread that interacts with
- * physics, then passed to a physics update all at once.
- *
- */
-struct ACtxPhysInputs
-{
-    std::vector<ActiveEnt> m_bodyDirty;
-    std::vector<ActiveEnt> m_colliderDirty;
-    std::vector<ActiveEnt> m_inertiaDirty;
-    std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
-
-    acomp_storage_t<ACompPhysNetForce>  m_physNetForce;
-    acomp_storage_t<ACompPhysNetTorque> m_physNetTorque;
-
-}; // struct ACtxPhysInputs
-
-/**
- * @brief Mass and inertia of individual entities and totals from descendants
- *
- * Intended to easily calculate total mass, inertia, and center of mass of an
- * entire hierarchy for ACompPhysBody
- */
-struct ACtxHierBody
-{
-    acomp_storage_t<ACompSubBody> m_ownDyn;
-    acomp_storage_t<ACompSubBody> m_totalDyn;
-};
 
 }

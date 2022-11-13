@@ -703,39 +703,39 @@ Session setup_vehicle_spawn_rigid(
         }
     }));
 
-    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq}).data(
-            "Add physics to rigid group entities",
-            TopDataIds_t{           idBasic,             idPhys,                idPhysIn,                        idVehicleSpawn,                             idVehicleSpawnRgd,                 idScnParts  },
-            wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxParts const& rScnParts) noexcept
-    {
-        if (rVehicleSpawn.vehicle_count() == 0)
-        {
-            return;
-        }
+//    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq}).data(
+//            "Add physics to rigid group entities",
+//            TopDataIds_t{           idBasic,             idPhys,                idPhysIn,                        idVehicleSpawn,                             idVehicleSpawnRgd,                 idScnParts  },
+//            wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxParts const& rScnParts) noexcept
+//    {
+//        if (rVehicleSpawn.vehicle_count() == 0)
+//        {
+//            return;
+//        }
 
-        auto itRigidEnt = std::begin(rVehicleSpawnRgd.m_rigidGroupEnt);
+//        auto itRigidEnt = std::begin(rVehicleSpawnRgd.m_rigidGroupEnt);
 
-        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
-        {
-            ActiveEnt const rigidEnt = *itRigidEnt;
-            std::advance(itRigidEnt, 1);
+//        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
+//        {
+//            ActiveEnt const rigidEnt = *itRigidEnt;
+//            std::advance(itRigidEnt, 1);
 
-            auto const transform = Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position);
-            rBasic.m_transform      .emplace(rigidEnt, transform);
-            rPhys.m_hasColliders    .emplace(rigidEnt);
-            rPhys.m_solid           .emplace(rigidEnt);
-            rPhys.m_physBody        .emplace(rigidEnt);
-            rPhys.m_physLinearVel   .emplace(rigidEnt);
-            rPhys.m_physAngularVel  .emplace(rigidEnt);
-            rPhys.m_physDynamic     .emplace(rigidEnt, ACompPhysDynamic
-            {
-                .m_centerOfMassOffset = {0.0f, 0.0f, 0.0f},
-                .m_inertia = {1.0f, 1.0f, 1.0f},
-                .m_totalMass = 1.0f,
-            });
-            rPhysIn.m_setVelocity.emplace_back(rigidEnt, toInit.m_velocity);
-        }
-    }));
+//            auto const transform = Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position);
+//            rBasic.m_transform      .emplace(rigidEnt, transform);
+//            rPhys.m_hasColliders    .emplace(rigidEnt);
+//            rPhys.m_solid           .emplace(rigidEnt);
+//            rPhys.m_physBody        .emplace(rigidEnt);
+//            rPhys.m_physLinearVel   .emplace(rigidEnt);
+//            rPhys.m_physAngularVel  .emplace(rigidEnt);
+//            rPhys.m_physDynamic     .emplace(rigidEnt, ACompPhysDynamic
+//            {
+//                .m_centerOfMassOffset = {0.0f, 0.0f, 0.0f},
+//                .m_inertia = {1.0f, 1.0f, 1.0f},
+//                .m_totalMass = 1.0f,
+//            });
+//            rPhysIn.m_setVelocity.emplace_back(rigidEnt, toInit.m_velocity);
+//        }
+//    }));
 
     return vehicleSpawnRgd;
 }

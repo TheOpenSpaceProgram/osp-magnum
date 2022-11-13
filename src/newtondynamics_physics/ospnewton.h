@@ -84,16 +84,6 @@ struct ACtxNwtWorld
     osp::active::acomp_storage_t<ACompNwtBody_t> m_nwtBodies;
     osp::active::acomp_storage_t<ACompNwtCollider_t> m_nwtColliders;
 
-    struct ForceTorqueIn
-    {
-        osp::active::acomp_storage_t<osp::active::ACompPhysNetForce>  m_force;
-        osp::active::acomp_storage_t<osp::active::ACompPhysNetTorque> m_torque;
-    };
-
-    // Forces and torques swapped in during SysNewton::update_world to be read
-    // by multiple Newton threads during cb_force_torque
-    std::vector<ForceTorqueIn> m_forceTorqueIn;
-
     std::vector<PerThread> m_perThread;
 };
 

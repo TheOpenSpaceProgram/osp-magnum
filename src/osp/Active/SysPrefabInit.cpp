@@ -188,9 +188,7 @@ void SysPrefabInit::init_drawing(
 void SysPrefabInit::init_physics(
             ACtxPrefabInit const&               rPrefabInit,
             Resources const&                    rResources,
-            ACtxPhysInputs&                     rPhysIn,
-            ACtxPhysics&                        rCtxPhys,
-            ACtxHierBody&                       rCtxHierBody) noexcept
+            ACtxPhysics&                        rCtxPhys) noexcept
 {
     auto itPfEnts = std::begin(rPrefabInit.m_ents);
 
@@ -210,25 +208,25 @@ void SysPrefabInit::init_physics(
             // TODO: hasColliders should be set for each entity that has
             //       colliders, or descendents have colliders.
             //       For now, all entities are set.
-            rCtxPhys.m_hasColliders.emplace(ent);
+            rCtxPhys.m_hasColliders.set(std::size_t(ent));
 
-            EShape const shape = rPrefabData.m_objShape[objects[i]];
+            EShape shape = rPrefabData.m_objShape[objects[i]];
+            shape = (shape != EShape::None) ? shape : EShape::Sphere;
 
             if (shape != EShape::None)
             {
-                rCtxPhys.m_shape.emplace(ent, shape);
-                rCtxPhys.m_solid.emplace(ent);
-                rPhysIn.m_colliderDirty.push_back(ent);
+                rCtxPhys.m_shape[std::size_t(ent)] = shape;
+                //rCtxPhys.m_solid.set(std::size_t(ent));
+                rCtxPhys.m_colliderDirty.push_back(ent);
             }
 
             if (float const mass = rPrefabData.m_objMass[objects[i]];
                mass != 0.0f)
             {
-                osp::Vector3 const inertia = osp::phys::collider_inertia_tensor(
-                        shape != EShape::None ? shape : EShape::Sphere,
-                        rImportData.m_objTransforms[objects[i]].scaling(),
-                        mass);
-                rCtxHierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
+                Vector3 const scale = rImportData.m_objTransforms[objects[i]].scaling();
+                Vector3 const inertia = phys::collider_inertia_tensor(shape, scale, mass);
+                Vector3 const offset{0.0f, 0.0f, 0.0f};
+                rCtxPhys.m_ownDyn.emplace( ent, ACompSubBody{ inertia, offset, mass } );
             }
         }
 

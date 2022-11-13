@@ -96,11 +96,8 @@ public:
             ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
             float timestep,
-            Corrade::Containers::ArrayView<osp::active::ACtxPhysInputs> inputs,
             ACtxSceneGraph const& rScnGraph,
-            acomp_storage_t<osp::active::ACompTransform>& rTf,
-            acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
-            acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable) noexcept;
+            acomp_storage_t<osp::active::ACompTransform>& rTf) noexcept;
 
     static void remove_components(
             ACtxNwtWorld& rCtxWorld, ActiveEnt ent) noexcept;

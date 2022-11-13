@@ -89,6 +89,8 @@ struct Session
     TagId m_tgCleanupEvt{lgrn::id_null<TagId>()};
 };
 
+using Sessions_t = std::vector<osp::Session>;
+
 /**
  * @brief Close sessions, delete all their associated TopData, Tasks, and Tags.
  */

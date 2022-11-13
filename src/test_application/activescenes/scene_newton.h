@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2022 Open Space Program Project
  *
  * MIT License
  *
@@ -24,34 +24,30 @@
  */
 #pragma once
 
-#include "physics.h"
+#include "scenarios.h"
 
-namespace osp::active
+#include <osp/tasks/tasks.h>
+#include <osp/tasks/top_tasks.h>
+#include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/tasks/builder.h>
+
+#include <longeron/id_management/registry_stl.hpp>
+
+#include <string_view>
+
+namespace testapp::scenes
 {
 
-struct ACompTransform;
-
-class SysPhysics
-{
-public:
-
-    enum EIncludeRootMass { Ignore, Include };
-
-    // TODO: rewrite hierarchy inertia calculations for new mass/inertia system
-
-    template<typename IT_T>
-    static void update_delete_phys(
-            ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last);
-
-};
-
-template<typename IT_T>
-void SysPhysics::update_delete_phys(
-        ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last)
-{
-    rCtxPhys.m_ownDyn.remove(first, last);
-    rCtxPhys.m_totalDyn.remove(first, last);
-}
+/**
+ * @brief Newton Dynamics physics integration
+ */
+osp::Session setup_newton_physics(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         physics);
 
 
-}
+} // namespace testapp::scenes
