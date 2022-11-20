@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "scene_newton.h"
+#include "scene_physics.h"
 #include "identifiers.h"
 
 #include <osp/Active/basic.h>
@@ -41,16 +42,19 @@
 
 using namespace osp;
 using namespace osp::active;
+
 using osp::restypes::gc_importer;
 using osp::phys::EShape;
+using ospnewton::SysNewton;
 using ospnewton::ACtxNwtWorld;
+using ospnewton::NewtonBodyId;
 using Corrade::Containers::arrayView;
 
 namespace testapp::scenes
 {
 
 
-Session setup_newton_physics(
+Session setup_newton(
         Builder_t&                  rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
@@ -69,15 +73,6 @@ Session setup_newton_physics(
 
     using ospnewton::SysNewton;
 
-    newton.task() = rBuilder.task().assign({tgSceneEvt, tgSyncEvt, tgPhysReq, tgPhysBodyReq}).data(
-            "Update Entities with Newton colliders",
-            TopDataIds_t{             idPhys,              idNwt },
-            wrap_args([] (ACtxPhysics& rPhys, ACtxNwtWorld& rNwt) noexcept
-    {
-        //SysNewton::update_colliders(
-        //        rPhys, rNwt, std::exchange(rPhysIn.m_colliderDirty, {}));
-    }));
-
     newton.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgPhysBodyDel}).data(
             "Delete Newton components",
             TopDataIds_t{              idNwt,                   idDelTotal},
@@ -91,11 +86,7 @@ Session setup_newton_physics(
             TopDataIds_t{           idBasic,             idPhys,              idNwt,           idDeltaTimeIn },
             wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, float const deltaTimeIn) noexcept
     {
-//        auto const physIn = osp::ArrayView<ACtxPhysInputs>(&rPhysIn, 1);
-//        SysNewton::update_world(
-//                rPhys, rNwt, deltaTimeIn, physIn, rBasic.m_scnGraph,
-//                rBasic.m_transform, rBasic.m_transformControlled,
-//                rBasic.m_transformMutable);
+        SysNewton::update_world(rPhys, rNwt, deltaTimeIn, rBasic.m_scnGraph, rBasic.m_transform);
     }));
 
     top_emplace< ACtxNwtWorld >(topData, idNwt, 2);
@@ -104,6 +95,63 @@ Session setup_newton_physics(
 }
 
 
+
+Session setup_shape_spawn_newton(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              physics,
+        Session const&              shapeSpawn,
+        Session const&              newton)
+{
+    Session shapeSpawnNwt;
+
+    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(physics,    TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
+    OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
+    OSP_SESSION_UNPACK_DATA(newton,     TESTAPP_NEWTON);
+
+    shapeSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgPhysBodyMod}).data(
+            "Add physics to spawned shapes",
+            TopDataIds_t{                   idActiveIds,              idSpawner,             idSpawnerEnts,             idPhys,              idNwt },
+            wrap_args([] (ActiveReg_t const &rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt) noexcept
+    {
+        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        {
+            SpawnShape const &spawn = rSpawner[i];
+            ActiveEnt const root    = rSpawnerEnts[i * 2];
+            ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
+
+            NewtonCollision *pCollision = SysNewton::create_primative(rNwt, spawn.m_shape, {0.0f, 0.0f, 0.0f}, Matrix3{}, spawn.m_size);
+            NewtonBody *pBody = NewtonCreateDynamicBody(rNwt.m_world.get(), pCollision, Matrix4{}.data());
+
+            NewtonBodyId const bodyId = rNwt.m_bodyIds.create();
+            rNwt.m_bodyPtrs.resize(rNwt.m_bodyIds.capacity());
+            rNwt.m_bodyToEnt.resize(rNwt.m_bodyIds.capacity());
+
+            rNwt.m_bodyPtrs[bodyId].reset(pBody);
+
+            rNwt.m_bodyToEnt[bodyId] = root;
+            rNwt.m_entToBody.emplace(root, bodyId);
+
+            Vector3 const inertia = collider_inertia_tensor(spawn.m_shape, spawn.m_size, spawn.m_mass);
+
+            NewtonBodySetMassMatrix(pBody, spawn.m_mass, inertia.x(), inertia.y(), inertia.z());
+            NewtonDestroyCollision(std::exchange(pCollision, nullptr));
+            NewtonBodySetMatrix(pBody, Matrix4::translation(spawn.m_position).data());
+            NewtonBodySetLinearDamping(pBody, 0.0f);
+            NewtonBodySetForceAndTorqueCallback(pBody, &SysNewton::cb_force_torque);
+            NewtonBodySetTransformCallback(pBody, &SysNewton::cb_set_transform);
+            NewtonBodySetUserData(pBody, reinterpret_cast<void*>(root));
+        }
+    }));
+
+    return shapeSpawnNwt;
+}
 
 
 } // namespace testapp::scenes

@@ -42,12 +42,21 @@ namespace testapp::scenes
 /**
  * @brief Newton Dynamics physics integration
  */
-osp::Session setup_newton_physics(
+osp::Session setup_newton(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags,
         osp::Session const&         scnCommon,
         osp::Session const&         physics);
+
+osp::Session setup_shape_spawn_newton(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         physics,
+        osp::Session const&         shapeSpawn,
+        osp::Session const&         newton);
 
 
 } // namespace testapp::scenes

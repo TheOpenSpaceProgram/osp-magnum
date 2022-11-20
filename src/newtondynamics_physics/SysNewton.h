@@ -32,13 +32,11 @@
 
 #include <Corrade/Containers/ArrayView.h>
 
+#include <Newton.h>
+
 // IWYU pragma: no_include <cstdint>
 // IWYU pragma: no_include <stdint.h>
 // IWYU pragma: no_include <type_traits>
-
-class NewtonBody;
-class NewtonWorld;
-class NewtonCollision;
 
 namespace ospnewton
 {
@@ -57,6 +55,18 @@ class SysNewton
     using ACompTransformControlled  = osp::active::ACompTransformControlled;
     using ACompTransformMutable     = osp::active::ACompTransformMutable;
 public:
+
+    static void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex);
+
+    static void cb_set_transform(NewtonBody const* const pBody, const dFloat* const pMatrix, int threadIndex);
+
+    [[nodiscard]] static NewtonCollision* create_primative(
+            ACtxNwtWorld&           rCtxWorld,
+            osp::phys::EShape       shape,
+            osp::Vector3 const&     translation,
+            osp::Matrix3 const&     rotation,
+            osp::Vector3 const&     scale);
+
 
     /**
      * @brief Respond to scene origin shifts by translating all rigid bodies
