@@ -71,11 +71,27 @@
     idNwt
 
 
+
+#define OSP_DATA_TESTAPP_NEWTON_FORCES 1, \
+    idNwtForces
+
+
+
+#define OSP_DATA_TESTAPP_NEWTON_ACCEL 1, \
+    idAcceleration
+
+
+
 #define OSP_DATA_TESTAPP_SHAPE_SPAWN 2, \
     idSpawner, idSpawnerEnts
 #define OSP_TAGS_TESTAPP_SHAPE_SPAWN 5, \
     tgSpawnMod,         tgSpawnReq,         tgSpawnClr,         \
     tgSpawnEntMod,      tgSpawnEntReq
+
+
+
+#define OSP_DATA_TESTAPP_SHAPE_SPAWN_NWT 1, \
+    idSpawnNwtForces
 
 
 

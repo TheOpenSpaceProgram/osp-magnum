@@ -656,7 +656,7 @@ Session setup_vehicle_spawn_rigid(
         }
     }));
 
-    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierMod, tgPrefabEntReq, tgHierMod}).data(
+    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierMod, tgPrefabEntReq, tgHierMod, tgTransformNew}).data(
             "Add vehicle entities to Scene Graph",
             TopDataIds_t{           idBasic,                   idActiveIds,                        idVehicleSpawn,                             idVehicleSpawnRgd,                idPrefabInit,           idResources },
             wrap_args([] (ACtxBasic& rBasic, ActiveReg_t const& rActiveIds, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
@@ -670,6 +670,9 @@ Session setup_vehicle_spawn_rigid(
 
         for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
         {
+            auto const transform = Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position);
+            rBasic.m_transform.emplace(*itRigidEnt, transform);
+
             auto const itOffsetPartsNext = std::next(itOffsetParts);
 
             std::size_t const offsetPartsNext
@@ -702,40 +705,6 @@ Session setup_vehicle_spawn_rigid(
             std::advance(itRigidEnt, 1);
         }
     }));
-
-//    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq}).data(
-//            "Add physics to rigid group entities",
-//            TopDataIds_t{           idBasic,             idPhys,                idPhysIn,                        idVehicleSpawn,                             idVehicleSpawnRgd,                 idScnParts  },
-//            wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxParts const& rScnParts) noexcept
-//    {
-//        if (rVehicleSpawn.vehicle_count() == 0)
-//        {
-//            return;
-//        }
-
-//        auto itRigidEnt = std::begin(rVehicleSpawnRgd.m_rigidGroupEnt);
-
-//        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
-//        {
-//            ActiveEnt const rigidEnt = *itRigidEnt;
-//            std::advance(itRigidEnt, 1);
-
-//            auto const transform = Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position);
-//            rBasic.m_transform      .emplace(rigidEnt, transform);
-//            rPhys.m_hasColliders    .emplace(rigidEnt);
-//            rPhys.m_solid           .emplace(rigidEnt);
-//            rPhys.m_physBody        .emplace(rigidEnt);
-//            rPhys.m_physLinearVel   .emplace(rigidEnt);
-//            rPhys.m_physAngularVel  .emplace(rigidEnt);
-//            rPhys.m_physDynamic     .emplace(rigidEnt, ACompPhysDynamic
-//            {
-//                .m_centerOfMassOffset = {0.0f, 0.0f, 0.0f},
-//                .m_inertia = {1.0f, 1.0f, 1.0f},
-//                .m_totalMass = 1.0f,
-//            });
-//            rPhysIn.m_setVelocity.emplace_back(rigidEnt, toInit.m_velocity);
-//        }
-//    }));
 
     return vehicleSpawnRgd;
 }
@@ -772,7 +741,6 @@ Session setup_test_vehicles(
            { fueltank, Matrix4::translation({0, 0, 0}) },
            { engine,   Matrix4::translation({0, 0, -3}) },
         });
-
 
         namespace ports_magicrocket = adera::ports_magicrocket;
         namespace ports_userctrl = adera::ports_userctrl;

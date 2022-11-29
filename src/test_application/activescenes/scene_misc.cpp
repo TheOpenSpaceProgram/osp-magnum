@@ -291,7 +291,7 @@ Session setup_droppers(
             rSpawner.emplace_back(SpawnShape{
                 .m_position = {-10.0f, 0.0, 30.0f},
                 .m_velocity = {0.0f, 0.0f, 0.0f},
-                .m_size     = {2.0f, 1.0f, 2.0f},
+                .m_size     = {2.0f, 2.0f, 1.0f},
                 .m_mass     = 1.0f,
                 .m_shape    = EShape::Cylinder
             });

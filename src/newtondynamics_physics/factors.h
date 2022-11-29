@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2022 Open Space Program Project
  *
  * MIT License
  *
@@ -24,53 +24,15 @@
  */
 #pragma once
 
-#include "activetypes.h"
+#include <array>
+#include <cstdint>
 
-#include "../CommonPhysics.h"
-#include "../types.h"
-
-namespace osp::active
+namespace ospnewton
 {
 
-//using RigidBodyId_t = uint32_t;
-
-/**
- * @brief Represents the shape of an entity
- */
-struct ACompShape
-{
-    phys::EShape m_shape{phys::EShape::None};
-};
-
-/**
- * @brief Generic Mass and inertia intended for entities
- */
-struct ACompSubBody
-{
-    Vector3 m_offset;
-    Vector3 m_inertia;
-    float m_mass;
-};
-
-/**
- * @brief Physics components and other data needed to support physics in a scene
- */
-struct ACtxPhysics
-{
-    std::vector<phys::EShape>       m_shape;
-    EntSet_t                        m_hasColliders;
-
-    acomp_storage_t<ACompSubBody>   m_ownDyn;
-    acomp_storage_t<ACompSubBody>   m_totalDyn;
-
-    Vector3                         m_originTranslate;
-    EntVector_t                     m_bodyDirty;
-    EntVector_t                     m_colliderDirty;
-    EntVector_t                     m_inertiaDirty;
-
-    std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
-
-}; // struct ACtxPhysics
-
+// Each rigid body is given 64 bits to enable/disable forces
+// These determine which physics calculations are required for a certain
+// rigid body, such as gravity, thurst, or aerodynamics.
+using ForceSet_t = std::array<uint64_t, 1u>;
 
 }

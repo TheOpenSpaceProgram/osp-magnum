@@ -107,7 +107,8 @@ void SysPrefabInit::init_transforms(
             Matrix4 const& transform = (parents[i] == -1)
                     ? *rPfBasic.m_pTransform
                     : rImportData.m_objTransforms[objects[i]];
-            rTransform.emplace((*itPfEnts)[i], transform);
+            ActiveEnt const ent = (*itPfEnts)[i];
+            rTransform.emplace(ent, transform);
         }
 
         std::advance(itPfEnts, 1);
@@ -210,23 +211,20 @@ void SysPrefabInit::init_physics(
             //       For now, all entities are set.
             rCtxPhys.m_hasColliders.set(std::size_t(ent));
 
-            EShape shape = rPrefabData.m_objShape[objects[i]];
-            shape = (shape != EShape::None) ? shape : EShape::Sphere;
+            EShape const shape = rPrefabData.m_objShape[objects[i]];
 
+            rCtxPhys.m_shape[std::size_t(ent)] = shape;
             if (shape != EShape::None)
             {
-                rCtxPhys.m_shape[std::size_t(ent)] = shape;
                 //rCtxPhys.m_solid.set(std::size_t(ent));
-                rCtxPhys.m_colliderDirty.push_back(ent);
-            }
-
-            if (float const mass = rPrefabData.m_objMass[objects[i]];
-               mass != 0.0f)
-            {
-                Vector3 const scale = rImportData.m_objTransforms[objects[i]].scaling();
-                Vector3 const inertia = phys::collider_inertia_tensor(shape, scale, mass);
-                Vector3 const offset{0.0f, 0.0f, 0.0f};
-                rCtxPhys.m_ownDyn.emplace( ent, ACompSubBody{ inertia, offset, mass } );
+                if (float const mass = rPrefabData.m_objMass[objects[i]];
+                   mass != 0.0f)
+                {
+                    Vector3 const scale = rImportData.m_objTransforms[objects[i]].scaling();
+                    Vector3 const inertia = phys::collider_inertia_tensor(shape, scale, mass);
+                    Vector3 const offset{0.0f, 0.0f, 0.0f};
+                    rCtxPhys.m_ownDyn.emplace( ent, ACompSubBody{ inertia, offset, mass } );
+                }
             }
         }
 

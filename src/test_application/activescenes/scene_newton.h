@@ -31,10 +31,11 @@
 #include <osp/tasks/top_execute.h>
 #include <osp/tasks/top_session.h>
 #include <osp/tasks/builder.h>
+#include <osp/types.h>
+
+#include <newtondynamics_physics/factors.h>
 
 #include <longeron/id_management/registry_stl.hpp>
-
-#include <string_view>
 
 namespace testapp::scenes
 {
@@ -49,6 +50,19 @@ osp::Session setup_newton(
         osp::Session const&         scnCommon,
         osp::Session const&         physics);
 
+osp::Session setup_newton_force_set(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags);
+
+osp::Session setup_newton_force_accel(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         newton,
+        osp::Session const&         nwtForce,
+        osp::Vector3                accel);
+
 osp::Session setup_shape_spawn_newton(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
@@ -56,6 +70,19 @@ osp::Session setup_shape_spawn_newton(
         osp::Session const&         scnCommon,
         osp::Session const&         physics,
         osp::Session const&         shapeSpawn,
+        osp::Session const&         newton,
+        osp::Session const&         nwtForces);
+
+osp::Session setup_vehicle_spawn_rigid_newton(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         physics,
+        osp::Session const&         prefabs,
+        osp::Session const&         parts,
+        osp::Session const&         vehicleSpawn,
+        osp::Session const&         vehicleSpawnRgd,
         osp::Session const&         newton);
 
 

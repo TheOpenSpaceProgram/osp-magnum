@@ -60,13 +60,19 @@ public:
 
     static void cb_set_transform(NewtonBody const* const pBody, const dFloat* const pMatrix, int threadIndex);
 
+    static void resize_body_data(ACtxNwtWorld& rCtxWorld);
+
     [[nodiscard]] static NewtonCollision* create_primative(
             ACtxNwtWorld&           rCtxWorld,
+            osp::phys::EShape       shape);
+
+
+    static void orient_collision(
+            NewtonCollision const*  pCollision,
             osp::phys::EShape       shape,
             osp::Vector3 const&     translation,
             osp::Matrix3 const&     rotation,
             osp::Vector3 const&     scale);
-
 
     /**
      * @brief Respond to scene origin shifts by translating all rigid bodies

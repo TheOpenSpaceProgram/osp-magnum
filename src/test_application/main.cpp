@@ -410,9 +410,11 @@ void load_a_bunch_of_stuff()
         rResources.data_add<Trade::MeshData>(gc_mesh, meshId, std::move(data));
     };
 
+    Trade::MeshData &&cylinder = Magnum::MeshTools::transform3D( Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds), Matrix4::rotationX(Deg(90)), 0);
+
     add_mesh_quick("cube", Primitives::cubeSolid());
     add_mesh_quick("sphere", Primitives::icosphereSolid(2));
-    add_mesh_quick("cylinder", Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds));
+    add_mesh_quick("cylinder", std::move(cylinder));
     add_mesh_quick("grid64solid", Primitives::grid3DSolid({63, 63}));
 
     OSP_LOG_INFO("Resource loading complete");

@@ -331,9 +331,11 @@ Session setup_prefabs(
 
     prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgPhysBodyMod}).data(
             "Init Prefab physics",
-            TopDataIds_t{                idPrefabInit,           idResources,             idPhys},
-            wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxPhysics& rPhys) noexcept
+            TopDataIds_t{                   idActiveIds,                idPrefabInit,           idResources,             idPhys},
+            wrap_args([] (ActiveReg_t const& rActiveIds, ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxPhysics& rPhys) noexcept
     {
+        rPhys.m_hasColliders.ints().resize(rActiveIds.vec().capacity());
+        rPhys.m_shape.resize(rActiveIds.capacity());
         SysPrefabInit::init_physics(rPrefabInit, rResources, rPhys);
     }));
 
