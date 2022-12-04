@@ -56,11 +56,8 @@ void SysPrefabInit::add_to_subtree(
     auto const objs     = rPrefabData.m_prefabs[basic.m_prefabId];
     auto const parents  = rPrefabData.m_prefabParents[basic.m_prefabId];
 
-    //assert(objs.size() == bldPrefab.remaining());
-
     auto itObj      = std::begin(objs);
     auto itEnt      = std::begin(ents);
-    //auto itParent   = std::begin(parents);
 
     auto const add_child_recurse
             = [&rImportData, &itObj, &itEnt, &parents] (auto&& self, SubtreeBuilder& bldParent) -> void
@@ -71,7 +68,6 @@ void SysPrefabInit::add_to_subtree(
 
         std::advance(itObj, 1);
         std::advance(itEnt, 1);
-        //std::advance(itParent, 1);
 
         for ([[maybe_unused]] ObjId const child : children)
         {

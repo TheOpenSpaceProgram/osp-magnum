@@ -73,7 +73,7 @@ osp::Session setup_shape_spawn_newton(
         osp::Session const&         newton,
         osp::Session const&         nwtForces);
 
-osp::Session setup_vehicle_spawn_rigid_newton(
+osp::Session setup_vehicle_spawn_newton(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags,
@@ -82,8 +82,8 @@ osp::Session setup_vehicle_spawn_rigid_newton(
         osp::Session const&         prefabs,
         osp::Session const&         parts,
         osp::Session const&         vehicleSpawn,
-        osp::Session const&         vehicleSpawnRgd,
-        osp::Session const&         newton);
+        osp::Session const&         newton,
+        osp::TopDataId const        idResources);
 
 
 } // namespace testapp::scenes

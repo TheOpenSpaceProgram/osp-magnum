@@ -260,7 +260,12 @@ void compound_collect_recurse(
 
 }
 
-Session setup_vehicle_spawn_rigid_newton(
+struct ACtxVehiclesNwt
+{
+    std::vector<BodyId> m_weldToBody;
+};
+
+Session setup_vehicle_spawn_newton(
         Builder_t&                  rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
@@ -269,8 +274,8 @@ Session setup_vehicle_spawn_rigid_newton(
         Session const&              prefabs,
         Session const&              parts,
         Session const&              vehicleSpawn,
-        Session const&              vehicleSpawnRgd,
-        Session const&              newton)
+        Session const&              newton,
+        TopDataId const             idResources)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,          TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,          TESTAPP_COMMON_SCENE);
@@ -280,69 +285,158 @@ Session setup_vehicle_spawn_rigid_newton(
     OSP_SESSION_UNPACK_TAGS(prefabs,            TESTAPP_PREFABS);
     OSP_SESSION_UNPACK_DATA(vehicleSpawn,       TESTAPP_VEHICLE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(vehicleSpawn,       TESTAPP_VEHICLE_SPAWN);
-    OSP_SESSION_UNPACK_DATA(vehicleSpawnRgd,    TESTAPP_VEHICLE_SPAWN_RIGID);
     OSP_SESSION_UNPACK_DATA(newton,             TESTAPP_NEWTON);
     OSP_SESSION_UNPACK_DATA(parts,              TESTAPP_PARTS);
     OSP_SESSION_UNPACK_TAGS(parts,              TESTAPP_PARTS);
 
-    Session vehicleSpawnRgdNwt;
+    Session vehicleSpawnNwt;
 
-
-    vehicleSpawnRgdNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierReq, tgPhysBodyMod}).data(
-            "Add physics to rigid group entities",
-            TopDataIds_t{                   idActiveIds,           idBasic,             idPhys,              idNwt,                        idVehicleSpawn,                             idVehicleSpawnRgd,                 idScnParts  },
-            wrap_args([] (ActiveReg_t const &rActiveIds, ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxParts const& rScnParts) noexcept
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgEntNew, tgVehicleSpawnReq, tgVSpawnRgdReq, tgVSpawnRgdEntMod}).data(
+            "Create entity for each rigid group",
+            TopDataIds_t{             idActiveIds,                  idVehicleSpawn,           idScnParts },
+            wrap_args([] (ActiveReg_t& rActiveIds, ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts) noexcept
     {
-        if (rVehicleSpawn.vehicle_count() == 0)
+        if (rVehicleSpawn.new_vehicle_count() == 0)
+        {
+            return;
+        }
+
+        rVehicleSpawn.m_newWeldToEnt.resize(rVehicleSpawn.m_newWeldToWeld.size());
+        rActiveIds.create(std::begin(rVehicleSpawn.m_newWeldToEnt), std::end(rVehicleSpawn.m_newWeldToEnt));
+
+        // update WeldId->ActiveEnt mapping
+        auto itWeldEnt = std::begin(rVehicleSpawn.m_newWeldToEnt);
+        for (WeldId const weld : rVehicleSpawn.m_newWeldToWeld)
+        {
+            rScnParts.m_weldToEnt[weld] = *itWeldEnt;
+            std::advance(itWeldEnt, 1);
+        }
+    }));
+
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierMod, tgPrefabEntReq, tgHierMod, tgTransformNew}).data(
+            "Add vehicle entities to Scene Graph",
+            TopDataIds_t{           idBasic,                   idActiveIds,                        idVehicleSpawn,           idScnParts,                idPrefabInit,           idResources },
+            wrap_args([] (ACtxBasic& rBasic, ActiveReg_t const& rActiveIds, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
+    {
+        // ActiveEnts created for welds + ActiveEnts created for vehicle prefabs
+        std::size_t const totalEnts = rVehicleSpawn.m_newWeldToEnt.size() + rPrefabInit.m_newEnts.size();
+
+        auto const& itWeldsFirst        = std::begin(rVehicleSpawn.m_newWeldToWeld);
+        auto const& itWeldOffsetsLast   = std::end(rVehicleSpawn.m_newVhWeldOffsets);
+        auto itWeldOffsets              = std::begin(rVehicleSpawn.m_newVhWeldOffsets);
+
+        rBasic.m_scnGraph.resize(rActiveIds.capacity());
+
+        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_newVhBasicIn)
+        {
+            auto const itWeldOffsetsNext = std::next(itWeldOffsets);
+            NewWeldId const weldOffsetNext = (itWeldOffsetsNext != itWeldOffsetsLast)
+                                           ? (*itWeldOffsetsNext)
+                                           : rVehicleSpawn.m_newWeldToWeld.size();
+
+            std::for_each(itWeldsFirst + (*itWeldOffsets),
+                          itWeldsFirst + weldOffsetNext,
+                          [&rBasic, &rScnParts, &rVehicleSpawn, &rPrefabInit, &rResources, &toInit] (WeldId const weld)
+            {
+                // Count parts in this weld first
+                std::size_t entCount = 0;
+                for (PartId const part : rScnParts.m_weldToParts[weld])
+                {
+                    NewPartId const newPart = rVehicleSpawn.m_partToNewPart[part];
+                    uint32_t const prefabInit = rVehicleSpawn.m_newPartPrefabs[newPart];
+                    entCount += rPrefabInit.m_ents[prefabInit].size();
+                }
+
+                ActiveEnt const weldEnt = rScnParts.m_weldToEnt[weld];
+
+                rBasic.m_transform.emplace(weldEnt, Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position));
+
+                SubtreeBuilder bldRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, entCount + 1);
+                SubtreeBuilder bldWeld = bldRoot.add_child(weldEnt, entCount);
+
+                for (PartId const part : rScnParts.m_weldToParts[weld])
+                {
+                    NewPartId const newPart = rVehicleSpawn.m_partToNewPart[part];
+                    uint32_t const prefabInit   = rVehicleSpawn.m_newPartPrefabs[newPart];
+                    auto const& basic           = rPrefabInit.m_basic[prefabInit];
+                    auto const& ents            = rPrefabInit.m_ents[prefabInit];
+
+                    SysPrefabInit::add_to_subtree(basic, ents, rResources, bldWeld);
+                }
+            });
+
+            itWeldOffsets = itWeldOffsetsNext;
+        }
+    }));
+
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierReq, tgPhysBodyMod}).data(
+            "Add physics to rigid group entities",
+            TopDataIds_t{                   idActiveIds,           idBasic,             idPhys,              idNwt,                        idVehicleSpawn,                 idScnParts  },
+            wrap_args([] (ActiveReg_t const &rActiveIds, ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts) noexcept
+    {
+        if (rVehicleSpawn.new_vehicle_count() == 0)
         {
             return;
         }
 
         rPhys.m_hasColliders.ints().resize(rActiveIds.vec().capacity());
 
-        auto itRigidEnt = std::begin(rVehicleSpawnRgd.m_rigidGroupEnt);
+        auto const& itWeldsFirst        = std::begin(rVehicleSpawn.m_newWeldToWeld);
+        auto const& itWeldOffsetsLast   = std::end(rVehicleSpawn.m_newVhWeldOffsets);
+        auto itWeldOffsets              = std::begin(rVehicleSpawn.m_newVhWeldOffsets);
 
-        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
+        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_newVhBasicIn)
         {
-            ActiveEnt const rigidEnt = *itRigidEnt;
-            std::advance(itRigidEnt, 1);
+            auto const itWeldOffsetsNext = std::next(itWeldOffsets);
+            NewWeldId const weldOffsetNext = (itWeldOffsetsNext != itWeldOffsetsLast)
+                                           ? (*itWeldOffsetsNext)
+                                           : rVehicleSpawn.m_newWeldToWeld.size();
 
-            auto const transform = Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position);
-            NwtColliderPtr_t pCompound{ NewtonCreateCompoundCollision(rNwt.m_world.get(), 0) };
+            std::for_each(itWeldsFirst + (*itWeldOffsets),
+                          itWeldsFirst + weldOffsetNext,
+                          [&rBasic, &rScnParts, &rVehicleSpawn, &toInit, &rPhys, &rNwt] (WeldId const weld)
+            {
+                ActiveEnt const weldEnt = rScnParts.m_weldToEnt[weld];
 
-            rPhys.m_hasColliders.set(std::size_t(rigidEnt));
+                auto const transform = Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position);
+                NwtColliderPtr_t pCompound{ NewtonCreateCompoundCollision(rNwt.m_world.get(), 0) };
 
-            // Collect all colliders from hierarchy.
-            NewtonCompoundCollisionBeginAddRemove(pCompound.get());
-            compound_collect_recurse( rPhys, rNwt, rBasic, rigidEnt, Matrix4{}, pCompound.get() );
-            NewtonCompoundCollisionEndAddRemove(pCompound.get());
+                rPhys.m_hasColliders.set(std::size_t(weldEnt));
 
-            NewtonBody *pBody = NewtonCreateDynamicBody(rNwt.m_world.get(), pCompound.get(), Matrix4{}.data());
+                // Collect all colliders from hierarchy.
+                NewtonCompoundCollisionBeginAddRemove(pCompound.get());
+                compound_collect_recurse( rPhys, rNwt, rBasic, weldEnt, Matrix4{}, pCompound.get() );
+                NewtonCompoundCollisionEndAddRemove(pCompound.get());
 
-
-            BodyId const bodyId = rNwt.m_bodyIds.create();
-            SysNewton::resize_body_data(rNwt);
+                NewtonBody *pBody = NewtonCreateDynamicBody(rNwt.m_world.get(), pCompound.get(), Matrix4{}.data());
 
 
-            rNwt.m_bodyPtrs[bodyId].reset(pBody);
-            rNwt.m_bodyToEnt[bodyId] = rigidEnt;
-            rNwt.m_bodyForces[bodyId] = {1};
-            rNwt.m_entToBody.emplace(rigidEnt, bodyId);
+                BodyId const bodyId = rNwt.m_bodyIds.create();
+                SysNewton::resize_body_data(rNwt);
 
-            Vector3 const inertia = {1.0f, 1.0f, 1.0f};
 
-            NewtonBodySetMassMatrix(pBody, 1.0f, inertia.x(), inertia.y(), inertia.z());
-            NewtonBodySetMatrix(pBody, transform.data());
-            NewtonBodySetLinearDamping(pBody, 0.0f);
-            NewtonBodySetForceAndTorqueCallback(pBody, &SysNewton::cb_force_torque);
-            NewtonBodySetTransformCallback(pBody, &SysNewton::cb_set_transform);
-            NewtonBodySetUserData(pBody, reinterpret_cast<void*>(bodyId));
+                rNwt.m_bodyPtrs[bodyId].reset(pBody);
+                rNwt.m_bodyToEnt[bodyId] = weldEnt;
+                rNwt.m_bodyForces[bodyId] = {1};
+                rNwt.m_entToBody.emplace(weldEnt, bodyId);
 
-            rPhys.m_setVelocity.emplace_back(rigidEnt, toInit.m_velocity);
+                Vector3 const inertia = {1.0f, 1.0f, 1.0f};
+
+                NewtonBodySetMassMatrix(pBody, 1.0f, inertia.x(), inertia.y(), inertia.z());
+                NewtonBodySetMatrix(pBody, transform.data());
+                NewtonBodySetLinearDamping(pBody, 0.0f);
+                NewtonBodySetForceAndTorqueCallback(pBody, &SysNewton::cb_force_torque);
+                NewtonBodySetTransformCallback(pBody, &SysNewton::cb_set_transform);
+                NewtonBodySetUserData(pBody, reinterpret_cast<void*>(bodyId));
+
+                rPhys.m_setVelocity.emplace_back(weldEnt, toInit.m_velocity);
+            });
+
+            itWeldOffsets = itWeldOffsetsNext;
         }
     }));
 
-    return vehicleSpawnRgdNwt;
+    return vehicleSpawnNwt;
 }
 
 

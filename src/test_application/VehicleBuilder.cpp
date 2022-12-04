@@ -66,12 +66,23 @@ void VehicleBuilder::set_prefabs(std::initializer_list<SetPrefab> const& setPref
     }
 }
 
-void VehicleBuilder::set_transform(std::initializer_list<SetTransform> const& setTransform)
+WeldId VehicleBuilder::weld(std::initializer_list<SetTransform> const& setTransform)
 {
+    WeldId const weld = m_data->m_weldIds.create();
+    m_data->m_weldToParts.ids_reserve(m_data->m_weldIds.capacity());
+
+    PartId *pPartInWeld = m_data->m_weldToParts.emplace(weld, setTransform.size());
+
     for (SetTransform const& set : setTransform)
     {
-        m_data->m_partTransforms[std::size_t(set.m_part)] = set.m_transform;
+        m_data->m_partTransformWeld[set.m_part] = set.m_transform;
+
+        m_data->m_partToWeld[set.m_part] = weld;
+        (*pPartInWeld) = set.m_part;
+        std::advance(pPartInWeld, 1);
     }
+
+    return weld;
 }
 
 void VehicleBuilder::index_prefabs()

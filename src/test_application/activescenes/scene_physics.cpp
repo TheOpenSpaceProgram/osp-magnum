@@ -124,20 +124,19 @@ Session setup_shape_spawn(
 
         rSpawnerEnts.resize(rSpawner.size() * 2);
         rActiveIds.create(std::begin(rSpawnerEnts), std::end(rSpawnerEnts));
-
-        rBasic.m_scnGraph.resize(rActiveIds.capacity());
     }));
 
     shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgTransformNew, tgHierNew}).data(
             "Add hierarchy and transform to spawned shapes",
-            TopDataIds_t{           idBasic,              idSpawner,             idSpawnerEnts },
-            wrap_args([] (ACtxBasic& rBasic, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
+            TopDataIds_t{           idBasic,             idActiveIds,              idSpawner,             idSpawnerEnts },
+            wrap_args([] (ACtxBasic& rBasic, ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
     {
         if (rSpawner.size() == 0)
         {
             return;
         }
 
+        rBasic.m_scnGraph.resize(rActiveIds.capacity());
         SubtreeBuilder bldScnRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, rSpawner.size() * 2);
 
         for (std::size_t i = 0; i < rSpawner.size(); ++i)

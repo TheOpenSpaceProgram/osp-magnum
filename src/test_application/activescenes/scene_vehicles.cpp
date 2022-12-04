@@ -32,21 +32,13 @@
 #include <osp/Active/physics.h>
 #include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/SysPrefabInit.h>
-
-#include <osp/Active/opengl/SysRenderGL.h>
-
 #include <osp/link/machines.h>
 #include <osp/link/signal.h>
-
-#include <osp/UserInputHandler.h>
-
 #include <osp/Resource/resources.h>
-
+#include <osp/UserInputHandler.h>
 #include <osp/logging.h>
 
 #include <adera/machines/links.h>
-
-#include <Corrade/Containers/ArrayView.h>
 
 using namespace osp;
 using namespace osp::active;
@@ -54,18 +46,12 @@ using namespace osp::link;
 
 using osp::restypes::gc_importer;
 
-
-
-using Corrade::Containers::arrayView;
-
 namespace testapp::scenes
 {
 
-
-
 struct TmpPartInit
 {
-    PartEnt_t m_part;
+    PartId m_part;
     int m_initPrefabs;
 };
 
@@ -77,7 +63,6 @@ Session setup_parts(
         Session const&              scnCommon,
         TopDataId const             idResources)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
 
     Session parts;
@@ -91,8 +76,7 @@ Session setup_parts(
     rBuilder.tag(tgLinkMhUpdReq)        .depend_on({tgLinkMhUpdMod});
 
     auto &rScnParts = top_emplace< ACtxParts >      (topData, idScnParts);
-    auto &rUpdMach = top_emplace< UpdMachPerType >  (topData, idUpdMach);
-    //top_emplace< std::vector<TmpPartInit> >         (topData, idPartInit);
+    auto &rUpdMach  = top_emplace< UpdMachPerType > (topData, idUpdMach);
     top_emplace< MachTypeToEvt_t >                  (topData, idMachEvtTags, MachTypeReg_t::size());
 
     rUpdMach.m_machTypesDirty.ints().resize(MachTypeReg_t::size() + 1);
@@ -121,7 +105,6 @@ Session setup_signals_float(
         Session const&              scnCommon,
         Session const&              parts)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(parts,      TESTAPP_PARTS);
     OSP_SESSION_UNPACK_TAGS(parts,      TESTAPP_PARTS);
@@ -190,7 +173,6 @@ Session setup_mach_rocket(
         Session const&              parts,
         Session const&              signalsFloat)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
     OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
@@ -200,7 +182,6 @@ Session setup_mach_rocket(
     using namespace adera;
 
     Session machRocket;
-    OSP_SESSION_ACQUIRE_DATA(machRocket, topData, TESTAPP_MACH_ROCKET);
     OSP_SESSION_ACQUIRE_TAGS(machRocket, rTags,   TESTAPP_MACH_ROCKET);
 
     top_get< MachTypeToEvt_t >(topData, idMachEvtTags).at(gc_mtMagicRocket) = tgMhRocketEvt;
@@ -249,13 +230,9 @@ Session setup_vehicle_spawn(
         Builder_t&                  rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
-        Session const&              scnCommon,
-        Session const&              parts)
+        Session const&              scnCommon)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(parts,      TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,      TESTAPP_PARTS);
 
     Session vehicleSpawn;
     OSP_SESSION_ACQUIRE_DATA(vehicleSpawn, topData, TESTAPP_VEHICLE_SPAWN);
@@ -274,9 +251,8 @@ Session setup_vehicle_spawn(
             TopDataIds_t{                  idVehicleSpawn},
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn) noexcept
     {
-        rVehicleSpawn.m_basic.clear();
+        rVehicleSpawn.m_newVhBasicIn.clear();
     }));
-
 
     return vehicleSpawn;
 }
@@ -284,7 +260,7 @@ Session setup_vehicle_spawn(
 Session setup_vehicle_spawn_vb(
         Builder_t&                  rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
+        [[maybe_unused]] Tags&      rTags,
         Session const&              scnCommon,
         Session const&              prefabs,
         Session const&              parts,
@@ -310,92 +286,128 @@ Session setup_vehicle_spawn_vb(
             TopDataIds_t{                  idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts},
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
-        if (rVehicleSpawn.vehicle_count() == 0)
+        std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
+        if (newVehicleCount == 0)
         {
             return;
         }
 
-        rVehicleSpawnVB.m_remapPartOffsets.resize(rVehicleSpawn.vehicle_count());
+        rVehicleSpawnVB.m_remapPartOffsets  .resize(newVehicleCount);
+        rVehicleSpawnVB.m_remapWeldOffsets  .resize(newVehicleCount);
+        rVehicleSpawn.m_newVhPartOffsets    .resize(newVehicleCount);
+        rVehicleSpawn.m_newVhWeldOffsets    .resize(newVehicleCount);
 
-        // Count parts and calculate offsets Part ID remap vector
+        // Count total parts and welds, and calculate offsets for remap vectors
 
-        std::size_t partCount = 0;
-        std::size_t offsetTotal = 0;
+        std::size_t partTotal       = 0;
+        std::size_t remapPartTotal  = 0;
+
+        std::size_t weldTotal       = 0;
+        std::size_t remapWeldTotal  = 0;
 
         {
-            auto itRemapPartOffset = std::begin(rVehicleSpawnVB.m_remapPartOffsets);
+            auto itRemapPartOffsetsOut  = std::begin(rVehicleSpawnVB.m_remapPartOffsets);
+            auto itRemapWeldOffsetsOut  = std::begin(rVehicleSpawnVB.m_remapWeldOffsets);
+            auto itOffsetPartsOut       = std::begin(rVehicleSpawn.m_newVhPartOffsets);
+            auto itOffsetWeldsOut       = std::begin(rVehicleSpawn.m_newVhWeldOffsets);
 
             for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
             {
-                // TODO: eventually use "highest ID + 1" for bounds
-                // Capacity is the bit size of the internal uint64 vector: a
-                // number greater than all IDs and is a multiple of 64.
-                std::size_t const bounds = pVData->m_partIds.capacity();
-                (*itRemapPartOffset) = offsetTotal;
-                offsetTotal += bounds;
-
-                // Exact number of part IDs, size() counts the ones bits
-                partCount += pVData->m_partIds.size();
-
-                std::advance(itRemapPartOffset, 1);
-            }
-
-            rVehicleSpawnVB.m_remapPartAll.resize(offsetTotal, lgrn::id_null<PartEnt_t>());
-            rVehicleSpawn.m_partEnts.resize(partCount);
-            rVehicleSpawn.m_partPrefabs.resize(partCount);
-        }
-
-        // Create the part IDs
-        // Populates rVehicleSpawn.m_partEnts
-        rScnParts.m_partIds.create(std::begin(rVehicleSpawn.m_partEnts),
-                                     std::end(rVehicleSpawn.m_partEnts));
-
-        // Resize some containers to account for newly created part IDs
-        rScnParts.m_partPrefabs         .resize(rScnParts.m_partIds.capacity());
-        rScnParts.m_partTransformRigid  .resize(rScnParts.m_partIds.capacity());
-        rScnParts.m_partRigids          .resize(rScnParts.m_partIds.capacity());
-        rScnParts.m_rigidToParts  .data_reserve(rScnParts.m_partIds.capacity());
-
-        // Assign the part IDs to each vehicle to initialize
-        // Populates rVehicleSpawn.m_offsetParts
-        {
-            rVehicleSpawn.m_offsetParts.resize(rVehicleSpawn.m_basic.size());
-            auto itOffsetPartsOut         = std::begin(rVehicleSpawn.m_offsetParts);
-            auto const itPartEntsFirst    = std::cbegin(rVehicleSpawn.m_partEnts);
-            auto itPartEnts               = std::cbegin(rVehicleSpawn.m_partEnts);
-            for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
-            {
-                std::size_t const count = pVData->m_partIds.size();
-
-                (*itOffsetPartsOut) = std::distance(itPartEntsFirst, itPartEnts);
-
+                (*itOffsetPartsOut) = partTotal;
+                partTotal += pVData->m_partIds.size(); // O(N), counts bits
                 std::advance(itOffsetPartsOut, 1);
-                std::advance(itPartEnts, count);
+
+                (*itRemapPartOffsetsOut) = remapPartTotal;
+                remapPartTotal += pVData->m_partIds.capacity();
+                std::advance(itRemapPartOffsetsOut, 1);
+
+                (*itOffsetWeldsOut) = weldTotal;
+                weldTotal += pVData->m_weldIds.size();
+                std::advance(itOffsetWeldsOut, 1);
+
+                (*itRemapWeldOffsetsOut) = remapWeldTotal;
+                remapWeldTotal += pVData->m_weldIds.capacity();
+                std::advance(itRemapWeldOffsetsOut, 1);
             }
-            // All parts should always be used up
-            assert(itPartEnts == std::end(rVehicleSpawn.m_partEnts));
         }
 
-        // Generate "VehicleData Part -> Scene Part" remap vector
-        // Populates rVehicleSpawn.m_remapPartOffsets
+        rVehicleSpawn.m_newPartToPart   .resize(partTotal);
+        rVehicleSpawn.m_newWeldToWeld   .resize(weldTotal);
+        rVehicleSpawn.m_newPartPrefabs  .resize(partTotal);
+        rVehicleSpawnVB.m_remapParts    .resize(remapPartTotal, lgrn::id_null<PartId>());
+        rVehicleSpawnVB.m_remapWelds    .resize(remapPartTotal, lgrn::id_null<WeldId>());
+
+        // Create new Scene PartIds and WeldIds
+
+        rScnParts.m_partIds.create(std::begin(rVehicleSpawn.m_newPartToPart), std::end(rVehicleSpawn.m_newPartToPart));
+        rScnParts.m_weldIds.create(std::begin(rVehicleSpawn.m_newWeldToWeld), std::end(rVehicleSpawn.m_newWeldToWeld));
+
+        std::size_t const maxParts = rScnParts.m_partIds.capacity();
+        std::size_t const maxWelds = rScnParts.m_weldIds.capacity();
+        rScnParts.m_partPrefabs         .resize(maxParts);
+        rScnParts.m_partTransformWeld   .resize(maxParts);
+        rScnParts.m_partToWeld          .resize(maxParts);
+        rScnParts.m_weldToParts         .data_reserve(maxParts);
+        rScnParts.m_weldToParts         .ids_reserve(maxWelds);
+        rScnParts.m_weldToEnt           .resize(maxWelds);
+        rVehicleSpawn.m_partToNewPart   .resize(maxParts);
+
+        // Populate "Scene PartId -> NewPartId" map
+
+        auto itPart = std::begin(rVehicleSpawn.m_newPartToPart);
+        for (PartId newPart = 0; newPart < rVehicleSpawn.m_newPartToPart.size(); ++newPart)
         {
-            auto itRemapPartOffset  = std::cbegin(rVehicleSpawnVB.m_remapPartOffsets);
-            auto itDstPartEnts      = std::cbegin(rVehicleSpawn.m_partEnts);
-
-            for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
-            {
-                std::size_t const remapOffset = *itRemapPartOffset;
-
-                for (uint32_t srcPart : pVData->m_partIds.bitview().zeros())
-                {
-                    rVehicleSpawnVB.m_remapPartAll[remapOffset + srcPart] = *itDstPartEnts;
-                    std::advance(itDstPartEnts, 1);
-                }
-
-                std::advance(itRemapPartOffset, 1);
-            }
+            rVehicleSpawn.m_partToNewPart[*itPart] = newPart;
+            std::advance(itPart, 1);
         }
 
+        // Populate remap vectors and set weld connections
+
+        auto const& itRemapPartsFirst   = std::begin(rVehicleSpawnVB.m_remapParts);
+        auto itRemapPartOffset          = std::cbegin(rVehicleSpawnVB.m_remapPartOffsets);
+        auto itDstPartIds               = std::cbegin(rVehicleSpawn.m_newPartToPart);
+
+        auto const& itRemapWeldsFirst   = std::begin(rVehicleSpawnVB.m_remapWelds);
+        auto itRemapWeldOffset          = std::cbegin(rVehicleSpawnVB.m_remapWeldOffsets);
+        auto itDstWeldIds               = std::cbegin(rVehicleSpawn.m_newWeldToWeld);
+
+        for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
+        {
+            auto const itPartRemapOut = itRemapPartsFirst + (*itRemapPartOffset);
+            std::advance(itRemapPartOffset, 1);
+            for (PartId const srcPart : pVData->m_partIds.bitview().zeros())
+            {
+                // Populate map to "VehicleBuilder PartId -> Scene PartId"
+                // rVehicleSpawnVB.m_remapParts
+                itPartRemapOut[srcPart] = *itDstPartIds;
+                std::advance(itDstPartIds, 1);
+            }
+
+            auto const itWeldRemapOut = itRemapWeldsFirst + (*itRemapWeldOffset);
+            std::advance(itRemapWeldOffset, 1);
+            for (WeldId const srcWeld : pVData->m_weldIds.bitview().zeros())
+            {
+                // Populate map to "VehicleBuilder WeldId -> Scene WeldId"
+                // rVehicleSpawnVB.rVehicleSpawnVB.m_remapWelds
+                WeldId const dstWeld = *itDstWeldIds;
+                itWeldRemapOut[srcWeld] = dstWeld;
+                std::advance(itDstWeldIds, 1);
+
+                // Use remaps to connect Scene WeldIds and PartIds
+                // rScnParts.m_partToWeld and rScnParts.m_weldToParts
+
+                auto const srcWeldPartSpan  = pVData->m_weldToParts[srcWeld];
+                WeldId *pDstWeldPartOut     = rScnParts.m_weldToParts.emplace(dstWeld, srcWeldPartSpan.size());
+
+                for (PartId const srcPart : srcWeldPartSpan)
+                {
+                    PartId const dstPart = itPartRemapOut[srcPart];
+                    (*pDstWeldPartOut) = dstPart;
+                    rScnParts.m_partToWeld[dstPart] = dstWeld;
+                    std::advance(pDstWeldPartOut, 1);
+                }
+            }
+        }
     }));
 
     vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdReq, tgVSpawnRgdEntReq, tgVSpawnPartReq, tgPrefabMod}).data(
@@ -403,21 +415,21 @@ Session setup_vehicle_spawn_vb(
             TopDataIds_t{                  idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                idPrefabInit,           idResources},
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
     {
-        if (rVehicleSpawn.vehicle_count() == 0)
+        if (rVehicleSpawn.new_vehicle_count() == 0)
         {
             return;
         }
 
-        auto itDstPartEnts = std::cbegin(rVehicleSpawn.m_partEnts);
-        auto itPrefabOut   = std::begin(rVehicleSpawn.m_partPrefabs);
+        auto itDstPartIds = std::cbegin(rVehicleSpawn.m_newPartToPart);
+        auto itPrefabOut   = std::begin(rVehicleSpawn.m_newPartPrefabs);
 
         for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
         {
             // Copy Part data from VehicleBuilder to scene
             for (uint32_t srcPart : pVData->m_partIds.bitview().zeros())
             {
-                PartEnt_t const dstPart = *itDstPartEnts;
-                std::advance(itDstPartEnts, 1);
+                PartId const dstPart = *itDstPartIds;
+                std::advance(itDstPartIds, 1);
 
                 PrefabPair const& prefabPairSrc = pVData->m_partPrefabs[srcPart];
                 PrefabPair prefabPairDst{
@@ -425,9 +437,7 @@ Session setup_vehicle_spawn_vb(
                     prefabPairSrc.m_prefabId
                 };
                 rScnParts.m_partPrefabs[dstPart]        = std::move(prefabPairDst);
-                rScnParts.m_partTransformRigid[dstPart] = pVData->m_partTransforms[srcPart];
-
-                RigidGroup_t const rigid = rScnParts.m_partRigids[dstPart];
+                rScnParts.m_partTransformWeld[dstPart]  = pVData->m_partTransformWeld[srcPart];
 
                 // Add Prefab and Part init events
                 (*itPrefabOut) = rPrefabInit.m_basic.size();
@@ -436,7 +446,7 @@ Session setup_vehicle_spawn_vb(
                 rPrefabInit.m_basic.push_back(TmpPrefabInitBasic{
                     .m_importerRes = prefabPairSrc.m_importer,
                     .m_prefabId = prefabPairSrc.m_prefabId,
-                    .m_pTransform = &pVData->m_partTransforms[srcPart]
+                    .m_pTransform = &pVData->m_partTransformWeld[srcPart]
                 });
             }
         }
@@ -445,20 +455,22 @@ Session setup_vehicle_spawn_vb(
 
     vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVSpawnRgdEntReq, tgVSpawnPartReq, tgLinkMod}).data(
             "Copy machines from VehicleBuilder",
-            TopDataIds_t{                  idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts,                idPrefabInit,           idResources},
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
+            TopDataIds_t{                  idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts},
+            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
-        if (rVehicleSpawn.vehicle_count() == 0)
+        if (rVehicleSpawn.new_vehicle_count() == 0)
         {
             return;
         }
 
-        // Count total number of machines to make
+        // TODO: Count machines and offsets to help avoid allocations in
+        //       copy_machines below
+#if 0
         {
             std::size_t machCount = 0;
             std::size_t offsetTotal = 0;
 
-            rVehicleSpawnVB.m_remapMachOffsets.resize(rVehicleSpawn.vehicle_count());
+            rVehicleSpawnVB.m_remapMachOffsets.resize(rVehicleSpawn.new_vehicle_count());
             auto itRemapMachOffset = std::begin(rVehicleSpawnVB.m_remapMachOffsets);
 
             for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
@@ -475,22 +487,18 @@ Session setup_vehicle_spawn_vb(
 
                 std::advance(itRemapMachOffset, 1);
             }
-
         }
+#endif
 
+        // Copy Machines and Nodes from VehicleBuilder to Scene
 
         auto itRemapPartOffset = std::begin(rVehicleSpawnVB.m_remapPartOffsets);
 
         for (VehicleData const* pVData : rVehicleSpawnVB.m_dataVB)
         {
-            if (pVData == nullptr)
-            {
-                continue;
-            }
+            auto remapPart = arrayView(rVehicleSpawnVB.m_remapParts).exceptPrefix(*itRemapPartOffset);
+            std::advance(itRemapPartOffset, 1);
 
-            auto remapPart = arrayView(rVehicleSpawnVB.m_remapPartAll).exceptPrefix(*itRemapPartOffset);
-
-            // remapMach[source MachAnyId] -> destination MachAnyId
             std::vector<MachAnyId> remapMach(pVData->m_machines.m_ids.capacity());
 
             copy_machines(pVData->m_machines, rScnParts.m_machines, remapMach);
@@ -502,7 +510,6 @@ Session setup_vehicle_spawn_vb(
                 rScnParts.m_machineToPart[dstMach] = remapPart[std::size_t(pVData->m_machToPart[srcMach])];
             }
 
-            // Do the same for nodes
             auto itDstNodeType = std::begin(rScnParts.m_nodePerType);
             for (PerNodeType const &rSrcNodeType : pVData->m_nodePerType)
             {
@@ -513,210 +520,47 @@ Session setup_vehicle_spawn_vb(
             }
 
             // TODO: copy node values
-
-            std::advance(itRemapPartOffset, 1);
         }
-
     }));
 
 
     vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgPrefabEntReq}).data(
-            "Update PartEnt<->ActiveEnt mapping",
+            "Update PartId<->ActiveEnt mapping",
             TopDataIds_t{                  idVehicleSpawn,           idScnParts,                   idActiveIds,                 idPrefabInit },
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts, ActiveReg_t const& rActiveIds,  ACtxPrefabInit& rPrefabInit) noexcept
     {
+        if (rVehicleSpawn.new_vehicle_count() == 0)
+        {
+            return;
+        }
+
         rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
         rScnParts.m_activeToPart.resize(rActiveIds.capacity());
 
-        // Populate PartEnt<->ActiveEnt mmapping, now that the prefabs exist
+        // Populate PartId<->ActiveEnt mmapping, now that the prefabs exist
 
-        auto itPrefab = std::begin(rVehicleSpawn.m_partPrefabs);
+        auto itPrefab = std::begin(rVehicleSpawn.m_newPartPrefabs);
 
-        for (PartEnt_t const partEnt : rVehicleSpawn.m_partEnts)
+        for (PartId const PartId : rVehicleSpawn.m_newPartToPart)
         {
             ActiveEnt const root = rPrefabInit.m_ents[*itPrefab].front();
-
-            rScnParts.m_partToActive[partEnt]           = root;
-            rScnParts.m_activeToPart[std::size_t(root)] = partEnt;
-
             std::advance(itPrefab, 1);
-        }
 
+            rScnParts.m_partToActive[PartId]           = root;
+            rScnParts.m_activeToPart[std::size_t(root)] = PartId;
+        }
     }));
 
     return vehicleSpawnVB;
 }
 
-Session setup_vehicle_spawn_rigid(
-        Builder_t&                  rBuilder,
-        ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
-        Session const&              physics,
-        Session const&              prefabs,
-        Session const&              parts,
-        Session const&              vehicleSpawn,
-        TopDataId const             idResources)
-{
-    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_DATA(prefabs,        TESTAPP_PREFABS);
-    OSP_SESSION_UNPACK_TAGS(prefabs,        TESTAPP_PREFABS);
-    OSP_SESSION_UNPACK_DATA(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
-    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
-
-    Session vehicleSpawnRgd;
-    OSP_SESSION_ACQUIRE_DATA(vehicleSpawnRgd, topData, TESTAPP_VEHICLE_SPAWN_RIGID);
-
-    top_emplace< ACtxVehicleSpawnRigid >(topData, idVehicleSpawnRgd);
-
-    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdMod}).data(
-            "Create rigid groups for vehicles to spawn",
-            TopDataIds_t{                  idVehicleSpawn,                       idVehicleSpawnRgd,           idScnParts},
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnRigid& rVehicleSpawnRgd, ACtxParts& rScnParts) noexcept
-    {
-        if (rVehicleSpawn.vehicle_count() == 0)
-        {
-            return;
-        }
-
-        // Create rigid group for each vehicle to spawn
-        rVehicleSpawnRgd.m_rigidGroups.resize(rVehicleSpawn.vehicle_count());
-        rScnParts.m_rigidIds.create(std::begin(rVehicleSpawnRgd.m_rigidGroups), std::end(rVehicleSpawnRgd.m_rigidGroups));
-
-        // Newly created rigid groups must be put in the dirty vector
-        rScnParts.m_rigidDirty.insert(std::end(rScnParts.m_rigidDirty), std::begin(rVehicleSpawnRgd.m_rigidGroups), std::end(rVehicleSpawnRgd.m_rigidGroups));
-
-        // Resize vectors to account for newly created rigid groups
-        rScnParts.m_rigidToEnt  .resize(        rScnParts.m_rigidIds.capacity());
-        rScnParts.m_rigidToParts.ids_reserve(   rScnParts.m_rigidIds.capacity());
-    }));
-
-
-    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdReq}).data(
-            "Add vehicle parts to rigid groups",
-            TopDataIds_t{                  idVehicleSpawn,                       idVehicleSpawnRgd,           idScnParts  },
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnRigid& rVehicleSpawnRgd, ACtxParts& rScnParts) noexcept
-    {
-        if (rVehicleSpawn.vehicle_count() == 0)
-        {
-            return;
-        }
-
-        auto itRgdGroup    = std::begin(rVehicleSpawnRgd.m_rigidGroups);
-        auto itOffsetParts = std::cbegin(rVehicleSpawn.m_offsetParts);
-        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
-        {
-            auto const itOffsetPartsNext = std::next(itOffsetParts);
-
-            // Add parts of each vehicle to its corresponding rigid group
-
-            std::size_t const offsetPartsNext
-                    = (itOffsetPartsNext != std::end(rVehicleSpawn.m_offsetParts))
-                    ? (*itOffsetPartsNext)
-                    : rVehicleSpawn.m_partPrefabs.size();
-
-            auto vehicleParts = arrayView(rVehicleSpawn.m_partEnts).slice(*itOffsetParts, offsetPartsNext);
-
-            rScnParts.m_rigidToParts.emplace(*itRgdGroup, std::begin(vehicleParts), std::end(vehicleParts));
-            std::for_each(std::begin(vehicleParts), std::end(vehicleParts),
-                          [&rScnParts, rigid = *itRgdGroup] (PartEnt_t const part)
-            {
-                rScnParts.m_partRigids[part] = rigid;
-            });
-
-            std::advance(itRgdGroup, 1);
-            itOffsetParts = itOffsetPartsNext;
-        }
-    }));
-
-    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgEntNew, tgVehicleSpawnReq, tgVSpawnRgdReq, tgVSpawnRgdEntMod}).data(
-            "Create entity for each rigid group",
-            TopDataIds_t{             idActiveIds,                  idVehicleSpawn,                       idVehicleSpawnRgd,           idScnParts },
-            wrap_args([] (ActiveReg_t& rActiveIds, ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnRigid& rVehicleSpawnRgd, ACtxParts& rScnParts) noexcept
-    {
-        if (rVehicleSpawn.vehicle_count() == 0)
-        {
-            return;
-        }
-
-        rVehicleSpawnRgd.m_rigidGroupEnt.resize(rVehicleSpawn.vehicle_count());
-        rActiveIds.create(std::begin(rVehicleSpawnRgd.m_rigidGroupEnt), std::end(rVehicleSpawnRgd.m_rigidGroupEnt));
-
-        // update RigidEnt->ActiveEnt mapping
-        auto itRigidEnt = std::begin(rVehicleSpawnRgd.m_rigidGroupEnt);
-        for (RigidGroup_t const rigid : rVehicleSpawnRgd.m_rigidGroups)
-        {
-            rScnParts.m_rigidToEnt[rigid] = *itRigidEnt;
-            std::advance(itRigidEnt, 1);
-        }
-    }));
-
-    vehicleSpawnRgd.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierMod, tgPrefabEntReq, tgHierMod, tgTransformNew}).data(
-            "Add vehicle entities to Scene Graph",
-            TopDataIds_t{           idBasic,                   idActiveIds,                        idVehicleSpawn,                             idVehicleSpawnRgd,                idPrefabInit,           idResources },
-            wrap_args([] (ACtxBasic& rBasic, ActiveReg_t const& rActiveIds, ACtxVehicleSpawn const& rVehicleSpawn, ACtxVehicleSpawnRigid const& rVehicleSpawnRgd, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
-    {
-        std::size_t const totalEnts = rVehicleSpawnRgd.m_rigidGroupEnt.size() + rPrefabInit.m_newEnts.size();
-
-        auto itRigidEnt     = std::begin(rVehicleSpawnRgd.m_rigidGroupEnt);
-        auto itOffsetParts  = std::begin(rVehicleSpawn.m_offsetParts);
-
-        rBasic.m_scnGraph.resize(rActiveIds.capacity());
-
-        for (ACtxVehicleSpawn::TmpToInit const& toInit : rVehicleSpawn.m_basic)
-        {
-            auto const transform = Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position);
-            rBasic.m_transform.emplace(*itRigidEnt, transform);
-
-            auto const itOffsetPartsNext = std::next(itOffsetParts);
-
-            std::size_t const offsetPartsNext
-                    = (itOffsetPartsNext != std::end(rVehicleSpawn.m_offsetParts))
-                    ? (*itOffsetPartsNext)
-                    : rVehicleSpawn.m_partPrefabs.size();
-
-            // Count entities in this vehicle
-            std::size_t totalVehicleEnts = 0;
-            for (std::size_t i = *itOffsetParts; i < offsetPartsNext; ++i)
-            {
-                uint32_t const prefabInit = rVehicleSpawn.m_partPrefabs[i];
-                totalVehicleEnts += rPrefabInit.m_ents[prefabInit].size();
-            }
-
-            SubtreeBuilder bldRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, totalVehicleEnts + 1);
-            SubtreeBuilder bldRigid = bldRoot.add_child(*itRigidEnt, totalVehicleEnts);
-
-            // Add entities to scene graph
-            for (std::size_t i = *itOffsetParts; i < offsetPartsNext; ++i)
-            {
-                uint32_t const prefabInit   = rVehicleSpawn.m_partPrefabs[i];
-                auto const& basic           = rPrefabInit.m_basic[prefabInit];
-                auto const& ents            = rPrefabInit.m_ents[prefabInit];
-
-                SysPrefabInit::add_to_subtree(basic, ents, rResources, bldRigid);
-            }
-
-            itOffsetParts = itOffsetPartsNext;
-            std::advance(itRigidEnt, 1);
-        }
-    }));
-
-    return vehicleSpawnRgd;
-}
-
 Session setup_test_vehicles(
         Builder_t&                  rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
+        [[maybe_unused]] Tags&      rTags,
         Session const&              scnCommon,
         TopDataId const             idResources)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
 
     Session testVehicles;
@@ -727,8 +571,10 @@ Session setup_test_vehicles(
 
     using namespace adera;
 
-    VehicleBuilder builder{&rResources};
+    // Build "PartVehicle"
     {
+        VehicleBuilder builder{&rResources};
+
         auto const [ capsule, fueltank, engine ] = builder.create_parts<3>();
         builder.set_prefabs({
             { capsule,  "phCapsule" },
@@ -736,7 +582,7 @@ Session setup_test_vehicles(
             { engine,   "phEngine" },
         });
 
-        builder.set_transform({
+        builder.weld({
            { capsule,  Matrix4::translation({0, 0, 3}) },
            { fueltank, Matrix4::translation({0, 0, 0}) },
            { engine,   Matrix4::translation({0, 0, -3}) },
@@ -800,7 +646,6 @@ Session setup_vehicle_control(
     OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
     OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
     OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
     OSP_SESSION_UNPACK_DATA(app,            TESTAPP_APP);
     OSP_SESSION_UNPACK_TAGS(app,            TESTAPP_APP);
 
@@ -896,8 +741,8 @@ Session setup_vehicle_control(
 
 Session setup_camera_vehicle(
         Builder_t&                  rBuilder,
-        ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
+        [[maybe_unused]] ArrayView<entt::any> const topData,
+        [[maybe_unused]] Tags&      rTags,
         Session const&              app,
         Session const&              scnCommon,
         Session const&              parts,
@@ -906,9 +751,7 @@ Session setup_camera_vehicle(
         Session const&              vehicleControl)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
     OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
     OSP_SESSION_UNPACK_TAGS(app,            TESTAPP_APP);
     OSP_SESSION_UNPACK_DATA(camera,         TESTAPP_CAMERA_CTRL);
@@ -930,11 +773,11 @@ Session setup_camera_vehicle(
 
             // Obtain associated ActiveEnt
             // MachLocalId -> MachAnyId -> PartId -> RigidGroup -> ActiveEnt
-            PerMachType const& rUsrCtrls = rScnParts.m_machines.m_perType.at(adera::gc_mtUserCtrl);
-            MachAnyId const selectedMach = rUsrCtrls.m_localToAny.at(selectedLocal);
-            PartEnt_t const selectedPart = rScnParts.m_machineToPart.at(selectedMach);
-            RigidGroup_t const rigid     = rScnParts.m_partRigids.at(selectedPart);
-            ActiveEnt const selectedEnt  = rScnParts.m_rigidToEnt.at(rigid);
+            PerMachType const& rUsrCtrls    = rScnParts.m_machines.m_perType.at(adera::gc_mtUserCtrl);
+            MachAnyId const selectedMach    = rUsrCtrls.m_localToAny        .at(selectedLocal);
+            PartId const selectedPart       = rScnParts.m_machineToPart     .at(selectedMach);
+            WeldId const weld               = rScnParts.m_partToWeld        .at(selectedPart);
+            ActiveEnt const selectedEnt     = rScnParts.m_weldToEnt         .at(weld);
 
             if (rBasic.m_transform.contains(selectedEnt))
             {

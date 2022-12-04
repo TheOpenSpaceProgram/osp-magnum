@@ -200,7 +200,7 @@ static ScenarioMap_t make_scenarios()
             vehicleSpawn, vehicleSpawnVB, vehicleSpawnRgd,
             signalsFloat, machRocket,
             testVehicles, droppers, gravity, bounds, thrower,
-            newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnRgdNwt
+            newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt
         ] = unpack<21>(sceneOut);
 
         scnCommon           = setup_common_scene        (builder, rTopData, rTags, idResources, pkg);
@@ -209,9 +209,8 @@ static ScenarioMap_t make_scenarios()
         shapeSpawn          = setup_shape_spawn         (builder, rTopData, rTags, scnCommon, physics, matVisual);
         prefabs             = setup_prefabs             (builder, rTopData, rTags, scnCommon, physics, matVisual, idResources);
         parts               = setup_parts               (builder, rTopData, rTags, scnCommon, idResources);
-        vehicleSpawn        = setup_vehicle_spawn       (builder, rTopData, rTags, scnCommon, parts);
+        vehicleSpawn        = setup_vehicle_spawn       (builder, rTopData, rTags, scnCommon);
         vehicleSpawnVB      = setup_vehicle_spawn_vb    (builder, rTopData, rTags, scnCommon, prefabs, parts, vehicleSpawn, idResources);
-        vehicleSpawnRgd     = setup_vehicle_spawn_rigid (builder, rTopData, rTags, scnCommon, physics, prefabs, parts, vehicleSpawn, idResources);
         signalsFloat        = setup_signals_float       (builder, rTopData, rTags, scnCommon, parts);
         machRocket          = setup_mach_rocket         (builder, rTopData, rTags, scnCommon, parts, signalsFloat);
         testVehicles        = setup_test_vehicles       (builder, rTopData, rTags, scnCommon, idResources);
@@ -222,14 +221,13 @@ static ScenarioMap_t make_scenarios()
         nwtGravSet          = setup_newton_force_set    (builder, rTopData, rTags);
         nwtGrav             = setup_newton_force_accel  (builder, rTopData, rTags, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
         shapeSpawnNwt       = setup_shape_spawn_newton  (builder, rTopData, rTags, scnCommon, physics, shapeSpawn, newton, nwtGravSet);
-        vehicleSpawnRgdNwt  = setup_vehicle_spawn_rigid_newton(builder, rTopData, rTags, scnCommon, physics, prefabs, parts, vehicleSpawn, vehicleSpawnRgd, newton);
+        vehicleSpawnNwt     = setup_vehicle_spawn_newton(builder, rTopData, rTags, scnCommon, physics, prefabs, parts, vehicleSpawn, newton, idResources);
 
 
         OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
         OSP_SESSION_UNPACK_DATA(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
         OSP_SESSION_UNPACK_DATA(vehicleSpawnVB, TESTAPP_VEHICLE_SPAWN_VB);
         OSP_SESSION_UNPACK_DATA(testVehicles,   TESTAPP_TEST_VEHICLES);
-        OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
 
         add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, pkg);
 
@@ -242,7 +240,7 @@ static ScenarioMap_t make_scenarios()
 
         for (int i = 0; i < 4; ++i)
         {
-            rVehicleSpawn.m_basic.push_back(
+            rVehicleSpawn.m_newVhBasicIn.push_back(
             {
                .m_position = {float(i - 2) * 8.0f, 30.0f, 10.0f},
                .m_velocity = {0.0, 0.0f, 0.0f},
@@ -250,8 +248,6 @@ static ScenarioMap_t make_scenarios()
             });
             rVehicleSpawnVB.m_dataVB.push_back(&rTVPartVehicle);
         }
-
-        ActiveEnt const rooot = rActiveIds.create();
 
         return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
         {
