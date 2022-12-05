@@ -86,7 +86,9 @@ static void setup_magnum_draw(MainView mainView, Session const& magnum, Session 
         top_run_blocking(rTags, rTasks, rTaskData, topData, rExec);
 
         // Enqueued tasks that don't run indicate a deadlock
-        if ( ! std::ranges::all_of(rExec.m_taskQueuedCounts, [] (unsigned int n) { return n == 0; }))
+        if ( ! std::all_of(std::begin(rExec.m_taskQueuedCounts),
+                           std::end(rExec.m_taskQueuedCounts),
+                           [] (unsigned int n) { return n == 0; }))
         {
             OSP_LOG_ERROR("Deadlock detected!");
             debug_top_print_deadlock(rTags, rTasks, rTaskData, rExec);

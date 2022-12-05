@@ -615,7 +615,8 @@ Session setup_vehicle_spawn_rigid(
             // Add parts of each vehicle to its corresponding rigid group
             auto vehicleParts = arrayView(rVehicleSpawn.m_partEnts).exceptPrefix(*itOffsetParts);
             rScnParts.m_rigidToParts.emplace(*itRgdGroup, std::begin(vehicleParts), std::end(vehicleParts));
-            std::ranges::for_each(vehicleParts, [&rScnParts, rigid = *itRgdGroup] (PartEnt_t const part)
+            std::for_each(std::begin(vehicleParts), std::end(vehicleParts),
+                          [&rScnParts, rigid = *itRgdGroup] (PartEnt_t const part)
             {
                 rScnParts.m_partRigids[part] = rigid;
             });

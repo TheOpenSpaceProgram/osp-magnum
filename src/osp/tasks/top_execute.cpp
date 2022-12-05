@@ -55,7 +55,7 @@ void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rT
     // Run until there's no tasks left to run
     while (true)
     {
-        std::ranges::fill(tasksToRun, 0u);
+        std::fill(std::begin(tasksToRun), std::end(tasksToRun), 0u);
         task_list_available(tags, tasks, rExec, tasksToRun);
 
         auto const tasksToRunBits = lgrn::bit_view(tasksToRun);
@@ -91,7 +91,7 @@ void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rT
         if (enqueueHappened)
         {
             task_enqueue(tags, tasks, rExec, enqueue);
-            std::ranges::fill(enqueue, 0u);
+            std::fill(std::begin(enqueue), std::end(enqueue), 0u);
         }
 
         task_finish(tags, tasks, rExec, task);

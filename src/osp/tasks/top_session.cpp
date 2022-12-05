@@ -102,7 +102,7 @@ void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, 
                 rTags.m_tags.remove(tag);
 
                 auto tagDepends = depends2d[std::size_t(tag)].asContiguous();
-                std::ranges::fill(tagDepends, lgrn::id_null<TagId>());
+                std::fill(std::begin(tagDepends), std::end(tagDepends), lgrn::id_null<TagId>());
             }
         }
     }
