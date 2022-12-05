@@ -26,6 +26,9 @@
 #include <Magnum/GL/Version.h>
 #include <Magnum/GL/Shader.h>
 #include <Magnum/GL/Texture.h>
+
+// used by attachShaders
+#include <Corrade/Containers/Iterable.h>  // for Containers::Iterable
 #include <Corrade/Containers/Reference.h>
 
 using namespace osp::active;
@@ -38,7 +41,7 @@ FullscreenTriShader::FullscreenTriShader()
     vert.addFile("OSPData/adera/Shaders/FullscreenTri.vert");
     frag.addFile("OSPData/adera/Shaders/FullscreenTri.frag");
 
-    CORRADE_INTERNAL_ASSERT_OUTPUT(GL::Shader::compile({vert, frag}));
+    CORRADE_INTERNAL_ASSERT_OUTPUT(vert.compile() && frag.compile());
     attachShaders({vert, frag});
     CORRADE_INTERNAL_ASSERT_OUTPUT(link());
 

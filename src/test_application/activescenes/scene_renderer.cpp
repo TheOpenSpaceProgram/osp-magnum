@@ -190,7 +190,7 @@ Session setup_shader_visualizer(
     OSP_SESSION_ACQUIRE_DATA(visualizer, topData, TESTAPP_SHADER_VISUALIZER)
     auto &rDrawVisual = top_emplace< ACtxDrawMeshVisualizer >(topData, idDrawVisual);
 
-    rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Flag::Wireframe };
+    rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Configuration{}.setFlags(MeshVisualizer::Flag::Wireframe) };
     rDrawVisual.assign_pointers(rScnRender, rRenderGl);
 
     visualizer.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgGroupFwdMod}).data(

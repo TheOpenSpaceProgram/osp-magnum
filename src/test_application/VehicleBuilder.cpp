@@ -145,7 +145,7 @@ void VehicleBuilder::connect(MachAnyId const mach, std::initializer_list<Connect
         rPortMax = std::max<int>(rPortMax, connect.m_port.m_port + 1);
     }
 
-    for (NodeTypeId nodeType = 0; nodeType < rData.m_nodePerType.size(); ++nodeType)
+    for (NodeTypeId nodeType = 0; std::size_t(nodeType) < rData.m_nodePerType.size(); ++nodeType)
     {
         int const portMax = nodePortMax[nodeType];
         PerNodeType &rPerNodeType = rData.m_nodePerType[nodeType];
@@ -184,7 +184,7 @@ using osp::link::JuncCustom;
 VehicleData VehicleBuilder::finalize_release()
 {
     auto &rData = m_data.value();
-    for (NodeTypeId nodeType = 0; nodeType < rData.m_nodePerType.size(); ++nodeType)
+    for (NodeTypeId nodeType = 0; std::size_t(nodeType) < rData.m_nodePerType.size(); ++nodeType)
     {
         PerNodeType &rPerNodeType = rData.m_nodePerType[nodeType];
 

@@ -335,8 +335,8 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication &rApp, R
     auto const texturedFlags
             = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask
             | Phong::Flag::AmbientTexture;
-    pRenderer->m_phong.m_shaderDiffuse      = Phong{texturedFlags, 2};
-    pRenderer->m_phong.m_shaderUntextured   = Phong{{}, 2};
+    pRenderer->m_phong.m_shaderDiffuse      = Phong{Phong::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
+    pRenderer->m_phong.m_shaderUntextured   = Phong{Phong::Configuration{}.setLightCount(2)};
     pRenderer->m_phong.assign_pointers(pRenderer->m_renderGl, rRenderGl);
 
     // Select first camera for rendering
