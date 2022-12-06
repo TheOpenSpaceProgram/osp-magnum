@@ -51,7 +51,13 @@ using namespace Magnum::Math::Literals;
 namespace testapp::scenes
 {
 
-void add_floor(ArrayView<entt::any> const topData, Session const& scnCommon, Session const& material, Session const& shapeSpawn, TopDataId const idResources, PkgId const pkg)
+void add_floor(
+        ArrayView<entt::any> const  topData,
+        Session const&              scnCommon,
+        Session const&              material,
+        Session const&              shapeSpawn,
+        TopDataId const             idResources,
+        PkgId const                 pkg)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
@@ -143,14 +149,79 @@ void add_floor(ArrayView<entt::any> const topData, Session const& scnCommon, Ses
     });
 }
 
+Session setup_camera_ctrl(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              app,
+        Session const&              scnRender)
+{
+    OSP_SESSION_UNPACK_DATA(app,        TESTAPP_APP);
+    OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
+    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
+    auto &rUserInput = top_get< osp::input::UserInputHandler >(topData, idUserInput);
 
-Session setup_thrower(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& renderer, Session const& simpleCamera, Session const& shapeSpawn)
+    Session cameraCtrl;
+    OSP_SESSION_ACQUIRE_DATA(cameraCtrl, topData, TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_ACQUIRE_TAGS(cameraCtrl, rTags,   TESTAPP_CAMERA_CTRL);
+
+    rBuilder.tag(tgCamCtrlReq).depend_on({tgCamCtrlMod});
+
+    top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
+
+    cameraCtrl.task() = rBuilder.task().assign({tgRenderEvt, tgCamCtrlReq, tgCameraMod}).data(
+            "Position Rendering Camera according to Camera Controller",
+            TopDataIds_t{                            idCamCtrl,        idCamera},
+            wrap_args([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
+    {
+        rCamera.m_transform = rCamCtrl.m_transform;
+    }));
+
+    return cameraCtrl;
+}
+
+Session setup_camera_free(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              app,
+        Session const&              scnCommon,
+        Session const&              camera)
+{
+    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
+    OSP_SESSION_UNPACK_DATA(camera,     TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_TAGS(camera,     TESTAPP_CAMERA_CTRL);
+
+    Session cameraFree;
+
+    cameraFree.task() = rBuilder.task().assign({tgInputEvt, tgCamCtrlMod}).data(
+            "Move Camera",
+            TopDataIds_t{                      idCamCtrl,           idDeltaTimeIn},
+            wrap_args([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
+    {
+        SysCameraController::update_view(rCamCtrl, deltaTimeIn);
+        SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
+    }));
+
+    return cameraFree;
+}
+
+Session setup_thrower(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              magnum,
+        Session const&              renderer,
+        Session const&              simpleCamera,
+        Session const&              shapeSpawn)
 {
     OSP_SESSION_UNPACK_DATA(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_MAGNUMAPP);
-    OSP_SESSION_UNPACK_DATA(renderer,       TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
     OSP_SESSION_UNPACK_DATA(simpleCamera,   TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_TAGS(simpleCamera,   TESTAPP_CAMERA_CTRL);
 
     auto &rCamCtrl = top_get< ACtxCameraController > (topData, idCamCtrl);
 
@@ -159,15 +230,15 @@ Session setup_thrower(Builder_t& rBuilder, ArrayView<entt::any> const topData, T
 
     top_emplace< EButtonControlIndex > (topData, idBtnThrow, rCamCtrl.m_controls.button_subscribe("debug_throw"));
 
-    thrower.task() = rBuilder.task().assign({tgInputEvt, tgSpawnMod}).data(
+    thrower.task() = rBuilder.task().assign({tgInputEvt, tgSpawnMod, tgCamCtrlReq}).data(
             "Throw spheres when pressing space",
-            TopDataIds_t{                      idCamCtrl,        idCamera,              idSpawner,                   idBtnThrow},
-            wrap_args([] (ACtxCameraController& rCamCtrl, Camera& rCamera, SpawnerVec_t& rSpawner, EButtonControlIndex btnThrow) noexcept
+            TopDataIds_t{                      idCamCtrl,              idSpawner,                   idBtnThrow},
+            wrap_args([] (ACtxCameraController& rCamCtrl, SpawnerVec_t& rSpawner, EButtonControlIndex btnThrow) noexcept
     {
         // Throw a sphere when the throw button is pressed
         if (rCamCtrl.m_controls.button_held(btnThrow))
         {
-            Matrix4 const &camTf = rCamera.m_transform;
+            Matrix4 const &camTf = rCamCtrl.m_transform;
             float const speed = 120;
             float const dist = 8.0f;
             rSpawner.emplace_back(SpawnShape{
@@ -185,7 +256,12 @@ Session setup_thrower(Builder_t& rBuilder, ArrayView<entt::any> const topData, T
     return thrower;
 }
 
-Session setup_droppers(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& scnCommon, Session const& shapeSpawn)
+Session setup_droppers(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              shapeSpawn)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);

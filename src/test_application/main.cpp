@@ -332,14 +332,14 @@ void start_magnum_async()
         // Acquire data for Magnum Session. This will search for empty spaces in
         // g_appTopData, and add their indices to g_magnum.m_dataIds, and
         // declare them as variables: idUserInput, idActiveApp, idRenderGl
-        // see OSP_DATA_TESTAPP_MAGNUMAPP in identifiers.h
-        OSP_SESSION_ACQUIRE_DATA(g_magnum, g_appTopData, TESTAPP_MAGNUMAPP);
+        // see OSP_DATA_TESTAPP_APP_MAGNUM in identifiers.h
+        OSP_SESSION_ACQUIRE_DATA(g_magnum, g_appTopData, TESTAPP_APP_MAGNUM);
 
         // Acquire tags will reserve unique integer TagIds from g_tags, and
         // add them to g_magnum.m_tagIds. Variables are declared here too, but
         // are not used.
-        // see OSP_TAGS_TESTAPP_MAGNUMAPP in identifiers.h
-        [[maybe_unused]] OSP_SESSION_ACQUIRE_TAGS(g_magnum, g_tags, TESTAPP_MAGNUMAPP);
+        // see OSP_TAGS_TESTAPP_APP_MAGNUM in identifiers.h
+        [[maybe_unused]] OSP_SESSION_ACQUIRE_TAGS(g_magnum, g_tags, TESTAPP_APP_MAGNUM);
 
         // We now have reserved spaces in g_appTopData we can add data to
         // Order-dependent; ActiveApplication construction starts OpenGL context
@@ -394,7 +394,6 @@ void load_a_bunch_of_stuff()
                                lgrn::id_null<osp::TagId>());
     g_tags.m_tagLimits.resize(maxTagsInts);
     g_tags.m_tagExtern.resize(maxTagsInts);
-    g_tags.m_tagEnqueues.resize(maxTags, lgrn::id_null<osp::TagId>());
 
     g_application.m_dataIds = { osp::top_reserve(g_appTopData) };
 
@@ -512,13 +511,21 @@ void clear_resource_owners()
 
 void debug_print_help()
 {
+
+    std::size_t longestName = 0;
+    for (auto const& [name, rTestScn] : scenarios())
+    {
+        longestName = std::max(name.size(), longestName);
+    }
+
     std::cout
         << "OSP-Magnum Temporary Debug CLI\n"
-        << "Open a scene:\n";
+        << "Open a scenario:\n";
 
     for (auto const& [name, rTestScn] : scenarios())
     {
-        std::cout << "* " << name << " - " << rTestScn.m_desc << "\n";
+        std::string spaces(longestName - name.length(), ' ');
+        std::cout << "* " << name << spaces << " - " << rTestScn.m_desc << "\n";
     }
 
     std::cout

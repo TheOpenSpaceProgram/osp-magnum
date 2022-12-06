@@ -24,8 +24,13 @@
  */
 #pragma once
 
-#include "osp/Active/activetypes.h"
 #include "scenarios.h"
+
+#include <osp/Active/activetypes.h>
+#include <osp/CommonPhysics.h>
+#include <osp/Active/drawing.h>
+
+#include <entt/container/dense_map.hpp>
 
 namespace testapp::scenes
 {
@@ -38,16 +43,38 @@ inline auto const delete_ent_set = osp::wrap_args([] (osp::active::EntSet_t& rSe
     }
 });
 
-osp::Session setup_common_scene(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::TopDataId idResources);
+struct NamedMeshes
+{
+    // Required for std::is_copy_assignable to work properly inside of entt::any
+    NamedMeshes() = default;
+    NamedMeshes(NamedMeshes const& copy) = delete;
+    NamedMeshes(NamedMeshes&& move) = default;
 
+    entt::dense_map<osp::phys::EShape,
+                    osp::active::MeshIdOwner_t> m_shapeToMesh;
+    entt::dense_map<std::string_view,
+                    osp::active::MeshIdOwner_t> m_namedMeshs;
+};
+
+/**
+ * @brief Support for Time, ActiveEnts, Hierarchy, Transforms, Drawing, and more...
+ */
+osp::Session setup_common_scene(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::TopDataId              idResources,
+        osp::PkgId                  pkg);
+
+/**
+ * @brief Support a single material, aka: a Set of ActiveEnts and dirty flags
+ *
+ * Multiple material sessions can be setup for each material
+ */
 osp::Session setup_material(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& scnCommon);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon);
 
 }

@@ -33,6 +33,8 @@
 namespace osp
 {
 
+using bit_int_t = uint64_t;
+
 using Corrade::Containers::ArrayView;
 using TopDataId = uint32_t;
 using TopDataIds_t = std::initializer_list<TopDataId>;
@@ -48,6 +50,9 @@ struct WorkerContext
     };
 
     Corrade::Containers::ArrayView<LimitSlot> m_limitSlots;
+    Corrade::Containers::ArrayView<bit_int_t> m_enqueue;
+
+    bool & m_rEnqueueHappened;
 };
 
 enum class TopTaskStatus : uint8_t
@@ -57,6 +62,6 @@ enum class TopTaskStatus : uint8_t
     DidNothing  = 2
 };
 
-using TopTaskFunc_t = TopTaskStatus(*)(WorkerContext&, ArrayView<entt::any>) noexcept;
+using TopTaskFunc_t = TopTaskStatus(*)(WorkerContext, ArrayView<entt::any>) noexcept;
 
 } // namespace osp

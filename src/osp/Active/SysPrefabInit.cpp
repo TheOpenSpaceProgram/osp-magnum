@@ -42,76 +42,84 @@ namespace osp::active
 {
 
 void SysPrefabInit::init_hierarchy(
-        PrefabInitView_t                    prefabInits,
+        ACtxPrefabInit const&               rPrefabInit,
         Resources const&                    rResources,
         acomp_storage_t<ACompHierarchy>&    rHier) noexcept
 {
-    for (TmpPrefabInit const& rPrefab : prefabInits)
+    auto itPfEnts = std::begin(rPrefabInit.m_ents);
+
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
     {
-        auto &rImportData = rResources.data_get<osp::ImporterData const>(
-                gc_importer, rPrefab.m_importerRes);
-        auto &rPrefabData = rResources.data_get<osp::Prefabs const>(
-                gc_importer, rPrefab.m_importerRes);
+        auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
+                gc_importer, rPfBasic.m_importerRes);
 
-        std::size_t const objCount = rPrefabData.m_prefabs[rPrefab.m_prefabId].size();
-        auto const parents = rPrefabData.m_prefabParents[rPrefab.m_prefabId];
+        std::size_t const objCount = rPrefabData.m_prefabs[rPfBasic.m_prefabId].size();
+        auto const parents = rPrefabData.m_prefabParents[rPfBasic.m_prefabId];
 
-        for (int i = 0; i < objCount; ++i)
+        for (std::size_t i = 0; i < objCount; ++i)
         {
             ObjId const prefabParent = parents[i];
             ActiveEnt const parent = (prefabParent == -1)
-                    ? rPrefab.m_parent
-                    : rPrefab.m_prefabToEnt[prefabParent];
+                    ? rPfBasic.m_parent
+                    : (*itPfEnts)[prefabParent];
 
-            ActiveEnt const child = rPrefab.m_prefabToEnt[i];
+            ActiveEnt const child = (*itPfEnts)[i];
 
             SysHierarchy::add_child(rHier, parent, child);
         }
+
+        std::advance(itPfEnts, 1);
     }
 }
 
 void SysPrefabInit::init_transforms(
-        PrefabInitView_t                    prefabInits,
+        ACtxPrefabInit const&               rPrefabInit,
         Resources const&                    rResources,
         acomp_storage_t<ACompTransform>&    rTransform) noexcept
 {
-    for (TmpPrefabInit const& rPrefab : prefabInits)
+    auto itPfEnts = std::begin(rPrefabInit.m_ents);
+
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
-                gc_importer, rPrefab.m_importerRes);
+                gc_importer, rPfBasic.m_importerRes);
         auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
-                gc_importer, rPrefab.m_importerRes);
+                gc_importer, rPfBasic.m_importerRes);
 
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_prefabId];
-        auto const parents = rPrefabData.m_prefabParents[rPrefab.m_prefabId];
+        auto const objects = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
+        auto const parents = rPrefabData.m_prefabParents[rPfBasic.m_prefabId];
 
-        for (int i = 0; i < objects.size(); ++i)
+        for (std::size_t i = 0; i < objects.size(); ++i)
         {
             Matrix4 const& transform = (parents[i] == -1)
-                    ? *rPrefab.m_pTransform
+                    ? *rPfBasic.m_pTransform
                     : rImportData.m_objTransforms[objects[i]];
-            rTransform.emplace(rPrefab.m_prefabToEnt[i], transform);
+            rTransform.emplace((*itPfEnts)[i], transform);
         }
+
+        std::advance(itPfEnts, 1);
     }
 }
 
 void SysPrefabInit::init_drawing(
-        PrefabInitView_t                    prefabInits,
+        ACtxPrefabInit const&               rPrefabInit,
         Resources&                          rResources,
         ACtxDrawing&                        rCtxDraw,
         ACtxDrawingRes&                     rCtxDrawRes,
-        int                                 materialId) noexcept
+        std::optional<EntSetPair>           material) noexcept
 {
-    for (TmpPrefabInit const& rPrefab : prefabInits)
+    auto itPfEnts = std::begin(rPrefabInit.m_ents);
+
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
     {
-        auto &rImportData = rResources.data_get<osp::ImporterData const>(
-                gc_importer, rPrefab.m_importerRes);
-        auto &rPrefabData = rResources.data_get<osp::Prefabs const>(
-                gc_importer, rPrefab.m_importerRes);
+        auto const &rImportData = rResources.data_get<osp::ImporterData const>(
+                gc_importer, rPfBasic.m_importerRes);
+        auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
+                gc_importer, rPfBasic.m_importerRes);
 
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_prefabId];
+        auto const objects = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
 
-        for (int i = 0; i < objects.size(); ++i)
+        for (std::size_t i = 0; i < objects.size(); ++i)
         {
             // Check if object has mesh
             int const meshImportId = rImportData.m_objMeshes[objects[i]];
@@ -120,7 +128,7 @@ void SysPrefabInit::init_drawing(
                 continue;
             }
 
-            ActiveEnt const ent = rPrefab.m_prefabToEnt[i];
+            ActiveEnt const ent = (*itPfEnts)[i];
 
             osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
             MeshId const meshId = SysRender::own_mesh_resource(rCtxDraw, rCtxDrawRes, rResources, meshRes);
@@ -146,29 +154,39 @@ void SysPrefabInit::init_drawing(
 
             rCtxDraw.m_opaque.emplace(ent);
             rCtxDraw.m_visible.emplace(ent);
+
+            if (material.has_value())
+            {
+                material.value().m_rEnts.set(std::size_t(ent));
+                material.value().m_rDirty.push_back(ent);
+            }
         }
+
+        std::advance(itPfEnts, 1);
     }
 }
 
 void SysPrefabInit::init_physics(
-            PrefabInitView_t                    prefabInits,
+            ACtxPrefabInit const&               rPrefabInit,
             Resources const&                    rResources,
             ACtxPhysInputs&                     rPhysIn,
             ACtxPhysics&                        rCtxPhys,
             ACtxHierBody&                       rCtxHierBody) noexcept
 {
-    for (TmpPrefabInit const& rPrefab : prefabInits)
+    auto itPfEnts = std::begin(rPrefabInit.m_ents);
+
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
     {
-        auto &rImportData = rResources.data_get<osp::ImporterData const>(
-                gc_importer, rPrefab.m_importerRes);
-        auto &rPrefabData = rResources.data_get<osp::Prefabs const>(
-                gc_importer, rPrefab.m_importerRes);
+        auto const &rImportData = rResources.data_get<osp::ImporterData const>(
+                gc_importer, rPfBasic.m_importerRes);
+        auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
+                gc_importer, rPfBasic.m_importerRes);
 
-        auto const objects = rPrefabData.m_prefabs[rPrefab.m_prefabId];
+        auto const objects = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
 
-        for (int i = 0; i < objects.size(); ++i)
+        for (std::size_t i = 0; i < objects.size(); ++i)
         {
-            ActiveEnt const ent = rPrefab.m_prefabToEnt[i];
+            ActiveEnt const ent = (*itPfEnts)[i];
 
             // TODO: hasColliders should be set for each entity that has
             //       colliders, or descendents have colliders.
@@ -194,6 +212,8 @@ void SysPrefabInit::init_physics(
                 rCtxHierBody.m_ownDyn.emplace( ent, ACompSubBody{ inertia, mass } );
             }
         }
+
+        std::advance(itPfEnts, 1);
     }
 }
 

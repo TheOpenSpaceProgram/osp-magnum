@@ -30,29 +30,27 @@
 namespace testapp::scenes
 {
 
+/**
+ * @brief Magnum-powered OpenGL Renderer
+ */
 osp::Session setup_scene_renderer(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& magnum,
-        osp::Session const& scene,
-        osp::TopDataId idResources);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         magnum,
+        osp::Session const&         scene,
+        osp::TopDataId              idResources);
 
-osp::Session setup_simple_camera(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& magnum,
-        osp::Session const& scene,
-        osp::Session const& renderer);
-
+/**
+ * @brief Assign a material from setup_material to use Magnum MeshVisualizer
+ */
 osp::Session setup_shader_visualizer(
-        Builder_t& rBuilder,
-        osp::ArrayView<entt::any> topData,
-        osp::Tags& rTags,
-        osp::Session const& magnum,
-        osp::Session const& scene,
-        osp::Session const& renderer,
-        osp::Session const& material);
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         magnum,
+        osp::Session const&         scene,
+        osp::Session const&         scnRender,
+        osp::Session const&         material);
 
 }

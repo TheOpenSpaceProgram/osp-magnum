@@ -27,12 +27,12 @@
 namespace osp::link
 {
 
-NodeTypeId const gc_ntNumber = NodeTypeReg_t::create();
+NodeTypeId const gc_ntSigFloat = NodeTypeReg_t::create();
 
 void copy_machines(
         Machines const &rSrc,
         Machines &rDst,
-        Corrade::Containers::ArrayView<MachAnyId> remapMach)
+        Corrade::Containers::ArrayView<MachAnyId> remapMachOut)
 {
 
     for (MachAnyId const srcMach : rSrc.m_ids.bitview().zeros())
@@ -50,9 +50,11 @@ void copy_machines(
         rDst.m_machTypes.resize(rDst.m_ids.capacity());
         rDstPerMach.m_localToAny.resize(rDstPerMach.m_localIds.capacity());
 
-        rDstPerMach.m_localToAny[dstLocal] = dstMach;
-        rDst.m_machToLocal[dstMach] = dstLocal;
-        remapMach[srcMach] = dstMach;
+        rDstPerMach.m_localToAny[dstLocal]  = dstMach;
+        rDst.m_machTypes[dstMach]           = srcType;
+        rDst.m_machToLocal[dstMach]         = dstLocal;
+
+        remapMachOut[srcMach] = dstMach;
     }
 }
 

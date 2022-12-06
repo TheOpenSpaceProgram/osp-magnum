@@ -41,7 +41,7 @@ VehicleBuilder::~VehicleBuilder()
         m_pResources->owner_destroy(gc_importer, std::move(value.m_importer));
     }
 
-    for ([[maybe_unused]] auto && rPrefabPair : std::exchange(m_data.m_partPrefabs, {}))
+    for ([[maybe_unused]] auto && rPrefabPair : std::exchange(m_data->m_partPrefabs, {}))
     {
         m_pResources->owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
     }
@@ -55,7 +55,7 @@ void VehicleBuilder::set_prefabs(std::initializer_list<SetPrefab> const& setPref
         auto const& foundIt = m_prefabs.find(set.m_prefabName);
         if (foundIt != endIt)
         {
-            auto &rPrefabPair = m_data.m_partPrefabs[std::size_t(set.m_part)];
+            auto &rPrefabPair = m_data->m_partPrefabs[std::size_t(set.m_part)];
             rPrefabPair.m_prefabId = foundIt->second.m_prefabId;
             rPrefabPair.m_importer = m_pResources->owner_create(gc_importer, foundIt->second.m_importer);
         }
@@ -70,7 +70,7 @@ void VehicleBuilder::set_transform(std::initializer_list<SetTransform> const& se
 {
     for (SetTransform const& set : setTransform)
     {
-        m_data.m_partTransforms[std::size_t(set.m_part)] = set.m_transform;
+        m_data->m_partTransforms[std::size_t(set.m_part)] = set.m_transform;
     }
 }
 
@@ -90,7 +90,7 @@ void VehicleBuilder::index_prefabs()
             continue; // No prefab data
         }
 
-        for (int j = 0; j < pPrefabData->m_prefabNames.size(); ++j)
+        for (osp::PrefabId j = 0; j < pPrefabData->m_prefabNames.size(); ++j)
         {
             osp::ResIdOwner_t owner = m_pResources->owner_create(gc_importer, resId);
 
@@ -104,15 +104,16 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId const part,
                                                     MachTypeId const machType,
                                                     std::initializer_list<Connection> const& connections)
 {
-    osp::link::PerMachType &rPerMachType = m_data.m_machines.m_perType[machType];
+    auto &rData = m_data.value();
+    osp::link::PerMachType &rPerMachType = rData.m_machines.m_perType[machType];
 
-    MachTypeId const mach = m_data.m_machines.m_ids.create();
+    MachTypeId const mach = rData.m_machines.m_ids.create();
 
-    std::size_t const capacity = m_data.m_machines.m_ids.capacity();
-    m_data.m_machines.m_machTypes.resize(capacity);
-    m_data.m_machines.m_machToLocal.resize(capacity);
-    m_data.m_machToPart.resize(capacity);
-    for (PerNodeType &rPerNodeType : m_data.m_nodePerType)
+    std::size_t const capacity = rData.m_machines.m_ids.capacity();
+    rData.m_machines.m_machTypes.resize(capacity);
+    rData.m_machines.m_machToLocal.resize(capacity);
+    rData.m_machToPart.resize(capacity);
+    for (PerNodeType &rPerNodeType : rData.m_nodePerType)
     {
         rPerNodeType.m_machToNode.ids_reserve(capacity);
         rPerNodeType.m_machToNodeCustom.ids_reserve(capacity);
@@ -121,12 +122,12 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId const part,
     MachTypeId const local = rPerMachType.m_localIds.create();
     rPerMachType.m_localToAny.resize(rPerMachType.m_localIds.capacity());
 
-    m_data.m_machines.m_machTypes[mach] = machType;
-    m_data.m_machines.m_machToLocal[mach] = local;
+    rData.m_machines.m_machTypes[mach] = machType;
+    rData.m_machines.m_machToLocal[mach] = local;
     rPerMachType.m_localToAny[local] = mach;
 
-    m_data.m_partMachCount[std::size_t(part)] ++;
-    m_data.m_machToPart[mach] = part;
+    rData.m_partMachCount[std::size_t(part)] ++;
+    rData.m_machToPart[mach] = part;
 
     connect(mach, connections);
 
@@ -136,17 +137,18 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId const part,
 void VehicleBuilder::connect(MachAnyId const mach, std::initializer_list<Connection> const& connections)
 {
     // get max port count for each node type
-    std::vector<int> nodePortMax(m_data.m_nodePerType.size(), 0);
+    auto &rData = m_data.value();
+    std::vector<int> nodePortMax(rData.m_nodePerType.size(), 0);
     for (Connection const& connect : connections)
     {
         int &rPortMax = nodePortMax[connect.m_port.m_type];
         rPortMax = std::max<int>(rPortMax, connect.m_port.m_port + 1);
     }
 
-    for (NodeTypeId nodeType = 0; nodeType < m_data.m_nodePerType.size(); ++nodeType)
+    for (NodeTypeId nodeType = 0; std::size_t(nodeType) < rData.m_nodePerType.size(); ++nodeType)
     {
         int const portMax = nodePortMax[nodeType];
-        PerNodeType &rPerNodeType = m_data.m_nodePerType[nodeType];
+        PerNodeType &rPerNodeType = rData.m_nodePerType[nodeType];
         if (portMax != 0)
         {
             // reallocate each time :)
@@ -179,11 +181,12 @@ using osp::link::MachLocalId;
 using osp::link::Junction;
 using osp::link::JuncCustom;
 
-void VehicleBuilder::finalize_machines()
+VehicleData VehicleBuilder::finalize_release()
 {
-    for (NodeTypeId nodeType = 0; nodeType < m_data.m_nodePerType.size(); ++nodeType)
+    auto &rData = m_data.value();
+    for (NodeTypeId nodeType = 0; std::size_t(nodeType) < rData.m_nodePerType.size(); ++nodeType)
     {
-        PerNodeType &rPerNodeType = m_data.m_nodePerType[nodeType];
+        PerNodeType &rPerNodeType = rData.m_nodePerType[nodeType];
 
         // reserve node-to-machine partitions
         rPerNodeType.m_nodeToMach.data_reserve(rPerNodeType.m_connectCountTotal);
@@ -195,7 +198,7 @@ void VehicleBuilder::finalize_machines()
         }
 
         // assign node-to-machine
-        for (MachAnyId const mach : m_data.m_machines.m_ids.bitview().zeros())
+        for (MachAnyId const mach : rData.m_machines.m_ids.bitview().zeros())
         {
             lgrn::Span<NodeId> portSpan = rPerNodeType.m_machToNode[mach];
             lgrn::Span<JuncCustom> customSpan = rPerNodeType.m_machToNodeCustom[mach];
@@ -215,8 +218,8 @@ void VehicleBuilder::finalize_machines()
                 });
                 assert(found != std::end(juncSpan));
 
-                MachTypeId const type = m_data.m_machines.m_machTypes[mach];
-                MachLocalId const local = m_data.m_machines.m_machToLocal[mach];
+                MachTypeId const type = rData.m_machines.m_machTypes[mach];
+                MachLocalId const local = rData.m_machines.m_machToLocal[mach];
 
                 found->m_local  = local;
                 found->m_type   = type;
@@ -226,6 +229,10 @@ void VehicleBuilder::finalize_machines()
             }
         }
     }
+
+    VehicleData dataOut{std::move(*m_data)};
+    m_data.emplace();
+    return dataOut;
 }
 
 } // namespace testapp

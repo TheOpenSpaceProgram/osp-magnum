@@ -123,7 +123,7 @@ using PrefabId  = uint32_t;
 struct PrefabPair
 {
     ResIdOwner_t m_importer;
-    int m_prefabId;
+    PrefabId m_prefabId;
 };
 
 } // namespace osp

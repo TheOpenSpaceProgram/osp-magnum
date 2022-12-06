@@ -57,7 +57,7 @@ bool update_signal_nodes(
         Machines const&                                 machines,
         Corrade::Containers::ArrayView<VALUE_T const>   newValues,
         Corrade::Containers::ArrayView<VALUE_T>         currentValues,
-        UpdMachPerType_t&                               rUpdMach)
+        UpdMachPerType&                                 rUpdMach)
 {
     bool somethingNotified = false;
 
@@ -72,7 +72,12 @@ bool update_signal_nodes(
             if (junc.m_custom == gc_sigIn)
             {
                 somethingNotified = true;
-                rUpdMach[junc.m_type].m_localDirty.set(junc.m_local);
+
+                // A machine of type "junc.m_type" has new values to read
+                rUpdMach.m_machTypesDirty.set(junc.m_type);
+
+                // Specify using local Id on which machine needs to update
+                rUpdMach.m_localDirty[junc.m_type].set(junc.m_local);
             }
         }
     }

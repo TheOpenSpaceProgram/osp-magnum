@@ -176,7 +176,7 @@ TEST(Tasks, SingleThreaded)
 
             task_start(tags, tasks, exec, task);
             functions.m_taskData[std::size_t(task)](world);
-            task_finish(tags, tasks, exec, task, {});
+            task_finish(tags, tasks, exec, task);
         }
 
         ASSERT_TRUE(world.m_canvas.contains("Physics Cube"));

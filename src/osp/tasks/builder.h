@@ -105,9 +105,7 @@ public:
 
         TagRef& depend_on(Tags_t tags) noexcept
         {
-            std::size_t const offset = std::size_t(m_tagId) * m_rTags.m_tagDependsPerTag;
-            auto depends = Corrade::Containers::arrayView(m_rTags.m_tagDepends)
-                            .slice(offset, offset + m_rTags.m_tagDependsPerTag);
+            auto depends = osp::tag_depends_2d(m_rTags)[std::size_t(m_tagId)].asContiguous();
             auto const depBegin = std::begin(depends);
             auto const depEnd   = std::end(depends);
 
@@ -151,12 +149,6 @@ public:
             {
                 bitView.reset(std::size_t(m_tagId));
             }
-            return *this;
-        }
-
-        TagRef& enqueues(TagId enqueueTag)
-        {
-            m_rTags.m_tagEnqueues[std::size_t(m_tagId)] = enqueueTag;
             return *this;
         }
 

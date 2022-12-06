@@ -23,7 +23,6 @@
  * SOFTWARE.
  */
 #include "top_execute.h"
-#include "top_session.h"
 #include "top_worker.h"
 #include "execute_simple.h"
 
@@ -33,6 +32,7 @@
 
 #include <entt/core/any.hpp>
 
+#include <algorithm>
 #include <sstream>
 #include <vector>
 
@@ -45,16 +45,19 @@ namespace osp
 
 void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec)
 {
-    std::vector<entt::any> dataRefs;
-    WorkerContext context;
+    std::vector<entt::any> topDataRefs;
 
-    std::vector<uint64_t> tmpEnqueue(tags.m_tags.vec().size());
+    std::vector<uint64_t> enqueue(tags.m_tags.vec().size());
+
+    std::vector<uint64_t> tasksToRun(tasks.m_tasks.vec().size());
+
 
     // Run until there's no tasks left to run
     while (true)
     {
-        std::vector<uint64_t> tasksToRun(tasks.m_tasks.vec().size());
+        std::fill(std::begin(tasksToRun), std::end(tasksToRun), 0u);
         task_list_available(tags, tasks, rExec, tasksToRun);
+
         auto const tasksToRunBits = lgrn::bit_view(tasksToRun);
         unsigned int const availableCount = tasksToRunBits.count();
 
@@ -69,17 +72,29 @@ void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rT
         task_start(tags, tasks, rExec, task);
 
         TopTask &rTopTask = rTaskData.m_taskData.at(std::size_t(task));
-        dataRefs.resize(rTopTask.m_dataUsed.size());
-        for (std::size_t i = 0; i < rTopTask.m_dataUsed.size(); ++i)
+
+        topDataRefs.clear();
+        topDataRefs.reserve(rTopTask.m_dataUsed.size());
+        for (TopDataId const dataId : rTopTask.m_dataUsed)
         {
-            dataRefs.at(i) = topData[rTopTask.m_dataUsed[i]].as_ref();
+
+            topDataRefs.push_back((dataId != lgrn::id_null<TopDataId>())
+                                   ? topData[dataId].as_ref()
+                                   : entt::any{});
         }
 
-        TopTaskStatus const status = rTopTask.m_func(context, dataRefs);
+        bool enqueueHappened = false;
 
-        BitSpan_t enqueue = (status == TopTaskStatus::Success) ? tmpEnqueue : BitSpan_t{};
+        // Task actually runs here. Results are not yet used for anything.
+        rTopTask.m_func(WorkerContext{{}, {enqueue}, enqueueHappened}, topDataRefs);
 
-        task_finish(tags, tasks, rExec, task, enqueue);
+        if (enqueueHappened)
+        {
+            task_enqueue(tags, tasks, rExec, enqueue);
+            std::fill(std::begin(enqueue), std::end(enqueue), 0u);
+        }
+
+        task_finish(tags, tasks, rExec, task);
     }
 }
 
@@ -94,8 +109,13 @@ void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& r
     task_enqueue(tags, tasks, rExec, tagsToRun);
 }
 
-static void check_task_dependencies(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, std::vector<uint32_t> &rPath, uint32_t const task, bool& rGood)
+static void check_task_dependencies(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, ExecutionContext const &rExec, std::vector<uint32_t> &rPath, uint32_t const task, bool& rGood)
 {
+    if (rExec.m_taskQueuedCounts.at(task) == 0)
+    {
+        return; // Only consider queued tasks
+    }
+
     rPath.push_back(task);
 
     auto const taskTags2d   = task_tags_2d(tags, tasks);
@@ -130,7 +150,7 @@ static void check_task_dependencies(Tags const& tags, Tasks const& tasks, TopTas
             auto const &last = std::end(rPath);
             if (last == std::find(std::begin(rPath), last, currTask))
             {
-                check_task_dependencies(tags, tasks, taskData, rPath, currTask, rGood);
+                check_task_dependencies(tags, tasks, taskData, rExec, rPath, currTask, rGood);
             }
             else
             {
@@ -151,7 +171,7 @@ static void check_task_dependencies(Tags const& tags, Tasks const& tasks, TopTas
     rPath.pop_back();
 }
 
-bool debug_top_verify(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData)
+bool debug_top_print_deadlock(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, ExecutionContext const &rExec)
 {
     std::vector<uint32_t> path;
 
@@ -160,7 +180,7 @@ bool debug_top_verify(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t con
     // Iterate all tasks
     for (uint32_t const currTask : tasks.m_tasks.bitview().zeros())
     {
-        check_task_dependencies(tags, tasks, taskData, path, currTask, good);
+        check_task_dependencies(tags, tasks, taskData, rExec, path, currTask, good);
     }
 
     return good;

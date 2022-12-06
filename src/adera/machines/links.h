@@ -36,22 +36,22 @@ extern osp::link::MachTypeId const gc_mtMagicRocket;
 namespace ports_userctrl
 {
 using osp::link::PortEntry;
-using osp::link::gc_ntNumber;
+using osp::link::gc_ntSigFloat;
 using osp::link::gc_sigOut;
 
-PortEntry const gc_throttleOut      { gc_ntNumber, 0, gc_sigOut };
-PortEntry const gc_pitchOut         { gc_ntNumber, 1, gc_sigOut };
-PortEntry const gc_yawOut           { gc_ntNumber, 2, gc_sigOut };
-PortEntry const gc_rollOut          { gc_ntNumber, 3, gc_sigOut };
+PortEntry const gc_throttleOut      { gc_ntSigFloat, 0, gc_sigOut };
+PortEntry const gc_pitchOut         { gc_ntSigFloat, 1, gc_sigOut };
+PortEntry const gc_yawOut           { gc_ntSigFloat, 2, gc_sigOut };
+PortEntry const gc_rollOut          { gc_ntSigFloat, 3, gc_sigOut };
 }
 
 namespace ports_magicrocket
 {
 using osp::link::PortEntry;
-using osp::link::gc_ntNumber;
+using osp::link::gc_ntSigFloat;
 using osp::link::gc_sigIn;
 
-PortEntry const gc_throttleIn       { gc_ntNumber, 0, gc_sigIn };
+PortEntry const gc_throttleIn       { gc_ntSigFloat, 0, gc_sigIn };
 }
 
 } // namespace adera

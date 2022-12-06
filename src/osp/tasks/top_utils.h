@@ -106,48 +106,45 @@ template <typename T>
 template<typename FUNCTOR_T>
 struct wrap_args_trait
 {
-    template<typename ... ARGS_T, std::size_t ... INDEX_T>
-    static constexpr void apply_void(ArrayView<entt::any> topData, [[maybe_unused]] std::index_sequence<INDEX_T...> indices) noexcept
+    template<typename T>
+    static constexpr decltype(auto) cast_arg(ArrayView<entt::any> topData, WorkerContext ctx, std::size_t const argIndex)
     {
-        std::invoke(FUNCTOR_T{}, entt::any_cast<ARGS_T&>(topData[INDEX_T]) ...);
-    }
-
-    template<typename ... ARGS_T>
-    static TopTaskStatus wrapper_void([[maybe_unused]] WorkerContext& rCtx, ArrayView<entt::any> topData) noexcept
-    {
-        assert(topData.size() == sizeof...(ARGS_T));
-
-        apply_void<ARGS_T ...>(topData, std::make_index_sequence<sizeof...(ARGS_T)>{});
-
-        return TopTaskStatus::Success;
+        if constexpr (std::is_same_v<T, WorkerContext>)
+        {
+            return ctx; // WorkerContext gives ctx instead of casting
+        }
+        else
+        {
+            return entt::any_cast<T&>(topData[argIndex]);
+        }
     }
 
     template<typename ... ARGS_T, std::size_t ... INDEX_T>
-    static constexpr TopTaskStatus apply(ArrayView<entt::any> topData, [[maybe_unused]] std::index_sequence<INDEX_T...> indices) noexcept
-    {
-        return FUNCTOR_T{}(entt::any_cast<ARGS_T&>(topData[INDEX_T]) ...);
-    }
-
-    template<typename ... ARGS_T>
-    static TopTaskStatus wrapper([[maybe_unused]] WorkerContext& rCtx, ArrayView<entt::any> topData) noexcept
+    static constexpr decltype(auto) cast_args(ArrayView<entt::any> topData, WorkerContext ctx, [[maybe_unused]] std::index_sequence<INDEX_T...> indices) noexcept
     {
         assert(topData.size() == sizeof...(ARGS_T));
-
-        return apply<ARGS_T ...>(topData, std::make_index_sequence<sizeof...(ARGS_T)>{});
+        return FUNCTOR_T{}(cast_arg<ARGS_T>(topData, ctx, INDEX_T) ...);
     }
 
-    template<typename ... ARGS_T>
-    static constexpr TopTaskFunc_t unpack([[maybe_unused]] TopTaskStatus(*func)(ARGS_T...))
+    template<typename RETURN_T, typename ... ARGS_T>
+    static TopTaskStatus wrapped_task([[maybe_unused]] WorkerContext ctx, ArrayView<entt::any> topData) noexcept
     {
-        // Parameter pack used to extract function arguments, func is discarded
-        return &wrapper<ARGS_T ...>;
+        if constexpr (std::is_void_v<RETURN_T>)
+        {
+            cast_args<ARGS_T ...>(topData, ctx, std::make_index_sequence<sizeof...(ARGS_T)>{});
+            return TopTaskStatus::Success;
+        }
+        else if constexpr (std::is_same_v<RETURN_T, TopTaskStatus>)
+        {
+            return cast_args<ARGS_T ...>(topData, ctx, std::make_index_sequence<sizeof...(ARGS_T)>{});
+        }
     }
 
-    template<typename ... ARGS_T>
-    static constexpr TopTaskFunc_t unpack([[maybe_unused]] void(*func)(ARGS_T...))
+    // Extract arguments and return type from function pointer
+    template<typename RETURN_T, typename ... ARGS_T>
+    static constexpr TopTaskFunc_t unpack([[maybe_unused]] RETURN_T(*func)(ARGS_T...))
     {
-        // Parameter pack used to extract function arguments, func is discarded
-        return &wrapper_void<ARGS_T ...>;
+        return &wrapped_task<RETURN_T, ARGS_T ...>;
     }
 };
 

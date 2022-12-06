@@ -22,11 +22,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "scene_common.h"
+#include "scene_renderer.h"
 #include "scenarios.h"
 #include "identifiers.h"
-
-#include "CameraController.h"
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <osp/Active/SysRender.h>
@@ -47,12 +45,18 @@ namespace testapp::scenes
 {
 
 
-Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnCommon, TopDataId const idResources)
+Session setup_scene_renderer(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              magnum,
+        Session const&              scnCommon,
+        TopDataId const             idResources)
 {
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_MAGNUMAPP);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_MAGNUMAPP);
+    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
 
     Session renderer;
     OSP_SESSION_ACQUIRE_DATA(renderer, topData, TESTAPP_COMMON_RENDERER);
@@ -73,6 +77,7 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
     rBuilder.tag(tgTexGlReq)            .depend_on({tgTexGlMod});
     rBuilder.tag(tgEntTexReq)           .depend_on({tgEntTexMod});
     rBuilder.tag(tgEntMeshReq)          .depend_on({tgEntMeshMod});
+    rBuilder.tag(tgCameraReq)           .depend_on({tgCameraMod});
     rBuilder.tag(tgGroupFwdMod)         .depend_on({tgGroupFwdDel});
     rBuilder.tag(tgGroupFwdReq)         .depend_on({tgGroupFwdDel, tgGroupFwdMod});
     rBuilder.tag(tgDrawTransformNew)    .depend_on({tgDrawTransformDel});
@@ -104,8 +109,10 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
         SysRenderGL::assign_meshes(rDrawing.m_mesh, rDrawingRes.m_meshToRes, rDrawing.m_meshDirty, rScnRender.m_meshId, rRenderGl);
     }));
 
+    // TODO: Separate forward renderer into different tasks to allow other
+    //       rendering techniques
 
-    renderer.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgDrawTransformReq, tgGroupFwdReq, tgDrawReq, tgEntTexMod, tgEntMeshMod}).data(
+    renderer.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgDrawTransformReq, tgGroupFwdReq, tgDrawReq, tgCameraReq, tgEntTexMod, tgEntMeshMod}).data(
             "Render and display scene",
             TopDataIds_t{                   idDrawing,          idRenderGl,                   idGroupFwd,              idCamera},
             wrap_args([] (ACtxDrawing const& rDrawing, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera) noexcept
@@ -160,46 +167,20 @@ Session setup_scene_renderer(Builder_t& rBuilder, ArrayView<entt::any> const top
     return renderer;
 }
 
-
-Session setup_simple_camera(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnCommon, Session const& renderer)
-{
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_MAGNUMAPP);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_MAGNUMAPP);
-    OSP_SESSION_UNPACK_DATA(renderer,   TESTAPP_COMMON_RENDERER);
-    auto &rUserInput = top_get< UserInputHandler >(topData, idUserInput);
-
-    Session simpleCamera;
-    OSP_SESSION_ACQUIRE_DATA(simpleCamera, topData, TESTAPP_CAMERA_CTRL);
-
-    auto &rCamCtrl = top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
-    rCamCtrl.m_target = {0.0f, 0.0f, 1.0f};
-
-    simpleCamera.task() = rBuilder.task().assign({tgInputEvt, tgGlUse}).data(
-            "Move Camera",
-            TopDataIds_t{                      idCamCtrl,        idCamera,           idDeltaTimeIn},
-            wrap_args([] (ACtxCameraController& rCamCtrl, Camera& rCamera, float const deltaTimeIn) noexcept
-    {
-        SysCameraController::update_view(rCamCtrl,
-                rCamera.m_transform, deltaTimeIn);
-        SysCameraController::update_move(
-                rCamCtrl,
-                rCamera.m_transform,
-                deltaTimeIn, true);
-    }));
-
-    return simpleCamera;
-}
-
-
-
-Session setup_shader_visualizer(Builder_t& rBuilder, ArrayView<entt::any> const topData, Tags& rTags, Session const& magnum, Session const& scnCommon, Session const& renderer, Session const& material)
+Session setup_shader_visualizer(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              magnum,
+        Session const&              scnCommon,
+        Session const&              scnRender,
+        Session const&              material)
 {
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_MAGNUMAPP);
-    OSP_SESSION_UNPACK_TAGS(renderer,   TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_DATA(renderer,   TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
     OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
     auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);
@@ -209,7 +190,7 @@ Session setup_shader_visualizer(Builder_t& rBuilder, ArrayView<entt::any> const 
     OSP_SESSION_ACQUIRE_DATA(visualizer, topData, TESTAPP_SHADER_VISUALIZER)
     auto &rDrawVisual = top_emplace< ACtxDrawMeshVisualizer >(topData, idDrawVisual);
 
-    rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Flag::Wireframe };
+    rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Configuration{}.setFlags(MeshVisualizer::Flag::Wireframe) };
     rDrawVisual.assign_pointers(rScnRender, rRenderGl);
 
     visualizer.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgGroupFwdMod}).data(

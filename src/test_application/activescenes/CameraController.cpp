@@ -42,9 +42,7 @@ using osp::Matrix4;
 using osp::Quaternion;
 using osp::Vector3;
 
-void SysCameraController::update_view(
-        ACtxCameraController& rCtrl, Matrix4& rCamTf,
-        float const delta)
+void SysCameraController::update_view(ACtxCameraController& rCtrl, float const delta)
 {
     // Process control inputs
 
@@ -79,7 +77,7 @@ void SysCameraController::update_view(
                               ->scroll_state().offset.y());
 
     Vector3 const up
-            = rCtrl.m_up.isZero() ? rCamTf.up() : rCtrl.m_up;
+            = rCtrl.m_up.isZero() ? rCtrl.m_transform.up() : rCtrl.m_up;
 
     // Prevent pitch overshoot if up is defined
     if ( ! rCtrl.m_up.isZero())
@@ -87,7 +85,7 @@ void SysCameraController::update_view(
         using Magnum::Math::angle;
         using Magnum::Math::clamp;
 
-        Rad const currentPitch = angle(rCtrl.m_up, -rCamTf.backward());
+        Rad const currentPitch = angle(rCtrl.m_up, -rCtrl.m_transform.backward());
         Rad const nextPitch = currentPitch - pitch;
 
         // Limit from 1 degree (looking down) to 179 degrees (looking up)
@@ -111,15 +109,15 @@ void SysCameraController::update_view(
         // Convert requested rotation to quaternion
         Quaternion const rotationDelta
                 = Quaternion::rotation(yaw, up)
-                * Quaternion::rotation(pitch, rCamTf.right());
+                * Quaternion::rotation(pitch, rCtrl.m_transform.right());
 
         Vector3 const translation
                 = rCtrl.m_target.value()
                 + rotationDelta.transformVector(
-                    rCamTf.backward() * rCtrl.m_orbitDistance);
+                    rCtrl.m_transform.backward() * rCtrl.m_orbitDistance);
 
         // look at target
-        rCamTf = Matrix4::lookAt( translation, rCtrl.m_target.value(), up);
+        rCtrl.m_transform = Matrix4::lookAt(translation, rCtrl.m_target.value(), up);
     }
     else
     {
@@ -128,7 +126,7 @@ void SysCameraController::update_view(
 }
 
 void SysCameraController::update_move(
-        ACtxCameraController& rCtrl, Matrix4& rCamTf,
+        ACtxCameraController& rCtrl,
         float const delta, bool const moveTarget)
 {
     ControlSubscriber const& controls = rCtrl.m_controls;
@@ -143,12 +141,12 @@ void SysCameraController::update_move(
     );
 
     Vector3 const translation
-            = (   rCamTf.right()    * command.x()
-                + rCamTf.up()       * command.y()
-                + rCamTf.backward() * command.z())
+            = (   rCtrl.m_transform.right()    * command.x()
+                + rCtrl.m_transform.up()       * command.y()
+                + rCtrl.m_transform.backward() * command.z())
             * delta * rCtrl.m_moveSpeed * rCtrl.m_orbitDistance;
 
-    rCamTf.translation() += translation;
+    rCtrl.m_transform.translation() += translation;
 
     if (moveTarget)
     {

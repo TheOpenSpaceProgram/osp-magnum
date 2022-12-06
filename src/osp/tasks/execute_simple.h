@@ -112,16 +112,13 @@ void task_list_available(Tags const& tags, Tasks const& tasks, ExecutionContext 
 void task_start(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId task);
 
 /**
- * @brief Mark a task as finished in an ExecutionContext, and potentially
- *        enqueue more tasks if the finished task has enqueue tags
+ * @brief Mark a task as finished in an ExecutionContext
  *
  * @param tags          [in] Tags
  * @param tasks         [in] Tasks
  * @param rExec         [ref] ExecutionContext to record running tasks
  * @param task          [in] Id of task to finish
- * @param tmpEnqueue    [ref] Temporary bit buffer for tasks to enqueue. Pass
- *                            empty to disable any enqueues
  */
-void task_finish(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId task, BitSpan_t tmpEnqueue);
+void task_finish(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId task);
 
 } // namespace osp

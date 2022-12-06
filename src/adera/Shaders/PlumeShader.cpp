@@ -39,10 +39,8 @@
 
 #include <Magnum/Magnum.h>                // for Int, Color4, Matrix3x3, Matrix4
 
-// Needed to make the following line of code compile, for unknown reasons.
-// CORRADE_INTERNAL_ASSERT_OUTPUT(GL::Shader::compile({vert, frag}));
-#include <Corrade/Containers/Reference.h> // IWYU pragma: keep
-#include "Corrade/Containers/ArrayView.h" // for ArrayView
+// used by attachShaders
+#include <Corrade/Containers/Iterable.h>  // for Containers::Iterable
 
 #include <Corrade/Utility/Assert.h>       // for CORRADE_INTERNAL_ASSERT_OUTPUT
 
@@ -121,7 +119,7 @@ void PlumeShader::init()
     vert.addFile("OSPData/adera/Shaders/PlumeShader.vert");
     frag.addFile("OSPData/adera/Shaders/PlumeShader.frag");
 
-    CORRADE_INTERNAL_ASSERT_OUTPUT(GL::Shader::compile({vert, frag}));
+    CORRADE_INTERNAL_ASSERT_OUTPUT(vert.compile() && frag.compile());
     attachShaders({vert, frag});
     CORRADE_INTERNAL_ASSERT_OUTPUT(link());
 

@@ -31,6 +31,8 @@
 
 #include <longeron/containers/bit_view.hpp>
 
+#include <algorithm>
+
 using Corrade::Containers::ArrayView;
 using Corrade::Containers::StridedArrayView2D;
 using Corrade::Containers::arrayView;
@@ -70,17 +72,25 @@ void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, 
         }
     }
 
+    auto const tagInts2d = task_tags_2d(rTags, rTasks);
+
     // Clear each session's tasks
     for (Session &rSession : sessions)
     {
         for (TaskId const task : rSession.m_taskIds)
         {
-            rTasks.m_tasks.remove(TaskId(task));
+            rTasks.m_tasks.remove(task);
+
+            auto taskTagInts = tagInts2d[std::size_t(task)].asContiguous();
+            lgrn::bit_view(taskTagInts).reset();
+
             TopTask &rCurrTaskData = rTaskData.m_taskData[std::size_t(task)];
             rCurrTaskData.m_dataUsed.clear();
             rCurrTaskData.m_func = nullptr;
         }
     }
+
+    auto const depends2d = tag_depends_2d(rTags);
 
     // Clear each session's tags
     for (Session &rSession : sessions)
@@ -90,6 +100,9 @@ void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, 
             if (tag != lgrn::id_null<TagId>())
             {
                 rTags.m_tags.remove(tag);
+
+                auto tagDepends = depends2d[std::size_t(tag)].asContiguous();
+                std::fill(std::begin(tagDepends), std::end(tagDepends), lgrn::id_null<TagId>());
             }
         }
     }
