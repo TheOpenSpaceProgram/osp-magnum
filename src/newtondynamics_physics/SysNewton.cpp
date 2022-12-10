@@ -86,10 +86,10 @@ void SysNewton::cb_force_torque(const NewtonBody* pBody, dFloat timestep, int th
     Vector3 force{0.0f};
     Vector3 torque{0.0f};
 
-    auto forcesBits = lgrn::bit_view(pWorldCtx->m_bodyForces[bodyId]);
-    for (std::size_t const forceIdx : forcesBits.ones())
+    auto factorBits = lgrn::bit_view(pWorldCtx->m_bodyFactors[bodyId]);
+    for (std::size_t const factorIdx : factorBits.ones())
     {
-        ACtxNwtWorld::ForceFactor const& factor = pWorldCtx->m_forces[forceIdx];
+        ACtxNwtWorld::ForceFactorFunc const& factor = pWorldCtx->m_factors[factorIdx];
 
         factor.m_func(pBody, bodyId, *pWorldCtx, factor.m_userData, force, torque);
     }
@@ -119,7 +119,7 @@ void SysNewton::resize_body_data(ACtxNwtWorld& rCtxWorld)
     std::size_t const capacity = rCtxWorld.m_bodyIds.capacity();
     rCtxWorld.m_bodyPtrs    .resize(capacity);
     rCtxWorld.m_bodyToEnt   .resize(capacity);
-    rCtxWorld.m_bodyForces  .resize(capacity);
+    rCtxWorld.m_bodyFactors .resize(capacity);
 }
 
 NewtonCollision* SysNewton::create_primative(
@@ -193,30 +193,6 @@ void SysNewton::update_translate(ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld)
             NewtonBodySetMatrix(pBody, matrix.data());
         }
     }
-}
-
-static NewtonCollision* update_newton_collider(
-        ACtxPhysics &rCtxPhys,
-        ACtxNwtWorld &rCtxWorld,
-        ActiveEnt ent) noexcept
-{
-    EShape const shape = rCtxPhys.m_shape[std::size_t(ent)];
-
-    NewtonWorld const *pNwtWorld = rCtxWorld.m_world.get();
-    NewtonCollision *pNwtCollider = nullptr;
-
-    if (rCtxWorld.m_colliders.contains(ent))
-    {
-        // Replace existing Newton collider component
-        rCtxWorld.m_colliders.get(ent).reset(pNwtCollider);
-    }
-    else
-    {
-        // Add new Newton collider component
-        rCtxWorld.m_colliders.emplace(ent, pNwtCollider);
-    }
-
-    return pNwtCollider;
 }
 
 using Corrade::Containers::ArrayView;

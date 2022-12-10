@@ -65,7 +65,7 @@ struct TmpPrefabInitBasic
 
 struct ACtxPrefabInit
 {
-    std::vector<TmpPrefabInitBasic>             m_basic;
+    std::vector<TmpPrefabInitBasic>             m_basicIn;
     std::vector< ArrayView<ActiveEnt const> >   m_ents;
 
     std::vector<ActiveEnt>                      m_newEnts;

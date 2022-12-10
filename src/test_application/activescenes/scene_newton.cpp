@@ -95,19 +95,19 @@ Session setup_newton(
     return newton;
 }
 
-osp::Session setup_newton_force_set(
+osp::Session setup_newton_factors(
         Builder_t&                  rBuilder,
         ArrayView<entt::any>        topData,
         Tags&                       rTags)
 {
-    Session nwtForces;
-    OSP_SESSION_ACQUIRE_DATA(nwtForces, topData, TESTAPP_NEWTON_FORCES);
+    Session nwtFactors;
+    OSP_SESSION_ACQUIRE_DATA(nwtFactors, topData, TESTAPP_NEWTON_FORCES);
 
-    auto &rForces = top_emplace<ForceSet_t>(topData, idNwtForces);
+    auto &rFactors = top_emplace<ForceFactors_t>(topData, idNwtFactors);
 
-    std::fill(rForces.begin(), rForces.end(), 0);
+    std::fill(rFactors.begin(), rFactors.end(), 0);
 
-    return nwtForces;
+    return nwtFactors;
 }
 
 osp::Session setup_newton_force_accel(
@@ -115,19 +115,21 @@ osp::Session setup_newton_force_accel(
         ArrayView<entt::any>        topData,
         Tags&                       rTags,
         Session const&              newton,
-        Session const&              nwtForce,
+        Session const&              nwtFactors,
         Vector3                     accel)
 {
-    using UserData_t = ACtxNwtWorld::ForceFactor::UserData_t;
+    using UserData_t = ACtxNwtWorld::ForceFactorFunc::UserData_t;
     OSP_SESSION_UNPACK_DATA(newton,     TESTAPP_NEWTON);
-    OSP_SESSION_UNPACK_DATA(nwtForce,   TESTAPP_NEWTON_FORCES);
+    OSP_SESSION_UNPACK_DATA(nwtFactors, TESTAPP_NEWTON_FORCES);
+
+    auto &rNwt      = top_get<ACtxNwtWorld>(topData, idNwt);
 
     Session nwtAccel;
     OSP_SESSION_ACQUIRE_DATA(nwtAccel, topData, TESTAPP_NEWTON_ACCEL);
 
-    auto &rAccel = top_emplace<Vector3>(topData, idAcceleration, accel);
+    auto &rAccel    = top_emplace<Vector3>(topData, idAcceleration, accel);
 
-    ACtxNwtWorld::ForceFactor const factor
+    ACtxNwtWorld::ForceFactorFunc const factor
     {
         .m_func = [] (NewtonBody const* pBody, BodyId const bodyID, ACtxNwtWorld const& rNwt, UserData_t data, Vector3& rForce, Vector3& rTorque) noexcept
         {
@@ -142,12 +144,12 @@ osp::Session setup_newton_force_accel(
     };
 
     // Register force
-    auto &rNwt = top_get<ACtxNwtWorld>(topData, idNwt);
-    std::size_t const index = rNwt.m_forces.size();
-    rNwt.m_forces.emplace_back(factor);
 
-    auto forcesBits = lgrn::bit_view(top_get<ForceSet_t>(topData, idNwtForces));
-    forcesBits.set(index);
+    std::size_t const index = rNwt.m_factors.size();
+    rNwt.m_factors.emplace_back(factor);
+
+    auto factorBits = lgrn::bit_view(top_get<ForceFactors_t>(topData, idNwtFactors));
+    factorBits.set(index);
 
     return nwtAccel;
 }
@@ -161,7 +163,7 @@ Session setup_shape_spawn_newton(
         Session const&              physics,
         Session const&              shapeSpawn,
         Session const&              newton,
-        Session const&              nwtForces)
+        Session const&              nwtFactors)
 {
     Session shapeSpawnNwt;
 
@@ -173,12 +175,12 @@ Session setup_shape_spawn_newton(
     OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_DATA(newton,     TESTAPP_NEWTON);
-    OSP_SESSION_UNPACK_DATA(nwtForces,  TESTAPP_NEWTON_FORCES);
+    OSP_SESSION_UNPACK_DATA(nwtFactors, TESTAPP_NEWTON_FORCES);
 
     shapeSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgPhysBodyMod}).data(
             "Add physics to spawned shapes",
-            TopDataIds_t{                   idActiveIds,              idSpawner,             idSpawnerEnts,             idPhys,              idNwt,          idNwtForces },
-            wrap_args([] (ActiveReg_t const &rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ForceSet_t nwtForces) noexcept
+            TopDataIds_t{                   idActiveIds,              idSpawner,             idSpawnerEnts,             idPhys,              idNwt,              idNwtFactors },
+            wrap_args([] (ActiveReg_t const &rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ForceFactors_t nwtFactors) noexcept
     {
         for (std::size_t i = 0; i < rSpawner.size(); ++i)
         {
@@ -195,8 +197,8 @@ Session setup_shape_spawn_newton(
 
             rNwt.m_bodyPtrs[bodyId].reset(pBody);
 
-            rNwt.m_bodyToEnt[bodyId] = root;
-            rNwt.m_bodyForces[bodyId] = nwtForces;
+            rNwt.m_bodyToEnt[bodyId]    = root;
+            rNwt.m_bodyFactors[bodyId]  = nwtFactors;
             rNwt.m_entToBody.emplace(root, bodyId);
 
             Vector3 const inertia = collider_inertia_tensor(spawn.m_shape, spawn.m_size, spawn.m_mass);
@@ -290,8 +292,13 @@ Session setup_vehicle_spawn_newton(
     OSP_SESSION_UNPACK_TAGS(parts,              TESTAPP_PARTS);
 
     Session vehicleSpawnNwt;
+    //OSP_SESSION_ACQUIRE_DATA(vehicleSpawnNwt, topData, TESTAPP_VEHICLE_SPAWN_NWT);
+    OSP_SESSION_ACQUIRE_TAGS(vehicleSpawnNwt, rTags,   TESTAPP_VEHICLE_SPAWN_NWT);
 
-    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgEntNew, tgVehicleSpawnReq, tgVSpawnRgdReq, tgVSpawnRgdEntMod}).data(
+    rBuilder.tag(tgNwtVhWeldEntReq)     .depend_on({tgNwtVhWeldEntMod});
+    rBuilder.tag(tgNwtVhHierReq)        .depend_on({tgNwtVhHierMod});
+
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgEntNew, tgNwtVhWeldEntMod}).data(
             "Create entity for each rigid group",
             TopDataIds_t{             idActiveIds,                  idVehicleSpawn,           idScnParts },
             wrap_args([] (ActiveReg_t& rActiveIds, ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts) noexcept
@@ -313,7 +320,7 @@ Session setup_vehicle_spawn_newton(
         }
     }));
 
-    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierMod, tgPrefabEntReq, tgHierMod, tgTransformNew}).data(
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgVhSpWeldReq, tgNwtVhWeldEntReq, tgNwtVhHierMod, tgPfParentHierMod, tgPrefabEntReq, tgHierMod, tgTransformNew}).data(
             "Add vehicle entities to Scene Graph",
             TopDataIds_t{           idBasic,                   idActiveIds,                        idVehicleSpawn,           idScnParts,                idPrefabInit,           idResources },
             wrap_args([] (ACtxBasic& rBasic, ActiveReg_t const& rActiveIds, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
@@ -358,7 +365,7 @@ Session setup_vehicle_spawn_newton(
                 {
                     NewPartId const newPart = rVehicleSpawn.m_partToNewPart[part];
                     uint32_t const prefabInit   = rVehicleSpawn.m_newPartPrefabs[newPart];
-                    auto const& basic           = rPrefabInit.m_basic[prefabInit];
+                    auto const& basic           = rPrefabInit.m_basicIn[prefabInit];
                     auto const& ents            = rPrefabInit.m_ents[prefabInit];
 
                     SysPrefabInit::add_to_subtree(basic, ents, rResources, bldWeld);
@@ -369,7 +376,7 @@ Session setup_vehicle_spawn_newton(
         }
     }));
 
-    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdEntReq, tgPfParentHierReq, tgPhysBodyMod}).data(
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgVhSpWeldReq, tgNwtVhWeldEntReq, tgNwtVhHierReq, tgPfParentHierReq, tgPhysBodyMod}).data(
             "Add physics to rigid group entities",
             TopDataIds_t{                   idActiveIds,           idBasic,             idPhys,              idNwt,                        idVehicleSpawn,                 idScnParts  },
             wrap_args([] (ActiveReg_t const &rActiveIds, ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts) noexcept
@@ -417,7 +424,7 @@ Session setup_vehicle_spawn_newton(
 
                 rNwt.m_bodyPtrs[bodyId].reset(pBody);
                 rNwt.m_bodyToEnt[bodyId] = weldEnt;
-                rNwt.m_bodyForces[bodyId] = {1};
+                rNwt.m_bodyFactors[bodyId] = {1}; // TODO: temporary
                 rNwt.m_entToBody.emplace(weldEnt, bodyId);
 
                 Vector3 const inertia = {1.0f, 1.0f, 1.0f};

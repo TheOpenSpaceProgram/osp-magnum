@@ -33,6 +33,6 @@ namespace ospnewton
 // Each rigid body is given 64 bits to enable/disable forces
 // These determine which physics calculations are required for a certain
 // rigid body, such as gravity, thurst, or aerodynamics.
-using ForceSet_t = std::array<uint64_t, 1u>;
+using ForceFactors_t = std::array<uint64_t, 1u>;
 
 }

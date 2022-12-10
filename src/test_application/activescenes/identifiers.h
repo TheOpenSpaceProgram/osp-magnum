@@ -25,8 +25,22 @@
 #pragma once
 
 // Identifiers made for OSP_ACQUIRE_* and OSP_UNPACK_* macros
-// Used to set counts and declare variable names for TopDataIds and TagIds
+// Used to declare variable names for TopDataIds and TagIds
 // #define OSP_[DATA/TAGS]_NAME <# of identifiers>, a, b, c, d, ...
+
+// Tag naming:
+//
+// tg...Evt: Event, tasks with these tags are enqueued externally
+// tg...New: Adds new instances
+// tg...Del: Deletes instances
+// tg...Mod: Modifies some data
+// tg...Req: Requires some data after its modified
+// tg...Clr: Clears a queue after its used
+//
+// * Tasks with a tg...Req tag will run AFTER its corresponding tg...Mod tag
+// * New often depends on Delete, as deleting instances first leaves empty
+//   spaces in a container, best immediately filled with new instances
+//
 
 // Scene sessions
 
@@ -67,31 +81,11 @@
 
 
 
-#define OSP_DATA_TESTAPP_NEWTON 1, \
-    idNwt
-
-
-
-#define OSP_DATA_TESTAPP_NEWTON_FORCES 1, \
-    idNwtForces
-
-
-
-#define OSP_DATA_TESTAPP_NEWTON_ACCEL 1, \
-    idAcceleration
-
-
-
 #define OSP_DATA_TESTAPP_SHAPE_SPAWN 2, \
     idSpawner, idSpawnerEnts
 #define OSP_TAGS_TESTAPP_SHAPE_SPAWN 5, \
     tgSpawnMod,         tgSpawnReq,         tgSpawnClr,         \
     tgSpawnEntMod,      tgSpawnEntReq
-
-
-
-#define OSP_DATA_TESTAPP_SHAPE_SPAWN_NWT 1, \
-    idSpawnNwtForces
 
 
 
@@ -104,13 +98,6 @@
 
 
 
-#define OSP_DATA_TESTAPP_GRAVITY 1, \
-    idGravity
-#define OSP_TAGS_TESTAPP_GRAVITY 3, \
-    tgGravityReq,       tgGravityDel,       tgGravityNew
-
-
-
 #define OSP_DATA_TESTAPP_BOUNDS 1, \
     idBounds
 #define OSP_TAGS_TESTAPP_BOUNDS 3, \
@@ -120,8 +107,10 @@
 
 #define OSP_DATA_TESTAPP_PARTS 4, \
     idScnParts, idPartInit, idUpdMach, idMachEvtTags
-#define OSP_TAGS_TESTAPP_PARTS 7, \
-    tgPartInitMod,      tgPartInitReq,      tgPartInitClr,      \
+#define OSP_TAGS_TESTAPP_PARTS 10, \
+    tgPartMod,          tgPartReq,                              \
+    tgMapPartEntMod,    tgMapPartEntReq,                        \
+    tgWeldMod,          tgWeldReq,                              \
     tgLinkMod,          tgLinkReq,                              \
     tgLinkMhUpdMod,     tgLinkMhUpdReq
 
@@ -130,21 +119,20 @@
 #define OSP_DATA_TESTAPP_VEHICLE_SPAWN 1, \
     idVehicleSpawn
 #define OSP_TAGS_TESTAPP_VEHICLE_SPAWN 9, \
-    tgVehicleSpawnMod,  tgVehicleSpawnReq,  tgVehicleSpawnClr,  \
-    tgVSpawnRgdMod,     tgVSpawnRgdReq,                         \
-    tgVSpawnRgdEntMod,  tgVSpawnRgdEntReq,                      \
-    tgVSpawnPartMod,    tgVSpawnPartReq
+    tgVhSpBasicInMod,   tgVhSpBasicInReq,   tgVhSpBasicInClr,   \
+    tgVhSpPartMod,      tgVhSpPartReq,                          \
+    tgVhSpWeldMod,      tgVhSpWeldReq,                          \
+    tgVhSpPartPfMod,    tgVhSpPartPfReq
 
 
 
 #define OSP_DATA_TESTAPP_VEHICLE_SPAWN_VB 1, \
     idVehicleSpawnVB
-
-
-
-#define OSP_DATA_TESTAPP_VEHICLE_SPAWN_RIGID 1, \
-    idVehicleSpawnRgd
-
+#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_VB 8, \
+    tgVBSpBasicInMod,   tgVBSpBasicInReq,                       \
+    tgVBPartMod,        tgVBPartReq,                            \
+    tgVBWeldMod,        tgVBWeldReq,                            \
+    tgVBMachMod,        tgVBMachReq
 
 
 #define OSP_DATA_TESTAPP_TEST_VEHICLES 1, \
@@ -165,6 +153,29 @@
     idDummy
 #define OSP_TAGS_TESTAPP_MACH_ROCKET 1, \
     tgMhRocketEvt
+
+
+
+#define OSP_DATA_TESTAPP_NEWTON 1, \
+    idNwt
+
+
+
+#define OSP_DATA_TESTAPP_NEWTON_FORCES 1, \
+    idNwtFactors
+
+
+
+#define OSP_DATA_TESTAPP_NEWTON_ACCEL 1, \
+    idAcceleration
+
+
+
+#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_NWT 4, \
+    tgNwtVhWeldEntMod,  tgNwtVhWeldEntReq,                      \
+    tgNwtVhHierMod,     tgNwtVhHierReq
+
+
 
 
 

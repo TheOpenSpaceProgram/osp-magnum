@@ -88,7 +88,7 @@ void SysPrefabInit::init_transforms(
 {
     auto itPfEnts = std::begin(rPrefabInit.m_ents);
 
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);
@@ -120,7 +120,7 @@ void SysPrefabInit::init_drawing(
 {
     auto itPfEnts = std::begin(rPrefabInit.m_ents);
 
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);
@@ -189,7 +189,7 @@ void SysPrefabInit::init_physics(
 {
     auto itPfEnts = std::begin(rPrefabInit.m_ents);
 
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);

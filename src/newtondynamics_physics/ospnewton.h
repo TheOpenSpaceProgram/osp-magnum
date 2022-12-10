@@ -68,7 +68,7 @@ using BodyId = uint32_t;
 struct ACtxNwtWorld
 {
 
-    struct ForceFactor
+    struct ForceFactorFunc
     {
         using UserData_t = std::array<void*, 6u>;
         using Func_t = void (*)(NewtonBody const* pBody, BodyId BodyId, ACtxNwtWorld const&, UserData_t, osp::Vector3&, osp::Vector3&) noexcept;
@@ -94,12 +94,12 @@ struct ACtxNwtWorld
 
     lgrn::IdRegistryStl<BodyId>                     m_bodyIds;
     std::vector<NwtBodyPtr_t>                       m_bodyPtrs;
-    std::vector<ForceSet_t>                       m_bodyForces;
+    std::vector<ForceFactors_t>                     m_bodyFactors;
 
     std::vector<osp::active::ActiveEnt>             m_bodyToEnt;
     osp::IdMap_t<osp::active::ActiveEnt, BodyId>    m_entToBody;
 
-    std::vector<ForceFactor>                        m_forces;
+    std::vector<ForceFactorFunc>                    m_factors;
 
     osp::active::acomp_storage_t<NwtColliderPtr_t>  m_colliders;
 

@@ -50,19 +50,31 @@ osp::Session setup_newton(
         osp::Session const&         scnCommon,
         osp::Session const&         physics);
 
-osp::Session setup_newton_force_set(
+/**
+ * @brief Create a single empty force factor bitset
+ *
+ * This is a simple bitset that can be assigned to a rigid body to set which
+ * functions contribute to its force and torque
+ */
+osp::Session setup_newton_factors(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags);
 
+/**
+ * @brief Setup constant acceleration force, add to a force factor bitset
+ */
 osp::Session setup_newton_force_accel(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags,
         osp::Session const&         newton,
-        osp::Session const&         nwtForce,
+        osp::Session const&         nwtFactors,
         osp::Vector3                accel);
 
+/**
+ * @brief Support for Shape Spawner physics using Newton Dynamics
+ */
 osp::Session setup_shape_spawn_newton(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
@@ -71,8 +83,11 @@ osp::Session setup_shape_spawn_newton(
         osp::Session const&         physics,
         osp::Session const&         shapeSpawn,
         osp::Session const&         newton,
-        osp::Session const&         nwtForces);
+        osp::Session const&         nwtFactors);
 
+/**
+ * @brief Support for Vehicle physics using Newton Dynamics
+ */
 osp::Session setup_vehicle_spawn_newton(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,

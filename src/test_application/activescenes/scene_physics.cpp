@@ -256,7 +256,7 @@ Session setup_prefabs(
     {
         // Count number of entities needed to be created
         std::size_t totalEnts = 0;
-        for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
+        for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
         {
             auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
             auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
@@ -269,10 +269,10 @@ Session setup_prefabs(
         rActiveIds.create(std::begin(rPrefabInit.m_newEnts), std::end(rPrefabInit.m_newEnts));
 
         // Assign new entities to each prefab to create
-        rPrefabInit.m_ents.resize(rPrefabInit.m_basic.size());
+        rPrefabInit.m_ents.resize(rPrefabInit.m_basicIn.size());
         auto itEntAvailable = std::begin(rPrefabInit.m_newEnts);
         auto itPfEntSpanOut = std::begin(rPrefabInit.m_ents);
-        for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.m_basic)
+        for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.m_basicIn)
         {
             auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
             auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
@@ -344,80 +344,11 @@ Session setup_prefabs(
             TopDataIds_t{                idPrefabInit },
             wrap_args([] (ACtxPrefabInit& rPrefabInit) noexcept
     {
-        rPrefabInit.m_basic.clear();
+        rPrefabInit.m_basicIn.clear();
     }));
 
 
     return prefabs;
-}
-
-Session setup_gravity(
-        Builder_t&                  rBuilder,
-        ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
-        Session const&              physics,
-        Session const&              shapeSpawn)
-{
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(physics,    TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
-
-    Session gravity;
-    OSP_SESSION_ACQUIRE_DATA(gravity, topData, TESTAPP_GRAVITY);
-    OSP_SESSION_ACQUIRE_TAGS(gravity, rTags, TESTAPP_GRAVITY);
-
-    top_emplace< EntSet_t >       (topData, idGravity);
-
-    rBuilder.tag(tgGravityReq)      .depend_on({tgGravityDel, tgGravityNew});
-    rBuilder.tag(tgGravityNew)      .depend_on({tgGravityDel, tgPhysReq});
-
-//    gravity.task() = rBuilder.task().assign({tgSceneEvt, tgGravityReq}).data(
-//            "Apply gravity (-Z 9.81m/s^2 acceleration) to entities in the rGravity set",
-//            TopDataIds_t{             idPhys,                idPhysIn,          idGravity   },
-//            wrap_args([] (ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, EntSet_t& rGravity) noexcept
-//    {
-//        acomp_storage_t<ACompPhysNetForce> &rNetForce = rPhysIn.m_physNetForce;
-//        for (std::size_t const entInt : rGravity.ones())
-//        {
-//            auto const ent = ActiveEnt(entInt);
-//            ACompPhysNetForce &rEntNetForce = rNetForce.contains(ent)
-//                                            ? rNetForce.get(ent)
-//                                            : rNetForce.emplace(ent);
-
-//            rEntNetForce.z() -= 9.81f * rPhys.m_physDynamic.get(ent).m_totalMass;
-//        }
-//    }));
-
-    gravity.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgGravityNew}).data(
-            "Add gravity to spawned shapes",
-            TopDataIds_t{                    idSpawner,                   idSpawnerEnts,          idGravity,                   idActiveIds },
-            wrap_args([] (SpawnerVec_t const& rSpawner, EntVector_t const& rSpawnerEnts, EntSet_t& rGravity, ActiveReg_t const& rActiveIds) noexcept
-    {
-        rGravity.ints().resize(rActiveIds.vec().capacity());
-
-        for (std::size_t i = 0; i < rSpawner.size(); ++i)
-        {
-            SpawnShape const &spawn = rSpawner[i];
-            if (spawn.m_mass == 0)
-            {
-                continue;
-            }
-
-            ActiveEnt const root    = rSpawnerEnts[i * 2];
-
-            rGravity.set(std::size_t(root));
-        }
-    }));
-
-    gravity.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgGravityDel}).data(
-            "Delete gravity components",
-            TopDataIds_t{idGravity, idDelTotal}, delete_ent_set);
-
-    return gravity;
 }
 
 Session setup_bounds(

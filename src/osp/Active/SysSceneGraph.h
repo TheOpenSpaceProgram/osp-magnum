@@ -32,6 +32,12 @@
 namespace osp::active
 {
 
+/**
+ * @brief Helps add entities to a reserved space in ACtxSceneGraph
+ *
+ * All reserved space must be used, or else this class will assert on
+ * destruction.
+ */
 class SubtreeBuilder
 {
 public:
@@ -45,7 +51,12 @@ public:
     SubtreeBuilder(SubtreeBuilder const& copy) = delete;
     ~SubtreeBuilder() { assert(m_first == m_last); }
 
-    [[nodiscard]] SubtreeBuilder add_child(ActiveEnt ent, uint32_t descendentCount);
+    /**
+     * @brief Add a child that might have more descendants
+     *
+     * @return
+     */
+    [[nodiscard]] SubtreeBuilder add_child(ActiveEnt ent, uint32_t descendantCount);
 
     void add_child(ActiveEnt ent)
     {
@@ -57,29 +68,18 @@ public:
         return m_last - m_first;
     }
 
-    struct ManualAdd
-    {
-        ACtxSceneGraph& m_rScnGraph;
-        ActiveEnt m_root;
-        TreePos_t m_first;
-        TreePos_t m_last;
-    };
-
-    ManualAdd manual()
-    {
-        ManualAdd out{ m_rScnGraph, m_root, m_first, m_last };
-        m_first = m_last;
-        return out;
-    };
-
 private:
     ActiveEnt m_root;
     TreePos_t m_first;
     TreePos_t m_last;
 
     ACtxSceneGraph& m_rScnGraph;
+
 }; // class SubtreeBuilder
 
+/**
+ * @brief Iterates entity children in an ACtxSceneGraph
+ */
 class ChildIterator
 {
 public:
@@ -106,29 +106,18 @@ public:
         return *this;
     }
 
-    constexpr friend bool operator==(ChildIterator const& lhs,
-                                     ChildIterator const& rhs) noexcept
-    {
-        return (lhs.m_pScnGraph == rhs.m_pScnGraph) && (lhs.m_pos == rhs.m_pos);
-    };
-
-    constexpr friend bool operator!=(ChildIterator const& lhs,
-                                     ChildIterator const& rhs) noexcept
-    {
-        return !(lhs == rhs);
-    }
+    auto operator<=>(ChildIterator const&) const = default;
 
     constexpr value_type operator*() const noexcept
     {
         return m_pScnGraph->m_treeToEnt[m_pos];
     }
 
-    // TODO: put more operators here
-
 private:
     ACtxSceneGraph const *m_pScnGraph;
     TreePos_t m_pos;
-};
+
+}; // class ChildIterator
 
 using ChildRange_t = lgrn::IteratorPair<ChildIterator, ChildIterator>;
 
@@ -136,22 +125,36 @@ class SysSceneGraph
 {
 public:
 
-    [[nodiscard]] static SubtreeBuilder add_descendants(ACtxSceneGraph& rScnGraph, uint32_t descendentCount, ActiveEnt root = lgrn::id_null<ActiveEnt>());
+    /**
+     * @brief Add new entities to a scene graph using a SubtreeBuilder
+     *
+     * Root entity and number of descendants must be known beforehand
+     */
+    [[nodiscard]] static SubtreeBuilder add_descendants(ACtxSceneGraph& rScnGraph, uint32_t descendantCount, ActiveEnt root = lgrn::id_null<ActiveEnt>());
 
     /**
      * @return Iterable range of an entity's descendants
      */
     static ArrayView<ActiveEnt const> descendants(ACtxSceneGraph const& rScnGraph, ActiveEnt root);
 
+    /**
+     * @return Iterable range of an entity's descendants by tree position
+     */
     static ArrayView<ActiveEnt const> descendants(ACtxSceneGraph const& rScnGraph, TreePos_t rootPos);
 
 
     /**
      * @return Iterable range of an entity's children
-     *
      */
     static ChildRange_t children(ACtxSceneGraph const& rScnGraph, ActiveEnt parent = lgrn::id_null<ActiveEnt>());
 
+    /**
+     * @brief Remove multiple entities from a scene graph
+     *
+     * @warning Do not include entities that are ancestors of any other entity
+     *          in the same range. All given entities should be a root of a
+     *          unique subtree.
+     */
     template<typename ITA_T, typename ITB_T>
     static void cut(ACtxSceneGraph& rScnGraph, ITA_T first, ITB_T const& last);
 
@@ -174,8 +177,6 @@ void SysSceneGraph::cut(ACtxSceneGraph& rScnGraph, ITA_T first, ITB_T const& las
         TreePos_t const pos = rScnGraph.m_entToTreePos[std::size_t(*first)];
 
         rScnGraph.m_delete.push_back(pos);
-
-
 
         std::advance(first, 1);
     }

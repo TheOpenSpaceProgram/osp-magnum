@@ -92,17 +92,6 @@ osp::Session setup_prefabs(
         osp::TopDataId              idResources);
 
 /**
- * @brief Entity set to apply 9.81m/s^2 acceleration, added to spawned shapes
- */
-osp::Session setup_gravity(
-        Builder_t&                  rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
-        osp::Session const&         physics,
-        osp::Session const&         shapeSpawn);
-
-/**
  * @brief Entity set to delete entities under Z = -10, added to spawned shapes
  */
 osp::Session setup_bounds(

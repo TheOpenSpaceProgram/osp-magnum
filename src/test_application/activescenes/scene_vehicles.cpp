@@ -70,8 +70,9 @@ Session setup_parts(
     OSP_SESSION_ACQUIRE_TAGS(parts, rTags,   TESTAPP_PARTS);
     parts.m_tgCleanupEvt = tgCleanupEvt;
 
-    rBuilder.tag(tgPartInitReq)         .depend_on({tgPartInitMod});
-    rBuilder.tag(tgPartInitClr)         .depend_on({tgPartInitMod, tgPartInitReq});
+    rBuilder.tag(tgPartReq)             .depend_on({tgPartMod});
+    rBuilder.tag(tgMapPartEntMod)       .depend_on({tgMapPartEntReq});
+    rBuilder.tag(tgWeldReq)             .depend_on({tgWeldMod});
     rBuilder.tag(tgLinkReq)             .depend_on({tgLinkMod});
     rBuilder.tag(tgLinkMhUpdReq)        .depend_on({tgLinkMhUpdMod});
 
@@ -238,15 +239,15 @@ Session setup_vehicle_spawn(
     OSP_SESSION_ACQUIRE_DATA(vehicleSpawn, topData, TESTAPP_VEHICLE_SPAWN);
     OSP_SESSION_ACQUIRE_TAGS(vehicleSpawn, rTags,   TESTAPP_VEHICLE_SPAWN);
 
-    rBuilder.tag(tgVehicleSpawnReq)     .depend_on({tgVehicleSpawnMod});
-    rBuilder.tag(tgVehicleSpawnClr)     .depend_on({tgVehicleSpawnMod, tgVehicleSpawnReq});
-    rBuilder.tag(tgVSpawnRgdReq)        .depend_on({tgVSpawnRgdMod});
-    rBuilder.tag(tgVSpawnRgdEntReq)     .depend_on({tgVSpawnRgdEntMod});
-    rBuilder.tag(tgVSpawnPartReq)       .depend_on({tgVSpawnPartMod});
+    rBuilder.tag(tgVhSpBasicInReq)      .depend_on({tgVhSpBasicInMod});
+    rBuilder.tag(tgVhSpBasicInClr)      .depend_on({tgVhSpBasicInMod, tgVhSpBasicInReq});
+    rBuilder.tag(tgVhSpPartReq)         .depend_on({tgVhSpPartMod});
+    rBuilder.tag(tgVhSpPartPfReq)       .depend_on({tgVhSpPartPfMod});
+    rBuilder.tag(tgVhSpWeldReq)         .depend_on({tgVhSpWeldMod});
 
     top_emplace< ACtxVehicleSpawn >     (topData, idVehicleSpawn);
 
-    vehicleSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnClr}).data(
+    vehicleSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInClr}).data(
             "Clear Vehicle Spawning vector after use",
             TopDataIds_t{                  idVehicleSpawn},
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn) noexcept
@@ -278,11 +279,17 @@ Session setup_vehicle_spawn_vb(
 
     Session vehicleSpawnVB;
     OSP_SESSION_ACQUIRE_DATA(vehicleSpawnVB, topData, TESTAPP_VEHICLE_SPAWN_VB);
+    OSP_SESSION_ACQUIRE_TAGS(vehicleSpawnVB, rTags,   TESTAPP_VEHICLE_SPAWN_VB);
+
+    rBuilder.tag(tgVBSpBasicInReq)      .depend_on({tgVBSpBasicInMod});
+    rBuilder.tag(tgVBPartReq)           .depend_on({tgVBPartMod});
+    rBuilder.tag(tgVBWeldReq)           .depend_on({tgVBWeldMod});
+    rBuilder.tag(tgVBMachReq)           .depend_on({tgVBMachMod});
 
     top_emplace< ACtxVehicleSpawnVB >(topData, idVehicleSpawnVB);
 
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnPartMod}).data(
-            "Create parts for vehicle",
+    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgVBSpBasicInReq, tgEntNew, tgPartMod, tgWeldMod, tgVhSpPartMod, tgVhSpWeldMod, tgVBPartMod, tgVBWeldMod}).data(
+            "Create parts for vehicle using VehicleData",
             TopDataIds_t{                  idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts},
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
@@ -410,8 +417,8 @@ Session setup_vehicle_spawn_vb(
         }
     }));
 
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgVSpawnRgdReq, tgVSpawnRgdEntReq, tgVSpawnPartReq, tgPrefabMod}).data(
-            "Load vehicle parts from VehicleBuilder",
+    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgVhSpPartReq, tgVBPartReq, tgPrefabMod}).data(
+            "Load vehicle part prefabs from VehicleBuilder",
             TopDataIds_t{                  idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                idPrefabInit,           idResources},
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
     {
@@ -440,10 +447,10 @@ Session setup_vehicle_spawn_vb(
                 rScnParts.m_partTransformWeld[dstPart]  = pVData->m_partTransformWeld[srcPart];
 
                 // Add Prefab and Part init events
-                (*itPrefabOut) = rPrefabInit.m_basic.size();
+                (*itPrefabOut) = rPrefabInit.m_basicIn.size();
                 std::advance(itPrefabOut, 1);
 
-                rPrefabInit.m_basic.push_back(TmpPrefabInitBasic{
+                rPrefabInit.m_basicIn.push_back(TmpPrefabInitBasic{
                     .m_importerRes = prefabPairSrc.m_importer,
                     .m_prefabId = prefabPairSrc.m_prefabId,
                     .m_pTransform = &pVData->m_partTransformWeld[srcPart]
@@ -453,7 +460,7 @@ Session setup_vehicle_spawn_vb(
 
     }));
 
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVSpawnRgdEntReq, tgVSpawnPartReq, tgLinkMod}).data(
+    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpPartReq, tgVBPartReq, tgVBMachMod, tgLinkMod}).data(
             "Copy machines from VehicleBuilder",
             TopDataIds_t{                  idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts},
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
@@ -524,7 +531,7 @@ Session setup_vehicle_spawn_vb(
     }));
 
 
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVehicleSpawnReq, tgPrefabEntReq}).data(
+    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpPartReq, tgPrefabEntReq, tgMapPartEntMod}).data(
             "Update PartId<->ActiveEnt mapping",
             TopDataIds_t{                  idVehicleSpawn,           idScnParts,                   idActiveIds,                 idPrefabInit },
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts, ActiveReg_t const& rActiveIds,  ACtxPrefabInit& rPrefabInit) noexcept
@@ -541,13 +548,13 @@ Session setup_vehicle_spawn_vb(
 
         auto itPrefab = std::begin(rVehicleSpawn.m_newPartPrefabs);
 
-        for (PartId const PartId : rVehicleSpawn.m_newPartToPart)
+        for (PartId const partId : rVehicleSpawn.m_newPartToPart)
         {
             ActiveEnt const root = rPrefabInit.m_ents[*itPrefab].front();
             std::advance(itPrefab, 1);
 
-            rScnParts.m_partToActive[PartId]           = root;
-            rScnParts.m_activeToPart[std::size_t(root)] = PartId;
+            rScnParts.m_partToActive[partId]            = root;
+            rScnParts.m_activeToPart[std::size_t(root)] = partId;
         }
     }));
 
