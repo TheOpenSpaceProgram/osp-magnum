@@ -24,26 +24,17 @@
  */
 #pragma once
 
-#include <cstddef>
+#include <longeron/containers/bit_view.hpp>
+
+#include <cstdint>
+#include <vector>
 
 namespace osp
 {
 
-template <typename ID_T, typename DUMMY_T = void>
-struct GlobalIdReg
-{
-    [[nodiscard]] static inline ID_T create() noexcept
-    {
-        return ID_T(sm_count++);
-    }
-
-    [[nodiscard]] static inline std::size_t size() noexcept
-    {
-        return sm_count;
-    }
-
-private:
-    static inline std::size_t sm_count{0};
-};
+using BitVector_t = lgrn::BitView< std::vector<uint64_t> >;
 
 } // namespace osp
+
+
+

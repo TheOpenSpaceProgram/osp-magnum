@@ -38,6 +38,8 @@
 #include <osp/Resource/resources.h>
 #include <osp/Resource/resourcetypes.h>
 
+#include <adera/machines/links.h>
+
 #include <newtondynamics_physics/ospnewton.h>
 #include <newtondynamics_physics/SysNewton.h>
 
@@ -269,11 +271,6 @@ void compound_collect_recurse(
 
 }
 
-struct ACtxVehiclesNwt
-{
-    std::vector<BodyId> m_weldToBody;
-};
-
 Session setup_vehicle_spawn_newton(
         Builder_t&                  rBuilder,
         ArrayView<entt::any> const  topData,
@@ -425,7 +422,6 @@ Session setup_vehicle_spawn_newton(
 
                 NewtonBody *pBody = NewtonCreateDynamicBody(rNwt.m_world.get(), pCompound.get(), Matrix4{}.data());
 
-
                 BodyId const bodyId = rNwt.m_bodyIds.create();
                 SysNewton::resize_body_data(rNwt);
 
@@ -454,6 +450,70 @@ Session setup_vehicle_spawn_newton(
     return vehicleSpawnNwt;
 }
 
+struct BodyRocket
+{
+    Vector3             m_direction;
+    Vector3             m_offset;
+    link::MachLocalId   m_rocketId;
+};
+
+struct ACtxRocketThrustNwt
+{
+    // map each bodyId to a {machine, offset}
+    lgrn::IntArrayMultiMap<BodyId, BodyRocket> m_bodyRockets;
+
+};
+
+
+Session setup_rocket_thrust_newton(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              physics,
+        Session const&              prefabs,
+        Session const&              parts,
+        Session const&              vehicleSpawn,
+        Session const&              newton,
+        Session const&              vehicleSpawnNwt,
+        TopDataId const             idResources)
+{
+    OSP_SESSION_UNPACK_DATA(scnCommon,          TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,          TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(physics,            TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_TAGS(physics,            TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_DATA(prefabs,            TESTAPP_PREFABS);
+    OSP_SESSION_UNPACK_TAGS(prefabs,            TESTAPP_PREFABS);
+    OSP_SESSION_UNPACK_DATA(vehicleSpawn,       TESTAPP_VEHICLE_SPAWN);
+    OSP_SESSION_UNPACK_TAGS(vehicleSpawn,       TESTAPP_VEHICLE_SPAWN);
+    OSP_SESSION_UNPACK_DATA(newton,             TESTAPP_NEWTON);
+    OSP_SESSION_UNPACK_TAGS(vehicleSpawnNwt,    TESTAPP_VEHICLE_SPAWN_NWT);
+    OSP_SESSION_UNPACK_DATA(parts,              TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_TAGS(parts,              TESTAPP_PARTS);
+
+    Session rocketNwt;
+    //OSP_SESSION_ACQUIRE_DATA(vehicleSpawnNwt, topData, TESTAPP_VEHICLE_SPAWN_NWT);
+    //OSP_SESSION_ACQUIRE_TAGS(vehicleSpawnNwt, rTags,   TESTAPP_VEHICLE_SPAWN_NWT);
+
+    rocketNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgLinkReq, tgWeldReq, tgNwtVhWeldEntReq}).data(
+            "Assign rockets to Newton bodies",
+            TopDataIds_t{                   idActiveIds,           idBasic,             idPhys,              idNwt,                        idVehicleSpawn,                 idScnParts  },
+            wrap_args([] (ActiveReg_t const &rActiveIds, ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts ) noexcept
+    {
+        using adera::gc_mtMagicRocket;
+
+        WeldId weld;
+        for (PartId const part : rScnParts.m_weldToParts[weld])
+        {
+            if (rScnParts.m_machines.m_machTypes[part] == gc_mtMagicRocket)
+            {
+                rScnParts.m_machines.m_machToLocal;
+            }
+        }
+    }));
+
+    return rocketNwt;
+}
 
 
 } // namespace testapp::scenes

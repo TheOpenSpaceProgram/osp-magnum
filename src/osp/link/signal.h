@@ -26,8 +26,6 @@
 
 #include "machines.h"
 
-#include <Corrade/Containers/ArrayView.h>
-
 namespace osp::link
 {
 
@@ -55,8 +53,8 @@ bool update_signal_nodes(
         RANGE_T const&                                  toUpdate,
         Nodes::NodeToMach_t const&                      nodeToMach,
         Machines const&                                 machines,
-        Corrade::Containers::ArrayView<VALUE_T const>   newValues,
-        Corrade::Containers::ArrayView<VALUE_T>         currentValues,
+        ArrayView<VALUE_T const>   newValues,
+        ArrayView<VALUE_T>         currentValues,
         UpdMachPerType&                                 rUpdMach)
 {
     bool somethingNotified = false;

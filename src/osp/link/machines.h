@@ -25,24 +25,17 @@
 #pragma once
 
 #include "../global_id.h"
+#include "../bitvector.h"
+#include "../types.h"
 
 #include <longeron/containers/intarray_multimap.hpp>
 #include <longeron/containers/bit_view.hpp>
 #include <longeron/id_management/registry_stl.hpp>
 
-#include <Corrade/Containers/ArrayView.h>
-
 #include <vector>
-
-namespace osp
-{
-using Corrade::Containers::ArrayView;
-}
 
 namespace osp::link
 {
-
-using BitVector_t = lgrn::BitView< std::vector<uint64_t> >;
 
 using MachTypeId    = uint16_t;
 using MachAnyId     = uint32_t;
@@ -133,15 +126,15 @@ inline NodeId connected_node(lgrn::Span<NodeId const> portSpan, PortId port) noe
 void copy_machines(
         Machines const &rSrc,
         Machines &rDst,
-        Corrade::Containers::ArrayView<MachAnyId> remapMachOut);
+        ArrayView<MachAnyId> remapMachOut);
 
 void copy_nodes(
         Nodes const &rSrcNodes,
         Machines const &rSrcMach,
-        Corrade::Containers::ArrayView<MachAnyId const> remapMach,
+        ArrayView<MachAnyId const> remapMach,
         Nodes &rDstNodes,
         Machines &rDstMach,
-        Corrade::Containers::ArrayView<NodeId> remapNodeOut);
+        ArrayView<NodeId> remapNodeOut);
 
 
 } // namespace osp::wire
