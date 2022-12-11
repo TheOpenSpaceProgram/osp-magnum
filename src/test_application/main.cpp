@@ -355,7 +355,7 @@ void load_a_bunch_of_stuff()
     using namespace Magnum;
     using Primitives::CylinderFlag;
 
-    std::size_t const maxTags = 128; // aka: just two 64-bit integers
+    std::size_t const maxTags = 256; // aka: just two 64-bit integers
     std::size_t const maxTagsInts = maxTags / 64;
 
     g_tags.m_tags.reserve(maxTags);

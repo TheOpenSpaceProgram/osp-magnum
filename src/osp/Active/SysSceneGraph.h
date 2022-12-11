@@ -100,7 +100,7 @@ public:
     constexpr ChildIterator& operator=(ChildIterator const& copy) noexcept = default;
     constexpr ChildIterator& operator=(ChildIterator&& move) noexcept = default;
 
-    constexpr ChildIterator& operator++() noexcept
+    ChildIterator& operator++() noexcept
     {
         m_pos += 1 + m_pScnGraph->m_treeDescendants[m_pos];
         return *this;
@@ -108,14 +108,14 @@ public:
 
     auto operator<=>(ChildIterator const&) const = default;
 
-    constexpr value_type operator*() const noexcept
+    value_type operator*() const noexcept
     {
         return m_pScnGraph->m_treeToEnt[m_pos];
     }
 
 private:
-    ACtxSceneGraph const *m_pScnGraph;
-    TreePos_t m_pos;
+    ACtxSceneGraph const    * m_pScnGraph   {nullptr};
+    TreePos_t               m_pos           {0};
 
 }; // class ChildIterator
 

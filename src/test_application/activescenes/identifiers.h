@@ -35,6 +35,7 @@
 // tg...Del: Deletes instances
 // tg...Mod: Modifies some data
 // tg...Req: Requires some data after its modified
+// tg...Prv: Requires previous from last update
 // tg...Clr: Clears a queue after its used
 //
 // * Tasks with a tg...Req tag will run AFTER its corresponding tg...Mod tag
@@ -75,9 +76,10 @@
 
 #define OSP_DATA_TESTAPP_PHYSICS 3, \
     idPhys, idHierBody, idPhysIn
-#define OSP_TAGS_TESTAPP_PHYSICS 5, \
-    tgPhysBodyDel,      tgPhysBodyMod,      tgPhysBodyReq,      \
-    tgPhysMod,          tgPhysReq
+#define OSP_TAGS_TESTAPP_PHYSICS 6, \
+    tgPhysPrv,          tgPhysDel,          tgPhysMod,          tgPhysReq,      \
+    tgPhysTransformMod, tgPhysTransformReq
+
 
 
 
@@ -98,10 +100,11 @@
 
 
 
-#define OSP_DATA_TESTAPP_BOUNDS 1, \
-    idBounds
-#define OSP_TAGS_TESTAPP_BOUNDS 3, \
-    tgBoundsReq,        tgBoundsDel,        tgBoundsNew
+#define OSP_DATA_TESTAPP_BOUNDS 2, \
+    idBounds, idOutOfBounds
+#define OSP_TAGS_TESTAPP_BOUNDS 5, \
+    tgBoundsSetDel,     tgBoundsSetMod,     tgBoundsSetReq,     \
+    tgOutOfBoundsPrv,   tgOutOfBoundsMod
 
 
 
@@ -158,7 +161,8 @@
 
 #define OSP_DATA_TESTAPP_NEWTON 1, \
     idNwt
-
+#define OSP_TAGS_TESTAPP_NEWTON 5, \
+    tgNwtBodyPrv,       tgNwtBodyDel,       tgNwtBodyMod,       tgNwtBodyReq,       tgNwtBodyClr
 
 
 #define OSP_DATA_TESTAPP_NEWTON_FORCES 1, \

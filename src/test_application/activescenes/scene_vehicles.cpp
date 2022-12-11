@@ -768,7 +768,7 @@ Session setup_camera_vehicle(
 
     Session cameraFree;
 
-    cameraFree.task() = rBuilder.task().assign({tgInputEvt, tgSelUsrCtrlReq, tgPhysReq, tgCamCtrlMod}).data(
+    cameraFree.task() = rBuilder.task().assign({tgInputEvt, tgSelUsrCtrlReq, tgPhysTransformReq, tgCamCtrlMod}).data(
             "Update vehicle camera",
             TopDataIds_t{                      idCamCtrl,           idDeltaTimeIn,                 idBasic,                     idVhControls,                 idScnParts },
             wrap_args([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleTestControls& rVhControls, ACtxParts const& rScnParts) noexcept

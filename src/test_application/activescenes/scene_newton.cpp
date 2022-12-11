@@ -69,12 +69,18 @@ Session setup_newton(
 
     Session newton;
     OSP_SESSION_ACQUIRE_DATA(newton, topData, TESTAPP_NEWTON);
+    OSP_SESSION_ACQUIRE_TAGS(newton, rTags,   TESTAPP_NEWTON);
+
+    rBuilder.tag(tgNwtBodyDel).depend_on({tgNwtBodyPrv});
+    rBuilder.tag(tgNwtBodyMod).depend_on({tgNwtBodyPrv, tgNwtBodyDel});
+    rBuilder.tag(tgNwtBodyReq).depend_on({tgNwtBodyPrv, tgNwtBodyDel, tgNwtBodyMod});
+    rBuilder.tag(tgNwtBodyClr).depend_on({tgNwtBodyPrv, tgNwtBodyDel, tgNwtBodyMod, tgNwtBodyReq});
 
     top_emplace< ACtxNwtWorld >(topData, idNwt, 2);
 
     using ospnewton::SysNewton;
 
-    newton.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgPhysBodyDel}).data(
+    newton.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgNwtBodyDel}).data(
             "Delete Newton components",
             TopDataIds_t{              idNwt,                   idDelTotal},
             wrap_args([] (ACtxNwtWorld& rNwt, EntVector_t const& rDelTotal) noexcept
@@ -82,7 +88,7 @@ Session setup_newton(
         SysNewton::update_delete (rNwt, std::cbegin(rDelTotal), std::cend(rDelTotal));
     }));
 
-    newton.task() = rBuilder.task().assign({tgTimeEvt, tgTransformMod, tgHierMod, tgPhysMod}).data(
+    newton.task() = rBuilder.task().assign({tgTimeEvt, tgPhysPrv, tgNwtBodyPrv, tgPhysTransformMod, tgTransformMod}).data(
             "Update Newton world",
             TopDataIds_t{           idBasic,             idPhys,              idNwt,           idDeltaTimeIn },
             wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, float const deltaTimeIn) noexcept
@@ -175,9 +181,10 @@ Session setup_shape_spawn_newton(
     OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_DATA(newton,     TESTAPP_NEWTON);
+    OSP_SESSION_UNPACK_TAGS(newton,     TESTAPP_NEWTON);
     OSP_SESSION_UNPACK_DATA(nwtFactors, TESTAPP_NEWTON_FORCES);
 
-    shapeSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgPhysBodyMod}).data(
+    shapeSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgNwtBodyMod}).data(
             "Add physics to spawned shapes",
             TopDataIds_t{                   idActiveIds,              idSpawner,             idSpawnerEnts,             idPhys,              idNwt,              idNwtFactors },
             wrap_args([] (ActiveReg_t const &rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ForceFactors_t nwtFactors) noexcept
@@ -279,17 +286,18 @@ Session setup_vehicle_spawn_newton(
         Session const&              newton,
         TopDataId const             idResources)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,          TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,          TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(physics,            TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(physics,            TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_DATA(prefabs,            TESTAPP_PREFABS);
-    OSP_SESSION_UNPACK_TAGS(prefabs,            TESTAPP_PREFABS);
-    OSP_SESSION_UNPACK_DATA(vehicleSpawn,       TESTAPP_VEHICLE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(vehicleSpawn,       TESTAPP_VEHICLE_SPAWN);
-    OSP_SESSION_UNPACK_DATA(newton,             TESTAPP_NEWTON);
-    OSP_SESSION_UNPACK_DATA(parts,              TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,              TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_DATA(prefabs,        TESTAPP_PREFABS);
+    OSP_SESSION_UNPACK_TAGS(prefabs,        TESTAPP_PREFABS);
+    OSP_SESSION_UNPACK_DATA(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
+    OSP_SESSION_UNPACK_TAGS(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
+    OSP_SESSION_UNPACK_DATA(newton,         TESTAPP_NEWTON);
+    OSP_SESSION_UNPACK_TAGS(newton,         TESTAPP_NEWTON);
+    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
 
     Session vehicleSpawnNwt;
     //OSP_SESSION_ACQUIRE_DATA(vehicleSpawnNwt, topData, TESTAPP_VEHICLE_SPAWN_NWT);
@@ -376,8 +384,8 @@ Session setup_vehicle_spawn_newton(
         }
     }));
 
-    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgVhSpWeldReq, tgNwtVhWeldEntReq, tgNwtVhHierReq, tgPfParentHierReq, tgPhysBodyMod}).data(
-            "Add physics to rigid group entities",
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgVhSpWeldReq, tgNwtVhWeldEntReq, tgNwtVhHierReq, tgPfParentHierReq, tgNwtBodyMod}).data(
+            "Add Newton physics to rigid group entities",
             TopDataIds_t{                   idActiveIds,           idBasic,             idPhys,              idNwt,                        idVehicleSpawn,                 idScnParts  },
             wrap_args([] (ActiveReg_t const &rActiveIds, ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts) noexcept
     {

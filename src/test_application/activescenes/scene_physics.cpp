@@ -67,11 +67,12 @@ Session setup_physics(
     // 'Per-thread' inputs fed into the physics engine. Only one here for now
     //top_emplace< ACtxPhysInputs >(topData, idPhysIn);
 
-    rBuilder.tag(tgPhysBodyMod)     .depend_on({tgPhysBodyDel});
-    rBuilder.tag(tgPhysBodyReq)     .depend_on({tgPhysBodyDel, tgPhysBodyMod, tgPhysMod});
-    rBuilder.tag(tgPhysReq)         .depend_on({tgPhysMod});
+    rBuilder.tag(tgPhysTransformReq).depend_on({tgPhysTransformMod});
+    rBuilder.tag(tgPhysDel)         .depend_on({tgPhysPrv});
+    rBuilder.tag(tgPhysMod)         .depend_on({tgPhysPrv, tgPhysDel});
+    rBuilder.tag(tgPhysReq)         .depend_on({tgPhysPrv, tgPhysDel, tgPhysMod});
 
-    physics.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgPhysBodyDel}).data(
+    physics.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgPhysDel}).data(
             "Delete Physics components",
             TopDataIds_t{             idPhys,                   idDelTotal},
             wrap_args([] (ACtxPhysics& rPhys, EntVector_t const& rDelTotal) noexcept
@@ -79,7 +80,7 @@ Session setup_physics(
         auto const &delFirst    = std::cbegin(rDelTotal);
         auto const &delLast     = std::cend(rDelTotal);
 
-        SysPhysics::update_delete_phys      (rPhys,     delFirst, delLast);
+        SysPhysics::update_delete_phys(rPhys, delFirst, delLast);
     }));
 
     return physics;
@@ -184,7 +185,7 @@ Session setup_shape_spawn(
         }
     }));
 
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgPhysBodyMod}).data(
+    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgPhysMod}).data(
             "Add physics to spawned shapes",
             TopDataIds_t{                   idActiveIds,              idSpawner,             idSpawnerEnts,             idPhys },
             wrap_args([] (ActiveReg_t const &rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxPhysics& rPhys) noexcept
@@ -328,7 +329,7 @@ Session setup_prefabs(
         }));
     }
 
-    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgPhysBodyMod}).data(
+    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgPhysMod}).data(
             "Init Prefab physics",
             TopDataIds_t{                   idActiveIds,                idPrefabInit,           idResources,             idPhys},
             wrap_args([] (ActiveReg_t const& rActiveIds, ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxPhysics& rPhys) noexcept
@@ -370,32 +371,47 @@ Session setup_bounds(
     OSP_SESSION_ACQUIRE_TAGS(bounds, rTags, TESTAPP_BOUNDS);
 
     top_emplace< EntSet_t >       (topData, idBounds);
+    top_emplace< EntVector_t >    (topData, idOutOfBounds);
 
-    rBuilder.tag(tgBoundsDel)       .depend_on({tgBoundsReq});
-    rBuilder.tag(tgBoundsNew)       .depend_on({tgBoundsReq, tgBoundsDel});
+    rBuilder.tag(tgBoundsSetMod)    .depend_on({tgBoundsSetDel});
+    rBuilder.tag(tgBoundsSetReq)    .depend_on({tgBoundsSetDel, tgBoundsSetMod});
+    rBuilder.tag(tgOutOfBoundsMod)  .depend_on({tgOutOfBoundsPrv});
 
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgPhysReq, tgBoundsReq, tgDelEntMod}).data(
-            "Bounds check",
-            TopDataIds_t{                 idBasic,                idBounds,             idDelEnts   },
-            wrap_args([] (ACtxBasic const& rBasic, EntSet_t const& rBounds, EntVector_t& rDelEnts) noexcept
+    // Bounds are checked are after transforms are final (tgTransformReq)
+    // Out-of-bounds entities are added to rOutOfBounds, and are deleted
+    // at the start of next frame
+
+    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgTransformReq, tgBoundsSetReq, tgOutOfBoundsMod}).data(
+            "Check for out-of-bounds entities",
+            TopDataIds_t{                 idBasic,                idBounds,             idOutOfBounds},
+            wrap_args([] (ACtxBasic const& rBasic, EntSet_t const& rBounds, EntVector_t& rOutOfBounds) noexcept
     {
-        for (std::size_t const entInt : rBounds.ones())
+        rOutOfBounds.clear();
+        for (std::size_t const ent : rBounds.ones())
         {
-            auto const ent = ActiveEnt(entInt);
-            ACompTransform const &entTf = rBasic.m_transform.get(ent);
+            ACompTransform const &entTf = rBasic.m_transform.get(ActiveEnt(ent));
             if (entTf.m_transform.translation().z() < -10)
             {
-                rDelEnts.push_back(ent);
+                rOutOfBounds.push_back(ActiveEnt(ent));
             }
         }
     }));
 
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgBoundsNew}).data(
+
+    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgOutOfBoundsPrv, tgDelEntMod}).data(
+            "Delete out-of-bounds entities",
+            TopDataIds_t{                 idBasic,                   idOutOfBounds,             idDelEnts   },
+            wrap_args([] (ACtxBasic const& rBasic, EntVector_t const& rOutOfBounds, EntVector_t& rDelEnts) noexcept
+    {
+        rDelEnts.insert(rDelEnts.end(), rOutOfBounds.cbegin(), rOutOfBounds.cend());
+    }));
+
+    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgBoundsSetMod}).data(
             "Add bounds to spawned shapes",
             TopDataIds_t{                    idSpawner,                   idSpawnerEnts,          idBounds,                   idActiveIds },
             wrap_args([] (SpawnerVec_t const& rSpawner, EntVector_t const& rSpawnerEnts, EntSet_t& rBounds, ActiveReg_t const& rActiveIds) noexcept
     {
-        rBounds.ints().resize(rActiveIds.vec().capacity());
+        rBounds     .ints().resize(rActiveIds.vec().capacity());
 
         for (std::size_t i = 0; i < rSpawner.size(); ++i)
         {
@@ -411,7 +427,7 @@ Session setup_bounds(
         }
     }));
 
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgBoundsDel}).data(
+    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgBoundsSetDel}).data(
             "Delete bounds components",
             TopDataIds_t{idBounds, idDelTotal}, delete_ent_set);
 

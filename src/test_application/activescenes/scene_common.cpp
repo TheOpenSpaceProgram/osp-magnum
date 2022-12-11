@@ -72,8 +72,9 @@ Session setup_common_scene(
     rBuilder.tag(tgDelEntClr)       .depend_on({tgDelEntMod, tgDelEntReq});
     rBuilder.tag(tgDelTotalReq)     .depend_on({tgDelTotalMod});
     rBuilder.tag(tgDelTotalClr)     .depend_on({tgDelTotalMod, tgDelTotalReq});
-    rBuilder.tag(tgTransformNew)    .depend_on({tgTransformDel});
-    rBuilder.tag(tgTransformReq)    .depend_on({tgTransformDel, tgTransformNew, tgTransformMod});
+    rBuilder.tag(tgTransformDel)    .depend_on({tgTransformMod});
+    rBuilder.tag(tgTransformNew)    .depend_on({tgTransformMod, tgTransformDel});
+    rBuilder.tag(tgTransformReq)    .depend_on({tgTransformMod, tgTransformDel, tgTransformNew});
     rBuilder.tag(tgHierNew)         .depend_on({tgHierDel});
     rBuilder.tag(tgHierModEnd)      .depend_on({tgHierDel, tgHierNew, tgHierMod});
     rBuilder.tag(tgHierReq)         .depend_on({tgHierMod, tgHierModEnd});

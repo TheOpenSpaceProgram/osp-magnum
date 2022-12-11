@@ -108,11 +108,13 @@ ArrayView<ActiveEnt const> SysSceneGraph::descendants(ACtxSceneGraph const& rScn
 
 ArrayView<ActiveEnt const> SysSceneGraph::descendants(ACtxSceneGraph const& rScnGraph, TreePos_t rootPos)
 {
-    uint32_t const descendants  = rScnGraph.m_treeDescendants[rootPos];
+    uint32_t const  descendants = rScnGraph.m_treeDescendants[rootPos];
+    TreePos_t const childFirst  = rootPos + 1;
+    TreePos_t const childLast   = childFirst + descendants;
 
     return (descendants == 0)
             ? ArrayView<ActiveEnt const>{}
-            : arrayView(rScnGraph.m_treeToEnt).slice(rootPos + 1, rootPos + descendants + 1);
+            : arrayView(rScnGraph.m_treeToEnt).slice(childFirst, childLast);
 }
 
 
@@ -121,8 +123,10 @@ ChildRange_t SysSceneGraph::children(ACtxSceneGraph const& rScnGraph, ActiveEnt 
     TreePos_t const parentPos = (parent == lgrn::id_null<ActiveEnt>())
                               ? 0
                               : rScnGraph.m_entToTreePos[std::size_t(parent)];
-    TreePos_t const childFirst = parentPos + 1;
-    TreePos_t const childLast = parentPos + 1 + rScnGraph.m_treeDescendants[parentPos];
+
+    uint32_t const  descendants = rScnGraph.m_treeDescendants[parentPos];
+    TreePos_t const childFirst  = parentPos + 1;
+    TreePos_t const childLast   = parentPos + 1 + descendants;
 
     return ChildRange_t{ChildIterator{&rScnGraph, childFirst},
                         ChildIterator{&rScnGraph, childLast}};
@@ -136,14 +140,14 @@ void SysSceneGraph::do_delete(ACtxSceneGraph& rScnGraph)
 
     std::sort(rScnGraph.m_delete.begin(), rScnGraph.m_delete.end());
 
-    TreePos_t const treeLast = 1 + rScnGraph.m_treeDescendants[0];
+    TreePos_t const treeLast    = 1 + rScnGraph.m_treeDescendants[0];
 
     auto const& itTreeDescFirst = rScnGraph.m_treeDescendants.begin();
     auto const& itTreeEntsFirst = rScnGraph.m_treeToEnt.begin();
 
-    auto const& itDelFirst  = rScnGraph.m_delete.begin();
-    auto const& itDelLast   = rScnGraph.m_delete.end();
-    auto itDel              = itDelFirst;
+    auto const& itDelFirst      = rScnGraph.m_delete.begin();
+    auto const& itDelLast       = rScnGraph.m_delete.end();
+    auto        itDel           = itDelFirst;
 
     TreePos_t const untouched = (*itDel);
     TreePos_t done = untouched;
@@ -153,7 +157,7 @@ void SysSceneGraph::do_delete(ACtxSceneGraph& rScnGraph)
         auto const itDelNext = std::next(itDel);
         bool const notLast = (itDelNext != itDelLast);
 
-        std::size_t const removeTotal = 1 + rScnGraph.m_treeDescendants[*itDel];
+        uint32_t const removeTotal = 1 + rScnGraph.m_treeDescendants[*itDel];
 
         // State of array each iteration:
         //
