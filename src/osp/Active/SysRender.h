@@ -236,7 +236,7 @@ void SysRender::update_draw_transforms(
         IT_T                                    first,
         ITB_T const&                            last)
 {
-    static Matrix4 const identity{};
+    static constexpr Matrix4 const identity{};
 
     while (first != last)
     {

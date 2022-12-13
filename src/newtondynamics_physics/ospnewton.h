@@ -40,21 +40,18 @@
 namespace ospnewton
 {
 
-struct DeleterNewtonBody
+template<auto FUNC_T>
+struct NwtDeleter
 {
-    void operator() (NewtonBody const* pCollision)
-    { NewtonDestroyBody(pCollision); }
+    void operator() (auto const* pNwtType)
+    {
+        FUNC_T(pNwtType);
+    }
 };
 
-using NwtBodyPtr_t = std::unique_ptr<NewtonBody, DeleterNewtonBody>;
+using NwtBodyPtr_t = std::unique_ptr< NewtonBody, NwtDeleter<NewtonDestroyBody> >;
 
-struct DeleterNewtonCollision
-{
-    void operator() (NewtonCollision const* pCollision)
-    { NewtonDestroyCollision(pCollision); }
-};
-
-using NwtColliderPtr_t = std::unique_ptr<NewtonCollision, DeleterNewtonCollision>;
+using NwtColliderPtr_t = std::unique_ptr<NewtonCollision, NwtDeleter<NewtonDestroyCollision> >;
 
 //using ForceFactor_t = void (*)(
 //        ActiveEnt, ViewProjMatrix const&, UserData_t) noexcept;

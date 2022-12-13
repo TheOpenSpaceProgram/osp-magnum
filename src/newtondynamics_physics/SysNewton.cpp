@@ -72,45 +72,36 @@ using osp::Vector3;
 
 
 // Callback called for dynamic rigid bodies for applying force and torque
-void SysNewton::cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex)
+void SysNewton::cb_force_torque(
+        NewtonBody const* pBody, dFloat const timestep, NwtThreadIndex_t const thread)
 {
-    // Get context from Newton World
-    auto const *const pWorldCtx = static_cast<ACtxNwtWorld*>(
-            NewtonWorldGetUserData(NewtonBodyGetWorld(pBody)));
-
-    // Get Associated entity
-    auto const userData = reinterpret_cast<uintptr_t>(
-            NewtonBodyGetUserData(pBody));
-    auto const bodyId = static_cast<BodyId>(userData);
+    ACtxNwtWorld &rWorldCtx = SysNewton::context_from_nwtbody(pBody);
+    BodyId const bodyId     = SysNewton::get_userdata_bodyid(pBody);
 
     Vector3 force{0.0f};
     Vector3 torque{0.0f};
 
-    auto factorBits = lgrn::bit_view(pWorldCtx->m_bodyFactors[bodyId]);
+    auto factorBits = lgrn::bit_view(rWorldCtx.m_bodyFactors[bodyId]);
     for (std::size_t const factorIdx : factorBits.ones())
     {
-        ACtxNwtWorld::ForceFactorFunc const& factor = pWorldCtx->m_factors[factorIdx];
+        ACtxNwtWorld::ForceFactorFunc const& factor = rWorldCtx.m_factors[factorIdx];
 
-        factor.m_func(pBody, bodyId, *pWorldCtx, factor.m_userData, force, torque);
+        factor.m_func(pBody, bodyId, rWorldCtx, factor.m_userData, force, torque);
     }
 
     NewtonBodySetForce(pBody, force.data());
     NewtonBodySetTorque(pBody, torque.data());
 } // cb_force_torque()
 
-void SysNewton::cb_set_transform(NewtonBody const* const pBody,
-                            const dFloat* const pMatrix, int threadIndex)
+void SysNewton::cb_set_transform(
+        NewtonBody const* pBody, dFloat const* const pMatrix, NwtThreadIndex_t const thread)
 {
-    // Get context from Newton World
-    ACtxNwtWorld* pWorldCtx = static_cast<ACtxNwtWorld*>(
-            NewtonWorldGetUserData(NewtonBodyGetWorld(pBody)));
+    ACtxNwtWorld &rWorldCtx = SysNewton::context_from_nwtbody(pBody);
+    BodyId const bodyId     = SysNewton::get_userdata_bodyid(pBody);
 
-    // Get Associated entity
-    auto const userData = reinterpret_cast<uintptr_t>(NewtonBodyGetUserData(pBody));
-    auto const bodyId = static_cast<BodyId>(userData);
-    ActiveEnt const ent = pWorldCtx->m_bodyToEnt[bodyId];
+    ActiveEnt const ent = rWorldCtx.m_bodyToEnt[bodyId];
 
-    NewtonBodyGetMatrix(pBody, pWorldCtx->m_pTransform->get(ent).m_transform.data());
+    NewtonBodyGetMatrix(pBody, rWorldCtx.m_pTransform->get(ent).m_transform.data());
 } // cb_set_transform()
 
 
@@ -122,7 +113,7 @@ void SysNewton::resize_body_data(ACtxNwtWorld& rCtxWorld)
     rCtxWorld.m_bodyFactors .resize(capacity);
 }
 
-NewtonCollision* SysNewton::create_primative(
+NwtColliderPtr_t SysNewton::create_primative(
         ACtxNwtWorld&   rCtxWorld,
         EShape          shape)
 {
@@ -145,7 +136,7 @@ NewtonCollision* SysNewton::create_primative(
         break;
     }
 
-    return pCollision;
+    return NwtColliderPtr_t{pCollision};
 }
 
 void SysNewton::orient_collision(
@@ -163,7 +154,7 @@ void SysNewton::orient_collision(
     }
     else
     {
-        constexpr Matrix3 const rotX90deg
+        static constexpr Matrix3 const rotX90deg
         {
             { 0.0f,  0.0f, -1.0f},
             { 0.0f,  1.0f,  0.0f},
@@ -215,7 +206,7 @@ void SysNewton::update_world(
         NewtonBodySetVelocity(pBody, vel.data());
     }
 
-    rCtxWorld.m_pTransform = &rTf;
+    rCtxWorld.m_pTransform = std::addressof(rTf);
 
     // Update the world
     NewtonUpdate(pNwtWorld, timestep);

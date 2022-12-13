@@ -76,7 +76,7 @@ void PlumeShader::draw_plume(
     Magnum::GL::Mesh &rMesh             = rData.m_pMeshGl->get(meshId);
     Magnum::GL::Texture2D &rTmpTex      = rData.m_pTexGl->get(rData.m_tmpTex);
 
-    Magnum::Matrix4 entRelative = viewProj.m_view * drawTf;
+    Matrix4 const entRelative = viewProj.m_view * drawTf;
 
     rData.m_shader
         .bindNozzleNoiseTexture     (rTmpTex)

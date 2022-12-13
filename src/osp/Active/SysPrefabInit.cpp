@@ -53,8 +53,8 @@ void SysPrefabInit::add_to_subtree(
     auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
             gc_importer, basic.m_importerRes);
 
-    auto const objs     = rPrefabData.m_prefabs[basic.m_prefabId];
-    auto const parents  = rPrefabData.m_prefabParents[basic.m_prefabId];
+    auto const& objs    = rPrefabData.m_prefabs[basic.m_prefabId];
+    auto const& parents = rPrefabData.m_prefabParents[basic.m_prefabId];
 
     auto itObj      = std::begin(objs);
     auto itEnt      = std::begin(ents);

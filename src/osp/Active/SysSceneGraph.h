@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2022 Open Space Program Project
  *
  * MIT License
  *
@@ -65,6 +65,7 @@ public:
 
     std::size_t remaining()
     {
+        assert(m_last >= m_first);
         return m_last - m_first;
     }
 
@@ -106,7 +107,7 @@ public:
         return *this;
     }
 
-    auto operator<=>(ChildIterator const&) const = default;
+    friend auto operator<=>(ChildIterator const& lhs, ChildIterator const& rhs) noexcept = default;
 
     value_type operator*() const noexcept
     {

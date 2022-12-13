@@ -215,7 +215,7 @@ Session setup_shape_spawn_newton(
             NewtonBodySetLinearDamping(pBody, 0.0f);
             NewtonBodySetForceAndTorqueCallback(pBody, &SysNewton::cb_force_torque);
             NewtonBodySetTransformCallback(pBody, &SysNewton::cb_set_transform);
-            NewtonBodySetUserData(pBody, reinterpret_cast<void*>(bodyId));
+            SysNewton::set_userdata_bodyid(pBody, bodyId);
         }
     }));
 
@@ -241,7 +241,7 @@ void compound_collect_recurse(
 
         if (rPtr.get() == nullptr)
         {
-            rPtr.reset(SysNewton::create_primative(rCtxWorld, shape));
+            rPtr = SysNewton::create_primative(rCtxWorld, shape);
         }
 
         SysNewton::orient_collision(rPtr.get(), shape, transform.translation(), transform.rotation(), transform.scaling());
@@ -442,7 +442,7 @@ Session setup_vehicle_spawn_newton(
                 NewtonBodySetLinearDamping(pBody, 0.0f);
                 NewtonBodySetForceAndTorqueCallback(pBody, &SysNewton::cb_force_torque);
                 NewtonBodySetTransformCallback(pBody, &SysNewton::cb_set_transform);
-                NewtonBodySetUserData(pBody, reinterpret_cast<void*>(bodyId));
+                SysNewton::set_userdata_bodyid(pBody, bodyId);
 
                 rPhys.m_setVelocity.emplace_back(weldEnt, toInit.m_velocity);
             });

@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "ospnewton.h"
+
 #include <osp/Active/physics.h>      // for ACompShape
 #include <osp/Active/basic.h>        // for ActiveEnt, ActiveReg_t, basic_sp...
 
@@ -41,8 +43,6 @@
 namespace ospnewton
 {
 
-struct ACtxNwtWorld;
-
 class SysNewton
 {
     template<typename COMP_T>
@@ -56,13 +56,15 @@ class SysNewton
     using ACompTransformMutable     = osp::active::ACompTransformMutable;
 public:
 
-    static void cb_force_torque(const NewtonBody* pBody, dFloat timestep, int threadIndex);
+    using NwtThreadIndex_t = int;
 
-    static void cb_set_transform(NewtonBody const* const pBody, const dFloat* const pMatrix, int threadIndex);
+    static void cb_force_torque(const NewtonBody* pBody, dFloat timestep, NwtThreadIndex_t thread);
+
+    static void cb_set_transform(NewtonBody const* pBody, dFloat const* pMatrix, NwtThreadIndex_t thread);
 
     static void resize_body_data(ACtxNwtWorld& rCtxWorld);
 
-    [[nodiscard]] static NewtonCollision* create_primative(
+    [[nodiscard]] static NwtColliderPtr_t create_primative(
             ACtxNwtWorld&           rCtxWorld,
             osp::phys::EShape       shape);
 
@@ -127,6 +129,21 @@ public:
             remove_components(rCtxWorld, *first);
             std::advance(first, 1);
         }
+    }
+
+    static ACtxNwtWorld& context_from_nwtbody(NewtonBody const* const pBody)
+    {
+        return *static_cast<ACtxNwtWorld*>(NewtonWorldGetUserData(NewtonBodyGetWorld(pBody)));
+    }
+
+    static BodyId get_userdata_bodyid(NewtonBody const* const pBody)
+    {
+        return reinterpret_cast<std::uintptr_t>(NewtonBodyGetUserData(pBody));
+    }
+
+    static void set_userdata_bodyid(NewtonBody const* const pBody, BodyId const body)
+    {
+        return NewtonBodySetUserData(pBody, reinterpret_cast<void*>(std::uintptr_t(body)));
     }
 
 private:
