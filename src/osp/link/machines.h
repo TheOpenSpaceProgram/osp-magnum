@@ -83,10 +83,14 @@ struct UpdMachPerType
     std::vector<BitVector_t> m_localDirty;
 };
 
-struct Junction
+struct MachinePair
 {
     MachLocalId     m_local{lgrn::id_null<MachLocalId>()};
     MachTypeId      m_type{lgrn::id_null<MachTypeId>()};
+};
+
+struct Junction : MachinePair
+{
     JuncCustom      m_custom{0};
 };
 

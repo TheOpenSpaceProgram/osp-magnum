@@ -43,14 +43,18 @@ using WeldId = uint32_t;
 
 struct Parts
 {
+    using MapPartToMachines_t = lgrn::IntArrayMultiMap<PartId, link::MachinePair>;
+
     lgrn::IdRegistryStl<PartId>                     m_partIds;
     std::vector<PrefabPair>                         m_partPrefabs;
     std::vector<WeldId>                             m_partToWeld;
     std::vector<Matrix4>                            m_partTransformWeld;
-    lgrn::IntArrayMultiMap<PartId, link::MachAnyId> m_partToMachines;
+    MapPartToMachines_t                             m_partToMachines;
+    std::vector<WeldId>                             m_partDirty;
 
     lgrn::IdRegistryStl<WeldId>                     m_weldIds;
     lgrn::IntArrayMultiMap<WeldId, PartId>          m_weldToParts;
+    std::vector<WeldId>                             m_weldDirty;
 
     link::Machines                                  m_machines;
     std::vector<PartId>                             m_machineToPart;

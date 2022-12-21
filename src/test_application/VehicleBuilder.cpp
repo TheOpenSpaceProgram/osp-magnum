@@ -137,7 +137,7 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId const part,
     rData.m_machines.m_machToLocal[mach] = local;
     rPerMachType.m_localToAny[local] = mach;
 
-    rData.m_partMachCount[std::size_t(part)] ++;
+    m_partMachCount[std::size_t(part)] ++;
     rData.m_machToPart[mach] = part;
 
     connect(mach, connections);
@@ -240,6 +240,38 @@ VehicleData VehicleBuilder::finalize_release()
             }
         }
     }
+
+    // Reserve part-to-machine partitions
+    using osp::link::MachinePair;
+    rData.m_partToMachines.ids_reserve(rData.m_partIds.capacity());
+    rData.m_partToMachines.data_reserve(rData.m_machines.m_ids.capacity());
+    for (PartId const part : rData.m_partIds.bitview().zeros())
+    {
+        rData.m_partToMachines.emplace(part, m_partMachCount[part]);
+    }
+
+    // Assign part-to-machine partitions
+    for (MachAnyId const mach : rData.m_machines.m_ids.bitview().zeros())
+    {
+        MachLocalId const local = rData.m_machines.m_machToLocal[mach];
+        MachTypeId const  type  = rData.m_machines.m_machTypes[mach];
+        PartId const      part  = rData.m_machToPart[mach];
+        lgrn::Span<MachinePair> machines = rData.m_partToMachines[part];
+
+        // Reuse machine count to track how many are currently added.
+        // By the end, these should all be zero
+        auto &rPartMachCount = m_partMachCount[part];
+        assert(rPartMachCount != 0);
+        -- rPartMachCount;
+
+        machines[rPartMachCount] = { .m_local = local, .m_type = type };
+    }
+
+    assert(std::all_of(m_partMachCount.begin(), m_partMachCount.end(),
+                       [] (auto const& count)
+    {
+        return count == 0;
+    }));
 
     VehicleData dataOut{std::move(*m_data)};
     m_data.emplace();

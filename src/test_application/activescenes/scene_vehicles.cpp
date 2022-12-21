@@ -71,8 +71,10 @@ Session setup_parts(
     parts.m_tgCleanupEvt = tgCleanupEvt;
 
     rBuilder.tag(tgPartReq)             .depend_on({tgPartMod});
+    rBuilder.tag(tgPartClr)             .depend_on({tgPartMod, tgPartReq});
     rBuilder.tag(tgMapPartEntMod)       .depend_on({tgMapPartEntReq});
     rBuilder.tag(tgWeldReq)             .depend_on({tgWeldMod});
+    rBuilder.tag(tgWeldClr)             .depend_on({tgWeldMod, tgWeldReq});
     rBuilder.tag(tgLinkReq)             .depend_on({tgLinkMod});
     rBuilder.tag(tgLinkMhUpdReq)        .depend_on({tgLinkMhUpdMod});
 
@@ -95,6 +97,16 @@ Session setup_parts(
             rResources.owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
         }
     }));
+
+    parts.task() = rBuilder.task().assign({tgSceneEvt, tgPartClr, tgWeldClr}).data(
+            "Clear Part and Weld dirty vectors after use",
+            TopDataIds_t{           idScnParts},
+            wrap_args([] (ACtxParts& rScnParts) noexcept
+    {
+        rScnParts.m_partDirty.clear();
+        rScnParts.m_weldDirty.clear();
+    }));
+
 
     return parts;
 }
@@ -349,6 +361,9 @@ Session setup_vehicle_spawn_vb(
         rScnParts.m_partIds.create(std::begin(rVehicleSpawn.m_newPartToPart), std::end(rVehicleSpawn.m_newPartToPart));
         rScnParts.m_weldIds.create(std::begin(rVehicleSpawn.m_newWeldToWeld), std::end(rVehicleSpawn.m_newWeldToWeld));
 
+        rScnParts.m_partDirty.insert(std::begin(rScnParts.m_partDirty), std::begin(rVehicleSpawn.m_newPartToPart), std::end(rVehicleSpawn.m_newPartToPart));
+        rScnParts.m_weldDirty.insert(std::begin(rScnParts.m_weldDirty), std::begin(rVehicleSpawn.m_newWeldToWeld), std::end(rVehicleSpawn.m_newWeldToWeld));
+
         std::size_t const maxParts = rScnParts.m_partIds.capacity();
         std::size_t const maxWelds = rScnParts.m_weldIds.capacity();
         rScnParts.m_partPrefabs         .resize(maxParts);
@@ -510,11 +525,42 @@ Session setup_vehicle_spawn_vb(
 
             copy_machines(pVData->m_machines, rScnParts.m_machines, remapMach);
 
+            // Update machine->part map
             rScnParts.m_machineToPart.resize(rScnParts.m_machines.m_ids.capacity());
             for (MachAnyId const srcMach : pVData->m_machines.m_ids.bitview().zeros())
             {
                 MachAnyId const dstMach = remapMach[srcMach];
-                rScnParts.m_machineToPart[dstMach] = remapPart[std::size_t(pVData->m_machToPart[srcMach])];
+                PartId const srcPart = pVData->m_machToPart[srcMach];
+                PartId const dstPart = remapPart[srcPart];
+
+                rScnParts.m_machineToPart[dstMach] = dstPart;
+            }
+
+            // Update part->machine multimap
+            rScnParts.m_partToMachines.ids_reserve(rScnParts.m_partIds.capacity());
+            rScnParts.m_partToMachines.data_reserve(rScnParts.m_machines.m_ids.capacity());
+            for (PartId const srcPart : pVData->m_partIds.bitview().zeros())
+            {
+                auto const& srcMachs = pVData->m_partToMachines[srcPart];
+                PartId const dstPart
+                            = remapPart[srcPart];
+
+                rScnParts.m_partToMachines.emplace(dstPart, srcMachs.size());
+                auto dstMachs = rScnParts.m_partToMachines[dstPart];
+
+                auto dstMachIt = std::begin(dstMachs);
+
+                for (MachinePair const srcPair : srcMachs)
+                {
+                    MachAnyId const srcMach = pVData->m_machines.m_perType[srcPair.m_type].m_localToAny[srcPair.m_local];
+                    MachAnyId const dstMach = remapMach[srcMach];
+                    MachTypeId const dstType = srcPair.m_type; // types are global
+                    MachLocalId const dstLocal = rScnParts.m_machines.m_machToLocal[dstMach];
+
+                    *dstMachIt = { .m_local = dstLocal, .m_type = dstType };
+
+                    std::advance(dstMachIt, 1);
+                }
             }
 
             auto itDstNodeType = std::begin(rScnParts.m_nodePerType);
@@ -740,7 +786,6 @@ Session setup_vehicle_control(
                 }
             }
         }
-
     }));
 
     return vehicleCtrl;

@@ -67,6 +67,7 @@ struct VehicleData
 {
     using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
                                                       osp::link::JuncCustom>;
+    using MapPartToMachines_t = osp::active::Parts::MapPartToMachines_t;
 
     VehicleData() = default;
     VehicleData(VehicleData const& copy) = delete;
@@ -75,8 +76,8 @@ struct VehicleData
     lgrn::IdRegistryStl<PartId>             m_partIds;
     std::vector<osp::Matrix4>               m_partTransformWeld;
     std::vector<osp::PrefabPair>            m_partPrefabs;
-    std::vector<uint16_t>                   m_partMachCount;
     std::vector<WeldId>                     m_partToWeld;
+    MapPartToMachines_t                     m_partToMachines;
 
     lgrn::IdRegistryStl<WeldId>             m_weldIds;
     lgrn::IntArrayMultiMap<WeldId, PartId>  m_weldToParts;
@@ -156,6 +157,7 @@ private:
 
     entt::dense_map< std::string_view, osp::PrefabPair > m_prefabs;
 
+    std::vector<uint16_t> m_partMachCount;
     std::optional<VehicleData> m_data;
 
     // put more attachment data here
@@ -169,7 +171,7 @@ std::array<PartId, N> VehicleBuilder::create_parts()
     m_data->m_partIds.create(std::begin(out), std::end(out));
 
     std::size_t const capacity = m_data->m_partIds.capacity();
-    m_data->m_partMachCount         .resize(capacity);
+    m_partMachCount                 .resize(capacity);
     m_data->m_partPrefabs           .resize(capacity);
     m_data->m_partTransformWeld     .resize(capacity);
     m_data->m_partToWeld            .resize(capacity);

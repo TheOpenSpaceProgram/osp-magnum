@@ -109,10 +109,10 @@
 
 #define OSP_DATA_TESTAPP_PARTS 4, \
     idScnParts, idPartInit, idUpdMach, idMachEvtTags
-#define OSP_TAGS_TESTAPP_PARTS 10, \
-    tgPartMod,          tgPartReq,                              \
+#define OSP_TAGS_TESTAPP_PARTS 12, \
+    tgPartMod,          tgPartReq,          tgPartClr,          \
     tgMapPartEntMod,    tgMapPartEntReq,                        \
-    tgWeldMod,          tgWeldReq,                              \
+    tgWeldMod,          tgWeldReq,          tgWeldClr,          \
     tgLinkMod,          tgLinkReq,                              \
     tgLinkMhUpdMod,     tgLinkMhUpdReq
 
@@ -179,6 +179,9 @@
     tgNwtVhHierMod,     tgNwtVhHierReq
 
 
+
+#define OSP_DATA_TESTAPP_ROCKETS_NWT 1, \
+    idRocketsNwt
 
 
 

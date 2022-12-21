@@ -191,7 +191,7 @@ static ScenarioMap_t make_scenarios()
         auto &rTags             = mainView.m_rTags;
         Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
-        sceneOut.resize(21);
+        sceneOut.resize(23);
         auto &
         [
             scnCommon, matVisual, physics, shapeSpawn,
@@ -199,8 +199,8 @@ static ScenarioMap_t make_scenarios()
             vehicleSpawn, vehicleSpawnVB, vehicleSpawnRgd,
             signalsFloat, machRocket,
             testVehicles, droppers, gravity, bounds, thrower,
-            newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt
-        ] = unpack<21>(sceneOut);
+            newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt, nwtRocketSet, rocketsNwt
+        ] = unpack<23>(sceneOut);
 
         scnCommon           = setup_common_scene        (builder, rTopData, rTags, idResources, pkg);
         matVisual           = setup_material            (builder, rTopData, rTags, scnCommon);
@@ -221,7 +221,8 @@ static ScenarioMap_t make_scenarios()
         nwtGrav             = setup_newton_force_accel  (builder, rTopData, rTags, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
         shapeSpawnNwt       = setup_shape_spawn_newton  (builder, rTopData, rTags, scnCommon, physics, shapeSpawn, newton, nwtGravSet);
         vehicleSpawnNwt     = setup_vehicle_spawn_newton(builder, rTopData, rTags, scnCommon, physics, prefabs, parts, vehicleSpawn, newton, idResources);
-
+        nwtRocketSet        = setup_newton_factors      (builder, rTopData, rTags);
+        rocketsNwt          = setup_rocket_thrust_newton(builder, rTopData, rTags, scnCommon, physics, prefabs, parts, signalsFloat, newton, nwtRocketSet);
 
         OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
         OSP_SESSION_UNPACK_DATA(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
@@ -259,8 +260,8 @@ static ScenarioMap_t make_scenarios()
                 vehicleSpawn, vehicleSpawnVB, vehicleSpawnRgd,
                 signalsFloat, machRocket,
                 testVehicles, droppers, gravity, bounds, thrower,
-                newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt
-            ] = unpack<21>(scene);
+                newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt, rocketsNwt
+            ] = unpack<22>(scene);
 
             rendererOut.resize(6);
             auto & [scnRender, cameraCtrl, shVisual, camThrow, vehicleCtrl, cameraVehicle] = unpack<6>(rendererOut);

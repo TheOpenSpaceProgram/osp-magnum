@@ -47,6 +47,7 @@
 
 using namespace osp;
 using namespace osp::active;
+using namespace osp::link;
 using namespace ospnewton;
 
 using osp::restypes::gc_importer;
@@ -452,18 +453,113 @@ Session setup_vehicle_spawn_newton(
 
 struct BodyRocket
 {
-    Vector3             m_direction;
-    Vector3             m_offset;
-    link::MachLocalId   m_rocketId;
+    Quaternion      m_rotation;
+    Vector3         m_offset;
+
+    MachLocalId     m_local;
+    NodeId          m_throttleIn;
 };
 
-struct ACtxRocketThrustNwt
+struct ACtxRocketsNwt
 {
     // map each bodyId to a {machine, offset}
     lgrn::IntArrayMultiMap<BodyId, BodyRocket> m_bodyRockets;
 
 };
 
+static void assign_rockets(
+        ACtxBasic const&            rBasic,
+        ACtxParts const&            rScnParts,
+        ACtxNwtWorld&               rNwt,
+        ACtxRocketsNwt&             rRocketsNwt,
+        Nodes const&                rFloatNodes,
+        PerMachType const&          machtypeRocket,
+        ForceFactors_t const&       rNwtFactors,
+        WeldId const                weld,
+        std::vector<BodyRocket>&    rTemp)
+{
+    using adera::gc_mtMagicRocket;
+    using adera::ports_magicrocket::gc_throttleIn;
+
+    ActiveEnt const weldEnt = rScnParts.m_weldToEnt[weld];
+    BodyId const body = rNwt.m_entToBody.at(weldEnt);
+
+    if (rRocketsNwt.m_bodyRockets.contains(body))
+    {
+        rRocketsNwt.m_bodyRockets.erase(body);
+    }
+
+    for (PartId const part : rScnParts.m_weldToParts[weld])
+    {
+        auto const sizeBefore = rTemp.size();
+
+        for (MachinePair const pair : rScnParts.m_partToMachines[part])
+        {
+            if (pair.m_type != gc_mtMagicRocket)
+            {
+                continue; // This machine is not a rocket
+            }
+
+            MachAnyId const mach        = machtypeRocket.m_localToAny[pair.m_local];
+            auto const&     portSpan    = rFloatNodes.m_machToNode[mach];
+            NodeId const    throttleIn  = connected_node(portSpan, gc_throttleIn.m_port);
+
+            if (throttleIn == lgrn::id_null<NodeId>())
+            {
+                continue; // Throttle is not connected
+            }
+
+            BodyRocket &rBodyRocket     = rTemp.emplace_back();
+            rBodyRocket.m_local         = pair.m_local;
+            rBodyRocket.m_throttleIn    = throttleIn;
+        }
+
+        if (sizeBefore == rTemp.size())
+        {
+            continue; // No rockets found
+        }
+
+        // calculate transform relative to body root
+        // start from part, then walk parents up
+        ActiveEnt const partEnt = rScnParts.m_partToActive[part];
+
+        Matrix4     transform   = rBasic.m_transform.get(partEnt).m_transform;
+        ActiveEnt   parent      = rBasic.m_scnGraph.m_entParent[std::size_t(partEnt)];
+
+        while (parent != weldEnt)
+        {
+            Matrix4 const& parentTransform = rBasic.m_transform.get(parent).m_transform;
+            transform = parentTransform * transform;
+            parent = rBasic.m_scnGraph.m_entParent[std::size_t(parent)];
+        }
+
+        auto const      rotation    = Quaternion::fromMatrix(transform.rotation());
+        Vector3 const   offset      = transform.translation();
+
+        for (BodyRocket &rBodyRocket : arrayView(rTemp).exceptPrefix(sizeBefore))
+        {
+            rBodyRocket.m_rotation  = rotation;
+            rBodyRocket.m_offset    = offset;
+        }
+    }
+
+    ForceFactors_t &rBodyFactors = rNwt.m_bodyFactors[body];
+
+    // TODO: Got lazy, eventually iterate ForceFactors_t instead of
+    //       just using [0]. This breaks if more factor bits are added
+    static_assert(ForceFactors_t{}.size() == 1u);
+
+    if ( rTemp.empty() )
+    {
+        rBodyFactors[0] &= ~rNwtFactors[0];
+        return;
+    }
+
+    rBodyFactors[0] |= rNwtFactors[0];
+
+    rRocketsNwt.m_bodyRockets.emplace(body, rTemp.begin(), rTemp.end());
+    rTemp.clear();
+}
 
 Session setup_rocket_thrust_newton(
         Builder_t&                  rBuilder,
@@ -473,44 +569,101 @@ Session setup_rocket_thrust_newton(
         Session const&              physics,
         Session const&              prefabs,
         Session const&              parts,
-        Session const&              vehicleSpawn,
+        Session const&              signalsFloat,
         Session const&              newton,
-        Session const&              vehicleSpawnNwt,
-        TopDataId const             idResources)
+        Session const&              nwtFactors)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,          TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,          TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(physics,            TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(physics,            TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_DATA(prefabs,            TESTAPP_PREFABS);
-    OSP_SESSION_UNPACK_TAGS(prefabs,            TESTAPP_PREFABS);
-    OSP_SESSION_UNPACK_DATA(vehicleSpawn,       TESTAPP_VEHICLE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(vehicleSpawn,       TESTAPP_VEHICLE_SPAWN);
-    OSP_SESSION_UNPACK_DATA(newton,             TESTAPP_NEWTON);
-    OSP_SESSION_UNPACK_TAGS(vehicleSpawnNwt,    TESTAPP_VEHICLE_SPAWN_NWT);
-    OSP_SESSION_UNPACK_DATA(parts,              TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,              TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
+    OSP_SESSION_UNPACK_DATA(prefabs,        TESTAPP_PREFABS);
+    OSP_SESSION_UNPACK_TAGS(prefabs,        TESTAPP_PREFABS);
+    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
+    OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
+    OSP_SESSION_UNPACK_DATA(newton,         TESTAPP_NEWTON);
+    OSP_SESSION_UNPACK_TAGS(newton,         TESTAPP_NEWTON);
+    OSP_SESSION_UNPACK_DATA(nwtFactors,     TESTAPP_NEWTON_FORCES);
+
 
     Session rocketNwt;
-    //OSP_SESSION_ACQUIRE_DATA(vehicleSpawnNwt, topData, TESTAPP_VEHICLE_SPAWN_NWT);
+    OSP_SESSION_ACQUIRE_DATA(rocketNwt, topData, TESTAPP_ROCKETS_NWT);
     //OSP_SESSION_ACQUIRE_TAGS(vehicleSpawnNwt, rTags,   TESTAPP_VEHICLE_SPAWN_NWT);
 
-    rocketNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgLinkReq, tgWeldReq, tgNwtVhWeldEntReq}).data(
+    auto &rRocketsNwt   = top_emplace< ACtxRocketsNwt >(topData, idRocketsNwt);
+
+
+    rocketNwt.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgWeldReq, tgNwtBodyReq}).data(
             "Assign rockets to Newton bodies",
-            TopDataIds_t{                   idActiveIds,           idBasic,             idPhys,              idNwt,                        idVehicleSpawn,                 idScnParts  },
-            wrap_args([] (ActiveReg_t const &rActiveIds, ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts ) noexcept
+            TopDataIds_t{                   idActiveIds,           idBasic,             idPhys,              idNwt,                 idScnParts,                idRocketsNwt,                      idNwtFactors},
+            wrap_args([] (ActiveReg_t const &rActiveIds, ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxParts const& rScnParts, ACtxRocketsNwt& rRocketsNwt, ForceFactors_t const& rNwtFactors) noexcept
     {
         using adera::gc_mtMagicRocket;
 
-        WeldId weld;
-        for (PartId const part : rScnParts.m_weldToParts[weld])
+
+        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
+        PerMachType const& machtypeRocket = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
+
+        rRocketsNwt.m_bodyRockets.ids_reserve(rNwt.m_bodyIds.size());
+        rRocketsNwt.m_bodyRockets.data_reserve(rScnParts.m_machines.m_perType[gc_mtMagicRocket].m_localIds.capacity());
+
+        std::vector<BodyRocket> temp;
+
+        for (WeldId const weld : rScnParts.m_weldDirty)
         {
-            if (rScnParts.m_machines.m_machTypes[part] == gc_mtMagicRocket)
-            {
-                rScnParts.m_machines.m_machToLocal;
-            }
+            assign_rockets(rBasic, rScnParts, rNwt, rRocketsNwt, rFloatNodes, machtypeRocket, rNwtFactors, weld, temp);
         }
     }));
+
+    auto &rScnParts     = top_get< ACtxParts >              (topData, idScnParts);
+    auto &rSigValFloat  = top_get< SignalValues_t<float> >  (topData, idSigValFloat);
+    Machines &rMachines = rScnParts.m_machines;
+
+    using UserData_t = ACtxNwtWorld::ForceFactorFunc::UserData_t;
+    ACtxNwtWorld::ForceFactorFunc const factor
+    {
+        .m_func = [] (NewtonBody const* pBody, BodyId const body, ACtxNwtWorld const& rNwt, UserData_t data, Vector3& rForce, Vector3& rTorque) noexcept
+        {
+            auto const& rRocketsNwt     = *reinterpret_cast<ACtxRocketsNwt const*>          (data[0]);
+            auto const& rMachines       = *reinterpret_cast<Machines const*>                (data[1]);
+            auto const& rSigValFloat    = *reinterpret_cast<SignalValues_t<float> const*>   (data[2]);
+
+            auto &rBodyRockets = rRocketsNwt.m_bodyRockets[body];
+
+            if (rBodyRockets.size() == 0)
+            {
+                return;
+            }
+
+            std::array<dFloat, 4> nwtRot; // quaternion xyzw
+            NewtonBodyGetRotation(pBody, nwtRot.data());
+            Quaternion const rot{{nwtRot[0], nwtRot[1], nwtRot[2]}, nwtRot[3]};
+
+            for (BodyRocket const& bodyRocket : rBodyRockets)
+            {
+                float const throttle = rSigValFloat[bodyRocket.m_throttleIn];
+
+                if (throttle == 0.0f)
+                {
+                    continue;
+                }
+
+                Vector3 const direction = (rot * bodyRocket.m_rotation).transformVector(Vector3{0.0f, 0.0f, 1.0f});
+                rForce += direction * throttle * 200.0f;
+            }
+        },
+        .m_userData = { &rRocketsNwt, &rMachines, &rSigValFloat }
+    };
+
+    auto &rNwt = top_get<ACtxNwtWorld>(topData, idNwt);
+
+    std::size_t const index = rNwt.m_factors.size();
+    rNwt.m_factors.emplace_back(factor);
+
+    auto factorBits = lgrn::bit_view(top_get<ForceFactors_t>(topData, idNwtFactors));
+    factorBits.set(index);
 
     return rocketNwt;
 }
