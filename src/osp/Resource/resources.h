@@ -44,7 +44,7 @@ namespace osp
 class Resources
 {
     using res_data_family_t = entt::family<struct ResourceType>;
-    using res_data_type_t = res_data_family_t::family_type;
+    using res_data_type_t = res_data_family_t::value_type;
 
     struct PerResType
     {
@@ -209,7 +209,7 @@ private:
 template<typename T>
 void Resources::data_register(ResTypeId typeId)
 {
-    res_data_type_t const type = res_data_family_t::type<T>;
+    res_data_type_t const type = res_data_family_t::value<T>;
     PerResType &rPerResType = get_type(typeId);
 
     std::vector<res_data_type_t> &rTypes = rPerResType.m_resDataTypes;
@@ -299,7 +299,7 @@ T* Resources::data_try_get(ResTypeId typeId, ResId resId)
 template <typename T>
 res_container_t<T>& Resources::get_container(PerResType &rPerResType, ResTypeId typeId)
 {
-    res_data_type_t const type = res_data_family_t::type<T>;
+    res_data_type_t const type = res_data_family_t::value<T>;
 
     std::vector<res_data_type_t> const &rTypes = rPerResType.m_resDataTypes;
     auto typeFound = std::find(rTypes.cbegin(), rTypes.cend(), type);

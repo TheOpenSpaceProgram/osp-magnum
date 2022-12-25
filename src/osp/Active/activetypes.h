@@ -49,9 +49,9 @@ enum class ActiveEnt: entt::id_type {};
 // Specialize entt::storage_traits to disable signals for storage that uses
 // ActiveEnt as entities
 template<typename Type>
-struct entt::storage_traits<osp::active::ActiveEnt, Type>
+struct entt::storage_type<Type, osp::active::ActiveEnt>
 {
-    using storage_type = basic_storage<osp::active::ActiveEnt, Type>;
+    using type = basic_storage<Type, osp::active::ActiveEnt>;
 };
 
 
@@ -75,7 +75,7 @@ struct EntSetPair
 using active_sparse_set_t = entt::basic_sparse_set<ActiveEnt>;
 
 template<typename COMP_T>
-using acomp_storage_t = typename entt::storage_traits<ActiveEnt, COMP_T>::storage_type;
+using acomp_storage_t = typename entt::storage_type<COMP_T, ActiveEnt>::type;
 
 template<typename... COMP_T>
 using acomp_view_t = entt::basic_view<ActiveEnt, entt::get_t<COMP_T...>, entt::exclude_t<>>;
