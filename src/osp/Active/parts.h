@@ -68,8 +68,9 @@ struct ACtxParts : Parts
     std::vector<ActiveEnt>                          m_weldToEnt;
 };
 
-using NewPartId = uint32_t;
-using NewWeldId = uint32_t;
+using NewVehicleId  = uint32_t;
+using NewPartId     = uint32_t;
+using NewWeldId     = uint32_t;
 
 struct ACtxVehicleSpawn
 {
@@ -85,17 +86,19 @@ struct ACtxVehicleSpawn
         return m_newVhBasicIn.size();
     }
 
-    std::vector<TmpToInit>      m_newVhBasicIn;
-    std::vector<NewPartId>      m_newVhPartOffsets;
-    std::vector<NewWeldId>      m_newVhWeldOffsets;
+    std::vector<TmpToInit>          m_newVhBasicIn;
+    std::vector<NewPartId>          m_newVhPartOffsets;
+    std::vector<NewWeldId>          m_newVhWeldOffsets;
 
-    std::vector<PartId>         m_newPartToPart;
-    std::vector<uint32_t>       m_newPartPrefabs;
+    std::vector<PartId>             m_newPartToPart;
+    std::vector<uint32_t>           m_newPartPrefabs;
 
-    std::vector<NewPartId>      m_partToNewPart;
+    std::vector<NewPartId>          m_partToNewPart;
 
-    std::vector<WeldId>         m_newWeldToWeld;
-    std::vector<ActiveEnt>      m_newWeldToEnt;
+    std::vector<WeldId>             m_newWeldToWeld;
+    std::vector<ActiveEnt>          m_newWeldToEnt;
+
+    std::vector<link::MachAnyId>    m_newMachToMach;
 };
 
 } // namespace osp::active

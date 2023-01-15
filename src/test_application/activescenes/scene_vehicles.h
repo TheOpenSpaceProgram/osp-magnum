@@ -87,6 +87,7 @@ osp::Session setup_vehicle_spawn_vb(
         osp::Session const&         prefabs,
         osp::Session const&         parts,
         osp::Session const&         vehicleSpawn,
+        osp::Session const&         signalsFloat,
         osp::TopDataId const        idResources);
 
 /**

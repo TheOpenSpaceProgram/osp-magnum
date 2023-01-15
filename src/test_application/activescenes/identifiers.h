@@ -120,21 +120,23 @@
 
 #define OSP_DATA_TESTAPP_VEHICLE_SPAWN 1, \
     idVehicleSpawn
-#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN 9, \
-    tgVhSpBasicInMod,   tgVhSpBasicInReq,   tgVhSpBasicInClr,   \
-    tgVhSpPartMod,      tgVhSpPartReq,                          \
-    tgVhSpWeldMod,      tgVhSpWeldReq,                          \
-    tgVhSpPartPfMod,    tgVhSpPartPfReq
+#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN 11, \
+    tgVsBasicInMod,     tgVsBasicInReq,     tgVsBasicInClr,     \
+    tgVsPartMod,        tgVsPartReq,                            \
+    tgVsMapPartMachMod, tgVsMapPartMachReq,                     \
+    tgVsWeldMod,        tgVsWeldReq,                            \
+    tgVsPartPfMod,      tgVsPartPfReq
 
 
 
 #define OSP_DATA_TESTAPP_VEHICLE_SPAWN_VB 1, \
     idVehicleSpawnVB
-#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_VB 8, \
-    tgVBSpBasicInMod,   tgVBSpBasicInReq,                       \
-    tgVBPartMod,        tgVBPartReq,                            \
-    tgVBWeldMod,        tgVBWeldReq,                            \
-    tgVBMachMod,        tgVBMachReq
+#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_VB 10, \
+    tgVbSpBasicInMod,   tgVbSpBasicInReq,                       \
+    tgVbPartMod,        tgVbPartReq,                            \
+    tgVbWeldMod,        tgVbWeldReq,                            \
+    tgVbMachMod,        tgVbMachReq,                            \
+    tgVbNodeMod,        tgVbNodeReq
 
 
 #define OSP_DATA_TESTAPP_TEST_VEHICLES 1, \

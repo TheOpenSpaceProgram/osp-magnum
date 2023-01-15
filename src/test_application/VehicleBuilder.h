@@ -31,6 +31,8 @@
 
 #include <longeron/id_management/registry_stl.hpp>
 
+#include <Corrade/Containers/StridedArrayView.h>
+
 #include <entt/core/any.hpp>
 #include <entt/container/dense_map.hpp>
 
@@ -89,7 +91,7 @@ struct VehicleData
 };
 
 /**
- * Used to easily create Vehicle blueprints
+ * Used to easily create VehicleData
  */
 class VehicleBuilder
 {
@@ -136,6 +138,14 @@ public:
 
     template <std::size_t N>
     [[nodiscard]] std::array<NodeId, N> create_nodes(NodeTypeId nodeType);
+
+    template <typename VALUES_T>
+    [[nodiscard]] VALUES_T& node_values(NodeTypeId nodeType);
+
+    std::size_t node_capacity(NodeTypeId nodeType) const
+    {
+        return m_data->m_nodePerType[nodeType].m_nodeIds.capacity();
+    }
 
     struct Connection
     {
@@ -196,11 +206,36 @@ std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId const n
     return out;
 }
 
+template <typename VALUES_T>
+VALUES_T& VehicleBuilder::node_values(NodeTypeId nodeType)
+{
+    PerNodeType &rPerNodeType = m_data->m_nodePerType[nodeType];
+    rPerNodeType.m_nodeValues.emplace<VALUES_T>();
+    return entt::any_cast<VALUES_T&>(rPerNodeType.m_nodeValues);
+}
+
 struct ACtxVehicleSpawnVB
 {
     std::vector<VehicleData const*> m_dataVB;
 
-    // Remap vectors used to convert VehicleData IDs for the scene
+    // Remap vectors convert IDs from VehicleData to ACtxParts.
+    // A single vector for remaps is shared for all vehicles to spawn,
+    // so offsets are used to divide up the vector.
+
+    // PartId srcPart = /* ID from VehicleData */
+    // PartId dstPart = m_remapParts[m_remapPartOffsets[newVehicleIndex] + srcPart];
+
+    inline Corrade::Containers::StridedArrayView2D<std::size_t> remap_node_offsets_2d() noexcept
+    {
+        return {Corrade::Containers::arrayView(m_remapNodeOffsets.data(), m_remapNodeOffsets.size()),
+                {m_dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+    }
+
+    inline Corrade::Containers::StridedArrayView2D<std::size_t const> remap_node_offsets_2d() const noexcept
+    {
+        return {Corrade::Containers::arrayView(m_remapNodeOffsets.data(), m_remapNodeOffsets.size()),
+                {m_dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+    }
 
     std::vector<osp::active::PartId>    m_remapParts;
     std::vector<std::size_t>            m_remapPartOffsets;
@@ -208,8 +243,14 @@ struct ACtxVehicleSpawnVB
     std::vector<osp::active::PartId>    m_remapWelds;
     std::vector<std::size_t>            m_remapWeldOffsets;
 
-    std::vector<osp::link::MachAnyId>   m_remapMachAll;
+    std::vector<std::size_t>            m_machtypeCount;
+    std::vector<osp::link::MachAnyId>   m_remapMachs;
     std::vector<std::size_t>            m_remapMachOffsets;
+
+    // remapNodes are both shared between all new vehicles and all node types
+    // An offset can exist for each pair of [New Vehicle, Node Type]
+    std::vector<osp::link::NodeId>      m_remapNodes;
+    std::vector<std::size_t>            m_remapNodeOffsets;
 };
 
 } // namespace testapp

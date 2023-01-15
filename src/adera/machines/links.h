@@ -52,6 +52,8 @@ using osp::link::gc_ntSigFloat;
 using osp::link::gc_sigIn;
 
 PortEntry const gc_throttleIn       { gc_ntSigFloat, 0, gc_sigIn };
+PortEntry const gc_multiplierIn     { gc_ntSigFloat, 1, gc_sigIn };
+
 }
 
 } // namespace adera

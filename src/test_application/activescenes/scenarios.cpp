@@ -208,9 +208,9 @@ static ScenarioMap_t make_scenarios()
         shapeSpawn          = setup_shape_spawn         (builder, rTopData, rTags, scnCommon, physics, matVisual);
         prefabs             = setup_prefabs             (builder, rTopData, rTags, scnCommon, physics, matVisual, idResources);
         parts               = setup_parts               (builder, rTopData, rTags, scnCommon, idResources);
-        vehicleSpawn        = setup_vehicle_spawn       (builder, rTopData, rTags, scnCommon);
-        vehicleSpawnVB      = setup_vehicle_spawn_vb    (builder, rTopData, rTags, scnCommon, prefabs, parts, vehicleSpawn, idResources);
         signalsFloat        = setup_signals_float       (builder, rTopData, rTags, scnCommon, parts);
+        vehicleSpawn        = setup_vehicle_spawn       (builder, rTopData, rTags, scnCommon);
+        vehicleSpawnVB      = setup_vehicle_spawn_vb    (builder, rTopData, rTags, scnCommon, prefabs, parts, vehicleSpawn, signalsFloat, idResources);
         machRocket          = setup_mach_rocket         (builder, rTopData, rTags, scnCommon, parts, signalsFloat);
         testVehicles        = setup_test_vehicles       (builder, rTopData, rTags, scnCommon, idResources);
         droppers            = setup_droppers            (builder, rTopData, rTags, scnCommon, shapeSpawn);
@@ -236,7 +236,7 @@ static ScenarioMap_t make_scenarios()
         auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
         auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
 
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < 10; ++i)
         {
             rVehicleSpawn.m_newVhBasicIn.push_back(
             {

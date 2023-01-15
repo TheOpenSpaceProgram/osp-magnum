@@ -326,7 +326,7 @@ Session setup_vehicle_spawn_newton(
         }
     }));
 
-    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgVhSpWeldReq, tgNwtVhWeldEntReq, tgNwtVhHierMod, tgPfParentHierMod, tgPrefabEntReq, tgHierMod, tgTransformNew}).data(
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVsBasicInReq, tgVsWeldReq, tgNwtVhWeldEntReq, tgNwtVhHierMod, tgPfParentHierMod, tgPrefabEntReq, tgHierMod, tgTransformNew}).data(
             "Add vehicle entities to Scene Graph",
             TopDataIds_t{           idBasic,                   idActiveIds,                        idVehicleSpawn,           idScnParts,                idPrefabInit,           idResources },
             wrap_args([] (ACtxBasic& rBasic, ActiveReg_t const& rActiveIds, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
@@ -382,7 +382,7 @@ Session setup_vehicle_spawn_newton(
         }
     }));
 
-    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVhSpBasicInReq, tgVhSpWeldReq, tgNwtVhWeldEntReq, tgNwtVhHierReq, tgPfParentHierReq, tgNwtBodyMod}).data(
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVsBasicInReq, tgVsWeldReq, tgNwtVhWeldEntReq, tgNwtVhHierReq, tgPfParentHierReq, tgNwtBodyMod}).data(
             "Add Newton physics to rigid group entities",
             TopDataIds_t{                   idActiveIds,           idBasic,             idPhys,              idNwt,                        idVehicleSpawn,                 idScnParts  },
             wrap_args([] (ActiveReg_t const &rActiveIds, ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts) noexcept
@@ -458,6 +458,7 @@ struct BodyRocket
 
     MachLocalId     m_local;
     NodeId          m_throttleIn;
+    NodeId          m_multiplierIn;
 };
 
 struct ACtxRocketsNwt
@@ -480,6 +481,7 @@ static void assign_rockets(
 {
     using adera::gc_mtMagicRocket;
     using adera::ports_magicrocket::gc_throttleIn;
+    using adera::ports_magicrocket::gc_multiplierIn;
 
     ActiveEnt const weldEnt = rScnParts.m_weldToEnt[weld];
     BodyId const body = rNwt.m_entToBody.at(weldEnt);
@@ -500,18 +502,21 @@ static void assign_rockets(
                 continue; // This machine is not a rocket
             }
 
-            MachAnyId const mach        = machtypeRocket.m_localToAny[pair.m_local];
-            auto const&     portSpan    = rFloatNodes.m_machToNode[mach];
-            NodeId const    throttleIn  = connected_node(portSpan, gc_throttleIn.m_port);
+            MachAnyId const mach            = machtypeRocket.m_localToAny[pair.m_local];
+            auto const&     portSpan        = rFloatNodes.m_machToNode[mach];
+            NodeId const    throttleIn      = connected_node(portSpan, gc_throttleIn.m_port);
+            NodeId const    multiplierIn    = connected_node(portSpan, gc_multiplierIn.m_port);
 
-            if (throttleIn == lgrn::id_null<NodeId>())
+            if (   (throttleIn   == lgrn::id_null<NodeId>())
+                || (multiplierIn == lgrn::id_null<NodeId>()) )
             {
-                continue; // Throttle is not connected
+                continue; // Throttle and/or multiplier is not connected
             }
 
             BodyRocket &rBodyRocket     = rTemp.emplace_back();
             rBodyRocket.m_local         = pair.m_local;
             rBodyRocket.m_throttleIn    = throttleIn;
+            rBodyRocket.m_multiplierIn  = multiplierIn;
         }
 
         if (sizeBefore == rTemp.size())
@@ -590,7 +595,6 @@ Session setup_rocket_thrust_newton(
 
     Session rocketNwt;
     OSP_SESSION_ACQUIRE_DATA(rocketNwt, topData, TESTAPP_ROCKETS_NWT);
-    //OSP_SESSION_ACQUIRE_TAGS(vehicleSpawnNwt, rTags,   TESTAPP_VEHICLE_SPAWN_NWT);
 
     auto &rRocketsNwt   = top_emplace< ACtxRocketsNwt >(topData, idRocketsNwt);
 
@@ -643,15 +647,18 @@ Session setup_rocket_thrust_newton(
 
             for (BodyRocket const& bodyRocket : rBodyRockets)
             {
-                float const throttle = rSigValFloat[bodyRocket.m_throttleIn];
+                float const throttle = std::clamp(rSigValFloat[bodyRocket.m_throttleIn], 0.0f, 1.0f);
+                float const multiplier = rSigValFloat[bodyRocket.m_multiplierIn];
 
-                if (throttle == 0.0f)
+                float const thrustForce = throttle * multiplier;
+
+                if (thrustForce == 0.0f)
                 {
                     continue;
                 }
 
                 Vector3 const direction = (rot * bodyRocket.m_rotation).transformVector(Vector3{0.0f, 0.0f, 1.0f});
-                rForce += direction * throttle * 200.0f;
+                rForce += direction * thrustForce * 200.0f;
             }
         },
         .m_userData = { &rRocketsNwt, &rMachines, &rSigValFloat }
