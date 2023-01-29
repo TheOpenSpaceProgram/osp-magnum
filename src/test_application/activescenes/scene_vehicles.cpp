@@ -46,6 +46,8 @@ using namespace osp::link;
 
 using osp::restypes::gc_importer;
 
+using namespace Magnum::Math::Literals;
+
 namespace testapp::scenes
 {
 
@@ -772,6 +774,25 @@ Session setup_vehicle_spawn_vb(
     return vehicleSpawnVB;
 }
 
+Matrix4 quick_transform(Vector3 const pos, Quaternion const rot) noexcept
+{
+    return Matrix4::from(rot.toMatrix(), pos);
+}
+
+void add_rcs_block(VehicleBuilder &rBuilder, VehicleBuilder::WeldVec_t &rWeldTo, Vector3 pos, Quaternion rot)
+{
+    Vector3 constexpr xAxis{1.0f, 0.0f, 0.0f};
+
+    auto const [ nozzleA, nozzleB ] = rBuilder.create_parts<2>();
+    rBuilder.set_prefabs({
+        { nozzleA,  "phLinRCS" },
+        { nozzleB,  "phLinRCS" }
+    });
+
+    rWeldTo.push_back({ nozzleA, quick_transform(pos, rot * Quaternion::rotation( 90.0_degf, xAxis))});
+    rWeldTo.push_back({ nozzleB, quick_transform(pos, rot * Quaternion::rotation(-90.0_degf, xAxis))});
+}
+
 Session setup_test_vehicles(
         Builder_t&                  rBuilder,
         ArrayView<entt::any> const  topData,
@@ -791,44 +812,61 @@ Session setup_test_vehicles(
 
     // Build "PartVehicle"
     {
-        VehicleBuilder builder{&rResources};
+        VehicleBuilder vbuilder{&rResources};
+        VehicleBuilder::WeldVec_t toWeld;
 
-        auto const [ capsule, fueltank, engine ] = builder.create_parts<3>();
-        builder.set_prefabs({
+        auto const [ capsule, fueltank, engine ] = vbuilder.create_parts<3>();
+        vbuilder.set_prefabs({
             { capsule,  "phCapsule" },
             { fueltank, "phFuselage" },
             { engine,   "phEngine" },
         });
 
-        builder.weld({
-           { capsule,  Matrix4::translation({0, 0, 3}) },
-           { fueltank, Matrix4::translation({0, 0, 0}) },
-           { engine,   Matrix4::translation({0, 0, -3}) },
-        });
+        toWeld.push_back( {capsule,  quick_transform({0, 0, 3}, {})} );
+        toWeld.push_back( {fueltank, quick_transform({0, 0, 0}, {})} );
+        toWeld.push_back( {engine,   quick_transform({0, 0, -3}, Quaternion::rotation(2.0_degf, {1.0, 0.0, 0.0}))} );
 
         namespace ports_magicrocket = adera::ports_magicrocket;
         namespace ports_userctrl = adera::ports_userctrl;
 
-        auto const [ pitch, yaw, roll, throttle, thrustMul ] = builder.create_nodes<5>(gc_ntSigFloat);
+        auto const [ pitch, yaw, roll, throttle, thrustMul ] = vbuilder.create_nodes<5>(gc_ntSigFloat);
 
-        auto &rFloatValues = builder.node_values< SignalValues_t<float> >(gc_ntSigFloat);
-        rFloatValues.resize(builder.node_capacity(gc_ntSigFloat));
-        rFloatValues[thrustMul] = 0.5f;
+        auto &rFloatValues = vbuilder.node_values< SignalValues_t<float> >(gc_ntSigFloat);
+        rFloatValues.resize(vbuilder.node_capacity(gc_ntSigFloat));
+        rFloatValues[thrustMul] = 100.0f;
 
-
-        builder.create_machine(capsule, gc_mtUserCtrl, {
+        vbuilder.create_machine(capsule, gc_mtUserCtrl, {
             { ports_userctrl::gc_throttleOut,   throttle },
-            { ports_userctrl::gc_pitchOut,      pitch },
-            { ports_userctrl::gc_yawOut,        yaw },
-            { ports_userctrl::gc_rollOut,       roll }
+            { ports_userctrl::gc_pitchOut,      pitch    },
+            { ports_userctrl::gc_yawOut,        yaw      },
+            { ports_userctrl::gc_rollOut,       roll     }
         } );
 
-        builder.create_machine(engine, gc_mtMagicRocket, {
+        vbuilder.create_machine(engine, gc_mtMagicRocket, {
             { ports_magicrocket::gc_throttleIn, throttle },
             { ports_magicrocket::gc_multiplierIn, thrustMul }
         } );
 
-        top_emplace<VehicleData>(topData, idTVPartVehicle, builder.finalize_release());
+        int const   rcsRingBlocks   = 4;
+        int const   rcsRingCount    = 2;
+        float const rcsRingZ        = -2.0f;
+        float const rcsZStep        = 4.0f;
+        float const rcsRadius       = 1.1f;
+
+        for (int ring = 0; ring < rcsRingCount; ++ring)
+        {
+            Vector3 const rcsOset{rcsRadius, 0.0f, rcsRingZ + ring*rcsZStep };
+
+            for (Rad ang = 0.0_degf; ang < Rad(360.0_degf); ang += Rad(360.0_degf)/rcsRingBlocks)
+            {
+               Quaternion rotZ = Quaternion::rotation(ang, {0.0f, 0.0f, 1.0f});
+               add_rcs_block(vbuilder, toWeld, rotZ.transformVector(rcsOset), rotZ);
+            }
+        }
+
+        vbuilder.weld(toWeld);
+
+        top_emplace<VehicleData>(topData, idTVPartVehicle, vbuilder.finalize_release());
     }
 
     auto const cleanup_prefab_owners = wrap_args([] (Resources& rResources, VehicleData &rTVData) noexcept

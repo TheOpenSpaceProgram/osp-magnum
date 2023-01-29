@@ -187,6 +187,7 @@ void SysPrefabInit::init_physics(
             Resources const&                    rResources,
             ACtxPhysics&                        rCtxPhys) noexcept
 {
+
     auto itPfEnts = std::begin(rPrefabInit.m_ents);
 
     for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
@@ -196,30 +197,68 @@ void SysPrefabInit::init_physics(
         auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
                 gc_importer, rPfBasic.m_importerRes);
 
-        auto const objects = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
+        ArrayView<ActiveEnt const>  ents        = *itPfEnts;
+        lgrn::Span<int const>       objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
+        lgrn::Span<int const>       parents     = rPrefabData.m_prefabParents[rPfBasic.m_prefabId];
+
+#if 0
+        auto const assign_dyn_recurse = [&rCtxPhys, ents, objects, parents] (auto const& self, int objectId, ActiveEnt ent) -> void
+        {
+            int const parentId = parents[objectId];
+            if (parentId == -1)
+            {
+                return;
+            }
+
+            ActiveEnt const parentEnt = ents[parentId];
+
+            if ( ! rCtxPhys.m_totalDyn.contains(parentEnt) )
+            {
+                rCtxPhys.m_totalDyn.emplace(parentEnt);
+            }
+
+            self(self, parentId, parentEnt);
+        };
+#endif
+
+        auto const assign_collider_recurse
+                = [&rHasColliders = rCtxPhys.m_hasColliders, ents, objects, parents]
+                  (auto const& self, int objectId, ActiveEnt ent) -> void
+        {
+            if (rHasColliders.test(std::size_t(ent)))
+            {
+                return; // HasColliders bit already set, this means all ancestors have it set too
+            }
+            rHasColliders.set(std::size_t(ent));
+
+            int const parentId = parents[objectId];
+
+            if (parentId != -1)
+            {
+                self(self, parentId, ents[parentId]);
+            }
+        };
 
         for (std::size_t i = 0; i < objects.size(); ++i)
         {
-            ActiveEnt const ent = (*itPfEnts)[i];
-
-            // TODO: hasColliders should be set for each entity that has
-            //       colliders, or descendents have colliders.
-            //       For now, all entities are set.
-            rCtxPhys.m_hasColliders.set(std::size_t(ent));
-
-            EShape const shape = rPrefabData.m_objShape[objects[i]];
+            ActiveEnt const ent         = ents[i];
+            int const       objectId    = objects[i];
+            float const     mass        = rPrefabData.m_objMass[objectId];
+            EShape const    shape       = rPrefabData.m_objShape[objectId];
 
             rCtxPhys.m_shape[std::size_t(ent)] = shape;
             if (shape != EShape::None)
             {
-                //rCtxPhys.m_solid.set(std::size_t(ent));
-                if (float const mass = rPrefabData.m_objMass[objects[i]];
-                   mass != 0.0f)
+                assign_collider_recurse(assign_collider_recurse, objectId, ent);
+
+                if (mass != 0.0f)
                 {
-                    Vector3 const scale = rImportData.m_objTransforms[objects[i]].scaling();
+                    Vector3 const scale = rImportData.m_objTransforms[objectId].scaling();
                     Vector3 const inertia = phys::collider_inertia_tensor(shape, scale, mass);
                     Vector3 const offset{0.0f, 0.0f, 0.0f};
-                    rCtxPhys.m_ownDyn.emplace( ent, ACompSubBody{ inertia, offset, mass } );
+                    rCtxPhys.m_mass.emplace( ent, ACompMass{ inertia, offset, mass } );
+
+                    //assign_dyn_recurse(assign_dyn_recurse, objectId, ent);
                 }
             }
         }
@@ -227,5 +266,6 @@ void SysPrefabInit::init_physics(
         std::advance(itPfEnts, 1);
     }
 }
+
 
 } // namespace osp::active

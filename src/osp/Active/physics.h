@@ -32,24 +32,14 @@
 namespace osp::active
 {
 
-//using RigidBodyId_t = uint32_t;
-
-/**
- * @brief Represents the shape of an entity
- */
-struct ACompShape
-{
-    phys::EShape m_shape{phys::EShape::None};
-};
-
 /**
  * @brief Generic Mass and inertia intended for entities
  */
-struct ACompSubBody
+struct ACompMass
 {
     Vector3 m_offset;
     Vector3 m_inertia;
-    float m_mass;
+    float   m_mass;
 };
 
 /**
@@ -60,13 +50,12 @@ struct ACtxPhysics
     std::vector<phys::EShape>       m_shape;
     EntSet_t                        m_hasColliders;
 
-    acomp_storage_t<ACompSubBody>   m_ownDyn;
-    acomp_storage_t<ACompSubBody>   m_totalDyn;
+    acomp_storage_t<ACompMass>      m_mass;
+
 
     Vector3                         m_originTranslate;
-    EntVector_t                     m_bodyDirty;
+
     EntVector_t                     m_colliderDirty;
-    EntVector_t                     m_inertiaDirty;
 
     std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
 

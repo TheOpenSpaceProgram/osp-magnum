@@ -66,14 +66,14 @@ void VehicleBuilder::set_prefabs(std::initializer_list<SetPrefab> const& setPref
     }
 }
 
-WeldId VehicleBuilder::weld(std::initializer_list<SetTransform> const& setTransform)
+WeldId VehicleBuilder::weld(osp::ArrayView<PartToWeld const> toWeld)
 {
     WeldId const weld = m_data->m_weldIds.create();
     m_data->m_weldToParts.ids_reserve(m_data->m_weldIds.capacity());
 
-    PartId *pPartInWeld = m_data->m_weldToParts.emplace(weld, setTransform.size());
+    PartId *pPartInWeld = m_data->m_weldToParts.emplace(weld, toWeld.size());
 
-    for (SetTransform const& set : setTransform)
+    for (PartToWeld const& set : toWeld)
     {
         m_data->m_partTransformWeld[set.m_part] = set.m_transform;
 

@@ -42,29 +42,6 @@ struct ACompTransform
     osp::Matrix4 m_transform;
 };
 
-// TODO: this scheme of controlled and mutable likely isn't the best, maybe
-//       consider other options
-
-/**
- * @brief Indicates that an entity's ACompTransform is owned by some specific
- *        system, and shouldn't be modified freely.
- *
- * This can be used by a physics or animation system, which may set the
- * transform each frame.
- */
-struct ACompTransformControlled { };
-
-/**
- * @brief Allows mutation for entities with ACompTransformControlled, as long as
- *        a dirty flag is set.
- */
-struct ACompTransformMutable{ bool m_dirty{false}; };
-
-/**
- * @brief The ACompFloatingOrigin struct
- */
-struct ACompFloatingOrigin { };
-
 /**
  * @brief Simple name component
  */
@@ -105,16 +82,12 @@ struct ACtxBasic
     ACtxSceneGraph m_scnGraph;
 
     acomp_storage_t<ACompTransform>             m_transform;
-    acomp_storage_t<ACompTransformControlled>   m_transformControlled;
-    acomp_storage_t<ACompTransformMutable>      m_transformMutable;
-    acomp_storage_t<ACompFloatingOrigin>        m_floatingOrigin;
     acomp_storage_t<ACompName>                  m_name;
 };
 
 template<typename IT_T>
 void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
 {
-    rCtxBasic.m_floatingOrigin  .remove(first, last);
     rCtxBasic.m_name            .remove(first, last);
 
     while (first != last)
@@ -124,8 +97,6 @@ void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
         if (rCtxBasic.m_transform.contains(ent))
         {
             rCtxBasic.m_transform           .remove(ent);
-            rCtxBasic.m_transformControlled .remove(ent);
-            rCtxBasic.m_transformMutable    .remove(ent);
 
         }
 

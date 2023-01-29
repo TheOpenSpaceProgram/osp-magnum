@@ -63,9 +63,6 @@ using osp::active::ACtxPhysics;
 using osp::active::SysPhysics;
 using osp::active::SysSceneGraph;
 
-using osp::active::ACompShape;
-
-
 using osp::Matrix3;
 using osp::Matrix4;
 using osp::Vector3;

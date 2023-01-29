@@ -326,7 +326,7 @@ Session setup_vehicle_spawn_newton(
         }
     }));
 
-    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVsBasicInReq, tgVsWeldReq, tgNwtVhWeldEntReq, tgNwtVhHierMod, tgPfParentHierMod, tgPrefabEntReq, tgHierMod, tgTransformNew}).data(
+    vehicleSpawnNwt.task() = rBuilder.task().assign({tgSceneEvt, tgVsBasicInReq, tgVsWeldReq, tgNwtVhWeldEntReq, tgPrefabEntReq, tgNwtVhHierMod, tgPfParentHierMod, tgHierMod, tgTransformNew}).data(
             "Add vehicle entities to Scene Graph",
             TopDataIds_t{           idBasic,                   idActiveIds,                        idVehicleSpawn,           idScnParts,                idPrefabInit,           idResources },
             wrap_args([] (ACtxBasic& rBasic, ActiveReg_t const& rActiveIds, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
@@ -433,6 +433,8 @@ Session setup_vehicle_spawn_newton(
                 rNwt.m_entToBody.emplace(weldEnt, bodyId);
 
                 Vector3 const inertia = {1.0f, 1.0f, 1.0f};
+
+                //rPhys.m_totalDyn.emplace(weldEnt);
 
                 NewtonBodySetMassMatrix(pBody, 1.0f, inertia.x(), inertia.y(), inertia.z());
                 NewtonBodySetMatrix(pBody, transform.data());
@@ -645,20 +647,33 @@ Session setup_rocket_thrust_newton(
             NewtonBodyGetRotation(pBody, nwtRot.data());
             Quaternion const rot{{nwtRot[0], nwtRot[1], nwtRot[2]}, nwtRot[3]};
 
+            std::optional<Vector3> offsetRel;
+
             for (BodyRocket const& bodyRocket : rBodyRockets)
             {
                 float const throttle = std::clamp(rSigValFloat[bodyRocket.m_throttleIn], 0.0f, 1.0f);
                 float const multiplier = rSigValFloat[bodyRocket.m_multiplierIn];
 
-                float const thrustForce = throttle * multiplier;
+                float const thrustMag = throttle * multiplier;
 
-                if (thrustForce == 0.0f)
+                if (thrustMag == 0.0f)
                 {
                     continue;
                 }
 
+                // calculate relative position just once
+                if ( ! offsetRel.has_value() )
+                {
+                    offsetRel.emplace(rot.transformVector(bodyRocket.m_offset));
+                }
+
                 Vector3 const direction = (rot * bodyRocket.m_rotation).transformVector(Vector3{0.0f, 0.0f, 1.0f});
-                rForce += direction * thrustForce * 200.0f;
+
+                Vector3 const thrustForce = direction * thrustMag;
+                Vector3 const thrustTorque = Magnum::Math::cross(offsetRel.value(), thrustForce);
+
+                rForce += thrustForce;
+                rTorque += thrustTorque;
             }
         },
         .m_userData = { &rRocketsNwt, &rMachines, &rSigValFloat }

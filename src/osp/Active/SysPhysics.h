@@ -25,6 +25,7 @@
 #pragma once
 
 #include "physics.h"
+#include "basic.h"
 
 namespace osp::active
 {
@@ -35,22 +36,17 @@ class SysPhysics
 {
 public:
 
-    enum EIncludeRootMass { Ignore, Include };
-
-    // TODO: rewrite hierarchy inertia calculations for new mass/inertia system
+    static void update_subtree_mass_inertia(ACtxPhysics& rCtxPhys, ACtxSceneGraph& rScnGraph, ActiveEnt ent, ACompMass& rHierMass);
 
     template<typename IT_T>
-    static void update_delete_phys(
-            ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last);
+    static void update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, IT_T const& last);
 
 };
 
 template<typename IT_T>
-void SysPhysics::update_delete_phys(
-        ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last)
+void SysPhysics::update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, IT_T const& last)
 {
-    rCtxPhys.m_ownDyn.remove(first, last);
-    rCtxPhys.m_totalDyn.remove(first, last);
+    rCtxPhys.m_mass.remove(first, last);
 }
 
 

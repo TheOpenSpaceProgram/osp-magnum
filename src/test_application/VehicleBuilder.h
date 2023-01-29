@@ -103,6 +103,14 @@ class VehicleBuilder
 
 public:
 
+    struct PartToWeld
+    {
+        PartId m_part;
+        osp::Matrix4 m_transform;
+    };
+
+    using WeldVec_t = std::vector<VehicleBuilder::PartToWeld>;
+
     VehicleBuilder(osp::Resources *pResources)
      : m_pResources{pResources}
     {
@@ -125,13 +133,13 @@ public:
 
     void set_prefabs(std::initializer_list<SetPrefab> const& setPrefab);
 
-    struct SetTransform
-    {
-        PartId m_part;
-        osp::Matrix4 const& m_transform;
-    };
 
-    WeldId weld(std::initializer_list<SetTransform> const& setTransform);
+    WeldId weld(osp::ArrayView<PartToWeld const> toWeld);
+
+    WeldId weld(std::initializer_list<PartToWeld const> const& toWeld)
+    {
+        return weld(osp::arrayView(toWeld));
+    }
 
     osp::Matrix4 align_attach(PartId partA, std::string_view attachA,
                               PartId partB, std::string_view attachB);
