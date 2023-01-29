@@ -28,6 +28,7 @@
 #include "activetypes.h"
 
 #include <algorithm>
+#include <compare>
 
 namespace osp::active
 {

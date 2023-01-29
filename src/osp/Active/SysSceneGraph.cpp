@@ -27,6 +27,8 @@
 #include <Corrade/Containers/ArrayView.h>
 #include <Corrade/Containers/ArrayViewStl.h>
 
+#include <algorithm>
+
 using namespace osp;
 using namespace osp::active;
 
@@ -182,7 +184,7 @@ void SysSceneGraph::do_delete(ACtxSceneGraph& rScnGraph)
         }
 
         // Clear values for entities to delete
-        std::for_each(itTreeEntsFirst + (*itDel), itTreeEntsFirst + (*itDel + removeTotal),
+        std::for_each(itTreeEntsFirst + (*itDel), itTreeEntsFirst + (*itDel) + removeTotal,
                       [&rScnGraph] (ActiveEnt const ent)
         {
             rScnGraph.m_entParent[std::size_t(ent)]     = lgrn::id_null<ActiveEnt>();
