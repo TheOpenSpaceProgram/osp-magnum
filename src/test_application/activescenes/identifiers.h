@@ -158,7 +158,8 @@
 #define OSP_TAGS_TESTAPP_MACH_ROCKET 1, \
     tgMhRocketEvt
 
-
+#define OSP_TAGS_TESTAPP_MACH_RCSDRIVER 1, \
+    tgMhRcsDriverEvt
 
 #define OSP_DATA_TESTAPP_NEWTON 1, \
     idNwt

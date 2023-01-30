@@ -218,8 +218,17 @@ template <typename VALUES_T>
 VALUES_T& VehicleBuilder::node_values(NodeTypeId nodeType)
 {
     PerNodeType &rPerNodeType = m_data->m_nodePerType[nodeType];
-    rPerNodeType.m_nodeValues.emplace<VALUES_T>();
-    return entt::any_cast<VALUES_T&>(rPerNodeType.m_nodeValues);
+
+    // Emplace values container if it doesn't exist
+    if ( ! bool(rPerNodeType.m_nodeValues))
+    {
+        rPerNodeType.m_nodeValues.emplace<VALUES_T>();
+    }
+
+    auto &rValues = entt::any_cast<VALUES_T&>(rPerNodeType.m_nodeValues);
+    rValues.resize(node_capacity(nodeType));
+
+    return rValues;
 }
 
 struct ACtxVehicleSpawnVB

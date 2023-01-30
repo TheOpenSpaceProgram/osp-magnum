@@ -30,9 +30,10 @@
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
 #include <osp/Active/parts.h>
-#include <osp/Active/SysSceneGraph.h>
+#include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysPrefabInit.h>
 #include <osp/Active/SysRender.h>
+#include <osp/Active/SysSceneGraph.h>
 
 #include <osp/Resource/ImporterData.h>
 #include <osp/Resource/resources.h>
@@ -432,13 +433,21 @@ Session setup_vehicle_spawn_newton(
                 rNwt.m_bodyFactors[bodyId] = {1}; // TODO: temporary
                 rNwt.m_entToBody.emplace(weldEnt, bodyId);
 
-                Vector3 const inertia = {1.0f, 1.0f, 1.0f};
+                float   totalMass = 0.0f;
+                Vector3 massPos{0.0f};
+                Matrix3 inertiaTensor{0.0f};
+                SysPhysics::calculate_subtree_mass_inertia(rBasic.m_transform, rPhys, rBasic.m_scnGraph, weldEnt, massPos, totalMass, inertiaTensor);
 
-                //rPhys.m_totalDyn.emplace(weldEnt);
+                Matrix4 const inertiaTensorMat4{inertiaTensor};
+                NewtonBodySetFullMassMatrix(pBody, totalMass, inertiaTensorMat4.data());
 
-                NewtonBodySetMassMatrix(pBody, 1.0f, inertia.x(), inertia.y(), inertia.z());
+                Vector3 const com = massPos / totalMass;
+                NewtonBodySetCentreOfMass(pBody, com.data());
+
+                NewtonBodySetGyroscopicTorque(pBody, 1);
                 NewtonBodySetMatrix(pBody, transform.data());
                 NewtonBodySetLinearDamping(pBody, 0.0f);
+                NewtonBodySetAngularDamping(pBody, Vector3{0.0f}.data());
                 NewtonBodySetForceAndTorqueCallback(pBody, &SysNewton::cb_force_torque);
                 NewtonBodySetTransformCallback(pBody, &SysNewton::cb_set_transform);
                 SysNewton::set_userdata_bodyid(pBody, bodyId);
@@ -647,8 +656,6 @@ Session setup_rocket_thrust_newton(
             NewtonBodyGetRotation(pBody, nwtRot.data());
             Quaternion const rot{{nwtRot[0], nwtRot[1], nwtRot[2]}, nwtRot[3]};
 
-            std::optional<Vector3> offsetRel;
-
             for (BodyRocket const& bodyRocket : rBodyRockets)
             {
                 float const throttle = std::clamp(rSigValFloat[bodyRocket.m_throttleIn], 0.0f, 1.0f);
@@ -661,16 +668,12 @@ Session setup_rocket_thrust_newton(
                     continue;
                 }
 
-                // calculate relative position just once
-                if ( ! offsetRel.has_value() )
-                {
-                    offsetRel.emplace(rot.transformVector(bodyRocket.m_offset));
-                }
+                Vector3 const offsetRel = rot.transformVector(bodyRocket.m_offset);
 
-                Vector3 const direction = (rot * bodyRocket.m_rotation).transformVector(Vector3{0.0f, 0.0f, 1.0f});
+                Vector3 const direction = (rot * bodyRocket.m_rotation).transformVector(adera::gc_rocketForward);
 
                 Vector3 const thrustForce = direction * thrustMag;
-                Vector3 const thrustTorque = Magnum::Math::cross(offsetRel.value(), thrustForce);
+                Vector3 const thrustTorque = Magnum::Math::cross(offsetRel, thrustForce);
 
                 rForce += thrustForce;
                 rTorque += thrustTorque;

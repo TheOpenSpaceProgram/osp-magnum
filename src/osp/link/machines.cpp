@@ -90,7 +90,9 @@ void copy_nodes(
             auto dstPortIt = std::begin(dstPorts);
             for (NodeId const srcNode : srcPorts)
             {
-                *dstPortIt = remapNode[srcNode];
+                *dstPortIt = (srcNode != lgrn::id_null<NodeId>())
+                           ? remapNode[srcNode]
+                           : lgrn::id_null<NodeId>();
 
                 std::advance(dstPortIt, 1);
             }

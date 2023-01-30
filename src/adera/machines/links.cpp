@@ -49,7 +49,14 @@ float thruster_influence(Vector3 const pos, Vector3 const dir, Vector3 const cmd
      * In the future, it would be neat to implement PWM so that unthrottlable
      * thrusters would pulse on and off in order to deliver reduced thrust
      */
-    return std::clamp(angInfluence + linInfluence, 0.0f, 1.0f);
+    float const totalInfluence = std::clamp(angInfluence + linInfluence, 0.0f, 1.0f);
+
+    if (totalInfluence != totalInfluence) // if NaN
+    {
+        return 0.0f;
+    }
+
+    return totalInfluence;
 }
 
 

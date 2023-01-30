@@ -39,6 +39,8 @@ extern osp::link::MachTypeId const gc_mtUserCtrl;
 extern osp::link::MachTypeId const gc_mtMagicRocket;
 extern osp::link::MachTypeId const gc_mtRcsDriver;
 
+constexpr osp::Vector3 gc_rocketForward{0.0f, 0.0f, 1.0f};
+
 namespace ports_userctrl
 {
 PortEntry const gc_throttleOut      { gc_ntSigFloat, 0, gc_sigOut };

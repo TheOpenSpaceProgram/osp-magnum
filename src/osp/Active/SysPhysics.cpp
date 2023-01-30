@@ -4,29 +4,41 @@
 using namespace osp;
 using namespace osp::active;
 
-void SysPhysics::update_subtree_mass_inertia(ACtxPhysics& rCtxPhys, ACtxSceneGraph& rScnGraph, ActiveEnt ent, ACompMass& rHierMass)
+
+void SysPhysics::calculate_subtree_mass_inertia(
+        acomp_storage_t<ACompTransform> const&  rTf,
+        ACtxPhysics&                            rCtxPhys,
+        ACtxSceneGraph&                         rScnGraph,
+        ActiveEnt                               root,
+        Vector3&                                rMassPos,
+        float&                                  rTotalMass,
+        Matrix3&                                rInertiaTensor,
+        Matrix4 const&                          currentTf)
 {
-#if 0
-    rCtxPhys.m_hierMassDirty.reset(std::size_t(ent));
-
-    ACompMass hierMassTotal;
-
-    for (ActiveEnt const childEnt : SysSceneGraph::children(rScnGraph, ent))
+    for (ActiveEnt const child : SysSceneGraph::children(rScnGraph, root))
     {
+        Matrix4 const childTf = currentTf * rTf.get(child).m_transform;
 
-
-        if (rCtxPhys.m_hierMass.contains(childEnt))
+        if (rCtxPhys.m_mass.contains(child))
         {
-            if (rCtxPhys.m_hierMassDirty.test(std::size_t(childEnt)))
-            {
-                //update_subtree_mass_inertia
-            }
+            ACompMass const& childMass = rCtxPhys.m_mass.get(child);
 
-            phys::transform_inertia_tensor()
+            Matrix3 inertiaTensor{};
+            inertiaTensor[0][0] = childMass.m_inertia.x();
+            inertiaTensor[1][1] = childMass.m_inertia.y();
+            inertiaTensor[2][2] = childMass.m_inertia.z();
+
+            Vector3 const offset = childTf.translation() + childMass.m_offset * childTf.scaling();
+
+            rInertiaTensor += phys::transform_inertia_tensor(inertiaTensor, childMass.m_mass, offset, childTf.rotation());
+
+            rTotalMass  += childMass.m_mass;
+            rMassPos    += childTf.translation() * childMass.m_mass;
         }
 
-
-        if (rCtxPhys.m_ownMass)
+        if (rCtxPhys.m_hasColliders.test(std::size_t(child)))
+        {
+            calculate_subtree_mass_inertia(rTf, rCtxPhys, rScnGraph, child, rMassPos, rTotalMass, rInertiaTensor, childTf);
+        }
     }
-#endif
 }

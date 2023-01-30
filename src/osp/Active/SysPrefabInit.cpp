@@ -246,20 +246,22 @@ void SysPrefabInit::init_physics(
             float const     mass        = rPrefabData.m_objMass[objectId];
             EShape const    shape       = rPrefabData.m_objShape[objectId];
 
+
             rCtxPhys.m_shape[std::size_t(ent)] = shape;
-            if (shape != EShape::None)
+
+            if (mass != 0.0f)
+            {
+                Vector3 const scale = rImportData.m_objTransforms[objectId].scaling();
+                Vector3 const inertia = phys::collider_inertia_tensor(shape, scale, mass);
+                Vector3 const offset{0.0f, 0.0f, 0.0f};
+                rCtxPhys.m_mass.emplace( ent, ACompMass{ offset, inertia, mass } );
+
+                //assign_dyn_recurse(assign_dyn_recurse, objectId, ent);
+            }
+
+            if ( (mass != 0.0f) || (shape != EShape::None) )
             {
                 assign_collider_recurse(assign_collider_recurse, objectId, ent);
-
-                if (mass != 0.0f)
-                {
-                    Vector3 const scale = rImportData.m_objTransforms[objectId].scaling();
-                    Vector3 const inertia = phys::collider_inertia_tensor(shape, scale, mass);
-                    Vector3 const offset{0.0f, 0.0f, 0.0f};
-                    rCtxPhys.m_mass.emplace( ent, ACompMass{ inertia, offset, mass } );
-
-                    //assign_dyn_recurse(assign_dyn_recurse, objectId, ent);
-                }
             }
         }
 

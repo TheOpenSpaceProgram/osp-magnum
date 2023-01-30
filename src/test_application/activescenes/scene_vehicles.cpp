@@ -148,7 +148,17 @@ Session setup_signals_float(
     {
         Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
 
+        // NOTE: The various use of reset() clear entire bit arrays, which may or may
+        //       not be expensive. They likely use memset
+
+        for (std::size_t const machTypeDirty : rUpdMach.m_machTypesDirty.ones())
+        {
+            rUpdMach.m_localDirty[machTypeDirty].reset();
+        }
         rUpdMach.m_machTypesDirty.reset();
+
+        // Sees which nodes changed, and writes into rUpdMach set dirty which MACHINES
+        // must be updated next
         update_signal_nodes<float>(
                 rSigUpdFloat.m_nodeDirty.ones(),
                 rFloatNodes.m_nodeToMach,
@@ -156,7 +166,9 @@ Session setup_signals_float(
                 arrayView(rSigUpdFloat.m_nodeNewValues),
                 rSigValFloat,
                 rUpdMach);
+        rSigUpdFloat.m_nodeDirty.reset();
 
+        // Run tasks needed to update machine types that are dirty
         for (MachTypeId const type : rUpdMach.m_machTypesDirty.ones())
         {
             ctx.m_rEnqueueHappened = true;
@@ -180,6 +192,17 @@ Session setup_signals_float(
     return signalsFloat;
 }
 
+template <MachTypeId const& MachType_T>
+TopTaskFunc_t gen_allocate_mach_bitsets()
+{
+    static TopTaskFunc_t const func = wrap_args([] (ACtxParts& rScnParts, UpdMachPerType& rUpdMach) noexcept
+    {
+        rUpdMach.m_localDirty[MachType_T].ints().resize(rScnParts.m_machines.m_perType[MachType_T].m_localIds.vec().capacity());
+    });
+
+    return func;
+}
+
 Session setup_mach_rocket(
         Builder_t&                  rBuilder,
         ArrayView<entt::any> const  topData,
@@ -201,44 +224,110 @@ Session setup_mach_rocket(
 
     top_get< MachTypeToEvt_t >(topData, idMachEvtTags).at(gc_mtMagicRocket) = tgMhRocketEvt;
 
-    // TODO: This session is not needed? Architecture prefers fine grained
-    //       individual sessions: thrust, plume FX, sounds, etc...
+    machRocket.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgLinkMhUpdMod}).data(
+            "Allocate Machine update bitset for MagicRocket",
+            TopDataIds_t{idScnParts, idUpdMach},
+            gen_allocate_mach_bitsets<gc_mtMagicRocket>());
 
-    machRocket.task() = rBuilder.task().assign({tgMhRocketEvt, tgSigFloatUpdReq, tgSigFloatValReq}).data(
-            "MagicRockets print throttle input values",
-            TopDataIds_t{           idScnParts,                      idUpdMach,                       idSigValFloat },
-            wrap_args([] (ACtxParts& rScnParts, UpdMachPerType const& rUpdMach, SignalValues_t<float>& rSigValFloat) noexcept
+    return machRocket;
+}
+
+Session setup_mach_rcsdriver(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              scnCommon,
+        Session const&              parts,
+        Session const&              signalsFloat)
+{
+    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
+    OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
+    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
+
+    using namespace adera;
+
+    Session machRcsDriver;
+    OSP_SESSION_ACQUIRE_TAGS(machRcsDriver, rTags,   TESTAPP_MACH_RCSDRIVER);
+
+    top_get< MachTypeToEvt_t >(topData, idMachEvtTags).at(gc_mtRcsDriver) = tgMhRcsDriverEvt;
+
+    auto const idNull = lgrn::id_null<TopDataId>();
+
+    machRcsDriver.task() = rBuilder.task().assign({tgMhRcsDriverEvt, tgSigFloatUpdReq, tgSigFloatValReq}).data(
+            "RCS Drivers print throttle input values",
+            TopDataIds_t{             idNull,          idScnParts,                      idUpdMach,                       idSigValFloat,                    idSigUpdFloat,           idTgSigFloatUpdEvt },
+            wrap_args([] (WorkerContext ctx, ACtxParts& rScnParts, UpdMachPerType const& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, TagId const tgSigFloatUpdEvt) noexcept
     {
         Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
-        PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
+        PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_mtRcsDriver];
 
-        for (MachLocalId const local : rUpdMach.m_localDirty[gc_mtMagicRocket].ones())
+        for (MachLocalId const local : rUpdMach.m_localDirty[gc_mtRcsDriver].ones())
         {
             MachAnyId const mach = rRockets.m_localToAny[local];
             lgrn::Span<NodeId const> const portSpan = rFloatNodes.m_machToNode[mach];
-            if (NodeId const thrNode = connected_node(portSpan, ports_magicrocket::gc_throttleIn.m_port);
-                thrNode != lgrn::id_null<NodeId>())
+
+            NodeId const thrNode = connected_node(portSpan, ports_rcsdriver::gc_throttleOut.m_port);
+            if (thrNode == lgrn::id_null<NodeId>())
             {
-                if (thrNode != lgrn::id_null<NodeId>())
+                continue; // Throttle Output not connected, calculations below are useless
+            }
+
+            auto const rcs_read = [&rSigValFloat, portSpan] (float& rDstVar, PortEntry const& entry)
+            {
+                NodeId const node = connected_node(portSpan, entry.m_port);
+
+                if (node != lgrn::id_null<NodeId>())
                 {
-                    float const thrNew = rSigValFloat[thrNode];
-                    OSP_LOG_INFO("Rocket {} reading node {} = {}", local, thrNode, thrNew);
+                    rDstVar = rSigValFloat[node];
                 }
+            };
+
+            Vector3 pos{0.0f};
+            Vector3 dir{0.0f};
+            Vector3 cmdLin{0.0f};
+            Vector3 cmdAng{0.0f};
+
+            rcs_read( pos.x(),    ports_rcsdriver::gc_posXIn    );
+            rcs_read( pos.y(),    ports_rcsdriver::gc_posYIn    );
+            rcs_read( pos.z(),    ports_rcsdriver::gc_posZIn    );
+            rcs_read( dir.x(),    ports_rcsdriver::gc_dirXIn    );
+            rcs_read( dir.y(),    ports_rcsdriver::gc_dirYIn    );
+            rcs_read( dir.z(),    ports_rcsdriver::gc_dirZIn    );
+            rcs_read( cmdLin.x(), ports_rcsdriver::gc_cmdLinXIn );
+            rcs_read( cmdLin.y(), ports_rcsdriver::gc_cmdLinYIn );
+            rcs_read( cmdLin.z(), ports_rcsdriver::gc_cmdLinZIn );
+            rcs_read( cmdAng.x(), ports_rcsdriver::gc_cmdAngXIn );
+            rcs_read( cmdAng.y(), ports_rcsdriver::gc_cmdAngYIn );
+            rcs_read( cmdAng.z(), ports_rcsdriver::gc_cmdAngZIn );
+
+            OSP_LOG_INFO("RCS controller {} pitch = {}", local, cmdAng.x());
+            OSP_LOG_INFO("RCS controller {} yaw = {}", local, cmdAng.y());
+            OSP_LOG_INFO("RCS controller {} roll = {}", local, cmdAng.z());
+
+            float const thrCurr = rSigValFloat[thrNode];
+            float const thrNew = thruster_influence(pos, dir, cmdLin, cmdAng);
+
+            if (thrCurr != thrNew)
+            {
+                rSigUpdFloat.m_nodeDirty.set(thrNode);
+                rSigUpdFloat.m_nodeNewValues[thrNode] = thrNew;
+
+                ctx.m_rEnqueueHappened = true;
+                lgrn::bit_view(ctx.m_enqueue).set(std::size_t(tgSigFloatUpdEvt));
+
+
             }
         }
     }));
 
-    // TODO: Make this a template. All machines that read inputs will just have
-    //       a different gc_mtMachineName variable
-    machRocket.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgLinkMhUpdMod}).data(
-            "Allocate machine update stuff",
-            TopDataIds_t{           idScnParts,                idUpdMach },
-            wrap_args([] (ACtxParts& rScnParts, UpdMachPerType& rUpdMach) noexcept
-    {
-        rUpdMach.m_localDirty[gc_mtMagicRocket].ints().resize(rScnParts.m_machines.m_perType[gc_mtMagicRocket].m_localIds.vec().capacity());
-    }));
+    machRcsDriver.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgLinkMhUpdMod}).data(
+            "Allocate Machine update bitset for RCS Drivers",
+            TopDataIds_t{idScnParts, idUpdMach},
+            gen_allocate_mach_bitsets<gc_mtRcsDriver>());
 
-    return machRocket;
+    return machRcsDriver;
 }
 
 Session setup_vehicle_spawn(
@@ -525,6 +614,8 @@ Session setup_vehicle_spawn_vb(
             Machines const &srcMachines = pVData->m_machines;
             std::size_t const bounds = srcMachines.m_ids.capacity();
 
+            rVSVB.m_remapMachOffsets[vhId] = remapMachTotal;
+
             remapMachTotal += bounds;
             machTotal += srcMachines.m_ids.size();
 
@@ -532,8 +623,6 @@ Session setup_vehicle_spawn_vb(
             {
                 rVSVB.m_machtypeCount[type] += srcMachines.m_perType[type].m_localIds.size();
             }
-
-            rVSVB.m_remapMachOffsets[vhId] = remapMachTotal;
         }
 
         rVehicleSpawn.m_newMachToMach.resize(machTotal);
@@ -779,9 +868,55 @@ Matrix4 quick_transform(Vector3 const pos, Quaternion const rot) noexcept
     return Matrix4::from(rot.toMatrix(), pos);
 }
 
-void add_rcs_block(VehicleBuilder &rBuilder, VehicleBuilder::WeldVec_t &rWeldTo, Vector3 pos, Quaternion rot)
+struct RCSInputs
 {
-    Vector3 constexpr xAxis{1.0f, 0.0f, 0.0f};
+    NodeId m_pitch  {lgrn::id_null<NodeId>()};
+    NodeId m_yaw    {lgrn::id_null<NodeId>()};
+    NodeId m_roll   {lgrn::id_null<NodeId>()};
+};
+
+void add_rcs_machines(VehicleBuilder& rBuilder, RCSInputs const& inputs, PartId part, float thrustMul, Matrix4 const& tf)
+{
+    using namespace adera;
+    namespace ports_rcsdriver = adera::ports_rcsdriver;
+    namespace ports_magicrocket = adera::ports_magicrocket;
+
+    auto const [posX, posY, posZ, dirX, dirY, dirZ, driverOut, thrMul] = rBuilder.create_nodes<8>(gc_ntSigFloat);
+
+    rBuilder.create_machine(part, gc_mtRcsDriver, {
+        { ports_rcsdriver::gc_posXIn,       posX            },
+        { ports_rcsdriver::gc_posYIn,       posY            },
+        { ports_rcsdriver::gc_posZIn,       posZ            },
+        { ports_rcsdriver::gc_dirXIn,       dirX            },
+        { ports_rcsdriver::gc_dirYIn,       dirY            },
+        { ports_rcsdriver::gc_dirZIn,       dirZ            },
+        { ports_rcsdriver::gc_cmdAngXIn,    inputs.m_pitch  },
+        { ports_rcsdriver::gc_cmdAngYIn,    inputs.m_yaw    },
+        { ports_rcsdriver::gc_cmdAngZIn,    inputs.m_roll   },
+        { ports_rcsdriver::gc_throttleOut,  driverOut       }
+    } );
+
+    rBuilder.create_machine(part, gc_mtMagicRocket, {
+        { ports_magicrocket::gc_throttleIn, driverOut },
+        { ports_magicrocket::gc_multiplierIn, thrMul }
+    } );
+
+    Vector3 const dir = tf.rotation() * gc_rocketForward;
+
+    auto &rFloatValues = rBuilder.node_values< SignalValues_t<float> >(gc_ntSigFloat);
+
+    rFloatValues[posX] = tf.translation().x();
+    rFloatValues[posY] = tf.translation().y();
+    rFloatValues[posZ] = tf.translation().z();
+    rFloatValues[dirX] = dir.x();
+    rFloatValues[dirY] = dir.y();
+    rFloatValues[dirZ] = dir.z();
+    rFloatValues[thrMul] = thrustMul;
+}
+
+void add_rcs_block(VehicleBuilder& rBuilder, VehicleBuilder::WeldVec_t& rWeldTo, RCSInputs const& inputs, float thrustMul, Vector3 pos, Quaternion rot)
+{
+    constexpr Vector3 xAxis{1.0f, 0.0f, 0.0f};
 
     auto const [ nozzleA, nozzleB ] = rBuilder.create_parts<2>();
     rBuilder.set_prefabs({
@@ -789,8 +924,14 @@ void add_rcs_block(VehicleBuilder &rBuilder, VehicleBuilder::WeldVec_t &rWeldTo,
         { nozzleB,  "phLinRCS" }
     });
 
-    rWeldTo.push_back({ nozzleA, quick_transform(pos, rot * Quaternion::rotation( 90.0_degf, xAxis))});
-    rWeldTo.push_back({ nozzleB, quick_transform(pos, rot * Quaternion::rotation(-90.0_degf, xAxis))});
+    Matrix4 const nozzleTfA = quick_transform(pos, rot * Quaternion::rotation( 90.0_degf,  xAxis));
+    Matrix4 const nozzleTfB = quick_transform(pos, rot * Quaternion::rotation( -90.0_degf, xAxis));
+
+    add_rcs_machines(rBuilder, inputs, nozzleA, thrustMul, nozzleTfA);
+    add_rcs_machines(rBuilder, inputs, nozzleB, thrustMul, nozzleTfB);
+
+    rWeldTo.push_back({ nozzleA, nozzleTfA });
+    rWeldTo.push_back({ nozzleB, nozzleTfB });
 }
 
 Session setup_test_vehicles(
@@ -815,16 +956,18 @@ Session setup_test_vehicles(
         VehicleBuilder vbuilder{&rResources};
         VehicleBuilder::WeldVec_t toWeld;
 
-        auto const [ capsule, fueltank, engine ] = vbuilder.create_parts<3>();
+        auto const [ capsule, fueltank, engineA, engineB ] = vbuilder.create_parts<4>();
         vbuilder.set_prefabs({
             { capsule,  "phCapsule" },
             { fueltank, "phFuselage" },
-            { engine,   "phEngine" },
+            { engineA,  "phEngine" },
+            { engineB,  "phEngine" },
         });
 
-        toWeld.push_back( {capsule,  quick_transform({0, 0, 3}, {})} );
-        toWeld.push_back( {fueltank, quick_transform({0, 0, 0}, {})} );
-        toWeld.push_back( {engine,   quick_transform({0, 0, -3}, Quaternion::rotation(2.0_degf, {1.0, 0.0, 0.0}))} );
+        toWeld.push_back( {capsule,  quick_transform({ 0.0f,  0.0f,  3.0f}, {})} );
+        toWeld.push_back( {fueltank, quick_transform({ 0.0f,  0.0f,  0.0f}, {})} );
+        toWeld.push_back( {engineA,  quick_transform({ 0.7f,  0.0f, -2.9f}, {})} );
+        toWeld.push_back( {engineB,  quick_transform({-0.7f,  0.0f, -2.9f},{})} );
 
         namespace ports_magicrocket = adera::ports_magicrocket;
         namespace ports_userctrl = adera::ports_userctrl;
@@ -832,8 +975,7 @@ Session setup_test_vehicles(
         auto const [ pitch, yaw, roll, throttle, thrustMul ] = vbuilder.create_nodes<5>(gc_ntSigFloat);
 
         auto &rFloatValues = vbuilder.node_values< SignalValues_t<float> >(gc_ntSigFloat);
-        rFloatValues.resize(vbuilder.node_capacity(gc_ntSigFloat));
-        rFloatValues[thrustMul] = 100.0f;
+        rFloatValues[thrustMul] = 50000.0f;
 
         vbuilder.create_machine(capsule, gc_mtUserCtrl, {
             { ports_userctrl::gc_throttleOut,   throttle },
@@ -842,16 +984,24 @@ Session setup_test_vehicles(
             { ports_userctrl::gc_rollOut,       roll     }
         } );
 
-        vbuilder.create_machine(engine, gc_mtMagicRocket, {
+        vbuilder.create_machine(engineA, gc_mtMagicRocket, {
             { ports_magicrocket::gc_throttleIn, throttle },
             { ports_magicrocket::gc_multiplierIn, thrustMul }
         } );
+
+        vbuilder.create_machine(engineB, gc_mtMagicRocket, {
+            { ports_magicrocket::gc_throttleIn, throttle },
+            { ports_magicrocket::gc_multiplierIn, thrustMul }
+        } );
+
+        RCSInputs rcsInputs{pitch, yaw, roll};
 
         int const   rcsRingBlocks   = 4;
         int const   rcsRingCount    = 2;
         float const rcsRingZ        = -2.0f;
         float const rcsZStep        = 4.0f;
         float const rcsRadius       = 1.1f;
+        float const rcsThrust       = 3000.0f;
 
         for (int ring = 0; ring < rcsRingCount; ++ring)
         {
@@ -860,7 +1010,7 @@ Session setup_test_vehicles(
             for (Rad ang = 0.0_degf; ang < Rad(360.0_degf); ang += Rad(360.0_degf)/rcsRingBlocks)
             {
                Quaternion rotZ = Quaternion::rotation(ang, {0.0f, 0.0f, 1.0f});
-               add_rcs_block(vbuilder, toWeld, rotZ.transformVector(rcsOset), rotZ);
+               add_rcs_block(vbuilder, toWeld, rcsInputs, rcsThrust, rotZ.transformVector(rcsOset), rotZ);
             }
         }
 
@@ -893,6 +1043,12 @@ struct VehicleTestControls
     input::EButtonControlIndex m_btnThrMin;
     input::EButtonControlIndex m_btnThrMore;
     input::EButtonControlIndex m_btnThrLess;
+    input::EButtonControlIndex m_btnPitchUp;
+    input::EButtonControlIndex m_btnPitchDn;
+    input::EButtonControlIndex m_btnYawLf;
+    input::EButtonControlIndex m_btnYawRt;
+    input::EButtonControlIndex m_btnRollLf;
+    input::EButtonControlIndex m_btnRollRt;
 };
 
 Session setup_vehicle_control(
@@ -927,7 +1083,13 @@ Session setup_vehicle_control(
         .m_btnThrMax    = rUserInput.button_subscribe("vehicle_thr_max"),
         .m_btnThrMin    = rUserInput.button_subscribe("vehicle_thr_min"),
         .m_btnThrMore   = rUserInput.button_subscribe("vehicle_thr_more"),
-        .m_btnThrLess   = rUserInput.button_subscribe("vehicle_thr_less")
+        .m_btnThrLess   = rUserInput.button_subscribe("vehicle_thr_less"),
+        .m_btnPitchUp   = rUserInput.button_subscribe("vehicle_pitch_up"),
+        .m_btnPitchDn   = rUserInput.button_subscribe("vehicle_pitch_dn"),
+        .m_btnYawLf     = rUserInput.button_subscribe("vehicle_yaw_lf"),
+        .m_btnYawRt     = rUserInput.button_subscribe("vehicle_yaw_rt"),
+        .m_btnRollLf    = rUserInput.button_subscribe("vehicle_roll_lf"),
+        .m_btnRollRt    = rUserInput.button_subscribe("vehicle_roll_rt")
     });
 
     auto const idNull = lgrn::id_null<TopDataId>();
@@ -966,35 +1128,61 @@ Session setup_vehicle_control(
             }
         }
 
-        // Control selected UsrCtrl machine
-        if (rVhControls.m_selectedUsrCtrl != lgrn::id_null<MachLocalId>())
+        if (rVhControls.m_selectedUsrCtrl == lgrn::id_null<MachLocalId>())
         {
-            float const thrRate = deltaTimeIn;
-            float const thrChange =
-                      float(rUserInput.button_state(rVhControls.m_btnThrMore).m_held) * thrRate
-                    - float(rUserInput.button_state(rVhControls.m_btnThrLess).m_held) * thrRate
-                    + float(rUserInput.button_state(rVhControls.m_btnThrMax).m_triggered)
-                    - float(rUserInput.button_state(rVhControls.m_btnThrMin).m_triggered);
-
-            MachAnyId const mach = rUsrCtrl.m_localToAny[rVhControls.m_selectedUsrCtrl];
-            lgrn::Span<NodeId const> const portSpan = rFloatNodes.m_machToNode[mach];
-
-            if (NodeId const thrNode = connected_node(portSpan, adera::ports_userctrl::gc_throttleOut.m_port);
-                thrNode != lgrn::id_null<NodeId>())
-            {
-                float const thrCurr = rSigValFloat[thrNode];
-                float const thrNew = Magnum::Math::clamp(thrCurr + thrChange, 0.0f, 1.0f);
-
-                if (thrCurr != thrNew)
-                {
-                    rSigUpdFloat.m_nodeDirty.set(thrNode);
-                    rSigUpdFloat.m_nodeNewValues[thrNode] = thrNew;
-
-                    ctx.m_rEnqueueHappened = true;
-                    lgrn::bit_view(ctx.m_enqueue).set(std::size_t(tgSigFloatUpdEvt));
-                }
-            }
+            return; // No vehicle selected
         }
+
+        // Control selected UsrCtrl machine
+
+        float const thrRate = deltaTimeIn;
+        float const thrChange =
+                  float(rUserInput.button_state(rVhControls.m_btnThrMore).m_held) * thrRate
+                - float(rUserInput.button_state(rVhControls.m_btnThrLess).m_held) * thrRate
+                + float(rUserInput.button_state(rVhControls.m_btnThrMax).m_triggered)
+                - float(rUserInput.button_state(rVhControls.m_btnThrMin).m_triggered);
+
+        Vector3 const attitude
+        {
+              float(rUserInput.button_state(rVhControls.m_btnPitchUp).m_held)
+            - float(rUserInput.button_state(rVhControls.m_btnPitchDn).m_held),
+              float(rUserInput.button_state(rVhControls.m_btnYawLf).m_held)
+            - float(rUserInput.button_state(rVhControls.m_btnYawRt).m_held),
+              float(rUserInput.button_state(rVhControls.m_btnRollLf).m_held)
+            - float(rUserInput.button_state(rVhControls.m_btnRollRt).m_held)
+        };
+
+
+
+        MachAnyId const mach = rUsrCtrl.m_localToAny[rVhControls.m_selectedUsrCtrl];
+        lgrn::Span<NodeId const> const portSpan = rFloatNodes.m_machToNode[mach];
+
+        auto const write_control = [&ctx, &rSigValFloat, &rSigUpdFloat, tgSigFloatUpdEvt, portSpan] (PortEntry const& entry, float write, bool replace = true, float min = 0.0f, float max = 1.0f)
+        {
+            NodeId const node = connected_node(portSpan, entry.m_port);
+            if (node == lgrn::id_null<NodeId>())
+            {
+                return; // not connected
+            }
+
+            float const oldVal = rSigValFloat[node];
+            float const newVal = replace ? write : Magnum::Math::clamp(oldVal + write, min, max);
+
+            if (oldVal != newVal)
+            {
+                rSigUpdFloat.m_nodeDirty.set(node);
+                rSigUpdFloat.m_nodeNewValues[node] = newVal;
+
+                ctx.m_rEnqueueHappened = true;
+                lgrn::bit_view(ctx.m_enqueue).set(std::size_t(tgSigFloatUpdEvt));
+            }
+        };
+
+        write_control(ports_userctrl::gc_throttleOut,   thrChange, false);
+        write_control(ports_userctrl::gc_pitchOut,      attitude.x());
+        write_control(ports_userctrl::gc_yawOut,        attitude.y());
+        write_control(ports_userctrl::gc_rollOut,       attitude.z());
+
     }));
 
     return vehicleCtrl;

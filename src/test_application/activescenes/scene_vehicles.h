@@ -54,9 +54,22 @@ osp::Session setup_signals_float(
         osp::Session const&         parts);
 
 /**
- * @brief 'Rockets' that print values to the console
+ * @brief Links for Magic Rockets
+ *
+ * This only sets up links and does not apply forces, see setup_rocket_thrust_newton
  */
 osp::Session setup_mach_rocket(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat);
+
+/**
+ * @brief Links for RCS Drivers, which output thrust levels given pitch/yaw/roll controls
+ */
+osp::Session setup_mach_rcsdriver(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags,

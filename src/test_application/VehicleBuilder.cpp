@@ -214,9 +214,15 @@ VehicleData VehicleBuilder::finalize_release()
             lgrn::Span<NodeId> portSpan = rPerNodeType.m_machToNode[mach];
             lgrn::Span<JuncCustom> customSpan = rPerNodeType.m_machToNodeCustom[mach];
 
-            auto customIt = std::begin(customSpan);
-            for (NodeId node : portSpan)
+            for (int i = 0; i < portSpan.size(); ++i)
             {
+                NodeId node = portSpan[i];
+
+                if (node == lgrn::id_null<NodeId>())
+                {
+                    continue;
+                }
+
                 lgrn::Span<Junction> const juncSpan = rPerNodeType.m_nodeToMach[node];
 
                 // find empty spot
@@ -234,9 +240,7 @@ VehicleData VehicleBuilder::finalize_release()
 
                 found->m_local  = local;
                 found->m_type   = type;
-                found->m_custom = *customIt;
-
-                std::advance(customIt, 1);
+                found->m_custom = customSpan[i];
             }
         }
     }
