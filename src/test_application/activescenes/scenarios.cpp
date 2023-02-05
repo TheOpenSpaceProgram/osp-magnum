@@ -32,6 +32,7 @@
 #include "scene_misc.h"
 #include "scene_newton.h"
 #include "scene_renderer.h"
+#include "scene_universe.h"
 #include "scene_vehicles.h"
 
 #include "../ActiveApplication.h"
@@ -272,6 +273,58 @@ static ScenarioMap_t make_scenarios()
             camThrow        = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
             vehicleCtrl     = setup_vehicle_control     (builder, rTopData, rTags, scnCommon, parts, signalsFloat, magnum);
             cameraVehicle   = setup_camera_vehicle      (builder, rTopData, rTags, magnum, scnCommon, parts, physics, cameraCtrl, vehicleCtrl);
+
+            setup_magnum_draw(mainView, magnum, scnCommon, scnRender);
+        };
+    });
+
+    add_scenario("universe", "Universe test scenario with very unrealistic planets",
+                 [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
+    {
+        using namespace testapp::scenes;
+
+        auto const idResources  = mainView.m_idResources;
+        auto &rTopData          = mainView.m_topData;
+        auto &rTags             = mainView.m_rTags;
+        Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
+
+        sceneOut.resize(13);
+        auto & [scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets] = unpack<13>(sceneOut);
+
+        // Compose together lots of Sessions
+        scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources, pkg);
+        matVisual       = setup_material            (builder, rTopData, rTags, scnCommon);
+        physics         = setup_physics             (builder, rTopData, rTags, scnCommon);
+        shapeSpawn      = setup_shape_spawn         (builder, rTopData, rTags, scnCommon, physics, matVisual);
+        droppers        = setup_droppers            (builder, rTopData, rTags, scnCommon, shapeSpawn);
+        bounds          = setup_bounds              (builder, rTopData, rTags, scnCommon, physics, shapeSpawn);
+
+        newton          = setup_newton              (builder, rTopData, rTags, scnCommon, physics);
+        nwtGravSet      = setup_newton_factors      (builder, rTopData, rTags);
+        nwtGrav         = setup_newton_force_accel  (builder, rTopData, rTags, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
+        shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, rTags, scnCommon, physics, shapeSpawn, newton, nwtGravSet);
+
+        uniCore         = setup_uni_core            (builder, rTopData, rTags);
+        uniScnFrame     = setup_uni_sceneframe      (builder, rTopData, rTags);
+        uniTestPlanets  = setup_uni_test_planets    (builder, rTopData, rTags, uniCore, uniScnFrame);
+
+        add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, pkg);
+
+        return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
+        {
+            auto &rTopData = mainView.m_topData;
+            auto &rTags = mainView.m_rTags;
+            Builder_t builder{mainView.m_rTags, mainView.m_rTasks, mainView.m_rTaskData};
+
+            auto const& [scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets] = unpack<13>(scene);
+
+            rendererOut.resize(5);
+            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow] = unpack<5>(rendererOut);
+            scnRender   = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
+            cameraCtrl  = setup_camera_ctrl         (builder, rTopData, rTags, magnum, scnRender);
+            cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, cameraCtrl);
+            shVisual    = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
+            camThrow    = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
 
             setup_magnum_draw(mainView, magnum, scnCommon, scnRender);
         };

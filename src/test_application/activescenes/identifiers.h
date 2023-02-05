@@ -188,6 +188,19 @@
     idRocketsNwt
 
 
+//-----------------------------------------------------------------------------
+
+// Universe sessions
+
+#define OSP_DATA_TESTAPP_UNI_CORE 1, \
+    idUniverse
+#define OSP_TAGS_TESTAPP_UNI_CORE 1, \
+    tgUniDummy
+
+#define OSP_DATA_TESTAPP_UNI_SCENEFRAME 1, \
+    idUniScnFrame
+#define OSP_TAGS_TESTAPP_UNI_SCENEFRAME 1, \
+    tgUniDummyB
 
 //-----------------------------------------------------------------------------
 

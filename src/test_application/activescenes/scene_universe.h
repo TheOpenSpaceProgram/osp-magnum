@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2022 Open Space Program Project
  *
  * MIT License
  *
@@ -24,41 +24,28 @@
  */
 #pragma once
 
-#include <entt/entity/storage.hpp>
+#include "scenarios.h"
 
-#include <Magnum/Math/Vector3.h>
-
-#include <cstdint>
-
-namespace osp::universe
+namespace testapp::scenes
 {
 
-using SatId     = uint32_t;
-using CoSpaceId = uint32_t;
+osp::Session setup_uni_core(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags);
 
-}
 
-// Specialize entt::storage_traits to disable signals for storage that uses
-// Satellites as entities
-template<typename Type>
-struct entt::storage_type<Type, osp::universe::SatId>
-{
-    using type = basic_storage<Type, osp::universe::SatId>;
-};
+osp::Session setup_uni_sceneframe(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags);
 
-namespace osp::universe
-{
+osp::Session setup_uni_test_planets(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         uniCore,
+        osp::Session const&         uniScnFrame);
 
-using spaceint_t = int64_t;
-
-// 1024 space units = 1 meter
-// TODO: this should vary by trajectory, but for now it's global
-constexpr float gc_units_per_meter = 1024.0f;
-
-// A Vector3 for space
-using Vector3g = Magnum::Math::Vector3<spaceint_t>;
-
-template<typename COMP_T>
-using ucomp_storage_t = typename entt::storage_type<COMP_T, SatId>::type;
 
 }
