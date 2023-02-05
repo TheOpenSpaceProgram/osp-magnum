@@ -126,7 +126,6 @@ struct ACtxPlumeData
 {
     template<typename COMP_T>
     using acomp_storage_t       = typename osp::active::acomp_storage_t<COMP_T>;
-    using ACompDrawTransform    = osp::active::ACompDrawTransform;
     using ACompExhaustPlume     = adera::active::ACompExhaustPlume;
     using MeshGlId              = osp::active::MeshGlId;
     using TexGlId               = osp::active::TexGlId;
@@ -135,7 +134,7 @@ struct ACtxPlumeData
 
     TexGlId m_tmpTex;
 
-    acomp_storage_t<ACompDrawTransform> *m_pDrawTf{nullptr};
+    acomp_storage_t<osp::Matrix4>       *m_pDrawTf{nullptr};
     acomp_storage_t<ACompExhaustPlume>  *m_pExaustPlumes{nullptr};
     acomp_storage_t<MeshGlId>           *m_pMeshId{nullptr};
     osp::active::MeshGlStorage_t        *m_pMeshGl{nullptr};

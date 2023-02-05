@@ -54,13 +54,10 @@ struct MainView
     osp::TopDataId              m_idResources;
 };
 
-using Builder_t         = osp::TaskBuilder<osp::TopTaskDataVec_t>;
-using TagSpan_t         = osp::ArrayView<const osp::TagId>;
-using TopDataSpan_t     = osp::ArrayView<const osp::TopDataId>;
-using Sessions_t        = std::vector<osp::Session>;
+using Builder_t = osp::TaskBuilder<osp::TopTaskDataVec_t>;
 
-using RendererSetup_t   = void(*)(MainView, osp::Session const&, Sessions_t const&, Sessions_t&);
-using SceneSetup_t      = RendererSetup_t(*)(MainView, osp::PkgId, Sessions_t&);
+using RendererSetup_t   = void(*)(MainView, osp::Session const&, osp::Sessions_t const&, osp::Sessions_t&);
+using SceneSetup_t      = RendererSetup_t(*)(MainView, osp::PkgId, osp::Sessions_t&);
 
 struct ScenarioOption
 {

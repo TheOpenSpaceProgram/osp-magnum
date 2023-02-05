@@ -75,17 +75,11 @@ public:
         m_onDraw = std::move(onDraw);
     }
 
-    void set_on_destruct(std::function<void()> onDestruct)
-    {
-        m_onDestruct = std::move(onDestruct);
-    }
-
 private:
 
     void drawEvent() override;
 
     on_draw_t m_onDraw;
-    std::function<void()> m_onDestruct;
 
     osp::input::UserInputHandler &m_rUserInput;
 

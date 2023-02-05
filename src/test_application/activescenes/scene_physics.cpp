@@ -30,22 +30,19 @@
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
 #include <osp/Active/physics.h>
-#include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/SysPrefabInit.h>
+#include <osp/Active/SysPhysics.h>
 #include <osp/Active/SysRender.h>
 
 #include <osp/Resource/ImporterData.h>
 #include <osp/Resource/resources.h>
 #include <osp/Resource/resourcetypes.h>
 
-#include <newtondynamics_physics/ospnewton.h>
-#include <newtondynamics_physics/SysNewton.h>
-
 using namespace osp;
 using namespace osp::active;
 using osp::restypes::gc_importer;
 using osp::phys::EShape;
-using ospnewton::ACtxNwtWorld;
 using Corrade::Containers::arrayView;
 
 namespace testapp::scenes
@@ -66,82 +63,27 @@ Session setup_physics(
 
 
     top_emplace< ACtxPhysics >  (topData, idPhys);
-    top_emplace< ACtxHierBody > (topData, idHierBody);
 
     // 'Per-thread' inputs fed into the physics engine. Only one here for now
-    top_emplace< ACtxPhysInputs >(topData, idPhysIn);
+    //top_emplace< ACtxPhysInputs >(topData, idPhysIn);
 
-    rBuilder.tag(tgPhysBodyMod)     .depend_on({tgPhysBodyDel});
-    rBuilder.tag(tgPhysBodyReq)     .depend_on({tgPhysBodyDel, tgPhysBodyMod, tgPhysMod});
-    rBuilder.tag(tgPhysReq)         .depend_on({tgPhysMod});
+    rBuilder.tag(tgPhysTransformReq).depend_on({tgPhysTransformMod});
+    rBuilder.tag(tgPhysDel)         .depend_on({tgPhysPrv});
+    rBuilder.tag(tgPhysMod)         .depend_on({tgPhysPrv, tgPhysDel});
+    rBuilder.tag(tgPhysReq)         .depend_on({tgPhysPrv, tgPhysDel, tgPhysMod});
 
-    physics.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgPhysBodyDel}).data(
+    physics.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgPhysDel}).data(
             "Delete Physics components",
-            TopDataIds_t{             idPhys,              idHierBody,                   idDelTotal},
-            wrap_args([] (ACtxPhysics& rPhys, ACtxHierBody& rHierBody, EntVector_t const& rDelTotal) noexcept
+            TopDataIds_t{             idPhys,                   idDelTotal},
+            wrap_args([] (ACtxPhysics& rPhys, EntVector_t const& rDelTotal) noexcept
     {
         auto const &delFirst    = std::cbegin(rDelTotal);
         auto const &delLast     = std::cend(rDelTotal);
 
-        SysPhysics::update_delete_phys      (rPhys,     delFirst, delLast);
-        SysPhysics::update_delete_shapes    (rPhys,     delFirst, delLast);
-        SysPhysics::update_delete_hier_body (rHierBody, delFirst, delLast);
+        SysPhysics::update_delete_phys(rPhys, delFirst, delLast);
     }));
 
     return physics;
-}
-
-Session setup_newton_physics(
-        Builder_t&                  rBuilder,
-        ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
-        Session const&              physics)
-{
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(physics,    TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
-
-    Session newton;
-    OSP_SESSION_ACQUIRE_DATA(newton, topData, TESTAPP_NEWTON);
-
-    top_emplace< ACtxNwtWorld >(topData, idNwt, 2);
-
-    using ospnewton::SysNewton;
-
-    newton.task() = rBuilder.task().assign({tgSceneEvt, tgSyncEvt, tgPhysReq, tgPhysBodyReq}).data(
-            "Update Entities with Newton colliders",
-            TopDataIds_t{             idPhys,                idPhysIn,              idNwt },
-            wrap_args([] (ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, ACtxNwtWorld& rNwt) noexcept
-    {
-        SysNewton::update_colliders(
-                rPhys, rNwt, std::exchange(rPhysIn.m_colliderDirty, {}));
-    }));
-
-    newton.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgPhysBodyDel}).data(
-            "Delete Newton components",
-            TopDataIds_t{              idNwt,                   idDelTotal},
-            wrap_args([] (ACtxNwtWorld& rNwt, EntVector_t const& rDelTotal) noexcept
-    {
-        SysNewton::update_delete (rNwt, std::cbegin(rDelTotal), std::cend(rDelTotal));
-    }));
-
-    newton.task() = rBuilder.task().assign({tgTimeEvt, tgTransformMod, tgHierMod, tgPhysMod}).data(
-            "Update Newton world",
-            TopDataIds_t{           idBasic,             idPhys,                idPhysIn,              idNwt,           idDeltaTimeIn },
-            wrap_args([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, ACtxNwtWorld& rNwt, float const deltaTimeIn) noexcept
-    {
-        auto const physIn = osp::ArrayView<ACtxPhysInputs>(&rPhysIn, 1);
-        SysNewton::update_world(
-                rPhys, rNwt, deltaTimeIn, physIn, rBasic.m_hierarchy,
-                rBasic.m_transform, rBasic.m_transformControlled,
-                rBasic.m_transformMutable);
-    }));
-
-    top_emplace< ACtxNwtWorld >(topData, idNwt, 2);
-
-    return newton;
 }
 
 Session setup_shape_spawn(
@@ -173,18 +115,31 @@ Session setup_shape_spawn(
 
     shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgEntNew, tgSpawnEntMod}).data(
             "Create entities for requested shapes to spawn",
-            TopDataIds_t{             idActiveIds,              idSpawner,             idSpawnerEnts },
-            wrap_args([] (ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
+            TopDataIds_t{           idBasic,             idActiveIds,              idSpawner,             idSpawnerEnts },
+            wrap_args([] (ACtxBasic& rBasic, ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
     {
+        if (rSpawner.size() == 0)
+        {
+            return;
+        }
+
         rSpawnerEnts.resize(rSpawner.size() * 2);
         rActiveIds.create(std::begin(rSpawnerEnts), std::end(rSpawnerEnts));
     }));
 
     shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgTransformNew, tgHierNew}).data(
             "Add hierarchy and transform to spawned shapes",
-            TopDataIds_t{           idBasic,              idSpawner,             idSpawnerEnts },
-            wrap_args([] (ACtxBasic& rBasic, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
+            TopDataIds_t{           idBasic,             idActiveIds,              idSpawner,             idSpawnerEnts },
+            wrap_args([] (ACtxBasic& rBasic, ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
     {
+        if (rSpawner.size() == 0)
+        {
+            return;
+        }
+
+        rBasic.m_scnGraph.resize(rActiveIds.capacity());
+        SubtreeBuilder bldScnRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, rSpawner.size() * 2);
+
         for (std::size_t i = 0; i < rSpawner.size(); ++i)
         {
             SpawnShape const &spawn = rSpawner[i];
@@ -193,8 +148,8 @@ Session setup_shape_spawn(
 
             rBasic.m_transform.emplace(root, ACompTransform{osp::Matrix4::translation(spawn.m_position)});
             rBasic.m_transform.emplace(child, ACompTransform{Matrix4::scaling(spawn.m_size)});
-            SysHierarchy::add_child(rBasic.m_hierarchy, rBasic.m_hierRoot, root);
-            SysHierarchy::add_child(rBasic.m_hierarchy, root, child);
+            SubtreeBuilder bldRoot = bldScnRoot.add_child(root, 1);
+            bldRoot.add_child(child);
         }
     }));
 
@@ -203,52 +158,58 @@ Session setup_shape_spawn(
             TopDataIds_t{             idDrawing,              idSpawner,             idSpawnerEnts,             idNMesh,          idMatEnts,             idMatDirty,                idActiveIds},
             wrap_args([] (ACtxDrawing& rDrawing, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, NamedMeshes& rNMesh, EntSet_t& rMatEnts, EntVector_t& rMatDirty, ActiveReg_t const& rActiveIds ) noexcept
     {
-        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        if (rSpawner.size() == 0)
         {
-            SpawnShape const &spawn = rSpawner[i];
-            ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
-
-            rDrawing.m_mesh.emplace( child, rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape)) );
-            rDrawing.m_meshDirty.push_back(child);
-
-            rMatEnts.ints().resize(rActiveIds.vec().capacity());
-            rMatEnts.set(std::size_t(child));
-            rMatDirty.push_back(child);
-
-            rDrawing.m_visible.emplace(child);
-            rDrawing.m_opaque.emplace(child);
+            return;
         }
-    }));
+        rMatEnts.ints().resize(rActiveIds.vec().capacity());
+        rDrawing.m_drawable.ints().resize(rActiveIds.vec().capacity());
 
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgPhysBodyMod}).data(
-            "Add physics to spawned shapes",
-            TopDataIds_t{              idSpawner,             idSpawnerEnts,             idPhys,             idHierBody,                 idPhysIn },
-            wrap_args([] (SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxPhysics& rPhys, ACtxHierBody& rHierBody, ACtxPhysInputs& rPhysIn) noexcept
-    {
         for (std::size_t i = 0; i < rSpawner.size(); ++i)
         {
             SpawnShape const &spawn = rSpawner[i];
             ActiveEnt const root    = rSpawnerEnts[i * 2];
             ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
 
-            rPhys.m_hasColliders.emplace(root);
-            rPhys.m_physBody.emplace(root);
+            rDrawing.m_mesh.emplace( child, rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape)) );
+            rDrawing.m_meshDirty.push_back(child);
+
+            rMatEnts.set(std::size_t(child));
+            rMatDirty.push_back(child);
+
+            rDrawing.m_visible.emplace(child);
+            rDrawing.m_opaque.emplace(child);
+
+            rDrawing.m_drawable.set(std::size_t(root));
+            rDrawing.m_drawable.set(std::size_t(child));
+        }
+    }));
+
+    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgPhysMod}).data(
+            "Add physics to spawned shapes",
+            TopDataIds_t{                   idActiveIds,              idSpawner,             idSpawnerEnts,             idPhys },
+            wrap_args([] (ActiveReg_t const &rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxPhysics& rPhys) noexcept
+    {
+        rPhys.m_hasColliders.ints().resize(rActiveIds.vec().capacity());
+        rPhys.m_shape.resize(rActiveIds.capacity());
+        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        {
+            SpawnShape const &spawn = rSpawner[i];
+            ActiveEnt const root    = rSpawnerEnts[i * 2];
+            ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
+
+            rPhys.m_hasColliders.set(std::size_t(root));
             if (spawn.m_mass != 0.0f)
             {
-                rPhys.m_physLinearVel.emplace(root);
-                rPhys.m_physAngularVel.emplace(root);
-                ACompPhysDynamic &rDyn = rPhys.m_physDynamic.emplace(root);
-                rDyn.m_totalMass = spawn.m_mass;
-
-                rPhysIn.m_setVelocity.emplace_back(root, spawn.m_velocity);
-                osp::Vector3 const inertia
-                        = osp::phys::collider_inertia_tensor(spawn.m_shape, spawn.m_size, spawn.m_mass);
-                rHierBody.m_ownDyn.emplace( child, ACompSubBody{ inertia, spawn.m_mass } );
+                rPhys.m_setVelocity.emplace_back(root, spawn.m_velocity);
+                Vector3 const inertia
+                        = phys::collider_inertia_tensor(spawn.m_shape, spawn.m_size, spawn.m_mass);
+                Vector3 const offset{0.0f, 0.0f, 0.0f};
+                rPhys.m_ownDyn.emplace( child, ACompSubBody{ inertia, offset, spawn.m_mass } );
             }
 
-            rPhys.m_shape.emplace(child, spawn.m_shape);
-            rPhys.m_solid.emplace(child);
-            rPhysIn.m_colliderDirty.push_back(child);
+            rPhys.m_shape[std::size_t(child)] = spawn.m_shape;
+            rPhys.m_colliderDirty.push_back(child);
         }
     }));
 
@@ -296,7 +257,7 @@ Session setup_prefabs(
     {
         // Count number of entities needed to be created
         std::size_t totalEnts = 0;
-        for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basic)
+        for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
         {
             auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
             auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
@@ -309,10 +270,10 @@ Session setup_prefabs(
         rActiveIds.create(std::begin(rPrefabInit.m_newEnts), std::end(rPrefabInit.m_newEnts));
 
         // Assign new entities to each prefab to create
-        rPrefabInit.m_ents.resize(rPrefabInit.m_basic.size());
+        rPrefabInit.m_ents.resize(rPrefabInit.m_basicIn.size());
         auto itEntAvailable = std::begin(rPrefabInit.m_newEnts);
         auto itPfEntSpanOut = std::begin(rPrefabInit.m_ents);
-        for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.m_basic)
+        for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.m_basicIn)
         {
             auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
             auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
@@ -331,7 +292,7 @@ Session setup_prefabs(
             TopDataIds_t{                idPrefabInit,           idResources,           idBasic },
             wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxBasic& rBasic) noexcept
     {
-        SysPrefabInit::init_hierarchy(rPrefabInit, rResources, rBasic.m_hierarchy);
+        //SysPrefabInit::init_hierarchy(rPrefabInit, rResources, rBasic.m_hierarchy);
     }));
 
     prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgTransformNew}).data(
@@ -359,19 +320,23 @@ Session setup_prefabs(
 
         prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod, tgMatMod}).data(
                 "Init Prefab drawables (single material)",
-                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,             idMatDirty },
-                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, EntVector_t& rMatDirty) noexcept
+                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,             idMatDirty,                   idActiveIds },
+                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, EntVector_t& rMatDirty, ActiveReg_t const& rActiveIds) noexcept
         {
+            rDrawing.m_drawable.ints().resize(rActiveIds.vec().capacity());
+            rMatEnts.ints().resize(rActiveIds.vec().capacity());
             SysPrefabInit::init_drawing(rPrefabInit, rResources, rDrawing, rDrawingRes, {{rMatEnts, rMatDirty}});
         }));
     }
 
-    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgPhysBodyMod}).data(
+    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgPhysMod}).data(
             "Init Prefab physics",
-            TopDataIds_t{                idPrefabInit,           idResources,             idPhys,             idHierBody,                 idPhysIn},
-            wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxPhysics& rPhys, ACtxHierBody& rHierBody, ACtxPhysInputs& rPhysIn) noexcept
+            TopDataIds_t{                   idActiveIds,                idPrefabInit,           idResources,             idPhys},
+            wrap_args([] (ActiveReg_t const& rActiveIds, ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxPhysics& rPhys) noexcept
     {
-        SysPrefabInit::init_physics(rPrefabInit, rResources, rPhysIn, rPhys, rHierBody);
+        rPhys.m_hasColliders.ints().resize(rActiveIds.vec().capacity());
+        rPhys.m_shape.resize(rActiveIds.capacity());
+        SysPrefabInit::init_physics(rPrefabInit, rResources, rPhys);
     }));
 
 
@@ -380,80 +345,11 @@ Session setup_prefabs(
             TopDataIds_t{                idPrefabInit },
             wrap_args([] (ACtxPrefabInit& rPrefabInit) noexcept
     {
-        rPrefabInit.m_basic.clear();
+        rPrefabInit.m_basicIn.clear();
     }));
 
 
     return prefabs;
-}
-
-Session setup_gravity(
-        Builder_t&                  rBuilder,
-        ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
-        Session const&              physics,
-        Session const&              shapeSpawn)
-{
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(physics,    TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
-
-    Session gravity;
-    OSP_SESSION_ACQUIRE_DATA(gravity, topData, TESTAPP_GRAVITY);
-    OSP_SESSION_ACQUIRE_TAGS(gravity, rTags, TESTAPP_GRAVITY);
-
-    top_emplace< EntSet_t >       (topData, idGravity);
-
-    rBuilder.tag(tgGravityReq)      .depend_on({tgGravityDel, tgGravityNew});
-    rBuilder.tag(tgGravityNew)      .depend_on({tgGravityDel, tgPhysReq});
-
-    gravity.task() = rBuilder.task().assign({tgSceneEvt, tgGravityReq}).data(
-            "Apply gravity (-Z 9.81m/s^2 acceleration) to entities in the rGravity set",
-            TopDataIds_t{             idPhys,                idPhysIn,          idGravity   },
-            wrap_args([] (ACtxPhysics& rPhys, ACtxPhysInputs& rPhysIn, EntSet_t& rGravity) noexcept
-    {
-        acomp_storage_t<ACompPhysNetForce> &rNetForce = rPhysIn.m_physNetForce;
-        for (std::size_t const entInt : rGravity.ones())
-        {
-            auto const ent = ActiveEnt(entInt);
-            ACompPhysNetForce &rEntNetForce = rNetForce.contains(ent)
-                                            ? rNetForce.get(ent)
-                                            : rNetForce.emplace(ent);
-
-            rEntNetForce.z() -= 9.81f * rPhys.m_physDynamic.get(ent).m_totalMass;
-        }
-    }));
-
-    gravity.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgGravityNew}).data(
-            "Add gravity to spawned shapes",
-            TopDataIds_t{                    idSpawner,                   idSpawnerEnts,          idGravity,                   idActiveIds },
-            wrap_args([] (SpawnerVec_t const& rSpawner, EntVector_t const& rSpawnerEnts, EntSet_t& rGravity, ActiveReg_t const& rActiveIds) noexcept
-    {
-        rGravity.ints().resize(rActiveIds.vec().capacity());
-
-        for (std::size_t i = 0; i < rSpawner.size(); ++i)
-        {
-            SpawnShape const &spawn = rSpawner[i];
-            if (spawn.m_mass == 0)
-            {
-                continue;
-            }
-
-            ActiveEnt const root    = rSpawnerEnts[i * 2];
-
-            rGravity.set(std::size_t(root));
-        }
-    }));
-
-    gravity.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgGravityDel}).data(
-            "Delete gravity components",
-            TopDataIds_t{idGravity, idDelTotal}, delete_ent_set);
-
-    return gravity;
 }
 
 Session setup_bounds(
@@ -475,32 +371,47 @@ Session setup_bounds(
     OSP_SESSION_ACQUIRE_TAGS(bounds, rTags, TESTAPP_BOUNDS);
 
     top_emplace< EntSet_t >       (topData, idBounds);
+    top_emplace< EntVector_t >    (topData, idOutOfBounds);
 
-    rBuilder.tag(tgBoundsDel)       .depend_on({tgBoundsReq});
-    rBuilder.tag(tgBoundsNew)       .depend_on({tgBoundsReq, tgBoundsDel});
+    rBuilder.tag(tgBoundsSetMod)    .depend_on({tgBoundsSetDel});
+    rBuilder.tag(tgBoundsSetReq)    .depend_on({tgBoundsSetDel, tgBoundsSetMod});
+    rBuilder.tag(tgOutOfBoundsMod)  .depend_on({tgOutOfBoundsPrv});
 
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgPhysReq, tgBoundsReq, tgDelEntMod}).data(
-            "Bounds check",
-            TopDataIds_t{                 idBasic,                idBounds,             idDelEnts   },
-            wrap_args([] (ACtxBasic const& rBasic, EntSet_t const& rBounds, EntVector_t& rDelEnts) noexcept
+    // Bounds are checked are after transforms are final (tgTransformReq)
+    // Out-of-bounds entities are added to rOutOfBounds, and are deleted
+    // at the start of next frame
+
+    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgTransformReq, tgBoundsSetReq, tgOutOfBoundsMod}).data(
+            "Check for out-of-bounds entities",
+            TopDataIds_t{                 idBasic,                idBounds,             idOutOfBounds},
+            wrap_args([] (ACtxBasic const& rBasic, EntSet_t const& rBounds, EntVector_t& rOutOfBounds) noexcept
     {
-        for (std::size_t const entInt : rBounds.ones())
+        rOutOfBounds.clear();
+        for (std::size_t const ent : rBounds.ones())
         {
-            auto const ent = ActiveEnt(entInt);
-            ACompTransform const &entTf = rBasic.m_transform.get(ent);
+            ACompTransform const &entTf = rBasic.m_transform.get(ActiveEnt(ent));
             if (entTf.m_transform.translation().z() < -10)
             {
-                rDelEnts.push_back(ent);
+                rOutOfBounds.push_back(ActiveEnt(ent));
             }
         }
     }));
 
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgBoundsNew}).data(
+
+    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgOutOfBoundsPrv, tgDelEntMod}).data(
+            "Delete out-of-bounds entities",
+            TopDataIds_t{                 idBasic,                   idOutOfBounds,             idDelEnts   },
+            wrap_args([] (ACtxBasic const& rBasic, EntVector_t const& rOutOfBounds, EntVector_t& rDelEnts) noexcept
+    {
+        rDelEnts.insert(rDelEnts.end(), rOutOfBounds.cbegin(), rOutOfBounds.cend());
+    }));
+
+    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgBoundsSetMod}).data(
             "Add bounds to spawned shapes",
             TopDataIds_t{                    idSpawner,                   idSpawnerEnts,          idBounds,                   idActiveIds },
             wrap_args([] (SpawnerVec_t const& rSpawner, EntVector_t const& rSpawnerEnts, EntSet_t& rBounds, ActiveReg_t const& rActiveIds) noexcept
     {
-        rBounds.ints().resize(rActiveIds.vec().capacity());
+        rBounds     .ints().resize(rActiveIds.vec().capacity());
 
         for (std::size_t i = 0; i < rSpawner.size(); ++i)
         {
@@ -516,7 +427,7 @@ Session setup_bounds(
         }
     }));
 
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgBoundsDel}).data(
+    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgBoundsSetDel}).data(
             "Delete bounds components",
             TopDataIds_t{idBounds, idDelTotal}, delete_ent_set);
 

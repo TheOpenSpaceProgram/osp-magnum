@@ -59,7 +59,6 @@ ActiveApplication::ActiveApplication(const Application::Arguments& arguments,
 ActiveApplication::~ActiveApplication()
 {
     m_onDraw = {};
-    m_onDestruct();
 }
 
 void ActiveApplication::drawEvent()

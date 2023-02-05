@@ -73,43 +73,27 @@ struct ACompName
     std::string m_name;
 };
 
-/**
- * @brief Places an entity in a hierarchy
- *
- * Stores entity IDs for parent, both siblings, and first child if present
- */
-struct ACompHierarchy
+using TreePos_t = uint32_t;
+
+struct ACtxSceneGraph
 {
-    unsigned m_level{0}; // 0 for root entity, 1 for root's child, etc...
-    ActiveEnt m_parent{entt::null};
-    ActiveEnt m_siblingNext{entt::null};
-    ActiveEnt m_siblingPrev{entt::null};
+    // Tree structure stored using an array of descendant count in parallel with
+    // identificaton (entities)
+    // A(B(C(D)), E(F(G(H,I)))) -> [A,B,C,D,E,F,G,H,I] and [8,2,1,0,4,3,2,0,0]
+    std::vector<ActiveEnt>  m_treeToEnt{lgrn::id_null<ActiveEnt>()};
+    std::vector<uint32_t>   m_treeDescendants{std::initializer_list<uint32_t>{0}};
 
-    // as a parent
-    unsigned m_childCount{0};
-    ActiveEnt m_childFirst{entt::null};
-};
+    std::vector<ActiveEnt>  m_entParent;
+    std::vector<TreePos_t>  m_entToTreePos;
 
-/**
- * @brief Component that represents a camera
- */
-struct ACompCamera
-{
-    float m_near;
-    float m_far;
-    float m_aspectRatio;
-    Deg m_fov;
+    std::vector<TreePos_t>  m_delete;
 
-    constexpr void set_aspect_ratio(Vector2 const viewport) noexcept
+    void resize(std::size_t ents)
     {
-        m_aspectRatio = viewport.x() / viewport.y();
-    }
-
-    Matrix4 calculate_projection() const noexcept
-    {
-        return osp::Matrix4::perspectiveProjection(
-                m_fov, m_aspectRatio,
-                m_near, m_far);
+        m_treeToEnt         .reserve(ents);
+        m_treeDescendants   .reserve(ents);
+        m_entParent         .resize(ents);
+        m_entToTreePos      .resize(ents);
     }
 };
 
@@ -118,15 +102,13 @@ struct ACompCamera
  */
 struct ACtxBasic
 {
+    ACtxSceneGraph m_scnGraph;
+
     acomp_storage_t<ACompTransform>             m_transform;
     acomp_storage_t<ACompTransformControlled>   m_transformControlled;
     acomp_storage_t<ACompTransformMutable>      m_transformMutable;
     acomp_storage_t<ACompFloatingOrigin>        m_floatingOrigin;
     acomp_storage_t<ACompName>                  m_name;
-    acomp_storage_t<ACompHierarchy>             m_hierarchy;
-    acomp_storage_t<ACompCamera>                m_camera;
-
-    ActiveEnt m_hierRoot{lgrn::id_null<ActiveEnt>()};
 };
 
 template<typename IT_T>
@@ -134,8 +116,6 @@ void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
 {
     rCtxBasic.m_floatingOrigin  .remove(first, last);
     rCtxBasic.m_name            .remove(first, last);
-    rCtxBasic.m_hierarchy       .remove(first, last);
-    rCtxBasic.m_camera          .remove(first, last);
 
     while (first != last)
     {

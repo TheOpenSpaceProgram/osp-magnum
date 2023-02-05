@@ -69,14 +69,14 @@ void PlumeShader::draw_plume(
     ACtxPlumeData &rData = *reinterpret_cast<ACtxPlumeData*>(userData[0]);
 
     // Collect uniform data
-    ACompDrawTransform const &drawTf    = rData.m_pDrawTf->get(ent);
+    Matrix4 const &drawTf               = rData.m_pDrawTf->get(ent);
     ACompExhaustPlume const &comp       = rData.m_pExaustPlumes->get(ent);
     PlumeEffectData const &effect       = comp.m_effect;
     MeshGlId const meshId               = rData.m_pMeshId->get(ent);
     Magnum::GL::Mesh &rMesh             = rData.m_pMeshGl->get(meshId);
     Magnum::GL::Texture2D &rTmpTex      = rData.m_pTexGl->get(rData.m_tmpTex);
 
-    Magnum::Matrix4 entRelative = viewProj.m_view * drawTf.m_transformWorld;
+    Matrix4 const entRelative = viewProj.m_view * drawTf;
 
     rData.m_shader
         .bindNozzleNoiseTexture     (rTmpTex)

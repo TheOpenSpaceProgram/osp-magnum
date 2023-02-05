@@ -68,6 +68,9 @@ void SysRenderGL::setup_context(RenderGL& rCtxGl)
 {
     using namespace Magnum;
 
+    // Initialize with GL context object, previously initialized using NoCreate
+    rCtxGl.m_fullscreenTriShader = {};
+
     /* Generate fullscreen tri for texture rendering */
     {
         Vector2 screenSize = Vector2{GL::defaultFramebuffer.viewport().size()};

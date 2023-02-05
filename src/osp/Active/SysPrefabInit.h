@@ -28,6 +28,7 @@
 #include "basic.h"
 #include "drawing.h"
 #include "physics.h"
+#include "SysSceneGraph.h"
 
 #include "../types.h"
 #include "../Resource/resourcetypes.h"
@@ -58,16 +59,13 @@ struct TmpPrefabInitBasic
 {
     ResId m_importerRes{lgrn::id_null<ResId>()};
     PrefabId m_prefabId;
-
-    // Parent and transform to assign root objects in the prefab
-    ActiveEnt m_parent{lgrn::id_null<ActiveEnt>()};
     Matrix4 const* m_pTransform{nullptr};
 };
 
 
 struct ACtxPrefabInit
 {
-    std::vector<TmpPrefabInitBasic>             m_basic;
+    std::vector<TmpPrefabInitBasic>             m_basicIn;
     std::vector< ArrayView<ActiveEnt const> >   m_ents;
 
     std::vector<ActiveEnt>                      m_newEnts;
@@ -78,10 +76,11 @@ class SysPrefabInit
 {
 public:
 
-    static void init_hierarchy(
-            ACtxPrefabInit const&               rPrefabInit,
+    static void add_to_subtree(
+            TmpPrefabInitBasic const&           basic,
+            ArrayView<ActiveEnt const>          ents,
             Resources const&                    rResources,
-            acomp_storage_t<ACompHierarchy>&    rHier) noexcept;
+            SubtreeBuilder&                     rSubtree) noexcept;
 
     static void init_transforms(
             ACtxPrefabInit const&               rPrefabInit,
@@ -91,16 +90,14 @@ public:
     static void init_drawing(
             ACtxPrefabInit const&               rPrefabInit,
             Resources&                          rResources,
-            ACtxDrawing&                        rCtxDraw,
+            ACtxDrawing&                        rDrawing,
             ACtxDrawingRes&                     rCtxDrawRes,
             std::optional<EntSetPair>           material) noexcept;
 
     static void init_physics(
             ACtxPrefabInit const&               rPrefabInit,
             Resources const&                    rResources,
-            ACtxPhysInputs&                     rPhysIn,
-            ACtxPhysics&                        rCtxPhys,
-            ACtxHierBody&                       rCtxHierBody) noexcept;
+            ACtxPhysics&                        rCtxPhys) noexcept;
 };
 
 

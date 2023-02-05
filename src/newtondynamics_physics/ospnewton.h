@@ -24,29 +24,40 @@
  */
 #pragma once
 
+#include "factors.h"
+
 #include <osp/Active/activetypes.h>
-#include <osp/Active/SysPhysics.h>
+#include <osp/Active/basic.h>
+#include <osp/id_map.h>
 
 #include <Newton.h>
+
+#include <longeron/id_management/registry_stl.hpp>
+
+#include <entt/core/any.hpp>
+
 
 namespace ospnewton
 {
 
-struct DeleterNewtonBody
+template<auto FUNC_T>
+struct NwtDeleter
 {
-    void operator() (NewtonBody const* pCollision)
-    { NewtonDestroyBody(pCollision); }
+    void operator() (auto const* pNwtType)
+    {
+        FUNC_T(pNwtType);
+    }
 };
 
-using ACompNwtBody_t = std::unique_ptr<NewtonBody const, DeleterNewtonBody>;
+using NwtBodyPtr_t = std::unique_ptr< NewtonBody, NwtDeleter<NewtonDestroyBody> >;
 
-struct DeleterNewtonCollision
-{
-    void operator() (NewtonCollision const* pCollision)
-    { NewtonDestroyCollision(pCollision); }
-};
+using NwtColliderPtr_t = std::unique_ptr<NewtonCollision, NwtDeleter<NewtonDestroyCollision> >;
 
-using ACompNwtCollider_t = std::unique_ptr<NewtonCollision const, DeleterNewtonCollision>;
+//using ForceFactor_t = void (*)(
+//        ActiveEnt, ViewProjMatrix const&, UserData_t) noexcept;
+
+using BodyId = uint32_t;
+
 
 /**
  * @brief Represents an instance of a Newton physics world in the scane
@@ -54,14 +65,13 @@ using ACompNwtCollider_t = std::unique_ptr<NewtonCollision const, DeleterNewtonC
 struct ACtxNwtWorld
 {
 
-    // TODO: not compiling, std::hardware_destructive_interference_size not found?
-    struct alignas(64) PerThread
+    struct ForceFactorFunc
     {
-        using SetTfPair_t = std::pair<osp::active::ActiveEnt,
-                                      NewtonBody const* const>;
+        using UserData_t = std::array<void*, 6u>;
+        using Func_t = void (*)(NewtonBody const* pBody, BodyId BodyId, ACtxNwtWorld const&, UserData_t, osp::Vector3&, osp::Vector3&) noexcept;
 
-        // transformations to set recorded in cb_set_transform
-        std::vector<SetTfPair_t> m_setTf;
+        Func_t      m_func;
+        UserData_t  m_userData;
     };
 
     struct Deleter
@@ -70,34 +80,28 @@ struct ACtxNwtWorld
     };
 
     ACtxNwtWorld(int threadCount)
-     : m_nwtWorld(NewtonCreate())
-     , m_perThread(threadCount)
+     : m_world(NewtonCreate())
     {
-        NewtonWorldSetUserData(m_nwtWorld.get(), this);
+        NewtonWorldSetUserData(m_world.get(), this);
     }
-
-    std::unique_ptr<NewtonWorld, Deleter> m_nwtWorld;
 
     // note: important that m_nwtBodies and m_nwtColliders are destructed
     //       before m_nwtWorld
+    std::unique_ptr<NewtonWorld, Deleter> m_world;
 
-    osp::active::acomp_storage_t<ACompNwtBody_t> m_nwtBodies;
-    osp::active::acomp_storage_t<ACompNwtCollider_t> m_nwtColliders;
+    lgrn::IdRegistryStl<BodyId>                     m_bodyIds;
+    std::vector<NwtBodyPtr_t>                       m_bodyPtrs;
+    std::vector<ForceFactors_t>                     m_bodyFactors;
 
-    struct ForceTorqueIn
-    {
-        osp::active::acomp_storage_t<osp::active::ACompPhysNetForce>  m_force;
-        osp::active::acomp_storage_t<osp::active::ACompPhysNetTorque> m_torque;
-    };
+    std::vector<osp::active::ActiveEnt>             m_bodyToEnt;
+    osp::IdMap_t<osp::active::ActiveEnt, BodyId>    m_entToBody;
 
-    // Forces and torques swapped in during SysNewton::update_world to be read
-    // by multiple Newton threads during cb_force_torque
-    std::vector<ForceTorqueIn> m_forceTorqueIn;
+    std::vector<ForceFactorFunc>                    m_factors;
 
-    std::vector<PerThread> m_perThread;
+    osp::active::acomp_storage_t<NwtColliderPtr_t>  m_colliders;
+
+    osp::active::acomp_storage_t<osp::active::ACompTransform> *m_pTransform;
 };
-
-
 
 
 }

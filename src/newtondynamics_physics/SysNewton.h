@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "ospnewton.h"
+
 #include <osp/Active/physics.h>      // for ACompShape
 #include <osp/Active/basic.h>        // for ActiveEnt, ActiveReg_t, basic_sp...
 
@@ -32,18 +34,14 @@
 
 #include <Corrade/Containers/ArrayView.h>
 
+#include <Newton.h>
+
 // IWYU pragma: no_include <cstdint>
 // IWYU pragma: no_include <stdint.h>
 // IWYU pragma: no_include <type_traits>
 
-class NewtonBody;
-class NewtonWorld;
-class NewtonCollision;
-
 namespace ospnewton
 {
-
-struct ACtxNwtWorld;
 
 class SysNewton
 {
@@ -52,11 +50,31 @@ class SysNewton
 
     using ActiveEnt                 = osp::active::ActiveEnt;
     using ACtxPhysics               = osp::active::ACtxPhysics;
-    using ACompHierarchy            = osp::active::ACompHierarchy;
+    using ACtxSceneGraph            = osp::active::ACtxSceneGraph;
     using ACompTransform            = osp::active::ACompTransform;
     using ACompTransformControlled  = osp::active::ACompTransformControlled;
     using ACompTransformMutable     = osp::active::ACompTransformMutable;
 public:
+
+    using NwtThreadIndex_t = int;
+
+    static void cb_force_torque(const NewtonBody* pBody, dFloat timestep, NwtThreadIndex_t thread);
+
+    static void cb_set_transform(NewtonBody const* pBody, dFloat const* pMatrix, NwtThreadIndex_t thread);
+
+    static void resize_body_data(ACtxNwtWorld& rCtxWorld);
+
+    [[nodiscard]] static NwtColliderPtr_t create_primative(
+            ACtxNwtWorld&           rCtxWorld,
+            osp::phys::EShape       shape);
+
+
+    static void orient_collision(
+            NewtonCollision const*  pCollision,
+            osp::phys::EShape       shape,
+            osp::Vector3 const&     translation,
+            osp::Matrix3 const&     rotation,
+            osp::Vector3 const&     scale);
 
     /**
      * @brief Respond to scene origin shifts by translating all rigid bodies
@@ -96,11 +114,8 @@ public:
             ACtxPhysics& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
             float timestep,
-            Corrade::Containers::ArrayView<osp::active::ACtxPhysInputs> inputs,
-            acomp_storage_t<osp::active::ACompHierarchy> const& rHier,
-            acomp_storage_t<osp::active::ACompTransform>& rTf,
-            acomp_storage_t<osp::active::ACompTransformControlled>& rTfControlled,
-            acomp_storage_t<osp::active::ACompTransformMutable>& rTfMutable) noexcept;
+            ACtxSceneGraph const& rScnGraph,
+            acomp_storage_t<osp::active::ACompTransform>& rTf) noexcept;
 
     static void remove_components(
             ACtxNwtWorld& rCtxWorld, ActiveEnt ent) noexcept;
@@ -116,6 +131,21 @@ public:
         }
     }
 
+    static ACtxNwtWorld& context_from_nwtbody(NewtonBody const* const pBody)
+    {
+        return *static_cast<ACtxNwtWorld*>(NewtonWorldGetUserData(NewtonBodyGetWorld(pBody)));
+    }
+
+    static BodyId get_userdata_bodyid(NewtonBody const* const pBody)
+    {
+        return reinterpret_cast<std::uintptr_t>(NewtonBodyGetUserData(pBody));
+    }
+
+    static void set_userdata_bodyid(NewtonBody const* const pBody, BodyId const body)
+    {
+        return NewtonBodySetUserData(pBody, reinterpret_cast<void*>(std::uintptr_t(body)));
+    }
+
 private:
 
     /**
@@ -127,19 +157,17 @@ private:
      * @param rHier         [in] Storage for hierarchy components
      * @param rTf           [in] Storage for relative hierarchy transforms
      * @param ent           [in] Entity to search
-     * @param firstChild    [in] First child of ent (to reduce rHier accesses)
      * @param transform     [in] Transform relative to root (part of recursion)
      * @param pCompound     [out] NewtonCompoundCollision to add colliders to
      */
     static void find_colliders_recurse(
-            ACtxPhysics const& rCtxPhys,
-            ACtxNwtWorld& rCtxWorld,
-            acomp_storage_t<ACompHierarchy> const& rHier,
-            acomp_storage_t<ACompTransform> const& rTf,
-            ActiveEnt ent,
-            ActiveEnt firstChild,
-            osp::Matrix4 const& transform,
-            NewtonCollision* pCompound) noexcept;
+            ACtxPhysics const&                      rCtxPhys,
+            ACtxNwtWorld&                           rCtxWorld,
+            ACtxSceneGraph const&                   rScnGraph,
+            acomp_storage_t<ACompTransform> const&  rTf,
+            ActiveEnt                               ent,
+            osp::Matrix4 const&                     transform,
+            NewtonCollision*                        pCompound) noexcept;
 
     /**
      * @brief Create Newton bodies and colliders for entities with ACompPhysBody
@@ -151,7 +179,7 @@ private:
     static void create_body(
             ACtxPhysics const& rCtxPhys,
             ACtxNwtWorld& rCtxWorld,
-            acomp_storage_t<ACompHierarchy> const& rHier,
+            ACtxSceneGraph const& rScnGraph,
             acomp_storage_t<ACompTransform> const& rTf,
             acomp_storage_t<ACompTransformControlled>& rTfControlled,
             acomp_storage_t<ACompTransformMutable>& rTfMutable,

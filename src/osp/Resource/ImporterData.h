@@ -71,6 +71,7 @@ struct ImporterData
 
     std::vector<ObjId>                      m_objParents;
     lgrn::IntArrayMultiMap<ObjId, ObjId>    m_objChildren;
+    std::vector<std::size_t>                m_objDescendants;
 
     std::vector<String>                     m_objNames;
     std::vector<Matrix4>                    m_objTransforms;
@@ -85,8 +86,8 @@ struct ImporterData
 struct Prefabs
 {
     // [prefab Id][object]
-    lgrn::IntArrayMultiMap<PrefabId, ObjId> m_prefabs;
-    lgrn::IntArrayMultiMap<PrefabId, ObjId> m_prefabParents;
+    lgrn::IntArrayMultiMap<PrefabId, ObjId>     m_prefabs;
+    lgrn::IntArrayMultiMap<PrefabId, int32_t>   m_prefabParents;
 
     // Points to ImporterData::m_objNames
     std::vector<std::string_view>           m_prefabNames;

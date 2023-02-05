@@ -45,6 +45,8 @@ public:
 
     FullscreenTriShader();
 
+    using AbstractShaderProgram::AbstractShaderProgram;
+
     /**
      * Displays a texture to the screen by drawing it to a fullscreen triangle
      * 

@@ -42,8 +42,9 @@
 namespace testapp
 {
 
-enum class AttachId : uint32_t { };
-enum class PartId : uint32_t { };
+using osp::active::PartId;
+using osp::active::WeldId;
+
 
 struct StructureLink
 {
@@ -64,23 +65,26 @@ struct PerNodeType : osp::link::Nodes
 
 struct VehicleData
 {
+    using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
+                                                      osp::link::JuncCustom>;
+
     VehicleData() = default;
     VehicleData(VehicleData const& copy) = delete;
     VehicleData(VehicleData&& move) = default;
 
+    lgrn::IdRegistryStl<PartId>             m_partIds;
+    std::vector<osp::Matrix4>               m_partTransformWeld;
+    std::vector<osp::PrefabPair>            m_partPrefabs;
+    std::vector<uint16_t>                   m_partMachCount;
+    std::vector<WeldId>                     m_partToWeld;
 
-    lgrn::IdRegistryStl<PartId>         m_partIds;
-    std::vector<osp::Matrix4>           m_partTransforms;
-    std::vector<osp::PrefabPair>        m_partPrefabs;
-    std::vector<uint16_t>               m_partMachCount;
+    lgrn::IdRegistryStl<WeldId>             m_weldIds;
+    lgrn::IntArrayMultiMap<WeldId, PartId>  m_weldToParts;
 
-    lgrn::IdRegistryStl<AttachId>       m_attachments;
-    std::vector<StructureLink>          m_attachLinks;
+    osp::link::Machines                     m_machines;
+    std::vector<PartId>                     m_machToPart;
 
-    osp::link::Machines                 m_machines;
-    std::vector<PartId>                 m_machToPart;
-
-    std::vector<PerNodeType>            m_nodePerType;
+    std::vector<PerNodeType>                m_nodePerType;
 };
 
 /**
@@ -124,7 +128,7 @@ public:
         osp::Matrix4 const& m_transform;
     };
 
-    void set_transform(std::initializer_list<SetTransform> const& setTransform);
+    WeldId weld(std::initializer_list<SetTransform> const& setTransform);
 
     osp::Matrix4 align_attach(PartId partA, std::string_view attachA,
                               PartId partB, std::string_view attachB);
@@ -165,9 +169,11 @@ std::array<PartId, N> VehicleBuilder::create_parts()
     m_data->m_partIds.create(std::begin(out), std::end(out));
 
     std::size_t const capacity = m_data->m_partIds.capacity();
-    m_data->m_partMachCount.resize(capacity);
-    m_data->m_partPrefabs.resize(capacity);
-    m_data->m_partTransforms.resize(capacity);
+    m_data->m_partMachCount         .resize(capacity);
+    m_data->m_partPrefabs           .resize(capacity);
+    m_data->m_partTransformWeld     .resize(capacity);
+    m_data->m_partToWeld            .resize(capacity);
+    m_data->m_weldToParts     .data_reserve(capacity);
 
     return out;
 }
@@ -192,8 +198,13 @@ struct ACtxVehicleSpawnVB
 {
     std::vector<VehicleData const*> m_dataVB;
 
-    std::vector<osp::active::PartEnt_t> m_remapPartAll;
+    // Remap vectors used to convert VehicleData IDs for the scene
+
+    std::vector<osp::active::PartId>    m_remapParts;
     std::vector<std::size_t>            m_remapPartOffsets;
+
+    std::vector<osp::active::PartId>    m_remapWelds;
+    std::vector<std::size_t>            m_remapWeldOffsets;
 
     std::vector<osp::link::MachAnyId>   m_remapMachAll;
     std::vector<std::size_t>            m_remapMachOffsets;

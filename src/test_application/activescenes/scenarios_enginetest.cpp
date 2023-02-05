@@ -28,7 +28,7 @@
 
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
-#include <osp/Active/SysHierarchy.h>
+#include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/SysRender.h>
 #include <osp/Active/opengl/SysRenderGL.h>
 
@@ -123,29 +123,13 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     rScene.m_pResources = &rResources;
 
-    // Create hierarchy root entity
-    rScene.m_basic.m_hierRoot = rScene.m_activeIds.create();
-    rScene.m_basic.m_hierarchy.emplace(rScene.m_basic.m_hierRoot);
-
-    // Create camera entity
-    ActiveEnt const camEnt = rScene.m_activeIds.create();
-
-    // Create camera transform and draw transform
-    ACompTransform &rCamTf = rScene.m_basic.m_transform.emplace(camEnt);
-    rCamTf.m_transform.translation().z() = 25;
-
-    // Create camera component
-    ACompCamera &rCamComp = rScene.m_basic.m_camera.emplace(camEnt);
-    rCamComp.m_far = 1u << 24;
-    rCamComp.m_near = 1.0f;
-    rCamComp.m_fov = 45.0_degf;
-
-    // Add camera to hierarchy
-    SysHierarchy::add_child(
-            rScene.m_basic.m_hierarchy, rScene.m_basic.m_hierRoot, camEnt);
-
     // Make a cube
     rScene.m_cube = rScene.m_activeIds.create();
+
+    // Resize some containers to fit all existing entities
+    rScene.m_matPhong.ints().resize(rScene.m_activeIds.vec().capacity());
+    rScene.m_drawing.m_drawable.ints().resize(rScene.m_activeIds.vec().capacity());
+    rScene.m_basic.m_scnGraph.resize(rScene.m_activeIds.capacity());
 
     // Take ownership of the cube mesh Resource. This will create a scene-space
     // MeshId that we can assign to ActiveEnts
@@ -158,21 +142,21 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
             rScene.m_cube, rScene.m_drawing.m_meshRefCounts.ref_add(meshCube));
     rScene.m_drawing.m_meshDirty.push_back(rScene.m_cube);
 
+    // Add transform
+    rScene.m_basic.m_transform.emplace(rScene.m_cube);
+
     // Add phong material to cube
-    rScene.m_matPhong.ints().resize(rScene.m_activeIds.vec().capacity());
     rScene.m_matPhong.set(std::size_t(rScene.m_cube));
     rScene.m_matPhongDirty.push_back(rScene.m_cube);
 
-    // Add transform and draw transform
-    rScene.m_basic.m_transform.emplace(rScene.m_cube);
-
-    // Add opaque and visible component
+    // Add drawble, opaque, and visible component
+    rScene.m_drawing.m_drawable.set(std::size_t(rScene.m_cube));
     rScene.m_drawing.m_opaque.emplace(rScene.m_cube);
     rScene.m_drawing.m_visible.emplace(rScene.m_cube);
 
     // Add cube to hierarchy, parented to root
-    SysHierarchy::add_child(
-            rScene.m_basic.m_hierarchy, rScene.m_basic.m_hierRoot, rScene.m_cube);
+    SubtreeBuilder builder = SysSceneGraph::add_descendants(rScene.m_basic.m_scnGraph, 1);
+    builder.add_child(rScene.m_cube);
 
     return sceneAny;
 }
@@ -192,10 +176,7 @@ void update_test_scene(EngineTestScene& rScene, float const delta)
     osp::Matrix4 &rCubeTf
             = rScene.m_basic.m_transform.get(rScene.m_cube).m_transform;
 
-    rCubeTf = Magnum::Matrix4::rotationY(90.0_degf * delta) * rCubeTf;
-
-    // Sort hierarchy, required by renderer
-    osp::active::SysHierarchy::sort(rScene.m_basic.m_hierarchy);
+    rCubeTf = Magnum::Matrix4::rotationZ(90.0_degf * delta) * rCubeTf;
 }
 
 //-----------------------------------------------------------------------------
@@ -219,7 +200,7 @@ struct EngineTestRenderer
     osp::active::ACtxSceneRenderGL m_renderGl{};
 
     // Pre-built easy camera controls
-    ActiveEnt m_camera{lgrn::id_null<ActiveEnt>()};
+    osp::active::Camera m_cam;
     ACtxCameraController m_camCtrl;
 
     // Phong shaders and their required data
@@ -252,9 +233,7 @@ void sync_test_scene(
             rScene.m_drawing.m_opaque, rRenderer.m_renderGl.m_diffuseTexId,
             rRenderer.m_phong);
 
-    // Make sure that all drawable entities are also given a draw transform
     SysRender::assure_draw_transforms(
-            rScene.m_basic.m_hierarchy,
             rRenderer.m_renderGl.m_drawTransform,
             std::cbegin(rScene.m_matPhongDirty),
             std::cend(rScene.m_matPhongDirty));
@@ -273,10 +252,14 @@ void sync_test_scene(
             rRenderer.m_renderGl.m_diffuseTexId, rRenderGl);
 
     // Calculate hierarchy transforms
+
+    auto drawTfDirty = {rScene.m_cube};
+
     SysRender::update_draw_transforms(
-            rScene.m_basic.m_hierarchy,
+            rScene.m_basic.m_scnGraph,
             rScene.m_basic.m_transform,
-            rRenderer.m_renderGl.m_drawTransform);
+            rRenderer.m_renderGl.m_drawTransform,
+            rScene.m_drawing.m_drawable, drawTfDirty.begin(), drawTfDirty.end());
 }
 
 /**
@@ -296,12 +279,9 @@ void render_test_scene(
     using Magnum::GL::Texture2D;
 
     // Get camera to calculate view and projection matrix
-    ACompCamera const &rCamera = rScene.m_basic.m_camera.get(rRenderer.m_camera);
-    ACompDrawTransform const &cameraDrawTf
-            = rRenderer.m_renderGl.m_drawTransform.get(rRenderer.m_camera);
     ViewProjMatrix const viewProj{
-            cameraDrawTf.m_transformWorld.inverted(),
-            rCamera.calculate_projection()};
+            rRenderer.m_cam.m_transform.inverted(),
+            rRenderer.m_cam.perspective()};
 
     // Bind offscreen FBO
     Framebuffer &rFbo = rRenderGl.m_fbo;
@@ -339,15 +319,8 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication &rApp, R
     pRenderer->m_phong.m_shaderUntextured   = Phong{Phong::Configuration{}.setLightCount(2)};
     pRenderer->m_phong.assign_pointers(pRenderer->m_renderGl, rRenderGl);
 
-    // Select first camera for rendering
-    ActiveEnt const camEnt = rScene.m_basic.m_camera.at(0);
-    pRenderer->m_camera = camEnt;
-    rScene.m_basic.m_camera.get(camEnt).set_aspect_ratio(
+    pRenderer->m_cam.set_aspect_ratio(
             osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size()));
-    SysRender::add_draw_transforms_recurse(
-            rScene.m_basic.m_hierarchy,
-            pRenderer->m_renderGl.m_drawTransform,
-            camEnt);
 
     // Set all drawing stuff dirty then sync with renderer.
     // This allows clean re-openning of the scene
@@ -367,7 +340,7 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication &rApp, R
         // Rotate and move the camera based on user inputs
         SysCameraController::update_view(pRenderer->m_camCtrl, delta);
         SysCameraController::update_move(pRenderer->m_camCtrl, delta, true);
-        rScene.m_basic.m_transform.get(pRenderer->m_camera).m_transform = pRenderer->m_camCtrl.m_transform;
+        pRenderer->m_cam.m_transform = pRenderer->m_camCtrl.m_transform;
 
         sync_test_scene(rRenderGl, rScene, *pRenderer);
         render_test_scene(rRenderGl, rScene, *pRenderer);

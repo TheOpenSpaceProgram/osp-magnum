@@ -100,10 +100,6 @@ void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rT
 
 void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, ArrayView<TagId const> tagsEnq)
 {
-    rExec.m_tagIncompleteCounts  .resize(tags.m_tags.capacity(), 0);
-    rExec.m_tagRunningCounts     .resize(tags.m_tags.capacity(), 0);
-    rExec.m_taskQueuedCounts     .resize(tasks.m_tasks.capacity(), 0);
-
     std::vector<uint64_t> tagsToRun(tags.m_tags.vec().size());
     to_bitspan(tagsEnq, tagsToRun);
     task_enqueue(tags, tasks, rExec, tagsToRun);

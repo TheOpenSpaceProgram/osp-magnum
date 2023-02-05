@@ -56,16 +56,6 @@ struct ACompTransparent {};
 struct ACompVisible {};
 
 /**
- * @brief World transform used for rendering.
- *
- * All ascendents of an entity using this must also have this component
- */
-struct ACompDrawTransform
-{
-    Matrix4 m_transformWorld;
-};
-
-/**
  * @brief Mesh that describes the appearance of an entity
  *
  * The renderer will synchronize this component with a GPU resource
@@ -94,6 +84,7 @@ struct ACtxDrawing
 {
 
     // Drawing Components
+    EntSet_t                                m_drawable;
     acomp_storage_t<ACompOpaque>            m_opaque;
     acomp_storage_t<ACompTransparent>       m_transparent;
     acomp_storage_t<ACompVisible>           m_visible;
@@ -141,7 +132,7 @@ struct Camera
     float m_near{0.25f};
     float m_far{1024.0f};
     float m_aspectRatio{1.0f};
-    Deg m_fov;
+    Deg m_fov{45.0f};
 
     constexpr void set_aspect_ratio(Vector2 const viewport) noexcept
     {

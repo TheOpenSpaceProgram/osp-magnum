@@ -25,9 +25,11 @@
 #include "scene_renderer.h"
 #include "scenarios.h"
 #include "identifiers.h"
+#include "../ActiveApplication.h"
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <osp/Active/SysRender.h>
+#include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/opengl/SysRenderGL.h>
 #include <osp/Shaders/MeshVisualizer.h>
 #include <osp/Shaders/Flat.h>
@@ -43,6 +45,38 @@ using osp::input::UserInputHandler;
 
 namespace testapp::scenes
 {
+
+Session setup_magnum_application(
+        Builder_t&                      rBuilder,
+        ArrayView<entt::any> const      topData,
+        Tags&                           rTags,
+        TopDataId const                 idResources,
+        ActiveApplication::Arguments    args)
+{
+    Session magnum;
+    OSP_SESSION_ACQUIRE_DATA(magnum, topData,   TESTAPP_APP_MAGNUM);
+    OSP_SESSION_ACQUIRE_TAGS(magnum, rTags,     TESTAPP_APP_MAGNUM);
+
+    // Order-dependent; ActiveApplication construction starts OpenGL context
+    auto &rUserInput    = osp::top_emplace<UserInputHandler>(topData, idUserInput, 12);
+    osp::top_emplace<ActiveApplication>                     (topData, idActiveApp, args, rUserInput);
+    auto &rRenderGl     = osp::top_emplace<RenderGL>        (topData, idRenderGl);
+
+    config_controls(rUserInput);
+    SysRenderGL::setup_context(rRenderGl);
+
+    magnum.task() = rBuilder.task().assign({tgCleanupMagnumEvt, tgGlUse}).data(
+            "Clean up Magnum renderer",
+            TopDataIds_t{           idResources,          idRenderGl},
+            wrap_args([] (Resources& rResources, RenderGL& rRenderGl) noexcept
+    {
+        SysRenderGL::clear_resource_owners(rRenderGl, rResources);
+        rRenderGl = {}; // Needs the OpenGL thread for destruction
+    }));
+    magnum.m_tgCleanupEvt = tgCleanupMagnumEvt;
+
+    return magnum;
+}
 
 
 Session setup_scene_renderer(
@@ -150,10 +184,11 @@ Session setup_scene_renderer(
 
     renderer.task() = rBuilder.task().assign({tgSyncEvt, tgHierReq, tgTransformReq, tgDrawTransformMod}).data(
             "Calculate draw transforms",
-            TopDataIds_t{                 idBasic,                   idScnRender},
-            wrap_args([] (ACtxBasic const& rBasic, ACtxSceneRenderGL& rScnRender) noexcept
+            TopDataIds_t{                 idBasic,                   idDrawing,                   idScnRender},
+            wrap_args([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
     {
-        SysRender::update_draw_transforms(rBasic.m_hierarchy, rBasic.m_transform, rScnRender.m_drawTransform);
+        auto rootChildren = SysSceneGraph::children(rBasic.m_scnGraph);
+        SysRender::update_draw_transforms(rBasic.m_scnGraph, rBasic.m_transform, rScnRender.m_drawTransform, rDrawing.m_drawable, std::begin(rootChildren), std::end(rootChildren));
     }));
 
     renderer.task() = rBuilder.task().assign({tgSyncEvt, tgDelTotalReq, tgGroupFwdDel}).data(
@@ -203,10 +238,10 @@ Session setup_shader_visualizer(
 
     visualizer.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgHierReq, tgTransformReq, tgDrawTransformNew}).data(
             "Add draw transforms to mesh visualizer",
-            TopDataIds_t{                 idBasic,                   idMatDirty,                      idScnRender},
-            wrap_args([] (ACtxBasic const& rBasic, EntVector_t const& rMatDirty, ACtxSceneRenderGL& rScnRender) noexcept
+            TopDataIds_t{                   idMatDirty,                   idScnRender},
+            wrap_args([] (EntVector_t const& rMatDirty, ACtxSceneRenderGL& rScnRender) noexcept
     {
-        SysRender::assure_draw_transforms(rBasic.m_hierarchy, rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
+        SysRender::assure_draw_transforms(rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
     }));
 
 

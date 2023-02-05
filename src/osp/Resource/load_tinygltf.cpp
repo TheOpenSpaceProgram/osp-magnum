@@ -110,6 +110,7 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
     rImportData.m_objMaterials  .resize(objCount, -1);
     rImportData.m_objTransforms .resize(objCount);
     rImportData.m_objParents    .resize(objCount, -1);
+    rImportData.m_objDescendants.resize(objCount, 0);
 
     // Allocate object parent to children multimap
     rImportData.m_objChildren.ids_reserve(objCount);
@@ -287,8 +288,6 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
 
     }
 
-
-
     // Reserve partitions for all objects with children, initialize to -1
     for (UnsignedInt obj = 0; obj < objCount; obj ++)
     {
@@ -297,6 +296,14 @@ static void load_gltf(TinyGltfImporter &rImporter, ResId res, std::string_view n
         {
             ObjId *pChildren = rImportData.m_objChildren.emplace(obj, childCount);
             std::fill_n(pChildren, childCount, -1);
+
+            // Also total up descendant counts here
+            ObjId parent = obj;
+            while (parent != -1)
+            {
+                rImportData.m_objDescendants[parent] += childCount;
+                parent = rImportData.m_objParents[parent];
+            }
         }
     }
 
@@ -404,7 +411,7 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
     auto const process_obj_recurse
             = [&prefabObjs, &prefabParents, &rPrefabs,
                &rNodeExtras = *pNodeExtras, &rImportData = *pImportData]
-              (auto&& self, ObjId obj, ObjId parent) -> void
+              (auto&& self, ObjId obj, int32_t parent) -> void
     {
         auto const &name = rImportData.m_objNames[obj];
         tinygltf::Value const &extras = rNodeExtras[obj];
@@ -427,7 +434,7 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
             }
         }
 
-        int const prefabIndex = prefabParents.size();
+        int32_t const prefabIndex = prefabParents.size();
         prefabParents.push_back(parent);
         prefabObjs.push_back(obj);
 
@@ -450,8 +457,9 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
 
         rPrefabs.m_prefabNames.emplace_back(name.exceptPrefix("part_"));
 
-        // Read children and populate prefabObjs and prefabParents
+        // Read descendants and populate prefabObjs and prefabParents
         process_obj_recurse(process_obj_recurse, obj, -1);
+        assert(prefabObjs.size() == (1 + pImportData->m_objDescendants[obj]));
 
         rPrefabs.m_prefabs.emplace(
                 prefabIdNext, std::begin(prefabObjs), std::end(prefabObjs));

@@ -26,42 +26,24 @@
 
 #include "scenarios.h"
 
-#include <osp/Active/drawing.h>
-#include <osp/Active/physics.h>
+#include <osp/tasks/tasks.h>
+#include <osp/tasks/top_tasks.h>
+#include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/tasks/builder.h>
+#include <osp/types.h>
+
+#include <newtondynamics_physics/factors.h>
 
 #include <longeron/id_management/registry_stl.hpp>
-
-#include <string_view>
 
 namespace testapp::scenes
 {
 
-struct SpawnShape
-{
-    osp::Vector3 m_position;
-    osp::Vector3 m_velocity;
-    osp::Vector3 m_size;
-    float m_mass;
-    osp::phys::EShape m_shape;
-};
-
-using SpawnerVec_t = std::vector<SpawnShape>;
-
-/**
- * @brief Physical properties for entities and generic Physics interface
- *
- * Independent of whichever physics engine is used
- */
-osp::Session setup_physics(
-        Builder_t&                  rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon);
-
 /**
  * @brief Newton Dynamics physics integration
  */
-osp::Session setup_newton_physics(
+osp::Session setup_newton(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags,
@@ -69,38 +51,54 @@ osp::Session setup_newton_physics(
         osp::Session const&         physics);
 
 /**
- * @brief Queues and logic for spawning physics shapes
+ * @brief Create a single empty force factor bitset
+ *
+ * This is a simple bitset that can be assigned to a rigid body to set which
+ * functions contribute to its force and torque
  */
-osp::Session setup_shape_spawn(
+osp::Session setup_newton_factors(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
-        osp::Session const&         physics,
-        osp::Session const&         material);
+        osp::Tags&                  rTags);
 
 /**
- * @brief Queues and logic for spawning Prefab resources
+ * @brief Setup constant acceleration force, add to a force factor bitset
  */
-osp::Session setup_prefabs(
+osp::Session setup_newton_force_accel(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
-        osp::Session const&         physics,
-        osp::Session const&         material,
-        osp::TopDataId              idResources);
+        osp::Session const&         newton,
+        osp::Session const&         nwtFactors,
+        osp::Vector3                accel);
 
 /**
- * @brief Entity set to delete entities under Z = -10, added to spawned shapes
+ * @brief Support for Shape Spawner physics using Newton Dynamics
  */
-osp::Session setup_bounds(
+osp::Session setup_shape_spawn_newton(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags,
         osp::Session const&         scnCommon,
         osp::Session const&         physics,
-        osp::Session const&         shapeSpawn);
+        osp::Session const&         shapeSpawn,
+        osp::Session const&         newton,
+        osp::Session const&         nwtFactors);
+
+/**
+ * @brief Support for Vehicle physics using Newton Dynamics
+ */
+osp::Session setup_vehicle_spawn_newton(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         physics,
+        osp::Session const&         prefabs,
+        osp::Session const&         parts,
+        osp::Session const&         vehicleSpawn,
+        osp::Session const&         newton,
+        osp::TopDataId const        idResources);
 
 
 } // namespace testapp::scenes

@@ -36,8 +36,9 @@ namespace osp
 using bit_int_t = uint64_t;
 
 using Corrade::Containers::ArrayView;
-using TopDataId = uint32_t;
-using TopDataIds_t = std::initializer_list<TopDataId>;
+
+using TopDataId     = uint32_t;
+using TopDataIds_t  = std::initializer_list<TopDataId>;
 
 struct Reserved {};
 

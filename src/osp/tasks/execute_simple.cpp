@@ -54,6 +54,10 @@ void task_enqueue(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec,
 {
     assert(query.size() == tags.tag_ints_per_task());
 
+    rExec.m_tagIncompleteCounts  .resize(tags.m_tags.capacity(), 0);
+    rExec.m_tagRunningCounts     .resize(tags.m_tags.capacity(), 0);
+    rExec.m_taskQueuedCounts     .resize(tasks.m_tasks.capacity(), 0);
+
     task_for_each(tags, tasks, [&rExec, &query]
             (uint32_t const currTask, ArrayView<uint64_t const> const currTags)
     {

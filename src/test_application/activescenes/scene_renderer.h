@@ -26,9 +26,19 @@
 
 #include "scenarios.h"
 
+#include "../ActiveApplication.h"
+
 
 namespace testapp::scenes
 {
+
+
+osp::Session setup_magnum_application(
+        Builder_t&                      rBuilder,
+        osp::ArrayView<entt::any>       topData,
+        osp::Tags&                      rTags,
+        osp::TopDataId const            idResources,
+        ActiveApplication::Arguments    args);
 
 /**
  * @brief Magnum-powered OpenGL Renderer

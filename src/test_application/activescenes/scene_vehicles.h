@@ -74,8 +74,7 @@ osp::Session setup_vehicle_spawn(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
-        osp::Session const&         parts);
+        osp::Session const&         scnCommon);
 
 /**
  * @brief Support VehicleBuilder data to be used to spawn vehicles
@@ -89,19 +88,6 @@ osp::Session setup_vehicle_spawn_vb(
         osp::Session const&         parts,
         osp::Session const&         vehicleSpawn,
         osp::TopDataId const        idResources);
-
-/**
- * @brief Connect spawned vehicles together into a same rigid body
- */
-osp::Session setup_vehicle_spawn_rigid(
-        Builder_t&                  rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
-        osp::Session const&         physics,
-        osp::Session const&         prefabs,
-        osp::Session const&         parts,
-        osp::Session const&         vehicleSpawn);
 
 /**
  * @brief Build "Test Vehicle" data, so they can be spawned

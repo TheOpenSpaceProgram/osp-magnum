@@ -43,7 +43,7 @@ struct ACtxDrawFlat
     Flat m_shaderUntextured     {Corrade::NoCreate};
     Flat m_shaderDiffuse        {Corrade::NoCreate};
 
-    acomp_storage_t<active::ACompDrawTransform> *m_pDrawTf{nullptr};
+    acomp_storage_t<Matrix4>                    *m_pDrawTf{nullptr};
     acomp_storage_t<active::ACompColor>         *m_pColor{nullptr};
     osp::active::ACompTexGlStorage_t            *m_pDiffuseTexId{nullptr};
     osp::active::ACompMeshGlStorage_t           *m_pMeshId{nullptr};
