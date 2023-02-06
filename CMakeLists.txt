@@ -89,21 +89,22 @@ ENDIF() # OSP_WARNINGS_ARE_ERRORS
 
 # The sanatizers provide compile time code instrumentation that drastically improve the ability of programmars to find bugs.
 IF(OSP_BUILD_SANATIZER)
-  LIST(APPEND GCC_COMPILE_FLAGS -fstack-protector-all -fsanitize=address,bounds,enum,leak,pointer-compare,pointer-subtract -fsanitize-address-use-after-scope)
+  add_link_options(-fstack-protector-all -fsanitize=address,bounds,enum,leak,pointer-compare,pointer-subtract -fsanitize-address-use-after-scope)
+  add_compile_options(-fstack-protector-all -fsanitize=address,bounds,enum,leak,pointer-compare,pointer-subtract -fsanitize-address-use-after-scope)
 ENDIF() # OSP_BUILD_SANATIZER
 
 IF(CLANG_COMPILE_FLAGS AND CMAKE_C_COMPILER_ID MATCHES "Clang")
-  add_compile_options($<$<COMPILE_LANGUAGE:C>:${CLANG_COMPILE_FLAGS}>)
+  add_compile_options("$<$<COMPILE_LANGUAGE:C>:${CLANG_COMPILE_FLAGS}>")
 ENDIF()
 IF(CLANG_COMPILE_FLAGS AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${CLANG_COMPILE_FLAGS}>)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${CLANG_COMPILE_FLAGS}>")
 ENDIF()
 
 IF(GCC_COMPILE_FLAGS AND CMAKE_C_COMPILER_ID MATCHES "GNU")
-  add_compile_options($<$<COMPILE_LANGUAGE:C>:${GCC_COMPILE_FLAGS}>)
+  add_compile_options("$<$<COMPILE_LANGUAGE:C>:${GCC_COMPILE_FLAGS}>")
 ENDIF()
 IF(GCC_COMPILE_FLAGS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${GCC_COMPILE_FLAGS}>)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${GCC_COMPILE_FLAGS}>")
 ENDIF()
 
 # In debug builds, disable optimizations (just in case they were enabled by a previous flag, or env variable)
