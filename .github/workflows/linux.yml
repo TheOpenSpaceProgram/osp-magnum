@@ -13,7 +13,7 @@ jobs:
       matrix:
         compiler: [gcc, clang]
         config: [Release, Debug]
-        image: [ubuntu-18.04, ubuntu-20.04, ubuntu-22.04]
+        image: [ubuntu-20.04, ubuntu-22.04]
 
     runs-on: ${{ matrix.image }}
 
@@ -34,21 +34,13 @@ jobs:
         key: linux-${{ matrix.image }}-${{ matrix.compiler }}-${{ matrix.config }}
 
     - name: Update Compiler (GCC)
-      if: ${{ matrix.image == 'ubuntu-18.04' && matrix.compiler == 'gcc' }}
+      if: ${{ matrix.image == 'ubuntu-20.04' && matrix.compiler == 'gcc' }}
       run: |
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test
         sudo apt update
         sudo apt install g++-10 gcc-10
         sudo update-alternatives --verbose --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
         sudo update-alternatives --verbose --install /usr/bin/g++ g++ /usr/bin/g++-10 100
-
-    - name: Update Compiler (Clang)
-      if: ${{ matrix.image == 'ubuntu-18.04' && matrix.compiler == 'clang' }}
-      run: |
-        sudo apt update
-        sudo apt install clang-10 clang++-10
-        sudo update-alternatives --verbose --install /usr/bin/clang   clang   /usr/bin/clang-10   100
-        sudo update-alternatives --verbose --install /usr/bin/clang++ clang++ /usr/bin/clang++-10 100
 
     - name: Install dependencies
       run: |
