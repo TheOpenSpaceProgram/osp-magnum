@@ -33,24 +33,15 @@ jobs:
       with:
         key: linux-${{ matrix.image }}-${{ matrix.compiler }}-${{ matrix.config }}
 
-    - name: Update Compiler (GCC)
-      if: ${{ matrix.image == 'ubuntu-20.04' && matrix.compiler == 'gcc' }}
-      run: |
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-        sudo apt update
-        sudo apt install g++-10 gcc-10
-        sudo update-alternatives --verbose --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
-        sudo update-alternatives --verbose --install /usr/bin/g++ g++ /usr/bin/g++-10 100
-
     - name: Install dependencies
       run: |
         sudo apt update
-        # TODO: Better to only install dependencies of these packages instead
-        sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev libsdl2-dev
+        # TODO: Better to only install dependencies of these packages instead, except ninja
+        sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev libsdl2-dev ninja-build
 
     - name: Configure
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DCMAKE_LINK_WHAT_YOU_USE=TRUE
+        cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }} -DCMAKE_LINK_WHAT_YOU_USE=TRUE
 
     - name: Compile Dependencies
       run: |
