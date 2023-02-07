@@ -13,7 +13,7 @@ jobs:
       matrix:
         compiler: [gcc, clang]
         config: [Release, Debug]
-        image: [ubuntu-20.04, ubuntu-22.04]
+        image: [ubuntu-22.04]
 
     runs-on: ${{ matrix.image }}
 
