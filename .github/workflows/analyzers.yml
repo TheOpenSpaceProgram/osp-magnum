@@ -29,13 +29,13 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev iwyu clang clang-tidy clang-tools
+        sudo apt install -y libglfw3-dev libopenal-dev libglvnd-core-dev iwyu clang clang-tidy clang-tools ninja
         # TODO: Really, this should only be fetching the build dependencies, so we can only use the in-tree version
         sudo apt install -y libsdl2-dev
 
     - name: Configure
       run: |
-        cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+        cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=${{ matrix.config }}
 
     # Compile deps before initializing codeql, to avoid unnecessary analysis.
     - name: Compile Dependencies
