@@ -192,6 +192,8 @@ void task_start(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, T
     {
         rExec.m_tagRunningCounts[tag] ++;
     }
+
+    rExec.m_taskQueuedCounts[std::size_t(task)] --;
 }
 
 void task_finish(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, TaskId const task)
@@ -216,8 +218,6 @@ void task_finish(Tags const& tags, Tasks const& tasks, ExecutionContext &rExec, 
             }
         }
     }
-
-    rExec.m_taskQueuedCounts[std::size_t(task)] --;
 }
 
 } // namespace osp

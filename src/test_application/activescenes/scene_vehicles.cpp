@@ -28,6 +28,8 @@
 #include "CameraController.h"
 #include "../VehicleBuilder.h"
 
+#include <adera/machines/links.h>
+
 #include <osp/Active/parts.h>
 #include <osp/Active/physics.h>
 #include <osp/Active/SysSceneGraph.h>
@@ -37,8 +39,6 @@
 #include <osp/Resource/resources.h>
 #include <osp/UserInputHandler.h>
 #include <osp/logging.h>
-
-#include <adera/machines/links.h>
 
 using namespace osp;
 using namespace osp::active;
@@ -50,12 +50,6 @@ using namespace Magnum::Math::Literals;
 
 namespace testapp::scenes
 {
-
-struct TmpPartInit
-{
-    PartId m_part;
-    int m_initPrefabs;
-};
 
 
 Session setup_parts(
@@ -79,15 +73,23 @@ Session setup_parts(
     rBuilder.tag(tgWeldClr)             .depend_on({tgWeldMod, tgWeldReq});
     rBuilder.tag(tgLinkReq)             .depend_on({tgLinkMod});
     rBuilder.tag(tgLinkMhUpdReq)        .depend_on({tgLinkMhUpdMod});
+    rBuilder.tag(tgNodeAnyUpdReq)       .depend_on({tgNodeAnyUpdMod});
+    rBuilder.tag(tgMachUpdEnqReq)       .depend_on({tgMachUpdEnqMod});
 
     auto &rScnParts = top_emplace< ACtxParts >      (topData, idScnParts);
     auto &rUpdMach  = top_emplace< UpdMachPerType > (topData, idUpdMach);
+    top_emplace< TagId >                            (topData, idtgNodeUpdEvt, tgNodeUpdEvt);
     top_emplace< MachTypeToEvt_t >                  (topData, idMachEvtTags, MachTypeReg_t::size());
+    top_emplace< std::vector<TagId> >               (topData, idMachUpdEnqueue);
 
-    rUpdMach.m_machTypesDirty.ints().resize(MachTypeReg_t::size() + 1);
-    rUpdMach.m_localDirty.resize(MachTypeReg_t::size());
-    rScnParts.m_machines.m_perType.resize(MachTypeReg_t::size());
-    rScnParts.m_nodePerType.resize(NodeTypeReg_t::size());
+    // Resize containers to fit all existing MachTypeIds and NodeTypeIds
+    // These Global IDs are dynamically initialized just as the program starts
+    bitvector_resize(rUpdMach.m_machTypesDirty, MachTypeReg_t::size());
+    rUpdMach.m_localDirty           .resize(MachTypeReg_t::size());
+    rScnParts.m_machines.m_perType  .resize(MachTypeReg_t::size());
+    rScnParts.m_nodePerType         .resize(NodeTypeReg_t::size());
+
+    auto const idNull = lgrn::id_null<TopDataId>();
 
     parts.task() = rBuilder.task().assign({tgCleanupEvt}).data(
             "Clean up Part prefab owners",
@@ -109,6 +111,31 @@ Session setup_parts(
         rScnParts.m_weldDirty.clear();
     }));
 
+    parts.task() = rBuilder.task().assign({tgSceneEvt, tgNodeUpdEvt, tgMachUpdEnqReq}).data(
+            "Enqueue Machine & Node update tasks",
+            TopDataIds_t{             idNull,            idMachUpdEnqueue,           idtgNodeUpdEvt },
+            wrap_args([] (WorkerContext ctx, std::vector<TagId>& rMachUpdEnqueue, TagId const tgNodeUpdEvt ) noexcept
+    {
+        if (rMachUpdEnqueue.empty())
+        {
+            return; // Nothing to enqueue
+        }
+
+        ctx.m_rEnqueueHappened = true;
+
+
+        auto enqueueBits = lgrn::bit_view(ctx.m_enqueue);
+
+        // Enqueue machine tags, eg: tgMhRcsDriverEvt, tgMhRocketEvt, ...
+        for (TagId const tag : rMachUpdEnqueue)
+        {
+            enqueueBits.set(std::size_t(tag));
+        }
+        rMachUpdEnqueue.clear();
+
+        // Enqueue self and all other machine update
+        enqueueBits.set(std::size_t(tgNodeUpdEvt));
+    }));
 
     return parts;
 }
@@ -129,23 +156,28 @@ Session setup_signals_float(
     OSP_SESSION_ACQUIRE_TAGS(signalsFloat, rTags,   TESTAPP_SIGNALS_FLOAT);
 
     rBuilder.tag(tgSigFloatLinkReq)         .depend_on({tgSigFloatLinkMod});
-    rBuilder.tag(tgSigFloatValReq)          .depend_on({tgSigFloatLinkMod, tgSigFloatValMod});
     rBuilder.tag(tgSigFloatUpdReq)          .depend_on({tgSigFloatLinkMod, tgSigFloatUpdMod});
 
     top_emplace< SignalValues_t<float> >    (topData, idSigValFloat);
     top_emplace< UpdateNodes<float> >       (topData, idSigUpdFloat);
-    top_emplace< TagId >                    (topData, idTgSigFloatUpdEvt, tgSigFloatUpdEvt);
 
-    // note: Eventually have an array of UpdateNodes to allow multiple threads
-    //       to update nodes in parallel. Tag limits would be handy here
+    // NOTE: Eventually have an array of UpdateNodes to allow multiple threads to update nodes in
+    //       parallel, noting the use of "Reduce". Tag limits are intended select which UpdateNodes
+    //       are passed to each thread, once they're properly implemented.
 
     auto const idNull = lgrn::id_null<TopDataId>();
 
-    signalsFloat.task() = rBuilder.task().assign({tgSigFloatUpdEvt, tgSigFloatValMod, tgSigFloatUpdReq}).data(
-            "Update Signal-Float Nodes",
-            TopDataIds_t{            idNull,                    idSigUpdFloat,                       idSigValFloat,                 idScnParts,                idUpdMach,                       idMachEvtTags  },
-            wrap_args([] (WorkerContext ctx, UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, ACtxParts const& rScnParts, UpdMachPerType& rUpdMach, MachTypeToEvt_t const& rMachEvtTags) noexcept
+
+    signalsFloat.task() = rBuilder.task().assign({tgSceneEvt, tgNodeUpdEvt, tgSigFloatUpdEvt, tgSigFloatUpdReq, tgMachUpdEnqMod}).data(
+            "Reduce Signal-Float Nodes",
+            TopDataIds_t{                   idNull,                   idSigUpdFloat,                       idSigValFloat,                idUpdMach,                    idMachUpdEnqueue,                 idScnParts,                       idMachEvtTags },
+            wrap_args([] (WorkerContext const ctx, UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, UpdMachPerType& rUpdMach, std::vector<TagId>& rMachUpdEnqueue, ACtxParts const& rScnParts, MachTypeToEvt_t const& rMachEvtTags ) noexcept
     {
+        if ( ! rSigUpdFloat.m_dirty )
+        {
+            return; // Not dirty, nothing to do
+        }
+
         Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
 
         // NOTE: The various use of reset() clear entire bit arrays, which may or may
@@ -167,13 +199,16 @@ Session setup_signals_float(
                 rSigValFloat,
                 rUpdMach);
         rSigUpdFloat.m_nodeDirty.reset();
+        rSigUpdFloat.m_dirty = false;
+
+        // Tasks cannot be enqueued here directly, since that will interfere with other node reduce
+        // tasks. All machine tasks must be enqueued at the same time. rMachUpdEnqueue here is
+        // passed to a task in setup_parts
 
         // Run tasks needed to update machine types that are dirty
         for (MachTypeId const type : rUpdMach.m_machTypesDirty.ones())
         {
-            ctx.m_rEnqueueHappened = true;
-            TagId const tag = rMachEvtTags[type];
-            lgrn::bit_view(ctx.m_enqueue).set(std::size_t(tag));
+            rMachUpdEnqueue.push_back(rMachEvtTags[type]);
         }
     }));
 
@@ -186,7 +221,6 @@ Session setup_signals_float(
         rSigUpdFloat.m_nodeNewValues.resize(rFloatNodes.m_nodeIds.capacity());
         rSigUpdFloat.m_nodeDirty.ints().resize(rFloatNodes.m_nodeIds.vec().capacity());
         rSigValFloat.resize(rFloatNodes.m_nodeIds.capacity());
-
     }));
 
     return signalsFloat;
@@ -253,12 +287,10 @@ Session setup_mach_rcsdriver(
 
     top_get< MachTypeToEvt_t >(topData, idMachEvtTags).at(gc_mtRcsDriver) = tgMhRcsDriverEvt;
 
-    auto const idNull = lgrn::id_null<TopDataId>();
-
-    machRcsDriver.task() = rBuilder.task().assign({tgMhRcsDriverEvt, tgSigFloatUpdReq, tgSigFloatValReq}).data(
-            "RCS Drivers print throttle input values",
-            TopDataIds_t{             idNull,          idScnParts,                      idUpdMach,                       idSigValFloat,                    idSigUpdFloat,           idTgSigFloatUpdEvt },
-            wrap_args([] (WorkerContext ctx, ACtxParts& rScnParts, UpdMachPerType const& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, TagId const tgSigFloatUpdEvt) noexcept
+    machRcsDriver.task() = rBuilder.task().assign({tgMhRcsDriverEvt, tgSigFloatUpdMod}).data(
+            "RCS Drivers calculate new values",
+            TopDataIds_t{           idScnParts,                      idUpdMach,                       idSigValFloat,                    idSigUpdFloat },
+            wrap_args([] (ACtxParts& rScnParts, UpdMachPerType const& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
         Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
         PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_mtRcsDriver];
@@ -302,22 +334,16 @@ Session setup_mach_rcsdriver(
             rcs_read( cmdAng.y(), ports_rcsdriver::gc_cmdAngYIn );
             rcs_read( cmdAng.z(), ports_rcsdriver::gc_cmdAngZIn );
 
-            OSP_LOG_INFO("RCS controller {} pitch = {}", local, cmdAng.x());
-            OSP_LOG_INFO("RCS controller {} yaw = {}", local, cmdAng.y());
-            OSP_LOG_INFO("RCS controller {} roll = {}", local, cmdAng.z());
+            OSP_LOG_TRACE("RCS controller {} pitch = {}", local, cmdAng.x());
+            OSP_LOG_TRACE("RCS controller {} yaw = {}", local, cmdAng.y());
+            OSP_LOG_TRACE("RCS controller {} roll = {}", local, cmdAng.z());
 
             float const thrCurr = rSigValFloat[thrNode];
             float const thrNew = thruster_influence(pos, dir, cmdLin, cmdAng);
 
             if (thrCurr != thrNew)
             {
-                rSigUpdFloat.m_nodeDirty.set(thrNode);
-                rSigUpdFloat.m_nodeNewValues[thrNode] = thrNew;
-
-                ctx.m_rEnqueueHappened = true;
-                lgrn::bit_view(ctx.m_enqueue).set(std::size_t(tgSigFloatUpdEvt));
-
-
+                rSigUpdFloat.assign(thrNode, thrNew);
             }
         }
     }));
@@ -823,7 +849,7 @@ Session setup_vehicle_spawn_vb(
         }
     }));
 
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVbNodeReq, tgSigFloatLinkReq, tgSigFloatValMod}).data(
+    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVbNodeReq, tgSigFloatLinkReq}).data(
             "Copy float signal values from VehicleBuilder",
             TopDataIds_t{                  idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                       idSigValFloat},
             wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat) noexcept
@@ -1094,10 +1120,10 @@ Session setup_vehicle_control(
 
     auto const idNull = lgrn::id_null<TopDataId>();
 
-    vehicleCtrl.task() = rBuilder.task().assign({tgInputEvt, tgSigFloatValReq, tgSigFloatUpdMod}).data(
+    vehicleCtrl.task() = rBuilder.task().assign({tgInputEvt, tgSigFloatUpdMod}).data(
             "Write inputs to UserControl Machines",
-            TopDataIds_t{             idNull,           idScnParts,                       idSigValFloat,                    idSigUpdFloat,           idTgSigFloatUpdEvt,                               idUserInput,                     idVhControls,           idDeltaTimeIn },
-            wrap_args([] (WorkerContext ctx,  ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, TagId const tgSigFloatUpdEvt, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls, float const deltaTimeIn) noexcept
+            TopDataIds_t{           idScnParts,                       idSigValFloat,                    idSigUpdFloat,                               idUserInput,                     idVhControls,           idDeltaTimeIn },
+            wrap_args([] (ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls, float const deltaTimeIn) noexcept
     {
         Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
         PerMachType &rUsrCtrl    = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
@@ -1157,7 +1183,7 @@ Session setup_vehicle_control(
         MachAnyId const mach = rUsrCtrl.m_localToAny[rVhControls.m_selectedUsrCtrl];
         lgrn::Span<NodeId const> const portSpan = rFloatNodes.m_machToNode[mach];
 
-        auto const write_control = [&ctx, &rSigValFloat, &rSigUpdFloat, tgSigFloatUpdEvt, portSpan] (PortEntry const& entry, float write, bool replace = true, float min = 0.0f, float max = 1.0f)
+        auto const write_control = [&rSigValFloat, &rSigUpdFloat, portSpan] (PortEntry const& entry, float write, bool replace = true, float min = 0.0f, float max = 1.0f)
         {
             NodeId const node = connected_node(portSpan, entry.m_port);
             if (node == lgrn::id_null<NodeId>())
@@ -1170,11 +1196,7 @@ Session setup_vehicle_control(
 
             if (oldVal != newVal)
             {
-                rSigUpdFloat.m_nodeDirty.set(node);
-                rSigUpdFloat.m_nodeNewValues[node] = newVal;
-
-                ctx.m_rEnqueueHappened = true;
-                lgrn::bit_view(ctx.m_enqueue).set(std::size_t(tgSigFloatUpdEvt));
+                rSigUpdFloat.assign(node, newVal);
             }
         };
 

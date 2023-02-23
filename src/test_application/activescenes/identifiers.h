@@ -107,14 +107,16 @@
 
 
 
-#define OSP_DATA_TESTAPP_PARTS 4, \
-    idScnParts, idPartInit, idUpdMach, idMachEvtTags
-#define OSP_TAGS_TESTAPP_PARTS 12, \
+#define OSP_DATA_TESTAPP_PARTS 6, \
+    idScnParts, idPartInit, idUpdMach, idMachEvtTags, idMachUpdEnqueue, idtgNodeUpdEvt
+#define OSP_TAGS_TESTAPP_PARTS 17, \
     tgPartMod,          tgPartReq,          tgPartClr,          \
     tgMapPartEntMod,    tgMapPartEntReq,                        \
     tgWeldMod,          tgWeldReq,          tgWeldClr,          \
     tgLinkMod,          tgLinkReq,                              \
-    tgLinkMhUpdMod,     tgLinkMhUpdReq
+    tgLinkMhUpdMod,     tgLinkMhUpdReq,                         \
+    tgNodeAnyUpdMod,    tgNodeAnyUpdReq,                        \
+    tgMachUpdEnqMod,    tgMachUpdEnqReq,    tgNodeUpdEvt
 
 
 
@@ -144,12 +146,11 @@
 
 
 
-#define OSP_DATA_TESTAPP_SIGNALS_FLOAT 3, \
-    idSigValFloat,      idSigUpdFloat,      idTgSigFloatUpdEvt
-#define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 7, \
+#define OSP_DATA_TESTAPP_SIGNALS_FLOAT 2, \
+    idSigValFloat,      idSigUpdFloat
+#define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 5, \
     tgSigFloatLinkMod,  tgSigFloatLinkReq,                      \
-    tgSigFloatValMod,   tgSigFloatValReq,   tgSigFloatUpdEvt,   \
-    tgSigFloatUpdMod,   tgSigFloatUpdReq
+    tgSigFloatUpdMod,   tgSigFloatUpdReq,   tgSigFloatUpdEvt    \
 
 
 

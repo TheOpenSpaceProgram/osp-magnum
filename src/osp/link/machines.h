@@ -48,7 +48,7 @@ using PortId        = uint16_t;
 using JunctionId    = uint16_t;
 using JuncCustom    = uint16_t;
 
-using MachTypeReg_t = GlobalIdReg<MachLocalId>;
+using MachTypeReg_t = GlobalIdReg<MachTypeId>;
 using NodeTypeReg_t = GlobalIdReg<NodeTypeId>;
 
 extern NodeTypeId const gc_ntSigFloat;

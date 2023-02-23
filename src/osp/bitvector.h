@@ -34,6 +34,11 @@ namespace osp
 
 using BitVector_t = lgrn::BitView< std::vector<uint64_t> >;
 
+constexpr void bitvector_resize(BitVector_t &rBitVector, std::size_t size)
+{
+    rBitVector.ints().resize(size / 64 + (size % 64 != 0));
+}
+
 } // namespace osp
 
 

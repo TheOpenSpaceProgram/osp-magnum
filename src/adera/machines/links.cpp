@@ -36,7 +36,7 @@ float thruster_influence(Vector3 const pos, Vector3 const dir, Vector3 const cmd
     // Total component of thrust in direction of command
     float const total = angInfluence + linInfluence;
 
-    if (total < .01f)
+    if (total < 0.01f)
     {
         /* Ignore small contributions from imprecision
          * Real thrusters can't throttle this deep anyways, so if their
