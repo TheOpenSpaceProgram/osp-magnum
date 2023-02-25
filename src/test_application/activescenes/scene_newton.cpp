@@ -44,8 +44,6 @@
 #include <newtondynamics_physics/ospnewton.h>
 #include <newtondynamics_physics/SysNewton.h>
 
-#include <iostream>
-
 using namespace osp;
 using namespace osp::active;
 using namespace osp::link;
@@ -435,13 +433,17 @@ Session setup_vehicle_spawn_newton(
 
                 float   totalMass = 0.0f;
                 Vector3 massPos{0.0f};
+                SysPhysics::calculate_subtree_mass_center(rBasic.m_transform, rPhys, rBasic.m_scnGraph, weldEnt, massPos, totalMass);
+
+                Vector3 const com = massPos / totalMass;
+                auto const comToOrigin = Matrix4::translation( - com );
+
                 Matrix3 inertiaTensor{0.0f};
-                SysPhysics::calculate_subtree_mass_inertia(rBasic.m_transform, rPhys, rBasic.m_scnGraph, weldEnt, massPos, totalMass, inertiaTensor);
+                SysPhysics::calculate_subtree_mass_inertia(rBasic.m_transform, rPhys, rBasic.m_scnGraph, weldEnt, inertiaTensor, comToOrigin);
 
                 Matrix4 const inertiaTensorMat4{inertiaTensor};
                 NewtonBodySetFullMassMatrix(pBody, totalMass, inertiaTensorMat4.data());
 
-                Vector3 const com = massPos / totalMass;
                 NewtonBodySetCentreOfMass(pBody, com.data());
 
                 NewtonBodySetGyroscopicTorque(pBody, 1);
@@ -617,7 +619,6 @@ Session setup_rocket_thrust_newton(
     {
         using adera::gc_mtMagicRocket;
 
-
         Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
         PerMachType const& machtypeRocket = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
 
@@ -656,6 +657,9 @@ Session setup_rocket_thrust_newton(
             NewtonBodyGetRotation(pBody, nwtRot.data());
             Quaternion const rot{{nwtRot[0], nwtRot[1], nwtRot[2]}, nwtRot[3]};
 
+            Vector3 com;
+            NewtonBodyGetCentreOfMass(pBody, com.data());
+
             for (BodyRocket const& bodyRocket : rBodyRockets)
             {
                 float const throttle = std::clamp(rSigValFloat[bodyRocket.m_throttleIn], 0.0f, 1.0f);
@@ -668,7 +672,7 @@ Session setup_rocket_thrust_newton(
                     continue;
                 }
 
-                Vector3 const offsetRel = rot.transformVector(bodyRocket.m_offset);
+                Vector3 const offsetRel = rot.transformVector(bodyRocket.m_offset - com);
 
                 Vector3 const direction = (rot * bodyRocket.m_rotation).transformVector(adera::gc_rocketForward);
 

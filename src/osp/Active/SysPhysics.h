@@ -36,13 +36,20 @@ class SysPhysics
 {
 public:
 
-    static void calculate_subtree_mass_inertia(
+    static void calculate_subtree_mass_center(
             acomp_storage_t<ACompTransform> const&  rTf,
             ACtxPhysics&                            rCtxPhys,
             ACtxSceneGraph&                         rScnGraph,
             ActiveEnt                               root,
             Vector3&                                rMassPos,
             float&                                  rTotalMass,
+            Matrix4 const&                          currentTf = {});
+
+    static void calculate_subtree_mass_inertia(
+            acomp_storage_t<ACompTransform> const&  rTf,
+            ACtxPhysics&                            rCtxPhys,
+            ACtxSceneGraph&                         rScnGraph,
+            ActiveEnt                               root,
             Matrix3&                                rInertiaTensor,
             Matrix4 const&                          currentTf = {});
 

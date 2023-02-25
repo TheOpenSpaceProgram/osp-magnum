@@ -993,7 +993,7 @@ Session setup_test_vehicles(
         toWeld.push_back( {capsule,  quick_transform({ 0.0f,  0.0f,  3.0f}, {})} );
         toWeld.push_back( {fueltank, quick_transform({ 0.0f,  0.0f,  0.0f}, {})} );
         toWeld.push_back( {engineA,  quick_transform({ 0.7f,  0.0f, -2.9f}, {})} );
-        toWeld.push_back( {engineB,  quick_transform({-0.7f,  0.0f, -2.9f},{})} );
+        toWeld.push_back( {engineB,  quick_transform({-0.7f,  0.0f, -2.9f}, {})} );
 
         namespace ports_magicrocket = adera::ports_magicrocket;
         namespace ports_userctrl = adera::ports_userctrl;
