@@ -88,7 +88,7 @@ struct EntityToDraw
  */
 struct RenderGroup
 {
-    using Storage_t = entt::storage_traits<ActiveEnt, EntityToDraw>::storage_type;
+    using Storage_t = entt::storage_type<EntityToDraw, ActiveEnt>::type;
     using ArrayView_t = Corrade::Containers::ArrayView<const ActiveEnt>;
 
     /**

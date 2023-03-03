@@ -41,9 +41,9 @@ enum class CoSpaceId : uint32_t {};
 // Specialize entt::storage_traits to disable signals for storage that uses
 // Satellites as entities
 template<typename Type>
-struct entt::storage_traits<osp::universe::SatId, Type>
+struct entt::storage_type<Type, osp::universe::SatId>
 {
-    using storage_type = basic_storage<osp::universe::SatId, Type>;
+    using type = basic_storage<Type, osp::universe::SatId>;
 };
 
 namespace osp::universe
@@ -59,6 +59,6 @@ constexpr float gc_units_per_meter = 1024.0f;
 using Vector3g = Magnum::Math::Vector3<spaceint_t>;
 
 template<typename COMP_T>
-using ucomp_storage_t = typename entt::storage_traits<SatId, COMP_T>::storage_type;
+using ucomp_storage_t = typename entt::storage_type<COMP_T, SatId>::type;
 
 }

@@ -44,8 +44,8 @@ namespace osp::active
 enum class TexGlId : uint32_t { };
 enum class MeshGlId : uint32_t { };
 
-using TexGlStorage_t    = entt::basic_storage<TexGlId, Magnum::GL::Texture2D>;
-using MeshGlStorage_t   = entt::basic_storage<MeshGlId, Magnum::GL::Mesh>;
+using TexGlStorage_t    = entt::basic_storage<Magnum::GL::Texture2D, TexGlId>;
+using MeshGlStorage_t   = entt::basic_storage<Magnum::GL::Mesh, MeshGlId>;
 
 /**
  * @brief Main renderer state and essential GL resources
