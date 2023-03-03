@@ -63,4 +63,38 @@ osp::Session setup_shader_visualizer(
         osp::Session const&         scnRender,
         osp::Session const&         material);
 
+
+osp::Session setup_shader_flat(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         magnum,
+        osp::Session const&         scene,
+        osp::Session const&         scnRender,
+        osp::Session const&         material);
+
+
+osp::Session setup_shader_phong(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         magnum,
+        osp::Session const&         scene,
+        osp::Session const&         scnRender,
+        osp::Session const&         material);
+
+
+osp::Session setup_uni_test_planets_renderer(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         magnum,
+        osp::Session const&         scnRender,
+        osp::Session const&         scnCommon,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         visualizer,
+        osp::Session const&         uniCore,
+        osp::Session const&         uniScnFrame,
+        osp::Session const&         uniTestPlanets);
+
 }

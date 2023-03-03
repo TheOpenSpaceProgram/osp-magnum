@@ -155,7 +155,7 @@ Session setup_shape_spawn(
 
     shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgMeshMod, tgDrawMod, tgMatMod}).data(
             "Add mesh and material to spawned shapes",
-            TopDataIds_t{             idDrawing,              idSpawner,             idSpawnerEnts,             idNMesh,          idMatEnts,             idMatDirty,                idActiveIds},
+            TopDataIds_t{             idDrawing,              idSpawner,             idSpawnerEnts,             idNMesh,          idMatEnts,             idMatDirty,                   idActiveIds},
             wrap_args([] (ACtxDrawing& rDrawing, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, NamedMeshes& rNMesh, EntSet_t& rMatEnts, EntVector_t& rMatDirty, ActiveReg_t const& rActiveIds ) noexcept
     {
         if (rSpawner.size() == 0)

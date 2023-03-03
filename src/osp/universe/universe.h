@@ -116,28 +116,28 @@ struct Universe
 
 struct SceneFrame : CoSpaceTransform, CoSpaceHierarchy
 {
-
+    Vector3g m_scenePosition;
 };
 
 template <typename FIRST_T, typename ... T>
-constexpr void aux_interleave(std::size_t const pos, TypedStrideDesc<FIRST_T>& rStrideDescFirst, TypedStrideDesc<T>& ... rStrideDesc)
+constexpr void aux_partition(std::size_t const pos, TypedStrideDesc<FIRST_T>& rInterleveFirst, TypedStrideDesc<T>& ... rInterleve)
 {
-    rStrideDescFirst.m_offset = pos;
+    rInterleveFirst.m_offset = pos;
 
     if constexpr (sizeof...(T) != 0)
     {
-        aux_interleave(pos + sizeof(FIRST_T), rStrideDesc ...);
+        aux_partition(pos + sizeof(FIRST_T), rInterleve ...);
     }
 }
 
 template <typename ... T>
-constexpr void interleave(std::size_t& rPos, std::size_t count, TypedStrideDesc<T>& ... rStrideDesc)
+constexpr void partition(std::size_t& rPos, std::size_t count, TypedStrideDesc<T>& ... rInterleve)
 {
     constexpr std::size_t stride = (sizeof(T) + ...);
 
-    (rStrideDesc.m_stride = ... = stride);
+    (rInterleve.m_stride = ... = stride);
 
-    aux_interleave(rPos, rStrideDesc ...);
+    aux_partition(rPos, rInterleve ...);
 
     rPos += stride * count;
 }

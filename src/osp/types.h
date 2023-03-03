@@ -64,6 +64,7 @@ using Quaternion    = Magnum::Math::Quaternion<Magnum::Float>;
 using Quaterniond   = Magnum::Math::Quaternion<Magnum::Double>;
 
 using Rad           = Magnum::Math::Rad<Magnum::Float>;
+using Radd          = Magnum::Math::Rad<Magnum::Double>;
 using Deg           = Magnum::Math::Deg<Magnum::Float>;
 
 }

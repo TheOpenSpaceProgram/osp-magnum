@@ -85,7 +85,7 @@ void draw_ent_phong(
  */
 template<typename ITA_T, typename ITB_T>
 void sync_phong(
-        ITA_T dirtyFirst,
+        ITA_T dirtyIt,
         ITB_T const& dirtyLast,
         active::EntSet_t const& hasMaterial,
         active::RenderGroup::Storage_t *const pStorageOpaque,
@@ -96,9 +96,9 @@ void sync_phong(
 {
     using namespace active;
 
-    while (dirtyFirst != dirtyLast)
+    for (; dirtyIt != dirtyLast; std::advance(dirtyIt, 1))
     {
-        ActiveEnt const ent = *dirtyFirst;
+        ActiveEnt const ent = *dirtyIt;
 
         // Erase from group if they exist
         if (pStorageOpaque != nullptr)
@@ -135,8 +135,6 @@ void sync_phong(
 
             pStorageTransparent->emplace(ent, EntityToDraw{&draw_ent_phong, {&rData, pShader} });
         }
-
-        std::advance(dirtyFirst, 1);
     }
 }
 

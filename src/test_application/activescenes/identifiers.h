@@ -192,15 +192,19 @@
 
 // Universe sessions
 
-#define OSP_DATA_TESTAPP_UNI_CORE 1, \
-    idUniverse
-#define OSP_TAGS_TESTAPP_UNI_CORE 1, \
-    tgUniDummy
+#define OSP_DATA_TESTAPP_UNI_CORE 2, \
+    idUniverse,         tgUniDeltaTimeIn
+#define OSP_TAGS_TESTAPP_UNI_CORE 4, \
+    tgUniUpdEvt,        tgUniTimeEvt,                           \
+    tgUniTransferMod,   tgUniTransferReq
 
 #define OSP_DATA_TESTAPP_UNI_SCENEFRAME 1, \
-    idUniScnFrame
-#define OSP_TAGS_TESTAPP_UNI_SCENEFRAME 1, \
-    tgUniDummyB
+    idScnFrame
+#define OSP_TAGS_TESTAPP_UNI_SCENEFRAME 2, \
+    tgScnFramePosMod,   tgScnFramePosReq
+
+#define OSP_DATA_TESTAPP_UNI_PLANETS 2, \
+    idPlanetMainSpace, idSatSurfaceSpaces
 
 //-----------------------------------------------------------------------------
 
@@ -222,7 +226,7 @@
 
 #define OSP_DATA_TESTAPP_COMMON_RENDERER 3, \
     idScnRender, idGroupFwd, idCamera
-#define OSP_TAGS_TESTAPP_COMMON_RENDERER 20, \
+#define OSP_TAGS_TESTAPP_COMMON_RENDERER 24, \
     tgDrawGlDel,        tgDrawGlMod,        tgDrawGlReq,        \
     tgMeshGlMod,        tgMeshGlReq,                            \
     tgTexGlMod,         tgTexGlReq,                             \
@@ -230,6 +234,8 @@
     tgEntMeshMod,       tgEntMeshReq,                           \
     tgCameraMod,        tgCameraReq,                            \
     tgGroupFwdDel,      tgGroupFwdMod,      tgGroupFwdReq,      \
+    tgBindFboMod,       tgBindFboReq,                           \
+    tgFwdRenderMod,     tgFwdRenderReq,                         \
     tgDrawTransformDel, tgDrawTransformNew, tgDrawTransformMod, tgDrawTransformReq
 
 
@@ -242,9 +248,17 @@
 
 
 #define OSP_DATA_TESTAPP_SHADER_VISUALIZER 1, \
-    idDrawVisual
-#define OSP_TAGS_TESTAPP_SHADER_VISUALIZER 3, \
-    tgRenderEvt, tgInputEvt, tgGlUse
+    idDrawShVisual
+
+
+
+#define OSP_DATA_TESTAPP_SHADER_PHONG 1, \
+    idDrawShPhong
+
+
+
+#define OSP_DATA_TESTAPP_SHADER_FLAT 1, \
+    idDrawShFlat
 
 
 

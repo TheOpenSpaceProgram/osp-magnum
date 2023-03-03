@@ -27,7 +27,11 @@
 
 #include "identifiers.h"
 
+#include <osp/universe/coordinates.h>
 #include <osp/universe/universe.h>
+
+#include <osp/CommonMath.h>
+#include <osp/logging.h>
 
 #include <random>
 
@@ -57,13 +61,15 @@ Session setup_uni_sceneframe(
         ArrayView<entt::any>        topData,
         Tags&                       rTags)
 {
-    Session uniScnFrame;
-    OSP_SESSION_ACQUIRE_DATA(uniScnFrame, topData, TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_ACQUIRE_TAGS(uniScnFrame, rTags,   TESTAPP_UNI_SCENEFRAME);
+    Session ScnFrame;
+    OSP_SESSION_ACQUIRE_DATA(ScnFrame, topData, TESTAPP_UNI_SCENEFRAME);
+    OSP_SESSION_ACQUIRE_TAGS(ScnFrame, rTags,   TESTAPP_UNI_SCENEFRAME);
 
-    top_emplace< SceneFrame > (topData, idUniScnFrame);
+    rBuilder.tag(tgScnFramePosReq).depend_on({tgScnFramePosMod});
 
-    return uniScnFrame;
+    top_emplace< SceneFrame > (topData, idScnFrame);
+
+    return ScnFrame;
 }
 
 
@@ -72,33 +78,28 @@ Session setup_uni_test_planets(
         ArrayView<entt::any>        topData,
         Tags&                       rTags,
         Session const&              uniCore,
-        Session const&              uniScnFrame)
+        Session const&              ScnFrame)
 {
+    using CoSpaceIdVec_t = std::vector<CoSpaceId>;
     using Corrade::Containers::Array;
 
     OSP_SESSION_UNPACK_TAGS(uniCore,        TESTAPP_UNI_CORE);
     OSP_SESSION_UNPACK_DATA(uniCore,        TESTAPP_UNI_CORE);
-    OSP_SESSION_UNPACK_TAGS(uniScnFrame,    TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_UNPACK_DATA(uniScnFrame,    TESTAPP_UNI_SCENEFRAME);
+    OSP_SESSION_UNPACK_TAGS(ScnFrame,    TESTAPP_UNI_SCENEFRAME);
+    OSP_SESSION_UNPACK_DATA(ScnFrame,    TESTAPP_UNI_SCENEFRAME);
 
     auto &rUniverse = top_get< Universe >(topData, idUniverse);
 
-    Session uniTestPlanets;
-
-    constexpr int           precision   = 10;
-    constexpr int           planetCount = 64;
-    constexpr int           seed        = 1337;
-    constexpr spaceint_t    maxDist     = 20000ul << precision;
-    constexpr float         maxVel      = 800.0f;
-
-    constexpr std::size_t planetSize = sizeof(spaceint_t) * 3   // Position
-                                     + sizeof(double) * 3       // Velocity
-                                     + sizeof(double) * 4;      // Rotation
+    constexpr int           precision       = 10;
+    constexpr int           planetCount     = 64;
+    constexpr int           seed            = 1337;
+    constexpr spaceint_t    maxDist         = math::mul_2pow<spaceint_t, int>(20000ul, precision);
+    constexpr float         maxVel          = 800.0f;
 
     // Create coordinate spaces
     CoSpaceId const mainSpace = rUniverse.m_coordIds.create();
-    std::vector<CoSpaceId> surfaceSpaces(planetCount);
-    rUniverse.m_coordIds.create(surfaceSpaces.begin(), surfaceSpaces.end());
+    std::vector<CoSpaceId> satSurfaceSpaces(planetCount);
+    rUniverse.m_coordIds.create(satSurfaceSpaces.begin(), satSurfaceSpaces.end());
 
     rUniverse.m_coordCommon.resize(rUniverse.m_coordIds.capacity());
 
@@ -109,30 +110,31 @@ Session setup_uni_test_planets(
     // Associate each planet satellite with their surface coordinate space
     for (SatId satId = 0; satId < planetCount; ++satId)
     {
-        CoSpaceId const surfaceSpaceId = surfaceSpaces[satId];
+        CoSpaceId const surfaceSpaceId = satSurfaceSpaces[satId];
         CoSpaceCommon &rCommon = rUniverse.m_coordCommon[surfaceSpaceId];
         rCommon.m_parent    = mainSpace;
         rCommon.m_parentSat = satId;
     }
 
-    // Create description for Position, Velocity, and Rotation data
-    // TODO: Alignment is needed for SIMD. see Corrade alignedAlloc
+    // Coordinate space data is a single allocation partitioned to hold positions, velocities, and
+    // rotations.
+    // TODO: Alignment is needed for SIMD (not yet implemented). see Corrade alignedAlloc
 
     std::size_t bytesUsed = 0;
 
     // Positions and velocities are arranged as XXXX... YYYY... ZZZZ...
-    interleave(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[0]);
-    interleave(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[1]);
-    interleave(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[2]);
-    interleave(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[0]);
-    interleave(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[1]);
-    interleave(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[2]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[0]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[1]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[2]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[0]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[1]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[2]);
 
     // Rotations use XYZWXYZWXYZWXYZW...
-    interleave(bytesUsed, planetCount, rMainSpaceCommon.m_satRotations[0],
-                                       rMainSpaceCommon.m_satRotations[1],
-                                       rMainSpaceCommon.m_satRotations[2],
-                                       rMainSpaceCommon.m_satRotations[3]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satRotations[0],
+                                      rMainSpaceCommon.m_satRotations[1],
+                                      rMainSpaceCommon.m_satRotations[2],
+                                      rMainSpaceCommon.m_satRotations[3]);
 
     // Allocate data for all planets
     rMainSpaceCommon.m_data = Array<unsigned char>{Corrade::NoInit, bytesUsed};
@@ -148,7 +150,7 @@ Session setup_uni_test_planets(
 
     for (std::size_t i = 0; i < planetCount; ++i)
     {
-        // Assign each planet random ositions and velocities
+        // Assign each planet random positions and velocities
         x[i] = posDist(gen);
         y[i] = posDist(gen);
         z[i] = posDist(gen);
@@ -163,11 +165,128 @@ Session setup_uni_test_planets(
         qw[i] = 1.0;
     }
 
+    // Set initial scene frame
+
+    auto &rScnFrame      = top_get<SceneFrame>(topData, idScnFrame);
+    rScnFrame.m_parent   = mainSpace;
+    rScnFrame.m_position = math::mul_2pow<Vector3g, int>({400, 400, 400}, precision);
+
+    Session uniTestPlanets;
+    OSP_SESSION_ACQUIRE_DATA(uniTestPlanets, topData, TESTAPP_UNI_PLANETS);
+
+    top_emplace< CoSpaceId >        (topData, idPlanetMainSpace, mainSpace);
+    top_emplace< float >            (topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
+    top_emplace< CoSpaceIdVec_t >   (topData, idSatSurfaceSpaces, std::move(satSurfaceSpaces));
+
+
+    uniTestPlanets.task() = rBuilder.task().assign({tgUniTimeEvt, tgScnFramePosReq}).data(
+            "Update planets",
+            TopDataIds_t{          idUniverse,               idPlanetMainSpace,            idScnFrame,                      idSatSurfaceSpaces,           tgUniDeltaTimeIn},
+            wrap_args([] (Universe& rUniverse, CoSpaceId const planetMainSpace, SceneFrame &rScnFrame, CoSpaceIdVec_t const& rSatSurfaceSpaces, float const uniDeltaTimeIn) noexcept
+    {
+        CoSpaceCommon &rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
+
+        float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpaceCommon.m_precision);
+        float const scaleDelta = uniDeltaTimeIn / scale;
+
+        auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
+        auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
+        auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
+
+        // Phase 1: Move satellites
+
+        for (std::size_t i = 0; i < rMainSpaceCommon.m_satCount; ++i)
+        {
+            x[i] += vx[i] * scaleDelta;
+            y[i] += vy[i] * scaleDelta;
+            z[i] += vz[i] * scaleDelta;
+
+            // Apply arbitrary inverse-square gravity towards origin
+            Vector3d const pos       = Vector3d( Vector3g( x[i], y[i], z[i] ) ) * scale;
+            float const r           = pos.length();
+            float const c_gm        = 10000000000.0f;
+            Vector3d const accel     = -pos * uniDeltaTimeIn * c_gm / (r * r * r);
+
+            vx[i] += accel.x();
+            vy[i] += accel.y();
+            vz[i] += accel.z();
+
+            // Rotate based on i, semi-random
+            Vector3d const axis = Vector3d{std::sin(i), std::cos(i), double(i % 8 - 4)}.normalized();
+            Radd const speed{(i % 16) / 16.0};
+
+            Quaterniond const rot =   Quaterniond{{qx[i], qy[i], qz[i]}, qw[i]}
+                                    * Quaterniond::rotation(speed * uniDeltaTimeIn, axis);
+            qx[i] = rot.vector().x();
+            qy[i] = rot.vector().y();
+            qz[i] = rot.vector().z();
+            qw[i] = rot.scalar();
+        }
+
+        // Phase 2: Transfers and stuff
+
+        constexpr float captureDist = 500.0f;
+
+        Vector3g const cameraPos{rScnFrame.m_rotation.transformVector(Vector3d(rScnFrame.m_scenePosition))};
+        Vector3g const areaPos{rScnFrame.m_position + cameraPos};
+
+        bool const notInPlanet = (rScnFrame.m_parent == planetMainSpace);
+
+        if (notInPlanet)
+        {
+            // Find a planet to enter
+            std::size_t nearbyPlanet = rMainSpaceCommon.m_satCount;
+            for (std::size_t i = 0; i < rMainSpaceCommon.m_satCount; ++i)
+            {
+                Vector3 const diff = (Vector3( x[i], y[i], z[i] ) - Vector3(areaPos)) * scale;
+                if (diff.length() < captureDist)
+                {
+                    nearbyPlanet = i;
+                    break;
+                }
+            }
+
+            if (nearbyPlanet < rMainSpaceCommon.m_satCount)
+            {
+                OSP_LOG_INFO("Captured into Satellite {} under CoordSpace {}",
+                             nearbyPlanet, int(rSatSurfaceSpaces[nearbyPlanet]));
+
+                CoSpaceId const surface         = rSatSurfaceSpaces[nearbyPlanet];
+                CoSpaceCommon  &rSurfaceCommon  = rUniverse.m_coordCommon[surface];
+
+                CoSpaceTransform const surfaceTf     = coord_get_transform(rSurfaceCommon, rSurfaceCommon, x, y, z, qx, qy, qz, qw);
+                CoordTransformer const mainToSurface = coord_parent_to_child(rMainSpaceCommon, surfaceTf);
+
+                // Transfer scene frame from Main to Surface coordinate space
+                rScnFrame.m_parent   = surface;
+                rScnFrame.m_position = mainToSurface.transform_position(rScnFrame.m_position);
+                rScnFrame.m_rotation = mainToSurface.rotation() * rScnFrame.m_rotation;
+            }
+        }
+        else
+        {
+            // Currently within planet, try to escape it
+
+            Vector3 const diff = Vector3(areaPos) * scale;
+            if (diff.length() > captureDist)
+            {
+                OSP_LOG_INFO("Leaving planet");
+
+                CoSpaceId const surface       = rScnFrame.m_parent;
+                CoSpaceCommon &rSurfaceCommon = rUniverse.m_coordCommon[surface];
+
+                CoSpaceTransform const surfaceTf     = coord_get_transform(rSurfaceCommon, rSurfaceCommon, x, y, z, qx, qy, qz, qw);
+                CoordTransformer const surfaceToMain = coord_child_to_parent(rMainSpaceCommon, surfaceTf);
+
+                // Transfer scene frame from Surface to Main coordinate space
+                rScnFrame.m_parent   = planetMainSpace;
+                rScnFrame.m_position = surfaceToMain.transform_position(rScnFrame.m_position);
+                rScnFrame.m_rotation = surfaceToMain.rotation() * rScnFrame.m_rotation;
+            }
+        }
+    }));
+
     return uniTestPlanets;
 }
 
-}
-
-
-
-
+} // namespace testapp::scenes

@@ -54,7 +54,7 @@ using namespace osp;
 namespace testapp
 {
 
-static void setup_magnum_draw(MainView mainView, Session const& magnum, Session const& scnCommon, Session const& scnRender)
+static void setup_magnum_draw(MainView mainView, Session const& magnum, Session const& scnCommon, Session const& scnRender, std::vector<TagId> runTagsVec = {})
 {
     OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
@@ -67,18 +67,18 @@ static void setup_magnum_draw(MainView mainView, Session const& magnum, Session 
     ExecutionContext        &rExec      = mainView.m_rExec;
     ArrayView<entt::any>    topData     = mainView.m_topData;
 
-    auto &rActiveApp = top_get<ActiveApplication>(topData, idActiveApp);
-
-    auto &rCamera = top_get<active::Camera>(topData, idCamera);
+    auto &rActiveApp    = top_get<ActiveApplication>(topData, idActiveApp);
+    auto &rCamera       = top_get<active::Camera>(topData, idCamera);
     rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
-
-    top_enqueue_quick(rTags, rTasks, rExec, {tgSyncEvt, tgResyncEvt});
+    // Run Resync tasks to mark all used gpu resources as dirty
+    top_enqueue_quick(rTags, rTasks, rExec, {tgResyncEvt});
     top_run_blocking(rTags, rTasks, rTaskData, topData, rExec);
 
-    auto const runTags = {tgSyncEvt, tgSceneEvt, tgTimeEvt, tgRenderEvt, tgInputEvt};
+    runTagsVec.insert(runTagsVec.end(), {tgSyncEvt, tgSceneEvt, tgTimeEvt, tgRenderEvt, tgInputEvt});
 
-    rActiveApp.set_on_draw( [&rTags, &rTasks, &rExec, &rTaskData, topData, runTagsVec = std::vector<TagId>(runTags)]
+    // runTagsVec gets copied but who cares lol
+    rActiveApp.set_on_draw( [&rTags, &rTasks, &rExec, &rTaskData, topData, runTagsVec = std::move(runTagsVec)]
                             (ActiveApplication& rApp, float delta)
     {
         // Magnum Application's main loop is here
@@ -289,7 +289,9 @@ static ScenarioMap_t make_scenarios()
         Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
         sceneOut.resize(13);
-        auto & [scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets] = unpack<13>(sceneOut);
+        auto &
+        [
+            scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets] = unpack<13>(sceneOut);
 
         // Compose together lots of Sessions
         scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources, pkg);
@@ -318,15 +320,18 @@ static ScenarioMap_t make_scenarios()
 
             auto const& [scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets] = unpack<13>(scene);
 
-            rendererOut.resize(5);
-            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow] = unpack<5>(rendererOut);
-            scnRender   = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
-            cameraCtrl  = setup_camera_ctrl         (builder, rTopData, rTags, magnum, scnRender);
-            cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, cameraCtrl);
-            shVisual    = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
-            camThrow    = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
+            rendererOut.resize(6);
+            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow, uniTestPlanetsRdr] = unpack<6>(rendererOut);
+            scnRender           = setup_scene_renderer              (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
+            cameraCtrl          = setup_camera_ctrl                 (builder, rTopData, rTags, magnum, scnRender);
+            cameraFree          = setup_camera_free                 (builder, rTopData, rTags, magnum, scnCommon, cameraCtrl);
+            shVisual            = setup_shader_visualizer           (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
+            camThrow            = setup_thrower                     (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
+            uniTestPlanetsRdr   = setup_uni_test_planets_renderer   (builder, rTopData, rTags, magnum, scnRender, scnCommon, cameraCtrl, shVisual, uniCore, uniScnFrame, uniTestPlanets);
 
-            setup_magnum_draw(mainView, magnum, scnCommon, scnRender);
+            OSP_SESSION_UNPACK_TAGS(uniCore, TESTAPP_UNI_CORE);
+
+            setup_magnum_draw(mainView, magnum, scnCommon, scnRender, {tgUniTimeEvt});
         };
     });
 
