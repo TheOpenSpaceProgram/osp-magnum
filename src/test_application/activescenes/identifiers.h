@@ -262,6 +262,11 @@
 
 
 
+#define OSP_DATA_TESTAPP_CURSOR 1, \
+    idCursorData
+
+
+
 #define OSP_DATA_TESTAPP_VEHICLE_CONTROL 1, \
     idVhControls
 #define OSP_TAGS_TESTAPP_VEHICLE_CONTROL 2, \

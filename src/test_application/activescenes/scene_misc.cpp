@@ -72,14 +72,8 @@ void add_floor(
     auto &rMatDirty     = top_get< EntVector_t >    (topData, idMatDirty);
     auto &rSpawner      = top_get< SpawnerVec_t >   (topData, idSpawner);
 
-    // Convenient function to get a reference-counted mesh owner
-    auto const quick_add_mesh = [&rResources, &rDrawing, &rDrawingRes, pkg] (std::string_view const name) -> MeshIdOwner_t
-    {
-        osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
-        assert(res != lgrn::id_null<osp::ResId>());
-        MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, res);
-        return rDrawing.m_meshRefCounts.ref_add(meshId);
-    };
+    // Convenient functor to get a reference-counted mesh owner
+    auto const quick_add_mesh = SysRender::gen_drawable_mesh_adder(rDrawing, rDrawingRes, rResources, pkg);
 
     // start making floor
 

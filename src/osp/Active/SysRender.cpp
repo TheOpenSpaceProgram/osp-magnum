@@ -135,3 +135,13 @@ void SysRender::update_draw_transforms_recurse(
     //parentTf.
 }
 
+
+MeshIdOwner_t SysRender::add_drawable_mesh(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg, std::string_view const name)
+{
+    ResId const res = rResources.find(restypes::gc_mesh, pkg, name);
+    assert(res != lgrn::id_null<ResId>());
+    MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, res);
+    return rDrawing.m_meshRefCounts.ref_add(meshId);
+}
+
+

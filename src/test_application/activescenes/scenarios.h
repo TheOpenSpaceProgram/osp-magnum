@@ -52,12 +52,13 @@ struct MainView
     osp::ExecutionContext       & m_rExec;
     osp::TopTaskDataVec_t       & m_rTaskData;
     osp::TopDataId              m_idResources;
+    osp::PkgId                  m_defaultPkg;
 };
 
 using Builder_t = osp::TaskBuilder<osp::TopTaskDataVec_t>;
 
 using RendererSetup_t   = void(*)(MainView, osp::Session const&, osp::Sessions_t const&, osp::Sessions_t&);
-using SceneSetup_t      = RendererSetup_t(*)(MainView, osp::PkgId, osp::Sessions_t&);
+using SceneSetup_t      = RendererSetup_t(*)(MainView, osp::Sessions_t&);
 
 struct ScenarioOption
 {

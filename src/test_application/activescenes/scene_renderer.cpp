@@ -238,8 +238,6 @@ Session setup_shader_visualizer(
     OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
     OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
     auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
@@ -249,6 +247,17 @@ Session setup_shader_visualizer(
 
     rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Configuration{}.setFlags(MeshVisualizer::Flag::Wireframe) };
     rDrawVisual.assign_pointers(rScnRender, rRenderGl);
+
+    // Default colors
+    rDrawVisual.m_shader.setWireframeColor({0.7f, 0.5f, 0.7f, 1.0f});
+    rDrawVisual.m_shader.setColor({0.2f, 0.1f, 0.5f, 1.0f});
+
+    if (material.m_dataIds.empty())
+    {
+        return shVisual;
+    }
+    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
+    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
 
     shVisual.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgGroupFwdMod}).data(
             "Sync MeshVisualizer shader entities",
@@ -287,8 +296,6 @@ Session setup_shader_flat(
     OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
     OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
     auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
@@ -299,6 +306,13 @@ Session setup_shader_flat(
     rDrawFlat.m_shaderDiffuse      = Flat{Flat::Configuration{}.setFlags(Flat::Flag::Textured)};
     rDrawFlat.m_shaderUntextured   = Flat{Flat::Configuration{}};
     rDrawFlat.assign_pointers(rScnRender, rRenderGl);
+
+    if (material.m_dataIds.empty())
+    {
+        return shFlat;
+    }
+    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
+    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
 
     shFlat.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, tgTexGlReq, tgGroupFwdMod}).data(
             "Sync Flat shader entities",
@@ -336,8 +350,6 @@ Session setup_shader_phong(
     OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
     OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
     OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
     auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
@@ -350,6 +362,13 @@ Session setup_shader_phong(
     rDrawPhong.m_shaderDiffuse      = Phong{Phong::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
     rDrawPhong.m_shaderUntextured   = Phong{Phong::Configuration{}.setLightCount(2)};
     rDrawPhong.assign_pointers(rScnRender, rRenderGl);
+
+    if (material.m_dataIds.empty())
+    {
+        return shPhong;
+    }
+    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
+    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
 
     shPhong.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, tgTexGlReq, tgGroupFwdMod}).data(
             "Sync Phong shader entities",
@@ -368,6 +387,78 @@ Session setup_shader_phong(
     }));
 
     return shPhong;
+}
+
+struct Cursor
+{
+    Magnum::Color4 m_color;
+    MeshIdOwner_t m_mesh;
+};
+
+Session setup_cursor(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              magnum,
+        Session const&              scnCommon,
+        Session const&              scnRender,
+        Session const&              cameraCtrl,
+        Session const&              shFlat,
+        TopDataId const             idResources,
+        PkgId const                 pkg)
+{
+    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_DATA(magnum,         TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_TAGS(scnRender,      TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_DATA(scnRender,      TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(cameraCtrl,     TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_TAGS(cameraCtrl,     TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_DATA(shFlat,         TESTAPP_SHADER_FLAT);
+
+    auto &rResources    = top_get< Resources >      (topData, idResources);
+    auto &rBasic        = top_get< ACtxBasic >      (topData, idBasic);
+    auto &rActiveIds    = top_get< ActiveReg_t >    (topData, idActiveIds);
+    auto &rDrawing      = top_get< ACtxDrawing >    (topData, idDrawing);
+    auto &rDrawingRes   = top_get< ACtxDrawingRes > (topData, idDrawingRes);
+
+    Session cursor;
+    OSP_SESSION_ACQUIRE_DATA(cursor, topData, TESTAPP_CURSOR);
+    cursor.m_tgCleanupEvt = tgCleanupMagnumEvt;
+
+    auto &rCursorData   = top_emplace<Cursor>(topData, idCursorData);
+    rCursorData.m_color = { 0.0f, 1.0f, 0.0f, 1.0f };
+    rCursorData.m_mesh  = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cubewire");
+
+    cursor.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgBindFboReq, tgFwdRenderMod, tgCamCtrlReq}).data(
+            "Render cursor",
+            TopDataIds_t{          idRenderGl,              idCamera,                      idDrawingRes,              idDrawShFlat,                             idCamCtrl,        idCursorData },
+            wrap_args([] (RenderGL& rRenderGl, Camera const& rCamera, ACtxDrawingRes const& rDrawingRes, ACtxDrawFlat& rDrawShFlat,  ACtxCameraController const& rCamCtrl, Cursor& rCursorData) noexcept
+    {
+        ResId const     cursorResId     = rDrawingRes.m_meshToRes.at(rCursorData.m_mesh.value());
+        MeshGlId const  cursorMeshGlId  = rRenderGl.m_resToMesh.at(cursorResId);
+        Mesh&           rCursorMeshGl   = rRenderGl.m_meshGl.get(cursorMeshGlId);
+
+        ViewProjMatrix viewProj{rCamera.m_transform.inverted(), rCamera.perspective()};
+
+        auto const matrix = viewProj.m_viewProj * Matrix4::translation(rCamCtrl.m_target.value());
+
+        rDrawShFlat.m_shaderUntextured
+            .setColor(rCursorData.m_color)
+            .setTransformationProjectionMatrix(matrix)
+            .draw(rCursorMeshGl);
+    }));
+
+    cursor.task() = rBuilder.task().assign({tgCleanupMagnumEvt}).data(
+            "Clean up cursor resource owners",
+            TopDataIds_t{             idDrawing,        idCursorData},
+            wrap_args([] (ACtxDrawing& rDrawing, Cursor& rCursorData) noexcept
+    {
+        rDrawing.m_meshRefCounts.ref_release(std::move(rCursorData.m_mesh));
+    }));
+
+    return cursor;
 }
 
 
@@ -460,7 +551,6 @@ Session setup_uni_test_planets_renderer(
         // Draw black hole
         Vector3 const blackHolePos = Vector3(mainToArea.transform_position({})) * scale;
         rDrawShVisual.m_shader
-            .setColor(0x0E0E0E_rgbf)
             .setTransformationMatrix(
                     viewProj.m_view
                     * Matrix4::translation(blackHolePos)
@@ -469,7 +559,6 @@ Session setup_uni_test_planets_renderer(
             .draw(rSphereMeshGl);
 
         // Draw planets
-        rDrawShVisual.m_shader.setColor(0xFFFFFF_rgbf);
         for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
         {
             Vector3g const relative = mainToArea.transform_position({x[i], y[i], z[i]});
@@ -478,7 +567,6 @@ Session setup_uni_test_planets_renderer(
             Quaterniond const rot{{qx[i], qy[i], qz[i]}, qw[i]};
 
             rDrawShVisual.m_shader
-                .setColor(0xFFFFFF_rgbf)
                 .setTransformationMatrix(
                         viewProj.m_view
                         * Matrix4::translation(relativeMeters)

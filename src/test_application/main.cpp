@@ -168,6 +168,7 @@ static MainView get_main_view()
         .m_rExec        = g_exec,
         .m_rTaskData    = g_taskData,
         .m_idResources  = g_idResources,
+        .m_defaultPkg   = g_defaultPkg
     };
 }
 
@@ -210,7 +211,7 @@ int main(int argc, char** argv)
             exit(-1);
         }
 
-        g_rendererSetup = it->second.m_setup(get_main_view(), g_defaultPkg, g_sceneSessions);
+        g_rendererSetup = it->second.m_setup(get_main_view(), g_sceneSessions);
 
         start_magnum_async();
     }
@@ -261,7 +262,7 @@ int debug_cli_loop()
 
                 close_sessions(g_sceneSessions); // Close existing scene
 
-                g_rendererSetup = it->second.m_setup(get_main_view(), g_defaultPkg, g_sceneSessions);
+                g_rendererSetup = it->second.m_setup(get_main_view(), g_sceneSessions);
                 start_magnum_async();
             }
         }

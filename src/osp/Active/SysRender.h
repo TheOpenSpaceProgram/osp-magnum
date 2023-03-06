@@ -201,6 +201,10 @@ public:
     static void update_delete_groups(
             ACtxRenderGroups& rCtxGroups, IT_T first, IT_T const& last);
 
+    static MeshIdOwner_t add_drawable_mesh(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg, std::string_view const name);
+
+    static constexpr decltype(auto) gen_drawable_mesh_adder(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg);
+
 private:
     static void update_draw_transforms_recurse(
             ACtxSceneGraph const&                   rScnGraph,
@@ -295,5 +299,15 @@ void SysRender::update_delete_groups(
         rGroup.m_entities.remove(first, last);
     }
 }
+
+constexpr decltype(auto) SysRender::gen_drawable_mesh_adder(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg)
+{
+    return [&rDrawing, &rDrawingRes, &rResources, pkg] (std::string_view const name) -> MeshIdOwner_t
+    {
+        return add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, name);
+    };
+}
+
+
 
 } // namespace osp::active

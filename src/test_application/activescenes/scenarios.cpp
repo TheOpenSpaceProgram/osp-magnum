@@ -108,7 +108,7 @@ static ScenarioMap_t make_scenarios()
     };
 
     add_scenario("enginetest", "Basic game engine and drawing scenario (without using TopTasks)",
-                 [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
+                 [] (MainView mainView, Sessions_t& sceneOut) -> RendererSetup_t
     {
         sceneOut.resize(1);
         TopDataId const idSceneData = sceneOut.front().acquire_data<1>(mainView.m_topData).front();
@@ -116,7 +116,7 @@ static ScenarioMap_t make_scenarios()
 
         // enginetest::setup_scene returns an entt::any containing one big
         // struct containing all the scene data.
-        top_assign<enginetest::EngineTestScene>(mainView.m_topData, idSceneData, enginetest::setup_scene(rResources, pkg));
+        top_assign<enginetest::EngineTestScene>(mainView.m_topData, idSceneData, enginetest::setup_scene(rResources, mainView.m_defaultPkg));
 
         return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
         {
@@ -134,7 +134,7 @@ static ScenarioMap_t make_scenarios()
     });
 
     add_scenario("physics", "Newton Dynamics integration test scenario",
-                 [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
+                 [] (MainView mainView, Sessions_t& sceneOut) -> RendererSetup_t
     {
         using namespace testapp::scenes;
 
@@ -147,7 +147,7 @@ static ScenarioMap_t make_scenarios()
         auto & [scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt] = unpack<10>(sceneOut);
 
         // Compose together lots of Sessions
-        scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources, pkg);
+        scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources, mainView.m_defaultPkg);
         matVisual       = setup_material            (builder, rTopData, rTags, scnCommon);
         physics         = setup_physics             (builder, rTopData, rTags, scnCommon);
         shapeSpawn      = setup_shape_spawn         (builder, rTopData, rTags, scnCommon, physics, matVisual);
@@ -159,7 +159,7 @@ static ScenarioMap_t make_scenarios()
         nwtGrav         = setup_newton_force_accel  (builder, rTopData, rTags, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
         shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, rTags, scnCommon, physics, shapeSpawn, newton, nwtGravSet);
 
-        add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, pkg);
+        add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, mainView.m_defaultPkg);
 
         return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
         {
@@ -182,7 +182,7 @@ static ScenarioMap_t make_scenarios()
     });
 
     add_scenario("vehicles", "Physics scenario but with Vehicles",
-                 [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
+                 [] (MainView mainView, Sessions_t& sceneOut) -> RendererSetup_t
     {
         using namespace testapp::scenes;
         using namespace osp::active;
@@ -203,7 +203,7 @@ static ScenarioMap_t make_scenarios()
             newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt, nwtRocketSet, rocketsNwt
         ] = unpack<24>(sceneOut);
 
-        scnCommon           = setup_common_scene        (builder, rTopData, rTags, idResources, pkg);
+        scnCommon           = setup_common_scene        (builder, rTopData, rTags, idResources, mainView.m_defaultPkg);
         matVisual           = setup_material            (builder, rTopData, rTags, scnCommon);
         physics             = setup_physics             (builder, rTopData, rTags, scnCommon);
         shapeSpawn          = setup_shape_spawn         (builder, rTopData, rTags, scnCommon, physics, matVisual);
@@ -231,7 +231,7 @@ static ScenarioMap_t make_scenarios()
         OSP_SESSION_UNPACK_DATA(vehicleSpawnVB, TESTAPP_VEHICLE_SPAWN_VB);
         OSP_SESSION_UNPACK_DATA(testVehicles,   TESTAPP_TEST_VEHICLES);
 
-        add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, pkg);
+        add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, mainView.m_defaultPkg);
 
         auto &rActiveIds        = top_get<ActiveReg_t>          (rTopData, idActiveIds);
         auto &rTVPartVehicle    = top_get<VehicleData>          (rTopData, idTVPartVehicle);
@@ -279,7 +279,7 @@ static ScenarioMap_t make_scenarios()
     });
 
     add_scenario("universe", "Universe test scenario with very unrealistic planets",
-                 [] (MainView mainView, PkgId pkg, Sessions_t& sceneOut) -> RendererSetup_t
+                 [] (MainView mainView, Sessions_t& sceneOut) -> RendererSetup_t
     {
         using namespace testapp::scenes;
 
@@ -294,7 +294,7 @@ static ScenarioMap_t make_scenarios()
             scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets] = unpack<13>(sceneOut);
 
         // Compose together lots of Sessions
-        scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources, pkg);
+        scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources, mainView.m_defaultPkg);
         matVisual       = setup_material            (builder, rTopData, rTags, scnCommon);
         physics         = setup_physics             (builder, rTopData, rTags, scnCommon);
         shapeSpawn      = setup_shape_spawn         (builder, rTopData, rTags, scnCommon, physics, matVisual);
@@ -310,9 +310,9 @@ static ScenarioMap_t make_scenarios()
         uniScnFrame     = setup_uni_sceneframe      (builder, rTopData, rTags);
         uniTestPlanets  = setup_uni_test_planets    (builder, rTopData, rTags, uniCore, uniScnFrame);
 
-        add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, pkg);
+        add_floor(rTopData, scnCommon, matVisual, shapeSpawn, idResources, mainView.m_defaultPkg);
 
-        return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
+        return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, Sessions_t& rendererOut)
         {
             auto &rTopData = mainView.m_topData;
             auto &rTags = mainView.m_rTags;
@@ -320,13 +320,15 @@ static ScenarioMap_t make_scenarios()
 
             auto const& [scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets] = unpack<13>(scene);
 
-            rendererOut.resize(6);
-            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow, uniTestPlanetsRdr] = unpack<6>(rendererOut);
+            rendererOut.resize(8);
+            auto & [scnRender, cameraCtrl, cameraFree, shFlat, shVisual, camThrow, cursor, uniTestPlanetsRdr] = unpack<8>(rendererOut);
             scnRender           = setup_scene_renderer              (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
             cameraCtrl          = setup_camera_ctrl                 (builder, rTopData, rTags, magnum, scnRender);
             cameraFree          = setup_camera_free                 (builder, rTopData, rTags, magnum, scnCommon, cameraCtrl);
+            shFlat              = setup_shader_flat                 (builder, rTopData, rTags, magnum, scnCommon, scnRender, {});
             shVisual            = setup_shader_visualizer           (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
             camThrow            = setup_thrower                     (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
+            cursor              = setup_cursor                      (builder, rTopData, rTags, magnum, scnCommon, scnRender, cameraCtrl, shFlat, mainView.m_idResources, mainView.m_defaultPkg);
             uniTestPlanetsRdr   = setup_uni_test_planets_renderer   (builder, rTopData, rTags, magnum, scnRender, scnCommon, cameraCtrl, shVisual, uniCore, uniScnFrame, uniTestPlanets);
 
             OSP_SESSION_UNPACK_TAGS(uniCore, TESTAPP_UNI_CORE);
