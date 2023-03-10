@@ -44,6 +44,7 @@
 #include <osp/logging.h>
 
 #include <Magnum/MeshTools/Transform.h>
+#include <Magnum/Primitives/Cone.h>
 #include <Magnum/Primitives/Cylinder.h>
 #include <Magnum/Primitives/Cube.h>
 #include <Magnum/Primitives/Grid.h>
@@ -354,6 +355,7 @@ void load_a_bunch_of_stuff()
 {
     using namespace osp::restypes;
     using namespace Magnum;
+    using Primitives::ConeFlag;
     using Primitives::CylinderFlag;
 
     std::size_t const maxTags = 256; // aka: just two 64-bit integers
@@ -412,11 +414,13 @@ void load_a_bunch_of_stuff()
     };
 
     Trade::MeshData &&cylinder = Magnum::MeshTools::transform3D( Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds), Matrix4::rotationX(Deg(90)), 0);
+    Trade::MeshData &&cone = Magnum::MeshTools::transform3D( Primitives::coneSolid(3, 16, 1.0f, ConeFlag::CapEnd), Matrix4::rotationX(Deg(90)), 0);
 
     add_mesh_quick("cube", Primitives::cubeSolid());
     add_mesh_quick("cubewire", Primitives::cubeWireframe());
     add_mesh_quick("sphere", Primitives::icosphereSolid(2));
     add_mesh_quick("cylinder", std::move(cylinder));
+    add_mesh_quick("cone", std::move(cone));
     add_mesh_quick("grid64solid", Primitives::grid3DSolid({63, 63}));
 
     OSP_LOG_INFO("Resource loading complete");
