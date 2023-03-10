@@ -32,6 +32,8 @@
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Renderer.h>
+
+#include <osp/Active/parts.h>
 #include <osp/Active/SysRender.h>
 #include <osp/Active/SysSceneGraph.h>
 #include <osp/Active/opengl/SysRenderGL.h>
@@ -40,6 +42,8 @@
 #include <osp/Shaders/Phong.h>
 #include <osp/universe/universe.h>
 #include <osp/universe/coordinates.h>
+
+#include <adera/machines/links.h>
 
 #include <osp/unpack.h>
 
@@ -389,11 +393,160 @@ Session setup_shader_phong(
     return shPhong;
 }
 
-struct Cursor
+struct IndicatorMesh
 {
     Magnum::Color4 m_color;
     MeshIdOwner_t m_mesh;
 };
+
+
+Session setup_thrust_indicators(
+        Builder_t&                  rBuilder,
+        ArrayView<entt::any> const  topData,
+        Tags&                       rTags,
+        Session const&              magnum,
+        Session const&              scnCommon,
+        Session const&              parts,
+        Session const&              signalsFloat,
+        Session const&              scnRender,
+        Session const&              cameraCtrl,
+        Session const&              shFlat,
+        TopDataId const             idResources,
+        PkgId const                 pkg)
+{
+    using namespace osp::link;
+    using adera::gc_mtMagicRocket;
+    using adera::ports_magicrocket::gc_throttleIn;
+    using adera::ports_magicrocket::gc_multiplierIn;
+
+    static constexpr float indicatorScale = 0.0001f;
+
+    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_DATA(magnum,         TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
+    OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
+    OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
+    OSP_SESSION_UNPACK_TAGS(scnRender,      TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_DATA(scnRender,      TESTAPP_COMMON_RENDERER);
+
+    OSP_SESSION_UNPACK_DATA(cameraCtrl,     TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_TAGS(cameraCtrl,     TESTAPP_CAMERA_CTRL);
+    OSP_SESSION_UNPACK_DATA(shFlat,         TESTAPP_SHADER_FLAT);
+
+    auto &rResources    = top_get< Resources >      (topData, idResources);
+    auto &rBasic        = top_get< ACtxBasic >      (topData, idBasic);
+    auto &rActiveIds    = top_get< ActiveReg_t >    (topData, idActiveIds);
+    auto &rDrawing      = top_get< ACtxDrawing >    (topData, idDrawing);
+    auto &rDrawingRes   = top_get< ACtxDrawingRes > (topData, idDrawingRes);
+
+    Session thrustIndicator;
+    OSP_SESSION_ACQUIRE_DATA(thrustIndicator, topData, TESTAPP_INDICATOR);
+    thrustIndicator.m_tgCleanupEvt = tgCleanupMagnumEvt;
+
+    auto &rIndicator   = top_emplace<IndicatorMesh>(topData, idIndicator);
+    rIndicator.m_color = { 1.0f, 0.0f, 0.0f, 1.0f };
+    rIndicator.m_mesh  = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cone");
+
+    thrustIndicator.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgDrawTransformReq, tgBindFboReq, tgFwdRenderMod, tgCamCtrlReq}).data(
+            "Render cursor",
+            TopDataIds_t{          idRenderGl,              idCamera,                      idDrawingRes,                         idScnRender,                 idScnParts,                             idSigValFloat,              idDrawShFlat,                            idCamCtrl,               idIndicator},
+            wrap_args([] (RenderGL& rRenderGl, Camera const& rCamera, ACtxDrawingRes const& rDrawingRes, ACtxSceneRenderGL const& rScnRender, ACtxParts const& rScnParts, SignalValues_t<float> const& rSigValFloat, ACtxDrawFlat& rDrawShFlat, ACtxCameraController const& rCamCtrl, IndicatorMesh& rIndicator) noexcept
+    {
+
+        ResId const     indicatorResId      = rDrawingRes.m_meshToRes.at(rIndicator.m_mesh.value());
+        MeshGlId const  indicatorMeshGlId   = rRenderGl.m_resToMesh.at(indicatorResId);
+        Mesh&           rIndicatorMeshGl    = rRenderGl.m_meshGl.get(indicatorMeshGlId);
+
+        ViewProjMatrix viewProj{rCamera.m_transform.inverted(), rCamera.perspective()};
+
+        //auto const matrix = viewProj.m_viewProj * Matrix4::translation(rCamCtrl.m_target.value());
+
+        PerMachType const& rockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
+        Nodes const& floats = rScnParts.m_nodePerType[gc_ntSigFloat];
+
+        for (MachLocalId const localId : rockets.m_localIds.bitview().zeros())
+        {
+            MachAnyId const anyId           = rockets.m_localToAny[localId];
+            PartId const    part            = rScnParts.m_machineToPart[anyId];
+            ActiveEnt const partEnt         = rScnParts.m_partToActive[part];
+
+            auto const&     portSpan        = floats.m_machToNode[anyId];
+            NodeId const    throttleIn      = connected_node(portSpan, gc_throttleIn.m_port);
+            NodeId const    multiplierIn    = connected_node(portSpan, gc_multiplierIn.m_port);
+
+            float const     throttle        = std::clamp(rSigValFloat[throttleIn], 0.0f, 1.0f);
+            float const     multiplier      = rSigValFloat[multiplierIn];
+            float const     thrustMag       = throttle * multiplier;
+
+            if (thrustMag == 0.0f)
+            {
+                continue;
+            }
+
+            Matrix4 const& rocketDrawTf = rScnRender.m_drawTransform.get(partEnt);
+
+            auto const& matrix = Matrix4::from(rocketDrawTf.rotationNormalized(), rocketDrawTf.translation())
+                               * Matrix4::scaling({1.0f, 1.0f, thrustMag * indicatorScale})
+                               * Matrix4::translation({0.0f, 0.0f, -1.0f})
+                               * Matrix4::scaling({0.2f, 0.2f, 1.0f});
+
+            rDrawShFlat.m_shaderUntextured
+                .setColor(rIndicator.m_color)
+                .setTransformationProjectionMatrix(viewProj.m_viewProj * matrix)
+                .draw(rIndicatorMeshGl);
+        }
+    }));
+
+    thrustIndicator.task() = rBuilder.task().assign({tgCleanupMagnumEvt}).data(
+            "Clean up thrust indicator resource owners",
+            TopDataIds_t{             idDrawing,               idIndicator},
+            wrap_args([] (ACtxDrawing& rDrawing, IndicatorMesh& rIndicator) noexcept
+    {
+        rDrawing.m_meshRefCounts.ref_release(std::move(rIndicator.m_mesh));
+    }));
+
+    // Draw transforms in part entities are required for drawing indicators.
+    // This solution of adding them here is a bit janky but it works.
+
+    thrustIndicator.task() = rBuilder.task().assign({tgSyncEvt, tgPartReq}).data(
+            "Add draw transforms to rocket entities",
+            TopDataIds_t{                 idScnParts,                   idScnRender},
+            wrap_args([] (ACtxParts const& rScnParts, ACtxSceneRenderGL& rScnRender) noexcept
+    {
+        for (PartId const part : rScnParts.m_partDirty)
+        {
+            // TODO: maybe first check if the part contains any rocket machines
+
+            ActiveEnt const ent = rScnParts.m_partToActive[part];
+            if ( ! rScnRender.m_drawTransform.contains(ent) )
+            {
+                rScnRender.m_drawTransform.emplace(ent);
+            }
+        }
+    }));
+
+    // Called when scene is reopened
+    thrustIndicator.task() = rBuilder.task().assign({tgResyncEvt, tgPartReq}).data(
+            "Add draw transforms to all rocket entities",
+            TopDataIds_t{                 idScnParts,                   idScnRender},
+            wrap_args([] (ACtxParts const& rScnParts, ACtxSceneRenderGL& rScnRender) noexcept
+    {
+        for (PartId const part : rScnParts.m_partIds.bitview().zeros())
+        {
+            ActiveEnt const ent = rScnParts.m_partToActive[part];
+            if ( ! rScnRender.m_drawTransform.contains(ent) )
+            {
+                rScnRender.m_drawTransform.emplace(ent);
+            }
+        }
+    }));
+
+    return thrustIndicator;
+}
+
 
 Session setup_cursor(
         Builder_t&                  rBuilder,
@@ -424,19 +577,19 @@ Session setup_cursor(
     auto &rDrawingRes   = top_get< ACtxDrawingRes > (topData, idDrawingRes);
 
     Session cursor;
-    OSP_SESSION_ACQUIRE_DATA(cursor, topData, TESTAPP_CURSOR);
+    OSP_SESSION_ACQUIRE_DATA(cursor, topData, TESTAPP_INDICATOR);
     cursor.m_tgCleanupEvt = tgCleanupMagnumEvt;
 
-    auto &rCursorData   = top_emplace<Cursor>(topData, idCursorData);
+    auto &rCursorData   = top_emplace<IndicatorMesh>(topData, idIndicator);
     rCursorData.m_color = { 0.0f, 1.0f, 0.0f, 1.0f };
     rCursorData.m_mesh  = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cubewire");
 
     cursor.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgBindFboReq, tgFwdRenderMod, tgCamCtrlReq}).data(
             "Render cursor",
-            TopDataIds_t{          idRenderGl,              idCamera,                      idDrawingRes,              idDrawShFlat,                             idCamCtrl,        idCursorData },
-            wrap_args([] (RenderGL& rRenderGl, Camera const& rCamera, ACtxDrawingRes const& rDrawingRes, ACtxDrawFlat& rDrawShFlat,  ACtxCameraController const& rCamCtrl, Cursor& rCursorData) noexcept
+            TopDataIds_t{          idRenderGl,              idCamera,                      idDrawingRes,              idDrawShFlat,                             idCamCtrl,               idIndicator },
+            wrap_args([] (RenderGL& rRenderGl, Camera const& rCamera, ACtxDrawingRes const& rDrawingRes, ACtxDrawFlat& rDrawShFlat,  ACtxCameraController const& rCamCtrl, IndicatorMesh& rIndicator) noexcept
     {
-        ResId const     cursorResId     = rDrawingRes.m_meshToRes.at(rCursorData.m_mesh.value());
+        ResId const     cursorResId     = rDrawingRes.m_meshToRes.at(rIndicator.m_mesh.value());
         MeshGlId const  cursorMeshGlId  = rRenderGl.m_resToMesh.at(cursorResId);
         Mesh&           rCursorMeshGl   = rRenderGl.m_meshGl.get(cursorMeshGlId);
 
@@ -445,17 +598,17 @@ Session setup_cursor(
         auto const matrix = viewProj.m_viewProj * Matrix4::translation(rCamCtrl.m_target.value());
 
         rDrawShFlat.m_shaderUntextured
-            .setColor(rCursorData.m_color)
+            .setColor(rIndicator.m_color)
             .setTransformationProjectionMatrix(matrix)
             .draw(rCursorMeshGl);
     }));
 
     cursor.task() = rBuilder.task().assign({tgCleanupMagnumEvt}).data(
             "Clean up cursor resource owners",
-            TopDataIds_t{             idDrawing,        idCursorData},
-            wrap_args([] (ACtxDrawing& rDrawing, Cursor& rCursorData) noexcept
+            TopDataIds_t{             idDrawing,               idIndicator},
+            wrap_args([] (ACtxDrawing& rDrawing, IndicatorMesh& rIndicator) noexcept
     {
-        rDrawing.m_meshRefCounts.ref_release(std::move(rCursorData.m_mesh));
+        rDrawing.m_meshRefCounts.ref_release(std::move(rIndicator.m_mesh));
     }));
 
     return cursor;
@@ -494,15 +647,37 @@ Session setup_uni_test_planets_renderer(
 
     //OSP_SESSION_ACQUIRE_DATA(uniTestPlanets, topData, TESTAPP_UNI_PLANETS);
 
-    uniTestPlanetsRdr.task() = rBuilder.task().assign({tgRenderEvt, tgCamCtrlReq}).data(
+    uniTestPlanetsRdr.task() = rBuilder.task().assign({tgRenderEvt, tgScnFramePosMod, tgCamCtrlMod}).data(
             "Position SceneFrame center Camera Controller",
-            TopDataIds_t{                            idCamCtrl,            idScnFrame},
-            wrap_args([] (ACtxCameraController const& rCamCtrl, SceneFrame& rScnFrame) noexcept
+            TopDataIds_t{                      idCamCtrl,            idScnFrame},
+            wrap_args([] (ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
     {
-        rScnFrame.m_scenePosition = Vector3g(math::mul_2pow<Vector3, int>( rCamCtrl.m_target.value(), rScnFrame.m_precision));
+        if ( ! rCamCtrl.m_target.has_value())
+        {
+            return;
+        }
+        Vector3 &rCamTgt = rCamCtrl.m_target.value();
+
+        // check origin translation
+        // ADL used for Magnum::Math::sign/floor/abs
+        float const maxDist = 512.0f;
+        Vector3 const translate = sign(rCamTgt) * floor(abs(rCamTgt) / maxDist) * maxDist;
+
+        if ( ! translate.isZero())
+        {
+            rCamCtrl.m_transform.translation() -= translate;
+            rCamTgt -= translate;
+
+            // a bit janky to modify universe stuff directly here, but it works lol
+            Vector3 const rotated = Quaternion(rScnFrame.m_rotation).transformVector(translate);
+            rScnFrame.m_position += Vector3g(math::mul_2pow<Vector3, int>(rotated, rScnFrame.m_precision));
+        }
+
+        rScnFrame.m_scenePosition = Vector3g(math::mul_2pow<Vector3, int>(rCamCtrl.m_target.value(), rScnFrame.m_precision));
+
     }));
 
-    uniTestPlanetsRdr.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgBindFboReq, tgFwdRenderMod, tgDrawReq, tgCameraReq}).data(
+    uniTestPlanetsRdr.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgBindFboReq, tgFwdRenderMod, tgDrawReq, tgCameraReq, tgScnFramePosReq}).data(
             "Render test planets",
             TopDataIds_t{          idRenderGl,              idCamera,                        idDrawShVisual,                      idDrawingRes,             idNMesh,          idUniverse,                  idScnFrame,               idPlanetMainSpace},
             wrap_args([] (RenderGL& rRenderGl, Camera const& rCamera, ACtxDrawMeshVisualizer& rDrawShVisual, ACtxDrawingRes const& rDrawingRes, NamedMeshes& rNMesh, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace) noexcept
@@ -546,16 +721,28 @@ Session setup_uni_test_planets_renderer(
         Renderer::enable(Renderer::Feature::DepthTest);
         Renderer::enable(Renderer::Feature::FaceCulling);
         Renderer::disable(Renderer::Feature::Blending);
-        //Renderer::setDepthMask(true);
+        Renderer::setDepthMask(true);
 
-        // Draw black hole
-        Vector3 const blackHolePos = Vector3(mainToArea.transform_position({})) * scale;
+        // Draw center indicator
+        Vector3 const centerPos = Vector3(mainToArea.transform_position({})) * scale;
         rDrawShVisual.m_shader
             .setTransformationMatrix(
                     viewProj.m_view
-                    * Matrix4::translation(blackHolePos)
-                    * Matrix4::scaling({200, 200, 200})
-                    * Matrix4{mainToAreaRot.toMatrix()} )
+                    * Matrix4::translation(centerPos)
+                    * Matrix4{mainToAreaRot.toMatrix()}
+                    * Matrix4::scaling({500, 50, 50}))
+            .draw(rSphereMeshGl)
+            .setTransformationMatrix(
+                    viewProj.m_view
+                    * Matrix4::translation(centerPos)
+                    * Matrix4{mainToAreaRot.toMatrix()}
+                    * Matrix4::scaling({50, 500, 50}))
+            .draw(rSphereMeshGl)
+            .setTransformationMatrix(
+                    viewProj.m_view
+                    * Matrix4::translation(centerPos)
+                    * Matrix4{mainToAreaRot.toMatrix()}
+                    * Matrix4::scaling({50, 50, 500}) )
             .draw(rSphereMeshGl);
 
         // Draw planets

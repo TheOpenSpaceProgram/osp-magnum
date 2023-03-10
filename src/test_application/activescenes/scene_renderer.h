@@ -83,6 +83,20 @@ osp::Session setup_shader_phong(
         osp::Session const&         scnRender,
         osp::Session const&         material);
 
+osp::Session setup_thrust_indicators(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         magnum,
+        osp::Session const&         scnCommon,
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat,
+        osp::Session const&         scnRender,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         shFlat,
+        osp::TopDataId const        idResources,
+        osp::PkgId const            pkg);
+
 osp::Session setup_cursor(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,

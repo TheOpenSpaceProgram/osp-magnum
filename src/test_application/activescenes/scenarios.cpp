@@ -265,14 +265,16 @@ static ScenarioMap_t make_scenarios()
                 newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt, nwtRocketSet, rocketsNwt
             ] = unpack<24>(scene);
 
-            rendererOut.resize(6);
-            auto & [scnRender, cameraCtrl, shVisual, camThrow, vehicleCtrl, cameraVehicle] = unpack<6>(rendererOut);
+            rendererOut.resize(8);
+            auto & [scnRender, cameraCtrl, shVisual, shFlat, camThrow, vehicleCtrl, cameraVehicle, thrustIndicator] = unpack<8>(rendererOut);
             scnRender       = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
             cameraCtrl      = setup_camera_ctrl         (builder, rTopData, rTags, magnum, scnRender);
             shVisual        = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
+            shFlat          = setup_shader_flat         (builder, rTopData, rTags, magnum, scnCommon, scnRender, {});
             camThrow        = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
             vehicleCtrl     = setup_vehicle_control     (builder, rTopData, rTags, scnCommon, parts, signalsFloat, magnum);
             cameraVehicle   = setup_camera_vehicle      (builder, rTopData, rTags, magnum, scnCommon, parts, physics, cameraCtrl, vehicleCtrl);
+            thrustIndicator = setup_thrust_indicators   (builder, rTopData, rTags, magnum, scnCommon, parts, signalsFloat, scnRender, cameraCtrl, shFlat, mainView.m_idResources, mainView.m_defaultPkg);
 
             setup_magnum_draw(mainView, magnum, scnCommon, scnRender);
         };

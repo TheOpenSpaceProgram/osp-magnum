@@ -262,8 +262,8 @@
 
 
 
-#define OSP_DATA_TESTAPP_CURSOR 1, \
-    idCursorData
+#define OSP_DATA_TESTAPP_INDICATOR 1, \
+    idIndicator
 
 
 
