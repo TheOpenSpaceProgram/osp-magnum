@@ -197,9 +197,9 @@ void SysPrefabInit::init_physics(
         auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
                 gc_importer, rPfBasic.m_importerRes);
 
-        ArrayView<ActiveEnt const>  ents        = *itPfEnts;
-        lgrn::Span<int const>       objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
-        lgrn::Span<int const>       parents     = rPrefabData.m_prefabParents[rPfBasic.m_prefabId];
+        auto const ents     = ArrayView<ActiveEnt const>{*itPfEnts};
+        auto const objects  = lgrn::Span<int const>     {rPrefabData.m_prefabs[rPfBasic.m_prefabId]};
+        auto const parents  = lgrn::Span<int const>     {rPrefabData.m_prefabParents[rPfBasic.m_prefabId]};
 
 #if 0
         auto const assign_dyn_recurse = [&rCtxPhys, ents, objects, parents] (auto const& self, int objectId, ActiveEnt ent) -> void

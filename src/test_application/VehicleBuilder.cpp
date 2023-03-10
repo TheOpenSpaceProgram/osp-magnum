@@ -257,10 +257,10 @@ VehicleData VehicleBuilder::finalize_release()
     // Assign part-to-machine partitions
     for (MachAnyId const mach : rData.m_machines.m_ids.bitview().zeros())
     {
-        MachLocalId const local = rData.m_machines.m_machToLocal[mach];
-        MachTypeId const  type  = rData.m_machines.m_machTypes[mach];
-        PartId const      part  = rData.m_machToPart[mach];
-        lgrn::Span<MachinePair> machines = rData.m_partToMachines[part];
+        MachLocalId const   local       = rData.m_machines.m_machToLocal[mach];
+        MachTypeId const    type        = rData.m_machines.m_machTypes[mach];
+        PartId const        part        = rData.m_machToPart[mach];
+        auto const          machines    = lgrn::Span<MachinePair>{rData.m_partToMachines[part]};
 
         // Reuse machine count to track how many are currently added.
         // By the end, these should all be zero

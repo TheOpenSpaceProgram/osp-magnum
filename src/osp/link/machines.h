@@ -89,8 +89,10 @@ struct MachinePair
     MachTypeId      m_type{lgrn::id_null<MachTypeId>()};
 };
 
-struct Junction : MachinePair
+struct Junction
 {
+    MachLocalId     m_local{lgrn::id_null<MachLocalId>()};
+    MachTypeId      m_type{lgrn::id_null<MachTypeId>()};
     JuncCustom      m_custom{0};
 };
 

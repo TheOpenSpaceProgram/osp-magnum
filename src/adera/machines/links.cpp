@@ -1,3 +1,27 @@
+/**
+ * Open Space Program
+ * Copyright © 2019-2023 Open Space Program Project
+ *
+ * MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 #include "links.h"
 
 using namespace osp;
@@ -17,46 +41,30 @@ float thruster_influence(Vector3 const pos, Vector3 const dir, Vector3 const cmd
     using Magnum::Math::cross;
     using Magnum::Math::dot;
 
-    // Thrust is applied in opposite direction of thruster nozzle direction
-    Vector3 const thrustDir = std::negate{}(dir.normalized());
+    float influence = 0.0f;
 
-    float angInfluence = 0.0f;
     if (cmdAng.dot() > 0.0f)
     {
-        Vector3 const torque = cross(pos, thrustDir).normalized();
-        angInfluence = dot(torque, cmdAng.normalized());
+        Vector3 const torque = cross(pos, dir).normalized();
+        influence += dot(torque, cmdAng.normalized());
     }
 
-    float linInfluence = 0.0f;
     if (cmdLin.dot() > 0.0f)
     {
-        linInfluence = dot(thrustDir, cmdLin.normalized());
+        influence += dot(dir, cmdLin.normalized());
     }
 
-    // Total component of thrust in direction of command
-    float const total = angInfluence + linInfluence;
-
-    if (total < 0.01f)
+    if (influence < 0.01f)
     {
-        /* Ignore small contributions from imprecision
-         * Real thrusters can't throttle this deep anyways, so if their
-         * contribution is this small, it'd be a waste of fuel to fire them.
-         */
-        return 0.0f;
+        return 0.0f; // Ignore small contributions
     }
 
-    /* Compute thruster throttle output demanded by current command.
-     * In the future, it would be neat to implement PWM so that unthrottlable
-     * thrusters would pulse on and off in order to deliver reduced thrust
-     */
-    float const totalInfluence = std::clamp(angInfluence + linInfluence, 0.0f, 1.0f);
-
-    if (totalInfluence != totalInfluence) // if NaN
+    if (Magnum::Math::isNan(influence))
     {
         return 0.0f;
     }
 
-    return totalInfluence;
+    return std::clamp(influence, 0.0f, 1.0f);
 }
 
 

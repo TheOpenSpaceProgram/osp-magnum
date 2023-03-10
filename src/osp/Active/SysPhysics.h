@@ -53,13 +53,13 @@ public:
             Matrix3&                                rInertiaTensor,
             Matrix4 const&                          currentTf = {});
 
-    template<typename IT_T>
-    static void update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, IT_T const& last);
+    template<typename IT_T, typename ITB_T>
+    static void update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, ITB_T const& last);
 
 };
 
-template<typename IT_T>
-void SysPhysics::update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, IT_T const& last)
+template<typename IT_T, typename ITB_T>
+void SysPhysics::update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, ITB_T const& last)
 {
     rCtxPhys.m_mass.remove(first, last);
 }

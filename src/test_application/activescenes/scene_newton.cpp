@@ -469,9 +469,9 @@ struct BodyRocket
     Quaternion      m_rotation;
     Vector3         m_offset;
 
-    MachLocalId     m_local;
-    NodeId          m_throttleIn;
-    NodeId          m_multiplierIn;
+    MachLocalId     m_local         {lgrn::id_null<MachLocalId>()};
+    NodeId          m_throttleIn    {lgrn::id_null<NodeId>()};
+    NodeId          m_multiplierIn  {lgrn::id_null<NodeId>()};
 };
 
 struct ACtxRocketsNwt

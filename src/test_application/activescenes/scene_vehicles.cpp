@@ -873,7 +873,7 @@ Session setup_vehicle_spawn_vb(
             }
 
             PerNodeType const&  srcFloatNodes       = pVData->m_nodePerType[gc_ntSigFloat];
-            entt::any const     srcFloatValuesAny   = srcFloatNodes.m_nodeValues;
+            entt::any const&    srcFloatValuesAny   = srcFloatNodes.m_nodeValues;
             auto const&         srcFloatValues      = entt::any_cast< SignalValues_t<float> >(srcFloatValuesAny);
             std::size_t const   nodeRemapOffset     = remapNodeOffsets2d[vhId][gc_ntSigFloat];
             auto const          nodeRemap           = arrayView(rVSVB.m_remapNodes).exceptPrefix(nodeRemapOffset);
@@ -1035,7 +1035,7 @@ Session setup_test_vehicles(
 
             for (Rad ang = 0.0_degf; ang < Rad(360.0_degf); ang += Rad(360.0_degf)/rcsRingBlocks)
             {
-               Quaternion rotZ = Quaternion::rotation(ang, {0.0f, 0.0f, 1.0f});
+               Quaternion const rotZ = Quaternion::rotation(ang, {0.0f, 0.0f, 1.0f});
                add_rcs_block(vbuilder, toWeld, rcsInputs, rcsThrust, rotZ.transformVector(rcsOset), rotZ);
             }
         }
@@ -1170,12 +1170,12 @@ Session setup_vehicle_control(
 
         Vector3 const attitude
         {
-              float(rUserInput.button_state(rVhControls.m_btnPitchUp).m_held)
-            - float(rUserInput.button_state(rVhControls.m_btnPitchDn).m_held),
+              float(rUserInput.button_state(rVhControls.m_btnPitchDn).m_held)
+            - float(rUserInput.button_state(rVhControls.m_btnPitchUp).m_held),
               float(rUserInput.button_state(rVhControls.m_btnYawLf).m_held)
             - float(rUserInput.button_state(rVhControls.m_btnYawRt).m_held),
-              float(rUserInput.button_state(rVhControls.m_btnRollLf).m_held)
-            - float(rUserInput.button_state(rVhControls.m_btnRollRt).m_held)
+              float(rUserInput.button_state(rVhControls.m_btnRollRt).m_held)
+            - float(rUserInput.button_state(rVhControls.m_btnRollLf).m_held)
         };
 
 
