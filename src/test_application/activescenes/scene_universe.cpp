@@ -41,7 +41,6 @@ using namespace osp::universe;
 namespace testapp::scenes
 {
 
-
 Session setup_uni_core(
         Builder_t&                  rBuilder,
         ArrayView<entt::any>        topData,
@@ -56,20 +55,21 @@ Session setup_uni_core(
     return uniCore;
 }
 
+
 Session setup_uni_sceneframe(
         Builder_t&                  rBuilder,
         ArrayView<entt::any>        topData,
         Tags&                       rTags)
 {
-    Session ScnFrame;
-    OSP_SESSION_ACQUIRE_DATA(ScnFrame, topData, TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_ACQUIRE_TAGS(ScnFrame, rTags,   TESTAPP_UNI_SCENEFRAME);
+    Session scnFrame;
+    OSP_SESSION_ACQUIRE_DATA(scnFrame, topData, TESTAPP_UNI_SCENEFRAME);
+    OSP_SESSION_ACQUIRE_TAGS(scnFrame, rTags,   TESTAPP_UNI_SCENEFRAME);
 
     rBuilder.tag(tgScnFramePosReq).depend_on({tgScnFramePosMod});
 
     top_emplace< SceneFrame > (topData, idScnFrame);
 
-    return ScnFrame;
+    return scnFrame;
 }
 
 
@@ -78,15 +78,15 @@ Session setup_uni_test_planets(
         ArrayView<entt::any>        topData,
         Tags&                       rTags,
         Session const&              uniCore,
-        Session const&              ScnFrame)
+        Session const&              scnFrame)
 {
     using CoSpaceIdVec_t = std::vector<CoSpaceId>;
     using Corrade::Containers::Array;
 
     OSP_SESSION_UNPACK_TAGS(uniCore,        TESTAPP_UNI_CORE);
     OSP_SESSION_UNPACK_DATA(uniCore,        TESTAPP_UNI_CORE);
-    OSP_SESSION_UNPACK_TAGS(ScnFrame,    TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_UNPACK_DATA(ScnFrame,    TESTAPP_UNI_SCENEFRAME);
+    OSP_SESSION_UNPACK_TAGS(scnFrame,    TESTAPP_UNI_SCENEFRAME);
+    OSP_SESSION_UNPACK_DATA(scnFrame,    TESTAPP_UNI_SCENEFRAME);
 
     auto &rUniverse = top_get< Universe >(topData, idUniverse);
 

@@ -78,15 +78,39 @@ void shader::draw_ent_phong(
     MeshGlId const meshId = rData.m_pMeshId->get(ent).m_glId;
     Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
+    Matrix3 a{viewProj.m_view};
+
+
+    // Lights with w=0.0f are directional lights
+    // Directonal lights are camera-relative, so we need 'viewProj.m_view *'
+    auto const lightPositions =
+    {
+        viewProj.m_view * Vector4{ Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f},
+        viewProj.m_view * Vector4{-Vector3{0.0f, 0.0f, 1.0f}, 0.0f}
+    };
+
+    auto const lightColors =
+    {
+        0xddd4Cd_rgbf,
+        0x32354e_rgbf
+    };
+
+    auto const lightSpecColors =
+    {
+        0xfff5ed_rgbf,
+        0x000000_rgbf
+    };
+
+    // TODO: find a better way to deal with lights instead of hard-coding it
     rShader
-        .setAmbientColor(0x000000ff_rgbaf)
+        .setAmbientColor(0x1a1e29ff_rgbaf)
         .setSpecularColor(0xffffff00_rgbaf)
-        .setLightColors({0xfff5ec_rgbf, 0xe4e8ff_rgbf})
-        .setLightPositions({ Vector4{ Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f},
-                             Vector4{-Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f} })
+        .setLightColors(lightColors)
+        .setLightSpecularColors(lightSpecColors)
+        .setLightPositions(lightPositions)
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(viewProj.m_proj)
-        .setNormalMatrix(Matrix3{drawTf})
+        .setNormalMatrix(entRelative.normalMatrix())
         .draw(rMesh);
 }
 

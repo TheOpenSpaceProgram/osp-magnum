@@ -45,6 +45,13 @@ constexpr auto& unpack(RANGE_T &rIn)
     return *reinterpret_cast<type_t(*)[N]>(std::data(rIn));
 }
 
+template<std::size_t N, typename CONTAINER_T>
+constexpr auto& resize_then_unpack(CONTAINER_T &rIn)
+{
+    rIn.resize(N);
+    return unpack<N, CONTAINER_T>(rIn);
+}
+
 
 }
 

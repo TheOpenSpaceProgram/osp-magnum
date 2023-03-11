@@ -143,8 +143,7 @@ static ScenarioMap_t make_scenarios()
         auto &rTags             = mainView.m_rTags;
         Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
-        sceneOut.resize(10);
-        auto & [scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt] = unpack<10>(sceneOut);
+        auto & [scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt] = resize_then_unpack<10>(sceneOut);
 
         // Compose together lots of Sessions
         scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources, mainView.m_defaultPkg);
@@ -169,8 +168,7 @@ static ScenarioMap_t make_scenarios()
 
             auto const& [scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt] = unpack<10>(scene);
 
-            rendererOut.resize(5);
-            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow] = unpack<5>(rendererOut);
+            auto & [scnRender, cameraCtrl, cameraFree, shVisual, camThrow] = resize_then_unpack<5>(rendererOut);
             scnRender   = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
             cameraCtrl  = setup_camera_ctrl         (builder, rTopData, rTags, magnum, scnRender);
             cameraFree  = setup_camera_free         (builder, rTopData, rTags, magnum, scnCommon, cameraCtrl);
@@ -192,7 +190,6 @@ static ScenarioMap_t make_scenarios()
         auto &rTags             = mainView.m_rTags;
         Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
-        sceneOut.resize(24);
         auto &
         [
             scnCommon, matVisual, physics, shapeSpawn,
@@ -201,7 +198,7 @@ static ScenarioMap_t make_scenarios()
             signalsFloat, machRocket, machRcsDriver,
             testVehicles, droppers, gravity, bounds, thrower,
             newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt, nwtRocketSet, rocketsNwt
-        ] = unpack<24>(sceneOut);
+        ] = resize_then_unpack<24>(sceneOut);
 
         scnCommon           = setup_common_scene        (builder, rTopData, rTags, idResources, mainView.m_defaultPkg);
         matVisual           = setup_material            (builder, rTopData, rTags, scnCommon);
@@ -265,11 +262,10 @@ static ScenarioMap_t make_scenarios()
                 newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt, nwtRocketSet, rocketsNwt
             ] = unpack<24>(scene);
 
-            rendererOut.resize(8);
-            auto & [scnRender, cameraCtrl, shVisual, shFlat, camThrow, vehicleCtrl, cameraVehicle, thrustIndicator] = unpack<8>(rendererOut);
+            auto & [scnRender, cameraCtrl, shPhong, shFlat, camThrow, vehicleCtrl, cameraVehicle, thrustIndicator] = resize_then_unpack<8>(rendererOut);
             scnRender       = setup_scene_renderer      (builder, rTopData, rTags, magnum, scnCommon, mainView.m_idResources);
             cameraCtrl      = setup_camera_ctrl         (builder, rTopData, rTags, magnum, scnRender);
-            shVisual        = setup_shader_visualizer   (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
+            shPhong         = setup_shader_phong        (builder, rTopData, rTags, magnum, scnCommon, scnRender, matVisual);
             shFlat          = setup_shader_flat         (builder, rTopData, rTags, magnum, scnCommon, scnRender, {});
             camThrow        = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
             vehicleCtrl     = setup_vehicle_control     (builder, rTopData, rTags, scnCommon, parts, signalsFloat, magnum);
@@ -290,10 +286,10 @@ static ScenarioMap_t make_scenarios()
         auto &rTags             = mainView.m_rTags;
         Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
 
-        sceneOut.resize(13);
         auto &
         [
-            scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets] = unpack<13>(sceneOut);
+            scnCommon, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets
+        ] = resize_then_unpack<13>(sceneOut);
 
         // Compose together lots of Sessions
         scnCommon       = setup_common_scene        (builder, rTopData, rTags, idResources, mainView.m_defaultPkg);

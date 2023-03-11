@@ -52,7 +52,7 @@ osp::Session setup_scene_renderer(
         osp::TopDataId              idResources);
 
 /**
- * @brief Assign a material from setup_material to use Magnum MeshVisualizer
+ * @brief Magnum MeshVisualizer shader and optional material for drawing ActiveEnts with it
  */
 osp::Session setup_shader_visualizer(
         Builder_t&                  rBuilder,
@@ -63,7 +63,9 @@ osp::Session setup_shader_visualizer(
         osp::Session const&         scnRender,
         osp::Session const&         material);
 
-
+/**
+ * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
+ */
 osp::Session setup_shader_flat(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
@@ -73,7 +75,9 @@ osp::Session setup_shader_flat(
         osp::Session const&         scnRender,
         osp::Session const&         material);
 
-
+/**
+ * @brief Magnum Phong shader and optional material for drawing ActiveEnts with it
+ */
 osp::Session setup_shader_phong(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
@@ -83,6 +87,9 @@ osp::Session setup_shader_phong(
         osp::Session const&         scnRender,
         osp::Session const&         material);
 
+/**
+ * @brief Red indicators over Magic Rockets
+ */
 osp::Session setup_thrust_indicators(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
@@ -97,6 +104,9 @@ osp::Session setup_thrust_indicators(
         osp::TopDataId const        idResources,
         osp::PkgId const            pkg);
 
+/**
+ * @brief Wireframe cube over the camera controller's target
+ */
 osp::Session setup_cursor(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
@@ -109,6 +119,9 @@ osp::Session setup_cursor(
         osp::TopDataId const        idResources,
         osp::PkgId const            pkg);
 
+/**
+ * @brief Draw universe, specifically designed for setup_uni_test_planets
+ */
 osp::Session setup_uni_test_planets_renderer(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
