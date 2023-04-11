@@ -35,9 +35,9 @@ using osp::link::gc_ntSigFloat;
 using osp::link::gc_sigIn;
 using osp::link::gc_sigOut;
 
-extern osp::link::MachTypeId const gc_mtUserCtrl;
-extern osp::link::MachTypeId const gc_mtMagicRocket;
-extern osp::link::MachTypeId const gc_mtRcsDriver;
+inline osp::link::MachTypeId const gc_mtUserCtrl    = osp::link::MachTypeReg_t::create();
+inline osp::link::MachTypeId const gc_mtMagicRocket = osp::link::MachTypeReg_t::create();
+inline osp::link::MachTypeId const gc_mtRcsDriver   = osp::link::MachTypeReg_t::create();
 
 constexpr osp::Vector3 gc_rocketForward{0.0f, 0.0f, 1.0f};
 

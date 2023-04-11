@@ -51,7 +51,7 @@ using JuncCustom    = uint16_t;
 using MachTypeReg_t = GlobalIdReg<MachTypeId>;
 using NodeTypeReg_t = GlobalIdReg<NodeTypeId>;
 
-extern NodeTypeId const gc_ntSigFloat;
+inline NodeTypeId const gc_ntSigFloat = NodeTypeReg_t::create();
 
 /**
  * @brief Keeps track of Machines of a certain type that exists
