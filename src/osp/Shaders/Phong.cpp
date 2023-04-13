@@ -32,7 +32,7 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_phong(
-        ActiveEnt ent, ViewProjMatrix const& viewProj,
+        DrawEnt ent, ViewProjMatrix const& viewProj,
         EntityToDraw::UserData_t userData) noexcept
 {
     using Flag = Phong::Flag;
@@ -46,7 +46,7 @@ void shader::draw_ent_phong(
     auto &rShader = *reinterpret_cast<Phong*>(pShader);
 
     // Collect uniform information
-    Matrix4 const &drawTf = rData.m_pDrawTf->get(ent);
+    Matrix4 const &drawTf = (*rData.m_pDrawTf)[ent];
 
     Magnum::Matrix4 entRelative = viewProj.m_view * drawTf;
 
@@ -58,7 +58,7 @@ void shader::draw_ent_phong(
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {
-        TexGlId const texGlId = rData.m_pDiffuseTexId->get(ent).m_glId;
+        TexGlId const texGlId = (*rData.m_pDiffuseTexId)[ent].m_glId;
         Magnum::GL::Texture2D &rTexture = rData.m_pTexGl->get(texGlId);
         rShader.bindDiffuseTexture(rTexture);
 
@@ -70,12 +70,10 @@ void shader::draw_ent_phong(
 
     if (rData.m_pColor != nullptr)
     {
-        rShader.setDiffuseColor(rData.m_pColor->contains(ent)
-                                ? rData.m_pColor->get(ent)
-                                : 0xffffffff_rgbaf);
+        rShader.setDiffuseColor((*rData.m_pColor)[ent]);
     }
 
-    MeshGlId const meshId = rData.m_pMeshId->get(ent).m_glId;
+    MeshGlId const meshId = (*rData.m_pMeshId)[ent].m_glId;
     Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
     Matrix3 a{viewProj.m_view};

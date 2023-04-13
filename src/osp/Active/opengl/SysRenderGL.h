@@ -94,17 +94,17 @@ struct ACompMeshGl
     MeshGlId    m_glId      {lgrn::id_null<MeshGlId>()};
 };
 
-using ACompMeshGlStorage_t = acomp_storage_t<ACompMeshGl>;
-using ACompTexGlStorage_t = acomp_storage_t<ACompTexGl>;
+using MeshGlEntStorage_t    = KeyedVec<DrawEnt, ACompMeshGl>;
+using TexGlEntStorage_t     = KeyedVec<DrawEnt, ACompTexGl>;
 
 /**
  * @brief OpenGL specific rendering components for rendering a scene
  */
 struct ACtxSceneRenderGL
 {
-    ACompMeshGlStorage_t        m_meshId;
-    ACompTexGlStorage_t         m_diffuseTexId;
-    acomp_storage_t<Matrix4>    m_drawTransform;
+    MeshGlEntStorage_t      m_meshId;
+    TexGlEntStorage_t       m_diffuseTexId;
+    DrawTransforms_t        m_drawTransform;
 };
 
 /**
@@ -158,11 +158,11 @@ public:
      * @param rRenderGl     [ref] Renderer state
      */
     static void assign_meshes(
-            acomp_storage_t<MeshIdOwner_t> const& cmpMeshIds,
-            IdMap_t<MeshId, ResIdOwner_t> const& meshToRes,
-            std::vector<ActiveEnt> const& entsDirty,
-            acomp_storage_t<ACompMeshGl>& rCmpMeshGl,
-            RenderGL& rRenderGl);
+            KeyedVec<DrawEnt, MeshIdOwner_t> const&     cmpMeshIds,
+            IdMap_t<MeshId, ResIdOwner_t> const&        meshToRes,
+            std::vector<DrawEnt> const&                 entsDirty,
+            MeshGlEntStorage_t&                         rCmpMeshGl,
+            RenderGL&                                   rRenderGl);
 
     /**
      * @brief Synchronize entities with a TexId component to an ACompTexGl
@@ -174,11 +174,11 @@ public:
      * @param rRenderGl     [ref] Renderer state
      */
     static void assign_textures(
-            acomp_storage_t<TexIdOwner_t> const& cmpTexIds,
-            IdMap_t<TexId, ResIdOwner_t> const& texToRes,
-            std::vector<ActiveEnt> const& entsDirty,
-            acomp_storage_t<ACompTexGl>& rCmpTexGl,
-            RenderGL& rRenderGl);
+            KeyedVec<DrawEnt, TexIdOwner_t> const&      cmpTexIds,
+            IdMap_t<TexId, ResIdOwner_t> const&         texToRes,
+            std::vector<DrawEnt> const&                 entsDirty,
+            TexGlEntStorage_t&                          rCmpTexGl,
+            RenderGL&                                   rRenderGl);
 
     /**
      * @brief Call draw functions of a RenderGroup of opaque objects
@@ -189,7 +189,7 @@ public:
      */
     static void render_opaque(
             RenderGroup const& group,
-            acomp_storage_t<ACompVisible> const& visible,
+            EntSet_t const& visible,
             ViewProjMatrix const& viewProj);
 
     /**
@@ -203,12 +203,12 @@ public:
      */
     static void render_transparent(
             RenderGroup const& group,
-            acomp_storage_t<ACompVisible> const& visible,
+            EntSet_t const& visible,
             ViewProjMatrix const& viewProj);
 
     static void draw_group(
             RenderGroup const& group,
-            acomp_storage_t<ACompVisible> const& visible,
+            EntSet_t const& visible,
             ViewProjMatrix const& viewProj);
 
     template<typename IT_T>
@@ -220,9 +220,7 @@ template<typename IT_T>
 void SysRenderGL::update_delete(
         ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T const& last)
 {
-    rCtxRenderGl.m_meshId           .remove(first, last);
-    rCtxRenderGl.m_diffuseTexId     .remove(first, last);
-    rCtxRenderGl.m_drawTransform    .remove(first, last);
+    //rCtxRenderGl.m_drawTransform    .remove(first, last);
 }
 
 

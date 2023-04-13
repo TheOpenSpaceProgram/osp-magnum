@@ -26,34 +26,34 @@
 
 #include "activetypes.h"
 #include "basic.h"
-#include "../types.h"
+
 #include "../id_map.h"
+#include "../keyed_vector.h"
+#include "../types.h"
 
 #include "../Resource/resourcetypes.h"
 
 #include <Magnum/Magnum.h>
 #include <Magnum/Math/Color.h>
 
-#include <longeron/id_management/registry.hpp>
 #include <longeron/id_management/refcount.hpp>
 
 namespace osp::active
 {
 
-/**
- * @brief An object that is completely opaque
- */
-struct ACompOpaque {};
+enum class DrawEnt : uint32_t { };
 
-/**
- *  @brief An object with transparency
- */
-struct ACompTransparent {};
+struct BasicDrawProps
+{
+    bool m_opaque:1         { false };
+    bool m_transparent:1    { false };
+};
 
-/**
- * @brief Visibility state of this object
- */
-struct ACompVisible {};
+struct Material
+{
+    EntSet_t&               m_rEnts;
+    std::vector<DrawEnt>&   m_rDirty;
+};
 
 /**
  * @brief Mesh that describes the appearance of an entity
@@ -69,7 +69,6 @@ enum class MeshId : uint32_t { };
  */
 enum class TexId : uint32_t { };
 
-struct ACompColor : Magnum::Color4 {};
 
 using MeshRefCount_t    = lgrn::IdRefCount<MeshId>;
 using MeshIdOwner_t     = MeshRefCount_t::Owner_t;
@@ -82,28 +81,29 @@ using TexIdOwner_t      = TexRefCount_t::Owner_t;
  */
 struct ACtxDrawing
 {
+    lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
 
-    // Drawing Components
-    EntSet_t                                m_drawable;
-    acomp_storage_t<ACompOpaque>            m_opaque;
-    acomp_storage_t<ACompTransparent>       m_transparent;
-    acomp_storage_t<ACompVisible>           m_visible;
-    acomp_storage_t<ACompColor>             m_color;
+    EntSet_t                                m_visible;
+    EntSet_t                                m_needDrawTf;
+    KeyedVec<DrawEnt, BasicDrawProps>       m_drawBasic;
+    KeyedVec<DrawEnt, Magnum::Color4>       m_color;
+
+    KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
 
     // Scene-space Meshes
-    lgrn::IdRegistry<MeshId>                m_meshIds;
+    lgrn::IdRegistryStl<MeshId>             m_meshIds;
     MeshRefCount_t                          m_meshRefCounts;
 
     // Scene-space Textures
-    lgrn::IdRegistry<TexId>                 m_texIds;
+    lgrn::IdRegistryStl<TexId>              m_texIds;
     TexRefCount_t                           m_texRefCounts;
 
     // Meshes and textures assigned to ActiveEnts
-    acomp_storage_t<TexIdOwner_t>           m_diffuseTex;
-    std::vector<osp::active::ActiveEnt>     m_diffuseDirty;
+    KeyedVec<DrawEnt, TexIdOwner_t>         m_diffuseTex;
+    std::vector<DrawEnt>                    m_diffuseDirty;
 
-    acomp_storage_t<MeshIdOwner_t>          m_mesh;
-    std::vector<osp::active::ActiveEnt>     m_meshDirty;
+    KeyedVec<DrawEnt, MeshIdOwner_t>        m_mesh;
+    std::vector<DrawEnt>                    m_meshDirty;
 };
 
 /**

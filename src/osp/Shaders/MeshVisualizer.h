@@ -37,8 +37,8 @@ struct ACtxDrawMeshVisualizer
 {
     MeshVisualizer m_shader{Corrade::NoCreate};
 
-    active::acomp_storage_t<Matrix4>    *m_pDrawTf{nullptr};
-    osp::active::ACompMeshGlStorage_t   *m_pMeshId{nullptr};
+    osp::active::DrawTransforms_t       *m_pDrawTf{nullptr};
+    osp::active::MeshGlEntStorage_t     *m_pMeshId{nullptr};
     osp::active::MeshGlStorage_t        *m_pMeshGl{nullptr};
 
     bool m_wireframeOnly{false};
@@ -53,7 +53,7 @@ struct ACtxDrawMeshVisualizer
 };
 
 void draw_ent_visualizer(
-        active::ActiveEnt ent,
+        active::DrawEnt ent,
         active::ViewProjMatrix const& viewProj,
         active::EntityToDraw::UserData_t userData) noexcept;
 
@@ -69,7 +69,7 @@ void sync_visualizer(
 
     while (dirtyFirst != dirtyLast)
     {
-        ActiveEnt const ent = *dirtyFirst;
+        DrawEnt const ent = *dirtyFirst;
         bool alreadyAdded = rStorage.contains(ent);
         if (hasMaterial.test(std::size_t(ent)))
         {

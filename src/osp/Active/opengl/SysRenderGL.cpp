@@ -204,23 +204,20 @@ void SysRenderGL::sync_scene_resources(
 }
 
 void SysRenderGL::assign_meshes(
-        acomp_storage_t<MeshIdOwner_t> const& cmpMeshIds,
-        IdMap_t<MeshId, ResIdOwner_t> const& meshToRes,
-        std::vector<ActiveEnt> const& entsDirty,
-        acomp_storage_t<ACompMeshGl>& rCmpMeshGl,
-        RenderGL& rRenderGl)
+        KeyedVec<DrawEnt, MeshIdOwner_t> const&     cmpMeshIds,
+        IdMap_t<MeshId, ResIdOwner_t> const&        meshToRes,
+        std::vector<DrawEnt> const&                 entsDirty,
+        MeshGlEntStorage_t&                         rCmpMeshGl,
+        RenderGL&                                   rRenderGl)
 {
-    for (ActiveEnt const ent : entsDirty)
+    for (DrawEnt const ent : entsDirty)
     {
+        ACompMeshGl &rEntMeshGl = rCmpMeshGl[ent];
+        MeshIdOwner_t const& entMeshScnId = cmpMeshIds[ent];
+
         // Make sure dirty entity has a MeshId component
-        if (cmpMeshIds.contains(ent))
+        if (entMeshScnId.has_value())
         {
-            MeshId const entMeshScnId = cmpMeshIds.get(ent);
-
-            ACompMeshGl &rEntMeshGl = rCmpMeshGl.contains(ent)
-                                    ? rCmpMeshGl.get(ent)
-                                    : rCmpMeshGl.emplace(ent);
-
             // Check if scene mesh ID is properly synchronized
             if (rEntMeshGl.m_scnId == entMeshScnId)
             {
@@ -246,10 +243,10 @@ void SysRenderGL::assign_meshes(
         }
         else
         {
-            if (rCmpMeshGl.contains(ent))
+            if (rEntMeshGl.m_glId != lgrn::id_null<MeshGlId>())
             {
                 // ACompMesh removed, remove ACompMeshGL too
-                rCmpMeshGl.erase(ent);
+                rEntMeshGl = {};
             }
             else
             {
@@ -260,22 +257,21 @@ void SysRenderGL::assign_meshes(
 }
 
 void SysRenderGL::assign_textures(
-        acomp_storage_t<TexIdOwner_t> const& cmpTexIds,
-        IdMap_t<TexId, ResIdOwner_t> const& texToRes,
-        std::vector<ActiveEnt> const& entsDirty,
-        acomp_storage_t<ACompTexGl>& rCmpTexGl,
-        RenderGL& rRenderGl)
+        KeyedVec<DrawEnt, TexIdOwner_t> const&      cmpTexIds,
+        IdMap_t<TexId, ResIdOwner_t> const&         texToRes,
+        std::vector<DrawEnt> const&                 entsDirty,
+        TexGlEntStorage_t&                          rCmpTexGl,
+        RenderGL&                                   rRenderGl)
 {
-    for (ActiveEnt const ent : entsDirty)
+    for (DrawEnt const ent : entsDirty)
     {
-        // Make sure dirty entity has a MeshId component
-        if (cmpTexIds.contains(ent))
-        {
-            TexId const entTexScnId = cmpTexIds.get(ent);
+        ACompTexGl &rEntTexGl = rCmpTexGl[ent];
+        TexIdOwner_t const& entTexScnId = cmpTexIds[ent];
 
-            ACompTexGl &rEntTexGl = rCmpTexGl.contains(ent)
-                                  ? rCmpTexGl.get(ent)
-                                  : rCmpTexGl.emplace(ent);
+        // Make sure dirty entity has a MeshId component
+        if (entTexScnId.has_value())
+        {
+
 
             // Check if scene mesh ID is properly synchronized
             if (rEntTexGl.m_scnId == entTexScnId)
@@ -302,10 +298,10 @@ void SysRenderGL::assign_textures(
         }
         else
         {
-            if (rCmpTexGl.contains(ent))
+            if (rEntTexGl.m_glId != lgrn::id_null<TexGlId>())
             {
                 // ACompMesh removed, remove ACompMeshGL too
-                rCmpTexGl.erase(ent);
+                rEntTexGl = {};
             }
             else
             {
@@ -352,7 +348,7 @@ void SysRenderGL::clear_resource_owners(RenderGL& rRenderGl, Resources& rResourc
 
 void SysRenderGL::render_opaque(
         RenderGroup const& group,
-        acomp_storage_t<ACompVisible> const& visible,
+        EntSet_t const& visible,
         ViewProjMatrix const& viewProj)
 {
     using Magnum::GL::Renderer;
@@ -367,7 +363,7 @@ void SysRenderGL::render_opaque(
 
 void SysRenderGL::render_transparent(
         RenderGroup const& group,
-        acomp_storage_t<ACompVisible> const& visible,
+        EntSet_t const& visible,
         ViewProjMatrix const& viewProj)
 {
     using Magnum::GL::Renderer;
@@ -388,12 +384,12 @@ void SysRenderGL::render_transparent(
 
 void SysRenderGL::draw_group(
         RenderGroup const& group,
-        acomp_storage_t<ACompVisible> const& visible,
+        EntSet_t const& visible,
         ViewProjMatrix const& viewProj)
 {
     for (auto const& [ent, toDraw] : group.view().each())
     {
-        if (visible.contains(ent))
+        if (visible.test(std::size_t(ent)))
         {
             toDraw(ent, viewProj);
         }

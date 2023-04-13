@@ -106,7 +106,7 @@ void PlumeShader::assign_plumes(
 {
     for (ActiveEnt ent : entities)
     {
-        rStorage.emplace(ent, EntityToDraw{&draw_plume, {&rData} });
+        //rStorage.emplace(ent, EntityToDraw{&draw_plume, {&rData} });
     }
 }
 

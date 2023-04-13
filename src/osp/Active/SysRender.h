@@ -31,6 +31,8 @@
 namespace osp::active
 {
 
+using DrawTransforms_t = KeyedVec<DrawEnt, Matrix4>;
+
 /**
  * @brief View and Projection matrix
  */
@@ -62,10 +64,10 @@ struct EntityToDraw
      * @param UserData_t        [in] Non-owning user data
      */
     using ShaderDrawFnc_t = void (*)(
-            ActiveEnt, ViewProjMatrix const&, UserData_t) noexcept;
+            DrawEnt, ViewProjMatrix const&, UserData_t) noexcept;
 
     constexpr void operator()(
-            ActiveEnt ent,
+            DrawEnt ent,
             ViewProjMatrix const& viewProj) const noexcept
     {
         m_draw(ent, viewProj, m_data);
@@ -88,7 +90,7 @@ struct EntityToDraw
  */
 struct RenderGroup
 {
-    using Storage_t = entt::storage_type<EntityToDraw, ActiveEnt>::type;
+    using Storage_t = entt::basic_storage<EntityToDraw, DrawEnt>;
     using ArrayView_t = Corrade::Containers::ArrayView<const ActiveEnt>;
 
     /**
@@ -173,9 +175,10 @@ public:
     template<typename IT_T, typename ITB_T>
     static void update_draw_transforms(
             ACtxSceneGraph const&                   rScnGraph,
+            KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
             acomp_storage_t<ACompTransform> const&  transform,
-            acomp_storage_t<Matrix4>&               rDrawTf,
-            EntSet_t const&                         rDrawable,
+            DrawTransforms_t&                       rDrawTf,
+            EntSet_t const&                         useDrawTf,
             IT_T                                    first,
             ITB_T const&                            last);
 
@@ -208,9 +211,10 @@ public:
 private:
     static void update_draw_transforms_recurse(
             ACtxSceneGraph const&                   rScnGraph,
+            KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
             acomp_storage_t<ACompTransform> const&  rTf,
-            acomp_storage_t<Matrix4>&               rDrawTf,
-            EntSet_t const&                         rDrawable,
+            DrawTransforms_t&                       rDrawTf,
+            EntSet_t const&                         useDrawTf,
             ActiveEnt                               ent,
             Matrix4 const&                          parentTf,
             bool                                    root);
@@ -234,9 +238,10 @@ void SysRender::assure_draw_transforms(
 template<typename IT_T, typename ITB_T>
 void SysRender::update_draw_transforms(
         ACtxSceneGraph const&                   rScnGraph,
+        KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
         acomp_storage_t<ACompTransform> const&  rTf,
-        acomp_storage_t<Matrix4>&               rDrawTf,
-        EntSet_t const&                         rDrawable,
+        DrawTransforms_t&                       rDrawTf,
+        EntSet_t const&                         needDrawTf,
         IT_T                                    first,
         ITB_T const&                            last)
 {
@@ -244,7 +249,7 @@ void SysRender::update_draw_transforms(
 
     while (first != last)
     {
-        update_draw_transforms_recurse(rScnGraph, rTf, rDrawTf, rDrawable, *first, identity, true);
+        update_draw_transforms_recurse(rScnGraph, activeToDraw, rTf, rDrawTf, needDrawTf, *first, identity, true);
 
         std::advance(first, 1);
     }
@@ -253,16 +258,12 @@ void SysRender::update_draw_transforms(
 
 template<typename STORAGE_T, typename REFCOUNT_T>
 void remove_refcounted(
-        ActiveEnt const ent, STORAGE_T &rStorage, REFCOUNT_T &rRefcount)
+        DrawEnt const ent, STORAGE_T &rStorage, REFCOUNT_T &rRefcount)
 {
-    if (rStorage.contains(ent))
+    auto &rOwner = rStorage[ent];
+    if (rOwner.has_value())
     {
-        auto &rOwner = rStorage.get(ent);
-        if (rOwner.has_value())
-        {
-            rRefcount.ref_release(std::move(rOwner));
-        }
-        rStorage.erase(ent);
+        rRefcount.ref_release(std::move(rOwner));
     }
 }
 
@@ -272,10 +273,7 @@ void SysRender::update_delete_drawing(
 {
     while (first != last)
     {
-        ActiveEnt const ent = *first;
-        rCtxDraw.m_opaque       .remove(ent);
-        rCtxDraw.m_transparent  .remove(ent);
-        rCtxDraw.m_visible      .remove(ent);
+        DrawEnt const ent = rCtxDraw.m_activeToDraw[*first];
 
         // Textures and meshes are reference counted
         remove_refcounted(ent, rCtxDraw.m_diffuseTex, rCtxDraw.m_texRefCounts);

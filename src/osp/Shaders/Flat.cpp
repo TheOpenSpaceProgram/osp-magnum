@@ -32,7 +32,7 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_flat(
-        ActiveEnt ent, ViewProjMatrix const& viewProj,
+        DrawEnt ent, ViewProjMatrix const& viewProj,
         EntityToDraw::UserData_t userData) noexcept
 {
     using Flag = Flat::Flag;
@@ -46,22 +46,20 @@ void shader::draw_ent_flat(
     auto &rShader = *reinterpret_cast<Flat*>(pShader);
 
     // Collect uniform information
-    Matrix4 const &drawTf = rData.m_pDrawTf->get(ent);
+    Matrix4 const &drawTf = (*rData.m_pDrawTf)[ent];
 
     if (rShader.flags() & Flag::Textured)
     {
-        TexGlId const texGlId = rData.m_pDiffuseTexId->get(ent).m_glId;
+        TexGlId const texGlId = (*rData.m_pDiffuseTexId)[ent].m_glId;
         rShader.bindTexture(rData.m_pTexGl->get(texGlId));
     }
 
     if (rData.m_pColor != nullptr)
     {
-        rShader.setColor(rData.m_pColor->contains(ent)
-                         ? rData.m_pColor->get(ent)
-                         : 0xffffffff_rgbaf);
+        rShader.setColor((*rData.m_pColor)[ent]);
     }
 
-    MeshGlId const meshId = rData.m_pMeshId->get(ent).m_glId;
+    MeshGlId const meshId = (*rData.m_pMeshId)[ent].m_glId;
     Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
     rShader

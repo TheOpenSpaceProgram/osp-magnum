@@ -36,7 +36,7 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_visualizer(
-        ActiveEnt ent, const ViewProjMatrix &viewProj,
+        DrawEnt ent, const ViewProjMatrix &viewProj,
         EntityToDraw::UserData_t userData) noexcept
 {
     using Magnum::Shaders::MeshVisualizerGL3D;
@@ -45,7 +45,7 @@ void shader::draw_ent_visualizer(
     assert(pData != nullptr);
     auto &rData = *reinterpret_cast<ACtxDrawMeshVisualizer*>(pData);
 
-    Matrix4 const& drawTf = rData.m_pDrawTf->get(ent);
+    Matrix4 const& drawTf = (*rData.m_pDrawTf)[ent];
 
     Matrix4 const entRelative = viewProj.m_view * drawTf;
 
@@ -63,7 +63,7 @@ void shader::draw_ent_visualizer(
         Magnum::GL::Renderer::setDepthMask(false);
     }
 
-    MeshGlId const meshId = rData.m_pMeshId->get(ent).m_glId;
+    MeshGlId const meshId = (*rData.m_pMeshId)[ent].m_glId;
     Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
     rShader

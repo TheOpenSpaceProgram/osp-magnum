@@ -58,19 +58,10 @@ struct entt::storage_type<Type, osp::active::ActiveEnt>
 namespace osp::active
 {
 
-
-inline constexpr unsigned gc_heir_physics_level = 1;
-
 using ActiveReg_t = lgrn::IdRegistryStl<osp::active::ActiveEnt>;
 
 using EntVector_t = std::vector<ActiveEnt>;
 using EntSet_t = lgrn::BitView< std::vector<uint64_t> >;
-
-struct EntSetPair
-{
-    EntSet_t    &m_rEnts;
-    EntVector_t &m_rDirty;
-};
 
 using active_sparse_set_t = entt::basic_sparse_set<ActiveEnt>;
 

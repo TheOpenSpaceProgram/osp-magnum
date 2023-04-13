@@ -116,7 +116,7 @@ void SysPrefabInit::init_drawing(
         Resources&                          rResources,
         ACtxDrawing&                        rDrawing,
         ACtxDrawingRes&                     rDrawingRes,
-        std::optional<EntSetPair>           material) noexcept
+        std::optional<Material>             material) noexcept
 {
     auto itPfEnts = std::begin(rPrefabInit.m_ents);
 
@@ -137,7 +137,7 @@ void SysPrefabInit::init_drawing(
             //       which considers them for draw transformations.
             //       Only set drawable for entities that have a mesh or is an
             //       ancestor of an entity with a mesh.
-            rDrawing.m_drawable.set(std::size_t(ent));
+            //rDrawing.m_drawable.set(std::size_t(ent));
 
             // Check if object has mesh
             int const meshImportId = rImportData.m_objMeshes[objects[i]];
@@ -146,10 +146,13 @@ void SysPrefabInit::init_drawing(
                 continue;
             }
 
+            DrawEnt const drawEnt = rDrawing.m_drawIds.create();
+            rDrawing.m_activeToDraw[ent] = drawEnt;
+
             osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
             MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, meshRes);
-            rDrawing.m_mesh.emplace(ent, rDrawing.m_meshRefCounts.ref_add(meshId));
-            rDrawing.m_meshDirty.push_back(ent);
+            rDrawing.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(meshId);
+            rDrawing.m_meshDirty.push_back(drawEnt);
 
             int const matImportId = rImportData.m_objMaterials[objects[i]];
 
@@ -162,19 +165,19 @@ void SysPrefabInit::init_drawing(
                 {
                     osp::ResId const texRes = rImportData.m_textures[baseColor];
                     TexId const texId = SysRender::own_texture_resource(rDrawing, rDrawingRes, rResources, texRes);
-                    rDrawing.m_diffuseTex.emplace(ent, rDrawing.m_texRefCounts.ref_add(texId));
-                    rDrawing.m_diffuseDirty.push_back(ent);
+                    rDrawing.m_diffuseTex[drawEnt] = rDrawing.m_texRefCounts.ref_add(texId);
+                    rDrawing.m_diffuseDirty.push_back(drawEnt);
                 }
 
             }
 
-            rDrawing.m_opaque.emplace(ent);
-            rDrawing.m_visible.emplace(ent);
+            rDrawing.m_drawBasic[drawEnt] = { .m_opaque = true, .m_transparent = false };
+            rDrawing.m_visible.set(std::size_t(drawEnt));
 
             if (material.has_value())
             {
-                material.value().m_rEnts.set(std::size_t(ent));
-                material.value().m_rDirty.push_back(ent);
+                material.value().m_rEnts.set(std::size_t(drawEnt));
+                material.value().m_rDirty.push_back(drawEnt);
             }
         }
 

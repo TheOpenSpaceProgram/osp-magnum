@@ -91,13 +91,23 @@ void SysRender::set_dirty_all(ACtxDrawing &rCtxDrawing)
 {
     using osp::active::active_sparse_set_t;
 
-    // Set all meshs dirty
-    auto &rMeshSet = static_cast<active_sparse_set_t&>(rCtxDrawing.m_mesh);
-    rCtxDrawing.m_meshDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
 
-    // Set all textures dirty
-    auto &rDiffSet = static_cast<active_sparse_set_t&>(rCtxDrawing.m_diffuseTex);
-    rCtxDrawing.m_diffuseDirty.assign(std::begin(rMeshSet), std::end(rMeshSet));
+    for (std::size_t const drawEntInt : rCtxDrawing.m_drawIds.bitview().zeros())
+    {
+        auto const drawEnt = DrawEnt(drawEntInt);
+
+        // Set all meshs dirty
+        if (rCtxDrawing.m_mesh[drawEnt] != lgrn::id_null<MeshId>())
+        {
+            rCtxDrawing.m_meshDirty.push_back(drawEnt);
+        }
+
+        // Set all textures dirty
+        if (rCtxDrawing.m_diffuseTex[drawEnt] != lgrn::id_null<TexId>())
+        {
+            rCtxDrawing.m_diffuseDirty.push_back(drawEnt);
+        }
+    }
 }
 
 void SysRender::clear_dirty_all(ACtxDrawing& rCtxDrawing)
@@ -109,9 +119,10 @@ void SysRender::clear_dirty_all(ACtxDrawing& rCtxDrawing)
 
 void SysRender::update_draw_transforms_recurse(
         ACtxSceneGraph const&                   rScnGraph,
+        KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
         acomp_storage_t<ACompTransform> const&  rTf,
-        acomp_storage_t<Matrix4>&               rDrawTf,
-        EntSet_t const&                         rDrawable,
+        DrawTransforms_t&                       rDrawTf,
+        EntSet_t const&                         needDrawTf,
         ActiveEnt                               ent,
         Matrix4 const&                          parentTf,
         bool                                    root)
@@ -119,20 +130,19 @@ void SysRender::update_draw_transforms_recurse(
     Matrix4 const& entTf = rTf.get(ent).m_transform;
     Matrix4 const& entDrawTf = root ? (entTf) : (parentTf * entTf);
 
-    if (rDrawTf.contains(ent))
+    if (DrawEnt const drawEnt = activeToDraw[ent];
+        drawEnt != lgrn::id_null<DrawEnt>())
     {
-        rDrawTf.get(ent) = entDrawTf;
+        rDrawTf[drawEnt] = entDrawTf;
     }
 
     for (ActiveEnt entChild : SysSceneGraph::children(rScnGraph, ent))
     {
-        if (rDrawable.test(std::size_t(entChild)))
+        if (needDrawTf.test(std::size_t(entChild)))
         {
-            update_draw_transforms_recurse(rScnGraph, rTf, rDrawTf, rDrawable, entChild, entDrawTf, false);
+            update_draw_transforms_recurse(rScnGraph, activeToDraw, rTf, rDrawTf, needDrawTf, entChild, entDrawTf, false);
         }
     }
-
-    //parentTf.
 }
 
 

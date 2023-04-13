@@ -44,10 +44,10 @@ struct ACtxDrawPhong
     Phong m_shaderUntextured    {Corrade::NoCreate};
     Phong m_shaderDiffuse       {Corrade::NoCreate};
 
-    acomp_storage_t<Matrix4>                    *m_pDrawTf{nullptr};
-    acomp_storage_t<active::ACompColor>         *m_pColor{nullptr};
-    osp::active::ACompTexGlStorage_t            *m_pDiffuseTexId{nullptr};
-    osp::active::ACompMeshGlStorage_t           *m_pMeshId{nullptr};
+    osp::active::DrawTransforms_t               *m_pDrawTf{nullptr};
+    osp::KeyedVec<osp::active::DrawEnt, Magnum::Color4> *m_pColor{nullptr};
+    osp::active::TexGlEntStorage_t              *m_pDiffuseTexId{nullptr};
+    osp::active::MeshGlEntStorage_t             *m_pMeshId{nullptr};
 
     osp::active::TexGlStorage_t                 *m_pTexGl{nullptr};
     osp::active::MeshGlStorage_t                *m_pMeshGl{nullptr};
@@ -66,7 +66,7 @@ struct ACtxDrawPhong
 };
 
 void draw_ent_phong(
-        active::ActiveEnt ent,
+        active::DrawEnt ent,
         active::ViewProjMatrix const& viewProj,
         active::EntityToDraw::UserData_t userData) noexcept;
 
@@ -90,15 +90,15 @@ void sync_phong(
         active::EntSet_t const& hasMaterial,
         active::RenderGroup::Storage_t *const pStorageOpaque,
         active::RenderGroup::Storage_t *const pStorageTransparent,
-        active::acomp_storage_t<active::ACompOpaque> const& opaque,
-        active::acomp_storage_t<active::ACompTexGl> const& diffuse,
+        KeyedVec<active::DrawEnt, active:: BasicDrawProps> const& drawBasic,
+        active::TexGlEntStorage_t const& diffuse,
         ACtxDrawPhong &rData)
 {
     using namespace active;
 
     for (; dirtyIt != dirtyLast; std::advance(dirtyIt, 1))
     {
-        ActiveEnt const ent = *dirtyIt;
+        DrawEnt const ent = *dirtyIt;
 
         // Erase from group if they exist
         if (pStorageOpaque != nullptr)
@@ -115,9 +115,11 @@ void sync_phong(
             continue; // Phong material is not assigned to this entity
         }
 
-        Phong *pShader = diffuse.contains(ent) ? &rData.m_shaderDiffuse : &rData.m_shaderUntextured;
+        Phong *pShader = (diffuse[ent].m_glId != lgrn::id_null<TexGlId>())
+                       ? &rData.m_shaderDiffuse
+                       : &rData.m_shaderUntextured;
 
-        if (opaque.contains(ent))
+        if (drawBasic[ent].m_opaque)
         {
             if (pStorageOpaque == nullptr)
             {
