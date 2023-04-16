@@ -136,6 +136,16 @@ Session setup_scene_renderer(
     rBuilder.tag(tgDrawTransformMod)    .depend_on({tgDrawTransformDel, tgDrawTransformNew});
     rBuilder.tag(tgDrawTransformReq)    .depend_on({tgDrawTransformDel, tgDrawTransformNew, tgDrawTransformMod});
 
+    renderer.task() = rBuilder.task().assign({tgSyncEvt, tgTexGlMod, tgMeshGlMod, tgDrawGlMod, tgDrawReq}).data(
+            "Resize Scene Render containers to fit drawable entities",
+            TopDataIds_t{                   idDrawing,                   idScnRender},
+            wrap_args([] (ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
+    {
+        std::size_t const capacity = rDrawing.m_drawIds.capacity();
+        rScnRender.m_drawTransform  .resize(capacity);
+        rScnRender.m_diffuseTexId   .resize(capacity);
+        rScnRender.m_meshId         .resize(capacity);
+    }));
 
     renderer.task() = rBuilder.task().assign({tgSyncEvt, tgGlUse, tgTexGlMod, tgTexGlMod}).data(
             "Synchronize used mesh and texture Resources with GL",
@@ -189,7 +199,7 @@ Session setup_scene_renderer(
         SysRenderGL::display_texture(rRenderGl, rFboColor);
     }));
 
-    renderer.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgBindFboReq, tgFwdRenderMod, tgDrawTransformReq, tgGroupFwdReq, tgDrawReq, tgCameraReq, tgEntTexMod, tgEntMeshMod}).data(
+    renderer.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgBindFboReq, tgFwdRenderMod, tgDrawTransformReq, tgGroupFwdReq, tgDrawGlReq, tgCameraReq, tgEntTexMod, tgEntMeshMod}).data(
             "Render Entities",
             TopDataIds_t{                   idDrawing,          idRenderGl,                   idGroupFwd,              idCamera},
             wrap_args([] (ACtxDrawing const& rDrawing, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera) noexcept
@@ -214,15 +224,25 @@ Session setup_scene_renderer(
             wrap_args([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
     {
         auto rootChildren = SysSceneGraph::children(rBasic.m_scnGraph);
-        SysRender::update_draw_transforms(rBasic.m_scnGraph, rBasic.m_transform, rScnRender.m_drawTransform, rDrawing.m_drawable, std::begin(rootChildren), std::end(rootChildren));
+        SysRender::update_draw_transforms(
+                    rBasic.m_scnGraph,
+                    rDrawing.m_activeToDraw,
+                    rBasic.m_transform,
+                    rScnRender.m_drawTransform,
+                    rDrawing.m_needDrawTf,
+                    std::begin(rootChildren),
+                    std::end(rootChildren));
     }));
 
-    renderer.task() = rBuilder.task().assign({tgSyncEvt, tgDelTotalReq, tgGroupFwdDel}).data(
+    renderer.task() = rBuilder.task().assign({tgSyncEvt, tgGroupFwdDel, tgDelDrawEntReq}).data(
             "Delete entities from render groups",
-            TopDataIds_t{             idGroupFwd,                idDelTotal},
-            wrap_args([] (RenderGroup& rGroup, EntVector_t const& rDelTotal) noexcept
+            TopDataIds_t{                   idDrawing,             idGroupFwd,                    idDelDrawEnts},
+            wrap_args([] (ACtxDrawing const& rDrawing, RenderGroup& rGroup, DrawEntVector_t const& rDelDrawEnts) noexcept
     {
-        rGroup.m_entities.remove(std::cbegin(rDelTotal), std::cend(rDelTotal));
+        for (DrawEnt const drawEnt : rDelDrawEnts)
+        {
+            rGroup.m_entities.remove(drawEnt);
+        }
     }));
 
     return renderer;
@@ -265,8 +285,8 @@ Session setup_shader_visualizer(
 
     shVisual.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgGroupFwdMod}).data(
             "Sync MeshVisualizer shader entities",
-            TopDataIds_t{                   idMatDirty,                idMatEnts,             idGroupFwd,                     idDrawShVisual},
-            wrap_args([] (EntVector_t const& rMatDirty, EntSet_t const& rMatEnts, RenderGroup& rGroup, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
+            TopDataIds_t{                            idMatDirty,                idMatEnts,             idGroupFwd,                     idDrawShVisual},
+            wrap_args([] (std::vector<DrawEnt> const& rMatDirty, EntSet_t const& rMatEnts, RenderGroup& rGroup, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
     {
         sync_visualizer(std::cbegin(rMatDirty), std::cend(rMatDirty), rMatEnts, rGroup.m_entities, rDrawShVisual);
     }));
@@ -274,9 +294,9 @@ Session setup_shader_visualizer(
     shVisual.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgTransformReq, tgDrawTransformNew}).data(
             "Add draw transforms to mesh visualizer",
             TopDataIds_t{                   idMatDirty,                   idScnRender},
-            wrap_args([] (EntVector_t const& rMatDirty, ACtxSceneRenderGL& rScnRender) noexcept
+            wrap_args([] (std::vector<DrawEnt> const& rMatDirty, ACtxSceneRenderGL& rScnRender) noexcept
     {
-        SysRender::assure_draw_transforms(rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
+        //SysRender::assure_draw_transforms(rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
     }));
 
 
@@ -320,18 +340,10 @@ Session setup_shader_flat(
 
     shFlat.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, tgTexGlReq, tgGroupFwdMod}).data(
             "Sync Flat shader entities",
-            TopDataIds_t{                   idMatDirty,                idMatEnts,                   idDrawing,                         idScnRender,             idGroupFwd,               idDrawShFlat},
-            wrap_args([] (EntVector_t const& rMatDirty, EntSet_t const& rMatEnts, ACtxDrawing const& rDrawing, ACtxSceneRenderGL const& rScnRender, RenderGroup& rGroupFwd, ACtxDrawFlat& rDrawShFlat) noexcept
+            TopDataIds_t{                            idMatDirty,                idMatEnts,                   idDrawing,                         idScnRender,             idGroupFwd,               idDrawShFlat},
+            wrap_args([] (std::vector<DrawEnt> const& rMatDirty, EntSet_t const& rMatEnts, ACtxDrawing const& rDrawing, ACtxSceneRenderGL const& rScnRender, RenderGroup& rGroupFwd, ACtxDrawFlat& rDrawShFlat) noexcept
     {
-        sync_flat(std::cbegin(rMatDirty), std::cend(rMatDirty), rMatEnts, &rGroupFwd.m_entities, nullptr, rDrawing.m_opaque, rScnRender.m_diffuseTexId, rDrawShFlat);
-    }));
-
-    shFlat.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgTransformReq, tgDrawTransformNew}).data(
-            "Add draw transforms to entities with Phong shader",
-            TopDataIds_t{                   idMatDirty,                   idScnRender},
-            wrap_args([] (EntVector_t const& rMatDirty, ACtxSceneRenderGL& rScnRender) noexcept
-    {
-        SysRender::assure_draw_transforms(rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
+        sync_flat(std::cbegin(rMatDirty), std::cend(rMatDirty), rMatEnts, &rGroupFwd.m_entities, nullptr, rDrawing.m_drawBasic, rScnRender.m_diffuseTexId, rDrawShFlat);
     }));
 
     return shFlat;
@@ -376,18 +388,10 @@ Session setup_shader_phong(
 
     shPhong.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, tgTexGlReq, tgGroupFwdMod}).data(
             "Sync Phong shader entities",
-            TopDataIds_t{                   idMatDirty,                idMatEnts,                   idDrawing,                         idScnRender,             idGroupFwd,               idDrawShPhong},
-            wrap_args([] (EntVector_t const& rMatDirty, EntSet_t const& rMatEnts, ACtxDrawing const& rDrawing, ACtxSceneRenderGL const& rScnRender, RenderGroup& rGroupFwd, ACtxDrawPhong& rDrawShPhong) noexcept
+            TopDataIds_t{                            idMatDirty,                idMatEnts,                   idDrawing,                         idScnRender,             idGroupFwd,               idDrawShPhong},
+            wrap_args([] (std::vector<DrawEnt> const& rMatDirty, EntSet_t const& rMatEnts, ACtxDrawing const& rDrawing, ACtxSceneRenderGL const& rScnRender, RenderGroup& rGroupFwd, ACtxDrawPhong& rDrawShPhong) noexcept
     {
-        sync_phong(std::cbegin(rMatDirty), std::cend(rMatDirty), rMatEnts, &rGroupFwd.m_entities, nullptr, rDrawing.m_opaque, rScnRender.m_diffuseTexId, rDrawShPhong);
-    }));
-
-    shPhong.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgTransformReq, tgDrawTransformNew}).data(
-            "Add draw transforms to entities with Phong shader",
-            TopDataIds_t{                   idMatDirty,                   idScnRender},
-            wrap_args([] (EntVector_t const& rMatDirty, ACtxSceneRenderGL& rScnRender) noexcept
-    {
-        SysRender::assure_draw_transforms(rScnRender.m_drawTransform, std::cbegin(rMatDirty), std::cend(rMatDirty));
+        sync_phong(std::cbegin(rMatDirty), std::cend(rMatDirty), rMatEnts, &rGroupFwd.m_entities, nullptr, rDrawing.m_drawBasic, rScnRender.m_diffuseTexId, rDrawShPhong);
     }));
 
     return shPhong;
@@ -414,6 +418,8 @@ Session setup_thrust_indicators(
         TopDataId const             idResources,
         PkgId const                 pkg)
 {
+
+
     using namespace osp::link;
     using adera::gc_mtMagicRocket;
     using adera::ports_magicrocket::gc_throttleIn;
@@ -443,6 +449,7 @@ Session setup_thrust_indicators(
     auto &rDrawingRes   = top_get< ACtxDrawingRes > (topData, idDrawingRes);
 
     Session thrustIndicator;
+#if 0 // RENDERENT
     OSP_SESSION_ACQUIRE_DATA(thrustIndicator, topData, TESTAPP_INDICATOR);
     thrustIndicator.m_tgCleanupEvt = tgCleanupMagnumEvt;
 
@@ -543,7 +550,7 @@ Session setup_thrust_indicators(
             }
         }
     }));
-
+#endif
     return thrustIndicator;
 }
 

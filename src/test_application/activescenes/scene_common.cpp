@@ -59,6 +59,7 @@ Session setup_common_scene(
     top_emplace< float >            (topData, idDeltaTimeIn, 1.0f / 60.0f);
     top_emplace< EntVector_t >      (topData, idDelEnts);
     top_emplace< EntVector_t >      (topData, idDelTotal);
+    top_emplace< DrawEntVector_t >  (topData, idDelDrawEnts);
 
     auto &rBasic        = top_emplace< ACtxBasic >      (topData, idBasic);
     auto &rActiveIds    = top_emplace< ActiveReg_t >    (topData, idActiveIds);
@@ -80,6 +81,8 @@ Session setup_common_scene(
     rBuilder.tag(tgHierReq)         .depend_on({tgHierMod, tgHierModEnd});
     rBuilder.tag(tgDrawMod)         .depend_on({tgDrawDel});
     rBuilder.tag(tgDrawReq)         .depend_on({tgDrawDel, tgDrawMod});
+    rBuilder.tag(tgDelDrawEntReq)   .depend_on({tgDelDrawEntMod});
+    rBuilder.tag(tgDelDrawEntClr)   .depend_on({tgDelDrawEntMod, tgDelDrawEntReq});
     rBuilder.tag(tgMeshMod)         .depend_on({tgMeshDel});
     rBuilder.tag(tgMeshReq)         .depend_on({tgMeshDel, tgMeshMod});
     rBuilder.tag(tgMeshClr)         .depend_on({tgMeshDel, tgMeshMod, tgMeshReq});
@@ -148,19 +151,49 @@ Session setup_common_scene(
     }));
 
     scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgDrawDel}).data(
-            "Delete drawing components",
-            TopDataIds_t{              idDrawing,                  idDelTotal},
-            wrap_args([] (ACtxDrawing& rDrawing, EntVector_t const& rDelTotal) noexcept
+            "Delete DrawEntity of deleted ActiveEnts",
+            TopDataIds_t{             idDrawing,                   idDelTotal,                 idDelDrawEnts},
+            wrap_args([] (ACtxDrawing& rDrawing, EntVector_t const& rDelTotal, DrawEntVector_t& rDelDrawEnts) noexcept
     {
-        SysRender::update_delete_drawing(rDrawing, std::cbegin(rDelTotal), std::cend(rDelTotal));
+        for (ActiveEnt const ent : rDelTotal)
+        {
+            DrawEnt const drawEnt = std::exchange(rDrawing.m_activeToDraw[ent], lgrn::id_null<DrawEnt>());
+            if (drawEnt != lgrn::id_null<DrawEnt>())
+            {
+                rDelDrawEnts.push_back(drawEnt);
+            }
+        }
     }));
 
-    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelEntClr}).data(
+    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelDrawEntReq, tgDrawDel}).data(
+            "Delete drawing components",
+            TopDataIds_t{              idDrawing,                      idDelDrawEnts},
+            wrap_args([] (ACtxDrawing& rDrawing, DrawEntVector_t const& rDelDrawEnts) noexcept
+    {
+        SysRender::update_delete_drawing(rDrawing, rDelDrawEnts.cbegin(), rDelDrawEnts.cend());
+    }));
+
+    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelDrawEntReq}).data(
+            "Delete DrawEntity IDs",
+            TopDataIds_t{             idDrawing,                       idDelDrawEnts},
+            wrap_args([] (ACtxDrawing& rDrawing, DrawEntVector_t const& rDelDrawEnts) noexcept
+    {
+        for (DrawEnt const drawEnt : rDelDrawEnts)
+        {
+            if (rDrawing.m_drawIds.exists(drawEnt))
+            {
+                rDrawing.m_drawIds.remove(drawEnt);
+            }
+        }
+    }));
+
+    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelEntClr, tgDelDrawEntClr}).data(
             "Clear delete vectors once we're done with it",
-            TopDataIds_t{             idDelEnts},
-            wrap_args([] (EntVector_t& rDelEnts) noexcept
+            TopDataIds_t{             idDelEnts,                 idDelDrawEnts},
+            wrap_args([] (EntVector_t& rDelEnts, DrawEntVector_t& rDelDrawEnts) noexcept
     {
         rDelEnts.clear();
+        rDelDrawEnts.clear();
     }));
 
     scnCommon.task() = rBuilder.task().assign({tgCleanupEvt}).data(
@@ -216,8 +249,8 @@ Session setup_material(
     OSP_SESSION_ACQUIRE_DATA(material, topData, TESTAPP_MATERIAL);
     OSP_SESSION_ACQUIRE_TAGS(material, rTags, TESTAPP_MATERIAL);
 
-    top_emplace< EntSet_t >     (topData, idMatEnts);
-    top_emplace< EntVector_t >  (topData, idMatDirty);
+    top_emplace< EntSet_t >             (topData, idMatEnts);
+    top_emplace< std::vector<DrawEnt> > (topData, idMatDirty);
 
     rBuilder.tag(tgMatMod)      .depend_on({tgMatDel});
     rBuilder.tag(tgMatReq)      .depend_on({tgMatDel, tgMatMod});
@@ -226,26 +259,37 @@ Session setup_material(
     material.task() = rBuilder.task().assign({tgResyncEvt}).data(
             "Set all X material entities as dirty",
             TopDataIds_t{                idMatEnts,             idMatDirty},
-            wrap_args([] (EntSet_t const& rMatEnts, EntVector_t& rMatDirty) noexcept
+            wrap_args([] (EntSet_t const& rMatEnts, std::vector<DrawEnt>& rMatDirty) noexcept
     {
         for (std::size_t const entInt : rMatEnts.ones())
         {
-            rMatDirty.push_back(ActiveEnt(entInt));
+            rMatDirty.push_back(DrawEnt(entInt));
         }
     }));
 
     material.task() = rBuilder.task().assign({tgSceneEvt, tgSyncEvt, tgMatClr}).data(
             "Clear dirty vectors for material",
-            TopDataIds_t{             idMatDirty},
-            wrap_args([] (EntVector_t& rMatDirty) noexcept
+            TopDataIds_t{                      idMatDirty},
+            wrap_args([] (std::vector<DrawEnt>& rMatDirty) noexcept
     {
         rMatDirty.clear();
     }));
 
     material.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgMatDel}).data(
             "Delete material components",
-            TopDataIds_t{idMatEnts, idDelTotal}, delete_ent_set);
+            TopDataIds_t{                   idDrawing,                         idDelTotal,          idMatEnts},
+            wrap_args([] (ACtxDrawing const& rDrawing, EntVector_t const& rDelTotal, EntSet_t& rMatEnts) noexcept
+    {
+        for (ActiveEnt const ent : rDelTotal)
+        {
+            DrawEnt const drawEnt = rDrawing.m_activeToDraw[ent];
 
+            if (drawEnt != lgrn::id_null<DrawEnt>())
+            {
+                rMatEnts.reset(std::size_t(drawEnt));
+            }
+        }
+    }));
 
     return material;
 }

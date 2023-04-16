@@ -127,8 +127,8 @@ void SysRender::update_draw_transforms_recurse(
         Matrix4 const&                          parentTf,
         bool                                    root)
 {
-    Matrix4 const& entTf = rTf.get(ent).m_transform;
-    Matrix4 const& entDrawTf = root ? (entTf) : (parentTf * entTf);
+    Matrix4 const& entTf        = rTf.get(ent).m_transform;
+    Matrix4 const& entDrawTf    = root ? (entTf) : (parentTf * entTf);
 
     if (DrawEnt const drawEnt = activeToDraw[ent];
         drawEnt != lgrn::id_null<DrawEnt>())

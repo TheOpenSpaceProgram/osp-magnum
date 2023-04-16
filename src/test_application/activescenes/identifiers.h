@@ -45,9 +45,9 @@
 
 // Scene sessions
 
-#define OSP_DATA_TESTAPP_COMMON_SCENE 8, \
-    idDeltaTimeIn, idActiveIds, idBasic, idDrawing, idDrawingRes, idDelEnts, idDelTotal, idNMesh
-#define OSP_TAGS_TESTAPP_COMMON_SCENE 34, \
+#define OSP_DATA_TESTAPP_COMMON_SCENE 9, \
+    idDeltaTimeIn, idActiveIds, idBasic, idDrawing, idDrawingRes, idDelEnts, idDelTotal, idDelDrawEnts, idNMesh
+#define OSP_TAGS_TESTAPP_COMMON_SCENE 37, \
     tgCleanupEvt,       tgResyncEvt,        tgSyncEvt,          tgSceneEvt,         tgTimeEvt,      \
     tgEntDel,           tgEntNew,           tgEntReq,                                               \
     tgDelEntMod,        tgDelEntReq,        tgDelEntClr,                                            \
@@ -55,6 +55,7 @@
     tgTransformMod,     tgTransformDel,     tgTransformNew,     tgTransformReq,                     \
     tgHierMod,          tgHierModEnd,       tgHierDel,          tgHierNew,          tgHierReq,      \
     tgDrawDel,          tgDrawMod,          tgDrawReq,                                              \
+    tgDelDrawEntMod,    tgDelDrawEntReq,    tgDelDrawEntClr,                                        \
     tgMeshDel,          tgMeshMod,          tgMeshReq,          tgMeshClr,                          \
     tgTexDel,           tgTexMod,           tgTexReq,           tgTexClr
 

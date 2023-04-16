@@ -271,8 +271,6 @@ void SysRenderGL::assign_textures(
         // Make sure dirty entity has a MeshId component
         if (entTexScnId.has_value())
         {
-
-
             // Check if scene mesh ID is properly synchronized
             if (rEntTexGl.m_scnId == entTexScnId)
             {

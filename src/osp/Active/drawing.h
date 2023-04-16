@@ -27,6 +27,7 @@
 #include "activetypes.h"
 #include "basic.h"
 
+#include "../bitvector.h"
 #include "../id_map.h"
 #include "../keyed_vector.h"
 #include "../types.h"
@@ -42,6 +43,9 @@ namespace osp::active
 {
 
 enum class DrawEnt : uint32_t { };
+
+using DrawEntVector_t   = std::vector<DrawEnt>;
+using DrawEntSet_t      = BitVector_t;
 
 struct BasicDrawProps
 {
@@ -81,13 +85,31 @@ using TexIdOwner_t      = TexRefCount_t::Owner_t;
  */
 struct ACtxDrawing
 {
+
+    void resize_draw()
+    {
+        std::size_t const size = m_drawIds.capacity();
+
+        bitvector_resize(m_visible, size);
+        m_drawBasic     .resize(size);
+        m_color         .resize(size);
+        m_diffuseTex    .resize(size);
+        m_mesh          .resize(size);
+    }
+
+    void resize_active(std::size_t const size)
+    {
+        bitvector_resize(m_needDrawTf, size);
+        m_activeToDraw.resize(size, lgrn::id_null<DrawEnt>());
+    }
+
     lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
 
     EntSet_t                                m_visible;
-    EntSet_t                                m_needDrawTf;
     KeyedVec<DrawEnt, BasicDrawProps>       m_drawBasic;
     KeyedVec<DrawEnt, Magnum::Color4>       m_color;
 
+    EntSet_t                                m_needDrawTf;
     KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
 
     // Scene-space Meshes

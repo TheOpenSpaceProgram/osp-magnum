@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "../bitvector.h"   // for osp::BitVector_t
+
 // IWYU pragma: begin_exports
 
 #include <entt/core/fwd.hpp>          // for entt::id_type
@@ -58,10 +60,10 @@ struct entt::storage_type<Type, osp::active::ActiveEnt>
 namespace osp::active
 {
 
-using ActiveReg_t = lgrn::IdRegistryStl<osp::active::ActiveEnt>;
+using ActiveReg_t = lgrn::IdRegistryStl<ActiveEnt>;
 
-using EntVector_t = std::vector<ActiveEnt>;
-using EntSet_t = lgrn::BitView< std::vector<uint64_t> >;
+using EntVector_t   = std::vector<ActiveEnt>;
+using EntSet_t      = BitVector_t;
 
 using active_sparse_set_t = entt::basic_sparse_set<ActiveEnt>;
 

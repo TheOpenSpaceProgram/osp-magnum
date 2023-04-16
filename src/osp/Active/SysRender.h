@@ -198,7 +198,7 @@ public:
 
     template<typename IT_T>
     static void update_delete_drawing(
-            ACtxDrawing& rCtxDraw, IT_T first, IT_T const& last);
+            ACtxDrawing& rCtxDraw, IT_T const& first, IT_T const& last);
 
     template<typename IT_T>
     static void update_delete_groups(
@@ -269,18 +269,14 @@ void remove_refcounted(
 
 template<typename IT_T>
 void SysRender::update_delete_drawing(
-        ACtxDrawing& rCtxDraw, IT_T first, IT_T const& last)
+        ACtxDrawing& rCtxDraw, IT_T const& first, IT_T const& last)
 {
-    while (first != last)
+    for (auto it = first; it != last; std::advance(it, 1))
     {
-        DrawEnt const ent = rCtxDraw.m_activeToDraw[*first];
+        DrawEnt const drawEnt = *it;
 
-        // Textures and meshes are reference counted
-        remove_refcounted(ent, rCtxDraw.m_diffuseTex, rCtxDraw.m_texRefCounts);
-        remove_refcounted(ent, rCtxDraw.m_mesh, rCtxDraw.m_meshRefCounts);
-
-
-        std::advance(first, 1);
+        remove_refcounted(drawEnt, rCtxDraw.m_diffuseTex, rCtxDraw.m_texRefCounts);
+        remove_refcounted(drawEnt, rCtxDraw.m_mesh,       rCtxDraw.m_meshRefCounts);
     }
 }
 

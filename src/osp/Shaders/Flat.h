@@ -90,7 +90,7 @@ void sync_flat(
         active::RenderGroup::Storage_t *const                   pStorageOpaque,
         active::RenderGroup::Storage_t *const                   pStorageTransparent,
         KeyedVec<active::DrawEnt, active::BasicDrawProps> const& drawBasic,
-        KeyedVec<active::DrawEnt, active::TexIdOwner_t> const& diffuse,
+        active::TexGlEntStorage_t const&                        diffuse,
         ACtxDrawFlat &rData)
 {
     using namespace active;
@@ -114,7 +114,9 @@ void sync_flat(
             continue; // Phong material is not assigned to this entity
         }
 
-        Flat *pShader = diffuse[ent].has_value() ? &rData.m_shaderDiffuse : &rData.m_shaderUntextured;
+        Flat *pShader = (diffuse[ent].m_glId != lgrn::id_null<TexGlId>())
+                      ? &rData.m_shaderDiffuse
+                      : &rData.m_shaderUntextured;
 
         if (drawBasic[ent].m_opaque)
         {

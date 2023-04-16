@@ -69,7 +69,7 @@ void add_floor(
     auto &rDrawing      = top_get< ACtxDrawing >    (topData, idDrawing);
     auto &rDrawingRes   = top_get< ACtxDrawingRes > (topData, idDrawingRes);
     auto &rMatEnts      = top_get< EntSet_t >       (topData, idMatEnts);
-    auto &rMatDirty     = top_get< EntVector_t >    (topData, idMatDirty);
+    auto &rMatDirty     = top_get< std::vector<DrawEnt> >    (topData, idMatDirty);
     auto &rSpawner      = top_get< SpawnerVec_t >   (topData, idSpawner);
 
     // Convenient functor to get a reference-counted mesh owner
@@ -83,31 +83,32 @@ void add_floor(
     // Create floor root and mesh entity
     ActiveEnt const floorRootEnt = rActiveIds.create();
     ActiveEnt const floorMeshEnt = rActiveIds.create();
+    DrawEnt const floorMeshDrawEnt = rDrawing.m_drawIds.create();
 
     // Resize some containers to fit all existing entities
-    rDrawing.m_drawable.ints().resize(rActiveIds.vec().capacity());
     rBasic.m_scnGraph.resize(rActiveIds.capacity());
+    rDrawing.resize_active(rActiveIds.capacity());
+    rDrawing.resize_draw();
+    bitvector_resize(rMatEnts, rDrawing.m_drawIds.capacity());
 
-    // Add transform and draw transform to root
     rBasic.m_transform.emplace(floorRootEnt);
 
     // Add mesh to floor mesh entity
-    rDrawing.m_mesh.emplace(floorMeshEnt, quick_add_mesh("grid64solid"));
-    rDrawing.m_meshDirty.push_back(floorMeshEnt);
+    rDrawing.m_activeToDraw[floorMeshEnt] = floorMeshDrawEnt;
+    rDrawing.m_mesh[floorMeshDrawEnt] = quick_add_mesh("grid64solid");
+    rDrawing.m_meshDirty.push_back(floorMeshDrawEnt);
 
     // Add mesh visualizer material to floor mesh entity
-    rMatEnts.ints().resize(rActiveIds.vec().capacity());
-    rMatEnts.set(std::size_t(floorMeshEnt));
-    rMatDirty.push_back(floorMeshEnt);
+
+    rMatEnts.set(std::size_t(floorMeshDrawEnt));
+    rMatDirty.push_back(floorMeshDrawEnt);
 
     // Add transform, draw transform, opaque, and visible entity
-    rBasic.m_transform.emplace(
-            floorMeshEnt, ACompTransform{Matrix4::scaling(sc_floorSize)});
-    rDrawing.m_opaque.emplace(floorMeshEnt);
-    rDrawing.m_visible.emplace(floorMeshEnt);
-
-    rDrawing.m_drawable.set(std::size_t(floorRootEnt));
-    rDrawing.m_drawable.set(std::size_t(floorMeshEnt));
+    rBasic.m_transform.emplace(floorMeshEnt, ACompTransform{Matrix4::scaling(sc_floorSize)});
+    rDrawing.m_drawBasic[floorMeshDrawEnt].m_opaque = true;
+    rDrawing.m_visible.set(std::size_t(floorMeshDrawEnt));
+    rDrawing.m_needDrawTf.set(std::size_t(floorRootEnt));
+    rDrawing.m_needDrawTf.set(std::size_t(floorMeshEnt));
 
     SubtreeBuilder builder = SysSceneGraph::add_descendants(rBasic.m_scnGraph, 2);
 

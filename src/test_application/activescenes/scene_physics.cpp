@@ -155,33 +155,43 @@ Session setup_shape_spawn(
 
     shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgMeshMod, tgDrawMod, tgMatMod}).data(
             "Add mesh and material to spawned shapes",
-            TopDataIds_t{             idDrawing,              idSpawner,             idSpawnerEnts,             idNMesh,          idMatEnts,             idMatDirty,                   idActiveIds},
-            wrap_args([] (ACtxDrawing& rDrawing, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, NamedMeshes& rNMesh, EntSet_t& rMatEnts, EntVector_t& rMatDirty, ActiveReg_t const& rActiveIds ) noexcept
+            TopDataIds_t{             idDrawing,              idSpawner,             idSpawnerEnts,             idNMesh,          idMatEnts,                      idMatDirty,                   idActiveIds},
+            wrap_args([] (ACtxDrawing& rDrawing, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, NamedMeshes& rNMesh, EntSet_t& rMatEnts, std::vector<DrawEnt>& rMatDirty, ActiveReg_t const& rActiveIds ) noexcept
     {
         if (rSpawner.size() == 0)
         {
             return;
         }
-        rMatEnts.ints().resize(rActiveIds.vec().capacity());
-        rDrawing.m_drawable.ints().resize(rActiveIds.vec().capacity());
+
+        rDrawing.resize_active(rActiveIds.capacity());
+
+        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        {
+            ActiveEnt const child           = rSpawnerEnts[i * 2 + 1];
+            rDrawing.m_activeToDraw[child]  = rDrawing.m_drawIds.create();
+        }
+
+        rDrawing.resize_draw();
+        bitvector_resize(rMatEnts, rDrawing.m_drawIds.capacity());
 
         for (std::size_t i = 0; i < rSpawner.size(); ++i)
         {
             SpawnShape const &spawn = rSpawner[i];
             ActiveEnt const root    = rSpawnerEnts[i * 2];
             ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
+            DrawEnt const drawEnt   = rDrawing.m_activeToDraw[child];
 
-            rDrawing.m_mesh.emplace( child, rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape)) );
-            rDrawing.m_meshDirty.push_back(child);
+            rDrawing.m_needDrawTf.set(std::size_t(root));
+            rDrawing.m_needDrawTf.set(std::size_t(child));
 
-            rMatEnts.set(std::size_t(child));
-            rMatDirty.push_back(child);
+            rDrawing.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape));
+            rDrawing.m_meshDirty.push_back(drawEnt);
 
-            rDrawing.m_visible.emplace(child);
-            rDrawing.m_opaque.emplace(child);
+            rMatEnts.set(std::size_t(drawEnt));
+            rMatDirty.push_back(drawEnt);
 
-            rDrawing.m_drawable.set(std::size_t(root));
-            rDrawing.m_drawable.set(std::size_t(child));
+            rDrawing.m_visible.set(std::size_t(drawEnt));
+            rDrawing.m_drawBasic[drawEnt].m_opaque = true;
         }
     }));
 
@@ -320,10 +330,10 @@ Session setup_prefabs(
 
         prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod, tgMatMod}).data(
                 "Init Prefab drawables (single material)",
-                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,             idMatDirty,                   idActiveIds },
-                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, EntVector_t& rMatDirty, ActiveReg_t const& rActiveIds) noexcept
+                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,                      idMatDirty,                   idActiveIds },
+                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, std::vector<DrawEnt>& rMatDirty, ActiveReg_t const& rActiveIds) noexcept
         {
-            rDrawing.m_drawable.ints().resize(rActiveIds.vec().capacity());
+            rDrawing.resize_active(rActiveIds.capacity());
             rMatEnts.ints().resize(rActiveIds.vec().capacity());
             SysPrefabInit::init_drawing(rPrefabInit, rResources, rDrawing, rDrawingRes, {{rMatEnts, rMatDirty}});
         }));
