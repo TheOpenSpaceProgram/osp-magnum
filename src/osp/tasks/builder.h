@@ -25,7 +25,9 @@
 #pragma once
 
 #include "tasks.h"
+#include "../types.h"
 
+#include <iterator>
 #include <longeron/containers/bit_view.hpp>
 
 #include <Corrade/Containers/ArrayView.h>
@@ -38,178 +40,130 @@
 namespace osp
 {
 
-using Corrade::Containers::ArrayView;
-
-inline void set_tags(
-        Corrade::Containers::ArrayView<uint32_t const>  tagsIn,
-        ArrayView<bit_int_t>                            taggedInts,
-        std::size_t const                               taggedSize,
-        std::size_t const                               taggedId) noexcept
+struct TaskBuilderData
 {
-    std::size_t const offset = taggedId * taggedSize;
-    auto taggedBits = lgrn::BitView(taggedInts.slice(offset, offset + taggedSize));
-
-    for (uint32_t const tag : tagsIn)
+    struct TaskTargetPair
     {
-        taggedBits.set(tag);
-    }
-}
+        TaskId m_task;
+        TargetId m_target;
+    };
+
+    struct TaskSemaphorePair
+    {
+        TaskId m_task;
+        SemaphoreId m_sema;
+    };
+
+    struct TaskCounts
+    {
+        unsigned int m_dependingOn  {0};
+        unsigned int m_fulfills     {0};
+        unsigned int m_acquires     {0};
+    };
+
+    struct TargetCounts
+    {
+        unsigned int m_dependents   {0};
+        unsigned int m_fulfilledBy  {0};
+    };
+
+    lgrn::IdRegistryStl<TaskId>             m_taskIds;
+    lgrn::IdRegistryStl<TargetId>           m_targetIds;
+    lgrn::IdRegistryStl<SemaphoreId>        m_semaIds;
+    KeyedVec<SemaphoreId, unsigned int>     m_semaLimits;
+
+    std::vector<TaskTargetPair>             m_targetDependEdges;
+    std::vector<TaskTargetPair>             m_targetFulfillEdges;
+    std::vector<TaskSemaphorePair>          m_semaphoreEdges;
+
+}; // TaskBuilderData
 
 /**
- * @brief A convenient interface for setting up TaskTags and required task data
+ * @brief A convenient interface for setting up Tasks and required task data
  */
-template <typename DATA_T>
-class TaskBuilder
+template <typename TASKBUILDER_T, typename TASKREF_T>
+struct TaskBuilderBase : TaskBuilderData
 {
-    using Tags_t = Corrade::Containers::ArrayView<TagId const>;
-
 public:
 
-    struct TaskRef
+    TASKREF_T task()
     {
-        constexpr operator TaskId() noexcept
-        {
-            return m_taskId;
-        }
+        TaskId const taskId = m_taskIds.create();
 
-        TaskRef& assign(Tags_t const tags) noexcept
-        {
-            set_tags(Corrade::Containers::arrayCast<uint32_t const>(tags),
-                     m_rTasks.m_taskTags,
-                     m_rTags.tag_ints_per_task(),
-                     std::size_t(m_taskId));
-            return *this;
-        }
-
-        TaskRef& assign(std::initializer_list<TagId> tags) noexcept
-        {
-            return assign(Corrade::Containers::arrayView(tags));
-        }
-
-        template <typename ... ARGS_T>
-        TaskRef& data(ARGS_T&& ... args) noexcept
-        {
-            task_data(m_rData, m_taskId, std::forward<ARGS_T>(args) ...);
-            return *this;
-        }
-
-        TaskId const    m_taskId;
-        Tags            & m_rTags;
-        Tasks           & m_rTasks;
-        DATA_T          & m_rData;
-
-    }; // struct TaskRefSpec
-
-    struct TagRef
-    {
-
-        TagRef& depend_on(Tags_t tags) noexcept
-        {
-            auto depends = osp::tag_depends_2d(m_rTags)[std::size_t(m_tagId)].asContiguous();
-            auto const depBegin = std::begin(depends);
-            auto const depEnd   = std::end(depends);
-
-            for (TagId const tag : tags)
-            {
-                // Find first empty spot or already-added dependency
-                auto dependIt = std::find_if(
-                        depBegin, depEnd, [tag] (TagId const lhs)
-                {
-                    return (lhs == lgrn::id_null<TagId>()) || (lhs == tag);
-                });
-
-                // No space left for any dependencies
-                assert(dependIt != depEnd);
-
-                *dependIt = tag;
-            }
-
-            return *this;
-        }
-
-        TagRef& depend_on(std::initializer_list<TagId> tags) noexcept
-        {
-            return depend_on(Corrade::Containers::arrayView(tags));
-        }
-
-        TagRef& limit(unsigned int lim)
-        {
-            m_rTags.m_tagLimits[std::size_t(m_tagId)] = lim;
-            return *this;
-        }
-
-        TagRef& set_external(bool value)
-        {
-            auto bitView = lgrn::bit_view(m_rTags.m_tagExtern);
-            if (value)
-            {
-                bitView.set(std::size_t(m_tagId));
-            }
-            else
-            {
-                bitView.reset(std::size_t(m_tagId));
-            }
-            return *this;
-        }
-
-        TagId const m_tagId;
-        Tags        & m_rTags;
-
-    }; // struct TagRef
-
-    constexpr TaskBuilder(Tags& rTags, Tasks& rTasks, DATA_T& rData)
-     : m_rTags{rTags}
-     , m_rTasks{rTasks}
-     , m_rData{rData}
-    { }
-
-    template <std::size_t N>
-    std::array<TagId, N> create_tags()
-    {
-        std::array<TagId, N> out;
-
-        [[maybe_unused]] auto const it
-                = m_rTags.m_tags.create(std::begin(out), std::end(out));
-
-        assert(it == std::end(out)); // Auto-resizing tags not (yet?) supported
-
-        return out;
-    }
-
-    TagRef tag(TagId const tagId)
-    {
-        return {
-            .m_tagId = tagId,
-            .m_rTags = m_rTags
-        };
-    }
-
-    TaskRef task()
-    {
-        TaskId const taskId = m_rTasks.m_tasks.create();
-
-        std::size_t const capacity = m_rTasks.m_tasks.capacity();
-
-        m_rTasks.m_taskTags.resize(capacity * m_rTags.tag_ints_per_task());
+        std::size_t const capacity = m_taskIds.capacity();
 
         return task(taskId);
     };
 
-    constexpr TaskRef task(TaskId const taskId) noexcept
+    constexpr TASKREF_T task(TaskId const taskId) noexcept
     {
-        return {
-            .m_taskId       = taskId,
-            .m_rTags        = m_rTags,
-            .m_rTasks       = m_rTasks,
-            .m_rData        = m_rData
+        return TASKREF_T{
+            taskId,
+            static_cast<TASKBUILDER_T&>(*this)
         };
     }
 
-private:
-    Tags    & m_rTags;
-    Tasks   & m_rTasks;
-    DATA_T  & m_rData;
+    template<typename TGT_STRUCT_T>
+    TGT_STRUCT_T create_targets()
+    {
+        static_assert(sizeof(TGT_STRUCT_T) % sizeof(TargetId) == 0);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(TargetId);
 
-}; // class TaskBuilder
+        std::array<TargetId, count> out;
+
+        m_targetIds.create(out.begin(), out.end());
+
+        return reinterpret_cast<TGT_STRUCT_T&>(*out.data());
+    }
+
+}; // class TaskBuilderBase
+
+
+template <typename TASKBUILDER_T, typename TASKREF_T>
+struct TaskRefBase
+{
+    struct Empty {};
+
+    constexpr operator TaskId() noexcept
+    {
+        return m_taskId;
+    }
+
+    constexpr Tasks & tasks() noexcept { return m_rBuilder.m_rTasks; }
+
+    TASKREF_T& depends_on(ArrayView<TargetId const> const targets) noexcept
+    {
+        for (TargetId const target : targets)
+        {
+            m_rBuilder.m_targetDependEdges.push_back({m_taskId, target});
+        }
+        return static_cast<TASKREF_T&>(*this);
+    }
+
+    TASKREF_T& depends_on(std::initializer_list<TargetId const> targets) noexcept
+    {
+        return depends_on(Corrade::Containers::arrayView(targets));
+    }
+
+    TASKREF_T& fulfills(ArrayView<TargetId const> const targets) noexcept
+    {
+        for (TargetId const target : targets)
+        {
+            m_rBuilder.m_targetFulfillEdges.push_back({m_taskId, target});
+        }
+        return static_cast<TASKREF_T&>(*this);
+    }
+
+    TASKREF_T& fulfills(std::initializer_list<TargetId const> targets) noexcept
+    {
+        return fulfills(Corrade::Containers::arrayView(targets));
+    }
+
+    TaskId          m_taskId;
+    TASKBUILDER_T   & m_rBuilder;
+
+}; // struct TaskRefBase
+
+Tasks finalize(TaskBuilderData && data);
 
 } // namespace osp

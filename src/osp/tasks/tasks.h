@@ -24,7 +24,10 @@
  */
 #pragma once
 
+#include "../keyed_vector.h"
+
 #include <longeron/id_management/registry_stl.hpp>
+#include <longeron/containers/intarray_multimap.hpp>
 
 #include <Corrade/Containers/StridedArrayView.h>
 
@@ -34,91 +37,34 @@
 namespace osp
 {
 
-using bit_int_t = uint64_t;
-
-enum class TaskId : uint32_t {};
-enum class TagId  : uint32_t {};
-
-struct Tags
-{
-    lgrn::IdRegistryStl<TagId, true>    m_tags;
-
-    // Dependency tags restricts a task from running until all tasks containing
-    // tags it depends on are complete.
-    // 2D with m_tagDependsPerTag elements per row, [tag][dependency]
-    // lgrn::null<Tag> used as null, or termination per-tag
-    std::vector<TagId>                  m_tagDepends;
-    std::size_t                         m_tagDependsPerTag{8};
-
-    // Limit sets how many tasks using a certain tag can run simultaneously
-    std::vector<unsigned int>           m_tagLimits;
-
-    // Restricts associated enqueued tasks from running until externally set
-    // Resets once all associated tasks are complete
-    std::vector<bit_int_t>              m_tagExtern;
-
-    [[nodiscard]] std::size_t tag_ints_per_task() const noexcept { return m_tags.vec().size(); }
-
-}; // struct Tags
+enum class TaskId       : uint32_t { };
+enum class TargetId     : uint32_t { };
+enum class SemaphoreId  : uint32_t { };
 
 struct Tasks
 {
-    lgrn::IdRegistryStl<TaskId>         m_tasks;
+    using TaskInt       = uint32_t;
+    using TargetInt     = uint32_t;
+    using SemaphoreInt  = uint32_t;
 
-    // Bit positions are used to store which tags a task contains.
-    // 2D with Tags::m_tags.vec().size() elements per row. [task][tagsInt]
-    // partitioned based on Tags::tag_ints_per_task(): AAAABBBBCCCCDDDD
-    std::vector<bit_int_t>              m_taskTags;
+    lgrn::IdRegistryStl<TaskId>                     m_taskIds;
+    lgrn::IdRegistryStl<TargetId>                   m_targetIds;
+    lgrn::IdRegistryStl<SemaphoreId>                m_semaIds;
 
-}; // struct Tasks
+    KeyedVec<SemaphoreId, unsigned int>             m_semaLimits;
 
-inline Corrade::Containers::StridedArrayView2D<TagId> tag_depends_2d(Tags& rTags) noexcept
-{
-    return {Corrade::Containers::arrayView(rTags.m_tagDepends.data(), rTags.m_tagDepends.size()),
-            {rTags.m_tags.capacity(), rTags.m_tagDependsPerTag}};
-}
+    lgrn::IntArrayMultiMap<TaskInt, TargetId>       m_taskDependOn;         /// Tasks depend on (n) Targets
+    lgrn::IntArrayMultiMap<TargetInt, TaskId>       m_targetDependents;     /// Targets have (n) Tasks that depend on it
 
-inline Corrade::Containers::StridedArrayView2D<TagId const> tag_depends_2d(Tags const& rTags) noexcept
-{
-    return {Corrade::Containers::arrayView(rTags.m_tagDepends.data(), rTags.m_tagDepends.size()),
-            {rTags.m_tags.capacity(), rTags.m_tagDependsPerTag}};
-}
+    lgrn::IntArrayMultiMap<TaskInt, TargetId>       m_taskFulfill;          /// Tasks fulfill (n) Targets
+    lgrn::IntArrayMultiMap<TargetInt, TaskId>       m_targetFulfilledBy;    /// Targets are fulfilled by (n) Tasks
 
-inline Corrade::Containers::StridedArrayView2D<bit_int_t> task_tags_2d(Tags const& rTags, Tasks &rTasks) noexcept
-{
-    return {Corrade::Containers::arrayView(rTasks.m_taskTags.data(), rTasks.m_taskTags.size()),
-            {rTasks.m_tasks.capacity(), rTags.tag_ints_per_task()}};
-}
-
-inline Corrade::Containers::StridedArrayView2D<bit_int_t const> task_tags_2d(Tags const& rTags, Tasks const &rTasks) noexcept
-{
-    return {Corrade::Containers::arrayView(rTasks.m_taskTags.data(), rTasks.m_taskTags.size()),
-            {rTasks.m_tasks.capacity(), rTags.tag_ints_per_task()}};
-}
-
-template <typename DATA_T>
-struct TaskDataVec
-{
-    std::vector<DATA_T> m_taskData;
-
-}; // struct TaskDataVec
-
-template <typename DATA_T, typename RHS_T>
-void task_data(TaskDataVec<DATA_T> &rData, TaskId const task, RHS_T&& rhs)
-{
-    rData.m_taskData.resize(
-            std::max(rData.m_taskData.size(), std::size_t(task) + 1));
-    rData.m_taskData[std::size_t(task)] = std::forward<RHS_T>(rhs);
-}
+    lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>    m_taskAcquire;          /// Tasks acquire (n) Semaphores
+    lgrn::IntArrayMultiMap<SemaphoreInt, TaskId>    m_semaAcquiredBy;       /// Semaphores are acquired by (n) Tasks
+};
 
 struct ExecutionContext
 {
-    // Tag counts from running or queued tasks; used for Dependencies
-    std::vector<unsigned int> m_tagIncompleteCounts;
-    // Tag counts from running tasks; used for Limits
-    std::vector<unsigned int> m_tagRunningCounts;
-    // External tags
-    std::vector<uint64_t> m_tagExternTriggers;
 
     // Number of times each task is queued to run
     std::vector<unsigned int> m_taskQueuedCounts;
