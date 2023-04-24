@@ -25,16 +25,15 @@
 #pragma once
 
 #include "../keyed_vector.h"
+#include "../bitvector.h"
 
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>
 
-#include <Corrade/Containers/StridedArrayView.h>
-
 #include <cstdint>
 #include <vector>
 
-namespace osp
+namespace osp::tasks
 {
 
 enum class TaskId       : uint32_t { };
@@ -63,22 +62,5 @@ struct Tasks
     lgrn::IntArrayMultiMap<SemaphoreInt, TaskId>    m_semaAcquiredBy;       /// Semaphores are acquired by (n) Tasks
 };
 
-struct ExecutionContext
-{
-
-    // Number of times each task is queued to run
-    std::vector<unsigned int> m_taskQueuedCounts;
-    //std::vector<uint64_t>     m_taskQueuedBits;
-
-    // TODO: Consider multithreading. something something work stealing...
-    //  * Allow multiple threads to search for and execute tasks. Atomic access
-    //    for ExecutionContext? Might be messy to implement.
-    //  * Only allow one thread to search for tasks, assign tasks to other
-    //    threads if they're available before running own task. Another thread
-    //    can take over once it completes its task. May be faster as only one
-    //    thread is modifying ExecutionContext, and easier to implement.
-    //  * Plug into an existing work queue library?
-
-}; // struct ExecutionContext
 
 } // namespace osp

@@ -33,15 +33,13 @@ namespace osp
 {
 
 
-void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec);
+void top_run_blocking(Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec);
 
-void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, ArrayView<TagId const> tagsEnq);
+void top_enqueue_quick(Tasks const& tasks, ExecutionContext& rExec, ArrayView<TagId const> tagsEnq);
 
-inline void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, std::initializer_list<TagId const> tagsEnq)
+inline void top_enqueue_quick(Tasks const& tasks, ExecutionContext& rExec, std::initializer_list<TagId const> tagsEnq)
 {
     return top_enqueue_quick(tags, tasks, rExec, Corrade::Containers::arrayView(tagsEnq));
 }
-
-bool debug_top_print_deadlock(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, ExecutionContext const &rExec);
 
 } // namespace testapp

@@ -24,7 +24,7 @@
  */
 #include "builder.h"
 
-namespace osp
+namespace osp::tasks
 {
 
 Tasks finalize(TaskBuilderData && data)
@@ -102,20 +102,26 @@ Tasks finalize(TaskBuilderData && data)
 
     for (auto const [task, target] : data.m_targetDependEdges)
     {
+        auto const dependOn     = lgrn::Span<TargetId>  (out.m_taskDependOn[TaskInt(task)]);
+        auto const dependents   = lgrn::Span<TaskId>    (out.m_targetDependents[TargetInt(target)]);
+
+        dependOn    [dependOn.size()    - taskCounts[task].m_dependingOn]       = target;
+        dependents  [dependents.size()  - targetCounts[target].m_dependents]    = task;
+
         --taskCounts[task]    .m_dependingOn;
         --targetCounts[target].m_dependents;
-
-        out.m_taskDependOn     [TaskInt(task)]     [taskCounts[task].m_dependingOn]     = target;
-        out.m_targetDependents [TargetInt(target)] [targetCounts[target].m_dependents]  = task;
     }
 
     for (auto const [task, target] : data.m_targetFulfillEdges)
     {
+        auto const fulfills     = lgrn::Span<TargetId>  (out.m_taskFulfill[TaskInt(task)]);
+        auto const fulfilledBy  = lgrn::Span<TaskId>    (out.m_targetFulfilledBy[TargetInt(target)]);
+
+        fulfills    [fulfills.size()    - taskCounts[task].m_fulfills]          = target;
+        fulfilledBy [fulfilledBy.size() - targetCounts[target].m_fulfilledBy]   = task;
+
         -- taskCounts[task]    .m_fulfills;
         -- targetCounts[target].m_fulfilledBy;
-
-        out.m_taskFulfill       [TaskInt(task)]     [taskCounts[task].m_fulfills]        = target;
-        out.m_targetFulfilledBy [TargetInt(target)] [targetCounts[target].m_fulfilledBy] = task;
     }
 
     out.m_taskIds       = std::move(data.m_taskIds);

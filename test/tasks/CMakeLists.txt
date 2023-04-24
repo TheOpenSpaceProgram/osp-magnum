@@ -26,6 +26,4 @@ PROJECT(test_tasks CXX)
 ADD_TEST_DIRECTORY(${PROJECT_NAME})
 
 TARGET_LINK_LIBRARIES(test_tasks PRIVATE longeron EnTT::EnTT Magnum::Magnum)
-TARGET_SOURCES(test_tasks PRIVATE "${CMAKE_SOURCE_DIR}/src/osp/tasks/builder.cpp")
-#TARGET_SOURCES(test_tasks PRIVATE "${CMAKE_SOURCE_DIR}/src/osp/tasks/execute_simple.cpp")
-
+TARGET_SOURCES(test_tasks PRIVATE "${CMAKE_SOURCE_DIR}/src/osp/tasks/builder.cpp" "${CMAKE_SOURCE_DIR}/src/osp/tasks/execute.cpp")

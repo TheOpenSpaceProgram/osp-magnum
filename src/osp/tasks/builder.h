@@ -37,7 +37,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace osp
+namespace osp::tasks
 {
 
 struct TaskBuilderData
@@ -116,6 +116,14 @@ public:
         return reinterpret_cast<TGT_STRUCT_T&>(*out.data());
     }
 
+    template<std::size_t N>
+    std::array<TargetId, N> create_targets()
+    {
+        std::array<TargetId, N> out;
+        m_targetIds.create(out.begin(), out.end());
+        return out;
+    }
+
 }; // class TaskBuilderBase
 
 
@@ -163,6 +171,42 @@ struct TaskRefBase
     TASKBUILDER_T   & m_rBuilder;
 
 }; // struct TaskRefBase
+
+template<typename FUNC_T>
+struct BasicBuilderTraits
+{
+    using Func_t    = FUNC_T;
+    using FuncVec_t = KeyedVec<TaskId, FUNC_T>;
+
+    struct Builder;
+
+    struct Ref : public TaskRefBase<Builder, Ref>
+    {
+        Ref& func(FUNC_T && in);
+    };
+
+    struct Builder : public TaskBuilderBase<Builder, Ref>
+    {
+        Builder(FuncVec_t& funcs)
+         : m_funcs{funcs}
+        { }
+        Builder(Builder const& copy) = delete;
+        Builder(Builder && move) = default;
+
+        Builder& operator=(Builder const& copy) = delete;
+        Builder& operator=(Builder && move) = default;
+
+        FuncVec_t & m_funcs;
+    };
+};
+
+template<typename FUNC_T>
+typename BasicBuilderTraits<FUNC_T>::Ref& BasicBuilderTraits<FUNC_T>::Ref::func(FUNC_T && in)
+{
+    this->m_rBuilder.m_funcs.resize(this->m_rBuilder.m_taskIds.capacity());
+    this->m_rBuilder.m_funcs[this->m_taskId] = std::move(in);
+    return *this;
+}
 
 Tasks finalize(TaskBuilderData && data);
 

@@ -24,7 +24,7 @@
  */
 #include <osp/tasks/tasks.h>
 #include <osp/tasks/builder.h>
-//#include <osp/tasks/execute_simple.h>
+#include <osp/tasks/execute.h>
 
 #include <gtest/gtest.h>
 
@@ -33,9 +33,10 @@
 #include <set>
 
 using namespace osp;
+using namespace osp::tasks;
 
 template <typename RANGE_T, typename VALUE_T>
-bool contains(RANGE_T const& range, VALUE_T const& value)
+bool contains(RANGE_T const& range, VALUE_T const& value) noexcept
 {
     for (auto const& element : range)
     {
@@ -47,101 +48,186 @@ bool contains(RANGE_T const& range, VALUE_T const& value)
     return false;
 }
 
-struct World
+template<typename RUN_TASK_T>
+void randomized_singlethreaded_execute(Tasks const& tasks, ExecutionContext& rExec, std::mt19937 &rRand, int maxRuns, RUN_TASK_T && runTask)
 {
-    int m_deltaTimeIn{0};
+    std::size_t tasksLeft = rExec.m_tasksQueued.count();
+
+    for (int i = 0; i < maxRuns; ++i)
+    {
+        if (tasksLeft == 0)
+        {
+            break;
+        }
+
+        // This solution of "pick random '1' bit in a bit vector" is very inefficient
+        std::size_t const randomTask = *std::next(rExec.m_tasksQueued.ones().begin(), rRand() % tasksLeft);
+
+        FulfillDirty_t const status = runTask(TaskId(randomTask));
+        mark_completed_task(tasks, rExec, TaskId(randomTask), status);
+        int const newTasks = enqueue_dirty(tasks, rExec);
+
+        tasksLeft = tasksLeft - 1 + newTasks;
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+// Test multiple tasks fulfilling a single target
+TEST(Tasks, BasicParallelSingleThreaded)
+{
+    // NOTE
+    // If this was multithreaded, then multiple threads writing to a single container is a bad
+    // idea. The proper way to do this is to make a vector per-thread. Targets are still
+    // well-suited for this problem, as these per-thread vectors can all be represented with the
+    // same TargetId.
+
+    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(int const, std::vector<int>&)>;
+    using Builder_t         = BasicTraits_t::Builder;
+    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
+
+    constexpr int sc_repetitions = 32;
+    constexpr int sc_pusherTaskCount = 1337;
+    constexpr int sc_totalTaskCount = sc_pusherTaskCount + 1;
+    std::mt19937 randGen(69);
+
+    TaskFuncVec_t functions;
+    auto builder = Builder_t{functions};
+    auto const
+    [
+        inputIn,    /// Input int, manually set dirty when it changes
+        vecClear,   /// Vector must be cleared before new stuff can be added to it
+        vecReady    /// Vector is ready, all ints have been added to it
+
+    ] = builder.create_targets<3>();
+
+    // Clear vector before use
+    builder.task()
+            .depends_on({inputIn})
+            .fulfills({vecClear})
+            .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
+    {
+        rOut.clear();
+        return {{0b01}};
+    });
+
+    // Multiple tasks push to the vector
+    for (int i = 0; i < sc_pusherTaskCount; ++i)
+    {
+        builder.task()
+                .depends_on({vecClear})
+                .fulfills({vecReady})
+                .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
+        {
+            rOut.push_back(in);
+            return {{0b01}};
+        });
+    }
+
+    Tasks const         tasks = finalize(std::move(builder));
+    ExecutionContext    exec;
+
+    exec.resize(tasks);
+
+    int                 input = 0;
+    std::vector<int>    output;
+
+    // Repeat (with randomness) to test many possible execution orders
+    for (int i = 0; i < sc_repetitions; ++i)
+    {
+        input = 1 + randGen() % 30;
+
+        // Enqueue initial tasks
+        // This roughly indicates "Time has changed" and "Render requested"
+        exec.m_targetDirty.set(std::size_t(inputIn));
+        enqueue_dirty(tasks, exec);
+
+        randomized_singlethreaded_execute(tasks, exec, randGen, sc_totalTaskCount, [&functions, &input, &output] (TaskId const task) -> FulfillDirty_t
+        {
+            return functions[task](input, output);
+        });
+
+        int const sum = std::accumulate(output.begin(), output.end(), 0);
+
+        ASSERT_EQ(sum, input * sc_pusherTaskCount);
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+struct TestWorld
+{
+    int m_deltaTimeIn{1};
     int m_forces{0};
     int m_positions{0};
     std::set<std::string> m_canvas;
 };
 
-using TaskFunctions_t = KeyedVec<TaskId, std::function<void(World&)>>;
-
-struct CustomTaskBuilder;
-
-struct CustomTaskRef : public osp::TaskRefBase<CustomTaskBuilder, CustomTaskRef>
+struct TestWorldTargets
 {
-    CustomTaskRef& func(std::function<void(World&)> in);
-};
-
-struct CustomTaskBuilder : public osp::TaskBuilderBase<CustomTaskBuilder, CustomTaskRef>
-{
-    TaskFunctions_t & m_funcs;
-};
-
-CustomTaskRef& CustomTaskRef::func(std::function<void(World&)> in)
-{
-    m_rBuilder.m_funcs.resize(m_rBuilder.m_taskIds.capacity());
-    m_rBuilder.m_funcs[m_taskId] = std::move(in);
-    return *this;
-}
-
-struct WorldTargets
-{
-    TargetId timeIn;            /// Fire externally when time changes, and world needs to update
-    TargetId forces;            /// Forces need to be calculated for physics
-    TargetId physics;           /// Physics calculations
-    TargetId renderRequestIn;   /// Fire externally when a new frame to render is required
+    TargetId timeIn;            /// External time input, manually set dirty when time 'changes', and the world needs to update
+    TargetId forces;            /// Forces need to be calculated before physics
+    TargetId positions;         /// Positions calculated by physics task
+    TargetId renderRequestIn;   /// External render request, manually set dirty when a new frame to render is required
     TargetId renderDoneOut;     /// Fired when all rendering is finished
 };
 
-// Single-threaded test against World with order-dependent tasks
-TEST(Tasks, SingleThreaded)
+// Single-threaded test against TestWorld with order-dependent tasks
+TEST(Tasks, BasicSingleThreaded)
 {
-    constexpr uint32_t const sc_seed = 69;
-    constexpr int const sc_repetitions = 32;
+    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(TestWorld&)>;
+    using Builder_t         = BasicTraits_t::Builder;
+    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
-    // Setup structs for storing tasks and tags
+    constexpr int sc_repetitions = 32;
+    std::mt19937 randGen(69);
 
-    KeyedVec<TaskId, std::function<void(World&)>> functions;
+    TaskFuncVec_t functions;
+    auto builder    = Builder_t{functions};
+    auto const tgt  = builder.create_targets<TestWorldTargets>();
 
-    // Create tags and set relationships between them
+    // Start adding tasks. The order these are added does not matter.
 
-    auto builder = CustomTaskBuilder{.m_funcs = functions};
-
-    auto const tgt = builder.create_targets<WorldTargets>();
-
-
-    // Start adding tasks / systems. The order these are added does not matter.
-
-
-    // Calculate forces needed by the physics update
+    // Two tasks calculate forces needed by the physics update
     TaskId const taskA = builder.task()
             .depends_on({tgt.timeIn})
             .fulfills({tgt.forces})
-            .func( [] (World& rWorld)
+            .func( [] (TestWorld& rWorld) -> FulfillDirty_t
     {
         rWorld.m_forces += 42 * rWorld.m_deltaTimeIn;
+        return {{0b01}};
     });
-
     TaskId const taskB = builder.task()
             .depends_on({tgt.timeIn})
             .fulfills({tgt.forces})
-            .func([] (World& rWorld)
+            .func([] (TestWorld& rWorld) -> FulfillDirty_t
     {
         rWorld.m_forces += 1337 * rWorld.m_deltaTimeIn;
+        return {{0b01}};
     });
 
     // Main Physics update
     TaskId const taskC = builder.task()
             .depends_on({tgt.timeIn, tgt.forces})
-            .fulfills({tgt.physics})
-            .func([] (World& rWorld)
+            .fulfills({tgt.positions})
+            .func([] (TestWorld& rWorld) -> FulfillDirty_t
     {
         EXPECT_EQ(rWorld.m_forces, 1337 + 42);
         rWorld.m_positions += rWorld.m_forces;
         rWorld.m_forces = 0;
+        return {{0b01}};
     });
 
     // Draw things moved by physics update. If 'updWorld' wasn't enqueued, then
     // this will still run, as no 'needPhysics' tasks are incomplete
     TaskId const taskD = builder.task()
-            .depends_on({tgt.physics, tgt.renderRequestIn})
+            .depends_on({tgt.positions, tgt.renderRequestIn})
             .fulfills({tgt.renderDoneOut})
-            .func([] (World& rWorld)
+            .func([] (TestWorld& rWorld) -> FulfillDirty_t
     {
         EXPECT_EQ(rWorld.m_positions, 1337 + 42);
         rWorld.m_canvas.emplace("Physics Cube");
+        return {{0b01}};
     });
 
     // Draw things unrelated to physics. This is allowed to be the first task
@@ -149,86 +235,62 @@ TEST(Tasks, SingleThreaded)
     TaskId const taskE = builder.task()
         .depends_on({tgt.renderRequestIn})
         .fulfills({tgt.renderDoneOut})
-        .func([] (World& rWorld)
+        .func([] (TestWorld& rWorld) -> FulfillDirty_t
     {
         rWorld.m_canvas.emplace("Terrain");
+        return {{0b01}};
     });
 
     Tasks const tasks = finalize(std::move(builder));
 
-    // Some random checks to assure the graph structure is properly built
-    EXPECT_EQ(tasks.m_targetDependents[ uint32_t(tgt.timeIn)          ].size(), 3);
-    EXPECT_EQ(tasks.m_targetDependents[ uint32_t(tgt.forces)          ].size(), 1);
-    EXPECT_EQ(tasks.m_targetDependents[ uint32_t(tgt.physics)         ].size(), 1);
-    EXPECT_EQ(tasks.m_targetDependents[ uint32_t(tgt.renderRequestIn) ].size(), 2);
-    EXPECT_EQ(tasks.m_targetDependents[ uint32_t(tgt.renderDoneOut)   ].size(), 0);
-    EXPECT_TRUE(  contains(tasks.m_targetFulfilledBy[uint32_t(tgt.forces)],        taskB) );
-    EXPECT_FALSE( contains(tasks.m_targetFulfilledBy[uint32_t(tgt.renderDoneOut)], taskC) );
-    EXPECT_TRUE(  contains(tasks.m_taskDependOn[uint32_t(taskA)], tgt.timeIn)       );
-    EXPECT_FALSE( contains(tasks.m_taskDependOn[uint32_t(taskB)], tgt.physics)      );
-    EXPECT_TRUE(  contains(tasks.m_taskDependOn[uint32_t(taskC)], tgt.timeIn)       );
-    EXPECT_TRUE(  contains(tasks.m_taskDependOn[uint32_t(taskC)], tgt.forces)       );
-    EXPECT_TRUE(  contains(tasks.m_taskFulfill[uint32_t(taskD)], tgt.renderDoneOut) );
-    EXPECT_FALSE( contains(tasks.m_taskFulfill[uint32_t(taskE)], tgt.forces)        );
+    // Random checks to assure the graph structure is properly built
+    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.timeIn)          ].size(), 3);
+    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.forces)          ].size(), 1);
+    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.positions)       ].size(), 1);
+    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.renderRequestIn) ].size(), 2);
+    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.renderDoneOut)   ].size(), 0);
+    ASSERT_TRUE(  contains(tasks.m_targetFulfilledBy[uint32_t(tgt.forces)],        taskB) );
+    ASSERT_FALSE( contains(tasks.m_targetFulfilledBy[uint32_t(tgt.renderDoneOut)], taskC) );
+    ASSERT_TRUE(  contains(tasks.m_taskDependOn[uint32_t(taskA)], tgt.timeIn)       );
+    ASSERT_FALSE( contains(tasks.m_taskDependOn[uint32_t(taskB)], tgt.positions)    );
+    ASSERT_TRUE(  contains(tasks.m_taskDependOn[uint32_t(taskC)], tgt.timeIn)       );
+    ASSERT_TRUE(  contains(tasks.m_taskDependOn[uint32_t(taskC)], tgt.forces)       );
+    ASSERT_TRUE(  contains(tasks.m_taskFulfill[uint32_t(taskD)], tgt.renderDoneOut) );
+    ASSERT_FALSE( contains(tasks.m_taskFulfill[uint32_t(taskE)], tgt.forces)        );
 
+    // Execute
 
-#if 0
-
-    // Start execution
-
-    ExecutionContext exec;
-    exec.m_tagIncompleteCounts  .resize(tags.m_tags.capacity(), 0);
-    exec.m_tagRunningCounts     .resize(tags.m_tags.capacity(), 0);
-    exec.m_taskQueuedCounts     .resize(tasks.m_tasks.capacity(), 0);
-
-    std::mt19937 gen(sc_seed);
-
-    std::vector<uint64_t> tagsToRun(tags.m_tags.vec().size());
-    to_bitspan({updWorld, updRender}, tagsToRun);
-
-    World world;
+    TestWorld           world;
+    ExecutionContext    exec;
+    exec.resize(tasks);
 
     // Repeat (with randomness) to test many possible execution orders
     for (int i = 0; i < sc_repetitions; ++i)
     {
-        // Enqueue all tasks tagged with updWorld and updRender
-        task_enqueue(tags, tasks, exec, tagsToRun);
-
-        // Its best to pass all external information (such as delta time) into
-        // the systems instead of leaving them to figure it out.
-        // Enqueuing should be similar to setting a dirty flag.
         world.m_deltaTimeIn = 1;
         world.m_positions = 0;
         world.m_canvas.clear();
 
-        // Run until there's no tasks left to run
-        while (true)
+        // Enqueue initial tasks
+        // This roughly indicates "Time has changed" and "Render requested"
+        exec.m_targetDirty.set(std::size_t(tgt.timeIn));
+        exec.m_targetDirty.set(std::size_t(tgt.renderRequestIn));
+        enqueue_dirty(tasks, exec);
+
+        randomized_singlethreaded_execute(tasks, exec, randGen, 5, [&functions, &world] (TaskId const task) -> FulfillDirty_t
         {
-            std::vector<uint64_t> tasksToRun(tasks.m_tasks.vec().size());
-            task_list_available(tags, tasks, exec, tasksToRun);
-            auto const tasksToRunBits = lgrn::bit_view(tasksToRun);
-            unsigned int const availableCount = tasksToRunBits.count();
-
-            if (availableCount == 0)
-            {
-                break;
-            }
-
-            // Choose a random available task
-            auto const choice = std::uniform_int_distribution<unsigned int>{0, availableCount - 1}(gen);
-            auto const task = TaskId(*std::next(tasksToRunBits.ones().begin(), choice));
-
-            task_start(tags, tasks, exec, task);
-            functions.m_taskData[std::size_t(task)](world);
-            task_finish(tags, tasks, exec, task);
-        }
+            return functions[task](world);
+        });
 
         ASSERT_TRUE(world.m_canvas.contains("Physics Cube"));
         ASSERT_TRUE(world.m_canvas.contains("Terrain"));
     }
-#endif
 }
 
 
 // TODO: Multi-threaded test with limits. Actual multithreading isn't needed;
 //       as long as task_start/finish are called at the right times
+
+
+
+
