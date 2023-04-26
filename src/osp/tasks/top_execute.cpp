@@ -36,42 +36,28 @@
 #include <sstream>
 #include <vector>
 
-using Corrade::Containers::ArrayView;
-using Corrade::Containers::StridedArrayView2D;
-using Corrade::Containers::arrayView;
-
 namespace osp
 {
 
-void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec)
+void top_run_blocking(Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec)
 {
     std::vector<entt::any> topDataRefs;
-
-    std::vector<uint64_t> enqueue(tags.m_tags.vec().size());
-
-    std::vector<uint64_t> tasksToRun(tasks.m_tasks.vec().size());
-
 
     // Run until there's no tasks left to run
     while (true)
     {
-        std::fill(std::begin(tasksToRun), std::end(tasksToRun), 0u);
-        task_list_available(tags, tasks, rExec, tasksToRun);
+        // Choose first available task
+        auto const enqueuedTasks = rExec.m_tasksQueued.ones();
+        auto const taskIt = enqueuedTasks.begin();
 
-        auto const tasksToRunBits = lgrn::bit_view(tasksToRun);
-        unsigned int const availableCount = tasksToRunBits.count();
-
-        if (availableCount == 0)
+        if (taskIt == enqueuedTasks.end())
         {
             break;
         }
 
-        // Choose first available task
-        auto const task = TaskId(*tasksToRunBits.ones().begin());
+        auto const task = TaskId(*taskIt);
 
-        task_start(tags, tasks, rExec, task);
-
-        TopTask &rTopTask = rTaskData.m_taskData.at(std::size_t(task));
+        TopTask &rTopTask = rTaskData[task];
 
         topDataRefs.clear();
         topDataRefs.reserve(rTopTask.m_dataUsed.size());
@@ -86,100 +72,21 @@ void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rT
         bool enqueueHappened = false;
 
         // Task actually runs here. Results are not yet used for anything.
-        rTopTask.m_func(WorkerContext{{}, {enqueue}, enqueueHappened}, topDataRefs);
+        FulfillDirty_t const status = rTopTask.m_func(WorkerContext{}, topDataRefs);
 
-        if (enqueueHappened)
-        {
-            task_enqueue(tags, tasks, rExec, enqueue);
-            std::fill(std::begin(enqueue), std::end(enqueue), 0u);
-        }
-
-        task_finish(tags, tasks, rExec, task);
+        mark_completed_task(tasks, rExec, task, status);
     }
 }
 
-void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, ArrayView<TagId const> tagsEnq)
+void top_enqueue_quick(Tasks const& tasks, ExecContext& rExec, ArrayView<TargetId const> enqueue)
 {
-    std::vector<uint64_t> tagsToRun(tags.m_tags.vec().size());
-    to_bitspan(tagsEnq, tagsToRun);
-    task_enqueue(tags, tasks, rExec, tagsToRun);
+    for (TargetId const target : enqueue)
+    {
+        rExec.m_targetDirty.set(std::size_t(target));
+    }
+
+    enqueue_dirty(tasks, rExec);
 }
 
-static void check_task_dependencies(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, ExecutionContext const &rExec, std::vector<uint32_t> &rPath, uint32_t const task, bool& rGood)
-{
-    if (rExec.m_taskQueuedCounts.at(task) == 0)
-    {
-        return; // Only consider queued tasks
-    }
-
-    rPath.push_back(task);
-
-    auto const taskTags2d   = task_tags_2d(tags, tasks);
-    auto const tagDepends2d = tag_depends_2d(tags);
-
-    std::vector<uint64_t> dependencyTagInts(tags.m_tags.vec().size(), 0x0);
-    auto dependencyTagsBits = lgrn::bit_view(dependencyTagInts);
-
-    // Loop through each of this task's tags to get dependent tags
-    auto const taskTagsInts = taskTags2d[task].asContiguous();
-    auto const view = lgrn::bit_view(taskTagsInts);
-    for (uint32_t const currTag : view.ones())
-    {
-        auto const currTagDepends = tagDepends2d[currTag].asContiguous();
-
-        for (TagId const dependTag : currTagDepends)
-        {
-            if (dependTag == lgrn::id_null<TagId>())
-            {
-                break;
-            }
-
-            dependencyTagsBits.set(std::size_t(dependTag));
-        }
-    }
-
-    // Get all tasks that contain any of the dependent tags
-    for (uint32_t const currTask : tasks.m_tasks.bitview().zeros())
-    {
-        if (any_bits_match(taskTags2d[currTask].asContiguous(), dependencyTagInts))
-        {
-            auto const &last = std::end(rPath);
-            if (last == std::find(std::begin(rPath), last, currTask))
-            {
-                check_task_dependencies(tags, tasks, taskData, rExec, rPath, currTask, rGood);
-            }
-            else
-            {
-                rGood = false;
-                std::ostringstream ss;
-                ss << "TopTask Circular Dependency Detected!\n";
-
-                for (uint32_t const pathTask : rPath)
-                {
-                    ss << "* [" << pathTask << "]: " << taskData.m_taskData[pathTask].m_debugName << "\n";
-                }
-                ss << "* Loops back to [" << currTask << "]\n";
-                OSP_LOG_ERROR("{}", ss.str());
-            }
-        }
-    }
-
-    rPath.pop_back();
-}
-
-bool debug_top_print_deadlock(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, ExecutionContext const &rExec)
-{
-    std::vector<uint32_t> path;
-
-    bool good = true;
-
-    // Iterate all tasks
-    for (uint32_t const currTask : tasks.m_tasks.bitview().zeros())
-    {
-        check_task_dependencies(tags, tasks, taskData, rExec, path, currTask, good);
-    }
-
-    return good;
-}
 
 } // namespace testapp

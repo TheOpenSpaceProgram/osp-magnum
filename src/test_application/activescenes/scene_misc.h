@@ -41,9 +41,8 @@ void add_floor(
  * @brief Create CameraController connected to an app's UserInputHandler
  */
 osp::Session setup_camera_ctrl(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         app,
         osp::Session const&         scnRender);
 
@@ -51,9 +50,8 @@ osp::Session setup_camera_ctrl(
  * @brief Adds free cam controls to a CameraController
  */
 osp::Session setup_camera_free(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         app,
         osp::Session const&         scnCommon,
         osp::Session const&         camera);
@@ -62,9 +60,8 @@ osp::Session setup_camera_free(
  * @brief Throws spheres when pressing space
  */
 osp::Session setup_thrower(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         magnum,
         osp::Session const&         renderer,
         osp::Session const&         simpleCamera,
@@ -74,9 +71,8 @@ osp::Session setup_thrower(
  * @brief Spawn blocks every 2 seconds and spheres every 1 second
  */
 osp::Session setup_droppers(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         scnCommon,
         osp::Session const&         shapeSpawn);
 

@@ -41,10 +41,11 @@ using namespace osp::universe;
 namespace testapp::scenes
 {
 
+#if 0
+
 Session setup_uni_core(
-        Builder_t&                  rBuilder,
-        ArrayView<entt::any>        topData,
-        Tags&                       rTags)
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any>        topData)
 {
     Session uniCore;
     OSP_SESSION_ACQUIRE_DATA(uniCore, topData, TESTAPP_UNI_CORE);
@@ -57,9 +58,8 @@ Session setup_uni_core(
 
 
 Session setup_uni_sceneframe(
-        Builder_t&                  rBuilder,
-        ArrayView<entt::any>        topData,
-        Tags&                       rTags)
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any>        topData)
 {
     Session scnFrame;
     OSP_SESSION_ACQUIRE_DATA(scnFrame, topData, TESTAPP_UNI_SCENEFRAME);
@@ -74,9 +74,8 @@ Session setup_uni_sceneframe(
 
 
 Session setup_uni_test_planets(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>        topData,
-        Tags&                       rTags,
         Session const&              uniCore,
         Session const&              scnFrame)
 {
@@ -288,5 +287,7 @@ Session setup_uni_test_planets(
 
     return uniTestPlanets;
 }
+
+#endif
 
 } // namespace testapp::scenes

@@ -30,67 +30,24 @@
 #include <iterator>
 #include <longeron/containers/bit_view.hpp>
 
-#include <Corrade/Containers/ArrayView.h>
-#include <Corrade/Containers/ArrayViewStl.h>
-
 #include <cassert>
 #include <cstdint>
 #include <vector>
 
-namespace osp::tasks
+namespace osp
 {
-
-struct TaskBuilderData
-{
-    struct TaskTargetPair
-    {
-        TaskId m_task;
-        TargetId m_target;
-    };
-
-    struct TaskSemaphorePair
-    {
-        TaskId m_task;
-        SemaphoreId m_sema;
-    };
-
-    struct TaskCounts
-    {
-        unsigned int m_dependingOn  {0};
-        unsigned int m_fulfills     {0};
-        unsigned int m_acquires     {0};
-    };
-
-    struct TargetCounts
-    {
-        unsigned int m_dependents   {0};
-        unsigned int m_fulfilledBy  {0};
-    };
-
-    lgrn::IdRegistryStl<TaskId>             m_taskIds;
-    lgrn::IdRegistryStl<TargetId>           m_targetIds;
-    lgrn::IdRegistryStl<SemaphoreId>        m_semaIds;
-    KeyedVec<SemaphoreId, unsigned int>     m_semaLimits;
-
-    std::vector<TaskTargetPair>             m_targetDependEdges;
-    std::vector<TaskTargetPair>             m_targetFulfillEdges;
-    std::vector<TaskSemaphorePair>          m_semaphoreEdges;
-
-}; // TaskBuilderData
 
 /**
  * @brief A convenient interface for setting up Tasks and required task data
  */
 template <typename TASKBUILDER_T, typename TASKREF_T>
-struct TaskBuilderBase : TaskBuilderData
+struct TaskBuilderBase
 {
-public:
-
     TASKREF_T task()
     {
-        TaskId const taskId = m_taskIds.create();
+        TaskId const taskId = m_rTasks.m_taskIds.create();
 
-        std::size_t const capacity = m_taskIds.capacity();
+        std::size_t const capacity = m_rTasks.m_taskIds.capacity();
 
         return task(taskId);
     };
@@ -111,7 +68,7 @@ public:
 
         std::array<TargetId, count> out;
 
-        m_targetIds.create(out.begin(), out.end());
+        m_rTasks.m_targetIds.create(out.begin(), out.end());
 
         return reinterpret_cast<TGT_STRUCT_T&>(*out.data());
     }
@@ -120,9 +77,12 @@ public:
     std::array<TargetId, N> create_targets()
     {
         std::array<TargetId, N> out;
-        m_targetIds.create(out.begin(), out.end());
+        m_rTasks.m_targetIds.create(out.begin(), out.end());
         return out;
     }
+
+    Tasks& m_rTasks;
+    TaskEdges& m_rEdges;
 
 }; // class TaskBuilderBase
 
@@ -143,7 +103,7 @@ struct TaskRefBase
     {
         for (TargetId const target : targets)
         {
-            m_rBuilder.m_targetDependEdges.push_back({m_taskId, target});
+            m_rBuilder.m_rEdges.m_targetDependEdges.push_back({m_taskId, target});
         }
         return static_cast<TASKREF_T&>(*this);
     }
@@ -157,7 +117,7 @@ struct TaskRefBase
     {
         for (TargetId const target : targets)
         {
-            m_rBuilder.m_targetFulfillEdges.push_back({m_taskId, target});
+            m_rBuilder.m_rEdges.m_targetFulfillEdges.push_back({m_taskId, target});
         }
         return static_cast<TASKREF_T&>(*this);
     }
@@ -187,27 +147,25 @@ struct BasicBuilderTraits
 
     struct Builder : public TaskBuilderBase<Builder, Ref>
     {
-        Builder(FuncVec_t& funcs)
-         : m_funcs{funcs}
+        Builder(Tasks& rTasks, TaskEdges& rEdges, FuncVec_t& rFuncs)
+         : TaskBuilderBase<Builder, Ref>{ rTasks, rEdges }
+         , m_rFuncs{rFuncs}
         { }
         Builder(Builder const& copy) = delete;
         Builder(Builder && move) = default;
 
         Builder& operator=(Builder const& copy) = delete;
-        Builder& operator=(Builder && move) = default;
 
-        FuncVec_t & m_funcs;
+        FuncVec_t & m_rFuncs;
     };
 };
 
 template<typename FUNC_T>
 typename BasicBuilderTraits<FUNC_T>::Ref& BasicBuilderTraits<FUNC_T>::Ref::func(FUNC_T && in)
 {
-    this->m_rBuilder.m_funcs.resize(this->m_rBuilder.m_taskIds.capacity());
-    this->m_rBuilder.m_funcs[this->m_taskId] = std::move(in);
+    this->m_rBuilder.m_rFuncs.resize(this->m_rBuilder.m_rTasks.m_taskIds.capacity());
+    this->m_rBuilder.m_rFuncs[this->m_taskId] = std::move(in);
     return *this;
 }
-
-Tasks finalize(TaskBuilderData && data);
 
 } // namespace osp

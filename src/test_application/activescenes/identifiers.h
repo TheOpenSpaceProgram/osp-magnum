@@ -24,6 +24,11 @@
  */
 #pragma once
 
+#include <osp/tasks/top_tasks.h>
+
+namespace testapp
+{
+
 // Identifiers made for OSP_ACQUIRE_* and OSP_UNPACK_* macros
 // Used to declare variable names for TopDataIds and TagIds
 // #define OSP_[DATA/TAGS]_NAME <# of identifiers>, a, b, c, d, ...
@@ -59,7 +64,13 @@
     tgMeshDel,          tgMeshMod,          tgMeshReq,          tgMeshClr,                          \
     tgTexDel,           tgTexMod,           tgTexReq,           tgTexClr
 
-
+struct TgtScene
+{
+    osp::TargetId cleanup;
+    osp::TargetId time;
+    osp::TargetId sync;
+    osp::TargetId resyncAll;
+};
 
 #define OSP_DATA_TESTAPP_MATERIAL 2, \
     idMatEnts, idMatDirty
@@ -216,6 +227,11 @@
 #define OSP_TAGS_TESTAPP_APP 2, \
     tgRenderEvt, tgInputEvt
 
+struct TgtApplication
+{
+    osp::TargetId input;
+    osp::TargetId render;
+};
 
 
 #define OSP_DATA_TESTAPP_APP_MAGNUM 3, \
@@ -272,3 +288,5 @@
     idVhControls
 #define OSP_TAGS_TESTAPP_VEHICLE_CONTROL 2, \
     tgSelUsrCtrlMod,    tgSelUsrCtrlReq
+
+} // namespace testapp::targets

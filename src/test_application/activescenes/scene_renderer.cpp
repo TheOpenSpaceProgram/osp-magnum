@@ -62,10 +62,11 @@ using Magnum::GL::Mesh;
 namespace testapp::scenes
 {
 
+#if 0
+
 Session setup_magnum_application(
-        Builder_t&                      rBuilder,
+        TopTaskBuilder&                 rBuilder,
         ArrayView<entt::any> const      topData,
-        Tags&                           rTags,
         TopDataId const                 idResources,
         ActiveApplication::Arguments    args)
 {
@@ -96,9 +97,8 @@ Session setup_magnum_application(
 
 
 Session setup_scene_renderer(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              magnum,
         Session const&              scnCommon,
         TopDataId const             idResources)
@@ -249,9 +249,8 @@ Session setup_scene_renderer(
 }
 
 Session setup_shader_visualizer(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              magnum,
         Session const&              scnCommon,
         Session const&              scnRender,
@@ -305,9 +304,8 @@ Session setup_shader_visualizer(
 
 
 Session setup_shader_flat(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              magnum,
         Session const&              scnCommon,
         Session const&              scnRender,
@@ -351,9 +349,8 @@ Session setup_shader_flat(
 
 
 Session setup_shader_phong(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              magnum,
         Session const&              scnCommon,
         Session const&              scnRender,
@@ -405,9 +402,8 @@ struct IndicatorMesh
 
 
 Session setup_thrust_indicators(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              magnum,
         Session const&              scnCommon,
         Session const&              parts,
@@ -556,9 +552,8 @@ Session setup_thrust_indicators(
 
 
 Session setup_cursor(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              magnum,
         Session const&              scnCommon,
         Session const&              scnRender,
@@ -623,9 +618,8 @@ Session setup_cursor(
 
 
 Session setup_uni_test_planets_renderer(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              magnum,
         Session const&              scnRender,
         Session const&              scnCommon,
@@ -773,5 +767,7 @@ Session setup_uni_test_planets_renderer(
 
     return uniTestPlanetsRdr;
 }
+
+#endif
 
 } // namespace testapp::scenes

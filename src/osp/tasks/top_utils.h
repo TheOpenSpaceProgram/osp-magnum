@@ -25,6 +25,8 @@
 #pragma once
 
 #include "tasks.h"
+#include "builder.h"
+#include "top_tasks.h"
 #include "top_worker.h"
 
 #include <entt/core/any.hpp>
@@ -33,7 +35,6 @@
 #include <functional>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
 namespace osp
 {
@@ -101,7 +102,7 @@ template <typename T>
     return entt::any_cast<T&>(topData[id]);
 }
 
-
+//-----------------------------------------------------------------------------
 
 template<typename FUNCTOR_T>
 struct wrap_args_trait
@@ -127,14 +128,14 @@ struct wrap_args_trait
     }
 
     template<typename RETURN_T, typename ... ARGS_T>
-    static TopTaskStatus wrapped_task([[maybe_unused]] WorkerContext ctx, ArrayView<entt::any> topData) noexcept
+    static FulfillDirty_t wrapped_task([[maybe_unused]] WorkerContext ctx, ArrayView<entt::any> topData) noexcept
     {
         if constexpr (std::is_void_v<RETURN_T>)
         {
             cast_args<ARGS_T ...>(topData, ctx, std::make_index_sequence<sizeof...(ARGS_T)>{});
-            return TopTaskStatus::Success;
+            return {{0xFFFFFFFFFFFFFFFFul}}; // All fulfilled targets set dirty
         }
-        else if constexpr (std::is_same_v<RETURN_T, TopTaskStatus>)
+        else if constexpr (std::is_same_v<RETURN_T, FulfillDirty_t>)
         {
             return cast_args<ARGS_T ...>(topData, ctx, std::make_index_sequence<sizeof...(ARGS_T)>{});
         }
@@ -176,5 +177,70 @@ constexpr TopTaskFunc_t wrap_args(FUNC_T funcArg)
     return wrap_args_trait<FUNC_T>::unpack(functionPtr);
 }
 
+//-----------------------------------------------------------------------------
+
+struct TopTaskBuilder;
+
+struct TopTaskRef : public TaskRefBase<TopTaskBuilder, TopTaskRef>
+{
+    TopTaskRef& name(std::string_view debugName);
+    TopTaskRef& data(std::initializer_list<TopDataId> dataUsed);
+
+    template<typename FUNC_T>
+    TopTaskRef& func(FUNC_T funcArg);
+    TopTaskRef& func_raw(TopTaskFunc_t func);
+    
+    template<typename CONTAINER_T>
+    TopTaskRef& push_to(CONTAINER_T& rContainer);
+};
+
+struct TopTaskBuilder : public TaskBuilderBase<TopTaskBuilder, TopTaskRef>
+{
+    TopTaskBuilder(TopTaskDataVec_t& data)
+     : m_rData{data}
+    { }
+    TopTaskBuilder(TopTaskBuilder const& copy) = delete;
+    TopTaskBuilder(TopTaskBuilder && move) = default;
+
+    TopTaskBuilder& operator=(TopTaskBuilder const& copy) = delete;
+
+    TopTaskDataVec_t & m_rData;
+};
+
+TopTaskRef& TopTaskRef::name(std::string_view debugName)
+{
+    m_rBuilder.m_rData.resize(m_rBuilder.m_taskIds.capacity());
+    m_rBuilder.m_rData[m_taskId].m_debugName = debugName;
+    return *this;
+}
+
+TopTaskRef& TopTaskRef::data(std::initializer_list<TopDataId> dataUsed)
+{
+    m_rBuilder.m_rData.resize(m_rBuilder.m_taskIds.capacity());
+    m_rBuilder.m_rData[m_taskId].m_dataUsed = dataUsed;
+    return *this;
+}
+
+template<typename FUNC_T>
+TopTaskRef& TopTaskRef::func(FUNC_T funcArg)
+{
+    m_rBuilder.m_rData.resize(m_rBuilder.m_taskIds.capacity());
+    m_rBuilder.m_rData[m_taskId].m_func = wrap_args(funcArg);
+    return *this;
+}
+
+TopTaskRef& TopTaskRef::func_raw(TopTaskFunc_t func)
+{
+    m_rBuilder.m_rData.resize(m_rBuilder.m_taskIds.capacity());
+    m_rBuilder.m_rData[m_taskId].m_func = func;
+    return *this;
+}
+
+template<typename CONTAINER_T>
+TopTaskRef& TopTaskRef::push_to(CONTAINER_T& rContainer)
+{
+    rContainer.push_back(m_taskId);
+    return *this;
+}
 
 } // namespace osp

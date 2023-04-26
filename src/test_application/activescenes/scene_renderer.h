@@ -34,9 +34,8 @@ namespace testapp::scenes
 
 
 osp::Session setup_magnum_application(
-        Builder_t&                      rBuilder,
+        osp::TopTaskBuilder&            rBuilder,
         osp::ArrayView<entt::any>       topData,
-        osp::Tags&                      rTags,
         osp::TopDataId const            idResources,
         ActiveApplication::Arguments    args);
 
@@ -44,9 +43,8 @@ osp::Session setup_magnum_application(
  * @brief Magnum-powered OpenGL Renderer
  */
 osp::Session setup_scene_renderer(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         magnum,
         osp::Session const&         scene,
         osp::TopDataId              idResources);
@@ -55,9 +53,8 @@ osp::Session setup_scene_renderer(
  * @brief Magnum MeshVisualizer shader and optional material for drawing ActiveEnts with it
  */
 osp::Session setup_shader_visualizer(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         magnum,
         osp::Session const&         scene,
         osp::Session const&         scnRender,
@@ -67,9 +64,8 @@ osp::Session setup_shader_visualizer(
  * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
  */
 osp::Session setup_shader_flat(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         magnum,
         osp::Session const&         scene,
         osp::Session const&         scnRender,
@@ -79,9 +75,8 @@ osp::Session setup_shader_flat(
  * @brief Magnum Phong shader and optional material for drawing ActiveEnts with it
  */
 osp::Session setup_shader_phong(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         magnum,
         osp::Session const&         scene,
         osp::Session const&         scnRender,
@@ -91,9 +86,8 @@ osp::Session setup_shader_phong(
  * @brief Red indicators over Magic Rockets
  */
 osp::Session setup_thrust_indicators(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         magnum,
         osp::Session const&         scnCommon,
         osp::Session const&         parts,
@@ -108,9 +102,8 @@ osp::Session setup_thrust_indicators(
  * @brief Wireframe cube over the camera controller's target
  */
 osp::Session setup_cursor(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         magnum,
         osp::Session const&         scnCommon,
         osp::Session const&         scnRender,
@@ -123,9 +116,8 @@ osp::Session setup_cursor(
  * @brief Draw universe, specifically designed for setup_uni_test_planets
  */
 osp::Session setup_uni_test_planets_renderer(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         magnum,
         osp::Session const&         scnRender,
         osp::Session const&         scnCommon,

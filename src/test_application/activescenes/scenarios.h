@@ -29,10 +29,10 @@
 #include <osp/Resource/resourcetypes.h>
 
 #include <osp/tasks/tasks.h>
+#include <osp/tasks/top_utils.h>
 #include <osp/tasks/top_tasks.h>
 #include <osp/tasks/top_execute.h>
 #include <osp/tasks/top_session.h>
-#include <osp/tasks/builder.h>
 
 #include <functional>
 #include <string_view>
@@ -47,15 +47,12 @@ namespace testapp
 struct MainView
 {
     osp::ArrayView<entt::any>   m_topData;
-    osp::Tags                   & m_rTags;
     osp::Tasks                  & m_rTasks;
     osp::ExecutionContext       & m_rExec;
     osp::TopTaskDataVec_t       & m_rTaskData;
     osp::TopDataId              m_idResources;
     osp::PkgId                  m_defaultPkg;
 };
-
-using Builder_t = osp::TaskBuilder<osp::TopTaskDataVec_t>;
 
 using RendererSetup_t   = void(*)(MainView, osp::Session const&, osp::Sessions_t const&, osp::Sessions_t&);
 using SceneSetup_t      = RendererSetup_t(*)(MainView, osp::Sessions_t&);

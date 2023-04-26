@@ -56,9 +56,10 @@ using Corrade::Containers::arrayView;
 namespace testapp::scenes
 {
 
+#if 0
 
 Session setup_newton(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
         Session const&              scnCommon,
@@ -104,7 +105,7 @@ Session setup_newton(
 }
 
 osp::Session setup_newton_factors(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>        topData,
         Tags&                       rTags)
 {
@@ -119,7 +120,7 @@ osp::Session setup_newton_factors(
 }
 
 osp::Session setup_newton_force_accel(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>        topData,
         Tags&                       rTags,
         Session const&              newton,
@@ -164,7 +165,7 @@ osp::Session setup_newton_force_accel(
 
 
 Session setup_shape_spawn_newton(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
         Session const&              scnCommon,
@@ -272,7 +273,7 @@ void compound_collect_recurse(
 }
 
 Session setup_vehicle_spawn_newton(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
         Session const&              scnCommon,
@@ -580,7 +581,7 @@ static void assign_rockets(
 }
 
 Session setup_rocket_thrust_newton(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
         Session const&              scnCommon,
@@ -697,6 +698,7 @@ Session setup_rocket_thrust_newton(
     return rocketNwt;
 }
 
+#endif
 
 } // namespace testapp::scenes
 

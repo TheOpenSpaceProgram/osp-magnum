@@ -60,9 +60,8 @@ struct NamedMeshes
  * @brief Support for Time, ActiveEnts, Hierarchy, Transforms, Drawing, and more...
  */
 osp::Session setup_common_scene(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::TopDataId              idResources,
         osp::PkgId                  pkg);
 
@@ -72,9 +71,8 @@ osp::Session setup_common_scene(
  * Multiple material sessions can be setup for each material
  */
 osp::Session setup_material(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         scnCommon);
 
 }

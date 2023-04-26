@@ -40,8 +40,9 @@ using Corrade::Containers::arrayView;
 namespace osp
 {
 
-void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec, ArrayView<Session> sessions)
+void top_close_session(Tasks& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, ArrayView<Session> sessions)
 {
+#if 0
     // Run cleanup tasks
     {
         // Accumulate together all cleanup tags from all sessons
@@ -106,6 +107,7 @@ void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, 
             }
         }
     }
+#endif
 }
 
 } // namespace testapp

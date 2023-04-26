@@ -26,17 +26,17 @@
 #include "execute.h"
 
 
-namespace osp::tasks
+namespace osp
 {
 
-bool try_enqueue_task(Tasks const& tasks, ExecutionContext &rExec, TaskId const task) noexcept
+bool try_enqueue_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task) noexcept
 {
     if (rExec.m_tasksQueued.test(std::size_t(task)))
     {
         return false; // task already queued
     }
 
-    for (TargetId const dependOn : tasks.m_taskDependOn[std::size_t(task)])
+    for (TargetId const dependOn : graph.m_taskDependOn[std::size_t(task)])
     {
         if (   rExec.m_targetPendingCount[dependOn] != 0
             || rExec.m_targetWillBePending.test(std::size_t(dependOn)) )
@@ -45,12 +45,12 @@ bool try_enqueue_task(Tasks const& tasks, ExecutionContext &rExec, TaskId const 
         }
     }
 
-    for (TargetId const dependOn : tasks.m_taskDependOn[std::size_t(task)])
+    for (TargetId const dependOn : graph.m_taskDependOn[std::size_t(task)])
     {
         ++ rExec.m_targetInUseCount[dependOn];
     }
 
-    for (TargetId const fulfill : tasks.m_taskFulfill[std::size_t(task)])
+    for (TargetId const fulfill : graph.m_taskFulfill[std::size_t(task)])
     {
         ++ rExec.m_targetPendingCount[fulfill];
     }
@@ -60,14 +60,14 @@ bool try_enqueue_task(Tasks const& tasks, ExecutionContext &rExec, TaskId const 
     return true;
 }
 
-int enqueue_dirty(Tasks const& tasks, ExecutionContext &rExec) noexcept
+int enqueue_dirty(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec) noexcept
 {
     // Find out which targets will be pending
     for (std::size_t const target : rExec.m_targetDirty.ones())
     {
-        for (TaskId const dependent : tasks.m_targetDependents[target])
+        for (TaskId const dependent : graph.m_targetDependents[target])
         {
-            for (TargetId const fulfill : tasks.m_taskFulfill[std::size_t(dependent)])
+            for (TargetId const fulfill : graph.m_taskFulfill[std::size_t(dependent)])
             {
                 rExec.m_targetWillBePending.set(std::size_t(fulfill));
             }
@@ -78,9 +78,9 @@ int enqueue_dirty(Tasks const& tasks, ExecutionContext &rExec) noexcept
 
     for (std::size_t const target : rExec.m_targetDirty.ones())
     {
-        for (TaskId const dependent : tasks.m_targetDependents[target])
+        for (TaskId const dependent : graph.m_targetDependents[target])
         {
-            tasksEnqueued += int(try_enqueue_task(tasks, rExec, dependent));
+            tasksEnqueued += int(try_enqueue_task(tasks, graph, rExec, dependent));
         }
     }
     rExec.m_targetWillBePending.reset();
@@ -89,12 +89,12 @@ int enqueue_dirty(Tasks const& tasks, ExecutionContext &rExec) noexcept
     return tasksEnqueued;
 }
 
-void mark_completed_task(Tasks const& tasks, ExecutionContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept
+void mark_completed_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept
 {
     LGRN_ASSERTMV(rExec.m_tasksQueued.test(std::size_t(task)),
                  "Task must be queued to have been allowed to run", std::size_t(task));
 
-    for (TargetId const dependOn : tasks.m_taskDependOn[std::size_t(task)])
+    for (TargetId const dependOn : graph.m_taskDependOn[std::size_t(task)])
     {
         -- rExec.m_targetInUseCount[dependOn];
 
@@ -104,7 +104,7 @@ void mark_completed_task(Tasks const& tasks, ExecutionContext &rExec, TaskId con
         }
     }
 
-    auto const taskFulfill = lgrn::Span<TargetId const>(tasks.m_taskFulfill[std::size_t(task)]);
+    auto const taskFulfill = lgrn::Span<TargetId const>(graph.m_taskFulfill[std::size_t(task)]);
 
     for (int i = 0; i < taskFulfill.size(); ++i)
     {
@@ -125,4 +125,4 @@ void mark_completed_task(Tasks const& tasks, ExecutionContext &rExec, TaskId con
 }
 
 
-} // namespace osp::tasks
+} // namespace osp

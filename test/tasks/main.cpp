@@ -33,7 +33,6 @@
 #include <set>
 
 using namespace osp;
-using namespace osp::tasks;
 
 template <typename RANGE_T, typename VALUE_T>
 bool contains(RANGE_T const& range, VALUE_T const& value) noexcept
@@ -49,7 +48,7 @@ bool contains(RANGE_T const& range, VALUE_T const& value) noexcept
 }
 
 template<typename RUN_TASK_T>
-void randomized_singlethreaded_execute(Tasks const& tasks, ExecutionContext& rExec, std::mt19937 &rRand, int maxRuns, RUN_TASK_T && runTask)
+void randomized_singlethreaded_execute(Tasks const& tasks, ExecGraph const& graph, ExecContext& rExec, std::mt19937 &rRand, int maxRuns, RUN_TASK_T && runTask)
 {
     std::size_t tasksLeft = rExec.m_tasksQueued.count();
 
@@ -61,11 +60,11 @@ void randomized_singlethreaded_execute(Tasks const& tasks, ExecutionContext& rEx
         }
 
         // This solution of "pick random '1' bit in a bit vector" is very inefficient
-        std::size_t const randomTask = *std::next(rExec.m_tasksQueued.ones().begin(), rRand() % tasksLeft);
+        auto const randomTask = TaskId(*std::next(rExec.m_tasksQueued.ones().begin(), rRand() % tasksLeft));
 
-        FulfillDirty_t const status = runTask(TaskId(randomTask));
-        mark_completed_task(tasks, rExec, TaskId(randomTask), status);
-        int const newTasks = enqueue_dirty(tasks, rExec);
+        FulfillDirty_t const status = runTask(randomTask);
+        mark_completed_task(tasks, graph, rExec, randomTask, status);
+        int const newTasks = enqueue_dirty(tasks, graph, rExec);
 
         tasksLeft = tasksLeft - 1 + newTasks;
     }
@@ -91,8 +90,10 @@ TEST(Tasks, BasicParallelSingleThreaded)
     constexpr int sc_totalTaskCount = sc_pusherTaskCount + 1;
     std::mt19937 randGen(69);
 
-    TaskFuncVec_t functions;
-    auto builder = Builder_t{functions};
+    Tasks           tasks;
+    TaskEdges       edges;
+    TaskFuncVec_t   functions;
+    Builder_t       builder{tasks, edges, functions};
     auto const
     [
         inputIn,    /// Input int, manually set dirty when it changes
@@ -124,8 +125,8 @@ TEST(Tasks, BasicParallelSingleThreaded)
         });
     }
 
-    Tasks const         tasks = finalize(std::move(builder));
-    ExecutionContext    exec;
+    ExecGraph const graph = make_exec_graph(tasks, {&edges});
+    ExecContext    exec;
 
     exec.resize(tasks);
 
@@ -140,9 +141,9 @@ TEST(Tasks, BasicParallelSingleThreaded)
         // Enqueue initial tasks
         // This roughly indicates "Time has changed" and "Render requested"
         exec.m_targetDirty.set(std::size_t(inputIn));
-        enqueue_dirty(tasks, exec);
+        enqueue_dirty(tasks, graph, exec);
 
-        randomized_singlethreaded_execute(tasks, exec, randGen, sc_totalTaskCount, [&functions, &input, &output] (TaskId const task) -> FulfillDirty_t
+        randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output] (TaskId const task) -> FulfillDirty_t
         {
             return functions[task](input, output);
         });
@@ -182,8 +183,10 @@ TEST(Tasks, BasicSingleThreaded)
     constexpr int sc_repetitions = 32;
     std::mt19937 randGen(69);
 
-    TaskFuncVec_t functions;
-    auto builder    = Builder_t{functions};
+    Tasks           tasks;
+    TaskEdges       edges;
+    TaskFuncVec_t   functions;
+    Builder_t       builder{tasks, edges, functions};
     auto const tgt  = builder.create_targets<TestWorldTargets>();
 
     // Start adding tasks. The order these are added does not matter.
@@ -241,27 +244,27 @@ TEST(Tasks, BasicSingleThreaded)
         return {{0b01}};
     });
 
-    Tasks const tasks = finalize(std::move(builder));
+    ExecGraph const graph = make_exec_graph(tasks, {&edges});
 
     // Random checks to assure the graph structure is properly built
-    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.timeIn)          ].size(), 3);
-    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.forces)          ].size(), 1);
-    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.positions)       ].size(), 1);
-    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.renderRequestIn) ].size(), 2);
-    ASSERT_EQ(tasks.m_targetDependents[ uint32_t(tgt.renderDoneOut)   ].size(), 0);
-    ASSERT_TRUE(  contains(tasks.m_targetFulfilledBy[uint32_t(tgt.forces)],        taskB) );
-    ASSERT_FALSE( contains(tasks.m_targetFulfilledBy[uint32_t(tgt.renderDoneOut)], taskC) );
-    ASSERT_TRUE(  contains(tasks.m_taskDependOn[uint32_t(taskA)], tgt.timeIn)       );
-    ASSERT_FALSE( contains(tasks.m_taskDependOn[uint32_t(taskB)], tgt.positions)    );
-    ASSERT_TRUE(  contains(tasks.m_taskDependOn[uint32_t(taskC)], tgt.timeIn)       );
-    ASSERT_TRUE(  contains(tasks.m_taskDependOn[uint32_t(taskC)], tgt.forces)       );
-    ASSERT_TRUE(  contains(tasks.m_taskFulfill[uint32_t(taskD)], tgt.renderDoneOut) );
-    ASSERT_FALSE( contains(tasks.m_taskFulfill[uint32_t(taskE)], tgt.forces)        );
+    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.timeIn)          ].size(), 3);
+    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.forces)          ].size(), 1);
+    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.positions)       ].size(), 1);
+    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.renderRequestIn) ].size(), 2);
+    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.renderDoneOut)   ].size(), 0);
+    ASSERT_TRUE(  contains(graph.m_targetFulfilledBy[uint32_t(tgt.forces)],        taskB) );
+    ASSERT_FALSE( contains(graph.m_targetFulfilledBy[uint32_t(tgt.renderDoneOut)], taskC) );
+    ASSERT_TRUE(  contains(graph.m_taskDependOn[uint32_t(taskA)], tgt.timeIn)       );
+    ASSERT_FALSE( contains(graph.m_taskDependOn[uint32_t(taskB)], tgt.positions)    );
+    ASSERT_TRUE(  contains(graph.m_taskDependOn[uint32_t(taskC)], tgt.timeIn)       );
+    ASSERT_TRUE(  contains(graph.m_taskDependOn[uint32_t(taskC)], tgt.forces)       );
+    ASSERT_TRUE(  contains(graph.m_taskFulfill[uint32_t(taskD)], tgt.renderDoneOut) );
+    ASSERT_FALSE( contains(graph.m_taskFulfill[uint32_t(taskE)], tgt.forces)        );
 
     // Execute
 
     TestWorld           world;
-    ExecutionContext    exec;
+    ExecContext    exec;
     exec.resize(tasks);
 
     // Repeat (with randomness) to test many possible execution orders
@@ -275,9 +278,11 @@ TEST(Tasks, BasicSingleThreaded)
         // This roughly indicates "Time has changed" and "Render requested"
         exec.m_targetDirty.set(std::size_t(tgt.timeIn));
         exec.m_targetDirty.set(std::size_t(tgt.renderRequestIn));
-        enqueue_dirty(tasks, exec);
+        enqueue_dirty(tasks, graph, exec);
 
-        randomized_singlethreaded_execute(tasks, exec, randGen, 5, [&functions, &world] (TaskId const task) -> FulfillDirty_t
+        randomized_singlethreaded_execute(
+                tasks, graph, exec, randGen, 5,
+                    [&functions, &world] (TaskId const task) -> FulfillDirty_t
         {
             return functions[task](world);
         });

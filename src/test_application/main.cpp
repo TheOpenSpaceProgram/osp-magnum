@@ -110,11 +110,10 @@ std::vector<entt::any>  g_appTopData;
 // Each TopTask is given a vector of TopDataIds its allowed to access
 osp::Tasks              g_tasks;
 osp::TopTaskDataVec_t   g_taskData;
-osp::Tags               g_tags;
 
 // Current execution state of TopTasks
 // g_tasks, g_taskData, and g_tags stay constant during execution
-osp::ExecutionContext   g_exec;
+osp::ExecContext   g_exec;
 
 // Sessions bundle together and own TopDataIds, TopTaskIds, and TagsIds
 // Sessions intend to add support for something to exist in the world
@@ -151,20 +150,19 @@ char** g_argv;
 
 static void close_sessions(osp::Sessions_t &rSessions)
 {
-    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, rSessions);
+    osp::top_close_session(g_tasks, g_taskData, g_appTopData, g_exec, rSessions);
     rSessions.clear();
 }
 
 static void close_session(osp::Session &rSession)
 {
-    osp::top_close_session(g_tags, g_tasks, g_taskData, g_appTopData, g_exec, osp::ArrayView<osp::Session>(&rSession, 1));
+    osp::top_close_session(g_tasks, g_taskData, g_appTopData, g_exec, osp::ArrayView<osp::Session>(&rSession, 1));
 }
 
 static MainView get_main_view()
 {
     return {
         .m_topData      = g_appTopData,
-        .m_rTags        = g_tags,
         .m_rTasks       = g_tasks,
         .m_rExec        = g_exec,
         .m_rTaskData    = g_taskData,
@@ -245,7 +243,7 @@ int debug_cli_loop()
         std::cout << "> ";
         std::cin >> command;
 
-        bool magnumOpen = ! g_magnum.m_dataIds.empty();
+        bool magnumOpen = ! g_magnum.m_data.empty();
         if (auto const it = scenarios().find(command);
             it != std::end(scenarios()))
         {
@@ -324,8 +322,8 @@ void start_magnum_async()
         osp::set_thread_logger(g_logMagnumApp);
 
         // Start Magnum application session
-        Builder_t builder{g_tags, g_tasks, g_taskData};
-        g_magnum = scenes::setup_magnum_application(builder, g_appTopData, g_tags, g_idResources, {g_argc, g_argv});
+        osp::TopTaskBuilder builder{g_taskData};
+        g_magnum = scenes::setup_magnum_application(builder, g_appTopData, g_idResources, {g_argc, g_argv});
         OSP_SESSION_UNPACK_DATA(g_magnum, TESTAPP_APP_MAGNUM); // declares idActiveApp
         auto &rActiveApp = osp::top_get<ActiveApplication>(g_appTopData, idActiveApp);
 

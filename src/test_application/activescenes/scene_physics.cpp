@@ -48,8 +48,10 @@ using Corrade::Containers::arrayView;
 namespace testapp::scenes
 {
 
+#if 0
+
 Session setup_physics(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
         Session const&              scnCommon)
@@ -87,7 +89,7 @@ Session setup_physics(
 }
 
 Session setup_shape_spawn(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
         Session const&              scnCommon,
@@ -236,7 +238,7 @@ Session setup_shape_spawn(
 
 
 Session setup_prefabs(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
         Session const&              scnCommon,
@@ -364,7 +366,7 @@ Session setup_prefabs(
 }
 
 Session setup_bounds(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
         Session const&              scnCommon,
@@ -445,6 +447,7 @@ Session setup_bounds(
     return bounds;
 }
 
+#endif
 
 } // namespace testapp::scenes
 

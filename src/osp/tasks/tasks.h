@@ -25,7 +25,7 @@
 #pragma once
 
 #include "../keyed_vector.h"
-#include "../bitvector.h"
+#include "../types.h"
 
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>
@@ -33,7 +33,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace osp::tasks
+namespace osp
 {
 
 enum class TaskId       : uint32_t { };
@@ -51,16 +51,51 @@ struct Tasks
     lgrn::IdRegistryStl<SemaphoreId>                m_semaIds;
 
     KeyedVec<SemaphoreId, unsigned int>             m_semaLimits;
-
-    lgrn::IntArrayMultiMap<TaskInt, TargetId>       m_taskDependOn;         /// Tasks depend on (n) Targets
-    lgrn::IntArrayMultiMap<TargetInt, TaskId>       m_targetDependents;     /// Targets have (n) Tasks that depend on it
-
-    lgrn::IntArrayMultiMap<TaskInt, TargetId>       m_taskFulfill;          /// Tasks fulfill (n) Targets
-    lgrn::IntArrayMultiMap<TargetInt, TaskId>       m_targetFulfilledBy;    /// Targets are fulfilled by (n) Tasks
-
-    lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>    m_taskAcquire;          /// Tasks acquire (n) Semaphores
-    lgrn::IntArrayMultiMap<SemaphoreInt, TaskId>    m_semaAcquiredBy;       /// Semaphores are acquired by (n) Tasks
 };
+
+struct TaskEdges
+{
+    struct TargetPair
+    {
+        TaskId m_task;
+        TargetId m_target;
+    };
+
+    struct SemaphorePair
+    {
+        TaskId m_task;
+        SemaphoreId m_sema;
+    };
+
+    std::vector<TargetPair>             m_targetDependEdges;
+    std::vector<TargetPair>             m_targetFulfillEdges;
+    std::vector<SemaphorePair>          m_semaphoreEdges;
+};
+
+struct ExecGraph
+{
+    lgrn::IntArrayMultiMap<Tasks::TaskInt, TargetId>        m_taskDependOn;         /// Tasks depend on (n) Targets
+    lgrn::IntArrayMultiMap<Tasks::TargetInt, TaskId>        m_targetDependents;     /// Targets have (n) Tasks that depend on it
+
+    lgrn::IntArrayMultiMap<Tasks::TaskInt, TargetId>        m_taskFulfill;          /// Tasks fulfill (n) Targets
+    lgrn::IntArrayMultiMap<Tasks::TargetInt, TaskId>        m_targetFulfilledBy;    /// Targets are fulfilled by (n) Tasks
+
+    lgrn::IntArrayMultiMap<Tasks::TaskInt, SemaphoreId>     m_taskAcquire;          /// Tasks acquire (n) Semaphores
+    lgrn::IntArrayMultiMap<Tasks::SemaphoreInt, TaskId>     m_semaAcquiredBy;       /// Semaphores are acquired by (n) Tasks
+};
+
+/**
+ * @brief Bitset returned by tasks to determine which fulfill targets should be marked dirty
+ */
+using FulfillDirty_t = lgrn::BitView<std::array<uint64_t, 1>>;
+
+
+ExecGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> data);
+
+inline ExecGraph make_exec_graph(Tasks const& tasks, std::initializer_list<TaskEdges const* const> data)
+{
+    return make_exec_graph(tasks, arrayView(data));
+}
 
 
 } // namespace osp

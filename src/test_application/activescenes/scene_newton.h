@@ -44,9 +44,8 @@ namespace testapp::scenes
  * @brief Newton Dynamics physics integration
  */
 osp::Session setup_newton(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         scnCommon,
         osp::Session const&         physics);
 
@@ -57,17 +56,15 @@ osp::Session setup_newton(
  * functions contribute to its force and torque
  */
 osp::Session setup_newton_factors(
-        Builder_t&                  rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags);
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData);
 
 /**
  * @brief Setup constant acceleration force, add to a force factor bitset
  */
 osp::Session setup_newton_force_accel(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         newton,
         osp::Session const&         nwtFactors,
         osp::Vector3                accel);
@@ -76,9 +73,8 @@ osp::Session setup_newton_force_accel(
  * @brief Support for Shape Spawner physics using Newton Dynamics
  */
 osp::Session setup_shape_spawn_newton(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         scnCommon,
         osp::Session const&         physics,
         osp::Session const&         shapeSpawn,
@@ -89,9 +85,8 @@ osp::Session setup_shape_spawn_newton(
  * @brief Support for Vehicle physics using Newton Dynamics
  */
 osp::Session setup_vehicle_spawn_newton(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         scnCommon,
         osp::Session const&         physics,
         osp::Session const&         prefabs,
@@ -104,9 +99,8 @@ osp::Session setup_vehicle_spawn_newton(
  * @brief Add thrust forces to Magic Rockets from setup_mach_rocket
  */
 osp::Session setup_rocket_thrust_newton(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         scnCommon,
         osp::Session const&         physics,
         osp::Session const&         prefabs,

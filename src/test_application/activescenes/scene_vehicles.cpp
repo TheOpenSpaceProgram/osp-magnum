@@ -51,11 +51,11 @@ using namespace Magnum::Math::Literals;
 namespace testapp::scenes
 {
 
+#if 0
 
 Session setup_parts(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              scnCommon,
         TopDataId const             idResources)
 {
@@ -141,9 +141,8 @@ Session setup_parts(
 }
 
 Session setup_signals_float(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              scnCommon,
         Session const&              parts)
 {
@@ -238,9 +237,8 @@ TopTaskFunc_t gen_allocate_mach_bitsets()
 }
 
 Session setup_mach_rocket(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              scnCommon,
         Session const&              parts,
         Session const&              signalsFloat)
@@ -267,9 +265,8 @@ Session setup_mach_rocket(
 }
 
 Session setup_mach_rcsdriver(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              scnCommon,
         Session const&              parts,
         Session const&              signalsFloat)
@@ -357,9 +354,8 @@ Session setup_mach_rcsdriver(
 }
 
 Session setup_vehicle_spawn(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              scnCommon)
 {
     OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
@@ -389,9 +385,8 @@ Session setup_vehicle_spawn(
 }
 
 Session setup_vehicle_spawn_vb(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        [[maybe_unused]] Tags&      rTags,
         Session const&              scnCommon,
         Session const&              prefabs,
         Session const&              parts,
@@ -961,9 +956,8 @@ void add_rcs_block(VehicleBuilder& rBuilder, VehicleBuilder::WeldVec_t& rWeldTo,
 }
 
 Session setup_test_vehicles(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        [[maybe_unused]] Tags&      rTags,
         Session const&              scnCommon,
         TopDataId const             idResources)
 {
@@ -1078,9 +1072,8 @@ struct VehicleTestControls
 };
 
 Session setup_vehicle_control(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              scnCommon,
         Session const&              parts,
         Session const&              signalsFloat,
@@ -1211,9 +1204,8 @@ Session setup_vehicle_control(
 }
 
 Session setup_camera_vehicle(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         [[maybe_unused]] ArrayView<entt::any> const topData,
-        [[maybe_unused]] Tags&      rTags,
         Session const&              app,
         Session const&              scnCommon,
         Session const&              parts,
@@ -1268,5 +1260,7 @@ Session setup_camera_vehicle(
 
     return cameraFree;
 }
+
+#endif
 
 } // namespace testapp::scenes

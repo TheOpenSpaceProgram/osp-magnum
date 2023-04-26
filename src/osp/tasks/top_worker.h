@@ -24,18 +24,19 @@
  */
 #pragma once
 
-#include <Corrade/Containers/ArrayView.h>
+#include "../types.h"
 
 #include <entt/core/fwd.hpp>
 
+#include <longeron/containers/bit_view.hpp>
+
+#include <array>
 #include <cstdint>
 
 namespace osp
 {
 
-using bit_int_t = uint64_t;
-
-using Corrade::Containers::ArrayView;
+using FulfillDirty_t = lgrn::BitView<std::array<uint64_t, 1>>;
 
 using TopDataId     = uint32_t;
 using TopDataIds_t  = std::initializer_list<TopDataId>;
@@ -44,25 +45,9 @@ struct Reserved {};
 
 struct WorkerContext
 {
-    struct LimitSlot
-    {
-        uint32_t m_tag;
-        int m_slot;
-    };
 
-    Corrade::Containers::ArrayView<LimitSlot> m_limitSlots;
-    Corrade::Containers::ArrayView<bit_int_t> m_enqueue;
-
-    bool & m_rEnqueueHappened;
 };
 
-enum class TopTaskStatus : uint8_t
-{
-    Success     = 0,
-    Failed      = 1,
-    DidNothing  = 2
-};
-
-using TopTaskFunc_t = TopTaskStatus(*)(WorkerContext, ArrayView<entt::any>) noexcept;
+using TopTaskFunc_t = FulfillDirty_t(*)(WorkerContext, ArrayView<entt::any>) noexcept;
 
 } // namespace osp

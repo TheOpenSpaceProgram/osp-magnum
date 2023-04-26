@@ -26,21 +26,18 @@
 
 #include "tasks.h"
 
+#include "../bitvector.h"
+
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Corrade/Containers/StridedArrayView.h>
 
 #include <cassert>
 #include <vector>
 
-namespace osp::tasks
+namespace osp
 {
 
-/**
- * @brief Bitset returned by tasks to determine which fulfill targets should be marked dirty
- */
-using FulfillDirty_t = lgrn::BitView<std::array<uint64_t, 1>>;
-
-struct ExecutionContext
+struct ExecContext
 {
     void resize(Tasks const& tasks)
     {
@@ -72,10 +69,10 @@ struct ExecutionContext
 }; // struct ExecutionContext
 
 
-int enqueue_dirty(Tasks const& tasks, ExecutionContext &rExec) noexcept;
+int enqueue_dirty(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec) noexcept;
 
-void mark_completed_task(Tasks const& tasks, ExecutionContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept;
+void mark_completed_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept;
 
 
 
-} // namespace osp::tasks
+} // namespace osp

@@ -33,25 +33,22 @@ namespace testapp::scenes
  * @brief Core Universe struct with addressable Coordinate Spaces
  */
 osp::Session setup_uni_core(
-        Builder_t&                  rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags);
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData);
 
 /**
  * @brief Represents the physics scene's presence in a Universe
  */
 osp::Session setup_uni_sceneframe(
-        Builder_t&                  rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags);
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData);
 
 /**
  * @brief Unrealistic planets test, allows SceneFrame to move around and get captured into planets
  */
 osp::Session setup_uni_test_planets(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         uniCore,
         osp::Session const&         uniScnFrame);
 

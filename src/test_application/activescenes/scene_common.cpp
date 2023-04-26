@@ -42,10 +42,11 @@ using namespace osp::active;
 namespace testapp::scenes
 {
 
+#if 0
+
 Session setup_common_scene(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         TopDataId const             idResources,
         PkgId const                 pkg)
 {
@@ -53,8 +54,7 @@ Session setup_common_scene(
 
     Session scnCommon;
     OSP_SESSION_ACQUIRE_DATA(scnCommon, topData,    TESTAPP_COMMON_SCENE);
-    OSP_SESSION_ACQUIRE_TAGS(scnCommon, rTags,      TESTAPP_COMMON_SCENE);
-    scnCommon.m_tgCleanupEvt = tgCleanupEvt;
+
 
     top_emplace< float >            (topData, idDeltaTimeIn, 1.0f / 60.0f);
     top_emplace< EntVector_t >      (topData, idDelEnts);
@@ -67,36 +67,42 @@ Session setup_common_scene(
     auto &rDrawingRes   = top_emplace< ACtxDrawingRes > (topData, idDrawingRes);
     auto &rNMesh        = top_emplace< NamedMeshes >    (topData, idNMesh);
 
-    rBuilder.tag(tgEntNew)          .depend_on({tgEntDel});
-    rBuilder.tag(tgEntReq)          .depend_on({tgEntDel, tgEntNew});
-    rBuilder.tag(tgDelEntReq)       .depend_on({tgDelEntMod});
-    rBuilder.tag(tgDelEntClr)       .depend_on({tgDelEntMod, tgDelEntReq});
-    rBuilder.tag(tgDelTotalReq)     .depend_on({tgDelTotalMod});
-    rBuilder.tag(tgDelTotalClr)     .depend_on({tgDelTotalMod, tgDelTotalReq});
-    rBuilder.tag(tgTransformDel)    .depend_on({tgTransformMod});
-    rBuilder.tag(tgTransformNew)    .depend_on({tgTransformMod, tgTransformDel});
-    rBuilder.tag(tgTransformReq)    .depend_on({tgTransformMod, tgTransformDel, tgTransformNew});
-    rBuilder.tag(tgHierNew)         .depend_on({tgHierDel});
-    rBuilder.tag(tgHierModEnd)      .depend_on({tgHierDel, tgHierNew, tgHierMod});
-    rBuilder.tag(tgHierReq)         .depend_on({tgHierMod, tgHierModEnd});
-    rBuilder.tag(tgDrawMod)         .depend_on({tgDrawDel});
-    rBuilder.tag(tgDrawReq)         .depend_on({tgDrawDel, tgDrawMod});
-    rBuilder.tag(tgDelDrawEntReq)   .depend_on({tgDelDrawEntMod});
-    rBuilder.tag(tgDelDrawEntClr)   .depend_on({tgDelDrawEntMod, tgDelDrawEntReq});
-    rBuilder.tag(tgMeshMod)         .depend_on({tgMeshDel});
-    rBuilder.tag(tgMeshReq)         .depend_on({tgMeshDel, tgMeshMod});
-    rBuilder.tag(tgMeshClr)         .depend_on({tgMeshDel, tgMeshMod, tgMeshReq});
-    rBuilder.tag(tgTexMod)          .depend_on({tgTexDel});
-    rBuilder.tag(tgTexReq)          .depend_on({tgTexDel, tgTexMod});
-    rBuilder.tag(tgTexClr)          .depend_on({tgTexDel, tgTexMod, tgTexReq});
+//    rBuilder.tag(tgEntNew)          .depend_on({tgEntDel});
+//    rBuilder.tag(tgEntReq)          .depend_on({tgEntDel, tgEntNew});
+//    rBuilder.tag(tgDelEntReq)       .depend_on({tgDelEntMod});
+//    rBuilder.tag(tgDelEntClr)       .depend_on({tgDelEntMod, tgDelEntReq});
+//    rBuilder.tag(tgDelTotalReq)     .depend_on({tgDelTotalMod});
+//    rBuilder.tag(tgDelTotalClr)     .depend_on({tgDelTotalMod, tgDelTotalReq});
+//    rBuilder.tag(tgTransformDel)    .depend_on({tgTransformMod});
+//    rBuilder.tag(tgTransformNew)    .depend_on({tgTransformMod, tgTransformDel});
+//    rBuilder.tag(tgTransformReq)    .depend_on({tgTransformMod, tgTransformDel, tgTransformNew});
+//    rBuilder.tag(tgHierNew)         .depend_on({tgHierDel});
+//    rBuilder.tag(tgHierModEnd)      .depend_on({tgHierDel, tgHierNew, tgHierMod});
+//    rBuilder.tag(tgHierReq)         .depend_on({tgHierMod, tgHierModEnd});
+//    rBuilder.tag(tgDrawMod)         .depend_on({tgDrawDel});
+//    rBuilder.tag(tgDrawReq)         .depend_on({tgDrawDel, tgDrawMod});
+//    rBuilder.tag(tgDelDrawEntReq)   .depend_on({tgDelDrawEntMod});
+//    rBuilder.tag(tgDelDrawEntClr)   .depend_on({tgDelDrawEntMod, tgDelDrawEntReq});
+//    rBuilder.tag(tgMeshMod)         .depend_on({tgMeshDel});
+//    rBuilder.tag(tgMeshReq)         .depend_on({tgMeshDel, tgMeshMod});
+//    rBuilder.tag(tgMeshClr)         .depend_on({tgMeshDel, tgMeshMod, tgMeshReq});
+//    rBuilder.tag(tgTexMod)          .depend_on({tgTexDel});
+//    rBuilder.tag(tgTexReq)          .depend_on({tgTexDel, tgTexMod});
+//    rBuilder.tag(tgTexClr)          .depend_on({tgTexDel, tgTexMod, tgTexReq});
 
-    scnCommon.task() = rBuilder.task().assign({tgResyncEvt}).data(
-            "Set entity meshes and textures dirty",
-            TopDataIds_t{             idDrawing},
-            wrap_args([] (ACtxDrawing& rDrawing) noexcept
+    std::vector<TaskId> tasks;
+
+    rBuilder.task()
+        .push_to(tasks)
+        .name("Set entity meshes and textures dirty")
+        .depends_on({})
+        .data({               idDrawing})
+        .func([] (ACtxDrawing& rDrawing) noexcept
     {
         SysRender::set_dirty_all(rDrawing);
-    }));
+    });
+
+
 
     scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelEntReq, tgDelTotalMod}).data(
             "Create DeleteTotal vector, which includes descendents of deleted hierarchy entities",
@@ -236,10 +242,10 @@ Session setup_common_scene(
     return scnCommon;
 }
 
+
 Session setup_material(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              scnCommon)
 {
     OSP_SESSION_UNPACK_DATA(scnCommon, TESTAPP_COMMON_SCENE);
@@ -294,7 +300,9 @@ Session setup_material(
     return material;
 }
 
-}
+#endif
+
+} // namespace testapp::scenes
 
 
 

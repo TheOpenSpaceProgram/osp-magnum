@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include "execute.h"
 #include "tasks.h"
 #include "top_tasks.h"
 
@@ -32,14 +33,13 @@
 namespace osp
 {
 
+void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec);
 
-void top_run_blocking(Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec);
+void top_enqueue_quick(Tasks const& tasks, ExecGraph const& graph, ExecContext& rExec, ArrayView<TargetId const> enqueue);
 
-void top_enqueue_quick(Tasks const& tasks, ExecutionContext& rExec, ArrayView<TagId const> tagsEnq);
-
-inline void top_enqueue_quick(Tasks const& tasks, ExecutionContext& rExec, std::initializer_list<TagId const> tagsEnq)
+inline void top_enqueue_quick(Tasks const& tasks, ExecGraph const& graph, ExecContext& rExec, std::initializer_list<TargetId const> enqueue)
 {
-    return top_enqueue_quick(tags, tasks, rExec, Corrade::Containers::arrayView(tagsEnq));
+    return top_enqueue_quick(tasks, graph, rExec, Corrade::Containers::arrayView(enqueue));
 }
 
 } // namespace testapp

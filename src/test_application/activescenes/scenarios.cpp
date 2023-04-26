@@ -54,47 +54,47 @@ using namespace osp;
 namespace testapp
 {
 
-static void setup_magnum_draw(MainView mainView, Session const& magnum, Session const& scnCommon, Session const& scnRender, std::vector<TagId> runTagsVec = {})
+static void setup_magnum_draw(MainView mainView, Session const& application, Session const& scene, Session const& scnRender, std::vector<TargetId> run = {})
 {
-    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_TAGS(magnum,     TESTAPP_APP_MAGNUM);
+    OSP_SESSION_UNPACK_DATA(scnRender,      TESTAPP_COMMON_RENDERER);
+    OSP_SESSION_UNPACK_DATA(application,    TESTAPP_APP_MAGNUM);
 
-    Tags                    &rTags      = mainView.m_rTags;
     Tasks                   &rTasks     = mainView.m_rTasks;
     TopTaskDataVec_t        &rTaskData  = mainView.m_rTaskData;
-    ExecutionContext        &rExec      = mainView.m_rExec;
+    ExecContext        &rExec      = mainView.m_rExec;
     ArrayView<entt::any>    topData     = mainView.m_topData;
 
     auto &rActiveApp    = top_get<ActiveApplication>(topData, idActiveApp);
     auto &rCamera       = top_get<active::Camera>(topData, idCamera);
     rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
+    auto tgScn = scene          .get_targets<TgtScene>();
+    auto tgApp = application    .get_targets<TgtApplication>();
+
     // Run Resync tasks to mark all used gpu resources as dirty
-    top_enqueue_quick(rTags, rTasks, rExec, {tgResyncEvt});
-    top_run_blocking(rTags, rTasks, rTaskData, topData, rExec);
+    top_enqueue_quick(rTasks, rExec, {tgScn.resyncAll});
+    top_run_blocking(rTasks, rTaskData, topData, rExec);
 
-    runTagsVec.insert(runTagsVec.end(), {tgSyncEvt, tgSceneEvt, tgTimeEvt, tgRenderEvt, tgInputEvt});
+    run.insert(run.end(), {tgScn.sync, tgScn.time, tgApp.input, tgApp.render});
 
-    // runTagsVec gets copied but who cares lol
-    rActiveApp.set_on_draw( [&rTags, &rTasks, &rExec, &rTaskData, topData, runTagsVec = std::move(runTagsVec)]
+    // run gets copied but who cares lol
+    rActiveApp.set_on_draw( [&rTasks, &rExec, &rTaskData, topData, runTagsVec = std::move(run)]
                             (ActiveApplication& rApp, float delta)
     {
         // Magnum Application's main loop is here
 
-        top_enqueue_quick(rTags, rTasks, rExec, runTagsVec);
-        top_run_blocking(rTags, rTasks, rTaskData, topData, rExec);
+        top_enqueue_quick(rTasks, rExec, runTagsVec);
+        top_run_blocking(rTasks, rTaskData, topData, rExec);
 
         // Enqueued tasks that don't run indicate a deadlock
-        if ( ! std::all_of(std::begin(rExec.m_taskQueuedCounts),
-                           std::end(rExec.m_taskQueuedCounts),
-                           [] (unsigned int n) { return n == 0; }))
-        {
-            OSP_LOG_ERROR("Deadlock detected!");
-            debug_top_print_deadlock(rTags, rTasks, rTaskData, rExec);
-            std::abort();
-        }
+//        if ( ! std::all_of(std::begin(rExec.m_taskQueuedCounts),
+//                           std::end(rExec.m_taskQueuedCounts),
+//                           [] (unsigned int n) { return n == 0; }))
+//        {
+//            OSP_LOG_ERROR("Deadlock detected!");
+//            debug_top_print_deadlock( rTasks, rTaskData, rExec);
+//            std::abort();
+//        }
     });
 }
 
@@ -120,7 +120,7 @@ static ScenarioMap_t make_scenarios()
 
         return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
         {
-            TopDataId const idSceneData = scene.front().m_dataIds.front();
+            TopDataId const idSceneData = scene.front().m_data.front();
             auto& rScene = top_get<enginetest::EngineTestScene>(mainView.m_topData, idSceneData);
 
             OSP_SESSION_UNPACK_DATA(magnum, TESTAPP_APP_MAGNUM);
@@ -132,6 +132,8 @@ static ScenarioMap_t make_scenarios()
             rActiveApp.set_on_draw(enginetest::generate_draw_func(rScene, rActiveApp, rRenderGl, rUserInput));
         };
     });
+
+#if 0
 
     add_scenario("physics", "Newton Dynamics integration test scenario",
                  [] (MainView mainView, Sessions_t& sceneOut) -> RendererSetup_t
@@ -334,6 +336,8 @@ static ScenarioMap_t make_scenarios()
             setup_magnum_draw(mainView, magnum, scnCommon, scnRender, {tgUniTimeEvt});
         };
     });
+
+#endif
 
     return scenarioMap;
 }

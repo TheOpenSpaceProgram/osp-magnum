@@ -51,6 +51,8 @@ using namespace Magnum::Math::Literals;
 namespace testapp::scenes
 {
 
+#if 0
+
 void add_floor(
         ArrayView<entt::any> const  topData,
         Session const&              scnCommon,
@@ -129,9 +131,8 @@ void add_floor(
 }
 
 Session setup_camera_ctrl(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              app,
         Session const&              scnRender)
 {
@@ -161,9 +162,8 @@ Session setup_camera_ctrl(
 }
 
 Session setup_camera_free(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              app,
         Session const&              scnCommon,
         Session const&              camera)
@@ -188,9 +188,8 @@ Session setup_camera_free(
 }
 
 Session setup_thrower(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              magnum,
         Session const&              renderer,
         Session const&              simpleCamera,
@@ -236,9 +235,8 @@ Session setup_thrower(
 }
 
 Session setup_droppers(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
         Session const&              scnCommon,
         Session const&              shapeSpawn)
 {
@@ -296,4 +294,6 @@ Session setup_droppers(
     return droppers;
 }
 
-}
+#endif
+
+} // namespace testapp::scenes
