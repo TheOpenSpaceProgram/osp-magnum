@@ -142,6 +142,8 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     // Add cube mesh to cube
 
+    rScene.m_drawing.m_needDrawTf.set(std::size_t(cubeEnt));
+    rScene.m_drawing.m_activeToDraw[cubeEnt] = cubeDraw;
     rScene.m_drawing.m_mesh[cubeDraw] = rScene.m_drawing.m_meshRefCounts.ref_add(meshCube);
     rScene.m_drawing.m_meshDirty.push_back(cubeDraw);
 

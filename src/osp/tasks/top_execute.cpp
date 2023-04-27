@@ -39,7 +39,7 @@
 namespace osp
 {
 
-void top_run_blocking(Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec)
+void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec)
 {
     std::vector<entt::any> topDataRefs;
 
@@ -74,19 +74,18 @@ void top_run_blocking(Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView
         // Task actually runs here. Results are not yet used for anything.
         FulfillDirty_t const status = rTopTask.m_func(WorkerContext{}, topDataRefs);
 
-        mark_completed_task(tasks, rExec, task, status);
+        mark_completed_task(tasks, graph, rExec, task, status);
     }
 }
 
-void top_enqueue_quick(Tasks const& tasks, ExecContext& rExec, ArrayView<TargetId const> enqueue)
+void top_enqueue_quick(Tasks const& tasks, ExecGraph const& graph, ExecContext& rExec, ArrayView<TargetId const> enqueue)
 {
     for (TargetId const target : enqueue)
     {
         rExec.m_targetDirty.set(std::size_t(target));
     }
 
-    enqueue_dirty(tasks, rExec);
+    enqueue_dirty(tasks, graph, rExec);
 }
-
 
 } // namespace testapp

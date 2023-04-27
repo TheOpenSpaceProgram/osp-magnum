@@ -28,6 +28,7 @@
 #include "execute.h"
 #include "tasks.h"
 #include "top_tasks.h"
+#include "top_utils.h"
 
 #include <entt/core/any.hpp>
 
@@ -39,13 +40,27 @@
 
 #include <osp/unpack.h>
 
-#define OSP_STRUCT_BIND_C(outerFunc, inner, count, ...) auto const [__VA_ARGS__] = outerFunc<count>(inner)
-#define OSP_STRUCT_BIND_B(x) x
-#define OSP_STRUCT_BIND_A(...) OSP_STRUCT_BIND_B(OSP_STRUCT_BIND_C(__VA_ARGS__))
+#define OSP_AUX_DCDI_C(session, topData, count, ...) \
+    session.m_data.resize(count); \
+    top_reserve(topData, 0, session.m_data.begin(), session.m_data.end()); \
+    auto const [__VA_ARGS__] = osp::unpack<count>(session.m_data)
+#define OSP_AUX_DCDI_B(x) x
+#define OSP_AUX_DCDI_A(...) OSP_AUX_DCDI_B(OSP_AUX_DCDI_C(__VA_ARGS__))
 
-#define OSP_SESSION_UNPACK_DATA(session, name) OSP_STRUCT_BIND_A(osp::unpack, (session).m_data, OSP_DATA_##name);
+/**
+ * @brief
+ */
+#define OSP_DECLARE_CREATE_DATA_IDS(session, topData, arglist) OSP_AUX_DCDI_A(session, topData, arglist);
 
-#define OSP_SESSION_ACQUIRE_DATA(session, topData, name) OSP_STRUCT_BIND_A((session).acquire_data, (topData), OSP_DATA_##name);
+
+#define OSP_AUX_DGDI_C(session, count, ...) \
+    auto const [__VA_ARGS__] = osp::unpack<count>(session.m_data)
+#define OSP_AUX_DGDI_B(x) x
+#define OSP_AUX_DGDI_A(...) OSP_AUX_DGDI_B(OSP_AUX_DGDI_C(__VA_ARGS__))
+
+#define OSP_DECLARE_GET_DATA_IDS(session, arglist) OSP_AUX_DGDI_A(session, arglist);
+
+
 
 namespace osp
 {
@@ -68,8 +83,8 @@ struct Session
         return out;
     }
 
-    template<typename TGT_STRUCT_T>
-    TGT_STRUCT_T create_targets(TaskBuilderData &rBuilder)
+    template<typename TGT_STRUCT_T, typename BUILDER_T>
+    TGT_STRUCT_T create_targets(BUILDER_T &rBuilder)
     {
         static_assert(sizeof(TGT_STRUCT_T) % sizeof(TargetId) == 0);
         constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(TargetId);
@@ -80,7 +95,7 @@ struct Session
 
         m_targets.resize(count);
 
-        rBuilder.m_targetIds.create(m_targets.begin(), m_targets.end());
+        rBuilder.m_rTasks.m_targetIds.create(m_targets.begin(), m_targets.end());
 
         return reinterpret_cast<TGT_STRUCT_T&>(*m_targets.data());
     }
@@ -92,10 +107,13 @@ struct Session
         constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(TargetId);
 
         std::type_info const& info = typeid(TGT_STRUCT_T);
-        LGRN_ASSERTMV(m_targetStructHash == info.hash_code(),
+        LGRN_ASSERTMV(m_targetStructHash == info.hash_code() && count == m_targets.size(),
                       "get_targets must use the same struct given to create_targets",
                       m_targetStructHash, m_targetStructName,
-                      info.hash_code(), info.name());
+                      info.hash_code(), info.name(),
+                      m_targets.size());
+
+        return reinterpret_cast<TGT_STRUCT_T const&>(*m_targets.data());
     }
 
     TaskId& task()
@@ -107,29 +125,22 @@ struct Session
     std::vector<TargetId>   m_targets;
     std::vector<TaskId>     m_tasks;
 
-    TargetId m_tgCleanupEvt{lgrn::id_null<TargetId>()};
+    TargetId m_cleanupTgt{lgrn::id_null<TargetId>()};
 
     std::size_t m_targetStructHash{0};
     std::string m_targetStructName;
 };
 
-template<typename TGT_STRUCT_T>
-std::vector<TargetId> to_target_vec(TGT_STRUCT_T const& targets)
+struct SessionGroup
 {
-    static_assert(sizeof(TGT_STRUCT_T) % sizeof(TargetId) == 0);
-    constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(TargetId);
-
-    TargetId const* pData = reinterpret_cast<TargetId const*>(std::addressof(targets));
-
-    return {pData, pData + count};
-}
-
-using Sessions_t = std::vector<Session>;
+    std::vector<Session> m_sessions;
+    TaskEdges m_edges;
+};
 
 /**
  * @brief Close sessions, delete all their associated TopData, Tasks, and Targets.
  */
-void top_close_session(Tasks& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec, ArrayView<Session> sessions);
+void top_close_session(Tasks& rTasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, ArrayView<Session> sessions);
 
 
 } // namespace osp

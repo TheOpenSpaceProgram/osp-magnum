@@ -43,6 +43,8 @@
 #include <osp/Active/SysPrefabInit.h>
 #include <osp/Resource/resources.h>
 
+#include <osp/tasks/top_utils.h>
+
 #include <osp/logging.h>
 
 #include <Magnum/GL/DefaultFramebuffer.h>
@@ -54,37 +56,34 @@ using namespace osp;
 namespace testapp
 {
 
-static void setup_magnum_draw(MainView mainView, Session const& application, Session const& scene, Session const& scnRender, std::vector<TargetId> run = {})
+static void setup_magnum_draw(Session const& windowApp, Session const& magnum, Session const& scene, Session const& scnRender, std::vector<TargetId> run = {})
 {
-    OSP_SESSION_UNPACK_DATA(scnRender,      TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_DATA(application,    TESTAPP_APP_MAGNUM);
+#if 0
+    OSP_DECLARE_GET_DATA_IDS(scnRender, TESTAPP_DATA_COMMON_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(windowApp, TESTAPP_DATA_WINDOW_APP);
+    OSP_DECLARE_GET_DATA_IDS(magnum,    TESTAPP_DATA_MAGNUM);
 
-    Tasks                   &rTasks     = mainView.m_rTasks;
-    TopTaskDataVec_t        &rTaskData  = mainView.m_rTaskData;
-    ExecContext        &rExec      = mainView.m_rExec;
-    ArrayView<entt::any>    topData     = mainView.m_topData;
-
-    auto &rActiveApp    = top_get<ActiveApplication>(topData, idActiveApp);
-    auto &rCamera       = top_get<active::Camera>(topData, idCamera);
+    auto &rActiveApp    = top_get<ActiveApplication>(main.m_topData, idActiveApp);
+    auto &rCamera       = top_get<active::Camera>(main.m_topData, idCamera);
     rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
-    auto tgScn = scene          .get_targets<TgtScene>();
-    auto tgApp = application    .get_targets<TgtApplication>();
+    auto tgScn = scene      .get_targets<TgtScene>();
+    auto tgApp = windowApp  .get_targets<TgtWindowApp>();
 
     // Run Resync tasks to mark all used gpu resources as dirty
-    top_enqueue_quick(rTasks, rExec, {tgScn.resyncAll});
-    top_run_blocking(rTasks, rTaskData, topData, rExec);
+    top_enqueue_quick(main.m_rTasks, main.m_rGraph, main.m_rExec, {tgScn.resyncAll});
+    top_run_blocking(main.m_rTasks, main.m_rGraph, main.m_rTaskData, main.m_topData, main.m_rExec);
 
     run.insert(run.end(), {tgScn.sync, tgScn.time, tgApp.input, tgApp.render});
 
     // run gets copied but who cares lol
-    rActiveApp.set_on_draw( [&rTasks, &rExec, &rTaskData, topData, runTagsVec = std::move(run)]
+    rActiveApp.set_on_draw( [main, runTagsVec = std::move(run)]
                             (ActiveApplication& rApp, float delta)
     {
         // Magnum Application's main loop is here
 
-        top_enqueue_quick(rTasks, rExec, runTagsVec);
-        top_run_blocking(rTasks, rTaskData, topData, rExec);
+        top_enqueue_quick(main.m_rTasks, main.m_rGraph, main.m_rExec, runTagsVec);
+        top_run_blocking(main.m_rTasks, main.m_rGraph, main.m_rTaskData, main.m_topData, main.m_rExec);
 
         // Enqueued tasks that don't run indicate a deadlock
 //        if ( ! std::all_of(std::begin(rExec.m_taskQueuedCounts),
@@ -96,37 +95,40 @@ static void setup_magnum_draw(MainView mainView, Session const& application, Ses
 //            std::abort();
 //        }
     });
+#endif
 }
 
 static ScenarioMap_t make_scenarios()
 {
     ScenarioMap_t scenarioMap;
 
-    auto const add_scenario = [&scenarioMap] (std::string_view name, std::string_view desc, SceneSetup_t run)
+    auto const add_scenario = [&scenarioMap] (std::string_view name, std::string_view desc, SceneSetupFunc_t run)
     {
         scenarioMap.emplace(name, ScenarioOption{desc, run});
     };
 
     add_scenario("enginetest", "Basic game engine and drawing scenario (without using TopTasks)",
-                 [] (MainView mainView, Sessions_t& sceneOut) -> RendererSetup_t
+                 [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
-        sceneOut.resize(1);
-        TopDataId const idSceneData = sceneOut.front().acquire_data<1>(mainView.m_topData).front();
-        auto &rResources = top_get<Resources>(mainView.m_topData, mainView.m_idResources);
+        SessionGroup &rOut = rTestApp.m_scene;
+        rOut.m_sessions.resize(1);
+        TopDataId const idSceneData = rOut.m_sessions[0].acquire_data<1>(rTestApp.m_topData)[0];
+        auto &rResources = osp::top_get<Resources>(rTestApp.m_topData, rTestApp.m_idResources);
 
         // enginetest::setup_scene returns an entt::any containing one big
         // struct containing all the scene data.
-        top_assign<enginetest::EngineTestScene>(mainView.m_topData, idSceneData, enginetest::setup_scene(rResources, mainView.m_defaultPkg));
+        top_assign<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData, enginetest::setup_scene(rResources, rTestApp.m_defaultPkg));
 
-        return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
+        return [] (TestApp& rTestApp)
         {
-            TopDataId const idSceneData = scene.front().m_data.front();
-            auto& rScene = top_get<enginetest::EngineTestScene>(mainView.m_topData, idSceneData);
+            TopDataId const idSceneData = rTestApp.m_scene.m_sessions[0].m_data[0];
+            auto &rScene = osp::top_get<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData);
 
-            OSP_SESSION_UNPACK_DATA(magnum, TESTAPP_APP_MAGNUM);
-            auto &rActiveApp    = top_get< ActiveApplication >      (mainView.m_topData, idActiveApp);
-            auto &rRenderGl     = top_get< active::RenderGL >       (mainView.m_topData, idRenderGl);
-            auto &rUserInput    = top_get< input::UserInputHandler >(mainView.m_topData, idUserInput);
+            OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,     TESTAPP_DATA_MAGNUM);
+            OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
+            auto &rActiveApp    = top_get< ActiveApplication >      (rTestApp.m_topData, idActiveApp);
+            auto &rRenderGl     = top_get< active::RenderGL >       (rTestApp.m_topData, idRenderGl);
+            auto &rUserInput    = top_get< input::UserInputHandler >(rTestApp.m_topData, idUserInput);
 
             // Renderer state is stored as lambda capture
             rActiveApp.set_on_draw(enginetest::generate_draw_func(rScene, rActiveApp, rRenderGl, rUserInput));

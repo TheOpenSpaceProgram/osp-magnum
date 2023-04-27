@@ -26,6 +26,8 @@
 
 #include "../ActiveApplication.h"
 
+#include <osp/Active/opengl/SysRenderGL.h>
+
 namespace testapp::enginetest
 {
 

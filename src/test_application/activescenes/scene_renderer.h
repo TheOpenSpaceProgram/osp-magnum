@@ -32,11 +32,15 @@
 namespace testapp::scenes
 {
 
+osp::Session setup_window_app(
+        osp::TopTaskBuilder&            rBuilder,
+        osp::ArrayView<entt::any>       topData);
 
-osp::Session setup_magnum_application(
+osp::Session setup_magnum(
         osp::TopTaskBuilder&            rBuilder,
         osp::ArrayView<entt::any>       topData,
-        osp::TopDataId const            idResources,
+        osp::Session const&             windowApp,
+        osp::TopDataId                  idResources,
         ActiveApplication::Arguments    args);
 
 /**

@@ -50,7 +50,7 @@ namespace testapp
 
 // Scene sessions
 
-#define OSP_DATA_TESTAPP_COMMON_SCENE 9, \
+#define TESTAPP_DATA_COMMON_SCENE 9, \
     idDeltaTimeIn, idActiveIds, idBasic, idDrawing, idDrawingRes, idDelEnts, idDelTotal, idDelDrawEnts, idNMesh
 #define OSP_TAGS_TESTAPP_COMMON_SCENE 37, \
     tgCleanupEvt,       tgResyncEvt,        tgSyncEvt,          tgSceneEvt,         tgTimeEvt,      \
@@ -72,21 +72,21 @@ struct TgtScene
     osp::TargetId resyncAll;
 };
 
-#define OSP_DATA_TESTAPP_MATERIAL 2, \
+#define TESTAPP_DATA_MATERIAL 2, \
     idMatEnts, idMatDirty
 #define OSP_TAGS_TESTAPP_MATERIAL 4, \
     tgMatDel, tgMatMod, tgMatReq, tgMatClr
 
 
 
-#define OSP_DATA_TESTAPP_MATERIAL 2, \
+#define TESTAPP_DATA_MATERIAL 2, \
     idMatEnts, idMatDirty
 #define OSP_TAGS_TESTAPP_MATERIAL 4, \
     tgMatDel, tgMatMod, tgMatReq, tgMatClr
 
 
 
-#define OSP_DATA_TESTAPP_PHYSICS 3, \
+#define TESTAPP_DATA_PHYSICS 3, \
     idPhys, idHierBody, idPhysIn
 #define OSP_TAGS_TESTAPP_PHYSICS 6, \
     tgPhysPrv,          tgPhysDel,          tgPhysMod,          tgPhysReq,      \
@@ -94,7 +94,7 @@ struct TgtScene
 
 
 
-#define OSP_DATA_TESTAPP_SHAPE_SPAWN 2, \
+#define TESTAPP_DATA_SHAPE_SPAWN 2, \
     idSpawner, idSpawnerEnts
 #define OSP_TAGS_TESTAPP_SHAPE_SPAWN 5, \
     tgSpawnMod,         tgSpawnReq,         tgSpawnClr,         \
@@ -102,7 +102,7 @@ struct TgtScene
 
 
 
-#define OSP_DATA_TESTAPP_PREFABS 1, \
+#define TESTAPP_DATA_PREFABS 1, \
     idPrefabInit
 #define OSP_TAGS_TESTAPP_PREFABS 7, \
     tgPrefabMod,        tgPrefabReq,        tgPrefabClr,        \
@@ -111,7 +111,7 @@ struct TgtScene
 
 
 
-#define OSP_DATA_TESTAPP_BOUNDS 2, \
+#define TESTAPP_DATA_BOUNDS 2, \
     idBounds, idOutOfBounds
 #define OSP_TAGS_TESTAPP_BOUNDS 5, \
     tgBoundsSetDel,     tgBoundsSetMod,     tgBoundsSetReq,     \
@@ -119,7 +119,7 @@ struct TgtScene
 
 
 
-#define OSP_DATA_TESTAPP_PARTS 6, \
+#define TESTAPP_DATA_PARTS 6, \
     idScnParts, idPartInit, idUpdMach, idMachEvtTags, idMachUpdEnqueue, idtgNodeUpdEvt
 #define OSP_TAGS_TESTAPP_PARTS 17, \
     tgPartMod,          tgPartReq,          tgPartClr,          \
@@ -132,7 +132,7 @@ struct TgtScene
 
 
 
-#define OSP_DATA_TESTAPP_VEHICLE_SPAWN 1, \
+#define TESTAPP_DATA_VEHICLE_SPAWN 1, \
     idVehicleSpawn
 #define OSP_TAGS_TESTAPP_VEHICLE_SPAWN 11, \
     tgVsBasicInMod,     tgVsBasicInReq,     tgVsBasicInClr,     \
@@ -143,7 +143,7 @@ struct TgtScene
 
 
 
-#define OSP_DATA_TESTAPP_VEHICLE_SPAWN_VB 1, \
+#define TESTAPP_DATA_VEHICLE_SPAWN_VB 1, \
     idVehicleSpawnVB
 #define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_VB 10, \
     tgVbSpBasicInMod,   tgVbSpBasicInReq,                       \
@@ -153,12 +153,12 @@ struct TgtScene
     tgVbNodeMod,        tgVbNodeReq
 
 
-#define OSP_DATA_TESTAPP_TEST_VEHICLES 1, \
+#define TESTAPP_DATA_TEST_VEHICLES 1, \
     idTVPartVehicle
 
 
 
-#define OSP_DATA_TESTAPP_SIGNALS_FLOAT 2, \
+#define TESTAPP_DATA_SIGNALS_FLOAT 2, \
     idSigValFloat,      idSigUpdFloat
 #define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 5, \
     tgSigFloatLinkMod,  tgSigFloatLinkReq,                      \
@@ -166,7 +166,7 @@ struct TgtScene
 
 
 
-#define OSP_DATA_TESTAPP_MACH_ROCKET 1, \
+#define TESTAPP_DATA_MACH_ROCKET 1, \
     idDummy
 #define OSP_TAGS_TESTAPP_MACH_ROCKET 1, \
     tgMhRocketEvt
@@ -174,18 +174,18 @@ struct TgtScene
 #define OSP_TAGS_TESTAPP_MACH_RCSDRIVER 1, \
     tgMhRcsDriverEvt
 
-#define OSP_DATA_TESTAPP_NEWTON 1, \
+#define TESTAPP_DATA_NEWTON 1, \
     idNwt
 #define OSP_TAGS_TESTAPP_NEWTON 5, \
     tgNwtBodyPrv,       tgNwtBodyDel,       tgNwtBodyMod,       tgNwtBodyReq,       tgNwtBodyClr
 
 
-#define OSP_DATA_TESTAPP_NEWTON_FORCES 1, \
+#define TESTAPP_DATA_NEWTON_FORCES 1, \
     idNwtFactors
 
 
 
-#define OSP_DATA_TESTAPP_NEWTON_ACCEL 1, \
+#define TESTAPP_DATA_NEWTON_ACCEL 1, \
     idAcceleration
 
 
@@ -196,7 +196,7 @@ struct TgtScene
 
 
 
-#define OSP_DATA_TESTAPP_ROCKETS_NWT 1, \
+#define TESTAPP_DATA_ROCKETS_NWT 1, \
     idRocketsNwt
 
 
@@ -204,44 +204,45 @@ struct TgtScene
 
 // Universe sessions
 
-#define OSP_DATA_TESTAPP_UNI_CORE 2, \
+#define TESTAPP_DATA_UNI_CORE 2, \
     idUniverse,         tgUniDeltaTimeIn
 #define OSP_TAGS_TESTAPP_UNI_CORE 4, \
     tgUniUpdEvt,        tgUniTimeEvt,                           \
     tgUniTransferMod,   tgUniTransferReq
 
-#define OSP_DATA_TESTAPP_UNI_SCENEFRAME 1, \
+#define TESTAPP_DATA_UNI_SCENEFRAME 1, \
     idScnFrame
 #define OSP_TAGS_TESTAPP_UNI_SCENEFRAME 2, \
     tgScnFramePosMod,   tgScnFramePosReq
 
-#define OSP_DATA_TESTAPP_UNI_PLANETS 2, \
+#define TESTAPP_DATA_UNI_PLANETS 2, \
     idPlanetMainSpace, idSatSurfaceSpaces
 
 //-----------------------------------------------------------------------------
 
 // Renderer sessions, tend to exist only when the window is open
 
-#define OSP_DATA_TESTAPP_APP 1, \
+#define TESTAPP_DATA_WINDOW_APP 1, \
     idUserInput
-#define OSP_TAGS_TESTAPP_APP 2, \
-    tgRenderEvt, tgInputEvt
 
-struct TgtApplication
+struct TgtWindowApp
 {
     osp::TargetId input;
     osp::TargetId render;
 };
 
 
-#define OSP_DATA_TESTAPP_APP_MAGNUM 3, \
-    idUserInput, idActiveApp, idRenderGl
-#define OSP_TAGS_TESTAPP_APP_MAGNUM 4, \
-    tgRenderEvt, tgInputEvt, tgGlUse, tgCleanupMagnumEvt
+
+#define TESTAPP_DATA_MAGNUM 2, \
+    idActiveApp, idRenderGl
+
+struct TgtMagnum
+{
+    osp::TargetId cleanup;
+};
 
 
-
-#define OSP_DATA_TESTAPP_COMMON_RENDERER 3, \
+#define TESTAPP_DATA_COMMON_RENDERER 3, \
     idScnRender, idGroupFwd, idCamera
 #define OSP_TAGS_TESTAPP_COMMON_RENDERER 24, \
     tgDrawGlDel,        tgDrawGlMod,        tgDrawGlReq,        \
@@ -257,34 +258,34 @@ struct TgtApplication
 
 
 
-#define OSP_DATA_TESTAPP_CAMERA_CTRL 1, \
+#define TESTAPP_DATA_CAMERA_CTRL 1, \
     idCamCtrl
 #define OSP_TAGS_TESTAPP_CAMERA_CTRL 2, \
     tgCamCtrlMod,       tgCamCtrlReq
 
 
 
-#define OSP_DATA_TESTAPP_SHADER_VISUALIZER 1, \
+#define TESTAPP_DATA_SHADER_VISUALIZER 1, \
     idDrawShVisual
 
 
 
-#define OSP_DATA_TESTAPP_SHADER_PHONG 1, \
+#define TESTAPP_DATA_SHADER_PHONG 1, \
     idDrawShPhong
 
 
 
-#define OSP_DATA_TESTAPP_SHADER_FLAT 1, \
+#define TESTAPP_DATA_SHADER_FLAT 1, \
     idDrawShFlat
 
 
 
-#define OSP_DATA_TESTAPP_INDICATOR 1, \
+#define TESTAPP_DATA_INDICATOR 1, \
     idIndicator
 
 
 
-#define OSP_DATA_TESTAPP_VEHICLE_CONTROL 1, \
+#define TESTAPP_DATA_VEHICLE_CONTROL 1, \
     idVhControls
 #define OSP_TAGS_TESTAPP_VEHICLE_CONTROL 2, \
     tgSelUsrCtrlMod,    tgSelUsrCtrlReq

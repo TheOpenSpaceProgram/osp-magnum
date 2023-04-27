@@ -187,6 +187,7 @@ TEST(Tasks, BasicSingleThreaded)
     TaskEdges       edges;
     TaskFuncVec_t   functions;
     Builder_t       builder{tasks, edges, functions};
+
     auto const tgt  = builder.create_targets<TestWorldTargets>();
 
     // Start adding tasks. The order these are added does not matter.
@@ -263,7 +264,7 @@ TEST(Tasks, BasicSingleThreaded)
 
     // Execute
 
-    TestWorld           world;
+    TestWorld      world;
     ExecContext    exec;
     exec.resize(tasks);
 

@@ -179,25 +179,16 @@ constexpr TopTaskFunc_t wrap_args(FUNC_T funcArg)
 
 //-----------------------------------------------------------------------------
 
-struct TopTaskBuilder;
+struct TopTaskRef;
 
-struct TopTaskRef : public TaskRefBase<TopTaskBuilder, TopTaskRef>
-{
-    TopTaskRef& name(std::string_view debugName);
-    TopTaskRef& data(std::initializer_list<TopDataId> dataUsed);
-
-    template<typename FUNC_T>
-    TopTaskRef& func(FUNC_T funcArg);
-    TopTaskRef& func_raw(TopTaskFunc_t func);
-    
-    template<typename CONTAINER_T>
-    TopTaskRef& push_to(CONTAINER_T& rContainer);
-};
-
+/**
+ * @brief Convenient interface for building TopTasks
+ */
 struct TopTaskBuilder : public TaskBuilderBase<TopTaskBuilder, TopTaskRef>
 {
-    TopTaskBuilder(TopTaskDataVec_t& data)
-     : m_rData{data}
+    TopTaskBuilder(Tasks& rTasks, TaskEdges& rEdges, TopTaskDataVec_t& rData)
+     : TaskBuilderBase<TopTaskBuilder, TopTaskRef>( {rTasks, rEdges} )
+     , m_rData{rData}
     { }
     TopTaskBuilder(TopTaskBuilder const& copy) = delete;
     TopTaskBuilder(TopTaskBuilder && move) = default;
@@ -207,16 +198,29 @@ struct TopTaskBuilder : public TaskBuilderBase<TopTaskBuilder, TopTaskRef>
     TopTaskDataVec_t & m_rData;
 };
 
+struct TopTaskRef : public TaskRefBase<TopTaskBuilder, TopTaskRef>
+{
+    inline TopTaskRef& name(std::string_view debugName);
+    inline TopTaskRef& data(std::initializer_list<TopDataId> dataUsed);
+
+    template<typename FUNC_T>
+    TopTaskRef& func(FUNC_T funcArg);
+    inline TopTaskRef& func_raw(TopTaskFunc_t func);
+
+    template<typename CONTAINER_T>
+    TopTaskRef& push_to(CONTAINER_T& rContainer);
+};
+
 TopTaskRef& TopTaskRef::name(std::string_view debugName)
 {
-    m_rBuilder.m_rData.resize(m_rBuilder.m_taskIds.capacity());
+    m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
     m_rBuilder.m_rData[m_taskId].m_debugName = debugName;
     return *this;
 }
 
 TopTaskRef& TopTaskRef::data(std::initializer_list<TopDataId> dataUsed)
 {
-    m_rBuilder.m_rData.resize(m_rBuilder.m_taskIds.capacity());
+    m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
     m_rBuilder.m_rData[m_taskId].m_dataUsed = dataUsed;
     return *this;
 }
@@ -224,14 +228,14 @@ TopTaskRef& TopTaskRef::data(std::initializer_list<TopDataId> dataUsed)
 template<typename FUNC_T>
 TopTaskRef& TopTaskRef::func(FUNC_T funcArg)
 {
-    m_rBuilder.m_rData.resize(m_rBuilder.m_taskIds.capacity());
+    m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
     m_rBuilder.m_rData[m_taskId].m_func = wrap_args(funcArg);
     return *this;
 }
 
 TopTaskRef& TopTaskRef::func_raw(TopTaskFunc_t func)
 {
-    m_rBuilder.m_rData.resize(m_rBuilder.m_taskIds.capacity());
+    m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
     m_rBuilder.m_rData[m_taskId].m_func = func;
     return *this;
 }

@@ -24,43 +24,21 @@
  */
 #pragma once
 
-#include <entt/core/any.hpp>
+#include "../testapp.h"
 
-#include <osp/Resource/resourcetypes.h>
-
-#include <osp/tasks/tasks.h>
+// IWYU pragma: begin_exports
 #include <osp/tasks/top_utils.h>
-#include <osp/tasks/top_tasks.h>
-#include <osp/tasks/top_execute.h>
-#include <osp/tasks/top_session.h>
+// IWYU pragma: end_exports
 
-#include <functional>
-#include <string_view>
 #include <unordered_map>
-
-namespace osp::active { struct RenderGL; }
-namespace osp::input { class UserInputHandler; }
 
 namespace testapp
 {
 
-struct MainView
-{
-    osp::ArrayView<entt::any>   m_topData;
-    osp::Tasks                  & m_rTasks;
-    osp::ExecutionContext       & m_rExec;
-    osp::TopTaskDataVec_t       & m_rTaskData;
-    osp::TopDataId              m_idResources;
-    osp::PkgId                  m_defaultPkg;
-};
-
-using RendererSetup_t   = void(*)(MainView, osp::Session const&, osp::Sessions_t const&, osp::Sessions_t&);
-using SceneSetup_t      = RendererSetup_t(*)(MainView, osp::Sessions_t&);
-
 struct ScenarioOption
 {
     std::string_view m_desc;
-    SceneSetup_t m_setup;
+    SceneSetupFunc_t m_setup;
 };
 
 using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;

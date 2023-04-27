@@ -62,39 +62,56 @@ using Magnum::GL::Mesh;
 namespace testapp::scenes
 {
 
-#if 0
+Session setup_window_app(
+        TopTaskBuilder&                 rBuilder,
+        ArrayView<entt::any> const      topData)
+{
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_WINDOW_APP);
+    out.create_targets<TgtWindowApp>(rBuilder);
 
-Session setup_magnum_application(
+    auto &rUserInput = osp::top_emplace<UserInputHandler>(topData, idUserInput, 12);
+    config_controls(rUserInput);
+
+    return out;
+}
+
+Session setup_magnum(
         TopTaskBuilder&                 rBuilder,
         ArrayView<entt::any> const      topData,
+        Session const&                  windowApp,
         TopDataId const                 idResources,
         ActiveApplication::Arguments    args)
 {
-    Session magnum;
-    OSP_SESSION_ACQUIRE_DATA(magnum, topData,   TESTAPP_APP_MAGNUM);
-    OSP_SESSION_ACQUIRE_TAGS(magnum, rTags,     TESTAPP_APP_MAGNUM);
+    OSP_DECLARE_GET_DATA_IDS(windowApp, TESTAPP_DATA_WINDOW_APP);
+    auto& rUserInput = top_get<UserInputHandler>(topData, idUserInput);
 
-    // Order-dependent; ActiveApplication construction starts OpenGL context
-    auto &rUserInput    = osp::top_emplace<UserInputHandler>(topData, idUserInput, 12);
-    osp::top_emplace<ActiveApplication>                     (topData, idActiveApp, args, rUserInput);
-    auto &rRenderGl     = osp::top_emplace<RenderGL>        (topData, idRenderGl);
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM);
+    auto const tgMgn = out.create_targets<TgtMagnum>(rBuilder);
+    out.m_cleanupTgt = tgMgn.cleanup;
 
-    config_controls(rUserInput);
+    // Order-dependent; ActiveApplication construction starts OpenGL context, needed by RenderGL
+    /* unused */      top_emplace<ActiveApplication>(topData, idActiveApp, args, rUserInput);
+    auto &rRenderGl = top_emplace<RenderGL>         (topData, idRenderGl);
+
     SysRenderGL::setup_context(rRenderGl);
 
-    magnum.task() = rBuilder.task().assign({tgCleanupMagnumEvt, tgGlUse}).data(
-            "Clean up Magnum renderer",
-            TopDataIds_t{           idResources,          idRenderGl},
-            wrap_args([] (Resources& rResources, RenderGL& rRenderGl) noexcept
+    rBuilder.task()
+        .push_to(out.m_tasks)
+        .depends_on({tgMgn.cleanup})
+        .name("Clean up Magnum renderer")
+        .data({             idResources,          idRenderGl})
+        .func([] (Resources& rResources, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::clear_resource_owners(rRenderGl, rResources);
         rRenderGl = {}; // Needs the OpenGL thread for destruction
-    }));
-    magnum.m_tgCleanupEvt = tgCleanupMagnumEvt;
+    });
 
-    return magnum;
+    return out;
 }
 
+#if 0
 
 Session setup_scene_renderer(
         TopTaskBuilder&             rBuilder,

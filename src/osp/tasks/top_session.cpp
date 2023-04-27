@@ -33,38 +33,33 @@
 
 #include <algorithm>
 
-using Corrade::Containers::ArrayView;
-using Corrade::Containers::StridedArrayView2D;
-using Corrade::Containers::arrayView;
-
 namespace osp
 {
 
-void top_close_session(Tasks& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, ArrayView<Session> sessions)
+void top_close_session(
+        Tasks &                 rTasks,
+        ExecGraph const&        graph,
+        TopTaskDataVec_t&       rTaskData,
+        ArrayView<entt::any>    topData,
+        ExecContext&            rExec,
+        ArrayView<Session>      sessions)
 {
-#if 0
     // Run cleanup tasks
+    for (Session &rSession : sessions)
     {
-        // Accumulate together all cleanup tags from all sessons
-        std::vector<bit_int_t> tagsToRun(rTags.m_tags.vec().size());
-        auto tagsToRunBits = lgrn::bit_view(tagsToRun);
-        for (Session &rSession : sessions)
+        if (TargetId const cleanup = std::exchange(rSession.m_cleanupTgt, lgrn::id_null<TargetId>());
+            cleanup != lgrn::id_null<TargetId>())
         {
-            if (TagId const tgCleanupEvt = std::exchange(rSession.m_tgCleanupEvt, lgrn::id_null<TagId>());
-                tgCleanupEvt != lgrn::id_null<TagId>())
-            {
-                tagsToRunBits.set(std::size_t(tgCleanupEvt));
-            }
+            rExec.m_targetDirty.set(std::size_t(cleanup));
         }
-
-        task_enqueue(rTags, rTasks, rExec, tagsToRun);
-        top_run_blocking(rTags, rTasks, rTaskData, topData, rExec);
     }
+    enqueue_dirty(rTasks, graph, rExec);
+    top_run_blocking(rTasks, graph, rTaskData, topData, rExec);
 
     // Clear each session's TopData
     for (Session &rSession : sessions)
     {
-        for (TopDataId const id : std::exchange(rSession.m_dataIds, {}))
+        for (TopDataId const id : std::exchange(rSession.m_data, {}))
         {
             if (id != lgrn::id_null<TopDataId>())
             {
@@ -73,41 +68,19 @@ void top_close_session(Tasks& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<ent
         }
     }
 
-    auto const tagInts2d = task_tags_2d(rTags, rTasks);
-
     // Clear each session's tasks
     for (Session &rSession : sessions)
     {
-        for (TaskId const task : rSession.m_taskIds)
+        for (TaskId const task : rSession.m_tasks)
         {
-            rTasks.m_tasks.remove(task);
+            rTasks.m_taskIds.remove(task);
 
-            auto taskTagInts = tagInts2d[std::size_t(task)].asContiguous();
-            lgrn::bit_view(taskTagInts).reset();
-
-            TopTask &rCurrTaskData = rTaskData.m_taskData[std::size_t(task)];
+            TopTask &rCurrTaskData = rTaskData[task];
+            rCurrTaskData.m_debugName.clear();
             rCurrTaskData.m_dataUsed.clear();
             rCurrTaskData.m_func = nullptr;
         }
     }
-
-    auto const depends2d = tag_depends_2d(rTags);
-
-    // Clear each session's tags
-    for (Session &rSession : sessions)
-    {
-        for (TagId const tag : std::exchange(rSession.m_tagIds, {}))
-        {
-            if (tag != lgrn::id_null<TagId>())
-            {
-                rTags.m_tags.remove(tag);
-
-                auto tagDepends = depends2d[std::size_t(tag)].asContiguous();
-                std::fill(std::begin(tagDepends), std::end(tagDepends), lgrn::id_null<TagId>());
-            }
-        }
-    }
-#endif
 }
 
 } // namespace testapp

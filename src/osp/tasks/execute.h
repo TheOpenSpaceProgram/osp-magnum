@@ -59,15 +59,14 @@ struct ExecContext
 
     // TODO: Consider multithreading. something something work stealing...
     //  * Allow multiple threads to search for and execute tasks. Atomic access
-    //    for ExecutionContext? Might be messy to implement.
+    //    for ExecContext? Might be messy to implement.
     //  * Only allow one thread to search for tasks, assign tasks to other
     //    threads if they're available before running own task. Another thread
     //    can take over once it completes its task. May be faster as only one
-    //    thread is modifying ExecutionContext, and easier to implement.
+    //    thread is modifying ExecContext, and easier to implement.
     //  * Plug into an existing work queue library?
 
-}; // struct ExecutionContext
-
+}; // struct ExecContext
 
 int enqueue_dirty(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec) noexcept;
 
