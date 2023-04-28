@@ -29,6 +29,7 @@
 #include <gtest/gtest.h>
 
 #include <functional>
+#include <numeric>
 #include <random>
 #include <set>
 
@@ -50,23 +51,20 @@ bool contains(RANGE_T const& range, VALUE_T const& value) noexcept
 template<typename RUN_TASK_T>
 void randomized_singlethreaded_execute(Tasks const& tasks, ExecGraph const& graph, ExecContext& rExec, std::mt19937 &rRand, int maxRuns, RUN_TASK_T && runTask)
 {
-    std::size_t tasksLeft = rExec.m_tasksQueued.count();
-
     for (int i = 0; i < maxRuns; ++i)
     {
+        std::size_t const tasksLeft = rExec.m_tasksQueued.size();
+
         if (tasksLeft == 0)
         {
             break;
         }
 
-        // This solution of "pick random '1' bit in a bit vector" is very inefficient
-        auto const randomTask = TaskId(*std::next(rExec.m_tasksQueued.ones().begin(), rRand() % tasksLeft));
+        TaskId const randomTask = rExec.m_tasksQueued.at(rRand() % tasksLeft);
 
         FulfillDirty_t const status = runTask(randomTask);
         mark_completed_task(tasks, graph, rExec, randomTask, status);
-        int const newTasks = enqueue_dirty(tasks, graph, rExec);
-
-        tasksLeft = tasksLeft - 1 + newTasks;
+        enqueue_dirty(tasks, graph, rExec);
     }
 }
 

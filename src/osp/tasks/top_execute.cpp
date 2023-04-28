@@ -46,16 +46,12 @@ void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec
     // Run until there's no tasks left to run
     while (true)
     {
-        // Choose first available task
-        auto const enqueuedTasks = rExec.m_tasksQueued.ones();
-        auto const taskIt = enqueuedTasks.begin();
-
-        if (taskIt == enqueuedTasks.end())
+        if (rExec.m_tasksQueued.empty())
         {
             break;
         }
 
-        auto const task = TaskId(*taskIt);
+        TaskId const task = rExec.m_tasksQueued.at(0);
 
         TopTask &rTopTask = rTaskData[task];
 

@@ -31,6 +31,8 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Corrade/Containers/StridedArrayView.h>
 
+#include <entt/entity/sparse_set.hpp>
+
 #include <cassert>
 #include <vector>
 
@@ -44,14 +46,16 @@ struct ExecContext
         std::size_t const maxTargets    = tasks.m_targetIds.capacity();
         std::size_t const maxTasks      = tasks.m_taskIds.capacity();
 
-        bitvector_resize(m_tasksQueued,         maxTasks);
+        m_tasksQueued.reserve(maxTasks);
+
         bitvector_resize(m_targetDirty,         maxTargets);
         bitvector_resize(m_targetWillBePending, maxTargets);
         m_targetPendingCount.resize(maxTargets);
         m_targetInUseCount  .resize(maxTargets);
     }
 
-    BitVector_t                 m_tasksQueued;
+    entt::basic_sparse_set<TaskId> m_tasksQueued;
+
     BitVector_t                 m_targetDirty;
     BitVector_t                 m_targetWillBePending;
     KeyedVec<TargetId, int>     m_targetPendingCount;

@@ -29,9 +29,9 @@
 namespace osp
 {
 
-bool try_enqueue_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task) noexcept
+static bool try_enqueue_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task) noexcept
 {
-    if (rExec.m_tasksQueued.test(std::size_t(task)))
+    if (rExec.m_tasksQueued.contains(task))
     {
         return false; // task already queued
     }
@@ -55,7 +55,7 @@ bool try_enqueue_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &r
         ++ rExec.m_targetPendingCount[fulfill];
     }
 
-    rExec.m_tasksQueued.set(std::size_t(task));
+    rExec.m_tasksQueued.emplace(task);
 
     return true;
 }
@@ -91,7 +91,7 @@ int enqueue_dirty(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec
 
 void mark_completed_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept
 {
-    LGRN_ASSERTMV(rExec.m_tasksQueued.test(std::size_t(task)),
+    LGRN_ASSERTMV(rExec.m_tasksQueued.contains(task),
                  "Task must be queued to have been allowed to run", std::size_t(task));
 
     for (TargetId const dependOn : graph.m_taskDependOn[std::size_t(task)])
@@ -121,8 +121,7 @@ void mark_completed_task(Tasks const& tasks, ExecGraph const& graph, ExecContext
         }
     }
 
-    rExec.m_tasksQueued.reset(std::size_t(task));
+    rExec.m_tasksQueued.erase(task);
 }
-
 
 } // namespace osp
