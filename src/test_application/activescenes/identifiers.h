@@ -82,7 +82,6 @@
 
 
 
-
 #define OSP_DATA_TESTAPP_SHAPE_SPAWN 2, \
     idSpawner, idSpawnerEnts
 #define OSP_TAGS_TESTAPP_SHAPE_SPAWN 5, \
@@ -108,34 +107,38 @@
 
 
 
-#define OSP_DATA_TESTAPP_PARTS 4, \
-    idScnParts, idPartInit, idUpdMach, idMachEvtTags
-#define OSP_TAGS_TESTAPP_PARTS 10, \
-    tgPartMod,          tgPartReq,                              \
+#define OSP_DATA_TESTAPP_PARTS 6, \
+    idScnParts, idPartInit, idUpdMach, idMachEvtTags, idMachUpdEnqueue, idtgNodeUpdEvt
+#define OSP_TAGS_TESTAPP_PARTS 17, \
+    tgPartMod,          tgPartReq,          tgPartClr,          \
     tgMapPartEntMod,    tgMapPartEntReq,                        \
-    tgWeldMod,          tgWeldReq,                              \
+    tgWeldMod,          tgWeldReq,          tgWeldClr,          \
     tgLinkMod,          tgLinkReq,                              \
-    tgLinkMhUpdMod,     tgLinkMhUpdReq
+    tgLinkMhUpdMod,     tgLinkMhUpdReq,                         \
+    tgNodeAnyUpdMod,    tgNodeAnyUpdReq,                        \
+    tgMachUpdEnqMod,    tgMachUpdEnqReq,    tgNodeUpdEvt
 
 
 
 #define OSP_DATA_TESTAPP_VEHICLE_SPAWN 1, \
     idVehicleSpawn
-#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN 9, \
-    tgVhSpBasicInMod,   tgVhSpBasicInReq,   tgVhSpBasicInClr,   \
-    tgVhSpPartMod,      tgVhSpPartReq,                          \
-    tgVhSpWeldMod,      tgVhSpWeldReq,                          \
-    tgVhSpPartPfMod,    tgVhSpPartPfReq
+#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN 11, \
+    tgVsBasicInMod,     tgVsBasicInReq,     tgVsBasicInClr,     \
+    tgVsPartMod,        tgVsPartReq,                            \
+    tgVsMapPartMachMod, tgVsMapPartMachReq,                     \
+    tgVsWeldMod,        tgVsWeldReq,                            \
+    tgVsPartPfMod,      tgVsPartPfReq
 
 
 
 #define OSP_DATA_TESTAPP_VEHICLE_SPAWN_VB 1, \
     idVehicleSpawnVB
-#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_VB 8, \
-    tgVBSpBasicInMod,   tgVBSpBasicInReq,                       \
-    tgVBPartMod,        tgVBPartReq,                            \
-    tgVBWeldMod,        tgVBWeldReq,                            \
-    tgVBMachMod,        tgVBMachReq
+#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_VB 10, \
+    tgVbSpBasicInMod,   tgVbSpBasicInReq,                       \
+    tgVbPartMod,        tgVbPartReq,                            \
+    tgVbWeldMod,        tgVbWeldReq,                            \
+    tgVbMachMod,        tgVbMachReq,                            \
+    tgVbNodeMod,        tgVbNodeReq
 
 
 #define OSP_DATA_TESTAPP_TEST_VEHICLES 1, \
@@ -143,12 +146,11 @@
 
 
 
-#define OSP_DATA_TESTAPP_SIGNALS_FLOAT 3, \
-    idSigValFloat,      idSigUpdFloat,      idTgSigFloatUpdEvt
-#define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 7, \
+#define OSP_DATA_TESTAPP_SIGNALS_FLOAT 2, \
+    idSigValFloat,      idSigUpdFloat
+#define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 5, \
     tgSigFloatLinkMod,  tgSigFloatLinkReq,                      \
-    tgSigFloatValMod,   tgSigFloatValReq,   tgSigFloatUpdEvt,   \
-    tgSigFloatUpdMod,   tgSigFloatUpdReq
+    tgSigFloatUpdMod,   tgSigFloatUpdReq,   tgSigFloatUpdEvt    \
 
 
 
@@ -157,7 +159,8 @@
 #define OSP_TAGS_TESTAPP_MACH_ROCKET 1, \
     tgMhRocketEvt
 
-
+#define OSP_TAGS_TESTAPP_MACH_RCSDRIVER 1, \
+    tgMhRcsDriverEvt
 
 #define OSP_DATA_TESTAPP_NEWTON 1, \
     idNwt
@@ -180,6 +183,9 @@
     tgNwtVhHierMod,     tgNwtVhHierReq
 
 
+
+#define OSP_DATA_TESTAPP_ROCKETS_NWT 1, \
+    idRocketsNwt
 
 
 

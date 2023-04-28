@@ -34,7 +34,7 @@ namespace testapp::scenes
 using MachTypeToEvt_t = std::vector<osp::TagId>;
 
 /**
- * @brief Support for Parts and their Machines
+ * @brief Support for Parts, Machines, and Links
  */
 osp::Session setup_parts(
         Builder_t&                  rBuilder,
@@ -45,6 +45,32 @@ osp::Session setup_parts(
 
 /**
  * @brief Float Signal Links, allowing Machines to pass floats to each other
+ *
+ * Setup:
+ * * Each machine type provides an update event tag in idMachEvtTags.
+ *   eg: tgMhRocketEvt and tgMhRcsDriverEvt
+ *
+ *
+ * Passing values:
+ *
+ * 1. Tasks write new values to idSigUpdFloat
+ *
+ * 2. The "Reduce Signal-Float Nodes" task reads new values from idSigUpdFloat(s) and writes them
+ *    into idSigValFloat. This changes the input values of connected Machines, marking them dirty.
+ *    Tags for each unique dirty machine type is added to rMachUpdEnqueue.
+ *    Other 'reduce node' tasks could be running in parallel here.
+ *
+ * 3. The "Enqueue Machine & Node update tasks" task from setup_parts runs, and enqueues machine
+ *    tasks from rMachUpdEnqueue as well as every tgNodeUpdEvt task, including
+ *    "Reduce Signal-Float Nodes".
+ *
+ * 4. Repeat until nothing is dirty
+ *
+ *
+ * This seemingly complex scheme allows different node types to interoperate seamlessly.
+ *
+ * eg. A float signal can trigger a fuel valve that triggers a pressure sensor which outputs
+ *     another float signal, all running within a single frame.
  */
 osp::Session setup_signals_float(
         Builder_t&                  rBuilder,
@@ -54,9 +80,22 @@ osp::Session setup_signals_float(
         osp::Session const&         parts);
 
 /**
- * @brief 'Rockets' that print values to the console
+ * @brief Links for Magic Rockets
+ *
+ * This only sets up links and does not apply forces, see setup_rocket_thrust_newton
  */
 osp::Session setup_mach_rocket(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat);
+
+/**
+ * @brief Links for RCS Drivers, which output thrust levels given pitch/yaw/roll controls
+ */
+osp::Session setup_mach_rcsdriver(
         Builder_t&                  rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Tags&                  rTags,
@@ -87,6 +126,7 @@ osp::Session setup_vehicle_spawn_vb(
         osp::Session const&         prefabs,
         osp::Session const&         parts,
         osp::Session const&         vehicleSpawn,
+        osp::Session const&         signalsFloat,
         osp::TopDataId const        idResources);
 
 /**

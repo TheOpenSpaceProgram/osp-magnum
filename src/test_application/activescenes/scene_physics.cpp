@@ -205,7 +205,7 @@ Session setup_shape_spawn(
                 Vector3 const inertia
                         = phys::collider_inertia_tensor(spawn.m_shape, spawn.m_size, spawn.m_mass);
                 Vector3 const offset{0.0f, 0.0f, 0.0f};
-                rPhys.m_ownDyn.emplace( child, ACompSubBody{ inertia, offset, spawn.m_mass } );
+                rPhys.m_mass.emplace( child, ACompMass{ inertia, offset, spawn.m_mass } );
             }
 
             rPhys.m_shape[std::size_t(child)] = spawn.m_shape;
@@ -335,6 +335,7 @@ Session setup_prefabs(
             wrap_args([] (ActiveReg_t const& rActiveIds, ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxPhysics& rPhys) noexcept
     {
         rPhys.m_hasColliders.ints().resize(rActiveIds.vec().capacity());
+        //rPhys.m_massDirty.ints().resize(rActiveIds.vec().capacity());
         rPhys.m_shape.resize(rActiveIds.capacity());
         SysPrefabInit::init_physics(rPrefabInit, rResources, rPhys);
     }));

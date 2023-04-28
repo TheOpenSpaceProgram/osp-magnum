@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,50 +22,24 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "links.h"
+#pragma once
 
-using namespace osp;
+#include <longeron/containers/bit_view.hpp>
 
-using osp::link::MachTypeReg_t;
-using osp::link::MachTypeId;
+#include <cstdint>
+#include <vector>
 
-namespace adera
+namespace osp
 {
 
-MachTypeId const gc_mtUserCtrl      = MachTypeReg_t::create();
-MachTypeId const gc_mtMagicRocket   = MachTypeReg_t::create();
-MachTypeId const gc_mtRcsDriver     = MachTypeReg_t::create();
+using BitVector_t = lgrn::BitView< std::vector<uint64_t> >;
 
-float thruster_influence(Vector3 const pos, Vector3 const dir, Vector3 const cmdLin, Vector3 const cmdAng) noexcept
+inline void bitvector_resize(BitVector_t &rBitVector, std::size_t size)
 {
-    using Magnum::Math::cross;
-    using Magnum::Math::dot;
-
-    float influence = 0.0f;
-
-    if (cmdAng.dot() > 0.0f)
-    {
-        Vector3 const torque = cross(pos, dir).normalized();
-        influence += dot(torque, cmdAng.normalized());
-    }
-
-    if (cmdLin.dot() > 0.0f)
-    {
-        influence += dot(dir, cmdLin.normalized());
-    }
-
-    if (influence < 0.01f)
-    {
-        return 0.0f; // Ignore small contributions
-    }
-
-    if (Magnum::Math::isNan(influence))
-    {
-        return 0.0f;
-    }
-
-    return std::clamp(influence, 0.0f, 1.0f);
+    rBitVector.ints().resize(size / 64 + (size % 64 != 0));
 }
 
+} // namespace osp
 
-} // namespace adera
+
+

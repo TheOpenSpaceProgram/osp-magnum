@@ -100,5 +100,19 @@ osp::Session setup_vehicle_spawn_newton(
         osp::Session const&         newton,
         osp::TopDataId const        idResources);
 
+/**
+ * @brief Add thrust forces to Magic Rockets from setup_mach_rocket
+ */
+osp::Session setup_rocket_thrust_newton(
+        Builder_t&                  rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Tags&                  rTags,
+        osp::Session const&         scnCommon,
+        osp::Session const&         physics,
+        osp::Session const&         prefabs,
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat,
+        osp::Session const&         newton,
+        osp::Session const&         nwtFactors);
 
 } // namespace testapp::scenes

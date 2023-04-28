@@ -30,15 +30,19 @@
 namespace adera
 {
 
+using osp::link::PortEntry;
+using osp::link::gc_ntSigFloat;
+using osp::link::gc_sigIn;
+using osp::link::gc_sigOut;
+
 extern osp::link::MachTypeId const gc_mtUserCtrl;
 extern osp::link::MachTypeId const gc_mtMagicRocket;
+extern osp::link::MachTypeId const gc_mtRcsDriver;
+
+constexpr osp::Vector3 gc_rocketForward{0.0f, 0.0f, 1.0f};
 
 namespace ports_userctrl
 {
-using osp::link::PortEntry;
-using osp::link::gc_ntSigFloat;
-using osp::link::gc_sigOut;
-
 PortEntry const gc_throttleOut      { gc_ntSigFloat, 0, gc_sigOut };
 PortEntry const gc_pitchOut         { gc_ntSigFloat, 1, gc_sigOut };
 PortEntry const gc_yawOut           { gc_ntSigFloat, 2, gc_sigOut };
@@ -47,11 +51,27 @@ PortEntry const gc_rollOut          { gc_ntSigFloat, 3, gc_sigOut };
 
 namespace ports_magicrocket
 {
-using osp::link::PortEntry;
-using osp::link::gc_ntSigFloat;
-using osp::link::gc_sigIn;
-
 PortEntry const gc_throttleIn       { gc_ntSigFloat, 0, gc_sigIn };
+PortEntry const gc_multiplierIn     { gc_ntSigFloat, 1, gc_sigIn };
 }
+
+namespace ports_rcsdriver
+{
+PortEntry const gc_posXIn           { gc_ntSigFloat, 0, gc_sigIn };
+PortEntry const gc_posYIn           { gc_ntSigFloat, 1, gc_sigIn };
+PortEntry const gc_posZIn           { gc_ntSigFloat, 2, gc_sigIn };
+PortEntry const gc_dirXIn           { gc_ntSigFloat, 3, gc_sigIn };
+PortEntry const gc_dirYIn           { gc_ntSigFloat, 4, gc_sigIn };
+PortEntry const gc_dirZIn           { gc_ntSigFloat, 5, gc_sigIn };
+PortEntry const gc_cmdLinXIn        { gc_ntSigFloat, 6, gc_sigIn };
+PortEntry const gc_cmdLinYIn        { gc_ntSigFloat, 7, gc_sigIn };
+PortEntry const gc_cmdLinZIn        { gc_ntSigFloat, 8, gc_sigIn };
+PortEntry const gc_cmdAngXIn        { gc_ntSigFloat, 9, gc_sigIn };
+PortEntry const gc_cmdAngYIn        { gc_ntSigFloat, 10, gc_sigIn };
+PortEntry const gc_cmdAngZIn        { gc_ntSigFloat, 11, gc_sigIn };
+PortEntry const gc_throttleOut      { gc_ntSigFloat, 12, gc_sigOut };
+}
+
+float thruster_influence(osp::Vector3 pos, osp::Vector3 dir, osp::Vector3 cmdLin, osp::Vector3 cmdAng) noexcept;
 
 } // namespace adera

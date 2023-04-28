@@ -66,14 +66,14 @@ void VehicleBuilder::set_prefabs(std::initializer_list<SetPrefab> const& setPref
     }
 }
 
-WeldId VehicleBuilder::weld(std::initializer_list<SetTransform> const& setTransform)
+WeldId VehicleBuilder::weld(osp::ArrayView<PartToWeld const> toWeld)
 {
     WeldId const weld = m_data->m_weldIds.create();
     m_data->m_weldToParts.ids_reserve(m_data->m_weldIds.capacity());
 
-    PartId *pPartInWeld = m_data->m_weldToParts.emplace(weld, setTransform.size());
+    PartId *pPartInWeld = m_data->m_weldToParts.emplace(weld, toWeld.size());
 
-    for (SetTransform const& set : setTransform)
+    for (PartToWeld const& set : toWeld)
     {
         m_data->m_partTransformWeld[set.m_part] = set.m_transform;
 
@@ -137,7 +137,7 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId const part,
     rData.m_machines.m_machToLocal[mach] = local;
     rPerMachType.m_localToAny[local] = mach;
 
-    rData.m_partMachCount[std::size_t(part)] ++;
+    m_partMachCount[std::size_t(part)] ++;
     rData.m_machToPart[mach] = part;
 
     connect(mach, connections);
@@ -214,9 +214,15 @@ VehicleData VehicleBuilder::finalize_release()
             lgrn::Span<NodeId> portSpan = rPerNodeType.m_machToNode[mach];
             lgrn::Span<JuncCustom> customSpan = rPerNodeType.m_machToNodeCustom[mach];
 
-            auto customIt = std::begin(customSpan);
-            for (NodeId node : portSpan)
+            for (int i = 0; i < portSpan.size(); ++i)
             {
+                NodeId node = portSpan[i];
+
+                if (node == lgrn::id_null<NodeId>())
+                {
+                    continue;
+                }
+
                 lgrn::Span<Junction> const juncSpan = rPerNodeType.m_nodeToMach[node];
 
                 // find empty spot
@@ -234,12 +240,42 @@ VehicleData VehicleBuilder::finalize_release()
 
                 found->m_local  = local;
                 found->m_type   = type;
-                found->m_custom = *customIt;
-
-                std::advance(customIt, 1);
+                found->m_custom = customSpan[i];
             }
         }
     }
+
+    // Reserve part-to-machine partitions
+    using osp::link::MachinePair;
+    rData.m_partToMachines.ids_reserve(rData.m_partIds.capacity());
+    rData.m_partToMachines.data_reserve(rData.m_machines.m_ids.capacity());
+    for (PartId const part : rData.m_partIds.bitview().zeros())
+    {
+        rData.m_partToMachines.emplace(part, m_partMachCount[part]);
+    }
+
+    // Assign part-to-machine partitions
+    for (MachAnyId const mach : rData.m_machines.m_ids.bitview().zeros())
+    {
+        MachLocalId const   local       = rData.m_machines.m_machToLocal[mach];
+        MachTypeId const    type        = rData.m_machines.m_machTypes[mach];
+        PartId const        part        = rData.m_machToPart[mach];
+        auto const          machines    = lgrn::Span<MachinePair>{rData.m_partToMachines[part]};
+
+        // Reuse machine count to track how many are currently added.
+        // By the end, these should all be zero
+        auto &rPartMachCount = m_partMachCount[part];
+        assert(rPartMachCount != 0);
+        -- rPartMachCount;
+
+        machines[rPartMachCount] = { .m_local = local, .m_type = type };
+    }
+
+    assert(std::all_of(m_partMachCount.begin(), m_partMachCount.end(),
+                       [] (auto const& count)
+    {
+        return count == 0;
+    }));
 
     VehicleData dataOut{std::move(*m_data)};
     m_data.emplace();

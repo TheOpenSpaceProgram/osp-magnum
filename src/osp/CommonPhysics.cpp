@@ -73,6 +73,8 @@ Vector3 collider_inertia_tensor(EShape shape, Vector3 scale, float mass)
 {
     switch (shape)
     {
+    case EShape::None:
+        return Vector3{0.0f};
     case EShape::Cylinder:
     {
         // Default cylinder dimensions: radius 1, height 2

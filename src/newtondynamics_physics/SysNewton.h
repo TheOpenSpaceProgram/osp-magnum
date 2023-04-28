@@ -52,8 +52,6 @@ class SysNewton
     using ACtxPhysics               = osp::active::ACtxPhysics;
     using ACtxSceneGraph            = osp::active::ACtxSceneGraph;
     using ACompTransform            = osp::active::ACompTransform;
-    using ACompTransformControlled  = osp::active::ACompTransformControlled;
-    using ACompTransformMutable     = osp::active::ACompTransformMutable;
 public:
 
     using NwtThreadIndex_t = int;
@@ -168,23 +166,6 @@ private:
             ActiveEnt                               ent,
             osp::Matrix4 const&                     transform,
             NewtonCollision*                        pCompound) noexcept;
-
-    /**
-     * @brief Create Newton bodies and colliders for entities with ACompPhysBody
-     *
-     * @param rScene    [ref] ActiveScene containing entity and physics world
-     * @param entity    [in] Entity containing ACompNwtBody
-     * @param pNwtWorld [in] Newton physics world
-     */
-    static void create_body(
-            ACtxPhysics const& rCtxPhys,
-            ACtxNwtWorld& rCtxWorld,
-            ACtxSceneGraph const& rScnGraph,
-            acomp_storage_t<ACompTransform> const& rTf,
-            acomp_storage_t<ACompTransformControlled>& rTfControlled,
-            acomp_storage_t<ACompTransformMutable>& rTfMutable,
-            ActiveEnt ent,
-            NewtonWorld const* pNwtWorld) noexcept;
 
 };
 

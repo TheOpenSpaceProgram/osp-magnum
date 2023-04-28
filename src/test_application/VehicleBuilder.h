@@ -31,6 +31,8 @@
 
 #include <longeron/id_management/registry_stl.hpp>
 
+#include <Corrade/Containers/StridedArrayView.h>
+
 #include <entt/core/any.hpp>
 #include <entt/container/dense_map.hpp>
 
@@ -67,6 +69,7 @@ struct VehicleData
 {
     using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
                                                       osp::link::JuncCustom>;
+    using MapPartToMachines_t = osp::active::Parts::MapPartToMachines_t;
 
     VehicleData() = default;
     VehicleData(VehicleData const& copy) = delete;
@@ -75,8 +78,8 @@ struct VehicleData
     lgrn::IdRegistryStl<PartId>             m_partIds;
     std::vector<osp::Matrix4>               m_partTransformWeld;
     std::vector<osp::PrefabPair>            m_partPrefabs;
-    std::vector<uint16_t>                   m_partMachCount;
     std::vector<WeldId>                     m_partToWeld;
+    MapPartToMachines_t                     m_partToMachines;
 
     lgrn::IdRegistryStl<WeldId>             m_weldIds;
     lgrn::IntArrayMultiMap<WeldId, PartId>  m_weldToParts;
@@ -88,7 +91,7 @@ struct VehicleData
 };
 
 /**
- * Used to easily create Vehicle blueprints
+ * Used to easily create VehicleData
  */
 class VehicleBuilder
 {
@@ -99,6 +102,14 @@ class VehicleBuilder
     using PortEntry     = osp::link::PortEntry;
 
 public:
+
+    struct PartToWeld
+    {
+        PartId m_part;
+        osp::Matrix4 m_transform;
+    };
+
+    using WeldVec_t = std::vector<VehicleBuilder::PartToWeld>;
 
     VehicleBuilder(osp::Resources *pResources)
      : m_pResources{pResources}
@@ -122,19 +133,27 @@ public:
 
     void set_prefabs(std::initializer_list<SetPrefab> const& setPrefab);
 
-    struct SetTransform
-    {
-        PartId m_part;
-        osp::Matrix4 const& m_transform;
-    };
 
-    WeldId weld(std::initializer_list<SetTransform> const& setTransform);
+    WeldId weld(osp::ArrayView<PartToWeld const> toWeld);
+
+    WeldId weld(std::initializer_list<PartToWeld const> const& toWeld)
+    {
+        return weld(osp::arrayView(toWeld));
+    }
 
     osp::Matrix4 align_attach(PartId partA, std::string_view attachA,
                               PartId partB, std::string_view attachB);
 
     template <std::size_t N>
     [[nodiscard]] std::array<NodeId, N> create_nodes(NodeTypeId nodeType);
+
+    template <typename VALUES_T>
+    [[nodiscard]] VALUES_T& node_values(NodeTypeId nodeType);
+
+    std::size_t node_capacity(NodeTypeId nodeType) const
+    {
+        return m_data->m_nodePerType[nodeType].m_nodeIds.capacity();
+    }
 
     struct Connection
     {
@@ -156,6 +175,7 @@ private:
 
     entt::dense_map< std::string_view, osp::PrefabPair > m_prefabs;
 
+    std::vector<uint16_t> m_partMachCount;
     std::optional<VehicleData> m_data;
 
     // put more attachment data here
@@ -169,7 +189,7 @@ std::array<PartId, N> VehicleBuilder::create_parts()
     m_data->m_partIds.create(std::begin(out), std::end(out));
 
     std::size_t const capacity = m_data->m_partIds.capacity();
-    m_data->m_partMachCount         .resize(capacity);
+    m_partMachCount                 .resize(capacity);
     m_data->m_partPrefabs           .resize(capacity);
     m_data->m_partTransformWeld     .resize(capacity);
     m_data->m_partToWeld            .resize(capacity);
@@ -194,11 +214,45 @@ std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId const n
     return out;
 }
 
+template <typename VALUES_T>
+VALUES_T& VehicleBuilder::node_values(NodeTypeId nodeType)
+{
+    PerNodeType &rPerNodeType = m_data->m_nodePerType[nodeType];
+
+    // Emplace values container if it doesn't exist
+    if ( ! bool(rPerNodeType.m_nodeValues))
+    {
+        rPerNodeType.m_nodeValues.emplace<VALUES_T>();
+    }
+
+    auto &rValues = entt::any_cast<VALUES_T&>(rPerNodeType.m_nodeValues);
+    rValues.resize(node_capacity(nodeType));
+
+    return rValues;
+}
+
 struct ACtxVehicleSpawnVB
 {
     std::vector<VehicleData const*> m_dataVB;
 
-    // Remap vectors used to convert VehicleData IDs for the scene
+    // Remap vectors convert IDs from VehicleData to ACtxParts.
+    // A single vector for remaps is shared for all vehicles to spawn,
+    // so offsets are used to divide up the vector.
+
+    // PartId srcPart = /* ID from VehicleData */
+    // PartId dstPart = m_remapParts[m_remapPartOffsets[newVehicleIndex] + srcPart];
+
+    inline Corrade::Containers::StridedArrayView2D<std::size_t> remap_node_offsets_2d() noexcept
+    {
+        return {Corrade::Containers::arrayView(m_remapNodeOffsets.data(), m_remapNodeOffsets.size()),
+                {m_dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+    }
+
+    inline Corrade::Containers::StridedArrayView2D<std::size_t const> remap_node_offsets_2d() const noexcept
+    {
+        return {Corrade::Containers::arrayView(m_remapNodeOffsets.data(), m_remapNodeOffsets.size()),
+                {m_dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+    }
 
     std::vector<osp::active::PartId>    m_remapParts;
     std::vector<std::size_t>            m_remapPartOffsets;
@@ -206,8 +260,14 @@ struct ACtxVehicleSpawnVB
     std::vector<osp::active::PartId>    m_remapWelds;
     std::vector<std::size_t>            m_remapWeldOffsets;
 
-    std::vector<osp::link::MachAnyId>   m_remapMachAll;
+    std::vector<std::size_t>            m_machtypeCount;
+    std::vector<osp::link::MachAnyId>   m_remapMachs;
     std::vector<std::size_t>            m_remapMachOffsets;
+
+    // remapNodes are both shared between all new vehicles and all node types
+    // An offset can exist for each pair of [New Vehicle, Node Type]
+    std::vector<osp::link::NodeId>      m_remapNodes;
+    std::vector<std::size_t>            m_remapNodeOffsets;
 };
 
 } // namespace testapp

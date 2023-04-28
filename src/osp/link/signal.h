@@ -26,8 +26,6 @@
 
 #include "machines.h"
 
-#include <Corrade/Containers/ArrayView.h>
-
 namespace osp::link
 {
 
@@ -43,8 +41,11 @@ struct UpdateNodes
     BitVector_t                 m_nodeDirty;
     SignalValues_t<VALUE_T>     m_nodeNewValues;
 
-    void assign(NodeId node, VALUE_T&& value)
+    bool                        m_dirty{false};
+
+    void assign(NodeId node, VALUE_T value)
     {
+        m_dirty = true;
         m_nodeDirty.set(node);
         m_nodeNewValues[node] = std::forward<VALUE_T>(value);
     }
@@ -52,12 +53,12 @@ struct UpdateNodes
 
 template <typename VALUE_T, typename RANGE_T>
 bool update_signal_nodes(
-        RANGE_T const&                                  toUpdate,
-        Nodes::NodeToMach_t const&                      nodeToMach,
-        Machines const&                                 machines,
-        Corrade::Containers::ArrayView<VALUE_T const>   newValues,
-        Corrade::Containers::ArrayView<VALUE_T>         currentValues,
-        UpdMachPerType&                                 rUpdMach)
+        RANGE_T const&                  toUpdate,
+        Nodes::NodeToMach_t const&      nodeToMach,
+        Machines const&                 machines,
+        ArrayView<VALUE_T const>        newValues,
+        ArrayView<VALUE_T>              currentValues,
+        UpdMachPerType&                 rUpdMach)
 {
     bool somethingNotified = false;
 

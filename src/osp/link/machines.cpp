@@ -29,34 +29,6 @@ namespace osp::link
 
 NodeTypeId const gc_ntSigFloat = NodeTypeReg_t::create();
 
-void copy_machines(
-        Machines const &rSrc,
-        Machines &rDst,
-        Corrade::Containers::ArrayView<MachAnyId> remapMachOut)
-{
-
-    for (MachAnyId const srcMach : rSrc.m_ids.bitview().zeros())
-    {
-        MachTypeId const srcType = rSrc.m_machTypes[srcMach];
-        PerMachType &rDstPerMach = rDst.m_perType[srcType];
-
-        // TODO: optimize multiple calls to IdRegistryStl::create()
-        //       (linear search for non-zero uint64_t is done each call)
-        MachAnyId const dstMach = rDst.m_ids.create();
-        MachLocalId const dstLocal = rDstPerMach.m_localIds.create();
-
-        // TODO: allocate once before this for loop
-        rDst.m_machToLocal.resize(rDst.m_ids.capacity());
-        rDst.m_machTypes.resize(rDst.m_ids.capacity());
-        rDstPerMach.m_localToAny.resize(rDstPerMach.m_localIds.capacity());
-
-        rDstPerMach.m_localToAny[dstLocal]  = dstMach;
-        rDst.m_machTypes[dstMach]           = srcType;
-        rDst.m_machToLocal[dstMach]         = dstLocal;
-
-        remapMachOut[srcMach] = dstMach;
-    }
-}
 
 void copy_nodes(
         Nodes const &rSrcNodes,
@@ -118,7 +90,9 @@ void copy_nodes(
             auto dstPortIt = std::begin(dstPorts);
             for (NodeId const srcNode : srcPorts)
             {
-                *dstPortIt = remapNode[srcNode];
+                *dstPortIt = (srcNode != lgrn::id_null<NodeId>())
+                           ? remapNode[srcNode]
+                           : lgrn::id_null<NodeId>();
 
                 std::advance(dstPortIt, 1);
             }

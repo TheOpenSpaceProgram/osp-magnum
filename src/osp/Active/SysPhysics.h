@@ -25,6 +25,7 @@
 #pragma once
 
 #include "physics.h"
+#include "basic.h"
 
 namespace osp::active
 {
@@ -35,22 +36,32 @@ class SysPhysics
 {
 public:
 
-    enum EIncludeRootMass { Ignore, Include };
+    static void calculate_subtree_mass_center(
+            acomp_storage_t<ACompTransform> const&  rTf,
+            ACtxPhysics&                            rCtxPhys,
+            ACtxSceneGraph&                         rScnGraph,
+            ActiveEnt                               root,
+            Vector3&                                rMassPos,
+            float&                                  rTotalMass,
+            Matrix4 const&                          currentTf = {});
 
-    // TODO: rewrite hierarchy inertia calculations for new mass/inertia system
+    static void calculate_subtree_mass_inertia(
+            acomp_storage_t<ACompTransform> const&  rTf,
+            ACtxPhysics&                            rCtxPhys,
+            ACtxSceneGraph&                         rScnGraph,
+            ActiveEnt                               root,
+            Matrix3&                                rInertiaTensor,
+            Matrix4 const&                          currentTf = {});
 
-    template<typename IT_T>
-    static void update_delete_phys(
-            ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last);
+    template<typename IT_T, typename ITB_T>
+    static void update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, ITB_T const& last);
 
 };
 
-template<typename IT_T>
-void SysPhysics::update_delete_phys(
-        ACtxPhysics &rCtxPhys, IT_T first, IT_T const& last)
+template<typename IT_T, typename ITB_T>
+void SysPhysics::update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, ITB_T const& last)
 {
-    rCtxPhys.m_ownDyn.remove(first, last);
-    rCtxPhys.m_totalDyn.remove(first, last);
+    rCtxPhys.m_mass.remove(first, last);
 }
 
 

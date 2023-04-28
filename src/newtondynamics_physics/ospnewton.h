@@ -29,6 +29,7 @@
 #include <osp/Active/activetypes.h>
 #include <osp/Active/basic.h>
 #include <osp/id_map.h>
+#include <osp/bitvector.h>
 
 #include <Newton.h>
 
@@ -92,6 +93,7 @@ struct ACtxNwtWorld
     lgrn::IdRegistryStl<BodyId>                     m_bodyIds;
     std::vector<NwtBodyPtr_t>                       m_bodyPtrs;
     std::vector<ForceFactors_t>                     m_bodyFactors;
+    osp::BitVector_t                                m_bodyDirty;
 
     std::vector<osp::active::ActiveEnt>             m_bodyToEnt;
     osp::IdMap_t<osp::active::ActiveEnt, BodyId>    m_entToBody;
