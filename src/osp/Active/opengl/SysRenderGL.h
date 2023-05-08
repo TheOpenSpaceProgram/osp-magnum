@@ -189,7 +189,7 @@ public:
      */
     static void render_opaque(
             RenderGroup const& group,
-            EntSet_t const& visible,
+            DrawEntSet_t const& visible,
             ViewProjMatrix const& viewProj);
 
     /**
@@ -203,25 +203,15 @@ public:
      */
     static void render_transparent(
             RenderGroup const& group,
-            EntSet_t const& visible,
+            DrawEntSet_t const& visible,
             ViewProjMatrix const& viewProj);
 
     static void draw_group(
             RenderGroup const& group,
-            EntSet_t const& visible,
+            DrawEntSet_t const& visible,
             ViewProjMatrix const& viewProj);
 
-    template<typename IT_T>
-    static void update_delete(
-            ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T const& last);
 };
-
-template<typename IT_T>
-void SysRenderGL::update_delete(
-        ACtxSceneRenderGL &rCtxRenderGl, IT_T first, IT_T const& last)
-{
-    //rCtxRenderGl.m_drawTransform    .remove(first, last);
-}
 
 
 

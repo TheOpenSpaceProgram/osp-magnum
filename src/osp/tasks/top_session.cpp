@@ -47,7 +47,7 @@ void top_close_session(
     // Run cleanup tasks
     for (Session &rSession : sessions)
     {
-        if (TargetId const cleanup = std::exchange(rSession.m_cleanupTgt, lgrn::id_null<TargetId>());
+        if (TargetId const cleanup = std::exchange(rSession.m_cleanup, lgrn::id_null<TargetId>());
             cleanup != lgrn::id_null<TargetId>())
         {
             rExec.m_targetDirty.set(std::size_t(cleanup));

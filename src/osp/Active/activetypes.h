@@ -43,35 +43,26 @@
 namespace osp::active
 {
 
-enum class ActiveEnt: entt::id_type {};
+enum class ActiveEnt: uint32_t { };
 
-} // namespace osp::active
-
-
-// Specialize entt::storage_traits to disable signals for storage that uses
-// ActiveEnt as entities
-template<typename Type>
-struct entt::storage_type<Type, osp::active::ActiveEnt>
-{
-    using type = basic_storage<Type, osp::active::ActiveEnt>;
-};
-
-
-namespace osp::active
-{
-
-using ActiveReg_t = lgrn::IdRegistryStl<ActiveEnt>;
-
-using EntVector_t   = std::vector<ActiveEnt>;
-using EntSet_t      = BitVector_t;
+using ActiveEntVec_t = std::vector<ActiveEnt>;
+using ActiveEntSet_t = BitVector_t;
 
 using active_sparse_set_t = entt::basic_sparse_set<ActiveEnt>;
 
 template<typename COMP_T>
-using acomp_storage_t = typename entt::storage_type<COMP_T, ActiveEnt>::type;
+using acomp_storage_t = typename entt::basic_storage<COMP_T, ActiveEnt>;
 
-template<typename... COMP_T>
-using acomp_view_t = entt::basic_view<ActiveEnt, entt::get_t<COMP_T...>, entt::exclude_t<>>;
+//-----------------------------------------------------------------------------
+
+enum class DrawEnt : uint32_t { };
+
+using DrawEntVec_t  = std::vector<DrawEnt>;
+using DrawEntSet_t  = BitVector_t;
+
+
+enum class MaterialId : uint32_t { };
+
 
 } // namespace osp::active
 

@@ -48,14 +48,14 @@ struct ACompMass
 struct ACtxPhysics
 {
     std::vector<phys::EShape>       m_shape;
-    EntSet_t                        m_hasColliders;
+    ActiveEntSet_t                        m_hasColliders;
 
     acomp_storage_t<ACompMass>      m_mass;
 
 
     Vector3                         m_originTranslate;
 
-    EntVector_t                     m_colliderDirty;
+    ActiveEntVec_t                  m_colliderDirty;
 
     std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;
 

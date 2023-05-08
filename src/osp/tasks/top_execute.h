@@ -33,7 +33,7 @@
 namespace osp
 {
 
-void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec);
+void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, WorkerContext worker = {});
 
 void top_enqueue_quick(Tasks const& tasks, ExecGraph const& graph, ExecContext& rExec, ArrayView<TargetId const> enqueue);
 
@@ -41,5 +41,7 @@ inline void top_enqueue_quick(Tasks const& tasks, ExecGraph const& graph, ExecCo
 {
     return top_enqueue_quick(tasks, graph, rExec, Corrade::Containers::arrayView(enqueue));
 }
+
+void write_dot_graph(std::ostream& rStream, Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData);
 
 } // namespace testapp

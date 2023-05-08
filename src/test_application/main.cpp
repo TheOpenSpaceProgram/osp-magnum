@@ -35,6 +35,8 @@
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
 
+#include <osp/tasks/top_execute.h>
+
 #include <osp/string_concat.h>
 #include <osp/logging.h>
 
@@ -55,9 +57,11 @@
 #include <entt/core/any.hpp>
 
 #include <array>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string_view>
+
 #include <thread>
 #include <unordered_map>
 
@@ -262,11 +266,18 @@ void start_magnum_async()
 
         // Setup renderer sessions
 
+        g_testApp.m_rendererSetup(g_testApp);
+
         g_testApp.m_exec.resize(g_testApp.m_tasks);
         g_testApp.m_graph.reset();
         g_testApp.m_graph.emplace(osp::make_exec_graph(g_testApp.m_tasks, {&g_testApp.m_renderer.m_edges, &g_testApp.m_scene.m_edges}));
+        std::ofstream dot;
+        dot.open("tasks.gv");
+        osp::write_dot_graph(dot, g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_taskData);
+        dot.close();
 
-        g_testApp.m_rendererSetup(g_testApp);
+        enqueue_dirty(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_exec);
+        top_run_blocking(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_taskData, g_testApp.m_topData, g_testApp.m_exec);
 
         // Starts the main loop. This function is blocking, and will only return
         // once the window is closed. See ActiveApplication::drawEvent

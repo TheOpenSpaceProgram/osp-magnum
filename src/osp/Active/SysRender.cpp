@@ -108,6 +108,15 @@ void SysRender::set_dirty_all(ACtxDrawing &rCtxDrawing)
             rCtxDrawing.m_diffuseDirty.push_back(drawEnt);
         }
     }
+
+    for (std::size_t const materialInt : rCtxDrawing.m_materialIds.bitview().zeros())
+    {
+        Material &mat = rCtxDrawing.m_materials[MaterialId(materialInt)];
+        for (std::size_t const entInt : mat.m_ents.ones())
+        {
+            mat.m_dirty.push_back(DrawEnt(entInt));
+        }
+    }
 }
 
 void SysRender::clear_dirty_all(ACtxDrawing& rCtxDrawing)
@@ -122,7 +131,7 @@ void SysRender::update_draw_transforms_recurse(
         KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
         acomp_storage_t<ACompTransform> const&  rTf,
         DrawTransforms_t&                       rDrawTf,
-        EntSet_t const&                         needDrawTf,
+        ActiveEntSet_t const&                   needDrawTf,
         ActiveEnt                               ent,
         Matrix4 const&                          parentTf,
         bool                                    root)

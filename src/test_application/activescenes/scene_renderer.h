@@ -26,6 +26,8 @@
 
 #include "scenarios.h"
 
+#include <osp/Active/activetypes.h>
+
 #include "../ActiveApplication.h"
 
 
@@ -49,8 +51,10 @@ osp::Session setup_magnum(
 osp::Session setup_scene_renderer(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
         osp::Session const&         magnum,
         osp::Session const&         scene,
+        osp::Session const&         commonScene,
         osp::TopDataId              idResources);
 
 /**
@@ -62,7 +66,7 @@ osp::Session setup_shader_visualizer(
         osp::Session const&         magnum,
         osp::Session const&         scene,
         osp::Session const&         scnRender,
-        osp::Session const&         material);
+        osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
 
 /**
  * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
@@ -93,7 +97,7 @@ osp::Session setup_thrust_indicators(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         magnum,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat,
         osp::Session const&         scnRender,
@@ -109,7 +113,7 @@ osp::Session setup_cursor(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         magnum,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         scnRender,
         osp::Session const&         cameraCtrl,
         osp::Session const&         shFlat,
@@ -124,7 +128,7 @@ osp::Session setup_uni_test_planets_renderer(
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         magnum,
         osp::Session const&         scnRender,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         cameraCtrl,
         osp::Session const&         visualizer,
         osp::Session const&         uniCore,

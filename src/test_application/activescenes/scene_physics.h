@@ -45,7 +45,12 @@ struct SpawnShape
     osp::phys::EShape m_shape;
 };
 
-using SpawnerVec_t = std::vector<SpawnShape>;
+struct ACtxShapeSpawner
+{
+    std::vector<SpawnShape>         m_spawnRequest;
+    osp::active::ActiveEntVec_t     m_ents;
+    osp::active::MaterialId         m_materialId;
+};
 
 /**
  * @brief Physical properties for entities and generic Physics interface
@@ -55,7 +60,7 @@ using SpawnerVec_t = std::vector<SpawnShape>;
 osp::Session setup_physics(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon);
+        osp::Session const&         commonScene);
 
 /**
  * @brief Newton Dynamics physics integration
@@ -63,7 +68,7 @@ osp::Session setup_physics(
 osp::Session setup_newton_physics(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         physics);
 
 /**
@@ -72,9 +77,9 @@ osp::Session setup_newton_physics(
 osp::Session setup_shape_spawn(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         scene,
         osp::Session const&         physics,
-        osp::Session const&         material);
+        osp::active::MaterialId     materialId);
 
 /**
  * @brief Queues and logic for spawning Prefab resources
@@ -82,7 +87,7 @@ osp::Session setup_shape_spawn(
 osp::Session setup_prefabs(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::Session const&         material,
         osp::TopDataId              idResources);
@@ -93,7 +98,7 @@ osp::Session setup_prefabs(
 osp::Session setup_bounds(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::Session const&         shapeSpawn);
 

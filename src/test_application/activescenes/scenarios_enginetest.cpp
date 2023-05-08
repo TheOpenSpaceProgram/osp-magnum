@@ -96,7 +96,7 @@ struct EngineTestScene
     ActiveEnt                       m_cube{lgrn::id_null<ActiveEnt>()};
 
     // Set of ActiveEnts that are assigned a Phong material
-    osp::active::EntSet_t               m_matPhong;
+    osp::active::ActiveEntSet_t         m_matPhong;
     std::vector<osp::active::DrawEnt>   m_matPhongDirty;
 
 };

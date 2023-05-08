@@ -99,11 +99,25 @@ struct TaskRefBase
 
     constexpr Tasks & tasks() noexcept { return m_rBuilder.m_rTasks; }
 
+    TASKREF_T& trigger_on(ArrayView<TargetId const> const targets) noexcept
+    {
+        for (TargetId const target : targets)
+        {
+            m_rBuilder.m_rEdges.m_targetDependEdges.push_back({m_taskId, target, true});
+        }
+        return static_cast<TASKREF_T&>(*this);
+    }
+
+    TASKREF_T& trigger_on(std::initializer_list<TargetId const> targets) noexcept
+    {
+        return trigger_on(Corrade::Containers::arrayView(targets));
+    }
+
     TASKREF_T& depends_on(ArrayView<TargetId const> const targets) noexcept
     {
         for (TargetId const target : targets)
         {
-            m_rBuilder.m_rEdges.m_targetDependEdges.push_back({m_taskId, target});
+            m_rBuilder.m_rEdges.m_targetDependEdges.push_back({m_taskId, target, false});
         }
         return static_cast<TASKREF_T&>(*this);
     }
@@ -117,7 +131,7 @@ struct TaskRefBase
     {
         for (TargetId const target : targets)
         {
-            m_rBuilder.m_rEdges.m_targetFulfillEdges.push_back({m_taskId, target});
+            m_rBuilder.m_rEdges.m_targetFulfillEdges.push_back({m_taskId, target, false});
         }
         return static_cast<TASKREF_T&>(*this);
     }

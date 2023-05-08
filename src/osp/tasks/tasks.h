@@ -31,6 +31,7 @@
 #include <longeron/containers/intarray_multimap.hpp>
 
 #include <cstdint>
+#include <ostream>
 #include <vector>
 
 namespace osp
@@ -57,13 +58,14 @@ struct TaskEdges
 {
     struct TargetPair
     {
-        TaskId m_task;
-        TargetId m_target;
+        TaskId      m_task;
+        TargetId    m_target;
+        bool        m_trigger; // unused for Fulfill edges
     };
 
     struct SemaphorePair
     {
-        TaskId m_task;
+        TaskId      m_task;
         SemaphoreId m_sema;
     };
 
@@ -72,9 +74,17 @@ struct TaskEdges
     std::vector<SemaphorePair>          m_semaphoreEdges;
 };
 
+struct DependOn
+{
+    TargetId    m_target;
+    bool        m_trigger;
+
+    constexpr operator TargetId() const noexcept { return m_target; }
+};
+
 struct ExecGraph
 {
-    lgrn::IntArrayMultiMap<Tasks::TaskInt, TargetId>        m_taskDependOn;         /// Tasks depend on (n) Targets
+    lgrn::IntArrayMultiMap<Tasks::TaskInt, DependOn>        m_taskDependOn;         /// Tasks depend on (n) Targets
     lgrn::IntArrayMultiMap<Tasks::TargetInt, TaskId>        m_targetDependents;     /// Targets have (n) Tasks that depend on it
 
     lgrn::IntArrayMultiMap<Tasks::TaskInt, TargetId>        m_taskFulfill;          /// Tasks fulfill (n) Targets
@@ -96,6 +106,5 @@ inline ExecGraph make_exec_graph(Tasks const& tasks, std::initializer_list<TaskE
 {
     return make_exec_graph(tasks, arrayView(data));
 }
-
 
 } // namespace osp

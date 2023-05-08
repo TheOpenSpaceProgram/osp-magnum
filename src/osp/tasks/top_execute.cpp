@@ -39,7 +39,7 @@
 namespace osp
 {
 
-void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec)
+void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, WorkerContext worker)
 {
     std::vector<entt::any> topDataRefs;
 
@@ -55,22 +55,42 @@ void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec
 
         TopTask &rTopTask = rTaskData[task];
 
+        std::cout << "running: " << rTopTask.m_debugName << "\n";
+
         topDataRefs.clear();
         topDataRefs.reserve(rTopTask.m_dataUsed.size());
         for (TopDataId const dataId : rTopTask.m_dataUsed)
         {
-
             topDataRefs.push_back((dataId != lgrn::id_null<TopDataId>())
                                    ? topData[dataId].as_ref()
                                    : entt::any{});
         }
 
-        bool enqueueHappened = false;
+//        if (rTopTask.m_awareOfDirtyDeps)
+//        {
+//            worker.m_dependOnDirty.reset();
+
+//            std::size_t index = 0;
+//            for (TargetId const dependOn : graph.m_taskDependOn[std::size_t(task)])
+//            {
+//                if (rExec.m_targetDirty.test(std::size_t(dependOn)))
+//                {
+//                    worker.m_dependOnDirty.set(index);
+//                }
+//                ++index;
+//            }
+//        }
 
         // Task actually runs here. Results are not yet used for anything.
-        FulfillDirty_t const status = rTopTask.m_func(WorkerContext{}, topDataRefs);
+        FulfillDirty_t const status = rTopTask.m_func(worker, topDataRefs);
 
         mark_completed_task(tasks, graph, rExec, task, status);
+
+        enqueue_dirty(tasks, graph, rExec);
+        for (TaskId const task : rExec.m_tasksQueued)
+        {
+            std::cout << "enq: " << rTaskData[task].m_debugName << "\n";
+        }
     }
 }
 
@@ -82,6 +102,44 @@ void top_enqueue_quick(Tasks const& tasks, ExecGraph const& graph, ExecContext& 
     }
 
     enqueue_dirty(tasks, graph, rExec);
+}
+
+
+
+void write_dot_graph(std::ostream& rStream, Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData)
+{
+    rStream << "graph {\n"
+            << "rankdir=LR;\n"
+            << "nodesep=0.4;\n"
+            << "splines=line;\n";
+
+    // Define targets
+    rStream << "node [shape=circle,fixedsize=true]; ";
+    for (std::size_t const target : tasks.m_targetIds.bitview().zeros())
+    {
+        rStream << target << ";";
+    }
+
+    rStream << "node [shape=rectangle,fixedsize=false];\n";
+
+    for (std::size_t const task : tasks.m_taskIds.bitview().zeros())
+    {
+        rStream << "task_" << task << " [label=\"" << rTaskData.at(TaskId(task)).m_debugName << "\"];\n";
+
+        for (DependOn const dependOn : graph.m_taskDependOn[task])
+        {
+            rStream << std::size_t(dependOn.m_target) << " -- task_" << task << " "
+                    << (dependOn.m_trigger ? "[color=darkblue,penwidth=\"2px\", weight=3,]" : "[color=darkblue,style=dashed]")
+                    << ";\n";
+        }
+
+        for (TargetId const fulfill : graph.m_taskFulfill[task])
+        {
+            rStream << "task_" << task << " -- " << std::size_t(fulfill) << " [color=darkred];\n";
+        }
+    }
+
+    rStream << "}";
 }
 
 } // namespace testapp

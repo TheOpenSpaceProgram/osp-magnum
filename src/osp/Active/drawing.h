@@ -25,7 +25,6 @@
 #pragma once
 
 #include "activetypes.h"
-#include "basic.h"
 
 #include "../bitvector.h"
 #include "../id_map.h"
@@ -42,10 +41,6 @@
 namespace osp::active
 {
 
-enum class DrawEnt : uint32_t { };
-
-using DrawEntVector_t   = std::vector<DrawEnt>;
-using DrawEntSet_t      = BitVector_t;
 
 struct BasicDrawProps
 {
@@ -55,8 +50,8 @@ struct BasicDrawProps
 
 struct Material
 {
-    EntSet_t&               m_rEnts;
-    std::vector<DrawEnt>&   m_rDirty;
+    DrawEntSet_t m_ents;
+    DrawEntVec_t m_dirty;
 };
 
 /**
@@ -105,11 +100,11 @@ struct ACtxDrawing
 
     lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
 
-    EntSet_t                                m_visible;
+    DrawEntSet_t                            m_visible;
     KeyedVec<DrawEnt, BasicDrawProps>       m_drawBasic;
     KeyedVec<DrawEnt, Magnum::Color4>       m_color;
 
-    EntSet_t                                m_needDrawTf;
+    DrawEntSet_t                            m_needDrawTf;
     KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
 
     // Scene-space Meshes
@@ -126,6 +121,9 @@ struct ACtxDrawing
 
     KeyedVec<DrawEnt, MeshIdOwner_t>        m_mesh;
     std::vector<DrawEnt>                    m_meshDirty;
+
+    lgrn::IdRegistryStl<MaterialId>         m_materialIds;
+    KeyedVec<MaterialId, Material>          m_materials;
 };
 
 /**

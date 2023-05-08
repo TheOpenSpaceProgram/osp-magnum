@@ -24,10 +24,10 @@
  */
 #include "testapp.h"
 
-#include <osp/tasks/top_utils.h>
-
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
+
+#include <osp/tasks/top_utils.h>
 
 namespace testapp
 {

@@ -37,7 +37,7 @@ namespace testapp::scenes
 osp::Session setup_parts(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::TopDataId const        idResources);
 
 /**
@@ -72,7 +72,7 @@ osp::Session setup_parts(
 osp::Session setup_signals_float(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts);
 
 /**
@@ -83,7 +83,7 @@ osp::Session setup_signals_float(
 osp::Session setup_mach_rocket(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat);
 
@@ -93,7 +93,7 @@ osp::Session setup_mach_rocket(
 osp::Session setup_mach_rcsdriver(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat);
 
@@ -106,7 +106,7 @@ osp::Session setup_mach_rcsdriver(
 osp::Session setup_vehicle_spawn(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon);
+        osp::Session const&         commonScene);
 
 /**
  * @brief Support VehicleBuilder data to be used to spawn vehicles
@@ -114,7 +114,7 @@ osp::Session setup_vehicle_spawn(
 osp::Session setup_vehicle_spawn_vb(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         prefabs,
         osp::Session const&         parts,
         osp::Session const&         vehicleSpawn,
@@ -127,7 +127,7 @@ osp::Session setup_vehicle_spawn_vb(
 osp::Session setup_test_vehicles(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::TopDataId const        idResources);
 
 /**
@@ -136,7 +136,7 @@ osp::Session setup_test_vehicles(
 osp::Session setup_vehicle_control(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat,
         osp::Session const&         app);
@@ -148,7 +148,7 @@ osp::Session setup_camera_vehicle(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         app,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts,
         osp::Session const&         physics,
         osp::Session const&         camera,

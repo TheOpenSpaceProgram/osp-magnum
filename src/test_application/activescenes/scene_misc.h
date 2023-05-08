@@ -26,14 +26,21 @@
 
 #include "scenarios.h"
 
+#include <osp/Active/activetypes.h>
+
 namespace testapp::scenes
 {
 
+void create_materials(
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         commonScene,
+        int                         count);
+
 void add_floor(
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
-        osp::Session const&         material,
+        osp::Session const&         commonScene,
         osp::Session const&         shapeSpawn,
+        osp::active::MaterialId     material,
         osp::TopDataId              idResources,
         osp::PkgId                  pkg);
 
@@ -43,7 +50,7 @@ void add_floor(
 osp::Session setup_camera_ctrl(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         app,
+        osp::Session const&         windowApp,
         osp::Session const&         scnRender);
 
 /**
@@ -52,8 +59,8 @@ osp::Session setup_camera_ctrl(
 osp::Session setup_camera_free(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         app,
-        osp::Session const&         scnCommon,
+        osp::Session const&         windowApp,
+        osp::Session const&         scene,
         osp::Session const&         camera);
 
 /**
@@ -62,9 +69,8 @@ osp::Session setup_camera_free(
 osp::Session setup_thrower(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         magnum,
-        osp::Session const&         renderer,
-        osp::Session const&         simpleCamera,
+        osp::Session const&         windowApp,
+        osp::Session const&         cameraCtrl,
         osp::Session const&         shapeSpawn);
 
 /**
@@ -73,7 +79,7 @@ osp::Session setup_thrower(
 osp::Session setup_droppers(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         shapeSpawn);
 
 }

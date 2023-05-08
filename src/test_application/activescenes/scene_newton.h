@@ -46,7 +46,8 @@ namespace testapp::scenes
 osp::Session setup_newton(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         scene,
+        osp::Session const&         commonScene,
         osp::Session const&         physics);
 
 /**
@@ -75,7 +76,7 @@ osp::Session setup_newton_force_accel(
 osp::Session setup_shape_spawn_newton(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::Session const&         shapeSpawn,
         osp::Session const&         newton,
@@ -87,7 +88,7 @@ osp::Session setup_shape_spawn_newton(
 osp::Session setup_vehicle_spawn_newton(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::Session const&         prefabs,
         osp::Session const&         parts,
@@ -101,7 +102,7 @@ osp::Session setup_vehicle_spawn_newton(
 osp::Session setup_rocket_thrust_newton(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::Session const&         prefabs,
         osp::Session const&         parts,

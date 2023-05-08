@@ -116,6 +116,7 @@ struct wrap_args_trait
         }
         else
         {
+            LGRN_ASSERTMV(topData.size() > argIndex, "Task function has more arguments than TopDataIds provided", topData.size(), argIndex);
             return entt::any_cast<T&>(topData[argIndex]);
         }
     }
@@ -123,7 +124,6 @@ struct wrap_args_trait
     template<typename ... ARGS_T, std::size_t ... INDEX_T>
     static constexpr decltype(auto) cast_args(ArrayView<entt::any> topData, WorkerContext ctx, [[maybe_unused]] std::index_sequence<INDEX_T...> indices) noexcept
     {
-        assert(topData.size() == sizeof...(ARGS_T));
         return FUNCTOR_T{}(cast_arg<ARGS_T>(topData, ctx, INDEX_T) ...);
     }
 
@@ -133,7 +133,7 @@ struct wrap_args_trait
         if constexpr (std::is_void_v<RETURN_T>)
         {
             cast_args<ARGS_T ...>(topData, ctx, std::make_index_sequence<sizeof...(ARGS_T)>{});
-            return {{0xFFFFFFFFFFFFFFFFul}}; // All fulfilled targets set dirty
+            return gc_fulfillAll; // All fulfilled targets set dirty
         }
         else if constexpr (std::is_same_v<RETURN_T, FulfillDirty_t>)
         {
@@ -201,11 +201,13 @@ struct TopTaskBuilder : public TaskBuilderBase<TopTaskBuilder, TopTaskRef>
 struct TopTaskRef : public TaskRefBase<TopTaskBuilder, TopTaskRef>
 {
     inline TopTaskRef& name(std::string_view debugName);
-    inline TopTaskRef& data(std::initializer_list<TopDataId> dataUsed);
+    inline TopTaskRef& args(std::initializer_list<TopDataId> dataUsed);
 
     template<typename FUNC_T>
-    TopTaskRef& func(FUNC_T funcArg);
+    TopTaskRef& func(FUNC_T&& funcArg);
     inline TopTaskRef& func_raw(TopTaskFunc_t func);
+
+    inline TopTaskRef& important_deps_count(int value);
 
     template<typename CONTAINER_T>
     TopTaskRef& push_to(CONTAINER_T& rContainer);
@@ -218,7 +220,7 @@ TopTaskRef& TopTaskRef::name(std::string_view debugName)
     return *this;
 }
 
-TopTaskRef& TopTaskRef::data(std::initializer_list<TopDataId> dataUsed)
+TopTaskRef& TopTaskRef::args(std::initializer_list<TopDataId> dataUsed)
 {
     m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
     m_rBuilder.m_rData[m_taskId].m_dataUsed = dataUsed;
@@ -226,7 +228,7 @@ TopTaskRef& TopTaskRef::data(std::initializer_list<TopDataId> dataUsed)
 }
 
 template<typename FUNC_T>
-TopTaskRef& TopTaskRef::func(FUNC_T funcArg)
+TopTaskRef& TopTaskRef::func(FUNC_T&& funcArg)
 {
     m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
     m_rBuilder.m_rData[m_taskId].m_func = wrap_args(funcArg);
@@ -239,6 +241,13 @@ TopTaskRef& TopTaskRef::func_raw(TopTaskFunc_t func)
     m_rBuilder.m_rData[m_taskId].m_func = func;
     return *this;
 }
+
+//TopTaskRef& TopTaskRef::aware_of_dirty_depends(bool value)
+//{
+//    m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
+//    m_rBuilder.m_rData[m_taskId].m_awareOfDirtyDeps = value;
+//    return *this;
+//}
 
 template<typename CONTAINER_T>
 TopTaskRef& TopTaskRef::push_to(CONTAINER_T& rContainer)

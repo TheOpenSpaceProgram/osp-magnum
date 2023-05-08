@@ -51,28 +51,41 @@ using namespace Magnum::Math::Literals;
 namespace testapp::scenes
 {
 
-#if 0
+void create_materials(
+        ArrayView<entt::any> const  topData,
+        Session const&              commonScene,
+        int const                   count)
+{
+    OSP_DECLARE_GET_DATA_IDS(commonScene, TESTAPP_DATA_COMMON_SCENE);
+    auto &rDrawing = top_get< ACtxDrawing >(topData, idDrawing);
+
+    for (int i = 0; i < count; ++i)
+    {
+        [[maybe_unused]] MaterialId const mat = rDrawing.m_materialIds.create();
+        LGRN_ASSERT(int(mat) == i);
+    }
+
+    rDrawing.m_materials.resize(count);
+}
 
 void add_floor(
         ArrayView<entt::any> const  topData,
-        Session const&              scnCommon,
-        Session const&              material,
+        Session const&              commonScene,
         Session const&              shapeSpawn,
+        MaterialId const            materialId,
         TopDataId const             idResources,
         PkgId const                 pkg)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
 
-    auto &rResources    = top_get< Resources >      (topData, idResources);
-    auto &rActiveIds    = top_get< ActiveReg_t >    (topData, idActiveIds);
-    auto &rBasic        = top_get< ACtxBasic >      (topData, idBasic);
-    auto &rDrawing      = top_get< ACtxDrawing >    (topData, idDrawing);
-    auto &rDrawingRes   = top_get< ACtxDrawingRes > (topData, idDrawingRes);
-    auto &rMatEnts      = top_get< EntSet_t >       (topData, idMatEnts);
-    auto &rMatDirty     = top_get< std::vector<DrawEnt> >    (topData, idMatDirty);
-    auto &rSpawner      = top_get< SpawnerVec_t >   (topData, idSpawner);
+    auto &rResources    = top_get< Resources >          (topData, idResources);
+    auto &rBasic        = top_get< ACtxBasic >          (topData, idBasic);
+    auto &rDrawing      = top_get< ACtxDrawing >        (topData, idDrawing);
+    auto &rDrawingRes   = top_get< ACtxDrawingRes >     (topData, idDrawingRes);
+    auto &rSpawner      = top_get< ACtxShapeSpawner >   (topData, idSpawner);
+
+    Material &rMaterial = rDrawing.m_materials.at(materialId);
 
     // Convenient functor to get a reference-counted mesh owner
     auto const quick_add_mesh = SysRender::gen_drawable_mesh_adder(rDrawing, rDrawingRes, rResources, pkg);
@@ -83,15 +96,15 @@ void add_floor(
     static constexpr Vector3 const sc_floorPos{0.0f, 0.0f, -1.005f};
 
     // Create floor root and mesh entity
-    ActiveEnt const floorRootEnt = rActiveIds.create();
-    ActiveEnt const floorMeshEnt = rActiveIds.create();
+    ActiveEnt const floorRootEnt = rBasic.m_activeIds.create();
+    ActiveEnt const floorMeshEnt = rBasic.m_activeIds.create();
     DrawEnt const floorMeshDrawEnt = rDrawing.m_drawIds.create();
 
     // Resize some containers to fit all existing entities
-    rBasic.m_scnGraph.resize(rActiveIds.capacity());
-    rDrawing.resize_active(rActiveIds.capacity());
+    rBasic.m_scnGraph.resize(rBasic.m_activeIds.capacity());
+    rDrawing.resize_active(rBasic.m_activeIds.capacity());
     rDrawing.resize_draw();
-    bitvector_resize(rMatEnts, rDrawing.m_drawIds.capacity());
+    bitvector_resize(rMaterial.m_ents, rDrawing.m_drawIds.capacity());
 
     rBasic.m_transform.emplace(floorRootEnt);
 
@@ -101,9 +114,8 @@ void add_floor(
     rDrawing.m_meshDirty.push_back(floorMeshDrawEnt);
 
     // Add mesh visualizer material to floor mesh entity
-
-    rMatEnts.set(std::size_t(floorMeshDrawEnt));
-    rMatDirty.push_back(floorMeshDrawEnt);
+    rMaterial.m_ents.set(std::size_t(floorMeshDrawEnt));
+    rMaterial.m_dirty.push_back(floorMeshDrawEnt);
 
     // Add transform, draw transform, opaque, and visible entity
     rBasic.m_transform.emplace(floorMeshEnt, ACompTransform{Matrix4::scaling(sc_floorSize)});
@@ -121,7 +133,7 @@ void add_floor(
     bldFloorRoot.add_child(floorMeshEnt);
 
     // Add collider to floor root entity
-    rSpawner.emplace_back(SpawnShape{
+    rSpawner.m_spawnRequest.emplace_back(SpawnShape{
         .m_position = sc_floorPos,
         .m_velocity = sc_floorSize,
         .m_size     = sc_floorSize,
@@ -130,88 +142,99 @@ void add_floor(
     });
 }
 
+
+
 Session setup_camera_ctrl(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Session const&              app,
+        Session const&              windowApp,
         Session const&              scnRender)
 {
-    OSP_SESSION_UNPACK_DATA(app,        TESTAPP_APP);
-    OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
-    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
+    OSP_DECLARE_GET_DATA_IDS(scnRender,     TESTAPP_DATA_COMMON_RENDERER);
+
+    auto const tgSR = scnRender.get_targets<TgtSceneRenderer>();
+
     auto &rUserInput = top_get< osp::input::UserInputHandler >(topData, idUserInput);
 
-    Session cameraCtrl;
-    OSP_SESSION_ACQUIRE_DATA(cameraCtrl, topData, TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_ACQUIRE_TAGS(cameraCtrl, rTags,   TESTAPP_CAMERA_CTRL);
-
-    rBuilder.tag(tgCamCtrlReq).depend_on({tgCamCtrlMod});
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_CAMERA_CTRL);
+    auto const tgCmCt = out.create_targets<TgtCameraCtrl>(rBuilder);
 
     top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
 
-    cameraCtrl.task() = rBuilder.task().assign({tgRenderEvt, tgCamCtrlReq, tgCameraMod}).data(
-            "Position Rendering Camera according to Camera Controller",
-            TopDataIds_t{                            idCamCtrl,        idCamera},
-            wrap_args([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
+    rBuilder.task()
+        .name       ("Position Rendering Camera according to Camera Controller")
+        .trigger_on ({tgCmCt.cameraCtrl_mod})
+        .fulfills   ({tgCmCt.cameraCtrl_use, tgSR.camera_mod})
+        .push_to    (out.m_tasks)
+        .args       ({                           idCamCtrl,        idCamera })
+        .func([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
     {
         rCamera.m_transform = rCamCtrl.m_transform;
-    }));
+    });
 
-    return cameraCtrl;
+    return out;
 }
 
 Session setup_camera_free(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Session const&              app,
-        Session const&              scnCommon,
-        Session const&              camera)
+        Session const&              windowApp,
+        Session const&              scene,
+        Session const&              cameraCtrl)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
-    OSP_SESSION_UNPACK_DATA(camera,     TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_TAGS(camera,     TESTAPP_CAMERA_CTRL);
+    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
 
-    Session cameraFree;
+    auto const tgWin    = windowApp     .get_targets<TgtWindowApp>();
+    auto const tgCmCt   = cameraCtrl    .get_targets<TgtCameraCtrl>();
 
-    cameraFree.task() = rBuilder.task().assign({tgInputEvt, tgCamCtrlMod}).data(
-            "Move Camera",
-            TopDataIds_t{                      idCamCtrl,           idDeltaTimeIn},
-            wrap_args([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
+    Session out;
+
+    rBuilder.task()
+        .name       ("Move Camera controller")
+        .trigger_on ({tgWin.input})
+        .fulfills   ({tgCmCt.cameraCtrl_mod})
+        .push_to    (out.m_tasks)
+        .args       ({                 idCamCtrl,           idDeltaTimeIn })
+        .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
     {
         SysCameraController::update_view(rCamCtrl, deltaTimeIn);
         SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
-    }));
+    });
 
-    return cameraFree;
+    return out;
 }
 
 Session setup_thrower(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Session const&              magnum,
-        Session const&              renderer,
-        Session const&              simpleCamera,
+        Session const&              windowApp,
+        Session const&              cameraCtrl,
         Session const&              shapeSpawn)
 {
-    OSP_SESSION_UNPACK_DATA(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_DATA(simpleCamera,   TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_TAGS(simpleCamera,   TESTAPP_CAMERA_CTRL);
-
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,     TESTAPP_DATA_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,   TESTAPP_DATA_CAMERA_CTRL);
     auto &rCamCtrl = top_get< ACtxCameraController > (topData, idCamCtrl);
 
-    Session thrower;
-    auto const [idBtnThrow] = thrower.acquire_data<1>(topData);
+    auto const tgWin    = windowApp     .get_targets<TgtWindowApp>();
+    auto const tgCmCt   = cameraCtrl    .get_targets<TgtCameraCtrl>();
+    auto const tgShSp   = shapeSpawn    .get_targets<TgtShapeSpawn>();
+
+    Session out;
+    auto const [idBtnThrow] = out.acquire_data<1>(topData);
 
     top_emplace< EButtonControlIndex > (topData, idBtnThrow, rCamCtrl.m_controls.button_subscribe("debug_throw"));
 
-    thrower.task() = rBuilder.task().assign({tgInputEvt, tgSpawnMod, tgCamCtrlReq}).data(
-            "Throw spheres when pressing space",
-            TopDataIds_t{                      idCamCtrl,              idSpawner,                   idBtnThrow},
-            wrap_args([] (ACtxCameraController& rCamCtrl, SpawnerVec_t& rSpawner, EButtonControlIndex btnThrow) noexcept
+    rBuilder.task()
+        .name       ("Throw spheres when pressing space")
+        .trigger_on ({tgWin.input})
+        .depends_on ({tgCmCt.cameraCtrl_mod})
+        .fulfills   ({tgShSp.spawnRequest_mod})
+        .push_to    (out.m_tasks)
+        .args       ({                 idCamCtrl,                  idSpawner,                   idBtnThrow })
+        .func([] (ACtxCameraController& rCamCtrl, ACtxShapeSpawner& rSpawner, EButtonControlIndex btnThrow) noexcept
     {
         // Throw a sphere when the throw button is pressed
         if (rCamCtrl.m_controls.button_held(btnThrow))
@@ -219,29 +242,29 @@ Session setup_thrower(
             Matrix4 const &camTf = rCamCtrl.m_transform;
             float const speed = 120;
             float const dist = 8.0f;
-            rSpawner.emplace_back(SpawnShape{
+            rSpawner.m_spawnRequest.emplace_back(SpawnShape{
                 .m_position = camTf.translation() - camTf.backward() * dist,
                 .m_velocity = -camTf.backward() * speed,
                 .m_size     = Vector3{1.0f},
                 .m_mass     = 1.0f,
                 .m_shape    = EShape::Sphere
             });
-            return osp::TopTaskStatus::Success;
         }
-        return osp::TopTaskStatus::Success;
-    }));
+    });
 
-    return thrower;
+    return out;
 }
+
+/*
 
 Session setup_droppers(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              shapeSpawn)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(commonScene,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
 
@@ -292,8 +315,6 @@ Session setup_droppers(
     }));
 
     return droppers;
-}
-
-#endif
+}*/
 
 } // namespace testapp::scenes

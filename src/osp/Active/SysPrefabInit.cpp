@@ -218,8 +218,8 @@ void SysPrefabInit::init_drawing(
 
             if (material.has_value())
             {
-                material.value().m_rEnts.set(std::size_t(drawEnt));
-                material.value().m_rDirty.push_back(drawEnt);
+                material.value().m_ents.set(std::size_t(drawEnt));
+                material.value().m_dirty.push_back(drawEnt);
             }
         }
 

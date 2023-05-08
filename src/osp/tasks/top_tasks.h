@@ -39,7 +39,8 @@ struct TopTask
 {
     std::string             m_debugName;
     std::vector<TopDataId>  m_dataUsed;
-    TopTaskFunc_t           m_func{nullptr};
+    TopTaskFunc_t           m_func              { nullptr };
+    //bool                    m_awareOfDirtyDeps  { false };
 };
 
 using TopTaskDataVec_t = KeyedVec<TaskId, TopTask>;

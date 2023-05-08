@@ -102,7 +102,7 @@ TEST(Tasks, BasicParallelSingleThreaded)
 
     // Clear vector before use
     builder.task()
-            .depends_on({inputIn})
+            .trigger_on({inputIn})
             .fulfills({vecClear})
             .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
     {
@@ -114,7 +114,7 @@ TEST(Tasks, BasicParallelSingleThreaded)
     for (int i = 0; i < sc_pusherTaskCount; ++i)
     {
         builder.task()
-                .depends_on({vecClear})
+                .trigger_on({vecClear})
                 .fulfills({vecReady})
                 .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
         {
@@ -192,7 +192,7 @@ TEST(Tasks, BasicSingleThreaded)
 
     // Two tasks calculate forces needed by the physics update
     TaskId const taskA = builder.task()
-            .depends_on({tgt.timeIn})
+            .trigger_on({tgt.timeIn})
             .fulfills({tgt.forces})
             .func( [] (TestWorld& rWorld) -> FulfillDirty_t
     {
@@ -200,7 +200,7 @@ TEST(Tasks, BasicSingleThreaded)
         return {{0b01}};
     });
     TaskId const taskB = builder.task()
-            .depends_on({tgt.timeIn})
+            .trigger_on({tgt.timeIn})
             .fulfills({tgt.forces})
             .func([] (TestWorld& rWorld) -> FulfillDirty_t
     {
@@ -210,7 +210,8 @@ TEST(Tasks, BasicSingleThreaded)
 
     // Main Physics update
     TaskId const taskC = builder.task()
-            .depends_on({tgt.timeIn, tgt.forces})
+            .trigger_on({tgt.timeIn})
+            .depends_on({tgt.forces})
             .fulfills({tgt.positions})
             .func([] (TestWorld& rWorld) -> FulfillDirty_t
     {
@@ -223,7 +224,8 @@ TEST(Tasks, BasicSingleThreaded)
     // Draw things moved by physics update. If 'updWorld' wasn't enqueued, then
     // this will still run, as no 'needPhysics' tasks are incomplete
     TaskId const taskD = builder.task()
-            .depends_on({tgt.positions, tgt.renderRequestIn})
+            .trigger_on({tgt.renderRequestIn})
+            .depends_on({tgt.positions})
             .fulfills({tgt.renderDoneOut})
             .func([] (TestWorld& rWorld) -> FulfillDirty_t
     {
@@ -235,7 +237,7 @@ TEST(Tasks, BasicSingleThreaded)
     // Draw things unrelated to physics. This is allowed to be the first task
     // to run
     TaskId const taskE = builder.task()
-        .depends_on({tgt.renderRequestIn})
+        .trigger_on({tgt.renderRequestIn})
         .fulfills({tgt.renderDoneOut})
         .func([] (TestWorld& rWorld) -> FulfillDirty_t
     {

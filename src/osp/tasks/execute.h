@@ -47,19 +47,21 @@ struct ExecContext
         std::size_t const maxTasks      = tasks.m_taskIds.capacity();
 
         m_tasksQueued.reserve(maxTasks);
+        bitvector_resize(m_taskTriggered,   maxTasks);
 
-        bitvector_resize(m_targetDirty,         maxTargets);
-        bitvector_resize(m_targetWillBePending, maxTargets);
+        bitvector_resize(m_targetDirty,             maxTargets);
+        bitvector_resize(m_targetWillBePending,     maxTargets);
         m_targetPendingCount.resize(maxTargets);
         m_targetInUseCount  .resize(maxTargets);
     }
 
-    entt::basic_sparse_set<TaskId> m_tasksQueued;
+    entt::basic_sparse_set<TaskId>  m_tasksQueued;
+    BitVector_t                     m_taskTriggered;
 
-    BitVector_t                 m_targetDirty;
-    BitVector_t                 m_targetWillBePending;
-    KeyedVec<TargetId, int>     m_targetPendingCount;
-    KeyedVec<TargetId, int>     m_targetInUseCount;
+    BitVector_t                     m_targetDirty;
+    BitVector_t                     m_targetWillBePending;
+    KeyedVec<TargetId, int>         m_targetPendingCount;
+    KeyedVec<TargetId, int>         m_targetInUseCount;
 
     // TODO: Consider multithreading. something something work stealing...
     //  * Allow multiple threads to search for and execute tasks. Atomic access

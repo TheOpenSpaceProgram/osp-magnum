@@ -55,7 +55,6 @@ using namespace Magnum::Math::Literals;
 
 using osp::phys::EShape;
 
-using osp::active::acomp_view_t;
 using osp::active::acomp_storage_t;
 
 using osp::active::ActiveEnt;

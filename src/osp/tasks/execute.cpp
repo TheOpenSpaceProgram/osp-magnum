@@ -29,25 +29,54 @@
 namespace osp
 {
 
-static bool try_enqueue_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task) noexcept
+static bool try_enqueue_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task, TargetId const calledFrom) noexcept
 {
     if (rExec.m_tasksQueued.contains(task))
     {
         return false; // task already queued
     }
 
-    for (TargetId const dependOn : graph.m_taskDependOn[std::size_t(task)])
+    bool const prevTriggered    = rExec.m_taskTriggered.test(std::size_t(task));
+    bool justTriggered          = false;
+    bool dontEnqueueYet         = false;
+
+    for (DependOn const dependOn : graph.m_taskDependOn[std::size_t(task)])
     {
-        if (   rExec.m_targetPendingCount[dependOn] != 0
-            || rExec.m_targetWillBePending.test(std::size_t(dependOn)) )
+        // If true: depend-on target is pending, wait for other tasks to finish
+        dontEnqueueYet |= rExec.m_targetPendingCount[dependOn.m_target] != 0;
+
+        // If true: depend-on target is fulfilled by a task that will be enqueued, wait for it
+        dontEnqueueYet |= rExec.m_targetWillBePending.test(std::size_t(dependOn.m_target));
+
+        if ( ! prevTriggered && dependOn.m_target == calledFrom)
         {
-            return false; // Dependency target is or will be pending, wait for other tasks to finish
+            justTriggered = dependOn.m_trigger;
         }
     }
 
-    for (TargetId const dependOn : graph.m_taskDependOn[std::size_t(task)])
+    // 'Triggered' indicates that one of the (trigger=true) depend-on targets became dirty for the
+    // period of time since this task last ran.
+    if (justTriggered)
     {
-        ++ rExec.m_targetInUseCount[dependOn];
+        rExec.m_taskTriggered.set(std::size_t(task));
+    }
+
+    if (dontEnqueueYet)
+    {
+        return false;
+    }
+
+    // At least one of the trigger depend-on targets must have been dirty previously to enqueue
+    if ( ! (justTriggered || prevTriggered) )
+    {
+        return false;
+    }
+
+    // Enqueue task
+
+    for (DependOn const dependOn : graph.m_taskDependOn[std::size_t(task)])
+    {
+        ++ rExec.m_targetInUseCount[dependOn.m_target];
     }
 
     for (TargetId const fulfill : graph.m_taskFulfill[std::size_t(task)])
@@ -65,6 +94,8 @@ int enqueue_dirty(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec
     // Find out which targets will be pending
     for (std::size_t const target : rExec.m_targetDirty.ones())
     {
+        rExec.m_targetDirty.set(target);
+
         for (TaskId const dependent : graph.m_targetDependents[target])
         {
             for (TargetId const fulfill : graph.m_taskFulfill[std::size_t(dependent)])
@@ -80,7 +111,7 @@ int enqueue_dirty(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec
     {
         for (TaskId const dependent : graph.m_targetDependents[target])
         {
-            tasksEnqueued += int(try_enqueue_task(tasks, graph, rExec, dependent));
+            tasksEnqueued += int(try_enqueue_task(tasks, graph, rExec, dependent, TargetId(target)));
         }
     }
     rExec.m_targetWillBePending.reset();
@@ -92,16 +123,13 @@ int enqueue_dirty(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec
 void mark_completed_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept
 {
     LGRN_ASSERTMV(rExec.m_tasksQueued.contains(task),
-                 "Task must be queued to have been allowed to run", std::size_t(task));
+                  "Task must be queued to have been allowed to run", std::size_t(task));
 
-    for (TargetId const dependOn : graph.m_taskDependOn[std::size_t(task)])
+    rExec.m_taskTriggered.reset(std::size_t(task));
+
+    for (DependOn const dependOn : graph.m_taskDependOn[std::size_t(task)])
     {
-        -- rExec.m_targetInUseCount[dependOn];
-
-        if (rExec.m_targetInUseCount[dependOn] == 0)
-        {
-            rExec.m_targetDirty.reset(std::size_t(dependOn));
-        }
+        -- rExec.m_targetInUseCount[dependOn.m_target];
     }
 
     auto const taskFulfill = lgrn::Span<TargetId const>(graph.m_taskFulfill[std::size_t(task)]);

@@ -41,6 +41,8 @@ struct ACtxDrawMeshVisualizer
     osp::active::MeshGlEntStorage_t     *m_pMeshId{nullptr};
     osp::active::MeshGlStorage_t        *m_pMeshGl{nullptr};
 
+    osp::active::MaterialId             m_materialId { lgrn::id_null<osp::active::MaterialId>() };
+
     bool m_wireframeOnly{false};
 
     constexpr void assign_pointers(active::ACtxSceneRenderGL& rCtxScnGl,
@@ -61,7 +63,7 @@ template<typename ITA_T, typename ITB_T>
 void sync_visualizer(
         ITA_T dirtyFirst,
         ITB_T const& dirtyLast,
-        active::EntSet_t const& hasMaterial,
+        active::DrawEntSet_t const& hasMaterial,
         active::RenderGroup::Storage_t& rStorage,
         ACtxDrawMeshVisualizer &rData)
 {

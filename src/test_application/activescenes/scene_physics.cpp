@@ -48,139 +48,117 @@ using Corrade::Containers::arrayView;
 namespace testapp::scenes
 {
 
-#if 0
-
 Session setup_physics(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon)
+        Session const&              commonScene)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,  TESTAPP_DATA_COMMON_SCENE);
+    auto const tgCS = commonScene.get_targets<TgtCommonScene>();
 
-    Session physics;
-    OSP_SESSION_ACQUIRE_DATA(physics, topData, TESTAPP_PHYSICS);
-    OSP_SESSION_ACQUIRE_TAGS(physics, rTags, TESTAPP_PHYSICS);
-
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_PHYSICS);
+    auto const tgPhy = out.create_targets<TgtPhysics>(rBuilder);
 
     top_emplace< ACtxPhysics >  (topData, idPhys);
 
-    // 'Per-thread' inputs fed into the physics engine. Only one here for now
-    //top_emplace< ACtxPhysInputs >(topData, idPhysIn);
-
-    rBuilder.tag(tgPhysTransformReq).depend_on({tgPhysTransformMod});
-    rBuilder.tag(tgPhysDel)         .depend_on({tgPhysPrv});
-    rBuilder.tag(tgPhysMod)         .depend_on({tgPhysPrv, tgPhysDel});
-    rBuilder.tag(tgPhysReq)         .depend_on({tgPhysPrv, tgPhysDel, tgPhysMod});
-
-    physics.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgPhysDel}).data(
-            "Delete Physics components",
-            TopDataIds_t{             idPhys,                   idDelTotal},
-            wrap_args([] (ACtxPhysics& rPhys, EntVector_t const& rDelTotal) noexcept
+    rBuilder.task()
+        .name       ("Delete Physics components")
+        .trigger_on ({tgCS.delActiveEnt_mod})
+        .fulfills   ({tgCS.delActiveEnt_use, tgPhy.physics_del, tgPhy.physics_mod})
+        .push_to    (out.m_tasks)
+        .args       ({        idPhys,                      idActiveEntDel })
+        .func([] (ACtxPhysics& rPhys, ActiveEntVec_t const& rActiveEntDel) noexcept
     {
-        auto const &delFirst    = std::cbegin(rDelTotal);
-        auto const &delLast     = std::cend(rDelTotal);
+        SysPhysics::update_delete_phys(rPhys, rActiveEntDel.cbegin(), rActiveEntDel.cend());
+    });
 
-        SysPhysics::update_delete_phys(rPhys, delFirst, delLast);
-    }));
-
-    return physics;
+    return out;
 }
 
 Session setup_shape_spawn(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              physics,
-        Session const&              material)
+        MaterialId const            materialId)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_DATA(physics,    TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
+    auto const tgCS     = commonScene   .get_targets<TgtCommonScene>();
+    auto const tgPhy    = physics       .get_targets<TgtPhysics>();
 
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHAPE_SPAWN);
+    auto const tgShSp = out.create_targets<TgtShapeSpawn>(rBuilder);
 
-    Session shapeSpawn;
-    OSP_SESSION_ACQUIRE_DATA(shapeSpawn, topData, TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_ACQUIRE_TAGS(shapeSpawn, rTags, TESTAPP_SHAPE_SPAWN);
+    top_emplace< ACtxShapeSpawner > (topData, idSpawner, ACtxShapeSpawner{ .m_materialId = materialId });
 
-    top_emplace< SpawnerVec_t > (topData, idSpawner);
-    top_emplace< EntVector_t >  (topData, idSpawnerEnts);
-
-    rBuilder.tag(tgSpawnReq)        .depend_on({tgSpawnMod});
-    rBuilder.tag(tgSpawnClr)        .depend_on({tgSpawnMod, tgSpawnReq});
-    rBuilder.tag(tgSpawnEntReq)     .depend_on({tgSpawnEntMod});
-
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgEntNew, tgSpawnEntMod}).data(
-            "Create entities for requested shapes to spawn",
-            TopDataIds_t{           idBasic,             idActiveIds,              idSpawner,             idSpawnerEnts },
-            wrap_args([] (ACtxBasic& rBasic, ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
+    rBuilder.task()
+        .name       ("Create entities for requested shapes to spawn")
+        .trigger_on ({tgShSp.spawnRequest_mod})
+        .depends_on ({                                                 tgCS.activeEnt_del})
+        .fulfills   ({tgShSp.spawnRequest_use, tgShSp.spawnedEnts_mod, tgCS.activeEnt_new, tgCS.activeEnt_mod})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                  idSpawner })
+        .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner) noexcept
     {
-        if (rSpawner.size() == 0)
-        {
-            return;
-        }
+        rSpawner.m_ents.resize(rSpawner.m_spawnRequest.size() * 2);
+        rBasic.m_activeIds.create(rSpawner.m_ents.begin(), rSpawner.m_ents.end());
+    });
 
-        rSpawnerEnts.resize(rSpawner.size() * 2);
-        rActiveIds.create(std::begin(rSpawnerEnts), std::end(rSpawnerEnts));
-    }));
-
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgTransformNew, tgHierNew}).data(
-            "Add hierarchy and transform to spawned shapes",
-            TopDataIds_t{           idBasic,             idActiveIds,              idSpawner,             idSpawnerEnts },
-            wrap_args([] (ACtxBasic& rBasic, ActiveReg_t& rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts) noexcept
+    rBuilder.task()
+        .name       ("Add hierarchy and transform to spawned shapes")
+        .trigger_on ({tgShSp.spawnRequest_mod})
+        .depends_on ({tgShSp.spawnedEnts_mod})
+        .fulfills   ({tgShSp.spawnRequest_use, tgShSp.spawnedEnts_use, tgCS.transform_new, tgCS.transform_mod, tgCS.hier_new, tgCS.hier_mod})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                  idSpawner })
+        .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner) noexcept
     {
-        if (rSpawner.size() == 0)
-        {
-            return;
-        }
+        rBasic.m_scnGraph.resize(rBasic.m_activeIds.capacity());
+        SubtreeBuilder bldScnRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, rSpawner.m_spawnRequest.size() * 2);
 
-        rBasic.m_scnGraph.resize(rActiveIds.capacity());
-        SubtreeBuilder bldScnRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, rSpawner.size() * 2);
-
-        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
         {
-            SpawnShape const &spawn = rSpawner[i];
-            ActiveEnt const root    = rSpawnerEnts[i * 2];
-            ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
+            SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
+            ActiveEnt const root    = rSpawner.m_ents[i * 2];
+            ActiveEnt const child   = rSpawner.m_ents[i * 2 + 1];
 
             rBasic.m_transform.emplace(root, ACompTransform{osp::Matrix4::translation(spawn.m_position)});
             rBasic.m_transform.emplace(child, ACompTransform{Matrix4::scaling(spawn.m_size)});
             SubtreeBuilder bldRoot = bldScnRoot.add_child(root, 1);
             bldRoot.add_child(child);
         }
-    }));
+    });
 
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgMeshMod, tgDrawMod, tgMatMod}).data(
-            "Add mesh and material to spawned shapes",
-            TopDataIds_t{             idDrawing,              idSpawner,             idSpawnerEnts,             idNMesh,          idMatEnts,                      idMatDirty,                   idActiveIds},
-            wrap_args([] (ACtxDrawing& rDrawing, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, NamedMeshes& rNMesh, EntSet_t& rMatEnts, std::vector<DrawEnt>& rMatDirty, ActiveReg_t const& rActiveIds ) noexcept
+    rBuilder.task()
+        .name       ("Add mesh and material to spawned shapes")
+        .trigger_on ({tgShSp.spawnRequest_mod})
+        .depends_on ({tgShSp.spawnedEnts_mod})
+        .fulfills   ({tgShSp.spawnRequest_use, tgShSp.spawnedEnts_use, tgCS.mesh_new, tgCS.mesh_mod, tgCS.material_new, tgCS.material_mod, tgCS.drawEnt_new, tgCS.drawEnt_mod})
+        .push_to    (out.m_tasks)
+        .args       ({            idBasic,             idDrawing,                  idSpawner,             idNMesh })
+        .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept
     {
-        if (rSpawner.size() == 0)
-        {
-            return;
-        }
+        Material &rMat = rDrawing.m_materials[rSpawner.m_materialId];
 
-        rDrawing.resize_active(rActiveIds.capacity());
+        rDrawing.resize_active(rBasic.m_activeIds.capacity());
 
-        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
         {
-            ActiveEnt const child           = rSpawnerEnts[i * 2 + 1];
+            ActiveEnt const child           = rSpawner.m_ents[i * 2 + 1];
             rDrawing.m_activeToDraw[child]  = rDrawing.m_drawIds.create();
         }
 
         rDrawing.resize_draw();
-        bitvector_resize(rMatEnts, rDrawing.m_drawIds.capacity());
+        bitvector_resize(rMat.m_ents, rDrawing.m_drawIds.capacity());
 
-        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
         {
-            SpawnShape const &spawn = rSpawner[i];
-            ActiveEnt const root    = rSpawnerEnts[i * 2];
-            ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
+            SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
+            ActiveEnt const root    = rSpawner.m_ents[i * 2];
+            ActiveEnt const child   = rSpawner.m_ents[i * 2 + 1];
             DrawEnt const drawEnt   = rDrawing.m_activeToDraw[child];
 
             rDrawing.m_needDrawTf.set(std::size_t(root));
@@ -189,26 +167,31 @@ Session setup_shape_spawn(
             rDrawing.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape));
             rDrawing.m_meshDirty.push_back(drawEnt);
 
-            rMatEnts.set(std::size_t(drawEnt));
-            rMatDirty.push_back(drawEnt);
+            rMat.m_ents.set(std::size_t(drawEnt));
+            rMat.m_dirty.push_back(drawEnt);
 
             rDrawing.m_visible.set(std::size_t(drawEnt));
             rDrawing.m_drawBasic[drawEnt].m_opaque = true;
         }
-    }));
+    });
 
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgSpawnEntReq, tgPhysMod}).data(
-            "Add physics to spawned shapes",
-            TopDataIds_t{                   idActiveIds,              idSpawner,             idSpawnerEnts,             idPhys },
-            wrap_args([] (ActiveReg_t const &rActiveIds, SpawnerVec_t& rSpawner, EntVector_t& rSpawnerEnts, ACtxPhysics& rPhys) noexcept
+    rBuilder.task()
+        .name       ("Add physics to spawned shapes")
+        .trigger_on ({tgShSp.spawnRequest_mod})
+        .depends_on ({tgShSp.spawnedEnts_mod})
+        .fulfills   ({tgShSp.spawnRequest_use, tgShSp.spawnedEnts_use, tgPhy.physics_new, tgPhy.physics_mod})
+        .push_to    (out.m_tasks)
+        .args       ({            idBasic,                  idSpawner,             idPhys })
+        .func([] (ACtxBasic const& rBasic, ACtxShapeSpawner& rSpawner, ACtxPhysics& rPhys) noexcept
     {
-        rPhys.m_hasColliders.ints().resize(rActiveIds.vec().capacity());
-        rPhys.m_shape.resize(rActiveIds.capacity());
-        for (std::size_t i = 0; i < rSpawner.size(); ++i)
+        rPhys.m_hasColliders.ints().resize(rBasic.m_activeIds.vec().capacity());
+        rPhys.m_shape.resize(rBasic.m_activeIds.capacity());
+
+        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
         {
-            SpawnShape const &spawn = rSpawner[i];
-            ActiveEnt const root    = rSpawnerEnts[i * 2];
-            ActiveEnt const child   = rSpawnerEnts[i * 2 + 1];
+            SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
+            ActiveEnt const root    = rSpawner.m_ents[i * 2];
+            ActiveEnt const child   = rSpawner.m_ents[i * 2 + 1];
 
             rPhys.m_hasColliders.set(std::size_t(root));
             if (spawn.m_mass != 0.0f)
@@ -223,31 +206,36 @@ Session setup_shape_spawn(
             rPhys.m_shape[std::size_t(child)] = spawn.m_shape;
             rPhys.m_colliderDirty.push_back(child);
         }
-    }));
+    });
 
-    shapeSpawn.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnClr}).data(
-            "Clear Shape Spawning vector after use",
-            TopDataIds_t{              idSpawner},
-            wrap_args([] (SpawnerVec_t& rSpawner) noexcept
+    rBuilder.task()
+        .name       ("Clear Shape Spawning vector after use")
+        .trigger_on ({tgShSp.spawnRequest_use})
+        .fulfills   ({tgShSp.spawnRequest_clr})
+        .push_to    (out.m_tasks)
+        .args       ({             idSpawner })
+        .func([] (ACtxShapeSpawner& rSpawner) noexcept
     {
-        rSpawner.clear();
-    }));
+        rSpawner.m_spawnRequest.clear();
+    });
 
-    return shapeSpawn;
+    return out;
 }
+
+#if 0
 
 
 Session setup_prefabs(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              physics,
         Session const&              material,
         TopDataId const             idResources)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(commonScene,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(physics,    TESTAPP_PHYSICS);
     OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
 
@@ -369,12 +357,12 @@ Session setup_bounds(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Tags&                       rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              physics,
         Session const&              shapeSpawn)
 {
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(commonScene,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
     OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
     OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
@@ -443,6 +431,10 @@ Session setup_bounds(
     bounds.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgBoundsSetDel}).data(
             "Delete bounds components",
             TopDataIds_t{idBounds, idDelTotal}, delete_ent_set);
+//    for (osp::active::ActiveEnt const ent : rDelTotal)
+//    {
+//        rSet.reset(std::size_t(ent));
+//    }
 
     return bounds;
 }

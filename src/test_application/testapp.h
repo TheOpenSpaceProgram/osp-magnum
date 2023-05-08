@@ -31,7 +31,6 @@
 #include <osp/Resource/resourcetypes.h>
 
 #include <osp/tasks/tasks.h>
-#include <osp/tasks/top_tasks.h>
 #include <osp/tasks/top_session.h>
 
 #include <optional>
@@ -44,19 +43,6 @@ struct TestApp;
 using RendererSetupFunc_t   = void(*)(TestApp&);
 
 using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
-
-// TopData stores most application state, addressed using a TopDataId
-
-// Sessions bundle together and own TopDataIds, TopTaskIds, and TagsIds
-// Sessions intend to add support for something to exist in the world
-// eg, Adding support for physics or supporting a certain shader
-
-// Current execution state of TopTasks
-
-// TopTasks and are organized with Tags to form task graphs and events.
-// Each TopTask is given a vector of TopDataIds its allowed to access
-// Called when openning a Magnum Application
-
 
 struct TestAppTasks
 {

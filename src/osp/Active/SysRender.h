@@ -25,6 +25,7 @@
 #pragma once
 
 #include "drawing.h"
+#include "basic.h"
 
 #include <unordered_map>
 
@@ -178,7 +179,7 @@ public:
             KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
             acomp_storage_t<ACompTransform> const&  transform,
             DrawTransforms_t&                       rDrawTf,
-            EntSet_t const&                         useDrawTf,
+            ActiveEntSet_t const&                   useDrawTf,
             IT_T                                    first,
             ITB_T const&                            last);
 
@@ -214,7 +215,7 @@ private:
             KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
             acomp_storage_t<ACompTransform> const&  rTf,
             DrawTransforms_t&                       rDrawTf,
-            EntSet_t const&                         useDrawTf,
+            ActiveEntSet_t const&                   useDrawTf,
             ActiveEnt                               ent,
             Matrix4 const&                          parentTf,
             bool                                    root);
@@ -241,7 +242,7 @@ void SysRender::update_draw_transforms(
         KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
         acomp_storage_t<ACompTransform> const&  rTf,
         DrawTransforms_t&                       rDrawTf,
-        EntSet_t const&                         needDrawTf,
+        ActiveEntSet_t const&                   needDrawTf,
         IT_T                                    first,
         ITB_T const&                            last)
 {

@@ -29,41 +29,29 @@
 namespace testapp
 {
 
-// Identifiers made for OSP_ACQUIRE_* and OSP_UNPACK_* macros
-// Used to declare variable names for TopDataIds and TagIds
-// #define OSP_[DATA/TAGS]_NAME <# of identifiers>, a, b, c, d, ...
-
-// Tag naming:
-//
-// tg...Evt: Event, tasks with these tags are enqueued externally
-// tg...New: Adds new instances
-// tg...Del: Deletes instances
-// tg...Mod: Modifies some data
-// tg...Req: Requires some data after its modified
-// tg...Prv: Requires previous from last update
-// tg...Clr: Clears a queue after its used
-//
-// * Tasks with a tg...Req tag will run AFTER its corresponding tg...Mod tag
-// * New often depends on Delete, as deleting instances first leaves empty
-//   spaces in a container, best immediately filled with new instances
+// Notes:
+// * "Delete" tasks often run before "New" tasks, since deletion leaves empty spaces in arrays
+//   that are best populated with new instances right away.
+//   * "Delete" task fulfills _del and _mod
+//   * "New" task depends on _del, fulfills _mod and _new
 //
 
 // Scene sessions
 
-#define TESTAPP_DATA_COMMON_SCENE 9, \
-    idDeltaTimeIn, idActiveIds, idBasic, idDrawing, idDrawingRes, idDelEnts, idDelTotal, idDelDrawEnts, idNMesh
-#define OSP_TAGS_TESTAPP_COMMON_SCENE 37, \
-    tgCleanupEvt,       tgResyncEvt,        tgSyncEvt,          tgSceneEvt,         tgTimeEvt,      \
-    tgEntDel,           tgEntNew,           tgEntReq,                                               \
-    tgDelEntMod,        tgDelEntReq,        tgDelEntClr,                                            \
-    tgDelTotalMod,      tgDelTotalReq,      tgDelTotalClr,                                          \
-    tgTransformMod,     tgTransformDel,     tgTransformNew,     tgTransformReq,                     \
-    tgHierMod,          tgHierModEnd,       tgHierDel,          tgHierNew,          tgHierReq,      \
-    tgDrawDel,          tgDrawMod,          tgDrawReq,                                              \
-    tgDelDrawEntMod,    tgDelDrawEntReq,    tgDelDrawEntClr,                                        \
-    tgMeshDel,          tgMeshMod,          tgMeshReq,          tgMeshClr,                          \
-    tgTexDel,           tgTexMod,           tgTexReq,           tgTexClr
+// Persistent:
+//
+// DeleteTask --->(_del)---> NewTask --->(_mod)---> UseTask --->(_use)
+//      |                                   ^
+//      +-----------------------------------+
+//
 
+// Transient: containers filled and cleared right away
+//
+// PushValuesTask --->(_mod)---> UseValuesTask --->(_use)---> ClearValuesTask --->(_clr)
+//
+
+#define TESTAPP_DATA_SCENE 1, \
+    idDeltaTimeIn
 struct TgtScene
 {
     osp::TargetId cleanup;
@@ -72,39 +60,45 @@ struct TgtScene
     osp::TargetId resyncAll;
 };
 
-#define TESTAPP_DATA_MATERIAL 2, \
-    idMatEnts, idMatDirty
-#define OSP_TAGS_TESTAPP_MATERIAL 4, \
-    tgMatDel, tgMatMod, tgMatReq, tgMatClr
-
-
-
-#define TESTAPP_DATA_MATERIAL 2, \
-    idMatEnts, idMatDirty
-#define OSP_TAGS_TESTAPP_MATERIAL 4, \
-    tgMatDel, tgMatMod, tgMatReq, tgMatClr
-
+#define TESTAPP_DATA_COMMON_SCENE 6, \
+    idBasic, idDrawing, idDrawingRes, idActiveEntDel, idDrawEntDel, idNMesh
+struct TgtCommonScene
+{
+    osp::TargetId      activeEnt_del,      activeEnt_new,      activeEnt_mod,      activeEnt_use;
+    osp::TargetId   delActiveEnt_mod,   delActiveEnt_use,   delActiveEnt_clr;
+    osp::TargetId      transform_del,      transform_new,      transform_mod,      transform_use;
+    osp::TargetId           hier_del,           hier_new,           hier_mod,           hier_use;
+    osp::TargetId        drawEnt_del,        drawEnt_new,        drawEnt_mod,        drawEnt_use;
+    osp::TargetId     delDrawEnt_mod,     delDrawEnt_use,     delDrawEnt_clr;
+    osp::TargetId           mesh_del,           mesh_new,           mesh_mod,           mesh_use;
+    osp::TargetId        texture_del,        texture_new,        texture_mod,        texture_use;
+    osp::TargetId       material_del,       material_new,       material_mod,       material_use,       material_clr;
+};
 
 
 #define TESTAPP_DATA_PHYSICS 3, \
     idPhys, idHierBody, idPhysIn
-#define OSP_TAGS_TESTAPP_PHYSICS 6, \
-    tgPhysPrv,          tgPhysDel,          tgPhysMod,          tgPhysReq,      \
-    tgPhysTransformMod, tgPhysTransformReq
+struct TgtPhysics
+{
+
+    osp::TargetId        physics_del,        physics_new,        physics_mod,        physics_use;
+};
 
 
 
-#define TESTAPP_DATA_SHAPE_SPAWN 2, \
-    idSpawner, idSpawnerEnts
-#define OSP_TAGS_TESTAPP_SHAPE_SPAWN 5, \
-    tgSpawnMod,         tgSpawnReq,         tgSpawnClr,         \
-    tgSpawnEntMod,      tgSpawnEntReq
+#define TESTAPP_DATA_SHAPE_SPAWN 1, \
+    idSpawner
+struct TgtShapeSpawn
+{
+    osp::TargetId   spawnRequest_mod,   spawnRequest_use,   spawnRequest_clr;
+    osp::TargetId    spawnedEnts_mod,    spawnedEnts_use;  // spawnRequest_clr;
+};
 
 
 
 #define TESTAPP_DATA_PREFABS 1, \
     idPrefabInit
-#define OSP_TAGS_TESTAPP_PREFABS 7, \
+#define OS, tP_TAGS_TESTAPP_PREFABS 7, \
     tgPrefabMod,        tgPrefabReq,        tgPrefabClr,        \
     tgPrefabEntMod,     tgPrefabEntReq,                         \
     tgPfParentHierMod,  tgPfParentHierReq
@@ -176,9 +170,10 @@ struct TgtScene
 
 #define TESTAPP_DATA_NEWTON 1, \
     idNwt
-#define OSP_TAGS_TESTAPP_NEWTON 5, \
-    tgNwtBodyPrv,       tgNwtBodyDel,       tgNwtBodyMod,       tgNwtBodyReq,       tgNwtBodyClr
-
+struct TgtNewton
+{
+    osp::TargetId        nwtBody_del,        nwtBody_new,        nwtBody_mod,        nwtBody_use;
+};
 
 #define TESTAPP_DATA_NEWTON_FORCES 1, \
     idNwtFactors
@@ -224,7 +219,6 @@ struct TgtScene
 
 #define TESTAPP_DATA_WINDOW_APP 1, \
     idUserInput
-
 struct TgtWindowApp
 {
     osp::TargetId input;
@@ -235,34 +229,40 @@ struct TgtWindowApp
 
 #define TESTAPP_DATA_MAGNUM 2, \
     idActiveApp, idRenderGl
-
 struct TgtMagnum
 {
     osp::TargetId cleanup;
+
+    osp::TargetId meshGL_mod, meshGL_use;
+    osp::TargetId textureGL_mod, textureGL_use;
 };
+
 
 
 #define TESTAPP_DATA_COMMON_RENDERER 3, \
     idScnRender, idGroupFwd, idCamera
-#define OSP_TAGS_TESTAPP_COMMON_RENDERER 24, \
-    tgDrawGlDel,        tgDrawGlMod,        tgDrawGlReq,        \
-    tgMeshGlMod,        tgMeshGlReq,                            \
-    tgTexGlMod,         tgTexGlReq,                             \
-    tgEntTexMod,        tgEntTexReq,                            \
-    tgEntMeshMod,       tgEntMeshReq,                           \
-    tgCameraMod,        tgCameraReq,                            \
-    tgGroupFwdDel,      tgGroupFwdMod,      tgGroupFwdReq,      \
-    tgBindFboMod,       tgBindFboReq,                           \
-    tgFwdRenderMod,     tgFwdRenderReq,                         \
-    tgDrawTransformDel, tgDrawTransformNew, tgDrawTransformMod, tgDrawTransformReq
+struct TgtSceneRenderer
+{
+    osp::TargetId fboRender;
+    osp::TargetId fboRenderDone;
+
+    osp::TargetId      scnRender_del,      scnRender_new,      scnRender_mod,      scnRender_use;
+    osp::TargetId          group_mod,          group_use;
+    osp::TargetId      groupEnts_del,      groupEnts_new,      groupEnts_mod,      groupEnts_use;
+    osp::TargetId  drawTransform_new,  drawTransform_mod,  drawTransform_use;
+    osp::TargetId         camera_mod,         camera_use;
+    osp::TargetId        entMesh_new,        entMesh_mod,        entMesh_use;
+    osp::TargetId     entTexture_new,     entTexture_mod,     entTexture_use;
+};
 
 
 
 #define TESTAPP_DATA_CAMERA_CTRL 1, \
     idCamCtrl
-#define OSP_TAGS_TESTAPP_CAMERA_CTRL 2, \
-    tgCamCtrlMod,       tgCamCtrlReq
-
+struct TgtCameraCtrl
+{
+    osp::TargetId     cameraCtrl_mod,     cameraCtrl_use;
+};
 
 
 #define TESTAPP_DATA_SHADER_VISUALIZER 1, \
@@ -290,4 +290,4 @@ struct TgtMagnum
 #define OSP_TAGS_TESTAPP_VEHICLE_CONTROL 2, \
     tgSelUsrCtrlMod,    tgSelUsrCtrlReq
 
-} // namespace testapp::targets
+} // namespace testapp

@@ -346,7 +346,7 @@ void SysRenderGL::clear_resource_owners(RenderGL& rRenderGl, Resources& rResourc
 
 void SysRenderGL::render_opaque(
         RenderGroup const& group,
-        EntSet_t const& visible,
+        DrawEntSet_t const& visible,
         ViewProjMatrix const& viewProj)
 {
     using Magnum::GL::Renderer;
@@ -361,7 +361,7 @@ void SysRenderGL::render_opaque(
 
 void SysRenderGL::render_transparent(
         RenderGroup const& group,
-        EntSet_t const& visible,
+        DrawEntSet_t const& visible,
         ViewProjMatrix const& viewProj)
 {
     using Magnum::GL::Renderer;
@@ -382,7 +382,7 @@ void SysRenderGL::render_transparent(
 
 void SysRenderGL::draw_group(
         RenderGroup const& group,
-        EntSet_t const& visible,
+        DrawEntSet_t const& visible,
         ViewProjMatrix const& viewProj)
 {
     for (auto const& [ent, toDraw] : group.view().each())

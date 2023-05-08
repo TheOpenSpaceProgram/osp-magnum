@@ -86,7 +86,7 @@ template<typename ITA_T, typename ITB_T>
 void sync_flat(
         ITA_T                                                   dirtyIt,
         ITB_T const&                                            dirtyLast,
-        active::EntSet_t const&                                 hasMaterial,
+        active::DrawEntSet_t const&                             hasMaterial,
         active::RenderGroup::Storage_t *const                   pStorageOpaque,
         active::RenderGroup::Storage_t *const                   pStorageTransparent,
         KeyedVec<active::DrawEnt, active::BasicDrawProps> const& drawBasic,

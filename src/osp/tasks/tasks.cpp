@@ -64,13 +64,13 @@ ExecGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         totalDependEdges += pEdges->m_targetDependEdges.size();
         totalFulfillEdges += pEdges->m_targetFulfillEdges.size();
 
-        for (auto const [task, target] : pEdges->m_targetDependEdges)
+        for (auto const [task, target, _] : pEdges->m_targetDependEdges)
         {
             ++ taskCounts[task]    .m_dependingOn;
             ++ targetCounts[target].m_dependents;
         }
 
-        for (auto const [task, target] : pEdges->m_targetFulfillEdges)
+        for (auto const [task, target, _] : pEdges->m_targetFulfillEdges)
         {
             ++ taskCounts[task]    .m_fulfills;
             ++ targetCounts[target].m_fulfilledBy;
@@ -123,19 +123,19 @@ ExecGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     for (TaskEdges const* pEdges : data)
     {
-        for (auto const [task, target] : pEdges->m_targetDependEdges)
+        for (auto const [task, target, trigger] : pEdges->m_targetDependEdges)
         {
-            auto const dependOn     = lgrn::Span<TargetId>  (out.m_taskDependOn[TaskInt(task)]);
+            auto const dependOn     = lgrn::Span<DependOn>  (out.m_taskDependOn[TaskInt(task)]);
             auto const dependents   = lgrn::Span<TaskId>    (out.m_targetDependents[TargetInt(target)]);
 
-            dependOn    [dependOn.size()    - taskCounts[task].m_dependingOn]       = target;
+            dependOn    [dependOn.size()    - taskCounts[task].m_dependingOn]       = {target, trigger};
             dependents  [dependents.size()  - targetCounts[target].m_dependents]    = task;
 
             --taskCounts[task]    .m_dependingOn;
             --targetCounts[target].m_dependents;
         }
 
-        for (auto const [task, target] : pEdges->m_targetFulfillEdges)
+        for (auto const [task, target, _] : pEdges->m_targetFulfillEdges)
         {
             auto const fulfills     = lgrn::Span<TargetId>  (out.m_taskFulfill[TaskInt(task)]);
             auto const fulfilledBy  = lgrn::Span<TaskId>    (out.m_targetFulfilledBy[TargetInt(target)]);
@@ -151,8 +151,6 @@ ExecGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     return out;
 }
-
-
 
 } // namespace osp
 

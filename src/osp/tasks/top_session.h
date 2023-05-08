@@ -75,7 +75,7 @@ namespace osp
 struct Session
 {
     template <std::size_t N>
-    std::array<TopDataId, N> acquire_data(ArrayView<entt::any> topData)
+    [[nodiscard]] std::array<TopDataId, N> acquire_data(ArrayView<entt::any> topData)
     {
         std::array<TopDataId, N> out;
         top_reserve(topData, 0, std::begin(out), std::end(out));
@@ -101,7 +101,7 @@ struct Session
     }
 
     template<typename TGT_STRUCT_T>
-    TGT_STRUCT_T get_targets() const
+    [[nodiscard]] TGT_STRUCT_T get_targets() const
     {
         static_assert(sizeof(TGT_STRUCT_T) % sizeof(TargetId) == 0);
         constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(TargetId);
@@ -116,16 +116,11 @@ struct Session
         return reinterpret_cast<TGT_STRUCT_T const&>(*m_targets.data());
     }
 
-    TaskId& task()
-    {
-        return m_tasks.emplace_back(lgrn::id_null<TaskId>());
-    }
-
     std::vector<TopDataId>  m_data;
     std::vector<TargetId>   m_targets;
     std::vector<TaskId>     m_tasks;
 
-    TargetId m_cleanupTgt{lgrn::id_null<TargetId>()};
+    TargetId m_cleanup  {lgrn::id_null<TargetId>()};
 
     std::size_t m_targetStructHash{0};
     std::string m_targetStructName;

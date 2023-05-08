@@ -35,14 +35,6 @@
 namespace testapp::scenes
 {
 
-inline auto const delete_ent_set = osp::wrap_args([] (osp::active::EntSet_t& rSet, osp::active::EntVector_t const& rDelTotal) noexcept
-{
-    for (osp::active::ActiveEnt const ent : rDelTotal)
-    {
-        rSet.reset(std::size_t(ent));
-    }
-});
-
 struct NamedMeshes
 {
     // Required for std::is_copy_assignable to work properly inside of entt::any
@@ -56,23 +48,19 @@ struct NamedMeshes
                     osp::active::MeshIdOwner_t> m_namedMeshs;
 };
 
+osp::Session setup_scene(
+        osp::TopTaskBuilder&                rBuilder,
+        osp::ArrayView<entt::any> const     topData);
+
 /**
  * @brief Support for Time, ActiveEnts, Hierarchy, Transforms, Drawing, and more...
  */
 osp::Session setup_common_scene(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         scene,
         osp::TopDataId              idResources,
         osp::PkgId                  pkg);
 
-/**
- * @brief Support a single material, aka: a Set of ActiveEnts and dirty flags
- *
- * Multiple material sessions can be setup for each material
- */
-osp::Session setup_material(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon);
 
 }

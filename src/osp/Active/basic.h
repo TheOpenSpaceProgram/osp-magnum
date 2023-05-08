@@ -79,17 +79,15 @@ struct ACtxSceneGraph
  */
 struct ACtxBasic
 {
-    ACtxSceneGraph m_scnGraph;
+    lgrn::IdRegistryStl<ActiveEnt>      m_activeIds;
 
-    acomp_storage_t<ACompTransform>             m_transform;
-    acomp_storage_t<ACompName>                  m_name;
+    ACtxSceneGraph                      m_scnGraph;
+    acomp_storage_t<ACompTransform>     m_transform;
 };
 
 template<typename IT_T>
 void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
 {
-    rCtxBasic.m_name            .remove(first, last);
-
     while (first != last)
     {
         ActiveEnt const ent = *first;
