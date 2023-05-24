@@ -102,7 +102,8 @@ SET(OSP_MAGNUM_DEPS_LIBS
             dNewton dScene dModel dVehicle
             toml11
             spdlog
-            longeron)
+            longeron
+            cmake_git_version_tracking)
 target_link_libraries(osp-magnum-deps INTERFACE ${OSP_MAGNUM_DEPS_LIBS})
 add_dependencies(compile-osp-magnum-deps ${OSP_MAGNUM_DEPS_LIBS})
 
