@@ -499,12 +499,11 @@ void debug_print_help()
         longestName = std::max(name.size(), longestName);
     }
 
-    std::cout
-        << "OSP-Magnum Temporary Debug CLI\n"
-        << "Open a scenario:\n";
+    std::cout << "OSP-Magnum Temporary Debug CLI\n";
 
-    std::cout << "Version: " << GIT_HASH << " (" << GIT_BRANCH << ")\n";
+    std::cout << "Version: " << GIT_HASH << " (" << GIT_BRANCH << ")\n\n";
 
+    std::cout << "Open a scenario:\n";
     for (auto const& [name, rTestScn] : scenarios())
     {
         std::string spaces(longestName - name.length(), ' ');
