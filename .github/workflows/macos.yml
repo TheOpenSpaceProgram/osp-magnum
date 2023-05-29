@@ -30,9 +30,6 @@ jobs:
       with:
         key: macos-${{ matrix.image }}-${{ matrix.image}}-${{ matrix.config }}
 
-    - name: Install dependencies
-      run: brew install cmake
-
     - name: Configure
       shell: bash
       run: |
