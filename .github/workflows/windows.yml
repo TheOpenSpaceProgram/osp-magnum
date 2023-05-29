@@ -1,8 +1,22 @@
 name: Windows
 
 on:
-  pull_request:
   push:
+    paths:
+      - '.github/workflows/windows.yml'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'test/**'
+      - 'modules/**'
+      - '3rdparty/**'
+  pull_request:
+    paths:
+      - '.github/workflows/windows.yml'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'test/**'
+      - 'modules/**'
+      - '3rdparty/**'
   release:
     types: published
 
