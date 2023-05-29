@@ -60,7 +60,7 @@ jobs:
       run: |
         ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build
 
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: OSP-linux-${{ matrix.image}}-${{ matrix.config }}-${{ matrix.compiler }}
         path: build/${{ matrix.config }}
