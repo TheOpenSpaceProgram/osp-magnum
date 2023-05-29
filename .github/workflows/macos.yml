@@ -1,8 +1,22 @@
 name: macOS
 
 on:
-  pull_request:
   push:
+    paths:
+      - '.github/workflows/macos.yml'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'test/**'
+      - 'modules/**'
+      - '3rdparty/**'
+  pull_request:
+    paths:
+      - '.github/workflows/macos.yml'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'test/**'
+      - 'modules/**'
+      - '3rdparty/**'
   release:
     types: published
 
