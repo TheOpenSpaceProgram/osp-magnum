@@ -39,7 +39,7 @@
 namespace osp
 {
 
-void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, WorkerContext worker)
+void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, WorkerContext worker)
 {
     std::vector<entt::any> topDataRefs;
 
@@ -94,7 +94,7 @@ void top_run_blocking(Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec
     }
 }
 
-void top_enqueue_quick(Tasks const& tasks, ExecGraph const& graph, ExecContext& rExec, ArrayView<TargetId const> enqueue)
+void top_enqueue_quick(Tasks const& tasks, TaskGraph const& graph, ExecContext& rExec, ArrayView<TargetId const> enqueue)
 {
     for (TargetId const target : enqueue)
     {
@@ -106,7 +106,7 @@ void top_enqueue_quick(Tasks const& tasks, ExecGraph const& graph, ExecContext& 
 
 
 
-void write_dot_graph(std::ostream& rStream, Tasks const& tasks, ExecGraph const& graph, TopTaskDataVec_t& rTaskData)
+void write_dot_graph(std::ostream& rStream, Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec_t& rTaskData)
 {
     rStream << "graph {\n"
             << "rankdir=LR;\n"

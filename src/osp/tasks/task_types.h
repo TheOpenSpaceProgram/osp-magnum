@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2023 Open Space Program Project
  *
  * MIT License
  *
@@ -24,24 +24,11 @@
  */
 #pragma once
 
-#include "execute.h"
-#include "tasks.h"
-#include "top_tasks.h"
 
-#include <vector>
 
 namespace osp
 {
 
-void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, WorkerContext worker = {});
 
-void top_enqueue_quick(Tasks const& tasks, TaskGraph const& graph, ExecContext& rExec, ArrayView<TargetId const> enqueue);
 
-inline void top_enqueue_quick(Tasks const& tasks, TaskGraph const& graph, ExecContext& rExec, std::initializer_list<TargetId const> enqueue)
-{
-    return top_enqueue_quick(tasks, graph, rExec, Corrade::Containers::arrayView(enqueue));
-}
-
-void write_dot_graph(std::ostream& rStream, Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec_t& rTaskData);
-
-} // namespace testapp
+} // namespace osp

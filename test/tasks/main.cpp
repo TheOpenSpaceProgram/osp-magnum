@@ -49,18 +49,18 @@ bool contains(RANGE_T const& range, VALUE_T const& value) noexcept
 }
 
 template<typename RUN_TASK_T>
-void randomized_singlethreaded_execute(Tasks const& tasks, ExecGraph const& graph, ExecContext& rExec, std::mt19937 &rRand, int maxRuns, RUN_TASK_T && runTask)
+void randomized_singlethreaded_execute(Tasks const& tasks, TaskGraph const& graph, ExecContext& rExec, std::mt19937 &rRand, int maxRuns, RUN_TASK_T && runTask)
 {
     for (int i = 0; i < maxRuns; ++i)
     {
-        std::size_t const tasksLeft = rExec.m_tasksQueued.size();
+        std::size_t const tasksLeft = rExec.m_tasksQueuedRun.size();
 
         if (tasksLeft == 0)
         {
             break;
         }
 
-        TaskId const randomTask = rExec.m_tasksQueued.at(rRand() % tasksLeft);
+        TaskId const randomTask = rExec.m_tasksQueuedRun.at(rRand() % tasksLeft);
 
         FulfillDirty_t const status = runTask(randomTask);
         mark_completed_task(tasks, graph, rExec, randomTask, status);
@@ -70,9 +70,23 @@ void randomized_singlethreaded_execute(Tasks const& tasks, ExecGraph const& grap
 
 //-----------------------------------------------------------------------------
 
-// Test multiple tasks fulfilling a single target
+namespace test_a
+{
+
+enum class Stages { Clear, Fill, Use };
+
+struct Pipelines
+{
+    osp::PipelineDef<Stages> vec;
+};
+
+} // namespace test_a
+
+// Test pipeline consisting of parallel tasks
 TEST(Tasks, BasicParallelSingleThreaded)
 {
+    using namespace test_a;
+    using enum Stages;
     // NOTE
     // If this was multithreaded, then multiple threads writing to a single container is a bad
     // idea. The proper way to do this is to make a vector per-thread. Targets are still
@@ -84,77 +98,84 @@ TEST(Tasks, BasicParallelSingleThreaded)
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
     constexpr int sc_repetitions = 32;
-    constexpr int sc_pusherTaskCount = 1337;
+    constexpr int sc_pusherTaskCount = 24;
     constexpr int sc_totalTaskCount = sc_pusherTaskCount + 1;
     std::mt19937 randGen(69);
+
+    // Step 1: Create tasks
 
     Tasks           tasks;
     TaskEdges       edges;
     TaskFuncVec_t   functions;
     Builder_t       builder{tasks, edges, functions};
-    auto const
-    [
-        inputIn,    /// Input int, manually set dirty when it changes
-        vecClear,   /// Vector must be cleared before new stuff can be added to it
-        vecReady    /// Vector is ready, all ints have been added to it
-
-    ] = builder.create_targets<3>();
-
-    // Clear vector before use
-    builder.task()
-            .trigger_on({inputIn})
-            .fulfills({vecClear})
-            .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
-    {
-        rOut.clear();
-        return {{0b01}};
-    });
+    auto pl = builder.create_pipelines<Pipelines>();
 
     // Multiple tasks push to the vector
     for (int i = 0; i < sc_pusherTaskCount; ++i)
     {
         builder.task()
-                .trigger_on({vecClear})
-                .fulfills({vecReady})
-                .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
+            .run_on  ({{pl.vec, Fill}})
+            .triggers({{pl.vec, Clear}})
+            .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
         {
             rOut.push_back(in);
             return {{0b01}};
         });
     }
 
-    ExecGraph const graph = make_exec_graph(tasks, {&edges});
-    ExecContext    exec;
+    // Use vector
+    builder.task()
+        .run_on({{pl.vec, Use}})
+        .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
+    {
+        int const sum = std::accumulate(rOut.begin(), rOut.end(), 0);
+        EXPECT_EQ(sum, in * sc_pusherTaskCount);
+        return {{0b0}};
+    });
 
+    // Clear vector after use
+    builder.task()
+        .run_on({{pl.vec, Clear}})
+        .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
+    {
+        rOut.clear();
+        return {{0b01}};
+    });
+
+    // Step 2: Compile tasks into an execution graph
+
+    TaskGraph const graph = make_exec_graph(tasks, {&edges});
+
+    // Step 3: Run
+
+    ExecContext exec;
     exec.resize(tasks);
 
     int                 input = 0;
     std::vector<int>    output;
 
-    // Repeat (with randomness) to test many possible execution orders
+    // Repeat with randomness to test many possible execution orders
     for (int i = 0; i < sc_repetitions; ++i)
     {
         input = 1 + randGen() % 30;
 
-        // Enqueue initial tasks
-        // This roughly indicates "Time has changed" and "Render requested"
-        exec.m_targetDirty.set(std::size_t(inputIn));
+        set_dirty(exec, pl.vec, Fill);
         enqueue_dirty(tasks, graph, exec);
 
         randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output] (TaskId const task) -> FulfillDirty_t
         {
             return functions[task](input, output);
         });
-
-        int const sum = std::accumulate(output.begin(), output.end(), 0);
-
-        ASSERT_EQ(sum, input * sc_pusherTaskCount);
     }
 }
 
+
 //-----------------------------------------------------------------------------
 
-struct TestWorld
+namespace test_gameworld
+{
+
+struct World
 {
     int m_deltaTimeIn{1};
     int m_forces{0};
@@ -162,23 +183,31 @@ struct TestWorld
     std::set<std::string> m_canvas;
 };
 
-struct TestWorldTargets
+enum class StgSimple { Recalc, Use };
+enum class StgRender { Render, Done };
+
+struct Pipelines
 {
-    TargetId timeIn;            /// External time input, manually set dirty when time 'changes', and the world needs to update
-    TargetId forces;            /// Forces need to be calculated before physics
-    TargetId positions;         /// Positions calculated by physics task
-    TargetId renderRequestIn;   /// External render request, manually set dirty when a new frame to render is required
-    TargetId renderDoneOut;     /// Fired when all rendering is finished
+    osp::PipelineDef<StgSimple> time;       /// External time input, manually set dirty when time 'changes', and the world needs to update
+    osp::PipelineDef<StgSimple> forces;     /// Forces need to be calculated before physics
+    osp::PipelineDef<StgSimple> positions;  /// Positions calculated by physics task
+    osp::PipelineDef<StgRender> render;     /// External render request, manually set dirty when a new frame to render is required
 };
 
-// Single-threaded test against TestWorld with order-dependent tasks
+} // namespace test_gameworld
+
+// Single-threaded test against World with order-dependent tasks
 TEST(Tasks, BasicSingleThreaded)
 {
-    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(TestWorld&)>;
+    using namespace test_gameworld;
+    using enum StgSimple;
+    using enum StgRender;
+
+    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(World&)>;
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
-    constexpr int sc_repetitions = 32;
+    constexpr int sc_repetitions = 128;
     std::mt19937 randGen(69);
 
     Tasks           tasks;
@@ -186,34 +215,33 @@ TEST(Tasks, BasicSingleThreaded)
     TaskFuncVec_t   functions;
     Builder_t       builder{tasks, edges, functions};
 
-    auto const tgt  = builder.create_targets<TestWorldTargets>();
+    auto const pl = builder.create_pipelines<Pipelines>();
 
     // Start adding tasks. The order these are added does not matter.
 
     // Two tasks calculate forces needed by the physics update
-    TaskId const taskA = builder.task()
-            .trigger_on({tgt.timeIn})
-            .fulfills({tgt.forces})
-            .func( [] (TestWorld& rWorld) -> FulfillDirty_t
+    builder.task()
+        .run_on   ({{pl.time, Use}})
+        .sync_with({{pl.forces, Recalc}})
+        .func( [] (World& rWorld) -> FulfillDirty_t
     {
         rWorld.m_forces += 42 * rWorld.m_deltaTimeIn;
         return {{0b01}};
     });
-    TaskId const taskB = builder.task()
-            .trigger_on({tgt.timeIn})
-            .fulfills({tgt.forces})
-            .func([] (TestWorld& rWorld) -> FulfillDirty_t
+    builder.task()
+        .run_on   ({{pl.time, Use}})
+        .sync_with({{pl.forces, Recalc}})
+        .func([] (World& rWorld) -> FulfillDirty_t
     {
         rWorld.m_forces += 1337 * rWorld.m_deltaTimeIn;
         return {{0b01}};
     });
 
     // Main Physics update
-    TaskId const taskC = builder.task()
-            .trigger_on({tgt.timeIn})
-            .depends_on({tgt.forces})
-            .fulfills({tgt.positions})
-            .func([] (TestWorld& rWorld) -> FulfillDirty_t
+    builder.task()
+        .run_on   ({{pl.time, Use}})
+        .sync_with({{pl.forces, Use}, {pl.positions, Recalc}})
+        .func([] (World& rWorld) -> FulfillDirty_t
     {
         EXPECT_EQ(rWorld.m_forces, 1337 + 42);
         rWorld.m_positions += rWorld.m_forces;
@@ -223,11 +251,10 @@ TEST(Tasks, BasicSingleThreaded)
 
     // Draw things moved by physics update. If 'updWorld' wasn't enqueued, then
     // this will still run, as no 'needPhysics' tasks are incomplete
-    TaskId const taskD = builder.task()
-            .trigger_on({tgt.renderRequestIn})
-            .depends_on({tgt.positions})
-            .fulfills({tgt.renderDoneOut})
-            .func([] (TestWorld& rWorld) -> FulfillDirty_t
+    builder.task()
+        .run_on   ({{pl.render, Render}})
+        .sync_with({{pl.positions, Use}})
+        .func([] (World& rWorld) -> FulfillDirty_t
     {
         EXPECT_EQ(rWorld.m_positions, 1337 + 42);
         rWorld.m_canvas.emplace("Physics Cube");
@@ -236,37 +263,22 @@ TEST(Tasks, BasicSingleThreaded)
 
     // Draw things unrelated to physics. This is allowed to be the first task
     // to run
-    TaskId const taskE = builder.task()
-        .trigger_on({tgt.renderRequestIn})
-        .fulfills({tgt.renderDoneOut})
-        .func([] (TestWorld& rWorld) -> FulfillDirty_t
+    builder.task()
+        .run_on  ({{pl.render, Render}})
+        .func([] (World& rWorld) -> FulfillDirty_t
     {
         rWorld.m_canvas.emplace("Terrain");
         return {{0b01}};
     });
 
-    ExecGraph const graph = make_exec_graph(tasks, {&edges});
-
-    // Random checks to assure the graph structure is properly built
-    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.timeIn)          ].size(), 3);
-    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.forces)          ].size(), 1);
-    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.positions)       ].size(), 1);
-    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.renderRequestIn) ].size(), 2);
-    ASSERT_EQ(graph.m_targetDependents[ uint32_t(tgt.renderDoneOut)   ].size(), 0);
-    ASSERT_TRUE(  contains(graph.m_targetFulfilledBy[uint32_t(tgt.forces)],        taskB) );
-    ASSERT_FALSE( contains(graph.m_targetFulfilledBy[uint32_t(tgt.renderDoneOut)], taskC) );
-    ASSERT_TRUE(  contains(graph.m_taskDependOn[uint32_t(taskA)], tgt.timeIn)       );
-    ASSERT_FALSE( contains(graph.m_taskDependOn[uint32_t(taskB)], tgt.positions)    );
-    ASSERT_TRUE(  contains(graph.m_taskDependOn[uint32_t(taskC)], tgt.timeIn)       );
-    ASSERT_TRUE(  contains(graph.m_taskDependOn[uint32_t(taskC)], tgt.forces)       );
-    ASSERT_TRUE(  contains(graph.m_taskFulfill[uint32_t(taskD)], tgt.renderDoneOut) );
-    ASSERT_FALSE( contains(graph.m_taskFulfill[uint32_t(taskE)], tgt.forces)        );
+    TaskGraph const graph = make_exec_graph(tasks, {&edges});
 
     // Execute
 
-    TestWorld      world;
-    ExecContext    exec;
+    ExecContext exec;
     exec.resize(tasks);
+
+    World world;
 
     // Repeat (with randomness) to test many possible execution orders
     for (int i = 0; i < sc_repetitions; ++i)
@@ -277,8 +289,8 @@ TEST(Tasks, BasicSingleThreaded)
 
         // Enqueue initial tasks
         // This roughly indicates "Time has changed" and "Render requested"
-        exec.m_targetDirty.set(std::size_t(tgt.timeIn));
-        exec.m_targetDirty.set(std::size_t(tgt.renderRequestIn));
+        set_dirty(exec, pl.time, StgSimple::Use);
+        set_dirty(exec, pl.render, StgRender::Render);
         enqueue_dirty(tasks, graph, exec);
 
         randomized_singlethreaded_execute(
@@ -290,6 +302,8 @@ TEST(Tasks, BasicSingleThreaded)
 
         ASSERT_TRUE(world.m_canvas.contains("Physics Cube"));
         ASSERT_TRUE(world.m_canvas.contains("Terrain"));
+
+        std::cout << "done!\n";
     }
 }
 

@@ -38,7 +38,7 @@ namespace osp
 
 void top_close_session(
         Tasks &                 rTasks,
-        ExecGraph const&        graph,
+        TaskGraph const&        graph,
         TopTaskDataVec_t&       rTaskData,
         ArrayView<entt::any>    topData,
         ExecContext&            rExec,

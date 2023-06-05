@@ -39,29 +39,65 @@
 namespace osp
 {
 
+struct StageCounts
+{
+    uint16_t        m_waitingTasks  {0};
+};
+
+struct ExecPipeline
+{
+    StageBits_t     m_triggered         {0};
+    int             m_tasksQueuedRun    {0};
+    int             m_tasksQueuedBlocked{0};
+    StageId         m_currentStage      {0};
+    uint32_t        m_waitingTasksTotal {0};
+
+    std::array<StageCounts, gc_maxStages> m_stageCounts;
+};
+
+struct TaskWaiting
+{
+    TaskId          m_recipient;
+    PipelineId      m_waitFor;
+    StageId         m_waitForStage;
+};
+
+/**
+ * @brief The ExecContext class
+ *
+ * Pipelines are marked dirty (m_plDirty.set(pipeline int)) if...
+ * * All of its running tasks just finished
+ * * Not running but required by another pipeline
+ */
 struct ExecContext
 {
     void resize(Tasks const& tasks)
     {
-        std::size_t const maxTargets    = tasks.m_targetIds.capacity();
         std::size_t const maxTasks      = tasks.m_taskIds.capacity();
+        std::size_t const maxPipeline   = tasks.m_pipelineIds.capacity();
 
-        m_tasksQueued.reserve(maxTasks);
-        bitvector_resize(m_taskTriggered,   maxTasks);
+        m_tasksQueuedRun    .reserve(maxTasks);
+        m_tasksQueuedBlocked.reserve(maxTasks);
+        bitvector_resize(m_tasksTryRun, maxTasks);
 
-        bitvector_resize(m_targetDirty,             maxTargets);
-        bitvector_resize(m_targetWillBePending,     maxTargets);
-        m_targetPendingCount.resize(maxTargets);
-        m_targetInUseCount  .resize(maxTargets);
+        m_plData.resize(maxPipeline);
+        bitvector_resize(m_plDirty,     maxPipeline);
+
+        m_plNextStage.resize(maxPipeline);
+        bitvector_resize(m_plRequired,  maxPipeline);
     }
 
-    entt::basic_sparse_set<TaskId>  m_tasksQueued;
-    BitVector_t                     m_taskTriggered;
+    KeyedVec<PipelineId, ExecPipeline>  m_plData;
+    BitVector_t                         m_plDirty;
 
-    BitVector_t                     m_targetDirty;
-    BitVector_t                     m_targetWillBePending;
-    KeyedVec<TargetId, int>         m_targetPendingCount;
-    KeyedVec<TargetId, int>         m_targetInUseCount;
+    entt::basic_sparse_set<TaskId>      m_tasksQueuedRun;
+    entt::basic_sparse_set<TaskId>      m_tasksQueuedBlocked;
+    BitVector_t                         m_tasksTryRun;
+
+    // used for updating
+
+    BitVector_t                         m_plRequired;
+    KeyedVec<PipelineId, StageId>       m_plNextStage;
 
     // TODO: Consider multithreading. something something work stealing...
     //  * Allow multiple threads to search for and execute tasks. Atomic access
@@ -74,9 +110,22 @@ struct ExecContext
 
 }; // struct ExecContext
 
-int enqueue_dirty(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec) noexcept;
+//inline bool compare_syncs(SyncWaiting const& lhs, SyncWaiting const& rhs)
+//{
+//    return (lhs.m_recipient < rhs.m_recipient)
+//        && (lhs.m_recipient < rhs.m_waitFor);
+//};
 
-void mark_completed_task(Tasks const& tasks, ExecGraph const& graph, ExecContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept;
+template<typename STAGE_ENUM_T>
+inline void set_dirty(ExecContext &rExec, PipelineDef<STAGE_ENUM_T> const pipeline, STAGE_ENUM_T const stage)
+{
+    rExec.m_plData[pipeline].m_triggered |= 1 << int(stage);
+    rExec.m_plDirty.set(std::size_t(pipeline));
+}
+
+void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;
+
+void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept;
 
 
 

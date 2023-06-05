@@ -50,7 +50,7 @@ struct TestAppTasks
     osp::Tasks                      m_tasks;
     osp::TopTaskDataVec_t           m_taskData;
     osp::ExecContext                m_exec;
-    std::optional<osp::ExecGraph>   m_graph;
+    std::optional<osp::TaskGraph>   m_graph;
 };
 
 struct TestApp : TestAppTasks

@@ -43,6 +43,11 @@ namespace osp
 template <typename TASKBUILDER_T, typename TASKREF_T>
 struct TaskBuilderBase
 {
+    constexpr TaskBuilderBase(Tasks &rTasks, TaskEdges &rEdges) noexcept
+     : m_rTasks{rTasks}
+     , m_rEdges{rEdges}
+    { }
+
     TASKREF_T task()
     {
         TaskId const taskId = m_rTasks.m_taskIds.create();
@@ -61,23 +66,23 @@ struct TaskBuilderBase
     }
 
     template<typename TGT_STRUCT_T>
-    TGT_STRUCT_T create_targets()
+    TGT_STRUCT_T create_pipelines()
     {
-        static_assert(sizeof(TGT_STRUCT_T) % sizeof(TargetId) == 0);
-        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(TargetId);
+        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineId) == 0);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineId);
 
-        std::array<TargetId, count> out;
+        std::array<PipelineId, count> out;
 
-        m_rTasks.m_targetIds.create(out.begin(), out.end());
+        m_rTasks.m_pipelineIds.create(out.begin(), out.end());
 
         return reinterpret_cast<TGT_STRUCT_T&>(*out.data());
     }
 
     template<std::size_t N>
-    std::array<TargetId, N> create_targets()
+    std::array<PipelineId, N> create_stateloops()
     {
-        std::array<TargetId, N> out;
-        m_rTasks.m_targetIds.create(out.begin(), out.end());
+        std::array<PipelineId, N> out;
+        m_rTasks.m_pipelineIds.create(out.begin(), out.end());
         return out;
     }
 
@@ -86,6 +91,17 @@ struct TaskBuilderBase
 
 }; // class TaskBuilderBase
 
+struct PipelineSpec
+{
+    template<typename STAGE_ENUM_T>
+    PipelineSpec(PipelineDef<STAGE_ENUM_T> const pipeline, STAGE_ENUM_T const stage)
+     : m_pipeline{pipeline}
+     , m_stage{StageId(stage)}
+    { }
+
+    PipelineId  m_pipeline;
+    StageId     m_stage;
+};
 
 template <typename TASKBUILDER_T, typename TASKREF_T>
 struct TaskRefBase
@@ -99,46 +115,48 @@ struct TaskRefBase
 
     constexpr Tasks & tasks() noexcept { return m_rBuilder.m_rTasks; }
 
-    TASKREF_T& trigger_on(ArrayView<TargetId const> const targets) noexcept
+    template<typename RANGE_T>
+    TASKREF_T& add_edges(std::vector<TplTaskPipelineStage>& rContainer, RANGE_T const& add)
     {
-        for (TargetId const target : targets)
+        for (PipelineSpec const spec : add)
         {
-            m_rBuilder.m_rEdges.m_targetDependEdges.push_back({m_taskId, target, true});
+            rContainer.push_back({
+                .task     = m_taskId,
+                .pipeline = spec.m_pipeline,
+                .stage    = spec.m_stage
+            });
         }
         return static_cast<TASKREF_T&>(*this);
     }
 
-    TASKREF_T& trigger_on(std::initializer_list<TargetId const> targets) noexcept
+    TASKREF_T& run_on(ArrayView<PipelineSpec const> const specs) noexcept
     {
-        return trigger_on(Corrade::Containers::arrayView(targets));
+        return add_edges(m_rBuilder.m_rEdges.m_runOn, specs);
     }
 
-    TASKREF_T& depends_on(ArrayView<TargetId const> const targets) noexcept
+    TASKREF_T& run_on(std::initializer_list<PipelineSpec const> specs) noexcept
     {
-        for (TargetId const target : targets)
-        {
-            m_rBuilder.m_rEdges.m_targetDependEdges.push_back({m_taskId, target, false});
-        }
-        return static_cast<TASKREF_T&>(*this);
+        return add_edges(m_rBuilder.m_rEdges.m_runOn, specs);
     }
 
-    TASKREF_T& depends_on(std::initializer_list<TargetId const> targets) noexcept
+    TASKREF_T& sync_with(ArrayView<PipelineSpec const> const specs) noexcept
     {
-        return depends_on(Corrade::Containers::arrayView(targets));
+        return add_edges(m_rBuilder.m_rEdges.m_syncWith, specs);
     }
 
-    TASKREF_T& fulfills(ArrayView<TargetId const> const targets) noexcept
+    TASKREF_T& sync_with(std::initializer_list<PipelineSpec const> specs) noexcept
     {
-        for (TargetId const target : targets)
-        {
-            m_rBuilder.m_rEdges.m_targetFulfillEdges.push_back({m_taskId, target, false});
-        }
-        return static_cast<TASKREF_T&>(*this);
+        return add_edges(m_rBuilder.m_rEdges.m_syncWith, specs);
     }
 
-    TASKREF_T& fulfills(std::initializer_list<TargetId const> targets) noexcept
+    TASKREF_T& triggers(ArrayView<PipelineSpec const> const specs) noexcept
     {
-        return fulfills(Corrade::Containers::arrayView(targets));
+        return add_edges(m_rBuilder.m_rEdges.m_triggers, specs);
+    }
+
+    TASKREF_T& triggers(std::initializer_list<PipelineSpec const> specs) noexcept
+    {
+        return add_edges(m_rBuilder.m_rEdges.m_triggers, specs);
     }
 
     TaskId          m_taskId;

@@ -29,125 +29,159 @@ namespace osp
 
 struct TaskCounts
 {
-    unsigned int m_dependingOn  {0};
-    unsigned int m_fulfills     {0};
-    unsigned int m_acquires     {0};
+    std::size_t runOn           {0};
+    std::size_t syncs           {0};
+    std::size_t triggers        {0};
+};
+
+struct PipelineCounts
+{
+    std::size_t runTasks        {0};
+    std::size_t syncedBy        {0};
+    std::size_t triggeredBy     {0};
+    uint8_t     stages          {0};
 };
 
 struct TargetCounts
 {
-    unsigned int m_dependents   {0};
-    unsigned int m_fulfilledBy  {0};
+
 };
 
 
-ExecGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> const data)
+TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> const data)
 {
-    using TargetInt     = Tasks::TargetInt;
-    using TaskInt       = Tasks::TaskInt;
+    TaskGraph out;
 
-    ExecGraph out;
+    std::size_t const maxPipelines  = tasks.m_pipelineIds.capacity();
+    std::size_t const maxTasks      = tasks.m_taskIds.capacity();
 
-    KeyedVec<TaskId, TaskCounts>        taskCounts;
-    KeyedVec<TargetId, TargetCounts>    targetCounts;
+    KeyedVec<PipelineId, PipelineCounts>    plCounts;
+    KeyedVec<TaskId, TaskCounts>            taskCounts;
 
-    taskCounts  .resize(tasks.m_taskIds  .capacity());
-    targetCounts.resize(tasks.m_targetIds.capacity());
+    out.m_pipelines .resize(maxPipelines);
+    plCounts        .resize(maxPipelines);
+    taskCounts      .resize(maxTasks);
 
-    // Count connections
+    std::size_t runTotal     = 0;
+    std::size_t syncTotal    = 0;
+    std::size_t triggerTotal = 0;
 
-    std::size_t totalDependEdges = 0;
-    std::size_t totalFulfillEdges = 0;
-
-    for (TaskEdges const* pEdges : data)
-    {
-        totalDependEdges += pEdges->m_targetDependEdges.size();
-        totalFulfillEdges += pEdges->m_targetFulfillEdges.size();
-
-        for (auto const [task, target, _] : pEdges->m_targetDependEdges)
-        {
-            ++ taskCounts[task]    .m_dependingOn;
-            ++ targetCounts[target].m_dependents;
-        }
-
-        for (auto const [task, target, _] : pEdges->m_targetFulfillEdges)
-        {
-            ++ taskCounts[task]    .m_fulfills;
-            ++ targetCounts[target].m_fulfilledBy;
-        }
-    }
-
-    // Allocate
-
-    out.m_taskDependOn      .ids_reserve  (tasks.m_taskIds.capacity());
-    out.m_taskDependOn      .data_reserve (totalDependEdges);
-    out.m_targetDependents  .ids_reserve  (tasks.m_targetIds.capacity());
-    out.m_targetDependents  .data_reserve (totalDependEdges);
-    out.m_taskFulfill       .ids_reserve  (tasks.m_taskIds.capacity());
-    out.m_taskFulfill       .data_reserve (totalFulfillEdges);
-    out.m_targetFulfilledBy .ids_reserve  (tasks.m_targetIds.capacity());
-    out.m_targetFulfilledBy .data_reserve (totalFulfillEdges);
-
-    // Reserve partitions
-
-    for (Tasks::TaskInt const task : tasks.m_taskIds.bitview().zeros())
-    {
-        if (std::size_t const size = taskCounts[TaskId(task)].m_dependingOn;
-            size != 0)
-        {
-            out.m_taskDependOn.emplace(task, size);
-        }
-        if (std::size_t const size = taskCounts[TaskId(task)].m_fulfills;
-            size != 0)
-        {
-            out.m_taskFulfill.emplace(task, size);
-        }
-    }
-
-    for (Tasks::TargetInt const target : tasks.m_targetIds.bitview().zeros())
-    {
-        if (std::size_t const size = targetCounts[TargetId(target)].m_dependents;
-            size != 0)
-        {
-            out.m_targetDependents.emplace(target, size);
-        }
-
-        if (std::size_t const size = targetCounts[TargetId(target)].m_fulfilledBy;
-            size != 0)
-        {
-            out.m_targetFulfilledBy.emplace(target, size);
-        }
-    }
-
-    // Place connections into allocated partitions
+    // Count
 
     for (TaskEdges const* pEdges : data)
     {
-        for (auto const [task, target, trigger] : pEdges->m_targetDependEdges)
+        runTotal     += pEdges->m_runOn   .size();
+        syncTotal    += pEdges->m_syncWith.size();
+        triggerTotal += pEdges->m_triggers.size();
+
+        auto const count_stage = [&plCounts] (PipelineId const pipeline, StageId const stage)
         {
-            auto const dependOn     = lgrn::Span<DependOn>  (out.m_taskDependOn[TaskInt(task)]);
-            auto const dependents   = lgrn::Span<TaskId>    (out.m_targetDependents[TargetInt(target)]);
+            uint8_t &rStageCount = plCounts[pipeline].stages;
+            rStageCount = std::max(rStageCount, uint8_t(uint8_t(stage) + 1));
+        };
 
-            dependOn    [dependOn.size()    - taskCounts[task].m_dependingOn]       = {target, trigger};
-            dependents  [dependents.size()  - targetCounts[target].m_dependents]    = task;
-
-            --taskCounts[task]    .m_dependingOn;
-            --targetCounts[target].m_dependents;
+        for (auto const [task, pipeline, stage] : pEdges->m_runOn)
+        {
+            plCounts[pipeline]  .runTasks ++;
+            taskCounts[task]    .runOn ++;
+            count_stage(pipeline, stage);
         }
 
-        for (auto const [task, target, _] : pEdges->m_targetFulfillEdges)
+        for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
         {
-            auto const fulfills     = lgrn::Span<TargetId>  (out.m_taskFulfill[TaskInt(task)]);
-            auto const fulfilledBy  = lgrn::Span<TaskId>    (out.m_targetFulfilledBy[TargetInt(target)]);
+            plCounts[pipeline]  .syncedBy ++;
+            taskCounts[task]    .syncs ++;
+            count_stage(pipeline, stage);
+        }
 
-            fulfills    [fulfills.size()    - taskCounts[task].m_fulfills]          = target;
-            fulfilledBy [fulfilledBy.size() - targetCounts[target].m_fulfilledBy]   = task;
-
-            -- taskCounts[task]    .m_fulfills;
-            -- targetCounts[target].m_fulfilledBy;
+        for (auto const [task, pipeline, stage] : pEdges->m_triggers)
+        {
+            plCounts[pipeline]  .triggeredBy ++;
+            taskCounts[task]    .triggers ++;
+            count_stage(pipeline, stage);
         }
     }
 
+    // Allocate / reserve
+
+    out.m_taskRunOn     .ids_reserve(maxTasks);
+    out.m_taskSync      .ids_reserve(maxTasks);
+    out.m_taskTriggers  .ids_reserve(maxTasks);
+    out.m_taskRunOn     .data_reserve(runTotal);
+    out.m_taskSync      .data_reserve(syncTotal);
+    out.m_taskTriggers  .data_reserve(triggerTotal);
+
+    for (std::size_t const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    {
+        auto const pipeline = PipelineId(pipelineInt);
+        out.m_pipelines[pipeline].m_stages.resize(plCounts[pipeline].stages);
+    }
+
+    for (TaskInt const taskInt : tasks.m_taskIds.bitview().zeros())
+    {
+        TaskCounts &rCounts = taskCounts[TaskId(taskInt)];
+        if (rCounts.runOn != 0)    { out.m_taskRunOn   .emplace(taskInt, rCounts.runOn); }
+        if (rCounts.syncs != 0)    { out.m_taskSync    .emplace(taskInt, rCounts.syncs); }
+        if (rCounts.triggers != 0) { out.m_taskTriggers.emplace(taskInt, rCounts.triggers); }
+    }
+
+    // Push
+
+    for (TaskEdges const* pEdges : data)
+    {
+        // taskCounts repurposed as items remaining
+
+        for (auto const [task, pipeline, stage] : pEdges->m_runOn)
+        {
+            out.m_pipelines[pipeline].m_stages[stage].m_runTasks.push_back(task);
+
+            auto const span     = lgrn::Span<TplPipelineStage>(out.m_taskRunOn[TaskInt(task)]);
+            TaskCounts &rCounts = taskCounts[task];
+            span[span.size()-rCounts.runOn] = { pipeline, stage };
+            rCounts.runOn --;
+        }
+    }
+
+    for (TaskEdges const* pEdges : data)
+    {
+        for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
+        {
+            auto const span     = lgrn::Span<TplPipelineStage>(out.m_taskSync[TaskInt(task)]);
+            TaskCounts &rCounts = taskCounts[task];
+
+            span[span.size()-rCounts.syncs] = { pipeline, stage };
+            rCounts.syncs --;
+
+            for (auto const [runPipeline, runStage] : out.m_taskRunOn[TaskInt(task)])
+            {
+                out.m_pipelines[pipeline].m_stages[stage_next(stage, plCounts[pipeline].stages)].m_enterReq.push_back({task, runPipeline, runStage});
+            }
+        }
+
+        for (auto const [task, pipeline, stage] : pEdges->m_triggers)
+        {
+            auto const span     = lgrn::Span<TplPipelineStage>(out.m_taskTriggers[TaskInt(task)]);
+            TaskCounts &rCounts = taskCounts[task];
+
+            span[span.size()-rCounts.triggers] = { pipeline, stage };
+            rCounts.triggers --;
+
+            out.m_pipelines[pipeline].m_stages[stage].m_enterReq.push_back({task, pipeline, stage});
+
+            for (auto const [runPipeline, runStage] : out.m_taskRunOn[TaskInt(task)])
+            {
+                out.m_pipelines[pipeline].m_stages[stage].m_enterReq.push_back({task, runPipeline, runStage});
+            }
+        }
+    }
+
+    [[maybe_unused]] auto const all_counts_zero = [] (TaskCounts const counts)
+    {
+        return counts.syncs == 0 && counts.triggers == 0;
+    };
+
+    LGRN_ASSERTM(std::all_of(taskCounts.begin(), taskCounts.end(), all_counts_zero),
+                 "Counts repurposed as items remaining, and must all be zero by the end here");
 
     return out;
 }

@@ -37,61 +37,79 @@
 namespace osp
 {
 
-enum class TaskId       : uint32_t { };
-enum class TargetId     : uint32_t { };
-enum class SemaphoreId  : uint32_t { };
+constexpr std::size_t gc_maxStages = 16;
+
+using StageBits_t   = std::bitset<gc_maxStages>;
+
+using TaskInt       = uint32_t;
+using PipelineInt   = uint32_t;
+using StageInt      = uint8_t;
+using SemaphoreInt  = uint32_t;
+
+enum class TaskId       : TaskInt       { };
+enum class PipelineId   : PipelineInt   { };
+enum class StageId      : StageInt      { };
+enum class SemaphoreId  : SemaphoreInt  { };
 
 struct Tasks
 {
-    using TaskInt       = uint32_t;
-    using TargetInt     = uint32_t;
-    using SemaphoreInt  = uint32_t;
-
     lgrn::IdRegistryStl<TaskId>                     m_taskIds;
-    lgrn::IdRegistryStl<TargetId>                   m_targetIds;
+    lgrn::IdRegistryStl<PipelineId>                 m_pipelineIds;
     lgrn::IdRegistryStl<SemaphoreId>                m_semaIds;
 
     KeyedVec<SemaphoreId, unsigned int>             m_semaLimits;
 };
 
+struct TplTaskPipelineStage
+{
+    TaskId      task;
+    PipelineId  pipeline;
+    StageId     stage;
+};
+
+struct TplPipelineStage
+{
+    PipelineId  pipeline;
+    StageId     stage;
+};
+
+struct TplTaskSemaphore
+{
+    TaskId      task;
+    SemaphoreId semaphore;
+};
+
 struct TaskEdges
 {
-    struct TargetPair
-    {
-        TaskId      m_task;
-        TargetId    m_target;
-        bool        m_trigger; // unused for Fulfill edges
-    };
-
-    struct SemaphorePair
-    {
-        TaskId      m_task;
-        SemaphoreId m_sema;
-    };
-
-    std::vector<TargetPair>             m_targetDependEdges;
-    std::vector<TargetPair>             m_targetFulfillEdges;
-    std::vector<SemaphorePair>          m_semaphoreEdges;
+    std::vector<TplTaskPipelineStage>   m_runOn;
+    std::vector<TplTaskPipelineStage>   m_syncWith;
+    std::vector<TplTaskPipelineStage>   m_triggers;
+    std::vector<TplTaskSemaphore>       m_semaphoreEdges;
 };
 
-struct DependOn
+struct TaskGraphStage
 {
-    TargetId    m_target;
-    bool        m_trigger;
-
-    constexpr operator TargetId() const noexcept { return m_target; }
+    std::vector<TaskId>                 m_runTasks;
+    std::vector<TaskId>                 m_triggeredBy;
+    std::vector<TaskId>                 m_syncedBy;
+    std::vector<TplTaskPipelineStage>   m_enterReq;
 };
 
-struct ExecGraph
+struct TaskGraphPipeline
 {
-    lgrn::IntArrayMultiMap<Tasks::TaskInt, DependOn>        m_taskDependOn;         /// Tasks depend on (n) Targets
-    lgrn::IntArrayMultiMap<Tasks::TargetInt, TaskId>        m_targetDependents;     /// Targets have (n) Tasks that depend on it
+    KeyedVec<StageId, TaskGraphStage>   m_stages;
+};
 
-    lgrn::IntArrayMultiMap<Tasks::TaskInt, TargetId>        m_taskFulfill;          /// Tasks fulfill (n) Targets
-    lgrn::IntArrayMultiMap<Tasks::TargetInt, TaskId>        m_targetFulfilledBy;    /// Targets are fulfilled by (n) Tasks
+struct TaskGraph
+{
+    KeyedVec<PipelineId, TaskGraphPipeline>             m_pipelines;
 
-    lgrn::IntArrayMultiMap<Tasks::TaskInt, SemaphoreId>     m_taskAcquire;          /// Tasks acquire (n) Semaphores
-    lgrn::IntArrayMultiMap<Tasks::SemaphoreInt, TaskId>     m_semaAcquiredBy;       /// Semaphores are acquired by (n) Tasks
+    lgrn::IntArrayMultiMap<TaskInt, TplPipelineStage>   m_taskRunOn;
+    lgrn::IntArrayMultiMap<TaskInt, TplPipelineStage>   m_taskTriggers;
+    lgrn::IntArrayMultiMap<TaskInt, TplPipelineStage>   m_taskSync;
+
+    lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>        m_taskAcquire;      /// Tasks acquire (n) Semaphores
+    lgrn::IntArrayMultiMap<SemaphoreInt, TaskId>        m_semaAcquiredBy;   /// Semaphores are acquired by (n) Tasks
 };
 
 /**
@@ -100,11 +118,29 @@ struct ExecGraph
 using FulfillDirty_t = lgrn::BitView<std::array<uint64_t, 1>>;
 
 
-ExecGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> data);
+TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> data);
 
-inline ExecGraph make_exec_graph(Tasks const& tasks, std::initializer_list<TaskEdges const* const> data)
+inline TaskGraph make_exec_graph(Tasks const& tasks, std::initializer_list<TaskEdges const* const> data)
 {
     return make_exec_graph(tasks, arrayView(data));
 }
+
+template <typename ENUM_T>
+struct PipelineDef
+{
+    operator PipelineId() const noexcept { return m_value; }
+    operator std::size_t() const noexcept { return std::size_t(m_value); }
+
+    PipelineId& operator=(PipelineId const assign) { m_value = assign; return m_value; }
+
+    PipelineId m_value;
+};
+
+constexpr StageId stage_next(StageId const in, int stageCount) noexcept
+{
+    int const next = int(in) + 1;
+    return StageId( (next == stageCount) ? 0 : next );
+}
+
 
 } // namespace osp
