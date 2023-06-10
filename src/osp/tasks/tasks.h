@@ -51,6 +51,7 @@ enum class PipelineId   : PipelineInt   { };
 enum class StageId      : StageInt      { };
 enum class SemaphoreId  : SemaphoreInt  { };
 
+
 struct Tasks
 {
     lgrn::IdRegistryStl<TaskId>                     m_taskIds;
@@ -87,30 +88,86 @@ struct TaskEdges
     std::vector<TplTaskSemaphore>       m_semaphoreEdges;
 };
 
-struct TaskGraphStage
+//struct TaskGraphStage
+//{
+//    std::vector<TaskId>                 m_runTasks;
+//    std::vector<TaskId>                 m_triggeredBy;
+//    std::vector<TaskId>                 m_syncedBy;
+//    std::vector<TplTaskPipelineStage>   m_enterReq;
+//};
+
+//struct TaskGraphPipeline
+//{
+//    KeyedVec<StageId, TaskGraphStage>   m_stages;
+//};
+
+enum class AnyStageId               : uint32_t { };
+enum class RunTaskId                : uint32_t { };
+
+enum class StageReqTaskId           : uint32_t { };
+enum class ReverseStageReqTaskId    : uint32_t { };
+
+enum class TaskReqStageId           : uint32_t { };
+enum class ReverseTaskReqStageId    : uint32_t { };
+
+struct StageRequiresTask
 {
-    std::vector<TaskId>                 m_runTasks;
-    std::vector<TaskId>                 m_triggeredBy;
-    std::vector<TaskId>                 m_syncedBy;
-    std::vector<TplTaskPipelineStage>   m_enterReq;
+    AnyStageId  ownStage    { lgrn::id_null<AnyStageId>() };
+
+    // Task needs to be complete for requirement to be satisfied
+    // All requirements must be satisfied to proceed to the next stage
+    TaskId      reqTask     { lgrn::id_null<TaskId>() };
+    PipelineId  reqPipeline { lgrn::id_null<PipelineId>() };
+    StageId     reqStage    { lgrn::id_null<StageId>() };
 };
 
-struct TaskGraphPipeline
+struct TaskRequiresStage
 {
-    KeyedVec<StageId, TaskGraphStage>   m_stages;
+    TaskId      ownTask     { lgrn::id_null<TaskId>() };
+
+    // Pipeline must be on a certain stage for requirement to be satisfied.
+    // All requirements must be satisfied for the task to be unblocked
+    PipelineId  reqPipeline { lgrn::id_null<PipelineId>() };
+    StageId     reqStage    { lgrn::id_null<StageId>() };
 };
 
 struct TaskGraph
 {
-    KeyedVec<PipelineId, TaskGraphPipeline>             m_pipelines;
+    // Each pipeline has multiple stages.
+    // PipelineId <--> many AnyStageIds
+    KeyedVec<PipelineId, AnyStageId>                pipelineToFirstAnystg;
+    KeyedVec<AnyStageId, PipelineId>                anystgToPipeline;
 
-    lgrn::IntArrayMultiMap<TaskInt, TplPipelineStage>   m_taskRunOn;
-    lgrn::IntArrayMultiMap<TaskInt, TplPipelineStage>   m_taskTriggers;
-    lgrn::IntArrayMultiMap<TaskInt, TplPipelineStage>   m_taskSync;
+    // Each stage has multiple tasks to run
+    // AnyStageId --> TaskInStageId --> many TaskId
+    KeyedVec<AnyStageId, RunTaskId>                 anystgToFirstRuntask;
+    KeyedVec<RunTaskId, TaskId>                     runtaskToTask;
 
-    lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>        m_taskAcquire;      /// Tasks acquire (n) Semaphores
-    lgrn::IntArrayMultiMap<SemaphoreInt, TaskId>        m_semaAcquiredBy;   /// Semaphores are acquired by (n) Tasks
+    // Each stage has multiple entrance requirements.
+    // AnyStageId <--> many StageEnterReqId
+    KeyedVec<AnyStageId, StageReqTaskId>            anystgToFirstStgreqtask;
+    KeyedVec<StageReqTaskId, StageRequiresTask>     stgreqtaskData;
+    // Tasks need to know which stages refer to them
+    // TaskId --> ReverseStageReqId --> many AnyStageId
+    KeyedVec<TaskId, ReverseStageReqTaskId>         taskToFirstRevStgreqtask;
+    KeyedVec<ReverseStageReqTaskId, AnyStageId>     revStgreqtaskToStage;
+
+
+    // Task requires pipelines to be on certain stages.
+    // TaskId <--> TaskReqId
+    KeyedVec<TaskId, TaskReqStageId>                taskToFirstTaskreqstg;
+    KeyedVec<TaskReqStageId, TaskRequiresStage>     taskreqstgData;
+    // Stages need to know which tasks require them
+    // StageId --> ReverseTaskReqId --> many TaskId
+    KeyedVec<AnyStageId, ReverseTaskReqStageId>     stageToFirstRevTaskreqstg;
+    KeyedVec<ReverseTaskReqStageId, TaskId>         revTaskreqstgToTask;
+
+
+    // not yet used
+    lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>    taskAcquire;      /// Tasks acquire (n) Semaphores
+    lgrn::IntArrayMultiMap<SemaphoreInt, TaskId>    semaAcquiredBy;   /// Semaphores are acquired by (n) Tasks
 };
+
 
 /**
  * @brief Bitset returned by tasks to determine which fulfill targets should be marked dirty
@@ -136,11 +193,30 @@ struct PipelineDef
     PipelineId m_value;
 };
 
+inline AnyStageId anystg_from(TaskGraph const& graph, PipelineId const pl, StageId stg) noexcept
+{
+    return AnyStageId(uint32_t(graph.pipelineToFirstAnystg[pl]) + uint32_t(stg));
+}
+
+inline StageId stage_from(TaskGraph const& graph, PipelineId const pl, AnyStageId const stg) noexcept
+{
+    return StageId(uint32_t(stg) - uint32_t(graph.pipelineToFirstAnystg[pl]));
+}
+
+inline StageId stage_from(TaskGraph const& graph, AnyStageId const stg) noexcept
+{
+    return stage_from(graph, graph.anystgToPipeline[stg], stg);
+}
+
 constexpr StageId stage_next(StageId const in, int stageCount) noexcept
 {
     int const next = int(in) + 1;
     return StageId( (next == stageCount) ? 0 : next );
 }
 
+constexpr StageId stage_prev(StageId const in, int stageCount) noexcept
+{
+    return StageId( (int(in)==0) ? (stageCount-1) : (int(in)-1) );
+}
 
 } // namespace osp

@@ -83,7 +83,7 @@ struct Pipelines
 } // namespace test_a
 
 // Test pipeline consisting of parallel tasks
-TEST(Tasks, BasicParallelSingleThreaded)
+TEST(Tasks, BasicSingleThreadedParallelTasks)
 {
     using namespace test_a;
     using enum Stages;
@@ -93,7 +93,7 @@ TEST(Tasks, BasicParallelSingleThreaded)
     // well-suited for this problem, as these per-thread vectors can all be represented with the
     // same TargetId.
 
-    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(int const, std::vector<int>&)>;
+    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(int const, std::vector<int>&, int&)>;
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
@@ -116,7 +116,7 @@ TEST(Tasks, BasicParallelSingleThreaded)
         builder.task()
             .run_on  ({{pl.vec, Fill}})
             .triggers({{pl.vec, Clear}})
-            .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
+            .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> FulfillDirty_t
         {
             rOut.push_back(in);
             return {{0b01}};
@@ -126,20 +126,21 @@ TEST(Tasks, BasicParallelSingleThreaded)
     // Use vector
     builder.task()
         .run_on({{pl.vec, Use}})
-        .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
+        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> FulfillDirty_t
     {
         int const sum = std::accumulate(rOut.begin(), rOut.end(), 0);
         EXPECT_EQ(sum, in * sc_pusherTaskCount);
+        ++rChecksRun;
         return {{0b0}};
     });
 
     // Clear vector after use
     builder.task()
         .run_on({{pl.vec, Clear}})
-        .func( [] (int const in, std::vector<int>& rOut) -> FulfillDirty_t
+        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> FulfillDirty_t
     {
         rOut.clear();
-        return {{0b01}};
+        return {{0b0}};
     });
 
     // Step 2: Compile tasks into an execution graph
@@ -151,6 +152,7 @@ TEST(Tasks, BasicParallelSingleThreaded)
     ExecContext exec;
     exec.resize(tasks);
 
+    int                 checksRun = 0;
     int                 input = 0;
     std::vector<int>    output;
 
@@ -162,13 +164,132 @@ TEST(Tasks, BasicParallelSingleThreaded)
         set_dirty(exec, pl.vec, Fill);
         enqueue_dirty(tasks, graph, exec);
 
-        randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output] (TaskId const task) -> FulfillDirty_t
+        randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output, &checksRun] (TaskId const task) -> FulfillDirty_t
         {
-            return functions[task](input, output);
+            return functions[task](input, output, checksRun);
         });
     }
+
+    ASSERT_EQ(checksRun, sc_repetitions);
 }
 
+
+//-----------------------------------------------------------------------------
+
+namespace test_b
+{
+
+struct TestState
+{
+    int     checks              {0};
+    bool    normalFlag          {false};
+    bool    optionalFlagExpect  {false};
+    bool    optionalFlag        {false};
+};
+
+enum class Stages { Write, Read, Clear };
+
+struct Pipelines
+{
+    osp::PipelineDef<Stages> normal;
+    osp::PipelineDef<Stages> optional;
+};
+
+} // namespace test_gameworld
+
+
+//
+TEST(Tasks, BasicSingleThreadedTriggers)
+{
+    using namespace test_b;
+    using enum Stages;
+
+    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(TestState&, std::mt19937 &)>;
+    using Builder_t         = BasicTraits_t::Builder;
+    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
+
+    constexpr int sc_repetitions = 128;
+    std::mt19937 randGen(69);
+
+    Tasks           tasks;
+    TaskEdges       edges;
+    TaskFuncVec_t   functions;
+    Builder_t       builder{tasks, edges, functions};
+
+    auto const pl = builder.create_pipelines<Pipelines>();
+
+
+    builder.task()
+        .run_on   ({{pl.normal, Write}})
+        .triggers ({{pl.normal, Read}, {pl.normal, Clear}, {pl.optional, Write}})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+    {
+        rState.normalFlag = true;
+
+        if (rRand() % 2 == 0)
+        {
+            return {{0b011}};
+        }
+        else
+        {
+            rState.optionalFlagExpect = true;
+            return {{0b111}};
+        }
+    });
+
+    builder.task()
+        .run_on   ({{pl.normal, Read}})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+    {
+        EXPECT_TRUE(rState.normalFlag);
+        EXPECT_EQ(rState.optionalFlagExpect, rState.optionalFlag);
+        return {{0}};
+    });
+
+    builder.task()
+        .run_on   ({{pl.normal, Clear}})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+    {
+        ++ rState.checks;
+        rState.normalFlag           = false;
+        rState.optionalFlagExpect   = false;
+        rState.optionalFlag         = false;
+        return {{0}};
+    });
+
+    // optional pipeline
+    builder.task()
+        .run_on   ({{pl.optional, Write}})
+        .triggers ({{pl.normal, Read}})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+    {
+        rState.optionalFlag = true;
+        return {{0b1}};
+    });
+
+
+    TaskGraph const graph = make_exec_graph(tasks, {&edges});
+
+    // Execute
+
+    ExecContext exec;
+    exec.resize(tasks);
+
+    TestState world;
+
+    set_dirty(exec, pl.normal, Write);
+    enqueue_dirty(tasks, graph, exec);
+
+    randomized_singlethreaded_execute(
+            tasks, graph, exec, randGen, 50,
+                [&functions, &world, &randGen] (TaskId const task) -> FulfillDirty_t
+    {
+        return functions[task](world, randGen);
+    });
+
+    ASSERT_GT(world.checks, 0);
+
+}
 
 //-----------------------------------------------------------------------------
 
@@ -196,8 +317,9 @@ struct Pipelines
 
 } // namespace test_gameworld
 
+
 // Single-threaded test against World with order-dependent tasks
-TEST(Tasks, BasicSingleThreaded)
+TEST(Tasks, BasicSingleThreadedGameWorld)
 {
     using namespace test_gameworld;
     using enum StgSimple;
@@ -302,8 +424,6 @@ TEST(Tasks, BasicSingleThreaded)
 
         ASSERT_TRUE(world.m_canvas.contains("Physics Cube"));
         ASSERT_TRUE(world.m_canvas.contains("Terrain"));
-
-        std::cout << "done!\n";
     }
 }
 

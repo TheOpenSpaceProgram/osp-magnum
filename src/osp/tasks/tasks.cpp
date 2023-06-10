@@ -24,28 +24,68 @@
  */
 #include "tasks.h"
 
+#include "Corrade/Containers/ArrayViewStl.h"
+
+#include <array>
+
 namespace osp
 {
 
 struct TaskCounts
 {
-    std::size_t runOn           {0};
-    std::size_t syncs           {0};
-    std::size_t triggers        {0};
+    uint8_t  runOn              {0};
+    uint16_t requiresStages     {0};
+    uint16_t requiredByStages   {0};
+
+};
+
+struct StageCounts
+{
+    uint16_t runTasks           {0};
+    uint16_t requiresTasks      {0};
+    uint16_t requiredByTasks    {0};
 };
 
 struct PipelineCounts
 {
-    std::size_t runTasks        {0};
-    std::size_t syncedBy        {0};
-    std::size_t triggeredBy     {0};
     uint8_t     stages          {0};
+    std::array<StageCounts, gc_maxStages> stageCounts;
 };
 
-struct TargetCounts
+
+
+template <typename KEY_T, typename VALUE_T, typename GETSIZE_T, typename CLAIM_T>
+static void fill_many(KeyedVec<KEY_T, VALUE_T>& rVec, GETSIZE_T&& get_size, CLAIM_T&& claim)
 {
+    using key_int_t     = lgrn::underlying_int_type_t<KEY_T>;
+    using value_int_t   = lgrn::underlying_int_type_t<VALUE_T>;
 
-};
+    value_int_t currentId = 0;
+    for (value_int_t i = 0; i < rVec.size(); ++i)
+    {
+        value_int_t const size = get_size(KEY_T(i));
+
+        rVec[KEY_T(i)] = VALUE_T(currentId);
+
+        if (size != 0)
+        {
+            value_int_t const nextId = currentId + size;
+
+            for (value_int_t j = currentId; j < nextId; ++j)
+            {
+                claim(KEY_T(i), VALUE_T(j));
+            }
+
+            currentId = nextId;
+        }
+    }
+}
+
+template <typename KEY_T, typename VALUE_T>
+static VALUE_T id_from_count(KeyedVec<KEY_T, VALUE_T> const& vec, KEY_T const key, lgrn::underlying_int_type_t<VALUE_T> const count)
+{
+    return VALUE_T( lgrn::underlying_int_type_t<VALUE_T>(vec[KEY_T(lgrn::underlying_int_type_t<KEY_T>(key) + 1)]) - count );
+}
 
 
 TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> const data)
@@ -55,133 +95,269 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     std::size_t const maxPipelines  = tasks.m_pipelineIds.capacity();
     std::size_t const maxTasks      = tasks.m_taskIds.capacity();
 
+    // counts
+
     KeyedVec<PipelineId, PipelineCounts>    plCounts;
     KeyedVec<TaskId, TaskCounts>            taskCounts;
+    out.pipelineToFirstAnystg .resize(maxPipelines);
+    plCounts        .resize(maxPipelines+1);
+    taskCounts      .resize(maxTasks+1);
 
-    out.m_pipelines .resize(maxPipelines);
-    plCounts        .resize(maxPipelines);
-    taskCounts      .resize(maxTasks);
+    std::size_t totalTasksReqStage = 0;
+    std::size_t totalStageReqTasks = 0;
+    std::size_t totalRunTasks      = 0;
+    std::size_t totalStages        = 0;
 
-    std::size_t runTotal     = 0;
-    std::size_t syncTotal    = 0;
-    std::size_t triggerTotal = 0;
+    // Count up which pipeline/stages each task runs on
 
-    // Count
+    auto const count_stage = [&plCounts] (PipelineId const pipeline, StageId const stage)
+    {
+        uint8_t &rStageCount = plCounts[pipeline].stages;
+        rStageCount = std::max(rStageCount, uint8_t(uint8_t(stage) + 1));
+    };
 
     for (TaskEdges const* pEdges : data)
     {
-        runTotal     += pEdges->m_runOn   .size();
-        syncTotal    += pEdges->m_syncWith.size();
-        triggerTotal += pEdges->m_triggers.size();
-
-        auto const count_stage = [&plCounts] (PipelineId const pipeline, StageId const stage)
-        {
-            uint8_t &rStageCount = plCounts[pipeline].stages;
-            rStageCount = std::max(rStageCount, uint8_t(uint8_t(stage) + 1));
-        };
+        totalRunTasks += pEdges->m_runOn.size();
 
         for (auto const [task, pipeline, stage] : pEdges->m_runOn)
         {
-            plCounts[pipeline]  .runTasks ++;
-            taskCounts[task]    .runOn ++;
+            plCounts[pipeline].stageCounts[std::size_t(stage)].runTasks ++;
+            taskCounts[task]    .runOn      ++;
             count_stage(pipeline, stage);
         }
 
         for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
         {
-            plCounts[pipeline]  .syncedBy ++;
-            taskCounts[task]    .syncs ++;
             count_stage(pipeline, stage);
         }
 
         for (auto const [task, pipeline, stage] : pEdges->m_triggers)
         {
-            plCounts[pipeline]  .triggeredBy ++;
-            taskCounts[task]    .triggers ++;
             count_stage(pipeline, stage);
         }
     }
 
-    // Allocate / reserve
+    // Count total stages
 
-    out.m_taskRunOn     .ids_reserve(maxTasks);
-    out.m_taskSync      .ids_reserve(maxTasks);
-    out.m_taskTriggers  .ids_reserve(maxTasks);
-    out.m_taskRunOn     .data_reserve(runTotal);
-    out.m_taskSync      .data_reserve(syncTotal);
-    out.m_taskTriggers  .data_reserve(triggerTotal);
-
-    for (std::size_t const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    for (PipelineCounts const& plCount : plCounts)
     {
-        auto const pipeline = PipelineId(pipelineInt);
-        out.m_pipelines[pipeline].m_stages.resize(plCounts[pipeline].stages);
+        totalStages += plCount.stages;
     }
 
-    for (TaskInt const taskInt : tasks.m_taskIds.bitview().zeros())
+    // Count TaskRequiresStages and StageRequiresTasks
+
+
+    auto const count_stagereqtask = [&plCounts, &taskCounts, &totalStageReqTasks]
+                                    (PipelineId const pl, StageId const stg, TaskId const task)
     {
-        TaskCounts &rCounts = taskCounts[TaskId(taskInt)];
-        if (rCounts.runOn != 0)    { out.m_taskRunOn   .emplace(taskInt, rCounts.runOn); }
-        if (rCounts.syncs != 0)    { out.m_taskSync    .emplace(taskInt, rCounts.syncs); }
-        if (rCounts.triggers != 0) { out.m_taskTriggers.emplace(taskInt, rCounts.triggers); }
+        StageCounts &rStageCounts = plCounts[pl].stageCounts[std::size_t(stg)];
+        TaskCounts  &rTaskCounts  = taskCounts[task];
+
+        rStageCounts.requiresTasks    ++;
+        rTaskCounts .requiredByStages ++;
+        totalStageReqTasks            ++;
+    };
+
+
+    auto const count_taskreqstage = [&plCounts, &taskCounts, &totalTasksReqStage]
+                                    (TaskId const task, PipelineId const pl, StageId const stg)
+    {
+        StageCounts &rStageCounts = plCounts[pl].stageCounts[std::size_t(stg)];
+        TaskCounts  &rTaskCounts  = taskCounts[task];
+
+        rTaskCounts .requiresStages  ++;
+        rStageCounts.requiredByTasks ++;
+        totalTasksReqStage           ++;
+    };
+
+    for (TaskEdges const* pEdges : data)
+    {
+        // Each sync-with adds...
+        // * TaskRequiresStage makes task require pipeline to be on stage
+        // * StageRequiresTask for stage to wait for task to complete
+        for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
+        {
+            count_stagereqtask(pipeline, stage, task);
+            count_taskreqstage(task, pipeline, stage);
+        }
+
+        // Each triggers adds...
+        // * StageRequiresTask on previous stage to wait for task to complete
+        for (auto const [task, pipeline, stage] : pEdges->m_triggers)
+        {
+            count_stagereqtask(pipeline, stage_prev(stage, plCounts[pipeline].stages), task);
+        }
     }
+
+    // Allocate
+
+    out.pipelineToFirstAnystg       .resize(maxPipelines+1,     lgrn::id_null<AnyStageId>());
+    out.anystgToPipeline            .resize(totalStages+1,      lgrn::id_null<PipelineId>());
+    out.anystgToFirstRuntask        .resize(totalStages+1,      lgrn::id_null<RunTaskId>());
+    out.runtaskToTask               .resize(totalRunTasks,      lgrn::id_null<TaskId>());
+    out.anystgToFirstStgreqtask     .resize(totalStages+1,      lgrn::id_null<StageReqTaskId>());
+    out.stgreqtaskData              .resize(totalStageReqTasks, {});
+    out.taskToFirstRevStgreqtask    .resize(maxTasks+1,         lgrn::id_null<ReverseStageReqTaskId>());
+    out.revStgreqtaskToStage        .resize(totalStageReqTasks, lgrn::id_null<AnyStageId>());
+    out.taskToFirstTaskreqstg       .resize(maxTasks+1,         lgrn::id_null<TaskReqStageId>());
+    out.taskreqstgData              .resize(totalTasksReqStage, {});
+    out.stageToFirstRevTaskreqstg   .resize(totalStages,        lgrn::id_null<ReverseTaskReqStageId>());
+    out.revTaskreqstgToTask         .resize(totalTasksReqStage, lgrn::id_null<TaskId>());
+
+    // Put spaces
+
+    fill_many(
+        out.pipelineToFirstAnystg,
+        [&plCounts] (PipelineId pl)                { return plCounts[pl].stages; },
+        [&out] (PipelineId pl, AnyStageId claimed) { out.anystgToPipeline[claimed] = pl; });
+
+    fill_many(
+        out.anystgToFirstRuntask,
+        [&plCounts, &out] (AnyStageId stg)
+        {
+            PipelineId const    pl          = out.anystgToPipeline[stg];
+            if (pl == lgrn::id_null<PipelineId>())
+            {
+                return uint16_t(0);
+            }
+            StageId const       stgLocal    = stage_from(out, pl, stg);
+            return plCounts[pl].stageCounts[std::size_t(stgLocal)].runTasks;
+        },
+        [] (AnyStageId, RunTaskId) { });
+
+    // for StageReqTaskId
+    fill_many(
+        out.anystgToFirstStgreqtask,
+        [&plCounts, &out] (AnyStageId stg)
+        {
+            PipelineId const    pl          = out.anystgToPipeline[stg];
+            if (pl == lgrn::id_null<PipelineId>())
+            {
+                return uint16_t(0);
+            }
+            StageId const       stgLocal    = stage_from(out, pl, stg);
+            return plCounts[pl].stageCounts[std::size_t(stgLocal)].requiresTasks;
+        },
+        [&out] (AnyStageId stg, StageReqTaskId claimed) { out.stgreqtaskData[claimed].ownStage = stg; });
+    fill_many(
+        out.taskToFirstRevStgreqtask,
+        [&taskCounts] (TaskId task)                         { return taskCounts[task].requiredByStages; },
+        [&out] (TaskId, ReverseStageReqTaskId) { });
+
+    // for TaskReqStage
+    fill_many(
+        out.taskToFirstTaskreqstg,
+        [&taskCounts] (TaskId task)                     { return taskCounts[task].requiresStages; },
+        [&out] (TaskId task, TaskReqStageId claimed)    { out.taskreqstgData[claimed].ownTask = task; });
+    fill_many(
+        out.stageToFirstRevTaskreqstg,
+        [&plCounts, &out] (AnyStageId stg)
+        {
+            PipelineId const    pl          = out.anystgToPipeline[stg];
+            StageId const       stgLocal    = stage_from(out, pl, stg);
+            return plCounts[pl].stageCounts[std::size_t(stgLocal)].requiredByTasks;
+        },
+        [&out] (AnyStageId, ReverseTaskReqStageId) { });
 
     // Push
 
+    auto add_stagereqtask = [&plCounts, &taskCounts, &totalStageReqTasks, &out]
+                            (PipelineId const pl, StageId const stg, TaskId const task)
+    {
+        AnyStageId const            anystg          = anystg_from(out, pl, stg);
+        StageCounts                 &rStageCounts   = plCounts[pl].stageCounts[std::size_t(stg)];
+        TaskCounts                  &rTaskCounts    = taskCounts[task];
+
+        StageReqTaskId const        stgReqTaskId    = id_from_count(out.anystgToFirstStgreqtask, anystg, rStageCounts.requiresTasks);
+        ReverseStageReqTaskId const revStgReqTaskId = id_from_count(out.taskToFirstRevStgreqtask, task, rTaskCounts.requiredByStages);
+
+        StageRequiresTask &rStgReqTask = out.stgreqtaskData[stgReqTaskId];
+        rStgReqTask.reqTask     = task;
+        rStgReqTask.reqPipeline = pl;
+        rStgReqTask.reqStage    = stg;
+        out.revStgreqtaskToStage[revStgReqTaskId] = anystg;
+
+        -- rStageCounts.requiresTasks;
+        -- rTaskCounts.requiredByStages;
+        -- totalStageReqTasks;
+    };
+
+    auto add_taskreqstage = [&plCounts, &taskCounts, &totalTasksReqStage, &out] (TaskId const task, PipelineId const pl, StageId const stg)
+    {
+        AnyStageId const            anystg          = anystg_from(out, pl, stg);
+        StageCounts                 &rStageCounts   = plCounts[pl].stageCounts[std::size_t(stg)];
+        TaskCounts                  &rTaskCounts    = taskCounts[task];
+
+        TaskReqStageId const        taskReqStgId    = id_from_count(out.taskToFirstTaskreqstg, task, rTaskCounts.requiresStages);
+        ReverseTaskReqStageId const revTaskReqStgId = id_from_count(out.stageToFirstRevTaskreqstg, anystg, rStageCounts.requiredByTasks);
+
+        TaskRequiresStage &rTaskReqStage = out.taskreqstgData[taskReqStgId];
+        rTaskReqStage.reqStage      = stg;
+        rTaskReqStage.reqPipeline   = pl;
+        out.revTaskreqstgToTask[revTaskReqStgId] = task;
+
+        -- rTaskCounts.requiresStages;
+        -- rStageCounts.requiredByTasks;
+        -- totalTasksReqStage;
+    };
+
     for (TaskEdges const* pEdges : data)
     {
-        // taskCounts repurposed as items remaining
-
         for (auto const [task, pipeline, stage] : pEdges->m_runOn)
         {
-            out.m_pipelines[pipeline].m_stages[stage].m_runTasks.push_back(task);
+            AnyStageId const anystg         = anystg_from(out, pipeline, stage);
+            StageCounts      &rStageCounts  = plCounts[pipeline].stageCounts[std::size_t(stage)];
+            TaskCounts       &rTaskCounts   = taskCounts[task];
 
-            auto const span     = lgrn::Span<TplPipelineStage>(out.m_taskRunOn[TaskInt(task)]);
-            TaskCounts &rCounts = taskCounts[task];
-            span[span.size()-rCounts.runOn] = { pipeline, stage };
-            rCounts.runOn --;
+            RunTaskId const runTask = id_from_count(out.anystgToFirstRuntask, anystg, rStageCounts.runTasks);
+            out.runtaskToTask[runTask] = task;
+
+            -- rStageCounts.runTasks;
+            -- rTaskCounts.runOn;
+            -- totalRunTasks;
         }
-    }
 
-    for (TaskEdges const* pEdges : data)
-    {
         for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
         {
-            auto const span     = lgrn::Span<TplPipelineStage>(out.m_taskSync[TaskInt(task)]);
-            TaskCounts &rCounts = taskCounts[task];
-
-            span[span.size()-rCounts.syncs] = { pipeline, stage };
-            rCounts.syncs --;
-
-            for (auto const [runPipeline, runStage] : out.m_taskRunOn[TaskInt(task)])
-            {
-                out.m_pipelines[pipeline].m_stages[stage_next(stage, plCounts[pipeline].stages)].m_enterReq.push_back({task, runPipeline, runStage});
-            }
+            add_stagereqtask(pipeline, stage, task);
+            add_taskreqstage(task, pipeline, stage);
         }
 
         for (auto const [task, pipeline, stage] : pEdges->m_triggers)
         {
-            auto const span     = lgrn::Span<TplPipelineStage>(out.m_taskTriggers[TaskInt(task)]);
-            TaskCounts &rCounts = taskCounts[task];
-
-            span[span.size()-rCounts.triggers] = { pipeline, stage };
-            rCounts.triggers --;
-
-            out.m_pipelines[pipeline].m_stages[stage].m_enterReq.push_back({task, pipeline, stage});
-
-            for (auto const [runPipeline, runStage] : out.m_taskRunOn[TaskInt(task)])
-            {
-                out.m_pipelines[pipeline].m_stages[stage].m_enterReq.push_back({task, runPipeline, runStage});
-            }
+            add_stagereqtask(pipeline, stage_prev(stage, plCounts[pipeline].stages), task);
         }
     }
 
-    [[maybe_unused]] auto const all_counts_zero = [] (TaskCounts const counts)
+    [[maybe_unused]] auto const all_counts_zero = [&plCounts, &taskCounts] ()
     {
-        return counts.syncs == 0 && counts.triggers == 0;
+        for (PipelineCounts const& plCount : plCounts)
+        {
+            for (StageCounts const& stgCount : plCount.stageCounts)
+            {
+                if (   stgCount.requiredByTasks != 0
+                    || stgCount.requiresTasks   != 0
+                    || stgCount.runTasks        != 0)
+                {
+                    return false;
+                }
+            }
+        }
+        for (TaskCounts const& taskCount : taskCounts)
+        {
+            if (   taskCount.requiredByStages != 0
+                || taskCount.requiredByStages != 0
+                || taskCount.runOn            != 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
     };
 
-    LGRN_ASSERTM(std::all_of(taskCounts.begin(), taskCounts.end(), all_counts_zero),
-                 "Counts repurposed as items remaining, and must all be zero by the end here");
+    LGRN_ASSERTM(all_counts_zero(), "Counts repurposed as items remaining, and must all be zero by the end here");
 
     return out;
 }
