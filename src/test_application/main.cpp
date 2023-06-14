@@ -64,6 +64,14 @@
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#if __has_include("git.h")
+#include "git.h"
+#define GIT_HASH git_Describe()
+#define GIT_BRANCH git_Branch()
+#else
+#define GIT_HASH "00000"
+#define GIT_BRANCH "n/a"
+#endif
 
 using namespace testapp;
 
@@ -491,10 +499,11 @@ void debug_print_help()
         longestName = std::max(name.size(), longestName);
     }
 
-    std::cout
-        << "OSP-Magnum Temporary Debug CLI\n"
-        << "Open a scenario:\n";
+    std::cout << "OSP-Magnum Temporary Debug CLI\n";
 
+    std::cout << "Version: " << GIT_HASH << " (" << GIT_BRANCH << ")\n\n";
+
+    std::cout << "Open a scenario:\n";
     for (auto const& [name, rTestScn] : scenarios())
     {
         std::string spaces(longestName - name.length(), ' ');

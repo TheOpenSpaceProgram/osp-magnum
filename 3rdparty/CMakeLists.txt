@@ -197,6 +197,7 @@ ADD_SUBDIRECTORY(toml11 EXCLUDE_FROM_ALL)
 ADD_SUBDIRECTORY(spdlog EXCLUDE_FROM_ALL)
 ADD_SUBDIRECTORY(longeronpp EXCLUDE_FROM_ALL)
 
+ADD_SUBDIRECTORY(cmake-git-version-tracking EXCLUDE_FROM_ALL)
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 SET(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 ADD_SUBDIRECTORY(googletest EXCLUDE_FROM_ALL)
