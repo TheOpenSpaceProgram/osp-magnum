@@ -31,7 +31,7 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 #include <Corrade/Containers/StridedArrayView.h>
 
-#include <entt/entity/sparse_set.hpp>
+#include <entt/entity/storage.hpp>
 
 #include <cassert>
 #include <vector>
@@ -39,27 +39,22 @@
 namespace osp
 {
 
-struct StageCounts
-{
-    uint16_t        m_waitingTasks  {0};
-};
-
 struct ExecPipeline
 {
-    StageBits_t     m_triggered         {0};
-    int             m_tasksQueuedRun    {0};
-    int             m_tasksQueuedBlocked{0};
-    StageId         m_currentStage      {0};
-    uint32_t        m_waitingTasksTotal {0};
+    StageBits_t     triggered           {0};
+    StageId         currentStage        {0};
 
-    std::array<StageCounts, gc_maxStages> m_stageCounts;
+    int             tasksQueuedRun      {0};
+    int             tasksQueuedBlocked  {0};
+
+    int             stageReqTaskCount   {0};
+    int             taskReqStageCount   {0};
 };
 
-struct TaskWaiting
+struct BlockedTask
 {
-    TaskId          m_recipient;
-    PipelineId      m_waitFor;
-    StageId         m_waitForStage;
+    int             remainingTaskReqStg;
+    PipelineId      pipeline;
 };
 
 /**
@@ -71,33 +66,20 @@ struct TaskWaiting
  */
 struct ExecContext
 {
-    void resize(Tasks const& tasks)
-    {
-        std::size_t const maxTasks      = tasks.m_taskIds.capacity();
-        std::size_t const maxPipeline   = tasks.m_pipelineIds.capacity();
+    KeyedVec<PipelineId, ExecPipeline>  plData;
+    BitVector_t                         plDirty;
+    BitVector_t                         plDirtyNext;
 
-        m_tasksQueuedRun    .reserve(maxTasks);
-        m_tasksQueuedBlocked.reserve(maxTasks);
-        bitvector_resize(m_tasksTryRun, maxTasks);
+    entt::basic_sparse_set<TaskId>      tasksQueuedRun;
+    entt::basic_storage<BlockedTask, TaskId> tasksQueuedBlocked;
+    BitVector_t                         tasksTryRun;
 
-        m_plData.resize(maxPipeline);
-        bitvector_resize(m_plDirty,     maxPipeline);
-
-        m_plNextStage.resize(maxPipeline);
-        bitvector_resize(m_plRequired,  maxPipeline);
-    }
-
-    KeyedVec<PipelineId, ExecPipeline>  m_plData;
-    BitVector_t                         m_plDirty;
-
-    entt::basic_sparse_set<TaskId>      m_tasksQueuedRun;
-    entt::basic_sparse_set<TaskId>      m_tasksQueuedBlocked;
-    BitVector_t                         m_tasksTryRun;
+    KeyedVec<AnyStageId, int>           anystgReqByTaskCount;
 
     // used for updating
 
-    BitVector_t                         m_plRequired;
-    KeyedVec<PipelineId, StageId>       m_plNextStage;
+
+    KeyedVec<PipelineId, StageId>       plNextStage;
 
     // TODO: Consider multithreading. something something work stealing...
     //  * Allow multiple threads to search for and execute tasks. Atomic access
@@ -110,6 +92,8 @@ struct ExecContext
 
 }; // struct ExecContext
 
+void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
+
 //inline bool compare_syncs(SyncWaiting const& lhs, SyncWaiting const& rhs)
 //{
 //    return (lhs.m_recipient < rhs.m_recipient)
@@ -119,8 +103,8 @@ struct ExecContext
 template<typename STAGE_ENUM_T>
 inline void set_dirty(ExecContext &rExec, PipelineDef<STAGE_ENUM_T> const pipeline, STAGE_ENUM_T const stage)
 {
-    rExec.m_plData[pipeline].m_triggered |= 1 << int(stage);
-    rExec.m_plDirty.set(std::size_t(pipeline));
+    rExec.plData[pipeline].triggered |= 1 << int(stage);
+    rExec.plDirty.set(std::size_t(pipeline));
 }
 
 void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;

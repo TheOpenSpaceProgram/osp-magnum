@@ -53,17 +53,21 @@ void randomized_singlethreaded_execute(Tasks const& tasks, TaskGraph const& grap
 {
     for (int i = 0; i < maxRuns; ++i)
     {
-        std::size_t const tasksLeft = rExec.m_tasksQueuedRun.size();
+        auto const runTasksLeft     = rExec.tasksQueuedRun.size();
+        auto const blockedTasksLeft = rExec.tasksQueuedBlocked.size();
 
-        if (tasksLeft == 0)
+        if (runTasksLeft+blockedTasksLeft == 0)
         {
             break;
         }
 
-        TaskId const randomTask = rExec.m_tasksQueuedRun.at(rRand() % tasksLeft);
+        if (runTasksLeft != 0)
+        {
+            TaskId const            randomTask  = rExec.tasksQueuedRun.at(rRand() % runTasksLeft);
+            FulfillDirty_t const    status      = runTask(randomTask);
+            mark_completed_task(tasks, graph, rExec, randomTask, status);
+        }
 
-        FulfillDirty_t const status = runTask(randomTask);
-        mark_completed_task(tasks, graph, rExec, randomTask, status);
         enqueue_dirty(tasks, graph, rExec);
     }
 }
@@ -87,6 +91,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
 {
     using namespace test_a;
     using enum Stages;
+
     // NOTE
     // If this was multithreaded, then multiple threads writing to a single container is a bad
     // idea. The proper way to do this is to make a vector per-thread. Targets are still
@@ -99,7 +104,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
 
     constexpr int sc_repetitions = 32;
     constexpr int sc_pusherTaskCount = 24;
-    constexpr int sc_totalTaskCount = sc_pusherTaskCount + 1;
+    constexpr int sc_totalTaskCount = sc_pusherTaskCount + 2;
     std::mt19937 randGen(69);
 
     // Step 1: Create tasks
@@ -115,11 +120,11 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     {
         builder.task()
             .run_on  ({{pl.vec, Fill}})
-            .triggers({{pl.vec, Clear}})
+            .triggers({{pl.vec, Use}, {pl.vec, Clear}})
             .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> FulfillDirty_t
         {
             rOut.push_back(in);
-            return {{0b01}};
+            return {{0b11}};
         });
     }
 
@@ -150,7 +155,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     // Step 3: Run
 
     ExecContext exec;
-    exec.resize(tasks);
+    exec_resize(tasks, graph, exec);
 
     int                 checksRun = 0;
     int                 input = 0;
@@ -181,13 +186,13 @@ namespace test_b
 
 struct TestState
 {
-    int     checks              {0};
-    bool    normalFlag          {false};
-    bool    optionalFlagExpect  {false};
-    bool    optionalFlag        {false};
+    int     checks              { 0 };
+    bool    normalFlag          { false };
+    bool    optionalFlagExpect  { false };
+    bool    optionalFlag        { false };
 };
 
-enum class Stages { Write, Read, Clear };
+enum class Stages { Schedule, Write, Read, Clear };
 
 struct Pipelines
 {
@@ -198,7 +203,7 @@ struct Pipelines
 } // namespace test_gameworld
 
 
-//
+// Test that features a looping 'normal' pipeline and an 'optional' pipeline that has a 50% chance of running
 TEST(Tasks, BasicSingleThreadedTriggers)
 {
     using namespace test_b;
@@ -208,7 +213,7 @@ TEST(Tasks, BasicSingleThreadedTriggers)
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
-    constexpr int sc_repetitions = 128;
+    constexpr int sc_taskRuns = 128;
     std::mt19937 randGen(69);
 
     Tasks           tasks;
@@ -218,76 +223,87 @@ TEST(Tasks, BasicSingleThreadedTriggers)
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
+    // These tasks run in a loop, triggering each other in a loop
 
     builder.task()
-        .run_on   ({{pl.normal, Write}})
-        .triggers ({{pl.normal, Read}, {pl.normal, Clear}, {pl.optional, Write}})
+        .run_on   ({{pl.normal, Schedule}})
+        .triggers ({{pl.normal, Write}, {pl.optional, Write}})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
     {
-        rState.normalFlag = true;
-
         if (rRand() % 2 == 0)
         {
-            return {{0b011}};
+            return {{0b01}};
         }
         else
         {
             rState.optionalFlagExpect = true;
-            return {{0b111}};
+            return {{0b11}};
         }
     });
 
     builder.task()
+        .run_on   ({{pl.normal, Write}})
+        .triggers ({{pl.normal, Read}, {pl.normal, Clear}})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+    {
+        rState.normalFlag = true;
+        return {{0b11}};
+    });
+
+    builder.task()
+        .run_on   ({{pl.optional, Write}})
+        .triggers ({{pl.optional, Read}, {pl.optional, Clear}})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+    {
+        rState.optionalFlag = true;
+        return {{0b11}};
+    });
+
+
+    builder.task()
         .run_on   ({{pl.normal, Read}})
+        .sync_with({{pl.optional, Read}})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
     {
         EXPECT_TRUE(rState.normalFlag);
         EXPECT_EQ(rState.optionalFlagExpect, rState.optionalFlag);
-        return {{0}};
+        return {{0b1}};
     });
 
     builder.task()
         .run_on   ({{pl.normal, Clear}})
+        .triggers ({{pl.normal, Schedule}})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
     {
         ++ rState.checks;
         rState.normalFlag           = false;
         rState.optionalFlagExpect   = false;
         rState.optionalFlag         = false;
-        return {{0}};
-    });
-
-    // optional pipeline
-    builder.task()
-        .run_on   ({{pl.optional, Write}})
-        .triggers ({{pl.normal, Read}})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
-    {
-        rState.optionalFlag = true;
         return {{0b1}};
     });
-
 
     TaskGraph const graph = make_exec_graph(tasks, {&edges});
 
     // Execute
 
     ExecContext exec;
-    exec.resize(tasks);
+    exec_resize(tasks, graph, exec);
 
     TestState world;
 
-    set_dirty(exec, pl.normal, Write);
+    set_dirty(exec, pl.normal, Schedule);
     enqueue_dirty(tasks, graph, exec);
 
     randomized_singlethreaded_execute(
-            tasks, graph, exec, randGen, 50,
+            tasks, graph, exec, randGen, sc_taskRuns,
                 [&functions, &world, &randGen] (TaskId const task) -> FulfillDirty_t
     {
         return functions[task](world, randGen);
     });
 
-    ASSERT_GT(world.checks, 0);
+    // Assure that the tasks above actually ran, and didn't just skip everything
+    // Max of 5 tasks run each loop
+    ASSERT_GT(world.checks, sc_taskRuns / 5);
 
 }
 
@@ -398,7 +414,7 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     // Execute
 
     ExecContext exec;
-    exec.resize(tasks);
+    exec_resize(tasks, graph, exec);
 
     World world;
 

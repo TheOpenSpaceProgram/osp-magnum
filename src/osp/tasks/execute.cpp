@@ -28,253 +28,284 @@
 namespace osp
 {
 
-static bool eval_stage_enter_req(ExecContext &rExec, std::vector<TplTaskPipelineStage> const& reqirements)
+void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut)
 {
-    bool out = true;
+    std::size_t const maxTasks      = tasks.m_taskIds.capacity();
+    std::size_t const maxPipeline   = tasks.m_pipelineIds.capacity();
 
-    for (auto const [reqTask, reqPipeline, reqStage] : reqirements)
+    rOut.tasksQueuedRun    .reserve(maxTasks);
+    rOut.tasksQueuedBlocked.reserve(maxTasks);
+    bitvector_resize(rOut.tasksTryRun, maxTasks);
+
+    rOut.plData.resize(maxPipeline);
+    bitvector_resize(rOut.plDirty,     maxPipeline);
+
+    rOut.plNextStage.resize(maxPipeline);
+    bitvector_resize(rOut.plDirtyNext,  maxPipeline);
+
+    rOut.anystgReqByTaskCount.resize(graph.anystgToPipeline.size(), 0);
+}
+
+static StageId pipeline_next_stage(TaskGraph const& graph, ExecContext const &exec, ExecPipeline const &execPl, PipelineId const pipeline) noexcept
+{
+    StageId out = execPl.currentStage;
+
+    if (    execPl.tasksQueuedBlocked  != 0
+         || execPl.tasksQueuedRun      != 0
+         || execPl.stageReqTaskCount   != 0)
     {
-        ExecPipeline &rReqExecPl    = rExec.m_plData[reqPipeline];
-        bool const pipelineDirty    = rExec.m_plDirty.test(std::size_t(reqPipeline));
-        bool const stageMatches     = rReqExecPl.m_currentStage == reqStage;
-        bool const taskRunning      = rExec.m_tasksQueuedRun    .contains(reqTask);
-        bool const taskBlocked      = rExec.m_tasksQueuedBlocked.contains(reqTask);
-        bool const allTasksDone     =    (rReqExecPl.m_tasksQueuedRun     == 0)
-                                      && (rReqExecPl.m_tasksQueuedBlocked == 0);
+        return out; // Can't advance. This stage still has (or requires other) tasks to complete
+    }
 
-        // All required Pipelines must be on the correct stage to allow incrementing stage
-        out &= stageMatches;
+    int const stageCount = fanout_size(graph.pipelineToFirstAnystg, pipeline);
 
-        // All required Tasks must not be in-progress (completed) to allow incrementing stage
-        out &= ! (taskRunning || taskBlocked);
-
-        if (taskBlocked)
+    while(true)
+    {
+        if (exec.anystgReqByTaskCount[anystg_from(graph, pipeline, out)])
         {
-            rExec.m_tasksTryRun.set(std::size_t(reqTask));
+            return out; // Can't advance, there are queued tasks that require this stage
         }
 
-        if ( ( ! stageMatches ) && ( ! pipelineDirty ) && allTasksDone )
+        out = stage_next(out, stageCount);
+
+        if (execPl.triggered.test(std::size_t(out)))
         {
-            // Pipeline is not running tasks and not on the right stage. We need it to advance even
-            // though it has no tasks to run. For this, mark it as 'required' to be set dirty later
-            rExec.m_plRequired.set(std::size_t(reqPipeline));
+            return out; // Stop on this stage to run tasks
+        }
+
+        // No triggered and no waiting tasks means infinite loop. Stage should still move by 1 though.
+        if (   ( ! execPl.triggered.any() )
+            && ( execPl.stageReqTaskCount == 0 )
+            && ( execPl.taskReqStageCount == 0 ) )
+        {
+            return out;
+        }
+    }
+}
+
+static void apply_pipeline_stage(TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
+{
+    ExecPipeline  &rPlExec = rExec.plData[pipeline];
+    StageId       &rStage  = rPlExec.currentStage;
+    StageId const oldStage = rStage;
+    StageId const newStage = rExec.plNextStage[pipeline];
+
+    if (oldStage == newStage)
+    {
+        return; // no change
+    }
+
+    rStage = newStage;
+
+    LGRN_ASSERTV(rPlExec.stageReqTaskCount == 0, rPlExec.stageReqTaskCount);
+
+    // Evaluate Stage-requires-Tasks
+    // * Calculate stageReqTaskCount as the number of required task that are currently queued
+    AnyStageId const    anystg              = anystg_from(graph, pipeline, newStage);
+    int                 stageReqTaskCount   = 0;
+
+    for (StageRequiresTask const& stgreqtask : fanout_view(graph.anystgToFirstStgreqtask, graph.stgreqtaskData, anystg))
+    {
+        if    (rExec.tasksQueuedBlocked.contains(stgreqtask.reqTask)
+            || rExec.tasksQueuedRun    .contains(stgreqtask.reqTask))
+        {
+            ++ stageReqTaskCount;
         }
     }
 
-    return out;
+    rPlExec.stageReqTaskCount = stageReqTaskCount;
+
+    // Evaluate Task-requires-Stages
+    // * Increment counts for queued tasks that depend on this stage. This unblocks tasks
+
+    for (TaskId const& task : fanout_view(graph.anystgToFirstRevTaskreqstg, graph.revTaskreqstgToTask, anystg))
+    {
+        if (rExec.tasksQueuedBlocked.contains(task))
+        {
+            BlockedTask &rBlocked = rExec.tasksQueuedBlocked.get(task);
+            -- rBlocked.remainingTaskReqStg;
+            if (rBlocked.remainingTaskReqStg == 0)
+            {
+                ExecPipeline &rTaskPlExec = rExec.plData[rBlocked.pipeline];
+                -- rTaskPlExec.tasksQueuedBlocked;
+                ++ rTaskPlExec.tasksQueuedRun;
+                rExec.tasksQueuedRun.emplace(task);
+                rExec.tasksQueuedBlocked.erase(task);
+            }
+        }
+    }
 }
 
-//static void advance_pipeline(ExecContext &rExec, TaskGraphPipeline const &graphPl, ExecPipeline &rExecPl, PipelineId const pipeline, StageId& rNextStage)
-//{
-//    auto const stageCount = int(graphPl.m_stages.size());
-
-//    rNextStage = rExecPl.m_currentStage;
-
-//    while(true)
-//    {
-//        auto const nextStageInt  = int(rNextStage);
-
-//        bool const triggered        = rExecPl.m_triggered .test(nextStageInt);
-//        bool const waited           = rExecPl.m_stageCounts[nextStageInt].m_waitingTasks != 0;
-
-//        StageId const nextNextStage = stage_next(rNextStage, stageCount);
-//        bool const canIncrement     = eval_stage_enter_req(rExec, graphPl.m_stages[nextNextStage].m_enterReq);
-
-//        if ( ( ! canIncrement ) || triggered || waited )
-//        {
-//            return;
-//        }
-
-//        rNextStage = nextNextStage;
-
-//        // No triggered and no waiting tasks means infinite loop. Stage should still move by 1 though.
-//        if (   ( ! rExecPl.m_triggered.any() )
-//            && ( rExecPl.m_waitingTasksTotal == 0 ) )
-//        {
-//            return;
-//        }
-//    }
-//}
-
-static void update_pipeline(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
+static void run_pipeline_tasks(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
 {
-//    ExecPipeline        &rPlExec    = rExec.m_plData[pipeline];
-//    StageId const       stage       = rExec.m_plNextStage[pipeline];
-//    StageBits_t const   stageBit    = 1 << int(stage);
+    ExecPipeline        &rPlExec    = rExec.plData[pipeline];
+    StageId const       stage       = rExec.plNextStage[pipeline];
+    StageBits_t const   stageBit    = 1 << int(stage);
 
-//    rPlExec.m_currentStage = stage;
+    LGRN_ASSERT(rPlExec.tasksQueuedBlocked == 0);
+    LGRN_ASSERT(rPlExec.tasksQueuedRun == 0);
 
-//    if ( (rPlExec.m_triggered & stageBit) == 0 )
-//    {
-//        return; // Not triggered
-//    }
+    if ( (rPlExec.triggered & stageBit) == 0 )
+    {
+        return; // Not triggered
+    }
 
-//    rPlExec.m_triggered ^= stageBit;
+    rPlExec.triggered &= ~stageBit;
 
-//    // Enqueue all tasks
+    // Enqueue all tasks
 
-//    auto const& runTasks = graph.m_pipelines[pipeline].m_stages[stage].m_runTasks;
+    AnyStageId const    anystg      = anystg_from(graph, pipeline, stage);
 
-//    for (TaskId task : runTasks)
-//    {
-//        bool blocked = false;
-//        for (auto const [waitPipeline, waitStage] : graph.m_taskSync[TaskInt(task)])
-//        {
-//            ExecPipeline &rWaitPlExec = rExec.m_plData[waitPipeline];
-//            ++ rWaitPlExec.m_stageCounts[std::size_t(waitStage)].m_waitingTasks;
-//            ++ rWaitPlExec.m_waitingTasksTotal;
+    for (TaskId task : fanout_view(graph.anystgToFirstRuntask, graph.runtaskToTask, anystg))
+    {
+        // Evaluate Stage-requires-Tasks
+        // * Increment counts for currently running stages that require this task
+        for (AnyStageId const& reqTaskAnystg : fanout_view(graph.taskToFirstRevStgreqtask, graph.revStgreqtaskToStage, task))
+        {
+            PipelineId const    reqTaskPl       = graph.anystgToPipeline[reqTaskAnystg];
+            StageId const       reqTaskStg      = stage_from(graph, reqTaskPl, reqTaskAnystg);
+            ExecPipeline        &rReqTaskPlData = rExec.plData[reqTaskPl];
 
-//            if (rWaitPlExec.m_currentStage != waitStage)
-//            {
-//                blocked = true;
-//            }
-//        }
+            if (rReqTaskPlData.currentStage == reqTaskStg)
+            {
+                ++ rReqTaskPlData.stageReqTaskCount;
+            }
+        }
 
-//        if (blocked)
-//        {
-//            ++rPlExec.m_tasksQueuedBlocked;
-//            rExec.m_tasksQueuedBlocked.emplace(task);
-//        }
-//        else
-//        {
-//            ++rPlExec.m_tasksQueuedRun;
-//            rExec.m_tasksQueuedRun.emplace(task);
-//        }
-//    }
+        // Evaluate Task-requires-Stages
+        // * Increment counts for each required stage
+        // * Determine which requirements are already satisfied
+        auto const  taskreqstageView    = ArrayView<const TaskRequiresStage>(fanout_view(graph.taskToFirstTaskreqstg, graph.taskreqstgData, task));
+        int         reqsRemaining       = taskreqstageView.size();
+        for (TaskRequiresStage const& req : taskreqstageView)
+        {
+            AnyStageId const    reqAnystg   = anystg_from(graph, req.reqPipeline, req.reqStage);
+            ExecPipeline        &rReqPlData = rExec.plData[req.reqPipeline];
+
+            ++ rExec.anystgReqByTaskCount[reqAnystg];
+            ++ rReqPlData.taskReqStageCount;
+
+            if (rReqPlData.currentStage == req.reqStage)
+            {
+                reqsRemaining --;
+            }
+            else if (   rReqPlData.tasksQueuedRun     == 0
+                     && rReqPlData.tasksQueuedBlocked == 0 )
+            {
+                rExec.plDirtyNext.set(std::size_t(req.reqPipeline));
+            }
+        }
+
+        if (reqsRemaining != 0)
+        {
+            rExec.tasksQueuedBlocked.emplace(task, BlockedTask{reqsRemaining, pipeline});
+            ++ rPlExec.tasksQueuedBlocked;
+        }
+        else
+        {
+            // Task can run right away
+            rExec.tasksQueuedRun.emplace(task);
+            ++ rPlExec.tasksQueuedRun;
+        }
+    }
 }
 
 
 void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept
 {
-//    auto const task_can_run = [&graph, &rExec] (TaskId const task)
-//    {
-//        for (auto const [waitPipeline, waitStage] : graph.m_taskSync[TaskInt(task)])
-//        {
-//            if (rExec.m_plData[waitPipeline].m_currentStage != waitStage)
-//            {
-//                return false;
-//            }
-//        }
+    auto const plDirtyOnes = rExec.plDirty.ones();
 
-//        return true;
-//    };
+    while (plDirtyOnes.begin() != plDirtyOnes.end())
+    {
+        // Calculate next stages
+        for (std::size_t const pipelineInt : plDirtyOnes)
+        {
+            auto const   pipeline       = PipelineId(pipelineInt);
+            ExecPipeline &rPlExec       = rExec.plData[pipeline];
+            rExec.plNextStage[pipeline] = pipeline_next_stage(graph, rExec, rPlExec, pipeline);
+        }
 
-//    auto const plDirtyOnes = rExec.m_plDirty.ones();
+        // Apply next stages
+        for (std::size_t const pipelineInt : plDirtyOnes)
+        {
+            apply_pipeline_stage(graph, rExec, PipelineId(pipelineInt));
+        }
 
-//    while (plDirtyOnes.begin() != plDirtyOnes.end())
-//    {
-//        // 1. Advance pipelines and determine next stages. Writes to...
-//        //   * rExec.m_plNextStage  - Next stages for each dirty pipeline
-//        //   * rExec.m_plRequired   - Pipelines that need to be dirty next
-//        //   * rExec.m_tasksTryRun  - Blocked tasks that might be able to start
-//        for (std::size_t const pipelineInt : plDirtyOnes)
-//        {
-//            auto const pipeline = PipelineId(pipelineInt);
-//            ExecPipeline &rPlExec = rExec.m_plData[pipeline];
+        // Run tasks. writes to plDirtyNext
+        for (std::size_t const pipelineInt : plDirtyOnes)
+        {
+            run_pipeline_tasks(tasks, graph, rExec, PipelineId(pipelineInt));
+        }
 
-//            if ( rPlExec.m_tasksQueuedBlocked == 0 && rPlExec.m_tasksQueuedRun == 0 )
-//            {
-//                advance_pipeline(rExec,
-//                                 graph.m_pipelines[pipeline],
-//                                 rPlExec,
-//                                 pipeline,
-//                                 rExec.m_plNextStage[pipeline]);
-//            }
-//        }
-
-//        // 2. Apply new stages and enqueue tasks. Writes to...
-//        //   * rExec.m_plData[n]            - Pipeline trigger flags and counts for queued tasks
-//        //   * rExec.m_tasksQueuedBlocked   - Queued task that are blocked
-//        //   * rExec.m_tasksQueuedRun       - Queued task that can run right away
-//        for (std::size_t const pipelineInt : plDirtyOnes)
-//        {
-//            update_pipeline(tasks, graph, rExec, PipelineId(pipelineInt));
-//        }
-
-//        // 3. Try running some blocked tasks that might be able to run after pipelines advanced
-//        for (std::size_t const taskInt : rExec.m_tasksTryRun.ones())
-//        {
-//            auto const task = TaskId(taskInt);
-//            LGRN_ASSERT(rExec.m_tasksQueuedBlocked.contains(task));
-
-//            if (task_can_run(task))
-//            {
-//                rExec.m_tasksQueuedBlocked.remove(task);
-//                rExec.m_tasksQueuedRun.emplace(task);
-
-//                for (auto const [pipeline, stage] : graph.m_taskRunOn[TaskInt(task)])
-//                {
-//                    ExecPipeline &plExec = rExec.m_plData[pipeline];
-
-//                    --plExec.m_tasksQueuedBlocked;
-//                    ++plExec.m_tasksQueuedRun;
-//                }
-//            }
-//        }
-//        rExec.m_tasksTryRun.reset();
-
-//        // 3. 'Required' pipeline is set as dirty for next iteration.
-//        std::copy(rExec.m_plRequired.ints().begin(),
-//                  rExec.m_plRequired.ints().end(),
-//                  rExec.m_plDirty   .ints().begin());
-//        rExec.m_plRequired.reset();
-//    }
-
-//    rExec.m_plDirty.reset();
+        // Select next dirty pipelines
+        std::copy(rExec.plDirtyNext.ints().begin(),
+                  rExec.plDirtyNext.ints().end(),
+                  rExec.plDirty    .ints().begin());
+        rExec.plDirtyNext.reset();
+    }
 }
 
 void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept
 {
-//    LGRN_ASSERT(rExec.m_tasksQueuedRun.contains(task));
-//    rExec.m_tasksQueuedRun.erase(task);
+    LGRN_ASSERT(rExec.tasksQueuedRun.contains(task));
+    rExec.tasksQueuedRun.erase(task);
 
-//    bool allPipelinesComplete = true;
+    auto const try_set_dirty = [&rExec] (ExecPipeline &plExec, PipelineId pipeline)
+    {
+        if (   plExec.tasksQueuedRun     == 0
+            && plExec.tasksQueuedBlocked == 0
+            && plExec.stageReqTaskCount  == 0)
+        {
+            rExec.plDirty.set(std::size_t(pipeline));
+        }
+    };
 
-//    for (auto const [pipeline, stage] : graph.m_taskRunOn[TaskInt(task)])
-//    {
-//        ExecPipeline &plExec = rExec.m_plData[pipeline];
+    // Handle task running on stage
+    for (AnyStageId const anystg : fanout_view(graph.taskToFirstRunstage, graph.runstageToAnystg, task))
+    {
+        PipelineId const pipeline = graph.anystgToPipeline[anystg];
+        ExecPipeline     &plExec  = rExec.plData[pipeline];
 
-//        plExec.m_tasksQueuedRun --;
-//        if (plExec.m_tasksQueuedRun == 0)
-//        {
-//            rExec.m_plDirty.set(std::size_t(pipeline));
-//        }
-//        else
-//        {
-//            allPipelinesComplete = false;
-//        }
-//    }
+        -- plExec.tasksQueuedRun;
+        try_set_dirty(plExec, pipeline);
+    }
 
-//    for (auto const [waitPipeline, waitStage] : graph.m_taskSync[TaskInt(task)])
-//    {
-//        ExecPipeline &rWaitPlExec = rExec.m_plData[waitPipeline];
-//        auto &rStgWaitingTasks = rWaitPlExec.m_stageCounts[std::size_t(waitStage)].m_waitingTasks;
-//        -- rStgWaitingTasks;
-//        -- rWaitPlExec.m_waitingTasksTotal;
+    // Handle stages requiring this task
+    for (AnyStageId const& reqTaskAnystg : fanout_view(graph.taskToFirstRevStgreqtask, graph.revStgreqtaskToStage, task))
+    {
+        PipelineId const    reqTaskPl       = graph.anystgToPipeline[reqTaskAnystg];
+        StageId const       reqTaskStg      = stage_from(graph, reqTaskPl, reqTaskAnystg);
+        ExecPipeline        &rReqTaskPlData = rExec.plData[reqTaskPl];
 
-//        if (rStgWaitingTasks == 0 && rWaitPlExec.m_tasksQueuedRun == 0 && rWaitPlExec.m_tasksQueuedBlocked == 0)
-//        {
-//            rExec.m_plDirty.set(std::size_t(waitPipeline));
-//        }
-//    }
+        if (rReqTaskPlData.currentStage == reqTaskStg)
+        {
+            -- rReqTaskPlData.stageReqTaskCount;
 
-//    if ( ! allPipelinesComplete )
-//    {
-//        return;
-//    }
+            try_set_dirty(rReqTaskPlData, reqTaskPl);
+        }
+    }
 
-//    auto const triggers = lgrn::Span<TplPipelineStage const>(graph.m_taskTriggers[TaskInt(task)]);
+    // Handle this task requiring stages
+    for (TaskRequiresStage const& req : fanout_view(graph.taskToFirstTaskreqstg, graph.taskreqstgData, task))
+    {
+        AnyStageId const reqAnystg = anystg_from(graph, req.reqPipeline, req.reqStage);
+        -- rExec.anystgReqByTaskCount[reqAnystg];
+        -- rExec.plData[req.reqPipeline].taskReqStageCount;
+    }
 
-//    for (int i = 0; i < triggers.size(); ++i)
-//    {
-//        if (dirty.test(i))
-//        {
-//            auto const [pipeline, stage] = triggers[i];
+    // Trigger specified stages based on return value
+    auto const triggersView = ArrayView<const TplPipelineStage>(fanout_view(graph.taskToFirstTrigger, graph.triggerToPlStage, task));
+    for (int i = 0; i < triggersView.size(); ++i)
+    {
+        if (dirty.test(i))
+        {
+            auto const [pipeline, stage] = triggersView[i];
+            ExecPipeline &plExec  = rExec.plData[pipeline];
 
-//            rExec.m_plData[pipeline].m_triggered |= 1 << int(stage);
-//            rExec.m_plDirty.set(std::size_t(pipeline));
-//        }
-//    }
+            plExec.triggered |= 1 << int(stage);
+            try_set_dirty(plExec, pipeline);
+        }
+    }
 }
 
 } // namespace osp

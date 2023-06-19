@@ -88,21 +88,11 @@ struct TaskEdges
     std::vector<TplTaskSemaphore>       m_semaphoreEdges;
 };
 
-//struct TaskGraphStage
-//{
-//    std::vector<TaskId>                 m_runTasks;
-//    std::vector<TaskId>                 m_triggeredBy;
-//    std::vector<TaskId>                 m_syncedBy;
-//    std::vector<TplTaskPipelineStage>   m_enterReq;
-//};
-
-//struct TaskGraphPipeline
-//{
-//    KeyedVec<StageId, TaskGraphStage>   m_stages;
-//};
-
 enum class AnyStageId               : uint32_t { };
+
 enum class RunTaskId                : uint32_t { };
+enum class RunStageId               : uint32_t { };
+enum class TriggerId                : uint32_t { };
 
 enum class StageReqTaskId           : uint32_t { };
 enum class ReverseStageReqTaskId    : uint32_t { };
@@ -143,6 +133,16 @@ struct TaskGraph
     KeyedVec<AnyStageId, RunTaskId>                 anystgToFirstRuntask;
     KeyedVec<RunTaskId, TaskId>                     runtaskToTask;
 
+    // Each task runs on many stages
+    // TaskId --> TaskRunStageId --> many AnyStageId
+    KeyedVec<TaskId, RunStageId>                    taskToFirstRunstage;
+    KeyedVec<RunStageId, AnyStageId>                runstageToAnystg;
+
+    // Tasks trigger stages of pipelines
+    // TaskId --> TriggerId --> many TplPipelineStage
+    KeyedVec<TaskId, TriggerId>                     taskToFirstTrigger;
+    KeyedVec<TriggerId, TplPipelineStage>           triggerToPlStage;
+
     // Each stage has multiple entrance requirements.
     // AnyStageId <--> many StageEnterReqId
     KeyedVec<AnyStageId, StageReqTaskId>            anystgToFirstStgreqtask;
@@ -152,14 +152,13 @@ struct TaskGraph
     KeyedVec<TaskId, ReverseStageReqTaskId>         taskToFirstRevStgreqtask;
     KeyedVec<ReverseStageReqTaskId, AnyStageId>     revStgreqtaskToStage;
 
-
     // Task requires pipelines to be on certain stages.
     // TaskId <--> TaskReqId
     KeyedVec<TaskId, TaskReqStageId>                taskToFirstTaskreqstg;
     KeyedVec<TaskReqStageId, TaskRequiresStage>     taskreqstgData;
     // Stages need to know which tasks require them
     // StageId --> ReverseTaskReqId --> many TaskId
-    KeyedVec<AnyStageId, ReverseTaskReqStageId>     stageToFirstRevTaskreqstg;
+    KeyedVec<AnyStageId, ReverseTaskReqStageId>     anystgToFirstRevTaskreqstg;
     KeyedVec<ReverseTaskReqStageId, TaskId>         revTaskreqstgToTask;
 
 
@@ -182,16 +181,63 @@ inline TaskGraph make_exec_graph(Tasks const& tasks, std::initializer_list<TaskE
     return make_exec_graph(tasks, arrayView(data));
 }
 
-template <typename ENUM_T>
-struct PipelineDef
+template <typename KEY_T, typename VALUE_T, typename GETSIZE_T, typename CLAIM_T>
+inline void fanout_partition(KeyedVec<KEY_T, VALUE_T>& rVec, GETSIZE_T&& get_size, CLAIM_T&& claim) noexcept
 {
-    operator PipelineId() const noexcept { return m_value; }
-    operator std::size_t() const noexcept { return std::size_t(m_value); }
+    using key_int_t     = lgrn::underlying_int_type_t<KEY_T>;
+    using value_int_t   = lgrn::underlying_int_type_t<VALUE_T>;
 
-    PipelineId& operator=(PipelineId const assign) { m_value = assign; return m_value; }
+    value_int_t currentId = 0;
+    for (value_int_t i = 0; i < rVec.size(); ++i)
+    {
+        value_int_t const size = get_size(KEY_T(i));
 
-    PipelineId m_value;
-};
+        rVec[KEY_T(i)] = VALUE_T(currentId);
+
+        if (size != 0)
+        {
+            value_int_t const nextId = currentId + size;
+
+            for (value_int_t j = currentId; j < nextId; ++j)
+            {
+                claim(KEY_T(i), VALUE_T(j));
+            }
+
+            currentId = nextId;
+        }
+    }
+}
+
+template <typename KEY_T, typename VALUE_T>
+inline auto fanout_size(KeyedVec<KEY_T, VALUE_T> const& vec, KEY_T key) -> lgrn::underlying_int_type_t<VALUE_T>
+{
+    using key_int_t     = lgrn::underlying_int_type_t<KEY_T>;
+    using value_int_t   = lgrn::underlying_int_type_t<VALUE_T>;
+
+    value_int_t const firstIdx  = value_int_t(vec[key]);
+    value_int_t const lastIdx   = value_int_t(vec[KEY_T(key_int_t(key) + 1)]);
+
+    return lastIdx - firstIdx;
+}
+
+template <typename VIEWTYPE_T, typename KEY_T, typename VALUE_T>
+inline decltype(auto) fanout_view(KeyedVec<KEY_T, VALUE_T> const& vec, KeyedVec<VALUE_T, VIEWTYPE_T> const& access, KEY_T key)
+{
+    using key_int_t     = lgrn::underlying_int_type_t<KEY_T>;
+    using value_int_t   = lgrn::underlying_int_type_t<VALUE_T>;
+
+    value_int_t const firstIdx  = value_int_t(vec[key]);
+    value_int_t const lastIdx   = value_int_t(vec[KEY_T(key_int_t(key) + 1)]);
+
+    return arrayView(access.data(), access.size()).slice(firstIdx, lastIdx);
+}
+
+
+template <typename KEY_T, typename VALUE_T>
+inline VALUE_T id_from_count(KeyedVec<KEY_T, VALUE_T> const& vec, KEY_T const key, lgrn::underlying_int_type_t<VALUE_T> const count)
+{
+    return VALUE_T( lgrn::underlying_int_type_t<VALUE_T>(vec[KEY_T(lgrn::underlying_int_type_t<KEY_T>(key) + 1)]) - count );
+}
 
 inline AnyStageId anystg_from(TaskGraph const& graph, PipelineId const pl, StageId stg) noexcept
 {
@@ -218,5 +264,16 @@ constexpr StageId stage_prev(StageId const in, int stageCount) noexcept
 {
     return StageId( (int(in)==0) ? (stageCount-1) : (int(in)-1) );
 }
+
+template <typename ENUM_T>
+struct PipelineDef
+{
+    operator PipelineId() const noexcept { return m_value; }
+    operator std::size_t() const noexcept { return std::size_t(m_value); }
+
+    PipelineId& operator=(PipelineId const assign) { m_value = assign; return m_value; }
+
+    PipelineId m_value;
+};
 
 } // namespace osp
