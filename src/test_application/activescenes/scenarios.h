@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "identifiers.h"
+
 #include "../testapp.h"
 
 // IWYU pragma: begin_exports
@@ -34,6 +36,12 @@
 
 namespace testapp
 {
+
+namespace scenes
+{
+    using enum EStgCont;
+    using enum EStgFlag;
+}
 
 struct ScenarioOption
 {

@@ -34,9 +34,10 @@ namespace testapp
 
 void close_sessions(TestAppTasks &rTestApp, osp::SessionGroup &rSessions)
 {
+    rSessions.m_edges.m_runOn               .clear();
+    rSessions.m_edges.m_syncWith            .clear();
+    rSessions.m_edges.m_triggers            .clear();
     rSessions.m_edges.m_semaphoreEdges      .clear();
-    rSessions.m_edges.m_targetDependEdges   .clear();
-    rSessions.m_edges.m_targetFulfillEdges  .clear();
 
     if ( rSessions.m_sessions.empty() || ! rTestApp.m_graph.has_value() )
     {

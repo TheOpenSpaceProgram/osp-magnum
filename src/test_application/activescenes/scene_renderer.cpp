@@ -62,13 +62,15 @@ using Magnum::GL::Mesh;
 namespace testapp::scenes
 {
 
+
+
 Session setup_window_app(
         TopTaskBuilder&                 rBuilder,
         ArrayView<entt::any> const      topData)
 {
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_WINDOW_APP);
-    out.create_targets<TgtWindowApp>(rBuilder);
+    out.create_pipelines<PlWindowApp>(rBuilder);
 
     auto &rUserInput = osp::top_emplace<UserInputHandler>(topData, idUserInput, 12);
     config_controls(rUserInput);
@@ -88,8 +90,8 @@ Session setup_magnum(
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM);
-    auto const tgMgn = out.create_targets<TgtMagnum>(rBuilder);
-    out.m_cleanup = tgMgn.cleanup;
+    auto const tgMgn = out.create_pipelines<PlMagnum>(rBuilder);
+    out.m_cleanup = tgMgn.cleanup.tpl(Working);
 
     // Order-dependent; ActiveApplication construction starts OpenGL context, needed by RenderGL
     /* unused */      top_emplace<ActiveApplication>(topData, idActiveApp, args, rUserInput);
@@ -99,7 +101,7 @@ Session setup_magnum(
 
     rBuilder.task()
         .name       ("Clean up Magnum renderer")
-        .depends_on ({tgMgn.cleanup})
+        .run_on     ({{tgMgn.cleanup, Working}})
         .push_to    (out.m_tasks)
         .args       ({      idResources,          idRenderGl})
         .func([] (Resources& rResources, RenderGL& rRenderGl) noexcept
@@ -111,6 +113,8 @@ Session setup_magnum(
     return out;
 }
 
+
+#if 0
 Session setup_scene_renderer(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
@@ -316,7 +320,7 @@ Session setup_shader_visualizer(
     return out;
 }
 
-#if 0
+
 
 
 Session setup_shader_flat(

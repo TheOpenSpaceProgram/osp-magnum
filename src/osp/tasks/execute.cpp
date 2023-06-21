@@ -245,7 +245,7 @@ void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
     }
 }
 
-void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept
+void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, TriggerOut_t dirty) noexcept
 {
     LGRN_ASSERT(rExec.tasksQueuedRun.contains(task));
     rExec.tasksQueuedRun.erase(task);

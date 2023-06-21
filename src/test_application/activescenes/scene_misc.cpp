@@ -142,7 +142,7 @@ void add_floor(
     });
 }
 
-
+/*
 
 Session setup_camera_ctrl(
         TopTaskBuilder&             rBuilder,

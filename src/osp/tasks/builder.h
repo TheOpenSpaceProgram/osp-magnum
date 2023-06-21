@@ -79,15 +79,15 @@ struct TaskBuilderBase
     }
 
     template<std::size_t N>
-    std::array<PipelineId, N> create_stateloops()
+    std::array<PipelineId, N> create_pipelines()
     {
         std::array<PipelineId, N> out;
         m_rTasks.m_pipelineIds.create(out.begin(), out.end());
         return out;
     }
 
-    Tasks& m_rTasks;
-    TaskEdges& m_rEdges;
+    Tasks       & m_rTasks;
+    TaskEdges   & m_rEdges;
 
 }; // class TaskBuilderBase
 

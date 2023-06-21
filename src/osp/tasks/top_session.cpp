@@ -44,13 +44,12 @@ void top_close_session(
         ExecContext&            rExec,
         ArrayView<Session>      sessions)
 {
-    // Run cleanup tasks
+    // Run cleanup pipelines
     for (Session &rSession : sessions)
     {
-        if (TargetId const cleanup = std::exchange(rSession.m_cleanup, lgrn::id_null<TargetId>());
-            cleanup != lgrn::id_null<TargetId>())
+        if (rSession.m_cleanup.pipeline != lgrn::id_null<PipelineId>())
         {
-            rExec.m_targetDirty.set(std::size_t(cleanup));
+            set_dirty(rExec, rSession.m_cleanup.pipeline, rSession.m_cleanup.stage);
         }
     }
     enqueue_dirty(rTasks, graph, rExec);

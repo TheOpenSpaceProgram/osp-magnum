@@ -31,6 +31,8 @@
 
 #include <entt/core/any.hpp>
 
+#include <Corrade/Containers/ArrayViewStl.h>
+
 #include <cassert>
 #include <functional>
 #include <type_traits>
@@ -128,14 +130,14 @@ struct wrap_args_trait
     }
 
     template<typename RETURN_T, typename ... ARGS_T>
-    static FulfillDirty_t wrapped_task([[maybe_unused]] WorkerContext ctx, ArrayView<entt::any> topData) noexcept
+    static TriggerOut_t wrapped_task([[maybe_unused]] WorkerContext ctx, ArrayView<entt::any> topData) noexcept
     {
         if constexpr (std::is_void_v<RETURN_T>)
         {
             cast_args<ARGS_T ...>(topData, ctx, std::make_index_sequence<sizeof...(ARGS_T)>{});
-            return gc_fulfillAll; // All fulfilled targets set dirty
+            return gc_triggerAll;
         }
-        else if constexpr (std::is_same_v<RETURN_T, FulfillDirty_t>)
+        else if constexpr (std::is_same_v<RETURN_T, TriggerOut_t>)
         {
             return cast_args<ARGS_T ...>(topData, ctx, std::make_index_sequence<sizeof...(ARGS_T)>{});
         }

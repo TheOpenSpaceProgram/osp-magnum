@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "worker.h"
+
 #include "../types.h"
 
 #include <entt/core/fwd.hpp>
@@ -36,23 +38,6 @@
 namespace osp
 {
 
-/**
- * @brief Return value from a task to tell the executor which fulfilled targets are dirty
- *
- * Bits here limits the max number of fulfill targets per-task to 1*64
- */
-using FulfillDirty_t = lgrn::BitView<std::array<uint64_t, 1>>;
-
-/**
- * @brief Passed to tasks to signify which targets the task depends on are dirty
- *
- * Bits here limits the max dependencies per-task to 4*64
- */
-//using DependOnDirty_t = lgrn::BitView<std::array<uint64_t, 4>>;
-
-constexpr FulfillDirty_t gc_fulfillAll{{0xFFFFFFFFFFFFFFFFul}};
-constexpr FulfillDirty_t gc_fulfillNone{{0}};
-
 using TopDataId     = uint32_t;
 using TopDataIds_t  = std::initializer_list<TopDataId>;
 
@@ -63,6 +48,6 @@ struct WorkerContext
     //DependOnDirty_t m_dependOnDirty;
 };
 
-using TopTaskFunc_t = FulfillDirty_t(*)(WorkerContext, ArrayView<entt::any>) noexcept;
+using TopTaskFunc_t = TriggerOut_t(*)(WorkerContext, ArrayView<entt::any>) noexcept;
 
 } // namespace osp

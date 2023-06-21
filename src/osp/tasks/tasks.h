@@ -168,12 +168,6 @@ struct TaskGraph
 };
 
 
-/**
- * @brief Bitset returned by tasks to determine which fulfill targets should be marked dirty
- */
-using FulfillDirty_t = lgrn::BitView<std::array<uint64_t, 1>>;
-
-
 TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> data);
 
 inline TaskGraph make_exec_graph(Tasks const& tasks, std::initializer_list<TaskEdges const* const> data)
@@ -271,9 +265,13 @@ struct PipelineDef
     operator PipelineId() const noexcept { return m_value; }
     operator std::size_t() const noexcept { return std::size_t(m_value); }
 
-    PipelineId& operator=(PipelineId const assign) { m_value = assign; return m_value; }
+    constexpr PipelineId& operator=(PipelineId const assign) noexcept { m_value = assign; return m_value; }
+
+    constexpr TplPipelineStage tpl(ENUM_T stage) const noexcept { return { m_value, StageId(stage) }; }
 
     PipelineId m_value;
 };
+
+
 
 } // namespace osp

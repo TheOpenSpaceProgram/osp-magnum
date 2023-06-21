@@ -66,8 +66,7 @@ namespace osp
 {
 
 /**
- * @brief A convenient group of TopData, Tasks, and Tags that work together to
- *        support a certain feature.
+ * @brief A convenient group of Pipelines that work together to support a certain feature.
  *
  * Sessions only store vectors of integer IDs, and don't does not handle
  * ownership on its own. Close using osp::top_close_session before destruction.
@@ -84,52 +83,52 @@ struct Session
     }
 
     template<typename TGT_STRUCT_T, typename BUILDER_T>
-    TGT_STRUCT_T create_targets(BUILDER_T &rBuilder)
+    TGT_STRUCT_T create_pipelines(BUILDER_T &rBuilder)
     {
-        static_assert(sizeof(TGT_STRUCT_T) % sizeof(TargetId) == 0);
-        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(TargetId);
+        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineId) == 0);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineId);
 
         std::type_info const& info = typeid(TGT_STRUCT_T);
-        m_targetStructHash = info.hash_code();
-        m_targetStructName = info.name();
+        m_structHash = info.hash_code();
+        m_structName = info.name();
 
-        m_targets.resize(count);
+        m_pipelines.resize(count);
 
-        rBuilder.m_rTasks.m_targetIds.create(m_targets.begin(), m_targets.end());
+        rBuilder.m_rTasks.m_pipelineIds.create(m_pipelines.begin(), m_pipelines.end());
 
-        return reinterpret_cast<TGT_STRUCT_T&>(*m_targets.data());
+        return reinterpret_cast<TGT_STRUCT_T&>(*m_pipelines.data());
     }
 
     template<typename TGT_STRUCT_T>
-    [[nodiscard]] TGT_STRUCT_T get_targets() const
+    [[nodiscard]] TGT_STRUCT_T get_pipelines() const
     {
-        static_assert(sizeof(TGT_STRUCT_T) % sizeof(TargetId) == 0);
-        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(TargetId);
+        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineId) == 0);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineId);
 
         std::type_info const& info = typeid(TGT_STRUCT_T);
-        LGRN_ASSERTMV(m_targetStructHash == info.hash_code() && count == m_targets.size(),
-                      "get_targets must use the same struct given to create_targets",
-                      m_targetStructHash, m_targetStructName,
+        LGRN_ASSERTMV(m_structHash == info.hash_code() && count == m_pipelines.size(),
+                      "get_pipeline must use the same struct previously given to get_pipelines",
+                      m_structHash, m_structName,
                       info.hash_code(), info.name(),
-                      m_targets.size());
+                      m_pipelines.size());
 
-        return reinterpret_cast<TGT_STRUCT_T const&>(*m_targets.data());
+        return reinterpret_cast<TGT_STRUCT_T const&>(*m_pipelines.data());
     }
 
     std::vector<TopDataId>  m_data;
-    std::vector<TargetId>   m_targets;
+    std::vector<PipelineId> m_pipelines;
     std::vector<TaskId>     m_tasks;
 
-    TargetId m_cleanup  {lgrn::id_null<TargetId>()};
+    TplPipelineStage        m_cleanup{ lgrn::id_null<PipelineId>(), lgrn::id_null<StageId>() };
 
-    std::size_t m_targetStructHash{0};
-    std::string m_targetStructName;
+    std::size_t             m_structHash{0};
+    std::string             m_structName;
 };
 
 struct SessionGroup
 {
-    std::vector<Session> m_sessions;
-    TaskEdges m_edges;
+    std::vector<Session>    m_sessions;
+    TaskEdges               m_edges;
 };
 
 /**

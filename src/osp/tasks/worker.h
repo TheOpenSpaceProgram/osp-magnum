@@ -24,11 +24,18 @@
  */
 #pragma once
 
-
+#include <bitset>
 
 namespace osp
 {
 
+/**
+ * @brief Bitset returned by tasks to determine which specified (pipeline,stage) to trigger
+ */
+using TriggerOut_t = std::bitset<64>;
+
+constexpr TriggerOut_t gc_triggerAll    {0xFFFFFFFFFFFFFFFFul};
+constexpr TriggerOut_t gc_triggerNone   {0};
 
 
 } // namespace osp

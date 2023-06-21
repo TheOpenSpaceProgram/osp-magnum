@@ -25,11 +25,9 @@
 #pragma once
 
 #include "tasks.h"
+#include "worker.h"
 
 #include "../bitvector.h"
-
-#include <Corrade/Containers/ArrayViewStl.h>
-#include <Corrade/Containers/StridedArrayView.h>
 
 #include <entt/entity/storage.hpp>
 
@@ -101,7 +99,13 @@ void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
 //};
 
 template<typename STAGE_ENUM_T>
-inline void set_dirty(ExecContext &rExec, PipelineDef<STAGE_ENUM_T> const pipeline, STAGE_ENUM_T const stage)
+inline void set_dirty(ExecContext &rExec, PipelineDef<STAGE_ENUM_T> const pipeline, STAGE_ENUM_T const stage) noexcept
+{
+    rExec.plData[pipeline].triggered |= 1 << int(stage);
+    rExec.plDirty.set(std::size_t(pipeline));
+}
+
+inline void set_dirty(ExecContext &rExec, PipelineId const pipeline, StageId const stage) noexcept
 {
     rExec.plData[pipeline].triggered |= 1 << int(stage);
     rExec.plDirty.set(std::size_t(pipeline));
@@ -109,7 +113,7 @@ inline void set_dirty(ExecContext &rExec, PipelineDef<STAGE_ENUM_T> const pipeli
 
 void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;
 
-void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, FulfillDirty_t dirty) noexcept;
+void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, TriggerOut_t dirty) noexcept;
 
 
 

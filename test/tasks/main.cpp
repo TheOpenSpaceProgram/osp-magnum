@@ -63,8 +63,8 @@ void randomized_singlethreaded_execute(Tasks const& tasks, TaskGraph const& grap
 
         if (runTasksLeft != 0)
         {
-            TaskId const            randomTask  = rExec.tasksQueuedRun.at(rRand() % runTasksLeft);
-            FulfillDirty_t const    status      = runTask(randomTask);
+            TaskId const        randomTask  = rExec.tasksQueuedRun.at(rRand() % runTasksLeft);
+            TriggerOut_t const  status      = runTask(randomTask);
             mark_completed_task(tasks, graph, rExec, randomTask, status);
         }
 
@@ -98,7 +98,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     // well-suited for this problem, as these per-thread vectors can all be represented with the
     // same TargetId.
 
-    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(int const, std::vector<int>&, int&)>;
+    using BasicTraits_t     = BasicBuilderTraits<TriggerOut_t(*)(int const, std::vector<int>&, int&)>;
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
@@ -121,31 +121,31 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
         builder.task()
             .run_on  ({{pl.vec, Fill}})
             .triggers({{pl.vec, Use}, {pl.vec, Clear}})
-            .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> FulfillDirty_t
+            .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
         {
             rOut.push_back(in);
-            return {{0b11}};
+            return osp::gc_triggerAll;
         });
     }
 
     // Use vector
     builder.task()
         .run_on({{pl.vec, Use}})
-        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> FulfillDirty_t
+        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
     {
         int const sum = std::accumulate(rOut.begin(), rOut.end(), 0);
         EXPECT_EQ(sum, in * sc_pusherTaskCount);
         ++rChecksRun;
-        return {{0b0}};
+        return osp::gc_triggerNone;
     });
 
     // Clear vector after use
     builder.task()
         .run_on({{pl.vec, Clear}})
-        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> FulfillDirty_t
+        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
     {
         rOut.clear();
-        return {{0b0}};
+        return osp::gc_triggerNone;
     });
 
     // Step 2: Compile tasks into an execution graph
@@ -169,7 +169,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
         set_dirty(exec, pl.vec, Fill);
         enqueue_dirty(tasks, graph, exec);
 
-        randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output, &checksRun] (TaskId const task) -> FulfillDirty_t
+        randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output, &checksRun] (TaskId const task) -> TriggerOut_t
         {
             return functions[task](input, output, checksRun);
         });
@@ -209,7 +209,7 @@ TEST(Tasks, BasicSingleThreadedTriggers)
     using namespace test_b;
     using enum Stages;
 
-    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(TestState&, std::mt19937 &)>;
+    using BasicTraits_t     = BasicBuilderTraits<TriggerOut_t(*)(TestState&, std::mt19937 &)>;
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
@@ -228,58 +228,58 @@ TEST(Tasks, BasicSingleThreadedTriggers)
     builder.task()
         .run_on   ({{pl.normal, Schedule}})
         .triggers ({{pl.normal, Write}, {pl.optional, Write}})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         if (rRand() % 2 == 0)
         {
-            return {{0b01}};
+            return 0b01; // trigger {pl.normal, Write}
         }
         else
         {
             rState.optionalFlagExpect = true;
-            return {{0b11}};
+            return 0b11; // trigger {pl.normal, Write} and {pl.optional, Write}
         }
     });
 
     builder.task()
         .run_on   ({{pl.normal, Write}})
         .triggers ({{pl.normal, Read}, {pl.normal, Clear}})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         rState.normalFlag = true;
-        return {{0b11}};
+        return gc_triggerAll;
     });
 
     builder.task()
         .run_on   ({{pl.optional, Write}})
         .triggers ({{pl.optional, Read}, {pl.optional, Clear}})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         rState.optionalFlag = true;
-        return {{0b11}};
+        return gc_triggerAll;
     });
 
 
     builder.task()
         .run_on   ({{pl.normal, Read}})
         .sync_with({{pl.optional, Read}})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         EXPECT_TRUE(rState.normalFlag);
         EXPECT_EQ(rState.optionalFlagExpect, rState.optionalFlag);
-        return {{0b1}};
+        return gc_triggerAll;
     });
 
     builder.task()
         .run_on   ({{pl.normal, Clear}})
         .triggers ({{pl.normal, Schedule}})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> FulfillDirty_t
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         ++ rState.checks;
         rState.normalFlag           = false;
         rState.optionalFlagExpect   = false;
         rState.optionalFlag         = false;
-        return {{0b1}};
+        return gc_triggerAll;
     });
 
     TaskGraph const graph = make_exec_graph(tasks, {&edges});
@@ -296,7 +296,7 @@ TEST(Tasks, BasicSingleThreadedTriggers)
 
     randomized_singlethreaded_execute(
             tasks, graph, exec, randGen, sc_taskRuns,
-                [&functions, &world, &randGen] (TaskId const task) -> FulfillDirty_t
+                [&functions, &world, &randGen] (TaskId const task) -> TriggerOut_t
     {
         return functions[task](world, randGen);
     });
@@ -341,7 +341,7 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     using enum StgSimple;
     using enum StgRender;
 
-    using BasicTraits_t     = BasicBuilderTraits<FulfillDirty_t(*)(World&)>;
+    using BasicTraits_t     = BasicBuilderTraits<TriggerOut_t(*)(World&)>;
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
@@ -361,30 +361,30 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     builder.task()
         .run_on   ({{pl.time, Use}})
         .sync_with({{pl.forces, Recalc}})
-        .func( [] (World& rWorld) -> FulfillDirty_t
+        .func( [] (World& rWorld) -> TriggerOut_t
     {
         rWorld.m_forces += 42 * rWorld.m_deltaTimeIn;
-        return {{0b01}};
+        return gc_triggerNone;
     });
     builder.task()
         .run_on   ({{pl.time, Use}})
         .sync_with({{pl.forces, Recalc}})
-        .func([] (World& rWorld) -> FulfillDirty_t
+        .func([] (World& rWorld) -> TriggerOut_t
     {
         rWorld.m_forces += 1337 * rWorld.m_deltaTimeIn;
-        return {{0b01}};
+        return gc_triggerNone;
     });
 
     // Main Physics update
     builder.task()
         .run_on   ({{pl.time, Use}})
         .sync_with({{pl.forces, Use}, {pl.positions, Recalc}})
-        .func([] (World& rWorld) -> FulfillDirty_t
+        .func([] (World& rWorld) -> TriggerOut_t
     {
         EXPECT_EQ(rWorld.m_forces, 1337 + 42);
         rWorld.m_positions += rWorld.m_forces;
         rWorld.m_forces = 0;
-        return {{0b01}};
+        return gc_triggerNone;
     });
 
     // Draw things moved by physics update. If 'updWorld' wasn't enqueued, then
@@ -392,21 +392,21 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     builder.task()
         .run_on   ({{pl.render, Render}})
         .sync_with({{pl.positions, Use}})
-        .func([] (World& rWorld) -> FulfillDirty_t
+        .func([] (World& rWorld) -> TriggerOut_t
     {
         EXPECT_EQ(rWorld.m_positions, 1337 + 42);
         rWorld.m_canvas.emplace("Physics Cube");
-        return {{0b01}};
+        return gc_triggerNone;
     });
 
     // Draw things unrelated to physics. This is allowed to be the first task
     // to run
     builder.task()
         .run_on  ({{pl.render, Render}})
-        .func([] (World& rWorld) -> FulfillDirty_t
+        .func([] (World& rWorld) -> TriggerOut_t
     {
         rWorld.m_canvas.emplace("Terrain");
-        return {{0b01}};
+        return gc_triggerNone;
     });
 
     TaskGraph const graph = make_exec_graph(tasks, {&edges});
@@ -433,7 +433,7 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
 
         randomized_singlethreaded_execute(
                 tasks, graph, exec, randGen, 5,
-                    [&functions, &world] (TaskId const task) -> FulfillDirty_t
+                    [&functions, &world] (TaskId const task) -> TriggerOut_t
         {
             return functions[task](world);
         });

@@ -56,6 +56,8 @@ using Corrade::Containers::arrayView;
 namespace testapp::scenes
 {
 
+#if 0
+
 Session setup_newton(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
@@ -277,7 +279,7 @@ void compound_collect_recurse(
 
 }
 
-#if 0
+
 
 Session setup_vehicle_spawn_newton(
         TopTaskBuilder&             rBuilder,

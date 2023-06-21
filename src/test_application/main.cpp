@@ -268,13 +268,9 @@ void start_magnum_async()
 
         g_testApp.m_rendererSetup(g_testApp);
 
-        g_testApp.m_exec.resize(g_testApp.m_tasks);
         g_testApp.m_graph.reset();
         g_testApp.m_graph.emplace(osp::make_exec_graph(g_testApp.m_tasks, {&g_testApp.m_renderer.m_edges, &g_testApp.m_scene.m_edges}));
-        std::ofstream dot;
-        dot.open("tasks.gv");
-        osp::write_dot_graph(dot, g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_taskData);
-        dot.close();
+        osp::exec_resize(g_testApp.m_tasks, *g_testApp.m_graph, g_testApp.m_exec);
 
         enqueue_dirty(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_exec);
         top_run_blocking(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_taskData, g_testApp.m_topData, g_testApp.m_exec);

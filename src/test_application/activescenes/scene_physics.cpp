@@ -48,6 +48,8 @@ using Corrade::Containers::arrayView;
 namespace testapp::scenes
 {
 
+#if 0
+
 Session setup_physics(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
@@ -222,7 +224,7 @@ Session setup_shape_spawn(
     return out;
 }
 
-#if 0
+
 
 
 Session setup_prefabs(

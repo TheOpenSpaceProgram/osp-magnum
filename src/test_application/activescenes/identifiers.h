@@ -29,76 +29,59 @@
 namespace testapp
 {
 
-// Notes:
-// * "Delete" tasks often run before "New" tasks, since deletion leaves empty spaces in arrays
-//   that are best populated with new instances right away.
-//   * "Delete" task fulfills _del and _mod
-//   * "New" task depends on _del, fulfills _mod and _new
-//
+using osp::PipelineDef;
 
-// Scene sessions
-
-// Persistent:
-//
-// DeleteTask --->(_del)---> NewTask --->(_mod)---> UseTask --->(_use)
-//      |                                   ^
-//      +-----------------------------------+
-//
-
-// Transient: containers filled and cleared right away
-//
-// PushValuesTask --->(_mod)---> UseValuesTask --->(_use)---> ClearValuesTask --->(_clr)
-//
+enum class EStgFlag : uint8_t { Working, Done };
+enum class EStgCont : uint8_t { Delete, New, Modify, Use, Clear };
 
 #define TESTAPP_DATA_SCENE 1, \
     idDeltaTimeIn
-struct TgtScene
+struct PlScene
 {
-    osp::TargetId cleanup;
-    osp::TargetId time;
-    osp::TargetId sync;
-    osp::TargetId resyncAll;
+    PipelineDef<EStgFlag> cleanup;
+    PipelineDef<EStgFlag> time;
+    //PipelineDef<EStgFlag> sync;
+    PipelineDef<EStgFlag> resyncAll;
 };
 
 #define TESTAPP_DATA_COMMON_SCENE 6, \
     idBasic, idDrawing, idDrawingRes, idActiveEntDel, idDrawEntDel, idNMesh
-struct TgtCommonScene
+struct PlCommonScene
 {
-    osp::TargetId      activeEnt_del,      activeEnt_new,      activeEnt_mod,      activeEnt_use;
-    osp::TargetId   delActiveEnt_mod,   delActiveEnt_use,   delActiveEnt_clr;
-    osp::TargetId      transform_del,      transform_new,      transform_mod,      transform_use;
-    osp::TargetId           hier_del,           hier_new,           hier_mod,           hier_use;
-    osp::TargetId        drawEnt_del,        drawEnt_new,        drawEnt_mod,        drawEnt_use;
-    osp::TargetId     delDrawEnt_mod,     delDrawEnt_use,     delDrawEnt_clr;
-    osp::TargetId           mesh_del,           mesh_new,           mesh_mod,           mesh_use;
-    osp::TargetId        texture_del,        texture_new,        texture_mod,        texture_use;
-    osp::TargetId       material_del,       material_new,       material_mod,       material_use,       material_clr;
+    PipelineDef<EStgCont> activeEnts;
+    PipelineDef<EStgCont> delActiveEnts;
+    PipelineDef<EStgCont> transform;
+    PipelineDef<EStgCont> hierarchy;
+    PipelineDef<EStgCont> drawEnts;
+    PipelineDef<EStgCont> delDrawEnts;
+    PipelineDef<EStgCont> mesh;
+    PipelineDef<EStgCont> texture;
+    PipelineDef<EStgCont> material;
 };
 
 
 #define TESTAPP_DATA_PHYSICS 3, \
     idPhys, idHierBody, idPhysIn
-struct TgtPhysics
+struct PlPhysics
 {
-
-    osp::TargetId        physics_del,        physics_new,        physics_mod,        physics_use;
+    PipelineDef<EStgCont> physics;
 };
 
 
 
 #define TESTAPP_DATA_SHAPE_SPAWN 1, \
     idSpawner
-struct TgtShapeSpawn
+struct PlShapeSpawn
 {
-    osp::TargetId   spawnRequest_mod,   spawnRequest_use,   spawnRequest_clr;
-    osp::TargetId    spawnedEnts_mod,    spawnedEnts_use;  // spawnRequest_clr;
+    PipelineDef<EStgCont> spawnRequest;
+    PipelineDef<EStgCont> spawnedEnts;
 };
 
 
 
 #define TESTAPP_DATA_PREFABS 1, \
     idPrefabInit
-#define OS, tP_TAGS_TESTAPP_PREFABS 7, \
+#define OSP_TAGS_TESTAPP_PREFABS 7, \
     tgPrefabMod,        tgPrefabReq,        tgPrefabClr,        \
     tgPrefabEntMod,     tgPrefabEntReq,                         \
     tgPfParentHierMod,  tgPfParentHierReq
@@ -170,9 +153,9 @@ struct TgtShapeSpawn
 
 #define TESTAPP_DATA_NEWTON 1, \
     idNwt
-struct TgtNewton
+struct PlNewton
 {
-    osp::TargetId        nwtBody_del,        nwtBody_new,        nwtBody_mod,        nwtBody_use;
+    PipelineDef<EStgCont> nwtBody;
 };
 
 #define TESTAPP_DATA_NEWTON_FORCES 1, \
@@ -219,49 +202,47 @@ struct TgtNewton
 
 #define TESTAPP_DATA_WINDOW_APP 1, \
     idUserInput
-struct TgtWindowApp
+struct PlWindowApp
 {
-    osp::TargetId input;
-    osp::TargetId render;
+    PipelineDef<EStgFlag> inputs;
+    PipelineDef<EStgFlag> render;
 };
 
 
 
 #define TESTAPP_DATA_MAGNUM 2, \
     idActiveApp, idRenderGl
-struct TgtMagnum
+struct PlMagnum
 {
-    osp::TargetId cleanup;
-
-    osp::TargetId meshGL_mod, meshGL_use;
-    osp::TargetId textureGL_mod, textureGL_use;
+    PipelineDef<EStgFlag> cleanup;
+    PipelineDef<EStgCont> meshGL;
+    PipelineDef<EStgCont> textureGL;
 };
 
 
 
 #define TESTAPP_DATA_COMMON_RENDERER 3, \
     idScnRender, idGroupFwd, idCamera
-struct TgtSceneRenderer
+struct PlSceneRenderer
 {
-    osp::TargetId fboRender;
-    osp::TargetId fboRenderDone;
+    PipelineDef<EStgFlag> fboRender;
 
-    osp::TargetId      scnRender_del,      scnRender_new,      scnRender_mod,      scnRender_use;
-    osp::TargetId          group_mod,          group_use;
-    osp::TargetId      groupEnts_del,      groupEnts_new,      groupEnts_mod,      groupEnts_use;
-    osp::TargetId  drawTransform_new,  drawTransform_mod,  drawTransform_use;
-    osp::TargetId         camera_mod,         camera_use;
-    osp::TargetId        entMesh_new,        entMesh_mod,        entMesh_use;
-    osp::TargetId     entTexture_new,     entTexture_mod,     entTexture_use;
+    PipelineDef<EStgCont> scnRender;
+    PipelineDef<EStgCont> group;
+    PipelineDef<EStgCont> groupEnts;
+    PipelineDef<EStgCont> drawTransforms;
+    PipelineDef<EStgCont> camera;
+    PipelineDef<EStgCont> entMesh;
+    PipelineDef<EStgCont> entTexture;
 };
 
 
 
 #define TESTAPP_DATA_CAMERA_CTRL 1, \
     idCamCtrl
-struct TgtCameraCtrl
+struct PlCameraCtrl
 {
-    osp::TargetId     cameraCtrl_mod,     cameraCtrl_use;
+    PipelineDef<EStgCont> camCtrl;
 };
 
 

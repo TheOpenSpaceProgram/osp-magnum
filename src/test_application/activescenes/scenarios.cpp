@@ -62,7 +62,7 @@ static constexpr auto   sc_matPhong         = active::MaterialId(2);
 static constexpr int    sc_materialCount    = 4;
 
 
-static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& scnRenderer, std::vector<TargetId> run = {})
+static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& scnRenderer, std::vector<TplPipelineStage> run = {})
 {
     OSP_DECLARE_GET_DATA_IDS(scnRenderer,        TESTAPP_DATA_COMMON_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
@@ -72,28 +72,40 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
     auto &rCamera       = top_get<active::Camera>(rTestApp.m_topData, idCamera);
     rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
-    auto tgScn = scene                  .get_targets<TgtScene>();
-    auto tgWin = rTestApp.m_windowApp   .get_targets<TgtWindowApp>();
+    auto tgScn = scene                  .get_pipelines<PlScene>();
+    auto tgWin = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>();
 
-    // Run Resync tasks to mark all used gpu resources as dirty
-    auto aaa = scene.get_targets<TgtScene>();
-    rTestApp.m_exec.m_targetDirty.set(std::size_t(aaa.resyncAll));
+    // Resynchronize scene with new renderer
+    set_dirty(rTestApp.m_exec, tgScn.resyncAll, EStgFlag::Working);
 
-    run.insert(run.end(), {tgScn.sync, tgScn.time, tgWin.input, tgWin.render});
+    run.insert(run.end(), {
+        tgScn.time.tpl(EStgFlag::Working),
+        tgWin.inputs.tpl(EStgFlag::Working),
+        tgWin.render.tpl(EStgFlag::Working)});
 
     // run gets copied but who cares lol
-    rActiveApp.set_on_draw( [&rTestApp, runTagsVec = std::move(run), resync  =tgScn.resyncAll]
+    rActiveApp.set_on_draw( [&rTestApp, run = std::move(run), resync  =tgScn.resyncAll]
                             (ActiveApplication& rApp, float delta)
     {
         // Magnum Application's main loop is here
 
         std::cout << "\n---- START ----\n";
 
-        top_enqueue_quick(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_exec, runTagsVec);
-
-        for (TaskId const task : rTestApp.m_exec.m_tasksQueued)
+        for (auto const [pipeline, stage] : run)
         {
-            std::cout << "enq: " << rTestApp.m_taskData[task].m_debugName << "\n";
+            set_dirty(rTestApp.m_exec, pipeline, stage);
+        }
+
+        enqueue_dirty(rTestApp.m_tasks, *rTestApp.m_graph, rTestApp.m_exec);
+
+        for (TaskId const task : rTestApp.m_exec.tasksQueuedRun)
+        {
+            std::cout << "run: " << rTestApp.m_taskData[task].m_debugName << "\n";
+        }
+
+        for (auto const [task, _] : rTestApp.m_exec.tasksQueuedBlocked.each())
+        {
+            std::cout << "blk: " << rTestApp.m_taskData[task].m_debugName << "\n";
         }
 
         top_run_blocking(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_taskData, rTestApp.m_topData, rTestApp.m_exec);
@@ -125,7 +137,7 @@ static ScenarioMap_t make_scenarios()
         SessionGroup &rOut = rTestApp.m_scene;
         rOut.m_sessions.resize(1);
         TopDataId const idSceneData = rOut.m_sessions[0].acquire_data<1>(rTestApp.m_topData)[0];
-        auto &rResources = osp::top_get<Resources>(rTestApp.m_topData, rTestApp.m_idResources);
+        auto &rResources = top_get<Resources>(rTestApp.m_topData, rTestApp.m_idResources);
 
         // enginetest::setup_scene returns an entt::any containing one big
         // struct containing all the scene data.
@@ -134,7 +146,7 @@ static ScenarioMap_t make_scenarios()
         return [] (TestApp& rTestApp)
         {
             TopDataId const idSceneData = rTestApp.m_scene.m_sessions[0].m_data[0];
-            auto &rScene = osp::top_get<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData);
+            auto &rScene = top_get<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData);
 
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,     TESTAPP_DATA_MAGNUM);
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
@@ -165,23 +177,22 @@ static ScenarioMap_t make_scenarios()
         // Compose together lots of Sessions
         scene           = setup_scene               (builder, rTopData);
         commonScene     = setup_common_scene        (builder, rTopData, scene, idResources, defaultPkg);
-        physics         = setup_physics             (builder, rTopData, commonScene);
-        shapeSpawn      = setup_shape_spawn         (builder, rTopData, commonScene, physics, sc_matVisualizer);
+        //physics         = setup_physics             (builder, rTopData, commonScene);
+        //shapeSpawn      = setup_shape_spawn         (builder, rTopData, commonScene, physics, sc_matVisualizer);
         //droppers        = setup_droppers            (builder, rTopData, commonScene, shapeSpawn);
         //bounds          = setup_bounds              (builder, rTopData, commonScene, physics, shapeSpawn);
 
-        newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
-        nwtGravSet      = setup_newton_factors      (builder, rTopData);
+        //newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
+        //nwtGravSet      = setup_newton_factors      (builder, rTopData);
         //nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
+        //shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
 
         create_materials(rTopData, commonScene, sc_materialCount);
         add_floor(rTopData, commonScene, shapeSpawn, sc_matVisualizer, idResources, defaultPkg);
 
-        rTestApp.m_exec.resize(rTestApp.m_tasks);
-        auto bbb = commonScene.get_targets<TgtCommonScene>();
-        rTestApp.m_exec.m_targetDirty.set(std::size_t(commonScene.get_targets<TgtCommonScene>().drawEnt_mod));
-        rTestApp.m_exec.m_targetDirty.set(std::size_t(shapeSpawn.get_targets<TgtShapeSpawn>().spawnRequest_mod));
+        //rTestApp.m_exec.resize(rTestApp.m_tasks);
+        //rTestApp.m_exec.m_targetDirty.set(std::size_t(commonScene.get_targets<PlCommonScene>().drawEnt_mod));
+        //rTestApp.m_exec.m_targetDirty.set(std::size_t(shapeSpawn.get_targets<PlShapeSpawn>().spawnRequest_mod));
 
 
         return [] (TestApp& rTestApp)
@@ -202,11 +213,11 @@ static ScenarioMap_t make_scenarios()
                 scnRender, cameraCtrl, cameraFree, shVisual, camThrow
             ] = resize_then_unpack<5>(rTestApp.m_renderer.m_sessions);
 
-            scnRender   = setup_scene_renderer      (builder, rTopData, windowApp, magnum, scene, commonScene, idResources);
-            cameraCtrl  = setup_camera_ctrl         (builder, rTopData, windowApp, scnRender);
-            cameraFree  = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
-            shVisual    = setup_shader_visualizer   (builder, rTopData, magnum, commonScene, scnRender, sc_matVisualizer);
-            camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
+            //scnRender   = setup_scene_renderer      (builder, rTopData, windowApp, magnum, scene, commonScene, idResources);
+            //cameraCtrl  = setup_camera_ctrl         (builder, rTopData, windowApp, scnRender);
+            //cameraFree  = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
+            //shVisual    = setup_shader_visualizer   (builder, rTopData, magnum, commonScene, scnRender, sc_matVisualizer);
+            //camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
 
             setup_magnum_draw(rTestApp, scene, scnRender);
         };
