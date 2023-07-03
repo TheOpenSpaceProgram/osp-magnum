@@ -113,7 +113,6 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     // Count TaskRequiresStages and StageRequiresTasks
 
-
     auto const count_stagereqtask = [&plCounts, &taskCounts, &totalStageReqTasks]
                                     (PipelineId const pl, StageId const stg, TaskId const task)
     {

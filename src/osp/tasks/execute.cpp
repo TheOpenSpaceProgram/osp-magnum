@@ -28,7 +28,7 @@
 namespace osp
 {
 
-void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut)
+void exec_resize(Tasks const& tasks, ExecContext &rOut)
 {
     std::size_t const maxTasks      = tasks.m_taskIds.capacity();
     std::size_t const maxPipeline   = tasks.m_pipelineIds.capacity();
@@ -42,8 +42,22 @@ void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut)
 
     rOut.plNextStage.resize(maxPipeline);
     bitvector_resize(rOut.plDirtyNext,  maxPipeline);
+}
+
+void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut)
+{
+    exec_resize(tasks, rOut);
 
     rOut.anystgReqByTaskCount.resize(graph.anystgToPipeline.size(), 0);
+
+    for (std::size_t pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    {
+        int const stageCount = fanout_size(graph.pipelineToFirstAnystg, PipelineId(pipelineInt));
+        if (stageCount == 0)
+        {
+            rOut.plData[PipelineId(pipelineInt)].currentStage = lgrn::id_null<StageId>();
+        }
+    }
 }
 
 static StageId pipeline_next_stage(TaskGraph const& graph, ExecContext const &exec, ExecPipeline const &execPl, PipelineId const pipeline) noexcept
@@ -52,12 +66,19 @@ static StageId pipeline_next_stage(TaskGraph const& graph, ExecContext const &ex
 
     if (    execPl.tasksQueuedBlocked  != 0
          || execPl.tasksQueuedRun      != 0
-         || execPl.stageReqTaskCount   != 0)
+         || execPl.stageReqTaskCount   != 0
+         || out == lgrn::id_null<StageId>())
     {
         return out; // Can't advance. This stage still has (or requires other) tasks to complete
+                    // or pipeline has no stages.
     }
 
     int const stageCount = fanout_size(graph.pipelineToFirstAnystg, pipeline);
+
+    if (stageCount == 0)
+    {
+        return out;
+    }
 
     while(true)
     {
@@ -140,6 +161,12 @@ static void run_pipeline_tasks(Tasks const& tasks, TaskGraph const& graph, ExecC
 {
     ExecPipeline        &rPlExec    = rExec.plData[pipeline];
     StageId const       stage       = rExec.plNextStage[pipeline];
+
+    if (stage == lgrn::id_null<StageId>())
+    {
+        return;
+    }
+
     StageBits_t const   stageBit    = 1 << int(stage);
 
     LGRN_ASSERT(rPlExec.tasksQueuedBlocked == 0);

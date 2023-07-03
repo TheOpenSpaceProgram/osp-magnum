@@ -91,17 +91,6 @@ struct TaskBuilderBase
 
 }; // class TaskBuilderBase
 
-struct PipelineSpec
-{
-    template<typename STAGE_ENUM_T>
-    PipelineSpec(PipelineDef<STAGE_ENUM_T> const pipeline, STAGE_ENUM_T const stage)
-     : m_pipeline{pipeline}
-     , m_stage{StageId(stage)}
-    { }
-
-    PipelineId  m_pipeline;
-    StageId     m_stage;
-};
 
 template <typename TASKBUILDER_T, typename TASKREF_T>
 struct TaskRefBase
@@ -118,43 +107,43 @@ struct TaskRefBase
     template<typename RANGE_T>
     TASKREF_T& add_edges(std::vector<TplTaskPipelineStage>& rContainer, RANGE_T const& add)
     {
-        for (PipelineSpec const spec : add)
+        for (auto const [pipeline, stage] : add)
         {
             rContainer.push_back({
                 .task     = m_taskId,
-                .pipeline = spec.m_pipeline,
-                .stage    = spec.m_stage
+                .pipeline = pipeline,
+                .stage    = stage
             });
         }
         return static_cast<TASKREF_T&>(*this);
     }
 
-    TASKREF_T& run_on(ArrayView<PipelineSpec const> const specs) noexcept
+    TASKREF_T& run_on(ArrayView<TplPipelineStage const> const specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_runOn, specs);
     }
 
-    TASKREF_T& run_on(std::initializer_list<PipelineSpec const> specs) noexcept
+    TASKREF_T& run_on(std::initializer_list<TplPipelineStage const> specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_runOn, specs);
     }
 
-    TASKREF_T& sync_with(ArrayView<PipelineSpec const> const specs) noexcept
+    TASKREF_T& sync_with(ArrayView<TplPipelineStage const> const specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_syncWith, specs);
     }
 
-    TASKREF_T& sync_with(std::initializer_list<PipelineSpec const> specs) noexcept
+    TASKREF_T& sync_with(std::initializer_list<TplPipelineStage const> specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_syncWith, specs);
     }
 
-    TASKREF_T& triggers(ArrayView<PipelineSpec const> const specs) noexcept
+    TASKREF_T& triggers(ArrayView<TplPipelineStage const> const specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_triggers, specs);
     }
 
-    TASKREF_T& triggers(std::initializer_list<PipelineSpec const> specs) noexcept
+    TASKREF_T& triggers(std::initializer_list<TplPipelineStage const> specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_triggers, specs);
     }

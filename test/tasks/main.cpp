@@ -119,8 +119,8 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     for (int i = 0; i < sc_pusherTaskCount; ++i)
     {
         builder.task()
-            .run_on  ({{pl.vec, Fill}})
-            .triggers({{pl.vec, Use}, {pl.vec, Clear}})
+            .run_on  ({pl.vec(Fill)})
+            .triggers({pl.vec(Use), pl.vec(Clear)})
             .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
         {
             rOut.push_back(in);
@@ -130,7 +130,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
 
     // Use vector
     builder.task()
-        .run_on({{pl.vec, Use}})
+        .run_on({pl.vec(Use)})
         .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
     {
         int const sum = std::accumulate(rOut.begin(), rOut.end(), 0);
@@ -141,7 +141,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
 
     // Clear vector after use
     builder.task()
-        .run_on({{pl.vec, Clear}})
+        .run_on({pl.vec(Clear)})
         .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
     {
         rOut.clear();
@@ -166,7 +166,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     {
         input = 1 + randGen() % 30;
 
-        set_dirty(exec, pl.vec, Fill);
+        set_dirty(exec, pl.vec(Fill));
         enqueue_dirty(tasks, graph, exec);
 
         randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output, &checksRun] (TaskId const task) -> TriggerOut_t
@@ -226,8 +226,8 @@ TEST(Tasks, BasicSingleThreadedTriggers)
     // These tasks run in a loop, triggering each other in a loop
 
     builder.task()
-        .run_on   ({{pl.normal, Schedule}})
-        .triggers ({{pl.normal, Write}, {pl.optional, Write}})
+        .run_on   ({pl.normal(Schedule)})
+        .triggers ({pl.normal(Write), pl.optional(Write)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         if (rRand() % 2 == 0)
@@ -242,8 +242,8 @@ TEST(Tasks, BasicSingleThreadedTriggers)
     });
 
     builder.task()
-        .run_on   ({{pl.normal, Write}})
-        .triggers ({{pl.normal, Read}, {pl.normal, Clear}})
+        .run_on   ({pl.normal(Write)})
+        .triggers ({pl.normal(Read), pl.normal(Clear)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         rState.normalFlag = true;
@@ -251,8 +251,8 @@ TEST(Tasks, BasicSingleThreadedTriggers)
     });
 
     builder.task()
-        .run_on   ({{pl.optional, Write}})
-        .triggers ({{pl.optional, Read}, {pl.optional, Clear}})
+        .run_on   ({pl.optional(Write)})
+        .triggers ({pl.optional(Read), pl.optional(Clear)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         rState.optionalFlag = true;
@@ -261,8 +261,8 @@ TEST(Tasks, BasicSingleThreadedTriggers)
 
 
     builder.task()
-        .run_on   ({{pl.normal, Read}})
-        .sync_with({{pl.optional, Read}})
+        .run_on   ({pl.normal(Read)})
+        .sync_with({pl.optional(Read)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         EXPECT_TRUE(rState.normalFlag);
@@ -271,8 +271,8 @@ TEST(Tasks, BasicSingleThreadedTriggers)
     });
 
     builder.task()
-        .run_on   ({{pl.normal, Clear}})
-        .triggers ({{pl.normal, Schedule}})
+        .run_on   ({pl.normal(Clear)})
+        .triggers ({pl.normal(Schedule)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
     {
         ++ rState.checks;
@@ -291,7 +291,7 @@ TEST(Tasks, BasicSingleThreadedTriggers)
 
     TestState world;
 
-    set_dirty(exec, pl.normal, Schedule);
+    set_dirty(exec, pl.normal(Schedule));
     enqueue_dirty(tasks, graph, exec);
 
     randomized_singlethreaded_execute(
@@ -359,16 +359,16 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
 
     // Two tasks calculate forces needed by the physics update
     builder.task()
-        .run_on   ({{pl.time, Use}})
-        .sync_with({{pl.forces, Recalc}})
+        .run_on   ({pl.time(Use)})
+        .sync_with({pl.forces(Recalc)})
         .func( [] (World& rWorld) -> TriggerOut_t
     {
         rWorld.m_forces += 42 * rWorld.m_deltaTimeIn;
         return gc_triggerNone;
     });
     builder.task()
-        .run_on   ({{pl.time, Use}})
-        .sync_with({{pl.forces, Recalc}})
+        .run_on   ({pl.time(Use)})
+        .sync_with({pl.forces(Recalc)})
         .func([] (World& rWorld) -> TriggerOut_t
     {
         rWorld.m_forces += 1337 * rWorld.m_deltaTimeIn;
@@ -377,8 +377,8 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
 
     // Main Physics update
     builder.task()
-        .run_on   ({{pl.time, Use}})
-        .sync_with({{pl.forces, Use}, {pl.positions, Recalc}})
+        .run_on   ({pl.time(Use)})
+        .sync_with({pl.forces(Use), pl.positions(Recalc)})
         .func([] (World& rWorld) -> TriggerOut_t
     {
         EXPECT_EQ(rWorld.m_forces, 1337 + 42);
@@ -390,8 +390,8 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     // Draw things moved by physics update. If 'updWorld' wasn't enqueued, then
     // this will still run, as no 'needPhysics' tasks are incomplete
     builder.task()
-        .run_on   ({{pl.render, Render}})
-        .sync_with({{pl.positions, Use}})
+        .run_on   ({pl.render(Render)})
+        .sync_with({pl.positions(Use)})
         .func([] (World& rWorld) -> TriggerOut_t
     {
         EXPECT_EQ(rWorld.m_positions, 1337 + 42);
@@ -402,7 +402,7 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     // Draw things unrelated to physics. This is allowed to be the first task
     // to run
     builder.task()
-        .run_on  ({{pl.render, Render}})
+        .run_on  ({pl.render(Render)})
         .func([] (World& rWorld) -> TriggerOut_t
     {
         rWorld.m_canvas.emplace("Terrain");
@@ -427,8 +427,8 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
 
         // Enqueue initial tasks
         // This roughly indicates "Time has changed" and "Render requested"
-        set_dirty(exec, pl.time, StgSimple::Use);
-        set_dirty(exec, pl.render, StgRender::Render);
+        set_dirty(exec, pl.time(StgSimple::Use));
+        set_dirty(exec, pl.render(StgRender::Render));
         enqueue_dirty(tasks, graph, exec);
 
         randomized_singlethreaded_execute(

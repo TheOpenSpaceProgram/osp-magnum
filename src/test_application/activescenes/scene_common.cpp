@@ -77,11 +77,9 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Set materials, meshes, and textures dirty")
-        .run_on     ({{tgScn.resyncAll, Working}})
-        .sync_with  ({{tgCS.texture,    Modify}, {tgCS.mesh, Modify}})
-        .triggers   ({{tgCS.texture,  Use}, {tgCS.texture,  Clear},
-                      {tgCS.mesh,     Use}, {tgCS.mesh,     Clear},
-                      {tgCS.material, Use}, {tgCS.material, Clear}})
+        .run_on     ({tgScn.resyncAll(Working)})
+        .sync_with  ({tgCS.texture(Modify), tgCS.mesh(Modify)})
+        .triggers   ({tgCS.entTextureDirty(Use_), tgCS.entMeshDirty(Use_), tgCS.materialDirty(Use_), tgCS.textureResDirty(Working), tgCS.meshResDirty(Working)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing })
         .func([] (ACtxDrawing& rDrawing) noexcept
@@ -92,8 +90,8 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Delete ActiveEnt IDs")
-        .run_on     ({{tgCS.delActiveEnts, Use}})
-        .sync_with  ({{tgCS.activeEnts,    Delete}})
+        .run_on     ({tgCS.activeEntDelete(Use_)})
+        .sync_with  ({tgCS.activeEnt      (Delete)})
         .push_to    (out.m_tasks)
         .args       ({      idBasic,                      idActiveEntDel })
         .func([] (ACtxBasic& rBasic, ActiveEntVec_t const& rActiveEntDel) noexcept
@@ -109,8 +107,8 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Delete basic components")
-        .run_on     ({{tgCS.delActiveEnts, Use}})
-        .sync_with  ({{tgCS.transform,     Delete}})
+        .run_on     ({tgCS.activeEntDelete(Use_)})
+        .sync_with  ({tgCS.transform      (Delete)})
         .push_to    (out.m_tasks)
         .args       ({      idBasic,                      idActiveEntDel })
         .func([] (ACtxBasic& rBasic, ActiveEntVec_t const& rActiveEntDel) noexcept
@@ -120,9 +118,9 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Delete DrawEntity of deleted ActiveEnts")
-        .run_on     ({{tgCS.delActiveEnts, Use}})
-        .sync_with  ({{tgCS.delDrawEnts,   Modify}})
-        .triggers   ({{tgCS.delDrawEnts,   Use}, {tgCS.delDrawEnts, Clear}})
+        .run_on     ({tgCS.activeEntDelete(Use_)})
+        .sync_with  ({tgCS.drawEntDelete  (Modify_)})
+        .triggers   ({tgCS.drawEntDelete  (Use_), tgCS.drawEntDelete(Clear)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                      idActiveEntDel,              idDrawEntDel })
         .func([] (ACtxDrawing& rDrawing, ActiveEntVec_t const& rActiveEntDel, DrawEntVec_t& rDrawEntDel) noexcept
@@ -141,9 +139,8 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Delete drawing components")
-        .run_on     ({{tgCS.delDrawEnts, Use}})
-        .sync_with  ({{tgCS.mesh,    Delete},
-                      {tgCS.texture, Delete}})
+        .run_on     ({tgCS.drawEntDelete(Use_)})
+        .sync_with  ({tgCS.mesh(Delete), tgCS.texture(Delete)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                    idDrawEntDel })
         .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept
@@ -153,8 +150,8 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Delete DrawEntity IDs")
-        .run_on     ({{tgCS.delDrawEnts, Use}})
-        .sync_with  ({{tgCS.drawEnts,    Delete}})
+        .run_on     ({tgCS.drawEntDelete(Use_)})
+        .sync_with  ({tgCS.drawEnt      (Delete)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                    idDrawEntDel })
         .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept
@@ -170,8 +167,8 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Delete DrawEnt from materials")
-        .run_on     ({{tgCS.delDrawEnts, Use}})
-        .sync_with  ({{tgCS.material,    Delete}})
+        .run_on     ({tgCS.drawEntDelete(Use_)})
+        .sync_with  ({tgCS.material     (Delete)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                    idDrawEntDel })
         .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept
@@ -187,7 +184,7 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Clear ActiveEnt delete vector once we're done with it")
-        .run_on     ({{tgCS.delActiveEnts, Clear}})
+        .run_on     ({tgCS.activeEntDelete(Clear)})
         .push_to    (out.m_tasks)
         .args       ({            idActiveEntDel })
         .func([] (ActiveEntVec_t& idActiveEntDel) noexcept
@@ -197,7 +194,7 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Clear DrawEnt delete vector once we're done with it")
-        .run_on     ({{tgCS.delDrawEnts, Clear}})
+        .run_on     ({tgCS.drawEntDelete(Clear)})
         .push_to    (out.m_tasks)
         .args       ({         idDrawEntDel })
         .func([] (DrawEntVec_t& rDrawEntDel) noexcept
@@ -207,7 +204,7 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Clear material dirty vectors once we're done with it")
-        .run_on     ({{tgCS.material, Clear}})
+        .run_on     ({tgCS.materialDirty(Clear)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing })
         .func([] (ACtxDrawing& rDrawing) noexcept
@@ -220,8 +217,8 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Clean up scene and resource owners")
-        .run_on     ({{tgScn.cleanup, Working}})
-        .sync_with  ({{tgCS.mesh, Clear}, {tgCS.texture, Clear}})
+        .run_on     ({tgScn.cleanup(Working)})
+        .sync_with  ({tgCS.mesh(Delete), tgCS.texture(Delete)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,           idResources})
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources) noexcept
@@ -232,7 +229,7 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Clean up NamedMeshes mesh and texture owners")
-        .run_on     ({{tgScn.cleanup, Working}})
+        .run_on     ({tgScn.cleanup(Working)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,             idNMesh })
         .func([] (ACtxDrawing& rDrawing, NamedMeshes& rNMesh) noexcept

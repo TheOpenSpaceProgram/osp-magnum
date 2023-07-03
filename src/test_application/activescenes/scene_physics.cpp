@@ -48,7 +48,7 @@ using Corrade::Containers::arrayView;
 namespace testapp::scenes
 {
 
-#if 0
+
 
 Session setup_physics(
         TopTaskBuilder&             rBuilder,
@@ -56,18 +56,18 @@ Session setup_physics(
         Session const&              commonScene)
 {
     OSP_DECLARE_GET_DATA_IDS(commonScene,  TESTAPP_DATA_COMMON_SCENE);
-    auto const tgCS = commonScene.get_targets<TgtCommonScene>();
+    auto const tgCS = commonScene.get_pipelines<PlCommonScene>();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_PHYSICS);
-    auto const tgPhy = out.create_targets<TgtPhysics>(rBuilder);
+    auto const tgPhy = out.create_pipelines<PlPhysics>(rBuilder);
 
     top_emplace< ACtxPhysics >  (topData, idPhys);
 
     rBuilder.task()
         .name       ("Delete Physics components")
-        .trigger_on ({tgCS.delActiveEnt_mod})
-        .fulfills   ({tgCS.delActiveEnt_use, tgPhy.physics_del, tgPhy.physics_mod})
+        .run_on     ({tgCS.activeEntDelete(Use_)})
+        .sync_with  ({tgPhy.physics(Delete)})
         .push_to    (out.m_tasks)
         .args       ({        idPhys,                      idActiveEntDel })
         .func([] (ACtxPhysics& rPhys, ActiveEntVec_t const& rActiveEntDel) noexcept
@@ -87,33 +87,37 @@ Session setup_shape_spawn(
 {
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
-    auto const tgCS     = commonScene   .get_targets<TgtCommonScene>();
-    auto const tgPhy    = physics       .get_targets<TgtPhysics>();
+    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHAPE_SPAWN);
-    auto const tgShSp = out.create_targets<TgtShapeSpawn>(rBuilder);
+    auto const tgShSp = out.create_pipelines<PlShapeSpawn>(rBuilder);
 
     top_emplace< ACtxShapeSpawner > (topData, idSpawner, ACtxShapeSpawner{ .m_materialId = materialId });
 
     rBuilder.task()
         .name       ("Create entities for requested shapes to spawn")
-        .trigger_on ({tgShSp.spawnRequest_mod})
-        .depends_on ({                                                 tgCS.activeEnt_del})
-        .fulfills   ({tgShSp.spawnRequest_use, tgShSp.spawnedEnts_mod, tgCS.activeEnt_new, tgCS.activeEnt_mod})
+        .run_on     ({tgShSp.spawnRequest(Use_)})
+        .sync_with  ({tgCS.activeEnt(New), tgShSp.spawnedEnts(Resize)})
+        .triggers   ({tgCS.activeEnt(Use), tgShSp.spawnedEnts(Use_)})
         .push_to    (out.m_tasks)
         .args       ({      idBasic,                  idSpawner })
         .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner) noexcept
     {
+        LGRN_ASSERTM(!rSpawner.m_spawnRequest.empty(), "spawnRequest Use_ shouldn't be triggered if rSpawner.m_spawnRequest is empty!");
+
         rSpawner.m_ents.resize(rSpawner.m_spawnRequest.size() * 2);
         rBasic.m_activeIds.create(rSpawner.m_ents.begin(), rSpawner.m_ents.end());
+
+        return gc_triggerAll;
     });
 
     rBuilder.task()
         .name       ("Add hierarchy and transform to spawned shapes")
-        .trigger_on ({tgShSp.spawnRequest_mod})
-        .depends_on ({tgShSp.spawnedEnts_mod})
-        .fulfills   ({tgShSp.spawnRequest_use, tgShSp.spawnedEnts_use, tgCS.transform_new, tgCS.transform_mod, tgCS.hier_new, tgCS.hier_mod})
+        .run_on     ({tgShSp.spawnRequest(Use_)})
+        .sync_with  ({tgShSp.spawnedEnts(Use_), tgCS.hierarchy(New), tgCS.transform(New)})
+        .triggers   ({tgCS.transform(Use)})
         .push_to    (out.m_tasks)
         .args       ({      idBasic,                  idSpawner })
         .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner) noexcept
@@ -132,13 +136,15 @@ Session setup_shape_spawn(
             SubtreeBuilder bldRoot = bldScnRoot.add_child(root, 1);
             bldRoot.add_child(child);
         }
+
+        return gc_triggerAll;
     });
 
     rBuilder.task()
         .name       ("Add mesh and material to spawned shapes")
-        .trigger_on ({tgShSp.spawnRequest_mod})
-        .depends_on ({tgShSp.spawnedEnts_mod})
-        .fulfills   ({tgShSp.spawnRequest_use, tgShSp.spawnedEnts_use, tgCS.mesh_new, tgCS.mesh_mod, tgCS.material_new, tgCS.material_mod, tgCS.drawEnt_new, tgCS.drawEnt_mod})
+        .run_on     ({tgShSp.spawnRequest(Use_)})
+        .sync_with  ({tgShSp.spawnedEnts(Use_), tgCS.mesh(New), tgCS.material(New), tgCS.drawEnt(New)})
+        .triggers   ({tgCS.drawEntResized(Working)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,             idDrawing,                  idSpawner,             idNMesh })
         .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept
@@ -179,9 +185,8 @@ Session setup_shape_spawn(
 
     rBuilder.task()
         .name       ("Add physics to spawned shapes")
-        .trigger_on ({tgShSp.spawnRequest_mod})
-        .depends_on ({tgShSp.spawnedEnts_mod})
-        .fulfills   ({tgShSp.spawnRequest_use, tgShSp.spawnedEnts_use, tgPhy.physics_new, tgPhy.physics_mod})
+        .run_on     ({tgShSp.spawnRequest(Use_)})
+        .sync_with  ({tgShSp.spawnedEnts(Use_), tgPhy.physics(New)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,                  idSpawner,             idPhys })
         .func([] (ACtxBasic const& rBasic, ACtxShapeSpawner& rSpawner, ACtxPhysics& rPhys) noexcept
@@ -212,8 +217,7 @@ Session setup_shape_spawn(
 
     rBuilder.task()
         .name       ("Clear Shape Spawning vector after use")
-        .trigger_on ({tgShSp.spawnRequest_use})
-        .fulfills   ({tgShSp.spawnRequest_clr})
+        .run_on     ({tgShSp.spawnRequest(Clear)})
         .push_to    (out.m_tasks)
         .args       ({             idSpawner })
         .func([] (ACtxShapeSpawner& rSpawner) noexcept
@@ -225,7 +229,7 @@ Session setup_shape_spawn(
 }
 
 
-
+#if 0
 
 Session setup_prefabs(
         TopTaskBuilder&             rBuilder,
@@ -297,7 +301,7 @@ Session setup_prefabs(
         //SysPrefabInit::init_hierarchy(rPrefabInit, rResources, rBasic.m_hierarchy);
     }));
 
-    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgTransformNew}).data(
+    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, PlransformNew}).data(
             "Init Prefab transforms",
             TopDataIds_t{                idPrefabInit,           idResources,           idBasic },
             wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxBasic& rBasic) noexcept
@@ -380,11 +384,11 @@ Session setup_bounds(
     rBuilder.tag(tgBoundsSetReq)    .depend_on({tgBoundsSetDel, tgBoundsSetMod});
     rBuilder.tag(tgOutOfBoundsMod)  .depend_on({tgOutOfBoundsPrv});
 
-    // Bounds are checked are after transforms are final (tgTransformReq)
+    // Bounds are checked are after transforms are final (PlransformReq)
     // Out-of-bounds entities are added to rOutOfBounds, and are deleted
     // at the start of next frame
 
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgTransformReq, tgBoundsSetReq, tgOutOfBoundsMod}).data(
+    bounds.task() = rBuilder.task().assign({tgSceneEvt, PlransformReq, tgBoundsSetReq, tgOutOfBoundsMod}).data(
             "Check for out-of-bounds entities",
             TopDataIds_t{                 idBasic,                idBounds,             idOutOfBounds},
             wrap_args([] (ACtxBasic const& rBasic, EntSet_t const& rBounds, EntVector_t& rOutOfBounds) noexcept

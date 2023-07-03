@@ -32,7 +32,40 @@ namespace testapp
 using osp::PipelineDef;
 
 enum class EStgFlag : uint8_t { Working, Done };
-enum class EStgCont : uint8_t { Delete, New, Modify, Use, Clear };
+
+/**
+ * @brief Temporary queue / events that are filled, used, then cleared right away
+ */
+enum class EStgIntr : uint8_t { Resize, Modify_, Use_, Clear };
+
+/**
+ * @brief Continuous Containers, data that persists and is modified over time
+ *
+ */
+enum class EStgCont : uint8_t
+{
+    Delete,
+    ///< Remove elements from a container or mark them for deletion. This often involves reading
+    ///< a set of elements to delete. This is run first since it leaves empty spaces for new
+    ///< elements to fill directly after
+
+    New,
+    ///< Add new elements. Potentially resize the container to fit more
+
+    Modify,
+    ///< Modify existing elements
+
+    Use
+    ///< Container is ready to use
+};
+
+
+enum class EStgRender
+{
+    Bind,
+    Draw,
+    Unbind
+};
 
 #define TESTAPP_DATA_SCENE 1, \
     idDeltaTimeIn
@@ -40,23 +73,37 @@ struct PlScene
 {
     PipelineDef<EStgFlag> cleanup;
     PipelineDef<EStgFlag> time;
-    //PipelineDef<EStgFlag> sync;
     PipelineDef<EStgFlag> resyncAll;
+
+    //PipelineDef<EStgFlag> sync;
 };
 
 #define TESTAPP_DATA_COMMON_SCENE 6, \
     idBasic, idDrawing, idDrawingRes, idActiveEntDel, idDrawEntDel, idNMesh
 struct PlCommonScene
 {
-    PipelineDef<EStgCont> activeEnts;
-    PipelineDef<EStgCont> delActiveEnts;
+    PipelineDef<EStgCont> activeEnt;
+    PipelineDef<EStgFlag> activeEntResized;
+    PipelineDef<EStgIntr> activeEntDelete;
+
     PipelineDef<EStgCont> transform;
     PipelineDef<EStgCont> hierarchy;
-    PipelineDef<EStgCont> drawEnts;
-    PipelineDef<EStgCont> delDrawEnts;
+
+    PipelineDef<EStgCont> drawEnt;
+    PipelineDef<EStgFlag> drawEntResized;
+    PipelineDef<EStgIntr> drawEntDelete;
+
     PipelineDef<EStgCont> mesh;
     PipelineDef<EStgCont> texture;
+
+    PipelineDef<EStgIntr> entTextureDirty;
+    PipelineDef<EStgIntr> entMeshDirty;
+
+    PipelineDef<EStgFlag> meshResDirty;
+    PipelineDef<EStgFlag> textureResDirty;
+
     PipelineDef<EStgCont> material;
+    PipelineDef<EStgIntr> materialDirty;
 };
 
 
@@ -73,8 +120,8 @@ struct PlPhysics
     idSpawner
 struct PlShapeSpawn
 {
-    PipelineDef<EStgCont> spawnRequest;
-    PipelineDef<EStgCont> spawnedEnts;
+    PipelineDef<EStgIntr> spawnRequest;
+    PipelineDef<EStgIntr> spawnedEnts;
 };
 
 
@@ -205,7 +252,7 @@ struct PlNewton
 struct PlWindowApp
 {
     PipelineDef<EStgFlag> inputs;
-    PipelineDef<EStgFlag> render;
+    PipelineDef<EStgFlag> display;
 };
 
 
@@ -215,8 +262,12 @@ struct PlWindowApp
 struct PlMagnum
 {
     PipelineDef<EStgFlag> cleanup;
+
     PipelineDef<EStgCont> meshGL;
     PipelineDef<EStgCont> textureGL;
+
+    PipelineDef<EStgCont> entMeshGL;
+    PipelineDef<EStgCont> entTextureGL;
 };
 
 
@@ -225,12 +276,12 @@ struct PlMagnum
     idScnRender, idGroupFwd, idCamera
 struct PlSceneRenderer
 {
-    PipelineDef<EStgFlag> fboRender;
+    PipelineDef<EStgRender> fboRender;
 
     PipelineDef<EStgCont> scnRender;
     PipelineDef<EStgCont> group;
     PipelineDef<EStgCont> groupEnts;
-    PipelineDef<EStgCont> drawTransforms;
+    PipelineDef<EStgIntr> drawTransforms;
     PipelineDef<EStgCont> camera;
     PipelineDef<EStgCont> entMesh;
     PipelineDef<EStgCont> entTexture;

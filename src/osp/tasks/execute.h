@@ -92,23 +92,19 @@ struct ExecContext
 
 void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
 
+void exec_resize(Tasks const& tasks, ExecContext &rOut);
+
 //inline bool compare_syncs(SyncWaiting const& lhs, SyncWaiting const& rhs)
 //{
 //    return (lhs.m_recipient < rhs.m_recipient)
 //        && (lhs.m_recipient < rhs.m_waitFor);
 //};
 
-template<typename STAGE_ENUM_T>
-inline void set_dirty(ExecContext &rExec, PipelineDef<STAGE_ENUM_T> const pipeline, STAGE_ENUM_T const stage) noexcept
-{
-    rExec.plData[pipeline].triggered |= 1 << int(stage);
-    rExec.plDirty.set(std::size_t(pipeline));
-}
 
-inline void set_dirty(ExecContext &rExec, PipelineId const pipeline, StageId const stage) noexcept
+inline void set_dirty(ExecContext &rExec, TplPipelineStage tpl) noexcept
 {
-    rExec.plData[pipeline].triggered |= 1 << int(stage);
-    rExec.plDirty.set(std::size_t(pipeline));
+    rExec.plData[tpl.pipeline].triggered |= 1 << int(tpl.stage);
+    rExec.plDirty.set(std::size_t(tpl.pipeline));
 }
 
 void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;

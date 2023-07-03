@@ -53,6 +53,9 @@ ActiveApplication::ActiveApplication(const Application::Arguments& arguments,
  : Application{arguments, Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})}
  , m_rUserInput(rUserInput)
 {
+    // temporary fixed 60fps. No physics interpolation or anything is implemented yet
+    setSwapInterval(1);
+    setMinimalLoopPeriod(16);
     m_timeline.start();
 }
 

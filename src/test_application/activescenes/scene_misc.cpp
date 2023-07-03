@@ -142,8 +142,6 @@ void add_floor(
     });
 }
 
-/*
-
 Session setup_camera_ctrl(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
@@ -153,20 +151,20 @@ Session setup_camera_ctrl(
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(scnRender,     TESTAPP_DATA_COMMON_RENDERER);
 
-    auto const tgSR = scnRender.get_targets<TgtSceneRenderer>();
+    auto const tgSR = scnRender.get_pipelines<PlSceneRenderer>();
 
     auto &rUserInput = top_get< osp::input::UserInputHandler >(topData, idUserInput);
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_CAMERA_CTRL);
-    auto const tgCmCt = out.create_targets<TgtCameraCtrl>(rBuilder);
+    auto const tgCmCt = out.create_pipelines<PlCameraCtrl>(rBuilder);
 
     top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
 
     rBuilder.task()
         .name       ("Position Rendering Camera according to Camera Controller")
-        .trigger_on ({tgCmCt.cameraCtrl_mod})
-        .fulfills   ({tgCmCt.cameraCtrl_use, tgSR.camera_mod})
+        .run_on     ({tgCmCt.camCtrl(Use)})
+        .sync_with  ({tgSR.camera(Modify)})
         .push_to    (out.m_tasks)
         .args       ({                           idCamCtrl,        idCamera })
         .func([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
@@ -187,25 +185,30 @@ Session setup_camera_free(
     OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
     OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
 
-    auto const tgWin    = windowApp     .get_targets<TgtWindowApp>();
-    auto const tgCmCt   = cameraCtrl    .get_targets<TgtCameraCtrl>();
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
 
     Session out;
 
     rBuilder.task()
         .name       ("Move Camera controller")
-        .trigger_on ({tgWin.input})
-        .fulfills   ({tgCmCt.cameraCtrl_mod})
+        .run_on     ({tgWin.inputs(Working)})
+        .sync_with  ({tgCmCt.camCtrl(Modify)})
+        .triggers   ({tgCmCt.camCtrl(Use)})
         .push_to    (out.m_tasks)
         .args       ({                 idCamCtrl,           idDeltaTimeIn })
         .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
     {
         SysCameraController::update_view(rCamCtrl, deltaTimeIn);
         SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
+
+        return gc_triggerAll;
     });
 
     return out;
 }
+
+/*
 
 Session setup_thrower(
         TopTaskBuilder&             rBuilder,

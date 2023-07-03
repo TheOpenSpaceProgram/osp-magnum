@@ -244,7 +244,8 @@ void sync_test_scene(
             rRenderer.m_phong);
 
     // Load required meshes and textures into OpenGL
-    SysRenderGL::sync_scene_resources(rScene.m_drawingRes, *rScene.m_pResources, rRenderGl);
+    SysRenderGL::compile_resource_meshes  (rScene.m_drawingRes, *rScene.m_pResources, rRenderGl);
+    SysRenderGL::compile_resource_textures(rScene.m_drawingRes, *rScene.m_pResources, rRenderGl);
 
     // Assign GL meshes to entities with a mesh component
     SysRenderGL::assign_meshes(

@@ -269,6 +269,8 @@ struct PipelineDef
 
     constexpr TplPipelineStage tpl(ENUM_T stage) const noexcept { return { m_value, StageId(stage) }; }
 
+    constexpr TplPipelineStage operator()(ENUM_T stage) const noexcept { return { m_value, StageId(stage) }; }
+
     PipelineId m_value;
 };
 

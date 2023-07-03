@@ -40,7 +40,9 @@ namespace testapp
 namespace scenes
 {
     using enum EStgCont;
+    using enum EStgIntr;
     using enum EStgFlag;
+    using enum EStgRender;
 }
 
 struct ScenarioOption

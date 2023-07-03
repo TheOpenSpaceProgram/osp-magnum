@@ -136,14 +136,25 @@ public:
     static void clear_resource_owners(RenderGL& rRenderGl, Resources& rResources);
 
     /**
-     * @brief Compile required meshes and textures resources used by a scene
+     * @brief Compile GPU-side TexGlIds for textures loaded from a Resource (TexId + ResId)
      *
      * @param rCtxDrawRes   [in] Resources used by the scene
-     * @param rResources    [ref] Application Resources shared with the scene.
-     *                            New resource owners may be created.
+     * @param rResources    [ref] Application Resources shared with the scene. New resource owners may be created.
      * @param rRenderGl     [ref] Renderer state
      */
-    static void sync_scene_resources(
+    static void compile_resource_textures(
+            ACtxDrawingRes const& rCtxDrawRes,
+            Resources& rResources,
+            RenderGL& rRenderGl);
+
+    /**
+     * @brief Compile GPU-side MeshGlIds for meshes loaded from a Resource (MeshId + ResId)
+     *
+     * @param rCtxDrawRes   [in] Resources used by the scene
+     * @param rResources    [ref] Application Resources shared with the scene. New resource owners may be created.
+     * @param rRenderGl     [ref] Renderer state
+     */
+    static void compile_resource_meshes(
             ACtxDrawingRes const& rCtxDrawRes,
             Resources& rResources,
             RenderGL& rRenderGl);

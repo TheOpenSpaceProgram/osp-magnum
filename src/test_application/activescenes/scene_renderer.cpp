@@ -101,7 +101,7 @@ Session setup_magnum(
 
     rBuilder.task()
         .name       ("Clean up Magnum renderer")
-        .run_on     ({{tgMgn.cleanup, Working}})
+        .run_on     ({tgMgn.cleanup(Working)})
         .push_to    (out.m_tasks)
         .args       ({      idResources,          idRenderGl})
         .func([] (Resources& rResources, RenderGL& rRenderGl) noexcept
@@ -114,7 +114,6 @@ Session setup_magnum(
 }
 
 
-#if 0
 Session setup_scene_renderer(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
@@ -127,14 +126,14 @@ Session setup_scene_renderer(
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
-    auto const tgWin    = windowApp     .get_targets<TgtWindowApp>();
-    auto const tgScn    = scene         .get_targets<TgtScene>();
-    auto const tgCS     = commonScene   .get_targets<TgtCommonScene>();
-    auto const tgMgn    = magnum        .get_targets<TgtMagnum>();
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const tgMgn    = magnum        .get_pipelines<PlMagnum>();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_COMMON_RENDERER);
-    auto const tgSR = out.create_targets<TgtSceneRenderer>(rBuilder);
+    auto const tgSR = out.create_pipelines<PlSceneRenderer>(rBuilder);
 
     top_emplace< ACtxSceneRenderGL >    (topData, idScnRender);
     top_emplace< RenderGroup >          (topData, idGroupFwd);
@@ -147,9 +146,8 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Resize Scene Render containers to fit drawable entities")
-        .trigger_on ({tgCS.drawEnt_mod})
-        .fulfills   ({tgSR.scnRender_new, tgSR.scnRender_mod, tgSR.drawTransform_new, tgSR.drawTransform_mod,
-                      tgSR.entTexture_new, tgSR.entTexture_mod, tgSR.entMesh_new, tgSR.entMesh_mod})
+        .run_on     ({tgCS.drawEntResized(Working)})
+        .sync_with  ({tgSR.scnRender(New), tgSR.drawTransforms(Resize), tgSR.entMesh(New)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,                   idScnRender})
         .func([] (ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
@@ -161,21 +159,31 @@ Session setup_scene_renderer(
     });
 
     rBuilder.task()
-        .name       ("Synchronize used mesh and texture Resources with GL")
-        .trigger_on ({tgCS.mesh_mod, tgCS.texture_mod})
-        .fulfills   ({tgCS.mesh_use, tgCS.texture_use, tgMgn.meshGL_mod, tgMgn.textureGL_mod})
+        .name       ("Compile Resource Meshes to GL")
+        .run_on     ({tgCS.meshResDirty(Working)})
+        .sync_with  ({tgCS.mesh(Use), tgMgn.meshGL(New)})
         .push_to    (out.m_tasks)
         .args       ({                 idDrawingRes,                idResources,          idRenderGl })
         .func([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
     {
-        SysRenderGL::sync_scene_resources(rDrawingRes, rResources, rRenderGl);
+        SysRenderGL::compile_resource_meshes(rDrawingRes, rResources, rRenderGl);
+    });
+
+    rBuilder.task()
+        .name       ("Compile Resource Textures to GL")
+        .run_on     ({tgCS.textureResDirty(Working)})
+        .sync_with  ({tgCS.texture(Use), tgMgn.textureGL(New)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idDrawingRes,                idResources,          idRenderGl })
+        .func([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
+    {
+        SysRenderGL::compile_resource_textures(rDrawingRes, rResources, rRenderGl);
     });
 
     rBuilder.task()
         .name       ("Assign GL textures to entities with scene textures")
-        .trigger_on ({tgCS.texture_mod})
-        .depends_on ({                  tgMgn.textureGL_mod, tgCS.drawEnt_mod, tgSR.entTexture_new})
-        .fulfills   ({tgCS.texture_use, tgMgn.textureGL_use, tgCS.drawEnt_use, tgSR.entTexture_mod})
+        .run_on     ({tgCS.entTextureDirty(Use_)})
+        .sync_with  ({tgCS.texture(Use), tgMgn.textureGL(Use), tgMgn.entTextureGL(Modify)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
@@ -185,9 +193,8 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Assign GL meshes to entities with scene meshes")
-        .trigger_on ({tgCS.mesh_mod})
-        .depends_on ({               tgMgn.meshGL_mod, tgCS.drawEnt_mod, tgSR.entMesh_new})
-        .fulfills   ({tgCS.mesh_use, tgMgn.meshGL_use, tgCS.drawEnt_use, tgSR.entMesh_mod})
+        .run_on     ({tgCS.entMeshDirty(Use_)})
+        .sync_with  ({tgCS.mesh(Use), tgMgn.meshGL(Use), tgMgn.entMeshGL(Modify)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
@@ -197,8 +204,9 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Bind and display off-screen FBO")
-        .trigger_on ({tgWin.render})
-        .fulfills   ({tgSR.fboRender})
+        .run_on     ({tgWin.display(Working)})
+        .sync_with  ({tgSR.fboRender(Bind)})
+        .triggers   ({tgSR.fboRender(Draw), tgSR.fboRender(Unbind)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,          idRenderGl,                   idGroupFwd,              idCamera })
         .func([] (ACtxDrawing const& rDrawing, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera) noexcept
@@ -215,13 +223,15 @@ Session setup_scene_renderer(
         // Clear it
         rFbo.clear(   FramebufferClear::Color | FramebufferClear::Depth
                     | FramebufferClear::Stencil);
+
+        return gc_triggerAll;
     });
 
     rBuilder.task()
         .name       ("Calculate draw transforms")
-        .trigger_on ({tgSR.fboRender})
-        .depends_on ({tgSR.drawTransform_new, tgCS.hier_mod, tgCS.drawEnt_mod, tgCS.transform_mod})
-        .fulfills   ({tgSR.drawTransform_mod, tgCS.hier_use, tgCS.drawEnt_use, tgCS.transform_use})
+        .run_on     ({tgCS.transform(Use)})
+        .sync_with  ({tgCS.hierarchy(Use), tgCS.activeEnt(Use), tgSR.drawTransforms(Modify_)})
+        .triggers   ({tgSR.drawTransforms(Use_)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,                   idDrawing,                   idScnRender })
         .func([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
@@ -235,13 +245,16 @@ Session setup_scene_renderer(
                 rDrawing    .m_needDrawTf,
                 rootChildren.begin(),
                 rootChildren.end());
+
+        return gc_triggerAll;
     });
 
     rBuilder.task()
         .name       ("Render Entities")
-        .trigger_on ({tgSR.fboRender})
-        .depends_on ({                    tgSR.scnRender_mod, tgSR.group_mod, tgSR.groupEnts_mod, tgSR.drawTransform_mod, tgSR.camera_mod, tgSR.entMesh_mod, tgSR.entTexture_mod, tgMgn.meshGL_mod, tgMgn.textureGL_mod, tgCS.drawEnt_mod})
-        .fulfills   ({tgSR.fboRenderDone, tgSR.scnRender_use, tgSR.group_use, tgSR.groupEnts_use, tgSR.drawTransform_use, tgSR.camera_use, tgSR.entMesh_use, tgSR.entTexture_use, tgMgn.meshGL_use, tgMgn.textureGL_use, tgCS.drawEnt_use})
+        .run_on     ({tgSR.fboRender(Draw)})
+        .sync_with  ({tgSR.group(Use), tgSR.groupEnts(Use), tgSR.camera(Use), tgSR.drawTransforms(Use_), tgSR.entMesh(Use), tgSR.entTexture(Use),
+                      tgMgn.entMeshGL(Use), tgMgn.entTextureGL(Use),
+                      tgCS.drawEnt(Use)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,          idRenderGl,                   idGroupFwd,              idCamera })
         .func([] (ACtxDrawing const& rDrawing, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera, WorkerContext ctx) noexcept
@@ -254,8 +267,8 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Delete entities from render groups")
-        .trigger_on ({tgCS.delDrawEnt_mod})
-        .fulfills   ({tgCS.delDrawEnt_use, tgSR.groupEnts_del, tgSR.groupEnts_mod})
+        .run_on     ({tgCS.drawEntDelete(Use_)})
+        .sync_with  ({tgSR.groupEnts    (Delete)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,             idGroupFwd,                 idDrawEntDel })
         .func([] (ACtxDrawing const& rDrawing, RenderGroup& rGroup, DrawEntVec_t const& rDrawEntDel) noexcept
@@ -280,9 +293,9 @@ Session setup_shader_visualizer(
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(scnRender,     TESTAPP_DATA_COMMON_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
-    auto const tgCS     = commonScene   .get_targets<TgtCommonScene>();
-    auto const tgSR     = scnRender     .get_targets<TgtSceneRenderer>();
-    auto const tgMgn    = magnum        .get_targets<TgtMagnum>();
+    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const tgSR     = scnRender     .get_pipelines<PlSceneRenderer>();
+    auto const tgMgn    = magnum        .get_pipelines<PlMagnum>();
 
     auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
@@ -306,9 +319,8 @@ Session setup_shader_visualizer(
 
     rBuilder.task()
         .name       ("Sync MeshVisualizer shader entities")
-        .trigger_on ({tgCS.material_mod})
-        .depends_on ({                   tgSR.groupEnts_mod})
-        .fulfills   ({tgCS.material_use, tgSR.groupEnts_use, tgSR.group_mod})
+        .run_on     ({tgCS.materialDirty(Use_)})
+        .sync_with  ({tgSR.groupEnts(Use), tgSR.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,             idGroupFwd,                        idDrawShVisual})
         .func([] (ACtxDrawing const& rDrawing, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
@@ -320,9 +332,7 @@ Session setup_shader_visualizer(
     return out;
 }
 
-
-
-
+#if 0
 Session setup_shader_flat(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
@@ -356,7 +366,7 @@ Session setup_shader_flat(
     OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
     OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
 
-    shFlat.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, tgTexGlReq, tgGroupFwdMod}).data(
+    shFlat.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, PlexGlReq, tgGroupFwdMod}).data(
             "Sync Flat shader entities",
             TopDataIds_t{                            idMatDirty,                idMatEnts,                   idDrawing,                         idScnRender,             idGroupFwd,               idDrawShFlat},
             wrap_args([] (std::vector<DrawEnt> const& rMatDirty, EntSet_t const& rMatEnts, ACtxDrawing const& rDrawing, ACtxSceneRenderGL const& rScnRender, RenderGroup& rGroupFwd, ACtxDrawFlat& rDrawShFlat) noexcept
@@ -403,7 +413,7 @@ Session setup_shader_phong(
     OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
     OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
 
-    shPhong.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, tgTexGlReq, tgGroupFwdMod}).data(
+    shPhong.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, PlexGlReq, tgGroupFwdMod}).data(
             "Sync Phong shader entities",
             TopDataIds_t{                            idMatDirty,                idMatEnts,                   idDrawing,                         idScnRender,             idGroupFwd,               idDrawShPhong},
             wrap_args([] (std::vector<DrawEnt> const& rMatDirty, EntSet_t const& rMatEnts, ACtxDrawing const& rDrawing, ACtxSceneRenderGL const& rScnRender, RenderGroup& rGroupFwd, ACtxDrawPhong& rDrawShPhong) noexcept
@@ -677,17 +687,17 @@ Session setup_uni_test_planets_renderer(
         {
             return;
         }
-        Vector3 &rCamTgt = rCamCtrl.m_target.value();
+        Vector3 &rCamPl = rCamCtrl.m_target.value();
 
         // check origin translation
         // ADL used for Magnum::Math::sign/floor/abs
         float const maxDist = 512.0f;
-        Vector3 const translate = sign(rCamTgt) * floor(abs(rCamTgt) / maxDist) * maxDist;
+        Vector3 const translate = sign(rCamPl) * floor(abs(rCamPl) / maxDist) * maxDist;
 
         if ( ! translate.isZero())
         {
             rCamCtrl.m_transform.translation() -= translate;
-            rCamTgt -= translate;
+            rCamPl -= translate;
 
             // a bit janky to modify universe stuff directly here, but it works lol
             Vector3 const rotated = Quaternion(rScnFrame.m_rotation).transformVector(translate);

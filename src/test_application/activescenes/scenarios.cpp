@@ -64,7 +64,7 @@ static constexpr int    sc_materialCount    = 4;
 
 static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& scnRenderer, std::vector<TplPipelineStage> run = {})
 {
-    OSP_DECLARE_GET_DATA_IDS(scnRenderer,        TESTAPP_DATA_COMMON_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(scnRenderer,           TESTAPP_DATA_COMMON_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,     TESTAPP_DATA_MAGNUM);
 
@@ -76,15 +76,16 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
     auto tgWin = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>();
 
     // Resynchronize scene with new renderer
-    set_dirty(rTestApp.m_exec, tgScn.resyncAll, EStgFlag::Working);
+    exec_resize(rTestApp.m_tasks, rTestApp.m_exec);
+    set_dirty(rTestApp.m_exec, tgScn.resyncAll(EStgFlag::Working));
 
     run.insert(run.end(), {
         tgScn.time.tpl(EStgFlag::Working),
         tgWin.inputs.tpl(EStgFlag::Working),
-        tgWin.render.tpl(EStgFlag::Working)});
+        tgWin.display.tpl(EStgFlag::Working)});
 
     // run gets copied but who cares lol
-    rActiveApp.set_on_draw( [&rTestApp, run = std::move(run), resync  =tgScn.resyncAll]
+    rActiveApp.set_on_draw( [&rTestApp, run = std::move(run), resync = tgScn.resyncAll]
                             (ActiveApplication& rApp, float delta)
     {
         // Magnum Application's main loop is here
@@ -93,7 +94,7 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
 
         for (auto const [pipeline, stage] : run)
         {
-            set_dirty(rTestApp.m_exec, pipeline, stage);
+            set_dirty(rTestApp.m_exec, {pipeline, stage});
         }
 
         enqueue_dirty(rTestApp.m_tasks, *rTestApp.m_graph, rTestApp.m_exec);
@@ -177,8 +178,8 @@ static ScenarioMap_t make_scenarios()
         // Compose together lots of Sessions
         scene           = setup_scene               (builder, rTopData);
         commonScene     = setup_common_scene        (builder, rTopData, scene, idResources, defaultPkg);
-        //physics         = setup_physics             (builder, rTopData, commonScene);
-        //shapeSpawn      = setup_shape_spawn         (builder, rTopData, commonScene, physics, sc_matVisualizer);
+        physics         = setup_physics             (builder, rTopData, commonScene);
+        shapeSpawn      = setup_shape_spawn         (builder, rTopData, commonScene, physics, sc_matVisualizer);
         //droppers        = setup_droppers            (builder, rTopData, commonScene, shapeSpawn);
         //bounds          = setup_bounds              (builder, rTopData, commonScene, physics, shapeSpawn);
 
@@ -190,10 +191,14 @@ static ScenarioMap_t make_scenarios()
         create_materials(rTopData, commonScene, sc_materialCount);
         add_floor(rTopData, commonScene, shapeSpawn, sc_matVisualizer, idResources, defaultPkg);
 
-        //rTestApp.m_exec.resize(rTestApp.m_tasks);
-        //rTestApp.m_exec.m_targetDirty.set(std::size_t(commonScene.get_targets<PlCommonScene>().drawEnt_mod));
-        //rTestApp.m_exec.m_targetDirty.set(std::size_t(shapeSpawn.get_targets<PlShapeSpawn>().spawnRequest_mod));
+        auto const tgCS = commonScene.get_pipelines<PlCommonScene>();
+        auto const tgShSp = shapeSpawn.get_pipelines<PlShapeSpawn>();
 
+        exec_resize(rTestApp.m_tasks, rTestApp.m_exec);
+        set_dirty(rTestApp.m_exec, tgCS.drawEnt(New));
+        set_dirty(rTestApp.m_exec, tgCS.drawEnt(Use));
+        set_dirty(rTestApp.m_exec, tgCS.drawEntResized(Working));
+        set_dirty(rTestApp.m_exec, tgShSp.spawnRequest(Use_));
 
         return [] (TestApp& rTestApp)
         {
@@ -213,10 +218,10 @@ static ScenarioMap_t make_scenarios()
                 scnRender, cameraCtrl, cameraFree, shVisual, camThrow
             ] = resize_then_unpack<5>(rTestApp.m_renderer.m_sessions);
 
-            //scnRender   = setup_scene_renderer      (builder, rTopData, windowApp, magnum, scene, commonScene, idResources);
-            //cameraCtrl  = setup_camera_ctrl         (builder, rTopData, windowApp, scnRender);
-            //cameraFree  = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
-            //shVisual    = setup_shader_visualizer   (builder, rTopData, magnum, commonScene, scnRender, sc_matVisualizer);
+            scnRender   = setup_scene_renderer      (builder, rTopData, windowApp, magnum, scene, commonScene, idResources);
+            cameraCtrl  = setup_camera_ctrl         (builder, rTopData, windowApp, scnRender);
+            cameraFree  = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
+            shVisual    = setup_shader_visualizer   (builder, rTopData, magnum, commonScene, scnRender, sc_matVisualizer);
             //camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
 
             setup_magnum_draw(rTestApp, scene, scnRender);

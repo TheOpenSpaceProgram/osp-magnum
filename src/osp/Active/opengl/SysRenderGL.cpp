@@ -111,14 +111,13 @@ void SysRenderGL::setup_context(RenderGL& rCtxGl)
     }
 }
 
-void SysRenderGL::sync_scene_resources(
-        const ACtxDrawingRes &rCtxDrawRes,
-        Resources &rResources,
-        RenderGL &rRenderGl)
+void SysRenderGL::compile_resource_textures(
+        ACtxDrawingRes const&   rCtxDrawRes,
+        Resources&              rResources,
+        RenderGL&               rRenderGl)
 {
     // TODO: Eventually have dirty flags instead of checking every entry.
 
-    // Compile required texture resources
     for ([[maybe_unused]] auto const & [_, scnOwner] : rCtxDrawRes.m_texToRes)
     {
         ResId const texRes = scnOwner.value();
@@ -168,8 +167,15 @@ void SysRenderGL::sync_scene_resources(
                 .setStorage(1, textureFormat(imgData.format()), imgData.size())
                 .setSubImage(0, {}, imgData);
     }
+}
 
-    // Compile required mesh resources
+void SysRenderGL::compile_resource_meshes(
+        ACtxDrawingRes const&   rCtxDrawRes,
+        Resources&              rResources,
+        RenderGL&               rRenderGl)
+{
+    // TODO: Eventually have dirty flags instead of checking every entry.
+
     for ([[maybe_unused]] auto const & [_, scnOwner] : rCtxDrawRes.m_meshToRes)
     {
         ResId const meshRes = scnOwner.value();
