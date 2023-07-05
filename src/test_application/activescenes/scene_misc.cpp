@@ -208,7 +208,6 @@ Session setup_camera_free(
     return out;
 }
 
-/*
 
 Session setup_thrower(
         TopTaskBuilder&             rBuilder,
@@ -221,9 +220,9 @@ Session setup_thrower(
     OSP_DECLARE_GET_DATA_IDS(cameraCtrl,   TESTAPP_DATA_CAMERA_CTRL);
     auto &rCamCtrl = top_get< ACtxCameraController > (topData, idCamCtrl);
 
-    auto const tgWin    = windowApp     .get_targets<TgtWindowApp>();
-    auto const tgCmCt   = cameraCtrl    .get_targets<TgtCameraCtrl>();
-    auto const tgShSp   = shapeSpawn    .get_targets<TgtShapeSpawn>();
+    auto const tgWin    = windowApp .get_pipelines<PlWindowApp>();
+    auto const tgCmCt   = cameraCtrl.get_pipelines<PlCameraCtrl>();
+    auto const tgShSp   = shapeSpawn.get_pipelines<PlShapeSpawn>();
 
     Session out;
     auto const [idBtnThrow] = out.acquire_data<1>(topData);
@@ -232,9 +231,9 @@ Session setup_thrower(
 
     rBuilder.task()
         .name       ("Throw spheres when pressing space")
-        .trigger_on ({tgWin.input})
-        .depends_on ({tgCmCt.cameraCtrl_mod})
-        .fulfills   ({tgShSp.spawnRequest_mod})
+        .run_on     ({tgWin.inputs(Working)})
+        .sync_with  ({tgCmCt.camCtrl(Use), tgShSp.spawnRequest(Modify_)})
+        .triggers   ({tgShSp.spawnRequest(Use_)})
         .push_to    (out.m_tasks)
         .args       ({                 idCamCtrl,                  idSpawner,                   idBtnThrow })
         .func([] (ACtxCameraController& rCamCtrl, ACtxShapeSpawner& rSpawner, EButtonControlIndex btnThrow) noexcept
@@ -252,7 +251,9 @@ Session setup_thrower(
                 .m_mass     = 1.0f,
                 .m_shape    = EShape::Sphere
             });
+            return gc_triggerAll;
         }
+        return gc_triggerNone;
     });
 
     return out;

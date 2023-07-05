@@ -35,8 +35,6 @@ void exec_resize(Tasks const& tasks, ExecContext &rOut)
 
     rOut.tasksQueuedRun    .reserve(maxTasks);
     rOut.tasksQueuedBlocked.reserve(maxTasks);
-    bitvector_resize(rOut.tasksTryRun, maxTasks);
-
     rOut.plData.resize(maxPipeline);
     bitvector_resize(rOut.plDirty,     maxPipeline);
 
@@ -57,6 +55,14 @@ void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut)
         {
             rOut.plData[PipelineId(pipelineInt)].currentStage = lgrn::id_null<StageId>();
         }
+    }
+}
+
+static void exec_log(ExecContext &rExec, ExecContext::LogMsg_t msg)
+{
+    if (rExec.doLogging)
+    {
+        rExec.logMsg.push_back(msg);
     }
 }
 
@@ -116,6 +122,8 @@ static void apply_pipeline_stage(TaskGraph const& graph, ExecContext &rExec, Pip
         return; // no change
     }
 
+    exec_log(rExec, ExecContext::StageChange{pipeline, oldStage, newStage});
+
     rStage = newStage;
 
     LGRN_ASSERTV(rPlExec.stageReqTaskCount == 0, rPlExec.stageReqTaskCount);
@@ -147,6 +155,7 @@ static void apply_pipeline_stage(TaskGraph const& graph, ExecContext &rExec, Pip
             -- rBlocked.remainingTaskReqStg;
             if (rBlocked.remainingTaskReqStg == 0)
             {
+                exec_log(rExec, ExecContext::UnblockTask{task});
                 ExecPipeline &rTaskPlExec = rExec.plData[rBlocked.pipeline];
                 -- rTaskPlExec.tasksQueuedBlocked;
                 ++ rTaskPlExec.tasksQueuedRun;
@@ -161,13 +170,12 @@ static void run_pipeline_tasks(Tasks const& tasks, TaskGraph const& graph, ExecC
 {
     ExecPipeline        &rPlExec    = rExec.plData[pipeline];
     StageId const       stage       = rExec.plNextStage[pipeline];
+    StageBits_t const   stageBit    = 1 << int(stage);
 
     if (stage == lgrn::id_null<StageId>())
     {
         return;
     }
-
-    StageBits_t const   stageBit    = 1 << int(stage);
 
     LGRN_ASSERT(rPlExec.tasksQueuedBlocked == 0);
     LGRN_ASSERT(rPlExec.tasksQueuedRun == 0);
@@ -183,8 +191,33 @@ static void run_pipeline_tasks(Tasks const& tasks, TaskGraph const& graph, ExecC
 
     AnyStageId const    anystg      = anystg_from(graph, pipeline, stage);
 
-    for (TaskId task : fanout_view(graph.anystgToFirstRuntask, graph.runtaskToTask, anystg))
+    auto const runTasks = ArrayView<TaskId const>{fanout_view(graph.anystgToFirstRuntask, graph.runtaskToTask, anystg)};
+
+    if (runTasks.size() == 0)
     {
+        // No tasks to run. RunTasks are responsible for setting this pipeline dirty once they're
+        // all done. If there is none, then this pipeline may get stuck if nothing sets it dirty,
+        // so set dirty right away.
+        rExec.plDirtyNext.set(std::size_t(pipeline));
+        return;
+    }
+
+    for (TaskId task : runTasks)
+    {
+        bool const runsOnManyPipelines = fanout_size(graph.taskToFirstRunstage, task) > 1;
+        bool const alreadyBlocked = rExec.tasksQueuedBlocked.contains(task);
+        bool const alreadyRunning = rExec.tasksQueuedRun    .contains(task);
+        bool const alreadyQueued  = alreadyBlocked || alreadyRunning;
+
+        LGRN_ASSERTM( ( ! alreadyQueued ) || runsOnManyPipelines,
+                     "Attempt to enqueue a single-stage task that is already running. This is impossible!");
+
+        if (alreadyBlocked)
+        {
+            ++ rPlExec.tasksQueuedBlocked;
+            continue;
+        }
+
         // Evaluate Stage-requires-Tasks
         // * Increment counts for currently running stages that require this task
         for (AnyStageId const& reqTaskAnystg : fanout_view(graph.taskToFirstRevStgreqtask, graph.revStgreqtaskToStage, task))
@@ -223,7 +256,9 @@ static void run_pipeline_tasks(Tasks const& tasks, TaskGraph const& graph, ExecC
             }
         }
 
-        if (reqsRemaining != 0)
+        bool const blocked = reqsRemaining != 0;
+
+        if (blocked)
         {
             rExec.tasksQueuedBlocked.emplace(task, BlockedTask{reqsRemaining, pipeline});
             ++ rPlExec.tasksQueuedBlocked;
@@ -233,6 +268,20 @@ static void run_pipeline_tasks(Tasks const& tasks, TaskGraph const& graph, ExecC
             // Task can run right away
             rExec.tasksQueuedRun.emplace(task);
             ++ rPlExec.tasksQueuedRun;
+        }
+
+        exec_log(rExec, ExecContext::EnqueueTask{pipeline, stage, task, blocked});
+        if (blocked)
+        {
+            for (TaskRequiresStage const& req : taskreqstageView)
+            {
+                ExecPipeline const  &reqPlData  = rExec.plData[req.reqPipeline];
+
+                if (reqPlData.currentStage != req.reqStage)
+                {
+                    exec_log(rExec, ExecContext::EnqueueTaskReq{req.reqPipeline, req.reqStage});
+                }
+            }
         }
     }
 }
@@ -244,6 +293,8 @@ void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
 
     while (plDirtyOnes.begin() != plDirtyOnes.end())
     {
+        exec_log(rExec, ExecContext::EnqueueCycleStart{});
+
         // Calculate next stages
         for (std::size_t const pipelineInt : plDirtyOnes)
         {
@@ -276,6 +327,8 @@ void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext
 {
     LGRN_ASSERT(rExec.tasksQueuedRun.contains(task));
     rExec.tasksQueuedRun.erase(task);
+
+    exec_log(rExec, ExecContext::CompleteTask{task});
 
     auto const try_set_dirty = [&rExec] (ExecPipeline &plExec, PipelineId pipeline)
     {
@@ -329,7 +382,12 @@ void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext
             auto const [pipeline, stage] = triggersView[i];
             ExecPipeline &plExec  = rExec.plData[pipeline];
 
-            plExec.triggered |= 1 << int(stage);
+            if ( ! plExec.triggered.test(std::size_t(stage)) )
+            {
+                plExec.triggered.set(std::size_t(stage));
+                exec_log(rExec, ExecContext::TriggeredStage{task, pipeline, stage});
+            }
+
             try_set_dirty(plExec, pipeline);
         }
     }

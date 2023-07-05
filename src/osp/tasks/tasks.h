@@ -30,9 +30,19 @@
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>
 
+#include <entt/core/family.hpp>
+
 #include <cstdint>
 #include <ostream>
+#include <string_view>
 #include <vector>
+
+#define OSP_DECLARE_STAGE_NAMES(type, ...)                                                              \
+    inline osp::ArrayView<std::string_view const> stage_names([[maybe_unused]] type _) noexcept               \
+    {                                                                                                   \
+        static auto const arr = std::array<std::string_view const, std::size({__VA_ARGS__})>{__VA_ARGS__};    \
+        return osp::arrayView( arr.data(), arr.size() );                                                                     \
+    }
 
 namespace osp
 {
@@ -51,6 +61,17 @@ enum class PipelineId   : PipelineInt   { };
 enum class StageId      : StageInt      { };
 enum class SemaphoreId  : SemaphoreInt  { };
 
+struct PipelineInfo
+{
+    using stage_type_family_t = entt::family<struct StageTypeDummy>;
+    using stage_type_t = stage_type_family_t::value_type;
+
+    static inline KeyedVec<stage_type_t, ArrayView<std::string_view const>> sm_stageNames;
+
+    std::string_view                name;
+    std::string_view                category;
+    stage_type_t                    stageType;
+};
 
 struct Tasks
 {
@@ -59,6 +80,8 @@ struct Tasks
     lgrn::IdRegistryStl<SemaphoreId>                m_semaIds;
 
     KeyedVec<SemaphoreId, unsigned int>             m_semaLimits;
+
+    KeyedVec<PipelineId, PipelineInfo>              m_pipelineInfo;
 };
 
 struct TplTaskPipelineStage
@@ -262,6 +285,11 @@ constexpr StageId stage_prev(StageId const in, int stageCount) noexcept
 template <typename ENUM_T>
 struct PipelineDef
 {
+    constexpr PipelineDef() = default;
+    constexpr PipelineDef(std::string_view name)
+     : m_name{name}
+    { }
+
     operator PipelineId() const noexcept { return m_value; }
     operator std::size_t() const noexcept { return std::size_t(m_value); }
 
@@ -271,8 +299,18 @@ struct PipelineDef
 
     constexpr TplPipelineStage operator()(ENUM_T stage) const noexcept { return { m_value, StageId(stage) }; }
 
-    PipelineId m_value;
+    std::string_view m_name;
+
+    PipelineInfo::stage_type_t m_type { PipelineInfo::stage_type_family_t::value<ENUM_T> };
+
+    PipelineId m_value { lgrn::id_null<PipelineId>() };
+
+
+
+
 };
+
+using PipelineDefBlank_t = PipelineDef<int>;
 
 
 

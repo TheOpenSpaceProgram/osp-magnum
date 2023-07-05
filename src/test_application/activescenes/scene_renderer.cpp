@@ -230,7 +230,7 @@ Session setup_scene_renderer(
     rBuilder.task()
         .name       ("Calculate draw transforms")
         .run_on     ({tgCS.transform(Use)})
-        .sync_with  ({tgCS.hierarchy(Use), tgCS.activeEnt(Use), tgSR.drawTransforms(Modify_)})
+        .sync_with  ({tgCS.hierarchy(Use), tgCS.activeEnt(Use), tgSR.drawTransforms(Modify_), tgCS.drawEnt(Use)})
         .triggers   ({tgSR.drawTransforms(Use_)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,                   idDrawing,                   idScnRender })

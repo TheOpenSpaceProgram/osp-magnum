@@ -32,6 +32,7 @@
 #include <entt/entity/storage.hpp>
 
 #include <cassert>
+#include <variant>
 #include <vector>
 
 namespace osp
@@ -66,18 +67,64 @@ struct ExecContext
 {
     KeyedVec<PipelineId, ExecPipeline>  plData;
     BitVector_t                         plDirty;
-    BitVector_t                         plDirtyNext;
+
 
     entt::basic_sparse_set<TaskId>      tasksQueuedRun;
     entt::basic_storage<BlockedTask, TaskId> tasksQueuedBlocked;
-    BitVector_t                         tasksTryRun;
 
     KeyedVec<AnyStageId, int>           anystgReqByTaskCount;
 
-    // used for updating
-
+    // used for enqueue_dirty as temporary values
 
     KeyedVec<PipelineId, StageId>       plNextStage;
+    BitVector_t                         plDirtyNext;
+
+    // 'logging'
+
+    struct EnqueueCycleStart { };
+
+    struct StageChange
+    {
+        PipelineId  pipeline;
+        StageId     stageOld;
+        StageId     stageNew;
+    };
+
+    struct EnqueueTask
+    {
+        PipelineId  pipeline;
+        StageId     stage;
+        TaskId      task;
+        bool        blocked;
+    };
+
+    struct EnqueueTaskReq
+    {
+        PipelineId  pipeline;
+        StageId     stage;
+    };
+
+    struct CompleteTask
+    {
+        TaskId      task;
+    };
+
+    struct TriggeredStage
+    {
+        TaskId      task;
+        PipelineId  pipeline;
+        StageId     stage;
+    };
+
+    struct UnblockTask
+    {
+        TaskId      task;
+    };
+
+    using LogMsg_t = std::variant<EnqueueCycleStart, StageChange, EnqueueTask, EnqueueTaskReq, CompleteTask, TriggeredStage, UnblockTask>;
+
+    std::vector<LogMsg_t>           logMsg;
+    bool                            doLogging{true};
 
     // TODO: Consider multithreading. something something work stealing...
     //  * Allow multiple threads to search for and execute tasks. Atomic access
@@ -93,13 +140,6 @@ struct ExecContext
 void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
 
 void exec_resize(Tasks const& tasks, ExecContext &rOut);
-
-//inline bool compare_syncs(SyncWaiting const& lhs, SyncWaiting const& rhs)
-//{
-//    return (lhs.m_recipient < rhs.m_recipient)
-//        && (lhs.m_recipient < rhs.m_waitFor);
-//};
-
 
 inline void set_dirty(ExecContext &rExec, TplPipelineStage tpl) noexcept
 {

@@ -85,8 +85,8 @@ struct Session
     template<typename TGT_STRUCT_T, typename BUILDER_T>
     TGT_STRUCT_T create_pipelines(BUILDER_T &rBuilder)
     {
-        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineId) == 0);
-        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineId);
+        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineDefBlank_t) == 0);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineDefBlank_t);
 
         std::type_info const& info = typeid(TGT_STRUCT_T);
         m_structHash = info.hash_code();
@@ -95,15 +95,28 @@ struct Session
         m_pipelines.resize(count);
 
         rBuilder.m_rTasks.m_pipelineIds.create(m_pipelines.begin(), m_pipelines.end());
+        rBuilder.m_rTasks.m_pipelineInfo.resize(rBuilder.m_rTasks.m_pipelineIds.capacity());
 
-        return reinterpret_cast<TGT_STRUCT_T&>(*m_pipelines.data());
+        TGT_STRUCT_T out;
+        auto const members = Corrade::Containers::staticArrayView<count, PipelineDefBlank_t>(reinterpret_cast<PipelineDefBlank_t*>(&out));
+
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            PipelineId const pl = m_pipelines[i];
+            members[i].m_value = pl;
+
+            rBuilder.m_rTasks.m_pipelineInfo[pl].stageType  = members[i].m_type;
+            rBuilder.m_rTasks.m_pipelineInfo[pl].name       = members[i].m_name;
+        }
+
+        return out;
     }
 
     template<typename TGT_STRUCT_T>
     [[nodiscard]] TGT_STRUCT_T get_pipelines() const
     {
         static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineId) == 0);
-        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineId);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineDefBlank_t);
 
         std::type_info const& info = typeid(TGT_STRUCT_T);
         LGRN_ASSERTMV(m_structHash == info.hash_code() && count == m_pipelines.size(),
@@ -112,7 +125,15 @@ struct Session
                       info.hash_code(), info.name(),
                       m_pipelines.size());
 
-        return reinterpret_cast<TGT_STRUCT_T const&>(*m_pipelines.data());
+        TGT_STRUCT_T out;
+        auto const members = Corrade::Containers::staticArrayView<count, PipelineDefBlank_t>(reinterpret_cast<PipelineDefBlank_t*>(&out));
+
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            members[i].m_value = m_pipelines[i];
+        }
+
+        return out;
     }
 
     std::vector<TopDataId>  m_data;

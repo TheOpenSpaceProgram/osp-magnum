@@ -138,8 +138,19 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     for (TaskEdges const* pEdges : data)
     {
+        // Each run-on adds...
+        // * TaskRequiresStage makes task require pipeline to be on stage to be allowed to run
+        //   only if the task runs on multiple pipelines. This means all pipelines need to be
+        for (auto const [task, pipeline, stage] : pEdges->m_runOn)
+        {
+            if (taskCounts[task].runOn > 1)
+            {
+                count_taskreqstage(task, pipeline, stage);
+            }
+        }
+
         // Each sync-with adds...
-        // * TaskRequiresStage makes task require pipeline to be on stage
+        // * TaskRequiresStage makes task require pipeline to be on stage to be allowed to run
         // * StageRequiresTask for stage to wait for task to complete
         for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
         {
@@ -303,6 +314,11 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
             -- rStageCounts.runTasks;
             -- rTaskCounts.runOn;
             -- totalRunTasks;
+
+            if (rTaskCounts.runOn > 1)
+            {
+                add_taskreqstage(task, pipeline, stage);
+            }
         }
 
         for (auto const [task, pipeline, stage] : pEdges->m_syncWith)

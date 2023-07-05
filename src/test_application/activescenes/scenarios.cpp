@@ -90,24 +90,12 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
     {
         // Magnum Application's main loop is here
 
-        std::cout << "\n---- START ----\n";
-
         for (auto const [pipeline, stage] : run)
         {
             set_dirty(rTestApp.m_exec, {pipeline, stage});
         }
 
         enqueue_dirty(rTestApp.m_tasks, *rTestApp.m_graph, rTestApp.m_exec);
-
-        for (TaskId const task : rTestApp.m_exec.tasksQueuedRun)
-        {
-            std::cout << "run: " << rTestApp.m_taskData[task].m_debugName << "\n";
-        }
-
-        for (auto const [task, _] : rTestApp.m_exec.tasksQueuedBlocked.each())
-        {
-            std::cout << "blk: " << rTestApp.m_taskData[task].m_debugName << "\n";
-        }
 
         top_run_blocking(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_taskData, rTestApp.m_topData, rTestApp.m_exec);
 
@@ -123,9 +111,23 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
     });
 }
 
+template <typename STAGE_ENUM_T>
+static constexpr void register_stage_enum()
+{
+    PipelineInfo::stage_type_t const type = PipelineInfo::stage_type_family_t::value<STAGE_ENUM_T>;
+    PipelineInfo::sm_stageNames[type] = stage_names(STAGE_ENUM_T{});
+}
+
 static ScenarioMap_t make_scenarios()
 {   
     ScenarioMap_t scenarioMap;
+
+    PipelineInfo::sm_stageNames.resize(32);
+
+    register_stage_enum<EStgFlag>();
+    register_stage_enum<EStgIntr>();
+    register_stage_enum<EStgCont>();
+    register_stage_enum<EStgRender>();
 
     auto const add_scenario = [&scenarioMap] (std::string_view name, std::string_view desc, SceneSetupFunc_t run)
     {
@@ -222,7 +224,7 @@ static ScenarioMap_t make_scenarios()
             cameraCtrl  = setup_camera_ctrl         (builder, rTopData, windowApp, scnRender);
             cameraFree  = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
             shVisual    = setup_shader_visualizer   (builder, rTopData, magnum, commonScene, scnRender, sc_matVisualizer);
-            //camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
+            camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
 
             setup_magnum_draw(rTestApp, scene, scnRender);
         };
