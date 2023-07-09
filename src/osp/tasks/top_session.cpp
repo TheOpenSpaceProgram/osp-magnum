@@ -49,7 +49,7 @@ void top_close_session(
     {
         if (rSession.m_cleanup.pipeline != lgrn::id_null<PipelineId>())
         {
-            set_dirty(rExec, {rSession.m_cleanup.pipeline, rSession.m_cleanup.stage});
+            exec_trigger(rExec, {rSession.m_cleanup.pipeline, rSession.m_cleanup.stage});
         }
     }
     enqueue_dirty(rTasks, graph, rExec);

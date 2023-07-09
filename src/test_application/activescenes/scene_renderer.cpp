@@ -146,8 +146,9 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Resize Scene Render containers to fit drawable entities")
-        .run_on     ({tgCS.drawEntResized(Working)})
-        .sync_with  ({tgSR.scnRender(New), tgSR.drawTransforms(Resize), tgSR.entMesh(New)})
+        .run_on     ({tgSR.drawTransforms(Resize)})
+        .conditions ({tgCS.drawEntResized(Working)})
+        .sync_with  ({tgCS.drawEnt(New), tgSR.scnRender(New), tgSR.entMesh(New)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,                   idScnRender})
         .func([] (ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept

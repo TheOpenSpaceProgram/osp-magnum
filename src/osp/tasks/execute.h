@@ -42,12 +42,16 @@ struct ExecPipeline
 {
     StageBits_t     triggered           {0};
     StageId         currentStage        {0};
+    StageId         nextStage           {0};
 
     int             tasksQueuedRun      {0};
     int             tasksQueuedBlocked  {0};
 
     int             stageReqTaskCount   {0};
     int             taskReqStageCount   {0};
+
+    bool            triggerUsed         {false};
+    bool            stageChanged        {false};
 };
 
 struct BlockedTask
@@ -76,12 +80,13 @@ struct ExecContext
 
     // used for enqueue_dirty as temporary values
 
-    KeyedVec<PipelineId, StageId>       plNextStage;
     BitVector_t                         plDirtyNext;
 
     // 'logging'
 
-    struct EnqueueCycleStart { };
+    struct EnqueueStart { };
+    struct EnqueueCycle { };
+    struct EnqueueEnd { };
 
     struct StageChange
     {
@@ -104,24 +109,29 @@ struct ExecContext
         StageId     stage;
     };
 
-    struct CompleteTask
-    {
-        TaskId      task;
-    };
-
-    struct TriggeredStage
-    {
-        TaskId      task;
-        PipelineId  pipeline;
-        StageId     stage;
-    };
-
     struct UnblockTask
     {
         TaskId      task;
     };
 
-    using LogMsg_t = std::variant<EnqueueCycleStart, StageChange, EnqueueTask, EnqueueTaskReq, CompleteTask, TriggeredStage, UnblockTask>;
+    struct CompleteTask
+    {
+        TaskId      task;
+    };
+
+    struct CompleteTaskTrigger
+    {
+        PipelineId  pipeline;
+        StageId     stage;
+    };
+
+    struct ExternalTrigger
+    {
+        PipelineId  pipeline;
+        StageId     stage;
+    };
+
+    using LogMsg_t = std::variant<EnqueueStart, EnqueueCycle, EnqueueEnd, StageChange, EnqueueTask, EnqueueTaskReq, UnblockTask, CompleteTask, CompleteTaskTrigger, ExternalTrigger>;
 
     std::vector<LogMsg_t>           logMsg;
     bool                            doLogging{true};
@@ -141,15 +151,13 @@ void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
 
 void exec_resize(Tasks const& tasks, ExecContext &rOut);
 
-inline void set_dirty(ExecContext &rExec, TplPipelineStage tpl) noexcept
-{
-    rExec.plData[tpl.pipeline].triggered |= 1 << int(tpl.stage);
-    rExec.plDirty.set(std::size_t(tpl.pipeline));
-}
+void exec_trigger(ExecContext &rExec, TplPipelineStage tpl);
 
 void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;
 
-void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, TriggerOut_t dirty) noexcept;
+bool conditions_satisfied(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId task) noexcept;
+
+void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId task, TriggerOut_t dirty) noexcept;
 
 
 

@@ -38,7 +38,6 @@ void exec_resize(Tasks const& tasks, ExecContext &rOut)
     rOut.plData.resize(maxPipeline);
     bitvector_resize(rOut.plDirty,     maxPipeline);
 
-    rOut.plNextStage.resize(maxPipeline);
     bitvector_resize(rOut.plDirtyNext,  maxPipeline);
 }
 
@@ -66,67 +65,90 @@ static void exec_log(ExecContext &rExec, ExecContext::LogMsg_t msg)
     }
 }
 
-static StageId pipeline_next_stage(TaskGraph const& graph, ExecContext const &exec, ExecPipeline const &execPl, PipelineId const pipeline) noexcept
+void exec_trigger(ExecContext &rExec, TplPipelineStage tpl)
 {
-    StageId out = execPl.currentStage;
+    StageBits_t &rTriggered = rExec.plData[tpl.pipeline].triggered;
 
-    if (    execPl.tasksQueuedBlocked  != 0
-         || execPl.tasksQueuedRun      != 0
-         || execPl.stageReqTaskCount   != 0
-         || out == lgrn::id_null<StageId>())
+    if ( ! rTriggered.test(std::size_t(tpl.stage)) )
     {
-        return out; // Can't advance. This stage still has (or requires other) tasks to complete
-                    // or pipeline has no stages.
+        rExec.plDirty.set(std::size_t(tpl.pipeline));
+        rTriggered.set(std::size_t(tpl.stage));
+
+        exec_log(rExec, ExecContext::ExternalTrigger{tpl.pipeline, tpl.stage});
+    }
+}
+
+static void calculate_next_stage(TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline) noexcept
+{
+    ExecPipeline    &rExecPl    = rExec.plData[pipeline];
+
+    rExecPl.nextStage = rExecPl.currentStage;
+    rExecPl.stageChanged = false;
+
+    if (    rExecPl.tasksQueuedBlocked  != 0
+         || rExecPl.tasksQueuedRun      != 0
+         || rExecPl.stageReqTaskCount   != 0
+         || rExecPl.currentStage        == lgrn::id_null<StageId>())
+    {
+        // Can't advance. This stage still has (or requires other) tasks to complete
+        // or pipeline has no stages.
+        return;
     }
 
     int const stageCount = fanout_size(graph.pipelineToFirstAnystg, pipeline);
 
     if (stageCount == 0)
     {
-        return out;
+        return;
     }
 
     while(true)
     {
-        if (exec.anystgReqByTaskCount[anystg_from(graph, pipeline, out)])
+        if (rExec.anystgReqByTaskCount[anystg_from(graph, pipeline, rExecPl.nextStage)] != 0)
         {
-            return out; // Can't advance, there are queued tasks that require this stage
+            // Stop here, there are queued tasks that require this stage
+            return;
         }
 
-        out = stage_next(out, stageCount);
+        rExecPl.nextStage = stage_next(rExecPl.nextStage, stageCount);
+        rExecPl.stageChanged = true;
 
-        if (execPl.triggered.test(std::size_t(out)))
+        if (rExecPl.triggered.test(std::size_t(rExecPl.nextStage)))
         {
-            return out; // Stop on this stage to run tasks
+            // Stop on this stage to run tasks
+            return;
         }
 
         // No triggered and no waiting tasks means infinite loop. Stage should still move by 1 though.
-        if (   ( ! execPl.triggered.any() )
-            && ( execPl.stageReqTaskCount == 0 )
-            && ( execPl.taskReqStageCount == 0 ) )
+        if (   ( ! rExecPl.triggered.any() )
+            && ( rExecPl.stageReqTaskCount == 0 )
+            && ( rExecPl.taskReqStageCount == 0 ) )
         {
-            return out;
+            return;
         }
     }
 }
 
 static void apply_pipeline_stage(TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
 {
-    ExecPipeline  &rPlExec = rExec.plData[pipeline];
-    StageId       &rStage  = rPlExec.currentStage;
-    StageId const oldStage = rStage;
-    StageId const newStage = rExec.plNextStage[pipeline];
+    ExecPipeline  &rExecPl = rExec.plData[pipeline];
 
-    if (oldStage == newStage)
+    StageId const oldStage = rExecPl.currentStage;
+    StageId const newStage = rExecPl.nextStage;
+
+    if ( ! rExecPl.stageChanged )
     {
-        return; // no change
+        return;
     }
+
+    rExecPl.triggerUsed = rExecPl.triggered.test(std::size_t(newStage));
+    rExecPl.triggered.reset(std::size_t(newStage));
 
     exec_log(rExec, ExecContext::StageChange{pipeline, oldStage, newStage});
 
-    rStage = newStage;
+    rExecPl.currentStage = newStage;
 
-    LGRN_ASSERTV(rPlExec.stageReqTaskCount == 0, rPlExec.stageReqTaskCount);
+    LGRN_ASSERTV(rExecPl.stageReqTaskCount == 0, rExecPl.stageReqTaskCount);
 
     // Evaluate Stage-requires-Tasks
     // * Calculate stageReqTaskCount as the number of required task that are currently queued
@@ -142,7 +164,7 @@ static void apply_pipeline_stage(TaskGraph const& graph, ExecContext &rExec, Pip
         }
     }
 
-    rPlExec.stageReqTaskCount = stageReqTaskCount;
+    rExecPl.stageReqTaskCount = stageReqTaskCount;
 
     // Evaluate Task-requires-Stages
     // * Increment counts for queued tasks that depend on this stage. This unblocks tasks
@@ -168,28 +190,29 @@ static void apply_pipeline_stage(TaskGraph const& graph, ExecContext &rExec, Pip
 
 static void run_pipeline_tasks(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
 {
-    ExecPipeline        &rPlExec    = rExec.plData[pipeline];
-    StageId const       stage       = rExec.plNextStage[pipeline];
-    StageBits_t const   stageBit    = 1 << int(stage);
+    ExecPipeline        &rExecPl    = rExec.plData[pipeline];
 
-    if (stage == lgrn::id_null<StageId>())
+    if ( ! rExecPl.stageChanged )
     {
         return;
     }
 
-    LGRN_ASSERT(rPlExec.tasksQueuedBlocked == 0);
-    LGRN_ASSERT(rPlExec.tasksQueuedRun == 0);
+    if (rExecPl.nextStage == lgrn::id_null<StageId>())
+    {
+        return;
+    }
 
-    if ( (rPlExec.triggered & stageBit) == 0 )
+    LGRN_ASSERT(rExecPl.tasksQueuedBlocked == 0);
+    LGRN_ASSERT(rExecPl.tasksQueuedRun == 0);
+
+    if ( ! rExecPl.triggerUsed )
     {
         return; // Not triggered
     }
 
-    rPlExec.triggered &= ~stageBit;
-
     // Enqueue all tasks
 
-    AnyStageId const    anystg      = anystg_from(graph, pipeline, stage);
+    AnyStageId const    anystg      = anystg_from(graph, pipeline, rExecPl.nextStage);
 
     auto const runTasks = ArrayView<TaskId const>{fanout_view(graph.anystgToFirstRuntask, graph.runtaskToTask, anystg)};
 
@@ -214,7 +237,7 @@ static void run_pipeline_tasks(Tasks const& tasks, TaskGraph const& graph, ExecC
 
         if (alreadyBlocked)
         {
-            ++ rPlExec.tasksQueuedBlocked;
+            ++ rExecPl.tasksQueuedBlocked;
             continue;
         }
 
@@ -261,16 +284,16 @@ static void run_pipeline_tasks(Tasks const& tasks, TaskGraph const& graph, ExecC
         if (blocked)
         {
             rExec.tasksQueuedBlocked.emplace(task, BlockedTask{reqsRemaining, pipeline});
-            ++ rPlExec.tasksQueuedBlocked;
+            ++ rExecPl.tasksQueuedBlocked;
         }
         else
         {
             // Task can run right away
             rExec.tasksQueuedRun.emplace(task);
-            ++ rPlExec.tasksQueuedRun;
+            ++ rExecPl.tasksQueuedRun;
         }
 
-        exec_log(rExec, ExecContext::EnqueueTask{pipeline, stage, task, blocked});
+        exec_log(rExec, ExecContext::EnqueueTask{pipeline, rExecPl.nextStage, task, blocked});
         if (blocked)
         {
             for (TaskRequiresStage const& req : taskreqstageView)
@@ -291,16 +314,16 @@ void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
 {
     auto const plDirtyOnes = rExec.plDirty.ones();
 
+    exec_log(rExec, ExecContext::EnqueueStart{});
+
     while (plDirtyOnes.begin() != plDirtyOnes.end())
     {
-        exec_log(rExec, ExecContext::EnqueueCycleStart{});
+        exec_log(rExec, ExecContext::EnqueueCycle{});
 
         // Calculate next stages
         for (std::size_t const pipelineInt : plDirtyOnes)
         {
-            auto const   pipeline       = PipelineId(pipelineInt);
-            ExecPipeline &rPlExec       = rExec.plData[pipeline];
-            rExec.plNextStage[pipeline] = pipeline_next_stage(graph, rExec, rPlExec, pipeline);
+            calculate_next_stage(graph, rExec, PipelineId(pipelineInt));
         }
 
         // Apply next stages
@@ -321,9 +344,26 @@ void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
                   rExec.plDirty    .ints().begin());
         rExec.plDirtyNext.reset();
     }
+
+    exec_log(rExec, ExecContext::EnqueueEnd{});
 }
 
-void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, TriggerOut_t dirty) noexcept
+bool conditions_satisfied(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task) noexcept
+{
+    for (auto const [pipeline, stage] : fanout_view(graph.taskToFirstCondition, graph.conditionToPlStage, task))
+    {
+        ExecPipeline &rExecPl = rExec.plData[pipeline];
+        if (   rExecPl.currentStage != stage
+            || ! rExecPl.triggerUsed )
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, TriggerOut_t dirty) noexcept
 {
     LGRN_ASSERT(rExec.tasksQueuedRun.contains(task));
     rExec.tasksQueuedRun.erase(task);
@@ -385,7 +425,7 @@ void mark_completed_task(Tasks const& tasks, TaskGraph const& graph, ExecContext
             if ( ! plExec.triggered.test(std::size_t(stage)) )
             {
                 plExec.triggered.set(std::size_t(stage));
-                exec_log(rExec, ExecContext::TriggeredStage{task, pipeline, stage});
+                exec_log(rExec, ExecContext::CompleteTaskTrigger{pipeline, stage});
             }
 
             try_set_dirty(plExec, pipeline);

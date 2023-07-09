@@ -75,9 +75,9 @@ void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec
             }
 
             // Task actually runs here. Results are not yet used for anything.
-            TriggerOut_t const status = rTopTask.m_func(worker, topDataRefs);
+            TriggerOut_t const status = (rTopTask.m_func != nullptr) ? rTopTask.m_func(worker, topDataRefs) : 0;
 
-            mark_completed_task(tasks, graph, rExec, task, status);
+            complete_task(tasks, graph, rExec, task, status);
             top_write_log(std::cout, tasks, rTaskData, graph, rExec);
             rExec.logMsg.clear();
         }
@@ -109,14 +109,12 @@ void top_write_pipeline_states(std::ostream &rStream, Tasks const& tasks, TopTas
 {
     constexpr int nameMinColumns = 48;
 
-    rStream << std::setfill('0');
-
     for (PipelineInt plInt : tasks.m_pipelineIds.bitview().zeros())
     {
         auto const          pl      = PipelineId(plInt);
         ExecPipeline const  &plExec = exec.plData[pl];
 
-        rStream << "PL" << std::setw(3) << plInt << ": ";
+        rStream << "PL" << std::setw(3) << std::left << plInt << ": ";
 
         int const stageCount = fanout_size(graph.pipelineToFirstAnystg, pl);
 
@@ -171,42 +169,53 @@ void top_write_log(std::ostream &rStream, Tasks const& tasks, TopTaskDataVec_t c
     auto const visitMsg = [&rStream, &tasks, &taskData, &graph, &stage_name] (auto&& msg)
     {
         using MSG_T = std::decay_t<decltype(msg)>;
-        if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueCycleStart>)
+        if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueStart>)
         {
-            rStream << "Cycle start\n";
+            rStream << "EnqueueStart\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueCycle>)
+        {
+            rStream << "EnqueueCycle\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueEnd>)
+        {
+            rStream << "EnqueueEnd\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::StageChange>)
         {
-
-            rStream << "Stage Change PL" << std::setw(3) << PipelineInt(msg.pipeline) << " "
+            rStream << "    StageChange PL" << std::setw(3) << PipelineInt(msg.pipeline) << "("
                     << stage_name(msg.pipeline, msg.stageOld)
                     << " -> "
-                    << stage_name(msg.pipeline, msg.stageNew) << "\n";
+                    << stage_name(msg.pipeline, msg.stageNew) << ")\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueTask>)
         {
-            rStream << "Enqueue " << (msg.blocked ? "Blocked" : "Run")
+            rStream << "    Enqueue " << (msg.blocked ? "Blocked" : "Run")
                     << " on PL" << std::setw(3) << PipelineInt(msg.pipeline)
-                    << " stage " << stage_name(msg.pipeline, msg.stage)
+                    << "(" << stage_name(msg.pipeline, msg.stage) << ")"
                     << " TASK" << TaskInt(msg.task) << " - " << taskData[msg.task].m_debugName << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueTaskReq>)
         {
-            rStream << "* Requires PL" << std::setw(3) << PipelineInt(msg.pipeline) << " stage " << stage_name(msg.pipeline, msg.stage) << "\n";
-        }
-        else if constexpr (std::is_same_v<MSG_T, ExecContext::CompleteTask>)
-        {
-            rStream << "Complete TASK" << TaskInt(msg.task) << "\n";
-        }
-        else if constexpr (std::is_same_v<MSG_T, ExecContext::TriggeredStage>)
-        {
-            rStream << "Triggered from TASK" << TaskInt(msg.task)
-                    << " PL" << std::setw(3) << PipelineInt(msg.pipeline)
-                    << " stage " << stage_name(msg.pipeline, msg.stage) << "\n";
+            rStream << "    * Requires PL" << std::setw(3) << PipelineInt(msg.pipeline) << "(" << stage_name(msg.pipeline, msg.stage) << ")\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::UnblockTask>)
         {
-            rStream << "* Unblock TASK" << TaskInt(msg.task) << "\n";
+            rStream << "    * Unblock TASK" << TaskInt(msg.task) << "\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::CompleteTask>)
+        {
+            rStream << "Complete TASK" << TaskInt(msg.task) << " - " << taskData[msg.task].m_debugName << "\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::CompleteTaskTrigger>)
+        {
+            rStream << "* Trigger PL" << std::setw(3) << PipelineInt(msg.pipeline)
+                    << "(" << stage_name(msg.pipeline, msg.stage) << ")\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::ExternalTrigger>)
+        {
+            rStream << "ExternalTrigger PL" << std::setw(3) << PipelineInt(msg.pipeline)
+                    << "(" << stage_name(msg.pipeline, msg.stage) << ")\n";
         }
     };
 

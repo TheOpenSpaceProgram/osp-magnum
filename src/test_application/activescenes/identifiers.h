@@ -72,7 +72,7 @@ enum class EStgCont : uint8_t
     ///< elements to fill directly after
 
     New,
-    ///< Add new elements. Potentially resize the container to fit more
+    ///< Add new elements. Potentially resize the container to fit more elements
 
     Modify,
     ///< Modify existing elements

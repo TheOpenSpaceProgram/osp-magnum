@@ -68,14 +68,23 @@ struct TaskBuilderBase
     template<typename TGT_STRUCT_T>
     TGT_STRUCT_T create_pipelines()
     {
-        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineId) == 0);
-        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineId);
+        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineDefBlank_t) == 0);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineDefBlank_t);
 
-        std::array<PipelineId, count> out;
+        std::array<PipelineId, count> pipelines;
 
-        m_rTasks.m_pipelineIds.create(out.begin(), out.end());
+        m_rTasks.m_pipelineIds.create(pipelines.begin(), pipelines.end());
 
-        return reinterpret_cast<TGT_STRUCT_T&>(*out.data());
+        TGT_STRUCT_T out;
+        auto const members = Corrade::Containers::staticArrayView<count, PipelineDefBlank_t>(reinterpret_cast<PipelineDefBlank_t*>(&out));
+
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            PipelineId const pl = pipelines[i];
+            members[i].m_value = pl;
+        }
+
+        return out;
     }
 
     template<std::size_t N>
@@ -146,6 +155,16 @@ struct TaskRefBase
     TASKREF_T& triggers(std::initializer_list<TplPipelineStage const> specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_triggers, specs);
+    }
+
+    TASKREF_T& conditions(ArrayView<TplPipelineStage const> const specs) noexcept
+    {
+        return add_edges(m_rBuilder.m_rEdges.m_conditions, specs);
+    }
+
+    TASKREF_T& conditions(std::initializer_list<TplPipelineStage const> specs) noexcept
+    {
+        return add_edges(m_rBuilder.m_rEdges.m_conditions, specs);
     }
 
     TaskId          m_taskId;

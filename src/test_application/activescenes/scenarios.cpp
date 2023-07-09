@@ -77,7 +77,7 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
 
     // Resynchronize scene with new renderer
     exec_resize(rTestApp.m_tasks, rTestApp.m_exec);
-    set_dirty(rTestApp.m_exec, tgScn.resyncAll(EStgFlag::Working));
+    exec_trigger(rTestApp.m_exec, tgScn.resyncAll(EStgFlag::Working));
 
     run.insert(run.end(), {
         tgScn.time.tpl(EStgFlag::Working),
@@ -92,7 +92,7 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
 
         for (auto const [pipeline, stage] : run)
         {
-            set_dirty(rTestApp.m_exec, {pipeline, stage});
+            exec_trigger(rTestApp.m_exec, {pipeline, stage});
         }
 
         enqueue_dirty(rTestApp.m_tasks, *rTestApp.m_graph, rTestApp.m_exec);
@@ -197,10 +197,10 @@ static ScenarioMap_t make_scenarios()
         auto const tgShSp = shapeSpawn.get_pipelines<PlShapeSpawn>();
 
         exec_resize(rTestApp.m_tasks, rTestApp.m_exec);
-        set_dirty(rTestApp.m_exec, tgCS.drawEnt(New));
-        set_dirty(rTestApp.m_exec, tgCS.drawEnt(Use));
-        set_dirty(rTestApp.m_exec, tgCS.drawEntResized(Working));
-        set_dirty(rTestApp.m_exec, tgShSp.spawnRequest(Use_));
+        exec_trigger(rTestApp.m_exec, tgCS.drawEnt(New));
+        exec_trigger(rTestApp.m_exec, tgCS.drawEnt(Use));
+        exec_trigger(rTestApp.m_exec, tgCS.drawEntResized(Working));
+        exec_trigger(rTestApp.m_exec, tgShSp.spawnRequest(Use_));
 
         return [] (TestApp& rTestApp)
         {

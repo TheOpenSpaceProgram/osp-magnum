@@ -97,6 +97,7 @@ struct TplPipelineStage
     StageId     stage;
 };
 
+
 struct TplTaskSemaphore
 {
     TaskId      task;
@@ -108,6 +109,7 @@ struct TaskEdges
     std::vector<TplTaskPipelineStage>   m_runOn;
     std::vector<TplTaskPipelineStage>   m_syncWith;
     std::vector<TplTaskPipelineStage>   m_triggers;
+    std::vector<TplTaskPipelineStage>   m_conditions;
     std::vector<TplTaskSemaphore>       m_semaphoreEdges;
 };
 
@@ -116,6 +118,7 @@ enum class AnyStageId               : uint32_t { };
 enum class RunTaskId                : uint32_t { };
 enum class RunStageId               : uint32_t { };
 enum class TriggerId                : uint32_t { };
+enum class ConditionId              : uint32_t { };
 
 enum class StageReqTaskId           : uint32_t { };
 enum class ReverseStageReqTaskId    : uint32_t { };
@@ -161,10 +164,15 @@ struct TaskGraph
     KeyedVec<TaskId, RunStageId>                    taskToFirstRunstage;
     KeyedVec<RunStageId, AnyStageId>                runstageToAnystg;
 
-    // Tasks trigger stages of pipelines
+    // Tasks trigger many stages of pipelines
     // TaskId --> TriggerId --> many TplPipelineStage
     KeyedVec<TaskId, TriggerId>                     taskToFirstTrigger;
     KeyedVec<TriggerId, TplPipelineStage>           triggerToPlStage;
+
+    // Tasks can have many conditions
+    // TaskId --> ConditionId --> many TplPipelineStage
+    KeyedVec<TaskId, ConditionId>                   taskToFirstCondition;
+    KeyedVec<ConditionId, TplPipelineStage>         conditionToPlStage;
 
     // Each stage has multiple entrance requirements.
     // AnyStageId <--> many StageEnterReqId
