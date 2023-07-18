@@ -65,6 +65,7 @@ osp::Session setup_shader_visualizer(
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         magnum,
         osp::Session const&         scene,
+        osp::Session const&         commonScene,
         osp::Session const&         scnRender,
         osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
 

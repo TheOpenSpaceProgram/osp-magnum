@@ -40,47 +40,41 @@ namespace osp
 
 struct ExecPipeline
 {
-    StageBits_t     triggered           {0};
-    StageId         currentStage        {0};
-    StageId         nextStage           {0};
-
     int             tasksQueuedRun      {0};
     int             tasksQueuedBlocked  {0};
 
-    int             stageReqTaskCount   {0};
-    int             taskReqStageCount   {0};
+    int             reqByTaskLeft       {0};
+    int             reqTasksLeft        {0};
 
-    bool            triggerUsed         {false};
-    bool            stageChanged        {false};
+    StageId         stage               { lgrn::id_null<StageId>() };
+    bool            tasksQueued         { false };
+    bool            running             { false };
+    bool            mightLoop           { false };
 };
 
 struct BlockedTask
 {
-    int             remainingTaskReqStg;
+    int             reqStagesLeft;
     PipelineId      pipeline;
 };
 
 /**
- * @brief The ExecContext class
- *
- * Pipelines are marked dirty (m_plDirty.set(pipeline int)) if...
- * * All of its running tasks just finished
- * * Not running but required by another pipeline
+ * @brief
  */
 struct ExecContext
 {
     KeyedVec<PipelineId, ExecPipeline>  plData;
-    BitVector_t                         plDirty;
 
+    entt::basic_sparse_set<TaskId>              tasksQueuedRun;
+    entt::basic_storage<BlockedTask, TaskId>    tasksQueuedBlocked;
 
-    entt::basic_sparse_set<TaskId>      tasksQueuedRun;
-    entt::basic_storage<BlockedTask, TaskId> tasksQueuedBlocked;
+    BitVector_t                         plAdvance;
+    BitVector_t                         plAdvanceNext;
+    bool                                hasPlAdvance  {false};
 
-    KeyedVec<AnyStageId, int>           anystgReqByTaskCount;
+    BitVector_t                         plRequestRun;
+    bool                                hasRequestRun {false};
 
-    // used for enqueue_dirty as temporary values
-
-    BitVector_t                         plDirtyNext;
 
     // 'logging'
 
@@ -151,7 +145,7 @@ void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
 
 void exec_resize(Tasks const& tasks, ExecContext &rOut);
 
-void exec_trigger(ExecContext &rExec, TplPipelineStage tpl);
+void exec_run(ExecContext &rExec, PipelineId pipeline);
 
 void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;
 

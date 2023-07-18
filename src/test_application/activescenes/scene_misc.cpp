@@ -151,7 +151,8 @@ Session setup_camera_ctrl(
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(scnRender,     TESTAPP_DATA_COMMON_RENDERER);
 
-    auto const tgSR = scnRender.get_pipelines<PlSceneRenderer>();
+    auto const tgSR  = scnRender.get_pipelines<PlSceneRenderer>();
+    auto const tgWin = windowApp.get_pipelines<PlWindowApp>();
 
     auto &rUserInput = top_get< osp::input::UserInputHandler >(topData, idUserInput);
 
@@ -163,8 +164,8 @@ Session setup_camera_ctrl(
 
     rBuilder.task()
         .name       ("Position Rendering Camera according to Camera Controller")
-        .run_on     ({tgCmCt.camCtrl(Use)})
-        .sync_with  ({tgSR.camera(Modify)})
+        .run_on     ({tgWin.inputs(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Use), tgSR.camera(Modify)})
         .push_to    (out.m_tasks)
         .args       ({                           idCamCtrl,        idCamera })
         .func([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
@@ -192,7 +193,7 @@ Session setup_camera_free(
 
     rBuilder.task()
         .name       ("Move Camera controller")
-        .run_on     ({tgWin.inputs(Working)})
+        .run_on     ({tgWin.inputs(Run)})
         .sync_with  ({tgCmCt.camCtrl(Modify)})
         .triggers   ({tgCmCt.camCtrl(Use)})
         .push_to    (out.m_tasks)
@@ -231,7 +232,7 @@ Session setup_thrower(
 
     rBuilder.task()
         .name       ("Throw spheres when pressing space")
-        .run_on     ({tgWin.inputs(Working)})
+        .run_on     ({tgWin.inputs(Run)})
         .sync_with  ({tgCmCt.camCtrl(Use), tgShSp.spawnRequest(Modify_)})
         .triggers   ({tgShSp.spawnRequest(Use_)})
         .push_to    (out.m_tasks)

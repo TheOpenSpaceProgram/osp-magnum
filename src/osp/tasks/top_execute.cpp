@@ -74,12 +74,20 @@ void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec
                                        : entt::any{});
             }
 
-            // Task actually runs here. Results are not yet used for anything.
-            TriggerOut_t const status = (rTopTask.m_func != nullptr) ? rTopTask.m_func(worker, topDataRefs) : 0;
+            bool const shouldRun = (rTopTask.m_func != nullptr) && conditions_satisfied(tasks, graph, rExec, task);
+
+            // Task actually runs here
+            TriggerOut_t const status = shouldRun ? rTopTask.m_func(worker, topDataRefs) : 0;
 
             complete_task(tasks, graph, rExec, task, status);
             top_write_log(std::cout, tasks, rTaskData, graph, rExec);
             rExec.logMsg.clear();
+        }
+        else
+        {
+            std::cout << "RIP pipelines. something deadlocked UwU\n";
+            top_write_pipeline_states(std::cout, tasks, rTaskData, graph, rExec);
+            std::abort();
         }
 
         enqueue_dirty(tasks, graph, rExec);

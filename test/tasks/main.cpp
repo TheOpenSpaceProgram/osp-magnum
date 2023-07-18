@@ -64,8 +64,7 @@ void randomized_singlethreaded_execute(Tasks const& tasks, TaskGraph const& grap
         if (runTasksLeft != 0)
         {
             TaskId const        randomTask  = rExec.tasksQueuedRun.at(rRand() % runTasksLeft);
-            bool const          canRun      = conditions_satisfied(tasks, graph, rExec, randomTask);
-            TriggerOut_t const  status      = canRun ? runTask(randomTask) : gc_triggerNone;
+            TriggerOut_t const  status      = runTask(randomTask);
             complete_task(tasks, graph, rExec, randomTask, status);
         }
 
@@ -78,7 +77,7 @@ void randomized_singlethreaded_execute(Tasks const& tasks, TaskGraph const& grap
 namespace test_a
 {
 
-enum class Stages { Clear, Fill, Use };
+enum class Stages { Fill, Use, Clear };
 
 struct Pipelines
 {
@@ -120,8 +119,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     for (int i = 0; i < sc_pusherTaskCount; ++i)
     {
         builder.task()
-            .run_on  ({pl.vec(Fill)})
-            .triggers({pl.vec(Use), pl.vec(Clear)})
+            .run_on  (pl.vec(Fill))
             .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
         {
             rOut.push_back(in);
@@ -131,7 +129,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
 
     // Use vector
     builder.task()
-        .run_on({pl.vec(Use)})
+        .run_on(pl.vec(Use))
         .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
     {
         int const sum = std::accumulate(rOut.begin(), rOut.end(), 0);
@@ -167,7 +165,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     {
         input = 1 + randGen() % 30;
 
-        exec_trigger(exec, pl.vec(Fill));
+        exec_run(exec, pl.vec);
         enqueue_dirty(tasks, graph, exec);
 
         randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output, &checksRun] (TaskId const task) -> TriggerOut_t
@@ -178,7 +176,6 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
 
     ASSERT_EQ(checksRun, sc_repetitions);
 }
-
 
 //-----------------------------------------------------------------------------
 
@@ -202,7 +199,6 @@ struct Pipelines
 };
 
 } // namespace test_gameworld
-
 
 // Test that features a looping 'normal' pipeline and an 'optional' pipeline that has a 50% chance of running
 TEST(Tasks, BasicSingleThreadedTriggers)
@@ -293,139 +289,6 @@ TEST(Tasks, BasicSingleThreadedTriggers)
     TestState world;
 
     exec_trigger(exec, pl.normal(Schedule));
-    enqueue_dirty(tasks, graph, exec);
-
-    randomized_singlethreaded_execute(
-            tasks, graph, exec, randGen, sc_taskRuns,
-                [&functions, &world, &randGen] (TaskId const task) -> TriggerOut_t
-    {
-        return functions[task](world, randGen);
-    });
-
-    // Assure that the tasks above actually ran, and didn't just skip everything
-    // Max of 5 tasks run each loop
-    ASSERT_GT(world.checks, sc_taskRuns / 5);
-
-}
-
-namespace test_c
-{
-
-struct TestState
-{
-    int     checks              { 0 };
-    bool    normalFlag          { false };
-    bool    optionalFlagExpect  { false };
-    bool    optionalFlag        { false };
-};
-
-
-enum class StgRun { Wait, Run };
-enum class StgGuide { Clear, Schedule, Write, Read };
-
-struct Pipelines
-{
-    osp::PipelineDef<StgRun>    run;
-    osp::PipelineDef<StgGuide>  normal;
-    osp::PipelineDef<StgGuide>  optional;
-};
-
-} // namespace test_gameworld
-
-// Test that features a looping 'normal' pipeline and an 'optional' pipeline that has a 50% chance of running
-TEST(Tasks, BasicSingleThreadedCondition)
-{
-    using namespace test_c;
-    using enum StgRun;
-    using enum StgGuide;
-
-    using BasicTraits_t     = BasicBuilderTraits<TriggerOut_t(*)(TestState&, std::mt19937 &)>;
-    using Builder_t         = BasicTraits_t::Builder;
-    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
-
-    constexpr int sc_taskRuns = 128;
-    std::mt19937 randGen(69);
-
-    Tasks           tasks;
-    TaskEdges       edges;
-    TaskFuncVec_t   functions;
-    Builder_t       builder{tasks, edges, functions};
-
-    auto const pl = builder.create_pipelines<Pipelines>();
-
-    // These tasks run in a loop, triggering each other to run continuously
-
-    builder.task()
-        .run_on     ({pl.run(Run)})
-        .sync_with  ({pl.optional(Schedule)})
-        .triggers   ({pl.optional(Write)})
-        .func       ( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
-    {
-        if (rRand() % 2 == 0)
-        {
-            return gc_triggerNone;
-        }
-        else
-        {
-            rState.optionalFlagExpect = true;
-            return gc_triggerAll;
-        }
-    });
-
-    builder.task()
-        .run_on     ({pl.run(Run)})
-        .sync_with  ({pl.normal(Write)})
-        .triggers   ({pl.normal(Read)})
-        .func       ( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
-    {
-        rState.normalFlag = true;
-        return gc_triggerAll;
-    });
-
-    builder.task()
-        .run_on     ({pl.run(Run)})
-        .conditions ({pl.optional(Write)})
-        .func       ( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
-    {
-        rState.optionalFlag = true;
-        return gc_triggerNone;
-    });
-
-
-    builder.task()
-        .run_on     ({pl.run(Run)})
-        .sync_with  ({pl.optional(Read), pl.normal(Read)})
-        .triggers   ({pl.run(Run)})
-        .func       ( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
-    {
-        EXPECT_TRUE(rState.normalFlag);
-        EXPECT_EQ(rState.optionalFlagExpect, rState.optionalFlag);
-        return gc_triggerAll;
-    });
-
-    builder.task()
-        .run_on     ({pl.run(Run)})
-        .sync_with  ({pl.optional(Clear), pl.normal(Clear)})
-        .func       ( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
-    {
-        ++ rState.checks;
-        rState.normalFlag           = false;
-        rState.optionalFlagExpect   = false;
-        rState.optionalFlag         = false;
-        return gc_triggerNone;
-    });
-
-
-    TaskGraph const graph = make_exec_graph(tasks, {&edges});
-
-    // Execute
-
-    ExecContext exec;
-    exec_resize(tasks, graph, exec);
-
-    TestState world;
-
-    exec_trigger(exec, pl.run(Run));
     enqueue_dirty(tasks, graph, exec);
 
     randomized_singlethreaded_execute(
@@ -561,8 +424,10 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
 
         // Enqueue initial tasks
         // This roughly indicates "Time has changed" and "Render requested"
-        exec_trigger(exec, pl.time(StgSimple::Use));
-        exec_trigger(exec, pl.render(StgRender::Render));
+        exec_run(exec, pl.time);
+        exec_run(exec, pl.forces);
+        exec_run(exec, pl.positions);
+        exec_run(exec, pl.render);
         enqueue_dirty(tasks, graph, exec);
 
         randomized_singlethreaded_execute(
@@ -580,7 +445,3 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
 
 // TODO: Multi-threaded test with limits. Actual multithreading isn't needed;
 //       as long as task_start/finish are called at the right times
-
-
-
-

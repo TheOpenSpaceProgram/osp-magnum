@@ -31,20 +31,21 @@
 namespace testapp
 {
 
+
 enum class EStgFlag : uint8_t
 {
-    Done,
-    Working
+    Wait_,
+    Write
 };
-OSP_DECLARE_STAGE_NAMES(EStgFlag, "Done", "Working");
+OSP_DECLARE_STAGE_NAMES(EStgFlag, "Wait", "Write");
 
 
 enum class EStgEvnt : uint8_t
 {
-    Waiting,
-    Fired
+    Wait,
+    Run
 };
-OSP_DECLARE_STAGE_NAMES(EStgEvnt, "Waiting", "Fired");
+OSP_DECLARE_STAGE_NAMES(EStgEvnt, "Wait", "Run");
 
 
 /**
@@ -100,11 +101,12 @@ using osp::PipelineDef;
     idDeltaTimeIn
 struct PlScene
 {
-    PipelineDef<EStgFlag> cleanup           {"cleanup - Scene cleanup before destruction"};
-    PipelineDef<EStgFlag> time              {"time - External Delta Time In"};
-    PipelineDef<EStgFlag> resyncAll         {"resyncAll - Resynchronize with "};
+    PipelineDef<EStgEvnt> cleanup           {"cleanup - Scene cleanup before destruction"};
+    PipelineDef<EStgEvnt> resyncAll         {"resyncAll - Resynchronize with renderer"};
 
-    //PipelineDef<EStgFlag> sync;
+    PipelineDef<EStgEvnt> updTime           {"time - External Delta Time In"};
+    PipelineDef<EStgEvnt> updActive         {"updActive - Updates on ActiveEnt and components"};
+    PipelineDef<EStgEvnt> updDraw           {"updDraw - Updates on DrawEnt and components"};
 };
 
 #define TESTAPP_DATA_COMMON_SCENE 6, \
@@ -128,8 +130,8 @@ struct PlCommonScene
     PipelineDef<EStgIntr> entTextureDirty   {"entTextureDirty"};
     PipelineDef<EStgIntr> entMeshDirty      {"entMeshDirty"};
 
-    PipelineDef<EStgFlag> meshResDirty      {"meshResDirty"};
-    PipelineDef<EStgFlag> textureResDirty   {"textureResDirty"};
+    PipelineDef<EStgEvnt> meshResDirty      {"meshResDirty"};
+    PipelineDef<EStgEvnt> textureResDirty   {"textureResDirty"};
 
     PipelineDef<EStgCont> material          {"material"};
     PipelineDef<EStgIntr> materialDirty     {"materialDirty"};
@@ -280,8 +282,8 @@ struct PlNewton
     idUserInput
 struct PlWindowApp
 {
-    PipelineDef<EStgFlag> inputs            {"inputs - User inputs in"};
-    PipelineDef<EStgFlag> display           {"display - Display new frame"};
+    PipelineDef<EStgEvnt> inputs            {"inputs - User inputs in"};
+    PipelineDef<EStgEvnt> display           {"display - Display new frame"};
 };
 
 
@@ -290,7 +292,7 @@ struct PlWindowApp
     idActiveApp, idRenderGl
 struct PlMagnum
 {
-    PipelineDef<EStgFlag> cleanup           {"cleanup Cleanup Magnum"};
+    PipelineDef<EStgEvnt> cleanup           {"cleanup Cleanup Magnum"};
 
     PipelineDef<EStgCont> meshGL            {"meshGL"};
     PipelineDef<EStgCont> textureGL         {"textureGL"};

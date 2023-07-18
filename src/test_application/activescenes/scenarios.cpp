@@ -77,12 +77,16 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
 
     // Resynchronize scene with new renderer
     exec_resize(rTestApp.m_tasks, rTestApp.m_exec);
-    exec_trigger(rTestApp.m_exec, tgScn.resyncAll(EStgFlag::Working));
+    exec_trigger(rTestApp.m_exec, tgScn.resyncAll(EStgEvnt::Run));
+    exec_trigger(rTestApp.m_exec, tgScn.updDraw(EStgEvnt::Run));
+    exec_trigger(rTestApp.m_exec, tgScn.updActive(EStgEvnt::Run));
 
     run.insert(run.end(), {
-        tgScn.time.tpl(EStgFlag::Working),
-        tgWin.inputs.tpl(EStgFlag::Working),
-        tgWin.display.tpl(EStgFlag::Working)});
+        tgScn.updTime   (EStgEvnt::Run),
+        tgScn.updActive (EStgEvnt::Run),
+        tgScn.updDraw   (EStgEvnt::Run),
+        tgWin.inputs    (EStgEvnt::Run),
+        tgWin.display   (EStgEvnt::Run)});
 
     // run gets copied but who cares lol
     rActiveApp.set_on_draw( [&rTestApp, run = std::move(run), resync = tgScn.resyncAll]
@@ -125,6 +129,7 @@ static ScenarioMap_t make_scenarios()
     PipelineInfo::sm_stageNames.resize(32);
 
     register_stage_enum<EStgFlag>();
+    register_stage_enum<EStgEvnt>();
     register_stage_enum<EStgIntr>();
     register_stage_enum<EStgCont>();
     register_stage_enum<EStgRender>();
@@ -180,8 +185,8 @@ static ScenarioMap_t make_scenarios()
         // Compose together lots of Sessions
         scene           = setup_scene               (builder, rTopData);
         commonScene     = setup_common_scene        (builder, rTopData, scene, idResources, defaultPkg);
-        physics         = setup_physics             (builder, rTopData, commonScene);
-        shapeSpawn      = setup_shape_spawn         (builder, rTopData, commonScene, physics, sc_matVisualizer);
+        physics         = setup_physics             (builder, rTopData, scene, commonScene);
+        shapeSpawn      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matVisualizer);
         //droppers        = setup_droppers            (builder, rTopData, commonScene, shapeSpawn);
         //bounds          = setup_bounds              (builder, rTopData, commonScene, physics, shapeSpawn);
 
@@ -193,14 +198,14 @@ static ScenarioMap_t make_scenarios()
         create_materials(rTopData, commonScene, sc_materialCount);
         add_floor(rTopData, commonScene, shapeSpawn, sc_matVisualizer, idResources, defaultPkg);
 
-        auto const tgCS = commonScene.get_pipelines<PlCommonScene>();
-        auto const tgShSp = shapeSpawn.get_pipelines<PlShapeSpawn>();
+        auto const tgScn    = scene         .get_pipelines<PlScene>();
+        auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+        auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
 
         exec_resize(rTestApp.m_tasks, rTestApp.m_exec);
-        exec_trigger(rTestApp.m_exec, tgCS.drawEnt(New));
-        exec_trigger(rTestApp.m_exec, tgCS.drawEnt(Use));
-        exec_trigger(rTestApp.m_exec, tgCS.drawEntResized(Working));
         exec_trigger(rTestApp.m_exec, tgShSp.spawnRequest(Use_));
+        exec_trigger(rTestApp.m_exec, tgScn.updDraw(EStgEvnt::Run));
+        exec_trigger(rTestApp.m_exec, tgScn.updActive(EStgEvnt::Run));
 
         return [] (TestApp& rTestApp)
         {
@@ -223,8 +228,8 @@ static ScenarioMap_t make_scenarios()
             scnRender   = setup_scene_renderer      (builder, rTopData, windowApp, magnum, scene, commonScene, idResources);
             cameraCtrl  = setup_camera_ctrl         (builder, rTopData, windowApp, scnRender);
             cameraFree  = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
-            shVisual    = setup_shader_visualizer   (builder, rTopData, magnum, commonScene, scnRender, sc_matVisualizer);
-            camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
+            shVisual    = setup_shader_visualizer   (builder, rTopData, magnum, scene, commonScene, scnRender, sc_matVisualizer);
+            //camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
 
             setup_magnum_draw(rTestApp, scene, scnRender);
         };

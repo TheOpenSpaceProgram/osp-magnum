@@ -60,6 +60,7 @@ struct ACtxShapeSpawner
 osp::Session setup_physics(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         scene,
         osp::Session const&         commonScene);
 
 /**
@@ -78,6 +79,7 @@ osp::Session setup_shape_spawn(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         scene,
+        osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::active::MaterialId     materialId);
 

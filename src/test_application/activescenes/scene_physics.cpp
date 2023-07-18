@@ -53,10 +53,12 @@ namespace testapp::scenes
 Session setup_physics(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              scene,
         Session const&              commonScene)
 {
     OSP_DECLARE_GET_DATA_IDS(commonScene,  TESTAPP_DATA_COMMON_SCENE);
-    auto const tgCS = commonScene.get_pipelines<PlCommonScene>();
+    auto const tgScn = scene      .get_pipelines<PlScene>();
+    auto const tgCS  = commonScene.get_pipelines<PlCommonScene>();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_PHYSICS);
@@ -66,7 +68,8 @@ Session setup_physics(
 
     rBuilder.task()
         .name       ("Delete Physics components")
-        .run_on     ({tgCS.activeEntDelete(Use_)})
+        .run_on     ({tgScn.updActive(Run)})
+        .conditions ({tgCS.activeEntDelete(Use_)})
         .sync_with  ({tgPhy.physics(Delete)})
         .push_to    (out.m_tasks)
         .args       ({        idPhys,                      idActiveEntDel })
@@ -81,12 +84,14 @@ Session setup_physics(
 Session setup_shape_spawn(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              scene,
         Session const&              commonScene,
         Session const&              physics,
         MaterialId const            materialId)
 {
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
     auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
     auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
 
@@ -95,10 +100,10 @@ Session setup_shape_spawn(
     auto const tgShSp = out.create_pipelines<PlShapeSpawn>(rBuilder);
 
     top_emplace< ACtxShapeSpawner > (topData, idSpawner, ACtxShapeSpawner{ .m_materialId = materialId });
-
     rBuilder.task()
         .name       ("Create entities for requested shapes to spawn")
-        .run_on     ({tgShSp.spawnRequest(Use_)})
+        .run_on     ({tgScn.updActive(Run)})
+        .conditions ({tgShSp.spawnRequest(Use_)})
         .sync_with  ({tgCS.activeEnt(New), tgShSp.spawnedEnts(Resize)})
         .triggers   ({tgCS.activeEnt(Use), tgShSp.spawnedEnts(Use_)})
         .push_to    (out.m_tasks)
@@ -115,7 +120,8 @@ Session setup_shape_spawn(
 
     rBuilder.task()
         .name       ("Add hierarchy and transform to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(Use_)})
+        .run_on     ({tgScn.updActive(Run)})
+        .conditions ({tgShSp.spawnRequest(Use_)})
         .sync_with  ({tgShSp.spawnedEnts(Use_), tgCS.hierarchy(New), tgCS.transform(New)})
         .triggers   ({tgCS.transform(Use)})
         .push_to    (out.m_tasks)
@@ -142,9 +148,10 @@ Session setup_shape_spawn(
 
     rBuilder.task()
         .name       ("Add mesh and material to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(Use_)})
+        .run_on     ({tgScn.updActive(Run)})
+        .conditions ({tgShSp.spawnRequest(Use_)})
         .sync_with  ({tgShSp.spawnedEnts(Use_), tgCS.mesh(New), tgCS.material(New), tgCS.drawEnt(New)})
-        .triggers   ({tgCS.drawEntResized(Working)})
+        .triggers   ({tgCS.drawEntResized(Write)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,             idDrawing,                  idSpawner,             idNMesh })
         .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept
@@ -181,11 +188,14 @@ Session setup_shape_spawn(
             rDrawing.m_visible.set(std::size_t(drawEnt));
             rDrawing.m_drawBasic[drawEnt].m_opaque = true;
         }
+
+        return gc_triggerAll;
     });
 
     rBuilder.task()
         .name       ("Add physics to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(Use_)})
+        .run_on     ({tgScn.updActive(Run)})
+        .conditions ({tgShSp.spawnRequest(Use_)})
         .sync_with  ({tgShSp.spawnedEnts(Use_), tgPhy.physics(New)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,                  idSpawner,             idPhys })
@@ -215,15 +225,18 @@ Session setup_shape_spawn(
         }
     });
 
+
     rBuilder.task()
         .name       ("Clear Shape Spawning vector after use")
-        .run_on     ({tgShSp.spawnRequest(Clear)})
+        .run_on     ({tgScn.updActive(Run)})
+        .conditions ({tgShSp.spawnRequest(Clear)})
         .push_to    (out.m_tasks)
         .args       ({             idSpawner })
         .func([] (ACtxShapeSpawner& rSpawner) noexcept
     {
         rSpawner.m_spawnRequest.clear();
     });
+
 
     return out;
 }

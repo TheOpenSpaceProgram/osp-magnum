@@ -41,6 +41,7 @@ namespace scenes
 {
     using enum EStgCont;
     using enum EStgIntr;
+    using enum EStgEvnt;
     using enum EStgFlag;
     using enum EStgRender;
 }

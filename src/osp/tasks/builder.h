@@ -127,14 +127,12 @@ struct TaskRefBase
         return static_cast<TASKREF_T&>(*this);
     }
 
-    TASKREF_T& run_on(ArrayView<TplPipelineStage const> const specs) noexcept
+    TASKREF_T& run_on(TplPipelineStage const tpl) noexcept
     {
-        return add_edges(m_rBuilder.m_rEdges.m_runOn, specs);
-    }
+        m_rBuilder.m_rTasks.m_taskRunOn.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
+        m_rBuilder.m_rTasks.m_taskRunOn[m_taskId] = tpl;
 
-    TASKREF_T& run_on(std::initializer_list<TplPipelineStage const> specs) noexcept
-    {
-        return add_edges(m_rBuilder.m_rEdges.m_runOn, specs);
+        return static_cast<TASKREF_T&>(*this);
     }
 
     TASKREF_T& sync_with(ArrayView<TplPipelineStage const> const specs) noexcept
@@ -147,25 +145,6 @@ struct TaskRefBase
         return add_edges(m_rBuilder.m_rEdges.m_syncWith, specs);
     }
 
-    TASKREF_T& triggers(ArrayView<TplPipelineStage const> const specs) noexcept
-    {
-        return add_edges(m_rBuilder.m_rEdges.m_triggers, specs);
-    }
-
-    TASKREF_T& triggers(std::initializer_list<TplPipelineStage const> specs) noexcept
-    {
-        return add_edges(m_rBuilder.m_rEdges.m_triggers, specs);
-    }
-
-    TASKREF_T& conditions(ArrayView<TplPipelineStage const> const specs) noexcept
-    {
-        return add_edges(m_rBuilder.m_rEdges.m_conditions, specs);
-    }
-
-    TASKREF_T& conditions(std::initializer_list<TplPipelineStage const> specs) noexcept
-    {
-        return add_edges(m_rBuilder.m_rEdges.m_conditions, specs);
-    }
 
     TaskId          m_taskId;
     TASKBUILDER_T   & m_rBuilder;

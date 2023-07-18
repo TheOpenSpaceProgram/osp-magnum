@@ -73,17 +73,6 @@ struct PipelineInfo
     stage_type_t                    stageType;
 };
 
-struct Tasks
-{
-    lgrn::IdRegistryStl<TaskId>                     m_taskIds;
-    lgrn::IdRegistryStl<PipelineId>                 m_pipelineIds;
-    lgrn::IdRegistryStl<SemaphoreId>                m_semaIds;
-
-    KeyedVec<SemaphoreId, unsigned int>             m_semaLimits;
-
-    KeyedVec<PipelineId, PipelineInfo>              m_pipelineInfo;
-};
-
 struct TplTaskPipelineStage
 {
     TaskId      task;
@@ -97,6 +86,11 @@ struct TplPipelineStage
     StageId     stage;
 };
 
+struct PipelineSubscribe
+{
+    PipelineId  publisher;
+    PipelineId  subscriber;
+};
 
 struct TplTaskSemaphore
 {
@@ -104,12 +98,24 @@ struct TplTaskSemaphore
     SemaphoreId semaphore;
 };
 
+struct Tasks
+{
+    lgrn::IdRegistryStl<TaskId>                     m_taskIds;
+    lgrn::IdRegistryStl<PipelineId>                 m_pipelineIds;
+    lgrn::IdRegistryStl<SemaphoreId>                m_semaIds;
+
+    KeyedVec<SemaphoreId, unsigned int>             m_semaLimits;
+
+    KeyedVec<PipelineId, PipelineInfo>              m_pipelineInfo;
+
+    KeyedVec<TaskId, TplPipelineStage>              m_taskRunOn;
+};
+
 struct TaskEdges
 {
-    std::vector<TplTaskPipelineStage>   m_runOn;
     std::vector<TplTaskPipelineStage>   m_syncWith;
-    std::vector<TplTaskPipelineStage>   m_triggers;
-    std::vector<TplTaskPipelineStage>   m_conditions;
+    std::vector<PipelineSubscribe>      m_subscriptions;
+
     std::vector<TplTaskSemaphore>       m_semaphoreEdges;
 };
 
@@ -117,8 +123,8 @@ enum class AnyStageId               : uint32_t { };
 
 enum class RunTaskId                : uint32_t { };
 enum class RunStageId               : uint32_t { };
-enum class TriggerId                : uint32_t { };
-enum class ConditionId              : uint32_t { };
+
+enum class PipelineSubId            : uint32_t { };
 
 enum class StageReqTaskId           : uint32_t { };
 enum class ReverseStageReqTaskId    : uint32_t { };
@@ -159,20 +165,10 @@ struct TaskGraph
     KeyedVec<AnyStageId, RunTaskId>                 anystgToFirstRuntask;
     KeyedVec<RunTaskId, TaskId>                     runtaskToTask;
 
-    // Each task runs on many stages
-    // TaskId --> TaskRunStageId --> many AnyStageId
-    KeyedVec<TaskId, RunStageId>                    taskToFirstRunstage;
-    KeyedVec<RunStageId, AnyStageId>                runstageToAnystg;
-
-    // Tasks trigger many stages of pipelines
-    // TaskId --> TriggerId --> many TplPipelineStage
-    KeyedVec<TaskId, TriggerId>                     taskToFirstTrigger;
-    KeyedVec<TriggerId, TplPipelineStage>           triggerToPlStage;
-
-    // Tasks can have many conditions
-    // TaskId --> ConditionId --> many TplPipelineStage
-    KeyedVec<TaskId, ConditionId>                   taskToFirstCondition;
-    KeyedVec<ConditionId, TplPipelineStage>         conditionToPlStage;
+    // Each pipeline has multiple subscriber pipelines
+    // PipelineId --> PipelineSubId --> many PipelineId
+    KeyedVec<PipelineId, PipelineSubId>             pipelineToFirstSub;
+    KeyedVec<PipelineSubId, PipelineId>             subToPipeline;
 
     // Each stage has multiple entrance requirements.
     // AnyStageId <--> many StageEnterReqId

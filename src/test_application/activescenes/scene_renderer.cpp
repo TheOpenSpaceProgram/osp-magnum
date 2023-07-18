@@ -91,7 +91,7 @@ Session setup_magnum(
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM);
     auto const tgMgn = out.create_pipelines<PlMagnum>(rBuilder);
-    out.m_cleanup = tgMgn.cleanup.tpl(Working);
+    out.m_cleanup = tgMgn.cleanup.tpl(Run);
 
     // Order-dependent; ActiveApplication construction starts OpenGL context, needed by RenderGL
     /* unused */      top_emplace<ActiveApplication>(topData, idActiveApp, args, rUserInput);
@@ -101,7 +101,7 @@ Session setup_magnum(
 
     rBuilder.task()
         .name       ("Clean up Magnum renderer")
-        .run_on     ({tgMgn.cleanup(Working)})
+        .run_on     ({tgMgn.cleanup(Run)})
         .push_to    (out.m_tasks)
         .args       ({      idResources,          idRenderGl})
         .func([] (Resources& rResources, RenderGL& rRenderGl) noexcept
@@ -146,9 +146,9 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Resize Scene Render containers to fit drawable entities")
-        .run_on     ({tgSR.drawTransforms(Resize)})
-        .conditions ({tgCS.drawEntResized(Working)})
-        .sync_with  ({tgCS.drawEnt(New), tgSR.scnRender(New), tgSR.entMesh(New)})
+        .run_on     ({tgScn.updDraw(Run)})
+        .conditions ({tgCS.drawEntResized(Write)})
+        .sync_with  ({tgSR.entMesh(New), tgSR.scnRender(New)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,                   idScnRender})
         .func([] (ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
@@ -161,7 +161,8 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Compile Resource Meshes to GL")
-        .run_on     ({tgCS.meshResDirty(Working)})
+        .run_on     ({tgScn.updDraw(Run)})
+        .conditions ({tgCS.meshResDirty(Run)})
         .sync_with  ({tgCS.mesh(Use), tgMgn.meshGL(New)})
         .push_to    (out.m_tasks)
         .args       ({                 idDrawingRes,                idResources,          idRenderGl })
@@ -172,7 +173,8 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Compile Resource Textures to GL")
-        .run_on     ({tgCS.textureResDirty(Working)})
+        .run_on     ({tgScn.updDraw(Run)})
+        .conditions ({tgCS.textureResDirty(Run)})
         .sync_with  ({tgCS.texture(Use), tgMgn.textureGL(New)})
         .push_to    (out.m_tasks)
         .args       ({                 idDrawingRes,                idResources,          idRenderGl })
@@ -183,7 +185,8 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Assign GL textures to entities with scene textures")
-        .run_on     ({tgCS.entTextureDirty(Use_)})
+        .run_on     ({tgScn.updDraw(Run)})
+        .conditions ({tgCS.entTextureDirty(Use_)})
         .sync_with  ({tgCS.texture(Use), tgMgn.textureGL(Use), tgMgn.entTextureGL(Modify)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
@@ -194,7 +197,8 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Assign GL meshes to entities with scene meshes")
-        .run_on     ({tgCS.entMeshDirty(Use_)})
+        .run_on     ({tgScn.updDraw(Run)})
+        .conditions ({tgCS.entMeshDirty(Use_)})
         .sync_with  ({tgCS.mesh(Use), tgMgn.meshGL(Use), tgMgn.entMeshGL(Modify)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
@@ -205,7 +209,7 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Bind and display off-screen FBO")
-        .run_on     ({tgWin.display(Working)})
+        .run_on     ({tgWin.display(Run)})
         .sync_with  ({tgSR.fboRender(Bind)})
         .triggers   ({tgSR.fboRender(Draw), tgSR.fboRender(Unbind)})
         .push_to    (out.m_tasks)
@@ -230,7 +234,8 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Calculate draw transforms")
-        .run_on     ({tgCS.transform(Use)})
+        .run_on     ({tgScn.updDraw(Run)})
+        .conditions ({tgCS.transform(Use)})
         .sync_with  ({tgCS.hierarchy(Use), tgCS.activeEnt(Use), tgSR.drawTransforms(Modify_), tgCS.drawEnt(Use)})
         .triggers   ({tgSR.drawTransforms(Use_)})
         .push_to    (out.m_tasks)
@@ -287,6 +292,7 @@ Session setup_shader_visualizer(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Session const&              magnum,
+        Session const&              scene,
         Session const&              commonScene,
         Session const&              scnRender,
         MaterialId const            materialId)
@@ -294,6 +300,7 @@ Session setup_shader_visualizer(
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(scnRender,     TESTAPP_DATA_COMMON_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
     auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
     auto const tgSR     = scnRender     .get_pipelines<PlSceneRenderer>();
     auto const tgMgn    = magnum        .get_pipelines<PlMagnum>();
@@ -320,7 +327,8 @@ Session setup_shader_visualizer(
 
     rBuilder.task()
         .name       ("Sync MeshVisualizer shader entities")
-        .run_on     ({tgCS.materialDirty(Use_)})
+        .run_on     ({tgScn.updDraw(Run)})
+        .conditions ({tgCS.materialDirty(Use_)})
         .sync_with  ({tgSR.groupEnts(Use), tgSR.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,             idGroupFwd,                        idDrawShVisual})

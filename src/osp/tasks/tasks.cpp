@@ -33,9 +33,6 @@ struct TaskCounts
 {
     uint16_t requiresStages     {0};
     uint16_t requiredByStages   {0};
-    uint8_t  triggers           {0};
-    uint8_t  conditions         {0};
-    uint8_t  runOn              {0};
 };
 
 struct StageCounts
@@ -49,7 +46,8 @@ struct PipelineCounts
 {
     std::array<StageCounts, gc_maxStages> stageCounts;
 
-    uint8_t     stages          {0};
+    uint16_t publishTo          {0};
+    uint8_t  stages             {0};
 };
 
 
@@ -60,21 +58,19 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     std::size_t const maxPipelines  = tasks.m_pipelineIds.capacity();
     std::size_t const maxTasks      = tasks.m_taskIds.capacity();
 
-    // counts
-
     KeyedVec<PipelineId, PipelineCounts>    plCounts;
     KeyedVec<TaskId, TaskCounts>            taskCounts;
     out.pipelineToFirstAnystg .resize(maxPipelines);
     plCounts        .resize(maxPipelines+1);
     taskCounts      .resize(maxTasks+1);
 
-    std::size_t totalTasksReqStage = 0;
-    std::size_t totalStageReqTasks = 0;
-    std::size_t totalRunTasks      = 0;
-    std::size_t totalTriggers      = 0;
-    std::size_t totalStages        = 0;
+    std::size_t totalTasksReqStage  = 0;
+    std::size_t totalStageReqTasks  = 0;
+    std::size_t totalRunTasks       = 0;
+    std::size_t totalSubscriptions  = 0;
+    std::size_t totalStages         = 0;
 
-    // Count up which pipeline/stages each task runs on
+    // 1. Count total number of stages
 
     auto const count_stage = [&plCounts] (PipelineId const pipeline, StageId const stage)
     {
@@ -82,105 +78,63 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         rStageCount = std::max(rStageCount, uint8_t(uint8_t(stage) + 1));
     };
 
+    // Count stages from task run-ons
+    for (TaskInt const taskInt : tasks.m_taskIds.bitview().zeros())
+    {
+        auto const task                     = TaskId(taskInt);
+        auto const [runPipeline, runStage]  = tasks.m_taskRunOn[task];
+
+        count_stage(runPipeline, runStage);
+
+        ++ plCounts[runPipeline].stageCounts[std::size_t(runStage)].runTasks;
+        ++ totalRunTasks;
+    }
+
+    // Count stages from syncs
     for (TaskEdges const* pEdges : data)
     {
-        totalRunTasks += pEdges->m_runOn.size();
-        for (auto const [task, pipeline, stage] : pEdges->m_runOn)
-        {
-            plCounts[pipeline].stageCounts[std::size_t(stage)].runTasks ++;
-            taskCounts[task].runOn ++;
-            count_stage(pipeline, stage);
-        }
-
-        for (auto const [task, pipeline, stage] : pEdges->m_conditions)
-        {
-            taskCounts[task].conditions ++;
-            count_stage(pipeline, stage);
-        }
-
         for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
         {
             count_stage(pipeline, stage);
         }
-
-        totalTriggers += pEdges->m_triggers.size();
-        for (auto const [task, pipeline, stage] : pEdges->m_triggers)
-        {
-            taskCounts[task].triggers ++;
-            count_stage(pipeline, stage);
-        }
     }
-
-    // Count total stages
 
     for (PipelineCounts const& plCount : plCounts)
     {
         totalStages += plCount.stages;
     }
 
-    // Count TaskRequiresStages and StageRequiresTasks
-
-    auto const count_stagereqtask = [&plCounts, &taskCounts, &totalStageReqTasks]
-                                    (PipelineId const pl, StageId const stg, TaskId const task)
-    {
-        StageCounts &rStageCounts = plCounts[pl].stageCounts[std::size_t(stg)];
-        TaskCounts  &rTaskCounts  = taskCounts[task];
-
-        rStageCounts.requiresTasks    ++;
-        rTaskCounts .requiredByStages ++;
-        totalStageReqTasks            ++;
-    };
-
-
-    auto const count_taskreqstage = [&plCounts, &taskCounts, &totalTasksReqStage]
-                                    (TaskId const task, PipelineId const pl, StageId const stg)
-    {
-        StageCounts &rStageCounts = plCounts[pl].stageCounts[std::size_t(stg)];
-        TaskCounts  &rTaskCounts  = taskCounts[task];
-
-        rTaskCounts .requiresStages  ++;
-        rStageCounts.requiredByTasks ++;
-        totalTasksReqStage           ++;
-    };
+    // 2. Count TaskRequiresStages and StageRequiresTasks and Subscriptions
 
     for (TaskEdges const* pEdges : data)
     {
-        // Each run-on adds...
-        // * TaskRequiresStage makes task require pipeline to be on stage to be allowed to run
-        //   only if the task runs on multiple pipelines. This means all pipelines need to be
-        for (auto const [task, pipeline, stage] : pEdges->m_runOn)
-        {
-            if (taskCounts[task].runOn > 1)
-            {
-                count_taskreqstage(task, pipeline, stage);
-            }
-        }
-
-        // Each sync-with adds...
-        // * TaskRequiresStage makes task require pipeline to be on stage to be allowed to run
-        // * StageRequiresTask for stage to wait for task to complete
         for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
         {
-            count_stagereqtask(pipeline, stage, task);
-            count_taskreqstage(task, pipeline, stage);
-        }
+            StageCounts &rStageCounts = plCounts[pipeline].stageCounts[std::size_t(stage)];
+            TaskCounts  &rTaskCounts  = taskCounts[task];
 
-        // Condition implies sync-with
-        for (auto const [task, pipeline, stage] : pEdges->m_conditions)
-        {
-            count_stagereqtask(pipeline, stage, task);
-            count_taskreqstage(task, pipeline, stage);
-        }
+            // TaskRequiresStage makes task require pipeline to be on stage to be allowed to run
+            ++ rTaskCounts .requiresStages;
+            ++ rStageCounts.requiredByTasks;
 
-        // Each triggers adds...
-        // * StageRequiresTask on previous stage to wait for task to complete
-        for (auto const [task, pipeline, stage] : pEdges->m_triggers)
-        {
-            count_stagereqtask(pipeline, stage_prev(stage, plCounts[pipeline].stages), task);
+
+            // StageRequiresTask for stage to wait for task to complete
+            ++ rStageCounts.requiresTasks;
+            ++ rTaskCounts .requiredByStages;
+
         }
+        totalTasksReqStage += pEdges->m_syncWith.size();
+        totalStageReqTasks += pEdges->m_syncWith.size();
+
+        for (auto const [publisher, subscriber] : pEdges->m_subscriptions)
+        {
+            ++ plCounts[publisher].publishTo;
+        }
+        totalSubscriptions += pEdges->m_subscriptions.size();
     }
 
-    // Allocate
+
+    // 3. Allocate
 
     // The +1 is needed for 1-to-many connections to store the total number of other elements they
     // index. This also simplifies logic in fanout_view(...)
@@ -189,12 +143,8 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     out.anystgToPipeline            .resize(totalStages+1,      lgrn::id_null<PipelineId>());
     out.anystgToFirstRuntask        .resize(totalStages+1,      lgrn::id_null<RunTaskId>());
     out.runtaskToTask               .resize(totalRunTasks,      lgrn::id_null<TaskId>());
-    out.taskToFirstRunstage         .resize(maxTasks+1,         lgrn::id_null<RunStageId>());
-    out.runstageToAnystg            .resize(totalRunTasks,      lgrn::id_null<AnyStageId>());
-    out.taskToFirstTrigger          .resize(maxTasks+1,         lgrn::id_null<TriggerId>());
-    out.triggerToPlStage            .resize(totalTriggers,      {lgrn::id_null<PipelineId>(), lgrn::id_null<StageId>()});
-    out.taskToFirstCondition        .resize(maxTasks+1,         lgrn::id_null<ConditionId>());
-    out.conditionToPlStage          .resize(totalTriggers,      {lgrn::id_null<PipelineId>(), lgrn::id_null<StageId>()});
+    out.pipelineToFirstSub          .resize(maxPipelines+1,     lgrn::id_null<PipelineSubId>());
+    out.subToPipeline               .resize(totalSubscriptions, lgrn::id_null<PipelineId>());
     out.anystgToFirstStgreqtask     .resize(totalStages+1,      lgrn::id_null<StageReqTaskId>());
     out.stgreqtaskData              .resize(totalStageReqTasks, {});
     out.taskToFirstRevStgreqtask    .resize(maxTasks+1,         lgrn::id_null<ReverseStageReqTaskId>());
@@ -204,7 +154,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     out.anystgToFirstRevTaskreqstg  .resize(totalStages+1,      lgrn::id_null<ReverseTaskReqStageId>());
     out.revTaskreqstgToTask         .resize(totalTasksReqStage, lgrn::id_null<TaskId>());
 
-    // Calcualte one-to-many partitions
+    // 4. Calculate one-to-many partitions
 
     fanout_partition(
         out.pipelineToFirstAnystg,
@@ -215,30 +165,20 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         out.anystgToFirstRuntask,
         [&plCounts, &out] (AnyStageId stg)
         {
-            PipelineId const    pl          = out.anystgToPipeline[stg];
+            PipelineId const pl = out.anystgToPipeline[stg];
             if (pl == lgrn::id_null<PipelineId>())
             {
                 return uint16_t(0);
             }
-            StageId const       stgLocal    = stage_from(out, pl, stg);
+            StageId const stgLocal = stage_from(out, pl, stg);
             return plCounts[pl].stageCounts[std::size_t(stgLocal)].runTasks;
         },
         [] (AnyStageId, RunTaskId) { });
 
     fanout_partition(
-        out.taskToFirstRunstage,
-        [&taskCounts, &out] (TaskId task) { return taskCounts[task].runOn; },
-        [&out] (TaskId, RunStageId) { });
-
-    fanout_partition(
-        out.taskToFirstTrigger,
-        [&taskCounts, &out] (TaskId task) { return taskCounts[task].triggers; },
-        [&out] (TaskId, TriggerId) { });
-
-    fanout_partition(
-        out.taskToFirstCondition,
-        [&taskCounts, &out] (TaskId task) { return taskCounts[task].conditions; },
-        [&out] (TaskId, ConditionId) { });
+        out.pipelineToFirstSub,
+        [&plCounts] (PipelineId pl) { return plCounts[pl].publishTo; },
+        [&out] (PipelineId, PipelineSubId) { });
 
     fanout_partition(
         out.anystgToFirstStgreqtask,
@@ -276,7 +216,20 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         },
         [&out] (AnyStageId, ReverseTaskReqStageId) { });
 
-    // Push
+    // 5. Push
+
+    for (TaskInt const taskInt : tasks.m_taskIds.bitview().zeros())
+    {
+        auto const      task            = TaskId(taskInt);
+        auto const      run             = tasks.m_taskRunOn[task];
+        auto const      anystg          = anystg_from(out, run.pipeline, run.stage);
+        StageCounts     &rStageCounts   = plCounts[run.pipeline].stageCounts[std::size_t(run.stage)];
+        RunTaskId const runtask         = id_from_count(out.anystgToFirstRuntask, anystg, rStageCounts.runTasks);
+
+        out.runtaskToTask[runtask] = task;
+
+        -- rStageCounts.runTasks;
+    }
 
     auto add_stagereqtask = [&plCounts, &taskCounts, &totalStageReqTasks, &out]
                             (PipelineId const pl, StageId const stg, TaskId const task)
@@ -320,27 +273,6 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     for (TaskEdges const* pEdges : data)
     {
-        for (auto const [task, pipeline, stage] : pEdges->m_runOn)
-        {
-            AnyStageId const anystg         = anystg_from(out, pipeline, stage);
-            StageCounts      &rStageCounts  = plCounts[pipeline].stageCounts[std::size_t(stage)];
-            TaskCounts       &rTaskCounts   = taskCounts[task];
-
-            RunTaskId const runTask = id_from_count(out.anystgToFirstRuntask, anystg, rStageCounts.runTasks);
-            RunStageId const runStage = id_from_count(out.taskToFirstRunstage, task, rTaskCounts.runOn);
-
-            out.runtaskToTask[runTask] = task;
-            out.runstageToAnystg[runStage] = anystg;
-
-            -- rStageCounts.runTasks;
-            -- rTaskCounts.runOn;
-            -- totalRunTasks;
-
-            if (rTaskCounts.runOn > 1)
-            {
-                add_taskreqstage(task, pipeline, stage);
-            }
-        }
 
         for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
         {
@@ -348,33 +280,12 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
             add_taskreqstage(task, pipeline, stage);
         }
 
-        for (auto const [task, pipeline, stage] : pEdges->m_conditions)
-        {
-            add_stagereqtask(pipeline, stage, task);
-            add_taskreqstage(task, pipeline, stage);
-
-            TaskCounts       &rTaskCounts   = taskCounts[task];
-            ConditionId const condition = id_from_count(out.taskToFirstCondition, task, rTaskCounts.conditions);
-            out.conditionToPlStage[condition] = { pipeline, stage };
-            -- rTaskCounts.conditions;
-        }
-
-        for (auto const [task, pipeline, stage] : pEdges->m_triggers)
-        {
-            add_stagereqtask(pipeline, stage_prev(stage, plCounts[pipeline].stages), task);
-
-            TaskCounts &rTaskCounts   = taskCounts[task];
-            TriggerId const trigger = id_from_count(out.taskToFirstTrigger, task, rTaskCounts.triggers);
-            out.triggerToPlStage[trigger] = { pipeline, stage };
-            -- rTaskCounts.triggers;
-        }
     }
 
     [[maybe_unused]] auto const all_counts_zero = [&] ()
     {
-        if (   totalRunTasks        != 0
-            || totalStageReqTasks   != 0
-            || totalTasksReqStage   != 0)
+        if (   totalStageReqTasks   != 0
+            || totalTasksReqStage   != 0 )
         {
             return false;
         }
@@ -383,8 +294,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
             for (StageCounts const& stgCount : plCount.stageCounts)
             {
                 if (   stgCount.requiredByTasks != 0
-                    || stgCount.requiresTasks   != 0
-                    || stgCount.runTasks        != 0)
+                    || stgCount.requiresTasks   != 0 )
                 {
                     return false;
                 }
@@ -393,9 +303,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         for (TaskCounts const& taskCount : taskCounts)
         {
             if (   taskCount.requiredByStages != 0
-                || taskCount.requiredByStages != 0
-                || taskCount.runOn            != 0
-                || taskCount.conditions       != 0)
+                || taskCount.requiredByStages != 0 )
             {
                 return false;
             }
