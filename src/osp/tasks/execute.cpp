@@ -46,7 +46,7 @@ void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut)
     exec_resize(tasks, rOut);
 }
 
-void exec_run(ExecContext &rExec, PipelineId const pipeline)
+void pipeline_run(ExecContext &rExec, PipelineId const pipeline)
 {
     rExec.plRequestRun.set(std::size_t(pipeline));
     rExec.hasRequestRun = true;
@@ -63,12 +63,24 @@ static void exec_log(ExecContext &rExec, ExecContext::LogMsg_t msg)
 
 static constexpr bool pipeline_can_advance(TaskGraph const& graph, ExecContext const &rExec, ExecPipeline &rExecPl) noexcept
 {
-    int const tasksQueued = rExecPl.tasksQueuedBlocked + rExecPl.tasksQueuedRun;
+    return    rExecPl.ownStageReqTasksLeft == 0   // Tasks required by stage are done
+           && rExecPl.tasksReqOwnStageLeft == 0   // Not required by any tasks
+           && (rExecPl.tasksQueuedBlocked+rExecPl.tasksQueuedRun) == 0; // Tasks done
 
-    return    tasksQueued           == 0   // Tasks done
-           && rExecPl.reqTasksLeft  == 0   // Tasks required by stage are done
-           && rExecPl.reqByTaskLeft == 0;  // Not required by any tasks
+}
 
+static inline void pipeline_try_advance(TaskGraph const& graph, ExecContext &rExec, ExecPipeline &rExecPl, PipelineId const pipeline)
+{
+    if (pipeline_can_advance(graph, rExec, rExecPl))
+    {
+        rExec.plAdvance.set(std::size_t(pipeline));
+        rExec.hasPlAdvance = true;
+    }
+};
+
+static inline bool stage_is_cancelled(Tasks const& tasks, ExecContext const &rExec, ExecPipeline &rExecPl, PipelineId const pipeline, StageId const stage)
+{
+    return rExecPl.cancelOptionals && tasks.m_pipelineControl[pipeline].optionalStages.test(std::size_t(stage));
 }
 
 static void pipeline_advance_stage(TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
@@ -84,23 +96,24 @@ static void pipeline_advance_stage(TaskGraph const& graph, ExecContext &rExec, P
 
     auto const nextStage = StageId( justStarting ? 0 : (int(rExecPl.stage)+1) );
 
-    if (nextStage == StageId(stageCount))
+    if (nextStage != StageId(stageCount))
+    {
+        rExecPl.stage       = nextStage;
+        rExecPl.tasksQueued = false;
+    }
+    else
     {
         // Next stage is 1 past the last stage. Finished running
-        rExecPl.stage = lgrn::id_null<StageId>();
-        rExecPl.running = false;
-        return;
+        rExecPl.stage       = lgrn::id_null<StageId>();
+        rExecPl.running     = false;
     }
 
-    rExecPl.stage       = nextStage;
-    rExecPl.tasksQueued = false;
-
     // asserted by pipeline_can_advance:
-    // * rExecPl.reqTasksLeft == 0;
-    // * rExecPl.reqByTaskLeft == 0;
+    // * rExecPl.ownStageReqTasksLeft == 0;
+    // * rExecPl.tasksReqOwnStageLeft == 0;
 }
 
-static void pipeline_advance_reqs(TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
+static void pipeline_advance_reqs(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
 {
     ExecPipeline &rExecPl = rExec.plData[pipeline];
 
@@ -116,14 +129,14 @@ static void pipeline_advance_reqs(TaskGraph const& graph, ExecContext &rExec, Pi
 
     auto const revTaskReqStageView = ArrayView<TaskId const>(fanout_view(graph.anystgToFirstRevTaskreqstg, graph.revTaskreqstgToTask, anystg));
 
-    // Number of tasks that require nextStage. This is decremented only when tasks finish
-    rExecPl.reqByTaskLeft = revTaskReqStageView.size();
+    // Number of tasks that require this stage. This is decremented when required tasks finish
+    rExecPl.tasksReqOwnStageLeft = revTaskReqStageView.size();
 
-    // Unblock tasks that are alredy queued
     for (TaskId const task : revTaskReqStageView)
     {
         if (rExec.tasksQueuedBlocked.contains(task))
         {
+            // Unblock tasks that are alredy queued
             BlockedTask &rBlocked = rExec.tasksQueuedBlocked.get(task);
             -- rBlocked.reqStagesLeft;
             if (rBlocked.reqStagesLeft == 0)
@@ -136,6 +149,12 @@ static void pipeline_advance_reqs(TaskGraph const& graph, ExecContext &rExec, Pi
                 rExec.tasksQueuedBlocked.erase(task);
             }
         }
+        else if (auto const [reqPipeline, reqStage] = tasks.m_taskRunOn[task];
+                 stage_is_cancelled(tasks, rExec, rExec.plData[reqPipeline], reqPipeline, reqStage))
+        {
+            // Task is cancelled
+            -- rExecPl.tasksReqOwnStageLeft;
+        }
     }
 
     // Evaluate Stage-requires-Tasks
@@ -143,18 +162,22 @@ static void pipeline_advance_reqs(TaskGraph const& graph, ExecContext &rExec, Pi
 
     auto const stgreqtaskView = ArrayView<StageRequiresTask const>(fanout_view(graph.anystgToFirstStgreqtask, graph.stgreqtaskData, anystg));
 
-    rExecPl.reqTasksLeft = stgreqtaskView.size();
+    rExecPl.ownStageReqTasksLeft = stgreqtaskView.size();
 
-    // Decrement reqTasksLeft, as some of these tasks might already be complete
+    // Decrement ownStageReqTasksLeft, as some of these tasks might already be complete
     for (StageRequiresTask const& stgreqtask : stgreqtaskView)
     {
         ExecPipeline &rReqTaskExecPl = rExec.plData[stgreqtask.reqPipeline];
 
-        bool const reqTaskDone = [&rReqTaskExecPl, &stgreqtask, &rExec] () noexcept -> bool
+        bool const reqTaskDone = [&tasks, &rReqTaskExecPl, &stgreqtask, &rExec] () noexcept -> bool
         {
             if ( ! rReqTaskExecPl.running )
             {
                 return true; // Not running, which means the whole pipeline finished already
+            }
+            else if (stage_is_cancelled(tasks, rExec, rReqTaskExecPl, stgreqtask.reqPipeline, stgreqtask.reqStage))
+            {
+                return true; // Stage cancelled. Required task is considered finish and will never run
             }
             else if (int(rReqTaskExecPl.stage) < int(stgreqtask.reqStage))
             {
@@ -181,12 +204,12 @@ static void pipeline_advance_reqs(TaskGraph const& graph, ExecContext &rExec, Pi
 
         if (reqTaskDone)
         {
-            -- rExecPl.reqTasksLeft;
+            -- rExecPl.ownStageReqTasksLeft;
         }
     }
 }
 
-static void pipeline_advance_run(TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
+static void pipeline_advance_run(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
 {
     ExecPipeline &rExecPl = rExec.plData[pipeline];
 
@@ -195,46 +218,53 @@ static void pipeline_advance_run(TaskGraph const& graph, ExecContext &rExec, Pip
         return;
     }
 
-    AnyStageId const anystg = anystg_from(graph, pipeline, rExecPl.stage);
+    bool const stageCancelled = rExecPl.cancelOptionals && tasks.m_pipelineControl[pipeline].optionalStages.test(std::size_t(rExecPl.stage));
+    bool noTasksRun = true;
 
-    auto const runTasks = ArrayView<TaskId const>{fanout_view(graph.anystgToFirstRuntask, graph.runtaskToTask, anystg)};
-
-    for (TaskId task : runTasks)
+    if ( ! stageCancelled )
     {
-        LGRN_ASSERTM( ! rExec.tasksQueuedBlocked.contains(task), "Impossible to queue a task that's already queued");
-        LGRN_ASSERTM( ! rExec.tasksQueuedRun    .contains(task), "Impossible to queue a task that's already queued");
+        auto const anystg   = anystg_from(graph, pipeline, rExecPl.stage);
+        auto const runTasks = ArrayView<TaskId const>{fanout_view(graph.anystgToFirstRuntask, graph.runtaskToTask, anystg)};
 
-        // Evaluate Task-requires-Stages
-        // Some requirements may already be satisfied
-        auto const taskreqstageView = ArrayView<const TaskRequiresStage>(fanout_view(graph.taskToFirstTaskreqstg, graph.taskreqstgData, task));
-        int reqStagesLeft = taskreqstageView.size();
+        noTasksRun = runTasks.size() == 0;
 
-        for (TaskRequiresStage const& req : taskreqstageView)
+        for (TaskId task : runTasks)
         {
-            ExecPipeline const &rReqPlData = rExec.plData[req.reqPipeline];
+            LGRN_ASSERTM( ! rExec.tasksQueuedBlocked.contains(task), "Impossible to queue a task that's already queued");
+            LGRN_ASSERTM( ! rExec.tasksQueuedRun    .contains(task), "Impossible to queue a task that's already queued");
 
-            if (rReqPlData.stage == req.reqStage)
+            // Evaluate Task-requires-Stages
+            // Some requirements may already be satisfied
+            auto const taskreqstageView = ArrayView<const TaskRequiresStage>(fanout_view(graph.taskToFirstTaskreqstg, graph.taskreqstgData, task));
+            int reqStagesLeft = taskreqstageView.size();
+
+            for (TaskRequiresStage const& req : taskreqstageView)
             {
-                reqStagesLeft --;
-            }
-        }
+                ExecPipeline const &rReqPlData = rExec.plData[req.reqPipeline];
 
-        if (reqStagesLeft == 0)
-        {
-            // Task can run right away
-            rExec.tasksQueuedRun.emplace(task);
-            ++ rExecPl.tasksQueuedRun;
-        }
-        else
-        {
-            rExec.tasksQueuedBlocked.emplace(task, BlockedTask{reqStagesLeft, pipeline});
-            ++ rExecPl.tasksQueuedBlocked;
+                if (rReqPlData.stage == req.reqStage)
+                {
+                    reqStagesLeft --;
+                }
+            }
+
+            if (reqStagesLeft == 0)
+            {
+                // Task can run right away
+                rExec.tasksQueuedRun.emplace(task);
+                ++ rExecPl.tasksQueuedRun;
+            }
+            else
+            {
+                rExec.tasksQueuedBlocked.emplace(task, BlockedTask{reqStagesLeft, pipeline});
+                ++ rExecPl.tasksQueuedBlocked;
+            }
         }
     }
 
     rExecPl.tasksQueued = true;
 
-    if (runTasks.size() == 0 && pipeline_can_advance(graph, rExec, rExecPl))
+    if (noTasksRun && pipeline_can_advance(graph, rExec, rExecPl))
     {
         // No tasks to run. RunTasks are responsible for setting this pipeline dirty once they're
         // all done. If there is none, then this pipeline may get stuck if nothing sets it dirty,
@@ -245,45 +275,110 @@ static void pipeline_advance_run(TaskGraph const& graph, ExecContext &rExec, Pip
 }
 
 
-static void run_pipeline_recurse(TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
+static void run_pipeline_recurse(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId const pipeline)
 {
     ExecPipeline &rExecPl = rExec.plData[pipeline];
 
     if (fanout_size(graph.pipelineToFirstAnystg, pipeline) != 0)
     {
-        rExecPl.running              = true;
+        rExecPl.running         = true;
+        rExecPl.doLoop          = tasks.m_pipelineControl[pipeline].loops;
+        rExecPl.cancelOptionals = false;
 
-        if (rExecPl.reqTasksLeft == 0)
+        if (rExecPl.ownStageReqTasksLeft == 0)
         {
             rExec.plAdvance.set(std::size_t(pipeline));
             rExec.hasPlAdvance = true;
         }
     }
 
-    auto const subscribers = ArrayView<PipelineId const>{fanout_view(graph.pipelineToFirstSub, graph.subToPipeline, pipeline)};
+    auto const children = ArrayView<PipelineId const>{fanout_view(graph.pipelineToFirstChild, graph.childPlToParent, pipeline)};
 
-    for (PipelineId const plSub : subscribers)
+    for (PipelineId const plSub : children)
     {
-        run_pipeline_recurse(graph, rExec, PipelineId(plSub));
+        run_pipeline_recurse(tasks, graph, rExec, PipelineId(plSub));
     }
+}
+
+void pipeline_cancel_optionals(Tasks const& tasks, TaskGraph const& graph, ExecContext& rExec, ExecPipeline& rExecPl, PipelineId pipeline)
+{
+    if (rExecPl.cancelOptionals)
+    {
+        return; // already cancelled
+    }
+
+    StageBits_t const optionalStages = tasks.m_pipelineControl[pipeline].optionalStages;
+    int const         stageCount     = fanout_size(graph.pipelineToFirstAnystg, pipeline);
+
+    auto anystgInt = uint32_t(anystg_from(graph, pipeline, rExecPl.stage));
+
+    // For each cancelled stage
+    for (auto stgInt = int(rExecPl.stage); stgInt < stageCount; ++stgInt, ++anystgInt)
+    {
+        if ( ! optionalStages.test(stgInt) )
+        {
+            continue;
+        }
+
+        auto const anystg = AnyStageId(anystgInt);
+
+        auto const runTasks = ArrayView<TaskId const>{fanout_view(graph.anystgToFirstRuntask, graph.runtaskToTask, anystg)};
+
+        for (TaskId task : runTasks)
+        {
+            // Stages depend on this RunTask (reverse Stage-requires-Task)
+            for (AnyStageId const& reqTaskAnystg : fanout_view(graph.taskToFirstRevStgreqtask, graph.revStgreqtaskToStage, task))
+            {
+                PipelineId const    reqPl       = graph.anystgToPipeline[reqTaskAnystg];
+                StageId const       reqStg      = stage_from(graph, reqPl, reqTaskAnystg);
+                ExecPipeline        &rReqExecPl = rExec.plData[reqPl];
+
+                if (rReqExecPl.stage == reqStg)
+                {
+                    LGRN_ASSERT(rReqExecPl.ownStageReqTasksLeft != 0);
+                    -- rReqExecPl.ownStageReqTasksLeft;
+                    pipeline_try_advance(graph, rExec, rReqExecPl, reqPl);
+                }
+            }
+
+            // RunTask depends on stages (Task-requires-Stage)
+            for (TaskRequiresStage const& req : fanout_view(graph.taskToFirstTaskreqstg, graph.taskreqstgData, task))
+            {
+                ExecPipeline &rReqExecPl = rExec.plData[req.reqPipeline];
+
+                if (rReqExecPl.stage == req.reqStage)
+                {
+                    LGRN_ASSERT(rReqExecPl.tasksReqOwnStageLeft != 0);
+                    -- rReqExecPl.tasksReqOwnStageLeft;
+                    pipeline_try_advance(graph, rExec, rReqExecPl, req.reqPipeline);
+                }
+            }
+        }
+    }
+
+    rExecPl.cancelOptionals = true;
+}
+
+void pipeline_cancel_loop(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId pipeline)
+{
+
 }
 
 void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept
 {
-
     exec_log(rExec, ExecContext::EnqueueStart{});
-
-    [[maybe_unused]] std::size_t const queuedTasks = rExec.tasksQueuedRun.size() + rExec.tasksQueuedBlocked.size();
-
-    LGRN_ASSERTM( ! ( queuedTasks!=0 && rExec.plRequestRun.count()!=0 ),
-                 "Running new pipelines while already running is not yet supported ROFL!");
 
     if (rExec.hasRequestRun)
     {
+        for (ExecPipeline const& rExecPl : rExec.plData)
+        {
+            LGRN_ASSERTM( ! rExecPl.running, "Running new pipelines while already running is not yet supported ROFL!");
+        }
+
         for (PipelineInt const plInt : rExec.plRequestRun.ones())
         {
             auto const pipeline = PipelineId(plInt);
-            run_pipeline_recurse(graph, rExec, pipeline);
+            run_pipeline_recurse(tasks, graph, rExec, pipeline);
         }
         rExec.plRequestRun.reset();
         rExec.hasRequestRun = false;
@@ -303,12 +398,12 @@ void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
 
         for (PipelineInt const plInt : rExec.plAdvance.ones())
         {
-            pipeline_advance_reqs(graph, rExec, PipelineId(plInt));
+            pipeline_advance_reqs(tasks, graph, rExec, PipelineId(plInt));
         }
 
         for (PipelineInt const plInt : rExec.plAdvance.ones())
         {
-            pipeline_advance_run(graph, rExec, PipelineId(plInt));
+            pipeline_advance_run(tasks, graph, rExec, PipelineId(plInt));
         }
 
         std::copy(rExec.plAdvanceNext.ints().begin(),
@@ -320,17 +415,8 @@ void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
     exec_log(rExec, ExecContext::EnqueueEnd{});
 }
 
-void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, TriggerOut_t dirty) noexcept
+void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId const task, TaskActions actions) noexcept
 {
-    auto const try_advance = [&graph, &rExec] (PipelineId const pipeline, ExecPipeline &rExecPl)
-    {
-        if (pipeline_can_advance(graph, rExec, rExecPl))
-        {
-            rExec.plAdvance.set(std::size_t(pipeline));
-            rExec.hasPlAdvance = true;
-        }
-    };
-
     LGRN_ASSERT(rExec.tasksQueuedRun.contains(task));
     rExec.tasksQueuedRun.erase(task);
 
@@ -341,7 +427,7 @@ void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
 
     -- rExecPl.tasksQueuedRun;
 
-    try_advance(pipeline, rExecPl);
+    pipeline_try_advance(graph, rExec, rExecPl, pipeline);
 
     // Handle stages requiring this task
     for (AnyStageId const& reqTaskAnystg : fanout_view(graph.taskToFirstRevStgreqtask, graph.revStgreqtaskToStage, task))
@@ -352,9 +438,9 @@ void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
 
         if (rReqExecPl.stage == reqStg)
         {
-            -- rReqExecPl.reqTasksLeft;
+            -- rReqExecPl.ownStageReqTasksLeft;
 
-            try_advance(reqPl, rReqExecPl);
+            pipeline_try_advance(graph, rExec, rReqExecPl, reqPl);
         }
         else
         {
@@ -373,9 +459,16 @@ void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
                       "Task-requires-Stage means this task should have not run unless the stage is selected",
                       int(task), int(rReqExecPl.stage), int(req.reqStage));
 
-        -- rReqExecPl.reqByTaskLeft;
+        -- rReqExecPl.tasksReqOwnStageLeft;
 
-        try_advance(req.reqPipeline, rReqExecPl);
+        pipeline_try_advance(graph, rExec, rReqExecPl, req.reqPipeline);
+    }
+
+    // Handle actions
+
+    if (actions & TaskAction::CancelOptionalStages)
+    {
+        pipeline_cancel_optionals(tasks, graph, rExec, rExecPl, pipeline);
     }
 
 }

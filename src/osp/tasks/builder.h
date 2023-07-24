@@ -75,6 +75,12 @@ struct TaskBuilderBase
 
         m_rTasks.m_pipelineIds.create(pipelines.begin(), pipelines.end());
 
+        std::size_t const capacity = m_rTasks.m_pipelineIds.capacity();
+
+        m_rTasks.m_pipelineInfo   .resize(capacity);
+        m_rTasks.m_pipelineControl.resize(capacity);
+        m_rTasks.m_pipelineParents.resize(capacity, lgrn::id_null<PipelineId>());
+
         TGT_STRUCT_T out;
         auto const members = Corrade::Containers::staticArrayView<count, PipelineDefBlank_t>(reinterpret_cast<PipelineDefBlank_t*>(&out));
 

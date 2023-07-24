@@ -43,13 +43,14 @@ struct ExecPipeline
     int             tasksQueuedRun      {0};
     int             tasksQueuedBlocked  {0};
 
-    int             reqByTaskLeft       {0};
-    int             reqTasksLeft        {0};
+    int             tasksReqOwnStageLeft{0};
+    int             ownStageReqTasksLeft{0};
 
     StageId         stage               { lgrn::id_null<StageId>() };
     bool            tasksQueued         { false };
     bool            running             { false };
-    bool            mightLoop           { false };
+    bool            doLoop              { false };
+    bool            cancelOptionals     { false };
 };
 
 struct BlockedTask
@@ -145,13 +146,15 @@ void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
 
 void exec_resize(Tasks const& tasks, ExecContext &rOut);
 
-void exec_run(ExecContext &rExec, PipelineId pipeline);
+void pipeline_run(ExecContext &rExec, PipelineId pipeline);
+
+void pipeline_cancel_optionals(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId pipeline);
+
+void pipeline_cancel_loop(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId pipeline);
 
 void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;
 
-bool conditions_satisfied(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId task) noexcept;
-
-void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId task, TriggerOut_t dirty) noexcept;
+void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId task, TaskActions actions) noexcept;
 
 
 

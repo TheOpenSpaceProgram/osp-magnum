@@ -46,7 +46,7 @@ struct PipelineCounts
 {
     std::array<StageCounts, gc_maxStages> stageCounts;
 
-    uint16_t publishTo          {0};
+    uint16_t children           {0};
     uint8_t  stages             {0};
 };
 
@@ -67,7 +67,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     std::size_t totalTasksReqStage  = 0;
     std::size_t totalStageReqTasks  = 0;
     std::size_t totalRunTasks       = 0;
-    std::size_t totalSubscriptions  = 0;
+    std::size_t totalChildren       = 0;
     std::size_t totalStages         = 0;
 
     // 1. Count total number of stages
@@ -104,7 +104,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         totalStages += plCount.stages;
     }
 
-    // 2. Count TaskRequiresStages and StageRequiresTasks and Subscriptions
+    // 2. Count TaskRequiresStages and StageRequiresTasks
 
     for (TaskEdges const* pEdges : data)
     {
@@ -125,16 +125,22 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         }
         totalTasksReqStage += pEdges->m_syncWith.size();
         totalStageReqTasks += pEdges->m_syncWith.size();
-
-        for (auto const [publisher, subscriber] : pEdges->m_subscriptions)
-        {
-            ++ plCounts[publisher].publishTo;
-        }
-        totalSubscriptions += pEdges->m_subscriptions.size();
     }
 
+    // 3. Count pipeline children
 
-    // 3. Allocate
+    for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    {
+        PipelineId const parent = tasks.m_pipelineParents[PipelineId(pipelineInt)];
+
+        if (parent != lgrn::id_null<PipelineId>())
+        {
+            ++ plCounts[parent].children;
+            ++ totalChildren;
+        }
+    }
+
+    // 4. Allocate
 
     // The +1 is needed for 1-to-many connections to store the total number of other elements they
     // index. This also simplifies logic in fanout_view(...)
@@ -143,8 +149,8 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     out.anystgToPipeline            .resize(totalStages+1,      lgrn::id_null<PipelineId>());
     out.anystgToFirstRuntask        .resize(totalStages+1,      lgrn::id_null<RunTaskId>());
     out.runtaskToTask               .resize(totalRunTasks,      lgrn::id_null<TaskId>());
-    out.pipelineToFirstSub          .resize(maxPipelines+1,     lgrn::id_null<PipelineSubId>());
-    out.subToPipeline               .resize(totalSubscriptions, lgrn::id_null<PipelineId>());
+    out.pipelineToFirstChild        .resize(maxPipelines+1,     lgrn::id_null<ChildPipelineId>());
+    out.childPlToParent             .resize(totalChildren,      lgrn::id_null<PipelineId>());
     out.anystgToFirstStgreqtask     .resize(totalStages+1,      lgrn::id_null<StageReqTaskId>());
     out.stgreqtaskData              .resize(totalStageReqTasks, {});
     out.taskToFirstRevStgreqtask    .resize(maxTasks+1,         lgrn::id_null<ReverseStageReqTaskId>());
@@ -154,7 +160,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     out.anystgToFirstRevTaskreqstg  .resize(totalStages+1,      lgrn::id_null<ReverseTaskReqStageId>());
     out.revTaskreqstgToTask         .resize(totalTasksReqStage, lgrn::id_null<TaskId>());
 
-    // 4. Calculate one-to-many partitions
+    // 5. Calculate one-to-many partitions
 
     fanout_partition(
         out.pipelineToFirstAnystg,
@@ -176,9 +182,9 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         [] (AnyStageId, RunTaskId) { });
 
     fanout_partition(
-        out.pipelineToFirstSub,
-        [&plCounts] (PipelineId pl) { return plCounts[pl].publishTo; },
-        [&out] (PipelineId, PipelineSubId) { });
+        out.pipelineToFirstChild,
+        [&plCounts] (PipelineId pl) { return plCounts[pl].children; },
+        [&out] (PipelineId, ChildPipelineId) { });
 
     fanout_partition(
         out.anystgToFirstStgreqtask,
@@ -216,7 +222,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         },
         [&out] (AnyStageId, ReverseTaskReqStageId) { });
 
-    // 5. Push
+    // 6. Push
 
     for (TaskInt const taskInt : tasks.m_taskIds.bitview().zeros())
     {
@@ -231,55 +237,56 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         -- rStageCounts.runTasks;
     }
 
-    auto add_stagereqtask = [&plCounts, &taskCounts, &totalStageReqTasks, &out]
-                            (PipelineId const pl, StageId const stg, TaskId const task)
-    {
-        AnyStageId const            anystg          = anystg_from(out, pl, stg);
-        StageCounts                 &rStageCounts   = plCounts[pl].stageCounts[std::size_t(stg)];
-        TaskCounts                  &rTaskCounts    = taskCounts[task];
-
-        StageReqTaskId const        stgReqTaskId    = id_from_count(out.anystgToFirstStgreqtask, anystg, rStageCounts.requiresTasks);
-        ReverseStageReqTaskId const revStgReqTaskId = id_from_count(out.taskToFirstRevStgreqtask, task, rTaskCounts.requiredByStages);
-
-        StageRequiresTask &rStgReqTask = out.stgreqtaskData[stgReqTaskId];
-        rStgReqTask.reqTask     = task;
-        rStgReqTask.reqPipeline = pl;
-        rStgReqTask.reqStage    = stg;
-        out.revStgreqtaskToStage[revStgReqTaskId] = anystg;
-
-        -- rStageCounts.requiresTasks;
-        -- rTaskCounts.requiredByStages;
-        -- totalStageReqTasks;
-    };
-
-    auto add_taskreqstage = [&plCounts, &taskCounts, &totalTasksReqStage, &out] (TaskId const task, PipelineId const pl, StageId const stg)
-    {
-        AnyStageId const            anystg          = anystg_from(out, pl, stg);
-        StageCounts                 &rStageCounts   = plCounts[pl].stageCounts[std::size_t(stg)];
-        TaskCounts                  &rTaskCounts    = taskCounts[task];
-
-        TaskReqStageId const        taskReqStgId    = id_from_count(out.taskToFirstTaskreqstg, task, rTaskCounts.requiresStages);
-        ReverseTaskReqStageId const revTaskReqStgId = id_from_count(out.anystgToFirstRevTaskreqstg, anystg, rStageCounts.requiredByTasks);
-
-        TaskRequiresStage &rTaskReqStage = out.taskreqstgData[taskReqStgId];
-        rTaskReqStage.reqStage      = stg;
-        rTaskReqStage.reqPipeline   = pl;
-        out.revTaskreqstgToTask[revTaskReqStgId] = task;
-
-        -- rTaskCounts.requiresStages;
-        -- rStageCounts.requiredByTasks;
-        -- totalTasksReqStage;
-    };
 
     for (TaskEdges const* pEdges : data)
     {
 
         for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
         {
-            add_stagereqtask(pipeline, stage, task);
-            add_taskreqstage(task, pipeline, stage);
-        }
+            AnyStageId const            anystg          = anystg_from(out, pipeline, stage);
+            StageCounts                 &rStageCounts   = plCounts[pipeline].stageCounts[std::size_t(stage)];
+            TaskCounts                  &rTaskCounts    = taskCounts[task];
 
+            auto const [taskPipeline, taskStage] = tasks.m_taskRunOn[task];
+
+            // Add StageReqTask (pipeline, stage) requires task
+            StageReqTaskId const        stgReqTaskId    = id_from_count(out.anystgToFirstStgreqtask, anystg, rStageCounts.requiresTasks);
+            ReverseStageReqTaskId const revStgReqTaskId = id_from_count(out.taskToFirstRevStgreqtask, task, rTaskCounts.requiredByStages);
+
+            StageRequiresTask &rStgReqTask = out.stgreqtaskData[stgReqTaskId];
+
+            // rTaskReqStage.ownStage set previously
+            rStgReqTask.reqTask     = task;
+            rStgReqTask.reqPipeline = taskPipeline;
+            rStgReqTask.reqStage    = taskStage;
+            out.revStgreqtaskToStage[revStgReqTaskId] = anystg;
+
+            -- rStageCounts.requiresTasks;
+            -- rTaskCounts.requiredByStages;
+            -- totalStageReqTasks;
+
+            // Add TaskReqStage task requires (pipeline, stage)
+            TaskReqStageId const        taskReqStgId    = id_from_count(out.taskToFirstTaskreqstg, task, rTaskCounts.requiresStages);
+            ReverseTaskReqStageId const revTaskReqStgId = id_from_count(out.anystgToFirstRevTaskreqstg, anystg, rStageCounts.requiredByTasks);
+
+            TaskRequiresStage &rTaskReqStage = out.taskreqstgData[taskReqStgId];
+
+            // rTaskReqStage.ownTask set previously
+            rTaskReqStage.reqStage      = stage;
+            rTaskReqStage.reqPipeline   = pipeline;
+            out.revTaskreqstgToTask[revTaskReqStgId] = task;
+
+            -- rTaskCounts.requiresStages;
+            -- rStageCounts.requiredByTasks;
+            -- totalTasksReqStage;
+        }
+    }
+
+    for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    {
+        // PipelineId const parent = tasks.m_pipelineParents[PipelineId(pipelineInt)];
+
+        // TODO
     }
 
     [[maybe_unused]] auto const all_counts_zero = [&] ()

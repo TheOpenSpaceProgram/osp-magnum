@@ -35,13 +35,14 @@
 #include <cstdint>
 #include <ostream>
 #include <string_view>
+#include <variant>
 #include <vector>
 
-#define OSP_DECLARE_STAGE_NAMES(type, ...)                                                              \
-    inline osp::ArrayView<std::string_view const> stage_names([[maybe_unused]] type _) noexcept               \
-    {                                                                                                   \
-        static auto const arr = std::array<std::string_view const, std::size({__VA_ARGS__})>{__VA_ARGS__};    \
-        return osp::arrayView( arr.data(), arr.size() );                                                                     \
+#define OSP_DECLARE_STAGE_NAMES(type, ...)                                                                  \
+    inline osp::ArrayView<std::string_view const> stage_names([[maybe_unused]] type _) noexcept             \
+    {                                                                                                       \
+        static auto const arr = std::array<std::string_view const, std::size({__VA_ARGS__})>{__VA_ARGS__};  \
+        return osp::arrayView( arr.data(), arr.size() );                                                    \
     }
 
 namespace osp
@@ -61,6 +62,8 @@ enum class PipelineId   : PipelineInt   { };
 enum class StageId      : StageInt      { };
 enum class SemaphoreId  : SemaphoreInt  { };
 
+//-----------------------------------------------------------------------------
+
 struct PipelineInfo
 {
     using stage_type_family_t = entt::family<struct StageTypeDummy>;
@@ -71,6 +74,12 @@ struct PipelineInfo
     std::string_view                name;
     std::string_view                category;
     stage_type_t                    stageType;
+};
+
+struct PipelineControl
+{
+    StageBits_t optionalStages;
+    bool        loops;
 };
 
 struct TplTaskPipelineStage
@@ -86,17 +95,13 @@ struct TplPipelineStage
     StageId     stage;
 };
 
-struct PipelineSubscribe
-{
-    PipelineId  publisher;
-    PipelineId  subscriber;
-};
-
 struct TplTaskSemaphore
 {
     TaskId      task;
     SemaphoreId semaphore;
 };
+
+//-----------------------------------------------------------------------------
 
 struct Tasks
 {
@@ -107,6 +112,8 @@ struct Tasks
     KeyedVec<SemaphoreId, unsigned int>             m_semaLimits;
 
     KeyedVec<PipelineId, PipelineInfo>              m_pipelineInfo;
+    KeyedVec<PipelineId, PipelineId>                m_pipelineParents;
+    KeyedVec<PipelineId, PipelineControl>           m_pipelineControl;
 
     KeyedVec<TaskId, TplPipelineStage>              m_taskRunOn;
 };
@@ -114,7 +121,6 @@ struct Tasks
 struct TaskEdges
 {
     std::vector<TplTaskPipelineStage>   m_syncWith;
-    std::vector<PipelineSubscribe>      m_subscriptions;
 
     std::vector<TplTaskSemaphore>       m_semaphoreEdges;
 };
@@ -124,7 +130,7 @@ enum class AnyStageId               : uint32_t { };
 enum class RunTaskId                : uint32_t { };
 enum class RunStageId               : uint32_t { };
 
-enum class PipelineSubId            : uint32_t { };
+enum class ChildPipelineId          : uint32_t { };
 
 enum class StageReqTaskId           : uint32_t { };
 enum class ReverseStageReqTaskId    : uint32_t { };
@@ -165,10 +171,10 @@ struct TaskGraph
     KeyedVec<AnyStageId, RunTaskId>                 anystgToFirstRuntask;
     KeyedVec<RunTaskId, TaskId>                     runtaskToTask;
 
-    // Each pipeline has multiple subscriber pipelines
-    // PipelineId --> PipelineSubId --> many PipelineId
-    KeyedVec<PipelineId, PipelineSubId>             pipelineToFirstSub;
-    KeyedVec<PipelineSubId, PipelineId>             subToPipeline;
+    // Each pipeline has multiple child pipelines
+    // PipelineId --> PipelineChildId --> many PipelineId
+    KeyedVec<PipelineId, ChildPipelineId>           pipelineToFirstChild;
+    KeyedVec<ChildPipelineId, PipelineId>           childPlToParent;
 
     // Each stage has multiple entrance requirements.
     // AnyStageId <--> many StageEnterReqId

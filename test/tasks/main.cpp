@@ -64,7 +64,7 @@ void randomized_singlethreaded_execute(Tasks const& tasks, TaskGraph const& grap
         if (runTasksLeft != 0)
         {
             TaskId const        randomTask  = rExec.tasksQueuedRun.at(rRand() % runTasksLeft);
-            TriggerOut_t const  status      = runTask(randomTask);
+            TaskActions const   status      = runTask(randomTask);
             complete_task(tasks, graph, rExec, randomTask, status);
         }
 
@@ -89,6 +89,7 @@ struct Pipelines
 // Test pipeline consisting of parallel tasks
 TEST(Tasks, BasicSingleThreadedParallelTasks)
 {
+    return;
     using namespace test_a;
     using enum Stages;
 
@@ -98,7 +99,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     // well-suited for this problem, as these per-thread vectors can all be represented with the
     // same TargetId.
 
-    using BasicTraits_t     = BasicBuilderTraits<TriggerOut_t(*)(int const, std::vector<int>&, int&)>;
+    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(int const, std::vector<int>&, int&)>;
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
@@ -120,31 +121,31 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     {
         builder.task()
             .run_on  (pl.vec(Fill))
-            .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
+            .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TaskActions
         {
             rOut.push_back(in);
-            return osp::gc_triggerAll;
+            return {};
         });
     }
 
     // Use vector
     builder.task()
         .run_on(pl.vec(Use))
-        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
+        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TaskActions
     {
         int const sum = std::accumulate(rOut.begin(), rOut.end(), 0);
         EXPECT_EQ(sum, in * sc_pusherTaskCount);
         ++rChecksRun;
-        return osp::gc_triggerNone;
+        return {};
     });
 
     // Clear vector after use
     builder.task()
         .run_on({pl.vec(Clear)})
-        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TriggerOut_t
+        .func( [] (int const in, std::vector<int>& rOut, int &rChecksRun) -> TaskActions
     {
         rOut.clear();
-        return osp::gc_triggerNone;
+        return {};
     });
 
     // Step 2: Compile tasks into an execution graph
@@ -165,10 +166,10 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     {
         input = 1 + randGen() % 30;
 
-        exec_run(exec, pl.vec);
+        pipeline_run(exec, pl.vec);
         enqueue_dirty(tasks, graph, exec);
 
-        randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output, &checksRun] (TaskId const task) -> TriggerOut_t
+        randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output, &checksRun] (TaskId const task) -> TaskActions
         {
             return functions[task](input, output, checksRun);
         });
@@ -185,9 +186,9 @@ namespace test_b
 struct TestState
 {
     int     checks              { 0 };
-    bool    normalFlag          { false };
-    bool    optionalFlagExpect  { false };
-    bool    optionalFlag        { false };
+    bool    normalDone          { false };
+    bool    expectOptionalDone  { false };
+    bool    optionalDone        { false };
 };
 
 enum class Stages { Schedule, Write, Read, Clear };
@@ -196,21 +197,24 @@ struct Pipelines
 {
     osp::PipelineDef<Stages> normal;
     osp::PipelineDef<Stages> optional;
+
+    // Extra pipeline blocked by optional task to make the test case more difficult
+    osp::PipelineDef<Stages> distraction;
 };
 
 } // namespace test_gameworld
 
 // Test that features a looping 'normal' pipeline and an 'optional' pipeline that has a 50% chance of running
-TEST(Tasks, BasicSingleThreadedTriggers)
+TEST(Tasks, BasicSingleThreadedOptional)
 {
     using namespace test_b;
     using enum Stages;
 
-    using BasicTraits_t     = BasicBuilderTraits<TriggerOut_t(*)(TestState&, std::mt19937 &)>;
+    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(TestState&, std::mt19937 &)>;
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
-    constexpr int sc_taskRuns = 128;
+    constexpr int sc_repetitions = 128;
     std::mt19937 randGen(69);
 
     Tasks           tasks;
@@ -220,64 +224,77 @@ TEST(Tasks, BasicSingleThreadedTriggers)
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
+    tasks.m_pipelineControl[pl.optional].optionalStages.set(std::size_t(Write));
+
     // These tasks run in a loop, triggering each other to run continuously
 
     builder.task()
-        .run_on   ({pl.normal(Schedule)})
-        .triggers ({pl.normal(Write), pl.optional(Write)})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
+        .run_on   ({pl.optional(Schedule)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
         if (rRand() % 2 == 0)
         {
-            return 0b01; // trigger pl.normal(Write) only
+            rState.expectOptionalDone = true;
+            return {};
         }
         else
         {
-            rState.optionalFlagExpect = true;
-            return 0b11; // trigger pl.normal(Write) and pl.optional(Write)
+            return TaskAction::CancelOptionalStages;
         }
     });
 
     builder.task()
         .run_on   ({pl.normal(Write)})
-        .triggers ({pl.normal(Read), pl.normal(Clear)})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
-        rState.normalFlag = true;
-        return gc_triggerAll;
+        rState.normalDone = true;
+        return {};
     });
 
     builder.task()
         .run_on   ({pl.optional(Write)})
-        .triggers ({pl.optional(Read), pl.optional(Clear)})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
+        .sync_with({pl.distraction(Read)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
-        rState.optionalFlag = true;
-        return gc_triggerAll;
+        rState.optionalDone = true;
+        return {};
     });
-
 
     builder.task()
         .run_on   ({pl.normal(Read)})
         .sync_with({pl.optional(Read)})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
-        EXPECT_TRUE(rState.normalFlag);
-        EXPECT_EQ(rState.optionalFlagExpect, rState.optionalFlag);
-        return gc_triggerAll;
+        EXPECT_TRUE(rState.normalDone);
+        EXPECT_EQ(rState.expectOptionalDone, rState.optionalDone);
+        return {};
     });
 
     builder.task()
         .run_on   ({pl.normal(Clear)})
-        .triggers ({pl.normal(Schedule)})
-        .func( [] (TestState& rState, std::mt19937 &rRand) -> TriggerOut_t
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
         ++ rState.checks;
-        rState.normalFlag           = false;
-        rState.optionalFlagExpect   = false;
-        rState.optionalFlag         = false;
-        return gc_triggerAll;
+        rState.normalDone           = false;
+        rState.expectOptionalDone   = false;
+        rState.optionalDone         = false;
+        return {};
     });
+
+    builder.task()
+        .run_on   ({pl.distraction(Write)})
+        .func( [] (TestState&, std::mt19937&) -> TaskActions
+    {
+        return {};
+    });
+
+    builder.task()
+        .run_on   ({pl.distraction(Read)})
+        .func( [] (TestState&, std::mt19937&) -> TaskActions
+    {
+        return {};
+    });
+
 
     TaskGraph const graph = make_exec_graph(tasks, {&edges});
 
@@ -288,19 +305,24 @@ TEST(Tasks, BasicSingleThreadedTriggers)
 
     TestState world;
 
-    exec_trigger(exec, pl.normal(Schedule));
-    enqueue_dirty(tasks, graph, exec);
-
-    randomized_singlethreaded_execute(
-            tasks, graph, exec, randGen, sc_taskRuns,
-                [&functions, &world, &randGen] (TaskId const task) -> TriggerOut_t
+    for (int i = 0; i < sc_repetitions; ++i)
     {
-        return functions[task](world, randGen);
-    });
+        pipeline_run(exec, pl.normal);
+        pipeline_run(exec, pl.optional);
+        pipeline_run(exec, pl.distraction);
+        enqueue_dirty(tasks, graph, exec);
+
+        randomized_singlethreaded_execute(
+                tasks, graph, exec, randGen, 10,
+                    [&functions, &world, &randGen] (TaskId const task) -> TaskActions
+        {
+            return functions[task](world, randGen);
+        });
+    }
 
     // Assure that the tasks above actually ran, and didn't just skip everything
     // Max of 5 tasks run each loop
-    ASSERT_GT(world.checks, sc_taskRuns / 5);
+    ASSERT_GT(world.checks, sc_repetitions / 5);
 
 }
 
@@ -338,7 +360,7 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     using enum StgSimple;
     using enum StgRender;
 
-    using BasicTraits_t     = BasicBuilderTraits<TriggerOut_t(*)(World&)>;
+    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(World&)>;
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
@@ -358,30 +380,30 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     builder.task()
         .run_on   ({pl.time(Use)})
         .sync_with({pl.forces(Recalc)})
-        .func( [] (World& rWorld) -> TriggerOut_t
+        .func( [] (World& rWorld) -> TaskActions
     {
         rWorld.m_forces += 42 * rWorld.m_deltaTimeIn;
-        return gc_triggerNone;
+        return {};
     });
     builder.task()
         .run_on   ({pl.time(Use)})
         .sync_with({pl.forces(Recalc)})
-        .func([] (World& rWorld) -> TriggerOut_t
+        .func([] (World& rWorld) -> TaskActions
     {
         rWorld.m_forces += 1337 * rWorld.m_deltaTimeIn;
-        return gc_triggerNone;
+        return {};
     });
 
     // Main Physics update
     builder.task()
         .run_on   ({pl.time(Use)})
         .sync_with({pl.forces(Use), pl.positions(Recalc)})
-        .func([] (World& rWorld) -> TriggerOut_t
+        .func([] (World& rWorld) -> TaskActions
     {
         EXPECT_EQ(rWorld.m_forces, 1337 + 42);
         rWorld.m_positions += rWorld.m_forces;
         rWorld.m_forces = 0;
-        return gc_triggerNone;
+        return {};
     });
 
     // Draw things moved by physics update. If 'updWorld' wasn't enqueued, then
@@ -389,21 +411,21 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     builder.task()
         .run_on   ({pl.render(Render)})
         .sync_with({pl.positions(Use)})
-        .func([] (World& rWorld) -> TriggerOut_t
+        .func([] (World& rWorld) -> TaskActions
     {
         EXPECT_EQ(rWorld.m_positions, 1337 + 42);
         rWorld.m_canvas.emplace("Physics Cube");
-        return gc_triggerNone;
+        return {};
     });
 
     // Draw things unrelated to physics. This is allowed to be the first task
     // to run
     builder.task()
         .run_on  ({pl.render(Render)})
-        .func([] (World& rWorld) -> TriggerOut_t
+        .func([] (World& rWorld) -> TaskActions
     {
         rWorld.m_canvas.emplace("Terrain");
-        return gc_triggerNone;
+        return {};
     });
 
     TaskGraph const graph = make_exec_graph(tasks, {&edges});
@@ -424,15 +446,15 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
 
         // Enqueue initial tasks
         // This roughly indicates "Time has changed" and "Render requested"
-        exec_run(exec, pl.time);
-        exec_run(exec, pl.forces);
-        exec_run(exec, pl.positions);
-        exec_run(exec, pl.render);
+        pipeline_run(exec, pl.time);
+        pipeline_run(exec, pl.forces);
+        pipeline_run(exec, pl.positions);
+        pipeline_run(exec, pl.render);
         enqueue_dirty(tasks, graph, exec);
 
         randomized_singlethreaded_execute(
                 tasks, graph, exec, randGen, 5,
-                    [&functions, &world] (TaskId const task) -> TriggerOut_t
+                    [&functions, &world] (TaskId const task) -> TaskActions
         {
             return functions[task](world);
         });

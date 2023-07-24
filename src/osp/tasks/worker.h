@@ -25,17 +25,18 @@
 #pragma once
 
 #include <bitset>
+#include <Corrade/Containers/EnumSet.h>
 
 namespace osp
 {
 
-/**
- * @brief Bitset returned by tasks to determine which specified (pipeline,stage) to trigger
- */
-using TriggerOut_t = std::bitset<64>;
+enum class TaskAction
+{
+    CancelLoop              = 1 << 0,
+    CancelOptionalStages    = 1 << 1
+};
 
-constexpr TriggerOut_t gc_triggerAll    {0xFFFFFFFFFFFFFFFFul};
-constexpr TriggerOut_t gc_triggerNone   {0};
-
+using TaskActions = Corrade::Containers::EnumSet<TaskAction>;
+CORRADE_ENUMSET_OPERATORS(TaskActions)
 
 } // namespace osp
