@@ -89,7 +89,6 @@ struct Pipelines
 // Test pipeline consisting of parallel tasks
 TEST(Tasks, BasicSingleThreadedParallelTasks)
 {
-    return;
     using namespace test_a;
     using enum Stages;
 
@@ -103,9 +102,9 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
-    constexpr int sc_repetitions = 32;
+    constexpr int sc_repetitions     = 32;
     constexpr int sc_pusherTaskCount = 24;
-    constexpr int sc_totalTaskCount = sc_pusherTaskCount + 2;
+    constexpr int sc_totalTaskCount  = sc_pusherTaskCount + 2;
     std::mt19937 randGen(69);
 
     // Step 1: Create tasks
@@ -158,7 +157,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     exec_resize(tasks, graph, exec);
 
     int                 checksRun = 0;
-    int                 input = 0;
+    int                 input     = 0;
     std::vector<int>    output;
 
     // Repeat with randomness to test many possible execution orders
@@ -202,7 +201,7 @@ struct Pipelines
     osp::PipelineDef<Stages> distraction;
 };
 
-} // namespace test_gameworld
+} // namespace test_b
 
 // Test that features a looping 'normal' pipeline and an 'optional' pipeline that has a 50% chance of running
 TEST(Tasks, BasicSingleThreadedOptional)
@@ -210,7 +209,7 @@ TEST(Tasks, BasicSingleThreadedOptional)
     using namespace test_b;
     using enum Stages;
 
-    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(TestState&, std::mt19937 &)>;
+    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(TestState&, std::mt19937&)>;
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
@@ -224,9 +223,11 @@ TEST(Tasks, BasicSingleThreadedOptional)
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
-    tasks.m_pipelineControl[pl.optional].optionalStages.set(std::size_t(Write));
+    builder.pipeline(pl.optional)
+            .parent(pl.normal);
 
-    // These tasks run in a loop, triggering each other to run continuously
+    builder.pipeline(pl.distraction)
+            .parent(pl.normal);
 
     builder.task()
         .run_on   ({pl.optional(Schedule)})
@@ -235,11 +236,11 @@ TEST(Tasks, BasicSingleThreadedOptional)
         if (rRand() % 2 == 0)
         {
             rState.expectOptionalDone = true;
-            return {};
+            return { };
         }
         else
         {
-            return TaskAction::CancelOptionalStages;
+            return TaskAction::Cancel;
         }
     });
 
@@ -308,8 +309,6 @@ TEST(Tasks, BasicSingleThreadedOptional)
     for (int i = 0; i < sc_repetitions; ++i)
     {
         pipeline_run(exec, pl.normal);
-        pipeline_run(exec, pl.optional);
-        pipeline_run(exec, pl.distraction);
         enqueue_dirty(tasks, graph, exec);
 
         randomized_singlethreaded_execute(
@@ -323,7 +322,94 @@ TEST(Tasks, BasicSingleThreadedOptional)
     // Assure that the tasks above actually ran, and didn't just skip everything
     // Max of 5 tasks run each loop
     ASSERT_GT(world.checks, sc_repetitions / 5);
+}
 
+//-----------------------------------------------------------------------------
+
+namespace test_c
+{
+
+struct TestState
+{
+    std::vector<int> in;
+    std::vector<int> out;
+
+    int processA{0};
+    int processB{0};
+};
+
+enum class Stages { Schedule, Process, Done, Clear };
+
+struct Pipelines
+{
+    osp::PipelineDef<Stages> main;
+    osp::PipelineDef<Stages> loop;
+    osp::PipelineDef<Stages> processA;
+    osp::PipelineDef<Stages> processB;
+};
+
+} // namespace test_c
+
+//
+TEST(Tasks, BasicSingleThreadedLoop)
+{
+    using namespace test_c;
+    using enum Stages;
+
+    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(TestState&, std::mt19937 &)>;
+    using Builder_t         = BasicTraits_t::Builder;
+    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
+
+    constexpr int sc_repetitions = 128;
+    std::mt19937 randGen(69);
+
+    Tasks           tasks;
+    TaskEdges       edges;
+    TaskFuncVec_t   functions;
+    Builder_t       builder{tasks, edges, functions};
+
+    auto const pl = builder.create_pipelines<Pipelines>();
+
+    builder.pipeline(pl.loop)    .parent(pl.main).loops(true);
+    builder.pipeline(pl.processA).parent(pl.loop);
+    builder.pipeline(pl.processB).parent(pl.loop);
+
+    builder.task()
+        .run_on   ({pl.main(Schedule)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
+    {
+        return { };
+    });
+
+    builder.task()
+        .run_on   ({pl.loop(Schedule)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
+    {
+        return { };
+    });
+
+
+    TaskGraph const graph = make_exec_graph(tasks, {&edges});
+
+    // Execute
+
+    ExecContext exec;
+    exec_resize(tasks, graph, exec);
+
+    TestState world;
+
+    for (int i = 0; i < sc_repetitions; ++i)
+    {
+        pipeline_run(exec, pl.main);
+        enqueue_dirty(tasks, graph, exec);
+
+        randomized_singlethreaded_execute(
+                tasks, graph, exec, randGen, 999999,
+                    [&functions, &world, &randGen] (TaskId const task) -> TaskActions
+        {
+            return functions[task](world, randGen);
+        });
+    }
 }
 
 //-----------------------------------------------------------------------------

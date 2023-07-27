@@ -24,6 +24,8 @@
  */
 #include "tasks.h"
 
+#include "../bitvector.h"
+
 #include <array>
 
 namespace osp
@@ -46,8 +48,10 @@ struct PipelineCounts
 {
     std::array<StageCounts, gc_maxStages> stageCounts;
 
-    uint16_t children           {0};
     uint8_t  stages             {0};
+
+    PipelineId firstChild       { lgrn::id_null<PipelineId>() };
+    PipelineId sibling          { lgrn::id_null<PipelineId>() };
 };
 
 
@@ -60,14 +64,16 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     KeyedVec<PipelineId, PipelineCounts>    plCounts;
     KeyedVec<TaskId, TaskCounts>            taskCounts;
+    BitVector_t                             plInTree;
+
     out.pipelineToFirstAnystg .resize(maxPipelines);
+    bitvector_resize(plInTree, maxPipelines);
     plCounts        .resize(maxPipelines+1);
     taskCounts      .resize(maxTasks+1);
 
     std::size_t totalTasksReqStage  = 0;
     std::size_t totalStageReqTasks  = 0;
     std::size_t totalRunTasks       = 0;
-    std::size_t totalChildren       = 0;
     std::size_t totalStages         = 0;
 
     // 1. Count total number of stages
@@ -127,18 +133,31 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         totalStageReqTasks += pEdges->m_syncWith.size();
     }
 
-    // 3. Count pipeline children
+    // 3. Map out children and siblings in tree
 
-    for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    for (PipelineInt const childPlInt : tasks.m_pipelineIds.bitview().zeros())
     {
-        PipelineId const parent = tasks.m_pipelineParents[PipelineId(pipelineInt)];
+        PipelineId const child  = PipelineId(childPlInt);
+        PipelineId const parent = tasks.m_pipelineParents[child];
 
         if (parent != lgrn::id_null<PipelineId>())
         {
-            ++ plCounts[parent].children;
-            ++ totalChildren;
+            plInTree.set(std::size_t(parent));
+            plInTree.set(std::size_t(child));
+
+            PipelineCounts &rChildCounts  = plCounts[child];
+            PipelineCounts &rParentCounts = plCounts[parent];
+
+            if (rParentCounts.firstChild != lgrn::id_null<PipelineId>())
+            {
+                rChildCounts.sibling = rParentCounts.firstChild;
+            }
+
+            rParentCounts.firstChild = child;
         }
     }
+
+    std::size_t const treeSize = plInTree.count();
 
     // 4. Allocate
 
@@ -149,8 +168,6 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     out.anystgToPipeline            .resize(totalStages+1,      lgrn::id_null<PipelineId>());
     out.anystgToFirstRuntask        .resize(totalStages+1,      lgrn::id_null<RunTaskId>());
     out.runtaskToTask               .resize(totalRunTasks,      lgrn::id_null<TaskId>());
-    out.pipelineToFirstChild        .resize(maxPipelines+1,     lgrn::id_null<ChildPipelineId>());
-    out.childPlToParent             .resize(totalChildren,      lgrn::id_null<PipelineId>());
     out.anystgToFirstStgreqtask     .resize(totalStages+1,      lgrn::id_null<StageReqTaskId>());
     out.stgreqtaskData              .resize(totalStageReqTasks, {});
     out.taskToFirstRevStgreqtask    .resize(maxTasks+1,         lgrn::id_null<ReverseStageReqTaskId>());
@@ -159,6 +176,9 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     out.taskreqstgData              .resize(totalTasksReqStage, {});
     out.anystgToFirstRevTaskreqstg  .resize(totalStages+1,      lgrn::id_null<ReverseTaskReqStageId>());
     out.revTaskreqstgToTask         .resize(totalTasksReqStage, lgrn::id_null<TaskId>());
+    out.pltreeDescendantCounts      .resize(treeSize,           0);
+    out.pltreeToPipeline            .resize(treeSize,           lgrn::id_null<PipelineId>());
+    out.pipelineToPltree            .resize(maxPipelines,       lgrn::id_null<PipelineTreePos_t>());
 
     // 5. Calculate one-to-many partitions
 
@@ -180,11 +200,6 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
             return plCounts[pl].stageCounts[std::size_t(stgLocal)].runTasks;
         },
         [] (AnyStageId, RunTaskId) { });
-
-    fanout_partition(
-        out.pipelineToFirstChild,
-        [&plCounts] (PipelineId pl) { return plCounts[pl].children; },
-        [&out] (PipelineId, ChildPipelineId) { });
 
     fanout_partition(
         out.anystgToFirstStgreqtask,
@@ -237,10 +252,8 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         -- rStageCounts.runTasks;
     }
 
-
     for (TaskEdges const* pEdges : data)
     {
-
         for (auto const [task, pipeline, stage] : pEdges->m_syncWith)
         {
             AnyStageId const            anystg          = anystg_from(out, pipeline, stage);
@@ -282,13 +295,6 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         }
     }
 
-    for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
-    {
-        // PipelineId const parent = tasks.m_pipelineParents[PipelineId(pipelineInt)];
-
-        // TODO
-    }
-
     [[maybe_unused]] auto const all_counts_zero = [&] ()
     {
         if (   totalStageReqTasks   != 0
@@ -320,6 +326,56 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     };
 
     LGRN_ASSERTM(all_counts_zero(), "Counts repurposed as items remaining, and must all be zero by the end here");
+
+
+    // 7. Build Pipeline Tree
+
+    auto const add_subtree = [&] (auto const& self, PipelineId const root, PipelineId const firstChild, PipelineTreePos_t const pos) -> uint32_t
+    {
+        out.pltreeToPipeline[pos] = root;
+        out.pipelineToPltree[root] = pos;
+
+        uint32_t descendantCount = 0;
+
+        PipelineId child = firstChild;
+
+        PipelineTreePos_t childPos = pos;
+
+        while (child != lgrn::id_null<PipelineId>())
+        {
+            PipelineCounts const& rChildCounts = plCounts[child];
+
+            ++ childPos;
+            uint32_t const childDescendantCount = self(self, child, rChildCounts.firstChild, childPos);
+            descendantCount += 1 + childDescendantCount;
+
+            child = rChildCounts.sibling;
+        }
+
+        out.pltreeDescendantCounts[pos] = descendantCount;
+
+        return descendantCount;
+    };
+
+    PipelineTreePos_t rootPos = 0;
+
+    for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    {
+        auto const pipeline = PipelineId(pipelineInt);
+        if ( ! plInTree.test(pipelineInt) || tasks.m_pipelineParents[pipeline] != lgrn::id_null<PipelineId>())
+        {
+            continue; // Not in tree or not a root
+        }
+
+        // For each root pipeline
+
+        PipelineCounts const& rRootCounts = plCounts[pipeline];
+
+        uint32_t const rootDescendantCount = add_subtree(add_subtree, pipeline, rRootCounts.firstChild, rootPos);
+
+        rootPos += 1 + rootDescendantCount;
+    }
+
 
     return out;
 }

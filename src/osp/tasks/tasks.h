@@ -78,7 +78,6 @@ struct PipelineInfo
 
 struct PipelineControl
 {
-    StageBits_t optionalStages;
     bool        loops;
 };
 
@@ -125,12 +124,12 @@ struct TaskEdges
     std::vector<TplTaskSemaphore>       m_semaphoreEdges;
 };
 
+using PipelineTreePos_t = uint32_t;
+
 enum class AnyStageId               : uint32_t { };
 
 enum class RunTaskId                : uint32_t { };
 enum class RunStageId               : uint32_t { };
-
-enum class ChildPipelineId          : uint32_t { };
 
 enum class StageReqTaskId           : uint32_t { };
 enum class ReverseStageReqTaskId    : uint32_t { };
@@ -171,11 +170,6 @@ struct TaskGraph
     KeyedVec<AnyStageId, RunTaskId>                 anystgToFirstRuntask;
     KeyedVec<RunTaskId, TaskId>                     runtaskToTask;
 
-    // Each pipeline has multiple child pipelines
-    // PipelineId --> PipelineChildId --> many PipelineId
-    KeyedVec<PipelineId, ChildPipelineId>           pipelineToFirstChild;
-    KeyedVec<ChildPipelineId, PipelineId>           childPlToParent;
-
     // Each stage has multiple entrance requirements.
     // AnyStageId <--> many StageEnterReqId
     KeyedVec<AnyStageId, StageReqTaskId>            anystgToFirstStgreqtask;
@@ -194,6 +188,13 @@ struct TaskGraph
     KeyedVec<AnyStageId, ReverseTaskReqStageId>     anystgToFirstRevTaskreqstg;
     KeyedVec<ReverseTaskReqStageId, TaskId>         revTaskreqstgToTask;
 
+    // N-ary tree structure represented as an array of descendant counts. Each node's subtree of
+    // descendants is positioned directly after it within the array.
+    // Example for tree structure "A(  B(C(D)), E(F(G(H,I)))  )"
+    // * Descendant Count array: [A:8, B:2, C:1, D:0, E:4, F:3, G:2, H:0, I:0]
+    KeyedVec<PipelineTreePos_t, uint32_t>           pltreeDescendantCounts;
+    KeyedVec<PipelineTreePos_t, PipelineId>         pltreeToPipeline;
+    KeyedVec<PipelineId, PipelineTreePos_t>         pipelineToPltree;
 
     // not yet used
     lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>    taskAcquire;      /// Tasks acquire (n) Semaphores
@@ -314,10 +315,6 @@ struct PipelineDef
     PipelineInfo::stage_type_t m_type { PipelineInfo::stage_type_family_t::value<ENUM_T> };
 
     PipelineId m_value { lgrn::id_null<PipelineId>() };
-
-
-
-
 };
 
 using PipelineDefBlank_t = PipelineDef<int>;

@@ -54,9 +54,10 @@ using TreePos_t = uint32_t;
 
 struct ACtxSceneGraph
 {
-    // Tree structure stored using an array of descendant count in parallel with
-    // identificaton (entities)
-    // A(B(C(D)), E(F(G(H,I)))) -> [A,B,C,D,E,F,G,H,I] and [8,2,1,0,4,3,2,0,0]
+    // N-ary tree structure represented as an array of descendant counts. Each node's subtree of
+    // descendants is positioned directly after it within the array.
+    // Example for tree structure "A(  B(C(D)), E(F(G(H,I)))  )"
+    // * Descendant Count array: [A:8, B:2, C:1, D:0, E:4, F:3, G:2, H:0, I:0]
     std::vector<ActiveEnt>  m_treeToEnt{lgrn::id_null<ActiveEnt>()};
     std::vector<uint32_t>   m_treeDescendants{std::initializer_list<uint32_t>{0}};
 

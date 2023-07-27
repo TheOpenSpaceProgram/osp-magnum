@@ -32,8 +32,8 @@ namespace osp
 
 enum class TaskAction
 {
-    CancelLoop              = 1 << 0,
-    CancelOptionalStages    = 1 << 1
+    Cancel = 1 << 0
+    // CancelLoop = 1 << 1
 };
 
 using TaskActions = Corrade::Containers::EnumSet<TaskAction>;

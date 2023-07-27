@@ -40,15 +40,21 @@ namespace osp
 /**
  * @brief A convenient interface for setting up Tasks and required task data
  */
-template <typename TASKBUILDER_T, typename TASKREF_T>
+template <typename TRAITS_T>
 struct TaskBuilderBase
 {
+    using Builder_t     = typename TRAITS_T::Builder_t;
+    using TaskRef_t     = typename TRAITS_T::TaskRef_t;
+
+    template <typename ENUM_T>
+    using PipelineRef_t = typename TRAITS_T::template PipelineRef<ENUM_T>;
+
     constexpr TaskBuilderBase(Tasks &rTasks, TaskEdges &rEdges) noexcept
      : m_rTasks{rTasks}
      , m_rEdges{rEdges}
     { }
 
-    TASKREF_T task()
+    TaskRef_t task()
     {
         TaskId const taskId = m_rTasks.m_taskIds.create();
 
@@ -57,16 +63,25 @@ struct TaskBuilderBase
         return task(taskId);
     };
 
-    constexpr TASKREF_T task(TaskId const taskId) noexcept
+    [[nodiscard]] constexpr TaskRef_t task(TaskId const taskId) noexcept
     {
-        return TASKREF_T{
+        return TaskRef_t{
             taskId,
-            static_cast<TASKBUILDER_T&>(*this)
+            static_cast<Builder_t&>(*this)
+        };
+    }
+
+    template <typename ENUM_T>
+    [[nodiscard]] constexpr PipelineRef_t<ENUM_T> pipeline(PipelineDef<ENUM_T> pipelineDef) noexcept
+    {
+        return PipelineRef_t<ENUM_T>{
+            pipelineDef.m_value,
+            static_cast<Builder_t&>(*this)
         };
     }
 
     template<typename TGT_STRUCT_T>
-    TGT_STRUCT_T create_pipelines()
+    [[nodiscard]] TGT_STRUCT_T create_pipelines()
     {
         static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineDefBlank_t) == 0);
         constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineDefBlank_t);
@@ -107,10 +122,11 @@ struct TaskBuilderBase
 }; // class TaskBuilderBase
 
 
-template <typename TASKBUILDER_T, typename TASKREF_T>
+template <typename TRAITS_T>
 struct TaskRefBase
 {
-    struct Empty {};
+    using Builder_t     = typename TRAITS_T::Builder_t;
+    using TaskRef_t     = typename TRAITS_T::TaskRef_t;
 
     constexpr operator TaskId() noexcept
     {
@@ -120,7 +136,7 @@ struct TaskRefBase
     constexpr Tasks & tasks() noexcept { return m_rBuilder.m_rTasks; }
 
     template<typename RANGE_T>
-    TASKREF_T& add_edges(std::vector<TplTaskPipelineStage>& rContainer, RANGE_T const& add)
+    TaskRef_t& add_edges(std::vector<TplTaskPipelineStage>& rContainer, RANGE_T const& add)
     {
         for (auto const [pipeline, stage] : add)
         {
@@ -130,30 +146,58 @@ struct TaskRefBase
                 .stage    = stage
             });
         }
-        return static_cast<TASKREF_T&>(*this);
+        return static_cast<TaskRef_t&>(*this);
     }
 
-    TASKREF_T& run_on(TplPipelineStage const tpl) noexcept
+    TaskRef_t& run_on(TplPipelineStage const tpl) noexcept
     {
         m_rBuilder.m_rTasks.m_taskRunOn.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
         m_rBuilder.m_rTasks.m_taskRunOn[m_taskId] = tpl;
 
-        return static_cast<TASKREF_T&>(*this);
+        return static_cast<TaskRef_t&>(*this);
     }
 
-    TASKREF_T& sync_with(ArrayView<TplPipelineStage const> const specs) noexcept
+    TaskRef_t& sync_with(ArrayView<TplPipelineStage const> const specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_syncWith, specs);
     }
 
-    TASKREF_T& sync_with(std::initializer_list<TplPipelineStage const> specs) noexcept
+    TaskRef_t& sync_with(std::initializer_list<TplPipelineStage const> specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_syncWith, specs);
     }
-
 
     TaskId          m_taskId;
-    TASKBUILDER_T   & m_rBuilder;
+    Builder_t       & m_rBuilder;
+
+}; // struct TaskRefBase
+
+template <typename TRAITS_T, typename ENUM_T>
+struct PipelineRefBase
+{
+    using Builder_t     = typename TRAITS_T::Builder_t;
+    using PipelineRef_t = typename TRAITS_T::template PipelineRef_t<ENUM_T>;
+    using TaskRef_t     = typename TRAITS_T::TaskRef_t;
+
+    constexpr operator PipelineId() noexcept
+    {
+        return m_pipelineId;
+    }
+
+    PipelineRef_t& parent(PipelineId const parent)
+    {
+        m_rBuilder.m_rTasks.m_pipelineParents[m_pipelineId] = parent;
+        return static_cast<PipelineRef_t&>(*this);
+    }
+
+    PipelineRef_t& loops(bool const loop)
+    {
+        m_rBuilder.m_rTasks.m_pipelineControl[m_pipelineId].loops = loop;
+        return static_cast<PipelineRef_t&>(*this);
+    }
+
+    PipelineId      m_pipelineId;
+    Builder_t       & m_rBuilder;
 
 }; // struct TaskRefBase
 
@@ -164,16 +208,26 @@ struct BasicBuilderTraits
     using FuncVec_t = KeyedVec<TaskId, FUNC_T>;
 
     struct Builder;
+    struct TaskRef;
 
-    struct Ref : public TaskRefBase<Builder, Ref>
-    {
-        Ref& func(FUNC_T && in);
-    };
+    template <typename PipelineType>
+    struct PipelineRef;
 
-    struct Builder : public TaskBuilderBase<Builder, Ref>
+    using Builder_t     = Builder;
+
+    using TaskRef_t     = TaskRef;
+
+    template <typename ENUM_T>
+    using PipelineRef_t = PipelineRef<ENUM_T>;
+
+    template <typename ENUM_T>
+    struct PipelineRef : public PipelineRefBase<BasicBuilderTraits, ENUM_T>
+    { };
+
+    struct Builder : public TaskBuilderBase<BasicBuilderTraits>
     {
         Builder(Tasks& rTasks, TaskEdges& rEdges, FuncVec_t& rFuncs)
-         : TaskBuilderBase<Builder, Ref>{ rTasks, rEdges }
+         : TaskBuilderBase<BasicBuilderTraits>{ rTasks, rEdges }
          , m_rFuncs{rFuncs}
         { }
         Builder(Builder const& copy) = delete;
@@ -183,10 +237,16 @@ struct BasicBuilderTraits
 
         FuncVec_t & m_rFuncs;
     };
+
+    struct TaskRef : public TaskRefBase<BasicBuilderTraits>
+    {
+        TaskRef& func(FUNC_T && in);
+    };
+
 };
 
 template<typename FUNC_T>
-typename BasicBuilderTraits<FUNC_T>::Ref& BasicBuilderTraits<FUNC_T>::Ref::func(FUNC_T && in)
+typename BasicBuilderTraits<FUNC_T>::TaskRef& BasicBuilderTraits<FUNC_T>::TaskRef::func(FUNC_T && in)
 {
     this->m_rBuilder.m_rFuncs.resize(this->m_rBuilder.m_rTasks.m_taskIds.capacity());
     this->m_rBuilder.m_rFuncs[this->m_taskId] = std::move(in);

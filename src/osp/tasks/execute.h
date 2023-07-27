@@ -47,10 +47,11 @@ struct ExecPipeline
     int             ownStageReqTasksLeft{0};
 
     StageId         stage               { lgrn::id_null<StageId>() };
-    bool            tasksQueued         { false };
+
+    bool            tasksQueueDone      { false };
+    bool            loop                { false };
     bool            running             { false };
-    bool            doLoop              { false };
-    bool            cancelOptionals     { false };
+    bool            canceled            { false };
 };
 
 struct BlockedTask
