@@ -97,12 +97,16 @@ struct TaskBuilderBase
         m_rTasks.m_pipelineParents.resize(capacity, lgrn::id_null<PipelineId>());
 
         TGT_STRUCT_T out;
-        auto const members = Corrade::Containers::staticArrayView<count, PipelineDefBlank_t>(reinterpret_cast<PipelineDefBlank_t*>(&out));
+
+        // Set m_value members of TGT_STRUCT_T, asserted to contain only PipelineDef<...>
+        // This is janky enough that rewriting the code below might cause it to ONLY SEGFAULT ON
+        // RELEASE AND ISN'T CAUGHT BY ASAN WTF??? (on gcc 11)
+        auto *pOutBytes = reinterpret_cast<char*>(std::addressof(out));
 
         for (std::size_t i = 0; i < count; ++i)
         {
             PipelineId const pl = pipelines[i];
-            members[i].m_value = pl;
+            *reinterpret_cast<PipelineId*>(pOutBytes + sizeof(PipelineDefBlank_t)*i + offsetof(PipelineDefBlank_t, m_value)) = pl;
         }
 
         return out;

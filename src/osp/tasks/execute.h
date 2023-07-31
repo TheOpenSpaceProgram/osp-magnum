@@ -46,6 +46,8 @@ struct ExecPipeline
     int             tasksReqOwnStageLeft{0};
     int             ownStageReqTasksLeft{0};
 
+    int             loopPipelinesLeft   {0};
+
     StageId         stage               { lgrn::id_null<StageId>() };
 
     bool            tasksQueueDone      { false };
@@ -60,6 +62,12 @@ struct BlockedTask
     PipelineId      pipeline;
 };
 
+struct LoopRequestRun
+{
+    PipelineId          pipeline;
+    PipelineTreePos_t   treePos;
+};
+
 /**
  * @brief
  */
@@ -72,10 +80,13 @@ struct ExecContext
 
     BitVector_t                         plAdvance;
     BitVector_t                         plAdvanceNext;
-    bool                                hasPlAdvance  {false};
+    bool                                hasPlAdvanceOrLoop  {false};
 
     BitVector_t                         plRequestRun;
+    std::vector<LoopRequestRun>         requestLoop;
     bool                                hasRequestRun {false};
+
+
 
 
     // 'logging'
@@ -147,13 +158,15 @@ void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
 
 void exec_resize(Tasks const& tasks, ExecContext &rOut);
 
-void pipeline_run(ExecContext &rExec, PipelineId pipeline);
-
-void pipeline_cancel_optionals(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId pipeline);
+inline void exec_request_run(ExecContext &rExec, PipelineId pipeline) noexcept
+{
+    rExec.plRequestRun.set(std::size_t(pipeline));
+    rExec.hasRequestRun = true;
+}
 
 void pipeline_cancel_loop(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId pipeline);
 
-void enqueue_dirty(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;
+void exec_update(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;
 
 void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, TaskId task, TaskActions actions) noexcept;
 

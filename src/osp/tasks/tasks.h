@@ -195,6 +195,7 @@ struct TaskGraph
     KeyedVec<PipelineTreePos_t, uint32_t>           pltreeDescendantCounts;
     KeyedVec<PipelineTreePos_t, PipelineId>         pltreeToPipeline;
     KeyedVec<PipelineId, PipelineTreePos_t>         pipelineToPltree;
+    KeyedVec<PipelineId, PipelineTreePos_t>         pipelineToLoopScope;
 
     // not yet used
     lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>    taskAcquire;      /// Tasks acquire (n) Semaphores
@@ -314,7 +315,7 @@ struct PipelineDef
 
     PipelineInfo::stage_type_t m_type { PipelineInfo::stage_type_family_t::value<ENUM_T> };
 
-    PipelineId m_value { lgrn::id_null<PipelineId>() };
+    PipelineId m_value { PipelineId(69) };
 };
 
 using PipelineDefBlank_t = PipelineDef<int>;

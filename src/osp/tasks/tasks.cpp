@@ -179,6 +179,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     out.pltreeDescendantCounts      .resize(treeSize,           0);
     out.pltreeToPipeline            .resize(treeSize,           lgrn::id_null<PipelineId>());
     out.pipelineToPltree            .resize(maxPipelines,       lgrn::id_null<PipelineTreePos_t>());
+    out.pipelineToLoopScope         .resize(maxPipelines,       lgrn::id_null<PipelineTreePos_t>());
 
     // 5. Calculate one-to-many partitions
 
@@ -330,26 +331,29 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     // 7. Build Pipeline Tree
 
-    auto const add_subtree = [&] (auto const& self, PipelineId const root, PipelineId const firstChild, PipelineTreePos_t const pos) -> uint32_t
+    auto const add_subtree = [&] (auto const& self, PipelineId const root, PipelineId const firstChild, PipelineTreePos_t const loopScope, PipelineTreePos_t const pos) -> uint32_t
     {
-        out.pltreeToPipeline[pos] = root;
-        out.pipelineToPltree[root] = pos;
+        out.pltreeToPipeline[pos]     = root;
+        out.pipelineToPltree[root]    = pos;
+        out.pipelineToLoopScope[root] = loopScope;
 
         uint32_t descendantCount = 0;
 
         PipelineId child = firstChild;
 
-        PipelineTreePos_t childPos = pos;
+        PipelineTreePos_t childPos = pos + 1;
 
         while (child != lgrn::id_null<PipelineId>())
         {
-            PipelineCounts const& rChildCounts = plCounts[child];
+            PipelineCounts const&   rChildCounts    = plCounts[child];
+            bool const              childLoops      = tasks.m_pipelineControl[child].loops;
+            PipelineTreePos_t       childLoopScope  = childLoops ? childPos : loopScope;
 
-            ++ childPos;
-            uint32_t const childDescendantCount = self(self, child, rChildCounts.firstChild, childPos);
+            uint32_t const childDescendantCount = self(self, child, rChildCounts.firstChild, childLoopScope, childPos);
             descendantCount += 1 + childDescendantCount;
 
             child = rChildCounts.sibling;
+            ++ childPos;
         }
 
         out.pltreeDescendantCounts[pos] = descendantCount;
@@ -371,7 +375,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
         PipelineCounts const& rRootCounts = plCounts[pipeline];
 
-        uint32_t const rootDescendantCount = add_subtree(add_subtree, pipeline, rRootCounts.firstChild, rootPos);
+        uint32_t const rootDescendantCount = add_subtree(add_subtree, pipeline, rRootCounts.firstChild, lgrn::id_null<PipelineTreePos_t>(), rootPos);
 
         rootPos += 1 + rootDescendantCount;
     }
