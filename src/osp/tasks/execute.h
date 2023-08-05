@@ -46,7 +46,7 @@ struct ExecPipeline
     int             tasksReqOwnStageLeft{0};
     int             ownStageReqTasksLeft{0};
 
-    int             loopPipelinesLeft   {0};
+    int             loopChildrenLeft    {0};
 
     StageId         stage               { lgrn::id_null<StageId>() };
 
@@ -54,6 +54,7 @@ struct ExecPipeline
     bool            loop                { false };
     bool            running             { false };
     bool            canceled            { false };
+    bool            triggered           { false };
 };
 
 struct BlockedTask
@@ -68,32 +69,41 @@ struct LoopRequestRun
     PipelineTreePos_t   treePos;
 };
 
+
 /**
- * @brief
+ * @brief The ExecLog struct
  */
-struct ExecContext
+struct ExecLog
 {
-    KeyedVec<PipelineId, ExecPipeline>  plData;
+    struct UpdateStart { };
+    struct UpdateCycle { };
+    struct UpdateEnd { };
 
-    entt::basic_sparse_set<TaskId>              tasksQueuedRun;
-    entt::basic_storage<BlockedTask, TaskId>    tasksQueuedBlocked;
+    struct PipelineRun
+    {
+        PipelineId  pipeline;
+    };
 
-    BitVector_t                         plAdvance;
-    BitVector_t                         plAdvanceNext;
-    bool                                hasPlAdvanceOrLoop  {false};
+    struct PipelineFinish
+    {
+        PipelineId  pipeline;
+    };
 
-    BitVector_t                         plRequestRun;
-    std::vector<LoopRequestRun>         requestLoop;
-    bool                                hasRequestRun {false};
+    struct PipelineCancel
+    {
+        PipelineId  pipeline;
+        StageId     stage;
+    };
 
+    struct PipelineLoop
+    {
+        PipelineId  pipeline;
+    };
 
-
-
-    // 'logging'
-
-    struct EnqueueStart { };
-    struct EnqueueCycle { };
-    struct EnqueueEnd { };
+    struct PipelineLoopFinish
+    {
+        PipelineId  pipeline;
+    };
 
     struct StageChange
     {
@@ -114,6 +124,7 @@ struct ExecContext
     {
         PipelineId  pipeline;
         StageId     stage;
+        bool        satisfied;
     };
 
     struct UnblockTask
@@ -126,22 +137,49 @@ struct ExecContext
         TaskId      task;
     };
 
-    struct CompleteTaskTrigger
+    struct ExternalRunRequest
     {
         PipelineId  pipeline;
-        StageId     stage;
     };
 
-    struct ExternalTrigger
-    {
-        PipelineId  pipeline;
-        StageId     stage;
-    };
-
-    using LogMsg_t = std::variant<EnqueueStart, EnqueueCycle, EnqueueEnd, StageChange, EnqueueTask, EnqueueTaskReq, UnblockTask, CompleteTask, CompleteTaskTrigger, ExternalTrigger>;
+    using LogMsg_t = std::variant<
+            UpdateStart,
+            UpdateCycle,
+            UpdateEnd,
+            PipelineRun,
+            PipelineFinish,
+            PipelineCancel,
+            PipelineLoop,
+            PipelineLoopFinish,
+            StageChange,
+            EnqueueTask,
+            EnqueueTaskReq,
+            UnblockTask,
+            CompleteTask,
+            ExternalRunRequest>;
 
     std::vector<LogMsg_t>           logMsg;
     bool                            doLogging{true};
+};
+
+
+/**
+ * @brief State for executing Tasks and TaskGraph
+ */
+struct ExecContext : public ExecLog
+{
+    KeyedVec<PipelineId, ExecPipeline>  plData;
+
+    entt::basic_sparse_set<TaskId>              tasksQueuedRun;
+    entt::basic_storage<BlockedTask, TaskId>    tasksQueuedBlocked;
+
+    BitVector_t                         plAdvance;
+    BitVector_t                         plAdvanceNext;
+    bool                                hasPlAdvanceOrLoop  {false};
+
+    BitVector_t                         plRequestRun;
+    std::vector<LoopRequestRun>         requestLoop;
+    bool                                hasRequestRun {false};
 
     // TODO: Consider multithreading. something something work stealing...
     //  * Allow multiple threads to search for and execute tasks. Atomic access
@@ -153,6 +191,7 @@ struct ExecContext
     //  * Plug into an existing work queue library?
 
 }; // struct ExecContext
+
 
 void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
 

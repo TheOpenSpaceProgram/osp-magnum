@@ -68,7 +68,7 @@ void randomized_singlethreaded_execute(Tasks const& tasks, TaskGraph const& grap
             complete_task(tasks, graph, rExec, randomTask, status);
         }
 
-        enqueue_dirty(tasks, graph, rExec);
+        exec_update(tasks, graph, rExec);
     }
 }
 
@@ -165,8 +165,8 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     {
         input = 1 + randGen() % 30;
 
-        pipeline_run(exec, pl.vec);
-        enqueue_dirty(tasks, graph, exec);
+        exec_request_run(exec, pl.vec);
+        exec_update(tasks, graph, exec);
 
         randomized_singlethreaded_execute(tasks, graph, exec, randGen, sc_totalTaskCount, [&functions, &input, &output, &checksRun] (TaskId const task) -> TaskActions
         {
@@ -203,7 +203,7 @@ struct Pipelines
 
 } // namespace test_b
 
-// Test that features a looping 'normal' pipeline and an 'optional' pipeline that has a 50% chance of running
+// Test that features a 'normal' pipeline and an 'optional' pipeline that has a 50% chance of running
 TEST(Tasks, BasicSingleThreadedOptional)
 {
     using namespace test_b;
@@ -266,6 +266,7 @@ TEST(Tasks, BasicSingleThreadedOptional)
         .sync_with({pl.optional(Read)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
+        ++ rState.checks;
         EXPECT_TRUE(rState.normalDone);
         EXPECT_EQ(rState.expectOptionalDone, rState.optionalDone);
         return {};
@@ -275,7 +276,6 @@ TEST(Tasks, BasicSingleThreadedOptional)
         .run_on   ({pl.normal(Clear)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
-        ++ rState.checks;
         rState.normalDone           = false;
         rState.expectOptionalDone   = false;
         rState.optionalDone         = false;
@@ -308,8 +308,8 @@ TEST(Tasks, BasicSingleThreadedOptional)
 
     for (int i = 0; i < sc_repetitions; ++i)
     {
-        pipeline_run(exec, pl.normal);
-        enqueue_dirty(tasks, graph, exec);
+        exec_request_run(exec, pl.normal);
+        exec_update(tasks, graph, exec);
 
         randomized_singlethreaded_execute(
                 tasks, graph, exec, randGen, 10,
@@ -331,11 +331,12 @@ namespace test_c
 
 struct TestState
 {
-    std::vector<int> in;
-    std::vector<int> out;
+    std::vector<int>    inputQueue;
+    std::vector<int>    outputQueue;
+    int                 intermediate    { 0 };
 
-    int processA{0};
-    int processB{0};
+    int                 checks          { 0 };
+    int                 outSumExpected  { 0 };
 };
 
 enum class Stages { Schedule, Process, Done, Clear };
@@ -344,13 +345,13 @@ struct Pipelines
 {
     osp::PipelineDef<Stages> main;
     osp::PipelineDef<Stages> loop;
-    osp::PipelineDef<Stages> processA;
-    osp::PipelineDef<Stages> processB;
+    osp::PipelineDef<Stages> stepA;
+    osp::PipelineDef<Stages> stepB;
 };
 
 } // namespace test_c
 
-//
+// Looping pipelines with 2 child pipelines that run a 2-step process
 TEST(Tasks, BasicSingleThreadedLoop)
 {
     using namespace test_c;
@@ -360,7 +361,7 @@ TEST(Tasks, BasicSingleThreadedLoop)
     using Builder_t         = BasicTraits_t::Builder;
     using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
 
-    constexpr int sc_repetitions = 128;
+    constexpr int sc_repetitions = 42;
     std::mt19937 randGen(69);
 
     Tasks           tasks;
@@ -370,21 +371,196 @@ TEST(Tasks, BasicSingleThreadedLoop)
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
-    builder.pipeline(pl.loop)    .parent(pl.main).loops(true);
-    builder.pipeline(pl.processA).parent(pl.loop);
-    builder.pipeline(pl.processB).parent(pl.loop);
+    builder.pipeline(pl.loop) .parent(pl.main).loops(true);
+    builder.pipeline(pl.stepA).parent(pl.loop);
+    builder.pipeline(pl.stepB).parent(pl.loop);
 
+    // Determine if we should loop or not
     builder.task()
-        .run_on   ({pl.main(Schedule)})
+        .run_on   ({pl.loop(Schedule)})
+        .sync_with({pl.main(Process), pl.stepA(Schedule), pl.stepB(Schedule)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
+        if (rState.inputQueue.empty())
+        {
+            return TaskAction::Cancel;
+        }
+
+        return { };
+    });
+
+    // Consume one item from input queue and writes to intermediate value
+    builder.task()
+        .run_on   ({pl.stepA(Process)})
+        .sync_with({pl.main(Process), pl.loop(Process)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
+    {
+        rState.intermediate = rState.inputQueue.back() * 2;
+        rState.inputQueue.pop_back();
+        return { };
+    });
+
+    // Read intermediate value and write to output queue
+    builder.task()
+        .run_on   ({pl.stepB(Process)})
+        .sync_with({pl.main(Process), pl.stepA(Done), pl.loop(Process)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
+    {
+        rState.outputQueue.push_back(rState.intermediate + 5);
+        return { };
+    });
+
+    // Verify output queue is correct
+    builder.task()
+        .run_on   ({pl.main(Done)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
+    {
+        ++ rState.checks;
+        int const sum = std::reduce(rState.outputQueue.begin(), rState.outputQueue.end());
+        EXPECT_TRUE(rState.outSumExpected == sum);
+        return { };
+    });
+
+    // Clear output queue after use
+    builder.task()
+        .run_on   ({pl.main(Clear)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
+    {
+        rState.outputQueue.clear();
+        return { };
+    });
+
+    TaskGraph const graph = make_exec_graph(tasks, {&edges});
+
+    // Execute
+
+    ExecContext exec;
+    exec_resize(tasks, graph, exec);
+
+    TestState world;
+
+    world.inputQueue.reserve(64);
+    world.outputQueue.reserve(64);
+
+    for (int i = 0; i < sc_repetitions; ++i)
+    {
+        int outSumExpected = 0;
+        world.inputQueue.resize(randGen() % 64);
+        for (int &rNum : world.inputQueue)
+        {
+            rNum = randGen() % 64;
+            outSumExpected += rNum * 2 + 5;
+        }
+        world.outSumExpected = outSumExpected;
+
+        exec_request_run(exec, pl.main);
+        exec_update(tasks, graph, exec);
+
+        randomized_singlethreaded_execute(
+                tasks, graph, exec, randGen, 999999,
+                    [&functions, &world, &randGen] (TaskId const task) -> TaskActions
+        {
+            return functions[task](world, randGen);
+        });
+    }
+
+    ASSERT_EQ(world.checks, sc_repetitions);
+}
+
+//-----------------------------------------------------------------------------
+
+namespace test_d
+{
+
+struct TestState
+{
+    int countIn          { 0 };
+
+    int countOut         { 0 };
+    int countOutExpected { 0 };
+    int outerLoops       { 0 };
+    bool innerLoopRan    { false };
+
+    int checks           { 0 };
+};
+
+enum class Stages { Schedule, Process, Done, Clear };
+
+struct Pipelines
+{
+    osp::PipelineDef<Stages> loopOuter;
+    osp::PipelineDef<Stages> loopInner;
+    osp::PipelineDef<Stages> aux;
+};
+
+} // namespace test_d
+
+// Looping 'outer' pipeline with a nested looping 'inner' pipeline
+TEST(Tasks, BasicSingleThreadedNestedLoop)
+{
+    using namespace test_d;
+    using enum Stages;
+
+    using BasicTraits_t     = BasicBuilderTraits<TaskActions(*)(TestState&, std::mt19937 &)>;
+    using Builder_t         = BasicTraits_t::Builder;
+    using TaskFuncVec_t     = BasicTraits_t::FuncVec_t;
+
+    constexpr int sc_repetitions = 42;
+    std::mt19937 randGen(69);
+
+    Tasks           tasks;
+    TaskEdges       edges;
+    TaskFuncVec_t   functions;
+    Builder_t       builder{tasks, edges, functions};
+
+    auto const pl = builder.create_pipelines<Pipelines>();
+
+    builder.pipeline(pl.loopOuter).loops(true);
+    builder.pipeline(pl.loopInner).loops(true).parent(pl.loopOuter);
+    //builder.pipeline(pl.aux).parent(pl.loopOuter);
+
+    builder.task()
+        .run_on   ({pl.loopInner(Schedule)})
+        .sync_with({pl.loopOuter(Process)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
+    {
+        if (rState.countIn == 0)
+        {
+            return TaskAction::Cancel;
+        }
+
+        rState.innerLoopRan = true;
         return { };
     });
 
     builder.task()
-        .run_on   ({pl.loop(Schedule)})
+        .run_on   ({pl.loopInner(Process)})
+        .sync_with({pl.loopOuter(Process)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
+        -- rState.countIn;
+        ++ rState.countOut;
+        return { };
+    });
+
+    builder.task()
+        .run_on   ({pl.loopOuter(Done)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
+    {
+        if (rState.innerLoopRan)
+        {
+            ++ rState.checks;
+            EXPECT_EQ(rState.countOut, rState.countOutExpected);
+        }
+        return { };
+    });
+
+    builder.task()
+        .run_on   ({pl.loopOuter(Clear)})
+        .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
+    {
+        rState.countOut = 0;
+        rState.innerLoopRan = false;
         return { };
     });
 
@@ -398,18 +574,30 @@ TEST(Tasks, BasicSingleThreadedLoop)
 
     TestState world;
 
+    exec_request_run(exec, pl.loopOuter);
+
+    int checksExpected = 0;
+
     for (int i = 0; i < sc_repetitions; ++i)
     {
-        pipeline_run(exec, pl.main);
-        enqueue_dirty(tasks, graph, exec);
+        int const count = randGen() % 10;
+
+        checksExpected += (count != 0);
+
+        world.countIn          = count;
+        world.countOutExpected = count;
+
+        exec_update(tasks, graph, exec);
 
         randomized_singlethreaded_execute(
-                tasks, graph, exec, randGen, 999999,
+                tasks, graph, exec, randGen, 50,
                     [&functions, &world, &randGen] (TaskId const task) -> TaskActions
         {
             return functions[task](world, randGen);
         });
     }
+
+    ASSERT_EQ(world.checks, checksExpected);
 }
 
 //-----------------------------------------------------------------------------
@@ -532,11 +720,11 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
 
         // Enqueue initial tasks
         // This roughly indicates "Time has changed" and "Render requested"
-        pipeline_run(exec, pl.time);
-        pipeline_run(exec, pl.forces);
-        pipeline_run(exec, pl.positions);
-        pipeline_run(exec, pl.render);
-        enqueue_dirty(tasks, graph, exec);
+        exec_request_run(exec, pl.time);
+        exec_request_run(exec, pl.forces);
+        exec_request_run(exec, pl.positions);
+        exec_request_run(exec, pl.render);
+        exec_update(tasks, graph, exec);
 
         randomized_singlethreaded_execute(
                 tasks, graph, exec, randGen, 5,

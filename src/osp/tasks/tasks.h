@@ -78,7 +78,8 @@ struct PipelineInfo
 
 struct PipelineControl
 {
-    bool        loops;
+    StageId     trigger     { lgrn::id_null<StageId>() };
+    bool        isLoopScope { false };
 };
 
 struct TplTaskPipelineStage

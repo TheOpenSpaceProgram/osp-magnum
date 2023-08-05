@@ -333,9 +333,12 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     auto const add_subtree = [&] (auto const& self, PipelineId const root, PipelineId const firstChild, PipelineTreePos_t const loopScope, PipelineTreePos_t const pos) -> uint32_t
     {
+        bool const        rootLoops    = tasks.m_pipelineControl[root].isLoopScope;
+        PipelineTreePos_t newLoopScope = rootLoops ? pos : loopScope;
+
         out.pltreeToPipeline[pos]     = root;
         out.pipelineToPltree[root]    = pos;
-        out.pipelineToLoopScope[root] = loopScope;
+        out.pipelineToLoopScope[root] = newLoopScope;
 
         uint32_t descendantCount = 0;
 
@@ -346,10 +349,8 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         while (child != lgrn::id_null<PipelineId>())
         {
             PipelineCounts const&   rChildCounts    = plCounts[child];
-            bool const              childLoops      = tasks.m_pipelineControl[child].loops;
-            PipelineTreePos_t       childLoopScope  = childLoops ? childPos : loopScope;
 
-            uint32_t const childDescendantCount = self(self, child, rChildCounts.firstChild, childLoopScope, childPos);
+            uint32_t const childDescendantCount = self(self, child, rChildCounts.firstChild, newLoopScope, childPos);
             descendantCount += 1 + childDescendantCount;
 
             child = rChildCounts.sibling;
