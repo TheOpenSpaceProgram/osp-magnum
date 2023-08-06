@@ -67,18 +67,18 @@ enum class SemaphoreId  : SemaphoreInt  { };
 struct PipelineInfo
 {
     using stage_type_family_t = entt::family<struct StageTypeDummy>;
-    using stage_type_t = stage_type_family_t::value_type;
+    using stage_type_t        = stage_type_family_t::value_type;
 
     static inline KeyedVec<stage_type_t, ArrayView<std::string_view const>> sm_stageNames;
 
-    std::string_view                name;
-    std::string_view                category;
-    stage_type_t                    stageType;
+    std::string_view    name;
+    std::string_view    category;
+    stage_type_t        stageType;
 };
 
 struct PipelineControl
 {
-    StageId     trigger     { lgrn::id_null<StageId>() };
+    StageId     waitStage   { lgrn::id_null<StageId>() };
     bool        isLoopScope { false };
 };
 
@@ -122,7 +122,7 @@ struct TaskEdges
 {
     std::vector<TplTaskPipelineStage>   m_syncWith;
 
-    std::vector<TplTaskSemaphore>       m_semaphoreEdges;
+    //std::vector<TplTaskSemaphore>       m_semaphoreEdges;
 };
 
 using PipelineTreePos_t = uint32_t;
@@ -199,8 +199,8 @@ struct TaskGraph
     KeyedVec<PipelineId, PipelineTreePos_t>         pipelineToLoopScope;
 
     // not yet used
-    lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>    taskAcquire;      /// Tasks acquire (n) Semaphores
-    lgrn::IntArrayMultiMap<SemaphoreInt, TaskId>    semaAcquiredBy;   /// Semaphores are acquired by (n) Tasks
+    //lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>    taskAcquire;      /// Tasks acquire (n) Semaphores
+    //lgrn::IntArrayMultiMap<SemaphoreInt, TaskId>    semaAcquiredBy;   /// Semaphores are acquired by (n) Tasks
 };
 
 
@@ -284,17 +284,6 @@ inline StageId stage_from(TaskGraph const& graph, AnyStageId const stg) noexcept
     return stage_from(graph, graph.anystgToPipeline[stg], stg);
 }
 
-constexpr StageId stage_next(StageId const in, int stageCount) noexcept
-{
-    int const next = int(in) + 1;
-    return StageId( (next == stageCount) ? 0 : next );
-}
-
-constexpr StageId stage_prev(StageId const in, int stageCount) noexcept
-{
-    return StageId( (int(in)==0) ? (stageCount-1) : (int(in)-1) );
-}
-
 template <typename ENUM_T>
 struct PipelineDef
 {
@@ -316,7 +305,7 @@ struct PipelineDef
 
     PipelineInfo::stage_type_t m_type { PipelineInfo::stage_type_family_t::value<ENUM_T> };
 
-    PipelineId m_value { PipelineId(69) };
+    PipelineId m_value { lgrn::id_null<PipelineId>() };
 };
 
 using PipelineDefBlank_t = PipelineDef<int>;

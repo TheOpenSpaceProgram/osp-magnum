@@ -154,7 +154,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     // Step 3: Run
 
     ExecContext exec;
-    exec_resize(tasks, graph, exec);
+    exec_conform(tasks, exec);
 
     int                 checksRun = 0;
     int                 input     = 0;
@@ -163,7 +163,7 @@ TEST(Tasks, BasicSingleThreadedParallelTasks)
     // Repeat with randomness to test many possible execution orders
     for (int i = 0; i < sc_repetitions; ++i)
     {
-        input = 1 + randGen() % 30;
+        input = 1 + int(randGen() % 30);
 
         exec_request_run(exec, pl.vec);
         exec_update(tasks, graph, exec);
@@ -302,7 +302,7 @@ TEST(Tasks, BasicSingleThreadedOptional)
     // Execute
 
     ExecContext exec;
-    exec_resize(tasks, graph, exec);
+    exec_conform(tasks,  exec);
 
     TestState world;
 
@@ -435,7 +435,7 @@ TEST(Tasks, BasicSingleThreadedLoop)
     // Execute
 
     ExecContext exec;
-    exec_resize(tasks, graph, exec);
+    exec_conform(tasks, exec);
 
     TestState world;
 
@@ -448,7 +448,7 @@ TEST(Tasks, BasicSingleThreadedLoop)
         world.inputQueue.resize(randGen() % 64);
         for (int &rNum : world.inputQueue)
         {
-            rNum = randGen() % 64;
+            rNum = int(randGen() % 64);
             outSumExpected += rNum * 2 + 5;
         }
         world.outSumExpected = outSumExpected;
@@ -479,7 +479,6 @@ struct TestState
     int countOut         { 0 };
     int countOutExpected { 0 };
     int outerLoops       { 0 };
-    bool innerLoopRan    { false };
 
     int checks           { 0 };
 };
@@ -515,9 +514,8 @@ TEST(Tasks, BasicSingleThreadedNestedLoop)
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
-    builder.pipeline(pl.loopOuter).loops(true);
+    builder.pipeline(pl.loopOuter).loops(true).wait_for_signal(Schedule);
     builder.pipeline(pl.loopInner).loops(true).parent(pl.loopOuter);
-    //builder.pipeline(pl.aux).parent(pl.loopOuter);
 
     builder.task()
         .run_on   ({pl.loopInner(Schedule)})
@@ -529,7 +527,6 @@ TEST(Tasks, BasicSingleThreadedNestedLoop)
             return TaskAction::Cancel;
         }
 
-        rState.innerLoopRan = true;
         return { };
     });
 
@@ -547,11 +544,8 @@ TEST(Tasks, BasicSingleThreadedNestedLoop)
         .run_on   ({pl.loopOuter(Done)})
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
-        if (rState.innerLoopRan)
-        {
-            ++ rState.checks;
-            EXPECT_EQ(rState.countOut, rState.countOutExpected);
-        }
+        ++ rState.checks;
+        EXPECT_EQ(rState.countOut, rState.countOutExpected);
         return { };
     });
 
@@ -560,7 +554,6 @@ TEST(Tasks, BasicSingleThreadedNestedLoop)
         .func( [] (TestState& rState, std::mt19937 &rRand) -> TaskActions
     {
         rState.countOut = 0;
-        rState.innerLoopRan = false;
         return { };
     });
 
@@ -570,24 +563,22 @@ TEST(Tasks, BasicSingleThreadedNestedLoop)
     // Execute
 
     ExecContext exec;
-    exec_resize(tasks, graph, exec);
+    exec_conform(tasks, exec);
 
     TestState world;
 
     exec_request_run(exec, pl.loopOuter);
 
-    int checksExpected = 0;
-
     for (int i = 0; i < sc_repetitions; ++i)
     {
-        int const count = randGen() % 10;
-
-        checksExpected += (count != 0);
+        auto const count = int(randGen() % 10);
 
         world.countIn          = count;
         world.countOutExpected = count;
 
         exec_update(tasks, graph, exec);
+
+        exec_signal(exec, pl.loopOuter);
 
         randomized_singlethreaded_execute(
                 tasks, graph, exec, randGen, 50,
@@ -597,7 +588,7 @@ TEST(Tasks, BasicSingleThreadedNestedLoop)
         });
     }
 
-    ASSERT_EQ(world.checks, checksExpected);
+    ASSERT_EQ(world.checks, sc_repetitions);
 }
 
 //-----------------------------------------------------------------------------
@@ -707,7 +698,7 @@ TEST(Tasks, BasicSingleThreadedGameWorld)
     // Execute
 
     ExecContext exec;
-    exec_resize(tasks, graph, exec);
+    exec_conform(tasks, exec);
 
     World world;
 

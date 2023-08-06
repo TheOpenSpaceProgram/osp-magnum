@@ -317,7 +317,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         for (TaskCounts const& taskCount : taskCounts)
         {
             if (   taskCount.requiredByStages != 0
-                || taskCount.requiredByStages != 0 )
+                || taskCount.requiresStages != 0 )
             {
                 return false;
             }

@@ -38,23 +38,46 @@
 namespace osp
 {
 
+/**
+ * @brief Per-Pipeline state needed for execution
+ */
 struct ExecPipeline
 {
-    int             tasksQueuedRun      {0};
-    int             tasksQueuedBlocked  {0};
 
-    int             tasksReqOwnStageLeft{0};
-    int             ownStageReqTasksLeft{0};
+    /// Number of Tasks with satisfied dependencies that are ready to run
+    int             tasksQueuedRun          { 0 };
 
-    int             loopChildrenLeft    {0};
+    ///< Number of Tasks waiting for their TaskReqStage dependencies to be satisfied
+    int             tasksQueuedBlocked      { 0 };
 
-    StageId         stage               { lgrn::id_null<StageId>() };
+    /**
+     * @brief Number of remaining TaskReqStage dependencies.
+     *
+     * Tasks from other running Pipelines require this Pipeline's current stage to be selected
+     * in order to run. This Pipeline has to wait for these tasks to complete before proceeding to
+     * the next stage.
+     */
+    int             tasksReqOwnStageLeft    { 0 };
 
-    bool            tasksQueueDone      { false };
-    bool            loop                { false };
-    bool            running             { false };
-    bool            canceled            { false };
-    bool            triggered           { false };
+    /**
+     * @brief Number of remaining StageReqTask dependencies.
+     *
+     * This Pipeline's current stage require Tasks from other Pipelines to complete in order to
+     * proceed to the next stage.
+     */
+    int             ownStageReqTasksLeft    { 0 };
+
+    int             loopChildrenLeft        { 0 };
+
+    StageId         stage                   { lgrn::id_null<StageId>() };
+
+    StageId         waitStage               { lgrn::id_null<StageId>() };
+    bool            waitSignaled            { false };
+
+    bool            tasksQueueDone          { false };
+    bool            loop                    { false };
+    bool            running                 { false };
+    bool            canceled                { false };
 };
 
 struct BlockedTask
@@ -71,7 +94,7 @@ struct LoopRequestRun
 
 
 /**
- * @brief The ExecLog struct
+ * @brief Fast plain-old-data log for ExecContext state changes
  */
 struct ExecLog
 {
@@ -192,10 +215,7 @@ struct ExecContext : public ExecLog
 
 }; // struct ExecContext
 
-
-void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut);
-
-void exec_resize(Tasks const& tasks, ExecContext &rOut);
+void exec_conform(Tasks const& tasks, ExecContext &rOut);
 
 inline void exec_request_run(ExecContext &rExec, PipelineId pipeline) noexcept
 {
@@ -203,7 +223,7 @@ inline void exec_request_run(ExecContext &rExec, PipelineId pipeline) noexcept
     rExec.hasRequestRun = true;
 }
 
-void pipeline_cancel_loop(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId pipeline);
+void exec_signal(ExecContext &rExec, PipelineId pipeline) noexcept;
 
 void exec_update(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec) noexcept;
 

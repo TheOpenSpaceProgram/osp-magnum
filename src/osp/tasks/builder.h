@@ -47,7 +47,7 @@ struct TaskBuilderBase
     using TaskRef_t     = typename TRAITS_T::TaskRef_t;
 
     template <typename ENUM_T>
-    using PipelineRef_t = typename TRAITS_T::template PipelineRef<ENUM_T>;
+    using PipelineRef_t = typename TRAITS_T::template PipelineRef_t<ENUM_T>;
 
     constexpr TaskBuilderBase(Tasks &rTasks, TaskEdges &rEdges) noexcept
      : m_rTasks{rTasks}
@@ -196,7 +196,13 @@ struct PipelineRefBase
 
     PipelineRef_t& loops(bool const loop)
     {
-        m_rBuilder.m_rTasks.m_pipelineControl[m_pipelineId].loops = loop;
+        m_rBuilder.m_rTasks.m_pipelineControl[m_pipelineId].isLoopScope = loop;
+        return static_cast<PipelineRef_t&>(*this);
+    }
+
+    PipelineRef_t& wait_for_signal(ENUM_T stage)
+    {
+        m_rBuilder.m_rTasks.m_pipelineControl[m_pipelineId].waitStage = StageId(stage);
         return static_cast<PipelineRef_t&>(*this);
     }
 

@@ -34,7 +34,7 @@ static void exec_log(ExecContext &rExec, ExecContext::LogMsg_t msg) noexcept;
 
 static void pipeline_run_root(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId pipeline) noexcept;
 
-static int pipeline_run(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, bool useAdvanceNext, PipelineId const pipeline, PipelineTreePos_t treePos, uint32_t descendents, bool isLoopScope, bool insideLoopScope);
+static int pipeline_run(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, bool rerunLoop, PipelineId pipeline, PipelineTreePos_t treePos, uint32_t descendents, bool isLoopScope, bool insideLoopScope);
 
 static void pipeline_advance_stage(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId pipeline) noexcept;
 
@@ -42,9 +42,9 @@ static void pipeline_advance_reqs(Tasks const& tasks, TaskGraph const& graph, Ex
 
 static void pipeline_advance_run(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, PipelineId pipeline) noexcept;
 
-static constexpr bool pipeline_can_advance(Tasks const& tasks, TaskGraph const& graph, ExecContext const &rExec, ExecPipeline &rExecPl) noexcept;
+static constexpr bool pipeline_can_advance(ExecPipeline &rExecPl) noexcept;
 
-static inline void pipeline_try_advance(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, ExecPipeline &rExecPl, PipelineId const pipeline) noexcept;
+static void pipeline_try_advance(ExecContext &rExec, ExecPipeline &rExecPl, PipelineId pipeline) noexcept;
 
 static void pipeline_cancel(Tasks const& tasks, TaskGraph const& graph, ExecContext& rExec, ExecPipeline& rExecPl, PipelineId pipeline) noexcept;
 
@@ -54,7 +54,7 @@ struct ArgsForIsPipelineInLoop
     PipelineId insideLoop;
 };
 
-static bool is_pipeline_in_loop(Tasks const& tasks, TaskGraph const& graph, ExecContext const& exec, ArgsForIsPipelineInLoop const args) noexcept;
+static bool is_pipeline_in_loop(Tasks const& tasks, TaskGraph const& graph, ExecContext const& exec, ArgsForIsPipelineInLoop args) noexcept;
 
 struct ArgsForSubtreeForEach
 {
@@ -139,7 +139,7 @@ void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
 
     -- rExecPl.tasksQueuedRun;
 
-    pipeline_try_advance(tasks, graph, rExec, rExecPl, pipeline);
+    pipeline_try_advance(rExec, rExecPl, pipeline);
 
     if (actions & TaskAction::Cancel)
     {
@@ -165,7 +165,7 @@ void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
             {
                 -- rReqExecPl.ownStageReqTasksLeft;
 
-                pipeline_try_advance(tasks, graph, rExec, rReqExecPl, reqPl);
+                pipeline_try_advance(rExec, rReqExecPl, reqPl);
             }
         }
         else
@@ -191,11 +191,18 @@ void complete_task(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExe
         {
             -- rReqExecPl.tasksReqOwnStageLeft;
 
-            pipeline_try_advance(tasks, graph, rExec, rReqExecPl, req.reqPipeline);
+            pipeline_try_advance(rExec, rReqExecPl, req.reqPipeline);
         }
         // else: This pipeline is enclosed in a loop relative to dependency. This task may run
         //       more times.
     }
+}
+
+void exec_signal(ExecContext &rExec, PipelineId pipeline) noexcept
+{
+    ExecPipeline &rExecPl = rExec.plData[pipeline];
+    rExecPl.waitSignaled = true;
+    pipeline_try_advance(rExec, rExecPl, pipeline);
 }
 
 //-----------------------------------------------------------------------------
@@ -280,7 +287,6 @@ static int pipeline_run(Tasks const& tasks, TaskGraph const& graph, ExecContext 
 
 static void loop_scope_done(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, ExecPipeline &rExecPl, PipelineId const pipeline, PipelineTreePos_t const treePos)
 {
-
     if ( ! rExecPl.canceled )
     {
         // Loop more
@@ -356,11 +362,11 @@ static void pipeline_advance_stage(Tasks const& tasks, TaskGraph const& graph, E
 {
     ExecPipeline &rExecPl = rExec.plData[pipeline];
 
-    LGRN_ASSERT(pipeline_can_advance(tasks, graph, rExec, rExecPl));
+    LGRN_ASSERT(pipeline_can_advance(rExecPl));
     // * rExecPl.ownStageReqTasksLeft == 0;
     // * rExecPl.tasksReqOwnStageLeft == 0;
 
-    int const stageCount = fanout_size(graph.pipelineToFirstAnystg, pipeline);
+    auto const stageCount = fanout_size(graph.pipelineToFirstAnystg, pipeline);
     LGRN_ASSERTM(stageCount != 0, "Pipelines with 0 stages shouldn't be running");
 
     bool const justStarting = rExecPl.stage == lgrn::id_null<StageId>();
@@ -368,6 +374,11 @@ static void pipeline_advance_stage(Tasks const& tasks, TaskGraph const& graph, E
     auto const nextStage = StageId( justStarting ? 0 : (int(rExecPl.stage)+1) );
 
     rExecPl.tasksQueueDone = false;
+
+    if (rExecPl.stage == rExecPl.waitStage)
+    {
+        rExecPl.waitSignaled = false;
+    }
 
     if (nextStage != StageId(stageCount))
     {
@@ -408,7 +419,7 @@ static void pipeline_advance_reqs(Tasks const& tasks, TaskGraph const& graph, Ex
     auto const revTaskReqStageView = ArrayView<TaskId const>(fanout_view(graph.anystgToFirstRevTaskreqstg, graph.revTaskreqstgToTask, anystg));
 
     // Number of tasks that require this stage. This is decremented when required tasks finish
-    rExecPl.tasksReqOwnStageLeft = revTaskReqStageView.size();
+    rExecPl.tasksReqOwnStageLeft = int(revTaskReqStageView.size());
 
     for (TaskId const task : revTaskReqStageView)
     {
@@ -444,7 +455,7 @@ static void pipeline_advance_reqs(Tasks const& tasks, TaskGraph const& graph, Ex
 
     auto const stgreqtaskView = ArrayView<StageRequiresTask const>(fanout_view(graph.anystgToFirstStgreqtask, graph.stgreqtaskData, anystg));
 
-    rExecPl.ownStageReqTasksLeft = stgreqtaskView.size();
+    rExecPl.ownStageReqTasksLeft = int(stgreqtaskView.size());
 
     // Decrement ownStageReqTasksLeft, as some of these tasks might already be complete
     for (StageRequiresTask const& stgreqtask : stgreqtaskView)
@@ -517,7 +528,7 @@ static void pipeline_advance_run(Tasks const& tasks, TaskGraph const& graph, Exe
             // Evaluate Task-requires-Stages
             // Some requirements may already be satisfied
             auto const taskreqstageView = ArrayView<const TaskRequiresStage>(fanout_view(graph.taskToFirstTaskreqstg, graph.taskreqstgData, task));
-            int reqStagesLeft = taskreqstageView.size();
+            auto reqStagesLeft = int(taskreqstageView.size());
 
             for (TaskRequiresStage const& req : taskreqstageView)
             {
@@ -557,7 +568,7 @@ static void pipeline_advance_run(Tasks const& tasks, TaskGraph const& graph, Exe
 
     rExecPl.tasksQueueDone = true;
 
-    if (noTasksRun && pipeline_can_advance(tasks, graph, rExec, rExecPl))
+    if (noTasksRun && pipeline_can_advance(rExecPl))
     {
         // No tasks to run. RunTasks are responsible for setting this pipeline dirty once they're
         // all done. If there is none, then this pipeline may get stuck if nothing sets it dirty,
@@ -571,17 +582,62 @@ static void pipeline_advance_run(Tasks const& tasks, TaskGraph const& graph, Exe
 
 // Pipeline utility
 
+
 static void pipeline_cancel(Tasks const& tasks, TaskGraph const& graph, ExecContext& rExec, ExecPipeline& rExecPl, PipelineId pipeline) noexcept
 {
     PipelineTreePos_t const treePos = graph.pipelineToPltree[pipeline];
 
+    auto const cancel_stage_ahead = [&tasks, &graph, &rExec, &rExecPl, pipeline] (AnyStageId const anystg)
+    {
+        for (TaskId task : fanout_view(graph.anystgToFirstRuntask, graph.runtaskToTask, anystg))
+        {
+            // Stages depend on this RunTask (reverse Stage-requires-Task)
+            for (AnyStageId const& reqTaskAnystg : fanout_view(graph.taskToFirstRevStgreqtask, graph.revStgreqtaskToStage, task))
+            {
+                PipelineId const    reqPl       = graph.anystgToPipeline[reqTaskAnystg];
+                StageId const       reqStg      = stage_from(graph, reqPl, reqTaskAnystg);
+                ExecPipeline        &rReqExecPl = rExec.plData[reqPl];
+
+                if (rReqExecPl.stage == reqStg)
+                {
+                    // True if 'reqPl' sees that 'pipeline' is inside a loop, and may run more times
+                    bool const loopsRelative = rExecPl.loop && is_pipeline_in_loop(tasks, graph, rExec, {.viewedFrom = reqPl, .insideLoop = pipeline});
+
+                    if ( ! loopsRelative )
+                    {
+                        LGRN_ASSERT(rReqExecPl.ownStageReqTasksLeft != 0);
+                        -- rReqExecPl.ownStageReqTasksLeft;
+                        pipeline_try_advance(rExec, rReqExecPl, reqPl);
+                    }
+                }
+            }
+
+            // RunTask depends on stages (Task-requires-Stage)
+            for (TaskRequiresStage const& req : fanout_view(graph.taskToFirstTaskreqstg, graph.taskreqstgData, task))
+            {
+                ExecPipeline &rReqExecPl = rExec.plData[req.reqPipeline];
+
+                if (rReqExecPl.stage == req.reqStage)
+                {
+                    bool const loopsRelative = rExecPl.loop && is_pipeline_in_loop(tasks, graph, rExec, {.viewedFrom = req.reqPipeline, .insideLoop = pipeline});
+
+                    if ( ! loopsRelative )
+                    {
+                        LGRN_ASSERT(rReqExecPl.tasksReqOwnStageLeft != 0);
+                        -- rReqExecPl.tasksReqOwnStageLeft;
+                        pipeline_try_advance(rExec, rReqExecPl, req.reqPipeline);
+                    }
+                }
+            }
+        }
+    };
+
     subtree_for_each(
             {.root = treePos, .includeRoot = true}, graph, rExec,
-            [&tasks, &graph, &rExec, &rExecPl, pipeline]
+            [&cancel_stage_ahead, &tasks, &graph, &rExec, &rExecPl, pipeline]
             (PipelineTreePos_t const cancelPos, PipelineId const cancelPl, uint32_t const descendants)
     {
         ExecPipeline &rCancelExecPl = rExec.plData[cancelPl];
-
 
         if ( ! rCancelExecPl.canceled )
         {
@@ -590,50 +646,14 @@ static void pipeline_cancel(Tasks const& tasks, TaskGraph const& graph, ExecCont
             auto const stageCount  = int(fanout_size(graph.pipelineToFirstAnystg, cancelPl));
             auto const stagesAhead = int(rCancelExecPl.stage) + 1;
 
+            // TODO: As of now, only stages ahead that have not yet run yet are being canceled.
+            //       This is a problem for loops, where stages behind that have already run still
+            //       have dependencies, since they may run again. Eventually deal with these.
+
             auto anystgInt = uint32_t(anystg_from(graph, cancelPl, StageId(stagesAhead)));
             for (auto stgInt = stagesAhead; stgInt < stageCount; ++stgInt, ++anystgInt)
             {
-                for (TaskId task : fanout_view(graph.anystgToFirstRuntask, graph.runtaskToTask, AnyStageId(anystgInt)))
-                {
-                    // Stages depend on this RunTask (reverse Stage-requires-Task)
-                    for (AnyStageId const& reqTaskAnystg : fanout_view(graph.taskToFirstRevStgreqtask, graph.revStgreqtaskToStage, task))
-                    {
-                        PipelineId const    reqPl       = graph.anystgToPipeline[reqTaskAnystg];
-                        StageId const       reqStg      = stage_from(graph, reqPl, reqTaskAnystg);
-                        ExecPipeline        &rReqExecPl = rExec.plData[reqPl];
-
-                        if (rReqExecPl.stage == reqStg)
-                        {
-                            // True if 'reqPl' sees that 'pipeline' is inside a loop, and may run more times
-                            bool const loopsRelative = rExecPl.loop && is_pipeline_in_loop(tasks, graph, rExec, {.viewedFrom = reqPl, .insideLoop = pipeline});
-
-                            if ( ! loopsRelative )
-                            {
-                                LGRN_ASSERT(rReqExecPl.ownStageReqTasksLeft != 0);
-                                -- rReqExecPl.ownStageReqTasksLeft;
-                                pipeline_try_advance(tasks, graph, rExec, rReqExecPl, reqPl);
-                            }
-                        }
-                    }
-
-                    // RunTask depends on stages (Task-requires-Stage)
-                    for (TaskRequiresStage const& req : fanout_view(graph.taskToFirstTaskreqstg, graph.taskreqstgData, task))
-                    {
-                        ExecPipeline &rReqExecPl = rExec.plData[req.reqPipeline];
-
-                        if (rReqExecPl.stage == req.reqStage)
-                        {
-                            bool const loopsRelative = rExecPl.loop && is_pipeline_in_loop(tasks, graph, rExec, {.viewedFrom = req.reqPipeline, .insideLoop = pipeline});
-
-                            if ( ! loopsRelative )
-                            {
-                                LGRN_ASSERT(rReqExecPl.tasksReqOwnStageLeft != 0);
-                                -- rReqExecPl.tasksReqOwnStageLeft;
-                                pipeline_try_advance(tasks, graph, rExec, rReqExecPl, req.reqPipeline);
-                            }
-                        }
-                    }
-                }
+                cancel_stage_ahead(AnyStageId(anystgInt));
             }
         }
 
@@ -641,9 +661,9 @@ static void pipeline_cancel(Tasks const& tasks, TaskGraph const& graph, ExecCont
     });
 }
 
-static inline void pipeline_try_advance(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec, ExecPipeline &rExecPl, PipelineId const pipeline) noexcept
+static void pipeline_try_advance(ExecContext &rExec, ExecPipeline &rExecPl, PipelineId const pipeline) noexcept
 {
-    if (pipeline_can_advance(tasks, graph, rExec, rExecPl))
+    if (pipeline_can_advance(rExecPl))
     {
         rExec.plAdvance.set(std::size_t(pipeline));
         rExec.hasPlAdvanceOrLoop = true;
@@ -654,11 +674,30 @@ static inline void pipeline_try_advance(Tasks const& tasks, TaskGraph const& gra
 
 // Read-only checks
 
-static constexpr bool pipeline_can_advance(Tasks const& tasks, TaskGraph const& graph, ExecContext const &rExec, ExecPipeline &rExecPl) noexcept
+static constexpr bool pipeline_can_advance(ExecPipeline &rExecPl) noexcept
 {
-    return    rExecPl.ownStageReqTasksLeft == 0   // Tasks required by stage are done
-           && rExecPl.tasksReqOwnStageLeft == 0   // Not required by any tasks
-           && (rExecPl.tasksQueuedBlocked+rExecPl.tasksQueuedRun) == 0; // Tasks done
+    // Pipeline can advance if...
+    return
+        // Tasks required by stage are done
+           rExecPl.ownStageReqTasksLeft == 0
+
+        // Not required by any tasks
+        && rExecPl.tasksReqOwnStageLeft == 0
+
+        // Tasks done
+        && ( rExecPl.tasksQueuedBlocked + rExecPl.tasksQueuedRun ) == 0
+
+        // Trigger checks out. only if...
+        && (
+            // Wait is disabled
+                ( rExecPl.waitStage == lgrn::id_null<StageId>() )
+
+            // Or not on specified wait stage
+             || ( rExecPl.waitStage != rExecPl.stage )
+
+            // Or wait is externally signaled to go
+             || rExecPl.waitSignaled
+           );
 
 }
 
@@ -740,7 +779,7 @@ static bool is_pipeline_in_loop(Tasks const& tasks, TaskGraph const& graph, Exec
 
 // Minor utility
 
-void exec_resize(Tasks const& tasks, ExecContext &rOut)
+void exec_conform(Tasks const& tasks, ExecContext &rOut)
 {
     std::size_t const maxTasks      = tasks.m_taskIds.capacity();
     std::size_t const maxPipeline   = tasks.m_pipelineIds.capacity();
@@ -751,11 +790,12 @@ void exec_resize(Tasks const& tasks, ExecContext &rOut)
     bitvector_resize(rOut.plAdvance,     maxPipeline);
     bitvector_resize(rOut.plAdvanceNext, maxPipeline);
     bitvector_resize(rOut.plRequestRun,  maxPipeline);
-}
 
-void exec_resize(Tasks const& tasks, TaskGraph const& graph, ExecContext &rOut)
-{
-    exec_resize(tasks, rOut);
+    for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    {
+        auto const pipeline = PipelineId(pipelineInt);
+        rOut.plData[pipeline].waitStage = tasks.m_pipelineControl[pipeline].waitStage;
+    }
 }
 
 static void exec_log(ExecContext &rExec, ExecContext::LogMsg_t msg) noexcept
