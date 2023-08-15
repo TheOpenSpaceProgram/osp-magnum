@@ -259,7 +259,7 @@ void start_magnum_async()
         osp::TopTaskBuilder builder{g_testApp.m_tasks, g_testApp.m_renderer.m_edges, g_testApp.m_taskData};
 
         g_testApp.m_windowApp   = scenes::setup_window_app  (builder, g_testApp.m_topData);
-        g_testApp.m_magnum      = scenes::setup_magnum      (builder, g_testApp.m_topData, g_testApp.m_windowApp, g_testApp.m_idResources, {g_argc, g_argv});
+        g_testApp.m_magnum      = scenes::setup_magnum      (builder, g_testApp.m_topData, g_testApp.m_windowApp, g_testApp.m_application, {g_argc, g_argv});
 
         OSP_DECLARE_GET_DATA_IDS(g_testApp.m_magnum, TESTAPP_DATA_MAGNUM); // declares idActiveApp
         auto &rActiveApp = osp::top_get<ActiveApplication>(g_testApp.m_topData, idActiveApp);
@@ -268,12 +268,12 @@ void start_magnum_async()
 
         g_testApp.m_rendererSetup(g_testApp);
 
-        g_testApp.m_graph.reset();
-        g_testApp.m_graph.emplace(osp::make_exec_graph(g_testApp.m_tasks, {&g_testApp.m_renderer.m_edges, &g_testApp.m_scene.m_edges}));
-        osp::exec_resize(g_testApp.m_tasks, *g_testApp.m_graph, g_testApp.m_exec);
+        //g_testApp.m_graph.reset();
+        //g_testApp.m_graph.emplace(osp::make_exec_graph(g_testApp.m_tasks, {&g_testApp.m_renderer.m_edges, &g_testApp.m_scene.m_edges}));
+        //osp::exec_conform(g_testApp.m_tasks, g_testApp.m_exec);
 
-        enqueue_dirty(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_exec);
-        top_run_blocking(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_taskData, g_testApp.m_topData, g_testApp.m_exec);
+        //exec_update(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_exec);
+        //top_run_blocking(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_taskData, g_testApp.m_topData, g_testApp.m_exec);
 
         // Starts the main loop. This function is blocking, and will only return
         // once the window is closed. See ActiveApplication::drawEvent
@@ -305,9 +305,11 @@ void load_a_bunch_of_stuff()
     std::size_t const maxTags = 256; // aka: just two 64-bit integers
     std::size_t const maxTagsInts = maxTags / 64;
 
-    g_testApp.m_idResources = osp::top_reserve(g_testApp.m_topData);
+    // declares idResources
+    //g_testApp.m_application.create_pipelines<>
+    OSP_DECLARE_CREATE_DATA_IDS(g_testApp.m_application, g_testApp.m_topData, TESTAPP_DATA_APPLICATION);
 
-    auto &rResources = osp::top_emplace<osp::Resources>(g_testApp.m_topData, g_testApp.m_idResources);
+    auto &rResources = osp::top_emplace<osp::Resources>(g_testApp.m_topData, idResources);
 
     rResources.resize_types(osp::ResTypeIdReg_t::size());
 

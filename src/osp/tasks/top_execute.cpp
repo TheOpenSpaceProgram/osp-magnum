@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <vector>
 
@@ -74,10 +75,10 @@ void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec
                                        : entt::any{});
             }
 
-            bool const shouldRun = (rTopTask.m_func != nullptr) && conditions_satisfied(tasks, graph, rExec, task);
+            bool const shouldRun = (rTopTask.m_func != nullptr);
 
             // Task actually runs here
-            TriggerOut_t const status = shouldRun ? rTopTask.m_func(worker, topDataRefs) : 0;
+            TaskActions const status = shouldRun ? rTopTask.m_func(worker, topDataRefs) : TaskActions{};
 
             complete_task(tasks, graph, rExec, task, status);
             top_write_log(std::cout, tasks, rTaskData, graph, rExec);
@@ -90,7 +91,7 @@ void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec
             std::abort();
         }
 
-        enqueue_dirty(tasks, graph, rExec);
+        exec_update(tasks, graph, rExec);
         top_write_log(std::cout, tasks, rTaskData, graph, rExec);
         rExec.logMsg.clear();
     }
@@ -105,7 +106,7 @@ static void write_task_requirements(std::ostream &rStream, Tasks const& tasks, T
         PipelineInfo const& info        = tasks.m_pipelineInfo[req.reqPipeline];
         auto const          stageNames  = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
 
-        if (reqPlData.currentStage != req.reqStage)
+        if (reqPlData.stage != req.reqStage)
         {
             rStream << "* Requires PL" << std::setw(3) << PipelineInt(req.reqPipeline) << " stage " << stageNames[std::size_t(req.reqStage)] << "\n";
         }
@@ -134,12 +135,9 @@ void top_write_pipeline_states(std::ostream &rStream, Tasks const& tasks, TopTas
 
         for (int stage = 0; stage < stageCount; ++stage)
         {
-            bool const trg = plExec.triggered.test(stage);
-            bool const sel = int(plExec.currentStage) == stage;
+            bool const sel = int(plExec.stage) == stage;
             rStream << (sel ? '[' : ' ')
-                    << (trg ? '*' : ' ')
                     << stageNames[stage]
-                    << (trg ? '*' : ' ')
                     << (sel ? ']' : ' ');
 
             charsUsed += 4 + stageNames[stage].size();
@@ -177,24 +175,43 @@ void top_write_log(std::ostream &rStream, Tasks const& tasks, TopTaskDataVec_t c
     auto const visitMsg = [&rStream, &tasks, &taskData, &graph, &stage_name] (auto&& msg)
     {
         using MSG_T = std::decay_t<decltype(msg)>;
-        if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueStart>)
+        if constexpr (std::is_same_v<MSG_T, ExecContext::UpdateStart>)
         {
-            rStream << "EnqueueStart\n";
+            rStream << "UpdateStart\n";
         }
-        else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueCycle>)
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::UpdateCycle>)
         {
-            rStream << "EnqueueCycle\n";
+            rStream << "UpdateCycle\n";
         }
-        else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueEnd>)
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::UpdateEnd>)
         {
-            rStream << "EnqueueEnd\n";
+            rStream << "UpdateEnd\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineRun>)
+        {
+            rStream << "    PipelineRun PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineFinish>)
+        {
+            rStream << "    PipelineFinish PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineCancel>)
+        {
+            rStream << "    PipelineCancel PL" << std::setw(3) << PipelineInt(msg.pipeline) << "("
+                    << stage_name(msg.pipeline, msg.stage) << ")\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineLoop>)
+        {
+            rStream << "    PipelineLoop PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
+        }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineLoopFinish>)
+        {
+            rStream << "    PipelineLoopFinish PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::StageChange>)
         {
-            rStream << "    StageChange PL" << std::setw(3) << PipelineInt(msg.pipeline) << "("
-                    << stage_name(msg.pipeline, msg.stageOld)
-                    << " -> "
-                    << stage_name(msg.pipeline, msg.stageNew) << ")\n";
+            rStream << "    StageChange PL" << std::setw(3) << PipelineInt(msg.pipeline)
+                    << "(" << stage_name(msg.pipeline, msg.stageOld) << " -> " << stage_name(msg.pipeline, msg.stageNew) << ")\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueTask>)
         {
@@ -205,7 +222,9 @@ void top_write_log(std::ostream &rStream, Tasks const& tasks, TopTaskDataVec_t c
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueTaskReq>)
         {
-            rStream << "    * Requires PL" << std::setw(3) << PipelineInt(msg.pipeline) << "(" << stage_name(msg.pipeline, msg.stage) << ")\n";
+            rStream << "    * " << (msg.satisfied ? "[DONE]" : "[wait]") << "Require PL"
+                    << std::setw(3) << PipelineInt(msg.pipeline)
+                    << "(" << stage_name(msg.pipeline, msg.stage) << ")\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::UnblockTask>)
         {
@@ -215,15 +234,9 @@ void top_write_log(std::ostream &rStream, Tasks const& tasks, TopTaskDataVec_t c
         {
             rStream << "Complete TASK" << TaskInt(msg.task) << " - " << taskData[msg.task].m_debugName << "\n";
         }
-        else if constexpr (std::is_same_v<MSG_T, ExecContext::CompleteTaskTrigger>)
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::ExternalRunRequest>)
         {
-            rStream << "* Trigger PL" << std::setw(3) << PipelineInt(msg.pipeline)
-                    << "(" << stage_name(msg.pipeline, msg.stage) << ")\n";
-        }
-        else if constexpr (std::is_same_v<MSG_T, ExecContext::ExternalTrigger>)
-        {
-            rStream << "ExternalTrigger PL" << std::setw(3) << PipelineInt(msg.pipeline)
-                    << "(" << stage_name(msg.pipeline, msg.stage) << ")\n";
+            rStream << "ExternalRunRequest PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
         }
     };
 

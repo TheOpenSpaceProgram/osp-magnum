@@ -24,6 +24,8 @@
  */
 #include "testapp.h"
 
+#include "activescenes/identifiers.h"
+
 #include <osp/Resource/resources.h>
 #include <osp/Resource/ImporterData.h>
 
@@ -34,28 +36,25 @@ namespace testapp
 
 void close_sessions(TestAppTasks &rTestApp, osp::SessionGroup &rSessions)
 {
-    rSessions.m_edges.m_runOn               .clear();
-    rSessions.m_edges.m_syncWith            .clear();
-    rSessions.m_edges.m_triggers            .clear();
-    rSessions.m_edges.m_semaphoreEdges      .clear();
+//    rSessions.m_edges.m_syncWith            .clear();
 
-    if ( rSessions.m_sessions.empty() || ! rTestApp.m_graph.has_value() )
-    {
-        return;
-    }
+//    if ( rSessions.m_sessions.empty() || ! rTestApp.m_graph.has_value() )
+//    {
+//        return;
+//    }
 
-    TestApp testapp;
-    testapp.m_topData.clear();
+//    TestApp testapp;
+//    testapp.m_topData.clear();
 
-    osp::top_close_session(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_taskData, rTestApp.m_topData, rTestApp.m_exec, rSessions.m_sessions);
+//    osp::top_close_session(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_taskData, rTestApp.m_topData, rTestApp.m_exec, rSessions.m_sessions);
 
-    rSessions.m_sessions.clear();
+//    rSessions.m_sessions.clear();
 }
 
 
 void close_session(TestAppTasks &rTestApp, osp::Session &rSession)
 {
-    osp::top_close_session(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_taskData, rTestApp.m_topData, rTestApp.m_exec, osp::ArrayView<osp::Session>(&rSession, 1));
+    //osp::top_close_session(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_taskData, rTestApp.m_topData, rTestApp.m_exec, osp::ArrayView<osp::Session>(&rSession, 1));
 }
 
 
@@ -76,7 +75,10 @@ void clear_resource_owners(TestApp& rTestApp)
 {
     using namespace osp::restypes;
 
-    auto &rResources = osp::top_get<osp::Resources>(rTestApp.m_topData, rTestApp.m_idResources);
+    // declares idResources
+    OSP_DECLARE_CREATE_DATA_IDS(rTestApp.m_application, rTestApp.m_topData, TESTAPP_DATA_APPLICATION);
+
+    auto &rResources = osp::top_get<osp::Resources>(rTestApp.m_topData, idResources);
 
     // Texture resources contain osp::TextureImgSource, which refererence counts
     // their associated image data

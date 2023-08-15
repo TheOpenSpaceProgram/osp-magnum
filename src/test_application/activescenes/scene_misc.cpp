@@ -70,12 +70,13 @@ void create_materials(
 
 void add_floor(
         ArrayView<entt::any> const  topData,
+        Session const&              application,
         Session const&              commonScene,
         Session const&              shapeSpawn,
         MaterialId const            materialId,
-        TopDataId const             idResources,
         PkgId const                 pkg)
 {
+    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
 
@@ -164,8 +165,8 @@ Session setup_camera_ctrl(
 
     rBuilder.task()
         .name       ("Position Rendering Camera according to Camera Controller")
-        .run_on     ({tgWin.inputs(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Use), tgSR.camera(Modify)})
+        .run_on     ({tgSR.render(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgSR.camera(Modify)})
         .push_to    (out.m_tasks)
         .args       ({                           idCamCtrl,        idCamera })
         .func([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
@@ -195,15 +196,12 @@ Session setup_camera_free(
         .name       ("Move Camera controller")
         .run_on     ({tgWin.inputs(Run)})
         .sync_with  ({tgCmCt.camCtrl(Modify)})
-        .triggers   ({tgCmCt.camCtrl(Use)})
         .push_to    (out.m_tasks)
         .args       ({                 idCamCtrl,           idDeltaTimeIn })
         .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
     {
         SysCameraController::update_view(rCamCtrl, deltaTimeIn);
         SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
-
-        return gc_triggerAll;
     });
 
     return out;
@@ -233,8 +231,7 @@ Session setup_thrower(
     rBuilder.task()
         .name       ("Throw spheres when pressing space")
         .run_on     ({tgWin.inputs(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Use), tgShSp.spawnRequest(Modify_)})
-        .triggers   ({tgShSp.spawnRequest(Use_)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgShSp.spawnRequest(Modify_)})
         .push_to    (out.m_tasks)
         .args       ({                 idCamCtrl,                  idSpawner,                   idBtnThrow })
         .func([] (ACtxCameraController& rCamCtrl, ACtxShapeSpawner& rSpawner, EButtonControlIndex btnThrow) noexcept
@@ -252,9 +249,7 @@ Session setup_thrower(
                 .m_mass     = 1.0f,
                 .m_shape    = EShape::Sphere
             });
-            return gc_triggerAll;
         }
-        return gc_triggerNone;
     });
 
     return out;

@@ -42,7 +42,7 @@ osp::Session setup_magnum(
         osp::TopTaskBuilder&            rBuilder,
         osp::ArrayView<entt::any>       topData,
         osp::Session const&             windowApp,
-        osp::TopDataId                  idResources,
+        osp::Session const&             application,
         ActiveApplication::Arguments    args);
 
 /**
@@ -51,11 +51,11 @@ osp::Session setup_magnum(
 osp::Session setup_scene_renderer(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
         osp::Session const&         windowApp,
         osp::Session const&         magnum,
         osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::TopDataId              idResources);
+        osp::Session const&         commonScene);
 
 /**
  * @brief Magnum MeshVisualizer shader and optional material for drawing ActiveEnts with it

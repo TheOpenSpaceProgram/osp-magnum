@@ -81,14 +81,16 @@ struct TaskBuilderBase
     }
 
     template<typename TGT_STRUCT_T>
-    [[nodiscard]] TGT_STRUCT_T create_pipelines()
+    TGT_STRUCT_T create_pipelines(osp::ArrayView<PipelineId> const pipelinesOut)
     {
         static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineDefBlank_t) == 0);
         constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineDefBlank_t);
 
-        std::array<PipelineId, count> pipelines;
+        LGRN_ASSERTMV(count == pipelinesOut.size() ,
+                      "The number of members in TGT_STRUCT_T must match the number of output pipelines",
+                      count, pipelinesOut.size());
 
-        m_rTasks.m_pipelineIds.create(pipelines.begin(), pipelines.end());
+        m_rTasks.m_pipelineIds.create(pipelinesOut.begin(), pipelinesOut.end());
 
         std::size_t const capacity = m_rTasks.m_pipelineIds.capacity();
 
@@ -105,11 +107,21 @@ struct TaskBuilderBase
 
         for (std::size_t i = 0; i < count; ++i)
         {
-            PipelineId const pl = pipelines[i];
+            PipelineId const pl = pipelinesOut[i];
             *reinterpret_cast<PipelineId*>(pOutBytes + sizeof(PipelineDefBlank_t)*i + offsetof(PipelineDefBlank_t, m_value)) = pl;
         }
-
         return out;
+    }
+
+    template<typename TGT_STRUCT_T>
+    [[nodiscard]] TGT_STRUCT_T create_pipelines()
+    {
+        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineDefBlank_t) == 0);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineDefBlank_t);
+
+        std::array<PipelineId, count> pipelines;
+
+        return create_pipelines<TGT_STRUCT_T>(osp::ArrayView<PipelineId>{pipelines.data(), count});
     }
 
     template<std::size_t N>

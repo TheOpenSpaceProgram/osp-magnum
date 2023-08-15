@@ -50,7 +50,7 @@ struct NamedMeshes
 
 osp::Session setup_scene(
         osp::TopTaskBuilder&                rBuilder,
-        osp::ArrayView<entt::any> const     topData);
+        osp::ArrayView<entt::any>           topData);
 
 /**
  * @brief Support for Time, ActiveEnts, Hierarchy, Transforms, Drawing, and more...
@@ -59,7 +59,7 @@ osp::Session setup_common_scene(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         scene,
-        osp::TopDataId              idResources,
+        osp::Session const&         application,
         osp::PkgId                  pkg);
 
 

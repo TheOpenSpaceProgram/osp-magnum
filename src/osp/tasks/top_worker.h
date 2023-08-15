@@ -48,6 +48,6 @@ struct WorkerContext
     //DependOnDirty_t m_dependOnDirty;
 };
 
-using TopTaskFunc_t = TriggerOut_t(*)(WorkerContext, ArrayView<entt::any>) noexcept;
+using TopTaskFunc_t = TaskActions(*)(WorkerContext, ArrayView<entt::any>) noexcept;
 
 } // namespace osp

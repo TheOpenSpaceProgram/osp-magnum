@@ -32,20 +32,29 @@ namespace testapp
 {
 
 
-enum class EStgFlag : uint8_t
+enum class EStgOptn : uint8_t
 {
-    Wait_,
-    Write
+    Schedule,
+    Run,
+    Done
 };
-OSP_DECLARE_STAGE_NAMES(EStgFlag, "Wait", "Write");
+OSP_DECLARE_STAGE_NAMES(EStgOptn, "Schedule", "Run", "Done");
 
 
 enum class EStgEvnt : uint8_t
 {
-    Wait,
-    Run
+    Run_,
+    Done_
 };
-OSP_DECLARE_STAGE_NAMES(EStgEvnt, "Wait", "Run");
+OSP_DECLARE_STAGE_NAMES(EStgEvnt, "Run", "Done");
+
+
+enum class EStgGate : uint8_t
+{
+    Wait,
+    Open
+};
+OSP_DECLARE_STAGE_NAMES(EStgGate, "Wait", "Open");
 
 
 /**
@@ -55,10 +64,11 @@ enum class EStgIntr : uint8_t
 {
     Resize,
     Modify_,
-    Use_,
+    Schedule_,
+    UseOrRun,
     Clear
 };
-OSP_DECLARE_STAGE_NAMES(EStgIntr, "Resize", "Modify", "Use", "Clear");
+OSP_DECLARE_STAGE_NAMES(EStgIntr, "Resize", "Modify", "Schedule", "Use", "Clear");
 
 
 /**
@@ -78,22 +88,31 @@ enum class EStgCont : uint8_t
     Modify,
     ///< Modify existing elements
 
-    Use
+    Ready
     ///< Container is ready to use
 };
 OSP_DECLARE_STAGE_NAMES(EStgCont, "Delete", "New", "Modify", "Use");
 
 
-enum class EStgRender
+enum class EStgFBO
 {
     Bind,
     Draw,
     Unbind
 };
-OSP_DECLARE_STAGE_NAMES(EStgRender, "Bind", "Draw", "Unbind");
+OSP_DECLARE_STAGE_NAMES(EStgFBO, "Bind", "Draw", "Unbind");
 
 
 using osp::PipelineDef;
+
+//-----------------------------------------------------------------------------
+
+#define TESTAPP_DATA_APPLICATION 1, \
+    idResources
+struct PlApplication
+{
+    PipelineDef<EStgOptn> mainLoop          {"mainLoop - ..."};
+};
 
 //-----------------------------------------------------------------------------
 
@@ -102,11 +121,7 @@ using osp::PipelineDef;
 struct PlScene
 {
     PipelineDef<EStgEvnt> cleanup           {"cleanup - Scene cleanup before destruction"};
-    PipelineDef<EStgEvnt> resyncAll         {"resyncAll - Resynchronize with renderer"};
-
-    PipelineDef<EStgEvnt> updTime           {"time - External Delta Time In"};
-    PipelineDef<EStgEvnt> updActive         {"updActive - Updates on ActiveEnt and components"};
-    PipelineDef<EStgEvnt> updDraw           {"updDraw - Updates on DrawEnt and components"};
+    PipelineDef<EStgEvnt> update            {"update - main loop "};
 };
 
 #define TESTAPP_DATA_COMMON_SCENE 6, \
@@ -114,14 +129,14 @@ struct PlScene
 struct PlCommonScene
 {
     PipelineDef<EStgCont> activeEnt         {"activeEnt"};
-    PipelineDef<EStgFlag> activeEntResized  {"activeEntResized"};
+    PipelineDef<EStgOptn> activeEntResized  {"activeEntResized"};
     PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete"};
 
     PipelineDef<EStgCont> transform         {"transform"};
     PipelineDef<EStgCont> hierarchy         {"hierarchy"};
 
     PipelineDef<EStgCont> drawEnt           {"drawEnt"};
-    PipelineDef<EStgFlag> drawEntResized    {"drawEntResized"};
+    PipelineDef<EStgOptn> drawEntResized    {"drawEntResized"};
     PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete"};
 
     PipelineDef<EStgCont> mesh              {"mesh"};
@@ -130,8 +145,8 @@ struct PlCommonScene
     PipelineDef<EStgIntr> entTextureDirty   {"entTextureDirty"};
     PipelineDef<EStgIntr> entMeshDirty      {"entMeshDirty"};
 
-    PipelineDef<EStgEvnt> meshResDirty      {"meshResDirty"};
-    PipelineDef<EStgEvnt> textureResDirty   {"textureResDirty"};
+    PipelineDef<EStgIntr> meshResDirty      {"meshResDirty"};
+    PipelineDef<EStgIntr> textureResDirty   {"textureResDirty"};
 
     PipelineDef<EStgCont> material          {"material"};
     PipelineDef<EStgIntr> materialDirty     {"materialDirty"};
@@ -282,8 +297,7 @@ struct PlNewton
     idUserInput
 struct PlWindowApp
 {
-    PipelineDef<EStgEvnt> inputs            {"inputs - User inputs in"};
-    PipelineDef<EStgEvnt> display           {"display - Display new frame"};
+    PipelineDef<EStgOptn> inputs            {"render"};
 };
 
 
@@ -307,7 +321,8 @@ struct PlMagnum
     idScnRender, idGroupFwd, idCamera
 struct PlSceneRenderer
 {
-    PipelineDef<EStgRender> fboRender       {"fboRender"};
+    PipelineDef<EStgOptn> render            {"render"};
+    PipelineDef<EStgFBO>  fbo               {"fboRender"};
 
     PipelineDef<EStgCont> scnRender         {"scnRender"};
     PipelineDef<EStgCont> group             {"group"};

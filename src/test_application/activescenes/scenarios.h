@@ -39,12 +39,20 @@ namespace testapp
 
 namespace scenes
 {
+    using enum EStgOptn;
     using enum EStgCont;
+    using enum EStgGate;
     using enum EStgIntr;
     using enum EStgEvnt;
-    using enum EStgFlag;
-    using enum EStgRender;
+    using enum EStgFBO;
 }
+
+struct MainLoopControl
+{
+    bool doUpdate;
+    bool doRenderResync;
+    bool doRender;
+};
 
 struct ScenarioOption
 {

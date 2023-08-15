@@ -44,26 +44,40 @@ using RendererSetupFunc_t   = void(*)(TestApp&);
 
 using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
 
+
+
 struct TestAppTasks
 {
     std::vector<entt::any>          m_topData;
     osp::Tasks                      m_tasks;
     osp::TopTaskDataVec_t           m_taskData;
-    osp::ExecContext                m_exec;
-    std::optional<osp::TaskGraph>   m_graph;
+    osp::TaskGraph                  m_graph;
+};
+
+class IExecutor
+{
+    virtual void load(TestAppTasks const* pTasks) = 0;
+    virtual void run(osp::PipelineId pipeline) = 0;
+    virtual void signal(osp::PipelineId pipeline) = 0;
+    virtual void wait() = 0;
+    virtual bool is_done() = 0;
 };
 
 struct TestApp : TestAppTasks
 {
+    osp::Session                    m_application;
+
     osp::SessionGroup               m_scene;
 
     osp::Session                    m_windowApp;
     osp::Session                    m_magnum;
     osp::SessionGroup               m_renderer;
 
+    IExecutor*                      m_executor{ nullptr };
+
     RendererSetupFunc_t             m_rendererSetup { nullptr };
 
-    osp::TopDataId                  m_idResources   { lgrn::id_null<osp::TopDataId>() };
+    //osp::TopDataId                  m_idResources   { lgrn::id_null<osp::TopDataId>() };
     osp::PkgId                      m_defaultPkg    { lgrn::id_null<osp::PkgId>() };
 };
 

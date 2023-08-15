@@ -38,10 +38,10 @@ void create_materials(
 
 void add_floor(
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
         osp::Session const&         commonScene,
         osp::Session const&         shapeSpawn,
         osp::active::MaterialId     material,
-        osp::TopDataId              idResources,
         osp::PkgId                  pkg);
 
 /**
