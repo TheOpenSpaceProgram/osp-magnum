@@ -239,6 +239,8 @@ static int pipeline_run(Tasks const& tasks, TaskGraph const& graph, ExecContext 
         rExecPl.running  = true;
         rExecPl.loop     = isLoopScope || insideLoopScope;
 
+        ++ rExec.pipelinesRunning;
+
         if (rerunLoop)
         {
             rExec.plAdvanceNext.set(std::size_t(pipeline));
@@ -261,27 +263,31 @@ static int pipeline_run(Tasks const& tasks, TaskGraph const& graph, ExecContext 
     PipelineTreePos_t const childPosLast = treePos + 1 + descendents;
     PipelineTreePos_t       childPos     = treePos + 1;
 
-    int childCount = 0;
+    int scopeChildCount = 0;
 
     while (childPos != childPosLast)
     {
-        uint32_t const childDescendents = graph.pltreeDescendantCounts[childPos];
+        uint32_t const      childDescendents    = graph.pltreeDescendantCounts[childPos];
+        PipelineId const    childPl             = graph.pltreeToPipeline[childPos];
+        bool const          childIsLoopScope    = tasks.m_pipelineControl[childPl].isLoopScope;
 
-        PipelineId const childPl = graph.pltreeToPipeline[childPos];
-        bool const childIsLoopScope = tasks.m_pipelineControl[childPl].isLoopScope;
+        int const childChildCount = pipeline_run(tasks, graph, rExec, rerunLoop, childPl, childPos, childDescendents, childIsLoopScope, isLoopScope || insideLoopScope);
 
-        pipeline_run(tasks, graph, rExec, rerunLoop, childPl, childPos, childDescendents, childIsLoopScope, isLoopScope || insideLoopScope);
+        scopeChildCount += childChildCount + 1; // + 1 for child itself
 
-        ++ childCount;
         childPos += 1 + childDescendents;
     }
 
     if (isLoopScope)
     {
-        rExecPl.loopChildrenLeft = childCount;
-    }
+        rExecPl.loopChildrenLeft = scopeChildCount;
 
-    return childCount;
+        return 0;
+    }
+    else
+    {
+        return scopeChildCount;
+    }
 }
 
 
@@ -308,6 +314,9 @@ static void loop_scope_done(Tasks const& tasks, TaskGraph const& graph, ExecCont
             rLoopExecPl.running  = false;
             rLoopExecPl.canceled = false;
             rLoopExecPl.loop     = false;
+
+            LGRN_ASSERT(rExec.pipelinesRunning != 0);
+            -- rExec.pipelinesRunning;
 
             exec_log(rExec, ExecContext::PipelineLoopFinish{loopPipeline});
         });
@@ -397,6 +406,9 @@ static void pipeline_advance_stage(Tasks const& tasks, TaskGraph const& graph, E
         rExecPl.stage    = lgrn::id_null<StageId>();
         rExecPl.running  = false;
         rExecPl.canceled = false;
+
+        LGRN_ASSERT(rExec.pipelinesRunning != 0);
+        -- rExec.pipelinesRunning;
 
         exec_log(rExec, ExecContext::PipelineFinish{pipeline});
     }

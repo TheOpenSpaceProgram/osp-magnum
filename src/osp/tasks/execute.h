@@ -204,6 +204,8 @@ struct ExecContext : public ExecLog
     std::vector<LoopRequestRun>         requestLoop;
     bool                                hasRequestRun {false};
 
+    int                                 pipelinesRunning {0};
+
     // TODO: Consider multithreading. something something work stealing...
     //  * Allow multiple threads to search for and execute tasks. Atomic access
     //    for ExecContext? Might be messy to implement.
