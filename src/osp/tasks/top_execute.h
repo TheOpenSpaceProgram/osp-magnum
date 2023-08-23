@@ -35,8 +35,24 @@ namespace osp
 
 void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, WorkerContext worker = {});
 
-void top_write_pipeline_states(std::ostream &rStream, Tasks const& tasks, TopTaskDataVec_t const& taskData, TaskGraph const& graph, ExecContext const& exec);
+struct TopExecWriteState
+{
+    Tasks const             &tasks;
+    TopTaskDataVec_t const  &taskData;
+    TaskGraph const         &graph;
+    ExecContext const       &exec;
+};
 
-void top_write_log(std::ostream &rStream, Tasks const& tasks, TopTaskDataVec_t const& taskData, TaskGraph const& graph, ExecContext const& exec);
+struct TopExecWriteLog
+{
+    Tasks const             &tasks;
+    TopTaskDataVec_t const  &taskData;
+    TaskGraph const         &graph;
+    ExecContext const       &exec;
+};
+
+std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write);
+
+std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write);
 
 } // namespace testapp

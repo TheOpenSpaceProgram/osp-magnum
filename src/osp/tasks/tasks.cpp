@@ -48,7 +48,7 @@ struct PipelineCounts
 {
     std::array<StageCounts, gc_maxStages> stageCounts;
 
-    uint8_t  stages             {0};
+    uint8_t  stages             { 0 };
 
     PipelineId firstChild       { lgrn::id_null<PipelineId>() };
     PipelineId sibling          { lgrn::id_null<PipelineId>() };
@@ -84,6 +84,12 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         rStageCount = std::max(rStageCount, uint8_t(uint8_t(stage) + 1));
     };
 
+    // Max 1 stage for each valid pipeline. Supporting 0-stage pipelines take more effort
+    for (PipelineInt const plInt : tasks.m_pipelineIds.bitview().zeros())
+    {
+        plCounts[PipelineId(plInt)].stages = 1;
+    }
+
     // Count stages from task run-ons
     for (TaskInt const taskInt : tasks.m_taskIds.bitview().zeros())
     {
@@ -105,9 +111,9 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         }
     }
 
-    for (PipelineCounts const& plCount : plCounts)
+    for (PipelineInt const plInt : tasks.m_pipelineIds.bitview().zeros())
     {
-        totalStages += plCount.stages;
+        totalStages += plCounts[PipelineId(plInt)].stages;
     }
 
     // 2. Count TaskRequiresStages and StageRequiresTasks
@@ -354,7 +360,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
             descendantCount += 1 + childDescendantCount;
 
             child = rChildCounts.sibling;
-            ++ childPos;
+            childPos += 1 + childDescendantCount;
         }
 
         out.pltreeDescendantCounts[pos] = descendantCount;
@@ -380,7 +386,6 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
         rootPos += 1 + rootDescendantCount;
     }
-
 
     return out;
 }

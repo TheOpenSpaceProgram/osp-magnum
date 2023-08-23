@@ -35,7 +35,7 @@
 #include "scene_universe.h"
 #include "scene_vehicles.h"
 
-#include "../ActiveApplication.h"
+#include "../MagnumApplication.h"
 #include "../VehicleBuilder.h"
 
 #include <osp/Active/basic.h>
@@ -61,53 +61,95 @@ static constexpr auto   sc_matFlat          = active::MaterialId(1);
 static constexpr auto   sc_matPhong         = active::MaterialId(2);
 static constexpr int    sc_materialCount    = 4;
 
+struct CommonMagnumApp : IOspApplication
+{
+    CommonMagnumApp(TestApp &rTestApp, MainLoopControl &rMainLoopCtrl, PipelineId mainLoop, PipelineId renderSync, PipelineId sceneUpdate, PipelineId sceneRender) noexcept
+     : m_rTestApp       { rTestApp }
+     , m_rMainLoopCtrl  { rMainLoopCtrl }
+     , m_mainLoop       { mainLoop }
+     , m_renderSync     { renderSync }
+     , m_sceneUpdate    { sceneUpdate }
+     , m_sceneRender    { sceneRender }
+
+    { }
+
+    void run(MagnumApplication& rApp) override
+    {
+        // Start the main loop
+
+        PipelineId const mainLoop = m_rTestApp.m_application.get_pipelines<PlApplication>().mainLoop;
+        m_rTestApp.m_pExecutor->run(m_rTestApp, mainLoop);
+    }
+
+    void draw(MagnumApplication& rApp, float delta) override
+    {
+        // Magnum Application's main loop is here
+
+        m_rMainLoopCtrl = MainLoopControl{
+            .doUpdate = true,
+            .doSync   = true,
+            .doResync = false,
+            .doRender = true,
+        };
+
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_mainLoop);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneUpdate);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneRender);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_renderSync);
+
+        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+    }
+
+    void exit(MagnumApplication& rApp) override
+    {
+        m_rMainLoopCtrl = MainLoopControl{
+            .doUpdate = false,
+            .doSync   = false,
+            .doResync = false,
+            .doRender = false,
+        };
+
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_mainLoop);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneUpdate);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneRender);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_renderSync);
+
+        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+
+        if (m_rTestApp.m_pExecutor->is_running(m_rTestApp))
+        {
+            // Main loop must have stopped, but didn't!
+            std::abort();
+        }
+    }
+
+    TestApp         &m_rTestApp;
+    MainLoopControl &m_rMainLoopCtrl;
+
+    PipelineId m_mainLoop;
+    PipelineId m_renderSync;
+    PipelineId m_sceneUpdate;
+    PipelineId m_sceneRender;
+};
 
 static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& scnRenderer, std::vector<PipelineId> run = {})
 {
-//    OSP_DECLARE_GET_DATA_IDS(scnRenderer,           TESTAPP_DATA_COMMON_RENDERER);
-//    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
-//    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,     TESTAPP_DATA_MAGNUM);
+    OSP_DECLARE_GET_DATA_IDS(scnRenderer,               TESTAPP_DATA_COMMON_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_application,    TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,         TESTAPP_DATA_MAGNUM);
 
-//    auto &rActiveApp    = top_get<ActiveApplication>(rTestApp.m_topData, idActiveApp);
-//    auto &rCamera       = top_get<active::Camera>(rTestApp.m_topData, idCamera);
-//    rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
+    auto &rMainLoopCtrl = top_get<MainLoopControl>  (rTestApp.m_topData, idMainLoopCtrl);
+    auto &rActiveApp    = top_get<MagnumApplication>(rTestApp.m_topData, idActiveApp);
+    auto &rCamera       = top_get<active::Camera>   (rTestApp.m_topData, idCamera);
 
-//    auto tgScn = scene                  .get_pipelines<PlScene>();
-//    auto tgWin = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>();
+    rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
-//    // Resynchronize scene with new renderer
-//    exec_conform(rTestApp.m_tasks, rTestApp.m_exec);
-//    exec_request_run(rTestApp.m_exec, tgScn.resyncAll);
-//    exec_request_run(rTestApp.m_exec, tgScn.updDraw);
-//    exec_request_run(rTestApp.m_exec, tgScn.updActive);
+    PipelineId const mainLoop    = rTestApp.m_application .get_pipelines<PlApplication>()   .mainLoop;
+    PipelineId const renderSync  = rTestApp.m_magnum      .get_pipelines<PlMagnum>()        .sync;
+    PipelineId const sceneUpdate = scene                  .get_pipelines<PlScene>()         .update;
+    PipelineId const sceneRender = scnRenderer            .get_pipelines<PlSceneRenderer>() .render;
 
-//    run.insert(run.end(), { tgScn.updTime, tgScn.updActive, tgScn.updDraw, tgWin.inputs, tgWin.display});
-
-//    // run gets copied but who cares lol
-//    rActiveApp.set_on_draw( [&rTestApp, run = std::move(run), resync = tgScn.resyncAll]
-//                            (ActiveApplication& rApp, float delta)
-//    {
-//        // Magnum Application's main loop is here
-
-//        for (PipelineId const pipeline : run)
-//        {
-//            exec_request_run(rTestApp.m_exec, pipeline);
-//        }
-
-//        exec_update(rTestApp.m_tasks, *rTestApp.m_graph, rTestApp.m_exec);
-
-//        top_run_blocking(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_taskData, rTestApp.m_topData, rTestApp.m_exec);
-
-        // Enqueued tasks that don't run indicate a deadlock
-//        if ( ! std::all_of(std::begin(rExec.m_taskQueuedCounts),
-//                           std::end(rExec.m_taskQueuedCounts),
-//                           [] (unsigned int n) { return n == 0; }))
-//        {
-//            OSP_LOG_ERROR("Deadlock detected!");
-//            debug_top_print_deadlock( rTasks, rTaskData, rExec);
-//            std::abort();
-//        }
-//    });
+    rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, mainLoop, renderSync, sceneUpdate, sceneRender) );
 }
 
 template <typename STAGE_ENUM_T>
@@ -125,7 +167,6 @@ static ScenarioMap_t make_scenarios()
 
     register_stage_enum<EStgOptn>();
     register_stage_enum<EStgEvnt>();
-    register_stage_enum<EStgGate>();
     register_stage_enum<EStgIntr>();
     register_stage_enum<EStgCont>();
     register_stage_enum<EStgFBO>();
@@ -142,7 +183,7 @@ static ScenarioMap_t make_scenarios()
         rOut.m_sessions.resize(1);
         TopDataId const idSceneData = rOut.m_sessions[0].acquire_data<1>(rTestApp.m_topData)[0];
 
-        OSP_DECLARE_CREATE_DATA_IDS(rTestApp.m_application, rTestApp.m_topData, TESTAPP_DATA_APPLICATION);
+        OSP_DECLARE_GET_DATA_IDS(rTestApp.m_application, TESTAPP_DATA_APPLICATION);
 
         auto &rResources = top_get<Resources>(rTestApp.m_topData, idResources);
 
@@ -157,12 +198,12 @@ static ScenarioMap_t make_scenarios()
 
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,     TESTAPP_DATA_MAGNUM);
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
-            auto &rActiveApp    = top_get< ActiveApplication >      (rTestApp.m_topData, idActiveApp);
+            auto &rActiveApp    = top_get< MagnumApplication >      (rTestApp.m_topData, idActiveApp);
             auto &rRenderGl     = top_get< active::RenderGL >       (rTestApp.m_topData, idRenderGl);
             auto &rUserInput    = top_get< input::UserInputHandler >(rTestApp.m_topData, idUserInput);
 
             // Renderer state is stored as lambda capture
-            rActiveApp.set_on_draw(enginetest::generate_draw_func(rScene, rActiveApp, rRenderGl, rUserInput));
+            rActiveApp.set_osp_app(enginetest::generate_draw_func(rScene, rActiveApp, rRenderGl, rUserInput));
         };
     });
 
@@ -182,7 +223,7 @@ static ScenarioMap_t make_scenarios()
         ] = resize_then_unpack<10>(rTestApp.m_scene.m_sessions);
 
         // Compose together lots of Sessions
-        scene           = setup_scene               (builder, rTopData);
+        scene           = setup_scene               (builder, rTopData, application);
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
         physics         = setup_physics             (builder, rTopData, scene, commonScene);
         shapeSpawn      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matVisualizer);
@@ -197,9 +238,11 @@ static ScenarioMap_t make_scenarios()
         create_materials(rTopData, commonScene, sc_materialCount);
         add_floor(rTopData, application, commonScene, shapeSpawn, sc_matVisualizer, defaultPkg);
 
-        auto const tgScn    = scene         .get_pipelines<PlScene>();
-        auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
-        auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+//        auto const tgScn    = scene         .get_pipelines<PlScene>();
+//        auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+//        auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+
+
 
         //exec_conform(rTestApp.m_tasks, rTestApp.m_exec);
 
@@ -225,7 +268,7 @@ static ScenarioMap_t make_scenarios()
             cameraCtrl  = setup_camera_ctrl         (builder, rTopData, windowApp, scnRender);
             cameraFree  = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
             shVisual    = setup_shader_visualizer   (builder, rTopData, magnum, scene, commonScene, scnRender, sc_matVisualizer);
-            //camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
+            camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
 
             setup_magnum_draw(rTestApp, scene, scnRender);
         };

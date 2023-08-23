@@ -103,12 +103,17 @@ struct TaskBuilderBase
         // Set m_value members of TGT_STRUCT_T, asserted to contain only PipelineDef<...>
         // This is janky enough that rewriting the code below might cause it to ONLY SEGFAULT ON
         // RELEASE AND ISN'T CAUGHT BY ASAN WTF??? (on gcc 11)
-        auto *pOutBytes = reinterpret_cast<char*>(std::addressof(out));
+        auto *pOutBytes = reinterpret_cast<unsigned char*>(std::addressof(out));
 
         for (std::size_t i = 0; i < count; ++i)
         {
             PipelineId const pl = pipelinesOut[i];
-            *reinterpret_cast<PipelineId*>(pOutBytes + sizeof(PipelineDefBlank_t)*i + offsetof(PipelineDefBlank_t, m_value)) = pl;
+            unsigned char *pDefBytes = pOutBytes + sizeof(PipelineDefBlank_t)*i;
+
+            *reinterpret_cast<PipelineId*>(pDefBytes + offsetof(PipelineDefBlank_t, m_value)) = pl;
+
+            m_rTasks.m_pipelineInfo[pl].stageType = *reinterpret_cast<PipelineInfo::stage_type_t*>(pDefBytes + offsetof(PipelineDefBlank_t, m_type));
+            m_rTasks.m_pipelineInfo[pl].name      = *reinterpret_cast<std::string_view*>(pDefBytes + offsetof(PipelineDefBlank_t, m_name));
         }
         return out;
     }
@@ -173,6 +178,13 @@ struct TaskRefBase
         return static_cast<TaskRef_t&>(*this);
     }
 
+    TaskRef_t& schedules(TplPipelineStage const tpl) noexcept
+    {
+        m_rBuilder.m_rTasks.m_pipelineControl[tpl.pipeline].scheduler = m_taskId;
+
+        return run_on(tpl);
+    }
+
     TaskRef_t& sync_with(ArrayView<TplPipelineStage const> const specs) noexcept
     {
         return add_edges(m_rBuilder.m_rEdges.m_syncWith, specs);
@@ -203,6 +215,25 @@ struct PipelineRefBase
     PipelineRef_t& parent(PipelineId const parent)
     {
         m_rBuilder.m_rTasks.m_pipelineParents[m_pipelineId] = parent;
+        return static_cast<PipelineRef_t&>(*this);
+    }
+
+    PipelineRef_t& parent_with_schedule(PipelineId const parent)
+    {
+        m_rBuilder.m_rTasks.m_pipelineParents[m_pipelineId] = parent;
+
+        constexpr ENUM_T const scheduleStage = stage_schedule(ENUM_T{0});
+        static_assert(scheduleStage != lgrn::id_null<ENUM_T>(), "Pipeline type has no schedule stage");
+
+        TaskId const scheduler = m_rBuilder.m_rTasks.m_pipelineControl[parent].scheduler;
+        LGRN_ASSERTM(scheduler != lgrn::id_null<TaskId>(), "Parent Pipeline has no scheduler task");
+
+        m_rBuilder.m_rEdges.m_syncWith.push_back({
+            .task     = scheduler,
+            .pipeline = m_pipelineId,
+            .stage    = StageId(scheduleStage)
+        });
+
         return static_cast<PipelineRef_t&>(*this);
     }
 
@@ -265,7 +296,7 @@ struct BasicBuilderTraits
         TaskRef& func(FUNC_T && in);
     };
 
-};
+}; // struct BasicBuilderTraits
 
 template<typename FUNC_T>
 typename BasicBuilderTraits<FUNC_T>::TaskRef& BasicBuilderTraits<FUNC_T>::TaskRef::func(FUNC_T && in)

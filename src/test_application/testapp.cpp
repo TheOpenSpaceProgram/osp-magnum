@@ -34,27 +34,58 @@
 namespace testapp
 {
 
-void close_sessions(TestAppTasks &rTestApp, osp::SessionGroup &rSessions)
+void TestApp::close_sessions(osp::ArrayView<osp::Session> const sessions)
 {
-//    rSessions.m_edges.m_syncWith            .clear();
+    using namespace osp;
 
-//    if ( rSessions.m_sessions.empty() || ! rTestApp.m_graph.has_value() )
-//    {
-//        return;
-//    }
+    // Run cleanup pipelines
+    for (Session &rSession : sessions)
+    {
+        if (rSession.m_cleanup != lgrn::id_null<osp::PipelineId>())
+        {
+            m_pExecutor->run(*this, rSession.m_cleanup);
+        }
+    }
+    m_pExecutor->wait(*this);
 
-//    TestApp testapp;
-//    testapp.m_topData.clear();
+    // Clear each session's TopData
+    for (Session &rSession : sessions)
+    {
+        for (TopDataId const id : std::exchange(rSession.m_data, {}))
+        {
+            if (id != lgrn::id_null<TopDataId>())
+            {
+                m_topData[std::size_t(id)].reset();
+            }
+        }
+    }
 
-//    osp::top_close_session(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_taskData, rTestApp.m_topData, rTestApp.m_exec, rSessions.m_sessions);
+    // Clear each session's tasks and pipelines
+    for (Session &rSession : sessions)
+    {
+        for (TaskId const task : rSession.m_tasks)
+        {
+            m_tasks.m_taskIds.remove(task);
 
-//    rSessions.m_sessions.clear();
+            TopTask &rCurrTaskData = m_taskData[task];
+            rCurrTaskData.m_debugName.clear();
+            rCurrTaskData.m_dataUsed.clear();
+            rCurrTaskData.m_func = nullptr;
+        }
+        rSession.m_tasks.clear();
+
+        for (PipelineId const pipeline : rSession.m_pipelines)
+        {
+            m_tasks.m_pipelineIds.remove(pipeline);
+        }
+        rSession.m_pipelines.clear();
+    }
 }
 
 
-void close_session(TestAppTasks &rTestApp, osp::Session &rSession)
+void TestApp::close_session(osp::Session &rSession)
 {
-    //osp::top_close_session(rTestApp.m_tasks, rTestApp.m_graph.value(), rTestApp.m_taskData, rTestApp.m_topData, rTestApp.m_exec, osp::ArrayView<osp::Session>(&rSession, 1));
+    close_sessions(osp::ArrayView<osp::Session>(&rSession, 1));
 }
 
 
@@ -71,14 +102,15 @@ static void resource_for_each_type(osp::ResTypeId const type, osp::Resources& rR
     }
 }
 
-void clear_resource_owners(TestApp& rTestApp)
+
+void TestApp::clear_resource_owners()
 {
     using namespace osp::restypes;
 
     // declares idResources
-    OSP_DECLARE_CREATE_DATA_IDS(rTestApp.m_application, rTestApp.m_topData, TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_CREATE_DATA_IDS(m_application, m_topData, TESTAPP_DATA_APPLICATION);
 
-    auto &rResources = osp::top_get<osp::Resources>(rTestApp.m_topData, idResources);
+    auto &rResources = osp::top_get<osp::Resources>(m_topData, idResources);
 
     // Texture resources contain osp::TextureImgSource, which refererence counts
     // their associated image data

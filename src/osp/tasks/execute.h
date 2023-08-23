@@ -165,6 +165,12 @@ struct ExecLog
         PipelineId  pipeline;
     };
 
+    struct ExternalSignal
+    {
+        PipelineId  pipeline;
+        bool        ignored;
+    };
+
     using LogMsg_t = std::variant<
             UpdateStart,
             UpdateCycle,
@@ -179,12 +185,12 @@ struct ExecLog
             EnqueueTaskReq,
             UnblockTask,
             CompleteTask,
-            ExternalRunRequest>;
+            ExternalRunRequest,
+            ExternalSignal>;
 
     std::vector<LogMsg_t>           logMsg;
     bool                            doLogging{true};
-};
-
+}; // struct ExecLog
 
 /**
  * @brief State for executing Tasks and TaskGraph

@@ -153,7 +153,7 @@ Session setup_camera_ctrl(
     OSP_DECLARE_GET_DATA_IDS(scnRender,     TESTAPP_DATA_COMMON_RENDERER);
 
     auto const tgSR  = scnRender.get_pipelines<PlSceneRenderer>();
-    auto const tgWin = windowApp.get_pipelines<PlWindowApp>();
+    //auto const tgWin = windowApp.get_pipelines<PlWindowApp>();
 
     auto &rUserInput = top_get< osp::input::UserInputHandler >(topData, idUserInput);
 
@@ -162,6 +162,8 @@ Session setup_camera_ctrl(
     auto const tgCmCt = out.create_pipelines<PlCameraCtrl>(rBuilder);
 
     top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
+
+    rBuilder.pipeline(tgCmCt.camCtrl).parent(tgSR.render);
 
     rBuilder.task()
         .name       ("Position Rendering Camera according to Camera Controller")

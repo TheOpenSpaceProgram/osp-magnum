@@ -483,7 +483,7 @@ struct TestState
     int checks           { 0 };
 };
 
-enum class Stages { Schedule, Process, Done, Clear };
+enum class Stages { Signal, Schedule, Process, Done, Clear };
 
 struct Pipelines
 {
@@ -514,7 +514,7 @@ TEST(Tasks, BasicSingleThreadedNestedLoop)
 
     auto const pl = builder.create_pipelines<Pipelines>();
 
-    builder.pipeline(pl.loopOuter).loops(true).wait_for_signal(Schedule);
+    builder.pipeline(pl.loopOuter).loops(true).wait_for_signal(Signal);
     builder.pipeline(pl.loopInner).loops(true).parent(pl.loopOuter);
 
     builder.task()

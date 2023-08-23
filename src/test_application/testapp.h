@@ -41,10 +41,7 @@ namespace testapp
 struct TestApp;
 
 using RendererSetupFunc_t   = void(*)(TestApp&);
-
 using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
-
-
 
 struct TestAppTasks
 {
@@ -54,17 +51,31 @@ struct TestAppTasks
     osp::TaskGraph                  m_graph;
 };
 
-class IExecutor
+struct IExecutor
 {
-    virtual void load(TestAppTasks const* pTasks) = 0;
-    virtual void run(osp::PipelineId pipeline) = 0;
-    virtual void signal(osp::PipelineId pipeline) = 0;
-    virtual void wait() = 0;
-    virtual bool is_done() = 0;
+    virtual void load(TestAppTasks& rAppTasks) = 0;
+
+    virtual void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
+
+    virtual void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
+
+    virtual void wait(TestAppTasks& rAppTasks) = 0;
+
+    virtual bool is_running(TestAppTasks const& rAppTasks) = 0;
 };
 
 struct TestApp : TestAppTasks
 {
+    void close_sessions(osp::ArrayView<osp::Session> sessions);
+
+    void close_session(osp::Session &rSession);
+
+    /**
+     * @brief Deal with resource reference counts for a clean termination
+     */
+    void clear_resource_owners();
+
+    osp::SessionGroup               m_applicationGroup;
     osp::Session                    m_application;
 
     osp::SessionGroup               m_scene;
@@ -73,21 +84,12 @@ struct TestApp : TestAppTasks
     osp::Session                    m_magnum;
     osp::SessionGroup               m_renderer;
 
-    IExecutor*                      m_executor{ nullptr };
-
     RendererSetupFunc_t             m_rendererSetup { nullptr };
 
-    //osp::TopDataId                  m_idResources   { lgrn::id_null<osp::TopDataId>() };
+    IExecutor                       *m_pExecutor { nullptr };
+
     osp::PkgId                      m_defaultPkg    { lgrn::id_null<osp::PkgId>() };
 };
 
-void close_sessions(TestAppTasks &rTestApp, osp::SessionGroup &rSessions);
-
-void close_session(TestAppTasks &rTestApp, osp::Session &rSession);
-
-/**
- * @brief Deal with resource reference counts for a clean termination
- */
-void clear_resource_owners(TestApp& rTestApp);
 
 } // namespace testapp

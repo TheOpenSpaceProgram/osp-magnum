@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2023 Open Space Program Project
  *
  * MIT License
  *
@@ -22,17 +22,33 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "top_session.h"
-#include "tasks.h"
+#pragma once
 
-#include <Corrade/Containers/ArrayViewStl.h>
+#include "testapp.h"
 
-#include <longeron/containers/bit_view.hpp>
+#include <osp/tasks/top_execute.h>
 
-#include <algorithm>
+#include <osp/logging.h>
 
-namespace osp
+namespace testapp
 {
 
+struct SingleThreadedExecutor final : public IExecutor
+{
+    void load(TestAppTasks& rAppTasks) override;
 
-} // namespace osp
+    void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
+
+    void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
+
+    void wait(TestAppTasks& rAppTasks) override;
+
+    bool is_running(TestAppTasks const& rAppTasks) override;
+
+    osp::ExecContext    m_execContext;
+
+    std::shared_ptr<spdlog::logger> m_log;
+};
+
+} // namespace testapp
+

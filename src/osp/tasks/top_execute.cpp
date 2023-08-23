@@ -43,23 +43,11 @@ void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec
 {
     std::vector<entt::any> topDataRefs;
 
-    std::cout << "-- Top Run Blocking called\n";
-
-    top_write_log(std::cout, tasks, rTaskData, graph, rExec);
-    rExec.logMsg.clear();
-
-    top_write_pipeline_states(std::cout, tasks, rTaskData, graph, rExec);
-
     // Run until there's no tasks left to run
     while (true)
     {
-        auto const runTasksLeft     = rExec.tasksQueuedRun.size();
-        auto const blockedTasksLeft = rExec.tasksQueuedBlocked.size();
-
-        if (runTasksLeft+blockedTasksLeft == 0)
-        {
-            break;
-        }
+        auto const runTasksLeft = rExec.tasksQueuedRun.size();
+        //auto const blockedTasksLeft = rExec.tasksQueuedBlocked.size();
 
         if (runTasksLeft != 0)
         {
@@ -77,23 +65,17 @@ void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec
 
             bool const shouldRun = (rTopTask.m_func != nullptr);
 
-            // Task actually runs here
+            // Task function is called here
             TaskActions const status = shouldRun ? rTopTask.m_func(worker, topDataRefs) : TaskActions{};
 
             complete_task(tasks, graph, rExec, task, status);
-            top_write_log(std::cout, tasks, rTaskData, graph, rExec);
-            rExec.logMsg.clear();
         }
         else
         {
-            std::cout << "RIP pipelines. something deadlocked UwU\n";
-            top_write_pipeline_states(std::cout, tasks, rTaskData, graph, rExec);
-            std::abort();
+            break;
         }
 
         exec_update(tasks, graph, rExec);
-        top_write_log(std::cout, tasks, rTaskData, graph, rExec);
-        rExec.logMsg.clear();
     }
 }
 
@@ -114,20 +96,53 @@ static void write_task_requirements(std::ostream &rStream, Tasks const& tasks, T
 }
 
 
-void top_write_pipeline_states(std::ostream &rStream, Tasks const& tasks, TopTaskDataVec_t const& taskData, TaskGraph const& graph, ExecContext const& exec)
+std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
 {
-    constexpr int nameMinColumns = 48;
+    auto const& [tasks, taskData, graph, exec] = write;
 
-    for (PipelineInt plInt : tasks.m_pipelineIds.bitview().zeros())
+    static constexpr int nameMinColumns = 50;
+    static constexpr int maxDepth = 4;
+
+    rStream << "Pipeline/Tree  | Status  |  Stages                                     |  Pipeline Names\n"
+            << "_________________________________________________________________________________________\n";
+
+    auto const write_pipeline = [&rStream, &tasks=tasks, &exec=exec, &graph=graph] (PipelineId const pipeline, int const depth)
     {
-        auto const          pl      = PipelineId(plInt);
-        ExecPipeline const  &plExec = exec.plData[pl];
+        ExecPipeline const  &plExec = exec.plData[pipeline];
 
-        rStream << "PL" << std::setw(3) << std::left << plInt << ": ";
+        for (int i = 0; i < depth; ++i)
+        {
+            rStream << "- ";
+        }
 
-        int const stageCount = fanout_size(graph.pipelineToFirstAnystg, pl);
+        rStream << "PL" << std::setw(3) << std::left << PipelineInt(pipeline) << " ";
 
-        PipelineInfo const& info = tasks.m_pipelineInfo[pl];
+        for (int i = 0; i < (maxDepth - depth); ++i)
+        {
+            rStream << "  ";
+        }
+
+        rStream << " | ";
+
+        ExecPipeline const &execPl = exec.plData[pipeline];
+
+        bool const signalBlocked =    (execPl.waitStage != lgrn::id_null<StageId>())
+                                   && (execPl.waitStage == execPl.stage)
+                                   && ( ! execPl.waitSignaled );
+
+        rStream << (execPl.running                 ? 'R' : '-')
+                << (execPl.loop                    ? 'L' : '-')
+                << (execPl.loopChildrenLeft   != 0 ? 'O' : '-')
+                << (execPl.canceled                ? 'C' : '-')
+                << (signalBlocked                  ? 'S' : '-')
+                << (execPl.tasksQueuedRun     != 0 ? 'Q' : '-')
+                << (execPl.tasksQueuedBlocked != 0 ? 'B' : '-');
+
+        rStream << " | ";
+
+        int const stageCount = fanout_size(graph.pipelineToFirstAnystg, pipeline);
+
+        PipelineInfo const& info = tasks.m_pipelineInfo[pipeline];
 
         auto const stageNames = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
 
@@ -140,7 +155,7 @@ void top_write_pipeline_states(std::ostream &rStream, Tasks const& tasks, TopTas
                     << stageNames[stage]
                     << (sel ? ']' : ' ');
 
-            charsUsed += 4 + stageNames[stage].size();
+            charsUsed += 2 + stageNames[stage].size();
         }
 
         for (; charsUsed < nameMinColumns; ++charsUsed)
@@ -148,10 +163,38 @@ void top_write_pipeline_states(std::ostream &rStream, Tasks const& tasks, TopTas
             rStream << ' ';
         }
 
-        rStream << "- " << info.name;
+        rStream << " | " << info.name;
 
         rStream << "\n";
+    };
+
+    auto const traverse = [&write_pipeline, &rStream, &graph=graph] (auto const& self, PipelineTreePos_t first, PipelineTreePos_t last, int depth) -> void
+    {
+        uint32_t descendants = 0;
+        for (PipelineTreePos_t pos = first; pos != last; pos += 1 + descendants)
+        {
+            descendants = graph.pltreeDescendantCounts[pos];
+
+            write_pipeline(graph.pltreeToPipeline[pos], depth);
+
+            self(self, pos + 1, pos + 1 + descendants, depth + 1);
+        }
+    };
+
+    traverse(traverse, 0, graph.pltreeToPipeline.size(), 0);
+
+    // Write pipelines that are not in the tree
+    for (PipelineInt const plInt : tasks.m_pipelineIds.bitview().zeros())
+    {
+        auto const pipeline = PipelineId(plInt);
+        if (graph.pipelineToPltree[pipeline] == lgrn::id_null<PipelineTreePos_t>())
+        {
+            write_pipeline(pipeline, 0);
+        }
     }
+
+    rStream << "*Status: [R: Running]  [L: Looping] [O: Looping Children] [C: Canceled] [S: Signal Blocked] [Q: Has Queued Tasks To Run] [B: Queued Tasks Blocked]\n";
+
 
     for (auto const [task, block] : exec.tasksQueuedBlocked.each())
     {
@@ -160,19 +203,28 @@ void top_write_pipeline_states(std::ostream &rStream, Tasks const& tasks, TopTas
         write_task_requirements(rStream, tasks, graph, exec, task);
     }
 
-    //   [*run*] - [ not ] - *trig*
+    return rStream;
 }
 
-void top_write_log(std::ostream &rStream, Tasks const& tasks, TopTaskDataVec_t const& taskData, TaskGraph const& graph, ExecContext const& exec)
+std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write)
 {
-    auto const stage_name = [&tasks] (PipelineId pl, StageId stg) -> std::string_view
+    auto const& [tasks, taskData, graph, exec] = write;
+
+    auto const stage_name = [&tasks=tasks] (PipelineId pl, StageId stg) -> std::string_view
     {
-        PipelineInfo const& info        = tasks.m_pipelineInfo[pl];
-        auto const          stageNames  = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
-        return stageNames[std::size_t(stg)];
+        if (stg != lgrn::id_null<StageId>())
+        {
+            PipelineInfo const& info        = tasks.m_pipelineInfo[pl];
+            auto const          stageNames  = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
+            return stageNames[std::size_t(stg)];
+        }
+        else
+        {
+            return "NULL";
+        }
     };
 
-    auto const visitMsg = [&rStream, &tasks, &taskData, &graph, &stage_name] (auto&& msg)
+    auto const visitMsg = [&rStream, &tasks=tasks, &taskData=taskData, &graph=graph, &stage_name] (auto&& msg)
     {
         using MSG_T = std::decay_t<decltype(msg)>;
         if constexpr (std::is_same_v<MSG_T, ExecContext::UpdateStart>)
@@ -238,12 +290,18 @@ void top_write_log(std::ostream &rStream, Tasks const& tasks, TopTaskDataVec_t c
         {
             rStream << "ExternalRunRequest PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
         }
+        else if constexpr (std::is_same_v<MSG_T, ExecContext::ExternalRunRequest>)
+        {
+            rStream << "ExternalSignal PL" << std::setw(3) << PipelineInt(msg.pipeline) << (msg.ignored ? " IGNORED!" : " ") << "\n";
+        }
     };
 
     for (ExecContext::LogMsg_t const& msg : exec.logMsg)
     {
         std::visit(visitMsg, msg);
     }
+
+    return rStream;
 }
 
 

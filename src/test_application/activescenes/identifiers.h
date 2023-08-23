@@ -34,11 +34,13 @@ namespace testapp
 
 enum class EStgOptn : uint8_t
 {
+    ModifyOrSignal,
     Schedule,
     Run,
     Done
 };
-OSP_DECLARE_STAGE_NAMES(EStgOptn, "Schedule", "Run", "Done");
+OSP_DECLARE_STAGE_NAMES(EStgOptn, "Modify/Signal", "Schedule", "Run", "Done");
+OSP_DECLARE_STAGE_SCHEDULE(EStgOptn, EStgOptn::Schedule);
 
 
 enum class EStgEvnt : uint8_t
@@ -47,15 +49,7 @@ enum class EStgEvnt : uint8_t
     Done_
 };
 OSP_DECLARE_STAGE_NAMES(EStgEvnt, "Run", "Done");
-
-
-enum class EStgGate : uint8_t
-{
-    Wait,
-    Open
-};
-OSP_DECLARE_STAGE_NAMES(EStgGate, "Wait", "Open");
-
+OSP_DECLARE_STAGE_NO_SCHEDULE(EStgEvnt);
 
 /**
  * @brief Temporary queue / events that are filled, used, then cleared right away
@@ -68,7 +62,8 @@ enum class EStgIntr : uint8_t
     UseOrRun,
     Clear
 };
-OSP_DECLARE_STAGE_NAMES(EStgIntr, "Resize", "Modify", "Schedule", "Use", "Clear");
+OSP_DECLARE_STAGE_NAMES(EStgIntr, "Resize", "Modify", "Schedule", "Use/Run", "Clear");
+OSP_DECLARE_STAGE_SCHEDULE(EStgIntr, EStgIntr::Schedule_);
 
 
 /**
@@ -92,7 +87,7 @@ enum class EStgCont : uint8_t
     ///< Container is ready to use
 };
 OSP_DECLARE_STAGE_NAMES(EStgCont, "Delete", "New", "Modify", "Use");
-
+OSP_DECLARE_STAGE_NO_SCHEDULE(EStgCont);
 
 enum class EStgFBO
 {
@@ -101,14 +96,14 @@ enum class EStgFBO
     Unbind
 };
 OSP_DECLARE_STAGE_NAMES(EStgFBO, "Bind", "Draw", "Unbind");
-
+OSP_DECLARE_STAGE_NO_SCHEDULE(EStgFBO);
 
 using osp::PipelineDef;
 
 //-----------------------------------------------------------------------------
 
-#define TESTAPP_DATA_APPLICATION 1, \
-    idResources
+#define TESTAPP_DATA_APPLICATION 2, \
+    idResources, idMainLoopCtrl
 struct PlApplication
 {
     PipelineDef<EStgOptn> mainLoop          {"mainLoop - ..."};
@@ -121,7 +116,7 @@ struct PlApplication
 struct PlScene
 {
     PipelineDef<EStgEvnt> cleanup           {"cleanup - Scene cleanup before destruction"};
-    PipelineDef<EStgEvnt> update            {"update - main loop "};
+    PipelineDef<EStgOptn> update            {"update - main loop "};
 };
 
 #define TESTAPP_DATA_COMMON_SCENE 6, \
@@ -297,7 +292,7 @@ struct PlNewton
     idUserInput
 struct PlWindowApp
 {
-    PipelineDef<EStgOptn> inputs            {"render"};
+    PipelineDef<EStgOptn> inputs            {"inputs"};
 };
 
 
@@ -307,6 +302,8 @@ struct PlWindowApp
 struct PlMagnum
 {
     PipelineDef<EStgEvnt> cleanup           {"cleanup Cleanup Magnum"};
+
+    PipelineDef<EStgOptn> sync              {"render"};
 
     PipelineDef<EStgCont> meshGL            {"meshGL"};
     PipelineDef<EStgCont> textureGL         {"textureGL"};
@@ -322,8 +319,8 @@ struct PlMagnum
 struct PlSceneRenderer
 {
     PipelineDef<EStgOptn> render            {"render"};
-    PipelineDef<EStgFBO>  fbo               {"fboRender"};
 
+    PipelineDef<EStgFBO>  fbo               {"fboRender"};
     PipelineDef<EStgCont> scnRender         {"scnRender"};
     PipelineDef<EStgCont> group             {"group"};
     PipelineDef<EStgCont> groupEnts         {"groupEnts"};

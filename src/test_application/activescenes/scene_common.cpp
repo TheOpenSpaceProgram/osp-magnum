@@ -43,14 +43,31 @@ namespace testapp::scenes
 
 Session setup_scene(
         TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any> const  topData)
+        ArrayView<entt::any> const  topData,
+        Session const&              application)
 {
+    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
+    auto const tgApp = application.get_pipelines< PlApplication >();
+
     osp::Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SCENE);
 
     top_emplace< float >(topData, idDeltaTimeIn, 1.0f / 60.0f);
 
-    out.create_pipelines<PlScene>(rBuilder);
+    auto const plScn = out.create_pipelines<PlScene>(rBuilder);
+
+    rBuilder.pipeline(plScn.update).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+
+    rBuilder.task()
+        .name       ("Schedule Scene update")
+        .schedules  ({plScn.update(Schedule)})
+        .push_to    (out.m_tasks)
+        .args       ({                  idMainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rMainLoopCtrl.doUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
+
     return out;
 }
 

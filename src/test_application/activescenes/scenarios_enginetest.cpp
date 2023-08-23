@@ -24,7 +24,7 @@
  */
 #include "CameraController.h"
 
-#include "../ActiveApplication.h"
+#include "../MagnumApplication.h"
 
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
@@ -203,7 +203,7 @@ struct EngineTestRenderer
 
     // Support for assigning render-space GL meshes/textures and transforms
     // for ActiveEnts
-    osp::active::ACtxSceneRenderGL m_renderGl{};
+    osp::active::ACtxSceneRenderGL m_sceneRenderGL{};
 
     // Pre-built easy camera controls
     osp::active::Camera m_cam;
@@ -231,16 +231,16 @@ void sync_test_scene(
     using namespace osp::active;
     using namespace osp::shader;
 
-    rRenderer.m_renderGl.m_drawTransform.resize(rScene.m_drawing.m_drawIds.capacity());
-    rRenderer.m_renderGl.m_diffuseTexId.resize(rScene.m_drawing.m_drawIds.capacity());
-    rRenderer.m_renderGl.m_meshId.resize(rScene.m_drawing.m_drawIds.capacity());
+    rRenderer.m_sceneRenderGL.m_drawTransform.resize(rScene.m_drawing.m_drawIds.capacity());
+    rRenderer.m_sceneRenderGL.m_diffuseTexId.resize(rScene.m_drawing.m_drawIds.capacity());
+    rRenderer.m_sceneRenderGL.m_meshId.resize(rScene.m_drawing.m_drawIds.capacity());
 
     // Assign or remove phong shaders from entities marked dirty
     sync_phong(
             std::cbegin(rScene.m_matPhongDirty),
             std::cend(rScene.m_matPhongDirty),
             rScene.m_matPhong, &rRenderer.m_groupFwdOpaque.m_entities, nullptr,
-            rScene.m_drawing.m_drawBasic, rRenderer.m_renderGl.m_diffuseTexId,
+            rScene.m_drawing.m_drawBasic, rRenderer.m_sceneRenderGL.m_diffuseTexId,
             rRenderer.m_phong);
 
     // Load required meshes and textures into OpenGL
@@ -250,12 +250,12 @@ void sync_test_scene(
     // Assign GL meshes to entities with a mesh component
     SysRenderGL::assign_meshes(
             rScene.m_drawing.m_mesh, rScene.m_drawingRes.m_meshToRes, rScene.m_drawing.m_meshDirty,
-            rRenderer.m_renderGl.m_meshId, rRenderGl);
+            rRenderer.m_sceneRenderGL.m_meshId, rRenderGl);
 
     // Assign GL textures to entities with a texture component
     SysRenderGL::assign_textures(
             rScene.m_drawing.m_diffuseTex, rScene.m_drawingRes.m_texToRes, rScene.m_drawing.m_diffuseDirty,
-            rRenderer.m_renderGl.m_diffuseTexId, rRenderGl);
+            rRenderer.m_sceneRenderGL.m_diffuseTexId, rRenderGl);
 
     // Calculate hierarchy transforms
 
@@ -265,7 +265,7 @@ void sync_test_scene(
             rScene.m_basic.m_scnGraph,
             rScene.m_drawing.m_activeToDraw,
             rScene.m_basic.m_transform,
-            rRenderer.m_renderGl.m_drawTransform,
+            rRenderer.m_sceneRenderGL.m_drawTransform,
             rScene.m_drawing.m_needDrawTf,
             drawTfDirty.begin(),
             drawTfDirty.end());
@@ -310,25 +310,61 @@ void render_test_scene(
     SysRenderGL::display_texture(rRenderGl, rFboColor);
 }
 
-on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
+class EngineTestApp : public IOspApplication
+{
+public:
+    EngineTestApp(EngineTestRenderer renderer, EngineTestScene& rScene, RenderGL& rRenderGl)
+     : m_renderer   {std::move(renderer)}
+     , m_rScene     {rScene}
+     , m_rRenderGl  {rRenderGl}
+    { }
+
+    ~EngineTestApp() override
+    { };
+
+    void run(MagnumApplication& rApp) override
+    { }
+
+    void draw(MagnumApplication& rApp, float delta) override
+    {
+        update_test_scene(m_rScene, delta);
+
+        // Rotate and move the camera based on user inputs
+        SysCameraController::update_view(m_renderer.m_camCtrl, delta);
+        SysCameraController::update_move(m_renderer.m_camCtrl, delta, true);
+        m_renderer.m_cam.m_transform = m_renderer.m_camCtrl.m_transform;
+
+        sync_test_scene  (m_rRenderGl, m_rScene, m_renderer);
+        render_test_scene(m_rRenderGl, m_rScene, m_renderer);
+    }
+
+    void exit(MagnumApplication& rApp) override
+    { }
+
+    EngineTestRenderer  m_renderer;
+
+    EngineTestScene     &m_rScene;
+    RenderGL            &m_rRenderGl;
+};
+
+MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
 {
     using namespace osp::active;
     using namespace osp::shader;
 
-    // Create renderer data. This uses a shared_ptr to allow being stored
-    // inside an std::function, which require copyable types
-    std::shared_ptr<EngineTestRenderer> pRenderer
-            = std::make_shared<EngineTestRenderer>(rUserInput);
+    auto pApp = std::make_unique<EngineTestApp>(EngineTestRenderer{rUserInput}, rScene, rRenderGl);
+
+    EngineTestRenderer &rRenderer = pApp->m_renderer;
 
     // Create Phong shaders
     auto const texturedFlags
             = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask
             | Phong::Flag::AmbientTexture;
-    pRenderer->m_phong.m_shaderDiffuse      = Phong{Phong::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
-    pRenderer->m_phong.m_shaderUntextured   = Phong{Phong::Configuration{}.setLightCount(2)};
-    pRenderer->m_phong.assign_pointers(pRenderer->m_renderGl, rRenderGl);
+    rRenderer.m_phong.m_shaderDiffuse      = Phong{Phong::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
+    rRenderer.m_phong.m_shaderUntextured   = Phong{Phong::Configuration{}.setLightCount(2)};
+    rRenderer.m_phong.assign_pointers(rRenderer.m_sceneRenderGL, rRenderGl);
 
-    pRenderer->m_cam.set_aspect_ratio(
+    rRenderer.m_cam.set_aspect_ratio(
             osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size()));
 
     // Set all drawing stuff dirty then sync with renderer.
@@ -339,21 +375,9 @@ on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication &rApp, R
         rScene.m_matPhongDirty.push_back(DrawEnt(entInt));
     }
 
-    sync_test_scene(rRenderGl, rScene, *pRenderer);
+    sync_test_scene(rRenderGl, rScene, rRenderer);
 
-    return [&rScene, pRenderer = std::move(pRenderer), &rRenderGl] (
-            ActiveApplication& rApp, float delta)
-    {
-        update_test_scene(rScene, delta);
-
-        // Rotate and move the camera based on user inputs
-        SysCameraController::update_view(pRenderer->m_camCtrl, delta);
-        SysCameraController::update_move(pRenderer->m_camCtrl, delta, true);
-        pRenderer->m_cam.m_transform = pRenderer->m_camCtrl.m_transform;
-
-        sync_test_scene(rRenderGl, rScene, *pRenderer);
-        render_test_scene(rRenderGl, rScene, *pRenderer);
-    };
+    return pApp;
 }
 
 } // namespace testapp::enginetest

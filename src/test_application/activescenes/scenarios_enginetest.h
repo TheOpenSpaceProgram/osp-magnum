@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "../ActiveApplication.h"
+#include "../MagnumApplication.h"
 
 #include <osp/Active/opengl/SysRenderGL.h>
 
@@ -44,17 +44,17 @@ struct EngineTestScene;
 entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
 
 /**
- * @brief Generate ActiveApplication draw function
+ * @brief Generate MagnumApplication draw function
  *
  * This draw function stores renderer data, and is responsible for updating
  * and drawing the engine test scene.
  *
  * @param rScene [ref] Engine test scene. Must be in stable memory.
- * @param rApp   [ref] Existing ActiveApplication to use GL resources of
+ * @param rApp   [ref] Existing MagnumApplication to use GL resources of
  *
- * @return ActiveApplication draw function
+ * @return MagnumApplication draw function
  */
-on_draw_t generate_draw_func(EngineTestScene& rScene, ActiveApplication& rApp, osp::active::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
+MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumApplication& rApp, osp::active::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
 
 
 } // namespace testapp::enginetest

@@ -122,11 +122,12 @@ struct Session
     std::vector<PipelineId> m_pipelines;
     std::vector<TaskId>     m_tasks;
 
-    TplPipelineStage        m_cleanup{ lgrn::id_null<PipelineId>(), lgrn::id_null<StageId>() };
+    PipelineId              m_cleanup { lgrn::id_null<PipelineId>() };
 
     std::size_t             m_structHash{0};
     std::string             m_structName;
-};
+
+}; // struct Session
 
 struct SessionGroup
 {

@@ -28,7 +28,7 @@
 #include "identifiers.h"
 #include "CameraController.h"
 
-#include "../ActiveApplication.h"
+#include "../MagnumApplication.h"
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Renderer.h>
@@ -66,11 +66,17 @@ namespace testapp::scenes
 
 Session setup_window_app(
         TopTaskBuilder&                 rBuilder,
-        ArrayView<entt::any> const      topData)
+        ArrayView<entt::any> const      topData,
+        Session const&                  application)
 {
+    auto const tgApp = application   .get_pipelines< PlApplication >();
+
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_WINDOW_APP);
-    out.create_pipelines<PlWindowApp>(rBuilder);
+    auto const tgWin = out.create_pipelines<PlWindowApp>(rBuilder);
+
+    rBuilder.pipeline(tgWin.inputs).parent(tgApp.mainLoop);//.wait_for_signal(Signal);
+
 
     auto &rUserInput = osp::top_emplace<UserInputHandler>(topData, idUserInput, 12);
     config_controls(rUserInput);
@@ -83,19 +89,28 @@ Session setup_magnum(
         ArrayView<entt::any> const      topData,
         Session const&                  windowApp,
         Session const&                  application,
-        ActiveApplication::Arguments    args)
+        MagnumApplication::Arguments    args)
 {
     OSP_DECLARE_GET_DATA_IDS(windowApp,   TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
+    auto const tgApp    = application   .get_pipelines< PlApplication >();
+
     auto& rUserInput = top_get<UserInputHandler>(topData, idUserInput);
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM);
     auto const tgMgn = out.create_pipelines<PlMagnum>(rBuilder);
-    out.m_cleanup = tgMgn.cleanup.tpl(Run_);
+    out.m_cleanup = tgMgn.cleanup;
 
-    // Order-dependent; ActiveApplication construction starts OpenGL context, needed by RenderGL
-    /* unused */      top_emplace<ActiveApplication>(topData, idActiveApp, args, rUserInput);
+    rBuilder.pipeline(tgMgn.sync).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+
+    rBuilder.pipeline(tgMgn.meshGL)         .parent(tgMgn.sync);
+    rBuilder.pipeline(tgMgn.textureGL)      .parent(tgMgn.sync);
+    rBuilder.pipeline(tgMgn.entMeshGL)      .parent(tgMgn.sync);
+    rBuilder.pipeline(tgMgn.entTextureGL)   .parent(tgMgn.sync);
+
+    // Order-dependent; MagnumApplication construction starts OpenGL context, needed by RenderGL
+    /* unused */      top_emplace<MagnumApplication>(topData, idActiveApp, args, rUserInput);
     auto &rRenderGl = top_emplace<RenderGL>         (topData, idRenderGl);
 
     SysRenderGL::setup_context(rRenderGl);
@@ -128,14 +143,26 @@ Session setup_scene_renderer(
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
-    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const tgScn    = scene         .get_pipelines<PlScene>();
-    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgMgn    = magnum        .get_pipelines<PlMagnum>();
+    auto const tgApp    = application   .get_pipelines< PlApplication >();
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgScn    = scene         .get_pipelines< PlScene >();
+    auto const tgCS     = commonScene   .get_pipelines< PlCommonScene >();
+    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_COMMON_RENDERER);
     auto const tgSR = out.create_pipelines<PlSceneRenderer>(rBuilder);
+
+    rBuilder.pipeline(tgSR.render).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+
+    rBuilder.pipeline(tgSR.fbo)             .parent(tgSR.render);
+    rBuilder.pipeline(tgSR.scnRender)       .parent(tgSR.render);
+    rBuilder.pipeline(tgSR.group)           .parent(tgMgn.sync);
+    rBuilder.pipeline(tgSR.groupEnts)       .parent(tgMgn.sync);
+    rBuilder.pipeline(tgSR.drawTransforms)  .parent(tgMgn.sync);
+    rBuilder.pipeline(tgSR.camera)          .parent(tgSR.render);
+    rBuilder.pipeline(tgSR.entMesh)         .parent(tgMgn.sync);
+    rBuilder.pipeline(tgSR.entTexture)      .parent(tgMgn.sync);
 
     top_emplace< ACtxSceneRenderGL >    (topData, idScnRender);
     top_emplace< RenderGroup >          (topData, idGroupFwd);
@@ -183,9 +210,20 @@ Session setup_scene_renderer(
     });
 
     rBuilder.task()
+        .name       ("Schedule Assign GL textures")
+        .schedules  ({tgCS.entTextureDirty(Schedule_)})
+        .sync_with  ({tgCS.texture(Ready)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing })
+        .func([] (ACtxDrawing& rDrawing) noexcept -> TaskActions
+    {
+        return rDrawing.m_diffuseDirty.empty() ? TaskAction::Cancel : TaskActions{};
+    });
+
+    rBuilder.task()
         .name       ("Assign GL textures to entities with scene textures")
         .run_on     ({tgCS.entTextureDirty(UseOrRun)})
-        .sync_with  ({tgCS.texture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify)})
+        .sync_with  ({tgCS.texture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgCS.drawEntResized(Done)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
@@ -194,9 +232,20 @@ Session setup_scene_renderer(
     });
 
     rBuilder.task()
+        .name       ("Schedule Assign GL meshes")
+        .schedules  ({tgCS.entMeshDirty(Schedule_)})
+        .sync_with  ({tgCS.mesh(Ready)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
+        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept -> TaskActions
+    {
+        return rDrawing.m_meshDirty.empty() ? TaskAction::Cancel : TaskActions{};
+    });
+
+    rBuilder.task()
         .name       ("Assign GL meshes to entities with scene meshes")
         .run_on     ({tgCS.entMeshDirty(UseOrRun)})
-        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify)})
+        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgCS.drawEntResized(Done)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept

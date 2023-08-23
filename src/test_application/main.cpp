@@ -22,11 +22,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#include "MagnumApplication.h"
+#include "executor.h"
 #include "testapp.h"
 
-#include <spdlog/sinks/stdout_color_sinks.h>
-
-#include "ActiveApplication.h"
 #include "activescenes/scenarios.h"
 #include "activescenes/identifiers.h"
 #include "activescenes/scene_renderer.h"
@@ -56,6 +55,8 @@
 
 #include <entt/core/any.hpp>
 
+#include <spdlog/sinks/stdout_color_sinks.h>
+
 #include <array>
 #include <fstream>
 #include <iostream>
@@ -75,7 +76,7 @@ using namespace testapp;
 void debug_cli_loop();
 
 /**
- * @brief Starts Magnum application (ActiveApplication) thread g_magnumThread
+ * @brief Starts Magnum application (MagnumApplication) thread g_magnumThread
  *
  * This initializes an OpenGL context, and opens the window
  */
@@ -97,10 +98,13 @@ void debug_print_resources();
 
 TestApp g_testApp;
 
+SingleThreadedExecutor g_executor;
+
 std::thread g_magnumThread;
 
 // Loggers
 std::shared_ptr<spdlog::logger> g_logTestApp;
+std::shared_ptr<spdlog::logger> g_logExecutor;
 std::shared_ptr<spdlog::logger> g_logMagnumApp;
 
 // lazily save the arguments to pass to Magnum
@@ -112,10 +116,11 @@ int main(int argc, char** argv)
 {
     Corrade::Utility::Arguments args;
     args.addSkippedPrefix("magnum", "Magnum options")
-        .addOption("scene", "none")         .setHelp("scene", "Set the scene to launch")
-        .addOption("config")                .setHelp("config", "path to configuration file to use")
-        .addBooleanOption("norepl")         .setHelp("norepl", "don't enter read, evaluate, print, loop.")
-        .addBooleanOption('v', "verbose")   .setHelp("verbose", "log verbosely")
+        .addOption("scene", "none")         .setHelp("scene",       "Set the scene to launch")
+        .addOption("config")                .setHelp("config",      "path to configuration file to use")
+        .addBooleanOption("norepl")         .setHelp("norepl",      "don't enter read, evaluate, print, loop.")
+        .addBooleanOption("log-exec")       .setHelp("log-exec",    "Log Task/Pipeline Execution (Extremely chatty!)")
+        // TODO .addBooleanOption('v', "verbose")   .setHelp("verbose",     "log verbosely")
         .setGlobalHelp("Helptext goes here.")
         .parse(argc, argv);
 
@@ -127,11 +132,20 @@ int main(int argc, char** argv)
     {
         auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         pSink->set_pattern("[%T.%e] [%n] [%^%l%$] [%s:%#] %v");
-        g_logTestApp = std::make_shared<spdlog::logger>("testapp", pSink);
+        g_logTestApp   = std::make_shared<spdlog::logger>("testapp", pSink);
+        g_logExecutor  = std::make_shared<spdlog::logger>("executor", pSink);
         g_logMagnumApp = std::make_shared<spdlog::logger>("flight", std::move(pSink));
     }
 
-    osp::set_thread_logger(g_logTestApp); // Set logger for this thread
+    // Set thread-local logger used by OSP_LOG_* macros
+    osp::set_thread_logger(g_logTestApp);
+
+    g_testApp.m_pExecutor = &g_executor;
+
+    if (args.isSet("log-exec"))
+    {
+        g_executor.m_log = g_logExecutor;
+    }
 
     g_testApp.m_topData.resize(64);
     load_a_bunch_of_stuff();
@@ -142,7 +156,7 @@ int main(int argc, char** argv)
         if(it == std::end(scenarios()))
         {
             std::cerr << "unknown scene" << std::endl;
-            clear_resource_owners(g_testApp);
+            g_testApp.clear_resource_owners();
             exit(-1);
         }
 
@@ -195,7 +209,7 @@ void debug_cli_loop()
             {
                 std::cout << "Loading scene: " << it->first << "\n";
 
-                close_sessions(g_testApp, g_testApp.m_scene); // Close existing scene
+                //g_testApp.close_sessions(g_executor, g_testApp.m_scene); // Close existing scene
 
                 g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
                 start_magnum_async();
@@ -231,7 +245,7 @@ void debug_cli_loop()
             {
                 // Request exit if application exists
                 OSP_DECLARE_GET_DATA_IDS(g_testApp.m_renderer.m_sessions[1], TESTAPP_DATA_MAGNUM); // declares idActiveApp
-                osp::top_get<ActiveApplication>(g_testApp.m_topData, idActiveApp).exit();
+                osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp).exit();
             }
 
             break;
@@ -242,7 +256,7 @@ void debug_cli_loop()
         }
     }
 
-    clear_resource_owners(g_testApp);
+    g_testApp.clear_resource_owners();
 }
 
 void start_magnum_async()
@@ -258,35 +272,34 @@ void start_magnum_async()
         // Start Magnum application session
         osp::TopTaskBuilder builder{g_testApp.m_tasks, g_testApp.m_renderer.m_edges, g_testApp.m_taskData};
 
-        g_testApp.m_windowApp   = scenes::setup_window_app  (builder, g_testApp.m_topData);
+        g_testApp.m_windowApp   = scenes::setup_window_app  (builder, g_testApp.m_topData, g_testApp.m_application);
         g_testApp.m_magnum      = scenes::setup_magnum      (builder, g_testApp.m_topData, g_testApp.m_windowApp, g_testApp.m_application, {g_argc, g_argv});
 
         OSP_DECLARE_GET_DATA_IDS(g_testApp.m_magnum, TESTAPP_DATA_MAGNUM); // declares idActiveApp
-        auto &rActiveApp = osp::top_get<ActiveApplication>(g_testApp.m_topData, idActiveApp);
+        auto &rActiveApp = osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp);
 
         // Setup renderer sessions
 
         g_testApp.m_rendererSetup(g_testApp);
 
-        //g_testApp.m_graph.reset();
-        //g_testApp.m_graph.emplace(osp::make_exec_graph(g_testApp.m_tasks, {&g_testApp.m_renderer.m_edges, &g_testApp.m_scene.m_edges}));
-        //osp::exec_conform(g_testApp.m_tasks, g_testApp.m_exec);
-
-        //exec_update(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_exec);
-        //top_run_blocking(g_testApp.m_tasks, g_testApp.m_graph.value(), g_testApp.m_taskData, g_testApp.m_topData, g_testApp.m_exec);
+        g_testApp.m_graph = osp::make_exec_graph(g_testApp.m_tasks, {&g_testApp.m_renderer.m_edges, &g_testApp.m_scene.m_edges});
+        g_executor.load(g_testApp);
 
         // Starts the main loop. This function is blocking, and will only return
-        // once the window is closed. See ActiveApplication::drawEvent
+        // once the window is closed. See MagnumApplication::drawEvent
         rActiveApp.exec();
 
         // Destruct draw function lambda first
         // EngineTest stores the entire renderer in here (if it's active)
-        rActiveApp.set_on_draw({});
+        rActiveApp.set_osp_app({});
         
         // Closing sessions will delete their associated TopData and Tags
-        close_sessions(g_testApp, g_testApp.m_renderer);
-        close_session(g_testApp, g_testApp.m_magnum);
-        close_session(g_testApp, g_testApp.m_windowApp);
+        g_testApp.close_sessions(g_testApp.m_renderer.m_sessions);
+        g_testApp.m_renderer.m_sessions.clear();
+        g_testApp.m_renderer.m_edges.m_syncWith.clear();
+
+        g_testApp.close_session(g_testApp.m_magnum);
+        g_testApp.close_session(g_testApp.m_windowApp);
 
         OSP_LOG_INFO("Closed Magnum Application");
     });
@@ -305,11 +318,37 @@ void load_a_bunch_of_stuff()
     std::size_t const maxTags = 256; // aka: just two 64-bit integers
     std::size_t const maxTagsInts = maxTags / 64;
 
-    // declares idResources
-    //g_testApp.m_application.create_pipelines<>
+    osp::TopTaskBuilder builder{g_testApp.m_tasks, g_testApp.m_applicationGroup.m_edges, g_testApp.m_taskData};
+    auto const plApp = g_testApp.m_application.create_pipelines<PlApplication>(builder);
+
+    builder.pipeline(plApp.mainLoop).loops(true).wait_for_signal(EStgOptn::ModifyOrSignal);
+
+    // declares idResources and idMainLoopCtrl
     OSP_DECLARE_CREATE_DATA_IDS(g_testApp.m_application, g_testApp.m_topData, TESTAPP_DATA_APPLICATION);
 
-    auto &rResources = osp::top_emplace<osp::Resources>(g_testApp.m_topData, idResources);
+    auto &rResources = osp::top_emplace<osp::Resources> (g_testApp.m_topData, idResources);
+    /* unused */       osp::top_emplace<MainLoopControl>(g_testApp.m_topData, idMainLoopCtrl);
+
+    builder.task()
+        .name       ("Schedule Main Loop")
+        .schedules  ({plApp.mainLoop(EStgOptn::Schedule)})
+        .push_to    (g_testApp.m_application.m_tasks)
+        .args       ({                  idMainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        if (   ! rMainLoopCtrl.doUpdate
+            && ! rMainLoopCtrl.doSync
+            && ! rMainLoopCtrl.doResync
+            && ! rMainLoopCtrl.doRender)
+        {
+            return osp::TaskAction::Cancel;
+        }
+        else
+        {
+            return { };
+        }
+    });
+
 
     rResources.resize_types(osp::ResTypeIdReg_t::size());
 

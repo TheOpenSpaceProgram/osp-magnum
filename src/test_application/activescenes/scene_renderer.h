@@ -28,7 +28,7 @@
 
 #include <osp/Active/activetypes.h>
 
-#include "../ActiveApplication.h"
+#include "../MagnumApplication.h"
 
 
 namespace testapp::scenes
@@ -36,14 +36,15 @@ namespace testapp::scenes
 
 osp::Session setup_window_app(
         osp::TopTaskBuilder&            rBuilder,
-        osp::ArrayView<entt::any>       topData);
+        osp::ArrayView<entt::any>       topData,
+        osp::Session const&             application);
 
 osp::Session setup_magnum(
         osp::TopTaskBuilder&            rBuilder,
         osp::ArrayView<entt::any>       topData,
         osp::Session const&             windowApp,
         osp::Session const&             application,
-        ActiveApplication::Arguments    args);
+        MagnumApplication::Arguments    args);
 
 /**
  * @brief Magnum-powered OpenGL Renderer

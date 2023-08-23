@@ -41,7 +41,6 @@ namespace scenes
 {
     using enum EStgOptn;
     using enum EStgCont;
-    using enum EStgGate;
     using enum EStgIntr;
     using enum EStgEvnt;
     using enum EStgFBO;
@@ -50,7 +49,8 @@ namespace scenes
 struct MainLoopControl
 {
     bool doUpdate;
-    bool doRenderResync;
+    bool doSync;
+    bool doResync;
     bool doRender;
 };
 
@@ -63,6 +63,5 @@ struct ScenarioOption
 using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
 
 ScenarioMap_t const& scenarios();
-
 
 } // namespace testapp

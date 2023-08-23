@@ -45,6 +45,18 @@
         return osp::arrayView( arr.data(), arr.size() );                                                    \
     }
 
+#define OSP_DECLARE_STAGE_SCHEDULE(type, schedule_enum)                     \
+    constexpr inline type stage_schedule([[maybe_unused]] type _) noexcept  \
+    {                                                                       \
+        return schedule_enum;                                               \
+    }
+
+#define OSP_DECLARE_STAGE_NO_SCHEDULE(type)                                 \
+    constexpr inline type stage_schedule([[maybe_unused]] type _) noexcept  \
+    {                                                                       \
+        return lgrn::id_null<type>();                                       \
+    }
+
 namespace osp
 {
 
@@ -78,6 +90,7 @@ struct PipelineInfo
 
 struct PipelineControl
 {
+    TaskId      scheduler   { lgrn::id_null<TaskId>() };
     StageId     waitStage   { lgrn::id_null<StageId>() };
     bool        isLoopScope { false };
 };
@@ -201,7 +214,8 @@ struct TaskGraph
     // not yet used
     //lgrn::IntArrayMultiMap<TaskInt, SemaphoreId>    taskAcquire;      /// Tasks acquire (n) Semaphores
     //lgrn::IntArrayMultiMap<SemaphoreInt, TaskId>    semaAcquiredBy;   /// Semaphores are acquired by (n) Tasks
-};
+
+}; // struct TaskGraph
 
 
 TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> data);
@@ -309,7 +323,5 @@ struct PipelineDef
 };
 
 using PipelineDefBlank_t = PipelineDef<int>;
-
-
 
 } // namespace osp

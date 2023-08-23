@@ -64,6 +64,8 @@ Session setup_physics(
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_PHYSICS);
     auto const tgPhy = out.create_pipelines<PlPhysics>(rBuilder);
 
+    rBuilder.pipeline(tgPhy.physics).parent(tgScn.update);
+
     top_emplace< ACtxPhysics >  (topData, idPhys);
 
     rBuilder.task()
@@ -98,6 +100,9 @@ Session setup_shape_spawn(
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHAPE_SPAWN);
     auto const tgShSp = out.create_pipelines<PlShapeSpawn>(rBuilder);
 
+    rBuilder.pipeline(tgShSp.spawnRequest)  .parent(tgScn.update);
+    rBuilder.pipeline(tgShSp.spawnedEnts)   .parent(tgScn.update);
+
     top_emplace< ACtxShapeSpawner > (topData, idSpawner, ACtxShapeSpawner{ .m_materialId = materialId });
     rBuilder.task()
         .name       ("Create entities for requested shapes to spawn")
@@ -107,7 +112,7 @@ Session setup_shape_spawn(
         .args       ({      idBasic,                  idSpawner })
         .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner) noexcept
     {
-        LGRN_ASSERTM(!rSpawner.m_spawnRequest.empty(), "spawnRequest Use_ shouldn't be triggered if rSpawner.m_spawnRequest is empty!");
+        //LGRN_ASSERTM(!rSpawner.m_spawnRequest.empty(), "spawnRequest Use_ shouldn't run if rSpawner.m_spawnRequest is empty!");
 
         rSpawner.m_ents.resize(rSpawner.m_spawnRequest.size() * 2);
         rBasic.m_activeIds.create(rSpawner.m_ents.begin(), rSpawner.m_ents.end());
@@ -140,7 +145,7 @@ Session setup_shape_spawn(
     rBuilder.task()
         .name       ("Add mesh and material to spawned shapes")
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgCS.mesh(New), tgCS.material(New), tgCS.drawEnt(New)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgCS.mesh(New), tgCS.material(New), tgCS.drawEnt(New), tgCS.drawEntResized(ModifyOrSignal)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,             idDrawing,                  idSpawner,             idNMesh })
         .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept
@@ -214,8 +219,7 @@ Session setup_shape_spawn(
 
     rBuilder.task()
         .name       ("Clear Shape Spawning vector after use")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnRequest(Clear)})
+        .run_on     ({tgShSp.spawnRequest(Clear)})
         .push_to    (out.m_tasks)
         .args       ({             idSpawner })
         .func([] (ACtxShapeSpawner& rSpawner) noexcept
