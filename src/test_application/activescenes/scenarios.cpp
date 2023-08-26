@@ -63,10 +63,11 @@ static constexpr int    sc_materialCount    = 4;
 
 struct CommonMagnumApp : IOspApplication
 {
-    CommonMagnumApp(TestApp &rTestApp, MainLoopControl &rMainLoopCtrl, PipelineId mainLoop, PipelineId renderSync, PipelineId sceneUpdate, PipelineId sceneRender) noexcept
+    CommonMagnumApp(TestApp &rTestApp, MainLoopControl &rMainLoopCtrl, PipelineId mainLoop, PipelineId inputs, PipelineId renderSync, PipelineId sceneUpdate, PipelineId sceneRender) noexcept
      : m_rTestApp       { rTestApp }
      , m_rMainLoopCtrl  { rMainLoopCtrl }
      , m_mainLoop       { mainLoop }
+     , m_inputs         { inputs }
      , m_renderSync     { renderSync }
      , m_sceneUpdate    { sceneUpdate }
      , m_sceneRender    { sceneRender }
@@ -93,6 +94,7 @@ struct CommonMagnumApp : IOspApplication
         };
 
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_mainLoop);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_inputs);
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneUpdate);
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneRender);
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_renderSync);
@@ -110,6 +112,7 @@ struct CommonMagnumApp : IOspApplication
         };
 
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_mainLoop);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_inputs);
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneUpdate);
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneRender);
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_renderSync);
@@ -119,6 +122,7 @@ struct CommonMagnumApp : IOspApplication
         if (m_rTestApp.m_pExecutor->is_running(m_rTestApp))
         {
             // Main loop must have stopped, but didn't!
+            m_rTestApp.m_pExecutor->wait(m_rTestApp);
             std::abort();
         }
     }
@@ -127,6 +131,7 @@ struct CommonMagnumApp : IOspApplication
     MainLoopControl &m_rMainLoopCtrl;
 
     PipelineId m_mainLoop;
+    PipelineId m_inputs;
     PipelineId m_renderSync;
     PipelineId m_sceneUpdate;
     PipelineId m_sceneRender;
@@ -145,11 +150,12 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
     rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
     PipelineId const mainLoop    = rTestApp.m_application .get_pipelines<PlApplication>()   .mainLoop;
+    PipelineId const inputs      = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .inputs;
     PipelineId const renderSync  = rTestApp.m_magnum      .get_pipelines<PlMagnum>()        .sync;
     PipelineId const sceneUpdate = scene                  .get_pipelines<PlScene>()         .update;
     PipelineId const sceneRender = scnRenderer            .get_pipelines<PlSceneRenderer>() .render;
 
-    rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, mainLoop, renderSync, sceneUpdate, sceneRender) );
+    rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, mainLoop, inputs, renderSync, sceneUpdate, sceneRender) );
 }
 
 template <typename STAGE_ENUM_T>
@@ -230,10 +236,10 @@ static ScenarioMap_t make_scenarios()
         //droppers        = setup_droppers            (builder, rTopData, commonScene, shapeSpawn);
         //bounds          = setup_bounds              (builder, rTopData, commonScene, physics, shapeSpawn);
 
-        //newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
-        //nwtGravSet      = setup_newton_factors      (builder, rTopData);
+        newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
+        nwtGravSet      = setup_newton_factors      (builder, rTopData);
         //nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        //shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
+        shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
 
         create_materials(rTopData, commonScene, sc_materialCount);
         add_floor(rTopData, application, commonScene, shapeSpawn, sc_matVisualizer, defaultPkg);
@@ -241,10 +247,6 @@ static ScenarioMap_t make_scenarios()
 //        auto const tgScn    = scene         .get_pipelines<PlScene>();
 //        auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
 //        auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
-
-
-
-        //exec_conform(rTestApp.m_tasks, rTestApp.m_exec);
 
         return [] (TestApp& rTestApp)
         {

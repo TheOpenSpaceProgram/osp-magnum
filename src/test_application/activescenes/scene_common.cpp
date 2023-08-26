@@ -58,15 +58,15 @@ Session setup_scene(
 
     rBuilder.pipeline(plScn.update).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
 
-    rBuilder.task()
-        .name       ("Schedule Scene update")
-        .schedules  ({plScn.update(Schedule)})
-        .push_to    (out.m_tasks)
-        .args       ({                  idMainLoopCtrl})
-        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
-    {
-        return rMainLoopCtrl.doUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
-    });
+//    rBuilder.task()
+//        .name       ("Schedule Scene update")
+//        .schedules  ({plScn.update(Schedule)})
+//        .push_to    (out.m_tasks)
+//        .args       ({                  idMainLoopCtrl})
+//        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+//    {
+//        return rMainLoopCtrl.doUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
+//    });
 
     return out;
 }
@@ -168,8 +168,8 @@ Session setup_common_scene(
 
     rBuilder.task()
         .name       ("Delete drawing components")
-        .run_on     ({tgCS.drawEntDelete(UseOrRun)})
-        .sync_with  ({tgCS.mesh(Delete), tgCS.texture(Delete)})
+        .run_on     ({tgCS.mesh(Delete)})
+        .sync_with  ({tgCS.texture(Delete)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                    idDrawEntDel })
         .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept

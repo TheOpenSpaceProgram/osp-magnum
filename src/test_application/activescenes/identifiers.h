@@ -152,7 +152,8 @@ struct PlCommonScene
     idPhys, idHierBody, idPhysIn
 struct PlPhysics
 {
-    PipelineDef<EStgCont> physics           {"physics"};
+    PipelineDef<EStgCont> physBody          {"physBody"};
+    PipelineDef<EStgOptn> physUpdate        {"physUpdate"};
 };
 
 
@@ -243,7 +244,7 @@ struct PlShapeSpawn
     idNwt
 struct PlNewton
 {
-    PipelineDef<EStgCont> nwtBody;
+    PipelineDef<EStgCont> nwtBody           {"nwtBody"};
 };
 
 #define TESTAPP_DATA_NEWTON_FORCES 1, \

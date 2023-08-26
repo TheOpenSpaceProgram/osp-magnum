@@ -64,14 +64,15 @@ Session setup_physics(
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_PHYSICS);
     auto const tgPhy = out.create_pipelines<PlPhysics>(rBuilder);
 
-    rBuilder.pipeline(tgPhy.physics).parent(tgScn.update);
+    rBuilder.pipeline(tgPhy.physBody)  .parent(tgScn.update);
+    rBuilder.pipeline(tgPhy.physUpdate).parent(tgScn.update);
 
     top_emplace< ACtxPhysics >  (topData, idPhys);
 
     rBuilder.task()
         .name       ("Delete Physics components")
         .run_on     ({tgCS.activeEntDelete(UseOrRun)})
-        .sync_with  ({tgPhy.physics(Delete)})
+        .sync_with  ({tgPhy.physBody(Delete)})
         .push_to    (out.m_tasks)
         .args       ({        idPhys,                      idActiveEntDel })
         .func([] (ACtxPhysics& rPhys, ActiveEntVec_t const& rActiveEntDel) noexcept
@@ -145,7 +146,7 @@ Session setup_shape_spawn(
     rBuilder.task()
         .name       ("Add mesh and material to spawned shapes")
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgCS.mesh(New), tgCS.material(New), tgCS.drawEnt(New), tgCS.drawEntResized(ModifyOrSignal)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgCS.mesh(New), tgCS.material(New), tgCS.drawEnt(New), tgCS.drawEntResized(ModifyOrSignal), tgCS.materialDirty(Modify_)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,             idDrawing,                  idSpawner,             idNMesh })
         .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept
@@ -187,7 +188,7 @@ Session setup_shape_spawn(
     rBuilder.task()
         .name       ("Add physics to spawned shapes")
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgPhy.physics(New)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgPhy.physBody(Modify), tgPhy.physUpdate(Done)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,                  idSpawner,             idPhys })
         .func([] (ACtxBasic const& rBasic, ACtxShapeSpawner& rSpawner, ACtxPhysics& rPhys) noexcept

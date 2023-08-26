@@ -311,14 +311,17 @@ static void loop_scope_done(Tasks const& tasks, TaskGraph const& graph, ExecCont
     {
         // Loop finished
 
+        LGRN_ASSERT(rExecPl.loopChildrenLeft == 0);
+
         subtree_for_each(
-                {.root = treePos, .includeRoot = true}, graph, rExec,
-                [&tasks, &graph, &rExec]
-                (PipelineTreePos_t const loopPos, PipelineId const loopPipeline, uint32_t const descendants)
+            {.root = treePos, .includeRoot = true}, graph, rExec,
+            [&tasks, &graph, &rExec]
+            (PipelineTreePos_t const loopPos, PipelineId const loopPipeline, uint32_t const descendants)
         {
             ExecPipeline &rLoopExecPl = rExec.plData[loopPipeline];
 
             LGRN_ASSERT(rLoopExecPl.running == true);
+            LGRN_ASSERT(rLoopExecPl.stage == lgrn::id_null<StageId>());
 
             rLoopExecPl.running  = false;
             rLoopExecPl.canceled = false;
@@ -349,7 +352,7 @@ static void loop_scope_done(Tasks const& tasks, TaskGraph const& graph, ExecCont
         LGRN_ASSERT(rParentScopeExecPl.loopChildrenLeft != 0);
         -- rParentScopeExecPl.loopChildrenLeft;
 
-        if (rExecPl.loopChildrenLeft == 0)
+        if (rParentScopeExecPl.loopChildrenLeft)
         {
             loop_scope_done(tasks, graph, rExec, rParentScopeExecPl, parentScopePl, parentScopeTreePos);
         }
@@ -738,6 +741,13 @@ static void pipeline_cancel(Tasks const& tasks, TaskGraph const& graph, ExecCont
             for (auto stgInt = stagesAhead; stgInt < stageCount; ++stgInt, ++anystgInt)
             {
                 cancel_stage_ahead(AnyStageId(anystgInt));
+            }
+
+            // In this case, "stage == null" means the pipeline is done; advancing it would
+            // accidentally restart the pipeline.
+            if (rCancelExecPl.stage != lgrn::id_null<StageId>())
+            {
+                pipeline_try_advance(rExec, rCancelExecPl, cancelPl);
             }
 
             exec_log(rExec, ExecContext::PipelineCancel{cancelPl, rCancelExecPl.stage});

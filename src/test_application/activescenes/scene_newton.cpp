@@ -56,7 +56,6 @@ using Corrade::Containers::arrayView;
 namespace testapp::scenes
 {
 
-#if 0
 
 Session setup_newton(
         TopTaskBuilder&             rBuilder,
@@ -69,13 +68,15 @@ Session setup_newton(
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
 
-    auto const tgScn    = scene         .get_targets<TgtScene>();
-    auto const tgCS     = commonScene   .get_targets<TgtCommonScene>();
-    auto const tgPhy    = physics       .get_targets<TgtPhysics>();
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_NEWTON);
-    auto const tgNwt = out.create_targets<TgtNewton>(rBuilder);
+    auto const tgNwt = out.create_pipelines<PlNewton>(rBuilder);
+
+    rBuilder.pipeline(tgNwt.nwtBody).parent(tgScn.update);
 
     top_emplace< ACtxNwtWorld >(topData, idNwt, 2);
 
@@ -83,8 +84,8 @@ Session setup_newton(
 
     rBuilder.task()
         .name       ("Delete Newton components")
-        .trigger_on ({tgCS.delActiveEnt_mod})
-        .fulfills   ({tgCS.delActiveEnt_use, tgNwt.nwtBody_del, tgNwt.nwtBody_new})
+        .run_on     ({tgCS.activeEntDelete(UseOrRun)})
+        .sync_with  ({tgNwt.nwtBody(Delete)})
         .push_to    (out.m_tasks)
         .args({                idNwt,                      idActiveEntDel })
         .func([] (ACtxNwtWorld& rNwt, ActiveEntVec_t const& rActiveEntDel) noexcept
@@ -94,9 +95,8 @@ Session setup_newton(
 
     rBuilder.task()
         .name       ("Update Newton world")
-        .trigger_on ({tgScn.time})
-        .depends_on ({tgNwt.nwtBody_mod, tgCS.hier_mod, tgPhy.physics_mod, tgCS.transform_new})
-        .fulfills   ({tgNwt.nwtBody_use, tgCS.hier_use, tgPhy.physics_use, tgCS.transform_mod})
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({/*tgNwt.nwtBody(Modify),*/ tgCS.hierarchy(Modify), tgPhy.physUpdate(Run), tgCS.transform(Modify)})
         .push_to    (out.m_tasks)
         .args({             idBasic,             idPhys,              idNwt,           idDeltaTimeIn })
         .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, float const deltaTimeIn, WorkerContext ctx) noexcept
@@ -185,16 +185,17 @@ Session setup_shape_spawn_newton(
     OSP_DECLARE_GET_DATA_IDS(newton,        TESTAPP_DATA_NEWTON);
     OSP_DECLARE_GET_DATA_IDS(nwtFactors,    TESTAPP_DATA_NEWTON_FORCES);
 
-    auto const tgShSp   = shapeSpawn    .get_targets<TgtShapeSpawn>();
-    auto const tgNwt    = newton         .get_targets<TgtNewton>();
+    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
+
+    auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+    auto const tgNwt    = newton        .get_pipelines<PlNewton>();
 
     Session out;
 
     rBuilder.task()
         .name       ("Add Newton physics to spawned shapes")
-        .trigger_on ({tgShSp.spawnRequest_mod})
-        .depends_on ({tgShSp.spawnedEnts_mod})
-        .fulfills   ({tgShSp.spawnedEnts_use, tgNwt.nwtBody_new, tgNwt.nwtBody_mod})
+        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgNwt.nwtBody(New), tgPhy.physUpdate(Done)})
         .push_to    (out.m_tasks)
         .args({                   idBasic,                  idSpawner,             idPhys,              idNwt,              idNwtFactors })
         .func([] (ACtxBasic const &rBasic, ACtxShapeSpawner& rSpawner, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ForceFactors_t nwtFactors) noexcept
@@ -231,6 +232,9 @@ Session setup_shape_spawn_newton(
 
     return out;
 }
+
+#if 0
+
 
 void compound_collect_recurse(
         ACtxPhysics const&  rCtxPhys,

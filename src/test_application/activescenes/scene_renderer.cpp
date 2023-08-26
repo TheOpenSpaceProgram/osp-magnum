@@ -75,8 +75,7 @@ Session setup_window_app(
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_WINDOW_APP);
     auto const tgWin = out.create_pipelines<PlWindowApp>(rBuilder);
 
-    rBuilder.pipeline(tgWin.inputs).parent(tgApp.mainLoop);//.wait_for_signal(Signal);
-
+    rBuilder.pipeline(tgWin.inputs).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
 
     auto &rUserInput = osp::top_emplace<UserInputHandler>(topData, idUserInput, 12);
     config_controls(rUserInput);
@@ -190,7 +189,7 @@ Session setup_scene_renderer(
     rBuilder.task()
         .name       ("Compile Resource Meshes to GL")
         .run_on     ({tgCS.meshResDirty(UseOrRun)})
-        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(New)})
+        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(New), tgCS.entMeshDirty(Modify_)})
         .push_to    (out.m_tasks)
         .args       ({                 idDrawingRes,                idResources,          idRenderGl })
         .func([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
@@ -231,16 +230,16 @@ Session setup_scene_renderer(
         SysRenderGL::assign_textures(rDrawing.m_diffuseTex, rDrawingRes.m_texToRes, rDrawing.m_diffuseDirty, rScnRender.m_diffuseTexId, rRenderGl);
     });
 
-    rBuilder.task()
-        .name       ("Schedule Assign GL meshes")
-        .schedules  ({tgCS.entMeshDirty(Schedule_)})
-        .sync_with  ({tgCS.mesh(Ready)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
-        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept -> TaskActions
-    {
-        return rDrawing.m_meshDirty.empty() ? TaskAction::Cancel : TaskActions{};
-    });
+//    rBuilder.task()
+//        .name       ("Schedule Assign GL meshes")
+//        .schedules  ({tgCS.entMeshDirty(Schedule_)})
+//        .sync_with  ({tgCS.mesh(Ready)})
+//        .push_to    (out.m_tasks)
+//        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
+//        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept -> TaskActions
+//    {
+//        return rDrawing.m_meshDirty.empty() ? TaskAction::Cancel : TaskActions{};
+//    });
 
     rBuilder.task()
         .name       ("Assign GL meshes to entities with scene meshes")
@@ -278,7 +277,7 @@ Session setup_scene_renderer(
     rBuilder.task()
         .name       ("Calculate draw transforms")
         .run_on     ({tgSR.render(Run)})
-        .sync_with  ({tgCS.hierarchy(Ready), tgCS.activeEnt(Ready), tgSR.drawTransforms(Modify_), tgCS.drawEnt(Ready)})
+        .sync_with  ({tgCS.hierarchy(Ready), tgCS.transform(Ready), tgCS.activeEnt(Ready), tgSR.drawTransforms(Modify_), tgCS.drawEnt(Ready), tgCS.drawEntResized(Done)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,                   idDrawing,                   idScnRender })
         .func([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
@@ -367,7 +366,7 @@ Session setup_shader_visualizer(
     rBuilder.task()
         .name       ("Sync MeshVisualizer shader entities")
         .run_on     ({tgCS.materialDirty(UseOrRun)})
-        .sync_with  ({tgSR.groupEnts(Ready), tgSR.group(Modify)})
+        .sync_with  ({tgSR.groupEnts(Modify), tgSR.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,             idGroupFwd,                        idDrawShVisual})
         .func([] (ACtxDrawing const& rDrawing, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
