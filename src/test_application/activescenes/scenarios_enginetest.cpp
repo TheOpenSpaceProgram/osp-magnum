@@ -175,7 +175,8 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 void update_test_scene(EngineTestScene& rScene, float const delta)
 {
     // Clear drawing-related dirty flags/vectors
-    osp::active::SysRender::clear_dirty_all(rScene.m_drawing);
+    rScene.m_drawing.m_meshDirty.clear();
+    rScene.m_drawing.m_diffuseDirty.clear();
     rScene.m_matPhongDirty.clear();
 
     // Rotate the cube
@@ -248,14 +249,22 @@ void sync_test_scene(
     SysRenderGL::compile_resource_textures(rScene.m_drawingRes, *rScene.m_pResources, rRenderGl);
 
     // Assign GL meshes to entities with a mesh component
-    SysRenderGL::assign_meshes(
-            rScene.m_drawing.m_mesh, rScene.m_drawingRes.m_meshToRes, rScene.m_drawing.m_meshDirty,
-            rRenderer.m_sceneRenderGL.m_meshId, rRenderGl);
+    SysRenderGL::sync_drawent_mesh(
+            rScene.m_drawing.m_meshDirty.begin(),
+            rScene.m_drawing.m_meshDirty.end(),
+            rScene.m_drawing.m_mesh,
+            rScene.m_drawingRes.m_meshToRes,
+            rRenderer.m_sceneRenderGL.m_meshId,
+            rRenderGl);
 
     // Assign GL textures to entities with a texture component
-    SysRenderGL::assign_textures(
-            rScene.m_drawing.m_diffuseTex, rScene.m_drawingRes.m_texToRes, rScene.m_drawing.m_diffuseDirty,
-            rRenderer.m_sceneRenderGL.m_diffuseTexId, rRenderGl);
+    SysRenderGL::sync_drawent_texture(
+            rScene.m_drawing.m_meshDirty.begin(),
+            rScene.m_drawing.m_meshDirty.end(),
+            rScene.m_drawing.m_diffuseTex,
+            rScene.m_drawingRes.m_texToRes,
+            rRenderer.m_sceneRenderGL.m_diffuseTexId,
+            rRenderGl);
 
     // Calculate hierarchy transforms
 

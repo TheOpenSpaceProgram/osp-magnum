@@ -190,13 +190,6 @@ public:
      */
     static void set_dirty_all(ACtxDrawing& rCtxDrawing);
 
-    /**
-     * @brief Clear all dirty flags/vectors
-     *
-     * @param rCtxDrawing [ref] Drawing data
-     */
-    static void clear_dirty_all(ACtxDrawing& rCtxDrawing);
-
     template<typename IT_T>
     static void update_delete_drawing(
             ACtxDrawing& rCtxDraw, IT_T const& first, IT_T const& last);

@@ -304,7 +304,8 @@ struct PlMagnum
 {
     PipelineDef<EStgEvnt> cleanup           {"cleanup Cleanup Magnum"};
 
-    PipelineDef<EStgOptn> sync              {"render"};
+    PipelineDef<EStgOptn> sync              {"sync"};
+    PipelineDef<EStgOptn> resync            {"resync"};
 
     PipelineDef<EStgCont> meshGL            {"meshGL"};
     PipelineDef<EStgCont> textureGL         {"textureGL"};

@@ -241,41 +241,41 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write)
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineRun>)
         {
-            rStream << "    PipelineRun PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
+            rStream << "    PipelineRun PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline) << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineFinish>)
         {
-            rStream << "    PipelineFinish PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
+            rStream << "    PipelineFinish PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline) << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineCancel>)
         {
-            rStream << "    PipelineCancel PL" << std::setw(3) << PipelineInt(msg.pipeline) << "("
+            rStream << "    PipelineCancel PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline) << "("
                     << stage_name(msg.pipeline, msg.stage) << ")\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineLoop>)
         {
-            rStream << "    PipelineLoop PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
+            rStream << "    PipelineLoop PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline) << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::PipelineLoopFinish>)
         {
-            rStream << "    PipelineLoopFinish PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
+            rStream << "    PipelineLoopFinish PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline) << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::StageChange>)
         {
-            rStream << "    StageChange PL" << std::setw(3) << PipelineInt(msg.pipeline)
+            rStream << "    StageChange PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline)
                     << "(" << stage_name(msg.pipeline, msg.stageOld) << " -> " << stage_name(msg.pipeline, msg.stageNew) << ")\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueTask>)
         {
             rStream << "    Enqueue " << (msg.blocked ? "Blocked" : "Run")
-                    << " on PL" << std::setw(3) << PipelineInt(msg.pipeline)
+                    << " on PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline)
                     << "(" << stage_name(msg.pipeline, msg.stage) << ")"
                     << " TASK" << TaskInt(msg.task) << " - " << taskData[msg.task].m_debugName << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueTaskReq>)
         {
             rStream << "    * " << (msg.satisfied ? "[DONE]" : "[wait]") << "Require PL"
-                    << std::setw(3) << PipelineInt(msg.pipeline)
+                    << std::setw(3) << std::left << PipelineInt(msg.pipeline)
                     << "(" << stage_name(msg.pipeline, msg.stage) << ")\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::UnblockTask>)
@@ -288,11 +288,11 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write)
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::ExternalRunRequest>)
         {
-            rStream << "ExternalRunRequest PL" << std::setw(3) << PipelineInt(msg.pipeline) << "\n";
+            rStream << "ExternalRunRequest PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline) << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::ExternalRunRequest>)
         {
-            rStream << "ExternalSignal PL" << std::setw(3) << PipelineInt(msg.pipeline) << (msg.ignored ? " IGNORED!" : " ") << "\n";
+            rStream << "ExternalSignal PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline) << (msg.ignored ? " IGNORED!" : " ") << "\n";
         }
     };
 

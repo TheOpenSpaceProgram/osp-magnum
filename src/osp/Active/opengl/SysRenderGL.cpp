@@ -209,108 +209,102 @@ void SysRenderGL::compile_resource_meshes(
     }
 }
 
-void SysRenderGL::assign_meshes(
+void SysRenderGL::sync_drawent_mesh(
+        DrawEnt const                               ent,
         KeyedVec<DrawEnt, MeshIdOwner_t> const&     cmpMeshIds,
         IdMap_t<MeshId, ResIdOwner_t> const&        meshToRes,
-        std::vector<DrawEnt> const&                 entsDirty,
         MeshGlEntStorage_t&                         rCmpMeshGl,
         RenderGL&                                   rRenderGl)
 {
-    for (DrawEnt const ent : entsDirty)
+    ACompMeshGl &rEntMeshGl = rCmpMeshGl[ent];
+    MeshIdOwner_t const& entMeshScnId = cmpMeshIds[ent];
+
+    // Make sure dirty entity has a MeshId component
+    if (entMeshScnId.has_value())
     {
-        ACompMeshGl &rEntMeshGl = rCmpMeshGl[ent];
-        MeshIdOwner_t const& entMeshScnId = cmpMeshIds[ent];
-
-        // Make sure dirty entity has a MeshId component
-        if (entMeshScnId.has_value())
+        // Check if scene mesh ID is properly synchronized
+        if (rEntMeshGl.m_scnId == entMeshScnId)
         {
-            // Check if scene mesh ID is properly synchronized
-            if (rEntMeshGl.m_scnId == entMeshScnId)
-            {
-                continue; // No changes needed
-            }
+            return; // No changes needed
+        }
 
-            rEntMeshGl.m_scnId = entMeshScnId;
+        rEntMeshGl.m_scnId = entMeshScnId;
 
-            // Check if MeshId is associated with a resource
-            if (auto const& foundIt = meshToRes.find(entMeshScnId);
-                foundIt != meshToRes.end())
-            {
-                ResId const meshResId = foundIt->second;
+        // Check if MeshId is associated with a resource
+        if (auto const& foundIt = meshToRes.find(entMeshScnId);
+            foundIt != meshToRes.end())
+        {
+            ResId const meshResId = foundIt->second;
 
-                // Mesh should have been loaded beforehand, assign it!
-                rEntMeshGl.m_glId = rRenderGl.m_resToMesh.at(meshResId);
-            }
-            else
-            {
-                OSP_LOG_WARN("No mesh data found for Mesh {} from Entity {}",
-                             std::size_t(entMeshScnId), std::size_t(ent));
-            }
+            // Mesh should have been loaded beforehand, assign it!
+            rEntMeshGl.m_glId = rRenderGl.m_resToMesh.at(meshResId);
         }
         else
         {
-            if (rEntMeshGl.m_glId != lgrn::id_null<MeshGlId>())
-            {
-                // ACompMesh removed, remove ACompMeshGL too
-                rEntMeshGl = {};
-            }
-            else
-            {
-                // Why is this entity here?
-            }
+            OSP_LOG_WARN("No mesh data found for Mesh {} from Entity {}",
+                         std::size_t(entMeshScnId), std::size_t(ent));
+        }
+    }
+    else
+    {
+        if (rEntMeshGl.m_glId != lgrn::id_null<MeshGlId>())
+        {
+            // ACompMesh removed, remove ACompMeshGL too
+            rEntMeshGl = {};
+        }
+        else
+        {
+            // Why is this entity here?
         }
     }
 }
 
-void SysRenderGL::assign_textures(
+void SysRenderGL::sync_drawent_texture(
+        DrawEnt const                               ent,
         KeyedVec<DrawEnt, TexIdOwner_t> const&      cmpTexIds,
         IdMap_t<TexId, ResIdOwner_t> const&         texToRes,
-        std::vector<DrawEnt> const&                 entsDirty,
         TexGlEntStorage_t&                          rCmpTexGl,
         RenderGL&                                   rRenderGl)
 {
-    for (DrawEnt const ent : entsDirty)
+    ACompTexGl &rEntTexGl = rCmpTexGl[ent];
+    TexIdOwner_t const& entTexScnId = cmpTexIds[ent];
+
+    // Make sure dirty entity has a MeshId component
+    if (entTexScnId.has_value())
     {
-        ACompTexGl &rEntTexGl = rCmpTexGl[ent];
-        TexIdOwner_t const& entTexScnId = cmpTexIds[ent];
-
-        // Make sure dirty entity has a MeshId component
-        if (entTexScnId.has_value())
+        // Check if scene mesh ID is properly synchronized
+        if (rEntTexGl.m_scnId == entTexScnId)
         {
-            // Check if scene mesh ID is properly synchronized
-            if (rEntTexGl.m_scnId == entTexScnId)
-            {
-                continue; // No changes needed
-            }
+            return; // No changes needed
+        }
 
-            rEntTexGl.m_scnId = entTexScnId;
+        rEntTexGl.m_scnId = entTexScnId;
 
-            // Check if MeshId is associated with a resource
-            if (auto const& foundIt = texToRes.find(entTexScnId);
-                foundIt != texToRes.end())
-            {
-                ResId const texResId = foundIt->second;
+        // Check if MeshId is associated with a resource
+        if (auto const& foundIt = texToRes.find(entTexScnId);
+            foundIt != texToRes.end())
+        {
+            ResId const texResId = foundIt->second;
 
-                // Mesh should have been loaded beforehand, assign it!
-                rEntTexGl.m_glId = rRenderGl.m_resToTex.at(texResId);
-            }
-            else
-            {
-                OSP_LOG_WARN("No mesh data found for Mesh {} from Entity {}",
-                             std::size_t(entMeshScnId), std::size_t(ent));
-            }
+            // Mesh should have been loaded beforehand, assign it!
+            rEntTexGl.m_glId = rRenderGl.m_resToTex.at(texResId);
         }
         else
         {
-            if (rEntTexGl.m_glId != lgrn::id_null<TexGlId>())
-            {
-                // ACompMesh removed, remove ACompMeshGL too
-                rEntTexGl = {};
-            }
-            else
-            {
-                // Why is this entity here?
-            }
+            OSP_LOG_WARN("No mesh data found for Mesh {} from Entity {}",
+                         std::size_t(entMeshScnId), std::size_t(ent));
+        }
+    }
+    else
+    {
+        if (rEntTexGl.m_glId != lgrn::id_null<TexGlId>())
+        {
+            // ACompMesh removed, remove ACompMeshGL too
+            rEntTexGl = {};
+        }
+        else
+        {
+            // Why is this entity here?
         }
     }
 }

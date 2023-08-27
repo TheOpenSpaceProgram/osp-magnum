@@ -55,43 +55,28 @@ struct ACtxDrawMeshVisualizer
 };
 
 void draw_ent_visualizer(
-        active::DrawEnt ent,
-        active::ViewProjMatrix const& viewProj,
-        active::EntityToDraw::UserData_t userData) noexcept;
+        active::DrawEnt                     ent,
+        active::ViewProjMatrix const&       viewProj,
+        active::EntityToDraw::UserData_t    userData) noexcept;
 
-template<typename ITA_T, typename ITB_T>
-void sync_visualizer(
-        ITA_T dirtyFirst,
-        ITB_T const& dirtyLast,
-        active::DrawEntSet_t const& hasMaterial,
-        active::RenderGroup::Storage_t& rStorage,
-        ACtxDrawMeshVisualizer &rData)
+void sync_drawent_visualizer(
+        active::DrawEnt const               ent,
+        active::DrawEntSet_t const&         hasMaterial,
+        active::RenderGroup::Storage_t&     rStorage,
+        ACtxDrawMeshVisualizer&             rData);
+
+template <typename ITA_T, typename ITB_T>
+static void sync_drawent_visualizer(
+        ITA_T const&                        first,
+        ITB_T const&                        last,
+        active::DrawEntSet_t const&         hasMaterial,
+        active::RenderGroup::Storage_t&     rStorage,
+        ACtxDrawMeshVisualizer&             rData)
 {
-    using namespace active;
-
-    while (dirtyFirst != dirtyLast)
+    std::for_each(first, last, [&] (active::DrawEnt const ent)
     {
-        DrawEnt const ent = *dirtyFirst;
-        bool alreadyAdded = rStorage.contains(ent);
-        if (hasMaterial.test(std::size_t(ent)))
-        {
-            if ( ! alreadyAdded)
-            {
-                rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
-            }
-        }
-        else
-        {
-            if (alreadyAdded)
-            {
-                rStorage.erase(ent);
-            }
-        }
-
-        std::advance(dirtyFirst, 1);
-    }
-
-
+        sync_drawent_visualizer(ent, hasMaterial, rStorage, rData);
+    });
 }
 
 } // namespace osp::shader

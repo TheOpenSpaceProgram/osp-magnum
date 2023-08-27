@@ -78,3 +78,30 @@ void shader::draw_ent_visualizer(
     }
 }
 
+void shader::sync_drawent_visualizer(
+        active::DrawEnt const ent,
+        active::DrawEntSet_t const& hasMaterial,
+        active::RenderGroup::Storage_t& rStorage,
+        ACtxDrawMeshVisualizer &rData)
+{
+    using namespace active;
+
+    bool alreadyAdded = rStorage.contains(ent);
+    if (hasMaterial.test(std::size_t(ent)))
+    {
+        if ( ! alreadyAdded)
+        {
+            rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
+        }
+    }
+    else
+    {
+        if (alreadyAdded)
+        {
+            rStorage.erase(ent);
+        }
+    }
+}
+
+
+

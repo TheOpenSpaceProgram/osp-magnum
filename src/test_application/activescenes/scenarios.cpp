@@ -89,9 +89,11 @@ struct CommonMagnumApp : IOspApplication
         m_rMainLoopCtrl = MainLoopControl{
             .doUpdate = true,
             .doSync   = true,
-            .doResync = false,
+            .doResync = m_justStarting,
             .doRender = true,
         };
+
+        m_justStarting = false;
 
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_mainLoop);
         m_rTestApp.m_pExecutor->signal(m_rTestApp, m_inputs);
@@ -130,11 +132,13 @@ struct CommonMagnumApp : IOspApplication
     TestApp         &m_rTestApp;
     MainLoopControl &m_rMainLoopCtrl;
 
-    PipelineId m_mainLoop;
-    PipelineId m_inputs;
-    PipelineId m_renderSync;
-    PipelineId m_sceneUpdate;
-    PipelineId m_sceneRender;
+    PipelineId      m_mainLoop;
+    PipelineId      m_inputs;
+    PipelineId      m_renderSync;
+    PipelineId      m_sceneUpdate;
+    PipelineId      m_sceneRender;
+
+    bool            m_justStarting{true};
 };
 
 static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& scnRenderer, std::vector<PipelineId> run = {})

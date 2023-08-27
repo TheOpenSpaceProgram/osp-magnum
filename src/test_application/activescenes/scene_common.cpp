@@ -58,15 +58,15 @@ Session setup_scene(
 
     rBuilder.pipeline(plScn.update).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
 
-//    rBuilder.task()
-//        .name       ("Schedule Scene update")
-//        .schedules  ({plScn.update(Schedule)})
-//        .push_to    (out.m_tasks)
-//        .args       ({                  idMainLoopCtrl})
-//        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
-//    {
-//        return rMainLoopCtrl.doUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
-//    });
+    rBuilder.task()
+        .name       ("Schedule Scene update")
+        .schedules  ({plScn.update(Schedule)})
+        .push_to    (out.m_tasks)
+        .args       ({                  idMainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rMainLoopCtrl.doUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
 
     return out;
 }
@@ -243,6 +243,28 @@ Session setup_common_scene(
             rDrawing.m_materials[MaterialId(materialInt)].m_dirty.clear();
         }
     });
+
+    rBuilder.task()
+        .name       ("Clear dirty DrawEnt's textures once we're done with it")
+        .run_on     ({tgCS.entMeshDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing})
+        .func([] (ACtxDrawing& rDrawing) noexcept
+    {
+        rDrawing.m_meshDirty.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Clear dirty DrawEnt's textures once we're done with it")
+        .run_on     ({tgCS.entTextureDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing})
+        .func([] (ACtxDrawing& rDrawing) noexcept
+    {
+        rDrawing.m_diffuseDirty.clear();
+    });
+
+    // Clean up tasks
 
     rBuilder.task()
         .name       ("Clean up scene and resource owners")

@@ -101,7 +101,8 @@ Session setup_magnum(
     auto const tgMgn = out.create_pipelines<PlMagnum>(rBuilder);
     out.m_cleanup = tgMgn.cleanup;
 
-    rBuilder.pipeline(tgMgn.sync).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+    rBuilder.pipeline(tgMgn.sync)  .parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+    rBuilder.pipeline(tgMgn.resync).parent(tgApp.mainLoop);
 
     rBuilder.pipeline(tgMgn.meshGL)         .parent(tgMgn.sync);
     rBuilder.pipeline(tgMgn.textureGL)      .parent(tgMgn.sync);
@@ -124,6 +125,27 @@ Session setup_magnum(
         SysRenderGL::clear_resource_owners(rRenderGl, rResources);
         rRenderGl = {}; // Needs the OpenGL thread for destruction
     });
+
+    rBuilder.task()
+        .name       ("Schedule GL Sync")
+        .schedules  ({tgMgn.sync(Schedule)})
+        .push_to    (out.m_tasks)
+        .args       ({                  idMainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rMainLoopCtrl.doSync ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
+
+    rBuilder.task()
+        .name       ("Schedule GL Resync")
+        .schedules  ({tgMgn.resync(Schedule)})
+        .push_to    (out.m_tasks)
+        .args       ({                  idMainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rMainLoopCtrl.doResync ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
+
 
     return out;
 }
@@ -189,7 +211,7 @@ Session setup_scene_renderer(
     rBuilder.task()
         .name       ("Compile Resource Meshes to GL")
         .run_on     ({tgCS.meshResDirty(UseOrRun)})
-        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(New), tgCS.entMeshDirty(Modify_)})
+        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(New), tgCS.entMeshDirty(UseOrRun)})
         .push_to    (out.m_tasks)
         .args       ({                 idDrawingRes,                idResources,          idRenderGl })
         .func([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
@@ -220,36 +242,86 @@ Session setup_scene_renderer(
     });
 
     rBuilder.task()
-        .name       ("Assign GL textures to entities with scene textures")
+        .name       ("Sync GL textures to entities with scene textures")
         .run_on     ({tgCS.entTextureDirty(UseOrRun)})
         .sync_with  ({tgCS.texture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgCS.drawEntResized(Done)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
     {
-        SysRenderGL::assign_textures(rDrawing.m_diffuseTex, rDrawingRes.m_texToRes, rDrawing.m_diffuseDirty, rScnRender.m_diffuseTexId, rRenderGl);
+        SysRenderGL::sync_drawent_texture(
+                rDrawing.m_diffuseDirty.begin(),
+                rDrawing.m_diffuseDirty.end(),
+                rDrawing.m_diffuseTex,
+                rDrawingRes.m_texToRes,
+                rScnRender.m_diffuseTexId,
+                rRenderGl);
     });
 
-//    rBuilder.task()
-//        .name       ("Schedule Assign GL meshes")
-//        .schedules  ({tgCS.entMeshDirty(Schedule_)})
-//        .sync_with  ({tgCS.mesh(Ready)})
-//        .push_to    (out.m_tasks)
-//        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
-//        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept -> TaskActions
-//    {
-//        return rDrawing.m_meshDirty.empty() ? TaskAction::Cancel : TaskActions{};
-//    });
+    rBuilder.task()
+        .name       ("Resync GL textures")
+        .run_on     ({tgMgn.resync(Run)})
+        .sync_with  ({tgCS.texture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgCS.drawEntResized(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
+        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+    {
+        for (auto const drawEntInt : rDrawing.m_drawIds.bitview().zeros())
+        {
+            SysRenderGL::sync_drawent_texture(
+                DrawEnt(drawEntInt),
+                rDrawing.m_diffuseTex,
+                rDrawingRes.m_texToRes,
+                rScnRender.m_diffuseTexId,
+                rRenderGl);
+        }
+    });
 
     rBuilder.task()
-        .name       ("Assign GL meshes to entities with scene meshes")
+        .name       ("Schedule Assign GL meshes")
+        .schedules  ({tgCS.entMeshDirty(Schedule_)})
+        .sync_with  ({tgCS.mesh(Ready)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
+        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept -> TaskActions
+    {
+        return rDrawing.m_meshDirty.empty() ? TaskAction::Cancel : TaskActions{};
+    });
+
+    rBuilder.task()
+        .name       ("Sync GL meshes to entities with scene meshes")
         .run_on     ({tgCS.entMeshDirty(UseOrRun)})
         .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgCS.drawEntResized(Done)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
     {
-        SysRenderGL::assign_meshes(rDrawing.m_mesh, rDrawingRes.m_meshToRes, rDrawing.m_meshDirty, rScnRender.m_meshId, rRenderGl);
+        SysRenderGL::sync_drawent_mesh(
+                rDrawing.m_meshDirty.begin(),
+                rDrawing.m_meshDirty.end(),
+                rDrawing.m_mesh,
+                rDrawingRes.m_meshToRes,
+                rScnRender.m_meshId,
+                rRenderGl);
+    });
+
+    rBuilder.task()
+        .name       ("Resync GL meshes")
+        .run_on     ({tgMgn.resync(Run)})
+        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgCS.drawEntResized(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
+        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+    {
+        for (auto const drawEntInt : rDrawing.m_drawIds.bitview().zeros())
+        {
+            SysRenderGL::sync_drawent_mesh(
+                DrawEnt(drawEntInt),
+                rDrawing.m_mesh,
+                rDrawingRes.m_meshToRes,
+                rScnRender.m_meshId,
+                rRenderGl);
+        }
     });
 
     rBuilder.task()
@@ -365,14 +437,29 @@ Session setup_shader_visualizer(
 
     rBuilder.task()
         .name       ("Sync MeshVisualizer shader entities")
-        .run_on     ({tgCS.materialDirty(UseOrRun)})
+        .run_on     ({tgMgn.sync(Run)})
+        .sync_with  ({tgSR.groupEnts(Modify), tgSR.group(Modify), tgCS.materialDirty(UseOrRun)})
+        .push_to    (out.m_tasks)
+        .args       ({              idDrawing,             idGroupFwd,                        idDrawShVisual})
+        .func([] (ACtxDrawing const& rDrawing, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
+    {
+        Material const &rMat = rDrawing.m_materials[rDrawShVisual.m_materialId];
+        sync_drawent_visualizer(rMat.m_dirty.begin(), rMat.m_dirty.end(), rMat.m_ents, rGroupFwd.m_entities, rDrawShVisual);
+    });
+
+    rBuilder.task()
+        .name       ("Resync MeshVisualizer")
+        .run_on     ({tgMgn.resync(Run)})
         .sync_with  ({tgSR.groupEnts(Modify), tgSR.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,             idGroupFwd,                        idDrawShVisual})
         .func([] (ACtxDrawing const& rDrawing, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
     {
         Material const &rMat = rDrawing.m_materials[rDrawShVisual.m_materialId];
-        sync_visualizer(rMat.m_dirty.begin(), rMat.m_dirty.end(), rMat.m_ents, rGroupFwd.m_entities, rDrawShVisual);
+        for (auto const drawEntInt : rMat.m_ents.ones())
+        {
+            sync_drawent_visualizer(DrawEnt(drawEntInt), rMat.m_ents, rGroupFwd.m_entities, rDrawShVisual);
+        }
     });
 
     return out;

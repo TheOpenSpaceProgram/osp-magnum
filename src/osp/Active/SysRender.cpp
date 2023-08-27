@@ -119,12 +119,6 @@ void SysRender::set_dirty_all(ACtxDrawing &rCtxDrawing)
     }
 }
 
-void SysRender::clear_dirty_all(ACtxDrawing& rCtxDrawing)
-{
-    rCtxDrawing.m_meshDirty.clear();
-    rCtxDrawing.m_diffuseDirty.clear();
-}
-
 
 void SysRender::update_draw_transforms_recurse(
         ACtxSceneGraph const&                   rScnGraph,

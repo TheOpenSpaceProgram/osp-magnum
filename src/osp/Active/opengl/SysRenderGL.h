@@ -160,20 +160,35 @@ public:
             RenderGL& rRenderGl);
 
     /**
-     * @brief Synchronize entities with a MeshId component to an ACompMeshGl
+     * @brief Synchronize an entity's MeshId component to an ACompMeshGl
      *
+     * @param ent           [in] DrawEnt with mesh to synchronize
      * @param cmpMeshIds    [in] Scene Mesh Id component
      * @param meshToRes     [in] Scene's Mesh Id to Resource Id
-     * @param entsDirty     [in] Entities to synchronize
      * @param rCmpMeshGl    [ref] Renderer-side ACompMeshGl components
      * @param rRenderGl     [ref] Renderer state
      */
-    static void assign_meshes(
+    static void sync_drawent_mesh(
+            DrawEnt                                     ent,
             KeyedVec<DrawEnt, MeshIdOwner_t> const&     cmpMeshIds,
             IdMap_t<MeshId, ResIdOwner_t> const&        meshToRes,
-            std::vector<DrawEnt> const&                 entsDirty,
             MeshGlEntStorage_t&                         rCmpMeshGl,
             RenderGL&                                   rRenderGl);
+
+    template <typename ITA_T, typename ITB_T>
+    static void sync_drawent_mesh(
+            ITA_T const&                                first,
+            ITB_T const&                                last,
+            KeyedVec<DrawEnt, MeshIdOwner_t> const&     cmpMeshIds,
+            IdMap_t<MeshId, ResIdOwner_t> const&        meshToRes,
+            MeshGlEntStorage_t&                         rCmpMeshGl,
+            RenderGL&                                   rRenderGl)
+    {
+        std::for_each(first, last, [&] (DrawEnt const ent)
+        {
+            sync_drawent_mesh(ent, cmpMeshIds, meshToRes, rCmpMeshGl, rRenderGl);
+        });
+    }
 
     /**
      * @brief Synchronize entities with a TexId component to an ACompTexGl
@@ -184,12 +199,27 @@ public:
      * @param rCmpTexGl     [ref] Renderer-side ACompTexGl components
      * @param rRenderGl     [ref] Renderer state
      */
-    static void assign_textures(
+    static void sync_drawent_texture(
+            DrawEnt                                     ent,
             KeyedVec<DrawEnt, TexIdOwner_t> const&      cmpTexIds,
             IdMap_t<TexId, ResIdOwner_t> const&         texToRes,
-            std::vector<DrawEnt> const&                 entsDirty,
             TexGlEntStorage_t&                          rCmpTexGl,
             RenderGL&                                   rRenderGl);
+
+    template <typename ITA_T, typename ITB_T>
+    static void sync_drawent_texture(
+            ITA_T const&                                first,
+            ITB_T const&                                last,
+            KeyedVec<DrawEnt, TexIdOwner_t> const&      cmpTexIds,
+            IdMap_t<TexId, ResIdOwner_t> const&         texToRes,
+            TexGlEntStorage_t&                          rCmpTexGl,
+            RenderGL&                                   rRenderGl)
+    {
+        std::for_each(first, last, [&] (DrawEnt const ent)
+        {
+            sync_drawent_texture(ent, cmpTexIds, texToRes, rCmpTexGl, rRenderGl);
+        });
+    }
 
     /**
      * @brief Call draw functions of a RenderGroup of opaque objects

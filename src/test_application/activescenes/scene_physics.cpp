@@ -146,7 +146,9 @@ Session setup_shape_spawn(
     rBuilder.task()
         .name       ("Add mesh and material to spawned shapes")
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgCS.mesh(New), tgCS.material(New), tgCS.drawEnt(New), tgCS.drawEntResized(ModifyOrSignal), tgCS.materialDirty(Modify_)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun),
+                      tgCS.mesh(New), tgCS.material(New), tgCS.drawEnt(New), tgCS.drawEntResized(ModifyOrSignal),
+                      tgCS.materialDirty(Modify_), tgCS.entMeshDirty(Modify_)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,             idDrawing,                  idSpawner,             idNMesh })
         .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept

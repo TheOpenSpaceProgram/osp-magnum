@@ -255,6 +255,8 @@ static int pipeline_run(Tasks const& tasks, TaskGraph const& graph, ExecContext 
 
         if (rerunLoop)
         {
+            rExecPl.canceled = false;
+
             rExec.plAdvanceNext.set(std::size_t(pipeline));
             exec_log(rExec, ExecContext::PipelineLoop{pipeline});
         }
