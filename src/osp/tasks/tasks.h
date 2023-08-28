@@ -83,6 +83,13 @@ struct PipelineInfo
 
     static inline KeyedVec<stage_type_t, ArrayView<std::string_view const>> sm_stageNames;
 
+    template <typename STAGE_ENUM_T>
+    static inline constexpr void register_stage_enum()
+    {
+        PipelineInfo::stage_type_t const type = PipelineInfo::stage_type_family_t::value<STAGE_ENUM_T>;
+        PipelineInfo::sm_stageNames[type] = stage_names(STAGE_ENUM_T{});
+    }
+
     std::string_view    name;
     std::string_view    category;
     stage_type_t        stageType;

@@ -244,7 +244,7 @@ Session setup_thrower(
             Matrix4 const &camTf = rCamCtrl.m_transform;
             float const speed = 120;
             float const dist = 8.0f;
-            rSpawner.m_spawnRequest.emplace_back(SpawnShape{
+            rSpawner.m_spawnRequest.push_back({
                 .m_position = camTf.translation() - camTf.backward() * dist,
                 .m_velocity = -camTf.backward() * speed,
                 .m_size     = Vector3{1.0f},
@@ -257,36 +257,41 @@ Session setup_thrower(
     return out;
 }
 
-/*
-
 Session setup_droppers(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              scene,
         Session const&              commonScene,
         Session const&              shapeSpawn)
 {
-    OSP_SESSION_UNPACK_DATA(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
 
-    Session droppers;
-    auto const [idSpawnTimerA, idSpawnTimerB] = droppers.acquire_data<2>(topData);
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+
+    Session out;
+    auto const [idSpawnTimerA, idSpawnTimerB] = out.acquire_data<2>(topData);
 
     top_emplace< float > (topData, idSpawnTimerA, 0.0f);
     top_emplace< float > (topData, idSpawnTimerB, 0.0f);
 
-    droppers.task() = rBuilder.task().assign({tgTimeEvt, tgSpawnMod}).data(
-            "Spawn blocks every 2 seconds",
-            TopDataIds_t{              idSpawner,       idSpawnTimerA,          idDeltaTimeIn },
-            wrap_args([] (SpawnerVec_t& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
+    rBuilder.task()
+        .name       ("Spawn blocks every 2 seconds")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgShSp.spawnRequest(Modify_)})
+        .push_to    (out.m_tasks)
+        .args({                    idSpawner,       idSpawnTimerA,          idDeltaTimeIn })
+        .func([] (ACtxShapeSpawner& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
+
     {
         rSpawnTimer += deltaTimeIn;
         if (rSpawnTimer >= 2.0f)
         {
             rSpawnTimer -= 2.0f;
 
-            rSpawner.emplace_back(SpawnShape{
+            rSpawner.m_spawnRequest.push_back({
                 .m_position = {10.0f, 0.0f, 30.0f},
                 .m_velocity = {0.0f, 0.0f, 0.0f},
                 .m_size     = {2.0f, 2.0f, 1.0f},
@@ -294,19 +299,22 @@ Session setup_droppers(
                 .m_shape    = EShape::Box
             });
         }
-    }));
+    });
 
-    droppers.task() = rBuilder.task().assign({tgTimeEvt, tgSpawnMod}).data(
-            "Spawn cylinders every 1 seconds",
-            TopDataIds_t{              idSpawner,       idSpawnTimerB,          idDeltaTimeIn },
-            wrap_args([] (SpawnerVec_t& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
+    rBuilder.task()
+        .name       ("Spawn cylinders every 1 second")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgShSp.spawnRequest(Modify_)})
+        .push_to    (out.m_tasks)
+        .args({                    idSpawner,       idSpawnTimerB,          idDeltaTimeIn })
+        .func([] (ACtxShapeSpawner& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
     {
         rSpawnTimer += deltaTimeIn;
         if (rSpawnTimer >= 1.0f)
         {
             rSpawnTimer -= 1.0f;
 
-            rSpawner.emplace_back(SpawnShape{
+            rSpawner.m_spawnRequest.push_back({
                 .m_position = {-10.0f, 0.0, 30.0f},
                 .m_velocity = {0.0f, 0.0f, 0.0f},
                 .m_size     = {2.0f, 2.0f, 1.0f},
@@ -314,9 +322,114 @@ Session setup_droppers(
                 .m_shape    = EShape::Cylinder
             });
         }
-    }));
+    });
 
-    return droppers;
-}*/
+    return out;
+}
+
+Session setup_bounds(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              scene,
+        Session const&              commonScene,
+        Session const&              shapeSpawn)
+{
+    using ActiveEntVec_t = std::vector<ActiveEnt>;
+
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_BOUNDS);
+    auto const tgBnds = out.create_pipelines<PlBounds>(rBuilder);
+
+    rBuilder.pipeline(tgBnds.boundsSet)     .parent(tgScn.update);
+    rBuilder.pipeline(tgBnds.outOfBounds)   .parent(tgScn.update);
+
+    top_emplace< ActiveEntSet_t >       (topData, idBounds);
+    top_emplace< ActiveEntVec_t >       (topData, idOutOfBounds);
+
+    rBuilder.task()
+        .name       ("Check for out-of-bounds entities")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgCS.transform(Ready), tgBnds.boundsSet(Ready), tgBnds.outOfBounds(Modify__)})
+        .push_to    (out.m_tasks)
+        .args       ({            idBasic,                      idBounds,                idOutOfBounds })
+        .func([] (ACtxBasic const& rBasic, ActiveEntSet_t const& rBounds, ActiveEntVec_t& rOutOfBounds) noexcept
+    {
+        for (std::size_t const ent : rBounds.ones())
+        {
+            ACompTransform const &entTf = rBasic.m_transform.get(ActiveEnt(ent));
+            if (entTf.m_transform.translation().z() < -10)
+            {
+                rOutOfBounds.push_back(ActiveEnt(ent));
+            }
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Queue-Delete out-of-bounds entities")
+        .run_on     ({tgBnds.outOfBounds(UseOrRun_)})
+        .sync_with  ({tgCS.activeEntDelete(Modify_), tgCS.hierarchy(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                idActiveEntDel,                idOutOfBounds })
+        .func([] (ACtxBasic& rBasic, ActiveEntVec_t& rActiveEntDel, ActiveEntVec_t& rOutOfBounds) noexcept
+    {
+        SysSceneGraph::queue_delete_entities(rBasic.m_scnGraph, rActiveEntDel, rOutOfBounds.begin(), rOutOfBounds.end());
+    });
+
+    rBuilder.task()
+        .name       ("Clear out-of-bounds vector once we're done with it")
+        .run_on     ({tgBnds.outOfBounds(Clear_)})
+        .push_to    (out.m_tasks)
+        .args       ({           idOutOfBounds })
+        .func([] (ActiveEntVec_t& rOutOfBounds) noexcept
+    {
+        rOutOfBounds.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Add bounds to spawned shapes")
+        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgBnds.boundsSet(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                  idSpawner,                idBounds })
+        .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner, ActiveEntSet_t& rBounds) noexcept
+    {
+        rBounds.ints().resize(rBasic.m_activeIds.vec().capacity());
+
+        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
+        {
+            SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
+            if (spawn.m_mass == 0)
+            {
+                continue;
+            }
+
+            ActiveEnt const root    = rSpawner.m_ents[i * 2];
+
+            rBounds.set(std::size_t(root));
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Delete bounds components")
+        .run_on     ({tgCS.activeEntDelete(UseOrRun)})
+        .sync_with  ({tgBnds.boundsSet(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idActiveEntDel,                idBounds })
+        .func([] (ActiveEntVec_t const& rActiveEntDel, ActiveEntSet_t& rBounds) noexcept
+    {
+        for (osp::active::ActiveEnt const ent : rActiveEntDel)
+        {
+            rBounds.reset(std::size_t(ent));
+        }
+    });
+
+    return out;
+}
 
 } // namespace testapp::scenes

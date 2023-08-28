@@ -110,7 +110,7 @@ Session setup_shape_spawn(
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
         .sync_with  ({tgCS.activeEnt(New), tgShSp.spawnedEnts(Resize)})
         .push_to    (out.m_tasks)
-        .args       ({      idBasic,                  idSpawner })
+        .args       ({      idBasic,                  idSpawner})
         .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner) noexcept
     {
         //LGRN_ASSERTM(!rSpawner.m_spawnRequest.empty(), "spawnRequest Use_ shouldn't run if rSpawner.m_spawnRequest is empty!");
@@ -147,7 +147,7 @@ Session setup_shape_spawn(
         .name       ("Add mesh and material to spawned shapes")
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
         .sync_with  ({tgShSp.spawnedEnts(UseOrRun),
-                      tgCS.mesh(New), tgCS.material(New), tgCS.drawEnt(New), tgCS.drawEntResized(ModifyOrSignal),
+                      tgCS.entMesh(New), tgCS.material(New), tgCS.drawEnt(New), tgCS.drawEntResized(ModifyOrSignal),
                       tgCS.materialDirty(Modify_), tgCS.entMeshDirty(Modify_)})
         .push_to    (out.m_tasks)
         .args       ({            idBasic,             idDrawing,                  idSpawner,             idNMesh })
@@ -365,94 +365,6 @@ Session setup_prefabs(
     return prefabs;
 }
 
-Session setup_bounds(
-        TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              commonScene,
-        Session const&              physics,
-        Session const&              shapeSpawn)
-{
-    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
-
-    Session bounds;
-    OSP_SESSION_ACQUIRE_DATA(bounds, topData, TESTAPP_BOUNDS);
-    OSP_SESSION_ACQUIRE_TAGS(bounds, rTags, TESTAPP_BOUNDS);
-
-    top_emplace< EntSet_t >       (topData, idBounds);
-    top_emplace< EntVector_t >    (topData, idOutOfBounds);
-
-    rBuilder.tag(tgBoundsSetMod)    .depend_on({tgBoundsSetDel});
-    rBuilder.tag(tgBoundsSetReq)    .depend_on({tgBoundsSetDel, tgBoundsSetMod});
-    rBuilder.tag(tgOutOfBoundsMod)  .depend_on({tgOutOfBoundsPrv});
-
-    // Bounds are checked are after transforms are final (PlransformReq)
-    // Out-of-bounds entities are added to rOutOfBounds, and are deleted
-    // at the start of next frame
-
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, PlransformReq, tgBoundsSetReq, tgOutOfBoundsMod}).data(
-            "Check for out-of-bounds entities",
-            TopDataIds_t{                 idBasic,                idBounds,             idOutOfBounds},
-            wrap_args([] (ACtxBasic const& rBasic, EntSet_t const& rBounds, EntVector_t& rOutOfBounds) noexcept
-    {
-        rOutOfBounds.clear();
-        for (std::size_t const ent : rBounds.ones())
-        {
-            ACompTransform const &entTf = rBasic.m_transform.get(ActiveEnt(ent));
-            if (entTf.m_transform.translation().z() < -10)
-            {
-                rOutOfBounds.push_back(ActiveEnt(ent));
-            }
-        }
-    }));
-
-
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgOutOfBoundsPrv, tgDelEntMod}).data(
-            "Delete out-of-bounds entities",
-            TopDataIds_t{                 idBasic,                   idOutOfBounds,             idDelEnts   },
-            wrap_args([] (ACtxBasic const& rBasic, EntVector_t const& rOutOfBounds, EntVector_t& rDelEnts) noexcept
-    {
-        rDelEnts.insert(rDelEnts.end(), rOutOfBounds.cbegin(), rOutOfBounds.cend());
-    }));
-
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgSpawnReq, tgBoundsSetMod}).data(
-            "Add bounds to spawned shapes",
-            TopDataIds_t{                    idSpawner,                   idSpawnerEnts,          idBounds,                   idActiveIds },
-            wrap_args([] (SpawnerVec_t const& rSpawner, EntVector_t const& rSpawnerEnts, EntSet_t& rBounds, ActiveReg_t const& rActiveIds) noexcept
-    {
-        rBounds     .ints().resize(rActiveIds.vec().capacity());
-
-        for (std::size_t i = 0; i < rSpawner.size(); ++i)
-        {
-            SpawnShape const &spawn = rSpawner[i];
-            if (spawn.m_mass == 0)
-            {
-                continue;
-            }
-
-            ActiveEnt const root    = rSpawnerEnts[i * 2];
-
-            rBounds.set(std::size_t(root));
-        }
-    }));
-
-    bounds.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgBoundsSetDel}).data(
-            "Delete bounds components",
-            TopDataIds_t{idBounds, idDelTotal}, delete_ent_set);
-//    for (osp::active::ActiveEnt const ent : rDelTotal)
-//    {
-//        rSet.reset(std::size_t(ent));
-//    }
-
-    return bounds;
-}
-
 #endif
 
 } // namespace testapp::scenes
-
-

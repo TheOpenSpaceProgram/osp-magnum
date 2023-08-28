@@ -52,7 +52,7 @@ OSP_DECLARE_STAGE_NAMES(EStgEvnt, "Run", "Done");
 OSP_DECLARE_STAGE_NO_SCHEDULE(EStgEvnt);
 
 /**
- * @brief Temporary queue / events that are filled, used, then cleared right away
+ * @brief Intermediate container that is filled, used, then cleared right away
  */
 enum class EStgIntr : uint8_t
 {
@@ -65,6 +65,19 @@ enum class EStgIntr : uint8_t
 OSP_DECLARE_STAGE_NAMES(EStgIntr, "Resize", "Modify", "Schedule", "Use/Run", "Clear");
 OSP_DECLARE_STAGE_SCHEDULE(EStgIntr, EStgIntr::Schedule_);
 
+/**
+ * @brief 'Reversed' Intermediate container
+ */
+enum class EStgRevd : uint8_t
+{
+    Schedule__,
+    UseOrRun_,
+    Clear_,
+    Resize_,
+    Modify__,
+};
+OSP_DECLARE_STAGE_NAMES(EStgRevd, "Schedule", "Use/Run", "Clear", "Resize", "Modify");
+OSP_DECLARE_STAGE_SCHEDULE(EStgRevd, EStgRevd::Schedule__);
 
 /**
  * @brief Continuous Containers, data that persists and is modified over time
@@ -72,6 +85,9 @@ OSP_DECLARE_STAGE_SCHEDULE(EStgIntr, EStgIntr::Schedule_);
  */
 enum class EStgCont : uint8_t
 {
+    Prev,
+    ///< Previous state of container
+
     Delete,
     ///< Remove elements from a container or mark them for deletion. This often involves reading
     ///< a set of elements to delete. This is run first since it leaves empty spaces for new
@@ -86,7 +102,7 @@ enum class EStgCont : uint8_t
     Ready
     ///< Container is ready to use
 };
-OSP_DECLARE_STAGE_NAMES(EStgCont, "Delete", "New", "Modify", "Use");
+OSP_DECLARE_STAGE_NAMES(EStgCont, "Prev", "Delete", "New", "Modify", "Use");
 OSP_DECLARE_STAGE_NO_SCHEDULE(EStgCont);
 
 enum class EStgFBO
@@ -98,6 +114,19 @@ enum class EStgFBO
 OSP_DECLARE_STAGE_NAMES(EStgFBO, "Bind", "Draw", "Unbind");
 OSP_DECLARE_STAGE_NO_SCHEDULE(EStgFBO);
 
+//-----------------------------------------------------------------------------
+
+inline void register_stage_enums()
+{
+    osp::PipelineInfo::sm_stageNames.resize(32);
+    osp::PipelineInfo::register_stage_enum<EStgOptn>();
+    osp::PipelineInfo::register_stage_enum<EStgEvnt>();
+    osp::PipelineInfo::register_stage_enum<EStgIntr>();
+    osp::PipelineInfo::register_stage_enum<EStgRevd>();
+    osp::PipelineInfo::register_stage_enum<EStgCont>();
+    osp::PipelineInfo::register_stage_enum<EStgFBO>();
+}
+
 using osp::PipelineDef;
 
 //-----------------------------------------------------------------------------
@@ -106,7 +135,7 @@ using osp::PipelineDef;
     idResources, idMainLoopCtrl
 struct PlApplication
 {
-    PipelineDef<EStgOptn> mainLoop          {"mainLoop - ..."};
+    PipelineDef<EStgOptn> mainLoop          {"mainLoop"};
 };
 
 //-----------------------------------------------------------------------------
@@ -116,26 +145,29 @@ struct PlApplication
 struct PlScene
 {
     PipelineDef<EStgEvnt> cleanup           {"cleanup - Scene cleanup before destruction"};
-    PipelineDef<EStgOptn> update            {"update - main loop "};
+    PipelineDef<EStgOptn> update            {"update"};
 };
 
 #define TESTAPP_DATA_COMMON_SCENE 6, \
     idBasic, idDrawing, idDrawingRes, idActiveEntDel, idDrawEntDel, idNMesh
 struct PlCommonScene
 {
-    PipelineDef<EStgCont> activeEnt         {"activeEnt"};
+    PipelineDef<EStgCont> activeEnt         {"activeEnt - ActiveEnt ID Registry"};
     PipelineDef<EStgOptn> activeEntResized  {"activeEntResized"};
-    PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete"};
+    PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete - Vector of ActiveEnts that need to be deleted"};
 
     PipelineDef<EStgCont> transform         {"transform"};
     PipelineDef<EStgCont> hierarchy         {"hierarchy"};
 
     PipelineDef<EStgCont> drawEnt           {"drawEnt"};
     PipelineDef<EStgOptn> drawEntResized    {"drawEntResized"};
-    PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete"};
+    PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete - Vector of DrawEnts that need to be deleted"};
 
     PipelineDef<EStgCont> mesh              {"mesh"};
     PipelineDef<EStgCont> texture           {"texture"};
+
+    PipelineDef<EStgCont> entMesh           {"entMesh - Scene-side DrawEnt-MeshId association"};
+    PipelineDef<EStgCont> entTexture        {"entTexture - Scene-side DrawEnt-TexId association"};
 
     PipelineDef<EStgIntr> entTextureDirty   {"entTextureDirty"};
     PipelineDef<EStgIntr> entMeshDirty      {"entMeshDirty"};
@@ -179,9 +211,11 @@ struct PlShapeSpawn
 
 #define TESTAPP_DATA_BOUNDS 2, \
     idBounds, idOutOfBounds
-#define OSP_TAGS_TESTAPP_BOUNDS 5, \
-    tgBoundsSetDel,     tgBoundsSetMod,     tgBoundsSetReq,     \
-    tgOutOfBoundsPrv,   tgOutOfBoundsMod
+struct PlBounds
+{
+    PipelineDef<EStgCont> boundsSet         {"boundsSet"};
+    PipelineDef<EStgRevd> outOfBounds       {"outOfBounds"};
+};
 
 
 
@@ -302,7 +336,7 @@ struct PlWindowApp
     idActiveApp, idRenderGl
 struct PlMagnum
 {
-    PipelineDef<EStgEvnt> cleanup           {"cleanup Cleanup Magnum"};
+    PipelineDef<EStgEvnt> cleanup           {"cleanup - Cleanup magnum renderer resources before destruction"};
 
     PipelineDef<EStgOptn> sync              {"sync"};
     PipelineDef<EStgOptn> resync            {"resync"};

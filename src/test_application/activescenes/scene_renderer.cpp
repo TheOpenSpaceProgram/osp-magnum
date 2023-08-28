@@ -99,6 +99,7 @@ Session setup_magnum(
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM);
     auto const tgMgn = out.create_pipelines<PlMagnum>(rBuilder);
+
     out.m_cleanup = tgMgn.cleanup;
 
     rBuilder.pipeline(tgMgn.sync)  .parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
@@ -165,8 +166,6 @@ Session setup_scene_renderer(
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
     auto const tgApp    = application   .get_pipelines< PlApplication >();
-    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
-    auto const tgScn    = scene         .get_pipelines< PlScene >();
     auto const tgCS     = commonScene   .get_pipelines< PlCommonScene >();
     auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
 
@@ -233,7 +232,7 @@ Session setup_scene_renderer(
     rBuilder.task()
         .name       ("Schedule Assign GL textures")
         .schedules  ({tgCS.entTextureDirty(Schedule_)})
-        .sync_with  ({tgCS.texture(Ready)})
+        .sync_with  ({tgCS.texture(Ready), tgCS.entTexture(Ready)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing })
         .func([] (ACtxDrawing& rDrawing) noexcept -> TaskActions
@@ -244,7 +243,7 @@ Session setup_scene_renderer(
     rBuilder.task()
         .name       ("Sync GL textures to entities with scene textures")
         .run_on     ({tgCS.entTextureDirty(UseOrRun)})
-        .sync_with  ({tgCS.texture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgCS.drawEntResized(Done)})
+        .sync_with  ({tgCS.texture(Ready), tgCS.entTexture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgCS.drawEntResized(Done)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
@@ -280,7 +279,7 @@ Session setup_scene_renderer(
     rBuilder.task()
         .name       ("Schedule Assign GL meshes")
         .schedules  ({tgCS.entMeshDirty(Schedule_)})
-        .sync_with  ({tgCS.mesh(Ready)})
+        .sync_with  ({tgCS.mesh(Ready), tgCS.entMesh(Ready)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept -> TaskActions
@@ -291,7 +290,7 @@ Session setup_scene_renderer(
     rBuilder.task()
         .name       ("Sync GL meshes to entities with scene meshes")
         .run_on     ({tgCS.entMeshDirty(UseOrRun)})
-        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgCS.drawEntResized(Done)})
+        .sync_with  ({tgCS.mesh(Ready), tgCS.entMesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgCS.drawEntResized(Done)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept

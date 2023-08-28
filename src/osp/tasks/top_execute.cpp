@@ -110,6 +110,8 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
     {
         ExecPipeline const  &plExec = exec.plData[pipeline];
 
+        std::cout << "pipeline: " << int(pipeline) << "\n";
+
         for (int i = 0; i < depth; ++i)
         {
             rStream << "- ";
@@ -148,7 +150,7 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
 
         int charsUsed = 7; // "PL###" + ": "
 
-        for (int stage = 0; stage < stageCount; ++stage)
+        for (int stage = 0; stage < std::min<int>(stageNames.size(), stageCount); ++stage)
         {
             bool const sel = int(plExec.stage) == stage;
             rStream << (sel ? '[' : ' ')
@@ -162,8 +164,9 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
         {
             rStream << ' ';
         }
+        std::cout << "AAAA" << info.name;
 
-        rStream << " | " << info.name;
+        rStream << " | " << (info.name.empty() ? "untitled or deleted" : info.name);
 
         rStream << "\n";
     };

@@ -77,6 +77,9 @@ void TestApp::close_sessions(osp::ArrayView<osp::Session> const sessions)
         for (PipelineId const pipeline : rSession.m_pipelines)
         {
             m_tasks.m_pipelineIds.remove(pipeline);
+            m_tasks.m_pipelineParents[pipeline] = lgrn::id_null<PipelineId>();
+            m_tasks.m_pipelineInfo[pipeline]    = {};
+            m_tasks.m_pipelineControl[pipeline] = {};
         }
         rSession.m_pipelines.clear();
     }

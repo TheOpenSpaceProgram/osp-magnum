@@ -162,24 +162,11 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
     rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, mainLoop, inputs, renderSync, sceneUpdate, sceneRender) );
 }
 
-template <typename STAGE_ENUM_T>
-static constexpr void register_stage_enum()
-{
-    PipelineInfo::stage_type_t const type = PipelineInfo::stage_type_family_t::value<STAGE_ENUM_T>;
-    PipelineInfo::sm_stageNames[type] = stage_names(STAGE_ENUM_T{});
-}
-
 static ScenarioMap_t make_scenarios()
 {   
     ScenarioMap_t scenarioMap;
 
-    PipelineInfo::sm_stageNames.resize(32);
-
-    register_stage_enum<EStgOptn>();
-    register_stage_enum<EStgEvnt>();
-    register_stage_enum<EStgIntr>();
-    register_stage_enum<EStgCont>();
-    register_stage_enum<EStgFBO>();
+    register_stage_enums();
 
     auto const add_scenario = [&scenarioMap] (std::string_view name, std::string_view desc, SceneSetupFunc_t run)
     {
@@ -237,20 +224,16 @@ static ScenarioMap_t make_scenarios()
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
         physics         = setup_physics             (builder, rTopData, scene, commonScene);
         shapeSpawn      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matVisualizer);
-        //droppers        = setup_droppers            (builder, rTopData, commonScene, shapeSpawn);
-        //bounds          = setup_bounds              (builder, rTopData, commonScene, physics, shapeSpawn);
+        droppers        = setup_droppers            (builder, rTopData, scene, commonScene, shapeSpawn);
+        bounds          = setup_bounds              (builder, rTopData, scene, commonScene, shapeSpawn);
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
         nwtGravSet      = setup_newton_factors      (builder, rTopData);
-        //nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
+        nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
         shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
 
         create_materials(rTopData, commonScene, sc_materialCount);
         add_floor(rTopData, application, commonScene, shapeSpawn, sc_matVisualizer, defaultPkg);
-
-//        auto const tgScn    = scene         .get_pipelines<PlScene>();
-//        auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
-//        auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
 
         return [] (TestApp& rTestApp)
         {

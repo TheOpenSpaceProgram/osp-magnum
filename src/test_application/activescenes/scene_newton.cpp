@@ -96,7 +96,7 @@ Session setup_newton(
     rBuilder.task()
         .name       ("Update Newton world")
         .run_on     ({tgScn.update(Run)})
-        .sync_with  ({/*tgNwt.nwtBody(Modify),*/ tgCS.hierarchy(Modify), tgPhy.physUpdate(Run), tgCS.transform(Modify)})
+        .sync_with  ({tgNwt.nwtBody(Prev), tgCS.hierarchy(Prev), tgPhy.physBody(Prev), tgPhy.physUpdate(Run), tgCS.transform(Prev)})
         .push_to    (out.m_tasks)
         .args({             idBasic,             idPhys,              idNwt,           idDeltaTimeIn })
         .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, float const deltaTimeIn, WorkerContext ctx) noexcept
@@ -125,48 +125,48 @@ osp::Session setup_newton_factors(
     return out;
 }
 
-//osp::Session setup_newton_force_accel(
-//        TopTaskBuilder&             rBuilder,
-//        ArrayView<entt::any>        topData,
-//        Session const&              newton,
-//        Session const&              nwtFactors,
-//        Vector3                     accel)
-//{
-//    using UserData_t = ACtxNwtWorld::ForceFactorFunc::UserData_t;
-//    OSP_SESSION_UNPACK_DATA(newton,     TESTAPP_NEWTON);
-//    OSP_SESSION_UNPACK_DATA(nwtFactors, TESTAPP_NEWTON_FORCES);
+osp::Session setup_newton_force_accel(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any>        topData,
+        Session const&              newton,
+        Session const&              nwtFactors,
+        Vector3                     accel)
+{
+    using UserData_t = ACtxNwtWorld::ForceFactorFunc::UserData_t;
+    OSP_DECLARE_GET_DATA_IDS(newton,     TESTAPP_DATA_NEWTON);
+    OSP_DECLARE_GET_DATA_IDS(nwtFactors, TESTAPP_DATA_NEWTON_FORCES);
 
-//    auto &rNwt      = top_get<ACtxNwtWorld>(topData, idNwt);
+    auto &rNwt      = top_get<ACtxNwtWorld>(topData, idNwt);
 
-//    Session nwtAccel;
-//    OSP_SESSION_ACQUIRE_DATA(nwtAccel, topData, TESTAPP_NEWTON_ACCEL);
+    Session nwtAccel;
+    OSP_DECLARE_CREATE_DATA_IDS(nwtAccel, topData, TESTAPP_DATA_NEWTON_ACCEL);
 
-//    auto &rAccel    = top_emplace<Vector3>(topData, idAcceleration, accel);
+    auto &rAccel    = top_emplace<Vector3>(topData, idAcceleration, accel);
 
-//    ACtxNwtWorld::ForceFactorFunc const factor
-//    {
-//        .m_func = [] (NewtonBody const* pBody, BodyId const bodyID, ACtxNwtWorld const& rNwt, UserData_t data, Vector3& rForce, Vector3& rTorque) noexcept
-//        {
-//            float mass = 0.0f;
-//            float dummy = 0.0f;
-//            NewtonBodyGetMass(pBody, &mass, &dummy, &dummy, &dummy);
+    ACtxNwtWorld::ForceFactorFunc const factor
+    {
+        .m_func = [] (NewtonBody const* pBody, BodyId const bodyID, ACtxNwtWorld const& rNwt, UserData_t data, Vector3& rForce, Vector3& rTorque) noexcept
+        {
+            float mass = 0.0f;
+            float dummy = 0.0f;
+            NewtonBodyGetMass(pBody, &mass, &dummy, &dummy, &dummy);
 
-//            auto const& force = *reinterpret_cast<Vector3 const*>(data[0]);
-//            rForce += force * mass;
-//        },
-//        .m_userData = {&rAccel}
-//    };
+            auto const& force = *reinterpret_cast<Vector3 const*>(data[0]);
+            rForce += force * mass;
+        },
+        .m_userData = {&rAccel}
+    };
 
-//    // Register force
+    // Register force
 
-//    std::size_t const index = rNwt.m_factors.size();
-//    rNwt.m_factors.emplace_back(factor);
+    std::size_t const index = rNwt.m_factors.size();
+    rNwt.m_factors.emplace_back(factor);
 
-//    auto factorBits = lgrn::bit_view(top_get<ForceFactors_t>(topData, idNwtFactors));
-//    factorBits.set(index);
+    auto factorBits = lgrn::bit_view(top_get<ForceFactors_t>(topData, idNwtFactors));
+    factorBits.set(index);
 
-//    return nwtAccel;
-//}
+    return nwtAccel;
+}
 
 
 Session setup_shape_spawn_newton(
@@ -186,7 +186,6 @@ Session setup_shape_spawn_newton(
     OSP_DECLARE_GET_DATA_IDS(nwtFactors,    TESTAPP_DATA_NEWTON_FORCES);
 
     auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
-
     auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
     auto const tgNwt    = newton        .get_pipelines<PlNewton>();
 

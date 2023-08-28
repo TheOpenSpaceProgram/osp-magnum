@@ -42,6 +42,7 @@ namespace scenes
     using enum EStgOptn;
     using enum EStgCont;
     using enum EStgIntr;
+    using enum EStgRevd;
     using enum EStgEvnt;
     using enum EStgFBO;
 }

@@ -107,15 +107,16 @@ struct Session
                       info.hash_code(), info.name(),
                       m_pipelines.size());
 
-        TGT_STRUCT_T out;
-        auto const members = Corrade::Containers::staticArrayView<count, PipelineDefBlank_t>(reinterpret_cast<PipelineDefBlank_t*>(&out));
+        alignas(TGT_STRUCT_T) std::array<unsigned char, sizeof(TGT_STRUCT_T)> bytes;
+        TGT_STRUCT_T *pOut = new(bytes.data()) TGT_STRUCT_T;\
 
         for (std::size_t i = 0; i < count; ++i)
         {
-            members[i].m_value = m_pipelines[i];
+            unsigned char *pDefBytes = bytes.data() + sizeof(PipelineDefBlank_t)*i;
+            *reinterpret_cast<PipelineId*>(pDefBytes + offsetof(PipelineDefBlank_t, m_value)) = m_pipelines[i];
         }
 
-        return out;
+        return *pOut;
     }
 
     std::vector<TopDataId>  m_data;

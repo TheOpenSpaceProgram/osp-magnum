@@ -98,24 +98,25 @@ struct TaskBuilderBase
         m_rTasks.m_pipelineControl.resize(capacity);
         m_rTasks.m_pipelineParents.resize(capacity, lgrn::id_null<PipelineId>());
 
-        TGT_STRUCT_T out;
-
         // Set m_value members of TGT_STRUCT_T, asserted to contain only PipelineDef<...>
         // This is janky enough that rewriting the code below might cause it to ONLY SEGFAULT ON
         // RELEASE AND ISN'T CAUGHT BY ASAN WTF??? (on gcc 11)
-        auto *pOutBytes = reinterpret_cast<unsigned char*>(std::addressof(out));
+
+        alignas(TGT_STRUCT_T) std::array<unsigned char, sizeof(TGT_STRUCT_T)> bytes;
+        TGT_STRUCT_T *pOut = new(bytes.data()) TGT_STRUCT_T;
 
         for (std::size_t i = 0; i < count; ++i)
         {
             PipelineId const pl = pipelinesOut[i];
-            unsigned char *pDefBytes = pOutBytes + sizeof(PipelineDefBlank_t)*i;
+            unsigned char *pDefBytes = bytes.data() + sizeof(PipelineDefBlank_t)*i;
 
             *reinterpret_cast<PipelineId*>(pDefBytes + offsetof(PipelineDefBlank_t, m_value)) = pl;
 
             m_rTasks.m_pipelineInfo[pl].stageType = *reinterpret_cast<PipelineInfo::stage_type_t*>(pDefBytes + offsetof(PipelineDefBlank_t, m_type));
             m_rTasks.m_pipelineInfo[pl].name      = *reinterpret_cast<std::string_view*>(pDefBytes + offsetof(PipelineDefBlank_t, m_name));
         }
-        return out;
+
+        return *pOut;
     }
 
     template<typename TGT_STRUCT_T>

@@ -115,7 +115,7 @@ struct ACtxDrawing
     lgrn::IdRegistryStl<TexId>              m_texIds;
     TexRefCount_t                           m_texRefCounts;
 
-    // Meshes and textures assigned to ActiveEnts
+    // Meshes and textures assigned to DrawEnts
     KeyedVec<DrawEnt, TexIdOwner_t>         m_diffuseTex;
     std::vector<DrawEnt>                    m_diffuseDirty;
 

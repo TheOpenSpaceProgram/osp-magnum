@@ -79,7 +79,19 @@ osp::Session setup_thrower(
 osp::Session setup_droppers(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         scene,
         osp::Session const&         commonScene,
         osp::Session const&         shapeSpawn);
+
+/**
+ * @brief Entity set to delete entities under Z = -10, added to spawned shapes
+ */
+osp::Session setup_bounds(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         scene,
+        osp::Session const&         commonScene,
+        osp::Session const&         shapeSpawn);
+
 
 }

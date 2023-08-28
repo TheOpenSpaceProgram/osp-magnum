@@ -209,7 +209,13 @@ void debug_cli_loop()
             {
                 std::cout << "Loading scene: " << it->first << "\n";
 
-                //g_testApp.close_sessions(g_executor, g_testApp.m_scene); // Close existing scene
+                // Close existing scene first
+                if ( ! g_testApp.m_scene.m_sessions.empty() )
+                {
+                    g_testApp.close_sessions(g_testApp.m_scene.m_sessions);
+                    g_testApp.m_scene.m_sessions.clear();
+                    g_testApp.m_scene.m_edges.m_syncWith.clear();
+                }
 
                 g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
                 start_magnum_async();

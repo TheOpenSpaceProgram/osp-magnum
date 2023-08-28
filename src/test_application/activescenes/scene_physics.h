@@ -94,15 +94,4 @@ osp::Session setup_prefabs(
         osp::Session const&         material,
         osp::TopDataId              idResources);
 
-/**
- * @brief Entity set to delete entities under Z = -10, added to spawned shapes
- */
-osp::Session setup_bounds(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         shapeSpawn);
-
-
 } // namespace testapp::scenes
