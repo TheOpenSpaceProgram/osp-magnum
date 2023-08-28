@@ -100,7 +100,7 @@ struct Session
         static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineId) == 0);
         constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineDefBlank_t);
 
-        std::type_info const& info = typeid(TGT_STRUCT_T);
+        [[maybe_unused]] std::type_info const& info = typeid(TGT_STRUCT_T);
         LGRN_ASSERTMV(m_structHash == info.hash_code() && count == m_pipelines.size(),
                       "get_pipeline must use the same struct previously given to get_pipelines",
                       m_structHash, m_structName,

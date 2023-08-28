@@ -41,8 +41,8 @@
 #define OSP_DECLARE_STAGE_NAMES(type, ...)                                                                  \
     inline osp::ArrayView<std::string_view const> stage_names([[maybe_unused]] type _) noexcept             \
     {                                                                                                       \
-        static auto const arr = std::array<std::string_view const, std::size({__VA_ARGS__})>{__VA_ARGS__};  \
-        return osp::arrayView( arr.data(), arr.size() );                                                    \
+        static auto const arr = std::initializer_list<std::string_view>{__VA_ARGS__};                       \
+        return osp::arrayView(arr);                                                                         \
     }
 
 #define OSP_DECLARE_STAGE_SCHEDULE(type, schedule_enum)                     \
@@ -92,7 +92,7 @@ struct PipelineInfo
 
     std::string_view    name;
     std::string_view    category;
-    stage_type_t        stageType;
+    stage_type_t        stageType { lgrn::id_null<stage_type_t>() };
 };
 
 struct PipelineControl

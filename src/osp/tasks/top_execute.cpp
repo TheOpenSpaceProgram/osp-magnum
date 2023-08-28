@@ -32,7 +32,6 @@
 
 #include <algorithm>
 #include <iomanip>
-#include <iostream>
 #include <sstream>
 #include <vector>
 
@@ -110,8 +109,6 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
     {
         ExecPipeline const  &plExec = exec.plData[pipeline];
 
-        std::cout << "pipeline: " << int(pipeline) << "\n";
-
         for (int i = 0; i < depth; ++i)
         {
             rStream << "- ";
@@ -146,25 +143,27 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
 
         PipelineInfo const& info = tasks.m_pipelineInfo[pipeline];
 
-        auto const stageNames = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
-
         int charsUsed = 7; // "PL###" + ": "
 
-        for (int stage = 0; stage < std::min<int>(stageNames.size(), stageCount); ++stage)
+        if (info.stageType != lgrn::id_null<PipelineInfo::stage_type_t>())
         {
-            bool const sel = int(plExec.stage) == stage;
-            rStream << (sel ? '[' : ' ')
-                    << stageNames[stage]
-                    << (sel ? ']' : ' ');
+            auto const stageNames = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
 
-            charsUsed += 2 + stageNames[stage].size();
+            for (int stage = 0; stage < std::min<int>(stageNames.size(), stageCount); ++stage)
+            {
+                bool const sel = int(plExec.stage) == stage;
+                rStream << (sel ? '[' : ' ')
+                        << stageNames[stage]
+                        << (sel ? ']' : ' ');
+
+                charsUsed += 2 + stageNames[stage].size();
+            }
         }
 
         for (; charsUsed < nameMinColumns; ++charsUsed)
         {
             rStream << ' ';
         }
-        std::cout << "AAAA" << info.name;
 
         rStream << " | " << (info.name.empty() ? "untitled or deleted" : info.name);
 

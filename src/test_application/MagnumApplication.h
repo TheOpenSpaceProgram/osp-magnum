@@ -56,14 +56,9 @@ public:
  *
  * This is intended to run a flight scene, map view, vehicle editor, or menu.
  */
-class MagnumApplication : Magnum::Platform::Application
+class MagnumApplication : public Magnum::Platform::Application
 {
-
 public:
-
-    using Magnum::Platform::Application::KeyEvent;
-    using Magnum::Platform::Application::MouseEvent;
-    using Magnum::Platform::Application::Arguments;
 
     using AppPtr_t = std::unique_ptr<IOspApplication>;
 

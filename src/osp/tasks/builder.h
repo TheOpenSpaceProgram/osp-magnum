@@ -30,6 +30,7 @@
 #include <iterator>
 #include <longeron/containers/bit_view.hpp>
 
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <vector>
