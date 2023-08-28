@@ -359,6 +359,9 @@ public:
      : m_pInputHandler(pInputHandler)
     { }
 
+    ControlSubscriber(ControlSubscriber&& move) noexcept = default;
+    ControlSubscriber& operator=(ControlSubscriber&& move) noexcept = default;
+
     ~ControlSubscriber();
 
     EButtonControlIndex button_subscribe(std::string_view name);

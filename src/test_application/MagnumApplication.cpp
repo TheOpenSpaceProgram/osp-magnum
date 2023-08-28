@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#include "ActiveApplication.h"
+#include "MagnumApplication.h"
 #include "osp/types.h"
 
 #include <Magnum/Math/Color.h>
@@ -34,8 +34,8 @@
 
 using namespace testapp;
 
-using Key_t = ActiveApplication::KeyEvent::Key;
-using Mouse_t = ActiveApplication::MouseEvent::Button;
+using Key_t = MagnumApplication::KeyEvent::Key;
+using Mouse_t = MagnumApplication::MouseEvent::Button;
 
 using osp::input::sc_keyboard;
 using osp::input::sc_mouse;
@@ -48,26 +48,29 @@ using osp::input::EVarOperator;
 
 using Magnum::Platform::Application;
 
-ActiveApplication::ActiveApplication(const Application::Arguments& arguments,
+MagnumApplication::MagnumApplication(const Application::Arguments& arguments,
                                      UserInputHandler& rUserInput)
  : Application{arguments, Configuration{}.setTitle("OSP-Magnum").setSize({1280, 720})}
  , m_rUserInput(rUserInput)
 {
+    // temporary fixed 60fps. No physics interpolation or anything is implemented yet
+    setSwapInterval(1);
+    setMinimalLoopPeriod(16);
     m_timeline.start();
 }
 
-ActiveApplication::~ActiveApplication()
+MagnumApplication::~MagnumApplication()
 {
-    m_onDraw = {};
+    m_ospApp.reset(nullptr);
 }
 
-void ActiveApplication::drawEvent()
+void MagnumApplication::drawEvent()
 {
     m_rUserInput.update_controls();
 
-    if (m_onDraw.operator bool())
+    if (m_ospApp != nullptr)
     {
-        m_onDraw(*this, m_timeline.previousFrameDuration());
+        m_ospApp->draw(*this, m_timeline.previousFrameDuration());
     }
 
     m_rUserInput.clear_events();
@@ -77,38 +80,38 @@ void ActiveApplication::drawEvent()
     redraw();
 }
 
-void ActiveApplication::keyPressEvent(KeyEvent& event)
+void MagnumApplication::keyPressEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
     m_rUserInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
                            osp::input::EButtonEvent::Pressed);
 }
 
-void ActiveApplication::keyReleaseEvent(KeyEvent& event)
+void MagnumApplication::keyReleaseEvent(KeyEvent& event)
 {
     if (event.isRepeated()) { return; }
     m_rUserInput.event_raw(osp::input::sc_keyboard, (int) event.key(),
                            osp::input::EButtonEvent::Released);
 }
 
-void ActiveApplication::mousePressEvent(MouseEvent& event)
+void MagnumApplication::mousePressEvent(MouseEvent& event)
 {
     m_rUserInput.event_raw(osp::input::sc_mouse, (int) event.button(),
                            osp::input::EButtonEvent::Pressed);
 }
 
-void ActiveApplication::mouseReleaseEvent(MouseEvent& event)
+void MagnumApplication::mouseReleaseEvent(MouseEvent& event)
 {
     m_rUserInput.event_raw(osp::input::sc_mouse, (int) event.button(),
                            osp::input::EButtonEvent::Released);
 }
 
-void ActiveApplication::mouseMoveEvent(MouseMoveEvent& event)
+void MagnumApplication::mouseMoveEvent(MouseMoveEvent& event)
 {
     m_rUserInput.mouse_delta(event.relativePosition());
 }
 
-void ActiveApplication::mouseScrollEvent(MouseScrollEvent & event)
+void MagnumApplication::mouseScrollEvent(MouseScrollEvent & event)
 {
     m_rUserInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 }
@@ -218,9 +221,9 @@ const std::map<std::string_view, button_pair_t, std::less<>> gc_buttonMap = {
     {"F12", {sc_keyboard, (int)Key_t::F12  }},
 
     //Mouse
-    {"RMouse", {sc_mouse, (int)ActiveApplication::MouseEvent::Button::Right }},
-    {"LMouse", {sc_mouse, (int)ActiveApplication::MouseEvent::Button::Left }},
-    {"MMouse", {sc_mouse, (int)ActiveApplication::MouseEvent::Button::Middle }}
+    {"RMouse", {sc_mouse, (int)MagnumApplication::MouseEvent::Button::Right }},
+    {"LMouse", {sc_mouse, (int)MagnumApplication::MouseEvent::Button::Left }},
+    {"MMouse", {sc_mouse, (int)MagnumApplication::MouseEvent::Button::Middle }}
 };
 
 ControlExprConfig_t parse_control(std::string_view str) noexcept

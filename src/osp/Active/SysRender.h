@@ -25,11 +25,14 @@
 #pragma once
 
 #include "drawing.h"
+#include "basic.h"
 
 #include <unordered_map>
 
 namespace osp::active
 {
+
+using DrawTransforms_t = KeyedVec<DrawEnt, Matrix4>;
 
 /**
  * @brief View and Projection matrix
@@ -62,10 +65,10 @@ struct EntityToDraw
      * @param UserData_t        [in] Non-owning user data
      */
     using ShaderDrawFnc_t = void (*)(
-            ActiveEnt, ViewProjMatrix const&, UserData_t) noexcept;
+            DrawEnt, ViewProjMatrix const&, UserData_t) noexcept;
 
     constexpr void operator()(
-            ActiveEnt ent,
+            DrawEnt ent,
             ViewProjMatrix const& viewProj) const noexcept
     {
         m_draw(ent, viewProj, m_data);
@@ -88,7 +91,7 @@ struct EntityToDraw
  */
 struct RenderGroup
 {
-    using Storage_t = entt::storage_type<EntityToDraw, ActiveEnt>::type;
+    using Storage_t = entt::basic_storage<EntityToDraw, DrawEnt>;
     using ArrayView_t = Corrade::Containers::ArrayView<const ActiveEnt>;
 
     /**
@@ -173,9 +176,10 @@ public:
     template<typename IT_T, typename ITB_T>
     static void update_draw_transforms(
             ACtxSceneGraph const&                   rScnGraph,
+            KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
             acomp_storage_t<ACompTransform> const&  transform,
-            acomp_storage_t<Matrix4>&               rDrawTf,
-            EntSet_t const&                         rDrawable,
+            DrawTransforms_t&                       rDrawTf,
+            ActiveEntSet_t const&                   useDrawTf,
             IT_T                                    first,
             ITB_T const&                            last);
 
@@ -186,27 +190,25 @@ public:
      */
     static void set_dirty_all(ACtxDrawing& rCtxDrawing);
 
-    /**
-     * @brief Clear all dirty flags/vectors
-     *
-     * @param rCtxDrawing [ref] Drawing data
-     */
-    static void clear_dirty_all(ACtxDrawing& rCtxDrawing);
-
     template<typename IT_T>
     static void update_delete_drawing(
-            ACtxDrawing& rCtxDraw, IT_T first, IT_T const& last);
+            ACtxDrawing& rCtxDraw, IT_T const& first, IT_T const& last);
 
     template<typename IT_T>
     static void update_delete_groups(
             ACtxRenderGroups& rCtxGroups, IT_T first, IT_T const& last);
 
+    static MeshIdOwner_t add_drawable_mesh(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg, std::string_view const name);
+
+    static constexpr decltype(auto) gen_drawable_mesh_adder(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg);
+
 private:
     static void update_draw_transforms_recurse(
             ACtxSceneGraph const&                   rScnGraph,
+            KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
             acomp_storage_t<ACompTransform> const&  rTf,
-            acomp_storage_t<Matrix4>&               rDrawTf,
-            EntSet_t const&                         rDrawable,
+            DrawTransforms_t&                       rDrawTf,
+            ActiveEntSet_t const&                   useDrawTf,
             ActiveEnt                               ent,
             Matrix4 const&                          parentTf,
             bool                                    root);
@@ -230,9 +232,10 @@ void SysRender::assure_draw_transforms(
 template<typename IT_T, typename ITB_T>
 void SysRender::update_draw_transforms(
         ACtxSceneGraph const&                   rScnGraph,
+        KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
         acomp_storage_t<ACompTransform> const&  rTf,
-        acomp_storage_t<Matrix4>&               rDrawTf,
-        EntSet_t const&                         rDrawable,
+        DrawTransforms_t&                       rDrawTf,
+        ActiveEntSet_t const&                   needDrawTf,
         IT_T                                    first,
         ITB_T const&                            last)
 {
@@ -240,7 +243,7 @@ void SysRender::update_draw_transforms(
 
     while (first != last)
     {
-        update_draw_transforms_recurse(rScnGraph, rTf, rDrawTf, rDrawable, *first, identity, true);
+        update_draw_transforms_recurse(rScnGraph, activeToDraw, rTf, rDrawTf, needDrawTf, *first, identity, true);
 
         std::advance(first, 1);
     }
@@ -249,36 +252,25 @@ void SysRender::update_draw_transforms(
 
 template<typename STORAGE_T, typename REFCOUNT_T>
 void remove_refcounted(
-        ActiveEnt const ent, STORAGE_T &rStorage, REFCOUNT_T &rRefcount)
+        DrawEnt const ent, STORAGE_T &rStorage, REFCOUNT_T &rRefcount)
 {
-    if (rStorage.contains(ent))
+    auto &rOwner = rStorage[ent];
+    if (rOwner.has_value())
     {
-        auto &rOwner = rStorage.get(ent);
-        if (rOwner.has_value())
-        {
-            rRefcount.ref_release(std::move(rOwner));
-        }
-        rStorage.erase(ent);
+        rRefcount.ref_release(std::move(rOwner));
     }
 }
 
 template<typename IT_T>
 void SysRender::update_delete_drawing(
-        ACtxDrawing& rCtxDraw, IT_T first, IT_T const& last)
+        ACtxDrawing& rCtxDraw, IT_T const& first, IT_T const& last)
 {
-    while (first != last)
+    for (auto it = first; it != last; std::advance(it, 1))
     {
-        ActiveEnt const ent = *first;
-        rCtxDraw.m_opaque       .remove(ent);
-        rCtxDraw.m_transparent  .remove(ent);
-        rCtxDraw.m_visible      .remove(ent);
+        DrawEnt const drawEnt = *it;
 
-        // Textures and meshes are reference counted
-        remove_refcounted(ent, rCtxDraw.m_diffuseTex, rCtxDraw.m_texRefCounts);
-        remove_refcounted(ent, rCtxDraw.m_mesh, rCtxDraw.m_meshRefCounts);
-
-
-        std::advance(first, 1);
+        remove_refcounted(drawEnt, rCtxDraw.m_diffuseTex, rCtxDraw.m_texRefCounts);
+        remove_refcounted(drawEnt, rCtxDraw.m_mesh,       rCtxDraw.m_meshRefCounts);
     }
 }
 
@@ -295,5 +287,15 @@ void SysRender::update_delete_groups(
         rGroup.m_entities.remove(first, last);
     }
 }
+
+constexpr decltype(auto) SysRender::gen_drawable_mesh_adder(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg)
+{
+    return [&rDrawing, &rDrawingRes, &rResources, pkg] (std::string_view const name) -> MeshIdOwner_t
+    {
+        return add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, name);
+    };
+}
+
+
 
 } // namespace osp::active

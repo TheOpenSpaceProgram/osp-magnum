@@ -33,8 +33,8 @@
 namespace osp::universe
 {
 
-enum class SatId     : uint32_t {};
-enum class CoSpaceId : uint32_t {};
+using SatId     = uint32_t;
+using CoSpaceId = uint32_t;
 
 }
 

@@ -33,30 +33,13 @@
 namespace osp
 {
 
-// TODO: ignore debug names on release builds
-
 struct TopTask
 {
-    std::string m_debugName;
-    std::vector<TopDataId> m_dataUsed;
-    TopTaskFunc_t m_func{nullptr};
+    std::string             m_debugName;
+    std::vector<TopDataId>  m_dataUsed;
+    TopTaskFunc_t           m_func              { nullptr };
 };
 
-inline void task_data(TaskDataVec<TopTask> &rData, TaskId const task, std::string_view debugName, std::initializer_list<TopDataId> dataUsed, TopTaskFunc_t func)
-{
-    rData.m_taskData.resize(
-            std::max(rData.m_taskData.size(), std::size_t(task) + 1));
-    auto &rTopTask = rData.m_taskData[std::size_t(task)];
-    rTopTask.m_debugName = debugName;
-    rTopTask.m_dataUsed = dataUsed;
-    rTopTask.m_func = func;
-}
-
-inline void task_data(TaskDataVec<TopTask> &rData, TaskId const task, std::initializer_list<TopDataId> dataUsed, TopTaskFunc_t func)
-{
-    task_data(rData, task, "Untitled Top Task", dataUsed, func);
-}
-
-using TopTaskDataVec_t = TaskDataVec<TopTask>;
+using TopTaskDataVec_t = KeyedVec<TaskId, TopTask>;
 
 } // namespace osp

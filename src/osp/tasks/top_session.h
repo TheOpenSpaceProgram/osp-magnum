@@ -24,35 +24,46 @@
  */
 #pragma once
 
-#include "top_tasks.h"
-#include "top_utils.h"
 #include "tasks.h"
+#include "top_utils.h"
 
 #include <entt/core/any.hpp>
 
 #include <cassert>
 #include <type_traits>
+#include <typeinfo>
 #include <utility>
 #include <vector>
 
 #include <osp/unpack.h>
 
-#define OSP_STRUCT_BIND_C(outerFunc, inner, count, ...) auto const [__VA_ARGS__] = outerFunc<count>(inner)
-#define OSP_STRUCT_BIND_B(x) x
-#define OSP_STRUCT_BIND_A(...) OSP_STRUCT_BIND_B(OSP_STRUCT_BIND_C(__VA_ARGS__))
+#define OSP_AUX_DCDI_C(session, topData, count, ...) \
+    session.m_data.resize(count); \
+    osp::top_reserve(topData, 0, session.m_data.begin(), session.m_data.end()); \
+    auto const [__VA_ARGS__] = osp::unpack<count>(session.m_data)
+#define OSP_AUX_DCDI_B(x) x
+#define OSP_AUX_DCDI_A(...) OSP_AUX_DCDI_B(OSP_AUX_DCDI_C(__VA_ARGS__))
 
-#define OSP_SESSION_UNPACK_TAGS(session, name) OSP_STRUCT_BIND_A(osp::unpack, (session).m_tagIds, OSP_TAGS_##name);
-#define OSP_SESSION_UNPACK_DATA(session, name) OSP_STRUCT_BIND_A(osp::unpack, (session).m_dataIds, OSP_DATA_##name);
+/**
+ * @brief
+ */
+#define OSP_DECLARE_CREATE_DATA_IDS(session, topData, arglist) OSP_AUX_DCDI_A(session, topData, arglist);
 
-#define OSP_SESSION_ACQUIRE_TAGS(session, tags, name) OSP_STRUCT_BIND_A((session).acquire_tags, (tags), OSP_TAGS_##name);
-#define OSP_SESSION_ACQUIRE_DATA(session, topData, name) OSP_STRUCT_BIND_A((session).acquire_data, (topData), OSP_DATA_##name);
+
+#define OSP_AUX_DGDI_C(session, count, ...) \
+    auto const [__VA_ARGS__] = osp::unpack<count>(session.m_data)
+#define OSP_AUX_DGDI_B(x) x
+#define OSP_AUX_DGDI_A(...) OSP_AUX_DGDI_B(OSP_AUX_DGDI_C(__VA_ARGS__))
+
+#define OSP_DECLARE_GET_DATA_IDS(session, arglist) OSP_AUX_DGDI_A(session, arglist);
+
+
 
 namespace osp
 {
 
 /**
- * @brief A convenient group of TopData, Tasks, and Tags that work together to
- *        support a certain feature.
+ * @brief A convenient group of Pipelines that work together to support a certain feature.
  *
  * Sessions only store vectors of integer IDs, and don't does not handle
  * ownership on its own. Close using osp::top_close_session before destruction.
@@ -60,41 +71,70 @@ namespace osp
 struct Session
 {
     template <std::size_t N>
-    std::array<TopDataId, N> acquire_data(ArrayView<entt::any> topData)
+    [[nodiscard]] std::array<TopDataId, N> acquire_data(ArrayView<entt::any> topData)
     {
         std::array<TopDataId, N> out;
         top_reserve(topData, 0, std::begin(out), std::end(out));
-        m_dataIds.assign(std::begin(out), std::end(out));
+        m_data.assign(std::begin(out), std::end(out));
         return out;
     }
 
-    template <std::size_t N>
-    std::array<TagId, N> acquire_tags(Tags &rTags)
+    template<typename TGT_STRUCT_T, typename BUILDER_T>
+    TGT_STRUCT_T create_pipelines(BUILDER_T &rBuilder)
     {
-        std::array<TagId, N> out;
-        rTags.m_tags.create(std::begin(out), std::end(out));
-        m_tagIds.assign(std::begin(out), std::end(out));
-        return out;
+        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineDefBlank_t) == 0);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineDefBlank_t);
+
+        std::type_info const& info = typeid(TGT_STRUCT_T);
+        m_structHash = info.hash_code();
+        m_structName = info.name();
+
+        m_pipelines.resize(count);
+
+        return rBuilder.template create_pipelines<TGT_STRUCT_T>(ArrayView<PipelineId>(m_pipelines.data(), count));
     }
 
-    TaskId& task()
+    template<typename TGT_STRUCT_T>
+    [[nodiscard]] TGT_STRUCT_T get_pipelines() const
     {
-        return m_taskIds.emplace_back(lgrn::id_null<TaskId>());
+        static_assert(sizeof(TGT_STRUCT_T) % sizeof(PipelineId) == 0);
+        constexpr std::size_t count = sizeof(TGT_STRUCT_T) / sizeof(PipelineDefBlank_t);
+
+        [[maybe_unused]] std::type_info const& info = typeid(TGT_STRUCT_T);
+        LGRN_ASSERTMV(m_structHash == info.hash_code() && count == m_pipelines.size(),
+                      "get_pipeline must use the same struct previously given to get_pipelines",
+                      m_structHash, m_structName,
+                      info.hash_code(), info.name(),
+                      m_pipelines.size());
+
+        alignas(TGT_STRUCT_T) std::array<unsigned char, sizeof(TGT_STRUCT_T)> bytes;
+        TGT_STRUCT_T *pOut = new(bytes.data()) TGT_STRUCT_T;\
+
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            unsigned char *pDefBytes = bytes.data() + sizeof(PipelineDefBlank_t)*i;
+            *reinterpret_cast<PipelineId*>(pDefBytes + offsetof(PipelineDefBlank_t, m_value)) = m_pipelines[i];
+        }
+
+        return *pOut;
     }
 
-    std::vector<TopDataId>  m_dataIds;
-    std::vector<TagId>      m_tagIds;
-    std::vector<TaskId>     m_taskIds;
+    std::vector<TopDataId>  m_data;
+    std::vector<PipelineId> m_pipelines;
+    std::vector<TaskId>     m_tasks;
 
-    TagId m_tgCleanupEvt{lgrn::id_null<TagId>()};
+    PipelineId              m_cleanup { lgrn::id_null<PipelineId>() };
+
+    std::size_t             m_structHash{0};
+    std::string             m_structName;
+
+}; // struct Session
+
+struct SessionGroup
+{
+    std::vector<Session>    m_sessions;
+    TaskEdges               m_edges;
 };
-
-using Sessions_t = std::vector<osp::Session>;
-
-/**
- * @brief Close sessions, delete all their associated TopData, Tasks, and Tags.
- */
-void top_close_session(Tags& rTags, Tasks& rTasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec, ArrayView<Session> sessions);
 
 
 } // namespace osp

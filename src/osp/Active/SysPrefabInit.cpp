@@ -116,10 +116,12 @@ void SysPrefabInit::init_drawing(
         Resources&                          rResources,
         ACtxDrawing&                        rDrawing,
         ACtxDrawingRes&                     rDrawingRes,
-        std::optional<EntSetPair>           material) noexcept
+        std::optional<Material>             material) noexcept
 {
-    auto itPfEnts = std::begin(rPrefabInit.m_ents);
+    auto itPfEnts = rPrefabInit.m_ents.begin();
 
+    // stupidly make drawIDs first
+    // TODO: separate this into another step.
     for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
@@ -131,13 +133,53 @@ void SysPrefabInit::init_drawing(
 
         for (std::size_t i = 0; i < objects.size(); ++i)
         {
-            ActiveEnt const ent = (*itPfEnts)[i];
+            int const meshImportId = rImportData.m_objMeshes[objects[i]];
+            if (meshImportId == -1)
+            {
+                continue;
+            }
 
-            // TODO: Don't actually do this. This marks every entity as drawable,
-            //       which considers them for draw transformations.
-            //       Only set drawable for entities that have a mesh or is an
-            //       ancestor of an entity with a mesh.
-            rDrawing.m_drawable.set(std::size_t(ent));
+            ActiveEnt const ent = (*itPfEnts)[i];
+            rDrawing.m_activeToDraw[ent] = rDrawing.m_drawIds.create();
+        }
+
+        ++itPfEnts;
+    }
+
+    // then resize containers
+    rDrawing.resize_draw();
+
+    itPfEnts = rPrefabInit.m_ents.begin();
+
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
+    {
+        auto const &rImportData = rResources.data_get<osp::ImporterData const>(
+                gc_importer, rPfBasic.m_importerRes);
+        auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
+                gc_importer, rPfBasic.m_importerRes);
+
+        auto const ents     = ArrayView<ActiveEnt const>{*itPfEnts};
+        auto const objects  = lgrn::Span<int const>{rPrefabData.m_prefabs[rPfBasic.m_prefabId]};
+        auto const parents  = lgrn::Span<int const>{rPrefabData.m_prefabParents[rPfBasic.m_prefabId]};
+
+        // All ancestors of  each entity that has a mesh
+        auto const needs_draw_transform
+            = [&parents, &ents, &rDrawing, &needDrawTf = rDrawing.m_needDrawTf]
+              (auto && self, int const object, ActiveEnt const ent) noexcept -> void
+        {
+            needDrawTf.set(std::size_t(ent));
+
+            int const parentObj = parents[object];
+
+            if (parentObj != -1)
+            {
+                self(self, parentObj, ents[parentObj]);
+            }
+        };
+
+        for (std::size_t i = 0; i < objects.size(); ++i)
+        {
+            ActiveEnt const ent = (*itPfEnts)[i];
 
             // Check if object has mesh
             int const meshImportId = rImportData.m_objMeshes[objects[i]];
@@ -146,10 +188,14 @@ void SysPrefabInit::init_drawing(
                 continue;
             }
 
+            needs_draw_transform(needs_draw_transform, objects[i], ent);
+
+            DrawEnt const drawEnt = rDrawing.m_activeToDraw[ent];
+
             osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
             MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, meshRes);
-            rDrawing.m_mesh.emplace(ent, rDrawing.m_meshRefCounts.ref_add(meshId));
-            rDrawing.m_meshDirty.push_back(ent);
+            rDrawing.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(meshId);
+            rDrawing.m_meshDirty.push_back(drawEnt);
 
             int const matImportId = rImportData.m_objMaterials[objects[i]];
 
@@ -162,23 +208,22 @@ void SysPrefabInit::init_drawing(
                 {
                     osp::ResId const texRes = rImportData.m_textures[baseColor];
                     TexId const texId = SysRender::own_texture_resource(rDrawing, rDrawingRes, rResources, texRes);
-                    rDrawing.m_diffuseTex.emplace(ent, rDrawing.m_texRefCounts.ref_add(texId));
-                    rDrawing.m_diffuseDirty.push_back(ent);
+                    rDrawing.m_diffuseTex[drawEnt] = rDrawing.m_texRefCounts.ref_add(texId);
+                    rDrawing.m_diffuseDirty.push_back(drawEnt);
                 }
-
             }
 
-            rDrawing.m_opaque.emplace(ent);
-            rDrawing.m_visible.emplace(ent);
+            rDrawing.m_drawBasic[drawEnt] = { .m_opaque = true, .m_transparent = false };
+            rDrawing.m_visible.set(std::size_t(drawEnt));
 
             if (material.has_value())
             {
-                material.value().m_rEnts.set(std::size_t(ent));
-                material.value().m_rDirty.push_back(ent);
+                material.value().m_ents.set(std::size_t(drawEnt));
+                material.value().m_dirty.push_back(drawEnt);
             }
         }
 
-        std::advance(itPfEnts, 1);
+        ++itPfEnts;
     }
 }
 

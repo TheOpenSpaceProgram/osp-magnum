@@ -24,34 +24,33 @@
  */
 #pragma once
 
-#include <cassert>
-#include <iterator>
-#include <type_traits>
+#include "scenarios.h"
 
-namespace osp
+namespace testapp::scenes
 {
 
 /**
- * @brief Create a structured binding-compatible type from a contiguous
- *        container. A c-array is used.
+ * @brief Core Universe struct with addressable Coordinate Spaces
  */
-template<std::size_t N, typename RANGE_T>
-constexpr auto& unpack(RANGE_T &rIn)
-{
-    using ptr_t = decltype(rIn.data());
-    using type_t = std::remove_pointer_t<ptr_t>;
+osp::Session setup_uni_core(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData);
 
-    assert(N <= rIn.size());
-    return *reinterpret_cast<type_t(*)[N]>(std::data(rIn));
+/**
+ * @brief Represents the physics scene's presence in a Universe
+ */
+osp::Session setup_uni_sceneframe(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData);
+
+/**
+ * @brief Unrealistic planets test, allows SceneFrame to move around and get captured into planets
+ */
+osp::Session setup_uni_test_planets(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         uniCore,
+        osp::Session const&         uniScnFrame);
+
+
 }
-
-template<std::size_t N, typename CONTAINER_T>
-constexpr auto& resize_then_unpack(CONTAINER_T &rIn)
-{
-    rIn.resize(N);
-    return unpack<N, CONTAINER_T>(rIn);
-}
-
-
-}
-

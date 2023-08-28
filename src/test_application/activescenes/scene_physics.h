@@ -45,7 +45,12 @@ struct SpawnShape
     osp::phys::EShape m_shape;
 };
 
-using SpawnerVec_t = std::vector<SpawnShape>;
+struct ACtxShapeSpawner
+{
+    std::vector<SpawnShape>         m_spawnRequest;
+    osp::active::ActiveEntVec_t     m_ents;
+    osp::active::MaterialId         m_materialId;
+};
 
 /**
  * @brief Physical properties for entities and generic Physics interface
@@ -53,54 +58,40 @@ using SpawnerVec_t = std::vector<SpawnShape>;
  * Independent of whichever physics engine is used
  */
 osp::Session setup_physics(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon);
+        osp::Session const&         scene,
+        osp::Session const&         commonScene);
 
 /**
  * @brief Newton Dynamics physics integration
  */
 osp::Session setup_newton_physics(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         physics);
 
 /**
  * @brief Queues and logic for spawning physics shapes
  */
 osp::Session setup_shape_spawn(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         scene,
+        osp::Session const&         commonScene,
         osp::Session const&         physics,
-        osp::Session const&         material);
+        osp::active::MaterialId     materialId);
 
 /**
  * @brief Queues and logic for spawning Prefab resources
  */
 osp::Session setup_prefabs(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::Session const&         material,
         osp::TopDataId              idResources);
-
-/**
- * @brief Entity set to delete entities under Z = -10, added to spawned shapes
- */
-osp::Session setup_bounds(
-        Builder_t&                  rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
-        osp::Session const&         physics,
-        osp::Session const&         shapeSpawn);
-
 
 } // namespace testapp::scenes

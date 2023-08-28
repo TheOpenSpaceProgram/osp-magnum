@@ -51,35 +51,45 @@ using namespace Magnum::Math::Literals;
 namespace testapp::scenes
 {
 
+void create_materials(
+        ArrayView<entt::any> const  topData,
+        Session const&              commonScene,
+        int const                   count)
+{
+    OSP_DECLARE_GET_DATA_IDS(commonScene, TESTAPP_DATA_COMMON_SCENE);
+    auto &rDrawing = top_get< ACtxDrawing >(topData, idDrawing);
+
+    for (int i = 0; i < count; ++i)
+    {
+        [[maybe_unused]] MaterialId const mat = rDrawing.m_materialIds.create();
+        LGRN_ASSERT(int(mat) == i);
+    }
+
+    rDrawing.m_materials.resize(count);
+}
+
 void add_floor(
         ArrayView<entt::any> const  topData,
-        Session const&              scnCommon,
-        Session const&              material,
+        Session const&              application,
+        Session const&              commonScene,
         Session const&              shapeSpawn,
-        TopDataId const             idResources,
+        MaterialId const            materialId,
         PkgId const                 pkg)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
 
-    auto &rResources    = top_get< Resources >      (topData, idResources);
-    auto &rActiveIds    = top_get< ActiveReg_t >    (topData, idActiveIds);
-    auto &rBasic        = top_get< ACtxBasic >      (topData, idBasic);
-    auto &rDrawing      = top_get< ACtxDrawing >    (topData, idDrawing);
-    auto &rDrawingRes   = top_get< ACtxDrawingRes > (topData, idDrawingRes);
-    auto &rMatEnts      = top_get< EntSet_t >       (topData, idMatEnts);
-    auto &rMatDirty     = top_get< EntVector_t >    (topData, idMatDirty);
-    auto &rSpawner      = top_get< SpawnerVec_t >   (topData, idSpawner);
+    auto &rResources    = top_get< Resources >          (topData, idResources);
+    auto &rBasic        = top_get< ACtxBasic >          (topData, idBasic);
+    auto &rDrawing      = top_get< ACtxDrawing >        (topData, idDrawing);
+    auto &rDrawingRes   = top_get< ACtxDrawingRes >     (topData, idDrawingRes);
+    auto &rSpawner      = top_get< ACtxShapeSpawner >   (topData, idSpawner);
 
-    // Convenient function to get a reference-counted mesh owner
-    auto const quick_add_mesh = [&rResources, &rDrawing, &rDrawingRes, pkg] (std::string_view const name) -> MeshIdOwner_t
-    {
-        osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
-        assert(res != lgrn::id_null<osp::ResId>());
-        MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, res);
-        return rDrawing.m_meshRefCounts.ref_add(meshId);
-    };
+    Material &rMaterial = rDrawing.m_materials.at(materialId);
+
+    // Convenient functor to get a reference-counted mesh owner
+    auto const quick_add_mesh = SysRender::gen_drawable_mesh_adder(rDrawing, rDrawingRes, rResources, pkg);
 
     // start making floor
 
@@ -87,33 +97,33 @@ void add_floor(
     static constexpr Vector3 const sc_floorPos{0.0f, 0.0f, -1.005f};
 
     // Create floor root and mesh entity
-    ActiveEnt const floorRootEnt = rActiveIds.create();
-    ActiveEnt const floorMeshEnt = rActiveIds.create();
+    ActiveEnt const floorRootEnt = rBasic.m_activeIds.create();
+    ActiveEnt const floorMeshEnt = rBasic.m_activeIds.create();
+    DrawEnt const floorMeshDrawEnt = rDrawing.m_drawIds.create();
 
     // Resize some containers to fit all existing entities
-    rDrawing.m_drawable.ints().resize(rActiveIds.vec().capacity());
-    rBasic.m_scnGraph.resize(rActiveIds.capacity());
+    rBasic.m_scnGraph.resize(rBasic.m_activeIds.capacity());
+    rDrawing.resize_active(rBasic.m_activeIds.capacity());
+    rDrawing.resize_draw();
+    bitvector_resize(rMaterial.m_ents, rDrawing.m_drawIds.capacity());
 
-    // Add transform and draw transform to root
     rBasic.m_transform.emplace(floorRootEnt);
 
     // Add mesh to floor mesh entity
-    rDrawing.m_mesh.emplace(floorMeshEnt, quick_add_mesh("grid64solid"));
-    rDrawing.m_meshDirty.push_back(floorMeshEnt);
+    rDrawing.m_activeToDraw[floorMeshEnt] = floorMeshDrawEnt;
+    rDrawing.m_mesh[floorMeshDrawEnt] = quick_add_mesh("grid64solid");
+    rDrawing.m_meshDirty.push_back(floorMeshDrawEnt);
 
     // Add mesh visualizer material to floor mesh entity
-    rMatEnts.ints().resize(rActiveIds.vec().capacity());
-    rMatEnts.set(std::size_t(floorMeshEnt));
-    rMatDirty.push_back(floorMeshEnt);
+    rMaterial.m_ents.set(std::size_t(floorMeshDrawEnt));
+    rMaterial.m_dirty.push_back(floorMeshDrawEnt);
 
     // Add transform, draw transform, opaque, and visible entity
-    rBasic.m_transform.emplace(
-            floorMeshEnt, ACompTransform{Matrix4::scaling(sc_floorSize)});
-    rDrawing.m_opaque.emplace(floorMeshEnt);
-    rDrawing.m_visible.emplace(floorMeshEnt);
-
-    rDrawing.m_drawable.set(std::size_t(floorRootEnt));
-    rDrawing.m_drawable.set(std::size_t(floorMeshEnt));
+    rBasic.m_transform.emplace(floorMeshEnt, ACompTransform{Matrix4::scaling(sc_floorSize)});
+    rDrawing.m_drawBasic[floorMeshDrawEnt].m_opaque = true;
+    rDrawing.m_visible.set(std::size_t(floorMeshDrawEnt));
+    rDrawing.m_needDrawTf.set(std::size_t(floorRootEnt));
+    rDrawing.m_needDrawTf.set(std::size_t(floorMeshEnt));
 
     SubtreeBuilder builder = SysSceneGraph::add_descendants(rBasic.m_scnGraph, 2);
 
@@ -124,7 +134,7 @@ void add_floor(
     bldFloorRoot.add_child(floorMeshEnt);
 
     // Add collider to floor root entity
-    rSpawner.emplace_back(SpawnShape{
+    rSpawner.m_spawnRequest.emplace_back(SpawnShape{
         .m_position = sc_floorPos,
         .m_velocity = sc_floorSize,
         .m_size     = sc_floorSize,
@@ -134,90 +144,99 @@ void add_floor(
 }
 
 Session setup_camera_ctrl(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              app,
+        Session const&              windowApp,
         Session const&              scnRender)
 {
-    OSP_SESSION_UNPACK_DATA(app,        TESTAPP_APP);
-    OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
-    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
+    OSP_DECLARE_GET_DATA_IDS(scnRender,     TESTAPP_DATA_COMMON_RENDERER);
+
+    auto const tgSR  = scnRender.get_pipelines<PlSceneRenderer>();
+    //auto const tgWin = windowApp.get_pipelines<PlWindowApp>();
+
     auto &rUserInput = top_get< osp::input::UserInputHandler >(topData, idUserInput);
 
-    Session cameraCtrl;
-    OSP_SESSION_ACQUIRE_DATA(cameraCtrl, topData, TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_ACQUIRE_TAGS(cameraCtrl, rTags,   TESTAPP_CAMERA_CTRL);
-
-    rBuilder.tag(tgCamCtrlReq).depend_on({tgCamCtrlMod});
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_CAMERA_CTRL);
+    auto const tgCmCt = out.create_pipelines<PlCameraCtrl>(rBuilder);
 
     top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
 
-    cameraCtrl.task() = rBuilder.task().assign({tgRenderEvt, tgCamCtrlReq, tgCameraMod}).data(
-            "Position Rendering Camera according to Camera Controller",
-            TopDataIds_t{                            idCamCtrl,        idCamera},
-            wrap_args([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
+    rBuilder.pipeline(tgCmCt.camCtrl).parent(tgSR.render);
+
+    rBuilder.task()
+        .name       ("Position Rendering Camera according to Camera Controller")
+        .run_on     ({tgSR.render(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgSR.camera(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({                           idCamCtrl,        idCamera })
+        .func([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
     {
         rCamera.m_transform = rCamCtrl.m_transform;
-    }));
+    });
 
-    return cameraCtrl;
+    return out;
 }
 
 Session setup_camera_free(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              app,
-        Session const&              scnCommon,
-        Session const&              camera)
+        Session const&              windowApp,
+        Session const&              scene,
+        Session const&              cameraCtrl)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(app,        TESTAPP_APP);
-    OSP_SESSION_UNPACK_DATA(camera,     TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_TAGS(camera,     TESTAPP_CAMERA_CTRL);
+    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
 
-    Session cameraFree;
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
 
-    cameraFree.task() = rBuilder.task().assign({tgInputEvt, tgCamCtrlMod}).data(
-            "Move Camera",
-            TopDataIds_t{                      idCamCtrl,           idDeltaTimeIn},
-            wrap_args([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
+    Session out;
+
+    rBuilder.task()
+        .name       ("Move Camera controller")
+        .run_on     ({tgWin.inputs(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idCamCtrl,           idDeltaTimeIn })
+        .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
     {
         SysCameraController::update_view(rCamCtrl, deltaTimeIn);
         SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
-    }));
+    });
 
-    return cameraFree;
+    return out;
 }
 
+
 Session setup_thrower(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              magnum,
-        Session const&              renderer,
-        Session const&              simpleCamera,
+        Session const&              windowApp,
+        Session const&              cameraCtrl,
         Session const&              shapeSpawn)
 {
-    OSP_SESSION_UNPACK_DATA(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(shapeSpawn,     TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_DATA(simpleCamera,   TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_TAGS(simpleCamera,   TESTAPP_CAMERA_CTRL);
-
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,     TESTAPP_DATA_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,   TESTAPP_DATA_CAMERA_CTRL);
     auto &rCamCtrl = top_get< ACtxCameraController > (topData, idCamCtrl);
 
-    Session thrower;
-    auto const [idBtnThrow] = thrower.acquire_data<1>(topData);
+    auto const tgWin    = windowApp .get_pipelines<PlWindowApp>();
+    auto const tgCmCt   = cameraCtrl.get_pipelines<PlCameraCtrl>();
+    auto const tgShSp   = shapeSpawn.get_pipelines<PlShapeSpawn>();
+
+    Session out;
+    auto const [idBtnThrow] = out.acquire_data<1>(topData);
 
     top_emplace< EButtonControlIndex > (topData, idBtnThrow, rCamCtrl.m_controls.button_subscribe("debug_throw"));
 
-    thrower.task() = rBuilder.task().assign({tgInputEvt, tgSpawnMod, tgCamCtrlReq}).data(
-            "Throw spheres when pressing space",
-            TopDataIds_t{                      idCamCtrl,              idSpawner,                   idBtnThrow},
-            wrap_args([] (ACtxCameraController& rCamCtrl, SpawnerVec_t& rSpawner, EButtonControlIndex btnThrow) noexcept
+    rBuilder.task()
+        .name       ("Throw spheres when pressing space")
+        .run_on     ({tgWin.inputs(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgShSp.spawnRequest(Modify_)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idCamCtrl,                  idSpawner,                   idBtnThrow })
+        .func([] (ACtxCameraController& rCamCtrl, ACtxShapeSpawner& rSpawner, EButtonControlIndex btnThrow) noexcept
     {
         // Throw a sphere when the throw button is pressed
         if (rCamCtrl.m_controls.button_held(btnThrow))
@@ -225,50 +244,54 @@ Session setup_thrower(
             Matrix4 const &camTf = rCamCtrl.m_transform;
             float const speed = 120;
             float const dist = 8.0f;
-            rSpawner.emplace_back(SpawnShape{
+            rSpawner.m_spawnRequest.push_back({
                 .m_position = camTf.translation() - camTf.backward() * dist,
                 .m_velocity = -camTf.backward() * speed,
                 .m_size     = Vector3{1.0f},
                 .m_mass     = 1.0f,
                 .m_shape    = EShape::Sphere
             });
-            return osp::TopTaskStatus::Success;
         }
-        return osp::TopTaskStatus::Success;
-    }));
+    });
 
-    return thrower;
+    return out;
 }
 
 Session setup_droppers(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
+        Session const&              scene,
+        Session const&              commonScene,
         Session const&              shapeSpawn)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(shapeSpawn, TESTAPP_SHAPE_SPAWN);
-    OSP_SESSION_UNPACK_TAGS(shapeSpawn, TESTAPP_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
 
-    Session droppers;
-    auto const [idSpawnTimerA, idSpawnTimerB] = droppers.acquire_data<2>(topData);
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+
+    Session out;
+    auto const [idSpawnTimerA, idSpawnTimerB] = out.acquire_data<2>(topData);
 
     top_emplace< float > (topData, idSpawnTimerA, 0.0f);
     top_emplace< float > (topData, idSpawnTimerB, 0.0f);
 
-    droppers.task() = rBuilder.task().assign({tgTimeEvt, tgSpawnMod}).data(
-            "Spawn blocks every 2 seconds",
-            TopDataIds_t{              idSpawner,       idSpawnTimerA,          idDeltaTimeIn },
-            wrap_args([] (SpawnerVec_t& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
+    rBuilder.task()
+        .name       ("Spawn blocks every 2 seconds")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgShSp.spawnRequest(Modify_)})
+        .push_to    (out.m_tasks)
+        .args({                    idSpawner,       idSpawnTimerA,          idDeltaTimeIn })
+        .func([] (ACtxShapeSpawner& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
+
     {
         rSpawnTimer += deltaTimeIn;
         if (rSpawnTimer >= 2.0f)
         {
             rSpawnTimer -= 2.0f;
 
-            rSpawner.emplace_back(SpawnShape{
+            rSpawner.m_spawnRequest.push_back({
                 .m_position = {10.0f, 0.0f, 30.0f},
                 .m_velocity = {0.0f, 0.0f, 0.0f},
                 .m_size     = {2.0f, 2.0f, 1.0f},
@@ -276,19 +299,22 @@ Session setup_droppers(
                 .m_shape    = EShape::Box
             });
         }
-    }));
+    });
 
-    droppers.task() = rBuilder.task().assign({tgTimeEvt, tgSpawnMod}).data(
-            "Spawn cylinders every 1 seconds",
-            TopDataIds_t{              idSpawner,       idSpawnTimerB,          idDeltaTimeIn },
-            wrap_args([] (SpawnerVec_t& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
+    rBuilder.task()
+        .name       ("Spawn cylinders every 1 second")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgShSp.spawnRequest(Modify_)})
+        .push_to    (out.m_tasks)
+        .args({                    idSpawner,       idSpawnTimerB,          idDeltaTimeIn })
+        .func([] (ACtxShapeSpawner& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
     {
         rSpawnTimer += deltaTimeIn;
         if (rSpawnTimer >= 1.0f)
         {
             rSpawnTimer -= 1.0f;
 
-            rSpawner.emplace_back(SpawnShape{
+            rSpawner.m_spawnRequest.push_back({
                 .m_position = {-10.0f, 0.0, 30.0f},
                 .m_velocity = {0.0f, 0.0f, 0.0f},
                 .m_size     = {2.0f, 2.0f, 1.0f},
@@ -296,9 +322,114 @@ Session setup_droppers(
                 .m_shape    = EShape::Cylinder
             });
         }
-    }));
+    });
 
-    return droppers;
+    return out;
 }
 
+Session setup_bounds(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              scene,
+        Session const&              commonScene,
+        Session const&              shapeSpawn)
+{
+    using ActiveEntVec_t = std::vector<ActiveEnt>;
+
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_BOUNDS);
+    auto const tgBnds = out.create_pipelines<PlBounds>(rBuilder);
+
+    rBuilder.pipeline(tgBnds.boundsSet)     .parent(tgScn.update);
+    rBuilder.pipeline(tgBnds.outOfBounds)   .parent(tgScn.update);
+
+    top_emplace< ActiveEntSet_t >       (topData, idBounds);
+    top_emplace< ActiveEntVec_t >       (topData, idOutOfBounds);
+
+    rBuilder.task()
+        .name       ("Check for out-of-bounds entities")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgCS.transform(Ready), tgBnds.boundsSet(Ready), tgBnds.outOfBounds(Modify__)})
+        .push_to    (out.m_tasks)
+        .args       ({            idBasic,                      idBounds,                idOutOfBounds })
+        .func([] (ACtxBasic const& rBasic, ActiveEntSet_t const& rBounds, ActiveEntVec_t& rOutOfBounds) noexcept
+    {
+        for (std::size_t const ent : rBounds.ones())
+        {
+            ACompTransform const &entTf = rBasic.m_transform.get(ActiveEnt(ent));
+            if (entTf.m_transform.translation().z() < -10)
+            {
+                rOutOfBounds.push_back(ActiveEnt(ent));
+            }
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Queue-Delete out-of-bounds entities")
+        .run_on     ({tgBnds.outOfBounds(UseOrRun_)})
+        .sync_with  ({tgCS.activeEntDelete(Modify_), tgCS.hierarchy(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                idActiveEntDel,                idOutOfBounds })
+        .func([] (ACtxBasic& rBasic, ActiveEntVec_t& rActiveEntDel, ActiveEntVec_t& rOutOfBounds) noexcept
+    {
+        SysSceneGraph::queue_delete_entities(rBasic.m_scnGraph, rActiveEntDel, rOutOfBounds.begin(), rOutOfBounds.end());
+    });
+
+    rBuilder.task()
+        .name       ("Clear out-of-bounds vector once we're done with it")
+        .run_on     ({tgBnds.outOfBounds(Clear_)})
+        .push_to    (out.m_tasks)
+        .args       ({           idOutOfBounds })
+        .func([] (ActiveEntVec_t& rOutOfBounds) noexcept
+    {
+        rOutOfBounds.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Add bounds to spawned shapes")
+        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgBnds.boundsSet(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                  idSpawner,                idBounds })
+        .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner, ActiveEntSet_t& rBounds) noexcept
+    {
+        rBounds.ints().resize(rBasic.m_activeIds.vec().capacity());
+
+        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
+        {
+            SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
+            if (spawn.m_mass == 0)
+            {
+                continue;
+            }
+
+            ActiveEnt const root    = rSpawner.m_ents[i * 2];
+
+            rBounds.set(std::size_t(root));
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Delete bounds components")
+        .run_on     ({tgCS.activeEntDelete(UseOrRun)})
+        .sync_with  ({tgBnds.boundsSet(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idActiveEntDel,                idBounds })
+        .func([] (ActiveEntVec_t const& rActiveEntDel, ActiveEntSet_t& rBounds) noexcept
+    {
+        for (osp::active::ActiveEnt const ent : rActiveEntDel)
+        {
+            rBounds.reset(std::size_t(ent));
+        }
+    });
+
+    return out;
 }
+
+} // namespace testapp::scenes

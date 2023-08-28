@@ -27,9 +27,6 @@
 namespace osp::link
 {
 
-NodeTypeId const gc_ntSigFloat = NodeTypeReg_t::create();
-
-
 void copy_nodes(
         Nodes const &rSrcNodes,
         Machines const &rSrcMach,

@@ -32,10 +32,6 @@ using osp::link::MachTypeId;
 namespace adera
 {
 
-MachTypeId const gc_mtUserCtrl      = MachTypeReg_t::create();
-MachTypeId const gc_mtMagicRocket   = MachTypeReg_t::create();
-MachTypeId const gc_mtRcsDriver     = MachTypeReg_t::create();
-
 float thruster_influence(Vector3 const pos, Vector3 const dir, Vector3 const cmdLin, Vector3 const cmdAng) noexcept
 {
     using Magnum::Math::cross;

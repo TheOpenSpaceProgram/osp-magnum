@@ -26,41 +26,115 @@
 
 #include "scenarios.h"
 
-#include "../ActiveApplication.h"
+#include <osp/Active/activetypes.h>
+
+#include "../MagnumApplication.h"
 
 
 namespace testapp::scenes
 {
 
-
-osp::Session setup_magnum_application(
-        Builder_t&                      rBuilder,
+osp::Session setup_window_app(
+        osp::TopTaskBuilder&            rBuilder,
         osp::ArrayView<entt::any>       topData,
-        osp::Tags&                      rTags,
-        osp::TopDataId const            idResources,
-        ActiveApplication::Arguments    args);
+        osp::Session const&             application);
+
+osp::Session setup_magnum(
+        osp::TopTaskBuilder&            rBuilder,
+        osp::ArrayView<entt::any>       topData,
+        osp::Session const&             windowApp,
+        osp::Session const&             application,
+        MagnumApplication::Arguments    args);
 
 /**
  * @brief Magnum-powered OpenGL Renderer
  */
 osp::Session setup_scene_renderer(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
+        osp::Session const&         application,
+        osp::Session const&         windowApp,
         osp::Session const&         magnum,
         osp::Session const&         scene,
-        osp::TopDataId              idResources);
+        osp::Session const&         commonScene);
 
 /**
- * @brief Assign a material from setup_material to use Magnum MeshVisualizer
+ * @brief Magnum MeshVisualizer shader and optional material for drawing ActiveEnts with it
  */
 osp::Session setup_shader_visualizer(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
+        osp::Session const&         magnum,
+        osp::Session const&         scene,
+        osp::Session const&         commonScene,
+        osp::Session const&         scnRender,
+        osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
+
+/**
+ * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
+ */
+osp::Session setup_shader_flat(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
         osp::Session const&         magnum,
         osp::Session const&         scene,
         osp::Session const&         scnRender,
         osp::Session const&         material);
+
+/**
+ * @brief Magnum Phong shader and optional material for drawing ActiveEnts with it
+ */
+osp::Session setup_shader_phong(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         magnum,
+        osp::Session const&         scene,
+        osp::Session const&         scnRender,
+        osp::Session const&         material);
+
+/**
+ * @brief Red indicators over Magic Rockets
+ */
+osp::Session setup_thrust_indicators(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         magnum,
+        osp::Session const&         commonScene,
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat,
+        osp::Session const&         scnRender,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         shFlat,
+        osp::TopDataId const        idResources,
+        osp::PkgId const            pkg);
+
+/**
+ * @brief Wireframe cube over the camera controller's target
+ */
+osp::Session setup_cursor(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         magnum,
+        osp::Session const&         commonScene,
+        osp::Session const&         scnRender,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         shFlat,
+        osp::TopDataId const        idResources,
+        osp::PkgId const            pkg);
+
+/**
+ * @brief Draw universe, specifically designed for setup_uni_test_planets
+ */
+osp::Session setup_uni_test_planets_renderer(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         magnum,
+        osp::Session const&         scnRender,
+        osp::Session const&         commonScene,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         visualizer,
+        osp::Session const&         uniCore,
+        osp::Session const&         uniScnFrame,
+        osp::Session const&         uniTestPlanets);
 
 }

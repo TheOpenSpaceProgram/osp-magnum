@@ -32,7 +32,7 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_phong(
-        ActiveEnt ent, ViewProjMatrix const& viewProj,
+        DrawEnt ent, ViewProjMatrix const& viewProj,
         EntityToDraw::UserData_t userData) noexcept
 {
     using Flag = Phong::Flag;
@@ -46,7 +46,7 @@ void shader::draw_ent_phong(
     auto &rShader = *reinterpret_cast<Phong*>(pShader);
 
     // Collect uniform information
-    Matrix4 const &drawTf = rData.m_pDrawTf->get(ent);
+    Matrix4 const &drawTf = (*rData.m_pDrawTf)[ent];
 
     Magnum::Matrix4 entRelative = viewProj.m_view * drawTf;
 
@@ -58,7 +58,7 @@ void shader::draw_ent_phong(
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {
-        TexGlId const texGlId = rData.m_pDiffuseTexId->get(ent).m_glId;
+        TexGlId const texGlId = (*rData.m_pDiffuseTexId)[ent].m_glId;
         Magnum::GL::Texture2D &rTexture = rData.m_pTexGl->get(texGlId);
         rShader.bindDiffuseTexture(rTexture);
 
@@ -70,23 +70,45 @@ void shader::draw_ent_phong(
 
     if (rData.m_pColor != nullptr)
     {
-        rShader.setDiffuseColor(rData.m_pColor->contains(ent)
-                                ? rData.m_pColor->get(ent)
-                                : 0xffffffff_rgbaf);
+        rShader.setDiffuseColor((*rData.m_pColor)[ent]);
     }
 
-    MeshGlId const meshId = rData.m_pMeshId->get(ent).m_glId;
+    MeshGlId const meshId = (*rData.m_pMeshId)[ent].m_glId;
     Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
 
+    Matrix3 a{viewProj.m_view};
+
+
+    // Lights with w=0.0f are directional lights
+    // Directonal lights are camera-relative, so we need 'viewProj.m_view *'
+    auto const lightPositions =
+    {
+        viewProj.m_view * Vector4{ Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f},
+        viewProj.m_view * Vector4{-Vector3{0.0f, 0.0f, 1.0f}, 0.0f}
+    };
+
+    auto const lightColors =
+    {
+        0xddd4Cd_rgbf,
+        0x32354e_rgbf
+    };
+
+    auto const lightSpecColors =
+    {
+        0xfff5ed_rgbf,
+        0x000000_rgbf
+    };
+
+    // TODO: find a better way to deal with lights instead of hard-coding it
     rShader
-        .setAmbientColor(0x000000ff_rgbaf)
+        .setAmbientColor(0x1a1e29ff_rgbaf)
         .setSpecularColor(0xffffff00_rgbaf)
-        .setLightColors({0xfff5ec_rgbf, 0xe4e8ff_rgbf})
-        .setLightPositions({ Vector4{ Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f},
-                             Vector4{-Vector3{0.2f, 0.6f, 0.5f}.normalized(), 0.0f} })
+        .setLightColors(lightColors)
+        .setLightSpecularColors(lightSpecColors)
+        .setLightPositions(lightPositions)
         .setTransformationMatrix(entRelative)
         .setProjectionMatrix(viewProj.m_proj)
-        .setNormalMatrix(Matrix3{drawTf})
+        .setNormalMatrix(entRelative.normalMatrix())
         .draw(rMesh);
 }
 

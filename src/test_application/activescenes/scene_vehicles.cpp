@@ -51,15 +51,15 @@ using namespace Magnum::Math::Literals;
 namespace testapp::scenes
 {
 
+#if 0
 
 Session setup_parts(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         TopDataId const             idResources)
 {
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
 
     Session parts;
     OSP_SESSION_ACQUIRE_DATA(parts, topData, TESTAPP_PARTS);
@@ -141,13 +141,12 @@ Session setup_parts(
 }
 
 Session setup_signals_float(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              parts)
 {
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(parts,      TESTAPP_PARTS);
     OSP_SESSION_UNPACK_TAGS(parts,      TESTAPP_PARTS);
 
@@ -238,14 +237,13 @@ TopTaskFunc_t gen_allocate_mach_bitsets()
 }
 
 Session setup_mach_rocket(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              parts,
         Session const&              signalsFloat)
 {
-    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
     OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
     OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
@@ -267,14 +265,13 @@ Session setup_mach_rocket(
 }
 
 Session setup_mach_rcsdriver(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              parts,
         Session const&              signalsFloat)
 {
-    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
     OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
     OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
@@ -357,12 +354,11 @@ Session setup_mach_rcsdriver(
 }
 
 Session setup_vehicle_spawn(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon)
+        Session const&              commonScene)
 {
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
 
     Session vehicleSpawn;
     OSP_SESSION_ACQUIRE_DATA(vehicleSpawn, topData, TESTAPP_VEHICLE_SPAWN);
@@ -389,18 +385,17 @@ Session setup_vehicle_spawn(
 }
 
 Session setup_vehicle_spawn_vb(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        [[maybe_unused]] Tags&      rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              prefabs,
         Session const&              parts,
         Session const&              vehicleSpawn,
         Session const&              signalsFloat,
         TopDataId const             idResources)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(commonScene,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(prefabs,        TESTAPP_PREFABS);
     OSP_SESSION_UNPACK_TAGS(prefabs,        TESTAPP_PREFABS);
     OSP_SESSION_UNPACK_DATA(vehicleSpawn,   TESTAPP_VEHICLE_SPAWN);
@@ -961,13 +956,12 @@ void add_rcs_block(VehicleBuilder& rBuilder, VehicleBuilder::WeldVec_t& rWeldTo,
 }
 
 Session setup_test_vehicles(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        [[maybe_unused]] Tags&      rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         TopDataId const             idResources)
 {
-    OSP_SESSION_UNPACK_TAGS(scnCommon,  TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
 
     Session testVehicles;
     OSP_SESSION_ACQUIRE_DATA(testVehicles, topData, TESTAPP_TEST_VEHICLES);
@@ -1078,15 +1072,14 @@ struct VehicleTestControls
 };
 
 Session setup_vehicle_control(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              parts,
         Session const&              signalsFloat,
         Session const&              app)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(commonScene,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
     OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
     OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
@@ -1211,17 +1204,16 @@ Session setup_vehicle_control(
 }
 
 Session setup_camera_vehicle(
-        Builder_t&                  rBuilder,
+        TopTaskBuilder&             rBuilder,
         [[maybe_unused]] ArrayView<entt::any> const topData,
-        [[maybe_unused]] Tags&      rTags,
         Session const&              app,
-        Session const&              scnCommon,
+        Session const&              commonScene,
         Session const&              parts,
         Session const&              physics,
         Session const&              camera,
         Session const&              vehicleControl)
 {
-    OSP_SESSION_UNPACK_DATA(scnCommon,      TESTAPP_COMMON_SCENE);
+    OSP_SESSION_UNPACK_DATA(commonScene,      TESTAPP_COMMON_SCENE);
     OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
     OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
     OSP_SESSION_UNPACK_TAGS(app,            TESTAPP_APP);
@@ -1268,5 +1260,7 @@ Session setup_camera_vehicle(
 
     return cameraFree;
 }
+
+#endif
 
 } // namespace testapp::scenes

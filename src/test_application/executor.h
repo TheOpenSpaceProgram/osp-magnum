@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2023 Open Space Program Project
  *
  * MIT License
  *
@@ -24,34 +24,31 @@
  */
 #pragma once
 
-#include <cassert>
-#include <iterator>
-#include <type_traits>
+#include "testapp.h"
 
-namespace osp
+#include <osp/tasks/top_execute.h>
+
+#include <osp/logging.h>
+
+namespace testapp
 {
 
-/**
- * @brief Create a structured binding-compatible type from a contiguous
- *        container. A c-array is used.
- */
-template<std::size_t N, typename RANGE_T>
-constexpr auto& unpack(RANGE_T &rIn)
+struct SingleThreadedExecutor final : public IExecutor
 {
-    using ptr_t = decltype(rIn.data());
-    using type_t = std::remove_pointer_t<ptr_t>;
+    void load(TestAppTasks& rAppTasks) override;
 
-    assert(N <= rIn.size());
-    return *reinterpret_cast<type_t(*)[N]>(std::data(rIn));
-}
+    void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
 
-template<std::size_t N, typename CONTAINER_T>
-constexpr auto& resize_then_unpack(CONTAINER_T &rIn)
-{
-    rIn.resize(N);
-    return unpack<N, CONTAINER_T>(rIn);
-}
+    void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
 
+    void wait(TestAppTasks& rAppTasks) override;
 
-}
+    bool is_running(TestAppTasks const& rAppTasks) override;
+
+    osp::ExecContext    m_execContext;
+
+    std::shared_ptr<spdlog::logger> m_log;
+};
+
+} // namespace testapp
 

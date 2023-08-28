@@ -54,9 +54,10 @@ using TreePos_t = uint32_t;
 
 struct ACtxSceneGraph
 {
-    // Tree structure stored using an array of descendant count in parallel with
-    // identificaton (entities)
-    // A(B(C(D)), E(F(G(H,I)))) -> [A,B,C,D,E,F,G,H,I] and [8,2,1,0,4,3,2,0,0]
+    // N-ary tree structure represented as an array of descendant counts. Each node's subtree of
+    // descendants is positioned directly after it within the array.
+    // Example for tree structure "A(  B(C(D)), E(F(G(H,I)))  )"
+    // * Descendant Count array: [A:8, B:2, C:1, D:0, E:4, F:3, G:2, H:0, I:0]
     std::vector<ActiveEnt>  m_treeToEnt{lgrn::id_null<ActiveEnt>()};
     std::vector<uint32_t>   m_treeDescendants{std::initializer_list<uint32_t>{0}};
 
@@ -79,17 +80,15 @@ struct ACtxSceneGraph
  */
 struct ACtxBasic
 {
-    ACtxSceneGraph m_scnGraph;
+    lgrn::IdRegistryStl<ActiveEnt>      m_activeIds;
 
-    acomp_storage_t<ACompTransform>             m_transform;
-    acomp_storage_t<ACompName>                  m_name;
+    ACtxSceneGraph                      m_scnGraph;
+    acomp_storage_t<ACompTransform>     m_transform;
 };
 
 template<typename IT_T>
 void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
 {
-    rCtxBasic.m_name            .remove(first, last);
-
     while (first != last)
     {
         ActiveEnt const ent = *first;

@@ -37,9 +37,11 @@ struct ACtxDrawMeshVisualizer
 {
     MeshVisualizer m_shader{Corrade::NoCreate};
 
-    active::acomp_storage_t<Matrix4>    *m_pDrawTf{nullptr};
-    osp::active::ACompMeshGlStorage_t   *m_pMeshId{nullptr};
+    osp::active::DrawTransforms_t       *m_pDrawTf{nullptr};
+    osp::active::MeshGlEntStorage_t     *m_pMeshId{nullptr};
     osp::active::MeshGlStorage_t        *m_pMeshGl{nullptr};
+
+    osp::active::MaterialId             m_materialId { lgrn::id_null<osp::active::MaterialId>() };
 
     bool m_wireframeOnly{false};
 
@@ -53,43 +55,28 @@ struct ACtxDrawMeshVisualizer
 };
 
 void draw_ent_visualizer(
-        active::ActiveEnt ent,
-        active::ViewProjMatrix const& viewProj,
-        active::EntityToDraw::UserData_t userData) noexcept;
+        active::DrawEnt                     ent,
+        active::ViewProjMatrix const&       viewProj,
+        active::EntityToDraw::UserData_t    userData) noexcept;
 
-template<typename ITA_T, typename ITB_T>
-void sync_visualizer(
-        ITA_T dirtyFirst,
-        ITB_T const& dirtyLast,
-        active::EntSet_t const& hasMaterial,
-        active::RenderGroup::Storage_t& rStorage,
-        ACtxDrawMeshVisualizer &rData)
+void sync_drawent_visualizer(
+        active::DrawEnt const               ent,
+        active::DrawEntSet_t const&         hasMaterial,
+        active::RenderGroup::Storage_t&     rStorage,
+        ACtxDrawMeshVisualizer&             rData);
+
+template <typename ITA_T, typename ITB_T>
+static void sync_drawent_visualizer(
+        ITA_T const&                        first,
+        ITB_T const&                        last,
+        active::DrawEntSet_t const&         hasMaterial,
+        active::RenderGroup::Storage_t&     rStorage,
+        ACtxDrawMeshVisualizer&             rData)
 {
-    using namespace active;
-
-    while (dirtyFirst != dirtyLast)
+    std::for_each(first, last, [&] (active::DrawEnt const ent)
     {
-        ActiveEnt const ent = *dirtyFirst;
-        bool alreadyAdded = rStorage.contains(ent);
-        if (hasMaterial.test(std::size_t(ent)))
-        {
-            if ( ! alreadyAdded)
-            {
-                rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
-            }
-        }
-        else
-        {
-            if (alreadyAdded)
-            {
-                rStorage.erase(ent);
-            }
-        }
-
-        std::advance(dirtyFirst, 1);
-    }
-
-
+        sync_drawent_visualizer(ent, hasMaterial, rStorage, rData);
+    });
 }
 
 } // namespace osp::shader

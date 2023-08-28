@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include "execute.h"
 #include "tasks.h"
 #include "top_tasks.h"
 
@@ -32,16 +33,26 @@
 namespace osp
 {
 
+void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, WorkerContext worker = {});
 
-void top_run_blocking(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecutionContext& rExec);
-
-void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, ArrayView<TagId const> tagsEnq);
-
-inline void top_enqueue_quick(Tags const& tags, Tasks const& tasks, ExecutionContext& rExec, std::initializer_list<TagId const> tagsEnq)
+struct TopExecWriteState
 {
-    return top_enqueue_quick(tags, tasks, rExec, Corrade::Containers::arrayView(tagsEnq));
-}
+    Tasks const             &tasks;
+    TopTaskDataVec_t const  &taskData;
+    TaskGraph const         &graph;
+    ExecContext const       &exec;
+};
 
-bool debug_top_print_deadlock(Tags const& tags, Tasks const& tasks, TopTaskDataVec_t const& taskData, ExecutionContext const &rExec);
+struct TopExecWriteLog
+{
+    Tasks const             &tasks;
+    TopTaskDataVec_t const  &taskData;
+    TaskGraph const         &graph;
+    ExecContext const       &exec;
+};
+
+std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write);
+
+std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write);
 
 } // namespace testapp

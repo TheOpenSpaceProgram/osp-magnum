@@ -25,35 +25,34 @@
 #pragma once
 
 #include "activetypes.h"
-#include "basic.h"
-#include "../types.h"
+
+#include "../bitvector.h"
 #include "../id_map.h"
+#include "../keyed_vector.h"
+#include "../types.h"
 
 #include "../Resource/resourcetypes.h"
 
 #include <Magnum/Magnum.h>
 #include <Magnum/Math/Color.h>
 
-#include <longeron/id_management/registry.hpp>
 #include <longeron/id_management/refcount.hpp>
 
 namespace osp::active
 {
 
-/**
- * @brief An object that is completely opaque
- */
-struct ACompOpaque {};
 
-/**
- *  @brief An object with transparency
- */
-struct ACompTransparent {};
+struct BasicDrawProps
+{
+    bool m_opaque:1         { false };
+    bool m_transparent:1    { false };
+};
 
-/**
- * @brief Visibility state of this object
- */
-struct ACompVisible {};
+struct Material
+{
+    DrawEntSet_t m_ents;
+    DrawEntVec_t m_dirty;
+};
 
 /**
  * @brief Mesh that describes the appearance of an entity
@@ -69,7 +68,6 @@ enum class MeshId : uint32_t { };
  */
 enum class TexId : uint32_t { };
 
-struct ACompColor : Magnum::Color4 {};
 
 using MeshRefCount_t    = lgrn::IdRefCount<MeshId>;
 using MeshIdOwner_t     = MeshRefCount_t::Owner_t;
@@ -83,27 +81,49 @@ using TexIdOwner_t      = TexRefCount_t::Owner_t;
 struct ACtxDrawing
 {
 
-    // Drawing Components
-    EntSet_t                                m_drawable;
-    acomp_storage_t<ACompOpaque>            m_opaque;
-    acomp_storage_t<ACompTransparent>       m_transparent;
-    acomp_storage_t<ACompVisible>           m_visible;
-    acomp_storage_t<ACompColor>             m_color;
+    void resize_draw()
+    {
+        std::size_t const size = m_drawIds.capacity();
+
+        bitvector_resize(m_visible, size);
+        m_drawBasic     .resize(size);
+        m_color         .resize(size);
+        m_diffuseTex    .resize(size);
+        m_mesh          .resize(size);
+    }
+
+    void resize_active(std::size_t const size)
+    {
+        bitvector_resize(m_needDrawTf, size);
+        m_activeToDraw.resize(size, lgrn::id_null<DrawEnt>());
+    }
+
+    lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
+
+    DrawEntSet_t                            m_visible;
+    KeyedVec<DrawEnt, BasicDrawProps>       m_drawBasic;
+    KeyedVec<DrawEnt, Magnum::Color4>       m_color;
+
+    DrawEntSet_t                            m_needDrawTf;
+    KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
 
     // Scene-space Meshes
-    lgrn::IdRegistry<MeshId>                m_meshIds;
+    lgrn::IdRegistryStl<MeshId>             m_meshIds;
     MeshRefCount_t                          m_meshRefCounts;
 
     // Scene-space Textures
-    lgrn::IdRegistry<TexId>                 m_texIds;
+    lgrn::IdRegistryStl<TexId>              m_texIds;
     TexRefCount_t                           m_texRefCounts;
 
-    // Meshes and textures assigned to ActiveEnts
-    acomp_storage_t<TexIdOwner_t>           m_diffuseTex;
-    std::vector<osp::active::ActiveEnt>     m_diffuseDirty;
+    // Meshes and textures assigned to DrawEnts
+    KeyedVec<DrawEnt, TexIdOwner_t>         m_diffuseTex;
+    std::vector<DrawEnt>                    m_diffuseDirty;
 
-    acomp_storage_t<MeshIdOwner_t>          m_mesh;
-    std::vector<osp::active::ActiveEnt>     m_meshDirty;
+    KeyedVec<DrawEnt, MeshIdOwner_t>        m_mesh;
+    std::vector<DrawEnt>                    m_meshDirty;
+
+    lgrn::IdRegistryStl<MaterialId>         m_materialIds;
+    KeyedVec<MaterialId, Material>          m_materials;
 };
 
 /**

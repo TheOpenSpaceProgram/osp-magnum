@@ -50,7 +50,7 @@ struct Parts
     std::vector<WeldId>                             m_partToWeld;
     std::vector<Matrix4>                            m_partTransformWeld;
     MapPartToMachines_t                             m_partToMachines;
-    std::vector<WeldId>                             m_partDirty;
+    std::vector<PartId>                             m_partDirty;
 
     lgrn::IdRegistryStl<WeldId>                     m_weldIds;
     lgrn::IntArrayMultiMap<WeldId, PartId>          m_weldToParts;

@@ -31,16 +31,13 @@ namespace testapp { struct VehicleData; }
 namespace testapp::scenes
 {
 
-using MachTypeToEvt_t = std::vector<osp::TagId>;
-
 /**
  * @brief Support for Parts, Machines, and Links
  */
 osp::Session setup_parts(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::TopDataId const        idResources);
 
 /**
@@ -73,10 +70,9 @@ osp::Session setup_parts(
  *     another float signal, all running within a single frame.
  */
 osp::Session setup_signals_float(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts);
 
 /**
@@ -85,10 +81,9 @@ osp::Session setup_signals_float(
  * This only sets up links and does not apply forces, see setup_rocket_thrust_newton
  */
 osp::Session setup_mach_rocket(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat);
 
@@ -96,10 +91,9 @@ osp::Session setup_mach_rocket(
  * @brief Links for RCS Drivers, which output thrust levels given pitch/yaw/roll controls
  */
 osp::Session setup_mach_rcsdriver(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat);
 
@@ -110,19 +104,17 @@ osp::Session setup_mach_rcsdriver(
  * of conencted Parts
  */
 osp::Session setup_vehicle_spawn(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon);
+        osp::Session const&         commonScene);
 
 /**
  * @brief Support VehicleBuilder data to be used to spawn vehicles
  */
 osp::Session setup_vehicle_spawn_vb(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         prefabs,
         osp::Session const&         parts,
         osp::Session const&         vehicleSpawn,
@@ -133,20 +125,18 @@ osp::Session setup_vehicle_spawn_vb(
  * @brief Build "Test Vehicle" data, so they can be spawned
  */
 osp::Session setup_test_vehicles(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::TopDataId const        idResources);
 
 /**
  * @brief Controls to select and control a UserControl Machine
  */
 osp::Session setup_vehicle_control(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat,
         osp::Session const&         app);
@@ -155,11 +145,10 @@ osp::Session setup_vehicle_control(
  * @brief Camera which can free cam or follow a selected vehicle
  */
 osp::Session setup_camera_vehicle(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
         osp::Session const&         app,
-        osp::Session const&         scnCommon,
+        osp::Session const&         commonScene,
         osp::Session const&         parts,
         osp::Session const&         physics,
         osp::Session const&         camera,

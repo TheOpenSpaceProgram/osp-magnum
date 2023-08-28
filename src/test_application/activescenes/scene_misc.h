@@ -26,58 +26,72 @@
 
 #include "scenarios.h"
 
+#include <osp/Active/activetypes.h>
+
 namespace testapp::scenes
 {
 
+void create_materials(
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         commonScene,
+        int                         count);
+
 void add_floor(
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scnCommon,
-        osp::Session const&         material,
+        osp::Session const&         application,
+        osp::Session const&         commonScene,
         osp::Session const&         shapeSpawn,
-        osp::TopDataId              idResources,
+        osp::active::MaterialId     material,
         osp::PkgId                  pkg);
 
 /**
  * @brief Create CameraController connected to an app's UserInputHandler
  */
 osp::Session setup_camera_ctrl(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         app,
+        osp::Session const&         windowApp,
         osp::Session const&         scnRender);
 
 /**
  * @brief Adds free cam controls to a CameraController
  */
 osp::Session setup_camera_free(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         app,
-        osp::Session const&         scnCommon,
+        osp::Session const&         windowApp,
+        osp::Session const&         scene,
         osp::Session const&         camera);
 
 /**
  * @brief Throws spheres when pressing space
  */
 osp::Session setup_thrower(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         magnum,
-        osp::Session const&         renderer,
-        osp::Session const&         simpleCamera,
+        osp::Session const&         windowApp,
+        osp::Session const&         cameraCtrl,
         osp::Session const&         shapeSpawn);
 
 /**
  * @brief Spawn blocks every 2 seconds and spheres every 1 second
  */
 osp::Session setup_droppers(
-        Builder_t&                  rBuilder,
+        osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Tags&                  rTags,
-        osp::Session const&         scnCommon,
+        osp::Session const&         scene,
+        osp::Session const&         commonScene,
         osp::Session const&         shapeSpawn);
+
+/**
+ * @brief Entity set to delete entities under Z = -10, added to spawned shapes
+ */
+osp::Session setup_bounds(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         scene,
+        osp::Session const&         commonScene,
+        osp::Session const&         shapeSpawn);
+
 
 }

@@ -92,7 +92,7 @@ public:
             Resources&                          rResources,
             ACtxDrawing&                        rDrawing,
             ACtxDrawingRes&                     rCtxDrawRes,
-            std::optional<EntSetPair>           material) noexcept;
+            std::optional<Material>             material) noexcept;
 
     static void init_physics(
             ACtxPrefabInit const&               rPrefabInit,

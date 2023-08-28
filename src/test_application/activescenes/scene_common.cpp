@@ -24,7 +24,6 @@
  */
 #include "scene_common.h"
 #include "scenarios.h"
-#include "identifiers.h"
 
 #include <osp/Active/basic.h>
 #include <osp/Active/drawing.h>
@@ -42,150 +41,256 @@ using namespace osp::active;
 namespace testapp::scenes
 {
 
-Session setup_common_scene(
-        Builder_t&                  rBuilder,
+Session setup_scene(
+        TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        TopDataId const             idResources,
+        Session const&              application)
+{
+    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
+    auto const tgApp = application.get_pipelines< PlApplication >();
+
+    osp::Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SCENE);
+
+    top_emplace< float >(topData, idDeltaTimeIn, 1.0f / 60.0f);
+
+    auto const plScn = out.create_pipelines<PlScene>(rBuilder);
+
+    rBuilder.pipeline(plScn.update).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+
+    rBuilder.task()
+        .name       ("Schedule Scene update")
+        .schedules  ({plScn.update(Schedule)})
+        .push_to    (out.m_tasks)
+        .args       ({                  idMainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rMainLoopCtrl.doUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
+
+    return out;
+}
+
+Session setup_common_scene(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              scene,
+        Session const&              application,
         PkgId const                 pkg)
 {
+    OSP_DECLARE_GET_DATA_IDS(application,  TESTAPP_DATA_APPLICATION);
+
+    auto const tgScn    = scene.get_pipelines<PlScene>();
     auto &rResources    = top_get< Resources >      (topData, idResources);
 
-    Session scnCommon;
-    OSP_SESSION_ACQUIRE_DATA(scnCommon, topData,    TESTAPP_COMMON_SCENE);
-    OSP_SESSION_ACQUIRE_TAGS(scnCommon, rTags,      TESTAPP_COMMON_SCENE);
-    scnCommon.m_tgCleanupEvt = tgCleanupEvt;
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_COMMON_SCENE);
+    auto const tgCS = out.create_pipelines<PlCommonScene>(rBuilder);
 
-    top_emplace< float >            (topData, idDeltaTimeIn, 1.0f / 60.0f);
-    top_emplace< EntVector_t >      (topData, idDelEnts);
-    top_emplace< EntVector_t >      (topData, idDelTotal);
+    out.m_cleanup = tgScn.cleanup;
 
+    /* unused */          top_emplace< ActiveEntVec_t > (topData, idActiveEntDel);
+    /* unused */          top_emplace< DrawEntVec_t >   (topData, idDrawEntDel);
     auto &rBasic        = top_emplace< ACtxBasic >      (topData, idBasic);
-    auto &rActiveIds    = top_emplace< ActiveReg_t >    (topData, idActiveIds);
     auto &rDrawing      = top_emplace< ACtxDrawing >    (topData, idDrawing);
     auto &rDrawingRes   = top_emplace< ACtxDrawingRes > (topData, idDrawingRes);
     auto &rNMesh        = top_emplace< NamedMeshes >    (topData, idNMesh);
 
-    rBuilder.tag(tgEntNew)          .depend_on({tgEntDel});
-    rBuilder.tag(tgEntReq)          .depend_on({tgEntDel, tgEntNew});
-    rBuilder.tag(tgDelEntReq)       .depend_on({tgDelEntMod});
-    rBuilder.tag(tgDelEntClr)       .depend_on({tgDelEntMod, tgDelEntReq});
-    rBuilder.tag(tgDelTotalReq)     .depend_on({tgDelTotalMod});
-    rBuilder.tag(tgDelTotalClr)     .depend_on({tgDelTotalMod, tgDelTotalReq});
-    rBuilder.tag(tgTransformDel)    .depend_on({tgTransformMod});
-    rBuilder.tag(tgTransformNew)    .depend_on({tgTransformMod, tgTransformDel});
-    rBuilder.tag(tgTransformReq)    .depend_on({tgTransformMod, tgTransformDel, tgTransformNew});
-    rBuilder.tag(tgHierNew)         .depend_on({tgHierDel});
-    rBuilder.tag(tgHierModEnd)      .depend_on({tgHierDel, tgHierNew, tgHierMod});
-    rBuilder.tag(tgHierReq)         .depend_on({tgHierMod, tgHierModEnd});
-    rBuilder.tag(tgDrawMod)         .depend_on({tgDrawDel});
-    rBuilder.tag(tgDrawReq)         .depend_on({tgDrawDel, tgDrawMod});
-    rBuilder.tag(tgMeshMod)         .depend_on({tgMeshDel});
-    rBuilder.tag(tgMeshReq)         .depend_on({tgMeshDel, tgMeshMod});
-    rBuilder.tag(tgMeshClr)         .depend_on({tgMeshDel, tgMeshMod, tgMeshReq});
-    rBuilder.tag(tgTexMod)          .depend_on({tgTexDel});
-    rBuilder.tag(tgTexReq)          .depend_on({tgTexDel, tgTexMod});
-    rBuilder.tag(tgTexClr)          .depend_on({tgTexDel, tgTexMod, tgTexReq});
+    rBuilder.pipeline(tgCS.activeEnt)           .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.activeEntResized)    .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.activeEntDelete)     .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.transform)           .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.hierarchy)           .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.drawEnt)             .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.drawEntResized)      .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.drawEntDelete)       .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.mesh)                .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.texture)             .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.entMesh)             .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.entTexture)          .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.entTextureDirty)     .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.entMeshDirty)        .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.meshResDirty)        .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.textureResDirty)     .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.material)            .parent(tgScn.update);
+    rBuilder.pipeline(tgCS.materialDirty)       .parent(tgScn.update);
 
-    scnCommon.task() = rBuilder.task().assign({tgResyncEvt}).data(
-            "Set entity meshes and textures dirty",
-            TopDataIds_t{             idDrawing},
-            wrap_args([] (ACtxDrawing& rDrawing) noexcept
+    rBuilder.task()
+        .name       ("Cancel entity delete tasks stuff if no entities were deleted")
+        .run_on     ({tgCS.activeEntDelete(Schedule_)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                      idActiveEntDel })
+        .func([] (ACtxBasic& rBasic, ActiveEntVec_t const& rActiveEntDel) noexcept
     {
-        SysRender::set_dirty_all(rDrawing);
-    }));
+        return rActiveEntDel.empty() ? TaskAction::Cancel : TaskActions{};
+    });
 
-    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelEntReq, tgDelTotalMod}).data(
-            "Create DeleteTotal vector, which includes descendents of deleted hierarchy entities",
-            TopDataIds_t{           idBasic,                   idDelEnts,             idDelTotal},
-            wrap_args([] (ACtxBasic& rBasic, EntVector_t const& rDelEnts, EntVector_t& rDelTotal) noexcept
+    rBuilder.task()
+        .name       ("Delete ActiveEnt IDs")
+        .run_on     ({tgCS.activeEntDelete(EStgIntr::UseOrRun)})
+        .sync_with  ({tgCS.activeEnt(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                      idActiveEntDel })
+        .func([] (ACtxBasic& rBasic, ActiveEntVec_t const& rActiveEntDel) noexcept
     {
-        auto const &delFirst    = std::cbegin(rDelEnts);
-        auto const &delLast     = std::cend(rDelEnts);
-
-        rDelTotal.assign(delFirst, delLast);
-
-        for (ActiveEnt root : rDelEnts)
+        for (ActiveEnt const ent : rActiveEntDel)
         {
-            for (ActiveEnt descendant : SysSceneGraph::descendants(rBasic.m_scnGraph, root))
+            if (rBasic.m_activeIds.exists(ent))
             {
-                rDelTotal.push_back(descendant);
+                rBasic.m_activeIds.remove(ent);
             }
         }
-    }));
+    });
 
-    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelEntReq, tgHierMod}).data(
-            "Cut deleted entities out of hierarchy",
-            TopDataIds_t{           idBasic,                   idDelEnts},
-            wrap_args([] (ACtxBasic& rBasic, EntVector_t const& rDelEnts) noexcept
+    rBuilder.task()
+        .name       ("Delete basic components")
+        .run_on     ({tgCS.activeEntDelete(UseOrRun)})
+        .sync_with  ({tgCS.transform(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                      idActiveEntDel })
+        .func([] (ACtxBasic& rBasic, ActiveEntVec_t const& rActiveEntDel) noexcept
     {
-        auto const &delFirst    = std::cbegin(rDelEnts);
-        auto const &delLast     = std::cend(rDelEnts);
+        update_delete_basic(rBasic, rActiveEntDel.cbegin(), rActiveEntDel.cend());
+    });
 
-        SysSceneGraph::cut(rBasic.m_scnGraph, delFirst, delLast);
-    }));
-
-    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgEntDel}).data(
-            "Delete Entity IDs",
-            TopDataIds_t{             idActiveIds,                    idDelTotal},
-            wrap_args([] (ActiveReg_t& rActiveIds, EntVector_t const& rDelTotal) noexcept
+    rBuilder.task()
+        .name       ("Delete DrawEntity of deleted ActiveEnts")
+        .run_on     ({tgCS.activeEntDelete(UseOrRun)})
+        .sync_with  ({tgCS.drawEntDelete(Modify_)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                      idActiveEntDel,              idDrawEntDel })
+        .func([] (ACtxDrawing& rDrawing, ActiveEntVec_t const& rActiveEntDel, DrawEntVec_t& rDrawEntDel) noexcept
     {
-        for (ActiveEnt const ent : rDelTotal)
+        for (ActiveEnt const ent : rActiveEntDel)
         {
-            if (rActiveIds.exists(ent))
+            DrawEnt const drawEnt = std::exchange(rDrawing.m_activeToDraw[ent], lgrn::id_null<DrawEnt>());
+            if (drawEnt != lgrn::id_null<DrawEnt>())
             {
-                rActiveIds.remove(ent);
+                rDrawEntDel.push_back(drawEnt);
             }
         }
-    }));
+    });
 
-    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgTransformDel, tgHierDel}).data(
-            "Delete basic components",
-            TopDataIds_t{           idBasic,                   idDelTotal},
-            wrap_args([] (ACtxBasic& rBasic, EntVector_t const& rDelTotal) noexcept
+    rBuilder.task()
+        .name       ("Delete drawing components")
+        .run_on     ({tgCS.drawEntDelete(UseOrRun)})
+        .sync_with  ({tgCS.entTexture(Delete), tgCS.entMesh(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                    idDrawEntDel })
+        .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept
     {
-        update_delete_basic(rBasic, std::cbegin(rDelTotal), std::cend(rDelTotal));
-    }));
+        SysRender::update_delete_drawing(rDrawing, rDrawEntDel.cbegin(), rDrawEntDel.cend());
+    });
 
-    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgDrawDel}).data(
-            "Delete drawing components",
-            TopDataIds_t{              idDrawing,                  idDelTotal},
-            wrap_args([] (ACtxDrawing& rDrawing, EntVector_t const& rDelTotal) noexcept
+    rBuilder.task()
+        .name       ("Delete DrawEntity IDs")
+        .run_on     ({tgCS.drawEntDelete(UseOrRun)})
+        .sync_with  ({tgCS.drawEnt(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                    idDrawEntDel })
+        .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept
     {
-        SysRender::update_delete_drawing(rDrawing, std::cbegin(rDelTotal), std::cend(rDelTotal));
-    }));
+        for (DrawEnt const drawEnt : rDrawEntDel)
+        {
+            if (rDrawing.m_drawIds.exists(drawEnt))
+            {
+                rDrawing.m_drawIds.remove(drawEnt);
+            }
+        }
+    });
 
-    scnCommon.task() = rBuilder.task().assign({tgSceneEvt, tgDelEntClr}).data(
-            "Clear delete vectors once we're done with it",
-            TopDataIds_t{             idDelEnts},
-            wrap_args([] (EntVector_t& rDelEnts) noexcept
+    rBuilder.task()
+        .name       ("Delete DrawEnt from materials")
+        .run_on     ({tgCS.drawEntDelete(UseOrRun)})
+        .sync_with  ({tgCS.material(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                    idDrawEntDel })
+        .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept
     {
-        rDelEnts.clear();
-    }));
+        for (DrawEnt const ent : rDrawEntDel)
+        {
+            for (Material &rMat : rDrawing.m_materials)
+            {
+                if (std::size_t(ent) < rMat.m_ents.size())
+                {
+                    rMat.m_ents.reset(std::size_t(ent));
+                }
+            }
+        }
+    });
 
-    scnCommon.task() = rBuilder.task().assign({tgCleanupEvt}).data(
-            "Clean up scene and resource owners",
-            TopDataIds_t{             idDrawing,                idDrawingRes,           idResources},
-            wrap_args([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources) noexcept
+    rBuilder.task()
+        .name       ("Clear ActiveEnt delete vector once we're done with it")
+        .run_on     ({tgCS.activeEntDelete(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({            idActiveEntDel })
+        .func([] (ActiveEntVec_t& idActiveEntDel) noexcept
+    {
+        idActiveEntDel.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Clear DrawEnt delete vector once we're done with it")
+        .run_on     ({tgCS.drawEntDelete(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({         idDrawEntDel })
+        .func([] (DrawEntVec_t& rDrawEntDel) noexcept
+    {
+        rDrawEntDel.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Clear material dirty vectors once we're done with it")
+        .run_on     ({tgCS.materialDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing })
+        .func([] (ACtxDrawing& rDrawing) noexcept
+    {
+        for (std::size_t const materialInt : rDrawing.m_materialIds.bitview().zeros())
+        {
+            rDrawing.m_materials[MaterialId(materialInt)].m_dirty.clear();
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Clear dirty DrawEnt's textures once we're done with it")
+        .run_on     ({tgCS.entMeshDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing})
+        .func([] (ACtxDrawing& rDrawing) noexcept
+    {
+        rDrawing.m_meshDirty.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Clear dirty DrawEnt's textures once we're done with it")
+        .run_on     ({tgCS.entTextureDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing})
+        .func([] (ACtxDrawing& rDrawing) noexcept
+    {
+        rDrawing.m_diffuseDirty.clear();
+    });
+
+    // Clean up tasks
+
+    rBuilder.task()
+        .name       ("Clean up scene and resource owners")
+        .run_on     ({tgScn.cleanup(Run_)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                idDrawingRes,           idResources})
+        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources) noexcept
     {
         SysRender::clear_owners(rDrawing);
         SysRender::clear_resource_owners(rDrawingRes, rResources);
-    }));
+    });
 
-
-    // Convenient function to get a reference-counted mesh owner
-    auto const quick_add_mesh = [&rResources, &rDrawing, &rDrawingRes, pkg] (std::string_view const name) -> MeshIdOwner_t
-    {
-        osp::ResId const res = rResources.find(osp::restypes::gc_mesh, pkg, name);
-        assert(res != lgrn::id_null<osp::ResId>());
-        MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, res);
-        return rDrawing.m_meshRefCounts.ref_add(meshId);
-    };
-
-    scnCommon.task() = rBuilder.task().assign({tgCleanupEvt}).data(
-            "Clean up NamedMeshes mesh and texture owners",
-            TopDataIds_t{             idDrawing,             idNMesh},
-            wrap_args([] (ACtxDrawing& rDrawing, NamedMeshes& rNMesh) noexcept
+    rBuilder.task()
+        .name       ("Clean up NamedMeshes mesh and texture owners")
+        .run_on     ({tgScn.cleanup(Run_)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,             idNMesh })
+        .func([] (ACtxDrawing& rDrawing, NamedMeshes& rNMesh) noexcept
     {
         for ([[maybe_unused]] auto && [_, rOwner] : std::exchange(rNMesh.m_shapeToMesh, {}))
         {
@@ -196,7 +301,10 @@ Session setup_common_scene(
         {
             rDrawing.m_meshRefCounts.ref_release(std::move(rOwner));
         }
-    }));
+    });
+
+    // Convenient functor to get a reference-counted mesh owner
+    auto const quick_add_mesh = SysRender::gen_drawable_mesh_adder(rDrawing, rDrawingRes, rResources, pkg);
 
     // Acquire mesh resources from Package
     using osp::phys::EShape;
@@ -205,59 +313,7 @@ Session setup_common_scene(
     rNMesh.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));
     rNMesh.m_namedMeshs.emplace("floor", quick_add_mesh("grid64solid"));
 
-
-    return scnCommon;
+    return out;
 }
 
-Session setup_material(
-        Builder_t&                  rBuilder,
-        ArrayView<entt::any> const  topData,
-        Tags&                       rTags,
-        Session const&              scnCommon)
-{
-    OSP_SESSION_UNPACK_DATA(scnCommon, TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(scnCommon, TESTAPP_COMMON_SCENE);
-
-    Session material;
-    OSP_SESSION_ACQUIRE_DATA(material, topData, TESTAPP_MATERIAL);
-    OSP_SESSION_ACQUIRE_TAGS(material, rTags, TESTAPP_MATERIAL);
-
-    top_emplace< EntSet_t >     (topData, idMatEnts);
-    top_emplace< EntVector_t >  (topData, idMatDirty);
-
-    rBuilder.tag(tgMatMod)      .depend_on({tgMatDel});
-    rBuilder.tag(tgMatReq)      .depend_on({tgMatDel, tgMatMod});
-    rBuilder.tag(tgMatClr)      .depend_on({tgMatDel, tgMatMod, tgMatReq});
-
-    material.task() = rBuilder.task().assign({tgResyncEvt}).data(
-            "Set all X material entities as dirty",
-            TopDataIds_t{                idMatEnts,             idMatDirty},
-            wrap_args([] (EntSet_t const& rMatEnts, EntVector_t& rMatDirty) noexcept
-    {
-        for (std::size_t const entInt : rMatEnts.ones())
-        {
-            rMatDirty.push_back(ActiveEnt(entInt));
-        }
-    }));
-
-    material.task() = rBuilder.task().assign({tgSceneEvt, tgSyncEvt, tgMatClr}).data(
-            "Clear dirty vectors for material",
-            TopDataIds_t{             idMatDirty},
-            wrap_args([] (EntVector_t& rMatDirty) noexcept
-    {
-        rMatDirty.clear();
-    }));
-
-    material.task() = rBuilder.task().assign({tgSceneEvt, tgDelTotalReq, tgMatDel}).data(
-            "Delete material components",
-            TopDataIds_t{idMatEnts, idDelTotal}, delete_ent_set);
-
-
-    return material;
-}
-
-}
-
-
-
-
+} // namespace testapp::scenes

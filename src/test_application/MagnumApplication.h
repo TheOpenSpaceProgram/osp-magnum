@@ -34,33 +34,39 @@
 #include <cstring> // workaround: memcpy needed by SDL2
 #include <Magnum/Platform/Sdl2Application.h>
 
-#include <functional>
 #include <memory>
 
 namespace testapp
 {
 
-class ActiveApplication;
+class MagnumApplication;
 
-// Stored inside an ActiveApplicaton to use as a main draw function.
-// Renderer state can be stored in lambda capture
-using on_draw_t = std::function<void(ActiveApplication&, float delta)>;
+class IOspApplication
+{
+public:
+    virtual ~IOspApplication() = default;
+
+    virtual void run(MagnumApplication& rApp) = 0;
+    virtual void draw(MagnumApplication& rApp, float delta) = 0;
+    virtual void exit(MagnumApplication& rApp) = 0;
+};
 
 /**
  * @brief An interactive Magnum application
  *
  * This is intended to run a flight scene, map view, vehicle editor, or menu.
  */
-class ActiveApplication : public Magnum::Platform::Application
+class MagnumApplication : public Magnum::Platform::Application
 {
-
 public:
 
-    explicit ActiveApplication(
+    using AppPtr_t = std::unique_ptr<IOspApplication>;
+
+    explicit MagnumApplication(
             const Magnum::Platform::Application::Arguments& arguments,
             osp::input::UserInputHandler& rUserInput);
 
-    ~ActiveApplication();
+    ~MagnumApplication();
 
     void keyPressEvent(KeyEvent& event) override;
     void keyReleaseEvent(KeyEvent& event) override;
@@ -70,16 +76,28 @@ public:
     void mouseMoveEvent(MouseMoveEvent& event) override;
     void mouseScrollEvent(MouseScrollEvent& event) override;
 
-    void set_on_draw(on_draw_t onDraw)
+    void exec()
     {
-        m_onDraw = std::move(onDraw);
+        m_ospApp->run(*this);
+        Magnum::Platform::Application::exec();
+        m_ospApp->exit(*this);
+    }
+
+    void exit()
+    {
+        Magnum::Platform::Application::exit();
+    }
+
+    void set_osp_app(AppPtr_t ospApp)
+    {
+        m_ospApp = std::move(ospApp);
     }
 
 private:
 
     void drawEvent() override;
 
-    on_draw_t m_onDraw;
+    AppPtr_t m_ospApp;
 
     osp::input::UserInputHandler &m_rUserInput;
 
@@ -92,11 +110,11 @@ void config_controls(osp::input::UserInputHandler& rUserInput);
 }
 
 /**
-* Parses the control string from the config file. 
-* 
-* A "None" input returns a empty vector.
-* 
-* @param Control string
-* @returns vector of the control created from the string. 
-*/
+ * Parses the control string from the config file.
+ *
+ * A "None" input returns a empty vector.
+ *
+ * @param Control string
+ * @returns vector of the control created from the string.
+ */
 osp::input::ControlExprConfig_t parse_control(std::string_view str) noexcept;
