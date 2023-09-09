@@ -61,17 +61,23 @@ static constexpr auto   sc_matFlat          = active::MaterialId(1);
 static constexpr auto   sc_matPhong         = active::MaterialId(2);
 static constexpr int    sc_materialCount    = 4;
 
-struct CommonMagnumApp : IOspApplication
+struct MainLoopSignals
 {
-    CommonMagnumApp(TestApp &rTestApp, MainLoopControl &rMainLoopCtrl, PipelineId mainLoop, PipelineId inputs, PipelineId renderSync, PipelineId sceneUpdate, PipelineId sceneRender) noexcept
+    PipelineId mainLoop;
+    PipelineId inputs;
+    PipelineId renderSync;
+    PipelineId renderResync;
+    PipelineId sceneUpdate;
+    PipelineId sceneRender;
+};
+
+class CommonMagnumApp : public IOspApplication
+{
+public:
+    CommonMagnumApp(TestApp &rTestApp, MainLoopControl &rMainLoopCtrl, MainLoopSignals signals) noexcept
      : m_rTestApp       { rTestApp }
      , m_rMainLoopCtrl  { rMainLoopCtrl }
-     , m_mainLoop       { mainLoop }
-     , m_inputs         { inputs }
-     , m_renderSync     { renderSync }
-     , m_sceneUpdate    { sceneUpdate }
-     , m_sceneRender    { sceneRender }
-
+     , m_signals        { signals }
     { }
 
     void run(MagnumApplication& rApp) override
@@ -80,26 +86,33 @@ struct CommonMagnumApp : IOspApplication
 
         PipelineId const mainLoop = m_rTestApp.m_application.get_pipelines<PlApplication>().mainLoop;
         m_rTestApp.m_pExecutor->run(m_rTestApp, mainLoop);
+
+        // Resyncronize renderer
+
+        m_rMainLoopCtrl = MainLoopControl{
+            .doUpdate = false,
+            .doSync   = true,
+            .doResync = true,
+            .doRender = false,
+        };
+
+        signal_all();
+
+        m_rTestApp.m_pExecutor->wait(m_rTestApp);
     }
 
     void draw(MagnumApplication& rApp, float delta) override
     {
-        // Magnum Application's main loop is here
+        // Magnum Application's main loop calls this
 
         m_rMainLoopCtrl = MainLoopControl{
             .doUpdate = true,
             .doSync   = true,
-            .doResync = m_justStarting,
+            .doResync = false,
             .doRender = true,
         };
 
-        m_justStarting = false;
-
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_mainLoop);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_inputs);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneUpdate);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneRender);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_renderSync);
+        signal_all();
 
         m_rTestApp.m_pExecutor->wait(m_rTestApp);
     }
@@ -113,11 +126,7 @@ struct CommonMagnumApp : IOspApplication
             .doRender = false,
         };
 
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_mainLoop);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_inputs);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneUpdate);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_sceneRender);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_renderSync);
+        signal_all();
 
         m_rTestApp.m_pExecutor->wait(m_rTestApp);
 
@@ -129,23 +138,30 @@ struct CommonMagnumApp : IOspApplication
         }
     }
 
+private:
+
+    void signal_all()
+    {
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.mainLoop);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.inputs);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderSync);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderResync);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneUpdate);
+        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneRender);
+    }
+
     TestApp         &m_rTestApp;
     MainLoopControl &m_rMainLoopCtrl;
 
-    PipelineId      m_mainLoop;
-    PipelineId      m_inputs;
-    PipelineId      m_renderSync;
-    PipelineId      m_sceneUpdate;
-    PipelineId      m_sceneRender;
-
-    bool            m_justStarting{true};
+    MainLoopSignals m_signals;
 };
 
-static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& scnRenderer, std::vector<PipelineId> run = {})
+static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene)
 {
-    OSP_DECLARE_GET_DATA_IDS(scnRenderer,               TESTAPP_DATA_COMMON_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(rTestApp.m_application,    TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,             TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,         TESTAPP_DATA_MAGNUM);
+    OSP_DECLARE_GET_DATA_IDS(magnumScene,               TESTAPP_DATA_MAGNUM_SCENE);
 
     auto &rMainLoopCtrl = top_get<MainLoopControl>  (rTestApp.m_topData, idMainLoopCtrl);
     auto &rActiveApp    = top_get<MagnumApplication>(rTestApp.m_topData, idActiveApp);
@@ -153,13 +169,17 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
 
     rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
-    PipelineId const mainLoop    = rTestApp.m_application .get_pipelines<PlApplication>()   .mainLoop;
-    PipelineId const inputs      = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .inputs;
-    PipelineId const renderSync  = rTestApp.m_magnum      .get_pipelines<PlMagnum>()        .sync;
-    PipelineId const sceneUpdate = scene                  .get_pipelines<PlScene>()         .update;
-    PipelineId const sceneRender = scnRenderer            .get_pipelines<PlSceneRenderer>() .render;
+    MainLoopSignals const signals
+    {
+        .mainLoop     = rTestApp.m_application .get_pipelines<PlApplication>()   .mainLoop,
+        .inputs       = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .inputs,
+        .renderSync   = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .sync,
+        .renderResync = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .resync,
+        .sceneUpdate  = scene                  .get_pipelines<PlScene>()         .update,
+        .sceneRender  = sceneRenderer          .get_pipelines<PlSceneRenderer>() .render,
+    };
 
-    rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, mainLoop, inputs, renderSync, sceneUpdate, sceneRender) );
+    rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, signals) );
 }
 
 static ScenarioMap_t make_scenarios()
@@ -207,6 +227,9 @@ static ScenarioMap_t make_scenarios()
     add_scenario("physics", "Newton Dynamics integration test scenario",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
+        #define SCENE_SESSIONS      scene, commonScene, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt
+        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, camThrow, shapeDraw
+
         using namespace testapp::scenes;
 
         auto const  defaultPkg      = rTestApp.m_defaultPkg;
@@ -215,9 +238,7 @@ static ScenarioMap_t make_scenarios()
 
         TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_scene.m_edges, rTestApp.m_taskData};
 
-        auto & [
-            scene, commonScene, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt
-        ] = resize_then_unpack<10>(rTestApp.m_scene.m_sessions);
+        auto & [SCENE_SESSIONS] = resize_then_unpack<10>(rTestApp.m_scene.m_sessions);
 
         // Compose together lots of Sessions
         scene           = setup_scene               (builder, rTopData, application);
@@ -232,8 +253,7 @@ static ScenarioMap_t make_scenarios()
         nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
         shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
 
-        create_materials(rTopData, commonScene, sc_materialCount);
-        add_floor(rTopData, application, commonScene, shapeSpawn, sc_matVisualizer, defaultPkg);
+        add_floor(rTopData, shapeSpawn, sc_matVisualizer, defaultPkg);
 
         return [] (TestApp& rTestApp)
         {
@@ -245,21 +265,21 @@ static ScenarioMap_t make_scenarios()
 
             TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
 
-            auto & [
-                scene, commonScene, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt
-            ] = unpack<10>(rTestApp.m_scene.m_sessions);
+            auto & [SCENE_SESSIONS] = unpack<10>(rTestApp.m_scene.m_sessions);
 
-            auto & [
-                scnRender, cameraCtrl, cameraFree, shVisual, camThrow
-            ] = resize_then_unpack<5>(rTestApp.m_renderer.m_sessions);
+            auto & [RENDERER_SESSIONS] = resize_then_unpack<7>(rTestApp.m_renderer.m_sessions);
 
-            scnRender   = setup_scene_renderer      (builder, rTopData, application, windowApp, magnum, scene, commonScene);
-            cameraCtrl  = setup_camera_ctrl         (builder, rTopData, windowApp, scnRender);
-            cameraFree  = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
-            shVisual    = setup_shader_visualizer   (builder, rTopData, magnum, scene, commonScene, scnRender, sc_matVisualizer);
-            camThrow    = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
+            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
+            magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
+            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
+            cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
+            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, scene, commonScene, sc_matVisualizer);
+            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
+            shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, shapeSpawn);
 
-            setup_magnum_draw(rTestApp, scene, scnRender);
+            create_materials(rTopData, sceneRenderer, sc_materialCount);
+
+            setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };
     });
 
@@ -362,10 +382,13 @@ static ScenarioMap_t make_scenarios()
         };
     });
 
+
+
     add_scenario("universe", "Universe test scenario with very unrealistic planets",
-                 [] (MainView mainView, Sessions_t& sceneOut) -> RendererSetup_t
+                 [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
         using namespace testapp::scenes;
+        using namespace osp::active;
 
         auto const idResources  = mainView.m_idResources;
         auto &rTopData          = mainView.m_topData;
@@ -420,8 +443,8 @@ static ScenarioMap_t make_scenarios()
             setup_magnum_draw(mainView, magnum, commonScene, scnRender, {tgUniTimeEvt});
         };
     });
-
 #endif
+
 
     return scenarioMap;
 }

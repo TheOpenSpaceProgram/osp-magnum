@@ -104,16 +104,27 @@ Session setup_shape_spawn(
     rBuilder.pipeline(tgShSp.spawnRequest)  .parent(tgScn.update);
     rBuilder.pipeline(tgShSp.spawnedEnts)   .parent(tgScn.update);
 
+    rBuilder.task()
+        .name       ("Schedule Shape spawn")
+        .schedules  ({tgShSp.spawnRequest(Schedule_)})
+        .push_to    (out.m_tasks)
+        .args       ({             idSpawner })
+        .func([] (ACtxShapeSpawner& rSpawner) noexcept -> TaskActions
+    {
+        return rSpawner.m_spawnRequest.empty() ? TaskAction::Cancel : TaskActions{};
+    });
+    rBuilder.pipeline(tgShSp.ownedEnts)     .parent(tgScn.update);
+
     top_emplace< ACtxShapeSpawner > (topData, idSpawner, ACtxShapeSpawner{ .m_materialId = materialId });
     rBuilder.task()
-        .name       ("Create entities for requested shapes to spawn")
+        .name       ("Create ActiveEnts for requested shapes to spawn")
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgCS.activeEnt(New), tgShSp.spawnedEnts(Resize)})
+        .sync_with  ({tgCS.activeEnt(New), tgCS.activeEntResized(Schedule), tgShSp.spawnedEnts(Resize)})
         .push_to    (out.m_tasks)
         .args       ({      idBasic,                  idSpawner})
         .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner) noexcept
     {
-        //LGRN_ASSERTM(!rSpawner.m_spawnRequest.empty(), "spawnRequest Use_ shouldn't run if rSpawner.m_spawnRequest is empty!");
+        LGRN_ASSERTM(!rSpawner.m_spawnRequest.empty(), "spawnRequest Use_ shouldn't run if rSpawner.m_spawnRequest is empty!");
 
         rSpawner.m_ents.resize(rSpawner.m_spawnRequest.size() * 2);
         rBasic.m_activeIds.create(rSpawner.m_ents.begin(), rSpawner.m_ents.end());
@@ -122,12 +133,14 @@ Session setup_shape_spawn(
     rBuilder.task()
         .name       ("Add hierarchy and transform to spawned shapes")
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgCS.hierarchy(New), tgCS.transform(New)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgShSp.ownedEnts(Modify__), tgCS.hierarchy(New), tgCS.transform(New)})
         .push_to    (out.m_tasks)
         .args       ({      idBasic,                  idSpawner })
         .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner) noexcept
     {
+        osp::bitvector_resize(rSpawner.m_ownedEnts, rBasic.m_activeIds.capacity());
         rBasic.m_scnGraph.resize(rBasic.m_activeIds.capacity());
+
         SubtreeBuilder bldScnRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, rSpawner.m_spawnRequest.size() * 2);
 
         for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
@@ -136,54 +149,12 @@ Session setup_shape_spawn(
             ActiveEnt const root    = rSpawner.m_ents[i * 2];
             ActiveEnt const child   = rSpawner.m_ents[i * 2 + 1];
 
+            rSpawner.m_ownedEnts.set(std::size_t(root));
+
             rBasic.m_transform.emplace(root, ACompTransform{osp::Matrix4::translation(spawn.m_position)});
             rBasic.m_transform.emplace(child, ACompTransform{Matrix4::scaling(spawn.m_size)});
             SubtreeBuilder bldRoot = bldScnRoot.add_child(root, 1);
             bldRoot.add_child(child);
-        }
-    });
-
-    rBuilder.task()
-        .name       ("Add mesh and material to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun),
-                      tgCS.entMesh(New), tgCS.material(New), tgCS.drawEnt(New), tgCS.drawEntResized(ModifyOrSignal),
-                      tgCS.materialDirty(Modify_), tgCS.entMeshDirty(Modify_)})
-        .push_to    (out.m_tasks)
-        .args       ({            idBasic,             idDrawing,                  idSpawner,             idNMesh })
-        .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept
-    {
-        Material &rMat = rDrawing.m_materials[rSpawner.m_materialId];
-
-        rDrawing.resize_active(rBasic.m_activeIds.capacity());
-
-        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
-        {
-            ActiveEnt const child           = rSpawner.m_ents[i * 2 + 1];
-            rDrawing.m_activeToDraw[child]  = rDrawing.m_drawIds.create();
-        }
-
-        rDrawing.resize_draw();
-        bitvector_resize(rMat.m_ents, rDrawing.m_drawIds.capacity());
-
-        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
-        {
-            SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
-            ActiveEnt const root    = rSpawner.m_ents[i * 2];
-            ActiveEnt const child   = rSpawner.m_ents[i * 2 + 1];
-            DrawEnt const drawEnt   = rDrawing.m_activeToDraw[child];
-
-            rDrawing.m_needDrawTf.set(std::size_t(root));
-            rDrawing.m_needDrawTf.set(std::size_t(child));
-
-            rDrawing.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape));
-            rDrawing.m_meshDirty.push_back(drawEnt);
-
-            rMat.m_ents.set(std::size_t(drawEnt));
-            rMat.m_dirty.push_back(drawEnt);
-
-            rDrawing.m_visible.set(std::size_t(drawEnt));
-            rDrawing.m_drawBasic[drawEnt].m_opaque = true;
         }
     });
 
@@ -214,11 +185,22 @@ Session setup_shape_spawn(
                 rPhys.m_mass.emplace( child, ACompMass{ inertia, offset, spawn.m_mass } );
             }
 
-            rPhys.m_shape[std::size_t(child)] = spawn.m_shape;
+            rPhys.m_shape[child] = spawn.m_shape;
             rPhys.m_colliderDirty.push_back(child);
         }
     });
 
+    //TODO
+    rBuilder.task()
+        .name       ("Delete basic components")
+        .run_on     ({tgCS.activeEntDelete(UseOrRun)})
+        .sync_with  ({tgShSp.ownedEnts(Modify__)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                      idActiveEntDel })
+        .func([] (ACtxBasic& rBasic, ActiveEntVec_t const& rActiveEntDel) noexcept
+    {
+        update_delete_basic(rBasic, rActiveEntDel.cbegin(), rActiveEntDel.cend());
+    });
 
     rBuilder.task()
         .name       ("Clear Shape Spawning vector after use")
@@ -230,6 +212,145 @@ Session setup_shape_spawn(
         rSpawner.m_spawnRequest.clear();
     });
 
+
+    return out;
+}
+
+Session setup_shape_spawn_draw(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
+        Session const&              commonScene,
+        Session const&              physics,
+        Session const&              shapeSpawn)
+{
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const tgCS     = commonScene   .get_pipelines< PlCommonScene >();
+    auto const tgPhy    = physics       .get_pipelines< PlPhysics >();
+    auto const tgShSp   = shapeSpawn    .get_pipelines< PlShapeSpawn >();
+
+    Session out;
+
+    rBuilder.task()
+        .name       ("Create DrawEnts for spawned shapes")
+        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgCS.activeEntResized(Done), tgScnRdr.drawEntResized(ModifyOrSignal)})
+        .push_to    (out.m_tasks)
+        .args       ({               idBasic,             idDrawing,                 idScnRender,                  idSpawner,             idNMesh })
+        .func([]    (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept
+    {
+        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
+        {
+            ActiveEnt const child            = rSpawner.m_ents[i * 2 + 1];
+            rScnRender.m_activeToDraw[child] = rScnRender.m_drawIds.create();
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Add mesh and material to spawned shapes")
+        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun),
+                      tgScnRdr.entMesh(New), tgScnRdr.material(New), tgScnRdr.drawEnt(New), tgScnRdr.drawEntResized(Done),
+                      tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
+        .push_to    (out.m_tasks)
+        .args       ({            idBasic,             idDrawing,                 idScnRender,                  idSpawner,             idNMesh })
+        .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept
+    {
+        Material &rMat = rScnRender.m_materials[rSpawner.m_materialId];
+
+        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
+        {
+            SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
+            ActiveEnt const root    = rSpawner.m_ents[i * 2];
+            ActiveEnt const child   = rSpawner.m_ents[i * 2 + 1];
+            DrawEnt const drawEnt   = rScnRender.m_activeToDraw[child];
+
+            rScnRender.m_needDrawTf.set(std::size_t(root));
+            rScnRender.m_needDrawTf.set(std::size_t(child));
+
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape));
+            rScnRender.m_meshDirty.push_back(drawEnt);
+
+            rMat.m_ents.set(std::size_t(drawEnt));
+            rMat.m_dirty.push_back(drawEnt);
+
+            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_drawBasic[drawEnt].m_opaque = true;
+        }
+    });
+
+    // When does resync run relative to deletes?
+
+    rBuilder.task()
+        .name       ("Resync spawned shapes DrawEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgShSp.ownedEnts(UseOrRun_), tgCS.hierarchy(Ready), tgCS.activeEntResized(Done), tgScnRdr.drawEntResized(ModifyOrSignal)})
+        .push_to    (out.m_tasks)
+        .args       ({               idBasic,             idDrawing,                 idScnRender,                  idSpawner,             idNMesh })
+        .func([]    (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxShapeSpawner& rSpawner, NamedMeshes& rNMesh) noexcept
+    {
+        for (std::size_t entInt : rSpawner.m_ownedEnts.ones())
+        {
+            ActiveEnt const root = ActiveEnt(entInt);
+            ActiveEnt const child = *SysSceneGraph::children(rBasic.m_scnGraph, root).begin();
+
+            rScnRender.m_activeToDraw[child] = rScnRender.m_drawIds.create();
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Resync spawned shapes mesh and material")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgShSp.ownedEnts(UseOrRun_), tgScnRdr.entMesh(New), tgScnRdr.material(New), tgScnRdr.drawEnt(New), tgScnRdr.drawEntResized(Done),
+                      tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
+        .push_to    (out.m_tasks)
+        .args       ({            idBasic,             idDrawing,             idPhys,                  idSpawner,                 idScnRender,             idNMesh })
+        .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxPhysics& rPhys, ACtxShapeSpawner& rSpawner, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh) noexcept
+    {
+        Material &rMat = rScnRender.m_materials[rSpawner.m_materialId];
+
+        for (std::size_t entInt : rSpawner.m_ownedEnts.ones())
+        {
+            ActiveEnt const root = ActiveEnt(entInt);
+            ActiveEnt const child = *SysSceneGraph::children(rBasic.m_scnGraph, root).begin();
+
+            //SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
+            DrawEnt const drawEnt   = rScnRender.m_activeToDraw[child];
+
+            rScnRender.m_needDrawTf.set(std::size_t(root));
+            rScnRender.m_needDrawTf.set(std::size_t(child));
+
+            phys::EShape const shape = rPhys.m_shape.at(child);
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(shape));
+            rScnRender.m_meshDirty.push_back(drawEnt);
+
+            rMat.m_ents.set(std::size_t(drawEnt));
+            rMat.m_dirty.push_back(drawEnt);
+
+            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_drawBasic[drawEnt].m_opaque = true;
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Remove deleted ActiveEnts from ACtxShapeSpawner")
+        .run_on     ({tgCS.activeEntDelete(UseOrRun)})
+        .sync_with  ({tgShSp.ownedEnts(Modify__)})
+        .push_to    (out.m_tasks)
+        .args       ({             idSpawner,                      idActiveEntDel })
+        .func([] (ACtxShapeSpawner& rSpawner, ActiveEntVec_t const& rActiveEntDel) noexcept
+    {
+        for (ActiveEnt const deleted : rActiveEntDel)
+        {
+            rSpawner.m_ownedEnts.reset(std::size_t(deleted));
+        }
+    });
 
     return out;
 }

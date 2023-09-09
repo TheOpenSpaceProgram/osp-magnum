@@ -114,17 +114,6 @@ struct RenderGroup
 
 }; // struct RenderGroup
 
-struct ACtxRenderGroups
-{
-    // Required for std::is_copy_assignable to work properly inside of entt::any
-    ACtxRenderGroups() = default;
-    ACtxRenderGroups(ACtxRenderGroups const& copy) = delete;
-    ACtxRenderGroups(ACtxRenderGroups&& move) = default;
-
-    std::unordered_map< std::string, RenderGroup > m_groups;
-
-};
-
 class SysRender
 {
 public:
@@ -153,10 +142,8 @@ public:
 
     /**
      * @brief Remove all mesh and texture components, aware of refcounts
-     *
-     * @param rCtxDrawing       [ref] Drawing data
      */
-    static void clear_owners(ACtxDrawing& rCtxDrawing);
+    static void clear_owners(ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing);
 
     /**
      * @brief Dissociate resources from the scene's meshes and textures
@@ -192,11 +179,7 @@ public:
 
     template<typename IT_T>
     static void update_delete_drawing(
-            ACtxDrawing& rCtxDraw, IT_T const& first, IT_T const& last);
-
-    template<typename IT_T>
-    static void update_delete_groups(
-            ACtxRenderGroups& rCtxGroups, IT_T first, IT_T const& last);
+            ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing, IT_T const& first, IT_T const& last);
 
     static MeshIdOwner_t add_drawable_mesh(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg, std::string_view const name);
 
@@ -263,28 +246,14 @@ void remove_refcounted(
 
 template<typename IT_T>
 void SysRender::update_delete_drawing(
-        ACtxDrawing& rCtxDraw, IT_T const& first, IT_T const& last)
+        ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing, IT_T const& first, IT_T const& last)
 {
     for (auto it = first; it != last; std::advance(it, 1))
     {
         DrawEnt const drawEnt = *it;
 
-        remove_refcounted(drawEnt, rCtxDraw.m_diffuseTex, rCtxDraw.m_texRefCounts);
-        remove_refcounted(drawEnt, rCtxDraw.m_mesh,       rCtxDraw.m_meshRefCounts);
-    }
-}
-
-template<typename IT_T>
-void SysRender::update_delete_groups(
-        ACtxRenderGroups& rCtxGroups, IT_T first, IT_T const& last)
-{
-    if (first == last)
-    {
-        return;
-    }
-    for ([[maybe_unused]] auto& [_, rGroup] : rCtxGroups.m_groups)
-    {
-        rGroup.m_entities.remove(first, last);
+        remove_refcounted(drawEnt, rCtxScnRdr.m_diffuseTex, rCtxDrawing.m_texRefCounts);
+        remove_refcounted(drawEnt, rCtxScnRdr.m_mesh,       rCtxDrawing.m_meshRefCounts);
     }
 }
 

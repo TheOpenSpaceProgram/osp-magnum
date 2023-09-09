@@ -81,6 +81,41 @@ using TexIdOwner_t      = TexRefCount_t::Owner_t;
 struct ACtxDrawing
 {
 
+    // Scene-space Meshes
+    lgrn::IdRegistryStl<MeshId>             m_meshIds;
+    MeshRefCount_t                          m_meshRefCounts;
+
+    // Scene-space Textures
+    lgrn::IdRegistryStl<TexId>              m_texIds;
+    TexRefCount_t                           m_texRefCounts;
+};
+
+/**
+ * @brief Associates mesh/texture resources Ids from ACtxDrawing with Resources
+ */
+struct ACtxDrawingRes
+{
+    // Required for std::is_copy_assignable to work properly inside of entt::any
+    ACtxDrawingRes() = default;
+    ACtxDrawingRes(ACtxDrawingRes const& copy) = delete;
+    ACtxDrawingRes(ACtxDrawingRes&& move) = default;
+
+    // Associate Texture Ids with resources
+    IdMap_t<ResId, TexId>                   m_resToTex;
+    IdMap_t<TexId, ResIdOwner_t>            m_texToRes;
+
+    // Associate Mesh Ids with resources
+    IdMap_t<ResId, MeshId>                  m_resToMesh;
+    IdMap_t<MeshId, ResIdOwner_t>           m_meshToRes;
+};
+
+struct ACtxSceneRender
+{
+    // Required for std::is_copy_assignable to work properly inside of entt::any
+    ACtxSceneRender() = default;
+    ACtxSceneRender(ACtxSceneRender const& copy) = delete;
+    ACtxSceneRender(ACtxSceneRender&& move) = default;
+
     void resize_draw()
     {
         std::size_t const size = m_drawIds.capacity();
@@ -107,14 +142,6 @@ struct ACtxDrawing
     DrawEntSet_t                            m_needDrawTf;
     KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
 
-    // Scene-space Meshes
-    lgrn::IdRegistryStl<MeshId>             m_meshIds;
-    MeshRefCount_t                          m_meshRefCounts;
-
-    // Scene-space Textures
-    lgrn::IdRegistryStl<TexId>              m_texIds;
-    TexRefCount_t                           m_texRefCounts;
-
     // Meshes and textures assigned to DrawEnts
     KeyedVec<DrawEnt, TexIdOwner_t>         m_diffuseTex;
     std::vector<DrawEnt>                    m_diffuseDirty;
@@ -124,25 +151,8 @@ struct ACtxDrawing
 
     lgrn::IdRegistryStl<MaterialId>         m_materialIds;
     KeyedVec<MaterialId, Material>          m_materials;
-};
 
-/**
- * @brief Associates mesh/texture resources Ids from ACtxDrawing with Resources
- */
-struct ACtxDrawingRes
-{
-    // Required for std::is_copy_assignable to work properly inside of entt::any
-    ACtxDrawingRes() = default;
-    ACtxDrawingRes(ACtxDrawingRes const& copy) = delete;
-    ACtxDrawingRes(ACtxDrawingRes&& move) = default;
-
-    // Associate Texture Ids with resources
-    IdMap_t<ResId, TexId>                   m_resToTex;
-    IdMap_t<TexId, ResIdOwner_t>            m_texToRes;
-
-    // Associate Mesh Ids with resources
-    IdMap_t<ResId, MeshId>                  m_resToMesh;
-    IdMap_t<MeshId, ResIdOwner_t>           m_meshToRes;
+    //DrawTransforms_t        m_drawTransform;
 };
 
 struct Camera

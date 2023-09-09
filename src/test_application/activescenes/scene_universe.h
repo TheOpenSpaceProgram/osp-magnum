@@ -34,13 +34,15 @@ namespace testapp::scenes
  */
 osp::Session setup_uni_core(
         osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData);
+        osp::ArrayView<entt::any>   topData,
+        osp::PipelineId             updateOn);
 
 /**
  * @brief Represents the physics scene's presence in a Universe
  */
 osp::Session setup_uni_sceneframe(
         osp::TopTaskBuilder&        rBuilder,
+        osp::Session const&         uniCore,
         osp::ArrayView<entt::any>   topData);
 
 /**

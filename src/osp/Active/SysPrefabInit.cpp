@@ -111,6 +111,7 @@ void SysPrefabInit::init_transforms(
     }
 }
 
+#if 0
 void SysPrefabInit::init_drawing(
         ACtxPrefabInit const&               rPrefabInit,
         Resources&                          rResources,
@@ -226,6 +227,7 @@ void SysPrefabInit::init_drawing(
         ++itPfEnts;
     }
 }
+#endif
 
 void SysPrefabInit::init_physics(
             ACtxPrefabInit const&               rPrefabInit,
@@ -292,7 +294,7 @@ void SysPrefabInit::init_physics(
             EShape const    shape       = rPrefabData.m_objShape[objectId];
 
 
-            rCtxPhys.m_shape[std::size_t(ent)] = shape;
+            rCtxPhys.m_shape[ent] = shape;
 
             if (mass != 0.0f)
             {

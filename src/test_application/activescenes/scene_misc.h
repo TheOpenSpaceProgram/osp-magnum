@@ -33,13 +33,11 @@ namespace testapp::scenes
 
 void create_materials(
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
+        osp::Session const&         sceneRenderer,
         int                         count);
 
 void add_floor(
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         commonScene,
         osp::Session const&         shapeSpawn,
         osp::active::MaterialId     material,
         osp::PkgId                  pkg);
@@ -51,7 +49,8 @@ osp::Session setup_camera_ctrl(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         windowApp,
-        osp::Session const&         scnRender);
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         magnumScene);
 
 /**
  * @brief Adds free cam controls to a CameraController

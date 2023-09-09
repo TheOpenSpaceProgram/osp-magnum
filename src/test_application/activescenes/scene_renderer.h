@@ -35,25 +35,33 @@ namespace testapp::scenes
 {
 
 osp::Session setup_window_app(
-        osp::TopTaskBuilder&            rBuilder,
-        osp::ArrayView<entt::any>       topData,
-        osp::Session const&             application);
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application);
 
-osp::Session setup_magnum(
-        osp::TopTaskBuilder&            rBuilder,
-        osp::ArrayView<entt::any>       topData,
-        osp::Session const&             windowApp,
-        osp::Session const&             application,
-        MagnumApplication::Arguments    args);
-
-/**
- * @brief Magnum-powered OpenGL Renderer
- */
 osp::Session setup_scene_renderer(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         application,
         osp::Session const&         windowApp,
+        osp::Session const&         commonScene);
+
+osp::Session setup_magnum(
+        osp::TopTaskBuilder&            rBuilder,
+        osp::ArrayView<entt::any>       topData,
+        osp::Session const&             application,
+        osp::Session const&             windowApp,
+        MagnumApplication::Arguments    args);
+
+/**
+ * @brief stuff needed to render a scene using Magnum
+ */
+osp::Session setup_magnum_scene(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
         osp::Session const&         scene,
         osp::Session const&         commonScene);
@@ -64,11 +72,15 @@ osp::Session setup_scene_renderer(
 osp::Session setup_shader_visualizer(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
+        osp::Session const&         magnumScene,
         osp::Session const&         scene,
         osp::Session const&         commonScene,
-        osp::Session const&         scnRender,
         osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
+
+
 
 /**
  * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
