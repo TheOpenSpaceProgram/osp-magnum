@@ -266,14 +266,13 @@ static ScenarioMap_t make_scenarios()
             TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
 
             auto & [SCENE_SESSIONS] = unpack<10>(rTestApp.m_scene.m_sessions);
-
             auto & [RENDERER_SESSIONS] = resize_then_unpack<7>(rTestApp.m_renderer.m_sessions);
 
             sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
             magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
             cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
             cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
-            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, scene, commonScene, sc_matVisualizer);
+            shVisual        = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
             camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
             shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, shapeSpawn);
 
@@ -281,7 +280,11 @@ static ScenarioMap_t make_scenarios()
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };
+
+        #undef SCENE_SESSIONS
+        #undef RENDERER_SESSIONS
     });
+
 
 #if 0
 

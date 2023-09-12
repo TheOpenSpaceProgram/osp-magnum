@@ -76,8 +76,6 @@ osp::Session setup_shader_visualizer(
         osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
         osp::Session const&         magnumScene,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
         osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
 
 
@@ -88,10 +86,11 @@ osp::Session setup_shader_visualizer(
 osp::Session setup_shader_flat(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
-        osp::Session const&         scene,
-        osp::Session const&         scnRender,
-        osp::Session const&         material);
+        osp::Session const&         magnumScene,
+        osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
 
 /**
  * @brief Magnum Phong shader and optional material for drawing ActiveEnts with it
@@ -99,10 +98,11 @@ osp::Session setup_shader_flat(
 osp::Session setup_shader_phong(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
-        osp::Session const&         scene,
-        osp::Session const&         scnRender,
-        osp::Session const&         material);
+        osp::Session const&         magnumScene,
+        osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
 
 /**
  * @brief Red indicators over Magic Rockets

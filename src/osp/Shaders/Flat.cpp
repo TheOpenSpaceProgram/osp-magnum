@@ -24,47 +24,40 @@
  */
 #include "Flat.h"
 
-// for the 0xrrggbb_rgbf and angle literals
-using namespace Magnum::Math::Literals;
-
 using namespace osp;
 using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_flat(
-        DrawEnt ent, ViewProjMatrix const& viewProj,
-        EntityToDraw::UserData_t userData) noexcept
+        DrawEnt                     ent,
+        ViewProjMatrix const&       viewProj,
+        EntityToDraw::UserData_t    userData) noexcept
 {
-    using Flag = Flat::Flag;
-
     void* const pData   = std::get<0>(userData);
     void* const pShader = std::get<1>(userData);
     assert(pData   != nullptr);
     assert(pShader != nullptr);
 
     auto &rData   = *reinterpret_cast<ACtxDrawFlat*>(pData);
-    auto &rShader = *reinterpret_cast<Flat*>(pShader);
+    auto &rShader = *reinterpret_cast<FlatGL3D*>(pShader);
 
     // Collect uniform information
-    Matrix4 const &drawTf = (*rData.m_pDrawTf)[ent];
+    Matrix4 const &drawTf = (*rData.pDrawTf)[ent];
 
-    if (rShader.flags() & Flag::Textured)
+    if (rShader.flags() & FlatGL3D::Flag::Textured)
     {
-        TexGlId const texGlId = (*rData.m_pDiffuseTexId)[ent].m_glId;
-        rShader.bindTexture(rData.m_pTexGl->get(texGlId));
+        TexGlId const texGlId = (*rData.pDiffuseTexId)[ent].m_glId;
+        rShader.bindTexture(rData.pTexGl->get(texGlId));
     }
 
-    if (rData.m_pColor != nullptr)
+    if (rData.pColor != nullptr)
     {
-        rShader.setColor((*rData.m_pColor)[ent]);
+        rShader.setColor((*rData.pColor)[ent]);
     }
 
-    MeshGlId const meshId = (*rData.m_pMeshId)[ent].m_glId;
-    Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
+    MeshGlId const      meshId = (*rData.pMeshId)[ent].m_glId;
+    Magnum::GL::Mesh    &rMesh = rData.pMeshGl->get(meshId);
 
-    rShader
-        .setTransformationProjectionMatrix(viewProj.m_viewProj * drawTf)
-        .draw(rMesh);
+    rShader.setTransformationProjectionMatrix(viewProj.m_viewProj * drawTf)
+           .draw(rMesh);
 }
-
-

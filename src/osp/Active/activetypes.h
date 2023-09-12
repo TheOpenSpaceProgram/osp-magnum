@@ -38,6 +38,7 @@
 #include <longeron/id_management/registry_stl.hpp>      // for lgrn::IdRegistryStl
 #include <longeron/containers/bit_view.hpp>             // for lgrn::BitView
 
+#include <optional>
 #include <vector>
 
 namespace osp::active
@@ -62,6 +63,30 @@ using DrawEntSet_t  = BitVector_t;
 
 
 enum class MaterialId : uint32_t { };
+
+
+/**
+ * @brief Emplace, Reassign, or Remove a value from an entt::basic_storage
+ */
+template <typename COMP_T, typename ENT_T>
+void storage_assign(entt::basic_storage<COMP_T, ENT_T> &rStorage, ENT_T const ent, std::optional<COMP_T> value)
+{
+    if (value.has_value())
+    {
+        if (rStorage.contains(ent))
+        {
+            rStorage.get(ent) = std::move(*value);
+        }
+        else
+        {
+            rStorage.emplace(ent, std::move(*value));
+        }
+    }
+    else
+    {
+        rStorage.remove(ent); // checks contains(ent) internally
+    }
+}
 
 
 } // namespace osp::active

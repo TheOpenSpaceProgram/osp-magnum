@@ -159,7 +159,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     // Add drawble, opaque, and visible component
     rScene.m_scnRdr.m_visible.set(std::size_t(cubeDraw));
-    rScene.m_scnRdr.m_drawBasic[cubeDraw].m_opaque = true;
+    rScene.m_scnRdr.m_opaque.set(std::size_t(cubeDraw));
 
     // Add cube to hierarchy, parented to root
     SubtreeBuilder builder = SysSceneGraph::add_descendants(rScene.m_basic.m_scnGraph, 1);
@@ -240,12 +240,15 @@ void sync_test_scene(
     rRenderer.m_sceneRenderGL.m_meshId.resize(rScene.m_scnRdr.m_drawIds.capacity());
 
     // Assign or remove phong shaders from entities marked dirty
-    sync_phong(
-            std::cbegin(rScene.m_matPhongDirty),
-            std::cend(rScene.m_matPhongDirty),
-            rScene.m_matPhong, &rRenderer.m_groupFwdOpaque.m_entities, nullptr,
-            rScene.m_scnRdr.m_drawBasic, rRenderer.m_sceneRenderGL.m_diffuseTexId,
-            rRenderer.m_phong);
+    sync_drawent_phong(rScene.m_matPhongDirty.cbegin(), rScene.m_matPhongDirty.cend(),
+    {
+        .hasMaterial    = rScene.m_matPhong,
+        .pStorageOpaque = &rRenderer.m_groupFwdOpaque.m_entities,
+        .opaque         = rScene.m_scnRdr.m_opaque,
+        .transparent    = rScene.m_scnRdr.m_transparent,
+        .diffuse        = rRenderer.m_sceneRenderGL.m_diffuseTexId,
+        .rData          = rRenderer.m_phong
+    });
 
     // Load required meshes and textures into OpenGL
     SysRenderGL::compile_resource_meshes  (rScene.m_drawingRes, *rScene.m_pResources, rRenderGl);
@@ -370,11 +373,11 @@ MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumAp
 
     // Create Phong shaders
     auto const texturedFlags
-            = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask
-            | Phong::Flag::AmbientTexture;
-    rRenderer.m_phong.m_shaderDiffuse      = Phong{Phong::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
-    rRenderer.m_phong.m_shaderUntextured   = Phong{Phong::Configuration{}.setLightCount(2)};
-    rRenderer.m_phong.assign_pointers(rRenderer.m_sceneRenderGL, rRenderGl);
+            = PhongGL::Flag::DiffuseTexture | PhongGL::Flag::AlphaMask
+            | PhongGL::Flag::AmbientTexture;
+    rRenderer.m_phong.shaderDiffuse    = PhongGL{PhongGL::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
+    rRenderer.m_phong.shaderUntextured = PhongGL{PhongGL::Configuration{}.setLightCount(2)};
+    rRenderer.m_phong.assign_pointers(rScene.m_scnRdr, rRenderer.m_sceneRenderGL, rRenderGl);
 
     rRenderer.m_cam.set_aspect_ratio(
             osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size()));

@@ -281,7 +281,7 @@ Session setup_shape_spawn_draw(
             rMat.m_dirty.push_back(drawEnt);
 
             rScnRender.m_visible.set(std::size_t(drawEnt));
-            rScnRender.m_drawBasic[drawEnt].m_opaque = true;
+            rScnRender.m_opaque.set(std::size_t(drawEnt));
         }
     });
 
@@ -334,7 +334,7 @@ Session setup_shape_spawn_draw(
             rMat.m_dirty.push_back(drawEnt);
 
             rScnRender.m_visible.set(std::size_t(drawEnt));
-            rScnRender.m_drawBasic[drawEnt].m_opaque = true;
+            rScnRender.m_opaque.set(std::size_t(drawEnt));
         }
     });
 

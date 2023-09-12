@@ -41,13 +41,6 @@
 namespace osp::active
 {
 
-
-struct BasicDrawProps
-{
-    bool m_opaque:1         { false };
-    bool m_transparent:1    { false };
-};
-
 struct Material
 {
     DrawEntSet_t m_ents;
@@ -109,6 +102,10 @@ struct ACtxDrawingRes
     IdMap_t<MeshId, ResIdOwner_t>           m_meshToRes;
 };
 
+using DrawEntColors_t = KeyedVec<DrawEnt, Magnum::Color4>;
+using DrawEntTextures_t = KeyedVec<DrawEnt, TexIdOwner_t>;
+
+
 struct ACtxSceneRender
 {
     // Required for std::is_copy_assignable to work properly inside of entt::any
@@ -120,9 +117,11 @@ struct ACtxSceneRender
     {
         std::size_t const size = m_drawIds.capacity();
 
-        bitvector_resize(m_visible, size);
-        m_drawBasic     .resize(size);
-        m_color         .resize(size);
+        bitvector_resize(m_opaque,      size);
+        bitvector_resize(m_transparent, size);
+        bitvector_resize(m_visible,     size);
+
+        m_color         .resize(size, {1.0f, 1.0f, 1.0f, 1.0f}); // Default white
         m_diffuseTex    .resize(size);
         m_mesh          .resize(size);
     }
@@ -135,24 +134,23 @@ struct ACtxSceneRender
 
     lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
 
+    DrawEntSet_t                            m_opaque;
+    DrawEntSet_t                            m_transparent;
     DrawEntSet_t                            m_visible;
-    KeyedVec<DrawEnt, BasicDrawProps>       m_drawBasic;
-    KeyedVec<DrawEnt, Magnum::Color4>       m_color;
+    DrawEntColors_t                         m_color;
 
     DrawEntSet_t                            m_needDrawTf;
     KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
 
     // Meshes and textures assigned to DrawEnts
     KeyedVec<DrawEnt, TexIdOwner_t>         m_diffuseTex;
-    std::vector<DrawEnt>                    m_diffuseDirty;
+    DrawEntVec_t                            m_diffuseDirty;
 
     KeyedVec<DrawEnt, MeshIdOwner_t>        m_mesh;
-    std::vector<DrawEnt>                    m_meshDirty;
+    DrawEntVec_t                            m_meshDirty;
 
     lgrn::IdRegistryStl<MaterialId>         m_materialIds;
     KeyedVec<MaterialId, Material>          m_materials;
-
-    //DrawTransforms_t        m_drawTransform;
 };
 
 struct Camera

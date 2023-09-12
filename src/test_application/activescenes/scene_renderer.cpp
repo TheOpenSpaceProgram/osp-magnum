@@ -592,29 +592,23 @@ Session setup_shader_visualizer(
         Session const&              sceneRenderer,
         Session const&              magnum,
         Session const&              magnumScene,
-        Session const&              scene,
-        Session const&              commonScene,
         MaterialId const            materialId)
 {
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
     auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
     auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
-    auto const tgScn    = scene         .get_pipelines< PlScene >();
-    auto const tgCS     = commonScene   .get_pipelines< PlCommonScene >();
-    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
-    auto const tgMgnScn = magnumScene   .get_pipelines< PlMagnumScene >();
 
     auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_VISUALIZER)
-    auto &rDrawVisual = top_emplace< ACtxDrawMeshVisualizer >(topData, idDrawShVisual);
-    rDrawVisual.m_materialId = materialId;
 
+    auto &rDrawVisual = top_emplace< ACtxDrawMeshVisualizer >(topData, idDrawShVisual);
+
+    rDrawVisual.m_materialId = materialId;
     rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Configuration{}.setFlags(MeshVisualizer::Flag::Wireframe) };
     rDrawVisual.assign_pointers(rScnRender, rRenderGl);
 
@@ -628,7 +622,7 @@ Session setup_shader_visualizer(
     }
 
     rBuilder.task()
-        .name       ("Sync MeshVisualizer shader entities")
+        .name       ("Sync MeshVisualizer shader DrawEnts")
         .run_on     ({tgWin.sync(Run)})
         .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify), tgScnRdr.materialDirty(UseOrRun)})
         .push_to    (out.m_tasks)
@@ -640,12 +634,12 @@ Session setup_shader_visualizer(
     });
 
     rBuilder.task()
-        .name       ("Resync MeshVisualizer")
+        .name       ("Resync MeshVisualizer shader DrawEnts")
         .run_on     ({tgWin.resync(Run)})
         .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({              idDrawing,                 idScnRender,             idGroupFwd,                        idDrawShVisual})
-        .func([] (ACtxDrawing const& rDrawing, ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
+        .args       ({            idScnRender,             idGroupFwd,                        idDrawShVisual})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
     {
         Material const &rMat = rScnRender.m_materials[rDrawShVisual.m_materialId];
         for (auto const drawEntInt : rMat.m_ents.ones())
@@ -657,51 +651,172 @@ Session setup_shader_visualizer(
     return out;
 }
 
-#if 0
+
 Session setup_shader_flat(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
         Session const&              magnum,
-        Session const&              commonScene,
-        Session const&              scnRender,
-        Session const&              material)
+        Session const&              magnumScene,
+        MaterialId const            materialId)
 {
-    using osp::shader::Flat;
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
 
-    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
-    auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);
+    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
-    Session shFlat;
-    OSP_SESSION_ACQUIRE_DATA(shFlat, topData, TESTAPP_SHADER_FLAT)
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_FLAT)
     auto &rDrawFlat = top_emplace< ACtxDrawFlat >(topData, idDrawShFlat);
 
-    rDrawFlat.m_shaderDiffuse      = Flat{Flat::Configuration{}.setFlags(Flat::Flag::Textured)};
-    rDrawFlat.m_shaderUntextured   = Flat{Flat::Configuration{}};
-    rDrawFlat.assign_pointers(rScnRender, rRenderGl);
+    rDrawFlat.shaderDiffuse       = FlatGL3D{FlatGL3D::Configuration{}.setFlags(FlatGL3D::Flag::Textured)};
+    rDrawFlat.shaderUntextured    = FlatGL3D{FlatGL3D::Configuration{}};
+    rDrawFlat.materialId          = materialId;
+    rDrawFlat.assign_pointers(rScnRender, rScnRenderGl, rRenderGl);
 
-    if (material.m_dataIds.empty())
+    if (materialId == lgrn::id_null<MaterialId>())
     {
-        return shFlat;
+        return out;
     }
-    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
 
-    shFlat.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, PlexGlReq, tgGroupFwdMod}).data(
-            "Sync Flat shader entities",
-            TopDataIds_t{                            idMatDirty,                idMatEnts,                   idDrawing,                         idScnRender,             idGroupFwd,               idDrawShFlat},
-            wrap_args([] (std::vector<DrawEnt> const& rMatDirty, EntSet_t const& rMatEnts, ACtxDrawing const& rDrawing, ACtxSceneRenderGL const& rScnRender, RenderGroup& rGroupFwd, ACtxDrawFlat& rDrawShFlat) noexcept
+    rBuilder.task()
+        .name       ("Sync Flat shader DrawEnts")
+        .run_on     ({tgWin.sync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify), tgScnRdr.materialDirty(UseOrRun)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,              idDrawShFlat})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawFlat& rDrawShFlat) noexcept
     {
-        sync_flat(std::cbegin(rMatDirty), std::cend(rMatDirty), rMatEnts, &rGroupFwd.m_entities, nullptr, rDrawing.m_drawBasic, rScnRender.m_diffuseTexId, rDrawShFlat);
-    }));
+        Material const &rMat = rScnRender.m_materials[rDrawShFlat.materialId];
+        sync_drawent_flat(rMat.m_dirty.begin(), rMat.m_dirty.end(),
+        {
+            .hasMaterial    = rMat.m_ents,
+            .pStorageOpaque = &rGroupFwd.m_entities,
+            /* TODO: set .pStorageTransparent */
+            .opaque         = rScnRender.m_opaque,
+            .transparent    = rScnRender.m_transparent,
+            .diffuse        = rScnRenderGl.m_diffuseTexId,
+            .rData          = rDrawShFlat
+        });
+    });
 
-    return shFlat;
+    rBuilder.task()
+        .name       ("Resync Flat shader DrawEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,              idDrawShFlat})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawFlat& rDrawShFlat) noexcept
+    {
+        Material const &rMat = rScnRender.m_materials[rDrawShFlat.materialId];
+        for (auto const drawEntInt : rMat.m_ents.ones())
+        {
+            sync_drawent_flat(DrawEnt(drawEntInt),
+            {
+                .hasMaterial    = rMat.m_ents,
+                .pStorageOpaque = &rGroupFwd.m_entities,
+                /* TODO: set .pStorageTransparent */
+                .opaque         = rScnRender.m_opaque,
+                .transparent    = rScnRender.m_transparent,
+                .diffuse        = rScnRenderGl.m_diffuseTexId,
+                .rData          = rDrawShFlat
+            });
+        }
+    });
+
+    return out;
 }
 
+
+Session setup_shader_phong(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
+        Session const&              magnum,
+        Session const&              magnumScene,
+        MaterialId const            materialId)
+{
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+
+    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
+    auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
+
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_PHONG)
+    auto &rDrawPhong = top_emplace< ACtxDrawPhong >(topData, idDrawShPhong);
+
+    auto const texturedFlags    = PhongGL::Flag::DiffuseTexture | PhongGL::Flag::AlphaMask | PhongGL::Flag::AmbientTexture;
+    rDrawPhong.shaderDiffuse    = PhongGL{PhongGL::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
+    rDrawPhong.shaderUntextured = PhongGL{PhongGL::Configuration{}.setLightCount(2)};
+    rDrawPhong.materialId       = materialId;
+    rDrawPhong.assign_pointers(rScnRender, rScnRenderGl, rRenderGl);
+
+    if (materialId == lgrn::id_null<MaterialId>())
+    {
+        return out;
+    }
+
+    rBuilder.task()
+        .name       ("Sync Phong shader DrawEnts")
+        .run_on     ({tgWin.sync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify), tgScnRdr.materialDirty(UseOrRun)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,               idDrawShPhong})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawPhong& rDrawShPhong) noexcept
+    {
+        Material const &rMat = rScnRender.m_materials[rDrawShPhong.materialId];
+        sync_drawent_phong(rMat.m_dirty.begin(), rMat.m_dirty.end(),
+        {
+            .hasMaterial    = rMat.m_ents,
+            .pStorageOpaque = &rGroupFwd.m_entities,
+            /* TODO: set .pStorageTransparent */
+            .opaque         = rScnRender.m_opaque,
+            .transparent    = rScnRender.m_transparent,
+            .diffuse        = rScnRenderGl.m_diffuseTexId,
+            .rData          = rDrawShPhong
+        });
+    });
+
+    rBuilder.task()
+        .name       ("Resync Phong shader DrawEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,               idDrawShPhong})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawPhong& rDrawShPhong) noexcept
+    {
+        Material const &rMat = rScnRender.m_materials[rDrawShPhong.materialId];
+        for (auto const drawEntInt : rMat.m_ents.ones())
+        {
+            sync_drawent_phong(DrawEnt(drawEntInt),
+            {
+                .hasMaterial    = rMat.m_ents,
+                .pStorageOpaque = &rGroupFwd.m_entities,
+                .opaque         = rScnRender.m_opaque,
+                .transparent    = rScnRender.m_transparent,
+                .diffuse        = rScnRenderGl.m_diffuseTexId,
+                .rData          = rDrawShPhong
+            });
+        }
+    });
+
+    return out;
+}
+
+
+#if 0
 
 Session setup_shader_phong(
         TopTaskBuilder&             rBuilder,
@@ -726,10 +841,7 @@ Session setup_shader_phong(
     auto &rDrawPhong = top_emplace< ACtxDrawPhong >(topData, idDrawShPhong);
 
 
-    auto const texturedFlags        = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask | Phong::Flag::AmbientTexture;
-    rDrawPhong.m_shaderDiffuse      = Phong{Phong::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
-    rDrawPhong.m_shaderUntextured   = Phong{Phong::Configuration{}.setLightCount(2)};
-    rDrawPhong.assign_pointers(rScnRender, rRenderGl);
+
 
     if (material.m_dataIds.empty())
     {
