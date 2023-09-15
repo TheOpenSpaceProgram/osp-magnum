@@ -32,8 +32,6 @@
 namespace osp::active
 {
 
-using DrawTransforms_t = KeyedVec<DrawEnt, Matrix4>;
-
 /**
  * @brief View and Projection matrix
  */

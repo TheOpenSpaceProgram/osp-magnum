@@ -57,7 +57,7 @@ struct ACtxDrawPhong
                                    active::ACtxSceneRenderGL&   rScnRenderGl,
                                    active::RenderGL&            rRenderGl) noexcept
     {
-        pDrawTf         = &rScnRenderGl .m_drawTransform;
+        pDrawTf         = &rScnRender   .m_drawTransform;
         pColor          = &rScnRender   .m_color;
         pDiffuseTexId   = &rScnRenderGl .m_diffuseTexId;
         pMeshId         = &rScnRenderGl .m_meshId;
@@ -89,7 +89,7 @@ inline void sync_drawent_phong(active::DrawEnt ent, ArgsForSyncDrawEntPhong cons
     auto const entInt = std::size_t(ent);
 
     bool const hasMaterial = args.hasMaterial.test(entInt);
-    bool const hasTexture = (args.diffuse[ent].m_glId != lgrn::id_null<TexGlId>());
+    bool const hasTexture = (args.diffuse.size() > std::size_t(ent)) && (args.diffuse[ent].m_glId != lgrn::id_null<TexGlId>());
 
     PhongGL *pShader = hasTexture
                      ? &args.rData.shaderDiffuse

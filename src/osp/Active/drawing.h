@@ -73,7 +73,6 @@ using TexIdOwner_t      = TexRefCount_t::Owner_t;
  */
 struct ACtxDrawing
 {
-
     // Scene-space Meshes
     lgrn::IdRegistryStl<MeshId>             m_meshIds;
     MeshRefCount_t                          m_meshRefCounts;
@@ -104,7 +103,7 @@ struct ACtxDrawingRes
 
 using DrawEntColors_t = KeyedVec<DrawEnt, Magnum::Color4>;
 using DrawEntTextures_t = KeyedVec<DrawEnt, TexIdOwner_t>;
-
+using DrawTransforms_t = KeyedVec<DrawEnt, Matrix4>;
 
 struct ACtxSceneRender
 {
@@ -121,9 +120,15 @@ struct ACtxSceneRender
         bitvector_resize(m_transparent, size);
         bitvector_resize(m_visible,     size);
 
+        m_drawTransform .resize(size);
         m_color         .resize(size, {1.0f, 1.0f, 1.0f, 1.0f}); // Default white
         m_diffuseTex    .resize(size);
         m_mesh          .resize(size);
+
+        for (uint32_t matInt : m_materialIds.bitview().zeros())
+        {
+            bitvector_resize(m_materials[MaterialId(matInt)].m_ents, size);
+        }
     }
 
     void resize_active(std::size_t const size)
@@ -141,6 +146,8 @@ struct ACtxSceneRender
 
     DrawEntSet_t                            m_needDrawTf;
     KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
+
+    DrawTransforms_t                        m_drawTransform;
 
     // Meshes and textures assigned to DrawEnts
     KeyedVec<DrawEnt, TexIdOwner_t>         m_diffuseTex;

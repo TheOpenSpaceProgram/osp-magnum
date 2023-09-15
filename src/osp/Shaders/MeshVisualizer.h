@@ -45,11 +45,12 @@ struct ACtxDrawMeshVisualizer
 
     bool m_wireframeOnly{false};
 
-    constexpr void assign_pointers(active::ACtxSceneRenderGL& rCtxScnGl,
-                                   active::RenderGL& rRenderGl) noexcept
+constexpr void assign_pointers(active::ACtxSceneRender&         rScnRender,
+                                   active::ACtxSceneRenderGL&   rScnRenderGl,
+                                   active::RenderGL&            rRenderGl) noexcept
     {
-        m_pDrawTf   = &rCtxScnGl.m_drawTransform;
-        m_pMeshId   = &rCtxScnGl.m_meshId;
+        m_pDrawTf   = &rScnRender.m_drawTransform;
+        m_pMeshId   = &rScnRenderGl.m_meshId;
         m_pMeshGl   = &rRenderGl.m_meshGl;
     }
 };

@@ -229,15 +229,15 @@ struct EngineTestRenderer
  * @param rRenderer [ref] Renderer data for test scene
  */
 void sync_test_scene(
-        RenderGL& rRenderGl, EngineTestScene const& rScene,
+        RenderGL& rRenderGl, EngineTestScene& rScene,
         EngineTestRenderer& rRenderer)
 {
     using namespace osp::active;
     using namespace osp::shader;
 
-    rRenderer.m_sceneRenderGL.m_drawTransform.resize(rScene.m_scnRdr.m_drawIds.capacity());
+    rScene.m_scnRdr.m_drawTransform         .resize(rScene.m_scnRdr.m_drawIds.capacity());
     rRenderer.m_sceneRenderGL.m_diffuseTexId.resize(rScene.m_scnRdr.m_drawIds.capacity());
-    rRenderer.m_sceneRenderGL.m_meshId.resize(rScene.m_scnRdr.m_drawIds.capacity());
+    rRenderer.m_sceneRenderGL.m_meshId      .resize(rScene.m_scnRdr.m_drawIds.capacity());
 
     // Assign or remove phong shaders from entities marked dirty
     sync_drawent_phong(rScene.m_matPhongDirty.cbegin(), rScene.m_matPhongDirty.cend(),
@@ -280,7 +280,7 @@ void sync_test_scene(
             rScene.m_basic.m_scnGraph,
             rScene.m_scnRdr.m_activeToDraw,
             rScene.m_basic.m_transform,
-            rRenderer.m_sceneRenderGL.m_drawTransform,
+            rScene.m_scnRdr.m_drawTransform,
             rScene.m_scnRdr.m_needDrawTf,
             drawTfDirty.begin(),
             drawTfDirty.end());

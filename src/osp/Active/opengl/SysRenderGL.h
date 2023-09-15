@@ -104,7 +104,6 @@ struct ACtxSceneRenderGL
 {
     MeshGlEntStorage_t      m_meshId;
     TexGlEntStorage_t       m_diffuseTexId;
-    DrawTransforms_t        m_drawTransform;
 };
 
 /**

@@ -344,6 +344,8 @@ struct PlSceneRenderer
     PipelineDef<EStgCont> material          {"material"};
     PipelineDef<EStgIntr> materialDirty     {"materialDirty"};
 
+    PipelineDef<EStgIntr> drawTransforms    {"drawTransforms"};
+
     PipelineDef<EStgCont> group             {"group"};
     PipelineDef<EStgCont> groupEnts         {"groupEnts"};
     PipelineDef<EStgCont> entMesh           {"entMesh"};
@@ -377,7 +379,6 @@ struct PlMagnumScene
 {
     PipelineDef<EStgFBO>  fbo               {"fboRender"};
 
-    PipelineDef<EStgIntr> drawTransforms    {"drawTransforms"};
     PipelineDef<EStgCont> camera            {"camera"};
 
 };

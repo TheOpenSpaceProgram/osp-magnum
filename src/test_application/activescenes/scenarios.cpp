@@ -228,7 +228,7 @@ static ScenarioMap_t make_scenarios()
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
         #define SCENE_SESSIONS      scene, commonScene, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt
-        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, camThrow, shapeDraw
+        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor
 
         using namespace testapp::scenes;
 
@@ -244,7 +244,7 @@ static ScenarioMap_t make_scenarios()
         scene           = setup_scene               (builder, rTopData, application);
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
         physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        shapeSpawn      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matVisualizer);
+        shapeSpawn      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
         droppers        = setup_droppers            (builder, rTopData, scene, commonScene, shapeSpawn);
         bounds          = setup_bounds              (builder, rTopData, scene, commonScene, shapeSpawn);
 
@@ -266,17 +266,20 @@ static ScenarioMap_t make_scenarios()
             TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
 
             auto & [SCENE_SESSIONS] = unpack<10>(rTestApp.m_scene.m_sessions);
-            auto & [RENDERER_SESSIONS] = resize_then_unpack<7>(rTestApp.m_renderer.m_sessions);
+            auto & [RENDERER_SESSIONS] = resize_then_unpack<10>(rTestApp.m_renderer.m_sessions);
 
             sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
+            create_materials(rTopData, sceneRenderer, sc_materialCount);
+
             magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
             cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
             cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
-            shVisual        = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
+            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
+            shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
             camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
             shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, shapeSpawn);
-
-            create_materials(rTopData, sceneRenderer, sc_materialCount);
+            cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };

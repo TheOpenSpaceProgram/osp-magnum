@@ -126,13 +126,14 @@ osp::Session setup_thrust_indicators(
 osp::Session setup_cursor(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         magnum,
-        osp::Session const&         commonScene,
-        osp::Session const&         scnRender,
+        osp::Session const&         application,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         cameraCtrl,
-        osp::Session const&         shFlat,
-        osp::TopDataId const        idResources,
+        osp::Session const&         commonScene,
+        osp::active::MaterialId const material,
         osp::PkgId const            pkg);
+
+
 
 /**
  * @brief Draw universe, specifically designed for setup_uni_test_planets
