@@ -53,7 +53,7 @@ Session setup_uni_core(
 
     auto const tgUCore = out.create_pipelines<PlUniCore>(rBuilder);
 
-    rBuilder.pipeline(tgUCore.update).parent(updateOn).wait_for_signal(EStgOptn::ModifyOrSignal);
+    rBuilder.pipeline(tgUCore.update).parent(updateOn);//.wait_for_signal(EStgOptn::ModifyOrSignal);
 
     rBuilder.pipeline(tgUCore.transfer).parent(tgUCore.update);
 
@@ -63,8 +63,8 @@ Session setup_uni_core(
 
 Session setup_uni_sceneframe(
         TopTaskBuilder&             rBuilder,
-        Session const&              uniCore,
-        ArrayView<entt::any>        topData)
+        ArrayView<entt::any>        topData,
+        Session const&              uniCore)
 {
     auto const tgUCore =  uniCore.get_pipelines<PlUniCore>();
 
@@ -81,20 +81,20 @@ Session setup_uni_sceneframe(
 }
 
 
-Session setup_uni_test_planets(
+Session setup_uni_testplanets(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>        topData,
         Session const&              uniCore,
-        Session const&              scnFrame)
+        Session const&              uniScnFrame)
 {
     using CoSpaceIdVec_t = std::vector<CoSpaceId>;
     using Corrade::Containers::Array;
 
     OSP_DECLARE_GET_DATA_IDS(uniCore, TESTAPP_DATA_UNI_CORE);
-    OSP_DECLARE_GET_DATA_IDS(scnFrame, TESTAPP_DATA_UNI_SCENEFRAME);
+    OSP_DECLARE_GET_DATA_IDS(uniScnFrame, TESTAPP_DATA_UNI_SCENEFRAME);
 
-    auto const tgUCore = uniCore.get_pipelines<PlUniCore>();
-    auto const tgUSFrm = scnFrame.get_pipelines<PlUniSceneFrame>();
+    auto const tgUCore = uniCore    .get_pipelines<PlUniCore>();
+    auto const tgUSFrm = uniScnFrame.get_pipelines<PlUniSceneFrame>();
 
     auto &rUniverse = top_get< Universe >(topData, idUniverse);
 

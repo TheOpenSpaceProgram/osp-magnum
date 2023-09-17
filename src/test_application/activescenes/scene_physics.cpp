@@ -232,7 +232,6 @@ Session setup_shape_spawn_draw(
     auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
     auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
     auto const tgCS     = commonScene   .get_pipelines< PlCommonScene >();
-    auto const tgPhy    = physics       .get_pipelines< PlPhysics >();
     auto const tgShSp   = shapeSpawn    .get_pipelines< PlShapeSpawn >();
 
     Session out;

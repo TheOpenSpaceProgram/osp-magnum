@@ -40,7 +40,8 @@ void add_floor(
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         shapeSpawn,
         osp::active::MaterialId     material,
-        osp::PkgId                  pkg);
+        osp::PkgId                  pkg,
+        int                         size);
 
 /**
  * @brief Create CameraController connected to an app's UserInputHandler

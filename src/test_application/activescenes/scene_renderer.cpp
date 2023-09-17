@@ -1016,45 +1016,59 @@ Session setup_thrust_indicators(
     return thrustIndicator;
 }
 
+#endif
 
+struct PlanetDraw
+{
+    DrawEntVec_t            drawEnts;
+    std::array<DrawEnt, 3>  axis;
+    DrawEnt                 attractor;
+    MaterialId              matPlanets;
+    MaterialId              matAxis;
+};
 
-
-
-Session setup_uni_test_planets_renderer(
+Session setup_testplanets_draw(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Session const&              magnum,
-        Session const&              scnRender,
-        Session const&              commonScene,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
         Session const&              cameraCtrl,
-        Session const&              visualizer,
+        Session const&              commonScene,
         Session const&              uniCore,
         Session const&              uniScnFrame,
-        Session const&              uniTestPlanets)
+        Session const&              uniTestPlanets,
+        MaterialId const            matPlanets,
+        MaterialId const            matAxis)
 {
-    Session uniTestPlanetsRdr;
+    OSP_DECLARE_GET_DATA_IDS(commonScene,    TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,  TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,     TESTAPP_DATA_CAMERA_CTRL);
+    OSP_DECLARE_GET_DATA_IDS(uniCore,        TESTAPP_DATA_UNI_CORE);
+    OSP_DECLARE_GET_DATA_IDS(uniScnFrame,    TESTAPP_DATA_UNI_SCENEFRAME);
+    OSP_DECLARE_GET_DATA_IDS(uniTestPlanets, TESTAPP_DATA_UNI_PLANETS);
 
-    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_DATA(magnum,         TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_TAGS(scnRender,      TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_DATA(scnRender,      TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_TAGS(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(cameraCtrl,     TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_TAGS(cameraCtrl,     TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_DATA(visualizer,     TESTAPP_SHADER_VISUALIZER);
-    OSP_SESSION_UNPACK_TAGS(uniCore,        TESTAPP_UNI_CORE);
-    OSP_SESSION_UNPACK_DATA(uniCore,        TESTAPP_UNI_CORE);
-    OSP_SESSION_UNPACK_TAGS(uniScnFrame,    TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_UNPACK_DATA(uniScnFrame,    TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_UNPACK_DATA(uniTestPlanets, TESTAPP_UNI_PLANETS);
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const tgUCore  = uniCore       .get_pipelines<PlUniCore>();
+    auto const tgUSFrm  = uniScnFrame   .get_pipelines<PlUniSceneFrame>();
 
-    //OSP_SESSION_ACQUIRE_DATA(uniTestPlanets, topData, TESTAPP_UNI_PLANETS);
+    Session out;
 
-    uniTestPlanetsRdr.task() = rBuilder.task().assign({tgRenderEvt, tgScnFramePosMod, tgCamCtrlMod}).data(
-            "Position SceneFrame center Camera Controller",
-            TopDataIds_t{                      idCamCtrl,            idScnFrame},
-            wrap_args([] (ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
+    auto const [idPlanetDraw] = out.acquire_data<1>(topData);
+
+    auto &rPlanetDraw = top_emplace<PlanetDraw>(topData, idPlanetDraw);
+
+    rPlanetDraw.matPlanets = matPlanets;
+    rPlanetDraw.matAxis    = matAxis;
+
+    rBuilder.task()
+        .name       ("Position SceneFrame center to Camera Controller target")
+        .run_on     ({tgWin.inputs(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idCamCtrl,            idScnFrame })
+        .func([] (ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
     {
         if ( ! rCamCtrl.m_target.has_value())
         {
@@ -1079,13 +1093,84 @@ Session setup_uni_test_planets_renderer(
 
         rScnFrame.m_scenePosition = Vector3g(math::mul_2pow<Vector3, int>(rCamCtrl.m_target.value(), rScnFrame.m_precision));
 
-    }));
+    });
 
-    uniTestPlanetsRdr.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgBindFboReq, tgFwdRenderMod, tgDrawReq, tgCameraReq, tgScnFramePosReq}).data(
-            "Render test planets",
-            TopDataIds_t{          idRenderGl,              idCamera,                        idDrawShVisual,                      idDrawingRes,             idNMesh,          idUniverse,                  idScnFrame,               idPlanetMainSpace},
-            wrap_args([] (RenderGL& rRenderGl, Camera const& rCamera, ACtxDrawMeshVisualizer& rDrawShVisual, ACtxDrawingRes const& rDrawingRes, NamedMeshes& rNMesh, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace) noexcept
+    rBuilder.task()
+        .name       ("Resync test planets, create DrawEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.drawEntResized(ModifyOrSignal)})
+        .push_to    (out.m_tasks)
+        .args       ({               idScnRender,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
+        .func([]    (ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
     {
+        CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+
+        rPlanetDraw.drawEnts.resize(rMainSpace.m_satCount, lgrn::id_null<DrawEnt>());
+
+        rScnRender.m_drawIds.create(rPlanetDraw.drawEnts   .begin(), rPlanetDraw.drawEnts   .end());
+        rScnRender.m_drawIds.create(rPlanetDraw.axis       .begin(), rPlanetDraw.axis       .end());
+        rPlanetDraw.attractor = rScnRender.m_drawIds.create();
+    });
+
+    rBuilder.task()
+        .name       ("Resync test planets, add mesh and material")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.drawEntResized(Done), tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
+        .push_to    (out.m_tasks)
+        .args       ({           idDrawing,                 idScnRender,             idNMesh,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
+        .func([]    (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
+    {
+        CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+
+        Material &rMatPlanet = rScnRender.m_materials[rPlanetDraw.matPlanets];
+        Material &rMatAxis   = rScnRender.m_materials[rPlanetDraw.matAxis];
+
+        MeshId const sphereMeshId = rNMesh.m_shapeToMesh.at(phys::EShape::Sphere);
+        MeshId const cubeMeshId   = rNMesh.m_shapeToMesh.at(phys::EShape::Box);
+
+        for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+        {
+            DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
+
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
+            rScnRender.m_meshDirty.push_back(drawEnt);
+            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_opaque.set(std::size_t(drawEnt));
+            rMatPlanet.m_ents.set(std::size_t(drawEnt));
+            rMatPlanet.m_dirty.push_back(drawEnt);
+        }
+
+        rScnRender.m_mesh[rPlanetDraw.attractor] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
+        rScnRender.m_meshDirty.push_back(rPlanetDraw.attractor);
+        rScnRender.m_visible.set(std::size_t(rPlanetDraw.attractor));
+        rScnRender.m_opaque.set(std::size_t(rPlanetDraw.attractor));
+        rMatPlanet.m_ents.set(std::size_t(rPlanetDraw.attractor));
+        rMatPlanet.m_dirty.push_back(rPlanetDraw.attractor);
+
+        for (DrawEnt const drawEnt : rPlanetDraw.axis)
+        {
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(cubeMeshId);
+            rScnRender.m_meshDirty.push_back(drawEnt);
+            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_opaque.set(std::size_t(drawEnt));
+            rMatAxis.m_ents.set(std::size_t(drawEnt));
+            rMatAxis.m_dirty.push_back(drawEnt);
+        }
+
+        rScnRender.m_color[rPlanetDraw.axis[0]] = {1.0f, 0.0f, 0.0f, 1.0f};
+        rScnRender.m_color[rPlanetDraw.axis[1]] = {0.0f, 1.0f, 0.0f, 1.0f};
+        rScnRender.m_color[rPlanetDraw.axis[2]] = {0.0f, 0.0f, 1.0f, 1.0f};
+    });
+
+    rBuilder.task()
+        .name       ("Reposition test planet DrawEnts")
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEntResized(Done), tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                 idScnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace})
+        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace) noexcept
+    {
+
         CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
         auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
         auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
@@ -1114,42 +1199,27 @@ Session setup_uni_test_planets_renderer(
 
         float const scale = math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
 
-        ViewProjMatrix viewProj{rCamera.m_transform.inverted(), rCamera.perspective()};
+        Vector3 const attractorPos = Vector3(mainToArea.transform_position({0, 0, 0})) * scale;
 
-        MeshId const    sphereMeshId    = rNMesh.m_shapeToMesh[phys::EShape::Sphere];
-        ResId const     sphereResId     = rDrawingRes.m_meshToRes.at(sphereMeshId);
-        MeshGlId const  sphereMeshGlId  = rRenderGl.m_resToMesh.at(sphereResId);
-        Mesh&           rSphereMeshGl   = rRenderGl.m_meshGl.get(sphereMeshGlId);
+        // Attractor
+        rScnRender.m_drawTransform[rPlanetDraw.attractor]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({500, 500, 500});
 
-        using Magnum::GL::Renderer;
-        Renderer::enable(Renderer::Feature::DepthTest);
-        Renderer::enable(Renderer::Feature::FaceCulling);
-        Renderer::disable(Renderer::Feature::Blending);
-        Renderer::setDepthMask(true);
+        rScnRender.m_drawTransform[rPlanetDraw.axis[0]]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({500000, 10, 10});
+        rScnRender.m_drawTransform[rPlanetDraw.axis[1]]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({10, 500000, 10});
+        rScnRender.m_drawTransform[rPlanetDraw.axis[2]]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({10, 10, 500000});
 
-        // Draw center indicator
-        Vector3 const centerPos = Vector3(mainToArea.transform_position({})) * scale;
-        rDrawShVisual.m_shader
-            .setTransformationMatrix(
-                    viewProj.m_view
-                    * Matrix4::translation(centerPos)
-                    * Matrix4{mainToAreaRot.toMatrix()}
-                    * Matrix4::scaling({500, 50, 50}))
-            .draw(rSphereMeshGl)
-            .setTransformationMatrix(
-                    viewProj.m_view
-                    * Matrix4::translation(centerPos)
-                    * Matrix4{mainToAreaRot.toMatrix()}
-                    * Matrix4::scaling({50, 500, 50}))
-            .draw(rSphereMeshGl)
-            .setTransformationMatrix(
-                    viewProj.m_view
-                    * Matrix4::translation(centerPos)
-                    * Matrix4{mainToAreaRot.toMatrix()}
-                    * Matrix4::scaling({50, 50, 500}) )
-            .draw(rSphereMeshGl);
-
-        // Draw planets
         for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
         {
             Vector3g const relative = mainToArea.transform_position({x[i], y[i], z[i]});
@@ -1157,20 +1227,17 @@ Session setup_uni_test_planets_renderer(
 
             Quaterniond const rot{{qx[i], qy[i], qz[i]}, qw[i]};
 
-            rDrawShVisual.m_shader
-                .setTransformationMatrix(
-                        viewProj.m_view
-                        * Matrix4::translation(relativeMeters)
-                        * Matrix4::scaling({200, 200, 200})
-                        * Matrix4{(mainToAreaRot * Quaternion{rot}).toMatrix()} )
-                .draw(rSphereMeshGl);
+            DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
+
+            rScnRender.m_drawTransform[drawEnt]
+                = Matrix4::translation(relativeMeters)
+                * Matrix4::scaling({200, 200, 200})
+                * Matrix4{(mainToAreaRot * Quaternion{rot}).toMatrix()};
         }
 
-    }));
+    });
 
-    return uniTestPlanetsRdr;
+    return out;
 }
-
-#endif
 
 } // namespace testapp::scenes

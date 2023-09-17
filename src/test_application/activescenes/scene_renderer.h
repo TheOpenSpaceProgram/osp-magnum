@@ -78,8 +78,6 @@ osp::Session setup_shader_visualizer(
         osp::Session const&         magnumScene,
         osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
 
-
-
 /**
  * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
  */
@@ -133,21 +131,20 @@ osp::Session setup_cursor(
         osp::active::MaterialId const material,
         osp::PkgId const            pkg);
 
-
-
 /**
  * @brief Draw universe, specifically designed for setup_uni_test_planets
  */
-osp::Session setup_uni_test_planets_renderer(
+osp::Session setup_testplanets_draw(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         magnum,
-        osp::Session const&         scnRender,
-        osp::Session const&         commonScene,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         cameraCtrl,
-        osp::Session const&         visualizer,
+        osp::Session const&         commonScene,
         osp::Session const&         uniCore,
         osp::Session const&         uniScnFrame,
-        osp::Session const&         uniTestPlanets);
+        osp::Session const&         uniTestPlanets,
+        osp::active::MaterialId const matPlanets,
+        osp::active::MaterialId const matAxis);
 
 }

@@ -74,7 +74,8 @@ void add_floor(
         ArrayView<entt::any> const  topData,
         Session const&              shapeSpawn,
         MaterialId const            materialId,
-        PkgId const                 pkg)
+        PkgId const                 pkg,
+        int const                   size)
 {
     OSP_DECLARE_GET_DATA_IDS(shapeSpawn, TESTAPP_DATA_SHAPE_SPAWN);
 
@@ -85,12 +86,11 @@ void add_floor(
     auto distSizeY  = std::uniform_real_distribution<float>{20.0, 80.0};
     auto distHeight = std::uniform_real_distribution<float>{1.0, 10.0};
 
-    constexpr int   extendCount = 6;
     constexpr float spread      = 128.0f;
 
-    for (int x = -extendCount; x < extendCount+1; ++x)
+    for (int x = -size; x < size+1; ++x)
     {
-        for (int y = -extendCount; y < extendCount+1; ++y)
+        for (int y = -size; y < size+1; ++y)
         {
             float const heightZ = distHeight(randGen);
             rSpawner.m_spawnRequest.emplace_back(SpawnShape{
@@ -113,7 +113,6 @@ Session setup_camera_ctrl(
 {
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
-    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
     auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
     auto const tgSR     = magnumScene   .get_pipelines<PlMagnumScene>();
 
@@ -206,13 +205,20 @@ Session setup_thrower(
             Matrix4 const &camTf = rCamCtrl.m_transform;
             float const speed = 120;
             float const dist = 8.0f;
-            rSpawner.m_spawnRequest.push_back({
-                .m_position = camTf.translation() - camTf.backward() * dist,
-                .m_velocity = -camTf.backward() * speed,
-                .m_size     = Vector3{1.0f},
-                .m_mass     = 1.0f,
-                .m_shape    = EShape::Sphere
-            });
+
+            for (int x = -2; x < 3; ++x)
+            {
+                for (int y = -2; y < 3; ++y)
+                {
+                    rSpawner.m_spawnRequest.push_back({
+                        .m_position = camTf.translation() - camTf.backward()*dist + camTf.up()*y*5.5f + camTf.right()*x*5.5f,
+                        .m_velocity = -camTf.backward()*speed,
+                        .m_size     = Vector3{1.0f},
+                        .m_mass     = 1.0f,
+                        .m_shape    = EShape::Sphere
+                    });
+                }
+            }
         }
     });
 

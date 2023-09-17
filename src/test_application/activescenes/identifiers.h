@@ -289,9 +289,6 @@ struct PlNewton
 
 #define TESTAPP_DATA_UNI_CORE 2, \
     idUniverse,         tgUniDeltaTimeIn
-#define OSP_TAGS_TESTAPP_UNI_CORE 4, \
-    tgUniUpdEvt,        tgUniTimeEvt,                           \
-    tgUniTransferMod,   tgUniTransferReq
 struct PlUniCore
 {
     PipelineDef<EStgOptn> update            {"update - Universe update"};
@@ -300,8 +297,6 @@ struct PlUniCore
 
 #define TESTAPP_DATA_UNI_SCENEFRAME 1, \
     idScnFrame
-#define OSP_TAGS_TESTAPP_UNI_SCENEFRAME 2, \
-    tgScnFramePosMod,   tgScnFramePosReq
 struct PlUniSceneFrame
 {
     PipelineDef<EStgCont> sceneFrame        {"sceneFrame"};

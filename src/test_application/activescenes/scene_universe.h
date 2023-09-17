@@ -42,13 +42,13 @@ osp::Session setup_uni_core(
  */
 osp::Session setup_uni_sceneframe(
         osp::TopTaskBuilder&        rBuilder,
-        osp::Session const&         uniCore,
-        osp::ArrayView<entt::any>   topData);
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         uniCore);
 
 /**
  * @brief Unrealistic planets test, allows SceneFrame to move around and get captured into planets
  */
-osp::Session setup_uni_test_planets(
+osp::Session setup_uni_testplanets(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         uniCore,

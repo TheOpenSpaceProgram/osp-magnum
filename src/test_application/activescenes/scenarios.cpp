@@ -253,7 +253,7 @@ static ScenarioMap_t make_scenarios()
         nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
         shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
 
-        add_floor(rTopData, shapeSpawn, sc_matVisualizer, defaultPkg);
+        add_floor(rTopData, shapeSpawn, sc_matVisualizer, defaultPkg, 4);
 
         return [] (TestApp& rTestApp)
         {
@@ -388,69 +388,78 @@ static ScenarioMap_t make_scenarios()
         };
     });
 
-
+#endif
 
     add_scenario("universe", "Universe test scenario with very unrealistic planets",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
+        #define SCENE_SESSIONS      scene, commonScene, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets
+        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, planetsDraw
+
         using namespace testapp::scenes;
-        using namespace osp::active;
 
-        auto const idResources  = mainView.m_idResources;
-        auto &rTopData          = mainView.m_topData;
-        auto &rTags             = mainView.m_rTags;
-        Builder_t builder{rTags, mainView.m_rTasks, mainView.m_rTaskData};
+        auto const  defaultPkg      = rTestApp.m_defaultPkg;
+        auto const  application     = rTestApp.m_application;
+        auto        & rTopData      = rTestApp.m_topData;
 
-        auto &
-        [
-            commonScene, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets
-        ] = resize_then_unpack<13>(sceneOut);
+        TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_scene.m_edges, rTestApp.m_taskData};
+
+        auto & [SCENE_SESSIONS] = resize_then_unpack<13>(rTestApp.m_scene.m_sessions);
 
         // Compose together lots of Sessions
-        commonScene       = setup_common_scene        (builder, rTopData, rTags, idResources, mainView.m_defaultPkg);
-        matVisual       = setup_material            (builder, rTopData, rTags, commonScene);
-        physics         = setup_physics             (builder, rTopData, rTags, commonScene);
-        shapeSpawn      = setup_shape_spawn         (builder, rTopData, rTags, commonScene, physics, matVisual);
-        droppers        = setup_droppers            (builder, rTopData, rTags, commonScene, shapeSpawn);
-        bounds          = setup_bounds              (builder, rTopData, rTags, commonScene, physics, shapeSpawn);
+        scene           = setup_scene               (builder, rTopData, application);
+        commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
+        physics         = setup_physics             (builder, rTopData, scene, commonScene);
+        shapeSpawn      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
+        droppers        = setup_droppers            (builder, rTopData, scene, commonScene, shapeSpawn);
+        bounds          = setup_bounds              (builder, rTopData, scene, commonScene, shapeSpawn);
 
-        newton          = setup_newton              (builder, rTopData, rTags, commonScene, physics);
-        nwtGravSet      = setup_newton_factors      (builder, rTopData, rTags);
-        nwtGrav         = setup_newton_force_accel  (builder, rTopData, rTags, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, rTags, commonScene, physics, shapeSpawn, newton, nwtGravSet);
+        newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
+        nwtGravSet      = setup_newton_factors      (builder, rTopData);
+        nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
+        shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
 
-        uniCore         = setup_uni_core            (builder, rTopData, rTags);
-        uniScnFrame     = setup_uni_sceneframe      (builder, rTopData, rTags);
-        uniTestPlanets  = setup_uni_test_planets    (builder, rTopData, rTags, uniCore, uniScnFrame);
+        auto const tgApp = application.get_pipelines< PlApplication >();
 
-        add_floor(rTopData, commonScene, matVisual, shapeSpawn, idResources, mainView.m_defaultPkg);
+        uniCore         = setup_uni_core            (builder, rTopData, tgApp.mainLoop);
+        uniScnFrame     = setup_uni_sceneframe      (builder, rTopData, uniCore);
+        uniTestPlanets  = setup_uni_testplanets     (builder, rTopData, uniCore, uniScnFrame);
 
-        return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, Sessions_t& rendererOut)
+        add_floor(rTopData, shapeSpawn, sc_matVisualizer, defaultPkg, 0);
+
+        return [] (TestApp& rTestApp)
         {
-            auto &rTopData = mainView.m_topData;
-            auto &rTags = mainView.m_rTags;
-            Builder_t builder{mainView.m_rTags, mainView.m_rTasks, mainView.m_rTaskData};
+            auto const  application     = rTestApp.m_application;
+            auto const  windowApp       = rTestApp.m_windowApp;
+            auto const  magnum          = rTestApp.m_magnum;
+            auto const  defaultPkg      = rTestApp.m_defaultPkg;
+            auto        & rTopData      = rTestApp.m_topData;
 
-            auto const& [commonScene, matVisual, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets] = unpack<13>(scene);
+            TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
 
-            rendererOut.resize(8);
-            auto & [scnRender, cameraCtrl, cameraFree, shFlat, shVisual, camThrow, cursor, uniTestPlanetsRdr] = unpack<8>(rendererOut);
-            scnRender           = setup_scene_renderer              (builder, rTopData, rTags, magnum, commonScene, mainView.m_idResources);
-            cameraCtrl          = setup_camera_ctrl                 (builder, rTopData, rTags, magnum, scnRender);
-            cameraFree          = setup_camera_free                 (builder, rTopData, rTags, magnum, commonScene, cameraCtrl);
-            shFlat              = setup_shader_flat                 (builder, rTopData, rTags, magnum, commonScene, scnRender, {});
-            shVisual            = setup_shader_visualizer           (builder, rTopData, rTags, magnum, commonScene, scnRender, matVisual);
-            camThrow            = setup_thrower                     (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
-            cursor              = setup_cursor                      (builder, rTopData, rTags, magnum, commonScene, scnRender, cameraCtrl, shFlat, mainView.m_idResources, mainView.m_defaultPkg);
-            uniTestPlanetsRdr   = setup_uni_test_planets_renderer   (builder, rTopData, rTags, magnum, scnRender, commonScene, cameraCtrl, shVisual, uniCore, uniScnFrame, uniTestPlanets);
+            auto & [SCENE_SESSIONS] = unpack<13>(rTestApp.m_scene.m_sessions);
+            auto & [RENDERER_SESSIONS] = resize_then_unpack<11>(rTestApp.m_renderer.m_sessions);
 
-            OSP_SESSION_UNPACK_TAGS(uniCore, TESTAPP_UNI_CORE);
+            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
+            create_materials(rTopData, sceneRenderer, sc_materialCount);
 
-            setup_magnum_draw(mainView, magnum, commonScene, scnRender, {tgUniTimeEvt});
+            magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
+            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
+            cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
+            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
+            shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
+            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
+            shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, shapeSpawn);
+            cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
+            planetsDraw     = setup_testplanets_draw    (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, uniCore, uniScnFrame, uniTestPlanets, sc_matVisualizer, sc_matFlat);
+
+            setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };
-    });
-#endif
 
+        #undef SCENE_SESSIONS
+        #undef RENDERER_SESSIONS
+    });
 
     return scenarioMap;
 }
