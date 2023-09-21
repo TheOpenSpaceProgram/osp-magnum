@@ -26,7 +26,7 @@
 
 #include <Magnum/Magnum.h>
 
-#include <osp/logging.h>
+#include <osp/util/logging.h>
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;

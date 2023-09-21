@@ -24,8 +24,9 @@
  */
 #pragma once
 
+#include "global_id.h"
+
 #include <longeron/id_management/owner.hpp>
-#include "../global_id.h"
 
 #include <cassert>
 #include <cstdint>
@@ -101,29 +102,6 @@ class Resources;
 
 using ResIdOwner_t = lgrn::IdOwner<ResId, Resources>;
 
-
-// Resource Type Ids
-
 using ResTypeIdReg_t = GlobalIdReg<ResTypeId>;
-
-namespace restypes
-{
-
-inline ResTypeId const gc_image         = ResTypeIdReg_t::create();
-inline ResTypeId const gc_texture       = ResTypeIdReg_t::create();
-inline ResTypeId const gc_mesh          = ResTypeIdReg_t::create();
-inline ResTypeId const gc_importer      = ResTypeIdReg_t::create();
-
-} // namespace restypes
-
-
-using ObjId     = int32_t;
-using PrefabId  = uint32_t;
-
-struct PrefabPair
-{
-    ResIdOwner_t m_importer;
-    PrefabId m_prefabId;
-};
 
 } // namespace osp

@@ -24,9 +24,11 @@
  */
 #pragma once
 
-#include "../types.h"
-#include "../CommonPhysics.h"
-#include "resourcetypes.h"
+#include "prefabs.h"
+
+#include "../core/resourcetypes.h"
+#include "../scientific/shapes.h"
+
 
 #include <Magnum/Trade/MaterialData.h>
 #include <Magnum/Magnum.h>
@@ -41,8 +43,6 @@
 
 namespace osp
 {
-
-struct TextureImgSource : public ResIdOwner_t { };
 
 /**
  * @brief Describes a set of scene graphs that share data with each other
@@ -92,7 +92,7 @@ struct Prefabs
     // Points to ImporterData::m_objNames
     std::vector<std::string_view>           m_prefabNames;
 
-    std::vector<phys::EShape>               m_objShape;
+    std::vector<EShape>                     m_objShape;
     std::vector<float>                      m_objMass;
 };
 

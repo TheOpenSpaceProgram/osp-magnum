@@ -23,14 +23,11 @@
  * SOFTWARE.
  */
 
-#include "CommonPhysics.h"
-
-
-#include <spdlog/spdlog.h>
+#include "shapes.h"
 
 #include <cassert>
 
-namespace osp::phys
+namespace osp
 {
 
 float shape_volume(EShape shape, Vector3 scale)
@@ -50,8 +47,6 @@ float shape_volume(EShape shape, Vector3 scale)
         // Default radius: 1, default height: 2
         return sc_pi * scale.x() * scale.x() * 2.0f*scale.z();
     default:
-        SPDLOG_LOGGER_ERROR(spdlog::get("application"), "Unsupported shape for volume calc");
-        assert(false);
         return 0.0f;
     }   
 }
@@ -98,11 +93,8 @@ Vector3 collider_inertia_tensor(EShape shape, Vector3 scale, float mass)
     case EShape::Capsule:
 
     default:
-        SPDLOG_LOGGER_ERROR(spdlog::get("application"),
-                            "ERROR: unknown collision shape");
-        assert(false);
         return Vector3{0.0f};
     }
 }
 
-} // namespace osp::phys
+} // namespace osp

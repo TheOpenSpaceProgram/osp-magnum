@@ -26,7 +26,8 @@
 
 #include "scenarios.h"
 
-#include <osp/Active/activetypes.h>
+#include <osp/activescene/basic.h>
+#include <osp/drawing/drawing.h>
 
 #include "../MagnumApplication.h"
 
@@ -76,7 +77,7 @@ osp::Session setup_shader_visualizer(
         osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
         osp::Session const&         magnumScene,
-        osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
+        osp::draw::MaterialId       materialId = lgrn::id_null<osp::draw::MaterialId>());
 
 /**
  * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
@@ -88,7 +89,7 @@ osp::Session setup_shader_flat(
         osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
         osp::Session const&         magnumScene,
-        osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
+        osp::draw::MaterialId       materialId = lgrn::id_null<osp::draw::MaterialId>());
 
 /**
  * @brief Magnum Phong shader and optional material for drawing ActiveEnts with it
@@ -100,7 +101,7 @@ osp::Session setup_shader_phong(
         osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
         osp::Session const&         magnumScene,
-        osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
+        osp::draw::MaterialId       materialId = lgrn::id_null<osp::draw::MaterialId>());
 
 /**
  * @brief Red indicators over Magic Rockets
@@ -128,7 +129,7 @@ osp::Session setup_cursor(
         osp::Session const&         sceneRenderer,
         osp::Session const&         cameraCtrl,
         osp::Session const&         commonScene,
-        osp::active::MaterialId const material,
+        osp::draw::MaterialId const material,
         osp::PkgId const            pkg);
 
 /**
@@ -144,7 +145,7 @@ osp::Session setup_testplanets_draw(
         osp::Session const&         uniCore,
         osp::Session const&         uniScnFrame,
         osp::Session const&         uniTestPlanets,
-        osp::active::MaterialId const matPlanets,
-        osp::active::MaterialId const matAxis);
+        osp::draw::MaterialId const matPlanets,
+        osp::draw::MaterialId const matAxis);
 
 }

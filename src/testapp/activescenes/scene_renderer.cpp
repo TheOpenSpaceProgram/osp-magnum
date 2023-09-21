@@ -33,27 +33,26 @@
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Renderer.h>
 
-#include <osp/Active/parts.h>
-#include <osp/Active/SysRender.h>
-#include <osp/Active/SysSceneGraph.h>
-#include <osp/Active/opengl/SysRenderGL.h>
-#include <osp/Shaders/MeshVisualizer.h>
-#include <osp/Shaders/Flat.h>
-#include <osp/Shaders/Phong.h>
-#include <osp/universe/universe.h>
+#include <adera/drawing_gl/flat_shader.h>
+#include <adera/drawing_gl/phong_shader.h>
+#include <adera/drawing_gl/visualizer_shader.h>
+#include <osp/activescene/basic_fn.h>
+#include <osp/drawing/drawing.h>
+#include <osp/drawing_gl/rendergl.h>
 #include <osp/universe/coordinates.h>
+#include <osp/universe/universe.h>
 
 #include <adera/machines/links.h>
 
-#include <osp/unpack.h>
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
-using namespace osp;
-using namespace osp::shader;
+using namespace adera::shader;
 using namespace osp::active;
+using namespace osp::draw;
 using namespace osp::universe;
+using namespace osp;
 
 using osp::input::UserInputHandler;
 
@@ -1125,8 +1124,8 @@ Session setup_testplanets_draw(
         Material &rMatPlanet = rScnRender.m_materials[rPlanetDraw.matPlanets];
         Material &rMatAxis   = rScnRender.m_materials[rPlanetDraw.matAxis];
 
-        MeshId const sphereMeshId = rNMesh.m_shapeToMesh.at(phys::EShape::Sphere);
-        MeshId const cubeMeshId   = rNMesh.m_shapeToMesh.at(phys::EShape::Box);
+        MeshId const sphereMeshId = rNMesh.m_shapeToMesh.at(EShape::Sphere);
+        MeshId const cubeMeshId   = rNMesh.m_shapeToMesh.at(EShape::Box);
 
         for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
         {

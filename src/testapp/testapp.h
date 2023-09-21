@@ -24,14 +24,12 @@
  */
 #pragma once
 
-#include <entt/core/any.hpp>
-
-#include <osp/keyed_vector.h>
-
-#include <osp/Resource/resourcetypes.h>
-
+#include <osp/core/keyed_vector.h>
+#include <osp/core/resourcetypes.h>
 #include <osp/tasks/tasks.h>
 #include <osp/tasks/top_session.h>
+
+#include <entt/core/any.hpp>
 
 #include <optional>
 

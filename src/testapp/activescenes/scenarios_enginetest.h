@@ -26,7 +26,7 @@
 
 #include "../MagnumApplication.h"
 
-#include <osp/Active/opengl/SysRenderGL.h>
+#include <osp/drawing_gl/rendergl.h>
 
 namespace testapp::enginetest
 {
@@ -54,7 +54,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
  *
  * @return MagnumApplication draw function
  */
-MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumApplication& rApp, osp::active::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
+MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumApplication& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
 
 
 } // namespace testapp::enginetest

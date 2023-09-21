@@ -24,12 +24,12 @@
  */
 #pragma once
 
-#include "../types.h"
-
-#include "resources.h"
+#include "../core/math_types.h"
+#include "../core/resourcetypes.h"
 
 namespace osp
 {
+
 
 struct BlueprintMachine
 {

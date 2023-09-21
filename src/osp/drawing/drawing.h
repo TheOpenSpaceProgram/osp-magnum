@@ -24,22 +24,30 @@
  */
 #pragma once
 
-#include "activetypes.h"
+#include "draw_ent.h"
 
-#include "../bitvector.h"
-#include "../id_map.h"
-#include "../keyed_vector.h"
-#include "../types.h"
+#include "../core/bitvector.h"
+#include "../core/id_map.h"
+#include "../core/keyed_vector.h"
+#include "../core/math_types.h"
+#include "../core/resourcetypes.h"
+#include "../core/storage.h"
 
-#include "../Resource/resourcetypes.h"
+#include "../activescene/active_ent.h"
 
 #include <Magnum/Magnum.h>
 #include <Magnum/Math/Color.h>
 
 #include <longeron/id_management/refcount.hpp>
+#include <longeron/id_management/registry_stl.hpp> // for lgrn::IdRegistryStl
 
-namespace osp::active
+namespace osp::draw
 {
+
+using DrawEntVec_t  = std::vector<DrawEnt>;
+using DrawEntSet_t  = BitVector_t;
+
+enum class MaterialId : uint32_t { };
 
 struct Material
 {
@@ -145,7 +153,7 @@ struct ACtxSceneRender
     DrawEntColors_t                         m_color;
 
     DrawEntSet_t                            m_needDrawTf;
-    KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
+    KeyedVec<active::ActiveEnt, DrawEnt>    m_activeToDraw;
 
     DrawTransforms_t                        m_drawTransform;
 
@@ -164,10 +172,10 @@ struct Camera
 {
     Matrix4 m_transform;
 
-    float m_near{0.25f};
-    float m_far{1024.0f};
-    float m_aspectRatio{1.0f};
-    Deg m_fov{45.0f};
+    float   m_near          { 0.25f };
+    float   m_far           { 1024.0f };
+    float   m_aspectRatio   { 1.0f };
+    Deg     m_fov           { 45.0f };
 
     constexpr void set_aspect_ratio(Vector2 const viewport) noexcept
     {
@@ -180,5 +188,5 @@ struct Camera
     }
 };
 
-} // namespace osp::active
+} // namespace osp::draw
 

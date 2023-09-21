@@ -26,13 +26,13 @@
 
 #include "scenarios.h"
 
-#include <osp/tasks/tasks.h>
-#include <osp/tasks/top_tasks.h>
-#include <osp/tasks/top_session.h>
+#include <osp/core/math_types.h>
 #include <osp/tasks/builder.h>
-#include <osp/types.h>
+#include <osp/tasks/tasks.h>
+#include <osp/tasks/top_session.h>
+#include <osp/tasks/top_tasks.h>
 
-#include <newtondynamics_physics/factors.h>
+#include <ospnewton/activescene/forcefactors.h>
 
 #include <longeron/id_management/registry_stl.hpp>
 

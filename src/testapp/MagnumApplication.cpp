@@ -24,7 +24,6 @@
  */
 
 #include "MagnumApplication.h"
-#include "osp/types.h"
 
 #include <Magnum/Math/Color.h>
 #include <Magnum/PixelFormat.h>

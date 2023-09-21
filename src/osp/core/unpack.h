@@ -52,6 +52,4 @@ constexpr auto& resize_then_unpack(CONTAINER_T &rIn)
     return unpack<N, CONTAINER_T>(rIn);
 }
 
-
-}
-
+} // namespace osp

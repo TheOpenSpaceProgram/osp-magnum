@@ -30,14 +30,13 @@
 #include "activescenes/identifiers.h"
 #include "activescenes/scene_renderer.h"
 
-#include <osp/Resource/load_tinygltf.h>
-#include <osp/Resource/resources.h>
-#include <osp/Resource/ImporterData.h>
-
+#include <osp/core/Resources.h>
+#include <osp/core/string_concat.h>
+#include <osp/drawing/own_restypes.h>
 #include <osp/tasks/top_execute.h>
-
-#include <osp/string_concat.h>
-#include <osp/logging.h>
+#include <osp/util/logging.h>
+#include <osp/vehicles/ImporterData.h>
+#include <osp/vehicles/load_tinygltf.h>
 
 #include <Magnum/MeshTools/Transform.h>
 #include <Magnum/Primitives/Cone.h>

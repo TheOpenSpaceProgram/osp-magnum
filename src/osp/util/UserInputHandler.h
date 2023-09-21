@@ -24,6 +24,9 @@
  */
 #pragma once
 
+#include "../core/array_view.h"
+#include "../core/math_types.h"
+
 #include <array>
 #include <cstdint>
 #include <limits>
@@ -31,8 +34,6 @@
 #include <map>
 #include <string>
 #include <vector>
-
-#include "types.h"
 
 namespace osp::input
 {

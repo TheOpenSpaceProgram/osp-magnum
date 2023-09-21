@@ -25,7 +25,8 @@
 #pragma once
 
 #include "basic.h"
-#include "activetypes.h"
+
+#include "../core/array_view.h"
 
 #include <algorithm>
 #include <compare>

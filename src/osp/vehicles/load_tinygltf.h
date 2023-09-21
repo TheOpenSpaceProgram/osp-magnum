@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "resourcetypes.h"
+#include "../core/resourcetypes.h"
 
 #include <string_view>
 

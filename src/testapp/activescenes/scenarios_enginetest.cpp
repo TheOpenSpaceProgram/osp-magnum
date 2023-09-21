@@ -26,17 +26,14 @@
 
 #include "../MagnumApplication.h"
 
-#include <osp/Active/basic.h>
-#include <osp/Active/drawing.h>
-#include <osp/Active/SysSceneGraph.h>
-#include <osp/Active/SysRender.h>
-#include <osp/Active/opengl/SysRenderGL.h>
+#include <osp/activescene/basic.h>
+#include <osp/activescene/basic_fn.h>
+#include <osp/core/Resources.h>
+#include <osp/drawing/drawing.h>
+#include <osp/drawing/own_restypes.h>
+#include <osp/drawing_gl/rendergl.h>
 
-#include <osp/Shaders/Phong.h>
-
-#include <osp/Resource/resources.h>
-
-#include <longeron/id_management/registry_stl.hpp>
+#include <adera/drawing_gl/phong_shader.h>
 
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/ImageData.h>
@@ -46,11 +43,13 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 
 using osp::active::ActiveEnt;
-using osp::active::RenderGL;
+using osp::draw::DrawEnt;
 using osp::input::UserInputHandler;
 
 using Magnum::Trade::MeshData;
 using Magnum::Trade::ImageData2D;
+
+using osp::draw::RenderGL;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -71,18 +70,24 @@ struct EngineTestScene
 
     // Global Resources, owned by the top-level application
     // Note that multiple scenes are intended to be supported
-    osp::Resources *m_pResources;
+    osp::Resources                  *m_pResources;
 
-    // ID registry generates entity IDs, and keeps track of which ones exist
+    // Tracks used/free unique 'Active Entity' IDs, starts from zero and counts up
     lgrn::IdRegistryStl<ActiveEnt>  m_activeIds;
 
     // Supports transforms, hierarchy, cameras, and other components assignable
     // to ActiveEnts
     osp::active::ACtxBasic          m_basic;
 
-    // Support for 'scene-space' meshes and textures, drawing components for
-    // ActiveEnt such as visible, opaque, and diffuse texture.
-    osp::active::ACtxDrawing        m_drawing;
+    // The rotating cube
+    ActiveEnt                       m_cube{lgrn::id_null<ActiveEnt>()};
+
+
+    // Everything below is for rendering
+
+    // Support for meshes and textures. This is intended to be shared across multiple scenes, but
+    // there is only one scene.
+    osp::draw::ACtxDrawing          m_drawing;
 
     // Support for associating scene-space meshes/textures with Resources
     // Meshes/textures can span 3 different spaces, with their own ID types:
@@ -90,17 +95,13 @@ struct EngineTestScene
     // * Renderer   (MeshGlId/TexGlId) Shared between scenes, used by GPU
     // * Scene      (MeshId/TexId)     Local to one scene
     // ACtxDrawingRes is a two-way mapping between MeshId/TexId <--> ResId
-    osp::active::ACtxDrawingRes     m_drawingRes;
+    osp::draw::ACtxDrawingRes       m_drawingRes;
 
-    // The rotating cube
-    ActiveEnt                       m_cube{lgrn::id_null<ActiveEnt>()};
+    // Set of DrawEnts that are assigned a Phong material
+    osp::draw::DrawEntSet_t         m_matPhong;
+    std::vector<osp::draw::DrawEnt> m_matPhongDirty;
 
-    // Set of ActiveEnts that are assigned a Phong material
-    osp::active::ActiveEntSet_t         m_matPhong;
-    std::vector<osp::active::DrawEnt>   m_matPhongDirty;
-
-    // This should be part of the renderer but who cares lol!
-    osp::active::ACtxSceneRender m_scnRdr;
+    osp::draw::ACtxSceneRender      m_scnRdr;
 };
 
 EngineTestScene::~EngineTestScene()
@@ -113,13 +114,14 @@ EngineTestScene::~EngineTestScene()
     // single integer internally.
     // Cleanup must be manual, but this has the advantage of having no side
     // effects, and practically zero runtime overhead.
-    osp::active::SysRender::clear_owners(m_scnRdr, m_drawing);
-    osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
+    osp::draw::SysRender::clear_owners(m_scnRdr, m_drawing);
+    osp::draw::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
 }
 
 entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 {
     using namespace osp::active;
+    using namespace osp::draw;
 
     entt::any sceneAny = entt::make_any<EngineTestScene>();
     auto &rScene = entt::any_cast<EngineTestScene&>(sceneAny);
@@ -207,18 +209,18 @@ struct EngineTestRenderer
 
     // Support for assigning render-space GL meshes/textures and transforms
     // for ActiveEnts
-    osp::active::ACtxSceneRenderGL m_sceneRenderGL{};
+    osp::draw::ACtxSceneRenderGL m_sceneRenderGL{};
 
     // Pre-built easy camera controls
-    osp::active::Camera m_cam;
+    osp::draw::Camera m_cam;
     ACtxCameraController m_camCtrl;
 
     // Phong shaders and their required data
-    osp::shader::ACtxDrawPhong m_phong{};
+    adera::shader::ACtxDrawPhong m_phong{};
 
     // An ordered set of entities and draw function pointers intended to be
     // forward-rendered
-    osp::active::RenderGroup m_groupFwdOpaque;
+    osp::draw::RenderGroup m_groupFwdOpaque;
 };
 
 /**
@@ -232,8 +234,8 @@ void sync_test_scene(
         RenderGL& rRenderGl, EngineTestScene& rScene,
         EngineTestRenderer& rRenderer)
 {
-    using namespace osp::active;
-    using namespace osp::shader;
+    using namespace osp::draw;
+    using namespace adera::shader;
 
     rScene.m_scnRdr.m_drawTransform         .resize(rScene.m_scnRdr.m_drawIds.capacity());
     rRenderer.m_sceneRenderGL.m_diffuseTexId.resize(rScene.m_scnRdr.m_drawIds.capacity());
@@ -297,7 +299,7 @@ void render_test_scene(
         RenderGL& rRenderGl, EngineTestScene const& rScene,
         EngineTestRenderer& rRenderer)
 {
-    using namespace osp::active;
+    using namespace osp::draw;
     using Magnum::GL::Framebuffer;
     using Magnum::GL::FramebufferClear;
     using Magnum::GL::Texture2D;
@@ -352,7 +354,7 @@ public:
 
     void exit(MagnumApplication& rApp) override
     {
-        osp::active::SysRenderGL::clear_resource_owners(m_rRenderGl, *m_rScene.m_pResources);
+        osp::draw::SysRenderGL::clear_resource_owners(m_rRenderGl, *m_rScene.m_pResources);
         m_rRenderGl = {}; // clear all GPU resources
     }
 
@@ -365,7 +367,8 @@ public:
 MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
 {
     using namespace osp::active;
-    using namespace osp::shader;
+    using namespace osp::draw;
+    using namespace adera::shader;
 
     auto pApp = std::make_unique<EngineTestApp>(EngineTestRenderer{rUserInput}, rScene, rRenderGl);
 

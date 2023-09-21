@@ -25,18 +25,14 @@
 #include "scene_common.h"
 #include "scenarios.h"
 
-#include <osp/Active/basic.h>
-#include <osp/Active/drawing.h>
-
-#include <osp/Active/SysSceneGraph.h>
-#include <osp/Active/SysRender.h>
-
-#include <osp/Resource/resources.h>
-
-#include <osp/unpack.h>
+#include <osp/activescene/basic_fn.h>
+#include <osp/core/Resources.h>
+#include <osp/core/unpack.h>
+#include <osp/drawing/drawing_fn.h>
 
 using namespace osp;
 using namespace osp::active;
+using namespace osp::draw;
 
 namespace testapp::scenes
 {
@@ -187,7 +183,6 @@ Session setup_common_scene(
     auto const quick_add_mesh = SysRender::gen_drawable_mesh_adder(rDrawing, rDrawingRes, rResources, pkg);
 
     // Acquire mesh resources from Package
-    using osp::phys::EShape;
     rNMesh.m_shapeToMesh.emplace(EShape::Box,       quick_add_mesh("cube"));
     rNMesh.m_shapeToMesh.emplace(EShape::Cylinder,  quick_add_mesh("cylinder"));
     rNMesh.m_shapeToMesh.emplace(EShape::Sphere,    quick_add_mesh("sphere"));

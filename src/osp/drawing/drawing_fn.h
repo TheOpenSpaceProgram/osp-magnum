@@ -25,11 +25,12 @@
 #pragma once
 
 #include "drawing.h"
-#include "basic.h"
+
+#include "../activescene/basic.h"
 
 #include <unordered_map>
 
-namespace osp::active
+namespace osp::draw
 {
 
 /**
@@ -89,8 +90,7 @@ struct EntityToDraw
  */
 struct RenderGroup
 {
-    using Storage_t = entt::basic_storage<EntityToDraw, DrawEnt>;
-    using ArrayView_t = Corrade::Containers::ArrayView<const ActiveEnt>;
+    using DrawEnts_t = Storage_t<DrawEnt, EntityToDraw>;
 
     /**
      * @return Iterable view for stored entities
@@ -108,7 +108,7 @@ struct RenderGroup
         return entt::basic_view{m_entities};
     }
 
-    Storage_t m_entities;
+    DrawEnts_t m_entities;
 
 }; // struct RenderGroup
 
@@ -153,18 +153,13 @@ public:
             ACtxDrawingRes& rCtxDrawingRes,
             Resources& rResources);
 
-
-    template<typename ITA_T, typename ITB_T>
-    static void assure_draw_transforms(
-            acomp_storage_t<Matrix4>& rDrawTf, ITA_T first, ITB_T const& last);
-
     template<typename IT_T, typename ITB_T>
     static void update_draw_transforms(
-            ACtxSceneGraph const&                   rScnGraph,
-            KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
-            acomp_storage_t<ACompTransform> const&  transform,
+            active::ACtxSceneGraph const&           rScnGraph,
+            KeyedVec<active::ActiveEnt, DrawEnt> const& activeToDraw,
+            active::ACompTransformStorage_t const&  transform,
             DrawTransforms_t&                       rDrawTf,
-            ActiveEntSet_t const&                   useDrawTf,
+            active::ActiveEntSet_t const&           useDrawTf,
             IT_T                                    first,
             ITB_T const&                            last);
 
@@ -185,38 +180,24 @@ public:
 
 private:
     static void update_draw_transforms_recurse(
-            ACtxSceneGraph const&                   rScnGraph,
-            KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
-            acomp_storage_t<ACompTransform> const&  rTf,
+            active::ACtxSceneGraph const&           rScnGraph,
+            KeyedVec<active::ActiveEnt, DrawEnt> const& activeToDraw,
+            active::ACompTransformStorage_t const&  rTf,
             DrawTransforms_t&                       rDrawTf,
-            ActiveEntSet_t const&                   useDrawTf,
-            ActiveEnt                               ent,
+            active::ActiveEntSet_t const&           useDrawTf,
+            active::ActiveEnt                       ent,
             Matrix4 const&                          parentTf,
             bool                                    root);
 
 }; // class SysRender
 
-template<typename ITA_T, typename ITB_T>
-void SysRender::assure_draw_transforms(
-        acomp_storage_t<Matrix4>& rDrawTf, ITA_T first, ITB_T const& last)
-{
-    while (first != last)
-    {
-        if ( ! rDrawTf.contains(*first))
-        {
-            rDrawTf.emplace(*first);
-        }
-        std::advance(first, 1);
-    }
-}
-
 template<typename IT_T, typename ITB_T>
 void SysRender::update_draw_transforms(
-        ACtxSceneGraph const&                   rScnGraph,
-        KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
-        acomp_storage_t<ACompTransform> const&  rTf,
+        active::ACtxSceneGraph const&           rScnGraph,
+        KeyedVec<active::ActiveEnt, DrawEnt> const& activeToDraw,
+        active::ACompTransformStorage_t const&  rTf,
         DrawTransforms_t&                       rDrawTf,
-        ActiveEntSet_t const&                   needDrawTf,
+        active::ActiveEntSet_t const&           needDrawTf,
         IT_T                                    first,
         ITB_T const&                            last)
 {
@@ -263,6 +244,4 @@ constexpr decltype(auto) SysRender::gen_drawable_mesh_adder(ACtxDrawing& rDrawin
     };
 }
 
-
-
-} // namespace osp::active
+} // namespace osp::draw

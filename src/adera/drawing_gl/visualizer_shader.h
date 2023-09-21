@@ -24,11 +24,11 @@
  */
 #pragma once
 
-#include <osp/Active/opengl/SysRenderGL.h>
+#include <osp/drawing_gl/rendergl.h>
 
 #include <Magnum/Shaders/MeshVisualizerGL.h>
 
-namespace osp::shader
+namespace adera::shader
 {
 
 using MeshVisualizer = Magnum::Shaders::MeshVisualizerGL3D;
@@ -37,17 +37,17 @@ struct ACtxDrawMeshVisualizer
 {
     MeshVisualizer m_shader{Corrade::NoCreate};
 
-    osp::active::DrawTransforms_t       *m_pDrawTf{nullptr};
-    osp::active::MeshGlEntStorage_t     *m_pMeshId{nullptr};
-    osp::active::MeshGlStorage_t        *m_pMeshGl{nullptr};
+    osp::draw::DrawTransforms_t         *m_pDrawTf{nullptr};
+    osp::draw::MeshGlEntStorage_t       *m_pMeshId{nullptr};
+    osp::draw::MeshGlStorage_t          *m_pMeshGl{nullptr};
 
-    osp::active::MaterialId             m_materialId { lgrn::id_null<osp::active::MaterialId>() };
+    osp::draw::MaterialId               m_materialId { lgrn::id_null<osp::draw::MaterialId>() };
 
     bool m_wireframeOnly{false};
 
-constexpr void assign_pointers(active::ACtxSceneRender&         rScnRender,
-                                   active::ACtxSceneRenderGL&   rScnRenderGl,
-                                   active::RenderGL&            rRenderGl) noexcept
+constexpr void assign_pointers(osp::draw::ACtxSceneRender&      rScnRender,
+                               osp::draw::ACtxSceneRenderGL&    rScnRenderGl,
+                               osp::draw::RenderGL&             rRenderGl) noexcept
     {
         m_pDrawTf   = &rScnRender.m_drawTransform;
         m_pMeshId   = &rScnRenderGl.m_meshId;
@@ -56,24 +56,22 @@ constexpr void assign_pointers(active::ACtxSceneRender&         rScnRender,
 };
 
 void draw_ent_visualizer(
-        active::DrawEnt                     ent,
-        active::ViewProjMatrix const&       viewProj,
-        active::EntityToDraw::UserData_t    userData) noexcept;
+        osp::draw::DrawEnt                  ent,
+        osp::draw::ViewProjMatrix const&    viewProj,
+        osp::draw::EntityToDraw::UserData_t userData) noexcept;
 
 inline void sync_drawent_visualizer(
-        active::DrawEnt const               ent,
-        active::DrawEntSet_t const&         hasMaterial,
-        active::RenderGroup::Storage_t&     rStorage,
+        osp::draw::DrawEnt const            ent,
+        osp::draw::DrawEntSet_t const&      hasMaterial,
+        osp::draw::RenderGroup::DrawEnts_t& rStorage,
         ACtxDrawMeshVisualizer&             rData)
 {
-    using namespace active;
-
     bool alreadyAdded = rStorage.contains(ent);
     if (hasMaterial.test(std::size_t(ent)))
     {
         if ( ! alreadyAdded)
         {
-            rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
+            rStorage.emplace( ent, osp::draw::EntityToDraw{&draw_ent_visualizer, {&rData} } );
         }
     }
     else
@@ -88,11 +86,11 @@ template <typename ITA_T, typename ITB_T>
 static void sync_drawent_visualizer(
         ITA_T const&                        first,
         ITB_T const&                        last,
-        active::DrawEntSet_t const&         hasMaterial,
-        active::RenderGroup::Storage_t&     rStorage,
+        osp::draw::DrawEntSet_t const&      hasMaterial,
+        osp::draw::RenderGroup::DrawEnts_t& rStorage,
         ACtxDrawMeshVisualizer&             rData)
 {
-    std::for_each(first, last, [&] (active::DrawEnt const ent)
+    std::for_each(first, last, [&] (osp::draw::DrawEnt const ent)
     {
         sync_drawent_visualizer(ent, hasMaterial, rStorage, rData);
     });

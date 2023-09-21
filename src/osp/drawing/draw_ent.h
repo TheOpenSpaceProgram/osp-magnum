@@ -24,27 +24,11 @@
  */
 #pragma once
 
-#include "../core/math_types.h"
-#include "../core/resourcetypes.h"
+#include <cstdint>
 
-namespace osp
+namespace osp::draw
 {
 
-namespace restypes
-{
+enum class DrawEnt : uint32_t { };
 
-inline ResTypeId const gc_importer      = ResTypeIdReg_t::create();
-
-} // namespace restypes
-
-
-using ObjId     = int32_t;
-using PrefabId  = uint32_t;
-
-struct PrefabPair
-{
-    ResIdOwner_t m_importer;
-    PrefabId m_prefabId;
-};
-
-} // namespace osp
+} // namespace osp::draw

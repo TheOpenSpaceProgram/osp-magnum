@@ -24,14 +24,11 @@
  */
 #pragma once
 
-#include "activetypes.h"
-#include "basic.h"
-#include "drawing.h"
+#include "basic_fn.h"
 #include "physics.h"
-#include "SysSceneGraph.h"
 
-#include "../types.h"
-#include "../Resource/resourcetypes.h"
+#include "../core/resourcetypes.h"
+#include "../vehicles/prefabs.h"
 
 #include <Corrade/Containers/ArrayView.h>
 
@@ -85,14 +82,7 @@ public:
     static void init_transforms(
             ACtxPrefabInit const&               rPrefabInit,
             Resources const&                    rResources,
-            acomp_storage_t<ACompTransform>&    rTransform) noexcept;
-
-    static void init_drawing(
-            ACtxPrefabInit const&               rPrefabInit,
-            Resources&                          rResources,
-            ACtxDrawing&                        rDrawing,
-            ACtxDrawingRes&                     rCtxDrawRes,
-            std::optional<Material>             material) noexcept;
+            ACompTransformStorage_t&            rTransform) noexcept;
 
     static void init_physics(
             ACtxPrefabInit const&               rPrefabInit,

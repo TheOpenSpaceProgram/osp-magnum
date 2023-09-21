@@ -24,13 +24,12 @@
  */
 #pragma once
 
-#include "activetypes.h"
+#include "active_ent.h"
 
-#include "../Resource/resourcetypes.h"
-#include "../types.h"
-#include "../id_map.h"
-
+#include "../core/array_view.h"
+#include "../core/math_types.h"
 #include "../link/machines.h"
+#include "../vehicles/prefabs.h"
 
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>

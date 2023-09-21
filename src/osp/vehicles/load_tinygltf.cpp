@@ -24,12 +24,11 @@
  */
 
 #include "load_tinygltf.h"
-
 #include "ImporterData.h"
-#include "resources.h"
 
-#include "../logging.h"
-#include "../string_concat.h"
+#include "../core/Resources.h"
+#include "../drawing/own_restypes.h"
+#include "../util/logging.h"
 
 #include <MagnumPlugins/TinyGltfImporter/TinyGltfImporter.h>
 #include <MagnumExternal/TinyGltf/tiny_gltf.h>
@@ -351,10 +350,8 @@ ResId osp::load_tinygltf_file(std::string_view filepath, Resources &rResources, 
     return res;
 }
 
-static phys::EShape shape_from_name(std::string_view name) noexcept
+static EShape shape_from_name(std::string_view name) noexcept
 {
-    using phys::EShape;
-
     if (name == "cube")             { return EShape::Box; }
     else if (name == "cylinder")    { return EShape::Cylinder; }
 
@@ -389,7 +386,7 @@ void osp::assigns_prefabs_tinygltf(Resources &rResources, ResId importer)
 
     int const objCount = pImportData->m_objParents.size();
     rPrefabs.m_objMass      .resize(objCount, 0.0f);
-    rPrefabs.m_objShape     .resize(objCount, phys::EShape::None);
+    rPrefabs.m_objShape     .resize(objCount, EShape::None);
 
     rPrefabs.m_prefabs      .data_reserve(objCount);
     rPrefabs.m_prefabs      .ids_reserve(topLevelSpan.size());

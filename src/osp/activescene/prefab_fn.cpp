@@ -22,13 +22,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "SysPrefabInit.h"
-#include "SysRender.h"
-#include "SysSceneGraph.h"
-#include "SysSceneGraph.h"
+#include "prefab_fn.h"
+#include "basic_fn.h"
 
-#include <osp/Resource/resources.h>
-#include <osp/Resource/ImporterData.h>
+#include "../core/Resources.h"
+#include "../vehicles/ImporterData.h"
 
 #include <Magnum/Trade/Trade.h>
 #include <Magnum/Trade/PbrMetallicRoughnessMaterialData.h>
@@ -36,8 +34,6 @@
 using Corrade::Containers::ArrayView;
 
 using osp::restypes::gc_importer;
-
-using osp::phys::EShape;
 
 namespace osp::active
 {
@@ -84,7 +80,7 @@ void SysPrefabInit::add_to_subtree(
 void SysPrefabInit::init_transforms(
         ACtxPrefabInit const&               rPrefabInit,
         Resources const&                    rResources,
-        acomp_storage_t<ACompTransform>&    rTransform) noexcept
+        ACompTransformStorage_t&            rTransform) noexcept
 {
     auto itPfEnts = std::begin(rPrefabInit.m_ents);
 
@@ -299,7 +295,7 @@ void SysPrefabInit::init_physics(
             if (mass != 0.0f)
             {
                 Vector3 const scale = rImportData.m_objTransforms[objectId].scaling();
-                Vector3 const inertia = phys::collider_inertia_tensor(shape, scale, mass);
+                Vector3 const inertia = collider_inertia_tensor(shape, scale, mass);
                 Vector3 const offset{0.0f, 0.0f, 0.0f};
                 rCtxPhys.m_mass.emplace( ent, ACompMass{ offset, inertia, mass } );
 

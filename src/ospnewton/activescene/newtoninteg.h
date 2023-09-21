@@ -24,12 +24,11 @@
  */
 #pragma once
 
-#include "factors.h"
+#include "forcefactors.h"
 
-#include <osp/Active/activetypes.h>
-#include <osp/Active/basic.h>
-#include <osp/id_map.h>
-#include <osp/bitvector.h>
+#include <osp/activescene/basic.h>
+#include <osp/core/id_map.h>
+#include <osp/core/bitvector.h>
 
 #include <Newton.h>
 
@@ -59,6 +58,7 @@ using NwtColliderPtr_t = std::unique_ptr<NewtonCollision, NwtDeleter<NewtonDestr
 
 using BodyId = uint32_t;
 
+using ColliderStorage_t = osp::Storage_t<osp::active::ActiveEnt, NwtColliderPtr_t>;
 
 /**
  * @brief Represents an instance of a Newton physics world in the scane
@@ -88,7 +88,7 @@ struct ACtxNwtWorld
 
     // note: important that m_nwtBodies and m_nwtColliders are destructed
     //       before m_nwtWorld
-    std::unique_ptr<NewtonWorld, Deleter> m_world;
+    std::unique_ptr<NewtonWorld, Deleter>           m_world;
 
     lgrn::IdRegistryStl<BodyId>                     m_bodyIds;
     std::vector<NwtBodyPtr_t>                       m_bodyPtrs;
@@ -100,9 +100,9 @@ struct ACtxNwtWorld
 
     std::vector<ForceFactorFunc>                    m_factors;
 
-    osp::active::acomp_storage_t<NwtColliderPtr_t>  m_colliders;
+    ColliderStorage_t                               m_colliders;
 
-    osp::active::acomp_storage_t<osp::active::ACompTransform> *m_pTransform;
+    osp::active::ACompTransformStorage_t            *m_pTransform;
 };
 
 

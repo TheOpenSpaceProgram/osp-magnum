@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "../shared_string.h"
+#include "shared_string.h"
 #include "resourcetypes.h"
 
 #include <longeron/id_management/registry.hpp>

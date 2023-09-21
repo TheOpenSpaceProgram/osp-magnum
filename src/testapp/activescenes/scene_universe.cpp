@@ -30,8 +30,8 @@
 #include <osp/universe/coordinates.h>
 #include <osp/universe/universe.h>
 
-#include <osp/CommonMath.h>
-#include <osp/logging.h>
+#include <osp/core/math_2pow.h>
+#include <osp/util/logging.h>
 
 #include <random>
 

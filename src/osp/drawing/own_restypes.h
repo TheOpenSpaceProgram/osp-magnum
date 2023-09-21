@@ -24,7 +24,6 @@
  */
 #pragma once
 
-#include "../core/math_types.h"
 #include "../core/resourcetypes.h"
 
 namespace osp
@@ -33,18 +32,12 @@ namespace osp
 namespace restypes
 {
 
-inline ResTypeId const gc_importer      = ResTypeIdReg_t::create();
+inline ResTypeId const gc_image         = ResTypeIdReg_t::create();
+inline ResTypeId const gc_texture       = ResTypeIdReg_t::create();
+inline ResTypeId const gc_mesh          = ResTypeIdReg_t::create();
 
 } // namespace restypes
 
-
-using ObjId     = int32_t;
-using PrefabId  = uint32_t;
-
-struct PrefabPair
-{
-    ResIdOwner_t m_importer;
-    PrefabId m_prefabId;
-};
+struct TextureImgSource : public ResIdOwner_t { };
 
 } // namespace osp

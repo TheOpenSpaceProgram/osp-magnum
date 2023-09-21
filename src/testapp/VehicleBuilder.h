@@ -24,9 +24,8 @@
  */
 #pragma once
 
-#include <osp/Active/parts.h>
-#include <osp/Resource/resourcetypes.h>
-#include <osp/types.h>
+#include <osp/activescene/vehicles.h>
+#include <osp/core/resourcetypes.h>
 #include <osp/link/machines.h>
 
 #include <longeron/id_management/registry_stl.hpp>

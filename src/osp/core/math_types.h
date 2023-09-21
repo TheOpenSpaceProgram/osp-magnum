@@ -37,15 +37,10 @@
 #include <Magnum/Math/Vector4.h>
 
 #include <Magnum/Math/Quaternion.h>
-
-#include <Corrade/Containers/ArrayView.h>
 // IWYU pragma: end_exports
 
 namespace osp
 {
-
-using Corrade::Containers::ArrayView;
-using Corrade::Containers::arrayView;
 
 using Matrix3       = Magnum::Math::Matrix3<Magnum::Float>;
 using Matrix4       = Magnum::Math::Matrix4<Magnum::Float>;
@@ -67,4 +62,4 @@ using Rad           = Magnum::Math::Rad<Magnum::Float>;
 using Radd          = Magnum::Math::Rad<Magnum::Double>;
 using Deg           = Magnum::Math::Deg<Magnum::Float>;
 
-}
+} // namespace osp

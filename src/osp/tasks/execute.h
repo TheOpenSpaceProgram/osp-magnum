@@ -27,7 +27,7 @@
 #include "tasks.h"
 #include "worker.h"
 
-#include "../bitvector.h"
+#include "../core/bitvector.h"
 
 #include <entt/entity/storage.hpp>
 

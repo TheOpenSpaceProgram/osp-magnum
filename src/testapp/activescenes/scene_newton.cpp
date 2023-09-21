@@ -26,23 +26,15 @@
 #include "scene_physics.h"
 #include "identifiers.h"
 
-#include <osp/Active/basic.h>
-#include <osp/Active/drawing.h>
-#include <osp/Active/physics.h>
-#include <osp/Active/parts.h>
-#include <osp/Active/SysPhysics.h>
-#include <osp/Active/SysPrefabInit.h>
-#include <osp/Active/SysRender.h>
-#include <osp/Active/SysSceneGraph.h>
-
-#include <osp/Resource/ImporterData.h>
-#include <osp/Resource/resources.h>
-#include <osp/Resource/resourcetypes.h>
+#include <osp/activescene/basic_fn.h>
+#include <osp/activescene/physics_fn.h>
+#include <osp/core/Resources.h>
+#include <osp/drawing/drawing.h>
+#include <osp/vehicles/ImporterData.h>
 
 #include <adera/machines/links.h>
 
-#include <newtondynamics_physics/ospnewton.h>
-#include <newtondynamics_physics/SysNewton.h>
+#include <ospnewton/activescene/newtoninteg_fn.h>
 
 using namespace osp;
 using namespace osp::active;
@@ -50,7 +42,6 @@ using namespace osp::link;
 using namespace ospnewton;
 
 using osp::restypes::gc_importer;
-using osp::phys::EShape;
 using Corrade::Containers::arrayView;
 
 namespace testapp::scenes
