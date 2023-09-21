@@ -26,8 +26,9 @@
 
 #include "activescenes/identifiers.h"
 
-#include <osp/Resource/resources.h>
-#include <osp/Resource/ImporterData.h>
+#include <osp/core/Resources.h>
+#include <osp/drawing/own_restypes.h>
+#include <osp/vehicles/ImporterData.h>
 
 #include <osp/tasks/top_utils.h>
 

@@ -24,9 +24,9 @@
  */
 #include "VehicleBuilder.h"
 
-#include <osp/Resource/ImporterData.h>
-#include <osp/Resource/resources.h>
-#include <osp/logging.h>
+#include <osp/core/Resources.h>
+#include <osp/util/logging.h>
+#include <osp/vehicles/ImporterData.h>
 
 namespace testapp
 {

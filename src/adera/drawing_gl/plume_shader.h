@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#if 0
+
 #include "../SysExhaustPlume.h"
 
 #include <osp/Active/opengl/SysRenderGL.h>
@@ -142,3 +144,5 @@ struct ACtxPlumeData
 };
 
 } // namespace adera::shader
+
+#endif

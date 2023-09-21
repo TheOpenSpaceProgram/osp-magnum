@@ -24,27 +24,14 @@
  */
 #pragma once
 
-#include "../core/math_types.h"
-#include "../core/resourcetypes.h"
+// IWYU pragma: begin_exports
+#include <Corrade/Containers/ArrayView.h>
+// IWYU pragma: end_exports
 
 namespace osp
 {
 
-namespace restypes
-{
-
-inline ResTypeId const gc_importer      = ResTypeIdReg_t::create();
-
-} // namespace restypes
-
-
-using ObjId     = int32_t;
-using PrefabId  = uint32_t;
-
-struct PrefabPair
-{
-    ResIdOwner_t m_importer;
-    PrefabId m_prefabId;
-};
+using Corrade::Containers::ArrayView;
+using Corrade::Containers::arrayView;
 
 } // namespace osp

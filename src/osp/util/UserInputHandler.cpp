@@ -23,7 +23,8 @@
  * SOFTWARE.
  */
 #include "UserInputHandler.h"
-#include "string_concat.h"
+
+#include "../core/string_concat.h"
 #include "logging.h"
 
 #include <Magnum/Math/Functions.h>

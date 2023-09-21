@@ -24,13 +24,10 @@
  */
 #pragma once
 
-#include "ospnewton.h"
+#include "newtoninteg.h"
 
-#include <osp/Active/physics.h>      // for ACompShape
-#include <osp/Active/basic.h>        // for ActiveEnt, ActiveReg_t, basic_sp...
-
-#include <osp/types.h>               // for Vector3, Matrix4
-#include <osp/CommonPhysics.h>       // for ECollisionShape, ECollisionShape...
+#include <osp/activescene/basic.h>
+#include <osp/activescene/physics.h>
 
 #include <Corrade/Containers/ArrayView.h>
 
@@ -45,13 +42,11 @@ namespace ospnewton
 
 class SysNewton
 {
-    template<typename COMP_T>
-    using acomp_storage_t           = osp::active::acomp_storage_t<COMP_T>;
-
     using ActiveEnt                 = osp::active::ActiveEnt;
     using ACtxPhysics               = osp::active::ACtxPhysics;
     using ACtxSceneGraph            = osp::active::ACtxSceneGraph;
     using ACompTransform            = osp::active::ACompTransform;
+    using ACompTransformStorage_t   = osp::active::ACompTransformStorage_t;
 public:
 
     using NwtThreadIndex_t = int;
@@ -64,12 +59,12 @@ public:
 
     [[nodiscard]] static NwtColliderPtr_t create_primative(
             ACtxNwtWorld&           rCtxWorld,
-            osp::phys::EShape       shape);
+            osp::EShape       shape);
 
 
     static void orient_collision(
             NewtonCollision const*  pCollision,
-            osp::phys::EShape       shape,
+            osp::EShape       shape,
             osp::Vector3 const&     translation,
             osp::Matrix3 const&     rotation,
             osp::Vector3 const&     scale);
@@ -109,11 +104,11 @@ public:
      * @param rTfMutable    [ref] Flags for mutable transforms
      */
     static void update_world(
-            ACtxPhysics& rCtxPhys,
-            ACtxNwtWorld& rCtxWorld,
-            float timestep,
-            ACtxSceneGraph const& rScnGraph,
-            acomp_storage_t<osp::active::ACompTransform>& rTf) noexcept;
+            ACtxPhysics&                            rCtxPhys,
+            ACtxNwtWorld&                           rCtxWorld,
+            float                                   timestep,
+            ACtxSceneGraph const&                   rScnGraph,
+            osp::active::ACompTransformStorage_t&   rTf) noexcept;
 
     static void remove_components(
             ACtxNwtWorld& rCtxWorld, ActiveEnt ent) noexcept;
@@ -162,7 +157,7 @@ private:
             ACtxPhysics const&                      rCtxPhys,
             ACtxNwtWorld&                           rCtxWorld,
             ACtxSceneGraph const&                   rScnGraph,
-            acomp_storage_t<ACompTransform> const&  rTf,
+            ACompTransformStorage_t const&          rTf,
             ActiveEnt                               ent,
             osp::Matrix4 const&                     transform,
             NewtonCollision*                        pCompound) noexcept;

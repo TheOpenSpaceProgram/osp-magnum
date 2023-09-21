@@ -24,9 +24,9 @@
  */
 #pragma once
 
-#include "types.h"
+#include "../core/math_types.h"
 
-namespace osp::phys
+namespace osp
 {
 
 /**
@@ -165,4 +165,4 @@ constexpr Vector3 ellipsoid_inertia_tensor(const Vector3 semiaxes, float mass) n
     return Vector3{c*xx, c*yy, c*zz};
 }
 
-} // namespace osp::phys
+} // namespace osp

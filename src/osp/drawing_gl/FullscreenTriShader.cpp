@@ -22,7 +22,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <osp/Shaders/FullscreenTriShader.h>
+#include "FullscreenTriShader.h"
+
 #include <Magnum/GL/Version.h>
 #include <Magnum/GL/Shader.h>
 #include <Magnum/GL/Texture.h>
@@ -31,7 +32,7 @@
 #include <Corrade/Containers/Iterable.h>  // for Containers::Iterable
 #include <Corrade/Containers/Reference.h>
 
-using namespace osp::active;
+using namespace osp;
 using namespace Magnum;
 
 FullscreenTriShader::FullscreenTriShader()

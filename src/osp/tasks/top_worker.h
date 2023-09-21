@@ -26,7 +26,7 @@
 
 #include "worker.h"
 
-#include "../types.h"
+#include "../core/array_view.h"
 
 #include <entt/core/fwd.hpp>
 

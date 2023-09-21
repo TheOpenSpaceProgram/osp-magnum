@@ -26,8 +26,7 @@
 
 #include "activescenes/scenarios.h"
 
-#include <osp/types.h>
-#include <osp/UserInputHandler.h>
+#include <osp/util/UserInputHandler.h>
 
 #include <Magnum/Timeline.h>
 

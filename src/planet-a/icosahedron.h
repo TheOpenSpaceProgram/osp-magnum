@@ -26,7 +26,7 @@
 
 #include "SubdivSkeleton.h"
 
-#include <osp/types.h>
+#include <osp/core/math_types.h>
 
 #include <vector>
 

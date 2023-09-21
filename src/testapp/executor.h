@@ -28,7 +28,7 @@
 
 #include <osp/tasks/top_execute.h>
 
-#include <osp/logging.h>
+#include <osp/util/logging.h>
 
 namespace testapp
 {

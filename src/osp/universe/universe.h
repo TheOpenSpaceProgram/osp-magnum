@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "../types.h"
+#include "../core/math_types.h"
 #include "universetypes.h"
 
 #include <longeron/id_management/registry_stl.hpp>

@@ -24,9 +24,9 @@
  */
 #pragma once
 
-#include "../SysRender.h"
-#include "../../id_map.h"
-#include "../../Shaders/FullscreenTriShader.h"
+#include "FullscreenTriShader.h"
+
+#include "../drawing/drawing_fn.h"
 
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>
@@ -38,14 +38,14 @@
 
 #include <longeron/id_management/registry.hpp>
 
-namespace osp::active
+namespace osp::draw
 {
 
 enum class TexGlId : uint32_t { };
 enum class MeshGlId : uint32_t { };
 
-using TexGlStorage_t    = entt::basic_storage<Magnum::GL::Texture2D, TexGlId>;
-using MeshGlStorage_t   = entt::basic_storage<Magnum::GL::Mesh, MeshGlId>;
+using TexGlStorage_t    = Storage_t<TexGlId, Magnum::GL::Texture2D>;
+using MeshGlStorage_t   = Storage_t<MeshGlId, Magnum::GL::Mesh>;
 
 /**
  * @brief Main renderer state and essential GL resources
@@ -253,6 +253,4 @@ public:
 
 };
 
-
-
-}
+} // namespace osp::draw

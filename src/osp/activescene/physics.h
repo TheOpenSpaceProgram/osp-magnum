@@ -24,11 +24,10 @@
  */
 #pragma once
 
-#include "activetypes.h"
+#include "basic.h"
 
-#include "../CommonPhysics.h"
-#include "../keyed_vector.h"
-#include "../types.h"
+#include "../core/keyed_vector.h"
+#include "../scientific/shapes.h"
 
 namespace osp::active
 {
@@ -48,14 +47,10 @@ struct ACompMass
  */
 struct ACtxPhysics
 {
-    KeyedVec<ActiveEnt, phys::EShape> m_shape;
-    ActiveEntSet_t                        m_hasColliders;
-
-    acomp_storage_t<ACompMass>      m_mass;
-
-
+    KeyedVec<ActiveEnt, EShape>     m_shape;
+    ActiveEntSet_t                  m_hasColliders;
+    Storage_t<ActiveEnt, ACompMass> m_mass;
     Vector3                         m_originTranslate;
-
     ActiveEntVec_t                  m_colliderDirty;
 
     std::vector< std::pair<ActiveEnt, Vector3> > m_setVelocity;

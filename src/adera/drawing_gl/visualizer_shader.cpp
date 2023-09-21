@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#include "MeshVisualizer.h"
+#include "visualizer_shader.h"
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Renderer.h>
@@ -32,10 +32,9 @@
 using namespace Magnum::Math::Literals;
 
 using namespace osp;
-using namespace osp::active;
-using namespace osp::shader;
+using namespace osp::draw;
 
-void shader::draw_ent_visualizer(
+void adera::shader::draw_ent_visualizer(
         DrawEnt                     ent,
         ViewProjMatrix const&       viewProj,
         EntityToDraw::UserData_t    userData) noexcept

@@ -22,13 +22,12 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "Flat.h"
+#include "flat_shader.h"
 
 using namespace osp;
-using namespace osp::active;
-using namespace osp::shader;
+using namespace osp::draw;
 
-void shader::draw_ent_flat(
+void adera::shader::draw_ent_flat(
         DrawEnt                     ent,
         ViewProjMatrix const&       viewProj,
         EntityToDraw::UserData_t    userData) noexcept

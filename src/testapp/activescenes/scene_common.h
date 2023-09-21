@@ -26,9 +26,9 @@
 
 #include "scenarios.h"
 
-#include <osp/Active/activetypes.h>
-#include <osp/CommonPhysics.h>
-#include <osp/Active/drawing.h>
+#include <osp/activescene/basic.h>
+#include <osp/drawing/drawing.h>
+#include <osp/scientific/shapes.h>
 
 #include <entt/container/dense_map.hpp>
 
@@ -42,10 +42,8 @@ struct NamedMeshes
     NamedMeshes(NamedMeshes const& copy) = delete;
     NamedMeshes(NamedMeshes&& move) = default;
 
-    entt::dense_map<osp::phys::EShape,
-                    osp::active::MeshIdOwner_t> m_shapeToMesh;
-    entt::dense_map<std::string_view,
-                    osp::active::MeshIdOwner_t> m_namedMeshs;
+    entt::dense_map<osp::EShape, osp::draw::MeshIdOwner_t>      m_shapeToMesh;
+    entt::dense_map<std::string_view, osp::draw::MeshIdOwner_t> m_namedMeshs;
 };
 
 osp::Session setup_scene(

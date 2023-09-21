@@ -23,14 +23,12 @@
  * SOFTWARE.
  */
 
-#include "SysRenderGL.h"
+#include "rendergl.h"
+#include "FullscreenTriShader.h"
 
-#include "../../Shaders/FullscreenTriShader.h"
-
-#include "../../Resource/resources.h"
-#include "../../Resource/ImporterData.h"
-
-#include "../../logging.h"
+#include "../core/Resources.h"
+#include "../drawing/own_restypes.h"
+#include "../util/logging.h"
 
 #include <Magnum/ImageView.h>
 
@@ -58,11 +56,11 @@ using Magnum::GL::Texture2D;
 
 using osp::ResId;
 
-using osp::active::SysRenderGL;
-using osp::active::RenderGL;
+using osp::draw::SysRenderGL;
+using osp::draw::RenderGL;
 
-using osp::active::TexGlId;
-using osp::active::MeshGlId;
+using osp::draw::TexGlId;
+using osp::draw::MeshGlId;
 
 void SysRenderGL::setup_context(RenderGL& rCtxGl)
 {

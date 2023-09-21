@@ -25,8 +25,8 @@
 #pragma once
 
 #include "universe.h"
-#include "../types.h"
-#include "../CommonMath.h"
+
+#include "../core/math_2pow.h"
 
 namespace osp::universe
 {

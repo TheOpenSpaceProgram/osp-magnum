@@ -29,22 +29,17 @@
 
 #include "CameraController.h"
 
-#include <osp/Active/basic.h>
-#include <osp/Active/drawing.h>
-
-#include <osp/Active/SysSceneGraph.h>
-#include <osp/Active/SysRender.h>
-
-#include <osp/Resource/resources.h>
-
-#include <osp/unpack.h>
+#include <osp/activescene/basic_fn.h>
+#include <osp/core/Resources.h>
+#include <osp/core/unpack.h>
+#include <osp/drawing/drawing.h>
 
 #include <random>
 
 using namespace osp;
 using namespace osp::active;
+using namespace osp::draw;
 
-using osp::phys::EShape;
 using osp::input::EButtonControlIndex;
 
 // for the 0xrrggbb_rgbf and angle literals

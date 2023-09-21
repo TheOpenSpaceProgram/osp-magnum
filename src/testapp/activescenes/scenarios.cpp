@@ -33,19 +33,15 @@
 #include "scene_newton.h"
 #include "scene_renderer.h"
 #include "scene_universe.h"
-#include "scene_vehicles.h"
+//#include "scene_vehicles.h"
 
 #include "../MagnumApplication.h"
-#include "../VehicleBuilder.h"
+//#include "../VehicleBuilder.h"
 
-#include <osp/Active/basic.h>
-#include <osp/Active/parts.h>
-#include <osp/Active/SysPrefabInit.h>
-#include <osp/Resource/resources.h>
-
+#include <osp/activescene/basic.h>
+#include <osp/core/Resources.h>
 #include <osp/tasks/top_utils.h>
-
-#include <osp/logging.h>
+#include <osp/util/logging.h>
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 
@@ -56,9 +52,9 @@ using namespace osp;
 namespace testapp
 {
 
-static constexpr auto   sc_matVisualizer    = active::MaterialId(0);
-static constexpr auto   sc_matFlat          = active::MaterialId(1);
-static constexpr auto   sc_matPhong         = active::MaterialId(2);
+static constexpr auto   sc_matVisualizer    = draw::MaterialId(0);
+static constexpr auto   sc_matFlat          = draw::MaterialId(1);
+static constexpr auto   sc_matPhong         = draw::MaterialId(2);
 static constexpr int    sc_materialCount    = 4;
 
 struct MainLoopSignals
@@ -165,7 +161,7 @@ static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session c
 
     auto &rMainLoopCtrl = top_get<MainLoopControl>  (rTestApp.m_topData, idMainLoopCtrl);
     auto &rActiveApp    = top_get<MagnumApplication>(rTestApp.m_topData, idActiveApp);
-    auto &rCamera       = top_get<active::Camera>   (rTestApp.m_topData, idCamera);
+    auto &rCamera       = top_get<draw::Camera>     (rTestApp.m_topData, idCamera);
 
     rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
@@ -216,7 +212,7 @@ static ScenarioMap_t make_scenarios()
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,     TESTAPP_DATA_MAGNUM);
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
             auto &rActiveApp    = top_get< MagnumApplication >      (rTestApp.m_topData, idActiveApp);
-            auto &rRenderGl     = top_get< active::RenderGL >       (rTestApp.m_topData, idRenderGl);
+            auto &rRenderGl     = top_get< draw::RenderGL >         (rTestApp.m_topData, idRenderGl);
             auto &rUserInput    = top_get< input::UserInputHandler >(rTestApp.m_topData, idUserInput);
 
             // Renderer state is stored as lambda capture

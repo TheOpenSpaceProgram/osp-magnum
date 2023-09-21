@@ -24,7 +24,7 @@
  */
 #include "tasks.h"
 
-#include "../bitvector.h"
+#include "../core/bitvector.h"
 
 #include <array>
 

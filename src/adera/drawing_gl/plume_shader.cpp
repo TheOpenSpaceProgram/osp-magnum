@@ -22,7 +22,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "PlumeShader.h"                  // IWYU pragma: associated
+#include "plume_shader.h"                  // IWYU pragma: associated
+
+#if 0
 
 #include <adera/Plume.h>                  // for PlumeEffectData
 #include <adera/SysExhaustPlume.h>        // for ACompExhaustPlume
@@ -197,3 +199,5 @@ PlumeShader& PlumeShader::setPower(const float power)
     setUniform(static_cast<Magnum::Int>(UniformPos::Power), power);
     return *this;
 }
+
+#endif

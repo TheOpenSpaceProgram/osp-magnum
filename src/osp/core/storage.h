@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2023 Open Space Program Project
  *
  * MIT License
  *
@@ -24,46 +24,18 @@
  */
 #pragma once
 
-#include "../bitvector.h"   // for osp::BitVector_t
-
 // IWYU pragma: begin_exports
-
-#include <entt/core/fwd.hpp>          // for entt::id_type
 #include <entt/entity/view.hpp>       // for basic_view
 #include <entt/entity/storage.hpp>    // for entt::basic_storage
-#include <entt/entity/sparse_set.hpp> // for entt::sparse_set
-
 // IWYU pragma: end_exports
 
-#include <longeron/id_management/registry_stl.hpp>      // for lgrn::IdRegistryStl
-#include <longeron/containers/bit_view.hpp>             // for lgrn::BitView
-
 #include <optional>
-#include <vector>
 
-namespace osp::active
+namespace osp
 {
 
-enum class ActiveEnt: uint32_t { };
-
-using ActiveEntVec_t = std::vector<ActiveEnt>;
-using ActiveEntSet_t = BitVector_t;
-
-using active_sparse_set_t = entt::basic_sparse_set<ActiveEnt>;
-
-template<typename COMP_T>
-using acomp_storage_t = typename entt::basic_storage<COMP_T, ActiveEnt>;
-
-//-----------------------------------------------------------------------------
-
-enum class DrawEnt : uint32_t { };
-
-using DrawEntVec_t  = std::vector<DrawEnt>;
-using DrawEntSet_t  = BitVector_t;
-
-
-enum class MaterialId : uint32_t { };
-
+template<typename ENT_T, typename COMP_T>
+using Storage_t = typename entt::basic_storage<COMP_T, ENT_T>;
 
 /**
  * @brief Emplace, Reassign, or Remove a value from an entt::basic_storage
@@ -88,6 +60,4 @@ void storage_assign(entt::basic_storage<COMP_T, ENT_T> &rStorage, ENT_T const en
     }
 }
 
-
-} // namespace osp::active
-
+} // namespace osp

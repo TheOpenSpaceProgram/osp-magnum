@@ -26,7 +26,8 @@
 
 #include "scenarios.h"
 
-#include <osp/Active/activetypes.h>
+#include <osp/activescene/basic.h>
+#include <osp/drawing/drawing.h>
 
 namespace testapp::scenes
 {
@@ -39,7 +40,7 @@ void create_materials(
 void add_floor(
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         shapeSpawn,
-        osp::active::MaterialId     material,
+        osp::draw::MaterialId       material,
         osp::PkgId                  pkg,
         int                         size);
 

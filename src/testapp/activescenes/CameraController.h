@@ -24,10 +24,9 @@
  */
 #pragma once
 
-#include <osp/Active/basic.h>
-
-#include <osp/UserInputHandler.h>
-#include <osp/types.h>
+#include <osp/activescene/basic.h>
+#include <osp/core/math_types.h>
+#include <osp/util/UserInputHandler.h>
 
 #include <optional>
 

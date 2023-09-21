@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include <osp/core/math_types.h>
+
 #include <osp/link/machines.h>
 #include <osp/link/signal.h>
 

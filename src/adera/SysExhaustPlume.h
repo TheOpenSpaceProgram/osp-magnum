@@ -25,8 +25,6 @@
 #pragma once
 #include <adera/Plume.h>             // for PlumeEffectData
 
-#include <osp/Active/activetypes.h>  // for ActiveEnt
-
 #include <entt/entity/entity.hpp>    // for null, null_t
 
 namespace osp { namespace active { class ActiveScene; } }
@@ -36,7 +34,6 @@ namespace adera::active
 
 struct ACompExhaustPlume
 {
-    osp::active::ActiveEnt m_parentMCompRocket{entt::null};
     PlumeEffectData m_effect;
 
     float m_time{0.0f};

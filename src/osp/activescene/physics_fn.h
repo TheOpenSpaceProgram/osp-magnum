@@ -37,7 +37,7 @@ class SysPhysics
 public:
 
     static void calculate_subtree_mass_center(
-            acomp_storage_t<ACompTransform> const&  rTf,
+            ACompTransformStorage_t const&          rTf,
             ACtxPhysics&                            rCtxPhys,
             ACtxSceneGraph&                         rScnGraph,
             ActiveEnt                               root,
@@ -46,7 +46,7 @@ public:
             Matrix4 const&                          currentTf = {});
 
     static void calculate_subtree_mass_inertia(
-            acomp_storage_t<ACompTransform> const&  rTf,
+            ACompTransformStorage_t const&          rTf,
             ACtxPhysics&                            rCtxPhys,
             ACtxSceneGraph&                         rScnGraph,
             ActiveEnt                               root,

@@ -23,22 +23,9 @@
  * SOFTWARE.
  */
 
-#include "SysNewton.h"               // IWYU pragma: associated
-#include "ospnewton.h"
+#include "newtoninteg_fn.h"          // IWYU pragma: associated
 
-#include <osp/Active/basic.h>        // for ACompHierarchy
-#include <osp/Active/physics.h>      // for ACompRigidBody
-#include <osp/Active/SysPhysics.h>   // for SysPhysics
-#include <osp/Active/SysSceneGraph.h>// for SysSceneGraph
-#include <osp/Active/activetypes.h>  // for ActiveReg_t
-
-#include <osp/logging.h>
-
-#include <osp/types.h>               // for Matrix4, Vector3
-#include <osp/CommonPhysics.h>       // for ECollisionShape
-
-#include <entt/signal/sigh.hpp>      // for entt::sink
-#include <entt/entity/entity.hpp>    // for entt::null, entt::null_t
+#include <osp/activescene/basic_fn.h>
 
 #include <Newton.h>                  // for NewtonBodySetCollision
 
@@ -53,13 +40,10 @@ using namespace ospnewton;
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
-using osp::phys::EShape;
-
-using osp::active::acomp_storage_t;
+using osp::EShape;
 
 using osp::active::ActiveEnt;
 using osp::active::ACtxPhysics;
-using osp::active::SysPhysics;
 using osp::active::SysSceneGraph;
 
 using osp::Matrix3;
@@ -137,7 +121,7 @@ NwtColliderPtr_t SysNewton::create_primative(
 
 void SysNewton::orient_collision(
         NewtonCollision const*  pCollision,
-        osp::phys::EShape       shape,
+        osp::EShape             shape,
         osp::Vector3 const&     translation,
         osp::Matrix3 const&     rotation,
         osp::Vector3 const&     scale)
@@ -185,11 +169,11 @@ void SysNewton::update_translate(ACtxPhysics& rCtxPhys, ACtxNwtWorld& rCtxWorld)
 using Corrade::Containers::ArrayView;
 
 void SysNewton::update_world(
-        ACtxPhysics& rCtxPhys,
-        ACtxNwtWorld& rCtxWorld,
-        float timestep,
-        ACtxSceneGraph const& rScnGraph,
-        acomp_storage_t<ACompTransform>& rTf) noexcept
+        ACtxPhysics&                rCtxPhys,
+        ACtxNwtWorld&               rCtxWorld,
+        float                       timestep,
+        ACtxSceneGraph const&       rScnGraph,
+        ACompTransformStorage_t&    rTf) noexcept
 {
     NewtonWorld const* pNwtWorld = rCtxWorld.m_world.get();
 
@@ -228,7 +212,7 @@ void SysNewton::find_colliders_recurse(
         ACtxPhysics const&                      rCtxPhys,
         ACtxNwtWorld&                           rCtxWorld,
         ACtxSceneGraph const&                   rScnGraph,
-        acomp_storage_t<ACompTransform> const&  rTf,
+        ACompTransformStorage_t const&          rTf,
         ActiveEnt                               ent,
         Matrix4 const&                          transform,
         NewtonCollision*                        pCompound) noexcept

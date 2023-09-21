@@ -26,8 +26,9 @@
 
 #include "scenarios.h"
 
-#include <osp/Active/drawing.h>
-#include <osp/Active/physics.h>
+#include <osp/activescene/basic.h>
+#include <osp/activescene/physics.h>
+#include <osp/drawing/drawing.h>
 
 #include <longeron/id_management/registry_stl.hpp>
 
@@ -38,11 +39,11 @@ namespace testapp::scenes
 
 struct SpawnShape
 {
-    osp::Vector3 m_position;
-    osp::Vector3 m_velocity;
-    osp::Vector3 m_size;
-    float m_mass;
-    osp::phys::EShape m_shape;
+    osp::Vector3    m_position;
+    osp::Vector3    m_velocity;
+    osp::Vector3    m_size;
+    float           m_mass;
+    osp::EShape     m_shape;
 };
 
 struct ACtxShapeSpawner
@@ -51,7 +52,7 @@ struct ACtxShapeSpawner
 
     std::vector<SpawnShape>         m_spawnRequest;
     osp::active::ActiveEntVec_t     m_ents;
-    osp::active::MaterialId         m_materialId;
+    osp::draw::MaterialId           m_materialId;
 };
 
 /**
@@ -83,7 +84,7 @@ osp::Session setup_shape_spawn(
         osp::Session const&         scene,
         osp::Session const&         commonScene,
         osp::Session const&         physics,
-        osp::active::MaterialId     materialId);
+        osp::draw::MaterialId       materialId);
 
 osp::Session setup_shape_spawn_draw(
         osp::TopTaskBuilder&        rBuilder,

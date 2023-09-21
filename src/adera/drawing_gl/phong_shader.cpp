@@ -22,16 +22,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "Phong.h"
+#include "phong_shader.h"
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
 using namespace osp;
-using namespace osp::active;
-using namespace osp::shader;
+using namespace osp::draw;
 
-void shader::draw_ent_phong(
+void adera::shader::draw_ent_phong(
         DrawEnt                     ent,
         ViewProjMatrix const&       viewProj,
         EntityToDraw::UserData_t    userData) noexcept

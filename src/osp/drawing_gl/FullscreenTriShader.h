@@ -27,7 +27,7 @@
 #include <Magnum/GL/AbstractShaderProgram.h>
 #include <Magnum/GL/Attribute.h>
 
-namespace osp::active
+namespace osp
 {
 
 class FullscreenTriShader : public Magnum::GL::AbstractShaderProgram
@@ -74,4 +74,4 @@ private:
     FullscreenTriShader& set_framebuffer(Magnum::GL::Texture2D& rTex);
 };
 
-}  // namespace osp::active
+} // namespace osp

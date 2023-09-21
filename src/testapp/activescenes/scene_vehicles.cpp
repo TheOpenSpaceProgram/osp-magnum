@@ -30,15 +30,9 @@
 
 #include <adera/machines/links.h>
 
-#include <osp/Active/parts.h>
-#include <osp/Active/physics.h>
-#include <osp/Active/SysSceneGraph.h>
-#include <osp/Active/SysPrefabInit.h>
-#include <osp/link/machines.h>
-#include <osp/link/signal.h>
-#include <osp/Resource/resources.h>
-#include <osp/UserInputHandler.h>
-#include <osp/logging.h>
+#include <osp/activescene/basic.h>
+#include <osp/activescene/physics.h>
+#include <osp/drawing/drawing.h>
 
 using namespace osp;
 using namespace osp::active;

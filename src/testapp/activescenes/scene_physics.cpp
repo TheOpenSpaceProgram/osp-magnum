@@ -27,22 +27,18 @@
 #include "scenarios.h"
 #include "identifiers.h"
 
-#include <osp/Active/basic.h>
-#include <osp/Active/drawing.h>
-#include <osp/Active/physics.h>
-#include <osp/Active/SysSceneGraph.h>
-#include <osp/Active/SysPrefabInit.h>
-#include <osp/Active/SysPhysics.h>
-#include <osp/Active/SysRender.h>
-
-#include <osp/Resource/ImporterData.h>
-#include <osp/Resource/resources.h>
-#include <osp/Resource/resourcetypes.h>
+#include <osp/activescene/basic.h>
+#include <osp/activescene/physics_fn.h>
+#include <osp/activescene/prefab_fn.h>
+#include <osp/core/Resources.h>
+#include <osp/core/Resources.h>
+#include <osp/drawing/drawing_fn.h>
+#include <osp/vehicles/ImporterData.h>
 
 using namespace osp;
 using namespace osp::active;
+using namespace osp::draw;
 using osp::restypes::gc_importer;
-using osp::phys::EShape;
 using Corrade::Containers::arrayView;
 
 namespace testapp::scenes
@@ -179,8 +175,7 @@ Session setup_shape_spawn(
             if (spawn.m_mass != 0.0f)
             {
                 rPhys.m_setVelocity.emplace_back(root, spawn.m_velocity);
-                Vector3 const inertia
-                        = phys::collider_inertia_tensor(spawn.m_shape, spawn.m_size, spawn.m_mass);
+                Vector3 const inertia = collider_inertia_tensor(spawn.m_shape, spawn.m_size, spawn.m_mass);
                 Vector3 const offset{0.0f, 0.0f, 0.0f};
                 rPhys.m_mass.emplace( child, ACompMass{ inertia, offset, spawn.m_mass } );
             }
@@ -325,7 +320,7 @@ Session setup_shape_spawn_draw(
             rScnRender.m_needDrawTf.set(std::size_t(root));
             rScnRender.m_needDrawTf.set(std::size_t(child));
 
-            phys::EShape const shape = rPhys.m_shape.at(child);
+            EShape const shape = rPhys.m_shape.at(child);
             rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(shape));
             rScnRender.m_meshDirty.push_back(drawEnt);
 

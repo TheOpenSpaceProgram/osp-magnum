@@ -24,8 +24,8 @@
  */
 #pragma once
 
-#include "../keyed_vector.h"
-#include "../types.h"
+#include "../core/array_view.h"
+#include "../core/keyed_vector.h"
 
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>

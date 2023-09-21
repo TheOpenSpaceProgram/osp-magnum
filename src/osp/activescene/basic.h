@@ -24,15 +24,22 @@
  */
 #pragma once
 
-#include "../types.h"
-#include "activetypes.h"
+#include "active_ent.h"
+
+#include "../core/bitvector.h"
+#include "../core/math_types.h"
+#include "../core/storage.h"
 
 #include <longeron/id_management/null.hpp>
+#include <longeron/id_management/registry_stl.hpp> // for lgrn::IdRegistryStl
 
 #include <string>
 
 namespace osp::active
 {
+
+using ActiveEntVec_t = std::vector<ActiveEnt>;
+using ActiveEntSet_t = BitVector_t;
 
 /**
  * @brief Component for transformation (in meters)
@@ -75,6 +82,8 @@ struct ACtxSceneGraph
     }
 };
 
+using ACompTransformStorage_t = Storage_t<ActiveEnt, ACompTransform>;
+
 /**
  * @brief Storage for basic components
  */
@@ -83,7 +92,7 @@ struct ACtxBasic
     lgrn::IdRegistryStl<ActiveEnt>      m_activeIds;
 
     ACtxSceneGraph                      m_scnGraph;
-    acomp_storage_t<ACompTransform>     m_transform;
+    ACompTransformStorage_t             m_transform;
 };
 
 template<typename IT_T>

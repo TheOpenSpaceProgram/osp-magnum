@@ -22,14 +22,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "SysRender.h"
-#include "SysSceneGraph.h"
+#include "drawing_fn.h"
+#include "own_restypes.h"
 
-
-#include "../Resource/resources.h"
+#include "../activescene/basic_fn.h"
+#include "../core/Resources.h"
 
 using namespace osp;
 using namespace osp::active;
+using namespace osp::draw;
 
 MeshId SysRender::own_mesh_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& rCtxDrawingRes, Resources &rResources, ResId const resId)
 {
@@ -90,7 +91,7 @@ void SysRender::clear_resource_owners(ACtxDrawingRes& rCtxDrawingRes, Resources 
 void SysRender::update_draw_transforms_recurse(
         ACtxSceneGraph const&                   rScnGraph,
         KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
-        acomp_storage_t<ACompTransform> const&  rTf,
+        active::ACompTransformStorage_t const&  rTf,
         DrawTransforms_t&                       rDrawTf,
         ActiveEntSet_t const&                   needDrawTf,
         ActiveEnt                               ent,

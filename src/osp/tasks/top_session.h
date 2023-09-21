@@ -27,6 +27,8 @@
 #include "tasks.h"
 #include "top_utils.h"
 
+#include "../core/unpack.h"
+
 #include <entt/core/any.hpp>
 
 #include <cassert>
@@ -34,8 +36,6 @@
 #include <typeinfo>
 #include <utility>
 #include <vector>
-
-#include <osp/unpack.h>
 
 #define OSP_AUX_DCDI_C(session, topData, count, ...) \
     session.m_data.resize(count); \
@@ -56,8 +56,6 @@
 #define OSP_AUX_DGDI_A(...) OSP_AUX_DGDI_B(OSP_AUX_DGDI_C(__VA_ARGS__))
 
 #define OSP_DECLARE_GET_DATA_IDS(session, arglist) OSP_AUX_DGDI_A(session, arglist);
-
-
 
 namespace osp
 {

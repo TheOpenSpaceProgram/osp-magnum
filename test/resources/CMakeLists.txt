@@ -27,4 +27,4 @@ ADD_TEST_DIRECTORY(${PROJECT_NAME})
 
 # workaround?
 TARGET_LINK_LIBRARIES(test_resources PRIVATE longeron EnTT::EnTT)
-TARGET_SOURCES(test_resources PRIVATE "${CMAKE_SOURCE_DIR}/src/osp/Resource/resources.cpp")
+TARGET_SOURCES(test_resources PRIVATE "${CMAKE_SOURCE_DIR}/src/osp/core/Resources.cpp")
