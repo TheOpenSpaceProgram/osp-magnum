@@ -113,5 +113,3 @@ PkgId Resources::pkg_create()
     m_pkgData[std::size_t(newPkgId)].m_resTypeOwn.resize(m_perResType.size());
     return newPkgId;
 }
-
-
