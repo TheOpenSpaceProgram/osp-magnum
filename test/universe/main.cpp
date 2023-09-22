@@ -24,7 +24,7 @@
  */
 #include <osp/universe/universe.h>
 #include <osp/universe/coordinates.h>
-#include <osp/CommonMath.h>
+#include <osp/core/math_2pow.h>
 
 #include <Magnum/Math/Functions.h>
 

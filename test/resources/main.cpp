@@ -22,7 +22,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <osp/Resource/resources.h>
+#include <osp/core/Resources.h>
+#include <osp/drawing/own_restypes.h>
 
 #include <gtest/gtest.h>
 
