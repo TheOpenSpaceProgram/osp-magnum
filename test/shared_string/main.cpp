@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <osp/shared_string.h>
+#include <osp/core/shared_string.h>
 
 #include <gtest/gtest.h>
 

@@ -22,8 +22,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <osp/string_concat.h>
-#include <osp/shared_string.h>
+#include <osp/core/string_concat.h>
+#include <osp/core/shared_string.h>
 
 #include <gtest/gtest.h>
 
