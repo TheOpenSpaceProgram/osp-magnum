@@ -24,11 +24,11 @@
  */
 #pragma once
 
-#include <cstdint>
+#include "../core/strong_id.h"
 
 namespace osp::active
 {
 
-enum class ActiveEnt: uint32_t { };
+using ActiveEnt = StrongId<uint32_t, struct DummyForActiveEnt>;
 
 } // namespace osp::active

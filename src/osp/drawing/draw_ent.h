@@ -24,11 +24,11 @@
  */
 #pragma once
 
-#include <cstdint>
+#include "../core/strong_id.h"
 
 namespace osp::draw
 {
 
-enum class DrawEnt : uint32_t { };
+using DrawEnt = StrongId<uint32_t, struct DummyForDrawEnt>;
 
 } // namespace osp::draw
