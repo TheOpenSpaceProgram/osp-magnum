@@ -27,6 +27,7 @@
 #include "draw_ent.h"
 
 #include "../core/bitvector.h"
+#include "../core/copymove_macros.h"
 #include "../core/id_map.h"
 #include "../core/keyed_vector.h"
 #include "../core/math_types.h"
@@ -90,15 +91,16 @@ struct ACtxDrawing
     TexRefCount_t                           m_texRefCounts;
 };
 
+// Note: IdOwner members below are move-only. Move constructors need to be defined for the structs
+//       (can use OSP_MOVE_ONLY_CTOR_ASSIGN) or else there will be huge compiler errors somehow.
+
 /**
  * @brief Associates mesh/texture resources Ids from ACtxDrawing with Resources
  */
 struct ACtxDrawingRes
 {
-    // Required for std::is_copy_assignable to work properly inside of entt::any
     ACtxDrawingRes() = default;
-    ACtxDrawingRes(ACtxDrawingRes const& copy) = delete;
-    ACtxDrawingRes(ACtxDrawingRes&& move) = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(ACtxDrawingRes);
 
     // Associate Texture Ids with resources
     IdMap_t<ResId, TexId>                   m_resToTex;
@@ -115,10 +117,8 @@ using DrawTransforms_t = KeyedVec<DrawEnt, Matrix4>;
 
 struct ACtxSceneRender
 {
-    // Required for std::is_copy_assignable to work properly inside of entt::any
     ACtxSceneRender() = default;
-    ACtxSceneRender(ACtxSceneRender const& copy) = delete;
-    ACtxSceneRender(ACtxSceneRender&& move) = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(ACtxSceneRender);
 
     void resize_draw()
     {

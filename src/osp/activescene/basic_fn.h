@@ -27,6 +27,7 @@
 #include "basic.h"
 
 #include "../core/array_view.h"
+#include "../core/copymove_macros.h"
 
 #include <algorithm>
 #include <compare>
@@ -43,14 +44,13 @@ namespace osp::active
 class SubtreeBuilder
 {
 public:
-    constexpr SubtreeBuilder(ACtxSceneGraph& rScnGraph, ActiveEnt root, TreePos_t first, TreePos_t last)
+    constexpr SubtreeBuilder(ACtxSceneGraph& rScnGraph, ActiveEnt root, TreePos_t first, TreePos_t last) noexcept
      : m_rScnGraph{rScnGraph}
      , m_root{root}
      , m_first{first}
      , m_last{last}
     { }
-    constexpr SubtreeBuilder(SubtreeBuilder&& move) = default;
-    SubtreeBuilder(SubtreeBuilder const& copy) = delete;
+    OSP_MOVE_ONLY_CTOR_CONSTEXPR_NOEXCEPT(SubtreeBuilder)
     ~SubtreeBuilder() { assert(m_first == m_last); }
 
     /**
