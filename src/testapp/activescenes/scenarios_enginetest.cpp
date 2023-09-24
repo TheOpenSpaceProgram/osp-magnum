@@ -22,8 +22,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "CameraController.h"
-
 #include "../MagnumApplication.h"
 
 #include <osp/activescene/basic.h>
@@ -33,6 +31,7 @@
 #include <osp/drawing/own_restypes.h>
 #include <osp/drawing_gl/rendergl.h>
 
+#include <adera/drawing/CameraController.h>
 #include <adera/drawing_gl/phong_shader.h>
 
 #include <Magnum/Trade/MeshData.h>
@@ -42,14 +41,14 @@
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
+using Magnum::Trade::ImageData2D;
+using Magnum::Trade::MeshData;
+using adera::ACtxCameraController;
+using adera::SysCameraController;
 using osp::active::ActiveEnt;
 using osp::draw::DrawEnt;
-using osp::input::UserInputHandler;
-
-using Magnum::Trade::MeshData;
-using Magnum::Trade::ImageData2D;
-
 using osp::draw::RenderGL;
+using osp::input::UserInputHandler;
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;

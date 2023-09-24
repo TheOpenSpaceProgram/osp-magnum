@@ -27,7 +27,9 @@
 #include <osp/core/keyed_vector.h>
 #include <osp/core/resourcetypes.h>
 #include <osp/tasks/tasks.h>
+#include <osp/tasks/top_execute.h>
 #include <osp/tasks/top_session.h>
+#include <osp/util/logging.h>
 
 #include <entt/core/any.hpp>
 
@@ -37,6 +39,7 @@ namespace testapp
 {
 
 struct TestApp;
+class IExecutor;
 
 using RendererSetupFunc_t   = void(*)(TestApp&);
 using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
@@ -47,19 +50,6 @@ struct TestAppTasks
     osp::Tasks                      m_tasks;
     osp::TopTaskDataVec_t           m_taskData;
     osp::TaskGraph                  m_graph;
-};
-
-struct IExecutor
-{
-    virtual void load(TestAppTasks& rAppTasks) = 0;
-
-    virtual void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
-
-    virtual void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
-
-    virtual void wait(TestAppTasks& rAppTasks) = 0;
-
-    virtual bool is_running(TestAppTasks const& rAppTasks) = 0;
 };
 
 struct TestApp : TestAppTasks
@@ -89,5 +79,38 @@ struct TestApp : TestAppTasks
     osp::PkgId                      m_defaultPkg    { lgrn::id_null<osp::PkgId>() };
 };
 
+class IExecutor
+{
+public:
+
+    virtual void load(TestAppTasks& rAppTasks) = 0;
+
+    virtual void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
+
+    virtual void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
+
+    virtual void wait(TestAppTasks& rAppTasks) = 0;
+
+    virtual bool is_running(TestAppTasks const& rAppTasks) = 0;
+};
+
+//-----------------------------------------------------------------------------
+
+class SingleThreadedExecutor final : public IExecutor
+{
+public:
+    void load(TestAppTasks& rAppTasks) override;
+
+    void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
+
+    void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
+
+    void wait(TestAppTasks& rAppTasks) override;
+
+    bool is_running(TestAppTasks const& rAppTasks) override;
+
+    osp::ExecContext                m_execContext;
+    std::shared_ptr<spdlog::logger> m_log;
+};
 
 } // namespace testapp

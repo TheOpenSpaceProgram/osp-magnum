@@ -26,13 +26,13 @@
 #include "scene_common.h"
 #include "scenarios.h"
 #include "identifiers.h"
-#include "CameraController.h"
 
 #include "../MagnumApplication.h"
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 #include <Magnum/GL/Renderer.h>
 
+#include <adera/drawing/CameraController.h>
 #include <adera/drawing_gl/flat_shader.h>
 #include <adera/drawing_gl/phong_shader.h>
 #include <adera/drawing_gl/visualizer_shader.h>
@@ -48,6 +48,7 @@
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
+using namespace adera;
 using namespace adera::shader;
 using namespace osp::active;
 using namespace osp::draw;

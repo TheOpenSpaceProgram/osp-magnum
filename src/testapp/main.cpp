@@ -23,7 +23,6 @@
  * SOFTWARE.
  */
 #include "MagnumApplication.h"
-#include "executor.h"
 #include "testapp.h"
 
 #include "activescenes/scenarios.h"

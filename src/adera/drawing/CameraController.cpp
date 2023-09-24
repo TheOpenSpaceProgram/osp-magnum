@@ -31,8 +31,8 @@
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
 
-using testapp::SysCameraController;
-using testapp::ACtxCameraController;
+using adera::SysCameraController;
+using adera::ACtxCameraController;
 
 using Magnum::Rad;
 

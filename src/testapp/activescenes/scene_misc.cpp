@@ -27,22 +27,23 @@
 #include "scenarios.h"
 #include "identifiers.h"
 
-#include "CameraController.h"
-
 #include <osp/activescene/basic_fn.h>
 #include <osp/core/Resources.h>
 #include <osp/core/unpack.h>
 #include <osp/drawing/drawing.h>
 
+#include <adera/drawing/CameraController.h>
+
 #include <random>
 
+using namespace adera;
 using namespace osp;
 using namespace osp::active;
 using namespace osp::draw;
 
 using osp::input::EButtonControlIndex;
 
-// for the 0xrrggbb_rgbf and angle literals
+// for the 0xrrggbb_rgbf and angle literalss
 using namespace Magnum::Math::Literals;
 
 namespace testapp::scenes

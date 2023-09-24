@@ -30,7 +30,7 @@
 
 #include <optional>
 
-namespace testapp
+namespace adera
 {
 
 struct ACtxCameraController
