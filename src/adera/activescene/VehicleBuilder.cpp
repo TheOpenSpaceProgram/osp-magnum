@@ -28,7 +28,7 @@
 #include <osp/util/logging.h>
 #include <osp/vehicles/ImporterData.h>
 
-namespace testapp
+namespace adera
 {
 
 using osp::restypes::gc_importer;

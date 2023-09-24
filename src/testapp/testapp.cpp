@@ -28,9 +28,10 @@
 
 #include <osp/core/Resources.h>
 #include <osp/drawing/own_restypes.h>
-#include <osp/vehicles/ImporterData.h>
-
+#include <osp/tasks/top_execute.h>
 #include <osp/tasks/top_utils.h>
+#include <osp/vehicles/ImporterData.h>
+#include <spdlog/fmt/ostr.h>
 
 namespace testapp
 {
@@ -150,5 +151,52 @@ void TestApp::clear_resource_owners()
         }
     });
 }
+
+
+//-----------------------------------------------------------------------------
+
+
+void SingleThreadedExecutor::load(TestAppTasks& rAppTasks)
+{
+    osp::exec_conform(rAppTasks.m_tasks, m_execContext);
+    m_execContext.doLogging = m_log != nullptr;
+}
+
+void SingleThreadedExecutor::run(TestAppTasks& rAppTasks, osp::PipelineId pipeline)
+{
+    osp::exec_request_run(m_execContext, pipeline);
+}
+
+void SingleThreadedExecutor::signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline)
+{
+    osp::exec_signal(m_execContext, pipeline);
+}
+
+void SingleThreadedExecutor::wait(TestAppTasks& rAppTasks)
+{
+    if (m_log != nullptr)
+    {
+        m_log->info("\n>>>>>>>>>> Previous State Changes\n{}\n>>>>>>>>>> Current State\n{}\n",
+                    osp::TopExecWriteLog  {rAppTasks.m_tasks, rAppTasks.m_taskData, rAppTasks.m_graph, m_execContext},
+                    osp::TopExecWriteState{rAppTasks.m_tasks, rAppTasks.m_taskData, rAppTasks.m_graph, m_execContext} );
+        m_execContext.logMsg.clear();
+    }
+
+    osp::exec_update(rAppTasks.m_tasks, rAppTasks.m_graph, m_execContext);
+    osp::top_run_blocking(rAppTasks.m_tasks, rAppTasks.m_graph, rAppTasks.m_taskData, rAppTasks.m_topData, m_execContext);
+
+    if (m_log != nullptr)
+    {
+        m_log->info("\n>>>>>>>>>> New State Changes\n{}",
+                    osp::TopExecWriteLog{rAppTasks.m_tasks, rAppTasks.m_taskData, rAppTasks.m_graph, m_execContext} );
+        m_execContext.logMsg.clear();
+    }
+}
+
+bool SingleThreadedExecutor::is_running(TestAppTasks const& appTasks)
+{
+    return m_execContext.hasRequestRun || (m_execContext.pipelinesRunning != 0);
+}
+
 
 } // namespace testapp

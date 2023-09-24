@@ -25,9 +25,8 @@
 #include "scene_vehicles.h"
 #include "scenarios.h"
 #include "identifiers.h"
-#include "CameraController.h"
-#include "../VehicleBuilder.h"
 
+#include <adera/activescene/VehicleBuilder.h>
 #include <adera/machines/links.h>
 
 #include <osp/activescene/basic.h>
