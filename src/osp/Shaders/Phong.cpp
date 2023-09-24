@@ -32,10 +32,11 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_phong(
-        DrawEnt ent, ViewProjMatrix const& viewProj,
-        EntityToDraw::UserData_t userData) noexcept
+        DrawEnt                     ent,
+        ViewProjMatrix const&       viewProj,
+        EntityToDraw::UserData_t    userData) noexcept
 {
-    using Flag = Phong::Flag;
+    using Flag = PhongGL::Flag;
 
     void* const pData   = std::get<0>(userData);
     void* const pShader = std::get<1>(userData);
@@ -43,10 +44,10 @@ void shader::draw_ent_phong(
     assert(pShader != nullptr);
 
     auto &rData   = *reinterpret_cast<ACtxDrawPhong*>(pData);
-    auto &rShader = *reinterpret_cast<Phong*>(pShader);
+    auto &rShader = *reinterpret_cast<PhongGL*>(pShader);
 
     // Collect uniform information
-    Matrix4 const &drawTf = (*rData.m_pDrawTf)[ent];
+    Matrix4 const &drawTf = (*rData.pDrawTf)[ent];
 
     Magnum::Matrix4 entRelative = viewProj.m_view * drawTf;
 
@@ -58,8 +59,8 @@ void shader::draw_ent_phong(
 
     if (rShader.flags() & Flag::DiffuseTexture)
     {
-        TexGlId const texGlId = (*rData.m_pDiffuseTexId)[ent].m_glId;
-        Magnum::GL::Texture2D &rTexture = rData.m_pTexGl->get(texGlId);
+        TexGlId const texGlId = (*rData.pDiffuseTexId)[ent].m_glId;
+        Magnum::GL::Texture2D &rTexture = rData.pTexGl->get(texGlId);
         rShader.bindDiffuseTexture(rTexture);
 
         if (rShader.flags() & (Flag::AmbientTexture | Flag::AlphaMask))
@@ -68,13 +69,13 @@ void shader::draw_ent_phong(
         }
     }
 
-    if (rData.m_pColor != nullptr)
+    if (rData.pColor != nullptr)
     {
-        rShader.setDiffuseColor((*rData.m_pColor)[ent]);
+        rShader.setDiffuseColor((*rData.pColor)[ent]);
     }
 
-    MeshGlId const meshId = (*rData.m_pMeshId)[ent].m_glId;
-    Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
+    MeshGlId const      meshId = (*rData.pMeshId)[ent].m_glId;
+    Magnum::GL::Mesh    &rMesh = rData.pMeshGl->get(meshId);
 
     Matrix3 a{viewProj.m_view};
 
@@ -111,5 +112,4 @@ void shader::draw_ent_phong(
         .setNormalMatrix(entRelative.normalMatrix())
         .draw(rMesh);
 }
-
 

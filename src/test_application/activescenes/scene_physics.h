@@ -47,6 +47,8 @@ struct SpawnShape
 
 struct ACtxShapeSpawner
 {
+    osp::active::ActiveEntSet_t     m_ownedEnts;
+
     std::vector<SpawnShape>         m_spawnRequest;
     osp::active::ActiveEntVec_t     m_ents;
     osp::active::MaterialId         m_materialId;
@@ -82,6 +84,15 @@ osp::Session setup_shape_spawn(
         osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::active::MaterialId     materialId);
+
+osp::Session setup_shape_spawn_draw(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         commonScene,
+        osp::Session const&         physics,
+        osp::Session const&         shapeSpawn);
 
 /**
  * @brief Queues and logic for spawning Prefab resources

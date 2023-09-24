@@ -45,11 +45,12 @@ struct ACtxDrawMeshVisualizer
 
     bool m_wireframeOnly{false};
 
-    constexpr void assign_pointers(active::ACtxSceneRenderGL& rCtxScnGl,
-                                   active::RenderGL& rRenderGl) noexcept
+constexpr void assign_pointers(active::ACtxSceneRender&         rScnRender,
+                                   active::ACtxSceneRenderGL&   rScnRenderGl,
+                                   active::RenderGL&            rRenderGl) noexcept
     {
-        m_pDrawTf   = &rCtxScnGl.m_drawTransform;
-        m_pMeshId   = &rCtxScnGl.m_meshId;
+        m_pDrawTf   = &rScnRender.m_drawTransform;
+        m_pMeshId   = &rScnRenderGl.m_meshId;
         m_pMeshGl   = &rRenderGl.m_meshGl;
     }
 };
@@ -59,12 +60,30 @@ void draw_ent_visualizer(
         active::ViewProjMatrix const&       viewProj,
         active::EntityToDraw::UserData_t    userData) noexcept;
 
-void sync_drawent_visualizer(
+inline void sync_drawent_visualizer(
         active::DrawEnt const               ent,
         active::DrawEntSet_t const&         hasMaterial,
         active::RenderGroup::Storage_t&     rStorage,
-        ACtxDrawMeshVisualizer&             rData);
+        ACtxDrawMeshVisualizer&             rData)
+{
+    using namespace active;
 
+    bool alreadyAdded = rStorage.contains(ent);
+    if (hasMaterial.test(std::size_t(ent)))
+    {
+        if ( ! alreadyAdded)
+        {
+            rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
+        }
+    }
+    else
+    {
+        if (alreadyAdded)
+        {
+            rStorage.erase(ent);
+        }
+    }
+}
 template <typename ITA_T, typename ITB_T>
 static void sync_drawent_visualizer(
         ITA_T const&                        first,

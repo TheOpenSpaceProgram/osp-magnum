@@ -78,7 +78,7 @@ Session setup_common_scene(
         Session const&              application,
         PkgId const                 pkg)
 {
-    OSP_DECLARE_GET_DATA_IDS(application,  TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
 
     auto const tgScn    = scene.get_pipelines<PlScene>();
     auto &rResources    = top_get< Resources >      (topData, idResources);
@@ -101,19 +101,8 @@ Session setup_common_scene(
     rBuilder.pipeline(tgCS.activeEntDelete)     .parent(tgScn.update);
     rBuilder.pipeline(tgCS.transform)           .parent(tgScn.update);
     rBuilder.pipeline(tgCS.hierarchy)           .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.drawEnt)             .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.drawEntResized)      .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.drawEntDelete)       .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.mesh)                .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.texture)             .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.entMesh)             .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.entTexture)          .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.entTextureDirty)     .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.entMeshDirty)        .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.meshResDirty)        .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.textureResDirty)     .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.material)            .parent(tgScn.update);
-    rBuilder.pipeline(tgCS.materialDirty)       .parent(tgScn.update);
+
+
 
     rBuilder.task()
         .name       ("Cancel entity delete tasks stuff if no entities were deleted")
@@ -154,72 +143,6 @@ Session setup_common_scene(
     });
 
     rBuilder.task()
-        .name       ("Delete DrawEntity of deleted ActiveEnts")
-        .run_on     ({tgCS.activeEntDelete(UseOrRun)})
-        .sync_with  ({tgCS.drawEntDelete(Modify_)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                      idActiveEntDel,              idDrawEntDel })
-        .func([] (ACtxDrawing& rDrawing, ActiveEntVec_t const& rActiveEntDel, DrawEntVec_t& rDrawEntDel) noexcept
-    {
-        for (ActiveEnt const ent : rActiveEntDel)
-        {
-            DrawEnt const drawEnt = std::exchange(rDrawing.m_activeToDraw[ent], lgrn::id_null<DrawEnt>());
-            if (drawEnt != lgrn::id_null<DrawEnt>())
-            {
-                rDrawEntDel.push_back(drawEnt);
-            }
-        }
-    });
-
-    rBuilder.task()
-        .name       ("Delete drawing components")
-        .run_on     ({tgCS.drawEntDelete(UseOrRun)})
-        .sync_with  ({tgCS.entTexture(Delete), tgCS.entMesh(Delete)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                    idDrawEntDel })
-        .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept
-    {
-        SysRender::update_delete_drawing(rDrawing, rDrawEntDel.cbegin(), rDrawEntDel.cend());
-    });
-
-    rBuilder.task()
-        .name       ("Delete DrawEntity IDs")
-        .run_on     ({tgCS.drawEntDelete(UseOrRun)})
-        .sync_with  ({tgCS.drawEnt(Delete)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                    idDrawEntDel })
-        .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept
-    {
-        for (DrawEnt const drawEnt : rDrawEntDel)
-        {
-            if (rDrawing.m_drawIds.exists(drawEnt))
-            {
-                rDrawing.m_drawIds.remove(drawEnt);
-            }
-        }
-    });
-
-    rBuilder.task()
-        .name       ("Delete DrawEnt from materials")
-        .run_on     ({tgCS.drawEntDelete(UseOrRun)})
-        .sync_with  ({tgCS.material(Delete)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                    idDrawEntDel })
-        .func([] (ACtxDrawing& rDrawing, DrawEntVec_t const& rDrawEntDel) noexcept
-    {
-        for (DrawEnt const ent : rDrawEntDel)
-        {
-            for (Material &rMat : rDrawing.m_materials)
-            {
-                if (std::size_t(ent) < rMat.m_ents.size())
-                {
-                    rMat.m_ents.reset(std::size_t(ent));
-                }
-            }
-        }
-    });
-
-    rBuilder.task()
         .name       ("Clear ActiveEnt delete vector once we're done with it")
         .run_on     ({tgCS.activeEntDelete(Clear)})
         .push_to    (out.m_tasks)
@@ -229,59 +152,16 @@ Session setup_common_scene(
         idActiveEntDel.clear();
     });
 
-    rBuilder.task()
-        .name       ("Clear DrawEnt delete vector once we're done with it")
-        .run_on     ({tgCS.drawEntDelete(Clear)})
-        .push_to    (out.m_tasks)
-        .args       ({         idDrawEntDel })
-        .func([] (DrawEntVec_t& rDrawEntDel) noexcept
-    {
-        rDrawEntDel.clear();
-    });
-
-    rBuilder.task()
-        .name       ("Clear material dirty vectors once we're done with it")
-        .run_on     ({tgCS.materialDirty(Clear)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing })
-        .func([] (ACtxDrawing& rDrawing) noexcept
-    {
-        for (std::size_t const materialInt : rDrawing.m_materialIds.bitview().zeros())
-        {
-            rDrawing.m_materials[MaterialId(materialInt)].m_dirty.clear();
-        }
-    });
-
-    rBuilder.task()
-        .name       ("Clear dirty DrawEnt's textures once we're done with it")
-        .run_on     ({tgCS.entMeshDirty(Clear)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing})
-        .func([] (ACtxDrawing& rDrawing) noexcept
-    {
-        rDrawing.m_meshDirty.clear();
-    });
-
-    rBuilder.task()
-        .name       ("Clear dirty DrawEnt's textures once we're done with it")
-        .run_on     ({tgCS.entTextureDirty(Clear)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing})
-        .func([] (ACtxDrawing& rDrawing) noexcept
-    {
-        rDrawing.m_diffuseDirty.clear();
-    });
 
     // Clean up tasks
 
     rBuilder.task()
-        .name       ("Clean up scene and resource owners")
+        .name       ("Clean up resource owners")
         .run_on     ({tgScn.cleanup(Run_)})
         .push_to    (out.m_tasks)
         .args       ({        idDrawing,                idDrawingRes,           idResources})
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources) noexcept
     {
-        SysRender::clear_owners(rDrawing);
         SysRender::clear_resource_owners(rDrawingRes, rResources);
     });
 

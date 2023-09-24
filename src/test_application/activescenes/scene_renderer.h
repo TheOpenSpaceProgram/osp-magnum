@@ -35,25 +35,33 @@ namespace testapp::scenes
 {
 
 osp::Session setup_window_app(
-        osp::TopTaskBuilder&            rBuilder,
-        osp::ArrayView<entt::any>       topData,
-        osp::Session const&             application);
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application);
 
-osp::Session setup_magnum(
-        osp::TopTaskBuilder&            rBuilder,
-        osp::ArrayView<entt::any>       topData,
-        osp::Session const&             windowApp,
-        osp::Session const&             application,
-        MagnumApplication::Arguments    args);
-
-/**
- * @brief Magnum-powered OpenGL Renderer
- */
 osp::Session setup_scene_renderer(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         application,
         osp::Session const&         windowApp,
+        osp::Session const&         commonScene);
+
+osp::Session setup_magnum(
+        osp::TopTaskBuilder&            rBuilder,
+        osp::ArrayView<entt::any>       topData,
+        osp::Session const&             application,
+        osp::Session const&             windowApp,
+        MagnumApplication::Arguments    args);
+
+/**
+ * @brief stuff needed to render a scene using Magnum
+ */
+osp::Session setup_magnum_scene(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
         osp::Session const&         scene,
         osp::Session const&         commonScene);
@@ -64,10 +72,10 @@ osp::Session setup_scene_renderer(
 osp::Session setup_shader_visualizer(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         scnRender,
+        osp::Session const&         magnumScene,
         osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
 
 /**
@@ -76,10 +84,11 @@ osp::Session setup_shader_visualizer(
 osp::Session setup_shader_flat(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
-        osp::Session const&         scene,
-        osp::Session const&         scnRender,
-        osp::Session const&         material);
+        osp::Session const&         magnumScene,
+        osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
 
 /**
  * @brief Magnum Phong shader and optional material for drawing ActiveEnts with it
@@ -87,10 +96,11 @@ osp::Session setup_shader_flat(
 osp::Session setup_shader_phong(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         magnum,
-        osp::Session const&         scene,
-        osp::Session const&         scnRender,
-        osp::Session const&         material);
+        osp::Session const&         magnumScene,
+        osp::active::MaterialId     materialId = lgrn::id_null<osp::active::MaterialId>());
 
 /**
  * @brief Red indicators over Magic Rockets
@@ -114,27 +124,27 @@ osp::Session setup_thrust_indicators(
 osp::Session setup_cursor(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         magnum,
-        osp::Session const&         commonScene,
-        osp::Session const&         scnRender,
+        osp::Session const&         application,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         cameraCtrl,
-        osp::Session const&         shFlat,
-        osp::TopDataId const        idResources,
+        osp::Session const&         commonScene,
+        osp::active::MaterialId const material,
         osp::PkgId const            pkg);
 
 /**
  * @brief Draw universe, specifically designed for setup_uni_test_planets
  */
-osp::Session setup_uni_test_planets_renderer(
+osp::Session setup_testplanets_draw(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         magnum,
-        osp::Session const&         scnRender,
-        osp::Session const&         commonScene,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         cameraCtrl,
-        osp::Session const&         visualizer,
+        osp::Session const&         commonScene,
         osp::Session const&         uniCore,
         osp::Session const&         uniScnFrame,
-        osp::Session const&         uniTestPlanets);
+        osp::Session const&         uniTestPlanets,
+        osp::active::MaterialId const matPlanets,
+        osp::active::MaterialId const matAxis);
 
 }

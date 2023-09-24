@@ -28,40 +28,41 @@
 
 #include <Magnum/Shaders/PhongGL.h>
 
+#include <optional>
+
 namespace osp::shader
 {
 
-using Phong = Magnum::Shaders::PhongGL;
+using PhongGL = Magnum::Shaders::PhongGL;
 
 /**
  * @brief Stores per-scene data needed for Phong shaders to draw
  */
 struct ACtxDrawPhong
 {
-    template <typename T>
-    using acomp_storage_t = osp::active::acomp_storage_t<T>;
+    PhongGL                     shaderUntextured    {Corrade::NoCreate};
+    PhongGL                     shaderDiffuse       {Corrade::NoCreate};
 
-    Phong m_shaderUntextured    {Corrade::NoCreate};
-    Phong m_shaderDiffuse       {Corrade::NoCreate};
+    active::DrawTransforms_t    *pDrawTf            {nullptr};
+    active::DrawEntColors_t     *pColor             {nullptr};
+    active::TexGlEntStorage_t   *pDiffuseTexId      {nullptr};
+    active::MeshGlEntStorage_t  *pMeshId            {nullptr};
 
-    osp::active::DrawTransforms_t               *m_pDrawTf{nullptr};
-    osp::KeyedVec<osp::active::DrawEnt, Magnum::Color4> *m_pColor{nullptr};
-    osp::active::TexGlEntStorage_t              *m_pDiffuseTexId{nullptr};
-    osp::active::MeshGlEntStorage_t             *m_pMeshId{nullptr};
+    active::TexGlStorage_t      *pTexGl             {nullptr};
+    active::MeshGlStorage_t     *pMeshGl            {nullptr};
 
-    osp::active::TexGlStorage_t                 *m_pTexGl{nullptr};
-    osp::active::MeshGlStorage_t                *m_pMeshGl{nullptr};
+    active::MaterialId materialId { lgrn::id_null<active::MaterialId>() };
 
-    constexpr void assign_pointers(active::ACtxSceneRenderGL& rCtxScnGl,
-                                   active::RenderGL& rRenderGl) noexcept
+    constexpr void assign_pointers(active::ACtxSceneRender&     rScnRender,
+                                   active::ACtxSceneRenderGL&   rScnRenderGl,
+                                   active::RenderGL&            rRenderGl) noexcept
     {
-        m_pDrawTf       = &rCtxScnGl.m_drawTransform;
-        // TODO: ACompColor
-        m_pDiffuseTexId = &rCtxScnGl.m_diffuseTexId;
-        m_pMeshId       = &rCtxScnGl.m_meshId;
-
-        m_pTexGl        = &rRenderGl.m_texGl;
-        m_pMeshGl       = &rRenderGl.m_meshGl;
+        pDrawTf         = &rScnRender   .m_drawTransform;
+        pColor          = &rScnRender   .m_color;
+        pDiffuseTexId   = &rScnRenderGl .m_diffuseTexId;
+        pMeshId         = &rScnRenderGl .m_meshId;
+        pTexGl          = &rRenderGl    .m_texGl;
+        pMeshGl         = &rRenderGl    .m_meshGl;
     }
 };
 
@@ -70,75 +71,59 @@ void draw_ent_phong(
         active::ViewProjMatrix const& viewProj,
         active::EntityToDraw::UserData_t userData) noexcept;
 
-/**
- * @brief Assign a Phong shader to a set of entities, and write results to
- *        a RenderGroup
- *
- * @param dirtyFirst            [in] Iterator to first entity to sync
- * @param dirtyLast             [in] Iterator to last entity to sync
- * @param hasMaterial           [in] Which entities a phong material is assigned to
- * @param pStorageOpaque        [out] Optional RenderGroup storage for opaque
- * @param pStorageTransparent   [out] Optional RenderGroup storage for transparent
- * @param opaque                [in] Storage for opaque component
- * @param diffuse               [in] Storage for diffuse texture component
- * @param rData                 [in] Phong shader data, stable memory required
- */
-template<typename ITA_T, typename ITB_T>
-void sync_phong(
-        ITA_T dirtyIt,
-        ITB_T const& dirtyLast,
-        active::DrawEntSet_t const& hasMaterial,
-        active::RenderGroup::Storage_t *const pStorageOpaque,
-        active::RenderGroup::Storage_t *const pStorageTransparent,
-        KeyedVec<active::DrawEnt, active:: BasicDrawProps> const& drawBasic,
-        active::TexGlEntStorage_t const& diffuse,
-        ACtxDrawPhong &rData)
+struct ArgsForSyncDrawEntPhong
+{
+    active::DrawEntSet_t const&             hasMaterial;
+    active::RenderGroup::Storage_t *const   pStorageOpaque      {nullptr};
+    active::RenderGroup::Storage_t *const   pStorageTransparent {nullptr};
+    active::DrawEntSet_t const&             opaque;
+    active::DrawEntSet_t const&             transparent;
+    active::TexGlEntStorage_t const&        diffuse;
+    ACtxDrawPhong&                          rData;
+};
+
+inline void sync_drawent_phong(active::DrawEnt ent, ArgsForSyncDrawEntPhong const args)
 {
     using namespace active;
 
-    for (; dirtyIt != dirtyLast; std::advance(dirtyIt, 1))
+    auto const entInt = std::size_t(ent);
+
+    bool const hasMaterial = args.hasMaterial.test(entInt);
+    bool const hasTexture = (args.diffuse.size() > std::size_t(ent)) && (args.diffuse[ent].m_glId != lgrn::id_null<TexGlId>());
+
+    PhongGL *pShader = hasTexture
+                     ? &args.rData.shaderDiffuse
+                     : &args.rData.shaderUntextured;
+
+    if (args.pStorageTransparent != nullptr)
     {
-        DrawEnt const ent = *dirtyIt;
+        auto value = (hasMaterial && args.transparent.test(entInt))
+                   ? std::make_optional(EntityToDraw{&draw_ent_phong, {&args.rData, pShader}})
+                   : std::nullopt;
 
-        // Erase from group if they exist
-        if (pStorageOpaque != nullptr)
-        {
-            pStorageOpaque->remove(ent);
-        }
-        if (pStorageTransparent != nullptr)
-        {
-            pStorageTransparent->remove(ent);
-        }
+        storage_assign(*args.pStorageTransparent, ent, std::move(value));
+    }
 
-        if ( ! hasMaterial.test(std::size_t(ent)))
-        {
-            continue; // Phong material is not assigned to this entity
-        }
+    if (args.pStorageOpaque != nullptr)
+    {
+        auto value = (hasMaterial && args.opaque.test(entInt))
+                   ? std::make_optional(EntityToDraw{&draw_ent_phong, {&args.rData, pShader}})
+                   : std::nullopt;
 
-        Phong *pShader = (diffuse[ent].m_glId != lgrn::id_null<TexGlId>())
-                       ? &rData.m_shaderDiffuse
-                       : &rData.m_shaderUntextured;
-
-        if (drawBasic[ent].m_opaque)
-        {
-            if (pStorageOpaque == nullptr)
-            {
-                continue;
-            }
-
-            pStorageOpaque->emplace(ent, EntityToDraw{&draw_ent_phong, {&rData, pShader} });
-        }
-        else
-        {
-            if (pStorageTransparent == nullptr)
-            {
-                continue;
-            }
-
-            pStorageTransparent->emplace(ent, EntityToDraw{&draw_ent_phong, {&rData, pShader} });
-        }
+        storage_assign(*args.pStorageOpaque, ent, std::move(value));
     }
 }
 
+template<typename ITA_T, typename ITB_T>
+void sync_drawent_phong(
+        ITA_T const&                    first,
+        ITB_T const&                    last,
+        ArgsForSyncDrawEntPhong const   args)
+{
+    std::for_each(first, last, [&args] (active::DrawEnt const ent)
+    {
+        sync_drawent_phong(ent, args);
+    });
+}
 
 } // namespace osp::shader

@@ -99,6 +99,8 @@ struct EngineTestScene
     osp::active::ActiveEntSet_t         m_matPhong;
     std::vector<osp::active::DrawEnt>   m_matPhongDirty;
 
+    // This should be part of the renderer but who cares lol!
+    osp::active::ACtxSceneRender m_scnRdr;
 };
 
 EngineTestScene::~EngineTestScene()
@@ -111,7 +113,7 @@ EngineTestScene::~EngineTestScene()
     // single integer internally.
     // Cleanup must be manual, but this has the advantage of having no side
     // effects, and practically zero runtime overhead.
-    osp::active::SysRender::clear_owners(m_drawing);
+    osp::active::SysRender::clear_owners(m_scnRdr, m_drawing);
     osp::active::SysRender::clear_resource_owners(m_drawingRes, *m_pResources);
 }
 
@@ -126,13 +128,14 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     // Make a cube
     ActiveEnt const cubeEnt = rScene.m_activeIds.create();
-    DrawEnt const   cubeDraw = rScene.m_drawing.m_drawIds.create();
+    DrawEnt const   cubeDraw = rScene.m_scnRdr.m_drawIds.create();
 
     // Resize some containers to fit all existing entities
-    rScene.m_matPhong.ints()    .resize(rScene.m_activeIds.vec().capacity());
-    rScene.m_basic.m_scnGraph   .resize(rScene.m_activeIds.capacity());
-    rScene.m_drawing.resize_active(rScene.m_activeIds.capacity());
-    rScene.m_drawing.resize_draw();
+    std::size_t const maxEnts = rScene.m_activeIds.vec().capacity();
+    rScene.m_matPhong.ints()    .resize(maxEnts);
+    rScene.m_basic.m_scnGraph   .resize(maxEnts);
+    rScene.m_scnRdr.resize_active(maxEnts);
+    rScene.m_scnRdr.resize_draw();
 
     // Take ownership of the cube mesh Resource. This will create a scene-space
     // MeshId that we can assign to ActiveEnts
@@ -142,10 +145,10 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     // Add cube mesh to cube
 
-    rScene.m_drawing.m_needDrawTf.set(std::size_t(cubeEnt));
-    rScene.m_drawing.m_activeToDraw[cubeEnt] = cubeDraw;
-    rScene.m_drawing.m_mesh[cubeDraw] = rScene.m_drawing.m_meshRefCounts.ref_add(meshCube);
-    rScene.m_drawing.m_meshDirty.push_back(cubeDraw);
+    rScene.m_scnRdr.m_needDrawTf.set(std::size_t(cubeEnt));
+    rScene.m_scnRdr.m_activeToDraw[cubeEnt] = cubeDraw;
+    rScene.m_scnRdr.m_mesh[cubeDraw] = rScene.m_drawing.m_meshRefCounts.ref_add(meshCube);
+    rScene.m_scnRdr.m_meshDirty.push_back(cubeDraw);
 
     // Add transform
     rScene.m_basic.m_transform.emplace(cubeEnt);
@@ -155,8 +158,8 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
     rScene.m_matPhongDirty.push_back(cubeDraw);
 
     // Add drawble, opaque, and visible component
-    rScene.m_drawing.m_visible.set(std::size_t(cubeDraw));
-    rScene.m_drawing.m_drawBasic[cubeDraw].m_opaque = true;
+    rScene.m_scnRdr.m_visible.set(std::size_t(cubeDraw));
+    rScene.m_scnRdr.m_opaque.set(std::size_t(cubeDraw));
 
     // Add cube to hierarchy, parented to root
     SubtreeBuilder builder = SysSceneGraph::add_descendants(rScene.m_basic.m_scnGraph, 1);
@@ -175,8 +178,8 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 void update_test_scene(EngineTestScene& rScene, float const delta)
 {
     // Clear drawing-related dirty flags/vectors
-    rScene.m_drawing.m_meshDirty.clear();
-    rScene.m_drawing.m_diffuseDirty.clear();
+    rScene.m_scnRdr.m_meshDirty.clear();
+    rScene.m_scnRdr.m_diffuseDirty.clear();
     rScene.m_matPhongDirty.clear();
 
     // Rotate the cube
@@ -226,23 +229,26 @@ struct EngineTestRenderer
  * @param rRenderer [ref] Renderer data for test scene
  */
 void sync_test_scene(
-        RenderGL& rRenderGl, EngineTestScene const& rScene,
+        RenderGL& rRenderGl, EngineTestScene& rScene,
         EngineTestRenderer& rRenderer)
 {
     using namespace osp::active;
     using namespace osp::shader;
 
-    rRenderer.m_sceneRenderGL.m_drawTransform.resize(rScene.m_drawing.m_drawIds.capacity());
-    rRenderer.m_sceneRenderGL.m_diffuseTexId.resize(rScene.m_drawing.m_drawIds.capacity());
-    rRenderer.m_sceneRenderGL.m_meshId.resize(rScene.m_drawing.m_drawIds.capacity());
+    rScene.m_scnRdr.m_drawTransform         .resize(rScene.m_scnRdr.m_drawIds.capacity());
+    rRenderer.m_sceneRenderGL.m_diffuseTexId.resize(rScene.m_scnRdr.m_drawIds.capacity());
+    rRenderer.m_sceneRenderGL.m_meshId      .resize(rScene.m_scnRdr.m_drawIds.capacity());
 
     // Assign or remove phong shaders from entities marked dirty
-    sync_phong(
-            std::cbegin(rScene.m_matPhongDirty),
-            std::cend(rScene.m_matPhongDirty),
-            rScene.m_matPhong, &rRenderer.m_groupFwdOpaque.m_entities, nullptr,
-            rScene.m_drawing.m_drawBasic, rRenderer.m_sceneRenderGL.m_diffuseTexId,
-            rRenderer.m_phong);
+    sync_drawent_phong(rScene.m_matPhongDirty.cbegin(), rScene.m_matPhongDirty.cend(),
+    {
+        .hasMaterial    = rScene.m_matPhong,
+        .pStorageOpaque = &rRenderer.m_groupFwdOpaque.m_entities,
+        .opaque         = rScene.m_scnRdr.m_opaque,
+        .transparent    = rScene.m_scnRdr.m_transparent,
+        .diffuse        = rRenderer.m_sceneRenderGL.m_diffuseTexId,
+        .rData          = rRenderer.m_phong
+    });
 
     // Load required meshes and textures into OpenGL
     SysRenderGL::compile_resource_meshes  (rScene.m_drawingRes, *rScene.m_pResources, rRenderGl);
@@ -250,18 +256,18 @@ void sync_test_scene(
 
     // Assign GL meshes to entities with a mesh component
     SysRenderGL::sync_drawent_mesh(
-            rScene.m_drawing.m_meshDirty.begin(),
-            rScene.m_drawing.m_meshDirty.end(),
-            rScene.m_drawing.m_mesh,
+            rScene.m_scnRdr.m_meshDirty.begin(),
+            rScene.m_scnRdr.m_meshDirty.end(),
+            rScene.m_scnRdr.m_mesh,
             rScene.m_drawingRes.m_meshToRes,
             rRenderer.m_sceneRenderGL.m_meshId,
             rRenderGl);
 
     // Assign GL textures to entities with a texture component
     SysRenderGL::sync_drawent_texture(
-            rScene.m_drawing.m_meshDirty.begin(),
-            rScene.m_drawing.m_meshDirty.end(),
-            rScene.m_drawing.m_diffuseTex,
+            rScene.m_scnRdr.m_meshDirty.begin(),
+            rScene.m_scnRdr.m_meshDirty.end(),
+            rScene.m_scnRdr.m_diffuseTex,
             rScene.m_drawingRes.m_texToRes,
             rRenderer.m_sceneRenderGL.m_diffuseTexId,
             rRenderGl);
@@ -272,10 +278,10 @@ void sync_test_scene(
 
     SysRender::update_draw_transforms(
             rScene.m_basic.m_scnGraph,
-            rScene.m_drawing.m_activeToDraw,
+            rScene.m_scnRdr.m_activeToDraw,
             rScene.m_basic.m_transform,
-            rRenderer.m_sceneRenderGL.m_drawTransform,
-            rScene.m_drawing.m_needDrawTf,
+            rScene.m_scnRdr.m_drawTransform,
+            rScene.m_scnRdr.m_needDrawTf,
             drawTfDirty.begin(),
             drawTfDirty.end());
 }
@@ -312,7 +318,7 @@ void render_test_scene(
     // Forward Render fwd_opaque group to FBO
     SysRenderGL::render_opaque(
             rRenderer.m_groupFwdOpaque,
-            rScene.m_drawing.m_visible, viewProj);
+            rScene.m_scnRdr.m_visible, viewProj);
 
     // Display FBO
     Texture2D &rFboColor = rRenderGl.m_texGl.get(rRenderGl.m_fboColor);
@@ -327,9 +333,6 @@ public:
      , m_rScene     {rScene}
      , m_rRenderGl  {rRenderGl}
     { }
-
-    ~EngineTestApp() override
-    { };
 
     void run(MagnumApplication& rApp) override
     { }
@@ -348,7 +351,10 @@ public:
     }
 
     void exit(MagnumApplication& rApp) override
-    { }
+    {
+        osp::active::SysRenderGL::clear_resource_owners(m_rRenderGl, *m_rScene.m_pResources);
+        m_rRenderGl = {}; // clear all GPU resources
+    }
 
     EngineTestRenderer  m_renderer;
 
@@ -367,18 +373,43 @@ MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumAp
 
     // Create Phong shaders
     auto const texturedFlags
-            = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask
-            | Phong::Flag::AmbientTexture;
-    rRenderer.m_phong.m_shaderDiffuse      = Phong{Phong::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
-    rRenderer.m_phong.m_shaderUntextured   = Phong{Phong::Configuration{}.setLightCount(2)};
-    rRenderer.m_phong.assign_pointers(rRenderer.m_sceneRenderGL, rRenderGl);
+            = PhongGL::Flag::DiffuseTexture | PhongGL::Flag::AlphaMask
+            | PhongGL::Flag::AmbientTexture;
+    rRenderer.m_phong.shaderDiffuse    = PhongGL{PhongGL::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
+    rRenderer.m_phong.shaderUntextured = PhongGL{PhongGL::Configuration{}.setLightCount(2)};
+    rRenderer.m_phong.assign_pointers(rScene.m_scnRdr, rRenderer.m_sceneRenderGL, rRenderGl);
 
     rRenderer.m_cam.set_aspect_ratio(
             osp::Vector2(Magnum::GL::defaultFramebuffer.viewport().size()));
 
     // Set all drawing stuff dirty then sync with renderer.
     // This allows clean re-openning of the scene
-    SysRender::set_dirty_all(rScene.m_drawing);
+    for (std::size_t const drawEntInt : rScene.m_scnRdr.m_drawIds.bitview().zeros())
+    {
+        auto const drawEnt = DrawEnt(drawEntInt);
+
+        // Set all meshs dirty
+        if (rScene.m_scnRdr.m_mesh[drawEnt] != lgrn::id_null<MeshId>())
+        {
+            rScene.m_scnRdr.m_meshDirty.push_back(drawEnt);
+        }
+
+        // Set all textures dirty
+        if (rScene.m_scnRdr.m_diffuseTex[drawEnt] != lgrn::id_null<TexId>())
+        {
+            rScene.m_scnRdr.m_diffuseDirty.push_back(drawEnt);
+        }
+    }
+
+    for (std::size_t const materialInt : rScene.m_scnRdr.m_materialIds.bitview().zeros())
+    {
+        Material &mat = rScene.m_scnRdr.m_materials[MaterialId(materialInt)];
+        for (std::size_t const entInt : mat.m_ents.ones())
+        {
+            mat.m_dirty.push_back(DrawEnt(entInt));
+        }
+    }
+
     for (std::size_t const entInt : rScene.m_matPhong.ones())
     {
         rScene.m_matPhongDirty.push_back(DrawEnt(entInt));

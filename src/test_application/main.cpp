@@ -279,7 +279,7 @@ void start_magnum_async()
         osp::TopTaskBuilder builder{g_testApp.m_tasks, g_testApp.m_renderer.m_edges, g_testApp.m_taskData};
 
         g_testApp.m_windowApp   = scenes::setup_window_app  (builder, g_testApp.m_topData, g_testApp.m_application);
-        g_testApp.m_magnum      = scenes::setup_magnum      (builder, g_testApp.m_topData, g_testApp.m_windowApp, g_testApp.m_application, {g_argc, g_argv});
+        g_testApp.m_magnum      = scenes::setup_magnum      (builder, g_testApp.m_topData, g_testApp.m_application, g_testApp.m_windowApp, {g_argc, g_argv});
 
         OSP_DECLARE_GET_DATA_IDS(g_testApp.m_magnum, TESTAPP_DATA_MAGNUM); // declares idActiveApp
         auto &rActiveApp = osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp);
@@ -300,6 +300,7 @@ void start_magnum_async()
         rActiveApp.set_osp_app({});
         
         // Closing sessions will delete their associated TopData and Tags
+        g_testApp.m_pExecutor->run(g_testApp, g_testApp.m_windowApp.m_cleanup);
         g_testApp.close_sessions(g_testApp.m_renderer.m_sessions);
         g_testApp.m_renderer.m_sessions.clear();
         g_testApp.m_renderer.m_edges.m_syncWith.clear();

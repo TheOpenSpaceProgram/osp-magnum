@@ -244,7 +244,7 @@ void SysNewton::find_colliders_recurse(
         // cylinder needs to be rotated 90 degrees Z to aligned with Y axis
         // TODO: replace this with something more sophisticated some time
         Matrix4 const &colliderTf
-                = (rCtxPhys.m_shape[std::size_t(ent)] != EShape::Cylinder)
+                = (rCtxPhys.m_shape[ent] != EShape::Cylinder)
                 ? transform : transform * Matrix4::rotationZ(90.0_degf);
 
         Matrix4 const normScale = Matrix4::from(colliderTf.rotation(), colliderTf.translation());

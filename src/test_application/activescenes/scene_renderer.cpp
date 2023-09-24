@@ -62,13 +62,12 @@ using Magnum::GL::Mesh;
 namespace testapp::scenes
 {
 
-
-
 Session setup_window_app(
         TopTaskBuilder&                 rBuilder,
         ArrayView<entt::any> const      topData,
         Session const&                  application)
 {
+    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
     auto const tgApp = application   .get_pipelines< PlApplication >();
 
     Session out;
@@ -76,9 +75,233 @@ Session setup_window_app(
     auto const tgWin = out.create_pipelines<PlWindowApp>(rBuilder);
 
     rBuilder.pipeline(tgWin.inputs).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+    rBuilder.pipeline(tgWin.sync)  .parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+    rBuilder.pipeline(tgWin.resync).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
 
     auto &rUserInput = osp::top_emplace<UserInputHandler>(topData, idUserInput, 12);
     config_controls(rUserInput);
+
+    out.m_cleanup = tgWin.cleanup;
+
+    rBuilder.task()
+        .name       ("Schedule GL Resync")
+        .schedules  ({tgWin.resync(Schedule)})
+        .push_to    (out.m_tasks)
+        .args       ({                  idMainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rMainLoopCtrl.doResync ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
+
+    return out;
+}
+
+Session setup_scene_renderer(
+        TopTaskBuilder&                 rBuilder,
+        ArrayView<entt::any> const      topData,
+        Session const&                  application,
+        Session const&                  windowApp,
+        Session const&                  commonScene)
+{
+    OSP_DECLARE_GET_DATA_IDS(windowApp,   TESTAPP_DATA_WINDOW_APP);
+    OSP_DECLARE_GET_DATA_IDS(commonScene, TESTAPP_DATA_COMMON_SCENE);
+    auto const tgApp    = application   .get_pipelines< PlApplication >();
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgCS     = commonScene   .get_pipelines< PlCommonScene >();
+
+
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SCENE_RENDERER);
+    auto const tgScnRdr = out.create_pipelines<PlSceneRenderer>(rBuilder);
+
+    rBuilder.pipeline(tgScnRdr.render).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+
+    rBuilder.pipeline(tgScnRdr.drawEnt)         .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.drawEntResized)  .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.drawEntDelete)   .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.entMesh)         .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.entTexture)      .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.entTextureDirty) .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.entMeshDirty)    .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.drawTransforms)  .parent(tgScnRdr.render);
+    rBuilder.pipeline(tgScnRdr.material)        .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.materialDirty)   .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.group)           .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.groupEnts)       .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.entMesh)         .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.entTexture)      .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.mesh)            .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.texture)         .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.meshResDirty)    .parent(tgWin.sync);
+    rBuilder.pipeline(tgScnRdr.textureResDirty) .parent(tgWin.sync);
+
+    auto &rScnRender = osp::top_emplace<ACtxSceneRender>(topData, idScnRender);
+
+    rBuilder.task()
+        .name       ("Resize ACtxSceneRender containers to fit all DrawEnts")
+        .run_on     ({tgScnRdr.drawEntResized(Run)})
+        .sync_with  ({tgScnRdr.entMesh(New), tgScnRdr.entTexture(New)})
+        .push_to    (out.m_tasks)
+        .args       ({idScnRender})
+        .func       ([] (ACtxSceneRender& rScnRender) noexcept
+    {
+        rScnRender.resize_draw();
+    });
+
+    rBuilder.task()
+        .name       ("Resize ACtxSceneRender to fit ActiveEnts")
+        .run_on     ({tgCS.activeEntResized(Run)})
+        .push_to    (out.m_tasks)
+        .args       ({               idBasic,                  idScnRender})
+        .func([]    (ACtxBasic const &rBasic,  ACtxSceneRender& rScnRender) noexcept
+    {
+        rScnRender.resize_active(rBasic.m_activeIds.capacity());
+    });
+
+    // Duplicate task needed for resync to account for existing ActiveEnts when the renderer opens,
+    // as activeEntResized doesn't run during resync
+    rBuilder.task()
+        .name       ("Resync ACtxSceneRender to fit ActiveEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgCS.activeEntResized(Run)})
+        .push_to    (out.m_tasks)
+        .args       ({               idBasic,                  idScnRender})
+        .func([]    (ACtxBasic const &rBasic,  ACtxSceneRender& rScnRender) noexcept
+    {
+        rScnRender.resize_active(rBasic.m_activeIds.capacity());
+    });
+
+    rBuilder.task()
+        .name       ("Schedule Assign GL textures")
+        .schedules  ({tgScnRdr.entTextureDirty(Schedule_)})
+        .sync_with  ({tgScnRdr.texture(Ready), tgScnRdr.entTexture(Ready)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender })
+        .func([] (ACtxSceneRender& rScnRender) noexcept -> TaskActions
+    {
+        return rScnRender.m_diffuseDirty.empty() ? TaskAction::Cancel : TaskActions{};
+    });
+
+    rBuilder.task()
+        .name       ("Schedule Assign GL meshes")
+        .schedules  ({tgScnRdr.entMeshDirty(Schedule_)})
+        .sync_with  ({tgScnRdr.mesh(Ready), tgScnRdr.entMesh(Ready)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender })
+        .func([] (ACtxSceneRender& rScnRender) noexcept -> TaskActions
+    {
+        return rScnRender.m_meshDirty.empty() ? TaskAction::Cancel : TaskActions{};
+    });
+
+    rBuilder.task()
+        .name       ("Delete DrawEntity of deleted ActiveEnts")
+        .run_on     ({tgCS.activeEntDelete(UseOrRun)})
+        .sync_with  ({tgScnRdr.drawEntDelete(Modify_)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,                      idActiveEntDel,              idDrawEntDel })
+        .func([] (ACtxSceneRender& rScnRender, ActiveEntVec_t const& rActiveEntDel, DrawEntVec_t& rDrawEntDel) noexcept
+    {
+        for (ActiveEnt const ent : rActiveEntDel)
+        {
+            if (rScnRender.m_activeToDraw.size() < std::size_t(ent))
+            {
+                continue;
+            }
+            DrawEnt const drawEnt = std::exchange(rScnRender.m_activeToDraw[ent], lgrn::id_null<DrawEnt>());
+            if (drawEnt != lgrn::id_null<DrawEnt>())
+            {
+                rDrawEntDel.push_back(drawEnt);
+            }
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Delete drawing components")
+        .run_on     ({tgScnRdr.drawEntDelete(UseOrRun)})
+        .sync_with  ({tgScnRdr.entTexture(Delete), tgScnRdr.entMesh(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                 idScnRender,                    idDrawEntDel })
+        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, DrawEntVec_t const& rDrawEntDel) noexcept
+    {
+        SysRender::update_delete_drawing(rScnRender, rDrawing, rDrawEntDel.cbegin(), rDrawEntDel.cend());
+    });
+
+    rBuilder.task()
+        .name       ("Delete DrawEntity IDs")
+        .run_on     ({tgScnRdr.drawEntDelete(UseOrRun)})
+        .sync_with  ({tgScnRdr.drawEnt(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,                    idDrawEntDel })
+        .func([] (ACtxSceneRender& rScnRender, DrawEntVec_t const& rDrawEntDel) noexcept
+    {
+        for (DrawEnt const drawEnt : rDrawEntDel)
+        {
+            if (rScnRender.m_drawIds.exists(drawEnt))
+            {
+                rScnRender.m_drawIds.remove(drawEnt);
+            }
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Delete DrawEnt from materials")
+        .run_on     ({tgScnRdr.drawEntDelete(UseOrRun)})
+        .sync_with  ({tgScnRdr.material(Delete)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,                    idDrawEntDel })
+        .func([] (ACtxSceneRender& rScnRender, DrawEntVec_t const& rDrawEntDel) noexcept
+    {
+        for (DrawEnt const ent : rDrawEntDel)
+        {
+            for (Material &rMat : rScnRender.m_materials)
+            {
+                if (std::size_t(ent) < rMat.m_ents.size())
+                {
+                    rMat.m_ents.reset(std::size_t(ent));
+                }
+            }
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Clear DrawEnt delete vector once we're done with it")
+        .run_on     ({tgScnRdr.drawEntDelete(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({         idDrawEntDel })
+        .func([] (DrawEntVec_t& rDrawEntDel) noexcept
+    {
+        rDrawEntDel.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Clear dirty DrawEnt's textures once we're done with it")
+        .run_on     ({tgScnRdr.entMeshDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender})
+        .func([] (ACtxSceneRender& rScnRender) noexcept
+    {
+        rScnRender.m_meshDirty.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Clear dirty DrawEnt's textures once we're done with it")
+        .run_on     ({tgScnRdr.entTextureDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender})
+        .func([] (ACtxSceneRender& rScnRender) noexcept
+    {
+        rScnRender.m_diffuseDirty.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Clean up scene owners")
+        .run_on     ({tgWin.cleanup(Run_)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                 idScnRender})
+        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender) noexcept
+    {
+        SysRender::clear_owners(rScnRender, rDrawing);
+    });
 
     return out;
 }
@@ -86,13 +309,13 @@ Session setup_window_app(
 Session setup_magnum(
         TopTaskBuilder&                 rBuilder,
         ArrayView<entt::any> const      topData,
-        Session const&                  windowApp,
         Session const&                  application,
+        Session const&                  windowApp,
         MagnumApplication::Arguments    args)
 {
-    OSP_DECLARE_GET_DATA_IDS(windowApp,   TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
-    auto const tgApp    = application   .get_pipelines< PlApplication >();
+    OSP_DECLARE_GET_DATA_IDS(windowApp,   TESTAPP_DATA_WINDOW_APP);
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
 
     auto& rUserInput = top_get<UserInputHandler>(topData, idUserInput);
 
@@ -100,15 +323,10 @@ Session setup_magnum(
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM);
     auto const tgMgn = out.create_pipelines<PlMagnum>(rBuilder);
 
-    out.m_cleanup = tgMgn.cleanup;
-
-    rBuilder.pipeline(tgMgn.sync)  .parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
-    rBuilder.pipeline(tgMgn.resync).parent(tgApp.mainLoop);
-
-    rBuilder.pipeline(tgMgn.meshGL)         .parent(tgMgn.sync);
-    rBuilder.pipeline(tgMgn.textureGL)      .parent(tgMgn.sync);
-    rBuilder.pipeline(tgMgn.entMeshGL)      .parent(tgMgn.sync);
-    rBuilder.pipeline(tgMgn.entTextureGL)   .parent(tgMgn.sync);
+    rBuilder.pipeline(tgMgn.meshGL)         .parent(tgWin.sync);
+    rBuilder.pipeline(tgMgn.textureGL)      .parent(tgWin.sync);
+    rBuilder.pipeline(tgMgn.entMeshGL)      .parent(tgWin.sync);
+    rBuilder.pipeline(tgMgn.entTextureGL)   .parent(tgWin.sync);
 
     // Order-dependent; MagnumApplication construction starts OpenGL context, needed by RenderGL
     /* unused */      top_emplace<MagnumApplication>(topData, idActiveApp, args, rUserInput);
@@ -118,7 +336,7 @@ Session setup_magnum(
 
     rBuilder.task()
         .name       ("Clean up Magnum renderer")
-        .run_on     ({tgMgn.cleanup(Run_)})
+        .run_on     ({tgWin.cleanup(Run_)})
         .push_to    (out.m_tasks)
         .args       ({      idResources,          idRenderGl})
         .func([] (Resources& rResources, RenderGL& rRenderGl) noexcept
@@ -129,7 +347,7 @@ Session setup_magnum(
 
     rBuilder.task()
         .name       ("Schedule GL Sync")
-        .schedules  ({tgMgn.sync(Schedule)})
+        .schedules  ({tgWin.sync(Schedule)})
         .push_to    (out.m_tasks)
         .args       ({                  idMainLoopCtrl})
         .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
@@ -137,26 +355,16 @@ Session setup_magnum(
         return rMainLoopCtrl.doSync ? osp::TaskActions{} : osp::TaskAction::Cancel;
     });
 
-    rBuilder.task()
-        .name       ("Schedule GL Resync")
-        .schedules  ({tgMgn.resync(Schedule)})
-        .push_to    (out.m_tasks)
-        .args       ({                  idMainLoopCtrl})
-        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
-    {
-        return rMainLoopCtrl.doResync ? osp::TaskActions{} : osp::TaskAction::Cancel;
-    });
-
-
     return out;
 }
 
 
-Session setup_scene_renderer(
+Session setup_magnum_scene(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Session const&              application,
         Session const&              windowApp,
+        Session const&              sceneRenderer,
         Session const&              magnum,
         Session const&              scene,
         Session const&              commonScene)
@@ -164,27 +372,22 @@ Session setup_scene_renderer(
     OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
-    auto const tgApp    = application   .get_pipelines< PlApplication >();
+
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
     auto const tgCS     = commonScene   .get_pipelines< PlCommonScene >();
     auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
+    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_COMMON_RENDERER);
-    auto const tgSR = out.create_pipelines<PlSceneRenderer>(rBuilder);
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM_SCENE);
+    auto const tgMgnScn = out.create_pipelines<PlMagnumScene>(rBuilder);
 
-    rBuilder.pipeline(tgSR.render).parent(tgApp.mainLoop).wait_for_signal(ModifyOrSignal);
+    rBuilder.pipeline(tgMgnScn.fbo)             .parent(tgScnRdr.render);
+    rBuilder.pipeline(tgMgnScn.camera)          .parent(tgScnRdr.render);
 
-    rBuilder.pipeline(tgSR.fbo)             .parent(tgSR.render);
-    rBuilder.pipeline(tgSR.scnRender)       .parent(tgSR.render);
-    rBuilder.pipeline(tgSR.group)           .parent(tgMgn.sync);
-    rBuilder.pipeline(tgSR.groupEnts)       .parent(tgMgn.sync);
-    rBuilder.pipeline(tgSR.drawTransforms)  .parent(tgMgn.sync);
-    rBuilder.pipeline(tgSR.camera)          .parent(tgSR.render);
-    rBuilder.pipeline(tgSR.entMesh)         .parent(tgMgn.sync);
-    rBuilder.pipeline(tgSR.entTexture)      .parent(tgMgn.sync);
-
-    top_emplace< ACtxSceneRenderGL >    (topData, idScnRender);
+    top_emplace< ACtxSceneRenderGL >    (topData, idScnRenderGl);
     top_emplace< RenderGroup >          (topData, idGroupFwd);
 
     auto &rCamera = top_emplace< Camera >(topData, idCamera);
@@ -194,23 +397,22 @@ Session setup_scene_renderer(
     rCamera.m_fov = Magnum::Deg(45.0f);
 
     rBuilder.task()
-        .name       ("Resize Scene Render containers to fit drawable entities")
-        .run_on     ({tgCS.drawEntResized(Run)})
-        .sync_with  ({tgSR.entMesh(New), tgSR.scnRender(New)})
+        .name       ("Resize ACtxSceneRenderGL (OpenGL) to fit all DrawEnts")
+        .run_on     ({tgScnRdr.drawEntResized(Run)})
+        .sync_with  ({})
         .push_to    (out.m_tasks)
-        .args       ({              idDrawing,                   idScnRender})
-        .func([] (ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
+        .args       ({ idScnRender, idScnRenderGl })
+        .func       ([] (ACtxSceneRender const& rScnRender, ACtxSceneRenderGL& rScnRenderGl) noexcept
     {
-        std::size_t const capacity = rDrawing.m_drawIds.capacity();
-        rScnRender.m_drawTransform  .resize(capacity);
-        rScnRender.m_diffuseTexId   .resize(capacity);
-        rScnRender.m_meshId         .resize(capacity);
+        std::size_t const capacity = rScnRender.m_drawIds.capacity();
+        rScnRenderGl.m_diffuseTexId   .resize(capacity);
+        rScnRenderGl.m_meshId         .resize(capacity);
     });
 
     rBuilder.task()
         .name       ("Compile Resource Meshes to GL")
-        .run_on     ({tgCS.meshResDirty(UseOrRun)})
-        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(New), tgCS.entMeshDirty(UseOrRun)})
+        .run_on     ({tgScnRdr.meshResDirty(UseOrRun)})
+        .sync_with  ({tgScnRdr.mesh(Ready), tgMgn.meshGL(New), tgScnRdr.entMeshDirty(UseOrRun)})
         .push_to    (out.m_tasks)
         .args       ({                 idDrawingRes,                idResources,          idRenderGl })
         .func([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
@@ -220,8 +422,8 @@ Session setup_scene_renderer(
 
     rBuilder.task()
         .name       ("Compile Resource Textures to GL")
-        .run_on     ({tgCS.textureResDirty(UseOrRun)})
-        .sync_with  ({tgCS.texture(Ready), tgMgn.textureGL(New)})
+        .run_on     ({tgScnRdr.textureResDirty(UseOrRun)})
+        .sync_with  ({tgScnRdr.texture(Ready), tgMgn.textureGL(New)})
         .push_to    (out.m_tasks)
         .args       ({                 idDrawingRes,                idResources,          idRenderGl })
         .func([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
@@ -230,103 +432,81 @@ Session setup_scene_renderer(
     });
 
     rBuilder.task()
-        .name       ("Schedule Assign GL textures")
-        .schedules  ({tgCS.entTextureDirty(Schedule_)})
-        .sync_with  ({tgCS.texture(Ready), tgCS.entTexture(Ready)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing })
-        .func([] (ACtxDrawing& rDrawing) noexcept -> TaskActions
-    {
-        return rDrawing.m_diffuseDirty.empty() ? TaskAction::Cancel : TaskActions{};
-    });
-
-    rBuilder.task()
         .name       ("Sync GL textures to entities with scene textures")
-        .run_on     ({tgCS.entTextureDirty(UseOrRun)})
-        .sync_with  ({tgCS.texture(Ready), tgCS.entTexture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgCS.drawEntResized(Done)})
+        .run_on     ({tgScnRdr.entTextureDirty(UseOrRun)})
+        .sync_with  ({tgScnRdr.texture(Ready), tgScnRdr.entTexture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgScnRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
-        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+        .args       ({        idDrawing,                idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
+        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::sync_drawent_texture(
-                rDrawing.m_diffuseDirty.begin(),
-                rDrawing.m_diffuseDirty.end(),
-                rDrawing.m_diffuseTex,
+                rScnRender.m_diffuseDirty.begin(),
+                rScnRender.m_diffuseDirty.end(),
+                rScnRender.m_diffuseTex,
                 rDrawingRes.m_texToRes,
-                rScnRender.m_diffuseTexId,
+                rScnRenderGl.m_diffuseTexId,
                 rRenderGl);
     });
 
     rBuilder.task()
         .name       ("Resync GL textures")
-        .run_on     ({tgMgn.resync(Run)})
-        .sync_with  ({tgCS.texture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgCS.drawEntResized(Done)})
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.texture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgScnRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
-        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+        .args       ({           idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
+        .func([] (ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
-        for (auto const drawEntInt : rDrawing.m_drawIds.bitview().zeros())
+        for (auto const drawEntInt : rScnRender.m_drawIds.bitview().zeros())
         {
             SysRenderGL::sync_drawent_texture(
-                DrawEnt(drawEntInt),
-                rDrawing.m_diffuseTex,
-                rDrawingRes.m_texToRes,
-                rScnRender.m_diffuseTexId,
-                rRenderGl);
+                    DrawEnt(drawEntInt),
+                    rScnRender.m_diffuseTex,
+                    rDrawingRes.m_texToRes,
+                    rScnRenderGl.m_diffuseTexId,
+                    rRenderGl);
         }
     });
 
     rBuilder.task()
-        .name       ("Schedule Assign GL meshes")
-        .schedules  ({tgCS.entMeshDirty(Schedule_)})
-        .sync_with  ({tgCS.mesh(Ready), tgCS.entMesh(Ready)})
-        .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
-        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept -> TaskActions
-    {
-        return rDrawing.m_meshDirty.empty() ? TaskAction::Cancel : TaskActions{};
-    });
-
-    rBuilder.task()
         .name       ("Sync GL meshes to entities with scene meshes")
-        .run_on     ({tgCS.entMeshDirty(UseOrRun)})
-        .sync_with  ({tgCS.mesh(Ready), tgCS.entMesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgCS.drawEntResized(Done)})
+        .run_on     ({tgScnRdr.entMeshDirty(UseOrRun)})
+        .sync_with  ({tgScnRdr.mesh(Ready), tgScnRdr.entMesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
-        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+        .args       ({           idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
+        .func([] (ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::sync_drawent_mesh(
-                rDrawing.m_meshDirty.begin(),
-                rDrawing.m_meshDirty.end(),
-                rDrawing.m_mesh,
+                rScnRender.m_meshDirty.begin(),
+                rScnRender.m_meshDirty.end(),
+                rScnRender.m_mesh,
                 rDrawingRes.m_meshToRes,
-                rScnRender.m_meshId,
+                rScnRenderGl.m_meshId,
                 rRenderGl);
     });
 
     rBuilder.task()
         .name       ("Resync GL meshes")
-        .run_on     ({tgMgn.resync(Run)})
-        .sync_with  ({tgCS.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgCS.drawEntResized(Done)})
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                idDrawingRes,                   idScnRender,          idRenderGl })
-        .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRenderGL& rScnRender, RenderGL& rRenderGl) noexcept
+        .args       ({           idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
+        .func([] (ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
-        for (auto const drawEntInt : rDrawing.m_drawIds.bitview().zeros())
+        for (auto const drawEntInt : rScnRender.m_drawIds.bitview().zeros())
         {
             SysRenderGL::sync_drawent_mesh(
-                DrawEnt(drawEntInt),
-                rDrawing.m_mesh,
-                rDrawingRes.m_meshToRes,
-                rScnRender.m_meshId,
-                rRenderGl);
+                    DrawEnt(drawEntInt),
+                    rScnRender.m_mesh,
+                    rDrawingRes.m_meshToRes,
+                    rScnRenderGl.m_meshId,
+                    rRenderGl);
         }
     });
 
     rBuilder.task()
         .name       ("Bind and display off-screen FBO")
-        .run_on     ({tgSR.render(Run)})
-        .sync_with  ({tgSR.fbo(EStgFBO::Bind)})
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgMgnScn.fbo(EStgFBO::Bind)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,          idRenderGl,                   idGroupFwd,              idCamera })
         .func([] (ACtxDrawing const& rDrawing, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera) noexcept
@@ -340,50 +520,49 @@ Session setup_scene_renderer(
         Magnum::GL::Texture2D &rFboColor = rRenderGl.m_texGl.get(rRenderGl.m_fboColor);
         SysRenderGL::display_texture(rRenderGl, rFboColor);
 
-        // Clear it
         rFbo.clear(   FramebufferClear::Color | FramebufferClear::Depth
                     | FramebufferClear::Stencil);
     });
 
     rBuilder.task()
         .name       ("Calculate draw transforms")
-        .run_on     ({tgSR.render(Run)})
-        .sync_with  ({tgCS.hierarchy(Ready), tgCS.transform(Ready), tgCS.activeEnt(Ready), tgSR.drawTransforms(Modify_), tgCS.drawEnt(Ready), tgCS.drawEntResized(Done)})
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgCS.hierarchy(Ready), tgCS.transform(Ready), tgCS.activeEnt(Ready), tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEnt(Ready), tgScnRdr.drawEntResized(Done), tgCS.activeEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({            idBasic,                   idDrawing,                   idScnRender })
-        .func([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRenderGL& rScnRender) noexcept
+        .args       ({            idBasic,                   idDrawing,                 idScnRender,                   idScnRenderGl })
+        .func([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl) noexcept
     {
         auto rootChildren = SysSceneGraph::children(rBasic.m_scnGraph);
         SysRender::update_draw_transforms(
                 rBasic      .m_scnGraph,
-                rDrawing    .m_activeToDraw,
+                rScnRender  .m_activeToDraw,
                 rBasic      .m_transform,
                 rScnRender  .m_drawTransform,
-                rDrawing    .m_needDrawTf,
+                rScnRender  .m_needDrawTf,
                 rootChildren.begin(),
                 rootChildren.end());
     });
 
     rBuilder.task()
         .name       ("Render Entities")
-        .run_on     ({tgSR.render(Run)})
-        .sync_with  ({tgSR.group(Ready), tgSR.groupEnts(Ready), tgSR.camera(Ready), tgSR.drawTransforms(UseOrRun), tgSR.entMesh(Ready), tgSR.entTexture(Ready),
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgScnRdr.group(Ready), tgScnRdr.groupEnts(Ready), tgMgnScn.camera(Ready), tgScnRdr.drawTransforms(UseOrRun), tgScnRdr.entMesh(Ready), tgScnRdr.entTexture(Ready),
                       tgMgn.entMeshGL(Ready), tgMgn.entTextureGL(Ready),
-                      tgCS.drawEnt(Ready)})
+                      tgScnRdr.drawEnt(Ready)})
         .push_to    (out.m_tasks)
-        .args       ({              idDrawing,          idRenderGl,                   idGroupFwd,              idCamera })
-        .func([] (ACtxDrawing const& rDrawing, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera, WorkerContext ctx) noexcept
+        .args       ({            idScnRender,          idRenderGl,                   idGroupFwd,              idCamera })
+        .func([] (ACtxSceneRender& rScnRender, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera, WorkerContext ctx) noexcept
     {
         ViewProjMatrix viewProj{rCamera.m_transform.inverted(), rCamera.perspective()};
 
         // Forward Render fwd_opaque group to FBO
-        SysRenderGL::render_opaque(rGroupFwd, rDrawing.m_visible, viewProj);
+        SysRenderGL::render_opaque(rGroupFwd, rScnRender.m_visible, viewProj);
     });
 
     rBuilder.task()
         .name       ("Delete entities from render groups")
-        .run_on     ({tgCS.drawEntDelete(UseOrRun)})
-        .sync_with  ({tgSR.groupEnts    (Delete)})
+        .run_on     ({tgScnRdr.drawEntDelete(UseOrRun)})
+        .sync_with  ({tgScnRdr.groupEnts(Delete)})
         .push_to    (out.m_tasks)
         .args       ({              idDrawing,             idGroupFwd,                 idDrawEntDel })
         .func([] (ACtxDrawing const& rDrawing, RenderGroup& rGroup, DrawEntVec_t const& rDrawEntDel) noexcept
@@ -400,30 +579,30 @@ Session setup_scene_renderer(
 Session setup_shader_visualizer(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
         Session const&              magnum,
-        Session const&              scene,
-        Session const&              commonScene,
-        Session const&              scnRender,
+        Session const&              magnumScene,
         MaterialId const            materialId)
 {
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(scnRender,     TESTAPP_DATA_COMMON_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
-    auto const tgScn    = scene         .get_pipelines<PlScene>();
-    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgSR     = scnRender     .get_pipelines<PlSceneRenderer>();
-    auto const tgMgn    = magnum        .get_pipelines<PlMagnum>();
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
 
-    auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);
+    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_VISUALIZER)
-    auto &rDrawVisual = top_emplace< ACtxDrawMeshVisualizer >(topData, idDrawShVisual);
-    rDrawVisual.m_materialId = materialId;
 
+    auto &rDrawVisual = top_emplace< ACtxDrawMeshVisualizer >(topData, idDrawShVisual);
+
+    rDrawVisual.m_materialId = materialId;
     rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Configuration{}.setFlags(MeshVisualizer::Flag::Wireframe) };
-    rDrawVisual.assign_pointers(rScnRender, rRenderGl);
+    rDrawVisual.assign_pointers(rScnRender, rScnRenderGl, rRenderGl);
 
     // Default colors
     rDrawVisual.m_shader.setWireframeColor({0.7f, 0.5f, 0.7f, 1.0f});
@@ -435,26 +614,26 @@ Session setup_shader_visualizer(
     }
 
     rBuilder.task()
-        .name       ("Sync MeshVisualizer shader entities")
-        .run_on     ({tgMgn.sync(Run)})
-        .sync_with  ({tgSR.groupEnts(Modify), tgSR.group(Modify), tgCS.materialDirty(UseOrRun)})
+        .name       ("Sync MeshVisualizer shader DrawEnts")
+        .run_on     ({tgWin.sync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify), tgScnRdr.materialDirty(UseOrRun)})
         .push_to    (out.m_tasks)
-        .args       ({              idDrawing,             idGroupFwd,                        idDrawShVisual})
-        .func([] (ACtxDrawing const& rDrawing, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
+        .args       ({            idScnRender,             idGroupFwd,                        idDrawShVisual})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
     {
-        Material const &rMat = rDrawing.m_materials[rDrawShVisual.m_materialId];
+        Material const &rMat = rScnRender.m_materials[rDrawShVisual.m_materialId];
         sync_drawent_visualizer(rMat.m_dirty.begin(), rMat.m_dirty.end(), rMat.m_ents, rGroupFwd.m_entities, rDrawShVisual);
     });
 
     rBuilder.task()
-        .name       ("Resync MeshVisualizer")
-        .run_on     ({tgMgn.resync(Run)})
-        .sync_with  ({tgSR.groupEnts(Modify), tgSR.group(Modify)})
+        .name       ("Resync MeshVisualizer shader DrawEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({              idDrawing,             idGroupFwd,                        idDrawShVisual})
-        .func([] (ACtxDrawing const& rDrawing, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
+        .args       ({            idScnRender,             idGroupFwd,                        idDrawShVisual})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
     {
-        Material const &rMat = rDrawing.m_materials[rDrawShVisual.m_materialId];
+        Material const &rMat = rScnRender.m_materials[rDrawShVisual.m_materialId];
         for (auto const drawEntInt : rMat.m_ents.ones())
         {
             sync_drawent_visualizer(DrawEnt(drawEntInt), rMat.m_ents, rGroupFwd.m_entities, rDrawShVisual);
@@ -464,97 +643,222 @@ Session setup_shader_visualizer(
     return out;
 }
 
-#if 0
+
 Session setup_shader_flat(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
         Session const&              magnum,
-        Session const&              commonScene,
-        Session const&              scnRender,
-        Session const&              material)
+        Session const&              magnumScene,
+        MaterialId const            materialId)
 {
-    using osp::shader::Flat;
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
 
-    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
-    auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);
+    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
-    Session shFlat;
-    OSP_SESSION_ACQUIRE_DATA(shFlat, topData, TESTAPP_SHADER_FLAT)
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_FLAT)
     auto &rDrawFlat = top_emplace< ACtxDrawFlat >(topData, idDrawShFlat);
 
-    rDrawFlat.m_shaderDiffuse      = Flat{Flat::Configuration{}.setFlags(Flat::Flag::Textured)};
-    rDrawFlat.m_shaderUntextured   = Flat{Flat::Configuration{}};
-    rDrawFlat.assign_pointers(rScnRender, rRenderGl);
+    rDrawFlat.shaderDiffuse       = FlatGL3D{FlatGL3D::Configuration{}.setFlags(FlatGL3D::Flag::Textured)};
+    rDrawFlat.shaderUntextured    = FlatGL3D{FlatGL3D::Configuration{}};
+    rDrawFlat.materialId          = materialId;
+    rDrawFlat.assign_pointers(rScnRender, rScnRenderGl, rRenderGl);
 
-    if (material.m_dataIds.empty())
+    if (materialId == lgrn::id_null<MaterialId>())
     {
-        return shFlat;
+        return out;
     }
-    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
 
-    shFlat.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, PlexGlReq, tgGroupFwdMod}).data(
-            "Sync Flat shader entities",
-            TopDataIds_t{                            idMatDirty,                idMatEnts,                   idDrawing,                         idScnRender,             idGroupFwd,               idDrawShFlat},
-            wrap_args([] (std::vector<DrawEnt> const& rMatDirty, EntSet_t const& rMatEnts, ACtxDrawing const& rDrawing, ACtxSceneRenderGL const& rScnRender, RenderGroup& rGroupFwd, ACtxDrawFlat& rDrawShFlat) noexcept
+    rBuilder.task()
+        .name       ("Sync Flat shader DrawEnts")
+        .run_on     ({tgWin.sync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify), tgScnRdr.materialDirty(UseOrRun)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,              idDrawShFlat})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawFlat& rDrawShFlat) noexcept
     {
-        sync_flat(std::cbegin(rMatDirty), std::cend(rMatDirty), rMatEnts, &rGroupFwd.m_entities, nullptr, rDrawing.m_drawBasic, rScnRender.m_diffuseTexId, rDrawShFlat);
-    }));
+        Material const &rMat = rScnRender.m_materials[rDrawShFlat.materialId];
+        sync_drawent_flat(rMat.m_dirty.begin(), rMat.m_dirty.end(),
+        {
+            .hasMaterial    = rMat.m_ents,
+            .pStorageOpaque = &rGroupFwd.m_entities,
+            /* TODO: set .pStorageTransparent */
+            .opaque         = rScnRender.m_opaque,
+            .transparent    = rScnRender.m_transparent,
+            .diffuse        = rScnRenderGl.m_diffuseTexId,
+            .rData          = rDrawShFlat
+        });
+    });
 
-    return shFlat;
+    rBuilder.task()
+        .name       ("Resync Flat shader DrawEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,              idDrawShFlat})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawFlat& rDrawShFlat) noexcept
+    {
+        Material const &rMat = rScnRender.m_materials[rDrawShFlat.materialId];
+        for (auto const drawEntInt : rMat.m_ents.ones())
+        {
+            sync_drawent_flat(DrawEnt(drawEntInt),
+            {
+                .hasMaterial    = rMat.m_ents,
+                .pStorageOpaque = &rGroupFwd.m_entities,
+                /* TODO: set .pStorageTransparent */
+                .opaque         = rScnRender.m_opaque,
+                .transparent    = rScnRender.m_transparent,
+                .diffuse        = rScnRenderGl.m_diffuseTexId,
+                .rData          = rDrawShFlat
+            });
+        }
+    });
+
+    return out;
 }
 
 
 Session setup_shader_phong(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
         Session const&              magnum,
-        Session const&              commonScene,
-        Session const&              scnRender,
-        Session const&              material)
+        Session const&              magnumScene,
+        MaterialId const            materialId)
 {
-    using osp::shader::Phong;
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
 
-    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(magnum,     TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_TAGS(scnRender,  TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_DATA(scnRender,  TESTAPP_COMMON_RENDERER);
-    auto &rScnRender    = top_get< ACtxSceneRenderGL >  (topData, idScnRender);
+    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
-    Session shPhong;
-    OSP_SESSION_ACQUIRE_DATA(shPhong, topData, TESTAPP_SHADER_PHONG)
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_PHONG)
     auto &rDrawPhong = top_emplace< ACtxDrawPhong >(topData, idDrawShPhong);
 
+    auto const texturedFlags    = PhongGL::Flag::DiffuseTexture | PhongGL::Flag::AlphaMask | PhongGL::Flag::AmbientTexture;
+    rDrawPhong.shaderDiffuse    = PhongGL{PhongGL::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
+    rDrawPhong.shaderUntextured = PhongGL{PhongGL::Configuration{}.setLightCount(2)};
+    rDrawPhong.materialId       = materialId;
+    rDrawPhong.assign_pointers(rScnRender, rScnRenderGl, rRenderGl);
 
-    auto const texturedFlags        = Phong::Flag::DiffuseTexture | Phong::Flag::AlphaMask | Phong::Flag::AmbientTexture;
-    rDrawPhong.m_shaderDiffuse      = Phong{Phong::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
-    rDrawPhong.m_shaderUntextured   = Phong{Phong::Configuration{}.setLightCount(2)};
-    rDrawPhong.assign_pointers(rScnRender, rRenderGl);
-
-    if (material.m_dataIds.empty())
+    if (materialId == lgrn::id_null<MaterialId>())
     {
-        return shPhong;
+        return out;
     }
-    OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
-    OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
 
-    shPhong.task() = rBuilder.task().assign({tgSyncEvt, tgMatReq, tgDrawReq, PlexGlReq, tgGroupFwdMod}).data(
-            "Sync Phong shader entities",
-            TopDataIds_t{                            idMatDirty,                idMatEnts,                   idDrawing,                         idScnRender,             idGroupFwd,               idDrawShPhong},
-            wrap_args([] (std::vector<DrawEnt> const& rMatDirty, EntSet_t const& rMatEnts, ACtxDrawing const& rDrawing, ACtxSceneRenderGL const& rScnRender, RenderGroup& rGroupFwd, ACtxDrawPhong& rDrawShPhong) noexcept
+    rBuilder.task()
+        .name       ("Sync Phong shader DrawEnts")
+        .run_on     ({tgWin.sync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify), tgScnRdr.materialDirty(UseOrRun)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,               idDrawShPhong})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawPhong& rDrawShPhong) noexcept
     {
-        sync_phong(std::cbegin(rMatDirty), std::cend(rMatDirty), rMatEnts, &rGroupFwd.m_entities, nullptr, rDrawing.m_drawBasic, rScnRender.m_diffuseTexId, rDrawShPhong);
-    }));
+        Material const &rMat = rScnRender.m_materials[rDrawShPhong.materialId];
+        sync_drawent_phong(rMat.m_dirty.begin(), rMat.m_dirty.end(),
+        {
+            .hasMaterial    = rMat.m_ents,
+            .pStorageOpaque = &rGroupFwd.m_entities,
+            /* TODO: set .pStorageTransparent */
+            .opaque         = rScnRender.m_opaque,
+            .transparent    = rScnRender.m_transparent,
+            .diffuse        = rScnRenderGl.m_diffuseTexId,
+            .rData          = rDrawShPhong
+        });
+    });
 
-    return shPhong;
+    rBuilder.task()
+        .name       ("Resync Phong shader DrawEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,               idDrawShPhong})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawPhong& rDrawShPhong) noexcept
+    {
+        Material const &rMat = rScnRender.m_materials[rDrawShPhong.materialId];
+        for (auto const drawEntInt : rMat.m_ents.ones())
+        {
+            sync_drawent_phong(DrawEnt(drawEntInt),
+            {
+                .hasMaterial    = rMat.m_ents,
+                .pStorageOpaque = &rGroupFwd.m_entities,
+                .opaque         = rScnRender.m_opaque,
+                .transparent    = rScnRender.m_transparent,
+                .diffuse        = rScnRenderGl.m_diffuseTexId,
+                .rData          = rDrawShPhong
+            });
+        }
+    });
+
+    return out;
 }
+
+
+Session setup_cursor(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              application,
+        Session const&              sceneRenderer,
+        Session const&              cameraCtrl,
+        Session const&              commonScene,
+        MaterialId const            material,
+        PkgId const                 pkg)
+{
+    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
+    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
+
+    auto &rResources    = top_get< Resources >          (topData, idResources);
+    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rDrawing      = top_get< ACtxDrawing >        (topData, idDrawing);
+    auto &rDrawingRes   = top_get< ACtxDrawingRes >     (topData, idDrawingRes);
+
+    Session out;
+    auto const [idCursorEnt] = out.acquire_data<1>(topData);
+
+    auto const cursorEnt = top_emplace<DrawEnt>(topData, idCursorEnt, rScnRender.m_drawIds.create());
+    rScnRender.resize_draw();
+
+    rScnRender.m_mesh[cursorEnt] = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cubewire");
+    rScnRender.m_color[cursorEnt] = { 0.0f, 1.0f, 0.0f, 1.0f };
+    rScnRender.m_visible.set(std::size_t(cursorEnt));
+    rScnRender.m_opaque.set(std::size_t(cursorEnt));
+
+    Material &rMat = rScnRender.m_materials[material];
+    rMat.m_ents.set(std::size_t(cursorEnt));
+
+    rBuilder.task()
+        .name       ("Move cursor")
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEntResized(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({        idCursorEnt,                            idCamCtrl,                 idScnRender })
+        .func([] (DrawEnt const cursorEnt, ACtxCameraController const& rCamCtrl, ACtxSceneRender& rScnRender) noexcept
+    {
+        rScnRender.m_drawTransform[cursorEnt] = Matrix4::translation(rCamCtrl.m_target.value());
+    });
+
+    return out;
+}
+
+#if 0
 
 struct IndicatorMesh
 {
@@ -712,108 +1016,59 @@ Session setup_thrust_indicators(
     return thrustIndicator;
 }
 
+#endif
 
-Session setup_cursor(
-        TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any> const  topData,
-        Session const&              magnum,
-        Session const&              commonScene,
-        Session const&              scnRender,
-        Session const&              cameraCtrl,
-        Session const&              shFlat,
-        TopDataId const             idResources,
-        PkgId const                 pkg)
+struct PlanetDraw
 {
-    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_DATA(magnum,         TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_TAGS(scnRender,      TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_DATA(scnRender,      TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_TAGS(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(cameraCtrl,     TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_TAGS(cameraCtrl,     TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_DATA(shFlat,         TESTAPP_SHADER_FLAT);
+    DrawEntVec_t            drawEnts;
+    std::array<DrawEnt, 3>  axis;
+    DrawEnt                 attractor;
+    MaterialId              matPlanets;
+    MaterialId              matAxis;
+};
 
-    auto &rResources    = top_get< Resources >      (topData, idResources);
-    auto &rBasic        = top_get< ACtxBasic >      (topData, idBasic);
-    auto &rActiveIds    = top_get< ActiveReg_t >    (topData, idActiveIds);
-    auto &rDrawing      = top_get< ACtxDrawing >    (topData, idDrawing);
-    auto &rDrawingRes   = top_get< ACtxDrawingRes > (topData, idDrawingRes);
-
-    Session cursor;
-    OSP_SESSION_ACQUIRE_DATA(cursor, topData, TESTAPP_INDICATOR);
-    cursor.m_tgCleanupEvt = tgCleanupMagnumEvt;
-
-    auto &rCursorData   = top_emplace<IndicatorMesh>(topData, idIndicator);
-    rCursorData.m_color = { 0.0f, 1.0f, 0.0f, 1.0f };
-    rCursorData.m_mesh  = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cubewire");
-
-    cursor.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgBindFboReq, tgFwdRenderMod, tgCamCtrlReq}).data(
-            "Render cursor",
-            TopDataIds_t{          idRenderGl,              idCamera,                      idDrawingRes,              idDrawShFlat,                             idCamCtrl,               idIndicator },
-            wrap_args([] (RenderGL& rRenderGl, Camera const& rCamera, ACtxDrawingRes const& rDrawingRes, ACtxDrawFlat& rDrawShFlat,  ACtxCameraController const& rCamCtrl, IndicatorMesh& rIndicator) noexcept
-    {
-        ResId const     cursorResId     = rDrawingRes.m_meshToRes.at(rIndicator.m_mesh.value());
-        MeshGlId const  cursorMeshGlId  = rRenderGl.m_resToMesh.at(cursorResId);
-        Mesh&           rCursorMeshGl   = rRenderGl.m_meshGl.get(cursorMeshGlId);
-
-        ViewProjMatrix viewProj{rCamera.m_transform.inverted(), rCamera.perspective()};
-
-        auto const matrix = viewProj.m_viewProj * Matrix4::translation(rCamCtrl.m_target.value());
-
-        rDrawShFlat.m_shaderUntextured
-            .setColor(rIndicator.m_color)
-            .setTransformationProjectionMatrix(matrix)
-            .draw(rCursorMeshGl);
-    }));
-
-    cursor.task() = rBuilder.task().assign({tgCleanupMagnumEvt}).data(
-            "Clean up cursor resource owners",
-            TopDataIds_t{             idDrawing,               idIndicator},
-            wrap_args([] (ACtxDrawing& rDrawing, IndicatorMesh& rIndicator) noexcept
-    {
-        rDrawing.m_meshRefCounts.ref_release(std::move(rIndicator.m_mesh));
-    }));
-
-    return cursor;
-}
-
-
-Session setup_uni_test_planets_renderer(
+Session setup_testplanets_draw(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Session const&              magnum,
-        Session const&              scnRender,
-        Session const&              commonScene,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
         Session const&              cameraCtrl,
-        Session const&              visualizer,
+        Session const&              commonScene,
         Session const&              uniCore,
         Session const&              uniScnFrame,
-        Session const&              uniTestPlanets)
+        Session const&              uniTestPlanets,
+        MaterialId const            matPlanets,
+        MaterialId const            matAxis)
 {
-    Session uniTestPlanetsRdr;
+    OSP_DECLARE_GET_DATA_IDS(commonScene,    TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,  TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,     TESTAPP_DATA_CAMERA_CTRL);
+    OSP_DECLARE_GET_DATA_IDS(uniCore,        TESTAPP_DATA_UNI_CORE);
+    OSP_DECLARE_GET_DATA_IDS(uniScnFrame,    TESTAPP_DATA_UNI_SCENEFRAME);
+    OSP_DECLARE_GET_DATA_IDS(uniTestPlanets, TESTAPP_DATA_UNI_PLANETS);
 
-    OSP_SESSION_UNPACK_TAGS(magnum,         TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_DATA(magnum,         TESTAPP_APP_MAGNUM);
-    OSP_SESSION_UNPACK_TAGS(scnRender,      TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_DATA(scnRender,      TESTAPP_COMMON_RENDERER);
-    OSP_SESSION_UNPACK_TAGS(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(cameraCtrl,     TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_TAGS(cameraCtrl,     TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_DATA(visualizer,     TESTAPP_SHADER_VISUALIZER);
-    OSP_SESSION_UNPACK_TAGS(uniCore,        TESTAPP_UNI_CORE);
-    OSP_SESSION_UNPACK_DATA(uniCore,        TESTAPP_UNI_CORE);
-    OSP_SESSION_UNPACK_TAGS(uniScnFrame,    TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_UNPACK_DATA(uniScnFrame,    TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_UNPACK_DATA(uniTestPlanets, TESTAPP_UNI_PLANETS);
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const tgUCore  = uniCore       .get_pipelines<PlUniCore>();
+    auto const tgUSFrm  = uniScnFrame   .get_pipelines<PlUniSceneFrame>();
 
-    //OSP_SESSION_ACQUIRE_DATA(uniTestPlanets, topData, TESTAPP_UNI_PLANETS);
+    Session out;
 
-    uniTestPlanetsRdr.task() = rBuilder.task().assign({tgRenderEvt, tgScnFramePosMod, tgCamCtrlMod}).data(
-            "Position SceneFrame center Camera Controller",
-            TopDataIds_t{                      idCamCtrl,            idScnFrame},
-            wrap_args([] (ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
+    auto const [idPlanetDraw] = out.acquire_data<1>(topData);
+
+    auto &rPlanetDraw = top_emplace<PlanetDraw>(topData, idPlanetDraw);
+
+    rPlanetDraw.matPlanets = matPlanets;
+    rPlanetDraw.matAxis    = matAxis;
+
+    rBuilder.task()
+        .name       ("Position SceneFrame center to Camera Controller target")
+        .run_on     ({tgWin.inputs(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idCamCtrl,            idScnFrame })
+        .func([] (ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
     {
         if ( ! rCamCtrl.m_target.has_value())
         {
@@ -838,13 +1093,84 @@ Session setup_uni_test_planets_renderer(
 
         rScnFrame.m_scenePosition = Vector3g(math::mul_2pow<Vector3, int>(rCamCtrl.m_target.value(), rScnFrame.m_precision));
 
-    }));
+    });
 
-    uniTestPlanetsRdr.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgBindFboReq, tgFwdRenderMod, tgDrawReq, tgCameraReq, tgScnFramePosReq}).data(
-            "Render test planets",
-            TopDataIds_t{          idRenderGl,              idCamera,                        idDrawShVisual,                      idDrawingRes,             idNMesh,          idUniverse,                  idScnFrame,               idPlanetMainSpace},
-            wrap_args([] (RenderGL& rRenderGl, Camera const& rCamera, ACtxDrawMeshVisualizer& rDrawShVisual, ACtxDrawingRes const& rDrawingRes, NamedMeshes& rNMesh, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace) noexcept
+    rBuilder.task()
+        .name       ("Resync test planets, create DrawEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.drawEntResized(ModifyOrSignal)})
+        .push_to    (out.m_tasks)
+        .args       ({               idScnRender,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
+        .func([]    (ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
     {
+        CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+
+        rPlanetDraw.drawEnts.resize(rMainSpace.m_satCount, lgrn::id_null<DrawEnt>());
+
+        rScnRender.m_drawIds.create(rPlanetDraw.drawEnts   .begin(), rPlanetDraw.drawEnts   .end());
+        rScnRender.m_drawIds.create(rPlanetDraw.axis       .begin(), rPlanetDraw.axis       .end());
+        rPlanetDraw.attractor = rScnRender.m_drawIds.create();
+    });
+
+    rBuilder.task()
+        .name       ("Resync test planets, add mesh and material")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.drawEntResized(Done), tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
+        .push_to    (out.m_tasks)
+        .args       ({           idDrawing,                 idScnRender,             idNMesh,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
+        .func([]    (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
+    {
+        CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+
+        Material &rMatPlanet = rScnRender.m_materials[rPlanetDraw.matPlanets];
+        Material &rMatAxis   = rScnRender.m_materials[rPlanetDraw.matAxis];
+
+        MeshId const sphereMeshId = rNMesh.m_shapeToMesh.at(phys::EShape::Sphere);
+        MeshId const cubeMeshId   = rNMesh.m_shapeToMesh.at(phys::EShape::Box);
+
+        for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+        {
+            DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
+
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
+            rScnRender.m_meshDirty.push_back(drawEnt);
+            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_opaque.set(std::size_t(drawEnt));
+            rMatPlanet.m_ents.set(std::size_t(drawEnt));
+            rMatPlanet.m_dirty.push_back(drawEnt);
+        }
+
+        rScnRender.m_mesh[rPlanetDraw.attractor] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
+        rScnRender.m_meshDirty.push_back(rPlanetDraw.attractor);
+        rScnRender.m_visible.set(std::size_t(rPlanetDraw.attractor));
+        rScnRender.m_opaque.set(std::size_t(rPlanetDraw.attractor));
+        rMatPlanet.m_ents.set(std::size_t(rPlanetDraw.attractor));
+        rMatPlanet.m_dirty.push_back(rPlanetDraw.attractor);
+
+        for (DrawEnt const drawEnt : rPlanetDraw.axis)
+        {
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(cubeMeshId);
+            rScnRender.m_meshDirty.push_back(drawEnt);
+            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_opaque.set(std::size_t(drawEnt));
+            rMatAxis.m_ents.set(std::size_t(drawEnt));
+            rMatAxis.m_dirty.push_back(drawEnt);
+        }
+
+        rScnRender.m_color[rPlanetDraw.axis[0]] = {1.0f, 0.0f, 0.0f, 1.0f};
+        rScnRender.m_color[rPlanetDraw.axis[1]] = {0.0f, 1.0f, 0.0f, 1.0f};
+        rScnRender.m_color[rPlanetDraw.axis[2]] = {0.0f, 0.0f, 1.0f, 1.0f};
+    });
+
+    rBuilder.task()
+        .name       ("Reposition test planet DrawEnts")
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEntResized(Done), tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                 idScnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace})
+        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace) noexcept
+    {
+
         CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
         auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
         auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
@@ -873,42 +1199,27 @@ Session setup_uni_test_planets_renderer(
 
         float const scale = math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
 
-        ViewProjMatrix viewProj{rCamera.m_transform.inverted(), rCamera.perspective()};
+        Vector3 const attractorPos = Vector3(mainToArea.transform_position({0, 0, 0})) * scale;
 
-        MeshId const    sphereMeshId    = rNMesh.m_shapeToMesh[phys::EShape::Sphere];
-        ResId const     sphereResId     = rDrawingRes.m_meshToRes.at(sphereMeshId);
-        MeshGlId const  sphereMeshGlId  = rRenderGl.m_resToMesh.at(sphereResId);
-        Mesh&           rSphereMeshGl   = rRenderGl.m_meshGl.get(sphereMeshGlId);
+        // Attractor
+        rScnRender.m_drawTransform[rPlanetDraw.attractor]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({500, 500, 500});
 
-        using Magnum::GL::Renderer;
-        Renderer::enable(Renderer::Feature::DepthTest);
-        Renderer::enable(Renderer::Feature::FaceCulling);
-        Renderer::disable(Renderer::Feature::Blending);
-        Renderer::setDepthMask(true);
+        rScnRender.m_drawTransform[rPlanetDraw.axis[0]]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({500000, 10, 10});
+        rScnRender.m_drawTransform[rPlanetDraw.axis[1]]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({10, 500000, 10});
+        rScnRender.m_drawTransform[rPlanetDraw.axis[2]]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({10, 10, 500000});
 
-        // Draw center indicator
-        Vector3 const centerPos = Vector3(mainToArea.transform_position({})) * scale;
-        rDrawShVisual.m_shader
-            .setTransformationMatrix(
-                    viewProj.m_view
-                    * Matrix4::translation(centerPos)
-                    * Matrix4{mainToAreaRot.toMatrix()}
-                    * Matrix4::scaling({500, 50, 50}))
-            .draw(rSphereMeshGl)
-            .setTransformationMatrix(
-                    viewProj.m_view
-                    * Matrix4::translation(centerPos)
-                    * Matrix4{mainToAreaRot.toMatrix()}
-                    * Matrix4::scaling({50, 500, 50}))
-            .draw(rSphereMeshGl)
-            .setTransformationMatrix(
-                    viewProj.m_view
-                    * Matrix4::translation(centerPos)
-                    * Matrix4{mainToAreaRot.toMatrix()}
-                    * Matrix4::scaling({50, 50, 500}) )
-            .draw(rSphereMeshGl);
-
-        // Draw planets
         for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
         {
             Vector3g const relative = mainToArea.transform_position({x[i], y[i], z[i]});
@@ -916,20 +1227,17 @@ Session setup_uni_test_planets_renderer(
 
             Quaterniond const rot{{qx[i], qy[i], qz[i]}, qw[i]};
 
-            rDrawShVisual.m_shader
-                .setTransformationMatrix(
-                        viewProj.m_view
-                        * Matrix4::translation(relativeMeters)
-                        * Matrix4::scaling({200, 200, 200})
-                        * Matrix4{(mainToAreaRot * Quaternion{rot}).toMatrix()} )
-                .draw(rSphereMeshGl);
+            DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
+
+            rScnRender.m_drawTransform[drawEnt]
+                = Matrix4::translation(relativeMeters)
+                * Matrix4::scaling({200, 200, 200})
+                * Matrix4{(mainToAreaRot * Quaternion{rot}).toMatrix()};
         }
 
-    }));
+    });
 
-    return uniTestPlanetsRdr;
+    return out;
 }
-
-#endif
 
 } // namespace testapp::scenes

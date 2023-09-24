@@ -158,25 +158,6 @@ struct PlCommonScene
 
     PipelineDef<EStgCont> transform         {"transform"};
     PipelineDef<EStgCont> hierarchy         {"hierarchy"};
-
-    PipelineDef<EStgCont> drawEnt           {"drawEnt"};
-    PipelineDef<EStgOptn> drawEntResized    {"drawEntResized"};
-    PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete - Vector of DrawEnts that need to be deleted"};
-
-    PipelineDef<EStgCont> mesh              {"mesh"};
-    PipelineDef<EStgCont> texture           {"texture"};
-
-    PipelineDef<EStgCont> entMesh           {"entMesh - Scene-side DrawEnt-MeshId association"};
-    PipelineDef<EStgCont> entTexture        {"entTexture - Scene-side DrawEnt-TexId association"};
-
-    PipelineDef<EStgIntr> entTextureDirty   {"entTextureDirty"};
-    PipelineDef<EStgIntr> entMeshDirty      {"entMeshDirty"};
-
-    PipelineDef<EStgIntr> meshResDirty      {"meshResDirty"};
-    PipelineDef<EStgIntr> textureResDirty   {"textureResDirty"};
-
-    PipelineDef<EStgCont> material          {"material"};
-    PipelineDef<EStgIntr> materialDirty     {"materialDirty"};
 };
 
 
@@ -196,6 +177,7 @@ struct PlShapeSpawn
 {
     PipelineDef<EStgIntr> spawnRequest      {"spawnRequest"};
     PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
+    PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
 };
 
 
@@ -307,14 +289,18 @@ struct PlNewton
 
 #define TESTAPP_DATA_UNI_CORE 2, \
     idUniverse,         tgUniDeltaTimeIn
-#define OSP_TAGS_TESTAPP_UNI_CORE 4, \
-    tgUniUpdEvt,        tgUniTimeEvt,                           \
-    tgUniTransferMod,   tgUniTransferReq
+struct PlUniCore
+{
+    PipelineDef<EStgOptn> update            {"update - Universe update"};
+    PipelineDef<EStgIntr> transfer          {"transfer"};
+};
 
 #define TESTAPP_DATA_UNI_SCENEFRAME 1, \
     idScnFrame
-#define OSP_TAGS_TESTAPP_UNI_SCENEFRAME 2, \
-    tgScnFramePosMod,   tgScnFramePosReq
+struct PlUniSceneFrame
+{
+    PipelineDef<EStgCont> sceneFrame        {"sceneFrame"};
+};
 
 #define TESTAPP_DATA_UNI_PLANETS 2, \
     idPlanetMainSpace, idSatSurfaceSpaces
@@ -328,6 +314,43 @@ struct PlNewton
 struct PlWindowApp
 {
     PipelineDef<EStgOptn> inputs            {"inputs"};
+    PipelineDef<EStgOptn> sync              {"sync"};
+    PipelineDef<EStgOptn> resync            {"resync"};
+
+    PipelineDef<EStgEvnt> cleanup           {"cleanup - Cleanup renderer resources before destruction"};
+
+};
+
+
+
+#define TESTAPP_DATA_SCENE_RENDERER 1, \
+    idScnRender
+struct PlSceneRenderer
+{
+    PipelineDef<EStgOptn> render            {"render"};
+
+    PipelineDef<EStgCont> drawEnt           {"drawEnt"};
+    PipelineDef<EStgOptn> drawEntResized    {"drawEntResized"};
+    PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete - Vector of DrawEnts that need to be deleted"};
+
+    PipelineDef<EStgIntr> entTextureDirty   {"entTextureDirty"};
+    PipelineDef<EStgIntr> entMeshDirty      {"entMeshDirty"};
+
+    PipelineDef<EStgCont> material          {"material"};
+    PipelineDef<EStgIntr> materialDirty     {"materialDirty"};
+
+    PipelineDef<EStgIntr> drawTransforms    {"drawTransforms"};
+
+    PipelineDef<EStgCont> group             {"group"};
+    PipelineDef<EStgCont> groupEnts         {"groupEnts"};
+    PipelineDef<EStgCont> entMesh           {"entMesh"};
+    PipelineDef<EStgCont> entTexture        {"entTexture"};
+
+    PipelineDef<EStgCont> mesh              {"mesh"};
+    PipelineDef<EStgCont> texture           {"texture"};
+
+    PipelineDef<EStgIntr> meshResDirty      {"meshResDirty"};
+    PipelineDef<EStgIntr> textureResDirty   {"textureResDirty"};
 };
 
 
@@ -336,11 +359,6 @@ struct PlWindowApp
     idActiveApp, idRenderGl
 struct PlMagnum
 {
-    PipelineDef<EStgEvnt> cleanup           {"cleanup - Cleanup magnum renderer resources before destruction"};
-
-    PipelineDef<EStgOptn> sync              {"sync"};
-    PipelineDef<EStgOptn> resync            {"resync"};
-
     PipelineDef<EStgCont> meshGL            {"meshGL"};
     PipelineDef<EStgCont> textureGL         {"textureGL"};
 
@@ -350,20 +368,14 @@ struct PlMagnum
 
 
 
-#define TESTAPP_DATA_COMMON_RENDERER 3, \
-    idScnRender, idGroupFwd, idCamera
-struct PlSceneRenderer
+#define TESTAPP_DATA_MAGNUM_SCENE 3, \
+    idScnRenderGl, idGroupFwd, idCamera
+struct PlMagnumScene
 {
-    PipelineDef<EStgOptn> render            {"render"};
-
     PipelineDef<EStgFBO>  fbo               {"fboRender"};
-    PipelineDef<EStgCont> scnRender         {"scnRender"};
-    PipelineDef<EStgCont> group             {"group"};
-    PipelineDef<EStgCont> groupEnts         {"groupEnts"};
-    PipelineDef<EStgIntr> drawTransforms    {"drawTransforms"};
+
     PipelineDef<EStgCont> camera            {"camera"};
-    PipelineDef<EStgCont> entMesh           {"entMesh"};
-    PipelineDef<EStgCont> entTexture        {"entTexture"};
+
 };
 
 

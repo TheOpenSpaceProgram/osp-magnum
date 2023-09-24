@@ -39,6 +39,8 @@
 
 #include <osp/unpack.h>
 
+#include <random>
+
 using namespace osp;
 using namespace osp::active;
 
@@ -53,107 +55,66 @@ namespace testapp::scenes
 
 void create_materials(
         ArrayView<entt::any> const  topData,
-        Session const&              commonScene,
+        Session const&              sceneRenderer,
         int const                   count)
 {
-    OSP_DECLARE_GET_DATA_IDS(commonScene, TESTAPP_DATA_COMMON_SCENE);
-    auto &rDrawing = top_get< ACtxDrawing >(topData, idDrawing);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    auto &rScnRender = top_get< ACtxSceneRender >(topData, idScnRender);
 
     for (int i = 0; i < count; ++i)
     {
-        [[maybe_unused]] MaterialId const mat = rDrawing.m_materialIds.create();
+        [[maybe_unused]] MaterialId const mat = rScnRender.m_materialIds.create();
         LGRN_ASSERT(int(mat) == i);
     }
 
-    rDrawing.m_materials.resize(count);
+    rScnRender.m_materials.resize(count);
 }
 
 void add_floor(
         ArrayView<entt::any> const  topData,
-        Session const&              application,
-        Session const&              commonScene,
         Session const&              shapeSpawn,
         MaterialId const            materialId,
-        PkgId const                 pkg)
+        PkgId const                 pkg,
+        int const                   size)
 {
-    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(shapeSpawn, TESTAPP_DATA_SHAPE_SPAWN);
 
-    auto &rResources    = top_get< Resources >          (topData, idResources);
-    auto &rBasic        = top_get< ACtxBasic >          (topData, idBasic);
-    auto &rDrawing      = top_get< ACtxDrawing >        (topData, idDrawing);
-    auto &rDrawingRes   = top_get< ACtxDrawingRes >     (topData, idDrawingRes);
-    auto &rSpawner      = top_get< ACtxShapeSpawner >   (topData, idSpawner);
+    auto &rSpawner = top_get<ACtxShapeSpawner>(topData, idSpawner);
 
-    Material &rMaterial = rDrawing.m_materials.at(materialId);
+    std::mt19937 randGen(69);
+    auto distSizeX  = std::uniform_real_distribution<float>{20.0, 80.0};
+    auto distSizeY  = std::uniform_real_distribution<float>{20.0, 80.0};
+    auto distHeight = std::uniform_real_distribution<float>{1.0, 10.0};
 
-    // Convenient functor to get a reference-counted mesh owner
-    auto const quick_add_mesh = SysRender::gen_drawable_mesh_adder(rDrawing, rDrawingRes, rResources, pkg);
+    constexpr float spread      = 128.0f;
 
-    // start making floor
-
-    static constexpr Vector3 const sc_floorSize{64.0f, 64.0f, 1.0f};
-    static constexpr Vector3 const sc_floorPos{0.0f, 0.0f, -1.005f};
-
-    // Create floor root and mesh entity
-    ActiveEnt const floorRootEnt = rBasic.m_activeIds.create();
-    ActiveEnt const floorMeshEnt = rBasic.m_activeIds.create();
-    DrawEnt const floorMeshDrawEnt = rDrawing.m_drawIds.create();
-
-    // Resize some containers to fit all existing entities
-    rBasic.m_scnGraph.resize(rBasic.m_activeIds.capacity());
-    rDrawing.resize_active(rBasic.m_activeIds.capacity());
-    rDrawing.resize_draw();
-    bitvector_resize(rMaterial.m_ents, rDrawing.m_drawIds.capacity());
-
-    rBasic.m_transform.emplace(floorRootEnt);
-
-    // Add mesh to floor mesh entity
-    rDrawing.m_activeToDraw[floorMeshEnt] = floorMeshDrawEnt;
-    rDrawing.m_mesh[floorMeshDrawEnt] = quick_add_mesh("grid64solid");
-    rDrawing.m_meshDirty.push_back(floorMeshDrawEnt);
-
-    // Add mesh visualizer material to floor mesh entity
-    rMaterial.m_ents.set(std::size_t(floorMeshDrawEnt));
-    rMaterial.m_dirty.push_back(floorMeshDrawEnt);
-
-    // Add transform, draw transform, opaque, and visible entity
-    rBasic.m_transform.emplace(floorMeshEnt, ACompTransform{Matrix4::scaling(sc_floorSize)});
-    rDrawing.m_drawBasic[floorMeshDrawEnt].m_opaque = true;
-    rDrawing.m_visible.set(std::size_t(floorMeshDrawEnt));
-    rDrawing.m_needDrawTf.set(std::size_t(floorRootEnt));
-    rDrawing.m_needDrawTf.set(std::size_t(floorMeshEnt));
-
-    SubtreeBuilder builder = SysSceneGraph::add_descendants(rBasic.m_scnGraph, 2);
-
-    // Add floor root to hierarchy root
-    SubtreeBuilder bldFloorRoot = builder.add_child(floorRootEnt, 1);
-
-    // Parent floor mesh entity to floor root entity
-    bldFloorRoot.add_child(floorMeshEnt);
-
-    // Add collider to floor root entity
-    rSpawner.m_spawnRequest.emplace_back(SpawnShape{
-        .m_position = sc_floorPos,
-        .m_velocity = sc_floorSize,
-        .m_size     = sc_floorSize,
-        .m_mass     = 0.0f,
-        .m_shape    = EShape::Box
-    });
+    for (int x = -size; x < size+1; ++x)
+    {
+        for (int y = -size; y < size+1; ++y)
+        {
+            float const heightZ = distHeight(randGen);
+            rSpawner.m_spawnRequest.emplace_back(SpawnShape{
+                .m_position = Vector3{x*spread, y*spread, heightZ},
+                .m_velocity = {0.0f, 0.0f, 0.0f},
+                .m_size     = Vector3{distSizeX(randGen), distSizeY(randGen), heightZ},
+                .m_mass     = 0.0f,
+                .m_shape    = EShape::Box
+            });
+        }
+    }
 }
 
 Session setup_camera_ctrl(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Session const&              windowApp,
-        Session const&              scnRender)
+        Session const&              sceneRenderer,
+        Session const&              magnumScene)
 {
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
-    OSP_DECLARE_GET_DATA_IDS(scnRender,     TESTAPP_DATA_COMMON_RENDERER);
-
-    auto const tgSR  = scnRender.get_pipelines<PlSceneRenderer>();
-    //auto const tgWin = windowApp.get_pipelines<PlWindowApp>();
+    OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
+    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const tgSR     = magnumScene   .get_pipelines<PlMagnumScene>();
 
     auto &rUserInput = top_get< osp::input::UserInputHandler >(topData, idUserInput);
 
@@ -163,11 +124,11 @@ Session setup_camera_ctrl(
 
     top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
 
-    rBuilder.pipeline(tgCmCt.camCtrl).parent(tgSR.render);
+    rBuilder.pipeline(tgCmCt.camCtrl).parent(tgScnRdr.render);
 
     rBuilder.task()
         .name       ("Position Rendering Camera according to Camera Controller")
-        .run_on     ({tgSR.render(Run)})
+        .run_on     ({tgScnRdr.render(Run)})
         .sync_with  ({tgCmCt.camCtrl(Ready), tgSR.camera(Modify)})
         .push_to    (out.m_tasks)
         .args       ({                           idCamCtrl,        idCamera })
@@ -244,13 +205,20 @@ Session setup_thrower(
             Matrix4 const &camTf = rCamCtrl.m_transform;
             float const speed = 120;
             float const dist = 8.0f;
-            rSpawner.m_spawnRequest.push_back({
-                .m_position = camTf.translation() - camTf.backward() * dist,
-                .m_velocity = -camTf.backward() * speed,
-                .m_size     = Vector3{1.0f},
-                .m_mass     = 1.0f,
-                .m_shape    = EShape::Sphere
-            });
+
+            for (int x = -2; x < 3; ++x)
+            {
+                for (int y = -2; y < 3; ++y)
+                {
+                    rSpawner.m_spawnRequest.push_back({
+                        .m_position = camTf.translation() - camTf.backward()*dist + camTf.up()*y*5.5f + camTf.right()*x*5.5f,
+                        .m_velocity = -camTf.backward()*speed,
+                        .m_size     = Vector3{1.0f},
+                        .m_mass     = 1.0f,
+                        .m_shape    = EShape::Sphere
+                    });
+                }
+            }
         }
     });
 
@@ -334,8 +302,6 @@ Session setup_bounds(
         Session const&              commonScene,
         Session const&              shapeSpawn)
 {
-    using ActiveEntVec_t = std::vector<ActiveEnt>;
-
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
     auto const tgScn    = scene         .get_pipelines<PlScene>();

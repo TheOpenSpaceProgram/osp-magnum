@@ -27,6 +27,7 @@
 #include "activetypes.h"
 
 #include "../CommonPhysics.h"
+#include "../keyed_vector.h"
 #include "../types.h"
 
 namespace osp::active
@@ -47,7 +48,7 @@ struct ACompMass
  */
 struct ACtxPhysics
 {
-    std::vector<phys::EShape>       m_shape;
+    KeyedVec<ActiveEnt, phys::EShape> m_shape;
     ActiveEntSet_t                        m_hasColliders;
 
     acomp_storage_t<ACompMass>      m_mass;

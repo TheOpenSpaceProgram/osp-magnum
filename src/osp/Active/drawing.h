@@ -41,13 +41,6 @@
 namespace osp::active
 {
 
-
-struct BasicDrawProps
-{
-    bool m_opaque:1         { false };
-    bool m_transparent:1    { false };
-};
-
 struct Material
 {
     DrawEntSet_t m_ents;
@@ -80,33 +73,6 @@ using TexIdOwner_t      = TexRefCount_t::Owner_t;
  */
 struct ACtxDrawing
 {
-
-    void resize_draw()
-    {
-        std::size_t const size = m_drawIds.capacity();
-
-        bitvector_resize(m_visible, size);
-        m_drawBasic     .resize(size);
-        m_color         .resize(size);
-        m_diffuseTex    .resize(size);
-        m_mesh          .resize(size);
-    }
-
-    void resize_active(std::size_t const size)
-    {
-        bitvector_resize(m_needDrawTf, size);
-        m_activeToDraw.resize(size, lgrn::id_null<DrawEnt>());
-    }
-
-    lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
-
-    DrawEntSet_t                            m_visible;
-    KeyedVec<DrawEnt, BasicDrawProps>       m_drawBasic;
-    KeyedVec<DrawEnt, Magnum::Color4>       m_color;
-
-    DrawEntSet_t                            m_needDrawTf;
-    KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
-
     // Scene-space Meshes
     lgrn::IdRegistryStl<MeshId>             m_meshIds;
     MeshRefCount_t                          m_meshRefCounts;
@@ -114,16 +80,6 @@ struct ACtxDrawing
     // Scene-space Textures
     lgrn::IdRegistryStl<TexId>              m_texIds;
     TexRefCount_t                           m_texRefCounts;
-
-    // Meshes and textures assigned to DrawEnts
-    KeyedVec<DrawEnt, TexIdOwner_t>         m_diffuseTex;
-    std::vector<DrawEnt>                    m_diffuseDirty;
-
-    KeyedVec<DrawEnt, MeshIdOwner_t>        m_mesh;
-    std::vector<DrawEnt>                    m_meshDirty;
-
-    lgrn::IdRegistryStl<MaterialId>         m_materialIds;
-    KeyedVec<MaterialId, Material>          m_materials;
 };
 
 /**
@@ -143,6 +99,65 @@ struct ACtxDrawingRes
     // Associate Mesh Ids with resources
     IdMap_t<ResId, MeshId>                  m_resToMesh;
     IdMap_t<MeshId, ResIdOwner_t>           m_meshToRes;
+};
+
+using DrawEntColors_t = KeyedVec<DrawEnt, Magnum::Color4>;
+using DrawEntTextures_t = KeyedVec<DrawEnt, TexIdOwner_t>;
+using DrawTransforms_t = KeyedVec<DrawEnt, Matrix4>;
+
+struct ACtxSceneRender
+{
+    // Required for std::is_copy_assignable to work properly inside of entt::any
+    ACtxSceneRender() = default;
+    ACtxSceneRender(ACtxSceneRender const& copy) = delete;
+    ACtxSceneRender(ACtxSceneRender&& move) = default;
+
+    void resize_draw()
+    {
+        std::size_t const size = m_drawIds.capacity();
+
+        bitvector_resize(m_opaque,      size);
+        bitvector_resize(m_transparent, size);
+        bitvector_resize(m_visible,     size);
+
+        m_drawTransform .resize(size);
+        m_color         .resize(size, {1.0f, 1.0f, 1.0f, 1.0f}); // Default white
+        m_diffuseTex    .resize(size);
+        m_mesh          .resize(size);
+
+        for (uint32_t matInt : m_materialIds.bitview().zeros())
+        {
+            bitvector_resize(m_materials[MaterialId(matInt)].m_ents, size);
+        }
+    }
+
+    void resize_active(std::size_t const size)
+    {
+        bitvector_resize(m_needDrawTf, size);
+        m_activeToDraw.resize(size, lgrn::id_null<DrawEnt>());
+    }
+
+    lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
+
+    DrawEntSet_t                            m_opaque;
+    DrawEntSet_t                            m_transparent;
+    DrawEntSet_t                            m_visible;
+    DrawEntColors_t                         m_color;
+
+    DrawEntSet_t                            m_needDrawTf;
+    KeyedVec<ActiveEnt, DrawEnt>            m_activeToDraw;
+
+    DrawTransforms_t                        m_drawTransform;
+
+    // Meshes and textures assigned to DrawEnts
+    KeyedVec<DrawEnt, TexIdOwner_t>         m_diffuseTex;
+    DrawEntVec_t                            m_diffuseDirty;
+
+    KeyedVec<DrawEnt, MeshIdOwner_t>        m_mesh;
+    DrawEntVec_t                            m_meshDirty;
+
+    lgrn::IdRegistryStl<MaterialId>         m_materialIds;
+    KeyedVec<MaterialId, Material>          m_materials;
 };
 
 struct Camera

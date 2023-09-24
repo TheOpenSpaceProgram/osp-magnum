@@ -59,14 +59,14 @@ TexId SysRender::own_texture_resource(ACtxDrawing& rCtxDrawing, ACtxDrawingRes& 
     return it->second;
 };
 
-void SysRender::clear_owners(ACtxDrawing& rCtxDrawing)
+void SysRender::clear_owners(ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing)
 {
-    for (TexIdOwner_t &rOwner : std::exchange(rCtxDrawing.m_diffuseTex, {}))
+    for (TexIdOwner_t &rOwner : std::exchange(rCtxScnRdr.m_diffuseTex, {}))
     {
         rCtxDrawing.m_texRefCounts.ref_release(std::move(rOwner));
     }
 
-    for (MeshIdOwner_t &rOwner : std::exchange(rCtxDrawing.m_mesh, {}))
+    for (MeshIdOwner_t &rOwner : std::exchange(rCtxScnRdr.m_mesh, {}))
     {
         rCtxDrawing.m_meshRefCounts.ref_release(std::move(rOwner));
     }
@@ -86,39 +86,6 @@ void SysRender::clear_resource_owners(ACtxDrawingRes& rCtxDrawingRes, Resources 
     }
     rCtxDrawingRes.m_resToMesh.clear();
 }
-
-void SysRender::set_dirty_all(ACtxDrawing &rCtxDrawing)
-{
-    using osp::active::active_sparse_set_t;
-
-
-    for (std::size_t const drawEntInt : rCtxDrawing.m_drawIds.bitview().zeros())
-    {
-        auto const drawEnt = DrawEnt(drawEntInt);
-
-        // Set all meshs dirty
-        if (rCtxDrawing.m_mesh[drawEnt] != lgrn::id_null<MeshId>())
-        {
-            rCtxDrawing.m_meshDirty.push_back(drawEnt);
-        }
-
-        // Set all textures dirty
-        if (rCtxDrawing.m_diffuseTex[drawEnt] != lgrn::id_null<TexId>())
-        {
-            rCtxDrawing.m_diffuseDirty.push_back(drawEnt);
-        }
-    }
-
-    for (std::size_t const materialInt : rCtxDrawing.m_materialIds.bitview().zeros())
-    {
-        Material &mat = rCtxDrawing.m_materials[MaterialId(materialInt)];
-        for (std::size_t const entInt : mat.m_ents.ones())
-        {
-            mat.m_dirty.push_back(DrawEnt(entInt));
-        }
-    }
-}
-
 
 void SysRender::update_draw_transforms_recurse(
         ACtxSceneGraph const&                   rScnGraph,

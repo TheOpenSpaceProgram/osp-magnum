@@ -41,51 +41,60 @@ using namespace osp::universe;
 namespace testapp::scenes
 {
 
-#if 0
-
 Session setup_uni_core(
         TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any>        topData)
+        ArrayView<entt::any>        topData,
+        PipelineId const            updateOn)
 {
-    Session uniCore;
-    OSP_SESSION_ACQUIRE_DATA(uniCore, topData, TESTAPP_UNI_CORE);
-    OSP_SESSION_ACQUIRE_TAGS(uniCore, rTags,   TESTAPP_UNI_CORE);
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_UNI_CORE);
 
     top_emplace< Universe > (topData, idUniverse);
 
-    return uniCore;
+    auto const tgUCore = out.create_pipelines<PlUniCore>(rBuilder);
+
+    rBuilder.pipeline(tgUCore.update).parent(updateOn);//.wait_for_signal(EStgOptn::ModifyOrSignal);
+
+    rBuilder.pipeline(tgUCore.transfer).parent(tgUCore.update);
+
+    return out;
 }
 
 
 Session setup_uni_sceneframe(
         TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any>        topData)
+        ArrayView<entt::any>        topData,
+        Session const&              uniCore)
 {
-    Session scnFrame;
-    OSP_SESSION_ACQUIRE_DATA(scnFrame, topData, TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_ACQUIRE_TAGS(scnFrame, rTags,   TESTAPP_UNI_SCENEFRAME);
+    auto const tgUCore =  uniCore.get_pipelines<PlUniCore>();
 
-    rBuilder.tag(tgScnFramePosReq).depend_on({tgScnFramePosMod});
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_UNI_SCENEFRAME);
 
     top_emplace< SceneFrame > (topData, idScnFrame);
 
-    return scnFrame;
+    auto const tgUSFrm = out.create_pipelines<PlUniSceneFrame>(rBuilder);
+
+    rBuilder.pipeline(tgUSFrm.sceneFrame).parent(tgUCore.update);
+
+    return out;
 }
 
 
-Session setup_uni_test_planets(
+Session setup_uni_testplanets(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>        topData,
         Session const&              uniCore,
-        Session const&              scnFrame)
+        Session const&              uniScnFrame)
 {
     using CoSpaceIdVec_t = std::vector<CoSpaceId>;
     using Corrade::Containers::Array;
 
-    OSP_SESSION_UNPACK_TAGS(uniCore,        TESTAPP_UNI_CORE);
-    OSP_SESSION_UNPACK_DATA(uniCore,        TESTAPP_UNI_CORE);
-    OSP_SESSION_UNPACK_TAGS(scnFrame,    TESTAPP_UNI_SCENEFRAME);
-    OSP_SESSION_UNPACK_DATA(scnFrame,    TESTAPP_UNI_SCENEFRAME);
+    OSP_DECLARE_GET_DATA_IDS(uniCore, TESTAPP_DATA_UNI_CORE);
+    OSP_DECLARE_GET_DATA_IDS(uniScnFrame, TESTAPP_DATA_UNI_SCENEFRAME);
+
+    auto const tgUCore = uniCore    .get_pipelines<PlUniCore>();
+    auto const tgUSFrm = uniScnFrame.get_pipelines<PlUniSceneFrame>();
 
     auto &rUniverse = top_get< Universe >(topData, idUniverse);
 
@@ -170,18 +179,20 @@ Session setup_uni_test_planets(
     rScnFrame.m_parent   = mainSpace;
     rScnFrame.m_position = math::mul_2pow<Vector3g, int>({400, 400, 400}, precision);
 
-    Session uniTestPlanets;
-    OSP_SESSION_ACQUIRE_DATA(uniTestPlanets, topData, TESTAPP_UNI_PLANETS);
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_UNI_PLANETS);
 
     top_emplace< CoSpaceId >        (topData, idPlanetMainSpace, mainSpace);
     top_emplace< float >            (topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
     top_emplace< CoSpaceIdVec_t >   (topData, idSatSurfaceSpaces, std::move(satSurfaceSpaces));
 
-
-    uniTestPlanets.task() = rBuilder.task().assign({tgUniTimeEvt, tgScnFramePosReq}).data(
-            "Update planets",
-            TopDataIds_t{          idUniverse,               idPlanetMainSpace,            idScnFrame,                      idSatSurfaceSpaces,           tgUniDeltaTimeIn},
-            wrap_args([] (Universe& rUniverse, CoSpaceId const planetMainSpace, SceneFrame &rScnFrame, CoSpaceIdVec_t const& rSatSurfaceSpaces, float const uniDeltaTimeIn) noexcept
+    rBuilder.task()
+        .name       ("Update planets")
+        .run_on     (tgUCore.update(Run))
+        .sync_with  ({tgUSFrm.sceneFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({     idUniverse,               idPlanetMainSpace,            idScnFrame,                      idSatSurfaceSpaces,           tgUniDeltaTimeIn })
+        .func([] (Universe& rUniverse, CoSpaceId const planetMainSpace, SceneFrame &rScnFrame, CoSpaceIdVec_t const& rSatSurfaceSpaces, float const uniDeltaTimeIn) noexcept
     {
         CoSpaceCommon &rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
 
@@ -283,11 +294,9 @@ Session setup_uni_test_planets(
                 rScnFrame.m_rotation = surfaceToMain.rotation() * rScnFrame.m_rotation;
             }
         }
-    }));
+    });
 
-    return uniTestPlanets;
+    return out;
 }
-
-#endif
 
 } // namespace testapp::scenes

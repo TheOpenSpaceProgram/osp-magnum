@@ -36,8 +36,9 @@ using namespace osp::active;
 using namespace osp::shader;
 
 void shader::draw_ent_visualizer(
-        DrawEnt ent, const ViewProjMatrix &viewProj,
-        EntityToDraw::UserData_t userData) noexcept
+        DrawEnt                     ent,
+        ViewProjMatrix const&       viewProj,
+        EntityToDraw::UserData_t    userData) noexcept
 {
     using Magnum::Shaders::MeshVisualizerGL3D;
 
@@ -45,9 +46,8 @@ void shader::draw_ent_visualizer(
     assert(pData != nullptr);
     auto &rData = *reinterpret_cast<ACtxDrawMeshVisualizer*>(pData);
 
-    Matrix4 const& drawTf = (*rData.m_pDrawTf)[ent];
-
-    Matrix4 const entRelative = viewProj.m_view * drawTf;
+    Matrix4 const&  drawTf      = (*rData.m_pDrawTf)[ent];
+    Matrix4 const   entRelative = viewProj.m_view * drawTf;
 
     MeshVisualizer &rShader = rData.m_shader;
 
@@ -56,15 +56,14 @@ void shader::draw_ent_visualizer(
         rShader.setNormalMatrix(entRelative.normalMatrix());
     }
 
-
     if (rData.m_wireframeOnly)
     {
         rShader.setColor(0x00000000_rgbaf);
         Magnum::GL::Renderer::setDepthMask(false);
     }
 
-    MeshGlId const meshId = (*rData.m_pMeshId)[ent].m_glId;
-    Magnum::GL::Mesh &rMesh = rData.m_pMeshGl->get(meshId);
+    MeshGlId const      meshId = (*rData.m_pMeshId)[ent].m_glId;
+    Magnum::GL::Mesh    &rMesh = rData.m_pMeshGl->get(meshId);
 
     rShader
         .setViewportSize(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()})
@@ -77,31 +76,3 @@ void shader::draw_ent_visualizer(
         Magnum::GL::Renderer::setDepthMask(true);
     }
 }
-
-void shader::sync_drawent_visualizer(
-        active::DrawEnt const ent,
-        active::DrawEntSet_t const& hasMaterial,
-        active::RenderGroup::Storage_t& rStorage,
-        ACtxDrawMeshVisualizer &rData)
-{
-    using namespace active;
-
-    bool alreadyAdded = rStorage.contains(ent);
-    if (hasMaterial.test(std::size_t(ent)))
-    {
-        if ( ! alreadyAdded)
-        {
-            rStorage.emplace( ent, EntityToDraw{&draw_ent_visualizer, {&rData} } );
-        }
-    }
-    else
-    {
-        if (alreadyAdded)
-        {
-            rStorage.erase(ent);
-        }
-    }
-}
-
-
-
