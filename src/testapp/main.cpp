@@ -25,9 +25,10 @@
 #include "MagnumApplication.h"
 #include "testapp.h"
 
-#include "activescenes/scenarios.h"
-#include "activescenes/identifiers.h"
-#include "activescenes/scene_renderer.h"
+#include "scenarios.h"
+#include "identifiers.h"
+#include "sessions/common.h"
+#include "sessions/magnum.h"
 
 #include <osp/core/Resources.h>
 #include <osp/core/string_concat.h>

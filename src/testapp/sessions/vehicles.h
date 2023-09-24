@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "scenarios.h"
+#include "../scenarios.h"
 
 namespace testapp { struct VehicleData; }
 
@@ -154,5 +154,21 @@ osp::Session setup_camera_vehicle(
         osp::Session const&         camera,
         osp::Session const&         vehicleControl);
 
+
+/**
+ * @brief Red indicators over Magic Rockets
+ */
+osp::Session setup_thrust_indicators(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         magnum,
+        osp::Session const&         commonScene,
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat,
+        osp::Session const&         scnRender,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         shFlat,
+        osp::TopDataId const        idResources,
+        osp::PkgId const            pkg);
 
 }

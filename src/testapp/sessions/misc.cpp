@@ -22,17 +22,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "scene_misc.h"
-#include "scene_physics.h"
-#include "scenarios.h"
-#include "identifiers.h"
+#include "misc.h"
+#include "physics.h"
 
+#include <adera/drawing/CameraController.h>
 #include <osp/activescene/basic_fn.h>
 #include <osp/core/Resources.h>
 #include <osp/core/unpack.h>
-#include <osp/drawing/drawing.h>
-
-#include <adera/drawing/CameraController.h>
+#include <osp/drawing/drawing_fn.h>
 
 #include <random>
 
@@ -134,7 +131,10 @@ Session setup_camera_ctrl(
     });
 
     return out;
-}
+} // setup_camera_ctrl
+
+
+
 
 Session setup_camera_free(
         TopTaskBuilder&             rBuilder,
@@ -164,7 +164,9 @@ Session setup_camera_free(
     });
 
     return out;
-}
+} // setup_camera_free
+
+
 
 
 Session setup_thrower(
@@ -219,7 +221,10 @@ Session setup_thrower(
     });
 
     return out;
-}
+} // setup_thrower
+
+
+
 
 Session setup_droppers(
         TopTaskBuilder&             rBuilder,
@@ -289,7 +294,10 @@ Session setup_droppers(
     });
 
     return out;
-}
+} // setup_droppers
+
+
+
 
 Session setup_bounds(
         TopTaskBuilder&             rBuilder,
@@ -392,6 +400,60 @@ Session setup_bounds(
     });
 
     return out;
-}
+} // setup_bounds
+
+
+
+
+Session setup_cursor(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              application,
+        Session const&              sceneRenderer,
+        Session const&              cameraCtrl,
+        Session const&              commonScene,
+        MaterialId const            material,
+        PkgId const                 pkg)
+{
+    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
+    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
+
+    auto &rResources    = top_get< Resources >          (topData, idResources);
+    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rDrawing      = top_get< ACtxDrawing >        (topData, idDrawing);
+    auto &rDrawingRes   = top_get< ACtxDrawingRes >     (topData, idDrawingRes);
+
+    Session out;
+    auto const [idCursorEnt] = out.acquire_data<1>(topData);
+
+    auto const cursorEnt = top_emplace<DrawEnt>(topData, idCursorEnt, rScnRender.m_drawIds.create());
+    rScnRender.resize_draw();
+
+    rScnRender.m_mesh[cursorEnt] = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cubewire");
+    rScnRender.m_color[cursorEnt] = { 0.0f, 1.0f, 0.0f, 1.0f };
+    rScnRender.m_visible.set(std::size_t(cursorEnt));
+    rScnRender.m_opaque.set(std::size_t(cursorEnt));
+
+    Material &rMat = rScnRender.m_materials[material];
+    rMat.m_ents.set(std::size_t(cursorEnt));
+
+    rBuilder.task()
+        .name       ("Move cursor")
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEntResized(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({        idCursorEnt,                            idCamCtrl,                 idScnRender })
+        .func([] (DrawEnt const cursorEnt, ACtxCameraController const& rCamCtrl, ACtxSceneRender& rScnRender) noexcept
+    {
+        rScnRender.m_drawTransform[cursorEnt] = Matrix4::translation(rCamCtrl.m_target.value());
+    });
+
+    return out;
+} // setup_cursor
+
 
 } // namespace testapp::scenes

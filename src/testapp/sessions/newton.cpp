@@ -22,9 +22,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "scene_newton.h"
-#include "scene_physics.h"
-#include "identifiers.h"
+#include "newton.h"
+#include "physics.h"
 
 #include <osp/activescene/basic_fn.h>
 #include <osp/activescene/physics_fn.h>
@@ -98,7 +97,8 @@ Session setup_newton(
     top_emplace< ACtxNwtWorld >(topData, idNwt, 2);
 
     return out;
-}
+} // setup_newton
+
 
 
 
@@ -114,7 +114,10 @@ osp::Session setup_newton_factors(
     std::fill(rFactors.begin(), rFactors.end(), 0);
 
     return out;
-}
+} // setup_newton_factors
+
+
+
 
 osp::Session setup_newton_force_accel(
         TopTaskBuilder&             rBuilder,
@@ -157,7 +160,9 @@ osp::Session setup_newton_force_accel(
     factorBits.set(index);
 
     return nwtAccel;
-}
+} // setup_newton_force_accel
+
+
 
 
 Session setup_shape_spawn_newton(
@@ -221,7 +226,9 @@ Session setup_shape_spawn_newton(
     });
 
     return out;
-}
+} // setup_shape_spawn_newton
+
+
 
 #if 0
 

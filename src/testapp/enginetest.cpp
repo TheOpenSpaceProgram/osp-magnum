@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "../MagnumApplication.h"
+#include "MagnumApplication.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/basic_fn.h>

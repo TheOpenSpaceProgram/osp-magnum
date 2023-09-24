@@ -24,6 +24,8 @@
  */
 #pragma once
 
+#include "copymove_macros.h"
+
 #include <cstdint>
 #include <typeindex> // light-ish header that happens to include std::hash
 
@@ -46,12 +48,11 @@ struct StrongId
     using entity_type = INT_T; // Name used for entt compatibility
 
     constexpr StrongId() noexcept = default;
-    constexpr StrongId(StrongId const& copy) noexcept
-     : m_value{copy.m_value}
-    { };
-    constexpr StrongId(INT_T const value) noexcept
+    constexpr explicit StrongId(INT_T const value) noexcept
      : m_value{value}
     { };
+
+    OSP_MOVE_COPY_CTOR_ASSIGN_CONSTEXPR_NOEXCEPT(StrongId);
 
     constexpr explicit operator std::size_t() const noexcept
     {
@@ -67,7 +68,6 @@ struct StrongId
 
     INT_T m_value{ lgrn::id_null<StrongId>() };
 };
-
 
 } // namespace osp
 

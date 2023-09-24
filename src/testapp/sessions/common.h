@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "scenarios.h"
+#include "../scenarios.h"
 
 #include <osp/core/copymove_macros.h>
 #include <osp/activescene/basic.h>
@@ -59,6 +59,18 @@ osp::Session setup_common_scene(
         osp::Session const&         scene,
         osp::Session const&         application,
         osp::PkgId                  pkg);
+
+osp::Session setup_window_app(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application);
+
+osp::Session setup_scene_renderer(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
+        osp::Session const&         windowApp,
+        osp::Session const&         commonScene);
 
 
 } // namespace testapp::scenes

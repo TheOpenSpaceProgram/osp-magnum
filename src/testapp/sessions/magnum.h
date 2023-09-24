@@ -24,28 +24,14 @@
  */
 #pragma once
 
-#include "scenarios.h"
+#include "../scenarios.h"
+#include "../MagnumApplication.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/drawing/drawing.h>
 
-#include "../MagnumApplication.h"
-
-
 namespace testapp::scenes
 {
-
-osp::Session setup_window_app(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application);
-
-osp::Session setup_scene_renderer(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         windowApp,
-        osp::Session const&         commonScene);
 
 osp::Session setup_magnum(
         osp::TopTaskBuilder&            rBuilder,
@@ -102,50 +88,5 @@ osp::Session setup_shader_phong(
         osp::Session const&         magnum,
         osp::Session const&         magnumScene,
         osp::draw::MaterialId       materialId = lgrn::id_null<osp::draw::MaterialId>());
-
-/**
- * @brief Red indicators over Magic Rockets
- */
-osp::Session setup_thrust_indicators(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         magnum,
-        osp::Session const&         commonScene,
-        osp::Session const&         parts,
-        osp::Session const&         signalsFloat,
-        osp::Session const&         scnRender,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         shFlat,
-        osp::TopDataId const        idResources,
-        osp::PkgId const            pkg);
-
-/**
- * @brief Wireframe cube over the camera controller's target
- */
-osp::Session setup_cursor(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         commonScene,
-        osp::draw::MaterialId const material,
-        osp::PkgId const            pkg);
-
-/**
- * @brief Draw universe, specifically designed for setup_uni_test_planets
- */
-osp::Session setup_testplanets_draw(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         commonScene,
-        osp::Session const&         uniCore,
-        osp::Session const&         uniScnFrame,
-        osp::Session const&         uniTestPlanets,
-        osp::draw::MaterialId const matPlanets,
-        osp::draw::MaterialId const matAxis);
 
 }

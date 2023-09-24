@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "activescenes/scenarios.h"
+#include "scenarios.h"
 
 #include <osp/util/UserInputHandler.h>
 

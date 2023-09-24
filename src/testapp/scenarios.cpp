@@ -24,18 +24,18 @@
  */
 
 #include "scenarios.h"
-#include "scenarios_enginetest.h"
+#include "enginetest.h"
 #include "identifiers.h"
 
-#include "scene_common.h"
-#include "scene_physics.h"
-#include "scene_misc.h"
-#include "scene_newton.h"
-#include "scene_renderer.h"
-#include "scene_universe.h"
-//#include "scene_vehicles.h"
+#include "sessions/common.h"
+#include "sessions/physics.h"
+#include "sessions/misc.h"
+#include "sessions/newton.h"
+#include "sessions/magnum.h"
+#include "sessions/universe.h"
+//#include "sessions/vehicles.h"
 
-#include "../MagnumApplication.h"
+#include "MagnumApplication.h"
 //#include "../VehicleBuilder.h"
 
 #include <osp/activescene/basic.h>

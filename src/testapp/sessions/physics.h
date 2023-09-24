@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "scenarios.h"
+#include "../scenarios.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/physics.h>
@@ -65,15 +65,6 @@ osp::Session setup_physics(
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         scene,
         osp::Session const&         commonScene);
-
-/**
- * @brief Newton Dynamics physics integration
- */
-osp::Session setup_newton_physics(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics);
 
 /**
  * @brief Queues and logic for spawning physics shapes

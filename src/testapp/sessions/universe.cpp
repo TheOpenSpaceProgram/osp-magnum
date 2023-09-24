@@ -23,20 +23,23 @@
  * SOFTWARE.
  */
 
-#include "scene_universe.h"
+#include "universe.h"
+#include "common.h"
 
-#include "identifiers.h"
-
-#include <osp/universe/coordinates.h>
-#include <osp/universe/universe.h>
+#include <adera/drawing/CameraController.h>
 
 #include <osp/core/math_2pow.h>
+#include <osp/drawing/drawing.h>
+#include <osp/universe/coordinates.h>
+#include <osp/universe/universe.h>
 #include <osp/util/logging.h>
 
 #include <random>
 
-using namespace osp;
+using namespace adera;
+using namespace osp::draw;
 using namespace osp::universe;
+using namespace osp;
 
 namespace testapp::scenes
 {
@@ -58,7 +61,9 @@ Session setup_uni_core(
     rBuilder.pipeline(tgUCore.transfer).parent(tgUCore.update);
 
     return out;
-}
+} // setup_uni_core
+
+
 
 
 Session setup_uni_sceneframe(
@@ -78,7 +83,9 @@ Session setup_uni_sceneframe(
     rBuilder.pipeline(tgUSFrm.sceneFrame).parent(tgUCore.update);
 
     return out;
-}
+} // setup_uni_sceneframe
+
+
 
 
 Session setup_uni_testplanets(
@@ -297,6 +304,231 @@ Session setup_uni_testplanets(
     });
 
     return out;
-}
+} // setup_uni_testplanets
+
+
+
+
+struct PlanetDraw
+{
+    DrawEntVec_t            drawEnts;
+    std::array<DrawEnt, 3>  axis;
+    DrawEnt                 attractor;
+    MaterialId              matPlanets;
+    MaterialId              matAxis;
+};
+
+Session setup_testplanets_draw(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
+        Session const&              cameraCtrl,
+        Session const&              commonScene,
+        Session const&              uniCore,
+        Session const&              uniScnFrame,
+        Session const&              uniTestPlanets,
+        MaterialId const            matPlanets,
+        MaterialId const            matAxis)
+{
+    OSP_DECLARE_GET_DATA_IDS(commonScene,    TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,  TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,     TESTAPP_DATA_CAMERA_CTRL);
+    OSP_DECLARE_GET_DATA_IDS(uniCore,        TESTAPP_DATA_UNI_CORE);
+    OSP_DECLARE_GET_DATA_IDS(uniScnFrame,    TESTAPP_DATA_UNI_SCENEFRAME);
+    OSP_DECLARE_GET_DATA_IDS(uniTestPlanets, TESTAPP_DATA_UNI_PLANETS);
+
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const tgUSFrm  = uniScnFrame   .get_pipelines<PlUniSceneFrame>();
+
+    Session out;
+
+    auto const [idPlanetDraw] = out.acquire_data<1>(topData);
+
+    auto &rPlanetDraw = top_emplace<PlanetDraw>(topData, idPlanetDraw);
+
+    rPlanetDraw.matPlanets = matPlanets;
+    rPlanetDraw.matAxis    = matAxis;
+
+    rBuilder.task()
+        .name       ("Position SceneFrame center to Camera Controller target")
+        .run_on     ({tgWin.inputs(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idCamCtrl,            idScnFrame })
+        .func([] (ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
+    {
+        if ( ! rCamCtrl.m_target.has_value())
+        {
+            return;
+        }
+        Vector3 &rCamPl = rCamCtrl.m_target.value();
+
+        // check origin translation
+        // ADL used for Magnum::Math::sign/floor/abs
+        float const maxDist = 512.0f;
+        Vector3 const translate = sign(rCamPl) * floor(abs(rCamPl) / maxDist) * maxDist;
+
+        if ( ! translate.isZero())
+        {
+            rCamCtrl.m_transform.translation() -= translate;
+            rCamPl -= translate;
+
+            // a bit janky to modify universe stuff directly here, but it works lol
+            Vector3 const rotated = Quaternion(rScnFrame.m_rotation).transformVector(translate);
+            rScnFrame.m_position += Vector3g(math::mul_2pow<Vector3, int>(rotated, rScnFrame.m_precision));
+        }
+
+        rScnFrame.m_scenePosition = Vector3g(math::mul_2pow<Vector3, int>(rCamCtrl.m_target.value(), rScnFrame.m_precision));
+
+    });
+
+    rBuilder.task()
+        .name       ("Resync test planets, create DrawEnts")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.drawEntResized(ModifyOrSignal)})
+        .push_to    (out.m_tasks)
+        .args       ({               idScnRender,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
+        .func([]    (ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
+    {
+        CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+
+        rPlanetDraw.drawEnts.resize(rMainSpace.m_satCount, lgrn::id_null<DrawEnt>());
+
+        rScnRender.m_drawIds.create(rPlanetDraw.drawEnts   .begin(), rPlanetDraw.drawEnts   .end());
+        rScnRender.m_drawIds.create(rPlanetDraw.axis       .begin(), rPlanetDraw.axis       .end());
+        rPlanetDraw.attractor = rScnRender.m_drawIds.create();
+    });
+
+    rBuilder.task()
+        .name       ("Resync test planets, add mesh and material")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.drawEntResized(Done), tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
+        .push_to    (out.m_tasks)
+        .args       ({           idDrawing,                 idScnRender,             idNMesh,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
+        .func([]    (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
+    {
+        CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+
+        Material &rMatPlanet = rScnRender.m_materials[rPlanetDraw.matPlanets];
+        Material &rMatAxis   = rScnRender.m_materials[rPlanetDraw.matAxis];
+
+        MeshId const sphereMeshId = rNMesh.m_shapeToMesh.at(EShape::Sphere);
+        MeshId const cubeMeshId   = rNMesh.m_shapeToMesh.at(EShape::Box);
+
+        for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+        {
+            DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
+
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
+            rScnRender.m_meshDirty.push_back(drawEnt);
+            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_opaque.set(std::size_t(drawEnt));
+            rMatPlanet.m_ents.set(std::size_t(drawEnt));
+            rMatPlanet.m_dirty.push_back(drawEnt);
+        }
+
+        rScnRender.m_mesh[rPlanetDraw.attractor] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
+        rScnRender.m_meshDirty.push_back(rPlanetDraw.attractor);
+        rScnRender.m_visible.set(std::size_t(rPlanetDraw.attractor));
+        rScnRender.m_opaque.set(std::size_t(rPlanetDraw.attractor));
+        rMatPlanet.m_ents.set(std::size_t(rPlanetDraw.attractor));
+        rMatPlanet.m_dirty.push_back(rPlanetDraw.attractor);
+
+        for (DrawEnt const drawEnt : rPlanetDraw.axis)
+        {
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(cubeMeshId);
+            rScnRender.m_meshDirty.push_back(drawEnt);
+            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_opaque.set(std::size_t(drawEnt));
+            rMatAxis.m_ents.set(std::size_t(drawEnt));
+            rMatAxis.m_dirty.push_back(drawEnt);
+        }
+
+        rScnRender.m_color[rPlanetDraw.axis[0]] = {1.0f, 0.0f, 0.0f, 1.0f};
+        rScnRender.m_color[rPlanetDraw.axis[1]] = {0.0f, 1.0f, 0.0f, 1.0f};
+        rScnRender.m_color[rPlanetDraw.axis[2]] = {0.0f, 0.0f, 1.0f, 1.0f};
+    });
+
+    rBuilder.task()
+        .name       ("Reposition test planet DrawEnts")
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEntResized(Done), tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                 idScnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace})
+        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace) noexcept
+    {
+
+        CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+        auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+        auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
+
+        // Calculate transform from universe to area/local-space for rendering.
+        // This can be generalized by finding a common ancestor within the tree
+        // of coordinate spaces. Since there's only two possibilities, an if
+        // statement works.
+        CoordTransformer mainToArea;
+        if (rScnFrame.m_parent == planetMainSpace)
+        {
+            mainToArea = coord_parent_to_child(rMainSpace, rScnFrame);
+        }
+        else
+        {
+            CoSpaceId const landedId = rScnFrame.m_parent;
+            CoSpaceCommon &rLanded = rUniverse.m_coordCommon[landedId];
+
+            CoSpaceTransform const landedTf     = coord_get_transform(rLanded, rLanded, x, y, z, qx, qy, qz, qw);
+            CoordTransformer const mainToLanded = coord_parent_to_child(rMainSpace, landedTf);
+            CoordTransformer const landedToArea = coord_parent_to_child(landedTf, rScnFrame);
+
+            mainToArea = coord_composite(landedToArea, mainToLanded);
+        }
+        Quaternion const mainToAreaRot{mainToArea.rotation()};
+
+        float const scale = math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
+
+        Vector3 const attractorPos = Vector3(mainToArea.transform_position({0, 0, 0})) * scale;
+
+        // Attractor
+        rScnRender.m_drawTransform[rPlanetDraw.attractor]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({500, 500, 500});
+
+        rScnRender.m_drawTransform[rPlanetDraw.axis[0]]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({500000, 10, 10});
+        rScnRender.m_drawTransform[rPlanetDraw.axis[1]]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({10, 500000, 10});
+        rScnRender.m_drawTransform[rPlanetDraw.axis[2]]
+            = Matrix4::translation(attractorPos)
+            * Matrix4{mainToAreaRot.toMatrix()}
+            * Matrix4::scaling({10, 10, 500000});
+
+        for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+        {
+            Vector3g const relative = mainToArea.transform_position({x[i], y[i], z[i]});
+            Vector3 const relativeMeters = Vector3(relative) * scale;
+
+            Quaterniond const rot{{qx[i], qy[i], qz[i]}, qw[i]};
+
+            DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
+
+            rScnRender.m_drawTransform[drawEnt]
+                = Matrix4::translation(relativeMeters)
+                * Matrix4::scaling({200, 200, 200})
+                * Matrix4{(mainToAreaRot * Quaternion{rot}).toMatrix()};
+        }
+
+    });
+
+    return out;
+} // setup_testplanets_draw
+
 
 } // namespace testapp::scenes
