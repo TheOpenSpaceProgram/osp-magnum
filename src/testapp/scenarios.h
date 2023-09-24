@@ -25,8 +25,7 @@
 #pragma once
 
 #include "identifiers.h"
-
-#include "../testapp.h"
+#include "testapp.h"
 
 // IWYU pragma: begin_exports
 #include <osp/tasks/top_utils.h>

@@ -24,7 +24,9 @@
  */
 #pragma once
 
-#include "scenarios.h"
+#include "../scenarios.h"
+
+#include <osp/drawing/drawing.h>
 
 namespace testapp::scenes
 {
@@ -55,4 +57,19 @@ osp::Session setup_uni_testplanets(
         osp::Session const&         uniScnFrame);
 
 
+/**
+ * @brief Draw universe, specifically designed for setup_uni_test_planets
+ */
+osp::Session setup_testplanets_draw(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         commonScene,
+        osp::Session const&         uniCore,
+        osp::Session const&         uniScnFrame,
+        osp::Session const&         uniTestPlanets,
+        osp::draw::MaterialId const matPlanets,
+        osp::draw::MaterialId const matAxis);
 }

@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "../MagnumApplication.h"
+#include "MagnumApplication.h"
 
 #include <osp/drawing_gl/rendergl.h>
 

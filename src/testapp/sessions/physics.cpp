@@ -22,10 +22,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "scene_physics.h"
-#include "scene_common.h"
-#include "scenarios.h"
-#include "identifiers.h"
+#include "physics.h"
+#include "common.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/physics_fn.h>
@@ -77,7 +75,10 @@ Session setup_physics(
     });
 
     return out;
-}
+} // setup_physics
+
+
+
 
 Session setup_shape_spawn(
         TopTaskBuilder&             rBuilder,
@@ -209,7 +210,10 @@ Session setup_shape_spawn(
 
 
     return out;
-}
+} // setup_shape_spawn
+
+
+
 
 Session setup_shape_spawn_draw(
         TopTaskBuilder&             rBuilder,
@@ -347,7 +351,7 @@ Session setup_shape_spawn_draw(
     });
 
     return out;
-}
+} // setup_shape_spawn_draw
 
 
 #if 0

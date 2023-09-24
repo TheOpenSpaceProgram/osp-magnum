@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "scenarios.h"
+#include "../scenarios.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/drawing/drawing.h>
@@ -93,6 +93,19 @@ osp::Session setup_bounds(
         osp::Session const&         scene,
         osp::Session const&         commonScene,
         osp::Session const&         shapeSpawn);
+
+/**
+ * @brief Wireframe cube over the camera controller's target
+ */
+osp::Session setup_cursor(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         commonScene,
+        osp::draw::MaterialId const material,
+        osp::PkgId const            pkg);
 
 
 }
