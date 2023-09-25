@@ -170,19 +170,19 @@ Session setup_shape_spawn_newton(
         ArrayView<entt::any> const  topData,
         Session const&              commonScene,
         Session const&              physics,
-        Session const&              shapeSpawn,
+        Session const&              physShapes,
         Session const&              newton,
         Session const&              nwtFactors)
 {
 
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
-    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(physShapes,    TESTAPP_DATA_PHYS_SHAPES);
     OSP_DECLARE_GET_DATA_IDS(newton,        TESTAPP_DATA_NEWTON);
     OSP_DECLARE_GET_DATA_IDS(nwtFactors,    TESTAPP_DATA_NEWTON_FORCES);
 
     auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
-    auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+    auto const tgShSp   = physShapes    .get_pipelines<PlPhysShapes>();
     auto const tgNwt    = newton        .get_pipelines<PlNewton>();
 
     Session out;
@@ -192,14 +192,14 @@ Session setup_shape_spawn_newton(
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
         .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgNwt.nwtBody(New), tgPhy.physUpdate(Done)})
         .push_to    (out.m_tasks)
-        .args({                   idBasic,                  idSpawner,             idPhys,              idNwt,              idNwtFactors })
-        .func([] (ACtxBasic const &rBasic, ACtxShapeSpawner& rSpawner, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ForceFactors_t nwtFactors) noexcept
+        .args({                   idBasic,                idPhysShapes,             idPhys,              idNwt,              idNwtFactors })
+        .func([] (ACtxBasic const &rBasic, ACtxPhysShapes& rPhysShapes, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ForceFactors_t nwtFactors) noexcept
     {
-        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
+        for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
         {
-            SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
-            ActiveEnt const root    = rSpawner.m_ents[i * 2];
-            ActiveEnt const child   = rSpawner.m_ents[i * 2 + 1];
+            SpawnShape const &spawn = rPhysShapes.m_spawnRequest[i];
+            ActiveEnt const root    = rPhysShapes.m_ents[i * 2];
+            ActiveEnt const child   = rPhysShapes.m_ents[i * 2 + 1];
 
             NwtColliderPtr_t pCollision{ SysNewton::create_primative(rNwt, spawn.m_shape) };
             SysNewton::orient_collision(pCollision.get(), spawn.m_shape, {0.0f, 0.0f, 0.0f}, Matrix3{}, spawn.m_size);

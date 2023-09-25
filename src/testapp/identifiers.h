@@ -171,11 +171,11 @@ struct PlPhysics
 
 
 
-#define TESTAPP_DATA_SHAPE_SPAWN 1, \
-    idSpawner
-struct PlShapeSpawn
+#define TESTAPP_DATA_PHYS_SHAPES 1, \
+    idPhysShapes
+struct PlPhysShapes
 {
-    PipelineDef<EStgIntr> spawnRequest      {"spawnRequest"};
+    PipelineDef<EStgIntr> spawnRequest      {"spawnRequest - Spawned shapes "};
     PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
     PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
 };
@@ -184,10 +184,16 @@ struct PlShapeSpawn
 
 #define TESTAPP_DATA_PREFABS 1, \
     idPrefabInit
-#define OSP_TAGS_TESTAPP_PREFABS 7, \
-    tgPrefabMod,        tgPrefabReq,        tgPrefabClr,        \
-    tgPrefabEntMod,     tgPrefabEntReq,                         \
-    tgPfParentHierMod,  tgPfParentHierReq
+struct PlPrefabs
+{
+    PipelineDef<EStgIntr> spawnRequest      {"spawnRequest"};
+    PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
+    PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
+};
+//#define OSP_TAGS_TESTAPP_PREFABS 7, \
+//    tgPrefabMod,        tgPrefabReq,        tgPrefabClr,        \
+//    tgPrefabEntMod,     tgPrefabEntReq,                         \
+//    tgPfParentHierMod,  tgPfParentHierReq
 
 
 

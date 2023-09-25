@@ -46,7 +46,7 @@ struct SpawnShape
     osp::EShape     m_shape;
 };
 
-struct ACtxShapeSpawner
+struct ACtxPhysShapes
 {
     osp::active::ActiveEntSet_t     m_ownedEnts;
 
@@ -84,7 +84,7 @@ osp::Session setup_shape_spawn_draw(
         osp::Session const&         sceneRenderer,
         osp::Session const&         commonScene,
         osp::Session const&         physics,
-        osp::Session const&         shapeSpawn);
+        osp::Session const&         physShapes);
 
 /**
  * @brief Queues and logic for spawning Prefab resources
@@ -96,5 +96,14 @@ osp::Session setup_prefabs(
         osp::Session const&         physics,
         osp::Session const&         material,
         osp::TopDataId              idResources);
+
+osp::Session setup_shape_spawn_draw(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         commonScene,
+        osp::Session const&         physics,
+        osp::Session const&         physShapes);
 
 } // namespace testapp::scenes

@@ -77,7 +77,7 @@ osp::Session setup_shape_spawn_newton(
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         commonScene,
         osp::Session const&         physics,
-        osp::Session const&         shapeSpawn,
+        osp::Session const&         physShapes,
         osp::Session const&         newton,
         osp::Session const&         nwtFactors);
 

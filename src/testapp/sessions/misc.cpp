@@ -64,14 +64,14 @@ void create_materials(
 
 void add_floor(
         ArrayView<entt::any> const  topData,
-        Session const&              shapeSpawn,
+        Session const&              physShapes,
         MaterialId const            materialId,
         PkgId const                 pkg,
         int const                   size)
 {
-    OSP_DECLARE_GET_DATA_IDS(shapeSpawn, TESTAPP_DATA_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(physShapes, TESTAPP_DATA_PHYS_SHAPES);
 
-    auto &rSpawner = top_get<ACtxShapeSpawner>(topData, idSpawner);
+    auto &rPhysShapes = top_get<ACtxPhysShapes>(topData, idPhysShapes);
 
     std::mt19937 randGen(69);
     auto distSizeX  = std::uniform_real_distribution<float>{20.0, 80.0};
@@ -85,7 +85,7 @@ void add_floor(
         for (int y = -size; y < size+1; ++y)
         {
             float const heightZ = distHeight(randGen);
-            rSpawner.m_spawnRequest.emplace_back(SpawnShape{
+            rPhysShapes.m_spawnRequest.emplace_back(SpawnShape{
                 .m_position = Vector3{x*spread, y*spread, heightZ},
                 .m_velocity = {0.0f, 0.0f, 0.0f},
                 .m_size     = Vector3{distSizeX(randGen), distSizeY(randGen), heightZ},
@@ -173,15 +173,15 @@ Session setup_thrower(
         ArrayView<entt::any> const  topData,
         Session const&              windowApp,
         Session const&              cameraCtrl,
-        Session const&              shapeSpawn)
+        Session const&              physShapes)
 {
-    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,     TESTAPP_DATA_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(physShapes,     TESTAPP_DATA_PHYS_SHAPES);
     OSP_DECLARE_GET_DATA_IDS(cameraCtrl,   TESTAPP_DATA_CAMERA_CTRL);
     auto &rCamCtrl = top_get< ACtxCameraController > (topData, idCamCtrl);
 
     auto const tgWin    = windowApp .get_pipelines<PlWindowApp>();
     auto const tgCmCt   = cameraCtrl.get_pipelines<PlCameraCtrl>();
-    auto const tgShSp   = shapeSpawn.get_pipelines<PlShapeSpawn>();
+    auto const tgShSp   = physShapes.get_pipelines<PlPhysShapes>();
 
     Session out;
     auto const [idBtnThrow] = out.acquire_data<1>(topData);
@@ -193,8 +193,8 @@ Session setup_thrower(
         .run_on     ({tgWin.inputs(Run)})
         .sync_with  ({tgCmCt.camCtrl(Ready), tgShSp.spawnRequest(Modify_)})
         .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,                  idSpawner,                   idBtnThrow })
-        .func([] (ACtxCameraController& rCamCtrl, ACtxShapeSpawner& rSpawner, EButtonControlIndex btnThrow) noexcept
+        .args       ({                 idCamCtrl,                idPhysShapes,                   idBtnThrow })
+        .func([] (ACtxCameraController& rCamCtrl, ACtxPhysShapes& rPhysShapes, EButtonControlIndex btnThrow) noexcept
     {
         // Throw a sphere when the throw button is pressed
         if (rCamCtrl.m_controls.button_held(btnThrow))
@@ -207,7 +207,7 @@ Session setup_thrower(
             {
                 for (int y = -2; y < 3; ++y)
                 {
-                    rSpawner.m_spawnRequest.push_back({
+                    rPhysShapes.m_spawnRequest.push_back({
                         .m_position = camTf.translation() - camTf.backward()*dist + camTf.up()*y*5.5f + camTf.right()*x*5.5f,
                         .m_velocity = -camTf.backward()*speed,
                         .m_size     = Vector3{1.0f},
@@ -230,14 +230,14 @@ Session setup_droppers(
         ArrayView<entt::any> const  topData,
         Session const&              scene,
         Session const&              commonScene,
-        Session const&              shapeSpawn)
+        Session const&              physShapes)
 {
     OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(physShapes,    TESTAPP_DATA_PHYS_SHAPES);
 
     auto const tgScn    = scene         .get_pipelines<PlScene>();
-    auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+    auto const tgShSp   = physShapes    .get_pipelines<PlPhysShapes>();
 
     Session out;
     auto const [idSpawnTimerA, idSpawnTimerB] = out.acquire_data<2>(topData);
@@ -250,8 +250,8 @@ Session setup_droppers(
         .run_on     ({tgScn.update(Run)})
         .sync_with  ({tgShSp.spawnRequest(Modify_)})
         .push_to    (out.m_tasks)
-        .args({                    idSpawner,       idSpawnTimerA,          idDeltaTimeIn })
-        .func([] (ACtxShapeSpawner& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
+        .args({                  idPhysShapes,       idSpawnTimerA,          idDeltaTimeIn })
+        .func([] (ACtxPhysShapes& rPhysShapes, float& rSpawnTimer, float const deltaTimeIn) noexcept
 
     {
         rSpawnTimer += deltaTimeIn;
@@ -259,7 +259,7 @@ Session setup_droppers(
         {
             rSpawnTimer -= 2.0f;
 
-            rSpawner.m_spawnRequest.push_back({
+            rPhysShapes.m_spawnRequest.push_back({
                 .m_position = {10.0f, 0.0f, 30.0f},
                 .m_velocity = {0.0f, 0.0f, 0.0f},
                 .m_size     = {2.0f, 2.0f, 1.0f},
@@ -274,15 +274,15 @@ Session setup_droppers(
         .run_on     ({tgScn.update(Run)})
         .sync_with  ({tgShSp.spawnRequest(Modify_)})
         .push_to    (out.m_tasks)
-        .args({                    idSpawner,       idSpawnTimerB,          idDeltaTimeIn })
-        .func([] (ACtxShapeSpawner& rSpawner, float& rSpawnTimer, float const deltaTimeIn) noexcept
+        .args({                  idPhysShapes,       idSpawnTimerB,          idDeltaTimeIn })
+        .func([] (ACtxPhysShapes& rPhysShapes, float& rSpawnTimer, float const deltaTimeIn) noexcept
     {
         rSpawnTimer += deltaTimeIn;
         if (rSpawnTimer >= 1.0f)
         {
             rSpawnTimer -= 1.0f;
 
-            rSpawner.m_spawnRequest.push_back({
+            rPhysShapes.m_spawnRequest.push_back({
                 .m_position = {-10.0f, 0.0, 30.0f},
                 .m_velocity = {0.0f, 0.0f, 0.0f},
                 .m_size     = {2.0f, 2.0f, 1.0f},
@@ -303,13 +303,13 @@ Session setup_bounds(
         ArrayView<entt::any> const  topData,
         Session const&              scene,
         Session const&              commonScene,
-        Session const&              shapeSpawn)
+        Session const&              physShapes)
 {
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(shapeSpawn,    TESTAPP_DATA_SHAPE_SPAWN);
+    OSP_DECLARE_GET_DATA_IDS(physShapes,    TESTAPP_DATA_PHYS_SHAPES);
     auto const tgScn    = scene         .get_pipelines<PlScene>();
     auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgShSp   = shapeSpawn    .get_pipelines<PlShapeSpawn>();
+    auto const tgShSp   = physShapes    .get_pipelines<PlPhysShapes>();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_BOUNDS);
@@ -365,20 +365,20 @@ Session setup_bounds(
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
         .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgBnds.boundsSet(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({      idBasic,                  idSpawner,                idBounds })
-        .func([] (ACtxBasic& rBasic, ACtxShapeSpawner& rSpawner, ActiveEntSet_t& rBounds) noexcept
+        .args       ({      idBasic,                idPhysShapes,                idBounds })
+        .func([] (ACtxBasic& rBasic, ACtxPhysShapes& rPhysShapes, ActiveEntSet_t& rBounds) noexcept
     {
         rBounds.ints().resize(rBasic.m_activeIds.vec().capacity());
 
-        for (std::size_t i = 0; i < rSpawner.m_spawnRequest.size(); ++i)
+        for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
         {
-            SpawnShape const &spawn = rSpawner.m_spawnRequest[i];
+            SpawnShape const &spawn = rPhysShapes.m_spawnRequest[i];
             if (spawn.m_mass == 0)
             {
                 continue;
             }
 
-            ActiveEnt const root    = rSpawner.m_ents[i * 2];
+            ActiveEnt const root    = rPhysShapes.m_ents[i * 2];
 
             rBounds.set(std::size_t(root));
         }

@@ -39,7 +39,7 @@ void create_materials(
 
 void add_floor(
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         shapeSpawn,
+        osp::Session const&         physShapes,
         osp::draw::MaterialId       material,
         osp::PkgId                  pkg,
         int                         size);
@@ -72,7 +72,7 @@ osp::Session setup_thrower(
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         windowApp,
         osp::Session const&         cameraCtrl,
-        osp::Session const&         shapeSpawn);
+        osp::Session const&         physShapes);
 
 /**
  * @brief Spawn blocks every 2 seconds and spheres every 1 second
@@ -82,7 +82,7 @@ osp::Session setup_droppers(
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         scene,
         osp::Session const&         commonScene,
-        osp::Session const&         shapeSpawn);
+        osp::Session const&         physShapes);
 
 /**
  * @brief Entity set to delete entities under Z = -10, added to spawned shapes
@@ -92,7 +92,7 @@ osp::Session setup_bounds(
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         scene,
         osp::Session const&         commonScene,
-        osp::Session const&         shapeSpawn);
+        osp::Session const&         physShapes);
 
 /**
  * @brief Wireframe cube over the camera controller's target

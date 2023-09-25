@@ -223,7 +223,7 @@ static ScenarioMap_t make_scenarios()
     add_scenario("physics", "Newton Dynamics integration test scenario",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
-        #define SCENE_SESSIONS      scene, commonScene, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt
+        #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, newton, nwtGravSet, nwtGrav, physShapesNwt
         #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor
 
         using namespace testapp::scenes;
@@ -240,16 +240,16 @@ static ScenarioMap_t make_scenarios()
         scene           = setup_scene               (builder, rTopData, application);
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
         physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        shapeSpawn      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
-        droppers        = setup_droppers            (builder, rTopData, scene, commonScene, shapeSpawn);
-        bounds          = setup_bounds              (builder, rTopData, scene, commonScene, shapeSpawn);
+        physShapes      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
+        droppers        = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
+        bounds          = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
         nwtGravSet      = setup_newton_factors      (builder, rTopData);
         nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
+        physShapesNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
 
-        add_floor(rTopData, shapeSpawn, sc_matVisualizer, defaultPkg, 4);
+        add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 4);
 
         return [] (TestApp& rTestApp)
         {
@@ -273,8 +273,8 @@ static ScenarioMap_t make_scenarios()
             shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
             shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
-            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
-            shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, shapeSpawn);
+            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, physShapes);
+            shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
@@ -300,18 +300,18 @@ static ScenarioMap_t make_scenarios()
 
         auto &
         [
-            commonScene, matVisual, physics, shapeSpawn,
+            commonScene, matVisual, physics, physShapes,
             prefabs, parts,
             vehicleSpawn, vehicleSpawnVB, vehicleSpawnRgd,
             signalsFloat, machRocket, machRcsDriver,
             testVehicles, droppers, gravity, bounds, thrower,
-            newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt, nwtRocketSet, rocketsNwt
+            newton, nwtGravSet, nwtGrav, physShapesNwt, vehicleSpawnNwt, nwtRocketSet, rocketsNwt
         ] = resize_then_unpack<24>(sceneOut);
 
         commonScene           = setup_common_scene        (builder, rTopData, rTags, idResources, mainView.m_defaultPkg);
         matVisual           = setup_material            (builder, rTopData, rTags, commonScene);
         physics             = setup_physics             (builder, rTopData, rTags, commonScene);
-        shapeSpawn          = setup_shape_spawn         (builder, rTopData, rTags, commonScene, physics, matVisual);
+        physShapes          = setup_shape_spawn         (builder, rTopData, rTags, commonScene, physics, matVisual);
         prefabs             = setup_prefabs             (builder, rTopData, rTags, commonScene, physics, matVisual, idResources);
         parts               = setup_parts               (builder, rTopData, rTags, commonScene, idResources);
         signalsFloat        = setup_signals_float       (builder, rTopData, rTags, commonScene, parts);
@@ -320,13 +320,13 @@ static ScenarioMap_t make_scenarios()
         machRocket          = setup_mach_rocket         (builder, rTopData, rTags, commonScene, parts, signalsFloat);
         machRcsDriver       = setup_mach_rcsdriver      (builder, rTopData, rTags, commonScene, parts, signalsFloat);
         testVehicles        = setup_test_vehicles       (builder, rTopData, rTags, commonScene, idResources);
-        droppers            = setup_droppers            (builder, rTopData, rTags, commonScene, shapeSpawn);
-        bounds              = setup_bounds              (builder, rTopData, rTags, commonScene, physics, shapeSpawn);
+        droppers            = setup_droppers            (builder, rTopData, rTags, commonScene, physShapes);
+        bounds              = setup_bounds              (builder, rTopData, rTags, commonScene, physics, physShapes);
 
         newton              = setup_newton              (builder, rTopData, rTags, commonScene, physics);
         nwtGravSet          = setup_newton_factors      (builder, rTopData, rTags);
         nwtGrav             = setup_newton_force_accel  (builder, rTopData, rTags, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        shapeSpawnNwt       = setup_shape_spawn_newton  (builder, rTopData, rTags, commonScene, physics, shapeSpawn, newton, nwtGravSet);
+        physShapesNwt       = setup_shape_spawn_newton  (builder, rTopData, rTags, commonScene, physics, physShapes, newton, nwtGravSet);
         vehicleSpawnNwt     = setup_vehicle_spawn_newton(builder, rTopData, rTags, commonScene, physics, prefabs, parts, vehicleSpawn, newton, idResources);
         nwtRocketSet        = setup_newton_factors      (builder, rTopData, rTags);
         rocketsNwt          = setup_rocket_thrust_newton(builder, rTopData, rTags, commonScene, physics, prefabs, parts, signalsFloat, newton, nwtRocketSet);
@@ -336,7 +336,7 @@ static ScenarioMap_t make_scenarios()
         OSP_SESSION_UNPACK_DATA(vehicleSpawnVB, TESTAPP_VEHICLE_SPAWN_VB);
         OSP_SESSION_UNPACK_DATA(testVehicles,   TESTAPP_TEST_VEHICLES);
 
-        add_floor(rTopData, commonScene, matVisual, shapeSpawn, idResources, mainView.m_defaultPkg);
+        add_floor(rTopData, commonScene, matVisual, physShapes, idResources, mainView.m_defaultPkg);
 
         auto &rActiveIds        = top_get<ActiveReg_t>          (rTopData, idActiveIds);
         auto &rTVPartVehicle    = top_get<VehicleData>          (rTopData, idTVPartVehicle);
@@ -362,12 +362,12 @@ static ScenarioMap_t make_scenarios()
 
             auto const&
             [
-                commonScene, matVisual, physics, shapeSpawn,
+                commonScene, matVisual, physics, physShapes,
                 prefabs, parts,
                 vehicleSpawn, vehicleSpawnVB, vehicleSpawnRgd,
                 signalsFloat, machRocket, machRcsDriver,
                 testVehicles, droppers, gravity, bounds, thrower,
-                newton, nwtGravSet, nwtGrav, shapeSpawnNwt, vehicleSpawnNwt, nwtRocketSet, rocketsNwt
+                newton, nwtGravSet, nwtGrav, physShapesNwt, vehicleSpawnNwt, nwtRocketSet, rocketsNwt
             ] = unpack<24>(scene);
 
             auto & [scnRender, cameraCtrl, shPhong, shFlat, camThrow, vehicleCtrl, cameraVehicle, thrustIndicator] = resize_then_unpack<8>(rendererOut);
@@ -375,7 +375,7 @@ static ScenarioMap_t make_scenarios()
             cameraCtrl      = setup_camera_ctrl         (builder, rTopData, rTags, magnum, scnRender);
             shPhong         = setup_shader_phong        (builder, rTopData, rTags, magnum, commonScene, scnRender, matVisual);
             shFlat          = setup_shader_flat         (builder, rTopData, rTags, magnum, commonScene, scnRender, {});
-            camThrow        = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, shapeSpawn);
+            camThrow        = setup_thrower             (builder, rTopData, rTags, magnum, scnRender, cameraCtrl, physShapes);
             vehicleCtrl     = setup_vehicle_control     (builder, rTopData, rTags, commonScene, parts, signalsFloat, magnum);
             cameraVehicle   = setup_camera_vehicle      (builder, rTopData, rTags, magnum, commonScene, parts, physics, cameraCtrl, vehicleCtrl);
             thrustIndicator = setup_thrust_indicators   (builder, rTopData, rTags, magnum, commonScene, parts, signalsFloat, scnRender, cameraCtrl, shFlat, mainView.m_idResources, mainView.m_defaultPkg);
@@ -389,7 +389,7 @@ static ScenarioMap_t make_scenarios()
     add_scenario("universe", "Universe test scenario with very unrealistic planets",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
-        #define SCENE_SESSIONS      scene, commonScene, physics, shapeSpawn, droppers, bounds, newton, nwtGravSet, nwtGrav, shapeSpawnNwt, uniCore, uniScnFrame, uniTestPlanets
+        #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, newton, nwtGravSet, nwtGrav, physShapesNwt, uniCore, uniScnFrame, uniTestPlanets
         #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, planetsDraw
 
         using namespace testapp::scenes;
@@ -406,14 +406,14 @@ static ScenarioMap_t make_scenarios()
         scene           = setup_scene               (builder, rTopData, application);
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
         physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        shapeSpawn      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
-        droppers        = setup_droppers            (builder, rTopData, scene, commonScene, shapeSpawn);
-        bounds          = setup_bounds              (builder, rTopData, scene, commonScene, shapeSpawn);
+        physShapes      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
+        droppers        = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
+        bounds          = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
         nwtGravSet      = setup_newton_factors      (builder, rTopData);
         nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        shapeSpawnNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, shapeSpawn, newton, nwtGravSet);
+        physShapesNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
 
         auto const tgApp = application.get_pipelines< PlApplication >();
 
@@ -421,7 +421,7 @@ static ScenarioMap_t make_scenarios()
         uniScnFrame     = setup_uni_sceneframe      (builder, rTopData, uniCore);
         uniTestPlanets  = setup_uni_testplanets     (builder, rTopData, uniCore, uniScnFrame);
 
-        add_floor(rTopData, shapeSpawn, sc_matVisualizer, defaultPkg, 0);
+        add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 0);
 
         return [] (TestApp& rTestApp)
         {
@@ -445,8 +445,8 @@ static ScenarioMap_t make_scenarios()
             shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
             shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
-            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, shapeSpawn);
-            shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, shapeSpawn);
+            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, physShapes);
+            shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
             planetsDraw     = setup_testplanets_draw    (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, uniCore, uniScnFrame, uniTestPlanets, sc_matVisualizer, sc_matFlat);
 
