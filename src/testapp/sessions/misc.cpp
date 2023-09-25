@@ -57,7 +57,6 @@ void create_materials(
     for (int i = 0; i < count; ++i)
     {
         [[maybe_unused]] MaterialId const mat = rScnRender.m_materialIds.create();
-        LGRN_ASSERT(int(mat) == i);
     }
 
     rScnRender.m_materials.resize(count);

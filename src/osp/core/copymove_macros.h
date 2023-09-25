@@ -24,14 +24,6 @@
  */
 #pragma once
 
-//#define OSP_AUX_MOVECOPY_CTOR(type, copy_is, move_is, move_constexpr, copy_constexpr, opt_noexcept) \
-//    copy_constexpr type(type const& copy)            opt_noexcept = copy_is;     \
-//    move_constexpr type(type&& move)                 opt_noexcept = move_is;
-
-//#define OSP_AUX_MOVECOPY_ASGN(type, copy_is, move_is, move_constexpr, copy_constexpr, opt_noexcept) \
-//    copy_constexpr type& operator=(type const& copy) opt_noexcept = copy_is;     \
-//    move_constexpr type& operator=(type&& move)      opt_noexcept = move_is;
-
 #define OSP_MOVE_COPY_CTOR_ASSIGN(type)             \
     Type            (Type const& copy)  = default;  \
     Type            (Type&& move)       = default;  \

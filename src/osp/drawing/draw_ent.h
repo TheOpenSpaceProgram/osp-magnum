@@ -31,4 +31,6 @@ namespace osp::draw
 
 using DrawEnt = StrongId<uint32_t, struct DummyForDrawEnt>;
 
+using MaterialId = StrongId<uint32_t, struct DummyForMaterialId>;
+
 } // namespace osp::draw
