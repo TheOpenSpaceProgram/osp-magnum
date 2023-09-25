@@ -48,8 +48,6 @@ namespace osp::draw
 using DrawEntVec_t  = std::vector<DrawEnt>;
 using DrawEntSet_t  = BitVector_t;
 
-enum class MaterialId : uint32_t { };
-
 struct Material
 {
     DrawEntSet_t m_ents;
