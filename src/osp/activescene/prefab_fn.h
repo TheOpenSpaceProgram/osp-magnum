@@ -62,10 +62,11 @@ struct TmpPrefabInitBasic
 
 struct ACtxPrefabInit
 {
-    std::vector<TmpPrefabInitBasic>             m_basicIn;
-    std::vector< ArrayView<ActiveEnt const> >   m_ents;
+    osp::active::ActiveEntSet_t                 roots;
 
-    std::vector<ActiveEnt>                      m_newEnts;
+    std::vector<TmpPrefabInitBasic>             spawnRequest;
+    std::vector< ArrayView<ActiveEnt const> >   spawnedEntsOffset;
+    std::vector<ActiveEnt>                      newEnts;
 };
 
 

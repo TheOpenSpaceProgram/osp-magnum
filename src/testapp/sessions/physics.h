@@ -48,7 +48,7 @@ struct SpawnShape
 
 struct ACtxPhysShapes
 {
-    osp::active::ActiveEntSet_t     m_ownedEnts;
+    osp::active::ActiveEntSet_t     ownedEnts;
 
     std::vector<SpawnShape>         m_spawnRequest;
     osp::active::ActiveEntVec_t     m_ents;
@@ -69,7 +69,7 @@ osp::Session setup_physics(
 /**
  * @brief Queues and logic for spawning physics shapes
  */
-osp::Session setup_shape_spawn(
+osp::Session setup_phys_shapes(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         scene,
@@ -77,7 +77,7 @@ osp::Session setup_shape_spawn(
         osp::Session const&         physics,
         osp::draw::MaterialId       materialId);
 
-osp::Session setup_shape_spawn_draw(
+osp::Session setup_phys_shapes_draw(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         windowApp,
@@ -92,18 +92,18 @@ osp::Session setup_shape_spawn_draw(
 osp::Session setup_prefabs(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
+        osp::Session const&         scene,
         osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         material,
-        osp::TopDataId              idResources);
+        osp::Session const&         physics);
 
-osp::Session setup_shape_spawn_draw(
+osp::Session setup_prefab_draw(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
         osp::Session const&         windowApp,
         osp::Session const&         sceneRenderer,
         osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         physShapes);
+        osp::Session const&         prefabs);
 
 } // namespace testapp::scenes

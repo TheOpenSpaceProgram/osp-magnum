@@ -33,10 +33,11 @@
 #include "sessions/newton.h"
 #include "sessions/magnum.h"
 #include "sessions/universe.h"
-//#include "sessions/vehicles.h"
+#include "sessions/vehicles.h"
 
 #include "MagnumApplication.h"
-//#include "../VehicleBuilder.h"
+
+#include <adera/activescene/VehicleBuilder.h>
 
 #include <osp/activescene/basic.h>
 #include <osp/core/Resources.h>
@@ -47,7 +48,9 @@
 
 #include <algorithm>
 
+using namespace adera;
 using namespace osp;
+using namespace osp::active;
 
 namespace testapp
 {
@@ -240,14 +243,14 @@ static ScenarioMap_t make_scenarios()
         scene           = setup_scene               (builder, rTopData, application);
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
         physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        physShapes      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
+        physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
         droppers        = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
         bounds          = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
         nwtGravSet      = setup_newton_factors      (builder, rTopData);
         nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        physShapesNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
+        physShapesNwt   = setup_phys_shapes_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
 
         add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 4);
 
@@ -274,8 +277,110 @@ static ScenarioMap_t make_scenarios()
             shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
             camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, physShapes);
-            shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
+            shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
+
+            setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
+        };
+
+        #undef SCENE_SESSIONS
+        #undef RENDERER_SESSIONS
+    });
+
+
+    add_scenario("vehicles", "Physics scenario but with Vehicles",
+                 [] (TestApp& rTestApp) -> RendererSetupFunc_t
+    {
+        #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, newton, nwtGravSet, nwtGrav, physShapesNwt, \
+                                    prefabs, parts, vehicleSpawn, signalsFloat, vehicleSpawnVB, vehicleSpawnRgd, vehicleSpawnNwt, testVehicles
+        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, \
+                                    prefabDraw, vehicleDraw
+
+        using namespace testapp::scenes;
+
+        auto const  defaultPkg      = rTestApp.m_defaultPkg;
+        auto const  application     = rTestApp.m_application;
+        auto        & rTopData      = rTestApp.m_topData;
+
+        TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_scene.m_edges, rTestApp.m_taskData};
+
+        auto & [SCENE_SESSIONS] = resize_then_unpack<18>(rTestApp.m_scene.m_sessions);
+
+        // Compose together lots of Sessions
+        scene           = setup_scene               (builder, rTopData, application);
+        commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
+        physics         = setup_physics             (builder, rTopData, scene, commonScene);
+        physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
+        //droppers        = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
+        bounds          = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
+
+        prefabs         = setup_prefabs             (builder, rTopData, application, scene, commonScene, physics);
+        parts           = setup_parts               (builder, rTopData, scene);
+        vehicleSpawn    = setup_vehicle_spawn       (builder, rTopData, scene);
+        vehicleSpawnVB  = setup_vehicle_spawn_vb    (builder, rTopData, application, scene, commonScene, prefabs, parts, vehicleSpawn, signalsFloat);
+        testVehicles    = setup_test_vehicles       (builder, rTopData, application);
+
+        newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
+        nwtGravSet      = setup_newton_factors      (builder, rTopData);
+        nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
+        physShapesNwt   = setup_phys_shapes_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
+        vehicleSpawnNwt = setup_vehicle_spawn_newton(builder, rTopData, application, commonScene, physics, prefabs, parts, vehicleSpawn, newton);
+
+        OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,   TESTAPP_DATA_VEHICLE_SPAWN);
+        OSP_DECLARE_GET_DATA_IDS(vehicleSpawnVB, TESTAPP_DATA_VEHICLE_SPAWN_VB);
+        OSP_DECLARE_GET_DATA_IDS(testVehicles,   TESTAPP_DATA_TEST_VEHICLES);
+
+        auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
+        auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
+        auto &rTVPartVehicle    = top_get<VehicleData>          (rTopData, idTVPartVehicle);
+
+        for (int i = 0; i < 1; ++i)
+        {
+            rVehicleSpawn.spawnRequest.push_back(
+            {
+               .m_position = {float(i - 2) * 8.0f, 30.0f, 10.0f},
+               .m_velocity = {0.0, 0.0f, 0.0f},
+               .m_rotation = {}
+            });
+            rVehicleSpawnVB.dataVB.push_back(&rTVPartVehicle);
+        }
+
+
+        add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 4);
+
+        return [] (TestApp& rTestApp)
+        {
+            auto const  application     = rTestApp.m_application;
+            auto const  windowApp       = rTestApp.m_windowApp;
+            auto const  magnum          = rTestApp.m_magnum;
+            auto const  defaultPkg      = rTestApp.m_defaultPkg;
+            auto        & rTopData      = rTestApp.m_topData;
+
+            TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
+
+            auto & [SCENE_SESSIONS] = unpack<18>(rTestApp.m_scene.m_sessions);
+            auto & [RENDERER_SESSIONS] = resize_then_unpack<12>(rTestApp.m_renderer.m_sessions);
+
+            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
+            create_materials(rTopData, sceneRenderer, sc_materialCount);
+
+            magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
+            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
+            cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
+            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
+            shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
+            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, physShapes);
+            shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
+            cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
+            prefabDraw      = setup_prefab_draw         (builder, rTopData, application, windowApp, sceneRenderer, commonScene, prefabs);
+            vehicleDraw     = setup_vehicle_spawn_draw  (builder, rTopData, sceneRenderer, vehicleSpawn);
+
+            // HACK
+            //OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+            //OSP_DECLARE_GET_DATA_IDS(veh, TESTAPP_DATA_SCENE_RENDERER);
+            //auto &a = osp::top_get<osp::draw::ACtxSceneRender>(rTopData, idScnRender);
+            //a.m_needDrawTf.set(std::size_t(root));
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };
@@ -311,7 +416,7 @@ static ScenarioMap_t make_scenarios()
         commonScene           = setup_common_scene        (builder, rTopData, rTags, idResources, mainView.m_defaultPkg);
         matVisual           = setup_material            (builder, rTopData, rTags, commonScene);
         physics             = setup_physics             (builder, rTopData, rTags, commonScene);
-        physShapes          = setup_shape_spawn         (builder, rTopData, rTags, commonScene, physics, matVisual);
+        physShapes          = setup_phys_shapes         (builder, rTopData, rTags, commonScene, physics, matVisual);
         prefabs             = setup_prefabs             (builder, rTopData, rTags, commonScene, physics, matVisual, idResources);
         parts               = setup_parts               (builder, rTopData, rTags, commonScene, idResources);
         signalsFloat        = setup_signals_float       (builder, rTopData, rTags, commonScene, parts);
@@ -326,7 +431,7 @@ static ScenarioMap_t make_scenarios()
         newton              = setup_newton              (builder, rTopData, rTags, commonScene, physics);
         nwtGravSet          = setup_newton_factors      (builder, rTopData, rTags);
         nwtGrav             = setup_newton_force_accel  (builder, rTopData, rTags, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        physShapesNwt       = setup_shape_spawn_newton  (builder, rTopData, rTags, commonScene, physics, physShapes, newton, nwtGravSet);
+        physShapesNwt       = setup_phys_shapes_newton  (builder, rTopData, rTags, commonScene, physics, physShapes, newton, nwtGravSet);
         vehicleSpawnNwt     = setup_vehicle_spawn_newton(builder, rTopData, rTags, commonScene, physics, prefabs, parts, vehicleSpawn, newton, idResources);
         nwtRocketSet        = setup_newton_factors      (builder, rTopData, rTags);
         rocketsNwt          = setup_rocket_thrust_newton(builder, rTopData, rTags, commonScene, physics, prefabs, parts, signalsFloat, newton, nwtRocketSet);
@@ -345,13 +450,13 @@ static ScenarioMap_t make_scenarios()
 
         for (int i = 0; i < 10; ++i)
         {
-            rVehicleSpawn.m_newVhBasicIn.push_back(
+            rVehicleSpawn.spawnRequest.push_back(
             {
                .m_position = {float(i - 2) * 8.0f, 30.0f, 10.0f},
                .m_velocity = {0.0, 0.0f, 0.0f},
                .m_rotation = {}
             });
-            rVehicleSpawnVB.m_dataVB.push_back(&rTVPartVehicle);
+            rVehicleSpawnVB.dataVB.push_back(&rTVPartVehicle);
         }
 
         return [] (MainView mainView, Session const& magnum, Sessions_t const& scene, [[maybe_unused]] Sessions_t& rendererOut)
@@ -406,14 +511,14 @@ static ScenarioMap_t make_scenarios()
         scene           = setup_scene               (builder, rTopData, application);
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
         physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        physShapes      = setup_shape_spawn         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
+        physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
         droppers        = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
         bounds          = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
         nwtGravSet      = setup_newton_factors      (builder, rTopData);
         nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        physShapesNwt   = setup_shape_spawn_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
+        physShapesNwt   = setup_phys_shapes_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
 
         auto const tgApp = application.get_pipelines< PlApplication >();
 
@@ -446,7 +551,7 @@ static ScenarioMap_t make_scenarios()
             shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
             camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, physShapes);
-            shapeDraw       = setup_shape_spawn_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
+            shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
             planetsDraw     = setup_testplanets_draw    (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, uniCore, uniScnFrame, uniTestPlanets, sc_matVisualizer, sc_matFlat);
 

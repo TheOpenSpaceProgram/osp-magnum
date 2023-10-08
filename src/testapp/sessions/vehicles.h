@@ -26,8 +26,6 @@
 
 #include "../scenarios.h"
 
-namespace testapp { struct VehicleData; }
-
 namespace testapp::scenes
 {
 
@@ -37,8 +35,7 @@ namespace testapp::scenes
 osp::Session setup_parts(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
-        osp::TopDataId const        idResources);
+        osp::Session const&         scene);
 
 /**
  * @brief Float Signal Links, allowing Machines to pass floats to each other
@@ -106,7 +103,13 @@ osp::Session setup_mach_rcsdriver(
 osp::Session setup_vehicle_spawn(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene);
+        osp::Session const&         scene);
+
+osp::Session setup_vehicle_spawn_draw(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         vehicleSpawn);
 
 /**
  * @brief Support VehicleBuilder data to be used to spawn vehicles
@@ -114,12 +117,13 @@ osp::Session setup_vehicle_spawn(
 osp::Session setup_vehicle_spawn_vb(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
+        osp::Session const&         scene,
         osp::Session const&         commonScene,
         osp::Session const&         prefabs,
         osp::Session const&         parts,
         osp::Session const&         vehicleSpawn,
-        osp::Session const&         signalsFloat,
-        osp::TopDataId const        idResources);
+        osp::Session const&         signalsFloat);
 
 /**
  * @brief Build "Test Vehicle" data, so they can be spawned
@@ -127,8 +131,7 @@ osp::Session setup_vehicle_spawn_vb(
 osp::Session setup_test_vehicles(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
-        osp::TopDataId const        idResources);
+        osp::Session const&         application);
 
 /**
  * @brief Controls to select and control a UserControl Machine

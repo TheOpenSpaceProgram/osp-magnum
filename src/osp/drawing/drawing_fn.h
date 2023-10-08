@@ -205,7 +205,12 @@ void SysRender::update_draw_transforms(
 
     while (first != last)
     {
-        update_draw_transforms_recurse(rScnGraph, activeToDraw, rTf, rDrawTf, needDrawTf, *first, identity, true);
+        active::ActiveEnt const ent = *first;
+
+        if (needDrawTf.test(std::size_t(ent)))
+        {
+            update_draw_transforms_recurse(rScnGraph, activeToDraw, rTf, rDrawTf, needDrawTf, ent, identity, true);
+        }
 
         std::advance(first, 1);
     }

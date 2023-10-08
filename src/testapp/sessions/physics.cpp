@@ -33,6 +33,10 @@
 #include <osp/drawing/drawing_fn.h>
 #include <osp/vehicles/ImporterData.h>
 
+#include <Magnum/Trade/Trade.h>
+#include <Magnum/Trade/PbrMetallicRoughnessMaterialData.h>
+
+
 using namespace osp;
 using namespace osp::active;
 using namespace osp::draw;
@@ -81,7 +85,7 @@ Session setup_physics(
 //-----------------------------------------------------------------------------
 
 
-Session setup_shape_spawn(
+Session setup_phys_shapes(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Session const&              scene,
@@ -101,6 +105,9 @@ Session setup_shape_spawn(
 
     rBuilder.pipeline(tgShSp.spawnRequest)  .parent(tgScn.update);
     rBuilder.pipeline(tgShSp.spawnedEnts)   .parent(tgScn.update);
+    rBuilder.pipeline(tgShSp.ownedEnts)     .parent(tgScn.update);
+
+    top_emplace< ACtxPhysShapes > (topData, idPhysShapes, ACtxPhysShapes{ .m_materialId = materialId });
 
     rBuilder.task()
         .name       ("Schedule Shape spawn")
@@ -111,9 +118,7 @@ Session setup_shape_spawn(
     {
         return rPhysShapes.m_spawnRequest.empty() ? TaskAction::Cancel : TaskActions{};
     });
-    rBuilder.pipeline(tgShSp.ownedEnts)     .parent(tgScn.update);
 
-    top_emplace< ACtxPhysShapes > (topData, idPhysShapes, ACtxPhysShapes{ .m_materialId = materialId });
     rBuilder.task()
         .name       ("Create ActiveEnts for requested shapes to spawn")
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
@@ -136,7 +141,7 @@ Session setup_shape_spawn(
         .args       ({      idBasic,                idPhysShapes })
         .func([] (ACtxBasic& rBasic, ACtxPhysShapes& rPhysShapes) noexcept
     {
-        osp::bitvector_resize(rPhysShapes.m_ownedEnts, rBasic.m_activeIds.capacity());
+        osp::bitvector_resize(rPhysShapes.ownedEnts, rBasic.m_activeIds.capacity());
         rBasic.m_scnGraph.resize(rBasic.m_activeIds.capacity());
 
         SubtreeBuilder bldScnRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, rPhysShapes.m_spawnRequest.size() * 2);
@@ -147,7 +152,7 @@ Session setup_shape_spawn(
             ActiveEnt const root    = rPhysShapes.m_ents[i * 2];
             ActiveEnt const child   = rPhysShapes.m_ents[i * 2 + 1];
 
-            rPhysShapes.m_ownedEnts.set(std::size_t(root));
+            rPhysShapes.ownedEnts.set(std::size_t(root));
 
             rBasic.m_transform.emplace(root, ACompTransform{osp::Matrix4::translation(spawn.m_position)});
             rBasic.m_transform.emplace(child, ACompTransform{Matrix4::scaling(spawn.m_size)});
@@ -211,12 +216,12 @@ Session setup_shape_spawn(
 
 
     return out;
-} // setup_shape_spawn
+} // setup_phys_shapes
 
 
 
 
-Session setup_shape_spawn_draw(
+Session setup_phys_shapes_draw(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Session const&              windowApp,
@@ -294,7 +299,7 @@ Session setup_shape_spawn_draw(
         .args       ({               idBasic,             idDrawing,                 idScnRender,                idPhysShapes,             idNMesh })
         .func([]    (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxPhysShapes& rPhysShapes, NamedMeshes& rNMesh) noexcept
     {
-        for (std::size_t entInt : rPhysShapes.m_ownedEnts.ones())
+        for (std::size_t entInt : rPhysShapes.ownedEnts.ones())
         {
             ActiveEnt const root = ActiveEnt(entInt);
             ActiveEnt const child = *SysSceneGraph::children(rBasic.m_scnGraph, root).begin();
@@ -314,7 +319,7 @@ Session setup_shape_spawn_draw(
     {
         Material &rMat = rScnRender.m_materials[rPhysShapes.m_materialId];
 
-        for (std::size_t entInt : rPhysShapes.m_ownedEnts.ones())
+        for (std::size_t entInt : rPhysShapes.ownedEnts.ones())
         {
             ActiveEnt const root = ActiveEnt(entInt);
             ActiveEnt const child = *SysSceneGraph::children(rBasic.m_scnGraph, root).begin();
@@ -347,44 +352,63 @@ Session setup_shape_spawn_draw(
     {
         for (ActiveEnt const deleted : rActiveEntDel)
         {
-            rPhysShapes.m_ownedEnts.reset(std::size_t(deleted));
+            rPhysShapes.ownedEnts.reset(std::size_t(deleted));
         }
     });
 
     return out;
-} // setup_shape_spawn_draw
+} // setup_phys_shapes_draw
 
 
 //-----------------------------------------------------------------------------
 
-/*
+
 Session setup_prefabs(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              application,
+        Session const&              scene,
         Session const&              commonScene,
-        Session const&              physics,
-        Session const&              material,
-        TopDataId const             idResources)
+        Session const&              physics)
 {
-    OSP_SESSION_UNPACK_DATA(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(physics,    TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(physics,    TESTAPP_PHYSICS);
+    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
 
-    Session prefabs;
-    OSP_SESSION_ACQUIRE_DATA(prefabs, topData,  TESTAPP_PREFABS);
-    OSP_SESSION_ACQUIRE_TAGS(prefabs, rTags,    TESTAPP_PREFABS);
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData,  TESTAPP_DATA_PREFABS);
+    auto const tgPf = out.create_pipelines<PlPrefabs>(rBuilder);
+
+    rBuilder.pipeline(tgPf.spawnRequest).parent(tgScn.update);
+    rBuilder.pipeline(tgPf.spawnedEnts) .parent(tgScn.update);
+    rBuilder.pipeline(tgPf.ownedEnts)   .parent(tgScn.update);
 
     top_emplace< ACtxPrefabInit > (topData, idPrefabInit);
 
-    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntMod, tgEntNew}).data(
-            "Create Prefab entities",
-            TopDataIds_t{             idActiveIds,                idPrefabInit,           idResources },
-            wrap_args([] (ActiveReg_t& rActiveIds, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
+    rBuilder.task()
+        .name       ("Schedule Prefab spawn")
+        .schedules  ({tgPf.spawnRequest(Schedule_)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idPrefabInit })
+        .func([] (ACtxPrefabInit const& rPrefabInit) noexcept -> TaskActions
+    {
+        return rPrefabInit.spawnRequest.empty() ? TaskAction::Cancel : TaskActions{};
+    });
+
+    rBuilder.task()
+        .name       ("Create Prefab entities")
+        .run_on     ({tgPf.spawnRequest(UseOrRun)})
+        .sync_with  ({tgCS.activeEnt(New), tgCS.activeEntResized(Schedule), tgPf.spawnedEnts(Resize)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,                idPrefabInit,           idResources})
+        .func([] (ACtxBasic& rBasic, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
     {
         // Count number of entities needed to be created
         std::size_t totalEnts = 0;
-        for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
+        for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
         {
             auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
             auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
@@ -393,14 +417,14 @@ Session setup_prefabs(
         }
 
         // Create entities
-        rPrefabInit.m_newEnts.resize(totalEnts);
-        rActiveIds.create(std::begin(rPrefabInit.m_newEnts), std::end(rPrefabInit.m_newEnts));
+        rPrefabInit.newEnts.resize(totalEnts);
+        rBasic.m_activeIds.create(std::begin(rPrefabInit.newEnts), std::end(rPrefabInit.newEnts));
 
         // Assign new entities to each prefab to create
-        rPrefabInit.m_ents.resize(rPrefabInit.m_basicIn.size());
-        auto itEntAvailable = std::begin(rPrefabInit.m_newEnts);
-        auto itPfEntSpanOut = std::begin(rPrefabInit.m_ents);
-        for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.m_basicIn)
+        rPrefabInit.spawnedEntsOffset.resize(rPrefabInit.spawnRequest.size());
+        auto itEntAvailable = std::begin(rPrefabInit.newEnts);
+        auto itPfEntSpanOut = std::begin(rPrefabInit.spawnedEntsOffset);
+        for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.spawnRequest)
         {
             auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
             auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
@@ -411,74 +435,272 @@ Session setup_prefabs(
             std::advance(itPfEntSpanOut, 1);
         }
 
-        assert(itEntAvailable == std::end(rPrefabInit.m_newEnts));
-    }));
+        assert(itEntAvailable == std::end(rPrefabInit.newEnts));
+    });
 
-    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgHierNew, tgPfParentHierReq}).data(
-            "Init Prefab hierarchy",
-            TopDataIds_t{                idPrefabInit,           idResources,           idBasic },
-            wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxBasic& rBasic) noexcept
-    {
-        //SysPrefabInit::init_hierarchy(rPrefabInit, rResources, rBasic.m_hierarchy);
-    }));
-
-    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, PlransformNew}).data(
-            "Init Prefab transforms",
-            TopDataIds_t{                idPrefabInit,           idResources,           idBasic },
-            wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxBasic& rBasic) noexcept
+    rBuilder.task()
+        .name       ("Init Prefab transforms")
+        .run_on     ({tgPf.spawnRequest(UseOrRun)})
+        .sync_with  ({tgPf.spawnedEnts(UseOrRun), tgCS.transform(New)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,           idResources,                idPrefabInit})
+        .func([] (ACtxBasic& rBasic, Resources& rResources, ACtxPrefabInit& rPrefabInit) noexcept
     {
         SysPrefabInit::init_transforms(rPrefabInit, rResources, rBasic.m_transform);
-    }));
+    });
 
-    if (material.m_dataIds.empty())
-    {
-        prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod}).data(
-                "Init Prefab drawables (no material)",
-                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes },
-                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes) noexcept
-        {
-            SysPrefabInit::init_drawing(rPrefabInit, rResources, rDrawing, rDrawingRes, {});
-        }));
-    }
-    else
-    {
-        OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
-        OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
 
-        prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod, tgMatMod}).data(
-                "Init Prefab drawables (single material)",
-                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,                      idMatDirty,                   idActiveIds },
-                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, std::vector<DrawEnt>& rMatDirty, ActiveReg_t const& rActiveIds) noexcept
-        {
-            rDrawing.resize_active(rActiveIds.capacity());
-            rMatEnts.ints().resize(rActiveIds.vec().capacity());
-            SysPrefabInit::init_drawing(rPrefabInit, rResources, rDrawing, rDrawingRes, {{rMatEnts, rMatDirty}});
-        }));
-    }
-
-    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgPhysMod}).data(
-            "Init Prefab physics",
-            TopDataIds_t{                   idActiveIds,                idPrefabInit,           idResources,             idPhys},
-            wrap_args([] (ActiveReg_t const& rActiveIds, ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxPhysics& rPhys) noexcept
+    rBuilder.task()
+        .name       ("Init Prefab physics")
+        .run_on     ({tgPf.spawnRequest(UseOrRun)})
+        .sync_with  ({tgPf.spawnedEnts(UseOrRun), tgPhy.physBody(Modify), tgPhy.physUpdate(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({      idBasic,           idResources,             idPhys,                idPrefabInit})
+        .func([] (ACtxBasic& rBasic, Resources& rResources, ACtxPhysics& rPhys, ACtxPrefabInit& rPrefabInit) noexcept
     {
-        rPhys.m_hasColliders.ints().resize(rActiveIds.vec().capacity());
+        rPhys.m_hasColliders.ints().resize(rBasic.m_activeIds.vec().capacity());
         //rPhys.m_massDirty.ints().resize(rActiveIds.vec().capacity());
-        rPhys.m_shape.resize(rActiveIds.capacity());
+        rPhys.m_shape.resize(rBasic.m_activeIds.capacity());
         SysPrefabInit::init_physics(rPrefabInit, rResources, rPhys);
-    }));
+    });
 
-
-    prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabClr}).data(
-            "Clear Prefab vector",
-            TopDataIds_t{                idPrefabInit },
-            wrap_args([] (ACtxPrefabInit& rPrefabInit) noexcept
+    rBuilder.task()
+        .name       ("Clear Prefab vector")
+        .run_on     ({tgPf.spawnRequest(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({           idPrefabInit})
+        .func([] (ACtxPrefabInit& rPrefabInit) noexcept
     {
-        rPrefabInit.m_basicIn.clear();
-    }));
+        rPrefabInit.spawnRequest.clear();
+    });
 
 
-    return prefabs;
-}*/
+    return out;
+}
+
+Session setup_prefab_draw(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              application,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
+        Session const&              commonScene,
+        Session const&              prefabs)
+{
+    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(prefabs,       TESTAPP_DATA_PREFABS);
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const tgCS     = commonScene   .get_pipelines< PlCommonScene >();
+    auto const tgPf     = prefabs       .get_pipelines< PlPrefabs >();
+
+    Session out;
+
+    rBuilder.task()
+        .name       ("Create DrawEnts for prefabs")
+        .run_on     ({tgPf.spawnRequest(UseOrRun)})
+        .sync_with  ({tgPf.spawnedEnts(UseOrRun), tgCS.activeEntResized(Done), tgScnRdr.drawEntResized(ModifyOrSignal)})
+        .push_to    (out.m_tasks)
+        .args       ({         idResources,                 idBasic,             idDrawing,                 idScnRender,                idPrefabInit })
+        .func([]    (Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxPrefabInit& rPrefabInit) noexcept
+    {
+        auto itPfEnts = rPrefabInit.spawnedEntsOffset.begin();
+
+        for (TmpPrefabInitBasic const& request : rPrefabInit.spawnRequest)
+        {
+            auto const &rImportData = rResources.data_get<osp::ImporterData const>(
+                    gc_importer, request.m_importerRes);
+            auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
+                    gc_importer, request.m_importerRes);
+
+            auto const objects = rPrefabData.m_prefabs[request.m_prefabId];
+
+            for (std::size_t i = 0; i < objects.size(); ++i)
+            {
+                int const meshImportId = rImportData.m_objMeshes[objects[i]];
+                if (meshImportId == -1)
+                {
+                    continue;
+                }
+
+                ActiveEnt const ent = (*itPfEnts)[i];
+                rScnRender.m_activeToDraw[ent] = rScnRender.m_drawIds.create();
+            }
+
+            ++itPfEnts;
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Add mesh and material to prefabs")
+        .run_on     ({tgPf.spawnRequest(UseOrRun)})
+        .sync_with  ({tgPf.spawnedEnts(UseOrRun),
+                      tgScnRdr.entMesh(New), tgScnRdr.material(New), tgScnRdr.drawEnt(New), tgScnRdr.drawEntResized(Done),
+                      tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
+        .push_to    (out.m_tasks)
+        .args       ({      idResources,                 idBasic,             idDrawing,                idDrawingRes,                 idScnRender,                idPrefabInit})
+        .func([] (Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxPrefabInit& rPrefabInit) noexcept
+    {
+        auto itPfEnts = rPrefabInit.spawnedEntsOffset.begin();
+
+        for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
+        {
+            auto const &rImportData = rResources.data_get<osp::ImporterData const>(
+                    gc_importer, rPfBasic.m_importerRes);
+            auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
+                    gc_importer, rPfBasic.m_importerRes);
+
+            auto const ents     = ArrayView<ActiveEnt const>{*itPfEnts};
+            auto const objects  = lgrn::Span<int const>{rPrefabData.m_prefabs[rPfBasic.m_prefabId]};
+            auto const parents  = lgrn::Span<int const>{rPrefabData.m_prefabParents[rPfBasic.m_prefabId]};
+
+            // All ancestors of  each entity that has a mesh
+            auto const needs_draw_transform
+                = [&parents, &ents, &rDrawing, &needDrawTf = rScnRender.m_needDrawTf]
+                  (auto && self, int const object, ActiveEnt const ent) noexcept -> void
+            {
+                needDrawTf.set(std::size_t(ent));
+
+                int const parentObj = parents[object];
+
+                if (parentObj != -1)
+                {
+                    self(self, parentObj, ents[parentObj]);
+                }
+            };
+
+            for (std::size_t i = 0; i < objects.size(); ++i)
+            {
+                ActiveEnt const ent = (*itPfEnts)[i];
+
+                // Check if object has mesh
+                int const meshImportId = rImportData.m_objMeshes[objects[i]];
+                if (meshImportId == -1)
+                {
+                    continue;
+                }
+
+                needs_draw_transform(needs_draw_transform, objects[i], ent);
+
+                DrawEnt const drawEnt = rScnRender.m_activeToDraw[ent];
+
+                osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
+                MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, meshRes);
+                rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(meshId);
+                rScnRender.m_meshDirty.push_back(drawEnt);
+
+                int const matImportId = rImportData.m_objMaterials[objects[i]];
+
+                if (Magnum::Trade::MaterialData const &mat = *rImportData.m_materials.at(matImportId);
+                    mat.types() & Magnum::Trade::MaterialType::PbrMetallicRoughness)
+                {
+                    auto const& matPbr = mat.as<Magnum::Trade::PbrMetallicRoughnessMaterialData>();
+                    if (int const baseColor = matPbr.baseColorTexture();
+                        baseColor != -1)
+                    {
+                        osp::ResId const texRes = rImportData.m_textures[baseColor];
+                        TexId const texId = SysRender::own_texture_resource(rDrawing, rDrawingRes, rResources, texRes);
+                        rScnRender.m_diffuseTex[drawEnt] = rDrawing.m_texRefCounts.ref_add(texId);
+                        rScnRender.m_diffuseDirty.push_back(drawEnt);
+                    }
+                }
+
+                rScnRender.m_opaque.set(std::size_t(drawEnt));
+                rScnRender.m_visible.set(std::size_t(drawEnt));
+
+                // TODO: assign proper material
+                rScnRender.m_materials[MaterialId{2}].m_dirty.push_back(drawEnt);
+                rScnRender.m_materials[MaterialId{2}].m_ents.set(std::size_t(drawEnt));
+
+            }
+
+            ++itPfEnts;
+        }
+    });
+
+
+//    rBuilder.task()
+//        .name       ("Resync spawned shapes DrawEnts")
+//        .run_on     ({tgWin.resync(Run)})
+//        .sync_with  ({tgShSp.ownedEnts(UseOrRun_), tgCS.hierarchy(Ready), tgCS.activeEntResized(Done), tgScnRdr.drawEntResized(ModifyOrSignal)})
+//        .push_to    (out.m_tasks)
+//        .args       ({               idBasic,             idDrawing,                 idScnRender,                idPhysShapes,             idNMesh })
+//        .func([]    (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxPhysShapes& rPhysShapes, NamedMeshes& rNMesh) noexcept
+//    {
+//        for (std::size_t entInt : rPhysShapes.ownedEnts.ones())
+//        {
+//            ActiveEnt const root = ActiveEnt(entInt);
+//            ActiveEnt const child = *SysSceneGraph::children(rBasic.m_scnGraph, root).begin();
+
+//            rScnRender.m_activeToDraw[child] = rScnRender.m_drawIds.create();
+//        }
+//    });
+
+//    rBuilder.task()
+//        .name       ("Resync spawned shapes mesh and material")
+//        .run_on     ({tgWin.resync(Run)})
+//        .sync_with  ({tgShSp.ownedEnts(UseOrRun_), tgScnRdr.entMesh(New), tgScnRdr.material(New), tgScnRdr.drawEnt(New), tgScnRdr.drawEntResized(Done),
+//                      tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
+//        .push_to    (out.m_tasks)
+//        .args       ({            idBasic,             idDrawing,             idPhys,                idPhysShapes,                 idScnRender,             idNMesh })
+//        .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxPhysics& rPhys, ACtxPhysShapes& rPhysShapes, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh) noexcept
+//    {
+//        Material &rMat = rScnRender.m_materials[rPhysShapes.m_materialId];
+
+//        for (std::size_t entInt : rPhysShapes.ownedEnts.ones())
+//        {
+//            ActiveEnt const root = ActiveEnt(entInt);
+//            ActiveEnt const child = *SysSceneGraph::children(rBasic.m_scnGraph, root).begin();
+
+//            //SpawnShape const &spawn = rPhysShapes.m_spawnRequest[i];
+//            DrawEnt const drawEnt   = rScnRender.m_activeToDraw[child];
+
+//            rScnRender.m_needDrawTf.set(std::size_t(root));
+//            rScnRender.m_needDrawTf.set(std::size_t(child));
+
+//            EShape const shape = rPhys.m_shape.at(child);
+//            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(shape));
+//            rScnRender.m_meshDirty.push_back(drawEnt);
+
+//            rMat.m_ents.set(std::size_t(drawEnt));
+//            rMat.m_dirty.push_back(drawEnt);
+
+//            rScnRender.m_visible.set(std::size_t(drawEnt));
+//            rScnRender.m_opaque.set(std::size_t(drawEnt));
+//        }
+//    });
+
+
+    return out;
+} // setup_phys_shapes_draw
+
+//    if (material.m_dataIds.empty())
+//    {
+//        prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod}).data(
+//                "Init Prefab drawables (no material)",
+//                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes },
+//                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes) noexcept
+//        {
+//            SysPrefabInit::init_drawing(rPrefabInit, rResources, rDrawing, rDrawingRes, {});
+//        }));
+//    }
+//    else
+//    {
+//        OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
+//        OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
+
+//        prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod, tgMatMod}).data(
+//                "Init Prefab drawables (single material)",
+//                TopDataIds_t{                idPrefabInit,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,                      idMatDirty,                   idActiveIds },
+//                wrap_args([] (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, std::vector<DrawEnt>& rMatDirty, ActiveReg_t const& rActiveIds) noexcept
+//        {
+//            rDrawing.resize_active(rActiveIds.capacity());
+//            rMatEnts.ints().resize(rActiveIds.vec().capacity());
+//            SysPrefabInit::init_drawing(rPrefabInit, rResources, rDrawing, rDrawingRes, {{rMatEnts, rMatDirty}});
+//        }));
+//    }
 
 
 } // namespace testapp::scenes

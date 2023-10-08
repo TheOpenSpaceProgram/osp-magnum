@@ -414,7 +414,7 @@ Session setup_cursor(
         MaterialId const            material,
         PkgId const                 pkg)
 {
-    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);

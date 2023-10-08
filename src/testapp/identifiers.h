@@ -189,11 +189,9 @@ struct PlPrefabs
     PipelineDef<EStgIntr> spawnRequest      {"spawnRequest"};
     PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
     PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
+
+    PipelineDef<EStgOptn> inSubtree         {"inSubtree"};
 };
-//#define OSP_TAGS_TESTAPP_PREFABS 7, \
-//    tgPrefabMod,        tgPrefabReq,        tgPrefabClr,        \
-//    tgPrefabEntMod,     tgPrefabEntReq,                         \
-//    tgPfParentHierMod,  tgPfParentHierReq
 
 
 
@@ -207,38 +205,50 @@ struct PlBounds
 
 
 
-#define TESTAPP_DATA_PARTS 6, \
-    idScnParts, idPartInit, idUpdMach, idMachEvtTags, idMachUpdEnqueue, idtgNodeUpdEvt
-#define OSP_TAGS_TESTAPP_PARTS 17, \
-    tgPartMod,          tgPartReq,          tgPartClr,          \
-    tgMapPartEntMod,    tgMapPartEntReq,                        \
-    tgWeldMod,          tgWeldReq,          tgWeldClr,          \
-    tgLinkMod,          tgLinkReq,                              \
-    tgLinkMhUpdMod,     tgLinkMhUpdReq,                         \
-    tgNodeAnyUpdMod,    tgNodeAnyUpdReq,                        \
-    tgMachUpdEnqMod,    tgMachUpdEnqReq,    tgNodeUpdEvt
+#define TESTAPP_DATA_PARTS 4, \
+    idScnParts, idPartInit, idUpdMach, idMachEvtTags
+struct PlParts
+{
+    PipelineDef<EStgIntr> part;
+    PipelineDef<EStgIntr> mapPartEnt;
+    PipelineDef<EStgIntr> weld;
+    PipelineDef<EStgIntr> link;
+    //PipelineDef<EStgIntr> linkMhUpd;
+    //PipelineDef<EStgIntr> nodeAnyUpd;
+};
 
 
 
 #define TESTAPP_DATA_VEHICLE_SPAWN 1, \
     idVehicleSpawn
-#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN 11, \
-    tgVsBasicInMod,     tgVsBasicInReq,     tgVsBasicInClr,     \
-    tgVsPartMod,        tgVsPartReq,                            \
-    tgVsMapPartMachMod, tgVsMapPartMachReq,                     \
-    tgVsWeldMod,        tgVsWeldReq,                            \
-    tgVsPartPfMod,      tgVsPartPfReq
+struct PlVehicleSpawn
+{
+    PipelineDef<EStgIntr> spawnRequest      {"VehicleSpawn boundsSet"};
+    PipelineDef<EStgIntr> spawnedParts;
+    PipelineDef<EStgIntr> spawnedWelds;
+    PipelineDef<EStgIntr> rootEnts;
+
+    PipelineDef<EStgIntr> mapPartMach;
+};
 
 
 
 #define TESTAPP_DATA_VEHICLE_SPAWN_VB 1, \
     idVehicleSpawnVB
-#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_VB 10, \
-    tgVbSpBasicInMod,   tgVbSpBasicInReq,                       \
-    tgVbPartMod,        tgVbPartReq,                            \
-    tgVbWeldMod,        tgVbWeldReq,                            \
-    tgVbMachMod,        tgVbMachReq,                            \
-    tgVbNodeMod,        tgVbNodeReq
+struct PlVehicleSpawnVB
+{
+    PipelineDef<EStgIntr> dataVB;
+    PipelineDef<EStgIntr> remapParts;
+    PipelineDef<EStgIntr> remapWelds;
+    PipelineDef<EStgIntr> remapMachs;
+    PipelineDef<EStgIntr> remapNodes;
+};
+//#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_VB 10, \
+//    tgVbSpBasicInMod,   tgVbSpBasicInReq,                       \
+//    tgVbPartMod,        tgVbPartReq,                            \
+//    tgVbWeldMod,        tgVbWeldReq,                            \
+//    tgVbMachMod,        tgVbMachReq,                            \
+//    tgVbNodeMod,        tgVbNodeReq
 
 
 #define TESTAPP_DATA_TEST_VEHICLES 1, \

@@ -72,7 +72,7 @@ osp::Session setup_newton_force_accel(
 /**
  * @brief Support for Shape Spawner physics using Newton Dynamics
  */
-osp::Session setup_shape_spawn_newton(
+osp::Session setup_phys_shapes_newton(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         commonScene,
@@ -87,13 +87,13 @@ osp::Session setup_shape_spawn_newton(
 osp::Session setup_vehicle_spawn_newton(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
         osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::Session const&         prefabs,
         osp::Session const&         parts,
         osp::Session const&         vehicleSpawn,
-        osp::Session const&         newton,
-        osp::TopDataId const        idResources);
+        osp::Session const&         newton);
 
 /**
  * @brief Add thrust forces to Magic Rockets from setup_mach_rocket

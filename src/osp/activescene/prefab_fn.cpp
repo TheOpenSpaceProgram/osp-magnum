@@ -82,9 +82,9 @@ void SysPrefabInit::init_transforms(
         Resources const&                    rResources,
         ACompTransformStorage_t&            rTransform) noexcept
 {
-    auto itPfEnts = std::begin(rPrefabInit.m_ents);
+    auto itPfEnts = std::begin(rPrefabInit.spawnedEntsOffset);
 
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);
@@ -115,11 +115,11 @@ void SysPrefabInit::init_drawing(
         ACtxDrawingRes&                     rDrawingRes,
         std::optional<Material>             material) noexcept
 {
-    auto itPfEnts = rPrefabInit.m_ents.begin();
+    auto itPfEnts = rPrefabInit.spawnedEntsOffset.begin();
 
     // stupidly make drawIDs first
     // TODO: separate this into another step.
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);
@@ -146,9 +146,9 @@ void SysPrefabInit::init_drawing(
     // then resize containers
     rDrawing.resize_draw();
 
-    itPfEnts = rPrefabInit.m_ents.begin();
+    itPfEnts = rPrefabInit.spawnedEntsOffset.begin();
 
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);
@@ -231,9 +231,9 @@ void SysPrefabInit::init_physics(
             ACtxPhysics&                        rCtxPhys) noexcept
 {
 
-    auto itPfEnts = std::begin(rPrefabInit.m_ents);
+    auto itPfEnts = std::begin(rPrefabInit.spawnedEntsOffset);
 
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.m_basicIn)
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);

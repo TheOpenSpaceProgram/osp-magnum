@@ -25,6 +25,7 @@
 #pragma once
 
 #include <osp/activescene/vehicles.h>
+#include <osp/core/copymove_macros.h>
 #include <osp/core/resourcetypes.h>
 #include <osp/link/machines.h>
 
@@ -71,8 +72,7 @@ struct VehicleData
     using MapPartToMachines_t = osp::active::Parts::MapPartToMachines_t;
 
     VehicleData() = default;
-    VehicleData(VehicleData const& copy) = delete;
-    VehicleData(VehicleData&& move) = default;
+    OSP_MOVE_ONLY_CTOR(VehicleData);
 
     lgrn::IdRegistryStl<PartId>             m_partIds;
     std::vector<osp::Matrix4>               m_partTransformWeld;
@@ -232,41 +232,43 @@ VALUES_T& VehicleBuilder::node_values(NodeTypeId nodeType)
 
 struct ACtxVehicleSpawnVB
 {
-    std::vector<VehicleData const*> m_dataVB;
+    using SpVehicleId = osp::active::SpVehicleId;
 
     // Remap vectors convert IDs from VehicleData to ACtxParts.
     // A single vector for remaps is shared for all vehicles to spawn,
     // so offsets are used to divide up the vector.
 
     // PartId srcPart = /* ID from VehicleData */
-    // PartId dstPart = m_remapParts[m_remapPartOffsets[newVehicleIndex] + srcPart];
+    // PartId dstPart = remapParts[remapPartOffsets[newVehicleIndex] + srcPart];
 
     inline Corrade::Containers::StridedArrayView2D<std::size_t> remap_node_offsets_2d() noexcept
     {
-        return {Corrade::Containers::arrayView(m_remapNodeOffsets.data(), m_remapNodeOffsets.size()),
-                {m_dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+        return {Corrade::Containers::arrayView(remapNodeOffsets.data(), remapNodeOffsets.size()),
+                {dataVB.size(), osp::link::NodeTypeReg_t::size()}};
     }
 
     inline Corrade::Containers::StridedArrayView2D<std::size_t const> remap_node_offsets_2d() const noexcept
     {
-        return {Corrade::Containers::arrayView(m_remapNodeOffsets.data(), m_remapNodeOffsets.size()),
-                {m_dataVB.size(), osp::link::NodeTypeReg_t::size()}};
+        return {Corrade::Containers::arrayView(remapNodeOffsets.data(), remapNodeOffsets.size()),
+                {dataVB.size(), osp::link::NodeTypeReg_t::size()}};
     }
 
-    std::vector<osp::active::PartId>    m_remapParts;
-    std::vector<std::size_t>            m_remapPartOffsets;
+    osp::KeyedVec<SpVehicleId, VehicleData const*> dataVB;
 
-    std::vector<osp::active::PartId>    m_remapWelds;
-    std::vector<std::size_t>            m_remapWeldOffsets;
+    std::vector<osp::active::PartId>        remapParts;
+    osp::KeyedVec<SpVehicleId, std::size_t> remapPartOffsets;
 
-    std::vector<std::size_t>            m_machtypeCount;
-    std::vector<osp::link::MachAnyId>   m_remapMachs;
-    std::vector<std::size_t>            m_remapMachOffsets;
+    std::vector<osp::active::PartId>        remapWelds;
+    osp::KeyedVec<SpVehicleId, std::size_t> remapWeldOffsets;
+
+    std::vector<std::size_t>                machtypeCount;
+    std::vector<osp::link::MachAnyId>       remapMachs;
+    osp::KeyedVec<SpVehicleId, std::size_t> remapMachOffsets;
 
     // remapNodes are both shared between all new vehicles and all node types
     // An offset can exist for each pair of [New Vehicle, Node Type]
-    std::vector<osp::link::NodeId>      m_remapNodes;
-    std::vector<std::size_t>            m_remapNodeOffsets;
+    std::vector<osp::link::NodeId>          remapNodes;
+    osp::KeyedVec<SpVehicleId, std::size_t> remapNodeOffsets;
 };
 
 } // namespace testapp

@@ -78,7 +78,7 @@ struct ACtxSceneGraph
         m_treeToEnt         .reserve(ents);
         m_treeDescendants   .reserve(ents);
         m_entParent         .resize(ents);
-        m_entToTreePos      .resize(ents);
+        m_entToTreePos      .resize(ents, lgrn::id_null<TreePos_t>());
     }
 };
 

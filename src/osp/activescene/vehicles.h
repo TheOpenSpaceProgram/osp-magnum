@@ -27,6 +27,7 @@
 #include "active_ent.h"
 
 #include "../core/array_view.h"
+#include "../core/keyed_vector.h"
 #include "../core/math_types.h"
 #include "../link/machines.h"
 #include "../vehicles/prefabs.h"
@@ -45,9 +46,9 @@ struct Parts
     using MapPartToMachines_t = lgrn::IntArrayMultiMap<PartId, link::MachinePair>;
 
     lgrn::IdRegistryStl<PartId>                     m_partIds;
-    std::vector<PrefabPair>                         m_partPrefabs;
-    std::vector<WeldId>                             m_partToWeld;
-    std::vector<Matrix4>                            m_partTransformWeld;
+    KeyedVec<PartId, PrefabPair>                    m_partPrefabs;
+    KeyedVec<PartId, WeldId>                        m_partToWeld;
+    KeyedVec<PartId, Matrix4>                       m_partTransformWeld;
     MapPartToMachines_t                             m_partToMachines;
     std::vector<PartId>                             m_partDirty;
 
@@ -67,9 +68,10 @@ struct ACtxParts : Parts
     std::vector<ActiveEnt>                          m_weldToEnt;
 };
 
-using NewVehicleId  = uint32_t;
-using NewPartId     = uint32_t;
-using NewWeldId     = uint32_t;
+using SpVehicleId = StrongId<uint32_t, struct DummyForSpVehicleId>;
+using SpPartId    = StrongId<uint32_t, struct DummyForSpPartId>;
+using SpWeldId    = StrongId<uint32_t, struct DummyForSpWeldId>;
+using SpMachAnyId = StrongId<uint32_t, struct DummyForSpMachAnyId>;
 
 struct ACtxVehicleSpawn
 {
@@ -82,22 +84,21 @@ struct ACtxVehicleSpawn
 
     std::size_t new_vehicle_count() const noexcept
     {
-        return m_newVhBasicIn.size();
+        return spawnRequest.size();
     }
 
-    std::vector<TmpToInit>          m_newVhBasicIn;
-    std::vector<NewPartId>          m_newVhPartOffsets;
-    std::vector<NewWeldId>          m_newVhWeldOffsets;
+    KeyedVec<SpVehicleId, TmpToInit>        spawnRequest;
 
-    std::vector<PartId>             m_newPartToPart;
-    std::vector<uint32_t>           m_newPartPrefabs;
+    KeyedVec<SpPartId, PartId>              spawnedParts;
+    KeyedVec<SpVehicleId, SpPartId>         spawnedPartOffsets;
+    KeyedVec<PartId, SpPartId>              partToSpawned;
+    KeyedVec<SpPartId, uint32_t>            spawnedPrefabs;
 
-    std::vector<NewPartId>          m_partToNewPart;
+    KeyedVec<SpWeldId, WeldId>              spawnedWelds;
+    KeyedVec<SpVehicleId, SpWeldId>         spawnedWeldOffsets;
+    KeyedVec<SpWeldId, ActiveEnt>           rootEnts;
 
-    std::vector<WeldId>             m_newWeldToWeld;
-    std::vector<ActiveEnt>          m_newWeldToEnt;
-
-    std::vector<link::MachAnyId>    m_newMachToMach;
+    KeyedVec<SpMachAnyId, link::MachAnyId>  m_newMachToMach;
 };
 
 } // namespace osp::active

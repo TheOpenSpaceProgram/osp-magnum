@@ -24,8 +24,6 @@
  */
 #pragma once
 
-#include "copymove_macros.h"
-
 #include <cstdint>
 #include <typeindex> // light-ish header that happens to include std::hash
 
@@ -48,9 +46,9 @@ struct StrongId
     using entity_type = INT_T; // Name used for entt compatibility
 
     constexpr StrongId() noexcept = default;
-    constexpr StrongId(StrongId const& copy) noexcept
-     : m_value{copy.m_value}
-    { };
+    constexpr StrongId(StrongId const& copy) noexcept = default;
+    constexpr StrongId& operator=(StrongId const& copy) noexcept = default;
+
     constexpr explicit StrongId(INT_T const value) noexcept
      : m_value{value}
     { };
