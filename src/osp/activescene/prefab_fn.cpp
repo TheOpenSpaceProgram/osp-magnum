@@ -38,6 +38,43 @@ using osp::restypes::gc_importer;
 namespace osp::active
 {
 
+void SysPrefabInit::create_activeents(
+        ACtxPrefabInit&                     rPrefabInit,
+        ACtxBasic&                          rBasic,
+        Resources&                          rResources)
+{
+    // Count number of entities needed to be created
+    std::size_t totalEnts = 0;
+    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
+    {
+        auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
+        auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
+
+        totalEnts += objects.size();
+    }
+
+    // Create entities
+    rPrefabInit.newEnts.resize(totalEnts);
+    rBasic.m_activeIds.create(std::begin(rPrefabInit.newEnts), std::end(rPrefabInit.newEnts));
+
+    // Assign new entities to each prefab to create
+    rPrefabInit.spawnedEntsOffset.resize(rPrefabInit.spawnRequest.size());
+    auto itEntAvailable = std::begin(rPrefabInit.newEnts);
+    auto itPfEntSpanOut = std::begin(rPrefabInit.spawnedEntsOffset);
+    for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.spawnRequest)
+    {
+        auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
+        auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
+
+        (*itPfEntSpanOut) = { &(*itEntAvailable), objects.size() };
+
+        std::advance(itEntAvailable, objects.size());
+        std::advance(itPfEntSpanOut, 1);
+    }
+
+    assert(itEntAvailable == std::end(rPrefabInit.newEnts));
+}
+
 void SysPrefabInit::add_to_subtree(
         TmpPrefabInitBasic const&           basic,
         ArrayView<ActiveEnt const>          ents,

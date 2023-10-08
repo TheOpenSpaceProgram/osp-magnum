@@ -230,45 +230,4 @@ VALUES_T& VehicleBuilder::node_values(NodeTypeId nodeType)
     return rValues;
 }
 
-struct ACtxVehicleSpawnVB
-{
-    using SpVehicleId = osp::active::SpVehicleId;
-
-    // Remap vectors convert IDs from VehicleData to ACtxParts.
-    // A single vector for remaps is shared for all vehicles to spawn,
-    // so offsets are used to divide up the vector.
-
-    // PartId srcPart = /* ID from VehicleData */
-    // PartId dstPart = remapParts[remapPartOffsets[newVehicleIndex] + srcPart];
-
-    inline Corrade::Containers::StridedArrayView2D<std::size_t> remap_node_offsets_2d() noexcept
-    {
-        return {Corrade::Containers::arrayView(remapNodeOffsets.data(), remapNodeOffsets.size()),
-                {dataVB.size(), osp::link::NodeTypeReg_t::size()}};
-    }
-
-    inline Corrade::Containers::StridedArrayView2D<std::size_t const> remap_node_offsets_2d() const noexcept
-    {
-        return {Corrade::Containers::arrayView(remapNodeOffsets.data(), remapNodeOffsets.size()),
-                {dataVB.size(), osp::link::NodeTypeReg_t::size()}};
-    }
-
-    osp::KeyedVec<SpVehicleId, VehicleData const*> dataVB;
-
-    std::vector<osp::active::PartId>        remapParts;
-    osp::KeyedVec<SpVehicleId, std::size_t> remapPartOffsets;
-
-    std::vector<osp::active::PartId>        remapWelds;
-    osp::KeyedVec<SpVehicleId, std::size_t> remapWeldOffsets;
-
-    std::vector<std::size_t>                machtypeCount;
-    std::vector<osp::link::MachAnyId>       remapMachs;
-    osp::KeyedVec<SpVehicleId, std::size_t> remapMachOffsets;
-
-    // remapNodes are both shared between all new vehicles and all node types
-    // An offset can exist for each pair of [New Vehicle, Node Type]
-    std::vector<osp::link::NodeId>          remapNodes;
-    osp::KeyedVec<SpVehicleId, std::size_t> remapNodeOffsets;
-};
-
 } // namespace testapp

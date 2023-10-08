@@ -403,39 +403,10 @@ Session setup_prefabs(
         .run_on     ({tgPf.spawnRequest(UseOrRun)})
         .sync_with  ({tgCS.activeEnt(New), tgCS.activeEntResized(Schedule), tgPf.spawnedEnts(Resize)})
         .push_to    (out.m_tasks)
-        .args       ({      idBasic,                idPrefabInit,           idResources})
-        .func([] (ACtxBasic& rBasic, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
+        .args       ({           idPrefabInit,           idBasic,           idResources})
+        .func([] (ACtxPrefabInit& rPrefabInit, ACtxBasic& rBasic, Resources& rResources) noexcept
     {
-        // Count number of entities needed to be created
-        std::size_t totalEnts = 0;
-        for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
-        {
-            auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
-            auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
-
-            totalEnts += objects.size();
-        }
-
-        // Create entities
-        rPrefabInit.newEnts.resize(totalEnts);
-        rBasic.m_activeIds.create(std::begin(rPrefabInit.newEnts), std::end(rPrefabInit.newEnts));
-
-        // Assign new entities to each prefab to create
-        rPrefabInit.spawnedEntsOffset.resize(rPrefabInit.spawnRequest.size());
-        auto itEntAvailable = std::begin(rPrefabInit.newEnts);
-        auto itPfEntSpanOut = std::begin(rPrefabInit.spawnedEntsOffset);
-        for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.spawnRequest)
-        {
-            auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
-            auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
-
-            (*itPfEntSpanOut) = { &(*itEntAvailable), objects.size() };
-
-            std::advance(itEntAvailable, objects.size());
-            std::advance(itPfEntSpanOut, 1);
-        }
-
-        assert(itEntAvailable == std::end(rPrefabInit.newEnts));
+        SysPrefabInit::create_activeents(rPrefabInit, rBasic, rResources);
     });
 
     rBuilder.task()
@@ -448,7 +419,6 @@ Session setup_prefabs(
     {
         SysPrefabInit::init_transforms(rPrefabInit, rResources, rBasic.m_transform);
     });
-
 
     rBuilder.task()
         .name       ("Init Prefab physics")
@@ -503,8 +473,8 @@ Session setup_prefab_draw(
         .run_on     ({tgPf.spawnRequest(UseOrRun)})
         .sync_with  ({tgPf.spawnedEnts(UseOrRun), tgCS.activeEntResized(Done), tgScnRdr.drawEntResized(ModifyOrSignal)})
         .push_to    (out.m_tasks)
-        .args       ({         idResources,                 idBasic,             idDrawing,                 idScnRender,                idPrefabInit })
-        .func([]    (Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxPrefabInit& rPrefabInit) noexcept
+        .args       ({              idPrefabInit,           idResources,                 idBasic,             idDrawing,                 idScnRender})
+        .func([]    (ACtxPrefabInit& rPrefabInit, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender) noexcept
     {
         auto itPfEnts = rPrefabInit.spawnedEntsOffset.begin();
 

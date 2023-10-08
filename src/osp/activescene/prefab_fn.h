@@ -74,23 +74,27 @@ class SysPrefabInit
 {
 public:
 
+    static void create_activeents(
+            ACtxPrefabInit&             rPrefabInit,
+            ACtxBasic&                  rBasic,
+            Resources&                  rResources);
+
     static void add_to_subtree(
-            TmpPrefabInitBasic const&           basic,
-            ArrayView<ActiveEnt const>          ents,
-            Resources const&                    rResources,
-            SubtreeBuilder&                     rSubtree) noexcept;
+            TmpPrefabInitBasic const&   basic,
+            ArrayView<ActiveEnt const>  ents,
+            Resources const&            rResources,
+            SubtreeBuilder&             rSubtree) noexcept;
 
     static void init_transforms(
-            ACtxPrefabInit const&               rPrefabInit,
-            Resources const&                    rResources,
-            ACompTransformStorage_t&            rTransform) noexcept;
+            ACtxPrefabInit const&       rPrefabInit,
+            Resources const&            rResources,
+            ACompTransformStorage_t&    rTransform) noexcept;
 
     static void init_physics(
-            ACtxPrefabInit const&               rPrefabInit,
-            Resources const&                    rResources,
-            ACtxPhysics&                        rCtxPhys) noexcept;
+            ACtxPrefabInit const&       rPrefabInit,
+            Resources const&            rResources,
+            ACtxPhysics&                rCtxPhys) noexcept;
 };
-
 
 
 } // namespace osp::active

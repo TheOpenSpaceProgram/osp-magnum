@@ -37,7 +37,7 @@
 
 #include "MagnumApplication.h"
 
-#include <adera/activescene/VehicleBuilder.h>
+#include <adera/activescene/vehicles_vb_fn.h>
 
 #include <osp/activescene/basic.h>
 #include <osp/core/Resources.h>
