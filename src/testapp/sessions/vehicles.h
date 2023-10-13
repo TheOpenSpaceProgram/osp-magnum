@@ -35,6 +35,7 @@ namespace testapp::scenes
 osp::Session setup_parts(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
         osp::Session const&         scene);
 
 /**
@@ -124,14 +125,6 @@ osp::Session setup_vehicle_spawn_vb(
         osp::Session const&         parts,
         osp::Session const&         vehicleSpawn,
         osp::Session const&         signalsFloat);
-
-/**
- * @brief Build "Test Vehicle" data, so they can be spawned
- */
-osp::Session setup_test_vehicles(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application);
 
 /**
  * @brief Controls to select and control a UserControl Machine

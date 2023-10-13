@@ -35,6 +35,7 @@
 #include "sessions/shapes.h"
 #include "sessions/universe.h"
 #include "sessions/vehicles.h"
+#include "sessions/vehicles_prebuilt.h"
 
 #include "MagnumApplication.h"
 
@@ -316,10 +317,10 @@ static ScenarioMap_t make_scenarios()
         bounds          = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
 
         prefabs         = setup_prefabs             (builder, rTopData, application, scene, commonScene, physics);
-        parts           = setup_parts               (builder, rTopData, scene);
+        parts           = setup_parts               (builder, rTopData, application, scene);
         vehicleSpawn    = setup_vehicle_spawn       (builder, rTopData, scene);
         vehicleSpawnVB  = setup_vehicle_spawn_vb    (builder, rTopData, application, scene, commonScene, prefabs, parts, vehicleSpawn, signalsFloat);
-        testVehicles    = setup_test_vehicles       (builder, rTopData, application);
+        testVehicles    = setup_prebuilt_vehicles   (builder, rTopData, application, scene);
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
         nwtGravSet      = setup_newton_factors      (builder, rTopData);
@@ -333,7 +334,7 @@ static ScenarioMap_t make_scenarios()
 
         auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
         auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
-        auto &rTVPartVehicle    = top_get<VehicleData>          (rTopData, idTVPartVehicle);
+        auto &rPrebuiltVehicles = top_get<PrebuiltVehicles>     (rTopData, idPrebuiltVehicles);
 
         for (int i = 0; i < 1; ++i)
         {
@@ -343,9 +344,8 @@ static ScenarioMap_t make_scenarios()
                .m_velocity = {0.0, 0.0f, 0.0f},
                .m_rotation = {}
             });
-            rVehicleSpawnVB.dataVB.push_back(&rTVPartVehicle);
+            rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
         }
-
 
         add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 4);
 

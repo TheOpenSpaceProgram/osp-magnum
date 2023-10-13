@@ -52,20 +52,24 @@ namespace testapp::scenes
 Session setup_parts(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              application,
         Session const&              scene)
 {
+    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
+
     auto const tgScn = scene.get_pipelines<PlScene>();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_PARTS);
     auto const tgParts = out.create_pipelines<PlParts>(rBuilder);
 
+    out.m_cleanup = tgScn.cleanup;
+
     rBuilder.pipeline(tgParts.part)         .parent(tgScn.update);
     rBuilder.pipeline(tgParts.mapPartEnt)   .parent(tgScn.update);
     rBuilder.pipeline(tgParts.weld)         .parent(tgScn.update);
     rBuilder.pipeline(tgParts.link)         .parent(tgScn.update);
 
-    //parts.m_cleanup = ;
 
     auto &rScnParts = top_emplace< ACtxParts >      (topData, idScnParts);
     auto &rUpdMach  = top_emplace< UpdMachPerType > (topData, idUpdMach);
@@ -79,16 +83,18 @@ Session setup_parts(
 
     auto const idNull = lgrn::id_null<TopDataId>();
 
-//    parts.task() = rBuilder.task().assign({tgCleanupEvt}).data(
-//            "Clean up Part prefab owners",
-//            TopDataIds_t{           idScnParts,           idResources },
-//            wrap_args([] (ACtxParts& rScnParts, Resources& rResources) noexcept
-//    {
-//        for (osp::PrefabPair &rPrefabPair : rScnParts.m_partPrefabs)
-//        {
-//            rResources.owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
-//        }
-//    }));
+    rBuilder.task()
+        .name       ("Clear Vehicle Spawning vector after use")
+        .run_on     ({tgScn.cleanup(Run_)})
+        .push_to    (out.m_tasks)
+        .args       ({      idScnParts,           idResources})
+        .func([] (ACtxParts& rScnParts, Resources& rResources) noexcept
+    {
+        for (osp::PrefabPair &rPrefabPair : rScnParts.m_partPrefabs)
+        {
+            rResources.owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
+        }
+    });
 
 //    parts.task() = rBuilder.task().assign({tgSceneEvt, tgPartClr, tgWeldClr}).data(
 //            "Clear Part and Weld dirty vectors after use",
@@ -732,177 +738,6 @@ Session setup_mach_rcsdriver(
 }
 #endif
 
-
-
-
-Matrix4 quick_transform(Vector3 const pos, Quaternion const rot) noexcept
-{
-    return Matrix4::from(rot.toMatrix(), pos);
-}
-
-struct RCSInputs
-{
-    NodeId m_pitch  {lgrn::id_null<NodeId>()};
-    NodeId m_yaw    {lgrn::id_null<NodeId>()};
-    NodeId m_roll   {lgrn::id_null<NodeId>()};
-};
-
-void add_rcs_machines(VehicleBuilder& rBuilder, RCSInputs const& inputs, PartId part, float thrustMul, Matrix4 const& tf)
-{
-    using namespace adera;
-    namespace ports_rcsdriver = adera::ports_rcsdriver;
-    namespace ports_magicrocket = adera::ports_magicrocket;
-
-    auto const [posX, posY, posZ, dirX, dirY, dirZ, driverOut, thrMul] = rBuilder.create_nodes<8>(gc_ntSigFloat);
-
-    rBuilder.create_machine(part, gc_mtRcsDriver, {
-        { ports_rcsdriver::gc_posXIn,       posX            },
-        { ports_rcsdriver::gc_posYIn,       posY            },
-        { ports_rcsdriver::gc_posZIn,       posZ            },
-        { ports_rcsdriver::gc_dirXIn,       dirX            },
-        { ports_rcsdriver::gc_dirYIn,       dirY            },
-        { ports_rcsdriver::gc_dirZIn,       dirZ            },
-        { ports_rcsdriver::gc_cmdAngXIn,    inputs.m_pitch  },
-        { ports_rcsdriver::gc_cmdAngYIn,    inputs.m_yaw    },
-        { ports_rcsdriver::gc_cmdAngZIn,    inputs.m_roll   },
-        { ports_rcsdriver::gc_throttleOut,  driverOut       }
-    } );
-
-    rBuilder.create_machine(part, gc_mtMagicRocket, {
-        { ports_magicrocket::gc_throttleIn, driverOut },
-        { ports_magicrocket::gc_multiplierIn, thrMul }
-    } );
-
-    Vector3 const dir = tf.rotation() * gc_rocketForward;
-
-    auto &rFloatValues = rBuilder.node_values< SignalValues_t<float> >(gc_ntSigFloat);
-
-    rFloatValues[posX] = tf.translation().x();
-    rFloatValues[posY] = tf.translation().y();
-    rFloatValues[posZ] = tf.translation().z();
-    rFloatValues[dirX] = dir.x();
-    rFloatValues[dirY] = dir.y();
-    rFloatValues[dirZ] = dir.z();
-    rFloatValues[thrMul] = thrustMul;
-}
-
-void add_rcs_block(VehicleBuilder& rBuilder, VehicleBuilder::WeldVec_t& rWeldTo, RCSInputs const& inputs, float thrustMul, Vector3 pos, Quaternion rot)
-{
-    constexpr Vector3 xAxis{1.0f, 0.0f, 0.0f};
-
-    auto const [ nozzleA, nozzleB ] = rBuilder.create_parts<2>();
-    rBuilder.set_prefabs({
-        { nozzleA,  "phLinRCS" },
-        { nozzleB,  "phLinRCS" }
-    });
-
-    Matrix4 const nozzleTfA = quick_transform(pos, rot * Quaternion::rotation( 90.0_degf,  xAxis));
-    Matrix4 const nozzleTfB = quick_transform(pos, rot * Quaternion::rotation( -90.0_degf, xAxis));
-
-    add_rcs_machines(rBuilder, inputs, nozzleA, thrustMul, nozzleTfA);
-    add_rcs_machines(rBuilder, inputs, nozzleB, thrustMul, nozzleTfB);
-
-    rWeldTo.push_back({ nozzleA, nozzleTfA });
-    rWeldTo.push_back({ nozzleB, nozzleTfB });
-}
-
-Session setup_test_vehicles(
-        TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any> const  topData,
-        Session const&              application)
-{
-    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
-
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_TEST_VEHICLES);
-    //testVehicles.m_tgCleanupEvt = tgCleanupEvt;
-
-    auto &rResources = top_get<Resources>(topData, idResources);
-
-    using namespace adera;
-
-    // Build "PartVehicle"
-    {
-        VehicleBuilder vbuilder{&rResources};
-        VehicleBuilder::WeldVec_t toWeld;
-
-        auto const [ capsule, fueltank, engineA, engineB ] = vbuilder.create_parts<4>();
-        vbuilder.set_prefabs({
-            { capsule,  "phCapsule" },
-            { fueltank, "phFuselage" },
-            { engineA,  "phEngine" },
-            { engineB,  "phEngine" },
-        });
-
-        toWeld.push_back( {capsule,  quick_transform({ 0.0f,  0.0f,  3.0f}, {})} );
-        toWeld.push_back( {fueltank, quick_transform({ 0.0f,  0.0f,  0.0f}, {})} );
-        toWeld.push_back( {engineA,  quick_transform({ 0.7f,  0.0f, -2.9f}, {})} );
-        toWeld.push_back( {engineB,  quick_transform({-0.7f,  0.0f, -2.9f}, {})} );
-
-        namespace ports_magicrocket = adera::ports_magicrocket;
-        namespace ports_userctrl = adera::ports_userctrl;
-
-        auto const [ pitch, yaw, roll, throttle, thrustMul ] = vbuilder.create_nodes<5>(gc_ntSigFloat);
-
-        auto &rFloatValues = vbuilder.node_values< SignalValues_t<float> >(gc_ntSigFloat);
-        rFloatValues[thrustMul] = 50000.0f;
-
-        vbuilder.create_machine(capsule, gc_mtUserCtrl, {
-            { ports_userctrl::gc_throttleOut,   throttle },
-            { ports_userctrl::gc_pitchOut,      pitch    },
-            { ports_userctrl::gc_yawOut,        yaw      },
-            { ports_userctrl::gc_rollOut,       roll     }
-        } );
-
-        vbuilder.create_machine(engineA, gc_mtMagicRocket, {
-            { ports_magicrocket::gc_throttleIn, throttle },
-            { ports_magicrocket::gc_multiplierIn, thrustMul }
-        } );
-
-        vbuilder.create_machine(engineB, gc_mtMagicRocket, {
-            { ports_magicrocket::gc_throttleIn, throttle },
-            { ports_magicrocket::gc_multiplierIn, thrustMul }
-        } );
-
-        RCSInputs rcsInputs{pitch, yaw, roll};
-
-        int const   rcsRingBlocks   = 4;
-        int const   rcsRingCount    = 2;
-        float const rcsRingZ        = -2.0f;
-        float const rcsZStep        = 4.0f;
-        float const rcsRadius       = 1.1f;
-        float const rcsThrust       = 3000.0f;
-
-        for (int ring = 0; ring < rcsRingCount; ++ring)
-        {
-            Vector3 const rcsOset{rcsRadius, 0.0f, rcsRingZ + ring*rcsZStep };
-
-            for (Rad ang = 0.0_degf; ang < Rad(360.0_degf); ang += Rad(360.0_degf)/rcsRingBlocks)
-            {
-               Quaternion const rotZ = Quaternion::rotation(ang, {0.0f, 0.0f, 1.0f});
-               add_rcs_block(vbuilder, toWeld, rcsInputs, rcsThrust, rotZ.transformVector(rcsOset), rotZ);
-            }
-        }
-
-        vbuilder.weld(toWeld);
-
-        top_emplace<VehicleData>(topData, idTVPartVehicle, vbuilder.finalize_release());
-    }
-
-    auto const cleanup_prefab_owners = wrap_args([] (Resources& rResources, VehicleData &rTVData) noexcept
-    {
-        for (osp::PrefabPair &rPrefabPair : rTVData.m_partPrefabs)
-        {
-            rResources.owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
-        }
-    });
-
-//    testVehicles.task() = rBuilder.task().assign({tgCleanupEvt}).data(
-//            "Clean up test vehicle's (idTVPartVehicle) owners",
-//            TopDataIds_t{ idResources, idTVPartVehicle }, cleanup_prefab_owners);
-
-    return out;
-}
 
 struct VehicleTestControls
 {

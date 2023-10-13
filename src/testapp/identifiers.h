@@ -254,7 +254,7 @@ struct PlVehicleSpawnVB
 
 
 #define TESTAPP_DATA_TEST_VEHICLES 1, \
-    idTVPartVehicle
+    idPrebuiltVehicles
 
 
 
