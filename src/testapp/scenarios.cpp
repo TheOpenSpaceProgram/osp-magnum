@@ -28,10 +28,11 @@
 #include "identifiers.h"
 
 #include "sessions/common.h"
-#include "sessions/physics.h"
+#include "sessions/magnum.h"
 #include "sessions/misc.h"
 #include "sessions/newton.h"
-#include "sessions/magnum.h"
+#include "sessions/physics.h"
+#include "sessions/shapes.h"
 #include "sessions/universe.h"
 #include "sessions/vehicles.h"
 

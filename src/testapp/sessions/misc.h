@@ -37,13 +37,6 @@ void create_materials(
         osp::Session const&         sceneRenderer,
         int                         count);
 
-void add_floor(
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         physShapes,
-        osp::draw::MaterialId       material,
-        osp::PkgId                  pkg,
-        int                         size);
-
 /**
  * @brief Create CameraController connected to an app's UserInputHandler
  */
@@ -63,36 +56,6 @@ osp::Session setup_camera_free(
         osp::Session const&         windowApp,
         osp::Session const&         scene,
         osp::Session const&         camera);
-
-/**
- * @brief Throws spheres when pressing space
- */
-osp::Session setup_thrower(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         physShapes);
-
-/**
- * @brief Spawn blocks every 2 seconds and spheres every 1 second
- */
-osp::Session setup_droppers(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         physShapes);
-
-/**
- * @brief Entity set to delete entities under Z = -10, added to spawned shapes
- */
-osp::Session setup_bounds(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         physShapes);
 
 /**
  * @brief Wireframe cube over the camera controller's target

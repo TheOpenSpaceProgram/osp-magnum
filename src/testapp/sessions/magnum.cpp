@@ -101,16 +101,6 @@ Session setup_magnum(
         rRenderGl = {}; // Needs the OpenGL thread for destruction
     });
 
-    rBuilder.task()
-        .name       ("Schedule GL Sync")
-        .schedules  ({tgWin.sync(Schedule)})
-        .push_to    (out.m_tasks)
-        .args       ({                  idMainLoopCtrl})
-        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
-    {
-        return rMainLoopCtrl.doSync ? osp::TaskActions{} : osp::TaskAction::Cancel;
-    });
-
     return out;
 } // setup_magnum
 

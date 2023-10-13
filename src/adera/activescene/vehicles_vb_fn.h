@@ -76,13 +76,13 @@ struct ACtxVehicleSpawnVB
 class SysVehicleSpawnVB
 {
     using ACtxParts         = osp::active::ACtxParts;
-    using ACtxPrefabInit    = osp::active::ACtxPrefabInit;
+    using ACtxPrefabs       = osp::active::ACtxPrefabs;
     using ACtxVehicleSpawn  = osp::active::ACtxVehicleSpawn;
     using Resources         = osp::Resources;
 public:
     static void create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts);
 
-    static void request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources);
+    static void request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources);
 };
 
 

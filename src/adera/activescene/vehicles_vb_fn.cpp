@@ -163,7 +163,7 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
 }
 
 
-void SysVehicleSpawnVB::request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources)
+void SysVehicleSpawnVB::request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources)
 {
     std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
 
@@ -195,10 +195,10 @@ void SysVehicleSpawnVB::request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVeh
             rScnParts.m_partTransformWeld[dstPart]  = pVData->m_partTransformWeld[srcPart];
 
             // Add Prefab and Part init events
-            (*itPrefabOut) = rPrefabInit.spawnRequest.size();
+            (*itPrefabOut) = rPrefabs.spawnRequest.size();
             ++itPrefabOut;
 
-            rPrefabInit.spawnRequest.push_back(TmpPrefabInitBasic{
+            rPrefabs.spawnRequest.push_back(TmpPrefabRequest{
                 .m_importerRes = prefabPairSrc.m_importer,
                 .m_prefabId = prefabPairSrc.m_prefabId,
                 .m_pTransform = &pVData->m_partTransformWeld[srcPart]

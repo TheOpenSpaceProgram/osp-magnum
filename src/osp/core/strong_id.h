@@ -49,6 +49,11 @@ struct StrongId
     constexpr StrongId(StrongId const& copy) noexcept = default;
     constexpr StrongId& operator=(StrongId const& copy) noexcept = default;
 
+    static StrongId from_index(std::size_t const index)
+    {
+        return StrongId{static_cast<INT_T>(index)};
+    }
+
     constexpr explicit StrongId(INT_T const value) noexcept
      : m_value{value}
     { };

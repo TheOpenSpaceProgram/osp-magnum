@@ -183,7 +183,7 @@ void SysSceneGraph::cut(ACtxSceneGraph& rScnGraph, ITA_T first, ITB_T const& las
 
     while (first != last)
     {
-        TreePos_t const pos = rScnGraph.m_entToTreePos[std::size_t(*first)];
+        TreePos_t const pos = rScnGraph.m_entToTreePos[*first];
 
         rScnGraph.m_delete.push_back(pos);
 

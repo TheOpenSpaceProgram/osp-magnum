@@ -36,10 +36,10 @@ using Corrade::Containers::arrayView;
 SubtreeBuilder SubtreeBuilder::add_child(ActiveEnt ent, uint32_t descendantCount)
 {
     // Place ent into tree at m_first
-    m_rScnGraph.m_treeToEnt[m_first]                = ent;
-    m_rScnGraph.m_treeDescendants[m_first]          = descendantCount;
-    m_rScnGraph.m_entParent[std::size_t(ent)]       = m_root;
-    m_rScnGraph.m_entToTreePos[std::size_t(ent)]    = m_first;
+    m_rScnGraph.m_treeToEnt[m_first]        = ent;
+    m_rScnGraph.m_treeDescendants[m_first]  = descendantCount;
+    m_rScnGraph.m_entParent[ent]            = m_root;
+    m_rScnGraph.m_entToTreePos[ent]         = m_first;
 
     TreePos_t const childFirst = m_first + 1;
     TreePos_t const childLast  = childFirst + descendantCount;
@@ -53,7 +53,7 @@ SubtreeBuilder SysSceneGraph::add_descendants(ACtxSceneGraph& rScnGraph, uint32_
 {
     TreePos_t const rootPos         = (root == lgrn::id_null<ActiveEnt>())
                                     ? 0
-                                    : rScnGraph.m_entToTreePos[std::size_t(root)];
+                                    : rScnGraph.m_entToTreePos[root];
 
     uint32_t rootdescendants        = rScnGraph.m_treeDescendants[rootPos];
 
@@ -73,9 +73,9 @@ SubtreeBuilder SysSceneGraph::add_descendants(ACtxSceneGraph& rScnGraph, uint32_
         // Right-shift tree vectors from subFirst and onwards to make
         // space for the new subtree
 
-        for (ActiveEnt const ent : arrayView(rScnGraph.m_treeToEnt).slice(subFirst, treeOldSize))
+        for (ActiveEnt const ent : arrayView(rScnGraph.m_treeToEnt.data(), rScnGraph.m_treeToEnt.size()).slice(subFirst, treeOldSize))
         {
-            rScnGraph.m_entToTreePos[std::size_t(ent)] += descendantCount;
+            rScnGraph.m_entToTreePos[ent] += descendantCount;
         }
         std::shift_right(rScnGraph.m_treeToEnt.begin() + subFirst,
                          rScnGraph.m_treeToEnt.end(),
@@ -92,9 +92,9 @@ SubtreeBuilder SysSceneGraph::add_descendants(ACtxSceneGraph& rScnGraph, uint32_
     while (parentNotNull)
     {
         parentNotNull = (parent != lgrn::id_null<ActiveEnt>());
-        TreePos_t const parentPos = parentNotNull ? rScnGraph.m_entToTreePos[std::size_t(parent)] : 0;
+        TreePos_t const parentPos = parentNotNull ? rScnGraph.m_entToTreePos[parent] : 0;
         rScnGraph.m_treeDescendants[parentPos] += descendantCount;
-        parent = parentNotNull ? rScnGraph.m_entParent[std::size_t(parent)] : parent;
+        parent = parentNotNull ? rScnGraph.m_entParent[parent] : parent;
     }
 
 
@@ -103,7 +103,7 @@ SubtreeBuilder SysSceneGraph::add_descendants(ACtxSceneGraph& rScnGraph, uint32_
 
 ArrayView<ActiveEnt const> SysSceneGraph::descendants(ACtxSceneGraph const& rScnGraph, ActiveEnt root)
 {
-    TreePos_t const rootPos = rScnGraph.m_entToTreePos[std::size_t(root)];
+    TreePos_t const rootPos = rScnGraph.m_entToTreePos[root];
     return descendants(rScnGraph, rootPos);
 }
 
@@ -115,7 +115,7 @@ ArrayView<ActiveEnt const> SysSceneGraph::descendants(ACtxSceneGraph const& rScn
 
     return (descendants == 0)
             ? ArrayView<ActiveEnt const>{}
-            : arrayView(rScnGraph.m_treeToEnt).slice(childFirst, childLast);
+            : arrayView(rScnGraph.m_treeToEnt.data(), rScnGraph.m_treeToEnt.size()).slice(childFirst, childLast);
 }
 
 
@@ -123,7 +123,7 @@ ChildRange_t SysSceneGraph::children(ACtxSceneGraph const& rScnGraph, ActiveEnt 
 {
     TreePos_t const parentPos = (parent == lgrn::id_null<ActiveEnt>())
                               ? 0
-                              : rScnGraph.m_entToTreePos[std::size_t(parent)];
+                              : rScnGraph.m_entToTreePos[parent];
 
     uint32_t const  descendants = rScnGraph.m_treeDescendants[parentPos];
     TreePos_t const childFirst  = parentPos + 1;
@@ -176,9 +176,9 @@ void SysSceneGraph::do_delete(ACtxSceneGraph& rScnGraph)
         bool parentNotNull = true;
         while (parentNotNull)
         {
-            parent = rScnGraph.m_entParent[std::size_t(parent)];
+            parent = rScnGraph.m_entParent[parent];
             parentNotNull = (parent != lgrn::id_null<ActiveEnt>());
-            TreePos_t const parentPos = parentNotNull ? rScnGraph.m_entToTreePos[std::size_t(parent)] : 0;
+            TreePos_t const parentPos = parentNotNull ? rScnGraph.m_entToTreePos[parent] : 0;
             rScnGraph.m_treeDescendants[parentPos] -= removeTotal;
         }
 
@@ -186,15 +186,15 @@ void SysSceneGraph::do_delete(ACtxSceneGraph& rScnGraph)
         std::for_each(itTreeEntsFirst + (*itDel), itTreeEntsFirst + (*itDel) + removeTotal,
                       [&rScnGraph] (ActiveEnt const ent)
         {
-            rScnGraph.m_entParent[std::size_t(ent)]     = lgrn::id_null<ActiveEnt>();
-            rScnGraph.m_entToTreePos[std::size_t(ent)]  = lgrn::id_null<TreePos_t>();
+            rScnGraph.m_entParent[ent]      = lgrn::id_null<ActiveEnt>();
+            rScnGraph.m_entToTreePos[ent]   = lgrn::id_null<TreePos_t>();
         });
 
         // Update tree positions for elements to shift
         std::for_each(itTreeEntsFirst + keepFirst, itTreeEntsFirst + keepLast,
                       [&rScnGraph, shift] (ActiveEnt const ent)
         {
-            rScnGraph.m_entToTreePos[std::size_t(ent)] -= shift;
+            rScnGraph.m_entToTreePos[ent] -= shift;
         });
 
         // Shift over tree data

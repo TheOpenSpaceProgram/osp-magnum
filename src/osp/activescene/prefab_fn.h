@@ -27,18 +27,12 @@
 #include "basic_fn.h"
 #include "physics.h"
 
+#include "../core/array_view.h"
 #include "../core/resourcetypes.h"
 #include "../vehicles/prefabs.h"
 
-#include <Corrade/Containers/ArrayView.h>
-
 #include <optional>
 #include <vector>
-
-namespace osp
-{
-    using Corrade::Containers::ArrayView;
-}
 
 namespace osp::active
 {
@@ -52,48 +46,59 @@ namespace osp::active
  * Intended to be created and quickly destroyed once the prefab is created.
  * This is often the span of a single frame.
  */
-struct TmpPrefabInitBasic
+struct TmpPrefabRequest
 {
     ResId m_importerRes{lgrn::id_null<ResId>()};
     PrefabId m_prefabId;
     Matrix4 const* m_pTransform{nullptr};
 };
 
-
-struct ACtxPrefabInit
+struct PrefabInstanceInfo
 {
-    osp::active::ActiveEntSet_t                 roots;
-
-    std::vector<TmpPrefabInitBasic>             spawnRequest;
-    std::vector< ArrayView<ActiveEnt const> >   spawnedEntsOffset;
-    std::vector<ActiveEnt>                      newEnts;
+    ResId       importer    { lgrn::id_null<ResId>() };
+    PrefabId    prefab      { lgrn::id_null<PrefabId>() };
+    ObjId       obj         { lgrn::id_null<ObjId>() };
 };
 
+struct ACtxPrefabs
+{
+    std::vector<TmpPrefabRequest>               spawnRequest;
+    std::vector< ArrayView<ActiveEnt const> >   spawnedEntsOffset;
+    std::vector<ActiveEnt>                      newEnts;
+
+    osp::active::ActiveEntSet_t                 roots;
+    KeyedVec<ActiveEnt, PrefabInstanceInfo>     instanceInfo;
+};
 
 class SysPrefabInit
 {
 public:
 
     static void create_activeents(
-            ACtxPrefabInit&             rPrefabInit,
+            ACtxPrefabs&                rPrefabs,
             ACtxBasic&                  rBasic,
             Resources&                  rResources);
 
     static void add_to_subtree(
-            TmpPrefabInitBasic const&   basic,
+            TmpPrefabRequest const&     basic,
             ArrayView<ActiveEnt const>  ents,
             Resources const&            rResources,
             SubtreeBuilder&             rSubtree) noexcept;
 
     static void init_transforms(
-            ACtxPrefabInit const&       rPrefabInit,
+            ACtxPrefabs const&          rPrefabs,
             Resources const&            rResources,
             ACompTransformStorage_t&    rTransform) noexcept;
 
+    static void init_info(
+            ACtxPrefabs&                rPrefabs,
+            Resources const&            rResources) noexcept;
+
     static void init_physics(
-            ACtxPrefabInit const&       rPrefabInit,
+            ACtxPrefabs const&          rPrefabs,
             Resources const&            rResources,
             ACtxPhysics&                rCtxPhys) noexcept;
+
 };
 
 

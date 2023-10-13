@@ -124,6 +124,7 @@ Session setup_vehicle_spawn(
     rBuilder.task()
         .name       ("Schedule Vehicle spawn")
         .schedules  ({tgVhSp.spawnRequest(Schedule_)})
+        .sync_with  ({tgScn.update(Run)})
         .push_to    (out.m_tasks)
         .args       ({                   idVehicleSpawn })
         .func([] (ACtxVehicleSpawn const& rVehicleSpawn) noexcept -> TaskActions
@@ -194,10 +195,10 @@ Session setup_vehicle_spawn_vb(
         .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
         .sync_with  ({tgPf.spawnRequest(Modify_), tgVhSp.spawnedParts(UseOrRun)})
         .push_to    (out.m_tasks)
-        .args       ({             idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                idPrefabInit,           idResources})
-        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
+        .args       ({             idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,             idPrefabs,           idResources})
+        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
     {
-        SysVehicleSpawnVB::request_prefabs(rVehicleSpawn, rVehicleSpawnVB, rScnParts, rPrefabInit, rResources);
+        SysVehicleSpawnVB::request_prefabs(rVehicleSpawn, rVehicleSpawnVB, rScnParts, rPrefabs, rResources);
     });
 
 /*
@@ -299,8 +300,8 @@ Session setup_vehicle_spawn_vb(
 
     vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVsBasicInReq, tgVsPartReq, tgVbPartReq, tgVbMachReq, tgVsMapPartMachMod}).data(
             "Update Part<->Machine maps",
-            TopDataIds_t{                  idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                idPrefabInit,           idResources},
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
+            TopDataIds_t{                  idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                idPrefabs,           idResources},
+            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabs, Resources& rResources) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
         ACtxVehicleSpawnVB const& rVSVB = rVehicleSpawnVB;
@@ -419,8 +420,8 @@ Session setup_vehicle_spawn_vb(
 
     vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVsPartReq, tgPrefabEntReq, tgMapPartEntMod}).data(
             "Update PartId<->ActiveEnt mapping",
-            TopDataIds_t{                  idVehicleSpawn,           idScnParts,                   idActiveIds,                 idPrefabInit },
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts, ActiveReg_t const& rActiveIds,  ACtxPrefabInit& rPrefabInit) noexcept
+            TopDataIds_t{                  idVehicleSpawn,           idScnParts,                   idActiveIds,                 idPrefabs },
+            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts, ActiveReg_t const& rActiveIds,  ACtxPrefabInit& rPrefabs) noexcept
     {
         if (rVehicleSpawn.new_vehicle_count() == 0)
         {
@@ -436,7 +437,7 @@ Session setup_vehicle_spawn_vb(
 
         for (PartId const partId : rVehicleSpawn.m_newPartToPart)
         {
-            ActiveEnt const root = rPrefabInit.spawnedEntsOffset[*itPrefab].front();
+            ActiveEnt const root = rPrefabs.spawnedEntsOffset[*itPrefab].front();
             std::advance(itPrefab, 1);
 
             rScnParts.m_partToActive[partId]            = root;
@@ -499,7 +500,7 @@ Session setup_vehicle_spawn_draw(
     Session out;
 
     rBuilder.task()
-        .name       ("")
+        .name       ("asdf")
         .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
         .sync_with  ({tgVhSp.rootEnts(UseOrRun), tgScnRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)

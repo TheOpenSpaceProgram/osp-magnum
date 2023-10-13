@@ -24,6 +24,7 @@
  */
 #include "newton.h"
 #include "physics.h"
+#include "shapes.h"
 
 #include <osp/activescene/basic_fn.h>
 #include <osp/activescene/physics_fn.h>
@@ -316,10 +317,7 @@ Session setup_vehicle_spawn_newton(
         .args       ({      idBasic,                  idVehicleSpawn,           idScnParts})
         .func([] (ACtxBasic& rBasic, ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts) noexcept
     {
-        if (rVehicleSpawn.new_vehicle_count() == 0)
-        {
-            return;
-        }
+        LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
 
         rVehicleSpawn.rootEnts.resize(rVehicleSpawn.spawnedWelds.size());
         rBasic.m_activeIds.create(rVehicleSpawn.rootEnts.begin(), rVehicleSpawn.rootEnts.end());
@@ -337,13 +335,15 @@ Session setup_vehicle_spawn_newton(
     rBuilder.task()
         .name       ("Add vehicle entities to Scene Graph")
         .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.rootEnts(UseOrRun), tgPf.spawnedEnts(UseOrRun), tgCS.transform(Ready), tgCS.hierarchy(Modify)})
+        .sync_with  ({tgVhSp.rootEnts(UseOrRun), tgPf.spawnedEnts(UseOrRun), tgPf.spawnRequest(UseOrRun), tgPf.inSubtree(Run), tgCS.transform(Ready), tgCS.hierarchy(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({      idBasic,                        idVehicleSpawn,           idScnParts,               idPrefabInit,            idResources})
-        .func([] (ACtxBasic& rBasic, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabInit, Resources& rResources) noexcept
+        .args       ({      idBasic,                        idVehicleSpawn,           idScnParts,             idPrefabs,            idResources})
+        .func([] (ACtxBasic& rBasic, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
     {
+        LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
+
         // ActiveEnts created for welds + ActiveEnts created for vehicle prefabs
-        std::size_t const totalEnts = rVehicleSpawn.rootEnts.size() + rPrefabInit.newEnts.size();
+        std::size_t const totalEnts = rVehicleSpawn.rootEnts.size() + rPrefabs.newEnts.size();
 
         auto const& itWeldsFirst        = std::begin(rVehicleSpawn.spawnedWelds);
         auto const& itWeldOffsetsLast   = std::end(rVehicleSpawn.spawnedWeldOffsets);
@@ -360,7 +360,7 @@ Session setup_vehicle_spawn_newton(
 
             std::for_each(itWeldsFirst + std::size_t{*itWeldOffsets},
                           itWeldsFirst + std::size_t{weldOffsetNext},
-                          [&rBasic, &rScnParts, &rVehicleSpawn, &rPrefabInit, &rResources, &toInit] (WeldId const weld)
+                          [&rBasic, &rScnParts, &rVehicleSpawn, &rPrefabs, &rResources, &toInit] (WeldId const weld)
             {
                 // Count parts in this weld first
                 std::size_t entCount = 0;
@@ -368,7 +368,7 @@ Session setup_vehicle_spawn_newton(
                 {
                     SpPartId const newPart = rVehicleSpawn.partToSpawned[part];
                     uint32_t const prefabInit = rVehicleSpawn.spawnedPrefabs[newPart];
-                    entCount += rPrefabInit.spawnedEntsOffset[prefabInit].size();
+                    entCount += rPrefabs.spawnedEntsOffset[prefabInit].size();
                 }
 
                 ActiveEnt const weldEnt = rScnParts.m_weldToEnt[weld];
@@ -382,8 +382,8 @@ Session setup_vehicle_spawn_newton(
                 {
                     SpPartId const newPart      = rVehicleSpawn.partToSpawned[part];
                     uint32_t const prefabInit   = rVehicleSpawn.spawnedPrefabs[newPart];
-                    auto const& basic           = rPrefabInit.spawnRequest[prefabInit];
-                    auto const& ents            = rPrefabInit.spawnedEntsOffset[prefabInit];
+                    auto const& basic           = rPrefabs.spawnRequest[prefabInit];
+                    auto const& ents            = rPrefabs.spawnedEntsOffset[prefabInit];
 
                     SysPrefabInit::add_to_subtree(basic, ents, rResources, bldWeld);
                 }
@@ -405,10 +405,7 @@ Session setup_vehicle_spawn_newton(
         .args       ({      idBasic,             idPhys,              idNwt,                        idVehicleSpawn,                 idScnParts})
         .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts) noexcept
     {
-        if (rVehicleSpawn.new_vehicle_count() == 0)
-        {
-            return;
-        }
+        LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
 
         rPhys.m_hasColliders.ints().resize(rBasic.m_activeIds.vec().capacity());
 

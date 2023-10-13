@@ -221,7 +221,17 @@ Session setup_window_app(
     out.m_cleanup = tgWin.cleanup;
 
     rBuilder.task()
-        .name       ("Schedule GL Resync")
+        .name       ("Schedule Renderer Sync")
+        .schedules  ({tgWin.sync(Schedule)})
+        .push_to    (out.m_tasks)
+        .args       ({                  idMainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rMainLoopCtrl.doSync ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
+
+    rBuilder.task()
+        .name       ("Schedule Renderer Resync")
         .schedules  ({tgWin.resync(Schedule)})
         .push_to    (out.m_tasks)
         .args       ({                  idMainLoopCtrl})

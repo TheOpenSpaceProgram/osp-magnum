@@ -183,12 +183,14 @@ struct PlPhysShapes
 
 
 #define TESTAPP_DATA_PREFABS 1, \
-    idPrefabInit
+    idPrefabs
 struct PlPrefabs
 {
     PipelineDef<EStgIntr> spawnRequest      {"spawnRequest"};
     PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
     PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
+
+    PipelineDef<EStgCont> instanceInfo      {"instanceInfo"};
 
     PipelineDef<EStgOptn> inSubtree         {"inSubtree"};
 };

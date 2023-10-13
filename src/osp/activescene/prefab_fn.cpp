@@ -39,13 +39,13 @@ namespace osp::active
 {
 
 void SysPrefabInit::create_activeents(
-        ACtxPrefabInit&                     rPrefabInit,
+        ACtxPrefabs&                        rPrefabs,
         ACtxBasic&                          rBasic,
         Resources&                          rResources)
 {
     // Count number of entities needed to be created
     std::size_t totalEnts = 0;
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
+    for (TmpPrefabRequest const& rPfBasic : rPrefabs.spawnRequest)
     {
         auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
         auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
@@ -54,14 +54,14 @@ void SysPrefabInit::create_activeents(
     }
 
     // Create entities
-    rPrefabInit.newEnts.resize(totalEnts);
-    rBasic.m_activeIds.create(std::begin(rPrefabInit.newEnts), std::end(rPrefabInit.newEnts));
+    rPrefabs.newEnts.resize(totalEnts);
+    rBasic.m_activeIds.create(std::begin(rPrefabs.newEnts), std::end(rPrefabs.newEnts));
 
     // Assign new entities to each prefab to create
-    rPrefabInit.spawnedEntsOffset.resize(rPrefabInit.spawnRequest.size());
-    auto itEntAvailable = std::begin(rPrefabInit.newEnts);
-    auto itPfEntSpanOut = std::begin(rPrefabInit.spawnedEntsOffset);
-    for (TmpPrefabInitBasic& rPfBasic : rPrefabInit.spawnRequest)
+    rPrefabs.spawnedEntsOffset.resize(rPrefabs.spawnRequest.size());
+    auto itEntAvailable = std::begin(rPrefabs.newEnts);
+    auto itPfEntSpanOut = std::begin(rPrefabs.spawnedEntsOffset);
+    for (TmpPrefabRequest& rPfBasic : rPrefabs.spawnRequest)
     {
         auto const& rPrefabData = rResources.data_get<Prefabs>(gc_importer, rPfBasic.m_importerRes);
         auto const& objects     = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
@@ -72,11 +72,11 @@ void SysPrefabInit::create_activeents(
         std::advance(itPfEntSpanOut, 1);
     }
 
-    assert(itEntAvailable == std::end(rPrefabInit.newEnts));
+    assert(itEntAvailable == std::end(rPrefabs.newEnts));
 }
 
 void SysPrefabInit::add_to_subtree(
-        TmpPrefabInitBasic const&           basic,
+        TmpPrefabRequest const&             basic,
         ArrayView<ActiveEnt const>          ents,
         Resources const&                    rResources,
         SubtreeBuilder&                     bldPrefab) noexcept
@@ -115,13 +115,13 @@ void SysPrefabInit::add_to_subtree(
 }
 
 void SysPrefabInit::init_transforms(
-        ACtxPrefabInit const&               rPrefabInit,
+        ACtxPrefabs const&                  rPrefabs,
         Resources const&                    rResources,
         ACompTransformStorage_t&            rTransform) noexcept
 {
-    auto itPfEnts = std::begin(rPrefabInit.spawnedEntsOffset);
+    auto itPfEnts = rPrefabs.spawnedEntsOffset.begin();
 
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
+    for (TmpPrefabRequest const& rPfBasic : rPrefabs.spawnRequest)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);
@@ -140,52 +140,17 @@ void SysPrefabInit::init_transforms(
             rTransform.emplace(ent, transform);
         }
 
-        std::advance(itPfEnts, 1);
+        ++itPfEnts;
     }
 }
 
-#if 0
-void SysPrefabInit::init_drawing(
-        ACtxPrefabInit const&               rPrefabInit,
-        Resources&                          rResources,
-        ACtxDrawing&                        rDrawing,
-        ACtxDrawingRes&                     rDrawingRes,
-        std::optional<Material>             material) noexcept
+void SysPrefabInit::init_info(
+            ACtxPrefabs&                    rPrefabs,
+            Resources const&                rResources) noexcept
 {
-    auto itPfEnts = rPrefabInit.spawnedEntsOffset.begin();
+    auto itPfEnts = rPrefabs.spawnedEntsOffset.begin();
 
-    // stupidly make drawIDs first
-    // TODO: separate this into another step.
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
-    {
-        auto const &rImportData = rResources.data_get<osp::ImporterData const>(
-                gc_importer, rPfBasic.m_importerRes);
-        auto const &rPrefabData = rResources.data_get<osp::Prefabs const>(
-                gc_importer, rPfBasic.m_importerRes);
-
-        auto const objects = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
-
-        for (std::size_t i = 0; i < objects.size(); ++i)
-        {
-            int const meshImportId = rImportData.m_objMeshes[objects[i]];
-            if (meshImportId == -1)
-            {
-                continue;
-            }
-
-            ActiveEnt const ent = (*itPfEnts)[i];
-            rDrawing.m_activeToDraw[ent] = rDrawing.m_drawIds.create();
-        }
-
-        ++itPfEnts;
-    }
-
-    // then resize containers
-    rDrawing.resize_draw();
-
-    itPfEnts = rPrefabInit.spawnedEntsOffset.begin();
-
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
+    for (TmpPrefabRequest const& rPfBasic : rPrefabs.spawnRequest)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);
@@ -193,84 +158,36 @@ void SysPrefabInit::init_drawing(
                 gc_importer, rPfBasic.m_importerRes);
 
         auto const ents     = ArrayView<ActiveEnt const>{*itPfEnts};
-        auto const objects  = lgrn::Span<int const>{rPrefabData.m_prefabs[rPfBasic.m_prefabId]};
-        auto const parents  = lgrn::Span<int const>{rPrefabData.m_prefabParents[rPfBasic.m_prefabId]};
-
-        // All ancestors of  each entity that has a mesh
-        auto const needs_draw_transform
-            = [&parents, &ents, &rDrawing, &needDrawTf = rDrawing.m_needDrawTf]
-              (auto && self, int const object, ActiveEnt const ent) noexcept -> void
-        {
-            needDrawTf.set(std::size_t(ent));
-
-            int const parentObj = parents[object];
-
-            if (parentObj != -1)
-            {
-                self(self, parentObj, ents[parentObj]);
-            }
-        };
+        auto const objects = rPrefabData.m_prefabs[rPfBasic.m_prefabId];
+        auto const parents = rPrefabData.m_prefabParents[rPfBasic.m_prefabId];
 
         for (std::size_t i = 0; i < objects.size(); ++i)
         {
-            ActiveEnt const ent = (*itPfEnts)[i];
+            ActiveEnt const ent = ents[i];
+            PrefabInstanceInfo &rInfo = rPrefabs.instanceInfo[ent];
+            rInfo.importer  = rPfBasic.m_importerRes;
+            rInfo.prefab    = rPfBasic.m_prefabId;
+            rInfo.obj       = i;
 
-            // Check if object has mesh
-            int const meshImportId = rImportData.m_objMeshes[objects[i]];
-            if (meshImportId == -1)
+            if (parents[i] == -1)
             {
-                continue;
-            }
-
-            needs_draw_transform(needs_draw_transform, objects[i], ent);
-
-            DrawEnt const drawEnt = rDrawing.m_activeToDraw[ent];
-
-            osp::ResId const meshRes = rImportData.m_meshes[meshImportId];
-            MeshId const meshId = SysRender::own_mesh_resource(rDrawing, rDrawingRes, rResources, meshRes);
-            rDrawing.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(meshId);
-            rDrawing.m_meshDirty.push_back(drawEnt);
-
-            int const matImportId = rImportData.m_objMaterials[objects[i]];
-
-            if (Magnum::Trade::MaterialData const &mat = *rImportData.m_materials.at(matImportId);
-                mat.types() & Magnum::Trade::MaterialType::PbrMetallicRoughness)
-            {
-                auto const& matPbr = mat.as<Magnum::Trade::PbrMetallicRoughnessMaterialData>();
-                if (int const baseColor = matPbr.baseColorTexture();
-                    baseColor != -1)
-                {
-                    osp::ResId const texRes = rImportData.m_textures[baseColor];
-                    TexId const texId = SysRender::own_texture_resource(rDrawing, rDrawingRes, rResources, texRes);
-                    rDrawing.m_diffuseTex[drawEnt] = rDrawing.m_texRefCounts.ref_add(texId);
-                    rDrawing.m_diffuseDirty.push_back(drawEnt);
-                }
-            }
-
-            rDrawing.m_drawBasic[drawEnt] = { .m_opaque = true, .m_transparent = false };
-            rDrawing.m_visible.set(std::size_t(drawEnt));
-
-            if (material.has_value())
-            {
-                material.value().m_ents.set(std::size_t(drawEnt));
-                material.value().m_dirty.push_back(drawEnt);
+                rPrefabs.roots.set(std::size_t(ent));
             }
         }
 
         ++itPfEnts;
     }
 }
-#endif
 
 void SysPrefabInit::init_physics(
-            ACtxPrefabInit const&               rPrefabInit,
-            Resources const&                    rResources,
-            ACtxPhysics&                        rCtxPhys) noexcept
+            ACtxPrefabs const&              rPrefabs,
+            Resources const&                rResources,
+            ACtxPhysics&                    rCtxPhys) noexcept
 {
 
-    auto itPfEnts = std::begin(rPrefabInit.spawnedEntsOffset);
+    auto itPfEnts = rPrefabs.spawnedEntsOffset.begin();
 
-    for (TmpPrefabInitBasic const& rPfBasic : rPrefabInit.spawnRequest)
+    for (TmpPrefabRequest const& rPfBasic : rPrefabs.spawnRequest)
     {
         auto const &rImportData = rResources.data_get<osp::ImporterData const>(
                 gc_importer, rPfBasic.m_importerRes);
