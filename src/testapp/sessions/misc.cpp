@@ -75,6 +75,7 @@ Session setup_camera_ctrl(
     OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
     auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
     auto const tgSR     = magnumScene   .get_pipelines<PlMagnumScene>();
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
 
     auto &rUserInput = top_get< osp::input::UserInputHandler >(topData, idUserInput);
 
@@ -84,7 +85,7 @@ Session setup_camera_ctrl(
 
     top_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
 
-    rBuilder.pipeline(tgCmCt.camCtrl).parent(tgScnRdr.render);
+    rBuilder.pipeline(tgCmCt.camCtrl).parent(tgWin.sync);
 
     rBuilder.task()
         .name       ("Position Rendering Camera according to Camera Controller")

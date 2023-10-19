@@ -25,6 +25,7 @@
 #include "vehicles.h"
 
 #include <adera/activescene/vehicles_vb_fn.h>
+#include <adera/drawing/CameraController.h>
 #include <adera/machines/links.h>
 
 #include <osp/activescene/basic.h>
@@ -65,11 +66,19 @@ Session setup_parts(
 
     out.m_cleanup = tgScn.cleanup;
 
-    rBuilder.pipeline(tgParts.part)         .parent(tgScn.update);
-    rBuilder.pipeline(tgParts.mapPartEnt)   .parent(tgScn.update);
-    rBuilder.pipeline(tgParts.weld)         .parent(tgScn.update);
-    rBuilder.pipeline(tgParts.link)         .parent(tgScn.update);
-
+    rBuilder.pipeline(tgParts.partIds)          .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.partPrefabs)      .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.partTransformWeld).parent(tgScn.update);
+    rBuilder.pipeline(tgParts.partDirty)        .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.weldIds)          .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.weldDirty)        .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.machIds)          .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.nodeIds)          .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.connect)          .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.mapWeldPart)      .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.mapPartMach)      .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.mapPartActive)    .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.mapWeldActive)    .parent(tgScn.update);
 
     auto &rScnParts = top_emplace< ACtxParts >      (topData, idScnParts);
     auto &rUpdMach  = top_emplace< UpdMachPerType > (topData, idUpdMach);
@@ -96,14 +105,26 @@ Session setup_parts(
         }
     });
 
-//    parts.task() = rBuilder.task().assign({tgSceneEvt, tgPartClr, tgWeldClr}).data(
-//            "Clear Part and Weld dirty vectors after use",
-//            TopDataIds_t{           idScnParts},
-//            wrap_args([] (ACtxParts& rScnParts) noexcept
-//    {
-//        rScnParts.m_partDirty.clear();
-//        rScnParts.m_weldDirty.clear();
-//    }));
+
+    rBuilder.task()
+        .name       ("Clear Part dirty vectors after use")
+        .run_on     ({tgParts.partDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({      idScnParts})
+        .func([] (ACtxParts& rScnParts) noexcept
+    {
+        rScnParts.m_partDirty.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Clear Weld dirty vectors after use")
+        .run_on     ({tgParts.weldDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({      idScnParts})
+        .func([] (ACtxParts& rScnParts) noexcept
+    {
+        rScnParts.m_weldDirty.clear();
+    });
 
     return out;
 } // setup_parts
@@ -123,7 +144,7 @@ Session setup_vehicle_spawn(
     rBuilder.pipeline(tgVhSp.spawnedParts)  .parent(tgScn.update);
     rBuilder.pipeline(tgVhSp.spawnedWelds)  .parent(tgScn.update);
     rBuilder.pipeline(tgVhSp.rootEnts)      .parent(tgScn.update);
-    rBuilder.pipeline(tgVhSp.mapPartMach)   .parent(tgScn.update);
+    rBuilder.pipeline(tgVhSp.spawnedMachs)     .parent(tgScn.update);
 
     top_emplace< ACtxVehicleSpawn >     (topData, idVehicleSpawn);
 
@@ -149,7 +170,7 @@ Session setup_vehicle_spawn(
     });
 
     return out;
-}
+} // setup_vehicle_spawn
 
 Session setup_vehicle_spawn_vb(
         TopTaskBuilder&             rBuilder,
@@ -171,6 +192,7 @@ Session setup_vehicle_spawn_vb(
     auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
     auto const tgPf     = prefabs       .get_pipelines<PlPrefabs>();
     auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgParts  = parts         .get_pipelines<PlParts>();
     auto const tgVhSp   = vehicleSpawn  .get_pipelines<PlVehicleSpawn>();
 
     Session out;
@@ -188,7 +210,7 @@ Session setup_vehicle_spawn_vb(
     rBuilder.task()
         .name       ("Create PartIds and WeldIds for vehicles to spawn from VehicleData")
         .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.spawnedParts(Resize)})
+        .sync_with  ({tgVhSp.spawnedParts(Resize), tgVhSpVB.remapParts(Modify_), tgVhSpVB.remapWelds(Modify_)})
         .push_to    (out.m_tasks)
         .args       ({             idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
@@ -207,19 +229,17 @@ Session setup_vehicle_spawn_vb(
         SysVehicleSpawnVB::request_prefabs(rVehicleSpawn, rVehicleSpawnVB, rScnParts, rPrefabs, rResources);
     });
 
-/*
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVsBasicInReq, tgVbMachMod, tgLinkMod}).data(
-            "Copy Machine IDs from VehicleData to ACtxParts",
-            TopDataIds_t{                  idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts},
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
+
+    rBuilder.task()
+        .name       ("Create Machine IDs copied from VehicleData")
+        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgVhSpVB.dataVB(UseOrRun), tgVhSpVB.remapMachs(Modify_), tgVhSp.spawnedMachs(Resize), tgParts.machIds(New)})
+        .push_to    (out.m_tasks)
+        .args       ({             idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts})
+        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
         ACtxVehicleSpawnVB &rVSVB = rVehicleSpawnVB;
-
-        if (newVehicleCount == 0)
-        {
-            return;
-        }
 
         // Count total machines, and calculate offsets for remaps.
 
@@ -231,7 +251,7 @@ Session setup_vehicle_spawn_vb(
 
         rVSVB.remapMachOffsets.resize(newVehicleCount);
 
-        for (NewVehicleId vhId = 0; vhId < newVehicleCount; ++vhId)
+        for (SpVehicleId vhId{0}; vhId.value < newVehicleCount; ++vhId.value)
         {
             VehicleData const* pVData = rVSVB.dataVB[vhId];
             if (pVData == nullptr)
@@ -253,20 +273,20 @@ Session setup_vehicle_spawn_vb(
             }
         }
 
-        rVehicleSpawn.m_newMachToMach.resize(machTotal);
+        rVehicleSpawn.spawnedMachs.resize(machTotal);
         rVSVB.remapMachs.resize(remapMachTotal);
 
         // Create ACtxParts MachAny/LocalIDs and populate remaps
 
         // MachAnyIDs created here
-        rScnParts.m_machines.m_ids.create(rVehicleSpawn.m_newMachToMach.begin(),
-                                          rVehicleSpawn.m_newMachToMach.end());
+        rScnParts.m_machines.m_ids.create(rVehicleSpawn.spawnedMachs.begin(),
+                                          rVehicleSpawn.spawnedMachs.end());
 
         rScnParts.m_machines.m_machToLocal.resize(rScnParts.m_machines.m_ids.capacity());
 
-        auto itDstMachIds = std::cbegin(rVehicleSpawn.m_newMachToMach);
+        auto itDstMachIds = rVehicleSpawn.spawnedMachs.cbegin();
 
-        for (NewVehicleId vhId = 0; vhId < newVehicleCount; ++vhId)
+        for (SpVehicleId vhId{0}; vhId.value < newVehicleCount; ++vhId.value)
         {
             VehicleData const* pVData = rVSVB.dataVB[vhId];
             if (pVData == nullptr)
@@ -302,22 +322,20 @@ Session setup_vehicle_spawn_vb(
                 rScnParts.m_machines.m_machToLocal[dstMach] = dstLocal;
             }
         }
-    }));
+    });
 
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVsBasicInReq, tgVsPartReq, tgVbPartReq, tgVbMachReq, tgVsMapPartMachMod}).data(
-            "Update Part<->Machine maps",
-            TopDataIds_t{                  idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                idPrefabs,           idResources},
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabInit& rPrefabs, Resources& rResources) noexcept
+    rBuilder.task()
+        .name       ("Update Part<->Machine maps")
+        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgVhSpVB.dataVB(UseOrRun), tgVhSpVB.remapMachs(UseOrRun), tgVhSpVB.remapParts(UseOrRun), tgParts.mapPartMach(New)})
+        .push_to    (out.m_tasks)
+        .args       ({             idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,             idPrefabs,           idResources})
+        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
         ACtxVehicleSpawnVB const& rVSVB = rVehicleSpawnVB;
 
-        if (newVehicleCount == 0)
-        {
-            return;
-        }
-
-        for (NewVehicleId vhId = 0; vhId < newVehicleCount; ++vhId)
+        for (SpVehicleId vhId{0}; vhId.value < newVehicleCount; ++vhId.value)
         {
             VehicleData const* pVData = rVSVB.dataVB[vhId];
             if (pVData == nullptr)
@@ -365,20 +383,18 @@ Session setup_vehicle_spawn_vb(
                 }
             }
         }
-    }));
+    });
 
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVsPartReq, tgVbPartReq, tgVbMachReq, tgLinkMod, tgVbNodeMod}).data(
-            "Copy Node IDs from VehicleBuilder to ACtxParts",
-            TopDataIds_t{                  idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts},
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
+    rBuilder.task()
+        .name       ("Create (and connect) Node IDs copied from VehicleBuilder")
+        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgVhSpVB.dataVB(UseOrRun), tgVhSpVB.remapMachs(UseOrRun), tgVhSpVB.remapNodes(Modify_), tgParts.nodeIds(New), tgParts.connect(New)})
+        .push_to    (out.m_tasks)
+        .args       ({             idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts})
+        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
         ACtxVehicleSpawnVB &rVSVB = rVehicleSpawnVB;
-
-        if (newVehicleCount == 0)
-        {
-            return;
-        }
 
         rVSVB.remapNodeOffsets.resize(newVehicleCount * NodeTypeReg_t::size());
         auto remapNodeOffsets2d = rVSVB.remap_node_offsets_2d();
@@ -400,7 +416,7 @@ Session setup_vehicle_spawn_vb(
 
         std::size_t nodeRemapUsed = 0;
 
-        for (NewVehicleId vhId = 0; vhId < newVehicleCount; ++vhId)
+        for (SpVehicleId vhId{0}; vhId.value < newVehicleCount; ++vhId.value)
         {
             VehicleData const* pVData = rVSVB.dataVB[vhId];
             if (pVData == nullptr)
@@ -416,41 +432,40 @@ Session setup_vehicle_spawn_vb(
 
                 std::size_t const remapSize = rSrcNodeType.m_nodeIds.capacity();
                 auto nodeRemapOut = arrayView(rVSVB.remapNodes).sliceSize(nodeRemapUsed, remapSize);
-                remapNodeOffsets2d[vhId][nodeType] = nodeRemapUsed;
+                remapNodeOffsets2d[vhId.value][nodeType] = nodeRemapUsed;
                 nodeRemapUsed += remapSize;
                 copy_nodes(rSrcNodeType, pVData->m_machines, machRemap,
                            rScnParts.m_nodePerType[nodeType], rScnParts.m_machines, nodeRemapOut);
             }
         }
-    }));
+    });
 
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVsPartReq, tgPrefabEntReq, tgMapPartEntMod}).data(
-            "Update PartId<->ActiveEnt mapping",
-            TopDataIds_t{                  idVehicleSpawn,           idScnParts,                   idActiveIds,                 idPrefabs },
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts, ActiveReg_t const& rActiveIds,  ACtxPrefabInit& rPrefabs) noexcept
+    rBuilder.task()
+        .name       ("Update PartId<->ActiveEnt mapping")
+        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgVhSp.spawnedParts(UseOrRun), tgPf.spawnedEnts(UseOrRun), tgParts.mapPartActive(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({             idVehicleSpawn,                 idBasic,           idScnParts,              idPrefabs})
+        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxBasic const& rBasic, ACtxParts& rScnParts,  ACtxPrefabs& rPrefabs) noexcept
     {
-        if (rVehicleSpawn.new_vehicle_count() == 0)
-        {
-            return;
-        }
-
         rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
-        rScnParts.m_activeToPart.resize(rActiveIds.capacity());
+        rScnParts.m_activeToPart.resize(rBasic.m_activeIds.capacity());
 
         // Populate PartId<->ActiveEnt mapping, now that the prefabs exist
 
-        auto itPrefab = std::begin(rVehicleSpawn.spawnedPrefabs);
+        auto itPrefab = rVehicleSpawn.spawnedPrefabs.begin();
 
-        for (PartId const partId : rVehicleSpawn.m_newPartToPart)
+        for (PartId const partId : rVehicleSpawn.spawnedParts)
         {
             ActiveEnt const root = rPrefabs.spawnedEntsOffset[*itPrefab].front();
-            std::advance(itPrefab, 1);
+            ++itPrefab;
 
             rScnParts.m_partToActive[partId]            = root;
             rScnParts.m_activeToPart[std::size_t(root)] = partId;
         }
-    }));
+    });
 
+/*
     vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVbNodeReq, tgSigFloatLinkReq}).data(
             "Copy float signal values from VehicleBuilder",
             TopDataIds_t{                  idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                       idSigValFloat},
@@ -490,7 +505,7 @@ Session setup_vehicle_spawn_vb(
     */
 
     return out;
-}
+} // setup_vehicle_spawn_vb
 
 Session setup_vehicle_spawn_draw(
         TopTaskBuilder&             rBuilder,
@@ -520,7 +535,7 @@ Session setup_vehicle_spawn_draw(
     });
 
     return out;
-}
+} // setup_vehicle_spawn_draw
 
 #if 0
 
@@ -756,30 +771,28 @@ struct VehicleTestControls
     input::EButtonControlIndex m_btnRollRt;
 };
 
-#if 0
 
 Session setup_vehicle_control(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Session const&              commonScene,
+        Session const&              windowApp,
+        Session const&              scene,
         Session const&              parts,
-        Session const&              signalsFloat,
-        Session const&              app)
+        Session const&              signalsFloat)
 {
-    OSP_SESSION_UNPACK_DATA(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
-    OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
-    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_DATA(app,            TESTAPP_APP);
-    OSP_SESSION_UNPACK_TAGS(app,            TESTAPP_APP);
+    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
+    //OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
+    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
+    OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
+    //OSP_DECLARE_GET_DATA_IDS(app,           TESTAPP_DATA_APP);
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
 
-    using namespace adera;
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_VEHICLE_CONTROL);
+    auto const tgVhCtrl = out.create_pipelines<PlVehicleCtrl>(rBuilder);
 
-    Session vehicleCtrl;
-    OSP_SESSION_ACQUIRE_DATA(vehicleCtrl, topData, TESTAPP_VEHICLE_CONTROL);
-    OSP_SESSION_ACQUIRE_TAGS(vehicleCtrl, rTags,   TESTAPP_VEHICLE_CONTROL);
-
-    rBuilder.tag(tgSelUsrCtrlReq).depend_on({tgSelUsrCtrlMod});
+    rBuilder.pipeline(tgVhCtrl.selectedVehicle).parent(tgScn.update);
 
     auto &rUserInput = top_get< input::UserInputHandler >(topData, idUserInput);
 
@@ -800,12 +813,14 @@ Session setup_vehicle_control(
 
     auto const idNull = lgrn::id_null<TopDataId>();
 
-    vehicleCtrl.task() = rBuilder.task().assign({tgInputEvt, tgSigFloatUpdMod}).data(
-            "Write inputs to UserControl Machines",
-            TopDataIds_t{           idScnParts,                       idSigValFloat,                    idSigUpdFloat,                               idUserInput,                     idVhControls,           idDeltaTimeIn },
-            wrap_args([] (ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls, float const deltaTimeIn) noexcept
+    rBuilder.task()
+        .name       ("Select vehicle")
+        .run_on     ({tgWin.inputs(Run)})
+        .sync_with  ({tgVhCtrl.selectedVehicle(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({      idScnParts,                               idUserInput,                     idVhControls})
+        .func([] (ACtxParts& rScnParts, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls) noexcept
     {
-        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
         PerMachType &rUsrCtrl    = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
 
         // Select a UsrCtrl machine when pressing the switch button
@@ -838,6 +853,18 @@ Session setup_vehicle_control(
         {
             return; // No vehicle selected
         }
+    });
+
+/*
+    rBuilder.task()
+        .name       ("Write inputs to UserControl Machines")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgWin.inputs(Run)})
+        .push_to    (out.m_tasks)
+        .args       ({      idScnParts,                       idSigValFloat,                    idSigUpdFloat,                               idUserInput,                     idVhControls,           idDeltaTimeIn})
+        .func([] (ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls, float const deltaTimeIn) noexcept
+    {
+        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
 
         // Control selected UsrCtrl machine
 
@@ -845,8 +872,8 @@ Session setup_vehicle_control(
         float const thrChange =
                   float(rUserInput.button_state(rVhControls.m_btnThrMore).m_held) * thrRate
                 - float(rUserInput.button_state(rVhControls.m_btnThrLess).m_held) * thrRate
-                + float(rUserInput.button_state(rVhControls.m_btnThrMax).m_triggered)
-                - float(rUserInput.button_state(rVhControls.m_btnThrMin).m_triggered);
+                + float(rUserInput.button_state(rVhControls.m_btnThrMax).m_held)
+                - float(rUserInput.button_state(rVhControls.m_btnThrMin).m_held);
 
         Vector3 const attitude
         {
@@ -858,8 +885,7 @@ Session setup_vehicle_control(
             - float(rUserInput.button_state(rVhControls.m_btnRollLf).m_held)
         };
 
-
-
+        PerMachType &rUsrCtrl    = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
         MachAnyId const mach = rUsrCtrl.m_localToAny[rVhControls.m_selectedUsrCtrl];
         lgrn::Span<NodeId const> const portSpan = rFloatNodes.m_machToNode[mach];
 
@@ -885,36 +911,52 @@ Session setup_vehicle_control(
         write_control(ports_userctrl::gc_yawOut,        attitude.y());
         write_control(ports_userctrl::gc_rollOut,       attitude.z());
 
-    }));
+    });*/
 
-    return vehicleCtrl;
-}
+    return out;
+} // setup_vehicle_control
 
 Session setup_camera_vehicle(
         TopTaskBuilder&             rBuilder,
         [[maybe_unused]] ArrayView<entt::any> const topData,
-        Session const&              app,
+        Session const&              windowApp,
+        Session const&              scene,
+        Session const&              sceneRenderer,
         Session const&              commonScene,
-        Session const&              parts,
         Session const&              physics,
-        Session const&              camera,
-        Session const&              vehicleControl)
+        Session const&              parts,
+        Session const&              cameraCtrl,
+        Session const&              vehicleCtrl)
 {
-    OSP_SESSION_UNPACK_DATA(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(app,            TESTAPP_APP);
-    OSP_SESSION_UNPACK_DATA(camera,         TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_TAGS(camera,         TESTAPP_CAMERA_CTRL);
-    OSP_SESSION_UNPACK_DATA(vehicleControl, TESTAPP_VEHICLE_CONTROL);
-    OSP_SESSION_UNPACK_TAGS(vehicleControl, TESTAPP_VEHICLE_CONTROL);
+    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
+    OSP_DECLARE_GET_DATA_IDS(vehicleCtrl,   TESTAPP_DATA_VEHICLE_CONTROL);
 
-    Session cameraFree;
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const tgVhCtrl = vehicleCtrl   .get_pipelines<PlVehicleCtrl>();
+    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const tgPhys   = physics       .get_pipelines<PlPhysics>();
 
-    cameraFree.task() = rBuilder.task().assign({tgInputEvt, tgSelUsrCtrlReq, tgPhysTransformReq, tgCamCtrlMod}).data(
-            "Update vehicle camera",
-            TopDataIds_t{                      idCamCtrl,           idDeltaTimeIn,                 idBasic,                     idVhControls,                 idScnParts },
-            wrap_args([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleTestControls& rVhControls, ACtxParts const& rScnParts) noexcept
+    Session out;
+
+    /*
+     * vehicle camera needs transforms and modifies cam-controller
+     * shape spawner needs cam-controller, modifies transforms
+     *
+     *, tgPhys.physUpdate(Done)
+     */
+
+    rBuilder.task()
+        .name       ("Update vehicle camera")
+        .run_on     ({tgWin.sync(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Modify), tgPhys.physUpdate(Done) /*, tgCS.transform(Modify)*/})
+        .push_to    (out.m_tasks)
+        .args       ({                 idCamCtrl,           idDeltaTimeIn,                 idBasic,                     idVhControls,                 idScnParts})
+        .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleTestControls& rVhControls, ACtxParts const& rScnParts) noexcept
     {
         if (MachLocalId const selectedLocal = rVhControls.m_selectedUsrCtrl;
             selectedLocal != lgrn::id_null<MachLocalId>())
@@ -923,11 +965,11 @@ Session setup_camera_vehicle(
 
             // Obtain associated ActiveEnt
             // MachLocalId -> MachAnyId -> PartId -> RigidGroup -> ActiveEnt
-            PerMachType const& rUsrCtrls    = rScnParts.m_machines.m_perType.at(adera::gc_mtUserCtrl);
-            MachAnyId const selectedMach    = rUsrCtrls.m_localToAny        .at(selectedLocal);
-            PartId const selectedPart       = rScnParts.m_machineToPart     .at(selectedMach);
-            WeldId const weld               = rScnParts.m_partToWeld        .at(selectedPart);
-            ActiveEnt const selectedEnt     = rScnParts.m_weldToEnt         .at(weld);
+            PerMachType const&  rUsrCtrls       = rScnParts.m_machines.m_perType.at(adera::gc_mtUserCtrl);
+            MachAnyId const     selectedMach    = rUsrCtrls.m_localToAny        .at(selectedLocal);
+            PartId const        selectedPart    = rScnParts.m_machineToPart     .at(selectedMach);
+            WeldId const        weld            = rScnParts.m_partToWeld        .at(selectedPart);
+            ActiveEnt const     selectedEnt     = rScnParts.weldToActive        .at(weld);
 
             if (rBasic.m_transform.contains(selectedEnt))
             {
@@ -943,11 +985,10 @@ Session setup_camera_vehicle(
         }
 
         SysCameraController::update_view(rCamCtrl, deltaTimeIn);
-    }));
+    });
 
-    return cameraFree;
-}
+    return out;
+} // setup_camera_vehicle
 
-#endif
 
 } // namespace testapp::scenes

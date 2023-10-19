@@ -69,7 +69,7 @@ struct VehicleData
 {
     using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
                                                       osp::link::JuncCustom>;
-    using MapPartToMachines_t = osp::active::Parts::MapPartToMachines_t;
+    using MapPartToMachines_t = osp::active::ACtxParts::MapPartToMachines_t;
 
     VehicleData() = default;
     OSP_MOVE_ONLY_CTOR(VehicleData);

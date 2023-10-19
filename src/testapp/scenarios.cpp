@@ -296,7 +296,7 @@ static ScenarioMap_t make_scenarios()
         #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, newton, nwtGravSet, nwtGrav, physShapesNwt, \
                                     prefabs, parts, vehicleSpawn, signalsFloat, vehicleSpawnVB, vehicleSpawnRgd, vehicleSpawnNwt, testVehicles
         #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, \
-                                    prefabDraw, vehicleDraw
+                                    prefabDraw, vehicleDraw, vehicleCtrl, cameraVehicle
 
         using namespace testapp::scenes;
 
@@ -336,12 +336,12 @@ static ScenarioMap_t make_scenarios()
         auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
         auto &rPrebuiltVehicles = top_get<PrebuiltVehicles>     (rTopData, idPrebuiltVehicles);
 
-        for (int i = 0; i < 1; ++i)
+        for (int i = 0; i < 10; ++i)
         {
             rVehicleSpawn.spawnRequest.push_back(
             {
                .m_position = {float(i - 2) * 8.0f, 30.0f, 10.0f},
-               .m_velocity = {0.0, 0.0f, 0.0f},
+               .m_velocity = {0.0, 0.0f, 50.0f * float(i)},
                .m_rotation = {}
             });
             rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
@@ -360,14 +360,14 @@ static ScenarioMap_t make_scenarios()
             TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
 
             auto & [SCENE_SESSIONS] = unpack<18>(rTestApp.m_scene.m_sessions);
-            auto & [RENDERER_SESSIONS] = resize_then_unpack<12>(rTestApp.m_renderer.m_sessions);
+            auto & [RENDERER_SESSIONS] = resize_then_unpack<14>(rTestApp.m_renderer.m_sessions);
 
             sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
             create_materials(rTopData, sceneRenderer, sc_materialCount);
 
             magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
             cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
-            cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
+            //cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
             shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
             shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
@@ -376,12 +376,8 @@ static ScenarioMap_t make_scenarios()
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
             prefabDraw      = setup_prefab_draw         (builder, rTopData, application, windowApp, sceneRenderer, commonScene, prefabs);
             vehicleDraw     = setup_vehicle_spawn_draw  (builder, rTopData, sceneRenderer, vehicleSpawn);
-
-            // HACK
-            //OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
-            //OSP_DECLARE_GET_DATA_IDS(veh, TESTAPP_DATA_SCENE_RENDERER);
-            //auto &a = osp::top_get<osp::draw::ACtxSceneRender>(rTopData, idScnRender);
-            //a.m_needDrawTf.set(std::size_t(root));
+            vehicleCtrl     = setup_vehicle_control     (builder, rTopData, windowApp, scene, parts, signalsFloat);
+            cameraVehicle   = setup_camera_vehicle      (builder, rTopData, windowApp, scene, sceneRenderer, commonScene, physics, parts, cameraCtrl, vehicleCtrl);
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };

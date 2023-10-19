@@ -132,10 +132,10 @@ osp::Session setup_vehicle_spawn_vb(
 osp::Session setup_vehicle_control(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
+        osp::Session const&         windowApp,
+        osp::Session const&         scene,
         osp::Session const&         parts,
-        osp::Session const&         signalsFloat,
-        osp::Session const&         app);
+        osp::Session const&         signalsFloat);
 
 /**
  * @brief Camera which can free cam or follow a selected vehicle
@@ -143,12 +143,14 @@ osp::Session setup_vehicle_control(
 osp::Session setup_camera_vehicle(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         app,
+        osp::Session const&         windowApp,
+        osp::Session const&         scene,
+        osp::Session const&         sceneRenderer,
         osp::Session const&         commonScene,
-        osp::Session const&         parts,
         osp::Session const&         physics,
-        osp::Session const&         camera,
-        osp::Session const&         vehicleControl);
+        osp::Session const&         parts,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         vehicleCtrl);
 
 
 /**

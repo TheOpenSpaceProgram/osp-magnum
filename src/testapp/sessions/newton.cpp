@@ -326,7 +326,7 @@ Session setup_vehicle_spawn_newton(
         auto itWeldEnt = rVehicleSpawn.rootEnts.begin();
         for (WeldId const weld : rVehicleSpawn.spawnedWelds)
         {
-            rScnParts.m_weldToEnt[weld] = *itWeldEnt;
+            rScnParts.weldToActive[weld] = *itWeldEnt;
             ++itWeldEnt;
         }
     });
@@ -371,7 +371,7 @@ Session setup_vehicle_spawn_newton(
                     entCount += rPrefabs.spawnedEntsOffset[prefabInit].size();
                 }
 
-                ActiveEnt const weldEnt = rScnParts.m_weldToEnt[weld];
+                ActiveEnt const weldEnt = rScnParts.weldToActive[weld];
 
                 rBasic.m_transform.emplace(weldEnt, Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position));
 
@@ -424,7 +424,7 @@ Session setup_vehicle_spawn_newton(
                           itWeldsFirst + std::size_t{weldOffsetNext},
                           [&rBasic, &rScnParts, &rVehicleSpawn, &toInit, &rPhys, &rNwt] (WeldId const weld)
             {
-                ActiveEnt const weldEnt = rScnParts.m_weldToEnt[weld];
+                ActiveEnt const weldEnt = rScnParts.weldToActive[weld];
 
                 auto const transform = Matrix4::from(toInit.m_rotation.toMatrix(), toInit.m_position);
                 NwtColliderPtr_t pCompound{ NewtonCreateCompoundCollision(rNwt.m_world.get(), 0) };
@@ -516,7 +516,7 @@ static void assign_rockets(
     using adera::ports_magicrocket::gc_throttleIn;
     using adera::ports_magicrocket::gc_multiplierIn;
 
-    ActiveEnt const weldEnt = rScnParts.m_weldToEnt[weld];
+    ActiveEnt const weldEnt = rScnParts.weldToActive[weld];
     BodyId const body = rNwt.m_entToBody.at(weldEnt);
 
     if (rRocketsNwt.m_bodyRockets.contains(body))

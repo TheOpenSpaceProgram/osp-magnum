@@ -144,7 +144,7 @@ struct PlApplication
     idDeltaTimeIn
 struct PlScene
 {
-    PipelineDef<EStgEvnt> cleanup           {"cleanup - Scene cleanup before destruction"};
+    PipelineDef<EStgEvnt> cleanup           {"cleanup           - Scene cleanup before destruction"};
     PipelineDef<EStgOptn> update            {"update"};
 };
 
@@ -152,12 +152,12 @@ struct PlScene
     idBasic, idDrawing, idDrawingRes, idActiveEntDel, idDrawEntDel, idNMesh
 struct PlCommonScene
 {
-    PipelineDef<EStgCont> activeEnt         {"activeEnt - ActiveEnt ID Registry"};
-    PipelineDef<EStgOptn> activeEntResized  {"activeEntResized"};
-    PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete - Vector of ActiveEnts that need to be deleted"};
+    PipelineDef<EStgCont> activeEnt         {"activeEnt         - ACtxBasic::m_activeIds"};
+    PipelineDef<EStgOptn> activeEntResized  {"activeEntResized  - ACtxBasic::m_activeIds option to resize"};
+    PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete   - idActiveEntDel, vector of ActiveEnts that need to be deleted"};
 
-    PipelineDef<EStgCont> transform         {"transform"};
-    PipelineDef<EStgCont> hierarchy         {"hierarchy"};
+    PipelineDef<EStgCont> transform         {"transform         - ACtxBasic::m_transform"};
+    PipelineDef<EStgCont> hierarchy         {"hierarchy         - ACtxBasic::m_scnGraph"};
 };
 
 
@@ -175,7 +175,7 @@ struct PlPhysics
     idPhysShapes
 struct PlPhysShapes
 {
-    PipelineDef<EStgIntr> spawnRequest      {"spawnRequest - Spawned shapes "};
+    PipelineDef<EStgIntr> spawnRequest      {"spawnRequest      - Spawned shapes"};
     PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
     PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
 };
@@ -211,12 +211,22 @@ struct PlBounds
     idScnParts, idPartInit, idUpdMach, idMachEvtTags
 struct PlParts
 {
-    PipelineDef<EStgIntr> part;
-    PipelineDef<EStgIntr> mapPartEnt;
-    PipelineDef<EStgIntr> weld;
-    PipelineDef<EStgIntr> link;
-    //PipelineDef<EStgIntr> linkMhUpd;
-    //PipelineDef<EStgIntr> nodeAnyUpd;
+    PipelineDef<EStgCont> partIds           {"partIds           - ACtxParts::partIds"};
+    PipelineDef<EStgCont> partPrefabs       {"partPrefabs       - ACtxParts::partPrefabs"};
+    PipelineDef<EStgCont> partTransformWeld {"partTransformWeld - ACtxParts::partTransformWeld"};
+    PipelineDef<EStgIntr> partDirty         {"partDirty         - ACtxParts::partDirty"};
+
+    PipelineDef<EStgCont> weldIds           {"weldIds           - ACtxParts::weldIds"};
+    PipelineDef<EStgIntr> weldDirty         {"weldDirty         - ACtxParts::weldDirty"};
+
+    PipelineDef<EStgCont> machIds           {"machIds           - ACtxParts::machines.ids"};
+    PipelineDef<EStgCont> nodeIds           {"nodeIds           - ACtxParts::nodePerType[*].nodeIds"};
+    PipelineDef<EStgCont> connect           {"connect           - ACtxParts::nodePerType[*].nodeToMach/machToNode"};
+
+    PipelineDef<EStgCont> mapWeldPart       {"mapPartWeld       - ACtxParts::weldToParts/partToWeld"};
+    PipelineDef<EStgCont> mapPartMach       {"mapPartMach       - ACtxParts::partToMachines/machineToPart"};
+    PipelineDef<EStgCont> mapPartActive     {"mapPartActive     - ACtxParts::partToActive/activeToPart"};
+    PipelineDef<EStgCont> mapWeldActive     {"mapWeldActive     - ACtxParts::weldToActive"};
 };
 
 
@@ -225,12 +235,11 @@ struct PlParts
     idVehicleSpawn
 struct PlVehicleSpawn
 {
-    PipelineDef<EStgIntr> spawnRequest      {"VehicleSpawn boundsSet"};
-    PipelineDef<EStgIntr> spawnedParts;
-    PipelineDef<EStgIntr> spawnedWelds;
-    PipelineDef<EStgIntr> rootEnts;
-
-    PipelineDef<EStgIntr> mapPartMach;
+    PipelineDef<EStgIntr> spawnRequest      {"spawnRequest      - ACtxVehicleSpawn::spawnRequest"};
+    PipelineDef<EStgIntr> spawnedParts      {"spawnedParts      - ACtxVehicleSpawn::spawnedPart*"};
+    PipelineDef<EStgIntr> spawnedWelds      {"spawnedWelds      - ACtxVehicleSpawn::spawnedWeld*"};
+    PipelineDef<EStgIntr> rootEnts          {"rootEnts          - ACtxVehicleSpawn::rootEnts"};
+    PipelineDef<EStgIntr> spawnedMachs      {"spawnedMachs      - ACtxVehicleSpawn::spawnedMachs"};
 };
 
 
@@ -239,18 +248,13 @@ struct PlVehicleSpawn
     idVehicleSpawnVB
 struct PlVehicleSpawnVB
 {
-    PipelineDef<EStgIntr> dataVB;
-    PipelineDef<EStgIntr> remapParts;
-    PipelineDef<EStgIntr> remapWelds;
-    PipelineDef<EStgIntr> remapMachs;
-    PipelineDef<EStgIntr> remapNodes;
+    PipelineDef<EStgIntr> dataVB            {"dataVB            - ACtxVehicleSpawnVB::dataVB"};
+    PipelineDef<EStgIntr> remapParts        {"remapParts        - ACtxVehicleSpawnVB::remapPart*"};
+    PipelineDef<EStgIntr> remapWelds        {"remapWelds        - ACtxVehicleSpawnVB::remapWeld*"};
+    PipelineDef<EStgIntr> remapMachs        {"remapMachs        - ACtxVehicleSpawnVB::remapMach*"};
+    PipelineDef<EStgIntr> remapNodes        {"remapNodes        - ACtxVehicleSpawnVB::remapNode*"};
 };
-//#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_VB 10, \
-//    tgVbSpBasicInMod,   tgVbSpBasicInReq,                       \
-//    tgVbPartMod,        tgVbPartReq,                            \
-//    tgVbWeldMod,        tgVbWeldReq,                            \
-//    tgVbMachMod,        tgVbMachReq,                            \
-//    tgVbNodeMod,        tgVbNodeReq
+
 
 
 #define TESTAPP_DATA_TEST_VEHICLES 1, \
@@ -309,7 +313,7 @@ struct PlNewton
     idUniverse,         tgUniDeltaTimeIn
 struct PlUniCore
 {
-    PipelineDef<EStgOptn> update            {"update - Universe update"};
+    PipelineDef<EStgOptn> update            {"update            - Universe update"};
     PipelineDef<EStgIntr> transfer          {"transfer"};
 };
 
@@ -335,7 +339,7 @@ struct PlWindowApp
     PipelineDef<EStgOptn> sync              {"sync"};
     PipelineDef<EStgOptn> resync            {"resync"};
 
-    PipelineDef<EStgEvnt> cleanup           {"cleanup - Cleanup renderer resources before destruction"};
+    PipelineDef<EStgEvnt> cleanup           {"cleanup           - Cleanup renderer resources before destruction"};
 
 };
 
@@ -345,11 +349,11 @@ struct PlWindowApp
     idScnRender
 struct PlSceneRenderer
 {
-    PipelineDef<EStgOptn> render            {"render"};
+    PipelineDef<EStgOptn> render            {"render            - "};
 
-    PipelineDef<EStgCont> drawEnt           {"drawEnt"};
-    PipelineDef<EStgOptn> drawEntResized    {"drawEntResized"};
-    PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete - Vector of DrawEnts that need to be deleted"};
+    PipelineDef<EStgCont> drawEnt           {"drawEnt           - "};
+    PipelineDef<EStgOptn> drawEntResized    {"drawEntResized    - "};
+    PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete     - Vector of DrawEnts that need to be deleted"};
 
     PipelineDef<EStgIntr> entTextureDirty   {"entTextureDirty"};
     PipelineDef<EStgIntr> entMeshDirty      {"entMeshDirty"};
@@ -428,7 +432,9 @@ struct PlCameraCtrl
 
 #define TESTAPP_DATA_VEHICLE_CONTROL 1, \
     idVhControls
-#define OSP_TAGS_TESTAPP_VEHICLE_CONTROL 2, \
-    tgSelUsrCtrlMod,    tgSelUsrCtrlReq
+struct PlVehicleCtrl
+{
+    PipelineDef<EStgCont> selectedVehicle   {"selectedVehicle"};
+};
 
 } // namespace testapp

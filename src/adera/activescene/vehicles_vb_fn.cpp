@@ -97,7 +97,7 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
     rScnParts.m_partToWeld          .resize(maxParts);
     rScnParts.m_weldToParts         .data_reserve(maxParts);
     rScnParts.m_weldToParts         .ids_reserve(maxWelds);
-    rScnParts.m_weldToEnt           .resize(maxWelds);
+    rScnParts.weldToActive          .resize(maxWelds);
     rVehicleSpawn.partToSpawned   .resize(maxParts);
 
     // Populate "Scene PartId -> NewPartId" map

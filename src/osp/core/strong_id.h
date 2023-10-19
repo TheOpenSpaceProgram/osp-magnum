@@ -55,22 +55,22 @@ struct StrongId
     }
 
     constexpr explicit StrongId(INT_T const value) noexcept
-     : m_value{value}
+     : value{value}
     { };
 
     constexpr explicit operator std::size_t() const noexcept
     {
-        return m_value;
+        return value;
     }
 
     constexpr explicit operator INT_T() const noexcept
     {
-        return m_value;
+        return value;
     }
 
     constexpr auto operator<=>(StrongId const&) const = default;
 
-    INT_T m_value{ lgrn::id_null<StrongId>() };
+    INT_T value{ lgrn::id_null<StrongId>() };
 };
 
 } // namespace osp
@@ -80,7 +80,7 @@ template <typename INT_T, typename DUMMY_T>
 struct std::hash<osp::StrongId<INT_T, DUMMY_T>> {
     constexpr auto operator() (osp::StrongId<INT_T, DUMMY_T> const& key) const
     {
-        return key.m_value;
+        return key.value;
     }
 };
 

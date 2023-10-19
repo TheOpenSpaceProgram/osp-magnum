@@ -41,32 +41,33 @@ namespace osp::active
 using PartId = uint32_t;
 using WeldId = uint32_t;
 
-struct Parts
+struct ACtxParts
 {
     using MapPartToMachines_t = lgrn::IntArrayMultiMap<PartId, link::MachinePair>;
 
     lgrn::IdRegistryStl<PartId>                     m_partIds;
     KeyedVec<PartId, PrefabPair>                    m_partPrefabs;
-    KeyedVec<PartId, WeldId>                        m_partToWeld;
-    KeyedVec<PartId, Matrix4>                       m_partTransformWeld;
-    MapPartToMachines_t                             m_partToMachines;
+    KeyedVec<PartId, Matrix4>                       m_partTransformWeld;    ///< Part's transform relative to the weld it's part of
     std::vector<PartId>                             m_partDirty;
 
     lgrn::IdRegistryStl<WeldId>                     m_weldIds;
-    lgrn::IntArrayMultiMap<WeldId, PartId>          m_weldToParts;
     std::vector<WeldId>                             m_weldDirty;
 
     link::Machines                                  m_machines;
-    std::vector<PartId>                             m_machineToPart;
     std::vector<link::Nodes>                        m_nodePerType;
-};
 
-struct ACtxParts : Parts
-{
+    lgrn::IntArrayMultiMap<WeldId, PartId>          m_weldToParts;
+    KeyedVec<PartId, WeldId>                        m_partToWeld;
+
+    MapPartToMachines_t                             m_partToMachines;
+    std::vector<PartId>                             m_machineToPart;
+
     std::vector<ActiveEnt>                          m_partToActive;
     std::vector<PartId>                             m_activeToPart;
-    std::vector<ActiveEnt>                          m_weldToEnt;
+
+    std::vector<ActiveEnt>                          weldToActive;
 };
+
 
 using SpVehicleId = StrongId<uint32_t, struct DummyForSpVehicleId>;
 using SpPartId    = StrongId<uint32_t, struct DummyForSpPartId>;
@@ -91,14 +92,16 @@ struct ACtxVehicleSpawn
 
     KeyedVec<SpPartId, PartId>              spawnedParts;
     KeyedVec<SpVehicleId, SpPartId>         spawnedPartOffsets;
+
     KeyedVec<PartId, SpPartId>              partToSpawned;
     KeyedVec<SpPartId, uint32_t>            spawnedPrefabs;
 
     KeyedVec<SpWeldId, WeldId>              spawnedWelds;
     KeyedVec<SpVehicleId, SpWeldId>         spawnedWeldOffsets;
+
     KeyedVec<SpWeldId, ActiveEnt>           rootEnts;
 
-    KeyedVec<SpMachAnyId, link::MachAnyId>  m_newMachToMach;
+    KeyedVec<SpMachAnyId, link::MachAnyId>  spawnedMachs;
 };
 
 } // namespace osp::active
