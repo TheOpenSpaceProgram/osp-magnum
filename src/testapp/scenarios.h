@@ -44,6 +44,7 @@ namespace scenes
     using enum EStgRevd;
     using enum EStgEvnt;
     using enum EStgFBO;
+    using enum EStgLink;
 }
 
 struct MainLoopControl

@@ -35,7 +35,6 @@
 #include <osp/drawing/drawing.h>
 #include <osp/util/UserInputHandler.h>
 
-
 using namespace adera;
 
 using namespace osp::active;
@@ -79,9 +78,11 @@ Session setup_parts(
     rBuilder.pipeline(tgParts.mapPartMach)      .parent(tgScn.update);
     rBuilder.pipeline(tgParts.mapPartActive)    .parent(tgScn.update);
     rBuilder.pipeline(tgParts.mapWeldActive)    .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.machUpdExtIn)     .parent(tgScn.update);
+    rBuilder.pipeline(tgParts.linkLoop)         .parent(tgScn.update).loops(true);
 
     auto &rScnParts = top_emplace< ACtxParts >      (topData, idScnParts);
-    auto &rUpdMach  = top_emplace< UpdMachPerType > (topData, idUpdMach);
+    auto &rUpdMach  = top_emplace< MachineUpdater > (topData, idUpdMach);
 
     // Resize containers to fit all existing MachTypeIds and NodeTypeIds
     // These Global IDs are dynamically initialized just as the program starts
@@ -93,7 +94,7 @@ Session setup_parts(
     auto const idNull = lgrn::id_null<TopDataId>();
 
     rBuilder.task()
-        .name       ("Clear Vehicle Spawning vector after use")
+        .name       ("Clear Resource owners")
         .run_on     ({tgScn.cleanup(Run_)})
         .push_to    (out.m_tasks)
         .args       ({      idScnParts,           idResources})
@@ -104,7 +105,6 @@ Session setup_parts(
             rResources.owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
         }
     });
-
 
     rBuilder.task()
         .name       ("Clear Part dirty vectors after use")
@@ -124,6 +124,25 @@ Session setup_parts(
         .func([] (ACtxParts& rScnParts) noexcept
     {
         rScnParts.m_weldDirty.clear();
+    });
+
+    rBuilder.task()
+        .name       ("Schedule Link update")
+        .schedules  ({tgParts.linkLoop(ScheduleLink)})
+        .sync_with  ({tgScn.update(Run)})
+        .push_to    (out.m_tasks)
+        .args       ({           idUpdMach})
+        .func([] (MachineUpdater& rUpdMach) noexcept -> TaskActions
+    {
+        if (rUpdMach.requestMachineUpdateLoop)
+        {
+            rUpdMach.requestMachineUpdateLoop = false;
+            return TaskActions{};
+        }
+        else
+        {
+            return TaskAction::Cancel;
+        }
     });
 
     return out;
@@ -187,12 +206,13 @@ Session setup_vehicle_spawn_vb(
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
     OSP_DECLARE_GET_DATA_IDS(prefabs,       TESTAPP_DATA_PREFABS);
-    //OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT);
+    OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT);
     OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,  TESTAPP_DATA_VEHICLE_SPAWN);
     auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
     auto const tgPf     = prefabs       .get_pipelines<PlPrefabs>();
     auto const tgScn    = scene         .get_pipelines<PlScene>();
     auto const tgParts  = parts         .get_pipelines<PlParts>();
+    auto const tgSgFlt  = signalsFloat  .get_pipelines<PlSignalsFloat>();
     auto const tgVhSp   = vehicleSpawn  .get_pipelines<PlVehicleSpawn>();
 
     Session out;
@@ -465,23 +485,25 @@ Session setup_vehicle_spawn_vb(
         }
     });
 
-/*
-    vehicleSpawnVB.task() = rBuilder.task().assign({tgSceneEvt, tgVbNodeReq, tgSigFloatLinkReq}).data(
-            "Copy float signal values from VehicleBuilder",
-            TopDataIds_t{                  idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                       idSigValFloat},
-            wrap_args([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat) noexcept
+    rBuilder.task()
+        .name       ("Copy float signal values from VehicleBuilder")
+        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
+        .sync_with  ({tgVhSp.spawnedParts(UseOrRun), tgVhSpVB.remapNodes(UseOrRun), tgSgFlt.sigFloatValues(New), tgSgFlt.sigFloatUpdExtIn(New)})
+        .push_to    (out.m_tasks)
+        .args       ({             idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                       idSigValFloat,                    idSigUpdFloat})
+        .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
-        std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
-        ACtxVehicleSpawnVB const &rVSVB = rVehicleSpawnVB;
+        Nodes const         &rFloatNodes    = rScnParts.m_nodePerType[gc_ntSigFloat];
+        std::size_t const   maxNodes        = rFloatNodes.m_nodeIds.capacity();
+        rSigUpdFloat.m_nodeNewValues.resize(maxNodes);
+        bitvector_resize(rSigUpdFloat.m_nodeDirty, maxNodes);
+        rSigValFloat.resize(maxNodes);
 
-        if (newVehicleCount == 0)
-        {
-            return;
-        }
+        std::size_t const           newVehicleCount     = rVehicleSpawn.new_vehicle_count();
+        ACtxVehicleSpawnVB const    &rVSVB              = rVehicleSpawnVB;
 
         auto const remapNodeOffsets2d = rVSVB.remap_node_offsets_2d();
-
-        for (NewVehicleId vhId = 0; vhId < newVehicleCount; ++vhId)
+        for (SpVehicleId vhId{0}; vhId.value < newVehicleCount; ++vhId.value)
         {
             VehicleData const* pVData = rVSVB.dataVB[vhId];
             if (pVData == nullptr)
@@ -492,7 +514,7 @@ Session setup_vehicle_spawn_vb(
             PerNodeType const&  srcFloatNodes       = pVData->m_nodePerType[gc_ntSigFloat];
             entt::any const&    srcFloatValuesAny   = srcFloatNodes.m_nodeValues;
             auto const&         srcFloatValues      = entt::any_cast< SignalValues_t<float> >(srcFloatValuesAny);
-            std::size_t const   nodeRemapOffset     = remapNodeOffsets2d[vhId][gc_ntSigFloat];
+            std::size_t const   nodeRemapOffset     = remapNodeOffsets2d[vhId.value][gc_ntSigFloat];
             auto const          nodeRemap           = arrayView(rVSVB.remapNodes).exceptPrefix(nodeRemapOffset);
 
             for (NodeId const srcNode : srcFloatNodes.m_nodeIds.bitview().zeros())
@@ -501,8 +523,7 @@ Session setup_vehicle_spawn_vb(
                 rSigValFloat[dstNode] = srcFloatValues[srcNode];
             }
         }
-    }));
-    */
+    });
 
     return out;
 } // setup_vehicle_spawn_vb
@@ -537,24 +558,26 @@ Session setup_vehicle_spawn_draw(
     return out;
 } // setup_vehicle_spawn_draw
 
-#if 0
 
 Session setup_signals_float(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
-        Session const&              commonScene,
+        Session const&              scene,
         Session const&              parts)
 {
-    OSP_SESSION_UNPACK_TAGS(commonScene,  TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(parts,      TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,      TESTAPP_PARTS);
+    //OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
 
-    Session signalsFloat;
-    OSP_SESSION_ACQUIRE_DATA(signalsFloat, topData, TESTAPP_SIGNALS_FLOAT);
-    OSP_SESSION_ACQUIRE_TAGS(signalsFloat, rTags,   TESTAPP_SIGNALS_FLOAT);
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SIGNALS_FLOAT);
+    auto const tgSgFlt = out.create_pipelines<PlSignalsFloat>(rBuilder);
 
-    rBuilder.tag(tgSigFloatLinkReq)         .depend_on({tgSigFloatLinkMod});
-    rBuilder.tag(tgSigFloatUpdReq)          .depend_on({tgSigFloatLinkMod, tgSigFloatUpdMod});
+    auto const tgParts = parts.get_pipelines<PlParts>();
+
+    rBuilder.pipeline(tgSgFlt.sigFloatValues)   .parent(tgScn.update);
+    rBuilder.pipeline(tgSgFlt.sigFloatUpdExtIn) .parent(tgScn.update);
+    rBuilder.pipeline(tgSgFlt.sigFloatUpdLoop)  .parent(tgParts.linkLoop);
 
     top_emplace< SignalValues_t<float> >    (topData, idSigValFloat);
     top_emplace< UpdateNodes<float> >       (topData, idSigUpdFloat);
@@ -565,11 +588,13 @@ Session setup_signals_float(
 
     auto const idNull = lgrn::id_null<TopDataId>();
 
-
-    signalsFloat.task() = rBuilder.task().assign({tgSceneEvt, tgNodeUpdEvt, tgSigFloatUpdEvt, tgSigFloatUpdReq, tgMachUpdEnqMod}).data(
-            "Reduce Signal-Float Nodes",
-            TopDataIds_t{                   idNull,                   idSigUpdFloat,                       idSigValFloat,                idUpdMach,                    idMachUpdEnqueue,                 idScnParts,                       idMachEvtTags },
-            wrap_args([] (WorkerContext const ctx, UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, UpdMachPerType& rUpdMach, std::vector<TagId>& rMachUpdEnqueue, ACtxParts const& rScnParts, MachTypeToEvt_t const& rMachEvtTags ) noexcept
+    rBuilder.task()
+        .name       ("Reduce Signal-Float Nodes")
+        .run_on     ({tgParts.linkLoop(EStgLink::NodeUpd)})
+        .sync_with  ({tgSgFlt.sigFloatUpdExtIn(Ready), tgParts.machUpdExtIn(Ready), tgSgFlt.sigFloatUpdLoop(Modify), tgSgFlt.sigFloatValues(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({               idSigUpdFloat,                       idSigValFloat,                idUpdMach,                 idScnParts})
+        .func([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, MachineUpdater& rUpdMach, ACtxParts const& rScnParts) noexcept
     {
         if ( ! rSigUpdFloat.m_dirty )
         {
@@ -599,396 +624,35 @@ Session setup_signals_float(
         rSigUpdFloat.m_nodeDirty.reset();
         rSigUpdFloat.m_dirty = false;
 
-        // Tasks cannot be enqueued here directly, since that will interfere with other node reduce
-        // tasks. All machine tasks must be enqueued at the same time. rMachUpdEnqueue here is
-        // passed to a task in setup_parts
-
         // Run tasks needed to update machine types that are dirty
+        bool anyMachineNotified = false;
         for (MachTypeId const type : rUpdMach.m_machTypesDirty.ones())
         {
-            rMachUpdEnqueue.push_back(rMachEvtTags[type]);
+            anyMachineNotified = true;
+            //rMachUpdEnqueue.push_back(rMachEvtTags[type]);
         }
-    }));
-
-    signalsFloat.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgSigFloatLinkMod}).data(
-            "Allocate Signal-Float Node Values",
-            TopDataIds_t{                    idSigUpdFloat,                       idSigValFloat,                 idScnParts  },
-            wrap_args([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, ACtxParts const& rScnParts) noexcept
-    {
-        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
-        rSigUpdFloat.m_nodeNewValues.resize(rFloatNodes.m_nodeIds.capacity());
-        rSigUpdFloat.m_nodeDirty.ints().resize(rFloatNodes.m_nodeIds.vec().capacity());
-        rSigValFloat.resize(rFloatNodes.m_nodeIds.capacity());
-    }));
-
-    return signalsFloat;
-}
-
-template <MachTypeId const& MachType_T>
-TopTaskFunc_t gen_allocate_mach_bitsets()
-{
-    static TopTaskFunc_t const func = wrap_args([] (ACtxParts& rScnParts, UpdMachPerType& rUpdMach) noexcept
-    {
-        rUpdMach.m_localDirty[MachType_T].ints().resize(rScnParts.m_machines.m_perType[MachType_T].m_localIds.vec().capacity());
-    });
-
-    return func;
-}
-
-Session setup_mach_rocket(
-        TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any> const  topData,
-        Session const&              commonScene,
-        Session const&              parts,
-        Session const&              signalsFloat)
-{
-    OSP_SESSION_UNPACK_TAGS(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
-    OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
-    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
-
-    using namespace adera;
-
-    Session machRocket;
-    OSP_SESSION_ACQUIRE_TAGS(machRocket, rTags,   TESTAPP_MACH_ROCKET);
-
-    top_get< MachTypeToEvt_t >(topData, idMachEvtTags).at(gc_mtMagicRocket) = tgMhRocketEvt;
-
-    machRocket.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgLinkMhUpdMod}).data(
-            "Allocate Machine update bitset for MagicRocket",
-            TopDataIds_t{idScnParts, idUpdMach},
-            gen_allocate_mach_bitsets<gc_mtMagicRocket>());
-
-    return machRocket;
-}
-
-Session setup_mach_rcsdriver(
-        TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any> const  topData,
-        Session const&              commonScene,
-        Session const&              parts,
-        Session const&              signalsFloat)
-{
-    OSP_SESSION_UNPACK_TAGS(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
-    OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
-    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
-
-    using namespace adera;
-
-    Session machRcsDriver;
-    OSP_SESSION_ACQUIRE_TAGS(machRcsDriver, rTags,   TESTAPP_MACH_RCSDRIVER);
-
-    top_get< MachTypeToEvt_t >(topData, idMachEvtTags).at(gc_mtRcsDriver) = tgMhRcsDriverEvt;
-
-    machRcsDriver.task() = rBuilder.task().assign({tgMhRcsDriverEvt, tgSigFloatUpdMod}).data(
-            "RCS Drivers calculate new values",
-            TopDataIds_t{           idScnParts,                      idUpdMach,                       idSigValFloat,                    idSigUpdFloat },
-            wrap_args([] (ACtxParts& rScnParts, UpdMachPerType const& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
-    {
-        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
-        PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_mtRcsDriver];
-
-        for (MachLocalId const local : rUpdMach.m_localDirty[gc_mtRcsDriver].ones())
+        if (anyMachineNotified && rUpdMach.requestMachineUpdateLoop.load())
         {
-            MachAnyId const mach = rRockets.m_localToAny[local];
-            lgrn::Span<NodeId const> const portSpan = rFloatNodes.m_machToNode[mach];
-
-            NodeId const thrNode = connected_node(portSpan, ports_rcsdriver::gc_throttleOut.m_port);
-            if (thrNode == lgrn::id_null<NodeId>())
-            {
-                continue; // Throttle Output not connected, calculations below are useless
-            }
-
-            auto const rcs_read = [&rSigValFloat, portSpan] (float& rDstVar, PortEntry const& entry)
-            {
-                NodeId const node = connected_node(portSpan, entry.m_port);
-
-                if (node != lgrn::id_null<NodeId>())
-                {
-                    rDstVar = rSigValFloat[node];
-                }
-            };
-
-            Vector3 pos{0.0f};
-            Vector3 dir{0.0f};
-            Vector3 cmdLin{0.0f};
-            Vector3 cmdAng{0.0f};
-
-            rcs_read( pos.x(),    ports_rcsdriver::gc_posXIn    );
-            rcs_read( pos.y(),    ports_rcsdriver::gc_posYIn    );
-            rcs_read( pos.z(),    ports_rcsdriver::gc_posZIn    );
-            rcs_read( dir.x(),    ports_rcsdriver::gc_dirXIn    );
-            rcs_read( dir.y(),    ports_rcsdriver::gc_dirYIn    );
-            rcs_read( dir.z(),    ports_rcsdriver::gc_dirZIn    );
-            rcs_read( cmdLin.x(), ports_rcsdriver::gc_cmdLinXIn );
-            rcs_read( cmdLin.y(), ports_rcsdriver::gc_cmdLinYIn );
-            rcs_read( cmdLin.z(), ports_rcsdriver::gc_cmdLinZIn );
-            rcs_read( cmdAng.x(), ports_rcsdriver::gc_cmdAngXIn );
-            rcs_read( cmdAng.y(), ports_rcsdriver::gc_cmdAngYIn );
-            rcs_read( cmdAng.z(), ports_rcsdriver::gc_cmdAngZIn );
-
-            OSP_LOG_TRACE("RCS controller {} pitch = {}", local, cmdAng.x());
-            OSP_LOG_TRACE("RCS controller {} yaw = {}", local, cmdAng.y());
-            OSP_LOG_TRACE("RCS controller {} roll = {}", local, cmdAng.z());
-
-            float const thrCurr = rSigValFloat[thrNode];
-            float const thrNew = thruster_influence(pos, dir, cmdLin, cmdAng);
-
-            if (thrCurr != thrNew)
-            {
-                rSigUpdFloat.assign(thrNode, thrNew);
-            }
-        }
-    }));
-
-    machRcsDriver.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgLinkMhUpdMod}).data(
-            "Allocate Machine update bitset for RCS Drivers",
-            TopDataIds_t{idScnParts, idUpdMach},
-            gen_allocate_mach_bitsets<gc_mtRcsDriver>());
-
-    return machRcsDriver;
-}
-#endif
-
-
-struct VehicleTestControls
-{
-    MachLocalId m_selectedUsrCtrl{lgrn::id_null<MachLocalId>()};
-
-    input::EButtonControlIndex m_btnSwitch;
-    input::EButtonControlIndex m_btnThrMax;
-    input::EButtonControlIndex m_btnThrMin;
-    input::EButtonControlIndex m_btnThrMore;
-    input::EButtonControlIndex m_btnThrLess;
-    input::EButtonControlIndex m_btnPitchUp;
-    input::EButtonControlIndex m_btnPitchDn;
-    input::EButtonControlIndex m_btnYawLf;
-    input::EButtonControlIndex m_btnYawRt;
-    input::EButtonControlIndex m_btnRollLf;
-    input::EButtonControlIndex m_btnRollRt;
-};
-
-
-Session setup_vehicle_control(
-        TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any> const  topData,
-        Session const&              windowApp,
-        Session const&              scene,
-        Session const&              parts,
-        Session const&              signalsFloat)
-{
-    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
-    //OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
-    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
-    //OSP_DECLARE_GET_DATA_IDS(app,           TESTAPP_DATA_APP);
-    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const tgScn    = scene         .get_pipelines<PlScene>();
-
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_VEHICLE_CONTROL);
-    auto const tgVhCtrl = out.create_pipelines<PlVehicleCtrl>(rBuilder);
-
-    rBuilder.pipeline(tgVhCtrl.selectedVehicle).parent(tgScn.update);
-
-    auto &rUserInput = top_get< input::UserInputHandler >(topData, idUserInput);
-
-    // TODO: add cleanup task
-    top_emplace<VehicleTestControls>(topData, idVhControls, VehicleTestControls{
-        .m_btnSwitch    = rUserInput.button_subscribe("game_switch"),
-        .m_btnThrMax    = rUserInput.button_subscribe("vehicle_thr_max"),
-        .m_btnThrMin    = rUserInput.button_subscribe("vehicle_thr_min"),
-        .m_btnThrMore   = rUserInput.button_subscribe("vehicle_thr_more"),
-        .m_btnThrLess   = rUserInput.button_subscribe("vehicle_thr_less"),
-        .m_btnPitchUp   = rUserInput.button_subscribe("vehicle_pitch_up"),
-        .m_btnPitchDn   = rUserInput.button_subscribe("vehicle_pitch_dn"),
-        .m_btnYawLf     = rUserInput.button_subscribe("vehicle_yaw_lf"),
-        .m_btnYawRt     = rUserInput.button_subscribe("vehicle_yaw_rt"),
-        .m_btnRollLf    = rUserInput.button_subscribe("vehicle_roll_lf"),
-        .m_btnRollRt    = rUserInput.button_subscribe("vehicle_roll_rt")
-    });
-
-    auto const idNull = lgrn::id_null<TopDataId>();
-
-    rBuilder.task()
-        .name       ("Select vehicle")
-        .run_on     ({tgWin.inputs(Run)})
-        .sync_with  ({tgVhCtrl.selectedVehicle(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({      idScnParts,                               idUserInput,                     idVhControls})
-        .func([] (ACtxParts& rScnParts, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls) noexcept
-    {
-        PerMachType &rUsrCtrl    = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
-
-        // Select a UsrCtrl machine when pressing the switch button
-        if (rUserInput.button_state(rVhControls.m_btnSwitch).m_triggered)
-        {
-            ++rVhControls.m_selectedUsrCtrl;
-            bool found = false;
-            for (MachLocalId local = rVhControls.m_selectedUsrCtrl; local < rUsrCtrl.m_localIds.capacity(); ++local)
-            {
-                if (rUsrCtrl.m_localIds.exists(local))
-                {
-                    found = true;
-                    rVhControls.m_selectedUsrCtrl = local;
-                    break;
-                }
-            }
-
-            if ( ! found )
-            {
-                rVhControls.m_selectedUsrCtrl = lgrn::id_null<MachLocalId>();
-                OSP_LOG_INFO("Unselected vehicles");
-            }
-            else
-            {
-                OSP_LOG_INFO("Selected User Control: {}", rVhControls.m_selectedUsrCtrl);
-            }
-        }
-
-        if (rVhControls.m_selectedUsrCtrl == lgrn::id_null<MachLocalId>())
-        {
-            return; // No vehicle selected
+            rUpdMach.requestMachineUpdateLoop.store(true);
         }
     });
 
-/*
-    rBuilder.task()
-        .name       ("Write inputs to UserControl Machines")
-        .run_on     ({tgScn.update(Run)})
-        .sync_with  ({tgWin.inputs(Run)})
-        .push_to    (out.m_tasks)
-        .args       ({      idScnParts,                       idSigValFloat,                    idSigUpdFloat,                               idUserInput,                     idVhControls,           idDeltaTimeIn})
-        .func([] (ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls, float const deltaTimeIn) noexcept
-    {
-        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
-
-        // Control selected UsrCtrl machine
-
-        float const thrRate = deltaTimeIn;
-        float const thrChange =
-                  float(rUserInput.button_state(rVhControls.m_btnThrMore).m_held) * thrRate
-                - float(rUserInput.button_state(rVhControls.m_btnThrLess).m_held) * thrRate
-                + float(rUserInput.button_state(rVhControls.m_btnThrMax).m_held)
-                - float(rUserInput.button_state(rVhControls.m_btnThrMin).m_held);
-
-        Vector3 const attitude
-        {
-              float(rUserInput.button_state(rVhControls.m_btnPitchDn).m_held)
-            - float(rUserInput.button_state(rVhControls.m_btnPitchUp).m_held),
-              float(rUserInput.button_state(rVhControls.m_btnYawLf).m_held)
-            - float(rUserInput.button_state(rVhControls.m_btnYawRt).m_held),
-              float(rUserInput.button_state(rVhControls.m_btnRollRt).m_held)
-            - float(rUserInput.button_state(rVhControls.m_btnRollLf).m_held)
-        };
-
-        PerMachType &rUsrCtrl    = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
-        MachAnyId const mach = rUsrCtrl.m_localToAny[rVhControls.m_selectedUsrCtrl];
-        lgrn::Span<NodeId const> const portSpan = rFloatNodes.m_machToNode[mach];
-
-        auto const write_control = [&rSigValFloat, &rSigUpdFloat, portSpan] (PortEntry const& entry, float write, bool replace = true, float min = 0.0f, float max = 1.0f)
-        {
-            NodeId const node = connected_node(portSpan, entry.m_port);
-            if (node == lgrn::id_null<NodeId>())
-            {
-                return; // not connected
-            }
-
-            float const oldVal = rSigValFloat[node];
-            float const newVal = replace ? write : Magnum::Math::clamp(oldVal + write, min, max);
-
-            if (oldVal != newVal)
-            {
-                rSigUpdFloat.assign(node, newVal);
-            }
-        };
-
-        write_control(ports_userctrl::gc_throttleOut,   thrChange, false);
-        write_control(ports_userctrl::gc_pitchOut,      attitude.x());
-        write_control(ports_userctrl::gc_yawOut,        attitude.y());
-        write_control(ports_userctrl::gc_rollOut,       attitude.z());
-
-    });*/
+//    rBuilder.task()
+//        .name       ("Allocate Signal-Float Node Values")
+//        .run_on     ({tgScn.update(Run)})
+//        .sync_with  ({tgSgFlt.sigFloatValues(New)})
+//        .push_to    (out.m_tasks)
+//        .args       ({            idSigUpdFloat,                       idSigValFloat,                 idScnParts})
+//        .func([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, ACtxParts const& rScnParts) noexcept
+//    {
+//        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
+//        rSigUpdFloat.m_nodeNewValues.resize(rFloatNodes.m_nodeIds.capacity());
+//        rSigUpdFloat.m_nodeDirty.ints().resize(rFloatNodes.m_nodeIds.vec().capacity());
+//        rSigValFloat.resize(rFloatNodes.m_nodeIds.capacity());
+//    });
 
     return out;
-} // setup_vehicle_control
-
-Session setup_camera_vehicle(
-        TopTaskBuilder&             rBuilder,
-        [[maybe_unused]] ArrayView<entt::any> const topData,
-        Session const&              windowApp,
-        Session const&              scene,
-        Session const&              sceneRenderer,
-        Session const&              commonScene,
-        Session const&              physics,
-        Session const&              parts,
-        Session const&              cameraCtrl,
-        Session const&              vehicleCtrl)
-{
-    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
-    OSP_DECLARE_GET_DATA_IDS(vehicleCtrl,   TESTAPP_DATA_VEHICLE_CONTROL);
-
-    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
-    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
-    auto const tgVhCtrl = vehicleCtrl   .get_pipelines<PlVehicleCtrl>();
-    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgPhys   = physics       .get_pipelines<PlPhysics>();
-
-    Session out;
-
-    /*
-     * vehicle camera needs transforms and modifies cam-controller
-     * shape spawner needs cam-controller, modifies transforms
-     *
-     *, tgPhys.physUpdate(Done)
-     */
-
-    rBuilder.task()
-        .name       ("Update vehicle camera")
-        .run_on     ({tgWin.sync(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Modify), tgPhys.physUpdate(Done) /*, tgCS.transform(Modify)*/})
-        .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,           idDeltaTimeIn,                 idBasic,                     idVhControls,                 idScnParts})
-        .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleTestControls& rVhControls, ACtxParts const& rScnParts) noexcept
-    {
-        if (MachLocalId const selectedLocal = rVhControls.m_selectedUsrCtrl;
-            selectedLocal != lgrn::id_null<MachLocalId>())
-        {
-            // Follow selected UserControl machine
-
-            // Obtain associated ActiveEnt
-            // MachLocalId -> MachAnyId -> PartId -> RigidGroup -> ActiveEnt
-            PerMachType const&  rUsrCtrls       = rScnParts.m_machines.m_perType.at(adera::gc_mtUserCtrl);
-            MachAnyId const     selectedMach    = rUsrCtrls.m_localToAny        .at(selectedLocal);
-            PartId const        selectedPart    = rScnParts.m_machineToPart     .at(selectedMach);
-            WeldId const        weld            = rScnParts.m_partToWeld        .at(selectedPart);
-            ActiveEnt const     selectedEnt     = rScnParts.weldToActive        .at(weld);
-
-            if (rBasic.m_transform.contains(selectedEnt))
-            {
-                rCamCtrl.m_target = rBasic.m_transform.get(selectedEnt).m_transform.translation();
-            }
-        }
-        else
-        {
-            // Free cam when no vehicle selected
-            SysCameraController::update_move(
-                    rCamCtrl,
-                    deltaTimeIn, true);
-        }
-
-        SysCameraController::update_view(rCamCtrl, deltaTimeIn);
-    });
-
-    return out;
-} // setup_camera_vehicle
+} // setup_signals_float
 
 
 } // namespace testapp::scenes

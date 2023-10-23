@@ -35,6 +35,8 @@
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/containers/intarray_multimap.hpp>
 
+#include <atomic>
+
 namespace osp::active
 {
 

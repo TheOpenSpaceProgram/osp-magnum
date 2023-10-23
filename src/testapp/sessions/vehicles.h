@@ -70,7 +70,7 @@ osp::Session setup_parts(
 osp::Session setup_signals_float(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
+        osp::Session const&         scene,
         osp::Session const&         parts);
 
 /**
@@ -81,7 +81,7 @@ osp::Session setup_signals_float(
 osp::Session setup_mach_rocket(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
+        osp::Session const&         scene,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat);
 
@@ -91,7 +91,7 @@ osp::Session setup_mach_rocket(
 osp::Session setup_mach_rcsdriver(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
+        osp::Session const&         scene,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat);
 
@@ -126,47 +126,6 @@ osp::Session setup_vehicle_spawn_vb(
         osp::Session const&         vehicleSpawn,
         osp::Session const&         signalsFloat);
 
-/**
- * @brief Controls to select and control a UserControl Machine
- */
-osp::Session setup_vehicle_control(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         scene,
-        osp::Session const&         parts,
-        osp::Session const&         signalsFloat);
 
-/**
- * @brief Camera which can free cam or follow a selected vehicle
- */
-osp::Session setup_camera_vehicle(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         scene,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         parts,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         vehicleCtrl);
-
-
-/**
- * @brief Red indicators over Magic Rockets
- */
-osp::Session setup_thrust_indicators(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         magnum,
-        osp::Session const&         commonScene,
-        osp::Session const&         parts,
-        osp::Session const&         signalsFloat,
-        osp::Session const&         scnRender,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         shFlat,
-        osp::TopDataId const        idResources,
-        osp::PkgId const            pkg);
 
 }

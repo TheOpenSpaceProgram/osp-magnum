@@ -101,6 +101,7 @@ osp::Session setup_vehicle_spawn_newton(
 osp::Session setup_rocket_thrust_newton(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         scene,
         osp::Session const&         commonScene,
         osp::Session const&         physics,
         osp::Session const&         prefabs,

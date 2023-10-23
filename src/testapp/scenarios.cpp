@@ -35,6 +35,7 @@
 #include "sessions/shapes.h"
 #include "sessions/universe.h"
 #include "sessions/vehicles.h"
+#include "sessions/vehicles_machines.h"
 #include "sessions/vehicles_prebuilt.h"
 
 #include "MagnumApplication.h"
@@ -294,7 +295,9 @@ static ScenarioMap_t make_scenarios()
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
         #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, newton, nwtGravSet, nwtGrav, physShapesNwt, \
-                                    prefabs, parts, vehicleSpawn, signalsFloat, vehicleSpawnVB, vehicleSpawnRgd, vehicleSpawnNwt, testVehicles
+                                    prefabs, parts, vehicleSpawn, signalsFloat, \
+                                    vehicleSpawnVB, vehicleSpawnRgd, vehicleSpawnNwt, \
+                                    testVehicles, machRocket, machRcsDriver, nwtRocketSet, rocketsNwt
         #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, \
                                     prefabDraw, vehicleDraw, vehicleCtrl, cameraVehicle
 
@@ -306,7 +309,7 @@ static ScenarioMap_t make_scenarios()
 
         TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_scene.m_edges, rTestApp.m_taskData};
 
-        auto & [SCENE_SESSIONS] = resize_then_unpack<18>(rTestApp.m_scene.m_sessions);
+        auto & [SCENE_SESSIONS] = resize_then_unpack<22>(rTestApp.m_scene.m_sessions);
 
         // Compose together lots of Sessions
         scene           = setup_scene               (builder, rTopData, application);
@@ -318,15 +321,21 @@ static ScenarioMap_t make_scenarios()
 
         prefabs         = setup_prefabs             (builder, rTopData, application, scene, commonScene, physics);
         parts           = setup_parts               (builder, rTopData, application, scene);
+        signalsFloat    = setup_signals_float       (builder, rTopData, scene, parts);
         vehicleSpawn    = setup_vehicle_spawn       (builder, rTopData, scene);
         vehicleSpawnVB  = setup_vehicle_spawn_vb    (builder, rTopData, application, scene, commonScene, prefabs, parts, vehicleSpawn, signalsFloat);
         testVehicles    = setup_prebuilt_vehicles   (builder, rTopData, application, scene);
+
+        machRocket      = setup_mach_rocket         (builder, rTopData, scene, parts, signalsFloat);
+        machRcsDriver   = setup_mach_rcsdriver      (builder, rTopData, scene, parts, signalsFloat);
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
         nwtGravSet      = setup_newton_factors      (builder, rTopData);
         nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
         physShapesNwt   = setup_phys_shapes_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
         vehicleSpawnNwt = setup_vehicle_spawn_newton(builder, rTopData, application, commonScene, physics, prefabs, parts, vehicleSpawn, newton);
+        nwtRocketSet    = setup_newton_factors      (builder, rTopData);
+        rocketsNwt      = setup_rocket_thrust_newton(builder, rTopData, scene, commonScene, physics, prefabs, parts, signalsFloat, newton, nwtRocketSet);
 
         OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,   TESTAPP_DATA_VEHICLE_SPAWN);
         OSP_DECLARE_GET_DATA_IDS(vehicleSpawnVB, TESTAPP_DATA_VEHICLE_SPAWN_VB);
@@ -359,7 +368,7 @@ static ScenarioMap_t make_scenarios()
 
             TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
 
-            auto & [SCENE_SESSIONS] = unpack<18>(rTestApp.m_scene.m_sessions);
+            auto & [SCENE_SESSIONS] = unpack<22>(rTestApp.m_scene.m_sessions);
             auto & [RENDERER_SESSIONS] = resize_then_unpack<14>(rTestApp.m_renderer.m_sessions);
 
             sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);

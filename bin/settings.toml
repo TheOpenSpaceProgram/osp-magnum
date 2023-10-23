@@ -56,12 +56,12 @@ holdable = true
 [vehicle_thr_max]
 primary = "Z"
 secondary = "None"
-holdable = false
+holdable = true
 
 [vehicle_thr_min]
 primary = "X"
 secondary = "None"
-holdable = false
+holdable = true
 
 [vehicle_thr_more]
 primary = "LShift"

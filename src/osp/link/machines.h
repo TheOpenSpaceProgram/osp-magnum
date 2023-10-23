@@ -32,6 +32,7 @@
 #include <longeron/containers/bit_view.hpp>
 #include <longeron/id_management/registry_stl.hpp>
 
+#include <atomic>
 #include <vector>
 
 namespace osp::link
@@ -75,12 +76,14 @@ struct Machines
     std::vector<PerMachType>            m_perType;
 };
 
-struct UpdMachPerType
+struct MachineUpdater
 {
     BitVector_t m_machTypesDirty;
 
     // [MachTypeId][MachLocalId]
     std::vector<BitVector_t> m_localDirty;
+
+    alignas(64) std::atomic<bool> requestMachineUpdateLoop {false};
 };
 
 struct MachinePair

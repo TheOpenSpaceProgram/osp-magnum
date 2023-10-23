@@ -240,7 +240,7 @@ Session setup_phys_shapes_draw(
     rBuilder.task()
         .name       ("Create DrawEnts for spawned shapes")
         .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgCS.activeEntResized(Done), tgScnRdr.drawEntResized(ModifyOrSignal)})
+        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgCS.activeEntResized(Done), tgScnRdr.drawEntResized(ModifyOrSignal), tgScnRdr.drawEnt(New)})
         .push_to    (out.m_tasks)
         .args       ({               idBasic,             idDrawing,                 idScnRender,                idPhysShapes,             idNMesh })
         .func([]    (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxPhysShapes& rPhysShapes, NamedMeshes& rNMesh) noexcept

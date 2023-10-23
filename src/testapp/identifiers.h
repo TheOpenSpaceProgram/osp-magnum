@@ -114,6 +114,16 @@ enum class EStgFBO
 OSP_DECLARE_STAGE_NAMES(EStgFBO, "Bind", "Draw", "Unbind");
 OSP_DECLARE_STAGE_NO_SCHEDULE(EStgFBO);
 
+
+enum class EStgLink
+{
+    ScheduleLink,
+    NodeUpd,
+    MachUpd
+};
+OSP_DECLARE_STAGE_NAMES(EStgLink, "Schedule", "NodeUpd", "MachUpd");
+OSP_DECLARE_STAGE_SCHEDULE(EStgLink, EStgLink::ScheduleLink);
+
 //-----------------------------------------------------------------------------
 
 inline void register_stage_enums()
@@ -125,6 +135,7 @@ inline void register_stage_enums()
     osp::PipelineInfo::register_stage_enum<EStgRevd>();
     osp::PipelineInfo::register_stage_enum<EStgCont>();
     osp::PipelineInfo::register_stage_enum<EStgFBO>();
+    osp::PipelineInfo::register_stage_enum<EStgLink>();
 }
 
 using osp::PipelineDef;
@@ -207,8 +218,8 @@ struct PlBounds
 
 
 
-#define TESTAPP_DATA_PARTS 4, \
-    idScnParts, idPartInit, idUpdMach, idMachEvtTags
+#define TESTAPP_DATA_PARTS 2, \
+    idScnParts, idUpdMach
 struct PlParts
 {
     PipelineDef<EStgCont> partIds           {"partIds           - ACtxParts::partIds"};
@@ -227,6 +238,10 @@ struct PlParts
     PipelineDef<EStgCont> mapPartMach       {"mapPartMach       - ACtxParts::partToMachines/machineToPart"};
     PipelineDef<EStgCont> mapPartActive     {"mapPartActive     - ACtxParts::partToActive/activeToPart"};
     PipelineDef<EStgCont> mapWeldActive     {"mapWeldActive     - ACtxParts::weldToActive"};
+
+    PipelineDef<EStgCont> machUpdExtIn      {"machUpdExtIn      -"};
+
+    PipelineDef<EStgLink> linkLoop          {"linkLoop          - oh god it loops LOL!"};
 };
 
 
@@ -264,19 +279,14 @@ struct PlVehicleSpawnVB
 
 #define TESTAPP_DATA_SIGNALS_FLOAT 2, \
     idSigValFloat,      idSigUpdFloat
-#define OSP_TAGS_TESTAPP_SIGNALS_FLOAT 5, \
-    tgSigFloatLinkMod,  tgSigFloatLinkReq,                      \
-    tgSigFloatUpdMod,   tgSigFloatUpdReq,   tgSigFloatUpdEvt    \
+struct PlSignalsFloat
+{
+    PipelineDef<EStgCont> sigFloatValues    {"sigFloatValues    -"};
+    PipelineDef<EStgCont> sigFloatUpdExtIn  {"sigFloatUpdExtIn  -"};
+    PipelineDef<EStgCont> sigFloatUpdLoop   {"sigFloatUpdLoop   -"};
+};
 
 
-
-#define TESTAPP_DATA_MACH_ROCKET 1, \
-    idDummy
-#define OSP_TAGS_TESTAPP_MACH_ROCKET 1, \
-    tgMhRocketEvt
-
-#define OSP_TAGS_TESTAPP_MACH_RCSDRIVER 1, \
-    tgMhRcsDriverEvt
 
 #define TESTAPP_DATA_NEWTON 1, \
     idNwt
@@ -292,12 +302,6 @@ struct PlNewton
 
 #define TESTAPP_DATA_NEWTON_ACCEL 1, \
     idAcceleration
-
-
-
-#define OSP_TAGS_TESTAPP_VEHICLE_SPAWN_NWT 4, \
-    tgNwtVhWeldEntMod,  tgNwtVhWeldEntReq,                      \
-    tgNwtVhHierMod,     tgNwtVhHierReq
 
 
 

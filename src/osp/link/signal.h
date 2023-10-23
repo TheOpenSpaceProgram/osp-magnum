@@ -58,7 +58,7 @@ bool update_signal_nodes(
         Machines const&                 machines,
         ArrayView<VALUE_T const>        newValues,
         ArrayView<VALUE_T>              currentValues,
-        UpdMachPerType&                 rUpdMach)
+        MachineUpdater&                 rUpdMach)
 {
     bool somethingNotified = false;
 

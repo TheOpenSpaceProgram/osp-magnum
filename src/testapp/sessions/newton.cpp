@@ -481,8 +481,6 @@ Session setup_vehicle_spawn_newton(
     return out;
 }
 
-#if 0
-
 
 struct BodyRocket
 {
@@ -562,13 +560,13 @@ static void assign_rockets(
         ActiveEnt const partEnt = rScnParts.m_partToActive[part];
 
         Matrix4     transform   = rBasic.m_transform.get(partEnt).m_transform;
-        ActiveEnt   parent      = rBasic.m_scnGraph.m_entParent[std::size_t(partEnt)];
+        ActiveEnt   parent      = rBasic.m_scnGraph.m_entParent[partEnt];
 
         while (parent != weldEnt)
         {
             Matrix4 const& parentTransform = rBasic.m_transform.get(parent).m_transform;
             transform = parentTransform * transform;
-            parent = rBasic.m_scnGraph.m_entParent[std::size_t(parent)];
+            parent = rBasic.m_scnGraph.m_entParent[parent];
         }
 
         auto const      rotation    = Quaternion::fromMatrix(transform.rotation());
@@ -647,6 +645,7 @@ static void rocket_thrust_force(NewtonBody const* pBody, BodyId const body, ACtx
 Session setup_rocket_thrust_newton(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
+        Session const&              scene,
         Session const&              commonScene,
         Session const&              physics,
         Session const&              prefabs,
@@ -655,35 +654,40 @@ Session setup_rocket_thrust_newton(
         Session const&              newton,
         Session const&              nwtFactors)
 {
-    OSP_SESSION_UNPACK_DATA(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_TAGS(commonScene,      TESTAPP_COMMON_SCENE);
-    OSP_SESSION_UNPACK_DATA(physics,        TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_TAGS(physics,        TESTAPP_PHYSICS);
-    OSP_SESSION_UNPACK_DATA(prefabs,        TESTAPP_PREFABS);
-    OSP_SESSION_UNPACK_TAGS(prefabs,        TESTAPP_PREFABS);
-    OSP_SESSION_UNPACK_DATA(parts,          TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_TAGS(parts,          TESTAPP_PARTS);
-    OSP_SESSION_UNPACK_DATA(signalsFloat,   TESTAPP_SIGNALS_FLOAT)
-    OSP_SESSION_UNPACK_TAGS(signalsFloat,   TESTAPP_SIGNALS_FLOAT);
-    OSP_SESSION_UNPACK_DATA(newton,         TESTAPP_NEWTON);
-    OSP_SESSION_UNPACK_TAGS(newton,         TESTAPP_NEWTON);
-    OSP_SESSION_UNPACK_DATA(nwtFactors,     TESTAPP_NEWTON_FORCES);
+    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
+    OSP_DECLARE_GET_DATA_IDS(prefabs,       TESTAPP_DATA_PREFABS);
+    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
+    OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
+    OSP_DECLARE_GET_DATA_IDS(newton,        TESTAPP_DATA_NEWTON);
+    OSP_DECLARE_GET_DATA_IDS(nwtFactors,    TESTAPP_DATA_NEWTON_FORCES);
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgPf     = prefabs       .get_pipelines<PlPrefabs>();
+    auto const tgParts  = parts         .get_pipelines<PlParts>();
+    auto const tgNwt    = newton        .get_pipelines<PlNewton>();
 
-
-    Session rocketNwt;
-    OSP_SESSION_ACQUIRE_DATA(rocketNwt, topData, TESTAPP_ROCKETS_NWT);
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_ROCKETS_NWT);
 
     auto &rRocketsNwt   = top_emplace< ACtxRocketsNwt >(topData, idRocketsNwt);
 
+//    rBuilder.task()
+//        .name       ("aaa")
+//        .depends_on ({})
+//        .fulfills   ({})
+//        .push_to    (out.m_tasks)
+//    rocketNwt.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgWeldReq, tgNwtBodyReq}).data(
+//            "Assign rockets to Newton bodies",
+//            .args({                    })
+//            .func([] (ActiveReg_t const &rActiveIds, ) noexcept
     rBuilder.task()
-        .name       ("aaa")
-        .depends_on ({})
-        .fulfills   ({})
+        .name       ("Assign rockets to Newton bodies")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgParts.weldIds(Ready), tgNwt.nwtBody(Ready), tgParts.connect(Ready)})
         .push_to    (out.m_tasks)
-    rocketNwt.task() = rBuilder.task().assign({tgSceneEvt, tgLinkReq, tgWeldReq, tgNwtBodyReq}).data(
-            "Assign rockets to Newton bodies",
-            .args({                   idActiveIds,           idBasic,             idPhys,              idNwt,                 idScnParts,                idRocketsNwt,                      idNwtFactors })
-            .func([] (ActiveReg_t const &rActiveIds, ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxParts const& rScnParts, ACtxRocketsNwt& rRocketsNwt, ForceFactors_t const& rNwtFactors) noexcept
+        .args       ({      idBasic,             idPhys,              idNwt,                 idScnParts,                idRocketsNwt,                      idNwtFactors})
+        .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxParts const& rScnParts, ACtxRocketsNwt& rRocketsNwt, ForceFactors_t const& rNwtFactors) noexcept
     {
         using adera::gc_mtMagicRocket;
 
@@ -699,7 +703,7 @@ Session setup_rocket_thrust_newton(
         {
             assign_rockets(rBasic, rScnParts, rNwt, rRocketsNwt, rFloatNodes, machtypeRocket, rNwtFactors, weld, temp);
         }
-    }));
+    });
 
     auto &rScnParts     = top_get< ACtxParts >              (topData, idScnParts);
     auto &rSigValFloat  = top_get< SignalValues_t<float> >  (topData, idSigValFloat);
@@ -720,9 +724,9 @@ Session setup_rocket_thrust_newton(
     auto factorBits = lgrn::bit_view(top_get<ForceFactors_t>(topData, idNwtFactors));
     factorBits.set(index);
 
-    return rocketNwt;
+    return out;
 }
-#endif
+
 
 } // namespace testapp::scenes
 
