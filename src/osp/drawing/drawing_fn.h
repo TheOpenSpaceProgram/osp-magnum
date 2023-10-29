@@ -36,7 +36,17 @@ namespace osp::draw
  * @brief Function pointers called when new draw transforms are calculated
  *
  * Draw transforms (Matrix4) are calculated by traversing the Scene graph (tree of ActiveEnts).
- * These matrices are only stored for ActiveEnts associeted with a DrawEnt (activeToDraw)
+ * These matrices are not always stored in memory since they're slightly expensive. By default,
+ * they are only saved for DrawEnts associated with an ActiveEnt in ACtxSceneRender::activeToDraw.
+ *
+ * Draw transforms can be calculated by SysRender::update_draw_transforms, or potentially by a
+ * future system that takes physics engine interpolation or animations into account.
+ * DrawTfObservers provides a way to tap into this procedure to call custom functions for other
+ * systems.
+ *
+ * To use, write into DrawTfObservers::observers[i]
+ * Enable per-DrawEnt by setting ACtxSceneRender::drawTfObserverEnable[drawEnt] bit [i]
+ *
  */
 struct DrawTfObservers
 {
@@ -49,7 +59,7 @@ struct DrawTfObservers
         UserData_t  data{};
     };
 
-    std::array<Observer, 8> observers;
+    std::array<Observer, 16> observers;
 };
 
 /**
@@ -224,7 +234,7 @@ void SysRender::update_draw_transforms(
     {
         active::ActiveEnt const ent = *first;
 
-        if (args.needDrawTf.test(std::size_t(ent)))
+        if (args.needDrawTf.test(ent.value))
         {
             update_draw_transforms_recurse(args, ent, identity, true, func);
         }
@@ -248,8 +258,8 @@ void SysRender::update_draw_transforms_recurse(
 
     func(entDrawTf, ent, depth);
 
-    if (DrawEnt const drawEnt = args.activeToDraw[ent];
-        drawEnt != lgrn::id_null<DrawEnt>())
+    DrawEnt const drawEnt = args.activeToDraw[ent];
+    if (drawEnt != lgrn::id_null<DrawEnt>())
     {
         args.rDrawTf[drawEnt] = entDrawTf;
     }

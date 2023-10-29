@@ -182,9 +182,11 @@ Session setup_prefabs(
         rPrefabs.spawnRequest.clear();
     });
 
-
     return out;
-}
+} // setup_prefabs
+
+
+
 
 Session setup_prefab_draw(
         TopTaskBuilder&             rBuilder,

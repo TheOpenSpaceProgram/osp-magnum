@@ -86,10 +86,10 @@ Session setup_parts(
 
     // Resize containers to fit all existing MachTypeIds and NodeTypeIds
     // These Global IDs are dynamically initialized just as the program starts
-    bitvector_resize(rUpdMach.m_machTypesDirty, MachTypeReg_t::size());
-    rUpdMach.m_localDirty           .resize(MachTypeReg_t::size());
-    rScnParts.m_machines.m_perType  .resize(MachTypeReg_t::size());
-    rScnParts.m_nodePerType         .resize(NodeTypeReg_t::size());
+    bitvector_resize(rUpdMach.machTypesDirty, MachTypeReg_t::size());
+    rUpdMach.localDirty       .resize(MachTypeReg_t::size());
+    rScnParts.machines.perType.resize(MachTypeReg_t::size());
+    rScnParts.nodePerType     .resize(NodeTypeReg_t::size());
 
     rBuilder.task()
         .name       ("Clear Resource owners")
@@ -98,7 +98,7 @@ Session setup_parts(
         .args       ({      idScnParts,           idResources})
         .func([] (ACtxParts& rScnParts, Resources& rResources) noexcept
     {
-        for (osp::PrefabPair &rPrefabPair : rScnParts.m_partPrefabs)
+        for (osp::PrefabPair &rPrefabPair : rScnParts.partPrefabs)
         {
             rResources.owner_destroy(gc_importer, std::move(rPrefabPair.m_importer));
         }
@@ -111,7 +111,7 @@ Session setup_parts(
         .args       ({      idScnParts})
         .func([] (ACtxParts& rScnParts) noexcept
     {
-        rScnParts.m_partDirty.clear();
+        rScnParts.partDirty.clear();
     });
 
     rBuilder.task()
@@ -121,7 +121,7 @@ Session setup_parts(
         .args       ({      idScnParts})
         .func([] (ACtxParts& rScnParts) noexcept
     {
-        rScnParts.m_weldDirty.clear();
+        rScnParts.weldDirty.clear();
     });
 
     rBuilder.task()
@@ -276,16 +276,16 @@ Session setup_vehicle_spawn_vb(
             }
 
             Machines const &srcMachines = pVData->m_machines;
-            std::size_t const bounds = srcMachines.m_ids.capacity();
+            std::size_t const bounds = srcMachines.ids.capacity();
 
             rVSVB.remapMachOffsets[vhId] = remapMachTotal;
 
             remapMachTotal += bounds;
-            machTotal += srcMachines.m_ids.size();
+            machTotal += srcMachines.ids.size();
 
             for (MachTypeId type = 0; type < MachTypeReg_t::size(); ++type)
             {
-                rVSVB.machtypeCount[type] += srcMachines.m_perType[type].m_localIds.size();
+                rVSVB.machtypeCount[type] += srcMachines.perType[type].localIds.size();
             }
         }
 
@@ -295,10 +295,10 @@ Session setup_vehicle_spawn_vb(
         // Create ACtxParts MachAny/LocalIDs and populate remaps
 
         // MachAnyIDs created here
-        rScnParts.m_machines.m_ids.create(rVehicleSpawn.spawnedMachs.begin(),
-                                          rVehicleSpawn.spawnedMachs.end());
+        rScnParts.machines.ids.create(rVehicleSpawn.spawnedMachs.begin(),
+                                      rVehicleSpawn.spawnedMachs.end());
 
-        rScnParts.m_machines.m_machToLocal.resize(rScnParts.m_machines.m_ids.capacity());
+        rScnParts.machines.machToLocal.resize(rScnParts.machines.ids.capacity());
 
         auto itDstMachIds = rVehicleSpawn.spawnedMachs.cbegin();
 
@@ -314,7 +314,7 @@ Session setup_vehicle_spawn_vb(
 
             std::size_t const remapMachOffset = rVSVB.remapMachOffsets[vhId];
 
-            for (MachAnyId const srcMach : srcMachines.m_ids.bitview().zeros())
+            for (MachAnyId const srcMach : srcMachines.ids.bitview().zeros())
             {
                 MachAnyId const dstMach = *itDstMachIds;
                 ++itDstMachIds;
@@ -328,14 +328,14 @@ Session setup_vehicle_spawn_vb(
                 // TODO: This can be optimized later, where all local IDs are
                 //       created at once with ids.create(first, last), and make
                 //       resize(..) called once per type too
-                MachTypeId const    type            = srcMachines.m_machTypes[srcMach];
-                PerMachType&        rDstPerType     = rScnParts.m_machines.m_perType[type];
+                MachTypeId const    type            = srcMachines.machTypes[srcMach];
+                PerMachType&        rDstPerType     = rScnParts.machines.perType[type];
 
-                MachLocalId const dstLocal = rDstPerType.m_localIds.create();
-                rDstPerType.m_localToAny.resize(rDstPerType.m_localIds.capacity());
+                MachLocalId const dstLocal = rDstPerType.localIds.create();
+                rDstPerType.localToAny.resize(rDstPerType.localIds.capacity());
 
-                rDstPerType.m_localToAny[dstLocal] = dstMach;
-                rScnParts.m_machines.m_machToLocal[dstMach] = dstLocal;
+                rDstPerType.localToAny[dstLocal] = dstMach;
+                rScnParts.machines.machToLocal[dstMach] = dstLocal;
             }
         }
     });
@@ -359,21 +359,21 @@ Session setup_vehicle_spawn_vb(
                 continue;
             }
 
-            rScnParts.m_machineToPart.resize(rScnParts.m_machines.m_ids.capacity());
-            rScnParts.m_partToMachines.ids_reserve(rScnParts.m_partIds.capacity());
-            rScnParts.m_partToMachines.data_reserve(rScnParts.m_machines.m_ids.capacity());
+            rScnParts.machineToPart.resize(rScnParts.machines.ids.capacity());
+            rScnParts.partToMachines.ids_reserve(rScnParts.partIds.capacity());
+            rScnParts.partToMachines.data_reserve(rScnParts.machines.ids.capacity());
 
             std::size_t const remapMachOffset = rVSVB.remapMachOffsets[vhId];
             std::size_t const remapPartOffset = rVSVB.remapPartOffsets[vhId];
 
             // Update rScnParts machine->part map
-            for (MachAnyId const srcMach : pVData->m_machines.m_ids.bitview().zeros())
+            for (MachAnyId const srcMach : pVData->m_machines.ids.bitview().zeros())
             {
                 MachAnyId const dstMach = rVSVB.remapMachs[remapMachOffset + srcMach];
                 PartId const    srcPart = pVData->m_machToPart[srcMach];
                 PartId const    dstPart = rVSVB.remapParts[remapPartOffset + srcPart];
 
-                rScnParts.m_machineToPart[dstMach] = dstPart;
+                rScnParts.machineToPart[dstMach] = dstPart;
             }
 
             // Update rScnParts part->machine multimap
@@ -383,19 +383,19 @@ Session setup_vehicle_spawn_vb(
 
                 auto const& srcPairs = pVData->m_partToMachines[srcPart];
 
-                rScnParts.m_partToMachines.emplace(dstPart, srcPairs.size());
-                auto dstPairs = rScnParts.m_partToMachines[dstPart];
+                rScnParts.partToMachines.emplace(dstPart, srcPairs.size());
+                auto dstPairs = rScnParts.partToMachines[dstPart];
 
                 for (int i = 0; i < srcPairs.size(); ++i)
                 {
                     MachinePair const&  srcPair  = srcPairs[i];
                     MachinePair&        rDstPair = dstPairs[i];
-                    MachAnyId const     srcMach  = pVData->m_machines.m_perType[srcPair.m_type].m_localToAny[srcPair.m_local];
+                    MachAnyId const     srcMach  = pVData->m_machines.perType[srcPair.type].localToAny[srcPair.local];
                     MachAnyId const     dstMach  = rVSVB.remapMachs[remapMachOffset + srcMach];
-                    MachTypeId const    dstType  = srcPair.m_type;
-                    MachLocalId const   dstLocal = rScnParts.m_machines.m_machToLocal[dstMach];
+                    MachTypeId const    dstType  = srcPair.type;
+                    MachLocalId const   dstLocal = rScnParts.machines.machToLocal[dstMach];
 
-                    rDstPair = { .m_local = dstLocal, .m_type = dstType };
+                    rDstPair = { .local = dstLocal, .type = dstType };
                 }
             }
         }
@@ -425,7 +425,7 @@ Session setup_vehicle_spawn_vb(
             }
             for (PerNodeType const &rSrcNodeType : pVData->m_nodePerType)
             {
-                remapNodeTotal += rSrcNodeType.m_nodeIds.capacity();
+                remapNodeTotal += rSrcNodeType.nodeIds.capacity();
             }
         }
         rVSVB.remapNodes.resize(remapNodeTotal);
@@ -446,12 +446,12 @@ Session setup_vehicle_spawn_vb(
             {
                 PerNodeType const &rSrcNodeType = pVData->m_nodePerType[nodeType];
 
-                std::size_t const remapSize = rSrcNodeType.m_nodeIds.capacity();
+                std::size_t const remapSize = rSrcNodeType.nodeIds.capacity();
                 auto nodeRemapOut = arrayView(rVSVB.remapNodes).sliceSize(nodeRemapUsed, remapSize);
                 remapNodeOffsets2d[vhId.value][nodeType] = nodeRemapUsed;
                 nodeRemapUsed += remapSize;
                 copy_nodes(rSrcNodeType, pVData->m_machines, machRemap,
-                           rScnParts.m_nodePerType[nodeType], rScnParts.m_machines, nodeRemapOut);
+                           rScnParts.nodePerType[nodeType], rScnParts.machines, nodeRemapOut);
             }
         }
     });
@@ -464,8 +464,8 @@ Session setup_vehicle_spawn_vb(
         .args       ({             idVehicleSpawn,                 idBasic,           idScnParts,              idPrefabs})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxBasic const& rBasic, ACtxParts& rScnParts,  ACtxPrefabs& rPrefabs) noexcept
     {
-        rScnParts.m_partToActive.resize(rScnParts.m_partIds.capacity());
-        rScnParts.m_activeToPart.resize(rBasic.m_activeIds.capacity());
+        rScnParts.partToActive.resize(rScnParts.partIds.capacity());
+        rScnParts.activeToPart.resize(rBasic.m_activeIds.capacity());
 
         // Populate PartId<->ActiveEnt mapping, now that the prefabs exist
 
@@ -476,8 +476,8 @@ Session setup_vehicle_spawn_vb(
             ActiveEnt const root = rPrefabs.spawnedEntsOffset[*itPrefab].front();
             ++itPrefab;
 
-            rScnParts.m_partToActive[partId]    = root;
-            rScnParts.m_activeToPart[root]      = partId;
+            rScnParts.partToActive[partId]    = root;
+            rScnParts.activeToPart[root]      = partId;
         }
     });
 
@@ -489,10 +489,10 @@ Session setup_vehicle_spawn_vb(
         .args       ({             idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                       idSigValFloat,                    idSigUpdFloat})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
-        Nodes const         &rFloatNodes    = rScnParts.m_nodePerType[gc_ntSigFloat];
-        std::size_t const   maxNodes        = rFloatNodes.m_nodeIds.capacity();
-        rSigUpdFloat.m_nodeNewValues.resize(maxNodes);
-        bitvector_resize(rSigUpdFloat.m_nodeDirty, maxNodes);
+        Nodes const         &rFloatNodes    = rScnParts.nodePerType[gc_ntSigFloat];
+        std::size_t const   maxNodes        = rFloatNodes.nodeIds.capacity();
+        rSigUpdFloat.nodeNewValues.resize(maxNodes);
+        bitvector_resize(rSigUpdFloat.nodeDirty, maxNodes);
         rSigValFloat.resize(maxNodes);
 
         std::size_t const           newVehicleCount     = rVehicleSpawn.new_vehicle_count();
@@ -513,7 +513,7 @@ Session setup_vehicle_spawn_vb(
             std::size_t const   nodeRemapOffset     = remapNodeOffsets2d[vhId.value][gc_ntSigFloat];
             auto const          nodeRemap           = arrayView(rVSVB.remapNodes).exceptPrefix(nodeRemapOffset);
 
-            for (NodeId const srcNode : srcFloatNodes.m_nodeIds.bitview().zeros())
+            for (NodeId const srcNode : srcFloatNodes.nodeIds.bitview().zeros())
             {
                 NodeId const dstNode = nodeRemap[srcNode];
                 rSigValFloat[dstNode] = srcFloatValues[srcNode];
@@ -538,7 +538,7 @@ Session setup_vehicle_spawn_draw(
     Session out;
 
     rBuilder.task()
-        .name       ("asdf")
+        .name       ("Enable Draw Transforms for spawned vehicle root entities")
         .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
         .sync_with  ({tgVhSp.rootEnts(UseOrRun), tgScnRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
@@ -576,51 +576,48 @@ Session setup_signals_float(
     top_emplace< SignalValues_t<float> >    (topData, idSigValFloat);
     top_emplace< UpdateNodes<float> >       (topData, idSigUpdFloat);
 
-    // NOTE: Eventually have an array of UpdateNodes to allow multiple threads to update nodes in
-    //       parallel, noting the use of "Reduce". Tag limits are intended select which UpdateNodes
-    //       are passed to each thread, once they're properly implemented.
-
-    auto const idNull = lgrn::id_null<TopDataId>();
+    // NOTE: Consider supporting per-thread UpdateNodes<float> to allow multiple threads to write
+    //       new float values in parallel.
 
     rBuilder.task()
-        .name       ("Reduce Signal-Float Nodes")
+        .name       ("Update Signal<float> Nodes")
         .run_on     ({tgParts.linkLoop(EStgLink::NodeUpd)})
         .sync_with  ({tgSgFlt.sigFloatUpdExtIn(Ready), tgParts.machUpdExtIn(Ready), tgSgFlt.sigFloatUpdLoop(Modify), tgSgFlt.sigFloatValues(Modify)})
         .push_to    (out.m_tasks)
         .args       ({               idSigUpdFloat,                       idSigValFloat,                idUpdMach,                 idScnParts})
         .func([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, MachineUpdater& rUpdMach, ACtxParts const& rScnParts) noexcept
     {
-        if ( ! rSigUpdFloat.m_dirty )
+        if ( ! rSigUpdFloat.dirty )
         {
             return; // Not dirty, nothing to do
         }
 
-        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
+        Nodes const &rFloatNodes = rScnParts.nodePerType[gc_ntSigFloat];
 
         // NOTE: The various use of reset() clear entire bit arrays, which may or may
         //       not be expensive. They likely optimize to memset
 
-        for (std::size_t const machTypeDirty : rUpdMach.m_machTypesDirty.ones())
+        for (std::size_t const machTypeDirty : rUpdMach.machTypesDirty.ones())
         {
-            rUpdMach.m_localDirty[machTypeDirty].reset();
+            rUpdMach.localDirty[machTypeDirty].reset();
         }
-        rUpdMach.m_machTypesDirty.reset();
+        rUpdMach.machTypesDirty.reset();
 
         // Sees which nodes changed, and writes into rUpdMach set dirty which MACHINES
         // must be updated next
         update_signal_nodes<float>(
-                rSigUpdFloat.m_nodeDirty.ones(),
-                rFloatNodes.m_nodeToMach,
-                rScnParts.m_machines,
-                arrayView(rSigUpdFloat.m_nodeNewValues),
+                rSigUpdFloat.nodeDirty.ones(),
+                rFloatNodes.nodeToMach,
+                rScnParts.machines,
+                arrayView(rSigUpdFloat.nodeNewValues),
                 rSigValFloat,
                 rUpdMach);
-        rSigUpdFloat.m_nodeDirty.reset();
-        rSigUpdFloat.m_dirty = false;
+        rSigUpdFloat.nodeDirty.reset();
+        rSigUpdFloat.dirty = false;
 
         // Run tasks needed to update machine types that are dirty
         bool anyMachineNotified = false;
-        for (MachTypeId const type : rUpdMach.m_machTypesDirty.ones())
+        for (MachTypeId const type : rUpdMach.machTypesDirty.ones())
         {
             anyMachineNotified = true;
         }

@@ -47,27 +47,27 @@ struct ACtxParts
 {
     using MapPartToMachines_t = lgrn::IntArrayMultiMap<PartId, link::MachinePair>;
 
-    lgrn::IdRegistryStl<PartId>                     m_partIds;
-    KeyedVec<PartId, PrefabPair>                    m_partPrefabs;
-    KeyedVec<PartId, Matrix4>                       m_partTransformWeld;    ///< Part's transform relative to the weld it's part of
-    std::vector<PartId>                             m_partDirty;
+    lgrn::IdRegistryStl<PartId>                     partIds;
+    KeyedVec<PartId, PrefabPair>                    partPrefabs;
+    KeyedVec<PartId, Matrix4>                       partTransformWeld;    ///< Part's transform relative to the weld it's part of
+    std::vector<PartId>                             partDirty;
 
-    lgrn::IdRegistryStl<WeldId>                     m_weldIds;
-    std::vector<WeldId>                             m_weldDirty;
+    lgrn::IdRegistryStl<WeldId>                     weldIds;
+    std::vector<WeldId>                             weldDirty;
 
-    link::Machines                                  m_machines;
-    std::vector<link::Nodes>                        m_nodePerType;
+    link::Machines                                  machines;
+    KeyedVec<link::NodeTypeId, link::Nodes>         nodePerType;
 
-    lgrn::IntArrayMultiMap<WeldId, PartId>          m_weldToParts;
-    KeyedVec<PartId, WeldId>                        m_partToWeld;
+    lgrn::IntArrayMultiMap<WeldId, PartId>          weldToParts;
+    KeyedVec<PartId, WeldId>                        partToWeld;
 
-    MapPartToMachines_t                             m_partToMachines;
-    std::vector<PartId>                             m_machineToPart;
+    MapPartToMachines_t                             partToMachines;
+    KeyedVec<link::MachAnyId, PartId>               machineToPart;
 
-    std::vector<ActiveEnt>                          m_partToActive;
-    KeyedVec<ActiveEnt, PartId>                     m_activeToPart;
+    KeyedVec<PartId, ActiveEnt>                     partToActive;
+    KeyedVec<ActiveEnt, PartId>                     activeToPart;
 
-    std::vector<ActiveEnt>                          weldToActive;
+    KeyedVec<WeldId, ActiveEnt>                     weldToActive;
 };
 
 
@@ -80,9 +80,9 @@ struct ACtxVehicleSpawn
 {
     struct TmpToInit
     {
-        Vector3    m_position;
-        Vector3    m_velocity;
-        Quaternion m_rotation;
+        Vector3    position;
+        Vector3    velocity;
+        Quaternion rotation;
     };
 
     std::size_t new_vehicle_count() const noexcept

@@ -51,7 +51,7 @@ TopTaskFunc_t gen_allocate_mach()
 {
     static TopTaskFunc_t const func = wrap_args([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach) noexcept
     {
-        rUpdMach.m_localDirty[MachType_T].ints().resize(rScnParts.m_machines.m_perType[MachType_T].m_localIds.vec().capacity());
+        rUpdMach.localDirty[MachType_T].ints().resize(rScnParts.machines.perType[MachType_T].localIds.vec().capacity());
     });
 
     return func;
@@ -80,7 +80,10 @@ Session setup_mach_rocket(
         .func_raw   (gen_allocate_mach<gc_mtMagicRocket>());
 
     return out;
-}
+} // setup_mach_rocket
+
+
+
 
 struct ThrustIndicator
 {
@@ -139,11 +142,11 @@ Session setup_thrust_indicators(
         .args       ({               idScnRender,                  idScnParts,                 idThrustIndicator})
         .func([]    (ACtxSceneRender &rScnRender,  ACtxParts const& rScnParts, ThrustIndicator& rThrustIndicator) noexcept
     {
-        PerMachType const& rockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
+        PerMachType const& rockets = rScnParts.machines.perType[gc_mtMagicRocket];
 
-        rThrustIndicator.rktToDrawEnt.resize(rockets.m_localIds.capacity());
+        rThrustIndicator.rktToDrawEnt.resize(rockets.localIds.capacity());
 
-        for (MachLocalId const localId : rockets.m_localIds.bitview().zeros())
+        for (MachLocalId const localId : rockets.localIds.bitview().zeros())
         {
             DrawEnt& rDrawEnt = rThrustIndicator.rktToDrawEnt[localId];
             if (rDrawEnt == lgrn::id_null<DrawEnt>())
@@ -162,20 +165,20 @@ Session setup_thrust_indicators(
         .func([]    (ACtxBasic& rBasic, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, ACtxDrawingRes const& rDrawingRes, ACtxParts const& rScnParts, SignalValues_t<float> const& rSigValFloat, ThrustIndicator& rThrustIndicator) noexcept
     {
         Material            &rMat           = rScnRender.m_materials[rThrustIndicator.material];
-        PerMachType const   &rockets        = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
-        Nodes const         &floats         = rScnParts.m_nodePerType[gc_ntSigFloat];
+        PerMachType const   &rockets        = rScnParts.machines.perType[gc_mtMagicRocket];
+        Nodes const         &floats         = rScnParts.nodePerType[gc_ntSigFloat];
 
-        for (MachLocalId const localId : rockets.m_localIds.bitview().zeros())
+        for (MachLocalId const localId : rockets.localIds.bitview().zeros())
         {
-             DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[localId];
+            DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[localId];
 
-            MachAnyId const anyId           = rockets.m_localToAny[localId];
-            PartId const    part            = rScnParts.m_machineToPart[anyId];
-            ActiveEnt const partEnt         = rScnParts.m_partToActive[part];
+            MachAnyId const anyId           = rockets.localToAny[localId];
+            PartId const    part            = rScnParts.machineToPart[anyId];
+            ActiveEnt const partEnt         = rScnParts.partToActive[part];
 
-            auto const&     portSpan        = floats.m_machToNode[anyId];
-            NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.m_port);
-            NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.m_port);
+            auto const&     portSpan        = floats.machToNode[anyId];
+            NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.port);
+            NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.port);
 
             float const     throttle        = std::clamp(rSigValFloat[throttleIn], 0.0f, 1.0f);
             float const     multiplier      = rSigValFloat[multiplierIn];
@@ -221,21 +224,21 @@ Session setup_thrust_indicators(
         auto &rScnParts                 = *static_cast< ACtxParts* >                (data[1]);
         auto &rSigValFloat              = *static_cast< SignalValues_t<float>* >    (data[2]);
 
-        PerMachType const   &rockets    = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
-        Nodes const         &floats     = rScnParts.m_nodePerType[gc_ntSigFloat];
+        PerMachType const   &rockets    = rScnParts.machines.perType[gc_mtMagicRocket];
+        Nodes const         &floats     = rScnParts.nodePerType[gc_ntSigFloat];
 
-        PartId const        part        = rScnParts.m_activeToPart[ent];
-        ActiveEnt const     partEnt     = rScnParts.m_partToActive[part];
+        PartId const        part        = rScnParts.activeToPart[ent];
+        ActiveEnt const     partEnt     = rScnParts.partToActive[part];
 
-        for (MachinePair const pair : rScnParts.m_partToMachines[part])
-        if (pair.m_type == gc_mtMagicRocket)
+        for (MachinePair const pair : rScnParts.partToMachines[part])
+        if (pair.type == gc_mtMagicRocket)
         {
-            DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[pair.m_local];
-            MachAnyId const anyId           = rockets.m_localToAny[pair.m_local];
+            DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[pair.local];
+            MachAnyId const anyId           = rockets.localToAny[pair.local];
 
-            auto const&     portSpan        = floats.m_machToNode[anyId];
-            NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.m_port);
-            NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.m_port);
+            auto const&     portSpan        = floats.machToNode[anyId];
+            NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.port);
+            NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.port);
 
             float const     throttle        = std::clamp(rSigValFloat[throttleIn], 0.0f, 1.0f);
             float const     multiplier      = rSigValFloat[multiplierIn];
@@ -260,7 +263,10 @@ Session setup_thrust_indicators(
     });
 
     return out;
-}
+} // setup_thrust_indicators
+
+
+
 
 Session setup_mach_rcsdriver(
         TopTaskBuilder&             rBuilder,
@@ -292,15 +298,15 @@ Session setup_mach_rcsdriver(
         .args       ({      idScnParts,                idUpdMach,                       idSigValFloat,                    idSigUpdFloat})
         .func([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
-        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
-        PerMachType &rRockets    = rScnParts.m_machines.m_perType[gc_mtRcsDriver];
+        Nodes const &rFloatNodes = rScnParts.nodePerType[gc_ntSigFloat];
+        PerMachType &rRockets    = rScnParts.machines.perType[gc_mtRcsDriver];
 
-        for (MachLocalId const local : rUpdMach.m_localDirty[gc_mtRcsDriver].ones())
+        for (MachLocalId const local : rUpdMach.localDirty[gc_mtRcsDriver].ones())
         {
-            MachAnyId const mach     = rRockets.m_localToAny[local];
-            auto const      portSpan = lgrn::Span<NodeId const>{rFloatNodes.m_machToNode[mach]};
+            MachAnyId const mach     = rRockets.localToAny[local];
+            auto const      portSpan = lgrn::Span<NodeId const>{rFloatNodes.machToNode[mach]};
 
-            NodeId const thrNode = connected_node(portSpan, ports_rcsdriver::gc_throttleOut.m_port);
+            NodeId const thrNode = connected_node(portSpan, ports_rcsdriver::gc_throttleOut.port);
             if (thrNode == lgrn::id_null<NodeId>())
             {
                 continue; // Throttle Output not connected, calculations below are useless
@@ -308,7 +314,7 @@ Session setup_mach_rcsdriver(
 
             auto const rcs_read = [&rSigValFloat, portSpan] (float& rDstVar, PortEntry const& entry)
             {
-                NodeId const node = connected_node(portSpan, entry.m_port);
+                NodeId const node = connected_node(portSpan, entry.port);
 
                 if (node != lgrn::id_null<NodeId>())
                 {
@@ -350,7 +356,9 @@ Session setup_mach_rcsdriver(
     });
 
     return out;
-}
+} // setup_mach_rcsdriver
+
+
 
 
 struct VehicleControls
@@ -369,7 +377,6 @@ struct VehicleControls
     input::EButtonControlIndex btnRollLf;
     input::EButtonControlIndex btnRollRt;
 };
-
 
 Session setup_vehicle_control(
         TopTaskBuilder&             rBuilder,
@@ -418,16 +425,16 @@ Session setup_vehicle_control(
         .args       ({      idScnParts,                               idUserInput,                 idVhControls})
         .func([] (ACtxParts& rScnParts, input::UserInputHandler const &rUserInput, VehicleControls &rVhControls) noexcept
     {
-        PerMachType &rUsrCtrl    = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
+        PerMachType &rUsrCtrl    = rScnParts.machines.perType[gc_mtUserCtrl];
 
         // Select a UsrCtrl machine when pressing the switch button
         if (rUserInput.button_state(rVhControls.btnSwitch).m_triggered)
         {
             ++rVhControls.selectedUsrCtrl;
             bool found = false;
-            for (MachLocalId local = rVhControls.selectedUsrCtrl; local < rUsrCtrl.m_localIds.capacity(); ++local)
+            for (MachLocalId local = rVhControls.selectedUsrCtrl; local < rUsrCtrl.localIds.capacity(); ++local)
             {
-                if (rUsrCtrl.m_localIds.exists(local))
+                if (rUsrCtrl.localIds.exists(local))
                 {
                     found = true;
                     rVhControls.selectedUsrCtrl = local;
@@ -466,7 +473,7 @@ Session setup_vehicle_control(
             return; // No vehicle selected
         }
 
-        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
+        Nodes const &rFloatNodes = rScnParts.nodePerType[gc_ntSigFloat];
         float const thrRate = deltaTimeIn;
 
         float const thrChange
@@ -480,14 +487,14 @@ Session setup_vehicle_control(
             held(rVC.btnRollRt,  1.0f) - held(rVC.btnRollLf,  1.0f)
         };
 
-        PerMachType     &rUsrCtrl   = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
-        MachAnyId const mach        = rUsrCtrl.m_localToAny[rVC.selectedUsrCtrl];
-        auto const      portSpan    = lgrn::Span<NodeId const>{rFloatNodes.m_machToNode[mach]};
+        PerMachType     &rUsrCtrl   = rScnParts.machines.perType[gc_mtUserCtrl];
+        MachAnyId const mach        = rUsrCtrl.localToAny[rVC.selectedUsrCtrl];
+        auto const      portSpan    = lgrn::Span<NodeId const>{rFloatNodes.machToNode[mach]};
 
         bool changed = false;
         auto const write_control = [&rSigValFloat, &rSigUpdFloat, &changed, portSpan] (PortEntry const& entry, float write, bool replace = true, float min = 0.0f, float max = 1.0f)
         {
-            NodeId const node = connected_node(portSpan, entry.m_port);
+            NodeId const node = connected_node(portSpan, entry.port);
             if (node == lgrn::id_null<NodeId>())
             {
                 return; // not connected
@@ -564,10 +571,10 @@ Session setup_camera_vehicle(
 
             // Obtain associated ActiveEnt
             // MachLocalId -> MachAnyId -> PartId -> RigidGroup -> ActiveEnt
-            PerMachType const&  rUsrCtrls       = rScnParts.m_machines.m_perType.at(adera::gc_mtUserCtrl);
-            MachAnyId const     selectedMach    = rUsrCtrls.m_localToAny        .at(rVhControls.selectedUsrCtrl);
-            PartId const        selectedPart    = rScnParts.m_machineToPart     .at(selectedMach);
-            WeldId const        weld            = rScnParts.m_partToWeld        .at(selectedPart);
+            PerMachType const&  rUsrCtrls       = rScnParts.machines.perType.at(adera::gc_mtUserCtrl);
+            MachAnyId const     selectedMach    = rUsrCtrls.localToAny        .at(rVhControls.selectedUsrCtrl);
+            PartId const        selectedPart    = rScnParts.machineToPart     .at(selectedMach);
+            WeldId const        weld            = rScnParts.partToWeld        .at(selectedPart);
             ActiveEnt const     selectedEnt     = rScnParts.weldToActive        .at(weld);
 
             if (rBasic.m_transform.contains(selectedEnt))

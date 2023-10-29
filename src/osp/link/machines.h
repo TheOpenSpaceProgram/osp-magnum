@@ -24,9 +24,10 @@
  */
 #pragma once
 
-#include "../core/global_id.h"
-#include "../core/bitvector.h"
 #include "../core/array_view.h"
+#include "../core/bitvector.h"
+#include "../core/global_id.h"
+#include "../core/keyed_vector.h"
 
 #include <longeron/containers/intarray_multimap.hpp>
 #include <longeron/containers/bit_view.hpp>
@@ -59,8 +60,8 @@ inline NodeTypeId const gc_ntSigFloat = NodeTypeReg_t::create();
  */
 struct PerMachType
 {
-    lgrn::IdRegistryStl<MachLocalId>    m_localIds;
-    std::vector<MachAnyId>              m_localToAny;
+    lgrn::IdRegistryStl<MachLocalId>    localIds;
+    std::vector<MachAnyId>              localToAny;
 };
 
 /**
@@ -68,35 +69,35 @@ struct PerMachType
  */
 struct Machines
 {
-    lgrn::IdRegistryStl<MachAnyId>      m_ids;
+    lgrn::IdRegistryStl<MachAnyId>      ids;
 
-    std::vector<MachTypeId>             m_machTypes;
-    std::vector<MachLocalId>            m_machToLocal;
+    std::vector<MachTypeId>             machTypes;
+    std::vector<MachLocalId>            machToLocal;
 
-    std::vector<PerMachType>            m_perType;
+    std::vector<PerMachType>            perType;
 };
 
 struct MachineUpdater
 {
-    BitVector_t m_machTypesDirty;
+    alignas(64) std::atomic<bool> requestMachineUpdateLoop {false};
+
+    BitVector_t machTypesDirty;
 
     // [MachTypeId][MachLocalId]
-    std::vector<BitVector_t> m_localDirty;
-
-    alignas(64) std::atomic<bool> requestMachineUpdateLoop {false};
+    osp::KeyedVec<MachTypeId, BitVector_t> localDirty;
 };
 
 struct MachinePair
 {
-    MachLocalId     m_local{lgrn::id_null<MachLocalId>()};
-    MachTypeId      m_type{lgrn::id_null<MachTypeId>()};
+    MachLocalId     local   {lgrn::id_null<MachLocalId>()};
+    MachTypeId      type    {lgrn::id_null<MachTypeId>()};
 };
 
 struct Junction
 {
-    MachLocalId     m_local{lgrn::id_null<MachLocalId>()};
-    MachTypeId      m_type{lgrn::id_null<MachTypeId>()};
-    JuncCustom      m_custom{0};
+    MachLocalId     local   {lgrn::id_null<MachLocalId>()};
+    MachTypeId      type    {lgrn::id_null<MachTypeId>()};
+    JuncCustom      custom  {0};
 };
 
 /**
@@ -109,22 +110,22 @@ struct Nodes
     using NodeToMach_t = lgrn::IntArrayMultiMap<NodeId, Junction>;
     using MachToNode_t = lgrn::IntArrayMultiMap<MachAnyId, NodeId>;
 
-    lgrn::IdRegistryStl<NodeId>         m_nodeIds;
+    lgrn::IdRegistryStl<NodeId>         nodeIds;
 
     // Node-to-Machine connections
     // [NodeId][JunctionIndex] -> Junction (type, MachLocalId, custom int)
-    NodeToMach_t                        m_nodeToMach;
+    NodeToMach_t                        nodeToMach;
 
     // Corresponding Machine-to-Node connections
     // [MachAnyId][PortIndex] -> NodeId
-    MachToNode_t                        m_machToNode;
+    MachToNode_t                        machToNode;
 };
 
 struct PortEntry
 {
-    NodeTypeId  m_type;
-    PortId      m_port;
-    JuncCustom  m_custom;
+    NodeTypeId  type;
+    PortId      port;
+    JuncCustom  custom;
 };
 
 inline NodeId connected_node(lgrn::Span<NodeId const> portSpan, PortId port) noexcept

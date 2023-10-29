@@ -114,7 +114,7 @@ public:
      : m_pResources{pResources}
     {
         auto &rData = m_data.emplace();
-        rData.m_machines.m_perType.resize(osp::link::MachTypeReg_t::size());
+        rData.m_machines.perType.resize(osp::link::MachTypeReg_t::size());
         rData.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
         index_prefabs();
     };
@@ -151,7 +151,7 @@ public:
 
     std::size_t node_capacity(NodeTypeId nodeType) const
     {
-        return m_data->m_nodePerType[nodeType].m_nodeIds.capacity();
+        return m_data->m_nodePerType[nodeType].nodeIds.capacity();
     }
 
     struct Connection
@@ -205,9 +205,9 @@ std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId const n
 
     PerNodeType &rPerNodeType = m_data->m_nodePerType[nodeType];
 
-    rPerNodeType.m_nodeIds.create(std::begin(out), std::end(out));
-    std::size_t const capacity = rPerNodeType.m_nodeIds.capacity();
-    rPerNodeType.m_nodeToMach.ids_reserve(rPerNodeType.m_nodeIds.capacity());
+    rPerNodeType.nodeIds.create(std::begin(out), std::end(out));
+    std::size_t const capacity = rPerNodeType.nodeIds.capacity();
+    rPerNodeType.nodeToMach.ids_reserve(rPerNodeType.nodeIds.capacity());
     rPerNodeType.m_nodeConnectCount.resize(capacity, 0);
 
     return out;

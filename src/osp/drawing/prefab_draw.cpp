@@ -83,7 +83,6 @@ void SysPrefabDraw::resync_drawents(
 
         PrefabInstanceInfo const &rRootInfo = rPrefabs.instanceInfo[root];
 
-        PrefabId const prefabId = rRootInfo.prefab;
         LGRN_ASSERT(rRootInfo.prefab   != lgrn::id_null<PrefabId>());
         LGRN_ASSERT(rRootInfo.importer != lgrn::id_null<ResId>());
 

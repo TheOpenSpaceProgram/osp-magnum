@@ -124,7 +124,6 @@ Session setup_magnum_scene(
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
 
     auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
-    auto const tgCS     = commonScene   .get_pipelines< PlCommonScene >();
     auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
     auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
 

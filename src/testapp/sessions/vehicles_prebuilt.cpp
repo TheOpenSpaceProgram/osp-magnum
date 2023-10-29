@@ -224,7 +224,7 @@ Session setup_prebuilt_vehicles(
     });
 
     return out;
-}
+} // setup_prebuilt_vehicles
 
 
 } // namespace testapp::scenes

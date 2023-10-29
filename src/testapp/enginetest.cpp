@@ -364,7 +364,7 @@ public:
     RenderGL            &m_rRenderGl;
 };
 
-MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
+MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
 {
     using namespace osp::active;
     using namespace osp::draw;

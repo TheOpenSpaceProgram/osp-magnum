@@ -82,21 +82,21 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
 
     // Create new Scene PartIds and WeldIds
 
-    rScnParts.m_partIds.create(rVehicleSpawn.spawnedParts.begin(), rVehicleSpawn.spawnedParts.end());
-    rScnParts.m_weldIds.create(rVehicleSpawn.spawnedWelds.begin(), rVehicleSpawn.spawnedWelds.end());
+    rScnParts.partIds.create(rVehicleSpawn.spawnedParts.begin(), rVehicleSpawn.spawnedParts.end());
+    rScnParts.weldIds.create(rVehicleSpawn.spawnedWelds.begin(), rVehicleSpawn.spawnedWelds.end());
 
-    rScnParts.m_partDirty.insert(rScnParts.m_partDirty.begin(), rVehicleSpawn.spawnedParts.begin(), rVehicleSpawn.spawnedParts.end());
-    rScnParts.m_weldDirty.insert(rScnParts.m_weldDirty.begin(), rVehicleSpawn.spawnedWelds.begin(), rVehicleSpawn.spawnedWelds.end());
+    rScnParts.partDirty.insert(rScnParts.partDirty.begin(), rVehicleSpawn.spawnedParts.begin(), rVehicleSpawn.spawnedParts.end());
+    rScnParts.weldDirty.insert(rScnParts.weldDirty.begin(), rVehicleSpawn.spawnedWelds.begin(), rVehicleSpawn.spawnedWelds.end());
 
     // Resize scene containers to account for new IDs
 
-    std::size_t const maxParts = rScnParts.m_partIds.capacity();
-    std::size_t const maxWelds = rScnParts.m_weldIds.capacity();
-    rScnParts.m_partPrefabs         .resize(maxParts);
-    rScnParts.m_partTransformWeld   .resize(maxParts);
-    rScnParts.m_partToWeld          .resize(maxParts);
-    rScnParts.m_weldToParts         .data_reserve(maxParts);
-    rScnParts.m_weldToParts         .ids_reserve(maxWelds);
+    std::size_t const maxParts = rScnParts.partIds.capacity();
+    std::size_t const maxWelds = rScnParts.weldIds.capacity();
+    rScnParts.partPrefabs           .resize(maxParts);
+    rScnParts.partTransformWeld     .resize(maxParts);
+    rScnParts.partToWeld            .resize(maxParts);
+    rScnParts.weldToParts           .data_reserve(maxParts);
+    rScnParts.weldToParts           .ids_reserve(maxWelds);
     rScnParts.weldToActive          .resize(maxWelds);
     rVehicleSpawn.partToSpawned     .resize(maxParts);
 
@@ -147,7 +147,7 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
             // rScnParts.m_partToWeld and rScnParts.m_weldToParts
 
             auto const srcWeldPartSpan  = pVData->m_weldToParts[srcWeld];
-            WeldId *pDstWeldPartOut     = rScnParts.m_weldToParts.emplace(dstWeld, srcWeldPartSpan.size());
+            WeldId *pDstWeldPartOut     = rScnParts.weldToParts.emplace(dstWeld, srcWeldPartSpan.size());
 
             for (PartId const srcPart : srcWeldPartSpan)
             {
@@ -156,7 +156,7 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
                 (*pDstWeldPartOut) = dstPart;
                 std::advance(pDstWeldPartOut, 1);
 
-                rScnParts.m_partToWeld[dstPart] = dstWeld;
+                rScnParts.partToWeld[dstPart] = dstWeld;
             }
         }
     }
@@ -191,8 +191,8 @@ void SysVehicleSpawnVB::request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVeh
                 rResources.owner_create(osp::restypes::gc_importer, prefabPairSrc.m_importer),
                 prefabPairSrc.m_prefabId
             };
-            rScnParts.m_partPrefabs[dstPart]        = std::move(prefabPairDst);
-            rScnParts.m_partTransformWeld[dstPart]  = pVData->m_partTransformWeld[srcPart];
+            rScnParts.partPrefabs[dstPart]        = std::move(prefabPairDst);
+            rScnParts.partTransformWeld[dstPart]  = pVData->m_partTransformWeld[srcPart];
 
             // Add Prefab and Part init events
             (*itPrefabOut) = rPrefabs.spawnRequest.size();

@@ -25,7 +25,6 @@
 #include "drawing_fn.h"
 #include "own_restypes.h"
 
-#include "../activescene/basic_fn.h"
 #include "../core/Resources.h"
 
 using namespace osp;
