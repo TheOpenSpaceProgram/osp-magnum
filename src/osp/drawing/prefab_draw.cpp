@@ -113,7 +113,8 @@ void SysPrefabDraw::init_mesh_and_material(
         ACtxBasic const&            rBasic,
         ACtxDrawing&                rDrawing,
         ACtxDrawingRes&             rDrawingRes,
-        ACtxSceneRender&            rScnRender)
+        ACtxSceneRender&            rScnRender,
+        MaterialId                  material)
 {
     auto itPfEnts = rPrefabs.spawnedEntsOffset.begin();
 
@@ -130,7 +131,7 @@ void SysPrefabDraw::init_mesh_and_material(
             = [&parents, &ents, &rDrawing, &needDrawTf = rScnRender.m_needDrawTf]
               (auto&& self, int const object, ActiveEnt const ent) noexcept -> void
         {
-            needDrawTf.set(std::size_t(ent));
+            needDrawTf.set(ent.value);
 
             int const parentObj = parents[object];
 
@@ -176,12 +177,14 @@ void SysPrefabDraw::init_mesh_and_material(
                 }
             }
 
-            rScnRender.m_opaque.set(std::size_t(drawEnt));
-            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_opaque.set(drawEnt.value);
+            rScnRender.m_visible.set(drawEnt.value);
 
-            // TODO: assign proper material
-            rScnRender.m_materials[MaterialId{2}].m_dirty.push_back(drawEnt);
-            rScnRender.m_materials[MaterialId{2}].m_ents.set(std::size_t(drawEnt));
+            if (material != lgrn::id_null<MaterialId>())
+            {
+                rScnRender.m_materials[material].m_dirty.push_back(drawEnt);
+                rScnRender.m_materials[material].m_ents.set(drawEnt.value);
+            }
         }
 
         ++itPfEnts;
@@ -195,7 +198,8 @@ void SysPrefabDraw::resync_mesh_and_material(
         ACtxBasic const&            rBasic,
         ACtxDrawing&                rDrawing,
         ACtxDrawingRes&             rDrawingRes,
-        ACtxSceneRender&            rScnRender)
+        ACtxSceneRender&            rScnRender,
+        MaterialId                  material)
 {
     for (std::size_t const rootInt : rPrefabs.roots.ones())
     {
@@ -210,21 +214,6 @@ void SysPrefabDraw::resync_mesh_and_material(
         auto const &rPrefabData = rResources.data_get<osp::Prefabs const>     (gc_importer, rRootInfo.importer);
         auto const objects  = lgrn::Span<int const>{rPrefabData.m_prefabs[rRootInfo.prefab]};
 
-        auto const needs_draw_transform
-            = [&root, &rBasic, &rDrawing, &needDrawTf = rScnRender.m_needDrawTf]
-              (auto&& self, ActiveEnt const ent) noexcept -> void
-        {
-            needDrawTf.set(std::size_t(ent));
-
-            ActiveEnt const parentEnt = rBasic.m_scnGraph.m_entParent[ent];
-
-            if (   parentEnt != lgrn::id_null<ActiveEnt>()
-                && ! needDrawTf.test(std::size_t(parentEnt)))
-            {
-                self(self, parentEnt);
-            }
-        };
-
         for (ActiveEnt const ent : SysSceneGraph::descendants(rBasic.m_scnGraph, root))
         {
             PrefabInstanceInfo const &rInfo = rPrefabs.instanceInfo[ent];
@@ -235,7 +224,7 @@ void SysPrefabDraw::resync_mesh_and_material(
                 continue;
             }
 
-            needs_draw_transform(needs_draw_transform, ent);
+            SysRender::needs_draw_transforms(rBasic.m_scnGraph, rScnRender.m_needDrawTf, ent);
 
             DrawEnt const drawEnt = rScnRender.m_activeToDraw[ent];
 
@@ -260,12 +249,14 @@ void SysPrefabDraw::resync_mesh_and_material(
                 }
             }
 
-            rScnRender.m_opaque.set(std::size_t(drawEnt));
-            rScnRender.m_visible.set(std::size_t(drawEnt));
+            rScnRender.m_opaque.set(drawEnt.value);
+            rScnRender.m_visible.set(drawEnt.value);
 
-            // TODO: assign proper material
-            rScnRender.m_materials[MaterialId{2}].m_dirty.push_back(drawEnt);
-            rScnRender.m_materials[MaterialId{2}].m_ents.set(std::size_t(drawEnt));
+            if (material != lgrn::id_null<MaterialId>())
+            {
+                rScnRender.m_materials[material].m_dirty.push_back(drawEnt);
+                rScnRender.m_materials[material].m_ents.set(drawEnt.value);
+            }
         }
     }
 }

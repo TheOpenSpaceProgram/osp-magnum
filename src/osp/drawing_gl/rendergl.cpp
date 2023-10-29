@@ -383,11 +383,11 @@ void SysRenderGL::draw_group(
         DrawEntSet_t const& visible,
         ViewProjMatrix const& viewProj)
 {
-    for (auto const& [ent, toDraw] : group.view().each())
+    for (auto const& [ent, toDraw] : entt::basic_view{group.entities}.each())
     {
         if (visible.test(std::size_t(ent)))
         {
-            toDraw(ent, viewProj);
+            toDraw.draw(ent, viewProj, toDraw.data);
         }
     }
 }

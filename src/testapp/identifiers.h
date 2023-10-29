@@ -241,7 +241,7 @@ struct PlParts
 
     PipelineDef<EStgCont> machUpdExtIn      {"machUpdExtIn      -"};
 
-    PipelineDef<EStgLink> linkLoop          {"linkLoop          - oh god it loops LOL!"};
+    PipelineDef<EStgLink> linkLoop          {"linkLoop          - Link update loop"};
 };
 
 
@@ -349,8 +349,8 @@ struct PlWindowApp
 
 
 
-#define TESTAPP_DATA_SCENE_RENDERER 1, \
-    idScnRender
+#define TESTAPP_DATA_SCENE_RENDERER 2, \
+    idScnRender, idDrawTfObservers
 struct PlSceneRenderer
 {
     PipelineDef<EStgOptn> render            {"render            - "};

@@ -65,7 +65,7 @@ struct ACtxParts
     std::vector<PartId>                             m_machineToPart;
 
     std::vector<ActiveEnt>                          m_partToActive;
-    std::vector<PartId>                             m_activeToPart;
+    KeyedVec<ActiveEnt, PartId>                     m_activeToPart;
 
     std::vector<ActiveEnt>                          weldToActive;
 };

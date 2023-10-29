@@ -55,7 +55,6 @@ struct RCSInputs
 
 static void add_rcs_machines(VehicleBuilder& rBuilder, RCSInputs const& inputs, PartId part, float thrustMul, Matrix4 const& tf)
 {
-    using namespace adera;
     namespace ports_rcsdriver = adera::ports_rcsdriver;
     namespace ports_magicrocket = adera::ports_magicrocket;
 
@@ -102,8 +101,8 @@ static void add_rcs_block(VehicleBuilder& rBuilder, VehicleBuilder::WeldVec_t& r
         { nozzleB,  "phLinRCS" }
     });
 
-    Matrix4 const nozzleTfA = quick_transform(pos, rot * Quaternion::rotation( 90.0_degf,  xAxis));
-    Matrix4 const nozzleTfB = quick_transform(pos, rot * Quaternion::rotation( -90.0_degf, xAxis));
+    Matrix4 const nozzleTfA = quick_transform(pos, rot * Quaternion::rotation(90.0_degf,  xAxis));
+    Matrix4 const nozzleTfB = quick_transform(pos, rot * Quaternion::rotation(-90.0_degf, xAxis));
 
     add_rcs_machines(rBuilder, inputs, nozzleA, thrustMul, nozzleTfA);
     add_rcs_machines(rBuilder, inputs, nozzleB, thrustMul, nozzleTfB);
@@ -199,6 +198,10 @@ Session setup_prebuilt_vehicles(
 
         rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule] = std::make_unique<VehicleData>(std::move(vbuilder.finalize_release()));
     }
+
+
+    // Put more prebuilt vehicles here!
+
 
     rBuilder.task()
         .name       ("Clean up prebuilt vehicles")

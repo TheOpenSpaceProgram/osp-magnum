@@ -91,8 +91,6 @@ Session setup_parts(
     rScnParts.m_machines.m_perType  .resize(MachTypeReg_t::size());
     rScnParts.m_nodePerType         .resize(NodeTypeReg_t::size());
 
-    auto const idNull = lgrn::id_null<TopDataId>();
-
     rBuilder.task()
         .name       ("Clear Resource owners")
         .run_on     ({tgScn.cleanup(Run_)})
@@ -208,7 +206,6 @@ Session setup_vehicle_spawn_vb(
     OSP_DECLARE_GET_DATA_IDS(prefabs,       TESTAPP_DATA_PREFABS);
     OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT);
     OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,  TESTAPP_DATA_VEHICLE_SPAWN);
-    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
     auto const tgPf     = prefabs       .get_pipelines<PlPrefabs>();
     auto const tgScn    = scene         .get_pipelines<PlScene>();
     auto const tgParts  = parts         .get_pipelines<PlParts>();
@@ -230,7 +227,7 @@ Session setup_vehicle_spawn_vb(
     rBuilder.task()
         .name       ("Create PartIds and WeldIds for vehicles to spawn from VehicleData")
         .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.spawnedParts(Resize), tgVhSpVB.remapParts(Modify_), tgVhSpVB.remapWelds(Modify_)})
+        .sync_with  ({tgVhSp.spawnedParts(Resize), tgVhSpVB.remapParts(Modify_), tgVhSpVB.remapWelds(Modify_), tgParts.partIds(New), tgParts.weldIds(New), tgParts.mapWeldActive(New)})
         .push_to    (out.m_tasks)
         .args       ({             idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
@@ -248,7 +245,6 @@ Session setup_vehicle_spawn_vb(
     {
         SysVehicleSpawnVB::request_prefabs(rVehicleSpawn, rVehicleSpawnVB, rScnParts, rPrefabs, rResources);
     });
-
 
     rBuilder.task()
         .name       ("Create Machine IDs copied from VehicleData")
@@ -480,8 +476,8 @@ Session setup_vehicle_spawn_vb(
             ActiveEnt const root = rPrefabs.spawnedEntsOffset[*itPrefab].front();
             ++itPrefab;
 
-            rScnParts.m_partToActive[partId]            = root;
-            rScnParts.m_activeToPart[std::size_t(root)] = partId;
+            rScnParts.m_partToActive[partId]    = root;
+            rScnParts.m_activeToPart[root]      = partId;
         }
     });
 
@@ -551,7 +547,7 @@ Session setup_vehicle_spawn_draw(
     {
         for (ActiveEnt const ent : rVehicleSpawn.rootEnts)
         {
-            rScnRender.m_needDrawTf.set(std::size_t(ent));
+            rScnRender.m_needDrawTf.set(ent.value);
         }
     });
 
@@ -565,15 +561,13 @@ Session setup_signals_float(
         Session const&              scene,
         Session const&              parts)
 {
-    //OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    OSP_DECLARE_GET_DATA_IDS(parts, TESTAPP_DATA_PARTS);
+    auto const tgScn = scene.get_pipelines<PlScene>();
+    auto const tgParts = parts.get_pipelines<PlParts>();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SIGNALS_FLOAT);
     auto const tgSgFlt = out.create_pipelines<PlSignalsFloat>(rBuilder);
-
-    auto const tgParts = parts.get_pipelines<PlParts>();
 
     rBuilder.pipeline(tgSgFlt.sigFloatValues)   .parent(tgScn.update);
     rBuilder.pipeline(tgSgFlt.sigFloatUpdExtIn) .parent(tgScn.update);
@@ -604,7 +598,7 @@ Session setup_signals_float(
         Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
 
         // NOTE: The various use of reset() clear entire bit arrays, which may or may
-        //       not be expensive. They likely use memset
+        //       not be expensive. They likely optimize to memset
 
         for (std::size_t const machTypeDirty : rUpdMach.m_machTypesDirty.ones())
         {
@@ -629,27 +623,12 @@ Session setup_signals_float(
         for (MachTypeId const type : rUpdMach.m_machTypesDirty.ones())
         {
             anyMachineNotified = true;
-            //rMachUpdEnqueue.push_back(rMachEvtTags[type]);
         }
         if (anyMachineNotified && rUpdMach.requestMachineUpdateLoop.load())
         {
             rUpdMach.requestMachineUpdateLoop.store(true);
         }
     });
-
-//    rBuilder.task()
-//        .name       ("Allocate Signal-Float Node Values")
-//        .run_on     ({tgScn.update(Run)})
-//        .sync_with  ({tgSgFlt.sigFloatValues(New)})
-//        .push_to    (out.m_tasks)
-//        .args       ({            idSigUpdFloat,                       idSigValFloat,                 idScnParts})
-//        .func([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, ACtxParts const& rScnParts) noexcept
-//    {
-//        Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
-//        rSigUpdFloat.m_nodeNewValues.resize(rFloatNodes.m_nodeIds.capacity());
-//        rSigUpdFloat.m_nodeDirty.ints().resize(rFloatNodes.m_nodeIds.vec().capacity());
-//        rSigValFloat.resize(rFloatNodes.m_nodeIds.capacity());
-//    });
 
     return out;
 } // setup_signals_float

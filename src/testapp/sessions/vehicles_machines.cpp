@@ -43,14 +43,11 @@ using namespace osp::draw;
 using namespace osp::link;
 using namespace osp;
 
-using namespace Magnum::Math::Literals;
-
 namespace testapp::scenes
 {
 
-
 template <MachTypeId const& MachType_T>
-TopTaskFunc_t gen_allocate_mach_bitsets()
+TopTaskFunc_t gen_allocate_mach()
 {
     static TopTaskFunc_t const func = wrap_args([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach) noexcept
     {
@@ -72,8 +69,6 @@ Session setup_mach_rocket(
     auto const tgScn    = scene         .get_pipelines<PlScene>();
     auto const tgParts  = parts         .get_pipelines<PlParts>();
 
-    using namespace adera;
-
     Session out;
 
     rBuilder.task()
@@ -82,20 +77,21 @@ Session setup_mach_rocket(
         .sync_with  ({tgParts.machIds(Ready), tgParts.machUpdExtIn(New)})
         .push_to    (out.m_tasks)
         .args       ({idScnParts, idUpdMach})
-        .func_raw   (gen_allocate_mach_bitsets<gc_mtMagicRocket>());
+        .func_raw   (gen_allocate_mach<gc_mtMagicRocket>());
 
     return out;
 }
 
 struct ThrustIndicator
 {
+    MaterialId      material;
     Magnum::Color4  color;
     MeshIdOwner_t   mesh;
 
     KeyedVec<MachLocalId, DrawEnt> rktToDrawEnt;
-};
 
-static constexpr float gc_indicatorScale = 0.0001f;
+    float           indicatorScale {0.0001f};
+};
 
 Session setup_thrust_indicators(
         TopTaskBuilder&             rBuilder,
@@ -106,44 +102,44 @@ Session setup_thrust_indicators(
         Session const&              parts,
         Session const&              signalsFloat,
         Session const&              sceneRenderer,
-        Session const&              cameraCtrl,
-        Session const&              shFlat,
-        TopDataId const             idResources,
-        PkgId const                 pkg)
+        PkgId const                 pkg,
+        MaterialId const            material)
 {
+    OSP_DECLARE_GET_DATA_IDS(application,    TESTAPP_DATA_APPLICATION);
     OSP_DECLARE_GET_DATA_IDS(commonScene,    TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(parts,          TESTAPP_DATA_PARTS);
     OSP_DECLARE_GET_DATA_IDS(signalsFloat,   TESTAPP_DATA_SIGNALS_FLOAT)
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer,  TESTAPP_DATA_SCENE_RENDERER);
-    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
     auto const tgParts  = parts         .get_pipelines<PlParts>();
-    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
 
-    auto &rResources    = top_get< Resources >      (topData, idResources);
-    auto &rBasic        = top_get< ACtxBasic >      (topData, idBasic);
-    auto &rDrawing      = top_get< ACtxDrawing >    (topData, idDrawing);
-    auto &rDrawingRes   = top_get< ACtxDrawingRes > (topData, idDrawingRes);
+    auto &rResources        = top_get< Resources >      (topData, idResources);
+    auto &rBasic            = top_get< ACtxBasic >      (topData, idBasic);
+    auto &rDrawing          = top_get< ACtxDrawing >    (topData, idDrawing);
+    auto &rDrawingRes       = top_get< ACtxDrawingRes > (topData, idDrawingRes);
+    auto &rScnRender        = top_get< ACtxSceneRender >(topData, idScnRender);
+    auto &rDrawTfObservers  = top_get< DrawTfObservers >(topData, idDrawTfObservers);
+    auto &rScnParts         = top_get< ACtxParts >      (topData, idScnParts);
+    auto &rSigValFloat      = top_get< SignalValues_t<float> > (topData, idSigValFloat);
 
     Session out;
     auto const [idThrustIndicator] = out.acquire_data<1>(topData);
     auto &rThrustIndicator = top_emplace<ThrustIndicator>(topData, idThrustIndicator);
 
-    rThrustIndicator.color = { 1.0f, 0.0f, 0.0f, 1.0f };
-    rThrustIndicator.mesh  = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cone");
-
-    using adera::gc_mtMagicRocket;
-    using adera::ports_magicrocket::gc_throttleIn;
-    using adera::ports_magicrocket::gc_multiplierIn;
+    rThrustIndicator.material   = material;
+    rThrustIndicator.color      = { 1.0f, 0.2f, 0.8f, 1.0f };
+    rThrustIndicator.mesh       = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cone");
 
     rBuilder.task()
         .name       ("Create DrawEnts for Thrust indicators")
         .run_on     ({tgWin.sync(Run)})
-        .sync_with  ({tgScnRdr.drawEntResized(ModifyOrSignal), tgScnRdr.drawEnt(New)})
+        .sync_with  ({tgScnRdr.drawEntResized(ModifyOrSignal), tgScnRdr.drawEnt(New), tgParts.machIds(Ready)})
         .push_to    (out.m_tasks)
         .args       ({               idScnRender,                  idScnParts,                 idThrustIndicator})
         .func([]    (ACtxSceneRender &rScnRender,  ACtxParts const& rScnParts, ThrustIndicator& rThrustIndicator) noexcept
     {
-        PerMachType const&  rockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
+        PerMachType const& rockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
 
         rThrustIndicator.rktToDrawEnt.resize(rockets.m_localIds.capacity());
 
@@ -162,23 +158,24 @@ Session setup_thrust_indicators(
         .run_on     ({tgWin.sync(Run)})
         .sync_with  ({tgScnRdr.drawEntResized(Done), tgScnRdr.drawEnt(Ready), tgScnRdr.entMesh(New), tgScnRdr.material(New), tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
         .push_to    (out.m_tasks)
-        .args       ({               idScnRender,             idDrawing,                      idDrawingRes,                 idScnParts,                             idSigValFloat,                  idThrustIndicator})
-        .func([]    (ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, ACtxDrawingRes const& rDrawingRes, ACtxParts const& rScnParts, SignalValues_t<float> const& rSigValFloat,  ThrustIndicator& rThrustIndicator) noexcept
+        .args       ({         idBasic,                 idScnRender,             idDrawing,                      idDrawingRes,                 idScnParts,                             idSigValFloat,                 idThrustIndicator})
+        .func([]    (ACtxBasic& rBasic, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, ACtxDrawingRes const& rDrawingRes, ACtxParts const& rScnParts, SignalValues_t<float> const& rSigValFloat, ThrustIndicator& rThrustIndicator) noexcept
     {
-        PerMachType const&  rockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
-        Nodes const&        floats  = rScnParts.m_nodePerType[gc_ntSigFloat];
+        Material            &rMat           = rScnRender.m_materials[rThrustIndicator.material];
+        PerMachType const   &rockets        = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
+        Nodes const         &floats         = rScnParts.m_nodePerType[gc_ntSigFloat];
 
         for (MachLocalId const localId : rockets.m_localIds.bitview().zeros())
         {
-            DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[localId];
+             DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[localId];
 
             MachAnyId const anyId           = rockets.m_localToAny[localId];
             PartId const    part            = rScnParts.m_machineToPart[anyId];
             ActiveEnt const partEnt         = rScnParts.m_partToActive[part];
 
             auto const&     portSpan        = floats.m_machToNode[anyId];
-            NodeId const    throttleIn      = connected_node(portSpan, gc_throttleIn.m_port);
-            NodeId const    multiplierIn    = connected_node(portSpan, gc_multiplierIn.m_port);
+            NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.m_port);
+            NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.m_port);
 
             float const     throttle        = std::clamp(rSigValFloat[throttleIn], 0.0f, 1.0f);
             float const     multiplier      = rSigValFloat[multiplierIn];
@@ -190,6 +187,12 @@ Session setup_thrust_indicators(
                 continue;
             }
 
+            if (!rMat.m_ents.test(drawEnt.value))
+            {
+                rMat.m_ents.set(drawEnt.value);
+                rMat.m_dirty.push_back(drawEnt);
+            }
+
             MeshIdOwner_t &rMeshOwner = rScnRender.m_mesh[drawEnt];
             if ( ! rMeshOwner.has_value() )
             {
@@ -198,113 +201,64 @@ Session setup_thrust_indicators(
             }
 
             rScnRender.m_visible.set(drawEnt.value);
-            rScnRender.m_opaque.set(drawEnt.value);
+            rScnRender.m_opaque .set(drawEnt.value);
 
-            //Matrix4 const& rocketDrawTf = rScnRender.m_drawTransform
+            rScnRender.m_color              [drawEnt] = rThrustIndicator.color;
+            rScnRender.drawTfObserverEnable [partEnt] = 1;
+
+            SysRender::needs_draw_transforms(rBasic.m_scnGraph, rScnRender.m_needDrawTf, partEnt);
         }
     });
 
-#if 0 // RENDERENT
-    OSP_SESSION_ACQUIRE_DATA(thrustIndicator, topData, TESTAPP_INDICATOR);
-    thrustIndicator.m_tgCleanupEvt = tgCleanupMagnumEvt;
+    using UserData_t = DrawTfObservers::UserData_t;
 
-    auto &rIndicator   = top_emplace<IndicatorMesh>(topData, idIndicator);
+    DrawTfObservers::Observer &rObserver = rDrawTfObservers.observers[0];
 
-
-    thrustIndicator.task() = rBuilder.task().assign({tgRenderEvt, tgGlUse, tgDrawTransformReq, tgBindFboReq, tgFwdRenderMod, tgCamCtrlReq}).data(
-            "Render cursor",
-            TopDataIds_t{          idRenderGl,              idCamera,                      idDrawingRes,                         idScnRender,                 idScnParts,                             idSigValFloat,              idDrawShFlat,                            idCamCtrl,               idIndicator},
-            wrap_args([] (RenderGL& rRenderGl, Camera const& rCamera, ACtxDrawingRes const& rDrawingRes, ACtxSceneRenderGL const& rScnRender, ACtxParts const& rScnParts, SignalValues_t<float> const& rSigValFloat, ACtxDrawFlat& rDrawShFlat, ACtxCameraController const& rCamCtrl, IndicatorMesh& rIndicator) noexcept
+    rObserver.data = { &rThrustIndicator, &rScnParts, &rSigValFloat };
+    rObserver.func = [] (ACtxSceneRender& rCtxScnRdr, Matrix4 const& drawTf, active::ActiveEnt ent, int depth, UserData_t data) noexcept
     {
+        auto &rThrustIndicator          = *static_cast< ThrustIndicator* >          (data[0]);
+        auto &rScnParts                 = *static_cast< ACtxParts* >                (data[1]);
+        auto &rSigValFloat              = *static_cast< SignalValues_t<float>* >    (data[2]);
 
-        ResId const     indicatorResId      = rDrawingRes.m_meshToRes.at(rIndicator.m_mesh.value());
-        MeshGlId const  indicatorMeshGlId   = rRenderGl.m_resToMesh.at(indicatorResId);
-        Mesh&           rIndicatorMeshGl    = rRenderGl.m_meshGl.get(indicatorMeshGlId);
+        PerMachType const   &rockets    = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
+        Nodes const         &floats     = rScnParts.m_nodePerType[gc_ntSigFloat];
 
-        ViewProjMatrix viewProj{rCamera.m_transform.inverted(), rCamera.perspective()};
+        PartId const        part        = rScnParts.m_activeToPart[ent];
+        ActiveEnt const     partEnt     = rScnParts.m_partToActive[part];
 
-        //auto const matrix = viewProj.m_viewProj * Matrix4::translation(rCamCtrl.m_target.value());
-
-        PerMachType const& rockets = rScnParts.m_machines.m_perType[gc_mtMagicRocket];
-        Nodes const& floats = rScnParts.m_nodePerType[gc_ntSigFloat];
-
-        for (MachLocalId const localId : rockets.m_localIds.bitview().zeros())
+        for (MachinePair const pair : rScnParts.m_partToMachines[part])
+        if (pair.m_type == gc_mtMagicRocket)
         {
-            MachAnyId const anyId           = rockets.m_localToAny[localId];
-            PartId const    part            = rScnParts.m_machineToPart[anyId];
-            ActiveEnt const partEnt         = rScnParts.m_partToActive[part];
+            DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[pair.m_local];
+            MachAnyId const anyId           = rockets.m_localToAny[pair.m_local];
 
             auto const&     portSpan        = floats.m_machToNode[anyId];
-            NodeId const    throttleIn      = connected_node(portSpan, gc_throttleIn.m_port);
-            NodeId const    multiplierIn    = connected_node(portSpan, gc_multiplierIn.m_port);
+            NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.m_port);
+            NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.m_port);
 
             float const     throttle        = std::clamp(rSigValFloat[throttleIn], 0.0f, 1.0f);
             float const     multiplier      = rSigValFloat[multiplierIn];
             float const     thrustMag       = throttle * multiplier;
 
-            if (thrustMag == 0.0f)
-            {
-                continue;
-            }
-
-            Matrix4 const& rocketDrawTf = rScnRender.m_drawTransform.get(partEnt);
-
-            auto const& matrix = Matrix4::from(rocketDrawTf.rotationNormalized(), rocketDrawTf.translation())
-                               * Matrix4::scaling({1.0f, 1.0f, thrustMag * indicatorScale})
-                               * Matrix4::translation({0.0f, 0.0f, -1.0f})
-                               * Matrix4::scaling({0.2f, 0.2f, 1.0f});
-
-            rDrawShFlat.m_shaderUntextured
-                .setColor(rIndicator.m_color)
-                .setTransformationProjectionMatrix(viewProj.m_viewProj * matrix)
-                .draw(rIndicatorMeshGl);
+            rCtxScnRdr.m_drawTransform[drawEnt]
+                    = drawTf
+                    * Matrix4::scaling({1.0f, 1.0f, thrustMag * rThrustIndicator.indicatorScale})
+                    * Matrix4::translation({0.0f, 0.0f, -1.0f})
+                    * Matrix4::scaling({0.2f, 0.2f, 1.0f});
         }
-    }));
+    };
 
-    thrustIndicator.task() = rBuilder.task().assign({tgCleanupMagnumEvt}).data(
-            "Clean up thrust indicator resource owners",
-            TopDataIds_t{             idDrawing,               idIndicator},
-            wrap_args([] (ACtxDrawing& rDrawing, IndicatorMesh& rIndicator) noexcept
+    rBuilder.task()
+        .name       ("Clean up ThrustIndicator")
+        .run_on     ({tgWin.cleanup(Run_)})
+        .push_to    (out.m_tasks)
+        .args       ({      idResources,             idDrawing,                 idThrustIndicator})
+        .func([] (Resources& rResources, ACtxDrawing& rDrawing, ThrustIndicator& rThrustIndicator) noexcept
     {
-        rDrawing.m_meshRefCounts.ref_release(std::move(rIndicator.m_mesh));
-    }));
+        rDrawing.m_meshRefCounts.ref_release(std::move(rThrustIndicator.mesh));
+    });
 
-    // Draw transforms in part entities are required for drawing indicators.
-    // This solution of adding them here is a bit janky but it works.
-
-    thrustIndicator.task() = rBuilder.task().assign({tgSyncEvt, tgPartReq}).data(
-            "Add draw transforms to rocket entities",
-            TopDataIds_t{                 idScnParts,                   idScnRender},
-            wrap_args([] (ACtxParts const& rScnParts, ACtxSceneRenderGL& rScnRender) noexcept
-    {
-        for (PartId const part : rScnParts.m_partDirty)
-        {
-            // TODO: maybe first check if the part contains any rocket machines
-
-            ActiveEnt const ent = rScnParts.m_partToActive[part];
-            if ( ! rScnRender.m_drawTransform.contains(ent) )
-            {
-                rScnRender.m_drawTransform.emplace(ent);
-            }
-        }
-    }));
-
-    // Called when scene is reopened
-    thrustIndicator.task() = rBuilder.task().assign({tgResyncEvt, tgPartReq}).data(
-            "Add draw transforms to all rocket entities",
-            TopDataIds_t{                 idScnParts,                   idScnRender},
-            wrap_args([] (ACtxParts const& rScnParts, ACtxSceneRenderGL& rScnRender) noexcept
-    {
-        for (PartId const part : rScnParts.m_partIds.bitview().zeros())
-        {
-            ActiveEnt const ent = rScnParts.m_partToActive[part];
-            if ( ! rScnRender.m_drawTransform.contains(ent) )
-            {
-                rScnRender.m_drawTransform.emplace(ent);
-            }
-        }
-    }));
-#endif
     return out;
 }
 
@@ -320,8 +274,6 @@ Session setup_mach_rcsdriver(
     auto const tgScn    = scene         .get_pipelines<PlScene>();
     auto const tgParts  = parts         .get_pipelines<PlParts>();
 
-    using namespace adera;
-
     Session out;
 
     rBuilder.task()
@@ -330,7 +282,7 @@ Session setup_mach_rcsdriver(
         .sync_with  ({tgParts.machIds(Ready), tgParts.machUpdExtIn(New)})
         .push_to    (out.m_tasks)
         .args       ({idScnParts, idUpdMach})
-        .func_raw   (gen_allocate_mach_bitsets<gc_mtRcsDriver>());
+        .func_raw   (gen_allocate_mach<gc_mtRcsDriver>());
 
     rBuilder.task()
         .name       ("RCS Drivers calculate new values")
@@ -341,7 +293,7 @@ Session setup_mach_rcsdriver(
         .func([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
         Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
-        PerMachType &rRockets = rScnParts.m_machines.m_perType[gc_mtRcsDriver];
+        PerMachType &rRockets    = rScnParts.m_machines.m_perType[gc_mtRcsDriver];
 
         for (MachLocalId const local : rUpdMach.m_localDirty[gc_mtRcsDriver].ones())
         {
@@ -401,21 +353,21 @@ Session setup_mach_rcsdriver(
 }
 
 
-struct VehicleTestControls
+struct VehicleControls
 {
-    MachLocalId m_selectedUsrCtrl{lgrn::id_null<MachLocalId>()};
+    MachLocalId selectedUsrCtrl{lgrn::id_null<MachLocalId>()};
 
-    input::EButtonControlIndex m_btnSwitch;
-    input::EButtonControlIndex m_btnThrMax;
-    input::EButtonControlIndex m_btnThrMin;
-    input::EButtonControlIndex m_btnThrMore;
-    input::EButtonControlIndex m_btnThrLess;
-    input::EButtonControlIndex m_btnPitchUp;
-    input::EButtonControlIndex m_btnPitchDn;
-    input::EButtonControlIndex m_btnYawLf;
-    input::EButtonControlIndex m_btnYawRt;
-    input::EButtonControlIndex m_btnRollLf;
-    input::EButtonControlIndex m_btnRollRt;
+    input::EButtonControlIndex btnSwitch;
+    input::EButtonControlIndex btnThrMax;
+    input::EButtonControlIndex btnThrMin;
+    input::EButtonControlIndex btnThrMore;
+    input::EButtonControlIndex btnThrLess;
+    input::EButtonControlIndex btnPitchUp;
+    input::EButtonControlIndex btnPitchDn;
+    input::EButtonControlIndex btnYawLf;
+    input::EButtonControlIndex btnYawRt;
+    input::EButtonControlIndex btnRollLf;
+    input::EButtonControlIndex btnRollRt;
 };
 
 
@@ -428,11 +380,9 @@ Session setup_vehicle_control(
         Session const&              signalsFloat)
 {
     OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
-    //OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
     OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT);
-    //OSP_DECLARE_GET_DATA_IDS(app,           TESTAPP_DATA_APP);
     auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
     auto const tgScn    = scene         .get_pipelines<PlScene>();
     auto const tgSgFlt  = signalsFloat  .get_pipelines<PlSignalsFloat>();
@@ -446,96 +396,92 @@ Session setup_vehicle_control(
     auto &rUserInput = top_get< input::UserInputHandler >(topData, idUserInput);
 
     // TODO: add cleanup task
-    top_emplace<VehicleTestControls>(topData, idVhControls, VehicleTestControls{
-        .m_btnSwitch    = rUserInput.button_subscribe("game_switch"),
-        .m_btnThrMax    = rUserInput.button_subscribe("vehicle_thr_max"),
-        .m_btnThrMin    = rUserInput.button_subscribe("vehicle_thr_min"),
-        .m_btnThrMore   = rUserInput.button_subscribe("vehicle_thr_more"),
-        .m_btnThrLess   = rUserInput.button_subscribe("vehicle_thr_less"),
-        .m_btnPitchUp   = rUserInput.button_subscribe("vehicle_pitch_up"),
-        .m_btnPitchDn   = rUserInput.button_subscribe("vehicle_pitch_dn"),
-        .m_btnYawLf     = rUserInput.button_subscribe("vehicle_yaw_lf"),
-        .m_btnYawRt     = rUserInput.button_subscribe("vehicle_yaw_rt"),
-        .m_btnRollLf    = rUserInput.button_subscribe("vehicle_roll_lf"),
-        .m_btnRollRt    = rUserInput.button_subscribe("vehicle_roll_rt")
+    top_emplace<VehicleControls>(topData, idVhControls, VehicleControls{
+        .btnSwitch  = rUserInput.button_subscribe("game_switch"),
+        .btnThrMax  = rUserInput.button_subscribe("vehicle_thr_max"),
+        .btnThrMin  = rUserInput.button_subscribe("vehicle_thr_min"),
+        .btnThrMore = rUserInput.button_subscribe("vehicle_thr_more"),
+        .btnThrLess = rUserInput.button_subscribe("vehicle_thr_less"),
+        .btnPitchUp = rUserInput.button_subscribe("vehicle_pitch_up"),
+        .btnPitchDn = rUserInput.button_subscribe("vehicle_pitch_dn"),
+        .btnYawLf   = rUserInput.button_subscribe("vehicle_yaw_lf"),
+        .btnYawRt   = rUserInput.button_subscribe("vehicle_yaw_rt"),
+        .btnRollLf  = rUserInput.button_subscribe("vehicle_roll_lf"),
+        .btnRollRt  = rUserInput.button_subscribe("vehicle_roll_rt")
     });
-
-    auto const idNull = lgrn::id_null<TopDataId>();
 
     rBuilder.task()
         .name       ("Select vehicle")
         .run_on     ({tgWin.inputs(Run)})
         .sync_with  ({tgVhCtrl.selectedVehicle(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({      idScnParts,                               idUserInput,                     idVhControls})
-        .func([] (ACtxParts& rScnParts, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls) noexcept
+        .args       ({      idScnParts,                               idUserInput,                 idVhControls})
+        .func([] (ACtxParts& rScnParts, input::UserInputHandler const &rUserInput, VehicleControls &rVhControls) noexcept
     {
         PerMachType &rUsrCtrl    = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
 
         // Select a UsrCtrl machine when pressing the switch button
-        if (rUserInput.button_state(rVhControls.m_btnSwitch).m_triggered)
+        if (rUserInput.button_state(rVhControls.btnSwitch).m_triggered)
         {
-            ++rVhControls.m_selectedUsrCtrl;
+            ++rVhControls.selectedUsrCtrl;
             bool found = false;
-            for (MachLocalId local = rVhControls.m_selectedUsrCtrl; local < rUsrCtrl.m_localIds.capacity(); ++local)
+            for (MachLocalId local = rVhControls.selectedUsrCtrl; local < rUsrCtrl.m_localIds.capacity(); ++local)
             {
                 if (rUsrCtrl.m_localIds.exists(local))
                 {
                     found = true;
-                    rVhControls.m_selectedUsrCtrl = local;
+                    rVhControls.selectedUsrCtrl = local;
                     break;
                 }
             }
 
             if ( ! found )
             {
-                rVhControls.m_selectedUsrCtrl = lgrn::id_null<MachLocalId>();
+                rVhControls.selectedUsrCtrl = lgrn::id_null<MachLocalId>();
                 OSP_LOG_INFO("Unselected vehicles");
             }
             else
             {
-                OSP_LOG_INFO("Selected User Control: {}", rVhControls.m_selectedUsrCtrl);
+                OSP_LOG_INFO("Selected User Control: {}", rVhControls.selectedUsrCtrl);
             }
         }
     });
-
 
     rBuilder.task()
         .name       ("Write inputs to UserControl Machines")
         .run_on     ({tgScn.update(Run)})
         .sync_with  ({tgWin.inputs(Run), tgSgFlt.sigFloatUpdExtIn(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({      idScnParts,                idUpdMach,                       idSigValFloat,                    idSigUpdFloat,                               idUserInput,                     idVhControls,           idDeltaTimeIn})
-        .func([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, input::UserInputHandler const &rUserInput, VehicleTestControls &rVhControls, float const deltaTimeIn) noexcept
+        .args       ({      idScnParts,                idUpdMach,                       idSigValFloat,                    idSigUpdFloat,                               idUserInput,                 idVhControls,           idDeltaTimeIn})
+        .func([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, input::UserInputHandler const& rUserInput, VehicleControls& rVhControls, float const deltaTimeIn) noexcept
     {
-        if (rVhControls.m_selectedUsrCtrl == lgrn::id_null<MachLocalId>())
+        VehicleControls& rVC = rVhControls;
+        auto const held = [&rUserInput] (input::EButtonControlIndex idx, float val) -> float
+        {
+            return rUserInput.button_state(idx).m_held ? val : 0.0f;
+        };
+
+        if (rVC.selectedUsrCtrl == lgrn::id_null<MachLocalId>())
         {
             return; // No vehicle selected
         }
 
         Nodes const &rFloatNodes = rScnParts.m_nodePerType[gc_ntSigFloat];
-
-        // Control selected UsrCtrl machine
-
         float const thrRate = deltaTimeIn;
-        float const thrChange =
-                  float(rUserInput.button_state(rVhControls.m_btnThrMore).m_held) * thrRate
-                - float(rUserInput.button_state(rVhControls.m_btnThrLess).m_held) * thrRate
-                + float(rUserInput.button_state(rVhControls.m_btnThrMax).m_held)
-                - float(rUserInput.button_state(rVhControls.m_btnThrMin).m_held);
+
+        float const thrChange
+            = held(rVC.btnThrMore, thrRate) - held(rVC.btnThrLess, thrRate)
+            + held(rVC.btnThrMax, 1.0f)     - held(rVC.btnThrMin, 1.0f);
 
         Vector3 const attitude
         {
-              float(rUserInput.button_state(rVhControls.m_btnPitchDn).m_held)
-            - float(rUserInput.button_state(rVhControls.m_btnPitchUp).m_held),
-              float(rUserInput.button_state(rVhControls.m_btnYawLf).m_held)
-            - float(rUserInput.button_state(rVhControls.m_btnYawRt).m_held),
-              float(rUserInput.button_state(rVhControls.m_btnRollRt).m_held)
-            - float(rUserInput.button_state(rVhControls.m_btnRollLf).m_held)
+            held(rVC.btnPitchDn, 1.0f) - held(rVC.btnPitchUp, 1.0f),
+            held(rVC.btnYawLf,   1.0f) - held(rVC.btnYawRt,   1.0f),
+            held(rVC.btnRollRt,  1.0f) - held(rVC.btnRollLf,  1.0f)
         };
 
         PerMachType     &rUsrCtrl   = rScnParts.m_machines.m_perType[gc_mtUserCtrl];
-        MachAnyId const mach        = rUsrCtrl.m_localToAny[rVhControls.m_selectedUsrCtrl];
+        MachAnyId const mach        = rUsrCtrl.m_localToAny[rVC.selectedUsrCtrl];
         auto const      portSpan    = lgrn::Span<NodeId const>{rFloatNodes.m_machToNode[mach]};
 
         bool changed = false;
@@ -592,11 +538,9 @@ Session setup_camera_vehicle(
     OSP_DECLARE_GET_DATA_IDS(vehicleCtrl,   TESTAPP_DATA_VEHICLE_CONTROL);
 
     auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
     auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
-    auto const tgVhCtrl = vehicleCtrl   .get_pipelines<PlVehicleCtrl>();
-    auto const tgCS     = commonScene   .get_pipelines<PlCommonScene>();
     auto const tgPhys   = physics       .get_pipelines<PlPhysics>();
+    auto const tgParts  = parts         .get_pipelines<PlParts>();
 
     Session out;
 
@@ -609,20 +553,19 @@ Session setup_camera_vehicle(
     rBuilder.task()
         .name       ("Update vehicle camera")
         .run_on     ({tgWin.sync(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Modify), tgPhys.physUpdate(Done)})
+        .sync_with  ({tgCmCt.camCtrl(Modify), tgPhys.physUpdate(Done), tgParts.mapWeldActive(Ready)})
         .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,           idDeltaTimeIn,                 idBasic,                     idVhControls,                 idScnParts})
-        .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleTestControls& rVhControls, ACtxParts const& rScnParts) noexcept
+        .args       ({                 idCamCtrl,           idDeltaTimeIn,                 idBasic,                 idVhControls,                 idScnParts})
+        .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleControls& rVhControls, ACtxParts const& rScnParts) noexcept
     {
-        if (MachLocalId const selectedLocal = rVhControls.m_selectedUsrCtrl;
-            selectedLocal != lgrn::id_null<MachLocalId>())
+        if (rVhControls.selectedUsrCtrl != lgrn::id_null<MachLocalId>())
         {
             // Follow selected UserControl machine
 
             // Obtain associated ActiveEnt
             // MachLocalId -> MachAnyId -> PartId -> RigidGroup -> ActiveEnt
             PerMachType const&  rUsrCtrls       = rScnParts.m_machines.m_perType.at(adera::gc_mtUserCtrl);
-            MachAnyId const     selectedMach    = rUsrCtrls.m_localToAny        .at(selectedLocal);
+            MachAnyId const     selectedMach    = rUsrCtrls.m_localToAny        .at(rVhControls.selectedUsrCtrl);
             PartId const        selectedPart    = rScnParts.m_machineToPart     .at(selectedMach);
             WeldId const        weld            = rScnParts.m_partToWeld        .at(selectedPart);
             ActiveEnt const     selectedEnt     = rScnParts.weldToActive        .at(weld);

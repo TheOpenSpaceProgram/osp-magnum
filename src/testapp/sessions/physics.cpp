@@ -193,7 +193,8 @@ Session setup_prefab_draw(
         Session const&              windowApp,
         Session const&              sceneRenderer,
         Session const&              commonScene,
-        Session const&              prefabs)
+        Session const&              prefabs,
+        MaterialId                  material)
 {
     OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
@@ -205,6 +206,9 @@ Session setup_prefab_draw(
     auto const tgPf     = prefabs       .get_pipelines< PlPrefabs >();
 
     Session out;
+    auto const [idMaterial] = out.acquire_data<1>(topData);
+
+    top_emplace<MaterialId>(topData, idMaterial, material);
 
     rBuilder.task()
         .name       ("Create DrawEnts for prefabs")
@@ -224,10 +228,10 @@ Session setup_prefab_draw(
                       tgScnRdr.entMesh(New), tgScnRdr.material(New), tgScnRdr.drawEnt(New), tgScnRdr.drawEntResized(Done),
                       tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
         .push_to    (out.m_tasks)
-        .args       ({        idPrefabs,           idResources,                 idBasic,             idDrawing,                idDrawingRes,                 idScnRender})
-        .func([] (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender) noexcept
+        .args       ({        idPrefabs,           idResources,                 idBasic,             idDrawing,                idDrawingRes,                 idScnRender,          idMaterial})
+        .func([] (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, MaterialId material) noexcept
     {
-        SysPrefabDraw::init_mesh_and_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender);
+        SysPrefabDraw::init_mesh_and_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender, material);
     });
 
 
@@ -248,41 +252,15 @@ Session setup_prefab_draw(
         .sync_with  ({tgPf.ownedEnts(UseOrRun_), tgScnRdr.entMesh(New), tgScnRdr.material(New), tgScnRdr.drawEnt(New), tgScnRdr.drawEntResized(Done),
                       tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
         .push_to    (out.m_tasks)
-        .args       ({        idPrefabs,           idResources,                 idBasic,             idDrawing,                idDrawingRes,                 idScnRender})
-        .func([] (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender) noexcept
+        .args       ({        idPrefabs,           idResources,                 idBasic,             idDrawing,                idDrawingRes,                 idScnRender,          idMaterial})
+        .func([] (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, MaterialId material) noexcept
     {
-        SysPrefabDraw::resync_mesh_and_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender);
+        SysPrefabDraw::resync_mesh_and_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender, material);
     });
 
 
     return out;
 } // setup_phys_shapes_draw
-
-//    if (material.m_dataIds.empty())
-//    {
-//        prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod}).data(
-//                "Init Prefab drawables (no material)",
-//                TopDataIds_t{                idPrefabs,           idResources,             idDrawing,                idDrawingRes },
-//                wrap_args([] (ACtxPrefabInit& rPrefabs, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes) noexcept
-//        {
-//            SysPrefabInit::init_drawing(rPrefabs, rResources, rDrawing, rDrawingRes, {});
-//        }));
-//    }
-//    else
-//    {
-//        OSP_SESSION_UNPACK_DATA(material,   TESTAPP_MATERIAL);
-//        OSP_SESSION_UNPACK_TAGS(material,   TESTAPP_MATERIAL);
-
-//        prefabs.task() = rBuilder.task().assign({tgSceneEvt, tgPrefabReq, tgPrefabEntReq, tgDrawMod, tgMeshMod, tgMatMod}).data(
-//                "Init Prefab drawables (single material)",
-//                TopDataIds_t{                idPrefabs,           idResources,             idDrawing,                idDrawingRes,          idMatEnts,                      idMatDirty,                   idActiveIds },
-//                wrap_args([] (ACtxPrefabInit& rPrefabs, Resources& rResources, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, EntSet_t& rMatEnts, std::vector<DrawEnt>& rMatDirty, ActiveReg_t const& rActiveIds) noexcept
-//        {
-//            rDrawing.resize_active(rActiveIds.capacity());
-//            rMatEnts.ints().resize(rActiveIds.vec().capacity());
-//            SysPrefabInit::init_drawing(rPrefabs, rResources, rDrawing, rDrawingRes, {{rMatEnts, rMatDirty}});
-//        }));
-//    }
 
 
 } // namespace testapp::scenes

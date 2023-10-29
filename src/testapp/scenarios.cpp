@@ -58,6 +58,8 @@ using namespace osp::active;
 namespace testapp
 {
 
+// MaterialIds hints which shaders should be used to draw a DrawEnt
+// DrawEnts can be assigned to multiple materials
 static constexpr auto   sc_matVisualizer    = draw::MaterialId(0);
 static constexpr auto   sc_matFlat          = draw::MaterialId(1);
 static constexpr auto   sc_matPhong         = draw::MaterialId(2);
@@ -195,6 +197,8 @@ static ScenarioMap_t make_scenarios()
         scenarioMap.emplace(name, ScenarioOption{desc, run});
     };
 
+    static constexpr auto sc_gravityForce = Vector3{0.0f, 0.0f, -9.81f};
+
     add_scenario("enginetest", "Basic game engine and drawing scenario (without using TopTasks)",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
@@ -252,7 +256,7 @@ static ScenarioMap_t make_scenarios()
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
         nwtGravSet      = setup_newton_factors      (builder, rTopData);
-        nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
+        nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, sc_gravityForce);
         physShapesNwt   = setup_phys_shapes_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
 
         add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 4);
@@ -298,8 +302,8 @@ static ScenarioMap_t make_scenarios()
                                     prefabs, parts, vehicleSpawn, signalsFloat, \
                                     vehicleSpawnVB, vehicleSpawnRgd, vehicleSpawnNwt, \
                                     testVehicles, machRocket, machRcsDriver, nwtRocketSet, rocketsNwt
-        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, \
-                                    prefabDraw, vehicleDraw, vehicleCtrl, cameraVehicle
+        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, \
+                                    prefabDraw, vehicleDraw, vehicleCtrl, cameraVehicle, thrustIndicator
 
         using namespace testapp::scenes;
 
@@ -316,7 +320,7 @@ static ScenarioMap_t make_scenarios()
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
         physics         = setup_physics             (builder, rTopData, scene, commonScene);
         physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
-        //droppers        = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
+        droppers        = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
         bounds          = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
 
         prefabs         = setup_prefabs             (builder, rTopData, application, scene, commonScene, physics);
@@ -331,7 +335,7 @@ static ScenarioMap_t make_scenarios()
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
         nwtGravSet      = setup_newton_factors      (builder, rTopData);
-        nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, Vector3{0.0f, 0.0f, -9.81f});
+        nwtGrav         = setup_newton_force_accel  (builder, rTopData, newton, nwtGravSet, sc_gravityForce);
         physShapesNwt   = setup_phys_shapes_newton  (builder, rTopData, commonScene, physics, physShapes, newton, nwtGravSet);
         vehicleSpawnNwt = setup_vehicle_spawn_newton(builder, rTopData, application, commonScene, physics, prefabs, parts, vehicleSpawn, newton);
         nwtRocketSet    = setup_newton_factors      (builder, rTopData);
@@ -376,17 +380,17 @@ static ScenarioMap_t make_scenarios()
 
             magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
             cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
-            //cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
             shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
             shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
             camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, physShapes);
             shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
-            prefabDraw      = setup_prefab_draw         (builder, rTopData, application, windowApp, sceneRenderer, commonScene, prefabs);
+            prefabDraw      = setup_prefab_draw         (builder, rTopData, application, windowApp, sceneRenderer, commonScene, prefabs, sc_matPhong);
             vehicleDraw     = setup_vehicle_spawn_draw  (builder, rTopData, sceneRenderer, vehicleSpawn);
             vehicleCtrl     = setup_vehicle_control     (builder, rTopData, windowApp, scene, parts, signalsFloat);
             cameraVehicle   = setup_camera_vehicle      (builder, rTopData, windowApp, scene, sceneRenderer, commonScene, physics, parts, cameraCtrl, vehicleCtrl);
+            thrustIndicator = setup_thrust_indicators   (builder, rTopData, application, windowApp, commonScene, parts, signalsFloat, sceneRenderer, defaultPkg, sc_matFlat);
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };

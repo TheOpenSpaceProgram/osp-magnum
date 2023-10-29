@@ -27,11 +27,30 @@
 #include "drawing.h"
 
 #include "../activescene/basic.h"
-
-#include <unordered_map>
+#include "../activescene/basic_fn.h"
 
 namespace osp::draw
 {
+
+/**
+ * @brief Function pointers called when new draw transforms are calculated
+ *
+ * Draw transforms (Matrix4) are calculated by traversing the Scene graph (tree of ActiveEnts).
+ * These matrices are only stored for ActiveEnts associeted with a DrawEnt (activeToDraw)
+ */
+struct DrawTfObservers
+{
+    using UserData_t = std::array<void*, 7>;
+    using Func_t = void(*)(ACtxSceneRender& rCtxScnRdr, Matrix4 const&, active::ActiveEnt, int, UserData_t) noexcept;
+
+    struct Observer
+    {
+        Func_t      func{nullptr};
+        UserData_t  data{};
+    };
+
+    std::array<Observer, 8> observers;
+};
 
 /**
  * @brief View and Projection matrix
@@ -66,17 +85,10 @@ struct EntityToDraw
     using ShaderDrawFnc_t = void (*)(
             DrawEnt, ViewProjMatrix const&, UserData_t) noexcept;
 
-    constexpr void operator()(
-            DrawEnt ent,
-            ViewProjMatrix const& viewProj) const noexcept
-    {
-        m_draw(ent, viewProj, m_data);
-    }
-
-    ShaderDrawFnc_t m_draw;
+    ShaderDrawFnc_t draw;
 
     // Non-owning user data passed to draw function, such as the shader
-    UserData_t m_data;
+    UserData_t data;
 
 }; // struct EntityToDraw
 
@@ -92,28 +104,17 @@ struct RenderGroup
 {
     using DrawEnts_t = Storage_t<DrawEnt, EntityToDraw>;
 
-    /**
-     * @return Iterable view for stored entities
-     */
-    decltype(auto) view()
-    {
-        return entt::basic_view{m_entities};
-    }
-
-    /**
-     * @return Iterable view for stored entities
-     */
-    decltype(auto) view() const
-    {
-        return entt::basic_view{m_entities};
-    }
-
-    DrawEnts_t m_entities;
+    DrawEnts_t entities;
 
 }; // struct RenderGroup
 
 class SysRender
 {
+    struct UpdDrawTransformNoOp
+    {
+        constexpr void operator()(Matrix4 const&, active::ActiveEnt, int) const noexcept {}
+    };
+
 public:
 
     /**
@@ -150,25 +151,29 @@ public:
      * @param rResources        [ref] Application Resources
      */
     static void clear_resource_owners(
-            ACtxDrawingRes& rCtxDrawingRes,
-            Resources& rResources);
+            ACtxDrawingRes&                         rCtxDrawingRes,
+            Resources&                              rResources);
 
-    template<typename IT_T, typename ITB_T>
+    static inline void needs_draw_transforms(
+            active::ACtxSceneGraph const&           scnGraph,
+            active::ActiveEntSet_t&                 rNeedDrawTf,
+            active::ActiveEnt                       ent);
+
+    struct ArgsForUpdDrawTransform
+    {
+        active::ACtxSceneGraph const&               scnGraph;
+        active::ACompTransformStorage_t const&      transforms;
+        KeyedVec<active::ActiveEnt, DrawEnt> const& activeToDraw;
+        active::ActiveEntSet_t const&               needDrawTf;
+        DrawTransforms_t&                           rDrawTf;
+    };
+
+    template<typename IT_T, typename ITB_T, typename FUNC_T = UpdDrawTransformNoOp>
     static void update_draw_transforms(
-            active::ACtxSceneGraph const&           rScnGraph,
-            KeyedVec<active::ActiveEnt, DrawEnt> const& activeToDraw,
-            active::ACompTransformStorage_t const&  transform,
-            DrawTransforms_t&                       rDrawTf,
-            active::ActiveEntSet_t const&           useDrawTf,
-            IT_T                                    first,
-            ITB_T const&                            last);
-
-    /**
-     * @brief Set all dirty flags/vectors
-     *
-     * @param rCtxDrawing [ref] Drawing data
-     */
-    static void set_dirty_all(ACtxDrawing& rCtxDrawing);
+            ArgsForUpdDrawTransform     args,
+            IT_T                        first,
+            ITB_T const&                last,
+            FUNC_T                      func = {});
 
     template<typename IT_T>
     static void update_delete_drawing(
@@ -179,27 +184,39 @@ public:
     static constexpr decltype(auto) gen_drawable_mesh_adder(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg);
 
 private:
+
+    template<typename FUNC_T>
     static void update_draw_transforms_recurse(
-            active::ACtxSceneGraph const&           rScnGraph,
-            KeyedVec<active::ActiveEnt, DrawEnt> const& activeToDraw,
-            active::ACompTransformStorage_t const&  rTf,
-            DrawTransforms_t&                       rDrawTf,
-            active::ActiveEntSet_t const&           useDrawTf,
-            active::ActiveEnt                       ent,
-            Matrix4 const&                          parentTf,
-            bool                                    root);
+            ArgsForUpdDrawTransform     args,
+            active::ActiveEnt           ent,
+            Matrix4 const&              parentTf,
+            int                         depth,
+            FUNC_T&                     func);
 
 }; // class SysRender
 
-template<typename IT_T, typename ITB_T>
+void SysRender::needs_draw_transforms(
+        active::ACtxSceneGraph const&   scnGraph,
+        active::ActiveEntSet_t&         rNeedDrawTf,
+        active::ActiveEnt               ent)
+{
+    rNeedDrawTf.set(ent.value);
+
+    active::ActiveEnt const parentEnt = scnGraph.m_entParent[ent];
+
+    if (   parentEnt != lgrn::id_null<active::ActiveEnt>()
+        && ! rNeedDrawTf.test(std::size_t(parentEnt)) )
+    {
+        SysRender::needs_draw_transforms(scnGraph, rNeedDrawTf, parentEnt);
+    }
+}
+
+template<typename IT_T, typename ITB_T, typename FUNC_T>
 void SysRender::update_draw_transforms(
-        active::ACtxSceneGraph const&           rScnGraph,
-        KeyedVec<active::ActiveEnt, DrawEnt> const& activeToDraw,
-        active::ACompTransformStorage_t const&  rTf,
-        DrawTransforms_t&                       rDrawTf,
-        active::ActiveEntSet_t const&           needDrawTf,
-        IT_T                                    first,
-        ITB_T const&                            last)
+        ArgsForUpdDrawTransform     args,
+        IT_T                        first,
+        ITB_T const&                last,
+        FUNC_T                      func)
 {
     static constexpr Matrix4 const identity{};
 
@@ -207,12 +224,42 @@ void SysRender::update_draw_transforms(
     {
         active::ActiveEnt const ent = *first;
 
-        if (needDrawTf.test(std::size_t(ent)))
+        if (args.needDrawTf.test(std::size_t(ent)))
         {
-            update_draw_transforms_recurse(rScnGraph, activeToDraw, rTf, rDrawTf, needDrawTf, ent, identity, true);
+            update_draw_transforms_recurse(args, ent, identity, true, func);
         }
 
         std::advance(first, 1);
+    }
+}
+
+template<typename FUNC_T>
+void SysRender::update_draw_transforms_recurse(
+        ArgsForUpdDrawTransform     args,
+        active::ActiveEnt           ent,
+        Matrix4 const&              parentTf,
+        int                         depth,
+        FUNC_T&                     func)
+{
+    using namespace osp::active;
+
+    Matrix4 const& entTf        = args.transforms.get(ent).m_transform;
+    Matrix4 const& entDrawTf    = (depth == 0) ? (entTf) : (parentTf * entTf);
+
+    func(entDrawTf, ent, depth);
+
+    if (DrawEnt const drawEnt = args.activeToDraw[ent];
+        drawEnt != lgrn::id_null<DrawEnt>())
+    {
+        args.rDrawTf[drawEnt] = entDrawTf;
+    }
+
+    for (ActiveEnt entChild : SysSceneGraph::children(args.scnGraph, ent))
+    {
+        if (args.needDrawTf.test(std::size_t(entChild)))
+        {
+            update_draw_transforms_recurse(args, entChild, entDrawTf, depth + 1, func);
+        }
     }
 }
 

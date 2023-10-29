@@ -26,6 +26,8 @@
 
 #include "../scenarios.h"
 
+#include <osp/drawing/draw_ent.h>
+
 namespace testapp::scenes
 {
 
@@ -61,14 +63,13 @@ osp::Session setup_camera_vehicle(
 osp::Session setup_thrust_indicators(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session const&         magnum,
-        osp::Session const&         commonScene,
+        osp::Session const&         application,
+        osp::Session const&         windowApp,
+        osp::Session const&         commonSecne,
         osp::Session const&         parts,
         osp::Session const&         signalsFloat,
-        osp::Session const&         scnRender,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         shFlat,
-        osp::TopDataId const        idResources,
-        osp::PkgId const            pkg);
+        osp::Session const&         sceneRenderer,
+        osp::PkgId const            pkg,
+        osp::draw::MaterialId       material);
 
 } // namespace testapp::scenes

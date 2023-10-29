@@ -67,6 +67,7 @@ osp::Session setup_prefab_draw(
         osp::Session const&         windowApp,
         osp::Session const&         sceneRenderer,
         osp::Session const&         commonScene,
-        osp::Session const&         prefabs);
+        osp::Session const&         prefabs,
+        osp::draw::MaterialId       material);
 
 } // namespace testapp::scenes

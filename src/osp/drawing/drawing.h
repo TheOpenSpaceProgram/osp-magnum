@@ -140,7 +140,8 @@ struct ACtxSceneRender
     void resize_active(std::size_t const size)
     {
         bitvector_resize(m_needDrawTf, size);
-        m_activeToDraw.resize(size, lgrn::id_null<DrawEnt>());
+        m_activeToDraw      .resize(size, lgrn::id_null<DrawEnt>());
+        drawTfObserverEnable.resize(size, 0);
     }
 
     lgrn::IdRegistryStl<DrawEnt>            m_drawIds;
@@ -153,6 +154,7 @@ struct ACtxSceneRender
     DrawEntSet_t                            m_needDrawTf;
     KeyedVec<active::ActiveEnt, DrawEnt>    m_activeToDraw;
 
+    KeyedVec<active::ActiveEnt, uint16_t>   drawTfObserverEnable;
     DrawTransforms_t                        m_drawTransform;
 
     // Meshes and textures assigned to DrawEnts

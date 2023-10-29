@@ -59,7 +59,8 @@ public:
             ACtxBasic const&            rBasic,
             ACtxDrawing&                rDrawing,
             ACtxDrawingRes&             rDrawingRes,
-            ACtxSceneRender&            rScnRender);
+            ACtxSceneRender&            rScnRender,
+            MaterialId                  material = lgrn::id_null<MaterialId>());
 
     static void resync_mesh_and_material(
             ACtxPrefabs&                rPrefabs,
@@ -67,7 +68,8 @@ public:
             ACtxBasic const&            rBasic,
             ACtxDrawing&                rDrawing,
             ACtxDrawingRes&             rDrawingRes,
-            ACtxSceneRender&            rScnRender);
+            ACtxSceneRender&            rScnRender,
+            MaterialId                  material = lgrn::id_null<MaterialId>());
 };
 
 } // namespace osp::active

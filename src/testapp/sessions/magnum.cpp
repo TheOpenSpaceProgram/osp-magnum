@@ -273,25 +273,6 @@ Session setup_magnum_scene(
     });
 
     rBuilder.task()
-        .name       ("Calculate draw transforms")
-        .run_on     ({tgScnRdr.render(Run)})
-        .sync_with  ({tgCS.hierarchy(Ready), tgCS.transform(Ready), tgCS.activeEnt(Ready), tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEnt(Ready), tgScnRdr.drawEntResized(Done), tgCS.activeEntResized(Done)})
-        .push_to    (out.m_tasks)
-        .args       ({            idBasic,                   idDrawing,                 idScnRender,                   idScnRenderGl })
-        .func([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl) noexcept
-    {
-        auto rootChildren = SysSceneGraph::children(rBasic.m_scnGraph);
-        SysRender::update_draw_transforms(
-                rBasic      .m_scnGraph,
-                rScnRender  .m_activeToDraw,
-                rBasic      .m_transform,
-                rScnRender  .m_drawTransform,
-                rScnRender  .m_needDrawTf,
-                rootChildren.begin(),
-                rootChildren.end());
-    });
-
-    rBuilder.task()
         .name       ("Render Entities")
         .run_on     ({tgScnRdr.render(Run)})
         .sync_with  ({tgScnRdr.group(Ready), tgScnRdr.groupEnts(Ready), tgMgnScn.camera(Ready), tgScnRdr.drawTransforms(UseOrRun), tgScnRdr.entMesh(Ready), tgScnRdr.entTexture(Ready),
@@ -317,7 +298,7 @@ Session setup_magnum_scene(
     {
         for (DrawEnt const drawEnt : rDrawEntDel)
         {
-            rGroup.m_entities.remove(drawEnt);
+            rGroup.entities.remove(drawEnt);
         }
     });
 
@@ -373,7 +354,7 @@ Session setup_shader_visualizer(
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
     {
         Material const &rMat = rScnRender.m_materials[rDrawShVisual.m_materialId];
-        sync_drawent_visualizer(rMat.m_dirty.begin(), rMat.m_dirty.end(), rMat.m_ents, rGroupFwd.m_entities, rDrawShVisual);
+        sync_drawent_visualizer(rMat.m_dirty.begin(), rMat.m_dirty.end(), rMat.m_ents, rGroupFwd.entities, rDrawShVisual);
     });
 
     rBuilder.task()
@@ -387,7 +368,7 @@ Session setup_shader_visualizer(
         Material const &rMat = rScnRender.m_materials[rDrawShVisual.m_materialId];
         for (auto const drawEntInt : rMat.m_ents.ones())
         {
-            sync_drawent_visualizer(DrawEnt(drawEntInt), rMat.m_ents, rGroupFwd.m_entities, rDrawShVisual);
+            sync_drawent_visualizer(DrawEnt(drawEntInt), rMat.m_ents, rGroupFwd.entities, rDrawShVisual);
         }
     });
 
@@ -442,7 +423,7 @@ Session setup_shader_flat(
         sync_drawent_flat(rMat.m_dirty.begin(), rMat.m_dirty.end(),
         {
             .hasMaterial    = rMat.m_ents,
-            .pStorageOpaque = &rGroupFwd.m_entities,
+            .pStorageOpaque = &rGroupFwd.entities,
             /* TODO: set .pStorageTransparent */
             .opaque         = rScnRender.m_opaque,
             .transparent    = rScnRender.m_transparent,
@@ -465,7 +446,7 @@ Session setup_shader_flat(
             sync_drawent_flat(DrawEnt(drawEntInt),
             {
                 .hasMaterial    = rMat.m_ents,
-                .pStorageOpaque = &rGroupFwd.m_entities,
+                .pStorageOpaque = &rGroupFwd.entities,
                 /* TODO: set .pStorageTransparent */
                 .opaque         = rScnRender.m_opaque,
                 .transparent    = rScnRender.m_transparent,
@@ -527,7 +508,7 @@ Session setup_shader_phong(
         sync_drawent_phong(rMat.m_dirty.begin(), rMat.m_dirty.end(),
         {
             .hasMaterial    = rMat.m_ents,
-            .pStorageOpaque = &rGroupFwd.m_entities,
+            .pStorageOpaque = &rGroupFwd.entities,
             /* TODO: set .pStorageTransparent */
             .opaque         = rScnRender.m_opaque,
             .transparent    = rScnRender.m_transparent,
@@ -550,7 +531,7 @@ Session setup_shader_phong(
             sync_drawent_phong(DrawEnt(drawEntInt),
             {
                 .hasMaterial    = rMat.m_ents,
-                .pStorageOpaque = &rGroupFwd.m_entities,
+                .pStorageOpaque = &rGroupFwd.entities,
                 .opaque         = rScnRender.m_opaque,
                 .transparent    = rScnRender.m_transparent,
                 .diffuse        = rScnRenderGl.m_diffuseTexId,
