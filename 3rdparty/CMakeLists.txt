@@ -127,6 +127,17 @@ if(NOT OSP_USE_SYSTEM_SDL)
   SET(SDL2_DISABLE_INSTALL   ON CACHE BOOL "" FORCE)
   SET(SDL2_DISABLE_UNINSTALL ON CACHE BOOL "" FORCE)
 
+  # Copied from https://github.com/libsdl-org/SDL/commit/7774de0fe364fa997d58f2faa2199054d37bedf6
+  #
+  # CMAKE_PREFIX_PATH and CMAKE_INSTALL_FULL_BINDIR can be a non-absolute path
+  # when a master-project does e.g. `set(CMAKE_INSTALL_PREFIX "libs/SDL2" CACHE PATH "prefix" FORCE)`.
+  if(NOT IS_ABSOLUTE "${CMAKE_INSTALL_PREFIX}")
+    set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_PREFIX}")
+  endif()
+  if(NOT IS_ABSOLUTE "${CMAKE_INSTALL_FULL_BINDIR}")
+    set(CMAKE_INSTALL_FULL_BINDIR "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_FULL_BINDIR}")
+  endif()
+
   ADD_SUBDIRECTORY(SDL2 EXCLUDE_FROM_ALL)
 
   # Work around macos-13 erroring on -Werror,-Wdeclaration-after-statement
