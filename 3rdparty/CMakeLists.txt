@@ -128,8 +128,13 @@ if(NOT OSP_USE_SYSTEM_SDL)
   SET(SDL2_DISABLE_UNINSTALL ON CACHE BOOL "" FORCE)
 
   ADD_SUBDIRECTORY(SDL2 EXCLUDE_FROM_ALL)
+
   # Work around macos-13 erroring on -Werror,-Wdeclaration-after-statement
-  target_compile_options(sdl-build-options INTERFACE "-Wno-error=declaration-after-statement")
+  check_c_compiler_flag	(-Wno-error=declaration-after-statement HAVE_GCC_WNO_ERROR_DECLARATION_AFTER_STATEMENT)
+  if(HAVE_GCC_WNO_ERROR_DECLARATION_AFTER_STATEMENT)
+    target_compile_options(sdl-build-options INTERFACE "-Wno-error=declaration-after-statement")
+  endif()
+
 endif() # NOT OSP_USE_SYSTEM_SDL
 
 # Corrade explicitly says IFUNC does not work with sanitizers
