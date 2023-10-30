@@ -84,7 +84,7 @@ jobs:
     - name: Run Clang Analyzer
       if: ${{ matrix.tool == 'clang-analyzer' }}
       run: |
-        wget https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-11.0.1/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
+        wget https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-14.0.6/clang-tools-extra/clang-tidy/tool/run-clang-tidy.py
         chmod +x run-clang-tidy.py
         ./run-clang-tidy.py -j $(nproc) -p build
 
@@ -92,7 +92,7 @@ jobs:
     - name: Run IWYU
       if: ${{ matrix.tool == 'iwyu' }}
       run: |
-        wget https://raw.githubusercontent.com/include-what-you-use/include-what-you-use/clang_11/iwyu_tool.py
+        wget https://raw.githubusercontent.com/include-what-you-use/include-what-you-use/clang_14/iwyu_tool.py
         chmod +x iwyu_tool.py
         ./iwyu_tool.py -j $(nproc) -p build -- -Xiwyu --mapping_file=${GITHUB_WORKSPACE}/iwyu-ubuntu.imp
 
