@@ -87,6 +87,7 @@ jobs:
       if: ${{ matrix.tool == 'CodeQL' }}
       uses: github/codeql-action/analyze@v2
       with:
+        upload: false
         output: sarif-results
 
     - name: Filter 3rdparty from CodeQL
@@ -98,6 +99,12 @@ jobs:
           -3rdparty/**
         input: sarif-results/cpp.sarif
         output: sarif-results/cpp.sarif
+
+    - name: Upload SARIF
+      if: ${{ matrix.tool == 'CodeQL' }}
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: sarif-results/cpp.sarif
 
     # Implicitly requires build/compile_commands.json to exist
     - name: Run Clang Analyzer
