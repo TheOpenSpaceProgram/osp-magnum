@@ -123,10 +123,6 @@ jobs:
       run: |
         cmake -B build -DCMAKE_CONFIGURATION_TYPES=${{ matrix.config }}
 
-    - name: Compile Dependencies
-      run: |
-        cmake --build build --parallel --config ${{ matrix.config }} --target compile-osp-magnum-deps compile-test-deps
-
     - name: Initialize MSVC Code Analysis
       uses: microsoft/msvc-code-analysis-action@v0.1.1
       # Provide a unique ID to access the sarif output path
