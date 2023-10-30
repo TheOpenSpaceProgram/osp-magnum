@@ -460,7 +460,7 @@ static void pipeline_advance_reqs(Tasks const& tasks, TaskGraph const& graph, Ex
                 ExecPipeline &rTaskPlExec = rExec.plData[rBlocked.pipeline];
                 -- rTaskPlExec.tasksQueuedBlocked;
                 ++ rTaskPlExec.tasksQueuedRun;
-                rExec.tasksQueuedRun.emplace(task);
+                rExec.tasksQueuedRun.push(task);
                 rExec.tasksQueuedBlocked.erase(task);
             }
         }
@@ -577,7 +577,7 @@ static void pipeline_advance_run(Tasks const& tasks, TaskGraph const& graph, Exe
             }
             else
             {
-                rExec.tasksQueuedRun.emplace(task);
+                rExec.tasksQueuedRun.push(task);
                 ++ rExecPl.tasksQueuedRun;
             }
 
