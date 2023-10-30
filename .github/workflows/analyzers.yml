@@ -86,6 +86,18 @@ jobs:
     - name: Perform CodeQL Analysis
       if: ${{ matrix.tool == 'CodeQL' }}
       uses: github/codeql-action/analyze@v2
+      with:
+        output: sarif-results
+
+    - name: Filter 3rdparty from CodeQL
+      if: ${{ matrix.tool == 'CodeQL' }}
+      uses: advanced-security/filter-sarif@v1
+      with:
+        # filter out all test files unless they contain a sql-injection vulnerability
+        patterns: |
+          -3rdparty/**
+        input: sarif-results/cpp.sarif
+        output: sarif-results/cpp.sarif
 
     # Implicitly requires build/compile_commands.json to exist
     - name: Run Clang Analyzer
