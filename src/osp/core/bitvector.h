@@ -26,16 +26,17 @@
 
 #include <longeron/containers/bit_view.hpp>
 
-#include <cstdint>
 #include <vector>
+
+#include <cstdint>
 
 namespace osp
 {
 
-using bitint_t = uint64_t;
+using bitint_t = std::uint64_t;
 using BitVector_t = lgrn::BitView< std::vector<bitint_t> >;
 
-inline void bitvector_resize(BitVector_t &rBitVector, std::size_t size)
+inline void bitvector_resize(BitVector_t &rBitVector, std::size_t const size)
 {
     rBitVector.ints().resize(size / 64 + (size % 64 != 0), 0);
 }

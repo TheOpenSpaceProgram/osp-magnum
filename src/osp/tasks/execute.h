@@ -92,7 +92,6 @@ struct LoopRequestRun
     PipelineTreePos_t   treePos;
 };
 
-
 /**
  * @brief Fast plain-old-data log for ExecContext state changes
  */

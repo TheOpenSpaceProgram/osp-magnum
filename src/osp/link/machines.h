@@ -35,20 +35,23 @@
 
 #include <atomic>
 #include <vector>
+#include <span>
+
+#include <cstdint>
 
 namespace osp::link
 {
 
-using MachTypeId    = uint16_t;
-using MachAnyId     = uint32_t;
-using MachLocalId   = uint32_t;
+using MachTypeId    = std::uint16_t;
+using MachAnyId     = std::uint32_t;
+using MachLocalId   = std::uint32_t;
 
-using NodeTypeId    = uint16_t;
-using NodeId        = uint32_t;
+using NodeTypeId    = std::uint16_t;
+using NodeId        = std::uint32_t;
 
-using PortId        = uint16_t;
-using JunctionId    = uint16_t;
-using JuncCustom    = uint16_t;
+using PortId        = std::uint16_t;
+using JunctionId    = std::uint16_t;
+using JuncCustom    = std::uint16_t;
 
 using MachTypeReg_t = GlobalIdReg<MachTypeId>;
 using NodeTypeReg_t = GlobalIdReg<NodeTypeId>;
@@ -128,7 +131,7 @@ struct PortEntry
     JuncCustom  custom;
 };
 
-inline NodeId connected_node(lgrn::Span<NodeId const> portSpan, PortId port) noexcept
+inline NodeId connected_node(std::span<NodeId const> portSpan, PortId port) noexcept
 {
     return (portSpan.size() > port) ? portSpan[port] : lgrn::id_null<NodeId>();
 }
@@ -145,6 +148,5 @@ void copy_nodes(
         Nodes &rDstNodes,
         Machines &rDstMach,
         ArrayView<NodeId> remapNodeOut);
-
 
 } // namespace osp::wire

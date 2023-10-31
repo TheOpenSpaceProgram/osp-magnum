@@ -29,12 +29,12 @@
 #include "string_concat.h"  // for string_data(), string_size()
 
 #include <memory>           // for std::shared_ptr
+#include <iterator>         // for std::forward_iterator, std::sentinal_for
 #include <utility>          // for std::forward
 #include <stdexcept>        // for std::invalid_argument
 #include <functional>       // for std::hash
 #include <string_view>      // for std::basic_string_view
 #include <type_traits>      // for std::is_nothrow_default_constructible_v, etc
-
 #include <cstddef>          // for std::size_t
 
 namespace osp
@@ -138,9 +138,11 @@ public:
 
     /**
      * @brief Constructs a new SharedString with newly allocated storage initialized with the provided data.
+     *
+     * Note that the provided iterator must be forward or better, so that the distance can be calculated before traversing.
      */
-    template<typename IT_T>
-    static BasicSharedString create(IT_T&&, IT_T&&) noexcept(false); // allocates
+    template<std::forward_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+    static BasicSharedString create(IT_T const&, SENT_T const&) noexcept(false); // allocates
 
     /**
      * @brief Constructs a new SharedString with newly allocated storage initialized with the provided data.
@@ -175,38 +177,37 @@ public:
     static constexpr BasicSharedString create_reference(ViewBase_t)
         noexcept( std::is_nothrow_default_constructible_v<LIFETIME_T> );
 
-#if defined(__cpp_impl_three_way_comparison)
+private: // hidden friend idiom
     /**
      * @brief threeway comparison operator for shared strings. Only compares string data, not lifetime.
      */
-    constexpr decltype(auto) operator<=>(BasicSharedString const& rhs)
+    friend constexpr std::strong_ordering operator<=>(BasicSharedString const& lhs, BasicSharedString const& rhs) noexcept
     {
-        return ViewBase_t(*this) <=> ViewBase_t(rhs);
+        return ViewBase_t(lhs) <=> ViewBase_t(rhs);
     }
 
     /**
      * @brief threeway comparison operator for shared strings. Only compares string data, not lifetime.
      */
-    constexpr decltype(auto) operator<=>(ViewBase_t const& rhs)
+    friend constexpr std::strong_ordering operator<=>(BasicSharedString const& lhs, ViewBase_t const rhs) noexcept
     {
-        return ViewBase_t(*this) <=> rhs;
-    }
-#endif // defined(__cpp_impl_three_way_comparison)
-
-    /**
-     * @brief Equality operator for shared strings. Only compares string data, not lifetime.
-     */
-    constexpr bool operator==(BasicSharedString const& rhs)
-    {
-        return ViewBase_t(*this) == ViewBase_t(rhs);
+        return ViewBase_t(lhs) <=> rhs;
     }
 
     /**
      * @brief Equality operator for shared strings. Only compares string data, not lifetime.
      */
-    constexpr bool operator==(ViewBase_t const& rhs)
+    friend constexpr bool operator==(BasicSharedString const& lhs, BasicSharedString const& rhs) noexcept
     {
-        return ViewBase_t(*this) == rhs;
+        return ViewBase_t(lhs) == ViewBase_t(rhs);
+    }
+
+    /**
+     * @brief Equality operator for shared strings. Only compares string data, not lifetime.
+     */
+    friend constexpr bool operator==(BasicSharedString const& lhs, ViewBase_t const rhs) noexcept
+    {
+        return ViewBase_t(lhs) == rhs;
     }
 
 protected:
@@ -225,12 +226,7 @@ private:
 
 //-----------------------------------------------------------------------------
 
-#if defined(__cpp_lib_shared_ptr_arrays) && 201707 <= __cpp_lib_shared_ptr_arrays
-using SharedStringLifetime_t = std::shared_ptr<const char[]>;
-#else
-// missing std::shared_ptr<T[]>...
-using SharedStringLifetime_t = std::shared_ptr<const char>;
-#endif
+using SharedStringLifetime_t = std::shared_ptr<char const[]>;
 
 /**
  * The concrete implementation.
@@ -267,8 +263,8 @@ constexpr BasicSharedString<CHAR_T, LIFETIME_T>::operator std::basic_string<CHAR
 // TODO: This isn't super generic. Using std::shared_ptr regardless of the LIFETIME_T parameter
 // means that alternative LIFETIME_T params will probably encounter compile failures.
 template<typename CHAR_T, typename LIFETIME_T>
-  template<typename IT_T>
-inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T && end) noexcept(false) // allocates
+  template<std::forward_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T const& begin, SENT_T const& end) noexcept(false) // allocates
     -> BasicSharedString
 {
     // Determine size
@@ -295,17 +291,10 @@ inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create(IT_T && begin, IT_T &&
     }
 
     // Make space to copy the string
-#if defined(__cpp_lib_smart_ptr_for_overwrite)
     auto buf = std::make_shared_for_overwrite<CHAR_T[]>(size);
-#elif defined(__cpp_lib_shared_ptr_arrays) && 201707 <= __cpp_lib_shared_ptr_arrays
-    // avoid initilization of allocated array...
-    std::shared_ptr<CHAR_T[]> buf{new CHAR_T[size]};
-#else
-    std::shared_ptr<CHAR_T> buf(new CHAR_T[size]);
-#endif
 
     // Do the copy
-    std::copy_n(std::forward<IT_T>(begin), size, buf.get());
+    std::copy(begin, end, buf.get());
 
     // Construct prior to SharedString constructor to avoid
     // ABI specific parameter passing order problems.
@@ -329,15 +318,7 @@ inline auto BasicSharedString<CHAR_T, LIFETIME_T>::create_from_parts(STRS_T && .
     }
 
     // Make space to copy the string
-#if defined(__cpp_lib_smart_ptr_for_overwrite)
     auto buf = std::make_shared_for_overwrite<CHAR_T[]>(size);
-#elif defined(__cpp_lib_shared_ptr_arrays) && 201707 <= __cpp_lib_shared_ptr_arrays
-    // avoid initilization of allocated array...
-    std::shared_ptr<CHAR_T[]> buf{new CHAR_T[size]};
-#else
-    std::shared_ptr<CHAR_T> buf(new CHAR_T[size]);
-#endif
-
     {
         auto * p = buf.get();
 

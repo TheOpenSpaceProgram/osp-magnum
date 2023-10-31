@@ -27,6 +27,8 @@
 #include "physics.h"
 #include "basic.h"
 
+#include <iterator>
+
 namespace osp::active
 {
 
@@ -53,13 +55,13 @@ public:
             Matrix3&                                rInertiaTensor,
             Matrix4 const&                          currentTf = {});
 
-    template<typename IT_T, typename ITB_T>
-    static void update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, ITB_T const& last);
+    template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+    static void update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, SENT_T const& last);
 
 };
 
-template<typename IT_T, typename ITB_T>
-void SysPhysics::update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, ITB_T const& last)
+template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+void SysPhysics::update_delete_phys(ACtxPhysics& rCtxPhys, IT_T const& first, SENT_T const& last)
 {
     rCtxPhys.m_mass.remove(first, last);
 }

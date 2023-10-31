@@ -215,7 +215,7 @@ void Resources::data_register(ResTypeId typeId)
     std::vector<res_data_type_t> &rTypes = rPerResType.m_resDataTypes;
 
     // Check to make sure type isn't already registered
-    assert(std::find(rTypes.begin(), rTypes.end(), type) == rTypes.end());
+    assert(std::ranges::find(rTypes, type) == rTypes.end());
 
     rTypes.push_back(type);
     rPerResType.m_resData.emplace_back(res_container_t<T>{});

@@ -26,9 +26,11 @@
 
 #include "../core/strong_id.h"
 
+#include <cstdint>
+
 namespace osp::active
 {
 
-using ActiveEnt = StrongId<uint32_t, struct DummyForActiveEnt>;
+using ActiveEnt = StrongId<std::uint32_t, struct DummyForActiveEnt>;
 
 } // namespace osp::active

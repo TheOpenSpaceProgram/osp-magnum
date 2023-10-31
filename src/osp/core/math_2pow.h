@@ -25,8 +25,10 @@
 #pragma once
 
 
-#include <cstdint>
+#include <concepts>
 #include <type_traits>
+
+#include <cstdint>
 
 namespace osp::math
 {
@@ -34,20 +36,18 @@ namespace osp::math
 /**
  * @return Integer 2^exponent
  */
-template <typename INT_T>
+template <std::integral INT_T>
 constexpr INT_T int_2pow(int exponent) noexcept
 {
-    static_assert(std::is_integral<INT_T>::value, "Integer required");
     return INT_T(1) << exponent;
 }
 
 /**
  * @return true if value is power of two
  */
-template <typename INT_T>
+template <std::integral INT_T>
 constexpr bool is_power_of_2(INT_T value) noexcept
 {
-    static_assert(std::is_integral_v<INT_T>, "Integer required");
     // Test to see if the value contains more than 1 set bit
     return !(value == 0) && !(value & (value - 1));
 }
@@ -63,7 +63,7 @@ constexpr bool is_power_of_2(INT_T value) noexcept
  *
  * @return value multiplied by 2^exponent
  */
-template <typename T, typename INT_T>
+template <typename T, std::integral INT_T>
 constexpr T mul_2pow(T value, int exponent) noexcept
 {
     // Multiply by power of two if exponent is positive

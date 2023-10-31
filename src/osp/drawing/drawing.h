@@ -42,6 +42,11 @@
 #include <longeron/id_management/refcount.hpp>
 #include <longeron/id_management/registry_stl.hpp> // for lgrn::IdRegistryStl
 
+#include <vector>
+
+#include <cstddef>
+#include <cstdint>
+
 namespace osp::draw
 {
 
@@ -59,14 +64,14 @@ struct Material
  *
  * The renderer will synchronize this component with a GPU resource
  */
-enum class MeshId : uint32_t { };
+enum class MeshId : std::uint32_t { };
 
 /**
  * @brief Texture component that describes the appearance of an entity
  *
  * The renderer will synchronize this component with a GPU resource
  */
-enum class TexId : uint32_t { };
+enum class TexId : std::uint32_t { };
 
 
 using MeshRefCount_t    = lgrn::IdRefCount<MeshId>;
@@ -131,7 +136,7 @@ struct ACtxSceneRender
         m_diffuseTex    .resize(size);
         m_mesh          .resize(size);
 
-        for (uint32_t matInt : m_materialIds.bitview().zeros())
+        for (std::uint32_t matInt : m_materialIds.bitview().zeros())
         {
             bitvector_resize(m_materials[MaterialId(matInt)].m_ents, size);
         }

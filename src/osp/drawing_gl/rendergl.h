@@ -38,6 +38,8 @@
 
 #include <longeron/id_management/registry.hpp>
 
+#include <iterator>
+
 namespace osp::draw
 {
 
@@ -111,7 +113,6 @@ struct ACtxSceneRenderGL
  */
 class SysRenderGL
 {
-
 public:
 
     /**
@@ -174,10 +175,10 @@ public:
             MeshGlEntStorage_t&                         rCmpMeshGl,
             RenderGL&                                   rRenderGl);
 
-    template <typename ITA_T, typename ITB_T>
+    template <std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
     static void sync_drawent_mesh(
-            ITA_T const&                                first,
-            ITB_T const&                                last,
+            IT_T const&                                 first,
+            SENT_T const&                               last,
             KeyedVec<DrawEnt, MeshIdOwner_t> const&     cmpMeshIds,
             IdMap_t<MeshId, ResIdOwner_t> const&        meshToRes,
             MeshGlEntStorage_t&                         rCmpMeshGl,
@@ -205,10 +206,10 @@ public:
             TexGlEntStorage_t&                          rCmpTexGl,
             RenderGL&                                   rRenderGl);
 
-    template <typename ITA_T, typename ITB_T>
+    template <std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
     static void sync_drawent_texture(
-            ITA_T const&                                first,
-            ITB_T const&                                last,
+            IT_T const&                                 first,
+            SENT_T const&                               last,
             KeyedVec<DrawEnt, TexIdOwner_t> const&      cmpTexIds,
             IdMap_t<TexId, ResIdOwner_t> const&         texToRes,
             TexGlEntStorage_t&                          rCmpTexGl,

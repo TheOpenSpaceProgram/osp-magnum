@@ -28,6 +28,8 @@
 
 #include <Magnum/Shaders/MeshVisualizerGL.h>
 
+#include <iterator>
+
 namespace adera::shader
 {
 
@@ -82,10 +84,10 @@ inline void sync_drawent_visualizer(
         }
     }
 }
-template <typename ITA_T, typename ITB_T>
+template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
 static void sync_drawent_visualizer(
-        ITA_T const&                        first,
-        ITB_T const&                        last,
+        IT_T const&                         first,
+        SENT_T const&                       last,
         osp::draw::DrawEntSet_t const&      hasMaterial,
         osp::draw::RenderGroup::DrawEnts_t& rStorage,
         ACtxDrawMeshVisualizer&             rData)

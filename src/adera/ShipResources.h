@@ -23,12 +23,15 @@
  * SOFTWARE.
  */
 #pragma once
-#include <string>
-#include <assert.h>
 
 //#include <osp/Active/machines.h>
 #include <osp/CommonMath.h>
 #include <osp/CommonPhysics.h>
+
+#include <string>
+
+#include <cassert>
+#include <cstdint>
 
 namespace adera::active::machines
 {
@@ -86,7 +89,7 @@ struct ShipResourceType
     const std::string m_displayName;
 
     // 1/(QPU) is the smallest representable quantity of this resource; must be a power of 2
-    const uint64_t m_quantaPerUnit;
+    const std::uint64_t m_quantaPerUnit;
 
     // The volume (in m^3) of one unit of this resource
     const float m_volumePerUnit;
@@ -98,35 +101,35 @@ struct ShipResourceType
     const float m_density;
 
     // Compute the volume of the specified quantity of resource
-    constexpr double resource_volume(uint64_t quantity) const
+    constexpr double resource_volume(std::uint64_t quantity) const
     {
         double units = static_cast<double>(quantity) / m_quantaPerUnit;
         return units * m_volumePerUnit;
     }
 
     // Compute the mass of the specified quantity of resource
-    constexpr double resource_mass(uint64_t quantity) const
+    constexpr double resource_mass(std::uint64_t quantity) const
     {
         double units = static_cast<double>(quantity) / m_quantaPerUnit;
         return units * m_massPerUnit;
     }
 
     // Compute the quantity of resource that fits in the specified volume
-    constexpr uint64_t resource_capacity(double volume) const
+    constexpr std::uint64_t resource_capacity(double volume) const
     {
         double units = volume / m_volumePerUnit;
-        return static_cast<uint64_t>(units * m_quantaPerUnit);
+        return static_cast<std::uint64_t>(units * m_quantaPerUnit);
     }
 
     // Compute the quantity of resource that masses the specified amount
-    constexpr uint64_t resource_quantity(double mass) const
+    constexpr std::uint64_t resource_quantity(double mass) const
     {
         double units = mass / m_massPerUnit;
         return static_cast<uint64_t>(units * m_quantaPerUnit);
     }
 
     ShipResourceType(std::string identifier, std::string displayName,
-        uint64_t quantaPerUnit, float volume, float mass, float density)
+        std::uint64_t quantaPerUnit, float volume, float mass, float density)
         : m_identifier(std::move(identifier))
         , m_displayName(std::move(displayName))
         , m_quantaPerUnit(quantaPerUnit)

@@ -29,6 +29,8 @@
 #include "../activescene/basic.h"
 #include "../activescene/basic_fn.h"
 
+#include <iterator>
+
 namespace osp::draw
 {
 
@@ -178,16 +180,15 @@ public:
         DrawTransforms_t&                           rDrawTf;
     };
 
-    template<typename IT_T, typename ITB_T, typename FUNC_T = UpdDrawTransformNoOp>
+    template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T, typename FUNC_T = UpdDrawTransformNoOp>
     static void update_draw_transforms(
             ArgsForUpdDrawTransform     args,
             IT_T                        first,
-            ITB_T const&                last,
+            SENT_T const&               last,
             FUNC_T                      func = {});
 
-    template<typename IT_T>
-    static void update_delete_drawing(
-            ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing, IT_T const& first, IT_T const& last);
+    template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+    static void update_delete_drawing(ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing, IT_T first, SENT_T const& last);
 
     static MeshIdOwner_t add_drawable_mesh(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg, std::string_view const name);
 
@@ -221,11 +222,11 @@ void SysRender::needs_draw_transforms(
     }
 }
 
-template<typename IT_T, typename ITB_T, typename FUNC_T>
+template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T, typename FUNC_T>
 void SysRender::update_draw_transforms(
         ArgsForUpdDrawTransform     args,
         IT_T                        first,
-        ITB_T const&                last,
+        SENT_T const&               last,
         FUNC_T                      func)
 {
     static constexpr Matrix4 const identity{};
@@ -239,7 +240,7 @@ void SysRender::update_draw_transforms(
             update_draw_transforms_recurse(args, ent, identity, true, func);
         }
 
-        std::advance(first, 1);
+        ++first;
     }
 }
 
@@ -264,7 +265,7 @@ void SysRender::update_draw_transforms_recurse(
         args.rDrawTf[drawEnt] = entDrawTf;
     }
 
-    for (ActiveEnt entChild : SysSceneGraph::children(args.scnGraph, ent))
+    for (ActiveEnt const entChild : SysSceneGraph::children(args.scnGraph, ent))
     {
         if (args.needDrawTf.test(std::size_t(entChild)))
         {
@@ -272,7 +273,6 @@ void SysRender::update_draw_transforms_recurse(
         }
     }
 }
-
 
 template<typename STORAGE_T, typename REFCOUNT_T>
 void remove_refcounted(
@@ -285,16 +285,18 @@ void remove_refcounted(
     }
 }
 
-template<typename IT_T>
+template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
 void SysRender::update_delete_drawing(
-        ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing, IT_T const& first, IT_T const& last)
+        ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawing, IT_T first, SENT_T const& last)
 {
-    for (auto it = first; it != last; std::advance(it, 1))
+    while(first != last)
     {
-        DrawEnt const drawEnt = *it;
+        DrawEnt const drawEnt = *first;
 
         remove_refcounted(drawEnt, rCtxScnRdr.m_diffuseTex, rCtxDrawing.m_texRefCounts);
         remove_refcounted(drawEnt, rCtxScnRdr.m_mesh,       rCtxDrawing.m_meshRefCounts);
+
+        ++first;
     }
 }
 

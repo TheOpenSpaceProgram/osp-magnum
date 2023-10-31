@@ -47,11 +47,11 @@ void storage_assign(entt::basic_storage<COMP_T, ENT_T> &rStorage, ENT_T const en
     {
         if (rStorage.contains(ent))
         {
-            rStorage.get(ent) = std::move(*value);
+            rStorage.get(ent) = *std::move(value);
         }
         else
         {
-            rStorage.emplace(ent, std::move(*value));
+            rStorage.emplace(ent, *std::move(value));
         }
     }
     else

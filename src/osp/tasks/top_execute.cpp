@@ -85,7 +85,7 @@ static void write_task_requirements(std::ostream &rStream, Tasks const& tasks, T
     {
         ExecPipeline const  &reqPlData  = exec.plData[req.reqPipeline];
         PipelineInfo const& info        = tasks.m_pipelineInfo[req.reqPipeline];
-        auto const          stageNames  = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
+        auto const          stageNames  = std::span<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
 
         if (reqPlData.stage != req.reqStage)
         {
@@ -147,7 +147,7 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
 
         if (info.stageType != lgrn::id_null<PipelineInfo::stage_type_t>())
         {
-            auto const stageNames = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
+            auto const stageNames = std::span<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
 
             for (int stage = 0; stage < std::min<int>(stageNames.size(), stageCount); ++stage)
             {
@@ -217,7 +217,7 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write)
         if (stg != lgrn::id_null<StageId>())
         {
             PipelineInfo const& info        = tasks.m_pipelineInfo[pl];
-            auto const          stageNames  = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
+            auto const          stageNames  = std::span<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
             return stageNames[std::size_t(stg)];
         }
         else

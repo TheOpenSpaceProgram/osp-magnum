@@ -51,6 +51,7 @@ struct UpdateNodes
     }
 };
 
+// TODO: convert to std::ranges::input_range
 template <typename VALUE_T, typename RANGE_T>
 bool update_signal_nodes(
         RANGE_T const&                  toUpdate,
@@ -62,13 +63,13 @@ bool update_signal_nodes(
 {
     bool somethingNotified = false;
 
-    for (uint32_t const node : toUpdate)
+    for (auto const node : toUpdate)
     {
         // Apply node value changes
         currentValues[node] = newValues[node];
 
         // Notify connected inputs
-        for (Junction junc : nodeToMach[node])
+        for (Junction const& junc : nodeToMach[node])
         {
             if (junc.custom == gc_sigIn)
             {

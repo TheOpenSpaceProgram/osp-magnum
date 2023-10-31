@@ -39,17 +39,17 @@ struct ACtxCameraController
 
     ACtxCameraController(osp::input::UserInputHandler &rInput)
      : m_controls(&rInput)
-     , m_btnOrbit(      m_controls.button_subscribe("cam_orbit"))
-     , m_btnRotUp(      m_controls.button_subscribe("ui_up"))
-     , m_btnRotDn(      m_controls.button_subscribe("ui_dn"))
-     , m_btnRotLf(      m_controls.button_subscribe("ui_lf"))
-     , m_btnRotRt(      m_controls.button_subscribe("ui_rt"))
-     , m_btnMovFd(      m_controls.button_subscribe("cam_fd"))
-     , m_btnMovBk(      m_controls.button_subscribe("cam_bk"))
-     , m_btnMovLf(      m_controls.button_subscribe("cam_lf"))
-     , m_btnMovRt(      m_controls.button_subscribe("cam_rt"))
-     , m_btnMovUp(      m_controls.button_subscribe("cam_up"))
-     , m_btnMovDn(      m_controls.button_subscribe("cam_dn"))
+     , m_btnOrbit(m_controls.button_subscribe("cam_orbit"))
+     , m_btnRotUp(m_controls.button_subscribe("ui_up"))
+     , m_btnRotDn(m_controls.button_subscribe("ui_dn"))
+     , m_btnRotLf(m_controls.button_subscribe("ui_lf"))
+     , m_btnRotRt(m_controls.button_subscribe("ui_rt"))
+     , m_btnMovFd(m_controls.button_subscribe("cam_fd"))
+     , m_btnMovBk(m_controls.button_subscribe("cam_bk"))
+     , m_btnMovLf(m_controls.button_subscribe("cam_lf"))
+     , m_btnMovRt(m_controls.button_subscribe("cam_rt"))
+     , m_btnMovUp(m_controls.button_subscribe("cam_up"))
+     , m_btnMovDn(m_controls.button_subscribe("cam_dn"))
     { }
     ACtxCameraController(ACtxCameraController const& copy) = delete;
     ACtxCameraController(ACtxCameraController&& move) = default;

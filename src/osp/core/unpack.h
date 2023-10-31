@@ -24,9 +24,11 @@
  */
 #pragma once
 
-#include <cassert>
+#include <ranges>
 #include <iterator>
 #include <type_traits>
+
+#include <cassert>
 
 namespace osp
 {
@@ -35,17 +37,18 @@ namespace osp
  * @brief Create a structured binding-compatible type from a contiguous
  *        container. A c-array is used.
  */
-template<std::size_t N, typename RANGE_T>
+template<std::size_t N, std::ranges::contiguous_range RANGE_T>
 constexpr auto& unpack(RANGE_T &rIn)
 {
-    using ptr_t = decltype(rIn.data());
+    using ptr_t = decltype(std::ranges::data(rIn));
     using type_t = std::remove_pointer_t<ptr_t>;
 
-    assert(N <= rIn.size());
-    return *reinterpret_cast<type_t(*)[N]>(std::data(rIn));
+    assert(N <= std::ranges::size(rIn));
+    return *reinterpret_cast<type_t(*)[N]>(std::ranges::data(rIn));
 }
 
-template<std::size_t N, typename CONTAINER_T>
+template<std::size_t N, std::ranges::contiguous_range CONTAINER_T>
+  requires requires(CONTAINER_T & rIn){ rIn.resize(N); }
 constexpr auto& resize_then_unpack(CONTAINER_T &rIn)
 {
     rIn.resize(N);

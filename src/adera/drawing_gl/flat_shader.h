@@ -28,6 +28,8 @@
 
 #include <Magnum/Shaders/FlatGL.h>
 
+#include <iterator>
+
 namespace adera::shader
 {
 
@@ -109,11 +111,11 @@ inline void sync_drawent_flat(osp::draw::DrawEnt ent, ArgsForSyncDrawEntFlat con
     }
 }
 
-template<typename ITA_T, typename ITB_T>
+template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
 void sync_drawent_flat(
-        ITA_T const&                    first,
-        ITB_T const&                    last,
-        ArgsForSyncDrawEntFlat const    args)
+        IT_T const&                  first,
+        SENT_T const&                last,
+        ArgsForSyncDrawEntFlat const args)
 {
     std::for_each(first, last, [&args] (osp::draw::DrawEnt const ent)
     {

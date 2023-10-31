@@ -28,6 +28,8 @@
 #include <osp/util/logging.h>
 #include <osp/vehicles/ImporterData.h>
 
+#include <ranges>
+
 namespace adera
 {
 
@@ -66,7 +68,7 @@ void VehicleBuilder::set_prefabs(std::initializer_list<SetPrefab> const& setPref
     }
 }
 
-WeldId VehicleBuilder::weld(osp::ArrayView<PartToWeld const> toWeld)
+WeldId VehicleBuilder::weld(std::span<PartToWeld const> toWeld)
 {
     WeldId const weld = m_data->m_weldIds.create();
     m_data->m_weldToParts.ids_reserve(m_data->m_weldIds.capacity());
@@ -79,7 +81,7 @@ WeldId VehicleBuilder::weld(osp::ArrayView<PartToWeld const> toWeld)
 
         m_data->m_partToWeld[set.m_part] = weld;
         (*pPartInWeld) = set.m_part;
-        std::advance(pPartInWeld, 1);
+        ++pPartInWeld;
     }
 
     return weld;
@@ -87,7 +89,7 @@ WeldId VehicleBuilder::weld(osp::ArrayView<PartToWeld const> toWeld)
 
 void VehicleBuilder::index_prefabs()
 {
-    for (unsigned int i = 0; i < m_pResources->ids(gc_importer).capacity(); ++i)
+    for (auto const i : std::views::iota(0u, m_pResources->ids(gc_importer).capacity()))
     {
         auto const resId = osp::ResId(i);
         if ( ! m_pResources->ids(gc_importer).exists(resId))
@@ -101,7 +103,7 @@ void VehicleBuilder::index_prefabs()
             continue; // No prefab data
         }
 
-        for (osp::PrefabId j = 0; j < pPrefabData->m_prefabNames.size(); ++j)
+        for (osp::PrefabId const j : std::views::iota(0u, pPrefabData->m_prefabNames.size()))
         {
             osp::ResIdOwner_t owner = m_pResources->owner_create(gc_importer, resId);
 

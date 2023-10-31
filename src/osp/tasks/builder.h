@@ -30,9 +30,11 @@
 #include <longeron/containers/bit_view.hpp>
 
 #include <array>
+#include <vector>
+#include <ranges>
+
 #include <cassert>
 #include <cstdint>
-#include <vector>
 
 namespace osp
 {
@@ -103,9 +105,9 @@ struct TaskBuilderBase
         // RELEASE AND ISN'T CAUGHT BY ASAN WTF??? (on gcc 11)
 
         alignas(TGT_STRUCT_T) std::array<unsigned char, sizeof(TGT_STRUCT_T)> bytes;
-        TGT_STRUCT_T *pOut = new(bytes.data()) TGT_STRUCT_T;
+        TGT_STRUCT_T *pOut = std::construct_at(reinterpret_cast<TGT_STRUCT_T*>(bytes.data()));
 
-        for (std::size_t i = 0; i < count; ++i)
+        for (std::size_t const i : std::views::iota(0u, count))
         {
             PipelineId const pl = pipelinesOut[i];
             unsigned char *pDefBytes = bytes.data() + sizeof(PipelineDefBlank_t)*i;
@@ -157,10 +159,10 @@ struct TaskRefBase
 
     constexpr Tasks & tasks() noexcept { return m_rBuilder.m_rTasks; }
 
-    template<typename RANGE_T>
+    template<std::ranges::input_range RANGE_T>
     TaskRef_t& add_edges(std::vector<TplTaskPipelineStage>& rContainer, RANGE_T const& add)
     {
-        for (auto const [pipeline, stage] : add)
+        for (auto const& [pipeline, stage] : add)
         {
             rContainer.push_back({
                 .task     = m_taskId,
@@ -285,7 +287,7 @@ struct BasicBuilderTraits
          , m_rFuncs{rFuncs}
         { }
         Builder(Builder const& copy) = delete;
-        Builder(Builder && move) = default;
+        Builder(Builder && move) noexcept = default;
 
         Builder& operator=(Builder const& copy) = delete;
 

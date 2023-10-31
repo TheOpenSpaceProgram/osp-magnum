@@ -36,10 +36,12 @@
 #include <entt/core/any.hpp>
 #include <entt/container/dense_map.hpp>
 
-#include <cstdint>
 #include <array>
 #include <optional>
 #include <vector>
+#include <span>
+
+#include <cstdint>
 
 namespace adera
 {
@@ -133,11 +135,11 @@ public:
     void set_prefabs(std::initializer_list<SetPrefab> const& setPrefab);
 
 
-    WeldId weld(osp::ArrayView<PartToWeld const> toWeld);
+    WeldId weld(std::span<PartToWeld const> toWeld);
 
     WeldId weld(std::initializer_list<PartToWeld const> const& toWeld)
     {
-        return weld(osp::arrayView(toWeld));
+        return weld(std::span{toWeld});
     }
 
     osp::Matrix4 align_attach(PartId partA, std::string_view attachA,

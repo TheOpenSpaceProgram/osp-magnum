@@ -48,6 +48,14 @@ if(NOT OSP_USE_SYSTEM_SDL)
   SET(SDL_MMX               OFF CACHE BOOL "" FORCE) # Old. Superceeded by SSE1, not supported by osp-magnum.
   SET(SDL_ASSEMBLY          OFF CACHE BOOL "" FORCE) # Presumably not actually needed. Lets try more for portability than speed...
 
+  SET(SDL_IBUS              OFF CACHE BOOL "" FORCE)
+  SET(SDL_TEST              OFF CACHE BOOL "" FORCE)
+  SET(SDL_EVENTS            OFF CACHE BOOL "" FORCE)
+  SET(SDL_SYSTEM_ICONV      OFF CACHE BOOL "" FORCE)
+
+  SET(SDL_DBUS              ON  CACHE BOOL "" FORCE)
+  SET(SDL_LIBUDEV           ON  CACHE BOOL "" FORCE)
+
   ##
   # SDL Audio backend settings
   ##
@@ -84,6 +92,8 @@ if(NOT OSP_USE_SYSTEM_SDL)
   # SDL Video backend settings
   ##
   SET(SDL_VIDEO              ON  CACHE BOOL "" FORCE)
+  SET(SDL_VIVANTE            OFF CACHE BOOL "" FORCE)
+  SET(SDL_OFFSCREEN          OFF CACHE BOOL "" FORCE)
 
   # Enabled video settings
   SET(SDL_OPENGL             ON  CACHE BOOL "" FORCE)
@@ -108,8 +118,10 @@ if(NOT OSP_USE_SYSTEM_SDL)
   SET(SDL_FILE               ON  CACHE BOOL "" FORCE) # Needed for Mac OSX
   SET(SDL_LOADSO             ON  CACHE BOOL "" FORCE)
 
-  SET(SDL_JOYSTICK           ON  CACHE BOOL "" FORCE)
-  SET(SDL_VIRTUAL_JOYSTICK   ON  CACHE BOOL "" FORCE)
+  SET(SDL_HIDAPI             OFF CACHE BOOL "" FORCE)
+  SET(SDL_HIDAPI_JOYSTICK    OFF CACHE BOOL "" FORCE)
+  SET(SDL_JOYSTICK           OFF CACHE BOOL "" FORCE)
+  SET(SDL_VIRTUAL_JOYSTICK   OFF CACHE BOOL "" FORCE)
 
   SET(LIBSAMPLERATE          ON  CACHE BOOL "" FORCE)
   SET(LIBSAMPLERATE_SHARED   ON  CACHE BOOL "" FORCE)

@@ -24,10 +24,12 @@
  */
 #pragma once
 
-#include <cstdint>
+#include <longeron/id_management/null.hpp>
+
+#include <concepts>
 #include <typeindex> // light-ish header that happens to include std::hash
 
-#include <longeron/id_management/null.hpp>
+#include <cstdint>
 
 namespace osp
 {
@@ -40,7 +42,7 @@ namespace osp
  * @tparam INT_T    Wrapped integer type, usually unsigned
  * @tparam DUMMY_T  Dummy used to make separate unique types, avoids needing inheritance
  */
-template <typename INT_T, typename DUMMY_T>
+template <std::integral INT_T, typename DUMMY_T>
 struct StrongId
 {
     using entity_type = INT_T; // Name used for entt compatibility
@@ -76,7 +78,7 @@ struct StrongId
 } // namespace osp
 
 // std::hash support for unordered containers
-template <typename INT_T, typename DUMMY_T>
+template <std::integral INT_T, typename DUMMY_T>
 struct std::hash<osp::StrongId<INT_T, DUMMY_T>> {
     constexpr auto operator() (osp::StrongId<INT_T, DUMMY_T> const& key) const
     {
@@ -86,7 +88,8 @@ struct std::hash<osp::StrongId<INT_T, DUMMY_T>> {
 
 // Longeron++ underlying_int_type
 template<typename TYPE_T>
-struct lgrn::underlying_int_type< TYPE_T, std::enable_if_t< std::is_integral_v<typename TYPE_T::entity_type> > >
+  requires std::is_integral_v<typename TYPE_T::entity_type>
+struct lgrn::underlying_int_type< TYPE_T >
 {
     using type = typename TYPE_T::entity_type;
 };

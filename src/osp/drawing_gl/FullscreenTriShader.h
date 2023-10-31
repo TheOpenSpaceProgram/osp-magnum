@@ -34,8 +34,8 @@ class FullscreenTriShader : public Magnum::GL::AbstractShaderProgram
 {
 public:
     // Vertex attribs
-    typedef Magnum::GL::Attribute<0, Magnum::Vector2> Position;
-    typedef Magnum::GL::Attribute<1, Magnum::Vector2> TextureCoordinates;
+    using Position           = Magnum::GL::Attribute<0, Magnum::Vector2>;
+    using TextureCoordinates = Magnum::GL::Attribute<1, Magnum::Vector2>;
 
     // Outputs
     enum class EOutputs : Magnum::UnsignedInt
@@ -54,6 +54,7 @@ public:
      * @param texture - The texture to display
      */
     void display_texure(Magnum::GL::Mesh& surface, Magnum::GL::Texture2D& texture);
+
 private:
     // Uniforms
     enum class EUniformPos : Magnum::Int

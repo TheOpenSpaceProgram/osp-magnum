@@ -35,6 +35,9 @@
 #include <longeron/id_management/registry_stl.hpp> // for lgrn::IdRegistryStl
 
 #include <string>
+#include <iterator>
+
+#include <cstdint>
 
 namespace osp::active
 {
@@ -58,7 +61,7 @@ struct ACompName
     std::string m_name;
 };
 
-using TreePos_t = uint32_t;
+using TreePos_t = std::uint32_t;
 
 struct ACtxSceneGraph
 {
@@ -66,15 +69,15 @@ struct ACtxSceneGraph
     // descendants is positioned directly after it within the array.
     // Example for tree structure "A(  B(C(D)), E(F(G(H,I)))  )"
     // * Descendant Count array: [A:8, B:2, C:1, D:0, E:4, F:3, G:2, H:0, I:0]
-    osp::KeyedVec<TreePos_t, ActiveEnt>  m_treeToEnt{{lgrn::id_null<ActiveEnt>()}};
-    osp::KeyedVec<TreePos_t, uint32_t>   m_treeDescendants{std::initializer_list<uint32_t>{0}};
+    osp::KeyedVec<TreePos_t, ActiveEnt>     m_treeToEnt{{lgrn::id_null<ActiveEnt>()}};
+    osp::KeyedVec<TreePos_t, std::uint32_t> m_treeDescendants{std::initializer_list<uint32_t>{0}};
 
-    osp::KeyedVec<ActiveEnt, ActiveEnt>  m_entParent;
-    osp::KeyedVec<ActiveEnt, TreePos_t>  m_entToTreePos;
+    osp::KeyedVec<ActiveEnt, ActiveEnt>     m_entParent;
+    osp::KeyedVec<ActiveEnt, TreePos_t>     m_entToTreePos;
 
-    std::vector<TreePos_t>  m_delete;
+    std::vector<TreePos_t>                  m_delete;
 
-    void resize(std::size_t ents)
+    void resize(std::size_t const ents)
     {
         m_treeToEnt         .reserve(ents);
         m_treeDescendants   .reserve(ents);
@@ -96,8 +99,8 @@ struct ACtxBasic
     ACompTransformStorage_t             m_transform;
 };
 
-template<typename IT_T>
-void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
+template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, SENT_T const& last)
 {
     while (first != last)
     {
@@ -109,7 +112,7 @@ void update_delete_basic(ACtxBasic &rCtxBasic, IT_T first, IT_T const& last)
 
         }
 
-        std::advance(first, 1);
+        ++first;
     }
 }
 

@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <compare>
+#include <iterator>
 
 namespace osp::active
 {
@@ -109,7 +110,14 @@ public:
         return *this;
     }
 
-    friend auto operator<=>(ChildIterator const& lhs, ChildIterator const& rhs) noexcept = default;
+    ChildIterator operator++(int) noexcept
+    {
+        ChildIterator tmp = *this;
+        this->operator++();
+        return tmp;
+    }
+
+    friend constexpr std::strong_ordering operator<=>(ChildIterator const& lhs, ChildIterator const& rhs) noexcept = default;
 
     value_type operator*() const noexcept
     {
@@ -158,14 +166,14 @@ public:
      *          in the same range. All given entities should be a root of a
      *          unique subtree.
      */
-    template<typename ITA_T, typename ITB_T>
-    static void cut(ACtxSceneGraph& rScnGraph, ITA_T first, ITB_T const& last);
+    template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+    static void cut(ACtxSceneGraph& rScnGraph, IT_T first, SENT_T const& last);
 
     /**
      * @brief Add multiple entities and their descendents to a delete queue
      */
-    template<typename ITA_T, typename ITB_T>
-    static void queue_delete_entities(ACtxSceneGraph& rScnGraph, ActiveEntVec_t &rDelete, ITA_T const& first, ITB_T const& last);
+    template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+    static void queue_delete_entities(ACtxSceneGraph& rScnGraph, ActiveEntVec_t &rDelete, IT_T const& first, SENT_T const& last);
 
 private:
 
@@ -173,8 +181,8 @@ private:
 
 }; // class SysSceneGraph
 
-template<typename ITA_T, typename ITB_T>
-void SysSceneGraph::cut(ACtxSceneGraph& rScnGraph, ITA_T first, ITB_T const& last)
+template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+void SysSceneGraph::cut(ACtxSceneGraph& rScnGraph, IT_T first, SENT_T const& last)
 {
     if (first == last)
     {
@@ -187,14 +195,14 @@ void SysSceneGraph::cut(ACtxSceneGraph& rScnGraph, ITA_T first, ITB_T const& las
 
         rScnGraph.m_delete.push_back(pos);
 
-        std::advance(first, 1);
+        ++first;
     }
 
     do_delete(rScnGraph);
 }
 
-template<typename ITA_T, typename ITB_T>
-void SysSceneGraph::queue_delete_entities(ACtxSceneGraph& rScnGraph, ActiveEntVec_t &rDelete, ITA_T const& first, ITB_T const& last)
+template<std::input_iterator IT_T, std::sentinel_for<IT_T> SENT_T>
+void SysSceneGraph::queue_delete_entities(ACtxSceneGraph& rScnGraph, ActiveEntVec_t &rDelete, IT_T const& first, SENT_T const& last)
 {
     std::for_each(first, last, [&] (ActiveEnt const ent)
     {

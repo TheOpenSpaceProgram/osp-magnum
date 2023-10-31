@@ -27,30 +27,30 @@
 #define OSP_MOVE_COPY_CTOR_ASSIGN(type)             \
     Type            (Type const& copy)  = default;  \
     Type            (Type&& move)       = default;  \
-    Type& operator= (Type const& copy)  = default;  \
-    Type& operator= (Type&& move)       = default;
+    Type& operator= (Type const& copy)& = default;  \
+    Type& operator= (Type&& move)&      = default;
 
 #define OSP_MOVE_ONLY_CTOR_ASSIGN(Type)             \
     Type            (Type const& copy)  = delete;   \
     Type            (Type&& move)       = default;  \
-    Type& operator= (Type const& copy)  = delete;   \
-    Type& operator= (Type&& move)       = default;
+    Type& operator= (Type const& copy)& = delete;   \
+    Type& operator= (Type&& move)&      = default;
 
-#define OSP_MOVE_ONLY_CTOR(Type)             \
-    Type            (Type const& copy)  = delete;   \
+#define OSP_MOVE_ONLY_CTOR(Type)                  \
+    Type            (Type const& copy)  = delete; \
     Type            (Type&& move)       = default;
 
-#define OSP_MOVE_COPY_CTOR_ASSIGN_CONSTEXPR_NOEXCEPT(Type)              \
-    constexpr Type            (Type const& copy) noexcept = default;    \
-    constexpr Type            (Type&& move)      noexcept = default;    \
-    constexpr Type& operator= (Type const& copy) noexcept = default;    \
-    constexpr Type& operator= (Type&& move)      noexcept = default;
+#define OSP_MOVE_COPY_CTOR_ASSIGN_CONSTEXPR_NOEXCEPT(Type)               \
+    constexpr Type            (Type const& copy)  noexcept = default;    \
+    constexpr Type            (Type&& move)       noexcept = default;    \
+    constexpr Type& operator= (Type const& copy)& noexcept = default;    \
+    constexpr Type& operator= (Type&& move)&      noexcept = default;
 
-#define OSP_MOVE_ONLY_CTOR_ASSIGN_CONSTEXPR_NOEXCEPT(Type)              \
-    constexpr Type            (Type const& copy) noexcept = delete;     \
-    constexpr Type            (Type&& move)      noexcept = default;    \
-    constexpr Type& operator= (Type const& copy) noexcept = delete;     \
-    constexpr Type& operator= (Type&& move)      noexcept = default;
+#define OSP_MOVE_ONLY_CTOR_ASSIGN_CONSTEXPR_NOEXCEPT(Type)               \
+    constexpr Type            (Type const& copy)  noexcept = delete;     \
+    constexpr Type            (Type&& move)       noexcept = default;    \
+    constexpr Type& operator= (Type const& copy)& noexcept = delete;     \
+    constexpr Type& operator= (Type&& move)&      noexcept = default;
 
 #define OSP_MOVE_ONLY_CTOR_CONSTEXPR_NOEXCEPT(Type)                     \
     constexpr Type            (Type const& copy) noexcept = delete;     \

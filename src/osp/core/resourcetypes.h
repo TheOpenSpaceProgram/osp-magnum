@@ -46,8 +46,8 @@ class ResourceContainer
 public:
     // Required for std::is_copy_assignable to work properly inside of entt::any
     ResourceContainer() = default;
-    ResourceContainer(ResourceContainer const& copy) = delete;
-    ResourceContainer(ResourceContainer&& move) = default;
+    ResourceContainer(ResourceContainer const& copy) noexcept = delete;
+    ResourceContainer(ResourceContainer&& move) noexcept  = default;
 
     template <typename ... ARGS_T>
     T& emplace(ResId id, ARGS_T&& ... args)

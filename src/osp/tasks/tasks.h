@@ -32,29 +32,30 @@
 
 #include <entt/core/family.hpp>
 
-#include <cstdint>
 #include <ostream>
 #include <string_view>
 #include <variant>
 #include <vector>
+#include <span>
 
-#define OSP_DECLARE_STAGE_NAMES(type, ...)                                                                  \
-    inline osp::ArrayView<std::string_view const> stage_names([[maybe_unused]] type _) noexcept             \
-    {                                                                                                       \
-        static auto const arr = std::initializer_list<std::string_view>{__VA_ARGS__};                       \
-        return osp::arrayView(arr);                                                                         \
+#include <cstdint>
+
+#define OSP_DECLARE_STAGE_NAMES(type, ...)                                                    \
+    constexpr std::span<std::string_view const> stage_names([[maybe_unused]] type _) noexcept \
+    {                                                                                         \
+        return std::initializer_list<std::string_view>{__VA_ARGS__};                          \
     }
 
-#define OSP_DECLARE_STAGE_SCHEDULE(type, schedule_enum)                     \
-    constexpr inline type stage_schedule([[maybe_unused]] type _) noexcept  \
-    {                                                                       \
-        return schedule_enum;                                               \
+#define OSP_DECLARE_STAGE_SCHEDULE(type, schedule_enum)              \
+    constexpr type stage_schedule([[maybe_unused]] type _) noexcept  \
+    {                                                                \
+        return schedule_enum;                                        \
     }
 
-#define OSP_DECLARE_STAGE_NO_SCHEDULE(type)                                 \
-    constexpr inline type stage_schedule([[maybe_unused]] type _) noexcept  \
-    {                                                                       \
-        return lgrn::id_null<type>();                                       \
+#define OSP_DECLARE_STAGE_NO_SCHEDULE(type)                          \
+    constexpr type stage_schedule([[maybe_unused]] type _) noexcept  \
+    {                                                                \
+        return lgrn::id_null<type>();                                \
     }
 
 namespace osp
@@ -64,10 +65,10 @@ constexpr std::size_t gc_maxStages = 16;
 
 using StageBits_t   = std::bitset<gc_maxStages>;
 
-using TaskInt       = uint32_t;
-using PipelineInt   = uint32_t;
-using StageInt      = uint8_t;
-using SemaphoreInt  = uint32_t;
+using TaskInt       = std::uint32_t;
+using PipelineInt   = std::uint32_t;
+using StageInt      = std::uint8_t;
+using SemaphoreInt  = std::uint32_t;
 
 enum class TaskId       : TaskInt       { };
 enum class PipelineId   : PipelineInt   { };
@@ -81,10 +82,10 @@ struct PipelineInfo
     using stage_type_family_t = entt::family<struct StageTypeDummy>;
     using stage_type_t        = stage_type_family_t::value_type;
 
-    static inline KeyedVec<stage_type_t, ArrayView<std::string_view const>> sm_stageNames;
+    static inline KeyedVec<stage_type_t, std::span<std::string_view const>> sm_stageNames;
 
     template <typename STAGE_ENUM_T>
-    static inline constexpr void register_stage_enum()
+    static constexpr void register_stage_enum()
     {
         PipelineInfo::stage_type_t const type = PipelineInfo::stage_type_family_t::value<STAGE_ENUM_T>;
         PipelineInfo::sm_stageNames[type] = stage_names(STAGE_ENUM_T{});
@@ -147,16 +148,16 @@ struct TaskEdges
 
 using PipelineTreePos_t = uint32_t;
 
-enum class AnyStageId               : uint32_t { };
+enum class AnyStageId               : std::uint32_t { };
 
-enum class RunTaskId                : uint32_t { };
-enum class RunStageId               : uint32_t { };
+enum class RunTaskId                : std::uint32_t { };
+enum class RunStageId               : std::uint32_t { };
 
-enum class StageReqTaskId           : uint32_t { };
-enum class ReverseStageReqTaskId    : uint32_t { };
+enum class StageReqTaskId           : std::uint32_t { };
+enum class ReverseStageReqTaskId    : std::uint32_t { };
 
-enum class TaskReqStageId           : uint32_t { };
-enum class ReverseTaskReqStageId    : uint32_t { };
+enum class TaskReqStageId           : std::uint32_t { };
+enum class ReverseTaskReqStageId    : std::uint32_t { };
 
 struct StageRequiresTask
 {
@@ -292,12 +293,12 @@ inline VALUE_T id_from_count(KeyedVec<KEY_T, VALUE_T> const& vec, KEY_T const ke
 
 inline AnyStageId anystg_from(TaskGraph const& graph, PipelineId const pl, StageId stg) noexcept
 {
-    return AnyStageId(uint32_t(graph.pipelineToFirstAnystg[pl]) + uint32_t(stg));
+    return AnyStageId(std::uint32_t(graph.pipelineToFirstAnystg[pl]) + std::uint32_t(stg));
 }
 
 inline StageId stage_from(TaskGraph const& graph, PipelineId const pl, AnyStageId const stg) noexcept
 {
-    return StageId(uint32_t(stg) - uint32_t(graph.pipelineToFirstAnystg[pl]));
+    return StageId(std::uint32_t(stg) - std::uint32_t(graph.pipelineToFirstAnystg[pl]));
 }
 
 inline StageId stage_from(TaskGraph const& graph, AnyStageId const stg) noexcept
