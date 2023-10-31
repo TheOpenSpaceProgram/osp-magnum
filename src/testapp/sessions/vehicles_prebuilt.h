@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2023 Open Space Program Project
  *
  * MIT License
  *
@@ -26,49 +26,34 @@
 
 #include "../scenarios.h"
 
-#include <osp/activescene/basic.h>
-#include <osp/drawing/drawing.h>
+#include <adera/activescene/VehicleBuilder.h>
+
+#include <osp/core/copymove_macros.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/global_id.h>
+#include <osp/core/strong_id.h>
+
+#include <memory>
 
 namespace testapp::scenes
 {
 
-void create_materials(
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         sceneRenderer,
-        int                         count);
+using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
+using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
 
-/**
- * @brief Create CameraController connected to an app's UserInputHandler
- */
-osp::Session setup_camera_ctrl(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         magnumScene);
+struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
+{
+    PrebuiltVehicles() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
+};
 
-/**
- * @brief Adds free cam controls to a CameraController
- */
-osp::Session setup_camera_free(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         scene,
-        osp::Session const&         camera);
+inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
 
-/**
- * @brief Wireframe cube over the camera controller's target
- */
-osp::Session setup_cursor(
+osp::Session setup_prebuilt_vehicles(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         application,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         commonScene,
-        osp::draw::MaterialId const material,
-        osp::PkgId const            pkg);
+        osp::Session const&         scene);
 
 
-}
+} // namespace testapp::scenes

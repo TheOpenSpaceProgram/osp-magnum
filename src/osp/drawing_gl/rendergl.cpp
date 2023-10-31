@@ -240,7 +240,7 @@ void SysRenderGL::sync_drawent_mesh(
         else
         {
             OSP_LOG_WARN("No mesh data found for Mesh {} from Entity {}",
-                         std::size_t(entMeshScnId), std::size_t(ent));
+                         std::size_t(entMeshScnId.value()), std::size_t(ent));
         }
     }
     else
@@ -290,7 +290,7 @@ void SysRenderGL::sync_drawent_texture(
         else
         {
             OSP_LOG_WARN("No mesh data found for Mesh {} from Entity {}",
-                         std::size_t(entMeshScnId), std::size_t(ent));
+                         std::size_t(entTexScnId.value()), std::size_t(ent));
         }
     }
     else
@@ -383,11 +383,11 @@ void SysRenderGL::draw_group(
         DrawEntSet_t const& visible,
         ViewProjMatrix const& viewProj)
 {
-    for (auto const& [ent, toDraw] : group.view().each())
+    for (auto const& [ent, toDraw] : entt::basic_view{group.entities}.each())
     {
         if (visible.test(std::size_t(ent)))
         {
-            toDraw(ent, viewProj);
+            toDraw.draw(ent, viewProj, toDraw.data);
         }
     }
 }

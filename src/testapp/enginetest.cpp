@@ -184,8 +184,7 @@ void update_test_scene(EngineTestScene& rScene, float const delta)
     rScene.m_matPhongDirty.clear();
 
     // Rotate the cube
-    osp::Matrix4 &rCubeTf
-            = rScene.m_basic.m_transform.get(rScene.m_cube).m_transform;
+    osp::Matrix4 &rCubeTf = rScene.m_basic.m_transform.get(rScene.m_cube).m_transform;
 
     rCubeTf = Magnum::Matrix4::rotationZ(90.0_degf * delta) * rCubeTf;
 }
@@ -244,7 +243,7 @@ void sync_test_scene(
     sync_drawent_phong(rScene.m_matPhongDirty.cbegin(), rScene.m_matPhongDirty.cend(),
     {
         .hasMaterial    = rScene.m_matPhong,
-        .pStorageOpaque = &rRenderer.m_groupFwdOpaque.m_entities,
+        .pStorageOpaque = &rRenderer.m_groupFwdOpaque.entities,
         .opaque         = rScene.m_scnRdr.m_opaque,
         .transparent    = rScene.m_scnRdr.m_transparent,
         .diffuse        = rRenderer.m_sceneRenderGL.m_diffuseTexId,
@@ -278,11 +277,13 @@ void sync_test_scene(
     auto drawTfDirty = {rScene.m_cube};
 
     SysRender::update_draw_transforms(
-            rScene.m_basic.m_scnGraph,
-            rScene.m_scnRdr.m_activeToDraw,
-            rScene.m_basic.m_transform,
-            rScene.m_scnRdr.m_drawTransform,
-            rScene.m_scnRdr.m_needDrawTf,
+            {
+                .scnGraph     = rScene.m_basic .m_scnGraph,
+                .transforms   = rScene.m_basic .m_transform,
+                .activeToDraw = rScene.m_scnRdr.m_activeToDraw,
+                .needDrawTf   = rScene.m_scnRdr.m_needDrawTf,
+                .rDrawTf      = rScene.m_scnRdr.m_drawTransform
+            },
             drawTfDirty.begin(),
             drawTfDirty.end());
 }
@@ -363,7 +364,7 @@ public:
     RenderGL            &m_rRenderGl;
 };
 
-MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
+MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
 {
     using namespace osp::active;
     using namespace osp::draw;

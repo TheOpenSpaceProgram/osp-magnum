@@ -37,23 +37,6 @@
 namespace testapp::scenes
 {
 
-struct SpawnShape
-{
-    osp::Vector3    m_position;
-    osp::Vector3    m_velocity;
-    osp::Vector3    m_size;
-    float           m_mass;
-    osp::EShape     m_shape;
-};
-
-struct ACtxShapeSpawner
-{
-    osp::active::ActiveEntSet_t     m_ownedEnts;
-
-    std::vector<SpawnShape>         m_spawnRequest;
-    osp::active::ActiveEntVec_t     m_ents;
-    osp::draw::MaterialId           m_materialId;
-};
 
 /**
  * @brief Physical properties for entities and generic Physics interface
@@ -67,34 +50,24 @@ osp::Session setup_physics(
         osp::Session const&         commonScene);
 
 /**
- * @brief Queues and logic for spawning physics shapes
- */
-osp::Session setup_shape_spawn(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::draw::MaterialId       materialId);
-
-osp::Session setup_shape_spawn_draw(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         shapeSpawn);
-
-/**
  * @brief Queues and logic for spawning Prefab resources
  */
 osp::Session setup_prefabs(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
+        osp::Session const&         scene,
         osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         material,
-        osp::TopDataId              idResources);
+        osp::Session const&         physics);
+
+osp::Session setup_prefab_draw(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         commonScene,
+        osp::Session const&         prefabs,
+        osp::draw::MaterialId       material);
 
 } // namespace testapp::scenes

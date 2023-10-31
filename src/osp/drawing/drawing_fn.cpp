@@ -25,7 +25,6 @@
 #include "drawing_fn.h"
 #include "own_restypes.h"
 
-#include "../activescene/basic_fn.h"
 #include "../core/Resources.h"
 
 using namespace osp;
@@ -87,35 +86,6 @@ void SysRender::clear_resource_owners(ACtxDrawingRes& rCtxDrawingRes, Resources 
     }
     rCtxDrawingRes.m_resToMesh.clear();
 }
-
-void SysRender::update_draw_transforms_recurse(
-        ACtxSceneGraph const&                   rScnGraph,
-        KeyedVec<ActiveEnt, DrawEnt> const&     activeToDraw,
-        active::ACompTransformStorage_t const&  rTf,
-        DrawTransforms_t&                       rDrawTf,
-        ActiveEntSet_t const&                   needDrawTf,
-        ActiveEnt                               ent,
-        Matrix4 const&                          parentTf,
-        bool                                    root)
-{
-    Matrix4 const& entTf        = rTf.get(ent).m_transform;
-    Matrix4 const& entDrawTf    = root ? (entTf) : (parentTf * entTf);
-
-    if (DrawEnt const drawEnt = activeToDraw[ent];
-        drawEnt != lgrn::id_null<DrawEnt>())
-    {
-        rDrawTf[drawEnt] = entDrawTf;
-    }
-
-    for (ActiveEnt entChild : SysSceneGraph::children(rScnGraph, ent))
-    {
-        if (needDrawTf.test(std::size_t(entChild)))
-        {
-            update_draw_transforms_recurse(rScnGraph, activeToDraw, rTf, rDrawTf, needDrawTf, entChild, entDrawTf, false);
-        }
-    }
-}
-
 
 MeshIdOwner_t SysRender::add_drawable_mesh(ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, Resources& rResources, PkgId const pkg, std::string_view const name)
 {

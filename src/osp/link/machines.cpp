@@ -38,51 +38,51 @@ void copy_nodes(
     using lgrn::Span;
 
     // Create new node IDs
-    for (NodeId const srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
+    for (NodeId const srcNode : rSrcNodes.nodeIds.bitview().zeros())
     {
-        NodeId const dstNode = rDstNodes.m_nodeIds.create();
+        NodeId const dstNode = rDstNodes.nodeIds.create();
         remapNode[srcNode] = dstNode;
     }
 
     // Copy node-to-machine connections
-    rDstNodes.m_nodeToMach.ids_reserve(rDstNodes.m_nodeIds.capacity());
-    rDstNodes.m_nodeToMach.data_reserve(rDstNodes.m_nodeToMach.data_size()
-                                        + rSrcNodes.m_nodeToMach.data_size());
-    for (NodeId const srcNode : rSrcNodes.m_nodeIds.bitview().zeros())
+    rDstNodes.nodeToMach.ids_reserve(rDstNodes.nodeIds.capacity());
+    rDstNodes.nodeToMach.data_reserve(rDstNodes.nodeToMach.data_size()
+                                        + rSrcNodes.nodeToMach.data_size());
+    for (NodeId const srcNode : rSrcNodes.nodeIds.bitview().zeros())
     {
         NodeId const dstNode = remapNode[srcNode];
-        Span<Junction const> srcJunction = rSrcNodes.m_nodeToMach[srcNode];
-        rDstNodes.m_nodeToMach.emplace(dstNode, srcJunction.size());
-        Span<Junction> dstJuncton = rDstNodes.m_nodeToMach[dstNode];
+        Span<Junction const> srcJunction = rSrcNodes.nodeToMach[srcNode];
+        rDstNodes.nodeToMach.emplace(dstNode, srcJunction.size());
+        Span<Junction> dstJuncton = rDstNodes.nodeToMach[dstNode];
 
         auto dstJuncIt = std::begin(dstJuncton);
         for (Junction const& srcJunc : srcJunction)
         {
-            MachTypeId const machType = srcJunc.m_type;
-            MachAnyId const srcMach = rSrcMach.m_perType[machType].m_localToAny[srcJunc.m_local];
+            MachTypeId const machType = srcJunc.type;
+            MachAnyId const srcMach = rSrcMach.perType[machType].localToAny[srcJunc.local];
             MachAnyId const dstMach = remapMach[srcMach];
-            MachLocalId const dstLocal = rDstMach.m_machToLocal[dstMach];
+            MachLocalId const dstLocal = rDstMach.machToLocal[dstMach];
 
-            dstJuncIt->m_local  = dstLocal;
-            dstJuncIt->m_type   = machType;
-            dstJuncIt->m_custom = srcJunc.m_custom;
+            dstJuncIt->local  = dstLocal;
+            dstJuncIt->type   = machType;
+            dstJuncIt->custom = srcJunc.custom;
 
             std::advance(dstJuncIt, 1);
         }
     }
 
     // copy mach-to-node connections
-    rDstNodes.m_machToNode.ids_reserve(rDstMach.m_ids.capacity());
-    rDstNodes.m_machToNode.data_reserve(rDstNodes.m_machToNode.data_size()
-                                        + rSrcNodes.m_machToNode.data_size());
-    for (MachAnyId const srcMach : rSrcMach.m_ids.bitview().zeros())
+    rDstNodes.machToNode.ids_reserve(rDstMach.ids.capacity());
+    rDstNodes.machToNode.data_reserve(rDstNodes.machToNode.data_size()
+                                        + rSrcNodes.machToNode.data_size());
+    for (MachAnyId const srcMach : rSrcMach.ids.bitview().zeros())
     {
-        if (rSrcNodes.m_machToNode.contains(srcMach))
+        if (rSrcNodes.machToNode.contains(srcMach))
         {
-            Span<NodeId const> srcPorts = rSrcNodes.m_machToNode[srcMach];
+            Span<NodeId const> srcPorts = rSrcNodes.machToNode[srcMach];
             MachAnyId const dstMach = remapMach[srcMach];
-            rDstNodes.m_machToNode.emplace(dstMach, srcPorts.size());
-            Span<NodeId> dstPorts = rDstNodes.m_machToNode[dstMach];
+            rDstNodes.machToNode.emplace(dstMach, srcPorts.size());
+            Span<NodeId> dstPorts = rDstNodes.machToNode[dstMach];
 
             auto dstPortIt = std::begin(dstPorts);
             for (NodeId const srcNode : srcPorts)

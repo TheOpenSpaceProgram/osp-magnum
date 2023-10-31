@@ -25,6 +25,7 @@
 #pragma once
 
 #include <osp/activescene/vehicles.h>
+#include <osp/core/copymove_macros.h>
 #include <osp/core/resourcetypes.h>
 #include <osp/link/machines.h>
 
@@ -68,11 +69,10 @@ struct VehicleData
 {
     using MachToNodeCustom_t = lgrn::IntArrayMultiMap<osp::link::MachAnyId,
                                                       osp::link::JuncCustom>;
-    using MapPartToMachines_t = osp::active::Parts::MapPartToMachines_t;
+    using MapPartToMachines_t = osp::active::ACtxParts::MapPartToMachines_t;
 
     VehicleData() = default;
-    VehicleData(VehicleData const& copy) = delete;
-    VehicleData(VehicleData&& move) = default;
+    OSP_MOVE_ONLY_CTOR(VehicleData);
 
     lgrn::IdRegistryStl<PartId>             m_partIds;
     std::vector<osp::Matrix4>               m_partTransformWeld;
@@ -114,7 +114,7 @@ public:
      : m_pResources{pResources}
     {
         auto &rData = m_data.emplace();
-        rData.m_machines.m_perType.resize(osp::link::MachTypeReg_t::size());
+        rData.m_machines.perType.resize(osp::link::MachTypeReg_t::size());
         rData.m_nodePerType.resize(osp::link::NodeTypeReg_t::size());
         index_prefabs();
     };
@@ -151,7 +151,7 @@ public:
 
     std::size_t node_capacity(NodeTypeId nodeType) const
     {
-        return m_data->m_nodePerType[nodeType].m_nodeIds.capacity();
+        return m_data->m_nodePerType[nodeType].nodeIds.capacity();
     }
 
     struct Connection
@@ -205,9 +205,9 @@ std::array<osp::link::NodeId, N> VehicleBuilder::create_nodes(NodeTypeId const n
 
     PerNodeType &rPerNodeType = m_data->m_nodePerType[nodeType];
 
-    rPerNodeType.m_nodeIds.create(std::begin(out), std::end(out));
-    std::size_t const capacity = rPerNodeType.m_nodeIds.capacity();
-    rPerNodeType.m_nodeToMach.ids_reserve(rPerNodeType.m_nodeIds.capacity());
+    rPerNodeType.nodeIds.create(std::begin(out), std::end(out));
+    std::size_t const capacity = rPerNodeType.nodeIds.capacity();
+    rPerNodeType.nodeToMach.ids_reserve(rPerNodeType.nodeIds.capacity());
     rPerNodeType.m_nodeConnectCount.resize(capacity, 0);
 
     return out;
@@ -229,44 +229,5 @@ VALUES_T& VehicleBuilder::node_values(NodeTypeId nodeType)
 
     return rValues;
 }
-
-struct ACtxVehicleSpawnVB
-{
-    std::vector<VehicleData const*> m_dataVB;
-
-    // Remap vectors convert IDs from VehicleData to ACtxParts.
-    // A single vector for remaps is shared for all vehicles to spawn,
-    // so offsets are used to divide up the vector.
-
-    // PartId srcPart = /* ID from VehicleData */
-    // PartId dstPart = m_remapParts[m_remapPartOffsets[newVehicleIndex] + srcPart];
-
-    inline Corrade::Containers::StridedArrayView2D<std::size_t> remap_node_offsets_2d() noexcept
-    {
-        return {Corrade::Containers::arrayView(m_remapNodeOffsets.data(), m_remapNodeOffsets.size()),
-                {m_dataVB.size(), osp::link::NodeTypeReg_t::size()}};
-    }
-
-    inline Corrade::Containers::StridedArrayView2D<std::size_t const> remap_node_offsets_2d() const noexcept
-    {
-        return {Corrade::Containers::arrayView(m_remapNodeOffsets.data(), m_remapNodeOffsets.size()),
-                {m_dataVB.size(), osp::link::NodeTypeReg_t::size()}};
-    }
-
-    std::vector<osp::active::PartId>    m_remapParts;
-    std::vector<std::size_t>            m_remapPartOffsets;
-
-    std::vector<osp::active::PartId>    m_remapWelds;
-    std::vector<std::size_t>            m_remapWeldOffsets;
-
-    std::vector<std::size_t>            m_machtypeCount;
-    std::vector<osp::link::MachAnyId>   m_remapMachs;
-    std::vector<std::size_t>            m_remapMachOffsets;
-
-    // remapNodes are both shared between all new vehicles and all node types
-    // An offset can exist for each pair of [New Vehicle, Node Type]
-    std::vector<osp::link::NodeId>      m_remapNodes;
-    std::vector<std::size_t>            m_remapNodeOffsets;
-};
 
 } // namespace testapp

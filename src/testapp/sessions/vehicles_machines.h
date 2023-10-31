@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2023 Open Space Program Project
  *
  * MIT License
  *
@@ -26,49 +26,50 @@
 
 #include "../scenarios.h"
 
-#include <osp/activescene/basic.h>
-#include <osp/drawing/drawing.h>
+#include <osp/drawing/draw_ent.h>
 
 namespace testapp::scenes
 {
 
-void create_materials(
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         sceneRenderer,
-        int                         count);
-
 /**
- * @brief Create CameraController connected to an app's UserInputHandler
+ * @brief Controls to select and control a UserControl Machine
  */
-osp::Session setup_camera_ctrl(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         magnumScene);
-
-/**
- * @brief Adds free cam controls to a CameraController
- */
-osp::Session setup_camera_free(
+osp::Session setup_vehicle_control(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         windowApp,
         osp::Session const&         scene,
-        osp::Session const&         camera);
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat);
 
 /**
- * @brief Wireframe cube over the camera controller's target
+ * @brief Camera which can free cam or follow a selected vehicle
  */
-osp::Session setup_cursor(
+osp::Session setup_camera_vehicle(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         scene,
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         commonScene,
+        osp::Session const&         physics,
+        osp::Session const&         parts,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         vehicleCtrl);
+
+/**
+ * @brief Red indicators over Magic Rockets
+ */
+osp::Session setup_thrust_indicators(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session const&         application,
+        osp::Session const&         windowApp,
+        osp::Session const&         commonSecne,
+        osp::Session const&         parts,
+        osp::Session const&         signalsFloat,
         osp::Session const&         sceneRenderer,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         commonScene,
-        osp::draw::MaterialId const material,
-        osp::PkgId const            pkg);
+        osp::PkgId const            pkg,
+        osp::draw::MaterialId       material);
 
-
-}
+} // namespace testapp::scenes

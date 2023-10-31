@@ -24,8 +24,6 @@
  */
 #pragma once
 
-#include "copymove_macros.h"
-
 #include <cstdint>
 #include <typeindex> // light-ish header that happens to include std::hash
 
@@ -48,26 +46,31 @@ struct StrongId
     using entity_type = INT_T; // Name used for entt compatibility
 
     constexpr StrongId() noexcept = default;
-    constexpr StrongId(StrongId const& copy) noexcept
-     : m_value{copy.m_value}
-    { };
+    constexpr StrongId(StrongId const& copy) noexcept = default;
+    constexpr StrongId& operator=(StrongId const& copy) noexcept = default;
+
+    static StrongId from_index(std::size_t const index)
+    {
+        return StrongId{static_cast<INT_T>(index)};
+    }
+
     constexpr explicit StrongId(INT_T const value) noexcept
-     : m_value{value}
+     : value{value}
     { };
 
     constexpr explicit operator std::size_t() const noexcept
     {
-        return m_value;
+        return value;
     }
 
     constexpr explicit operator INT_T() const noexcept
     {
-        return m_value;
+        return value;
     }
 
     constexpr auto operator<=>(StrongId const&) const = default;
 
-    INT_T m_value{ lgrn::id_null<StrongId>() };
+    INT_T value{ lgrn::id_null<StrongId>() };
 };
 
 } // namespace osp
@@ -77,7 +80,7 @@ template <typename INT_T, typename DUMMY_T>
 struct std::hash<osp::StrongId<INT_T, DUMMY_T>> {
     constexpr auto operator() (osp::StrongId<INT_T, DUMMY_T> const& key) const
     {
-        return key.m_value;
+        return key.value;
     }
 };
 

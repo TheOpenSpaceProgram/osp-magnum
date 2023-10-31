@@ -221,7 +221,17 @@ Session setup_window_app(
     out.m_cleanup = tgWin.cleanup;
 
     rBuilder.task()
-        .name       ("Schedule GL Resync")
+        .name       ("Schedule Renderer Sync")
+        .schedules  ({tgWin.sync(Schedule)})
+        .push_to    (out.m_tasks)
+        .args       ({                  idMainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rMainLoopCtrl.doSync ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
+
+    rBuilder.task()
+        .name       ("Schedule Renderer Resync")
         .schedules  ({tgWin.resync(Schedule)})
         .push_to    (out.m_tasks)
         .args       ({                  idMainLoopCtrl})
@@ -276,6 +286,7 @@ Session setup_scene_renderer(
     rBuilder.pipeline(tgScnRdr.textureResDirty) .parent(tgWin.sync);
 
     auto &rScnRender = osp::top_emplace<ACtxSceneRender>(topData, idScnRender);
+    /* unused */       osp::top_emplace<DrawTfObservers>(topData, idDrawTfObservers);
 
     rBuilder.task()
         .name       ("Resize ACtxSceneRender containers to fit all DrawEnts")
@@ -331,6 +342,38 @@ Session setup_scene_renderer(
         .func([] (ACtxSceneRender& rScnRender) noexcept -> TaskActions
     {
         return rScnRender.m_meshDirty.empty() ? TaskAction::Cancel : TaskActions{};
+    });
+
+    rBuilder.task()
+        .name       ("Calculate draw transforms")
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgCS.hierarchy(Ready), tgCS.transform(Ready), tgCS.activeEnt(Ready), tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEnt(Ready), tgScnRdr.drawEntResized(Done), tgCS.activeEntResized(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({            idBasic,                   idDrawing,                 idScnRender,                 idDrawTfObservers })
+        .func([] (ACtxBasic const& rBasic, ACtxDrawing const& rDrawing, ACtxSceneRender& rScnRender, DrawTfObservers &rDrawTfObservers) noexcept
+    {
+        auto rootChildren = SysSceneGraph::children(rBasic.m_scnGraph);
+        SysRender::update_draw_transforms(
+                {
+                    .scnGraph     = rBasic    .m_scnGraph,
+                    .transforms   = rBasic    .m_transform,
+                    .activeToDraw = rScnRender.m_activeToDraw,
+                    .needDrawTf   = rScnRender.m_needDrawTf,
+                    .rDrawTf      = rScnRender.m_drawTransform
+                },
+                rootChildren.begin(),
+                rootChildren.end(),
+                [&rDrawTfObservers, &rScnRender] (Matrix4 const& transform, active::ActiveEnt ent, int depth)
+        {
+            auto const enableInt  = std::array{rScnRender.drawTfObserverEnable[ent]};
+            auto const enableBits = lgrn::bit_view(enableInt);
+
+            for (std::size_t idx : enableBits.ones())
+            {
+                DrawTfObservers::Observer const &rObserver = rDrawTfObservers.observers[idx];
+                rObserver.func(rScnRender, transform, ent, depth, rObserver.data);
+            }
+        });
     });
 
     rBuilder.task()

@@ -355,7 +355,7 @@ static EShape shape_from_name(std::string_view name) noexcept
     if (name == "cube")             { return EShape::Box; }
     else if (name == "cylinder")    { return EShape::Cylinder; }
 
-    OSP_LOG_WARN("Unknown shape: {}" name);
+    OSP_LOG_WARN("Unknown shape: {}", name);
     return EShape::None;
 }
 

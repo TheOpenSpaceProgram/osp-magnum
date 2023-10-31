@@ -44,17 +44,9 @@ struct EngineTestScene;
 entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
 
 /**
- * @brief Generate MagnumApplication draw function
- *
- * This draw function stores renderer data, and is responsible for updating
- * and drawing the engine test scene.
- *
- * @param rScene [ref] Engine test scene. Must be in stable memory.
- * @param rApp   [ref] Existing MagnumApplication to use GL resources of
- *
- * @return MagnumApplication draw function
+ * @brief Generate IOspApplication for MagnumApplication
  */
-MagnumApplication::AppPtr_t generate_draw_func(EngineTestScene& rScene, MagnumApplication& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
+MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumApplication& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
 
 
 } // namespace testapp::enginetest

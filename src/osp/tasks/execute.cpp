@@ -289,6 +289,7 @@ static int pipeline_run(Tasks const& tasks, TaskGraph const& graph, ExecContext 
 
     if (isLoopScope)
     {
+        LGRN_ASSERT(rExecPl.loopChildrenLeft == 0);
         rExecPl.loopChildrenLeft = scopeChildCount;
 
         return 0;
@@ -322,39 +323,43 @@ static void loop_scope_done(Tasks const& tasks, TaskGraph const& graph, ExecCont
         {
             ExecPipeline &rLoopExecPl = rExec.plData[loopPipeline];
 
-            LGRN_ASSERT(rLoopExecPl.running == true);
             LGRN_ASSERT(rLoopExecPl.stage == lgrn::id_null<StageId>());
+
+            if (rLoopExecPl.running)
+            {
+                LGRN_ASSERT(rExec.pipelinesRunning != 0);
+                -- rExec.pipelinesRunning;
+            }
 
             rLoopExecPl.running  = false;
             rLoopExecPl.canceled = false;
             rLoopExecPl.loop     = false;
 
-            LGRN_ASSERT(rExec.pipelinesRunning != 0);
-            -- rExec.pipelinesRunning;
 
             exec_log(rExec, ExecContext::PipelineLoopFinish{loopPipeline});
         });
 
         // If this is a nested loop, decrement parent loop scope's loopChildrenLeft
 
-        PipelineId const parentScopePl = tasks.m_pipelineParents[pipeline];
-        if (parentScopePl == lgrn::id_null<PipelineId>())
+        PipelineId const parentPl = tasks.m_pipelineParents[pipeline];
+        if (parentPl == lgrn::id_null<PipelineId>())
         {
             return; // Loop is in the root
         }
 
-        PipelineTreePos_t const parentScopeTreePos = graph.pipelineToLoopScope[parentScopePl];
+        PipelineTreePos_t const parentScopeTreePos = graph.pipelineToLoopScope[parentPl];
         if (parentScopeTreePos == lgrn::id_null<PipelineTreePos_t>())
         {
             return; // Parent does not loop
         }
 
+        PipelineId const parentScopePl = graph.pltreeToPipeline[parentScopeTreePos];
         ExecPipeline &rParentScopeExecPl = rExec.plData[parentScopePl];
 
         LGRN_ASSERT(rParentScopeExecPl.loopChildrenLeft != 0);
         -- rParentScopeExecPl.loopChildrenLeft;
 
-        if (rParentScopeExecPl.loopChildrenLeft)
+        if (rParentScopeExecPl.loopChildrenLeft == 0)
         {
             loop_scope_done(tasks, graph, rExec, rParentScopeExecPl, parentScopePl, parentScopeTreePos);
         }

@@ -27,6 +27,7 @@
 #include "active_ent.h"
 
 #include "../core/bitvector.h"
+#include "../core/keyed_vector.h"
 #include "../core/math_types.h"
 #include "../core/storage.h"
 
@@ -65,11 +66,11 @@ struct ACtxSceneGraph
     // descendants is positioned directly after it within the array.
     // Example for tree structure "A(  B(C(D)), E(F(G(H,I)))  )"
     // * Descendant Count array: [A:8, B:2, C:1, D:0, E:4, F:3, G:2, H:0, I:0]
-    std::vector<ActiveEnt>  m_treeToEnt{lgrn::id_null<ActiveEnt>()};
-    std::vector<uint32_t>   m_treeDescendants{std::initializer_list<uint32_t>{0}};
+    osp::KeyedVec<TreePos_t, ActiveEnt>  m_treeToEnt{{lgrn::id_null<ActiveEnt>()}};
+    osp::KeyedVec<TreePos_t, uint32_t>   m_treeDescendants{std::initializer_list<uint32_t>{0}};
 
-    std::vector<ActiveEnt>  m_entParent;
-    std::vector<TreePos_t>  m_entToTreePos;
+    osp::KeyedVec<ActiveEnt, ActiveEnt>  m_entParent;
+    osp::KeyedVec<ActiveEnt, TreePos_t>  m_entToTreePos;
 
     std::vector<TreePos_t>  m_delete;
 
@@ -78,7 +79,7 @@ struct ACtxSceneGraph
         m_treeToEnt         .reserve(ents);
         m_treeDescendants   .reserve(ents);
         m_entParent         .resize(ents);
-        m_entToTreePos      .resize(ents);
+        m_entToTreePos      .resize(ents, lgrn::id_null<TreePos_t>());
     }
 };
 

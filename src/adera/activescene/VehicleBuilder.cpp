@@ -116,26 +116,26 @@ osp::link::MachAnyId VehicleBuilder::create_machine(PartId const part,
                                                     std::initializer_list<Connection> const& connections)
 {
     auto &rData = m_data.value();
-    osp::link::PerMachType &rPerMachType = rData.m_machines.m_perType[machType];
+    osp::link::PerMachType &rPerMachType = rData.m_machines.perType[machType];
 
-    MachTypeId const mach = rData.m_machines.m_ids.create();
+    MachTypeId const mach = rData.m_machines.ids.create();
 
-    std::size_t const capacity = rData.m_machines.m_ids.capacity();
-    rData.m_machines.m_machTypes.resize(capacity);
-    rData.m_machines.m_machToLocal.resize(capacity);
+    std::size_t const capacity = rData.m_machines.ids.capacity();
+    rData.m_machines.machTypes.resize(capacity);
+    rData.m_machines.machToLocal.resize(capacity);
     rData.m_machToPart.resize(capacity);
     for (PerNodeType &rPerNodeType : rData.m_nodePerType)
     {
-        rPerNodeType.m_machToNode.ids_reserve(capacity);
+        rPerNodeType.machToNode.ids_reserve(capacity);
         rPerNodeType.m_machToNodeCustom.ids_reserve(capacity);
     }
 
-    MachTypeId const local = rPerMachType.m_localIds.create();
-    rPerMachType.m_localToAny.resize(rPerMachType.m_localIds.capacity());
+    MachTypeId const local = rPerMachType.localIds.create();
+    rPerMachType.localToAny.resize(rPerMachType.localIds.capacity());
 
-    rData.m_machines.m_machTypes[mach] = machType;
-    rData.m_machines.m_machToLocal[mach] = local;
-    rPerMachType.m_localToAny[local] = mach;
+    rData.m_machines.machTypes[mach] = machType;
+    rData.m_machines.machToLocal[mach] = local;
+    rPerMachType.localToAny[local] = mach;
 
     m_partMachCount[std::size_t(part)] ++;
     rData.m_machToPart[mach] = part;
@@ -152,8 +152,8 @@ void VehicleBuilder::connect(MachAnyId const mach, std::initializer_list<Connect
     std::vector<int> nodePortMax(rData.m_nodePerType.size(), 0);
     for (Connection const& connect : connections)
     {
-        int &rPortMax = nodePortMax[connect.m_port.m_type];
-        rPortMax = std::max<int>(rPortMax, connect.m_port.m_port + 1);
+        int &rPortMax = nodePortMax[connect.m_port.type];
+        rPortMax = std::max<int>(rPortMax, connect.m_port.port + 1);
     }
 
     for (NodeTypeId nodeType = 0; std::size_t(nodeType) < rData.m_nodePerType.size(); ++nodeType)
@@ -163,12 +163,12 @@ void VehicleBuilder::connect(MachAnyId const mach, std::initializer_list<Connect
         if (portMax != 0)
         {
             // reallocate each time :)
-            rPerNodeType.m_machToNode.data_reserve(rPerNodeType.m_machToNode.data_capacity() + portMax);
-            rPerNodeType.m_machToNodeCustom.data_reserve(rPerNodeType.m_machToNode.data_capacity() + portMax);
+            rPerNodeType.machToNode.data_reserve(rPerNodeType.machToNode.data_capacity() + portMax);
+            rPerNodeType.m_machToNodeCustom.data_reserve(rPerNodeType.machToNode.data_capacity() + portMax);
 
             // emplace and fill with null
-            rPerNodeType.m_machToNode.emplace(mach, portMax);
-            lgrn::Span<NodeId> const portSpan = rPerNodeType.m_machToNode[mach];
+            rPerNodeType.machToNode.emplace(mach, portMax);
+            lgrn::Span<NodeId> const portSpan = rPerNodeType.machToNode[mach];
             std::fill(std::begin(portSpan), std::end(portSpan), lgrn::id_null<NodeId>());
             rPerNodeType.m_machToNodeCustom.emplace(mach, portMax);
             lgrn::Span<uint16_t> const customSpan = rPerNodeType.m_machToNodeCustom[mach];
@@ -176,10 +176,10 @@ void VehicleBuilder::connect(MachAnyId const mach, std::initializer_list<Connect
 
             for (Connection const& connect : connections)
             {
-                if (connect.m_port.m_type == nodeType)
+                if (connect.m_port.type == nodeType)
                 {
-                    customSpan[connect.m_port.m_port] = connect.m_port.m_custom;
-                    portSpan[connect.m_port.m_port] = connect.m_node;
+                    customSpan[connect.m_port.port] = connect.m_port.custom;
+                    portSpan[connect.m_port.port] = connect.m_node;
                     rPerNodeType.m_nodeConnectCount[connect.m_node] ++;
                     rPerNodeType.m_connectCountTotal ++;
                 }
@@ -200,18 +200,18 @@ VehicleData VehicleBuilder::finalize_release()
         PerNodeType &rPerNodeType = rData.m_nodePerType[nodeType];
 
         // reserve node-to-machine partitions
-        rPerNodeType.m_nodeToMach.data_reserve(rPerNodeType.m_connectCountTotal);
-        for (NodeId node : rPerNodeType.m_nodeIds.bitview().zeros())
+        rPerNodeType.nodeToMach.data_reserve(rPerNodeType.m_connectCountTotal);
+        for (NodeId node : rPerNodeType.nodeIds.bitview().zeros())
         {
-            rPerNodeType.m_nodeToMach.emplace(node, rPerNodeType.m_nodeConnectCount[node]);
-            lgrn::Span<Junction> junction = rPerNodeType.m_nodeToMach[node];
+            rPerNodeType.nodeToMach.emplace(node, rPerNodeType.m_nodeConnectCount[node]);
+            lgrn::Span<Junction> junction = rPerNodeType.nodeToMach[node];
             std::fill(std::begin(junction), std::end(junction), Junction{});
         }
 
         // assign node-to-machine
-        for (MachAnyId const mach : rData.m_machines.m_ids.bitview().zeros())
+        for (MachAnyId const mach : rData.m_machines.ids.bitview().zeros())
         {
-            lgrn::Span<NodeId> portSpan = rPerNodeType.m_machToNode[mach];
+            lgrn::Span<NodeId> portSpan = rPerNodeType.machToNode[mach];
             lgrn::Span<JuncCustom> customSpan = rPerNodeType.m_machToNodeCustom[mach];
 
             for (int i = 0; i < portSpan.size(); ++i)
@@ -223,7 +223,7 @@ VehicleData VehicleBuilder::finalize_release()
                     continue;
                 }
 
-                lgrn::Span<Junction> const juncSpan = rPerNodeType.m_nodeToMach[node];
+                lgrn::Span<Junction> const juncSpan = rPerNodeType.nodeToMach[node];
 
                 // find empty spot
                 // should always succeed, as they were reserved a few lines ago
@@ -231,16 +231,16 @@ VehicleData VehicleBuilder::finalize_release()
                         std::begin(juncSpan), std::end(juncSpan),
                         [] (Junction const& pair)
                 {
-                    return pair.m_type == lgrn::id_null<MachTypeId>();
+                    return pair.type == lgrn::id_null<MachTypeId>();
                 });
                 assert(found != std::end(juncSpan));
 
-                MachTypeId const type = rData.m_machines.m_machTypes[mach];
-                MachLocalId const local = rData.m_machines.m_machToLocal[mach];
+                MachTypeId const type = rData.m_machines.machTypes[mach];
+                MachLocalId const local = rData.m_machines.machToLocal[mach];
 
-                found->m_local  = local;
-                found->m_type   = type;
-                found->m_custom = customSpan[i];
+                found->local  = local;
+                found->type   = type;
+                found->custom = customSpan[i];
             }
         }
     }
@@ -248,17 +248,17 @@ VehicleData VehicleBuilder::finalize_release()
     // Reserve part-to-machine partitions
     using osp::link::MachinePair;
     rData.m_partToMachines.ids_reserve(rData.m_partIds.capacity());
-    rData.m_partToMachines.data_reserve(rData.m_machines.m_ids.capacity());
+    rData.m_partToMachines.data_reserve(rData.m_machines.ids.capacity());
     for (PartId const part : rData.m_partIds.bitview().zeros())
     {
         rData.m_partToMachines.emplace(part, m_partMachCount[part]);
     }
 
     // Assign part-to-machine partitions
-    for (MachAnyId const mach : rData.m_machines.m_ids.bitview().zeros())
+    for (MachAnyId const mach : rData.m_machines.ids.bitview().zeros())
     {
-        MachLocalId const   local       = rData.m_machines.m_machToLocal[mach];
-        MachTypeId const    type        = rData.m_machines.m_machTypes[mach];
+        MachLocalId const   local       = rData.m_machines.machToLocal[mach];
+        MachTypeId const    type        = rData.m_machines.machTypes[mach];
         PartId const        part        = rData.m_machToPart[mach];
         auto const          machines    = lgrn::Span<MachinePair>{rData.m_partToMachines[part]};
 
@@ -268,7 +268,7 @@ VehicleData VehicleBuilder::finalize_release()
         assert(rPartMachCount != 0);
         -- rPartMachCount;
 
-        machines[rPartMachCount] = { .m_local = local, .m_type = type };
+        machines[rPartMachCount] = { .local = local, .type = type };
     }
 
     assert(std::all_of(m_partMachCount.begin(), m_partMachCount.end(),
