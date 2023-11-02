@@ -34,11 +34,9 @@
 namespace planeta
 {
 
-// ID for all chunks, from 0 to m_chunkMax
-enum class ChunkId : uint16_t {};
 
 // ID for all shared vertices; from 0 to m_sharedMax
-enum class SharedVrtxId : uint32_t {};
+
 
 // Indices of vertices, unaware of vertex size;
 // from 0 to (m_chunkMax*m_chunkVrtxCount + m_sharedMax)
@@ -50,7 +48,6 @@ enum class ChunkLocalSharedId : uint16_t {};
 // IDs for any chunk's fill vertices; from 0 to m_chunkVrtxSharedCount
 enum class ChunkLocalFillId : uint16_t {};
 
-using SharedVrtxStorage_t = lgrn::IdRefCount<SharedVrtxId>::Owner_t;
 
 //-----------------------------------------------------------------------------
 
@@ -93,12 +90,7 @@ constexpr std::pair<ChunkLocalSharedId, bool> coord_to_shared(
 }
 
 //-----------------------------------------------------------------------------
-
-
-struct Chunk
-{
-    SkTriStorage_t m_skeletonTri;
-};
+#if 0
 
 class ChunkedTriangleMeshInfo
 {
@@ -126,13 +118,7 @@ public:
      */
     ChunkedTriangleMeshInfo(uint16_t const chunkMax,  uint8_t const subdivLevels,
                             uint32_t const sharedMax, uint16_t const fanMax)
-     : m_chunkMax{ chunkMax }
-     , m_chunkSubdivLevel{ subdivLevels }
-     , m_chunkWidth{ uint16_t(1u << subdivLevels) }
-     , m_chunkIds{ chunkMax }
-     , m_chunkData{ std::make_unique<Chunk[]>(chunkMax) }
-
-     , m_chunkVrtxFillCount{ uint16_t((m_chunkWidth-2) * (m_chunkWidth-1) / 2)}
+     : m_chunkVrtxFillCount{ uint16_t((m_chunkWidth-2) * (m_chunkWidth-1) / 2)}
 
      , m_chunkVrtxSharedCount{ uint16_t(m_chunkWidth * 3) }
      , m_chunkSharedUsed{
@@ -142,24 +128,15 @@ public:
                              - smc_minFansVsLevel[subdivLevels] }
      , m_chunkIndxFillCount{ m_chunkIndxFanOffset + fanMax }
 
-     , m_sharedMax{ sharedMax }
-     , m_sharedIds{ sharedMax }
-     , m_sharedRefCount{ sharedMax }
-     , m_sharedSkVrtx{ std::make_unique<SkVrtxStorage_t[]>(m_sharedMax) }
-     , m_sharedFaceCount{ std::make_unique<uint8_t[]>(m_sharedMax) }
-
      , m_vrtxSharedOffset{ uint32_t(chunkMax)*m_chunkVrtxFillCount }
 
      , m_vrtxCountMax{ uint32_t(chunkMax)*m_chunkVrtxFillCount + sharedMax }
      , m_indxCountMax{ uint32_t(chunkMax) * uint32_t(m_chunkIndxFillCount) }
-    { };
+    {
+        m_chunkIds.reserve(chunkMax);
+        m_sharedIds.reserve(sharedMax);
+    };
 
-    ChunkId chunk_create(
-            SubdivTriangleSkeleton& rSkel,
-            SkTriId skTri,
-            ArrayView_t<SkVrtxId> edgeRte,
-            ArrayView_t<SkVrtxId> edgeBtm,
-            ArrayView_t<SkVrtxId> edgeLft);
 
     constexpr VertexId chunk_coord_to_vrtx(
             ChunkId const chunkId, uint16_t const x, uint16_t const y) const noexcept
@@ -197,20 +174,7 @@ public:
         return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
     };
 
-    /**
-     *
-     * Param 0: Newly added shared vertices; iterate this.
-     * Param 1: Maps SharedVrtxId to their associated SkVrtxId.
-     * Param 2: The index of the first shared vertex in the vertex buffer.
-     */
-    template<typename FUNC_T>
-    void shared_update(FUNC_T&& func)
-    {
-        auto const tmpData = std::exchange(m_sharedNewlyAdded, {});
-        std::forward<FUNC_T>(func)(
-             ArrayView_t<SharedVrtxId const>(tmpData),
-             ArrayView_t<SkVrtxStorage_t const>(m_sharedSkVrtx.get(), m_sharedMax));
-    }
+
 
     /**
      * @return Max number of shared vertices
@@ -249,47 +213,10 @@ public:
         return uint32_t(vrtx) >= m_vrtxSharedOffset;
     }
 
-    void clear(SubdivTriangleSkeleton& rSkel)
-    {
-        // Delete all chunks
-        for (uint16_t i = 0; i < m_chunkIds.capacity(); i ++)
-        {
-            if ( ! m_chunkIds.exists(ChunkId(i)) )
-            {
-                continue;
-            }
-
-            // Release their associated skeleton triangle
-            rSkel.tri_release(m_chunkData[i].m_skeletonTri);
-
-            // Release all of their shared vertices
-            for (SharedVrtxStorage_t& shared : chunk_shared_mutable(ChunkId(i)))
-            {
-                shared_release(shared);
-            }
-        }
-
-        // Delete all shared vertices
-        for (uint32_t i = 0; i < m_sharedIds.capacity(); i ++)
-        {
-            if ( ! m_sharedIds.exists(SharedVrtxId(i)) )
-            {
-                continue;
-            }
-
-            // Release associated skeleton vertex
-            rSkel.vrtx_release(m_sharedSkVrtx[i]);
-        }
-    }
 
 private:
 
 
-    ArrayView_t<SharedVrtxStorage_t> chunk_shared_mutable(ChunkId const chunkId) noexcept
-    {
-        size_t const offset = size_t(chunkId) * m_chunkVrtxSharedCount;
-        return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
-    }
 
     SharedVrtxId chunk_shared_get(ChunkId const chunkId, ChunkLocalSharedId const localId) const noexcept
     {
@@ -297,68 +224,25 @@ private:
                                  + size_t(localId)];
     }
 
-    /**
-     * @brief Create or get a shared vertex associated with a skeleton vertex
-     *
-     * @param skVrtxId
-     * @return
-     */
-    SharedVrtxId shared_get_or_create(SkVrtxId const skVrtxId,
-                                      SubdivTriangleSkeleton &rSkel)
-    {
-        auto const& [it, success]
-                = m_skVrtxToShared.try_emplace(skVrtxId, SharedVrtxId(0));
-        if (success)
-        {
-            SharedVrtxId const id = m_sharedIds.create();
-            it->second = id;
-            m_sharedFaceCount[size_t(id)] = 0;
-            m_sharedSkVrtx[size_t(id)] = rSkel.vrtx_store(skVrtxId);
-            m_sharedNewlyAdded.push_back(id);
-        }
 
-        return it->second;
-    }
 
-    SharedVrtxStorage_t shared_store(SharedVrtxId const triId)
-    {
-        return m_sharedRefCount.ref_add(triId);
-    }
-
-    void shared_release(SharedVrtxStorage_t &rStorage) noexcept
-    {
-        m_sharedRefCount.ref_release(std::move(rStorage));
-    }
 
     constexpr VertexId shared_get_vrtx(SharedVrtxId const sharedId) const
     {
         return VertexId(uint32_t(m_vrtxSharedOffset) + uint32_t(sharedId));
     };
 
-    uint16_t m_chunkMax;
-    uint8_t m_chunkSubdivLevel;
-    uint16_t m_chunkWidth;
-    lgrn::IdRegistry<ChunkId, true> m_chunkIds;
-    std::unique_ptr<Chunk[]> m_chunkData;
 
     uint16_t m_chunkVrtxFillCount;
 
-    uint16_t m_chunkVrtxSharedCount;
-    std::unique_ptr<SharedVrtxStorage_t[]> m_chunkSharedUsed;
+
+
 
     uint32_t m_chunkIndxFanOffset;
     uint32_t m_chunkIndxFillCount;
 
     uint32_t m_sharedMax;
-    lgrn::IdRegistry<SharedVrtxId, true> m_sharedIds;
-    lgrn::IdRefCount<SharedVrtxId> m_sharedRefCount;
-    std::unique_ptr<SkVrtxStorage_t[]> m_sharedSkVrtx;
-    // Connected face count used for vertex normal calculations
-    std::unique_ptr<uint8_t[]> m_sharedFaceCount;
-    std::unordered_map<SkVrtxId, SharedVrtxId> m_skVrtxToShared;
 
-    // Newly added shared vertices, position needs to be copied from skeleton
-    std::vector<SharedVrtxId> m_sharedNewlyAdded;
 
     // Index of first shared vertex in vertex buffer
     // = m_chunkMax*m_chunkVrtxCount
@@ -418,6 +302,8 @@ private:
 
 }; // class ChunkedTriangleMeshInfo
 
+#endif
+
 //-----------------------------------------------------------------------------
 
 /**
@@ -447,7 +333,7 @@ public:
     template<typename VRTX_BUF_T>
     constexpr decltype(auto) get(
             LUTVrtx lutVrtx,
-            ArrayView_t<SharedVrtxStorage_t const> sharedUsed,
+            ArrayView_t<SharedVrtxOwner_t const> sharedUsed,
             VRTX_BUF_T && chunkVrtx,
             VRTX_BUF_T && sharedVrtx) const noexcept
     {
@@ -491,7 +377,7 @@ private:
 }; // class ChunkVrtxSubdivLUT
 
 
-ChunkedTriangleMeshInfo make_subdivtrimesh_general(
-        unsigned int chunkMax, unsigned int subdivLevels, int pow2scale);
+//ChunkedTriangleMeshInfo make_subdivtrimesh_general(
+//        unsigned int chunkMax, unsigned int subdivLevels, int pow2scale);
 
 }

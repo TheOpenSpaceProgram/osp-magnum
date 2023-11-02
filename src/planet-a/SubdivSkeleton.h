@@ -24,13 +24,18 @@
  */
 #pragma once
 
-#include <longeron/id_management/registry.hpp>
+#include <osp/core/array_view.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/strong_id.h>
+
+#include <longeron/id_management/registry_stl.hpp>
 #include <longeron/id_management/refcount.hpp>
 
 #include <Corrade/Containers/ArrayViewStl.h>
 
-#include <optional>
 #include <limits>
+#include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -47,10 +52,10 @@ using ArrayView_t = Corrade::Containers::ArrayView<T>;
  *        be created from two other parent IDs.
  */
 template<typename ID_T>
-class SubdivIdTree : private lgrn::IdRegistry<ID_T>
+class SubdivIdTree : private lgrn::IdRegistryStl<ID_T>
 {
 
-    using base_t = lgrn::IdRegistry<ID_T>;
+    using base_t = lgrn::IdRegistryStl<ID_T>;
     using id_int_t = lgrn::underlying_int_type_t<ID_T>;
 
     static_assert(std::is_integral_v<id_int_t> && sizeof(ID_T) <= 4,
@@ -253,7 +258,7 @@ private:
 enum class SkTriId : uint32_t {};
 enum class SkTriGroupId : uint32_t {};
 
-using SkTriStorage_t = lgrn::IdRefCount<SkTriId>::Owner_t;
+using SkTriOwner_t = lgrn::IdRefCount<SkTriId>::Owner_t;
 
 struct SkeletonTriangle
 {
@@ -343,7 +348,7 @@ public:
                 continue;
             }
 
-            for (SkeletonTriangle& rTri : m_triData[i].m_triangles)
+            for (SkeletonTriangle& rTri : m_triData[SkTriGroupId(i)].m_triangles)
             {
                 for (SkVrtxStorage_t& rVrtx : rTri.m_vertices)
                 {
@@ -450,7 +455,7 @@ public:
         SkTriGroupId const groupId = m_triIds.create();
         tri_group_resize_fit_ids();
 
-        SkTriGroup &rGroup = m_triData[size_t(groupId)];
+        SkTriGroup &rGroup = m_triData[groupId];
         rGroup.m_parent = parent;
         rGroup.m_depth = depth;
 
@@ -472,15 +477,13 @@ public:
      */
     SkeletonTriangle& tri_at(SkTriId const triId)
     {
-        auto groupIndex = size_t(tri_group_id(triId));
-        uint8_t siblingIndex = tri_sibling_index(triId);
-        return m_triData.at(groupIndex).m_triangles[siblingIndex];
+        return m_triData.at(tri_group_id(triId)).m_triangles[tri_sibling_index(triId)];
     }
 
     /**
      * @return Read-only access to Triangle IDs
      */
-    constexpr lgrn::IdRegistry<SkTriGroupId> const& tri_ids() const { return m_triIds; }
+    constexpr lgrn::IdRegistryStl<SkTriGroupId> const& tri_ids() const { return m_triIds; }
 
     /**
      * @brief Subdivide a triangle, creating a new group (4 new triangles)
@@ -509,7 +512,7 @@ public:
      *
      * @return Triangle
      */
-    SkTriStorage_t tri_store(SkTriId const triId)
+    SkTriOwner_t tri_store(SkTriId const triId)
     {
         return m_triRefCount.ref_add(triId);
     }
@@ -520,19 +523,112 @@ public:
      *
      * @param rStorage [ref] Storage to release
      */
-    void tri_release(SkTriStorage_t &rStorage)
+    void tri_release(SkTriOwner_t &rStorage)
     {
         m_triRefCount.ref_release(std::move(rStorage));
     }
 
 private:
 
-    lgrn::IdRegistry<SkTriGroupId> m_triIds;
+    lgrn::IdRegistryStl<SkTriGroupId> m_triIds;
     lgrn::IdRefCount<SkTriId> m_triRefCount;
 
     // access using SkTriGroupId from m_triIds
-    std::vector<SkTriGroup> m_triData;
+    osp::KeyedVec<SkTriGroupId, SkTriGroup> m_triData;
 }; // class SubdivTriangleSkeleton
+
+
+//-----------------------------------------------------------------------------
+
+
+using ChunkId = osp::StrongId<uint16_t, struct DummyForChunkId>;
+using SharedVrtxId = osp::StrongId<uint32_t, struct DummyForSharedVrtxId>;
+
+using SharedVrtxOwner_t = lgrn::IdRefCount<SharedVrtxId>::Owner_t;
+
+
+class SkeletonChunks
+{
+public:
+
+    SkeletonChunks(uint8_t const subdivLevels)
+     : m_chunkSubdivLevel       { subdivLevels }
+     , m_chunkWidth             { uint16_t(1u << subdivLevels) }
+     , m_chunkVrtxSharedCount   { uint16_t(m_chunkWidth * 3) }
+    {
+
+    }
+
+    ChunkId chunk_create(
+            SubdivTriangleSkeleton& rSkel,
+            SkTriId                 skTri,
+            ArrayView_t<SkVrtxId>   edgeRte,
+            ArrayView_t<SkVrtxId>   edgeBtm,
+            ArrayView_t<SkVrtxId>   edgeLft);
+
+    ArrayView_t<SharedVrtxOwner_t> shared_vertices_used(ChunkId const chunkId) noexcept
+    {
+        std::size_t const offset = std::size_t(chunkId) * m_chunkVrtxSharedCount;
+        return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
+    }
+
+    SharedVrtxOwner_t shared_store(SharedVrtxId const triId)
+    {
+        return m_sharedRefCount.ref_add(triId);
+    }
+
+    void shared_release(SharedVrtxOwner_t &rStorage) noexcept
+    {
+        m_sharedRefCount.ref_release(std::move(rStorage));
+    }
+
+    /**
+     * Param 0: Newly added shared vertices; iterate this.
+     * Param 1: Maps SharedVrtxId to their associated SkVrtxId.
+     */
+    template<typename FUNC_T>
+    void shared_update(FUNC_T&& func)
+    {
+        std::forward<FUNC_T>(func)(m_sharedNewlyAdded, osp::arrayView(m_sharedSkVrtx));
+        m_sharedNewlyAdded.clear();
+    }
+
+    /**
+     * @brief Create or get a shared vertex associated with a skeleton vertex
+     *
+     * @param skVrtxId
+     * @return
+     */
+    SharedVrtxId shared_get_or_create(SkVrtxId const skVrtxId, SubdivTriangleSkeleton &rSkel);
+
+    void clear(SubdivTriangleSkeleton& rSkel);
+
+private:
+
+    lgrn::IdRegistryStl<ChunkId>            m_chunkIds;
+    osp::KeyedVec<ChunkId, SkTriOwner_t>    m_chunkTris;
+    uint8_t                                 m_chunkSubdivLevel;
+    std::vector <SharedVrtxOwner_t>         m_chunkSharedUsed;
+    uint16_t                                m_chunkWidth;
+    uint16_t                                m_chunkVrtxSharedCount;
+
+    lgrn::IdRegistryStl<SharedVrtxId, true> m_sharedIds;
+    lgrn::IdRefCount<SharedVrtxId>          m_sharedRefCount;
+
+    std::vector<SkVrtxStorage_t>            m_sharedSkVrtx;
+
+    /// Connected face count used for vertex normal calculations
+    osp::KeyedVec<SharedVrtxId, uint8_t>    m_sharedFaceCount;
+    osp::KeyedVec<SkVrtxId, SharedVrtxId>   m_skVrtxToShared;
+
+    /// Newly added shared vertices, position needs to be copied from skeleton
+    std::vector<SharedVrtxId>               m_sharedNewlyAdded;
+
+
+
+
+}; // class SkeletonChunks
+
 
 
 }

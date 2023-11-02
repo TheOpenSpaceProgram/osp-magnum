@@ -30,7 +30,7 @@
 using namespace planeta;
 
 
-
+/*
 ChunkedTriangleMeshInfo planeta::make_subdivtrimesh_general(
         unsigned int const chunkMax, unsigned int const subdivLevels, int const pow2scale)
 {
@@ -55,53 +55,7 @@ ChunkedTriangleMeshInfo planeta::make_subdivtrimesh_general(
     return ChunkedTriangleMeshInfo(
                 chunkMax, subdivLevels, sharedMax, fanMax);
 }
-
-ChunkId ChunkedTriangleMeshInfo::chunk_create(
-        SubdivTriangleSkeleton& rSkel,
-        SkTriId skTri,
-        ArrayView_t<SkVrtxId> const edgeRte,
-        ArrayView_t<SkVrtxId> const edgeBtm,
-        ArrayView_t<SkVrtxId> const edgeLft)
-{
-    if (   edgeRte.size() != m_chunkWidth - 1
-        || edgeBtm.size() != m_chunkWidth - 1
-        || edgeLft.size() != m_chunkWidth - 1)
-    {
-        throw std::runtime_error("Incorrect edge vertex count");
-    }
-
-    // Create a new chunk ID
-    ChunkId const chunkId = m_chunkIds.create();
-    Chunk &rChunk = m_chunkData[size_t(chunkId)];
-
-    rChunk.m_skeletonTri = rSkel.tri_store(skTri);
-
-    SkeletonTriangle const &tri = rSkel.tri_at(skTri);
-
-    ArrayView_t<SharedVrtxStorage_t> const sharedSpace = chunk_shared_mutable(chunkId);
-
-    std::array const edges = {edgeRte, edgeBtm, edgeLft};
-
-    for (int i = 0; i < 3; i ++)
-    {
-        size_t const cornerOffset = m_chunkWidth * i;
-        size_t const edgeOffset = m_chunkWidth * i + 1;
-
-        ArrayView_t<SkVrtxId> const edge = edges[i];
-        {
-            SharedVrtxId const sharedId = shared_get_or_create(
-                    tri.m_vertices[i], rSkel);
-            sharedSpace[cornerOffset] = shared_store(sharedId);
-        }
-        for (unsigned int j = 0; j < m_chunkWidth - 1; j ++)
-        {
-            SharedVrtxId const sharedId = shared_get_or_create(edge[j], rSkel);
-            sharedSpace[edgeOffset + j] = shared_store(sharedId);
-        }
-    }
-
-    return chunkId;
-}
+*/
 
 //-----------------------------------------------------------------------------
 
