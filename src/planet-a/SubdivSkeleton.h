@@ -42,9 +42,6 @@
 namespace planeta
 {
 
-template<typename T>
-using ArrayView_t = Corrade::Containers::ArrayView<T>;
-
 //-----------------------------------------------------------------------------
 
 /**
@@ -65,6 +62,7 @@ class SubdivIdTree : private lgrn::IdRegistryStl<ID_T>
 
 public:
 
+    using base_t::bitview;
     using base_t::capacity;
     using base_t::size;
 
@@ -118,9 +116,21 @@ public:
         return ID_T(it->second);
     }
 
-    // TODO
 
-    ID_T get(ID_T a, ID_T b) const;
+    [[nodiscard]] ID_T get(ID_T a, ID_T b) const
+    {
+        combination_t const combination = hash_id_combination(a, b);
+        return ID_T(m_parentsToId.at(combination));
+    }
+
+    [[nodiscard]] ID_T try_get(ID_T a, ID_T b) const
+    {
+        combination_t const combination = hash_id_combination(a, b);
+        auto const found = m_parentsToId.find(combination);
+        return found != m_parentsToId.end() ? ID_T(found->second) : lgrn::id_null<ID_T>();
+    }
+
+    // TODO
 
     std::pair<ID_T, ID_T> get_parents(ID_T a);
 
@@ -411,7 +421,7 @@ public:
     void vrtx_create_chunk_edge_recurse(
             unsigned int const level,
             SkVrtxId a, SkVrtxId b,
-            ArrayView_t< SkVrtxId > rOut)
+            osp::ArrayView< SkVrtxId > rOut)
     {
         if (rOut.size() != ( (1 << level) - 1) )
         {
@@ -425,7 +435,7 @@ public:
         if (level > 1)
         {
             vrtx_create_chunk_edge_recurse(level - 1, a, mid, rOut.prefix(halfSize));
-            vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.exceptPrefix(halfSize));
+            vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.exceptPrefix(halfSize + 1));
         }
     }
 
@@ -555,21 +565,39 @@ public:
      : m_chunkSubdivLevel       { subdivLevels }
      , m_chunkWidth             { uint16_t(1u << subdivLevels) }
      , m_chunkVrtxSharedCount   { uint16_t(m_chunkWidth * 3) }
-    {
+    { }
 
+    void chunk_reserve(uint16_t const size)
+    {
+        m_chunkIds.reserve(size);
+        m_chunkSharedUsed.resize(std::size_t(size) * m_chunkVrtxSharedCount);
+        m_chunkTris     .resize(size);
     }
 
     ChunkId chunk_create(
-            SubdivTriangleSkeleton& rSkel,
-            SkTriId                 skTri,
-            ArrayView_t<SkVrtxId>   edgeRte,
-            ArrayView_t<SkVrtxId>   edgeBtm,
-            ArrayView_t<SkVrtxId>   edgeLft);
+            SubdivTriangleSkeleton&     rSkel,
+            SkTriId                     skTri,
+            osp::ArrayView<SkVrtxId>    edgeRte,
+            osp::ArrayView<SkVrtxId>    edgeBtm,
+            osp::ArrayView<SkVrtxId>    edgeLft);
 
-    ArrayView_t<SharedVrtxOwner_t> shared_vertices_used(ChunkId const chunkId) noexcept
+    osp::ArrayView<SharedVrtxOwner_t> shared_vertices_used(ChunkId const chunkId) noexcept
     {
         std::size_t const offset = std::size_t(chunkId) * m_chunkVrtxSharedCount;
         return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
+    }
+
+    osp::ArrayView<SharedVrtxOwner_t const> shared_vertices_used(ChunkId const chunkId) const noexcept
+    {
+        std::size_t const offset = std::size_t(chunkId) * m_chunkVrtxSharedCount;
+        return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
+    }
+
+    void shared_reserve(uint32_t const size)
+    {
+        m_sharedIds         .reserve(size);
+        m_sharedSkVrtx      .resize(size);
+        m_sharedFaceCount   .resize(size);
     }
 
     SharedVrtxOwner_t shared_store(SharedVrtxId const triId)
@@ -589,7 +617,7 @@ public:
     template<typename FUNC_T>
     void shared_update(FUNC_T&& func)
     {
-        std::forward<FUNC_T>(func)(m_sharedNewlyAdded, osp::arrayView(m_sharedSkVrtx));
+        std::forward<FUNC_T>(func)(m_sharedNewlyAdded, m_sharedSkVrtx);
         m_sharedNewlyAdded.clear();
     }
 
@@ -603,19 +631,19 @@ public:
 
     void clear(SubdivTriangleSkeleton& rSkel);
 
-private:
+//private:
 
-    lgrn::IdRegistryStl<ChunkId>            m_chunkIds;
+    lgrn::IdRegistryStl<ChunkId, true>      m_chunkIds;
     osp::KeyedVec<ChunkId, SkTriOwner_t>    m_chunkTris;
+    std::vector<SharedVrtxOwner_t>          m_chunkSharedUsed;
     uint8_t                                 m_chunkSubdivLevel;
-    std::vector <SharedVrtxOwner_t>         m_chunkSharedUsed;
     uint16_t                                m_chunkWidth;
     uint16_t                                m_chunkVrtxSharedCount;
 
     lgrn::IdRegistryStl<SharedVrtxId, true> m_sharedIds;
     lgrn::IdRefCount<SharedVrtxId>          m_sharedRefCount;
 
-    std::vector<SkVrtxStorage_t>            m_sharedSkVrtx;
+    osp::KeyedVec<SharedVrtxId, SkVrtxStorage_t> m_sharedSkVrtx;
 
     /// Connected face count used for vertex normal calculations
     osp::KeyedVec<SharedVrtxId, uint8_t>    m_sharedFaceCount;
@@ -623,9 +651,6 @@ private:
 
     /// Newly added shared vertices, position needs to be copied from skeleton
     std::vector<SharedVrtxId>               m_sharedNewlyAdded;
-
-
-
 
 }; // class SkeletonChunks
 

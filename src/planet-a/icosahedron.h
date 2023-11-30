@@ -84,11 +84,12 @@ SubdivTriangleSkeleton create_skeleton_icosahedron(
  * @param rNormals      [ref] Normal data
  */
 void ico_calc_middles(
-        double radius, int pow2scale,
-        std::array<SkVrtxId, 3> const vrtxCorners,
-        std::array<SkVrtxId, 3> const vrtxMid,
-        std::vector<osp::Vector3l> &rPositions,
-        std::vector<osp::Vector3> &rNormals);
+        double      radius,
+        int         pow2scale,
+        std::array<SkVrtxId, 3> const   vrtxCorners,
+        std::array<SkVrtxId, 3> const   vrtxMid,
+        std::vector<osp::Vector3l>      &rPositions,
+        std::vector<osp::Vector3>       &rNormals);
 
 /**
  * @brief Calculate positions for vertices along an edge from Vertex A to B
@@ -105,11 +106,14 @@ void ico_calc_middles(
  * @param rNormals      [ref] Normal data
  */
 void ico_calc_chunk_edge_recurse(
-        double radius, int pow2scale, unsigned int level,
-        SkVrtxId a, SkVrtxId b,
-        ArrayView_t<SkVrtxId const> vrtxs,
-        std::vector<osp::Vector3l> &rPositions,
-        std::vector<osp::Vector3> &rNormals);
+        double          radius,
+        int             pow2scale,
+        unsigned int    level,
+        SkVrtxId        a,
+        SkVrtxId        b,
+        osp::ArrayView<SkVrtxId const>  vrtxs,
+        std::vector<osp::Vector3l>      &rPositions,
+        std::vector<osp::Vector3>       &rNormals);
 
 
 }

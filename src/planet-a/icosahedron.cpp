@@ -196,11 +196,14 @@ void planeta::ico_calc_middles(
 
 
 void planeta::ico_calc_chunk_edge_recurse(
-        double const radius, int const pow2scale, unsigned int const level,
-        SkVrtxId const a, SkVrtxId const b,
-        ArrayView_t<SkVrtxId const> const vrtxs,
-        std::vector<osp::Vector3l> &rPositions,
-        std::vector<osp::Vector3> &rNormals)
+        double const        radius,
+        int const           pow2scale,
+        unsigned int const  level,
+        SkVrtxId const      a,
+        SkVrtxId const      b,
+        osp::ArrayView<SkVrtxId const> const    vrtxs,
+        std::vector<osp::Vector3l>              &rPositions,
+        std::vector<osp::Vector3>               &rNormals)
 {
     if (level == 0)
     {

@@ -29,7 +29,7 @@
 #include <osp/core/math_types.h>
 
 #include <memory>
-#include <variant>
+#include <optional>
 
 namespace planeta
 {
@@ -38,9 +38,9 @@ namespace planeta
 // ID for all shared vertices; from 0 to m_sharedMax
 
 
-// Indices of vertices, unaware of vertex size;
+// Indices to vertices, unaware of vertex size;
 // from 0 to (m_chunkMax*m_chunkVrtxCount + m_sharedMax)
-enum class VertexId : uint32_t {};
+using VertexIdx = uint32_t;
 
 // IDs for any chunk's shared vertices; from 0 to m_chunkVrtxSharedCount
 enum class ChunkLocalSharedId : uint16_t {};
@@ -71,238 +71,132 @@ constexpr int xy_to_triangular(int const x, int const y) noexcept
     return ( y * (y + 1) ) / 2 + x;
 };
 
-constexpr std::pair<ChunkLocalSharedId, bool> coord_to_shared(
-        uint16_t x, uint16_t y, uint16_t chunkEdgeVrtxCount) noexcept
+struct CoordToSharedResult
+{
+    ChunkLocalSharedId localShared;
+    bool isShared;
+};
+
+constexpr CoordToSharedResult coord_to_shared(
+        uint16_t x, uint16_t y, uint16_t chunkWidth) noexcept
 {
     // Tests if (x,y) lies along right, bottom, or left edges of triangle
-    // branchless because why not
-    bool const lft = (x == 0);
-    bool const btm = !lft && (y == chunkEdgeVrtxCount);
-    bool const rte = !btm && (x == y);
 
-    // Calculate chunk local shared ID. starts at 0 from the top of the chunk,
-    // and increases counterclockwise along the edge
-    uint16_t const offset = lft * y
-                          + btm * (chunkEdgeVrtxCount + x)
-                          + rte * (chunkEdgeVrtxCount * 3 - x);
-
-    return {ChunkLocalSharedId(offset), rte || btm || lft};
+    if (x == 0)         // Left
+    {
+        return { ChunkLocalSharedId(y), true};
+    }
+    else if (y == chunkWidth) // Bottom
+    {
+        return { ChunkLocalSharedId(chunkWidth + x), true};
+    }
+    else if (x == y)    // Right
+    {
+        return { ChunkLocalSharedId(chunkWidth * 3 - x), true};
+    }
+    else                // Non-shared vertex
+    {
+        return { .isShared = false };
+    }
 }
 
 //-----------------------------------------------------------------------------
-#if 0
 
-class ChunkedTriangleMeshInfo
+
+struct ChunkedTriangleMeshInfo
 {
-public:
-
-    // from wolfram alpha: "sequence 1 3 9 21 45 93"
-    // non-trivial to calculate. ~10 is over the practical limit for
-    // subdivision levels.
-    static constexpr std::array<uint16_t, 10> smc_minFansVsLevel =
+    /// Number of non-fill 'Fan' faces a chunk of a given subdiv level will contain. These are
+    /// triangle faces along the edges of the chunk that have two shared vertices (a whole edge
+    /// lining up along the chunk edge).
+    ///
+    /// This is not easy to to calculate, and was first manually counted. Wolfram alpha was then
+    /// used to complete the sequence. query: "sequence 1 3 9 21 45 93"
+    ///
+    /// 10 subdivision levels is beyond the practical limit
+    ///
+    static constexpr std::array<std::uint16_t, 10> smc_fanFacesVsSubdivLevel =
     {
         1u, 3u, 9u, 21u, 45u, 93u, 189u, 381u, 765u, 1533u
     };
 
-    /**
-     * @brief Construct a ChunkedTriangleMesh
-     *
-     * Datatypes chosen are above practical limits, varrying by detail
-     * preferences.
-     *
-     * @param chunkMax     [in] Max number of chunks
-     * @param subdivLevels [in] Number of times a chunk triangle is subdivided.
-     *                          Practical limit: ~8
-     * @param sharedMax    [in] Max number of vertices shared between chunks
-     * @param fanMax       [in] Max number of Fan triangles reserved per chunk
-     */
-    ChunkedTriangleMeshInfo(uint16_t const chunkMax,  uint8_t const subdivLevels,
-                            uint32_t const sharedMax, uint16_t const fanMax)
-     : m_chunkVrtxFillCount{ uint16_t((m_chunkWidth-2) * (m_chunkWidth-1) / 2)}
-
-     , m_chunkVrtxSharedCount{ uint16_t(m_chunkWidth * 3) }
-     , m_chunkSharedUsed{
-           std::make_unique<SharedVrtxStorage_t[]>(chunkMax * m_chunkVrtxSharedCount) }
-
-     , m_chunkIndxFanOffset{ uint32_t(m_chunkWidth)*m_chunkWidth
-                             - smc_minFansVsLevel[subdivLevels] }
-     , m_chunkIndxFillCount{ m_chunkIndxFanOffset + fanMax }
-
-     , m_vrtxSharedOffset{ uint32_t(chunkMax)*m_chunkVrtxFillCount }
-
-     , m_vrtxCountMax{ uint32_t(chunkMax)*m_chunkVrtxFillCount + sharedMax }
-     , m_indxCountMax{ uint32_t(chunkMax) * uint32_t(m_chunkIndxFillCount) }
+    constexpr bool is_vertex_shared(VertexIdx const vrtx) const noexcept
     {
-        m_chunkIds.reserve(chunkMax);
-        m_sharedIds.reserve(sharedMax);
+        auto const sharedIdInt = uint32_t(vrtx) - vbufSharedOffset; // note: intentional overflow
+        return sharedIdInt < sharedMax;
+    }
+
+    constexpr SharedVrtxId vertex_to_shared(VertexIdx const vrtx) const noexcept
+    {
+        return SharedVrtxId(uint32_t(vrtx) - vbufSharedOffset);
+    }
+
+    constexpr std::uint32_t total_face_count() const noexcept { return fillFaceCount + fanExtraFaceCount; }
+
+    /// Number of non-shared vertices that fill the center of a chunk. Vertices that don't lie
+    /// along the outer edges of their chunk are not shared with other chunks.
+    std::uint32_t fillVrtxCount;
+    /// Number of triangle faces needed to fill the center of the chunk. This includes faces
+    /// with a single corner touching the edge. Faces with two shared vertices (a whole edge
+    /// lining up along the chunk edge) are excluded.
+    std::uint32_t fillFaceCount;
+    /// Number of fan triangles per-chunk + extra triangles needed to fill a chunk edge with 2-triangle
+    std::uint32_t fanExtraFaceCount;
+
+    /// Index of first fill vertex within in vertex buffer
+    std::uint32_t vbufFillOffset;
+    /// Index of first shared vertex within in vertex buffer
+    std::uint32_t vbufSharedOffset;
+
+    /// Total size of vertex buffer
+    std::uint32_t vbufSize;
+
+    std::uint32_t sharedMax;
+    std::uint16_t chunkMax;
+};
+
+constexpr ChunkedTriangleMeshInfo make_chunked_mesh_info(
+        SkeletonChunks const&       skChunks,
+        std::uint16_t const         chunkMax,
+        std::uint32_t const         sharedMax)
+{
+    std::uint32_t const chunkWidth      = skChunks.m_chunkWidth;
+    std::uint32_t const fillCount       = (chunkWidth-2)*(chunkWidth-1) / 2;
+    std::uint32_t const fillTotal       = fillCount * chunkMax;
+    std::uint32_t const fanFaceCount    = ChunkedTriangleMeshInfo::smc_fanFacesVsSubdivLevel[skChunks.m_chunkSubdivLevel];
+
+    return
+    {
+        .fillVrtxCount       = fillCount,
+        .fillFaceCount       = chunkWidth*chunkWidth - fanFaceCount,
+        .fanExtraFaceCount   = fanFaceCount + fanFaceCount/3 + 1,
+        .vbufFillOffset      = 0,
+        .vbufSharedOffset    = fillTotal,
+        .vbufSize            = fillTotal + sharedMax,
+        .sharedMax           = sharedMax,
+        .chunkMax            = chunkMax
     };
+}
 
+inline VertexIdx shared_to_vrtx(SkeletonChunks const& skChunks, ChunkedTriangleMeshInfo const& info, ChunkId const chunkId, ChunkLocalSharedId const localId)
+{
+    auto const&         chunkSharedVertices = skChunks.shared_vertices_used(chunkId);
+    SharedVrtxId const  sharedId            = chunkSharedVertices[std::size_t(localId)].value();
+    return info.vbufSharedOffset + sharedId.value;
+}
 
-    constexpr VertexId chunk_coord_to_vrtx(
-            ChunkId const chunkId, uint16_t const x, uint16_t const y) const noexcept
-    {
-        if (auto const& [localId, shared] = coord_to_shared(x, y, m_chunkWidth);
-            shared)
-        {
-            return shared_get_vrtx(chunk_shared(chunkId)[size_t(localId)]);
-        }
+constexpr VertexIdx fill_to_vrtx(ChunkedTriangleMeshInfo const& info, ChunkId const chunkId, int const triangular)
+{
+    return info.vbufFillOffset + info.fillVrtxCount * chunkId.value + triangular;
+}
 
-        // Center, non-shared chunk vertex
-        return VertexId(m_chunkVrtxFillCount * uint32_t(chunkId) + xy_to_triangular(x - 1, y - 2));
-    }
+constexpr VertexIdx chunk_coord_to_vrtx(SkeletonChunks const& skChunks, ChunkedTriangleMeshInfo const& info, ChunkId const chunkId, uint16_t const x, uint16_t const y) noexcept
+{
+    auto const [localId, isShared] = coord_to_shared(x, y, skChunks.m_chunkWidth);
+    return isShared
+            ? shared_to_vrtx(skChunks, info, chunkId, localId)
+            : fill_to_vrtx(info, chunkId, xy_to_triangular(x - 1, y - 2));
 
-    /**
-     * @return Number of triangles along the edge of a chunk
-     */
-    constexpr uint32_t chunk_width() const noexcept { return m_chunkWidth; }
-
-    /**
-     * @return Number of fill vertices per chunk
-     */
-    constexpr uint32_t chunk_vrtx_fill_count() const noexcept { return m_chunkVrtxFillCount; }
-
-    /**
-     * @brief Get shared vertices used by a specific chunk
-     *
-     * @param chunkId [in] Chunk Id
-     *
-     * @return Array view of shared vertices, access using ChunkLocalSharedId
-     */
-    ArrayView_t<SharedVrtxStorage_t const> chunk_shared(ChunkId const chunkId) const noexcept
-    {
-        size_t const offset = size_t(chunkId) * m_chunkVrtxSharedCount;
-        return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
-    };
-
-
-
-    /**
-     * @return Max number of shared vertices
-     */
-    constexpr uint32_t shared_count_max() const noexcept { return m_sharedMax; }
-
-    uint8_t& shared_face_count(SharedVrtxId const sharedId) noexcept { return m_sharedFaceCount[size_t(sharedId)]; }
-
-    /**
-     * @return Max number of mesh triangles / Required index buffer size.
-     */
-    constexpr uint32_t index_count_max() const noexcept { return m_indxCountMax; };
-
-    constexpr uint32_t index_chunk_offset(ChunkId const chunkId) const noexcept { return m_chunkIndxFillCount * uint32_t(chunkId); }
-
-    /**
-     * @return Total max number of shared and fill vertices / Required vertex
-     *         buffer size.
-     */
-    constexpr uint32_t vertex_count_max() const noexcept { return m_vrtxCountMax; };
-
-    /**
-     * @return Index of first shared vertex / Max total number of fill vertices
-     */
-    constexpr uint32_t vertex_offset_shared() const noexcept { return m_vrtxSharedOffset; }
-
-    constexpr SharedVrtxId vertex_to_shared(VertexId const sharedId) const noexcept { return SharedVrtxId(uint32_t(sharedId) - m_vrtxSharedOffset); }
-
-    constexpr uint32_t vertex_offset_fill(ChunkId const chunkId) const noexcept
-    {
-        return m_chunkVrtxFillCount * uint32_t(chunkId);
-    }
-
-    constexpr bool vertex_is_shared(VertexId const vrtx) const noexcept
-    {
-        return uint32_t(vrtx) >= m_vrtxSharedOffset;
-    }
-
-
-private:
-
-
-
-    SharedVrtxId chunk_shared_get(ChunkId const chunkId, ChunkLocalSharedId const localId) const noexcept
-    {
-        return m_chunkSharedUsed[size_t(chunkId) * m_chunkVrtxSharedCount
-                                 + size_t(localId)];
-    }
-
-
-
-
-    constexpr VertexId shared_get_vrtx(SharedVrtxId const sharedId) const
-    {
-        return VertexId(uint32_t(m_vrtxSharedOffset) + uint32_t(sharedId));
-    };
-
-
-    uint16_t m_chunkVrtxFillCount;
-
-
-
-
-    uint32_t m_chunkIndxFanOffset;
-    uint32_t m_chunkIndxFillCount;
-
-    uint32_t m_sharedMax;
-
-
-    // Index of first shared vertex in vertex buffer
-    // = m_chunkMax*m_chunkVrtxCount
-    uint32_t m_vrtxSharedOffset;
-
-    uint32_t m_vrtxCountMax;
-    uint32_t m_indxCountMax;
-
-    // Vertex and index buffer for GPU
-
-    // Vertex buffer is split between large blocks of Chunked vertices, and
-    // individual Shared vertices:
-    // * Chunked vertices are fixed-size groups of vertices associated with
-    //   a SkeletonTriangle. They help form the triangular tiling mesh in the
-    //   middle of a chunked SkeletonTriangle, and are not shared with other
-    //   SkeletonTriangles.
-    // * Shared vertices reside along the edges of SkeletonTriangles, and are
-    //   shared between them. They are associated with a VrtxId in m_vrtxIdTree
-    //
-    // Chunk vertex data:
-    // [vertex] [vertex] [vertex] [vertex] [vertex] ...
-    // <-------  m_chunkVrtxCount*m_vrtxSize  ------->
-    //
-    // Vertex buffer m_vrtxBuffer:
-    // [chunk..] [chunk..] [chunk..]  [chunk..] ... [shared] [shared] ...
-    // <-----  m_chunkMax*m_chunkVrtxCount  ----->  <--  m_sharedMax  -->
-    //         * m_vrtxSize                              * m_vrtxSize
-
-    //std::unique_ptr<unsigned char[]> m_vrtxBuffer;
-
-    // Index buffer consists of large fixed-size blocks forming a mesh patched
-    // overtop of a SkeletonTriangle, known as a Chunk. Each chunk consists of
-    // a fixed number of mesh triangles to form most of the triangular tiling
-    // of the chunk, but the triangles along the edges are specially treated as
-    // a variable (but limited) number of 'Fan triangles' that may form fan-like
-    // structures to smoothly transition to other chunks of a higher detail.
-    //
-    // Chunk index data:
-    // [tri] [tri] [tri] [tri] ...  [fan tri] [fan tri] [fan tri] ... [empty]
-    // <-  m_chunkIndxFanOffset  ->
-    // <------------------------  m_chunkIndxCount  ------------------------>
-    //
-    // Index buffer m_indxBuffer:
-    // [chunk..] [chunk..] [chunk..] [chunk..] [chunk..] [chunk..] ...
-    // <---------------  m_chunkMax * m_chunkIndxCount  --------------->
-    //std::unique_ptr<Vector3ui[]> m_indxBuffer;
-
-    //std::variant< std::unique_ptr<Vector3us_t[]>,
-    //              std::unique_ptr<Vector3ui_t[]> > m_indxBuffer;
-
-    // When Chunked vertices, Shared vertices, or Chunks are deleted, then
-    // they are simply added to a list of deleted elements in IdRegistry to
-    // be reused later, and are not drawn.
-
-    // Empty spaces in the buffers are not a problem. For index buffers, use
-    // something like glMultiDrawArrays
-
-}; // class ChunkedTriangleMeshInfo
-
-#endif
+}
 
 //-----------------------------------------------------------------------------
 
@@ -330,27 +224,27 @@ public:
 
     ChunkVrtxSubdivLUT(uint8_t subdivLevel);
 
-    template<typename VRTX_BUF_T>
-    constexpr decltype(auto) get(
-            LUTVrtx lutVrtx,
-            ArrayView_t<SharedVrtxOwner_t const> sharedUsed,
-            VRTX_BUF_T && chunkVrtx,
-            VRTX_BUF_T && sharedVrtx) const noexcept
+    constexpr VertexIdx index(
+            osp::ArrayView<SharedVrtxOwner_t const> sharedUsed,
+            std::uint32_t const                     fillOffset,
+            std::uint32_t const                     sharedOffset,
+            LUTVrtx const                           lutVrtx ) const noexcept
     {
-        return (uint16_t(lutVrtx) < m_fillVrtxCount)
-                ? std::forward<VRTX_BUF_T>(chunkVrtx)[size_t(lutVrtx)]
-                : std::forward<VRTX_BUF_T>(sharedVrtx)[size_t(sharedUsed[uint16_t(lutVrtx) - m_fillVrtxCount].value())];
+        auto const lutVrtxInt   = std::uint16_t(lutVrtx);
+        bool const isShared     = lutVrtxInt > m_fillVrtxCount;
+
+        return isShared ? sharedOffset + sharedUsed[lutVrtxInt-m_fillVrtxCount].value().value
+                        : fillOffset + lutVrtxInt;
     }
 
-    constexpr ArrayView_t<ToSubdiv const> data() const noexcept { return m_data; }
+    constexpr osp::ArrayView<ToSubdiv const> data() const noexcept { return m_data; }
 
 private:
 
     constexpr LUTVrtx id_at(Vector2us const pos) const noexcept
     {
-        auto const [localId, shared] = coord_to_shared(pos.x(), pos.y(),
-                                                       m_edgeVrtxCount);
-        if (shared)
+        auto const [localId, isShared] = coord_to_shared(pos.x(), pos.y(), m_edgeVrtxCount);
+        if (isShared)
         {
             return LUTVrtx(m_fillVrtxCount + uint16_t(localId));
         }
@@ -377,7 +271,254 @@ private:
 }; // class ChunkVrtxSubdivLUT
 
 
-//ChunkedTriangleMeshInfo make_subdivtrimesh_general(
-//        unsigned int chunkMax, unsigned int subdivLevels, int pow2scale);
+//-----------------------------------------------------------------------------
 
+enum class ECornerDetailX2 : int { None = 0, Right = 1, Left = 2 };
+
+template <typename FUNCTOR_T>
+struct ChunkFanStitcher
+{
+    template <int corner, ECornerDetailX2 detailX2>
+    inline void corner();
+
+    template <int side, bool detailX2>
+    inline void edge();
+
+    FUNCTOR_T                           emit_face;
+
+    osp::ArrayView<SharedVrtxOwner_t const> chunkSharedVertices;
+
+    SubdivTriangleSkeleton const        &rSkeleton;
+    SkeletonChunks const                &rSkChunks;
+
+    std::uint32_t                       sharedOffset;
+    std::uint32_t                       chunkFillOffset;
+    std::uint16_t                       chunkWidth;
+
+}; // struct ChunkFanStitcher
+
+template<typename FUNCTOR_T>
+ChunkFanStitcher<FUNCTOR_T> make_chunk_fan_stitcher(
+        SubdivTriangleSkeleton const        &rSkeleton,
+        SkeletonChunks const                &rSkChunks,
+        ChunkedTriangleMeshInfo const       &rInfo,
+        ChunkId                             chunk,
+        FUNCTOR_T &&emit_face)
+{
+    return ChunkFanStitcher<FUNCTOR_T>
+    {
+        .emit_face              = std::forward<FUNCTOR_T>(emit_face),
+        .chunkSharedVertices    = rSkChunks.shared_vertices_used(chunk),
+        .rSkeleton              = rSkeleton,
+        .rSkChunks              = rSkChunks,
+        .sharedOffset           = rInfo.vbufSharedOffset,
+        .chunkFillOffset        = rInfo.vbufFillOffset + std::uint32_t(chunk.value)*rInfo.fillVrtxCount,
+        .chunkWidth             = rSkChunks.m_chunkWidth
+    };
 }
+
+template <typename FUNCTOR_T>
+template <int corner, ECornerDetailX2 detailX2>
+void ChunkFanStitcher<FUNCTOR_T>::corner()
+{
+    // Chunk corner consists of 3 shared vertices
+    //
+    //          [1]
+    //          . .
+    //         .   .
+    //        .     .
+    //      [2]-----[0]
+    //     /   \   /   \
+    //    /     \ /     \
+    //   X-------X-------X  <-- don't care what's down heres
+    //
+
+    std::array<int, 3> tri;
+
+    // Figure out which 3 shared vertices make the chunk's corner
+    if constexpr (corner == 0)
+    {
+        tri = { chunkWidth*3-1, chunkWidth*0+0, chunkWidth*0+1 };
+    }
+    else if constexpr (corner == 1)
+    {
+        tri = { chunkWidth*1-1, chunkWidth*1+0, chunkWidth*1+1 };
+    }
+    else if constexpr (corner == 2)
+    {
+        tri = { chunkWidth*2-1, chunkWidth*2+0, chunkWidth*2+1 };
+    }
+
+    std::array<SharedVrtxId, 3> const triShared
+    {
+        chunkSharedVertices[tri[0]].value(),
+        chunkSharedVertices[tri[1]].value(),
+        chunkSharedVertices[tri[2]].value()
+    };
+
+    std::array<VertexIdx, 3> const triVrtx
+    {
+        sharedOffset + triShared[0].value,
+        sharedOffset + triShared[1].value,
+        sharedOffset + triShared[2].value
+    };
+
+    if (detailX2 == ECornerDetailX2::None)
+    {
+        // Add 1 triangle normally
+        //        1
+        //       / \
+        //      /   \
+        //     2-----0
+        emit_face(triVrtx[0], triVrtx[1], triVrtx[2]);
+    }
+    else if constexpr (detailX2 == ECornerDetailX2::Right)
+    {
+        // Add 2 triangles: 'right' side has higher detail
+        //             1
+        //            / \
+        //           /   \
+        //          /    MID
+        //         /  _-'  \
+        //        /_-'      \
+        //       2'----------0
+
+        SkVrtxId const skelA   = rSkChunks.m_sharedSkVrtx[triShared[1]];
+        SkVrtxId const skelB   = rSkChunks.m_sharedSkVrtx[triShared[2]];
+        SkVrtxId const skelMid = rSkeleton.vrtx_ids().try_get(skelA, skelB);
+
+        if (skelMid != lgrn::id_null<SkVrtxId>())
+        {
+            SharedVrtxId const sharedMid = rSkChunks.m_skVrtxToShared[skelMid];
+            VertexIdx const    vrtxMid   = sharedOffset + sharedMid.value;
+
+            emit_face(triVrtx[2], triVrtx[1], vrtxMid);
+            emit_face(triVrtx[2], vrtxMid, triVrtx[0]);
+        }
+        else
+        {
+            emit_face(triVrtx[0], triVrtx[1], triVrtx[2]);
+        }
+    }
+    else if constexpr (detailX2 == ECornerDetailX2::Left)
+    {
+        // Add 2 triangles: 'left' side has higher detail.
+        //             1
+        //            / \
+        //           /   \
+        //         MID    \
+        //         /  `-_  \
+        //        /      `-_\
+        //       2----------`0
+
+        SkVrtxId const skelA   = rSkChunks.m_sharedSkVrtx[triShared[1]];
+        SkVrtxId const skelB   = rSkChunks.m_sharedSkVrtx[triShared[2]];
+        SkVrtxId const skelMid = rSkeleton.vrtx_ids().try_get(skelA, skelB);
+
+        if (skelMid != lgrn::id_null<SkVrtxId>())
+        {
+            SharedVrtxId const sharedMid = rSkChunks.m_skVrtxToShared[skelMid];
+            VertexIdx const    vrtxMid   = sharedOffset + sharedMid.value;
+
+            emit_face(triVrtx[0], triVrtx[1], vrtxMid);
+            emit_face(triVrtx[0], vrtxMid, triVrtx[2]);
+        }
+        else
+        {
+            emit_face(triVrtx[0], triVrtx[1], triVrtx[2]);
+        }
+    }
+}
+
+template <typename FUNCTOR_T>
+template <int side, bool detailX2>
+void ChunkFanStitcher<FUNCTOR_T>::edge()
+{
+    int const fillWidth = rSkChunks.m_chunkWidth - 2;
+
+    int sharedLocalA    {};
+    int sharedLocalB    {};
+    int fillTriangular  {};
+    int triRowSize      {};
+
+    sharedLocalA = side*chunkWidth + 1;
+    sharedLocalB = side*chunkWidth + 2;
+
+    if constexpr (side == 0)
+    {
+        fillTriangular = xy_to_triangular(0, 0);
+        triRowSize = 1;
+    }
+    else if constexpr (side == 1)
+    {
+        fillTriangular = xy_to_triangular(0, fillWidth-1);
+        // triRowSize = don't care
+    }
+    else if constexpr (side == 2)
+    {
+        fillTriangular = xy_to_triangular(fillWidth-1, fillWidth-1);
+        triRowSize = fillWidth;
+    }
+
+    for (int i = 0; i < fillWidth; ++i)
+    {
+        SharedVrtxId const sharedA = chunkSharedVertices[sharedLocalA].value();
+        SharedVrtxId const sharedB = chunkSharedVertices[sharedLocalB].value();
+
+        VertexIdx const vrtxA = sharedOffset + sharedA.value;
+        VertexIdx const vrtxB = sharedOffset + sharedB.value;
+        VertexIdx const vrtxC = chunkFillOffset + fillTriangular;
+
+        if constexpr (detailX2)
+        {
+            //         A
+            //        / \
+            //       /   \
+            //      /    MID
+            //     /  _-'  \
+            //    /_-'      \
+            //   C'----------B
+
+            SkVrtxId const skelA   = rSkChunks.m_sharedSkVrtx[sharedA];
+            SkVrtxId const skelB   = rSkChunks.m_sharedSkVrtx[sharedB];
+            SkVrtxId const skelMid = rSkeleton.vrtx_ids().try_get(skelA, skelB);
+
+            if (skelMid != lgrn::id_null<SkVrtxId>())
+            {
+                SharedVrtxId const sharedMid = rSkChunks.m_skVrtxToShared[skelMid];
+                VertexIdx const    vrtxMid   = sharedOffset + sharedMid.value;
+
+                emit_face(vrtxA, vrtxMid, vrtxC);
+                emit_face(vrtxC, vrtxMid, vrtxB);
+            }
+            else
+            {
+                emit_face(vrtxA, vrtxB, vrtxC);
+            }
+        }
+        else
+        {
+            emit_face(vrtxA, vrtxB, vrtxC);
+        }
+
+        ++sharedLocalA;
+        ++sharedLocalB;
+
+        if constexpr (side == 0)
+        {
+            fillTriangular += triRowSize;
+            ++triRowSize;
+        }
+        else if constexpr (side == 1)
+        {
+            fillTriangular += 1;
+        }
+        else if constexpr (side == 2)
+        {
+            fillTriangular -= triRowSize;
+            --triRowSize;
+        }
+    }
+}
+
+} // namespace planeta
