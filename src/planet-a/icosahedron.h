@@ -39,19 +39,62 @@ namespace planeta
 inline constexpr std::uint8_t const gc_icoVrtxCount = 12;
 inline constexpr std::uint8_t const gc_icoTriCount = 20;
 
-// Ratio between an icosahedron's edge length and radius
-// = sqrt(10.0 + 2.0 * sqrt(5.0)) / 4.0;
-inline constexpr double const sc_icoEdgeRatio = 0.95105651629f;
+inline constexpr std::array<osp::Vector3d, 12> gc_icoVrtxPos
+{{
+    { 0.000000000000000e+0,  0.000000000000000e+0,  1.000000000000000e+0},
+    { 8.944271909999159e-1,  0.000000000000000e+0,  4.472135954999579e-1},
+    { 2.763932022500210e-1, -8.506508083520400e-1,  4.472135954999579e-1},
+    {-7.236067977499790e-1, -5.257311121191336e-1,  4.472135954999579e-1},
+    {-7.236067977499790e-1,  5.257311121191336e-1,  4.472135954999579e-1},
+    { 2.763932022500210e-1,  8.506508083520400e-1,  4.472135954999579e-1},
+    {-8.944271909999159e-1,  0.000000000000000e+0, -4.472135954999579e-1},
+    {-2.763932022500210e-1, -8.506508083520400e-1, -4.472135954999579e-1},
+    { 7.236067977499790e-1, -5.257311121191336e-1, -4.472135954999579e-1},
+    { 7.236067977499790e-1,  5.257311121191336e-1, -4.472135954999579e-1},
+    {-2.763932022500210e-1,  8.506508083520400e-1, -4.472135954999579e-1},
+    { 0.000000000000000e+0,  0.000000000000000e+0, -1.000000000000000e+0}
+}};
 
-// The 20 faces of the icosahedron {Top, Left, Right}
-// Each number refers to one of 12 initial vertices
-inline constexpr std::array<std::array<uint8_t, 3>, 20> sc_icoTriLUT
+/**
+ * @brief Indices for the 20 triangular faces of the icosahedron {Top, Left, Right}
+ */
+inline constexpr std::array<std::array<uint8_t, 3>, 20> gc_icoIndx
 {{
     { 0,  2,  1},  { 0,  3,  2},  { 0,  4,  3},  { 0,  5,  4},  { 0,  1,  5},
     { 8,  1,  2},  { 2,  7,  8},  { 7,  2,  3},  { 3,  6,  7},  { 6,  3,  4},
     { 4, 10,  6},  {10,  4,  5},  { 5,  9, 10},  { 9,  5,  1},  { 1,  8,  9},
     {11,  7,  6},  {11,  8,  7},  {11,  9,  8},  {11, 10,  9},  {11,  6, 10}
 }};
+
+/**
+ * @brief Icosahedron Minimum Edge Length vs Subdiv Levels, radius = 1.0
+ */
+inline constexpr std::array<float, 10> const gc_icoMinEdgeVsSubdiv
+{
+    1.05146222e+0f,  5.46533058e-1f,  2.75904484e-1f,  1.38283174e-1f,  6.91829904e-2f,
+    3.45966718e-2f,  1.72989830e-2f,  8.64957239e-3f,  4.32479631e-3f,  2.16239942e-3f
+};
+
+/**
+ * @brief Icosahedron Maximum Edge Length vs Subdiv Levels, radius = 1.0
+ */
+inline constexpr std::array<float, 10> const gc_icoMaxEdgeVsSubdiv
+{
+    1.05146222e+0f,  6.18033989e-1f,  3.24919696e-1f,  1.64647160e-1f,  8.26039665e-2f,
+    4.13372560e-2f,  2.06730441e-2f,  1.03370743e-2f,  5.16860619e-3f,  2.58431173e-3f
+};
+
+/**
+ * @brief Tower height required to clear the horizon over an edge vs Subdiv levels, radius = 1.0
+ *
+ * If identical towers were built on the two vertices spanning an edge, this is how high each tower
+ * needs to be in order to see each other over the horizon.
+ */
+inline constexpr std::array<float, 10> const gc_icoTowerOverHorizonVsSubdiv
+{
+    1.75570505e-1f,  3.95676520e-2f,  9.65341549e-3f,  2.39888395e-3f,  5.98823224e-4f,
+    1.49649798e-4f,  3.74089507e-5f,  9.35201901e-6f,  2.33799109e-6f,  5.84496918e-7f
+};
 
 /**
  * @brief Create an icosahedron shaped Triangle Mesh Skeleton

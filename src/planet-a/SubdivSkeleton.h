@@ -25,6 +25,7 @@
 #pragma once
 
 #include <osp/core/array_view.h>
+#include <osp/core/copymove_macros.h>
 #include <osp/core/keyed_vector.h>
 #include <osp/core/strong_id.h>
 
@@ -42,6 +43,14 @@
 namespace planeta
 {
 
+/**
+ * @brief Concatenate bits of two uint32 ints into a uint64
+ */
+constexpr std::uint64_t combine_u32(std::uint32_t const lhs, std::uint32_t const rhs) noexcept
+{
+    return (std::uint64_t(lhs) << (sizeof(std::uint32_t) * 8)) | std::uint64_t(rhs);
+}
+
 //-----------------------------------------------------------------------------
 
 /**
@@ -57,8 +66,6 @@ class SubdivIdTree : private lgrn::IdRegistryStl<ID_T>
 
     static_assert(std::is_integral_v<id_int_t> && sizeof(ID_T) <= 4,
                   "ID_T must be an integral type, 4 bytes or less in size");
-
-    using combination_t = uint64_t;
 
 public:
 
@@ -91,7 +98,7 @@ public:
      */
     ID_T create_or_get(ID_T const a, ID_T const b)
     {
-        combination_t const combination = hash_id_combination(a, b);
+        std::uint64_t const combination = hash_id_combination(a, b);
 
         // Try emplacing a blank element under this combination of IDs, or get
         // existing element
@@ -119,13 +126,13 @@ public:
 
     [[nodiscard]] ID_T get(ID_T a, ID_T b) const
     {
-        combination_t const combination = hash_id_combination(a, b);
+        std::uint64_t const combination = hash_id_combination(a, b);
         return ID_T(m_parentsToId.at(combination));
     }
 
     [[nodiscard]] ID_T try_get(ID_T a, ID_T b) const
     {
-        combination_t const combination = hash_id_combination(a, b);
+        std::uint64_t const combination = hash_id_combination(a, b);
         auto const found = m_parentsToId.find(combination);
         return found != m_parentsToId.end() ? ID_T(found->second) : lgrn::id_null<ID_T>();
     }
@@ -149,29 +156,20 @@ public:
 private:
 
     /**
-     * @brief Create a unique hash for two unordered IDs a and b
-     *
-     * @param a [in] ID to hash
-     * @param b [in] ID to hash
-     *
-     * @return Hash unique to combination
+     * @brief Create a unique hash for two unordered IDs
      */
-    static constexpr combination_t
-    hash_id_combination(ID_T const a, ID_T const b) noexcept
+    static constexpr std::uint64_t hash_id_combination(ID_T const a, ID_T const b) noexcept
     {
         // Sort to make A and B order-independent
         id_int_t const ls = id_int_t(std::min(a, b));
         id_int_t const ms = id_int_t(std::max(a, b));
 
-        // Concatenate bits of ls and ms into a 2x larger integer
-        // This can be two 32-bit ints being combined into a 64-bit int
-        return combination_t(ls)
-                | (combination_t(ms) << (sizeof(id_int_t) * 8));
+        return combine_u32(ms, ls);
     }
 
-    std::unordered_map<combination_t, id_int_t> m_parentsToId;
-    std::vector<combination_t> m_idToParents;
-    std::vector<uint8_t> m_idChildCount;
+    std::unordered_map<std::uint64_t, id_int_t> m_parentsToId;
+    std::vector<std::uint64_t>                  m_idToParents;
+    std::vector<uint8_t>                        m_idChildCount;
 
 }; // class SubdivTree
 
@@ -345,8 +343,7 @@ public:
 
     SubdivTriangleSkeleton() = default;
 
-    SubdivTriangleSkeleton(SubdivTriangleSkeleton const&) = delete;
-    SubdivTriangleSkeleton(SubdivTriangleSkeleton&& move) = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(SubdivTriangleSkeleton);
 
     ~SubdivTriangleSkeleton()
     {
@@ -439,6 +436,11 @@ public:
         }
     }
 
+    SkTriGroup const& tri_group_at(SkTriGroupId const group)
+    {
+        return m_triData.at(group);
+    }
+
     /**
      * @brief Resize data to fit all possible IDs
      */
@@ -493,7 +495,7 @@ public:
     /**
      * @return Read-only access to Triangle IDs
      */
-    constexpr lgrn::IdRegistryStl<SkTriGroupId> const& tri_ids() const { return m_triIds; }
+    constexpr lgrn::IdRegistryStl<SkTriGroupId> const& tri_group_ids() const { return m_triIds; }
 
     /**
      * @brief Subdivide a triangle, creating a new group (4 new triangles)

@@ -35,75 +35,6 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
         std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals)
 {
-    // Create an Icosahedron. Blender style, so there's a vertex directly on
-    // top and directly on the bottom. Basicly, a sandwich of two pentagons,
-    // rotated 180 apart from each other, and each 1/sqrt(5) above and below
-    // the origin.
-    //
-    // Icosahedron indices viewed from above (Z)
-    //
-    //          5
-    //  4
-    //
-    //        0      1
-    //
-    //  3
-    //          2
-    //
-    // Useful page from wolfram:
-    // https://mathworld.wolfram.com/RegularPentagon.html
-    //
-    // The 'radius' of the pentagons are NOT 1.0, as they are slightly above or
-    // below the origin. They have to be slightly smaller to keep their
-    // distance to the 3D origin as 1.0.
-    //
-    // it works out to be (2/5 * sqrt(5)) ~~ 90% the size of a typical pentagon
-    //
-    // Equations 5..8 from the wolfram page:
-    // c1 = 1/4 * ( sqrt(5) - 1 )
-    // c2 = 1/4 * ( sqrt(5) + 1 )
-    // s1 = 1/4 * sqrt( 10 + 2*sqrt(5) )
-    // s2 = 1/4 * sqrt( 10 - 2*sqrt(5) )
-    //
-    // Now multiply by (2/5 * sqrt(5)), using auto-simplify
-    // let m = (2/5 * sqrt(5))
-    // cxA = m * c1 = 1/2 - sqrt(5)/10
-    // cxB = m * c2 = 1/2 + sqrt(5)/10
-    // syA = m * s1 = 1/10 * sqrt( 10 * (5 + sqrt(5)) )
-    // syN = m * s2 = 1/10 * sqrt( 10 * (5 - sqrt(5)) )
-
-    using std::sqrt; // if only sqrt was constexpr
-
-    // Height of pentagon within the icosahedron
-    double const hei = 1.0/sqrt(5.0);
-
-    // Circumcircle radius of pentagon
-    double const cmR = 2.0/5.0 * sqrt(5.0);
-
-    // X and Y coordinates of pentagon
-    double const cxA = 1.0/2.0 - sqrt(5.0)/10.0;
-    double const cxB = 1.0/2.0 + sqrt(5)/10.0;
-    double const syA = 1.0/10.0 * sqrt( 10.0 * (5.0+sqrt(5.0)) );
-    double const syB = 1.0/10.0 * sqrt( 10.0 * (5.0-sqrt(5.0)) );
-
-    std::array<osp::Vector3d, 12> const icosahedronVrtx
-    {{
-        { 0.0,    0.0,    1.0}, // top point
-
-        { cmR,   0.0f,    hei}, // 1 top pentagon
-        { cxA,   -syA,    hei}, // 2
-        {-cxB,   -syB,    hei}, // 3
-        {-cxB,    syB,    hei}, // 4
-        { cxA,    syA,    hei}, // 5
-
-        {-cmR,   0.0f,   -hei}, // 6 bottom pentagon
-        {-cxA,   -syA,   -hei}, // 7
-        { cxB,   -syB,   -hei}, // 8
-        { cxB,    syB,   -hei}, // 9
-        {-cxA,    syA,   -hei}, // 10
-
-        {0.0f,   0.0f,  -1.0f}  // 11 bottom point
-    }};
 
     // Create the skeleton
 
@@ -125,20 +56,20 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
 
     for (int i = 0; i < gc_icoVrtxCount; i ++)
     {
-        rPositions[i] = osp::Vector3l(icosahedronVrtx[i] * radius * scale);
-        rNormals[i] = osp::Vector3(icosahedronVrtx[i]);
+        rPositions[i] = osp::Vector3l(gc_icoVrtxPos[i] * radius * scale);
+        rNormals[i] = osp::Vector3(gc_icoVrtxPos[i]);
     }
 
     // Add initial triangles
 
     // Create 20 root triangles by forming 5 groups. each group is 4 triangles
-    skeleton.tri_group_reserve(skeleton.tri_ids().size() + 5);
+    skeleton.tri_group_reserve(skeleton.tri_group_ids().size() + 5);
 
     auto const vrtx_id_lut = [&vrtxIds] (int i) -> std::array<SkVrtxId, 3>
     {
-        return { vrtxIds[ sc_icoTriLUT[i][0] ],
-                 vrtxIds[ sc_icoTriLUT[i][1] ],
-                 vrtxIds[ sc_icoTriLUT[i][2] ] };
+        return { vrtxIds[ gc_icoIndx[i][0] ],
+                 vrtxIds[ gc_icoIndx[i][1] ],
+                 vrtxIds[ gc_icoIndx[i][2] ] };
     };
 
     for (int i = 0; i < gc_icoTriCount; i += 4)
@@ -159,17 +90,23 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
     return skeleton;
 }
 
-void subdiv_curvature(
+/**
+ * @brief Calculate middle point on a sphere's surface given two other points on the sphere
+ */
+void sphere_midpoint(
         double const radius, float const scale, osp::Vector3l const a, osp::Vector3l const b,
         osp::Vector3l &rPos, osp::Vector3 &rNorm) noexcept
 {
-    osp::Vector3l const avg = (a + b) / 2;
-    osp::Vector3d const avgDouble = osp::Vector3d(avg) / scale;
-    float const avgLen = avgDouble.length();
-    float const roundness = radius - avgLen;
+    // This is simply "rPos = (a + b).normalized() * radius * scale", but avoids squaring
+    // potentially massive numbers and tries to improve precision
 
-    rNorm = osp::Vector3(avgDouble / avgLen);
-    rPos = avg + osp::Vector3l(rNorm * roundness * scale);
+    osp::Vector3l const mid = (a + b) / 2;
+    osp::Vector3d const midD = osp::Vector3d(mid) / scale;
+    float const midLen = midD.length();
+    float const roundness = radius - midLen;
+
+    rNorm = osp::Vector3(midD / midLen);
+    rPos = mid + osp::Vector3l(rNorm * roundness * scale);
 }
 
 void planeta::ico_calc_middles(
@@ -184,14 +121,14 @@ void planeta::ico_calc_middles(
 
     float const scale = std::pow(2.0f, pow2scale);
 
-    subdiv_curvature(radius, scale, pos(vrtxCorner[0]), pos(vrtxCorner[1]),
-                     pos(vrtxMid[0]), nrm(vrtxMid[0]));
+    sphere_midpoint(radius, scale, pos(vrtxCorner[0]), pos(vrtxCorner[1]),
+                    pos(vrtxMid[0]), nrm(vrtxMid[0]));
 
-    subdiv_curvature(radius, scale, pos(vrtxCorner[1]), pos(vrtxCorner[2]),
-                     pos(vrtxMid[1]), nrm(vrtxMid[1]));
+    sphere_midpoint(radius, scale, pos(vrtxCorner[1]), pos(vrtxCorner[2]),
+                    pos(vrtxMid[1]), nrm(vrtxMid[1]));
 
-    subdiv_curvature(radius, scale, pos(vrtxCorner[2]), pos(vrtxCorner[0]),
-                     pos(vrtxMid[2]), nrm(vrtxMid[2]));
+    sphere_midpoint(radius, scale, pos(vrtxCorner[2]), pos(vrtxCorner[0]),
+                    pos(vrtxMid[2]), nrm(vrtxMid[2]));
 }
 
 
@@ -216,8 +153,8 @@ void planeta::ico_calc_chunk_edge_recurse(
     size_t const halfSize = vrtxs.size() / 2;
     SkVrtxId const mid = vrtxs[halfSize];
 
-    subdiv_curvature(radius, std::pow(2.0f, pow2scale), pos(a), pos(b),
-                     pos(mid), nrm(mid));
+    sphere_midpoint(radius, std::pow(2.0f, pow2scale), pos(a), pos(b),
+                    pos(mid), nrm(mid));
 
     ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, a, mid,
                                 vrtxs.prefix(halfSize), rPositions, rNormals);
