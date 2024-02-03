@@ -203,6 +203,9 @@ SET_TARGET_PROPERTIES(dAnimation dContainers dCustomJoints dMath dModel dNewton 
 
 ADD_SUBDIRECTORY(entt EXCLUDE_FROM_ALL)
 
+# toml11 3.8.0 added a check for this global variable, which they should not have.
+# https://github.com/ToruNiina/toml11/issues/241
+SET(CMAKE_CXX_STANDARD 20)
 SET(toml11_INSTALL OFF CACHE BOOL "" FORCE)
 ADD_SUBDIRECTORY(toml11 EXCLUDE_FROM_ALL)
 
