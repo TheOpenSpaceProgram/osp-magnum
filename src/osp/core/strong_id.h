@@ -49,7 +49,7 @@ struct StrongId
     constexpr StrongId(StrongId const& copy) noexcept = default;
     constexpr StrongId& operator=(StrongId const& copy) noexcept = default;
 
-    static StrongId from_index(std::size_t const index)
+    static constexpr StrongId from_index(std::size_t const index) noexcept
     {
         return StrongId{static_cast<INT_T>(index)};
     }
@@ -69,6 +69,11 @@ struct StrongId
     }
 
     constexpr auto operator<=>(StrongId const&) const = default;
+
+    constexpr bool has_value() const noexcept
+    {
+        return *this != StrongId{};
+    }
 
     INT_T value{ lgrn::id_null<StrongId>() };
 };
