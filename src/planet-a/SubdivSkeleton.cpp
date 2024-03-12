@@ -22,24 +22,111 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 #include "SubdivSkeleton.h"
 
 using namespace planeta;
 
-SkTriGroupId SubdivTriangleSkeleton::tri_subdiv(SkTriId const triId,
-                                                std::array<SkVrtxId, 3> const vrtxMid)
+SubdivTriangleSkeleton::~SubdivTriangleSkeleton()
+{
+    // Release the 3 Vertex IDs of each triangle
+    for (uint32_t i = 0; i < m_triIds.capacity(); i ++)
+    {
+        if ( ! m_triIds.exists(SkTriGroupId(i)))
+        {
+            continue;
+        }
+
+        for (SkeletonTriangle& rTri : m_triData[SkTriGroupId(i)].triangles)
+        {
+            for (SkVrtxOwner_t& rVrtx : rTri.vertices)
+            {
+                vrtx_release(rVrtx);
+            }
+        }
+    }
+}
+
+void SubdivTriangleSkeleton::vrtx_create_chunk_edge_recurse(
+            unsigned int const level,
+            SkVrtxId a, SkVrtxId b,
+            osp::ArrayView< SkVrtxId > rOut)
+{
+        LGRN_ASSERTV(rOut.size() == ( (1<<level) - 1),
+                     rOut.size(), ( (1<<level) - 1));
+
+        SkVrtxId const mid = vrtx_create_or_get_child(a, b).id;
+        size_t const halfSize = rOut.size() / 2;
+        rOut[halfSize] = mid;
+
+        if (level > 1)
+        {
+            vrtx_create_chunk_edge_recurse(level - 1, a, mid, rOut.prefix(halfSize));
+            vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.exceptPrefix(halfSize + 1));
+        }
+    }
+
+SkTriGroupPair SubdivTriangleSkeleton::tri_group_create(
+        uint8_t const depth,
+        SkTriId const parentId,
+        SkeletonTriangle &rParent,
+        std::array<std::array<SkVrtxId, 3>, 4> const vertices)
+{
+    SkTriGroupId const groupId = m_triIds.create();
+    rParent.children = groupId;
+
+    tri_group_resize_fit_ids(); // invalidates rParent
+
+    SkTriGroup &rGroup = m_triData[groupId];
+    rGroup.parent = parentId;
+    rGroup.depth = depth;
+
+    for (int i = 0; i < 4; i ++)
+    {
+        SkeletonTriangle &rTri = rGroup.triangles[i];
+        rTri.vertices = {
+            vrtx_store(vertices[i][0]),
+            vrtx_store(vertices[i][1]),
+            vrtx_store(vertices[i][2])
+        };
+    }
+    return {groupId, rGroup};
+}
+
+SkTriGroupPair SubdivTriangleSkeleton::tri_group_create_root(
+        uint8_t const depth,
+        std::array<std::array<SkVrtxId, 3>, 4> const vertices)
+{
+    SkTriGroupId const groupId = m_triIds.create();
+
+    tri_group_resize_fit_ids();
+
+    SkTriGroup &rGroup = m_triData[groupId];
+    rGroup.depth = depth;
+
+    for (int i = 0; i < 4; i ++)
+    {
+        SkeletonTriangle &rTri = rGroup.triangles[i];
+        rTri.vertices = {
+            vrtx_store(vertices[i][0]),
+            vrtx_store(vertices[i][1]),
+            vrtx_store(vertices[i][2])
+        };
+    }
+    return {groupId, rGroup};
+}
+
+SkTriGroupPair SubdivTriangleSkeleton::tri_subdiv(
+        SkTriId                 const triId,
+        std::array<SkVrtxId, 3> const vrtxMid)
 {
     SkeletonTriangle &rTri = tri_at(triId);
 
-    if (rTri.m_children.has_value())
-    {
-        throw std::runtime_error("SkeletonTriangle is already subdivided");
-    }
+    LGRN_ASSERTM(!rTri.children.has_value(), "SkeletonTriangle is already subdivided");
 
     SkTriGroup const& parentGroup = m_triData[tri_group_id(triId)];
 
-    auto corner = [&rTri]    (int i) -> SkVrtxId { return rTri.m_vertices[i]; };
+    std::array<SkVrtxId, 3> corner = {rTri.vertices[0], rTri.vertices[1], rTri.vertices[2]};
+\
     auto middle = [&vrtxMid] (int i) -> SkVrtxId { return vrtxMid[i]; };
 
     // c?: Corner vertex corner(?) aka: rTri.m_vertices[?]
@@ -57,20 +144,29 @@ SkTriGroupId SubdivTriangleSkeleton::tri_subdiv(SkTriId const triId,
     //   /______\/______\
     // c1       m1       c2
     //
-    SkTriGroupId const groupId = tri_group_create(
-        parentGroup.m_depth + 1,
+    SkTriGroupPair const group = tri_group_create(
+        parentGroup.depth + 1,
         triId,
+        rTri,
         {{
-            { corner(0), middle(0), middle(2) }, // 0: Top
-            { middle(0), corner(1), middle(1) }, // 1: Left
-            { middle(2), middle(1), corner(2) }, // 2: Right
+            { corner[0], middle(0), middle(2) }, // 0: Top
+            { middle(0), corner[1], middle(1) }, // 1: Left
+            { middle(2), middle(1), corner[2] }, // 2: Right
             { middle(1), middle(2), middle(0) }  // 3: Center
         }}
     );
 
-    rTri.m_children = groupId;
+    // Triangle 3 neighbors all of its siblings
+    group.rGroup.triangles[0].neighbors[1] = tri_store(tri_id(group.id, 3));
+    group.rGroup.triangles[1].neighbors[2] = tri_store(tri_id(group.id, 3));
+    group.rGroup.triangles[2].neighbors[0] = tri_store(tri_id(group.id, 3));
+    group.rGroup.triangles[3].neighbors = {
+        tri_store(tri_id(group.id, 2)),
+        tri_store(tri_id(group.id, 0)),
+        tri_store(tri_id(group.id, 1))
+    };
 
-    return groupId;
+    return group;
 }
 
 //-----------------------------------------------------------------------------
@@ -109,7 +205,7 @@ ChunkId SkeletonChunks::chunk_create(
 
         osp::ArrayView<SkVrtxId> const edge = edges[i];
         {
-            SharedVrtxId const sharedId = shared_get_or_create(tri.m_vertices[i], rSkel);
+            SharedVrtxId const sharedId = shared_get_or_create(tri.vertices[i], rSkel);
             sharedSpace[cornerOffset] = shared_store(sharedId);
         }
         for (unsigned int j = 0; j < m_chunkWidth - 1; j ++)

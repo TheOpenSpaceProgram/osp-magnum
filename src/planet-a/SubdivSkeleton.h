@@ -24,6 +24,7 @@
  */
 #pragma once
 
+#include <osp/core/math_2pow.h>
 #include <osp/core/array_view.h>
 #include <osp/core/copymove_macros.h>
 #include <osp/core/keyed_vector.h>
@@ -36,7 +37,6 @@
 
 #include <limits>
 #include <memory>
-#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -46,12 +46,19 @@ namespace planeta
 /**
  * @brief Concatenate bits of two uint32 ints into a uint64
  */
-constexpr std::uint64_t combine_u32(std::uint32_t const lhs, std::uint32_t const rhs) noexcept
+constexpr std::uint64_t concat_u32(std::uint32_t const lhs, std::uint32_t const rhs) noexcept
 {
     return (std::uint64_t(lhs) << (sizeof(std::uint32_t) * 8)) | std::uint64_t(rhs);
 }
 
 //-----------------------------------------------------------------------------
+
+template<typename ID_T>
+struct MaybeNewId
+{
+    ID_T id;
+    bool isNew;
+};
 
 /**
  * @brief A multitree directed acyclic graph of reusable IDs where new IDs can
@@ -96,7 +103,7 @@ public:
      *
      * @return New ID created
      */
-    ID_T create_or_get(ID_T const a, ID_T const b)
+    MaybeNewId<ID_T> create_or_get(ID_T const a, ID_T const b)
     {
         std::uint64_t const combination = hash_id_combination(a, b);
 
@@ -108,7 +115,7 @@ public:
         {
             // The space was free, and a new element was succesfully emplaced
 
-            // Create a new ID for real, replacing the blank one from before
+            // Create a new ID for real, replacing the blank one from before (it->second is a reference)
             it->second = id_int_t(create_root());
 
             // Keep track of the new ID's parents
@@ -120,7 +127,7 @@ public:
             m_idChildCount[size_t(b)] ++;
         }
 
-        return ID_T(it->second);
+        return { ID_T(it->second), success };
     }
 
 
@@ -161,10 +168,10 @@ private:
     static constexpr std::uint64_t hash_id_combination(ID_T const a, ID_T const b) noexcept
     {
         // Sort to make A and B order-independent
-        id_int_t const ls = id_int_t(std::min(a, b));
-        id_int_t const ms = id_int_t(std::max(a, b));
+        auto const ls = id_int_t(std::min(a, b));
+        auto const ms = id_int_t(std::max(a, b));
 
-        return combine_u32(ms, ls);
+        return concat_u32(ms, ls);
     }
 
     std::unordered_map<std::uint64_t, id_int_t> m_parentsToId;
@@ -177,7 +184,7 @@ private:
 
 enum class SkVrtxId : uint32_t {};
 
-using SkVrtxStorage_t = lgrn::IdRefCount<SkVrtxId>::Owner_t;
+using SkVrtxOwner_t = lgrn::IdRefCount<SkVrtxId>::Owner_t;
 
 /**
  * @brief Uses a SubdivIdTree to manage relationships between Vertex IDs, and
@@ -206,7 +213,7 @@ public:
      *
      * @return New Vertex ID created
      */
-    SkVrtxId vrtx_create_or_get_child(SkVrtxId const a, SkVrtxId const b)
+    MaybeNewId<SkVrtxId> vrtx_create_or_get_child(SkVrtxId const a, SkVrtxId const b)
     {
         return m_vrtxIdTree.create_or_get(a, b);
     }
@@ -218,7 +225,7 @@ public:
      *
      * @return Vertex ID Storage
      */
-    SkVrtxStorage_t vrtx_store(SkVrtxId const vrtxId)
+    SkVrtxOwner_t vrtx_store(SkVrtxId const vrtxId)
     {
         return m_vrtxRefCount.ref_add(vrtxId);
     }
@@ -227,11 +234,11 @@ public:
      * @brief Safely cleares the contents of a Vertex ID storage, making it safe
      *        to destruct.
      *
-     * @param rStorage [ref] Storage to release
+     * @param rStorage [ref] Owner to release
      */
-    void vrtx_release(SkVrtxStorage_t &rStorage)
+    void vrtx_release(SkVrtxOwner_t &rOwner)
     {
-        m_vrtxRefCount.ref_release(std::move(rStorage));
+        m_vrtxRefCount.ref_release(std::move(rOwner));
     }
 
     /**
@@ -263,8 +270,8 @@ private:
 
 //-----------------------------------------------------------------------------
 
-enum class SkTriId : uint32_t {};
-enum class SkTriGroupId : uint32_t {};
+using SkTriId      = osp::StrongId<std::uint32_t, struct DummyForSkTriId>;
+using SkTriGroupId = osp::StrongId<std::uint32_t, struct DummyForSkTriGroupId>;
 
 using SkTriOwner_t = lgrn::IdRefCount<SkTriId>::Owner_t;
 
@@ -278,33 +285,45 @@ struct SkeletonTriangle
     //    /     \
     //   1 _____ 2
     //
-    std::array<SkVrtxStorage_t, 3> m_vertices;
+    std::array<SkVrtxOwner_t, 3>    vertices;
 
-    std::optional<SkTriGroupId> m_children;
+    std::array<SkTriOwner_t, 3>     neighbors;
+    SkTriGroupId                    children;
 
 }; // struct SkeletonTriangle
 
-// Skeleton triangles are added and removed in groups of 4
+/**
+ * @brief Group of 4 Skeleton triangles (resulting from subdividing existing ones)
+ *
+ * Subdivided triangles are arranged in m_triangles as followed:
+ *
+ *   0: Top   1: Left   2: Right   3: Center
+ *
+ *          /\
+ *         /  \
+ *        / t0 \
+ *       /______\
+ *      /\      /\
+ *     /  \ t3 /  \
+ *    / t1 \  / t2 \
+ *   /______\/______\
+ *
+ * Center is upside-down, it's 'top' vertex is the bottom-middle one
+ * This arrangement may not apply for root triangles.
+ */
 struct SkTriGroup
 {
-    // Subdivided triangles are arranged in m_triangles as followed:
-    // 0: Top   1: Left   2: Right   3: Center
-    //
-    //        /\
-    //       /  \
-    //      / t0 \
-    //     /______\
-    //    /\      /\
-    //   /  \ t3 /  \
-    //  / t1 \  / t2 \
-    // /______\/______\
-    //
-    // Center is upside-down, it's 'top' vertex is the bottom-middle one
-    // This arrangement may not apply for root triangles.
-    std::array<SkeletonTriangle, 4> m_triangles;
 
-    SkTriId m_parent;
-    uint8_t m_depth;
+    std::array<SkeletonTriangle, 4> triangles;
+
+    SkTriId parent;
+    uint8_t depth;
+};
+
+struct SkTriGroupPair
+{
+    SkTriGroupId id;
+    SkTriGroup& rGroup;
 };
 
 /**
@@ -345,25 +364,7 @@ public:
 
     OSP_MOVE_ONLY_CTOR_ASSIGN(SubdivTriangleSkeleton);
 
-    ~SubdivTriangleSkeleton()
-    {
-        // Release the 3 Vertex IDs of each triangle
-        for (uint32_t i = 0; i < m_triIds.capacity(); i ++)
-        {
-            if ( ! m_triIds.exists(SkTriGroupId(i)))
-            {
-                continue;
-            }
-
-            for (SkeletonTriangle& rTri : m_triData[SkTriGroupId(i)].m_triangles)
-            {
-                for (SkVrtxStorage_t& rVrtx : rTri.m_vertices)
-                {
-                    vrtx_release(rVrtx);
-                }
-            }
-        }
-    }
+    ~SubdivTriangleSkeleton();
 
     /**
      * @brief Get or Create 3 Vertex IDs between the 3 other Vertex IDs
@@ -375,14 +376,12 @@ public:
      *
      * @return 3 newly created or obtained Vertex IDs
      */
-    std::array<SkVrtxId, 3> vrtx_create_middles(
+    std::array<MaybeNewId<SkVrtxId>, 3> vrtx_create_middles(
             std::array<SkVrtxId, 3> const& vertices)
     {
-        return {
-            vrtx_create_or_get_child(vertices[0], vertices[1]),
-            vrtx_create_or_get_child(vertices[1], vertices[2]),
-            vrtx_create_or_get_child(vertices[2], vertices[0])
-        };
+        return { vrtx_create_or_get_child(vertices[0], vertices[1]),
+                 vrtx_create_or_get_child(vertices[1], vertices[2]),
+                 vrtx_create_or_get_child(vertices[2], vertices[0]) };
     }
 
     /**
@@ -418,25 +417,15 @@ public:
     void vrtx_create_chunk_edge_recurse(
             unsigned int const level,
             SkVrtxId a, SkVrtxId b,
-            osp::ArrayView< SkVrtxId > rOut)
+            osp::ArrayView< SkVrtxId > rOut);
+
+
+    SkTriGroup const& tri_group_at(SkTriGroupId const group) const
     {
-        if (rOut.size() != ( (1 << level) - 1) )
-        {
-            throw std::runtime_error("Incorrect ");
-        }
-
-        SkVrtxId const mid = vrtx_create_or_get_child(a, b);
-        size_t const halfSize = rOut.size() / 2;
-        rOut[halfSize] = mid;
-
-        if (level > 1)
-        {
-            vrtx_create_chunk_edge_recurse(level - 1, a, mid, rOut.prefix(halfSize));
-            vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.exceptPrefix(halfSize + 1));
-        }
+        return m_triData.at(group);
     }
 
-    SkTriGroup const& tri_group_at(SkTriGroupId const group)
+    SkTriGroup& tri_group_at(SkTriGroupId const group)
     {
         return m_triData.at(group);
     }
@@ -453,35 +442,79 @@ public:
     /**
      * @brief Create a triangle group (4 new triangles)
      *
-     * @param depth    [in] Depth of group to create
-     * @param parent   [in] Parent of group to create
-     * @param vertices [in] Vertices of each of the 4 triangles to create
-     *
      * @return New Triangle Group ID
      */
-    SkTriGroupId tri_group_create(
-            uint8_t const depth,
-            SkTriId const parent,
-            std::array<std::array<SkVrtxId, 3>, 4> const vertices)
+    SkTriGroupPair tri_group_create(
+            uint8_t                                 depth,
+            SkTriId                                 parentId,
+            SkeletonTriangle&                       rParent,
+            std::array<std::array<SkVrtxId, 3>, 4>  vertices);
+
+    SkTriGroupPair tri_group_create_root(
+            uint8_t                                 depth,
+            std::array<std::array<SkVrtxId, 3>, 4>  vertices);
+
+    /**
+     * @brief Reserve to fit at least n Triangle groups
+     *
+     * @param n [in] Requested capacity
+     */
+    void tri_group_reserve(size_t const n)
     {
-        SkTriGroupId const groupId = m_triIds.create();
-        tri_group_resize_fit_ids();
+        m_triIds.reserve(n);
+        m_triData.reserve(m_triIds.capacity());
+        m_triRefCount.resize(m_triIds.capacity() * 4);
+    }
 
-        SkTriGroup &rGroup = m_triData[groupId];
-        rGroup.m_parent = parent;
-        rGroup.m_depth = depth;
+    struct SkTriGroupNeighboring
+    {
+        SkTriGroupId id;
+        SkTriGroup&  rGroup;
+        int          edge;
+    };
 
-        for (int i = 0; i < 4; i ++)
+
+    struct TmpSkTriGroupEdge
+    {
+        SkTriOwner_t &rNeighborA;
+        SkTriOwner_t &rNeighborB;
+        SkTriId      childA;
+        SkTriId      childB;
+    };
+
+    struct NeighboringEdges
+    {
+        TmpSkTriGroupEdge lhs;
+        TmpSkTriGroupEdge rhs;
+    };
+
+    NeighboringEdges tri_group_set_neighboring(SkTriGroupNeighboring lhs, SkTriGroupNeighboring rhs)
+    {
+        auto const children_on_edge = [] (SkTriGroupNeighboring const& x) -> TmpSkTriGroupEdge
         {
-            SkeletonTriangle &rTri = rGroup.m_triangles[i];
-            rTri.m_children = std::nullopt;
-            rTri.m_vertices = {
-                vrtx_store(vertices[i][0]),
-                vrtx_store(vertices[i][1]),
-                vrtx_store(vertices[i][2])
-            };
-        }
-        return groupId;
+            switch (x.edge)
+            {
+            case 0:
+                return { x.rGroup.triangles[0].neighbors[0], x.rGroup.triangles[1].neighbors[0],
+                               tri_id(x.id, 0),                    tri_id(x.id, 1) };
+            case 1:
+                return { x.rGroup.triangles[1].neighbors[1], x.rGroup.triangles[2].neighbors[1],
+                               tri_id(x.id, 1),                    tri_id(x.id, 2) };
+            case 2:
+            default:
+                return { x.rGroup.triangles[2].neighbors[2], x.rGroup.triangles[0].neighbors[2],
+                               tri_id(x.id, 2),                    tri_id(x.id, 0) };
+            }
+        };
+
+        NeighboringEdges const edges = { children_on_edge(lhs), children_on_edge(rhs) };
+
+        edges.lhs.rNeighborA = tri_store(edges.rhs.childB);
+        edges.lhs.rNeighborB = tri_store(edges.rhs.childA);
+        edges.rhs.rNeighborA = tri_store(edges.lhs.childB);
+        edges.rhs.rNeighborB = tri_store(edges.lhs.childA);
+
+        return edges;
     }
 
     /**
@@ -489,7 +522,7 @@ public:
      */
     SkeletonTriangle& tri_at(SkTriId const triId)
     {
-        return m_triData.at(tri_group_id(triId)).m_triangles[tri_sibling_index(triId)];
+        return m_triData.at(tri_group_id(triId)).triangles[tri_sibling_index(triId)];
     }
 
     /**
@@ -505,19 +538,7 @@ public:
      *
      * @return New Triangle Group ID
      */
-    SkTriGroupId tri_subdiv(SkTriId triId, std::array<SkVrtxId, 3> vrtxMid);
-
-    /**
-     * @brief Reserve to fit at least n Triangle groups
-     *
-     * @param n [in] Requested capacity
-     */
-    void tri_group_reserve(size_t const n)
-    {
-        m_triIds.reserve(n);
-        m_triData.reserve(m_triIds.capacity());
-        m_triRefCount.resize(m_triIds.capacity() * 4);
-    }
+    SkTriGroupPair tri_subdiv(SkTriId triId, std::array<SkVrtxId, 3> vrtxMid);
 
     /**
      * @brief Store a Triangle ID in ref-counted long term storage
@@ -542,8 +563,8 @@ public:
 
 private:
 
-    lgrn::IdRegistryStl<SkTriGroupId> m_triIds;
-    lgrn::IdRefCount<SkTriId> m_triRefCount;
+    lgrn::IdRegistryStl<SkTriGroupId>       m_triIds;
+    lgrn::IdRefCount<SkTriId>               m_triRefCount;
 
     // access using SkTriGroupId from m_triIds
     osp::KeyedVec<SkTriGroupId, SkTriGroup> m_triData;
@@ -645,7 +666,7 @@ public:
     lgrn::IdRegistryStl<SharedVrtxId, true> m_sharedIds;
     lgrn::IdRefCount<SharedVrtxId>          m_sharedRefCount;
 
-    osp::KeyedVec<SharedVrtxId, SkVrtxStorage_t> m_sharedSkVrtx;
+    osp::KeyedVec<SharedVrtxId, SkVrtxOwner_t> m_sharedSkVrtx;
 
     /// Connected face count used for vertex normal calculations
     osp::KeyedVec<SharedVrtxId, uint8_t>    m_sharedFaceCount;

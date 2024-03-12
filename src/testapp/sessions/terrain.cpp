@@ -23,23 +23,24 @@
  * SOFTWARE.
  */
 #include "terrain.h"
-
+#include "common.h"
+#include "longeron/utility/asserts.hpp"
 
 #include <planet-a/icosahedron.h>
 #include <osp/core/math_2pow.h>
+#include <osp/drawing/drawing.h>
 
 #include <fstream>
+#include <span>
 
 using namespace planeta;
 using namespace osp;
 using namespace osp::math;
+using namespace osp::draw;
 
 namespace testapp::scenes
 {
 
-// max detail chunks don't have fans! useful fact for physics
-// just leave some holes in the index buffer for the fans. max 2 to 4 per-chunk?
-// RESTRICT FANS TO ONE SIDE ONLY!!!!
 
 struct PlanetVertex
 {
@@ -50,402 +51,533 @@ struct PlanetVertex
 using Vector2ui = Magnum::Math::Vector2<Magnum::UnsignedInt>;
 
 
-
-Session setup_terrain(
-        TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any> const  topData)
+void calculate_centers(SkTriGroupId const groupId, ACtxTerrain& rTerrain, float const maxRadius, float const height)
 {
-    std::array<planeta::SkVrtxId, 12>           icoVrtx;
-    std::array<planeta::SkTriId, 20>            icoTri;
-    osp::KeyedVec<planeta::SkVrtxId, Vector3l>  positions;
-    osp::KeyedVec<planeta::SkVrtxId, Vector3>   normals;
-    int const   scale   = 10;
-    float const radius  = 10;
 
-    SubdivTriangleSkeleton skeleton = create_skeleton_icosahedron(radius, scale, icoVrtx, icoTri, positions, normals);
+    SkTriGroup const &group = rTerrain.skeleton.tri_group_at(groupId);
 
-    constexpr int const c_level = 6;
-    constexpr int const c_edgeCount = (1u << c_level) - 1;
-
-    for (planeta::SkTriId tri : icoTri)
+    for (int i = 0; i < 4; ++i)
     {
-        auto &fish = skeleton.tri_at(tri);
+        SkTriId          const  sktriId = tri_id(groupId, i);
+        SkeletonTriangle const& tri     = group.triangles[i];
 
-        std::array<SkVrtxId, c_edgeCount> chunkEdgeA;
-        std::array<SkVrtxId, c_edgeCount> chunkEdgeB;
-        std::array<SkVrtxId, c_edgeCount> chunkEdgeC;
-        skeleton.vrtx_create_chunk_edge_recurse(c_level, fish.m_vertices[0], fish.m_vertices[1], chunkEdgeA);
-        skeleton.vrtx_create_chunk_edge_recurse(c_level, fish.m_vertices[1], fish.m_vertices[2], chunkEdgeB);
-        skeleton.vrtx_create_chunk_edge_recurse(c_level, fish.m_vertices[2], fish.m_vertices[0], chunkEdgeC);
+        SkVrtxId const va = tri.vertices[0].value();
+        SkVrtxId const vb = tri.vertices[1].value();
+        SkVrtxId const vc = tri.vertices[2].value();
 
-        positions.resize(skeleton.vrtx_ids().capacity());
-        normals.resize(skeleton.vrtx_ids().capacity());
+        // average without overflow
+        Vector3l const posAvg = rTerrain.skPositions[va] / 3
+                              + rTerrain.skPositions[vb] / 3
+                              + rTerrain.skPositions[vc] / 3;
 
-        ico_calc_chunk_edge_recurse(radius, scale, c_level, fish.m_vertices[0], fish.m_vertices[1], chunkEdgeA, positions, normals);
-        ico_calc_chunk_edge_recurse(radius, scale, c_level, fish.m_vertices[1], fish.m_vertices[2], chunkEdgeB, positions, normals);
-        ico_calc_chunk_edge_recurse(radius, scale, c_level, fish.m_vertices[2], fish.m_vertices[0], chunkEdgeC, positions, normals);
+        Vector3 const nrmSum = rTerrain.skNormals[va]
+                             + rTerrain.skNormals[vb]
+                             + rTerrain.skNormals[vc];
+
+        float const terrainMaxHeight = height + maxRadius * gc_icoTowerOverHorizonVsLevel[group.depth];
+
+        // 0.5 * terrainMaxHeight           : halve for middle
+        // int_2pow<int>(rTerrain.scale)    : Vector3l conversion factor
+        // / 3.0f                           : average from sum of 3 values
+        Vector3l const riseToMid = Vector3l(nrmSum * (0.5f * terrainMaxHeight * int_2pow<int>(rTerrain.scale) / 3.0f));
+
+        rTerrain.sktriCenter[sktriId] = posAvg + riseToMid;
+    }
+}
+
+void init_ico_terrain(ACtxTerrain& rTerrain, ACtxTerrainIco& rTerrainIco, float radius, float height, int scale)
+{
+    rTerrainIco.radius = radius;
+    rTerrain.scale  = scale;
+
+    auto &rSkel = rTerrain.skeleton;
+
+    rSkel = create_skeleton_icosahedron(radius, scale, rTerrainIco.icoVrtx, rTerrainIco.icoGroups, rTerrainIco.icoTri, rTerrain.skPositions, rTerrain.skNormals);
+
+    rTerrain.sktriCenter.resize(rTerrain.skeleton.tri_group_ids().capacity() * 4);
+
+    for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
+    {
+        calculate_centers(groupId, rTerrain, radius + height, height);
+    }
+}
+
+struct SkTriNewSubdiv
+{
+    std::array<SkVrtxId, 3> corners;
+    std::array<MaybeNewId<SkVrtxId>, 3> middles;
+    SkTriId id;
+    SkTriGroupId group;
+};
+
+constexpr std::uint64_t absdelta(std::int64_t lhs, std::int64_t rhs) noexcept
+{
+    bool const lhsPositive = lhs > 0;
+    bool const rhsPositive = rhs > 0;
+    if      (   lhsPositive && ! rhsPositive )
+    {
+        return std::uint64_t(lhs) + std::uint64_t(-rhs);
+    }
+    else if ( ! lhsPositive &&   rhsPositive )
+    {
+        return std::uint64_t(-lhs) + std::uint64_t(rhs);
+    }
+    // else, lhs and rhs are the same sign. no risk of overflow
+
+    return std::uint64_t((lhs > rhs) ? (lhs - rhs) : (rhs - lhs));
+};
+
+/**
+ * @return (distance between a and b) > threshold
+ */
+constexpr bool is_distance_near(Vector3l const a, Vector3l const b, std::uint64_t const threshold)
+{
+    std::uint64_t const dx = absdelta(a.x(), b.x());
+    std::uint64_t const dy = absdelta(a.y(), b.y());
+    std::uint64_t const dz = absdelta(a.z(), b.z());
+
+    // 1431655765 = sqrt(2^64)/3 = max distance without risk of overflow
+    constexpr std::uint64_t dmax = 1431655765ul;
+
+    if (dx > dmax || dy > dmax || dz > dmax)
+    {
+        return false;
     }
 
+    std::uint64_t const magnitudeSqr = (dx*dx + dy*dy + dz*dz);
 
-//
+    return magnitudeSqr < threshold*threshold;
+}
 
+struct TplIterEdge
+{
+    SkTriId neighborId;
+    SkTriOwner_t &rChildNeighbor0;
+    SkTriOwner_t &rChildNeighbor1;
+};
 
+bool violates_rule_a(SkTriId const sktri, SkeletonTriangle &rSkTri, SkTriId const requester, SubdivTriangleSkeleton& rSkeleton)
+{
+    int subdivedNeighbors = 1;
 
-
-
-    uint16_t const maxChunks = 69;
-    uint16_t const maxShared = 40000;
-
-
-    ChunkVrtxSubdivLUT chunkVrtxLut(c_level);
-
-    SkeletonChunks skChunks{c_level};
-
-
-    skChunks.chunk_reserve(maxChunks);
-    skChunks.shared_reserve(maxShared);
-
-    ChunkedTriangleMeshInfo info = make_chunked_mesh_info(skChunks, maxChunks, maxShared);
-
-
+    for (SkTriId const neighborId : rSkTri.neighbors)
     {
-        SkeletonTriangle const &fish = skeleton.tri_at(icoTri[0]);
-
-        std::array<SkVrtxId, c_edgeCount> chunkEdgeA;
-        std::array<SkVrtxId, c_edgeCount> chunkEdgeB;
-        std::array<SkVrtxId, c_edgeCount> chunkEdgeC;
-        skeleton.vrtx_create_chunk_edge_recurse(c_level, fish.m_vertices[0], fish.m_vertices[1], chunkEdgeA);
-        skeleton.vrtx_create_chunk_edge_recurse(c_level, fish.m_vertices[1], fish.m_vertices[2], chunkEdgeB);
-        skeleton.vrtx_create_chunk_edge_recurse(c_level, fish.m_vertices[2], fish.m_vertices[0], chunkEdgeC);
-
-        ChunkId const chunk = skChunks.chunk_create(skeleton, icoTri[0], chunkEdgeA, chunkEdgeB, chunkEdgeC);
+        subdivedNeighbors += neighborId.has_value() && int( (neighborId != requester) && (rSkeleton.tri_at(neighborId).children.has_value()) );
     }
 
+    return subdivedNeighbors >= 2;
+}
 
+struct SubdivCtxArgs
+{
+    ACtxTerrain&                rTerrain;
+    ACtxTerrainIco&             rTerrainIco;
+    ACtxSurfaceFrame&           rSurfaceFrame;
+    std::vector<SkTriNewSubdiv>& rNewSubdiv;
+    BitVector_t&                rDistanceTestDone;
+};
+
+void unsubdivide()
+{
+    // TODO
+    //   Rule A: dont unsubdiv if there's 2 subdivided neightbours that won't be subdivided
+    //           (may need a funny recursive algorithm)
+    //   Rule B: don't unsubdivide if there is a subdivided neighbour yada yada
+
+}
+
+void subdivide(SkTriId const sktriId, int level, PerSubdivLevel &rLevel, PerSubdivLevel &rNextLevel, SubdivCtxArgs ctx)
+{
+
+    // Rule A: if neighbour has 2 subdivided neighbours, subdivide it too
+    // Rule B: for corner children (childIndex != 3), parent's neighbours must be subdivided
+
+
+    SubdivTriangleSkeleton &rSkeleton = ctx.rTerrain.skeleton;
+    SkeletonTriangle &rTri = rSkeleton.tri_at(sktriId);
+
+    if (rTri.children.has_value())
     {
-        SkeletonTriangle const &tri = skeleton.tri_at(icoTri[1]);
-
-        std::array<SkVrtxId, 3> vertices = {tri.m_vertices[0], tri.m_vertices[1], tri.m_vertices[2]};
-        std::array<SkVrtxId, 3> const middles = skeleton.vrtx_create_middles(vertices);
-        SkTriGroupId triChildren = skeleton.tri_subdiv(icoTri[1], middles);
-
-        positions.resize(skeleton.vrtx_ids().capacity());
-        normals.resize(skeleton.vrtx_ids().capacity());
-
-        ico_calc_middles(radius, scale, vertices, middles, positions, normals);
-
-        SkTriId const tochunk = tri_id(triChildren, 0);
-        SkeletonTriangle const &fish = skeleton.tri_at(tochunk);
-
-        std::array<SkVrtxId, c_edgeCount> chunkEdgeA;
-        std::array<SkVrtxId, c_edgeCount> chunkEdgeB;
-        std::array<SkVrtxId, c_edgeCount> chunkEdgeC;
-        skeleton.vrtx_create_chunk_edge_recurse(c_level,    fish.m_vertices[0], middles[0],         chunkEdgeA);
-        skeleton.vrtx_create_chunk_edge_recurse(c_level,    middles[0],         middles[2],         chunkEdgeB);
-        skeleton.vrtx_create_chunk_edge_recurse(c_level,    middles[2],         fish.m_vertices[0], chunkEdgeC);
-
-        positions.resize(skeleton.vrtx_ids().capacity());
-        normals.resize(skeleton.vrtx_ids().capacity());
-
-        ico_calc_chunk_edge_recurse(radius, scale, c_level, fish.m_vertices[0], middles[0],         chunkEdgeA, positions, normals);
-        ico_calc_chunk_edge_recurse(radius, scale, c_level, middles[0],         middles[2],         chunkEdgeB, positions, normals);
-        ico_calc_chunk_edge_recurse(radius, scale, c_level, middles[2],         fish.m_vertices[0], chunkEdgeC, positions, normals);
-
-        ChunkId const chunk = skChunks.chunk_create(skeleton, tochunk, chunkEdgeA, chunkEdgeB, chunkEdgeC);
-
+        return; // Already subdivided
     }
 
+    LGRN_ASSERTM(! ctx.rDistanceTestDone.test(sktriId.value), "oops! that's not intended to happen");
 
-    osp::KeyedVec<VertexIdx, PlanetVertex> vrtxBuf;
-    //std::vector<Vector2ui> indxBuf;
+    std::array<SkTriId, 3> const neighbors { rTri.neighbors[0], rTri.neighbors[1], rTri.neighbors[2] };
 
-    vrtxBuf.resize(info.vbufSize, PlanetVertex{ {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} });
+    std::array<SkVrtxId, 3> const corners { rTri.vertices[0], rTri.vertices[1], rTri.vertices[2] };
 
-    auto const to_vrtx = [offset = info.vbufSharedOffset] (SharedVrtxId in)
+    // Actually do the subdivision
+    auto const middles           = std::array<MaybeNewId<SkVrtxId>, 3>{rSkeleton.vrtx_create_middles(corners)};
+    auto const [groupId, rGroup] = rSkeleton.tri_subdiv(sktriId, {middles[0].id, middles[1].id, middles[2].id});
+
+    rNextLevel.distanceTestNext.insert(rNextLevel.distanceTestNext.end(), {
+        tri_id(groupId, 0),
+        tri_id(groupId, 1),
+        tri_id(groupId, 2),
+        tri_id(groupId, 3),
+    });
+
+    ctx.rNewSubdiv.push_back({corners, middles, sktriId, groupId});
+
+    // kinda stupid to resize these here, but WHO CARES LOL XD
+    bitvector_resize(rLevel    .hasSubdivedNeighbor,    rSkeleton.tri_group_ids().capacity() * 4);
+    bitvector_resize(rNextLevel.hasSubdivedNeighbor,    rSkeleton.tri_group_ids().capacity() * 4);
+    bitvector_resize(rLevel    .hasNonSubdivedNeighbor, rSkeleton.tri_group_ids().capacity() * 4);
+
+    rLevel.hasSubdivedNeighbor.reset(sktriId.value);
+
+    bool hasNonSubdivNeighbor = false;
+
+    // Check neighbours along all 3 edges
+    for (int selfEdgeIdx = 0; selfEdgeIdx < 3; ++selfEdgeIdx)
     {
-        return VertexIdx( offset + std::uint32_t(in) );
-    };
-
-    // Calculate shared vertex positions
-    float const scalepow = std::pow(2.0f, -scale);
-    for (SharedVrtxId sharedVrtx : skChunks.m_sharedNewlyAdded)
-    {
-        SkVrtxId const skelVrtx = skChunks.m_sharedSkVrtx[sharedVrtx];
-
-        //Vector3l const translated = positions[size_t(skelId)] + translaton;
-        auto const scaled = Vector3d(positions[skelVrtx]) * scalepow;
-
-        vrtxBuf[to_vrtx(sharedVrtx)].pos = Vector3(scaled);
-    }
-    skChunks.m_sharedNewlyAdded.clear();
-
-    // Calculate fill vertex positions
-    for (std::size_t const chunkIdInt : skChunks.m_chunkIds.bitview().zeros())
-    {
-        auto const chunk = ChunkId(chunkIdInt);
-
-        std::size_t const fillOffset = info.vbufFillOffset + chunkIdInt*info.fillVrtxCount;
-
-        osp::ArrayView<SharedVrtxOwner_t const> sharedUsed = skChunks.shared_vertices_used(chunk);
-
-        for (ChunkVrtxSubdivLUT::ToSubdiv const& toSubdiv : chunkVrtxLut.data())
+        SkTriId const neighborId = neighbors[selfEdgeIdx];
+        if (neighborId.has_value())
         {
-            PlanetVertex const &vrtxA = vrtxBuf[chunkVrtxLut.index(sharedUsed, fillOffset, info.vbufSharedOffset, toSubdiv.m_vrtxA)];
-            PlanetVertex const &vrtxB = vrtxBuf[chunkVrtxLut.index(sharedUsed, fillOffset, info.vbufSharedOffset, toSubdiv.m_vrtxB)];
+            SkeletonTriangle& rNeighbor = rSkeleton.tri_at(neighborId);
+            if (rNeighbor.children.has_value())
+            {
+                // Assign bi-directional connection (neighbor's neighbor)
+                int const neighborEdgeIdx = [&neighbors = rNeighbor.neighbors, sktriId] ()
+                {
+                    if        (neighbors[0].value() == sktriId)   { return 0; }
+                    else if   (neighbors[1].value() == sktriId)   { return 1; }
+                    else /*if (neighbors[2].value() == sktriId)*/ { return 2; }
+                }();
 
+                SkTriGroup &rNeighborGroup = rSkeleton.tri_group_at(rNeighbor.children);
 
-            PlanetVertex &rVrtxC = vrtxBuf[info.vbufFillOffset + info.fillVrtxCount*chunkIdInt + std::uint32_t(toSubdiv.m_fillOut)];
-            // Heightmap goes here
+                auto const [selfEdge, neighborEdge]
+                    = rSkeleton.tri_group_set_neighboring(
+                        {.id = groupId,            .rGroup = rGroup,         .edge = selfEdgeIdx},
+                        {.id = rNeighbor.children, .rGroup = rNeighborGroup, .edge = neighborEdgeIdx});
 
-            osp::Vector3 const avg = (vrtxA.pos + vrtxB.pos) / 2.0f;
-            float const avgLen = avg.length();
-            float const roundness = radius - avgLen;
+                if (rSkeleton.tri_at(neighborEdge.childB).children.has_value())
+                {
+                    rNextLevel.hasSubdivedNeighbor.set(selfEdge.childA.value);
+                }
 
-            LGRN_ASSERT(rVrtxC.pos.isZero());
-
-            rVrtxC.pos = avg + (avg / avgLen) * roundness;
+                if (rSkeleton.tri_at(neighborEdge.childA).children.has_value())
+                {
+                    rNextLevel.hasSubdivedNeighbor.set(selfEdge.childB.value);
+                }
+            }
+            else
+            {
+                // Neighbor is not subdivided
+                hasNonSubdivNeighbor = true;
+                rLevel.hasSubdivedNeighbor.set(neighborId.value);
+            }
         }
     }
 
-
-
-    std::ofstream objfile;
-    objfile.open("planetdebug.obj");
-
-    objfile << "o Planet\n";
-
-
-//    for (std::size_t const skVrtxInt : skeleton.vrtx_ids().bitview().zeros())
-//    {
-//        auto pos = Vector3(positions[skVrtxInt]) / int_2pow<int>(scale);
-
-//        objfile << "v " << (pos.x()) << " "
-//                        << (pos.y()) << " "
-//                        << (pos.z()) << "\n";
-
-//    }
-
-    // how to deal with normals if chunks are separate index and vertex buffers?
-    // single vertex buffer?
-    // 'stitcher'
-    //
-    // separate the fill buffers lol
-
-    for (PlanetVertex v : vrtxBuf)
+    if (hasNonSubdivNeighbor)
     {
-        objfile << "v " << (v.pos.x()) << " "
-                        << (v.pos.y()) << " "
-                        << (v.pos.z()) << "\n";
+        rLevel.hasNonSubdivedNeighbor.set(sktriId.value);
+    }
+    else
+    {
+        rLevel.hasNonSubdivedNeighbor.reset(sktriId.value);
     }
 
-    for (PlanetVertex v : vrtxBuf)
+    // Check for rule A and rule B violations
+    // This can immediately subdivide other triangles recursively
+    for (int edge = 0; edge < 3; ++edge)
     {
-        objfile << "vn " << (v.nrm.x()) << " "
-                         << (v.nrm.y()) << " "
-                         << (v.nrm.z()) << "\n";
-    }
-
-    // future optimization: LUT some of these too
-
-    using Vector2us = ChunkVrtxSubdivLUT::Vector2us;
-
-    using Vector3ui = Magnum::Math::Vector3<Magnum::UnsignedInt>;
-    //uint32_t indexOffset = a.index_chunk_offset(chunk);
-
-    auto const emit_face = [&objfile] (Magnum::UnsignedInt a, Magnum::UnsignedInt b, Magnum::UnsignedInt c)
-    {
-        objfile << "f " << (a+1) << "//" << (a+1) << " "
-                        << (b+1) << "//" << (b+1) << " "
-                        << (c+1) << "//" << (c+1) << "\n";
-    };
-
-    for (std::size_t const chunkIdInt : skChunks.m_chunkIds.bitview().zeros())
-    {
-        auto const chunk = ChunkId(chunkIdInt);
-        int trisAdded = 0;
-        for (unsigned int y = 0; y < skChunks.m_chunkWidth; y ++)
-        for (unsigned int x = 0; x < y * 2 + 1; x ++)
+        SkTriId const neighborId = neighbors[edge];
+        if (neighborId.has_value())
         {
-            // alternate between up-pointing and down-pointing triangles
-            bool const upPointing = (x % 2 == 0);
-            bool const onEdge = (x == 0) || (x == y * 2)
-                                || (upPointing && y == skChunks.m_chunkWidth - 1);
-
-            auto const indx
-                = upPointing
-                ? Vector3ui{ chunk_coord_to_vrtx(skChunks, info, chunk, x / 2,      y       ),
-                             chunk_coord_to_vrtx(skChunks, info, chunk, x / 2,      y + 1   ),
-                             chunk_coord_to_vrtx(skChunks, info, chunk, x / 2 + 1,  y + 1   ) }
-                : Vector3ui{ chunk_coord_to_vrtx(skChunks, info, chunk, x / 2 + 1,  y + 1   ),
-                             chunk_coord_to_vrtx(skChunks, info, chunk, x / 2 + 1,  y       ),
-                             chunk_coord_to_vrtx(skChunks, info, chunk, x / 2,      y       ) };
-
-            std::array<PlanetVertex*, 3> const vrtxData
+            SkeletonTriangle& rNeighbor = rSkeleton.tri_at(neighborId);
+            if ( ! rNeighbor.children.has_value() )
             {
-                &vrtxBuf[indx.x()],
-                &vrtxBuf[indx.y()],
-                &vrtxBuf[indx.z()]
-            };
-
-            // Calculate face normal
-            Vector3 const u = vrtxData[1]->pos - vrtxData[0]->pos;
-            Vector3 const v = vrtxData[2]->pos - vrtxData[0]->pos;
-            Vector3 const faceNorm = Magnum::Math::cross(u, v).normalized();
-
-            for (int i = 0; i < 3; i ++)
-            {
-                Vector3 &rVrtxNorm = vrtxData[i]->nrm;
-
-                if (info.is_vertex_shared(indx[i]))
+                // Non-subdivided neighbor
+                if (violates_rule_a(neighborId, rNeighbor, sktriId, rSkeleton))
                 {
-                    if ( ! onEdge)
-                    {
-                        // Shared vertices can have a variable number of
-                        // connected faces
-
-                        SharedVrtxId const shared   = info.vertex_to_shared(indx[i]);
-                        uint8_t &rFaceCount         = skChunks.m_sharedFaceCount[shared];
-
-                        // Add new face normal to the average
-                        rVrtxNorm = (rVrtxNorm * rFaceCount + faceNorm) / (rFaceCount + 1);
-                        rFaceCount ++;
-
-                    }
-                    // edge triangles handled by fans, and are left empty
+                    subdivide(neighborId, level, rLevel, rNextLevel, ctx);
+                    bitvector_resize(ctx.rDistanceTestDone, rSkeleton.tri_group_ids().capacity() * 4);
+                    ctx.rDistanceTestDone.set(neighborId.value);
                 }
                 else
                 {
-                    // All fill vertices have 6 connected faces
-                    // (just look at a picture of a triangular tiling)
-
-                    // Fans with multiple triangles may be connected to a fill
-                    // vertex, but the normals are calculated as if there was
-                    // only one triangle to (potentially) improve blending
-
-                    rVrtxNorm += faceNorm / 6.0f;
+                    if (ctx.rDistanceTestDone.test(neighborId.value))
+                    {
+                        rLevel.distanceTestNext.push_back(neighborId);
+                    }
                 }
             }
+        }
+        else // Neighbour doesn't exist, its parent is not subdivided. Rule B violation
+        {
+            LGRN_ASSERTM(tri_sibling_index(sktriId) != 3,
+                         "Center triangles are always surrounded by their siblings");
+            LGRN_ASSERTM(level != 0,
+                         "No level above level 0");
 
-            if ( ! onEdge)
+            SkTriId const parent = rSkeleton.tri_group_at(tri_group_id(sktriId)).parent;
+
+            LGRN_ASSERTM(parent.has_value(), "bruh");
+
+            auto const& parentNeighbors = rSkeleton.tri_at(parent).neighbors;
+
+            LGRN_ASSERTM(parentNeighbors[edge].has_value(),
+                         "something screwed up XD");
+
+            SkTriId const neighborParent = parentNeighbors[edge].value();
+
+            // Adds to ctx.rTerrain.levels[level-1].distanceTestNext
+
+            subdivide(neighborParent, level-1, ctx.rTerrain.levels[level-1], rLevel, ctx);
+            ctx.rDistanceTestDone.set(neighborParent.value);
+        }
+    }
+};
+
+void munch_level(int level, SubdivCtxArgs ctx)
+{
+    LGRN_ASSERTM(level+1 < ctx.rTerrain.levels.size(), "oops!");
+
+    // Good-enough bounding sphere is ~75% of the edge length (determined using Blender)
+    float         const boundRadiusF   = gc_icoMaxEdgeVsLevel[level] * ctx.rTerrainIco.radius * 0.75f;
+    std::uint64_t const boundRadiusU64 = std::uint64_t(boundRadiusF * int_2pow<int>(ctx.rTerrain.scale));
+
+    PerSubdivLevel &rLevel     = ctx.rTerrain.levels[level];
+    PerSubdivLevel &rNextLevel = ctx.rTerrain.levels[level+1];
+
+    while ( ! rLevel.distanceTestNext.empty() )
+    {
+        std::swap(rLevel.distanceTestProcessing, rLevel.distanceTestNext);
+        rLevel.distanceTestNext.clear();
+
+        bitvector_resize(ctx.rDistanceTestDone, ctx.rTerrain.skeleton.tri_group_ids().capacity() * 4);
+        ctx.rTerrain.sktriCenter.resize(ctx.rTerrain.skeleton.tri_group_ids().capacity() * 4);
+
+        for (SkTriId const sktriId : rLevel.distanceTestProcessing)
+        {
+            Vector3l const center = ctx.rTerrain.sktriCenter[sktriId];
+
+            bool const distanceNear
+                = (ctx.rDistanceTestDone.test(sktriId.value) == false)
+                && is_distance_near(ctx.rSurfaceFrame.position, center, boundRadiusU64);
+
+            if (distanceNear)
             {
-                emit_face(indx[0], indx[1], indx[2]);
-                trisAdded ++;
+                subdivide(sktriId, level, rLevel, rNextLevel, ctx);
             }
         }
 
-        LGRN_ASSERT(trisAdded == info.fillFaceCount);
-
-        auto stitcher = make_chunk_fan_stitcher(skeleton, skChunks, info, chunk, emit_face);
-
-        int sideDetailX2 = 0;
-
-        using enum ECornerDetailX2;
-
-        switch (sideDetailX2)
+        // Fix up Rule B violations by subdivide()
+        if (level != 0)
         {
-        case 0:
-            stitcher.corner <0, Left>();
-            stitcher.edge   <0, true>();
-            stitcher.corner <1, Left>();
-            stitcher.edge   <1, true>();
-            stitcher.corner <2, Left>();
-            stitcher.edge   <2, true>();
-            break;
-        default:
-            stitcher.corner <0, None>();
-            stitcher.edge   <0, false>();
-            stitcher.corner <1, None>();
-            stitcher.edge   <1, false>();
-            stitcher.corner <2, None>();
-            stitcher.edge   <2, false>();
+            PerSubdivLevel &rPrevLevel = ctx.rTerrain.levels[level];
+            if ( ! rPrevLevel.distanceTestNext.empty() )
+            {
+                munch_level(level - 1, ctx);
+            }
         }
-
-        // write function to fill gaps
-
-        // 3 separate functions for stich
-
-        /*
-         * side fanned: {0, 1, 2, none}
-         *
-         * fan() single() single();
-         * constexpr if@
-         *
-         *
-         *
-         *
-         * stitch(shared, shared, mid)
-         *
-         * switch()
-         * case a
-         * case b
-         * case c
-         * case d
-         *
-         *
-         */
-
-
     }
+}
 
-
-
-
-
-//    for (Vector3ui i : indxBuf)
-//    {
-//        Vector3ui iB = i + Vector3ui(1, 1, 1); // obj indices start at 1
-//        objfile << "f " << iB.x() << "//" << iB.x() << " "
-//                        << iB.y() << "//" << iB.y() << " "
-//                        << iB.z() << "//" << iB.z() << "\n";
-//    }
-
-    objfile.close();
-
-    /*
-    //ChunkedTriangleMeshInfo a = make_subdivtrimesh_general(10, c_level, scale);
-
-    std::vector<PlanetVertex> vrtxBuf(a.vertex_count_max());
-    auto const get_vrtx = [&vrtxBuf] (VertexId vrtxId) -> PlanetVertex& { return vrtxBuf[size_t(vrtxId)]; };
-
-    std::vector<Vector3ui> indxBuf(a.index_count_max());
-
-    ChunkVrtxSubdivLUT chunkVrtxLut(c_level);
-
-    ChunkId chunk = a.chunk_create(skeleton, tri_id(triChildren, 3), chunkEdgeA, chunkEdgeB, chunkEdgeC);
-
-    using Corrade::Containers::arrayCast;
-
-    ArrayView_t<PlanetVertex> const vrtxBufShared{
-        &vrtxBuf[a.vertex_offset_shared()],
-        a.shared_count_max()
-    };
-
-    ArrayView_t<PlanetVertex> const vrtxBufChunkFill(
-        &vrtxBuf[a.vertex_offset_fill(chunk)],
-        a.chunk_vrtx_fill_count()
-    );
-
-    // Set positions of shared vertices
-
-    float scalepow = std::pow(2.0f, -scale);
-
-
-    */
-
-    // notes:
-    // 'custom mesh system'
-    // just use magnum MeshData
-    // https://doc.magnum.graphics/magnum/classMagnum_1_1Trade_1_1MeshData.html#Trade-MeshData-populating-non-owned
-    //
-    // figure out how to get two GL::Mesh pointing at the same vertex buffer?
-    // keep separate vertex and index GL::Buffers
-    //
-    // don't write a custom mesh system
-    // write a thing that just takes the current planet stuff and syncs with GL buffers and shit.
-    // 1 gl buffer per chunk for indices
-    //
+Session setup_terrain(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              scene)
+{
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
 
     Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_TERRAIN);
+    auto const tgTrn = out.create_pipelines<PlTerrain>(rBuilder);
+
+    rBuilder.pipeline(tgTrn.skSubdivLoop).parent(tgScn.update);
+    rBuilder.pipeline(tgTrn.skeleton)    .parent(tgScn.update);
+    rBuilder.pipeline(tgTrn.surfaceFrame).parent(tgScn.update);
+
+    auto &rSurfaceFrame = top_emplace< ACtxSurfaceFrame >(topData, idSurfaceFrame);
+    auto &rTerrain      = top_emplace< ACtxTerrain >     (topData, idTerrain);
+    auto &rTerrainIco   = top_emplace< ACtxTerrainIco >  (topData, idTerrainIco);
+
+    rBuilder.task()
+        .name       ("Initialize terrain when entering planet coordinate space")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgTrn.surfaceFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args({                    idSurfaceFrame,             idTerrain,                idTerrainIco })
+        .func([] (ACtxSurfaceFrame &rSurfaceFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
+    {
+        if ( ! rSurfaceFrame.active )
+        {
+            rSurfaceFrame.active = true;
+
+            init_ico_terrain(rTerrain, rTerrainIco, 50.0f, 2.0f, 10);
+        }
+    });
+
+    static bool lazy = false;
+
+    rBuilder.task()
+        .name       ("subdivide triangle skeleton")
+        .run_on     ({tgTrn.skSubdivLoop(Run_)})
+        .sync_with  ({tgTrn.surfaceFrame(Ready), tgTrn.skeleton(New)})
+        .push_to    (out.m_tasks)
+        .args({                    idSurfaceFrame,             idTerrain,                idTerrainIco })
+        .func([] (ACtxSurfaceFrame &rSurfaceFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept -> TaskActions
+    {
+        if ( ! rSurfaceFrame.active )
+        {
+            return TaskAction::Cancel;
+        }
+
+        static float t = 0;
+        t += 0.005f;
+
+        //rSurfaceFrame.position = Vector3l(Vector3(0, 0, 2.0f - t) * rTerrainIco.radius * int_2pow<int>(rTerrain.scale));
+
+        rSurfaceFrame.position = Vector3l(Vector3(std::cos(t), 0, std::sin(t)) * rTerrainIco.radius * int_2pow<int>(rTerrain.scale));
+
+        if (lazy) {
+        //    return TaskActions{};
+        }
+        lazy = true;
+
+        SubdivTriangleSkeleton &rSkeleton = rTerrain.skeleton;
+        std::vector<SkTriNewSubdiv> calc;
+
+        BitVector_t distanceTestDone;
+        bitvector_resize(distanceTestDone, rTerrain.skeleton.tri_group_ids().capacity() * 4);
+
+        std::vector<SkTriId> distanceTestNext;
+
+        SubdivCtxArgs ctx { rTerrain, rTerrainIco, rSurfaceFrame, calc, distanceTestDone };
+
+        for (int level = 0; level < rTerrain.levels.size()-1; ++level)
+        {
+            PerSubdivLevel &rLevel = rTerrain.levels[level];
+
+            bool nothingHappened = true;
+            for (std::size_t const sktriInt : rLevel.hasSubdivedNeighbor.ones())
+            {
+                rLevel.distanceTestNext.push_back(SkTriId(sktriInt));
+                nothingHappened = false;
+            }
+
+            if (nothingHappened)
+            {
+                if (level == 0)
+                {
+                    rTerrain.levels[0].distanceTestNext.assign(rTerrainIco.icoTri.begin(), rTerrainIco.icoTri.end());
+                }
+            }
+        }
+
+        for (int level = 0; level < rTerrain.levels.size()-1; ++level)
+        {
+            munch_level(level, ctx);
+
+            auto const capacity = rTerrain.skeleton.vrtx_ids().capacity();
+            rTerrain.skPositions.resize(capacity);
+            rTerrain.skNormals  .resize(capacity);
+
+            // stupid reminder: each triangle group is 4 triangles
+            rTerrain.sktriCenter.resize(rTerrain.skeleton.tri_group_ids().capacity() * 4);
+
+            for (auto const& [corners, middles, sktriId, groupId] : calc)
+            {
+                ico_calc_middles(rTerrainIco.radius, rTerrain.scale, corners, middles, rTerrain.skPositions, rTerrain.skNormals);
+
+                calculate_centers(groupId, rTerrain, rTerrainIco.radius + rTerrainIco.height, rTerrainIco.height);
+            }
+        }
+
+
+
+        return true ? TaskActions{} : TaskAction::Cancel;
+    });
+
+    return out;
+}
+
+
+struct TerrainDebugDraw
+{
+    KeyedVec<SkVrtxId, osp::draw::DrawEnt> verts;
+    MaterialId mat;
+};
+
+Session setup_terrain_debug_draw(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any> const  topData,
+        Session const&              windowApp,
+        Session const&              sceneRenderer,
+        Session const&              cameraCtrl,
+        Session const&              commonScene,
+        Session const&              terrain,
+        MaterialId const            mat)
+{
+    OSP_DECLARE_GET_DATA_IDS(commonScene,    TESTAPP_DATA_COMMON_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,  TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,     TESTAPP_DATA_CAMERA_CTRL);
+    OSP_DECLARE_GET_DATA_IDS(terrain,        TESTAPP_DATA_TERRAIN);
+
+    auto const tgScnRdr = sceneRenderer.get_pipelines<PlSceneRenderer>();
+
+    Session out;
+    auto const [idTrnDbgDraw] = out.acquire_data<1>(topData);
+
+    auto &rTrnDbgDraw = top_emplace< TerrainDebugDraw > (topData, idTrnDbgDraw);
+
+    rTrnDbgDraw.mat = mat;
+
+    rBuilder.task()
+        .name       ("do spooky scary skeleton stuff")
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgScnRdr.drawTransforms(Modify_), tgScnRdr.entMeshDirty(Modify_), tgScnRdr.drawEntResized(ModifyOrSignal)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                 idScnRender,             idNMesh,                  idTrnDbgDraw,             idTerrain,                idTerrainIco})
+        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw& rTrnDbgDraw, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
+    {
+
+        Material &rMatPlanet = rScnRender.m_materials[rTrnDbgDraw.mat];
+        MeshId const cubeMeshId   = rNMesh.m_shapeToMesh.at(EShape::Box);
+
+        rTrnDbgDraw.verts.resize(rTerrain.skeleton.vrtx_ids().capacity());
+
+        auto const view = rTerrain.skeleton.vrtx_ids().bitview();
+        for (std::size_t const skVertInt : view.zeros())
+        if (auto const skVert = SkVrtxId(skVertInt);
+            skVert != lgrn::id_null<SkVrtxId>())
+        {
+            DrawEnt &rDrawEnt = rTrnDbgDraw.verts[skVert];
+            if (rDrawEnt == lgrn::id_null<DrawEnt>())
+            {
+                rDrawEnt = rScnRender.m_drawIds.create();
+            }
+        }
+
+        rScnRender.resize_draw(); // >:)
+
+        for (std::size_t const skVertInt : view.zeros())
+        if (auto const skVert = SkVrtxId(skVertInt);
+            skVert != lgrn::id_null<SkVrtxId>())
+        {
+            DrawEnt const drawEnt = rTrnDbgDraw.verts[skVert];
+
+            if (rScnRender.m_mesh[drawEnt].has_value() == false)
+            {
+                rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(cubeMeshId);
+                rScnRender.m_meshDirty.push_back(drawEnt);
+                rScnRender.m_visible.set(drawEnt.value);
+                rScnRender.m_opaque.set(drawEnt.value);
+                rMatPlanet.m_ents.set(drawEnt.value);
+                rMatPlanet.m_dirty.push_back(drawEnt);
+            }
+
+
+            rScnRender.m_drawTransform[drawEnt]
+                = Matrix4::translation(Vector3(rTerrain.skPositions[skVert]) / int_2pow<int>(rTerrain.scale))
+                * Matrix4::scaling({0.1f, 0.1f, 0.1f});
+        }
+    });
 
     return out;
 }

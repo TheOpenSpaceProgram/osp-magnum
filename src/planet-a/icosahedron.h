@@ -67,9 +67,20 @@ inline constexpr std::array<std::array<uint8_t, 3>, 20> gc_icoIndx
 }};
 
 /**
+ * @brief Neighbor indices along edges {0->1, 1->2, 2->0} for the 20 icosahedron faces
+ */
+inline constexpr std::array<std::array<uint8_t, 3>, 20> gc_icoNeighbors
+{{
+    { 1,  5,  4},  { 2,  7,  0},  { 3,  9,  1},  { 4, 11,  2},  { 0, 13,  3},
+    {14,  0,  6},  { 7, 16,  5},  { 6,  1,  8},  { 9, 15,  7},  { 8,  2, 10},
+    {11, 19,  9},  {10,  3, 12},  {13, 18, 11},  {12,  4, 14},  { 5, 17, 13},
+    {16,  8, 19},  {17,  6, 15},  {18, 14, 16},  {19, 12, 17},  {15, 10, 18}
+}};
+
+/**
  * @brief Icosahedron Minimum Edge Length vs Subdiv Levels, radius = 1.0
  */
-inline constexpr std::array<float, 10> const gc_icoMinEdgeVsSubdiv
+inline constexpr std::array<float, 10> const gc_icoMinEdgeVsLevel
 {
     1.05146222e+0f,  5.46533058e-1f,  2.75904484e-1f,  1.38283174e-1f,  6.91829904e-2f,
     3.45966718e-2f,  1.72989830e-2f,  8.64957239e-3f,  4.32479631e-3f,  2.16239942e-3f
@@ -78,7 +89,7 @@ inline constexpr std::array<float, 10> const gc_icoMinEdgeVsSubdiv
 /**
  * @brief Icosahedron Maximum Edge Length vs Subdiv Levels, radius = 1.0
  */
-inline constexpr std::array<float, 10> const gc_icoMaxEdgeVsSubdiv
+inline constexpr std::array<float, 10> const gc_icoMaxEdgeVsLevel
 {
     1.05146222e+0f,  6.18033989e-1f,  3.24919696e-1f,  1.64647160e-1f,  8.26039665e-2f,
     4.13372560e-2f,  2.06730441e-2f,  1.03370743e-2f,  5.16860619e-3f,  2.58431173e-3f
@@ -90,7 +101,7 @@ inline constexpr std::array<float, 10> const gc_icoMaxEdgeVsSubdiv
  * If identical towers were built on the two vertices spanning an edge, this is how high each tower
  * needs to be in order to see each other over the horizon.
  */
-inline constexpr std::array<float, 10> const gc_icoTowerOverHorizonVsSubdiv
+inline constexpr std::array<float, 10> const gc_icoTowerOverHorizonVsLevel
 {
     1.75570505e-1f,  3.95676520e-2f,  9.65341549e-3f,  2.39888395e-3f,  5.98823224e-4f,
     1.49649798e-4f,  3.74089507e-5f,  9.35201901e-6f,  2.33799109e-6f,  5.84496918e-7f
@@ -109,11 +120,13 @@ inline constexpr std::array<float, 10> const gc_icoTowerOverHorizonVsSubdiv
  * @return SubdivTriangleSkeleton for keeping track of Vertex and Triangle IDs
  */
 SubdivTriangleSkeleton create_skeleton_icosahedron(
-        double radius, int pow2scale,
-        Corrade::Containers::StaticArrayView<gc_icoVrtxCount, SkVrtxId> vrtxIds,
-        Corrade::Containers::StaticArrayView<gc_icoTriCount, SkTriId> triIds,
-        std::vector<osp::Vector3l> &rPositions,
-        std::vector<osp::Vector3> &rNormals);
+        double  radius,
+        int     pow2scale,
+        Corrade::Containers::StaticArrayView<12, SkVrtxId>      vrtxIds,
+        Corrade::Containers::StaticArrayView<5,  SkTriGroupId>  groupIds,
+        Corrade::Containers::StaticArrayView<20, SkTriId>       triIds,
+        std::vector<osp::Vector3l>  &rPositions,
+        std::vector<osp::Vector3>   &rNormals);
 
 /**
  * @brief Calculate positions and normals for 3 new vertices created when
@@ -130,7 +143,7 @@ void ico_calc_middles(
         double      radius,
         int         pow2scale,
         std::array<SkVrtxId, 3> const   vrtxCorners,
-        std::array<SkVrtxId, 3> const   vrtxMid,
+        std::array<MaybeNewId<SkVrtxId>, 3> const   vrtxMid,
         std::vector<osp::Vector3l>      &rPositions,
         std::vector<osp::Vector3>       &rNormals);
 

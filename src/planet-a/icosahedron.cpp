@@ -29,11 +29,13 @@
 using namespace planeta;
 
 SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
-        double const radius, int const pow2scale,
-        Corrade::Containers::StaticArrayView<gc_icoVrtxCount, SkVrtxId> const vrtxIds,
-        Corrade::Containers::StaticArrayView<gc_icoTriCount, SkTriId> const triIds,
-        std::vector<osp::Vector3l> &rPositions,
-        std::vector<osp::Vector3> &rNormals)
+        double  const radius,
+        int     const pow2scale,
+        Corrade::Containers::StaticArrayView<12, SkVrtxId>      const vrtxIds,
+        Corrade::Containers::StaticArrayView<5,  SkTriGroupId>  const groupIds,
+        Corrade::Containers::StaticArrayView<20, SkTriId>       const triIds,
+        std::vector<osp::Vector3l>  &rPositions,
+        std::vector<osp::Vector3>   &rNormals)
 {
 
     // Create the skeleton
@@ -63,6 +65,7 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
     // Add initial triangles
 
     // Create 20 root triangles by forming 5 groups. each group is 4 triangles
+
     skeleton.tri_group_reserve(skeleton.tri_group_ids().size() + 5);
 
     auto const vrtx_id_lut = [&vrtxIds] (int i) -> std::array<SkVrtxId, 3>
@@ -72,19 +75,33 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
                  vrtxIds[ gc_icoIndx[i][2] ] };
     };
 
-    for (int i = 0; i < gc_icoTriCount; i += 4)
+    for (int i = 0, j = 0; i < 5; ++i, j += 4)
     {
-        //std::array<std::array<SkVrtxId, 3>, 4> ;
-        SkTriGroupId const groupId = skeleton.tri_group_create(0, lgrn::id_null<SkTriId>(),
+        std::array<std::array<SkVrtxId, 3>, 4> const triVrtx
         {
-            vrtx_id_lut(i + 0), vrtx_id_lut(i + 1),
-            vrtx_id_lut(i + 2), vrtx_id_lut(i + 3)
-        });
+            vrtx_id_lut(j + 0),
+            vrtx_id_lut(j + 1),
+            vrtx_id_lut(j + 2),
+            vrtx_id_lut(j + 3)
+        };
 
-        triIds[i + 0] = tri_id(groupId, 0);
-        triIds[i + 1] = tri_id(groupId, 1);
-        triIds[i + 2] = tri_id(groupId, 2);
-        triIds[i + 3] = tri_id(groupId, 3);
+        groupIds[i] = skeleton.tri_group_create_root(0, triVrtx).id;
+
+        triIds[j + 0] = tri_id(groupIds[i], 0);
+        triIds[j + 1] = tri_id(groupIds[i], 1);
+        triIds[j + 2] = tri_id(groupIds[i], 2);
+        triIds[j + 3] = tri_id(groupIds[i], 3);
+    }
+
+    for (int i = 0; i < triIds.size(); ++i)
+    {
+        auto const& neighbors = gc_icoNeighbors[i];
+        SkTriId const triId = triIds[i];
+        skeleton.tri_at(triId).neighbors = {
+            skeleton.tri_store(triIds[neighbors[0]]),
+            skeleton.tri_store(triIds[neighbors[1]]),
+            skeleton.tri_store(triIds[neighbors[2]]),
+        };
     }
 
     return skeleton;
@@ -112,7 +129,7 @@ void sphere_midpoint(
 void planeta::ico_calc_middles(
         double const radius, int const pow2scale,
         std::array<SkVrtxId, 3> const vrtxCorner,
-        std::array<SkVrtxId, 3> const vrtxMid,
+        std::array<MaybeNewId<SkVrtxId>, 3> const vrtxMid,
         std::vector<osp::Vector3l> &rPositions,
         std::vector<osp::Vector3> &rNormals)
 {
@@ -121,14 +138,21 @@ void planeta::ico_calc_middles(
 
     float const scale = std::pow(2.0f, pow2scale);
 
-    sphere_midpoint(radius, scale, pos(vrtxCorner[0]), pos(vrtxCorner[1]),
-                    pos(vrtxMid[0]), nrm(vrtxMid[0]));
-
-    sphere_midpoint(radius, scale, pos(vrtxCorner[1]), pos(vrtxCorner[2]),
-                    pos(vrtxMid[1]), nrm(vrtxMid[1]));
-
-    sphere_midpoint(radius, scale, pos(vrtxCorner[2]), pos(vrtxCorner[0]),
-                    pos(vrtxMid[2]), nrm(vrtxMid[2]));
+    if (vrtxMid[0].isNew)
+    {
+        sphere_midpoint(radius, scale, pos(vrtxCorner[0]), pos(vrtxCorner[1]),
+                    pos(vrtxMid[0].id), nrm(vrtxMid[0].id));
+    }
+    if (vrtxMid[1].isNew)
+    {
+        sphere_midpoint(radius, scale, pos(vrtxCorner[1]), pos(vrtxCorner[2]),
+                    pos(vrtxMid[1].id), nrm(vrtxMid[1].id));
+    }
+    if (vrtxMid[2].isNew)
+    {
+        sphere_midpoint(radius, scale, pos(vrtxCorner[2]), pos(vrtxCorner[0]),
+                    pos(vrtxMid[2].id), nrm(vrtxMid[2].id));
+    }
 }
 
 

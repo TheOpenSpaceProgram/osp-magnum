@@ -38,35 +38,85 @@ namespace testapp::scenes
 //https://github.com/Capital-Asterisk/osp-magnum/blob/planets-despaghetti/src/planet-a/Active/SysPlanetA.cpp
 //https://github.com/Capital-Asterisk/osp-magnum/blob/cdf94fe7942d12bbc6e90fd586957640dc088d78/src/planet-a/Active/SysPlanetA.cpp
 
+struct ACtxSurfaceFrame
+{
+    osp::Vector3l       position; ///< Position relative to planet's center
+    osp::Quaterniond    rotation;
+    bool                active      {false};
+};
+
+struct SkeletonAABB
+{
+    osp::Vector3l min;
+    osp::Vector3l max;
+};
+
+struct PerSubdivLevel
+{
+    /// Subdivided triangles that neighbor a non-subdivided one
+    osp::BitVector_t hasNonSubdivedNeighbor;
+
+    /// Non-subdivided triangles that neighbor a subdivided one
+    osp::BitVector_t hasSubdivedNeighbor;
+
+    std::vector<planeta::SkTriId>       distanceTestProcessing;
+    std::vector<planeta::SkTriId>       distanceTestNext;
+
+    //std::vector<planeta::SkTriId> mustSubdiv;
+};
+
 struct ACtxTerrain
 {
-    osp::Vector3l position; ///< Position relative to planet's center
-    osp::Quaterniond rotation;
+    planeta::SubdivTriangleSkeleton skeleton;
 
-    std::vector<osp::Vector3l> skPositions;
-    std::vector<osp::Vector3> skNormals;
+    osp::KeyedVec<planeta::SkVrtxId, osp::Vector3l> skPositions;
+    osp::KeyedVec<planeta::SkVrtxId, osp::Vector3>  skNormals;
+
+    osp::KeyedVec<planeta::SkTriId, osp::Vector3l> sktriCenter;
+
+//    std::vector<planeta::SkTriGroupId> sktriNewSubdiv;
+//    std::vector<planeta::SkTriGroupId> sktriNewUnsubdiv;
+//    std::vector<planeta::SkTriId> sktriCheck;
+//    std::vector<planeta::SkTriId> sktriCheckNext;
+
+    std::array<PerSubdivLevel, 10> levels;
+    //int levelMax{0};
+
+    int scale{};
 };
 
 struct ACtxTerrainIco
 {
-    std::array<planeta::SkVrtxId, 12> icoVrtx;
-    std::array<planeta::SkTriId, 20> icoTri;
+    float   radius{};
+    float   height{};
+
+    std::array<planeta::SkVrtxId, 12>    icoVrtx;
+    std::array<planeta::SkTriGroupId, 5> icoGroups;
+    std::array<planeta::SkTriId, 20>     icoTri;
 };
 
-
-struct ACtxTerrainChunks
-{
-
-};
 
 struct ACtxPlanetTerrainDraw
 {
-
+    planeta::ChunkVrtxSubdivLUT         chunkVrtxLut;
+    planeta::SkeletonChunks             skChunks;
+    planeta::ChunkedTriangleMeshInfo    info;
 };
 
 osp::Session setup_terrain(
         osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData);
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         scene);
+
+osp::Session setup_terrain_debug_draw(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         commonScene,
+        osp::Session const&         terrain,
+        osp::draw::MaterialId       mat);
 
 
 } // namespace testapp::scenes
