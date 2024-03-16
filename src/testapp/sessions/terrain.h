@@ -80,6 +80,7 @@ struct ACtxTerrain
 //    std::vector<planeta::SkTriId> sktriCheckNext;
 
     std::array<PerSubdivLevel, 10> levels;
+    int levelNeedProcess = 10;
     //int levelMax{0};
 
     int scale{};
