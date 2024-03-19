@@ -46,7 +46,7 @@ using namespace osp;
 namespace testapp::scenes
 {
 
-template <MachTypeId const& MachType_T>
+template <MachTypeId MachType_T>
 TopTaskFunc_t gen_allocate_mach()
 {
     static TopTaskFunc_t const func = wrap_args([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach) noexcept
