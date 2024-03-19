@@ -23,6 +23,16 @@
 # SOFTWARE.
 ##
 
+##
+# Mark this directory and all scoped subdirectories as "SYSTEM" directories to try to squash warnings
+# This property should mark all targets created in this directory and subdirs as third party code.
+##
+set_directory_properties(PROPERTIES SYSTEM TRUE)
+
+##
+# SDL
+##
+
 SET(INSTALL_GTEST    OFF CACHE BOOL "" FORCE)
 SET(BUILD_TESTING    OFF CACHE BOOL "" FORCE)
 SET(BUILD_DEPRECATED OFF CACHE BOOL "" FORCE)
