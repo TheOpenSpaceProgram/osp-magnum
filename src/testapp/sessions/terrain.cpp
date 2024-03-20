@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "terrain.h"
+#include "adera/drawing/CameraController.h"
 #include "common.h"
 #include "longeron/utility/asserts.hpp"
 
@@ -33,6 +34,8 @@
 #include <fstream>
 #include <iostream>
 #include <span>
+
+using adera::ACtxCameraController;
 
 using namespace planeta;
 using namespace osp;
@@ -54,7 +57,6 @@ using Vector2ui = Magnum::Math::Vector2<Magnum::UnsignedInt>;
 
 void calculate_centers(SkTriGroupId const groupId, ACtxTerrain& rTerrain, float const maxRadius, float const height)
 {
-
     SkTriGroup const &group = rTerrain.skeleton.tri_group_at(groupId);
 
     for (int i = 0; i < 4; ++i)
@@ -157,18 +159,6 @@ struct TplIterEdge
     SkTriOwner_t &rChildNeighbor1;
 };
 
-bool violates_rule_a(SkTriId const sktri, SkeletonTriangle &rSkTri, SkTriId const requester, SubdivTriangleSkeleton& rSkeleton)
-{
-    int subdivedNeighbors = 1;
-
-    for (SkTriId const neighborId : rSkTri.neighbors)
-    {
-        subdivedNeighbors += neighborId.has_value() && int( (neighborId != requester) && (rSkeleton.tri_at(neighborId).children.has_value()) );
-    }
-
-    return subdivedNeighbors >= 2;
-}
-
 struct SubdivCtxArgs
 {
     ACtxTerrain&                rTerrain;
@@ -180,22 +170,11 @@ struct SubdivCtxArgs
     int& rSubdivLevelCount;
 };
 
-void unsubdivide()
-{
-    // TODO
-    //   Rule A: dont unsubdiv if there's 2 subdivided neightbours that won't be subdivided
-    //           (may need a funny recursive algorithm)
-    //   Rule B: don't unsubdivide if there is a subdivided neighbour yada yada
-
-}
-
 void subdivide(SkTriId const sktriId, SkeletonTriangle &rTri, int level, PerSubdivLevel &rLevel, PerSubdivLevel &rNextLevel, SubdivCtxArgs ctx)
 {
-    // Rule A: if neighbour has 2 subdivided neighbours, subdivide it too
-    // Rule B: for corner children (childIndex != 3), parent's neighbours must be subdivided
+    LGRN_ASSERT(ctx.rTerrain.skeleton.tri_group_ids().exists(tri_group_id(sktriId)));
 
     SubdivTriangleSkeleton &rSkeleton = ctx.rTerrain.skeleton;
-    //SkeletonTriangle &rTri = rSkeleton.tri_at(sktriId);
 
     LGRN_ASSERTM(!rTri.children.has_value(), "Already subdivided!");
 
@@ -211,10 +190,18 @@ void subdivide(SkTriId const sktriId, SkeletonTriangle &rTri, int level, PerSubd
     // manual borrow checker hint: rTri becomes invalid here >:)
 
     // kinda stupid to resize these here, but WHO CARES LOL XD
-    bitvector_resize(ctx       .rDistanceTestDone,      rSkeleton.tri_group_ids().capacity() * 4);
-    bitvector_resize(rLevel    .hasSubdivedNeighbor,    rSkeleton.tri_group_ids().capacity() * 4);
-    bitvector_resize(rLevel    .hasNonSubdivedNeighbor, rSkeleton.tri_group_ids().capacity() * 4);
-    bitvector_resize(rNextLevel.hasSubdivedNeighbor,    rSkeleton.tri_group_ids().capacity() * 4);
+    auto const vrtxCapacity = rSkeleton.vrtx_ids().capacity();
+    auto const triCapacity  = rSkeleton.tri_group_ids().capacity() * 4;
+    bitvector_resize(ctx       .rDistanceTestDone,      triCapacity);
+    bitvector_resize(rLevel    .hasSubdivedNeighbor,    triCapacity);
+    bitvector_resize(rLevel    .hasNonSubdivedNeighbor, triCapacity);
+    bitvector_resize(rNextLevel.hasSubdivedNeighbor,    triCapacity);
+    ctx.rTerrain.skPositions.resize(vrtxCapacity);
+    ctx.rTerrain.skNormals  .resize(vrtxCapacity);
+    ctx.rTerrain.sktriCenter.resize(triCapacity);
+
+    ico_calc_middles(ctx.rTerrainIco.radius, ctx.rTerrain.scale, corners, middles, ctx.rTerrain.skPositions, ctx.rTerrain.skNormals);
+    calculate_centers(groupId, ctx.rTerrain, ctx.rTerrainIco.radius + ctx.rTerrainIco.height, ctx.rTerrainIco.height);
 
     ctx.rNewSubdiv.push_back({corners, middles, sktriId, groupId});
 
@@ -232,12 +219,7 @@ void subdivide(SkTriId const sktriId, SkeletonTriangle &rTri, int level, PerSubd
             if (rNeighbor.children.has_value())
             {
                 // Assign bi-directional connection (neighbor's neighbor)
-                int const neighborEdgeIdx = [&neighbors = rNeighbor.neighbors, sktriId] ()
-                {
-                    if        (neighbors[0].value() == sktriId)   { return 0; }
-                    else if   (neighbors[1].value() == sktriId)   { return 1; }
-                    else /*if (neighbors[2].value() == sktriId)*/ { return 2; }
-                }();
+                int const neighborEdgeIdx = rNeighbor.find_neighbor_index(sktriId);
 
                 SkTriGroup &rNeighborGroup = rSkeleton.tri_group_at(rNeighbor.children);
 
@@ -276,6 +258,8 @@ void subdivide(SkTriId const sktriId, SkeletonTriangle &rTri, int level, PerSubd
 
     // Check for rule A and rule B violations
     // This can immediately subdivide other triangles recursively
+    // Rule A: if neighbour has 2 subdivided neighbours, subdivide it too
+    // Rule B: for corner children (childIndex != 3), parent's neighbours must be subdivided
     for (int selfEdgeIdx = 0; selfEdgeIdx < 3; ++selfEdgeIdx)
     {
         SkTriId const neighborId = rSkeleton.tri_at(sktriId).neighbors[selfEdgeIdx];
@@ -284,10 +268,20 @@ void subdivide(SkTriId const sktriId, SkeletonTriangle &rTri, int level, PerSubd
             SkeletonTriangle& rNeighbor = rSkeleton.tri_at(neighborId);
             if ( ! rNeighbor.children.has_value() )
             {
-                // Non-subdivided neighbor
-                if (violates_rule_a(neighborId, rNeighbor, sktriId, rSkeleton))
-                {
+                // Neighbor is not subdivided.
 
+                // Check Rule A by seeing if any other neighbor's neighbors are subdivided
+                auto const is_other_subdivided = [&rSkeleton, &rNeighbor, sktriId] (SkTriId const other)
+                {
+                    return    other != sktriId
+                           && other.has_value()
+                           && rSkeleton.tri_at(other).children.has_value();
+                };
+
+                if (   is_other_subdivided(rNeighbor.neighbors[0])
+                    || is_other_subdivided(rNeighbor.neighbors[1])
+                    || is_other_subdivided(rNeighbor.neighbors[2]) )
+                {
                     subdivide(neighborId, rSkeleton.tri_at(neighborId), level, rLevel, rNextLevel, ctx);
                     bitvector_resize(ctx.rDistanceTestDone, rSkeleton.tri_group_ids().capacity() * 4);
                     ctx.rDistanceTestDone.set(neighborId.value);
@@ -404,12 +398,52 @@ void subdivide_level(int level, SubdivCtxArgs ctx)
     ++ctx.rSubdivLevelCount;
 }
 
+void debug_check_rules(ACtxTerrain &rTerrain)
+{
+    // iterate all existing triangles
+    for (std::size_t i = 0; i < rTerrain.skeleton.tri_group_ids().capacity() * 4; ++i)
+    if (SkTriId const sktriId = SkTriId(i);
+        rTerrain.skeleton.tri_group_ids().exists(tri_group_id(sktriId)))
+    {
+        SkeletonTriangle const& sktri = rTerrain.skeleton.tri_at(sktriId);
+
+        if (!sktri.children.has_value()) // if not subdivided
+        {
+            int subdivedNeighbors = 0;
+            for (int edge = 0; edge < 3; ++edge)
+            {
+                SkTriId const neighbor = sktri.neighbors[edge];
+                if (neighbor.has_value())
+                {
+                    if (rTerrain.skeleton.tri_at(neighbor).children.has_value())
+                    {
+                        ++subdivedNeighbors;
+                    }
+                }
+                else
+                {
+                    // Neighbor doesn't exist. parent MUST have neighbor
+                    SkTriId const parent = rTerrain.skeleton.tri_group_at(tri_group_id(sktriId)).parent;
+                    LGRN_ASSERTM(parent.has_value(), "bruh");
+                    auto const& parentNeighbors = rTerrain.skeleton.tri_at(parent).neighbors;
+                    LGRN_ASSERTM(parentNeighbors[edge].has_value(), "Rule B Violation");
+
+                    LGRN_ASSERTM(rTerrain.skeleton.tri_at(parentNeighbors[edge]).children.has_value() == false,
+                                 "Incorrectly set neighbors");
+                }
+            }
+
+            LGRN_ASSERTM(subdivedNeighbors < 2, "Rule A Violation");
+        }
+    }
+}
+
 Session setup_terrain(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
         Session const&              scene)
 {
-    auto const tgScn    = scene         .get_pipelines<PlScene>();
+    auto const tgScn = scene.get_pipelines<PlScene>();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_TERRAIN);
@@ -439,8 +473,6 @@ Session setup_terrain(
         }
     });
 
-    static bool lazy = false;
-
     rBuilder.task()
         .name       ("subdivide triangle skeleton")
         .run_on     ({tgTrn.skSubdivLoop(Run_)})
@@ -454,51 +486,70 @@ Session setup_terrain(
             return TaskAction::Cancel;
         }
 
-        static float t = 0;
-        t += 0.005f;
+//        static float t = 3.0f;
+//        t += 0.005f;
 
         //rSurfaceFrame.position = Vector3l(Vector3(0, 0, 2.0f - t) * rTerrainIco.radius * int_2pow<int>(rTerrain.scale));
 
-        auto a = Quaternion::rotation(Rad{t},                   Vector3::zAxis())
-               * Quaternion::rotation(Rad{std::cos(5.0f*t)},    Vector3::yAxis())
-               * Quaternion::rotation(Rad{0.0f},                Vector3::xAxis());
+//        auto a = Quaternion::rotation(Rad{t},                   Vector3::zAxis())
+//               * Quaternion::rotation(Rad{std::cos(5.0f*t)},    Vector3::yAxis())
+//               * Quaternion::rotation(Rad{0.0f},                Vector3::xAxis());
 
-        rSurfaceFrame.position = Vector3l(a.transformVector(Vector3(0.0f, 0.0f, 1.0f)) * rTerrainIco.radius * int_2pow<int>(rTerrain.scale));
-
-        if (lazy) {
-        //    return TaskActions{};
-        }
-        lazy = true;
+//        rSurfaceFrame.position = Vector3l(a.transformVector(Vector3(0.0f, 0.0f, 1.0f)) * rTerrainIco.radius * int_2pow<int>(rTerrain.scale));
 
         SubdivTriangleSkeleton &rSkeleton = rTerrain.skeleton;
 
         BitVector_t tryUnsubdiv;
         bitvector_resize(tryUnsubdiv, rTerrain.skeleton.tri_group_ids().capacity() * 4);
-
+        BitVector_t cantUnsubdiv;
+        bitvector_resize(cantUnsubdiv, rTerrain.skeleton.tri_group_ids().capacity() * 4);
         BitVector_t distanceTestDone;
         bitvector_resize(distanceTestDone, rTerrain.skeleton.tri_group_ids().capacity() * 4);
 
-        std::vector<SkTriId> selected;
 
         for (int level = rTerrain.levels.size()-1; level >= 0; --level)
         {
             // Good-enough bounding sphere is ~75% of the edge length (determined using Blender)
-            float         const boundRadiusF   = gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * 0.75f;
+            // Unsubdivide thresholds should be slightly larger (arbitrary +50%)
+            float         const boundRadiusF   = gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * 0.75f * 1.5f;
             std::uint64_t const boundRadiusU64 = std::uint64_t(boundRadiusF * int_2pow<int>(rTerrain.scale));
 
             PerSubdivLevel &rLevel = rTerrain.levels[level];
 
             LGRN_ASSERT(rLevel.distanceTestNext.size() == 0);
 
-            // Step 1: Floodfill-select all triangles in this level that might be unsubdivided
-            //         (distance too far)
+            // Step 1: Populate tryUnsubdiv
+            // * Floodfill-select all triangles in this level that might be unsubdivided
 
-            tryUnsubdiv.reset();
+            auto const maybe_distance_check = [&rTerrain, &tryUnsubdiv, &distanceTestDone, &rLevel] (SkTriId const sktriId)
+            {
+                if (distanceTestDone.test(sktriId.value))
+                {
+                    return;
+                }
+
+                SkTriGroupId const childrenId = rTerrain.skeleton.tri_at(sktriId).children;
+                if ( ! childrenId.has_value() )
+                {
+                    return; // Must be subdivided to be considered for unsubdivision lol
+                }
+
+                SkTriGroup const& children = rTerrain.skeleton.tri_group_at(childrenId);
+                if (   children.triangles[0].children.has_value()
+                    || children.triangles[1].children.has_value()
+                    || children.triangles[2].children.has_value()
+                    || children.triangles[3].children.has_value() )
+                {
+                    return; // For parents to unsubdivide, all children must be unsubdivided too
+                }
+
+                rLevel.distanceTestNext.push_back(sktriId);
+                distanceTestDone.set(sktriId.value);
+            };
 
             for (std::size_t const sktriInt : rLevel.hasNonSubdivedNeighbor.ones())
             {
-                rLevel.distanceTestNext.push_back(SkTriId(sktriInt));
-                distanceTestDone.set(sktriInt);
+                maybe_distance_check(SkTriId(sktriInt));
             }
 
             while (rLevel.distanceTestNext.size() != 0)
@@ -516,19 +567,18 @@ Session setup_terrain(
 
                     if (tooFar)
                     {
+                        // All step-1 checks passed
                         tryUnsubdiv.set(sktriId.value);
 
+                        // Floodfill
                         SkeletonTriangle const& sktri = rTerrain.skeleton.tri_at(sktriId);
                         for (int edge = 0; edge < 3; ++edge)
                         {
                             SkTriId const neighbor = sktri.neighbors[edge];
-                            if (   neighbor.has_value()
-                                && distanceTestDone.test(neighbor.value) == false
-                                && rTerrain.skeleton.tri_at(neighbor).children.has_value())
+                            if (neighbor.has_value())
                             {
                                 // Neighbor is subdivided, distance test them next
-                                rLevel.distanceTestNext.push_back(neighbor);
-                                distanceTestDone.set(neighbor.value);
+                                maybe_distance_check(neighbor);
                             }
                         }
                     }
@@ -537,9 +587,116 @@ Session setup_terrain(
 
             std::cout << "lvl:" << level << " filled:" << tryUnsubdiv.count() << "\n";
 
+            // Step 2: Populate cantUnsubdiv considering Rule A & B violations
+            //
+            // * Strategy: Pretend tris in tryUnsubdiv are all deleted, then try to 're-add' them
+            //             by adding to cantUnsubdiv.
+            //
+            // * Rule A: Re-add if 2+ neighbors are subdivided.
+            // * Rule B: For subdivided neighbors, re-add if any neighbor's two children along edge
+            //           are subdivided.
+
+            // loop through all entries and see which ones can be readded.
+            // if re-added, then its neighbors that are also tryUnsubdiv must be rechecked for rules
+
+            auto const violates_rules = [&rTerrain, &tryUnsubdiv, &cantUnsubdiv] (SkTriId const sktriId, SkeletonTriangle const& sktri) noexcept -> bool
+            {
+                int subdivedNeighbors = 0;
+                for (int edge = 0; edge < 3; ++edge)
+                {
+                    SkTriId const neighbor = sktri.neighbors[edge];
+                    if (neighbor.has_value())
+                    {
+                        SkeletonTriangle &rNeighbor = rTerrain.skeleton.tri_at(neighbor);
+                        // Pretend neighbor is unsubdivided when it's in tryUnsubdiv, overrided
+                        // by cantUnsubdiv
+                        if (rNeighbor.children.has_value()
+                            && (  ! tryUnsubdiv .test(neighbor.value)
+                                 || cantUnsubdiv.test(neighbor.value) ) )
+                        {
+                            // Neighbor is subdivided
+                            ++subdivedNeighbors;
+
+                            // Check Rule B
+                            int        const  neighborEdge  = rNeighbor.find_neighbor_index(sktriId);
+                            SkTriGroup const& neighborGroup = rTerrain.skeleton.tri_group_at(rNeighbor.children);
+
+                            switch (neighborEdge)
+                            {
+                            case 0:
+                                if (neighborGroup.triangles[0].children.has_value()) return true;
+                                if (neighborGroup.triangles[1].children.has_value()) return true;
+                                break;
+                            case 1:
+                                if (neighborGroup.triangles[1].children.has_value()) return true;
+                                if (neighborGroup.triangles[2].children.has_value()) return true;
+                                break;
+                            case 2:
+                                if (neighborGroup.triangles[2].children.has_value()) return true;
+                                if (neighborGroup.triangles[0].children.has_value()) return true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Rule B
+                if (subdivedNeighbors >= 2)
+                {
+                    return true;
+                }
+
+                return false;
+            };
+
+            auto const check_recurse = [&violates_rules, &tryUnsubdiv, &cantUnsubdiv, &rTerrain] (auto const& self, SkTriId const sktriId) -> void
+            {
+                SkeletonTriangle const& sktri = rTerrain.skeleton.tri_at(sktriId);
+
+                if (violates_rules(sktriId, sktri))
+                {
+                    cantUnsubdiv.set(sktriId.value);
+
+                    // Recurse into neighbors if they're also tryUnsubdiv
+                    for (int edge = 0; edge < 3; ++edge)
+                    {
+                        SkTriId const neighbor = sktri.neighbors[edge];
+                        if (tryUnsubdiv.test(neighbor.value) && ! cantUnsubdiv.test(neighbor.value))
+                        {
+                            self(self, neighbor);
+                        }
+                    }
+                }
+            };
+
+
+            for (std::size_t const sktriInt : tryUnsubdiv.ones())
+            {
+                if ( ! cantUnsubdiv.test(sktriInt) )
+                {
+                    check_recurse(check_recurse, SkTriId::from_index(sktriInt));
+                }
+            }
+
+            std::cout << "* cantunsubdiv: " << cantUnsubdiv.count() << "\n";
+
+            for (std::size_t const sktriInt : tryUnsubdiv.ones())
+            {
+                if ( ! cantUnsubdiv.test(sktriInt) )
+                {
+                    rTerrain.skeleton.tri_unsubdiv(SkTriId(sktriInt));
+                    rLevel.hasNonSubdivedNeighbor.reset(sktriInt);
+                    LGRN_ASSERT(!rLevel.hasSubdivedNeighbor.test(sktriInt));
+                }
+            }
+
+            tryUnsubdiv.reset();
+            cantUnsubdiv.reset();
         }
 
         distanceTestDone.reset();
+
+        debug_check_rules(rTerrain);
 
         for (int level = 0; level < rTerrain.levels.size(); ++level)
         {
@@ -589,7 +746,7 @@ Session setup_terrain(
 
         for (int level = 0; level < rTerrain.levels.size()-1; ++level)
         {
-            if (level > 6)
+            if (level > 7)
             {
                 // >:)
                 rTerrain.levels[level].distanceTestNext.clear();
@@ -604,58 +761,9 @@ Session setup_terrain(
                 // this asserts since some subdivide calls request distance-checks with lower levels without calling subdivide_level afterwards
                 LGRN_ASSERT(rTerrain.levels[levelb].distanceTestNext.empty());
             }
-
-            auto const capacity = rTerrain.skeleton.vrtx_ids().capacity();
-            rTerrain.skPositions.resize(capacity);
-            rTerrain.skNormals  .resize(capacity);
-
-            // stupid reminder: each triangle group is 4 triangles
-            rTerrain.sktriCenter.resize(rTerrain.skeleton.tri_group_ids().capacity() * 4);
-
-            for (auto const& [corners, middles, sktriId, groupId] : calc)
-            {
-                ico_calc_middles(rTerrainIco.radius, rTerrain.scale, corners, middles, rTerrain.skPositions, rTerrain.skNormals);
-                calculate_centers(groupId, rTerrain, rTerrainIco.radius + rTerrainIco.height, rTerrainIco.height);
-            }
         }
 
-        // Verify rules are satisfied
-        // iterate all existing triangles
-        for (std::size_t i = 0; i < rTerrain.skeleton.tri_group_ids().capacity() * 4; ++i)
-        if (SkTriId const sktriId = SkTriId(i);
-            rTerrain.skeleton.tri_group_ids().exists(tri_group_id(sktriId)))
-        {
-            SkeletonTriangle const& sktri = rTerrain.skeleton.tri_at(sktriId);
-
-            if (!sktri.children.has_value()) // if not subdivided
-            {
-                int subdivedNeighbors = 0;
-                for (int edge = 0; edge < 3; ++edge)
-                {
-                    SkTriId const neighbor = sktri.neighbors[edge];
-                    if (neighbor.has_value())
-                    {
-                        if (rTerrain.skeleton.tri_at(neighbor).children.has_value())
-                        {
-                            ++subdivedNeighbors;
-                        }
-                    }
-                    else
-                    {
-                        // Neighbor doesn't exist. parent MUST have neighbor
-                        SkTriId const parent = rSkeleton.tri_group_at(tri_group_id(sktriId)).parent;
-                        LGRN_ASSERTM(parent.has_value(), "bruh");
-                        auto const& parentNeighbors = rSkeleton.tri_at(parent).neighbors;
-                        LGRN_ASSERTM(parentNeighbors[edge].has_value(), "Rule B Violation");
-
-                        LGRN_ASSERTM(rTerrain.skeleton.tri_at(parentNeighbors[edge]).children.has_value() == false,
-                                     "Incorrectly set neighbors");
-                    }
-                }
-
-                LGRN_ASSERTM(subdivedNeighbors < 2, "Rule A Violation");
-            }
-        }
+        debug_check_rules(rTerrain);
 
         std::cout << "total distance checks: " << distanceCheckCount << "\n";
         std::cout << "total subdiv levels: " << subdivLevelCount << "\n";
@@ -673,6 +781,7 @@ struct TerrainDebugDraw
     MaterialId mat;
 };
 
+
 Session setup_terrain_debug_draw(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
@@ -688,7 +797,10 @@ Session setup_terrain_debug_draw(
     OSP_DECLARE_GET_DATA_IDS(cameraCtrl,     TESTAPP_DATA_CAMERA_CTRL);
     OSP_DECLARE_GET_DATA_IDS(terrain,        TESTAPP_DATA_TERRAIN);
 
-    auto const tgScnRdr = sceneRenderer.get_pipelines<PlSceneRenderer>();
+    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const tgTrn    = terrain       .get_pipelines<PlTerrain>();
 
     Session out;
     auto const [idTrnDbgDraw] = out.acquire_data<1>(topData);
@@ -697,39 +809,91 @@ Session setup_terrain_debug_draw(
 
     rTrnDbgDraw.mat = mat;
 
+
+    rBuilder.task()
+        .name       ("Position SceneFrame center to Camera Controller target")
+        .run_on     ({tgWin.inputs(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Ready), tgTrn.surfaceFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({                 idCamCtrl,                  idSurfaceFrame,             idTerrain,                idTerrainIco })
+        .func([] (ACtxCameraController& rCamCtrl, ACtxSurfaceFrame &rSurfaceFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
+    {
+        if ( ! rCamCtrl.m_target.has_value())
+        {
+            return;
+        }
+        Vector3 camPos = rCamCtrl.m_target.value();
+
+        float const len = camPos.length();
+        if (len < rTerrainIco.radius)
+        {
+            camPos *= rTerrainIco.radius / len;
+        }
+
+
+        rSurfaceFrame.position = Vector3l(camPos * int_2pow<int>(rTerrain.scale));
+    });
+
+
     rBuilder.task()
         .name       ("do spooky scary skeleton stuff")
         .run_on     ({tgScnRdr.render(Run)})
         .sync_with  ({tgScnRdr.drawTransforms(Modify_), tgScnRdr.entMeshDirty(Modify_), tgScnRdr.drawEntResized(ModifyOrSignal)})
         .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                 idScnRender,             idNMesh,                  idTrnDbgDraw,             idTerrain,                idTerrainIco})
+        .args       ({        idDrawing,                 idScnRender,             idNMesh,                  idTrnDbgDraw,             idTerrain,                idTerrainIco })
         .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw& rTrnDbgDraw, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
 
         Material &rMatPlanet = rScnRender.m_materials[rTrnDbgDraw.mat];
         MeshId const cubeMeshId   = rNMesh.m_shapeToMesh.at(EShape::Box);
 
-        rTrnDbgDraw.verts.resize(rTerrain.skeleton.vrtx_ids().capacity());
+        SubdivIdTree<SkVrtxId> const& vrtxIds = rTerrain.skeleton.vrtx_ids();
+        rTrnDbgDraw.verts.resize(vrtxIds.capacity());
 
-        auto const view = rTerrain.skeleton.vrtx_ids().bitview();
-        for (std::size_t const skVertInt : view.zeros())
-        if (auto const skVert = SkVrtxId(skVertInt);
-            skVert != lgrn::id_null<SkVrtxId>())
+        for (std::size_t skVertInt = 0; skVertInt < vrtxIds.capacity(); ++skVertInt)
         {
+            auto const skVert = SkVrtxId(skVertInt);
             DrawEnt &rDrawEnt = rTrnDbgDraw.verts[skVert];
-            if (rDrawEnt == lgrn::id_null<DrawEnt>())
+
+            if (vrtxIds.exists(skVert))
             {
-                rDrawEnt = rScnRender.m_drawIds.create();
+                if ( ! rDrawEnt.has_value())
+                {
+                    rDrawEnt = rScnRender.m_drawIds.create();
+                }
+            }
+            else
+            {
+                if (rDrawEnt.has_value())
+                {
+                    if (rScnRender.m_mesh[rDrawEnt].has_value())
+                    {
+                        rDrawing.m_meshRefCounts.ref_release(std::exchange(rScnRender.m_mesh[rDrawEnt], {}));
+
+                    }
+                    rScnRender.m_meshDirty  .push_back  (rDrawEnt);
+                    rScnRender.m_visible    .reset      (rDrawEnt.value);
+                    rMatPlanet.m_ents       .reset      (rDrawEnt.value);
+                    rMatPlanet.m_dirty      .push_back  (rDrawEnt);
+
+                    rScnRender.m_drawIds.remove(std::exchange(rDrawEnt, {}));
+                }
             }
         }
 
         rScnRender.resize_draw(); // >:)
+        std::cout << "vertex ids: " <<rTerrain.skeleton.vrtx_ids().capacity() <<"\n";
 
-        for (std::size_t const skVertInt : view.zeros())
+        for (std::size_t const skVertInt : vrtxIds.bitview().zeros())
         if (auto const skVert = SkVrtxId(skVertInt);
-            skVert != lgrn::id_null<SkVrtxId>())
+            vrtxIds.exists(skVert))
         {
             DrawEnt const drawEnt = rTrnDbgDraw.verts[skVert];
+
+            if ( ! drawEnt.has_value() )
+            {
+                continue;
+            }
 
             if (rScnRender.m_mesh[drawEnt].has_value() == false)
             {
@@ -744,7 +908,7 @@ Session setup_terrain_debug_draw(
 
             rScnRender.m_drawTransform[drawEnt]
                 = Matrix4::translation(Vector3(rTerrain.skPositions[skVert]) / int_2pow<int>(rTerrain.scale))
-                * Matrix4::scaling({0.1f, 0.1f, 0.1f});
+                * Matrix4::scaling({0.05f, 0.05f, 0.05f});
         }
     });
 

@@ -40,7 +40,7 @@ SubdivTriangleSkeleton::~SubdivTriangleSkeleton()
         {
             for (SkVrtxOwner_t& rVrtx : rTri.vertices)
             {
-                vrtx_release(rVrtx);
+                vrtx_release(std::exchange(rVrtx, {}));
             }
         }
     }
@@ -115,6 +115,33 @@ SkTriGroupPair SubdivTriangleSkeleton::tri_group_create_root(
     return {groupId, rGroup};
 }
 
+SubdivTriangleSkeleton::NeighboringEdges SubdivTriangleSkeleton::tri_group_set_neighboring(SkTriGroupNeighboring lhs, SkTriGroupNeighboring rhs)
+{
+    auto const tri_group_edge = [] (SkTriGroupNeighboring const& x) -> SkTriGroupEdge
+    {
+        switch (x.edge)
+        {
+        case 0:
+            return { x.rGroup.triangles[0].neighbors[0], x.rGroup.triangles[1].neighbors[0],
+                           tri_id(x.id, 0),                    tri_id(x.id, 1) };
+        case 1:
+            return { x.rGroup.triangles[1].neighbors[1], x.rGroup.triangles[2].neighbors[1],
+                           tri_id(x.id, 1),                    tri_id(x.id, 2) };
+        case 2: default:
+            return { x.rGroup.triangles[2].neighbors[2], x.rGroup.triangles[0].neighbors[2],
+                           tri_id(x.id, 2),                    tri_id(x.id, 0) };
+        }
+    };
+    NeighboringEdges const edges = { tri_group_edge(lhs), tri_group_edge(rhs) };
+
+    edges.lhs.rNeighborA = tri_store(edges.rhs.childB);
+    edges.lhs.rNeighborB = tri_store(edges.rhs.childA);
+    edges.rhs.rNeighborA = tri_store(edges.lhs.childB);
+    edges.rhs.rNeighborB = tri_store(edges.lhs.childA);
+
+    return edges;
+}
+
 SkTriGroupPair SubdivTriangleSkeleton::tri_subdiv(
         SkTriId                 const triId,
         std::array<SkVrtxId, 3> const vrtxMid)
@@ -156,7 +183,7 @@ SkTriGroupPair SubdivTriangleSkeleton::tri_subdiv(
         }}
     );
 
-    // Triangle 3 neighbors all of its siblings
+    // Middle Triangle (index 3) neighbors all of its siblings
     group.rGroup.triangles[0].neighbors[1] = tri_store(tri_id(group.id, 3));
     group.rGroup.triangles[1].neighbors[2] = tri_store(tri_id(group.id, 3));
     group.rGroup.triangles[2].neighbors[0] = tri_store(tri_id(group.id, 3));
@@ -168,6 +195,64 @@ SkTriGroupPair SubdivTriangleSkeleton::tri_subdiv(
 
     return group;
 }
+
+void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId)
+{
+    SkeletonTriangle &rTri = tri_at(triId);
+
+    SkTriGroup &rGroup = tri_group_at(rTri.children);
+
+    auto const clear_neighbor = [this, &rGroup, triId, groupId = rTri.children] (int childIdx, int neighborIdx, bool pair)
+    {
+        SkTriOwner_t &rOwner = rGroup.triangles[childIdx].neighbors[neighborIdx];
+        if (rOwner.has_value())
+        {
+            if (pair)
+            {
+                SkeletonTriangle &rNeighbor = tri_at(rOwner);
+                int const neighborEdgeIdx = rNeighbor.find_neighbor_index(tri_id(groupId, childIdx));
+                tri_release(std::exchange(rNeighbor.neighbors[neighborEdgeIdx], {}));
+            }
+            tri_release(std::exchange(rOwner, {}));
+        }
+
+    };
+    clear_neighbor(0, 0, true);
+    clear_neighbor(0, 1, false);
+    clear_neighbor(0, 2, true);
+    clear_neighbor(1, 0, true);
+    clear_neighbor(1, 1, true);
+    clear_neighbor(1, 2, false);
+    clear_neighbor(2, 0, false);
+    clear_neighbor(2, 1, true);
+    clear_neighbor(2, 2, true);
+    clear_neighbor(3, 0, false);
+    clear_neighbor(3, 1, false);
+    clear_neighbor(3, 2, false);
+
+    for (int i = 0; i < 4; i ++)
+    {
+        SkeletonTriangle &rChildTri = rGroup.triangles[i];
+        LGRN_ASSERTM(rChildTri.children.has_value() == false, "Children must not be subdivided to unsubdivide parent");
+        for (int j = 0; j < 3; j ++)
+        {
+            vrtx_release(std::exchange(rChildTri.vertices[j], {}));
+        }
+
+        LGRN_ASSERTMV(m_triRefCount[tri_id(rTri.children, i).value] == 0,
+                     "Can't unsubdivide if a child has a non-zero refcount",
+                     tri_id(rTri.children, i).value,
+                     m_triRefCount[tri_id(rTri.children, i).value]);
+    }
+
+    m_triIds.remove(rTri.children);
+
+    rGroup.parent = lgrn::id_null<SkTriId>();
+    rTri.children = lgrn::id_null<SkTriGroupId>();
+
+
+}
+
 
 //-----------------------------------------------------------------------------
 
@@ -243,7 +328,7 @@ void SkeletonChunks::clear(SubdivTriangleSkeleton& rSkel)
     {
         auto const chunk = static_cast<ChunkId>(chunkInt);
 
-        rSkel.tri_release(m_chunkTris[chunk]);
+        rSkel.tri_release(std::exchange(m_chunkTris[chunk], {}));
 
         // Release all shared vertices
         for (SharedVrtxOwner_t& shared : shared_vertices_used(chunk))
@@ -257,7 +342,7 @@ void SkeletonChunks::clear(SubdivTriangleSkeleton& rSkel)
     {
         auto const shared = static_cast<SharedVrtxId>(sharedInt);
 
-        rSkel.vrtx_release(m_sharedSkVrtx[shared]);
+        rSkel.vrtx_release(std::exchange(m_sharedSkVrtx[shared], {}));
     }
 }
 

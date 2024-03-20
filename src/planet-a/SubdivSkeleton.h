@@ -48,7 +48,7 @@ namespace planeta
  */
 constexpr std::uint64_t concat_u32(std::uint32_t const lhs, std::uint32_t const rhs) noexcept
 {
-    return (std::uint64_t(lhs) << (sizeof(std::uint32_t) * 8)) | std::uint64_t(rhs);
+    return (std::uint64_t(lhs) << 32) | std::uint64_t(rhs);
 }
 
 //-----------------------------------------------------------------------------
@@ -78,6 +78,7 @@ public:
 
     using base_t::bitview;
     using base_t::capacity;
+    using base_t::exists;
     using base_t::size;
 
     /**
@@ -105,7 +106,7 @@ public:
      */
     MaybeNewId<ID_T> create_or_get(ID_T const a, ID_T const b)
     {
-        std::uint64_t const combination = hash_id_combination(a, b);
+        std::uint64_t const combination = id_pair_to_combination(a, b);
 
         // Try emplacing a blank element under this combination of IDs, or get
         // existing element
@@ -148,6 +149,22 @@ public:
 
     std::pair<ID_T, ID_T> get_parents(ID_T a);
 
+
+    void remove(ID_T x)
+    {
+        LGRN_ASSERTM(m_idChildCount[std::size_t(x)] == 0, "Can't remove vertex with non-zero children");
+        std::uint64_t const combination = m_idToParents[std::size_t(x)];
+        [[maybe_unused]]
+        std::size_t const erased = m_parentsToId.erase(combination);
+        LGRN_ASSERT(erased != 0);
+
+        auto const [a, b] = combination_to_id_pair(combination);
+        -- m_idChildCount[std::size_t(a)];
+        -- m_idChildCount[std::size_t(b)];
+
+        base_t::remove(x);
+    }
+
     /**
      * @brief Reserve to fit at least n IDs
      *
@@ -162,16 +179,24 @@ public:
 
 private:
 
-    /**
-     * @brief Create a unique hash for two unordered IDs
-     */
-    static constexpr std::uint64_t hash_id_combination(ID_T const a, ID_T const b) noexcept
+    static constexpr std::uint64_t id_pair_to_combination(ID_T const a, ID_T const b) noexcept
     {
         // Sort to make A and B order-independent
         auto const ls = id_int_t(std::min(a, b));
         auto const ms = id_int_t(std::max(a, b));
 
         return concat_u32(ms, ls);
+    }
+
+    struct IdPair
+    {
+        ID_T a;
+        ID_T b;
+    };
+
+    static constexpr IdPair combination_to_id_pair(std::uint64_t const combination)
+    {
+        return { ID_T(std::uint32_t(combination)), ID_T(std::uint32_t(combination >> 32)) };
     }
 
     std::unordered_map<std::uint64_t, id_int_t> m_parentsToId;
@@ -236,9 +261,16 @@ public:
      *
      * @param rStorage [ref] Owner to release
      */
-    void vrtx_release(SkVrtxOwner_t &rOwner)
+    bool vrtx_release(SkVrtxOwner_t&& rOwner)
     {
+        SkVrtxId const value = rOwner.value();
         m_vrtxRefCount.ref_release(std::move(rOwner));
+        bool const noRefsRemaining = (m_vrtxRefCount[std::size_t(value)] == 0);
+        if (noRefsRemaining)
+        {
+            m_vrtxIdTree.remove(value);
+        }
+        return noRefsRemaining;
     }
 
     /**
@@ -290,6 +322,23 @@ struct SkeletonTriangle
     std::array<SkTriOwner_t, 3>     neighbors;
     SkTriGroupId                    children;
 
+    constexpr int find_neighbor_index(SkTriId const neighbor)
+    {
+        if (neighbors[0].value() == neighbor)
+        {
+            return 0;
+        }
+        else if (neighbors[1].value() == neighbor)
+        {
+            return 1;
+        }
+        else
+        {
+            LGRN_ASSERTM(neighbors[2].value() == neighbor, "Neighbor not found");
+            return 2;
+        }
+    }
+
 }; // struct SkeletonTriangle
 
 /**
@@ -325,6 +374,8 @@ struct SkTriGroupPair
     SkTriGroupId id;
     SkTriGroup& rGroup;
 };
+
+
 
 /**
  * @return Group ID of a SkeletonTriangle's group specified by Id
@@ -420,12 +471,12 @@ public:
             osp::ArrayView< SkVrtxId > rOut);
 
 
-    SkTriGroup const& tri_group_at(SkTriGroupId const group) const
+    [[nodiscard]] SkTriGroup const& tri_group_at(SkTriGroupId const group) const
     {
         return m_triData.at(group);
     }
 
-    SkTriGroup& tri_group_at(SkTriGroupId const group)
+    [[nodiscard]] SkTriGroup& tri_group_at(SkTriGroupId const group)
     {
         return m_triData.at(group);
     }
@@ -473,54 +524,26 @@ public:
         int          edge;
     };
 
-
-    struct TmpSkTriGroupEdge
+    struct SkTriGroupEdge
     {
-        SkTriOwner_t &rNeighborA;
-        SkTriOwner_t &rNeighborB;
-        SkTriId      childA;
-        SkTriId      childB;
+        SkTriOwner_t        &rNeighborA;
+        SkTriOwner_t        &rNeighborB;
+        SkTriId             childA;
+        SkTriId             childB;
     };
 
     struct NeighboringEdges
     {
-        TmpSkTriGroupEdge lhs;
-        TmpSkTriGroupEdge rhs;
+        SkTriGroupEdge lhs;
+        SkTriGroupEdge rhs;
     };
 
-    NeighboringEdges tri_group_set_neighboring(SkTriGroupNeighboring lhs, SkTriGroupNeighboring rhs)
-    {
-        auto const children_on_edge = [] (SkTriGroupNeighboring const& x) -> TmpSkTriGroupEdge
-        {
-            switch (x.edge)
-            {
-            case 0:
-                return { x.rGroup.triangles[0].neighbors[0], x.rGroup.triangles[1].neighbors[0],
-                               tri_id(x.id, 0),                    tri_id(x.id, 1) };
-            case 1:
-                return { x.rGroup.triangles[1].neighbors[1], x.rGroup.triangles[2].neighbors[1],
-                               tri_id(x.id, 1),                    tri_id(x.id, 2) };
-            case 2:
-            default:
-                return { x.rGroup.triangles[2].neighbors[2], x.rGroup.triangles[0].neighbors[2],
-                               tri_id(x.id, 2),                    tri_id(x.id, 0) };
-            }
-        };
-
-        NeighboringEdges const edges = { children_on_edge(lhs), children_on_edge(rhs) };
-
-        edges.lhs.rNeighborA = tri_store(edges.rhs.childB);
-        edges.lhs.rNeighborB = tri_store(edges.rhs.childA);
-        edges.rhs.rNeighborA = tri_store(edges.lhs.childB);
-        edges.rhs.rNeighborB = tri_store(edges.lhs.childA);
-
-        return edges;
-    }
+    NeighboringEdges tri_group_set_neighboring(SkTriGroupNeighboring lhs, SkTriGroupNeighboring rhs);
 
     /**
      * @return Triangle data from ID
      */
-    SkeletonTriangle& tri_at(SkTriId const triId)
+    [[nodiscard]] SkeletonTriangle& tri_at(SkTriId const triId)
     {
         return m_triData.at(tri_group_id(triId)).triangles[tri_sibling_index(triId)];
     }
@@ -540,12 +563,14 @@ public:
      */
     SkTriGroupPair tri_subdiv(SkTriId triId, std::array<SkVrtxId, 3> vrtxMid);
 
+    void tri_unsubdiv(SkTriId triId);
+
     /**
      * @brief Store a Triangle ID in ref-counted long term storage
      *
      * @return Triangle
      */
-    SkTriOwner_t tri_store(SkTriId const triId)
+    [[nodiscard]] SkTriOwner_t tri_store(SkTriId const triId)
     {
         return m_triRefCount.ref_add(triId);
     }
@@ -556,7 +581,7 @@ public:
      *
      * @param rStorage [ref] Storage to release
      */
-    void tri_release(SkTriOwner_t &rStorage)
+    void tri_release(SkTriOwner_t&& rStorage)
     {
         m_triRefCount.ref_release(std::move(rStorage));
     }

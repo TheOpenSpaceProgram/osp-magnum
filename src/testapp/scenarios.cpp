@@ -42,6 +42,7 @@
 #include "MagnumApplication.h"
 
 #include <adera/activescene/vehicles_vb_fn.h>
+#include <adera/drawing/CameraController.h>
 
 #include <osp/activescene/basic.h>
 #include <osp/core/Resources.h>
@@ -348,6 +349,13 @@ static ScenarioMap_t make_scenarios()
             shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
             terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, terrain, sc_matFlat);
+
+            OSP_DECLARE_GET_DATA_IDS(cameraCtrl,   TESTAPP_DATA_CAMERA_CTRL);
+
+            auto &rCamCtrl = top_get<ACtxCameraController>(rTopData, idCamCtrl);
+            rCamCtrl.m_target = Vector3(0.0f, 0.0f, 50.0f);
+            rCamCtrl.m_orbitDistanceMin = 1.0f;
+            rCamCtrl.m_moveSpeed = 0.5f;
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };

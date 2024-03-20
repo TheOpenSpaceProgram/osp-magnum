@@ -35,9 +35,6 @@
 namespace testapp::scenes
 {
 
-//https://github.com/Capital-Asterisk/osp-magnum/blob/planets-despaghetti/src/planet-a/Active/SysPlanetA.cpp
-//https://github.com/Capital-Asterisk/osp-magnum/blob/cdf94fe7942d12bbc6e90fd586957640dc088d78/src/planet-a/Active/SysPlanetA.cpp
-
 struct ACtxSurfaceFrame
 {
     osp::Vector3l       position; ///< Position relative to planet's center
@@ -74,11 +71,6 @@ struct ACtxTerrain
 
     osp::KeyedVec<planeta::SkTriId, osp::Vector3l> sktriCenter;
 
-//    std::vector<planeta::SkTriGroupId> sktriNewSubdiv;
-//    std::vector<planeta::SkTriGroupId> sktriNewUnsubdiv;
-//    std::vector<planeta::SkTriId> sktriCheck;
-//    std::vector<planeta::SkTriId> sktriCheckNext;
-
     std::array<PerSubdivLevel, 10> levels;
     int levelNeedProcess = 10;
     //int levelMax{0};
@@ -95,7 +87,6 @@ struct ACtxTerrainIco
     std::array<planeta::SkTriGroupId, 5> icoGroups;
     std::array<planeta::SkTriId, 20>     icoTri;
 };
-
 
 struct ACtxPlanetTerrainDraw
 {

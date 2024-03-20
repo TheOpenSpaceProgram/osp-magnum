@@ -101,10 +101,9 @@ void SysCameraController::update_view(ACtxCameraController& rCtrl, float const d
 
         // Scroll to move in/out
         constexpr float const distSensitivity = 0.3f;
-        constexpr float const minDist = 5.0f;
         rCtrl.m_orbitDistance
                 -= rCtrl.m_orbitDistance * distSensitivity * scroll;
-        rCtrl.m_orbitDistance = std::max(rCtrl.m_orbitDistance, minDist);
+        rCtrl.m_orbitDistance = std::max(rCtrl.m_orbitDistance, rCtrl.m_orbitDistanceMin);
 
         // Convert requested rotation to quaternion
         Quaternion const rotationDelta
