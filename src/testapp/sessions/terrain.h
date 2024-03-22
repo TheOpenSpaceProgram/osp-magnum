@@ -31,6 +31,8 @@
 #include <osp/drawing/draw_ent.h>
 
 #include <planet-a/SubdivSkeleton.h>
+//#include <planet-a/terrain_skeleton.h>
+
 
 namespace testapp::scenes
 {
@@ -71,9 +73,9 @@ struct ACtxTerrain
 
     osp::KeyedVec<planeta::SkTriId, osp::Vector3l> sktriCenter;
 
-    std::array<PerSubdivLevel, 10> levels;
-    int levelNeedProcess = 10;
-    //int levelMax{0};
+    std::array<PerSubdivLevel, 9> levels;
+    int levelNeedProcess = 9;
+    int levelMax {9};
 
     int scale{};
 };

@@ -144,16 +144,15 @@ SubdivTriangleSkeleton::NeighboringEdges SubdivTriangleSkeleton::tri_group_set_n
 
 SkTriGroupPair SubdivTriangleSkeleton::tri_subdiv(
         SkTriId                 const triId,
+        SkeletonTriangle&             rTri,
         std::array<SkVrtxId, 3> const vrtxMid)
 {
-    SkeletonTriangle &rTri = tri_at(triId);
-
     LGRN_ASSERTM(!rTri.children.has_value(), "SkeletonTriangle is already subdivided");
 
     SkTriGroup const& parentGroup = m_triData[tri_group_id(triId)];
 
     std::array<SkVrtxId, 3> corner = {rTri.vertices[0], rTri.vertices[1], rTri.vertices[2]};
-\
+
     auto middle = [&vrtxMid] (int i) -> SkVrtxId { return vrtxMid[i]; };
 
     // c?: Corner vertex corner(?) aka: rTri.m_vertices[?]
@@ -196,10 +195,8 @@ SkTriGroupPair SubdivTriangleSkeleton::tri_subdiv(
     return group;
 }
 
-void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId)
+void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri)
 {
-    SkeletonTriangle &rTri = tri_at(triId);
-
     SkTriGroup &rGroup = tri_group_at(rTri.children);
 
     auto const clear_neighbor = [this, &rGroup, triId, groupId = rTri.children] (int childIdx, int neighborIdx, bool pair)

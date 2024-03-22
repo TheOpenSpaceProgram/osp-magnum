@@ -322,7 +322,7 @@ struct SkeletonTriangle
     std::array<SkTriOwner_t, 3>     neighbors;
     SkTriGroupId                    children;
 
-    constexpr int find_neighbor_index(SkTriId const neighbor)
+    constexpr int find_neighbor_index(SkTriId const neighbor) const noexcept
     {
         if (neighbors[0].value() == neighbor)
         {
@@ -334,7 +334,7 @@ struct SkeletonTriangle
         }
         else
         {
-            LGRN_ASSERTM(neighbors[2].value() == neighbor, "Neighbor not found");
+            //LGRN_ASSERTM(neighbors[2].value() == neighbor, "Neighbor not found");
             return 2;
         }
     }
@@ -548,6 +548,11 @@ public:
         return m_triData.at(tri_group_id(triId)).triangles[tri_sibling_index(triId)];
     }
 
+    [[nodiscard]] SkeletonTriangle const& tri_at(SkTriId const triId) const
+    {
+        return m_triData.at(tri_group_id(triId)).triangles[tri_sibling_index(triId)];
+    }
+
     /**
      * @return Read-only access to Triangle IDs
      */
@@ -561,9 +566,14 @@ public:
      *
      * @return New Triangle Group ID
      */
-    SkTriGroupPair tri_subdiv(SkTriId triId, std::array<SkVrtxId, 3> vrtxMid);
+    SkTriGroupPair tri_subdiv(SkTriId triId, SkeletonTriangle &rTri, std::array<SkVrtxId, 3> vrtxMid);
 
-    void tri_unsubdiv(SkTriId triId);
+    bool is_tri_subdivided(SkTriId const triId) const
+    {
+        return m_triData[tri_group_id(triId)].triangles[tri_sibling_index(triId)].children.has_value();
+    }
+
+    void tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri);
 
     /**
      * @brief Store a Triangle ID in ref-counted long term storage
