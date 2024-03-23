@@ -226,14 +226,15 @@ Session setup_prefab_draw(
     rBuilder.task()
         .name       ("Add mesh and material to prefabs")
         .run_on     ({tgPf.spawnRequest(UseOrRun)})
-        .sync_with  ({tgPf.spawnedEnts(UseOrRun),
-                      tgScnRdr.entMesh(New), tgScnRdr.material(New), tgScnRdr.drawEnt(New), tgScnRdr.drawEntResized(Done),
-                      tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
+        .sync_with  ({tgPf.spawnedEnts(UseOrRun), tgScnRdr.drawEnt(New), tgScnRdr.drawEntResized(Done),
+                      tgScnRdr   .entMesh(New), tgScnRdr   .entMeshDirty(Modify_), tgScnRdr   .meshResDirty(Modify_),
+                      tgScnRdr.entTexture(New), tgScnRdr.entTextureDirty(Modify_), tgScnRdr.textureResDirty(Modify_),
+                      tgScnRdr  .material(New), tgScnRdr  .materialDirty(Modify_)})
         .push_to    (out.m_tasks)
         .args       ({        idPrefabs,           idResources,                 idBasic,             idDrawing,                idDrawingRes,                 idScnRender,          idMaterial})
         .func([] (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, MaterialId material) noexcept
     {
-        SysPrefabDraw::init_mesh_and_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender, material);
+        SysPrefabDraw::init_mesh_texture_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender, material);
     });
 
 
@@ -257,7 +258,7 @@ Session setup_prefab_draw(
         .args       ({        idPrefabs,           idResources,                 idBasic,             idDrawing,                idDrawingRes,                 idScnRender,          idMaterial})
         .func([] (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, MaterialId material) noexcept
     {
-        SysPrefabDraw::resync_mesh_and_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender, material);
+        SysPrefabDraw::resync_mesh_texture_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender, material);
     });
 
 

@@ -106,7 +106,7 @@ void SysPrefabDraw::resync_drawents(
     }
 }
 
-void SysPrefabDraw::init_mesh_and_material(
+void SysPrefabDraw::init_mesh_texture_material(
         ACtxPrefabs&                rPrefabs,
         Resources&                  rResources,
         ACtxBasic const&            rBasic,
@@ -191,7 +191,7 @@ void SysPrefabDraw::init_mesh_and_material(
 }
 
 
-void SysPrefabDraw::resync_mesh_and_material(
+void SysPrefabDraw::resync_mesh_texture_material(
         ACtxPrefabs&                rPrefabs,
         Resources&                  rResources,
         ACtxBasic const&            rBasic,

@@ -46,17 +46,6 @@ using namespace osp;
 namespace testapp::scenes
 {
 
-template <MachTypeId const& MachType_T>
-TopTaskFunc_t gen_allocate_mach()
-{
-    static TopTaskFunc_t const func = wrap_args([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach) noexcept
-    {
-        rUpdMach.localDirty[MachType_T].ints().resize(rScnParts.machines.perType[MachType_T].localIds.vec().capacity());
-    });
-
-    return func;
-}
-
 Session setup_mach_rocket(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,
@@ -77,7 +66,10 @@ Session setup_mach_rocket(
         .sync_with  ({tgParts.machIds(Ready), tgParts.machUpdExtIn(New)})
         .push_to    (out.m_tasks)
         .args       ({idScnParts, idUpdMach})
-        .func_raw   (gen_allocate_mach<gc_mtMagicRocket>());
+        .func       ( [] (ACtxParts& rScnParts, MachineUpdater& rUpdMach) noexcept
+    {
+        rUpdMach.localDirty[gc_mtMagicRocket].ints().resize(rScnParts.machines.perType[gc_mtMagicRocket].localIds.vec().capacity());
+    });
 
     return out;
 } // setup_mach_rocket
@@ -288,7 +280,10 @@ Session setup_mach_rcsdriver(
         .sync_with  ({tgParts.machIds(Ready), tgParts.machUpdExtIn(New)})
         .push_to    (out.m_tasks)
         .args       ({idScnParts, idUpdMach})
-        .func_raw   (gen_allocate_mach<gc_mtRcsDriver>());
+        .func       ( [] (ACtxParts& rScnParts, MachineUpdater& rUpdMach) noexcept
+    {
+        rUpdMach.localDirty[gc_mtRcsDriver].ints().resize(rScnParts.machines.perType[gc_mtRcsDriver].localIds.vec().capacity());
+    });
 
     rBuilder.task()
         .name       ("RCS Drivers calculate new values")

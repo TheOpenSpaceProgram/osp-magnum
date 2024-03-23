@@ -321,6 +321,7 @@ Session setup_shader_visualizer(
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
     auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
     auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
 
     auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
     auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
@@ -347,7 +348,7 @@ Session setup_shader_visualizer(
     rBuilder.task()
         .name       ("Sync MeshVisualizer shader DrawEnts")
         .run_on     ({tgWin.sync(Run)})
-        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify), tgScnRdr.materialDirty(UseOrRun)})
+        .sync_with  ({tgScnRdr.materialDirty(UseOrRun), tgMgn.textureGL(Ready), tgScnRdr.groupEnts(Modify)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                        idDrawShVisual})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
@@ -391,6 +392,7 @@ Session setup_shader_flat(
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
     auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
     auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
 
     auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
     auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
@@ -434,7 +436,7 @@ Session setup_shader_flat(
     rBuilder.task()
         .name       ("Resync Flat shader DrawEnts")
         .run_on     ({tgWin.resync(Run)})
-        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .sync_with  ({tgScnRdr.materialDirty(UseOrRun), tgMgn.textureGL(Ready), tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,              idDrawShFlat})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawFlat& rDrawShFlat) noexcept
@@ -475,6 +477,7 @@ Session setup_shader_phong(
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
     auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
     auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
 
     auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
     auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
@@ -498,7 +501,7 @@ Session setup_shader_phong(
     rBuilder.task()
         .name       ("Sync Phong shader DrawEnts")
         .run_on     ({tgWin.sync(Run)})
-        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify), tgScnRdr.materialDirty(UseOrRun)})
+        .sync_with  ({tgScnRdr.materialDirty(UseOrRun), tgMgn.entTextureGL(Ready), tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,               idDrawShPhong})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawPhong& rDrawShPhong) noexcept
@@ -519,7 +522,7 @@ Session setup_shader_phong(
     rBuilder.task()
         .name       ("Resync Phong shader DrawEnts")
         .run_on     ({tgWin.resync(Run)})
-        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .sync_with  ({tgScnRdr.materialDirty(UseOrRun), tgMgn.entTextureGL(Ready), tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,               idDrawShPhong})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawPhong& rDrawShPhong) noexcept
