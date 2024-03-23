@@ -31,7 +31,7 @@
 #include <osp/drawing/draw_ent.h>
 
 #include <planet-a/SubdivSkeleton.h>
-//#include <planet-a/terrain_skeleton.h>
+#include <planet-a/terrain_skeleton.h>
 
 
 namespace testapp::scenes
@@ -44,40 +44,10 @@ struct ACtxSurfaceFrame
     bool                active      {false};
 };
 
-struct SkeletonAABB
+
+struct ACtxTerrain : planeta::TerrainSkeleton
 {
-    osp::Vector3l min;
-    osp::Vector3l max;
-};
-
-struct PerSubdivLevel
-{
-    /// Subdivided triangles that neighbor a non-subdivided one
-    osp::BitVector_t hasNonSubdivedNeighbor;
-
-    /// Non-subdivided triangles that neighbor a subdivided one
-    osp::BitVector_t hasSubdivedNeighbor;
-
-    std::vector<planeta::SkTriId>       distanceTestProcessing;
-    std::vector<planeta::SkTriId>       distanceTestNext;
-
-    //std::vector<planeta::SkTriId> mustSubdiv;
-};
-
-struct ACtxTerrain
-{
-    planeta::SubdivTriangleSkeleton skeleton;
-
-    osp::KeyedVec<planeta::SkVrtxId, osp::Vector3l> skPositions;
-    osp::KeyedVec<planeta::SkVrtxId, osp::Vector3>  skNormals;
-
-    osp::KeyedVec<planeta::SkTriId, osp::Vector3l> sktriCenter;
-
-    std::array<PerSubdivLevel, 9> levels;
-    int levelNeedProcess = 9;
-    int levelMax {9};
-
-    int scale{};
+    planeta::SubdivScratchpad scratchpad;
 };
 
 struct ACtxTerrainIco

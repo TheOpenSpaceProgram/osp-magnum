@@ -334,7 +334,7 @@ struct SkeletonTriangle
         }
         else
         {
-            //LGRN_ASSERTM(neighbors[2].value() == neighbor, "Neighbor not found");
+            LGRN_ASSERTM(neighbors[2].value() == neighbor, "Neighbor not found");
             return 2;
         }
     }

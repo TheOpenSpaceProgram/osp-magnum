@@ -171,5 +171,4 @@ void ico_calc_chunk_edge_recurse(
         std::vector<osp::Vector3l>      &rPositions,
         std::vector<osp::Vector3>       &rNormals);
 
-
 }

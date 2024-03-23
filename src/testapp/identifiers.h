@@ -328,7 +328,6 @@ struct PlNewton
     idSurfaceFrame, idTerrain, idTerrainIco
 struct PlTerrain
 {
-    PipelineDef<EStgEvnt> skSubdivLoop      {"skSubdivLoop"};
     PipelineDef<EStgCont> skeleton          {"skeleton"};
     PipelineDef<EStgCont> surfaceFrame      {"surfaceFrame"};
 };
