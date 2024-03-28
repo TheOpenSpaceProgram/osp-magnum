@@ -47,23 +47,24 @@ SubdivTriangleSkeleton::~SubdivTriangleSkeleton()
 }
 
 void SubdivTriangleSkeleton::vrtx_create_chunk_edge_recurse(
-            unsigned int const level,
-            SkVrtxId a, SkVrtxId b,
-            osp::ArrayView< SkVrtxId > rOut)
+            std::uint8_t  const level,
+            SkVrtxId      const vrtxA,
+            SkVrtxId      const vrtxB,
+            osp::ArrayView< MaybeNewId<SkVrtxId> > rOut)
 {
-        LGRN_ASSERTV(rOut.size() == ( (1<<level) - 1),
-                     rOut.size(), ( (1<<level) - 1));
+    LGRN_ASSERTV(rOut.size() == ( (1<<level) - 1 ),
+                 rOut.size(),   ( (1<<level) - 1 ));
 
-        SkVrtxId const mid = vrtx_create_or_get_child(a, b).id;
-        size_t const halfSize = rOut.size() / 2;
-        rOut[halfSize] = mid;
+    MaybeNewId<SkVrtxId> const mid      = vrtx_create_or_get_child(vrtxA, vrtxB);
+    std::size_t          const halfSize = rOut.size() / 2;
+    rOut[halfSize] = mid;
 
-        if (level > 1)
-        {
-            vrtx_create_chunk_edge_recurse(level - 1, a, mid, rOut.prefix(halfSize));
-            vrtx_create_chunk_edge_recurse(level - 1, mid, b, rOut.exceptPrefix(halfSize + 1));
-        }
+    if (level > 1)
+    {
+        vrtx_create_chunk_edge_recurse(level - 1, vrtxA,  mid.id, rOut.prefix(halfSize));
+        vrtx_create_chunk_edge_recurse(level - 1, mid.id, vrtxB,  rOut.exceptPrefix(halfSize + 1));
     }
+}
 
 SkTriGroupPair SubdivTriangleSkeleton::tri_group_create(
         uint8_t const depth,
@@ -256,19 +257,15 @@ void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri)
 
 ChunkId SkeletonChunks::chunk_create(
         SubdivTriangleSkeleton&         rSkel,
-        SkTriId const                   skTri,
-        osp::ArrayView<SkVrtxId> const  edgeRte,
-        osp::ArrayView<SkVrtxId> const  edgeBtm,
-        osp::ArrayView<SkVrtxId> const  edgeLft)
+        SkTriId                   const skTri,
+        osp::ArrayView<SkVrtxId>  const edgeRte,
+        osp::ArrayView<SkVrtxId>  const edgeBtm,
+        osp::ArrayView<SkVrtxId>  const edgeLft)
 {
-    if (   edgeRte.size() != m_chunkWidth - 1
-        || edgeBtm.size() != m_chunkWidth - 1
-        || edgeLft.size() != m_chunkWidth - 1)
-    {
-        throw std::runtime_error("Incorrect edge vertex count");
-    }
+    LGRN_ASSERT(   edgeRte.size() == m_chunkWidth - 1
+                && edgeBtm.size() == m_chunkWidth - 1
+                && edgeLft.size() == m_chunkWidth - 1 );
 
-    // Create a new chunk ID
     ChunkId const chunkId   = m_chunkIds.create();
     SkTriOwner_t &rChunkTri = m_chunkTris[chunkId];
 
@@ -282,8 +279,8 @@ ChunkId SkeletonChunks::chunk_create(
 
     for (int i = 0; i < 3; i ++)
     {
-        size_t const cornerOffset = m_chunkWidth * i;
-        size_t const edgeOffset = m_chunkWidth * i + 1;
+        std::size_t const cornerOffset = m_chunkWidth * i;
+        std::size_t const edgeOffset = m_chunkWidth * i + 1;
 
         osp::ArrayView<SkVrtxId> const edge = edges[i];
         {

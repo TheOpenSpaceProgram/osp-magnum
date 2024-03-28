@@ -84,8 +84,11 @@ struct SubdivScratchpadLevel
  */
 struct SubdivScratchpad
 {
-    using OnUnsubdivideFunc_t = void (*)(SkTriId, SkeletonTriangle&, TerrainSkeleton&, void*) noexcept;
-    using OnSubdivideFunc_t   = void (*)(SkTriId, SkTriGroupId, std::array<SkVrtxId, 3>, std::array<MaybeNewId<SkVrtxId>, 3>, TerrainSkeleton&, void*) noexcept;
+    using UserData_t = std::array<void*, 4>;
+    using OnUnsubdivideFunc_t = void (*)(SkTriId, SkeletonTriangle&, TerrainSkeleton&, UserData_t) noexcept;
+    using OnSubdivideFunc_t   = void (*)(SkTriId, SkTriGroupId, std::array<SkVrtxId, 3>, std::array<MaybeNewId<SkVrtxId>, 3>, TerrainSkeleton&, UserData_t) noexcept;
+
+    void resize(TerrainSkeleton& rTrn);
 
     std::array<std::uint64_t, gc_maxSubdivLevels> distanceThresholdSubdiv;
     std::array<std::uint64_t, gc_maxSubdivLevels> distanceThresholdUnsubdiv;
@@ -95,16 +98,22 @@ struct SubdivScratchpad
     osp::BitVector_t distanceTestDone;
     osp::BitVector_t tryUnsubdiv;
     osp::BitVector_t cantUnsubdiv;
-    osp::BitVector_t recheckNeighbors;
 
-    std::uint8_t levelNeedProcess = 9;
-    std::uint8_t levelMax {9};
+    /// Non-subdivided triangles recently added, excluding intermediate triangles removed
+    /// directly after creation.
+    osp::BitVector_t surfaceAdded;
+    /// Non-subdivided triangles recently removed, excluding intermediate triangles removed
+    /// directly after creation.
+    osp::BitVector_t surfaceRemoved;
 
-    OnSubdivideFunc_t onSubdiv  {nullptr};
-    void* onSubdivUserData      {nullptr};
+    std::uint8_t levelNeedProcess = 7;
+    std::uint8_t levelMax {7};
+
+    OnSubdivideFunc_t onSubdiv      {nullptr};
+    UserData_t onSubdivUserData     {{nullptr, nullptr, nullptr, nullptr}};
 
     OnUnsubdivideFunc_t onUnsubdiv  {nullptr};
-    void* onUnsubdivUserData        {nullptr};
+    UserData_t onUnsubdivUserData   {{nullptr, nullptr, nullptr, nullptr}};
 
     std::uint32_t distanceCheckCount;
 };

@@ -32,6 +32,39 @@ using osp::Vector3;
 namespace planeta
 {
 
+void SubdivScratchpad::resize(TerrainSkeleton& rTrn)
+{
+    auto const triCapacity = rTrn.skel.tri_group_ids().capacity() * 4;
+
+    // Using sktriCenter as 'previous capacity' to detect a reallocation
+    if (triCapacity != rTrn.sktriCenter.size())
+    {
+        // note: Since all of these are the same size, it feel practical to put them all in a
+        //       single unique_ptr allocation, and access it with array views
+
+        rTrn.sktriCenter.resize(triCapacity);
+
+        bitvector_resize(this->  distanceTestDone,  triCapacity);
+        bitvector_resize(this->  tryUnsubdiv,       triCapacity);
+        bitvector_resize(this->  cantUnsubdiv,      triCapacity);
+        bitvector_resize(this->  surfaceAdded,      triCapacity);
+        bitvector_resize(this->  surfaceRemoved,    triCapacity);
+
+        for (int lvl = 0; lvl < this->levelMax+1; ++lvl)
+        {
+            bitvector_resize(rTrn.levels[lvl].hasSubdivedNeighbor,       triCapacity);
+            bitvector_resize(rTrn.levels[lvl].hasNonSubdivedNeighbor,    triCapacity);
+        }
+    }
+
+    auto const vrtxCapacity = rTrn.skel.vrtx_ids().capacity();
+    if (vrtxCapacity != rTrn.skPositions.size())
+    {
+        rTrn.skPositions.resize(vrtxCapacity);
+        rTrn.skNormals  .resize(vrtxCapacity);
+    }
+}
+
 void unsubdivide_level_by_distance(std::uint8_t const lvl, osp::Vector3l const pos, TerrainSkeleton const& rTrn, SubdivScratchpad& rSP)
 {
     TerrainSkeleton::Level const& rLvl   = rTrn.levels[lvl];
@@ -231,12 +264,34 @@ void unsubdivide_level(std::uint8_t const lvl, TerrainSkeleton& rTrn, SubdivScra
             }
         }
 
+        rLvl.hasNonSubdivedNeighbor.reset(sktriInt);
+
         LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.test(tri_id(rTri.children, 0).value) );
         LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.test(tri_id(rTri.children, 1).value) );
         LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.test(tri_id(rTri.children, 2).value) );
         LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.test(tri_id(rTri.children, 3).value) );
 
-        rLvl.hasNonSubdivedNeighbor.reset(sktriInt);
+        LGRN_ASSERT(!rSP.surfaceAdded.test(sktriInt));
+        rSP.surfaceAdded.set(sktriInt);
+
+        // If child is in surfaceAdded. This means it was just recently unsubdivided.
+        // It will be removed right away and is an intermediate step, so don't include it in
+        // surfaceAdded or surfaceRemoved.
+        auto const check_surface = [&rSP] (SkTriId const child)
+        {
+            if (rSP.surfaceAdded.test(child.value))
+            {
+                rSP.surfaceAdded.reset(child.value);
+            }
+            else
+            {
+                rSP.surfaceRemoved.set(child.value);
+            }
+        };
+        check_surface(tri_id(rTri.children, 0));
+        check_surface(tri_id(rTri.children, 1));
+        check_surface(tri_id(rTri.children, 2));
+        check_surface(tri_id(rTri.children, 3));
 
         rSP.onUnsubdiv(sktriId, rTri, rTrn, rSP.onUnsubdivUserData);
 
@@ -271,18 +326,18 @@ SkTriGroupId subdivide(
     // manual borrow checker hint: rSkTri becomes invalid here >:)
     auto const [groupId, rGroup] = rTrn.skel.tri_subdiv(sktriId, rSkTri, middles);
 
-    // kinda stupid to resize these here, but WHO CARES LOL XD
-    auto const triCapacity  = rTrn.skel.tri_group_ids().capacity() * 4;
-    bitvector_resize(rSP    .distanceTestDone,       triCapacity);
-    bitvector_resize(rLvl   .hasSubdivedNeighbor,    triCapacity);
-    bitvector_resize(rLvl   .hasNonSubdivedNeighbor, triCapacity);
-    rTrn.sktriCenter.resize(triCapacity);
-    auto const vrtxCapacity = rTrn.skel.vrtx_ids().capacity();
-    rTrn.skPositions.resize(vrtxCapacity);
-    rTrn.skNormals  .resize(vrtxCapacity);
+    rSP.resize(rTrn);
+
+    rSP.onSubdiv(sktriId, groupId, corners, middlesNew, rTrn, rSP.onSubdivUserData);
 
     if (hasNextLevel)
     {
+        rSP.levels[lvl+1].distanceTestNext.insert(rSP.levels[lvl+1].distanceTestNext.end(), {
+            tri_id(groupId, 0),
+            tri_id(groupId, 1),
+            tri_id(groupId, 2),
+            tri_id(groupId, 3),
+        });
         rSP.levels[lvl+1].distanceTestNext.insert(rSP.levels[lvl+1].distanceTestNext.end(), {
             tri_id(groupId, 0),
             tri_id(groupId, 1),
@@ -295,7 +350,21 @@ SkTriGroupId subdivide(
         rSP.distanceTestDone.set(tri_id(groupId, 3).value);
     }
 
-    rSP.onSubdiv(sktriId, groupId, corners, middlesNew, rTrn, rSP.onSubdivUserData);
+    // sktri is recently unsubdivided or newly added
+    // It will be removed right away and is an intermediate step, so don't include it
+    // in surfaceAdded or surfaceRemoved.
+    if (rSP.surfaceAdded.test(sktriId.value))
+    {
+        rSP.surfaceAdded.reset(sktriId.value);
+    }
+    else
+    {
+        rSP.surfaceRemoved.set(sktriId.value);
+    }
+    rSP.surfaceAdded.set(tri_id(groupId, 0).value);
+    rSP.surfaceAdded.set(tri_id(groupId, 1).value);
+    rSP.surfaceAdded.set(tri_id(groupId, 2).value);
+    rSP.surfaceAdded.set(tri_id(groupId, 3).value);
 
     // hasSubdivedNeighbor is only for Non-subdivided triangles
     rLvl.hasSubdivedNeighbor.reset(sktriId.value);
@@ -325,19 +394,13 @@ SkTriGroupId subdivide(
                 TerrainSkeleton::Level &rNextLvl = rTrn.levels[lvl+1];
                 if (rTrn.skel.tri_at(neighborEdge.childB).children.has_value())
                 {
-                    bitvector_resize(rNextLvl.hasSubdivedNeighbor, triCapacity);
                     rNextLvl.hasSubdivedNeighbor.set(selfEdge.childA.value);
-
-                    bitvector_resize(rNextLvl.hasNonSubdivedNeighbor, triCapacity);
                     rNextLvl.hasNonSubdivedNeighbor.set(neighborEdge.childB.value);
                 }
 
                 if (rTrn.skel.tri_at(neighborEdge.childA).children.has_value())
                 {
-                    bitvector_resize(rNextLvl.hasSubdivedNeighbor, triCapacity);
                     rNextLvl.hasSubdivedNeighbor.set(selfEdge.childB.value);
-
-                    bitvector_resize(rNextLvl.hasNonSubdivedNeighbor, triCapacity);
                     rNextLvl.hasNonSubdivedNeighbor.set(neighborEdge.childA.value);
                 }
             }
@@ -407,7 +470,6 @@ SkTriGroupId subdivide(
             {
                 // Rule A violation, more than 2 neighbors subdivided
                 subdivide(neighborId, rTrn.skel.tri_at(neighborId), lvl, hasNextLevel, rTrn, rSP);
-                bitvector_resize(rSP.distanceTestDone, rTrn.skel.tri_group_ids().capacity() * 4);
                 rSP.distanceTestDone.set(neighborId.value);
             }
             else if (!rSP.distanceTestDone.test(neighborId.value))
@@ -460,8 +522,6 @@ void subdivide_level_by_distance(Vector3l const pos, std::uint8_t const lvl, Ter
     {
         std::swap(rLvlSP.distanceTestProcessing, rLvlSP.distanceTestNext);
         rLvlSP.distanceTestNext.clear();
-
-        bitvector_resize(rSP.distanceTestDone, rTrn.skel.tri_group_ids().capacity() * 4);
 
         for (SkTriId const sktriId : rLvlSP.distanceTestProcessing)
         {
@@ -594,10 +654,7 @@ void debug_check_rules(TerrainSkeleton &rTrn)
         {
             TerrainSkeleton::Level& rLvl = rTrn.levels[group.depth];
 
-            // lazy!
             auto const triCapacity  = rTrn.skel.tri_group_ids().capacity() * 4;
-            bitvector_resize(rLvl.hasSubdivedNeighbor,    triCapacity);
-            bitvector_resize(rLvl.hasNonSubdivedNeighbor, triCapacity);
 
             if (sktri.children.has_value())
             {

@@ -162,7 +162,7 @@ void planeta::ico_calc_chunk_edge_recurse(
         unsigned int const  level,
         SkVrtxId const      a,
         SkVrtxId const      b,
-        osp::ArrayView<SkVrtxId const> const    vrtxs,
+        osp::ArrayView<MaybeNewId<SkVrtxId> const> const    vrtxOut,
         std::vector<osp::Vector3l>              &rPositions,
         std::vector<osp::Vector3>               &rNormals)
 {
@@ -174,16 +174,18 @@ void planeta::ico_calc_chunk_edge_recurse(
     auto const pos = [&rPositions] (SkVrtxId const id) -> osp::Vector3l& { return rPositions[size_t(id)]; };
     auto const nrm = [&rNormals]   (SkVrtxId const id) -> osp::Vector3&  { return rNormals[size_t(id)];   };
 
-    size_t const halfSize = vrtxs.size() / 2;
-    SkVrtxId const mid = vrtxs[halfSize];
+    size_t const halfSize = vrtxOut.size() / 2;
+    MaybeNewId<SkVrtxId> const mid = vrtxOut[halfSize];
 
-    sphere_midpoint(radius, std::pow(2.0f, pow2scale), pos(a), pos(b),
-                    pos(mid), nrm(mid));
+    if (mid.isNew)
+    {
+        sphere_midpoint(radius, std::pow(2.0f, pow2scale), pos(a), pos(b), pos(mid.id), nrm(mid.id));
+    }
 
-    ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, a, mid,
-                                vrtxs.prefix(halfSize), rPositions, rNormals);
-    ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, mid, b,
-                                vrtxs.exceptPrefix(halfSize), rPositions, rNormals);
+    ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, a, mid.id,
+                                vrtxOut.prefix(halfSize), rPositions, rNormals);
+    ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, mid.id, b,
+                                vrtxOut.exceptPrefix(halfSize), rPositions, rNormals);
 
 }
 

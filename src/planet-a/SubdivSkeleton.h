@@ -89,8 +89,8 @@ public:
     ID_T create_root()
     {
         ID_T const id = base_t::create();
-        m_idChildCount.resize(capacity());
-        m_idChildCount[size_t(id)] = 0;
+        m_idUsers.resize(capacity());
+        m_idUsers[std::size_t(id)] = 0;
         return id;
     };
 
@@ -123,9 +123,9 @@ public:
             m_idToParents.resize(capacity());
             m_idToParents[it->second] = combination;
 
-            // Increase child count of the two parents
-            m_idChildCount[size_t(a)] ++;
-            m_idChildCount[size_t(b)] ++;
+            // Increase use count of both parents as child is added
+            user_increment(a);
+            user_increment(b);
         }
 
         return { ID_T(it->second), success };
@@ -149,18 +149,26 @@ public:
 
     std::pair<ID_T, ID_T> get_parents(ID_T a);
 
-
     void remove(ID_T x)
     {
-        LGRN_ASSERTM(m_idChildCount[std::size_t(x)] == 0, "Can't remove vertex with non-zero children");
+        LGRN_ASSERTM(m_idUsers[std::size_t(x)] == 0, "Can't remove vertex with non-zero users");
+
         std::uint64_t const combination = m_idToParents[std::size_t(x)];
         [[maybe_unused]]
         std::size_t const erased = m_parentsToId.erase(combination);
         LGRN_ASSERT(erased != 0);
 
         auto const [a, b] = combination_to_id_pair(combination);
-        -- m_idChildCount[std::size_t(a)];
-        -- m_idChildCount[std::size_t(b)];
+
+        if (user_decrement(a))
+        {
+            remove(a);
+        }
+
+        if (user_decrement(b))
+        {
+            remove(b);
+        }
 
         base_t::remove(x);
     }
@@ -174,7 +182,18 @@ public:
     {
         base_t::reserve(n);
         m_idToParents.reserve(base_t::capacity());
-        m_idChildCount.reserve(base_t::capacity());
+        m_idUsers.reserve(base_t::capacity());
+    }
+
+    void user_increment(ID_T x) noexcept
+    {
+        m_idUsers[std::size_t(x)] ++;
+    }
+
+    bool user_decrement(ID_T x) noexcept
+    {
+        m_idUsers[std::size_t(x)] --;
+        return m_idUsers[std::size_t(x)] == 0;
     }
 
 private:
@@ -201,7 +220,7 @@ private:
 
     std::unordered_map<std::uint64_t, id_int_t> m_parentsToId;
     std::vector<std::uint64_t>                  m_idToParents;
-    std::vector<uint8_t>                        m_idChildCount;
+    std::vector<uint8_t>                        m_idUsers;
 
 }; // class SubdivTree
 
@@ -209,7 +228,9 @@ private:
 
 enum class SkVrtxId : uint32_t {};
 
-using SkVrtxOwner_t = lgrn::IdRefCount<SkVrtxId>::Owner_t;
+class SubdivSkeleton;
+
+using SkVrtxOwner_t = lgrn::IdOwner<SkVrtxId, SubdivSkeleton>;
 
 /**
  * @brief Uses a SubdivIdTree to manage relationships between Vertex IDs, and
@@ -252,7 +273,9 @@ public:
      */
     SkVrtxOwner_t vrtx_store(SkVrtxId const vrtxId)
     {
-        return m_vrtxRefCount.ref_add(vrtxId);
+        LGRN_ASSERT(m_vrtxIdTree.exists(vrtxId));
+        m_vrtxIdTree.user_increment(vrtxId);
+        return SkVrtxOwner_t{vrtxId};
     }
 
     /**
@@ -263,13 +286,16 @@ public:
      */
     bool vrtx_release(SkVrtxOwner_t&& rOwner)
     {
-        SkVrtxId const value = rOwner.value();
-        m_vrtxRefCount.ref_release(std::move(rOwner));
-        bool const noRefsRemaining = (m_vrtxRefCount[std::size_t(value)] == 0);
+        LGRN_ASSERT(m_vrtxIdTree.exists(rOwner.value()));
+
+        bool const noRefsRemaining = m_vrtxIdTree.user_decrement(rOwner.value());
         if (noRefsRemaining)
         {
-            m_vrtxIdTree.remove(value);
+            m_vrtxIdTree.remove(rOwner.value());
         }
+
+        [[maybe_unused]] SkVrtxOwner_t moved = std::move(rOwner);
+        moved.m_id = lgrn::id_null<SkVrtxId>();
         return noRefsRemaining;
     }
 
@@ -286,7 +312,7 @@ public:
     void vrtx_reserve(size_t const n)
     {
         m_vrtxIdTree.reserve(n);
-        m_vrtxRefCount.resize(m_vrtxIdTree.capacity());
+        //m_vrtxRefCount.resize(m_vrtxIdTree.capacity());
     }
 
 private:
@@ -294,9 +320,9 @@ private:
     SubdivIdTree<SkVrtxId> m_vrtxIdTree;
 
     // access using VrtxIds from m_vrtxTree
-    lgrn::IdRefCount<SkVrtxId> m_vrtxRefCount;
+    //lgrn::IdRefCount<SkVrtxId> m_vrtxRefCount;
 
-    std::vector<SkVrtxId> m_maybeDelete;
+//    std::vector<SkVrtxId> m_maybeDelete;
 
 }; // class SubdivSkeleton
 
@@ -466,9 +492,9 @@ public:
      * @param rOut  [out] Output Vertex IDs, size must be 2^level-1
      */
     void vrtx_create_chunk_edge_recurse(
-            unsigned int const level,
-            SkVrtxId a, SkVrtxId b,
-            osp::ArrayView< SkVrtxId > rOut);
+            std::uint8_t level,
+            SkVrtxId vrtxA, SkVrtxId vrtxB,
+            osp::ArrayView< MaybeNewId<SkVrtxId> > rOut);
 
 
     [[nodiscard]] SkTriGroup const& tri_group_at(SkTriGroupId const group) const

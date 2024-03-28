@@ -167,7 +167,7 @@ void ico_calc_chunk_edge_recurse(
         unsigned int    level,
         SkVrtxId        a,
         SkVrtxId        b,
-        osp::ArrayView<SkVrtxId const>  vrtxs,
+        osp::ArrayView<MaybeNewId<SkVrtxId> const> const vrtxOut,
         std::vector<osp::Vector3l>      &rPositions,
         std::vector<osp::Vector3>       &rNormals);
 
