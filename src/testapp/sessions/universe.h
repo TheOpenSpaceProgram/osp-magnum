@@ -48,6 +48,15 @@ osp::Session setup_uni_sceneframe(
         osp::Session const&         uniCore);
 
 /**
+ * @brief A single planet setup for landing on
+ */
+osp::Session setup_uni_landerplanet(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         uniCore,
+        osp::Session const&         uniScnFrame);
+
+/**
  * @brief Unrealistic planets test, allows SceneFrame to move around and get captured into planets
  */
 osp::Session setup_uni_testplanets(
