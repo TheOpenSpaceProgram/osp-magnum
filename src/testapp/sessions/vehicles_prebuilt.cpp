@@ -176,16 +176,16 @@ Session setup_prebuilt_vehicles(
 
         RCSInputs rcsInputs{pitch, yaw, roll};
 
-        int const   rcsRingBlocks   = 4;
-        int const   rcsRingCount    = 2;
-        float const rcsRingZ        = -2.0f;
-        float const rcsZStep        = 4.0f;
-        float const rcsRadius       = 1.1f;
-        float const rcsThrust       = 3000.0f;
+        static constexpr int const   rcsRingBlocks   = 4;
+        static constexpr int const   rcsRingCount    = 2;
+        static constexpr float const rcsRingZ        = -2.0f;
+        static constexpr float const rcsZStep        = 4.0f;
+        static constexpr float const rcsRadius       = 1.1f;
+        static constexpr float const rcsThrust       = 3000.0f;
 
         for (int ring = 0; ring < rcsRingCount; ++ring)
         {
-            Vector3 const rcsOset{rcsRadius, 0.0f, rcsRingZ + ring*rcsZStep };
+            Vector3 const rcsOset{rcsRadius, 0.0f, rcsRingZ + float(ring)*rcsZStep };
 
             for (Rad ang = 0.0_degf; ang < Rad(360.0_degf); ang += Rad(360.0_degf)/rcsRingBlocks)
             {

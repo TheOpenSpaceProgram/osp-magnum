@@ -24,7 +24,9 @@
  */
 #pragma once
 
-#include <cstddef>
+#include <longeron/utility/enum_traits.hpp> // for lgrn::underlying_int_type_t
+
+#include <type_traits> // for std::is_integral_v
 
 namespace osp
 {
@@ -32,18 +34,26 @@ namespace osp
 template <typename ID_T, typename DUMMY_T = void>
 struct GlobalIdReg
 {
-    [[nodiscard]] static inline ID_T create() noexcept
+    using underlying_t = lgrn::underlying_int_type_t<ID_T>;
+    static_assert(std::is_integral_v<underlying_t>);
+
+    [[nodiscard]] static constexpr ID_T create() noexcept
     {
-        return ID_T(sm_count++);
+        return ID_T{sm_count++};
     }
 
-    [[nodiscard]] static inline std::size_t size() noexcept
+    [[nodiscard]] static constexpr std::size_t size() noexcept
     {
-        return sm_count;
+      return std::size_t{sm_count};
+    }
+
+    [[nodiscard]] static constexpr underlying_t largest() noexcept
+    {
+      return sm_count;
     }
 
 private:
-    static inline std::size_t sm_count{0};
+    static inline constinit underlying_t sm_count{0};
 };
 
 } // namespace osp

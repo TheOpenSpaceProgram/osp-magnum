@@ -415,7 +415,7 @@ MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, Mag
 
     for (std::size_t const entInt : rScene.m_matPhong.ones())
     {
-        rScene.m_matPhongDirty.push_back(DrawEnt(entInt));
+        rScene.m_matPhongDirty.emplace_back(entInt);
     }
 
     sync_test_scene(rRenderGl, rScene, rRenderer);

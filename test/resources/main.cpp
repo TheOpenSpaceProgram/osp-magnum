@@ -109,7 +109,7 @@ TEST(Resources, RefCounting)
         storage = res.owner_create(restypes::gc_image, id);
         EXPECT_TRUE(storage.has_value());
         res.owner_destroy(restypes::gc_image, std::move(storage));
-        EXPECT_FALSE(storage.has_value());
+        EXPECT_FALSE(storage.has_value()); // NOLINT(bugprone-use-after-move)
     }
 
     #ifdef NDEBUG

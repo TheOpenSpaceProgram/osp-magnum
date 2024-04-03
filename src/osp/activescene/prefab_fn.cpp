@@ -167,7 +167,7 @@ void SysPrefabInit::init_info(
             PrefabInstanceInfo &rInfo = rPrefabs.instanceInfo[ent];
             rInfo.importer  = rPfBasic.m_importerRes;
             rInfo.prefab    = rPfBasic.m_prefabId;
-            rInfo.obj       = i;
+            rInfo.obj       = static_cast<ObjId>(i);
 
             if (parents[i] == -1)
             {

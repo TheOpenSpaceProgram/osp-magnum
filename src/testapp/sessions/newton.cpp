@@ -357,8 +357,8 @@ Session setup_vehicle_spawn_newton(
                                           ? (*itWeldOffsetsNext)
                                           : SpWeldId(uint32_t(rVehicleSpawn.spawnedWelds.size()));
 
-            std::for_each(itWeldsFirst + std::size_t{*itWeldOffsets},
-                          itWeldsFirst + std::size_t{weldOffsetNext},
+            std::for_each(itWeldsFirst + std::ptrdiff_t{*itWeldOffsets},
+                          itWeldsFirst + std::ptrdiff_t{weldOffsetNext},
                           [&rBasic, &rScnParts, &rVehicleSpawn, &rPrefabs, &rResources, &toInit] (WeldId const weld)
             {
                 // Count parts in this weld first
@@ -415,8 +415,8 @@ Session setup_vehicle_spawn_newton(
                                            ? (*itWeldOffsetsNext)
                                            : SpWeldId(uint32_t(rVehicleSpawn.spawnedWelds.size()));
 
-            std::for_each(itWeldsFirst + std::size_t{*itWeldOffsets},
-                          itWeldsFirst + std::size_t{weldOffsetNext},
+            std::for_each(itWeldsFirst + std::ptrdiff_t{*itWeldOffsets},
+                          itWeldsFirst + std::ptrdiff_t{weldOffsetNext},
                           [&rBasic, &rScnParts, &rVehicleSpawn, &toInit, &rPhys, &rNwt] (WeldId const weld)
             {
                 ActiveEnt const weldEnt = rScnParts.weldToActive[weld];
@@ -599,7 +599,7 @@ static void rocket_thrust_force(NewtonBody const* pBody, BodyId const body, ACtx
 
     auto &rBodyRockets = rRocketsNwt.m_bodyRockets[body];
 
-    if (rBodyRockets.size() == 0)
+    if (rBodyRockets.empty())
     {
         return;
     }
