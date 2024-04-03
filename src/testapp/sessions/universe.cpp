@@ -203,8 +203,8 @@ Session setup_uni_testplanets(
     {
         CoSpaceCommon &rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
 
-        float const scale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpaceCommon.m_precision);
-        float const scaleDelta = uniDeltaTimeIn / scale;
+        auto const scale = osp::math::mul_2pow<double, int>(1.0, -rMainSpaceCommon.m_precision);
+        double const scaleDelta = uniDeltaTimeIn / scale;
 
         auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
         auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
@@ -220,8 +220,8 @@ Session setup_uni_testplanets(
 
             // Apply arbitrary inverse-square gravity towards origin
             Vector3d const pos       = Vector3d( Vector3g( x[i], y[i], z[i] ) ) * scale;
-            float const r           = pos.length();
-            float const c_gm        = 10000000000.0f;
+            double const r           = pos.length();
+            double const c_gm        = 10000000000.0;
             Vector3d const accel     = -pos * uniDeltaTimeIn * c_gm / (r * r * r);
 
             vx[i] += accel.x();

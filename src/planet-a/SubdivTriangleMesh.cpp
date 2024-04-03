@@ -40,8 +40,8 @@ ChunkedTriangleMeshInfo planeta::make_subdivtrimesh_general(
     using std::ceil;
     using std::pow;
 
-    float const C = chunkMax;
-    float const L = subdivLevels;
+    float const C = static_cast<float>(chunkMax);
+    float const L = static_cast<float>(subdivLevels);
 
     // Calculate a fair number of shared vertices, based on a triangular
     // tiling pattern.
@@ -72,7 +72,7 @@ ChunkId ChunkedTriangleMeshInfo::chunk_create(
 
     // Create a new chunk ID
     ChunkId const chunkId = m_chunkIds.create();
-    Chunk &rChunk = m_chunkData[size_t(chunkId)];
+    Chunk &rChunk = m_chunkData[std::size_t(chunkId)];
 
     rChunk.m_skeletonTri = rSkel.tri_store(skTri);
 
@@ -84,8 +84,8 @@ ChunkId ChunkedTriangleMeshInfo::chunk_create(
 
     for (int i = 0; i < 3; i ++)
     {
-        size_t const cornerOffset = m_chunkWidth * i;
-        size_t const edgeOffset = m_chunkWidth * i + 1;
+        std::size_t const cornerOffset = static_cast<std::size_t>(m_chunkWidth) * i;
+        std::size_t const edgeOffset   = static_cast<std::size_t>(m_chunkWidth) * i + 1;
 
         ArrayView_t<SkVrtxId> const edge = edges[i];
         {
@@ -93,7 +93,7 @@ ChunkId ChunkedTriangleMeshInfo::chunk_create(
                     tri.m_vertices[i], rSkel);
             sharedSpace[cornerOffset] = shared_store(sharedId);
         }
-        for (unsigned int j = 0; j < m_chunkWidth - 1; j ++)
+        for (std::size_t j = 0; j < m_chunkWidth - 1; j ++)
         {
             SharedVrtxId const sharedId = shared_get_or_create(edge[j], rSkel);
             sharedSpace[edgeOffset + j] = shared_store(sharedId);

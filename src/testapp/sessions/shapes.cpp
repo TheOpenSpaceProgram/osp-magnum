@@ -68,7 +68,7 @@ void add_floor(
         {
             float const heightZ = distHeight(randGen);
             rPhysShapes.m_spawnRequest.emplace_back(SpawnShape{
-                .m_position = Vector3{x*spread, y*spread, heightZ},
+                .m_position = Vector3{float(x)*spread, float(y)*spread, heightZ},
                 .m_velocity = {0.0f, 0.0f, 0.0f},
                 .m_size     = Vector3{distSizeX(randGen), distSizeY(randGen), heightZ},
                 .m_mass     = 0.0f,
@@ -398,7 +398,7 @@ Session setup_thrower(
                 for (int y = -2; y < 3; ++y)
                 {
                     rPhysShapes.m_spawnRequest.push_back({
-                        .m_position = camTf.translation() - camTf.backward()*dist + camTf.up()*y*5.5f + camTf.right()*x*5.5f,
+                        .m_position = camTf.translation() - camTf.backward()*dist + camTf.up()*float(y)*5.5f + camTf.right()*float(x)*5.5f,
                         .m_velocity = -camTf.backward()*speed,
                         .m_size     = Vector3{1.0f},
                         .m_mass     = 1.0f,

@@ -58,7 +58,7 @@ void adera::shader::draw_ent_visualizer(
     if (rData.m_wireframeOnly)
     {
         rShader.setColor(0x00000000_rgbaf);
-        Magnum::GL::Renderer::setDepthMask(false);
+        Magnum::GL::Renderer::setDepthMask(GL_FALSE);
     }
 
     MeshGlId const      meshId = (*rData.m_pMeshId)[ent].m_glId;
@@ -72,6 +72,6 @@ void adera::shader::draw_ent_visualizer(
 
     if (rData.m_wireframeOnly)
     {
-        Magnum::GL::Renderer::setDepthMask(true);
+        Magnum::GL::Renderer::setDepthMask(GL_TRUE);
     }
 }

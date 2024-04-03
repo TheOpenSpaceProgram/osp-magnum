@@ -320,7 +320,7 @@ void SysRenderGL::display_texture(
     Renderer::disable(Renderer::Feature::DepthTest);
     Renderer::disable(Renderer::Feature::FaceCulling);
     Renderer::disable(Renderer::Feature::Blending);
-    Renderer::setDepthMask(true);
+    Renderer::setDepthMask(GL_TRUE);
 
     rRenderGl.m_fullscreenTriShader.display_texure(
             rRenderGl.m_meshGl.get(rRenderGl.m_fullscreenTri),
@@ -352,7 +352,7 @@ void SysRenderGL::render_opaque(
     Renderer::enable(Renderer::Feature::DepthTest);
     Renderer::enable(Renderer::Feature::FaceCulling);
     Renderer::disable(Renderer::Feature::Blending);
-    Renderer::setDepthMask(true);
+    Renderer::setDepthMask(GL_TRUE);
 
     draw_group(group, visible, viewProj);
 }
@@ -373,7 +373,7 @@ void SysRenderGL::render_transparent(
 
     // temporary: disabled depth writing makes the plumes look nice, but
     //            can mess up other transparent objects once added
-    //Renderer::setDepthMask(false);
+    //Renderer::setDepthMask(GL_FALSE);
 
     draw_group(group, visible, viewProj);
 }

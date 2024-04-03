@@ -63,7 +63,7 @@ void randomized_singlethreaded_execute(Tasks const& tasks, TaskGraph const& grap
 
         if (runTasksLeft != 0)
         {
-            TaskId const        randomTask  = rExec.tasksQueuedRun.at(rRand() % runTasksLeft);
+            TaskId const        randomTask  = rExec.tasksQueuedRun[rRand() % runTasksLeft];
             TaskActions const   status      = runTask(randomTask);
             complete_task(tasks, graph, rExec, randomTask, status);
         }

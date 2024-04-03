@@ -166,7 +166,7 @@ void SysPrefabDraw::init_mesh_and_material(
                 mat.types() & Magnum::Trade::MaterialType::PbrMetallicRoughness)
             {
                 auto const& matPbr = mat.as<Magnum::Trade::PbrMetallicRoughnessMaterialData>();
-                if (int const baseColor = matPbr.baseColorTexture();
+                if (auto const baseColor = matPbr.baseColorTexture();
                     baseColor != -1)
                 {
                     osp::ResId const texRes = rImportData.m_textures[baseColor];
@@ -238,7 +238,7 @@ void SysPrefabDraw::resync_mesh_and_material(
                 mat.types() & Magnum::Trade::MaterialType::PbrMetallicRoughness)
             {
                 auto const& matPbr = mat.as<Magnum::Trade::PbrMetallicRoughnessMaterialData>();
-                if (int const baseColor = matPbr.baseColorTexture();
+                if (auto const baseColor = matPbr.baseColorTexture();
                     baseColor != -1)
                 {
                     osp::ResId const texRes = rImportData.m_textures[baseColor];

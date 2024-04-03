@@ -493,6 +493,7 @@ static void pipeline_advance_reqs(Tasks const& tasks, TaskGraph const& graph, Ex
     {
         ExecPipeline &rReqTaskExecPl = rExec.plData[stgreqtask.reqPipeline];
 
+        // NOLINTBEGIN(bugprone-branch-clone)
         bool const reqTaskDone = [&tasks, &rReqTaskExecPl, &stgreqtask, &rExec] () noexcept -> bool
         {
             if ( ! rReqTaskExecPl.running )
@@ -525,6 +526,7 @@ static void pipeline_advance_reqs(Tasks const& tasks, TaskGraph const& graph, Ex
                 return true; // On the right stage and task not running. This means it's done
             }
         }();
+        // NOLINTEND(bugprone-branch-clone)
 
         if (reqTaskDone)
         {
@@ -828,6 +830,7 @@ static bool is_pipeline_in_loop(Tasks const& tasks, TaskGraph const& graph, Exec
 
         if (exec.plData[args.insideLoop].canceled)
         {
+            // NOLINTBEGIN(readability-simplify-boolean-expr)
             if (exec.plData[graph.pltreeToPipeline[insideLoopScopePos]].canceled)
             {
                 return false; // insideLoop is canceled and will not loop again
@@ -837,6 +840,7 @@ static bool is_pipeline_in_loop(Tasks const& tasks, TaskGraph const& graph, Exec
                 return true; // insideLoop itself is canceled, but is parented to a non-canceled
                              // loop scope. It will loop more times.
             }
+            // NOLINTEND(readability-simplify-boolean-expr)
         }
         else // insideLoop is canceled
         {
@@ -856,6 +860,7 @@ static bool is_pipeline_in_loop(Tasks const& tasks, TaskGraph const& graph, Exec
         {
             if (exec.plData[args.insideLoop].canceled)
             {
+                // NOLINTBEGIN(readability-simplify-boolean-expr)
                 if (exec.plData[graph.pltreeToPipeline[insideLoopScopePos]].canceled)
                 {
                     return false; // insideLoop is canceled and will not loop again
@@ -865,6 +870,7 @@ static bool is_pipeline_in_loop(Tasks const& tasks, TaskGraph const& graph, Exec
                     return true; // insideLoop is in a nested loop and is canceled, but is parented
                                  // to a non-canceled loop scope. It will loop more times.
                 }
+                // NOLINTEND(readability-simplify-boolean-expr)
             }
             else
             {

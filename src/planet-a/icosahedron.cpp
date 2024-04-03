@@ -26,6 +26,8 @@
 
 #include "icosahedron.h"
 
+#include <cmath> // for std::pow
+
 using namespace planeta;
 
 SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
@@ -165,8 +167,8 @@ void subdiv_curvature(
 {
     osp::Vector3l const avg = (a + b) / 2;
     osp::Vector3d const avgDouble = osp::Vector3d(avg) / scale;
-    float const avgLen = avgDouble.length();
-    float const roundness = radius - avgLen;
+    double const avgLen = avgDouble.length();
+    double const roundness = radius - avgLen;
 
     rNorm = osp::Vector3(avgDouble / avgLen);
     rPos = avg + osp::Vector3l(rNorm * roundness * scale);
@@ -182,15 +184,15 @@ void planeta::ico_calc_middles(
     auto const pos = [&rPositions] (SkVrtxId const id) -> osp::Vector3l& { return rPositions[size_t(id)]; };
     auto const nrm = [&rNormals]   (SkVrtxId const id) -> osp::Vector3&  { return rNormals[size_t(id)];   };
 
-    float const scale = std::pow(2.0f, pow2scale);
+    auto const scale = std::pow(2.0, pow2scale);
 
-    subdiv_curvature(radius, scale, pos(vrtxCorner[0]), pos(vrtxCorner[1]),
+    subdiv_curvature(radius, float(scale), pos(vrtxCorner[0]), pos(vrtxCorner[1]),
                      pos(vrtxMid[0]), nrm(vrtxMid[0]));
 
-    subdiv_curvature(radius, scale, pos(vrtxCorner[1]), pos(vrtxCorner[2]),
+    subdiv_curvature(radius, float(scale), pos(vrtxCorner[1]), pos(vrtxCorner[2]),
                      pos(vrtxMid[1]), nrm(vrtxMid[1]));
 
-    subdiv_curvature(radius, scale, pos(vrtxCorner[2]), pos(vrtxCorner[0]),
+    subdiv_curvature(radius, float(scale), pos(vrtxCorner[2]), pos(vrtxCorner[0]),
                      pos(vrtxMid[2]), nrm(vrtxMid[2]));
 }
 
@@ -213,7 +215,7 @@ void planeta::ico_calc_chunk_edge_recurse(
     size_t const halfSize = vrtxs.size() / 2;
     SkVrtxId const mid = vrtxs[halfSize];
 
-    subdiv_curvature(radius, std::pow(2.0f, pow2scale), pos(a), pos(b),
+    subdiv_curvature(radius, float(std::pow(2.0f, pow2scale)), pos(a), pos(b),
                      pos(mid), nrm(mid));
 
     ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, a, mid,

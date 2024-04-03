@@ -24,10 +24,12 @@
  */
 #pragma once
 
-#include <cstdint>
-#include <typeindex> // light-ish header that happens to include std::hash
+#include <longeron/id_management/null.hpp>  // for lgrn::id_null
+#include <longeron/utility/enum_traits.hpp> // for lgrn::underlying_int_type
 
-#include <longeron/id_management/null.hpp>
+#include <concepts>   // for std::integral
+#include <cstddef>    // for std::size_t
+#include <typeindex>  // IWYU pragma: keep, light-ish header that happens to include std::hash
 
 namespace osp
 {
@@ -58,9 +60,10 @@ struct StrongId
      : value{value}
     { };
 
-    constexpr explicit operator std::size_t() const noexcept
+    template<std::integral T>
+    constexpr explicit operator T() const noexcept
     {
-        return value;
+        return static_cast<T>(value);
     }
 
     constexpr explicit operator INT_T() const noexcept
@@ -77,7 +80,8 @@ struct StrongId
 
 // std::hash support for unordered containers
 template <typename INT_T, typename DUMMY_T>
-struct std::hash<osp::StrongId<INT_T, DUMMY_T>> {
+struct std::hash<osp::StrongId<INT_T, DUMMY_T>>
+{
     constexpr auto operator() (osp::StrongId<INT_T, DUMMY_T> const& key) const
     {
         return key.value;

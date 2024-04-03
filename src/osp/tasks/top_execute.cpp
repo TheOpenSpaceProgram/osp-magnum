@@ -32,7 +32,6 @@
 
 #include <algorithm>
 #include <iomanip>
-#include <sstream>
 #include <vector>
 
 namespace osp
@@ -50,7 +49,7 @@ void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec
 
         if (runTasksLeft != 0)
         {
-            TaskId const task = rExec.tasksQueuedRun.at(0);
+            TaskId const task = rExec.tasksQueuedRun[0];
             TopTask &rTopTask = rTaskData[task];
 
             topDataRefs.clear();
@@ -99,17 +98,17 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
 {
     auto const& [tasks, taskData, graph, exec] = write;
 
-    static constexpr int nameMinColumns = 50;
-    static constexpr int maxDepth = 4;
+    static constexpr std::size_t nameMinColumns = 50;
+    static constexpr std::size_t maxDepth = 4;
 
     rStream << "Pipeline/Tree  | Status  |  Stages                                     |  Pipeline Names\n"
             << "_________________________________________________________________________________________\n";
 
-    auto const write_pipeline = [&rStream, &tasks=tasks, &exec=exec, &graph=graph] (PipelineId const pipeline, int const depth)
+    auto const write_pipeline = [&rStream, &tasks=tasks, &exec=exec, &graph=graph] (PipelineId const pipeline, std::size_t const depth)
     {
         ExecPipeline const  &plExec = exec.plData[pipeline];
 
-        for (int i = 0; i < depth; ++i)
+        for (std::size_t i = 0; i < depth; ++i)
         {
             rStream << "- ";
         }
@@ -139,19 +138,19 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
 
         rStream << " | ";
 
-        int const stageCount = fanout_size(graph.pipelineToFirstAnystg, pipeline);
+        uint32_t const stageCount = fanout_size(graph.pipelineToFirstAnystg, pipeline);
 
         PipelineInfo const& info = tasks.m_pipelineInfo[pipeline];
 
-        int charsUsed = 7; // "PL###" + ": "
+        std::size_t charsUsed = 7; // "PL###" + ": "
 
         if (info.stageType != lgrn::id_null<PipelineInfo::stage_type_t>())
         {
             auto const stageNames = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
 
-            for (int stage = 0; stage < std::min<int>(stageNames.size(), stageCount); ++stage)
+            for (uint32_t stage = 0; stage < std::min(uint32_t(stageNames.size()), stageCount); ++stage)
             {
-                bool const sel = int(plExec.stage) == stage;
+                bool const sel = uint32_t(plExec.stage) == stage;
                 rStream << (sel ? '[' : ' ')
                         << stageNames[stage]
                         << (sel ? ']' : ' ');

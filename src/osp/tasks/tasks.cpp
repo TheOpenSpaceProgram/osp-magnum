@@ -302,6 +302,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         }
     }
 
+    // NOLINTBEGIN(readability-use-anyofallof)
     [[maybe_unused]] auto const all_counts_zero = [&] ()
     {
         if (   totalStageReqTasks   != 0
@@ -331,6 +332,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
         return true;
     };
+    // NOLINTEND(readability-use-anyofallof)
 
     LGRN_ASSERTM(all_counts_zero(), "Counts repurposed as items remaining, and must all be zero by the end here");
 

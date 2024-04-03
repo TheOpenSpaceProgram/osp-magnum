@@ -26,11 +26,13 @@
 
 #include "../core/strong_id.h"
 
+#include <cstdint> // for std::uint32_t
+
 namespace osp::draw
 {
 
-using DrawEnt = StrongId<uint32_t, struct DummyForDrawEnt>;
+using DrawEnt = StrongId<std::uint32_t, struct DummyForDrawEnt>;
 
-using MaterialId = StrongId<uint32_t, struct DummyForMaterialId>;
+using MaterialId = StrongId<std::uint32_t, struct DummyForMaterialId>;
 
 } // namespace osp::draw

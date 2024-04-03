@@ -283,7 +283,7 @@ Session setup_vehicle_spawn_vb(
             remapMachTotal += bounds;
             machTotal += srcMachines.ids.size();
 
-            for (MachTypeId type = 0; type < MachTypeReg_t::size(); ++type)
+            for (MachTypeId type = 0; type < MachTypeReg_t::largest(); ++type)
             {
                 rVSVB.machtypeCount[type] += srcMachines.perType[type].localIds.size();
             }
@@ -442,7 +442,7 @@ Session setup_vehicle_spawn_vb(
 
             auto machRemap = arrayView(std::as_const(rVSVB.remapMachs)).exceptPrefix(rVSVB.remapMachOffsets[vhId]);
 
-            for (NodeTypeId nodeType = 0; nodeType < NodeTypeReg_t::size(); ++nodeType)
+            for (NodeTypeId nodeType = 0; nodeType < NodeTypeReg_t::largest(); ++nodeType)
             {
                 PerNodeType const &rSrcNodeType = pVData->m_nodePerType[nodeType];
 

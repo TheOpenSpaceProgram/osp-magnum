@@ -46,7 +46,7 @@ SubtreeBuilder SubtreeBuilder::add_child(ActiveEnt ent, uint32_t descendantCount
 
     m_first = childLast;
 
-    return SubtreeBuilder(m_rScnGraph, ent, childFirst, childLast);
+    return {m_rScnGraph, ent, childFirst, childLast};
 }
 
 SubtreeBuilder SysSceneGraph::add_descendants(ACtxSceneGraph& rScnGraph, uint32_t descendantCount, ActiveEnt root)
@@ -169,7 +169,7 @@ void SysSceneGraph::do_delete(ACtxSceneGraph& rScnGraph)
         TreePos_t const keepLast    = (notLast) ? (*itDelNext) : (treeLast);
         assert(keepFirst <= keepLast);
 
-        std::size_t const shift     = keepFirst - done;
+        std::ptrdiff_t const shift  = keepFirst - done;
 
         // Update descendant count of ancestors
         ActiveEnt parent = rScnGraph.m_treeToEnt[*itDel];
