@@ -37,7 +37,7 @@
 namespace testapp::scenes
 {
 
-struct ACtxSurfaceFrame
+struct ACtxTerrainFrame
 {
     osp::Vector3l       position; ///< Position relative to planet's center
     osp::Quaterniond    rotation;
@@ -45,9 +45,12 @@ struct ACtxSurfaceFrame
 };
 
 
-struct ACtxTerrain : planeta::TerrainSkeleton
+struct ACtxTerrain
 {
-    planeta::SubdivScratchpad scratchpad;
+    planeta::TerrainSkeleton            skTerrain;
+    planeta::SkeletonChunks             skChunks;
+    planeta::SubdivScratchpad           scratchpad;
+    planeta::ChunkedTriangleMeshInfo    chunkInfo;
 };
 
 struct ACtxTerrainIco

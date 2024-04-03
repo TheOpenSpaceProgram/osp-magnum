@@ -645,25 +645,21 @@ class SkeletonChunks
 {
 public:
 
-    SkeletonChunks(uint8_t const subdivLevels)
-     : m_chunkSubdivLevel       { subdivLevels }
-     , m_chunkWidth             { uint16_t(1u << subdivLevels) }
-     , m_chunkVrtxSharedCount   { uint16_t(m_chunkWidth * 3) }
-    { }
-
     void chunk_reserve(uint16_t const size)
     {
-        m_chunkIds.reserve(size);
-        m_chunkSharedUsed.resize(std::size_t(size) * m_chunkVrtxSharedCount);
-        m_chunkTris     .resize(size);
+        m_chunkIds       .reserve(size);
+        m_chunkSharedUsed.resize(m_chunkIds.capacity() * m_chunkVrtxSharedCount);
+        m_chunkToTri     .resize(m_chunkIds.capacity());
     }
 
     ChunkId chunk_create(
             SubdivTriangleSkeleton&     rSkel,
-            SkTriId                     skTri,
-            osp::ArrayView<SkVrtxId>    edgeRte,
-            osp::ArrayView<SkVrtxId>    edgeBtm,
-            osp::ArrayView<SkVrtxId>    edgeLft);
+            SkTriId                     sktriId,
+            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeRte,
+            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeBtm,
+            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeLft);
+
+    void chunk_remove(ChunkId chunkId, SkTriId sktriId, SubdivTriangleSkeleton& rSkel) noexcept;
 
     osp::ArrayView<SharedVrtxOwner_t> shared_vertices_used(ChunkId const chunkId) noexcept
     {
@@ -672,7 +668,7 @@ public:
     }
 
     osp::ArrayView<SharedVrtxOwner_t const> shared_vertices_used(ChunkId const chunkId) const noexcept
-    {
+    {;
         std::size_t const offset = std::size_t(chunkId) * m_chunkVrtxSharedCount;
         return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
     }
@@ -680,8 +676,8 @@ public:
     void shared_reserve(uint32_t const size)
     {
         m_sharedIds         .reserve(size);
-        m_sharedSkVrtx      .resize(size);
-        m_sharedFaceCount   .resize(size);
+        m_sharedToSkVrtx    .resize(m_sharedIds.capacity());
+        m_sharedFaceCount   .resize(m_sharedIds.capacity());
     }
 
     SharedVrtxOwner_t shared_store(SharedVrtxId const triId)
@@ -689,9 +685,19 @@ public:
         return m_sharedRefCount.ref_add(triId);
     }
 
-    void shared_release(SharedVrtxOwner_t &rStorage) noexcept
+    void shared_release(SharedVrtxOwner_t&& rStorage, SubdivTriangleSkeleton &rSkel) noexcept
     {
+        SharedVrtxId const sharedId = rStorage.value();
         m_sharedRefCount.ref_release(std::move(rStorage));
+
+        if (m_sharedRefCount[sharedId.value] == 0)
+        {
+            SkVrtxOwner_t skvrtxOwner = std::exchange(m_sharedToSkVrtx[sharedId], {});
+            m_skVrtxToShared[skvrtxOwner.value()] = {};
+
+            rSkel.vrtx_release(std::move(skvrtxOwner));
+            m_sharedIds.remove(sharedId);
+        }
     }
 
     /**
@@ -701,7 +707,7 @@ public:
     template<typename FUNC_T>
     void shared_update(FUNC_T&& func)
     {
-        std::forward<FUNC_T>(func)(m_sharedNewlyAdded, m_sharedSkVrtx);
+        std::forward<FUNC_T>(func)(m_sharedNewlyAdded, m_sharedToSkVrtx);
         m_sharedNewlyAdded.clear();
     }
 
@@ -711,23 +717,25 @@ public:
      * @param skVrtxId
      * @return
      */
-    SharedVrtxId shared_get_or_create(SkVrtxId const skVrtxId, SubdivTriangleSkeleton &rSkel);
+    SharedVrtxId shared_get_or_create(SkVrtxId skVrtxId, SubdivTriangleSkeleton &rSkel);
 
     void clear(SubdivTriangleSkeleton& rSkel);
 
 //private:
 
     lgrn::IdRegistryStl<ChunkId, true>      m_chunkIds;
-    osp::KeyedVec<ChunkId, SkTriOwner_t>    m_chunkTris;
     std::vector<SharedVrtxOwner_t>          m_chunkSharedUsed;
-    uint8_t                                 m_chunkSubdivLevel;
-    uint16_t                                m_chunkWidth;
-    uint16_t                                m_chunkVrtxSharedCount;
+    std::uint8_t                            m_chunkSubdivLevel;
+    std::uint16_t                           m_chunkEdgeVrtxCount;
+    std::uint16_t                           m_chunkVrtxSharedCount;
+
+    osp::KeyedVec<ChunkId, SkTriId>         m_chunkToTri;
+    osp::KeyedVec<SkTriId, ChunkId>         m_triToChunk;
 
     lgrn::IdRegistryStl<SharedVrtxId, true> m_sharedIds;
     lgrn::IdRefCount<SharedVrtxId>          m_sharedRefCount;
 
-    osp::KeyedVec<SharedVrtxId, SkVrtxOwner_t> m_sharedSkVrtx;
+    osp::KeyedVec<SharedVrtxId, SkVrtxOwner_t> m_sharedToSkVrtx;
 
     /// Connected face count used for vertex normal calculations
     osp::KeyedVec<SharedVrtxId, uint8_t>    m_sharedFaceCount;
@@ -737,6 +745,17 @@ public:
     std::vector<SharedVrtxId>               m_sharedNewlyAdded;
 
 }; // class SkeletonChunks
+
+
+inline SkeletonChunks make_skeleton_chunks(uint8_t const subdivLevels)
+{
+    std::uint16_t const chunkEdgeVrtxCount = 1u << subdivLevels;
+    return {
+        .m_chunkSubdivLevel     = subdivLevels,
+        .m_chunkEdgeVrtxCount   = chunkEdgeVrtxCount,
+        .m_chunkVrtxSharedCount = std::uint16_t(chunkEdgeVrtxCount * 3)
+    };
+}
 
 
 

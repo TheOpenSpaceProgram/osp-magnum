@@ -159,7 +159,7 @@ constexpr ChunkedTriangleMeshInfo make_chunked_mesh_info(
         std::uint16_t const         chunkMax,
         std::uint32_t const         sharedMax)
 {
-    std::uint32_t const chunkWidth      = skChunks.m_chunkWidth;
+    std::uint32_t const chunkWidth      = skChunks.m_chunkEdgeVrtxCount;
     std::uint32_t const fillCount       = (chunkWidth-2)*(chunkWidth-1) / 2;
     std::uint32_t const fillTotal       = fillCount * chunkMax;
     std::uint32_t const fanFaceCount    = ChunkedTriangleMeshInfo::smc_fanFacesVsSubdivLevel[skChunks.m_chunkSubdivLevel];
@@ -191,7 +191,7 @@ constexpr VertexIdx fill_to_vrtx(ChunkedTriangleMeshInfo const& info, ChunkId co
 
 constexpr VertexIdx chunk_coord_to_vrtx(SkeletonChunks const& skChunks, ChunkedTriangleMeshInfo const& info, ChunkId const chunkId, uint16_t const x, uint16_t const y) noexcept
 {
-    auto const [localId, isShared] = coord_to_shared(x, y, skChunks.m_chunkWidth);
+    auto const [localId, isShared] = coord_to_shared(x, y, skChunks.m_chunkEdgeVrtxCount);
     return isShared
             ? shared_to_vrtx(skChunks, info, chunkId, localId)
             : fill_to_vrtx(info, chunkId, xy_to_triangular(x - 1, y - 2));
@@ -313,7 +313,7 @@ ChunkFanStitcher<FUNCTOR_T> make_chunk_fan_stitcher(
         .rSkChunks              = rSkChunks,
         .sharedOffset           = rInfo.vbufSharedOffset,
         .chunkFillOffset        = rInfo.vbufFillOffset + std::uint32_t(chunk.value)*rInfo.fillVrtxCount,
-        .chunkWidth             = rSkChunks.m_chunkWidth
+        .chunkWidth             = rSkChunks.m_chunkEdgeVrtxCount
     };
 }
 
@@ -383,8 +383,8 @@ void ChunkFanStitcher<FUNCTOR_T>::corner()
         //        /_-'      \
         //       2'----------0
 
-        SkVrtxId const skelA   = rSkChunks.m_sharedSkVrtx[triShared[1]];
-        SkVrtxId const skelB   = rSkChunks.m_sharedSkVrtx[triShared[2]];
+        SkVrtxId const skelA   = rSkChunks.m_sharedToSkVrtx[triShared[1]];
+        SkVrtxId const skelB   = rSkChunks.m_sharedToSkVrtx[triShared[2]];
         SkVrtxId const skelMid = rSkeleton.vrtx_ids().try_get(skelA, skelB);
 
         if (skelMid != lgrn::id_null<SkVrtxId>())
@@ -411,8 +411,8 @@ void ChunkFanStitcher<FUNCTOR_T>::corner()
         //        /      `-_\
         //       2----------`0
 
-        SkVrtxId const skelA   = rSkChunks.m_sharedSkVrtx[triShared[1]];
-        SkVrtxId const skelB   = rSkChunks.m_sharedSkVrtx[triShared[2]];
+        SkVrtxId const skelA   = rSkChunks.m_sharedToSkVrtx[triShared[1]];
+        SkVrtxId const skelB   = rSkChunks.m_sharedToSkVrtx[triShared[2]];
         SkVrtxId const skelMid = rSkeleton.vrtx_ids().try_get(skelA, skelB);
 
         if (skelMid != lgrn::id_null<SkVrtxId>())
@@ -434,7 +434,7 @@ template <typename FUNCTOR_T>
 template <int side, bool detailX2>
 void ChunkFanStitcher<FUNCTOR_T>::edge()
 {
-    int const fillWidth = rSkChunks.m_chunkWidth - 2;
+    int const fillWidth = rSkChunks.m_chunkEdgeVrtxCount - 2;
 
     int sharedLocalA    {};
     int sharedLocalB    {};
@@ -479,8 +479,8 @@ void ChunkFanStitcher<FUNCTOR_T>::edge()
             //    /_-'      \
             //   C'----------B
 
-            SkVrtxId const skelA   = rSkChunks.m_sharedSkVrtx[sharedA];
-            SkVrtxId const skelB   = rSkChunks.m_sharedSkVrtx[sharedB];
+            SkVrtxId const skelA   = rSkChunks.m_sharedToSkVrtx[sharedA];
+            SkVrtxId const skelB   = rSkChunks.m_sharedToSkVrtx[sharedB];
             SkVrtxId const skelMid = rSkeleton.vrtx_ids().try_get(skelA, skelB);
 
             if (skelMid != lgrn::id_null<SkVrtxId>())

@@ -200,12 +200,16 @@ void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri)
 {
     SkTriGroup &rGroup = tri_group_at(rTri.children);
 
-    auto const clear_neighbor = [this, &rGroup, triId, groupId = rTri.children] (int childIdx, int neighborIdx, bool pair)
+    // Release owners to neighbors for all 4 triangles in the group
+
+    auto const clear_neighbor = [this, &rGroup, triId, groupId = rTri.children] (int childIdx, int neighborIdx, bool isSibling)
     {
         SkTriOwner_t &rOwner = rGroup.triangles[childIdx].neighbors[neighborIdx];
         if (rOwner.has_value())
         {
-            if (pair)
+            // Since siblings neighbor each other in a known arrangement, skip to avoid
+            // unnessesary lookups
+            if ( ! isSibling )
             {
                 SkeletonTriangle &rNeighbor = tri_at(rOwner);
                 int const neighborEdgeIdx = rNeighbor.find_neighbor_index(tri_id(groupId, childIdx));
@@ -213,20 +217,20 @@ void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri)
             }
             tri_release(std::exchange(rOwner, {}));
         }
-
     };
-    clear_neighbor(0, 0, true);
-    clear_neighbor(0, 1, false);
-    clear_neighbor(0, 2, true);
-    clear_neighbor(1, 0, true);
-    clear_neighbor(1, 1, true);
-    clear_neighbor(1, 2, false);
-    clear_neighbor(2, 0, false);
-    clear_neighbor(2, 1, true);
-    clear_neighbor(2, 2, true);
-    clear_neighbor(3, 0, false);
-    clear_neighbor(3, 1, false);
-    clear_neighbor(3, 2, false);
+
+    clear_neighbor(0, 0, false);
+    clear_neighbor(0, 1, true);
+    clear_neighbor(0, 2, false);
+    clear_neighbor(1, 0, false);
+    clear_neighbor(1, 1, false);
+    clear_neighbor(1, 2, true);
+    clear_neighbor(2, 0, true);
+    clear_neighbor(2, 1, false);
+    clear_neighbor(2, 2, false);
+    clear_neighbor(3, 0, true);
+    clear_neighbor(3, 1, true);
+    clear_neighbor(3, 2, true);
 
     for (int i = 0; i < 4; i ++)
     {
@@ -247,8 +251,6 @@ void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri)
 
     rGroup.parent = lgrn::id_null<SkTriId>();
     rTri.children = lgrn::id_null<SkTriGroupId>();
-
-
 }
 
 
@@ -257,57 +259,68 @@ void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri)
 
 ChunkId SkeletonChunks::chunk_create(
         SubdivTriangleSkeleton&         rSkel,
-        SkTriId                   const skTri,
-        osp::ArrayView<SkVrtxId>  const edgeRte,
-        osp::ArrayView<SkVrtxId>  const edgeBtm,
-        osp::ArrayView<SkVrtxId>  const edgeLft)
+        SkTriId                   const sktriId,
+        osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeRte,
+        osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeBtm,
+        osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeLft)
 {
-    LGRN_ASSERT(   edgeRte.size() == m_chunkWidth - 1
-                && edgeBtm.size() == m_chunkWidth - 1
-                && edgeLft.size() == m_chunkWidth - 1 );
+    LGRN_ASSERT(   edgeRte.size() == m_chunkEdgeVrtxCount - 1
+                && edgeBtm.size() == m_chunkEdgeVrtxCount - 1
+                && edgeLft.size() == m_chunkEdgeVrtxCount - 1 );
 
     ChunkId const chunkId   = m_chunkIds.create();
-    SkTriOwner_t &rChunkTri = m_chunkTris[chunkId];
 
-    rChunkTri = rSkel.tri_store(skTri);
+    m_chunkToTri[chunkId] = sktriId;
+    m_triToChunk[sktriId] = chunkId;
 
-    SkeletonTriangle const &tri = rSkel.tri_at(skTri);
+    SkeletonTriangle const &tri = rSkel.tri_at(sktriId);
 
-    osp::ArrayView<SharedVrtxOwner_t> const sharedSpace = shared_vertices_used(chunkId);
+    osp::ArrayView<SharedVrtxOwner_t> const chunkSharedVertices = shared_vertices_used(chunkId);
 
-    std::array const edges = {edgeRte, edgeBtm, edgeLft};
-
-    for (int i = 0; i < 3; i ++)
+    auto const assign_shared_vertices = [this, &chunkSharedVertices, &tri, &rSkel] (osp::ArrayView< MaybeNewId<SkVrtxId> > const skvrtx, int edgeIdx)
     {
-        std::size_t const cornerOffset = m_chunkWidth * i;
-        std::size_t const edgeOffset = m_chunkWidth * i + 1;
+        auto const edgeSharedVertices = chunkSharedVertices.sliceSize(m_chunkEdgeVrtxCount * edgeIdx, m_chunkEdgeVrtxCount);
 
-        osp::ArrayView<SkVrtxId> const edge = edges[i];
+        // First vertex along the edge is the corner
+        edgeSharedVertices[0] = shared_store(shared_get_or_create(tri.vertices[edgeIdx], rSkel));
+
+        for (unsigned int i = 0; i < m_chunkEdgeVrtxCount-1; i ++)
         {
-            SharedVrtxId const sharedId = shared_get_or_create(tri.vertices[i], rSkel);
-            sharedSpace[cornerOffset] = shared_store(sharedId);
+            edgeSharedVertices[i+1] = shared_store(shared_get_or_create(skvrtx[i].id, rSkel));
         }
-        for (unsigned int j = 0; j < m_chunkWidth - 1; j ++)
-        {
-            SharedVrtxId const sharedId = shared_get_or_create(edge[j], rSkel);
-            sharedSpace[edgeOffset + j] = shared_store(sharedId);
-        }
-    }
+    };
+
+    assign_shared_vertices(edgeRte, 0);
+    assign_shared_vertices(edgeBtm, 1);
+    assign_shared_vertices(edgeLft, 2);
 
     return chunkId;
+}
+
+void SkeletonChunks::chunk_remove(ChunkId const chunkId, SkTriId const sktriId, SubdivTriangleSkeleton& rSkel) noexcept
+{
+    for (SharedVrtxOwner_t& rOwner : shared_vertices_used(chunkId))
+    {
+        shared_release(std::exchange(rOwner, {}), rSkel);
+    }
+    m_triToChunk[sktriId] = {};
+    m_chunkToTri[chunkId] = {};
+    m_chunkIds.remove(chunkId);
+    //rSkel.tri_release(std::exchange(m_chunkToTri[chunkId], {}));
 }
 
 
 
 SharedVrtxId SkeletonChunks::shared_get_or_create(SkVrtxId const skVrtxId, SubdivTriangleSkeleton &rSkel)
 {
-    m_skVrtxToShared.resize(m_sharedIds.capacity());
+    m_skVrtxToShared.resize(rSkel.vrtx_ids().capacity());
     SharedVrtxId &rShared = m_skVrtxToShared[skVrtxId];
     if (rShared == lgrn::id_null<SharedVrtxId>())
     {
         rShared = m_sharedIds.create();
+        LGRN_ASSERTM(rShared.has_value(), "Exceeded max shared vertices!");
         m_sharedFaceCount[rShared] = 0;
-        m_sharedSkVrtx[rShared] = rSkel.vrtx_store(skVrtxId);
+        m_sharedToSkVrtx [rShared] = rSkel.vrtx_store(skVrtxId);
         m_sharedNewlyAdded.push_back(rShared);
     }
 
@@ -322,21 +335,24 @@ void SkeletonChunks::clear(SubdivTriangleSkeleton& rSkel)
     {
         auto const chunk = static_cast<ChunkId>(chunkInt);
 
-        rSkel.tri_release(std::exchange(m_chunkTris[chunk], {}));
+        //rSkel.tri_release(std::move(m_chunkToTri[chunk]));
 
         // Release all shared vertices
         for (SharedVrtxOwner_t& shared : shared_vertices_used(chunk))
         {
-            shared_release(shared);
+            shared_release(std::move(shared), rSkel);
         }
     }
+    m_chunkToTri.clear();
+    m_chunkSharedUsed.clear();
 
     // Release all associated skeleton vertices
     for (std::size_t sharedInt : m_sharedIds.bitview().zeros())
     {
         auto const shared = static_cast<SharedVrtxId>(sharedInt);
 
-        rSkel.vrtx_release(std::exchange(m_sharedSkVrtx[shared], {}));
+        rSkel.vrtx_release(std::move(m_sharedToSkVrtx[shared]));
     }
+    m_sharedToSkVrtx.clear();
 }
 

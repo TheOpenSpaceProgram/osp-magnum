@@ -325,11 +325,12 @@ struct PlNewton
     idRocketsNwt
 
 #define TESTAPP_DATA_TERRAIN 3, \
-    idSurfaceFrame, idTerrain, idTerrainIco
+    idTerrainFrame, idTerrain, idTerrainIco
 struct PlTerrain
 {
     PipelineDef<EStgCont> skeleton          {"skeleton"};
-    PipelineDef<EStgCont> surfaceFrame      {"surfaceFrame"};
+    PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
+    PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
 };
 
 //-----------------------------------------------------------------------------
