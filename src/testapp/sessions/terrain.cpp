@@ -33,7 +33,9 @@
 #include <planet-a/icosahedron.h>
 #include <planet-a/terrain_skeleton.h>
 
-#include <iostream>
+#include <chrono>
+#include <format>
+#include <fstream>
 
 using adera::ACtxCameraController;
 
@@ -78,17 +80,11 @@ Session setup_terrain(
 
             rTerrainFrame.active = true;
 
-            rTerrainIco.radius = 50.0f;
-            rTerrainIco.height = 5.0f;
-            rTerrain.skTerrain.scale  = 10;
+            rTerrainIco.radius          = 50.0f;
+            rTerrainIco.height          = 5.0f;
+            rTerrain.skTerrain.scale    = 10;
 
-            constexpr std::uint8_t chunkSubdivLevels = 4;
-
-            rTerrain.skTerrain.skel = create_skeleton_icosahedron(rTerrainIco.radius, rTerrain.skTerrain.scale, rTerrainIco.icoVrtx, rTerrainIco.icoGroups, rTerrainIco.icoTri, rTerrain.skTerrain.skPositions, rTerrain.skTerrain.skNormals);
-            rTerrain.skChunks       = make_skeleton_chunks       (chunkSubdivLevels);
-            rTerrain.chunkInfo      = make_chunked_mesh_info     (rTerrain.skChunks, 40, 400);
-            rTerrain.skChunks.chunk_reserve(400);
-            rTerrain.skChunks.shared_reserve(40000);
+            rTerrain.skTerrain.skel = create_skeleton_icosahedron(rTerrainIco.radius, rTerrain.skTerrain.scale, rTerrainIco.icoVrtx, rTerrainIco.icoGroups, rTerrainIco.icoTri, rTerrain.skTerrain.positions, rTerrain.skTerrain.normals);
 
             rSP.resize(rTerrain.skTerrain);
 
@@ -115,7 +111,7 @@ Session setup_terrain(
                     SubdivScratchpad::UserData_t        userData) noexcept
             {
                 auto const& rTerrainIco = *reinterpret_cast<ACtxTerrainIco*>(userData[0]);
-                ico_calc_middles(rTerrainIco.radius, rTrn.scale, corners, middles, rTrn.skPositions, rTrn.skNormals);
+                ico_calc_middles(rTerrainIco.radius, rTrn.scale, corners, middles, rTrn.positions, rTrn.normals);
                 calc_sphere_tri_center(groupId, rTrn, rTerrainIco.radius + rTerrainIco.height, rTerrainIco.height);
             };
 
@@ -142,6 +138,25 @@ Session setup_terrain(
                 // terrain changes when moving back and forth quickly
                 rSP.distanceThresholdUnsubdiv[level] = std::uint64_t(2.0f * subdivRadius);
             }
+
+            // TODO: just make this dynamically resizable
+
+
+            constexpr std::uint8_t chunkSubdivLevels = 4;
+
+            rTerrain.skChunks = make_skeleton_chunks(chunkSubdivLevels);
+            rTerrain.skChunks.chunk_reserve(300);
+            rTerrain.skChunks.shared_reserve(40000);
+
+            std::uint16_t const maxChunks     = rTerrain.skChunks.m_chunkIds.capacity();
+            std::uint32_t const maxSharedVrtx = rTerrain.skChunks.m_sharedIds.capacity();
+
+            rTerrain.chunkInfo = make_chunked_mesh_info(rTerrain.skChunks, maxChunks, maxSharedVrtx);
+            rTerrain.chunkVbufPos.resize(rTerrain.chunkInfo.vbufSize);
+            rTerrain.chunkVbufNrm.resize(rTerrain.chunkInfo.vbufSize);
+            rTerrain.chunkIbuf   .resize(rTerrain.chunkInfo.chunkMaxFaceCount * maxChunks);
+
+            rTerrain.chunkSP.lut = make_chunk_vrtx_subdiv_lut(chunkSubdivLevels);
         }
     });
 
@@ -198,26 +213,25 @@ Session setup_terrain(
         .args({                    idTerrainFrame,             idTerrain,                idTerrainIco })
         .func([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
-        // TODO: Temporary code
         if ( ! rTerrainFrame.active )
         {
             return;
         }
 
         SubdivScratchpad &rSP    = rTerrain.scratchpad;
+        ChunkScratchpad  &rChSP  = rTerrain.chunkSP;
         TerrainSkeleton  &rSkTrn = rTerrain.skTerrain;
-        SkeletonChunks   &rSkCh  = rTerrain.skChunks;
+        ChunkSkeleton    &rSkCh  = rTerrain.skChunks;
 
-//        constexpr int const c_level = 4;
-//        constexpr int const c_edgeCount = (1u << c_level) - 1;
-//        static std::map<std::size_t, std::array<SkVrtxOwner_t, c_edgeCount*3>> owners;
-
+        // Delete chunk IDs
         for (std::size_t const sktriInt : rSP.surfaceRemoved.ones())
         {
             auto const sktriId = SkTriId(sktriInt);
             ChunkId const chunkId = rSkCh.m_triToChunk[sktriId];
             rSkCh.chunk_remove(chunkId, sktriId, rTerrain.skTerrain.skel);
         }
+
+        rChSP.stitchCmds.resize(rSkCh.m_chunkIds.capacity(), {} /* zero init */);
 
         rSkCh.m_triToChunk.resize(rTerrain.skTerrain.skel.tri_group_ids().capacity() * 4);
 
@@ -228,31 +242,383 @@ Session setup_terrain(
         edgeVrtxs.resize(edgeSize * 3);
 
         ArrayView< MaybeNewId<SkVrtxId> > const edgeVrtxView = edgeVrtxs;
-        ArrayView< MaybeNewId<SkVrtxId> > const edgeRte = edgeVrtxView.sliceSize(edgeSize * 0, edgeSize);
+
+        ArrayView< MaybeNewId<SkVrtxId> > const edgeLft = edgeVrtxView.sliceSize(edgeSize * 0, edgeSize);
         ArrayView< MaybeNewId<SkVrtxId> > const edgeBtm = edgeVrtxView.sliceSize(edgeSize * 1, edgeSize);
-        ArrayView< MaybeNewId<SkVrtxId> > const edgeLft = edgeVrtxView.sliceSize(edgeSize * 2, edgeSize);
+        ArrayView< MaybeNewId<SkVrtxId> > const edgeRte = edgeVrtxView.sliceSize(edgeSize * 2, edgeSize);
 
         for (std::size_t const sktriInt : rSP.surfaceAdded.ones())
         {
-            auto const sktriId = SkTriId(sktriInt);
+            auto const sktriId = SkTriId::from_index(sktriInt);
 
             LGRN_ASSERTV(!rSkCh.m_triToChunk[sktriId].has_value(), sktriInt);
 
             auto const &tri = rSkTrn.skel.tri_at(SkTriId(sktriInt));
             auto const& corners = tri.vertices;
 
-            rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[0], corners[1], edgeRte);
+            rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[0], corners[1], edgeLft);
             rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[1], corners[2], edgeBtm);
-            rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[2], corners[0], edgeLft);
+            rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[2], corners[0], edgeRte);
 
-            rSkCh.chunk_create(rSkTrn.skel, sktriId, edgeRte, edgeBtm, edgeLft);
+            ChunkId const chunk = rSkCh.chunk_create(sktriId, rSkTrn.skel, rChSP.sharedNewlyAdded, edgeLft, edgeBtm, edgeRte);
+
+            rChSP.stitchCmds[chunk] = {.enabled = true, .detailX2 = false};
 
             rSP.resize(rSkTrn);
 
-            ico_calc_chunk_edge_recurse(rTerrainIco.radius, rSkTrn.scale, chLevel, corners[0], corners[1], edgeRte, rSkTrn.skPositions, rSkTrn.skNormals);
-            ico_calc_chunk_edge_recurse(rTerrainIco.radius, rSkTrn.scale, chLevel, corners[1], corners[2], edgeBtm, rSkTrn.skPositions, rSkTrn.skNormals);
-            ico_calc_chunk_edge_recurse(rTerrainIco.radius, rSkTrn.scale, chLevel, corners[2], corners[0], edgeLft, rSkTrn.skPositions, rSkTrn.skNormals);
+            ico_calc_chunk_edge_recurse(rTerrainIco.radius, rSkTrn.scale, chLevel, corners[0], corners[1], edgeLft, rSkTrn.positions, rSkTrn.normals);
+            ico_calc_chunk_edge_recurse(rTerrainIco.radius, rSkTrn.scale, chLevel, corners[1], corners[2], edgeBtm, rSkTrn.positions, rSkTrn.normals);
+            ico_calc_chunk_edge_recurse(rTerrainIco.radius, rSkTrn.scale, chLevel, corners[2], corners[0], edgeRte, rSkTrn.positions, rSkTrn.normals);
         }
+
+        for (std::size_t const sktriInt : rSP.surfaceAdded.ones())
+        {
+            auto const sktriId = SkTriId::from_index(sktriInt);
+
+            auto const chunk      = rSkCh.m_triToChunk[SkTriId::from_index(sktriInt)];
+            auto const& neighbors = rSkTrn.skel.tri_at(sktriId).neighbors;
+
+            for (int selfEdgeIdx = 0; selfEdgeIdx < 3; ++selfEdgeIdx)
+            {
+                SkTriId const neighborId = neighbors[selfEdgeIdx];
+                if ( neighborId.has_value() )
+                {
+
+                    ChunkId const neighborChunk = rSkCh.m_triToChunk[neighborId];
+                    if ( ! neighborChunk.has_value() )
+                    {
+                        // Neighbor doesn't have chunk, has chunked children, or hole in terrain
+                        SkeletonTriangle const& neighbor = rSkTrn.skel.tri_at(neighborId);
+
+                        if ( ! neighbor.children.has_value() )
+                        {
+                            continue;
+                        }
+
+                        int const neighborEdgeIdx = neighbor.find_neighbor_index(sktriId);
+
+                        bool const neighborHasChunkedChildren
+                                =  rSkCh.m_triToChunk[tri_id(neighbor.children, neighborEdgeIdx) ]       .has_value()
+                                || rSkCh.m_triToChunk[tri_id(neighbor.children, (neighborEdgeIdx+1) % 3)].has_value();
+
+                        if ( ! neighborHasChunkedChildren )
+                        {
+                            continue;
+                        }
+
+                        rChSP.stitchCmds[chunk] = {
+                                .enabled        = true,
+                                .detailX2       = true,
+                                .x2ownEdge      = static_cast<unsigned char>(selfEdgeIdx),
+                                .x2neighborEdge = static_cast<unsigned char>(neighborEdgeIdx)
+                        };
+
+                        continue;
+                    }
+                    // In cases where high-detail chunks were in sktriId's position previously,
+                    // but were then unsubdivided and replaced with one low-detail chunk,
+                    // remove any detailX2 (low-to-high detail) stitches from neighbors.
+                    ChunkStitch &rNeighborStitchCmd = rChSP.stitchCmds[neighborChunk];
+                    if (rNeighborStitchCmd.enabled)
+                    {
+                        continue; // Command already issued by neighbor's neighbor who happens to
+                                  // be in surfaceAdded
+                    }
+                    ChunkStitch const neighborStitch = rSkCh.m_chunkStitch[neighborChunk];
+                    if (neighborStitch.enabled && ! neighborStitch.detailX2)
+                    {
+                        continue; // Neighbor stitch is up-to-date
+                    }
+                    if (neighborStitch.detailX2 && rSkTrn.skel.tri_at(neighborId).neighbors[neighborStitch.x2ownEdge] != sktriId)
+                    {
+                        continue; // Neighbor has detailX2 stitch but for an unrelated chunk
+                    }
+
+                    rNeighborStitchCmd = { .enabled = true, .detailX2 = false };
+                }
+                else if (tri_sibling_index(sktriId) != 3)
+                {
+                    // Check parent's neighbors for lower-detail chunks and make sure they have an
+                    // x2detail stitch towards this new chunk.
+                    // Sibling 3 triangles are skipped since it's surrounded by its siblings, and
+                    // isn't touching any of its parent's neighbors.
+
+                    // Assumes Rule A isn't broken, these don't need checks
+                    SkTriId const parent                = rSkTrn.skel.tri_group_at(tri_group_id(sktriId)).parent;
+                    SkTriId const parentNeighbor        = rSkTrn.skel.tri_at(parent).neighbors[selfEdgeIdx];
+                    ChunkId const parentNeighborChunk   = rSkCh.m_triToChunk[parentNeighbor];
+                    int     const neighborEdge          = rSkTrn.skel.tri_at(parentNeighbor).find_neighbor_index(parent);
+
+                    ChunkStitch const desiredStitch =  {
+                            .enabled        = true,
+                            .detailX2       = true,
+                            .x2ownEdge      = static_cast<unsigned char>(neighborEdge),
+                            .x2neighborEdge = static_cast<unsigned char>(selfEdgeIdx)
+                    };
+
+                    ChunkStitch &rStitchCmd = rChSP.stitchCmds[parentNeighborChunk];
+                    LGRN_ASSERT(   (rStitchCmd.enabled == false)
+                                || (rStitchCmd.detailX2 == false)
+                                || (rStitchCmd == desiredStitch));
+                    rStitchCmd = desiredStitch;
+                }
+            }
+        }
+
+        ChunkedTriangleMeshInfo &rChInfo = rTerrain.chunkInfo;
+
+        auto const to_vrtx = [offset = rChInfo.vbufSharedOffset] (SharedVrtxId in)
+        {
+            return VertexIdx( offset + std::uint32_t(in) );
+        };
+
+        // Calculate shared vertex positions
+        float const scalepow = std::pow(2.0f, -rSkTrn.scale);
+        for (SharedVrtxId sharedVrtx : rChSP.sharedNewlyAdded)
+        {
+            SkVrtxId const skelVrtx = rSkCh.m_sharedToSkVrtx[sharedVrtx];
+
+            //Vector3l const translated = positions[size_t(skelId)] + translaton;
+            auto const scaled = Vector3d(rTerrain.skTerrain.positions[skelVrtx]) * scalepow;
+
+            rTerrain.chunkVbufPos[to_vrtx(sharedVrtx)] = Vector3(scaled);
+        }
+        rChSP.sharedNewlyAdded.clear();
+
+        // Calculate fill vertex positions
+        for (std::size_t const sktriInt : rSP.surfaceAdded.ones())
+        {
+            auto const chunk      = rSkCh.m_triToChunk[SkTriId::from_index(sktriInt)];
+            auto const chunkIdInt = std::size_t(chunk);
+
+            std::size_t const fillOffset = rChInfo.vbufFillOffset + chunkIdInt*rChInfo.fillVrtxCount;
+
+            osp::ArrayView<SharedVrtxOwner_t const> sharedUsed = rTerrain.skChunks.shared_vertices_used(chunk);
+
+            for (ChunkVrtxSubdivLUT::ToSubdiv const& toSubdiv : rChSP.lut.data())
+            {
+                std::size_t const vrtxA = rChSP.lut.index(sharedUsed, fillOffset, rChInfo.vbufSharedOffset, toSubdiv.m_vrtxA);
+                std::size_t const vrtxB = rChSP.lut.index(sharedUsed, fillOffset, rChInfo.vbufSharedOffset, toSubdiv.m_vrtxB);
+
+                std::size_t const vrtxC = rChInfo.vbufFillOffset + rChInfo.fillVrtxCount*chunkIdInt + std::uint32_t(toSubdiv.m_fillOut);
+
+                Vector3 &rPosC = rTerrain.chunkVbufPos[vrtxC];
+                //Vector3 &rNormC = rTerrain.chunkVbufNrm[vrtxC];
+
+                // Heightmap goes here
+                Vector3 const avg = (rTerrain.chunkVbufPos[vrtxA] + rTerrain.chunkVbufPos[vrtxB]) / 2.0f;
+                float const avgLen = avg.length();
+                float const roundness = rTerrainIco.radius - avgLen;
+
+                rPosC = avg + (avg / avgLen) * roundness;
+            }
+        }
+
+        // Fill index buffer (connect the dots with vertices)
+        for (unsigned int chunkInt = 0; chunkInt < rSkCh.m_chunkIds.capacity(); ++chunkInt)
+        {
+            auto const chunkId = ChunkId::from_index(chunkInt);
+
+            if ( ! rSkCh.m_chunkIds.exists(chunkId) )
+            {
+                continue;
+            }
+
+            auto const firstFace = rTerrain.chunkIbuf.begin() + (chunkInt * rChInfo.chunkMaxFaceCount);
+            auto const lastFace  = firstFace + rChInfo.chunkMaxFaceCount;
+
+            auto currentFace = firstFace;
+
+            auto const emit_face = [&currentFace, &lastFace] (std::uint32_t a, std::uint32_t b, std::uint32_t c)
+            {
+                LGRN_ASSERTM(currentFace != lastFace, "Max faces exceeded");
+                *currentFace = {a, b, c};
+                ++currentFace;
+            };
+
+            bool const newlyAdded = rSP.surfaceAdded.test(rSkCh.m_chunkToTri[chunkId].value);
+
+            if (newlyAdded)
+            {
+                for (unsigned int y = 0; y < rSkCh.m_chunkEdgeVrtxCount; y ++)
+                for (unsigned int x = 0; x < y * 2 + 1; x ++)
+                {
+                    // alternate between up-pointing and down-pointing triangles
+                    bool const upPointing = (x % 2 == 0);
+                    bool const onEdge = (x == 0) || (x == y * 2)
+                                        || (upPointing && y == rSkCh.m_chunkEdgeVrtxCount - 1);
+
+                    auto const indx
+                        = upPointing
+                        ? Vector3u{ chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, x / 2,      y       ),
+                                    chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, x / 2,      y + 1   ),
+                                    chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, x / 2 + 1,  y + 1   ) }
+                        : Vector3u{ chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, x / 2 + 1,  y + 1   ),
+                                    chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, x / 2 + 1,  y       ),
+                                    chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, x / 2,      y       ) };
+
+                    // Calculate face normal
+                    Vector3 const u = rTerrain.chunkVbufPos[indx.y()] - rTerrain.chunkVbufPos[indx.x()];
+                    Vector3 const v = rTerrain.chunkVbufPos[indx.z()] - rTerrain.chunkVbufPos[indx.x()];
+                    Vector3 const faceNorm = Magnum::Math::cross(u, v).normalized();
+
+                    for (int i = 0; i < 3; i ++)
+                    {
+                        Vector3 &rVrtxNorm = rTerrain.chunkVbufNrm[indx[i]];
+
+                        if (rChInfo.is_vertex_shared(indx[i]))
+                        {
+                            if ( ! onEdge)
+                            {
+                                // Shared vertices can have a variable number of
+                                // connected faces
+
+                                SharedVrtxId const shared   = rChInfo.vertex_to_shared(indx[i]);
+                                uint8_t &rFaceCount         = rSkCh.m_sharedFaceCount[shared];
+
+                                // Add new face normal to the average
+                                rVrtxNorm = (rVrtxNorm * rFaceCount + faceNorm) / (rFaceCount + 1);
+                                rFaceCount ++;
+
+                            }
+                            // edge triangles handled by fans, and are left empty
+                        }
+                        else
+                        {
+                            // All fill vertices have 6 connected faces
+                            // (just look at a picture of a triangular tiling)
+
+                            // Fans with multiple triangles may be connected to a fill
+                            // vertex, but the normals are calculated as if there was
+                            // only one triangle to (potentially) improve blending
+
+                            rVrtxNorm += faceNorm / 6.0f;
+                        }
+                    }
+
+                    if ( ! onEdge )
+                    {
+                        emit_face(indx[0], indx[1], indx[2]);
+                    }
+                }
+
+                LGRN_ASSERT(currentFace == (firstFace + rChInfo.fillFaceCount));
+            }
+
+            ChunkStitch const cmd = rChSP.stitchCmds[chunkId];
+
+            if (cmd.enabled)
+            {
+                rSkCh.m_chunkStitch[chunkId] = cmd;
+
+                currentFace = firstFace + rChInfo.fillFaceCount;
+
+                auto stitcher = make_chunk_fan_stitcher(chunkId, std::nullopt, rSkCh, rChInfo, emit_face);
+
+                using enum ECornerDetailX2;
+
+                if (cmd.detailX2)
+                {
+                    switch (cmd.x2ownEdge)
+                    {
+                    case 0:
+                        stitcher.corner <0, Left >();
+                        stitcher.edge   <0, true >();
+                        stitcher.corner <1, Right>();
+                        stitcher.edge   <1, false>();
+                        stitcher.corner <2, None >();
+                        stitcher.edge   <2, false>();
+                        break;
+                    case 1:
+                        stitcher.corner <0, None >();
+                        stitcher.edge   <0, false>();
+                        stitcher.corner <1, Left >();
+                        stitcher.edge   <1, true >();
+                        stitcher.corner <2, Right>();
+                        stitcher.edge   <2, false>();
+                        break;
+                    case 2:
+                        stitcher.corner <0, Right>();
+                        stitcher.edge   <0, false>();
+                        stitcher.corner <1, None >();
+                        stitcher.edge   <1, false>();
+                        stitcher.corner <2, Left >();
+                        stitcher.edge   <2, true >();
+                        break;
+                    }
+                }
+                else
+                {
+                    stitcher.corner <0, None>();
+                    stitcher.edge   <0, false>();
+                    stitcher.corner <1, None>();
+                    stitcher.edge   <1, false>();
+                    stitcher.corner <2, None>();
+                    stitcher.edge   <2, false>();
+                }
+
+                std::fill(currentFace, lastFace, Vector3u{0, 0, 0});
+            }
+        }
+        std::fill(rChSP.stitchCmds.begin(), rChSP.stitchCmds.end(), ChunkStitch{});
+
+
+        // TODO: temporary, write debug obj file every ~10 seconds
+        static int fish = 0;
+        if (fish == 60*10)
+        {
+            auto const chunkCount = rSkCh.m_chunkIds.size();
+            auto const sharedCount = rSkCh.m_sharedIds.size();
+
+            std::ofstream objfile;
+            auto time = std::chrono::system_clock::now().time_since_epoch().count();
+
+            std::string const filename = std::format("planetdebug_{}.obj", time);
+            OSP_LOG_INFO("Writing planet terrain obj: {}\n"
+                         "* Chunks:          {}/{}\n"
+                         "* Shared Vertices: {}/{}\n",
+                         filename,
+                         chunkCount, rSkCh.m_chunkIds.capacity(),
+                         sharedCount, rSkCh.m_sharedIds.capacity() );
+
+            objfile.open(filename);
+
+            objfile << "# Terrain mesh debug output\n"
+                    << "# Chunks: "          << chunkCount  << "/" << rSkCh.m_chunkIds.capacity() << "\n"
+                    << "# Shared Vertices: " << sharedCount << "/" << rSkCh.m_sharedIds.capacity() << "\n";
+
+            objfile << "o Planet\n";
+
+            for (Vector3 v : rTerrain.chunkVbufPos)
+            {
+                objfile << "v " << v.x() << " " << v.y() << " "  << v.z() << "\n";
+            }
+
+            for (Vector3 v : rTerrain.chunkVbufNrm)
+            {
+                objfile << "vn " << v.x() << " " << v.y() << " "  << v.z() << "\n";
+            }
+
+
+            for (std::size_t const chunkIdInt : rSkCh.m_chunkIds.bitview().zeros())
+            {
+                auto const view = arrayView(rTerrain.chunkIbuf).sliceSize(chunkIdInt * rChInfo.chunkMaxFaceCount, rChInfo.chunkMaxFaceCount);
+
+                for (Vector3u const faceIdx : view)
+                {
+                    // Indexes start at 1 for .obj files
+                    // Format: "f vertex1//normal1 vertex2//normal2 vertex3//normal3"
+                    objfile << "f "
+                            << (faceIdx.x()+1) << "//" << (faceIdx.x()+1) << " "
+                            << (faceIdx.y()+1) << "//" << (faceIdx.y()+1) << " "
+                            << (faceIdx.z()+1) << "//" << (faceIdx.z()+1) << "\n";
+                }
+            }
+
+            fish = 0;
+        }
+        ++fish;
+
 
 //        for (auto const& [sktriInt, _] : owners)
 //        {
@@ -404,7 +770,7 @@ Session setup_terrain_debug_draw(
             }
 
             rScnRender.m_drawTransform[drawEnt]
-                = Matrix4::translation(Vector3(rTerrain.skTerrain.skPositions[skVert]) / int_2pow<int>(rTerrain.skTerrain.scale))
+                = Matrix4::translation(Vector3(rTerrain.skTerrain.positions[skVert]) / int_2pow<int>(rTerrain.skTerrain.scale))
                 * Matrix4::scaling({0.05f, 0.05f, 0.05f});
         }
     });

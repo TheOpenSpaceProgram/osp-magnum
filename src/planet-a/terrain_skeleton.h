@@ -28,6 +28,7 @@
 #include <osp/core/math_int64.h>
 
 #include "SubdivSkeleton.h"
+#include "SubdivTriangleMesh.h"
 
 namespace planeta
 {
@@ -62,9 +63,10 @@ struct TerrainSkeleton
 
     SubdivTriangleSkeleton skel;
 
-    osp::KeyedVec<planeta::SkVrtxId, osp::Vector3l> skPositions;
-    osp::KeyedVec<planeta::SkVrtxId, osp::Vector3>  skNormals;
-    osp::KeyedVec<planeta::SkTriId,  osp::Vector3l> sktriCenter;
+    osp::KeyedVec<planeta::SkVrtxId, osp::Vector3l> positions;
+    osp::KeyedVec<planeta::SkVrtxId, osp::Vector3>  normals;
+
+    osp::KeyedVec<planeta::SkTriId,  osp::Vector3l> centers;
 
     std::array<Level, gc_maxSubdivLevels> levels;
 
@@ -116,6 +118,17 @@ struct SubdivScratchpad
     UserData_t onUnsubdivUserData   {{nullptr, nullptr, nullptr, nullptr}};
 
     std::uint32_t distanceCheckCount;
+};
+
+
+struct ChunkScratchpad
+{
+    ChunkVrtxSubdivLUT lut;
+
+    osp::KeyedVec<ChunkId, ChunkStitch> stitchCmds;
+
+    /// Newly added shared vertices, position needs to be copied from skeleton
+    std::vector<SharedVrtxId>    sharedNewlyAdded;
 };
 
 /**

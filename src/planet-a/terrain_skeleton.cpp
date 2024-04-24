@@ -36,13 +36,13 @@ void SubdivScratchpad::resize(TerrainSkeleton& rTrn)
 {
     auto const triCapacity = rTrn.skel.tri_group_ids().capacity() * 4;
 
-    // Using sktriCenter as 'previous capacity' to detect a reallocation
-    if (triCapacity != rTrn.sktriCenter.size())
+    // Using centers as 'previous capacity' to detect a reallocation
+    if (triCapacity != rTrn.centers.size())
     {
         // note: Since all of these are the same size, it feel practical to put them all in a
         //       single unique_ptr allocation, and access it with array views
 
-        rTrn.sktriCenter.resize(triCapacity);
+        rTrn.centers.resize(triCapacity);
 
         bitvector_resize(this->  distanceTestDone,  triCapacity);
         bitvector_resize(this->  tryUnsubdiv,       triCapacity);
@@ -58,10 +58,10 @@ void SubdivScratchpad::resize(TerrainSkeleton& rTrn)
     }
 
     auto const vrtxCapacity = rTrn.skel.vrtx_ids().capacity();
-    if (vrtxCapacity != rTrn.skPositions.size())
+    if (vrtxCapacity != rTrn.positions.size())
     {
-        rTrn.skPositions.resize(vrtxCapacity);
-        rTrn.skNormals  .resize(vrtxCapacity);
+        rTrn.positions.resize(vrtxCapacity);
+        rTrn.normals  .resize(vrtxCapacity);
     }
 }
 
@@ -111,7 +111,7 @@ void unsubdivide_level_by_distance(std::uint8_t const lvl, osp::Vector3l const p
 
         for (SkTriId const sktriId : rLvlSP.distanceTestProcessing)
         {
-            Vector3l const center = rTrn.sktriCenter[sktriId];
+            Vector3l const center = rTrn.centers[sktriId];
             bool const tooFar = ! osp::is_distance_near(pos, center, rSP.distanceThresholdUnsubdiv[lvl]);
 
             LGRN_ASSERTM(rTrn.skel.tri_at(sktriId).children.has_value(),
@@ -525,7 +525,7 @@ void subdivide_level_by_distance(Vector3l const pos, std::uint8_t const lvl, Ter
 
         for (SkTriId const sktriId : rLvlSP.distanceTestProcessing)
         {
-            Vector3l const center = rTrn.sktriCenter[sktriId];
+            Vector3l const center = rTrn.centers[sktriId];
 
             LGRN_ASSERT(rSP.distanceTestDone.test(sktriId.value));
             bool const distanceNear = osp::is_distance_near(pos, center, rSP.distanceThresholdSubdiv[lvl]);
@@ -585,13 +585,13 @@ void calc_sphere_tri_center(SkTriGroupId const groupId, TerrainSkeleton& rTrn, f
         SkVrtxId const vc = tri.vertices[2].value();
 
         // average without overflow
-        Vector3l const posAvg = rTrn.skPositions[va] / 3
-                              + rTrn.skPositions[vb] / 3
-                              + rTrn.skPositions[vc] / 3;
+        Vector3l const posAvg = rTrn.positions[va] / 3
+                              + rTrn.positions[vb] / 3
+                              + rTrn.positions[vc] / 3;
 
-        Vector3 const nrmSum = rTrn.skNormals[va]
-                             + rTrn.skNormals[vb]
-                             + rTrn.skNormals[vc];
+        Vector3 const nrmSum = rTrn.normals[va]
+                             + rTrn.normals[vb]
+                             + rTrn.normals[vc];
 
         LGRN_ASSERT(group.depth < gc_icoTowerOverHorizonVsLevel.size());
         float const terrainMaxHeight = height + maxRadius * gc_icoTowerOverHorizonVsLevel[group.depth];
@@ -601,7 +601,7 @@ void calc_sphere_tri_center(SkTriGroupId const groupId, TerrainSkeleton& rTrn, f
         // / 3.0f                           : average from sum of 3 values
         Vector3l const riseToMid = Vector3l(nrmSum * (0.5f * terrainMaxHeight * osp::math::int_2pow<int>(rTrn.scale) / 3.0f));
 
-        rTrn.sktriCenter[sktriId] = posAvg + riseToMid;
+        rTrn.centers[sktriId] = posAvg + riseToMid;
     }
 }
 

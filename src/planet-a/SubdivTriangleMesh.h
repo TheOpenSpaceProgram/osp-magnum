@@ -28,7 +28,8 @@
 
 #include <osp/core/math_types.h>
 
-#include <memory>
+#include <Corrade/Containers/ArrayViewStl.h>
+
 #include <optional>
 
 namespace planeta
@@ -130,8 +131,6 @@ struct ChunkedTriangleMeshInfo
         return SharedVrtxId(uint32_t(vrtx) - vbufSharedOffset);
     }
 
-    constexpr std::uint32_t total_face_count() const noexcept { return fillFaceCount + fanExtraFaceCount; }
-
     /// Number of non-shared vertices that fill the center of a chunk. Vertices that don't lie
     /// along the outer edges of their chunk are not shared with other chunks.
     std::uint32_t fillVrtxCount;
@@ -141,6 +140,9 @@ struct ChunkedTriangleMeshInfo
     std::uint32_t fillFaceCount;
     /// Number of fan triangles per-chunk + extra triangles needed to fill a chunk edge with 2-triangle
     std::uint32_t fanExtraFaceCount;
+
+    /// Max total faces per chunk. fillFaceCount + fanExtraFaceCount
+    std::uint32_t chunkMaxFaceCount;
 
     /// Index of first fill vertex within in vertex buffer
     std::uint32_t vbufFillOffset;
@@ -155,7 +157,7 @@ struct ChunkedTriangleMeshInfo
 };
 
 constexpr ChunkedTriangleMeshInfo make_chunked_mesh_info(
-        SkeletonChunks const&       skChunks,
+        ChunkSkeleton const&        skChunks,
         std::uint16_t const         chunkMax,
         std::uint32_t const         sharedMax)
 {
@@ -163,12 +165,15 @@ constexpr ChunkedTriangleMeshInfo make_chunked_mesh_info(
     std::uint32_t const fillCount       = (chunkWidth-2)*(chunkWidth-1) / 2;
     std::uint32_t const fillTotal       = fillCount * chunkMax;
     std::uint32_t const fanFaceCount    = ChunkedTriangleMeshInfo::smc_fanFacesVsSubdivLevel[skChunks.m_chunkSubdivLevel];
+    std::uint32_t const fillFaceCount   = chunkWidth*chunkWidth - fanFaceCount;
+    std::uint32_t const fanExtraFaceCount = fanFaceCount + fanFaceCount/3 + 1;
 
     return
     {
         .fillVrtxCount       = fillCount,
-        .fillFaceCount       = chunkWidth*chunkWidth - fanFaceCount,
-        .fanExtraFaceCount   = fanFaceCount + fanFaceCount/3 + 1,
+        .fillFaceCount       = fillFaceCount,
+        .fanExtraFaceCount   = fanExtraFaceCount,
+        .chunkMaxFaceCount   = fillFaceCount + fanExtraFaceCount,
         .vbufFillOffset      = 0,
         .vbufSharedOffset    = fillTotal,
         .vbufSize            = fillTotal + sharedMax,
@@ -177,7 +182,7 @@ constexpr ChunkedTriangleMeshInfo make_chunked_mesh_info(
     };
 }
 
-inline VertexIdx shared_to_vrtx(SkeletonChunks const& skChunks, ChunkedTriangleMeshInfo const& info, ChunkId const chunkId, ChunkLocalSharedId const localId)
+inline VertexIdx shared_to_vrtx(ChunkSkeleton const& skChunks, ChunkedTriangleMeshInfo const& info, ChunkId const chunkId, ChunkLocalSharedId const localId)
 {
     auto const&         chunkSharedVertices = skChunks.shared_vertices_used(chunkId);
     SharedVrtxId const  sharedId            = chunkSharedVertices[std::size_t(localId)].value();
@@ -189,7 +194,7 @@ constexpr VertexIdx fill_to_vrtx(ChunkedTriangleMeshInfo const& info, ChunkId co
     return info.vbufFillOffset + info.fillVrtxCount * chunkId.value + triangular;
 }
 
-constexpr VertexIdx chunk_coord_to_vrtx(SkeletonChunks const& skChunks, ChunkedTriangleMeshInfo const& info, ChunkId const chunkId, uint16_t const x, uint16_t const y) noexcept
+constexpr VertexIdx chunk_coord_to_vrtx(ChunkSkeleton const& skChunks, ChunkedTriangleMeshInfo const& info, ChunkId const chunkId, uint16_t const x, uint16_t const y) noexcept
 {
     auto const [localId, isShared] = coord_to_shared(x, y, skChunks.m_chunkEdgeVrtxCount);
     return isShared
@@ -222,8 +227,6 @@ public:
         ChunkLocalSharedId m_fillOut;
     };
 
-    ChunkVrtxSubdivLUT(uint8_t subdivLevel);
-
     constexpr VertexIdx index(
             osp::ArrayView<SharedVrtxOwner_t const> sharedUsed,
             std::uint32_t const                     fillOffset,
@@ -238,6 +241,8 @@ public:
     }
 
     constexpr osp::ArrayView<ToSubdiv const> data() const noexcept { return m_data; }
+
+    friend ChunkVrtxSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t subdivLevel);
 
 private:
 
@@ -270,6 +275,7 @@ private:
 
 }; // class ChunkVrtxSubdivLUT
 
+ChunkVrtxSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t subdivLevel);
 
 //-----------------------------------------------------------------------------
 
@@ -288,8 +294,10 @@ struct ChunkFanStitcher
 
     osp::ArrayView<SharedVrtxOwner_t const> chunkSharedVertices;
 
-    SubdivTriangleSkeleton const        &rSkeleton;
-    SkeletonChunks const                &rSkChunks;
+    osp::ArrayView<SharedVrtxOwner_t const> edge2XSharedVertices0;
+    osp::ArrayView<SharedVrtxOwner_t const> edge2XSharedVertices1;
+
+    ChunkSkeleton const                &rSkChunks;
 
     std::uint32_t                       sharedOffset;
     std::uint32_t                       chunkFillOffset;
@@ -297,24 +305,48 @@ struct ChunkFanStitcher
 
 }; // struct ChunkFanStitcher
 
+struct X2DetailNeighbor
+{
+    ChunkId chunkA;
+    ChunkId chunkB;
+    //std::uint8_t ownEdge;
+    std::uint8_t neighborEdge;
+};
+
 template<typename FUNCTOR_T>
 ChunkFanStitcher<FUNCTOR_T> make_chunk_fan_stitcher(
-        SubdivTriangleSkeleton const        &rSkeleton,
-        SkeletonChunks const                &rSkChunks,
-        ChunkedTriangleMeshInfo const       &rInfo,
         ChunkId                             chunk,
-        FUNCTOR_T &&emit_face)
+        std::optional< X2DetailNeighbor >   oX2Detail,
+        ChunkSkeleton                 const &rSkChunks,
+        ChunkedTriangleMeshInfo       const &rInfo,
+        FUNCTOR_T                           &&emit_face)
 {
-    return ChunkFanStitcher<FUNCTOR_T>
+    if (oX2Detail.has_value())
     {
-        .emit_face              = std::forward<FUNCTOR_T>(emit_face),
-        .chunkSharedVertices    = rSkChunks.shared_vertices_used(chunk),
-        .rSkeleton              = rSkeleton,
-        .rSkChunks              = rSkChunks,
-        .sharedOffset           = rInfo.vbufSharedOffset,
-        .chunkFillOffset        = rInfo.vbufFillOffset + std::uint32_t(chunk.value)*rInfo.fillVrtxCount,
-        .chunkWidth             = rSkChunks.m_chunkEdgeVrtxCount
-    };
+        std::uint32_t const edgeVrtxCount = rSkChunks.m_chunkEdgeVrtxCount;
+        X2DetailNeighbor const x2Detail = oX2Detail.value();
+        return ChunkFanStitcher<FUNCTOR_T> {
+            .emit_face              = std::forward<FUNCTOR_T>(emit_face),
+            .chunkSharedVertices    = rSkChunks.shared_vertices_used(chunk),
+            .edge2XSharedVertices0  = rSkChunks.shared_vertices_used(x2Detail.chunkA).sliceSize(edgeVrtxCount * x2Detail.neighborEdge, edgeVrtxCount),
+            .edge2XSharedVertices1  = rSkChunks.shared_vertices_used(x2Detail.chunkB).sliceSize(edgeVrtxCount * x2Detail.neighborEdge, edgeVrtxCount),
+            .rSkChunks              = rSkChunks,
+            .sharedOffset           = rInfo.vbufSharedOffset,
+            .chunkFillOffset        = rInfo.vbufFillOffset + std::uint32_t(chunk.value)*rInfo.fillVrtxCount,
+            .chunkWidth             = rSkChunks.m_chunkEdgeVrtxCount
+        };
+    }
+    else
+    {
+        return ChunkFanStitcher<FUNCTOR_T> {
+            .emit_face                  = std::forward<FUNCTOR_T>(emit_face),
+            .chunkSharedVertices        = rSkChunks.shared_vertices_used(chunk),
+            .rSkChunks                  = rSkChunks,
+            .sharedOffset               = rInfo.vbufSharedOffset,
+            .chunkFillOffset            = rInfo.vbufFillOffset + std::uint32_t(chunk.value)*rInfo.fillVrtxCount,
+            .chunkWidth                 = rSkChunks.m_chunkEdgeVrtxCount
+        };
+    }
 }
 
 template <typename FUNCTOR_T>
@@ -332,7 +364,6 @@ void ChunkFanStitcher<FUNCTOR_T>::corner()
     //    /     \ /     \
     //   X-------X-------X  <-- don't care what's down heres
     //
-
     std::array<int, 3> tri;
 
     // Figure out which 3 shared vertices make the chunk's corner
@@ -385,6 +416,8 @@ void ChunkFanStitcher<FUNCTOR_T>::corner()
 
         SkVrtxId const skelA   = rSkChunks.m_sharedToSkVrtx[triShared[1]];
         SkVrtxId const skelB   = rSkChunks.m_sharedToSkVrtx[triShared[2]];
+
+        /*
         SkVrtxId const skelMid = rSkeleton.vrtx_ids().try_get(skelA, skelB);
 
         if (skelMid != lgrn::id_null<SkVrtxId>())
@@ -399,6 +432,7 @@ void ChunkFanStitcher<FUNCTOR_T>::corner()
         {
             emit_face(triVrtx[0], triVrtx[1], triVrtx[2]);
         }
+        */
     }
     else if constexpr (detailX2 == ECornerDetailX2::Left)
     {
@@ -413,6 +447,8 @@ void ChunkFanStitcher<FUNCTOR_T>::corner()
 
         SkVrtxId const skelA   = rSkChunks.m_sharedToSkVrtx[triShared[1]];
         SkVrtxId const skelB   = rSkChunks.m_sharedToSkVrtx[triShared[2]];
+
+        /*
         SkVrtxId const skelMid = rSkeleton.vrtx_ids().try_get(skelA, skelB);
 
         if (skelMid != lgrn::id_null<SkVrtxId>())
@@ -427,6 +463,7 @@ void ChunkFanStitcher<FUNCTOR_T>::corner()
         {
             emit_face(triVrtx[0], triVrtx[1], triVrtx[2]);
         }
+        */
     }
 }
 
@@ -481,6 +518,8 @@ void ChunkFanStitcher<FUNCTOR_T>::edge()
 
             SkVrtxId const skelA   = rSkChunks.m_sharedToSkVrtx[sharedA];
             SkVrtxId const skelB   = rSkChunks.m_sharedToSkVrtx[sharedB];
+
+            /*
             SkVrtxId const skelMid = rSkeleton.vrtx_ids().try_get(skelA, skelB);
 
             if (skelMid != lgrn::id_null<SkVrtxId>())
@@ -495,6 +534,7 @@ void ChunkFanStitcher<FUNCTOR_T>::edge()
             {
                 emit_face(vrtxA, vrtxB, vrtxC);
             }
+            */
         }
         else
         {

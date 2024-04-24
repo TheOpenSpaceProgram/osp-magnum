@@ -59,18 +59,22 @@ ChunkedTriangleMeshInfo planeta::make_subdivtrimesh_general(
 
 //-----------------------------------------------------------------------------
 
-ChunkVrtxSubdivLUT::ChunkVrtxSubdivLUT(uint8_t const subdivLevel)
+ChunkVrtxSubdivLUT planeta::make_chunk_vrtx_subdiv_lut(uint8_t const subdivLevel)
 {
-    m_edgeVrtxCount = 1u << subdivLevel;
-    m_fillVrtxCount = (m_edgeVrtxCount-2) * (m_edgeVrtxCount-1) / 2;
+    ChunkVrtxSubdivLUT out;
 
-    m_data.reserve(m_fillVrtxCount);
+    out.m_edgeVrtxCount = 1u << subdivLevel;
+    out.m_fillVrtxCount = (out.m_edgeVrtxCount-2) * (out.m_edgeVrtxCount-1) / 2;
+
+    out.m_data.reserve(out.m_fillVrtxCount);
 
     // Calculate LUT, this fills m_data
-    fill_tri_recurse({0,               0              },
-                     {0,               m_edgeVrtxCount},
-                     {m_edgeVrtxCount, m_edgeVrtxCount},
-                     subdivLevel);
+    out.fill_tri_recurse({0,                   0              },
+                         {0,                   out.m_edgeVrtxCount},
+                         {out.m_edgeVrtxCount, out.m_edgeVrtxCount},
+                         subdivLevel);
+
+    return out;
 
     // Future optimization:
     // m_data can be sorted in a way that slightly improves cache locality

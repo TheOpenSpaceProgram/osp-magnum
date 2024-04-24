@@ -257,18 +257,31 @@ void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri)
 //-----------------------------------------------------------------------------
 
 
-ChunkId SkeletonChunks::chunk_create(
-        SubdivTriangleSkeleton&         rSkel,
-        SkTriId                   const sktriId,
-        osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeRte,
+ChunkId ChunkSkeleton::chunk_create(
+        SkTriId                               const sktriId,
+        SubdivTriangleSkeleton&                     rSkel,
+        std::vector<SharedVrtxId>&                  rNewSharedIds,
+        osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeLft,
         osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeBtm,
-        osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeLft)
+        osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeRte)
 {
-    LGRN_ASSERT(   edgeRte.size() == m_chunkEdgeVrtxCount - 1
+    LGRN_ASSERT(   edgeLft.size() == m_chunkEdgeVrtxCount - 1
                 && edgeBtm.size() == m_chunkEdgeVrtxCount - 1
-                && edgeLft.size() == m_chunkEdgeVrtxCount - 1 );
+                && edgeRte.size() == m_chunkEdgeVrtxCount - 1 );
 
-    ChunkId const chunkId   = m_chunkIds.create();
+    auto const own_shared_from_skvrtx = [this, &rSkel, &rNewSharedIds] (SkVrtxId const vrtx) -> SharedVrtxOwner_t
+    {
+        MaybeNewId<SharedVrtxId> const shared = shared_get_or_create(vrtx, rSkel);
+        if (shared.isNew)
+        {
+            rNewSharedIds.emplace_back(shared.id);
+        }
+        return shared_store(shared.id);
+    };
+
+    ChunkId const chunkId = m_chunkIds.create();
+
+    LGRN_ASSERTM(chunkId.has_value(), "Max chunks exceeded");
 
     m_chunkToTri[chunkId] = sktriId;
     m_triToChunk[sktriId] = chunkId;
@@ -277,27 +290,27 @@ ChunkId SkeletonChunks::chunk_create(
 
     osp::ArrayView<SharedVrtxOwner_t> const chunkSharedVertices = shared_vertices_used(chunkId);
 
-    auto const assign_shared_vertices = [this, &chunkSharedVertices, &tri, &rSkel] (osp::ArrayView< MaybeNewId<SkVrtxId> > const skvrtx, int edgeIdx)
+    auto const assign_shared_vertices = [&] (osp::ArrayView< MaybeNewId<SkVrtxId> > const skvrtx, int edgeIdx)
     {
         auto const edgeSharedVertices = chunkSharedVertices.sliceSize(m_chunkEdgeVrtxCount * edgeIdx, m_chunkEdgeVrtxCount);
 
         // First vertex along the edge is the corner
-        edgeSharedVertices[0] = shared_store(shared_get_or_create(tri.vertices[edgeIdx], rSkel));
+        edgeSharedVertices[0] = own_shared_from_skvrtx(tri.vertices[edgeIdx]);
 
         for (unsigned int i = 0; i < m_chunkEdgeVrtxCount-1; i ++)
         {
-            edgeSharedVertices[i+1] = shared_store(shared_get_or_create(skvrtx[i].id, rSkel));
+            edgeSharedVertices[i+1] = own_shared_from_skvrtx(skvrtx[i].id);
         }
     };
 
-    assign_shared_vertices(edgeRte, 0);
+    assign_shared_vertices(edgeLft, 0);
     assign_shared_vertices(edgeBtm, 1);
-    assign_shared_vertices(edgeLft, 2);
+    assign_shared_vertices(edgeRte, 2);
 
     return chunkId;
 }
 
-void SkeletonChunks::chunk_remove(ChunkId const chunkId, SkTriId const sktriId, SubdivTriangleSkeleton& rSkel) noexcept
+void ChunkSkeleton::chunk_remove(ChunkId const chunkId, SkTriId const sktriId, SubdivTriangleSkeleton& rSkel) noexcept
 {
     for (SharedVrtxOwner_t& rOwner : shared_vertices_used(chunkId))
     {
@@ -311,24 +324,25 @@ void SkeletonChunks::chunk_remove(ChunkId const chunkId, SkTriId const sktriId, 
 
 
 
-SharedVrtxId SkeletonChunks::shared_get_or_create(SkVrtxId const skVrtxId, SubdivTriangleSkeleton &rSkel)
+MaybeNewId<SharedVrtxId> ChunkSkeleton::shared_get_or_create(SkVrtxId const skVrtxId, SubdivTriangleSkeleton &rSkel)
 {
     m_skVrtxToShared.resize(rSkel.vrtx_ids().capacity());
     SharedVrtxId &rShared = m_skVrtxToShared[skVrtxId];
-    if (rShared == lgrn::id_null<SharedVrtxId>())
+
+    bool const makeNewId = ! rShared.has_value();
+    if (makeNewId)
     {
         rShared = m_sharedIds.create();
         LGRN_ASSERTM(rShared.has_value(), "Exceeded max shared vertices!");
         m_sharedFaceCount[rShared] = 0;
         m_sharedToSkVrtx [rShared] = rSkel.vrtx_store(skVrtxId);
-        m_sharedNewlyAdded.push_back(rShared);
     }
 
-    return rShared;
+    return {rShared, makeNewId};
 }
 
 
-void SkeletonChunks::clear(SubdivTriangleSkeleton& rSkel)
+void ChunkSkeleton::clear(SubdivTriangleSkeleton& rSkel)
 {
     // Release associated skeleton triangles from chunks
     for (std::size_t chunkInt : m_chunkIds.bitview().zeros())

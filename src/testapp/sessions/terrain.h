@@ -48,9 +48,15 @@ struct ACtxTerrainFrame
 struct ACtxTerrain
 {
     planeta::TerrainSkeleton            skTerrain;
-    planeta::SkeletonChunks             skChunks;
+    planeta::ChunkSkeleton              skChunks;
     planeta::SubdivScratchpad           scratchpad;
+
     planeta::ChunkedTriangleMeshInfo    chunkInfo;
+    planeta::ChunkScratchpad            chunkSP;
+
+    std::vector<osp::Vector3>           chunkVbufPos;
+    std::vector<osp::Vector3>           chunkVbufNrm;
+    std::vector<osp::Vector3u>          chunkIbuf;
 };
 
 struct ACtxTerrainIco
@@ -61,13 +67,6 @@ struct ACtxTerrainIco
     std::array<planeta::SkVrtxId, 12>    icoVrtx;
     std::array<planeta::SkTriGroupId, 5> icoGroups;
     std::array<planeta::SkTriId, 20>     icoTri;
-};
-
-struct ACtxPlanetTerrainDraw
-{
-    planeta::ChunkVrtxSubdivLUT         chunkVrtxLut;
-    planeta::SkeletonChunks             skChunks;
-    planeta::ChunkedTriangleMeshInfo    info;
 };
 
 osp::Session setup_terrain(

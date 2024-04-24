@@ -33,10 +33,7 @@
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/id_management/refcount.hpp>
 
-#include <Corrade/Containers/ArrayViewStl.h>
-
-#include <limits>
-#include <memory>
+#include <array>
 #include <unordered_map>
 #include <vector>
 
@@ -228,103 +225,9 @@ private:
 
 enum class SkVrtxId : uint32_t {};
 
-class SubdivSkeleton;
+class SubdivTriangleSkeleton;
 
-using SkVrtxOwner_t = lgrn::IdOwner<SkVrtxId, SubdivSkeleton>;
-
-/**
- * @brief Uses a SubdivIdTree to manage relationships between Vertex IDs, and
- *        adds reference counting features.
- *
- * This class does NOT store vertex data like positions and normals.
- */
-class SubdivSkeleton
-{
-
-public:
-
-    /**
-     * @brief Create a single Vertex ID with no parents
-     *
-     * @return New Vertex ID created
-     */
-    SkVrtxId vrtx_create_root()
-    {
-        SkVrtxId const vrtxId = m_vrtxIdTree.create_root();
-        return vrtxId;
-    };
-
-    /**
-     * @brief Create a single Vertex ID from two other Vertex IDs
-     *
-     * @return New Vertex ID created
-     */
-    MaybeNewId<SkVrtxId> vrtx_create_or_get_child(SkVrtxId const a, SkVrtxId const b)
-    {
-        return m_vrtxIdTree.create_or_get(a, b);
-    }
-
-    /**
-     * @brief Store a Vertex ID in ref-counted long term storage
-     *
-     * @param vrtxId [in] ID to store
-     *
-     * @return Vertex ID Storage
-     */
-    SkVrtxOwner_t vrtx_store(SkVrtxId const vrtxId)
-    {
-        LGRN_ASSERT(m_vrtxIdTree.exists(vrtxId));
-        m_vrtxIdTree.user_increment(vrtxId);
-        return SkVrtxOwner_t{vrtxId};
-    }
-
-    /**
-     * @brief Safely cleares the contents of a Vertex ID storage, making it safe
-     *        to destruct.
-     *
-     * @param rStorage [ref] Owner to release
-     */
-    bool vrtx_release(SkVrtxOwner_t&& rOwner)
-    {
-        LGRN_ASSERT(m_vrtxIdTree.exists(rOwner.value()));
-
-        bool const noRefsRemaining = m_vrtxIdTree.user_decrement(rOwner.value());
-        if (noRefsRemaining)
-        {
-            m_vrtxIdTree.remove(rOwner.value());
-        }
-
-        [[maybe_unused]] SkVrtxOwner_t moved = std::move(rOwner);
-        moved.m_id = lgrn::id_null<SkVrtxId>();
-        return noRefsRemaining;
-    }
-
-    /**
-     * @return Read-only access to vertex IDs
-     */
-    SubdivIdTree<SkVrtxId> const& vrtx_ids() const noexcept { return m_vrtxIdTree; }
-
-    /**
-     * @brief Reserve to fit at least n Vertex IDs
-     *
-     * @param n [in] Requested capacity
-     */
-    void vrtx_reserve(size_t const n)
-    {
-        m_vrtxIdTree.reserve(n);
-        //m_vrtxRefCount.resize(m_vrtxIdTree.capacity());
-    }
-
-private:
-
-    SubdivIdTree<SkVrtxId> m_vrtxIdTree;
-
-    // access using VrtxIds from m_vrtxTree
-    //lgrn::IdRefCount<SkVrtxId> m_vrtxRefCount;
-
-//    std::vector<SkVrtxId> m_maybeDelete;
-
-}; // class SubdivSkeleton
+using SkVrtxOwner_t = lgrn::IdOwner<SkVrtxId, SubdivTriangleSkeleton>;
 
 //-----------------------------------------------------------------------------
 
@@ -335,16 +238,21 @@ using SkTriOwner_t = lgrn::IdRefCount<SkTriId>::Owner_t;
 
 struct SkeletonTriangle
 {
-    // Vertices are ordered counter-clockwise, starting from top:
-    // 0: Top   1: Left   2: Right
-    //       0
-    //      / \
-    //     /   \
-    //    /     \
-    //   1 _____ 2
-    //
+
+    /**
+     * Vertices are ordered counter-clockwise, starting from top:
+     * 0: Top   1: Left   2: Right
+     *       0
+     *      / \
+     *     /   \
+     *    /     \
+     *   1 _____ 2
+     */
     std::array<SkVrtxOwner_t, 3>    vertices;
 
+    /**
+     * @brief Neighboring Skeleton triangles [left, bottom, right]; each can be null
+     */
     std::array<SkTriOwner_t, 3>     neighbors;
     SkTriGroupId                    children;
 
@@ -388,7 +296,6 @@ struct SkeletonTriangle
  */
 struct SkTriGroup
 {
-
     std::array<SkeletonTriangle, 4> triangles;
 
     SkTriId parent;
@@ -400,8 +307,6 @@ struct SkTriGroupPair
     SkTriGroupId id;
     SkTriGroup& rGroup;
 };
-
-
 
 /**
  * @return Group ID of a SkeletonTriangle's group specified by Id
@@ -428,12 +333,17 @@ constexpr SkTriId tri_id(SkTriGroupId const id, uint8_t const siblingIndex) noex
 }
 
 /**
- * @brief A subdividable mesh with reference counted triangles and vertices;
- *        A SubdivSkeleton that also features triangles.
+ * @brief A subdividable mesh with reference counted triangles and vertices.
  *
- * This class does NOT store vertex data like positions and normals.
+ * This class...
+ * * manages Vertex IDs (SkVrtxId) and Triangle IDs (SkTriId)
+ * * tracks which 3 vertices make up each triangle
+ * * subdivides triangles into 4 new triangles (parents are kept, tracks parent<->child tree)
+ * * does NOT store vertex data like positions and normals
+ *
+ * Triangles are created in groups of 4 (SkTriGroupId) and cannot be individually created.
  */
-class SubdivTriangleSkeleton : public SubdivSkeleton
+class SubdivTriangleSkeleton
 {
 public:
 
@@ -622,8 +532,80 @@ public:
         m_triRefCount.ref_release(std::move(rStorage));
     }
 
+    /**
+     * @brief Create a single Vertex ID with no parents
+     *
+     * @return New Vertex ID created
+     */
+    SkVrtxId vrtx_create_root()
+    {
+        SkVrtxId const vrtxId = m_vrtxIdTree.create_root();
+        return vrtxId;
+    };
+
+    /**
+     * @brief Create a single Vertex ID from two other Vertex IDs
+     *
+     * @return New Vertex ID created
+     */
+    MaybeNewId<SkVrtxId> vrtx_create_or_get_child(SkVrtxId const a, SkVrtxId const b)
+    {
+        return m_vrtxIdTree.create_or_get(a, b);
+    }
+
+    /**
+     * @brief Store a Vertex ID in ref-counted long term storage
+     *
+     * @param vrtxId [in] ID to store
+     *
+     * @return Vertex ID Storage
+     */
+    SkVrtxOwner_t vrtx_store(SkVrtxId const vrtxId)
+    {
+        LGRN_ASSERT(m_vrtxIdTree.exists(vrtxId));
+        m_vrtxIdTree.user_increment(vrtxId);
+        return SkVrtxOwner_t{vrtxId};
+    }
+
+    /**
+     * @brief Safely cleares the contents of a Vertex ID storage, making it safe
+     *        to destruct.
+     *
+     * @param rStorage [ref] Owner to release
+     */
+    bool vrtx_release(SkVrtxOwner_t&& rOwner)
+    {
+        LGRN_ASSERT(m_vrtxIdTree.exists(rOwner.value()));
+
+        bool const noRefsRemaining = m_vrtxIdTree.user_decrement(rOwner.value());
+        if (noRefsRemaining)
+        {
+            m_vrtxIdTree.remove(rOwner.value());
+        }
+
+        [[maybe_unused]] SkVrtxOwner_t moved = std::move(rOwner);
+        moved.m_id = lgrn::id_null<SkVrtxId>();
+        return noRefsRemaining;
+    }
+
+    /**
+     * @return Read-only access to vertex IDs
+     */
+    SubdivIdTree<SkVrtxId> const& vrtx_ids() const noexcept { return m_vrtxIdTree; }
+
+    /**
+     * @brief Reserve to fit at least n Vertex IDs
+     *
+     * @param n [in] Requested capacity
+     */
+    void vrtx_reserve(std::size_t const n)
+    {
+        m_vrtxIdTree.reserve(n);
+    }
+
 private:
 
+    SubdivIdTree<SkVrtxId>                  m_vrtxIdTree;
     lgrn::IdRegistryStl<SkTriGroupId>       m_triIds;
     lgrn::IdRefCount<SkTriId>               m_triRefCount;
 
@@ -640,35 +622,87 @@ using SharedVrtxId = osp::StrongId<uint32_t, struct DummyForSharedVrtxId>;
 
 using SharedVrtxOwner_t = lgrn::IdRefCount<SharedVrtxId>::Owner_t;
 
+struct ChunkStitch
+{
+    bool          enabled        :1;
+    bool          detailX2       :1;
+    unsigned char x2ownEdge      :2;
+    unsigned char x2neighborEdge :2;
 
-class SkeletonChunks
+    friend bool operator==(ChunkStitch const& lhs, ChunkStitch const& rhs) = default;
+    friend bool operator!=(ChunkStitch const& lhs, ChunkStitch const& rhs) = default;
+};
+
+// This is a suggestion
+//static_assert(sizeof(ChunkStitch) == 1);
+
+/**
+ * @brief Manages 'chunks' within a SubdivTriangleSkeleton
+ *
+ * Chunks are triangle grid patched over a skeleton triangle, forming a smooth high-detail terrain
+ * surface for physics colliders and/or rendering. This is where a heightmap can be applied.
+ *
+ * Chunks are created by repeatedly subdividing an initial triangle; detail is controlled by a
+ * subdivision level integer from 0 to 9.
+ *
+ * To allow neighboring chunks to share vertices, skeleton vertices are needed along the edges of
+ * chunks. This can be created by repeatedly subdividing the edges of a skeleton triangle
+ * (with vrtx_create_chunk_edge_recurse). These skeleton vertices are required to create a chunk,
+ * and are also owned and ref-counted by the chunk.
+ *
+ * To associate skeleton vertices with a vertex buffer, vertices used by chunks are assigned with
+ * with a 'Shared vertex' (SharedVrtxId). This decouples skeleton vertex IDs from the vertex buffer,
+ *
+ * This class...
+ * * manages Chunk IDs (ChunkId) and the shared/skeleton vertices they use
+ * * manages Shared Vertex IDs (SharedVrtxId)
+ * * owns/ref-counts skeleton vertices within a SubdivTriangleSkeleton
+ * * does NOT store vertex data like positions and normals
+ */
+class ChunkSkeleton
 {
 public:
 
     void chunk_reserve(uint16_t const size)
     {
-        m_chunkIds       .reserve(size);
-        m_chunkSharedUsed.resize(m_chunkIds.capacity() * m_chunkVrtxSharedCount);
-        m_chunkToTri     .resize(m_chunkIds.capacity());
+        m_chunkIds.reserve(size);
+
+        auto const realSize = m_chunkIds.capacity();
+        m_chunkSharedUsed   .resize(realSize * m_chunkVrtxSharedCount);
+        m_chunkToTri        .resize(realSize);
+        m_chunkStitch       .resize(realSize, {} /* zero init */);
     }
 
     ChunkId chunk_create(
-            SubdivTriangleSkeleton&     rSkel,
-            SkTriId                     sktriId,
-            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeRte,
+            SkTriId                                 sktriId,
+            SubdivTriangleSkeleton&                 rSkel,
+            std::vector<SharedVrtxId>&              rNewSharedIds,
+            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeLft,
             osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeBtm,
-            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeLft);
+            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeRte);
 
     void chunk_remove(ChunkId chunkId, SkTriId sktriId, SubdivTriangleSkeleton& rSkel) noexcept;
 
+    /**
+     * @brief Get shared vertices used by a chunk
+     *
+     * This array view is split into 3 sections, each are (m_chunkVrtxSharedCount) elements in size
+     *
+     * { left edge...  bottom edge...  right edge... }
+     *
+     * Corners are not included
+     */
     osp::ArrayView<SharedVrtxOwner_t> shared_vertices_used(ChunkId const chunkId) noexcept
     {
         std::size_t const offset = std::size_t(chunkId) * m_chunkVrtxSharedCount;
         return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
     }
 
+    /**
+     * @copydoc shared_vertices_used
+     */
     osp::ArrayView<SharedVrtxOwner_t const> shared_vertices_used(ChunkId const chunkId) const noexcept
-    {;
+    {
         std::size_t const offset = std::size_t(chunkId) * m_chunkVrtxSharedCount;
         return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
     }
@@ -701,23 +735,12 @@ public:
     }
 
     /**
-     * Param 0: Newly added shared vertices; iterate this.
-     * Param 1: Maps SharedVrtxId to their associated SkVrtxId.
-     */
-    template<typename FUNC_T>
-    void shared_update(FUNC_T&& func)
-    {
-        std::forward<FUNC_T>(func)(m_sharedNewlyAdded, m_sharedToSkVrtx);
-        m_sharedNewlyAdded.clear();
-    }
-
-    /**
      * @brief Create or get a shared vertex associated with a skeleton vertex
      *
      * @param skVrtxId
      * @return
      */
-    SharedVrtxId shared_get_or_create(SkVrtxId skVrtxId, SubdivTriangleSkeleton &rSkel);
+    MaybeNewId<SharedVrtxId> shared_get_or_create(SkVrtxId skVrtxId, SubdivTriangleSkeleton &rSkel);
 
     void clear(SubdivTriangleSkeleton& rSkel);
 
@@ -728,6 +751,8 @@ public:
     std::uint8_t                            m_chunkSubdivLevel;
     std::uint16_t                           m_chunkEdgeVrtxCount;
     std::uint16_t                           m_chunkVrtxSharedCount;
+
+    osp::KeyedVec<ChunkId, ChunkStitch>     m_chunkStitch;
 
     osp::KeyedVec<ChunkId, SkTriId>         m_chunkToTri;
     osp::KeyedVec<SkTriId, ChunkId>         m_triToChunk;
@@ -741,13 +766,12 @@ public:
     osp::KeyedVec<SharedVrtxId, uint8_t>    m_sharedFaceCount;
     osp::KeyedVec<SkVrtxId, SharedVrtxId>   m_skVrtxToShared;
 
-    /// Newly added shared vertices, position needs to be copied from skeleton
-    std::vector<SharedVrtxId>               m_sharedNewlyAdded;
-
-}; // class SkeletonChunks
 
 
-inline SkeletonChunks make_skeleton_chunks(uint8_t const subdivLevels)
+}; // class ChunkSkeleton
+
+
+inline ChunkSkeleton make_skeleton_chunks(uint8_t const subdivLevels)
 {
     std::uint16_t const chunkEdgeVrtxCount = 1u << subdivLevels;
     return {
