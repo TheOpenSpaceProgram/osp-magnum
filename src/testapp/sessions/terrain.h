@@ -57,6 +57,15 @@ struct ACtxTerrain
     std::vector<osp::Vector3>           chunkVbufPos;
     std::vector<osp::Vector3>           chunkVbufNrm;
     std::vector<osp::Vector3u>          chunkIbuf;
+
+    /// 2D, each row is
+    std::vector<planeta::SharedNormalContribution> chunkFanNormalContrib;
+
+    /// parallel with skChunks.m_chunkSharedUsed
+    std::vector<osp::Vector3>  chunkFillSharedNormals;
+
+    /// Non-normalized sum of face normals of connected faces
+    osp::KeyedVec<planeta::SharedVrtxId, osp::Vector3>  sharedNormals;
 };
 
 struct ACtxTerrainIco

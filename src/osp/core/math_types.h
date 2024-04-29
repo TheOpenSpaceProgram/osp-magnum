@@ -64,4 +64,8 @@ using Rad           = Magnum::Math::Rad<Magnum::Float>;
 using Radd          = Magnum::Math::Rad<Magnum::Double>;
 using Deg           = Magnum::Math::Deg<Magnum::Float>;
 
+using Magnum::Math::ZeroInit;
+using Magnum::Math::IdentityInit;
+
+
 } // namespace osp

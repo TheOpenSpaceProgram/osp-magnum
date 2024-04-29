@@ -28,10 +28,56 @@
 #include <Corrade/Containers/ArrayView.h>
 // IWYU pragma: end_exports
 
+#include <iterator>
+
 namespace osp
 {
 
 using Corrade::Containers::ArrayView;
 using Corrade::Containers::arrayView;
+
+template<typename T>
+struct ArrayView2DWrapper
+{
+    constexpr ArrayView<T> row(std::size_t const index) const noexcept
+    {
+        return view.sliceSize(index * columns, columns);
+    }
+
+    ArrayView<T> view;
+    std::size_t columns;
+};
+
+template<typename T>
+constexpr ArrayView2DWrapper<T> as_2d(ArrayView<T> view, std::size_t columns) noexcept
+{
+    return { .view = view, .columns = columns };
+}
+
+/**
+ * @brief slice_2d_row
+ * @param view
+ * @param index
+ * @param size
+ */
+template<typename T>
+ArrayView<T> slice_2d_row(ArrayView<T> const& view, std::size_t index, std::size_t size) noexcept
+{
+    return view.sliceSize(index, size);
+}
+
+/**
+ * @brief Anger the address sanitizer for invalid array views / spans / similar containers
+ */
+template<typename T>
+void debug_touch_container(T const& container)
+{
+    // This feels kinda stupid, but if you're reading this and have a better idea then go ahead
+    // and change it. (asan annotations?)
+    auto const* ptrA = reinterpret_cast<unsigned char const*>(std::addressof(*container.begin()));
+    auto const* ptrB = reinterpret_cast<unsigned char const*>(std::addressof((std::size(container) == 0) ? *container.begin() : *std::prev(container.end())));
+
+    [[maybe_unused]] char dummy = *ptrA + *ptrB;
+}
 
 } // namespace osp

@@ -112,9 +112,12 @@ void ChunkVrtxSubdivLUT::fill_tri_recurse(
     uint8_t const levelNext = level - 1;
 
     // make lines between them
-    subdiv_line_recurse(mid[0], mid[1], levelNext);
-    subdiv_line_recurse(mid[1], mid[2], levelNext);
-    subdiv_line_recurse(mid[2], mid[0], levelNext);
+    if (level > 1)
+    {
+        subdiv_line_recurse(mid[0], mid[1], levelNext);
+        subdiv_line_recurse(mid[1], mid[2], levelNext);
+        subdiv_line_recurse(mid[2], mid[0], levelNext);
+    }
 
     if (level > 2)
     {

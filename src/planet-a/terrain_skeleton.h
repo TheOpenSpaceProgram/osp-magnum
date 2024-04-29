@@ -40,12 +40,12 @@ inline constexpr std::size_t gc_maxSubdivLevels = 9;
  *
  * Uses int64 coordinates capable of representing entire planets.
  *
- * The included subdivision functionality constrains triangles under certain rules to support
- * seamless transitions between levels of detail for ChunkedTriangleMesh:
+ * Invariants must be followed in order to support seamless transitions between levels of detail:
  *
- * * Rule A: Non-subdivided triangles with 2 subdivided neighbours are not allowed
- * * Rule B: Edges acting as a transition between levels of detail can only differ by 1 level
- *
+ * * Invariant A: Non-subdivided triangles can only neighbor ONE subdivided triangle.
+ * * Invariant B: For each subdivided triangle neighboring a non-subdivided triangle, the
+ *                subdivided triangle's two children neighboring the non-subdivided triangle
+ *                must not be subdivided.
  *
  * This is intended for spherical planets, but can easily be used for flat terrain or other
  * weirder shapes.
@@ -65,7 +65,6 @@ struct TerrainSkeleton
 
     osp::KeyedVec<planeta::SkVrtxId, osp::Vector3l> positions;
     osp::KeyedVec<planeta::SkVrtxId, osp::Vector3>  normals;
-
     osp::KeyedVec<planeta::SkTriId,  osp::Vector3l> centers;
 
     std::array<Level, gc_maxSubdivLevels> levels;
@@ -82,7 +81,7 @@ struct SubdivScratchpadLevel
 /**
  * @brief Temporary data needed to subdivide/unsubdivide a TerrainSkeleton
  *
- * This can be kept around to avoid reallocations
+ * This is intended to be kept around to avoid reallocations
  */
 struct SubdivScratchpad
 {
@@ -120,7 +119,6 @@ struct SubdivScratchpad
     std::uint32_t distanceCheckCount;
 };
 
-
 struct ChunkScratchpad
 {
     ChunkVrtxSubdivLUT lut;
@@ -129,6 +127,23 @@ struct ChunkScratchpad
 
     /// Newly added shared vertices, position needs to be copied from skeleton
     std::vector<SharedVrtxId>    sharedNewlyAdded;
+
+    std::vector< MaybeNewId<SkVrtxId> > edgeVertices;
+
+    /// Shared vertices that need to recalculate normals
+    osp::BitVector_t sharedNormalsDirty;
+};
+
+/**
+ * @brief
+ *
+ * When a chunk is deleted, it needs subtract face normals of all of its deleted faces from all
+ * connected shared vertices.
+ */
+struct SharedNormalContribution
+{
+    SharedVrtxId shared;
+    osp::Vector3 sum{osp::ZeroInit};
 };
 
 /**
@@ -136,14 +151,14 @@ struct ChunkScratchpad
  *
  * Populates SubdivScratchpad::tryUnsubdiv
  */
-void unsubdivide_level_by_distance(std::uint8_t const lvl, osp::Vector3l const pos, TerrainSkeleton const& rTrn, SubdivScratchpad& rSP);
+void unsubdivide_select_by_distance(std::uint8_t const lvl, osp::Vector3l const pos, TerrainSkeleton const& rTrn, SubdivScratchpad& rSP);
 
 /**
  * @brief Tests which triangles in SubdivScratchpad::tryUnsubdiv are not allowed to un-subdivide
  *
  * Populates SubdivScratchpad::cantUnsubdiv
  */
-void unsubdivide_level_check_rules(std::uint8_t const lvl, TerrainSkeleton const& rTrn, SubdivScratchpad& rSP);
+void unsubdivide_deselect_invariant_violations(std::uint8_t const lvl, TerrainSkeleton const& rTrn, SubdivScratchpad& rSP);
 
 /**
  * @brief Performs unsubdivision on triangles in scratchpad's tryUnsubdiv and not in cantUnsubdiv
@@ -153,7 +168,7 @@ void unsubdivide_level(std::uint8_t const lvl, TerrainSkeleton& rTrn, SubdivScra
 /**
  * @brief Subdivide a triangle forming a group of 4 new triangles on the next subdiv level
  *
- * May recursively call other subdivisions in same or level to enforce rules.
+ * May recursively call other subdivisions in same or level to enforce invariants.
  */
 SkTriGroupId subdivide(SkTriId sktriId, SkeletonTriangle& rSkTri, std::uint8_t lvl, bool hasNextLevel, TerrainSkeleton& rTrn, SubdivScratchpad& rSP);
 
@@ -172,7 +187,39 @@ void calc_sphere_tri_center(SkTriGroupId const groupId, TerrainSkeleton& rTrn, f
 /**
  * @brief Does a lot of asserts
  */
-void debug_check_rules(TerrainSkeleton &rTrn);
+void debug_check_invariants(TerrainSkeleton &rTrn);
 
+
+void chunkgen_restitch_check(ChunkId chunkId, SkTriId sktriId, ChunkSkeleton& rSkCh, TerrainSkeleton& rSkTrn, ChunkScratchpad& rChSP);
+
+void chunkgen_update_faces(
+        ChunkId                             chunkId,
+        SkTriId                             sktriId,
+        bool                                newlyAdded,
+        osp::ArrayView<osp::Vector3u>       ibuf,
+        osp::ArrayView<osp::Vector3 const>  vbufPos,
+        osp::ArrayView<osp::Vector3>        vbufNrm,
+        osp::ArrayView<osp::Vector3>        sharedNormals,
+        osp::ArrayView<osp::Vector3>        chunkFillSharedNormals,
+        osp::ArrayView<SharedNormalContribution> chunkFanNormalContrib,
+        TerrainSkeleton               const &rSkTrn,
+        ChunkedTriangleMeshInfo       const &rChInfo,
+        ChunkScratchpad                     &rChSP,
+        ChunkSkeleton                       &rSkCh);
+
+void chunkgen_debug_check_invariants(
+        osp::ArrayView<osp::Vector3u>            ibuf,
+        osp::ArrayView<osp::Vector3 const>       vbufPos,
+        osp::ArrayView<osp::Vector3 const>       vbufNrm,
+        ChunkedTriangleMeshInfo            const &rChInfo,
+        ChunkSkeleton                      const &rSkCh);
+
+void chunkgen_write_obj(
+        std::ostream                             &rStream,
+        osp::ArrayView<osp::Vector3u>            ibuf,
+        osp::ArrayView<osp::Vector3 const>       vbufPos,
+        osp::ArrayView<osp::Vector3 const>       vbufNrm,
+        ChunkedTriangleMeshInfo            const &rChInfo,
+        ChunkSkeleton                      const &rSkCh);
 
 } // namespace planeta

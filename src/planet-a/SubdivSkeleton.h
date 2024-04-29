@@ -668,7 +668,7 @@ public:
         m_chunkIds.reserve(size);
 
         auto const realSize = m_chunkIds.capacity();
-        m_chunkSharedUsed   .resize(realSize * m_chunkVrtxSharedCount);
+        m_chunkSharedUsed   .resize(realSize * m_chunkSharedCount);
         m_chunkToTri        .resize(realSize);
         m_chunkStitch       .resize(realSize, {} /* zero init */);
     }
@@ -686,16 +686,19 @@ public:
     /**
      * @brief Get shared vertices used by a chunk
      *
-     * This array view is split into 3 sections, each are (m_chunkVrtxSharedCount) elements in size
+     * This array view is split into 3 sections, each are (m_chunkSharedCount) elements in size
      *
-     * { left edge...  bottom edge...  right edge... }
+     * { left edge (corner 0->1)...  bottom edge (corner 1->2)...  right edge (corner 2->0)... }
      *
-     * Corners are not included
+     * Each edge starts with the corner, then the rest of the vertices along the edge, excluding
+     * the corner of the next edge.
+     *
+     * Corner orders are from SkeletonTriangle: {top, left, right}
      */
     osp::ArrayView<SharedVrtxOwner_t> shared_vertices_used(ChunkId const chunkId) noexcept
     {
-        std::size_t const offset = std::size_t(chunkId) * m_chunkVrtxSharedCount;
-        return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
+        std::size_t const offset = std::size_t(chunkId) * m_chunkSharedCount;
+        return {&m_chunkSharedUsed[offset], m_chunkSharedCount};
     }
 
     /**
@@ -703,8 +706,8 @@ public:
      */
     osp::ArrayView<SharedVrtxOwner_t const> shared_vertices_used(ChunkId const chunkId) const noexcept
     {
-        std::size_t const offset = std::size_t(chunkId) * m_chunkVrtxSharedCount;
-        return {&m_chunkSharedUsed[offset], m_chunkVrtxSharedCount};
+        std::size_t const offset = std::size_t(chunkId) * m_chunkSharedCount;
+        return {&m_chunkSharedUsed[offset], m_chunkSharedCount};
     }
 
     void shared_reserve(uint32_t const size)
@@ -750,7 +753,7 @@ public:
     std::vector<SharedVrtxOwner_t>          m_chunkSharedUsed;
     std::uint8_t                            m_chunkSubdivLevel;
     std::uint16_t                           m_chunkEdgeVrtxCount;
-    std::uint16_t                           m_chunkVrtxSharedCount;
+    std::uint16_t                           m_chunkSharedCount;
 
     osp::KeyedVec<ChunkId, ChunkStitch>     m_chunkStitch;
 
@@ -766,8 +769,6 @@ public:
     osp::KeyedVec<SharedVrtxId, uint8_t>    m_sharedFaceCount;
     osp::KeyedVec<SkVrtxId, SharedVrtxId>   m_skVrtxToShared;
 
-
-
 }; // class ChunkSkeleton
 
 
@@ -777,7 +778,7 @@ inline ChunkSkeleton make_skeleton_chunks(uint8_t const subdivLevels)
     return {
         .m_chunkSubdivLevel     = subdivLevels,
         .m_chunkEdgeVrtxCount   = chunkEdgeVrtxCount,
-        .m_chunkVrtxSharedCount = std::uint16_t(chunkEdgeVrtxCount * 3)
+        .m_chunkSharedCount = std::uint16_t(chunkEdgeVrtxCount * 3)
     };
 }
 

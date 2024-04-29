@@ -55,6 +55,9 @@ public:
     using difference_type           = typename vector_t::difference_type;
     using size_type                 = typename vector_t::size_type;
 
+    constexpr vector_t& base() noexcept { return *this; }
+    constexpr vector_t const& base() const noexcept { return *this; }
+
     reference at(ID_T const id)
     {
         return vector_t::at(std::size_t(id));
