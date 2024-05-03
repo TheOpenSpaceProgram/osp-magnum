@@ -69,6 +69,15 @@ osp::Session setup_newton_force_accel(
         osp::Session const&         nwtFactors,
         osp::Vector3                accel);
 
+osp::Session setup_newton_force_grav_nbody(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         newton,
+        osp::Session const&         nwtFactors,
+        osp::Session const&         uniCore,
+        osp::Session const&         uniPlanets,
+        osp::Session const&         uniScnFrame);
+
 /**
  * @brief Support for Shape Spawner physics using Newton Dynamics
  */

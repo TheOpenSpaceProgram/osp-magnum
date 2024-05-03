@@ -86,6 +86,10 @@ Session setup_uni_sceneframe(
 } // setup_uni_sceneframe
 
 
+
+
+
+
 Session setup_uni_landerplanet(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>        topData,
@@ -104,7 +108,7 @@ Session setup_uni_landerplanet(
     auto &rUniverse = top_get< Universe >(topData, idUniverse);
 
     constexpr int           precision       = 10;
-    constexpr int           planetCount     = 1;
+    constexpr int           planetCount     = 2;
 
     // Create coordinate spaces
     CoSpaceId const mainSpace = rUniverse.m_coordIds.create();
@@ -155,7 +159,7 @@ Session setup_uni_landerplanet(
 
     for (std::size_t i = 0; i < planetCount; ++i)
     {
-        // Assign each planet random positions and velocities
+        // Place the planet at the origin
         x[i] = 0;
         y[i] = 0;
         z[i] = 0;
@@ -170,6 +174,10 @@ Session setup_uni_landerplanet(
         qw[i] = 1.0;
     }
 
+    x[1] = 1000000;
+    y[1] = 1000000;
+    z[1] = 0;
+
     auto &rScnFrame      = top_get<SceneFrame>(topData, idScnFrame);
     rScnFrame.m_parent   = mainSpace;
     rScnFrame.m_position = math::mul_2pow<Vector3g, int>({400, 400, 400}, precision);
@@ -182,7 +190,7 @@ Session setup_uni_landerplanet(
     top_emplace< CoSpaceIdVec_t >   (topData, idSatSurfaceSpaces, std::move(satSurfaceSpaces));
 
     return out;
-}
+} // setup_uni_landerplanet
 
 Session setup_uni_testplanets(
         TopTaskBuilder&             rBuilder,
@@ -403,8 +411,6 @@ Session setup_uni_testplanets(
 } // setup_uni_testplanets
 
 
-
-
 struct PlanetDraw
 {
     DrawEntVec_t            drawEnts;
@@ -445,38 +451,6 @@ Session setup_landerplanet_draw(
     auto &rPlanetDraw = top_emplace<PlanetDraw>(topData, idPlanetDraw);
     rPlanetDraw.matPlanets = matPlanets;
     rPlanetDraw.matAxis    = matAxis;
-
-    rBuilder.task()
-        .name       ("Position SceneFrame center to Camera Controller target")
-        .run_on     ({tgWin.inputs(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,            idScnFrame })
-        .func([] (ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
-    {
-        if ( ! rCamCtrl.m_target.has_value())
-        {
-            return;
-        }
-        Vector3 &rCamPl = rCamCtrl.m_target.value();
-
-        // check origin translation
-        // ADL used for Magnum::Math::sign/floor/abs
-        float const maxDist = 512.0f;
-        Vector3 const translate = sign(rCamPl) * floor(abs(rCamPl) / maxDist) * maxDist;
-
-        if ( ! translate.isZero())
-        {
-            rCamCtrl.m_transform.translation() -= translate;
-            rCamPl -= translate;
-
-            // a bit janky to modify universe stuff directly here, but it works lol
-            Vector3 const rotated = Quaternion(rScnFrame.m_rotation).transformVector(translate);
-            rScnFrame.m_position += Vector3g(math::mul_2pow<Vector3, int>(rotated, rScnFrame.m_precision));
-        }
-
-        rScnFrame.m_scenePosition = Vector3g(math::mul_2pow<Vector3, int>(rCamCtrl.m_target.value(), rScnFrame.m_precision));
-    });
 
     rBuilder.task()
         .name       ("Resync test planets, create DrawEnts")
@@ -522,13 +496,6 @@ Session setup_landerplanet_draw(
             rMatPlanet.m_ents.set(std::size_t(drawEnt));
             rMatPlanet.m_dirty.push_back(drawEnt);
         }
-
-        rScnRender.m_mesh[rPlanetDraw.attractor] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
-        rScnRender.m_meshDirty.push_back(rPlanetDraw.attractor);
-        rScnRender.m_visible.set(std::size_t(rPlanetDraw.attractor));
-        rScnRender.m_opaque.set(std::size_t(rPlanetDraw.attractor));
-        rMatPlanet.m_ents.set(std::size_t(rPlanetDraw.attractor));
-        rMatPlanet.m_dirty.push_back(rPlanetDraw.attractor);
 
         for (DrawEnt const drawEnt : rPlanetDraw.axis)
         {

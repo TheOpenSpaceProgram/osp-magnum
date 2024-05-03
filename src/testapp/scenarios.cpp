@@ -373,9 +373,9 @@ static ScenarioMap_t make_scenarios()
     add_scenario("lander", "Lander simulation game", [] (TestApp& rTestApp) -> RendererSetupFunc_t {
         #define SCENE_SESSIONS scene, commonScene, uniCore, uniScnFrame, uniPlanet, physics, \
             prefabs, parts, signalsFloat, vehicleSpawn, vehicleSpawnVB, vehicles, \
-            newton, vehicleSpawnNwt, nwtRocketSet, rocketsNwt, \
+            newton, nwtGravSet, nwtGrav, vehicleSpawnNwt, nwtRocketSet, rocketsNwt, \
             machRocket, machRcsDriver
-        #define SCENE_SESSIONS_COUNT 18
+        #define SCENE_SESSIONS_COUNT 20
         #define RENDERER_SESSIONS sceneRenderer, magnumScene, planetDraw, \
             cameraCtrl, cameraFree, shVisual, shFlat, shPhong, \
             prefabDraw, vehicleDraw, vehicleCtrl, cameraVehicle
@@ -411,6 +411,8 @@ static ScenarioMap_t make_scenarios()
         machRcsDriver   = setup_mach_rcsdriver      (builder, rTopData, scene, parts, signalsFloat);
 
         newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
+        nwtGravSet      = setup_newton_factors      (builder, rTopData);
+        nwtGrav         = setup_newton_force_grav_nbody  (builder, rTopData, newton, nwtGravSet, uniCore, uniPlanet, uniScnFrame);
         vehicleSpawnNwt = setup_vehicle_spawn_newton(builder, rTopData, application, commonScene, physics, prefabs, parts, vehicleSpawn, newton);
         nwtRocketSet    = setup_newton_factors      (builder, rTopData);
         rocketsNwt      = setup_rocket_thrust_newton(builder, rTopData, scene, commonScene, physics, prefabs, parts, signalsFloat, newton, nwtRocketSet);
@@ -426,8 +428,8 @@ static ScenarioMap_t make_scenarios()
 
         rVehicleSpawn.spawnRequest.push_back(
         {
-            .position = {30.0f, 0.0f, 0.0f},
-            .velocity = {0.0f, 0.0f, 0.0f},
+            .position = {400.0f, 400.0f, 10.0f},
+            .velocity = {-5.0f, -5.0f, 0.0f},
             .rotation = {}
         });
         rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
@@ -453,7 +455,7 @@ static ScenarioMap_t make_scenarios()
             shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
             // shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
-            planetDraw      = setup_testplanets_draw    (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, uniCore, uniScnFrame, uniPlanet, sc_matVisualizer, sc_matFlat);
+            planetDraw      = setup_landerplanet_draw    (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, uniCore, uniScnFrame, uniPlanet, sc_matVisualizer, sc_matFlat);
             
             prefabDraw      = setup_prefab_draw         (builder, rTopData, application, windowApp, sceneRenderer, commonScene, prefabs, sc_matPhong);
             vehicleDraw     = setup_vehicle_spawn_draw  (builder, rTopData, sceneRenderer, vehicleSpawn);

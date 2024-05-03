@@ -33,6 +33,9 @@
 #include <osp/core/Resources.h>
 #include <osp/drawing/drawing.h>
 #include <osp/vehicles/ImporterData.h>
+#include <osp/universe/coordinates.h>
+#include <osp/universe/universetypes.h>
+#include <osp/universe/universe.h>
 
 #include <adera/machines/links.h>
 
@@ -709,6 +712,95 @@ Session setup_rocket_thrust_newton(
     return out;
 } // setup_rocket_thrust_newton
 
+
+static void nbody_grav_force(NewtonBody const* pBody, BodyId const body, ACtxNwtWorld const& rNwt, ACtxNwtWorld::ForceFactorFunc::UserData_t data, Vector3& rForce, Vector3& rTorque) noexcept
+{
+    using namespace osp::universe;
+
+    auto &rUniverse = *reinterpret_cast<Universe*>(data[0]);
+    auto &rMainSpace = *reinterpret_cast<CoSpaceId*>(data[1]);
+    auto &rScnFrame = *reinterpret_cast<SceneFrame*>(data[2]);
+
+    CoSpaceCommon &rMainSpaceCommon = rUniverse.m_coordCommon[rMainSpace];
+
+    float const invCommonScale = osp::math::mul_2pow<float, int>(1.0f, -rMainSpaceCommon.m_precision);
+    float const sceneScale = osp::math::mul_2pow<float, int>(1.0f, rScnFrame.m_precision);
+
+    // get the positions of all the planets
+    auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
+
+    // get the position/mass of this physics body
+    Vector3 pos = Vector3(0.0f);
+    float mass = 0.0f;
+    float dummy = 0.0f;
+    NewtonBodyGetPosition(pBody, pos.data());
+    NewtonBodyGetMass(pBody, &mass, &dummy, &dummy, &dummy);
+
+    // transform our local scene position to the universe space
+    Vector3g const bodyPos{rScnFrame.m_rotation.transformVector(Vector3d(rScnFrame.m_scenePosition) + Vector3d(pos))};
+    Vector3g const areaPos{rScnFrame.m_position + bodyPos * sceneScale};
+
+    uint32_t const planetCount = rMainSpaceCommon.m_satCount;
+
+    // sum up the forces
+    for (uint32_t i = 0; i < planetCount; ++i)
+    {
+        Vector3 const diff = (Vector3( x[i], y[i], z[i]) - Vector3(areaPos)) * invCommonScale;
+        float const r = diff.length();
+        float const factor = 1000000.f;
+        Vector3 const accel = diff * factor / (r * r * r);
+
+        rForce += accel * mass;
+    }
+}
+
+osp::Session setup_newton_force_grav_nbody(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any>        topData,
+        Session const&              newton,
+        Session const&              nwtFactors,
+        Session const&              uniCore,
+        Session const&              uniPlanets,
+        Session const&              uniScnFrame)
+{
+    using namespace osp::universe;
+    using UserData_t = ACtxNwtWorld::ForceFactorFunc::UserData_t;
+    using CoSpaceIdVec_t = std::vector<CoSpaceId>;
+    using Corrade::Containers::Array;
+
+    OSP_DECLARE_GET_DATA_IDS(newton,     TESTAPP_DATA_NEWTON);
+    OSP_DECLARE_GET_DATA_IDS(nwtFactors, TESTAPP_DATA_NEWTON_FORCES);
+
+    auto &rNwt      = top_get<ACtxNwtWorld>(topData, idNwt);
+
+    OSP_DECLARE_GET_DATA_IDS(uniCore, TESTAPP_DATA_UNI_CORE);
+    auto &rUniverse = top_get< Universe >(topData, idUniverse);
+
+    OSP_DECLARE_GET_DATA_IDS(uniPlanets, TESTAPP_DATA_UNI_PLANETS);
+    auto& rPlanetMainSpace = top_get<CoSpaceId>(topData, idPlanetMainSpace);
+
+    OSP_DECLARE_GET_DATA_IDS(uniScnFrame, TESTAPP_DATA_UNI_SCENEFRAME);
+    auto& rScnFrame = top_get<SceneFrame>(topData, idScnFrame);
+
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_NEWTON_ACCEL);
+
+    ACtxNwtWorld::ForceFactorFunc const factor
+    {
+        .m_func = nbody_grav_force,
+        .m_userData = {&rUniverse, &rPlanetMainSpace, &rScnFrame}
+    };
+
+    // Register force
+
+    std::size_t const index = rNwt.m_factors.size();
+    rNwt.m_factors.emplace_back(factor);
+
+    auto factorBits = lgrn::bit_view(top_get<ForceFactors_t>(topData, idNwtFactors));
+    factorBits.set(index);
+
+    return out;
+} // setup_newton_force_accel
 
 } // namespace testapp::scenes
 
