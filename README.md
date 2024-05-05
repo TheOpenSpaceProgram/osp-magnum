@@ -79,13 +79,13 @@ Run the unit tests!
 
 ```bash
 cmake --build build-osp-magnum --parallel --config Release --target compile-tests
-ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build/test
+ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config Release --test-dir build-osp-magnum/test
 ```
 
 Run the game!
 
 ```bash
-cd build-osp-magnum/bin
+cd build-osp-magnum/Release
 ./osp-magnum
 ```
 
