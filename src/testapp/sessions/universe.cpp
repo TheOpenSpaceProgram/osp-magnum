@@ -588,7 +588,7 @@ Session setup_landerplanet_draw(
     });
 
     return out;
-}
+} // setup_landerplanet_draw
 
 Session setup_testplanets_draw(
         TopTaskBuilder&             rBuilder,

@@ -374,8 +374,8 @@ static ScenarioMap_t make_scenarios()
         #define SCENE_SESSIONS scene, commonScene, uniCore, uniScnFrame, uniPlanet, physics, \
             prefabs, parts, signalsFloat, vehicleSpawn, vehicleSpawnVB, vehicles, \
             newton, nwtGravSet, nwtGrav, vehicleSpawnNwt, nwtRocketSet, rocketsNwt, \
-            machRocket, machRcsDriver
-        #define SCENE_SESSIONS_COUNT 20
+            machRocket, machRcsDriver, nwtFollow
+        #define SCENE_SESSIONS_COUNT 21
         #define RENDERER_SESSIONS sceneRenderer, magnumScene, planetDraw, \
             cameraCtrl, cameraFree, shVisual, shFlat, shPhong, \
             prefabDraw, vehicleDraw, vehicleCtrl, cameraVehicle
@@ -395,32 +395,33 @@ static ScenarioMap_t make_scenarios()
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
 
         auto const tgApp = application.get_pipelines< PlApplication >();
-        uniCore         = setup_uni_core            (builder, rTopData, tgApp.mainLoop);
-        uniScnFrame     = setup_uni_sceneframe      (builder, rTopData, uniCore);
-        uniPlanet       = setup_uni_landerplanet    (builder, rTopData, uniCore, uniScnFrame);
+        uniCore         = setup_uni_core               (builder, rTopData, tgApp.mainLoop);
+        uniScnFrame     = setup_uni_sceneframe         (builder, rTopData, uniCore);
+        uniPlanet       = setup_uni_landerplanet       (builder, rTopData, uniCore, uniScnFrame);
         
-        physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        prefabs         = setup_prefabs             (builder, rTopData, application, scene, commonScene, physics);
-        parts           = setup_parts               (builder, rTopData, application, scene);
-        signalsFloat    = setup_signals_float       (builder, rTopData, scene, parts);
-        vehicleSpawn    = setup_vehicle_spawn       (builder, rTopData, scene);
-        vehicleSpawnVB  = setup_vehicle_spawn_vb    (builder, rTopData, application, scene, commonScene, prefabs, parts, vehicleSpawn, signalsFloat);
-        vehicles        = setup_prebuilt_vehicles   (builder, rTopData, application, scene);
+        physics         = setup_physics                (builder, rTopData, scene, commonScene);
+        prefabs         = setup_prefabs                (builder, rTopData, application, scene, commonScene, physics);
+        parts           = setup_parts                  (builder, rTopData, application, scene);
+        signalsFloat    = setup_signals_float          (builder, rTopData, scene, parts);
+        vehicleSpawn    = setup_vehicle_spawn          (builder, rTopData, scene);
+        vehicleSpawnVB  = setup_vehicle_spawn_vb       (builder, rTopData, application, scene, commonScene, prefabs, parts, vehicleSpawn, signalsFloat);
+        vehicles        = setup_prebuilt_vehicles      (builder, rTopData, application, scene);
 
-        machRocket      = setup_mach_rocket         (builder, rTopData, scene, parts, signalsFloat);
-        machRcsDriver   = setup_mach_rcsdriver      (builder, rTopData, scene, parts, signalsFloat);
+        machRocket      = setup_mach_rocket            (builder, rTopData, scene, parts, signalsFloat);
+        machRcsDriver   = setup_mach_rcsdriver         (builder, rTopData, scene, parts, signalsFloat);
 
-        newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
-        nwtGravSet      = setup_newton_factors      (builder, rTopData);
-        nwtGrav         = setup_newton_force_grav_nbody  (builder, rTopData, newton, nwtGravSet, uniCore, uniPlanet, uniScnFrame);
-        vehicleSpawnNwt = setup_vehicle_spawn_newton(builder, rTopData, application, commonScene, physics, prefabs, parts, vehicleSpawn, newton);
-        nwtRocketSet    = setup_newton_factors      (builder, rTopData);
-        rocketsNwt      = setup_rocket_thrust_newton(builder, rTopData, scene, commonScene, physics, prefabs, parts, signalsFloat, newton, nwtRocketSet);
+        newton          = setup_newton                 (builder, rTopData, scene, commonScene, physics);
+        nwtGravSet      = setup_newton_factors         (builder, rTopData);
+        nwtGrav         = setup_newton_force_grav_nbody(builder, rTopData, newton, nwtGravSet, uniCore, uniPlanet, uniScnFrame);
+        nwtFollow       = setup_newton_origin_translate(builder, rTopData, scene, uniScnFrame, newton, physics);
+        vehicleSpawnNwt = setup_vehicle_spawn_newton   (builder, rTopData, application, commonScene, physics, prefabs, parts, vehicleSpawn, newton);
+        nwtRocketSet    = setup_newton_factors         (builder, rTopData);
+        rocketsNwt      = setup_rocket_thrust_newton   (builder, rTopData, scene, commonScene, physics, prefabs, parts, signalsFloat, newton, nwtRocketSet);
 
 
         OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,   TESTAPP_DATA_VEHICLE_SPAWN);
         OSP_DECLARE_GET_DATA_IDS(vehicleSpawnVB, TESTAPP_DATA_VEHICLE_SPAWN_VB);
-        OSP_DECLARE_GET_DATA_IDS(vehicles,   TESTAPP_DATA_TEST_VEHICLES);
+        OSP_DECLARE_GET_DATA_IDS(vehicles,       TESTAPP_DATA_TEST_VEHICLES);
 
         auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
         auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);

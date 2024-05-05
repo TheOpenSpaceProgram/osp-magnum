@@ -69,6 +69,9 @@ osp::Session setup_newton_force_accel(
         osp::Session const&         nwtFactors,
         osp::Vector3                accel);
 
+/**
+ * @brief Setup a gravity force for every satellite in the universe which acts on the newton scene
+ */
 osp::Session setup_newton_force_grav_nbody(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
@@ -77,6 +80,17 @@ osp::Session setup_newton_force_grav_nbody(
         osp::Session const&         uniCore,
         osp::Session const&         uniPlanets,
         osp::Session const&         uniScnFrame);
+
+/**
+ * @brief Set the scene origin to follow a Newton Dynamics object
+ */
+osp::Session setup_newton_origin_translate(
+        osp::TopTaskBuilder&       rBuilder,
+        osp::ArrayView<entt::any>  topData,
+        osp::Session const&        scene,
+        osp::Session const&        sceneFrame,
+        osp::Session const&        newton,
+        osp::Session const&        physics);
 
 /**
  * @brief Support for Shape Spawner physics using Newton Dynamics

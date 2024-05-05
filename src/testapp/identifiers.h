@@ -303,7 +303,8 @@ struct PlNewton
 #define TESTAPP_DATA_NEWTON_ACCEL 1, \
     idAcceleration
 
-
+#define TESTAPP_DATA_NEWTON_ORIGIN_TRANSLATE 1, \
+    idNwtSync
 
 #define TESTAPP_DATA_ROCKETS_NWT 1, \
     idRocketsNwt

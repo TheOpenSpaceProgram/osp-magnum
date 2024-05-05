@@ -802,6 +802,67 @@ osp::Session setup_newton_force_grav_nbody(
     return out;
 } // setup_newton_force_accel
 
+Session setup_newton_origin_translate(
+        TopTaskBuilder&             rBuilder,
+        ArrayView<entt::any>        topData,
+        Session const&              scene,
+        Session const&              sceneFrame,
+        Session const&              newton,
+        Session const&              physics)
+{
+    using namespace osp::universe;
+
+    OSP_DECLARE_GET_DATA_IDS(scene, TESTAPP_DATA_SCENE);
+    auto const tgScn = scene.get_pipelines<PlScene>();
+
+    OSP_DECLARE_GET_DATA_IDS(newton, TESTAPP_DATA_NEWTON);
+    auto const tgNwt = newton.get_pipelines<PlNewton>();
+
+    OSP_DECLARE_GET_DATA_IDS(sceneFrame, TESTAPP_DATA_UNI_SCENEFRAME);
+    auto const tgScnFrame = sceneFrame.get_pipelines<PlUniSceneFrame>();
+
+    OSP_DECLARE_GET_DATA_IDS(physics, TESTAPP_DATA_PHYSICS);
+    auto const tgPhys = physics.get_pipelines<PlPhysics>();
+
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_NEWTON_ORIGIN_TRANSLATE);
+
+    rBuilder.task()
+        .name       ("Update scene origin if body strays too far")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgNwt.nwtBody(Prev), tgScnFrame.sceneFrame(Modify)})
+        .push_to    (out.m_tasks)
+        .args       ({idNwt, idScnFrame, idPhys})
+        .func([] (ACtxNwtWorld& rNwt, SceneFrame& rScnFrame, ACtxPhysics& rPhysics) noexcept
+    {
+        for (auto& pBody : rNwt.m_bodyPtrs)
+        {
+            Vector3 pos = Vector3(0.0f);
+            NewtonBodyGetPosition(pBody.get(), pos.data());
+
+            float const maxDist = 512.0f;
+            Vector3 const translate = sign(pos) * floor(abs(pos) / maxDist) * maxDist;
+            
+            if ( ! translate.isZero())
+            {
+                Vector3 const rotated = Quaternion(rScnFrame.m_rotation).transformVector(translate);
+                rScnFrame.m_position += Vector3g(math::mul_2pow<Vector3, int>(rotated, rScnFrame.m_precision));
+
+                rPhysics.m_originTranslate -= translate;
+                // printf("Recentering local scene\n, new origin: %ld, %ld, %ld\n", rScnFrame.m_position.x(), rScnFrame.m_position.y(), rScnFrame.m_position.z());
+            
+                SysNewton::update_translate(rPhysics, rNwt);
+            }
+
+            // TODO: do the same but for velocity
+
+            break; // We're just taking the first newton body because i am very lazy
+        }
+    });
+
+    return out; 
+} // setup_newton_scene_follow
+
 } // namespace testapp::scenes
 
 
