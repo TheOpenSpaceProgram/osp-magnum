@@ -22,9 +22,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 #include "MagnumApplication.h"
 #include "testapp.h"
-
 #include "scenarios.h"
 #include "identifiers.h"
 #include "sessions/common.h"
@@ -44,7 +44,6 @@
 #include <Magnum/Primitives/Cube.h>
 #include <Magnum/Primitives/Grid.h>
 #include <Magnum/Primitives/Icosphere.h>
-
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/TextureData.h>
 #include <Magnum/Trade/MeshData.h>
@@ -61,7 +60,6 @@
 #include <iostream>
 #include <memory>
 #include <string_view>
-
 #include <thread>
 #include <unordered_map>
 
@@ -208,7 +206,6 @@ void debug_cli_loop(int argc, char** argv)
                 }
 
                 g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
-                start_magnum_async(argc, g_argv);
                 start_magnum_async(argc, argv);
             }
         }
@@ -304,17 +301,12 @@ void start_magnum_async(int argc, char** argv)
     g_magnumThread.swap(t);
 }
 
-
-
 void load_a_bunch_of_stuff()
 {
     using namespace osp::restypes;
     using namespace Magnum;
     using Primitives::ConeFlag;
     using Primitives::CylinderFlag;
-
-    std::size_t const maxTags = 256; // aka: just two 64-bit integers
-    std::size_t const maxTagsInts = maxTags / 64;
 
     osp::TopTaskBuilder builder{g_testApp.m_tasks, g_testApp.m_applicationGroup.m_edges, g_testApp.m_taskData};
     auto const plApp = g_testApp.m_application.create_pipelines<PlApplication>(builder);
@@ -346,7 +338,6 @@ void load_a_bunch_of_stuff()
             return { };
         }
     });
-
 
     rResources.resize_types(osp::ResTypeIdReg_t::size());
 
@@ -401,12 +392,10 @@ void load_a_bunch_of_stuff()
     OSP_LOG_INFO("Resource loading complete");
 }
 
-
 //-----------------------------------------------------------------------------
 
 void debug_print_help()
 {
-
     std::size_t longestName = 0;
     for (auto const& [name, rTestScn] : scenarios())
     {
@@ -436,5 +425,3 @@ void debug_print_resources()
     // TODO: Add features to list resources in osp::Resources
     std::cout << "Not yet implemented!\n";
 }
-
-
