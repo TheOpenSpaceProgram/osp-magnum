@@ -100,12 +100,13 @@ SingleThreadedExecutor g_executor;
 std::thread g_magnumThread;
 
 // Loggers
-osp::Logger_t g_logTestApp;
+osp::Logger_t g_mainThreadLogger;
 osp::Logger_t g_logExecutor;
 osp::Logger_t g_logMagnumApp;
 
 int main(int argc, char** argv)
 {
+    // Command line argument parsing
     Corrade::Utility::Arguments args;
     args.addSkippedPrefix("magnum", "Magnum options")
         .addOption("scene", "none")         .setHelp("scene",       "Set the scene to launch")
@@ -116,17 +117,15 @@ int main(int argc, char** argv)
         .setGlobalHelp("Helptext goes here.")
         .parse(argc, argv);
 
-    // Setup loggers
-    {
-        auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        pSink->set_pattern("[%T.%e] [%n] [%^%l%$] [%s:%#] %v");
-        g_logTestApp   = std::make_shared<spdlog::logger>("testapp", pSink);
-        g_logExecutor  = std::make_shared<spdlog::logger>("executor", pSink);
-        g_logMagnumApp = std::make_shared<spdlog::logger>("flight", std::move(pSink));
-    }
+    // Setup logging
+    auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    pSink->set_pattern("[%T.%e] [%n] [%^%l%$] [%s:%#] %v");
+    g_mainThreadLogger = std::make_shared<spdlog::logger>("main-thread", pSink);
+    g_logExecutor  = std::make_shared<spdlog::logger>("executor", pSink);
+    g_logMagnumApp = std::make_shared<spdlog::logger>("flight", std::move(pSink));
 
     // Set thread-local logger used by OSP_LOG_* macros
-    osp::set_thread_logger(g_logTestApp);
+    osp::set_thread_logger(g_mainThreadLogger);
 
     g_testApp.m_pExecutor = &g_executor;
 
