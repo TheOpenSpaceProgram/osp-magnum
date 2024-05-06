@@ -106,11 +106,6 @@ std::shared_ptr<spdlog::logger> g_logTestApp;
 std::shared_ptr<spdlog::logger> g_logExecutor;
 std::shared_ptr<spdlog::logger> g_logMagnumApp;
 
-// lazily save the arguments to pass to Magnum
-int g_argc;
-char** g_argv;
-
-
 int main(int argc, char** argv)
 {
     Corrade::Utility::Arguments args;
@@ -122,10 +117,6 @@ int main(int argc, char** argv)
         // TODO .addBooleanOption('v', "verbose")   .setHelp("verbose",     "log verbosely")
         .setGlobalHelp("Helptext goes here.")
         .parse(argc, argv);
-
-    // just lazily save the arguments
-    g_argc = argc;
-    g_argv = argv;
 
     // Setup loggers
     {
@@ -218,6 +209,7 @@ void debug_cli_loop(int argc, char** argv)
 
                 g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
                 start_magnum_async(argc, g_argv);
+                start_magnum_async(argc, argv);
             }
         }
         else if (command == "help")
