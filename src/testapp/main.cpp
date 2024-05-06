@@ -408,8 +408,8 @@ void debug_print_help()
 
     for (auto const& [name, rTestScn] : scenarios())
     {
-        std::string spaces(longestName - name.length(), ' ');
-        std::cout << "* " << name << spaces << " - " << rTestScn.m_desc << "\n";
+        std::string spaces(longestName - rName.length(), ' ');
+        std::cout << "* " << rName << spaces << " - " << rScenerio.m_description << "\n";
     }
 
     std::cout

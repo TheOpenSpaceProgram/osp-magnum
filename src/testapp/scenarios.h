@@ -57,7 +57,7 @@ struct MainLoopControl
 
 struct ScenarioOption
 {
-    std::string_view m_desc;
+    std::string_view m_description;
     SceneSetupFunc_t m_setup;
 };
 
