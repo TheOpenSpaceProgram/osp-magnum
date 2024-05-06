@@ -202,7 +202,7 @@ void debug_cli_loop()
                 //       its still running.
                 //       ie. Message it to destroy its GL resources and draw
                 //           function, then load new scene
-                std::cout << "Close application before openning new scene\n";
+                std::cout << "Close application before opening new scene\n";
             }
             else
             {
