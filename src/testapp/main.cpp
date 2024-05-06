@@ -326,10 +326,10 @@ void load_a_bunch_of_stuff()
         .args       ({                  idMainLoopCtrl})
         .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
     {
-        if (!rMainLoopCtrl.doUpdate &&
-            !rMainLoopCtrl.doSync   &&
-            !rMainLoopCtrl.doResync &&
-            !rMainLoopCtrl.doRender   )
+        if ( ! rMainLoopCtrl.doUpdate &&
+             ! rMainLoopCtrl.doSync   &&
+             ! rMainLoopCtrl.doResync &&
+             ! rMainLoopCtrl.doRender   )
         {
             return osp::TaskAction::Cancel;
         }
