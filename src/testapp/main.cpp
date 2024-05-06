@@ -72,14 +72,14 @@ using namespace testapp;
  *
  * This interface can be used to run commands and load scenes
  */
-void debug_cli_loop();
+void debug_cli_loop(int argc, char** argv);
 
 /**
  * @brief Starts Magnum application (MagnumApplication) thread g_magnumThread
  *
  * This initializes an OpenGL context, and opens the window
  */
-void start_magnum_async();
+void start_magnum_async(int argc, char** argv);
 
 /**
  * @brief As the name implies
@@ -161,13 +161,13 @@ int main(int argc, char** argv)
 
         g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
 
-        start_magnum_async();
+        start_magnum_async(argc, argv);
     }
 
     if(!args.isSet("norepl"))
     {
         // start doing debug cli loop
-        debug_cli_loop();
+        debug_cli_loop(argc, argv);
     }
 
     // wait for magnum thread to exit if it exists
@@ -181,7 +181,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
-void debug_cli_loop()
+void debug_cli_loop(int argc, char** argv)
 {
     debug_print_help();
 
@@ -217,7 +217,7 @@ void debug_cli_loop()
                 }
 
                 g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
-                start_magnum_async();
+                start_magnum_async(argc, g_argv);
             }
         }
         else if (command == "help")
@@ -236,7 +236,7 @@ void debug_cli_loop()
             }
             else
             {
-                start_magnum_async();
+                start_magnum_async(argc, argv);
             }
 
         }
@@ -264,13 +264,13 @@ void debug_cli_loop()
     g_testApp.clear_resource_owners();
 }
 
-void start_magnum_async()
+void start_magnum_async(int argc, char** argv)
 {
     if (g_magnumThread.joinable())
     {
         g_magnumThread.join();
     }
-    std::thread t([] {
+    std::thread t([&] {
 
         osp::set_thread_logger(g_logMagnumApp);
 
@@ -278,7 +278,7 @@ void start_magnum_async()
         osp::TopTaskBuilder builder{g_testApp.m_tasks, g_testApp.m_renderer.m_edges, g_testApp.m_taskData};
 
         g_testApp.m_windowApp   = scenes::setup_window_app  (builder, g_testApp.m_topData, g_testApp.m_application);
-        g_testApp.m_magnum      = scenes::setup_magnum      (builder, g_testApp.m_topData, g_testApp.m_application, g_testApp.m_windowApp, {g_argc, g_argv});
+        g_testApp.m_magnum      = scenes::setup_magnum      (builder, g_testApp.m_topData, g_testApp.m_application, g_testApp.m_windowApp, MagnumApplication::Arguments{ argc, argv });
 
         OSP_DECLARE_GET_DATA_IDS(g_testApp.m_magnum, TESTAPP_DATA_MAGNUM); // declares idActiveApp
         auto &rActiveApp = osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp);
