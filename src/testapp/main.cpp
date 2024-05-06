@@ -100,9 +100,9 @@ SingleThreadedExecutor g_executor;
 std::thread g_magnumThread;
 
 // Loggers
-std::shared_ptr<spdlog::logger> g_logTestApp;
-std::shared_ptr<spdlog::logger> g_logExecutor;
-std::shared_ptr<spdlog::logger> g_logMagnumApp;
+osp::Logger_t g_logTestApp;
+osp::Logger_t g_logExecutor;
+osp::Logger_t g_logMagnumApp;
 
 int main(int argc, char** argv)
 {

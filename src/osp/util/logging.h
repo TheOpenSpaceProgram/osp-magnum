@@ -29,17 +29,16 @@
 
 namespace osp
 {
+using Logger_t = std::shared_ptr<spdlog::logger>;
 
-using logger_t = std::shared_ptr<spdlog::logger>;
+inline thread_local Logger_t t_currentLogger;
 
-inline thread_local logger_t t_currentLogger;
-
-inline void set_thread_logger(logger_t const logger)
+inline void set_thread_logger(Logger_t const logger)
 {
     t_currentLogger = std::move(logger);
 }
 
-}
+} // namespace osp
 
 #define OSP_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(osp::t_currentLogger, __VA_ARGS__)
 #define OSP_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(osp::t_currentLogger, __VA_ARGS__)
