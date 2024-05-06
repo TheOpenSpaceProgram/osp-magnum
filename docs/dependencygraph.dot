@@ -1,0 +1,58 @@
+// Generate with
+// $ dot -Tpng docs/dependencygraph.dot -o docs/dependencygraph.png
+digraph {
+
+    rankdir="BT"
+
+    node [shape=rectangle, style=filled, fillcolor=palevioletred2]
+    "EnTT"
+    "Longeron++"
+    "Magnum & Corrade"
+    "Magnum/GL";
+    "Newton Dynamics";
+
+    node [shape=rectangle, style=filled, fillcolor=white]
+    "osp/core"          -> "Magnum & Corrade";
+    "osp/core"          -> "Longeron++";
+    "osp/core"          -> "EnTT";
+    "osp/activescene"   -> "osp/vehicles";
+    "osp/activescene"   -> "osp/link";
+    "osp/drawing"       -> "osp/activescene";
+    "osp/drawing_gl"    -> "osp/drawing";
+    "osp/drawing_gl"    -> "osp/util";
+    "osp/drawing_gl"    -> "Magnum/GL";
+    "osp/link"          -> "osp/core";
+    "osp/scientific"    -> "osp/core";
+    "osp/tasks"         -> "osp/core";
+    "osp/vehicles"      -> "osp/scientific";
+    "osp/universe"      -> "osp/core";
+    "osp/util"          -> "osp/core";
+
+    node [shape=rectangle, style=filled, fillcolor=lightblue1]
+    "adera/activescene" -> "osp/activescene";
+    "adera/drawing"     -> "osp/activescene";
+    "adera/drawing_gl"  -> "osp/drawing_gl";
+    "adera/drawing_gl"  -> "osp/util";
+    "adera/machines"    -> "osp/link";
+
+    node [shape=rectangle, style=filled, fillcolor=lightslateblue]
+    "ospnewton/activescene" -> "osp/activescene";
+    "ospnewton/activescene" -> "Newton Dynamics";
+
+    node [shape=rectangle, style=filled, fillcolor=palegreen1]
+    "planet-a"          -> "osp/core";
+
+    node [shape=rectangle, style=filled, fillcolor=orange1]
+    "testapp/sessions"  -> "osp/universe";
+    "testapp/sessions"  -> "osp/tasks";
+    "testapp/sessions"  -> "adera/machines";
+    "testapp/sessions"  -> "adera/drawing_gl";
+    "testapp/sessions"  -> "adera/drawing";
+    "testapp/sessions"  -> "ospnewton/activescene";
+    "testapp/sessions"  -> "planet-a";
+    "testapp/sessions"  -> "adera/activescene";
+    "testapp"           -> "testapp/sessions";
+
+
+
+}
