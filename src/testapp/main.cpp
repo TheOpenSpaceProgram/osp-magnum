@@ -90,8 +90,8 @@ void start_magnum_async(int argc, char** argv);
 void load_a_bunch_of_stuff();
 
 // called only from commands to display information
-void debug_print_help();
-void debug_print_resources();
+void print_help();
+void print_resources();
 
 TestApp g_testApp;
 
@@ -172,7 +172,7 @@ int main(int argc, char** argv)
 
 void debug_cli_loop(int argc, char** argv)
 {
-    debug_print_help();
+    print_help();
 
     std::string command;
 
@@ -211,7 +211,7 @@ void debug_cli_loop(int argc, char** argv)
         }
         else if (command == "help")
         {
-            debug_print_help();
+            print_help();
         }
         else if (command == "reopen")
         {
@@ -231,7 +231,7 @@ void debug_cli_loop(int argc, char** argv)
         }
         else if (command == "list_pkg")
         {
-            debug_print_resources();
+            print_resources();
         }
         else if (command == "exit")
         {
@@ -394,7 +394,7 @@ void load_a_bunch_of_stuff()
 
 //-----------------------------------------------------------------------------
 
-void debug_print_help()
+void print_help()
 {
     std::size_t longestName = 0;
     for (auto const& [rName, rScenerio] : scenarios())
@@ -420,7 +420,7 @@ void debug_print_help()
         << "* exit      - Deallocate everything and return memory to OS\n";
 }
 
-void debug_print_resources()
+void print_resources()
 {
     // TODO: Add features to list resources in osp::Resources
     std::cout << "Not yet implemented!\n";
