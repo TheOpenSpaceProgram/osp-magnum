@@ -69,8 +69,10 @@ using namespace testapp;
  * @brief Starts a spaghetti REPL (Read Evaluate Print Loop) interface that gets inputs from standard in
  *
  * This interface can be used to run commands and load scenes
+ *
+ * CLI -> Command line interface
  */
-void debug_cli_loop(int argc, char** argv);
+void cli_loop(int argc, char** argv);
 
 /**
  * @brief Starts Magnum application (MagnumApplication) thread g_magnumThread
@@ -142,9 +144,9 @@ int main(int argc, char** argv)
         auto const it = scenarios().find(args.value("scene"));
         if(it == std::end(scenarios()))
         {
-            std::cerr << "unknown scene" << std::endl;
+            OSP_LOG_ERROR("unknown scene");
             g_testApp.clear_resource_owners();
-            exit(-1);
+            return 1;
         }
 
         g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
@@ -152,24 +154,22 @@ int main(int argc, char** argv)
         start_magnum_async(argc, argv);
     }
 
-    if(!args.isSet("norepl"))
+    if( ! args.isSet("norepl"))
     {
-        // start doing debug cli loop
-        debug_cli_loop(argc, argv);
+        cli_loop(argc, argv);
     }
 
-    // wait for magnum thread to exit if it exists
+    // Wait for magnum thread to exit if it exists.
     if (g_magnumThread.joinable())
     {
         g_magnumThread.join();
     }
 
-    //Kill spdlog
-    spdlog::shutdown();  //>_> -> X.X  *Stab
+    spdlog::shutdown();
     return 0;
 }
 
-void debug_cli_loop(int argc, char** argv)
+void cli_loop(int argc, char** argv)
 {
     print_help();
 
@@ -180,9 +180,10 @@ void debug_cli_loop(int argc, char** argv)
         std::cout << "> ";
         std::cin >> command;
 
-        bool magnumOpen = ! g_testApp.m_renderer.m_sessions.empty();
-        if (auto const it = scenarios().find(command);
-            it != std::end(scenarios()))
+        bool const magnumOpen = ! g_testApp.m_renderer.m_sessions.empty();
+        auto const it = scenarios().find(command);
+        // First check to see if command is the name of a scenario.
+        if (it != std::end(scenarios())) 
         {
             if (magnumOpen)
             {
@@ -190,11 +191,11 @@ void debug_cli_loop(int argc, char** argv)
                 //       its still running.
                 //       ie. Message it to destroy its GL resources and draw
                 //           function, then load new scene
-                std::cout << "Close application before openning new scene\n";
+                std::cout << "Close application before opening new scene" << std::endl;
             }
             else
             {
-                std::cout << "Loading scene: " << it->first << "\n";
+                std::cout << "Loading scene: " << it->first << std::endl;
 
                 // Close existing scene first
                 if ( ! g_testApp.m_scene.m_sessions.empty() )
@@ -208,44 +209,46 @@ void debug_cli_loop(int argc, char** argv)
                 start_magnum_async(argc, argv);
             }
         }
-        else if (command == "help")
-        {
-            print_help();
-        }
-        else if (command == "reopen")
-        {
-            if (magnumOpen)
+        else // Otherwise check all other commands. 
+        { 
+            if (command == "help") 
             {
-                std::cout << "Application is already open\n";
+                print_help();
             }
-            else if ( g_testApp.m_rendererSetup == nullptr )
+            else if (command == "reopen") 
             {
-                std::cout << "No existing scene loaded\n";
+                if (magnumOpen)
+                {
+                    std::cout << "Application is already open" << std::endl;
+                }
+                else if (g_testApp.m_rendererSetup == nullptr)
+                {
+                    std::cout << "No existing scene loaded" << std::endl;
+                }
+                else
+                {
+                    start_magnum_async(argc, argv);
+                }
+                break;
             }
-            else
+            else if (command == "list_pkg") 
             {
-                start_magnum_async(argc, argv);
+                print_resources();
             }
+            else if (command == "exit") 
+            {
+                if (magnumOpen)
+                {
+                    OSP_DECLARE_GET_DATA_IDS(g_testApp.m_renderer.m_sessions[1], TESTAPP_DATA_MAGNUM); // declares idActiveApp
+                    osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp).exit();
 
-        }
-        else if (command == "list_pkg")
-        {
-            print_resources();
-        }
-        else if (command == "exit")
-        {
-            if (magnumOpen)
-            {
-                // Request exit if application exists
-                OSP_DECLARE_GET_DATA_IDS(g_testApp.m_renderer.m_sessions[1], TESTAPP_DATA_MAGNUM); // declares idActiveApp
-                osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp).exit();
+                    break;
+                }
             }
-
-            break;
-        }
-        else
-        {
-            std::cout << "that doesn't do anything ._.\n";
+            else 
+            {
+                std::cout << "That command doesn't do anything ._." << std::endl;
+            }
         }
     }
 
@@ -416,11 +419,11 @@ void print_help()
         << "* list_pkg  - List Packages and Resources\n"
         << "* help      - Show this again\n"
         << "* reopen    - Re-open Magnum Application\n"
-        << "* exit      - Deallocate everything and return memory to OS\n";
+        << "* exit      - Deallocate everything and return memory to OS" << std::endl;
 }
 
 void print_resources()
 {
     // TODO: Add features to list resources in osp::Resources
-    std::cout << "Not yet implemented!\n";
+    std::cout << "Not yet implemented!" << std::endl;
 }
