@@ -66,7 +66,7 @@
 using namespace testapp;
 
 /**
- * @brief Starts a spaghetti REPL line interface that gets inputs from stdin
+ * @brief Starts a spaghetti REPL (Read Evaluate Print Loop) interface that gets inputs from standard in
  *
  * This interface can be used to run commands and load scenes
  */
@@ -326,10 +326,10 @@ void load_a_bunch_of_stuff()
         .args       ({                  idMainLoopCtrl})
         .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
     {
-        if (   ! rMainLoopCtrl.doUpdate
-            && ! rMainLoopCtrl.doSync
-            && ! rMainLoopCtrl.doResync
-            && ! rMainLoopCtrl.doRender)
+        if (!rMainLoopCtrl.doUpdate &&
+            !rMainLoopCtrl.doSync   &&
+            !rMainLoopCtrl.doResync &&
+            !rMainLoopCtrl.doRender   )
         {
             return osp::TaskAction::Cancel;
         }
@@ -351,7 +351,7 @@ void load_a_bunch_of_stuff()
     g_testApp.m_defaultPkg = rResources.pkg_create();
 
     // Load sturdy glTF files
-    const std::string_view datapath = {"OSPData/adera/"};
+    const std::string_view datapath = { "OSPData/adera/" };
     const std::vector<std::string_view> meshes =
     {
         "spamcan.sturdy.gltf",
@@ -397,16 +397,16 @@ void load_a_bunch_of_stuff()
 void debug_print_help()
 {
     std::size_t longestName = 0;
-    for (auto const& [name, rTestScn] : scenarios())
+    for (auto const& [rName, rScenerio] : scenarios())
     {
-        longestName = std::max(name.size(), longestName);
+        longestName = std::max(rName.size(), longestName);
     }
 
     std::cout
         << "OSP-Magnum Temporary Debug CLI\n"
         << "Open a scenario:\n";
 
-    for (auto const& [name, rTestScn] : scenarios())
+    for (auto const& [rName, rScenerio] : scenarios())
     {
         std::string spaces(longestName - rName.length(), ' ');
         std::cout << "* " << rName << spaces << " - " << rScenerio.m_description << "\n";
