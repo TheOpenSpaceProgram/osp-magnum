@@ -72,14 +72,14 @@ using namespace testapp;
  *
  * CLI -> Command line interface
  */
-void cli_loop(int argc, char** argv);
+void cli_loop(int& argc, char** argv);
 
 /**
  * @brief Starts Magnum application (MagnumApplication) thread g_magnumThread
  *
  * This initializes an OpenGL context, and opens the window
  */
-void start_magnum_async(int argc, char** argv);
+void start_magnum_async(int& argc, char** argv);
 
 /**
  * @brief As the name implies
@@ -169,7 +169,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
-void cli_loop(int argc, char** argv)
+void cli_loop(int& argc, char** argv)
 {
     print_help();
 
@@ -181,9 +181,10 @@ void cli_loop(int argc, char** argv)
         std::cin >> command;
 
         bool const magnumOpen = ! g_testApp.m_renderer.m_sessions.empty();
-        auto const it = scenarios().find(command);
+        
         // First check to see if command is the name of a scenario.
-        if (it != std::end(scenarios())) 
+        if (auto const it = scenarios().find(command); 
+            it != std::end(scenarios()))
         {
             if (magnumOpen)
             {
@@ -255,14 +256,13 @@ void cli_loop(int argc, char** argv)
     g_testApp.clear_resource_owners();
 }
 
-void start_magnum_async(int argc, char** argv)
+void start_magnum_async(int& argc, char** argv)
 {
     if (g_magnumThread.joinable())
     {
         g_magnumThread.join();
     }
     std::thread t([&] {
-
         osp::set_thread_logger(g_logMagnumApp);
 
         // Start Magnum application session

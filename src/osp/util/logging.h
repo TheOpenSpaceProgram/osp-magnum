@@ -33,7 +33,7 @@ using Logger_t = std::shared_ptr<spdlog::logger>;
 
 inline thread_local Logger_t t_logger; // Unique logger per thread
 
-inline void set_thread_logger(Logger_t const logger)
+inline void set_thread_logger(Logger_t logger)
 {
     t_logger = std::move(logger);
 }
