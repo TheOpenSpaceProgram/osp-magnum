@@ -261,7 +261,7 @@ void start_magnum_async(int& argc, char** argv)
     {
         g_magnumThread.join();
     }
-    std::thread t([&] {
+    std::thread t([&argc, argv] {
         osp::set_thread_logger(g_logMagnumApp);
 
         // Start Magnum application session
