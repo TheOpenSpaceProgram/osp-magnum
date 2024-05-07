@@ -66,7 +66,7 @@ Session setup_terrain(
     auto &rTerrainIco   = top_emplace< ACtxTerrainIco >  (topData, idTerrainIco);
 
     rBuilder.task()
-        .name       ("Initialize terrain when entering planet coordinate space")
+        .name       ("Initialize Terrain when entering planet coordinate space")
         .run_on     ({tgScn.update(Run)})
         .sync_with  ({tgTrn.terrainFrame(Modify)})
         .push_to    (out.m_tasks)
@@ -145,29 +145,24 @@ Session setup_terrain(
                 rSP.distanceThresholdUnsubdiv[level] = std::uint64_t(2.0f * subdivRadius);
             }
 
-            // TODO: just make this dynamically resizable
-
-
-            constexpr std::uint8_t chunkSubdivLevels = 4;
+            constexpr std::uint8_t chunkSubdivLevels = 3;
 
             rTerrain.skChunks = make_skeleton_chunks(chunkSubdivLevels);
             rTerrain.skChunks.chunk_reserve(300);
-            rTerrain.skChunks.shared_reserve(40000);
+            rTerrain.skChunks.shared_reserve(10000);
 
             auto const maxChunks     = rTerrain.skChunks.m_chunkIds.capacity();
             auto const maxSharedVrtx = rTerrain.skChunks.m_sharedIds.capacity();
 
             rTerrain.chunkInfo = make_chunked_mesh_info(rTerrain.skChunks, std::uint16_t(maxChunks), maxSharedVrtx);
-            rTerrain.chunkVbufPos           .resize(rTerrain.chunkInfo.vbufSize);
-            rTerrain.chunkVbufNrm           .resize(rTerrain.chunkInfo.vbufSize);
-            rTerrain.chunkIbuf              .resize(maxChunks * rTerrain.chunkInfo.chunkMaxFaceCount);
-            rTerrain.chunkFanNormalContrib  .resize(maxChunks * rTerrain.chunkInfo.fanExtraFaceCount);
-            rTerrain.sharedNormals          .resize(maxSharedVrtx, Vector3{0.0f, 0.0f, 0.0f});
-            rTerrain.chunkFillSharedNormals .resize(maxChunks * rTerrain.skChunks.m_chunkSharedCount);
+            rTerrain.chunkGeom.resize(rTerrain.skChunks, rTerrain.chunkInfo);
 
             rTerrain.chunkSP.lut = make_chunk_vrtx_subdiv_lut(chunkSubdivLevels);
             rTerrain.chunkSP.edgeVertices.resize((rTerrain.skChunks.m_chunkEdgeVrtxCount - 1) * 3);
             rTerrain.chunkSP.stitchCmds  .resize(rTerrain.skChunks.m_chunkIds.capacity(), {});
+
+            bitvector_resize(rTerrain.chunkSP.sharedAdded,  maxSharedVrtx);
+            bitvector_resize(rTerrain.chunkSP.sharedRemoved,  maxSharedVrtx);
             bitvector_resize(rTerrain.chunkSP.sharedNormalsDirty, maxSharedVrtx);
         }
     });
@@ -221,7 +216,7 @@ Session setup_terrain(
     });
 
     rBuilder.task()
-        .name       ("chunk stuff")
+        .name       ("Update Terrain Chunks")
         .run_on     ({tgScn.update(Run)})
         .sync_with  ({tgTrn.terrainFrame(Ready), tgTrn.skeleton(New), tgTrn.surfaceChanges(UseOrRun)})
         .push_to    (out.m_tasks)
@@ -239,19 +234,79 @@ Session setup_terrain(
         ChunkSkeleton           &rSkCh   = rTerrain.skChunks;
         ChunkedTriangleMeshInfo &rChInfo = rTerrain.chunkInfo;
 
+        dumdum = [&] {
+            static osp::KeyedVec<SharedVrtxId, Vector3> stupid;
+            stupid.resize(rSkCh.m_sharedIds.capacity());
+            std::fill(stupid.begin(), stupid.end(), Vector3{ZeroInit});
+            for (std::size_t const chunkInt : rSkCh.m_chunkIds.bitview().zeros())
+            {
+                auto const chunkId = ChunkId::from_index(chunkInt);
+                auto const sharedUsed = rSkCh.shared_vertices_used(chunkId);
+                auto const chunkFillNormalContrib2D = as_2d(arrayView(rTerrain.chunkGeom.chunkFillSharedNormals), rSkCh.m_chunkSharedCount);
+                auto const fillNormalContrib        = chunkFillNormalContrib2D.row(chunkId.value);
+
+                for (std::size_t i = 0; i < sharedUsed.size(); ++i)
+                {
+                    SharedVrtxId const shared = sharedUsed[i].value();
+                    if ( ! shared.has_value() )
+                    {
+                        break;
+                    }
+                    if (rSkCh.m_sharedIds.exists(shared))
+                    {
+                        stupid[shared] += fillNormalContrib[i];
+                    }
+                }
+
+                auto const chunkFanNormalContrib2D = as_2d(arrayView(rTerrain.chunkGeom.chunkFanNormalContrib), rChInfo.fanMaxSharedCount);
+                auto const fanNormalContrib        = chunkFanNormalContrib2D.row(chunkId.value);
+
+                for (FanNormalContrib &rContrib : fanNormalContrib)
+                {
+                    if ( ! rContrib.shared.has_value() )
+                    {
+                        break;
+                    }
+                    if (rSkCh.m_sharedIds.exists(rContrib.shared))
+                    {
+                        stupid[rContrib.shared] += rContrib.sum;
+                    }
+                }
+            }
+            for (std::size_t const sharedInt : rSkCh.m_sharedIds.bitview().zeros())
+            {
+                Vector3 owo = stupid[SharedVrtxId(sharedInt)];
+                Vector3 uwu = rTerrain.chunkGeom.sharedNormals[SharedVrtxId(sharedInt)];
+
+                auto pos = rTerrain.chunkGeom.chunkVbufPos[rTerrain.chunkInfo.vbufSharedOffset + sharedInt];
+
+                //LGRN_ASSERT((owo - uwu).length() < 0.04f);
+                if (!((owo - uwu).length() < 0.04f))
+                {
+                    std::cout << "bad vertex at: " << pos.x() << ", " << pos.y() << ", " << pos.z() << "\n";
+                }
+
+            }
+        };
+
+
+
+
         // Delete chunks of now-deleted Skeleton Triangles
         for (std::size_t const sktriInt : rSP.surfaceRemoved.ones())
         {
             auto    const sktriId = SkTriId(sktriInt);
             ChunkId const chunkId = rSkCh.m_triToChunk[sktriId];
 
-            // TODO: Subtract normal contributions
+            subtract_normal_contrib(chunkId, true, true, rTerrain.chunkGeom, rChInfo, rChSP, rSkCh);
 
-            rSkCh.chunk_remove(chunkId, sktriId, rTerrain.skTerrain.skel);
+            rSkCh.chunk_remove(chunkId, sktriId, rTerrain.chunkSP.sharedRemoved, rTerrain.skTerrain.skel);
+
         }
 
         auto const chLevel  = rSkCh.m_chunkSubdivLevel;
         auto const edgeSize = rSkCh.m_chunkEdgeVrtxCount-1;
+
 
         // Create new chunks for each new surface Skeleton Triangle added
         rSkCh.m_triToChunk.resize(rTerrain.skTerrain.skel.tri_group_ids().capacity() * 4);
@@ -269,7 +324,7 @@ Session setup_terrain(
             rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[1], corners[2], edgeBtm);
             rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[2], corners[0], edgeRte);
 
-            rSkCh.chunk_create(sktriId, rSkTrn.skel, rChSP.sharedNewlyAdded, edgeLft, edgeBtm, edgeRte);
+            ChunkId const chunkId = rSkCh.chunk_create(sktriId, rSkTrn.skel, rChSP.sharedAdded, edgeLft, edgeBtm, edgeRte);
 
             // chunk_create creates new Skeleton Vertices. Resize is needed after each call
             rSP.resize(rSkTrn);
@@ -284,29 +339,26 @@ Session setup_terrain(
         {
             auto const sktriId = SkTriId::from_index(sktriInt);
             auto const chunkId = rSkCh.m_triToChunk[SkTriId::from_index(sktriInt)];
-            chunkgen_restitch_check(chunkId, sktriId, rSkCh, rSkTrn, rChSP);
+            restitch_check(chunkId, sktriId, rSkCh, rSkTrn, rChSP);
         }
-
-        auto const to_vrtx = [offset = rChInfo.vbufSharedOffset] (SharedVrtxId in)
-        {
-            return VertexIdx( offset + std::uint32_t(in) );
-        };
 
         // Calculate shared vertex positions
         float const scalepow = std::pow(2.0f, -rSkTrn.scale);
-        for (SharedVrtxId sharedVrtx : rChSP.sharedNewlyAdded)
+        for (std::size_t const sharedVrtxInt : rChSP.sharedAdded.ones())
         {
-            SkVrtxId const skelVrtx = rSkCh.m_sharedToSkVrtx[sharedVrtx];
+            auto     const sharedVrtxId = SharedVrtxId::from_index(sharedVrtxInt);
+            SkVrtxId const skelVrtx     = rSkCh.m_sharedToSkVrtx[sharedVrtxId];
 
             //Vector3l const translated = positions[size_t(skelId)] + translaton;
             Vector3d  const scaled = Vector3d(rTerrain.skTerrain.positions[skelVrtx]) * scalepow;
-            VertexIdx const vertex = to_vrtx(sharedVrtx);
+            VertexIdx const vertex = rChInfo.vbufSharedOffset + sharedVrtxInt;
 
             // Heightmap goes here
-            rTerrain.chunkVbufPos[vertex] = Vector3(scaled);
-            rTerrain.chunkVbufNrm[vertex] = Vector3{0.0f, 0.0f, 0.0f};
+            rTerrain.chunkGeom.chunkVbufPos[vertex] = Vector3(scaled);
+
+            rTerrain.chunkGeom.sharedNormals[sharedVrtxId] = Vector3{ZeroInit};
         }
-        rChSP.sharedNewlyAdded.clear();
+
 
         // Calculate fill vertex positions
         for (std::size_t const sktriInt : rSP.surfaceAdded.ones())
@@ -323,10 +375,10 @@ Session setup_terrain(
                 std::size_t const vrtxB = rChSP.lut.index(sharedUsed, fillOffset, rChInfo.vbufSharedOffset, toSubdiv.m_vrtxB);
                 std::size_t const vrtxC = rChInfo.vbufFillOffset + rChInfo.fillVrtxCount*chunkIdInt + toSubdiv.m_fillOut.value;
 
-                Vector3 &rPosC = rTerrain.chunkVbufPos[vrtxC];
+                Vector3 &rPosC = rTerrain.chunkGeom.chunkVbufPos[vrtxC];
 
                 // Heightmap goes here
-                Vector3 const avg       = (rTerrain.chunkVbufPos[vrtxA] + rTerrain.chunkVbufPos[vrtxB]) / 2.0f;
+                Vector3 const avg       = (rTerrain.chunkGeom.chunkVbufPos[vrtxA] + rTerrain.chunkGeom.chunkVbufPos[vrtxB]) / 2.0f;
                 float   const avgLen    = avg.length();
                 float   const roundness = rTerrainIco.radius - avgLen;
 
@@ -335,42 +387,33 @@ Session setup_terrain(
         }
 
         // Fill index buffer (connect the dots with vertices) and calculate normals
-        for (unsigned int chunkInt = 0; chunkInt < rSkCh.m_chunkIds.capacity(); ++chunkInt)
+        for (std::size_t const chunkInt : rSkCh.m_chunkIds.bitview().zeros())
         {
             auto const chunkId = ChunkId::from_index(chunkInt);
-
-            if ( ! rSkCh.m_chunkIds.exists(chunkId) )
-            {
-                continue;
-            }
             SkTriId const sktriId    = rSkCh.m_chunkToTri[chunkId];
             bool    const newlyAdded = rSP.surfaceAdded.test(sktriId.value);
 
-            chunkgen_update_faces(
-                    chunkId,
-                    sktriId,
-                    newlyAdded,
-                    rTerrain.chunkIbuf,
-                    rTerrain.chunkVbufPos,
-                    rTerrain.chunkVbufNrm,
-                    rTerrain.sharedNormals.base(),
-                    rTerrain.chunkFillSharedNormals,
-                    rTerrain.chunkFanNormalContrib,
-                    rSkTrn,
-                    rChInfo,
-                    rChSP,
-                    rSkCh);
+            update_faces(chunkId, sktriId, newlyAdded, rTerrain.chunkGeom, rSkTrn, rChInfo, rChSP, rSkCh);
         }
         std::fill(rChSP.stitchCmds.begin(), rChSP.stitchCmds.end(), ChunkStitch{});
 
-        for (std::size_t const sharedIdx : rChSP.sharedNormalsDirty.ones())
-        {
-            Vector3 const normalSum = rTerrain.sharedNormals[SharedVrtxId(sharedIdx)];
-            rTerrain.chunkVbufNrm[rChInfo.vbufSharedOffset + sharedIdx] = normalSum.normalized();
-        }
-        rChSP.sharedNormalsDirty.reset();
+dumdum();
 
-        //chunkgen_debug_check_invariants(rTerrain.chunkIbuf, rTerrain.chunkVbufPos, rTerrain.chunkVbufNrm, rChInfo, rSkCh);
+        //for (std::size_t const sharedIdx : rChSP.sharedNormalsDirty.ones())
+        for (std::size_t sharedIdx = 0; sharedIdx < rChSP.sharedNormalsDirty.size(); ++sharedIdx)
+        if (rTerrain.skChunks.m_sharedIds.exists(SharedVrtxId(sharedIdx)))
+        {
+            SharedVrtxId const shared    = SharedVrtxId(sharedIdx);
+            Vector3      const normalSum = rTerrain.chunkGeom.sharedNormals[shared];
+            rTerrain.chunkGeom.chunkVbufNrm[rChInfo.vbufSharedOffset + sharedIdx] = normalSum.normalized();
+        }
+
+
+        rChSP.sharedNormalsDirty.reset();
+        rChSP.sharedAdded.reset();
+        rChSP.sharedRemoved.reset();
+
+        debug_check_invariants(rTerrain.chunkGeom, rChInfo, rSkCh);
 
         // TODO: temporary, write debug obj file every ~10 seconds
         static int fish = 0;
@@ -391,7 +434,7 @@ Session setup_terrain(
 
             std::ofstream objfile;
             objfile.open(filename);
-            chunkgen_write_obj(objfile, rTerrain.chunkIbuf, rTerrain.chunkVbufPos, rTerrain.chunkVbufNrm, rChInfo, rSkCh);
+            write_obj(objfile, rTerrain.chunkGeom, rChInfo, rSkCh);
         }
     });
 

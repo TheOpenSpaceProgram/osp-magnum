@@ -25,10 +25,14 @@
 #include "terrain_skeleton.h"
 #include "icosahedron.h"
 
-using osp::bitvector_resize;
+#include <ostream>
+
+using osp::Vector3;
 using osp::Vector3l;
 using osp::Vector3u;
-using osp::Vector3;
+using osp::arrayView;
+using osp::as_2d;
+using osp::bitvector_resize;
 
 namespace planeta
 {
@@ -64,6 +68,19 @@ void SubdivScratchpad::resize(TerrainSkeleton& rTrn)
         rTrn.positions.resize(vrtxCapacity);
         rTrn.normals  .resize(vrtxCapacity);
     }
+}
+
+void BasicTerrainGeometry::resize(ChunkSkeleton const& skCh, ChunkedTriangleMeshInfo const& info)
+{
+    auto const maxChunks     = skCh.m_chunkIds.capacity();
+    auto const maxSharedVrtx = skCh.m_sharedIds.capacity();
+
+    chunkVbufPos           .resize(info.vbufSize);
+    chunkVbufNrm           .resize(info.vbufSize);
+    chunkIbuf              .resize(maxChunks * info.chunkMaxFaceCount);
+    chunkFanNormalContrib  .resize(maxChunks * info.fanMaxSharedCount);
+    chunkFillSharedNormals .resize(maxChunks * skCh.m_chunkSharedCount, Vector3{osp::ZeroInit});
+    sharedNormals          .resize(maxSharedVrtx, Vector3{osp::ZeroInit});
 }
 
 void unsubdivide_select_by_distance(std::uint8_t const lvl, osp::Vector3l const pos, TerrainSkeleton const& rTrn, SubdivScratchpad& rSP)
@@ -684,7 +701,7 @@ void debug_check_invariants(TerrainSkeleton &rTrn)
 }
 
 
-void chunkgen_restitch_check(
+void restitch_check(
         ChunkId       const chunkId,
         SkTriId       const sktriId,
         ChunkSkeleton&      rSkCh,
@@ -698,10 +715,10 @@ void chunkgen_restitch_check(
     for (int selfEdgeIdx = 0; selfEdgeIdx < 3; ++selfEdgeIdx)
     {
         SkTriId const neighborId = neighbors[selfEdgeIdx];
-        if ( neighborId.has_value() )
+        if (neighborId.has_value())
         {
             ChunkId const neighborChunk = rSkCh.m_triToChunk[neighborId];
-            if ( neighborChunk.has_value() )
+            if (neighborChunk.has_value())
             {
                 // In cases where high-detail chunks were in sktriId's position previously,
                 // but were then unsubdivided and replaced with one low-detail chunk,
@@ -736,13 +753,34 @@ void chunkgen_restitch_check(
                 }
 
                 int  const neighborEdgeIdx = neighbor.find_neighbor_index(sktriId);
-                bool const neighborHasChunkedChildren
-                        =  rSkCh.m_triToChunk[tri_id(neighbor.children, neighborEdgeIdx) ]       .has_value()
-                        && rSkCh.m_triToChunk[tri_id(neighbor.children, (neighborEdgeIdx+1) % 3)].has_value();
+                ChunkId const childA = rSkCh.m_triToChunk[tri_id(neighbor.children, neighborEdgeIdx) ];
+                ChunkId const childB = rSkCh.m_triToChunk[tri_id(neighbor.children, (neighborEdgeIdx+1) % 3)];
 
-                if ( ! neighborHasChunkedChildren )
+                if ( ! (childA.has_value() && childB.has_value()) )
                 {
                     continue; // Both neighboring children are holes in the terrain
+                }
+
+                // Remove DetailX2 stitch from any of the children, in rare cases where there was
+                // previously a much higher detail chunk in sktriId's position.
+
+                // Just Repeating Yourself Already (JRYA). what, you want me to write a lambda?
+
+                ChunkStitch const childStitchA     = rSkCh.m_chunkStitch[childA];
+                ChunkStitch const childStitchB     = rSkCh.m_chunkStitch[childB];
+                ChunkStitch       &childStitchACmd = rChSP.stitchCmds[childA];
+                ChunkStitch       &childStitchBCmd = rChSP.stitchCmds[childB];
+
+                if ( ! childStitchACmd.enabled && childStitchA.detailX2
+                    && childStitchA.x2ownEdge == neighborEdgeIdx)
+                {
+                    childStitchACmd = {.enabled = true, .detailX2 = false};
+                }
+
+                if ( ! childStitchBCmd.enabled && childStitchB.detailX2
+                    && childStitchB.x2ownEdge == neighborEdgeIdx)
+                {
+                    childStitchBCmd = {.enabled = true, .detailX2 = false};
                 }
 
                 ownCmd = {
@@ -784,90 +822,64 @@ void chunkgen_restitch_check(
     rChSP.stitchCmds[chunkId] = ownCmd;
 }
 
-/*
-void chunkgen_create(SkTriId const sktriId,std::uint8_t  const chLevel,  ChunkSkeleton&      rSkCh, TerrainSkeleton&    rSkTrn, ChunkScratchpad&    rChSP)
-{
-    LGRN_ASSERTV(!rSkCh.m_triToChunk[sktriId].has_value(), sktriId.value);
-
-    auto const &tri = rSkTrn.skel.tri_at(sktriId);
-    auto const& corners = tri.vertices;
-
-    osp::ArrayView< MaybeNewId<SkVrtxId> > const edgeVrtxView = rChSP.edgeVertices;
-    osp::ArrayView< MaybeNewId<SkVrtxId> > const edgeLft = edgeVrtxView.sliceSize(edgeSize * 0, edgeSize);
-    osp::ArrayView< MaybeNewId<SkVrtxId> > const edgeBtm = edgeVrtxView.sliceSize(edgeSize * 1, edgeSize);
-    osp::ArrayView< MaybeNewId<SkVrtxId> > const edgeRte = edgeVrtxView.sliceSize(edgeSize * 2, edgeSize);
-
-    rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[0], corners[1], edgeLft);
-    rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[1], corners[2], edgeBtm);
-    rSkTrn.skel.vrtx_create_chunk_edge_recurse(chLevel, corners[2], corners[0], edgeRte);
-
-    ChunkId const chunk = rSkCh.chunk_create(sktriId, rSkTrn.skel, rChSP.sharedNewlyAdded, edgeLft, edgeBtm, edgeRte);
-
-    rChSP.stitchCmds[chunk] = {.enabled = true, .detailX2 = false};
-
-    rSP.resize(rSkTrn);
-
-    ico_calc_chunk_edge_recurse(rTerrainIco.radius, rSkTrn.scale, chLevel, corners[0], corners[1], edgeLft, rSkTrn.positions, rSkTrn.normals);
-    ico_calc_chunk_edge_recurse(rTerrainIco.radius, rSkTrn.scale, chLevel, corners[1], corners[2], edgeBtm, rSkTrn.positions, rSkTrn.normals);
-    ico_calc_chunk_edge_recurse(rTerrainIco.radius, rSkTrn.scale, chLevel, corners[2], corners[0], edgeRte, rSkTrn.positions, rSkTrn.normals);
-
-}
-
-*/
 
 struct TerrainFaceWriter
 {
     // 'iterators' used by ArrayView
     using IndxIt_t      = osp::Vector3u*;
     using FanNormalIt_t = osp::Vector3*;
-    using ContribIt_t   = SharedNormalContribution*;
+    using ContribIt_t   = FanNormalContrib*;
 
-    void emit_face(VertexIdx a, VertexIdx b, VertexIdx c) noexcept
+    void fill_add_face(VertexIdx a, VertexIdx b, VertexIdx c) noexcept
     {
-        Vector3 const u = vbufPos[b] - vbufPos[a];
-        Vector3 const v = vbufPos[c] - vbufPos[a];
+        fan_add_face(a, b, c);
+    }
+
+    void fill_add_normal_shared(VertexIdx const vertex, ChunkLocalSharedId const local)
+    {
+        SharedVrtxId const shared = sharedUsed[local.value];
+
+        fillNormalContrib[local.value]  += selectedFaceNormal;
+        sharedNormals    [shared.value] += selectedFaceNormal;
+
+        rSharedNormalsDirty.set(shared.value);
+    }
+
+    void fill_add_normal_filled(VertexIdx const vertex)
+    {
+        vbufNrm[vertex] += selectedFaceNormal;
+    }
+
+    void fan_add_face(VertexIdx a, VertexIdx b, VertexIdx c) noexcept
+    {
+        calculate_face_normal(a, b, c);
 
         selectedFaceIndx   = {a, b, c};
-        selectedFaceNormal = Magnum::Math::cross(u, v).normalized();
-
-        *currentFace       = selectedFaceIndx;
-
+        *currentFace = selectedFaceIndx;
         std::advance(currentFace, 1);
     }
 
-//    void add_normal_fill_vrtx(VertexIdx const vertex, bool const detailX2Half)
-//    {
-//        // All fill vertices have 6 connected faces
-//        // (just look at a picture of a triangular tiling)
-
-//        float const mul = detailX2Half ? (1.0f/12.0f) : (1.0f/6.0f);
-//        vbufNrm[vertex] += mul * prevFaceNormal;
-//    }
-
-    void add_normal_shared_vrtx(VertexIdx const vertex, SharedVrtxId const shared)
+    void fan_add_normal_shared(VertexIdx const vertex, SharedVrtxId const shared)
     {
-        std::uint8_t &rFaceCount = sharedFaceCount[shared.value];
-        rFaceCount ++;
-
         sharedNormals[shared.value] += selectedFaceNormal;
 
         // Record contributions to shared vertex normal, since this needs to be subtracted when
         // the associated chunk is removed or restitched.
 
-        // Find an existing SharedNormalContribution for the given shared vertex.
+        // Find an existing FanNormalContrib for the given shared vertex.
         // Since each triangle added is in contact with the previous triangle added, we only need
         // to linear-search the previous few (4) contributions added. We also need to consider the
         // first few (4), since the last triangle added will loop around and touch the start,
         // forming a ring of triangles.
         bool found = false;
-        SharedNormalContribution &rContrib = [this, shared, &found] () -> SharedNormalContribution&
+        FanNormalContrib &rContrib = [this, shared, &found] () -> FanNormalContrib&
         {
-            auto const matches = [shared] (SharedNormalContribution const& x) noexcept { return x.shared == shared; };
+            auto const matches = [shared] (FanNormalContrib const& x) noexcept { return x.shared == shared; };
 
-            ContribIt_t const searchAFirst = std::max<ContribIt_t>(std::prev(contribLast, 4), normalContrib.begin());
+            ContribIt_t const searchAFirst = std::max<ContribIt_t>(std::prev(contribLast, 4), fanNormalContrib.begin());
             ContribIt_t const searchALast  = contribLast;
-            ContribIt_t const searchBFirst = normalContrib.begin();
-            ContribIt_t const searchBLast  = std::min<ContribIt_t>(std::next(normalContrib.begin(), 4), searchAFirst);
+            ContribIt_t const searchBFirst = fanNormalContrib.begin();
+            ContribIt_t const searchBLast  = std::min<ContribIt_t>(std::next(fanNormalContrib.begin(), 4), searchAFirst);
 
             if (ContribIt_t const foundTemp = std::find_if(searchAFirst, searchALast, matches);
                 foundTemp != searchALast)
@@ -883,7 +895,7 @@ struct TerrainFaceWriter
                 return *foundTemp;
             }
 
-            LGRN_ASSERTM(std::none_of(searchALast, searchALast, matches), "search code above is broken XD");
+            LGRN_ASSERTM(std::none_of(fanNormalContrib.begin(), contribLast, matches), "search code above is broken XD");
 
             return *contribLast;
         }();
@@ -891,44 +903,42 @@ struct TerrainFaceWriter
         if ( ! found )
         {
             rContrib.shared = shared;
-            std::advance(contribLast, 1);
-            LGRN_ASSERT(contribLast != normalContrib.end());
+            rContrib.sum = Vector3{osp::ZeroInit};
             rSharedNormalsDirty.set(shared.value);
+            std::advance(contribLast, 1);
+            LGRN_ASSERT(contribLast != fanNormalContrib.end());
         }
 
         rContrib.sum += selectedFaceNormal;
-
-
-
-        // Add new face normal to the average
-//        Vector3 &rVrtxNormal = vbufNrm[vertex];
-//        rVrtxNormal = (rVrtxNormal * rFaceCount + prevFaceNormal) / (rFaceCount + 1);
-//        rFaceCount ++;
     }
 
-    osp::ArrayView<osp::Vector3 const>          vbufPos;
-    osp::ArrayView<std::uint8_t>                sharedFaceCount;
-    osp::ArrayView<osp::Vector3>                sharedNormals;
-    osp::ArrayView<SharedNormalContribution>    normalContrib;
+    void calculate_face_normal(VertexIdx a, VertexIdx b, VertexIdx c)
+    {
+        Vector3 const u = vbufPos[b] - vbufPos[a];
+        Vector3 const v = vbufPos[c] - vbufPos[a];
+        selectedFaceNormal = Magnum::Math::cross(u, v).normalized();
+    }
 
-    Vector3          selectedFaceNormal;
-    Vector3u         selectedFaceIndx;
-    IndxIt_t         currentFace;
-    ContribIt_t      contribLast;
-    osp::BitVector_t &rSharedNormalsDirty;
+    osp::ArrayView<osp::Vector3 const>  vbufPos;
+    osp::ArrayView<osp::Vector3>        vbufNrm;
+    osp::ArrayView<osp::Vector3>        sharedNormals;
+    osp::ArrayView<osp::Vector3>        fillNormalContrib;;
+    osp::ArrayView<FanNormalContrib>    fanNormalContrib;
+    osp::ArrayView<SharedVrtxOwner_t>   sharedUsed;
+
+    Vector3                 selectedFaceNormal;
+    Vector3u                selectedFaceIndx;
+    IndxIt_t                currentFace;
+    ContribIt_t             contribLast;
+    osp::BitVector_t        &rSharedNormalsDirty;
 };
 static_assert(CFaceWriter<TerrainFaceWriter>, "TerrainFaceWriter must satisfy concept CFaceWriter");
 
-void chunkgen_update_faces(
+void update_faces(
         ChunkId                            const chunkId,
         SkTriId                            const sktriId,
         bool                               const newlyAdded,
-        osp::ArrayView<osp::Vector3u>      const ibuf,
-        osp::ArrayView<osp::Vector3 const> const vbufPos,
-        osp::ArrayView<osp::Vector3>       const vbufNrm,
-        osp::ArrayView<osp::Vector3>       const sharedNormals,
-        osp::ArrayView<osp::Vector3>       const chunkFillSharedNormals,
-        osp::ArrayView<SharedNormalContribution> const chunkFanNormalContrib,
+        BasicTerrainGeometry                     &rGeom,
         TerrainSkeleton                    const &rSkTrn,
         ChunkedTriangleMeshInfo            const &rChInfo,
         ChunkScratchpad                          &rChSP,
@@ -936,117 +946,105 @@ void chunkgen_update_faces(
 {
     using namespace osp;
 
-    auto const ibufSlice         = as_2d(ibuf,                   rChInfo.chunkMaxFaceCount) .row(chunkId.value);
-    auto const fanNormalContrib  = as_2d(chunkFanNormalContrib,  rChInfo.fanExtraFaceCount) .row(chunkId.value);
-    auto const fillNormalContrib = as_2d(chunkFillSharedNormals, rSkCh.m_chunkSharedCount) .row(chunkId.value);
+    ChunkStitch const cmd = rChSP.stitchCmds[chunkId];
+
+    if ( ! newlyAdded && ! cmd.enabled )
+    {
+        return; // Nothing to do
+    }
+
+    auto const ibufSlice         = as_2d(arrayView(rGeom.chunkIbuf),              rChInfo.chunkMaxFaceCount).row(chunkId.value);
+    auto const fanNormalContrib  = as_2d(arrayView(rGeom.chunkFanNormalContrib),  rChInfo.fanMaxSharedCount).row(chunkId.value);
+    auto const fillNormalContrib = as_2d(arrayView(rGeom.chunkFillSharedNormals), rSkCh.m_chunkSharedCount) .row(chunkId.value);
     auto const sharedUsed        = rSkCh.shared_vertices_used(chunkId);
 
     TerrainFaceWriter writer{
-        .vbufPos             = vbufPos,
-        .sharedFaceCount     = rSkCh.m_sharedFaceCount.base(),
-        .sharedNormals       = sharedNormals,
-        .normalContrib       = fanNormalContrib,
+        .vbufPos             = rGeom.chunkVbufPos,
+        .vbufNrm             = rGeom.chunkVbufNrm,
+        .sharedNormals       = rGeom.sharedNormals.base(),
+        .fillNormalContrib   = fillNormalContrib,
+        .fanNormalContrib    = fanNormalContrib,
+        .sharedUsed          = sharedUsed,
         .currentFace         = ibufSlice.begin(),
         .contribLast         = fanNormalContrib.begin(),
         .rSharedNormalsDirty = rChSP.sharedNormalsDirty
     };
 
-    auto const add_fill_normal = [&sharedUsed, &fillNormalContrib, &sharedNormals, &rChSP, &vbufNrm]
-                                 (ChunkLocalSharedId const local, VertexIdx const vertex, Vector3 const faceNormal, bool const onEdge)
-    {
-        if (local.has_value())
-        {
-            if ( ! onEdge )
-            {
-                SharedVrtxId const shared = sharedUsed[local.value];
-
-                fillNormalContrib[local.value]  += faceNormal;
-                sharedNormals    [shared.value] += faceNormal;
-
-                rChSP.sharedNormalsDirty.set(shared.value);
-            }
-        }
-        else
-        {
-            vbufNrm[vertex] += faceNormal;
-        }
-    };
-
-    // top, left, right
-    auto const add_fill_tri = [&add_fill_normal, &rSkCh, &rChInfo, &writer, &vbufPos, chunkId]
-            (uint16_t const aX, uint16_t const aY,
-             uint16_t const bX, uint16_t const bY,
-             uint16_t const cX, uint16_t const cY,
-             bool const onEdge)
-    {
-        auto const [shLocalA, vrtxA] = chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, aX, aY);
-        auto const [shLocalB, vrtxB] = chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, bX, bY);
-        auto const [shLocalC, vrtxC] = chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, cX, cY);
-
-        Vector3 const u      = vbufPos[vrtxB] - vbufPos[vrtxA];
-        Vector3 const v      = vbufPos[vrtxC] - vbufPos[vrtxA];
-        Vector3 const normal = Magnum::Math::cross(u, v).normalized();
-
-        add_fill_normal(shLocalA, vrtxA, normal, onEdge);
-        add_fill_normal(shLocalB, vrtxB, normal, onEdge);
-        add_fill_normal(shLocalC, vrtxC, normal, onEdge);
-
-        if ( ! onEdge )
-        {
-            writer.emit_face(vrtxA, vrtxB, vrtxC);
-        }
-    };
-
-
+    // Create triangle fill for newly added triangles
     if (newlyAdded)
     {
         // Reset fill normals to zero, as values are left over from a previously deleted chunk
-        auto const fillNormals = as_2d(vbufNrm.exceptPrefix(rChInfo.vbufFillOffset), rChInfo.fillVrtxCount).row(chunkId.value);
-        std::fill(fillNormals.begin(),       fillNormals.end(),       Vector3{ZeroInit});
+        auto const chunkVbufFillNormals2D = as_2d(arrayView(rGeom.chunkVbufNrm).exceptPrefix(rChInfo.vbufFillOffset), rChInfo.fillVrtxCount);
+        auto const vbufFillNormals        = chunkVbufFillNormals2D.row(chunkId.value);
+
+        // These aren't cleaned up by the previous chunk that used them
+        std::fill(vbufFillNormals.begin(),   vbufFillNormals.end(),   Vector3{ZeroInit});
         std::fill(fillNormalContrib.begin(), fillNormalContrib.end(), Vector3{ZeroInit});
+        std::fill(fanNormalContrib.begin(), fanNormalContrib.end(),   FanNormalContrib{});
+
+        auto const add_fill_tri = [&rSkCh, &rChInfo, &writer, chunkId]
+                (uint16_t const aX, uint16_t const aY,
+                 uint16_t const bX, uint16_t const bY,
+                 uint16_t const cX, uint16_t const cY)
+        {
+            auto const [shLocalA, vrtxA] = chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, aX, aY);
+            auto const [shLocalB, vrtxB] = chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, bX, bY);
+            auto const [shLocalC, vrtxC] = chunk_coord_to_vrtx(rSkCh, rChInfo, chunkId, cX, cY);
+
+            writer.fill_add_face(vrtxA, vrtxB, vrtxC);
+
+            shLocalA.has_value() ? writer.fill_add_normal_shared(vrtxA, shLocalA)
+                                 : writer.fill_add_normal_filled(vrtxA);
+            shLocalB.has_value() ? writer.fill_add_normal_shared(vrtxB, shLocalB)
+                                 : writer.fill_add_normal_filled(vrtxB);
+            shLocalC.has_value() ? writer.fill_add_normal_shared(vrtxC, shLocalC)
+                                 : writer.fill_add_normal_filled(vrtxC);
+        };
 
         for (unsigned int y = 0; y < rSkCh.m_chunkEdgeVrtxCount; ++y)
         {
-            add_fill_tri(0, y,      0, y+1,     1, y+1,  true);
+            //add_fill_tri(0, y,      0, y+1,     1, y+1);
 
             for (unsigned int x = 0; x < y; ++x)
             {
                 // down-pointing
-                add_fill_tri(   x+1, y+1,      x+1, y,         x, y,        false);
+                add_fill_tri(   x+1, y+1,      x+1, y,         x, y   );
 
                 // up pointing
                 bool const onEdge = (x == y-1) || y == rSkCh.m_chunkEdgeVrtxCount - 1;
-                add_fill_tri(   x+1, y,        x+1, y+1,       x+2, y+1,    onEdge);
+                if ( ! onEdge )
+                {
+                    add_fill_tri(   x+1, y,        x+1, y+1,       x+2, y+1   );
+                }
             }
         }
 
-        LGRN_ASSERT(writer.currentFace == std::next(ibufSlice.begin(), rChInfo.fillFaceCount));
+        LGRN_ASSERTM(writer.currentFace == std::next(ibufSlice.begin(), rChInfo.fillFaceCount),
+                     "Code above must always add a known number of faces");
 
-        for (Vector3 &rNormal : fillNormals)
+        for (Vector3 &rNormal : vbufFillNormals)
         {
             rNormal = rNormal.normalized();
         }
     }
 
-    ChunkStitch const cmd = rChSP.stitchCmds[chunkId];
+    writer.currentFace = std::next(ibufSlice.begin(), rChInfo.fillFaceCount);
 
+    // Add or replace Fan triangles
     if (cmd.enabled)
     {
-        std::fill(fanNormalContrib.begin(), fanNormalContrib.end(), SharedNormalContribution{});
-
         ChunkStitch &rCurrentStitch = rSkCh.m_chunkStitch[chunkId];
-
         if (rCurrentStitch.enabled)
         {
-            // TODO: Subtract normal contributions, Delete previous stitch
+            // Delete previous fan stitch, Subtract normal contributions
+            subtract_normal_contrib(chunkId, false, true, rGeom, rChInfo, rChSP, rSkCh);
         }
         rSkCh.m_chunkStitch[chunkId] = cmd;
-
-        writer.currentFace = std::next(ibufSlice.begin(), rChInfo.fillFaceCount);
-
         ArrayView<SharedVrtxOwner_t const> detailX2Edge0;
         ArrayView<SharedVrtxOwner_t const> detailX2Edge1;
 
+        // For detailX2 stitches, get the 2 neighboring higher detail triangles,
+        // and get the rows of shared vertices along the edge in contact.
         if (cmd.detailX2)
         {
             SkTriId          const  neighborId = rSkTrn.skel.tri_at(sktriId).neighbors[cmd.x2ownEdge];
@@ -1106,21 +1104,84 @@ void chunkgen_update_faces(
             stitcher.corner <2, None>();
             stitcher.edge   <2, false>();
         }
+    }
 
-        std::fill(writer.currentFace, ibufSlice.end(), Vector3u{0, 0, 0});
+    // Fill remaining with zeros to indicate an early end if the full range isn't used
+    std::fill(writer.currentFace, ibufSlice.end(), Vector3u{ZeroInit});
+
+}
+
+void subtract_normal_contrib(
+        ChunkId                             chunkId,
+        bool const subtractFill,
+        bool const subtractFan,
+        BasicTerrainGeometry                &rGeom,
+        ChunkedTriangleMeshInfo       const &rChInfo,
+        ChunkScratchpad                     &rChSP,
+        ChunkSkeleton                       &rSkCh)
+{
+    using namespace osp;
+
+    // Subtract Fill shared vertex normal contributions
+    if ( subtractFill )
+    {
+        auto const chunkFillNormalContrib2D = as_2d(arrayView(rGeom.chunkFillSharedNormals), rSkCh.m_chunkSharedCount);
+        auto const fillNormalContrib        = chunkFillNormalContrib2D.row(chunkId.value);
+
+        auto const sharedUsed = rSkCh.shared_vertices_used(chunkId);
+
+        for (std::size_t i = 0; i < sharedUsed.size(); ++i)
+        {
+            SharedVrtxId const shared = sharedUsed[i].value();
+            if ( ! shared.has_value() )
+            {
+                break;
+            }
+
+            if (rSkCh.m_sharedIds.exists(shared) && ! rChSP.sharedRemoved.test(shared.value))
+            {
+                Vector3 const& contrib = fillNormalContrib[i];
+                Vector3 &rNormal = rGeom.sharedNormals[shared];
+                rNormal -= contrib;
+                rChSP.sharedNormalsDirty.set(shared.value);
+            }
+            fillNormalContrib[i] *= 0.0f;
+        }
+    }
+
+    // Subtract Fan shared vertex normal contributions
+    if ( subtractFan )
+    {
+        auto const chunkFanNormalContrib2D = as_2d(arrayView(rGeom.chunkFanNormalContrib), rChInfo.fanMaxSharedCount);
+        auto const fanNormalContrib        = chunkFanNormalContrib2D.row(chunkId.value);
+
+        LGRN_ASSERT(rSkCh.m_chunkStitch[chunkId].enabled);
+        for (FanNormalContrib &rContrib : fanNormalContrib)
+        {
+            if ( ! rContrib.shared.has_value() )
+            {
+                break;
+            }
+
+            if (rSkCh.m_sharedIds.exists(rContrib.shared) && ! rChSP.sharedRemoved.test(rContrib.shared.value))
+            {
+                Vector3 &rNormal = rGeom.sharedNormals[rContrib.shared];
+                rNormal -= rContrib.sum;
+                rChSP.sharedNormalsDirty.set(rContrib.shared.value);
+            }
+            rContrib.sum *= 0.0f;
+        }
     }
 }
 
-void chunkgen_debug_check_invariants(
-        osp::ArrayView<osp::Vector3u>      const ibuf,
-        osp::ArrayView<osp::Vector3 const> const vbufPos,
-        osp::ArrayView<osp::Vector3 const> const vbufNrm,
+void debug_check_invariants(
+        BasicTerrainGeometry               const &rGeom,
         ChunkedTriangleMeshInfo            const &rChInfo,
         ChunkSkeleton                      const &rSkCh)
 {
     auto const check_vertex = [&] (VertexIdx vertex, SharedVrtxId sharedId, ChunkId chunkId)
     {
-        Vector3 const normal = vbufNrm[vertex];
+        Vector3 const normal = rGeom.chunkVbufNrm[vertex];
         float   const length = normal.length();
 
         LGRN_ASSERTMV(std::abs(length - 1.0f) < 0.05f, "Normal isn't normalized", length, vertex, sharedId.value, chunkId.value);
@@ -1143,11 +1204,9 @@ void chunkgen_debug_check_invariants(
     }
 }
 
-void chunkgen_write_obj(
+void write_obj(
         std::ostream                             &rStream,
-        osp::ArrayView<osp::Vector3u>      const ibuf,
-        osp::ArrayView<osp::Vector3 const> const vbufPos,
-        osp::ArrayView<osp::Vector3 const> const vbufNrm,
+        BasicTerrainGeometry               const &rGeom,
         ChunkedTriangleMeshInfo            const &rChInfo,
         ChunkSkeleton                      const &rSkCh)
 {
@@ -1160,19 +1219,19 @@ void chunkgen_write_obj(
 
     rStream << "o Planet\n";
 
-    for (Vector3 v : vbufPos)
+    for (Vector3 v : rGeom.chunkVbufPos)
     {
         rStream << "v " << v.x() << " " << v.y() << " "  << v.z() << "\n";
     }
 
-    for (Vector3 v : vbufNrm)
+    for (Vector3 v : rGeom.chunkVbufNrm)
     {
         rStream << "vn " << v.x() << " " << v.y() << " "  << v.z() << "\n";
     }
 
     for (std::size_t const chunkIdInt : rSkCh.m_chunkIds.bitview().zeros())
     {
-        auto const view = ibuf.sliceSize(chunkIdInt * rChInfo.chunkMaxFaceCount, rChInfo.chunkMaxFaceCount);
+        auto const view = as_2d(arrayView(rGeom.chunkIbuf), rChInfo.chunkMaxFaceCount).row(chunkIdInt);
 
         for (osp::Vector3u const faceIdx : view)
         {

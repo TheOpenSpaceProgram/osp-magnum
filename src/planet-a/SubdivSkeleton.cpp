@@ -259,8 +259,8 @@ void SubdivTriangleSkeleton::tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri)
 
 ChunkId ChunkSkeleton::chunk_create(
         SkTriId                               const sktriId,
-        SubdivTriangleSkeleton&                     rSkel,
-        std::vector<SharedVrtxId>&                  rNewSharedIds,
+        SubdivTriangleSkeleton                      &rSkel,
+        osp::BitVector_t                            &rSharedAdded,
         osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeLft,
         osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeBtm,
         osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeRte)
@@ -269,12 +269,12 @@ ChunkId ChunkSkeleton::chunk_create(
                 && edgeBtm.size() == m_chunkEdgeVrtxCount - 1
                 && edgeRte.size() == m_chunkEdgeVrtxCount - 1 );
 
-    auto const own_shared_from_skvrtx = [this, &rSkel, &rNewSharedIds] (SkVrtxId const vrtx) -> SharedVrtxOwner_t
+    auto const own_shared_from_skvrtx = [this, &rSkel, &rSharedAdded] (SkVrtxId const vrtx) -> SharedVrtxOwner_t
     {
         MaybeNewId<SharedVrtxId> const shared = shared_get_or_create(vrtx, rSkel);
         if (shared.isNew)
         {
-            rNewSharedIds.emplace_back(shared.id);
+            rSharedAdded.set(shared.id.value);
         }
         return shared_store(shared.id);
     };
@@ -310,16 +310,25 @@ ChunkId ChunkSkeleton::chunk_create(
     return chunkId;
 }
 
-void ChunkSkeleton::chunk_remove(ChunkId const chunkId, SkTriId const sktriId, SubdivTriangleSkeleton& rSkel) noexcept
+void ChunkSkeleton::chunk_remove(
+        ChunkId                const chunkId,
+        SkTriId                const sktriId,
+        osp::BitVector_t             &rSharedRemoved,
+        SubdivTriangleSkeleton       &rSkel) noexcept
 {
     for (SharedVrtxOwner_t& rOwner : shared_vertices_used(chunkId))
     {
-        shared_release(std::exchange(rOwner, {}), rSkel);
+        SharedVrtxId const shared = rOwner.value();
+        auto const status = shared_release(std::exchange(rOwner, {}), rSkel);
+        if (status.refCount == 0)
+        {
+            rSharedRemoved.set(shared.value);
+        }
     }
     m_triToChunk[sktriId] = {};
     m_chunkToTri[chunkId] = {};
     m_chunkIds.remove(chunkId);
-    //rSkel.tri_release(std::exchange(m_chunkToTri[chunkId], {}));
+    m_chunkStitch[chunkId].enabled = false;
 }
 
 
@@ -334,8 +343,7 @@ MaybeNewId<SharedVrtxId> ChunkSkeleton::shared_get_or_create(SkVrtxId const skVr
     {
         rShared = m_sharedIds.create();
         LGRN_ASSERTM(rShared.has_value(), "Exceeded max shared vertices!");
-        m_sharedFaceCount[rShared] = 0;
-        m_sharedToSkVrtx [rShared] = rSkel.vrtx_store(skVrtxId);
+        m_sharedToSkVrtx[rShared] = rSkel.vrtx_store(skVrtxId);
     }
 
     return {rShared, makeNewId};

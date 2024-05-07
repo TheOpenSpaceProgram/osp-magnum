@@ -27,6 +27,10 @@
 #include <osp/core/bitvector.h>
 #include <osp/core/math_int64.h>
 
+#include <functional>
+
+inline std::function<void()> dumdum;
+
 #include "SubdivSkeleton.h"
 #include "SubdivTriangleMesh.h"
 
@@ -126,7 +130,9 @@ struct ChunkScratchpad
     osp::KeyedVec<ChunkId, ChunkStitch> stitchCmds;
 
     /// Newly added shared vertices, position needs to be copied from skeleton
-    std::vector<SharedVrtxId>    sharedNewlyAdded;
+    osp::BitVector_t    sharedAdded;
+
+    osp::BitVector_t    sharedRemoved;
 
     std::vector< MaybeNewId<SkVrtxId> > edgeVertices;
 
@@ -140,10 +146,28 @@ struct ChunkScratchpad
  * When a chunk is deleted, it needs subtract face normals of all of its deleted faces from all
  * connected shared vertices.
  */
-struct SharedNormalContribution
+struct FanNormalContrib
 {
     SharedVrtxId shared;
     osp::Vector3 sum{osp::ZeroInit};
+};
+
+struct BasicTerrainGeometry
+{
+    void resize(ChunkSkeleton const& skCh, ChunkedTriangleMeshInfo const& info);
+
+    std::vector<osp::Vector3>           chunkVbufPos;
+    std::vector<osp::Vector3>           chunkVbufNrm;
+    std::vector<osp::Vector3u>          chunkIbuf;
+
+    /// 2D, each row is
+    std::vector<planeta::FanNormalContrib>              chunkFanNormalContrib;
+
+    /// parallel with skChunks.m_chunkSharedUsed
+    std::vector<osp::Vector3>                           chunkFillSharedNormals;
+
+    /// Non-normalized sum of face normals of connected faces
+    osp::KeyedVec<planeta::SharedVrtxId, osp::Vector3>  sharedNormals;
 };
 
 /**
@@ -189,36 +213,35 @@ void calc_sphere_tri_center(SkTriGroupId const groupId, TerrainSkeleton& rTrn, f
  */
 void debug_check_invariants(TerrainSkeleton &rTrn);
 
+void restitch_check(ChunkId chunkId, SkTriId sktriId, ChunkSkeleton& rSkCh, TerrainSkeleton& rSkTrn, ChunkScratchpad& rChSP);
 
-void chunkgen_restitch_check(ChunkId chunkId, SkTriId sktriId, ChunkSkeleton& rSkCh, TerrainSkeleton& rSkTrn, ChunkScratchpad& rChSP);
-
-void chunkgen_update_faces(
+void update_faces(
         ChunkId                             chunkId,
         SkTriId                             sktriId,
         bool                                newlyAdded,
-        osp::ArrayView<osp::Vector3u>       ibuf,
-        osp::ArrayView<osp::Vector3 const>  vbufPos,
-        osp::ArrayView<osp::Vector3>        vbufNrm,
-        osp::ArrayView<osp::Vector3>        sharedNormals,
-        osp::ArrayView<osp::Vector3>        chunkFillSharedNormals,
-        osp::ArrayView<SharedNormalContribution> chunkFanNormalContrib,
+        BasicTerrainGeometry                &rGeom,
         TerrainSkeleton               const &rSkTrn,
         ChunkedTriangleMeshInfo       const &rChInfo,
         ChunkScratchpad                     &rChSP,
         ChunkSkeleton                       &rSkCh);
 
-void chunkgen_debug_check_invariants(
-        osp::ArrayView<osp::Vector3u>            ibuf,
-        osp::ArrayView<osp::Vector3 const>       vbufPos,
-        osp::ArrayView<osp::Vector3 const>       vbufNrm,
+void subtract_normal_contrib(
+        ChunkId                             chunkId,
+        bool const subtractFill,
+        bool const subtractFan,
+        BasicTerrainGeometry                &rGeom,
+        ChunkedTriangleMeshInfo       const &rChInfo,
+        ChunkScratchpad                     &rChSP,
+        ChunkSkeleton                       &rSkCh);
+
+void debug_check_invariants(
+        BasicTerrainGeometry               const &rGeom,
         ChunkedTriangleMeshInfo            const &rChInfo,
         ChunkSkeleton                      const &rSkCh);
 
-void chunkgen_write_obj(
+void write_obj(
         std::ostream                             &rStream,
-        osp::ArrayView<osp::Vector3u>            ibuf,
-        osp::ArrayView<osp::Vector3 const>       vbufPos,
-        osp::ArrayView<osp::Vector3 const>       vbufNrm,
+        BasicTerrainGeometry               const &rGeom,
         ChunkedTriangleMeshInfo            const &rChInfo,
         ChunkSkeleton                      const &rSkCh);
 

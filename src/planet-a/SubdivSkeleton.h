@@ -24,10 +24,11 @@
  */
 #pragma once
 
-#include <osp/core/math_2pow.h>
 #include <osp/core/array_view.h>
+#include <osp/core/bitvector.h>
 #include <osp/core/copymove_macros.h>
 #include <osp/core/keyed_vector.h>
+#include <osp/core/math_2pow.h>
 #include <osp/core/strong_id.h>
 
 #include <longeron/id_management/registry_stl.hpp>
@@ -223,13 +224,12 @@ private:
 
 //-----------------------------------------------------------------------------
 
-enum class SkVrtxId : uint32_t {};
+
 
 class SubdivTriangleSkeleton;
+using SkVrtxId      = osp::StrongId<std::uint32_t, struct DummyForSkVrtxId>;
 
 using SkVrtxOwner_t = lgrn::IdOwner<SkVrtxId, SubdivTriangleSkeleton>;
-
-//-----------------------------------------------------------------------------
 
 using SkTriId      = osp::StrongId<std::uint32_t, struct DummyForSkTriId>;
 using SkTriGroupId = osp::StrongId<std::uint32_t, struct DummyForSkTriGroupId>;
@@ -675,13 +675,13 @@ public:
 
     ChunkId chunk_create(
             SkTriId                                 sktriId,
-            SubdivTriangleSkeleton&                 rSkel,
-            std::vector<SharedVrtxId>&              rNewSharedIds,
+            SubdivTriangleSkeleton                  &rSkel,
+            osp::BitVector_t                        &rSharedAdded,
             osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeLft,
             osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeBtm,
             osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeRte);
 
-    void chunk_remove(ChunkId chunkId, SkTriId sktriId, SubdivTriangleSkeleton& rSkel) noexcept;
+    void chunk_remove(ChunkId chunkId, SkTriId sktriId, osp::BitVector_t &rSharedRemoved, SubdivTriangleSkeleton& rSkel) noexcept;
 
     /**
      * @brief Get shared vertices used by a chunk
@@ -714,7 +714,6 @@ public:
     {
         m_sharedIds         .reserve(size);
         m_sharedToSkVrtx    .resize(m_sharedIds.capacity());
-        m_sharedFaceCount   .resize(m_sharedIds.capacity());
     }
 
     SharedVrtxOwner_t shared_store(SharedVrtxId const triId)
@@ -722,12 +721,18 @@ public:
         return m_sharedRefCount.ref_add(triId);
     }
 
-    void shared_release(SharedVrtxOwner_t&& rStorage, SubdivTriangleSkeleton &rSkel) noexcept
+    struct ReleaseStatus
+    {
+        std::uint16_t refCount;
+    };
+
+    ReleaseStatus shared_release(SharedVrtxOwner_t&& rStorage, SubdivTriangleSkeleton &rSkel) noexcept
     {
         SharedVrtxId const sharedId = rStorage.value();
         m_sharedRefCount.ref_release(std::move(rStorage));
+        auto const refCount    = m_sharedRefCount[sharedId.value];
 
-        if (m_sharedRefCount[sharedId.value] == 0)
+        if (refCount == 0)
         {
             SkVrtxOwner_t skvrtxOwner = std::exchange(m_sharedToSkVrtx[sharedId], {});
             m_skVrtxToShared[skvrtxOwner.value()] = {};
@@ -735,6 +740,8 @@ public:
             rSkel.vrtx_release(std::move(skvrtxOwner));
             m_sharedIds.remove(sharedId);
         }
+
+        return ReleaseStatus{refCount};
     }
 
     /**
@@ -764,9 +771,6 @@ public:
     lgrn::IdRefCount<SharedVrtxId>          m_sharedRefCount;
 
     osp::KeyedVec<SharedVrtxId, SkVrtxOwner_t> m_sharedToSkVrtx;
-
-    /// Connected face count used for vertex normal calculations
-    osp::KeyedVec<SharedVrtxId, uint8_t>    m_sharedFaceCount;
     osp::KeyedVec<SkVrtxId, SharedVrtxId>   m_skVrtxToShared;
 
 }; // class ChunkSkeleton

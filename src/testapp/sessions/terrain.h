@@ -37,9 +37,15 @@
 namespace testapp::scenes
 {
 
+/**
+ * @brief Scene orientation relative to planet center
+ *
+ * This is intended to be modified by a system responsible for handling floating origin and
+ * the Scene's position within a universe.
+ */
 struct ACtxTerrainFrame
 {
-    osp::Vector3l       position; ///< Position relative to planet's center
+    osp::Vector3l       position;
     osp::Quaterniond    rotation;
     bool                active      {false};
 };
@@ -47,25 +53,16 @@ struct ACtxTerrainFrame
 
 struct ACtxTerrain
 {
+    // 'Skeleton' used for managing instances and relationships between vertices, triangles, and
+    // chunks. These are all integer IDs that can be parented, connected, neighboring, etc...
     planeta::TerrainSkeleton            skTerrain;
     planeta::ChunkSkeleton              skChunks;
-    planeta::SubdivScratchpad           scratchpad;
 
     planeta::ChunkedTriangleMeshInfo    chunkInfo;
+    planeta::BasicTerrainGeometry       chunkGeom;
+
     planeta::ChunkScratchpad            chunkSP;
-
-    std::vector<osp::Vector3>           chunkVbufPos;
-    std::vector<osp::Vector3>           chunkVbufNrm;
-    std::vector<osp::Vector3u>          chunkIbuf;
-
-    /// 2D, each row is
-    std::vector<planeta::SharedNormalContribution> chunkFanNormalContrib;
-
-    /// parallel with skChunks.m_chunkSharedUsed
-    std::vector<osp::Vector3>  chunkFillSharedNormals;
-
-    /// Non-normalized sum of face normals of connected faces
-    osp::KeyedVec<planeta::SharedVrtxId, osp::Vector3>  sharedNormals;
+    planeta::SubdivScratchpad           scratchpad;
 };
 
 struct ACtxTerrainIco
