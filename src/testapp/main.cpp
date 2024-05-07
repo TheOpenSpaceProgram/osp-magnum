@@ -192,11 +192,11 @@ void cli_loop(int& argc, char** argv)
                 //       its still running.
                 //       ie. Message it to destroy its GL resources and draw
                 //           function, then load new scene
-                std::cout << "Close application before opening new scene" << std::endl;
+                std::cout << "Close application before opening new scene\n";
             }
             else
             {
-                std::cout << "Loading scene: " << it->first << std::endl;
+                std::cout << "Loading scene: " << it->first << "\n";
 
                 // Close existing scene first
                 if ( ! g_testApp.m_scene.m_sessions.empty() )
@@ -220,17 +220,16 @@ void cli_loop(int& argc, char** argv)
             {
                 if (magnumOpen)
                 {
-                    std::cout << "Application is already open" << std::endl;
+                    std::cout << "Application is already open\n";
                 }
                 else if (g_testApp.m_rendererSetup == nullptr)
                 {
-                    std::cout << "No existing scene loaded" << std::endl;
+                    std::cout << "No existing scene loaded\n";
                 }
                 else
                 {
                     start_magnum_async(argc, argv);
                 }
-                break;
             }
             else if (command == "list_pkg") 
             {
@@ -248,7 +247,7 @@ void cli_loop(int& argc, char** argv)
             }
             else 
             {
-                std::cout << "That command doesn't do anything ._." << std::endl;
+                std::cout << "That command doesn't do anything ._.\n";
             }
         }
     }
@@ -328,10 +327,10 @@ void load_a_bunch_of_stuff()
         .args       ({                  idMainLoopCtrl})
         .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
     {
-        if ( ! rMainLoopCtrl.doUpdate &&
-             ! rMainLoopCtrl.doSync   &&
-             ! rMainLoopCtrl.doResync &&
-             ! rMainLoopCtrl.doRender   )
+        if (   ! rMainLoopCtrl.doUpdate
+            && ! rMainLoopCtrl.doSync
+            && ! rMainLoopCtrl.doResync
+            && ! rMainLoopCtrl.doRender)
         {
             return osp::TaskAction::Cancel;
         }
@@ -419,11 +418,11 @@ void print_help()
         << "* list_pkg  - List Packages and Resources\n"
         << "* help      - Show this again\n"
         << "* reopen    - Re-open Magnum Application\n"
-        << "* exit      - Deallocate everything and return memory to OS" << std::endl;
+        << "* exit      - Deallocate everything and return memory to OS\n";
 }
 
 void print_resources()
 {
     // TODO: Add features to list resources in osp::Resources
-    std::cout << "Not yet implemented!" << std::endl;
+    std::cout << "Not yet implemented!\n";
 }
