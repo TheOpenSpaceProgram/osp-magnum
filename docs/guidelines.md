@@ -145,6 +145,7 @@ Examples:
 * `variableName` - Regular variable
 * `rVariableName` - Reference
 * `m_pVariableName` - Member variable that's a pointer
+* `gc_variableName` - Global constant
 
 #### Type Aliases
 
