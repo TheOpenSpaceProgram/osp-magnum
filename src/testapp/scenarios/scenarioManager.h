@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright Â© 2019-2021 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,47 +22,48 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
 
-#include "identifiers.h"
-#include "testapp.h"
-
-// IWYU pragma: begin_exports
-#include <osp/tasks/top_utils.h>
-// IWYU pragma: end_exports
-
-#include <unordered_map>
+#include "scenarios.h"
 
 namespace testapp
 {
 
-namespace scenes
+/*
+* @brief
+*/
+class ScenarioManager
 {
-    using enum EStgOptn;
-    using enum EStgCont;
-    using enum EStgIntr;
-    using enum EStgRevd;
-    using enum EStgEvnt;
-    using enum EStgFBO;
-    using enum EStgLink;
+public:
+	/*
+	*/
+	ScenarioManager(ScenarioManager const&) = delete;
+
+	/*
+	*/
+	void operator=(ScenarioManager const&) = delete;
+
+	/*
+	*/
+	static ScenarioManager get();
+
+	/*
+	*/
+	bool has_scenario(const std::string& scenarioName);
+
+	/*
+	*/
+	Scenario get_scenario(const std::string& scenarioName);
+
+	/*
+	*/
+	void add_scenario(const Scenario& scenario);
+
+private:
+	/*
+	*/
+    ScenarioManager() = default;
+
+	std::vector<Scenario> m_scenarios;
+};
+
 }
-
-struct MainLoopControl
-{
-    bool doUpdate;
-    bool doSync;
-    bool doResync;
-    bool doRender;
-};
-
-struct ScenarioOption
-{
-    std::string_view m_description;
-    SceneSetupFunc_t m_setup;
-};
-
-using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
-
-ScenarioMap_t const& scenarios();
-
-} // namespace testapp

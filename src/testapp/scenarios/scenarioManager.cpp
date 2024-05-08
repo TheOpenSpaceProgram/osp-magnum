@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright � 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -22,38 +22,44 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
 
-#include "../scenarios/scenarios.h"
+#include "scenarioManager.h"
 
-#include <adera/activescene/VehicleBuilder.h>
-
-#include <osp/core/copymove_macros.h>
-#include <osp/core/keyed_vector.h>
-#include <osp/core/global_id.h>
-#include <osp/core/strong_id.h>
-
-#include <memory>
-
-namespace testapp::scenes
+namespace testapp
 {
 
-using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
-using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
-
-struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
+ScenarioManager ScenarioManager::get() 
 {
-    PrebuiltVehicles() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
-};
+    static ScenarioManager instance;
+    return instance;
+}
 
-inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
+bool ScenarioManager::has_scenario(const std::string &scenarioName) 
+{
+    for (auto& scenario : m_scenarios) {
+        if (scenario.m_name == scenarioName) {
+            return true;
+        }
+    }
 
-osp::Session setup_prebuilt_vehicles(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         scene);
+    return false;
+}
+
+Scenario ScenarioManager::get_scenario(const std::string& scenarioName) 
+{
+    for (auto& scenario : m_scenarios) {
+        if (scenario.m_name == scenarioName) {
+            return scenario;
+        }
+    }
+
+    OSP_LOG_ERROR("Failed to find scenario with the name: " + scenarioName);
+
+    return Scenario{ 
+        "Failed Scenario", "This scenario was returned because \
+        there was no scenario with the given name: " + scenarioName, nullptr };
+}
 
 
-} // namespace testapp::scenes
+
+}

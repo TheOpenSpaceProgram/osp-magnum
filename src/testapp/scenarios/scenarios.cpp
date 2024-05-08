@@ -24,21 +24,21 @@
  */
 
 #include "scenarios.h"
-#include "enginetest.h"
-#include "identifiers.h"
+#include "../enginetest.h"
+#include "../identifiers.h"
 
-#include "sessions/common.h"
-#include "sessions/magnum.h"
-#include "sessions/misc.h"
-#include "sessions/newton.h"
-#include "sessions/physics.h"
-#include "sessions/shapes.h"
-#include "sessions/universe.h"
-#include "sessions/vehicles.h"
-#include "sessions/vehicles_machines.h"
-#include "sessions/vehicles_prebuilt.h"
+#include "../sessions/common.h"
+#include "../sessions/magnum.h"
+#include "../sessions/misc.h"
+#include "../sessions/newton.h"
+#include "../sessions/physics.h"
+#include "../sessions/shapes.h"
+#include "../sessions/universe.h"
+#include "../sessions/vehicles.h"
+#include "../sessions/vehicles_machines.h"
+#include "../sessions/vehicles_prebuilt.h"
 
-#include "MagnumApplication.h"
+#include "../MagnumApplication.h"
 
 #include <adera/activescene/vehicles_vb_fn.h>
 
@@ -67,18 +67,18 @@ static constexpr auto   sc_matFlat          = draw::MaterialId(1);
 static constexpr auto   sc_matPhong         = draw::MaterialId(2);
 static constexpr int    sc_materialCount    = 4;
 
+void add_scenario(ScenarioMap_t& rScenarioMap, std::string_view name, std::string_view desc, SceneSetupFunc_t run)
+{
+    rScenarioMap.emplace(name, ScenarioOption{ desc, run });
+}
+
 static ScenarioMap_t make_scenarios()
 {   
     ScenarioMap_t scenarioMap;
 
     register_stage_enums();
 
-    auto const add_scenario = [&scenarioMap] (std::string_view name, std::string_view desc, SceneSetupFunc_t run)
-    {
-        scenarioMap.emplace(name, ScenarioOption{desc, run});
-    };
-
-    add_scenario("enginetest", "Simple rotating cube scenario without using Pipelines/Tasks",
+    add_scenario(scenarioMap, "enginetest", "Simple rotating cube scenario without using Pipelines/Tasks",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
         // Declares idResources TopDataId variable, obtained from Session m_application.m_data[0].
@@ -126,7 +126,7 @@ static ScenarioMap_t make_scenarios()
 
     static constexpr auto sc_gravityForce = Vector3{0.0f, 0.0f, -9.81f};
 
-    add_scenario("physics", "Newton Dynamics integration test scenario",
+    add_scenario(scenarioMap, "physics", "Newton Dynamics integration test scenario",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
         #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, newton, nwtGravSet, nwtGrav, physShapesNwt
@@ -192,7 +192,7 @@ static ScenarioMap_t make_scenarios()
         return setup_renderer;
     });
 
-    add_scenario("vehicles", "Physics scenario but with Vehicles",
+    add_scenario(scenarioMap, "vehicles", "Physics scenario but with Vehicles",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
         #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, newton, nwtGravSet, nwtGrav, physShapesNwt, \
@@ -297,7 +297,7 @@ static ScenarioMap_t make_scenarios()
         return setup_renderer;
     });
 
-    add_scenario("universe", "Universe test scenario with very unrealistic planets",
+    add_scenario(scenarioMap, "universe", "Universe test scenario with very unrealistic planets",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
         #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, newton, nwtGravSet, nwtGrav, physShapesNwt, uniCore, uniScnFrame, uniTestPlanets
@@ -373,15 +373,13 @@ static ScenarioMap_t make_scenarios()
     return scenarioMap;
 }
 
-ScenarioMap_t const& scenarios()
+ScenarioMap_t const& get_scenarios()
 {
     static ScenarioMap_t s_scenarioMap = make_scenarios();
     return s_scenarioMap;
 }
 
-
 //-----------------------------------------------------------------------------
-
 
 struct MainLoopSignals
 {

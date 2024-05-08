@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 #include "common.h"
-#include "../scenarios.h"
+#include "../scenarios/scenarios.h"
 
 #include <adera/drawing/CameraController.h>
 #include <osp/activescene/basic_fn.h>

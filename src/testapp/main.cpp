@@ -25,7 +25,7 @@
 
 #include "MagnumApplication.h"
 #include "testapp.h"
-#include "scenarios.h"
+#include "scenarios/scenarios.h"
 #include "identifiers.h"
 #include "sessions/common.h"
 #include "sessions/magnum.h"
@@ -141,8 +141,8 @@ int main(int argc, char** argv)
 
     if(args.value("scene") != "none")
     {
-        auto const it = scenarios().find(args.value("scene"));
-        if(it == std::end(scenarios()))
+        auto const it = get_scenarios().find(args.value("scene"));
+        if(it == std::end(get_scenarios()))
         {
             OSP_LOG_ERROR("unknown scene");
             g_testApp.clear_resource_owners();
@@ -183,8 +183,8 @@ void cli_loop(int& argc, char** argv)
         bool const magnumOpen = ! g_testApp.m_renderer.m_sessions.empty();
         
         // First check to see if command is the name of a scenario.
-        if (auto const it = scenarios().find(command); 
-            it != std::end(scenarios()))
+        if (auto const it = get_scenarios().find(command); 
+            it != std::end(get_scenarios()))
         {
             if (magnumOpen)
             {
@@ -399,7 +399,7 @@ void load_a_bunch_of_stuff()
 void print_help()
 {
     std::size_t longestName = 0;
-    for (auto const& [rName, rScenerio] : scenarios())
+    for (auto const& [rName, rScenerio] : get_scenarios())
     {
         longestName = std::max(rName.size(), longestName);
     }
@@ -408,7 +408,7 @@ void print_help()
         << "OSP-Magnum Temporary Debug CLI\n"
         << "Open a scenario:\n";
 
-    for (auto const& [rName, rScenerio] : scenarios())
+    for (auto const& [rName, rScenerio] : get_scenarios())
     {
         std::string spaces(longestName - rName.length(), ' ');
         std::cout << "* " << rName << spaces << " - " << rScenerio.m_description << "\n";

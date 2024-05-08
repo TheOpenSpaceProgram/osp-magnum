@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include "../scenarios/scenarios.h"
 
 #include <osp/drawing/drawing.h>
 

@@ -118,7 +118,7 @@ target_link_libraries(osp-magnum PRIVATE osp-magnum-deps)
 # Gather paths to OSP headers and sources
 file(GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
 file(GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
-target_sources(osp-magnum PRIVATE "${CPP_FILES}" "${H_FILES}")
+target_sources(osp-magnum PRIVATE "${CPP_FILES}" "${H_FILES}" "testapp/scenarios/scenarioManager.h" "testapp/scenarios/scenarioManager.cpp")
 
 # Add shaders to IDE project
 set(SHADERS_DIR "../bin/OSPData/adera/Shaders")

@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,36 +24,52 @@
  */
 #pragma once
 
-#include "../scenarios/scenarios.h"
+#include "../identifiers.h"
+#include "../testapp.h"
 
-#include <adera/activescene/VehicleBuilder.h>
+// IWYU pragma: begin_exports
+#include <osp/tasks/top_utils.h>
+// IWYU pragma: end_exports
 
-#include <osp/core/copymove_macros.h>
-#include <osp/core/keyed_vector.h>
-#include <osp/core/global_id.h>
-#include <osp/core/strong_id.h>
+#include <unordered_map>
 
-#include <memory>
-
-namespace testapp::scenes
+namespace testapp
 {
 
-using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
-using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
-
-struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
+struct Scenario
 {
-    PrebuiltVehicles() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
+    std::string m_name;
+    std::string m_description;
+    ScenarioSetupFunction_t m_setupFunction;
 };
 
-inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
+struct ScenarioOption
+{
+    std::string_view m_description;
+    SceneSetupFunc_t m_setup;
+};
 
-osp::Session setup_prebuilt_vehicles(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         scene);
+using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
 
+ScenarioMap_t const& get_scenarios();
 
-} // namespace testapp::scenes
+namespace scenes
+{
+    using enum EStgOptn;
+    using enum EStgCont;
+    using enum EStgIntr;
+    using enum EStgRevd;
+    using enum EStgEvnt;
+    using enum EStgFBO;
+    using enum EStgLink;
+}
+
+struct MainLoopControl
+{
+    bool doUpdate;
+    bool doSync;
+    bool doResync;
+    bool doRender;
+};
+
+} // namespace testapp

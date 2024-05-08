@@ -43,6 +43,7 @@ class IExecutor;
 
 using RendererSetupFunc_t   = void(*)(TestApp&);
 using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
+using ScenarioSetupFunction_t = void(*)(TestApp&);
 
 struct TestAppTasks
 {
