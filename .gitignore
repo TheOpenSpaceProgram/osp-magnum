@@ -13,3 +13,4 @@ CMakeSettings.json
 out/
 .vs/
 build/
+.vscode

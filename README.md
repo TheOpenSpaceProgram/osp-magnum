@@ -91,6 +91,54 @@ cd build-osp-magnum/Release
 
 If you just want to test out the project so far, then see the [Actions](https://github.com/TheOpenSpaceProgram/osp-magnum/actions) tab on GitHub to obtain automated builds for Linux or Windows.
 
+## Controls
+The most important thing to remember, the controls!
+
+#### Navigating
+```bash
+V - Switch game mode
+
+ArrowUp    - Camera look up
+ArrowDown  - Camera look down
+ArrowLeft  - Camera look left
+ArrowRight - Camera look right
+
+RightMouse - Camera orbit
+
+W - Camera forward
+S - Camera backwards
+A - Camera left
+D - Camera right
+
+Q - Camera up
+E - Camera down
+```
+
+#### Flight
+```bash
+S - Vehicle pitch up
+W - Vehicle pitch down
+
+A - Vehicle yaw left
+D - Vehicle yaw right
+
+Q - Vehicle roll left
+E - Vehicle roll right
+
+Z - Vehicle thrust max
+X - Vehicle thrust min
+LShift - Vehicle thrust increment
+LCtrl  - Vehicle thrust decrement
+
+LCtrl+C | LShift+A - Vehicle self destruct
+```
+
+#### Misc
+```bash
+Space - Debug Throw
+LCtrl+1 - Debug Planet Update
+```
+
 ## Contributing
 
 Our development team is very small right now. We need more crew to help to launch this project to its first release.
