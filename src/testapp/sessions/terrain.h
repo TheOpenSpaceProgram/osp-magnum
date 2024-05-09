@@ -25,14 +25,14 @@
 #pragma once
 
 #include "../scenarios.h"
-#include "planet-a/SubdivTriangleMesh.h"
+#include "planet-a/chunk_utils.h"
 
 #include <osp/core/math_types.h>
 #include <osp/drawing/draw_ent.h>
 
-#include <planet-a/SubdivSkeleton.h>
-#include <planet-a/terrain_skeleton.h>
-
+#include <planet-a/skeleton.h>
+#include <planet-a/skeleton_subdiv.h>
+#include <planet-a/chunk_generate.h>
 
 namespace testapp::scenes
 {
@@ -55,10 +55,11 @@ struct ACtxTerrain
 {
     // 'Skeleton' used for managing instances and relationships between vertices, triangles, and
     // chunks. These are all integer IDs that can be parented, connected, neighboring, etc...
-    planeta::TerrainSkeleton            skTerrain;
+    planeta::SubdivTriangleSkeleton     skeleton;
+    planeta::SkeletonVertexData         skData;
     planeta::ChunkSkeleton              skChunks;
 
-    planeta::ChunkedTriangleMeshInfo    chunkInfo;
+    planeta::ChunkMeshBufferInfo        chunkInfo;
     planeta::BasicTerrainGeometry       chunkGeom;
 
     planeta::ChunkScratchpad            chunkSP;

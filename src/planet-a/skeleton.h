@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2021 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -22,219 +22,31 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+/**
+ * @file
+ * @brief Features SubdivTriangleSkeleton and ChunkSkeleton
+ */
 #pragma once
+
+#include "subdiv_id_registry.h"
+
+#include "planeta_types.h"
 
 #include <osp/core/array_view.h>
 #include <osp/core/bitvector.h>
 #include <osp/core/copymove_macros.h>
 #include <osp/core/keyed_vector.h>
 #include <osp/core/math_2pow.h>
-#include <osp/core/strong_id.h>
 
-#include <longeron/id_management/registry_stl.hpp>
-#include <longeron/id_management/refcount.hpp>
 
 #include <array>
-#include <unordered_map>
 #include <vector>
 
 namespace planeta
 {
 
-/**
- * @brief Concatenate bits of two uint32 ints into a uint64
- */
-constexpr std::uint64_t concat_u32(std::uint32_t const lhs, std::uint32_t const rhs) noexcept
-{
-    return (std::uint64_t(lhs) << 32) | std::uint64_t(rhs);
-}
-
-//-----------------------------------------------------------------------------
-
-template<typename ID_T>
-struct MaybeNewId
-{
-    ID_T id;
-    bool isNew;
-};
-
-/**
- * @brief A multitree directed acyclic graph of reusable IDs where new IDs can
- *        be created from two other parent IDs.
- */
-template<typename ID_T>
-class SubdivIdTree : private lgrn::IdRegistryStl<ID_T>
-{
-
-    using base_t = lgrn::IdRegistryStl<ID_T>;
-    using id_int_t = lgrn::underlying_int_type_t<ID_T>;
-
-    static_assert(std::is_integral_v<id_int_t> && sizeof(ID_T) <= 4,
-                  "ID_T must be an integral type, 4 bytes or less in size");
-
-public:
-
-    using base_t::bitview;
-    using base_t::capacity;
-    using base_t::exists;
-    using base_t::size;
-
-    /**
-     * @brief Create a single ID with no parents
-     *
-     * @return New ID created
-     */
-    ID_T create_root()
-    {
-        ID_T const id = base_t::create();
-        m_idUsers.resize(capacity());
-        m_idUsers[std::size_t(id)] = 0;
-        return id;
-    };
-
-    /**
-     * @brief Create an ID from two parent IDs
-     *
-     * Order of parents does not matter
-     *
-     * @param a [in] Parent A
-     * @param b [in] Parent B
-     *
-     * @return New ID created
-     */
-    MaybeNewId<ID_T> create_or_get(ID_T const a, ID_T const b)
-    {
-        std::uint64_t const combination = id_pair_to_combination(a, b);
-
-        // Try emplacing a blank element under this combination of IDs, or get
-        // existing element
-        auto const& [it, success] = m_parentsToId.try_emplace(combination, 0);
-
-        if (success)
-        {
-            // The space was free, and a new element was succesfully emplaced
-
-            // Create a new ID for real, replacing the blank one from before (it->second is a reference)
-            it->second = id_int_t(create_root());
-
-            // Keep track of the new ID's parents
-            m_idToParents.resize(capacity());
-            m_idToParents[it->second] = combination;
-
-            // Increase use count of both parents as child is added
-            user_increment(a);
-            user_increment(b);
-        }
-
-        return { ID_T(it->second), success };
-    }
-
-
-    [[nodiscard]] ID_T get(ID_T a, ID_T b) const
-    {
-        std::uint64_t const combination = hash_id_combination(a, b);
-        return ID_T(m_parentsToId.at(combination));
-    }
-
-    [[nodiscard]] ID_T try_get(ID_T a, ID_T b) const
-    {
-        std::uint64_t const combination = hash_id_combination(a, b);
-        auto const found = m_parentsToId.find(combination);
-        return found != m_parentsToId.end() ? ID_T(found->second) : lgrn::id_null<ID_T>();
-    }
-
-    // TODO
-
-    std::pair<ID_T, ID_T> get_parents(ID_T a);
-
-    void remove(ID_T x)
-    {
-        LGRN_ASSERTM(m_idUsers[std::size_t(x)] == 0, "Can't remove vertex with non-zero users");
-
-        std::uint64_t const combination = m_idToParents[std::size_t(x)];
-        [[maybe_unused]]
-        std::size_t const erased = m_parentsToId.erase(combination);
-        LGRN_ASSERT(erased != 0);
-
-        auto const [a, b] = combination_to_id_pair(combination);
-
-        if (user_decrement(a))
-        {
-            remove(a);
-        }
-
-        if (user_decrement(b))
-        {
-            remove(b);
-        }
-
-        base_t::remove(x);
-    }
-
-    /**
-     * @brief Reserve to fit at least n IDs
-     *
-     * @param n [in] Requested capacity
-     */
-    void reserve(size_t n)
-    {
-        base_t::reserve(n);
-        m_idToParents.reserve(base_t::capacity());
-        m_idUsers.reserve(base_t::capacity());
-    }
-
-    void user_increment(ID_T x) noexcept
-    {
-        m_idUsers[std::size_t(x)] ++;
-    }
-
-    bool user_decrement(ID_T x) noexcept
-    {
-        m_idUsers[std::size_t(x)] --;
-        return m_idUsers[std::size_t(x)] == 0;
-    }
-
-private:
-
-    static constexpr std::uint64_t id_pair_to_combination(ID_T const a, ID_T const b) noexcept
-    {
-        // Sort to make A and B order-independent
-        auto const ls = id_int_t(std::min(a, b));
-        auto const ms = id_int_t(std::max(a, b));
-
-        return concat_u32(ms, ls);
-    }
-
-    struct IdPair
-    {
-        ID_T a;
-        ID_T b;
-    };
-
-    static constexpr IdPair combination_to_id_pair(std::uint64_t const combination)
-    {
-        return { ID_T(std::uint32_t(combination)), ID_T(std::uint32_t(combination >> 32)) };
-    }
-
-    std::unordered_map<std::uint64_t, id_int_t> m_parentsToId;
-    std::vector<std::uint64_t>                  m_idToParents;
-    std::vector<uint8_t>                        m_idUsers;
-
-}; // class SubdivTree
-
-//-----------------------------------------------------------------------------
-
-
-
-class SubdivTriangleSkeleton;
-using SkVrtxId      = osp::StrongId<std::uint32_t, struct DummyForSkVrtxId>;
-
-using SkVrtxOwner_t = lgrn::IdOwner<SkVrtxId, SubdivTriangleSkeleton>;
-
-using SkTriId      = osp::StrongId<std::uint32_t, struct DummyForSkTriId>;
-using SkTriGroupId = osp::StrongId<std::uint32_t, struct DummyForSkTriGroupId>;
-
-using SkTriOwner_t = lgrn::IdRefCount<SkTriId>::Owner_t;
+inline constexpr std::size_t gc_maxSubdivLevels = 9;
 
 struct SkeletonTriangle
 {
@@ -268,7 +80,7 @@ struct SkeletonTriangle
         }
         else
         {
-            LGRN_ASSERTM(neighbors[2].value() == neighbor, "Neighbor not found");
+            //LGRN_ASSERTM(neighbors[2].value() == neighbor, "Neighbor not found");
             return 2;
         }
     }
@@ -363,7 +175,7 @@ public:
      *
      * @return 3 newly created or obtained Vertex IDs
      */
-    std::array<MaybeNewId<SkVrtxId>, 3> vrtx_create_middles(
+    std::array<osp::MaybeNewId<SkVrtxId>, 3> vrtx_create_middles(
             std::array<SkVrtxId, 3> const& vertices)
     {
         return { vrtx_create_or_get_child(vertices[0], vertices[1]),
@@ -403,8 +215,9 @@ public:
      */
     void vrtx_create_chunk_edge_recurse(
             std::uint8_t level,
-            SkVrtxId vrtxA, SkVrtxId vrtxB,
-            osp::ArrayView< MaybeNewId<SkVrtxId> > rOut);
+            SkVrtxId vrtxA,
+            SkVrtxId vrtxB,
+            osp::ArrayView< osp::MaybeNewId<SkVrtxId> > rOut);
 
 
     [[nodiscard]] SkTriGroup const& tri_group_at(SkTriGroupId const group) const
@@ -422,8 +235,8 @@ public:
      */
     void tri_group_resize_fit_ids()
     {
-        m_triData.resize(m_triIds.capacity());
-        m_triRefCount.resize(m_triIds.capacity() * 4);
+        m_triData.resize(m_triGroupIds.capacity());
+        m_triRefCount.resize(m_triGroupIds.capacity() * 4);
     }
 
     /**
@@ -448,9 +261,9 @@ public:
      */
     void tri_group_reserve(size_t const n)
     {
-        m_triIds.reserve(n);
-        m_triData.reserve(m_triIds.capacity());
-        m_triRefCount.resize(m_triIds.capacity() * 4);
+        m_triGroupIds.reserve(n);
+        m_triData.reserve(m_triGroupIds.capacity());
+        m_triRefCount.resize(m_triGroupIds.capacity() * 4);
     }
 
     struct SkTriGroupNeighboring
@@ -492,7 +305,7 @@ public:
     /**
      * @return Read-only access to Triangle IDs
      */
-    constexpr lgrn::IdRegistryStl<SkTriGroupId> const& tri_group_ids() const { return m_triIds; }
+    constexpr lgrn::IdRegistryStl<SkTriGroupId> const& tri_group_ids() const { return m_triGroupIds; }
 
     /**
      * @brief Subdivide a triangle, creating a new group (4 new triangles)
@@ -539,7 +352,7 @@ public:
      */
     SkVrtxId vrtx_create_root()
     {
-        SkVrtxId const vrtxId = m_vrtxIdTree.create_root();
+        SkVrtxId const vrtxId = m_vertexIds.create_root();
         return vrtxId;
     };
 
@@ -548,9 +361,9 @@ public:
      *
      * @return New Vertex ID created
      */
-    MaybeNewId<SkVrtxId> vrtx_create_or_get_child(SkVrtxId const a, SkVrtxId const b)
+    osp::MaybeNewId<SkVrtxId> vrtx_create_or_get_child(SkVrtxId const a, SkVrtxId const b)
     {
-        return m_vrtxIdTree.create_or_get(a, b);
+        return m_vertexIds.create_or_get(a, b);
     }
 
     /**
@@ -562,36 +375,33 @@ public:
      */
     SkVrtxOwner_t vrtx_store(SkVrtxId const vrtxId)
     {
-        LGRN_ASSERT(m_vrtxIdTree.exists(vrtxId));
-        m_vrtxIdTree.user_increment(vrtxId);
+        LGRN_ASSERT(m_vertexIds.exists(vrtxId));
+        m_vertexIds.refcount_increment(vrtxId);
         return SkVrtxOwner_t{vrtxId};
     }
 
     /**
-     * @brief Safely cleares the contents of a Vertex ID storage, making it safe
-     *        to destruct.
-     *
-     * @param rStorage [ref] Owner to release
+     * @brief Safely cleares the contents of a Vertex ID owner, making it safe to destruct.
      */
-    bool vrtx_release(SkVrtxOwner_t&& rOwner)
+    osp::RefCountStatus<std::uint8_t> vrtx_release(SkVrtxOwner_t&& rOwner)
     {
-        LGRN_ASSERT(m_vrtxIdTree.exists(rOwner.value()));
+        LGRN_ASSERT(m_vertexIds.exists(rOwner.value()));
 
-        bool const noRefsRemaining = m_vrtxIdTree.user_decrement(rOwner.value());
-        if (noRefsRemaining)
+        auto const status = m_vertexIds.refcount_decrement(rOwner.value());
+        if (status.refCount == 0)
         {
-            m_vrtxIdTree.remove(rOwner.value());
+            m_vertexIds.remove(rOwner.value());
         }
 
         [[maybe_unused]] SkVrtxOwner_t moved = std::move(rOwner);
         moved.m_id = lgrn::id_null<SkVrtxId>();
-        return noRefsRemaining;
+        return status;
     }
 
     /**
      * @return Read-only access to vertex IDs
      */
-    SubdivIdTree<SkVrtxId> const& vrtx_ids() const noexcept { return m_vrtxIdTree; }
+    SubdivIdRegistry<SkVrtxId> const& vrtx_ids() const noexcept { return m_vertexIds; }
 
     /**
      * @brief Reserve to fit at least n Vertex IDs
@@ -600,16 +410,29 @@ public:
      */
     void vrtx_reserve(std::size_t const n)
     {
-        m_vrtxIdTree.reserve(n);
+        m_vertexIds.reserve(n);
     }
+
+    void debug_check_invariants();
+
+    struct Level
+    {
+        /// Subdivided triangles that neighbor a non-subdivided one
+        osp::BitVector_t hasNonSubdivedNeighbor;
+
+        /// Non-subdivided triangles that neighbor a subdivided one
+        osp::BitVector_t hasSubdivedNeighbor;
+    };
+
+    std::array<Level, gc_maxSubdivLevels> levels;
 
 private:
 
-    SubdivIdTree<SkVrtxId>                  m_vrtxIdTree;
-    lgrn::IdRegistryStl<SkTriGroupId>       m_triIds;
+    SubdivIdRegistry<SkVrtxId>              m_vertexIds;
+    lgrn::IdRegistryStl<SkTriGroupId>       m_triGroupIds;
     lgrn::IdRefCount<SkTriId>               m_triRefCount;
 
-    // access using SkTriGroupId from m_triIds
+    // access using SkTriGroupId from m_triGroupIds
     osp::KeyedVec<SkTriGroupId, SkTriGroup> m_triData;
 }; // class SubdivTriangleSkeleton
 
@@ -617,17 +440,12 @@ private:
 //-----------------------------------------------------------------------------
 
 
-using ChunkId = osp::StrongId<uint16_t, struct DummyForChunkId>;
-using SharedVrtxId = osp::StrongId<uint32_t, struct DummyForSharedVrtxId>;
-
-using SharedVrtxOwner_t = lgrn::IdRefCount<SharedVrtxId>::Owner_t;
-
 struct ChunkStitch
 {
     bool          enabled        :1;
     bool          detailX2       :1;
-    unsigned char x2ownEdge      :2;
-    unsigned char x2neighborEdge :2;
+    unsigned char x2ownEdge      :2; ///< [left, bottom, right]
+    unsigned char x2neighborEdge :2; ///< [left, bottom, right]
 
     friend bool operator==(ChunkStitch const& lhs, ChunkStitch const& rhs) = default;
     friend bool operator!=(ChunkStitch const& lhs, ChunkStitch const& rhs) = default;
@@ -674,12 +492,12 @@ public:
     }
 
     ChunkId chunk_create(
-            SkTriId                                 sktriId,
-            SubdivTriangleSkeleton                  &rSkel,
-            osp::BitVector_t                        &rSharedAdded,
-            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeLft,
-            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeBtm,
-            osp::ArrayView< MaybeNewId<SkVrtxId> >  edgeRte);
+            SkTriId                                     sktriId,
+            SubdivTriangleSkeleton                      &rSkel,
+            osp::BitVector_t                            &rSharedAdded,
+            osp::ArrayView< osp::MaybeNewId<SkVrtxId> > edgeLft,
+            osp::ArrayView< osp::MaybeNewId<SkVrtxId> > edgeBtm,
+            osp::ArrayView< osp::MaybeNewId<SkVrtxId> > edgeRte);
 
     void chunk_remove(ChunkId chunkId, SkTriId sktriId, osp::BitVector_t &rSharedRemoved, SubdivTriangleSkeleton& rSkel) noexcept;
 
@@ -750,31 +568,30 @@ public:
      * @param skVrtxId
      * @return
      */
-    MaybeNewId<SharedVrtxId> shared_get_or_create(SkVrtxId skVrtxId, SubdivTriangleSkeleton &rSkel);
+    osp::MaybeNewId<SharedVrtxId> shared_get_or_create(SkVrtxId skVrtxId, SubdivTriangleSkeleton &rSkel);
 
     void clear(SubdivTriangleSkeleton& rSkel);
 
 //private:
 
-    lgrn::IdRegistryStl<ChunkId, true>      m_chunkIds;
-    std::vector<SharedVrtxOwner_t>          m_chunkSharedUsed;
-    std::uint8_t                            m_chunkSubdivLevel;
-    std::uint16_t                           m_chunkEdgeVrtxCount;
-    std::uint16_t                           m_chunkSharedCount;
+    lgrn::IdRegistryStl<ChunkId, true>          m_chunkIds;
+    std::vector<SharedVrtxOwner_t>              m_chunkSharedUsed;
+    std::uint8_t                                m_chunkSubdivLevel;
+    std::uint16_t                               m_chunkEdgeVrtxCount;
+    std::uint16_t                               m_chunkSharedCount;
 
-    osp::KeyedVec<ChunkId, ChunkStitch>     m_chunkStitch;
+    osp::KeyedVec<ChunkId, ChunkStitch>         m_chunkStitch;
 
-    osp::KeyedVec<ChunkId, SkTriId>         m_chunkToTri;
-    osp::KeyedVec<SkTriId, ChunkId>         m_triToChunk;
+    osp::KeyedVec<ChunkId, SkTriId>             m_chunkToTri;
+    osp::KeyedVec<SkTriId, ChunkId>             m_triToChunk;
 
-    lgrn::IdRegistryStl<SharedVrtxId, true> m_sharedIds;
-    lgrn::IdRefCount<SharedVrtxId>          m_sharedRefCount;
+    lgrn::IdRegistryStl<SharedVrtxId, true>     m_sharedIds;
+    lgrn::IdRefCount<SharedVrtxId>              m_sharedRefCount;
 
-    osp::KeyedVec<SharedVrtxId, SkVrtxOwner_t> m_sharedToSkVrtx;
-    osp::KeyedVec<SkVrtxId, SharedVrtxId>   m_skVrtxToShared;
+    osp::KeyedVec<SharedVrtxId, SkVrtxOwner_t>  m_sharedToSkVrtx;
+    osp::KeyedVec<SkVrtxId, SharedVrtxId>       m_skVrtxToShared;
 
 }; // class ChunkSkeleton
-
 
 inline ChunkSkeleton make_skeleton_chunks(uint8_t const subdivLevels)
 {
@@ -785,7 +602,5 @@ inline ChunkSkeleton make_skeleton_chunks(uint8_t const subdivLevels)
         .m_chunkSharedCount = std::uint16_t(chunkEdgeVrtxCount * 3)
     };
 }
-
-
 
 }

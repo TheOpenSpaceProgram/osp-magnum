@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2021 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -23,43 +23,13 @@
  * SOFTWARE.
  */
 
-#include "SubdivTriangleMesh.h"
-
-#include <Magnum/Math/Vector3.h>
-
-using namespace planeta;
+#include "chunk_utils.h"
 
 
-/*
-ChunkedTriangleMeshInfo planeta::make_subdivtrimesh_general(
-        unsigned int const chunkMax, unsigned int const subdivLevels, int const pow2scale)
+namespace planeta
 {
-    // calculate stuff here
 
-    using std::sqrt;
-    using std::ceil;
-    using std::pow;
-
-    float const C = chunkMax;
-    float const L = subdivLevels;
-
-    // Calculate a fair number of shared vertices, based on a triangular
-    // tiling pattern.
-    // worked out here: https://www.desmos.com/calculator/ffd8lraosl
-    unsigned int const sharedMax
-            = ceil( ( 3.0f*C + sqrt(6.0f)*sqrt(C) ) * pow(2.0f, L-1) - C + 1 );
-
-    unsigned int const fanMax
-            = ChunkedTriangleMeshInfo::smc_minFansVsLevel[subdivLevels] * 2;
-
-    return ChunkedTriangleMeshInfo(
-                chunkMax, subdivLevels, sharedMax, fanMax);
-}
-*/
-
-//-----------------------------------------------------------------------------
-
-ChunkVrtxSubdivLUT planeta::make_chunk_vrtx_subdiv_lut(uint8_t const subdivLevel)
+ChunkVrtxSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t const subdivLevel)
 {
     ChunkVrtxSubdivLUT out;
 
@@ -128,5 +98,4 @@ void ChunkVrtxSubdivLUT::fill_tri_recurse(
     }
 }
 
-
-
+} // namespace planeta

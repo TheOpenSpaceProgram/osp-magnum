@@ -1,4 +1,3 @@
-
 /**
  * Open Space Program
  * Copyright © 2019-2021 Open Space Program Project
@@ -26,46 +25,37 @@
 
 #include "icosahedron.h"
 
-using namespace planeta;
+namespace planeta
+{
 
-SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
-        double  const radius,
-        int     const pow2scale,
+SubdivTriangleSkeleton create_skeleton_icosahedron(
+        double                                                  const radius,
         Corrade::Containers::StaticArrayView<12, SkVrtxId>      const vrtxIds,
         Corrade::Containers::StaticArrayView<5,  SkTriGroupId>  const groupIds,
         Corrade::Containers::StaticArrayView<20, SkTriId>       const triIds,
-        std::vector<osp::Vector3l>  &rPositions,
-        std::vector<osp::Vector3>   &rNormals)
+        SkeletonVertexData                                            &rSkData)
 {
-
     // Create the skeleton
-
     SubdivTriangleSkeleton skeleton;
 
     // Create initial 12 vertices
-
     for (SkVrtxId &rVrtxId : vrtxIds)
     {
         rVrtxId = skeleton.vrtx_create_root();
     }
 
-    rPositions.resize(skeleton.vrtx_ids().capacity());
-    rNormals.resize(skeleton.vrtx_ids().capacity());
+    // Copy and scale Icosahedron vertex data from tables
 
-    // Set positions and normals of the new vertices
-
-    double const scale = std::pow(2.0, pow2scale);
-
+    rSkData.positions.resize(skeleton.vrtx_ids().capacity());
+    rSkData.normals.resize  (skeleton.vrtx_ids().capacity());
+    double const totalScale = radius * std::pow<double>(2.0, rSkData.scale);
     for (int i = 0; i < gc_icoVrtxCount; i ++)
     {
-        rPositions[i] = osp::Vector3l(gc_icoVrtxPos[i] * radius * scale);
-        rNormals[i] = osp::Vector3(gc_icoVrtxPos[i]);
+        rSkData.positions[vrtxIds[i]] = osp::Vector3l(gc_icoVrtxPos[i] * totalScale);
+        rSkData.normals  [vrtxIds[i]] = osp::Vector3 (gc_icoVrtxPos[i]);
     }
 
-    // Add initial triangles
-
     // Create 20 root triangles by forming 5 groups. each group is 4 triangles
-
     skeleton.tri_group_reserve(skeleton.tri_group_ids().size() + 5);
 
     auto const vrtx_id_lut = [&vrtxIds] (int i) -> std::array<SkVrtxId, 3>
@@ -108,84 +98,127 @@ SubdivTriangleSkeleton planeta::create_skeleton_icosahedron(
 }
 
 /**
- * @brief Calculate middle point on a sphere's surface given two other points on the sphere
+ * @brief Calculate midpoint between two vertices on a skeleton mesh
  */
-void sphere_midpoint(
-        double const radius, float const scale, osp::Vector3l const a, osp::Vector3l const b,
-        osp::Vector3l &rPos, osp::Vector3 &rNorm) noexcept
+static void calc_midpoint_spherical(
+        SkVrtxId              const a,
+        SkVrtxId              const mid,
+        SkVrtxId              const b,
+        double                const radius,
+        double                const scale,
+        SkeletonVertexData          &rSkData)
 {
-    // This is simply "rPos = (a + b).normalized() * radius * scale", but avoids squaring
-    // potentially massive numbers and tries to improve precision
+    // Midpoint is first calculated with only integers, then curvature is added on afterwards.
+    // This is intended to prevent gargantuan numbers from squaring Vertex3l (int64) positions.
+    osp::Vector3l const midPos    = (rSkData.positions[a] + rSkData.positions[b]) / 2;
+    osp::Vector3d const midPosDbl = osp::Vector3d(midPos) / scale;
+    double        const midLen    = midPosDbl.length();
+    double        const curvature = radius - midLen;
 
-    osp::Vector3l const mid = (a + b) / 2;
-    osp::Vector3d const midD = osp::Vector3d(mid) / scale;
-    float const midLen = midD.length();
-    float const roundness = radius - midLen;
-
-    rNorm = osp::Vector3(midD / midLen);
-    rPos = mid + osp::Vector3l(rNorm * roundness * scale);
+    rSkData.normals[mid]   = osp::Vector3(midPosDbl / midLen);
+    rSkData.positions[mid] = midPos + osp::Vector3l(rSkData.normals[mid] * curvature * scale);
 }
 
-void planeta::ico_calc_middles(
-        double const radius, int const pow2scale,
-        std::array<SkVrtxId, 3> const vrtxCorner,
-        std::array<MaybeNewId<SkVrtxId>, 3> const vrtxMid,
-        std::vector<osp::Vector3l> &rPositions,
-        std::vector<osp::Vector3> &rNormals)
-{
-    auto const pos = [&rPositions] (SkVrtxId const id) -> osp::Vector3l& { return rPositions[size_t(id)]; };
-    auto const nrm = [&rNormals]   (SkVrtxId const id) -> osp::Vector3&  { return rNormals[size_t(id)];   };
 
-    float const scale = std::pow(2.0f, pow2scale);
+void ico_calc_middles(
+        double                                    const radius,
+        std::array<SkVrtxId, 3>                   const vrtxCorner,
+        std::array<osp::MaybeNewId<SkVrtxId>, 3>  const vrtxMid,
+        SkeletonVertexData                              &rSkData)
+{
+    float const scale = std::pow(2.0f, rSkData.scale);
 
     if (vrtxMid[0].isNew)
     {
-        sphere_midpoint(radius, scale, pos(vrtxCorner[0]), pos(vrtxCorner[1]),
-                    pos(vrtxMid[0].id), nrm(vrtxMid[0].id));
+        calc_midpoint_spherical(vrtxCorner[0], vrtxMid[0].id, vrtxCorner[1], radius, scale, rSkData);
     }
     if (vrtxMid[1].isNew)
     {
-        sphere_midpoint(radius, scale, pos(vrtxCorner[1]), pos(vrtxCorner[2]),
-                    pos(vrtxMid[1].id), nrm(vrtxMid[1].id));
+        calc_midpoint_spherical(vrtxCorner[1], vrtxMid[1].id, vrtxCorner[2], radius, scale, rSkData);
     }
     if (vrtxMid[2].isNew)
     {
-        sphere_midpoint(radius, scale, pos(vrtxCorner[2]), pos(vrtxCorner[0]),
-                    pos(vrtxMid[2].id), nrm(vrtxMid[2].id));
+        calc_midpoint_spherical(vrtxCorner[2], vrtxMid[2].id, vrtxCorner[0], radius, scale, rSkData);
     }
 }
 
+using ChunkEdgeView_t = osp::ArrayView<osp::MaybeNewId<SkVrtxId> const>;
 
-void planeta::ico_calc_chunk_edge_recurse(
-        double const        radius,
-        int const           pow2scale,
-        unsigned int const  level,
-        SkVrtxId const      a,
-        SkVrtxId const      b,
-        osp::ArrayView<MaybeNewId<SkVrtxId> const> const    vrtxOut,
-        std::vector<osp::Vector3l>              &rPositions,
-        std::vector<osp::Vector3>               &rNormals)
+void ico_calc_chunk_edge(
+        double const radius,
+        std::uint8_t const level,
+        SkVrtxId const cornerA,
+        SkVrtxId const cornerB,
+        ChunkEdgeView_t const vrtxOut,
+        SkeletonVertexData  &rSkData)
 {
-    if (level == 0)
+    if (level <= 1)
     {
         return;
     }
 
-    auto const pos = [&rPositions] (SkVrtxId const id) -> osp::Vector3l& { return rPositions[size_t(id)]; };
-    auto const nrm = [&rNormals]   (SkVrtxId const id) -> osp::Vector3&  { return rNormals[size_t(id)];   };
+    float const scale = std::pow(2.0f, rSkData.scale);
 
-    size_t const halfSize = vrtxOut.size() / 2;
-    MaybeNewId<SkVrtxId> const mid = vrtxOut[halfSize];
-
-    if (mid.isNew)
+    auto const recurse = [scale, radius, &rSkData] (auto &&self, SkVrtxId const a, SkVrtxId const b, int const currentLevel, ChunkEdgeView_t const view) noexcept -> void
     {
-        sphere_midpoint(radius, std::pow(2.0f, pow2scale), pos(a), pos(b), pos(mid.id), nrm(mid.id));
-    }
+        auto const halfSize = view.size() / 2;
+        osp::MaybeNewId<SkVrtxId> const mid = view[halfSize];
 
-    ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, a, mid.id,
-                                vrtxOut.prefix(halfSize), rPositions, rNormals);
-    ico_calc_chunk_edge_recurse(radius, pow2scale, level - 1, mid.id, b,
-                                vrtxOut.exceptPrefix(halfSize), rPositions, rNormals);
+        if (mid.isNew)
+        {
+            calc_midpoint_spherical(a, mid.id, b, radius, scale, rSkData);
+        }
 
+        if (currentLevel != 1)
+        {
+            self(self, a, mid.id, currentLevel - 1, view.prefix(halfSize));
+            self(self, mid.id, b, currentLevel - 1, view.exceptPrefix(halfSize));
+        }
+    };
+
+    recurse(recurse, cornerA, cornerB, level, vrtxOut);
 }
 
+
+void ico_calc_sphere_tri_center(
+        SkTriGroupId            const groupId,
+        float                   const maxRadius,
+        float                   const height,
+        SubdivTriangleSkeleton  const &rSkel,
+        SkeletonVertexData&           rSkData)
+{
+    using osp::math::int_2pow;
+
+    SkTriGroup const &group = rSkel.tri_group_at(groupId);
+
+    for (int i = 0; i < 4; ++i)
+    {
+        SkTriId          const  sktriId = tri_id(groupId, i);
+        SkeletonTriangle const& tri     = group.triangles[i];
+
+        SkVrtxId const va = tri.vertices[0].value();
+        SkVrtxId const vb = tri.vertices[1].value();
+        SkVrtxId const vc = tri.vertices[2].value();
+
+        // average without overflow
+        osp::Vector3l const posAvg = rSkData.positions[va] / 3
+                                   + rSkData.positions[vb] / 3
+                                   + rSkData.positions[vc] / 3;
+
+        osp::Vector3  const nrmSum = rSkData.normals[va]
+                                   + rSkData.normals[vb]
+                                   + rSkData.normals[vc];
+
+        LGRN_ASSERT(group.depth < gc_icoTowerOverHorizonVsLevel.size());
+        float const terrainMaxHeight = height + maxRadius * gc_icoTowerOverHorizonVsLevel[group.depth];
+
+        // 0.5 * terrainMaxHeight           : halve for middle
+        // int_2pow<int>(rTerrain.scale)    : Vector3l conversion factor
+        // / 3.0f                           : average from sum of 3 values
+        osp::Vector3l const riseToMid = osp::Vector3l(nrmSum * (0.5f * terrainMaxHeight * osp::math::int_2pow<int>(rSkData.scale) / 3.0f));
+
+        rSkData.centers[sktriId] = posAvg + riseToMid;
+    }
+}
+
+} // namespace planeta

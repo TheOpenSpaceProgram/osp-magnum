@@ -24,7 +24,8 @@
  */
 #pragma once
 
-#include "SubdivSkeleton.h"
+#include "skeleton.h"
+#include "geometry.h"
 
 #include <osp/core/math_types.h>
 
@@ -113,20 +114,19 @@ inline constexpr std::array<float, 10> const gc_icoTowerOverHorizonVsLevel
  * @param radius        [in] Radius of icosahedron in meters
  * @param pow2scale     [in] Scale for rPositions, 2^pow2scale units = 1 meter
  * @param vrtxIds       [out] Vertex IDs out for initial 12 vertices
+ * @param groupIds      [out] Triangle Group IDs out for initial 5 groups for 5*4 triangles
  * @param triIds        [out] Triangle IDs out for initial 20 triangles
- * @param rPositions    [out] Position data to allocate
- * @param rNormals      [out] Normal data to allocate
+ * @param rPositions    [out] Vertex Position data to allocate
+ * @param rVBufNrm      [out] Vertex Normal data to allocate
  *
  * @return SubdivTriangleSkeleton for keeping track of Vertex and Triangle IDs
  */
 SubdivTriangleSkeleton create_skeleton_icosahedron(
-        double  radius,
-        int     pow2scale,
+        double                                                  radius,
         Corrade::Containers::StaticArrayView<12, SkVrtxId>      vrtxIds,
         Corrade::Containers::StaticArrayView<5,  SkTriGroupId>  groupIds,
         Corrade::Containers::StaticArrayView<20, SkTriId>       triIds,
-        std::vector<osp::Vector3l>  &rPositions,
-        std::vector<osp::Vector3>   &rNormals);
+        SkeletonVertexData                                      &rSkData);
 
 /**
  * @brief Calculate positions and normals for 3 new vertices created when
@@ -136,16 +136,12 @@ SubdivTriangleSkeleton create_skeleton_icosahedron(
  * @param pow2scale     [in] Scale for rPositions, 2^pow2scale units = 1 meter
  * @param vrtxCorners   [in] Vertex IDs for the main Triangle's corners
  * @param vrtxMid       [in] Vertex IDs of the 3 new middle vertices
- * @param rPositions    [ref] Position data
- * @param rNormals      [ref] Normal data
  */
 void ico_calc_middles(
         double      radius,
-        int         pow2scale,
         std::array<SkVrtxId, 3> const   vrtxCorners,
-        std::array<MaybeNewId<SkVrtxId>, 3> const   vrtxMid,
-        std::vector<osp::Vector3l>      &rPositions,
-        std::vector<osp::Vector3>       &rNormals);
+        std::array<osp::MaybeNewId<SkVrtxId>, 3>                vrtxMid,
+        SkeletonVertexData                                      &rSkData);
 
 /**
  * @brief Calculate positions for vertices along an edge from Vertex A to B
@@ -153,22 +149,30 @@ void ico_calc_middles(
  * Corresponds to SubdivTriangleSkeleton::vrtx_create_chunk_edge_recurse
  *
  * @param radius        [in] Radius of icosahedron in meters
- * @param pow2scale     [in] Scale for rPositions, 2^pow2scale units = 1 meter
  * @param level         [in] Number of times to subdivide
  * @param a             [in] Vertex ID of A
  * @param b             [in] Vertex ID of B
- * @param vrtxs         [in] Vertex IDs of vertices between A and B
- * @param rPositions    [ref] Position data
- * @param rNormals      [ref] Normal data
+
  */
-void ico_calc_chunk_edge_recurse(
-        double          radius,
-        int             pow2scale,
-        unsigned int    level,
-        SkVrtxId        a,
-        SkVrtxId        b,
-        osp::ArrayView<MaybeNewId<SkVrtxId> const> const vrtxOut,
-        std::vector<osp::Vector3l>      &rPositions,
-        std::vector<osp::Vector3>       &rNormals);
+void ico_calc_chunk_edge(
+        double                                                  radius,
+        std::uint8_t                                            level,
+        SkVrtxId                                                a,
+        SkVrtxId                                                b,
+        osp::ArrayView<osp::MaybeNewId<SkVrtxId> const>         vrtxOut,
+        SkeletonVertexData                                      &rSkData);
+
+
+/**
+ * @brief Calculate center of a triangle given a spherical terrain mesh, writes to sktriCenter
+ *
+ * This accounts for the min/max height of terrain elevation
+ */
+void ico_calc_sphere_tri_center(
+        SkTriGroupId                    groupId,
+        float                           maxRadius,
+        float                           height,
+        SubdivTriangleSkeleton    const &rSkel,
+        SkeletonVertexData              &rSkData);
 
 }
