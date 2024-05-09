@@ -111,9 +111,9 @@ osp::Logger_t g_logMagnumApp;
 int main(int argc, char** argv)
 {
     // Command line argument parsing
-    Corrade::Utility::Arguments args; // TODO rename use of scene to scenario
+    Corrade::Utility::Arguments args;
     args.addSkippedPrefix("magnum", "Magnum options")
-        .addOption("scene", "none")         .setHelp("scene",       "Set the scene to launch")
+        .addOption("scenario", "none")       .setHelp("scenario",   "Set the scenario to launch")
         .addOption("config")                .setHelp("config",      "path to configuration file to use")
         .addBooleanOption("norepl")         .setHelp("norepl",      "don't enter read, evaluate, print, loop.")
         .addBooleanOption("log-exec")       .setHelp("log-exec",    "Log Task/Pipeline Execution (Extremely chatty!)")
@@ -141,16 +141,16 @@ int main(int argc, char** argv)
     g_testApp.m_topData.resize(64);
     load_a_bunch_of_stuff();
 
-    if(args.value("scene") != "none")
+    if(args.value("scenario") != "none")
     {
-        if ( ! ScenarioManager::get().has_scenario(args.value("scene"))) 
+        if ( ! ScenarioManager::get().has_scenario(args.value("scenario"))) 
         {
             OSP_LOG_ERROR("unknown scenario");
             g_testApp.clear_resource_owners();
             return 1;
         }
        
-        g_testApp.m_rendererSetup = ScenarioManager::get().get_scenario(args.value("scene")).setupFunction(g_testApp);
+        g_testApp.m_rendererSetup = ScenarioManager::get().get_scenario(args.value("scenario")).setupFunction(g_testApp);
 
         start_magnum_async(argc, argv);
     }
@@ -191,7 +191,7 @@ void cli_loop(int& argc, char** argv)
                 // TODO: Figure out some way to reload the application while
                 //       its still running.
                 //       ie. Message it to destroy its GL resources and draw
-                //           function, then load new scene
+                //           function, then load new scenario
                 std::cout << "Close application before opening new scenario" << std::endl;
             }
             else
