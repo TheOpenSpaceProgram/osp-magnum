@@ -54,6 +54,16 @@ namespace planeta
  */
 struct SkeletonVertexData
 {
+    void resize(SubdivTriangleSkeleton const &rSkel)
+    {
+        auto const vrtxCapacity = rSkel.vrtx_ids().capacity();
+        auto const triCapacity  = rSkel.tri_group_ids().capacity() * 4;
+
+        centers  .resize(triCapacity);
+        positions.resize(vrtxCapacity);
+        normals  .resize(vrtxCapacity);
+    }
+
     osp::KeyedVec<planeta::SkVrtxId, osp::Vector3l> positions;
     osp::KeyedVec<planeta::SkVrtxId, osp::Vector3>  normals;
     osp::KeyedVec<planeta::SkTriId,  osp::Vector3l> centers;
@@ -62,7 +72,7 @@ struct SkeletonVertexData
 };
 
 /**
- * @brief
+ * @brief Contributions to \c BasicChunkMeshGeometry::sharedNormalSum
  *
  * When a chunk is deleted, it needs subtract face normals of all of its deleted faces from all
  * connected shared vertices.
@@ -73,7 +83,14 @@ struct FanNormalContrib
     osp::Vector3 sum{osp::ZeroInit};
 };
 
-struct BasicTerrainGeometry
+/**
+ * @brief Basic float vertex and index buffer for a chunk mesh.
+ *
+ * To be able to efficiently calculate vertex normals of shared vertices, all triangles connected
+ * to shared vertices must add their normal contributions to \c sharedNormalSum, then remove their
+ * contributions when deleted.
+ */
+struct BasicChunkMeshGeometry
 {
     void resize(ChunkSkeleton const& skCh, ChunkMeshBufferInfo const& info);
 
@@ -81,17 +98,25 @@ struct BasicTerrainGeometry
     std::vector<osp::Vector3>           chunkVbufNrm;
     std::vector<osp::Vector3u>          chunkIbuf;
 
-    /// 2D, each row is
+    /// See \c FanNormalContrib; 2D, each row is \c ChunkMeshBufferInfo::fanMaxSharedCount
     std::vector<planeta::FanNormalContrib>              chunkFanNormalContrib;
 
-    /// parallel with skChunks.m_chunkSharedUsed
+    /// 2D, parallel with ChunkSkeleton::m_chunkSharedUsed
     std::vector<osp::Vector3>                           chunkFillSharedNormals;
 
     /// Non-normalized sum of face normals of connected faces
-    osp::KeyedVec<planeta::SharedVrtxId, osp::Vector3>  sharedNormals;
+    osp::KeyedVec<planeta::SharedVrtxId, osp::Vector3>  sharedNormalSum;
 };
 
-
+/**
+ * @brief Face writer used for ChunkFanStitcher
+ *
+ * See \c CFaceWriter
+ *
+ * TODO: Add vertex angle calculations for more accurate vertex normals. Vertex normals look fine
+ *       for the most part, but are actually calculated incorrectly. Face Normals added to
+ *       sharedNormalSum should be scaled depending on the vertex angle.
+ */
 struct TerrainFaceWriter
 {
     // 'iterators' used by ArrayView
@@ -109,7 +134,7 @@ struct TerrainFaceWriter
         SharedVrtxId const shared = sharedUsed[local.value];
 
         fillNormalContrib[local.value]  += selectedFaceNormal;
-        sharedNormals    [shared.value] += selectedFaceNormal;
+        sharedNormalSum  [shared.value] += selectedFaceNormal;
 
         rSharedNormalsDirty.set(shared.value);
     }
@@ -130,7 +155,7 @@ struct TerrainFaceWriter
 
     void fan_add_normal_shared(VertexIdx const vertex, SharedVrtxId const shared)
     {
-        sharedNormals[shared.value] += selectedFaceNormal;
+        sharedNormalSum[shared.value] += selectedFaceNormal;
 
         // Record contributions to shared vertex normal, since this needs to be subtracted when
         // the associated chunk is removed or restitched.
@@ -190,8 +215,8 @@ struct TerrainFaceWriter
 
     osp::ArrayView<osp::Vector3 const>  vbufPos;
     osp::ArrayView<osp::Vector3>        vbufNrm;
-    osp::ArrayView<osp::Vector3>        sharedNormals;
-    osp::ArrayView<osp::Vector3>        fillNormalContrib;;
+    osp::ArrayView<osp::Vector3>        sharedNormalSum;
+    osp::ArrayView<osp::Vector3>        fillNormalContrib;
     osp::ArrayView<FanNormalContrib>    fanNormalContrib;
     osp::ArrayView<SharedVrtxOwner_t>   sharedUsed;
     osp::Vector3                        selectedFaceNormal;

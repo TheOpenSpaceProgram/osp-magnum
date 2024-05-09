@@ -60,10 +60,10 @@ struct ACtxTerrain
     planeta::ChunkSkeleton              skChunks;
 
     planeta::ChunkMeshBufferInfo        chunkInfo;
-    planeta::BasicTerrainGeometry       chunkGeom;
+    planeta::BasicChunkMeshGeometry     chunkGeom;
 
     planeta::ChunkScratchpad            chunkSP;
-    planeta::SubdivScratchpad           scratchpad;
+    planeta::SkeletonSubdivScratchpad   scratchpad;
 };
 
 struct ACtxTerrainIco

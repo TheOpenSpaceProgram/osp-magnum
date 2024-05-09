@@ -29,7 +29,7 @@ namespace planeta
 {
 
 
-void BasicTerrainGeometry::resize(ChunkSkeleton const& skCh, ChunkMeshBufferInfo const& info)
+void BasicChunkMeshGeometry::resize(ChunkSkeleton const& skCh, ChunkMeshBufferInfo const& info)
 {
     auto const maxChunks     = skCh.m_chunkIds.capacity();
     auto const maxSharedVrtx = skCh.m_sharedIds.capacity();
@@ -39,7 +39,7 @@ void BasicTerrainGeometry::resize(ChunkSkeleton const& skCh, ChunkMeshBufferInfo
     chunkIbuf              .resize(maxChunks * info.chunkMaxFaceCount);
     chunkFanNormalContrib  .resize(maxChunks * info.fanMaxSharedCount);
     chunkFillSharedNormals .resize(maxChunks * skCh.m_chunkSharedCount, osp::Vector3{osp::ZeroInit});
-    sharedNormals          .resize(maxSharedVrtx, osp::Vector3{osp::ZeroInit});
+    sharedNormalSum        .resize(maxSharedVrtx, osp::Vector3{osp::ZeroInit});
 }
 
 } // namespace planeta

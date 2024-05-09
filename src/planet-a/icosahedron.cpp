@@ -145,12 +145,12 @@ void ico_calc_middles(
 using ChunkEdgeView_t = osp::ArrayView<osp::MaybeNewId<SkVrtxId> const>;
 
 void ico_calc_chunk_edge(
-        double const radius,
-        std::uint8_t const level,
-        SkVrtxId const cornerA,
-        SkVrtxId const cornerB,
-        ChunkEdgeView_t const vrtxOut,
-        SkeletonVertexData  &rSkData)
+        double                const radius,
+        std::uint8_t          const level,
+        SkVrtxId              const cornerA,
+        SkVrtxId              const cornerB,
+        ChunkEdgeView_t       const vrtxEdge,
+        SkeletonVertexData          &rSkData)
 {
     if (level <= 1)
     {
@@ -176,7 +176,7 @@ void ico_calc_chunk_edge(
         }
     };
 
-    recurse(recurse, cornerA, cornerB, level, vrtxOut);
+    recurse(recurse, cornerA, cornerB, level, vrtxEdge);
 }
 
 

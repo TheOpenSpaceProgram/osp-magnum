@@ -31,37 +31,15 @@ using osp::Vector3l;
 namespace planeta
 {
 
-void SubdivScratchpad::resize(SubdivTriangleSkeleton &rSkel, SkeletonVertexData &rSkData)
+void SkeletonSubdivScratchpad::resize(SubdivTriangleSkeleton &rSkel)
 {
     auto const triCapacity = rSkel.tri_group_ids().capacity() * 4;
 
-    // Using centers as 'previous capacity' to detect a reallocation
-    if (triCapacity != rSkData.centers.size())
-    {
-        // note: Since all of these are the same size, it feel practical to put them all in a
-        //       single unique_ptr allocation, and access it with array views
-
-        rSkData.centers.resize(triCapacity);
-
-        bitvector_resize(this->  distanceTestDone,  triCapacity);
-        bitvector_resize(this->  tryUnsubdiv,       triCapacity);
-        bitvector_resize(this->  cantUnsubdiv,      triCapacity);
-        bitvector_resize(this->  surfaceAdded,      triCapacity);
-        bitvector_resize(this->  surfaceRemoved,    triCapacity);
-
-        for (int lvl = 0; lvl < this->levelMax+1; ++lvl)
-        {
-            bitvector_resize(rSkel.levels[lvl].hasSubdivedNeighbor,       triCapacity);
-            bitvector_resize(rSkel.levels[lvl].hasNonSubdivedNeighbor,    triCapacity);
-        }
-    }
-
-    auto const vrtxCapacity = rSkel.vrtx_ids().capacity();
-    if (vrtxCapacity != rSkData.positions.size())
-    {
-        rSkData.positions.resize(vrtxCapacity);
-        rSkData.normals  .resize(vrtxCapacity);
-    }
+    bitvector_resize(this->  distanceTestDone,  triCapacity);
+    bitvector_resize(this->  tryUnsubdiv,       triCapacity);
+    bitvector_resize(this->  cantUnsubdiv,      triCapacity);
+    bitvector_resize(this->  surfaceAdded,      triCapacity);
+    bitvector_resize(this->  surfaceRemoved,    triCapacity);
 }
 
 void unsubdivide_select_by_distance(
@@ -69,7 +47,7 @@ void unsubdivide_select_by_distance(
         osp::Vector3l            const pos,
         SubdivTriangleSkeleton   const &rSkel,
         SkeletonVertexData       const &rSkData,
-        SubdivScratchpad               &rSP)
+        SkeletonSubdivScratchpad       &rSP)
 {
     SubdivTriangleSkeleton::Level const& rLvl   = rSkel.levels[lvl];
     SubdivScratchpadLevel&               rLvlSP = rSP  .levels[lvl];
@@ -142,7 +120,7 @@ void unsubdivide_deselect_invariant_violations(
         std::uint8_t              const lvl,
         SubdivTriangleSkeleton    const &rSkel,
         SkeletonVertexData        const &rSkData,
-        SubdivScratchpad                &rSP)
+        SkeletonSubdivScratchpad        &rSP)
 {
     SubdivTriangleSkeleton::Level const& rLvl  = rSkel.levels[lvl];
     SubdivScratchpadLevel&        rLvlSP = rSP .levels[lvl];
@@ -224,7 +202,7 @@ void unsubdivide_level(
         std::uint8_t          const lvl,
         SubdivTriangleSkeleton      &rSkel,
         SkeletonVertexData          &rSkData,
-        SubdivScratchpad            &rSP)
+        SkeletonSubdivScratchpad    &rSP)
 {
     auto const wont_unsubdivide = [&rSP] (SkTriId const sktriId) -> bool
     {
@@ -321,7 +299,7 @@ SkTriGroupId subdivide(
         bool                        hasNextLevel,
         SubdivTriangleSkeleton      &rSkel,
         SkeletonVertexData          &rSkData,
-        SubdivScratchpad            &rSP)
+        SkeletonSubdivScratchpad    &rSP)
 {
     LGRN_ASSERTM(rSkel.tri_group_ids().exists(tri_group_id(sktriId)), "SkTri does not exist");
     LGRN_ASSERTM(!rSkTri.children.has_value(), "Already subdivided");
@@ -339,7 +317,8 @@ SkTriGroupId subdivide(
     // manual borrow checker hint: rSkTri becomes invalid here >:)
     auto const [groupId, rGroup] = rSkel.tri_subdiv(sktriId, rSkTri, middles);
 
-    rSP.resize(rSkel, rSkData);
+    rSkData.resize(rSkel);
+    rSP.resize(rSkel);
 
     rSP.onSubdiv(sktriId, groupId, corners, middlesNew, rSkel, rSkData, rSP.onSubdivUserData);
 
@@ -527,14 +506,14 @@ void subdivide_level_by_distance(
         std::uint8_t          const lvl,
         SubdivTriangleSkeleton      &rSkel,
         SkeletonVertexData          &rSkData,
-        SubdivScratchpad            &rSP)
+        SkeletonSubdivScratchpad    &rSP)
 {
     LGRN_ASSERT(lvl == rSP.levelNeedProcess);
 
     SubdivTriangleSkeleton::Level &rLvl   = rSkel.levels[lvl];
-    SubdivScratchpadLevel  &rLvlSP = rSP .levels[lvl];
+    SubdivScratchpadLevel         &rLvlSP = rSP  .levels[lvl];
 
-    bool const hasNextLevel = (lvl+1 < rSP.levelMax);
+    bool const hasNextLevel = lvl+1 < rSkel.levelMax;
 
     while ( ! rSP.levels[lvl].distanceTestNext.empty() )
     {

@@ -22,14 +22,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+/**
+ * @file
+ * @brief Functions and tables for creating spherical triangle skeletons.
+ *
+ * It's possible to write similar functions to support non-spherical terrain.
+ */
 #pragma once
 
 #include "skeleton.h"
 #include "geometry.h"
 
 #include <osp/core/math_types.h>
-
-#include <vector>
 
 #include <cstdint>
 
@@ -40,6 +45,11 @@ namespace planeta
 inline constexpr std::uint8_t const gc_icoVrtxCount = 12;
 inline constexpr std::uint8_t const gc_icoTriCount = 20;
 
+// Tables generated with scripts/icosahedron_tables.py
+
+/**
+ * @brief Positions of the 12 vertices on an icosahedron
+ */
 inline constexpr std::array<osp::Vector3d, 12> gc_icoVrtxPos
 {{
     { 0.000000000000000e+0,  0.000000000000000e+0,  1.000000000000000e+0},
@@ -112,12 +122,10 @@ inline constexpr std::array<float, 10> const gc_icoTowerOverHorizonVsLevel
  * @brief Create an icosahedron shaped Triangle Mesh Skeleton
  *
  * @param radius        [in] Radius of icosahedron in meters
- * @param pow2scale     [in] Scale for rPositions, 2^pow2scale units = 1 meter
  * @param vrtxIds       [out] Vertex IDs out for initial 12 vertices
  * @param groupIds      [out] Triangle Group IDs out for initial 5 groups for 5*4 triangles
  * @param triIds        [out] Triangle IDs out for initial 20 triangles
- * @param rPositions    [out] Vertex Position data to allocate
- * @param rVBufNrm      [out] Vertex Normal data to allocate
+ * @param rSkData       [out] Vertex data out
  *
  * @return SubdivTriangleSkeleton for keeping track of Vertex and Triangle IDs
  */
@@ -133,13 +141,13 @@ SubdivTriangleSkeleton create_skeleton_icosahedron(
  *        subdividing a Triangle along an icosahedron sphere
  *
  * @param radius        [in] Radius of icosahedron in meters
- * @param pow2scale     [in] Scale for rPositions, 2^pow2scale units = 1 meter
  * @param vrtxCorners   [in] Vertex IDs for the main Triangle's corners
  * @param vrtxMid       [in] Vertex IDs of the 3 new middle vertices
+ * @param rSkData       [out] Vertex data out
  */
 void ico_calc_middles(
-        double      radius,
-        std::array<SkVrtxId, 3> const   vrtxCorners,
+        double                                                  radius,
+        std::array<SkVrtxId, 3>                                 vrtxCorners,
         std::array<osp::MaybeNewId<SkVrtxId>, 3>                vrtxMid,
         SkeletonVertexData                                      &rSkData);
 
@@ -150,16 +158,17 @@ void ico_calc_middles(
  *
  * @param radius        [in] Radius of icosahedron in meters
  * @param level         [in] Number of times to subdivide
- * @param a             [in] Vertex ID of A
- * @param b             [in] Vertex ID of B
-
+ * @param cornerA       [in] Vertex on one end
+ * @param cornerB       [in] Vertex on the other end lol
+ * @param vrtxEdge      [in] Vertices between corner A and B, position and normal will be written to
+ * @param rSkData       [out] Vertex data out
  */
 void ico_calc_chunk_edge(
         double                                                  radius,
         std::uint8_t                                            level,
         SkVrtxId                                                a,
         SkVrtxId                                                b,
-        osp::ArrayView<osp::MaybeNewId<SkVrtxId> const>         vrtxOut,
+        osp::ArrayView<osp::MaybeNewId<SkVrtxId> const>         vrtxEdge,
         SkeletonVertexData                                      &rSkData);
 
 

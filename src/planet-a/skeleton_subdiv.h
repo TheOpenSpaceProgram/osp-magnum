@@ -22,6 +22,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+/**
+ * @file
+ * @brief Functions and data for subdividing a SubdivTriangleSkeleton
+ */
 #pragma once
 
 #include "skeleton.h"
@@ -42,20 +47,23 @@ struct SubdivScratchpadLevel
  *
  * This is intended to be kept around to avoid reallocations
  */
-struct SubdivScratchpad
+struct SkeletonSubdivScratchpad
 {
     using UserData_t = std::array<void*, 4>;
     using OnUnsubdivideFunc_t = void (*)(SkTriId, SkeletonTriangle&, SubdivTriangleSkeleton&, SkeletonVertexData&, UserData_t) noexcept;
     using OnSubdivideFunc_t   = void (*)(SkTriId, SkTriGroupId, std::array<SkVrtxId, 3>, std::array<osp::MaybeNewId<SkVrtxId>, 3>, SubdivTriangleSkeleton&, SkeletonVertexData&, UserData_t) noexcept;
 
-    void resize(SubdivTriangleSkeleton &rSkel, SkeletonVertexData &rSkData);
+    void resize(SubdivTriangleSkeleton &rSkel);
 
     std::array<std::uint64_t, gc_maxSubdivLevels> distanceThresholdSubdiv;
     std::array<std::uint64_t, gc_maxSubdivLevels> distanceThresholdUnsubdiv;
 
     std::array<SubdivScratchpadLevel, gc_maxSubdivLevels> levels;
 
+    /// Used to record which Skeleton triangles have already been distance-checked. Used for both
+    /// subdividing and unsubdividing
     osp::BitVector_t distanceTestDone;
+
     osp::BitVector_t tryUnsubdiv;
     osp::BitVector_t cantUnsubdiv;
 
@@ -67,7 +75,6 @@ struct SubdivScratchpad
     osp::BitVector_t surfaceRemoved;
 
     std::uint8_t levelNeedProcess = 7;
-    std::uint8_t levelMax {7};
 
     OnSubdivideFunc_t onSubdiv      {nullptr};
     UserData_t onSubdivUserData     {{nullptr, nullptr, nullptr, nullptr}};
@@ -89,7 +96,7 @@ void unsubdivide_select_by_distance(
         osp::Vector3l                   pos,
         SubdivTriangleSkeleton    const &rSkel,
         SkeletonVertexData        const &rSkData,
-        SubdivScratchpad                &rSP);
+        SkeletonSubdivScratchpad        &rSP);
 
 /**
  * @brief Tests which triangles in SubdivScratchpad::tryUnsubdiv are not allowed to un-subdivide
@@ -100,7 +107,7 @@ void unsubdivide_deselect_invariant_violations(
         std::uint8_t                    lvl,
         SubdivTriangleSkeleton    const &rSkel,
         SkeletonVertexData        const &rSkData,
-        SubdivScratchpad                &rSP);
+        SkeletonSubdivScratchpad        &rSP);
 
 /**
  * @brief Performs unsubdivision on triangles in scratchpad's tryUnsubdiv and not in cantUnsubdiv
@@ -109,7 +116,7 @@ void unsubdivide_level(
         std::uint8_t                    lvl,
         SubdivTriangleSkeleton          &rSkel,
         SkeletonVertexData              &rSkData,
-        SubdivScratchpad                &rSP);
+        SkeletonSubdivScratchpad        &rSP);
 
 /**
  * @brief Subdivide a triangle forming a group of 4 new triangles on the next subdiv level
@@ -123,7 +130,7 @@ SkTriGroupId subdivide(
         bool                            hasNextLevel,
         SubdivTriangleSkeleton          &rSkel,
         SkeletonVertexData              &rSkData,
-        SubdivScratchpad                &rSP);
+        SkeletonSubdivScratchpad        &rSP);
 
 /**
  * @brief Subdivide all triangles (within a subdiv level) too close to pos
@@ -133,9 +140,6 @@ void subdivide_level_by_distance(
         std::uint8_t                    lvl,
         SubdivTriangleSkeleton          &rSkel,
         SkeletonVertexData              &rSkData,
-        SubdivScratchpad                &rSP);
-
-
-
+        SkeletonSubdivScratchpad        &rSP);
 
 } // namespace planeta

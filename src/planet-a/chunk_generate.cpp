@@ -28,19 +28,34 @@
 
 #include <ostream>
 
-
+using osp::ArrayView;
+using osp::Vector3;
+using osp::Vector3u;
+using osp::ZeroInit;
+using osp::arrayView;
+using osp::as_2d;
 
 namespace planeta
 {
 
+void ChunkScratchpad::resize(ChunkSkeleton const& rChSk)
+{
+    auto const maxSharedVrtx = rChSk.m_sharedIds.capacity();
+
+    edgeVertices.resize((rChSk.m_chunkEdgeVrtxCount - 1) * 3);
+    stitchCmds  .resize(rChSk.m_chunkIds.capacity(), {});
+    osp::bitvector_resize(sharedAdded,        maxSharedVrtx);
+    osp::bitvector_resize(sharedRemoved,      maxSharedVrtx);
+    osp::bitvector_resize(sharedNormalsDirty, maxSharedVrtx);
+}
 
 void restitch_check(
-        ChunkId              const chunkId,
-        SkTriId              const sktriId,
-        ChunkSkeleton&             rSkCh,
-        SubdivTriangleSkeleton     &rSkel,
-        SkeletonVertexData&        rSkData,
-        ChunkScratchpad&           rChSP)
+        ChunkId                   const chunkId,
+        SkTriId                   const sktriId,
+        ChunkSkeleton             const &rSkCh,
+        SubdivTriangleSkeleton    const &rSkel,
+        SkeletonVertexData        const &rSkData,
+        ChunkScratchpad                 &rChSP)
 {
     ChunkStitch ownCmd = {.enabled = true, .detailX2 = false};
 
@@ -163,13 +178,11 @@ void update_faces(
         bool                   const newlyAdded,
         SubdivTriangleSkeleton       &rSkel,
         SkeletonVertexData     const &rSkData,
-        BasicTerrainGeometry         &rGeom,
+        BasicChunkMeshGeometry       &rGeom,
         ChunkMeshBufferInfo    const &rChInfo,
         ChunkScratchpad              &rChSP,
         ChunkSkeleton                &rSkCh)
 {
-    using namespace osp;
-
     ChunkStitch const cmd = rChSP.stitchCmds[chunkId];
 
     if ( ! newlyAdded && ! cmd.enabled )
@@ -185,7 +198,7 @@ void update_faces(
     TerrainFaceWriter writer{
         .vbufPos             = rGeom.chunkVbufPos,
         .vbufNrm             = rGeom.chunkVbufNrm,
-        .sharedNormals       = rGeom.sharedNormals.base(),
+        .sharedNormalSum     = rGeom.sharedNormalSum.base(),
         .fillNormalContrib   = fillNormalContrib,
         .fanNormalContrib    = fanNormalContrib,
         .sharedUsed          = sharedUsed,
@@ -202,9 +215,9 @@ void update_faces(
         auto const vbufFillNormals        = chunkVbufFillNormals2D.row(chunkId.value);
 
         // These aren't cleaned up by the previous chunk that used them
-        std::fill(vbufFillNormals.begin(),   vbufFillNormals.end(),   Vector3{ZeroInit});
+        std::fill(vbufFillNormals  .begin(), vbufFillNormals  .end(), Vector3{ZeroInit});
         std::fill(fillNormalContrib.begin(), fillNormalContrib.end(), Vector3{ZeroInit});
-        std::fill(fanNormalContrib.begin(),  fanNormalContrib.end(),  FanNormalContrib{});
+        std::fill(fanNormalContrib .begin(), fanNormalContrib .end(), FanNormalContrib{});
 
         auto const add_fill_tri = [&rSkCh, &rChInfo, &writer, chunkId]
                 (std::uint16_t const aX, std::uint16_t const aY,
@@ -230,13 +243,15 @@ void update_faces(
             for (unsigned int x = 0; x < y; ++x)
             {
                 // down-pointing
-                add_fill_tri(   x+1, y+1,      x+1, y,         x, y   );
+                //                ( aX   aY )    ( aX   aY )    ( aX   aY )
+                add_fill_tri(      x+1, y+1,      x+1,  y,         x,  y      );
 
                 // up pointing
                 bool const onEdge = (x == y-1) || y == rSkCh.m_chunkEdgeVrtxCount - 1;
                 if ( ! onEdge )
                 {
-                    add_fill_tri(   x+1, y,        x+1, y+1,       x+2, y+1   );
+                    //                ( aX   aY )    ( aX   aY )    ( aX   aY )
+                    add_fill_tri(      x+1,  y,       x+1,  y+1,     x+2,  y+1   );
                 }
             }
         }
@@ -259,7 +274,7 @@ void update_faces(
         if (rCurrentStitch.enabled)
         {
             // Delete previous fan stitch, Subtract normal contributions
-            subtract_normal_contrib(chunkId, false, true, rGeom, rChInfo, rChSP, rSkCh);
+            subtract_normal_contrib(chunkId, true, rGeom, rChInfo, rChSP, rSkCh);
         }
         rSkCh.m_chunkStitch[chunkId] = cmd;
         ArrayView<SharedVrtxOwner_t const> detailX2Edge0;
@@ -295,18 +310,37 @@ void update_faces(
 
 void subtract_normal_contrib(
         ChunkId                       const chunkId,
-        bool                          const subtractFill,
-        bool                          const subtractFan,
-        BasicTerrainGeometry                &rGeom,
+        bool                          const onlySubtractFans,
+        BasicChunkMeshGeometry              &rGeom,
         ChunkMeshBufferInfo           const &rChInfo,
         ChunkScratchpad                     &rChSP,
         ChunkSkeleton                 const &rSkCh)
 {
-    using namespace osp;
+    // Subtract Fan shared vertex normal contributions
 
-    // Subtract Fill shared vertex normal contributions
-    if ( subtractFill )
+    auto const chunkFanNormalContrib2D = as_2d(arrayView(rGeom.chunkFanNormalContrib), rChInfo.fanMaxSharedCount);
+    auto const fanNormalContrib        = chunkFanNormalContrib2D.row(chunkId.value);
+
+    LGRN_ASSERT(rSkCh.m_chunkStitch[chunkId].enabled);
+    for (FanNormalContrib &rContrib : fanNormalContrib)
     {
+        if ( ! rContrib.shared.has_value() )
+        {
+            break;
+        }
+
+        if (rSkCh.m_sharedIds.exists(rContrib.shared) && ! rChSP.sharedRemoved.test(rContrib.shared.value))
+        {
+            osp::Vector3 &rNormal = rGeom.sharedNormalSum[rContrib.shared];
+            rNormal -= rContrib.sum;
+            rChSP.sharedNormalsDirty.set(rContrib.shared.value);
+        }
+        rContrib.sum *= 0.0f;
+    }
+
+    if ( ! onlySubtractFans )
+    {
+        // Subtract Fill shared vertex normal contributions
         auto const chunkFillNormalContrib2D = as_2d(arrayView(rGeom.chunkFillSharedNormals), rSkCh.m_chunkSharedCount);
         auto const fillNormalContrib        = chunkFillNormalContrib2D.row(chunkId.value);
 
@@ -322,42 +356,18 @@ void subtract_normal_contrib(
 
             if (rSkCh.m_sharedIds.exists(shared) && ! rChSP.sharedRemoved.test(shared.value))
             {
-                Vector3 const& contrib = fillNormalContrib[i];
-                Vector3 &rNormal = rGeom.sharedNormals[shared];
+                Vector3 const &contrib = fillNormalContrib[i];
+                Vector3       &rNormal = rGeom.sharedNormalSum[shared];
                 rNormal -= contrib;
                 rChSP.sharedNormalsDirty.set(shared.value);
             }
             fillNormalContrib[i] *= 0.0f;
         }
     }
-
-    // Subtract Fan shared vertex normal contributions
-    if ( subtractFan )
-    {
-        auto const chunkFanNormalContrib2D = as_2d(arrayView(rGeom.chunkFanNormalContrib), rChInfo.fanMaxSharedCount);
-        auto const fanNormalContrib        = chunkFanNormalContrib2D.row(chunkId.value);
-
-        LGRN_ASSERT(rSkCh.m_chunkStitch[chunkId].enabled);
-        for (FanNormalContrib &rContrib : fanNormalContrib)
-        {
-            if ( ! rContrib.shared.has_value() )
-            {
-                break;
-            }
-
-            if (rSkCh.m_sharedIds.exists(rContrib.shared) && ! rChSP.sharedRemoved.test(rContrib.shared.value))
-            {
-                Vector3 &rNormal = rGeom.sharedNormals[rContrib.shared];
-                rNormal -= rContrib.sum;
-                rChSP.sharedNormalsDirty.set(rContrib.shared.value);
-            }
-            rContrib.sum *= 0.0f;
-        }
-    }
 }
 
 void debug_check_invariants(
-        BasicTerrainGeometry          const &rGeom,
+        BasicChunkMeshGeometry        const &rGeom,
         ChunkMeshBufferInfo           const &rChInfo,
         ChunkSkeleton                 const &rSkCh)
 {
@@ -388,7 +398,7 @@ void debug_check_invariants(
 
 void write_obj(
         std::ostream                        &rStream,
-        BasicTerrainGeometry          const &rGeom,
+        BasicChunkMeshGeometry        const &rGeom,
         ChunkMeshBufferInfo           const &rChInfo,
         ChunkSkeleton                 const &rSkCh)
 {

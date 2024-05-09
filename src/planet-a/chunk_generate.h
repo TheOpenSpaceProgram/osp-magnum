@@ -23,71 +23,98 @@
  * SOFTWARE.
  */
 #pragma once
+/**
+ * @file
+ * @brief Functions and data required for generating chunk meshes
+ */
 
 #include "skeleton.h"
 #include "geometry.h"
-
-#include "chunk_utils.h"
-
-#include <osp/core/bitvector.h>
-#include <osp/core/math_int64.h>
 
 namespace planeta
 {
 
 struct ChunkScratchpad
 {
-    ChunkVrtxSubdivLUT lut;
+    void resize(ChunkSkeleton const& rChSk);
 
+    /// Lookup table to help calculate 'Fill' vertices for chunks
+    ChunkFillSubdivLUT lut;
+
+    /// Temporary vector for storing sections of shared vertices
+    std::vector< osp::MaybeNewId<SkVrtxId> > edgeVertices;
+
+    /// New stitches to apply to currently existing chunks
     osp::KeyedVec<ChunkId, ChunkStitch> stitchCmds;
 
-    /// Newly added shared vertices, position needs to be copied from skeleton
-    osp::BitVector_t    sharedAdded;
+    /// Recently added shared vertices, position needs to be copied from skeleton
+    osp::BitVector_t sharedAdded;
 
-    osp::BitVector_t    sharedRemoved;
-
-    std::vector< osp::MaybeNewId<SkVrtxId> > edgeVertices;
+    /// Recently added shared vertices
+    osp::BitVector_t sharedRemoved;
 
     /// Shared vertices that need to recalculate normals
     osp::BitVector_t sharedNormalsDirty;
 };
 
+/**
+ * @brief Check a chunk and its neighbors if their stitches (fan triangles) need to be updated.
+ *
+ * Populates ChunkScratchpad::stitchCmds
+ */
 void restitch_check(
-        ChunkId                         chunkId,
-        SkTriId                         sktriId,
-        ChunkSkeleton&                  rSkCh,
-        SubdivTriangleSkeleton          &rSkel,
-        SkeletonVertexData              &rSkTrn,
+        ChunkId                   const chunkId,
+        SkTriId                   const sktriId,
+        ChunkSkeleton             const &rSkCh,
+        SubdivTriangleSkeleton    const &rSkel,
+        SkeletonVertexData        const &rSkData,
         ChunkScratchpad                 &rChSP);
 
+/**
+ * @brief Write chunk fan and fill triangles to the index buffer.
+ *
+ * Fan triangles will be generated for newly added chunks. Fan triangles will be added or replaced
+ * if a chunk command is enabled.
+ */
 void update_faces(
         ChunkId                         chunkId,
         SkTriId                         sktriId,
         bool                            newlyAdded,
         SubdivTriangleSkeleton          &rSkel,
         SkeletonVertexData        const &rSkData,
-        BasicTerrainGeometry            &rGeom,
+        BasicChunkMeshGeometry          &rGeom,
         ChunkMeshBufferInfo       const &rChInfo,
         ChunkScratchpad                 &rChSP,
         ChunkSkeleton                   &rSkCh);
 
+/**
+ * @brief Subtract normals from connected shared vertices when removing a chunk, or fan triangles
+ *        only if fans are being redone.
+ *
+ * \c see BasicChunkMeshGeometry::sharedNormalSum
+ */
 void subtract_normal_contrib(
         ChunkId                         chunkId,
-        bool                            subtractFill,
-        bool                            subtractFan,
-        BasicTerrainGeometry            &rGeom,
+        bool                            onlySubtractFans,
+        BasicChunkMeshGeometry          &rGeom,
         ChunkMeshBufferInfo       const &rChInfo,
         ChunkScratchpad                 &rChSP,
         ChunkSkeleton             const &rSkCh);
 
+/**
+ * @brief Does asserts, checks if chunk normals are normalized
+ */
 void debug_check_invariants(
-        BasicTerrainGeometry      const &rGeom,
+        BasicChunkMeshGeometry    const &rGeom,
         ChunkMeshBufferInfo       const &rChInfo,
         ChunkSkeleton             const &rSkCh);
 
+/**
+ * @brief Write chunk mesh in wavefront .obj format
+ */
 void write_obj(
         std::ostream                    &rStream,
-        BasicTerrainGeometry      const &rGeom,
+        BasicChunkMeshGeometry    const &rGeom,
         ChunkMeshBufferInfo       const &rChInfo,
         ChunkSkeleton             const &rSkCh);
 

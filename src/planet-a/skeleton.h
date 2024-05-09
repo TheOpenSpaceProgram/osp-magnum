@@ -222,22 +222,18 @@ public:
 
     [[nodiscard]] SkTriGroup const& tri_group_at(SkTriGroupId const group) const
     {
-        return m_triData.at(group);
+        return m_triGroupData.at(group);
     }
 
     [[nodiscard]] SkTriGroup& tri_group_at(SkTriGroupId const group)
     {
-        return m_triData.at(group);
+        return m_triGroupData.at(group);
     }
 
     /**
      * @brief Resize data to fit all possible IDs
      */
-    void tri_group_resize_fit_ids()
-    {
-        m_triData.resize(m_triGroupIds.capacity());
-        m_triRefCount.resize(m_triGroupIds.capacity() * 4);
-    }
+    void tri_group_resize_fit_ids();
 
     /**
      * @brief Create a triangle group (4 new triangles)
@@ -251,7 +247,7 @@ public:
             std::array<std::array<SkVrtxId, 3>, 4>  vertices);
 
     SkTriGroupPair tri_group_create_root(
-            uint8_t                                 depth,
+            std::uint8_t                            depth,
             std::array<std::array<SkVrtxId, 3>, 4>  vertices);
 
     /**
@@ -259,12 +255,7 @@ public:
      *
      * @param n [in] Requested capacity
      */
-    void tri_group_reserve(size_t const n)
-    {
-        m_triGroupIds.reserve(n);
-        m_triData.reserve(m_triGroupIds.capacity());
-        m_triRefCount.resize(m_triGroupIds.capacity() * 4);
-    }
+    void tri_group_reserve(std::size_t const n) { m_triGroupIds.reserve(n); }
 
     struct SkTriGroupNeighboring
     {
@@ -294,12 +285,12 @@ public:
      */
     [[nodiscard]] SkeletonTriangle& tri_at(SkTriId const triId)
     {
-        return m_triData.at(tri_group_id(triId)).triangles[tri_sibling_index(triId)];
+        return m_triGroupData.at(tri_group_id(triId)).triangles[tri_sibling_index(triId)];
     }
 
     [[nodiscard]] SkeletonTriangle const& tri_at(SkTriId const triId) const
     {
-        return m_triData.at(tri_group_id(triId)).triangles[tri_sibling_index(triId)];
+        return m_triGroupData.at(tri_group_id(triId)).triangles[tri_sibling_index(triId)];
     }
 
     /**
@@ -319,7 +310,7 @@ public:
 
     bool is_tri_subdivided(SkTriId const triId) const
     {
-        return m_triData[tri_group_id(triId)].triangles[tri_sibling_index(triId)].children.has_value();
+        return m_triGroupData[tri_group_id(triId)].triangles[tri_sibling_index(triId)].children.has_value();
     }
 
     void tri_unsubdiv(SkTriId triId, SkeletonTriangle &rTri);
@@ -415,6 +406,9 @@ public:
 
     void debug_check_invariants();
 
+
+public:
+
     struct Level
     {
         /// Subdivided triangles that neighbor a non-subdivided one
@@ -425,6 +419,7 @@ public:
     };
 
     std::array<Level, gc_maxSubdivLevels> levels;
+    std::uint8_t levelMax {7};
 
 private:
 
@@ -433,13 +428,19 @@ private:
     lgrn::IdRefCount<SkTriId>               m_triRefCount;
 
     // access using SkTriGroupId from m_triGroupIds
-    osp::KeyedVec<SkTriGroupId, SkTriGroup> m_triData;
+    osp::KeyedVec<SkTriGroupId, SkTriGroup> m_triGroupData;
 }; // class SubdivTriangleSkeleton
 
 
 //-----------------------------------------------------------------------------
 
-
+/**
+ * @brief Describes how the edges of a chunk are stitched together with its neighbors.
+ *
+ * Chunks that share an edge with higher detail chunks must have a 'detailX2' stitch so that
+ * whoever is building the chunk mesh's 'Fan' triangles (ChunkFanStitcher) can generate a smooth
+ * transition between low and high detail.
+ */
 struct ChunkStitch
 {
     bool          enabled        :1;
@@ -481,7 +482,12 @@ class ChunkSkeleton
 {
 public:
 
-    void chunk_reserve(uint16_t const size)
+    /**
+     * @brief Allocate space enough space for AT LEAST certain number of chunks.
+     *
+     * Real capacity won't match specified size, check m_chunkIds.capacity() afterwards.
+     */
+    void chunk_reserve(std::uint16_t const size)
     {
         m_chunkIds.reserve(size);
 
@@ -528,6 +534,11 @@ public:
         return {&m_chunkSharedUsed[offset], m_chunkSharedCount};
     }
 
+    /**
+     * @brief Allocate space enough space for AT LEAST certain number of shared vertices.
+     *
+     * Real capacity won't match specified size, check m_sharedIds.capacity() afterwards.
+     */
     void shared_reserve(uint32_t const size)
     {
         m_sharedIds         .reserve(size);
@@ -539,12 +550,7 @@ public:
         return m_sharedRefCount.ref_add(triId);
     }
 
-    struct ReleaseStatus
-    {
-        std::uint16_t refCount;
-    };
-
-    ReleaseStatus shared_release(SharedVrtxOwner_t&& rStorage, SubdivTriangleSkeleton &rSkel) noexcept
+    osp::RefCountStatus<std::uint16_t> shared_release(SharedVrtxOwner_t&& rStorage, SubdivTriangleSkeleton &rSkel) noexcept
     {
         SharedVrtxId const sharedId = rStorage.value();
         m_sharedRefCount.ref_release(std::move(rStorage));
@@ -559,14 +565,11 @@ public:
             m_sharedIds.remove(sharedId);
         }
 
-        return ReleaseStatus{refCount};
+        return { refCount };
     }
 
     /**
      * @brief Create or get a shared vertex associated with a skeleton vertex
-     *
-     * @param skVrtxId
-     * @return
      */
     osp::MaybeNewId<SharedVrtxId> shared_get_or_create(SkVrtxId skVrtxId, SubdivTriangleSkeleton &rSkel);
 

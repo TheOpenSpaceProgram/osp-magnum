@@ -22,6 +22,13 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+/**
+ * @file
+ * @brief Utilities for managing chunk mesh buffers and writing faces
+ *
+ * Does not depend on types from geometry.h
+ */
 #pragma once
 
 #include "planeta_types.h"
@@ -53,17 +60,6 @@ struct ChunkMeshBufferInfo
         1u, 3u, 9u, 21u, 45u, 93u, 189u, 381u, 765u, 1533u
     };
 
-    constexpr bool is_vertex_shared(VertexIdx const vrtx) const noexcept
-    {
-        auto const sharedIdInt = uint32_t(vrtx) - vbufSharedOffset; // note: intentional underflow
-        return sharedIdInt < sharedMax;
-    }
-
-    constexpr SharedVrtxId vertex_to_shared(VertexIdx const vrtx) const noexcept
-    {
-        return SharedVrtxId(uint32_t(vrtx) - vbufSharedOffset);
-    }
-
     /// Number of non-shared vertices that fill the center of a chunk. Vertices that don't lie
     /// along the outer edges of their chunk are not shared with other chunks.
     std::uint32_t fillVrtxCount;
@@ -90,19 +86,16 @@ struct ChunkMeshBufferInfo
 
     /// Total size of vertex buffer
     std::uint32_t vbufSize;
-
-    std::uint32_t sharedMax;
-    std::uint16_t chunkMax;
 };
 
-constexpr ChunkMeshBufferInfo make_chunked_mesh_info(
-        ChunkSkeleton const&        skChunks,
-        std::uint16_t const         chunkMax,
-        std::uint32_t const         sharedMax)
+constexpr ChunkMeshBufferInfo make_chunk_mesh_buffer_info(ChunkSkeleton const &skChunks)
 {
+    std::uint32_t const maxChunks     = std::uint32_t(skChunks.m_chunkIds.capacity());
+    std::uint32_t const maxSharedVrtx = std::uint32_t(skChunks.m_sharedIds.capacity());
+
     std::uint32_t const chunkWidth        = skChunks.m_chunkEdgeVrtxCount;
     std::uint32_t const fillCount         = (chunkWidth-2)*(chunkWidth-1) / 2;
-    std::uint32_t const fillTotal         = fillCount * chunkMax;
+    std::uint32_t const fillTotal         = fillCount * maxChunks;
     std::uint32_t const fanFaceCount      = ChunkMeshBufferInfo::smc_fanFacesVsSubdivLevel[skChunks.m_chunkSubdivLevel];
     std::uint32_t const fillFaceCount     = chunkWidth*chunkWidth - fanFaceCount;
     std::uint32_t const fanMaxFaceCount   = fanFaceCount + fanFaceCount/3 + 1;
@@ -117,9 +110,7 @@ constexpr ChunkMeshBufferInfo make_chunked_mesh_info(
         .chunkMaxFaceCount   = fillFaceCount + fanMaxFaceCount,
         .vbufFillOffset      = 0,
         .vbufSharedOffset    = fillTotal,
-        .vbufSize            = fillTotal + sharedMax,
-        .sharedMax           = sharedMax,
-        .chunkMax            = chunkMax
+        .vbufSize            = std::uint32_t(fillTotal + maxSharedVrtx)
     };
 }
 
@@ -146,7 +137,7 @@ constexpr int xy_to_triangular(int const x, int const y) noexcept
 };
 
 constexpr ChunkLocalSharedId coord_to_shared(
-        uint16_t x, uint16_t y, uint16_t chunkWidth) noexcept
+        std::uint16_t x, std::uint16_t y, std::uint16_t chunkWidth) noexcept
 {
     // Tests if (x,y) lies along right, bottom, or left edges of triangle
 
@@ -167,34 +158,6 @@ constexpr ChunkLocalSharedId coord_to_shared(
         return {};
     }
 }
-
-//-----------------------------------------------------------------------------
-
-//
-//  No DetailX2       S                  With DetailX2      S
-//                   / \                                   / \                           a
-//                  /   \                                 / N S                          a
-//                 /  N  \                               /_--`N\                         a
-//                S_______S                             S`______S                        a
-//               / \     / \                           / \     / \                                a
-//              /   \ L /   \                         /   \ L / N S                                a
-//             /  N  \ /  N  \                       /  N  \ /_--`N\                                a
-//            S_______F_______S                     S_______F`______S                              a
-//           / \     / \     / \                   / \     / \     / \                                   a
-//          /   \ L /   \ L /   \                 /   \ L /   \ L / N S                                 a
-//         /  N  \ /  L  \ /  N  \               /  N  \ /  L  \ /_--`N\                               a
-//        S_______F_______F_______S             S_______F_______F`______S              a
-//       / \     / \     / \     / \           / \     / \     / \     / \           a
-//      /   \ L /   \ L /   \ L /   \         /   \ L /   \ L /   \ L / N S          a
-//     /  N  \ /  N  \ /  N  \ /  N  \       /  N  \ /  N  \ /  N  \ /_--`N\         a
-//    S_______S_______S_______S_______S     S_______S_______S_______S`______S                       a
-//
-//  S - Shared Vertex
-//  F - Fill Vertex
-//  N - Fan Face
-//  L - Fill Face
-
-
 
 constexpr VertexIdx fill_to_vrtx(ChunkMeshBufferInfo const& info, ChunkId const chunkId, int const triangular)
 {
@@ -224,7 +187,7 @@ constexpr ReturnThingUvU chunk_coord_to_vrtx(ChunkSkeleton const& skChunks, Chun
  * @brief Stores a procedure on which combinations of vertices need to be
  *        subdivided to calculate chunk fill vertices.
  */
-class ChunkVrtxSubdivLUT
+class ChunkFillSubdivLUT
 {
 public:
     using Vector2us = Magnum::Math::Vector2<uint16_t>;
@@ -257,7 +220,7 @@ public:
 
     constexpr std::vector<ToSubdiv> const& data() const noexcept { return m_data; }
 
-    friend ChunkVrtxSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t subdivLevel);
+    friend ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t subdivLevel);
 
 private:
 
@@ -288,11 +251,13 @@ private:
     uint16_t m_fillVrtxCount;
     uint16_t m_edgeVrtxCount;
 
-}; // class ChunkVrtxSubdivLUT
+}; // class ChunkFillSubdivLUT
 
-ChunkVrtxSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t subdivLevel);
+ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t subdivLevel);
+
 
 //-----------------------------------------------------------------------------
+
 
 template <typename T>
 concept CFaceWriter = requires(T t, VertexIdx idx)

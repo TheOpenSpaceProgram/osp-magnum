@@ -39,7 +39,7 @@ SubdivTriangleSkeleton::~SubdivTriangleSkeleton()
             continue;
         }
 
-        for (SkeletonTriangle& rTri : m_triData[SkTriGroupId(i)].triangles)
+        for (SkeletonTriangle& rTri : m_triGroupData[SkTriGroupId(i)].triangles)
         {
             for (SkVrtxOwner_t& rVrtx : rTri.vertices)
             {
@@ -69,18 +69,33 @@ void SubdivTriangleSkeleton::vrtx_create_chunk_edge_recurse(
     }
 }
 
+void SubdivTriangleSkeleton::tri_group_resize_fit_ids()
+{
+    auto const triGroupCapacity = m_triGroupIds.capacity();
+    auto const triCapacity      = 4 * triGroupCapacity;
+
+    m_triGroupData.resize(triGroupCapacity);
+    m_triRefCount.resize(triCapacity);
+
+    for (int lvl = 0; lvl < this->levelMax+1; ++lvl)
+    {
+        osp::bitvector_resize(levels[lvl].hasSubdivedNeighbor,    triCapacity);
+        osp::bitvector_resize(levels[lvl].hasNonSubdivedNeighbor, triCapacity);
+    }
+}
+
 SkTriGroupPair SubdivTriangleSkeleton::tri_group_create(
-        uint8_t const depth,
-        SkTriId const parentId,
-        SkeletonTriangle &rParent,
-        std::array<std::array<SkVrtxId, 3>, 4> const vertices)
+        std::uint8_t                              const depth,
+        SkTriId                                   const parentId,
+        SkeletonTriangle                                &rParent,
+        std::array<std::array<SkVrtxId, 3>, 4>    const vertices)
 {
     SkTriGroupId const groupId = m_triGroupIds.create();
     rParent.children = groupId;
 
     tri_group_resize_fit_ids(); // invalidates rParent
 
-    SkTriGroup &rGroup = m_triData[groupId];
+    SkTriGroup &rGroup = m_triGroupData[groupId];
     rGroup.parent = parentId;
     rGroup.depth = depth;
 
@@ -104,7 +119,7 @@ SkTriGroupPair SubdivTriangleSkeleton::tri_group_create_root(
 
     tri_group_resize_fit_ids();
 
-    SkTriGroup &rGroup = m_triData[groupId];
+    SkTriGroup &rGroup = m_triGroupData[groupId];
     rGroup.depth = depth;
 
     for (int i = 0; i < 4; i ++)
@@ -153,7 +168,7 @@ SkTriGroupPair SubdivTriangleSkeleton::tri_subdiv(
 {
     LGRN_ASSERTM(!rTri.children.has_value(), "SkeletonTriangle is already subdivided");
 
-    SkTriGroup const& parentGroup = m_triData[tri_group_id(triId)];
+    SkTriGroup const& parentGroup = m_triGroupData[tri_group_id(triId)];
 
     std::array<SkVrtxId, 3> corner = {rTri.vertices[0], rTri.vertices[1], rTri.vertices[2]};
 

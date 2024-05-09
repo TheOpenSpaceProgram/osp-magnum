@@ -76,14 +76,13 @@ Session setup_terrain(
     {
         if ( ! rTerrainFrame.active )
         {
-            SubdivScratchpad &rSP = rTerrain.scratchpad;
-
             rTerrainFrame.active = true;
+
+            // ## Create initial icosahedron skeleton
 
             rTerrainIco.radius          = 50.0f;
             rTerrainIco.height          = 5.0f;
-            rTerrain.skData.scale    = 10;
-
+            rTerrain.skData.scale       = 10;
             rTerrain.skeleton = create_skeleton_icosahedron(
                     rTerrainIco.radius,
                     rTerrainIco.icoVrtx,
@@ -91,22 +90,36 @@ Session setup_terrain(
                     rTerrainIco.icoTri,
                     rTerrain.skData);
 
-            rSP.resize(rTerrain.skeleton, rTerrain.skData);
+            // ## Assign skeleton icosahedron position data
 
+            rTerrain.skData.resize(rTerrain.skeleton);
+
+            float const scale = std::pow(2.0f, rTerrain.skData.scale);
             float const maxRadius = rTerrainIco.radius + rTerrainIco.height;
+
             for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
             {
                 ico_calc_sphere_tri_center(groupId, maxRadius, rTerrainIco.height, rTerrain.skeleton, rTerrain.skData);
+            }
+
+            // ## Prepare the skeleton subdiv scratchpad.
+            // This contains intermediate variables used when subdividing the triangle skeleton.
+
+            SkeletonSubdivScratchpad &rSP = rTerrain.scratchpad;
+            rSP.resize(rTerrain.skeleton);
+            for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
+            {
+                // Notify subsequent functions of the newly added initial icosahedron faces
                 rSP.surfaceAdded.set(tri_id(groupId, 0).value);
                 rSP.surfaceAdded.set(tri_id(groupId, 1).value);
                 rSP.surfaceAdded.set(tri_id(groupId, 2).value);
                 rSP.surfaceAdded.set(tri_id(groupId, 3).value);
             }
 
-            // Apply spherical curvature when skeleton triangles are subdivided.
-            // (Terrain subdivider is intended to work for non-spherical shapes too)
+            // Set function pointer to apply spherical curvature to the skeleton on subdivision.
+            // Spherical planets are not hard-coded into subdivision logic, it's intended to work
+            // to work for non-spherical shapes too.
             rTerrain.scratchpad.onSubdivUserData[0] = &rTerrainIco;
-
             rSP.onSubdiv = [] (
                     SkTriId                             tri,
                     SkTriGroupId                        groupId,
@@ -114,31 +127,34 @@ Session setup_terrain(
                     std::array<MaybeNewId<SkVrtxId>, 3> middles,
                     SubdivTriangleSkeleton              &rSkel,
                     SkeletonVertexData                  &rSkData,
-                    SubdivScratchpad::UserData_t        userData) noexcept
+                    SkeletonSubdivScratchpad::UserData_t userData) noexcept
             {
                 auto const& rTerrainIco = *reinterpret_cast<ACtxTerrainIco*>(userData[0]);
                 ico_calc_middles(rTerrainIco.radius, corners, middles, rSkData);
                 ico_calc_sphere_tri_center(groupId, rTerrainIco.radius + rTerrainIco.height, rTerrainIco.height, rSkel, rSkData);
             };
 
+            // Nothing to do on un-subdivide
             rSP.onUnsubdiv = [] (
                     SkTriId                         tri,
                     SkeletonTriangle                &rTri,
                     SubdivTriangleSkeleton          &rSkel,
                     SkeletonVertexData              &rSkData,
-                    SubdivScratchpad::UserData_t    userData) noexcept
-            {
-            };
+                    SkeletonSubdivScratchpad::UserData_t userData) noexcept
+            { };
 
-            // Calculate distance thresholds
-            for (int level = 0; level < rSP.levelMax; ++level)
+
+            // Calculate distance thresholds for when skeleton triangles should be subdivided and
+            // unsubdivided. These threshold values are used by
+            // subdivide_level_by_distance(...) and unsubdivide_select_by_distance(...)
+            for (int level = 0; level < gc_maxSubdivLevels; ++level)
             {
                 // Good-enough bounding sphere is ~75% of the edge length (determined using Blender)
-                float const subdivRadius = 0.75f * gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * int_2pow<int>(rTerrain.skData.scale);
+                float const edgeLength = gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * scale;
+                float const subdivRadius = 0.75f * edgeLength;
 
                 // TODO: Pick thresholds based on the angular diameter (size on screen) of the
                 //       chunk triangle mesh that will actually be rendered.
-
                 rSP.distanceThresholdSubdiv[level] = std::uint64_t(subdivRadius);
 
                 // Unsubdivide thresholds should be slightly larger (arbitrary x2) to avoid rapid
@@ -146,30 +162,28 @@ Session setup_terrain(
                 rSP.distanceThresholdUnsubdiv[level] = std::uint64_t(2.0f * subdivRadius);
             }
 
+            // ## Prepare Chunk Skeleton
+
             constexpr std::uint8_t chunkSubdivLevels = 3;
 
             rTerrain.skChunks = make_skeleton_chunks(chunkSubdivLevels);
             rTerrain.skChunks.chunk_reserve(300);
             rTerrain.skChunks.shared_reserve(10000);
 
-            auto const maxChunks     = rTerrain.skChunks.m_chunkIds.capacity();
-            auto const maxSharedVrtx = rTerrain.skChunks.m_sharedIds.capacity();
+            // ## Prepare Chunk geometry and buffer information
 
-            rTerrain.chunkInfo = make_chunked_mesh_info(rTerrain.skChunks, std::uint16_t(maxChunks), maxSharedVrtx);
+            rTerrain.chunkInfo = make_chunk_mesh_buffer_info(rTerrain.skChunks);
             rTerrain.chunkGeom.resize(rTerrain.skChunks, rTerrain.chunkInfo);
 
-            rTerrain.chunkSP.lut = make_chunk_vrtx_subdiv_lut(chunkSubdivLevels);
-            rTerrain.chunkSP.edgeVertices.resize((rTerrain.skChunks.m_chunkEdgeVrtxCount - 1) * 3);
-            rTerrain.chunkSP.stitchCmds  .resize(rTerrain.skChunks.m_chunkIds.capacity(), {});
+            // ## Prepare Chunk scratchpad
 
-            bitvector_resize(rTerrain.chunkSP.sharedAdded,  maxSharedVrtx);
-            bitvector_resize(rTerrain.chunkSP.sharedRemoved,  maxSharedVrtx);
-            bitvector_resize(rTerrain.chunkSP.sharedNormalsDirty, maxSharedVrtx);
+            rTerrain.chunkSP.lut = make_chunk_vrtx_subdiv_lut(chunkSubdivLevels);
+            rTerrain.chunkSP.resize(rTerrain.skChunks);
         }
     });
 
     rBuilder.task()
-        .name       ("subdivide triangle skeleton")
+        .name       ("Subdivide triangle skeleton")
         .run_on     ({tgScn.update(Run)})
         .sync_with  ({tgTrn.terrainFrame(Ready), tgTrn.skeleton(New), tgTrn.surfaceChanges(Resize)})
         .push_to    (out.m_tasks)
@@ -181,36 +195,51 @@ Session setup_terrain(
             return;
         }
 
-        SkeletonVertexData  &rSkTrn = rTerrain.skData;
-        SubdivScratchpad &rSP    = rTerrain.scratchpad;
+        SubdivTriangleSkeleton     &rSkel      = rTerrain.skeleton;
+        SkeletonVertexData         &rSkData    = rTerrain.skData;
+        BasicChunkMeshGeometry     &rChGeo     = rTerrain.chunkGeom;
+        SkeletonSubdivScratchpad   &rSkSP      = rTerrain.scratchpad;
+
+        // ## Unsubdivide triangles that are too far away
+
+        // Unsubdivide is performed first, since it's better to remove stuff before adding new
+        // stuff; this reduces peak memory requirements.
 
         // Unsubdividing is performed per-level, starting from the highest detail. In order to
         // respect invariants, triangles must be removed in groups (removing triangles 1-by-1 can
         // violate invariants mid-way).
-        for (int level = rSP.levelMax-1; level >= 0; --level)
+        for (int level = rSkel.levelMax-1; level >= 0; --level)
         {
-            unsubdivide_select_by_distance(level, rTerrainFrame.position, rTerrain.skeleton, rSkTrn, rSP);
-            unsubdivide_deselect_invariant_violations(level, rTerrain.skeleton, rSkTrn, rSP);
-            unsubdivide_level(level, rTerrain.skeleton, rSkTrn, rSP);
-        }
-        rSP.distanceTestDone.reset();
+            // Select and deselect only modifies rSkSP
+            unsubdivide_select_by_distance(level, rTerrainFrame.position, rSkel, rSkData, rSkSP);
+            unsubdivide_deselect_invariant_violations(level, rSkel, rSkData, rSkSP);
 
-        if (rSP.levelMax > 0)
+            // Perform changes on skeleton, delete selected triangles
+            unsubdivide_level(level, rSkel, rSkData, rSkSP);
+        }
+        rSkSP.distanceTestDone.reset();
+
+        // ## Subdivide nearby triangles
+
+        // Distance testing is performed 'recursively' per level. A triangle within the subdivision
+        // threshold and needs to be subdivided, will trigger a subdivision check for its children
+        // on the next level. To start, we seed the distance checker with the root triangles.
+        if (rSkel.levelMax > 0)
         {
             for (SkTriId const sktriId : rTerrainIco.icoTri)
             {
-                rSP.levels[0].distanceTestNext.push_back(sktriId);
-                rSP.distanceTestDone.set(sktriId.value);
+                rSkSP.levels[0].distanceTestNext.push_back(sktriId);
+                rSkSP.distanceTestDone.set(sktriId.value);
             }
-            rSP.levelNeedProcess = 0;
+            rSkSP.levelNeedProcess = 0;
         }
-        for (int level = 0; level < rSP.levelMax; ++level)
+
+        // Do the subdivide for real
+        for (int level = 0; level < rSkel.levelMax; ++level)
         {
-            subdivide_level_by_distance(rTerrainFrame.position, level, rTerrain.skeleton, rSkTrn, rSP);
+            subdivide_level_by_distance(rTerrainFrame.position, level, rSkel, rSkData, rSkSP);
         }
-
-        rSP.distanceTestDone.reset();
-
+        rSkSP.distanceTestDone.reset();
     });
 
     rBuilder.task()
@@ -226,103 +255,105 @@ Session setup_terrain(
             return;
         }
 
-        SubdivScratchpad        &rSP     = rTerrain.scratchpad;
-        ChunkScratchpad         &rChSP   = rTerrain.chunkSP;
-        SkeletonVertexData         &rSkTrn  = rTerrain.skData;
-        ChunkSkeleton           &rSkCh   = rTerrain.skChunks;
-        ChunkMeshBufferInfo &rChInfo = rTerrain.chunkInfo;
+        SubdivTriangleSkeleton     &rSkel      = rTerrain.skeleton;
+        SkeletonVertexData         &rSkData    = rTerrain.skData;
+        ChunkSkeleton              &rSkCh      = rTerrain.skChunks;
+        ChunkMeshBufferInfo        &rChInfo    = rTerrain.chunkInfo;
+        BasicChunkMeshGeometry     &rChGeo     = rTerrain.chunkGeom;
+        ChunkScratchpad            &rChSP      = rTerrain.chunkSP;
+        SkeletonSubdivScratchpad   &rSkSP      = rTerrain.scratchpad;
 
         rChSP.sharedNormalsDirty.reset();
         rChSP.sharedAdded.reset();
         rChSP.sharedRemoved.reset();
 
         // Delete chunks of now-deleted Skeleton Triangles
-        for (std::size_t const sktriInt : rSP.surfaceRemoved.ones())
+        for (std::size_t const sktriInt : rSkSP.surfaceRemoved.ones())
         {
             auto    const sktriId = SkTriId(sktriInt);
             ChunkId const chunkId = rSkCh.m_triToChunk[sktriId];
 
-            subtract_normal_contrib(chunkId, true, true, rTerrain.chunkGeom, rChInfo, rChSP, rSkCh);
+            subtract_normal_contrib(chunkId, false, rChGeo, rChInfo, rChSP, rSkCh);
 
-            rSkCh.chunk_remove(chunkId, sktriId, rTerrain.chunkSP.sharedRemoved, rTerrain.skeleton);
-
+            rSkCh.chunk_remove(chunkId, sktriId, rChSP.sharedRemoved, rSkel);
         }
 
         auto const chLevel  = rSkCh.m_chunkSubdivLevel;
         auto const edgeSize = rSkCh.m_chunkEdgeVrtxCount-1;
 
-
         // Create new chunks for each new surface Skeleton Triangle added
-        rSkCh.m_triToChunk.resize(rTerrain.skeleton.tri_group_ids().capacity() * 4);
-        for (std::size_t const sktriInt : rSP.surfaceAdded.ones())
+        rSkCh.m_triToChunk.resize(rSkel.tri_group_ids().capacity() * 4);
+        for (std::size_t const sktriInt : rSkSP.surfaceAdded.ones())
         {
             auto const sktriId  = SkTriId::from_index(sktriInt);
-            auto const &corners = rTerrain.skeleton.tri_at(SkTriId(sktriInt)).vertices;
+            auto const &corners = rSkel.tri_at(SkTriId(sktriInt)).vertices;
 
             ArrayView< MaybeNewId<SkVrtxId> > const edgeVrtxView = rChSP.edgeVertices;
             ArrayView< MaybeNewId<SkVrtxId> > const edgeLft = edgeVrtxView.sliceSize(edgeSize * 0, edgeSize);
             ArrayView< MaybeNewId<SkVrtxId> > const edgeBtm = edgeVrtxView.sliceSize(edgeSize * 1, edgeSize);
             ArrayView< MaybeNewId<SkVrtxId> > const edgeRte = edgeVrtxView.sliceSize(edgeSize * 2, edgeSize);
 
-            rTerrain.skeleton.vrtx_create_chunk_edge_recurse(chLevel, corners[0], corners[1], edgeLft);
-            rTerrain.skeleton.vrtx_create_chunk_edge_recurse(chLevel, corners[1], corners[2], edgeBtm);
-            rTerrain.skeleton.vrtx_create_chunk_edge_recurse(chLevel, corners[2], corners[0], edgeRte);
+            rSkel.vrtx_create_chunk_edge_recurse(chLevel, corners[0], corners[1], edgeLft);
+            rSkel.vrtx_create_chunk_edge_recurse(chLevel, corners[1], corners[2], edgeBtm);
+            rSkel.vrtx_create_chunk_edge_recurse(chLevel, corners[2], corners[0], edgeRte);
 
-            ChunkId const chunkId = rSkCh.chunk_create(sktriId, rTerrain.skeleton, rChSP.sharedAdded, edgeLft, edgeBtm, edgeRte);
+            ChunkId const chunkId = rSkCh.chunk_create(sktriId, rSkel, rChSP.sharedAdded, edgeLft, edgeBtm, edgeRte);
 
             // chunk_create creates new Skeleton Vertices. Resize is needed after each call
-            rSP.resize(rTerrain.skeleton, rSkTrn);
+            rSkData.resize(rSkel);
+            rSkSP.resize(rSkel);
 
             // Calculates positions and normals with spherical curvature
-            ico_calc_chunk_edge(rTerrainIco.radius, chLevel, corners[0], corners[1], edgeLft, rSkTrn);
-            ico_calc_chunk_edge(rTerrainIco.radius, chLevel, corners[1], corners[2], edgeBtm, rSkTrn);
-            ico_calc_chunk_edge(rTerrainIco.radius, chLevel, corners[2], corners[0], edgeRte, rSkTrn);
+            ico_calc_chunk_edge(rTerrainIco.radius, chLevel, corners[0], corners[1], edgeLft, rSkData);
+            ico_calc_chunk_edge(rTerrainIco.radius, chLevel, corners[1], corners[2], edgeBtm, rSkData);
+            ico_calc_chunk_edge(rTerrainIco.radius, chLevel, corners[2], corners[0], edgeRte, rSkData);
         }
 
-        for (std::size_t const sktriInt : rSP.surfaceAdded.ones())
+        for (std::size_t const sktriInt : rSkSP.surfaceAdded.ones())
         {
             auto const sktriId = SkTriId::from_index(sktriInt);
             auto const chunkId = rSkCh.m_triToChunk[SkTriId::from_index(sktriInt)];
-            restitch_check(chunkId, sktriId, rSkCh, rTerrain.skeleton, rSkTrn, rChSP);
+            restitch_check(chunkId, sktriId, rSkCh, rSkel, rSkData, rChSP);
         }
 
-        // Calculate shared vertex positions
-        float const scalepow = std::pow(2.0f, -rSkTrn.scale);
+        // Calculate positions for newly added shared vertex
+        float const scalepow = std::pow(2.0f, -rSkData.scale);
         for (std::size_t const sharedVrtxInt : rChSP.sharedAdded.ones())
         {
             auto     const sharedVrtxId = SharedVrtxId::from_index(sharedVrtxInt);
             SkVrtxId const skelVrtx     = rSkCh.m_sharedToSkVrtx[sharedVrtxId];
 
+            // Normal is not cleaned up by the previous user. Normal is initially set to zero, and
+            // face normals added in update_faces(...) will accumulate here.
+            rChGeo.sharedNormalSum[sharedVrtxId] = Vector3{ZeroInit};
+
             //Vector3l const translated = positions[size_t(skelId)] + translaton;
-            Vector3d  const scaled = Vector3d(rTerrain.skData.positions[skelVrtx]) * scalepow;
+            Vector3d  const scaled = Vector3d(rSkData.positions[skelVrtx]) * scalepow;
             VertexIdx const vertex = rChInfo.vbufSharedOffset + sharedVrtxInt;
 
-            // Heightmap goes here
-            rTerrain.chunkGeom.chunkVbufPos[vertex] = Vector3(scaled);
-
-            rTerrain.chunkGeom.sharedNormals[sharedVrtxId] = Vector3{ZeroInit};
+            // Heightmap goes here (1)
+            rChGeo.chunkVbufPos[vertex] = Vector3(scaled);
         }
 
-
         // Calculate fill vertex positions
-        for (std::size_t const sktriInt : rSP.surfaceAdded.ones())
+        for (std::size_t const sktriInt : rSkSP.surfaceAdded.ones())
         {
             auto        const chunk      = rSkCh.m_triToChunk[SkTriId::from_index(sktriInt)];
             auto        const chunkIdInt = std::size_t(chunk);
             std::size_t const fillOffset = rChInfo.vbufFillOffset + chunkIdInt*rChInfo.fillVrtxCount;
 
-            osp::ArrayView<SharedVrtxOwner_t const> sharedUsed = rTerrain.skChunks.shared_vertices_used(chunk);
+            osp::ArrayView<SharedVrtxOwner_t const> sharedUsed = rSkCh.shared_vertices_used(chunk);
 
-            for (ChunkVrtxSubdivLUT::ToSubdiv const& toSubdiv : rChSP.lut.data())
+            for (ChunkFillSubdivLUT::ToSubdiv const& toSubdiv : rChSP.lut.data())
             {
                 std::size_t const vrtxA = rChSP.lut.index(sharedUsed, fillOffset, rChInfo.vbufSharedOffset, toSubdiv.m_vrtxA);
                 std::size_t const vrtxB = rChSP.lut.index(sharedUsed, fillOffset, rChInfo.vbufSharedOffset, toSubdiv.m_vrtxB);
                 std::size_t const vrtxC = rChInfo.vbufFillOffset + rChInfo.fillVrtxCount*chunkIdInt + toSubdiv.m_fillOut.value;
 
-                Vector3 &rPosC = rTerrain.chunkGeom.chunkVbufPos[vrtxC];
+                Vector3 &rPosC = rChGeo.chunkVbufPos[vrtxC];
 
-                // Heightmap goes here
-                Vector3 const avg       = (rTerrain.chunkGeom.chunkVbufPos[vrtxA] + rTerrain.chunkGeom.chunkVbufPos[vrtxB]) / 2.0f;
+                // Heightmap goes here (2)
+                Vector3 const avg       = (rChGeo.chunkVbufPos[vrtxA] + rChGeo.chunkVbufPos[vrtxB]) / 2.0f;
                 float   const avgLen    = avg.length();
                 float   const roundness = rTerrainIco.radius - avgLen;
 
@@ -330,31 +361,27 @@ Session setup_terrain(
             }
         }
 
-        // Fill index buffer (connect the dots with vertices) and calculate normals
+        // Update index buffer and calculate normals
         for (std::size_t const chunkInt : rSkCh.m_chunkIds.bitview().zeros())
         {
-            auto const chunkId = ChunkId::from_index(chunkInt);
+            auto    const chunkId    = ChunkId::from_index(chunkInt);
             SkTriId const sktriId    = rSkCh.m_chunkToTri[chunkId];
-            bool    const newlyAdded = rSP.surfaceAdded.test(sktriId.value);
+            bool    const newlyAdded = rSkSP.surfaceAdded.test(sktriId.value);
 
-            update_faces(chunkId, sktriId, newlyAdded, rTerrain.skeleton, rSkTrn, rTerrain.chunkGeom, rChInfo, rChSP, rSkCh);
+            update_faces(chunkId, sktriId, newlyAdded, rSkel, rSkData, rChGeo, rChInfo, rChSP, rSkCh);
         }
         std::fill(rChSP.stitchCmds.begin(), rChSP.stitchCmds.end(), ChunkStitch{});
 
 
         for (std::size_t sharedIdx = 0; sharedIdx < rChSP.sharedNormalsDirty.size(); ++sharedIdx)
-        if (rTerrain.skChunks.m_sharedIds.exists(SharedVrtxId(sharedIdx)))
+        if (rSkCh.m_sharedIds.exists(SharedVrtxId(sharedIdx)))
         {
             SharedVrtxId const shared    = SharedVrtxId(sharedIdx);
-            Vector3      const normalSum = rTerrain.chunkGeom.sharedNormals[shared];
-            rTerrain.chunkGeom.chunkVbufNrm[rChInfo.vbufSharedOffset + sharedIdx] = normalSum.normalized();
+            Vector3      const normalSum = rChGeo.sharedNormalSum[shared];
+            rChGeo.chunkVbufNrm[rChInfo.vbufSharedOffset + sharedIdx] = normalSum.normalized();
         }
 
-
-
-
-
-        debug_check_invariants(rTerrain.chunkGeom, rChInfo, rSkCh);
+        //debug_check_invariants(rChGeo, rChInfo, rSkCh);
 
         // TODO: temporary, write debug obj file every ~10 seconds
         static int fish = 0;

@@ -29,9 +29,9 @@
 namespace planeta
 {
 
-ChunkVrtxSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t const subdivLevel)
+ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t const subdivLevel)
 {
-    ChunkVrtxSubdivLUT out;
+    ChunkFillSubdivLUT out;
 
     out.m_edgeVrtxCount = 1u << subdivLevel;
     out.m_fillVrtxCount = (out.m_edgeVrtxCount-2) * (out.m_edgeVrtxCount-1) / 2;
@@ -51,7 +51,7 @@ ChunkVrtxSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t const subdivLevel)
     // by accessing to fill vertices in a more sequential order.
 }
 
-void ChunkVrtxSubdivLUT::subdiv_line_recurse(
+void ChunkFillSubdivLUT::subdiv_line_recurse(
         Vector2us const a, Vector2us const b, uint8_t const level)
 {
     Vector2us const mid = (a + b) / 2;
@@ -68,7 +68,7 @@ void ChunkVrtxSubdivLUT::subdiv_line_recurse(
 
 }
 
-void ChunkVrtxSubdivLUT::fill_tri_recurse(
+void ChunkFillSubdivLUT::fill_tri_recurse(
         Vector2us const top, Vector2us const lft, Vector2us const rte, uint8_t const level)
 {
     // calculate midpoints
