@@ -92,7 +92,7 @@ cd build-osp-magnum/Release
 If you just want to test out the project so far, then see the [Actions](https://github.com/TheOpenSpaceProgram/osp-magnum/actions) tab on GitHub to obtain automated builds for Linux or Windows.
 
 ## Controls
-The most important thing to remember, the controls!
+These controls will seem familiar if you have played Kerbal Space Program!
 
 #### Navigating
 ```bash
