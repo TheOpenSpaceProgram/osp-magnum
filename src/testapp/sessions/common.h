@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios/scenarios.h"
+#include "../scenarios.h"
 
 #include <osp/core/copymove_macros.h>
 #include <osp/activescene/basic.h>

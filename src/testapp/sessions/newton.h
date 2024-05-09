@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios/scenarios.h"
+#include "../scenarios.h"
 
 #include <osp/core/math_types.h>
 #include <osp/tasks/builder.h>

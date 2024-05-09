@@ -25,10 +25,12 @@
 
 #include "MagnumApplication.h"
 #include "testapp.h"
-#include "scenarios/scenarios.h"
+#include "scenarios.h"
+#include "scenario.h"
 #include "identifiers.h"
 #include "sessions/common.h"
 #include "sessions/magnum.h"
+#include "scenarios/scenarioManager.h"
 
 #include <osp/core/Resources.h>
 #include <osp/core/string_concat.h>
@@ -68,7 +70,7 @@ using namespace testapp;
 /**
  * @brief Starts a spaghetti REPL (Read Evaluate Print Loop) interface that gets inputs from standard in
  *
- * This interface can be used to run commands and load scenes
+ * This interface can be used to run commands and load get_scenarios
  *
  * CLI -> Command line interface
  */
@@ -109,7 +111,7 @@ osp::Logger_t g_logMagnumApp;
 int main(int argc, char** argv)
 {
     // Command line argument parsing
-    Corrade::Utility::Arguments args;
+    Corrade::Utility::Arguments args; // TODO rename use of scene to scenario
     args.addSkippedPrefix("magnum", "Magnum options")
         .addOption("scene", "none")         .setHelp("scene",       "Set the scene to launch")
         .addOption("config")                .setHelp("config",      "path to configuration file to use")
@@ -141,15 +143,14 @@ int main(int argc, char** argv)
 
     if(args.value("scene") != "none")
     {
-        auto const it = get_scenarios().find(args.value("scene"));
-        if(it == std::end(get_scenarios()))
+        if ( ! ScenarioManager::get().has_scenario(args.value("scene"))) 
         {
-            OSP_LOG_ERROR("unknown scene");
+            OSP_LOG_ERROR("unknown scenario");
             g_testApp.clear_resource_owners();
             return 1;
         }
-
-        g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
+       
+        g_testApp.m_rendererSetup = ScenarioManager::get().get_scenario(args.value("scene")).setupFunction(g_testApp);
 
         start_magnum_async(argc, argv);
     }
@@ -181,32 +182,31 @@ void cli_loop(int& argc, char** argv)
         std::cin >> command;
 
         bool const magnumOpen = ! g_testApp.m_renderer.m_sessions.empty();
-        
+
         // First check to see if command is the name of a scenario.
-        if (auto const it = get_scenarios().find(command); 
-            it != std::end(get_scenarios()))
-        {
+        if (ScenarioManager::get().has_scenario(command)) {
+            Scenario scenario = ScenarioManager::get().get_scenario(command);
             if (magnumOpen)
             {
                 // TODO: Figure out some way to reload the application while
                 //       its still running.
                 //       ie. Message it to destroy its GL resources and draw
                 //           function, then load new scene
-                std::cout << "Close application before opening new scene" << std::endl;
+                std::cout << "Close application before opening new scenario" << std::endl;
             }
             else
             {
-                std::cout << "Loading scene: " << it->first << std::endl;
+                std::cout << "Loading scenario: " << scenario.name << std::endl;
 
                 // Close existing scene first
-                if ( ! g_testApp.m_scene.m_sessions.empty() )
+                if (!g_testApp.m_scene.m_sessions.empty())
                 {
                     g_testApp.close_sessions(g_testApp.m_scene.m_sessions);
                     g_testApp.m_scene.m_sessions.clear();
                     g_testApp.m_scene.m_edges.m_syncWith.clear();
                 }
 
-                g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
+                g_testApp.m_rendererSetup = scenario.setupFunction(g_testApp);
                 start_magnum_async(argc, argv);
             }
         }
@@ -224,7 +224,7 @@ void cli_loop(int& argc, char** argv)
                 }
                 else if (g_testApp.m_rendererSetup == nullptr)
                 {
-                    std::cout << "No existing scene loaded" << std::endl;
+                    std::cout << "No existing scenario loaded" << std::endl;
                 }
                 else
                 {
@@ -399,19 +399,19 @@ void load_a_bunch_of_stuff()
 void print_help()
 {
     std::size_t longestName = 0;
-    for (auto const& [rName, rScenerio] : get_scenarios())
+    for (auto const& scenario : ScenarioManager::get().get_scenarios())
     {
-        longestName = std::max(rName.size(), longestName);
+        longestName = std::max(scenario.name.size(), longestName);
     }
 
     std::cout
         << "OSP-Magnum Temporary Debug CLI\n"
         << "Open a scenario:\n";
 
-    for (auto const& [rName, rScenerio] : get_scenarios())
+    for (auto const& scenario : ScenarioManager::get().get_scenarios())
     {
-        std::string spaces(longestName - rName.length(), ' ');
-        std::cout << "* " << rName << spaces << " - " << rScenerio.m_description << "\n";
+        std::string spaces(longestName - scenario.name.length(), ' ');
+        std::cout << "* " << scenario.name << spaces << " - " << scenario.description << "\n";
     }
 
     std::cout

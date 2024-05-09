@@ -25,49 +25,22 @@
 
 #pragma once
 
-#include "../scenario.h"
+#include "testapp.h"
 
 namespace testapp
 {
 
 /*
-* @brief Singleton class that stores get_scenarios, and allows retrieval of get_scenarios by name.
+ * @brief A loadable/playable "level"
+ *
+ * A Scenario can be loaded into, and dictates the initial condition of an environment, as well as
+ * what process take place within the Scenario.
 */
-class ScenarioManager
+struct Scenario
 {
-public:
-	~ScenarioManager() = default;
-	ScenarioManager(ScenarioManager const&) = delete;
-	void operator=(ScenarioManager const&) = delete;
-	ScenarioManager(ScenarioManager&& other) noexcept = delete;
-	ScenarioManager& operator=(ScenarioManager&& other) noexcept = delete;
-
-	/*
-	 * @brief Returns the instance of the Singleton.
-	*/
-	static ScenarioManager& get();
-
-	bool has_scenario(const std::string& scenarioName);
-
-	/*
-	 * @brief Returns the scenario of the given name, call has_scenario first.
-	 *
-	 * Only call this function if you receive a true return value from has_scenario.
-	 * otherwise this function returns an invalid scenario.
-	*/
-	Scenario get_scenario(const std::string& scenarioName);
-
-	/*
-	 * @brief Only adds the scenario if a scenario with that name is not already stored.
-	*/
-	void add_scenario(const Scenario& scenario);
-
-	std::vector<Scenario> get_scenarios() const;
-
-private:
-    ScenarioManager();
-
-	std::vector<Scenario> m_scenarios;
+    std::string name;
+    std::string description;
+    ScenarioSetupFunction_t setupFunction;
 };
 
-}
+} // namespace testapp

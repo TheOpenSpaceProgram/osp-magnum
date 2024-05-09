@@ -24,8 +24,8 @@
  */
 #pragma once
 
-#include "../identifiers.h"
-#include "../testapp.h"
+#include "identifiers.h"
+#include "testapp.h"
 
 // IWYU pragma: begin_exports
 #include <osp/tasks/top_utils.h>
@@ -36,32 +36,17 @@
 namespace testapp
 {
 
-struct Scenario
-{
-    std::string m_name;
-    std::string m_description;
-    ScenarioSetupFunction_t m_setupFunction;
-};
-
-struct ScenarioOption
-{
-    std::string_view m_description;
-    SceneSetupFunc_t m_setup;
-};
-
-using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
-
-ScenarioMap_t const& get_scenarios();
-
 namespace scenes
 {
-    using enum EStgOptn;
-    using enum EStgCont;
-    using enum EStgIntr;
-    using enum EStgRevd;
-    using enum EStgEvnt;
-    using enum EStgFBO;
-    using enum EStgLink;
+
+using enum EStgOptn;
+using enum EStgCont;
+using enum EStgIntr;
+using enum EStgRevd;
+using enum EStgEvnt;
+using enum EStgFBO;
+using enum EStgLink;
+
 }
 
 struct MainLoopControl

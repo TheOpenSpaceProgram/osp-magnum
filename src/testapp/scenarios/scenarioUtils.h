@@ -24,50 +24,22 @@
  */
 
 #pragma once
-
-#include "../scenario.h"
+#include "osp/core/math_types.h"
+#include "osp/drawing/draw_ent.h"
+#include "testapp/testapp.h"
 
 namespace testapp
 {
 
-/*
-* @brief Singleton class that stores get_scenarios, and allows retrieval of get_scenarios by name.
-*/
-class ScenarioManager
-{
-public:
-	~ScenarioManager() = default;
-	ScenarioManager(ScenarioManager const&) = delete;
-	void operator=(ScenarioManager const&) = delete;
-	ScenarioManager(ScenarioManager&& other) noexcept = delete;
-	ScenarioManager& operator=(ScenarioManager&& other) noexcept = delete;
+void setup_magnum_draw(TestApp& rTestApp, osp::Session const& scene, osp::Session const& sceneRenderer, osp::Session const& magnumScene);
 
-	/*
-	 * @brief Returns the instance of the Singleton.
-	*/
-	static ScenarioManager& get();
+// MaterialIds hints which shaders should be used to draw a DrawEnt
+// DrawEnts can be assigned to multiple materials
+static constexpr auto   sc_matVisualizer = osp::draw::MaterialId(0);
+static constexpr auto   sc_matFlat = osp::draw::MaterialId(1);
+static constexpr auto   sc_matPhong = osp::draw::MaterialId(2);
+static constexpr int    sc_materialCount = 4;
 
-	bool has_scenario(const std::string& scenarioName);
+static constexpr auto sc_gravityForce = osp::Vector3{ 0.0f, 0.0f, -9.81f };
 
-	/*
-	 * @brief Returns the scenario of the given name, call has_scenario first.
-	 *
-	 * Only call this function if you receive a true return value from has_scenario.
-	 * otherwise this function returns an invalid scenario.
-	*/
-	Scenario get_scenario(const std::string& scenarioName);
-
-	/*
-	 * @brief Only adds the scenario if a scenario with that name is not already stored.
-	*/
-	void add_scenario(const Scenario& scenario);
-
-	std::vector<Scenario> get_scenarios() const;
-
-private:
-    ScenarioManager();
-
-	std::vector<Scenario> m_scenarios;
-};
-
-}
+} // namespace testapp

@@ -22,6 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 #pragma once
 
 #include <osp/core/keyed_vector.h>
@@ -33,17 +34,14 @@
 
 #include <entt/core/any.hpp>
 
-#include <optional>
-
 namespace testapp
 {
 
 struct TestApp;
 class IExecutor;
 
-using RendererSetupFunc_t   = void(*)(TestApp&);
-using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
-using ScenarioSetupFunction_t = void(*)(TestApp&);
+using RendererSetupFunc_t     = void(*)(TestApp&);
+using ScenarioSetupFunction_t = RendererSetupFunc_t(*)(TestApp&);
 
 struct TestAppTasks
 {

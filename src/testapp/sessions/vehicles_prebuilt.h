@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios/scenarios.h"
+#include "../scenarios.h"
 
 #include <adera/activescene/VehicleBuilder.h>
 

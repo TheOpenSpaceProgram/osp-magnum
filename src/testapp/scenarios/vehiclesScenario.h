@@ -30,44 +30,6 @@
 namespace testapp
 {
 
-/*
-* @brief Singleton class that stores get_scenarios, and allows retrieval of get_scenarios by name.
-*/
-class ScenarioManager
-{
-public:
-	~ScenarioManager() = default;
-	ScenarioManager(ScenarioManager const&) = delete;
-	void operator=(ScenarioManager const&) = delete;
-	ScenarioManager(ScenarioManager&& other) noexcept = delete;
-	ScenarioManager& operator=(ScenarioManager&& other) noexcept = delete;
+Scenario create_vehicles_scenario();
 
-	/*
-	 * @brief Returns the instance of the Singleton.
-	*/
-	static ScenarioManager& get();
-
-	bool has_scenario(const std::string& scenarioName);
-
-	/*
-	 * @brief Returns the scenario of the given name, call has_scenario first.
-	 *
-	 * Only call this function if you receive a true return value from has_scenario.
-	 * otherwise this function returns an invalid scenario.
-	*/
-	Scenario get_scenario(const std::string& scenarioName);
-
-	/*
-	 * @brief Only adds the scenario if a scenario with that name is not already stored.
-	*/
-	void add_scenario(const Scenario& scenario);
-
-	std::vector<Scenario> get_scenarios() const;
-
-private:
-    ScenarioManager();
-
-	std::vector<Scenario> m_scenarios;
-};
-
-}
+} // namespace testapp

@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios/scenarios.h"
+#include "../scenarios.h"
 #include "../MagnumApplication.h"
 
 #include <osp/activescene/basic.h>

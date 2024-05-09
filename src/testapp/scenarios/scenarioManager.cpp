@@ -25,10 +25,17 @@
 
 #include "scenarioManager.h"
 
+#include "enginetestScenario.h"
+#include "physicsScenario.h"
+#include "vehiclesScenario.h"
+#include "universeScenario.h"
+
+#include "testapp/identifiers.h"
+
 namespace testapp
 {
 
-ScenarioManager ScenarioManager::get() 
+ScenarioManager& ScenarioManager::get() 
 {
     static ScenarioManager instance;
     return instance;
@@ -37,7 +44,7 @@ ScenarioManager ScenarioManager::get()
 bool ScenarioManager::has_scenario(const std::string &scenarioName) 
 {
     for (auto& scenario : m_scenarios) {
-        if (scenario.m_name == scenarioName) {
+        if (scenario.name == scenarioName) {
             return true;
         }
     }
@@ -48,7 +55,7 @@ bool ScenarioManager::has_scenario(const std::string &scenarioName)
 Scenario ScenarioManager::get_scenario(const std::string& scenarioName) 
 {
     for (auto& scenario : m_scenarios) {
-        if (scenario.m_name == scenarioName) {
+        if (scenario.name == scenarioName) {
             return scenario;
         }
     }
@@ -60,6 +67,25 @@ Scenario ScenarioManager::get_scenario(const std::string& scenarioName)
         there was no scenario with the given name: " + scenarioName, nullptr };
 }
 
+void ScenarioManager::add_scenario(const Scenario& scenario) {
+    if (has_scenario(scenario.name)) {
+        return;
+    }
 
+    m_scenarios.push_back(scenario);
+}
+
+ScenarioManager::ScenarioManager() {
+    register_stage_enums();
+
+    add_scenario(create_engine_test_scenario());
+    add_scenario(create_physics_scenario());
+    add_scenario(create_vehicles_scenario());
+    add_scenario(create_universe_scenario());
+}
+
+std::vector<Scenario> ScenarioManager::get_scenarios() const {
+    return m_scenarios;
+}
 
 }
