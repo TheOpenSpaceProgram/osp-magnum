@@ -32,12 +32,13 @@ namespace osp
 {
 
 /**
- * @brief Holds parameters to fully define a Kepler orbit
+ * @brief Holds parameters to fully define a Keplerian (ideal 2-body) orbit
  */
 struct KeplerOrbit
 {
 private:
-    // These are private as we may want to change the representation in the future
+    static constexpr double KINDA_SMALL_NUMBER = 1.0E-8;
+    // These are private as we may want to change the internal representation in the future
     double m_semiMajorAxis;
     double m_eccentricity;
     double m_inclination;
@@ -49,8 +50,9 @@ private:
     double m_v0;
     double m_h;
 
-    union {
-        double m_F0; 
+    union
+    {
+        double m_F0;
         double m_E0;
     };
 
@@ -69,32 +71,55 @@ private:
                 double v0,
                 double m_E0,
                 double h) : m_semiMajorAxis(semiMajorAxis),
-                                                    m_eccentricity(eccentricity),
-                                                    m_inclination(inclination),
-                                                    m_argumentOfPeriapsis(argumentOfPeriapsis),
-                                                    m_longitudeOfAscendingNode(longitudeOfAscendingNode),
-                                                    m_meanAnomalyAtEpoch(meanAnomalyAtEpoch),
-                                                    m_epoch(epoch),
-                                                    m_gravitationalParameter(gravitationalParameter),
-                                                    m_r0(r0),
-                                                    m_v0(v0),
-                                                    m_E0(m_E0),
-                                                    m_h(h) {}
+                            m_eccentricity(eccentricity),
+                            m_inclination(inclination),
+                            m_argumentOfPeriapsis(argumentOfPeriapsis),
+                            m_longitudeOfAscendingNode(longitudeOfAscendingNode),
+                            m_meanAnomalyAtEpoch(meanAnomalyAtEpoch),
+                            m_epoch(epoch),
+                            m_gravitationalParameter(gravitationalParameter),
+                            m_r0(r0),
+                            m_v0(v0),
+                            m_E0(m_E0),
+                            m_h(h) {}
+
+    /**
+     * @brief Get the eccentric anomaly at a given time
+     */
+    double get_eccentric_anomaly(double time) const;
+
+    /**
+     * @brief Get the true anomaly at a given eccentric anomaly
+     *
+     * @note This is not a very satisfying interface for this function,
+     * but having a "get_true_anomaly_at_time" would require double the computation if you wanted both
+     */
+    double get_true_anomaly_from_eccentric(double eccentric_anomaly) const;
+
+    /**
+     * @brief Compute the position, velocity of the orbit at a given eccentric anomaly
+     */
+    void get_state_vectors_at_eccentric_anomaly(double true_anomaly, Vector3d &position, Vector3d &velocity) const;
 
 public:
     /**
-     * @brief Compute the position of the orbit at a given time
+     * @brief Compute the position, velocity of the orbit at a given time
      */
-    Vector3d get_position_and_velocity(double time, Vector3d& velocity) const;
+    void get_state_vectors_at_time(double time, Vector3d &position, Vector3d &velocity) const;
 
     /**
      * @brief Compute the acceleration of the orbit at a given position
      */
-    Vector3d get_acceleration(Vector3d radius) const;
+    Vector3d get_acceleration(const Vector3d &radius) const;
+
+    /**
+     * @brief Returns a fixed reference frame for the orbit, invariant of time
+     */
+    void get_fixed_reference_frame(Vector3d &radial, Vector3d &transverse, Vector3d &outOfPlane) const;
 
     /**
      * @brief Find Apoapsis of orbit
-     * 
+     *
      * @return std::optional<double> Apoapsis distance, if eccentricity < 1
      */
     std::optional<double> get_apoapsis() const;
@@ -109,11 +134,16 @@ public:
      */
     double get_periapsis() const;
 
+    inline bool is_elliptic() const { return m_eccentricity < 1.0 - KINDA_SMALL_NUMBER; }
+    inline bool is_circular() const { return m_eccentricity <= KINDA_SMALL_NUMBER; }
+    inline bool is_hyperbolic() const { return m_eccentricity > 1.0 + KINDA_SMALL_NUMBER; }
+    inline bool is_parabolic() const { return std::abs(m_eccentricity - 1.0) <= KINDA_SMALL_NUMBER; }
 
-    bool is_elliptic() const { return m_eccentricity < 1.0; }
-    bool is_hyperbolic() const { return m_eccentricity > 1.0; }
-    bool is_parabolic() const { return m_eccentricity == 1.0; }
-
+    /**
+     * @brief Recompute the orbit to be centralized around a new epoch
+     * This might be worth doing once in a great while for numerical stability
+     */
+    void rebase_epoch(double newEpoch);
 
     /**
      * @brief Compute the Kepler orbit parameters from initial conditions
@@ -126,7 +156,6 @@ public:
      * @return KeplerOrbit
      */
     static KeplerOrbit from_initial_conditions(Vector3d radius, Vector3d velocity, double epoch = 0.0, double gravitationalParameter = 1.0);
-
 };
 
 } // namespace osp
