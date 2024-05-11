@@ -40,33 +40,23 @@ private:
     
     static constexpr double KINDA_SMALL_NUMBER = 1.0E-8;
     // These are private as we may want to change the internal representation in the future
-    double m_semiMajorAxis;
-    double m_eccentricity;
-    double m_inclination;
-    double m_argumentOfPeriapsis;
-    double m_longitudeOfAscendingNode;
-    double m_meanAnomalyAtEpoch;
-    double m_epoch;
-    double m_h;
-    double m_gravitationalParameter;
 
-    KeplerOrbit(double semiMajorAxis,
-                double eccentricity,
-                double inclination,
-                double argumentOfPeriapsis,
-                double longitudeOfAscendingNode,
-                double meanAnomalyAtEpoch,
-                double epoch,
-                double gravitationalParameter,
-                double h) : m_semiMajorAxis(semiMajorAxis),
-                            m_eccentricity(eccentricity),
-                            m_inclination(inclination),
-                            m_argumentOfPeriapsis(argumentOfPeriapsis),
-                            m_longitudeOfAscendingNode(longitudeOfAscendingNode),
-                            m_meanAnomalyAtEpoch(meanAnomalyAtEpoch),
-                            m_epoch(epoch),
-                            m_gravitationalParameter(gravitationalParameter),
-                            m_h(h) {}
+    struct KeplerOrbitParams
+    {
+        double semiMajorAxis;
+        double eccentricity;
+        double inclination;
+        double argumentOfPeriapsis;
+        double longitudeOfAscendingNode;
+        double meanAnomalyAtEpoch;
+        double epoch;
+        double gravitationalParameter;
+        double angularMomentum;
+    };
+
+    KeplerOrbitParams m_params;
+
+    KeplerOrbit(KeplerOrbitParams const params): m_params(params) {}
 
     /**
      * @brief Get the eccentric anomaly at a given time
@@ -119,10 +109,10 @@ public:
      */
     double get_periapsis() const;
 
-    constexpr bool is_elliptic() const noexcept { return m_eccentricity < 1.0 - KINDA_SMALL_NUMBER; }
-    constexpr bool is_circular() const noexcept { return m_eccentricity <= KINDA_SMALL_NUMBER; }
-    constexpr bool is_hyperbolic() const noexcept { return m_eccentricity > 1.0 + KINDA_SMALL_NUMBER; }
-    constexpr bool is_parabolic() const noexcept { return std::abs(m_eccentricity - 1.0) <= KINDA_SMALL_NUMBER; }
+    constexpr bool is_elliptic() const noexcept { return m_params.eccentricity < 1.0 - KINDA_SMALL_NUMBER; }
+    constexpr bool is_circular() const noexcept { return m_params.eccentricity <= KINDA_SMALL_NUMBER; }
+    constexpr bool is_hyperbolic() const noexcept { return m_params.eccentricity > 1.0 + KINDA_SMALL_NUMBER; }
+    constexpr bool is_parabolic() const noexcept { return m_params.eccentricity <= KINDA_SMALL_NUMBER + 1.0 && m_params.eccentricity >= 1.0 - KINDA_SMALL_NUMBER; }
 
     /**
      * @brief Recompute the orbit to be centralized around a new epoch
