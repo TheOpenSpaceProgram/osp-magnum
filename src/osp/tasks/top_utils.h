@@ -40,11 +40,12 @@
 
 namespace osp
 {
-
+    
 /**
- * @brief Reserves the first empty value found in topData after the index current
- *
- * @return The index of the reserved value, or if topData is full, the largest index in topData
+ * @brief Reserves the first available space in topData after the indicated index.
+ * 
+ * @return The index of the reserved value, or the index after the end of topData if no slots are
+ * available after the indicated index.
  */
 [[nodiscard]] inline TopDataId top_reserve(
         ArrayView<entt::any> const topData, TopDataId current = 0)
@@ -63,8 +64,8 @@ namespace osp
 }
 
 /**
- * @brief Reserves n values in topData, where n = destLast - destFirst
- * and stores the reserved indices inside of the iterable object that destFirst belongs to
+ * @brief Reserves a slot in topData for each item in the output range [destFirst, destLast),
+ * writing the associated indices into the range.
  *
  * @return The largest index that was reserved in topData, or if topData is full,
  * the largest index in topData
@@ -94,7 +95,7 @@ TopDataId top_reserve(
 }
 
 /**
- * @brief Using args, constructs an object of type T at the index ID inside topData
+ * @brief Constructs an object of type T at the indicated index.
  *
  * @return A reference to the newly constructed value
  */

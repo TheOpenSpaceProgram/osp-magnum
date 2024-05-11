@@ -49,9 +49,8 @@
  * and declares an ID variable for each element that is given.
  * The same ID's are also stored inside of the sessions m_data member
  *
- * @param arglist A variadic argument broken into two sections:
- *     Firstly: 'count' The count is an integer equal to the number of id's
- *     Secondly: id's Every id is a unique index into 'topData'
+ * @param count The number of id variables passed to the macro.
+ * @param ids A set of variables that will each be assigned to a unique index of topData.
  */
 #define OSP_DECLARE_CREATE_DATA_IDS(session, topData, arglist) OSP_AUX_DCDI_A(session, topData, arglist);
 
@@ -65,12 +64,8 @@
  * @brief Retrieves a section of data within topData that was already given to a session
  * and maps an ID variable to each element that is retrieved.
  *
- * Because the data was already given, the indices are stored within the session and topData does
- * not need to be accessed.
- *
- * @param arglist A variadic argument broken into two sections:
- *     Firstly: 'count' The count is an integer equal to the number of id's
- *     Secondly: id's Every id is a unique index into 'topData'
+ * @param count The number of id variables passed to the macro.
+ * @param ids A set of variables that will each be assigned to a unique index of topData.
  */
 #define OSP_DECLARE_GET_DATA_IDS(session, arglist) OSP_AUX_DGDI_A(session, arglist);
 
