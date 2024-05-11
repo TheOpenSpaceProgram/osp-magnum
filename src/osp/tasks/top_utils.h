@@ -41,6 +41,11 @@
 namespace osp
 {
 
+/**
+ * @brief Reserves the first empty value found in topData after the index current
+ *
+ * @return The index of the reserved value, or if topData is full, the largest index in topData
+ */
 [[nodiscard]] inline TopDataId top_reserve(
         ArrayView<entt::any> const topData, TopDataId current = 0)
 {
@@ -57,6 +62,13 @@ namespace osp
     return current;
 }
 
+/**
+ * @brief Reserves n values in topData, where n = destLast - destFirst
+ * and stores the reserved indices inside of the iterable object that destFirst belongs to
+ *
+ * @return The largest index that was reserved in topData, or if topData is full,
+ * the largest index in topData
+ */
 template <typename IT_T, typename ITB_T>
 TopDataId top_reserve(
         ArrayView<entt::any> const topData, TopDataId current,
@@ -81,6 +93,11 @@ TopDataId top_reserve(
     return current;
 }
 
+/**
+ * @brief Using args, constructs an object of type T at the index ID inside topData
+ *
+ * @return A reference to the newly constructed value
+ */
 template <typename T, typename ... ARGS_T>
 T& top_emplace(ArrayView<entt::any> const topData, TopDataId id, ARGS_T&& ... args)
 {
@@ -89,6 +106,11 @@ T& top_emplace(ArrayView<entt::any> const topData, TopDataId id, ARGS_T&& ... ar
     return entt::any_cast<T&>(rData);
 }
 
+/**
+ * @brief Assigns the value at index id of topData to the value any
+ *
+ * @return A reference to the newly assigned value
+ */
 template <typename T, typename ANY_T>
 T& top_assign(ArrayView<entt::any> const topData, TopDataId id, ANY_T&& any)
 {
@@ -97,7 +119,9 @@ T& top_assign(ArrayView<entt::any> const topData, TopDataId id, ANY_T&& any)
     return entt::any_cast<T&>(rData);
 }
 
-
+/**
+ * @return A reference to the value at index id inside topData
+ */
 template <typename T>
 [[nodiscard]] T& top_get(ArrayView<entt::any> const topData, TopDataId const id)
 {
