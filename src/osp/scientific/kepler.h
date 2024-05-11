@@ -39,8 +39,8 @@ struct KeplerOrbit
 private:
     
     static constexpr double KINDA_SMALL_NUMBER = 1.0E-8;
-    // These are private as we may want to change the internal representation in the future
 
+    // These are private as we may want to change the internal representation in the future
     struct KeplerOrbitParams
     {
         double semiMajorAxis;
@@ -66,8 +66,8 @@ private:
     /**
      * @brief Get the true anomaly at a given eccentric anomaly
      *
-     * @note This is not a very satisfying interface for this function,
-     * but having a "get_true_anomaly_at_time" would require double the computation if you wanted both
+     * @note This isnt a very satisfying interface for this function,
+     * but having a "get_true_anomaly_at_time" would require double the computation if you wanted both anomalies
      */
     double get_true_anomaly_from_eccentric(double const eccentric_anomaly) const;
 
@@ -115,12 +115,6 @@ public:
     constexpr bool is_parabolic() const noexcept { return m_params.eccentricity <= KINDA_SMALL_NUMBER + 1.0 && m_params.eccentricity >= 1.0 - KINDA_SMALL_NUMBER; }
 
     /**
-     * @brief Recompute the orbit to be centralized around a new epoch
-     * This might be worth doing once in a great while for numerical stability
-     */
-    void rebase_epoch(double newEpoch);
-
-    /**
      * @brief Compute the Kepler orbit parameters from initial conditions
      *
      * @param radius                 [in] Initial radius vector relative to central body
@@ -131,6 +125,12 @@ public:
      * @return KeplerOrbit
      */
     static KeplerOrbit from_initial_conditions(Vector3d const radius, Vector3d const velocity, double const epoch = 0.0, double const gravitationalParameter = 1.0);
+    
+    
+    /**
+     * @brief Solve for the next time the radius = r, if such a time exists
+     */
+    std::optional<double> get_next_time_radius_equals(const double r, const double currentTime) const;
 };
 
 } // namespace osp

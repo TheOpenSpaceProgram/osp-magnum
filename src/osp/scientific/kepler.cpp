@@ -149,8 +149,6 @@ static double get_orbiting_radius(double const ecc, double const semiMajorAxis, 
 } // namespace
 
 
-
-
 namespace osp
 {
 
@@ -235,16 +233,6 @@ void KeplerOrbit::get_state_vectors_at_eccentric_anomaly(double const E, Vector3
 
         velocity = v_r * radusDir + v_perp * perpDir;
     }
-}
-
-void KeplerOrbit::rebase_epoch(const double newEpoch)
-{
-    double const new_E0 = get_eccentric_anomaly(newEpoch);
-    double const new_m0 = new_E0 - m_params.eccentricity * sin(new_E0);
-    Vector3d newPos;
-    Vector3d newVel;
-    get_state_vectors_at_eccentric_anomaly(new_E0, newPos, newVel);
-    m_params.meanAnomalyAtEpoch = new_m0;
 }
 
 Vector3d KeplerOrbit::get_acceleration(Vector3d const& radius) const
@@ -388,6 +376,62 @@ KeplerOrbit KeplerOrbit::from_initial_conditions(Vector3d const radius, Vector3d
     };
 
     return KeplerOrbit(params); 
+}
+
+std::optional<double> KeplerOrbit::get_next_time_radius_equals(const double r, const double currentTime) const {
+    std::optional<double> apoapsis = get_apoapsis();
+    if (apoapsis.has_value() && apoapsis.value() <= r) {
+        return std::nullopt;
+    }
+
+    double a = m_params.semiMajorAxis;
+    double e = m_params.eccentricity;
+    double cos_f = (a - r - e*e*a) / (e*r);
+    double trueAnomaly = std::acos(std::clamp(cos_f,-1.0,1.0));
+
+    double T;
+    double T2;
+    if (is_elliptic()) {
+        double E = true_anomaly_to_eccentric_anomaly(e,trueAnomaly);
+        double M = E - e * std::sin(E);
+        double E2 = -E;
+        double M2 = E2 - e * std::sin(E2);
+        T = (M-m_params.meanAnomalyAtEpoch) * std::sqrt(a*a*a / m_params.gravitationalParameter);
+        T2 = (M2-m_params.meanAnomalyAtEpoch) * std::sqrt(a*a*a / m_params.gravitationalParameter);
+    } else {
+        double F = true_anomaly_to_hyperbolic_eccentric_anomaly(e,trueAnomaly);
+        double M = e * std::sinh(F) - F;
+        double F2 = -F;
+        double M2 = e * std::sinh(F2) - F2;
+        T = -(M-m_params.meanAnomalyAtEpoch) * std::sqrt(-a*a*a / m_params.gravitationalParameter);
+        T2 = -(M2-m_params.meanAnomalyAtEpoch) * std::sqrt(-a*a*a / m_params.gravitationalParameter);
+    }
+
+    double t = T+m_params.epoch;
+    double t2 = T2+m_params.epoch;
+
+    if (is_elliptic()) {
+        t = std::fmod(t-currentTime, get_period().value());
+        if (t < 0) {
+            t += get_period().value();
+        }
+        t = t;
+        t2 = std::fmod(t2-currentTime, get_period().value());   
+        if (t2 < 0) {
+            t2 += get_period().value();
+        }
+        t2 = t2;
+    }
+    
+    if (t2 < 0 && t < 0) {
+        return std::nullopt;
+    }
+    if (t2 < t && t2 >= 0) {
+        return t2 + currentTime;
+    }
+    else {
+        return t + currentTime;
+    }
 }
 
 } // namespace osp
