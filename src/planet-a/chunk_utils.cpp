@@ -29,7 +29,7 @@
 namespace planeta
 {
 
-ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t const subdivLevel)
+ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(std::uint8_t const subdivLevel)
 {
     ChunkFillSubdivLUT out;
 
@@ -52,7 +52,7 @@ ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t const subdivLevel)
 }
 
 void ChunkFillSubdivLUT::subdiv_line_recurse(
-        Vector2us const a, Vector2us const b, uint8_t const level)
+        Vector2us const a, Vector2us const b, std::uint8_t const level)
 {
     Vector2us const mid = (a + b) / 2;
 
@@ -69,7 +69,7 @@ void ChunkFillSubdivLUT::subdiv_line_recurse(
 }
 
 void ChunkFillSubdivLUT::fill_tri_recurse(
-        Vector2us const top, Vector2us const lft, Vector2us const rte, uint8_t const level)
+        Vector2us const top, Vector2us const lft, Vector2us const rte, std::uint8_t const level)
 {
     // calculate midpoints
     std::array<Vector2us, 3> const mid
@@ -79,7 +79,7 @@ void ChunkFillSubdivLUT::fill_tri_recurse(
         (rte + top) / 2
     }};
 
-    uint8_t const levelNext = level - 1;
+    std::uint8_t const levelNext = level - 1;
 
     // make lines between them
     if (level > 1)

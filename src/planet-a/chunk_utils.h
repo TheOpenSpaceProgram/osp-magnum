@@ -170,7 +170,12 @@ struct ReturnThingUvU
     VertexIdx vertex;
 };
 
-constexpr ReturnThingUvU chunk_coord_to_vrtx(ChunkSkeleton const& skChunks, ChunkMeshBufferInfo const& info, ChunkId const chunkId, uint16_t const x, uint16_t const y) noexcept
+constexpr ReturnThingUvU chunk_coord_to_vrtx(
+        ChunkSkeleton         const &skChunks,
+        ChunkMeshBufferInfo   const &info,
+        ChunkId               const chunkId,
+        std::uint16_t         const x,
+        std::uint16_t         const y) noexcept
 {
     ChunkLocalSharedId const localShared = coord_to_shared(x, y, skChunks.m_chunkEdgeVrtxCount);
     return {
@@ -190,12 +195,12 @@ constexpr ReturnThingUvU chunk_coord_to_vrtx(ChunkSkeleton const& skChunks, Chun
 class ChunkFillSubdivLUT
 {
 public:
-    using Vector2us = Magnum::Math::Vector2<uint16_t>;
+    using Vector2us = Magnum::Math::Vector2<std::uint16_t>;
 
-    // Can either be a ChunkLocalSharedId or ChunkLocalFillId
+    // Can either be a shared vertex or fill vertex
     // Fill vertex if (0 to m_chunkVrtxCount-1)
     // Shared vertex if m_chunkVrtxCount to (m_edgeVrtxCount*3-1)
-    enum class LUTVrtx : uint16_t {};
+    enum class LUTVrtx : std::uint16_t {};
 
     struct ToSubdiv
     {
@@ -220,7 +225,7 @@ public:
 
     constexpr std::vector<ToSubdiv> const& data() const noexcept { return m_data; }
 
-    friend ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t subdivLevel);
+    friend ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(std::uint8_t subdivLevel);
 
 private:
 
@@ -229,7 +234,7 @@ private:
         ChunkLocalSharedId const shared = coord_to_shared(pos.x(), pos.y(), m_edgeVrtxCount);
         if (shared.has_value())
         {
-            return LUTVrtx(m_fillVrtxCount + uint16_t(shared));
+            return LUTVrtx(m_fillVrtxCount + std::uint16_t(shared));
         }
 
         return LUTVrtx(xy_to_triangular(pos.x() - 1, pos.y() - 2));
@@ -242,18 +247,18 @@ private:
      * @param b     [in]
      * @param level [in] Number of times this line can be subdivided further
      */
-    void subdiv_line_recurse(Vector2us a, Vector2us b, uint8_t level);
+    void subdiv_line_recurse(Vector2us a, Vector2us b, std::uint8_t level);
 
-    void fill_tri_recurse(Vector2us top, Vector2us lft, Vector2us rte, uint8_t level);
+    void fill_tri_recurse(Vector2us top, Vector2us lft, Vector2us rte, std::uint8_t level);
 
     //std::unique_ptr<ToSubdiv[]> m_data;
     std::vector<ToSubdiv> m_data;
-    uint16_t m_fillVrtxCount;
-    uint16_t m_edgeVrtxCount;
+    std::uint16_t m_fillVrtxCount{0};
+    std::uint16_t m_edgeVrtxCount{0};
 
 }; // class ChunkFillSubdivLUT
 
-ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(uint8_t subdivLevel);
+ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(std::uint8_t subdivLevel);
 
 
 //-----------------------------------------------------------------------------
@@ -274,7 +279,7 @@ enum class ECornerDetailX2 : int { None = 0, Right = 1, Left = 2 };
 template <CFaceWriter WRITER_T>
 struct ChunkFanStitcher
 {
-    template <int corner, ECornerDetailX2 detailX2>
+    template <int cornerIdx, ECornerDetailX2 detailX2>
     inline void corner() const;
 
     template <int side, bool detailX2>
@@ -369,7 +374,7 @@ void ChunkFanStitcher<WRITER_T>::stitch(ChunkStitch const cmd) const
 
 
 template <CFaceWriter WRITER_T>
-template <int corner, ECornerDetailX2 detailX2>
+template <int cornerIdx, ECornerDetailX2 detailX2>
 void ChunkFanStitcher<WRITER_T>::corner() const
 {
     // Chunk corner consists of 3 shared vertices
@@ -386,15 +391,15 @@ void ChunkFanStitcher<WRITER_T>::corner() const
     std::array<int, 3> tri;
 
     // Figure out which 3 shared vertices make the chunk's corner
-    if constexpr (corner == 0)
+    if constexpr (cornerIdx == 0)
     {
         tri = { chunkWidth*3-1, chunkWidth*0+0, chunkWidth*0+1 };
     }
-    else if constexpr (corner == 1)
+    else if constexpr (cornerIdx == 1)
     {
         tri = { chunkWidth*1-1, chunkWidth*1+0, chunkWidth*1+1 };
     }
-    else if constexpr (corner == 2)
+    else if constexpr (cornerIdx == 2)
     {
         tri = { chunkWidth*2-1, chunkWidth*2+0, chunkWidth*2+1 };
     }

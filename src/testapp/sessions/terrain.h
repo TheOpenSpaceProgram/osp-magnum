@@ -59,7 +59,7 @@ struct ACtxTerrain
     planeta::SkeletonVertexData         skData;
     planeta::ChunkSkeleton              skChunks;
 
-    planeta::ChunkMeshBufferInfo        chunkInfo;
+    planeta::ChunkMeshBufferInfo        chunkInfo{};
     planeta::BasicChunkMeshGeometry     chunkGeom;
 
     planeta::ChunkScratchpad            chunkSP;

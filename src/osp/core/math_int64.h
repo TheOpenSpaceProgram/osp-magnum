@@ -56,7 +56,7 @@ constexpr std::uint64_t absdelta(std::int64_t lhs, std::int64_t rhs) noexcept
  *
  * This function is quick and dirty, max threshold is limited to 1,431,655,765
  */
-constexpr bool is_distance_near(Vector3l const a, Vector3l const b, std::uint64_t const threshold)
+constexpr bool is_distance_near(Vector3l const a, Vector3l const b, std::uint64_t const threshold) noexcept
 {
     std::uint64_t const dx = absdelta(a.x(), b.x());
     std::uint64_t const dy = absdelta(a.y(), b.y());

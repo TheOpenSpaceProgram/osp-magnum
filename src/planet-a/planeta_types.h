@@ -25,17 +25,14 @@
 
 /**
  * @file
- * @brief
+ * @brief Id Types used around planeta
  */
 #pragma once
-
 
 #include <osp/core/strong_id.h>
 
 #include <longeron/id_management/registry_stl.hpp>
 #include <longeron/id_management/refcount.hpp>
-
-#include <array>
 
 namespace planeta
 {
@@ -48,27 +45,55 @@ using SkVrtxId          = osp::StrongId<std::uint32_t, struct DummyForSkVrtxId>;
 /// Skeleton Vertex ID owner; lifetime holds a refcount to a SkVrtxId
 using SkVrtxOwner_t     = lgrn::IdOwner<SkVrtxId, SubdivTriangleSkeleton>;
 
+/// Skeleton Triangle ID
 using SkTriId           = osp::StrongId<std::uint32_t, struct DummyForSkTriId>;
+
+/// Group of 4 skeleton triangles
 using SkTriGroupId      = osp::StrongId<std::uint32_t, struct DummyForSkTriGroupId>;
+
+/// Skeleton Triangle ID owner; lifetime holds a refcount to a SkTriId
 using SkTriOwner_t      = lgrn::IdRefCount<SkTriId>::Owner_t;
 
 
-using ChunkId = osp::StrongId<uint16_t, struct DummyForChunkId>;
-using SharedVrtxId = osp::StrongId<uint32_t, struct DummyForSharedVrtxId>;
+/**
+ * @return Group ID of a SkeletonTriangle's group specified by Id
+ */
+constexpr SkTriGroupId tri_group_id(SkTriId const id) noexcept
+{
+    return SkTriGroupId( std::uint32_t(id) / 4 );
+}
+
+/**
+ * @return Sibling index of a SkeletonTriangle by Id
+ */
+constexpr std::uint8_t tri_sibling_index(SkTriId const id) noexcept
+{
+    return std::uint32_t(id) % 4;
+}
+
+/**
+ * @return Id of a SkeletonTriangle from it's Group Id and sibling index (either 0, 1, 2, or 3)
+ */
+constexpr SkTriId tri_id(SkTriGroupId const id, std::uint8_t const siblingIndex) noexcept
+{
+    return SkTriId(std::uint32_t(id) * 4 + siblingIndex);
+}
+
+
+//-----------------------------------------------------------------------------
+
+
+using ChunkId           = osp::StrongId<uint16_t, struct DummyForChunkId>;
+using SharedVrtxId      = osp::StrongId<uint32_t, struct DummyForSharedVrtxId>;
 
 using SharedVrtxOwner_t = lgrn::IdRefCount<SharedVrtxId>::Owner_t;
 
-// Index to a mesh vertex, unaware of vertex size;
-using VertexIdx = std::uint32_t;
 
-// IDs for any chunk's shared vertices; from 0 to m_chunkSharedCount
-using ChunkLocalSharedId = osp::StrongId<uint16_t, struct DummyForChunkLocalSharedId>;
+/// IDs for any chunk's shared vertices; from 0 to m_chunkSharedCount
+using ChunkLocalSharedId = osp::StrongId<std::uint16_t, struct DummyForChunkLocalSharedId>;
 
-// IDs for any chunk's fill vertices; from 0 to m_chunkSharedCount
-enum class ChunkLocalFillId : uint16_t {};
-
-
-
+/// Index to a mesh vertex, unaware of vertex size;
+using VertexIdx         = std::uint32_t;
 
 
 };

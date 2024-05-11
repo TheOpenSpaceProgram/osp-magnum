@@ -39,7 +39,6 @@
 #include <osp/core/keyed_vector.h>
 #include <osp/core/math_2pow.h>
 
-
 #include <array>
 #include <vector>
 
@@ -111,7 +110,7 @@ struct SkTriGroup
     std::array<SkeletonTriangle, 4> triangles;
 
     SkTriId parent;
-    uint8_t depth;
+    uint8_t depth{};
 };
 
 struct SkTriGroupPair
@@ -119,30 +118,6 @@ struct SkTriGroupPair
     SkTriGroupId id;
     SkTriGroup& rGroup;
 };
-
-/**
- * @return Group ID of a SkeletonTriangle's group specified by Id
- */
-constexpr SkTriGroupId tri_group_id(SkTriId const id) noexcept
-{
-    return SkTriGroupId( uint32_t(id) / 4 );
-}
-
-/**
- * @return Sibling index of a SkeletonTriangle by Id
- */
-constexpr uint8_t tri_sibling_index(SkTriId const id) noexcept
-{
-    return uint32_t(id) % 4;
-}
-
-/**
- * @return Id of a SkeletonTriangle from it's group Id and sibling index
- */
-constexpr SkTriId tri_id(SkTriGroupId const id, uint8_t const siblingIndex) noexcept
-{
-    return SkTriId(uint32_t(id) * 4 + siblingIndex);
-}
 
 /**
  * @brief A subdividable mesh with reference counted triangles and vertices.
@@ -579,9 +554,9 @@ public:
 
     lgrn::IdRegistryStl<ChunkId, true>          m_chunkIds;
     std::vector<SharedVrtxOwner_t>              m_chunkSharedUsed;
-    std::uint8_t                                m_chunkSubdivLevel;
-    std::uint16_t                               m_chunkEdgeVrtxCount;
-    std::uint16_t                               m_chunkSharedCount;
+    std::uint8_t                                m_chunkSubdivLevel{};
+    std::uint16_t                               m_chunkEdgeVrtxCount{};
+    std::uint16_t                               m_chunkSharedCount{};
 
     osp::KeyedVec<ChunkId, ChunkStitch>         m_chunkStitch;
 

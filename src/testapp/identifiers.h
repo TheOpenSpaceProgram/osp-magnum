@@ -124,22 +124,6 @@ enum class EStgLink
 OSP_DECLARE_STAGE_NAMES(EStgLink, "Schedule", "NodeUpd", "MachUpd");
 OSP_DECLARE_STAGE_SCHEDULE(EStgLink, EStgLink::ScheduleLink);
 
-/*
- * @brief SubdivSkeleton terrain level-of-detail
- */
-//enum class EStgSkLOD
-//{
-//    SkSubdiv,
-//    ///<
-
-//    SkDel,
-//    ///< Remove triangles
-
-//    SkNew
-//    ///< Subdivide triangles, making more triangles
-//};
-//OSP_DECLARE_STAGE_NAMES(EStgSkLOD, "SkCheck", "SkDel", "SkNew");
-
 //-----------------------------------------------------------------------------
 
 inline void register_stage_enums()

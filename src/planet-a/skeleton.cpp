@@ -31,19 +31,22 @@ namespace planeta
 
 SubdivTriangleSkeleton::~SubdivTriangleSkeleton()
 {
-    // Release the 3 Vertex IDs of each triangle
-    for (uint32_t i = 0; i < m_triGroupIds.capacity(); i ++)
+    // Release ID owners of each triangle
+    for (std::size_t const triGroupIdx : m_triGroupIds.bitview().zeros())
     {
-        if ( ! m_triGroupIds.exists(SkTriGroupId(i)))
-        {
-            continue;
-        }
-
-        for (SkeletonTriangle& rTri : m_triGroupData[SkTriGroupId(i)].triangles)
+        for (SkeletonTriangle& rTri : m_triGroupData[SkTriGroupId::from_index(triGroupIdx)].triangles)
         {
             for (SkVrtxOwner_t& rVrtx : rTri.vertices)
             {
-                vrtx_release(std::exchange(rVrtx, {}));
+                vrtx_release(std::move(rVrtx));
+            }
+
+            for (SkTriOwner_t& rSktri : rTri.neighbors)
+            {
+                if (rSktri.has_value())
+                {
+                    tri_release(std::move(rSktri));
+                }
             }
         }
     }
@@ -394,11 +397,11 @@ ChunkId ChunkSkeleton::chunk_create(
 
     SkeletonTriangle const &tri = rSkel.tri_at(sktriId);
 
-    osp::ArrayView<SharedVrtxOwner_t> const chunkSharedVertices = shared_vertices_used(chunkId);
+    auto const chunkSharedVerticesEdges = osp::as_2d(shared_vertices_used(chunkId), m_chunkEdgeVrtxCount);
 
     auto const assign_shared_vertices = [&] (osp::ArrayView< MaybeNewId<SkVrtxId> > const skvrtx, int edgeIdx)
     {
-        auto const edgeSharedVertices = chunkSharedVertices.sliceSize(m_chunkEdgeVrtxCount * edgeIdx, m_chunkEdgeVrtxCount);
+        auto const edgeSharedVertices = chunkSharedVerticesEdges.row(edgeIdx);
 
         // First vertex along the edge is the corner
         edgeSharedVertices[0] = own_shared_from_skvrtx(tri.vertices[edgeIdx]);
@@ -462,8 +465,6 @@ void ChunkSkeleton::clear(SubdivTriangleSkeleton& rSkel)
     for (std::size_t chunkInt : m_chunkIds.bitview().zeros())
     {
         auto const chunk = static_cast<ChunkId>(chunkInt);
-
-        //this->tri_release(std::move(m_chunkToTri[chunk]));
 
         // Release all shared vertices
         for (SharedVrtxOwner_t& shared : shared_vertices_used(chunk))

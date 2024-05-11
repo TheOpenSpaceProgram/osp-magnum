@@ -291,7 +291,7 @@ void update_faces(
                                           (std::uint8_t siblingIdx) -> ArrayView<SharedVrtxOwner_t const>
             {
                 ChunkId const chunk = rSkCh.m_triToChunk[tri_id(children, siblingIdx)];
-                return rSkCh.shared_vertices_used(chunk).sliceSize(edgeIdx * rSkCh.m_chunkEdgeVrtxCount, rSkCh.m_chunkEdgeVrtxCount);
+                return as_2d(rSkCh.shared_vertices_used(chunk), rSkCh.m_chunkEdgeVrtxCount).row(edgeIdx);
             };
 
             detailX2Edge0 = child_chunk_edge(cmd.x2neighborEdge);

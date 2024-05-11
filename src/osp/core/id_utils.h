@@ -36,7 +36,7 @@ template<typename ID_T>
 struct MaybeNewId
 {
     ID_T id;
-    bool isNew;
+    bool isNew{true};
 };
 
 /**

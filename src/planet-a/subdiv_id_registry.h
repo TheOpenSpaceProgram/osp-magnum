@@ -80,6 +80,7 @@ public:
         ID_T const id = base_t::create();
         m_idRefcount.resize(capacity());
         m_idRefcount[std::size_t(id)] = 0;
+        m_idToParents.resize(capacity(), ~std::uint64_t(0));
         return id;
     };
 
@@ -174,7 +175,6 @@ osp::MaybeNewId<ID_T> SubdivIdRegistry<ID_T>::create_or_get(ID_T const a, ID_T c
         it->second = id_int_t(create_root());
 
         // Keep track of the new ID's parents
-        m_idToParents.resize(capacity());
         m_idToParents[it->second] = combination;
 
         refcount_increment(a);
@@ -193,24 +193,28 @@ void SubdivIdRegistry<ID_T>::remove(ID_T const x) noexcept
 
     std::uint64_t const combination = m_idToParents[std::size_t(x)];
 
-    [[maybe_unused]] auto const erased = m_parentsToId.erase(combination);
-    LGRN_ASSERT(erased != 0);
-
-    // Parents lost a child, RIP
-    auto const [parentA, parentB] = uint64_to_id_pair(combination);
-    auto const statusA = refcount_decrement(parentA);
-    auto const statusB = refcount_decrement(parentB);
-
-    // Recursively delete parents
-    if (statusA.refCount == 0)
+    if (combination != ~std::uint64_t(0))
     {
-        remove(parentA);
-    }
+        [[maybe_unused]] auto const numberOfElementsErased = m_parentsToId.erase(combination);
+        LGRN_ASSERT(numberOfElementsErased != 0);
 
-    if (statusB.refCount == 0)
-    {
-        remove(parentB);
+        // Parents lost a child, RIP
+        auto const [parentA, parentB] = uint64_to_id_pair(combination);
+        auto const statusA = refcount_decrement(parentA);
+        auto const statusB = refcount_decrement(parentB);
+
+        // Recursively delete parents
+        if (statusA.refCount == 0)
+        {
+            remove(parentA);
+        }
+
+        if (statusB.refCount == 0)
+        {
+            remove(parentB);
+        }
     }
+    // else, we're deleting a root value
 
     base_t::remove(x);
 }

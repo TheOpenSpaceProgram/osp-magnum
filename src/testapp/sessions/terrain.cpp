@@ -25,14 +25,17 @@
 #include "terrain.h"
 #include "common.h"
 
+#include <planet-a/chunk_generate.h>
+#include <planet-a/chunk_utils.h>
+#include <planet-a/icosahedron.h>
+
 #include <adera/drawing/CameraController.h>
-#include <longeron/utility/asserts.hpp>
+
 #include <osp/core/math_2pow.h>
 #include <osp/core/math_int64.h>
 #include <osp/drawing/drawing.h>
-#include <planet-a/icosahedron.h>
-#include <planet-a/chunk_generate.h>
-#include <planet-a/chunk_utils.h>
+
+#include <longeron/utility/asserts.hpp>
 
 #include <chrono>
 #include <fstream>
@@ -417,6 +420,21 @@ Session setup_terrain(
         rTerrain.scratchpad.surfaceRemoved.reset();
     });
 
+    rBuilder.task()
+        .name       ("Clean up terrain-related IdOwners")
+        .run_on     ({tgScn.cleanup(Run_)})
+        .push_to    (out.m_tasks)
+        .args       ({        idTerrain })
+        .func([] (ACtxTerrain &rTerrain) noexcept
+    {
+        // rTerrain.skChunks has owners referring to rTerrain.skeleton. A reference to
+        // rTerrain.skeleton can't be obtained during destruction, we must clear it separately.
+        rTerrain.skChunks.clear(rTerrain.skeleton);
+
+        // rTerrain.skeleton will clean itself up in its destructor, since it only holds owners
+        // referring to itself.
+    });
+
     return out;
 }
 
@@ -450,10 +468,8 @@ Session setup_terrain_debug_draw(
     Session out;
     auto const [idTrnDbgDraw] = out.acquire_data<1>(topData);
 
-    auto &rTrnDbgDraw = top_emplace< TerrainDebugDraw > (topData, idTrnDbgDraw);
-
-    rTrnDbgDraw.mat = mat;
-
+    auto &rTrnDbgDraw = top_emplace< TerrainDebugDraw > (topData, idTrnDbgDraw,
+                                                         TerrainDebugDraw{.mat = mat});
 
     rBuilder.task()
         .name       ("Position SceneFrame center to Camera Controller target")
@@ -479,26 +495,26 @@ Session setup_terrain_debug_draw(
         rTerrainFrame.position = Vector3l(camPos * int_2pow<int>(rTerrain.skData.scale));
     });
 
+    // Setup skeleton vertex visualizer
 
     rBuilder.task()
-        .name       ("do spooky scary skeleton stuff")
+        .name       ("Create or delete DrawEnts for each SkVrtxId in the terrain skeleton")
         .run_on     ({tgScnRdr.render(Run)})
-        .sync_with  ({tgScnRdr.drawTransforms(Modify_), tgScnRdr.entMeshDirty(Modify_), tgScnRdr.drawEntResized(ModifyOrSignal)})
+        .sync_with  ({tgTrn.skeleton(Ready), tgScnRdr.drawEnt(Delete), tgScnRdr.entMeshDirty(Modify_), tgScnRdr.materialDirty(Modify_), tgScnRdr.drawEntResized(ModifyOrSignal)})
         .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                 idScnRender,             idNMesh,                  idTrnDbgDraw,             idTerrain,                idTerrainIco })
-        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw& rTrnDbgDraw, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
+        .args       ({        idDrawing,                 idScnRender,             idNMesh,                  idTrnDbgDraw,                   idTerrain,                      idTerrainIco })
+        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw& rTrnDbgDraw, ACtxTerrain const &rTerrain, ACtxTerrainIco const &rTerrainIco) noexcept
     {
-
         Material &rMatPlanet = rScnRender.m_materials[rTrnDbgDraw.mat];
-        MeshId const cubeMeshId   = rNMesh.m_shapeToMesh.at(EShape::Box);
-
         SubdivIdRegistry<SkVrtxId> const& vrtxIds = rTerrain.skeleton.vrtx_ids();
         rTrnDbgDraw.verts.resize(vrtxIds.capacity());
 
+        // Iterate all existing and non-existing SkVrtxIDs. Create or delete a DrawEnt for it
+        // accordingly. This is probably very inefficient :)
         for (std::size_t skVertInt = 0; skVertInt < vrtxIds.capacity(); ++skVertInt)
         {
-            auto const skVert = SkVrtxId(skVertInt);
-            DrawEnt &rDrawEnt = rTrnDbgDraw.verts[skVert];
+            auto    const skVert    = SkVrtxId(skVertInt);
+            DrawEnt       &rDrawEnt = rTrnDbgDraw.verts[skVert];
 
             if (vrtxIds.exists(skVert))
             {
@@ -514,7 +530,6 @@ Session setup_terrain_debug_draw(
                     if (rScnRender.m_mesh[rDrawEnt].has_value())
                     {
                         rDrawing.m_meshRefCounts.ref_release(std::exchange(rScnRender.m_mesh[rDrawEnt], {}));
-
                     }
                     rScnRender.m_meshDirty  .push_back  (rDrawEnt);
                     rScnRender.m_visible    .reset      (rDrawEnt.value);
@@ -526,20 +541,31 @@ Session setup_terrain_debug_draw(
             }
         }
 
-        rScnRender.resize_draw(); // >:)
+        // New DrawEnts may have been created. We can't access rScnRender's members with the new
+        // entities yet, since they have not yet been resized.
+        //
+        // rScnRender will be resized afterwards by a task with tgScnRdr.drawEntResized(Run),
+        // before moving on to "Manage DrawEnts for each terrain SkVrtxId"
+    });
+
+    rBuilder.task()
+        .name       ("Arrange SkVrtxId DrawEnts as tiny cubes")
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgTrn.skeleton(Ready), tgScnRdr.drawEnt(Ready), tgScnRdr.drawTransforms(Modify_), tgScnRdr.entMeshDirty(Modify_), tgScnRdr.materialDirty(Modify_), tgScnRdr.drawEntResized(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({        idDrawing,                 idScnRender,             idNMesh,                        idTrnDbgDraw,                   idTerrain,                      idTerrainIco })
+        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw const& rTrnDbgDraw, ACtxTerrain const &rTerrain, ACtxTerrainIco const &rTerrainIco) noexcept
+    {
+        Material                         &rMatPlanet = rScnRender.m_materials[rTrnDbgDraw.mat];
+        MeshId                     const cubeMeshId  = rNMesh.m_shapeToMesh.at(EShape::Box);
+        SubdivIdRegistry<SkVrtxId> const &vrtxIds    = rTerrain.skeleton.vrtx_ids();
 
         for (std::size_t const skVertInt : vrtxIds.bitview().zeros())
-        if (auto const skVert = SkVrtxId(skVertInt);
-            vrtxIds.exists(skVert))
         {
-            DrawEnt const drawEnt = rTrnDbgDraw.verts[skVert];
+            SkVrtxId const skVert  = SkVrtxId::from_index(skVertInt);
+            DrawEnt  const drawEnt = rTrnDbgDraw.verts[skVert];
 
-            if ( ! drawEnt.has_value() )
-            {
-                continue;
-            }
-
-            if (rScnRender.m_mesh[drawEnt].has_value() == false)
+            if ( ! rScnRender.m_mesh[drawEnt].has_value() )
             {
                 rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(cubeMeshId);
                 rScnRender.m_meshDirty.push_back(drawEnt);
