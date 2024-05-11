@@ -39,7 +39,7 @@ static constexpr double PI = Magnum::Math::Constants<double>::pi();
 /**
  * @brief Wrap an angle to the range [0, 2π)
  */
-static constexpr double wrap_angle(double const angle)
+static double wrap_angle(double const angle)
 {
     double wrapped = fmod(angle, 2.0 * PI);
     if (wrapped < 0)
@@ -160,10 +160,11 @@ double KeplerOrbit::get_true_anomaly_from_eccentric(double const eccentric) cons
     {
         return elliptic_eccentric_anomaly_to_true_anomaly(m_params.eccentricity, eccentric);
     }
-    else if (is_hyperbolic())
+    else
     {
         return hyperbolic_eccentric_anomaly_to_true_anomaly(m_params.eccentricity, eccentric);
     }
+    // TODO: Add parabolic case (see Barker's equation)
 }
 
 double KeplerOrbit::get_eccentric_anomaly(double const time) const
@@ -175,12 +176,13 @@ double KeplerOrbit::get_eccentric_anomaly(double const time) const
         Mt = wrap_angle(Mt);
         return solve_kepler_elliptic(Mt, m_params.eccentricity, 20000);
     }
-    else if (is_hyperbolic())
+    else
     {
         double const nu = mean_motion(m_params.gravitationalParameter, -m_params.semiMajorAxis);
         double const Mt = m_params.meanAnomalyAtEpoch + (time - m_params.epoch) * nu;
         return solve_kepler_hyperbolic(Mt, m_params.eccentricity, 20000);
     }
+    // TODO: Add parabolic case
 }
 
 void KeplerOrbit::get_fixed_reference_frame(Vector3d &radial, Vector3d &transverse, Vector3d &outOfPlane) const
