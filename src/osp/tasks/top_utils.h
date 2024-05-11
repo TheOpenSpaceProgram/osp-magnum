@@ -65,7 +65,7 @@ namespace osp
 
 /**
  * @brief Reserves a slot in topData for each item in the output range [destFirst, destLast),
- * writing the associated indices into the range.
+ *     writing the associated indices into the range.
  *
  * @return The largest index that was reserved in topData, or if topData is full,
  * the largest index in topData

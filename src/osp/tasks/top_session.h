@@ -46,8 +46,9 @@
 
 /**
  * @brief Gives the next available section of topData to a session
- * and declares an ID variable for each element that is given.
- * The same ID's are also stored inside of the sessions m_data member
+ *     and declares an ID variable for each element that is given.
+ *
+ * The same ID's are also stored inside of the sessions m_data member.
  *
  * @param count The number of id variables passed to the macro.
  * @param ids A set of variables that will each be assigned to a unique index of topData.
@@ -62,7 +63,7 @@
 
 /**
  * @brief Retrieves a section of data within topData that was already given to a session
- * and maps an ID variable to each element that is retrieved.
+ *     and maps an ID variable to each element that is retrieved.
  *
  * @param count The number of id variables passed to the macro.
  * @param ids A set of variables that will each be assigned to a unique index of topData.
