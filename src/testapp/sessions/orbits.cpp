@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -36,8 +36,6 @@
 
 #include <random>
 
-#include <fenv.h>
-
 using namespace adera;
 using namespace osp::draw;
 using namespace osp::universe;
@@ -46,145 +44,144 @@ using namespace osp;
 namespace testapp::scenes
 {
 
-    osp::Session setup_orbit_planets(
-        TopTaskBuilder &rBuilder,
-        ArrayView<entt::any> topData,
-        Session &uniCore,
-        Session &uniScnFrame)
+osp::Session setup_orbit_planets(
+    TopTaskBuilder &rBuilder,
+    ArrayView<entt::any> topData,
+    Session &uniCore,
+    Session &uniScnFrame)
+{
+    using CoSpaceIdVec_t = std::vector<CoSpaceId>;
+    using Corrade::Containers::Array;
+
+    OSP_DECLARE_GET_DATA_IDS(uniCore, TESTAPP_DATA_UNI_CORE);
+    OSP_DECLARE_GET_DATA_IDS(uniScnFrame, TESTAPP_DATA_UNI_SCENEFRAME);
+
+    auto const tgUCore = uniCore.get_pipelines<PlUniCore>();
+
+    auto &rUniverse = top_get<Universe>(topData, idUniverse);
+
+    static constexpr int precision = 10;
+    static constexpr int planetCount = 64;
+    static constexpr int seed = 1337;
+    static constexpr spaceint_t maxDist = math::mul_2pow<spaceint_t, int>(20000ul, precision);
+    static constexpr float maxVel = 800.0f;
+
+    // Create coordinate spaces
+    CoSpaceId const mainSpace = rUniverse.m_coordIds.create();
+    std::vector<CoSpaceId> satSurfaceSpaces(planetCount);
+    rUniverse.m_coordIds.create(satSurfaceSpaces.begin(), satSurfaceSpaces.end());
+
+    rUniverse.m_coordCommon.resize(rUniverse.m_coordIds.capacity());
+
+    CoSpaceCommon &rMainSpaceCommon = rUniverse.m_coordCommon[mainSpace];
+    rMainSpaceCommon.m_satCount = planetCount;
+    rMainSpaceCommon.m_satCapacity = planetCount;
+
+    // Associate each planet satellite with their surface coordinate space
+    for (SatId satId = 0; satId < planetCount; ++satId)
     {
-        feenableexcept(FE_INVALID | FE_OVERFLOW);
-        using CoSpaceIdVec_t = std::vector<CoSpaceId>;
-        using Corrade::Containers::Array;
-
-        OSP_DECLARE_GET_DATA_IDS(uniCore, TESTAPP_DATA_UNI_CORE);
-        OSP_DECLARE_GET_DATA_IDS(uniScnFrame, TESTAPP_DATA_UNI_SCENEFRAME);
-
-        auto const tgUCore = uniCore.get_pipelines<PlUniCore>();
-
-        auto &rUniverse = top_get<Universe>(topData, idUniverse);
-
-        constexpr int precision = 10;
-        constexpr int planetCount = 64;
-        constexpr int seed = 1337;
-        constexpr spaceint_t maxDist = math::mul_2pow<spaceint_t, int>(20000ul, precision);
-        constexpr float maxVel = 800.0f;
-
-        // Create coordinate spaces
-        CoSpaceId const mainSpace = rUniverse.m_coordIds.create();
-        std::vector<CoSpaceId> satSurfaceSpaces(planetCount);
-        rUniverse.m_coordIds.create(satSurfaceSpaces.begin(), satSurfaceSpaces.end());
-
-        rUniverse.m_coordCommon.resize(rUniverse.m_coordIds.capacity());
-
-        CoSpaceCommon &rMainSpaceCommon = rUniverse.m_coordCommon[mainSpace];
-        rMainSpaceCommon.m_satCount = planetCount;
-        rMainSpaceCommon.m_satCapacity = planetCount;
-
-        // Associate each planet satellite with their surface coordinate space
-        for (SatId satId = 0; satId < planetCount; ++satId)
-        {
-            CoSpaceId const surfaceSpaceId = satSurfaceSpaces[satId];
-            CoSpaceCommon &rCommon = rUniverse.m_coordCommon[surfaceSpaceId];
-            rCommon.m_parent = mainSpace;
-            rCommon.m_parentSat = satId;
-        }
-
-        // Coordinate space data is a single allocation partitioned to hold positions, velocities, and
-        // rotations.
-        // TODO: Alignment is needed for SIMD (not yet implemented). see Corrade alignedAlloc
-
-        std::size_t bytesUsed = 0;
-
-        // Positions and velocities are arranged as XXXX... YYYY... ZZZZ...
-        partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[0]);
-        partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[1]);
-        partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[2]);
-        partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[0]);
-        partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[1]);
-        partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[2]);
-
-        // Rotations use XYZWXYZWXYZWXYZW...
-        partition(bytesUsed, planetCount, rMainSpaceCommon.m_satRotations[0],
-                  rMainSpaceCommon.m_satRotations[1],
-                  rMainSpaceCommon.m_satRotations[2],
-                  rMainSpaceCommon.m_satRotations[3]);
-
-        // Allocate data for all planets
-        rMainSpaceCommon.m_data = Array<unsigned char>{Corrade::NoInit, bytesUsed};
-
-        // Create easily accessible array views for each component
-        auto const [x, y, z] = sat_views(rMainSpaceCommon.m_satPositions, rMainSpaceCommon.m_data, planetCount);
-        auto const [vx, vy, vz] = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, planetCount);
-        auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations, rMainSpaceCommon.m_data, planetCount);
-
-        std::mt19937 gen(seed);
-        std::uniform_int_distribution<spaceint_t> posDist(-maxDist, maxDist);
-        std::uniform_real_distribution<double> velDist(-maxVel, maxVel);
-
-        for (std::size_t i = 0; i < planetCount; ++i)
-        {
-            // Assign each planet random positions and velocities
-            x[i] = posDist(gen);
-            y[i] = posDist(gen);
-            z[i] = posDist(gen);
-            vx[i] = velDist(gen);
-            vy[i] = velDist(gen);
-            vz[i] = velDist(gen);
-
-            // No rotation
-            qx[i] = 0.0;
-            qy[i] = 0.0;
-            qz[i] = 0.0;
-            qw[i] = 1.0;
-        }
-
-        // Set initial scene frame
-        // Is this needed?
-
-        auto &rScnFrame = top_get<SceneFrame>(topData, idScnFrame);
-        rScnFrame.m_parent = mainSpace;
-        rScnFrame.m_position = math::mul_2pow<Vector3g, int>({400, 400, 400}, precision);
-
-        Session out;
-        OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_UNI_PLANETS);
-
-        top_emplace<CoSpaceId>(topData, idPlanetMainSpace, mainSpace);
-        top_emplace<float>(topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
-        top_emplace<CoSpaceIdVec_t>(topData, idSatSurfaceSpaces, std::move(satSurfaceSpaces));
-
-        return out;
+        CoSpaceId const surfaceSpaceId = satSurfaceSpaces[satId];
+        CoSpaceCommon &rCommon = rUniverse.m_coordCommon[surfaceSpaceId];
+        rCommon.m_parent = mainSpace;
+        rCommon.m_parentSat = satId;
     }
 
-    osp::Session setup_orbit_dynamics_kepler(
-        TopTaskBuilder &rBuilder,
-        ArrayView<entt::any> topData,
-        Session &uniCore,
-        Session &uniPlanets,
-        Session &uniScnFrame)
+    // Coordinate space data is a single allocation partitioned to hold positions, velocities, and
+    // rotations.
+    // TODO: Alignment is needed for SIMD (not yet implemented). see Corrade alignedAlloc
+
+    std::size_t bytesUsed = 0;
+
+    // Positions and velocities are arranged as XXXX... YYYY... ZZZZ...
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[0]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[1]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satPositions[2]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[0]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[1]);
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satVelocities[2]);
+
+    // Rotations use XYZWXYZWXYZWXYZW...
+    partition(bytesUsed, planetCount, rMainSpaceCommon.m_satRotations[0],
+                rMainSpaceCommon.m_satRotations[1],
+                rMainSpaceCommon.m_satRotations[2],
+                rMainSpaceCommon.m_satRotations[3]);
+
+    // Allocate data for all planets
+    rMainSpaceCommon.m_data = Array<unsigned char>{Corrade::NoInit, bytesUsed};
+
+    // Create easily accessible array views for each component
+    auto const [x, y, z] = sat_views(rMainSpaceCommon.m_satPositions, rMainSpaceCommon.m_data, planetCount);
+    auto const [vx, vy, vz] = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, planetCount);
+    auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations, rMainSpaceCommon.m_data, planetCount);
+
+    std::mt19937 gen(seed);
+    std::uniform_int_distribution<spaceint_t> posDist(-maxDist, maxDist);
+    std::uniform_real_distribution<double> velDist(-maxVel, maxVel);
+
+    for (std::size_t i = 0; i < planetCount; ++i)
     {
-        using CoSpaceIdVec_t = std::vector<CoSpaceId>;
-        using Corrade::Containers::Array;
+        // Assign each planet random positions and velocities
+        x[i] = posDist(gen);
+        y[i] = posDist(gen);
+        z[i] = posDist(gen);
+        vx[i] = velDist(gen);
+        vy[i] = velDist(gen);
+        vz[i] = velDist(gen);
 
-        OSP_DECLARE_GET_DATA_IDS(uniCore, TESTAPP_DATA_UNI_CORE);
-        OSP_DECLARE_GET_DATA_IDS(uniPlanets, TESTAPP_DATA_UNI_PLANETS);
-        OSP_DECLARE_GET_DATA_IDS(uniScnFrame, TESTAPP_DATA_UNI_SCENEFRAME);
+        // No rotation
+        qx[i] = 0.0;
+        qy[i] = 0.0;
+        qz[i] = 0.0;
+        qw[i] = 1.0;
+    }
 
-        auto const tgUCore = uniCore.get_pipelines<PlUniCore>();
-        auto const tgUSFrm = uniScnFrame.get_pipelines<PlUniSceneFrame>();
+    // Set initial scene frame
+    // Is this needed?
 
-        auto &rUniverse = top_get<Universe>(topData, idUniverse);
-        auto const &rPlanetMainSpace = top_get<CoSpaceId>(topData, idPlanetMainSpace);
-        auto const &rSatSurfaceSpaces = top_get<CoSpaceIdVec_t>(topData, idSatSurfaceSpaces);
-        Session out;
+    auto &rScnFrame = top_get<SceneFrame>(topData, idScnFrame);
+    rScnFrame.m_parent = mainSpace;
+    rScnFrame.m_position = math::mul_2pow<Vector3g, int>({400, 400, 400}, precision);
 
-        rBuilder.task()
-            .name("Advanced planet orbits")
-            .run_on(tgUCore.update(Run))
-            .sync_with({tgUSFrm.sceneFrame(Modify)})
-            .push_to(out.m_tasks)
-            .args({idUniverse, idPlanetMainSpace, idSatSurfaceSpaces, tgUniDeltaTimeIn})
-            .func([](Universe &rUniverse, CoSpaceId const rPlanetMainSpace, CoSpaceIdVec_t const &rSatSurfaceSpaces, float const uniDeltaTimeIn) noexcept
-                  {
+    Session out;
+    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_UNI_PLANETS);
+
+    top_emplace<CoSpaceId>(topData, idPlanetMainSpace, mainSpace);
+    top_emplace<float>(topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
+    top_emplace<CoSpaceIdVec_t>(topData, idSatSurfaceSpaces, std::move(satSurfaceSpaces));
+
+    return out;
+}
+
+osp::Session setup_orbit_dynamics_kepler(
+    TopTaskBuilder &rBuilder,
+    ArrayView<entt::any> topData,
+    Session &uniCore,
+    Session &uniPlanets,
+    Session &uniScnFrame)
+{
+    using CoSpaceIdVec_t = std::vector<CoSpaceId>;
+    using Corrade::Containers::Array;
+
+    OSP_DECLARE_GET_DATA_IDS(uniCore, TESTAPP_DATA_UNI_CORE);
+    OSP_DECLARE_GET_DATA_IDS(uniPlanets, TESTAPP_DATA_UNI_PLANETS);
+    OSP_DECLARE_GET_DATA_IDS(uniScnFrame, TESTAPP_DATA_UNI_SCENEFRAME);
+
+    auto const tgUCore = uniCore.get_pipelines<PlUniCore>();
+    auto const tgUSFrm = uniScnFrame.get_pipelines<PlUniSceneFrame>();
+
+    auto &rUniverse = top_get<Universe>(topData, idUniverse);
+    auto const &rPlanetMainSpace = top_get<CoSpaceId>(topData, idPlanetMainSpace);
+    auto const &rSatSurfaceSpaces = top_get<CoSpaceIdVec_t>(topData, idSatSurfaceSpaces);
+    Session out;
+
+    rBuilder.task()
+        .name("Advanced planet orbits")
+        .run_on(tgUCore.update(Run))
+        .sync_with({tgUSFrm.sceneFrame(Modify)})
+        .push_to(out.m_tasks)
+        .args({idUniverse, idPlanetMainSpace, idSatSurfaceSpaces, tgUniDeltaTimeIn})
+        .func([](Universe &rUniverse, CoSpaceId const rPlanetMainSpace, CoSpaceIdVec_t const &rSatSurfaceSpaces, float const uniDeltaTimeIn) noexcept
+    {
         auto &rMainSpaceCommon = rUniverse.m_coordCommon[rPlanetMainSpace];
         auto const planetCount = rMainSpaceCommon.m_satCount;
         auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, planetCount);
@@ -226,9 +223,10 @@ namespace testapp::scenes
             vx[i] = velocity.x();
             vy[i] = velocity.y();
             vz[i] = velocity.z();
-        } });
+        } 
+    });
 
-        return out;
-    }
+    return out;
+}
 
 }

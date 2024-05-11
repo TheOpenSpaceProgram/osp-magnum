@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -30,6 +30,7 @@
 
 namespace testapp::scenes
 {
+    
 /**
  * @brief Setup planets for orbit scenario, initialized with random velocities and positions
  */
