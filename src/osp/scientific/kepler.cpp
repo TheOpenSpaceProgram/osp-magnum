@@ -33,15 +33,18 @@ using Magnum::Math::dot;
 
 namespace {
 
+// PI isn't standard, so define it here. Should it be added to constants.h?
+static constexpr double PI = Magnum::Math::Constants<double>::pi();
+
 /**
  * @brief Wrap an angle to the range [0, 2π), useful for keplerian orbits
  */
 static constexpr double wrap_angle(double const angle)
 {
-    double wrapped = std::fmod(angle, 2.0 * M_PI);
+    double wrapped = fmod(angle, 2.0 * PI);
     if (wrapped < 0)
     {
-        wrapped += 2.0 * M_PI;
+        wrapped += 2.0 * PI;
     }
     return wrapped;
 }
@@ -65,8 +68,8 @@ static double solve_kepler_elliptic(double const meanAnomaly, double const eccen
     // todo: implement something which converges more quickly
     do
     {
-        double f_E = E - eccentricity * std::sin(E) - meanAnomaly;
-        double df_E = 1.0 - eccentricity * std::cos(E);
+        double f_E = E - eccentricity * sin(E) - meanAnomaly;
+        double df_E = 1.0 - eccentricity * cos(E);
 
         delta = f_E / df_E;
         E = E - delta;
@@ -89,8 +92,8 @@ static double solve_kepler_hyperbolic(double const meanAnomaly, double const ecc
     // use newton's method
     do
     {
-        double f_E = eccentricity * std::sinh(E) - E - meanAnomaly;
-        double df_E = eccentricity * std::cosh(E) - 1.0;
+        double f_E = eccentricity * sinh(E) - E - meanAnomaly;
+        double df_E = eccentricity * cosh(E) - 1.0;
 
         delta = f_E / df_E;
         E = E - delta;
@@ -99,16 +102,13 @@ static double solve_kepler_hyperbolic(double const meanAnomaly, double const ecc
     return E;
 }
 
-
-
-
 static double eccentric_anomaly_to_true_anomaly(double const &ecc, double const &E)
 {
     // This formula supposedly has better numerical stability than the one below
     double const beta = ecc / (1 + std::sqrt(1 - ecc * ecc));
-    return E + 2.0 * std::atan2(beta * std::sin(E), 1 - beta * std::cos(E));
+    return E + 2.0 * atan2(beta * sin(E), 1 - beta * cos(E));
 
-    // return 2.0 * std::atan2(std::sqrt(1 + ecc) * std::sin(E / 2.0), std::sqrt(1 - ecc) * std::cos(E / 2.0));
+    // return 2.0 * atan2(std::sqrt(1 + ecc) * sin(E / 2.0), std::sqrt(1 - ecc) * cos(E / 2.0));
 }
 
 static double hyperbolic_eccentric_anomaly_to_true_anomaly(double const &ecc, double const &H)
@@ -118,12 +118,12 @@ static double hyperbolic_eccentric_anomaly_to_true_anomaly(double const &ecc, do
 
 static double true_anomaly_to_eccentric_anomaly(double const &ecc, double const &v)
 {
-    return 2.0 * std::atan(std::sqrt((1 - ecc) / (1 + ecc)) * std::tan(v / 2.0));
+    return 2.0 * atan(std::sqrt((1 - ecc) / (1 + ecc)) * tan(v / 2.0));
 }
 
 static double true_anomaly_to_hyperbolic_eccentric_anomaly(double const &ecc, double const &v)
 {
-    return 2.0 * std::atanh(std::clamp(std::sqrt((ecc - 1) / (ecc + 1)) * std::tan(v / 2.0), -1.0, 1.0));
+    return 2.0 * atanh(std::clamp(std::sqrt((ecc - 1) / (ecc + 1)) * tan(v / 2.0), -1.0, 1.0));
 }
 
 static double mean_motion(double const mu, double const a)
@@ -133,7 +133,7 @@ static double mean_motion(double const mu, double const a)
 
 static double get_orbiting_radius(double const ecc, double const semiMajorAxis, double const trueAnomaly)
 {
-    return semiMajorAxis * (1 - ecc * ecc) / (1 + ecc * std::cos(trueAnomaly));
+    return semiMajorAxis * (1 - ecc * ecc) / (1 + ecc * cos(trueAnomaly));
 }
 
 } // namespace
@@ -179,17 +179,17 @@ void KeplerOrbit::get_fixed_reference_frame(Vector3d &radial, Vector3d &transver
     double const b = m_longitudeOfAscendingNode;
     double const c = m_inclination;
 
-    radial = Vector3d(std::cos(a) * std::cos(b) - std::sin(a) * std::sin(b) * std::cos(c),
-                        std::cos(a) * std::sin(b) + std::sin(a) * std::cos(b) * std::cos(c),
-                        std::sin(a) * std::sin(c));
+    radial = Vector3d(cos(a) * cos(b) - sin(a) * sin(b) * cos(c),
+                        cos(a) * sin(b) + sin(a) * cos(b) * cos(c),
+                        sin(a) * sin(c));
 
-    transverse = Vector3d(-std::sin(a) * std::cos(b) - std::cos(a) * std::sin(b) * std::cos(c),
-                            -std::sin(a) * std::sin(b) + std::cos(a) * std::cos(b) * std::cos(c),
-                            std::cos(a) * std::sin(c));
+    transverse = Vector3d(-sin(a) * cos(b) - cos(a) * sin(b) * cos(c),
+                            -sin(a) * sin(b) + cos(a) * cos(b) * cos(c),
+                            cos(a) * sin(c));
 
-    outOfPlane = Vector3d(std::sin(b) * std::sin(c),
-                            -std::cos(b) * std::sin(c),
-                            std::cos(c));
+    outOfPlane = Vector3d(sin(b) * sin(c),
+                            -cos(b) * sin(c),
+                            cos(c));
 }
 
 void KeplerOrbit::get_state_vectors_at_time(double const time, Vector3d &position, Vector3d &velocity) const
@@ -208,15 +208,15 @@ void KeplerOrbit::get_state_vectors_at_eccentric_anomaly(double const E, Vector3
     Vector3d outOfPlane;
     get_fixed_reference_frame(radial, transverse, outOfPlane);
 
-    position = r * (std::cos(trueAnomaly) * radial + std::sin(trueAnomaly) * transverse);
+    position = r * (cos(trueAnomaly) * radial + sin(trueAnomaly) * transverse);
     if (m_eccentricity < 1.0)
     {
         velocity = (std::sqrt(m_gravitationalParameter * m_semiMajorAxis) / r) * 
-            (-std::sin(E) * radial + std::sqrt(1 - m_eccentricity * m_eccentricity) * std::cos(E) * transverse);
+            (-sin(E) * radial + std::sqrt(1 - m_eccentricity * m_eccentricity) * cos(E) * transverse);
     }
     else
     {
-        double const v_r = (m_gravitationalParameter / m_h * m_eccentricity * std::sin(trueAnomaly));
+        double const v_r = (m_gravitationalParameter / m_h * m_eccentricity * sin(trueAnomaly));
         double const v_perp = (m_h / r);
         Vector3d const radusDir = position.normalized();
         Vector3d const perpDir = cross(outOfPlane, radusDir).normalized();
@@ -228,7 +228,7 @@ void KeplerOrbit::get_state_vectors_at_eccentric_anomaly(double const E, Vector3
 void KeplerOrbit::rebase_epoch(const double newEpoch)
 {
     double const new_E0 = get_eccentric_anomaly(newEpoch);
-    double const new_m0 = new_E0 - m_eccentricity * std::sin(new_E0);
+    double const new_m0 = new_E0 - m_eccentricity * sin(new_E0);
     Vector3d newPos;
     Vector3d newVel;
     get_state_vectors_at_eccentric_anomaly(new_E0, newPos, newVel);
@@ -254,7 +254,7 @@ std::optional<double> KeplerOrbit::get_period() const
 {
     if (m_eccentricity < 1.0)
     {
-        return 2.0 * M_PI * std::sqrt(m_semiMajorAxis * m_semiMajorAxis * m_semiMajorAxis / m_gravitationalParameter);
+        return 2.0 * PI * std::sqrt(m_semiMajorAxis * m_semiMajorAxis * m_semiMajorAxis / m_gravitationalParameter);
     }
     return std::nullopt;
 }
@@ -279,7 +279,7 @@ KeplerOrbit KeplerOrbit::from_initial_conditions(Vector3d const radius, Vector3d
     double LAN = acos(std::clamp(n.x() / n.length(), -1.0, 1.0));
     if (n.y() < 0)
     {
-        LAN = 2.0 * M_PI - LAN;
+        LAN = 2.0 * PI - LAN;
     }
     if (n.length() <= KINDA_SMALL_NUMBER)
     {
@@ -295,10 +295,10 @@ KeplerOrbit KeplerOrbit::from_initial_conditions(Vector3d const radius, Vector3d
     {
         // True anomaly
         double m = dot(eVec, radius) / (e * radius.length());
-        v = std::acos(std::clamp(m, -1.0, 1.0));
+        v = acos(std::clamp(m, -1.0, 1.0));
         if (dot(radius, velocity) < 0)
         {
-            v = 2.0 * M_PI - v;
+            v = 2.0 * PI - v;
         }
         if (m >= 1.0)
         {
@@ -309,7 +309,7 @@ KeplerOrbit KeplerOrbit::from_initial_conditions(Vector3d const radius, Vector3d
         w = acos(std::clamp(dot(n, eVec) / (e * n.length()), -1.0, 1.0));
         if (eVec.z() < 0)
         {
-            w = 2.0 * M_PI - w;
+            w = 2.0 * PI - w;
         }
         if (e <= KINDA_SMALL_NUMBER)
         {
@@ -321,10 +321,10 @@ KeplerOrbit KeplerOrbit::from_initial_conditions(Vector3d const radius, Vector3d
         // If e == 0, the orbit is circular and has no periapsis, so we use argument of latitude as a substitute for argument of periapsis
         // see https://en.wikipedia.org/wiki/True_anomaly#From_state_vectors
         double m = dot(n, radius) / (n.length() * radius.length());
-        v = std::acos(std::clamp(m, -1.0, 1.0));
+        v = acos(std::clamp(m, -1.0, 1.0));
         if (radius.z() < 0)
         {
-            v = 2.0 * M_PI - v;
+            v = 2.0 * PI - v;
         }
         if (m >= 1.0 - KINDA_SMALL_NUMBER)
         {
@@ -347,19 +347,19 @@ KeplerOrbit KeplerOrbit::from_initial_conditions(Vector3d const radius, Vector3d
     else if (e >= 1.0 - KINDA_SMALL_NUMBER)
     {
         // parabolic orbit, todo
-        M0 = 0.5 * std::tan(v / 2.0) + (1 / 6.0) * std::pow(std::tan(v / 2.0), 3);
+        M0 = 0.5 * tan(v / 2.0) + (1 / 6.0) * std::pow(tan(v / 2.0), 3);
         E = v;
     }
     else if (e > KINDA_SMALL_NUMBER)
     {
         E = true_anomaly_to_eccentric_anomaly(e, v);
-        M0 = E - e * std::sin(E);
+        M0 = E - e * sin(E);
     }
     else
     {
         // circular orbit, todo
         E = v;
-        M0 = E - e * std::sin(E);
+        M0 = E - e * sin(E);
     }
 
     return KeplerOrbit(semiMajorAxis, e, inclination, w, LAN, M0, epoch, GM, h.length());

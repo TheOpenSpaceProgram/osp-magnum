@@ -37,6 +37,7 @@ namespace osp
 struct KeplerOrbit
 {
 private:
+    
     static constexpr double KINDA_SMALL_NUMBER = 1.0E-8;
     // These are private as we may want to change the internal representation in the future
     double m_semiMajorAxis;
