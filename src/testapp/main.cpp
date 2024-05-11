@@ -22,9 +22,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 #include "MagnumApplication.h"
 #include "testapp.h"
-
 #include "scenarios.h"
 #include "identifiers.h"
 #include "sessions/common.h"
@@ -44,7 +44,6 @@
 #include <Magnum/Primitives/Cube.h>
 #include <Magnum/Primitives/Grid.h>
 #include <Magnum/Primitives/Icosphere.h>
-
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/TextureData.h>
 #include <Magnum/Trade/MeshData.h>
@@ -61,25 +60,26 @@
 #include <iostream>
 #include <memory>
 #include <string_view>
-
 #include <thread>
 #include <unordered_map>
 
 using namespace testapp;
 
 /**
- * @brief Starts a spaghetti REPL line interface that gets inputs from stdin
+ * @brief Starts a spaghetti REPL (Read Evaluate Print Loop) interface that gets inputs from standard in
  *
  * This interface can be used to run commands and load scenes
+ *
+ * CLI -> Command line interface
  */
-void debug_cli_loop();
+void cli_loop(int argc, char** argv);
 
 /**
  * @brief Starts Magnum application (MagnumApplication) thread g_magnumThread
  *
  * This initializes an OpenGL context, and opens the window
  */
-void start_magnum_async();
+void start_magnum_async(int argc, char** argv);
 
 /**
  * @brief As the name implies
@@ -92,8 +92,8 @@ void start_magnum_async();
 void load_a_bunch_of_stuff();
 
 // called only from commands to display information
-void debug_print_help();
-void debug_print_resources();
+void print_help();
+void print_resources();
 
 TestApp g_testApp;
 
@@ -102,17 +102,13 @@ SingleThreadedExecutor g_executor;
 std::thread g_magnumThread;
 
 // Loggers
-std::shared_ptr<spdlog::logger> g_logTestApp;
-std::shared_ptr<spdlog::logger> g_logExecutor;
-std::shared_ptr<spdlog::logger> g_logMagnumApp;
-
-// lazily save the arguments to pass to Magnum
-int g_argc;
-char** g_argv;
-
+osp::Logger_t g_mainThreadLogger;
+osp::Logger_t g_logExecutor;
+osp::Logger_t g_logMagnumApp;
 
 int main(int argc, char** argv)
 {
+    // Command line argument parsing
     Corrade::Utility::Arguments args;
     args.addSkippedPrefix("magnum", "Magnum options")
         .addOption("scene", "none")         .setHelp("scene",       "Set the scene to launch")
@@ -123,21 +119,15 @@ int main(int argc, char** argv)
         .setGlobalHelp("Helptext goes here.")
         .parse(argc, argv);
 
-    // just lazily save the arguments
-    g_argc = argc;
-    g_argv = argv;
-
-    // Setup loggers
-    {
-        auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        pSink->set_pattern("[%T.%e] [%n] [%^%l%$] [%s:%#] %v");
-        g_logTestApp   = std::make_shared<spdlog::logger>("testapp", pSink);
-        g_logExecutor  = std::make_shared<spdlog::logger>("executor", pSink);
-        g_logMagnumApp = std::make_shared<spdlog::logger>("flight", std::move(pSink));
-    }
+    // Setup logging
+    auto pSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    pSink->set_pattern("[%T.%e] [%n] [%^%l%$] [%s:%#] %v");
+    g_mainThreadLogger = std::make_shared<spdlog::logger>("main-thread", pSink);
+    g_logExecutor  = std::make_shared<spdlog::logger>("executor", pSink);
+    g_logMagnumApp = std::make_shared<spdlog::logger>("flight", std::move(pSink));
 
     // Set thread-local logger used by OSP_LOG_* macros
-    osp::set_thread_logger(g_logTestApp);
+    osp::set_thread_logger(g_mainThreadLogger);
 
     g_testApp.m_pExecutor = &g_executor;
 
@@ -154,36 +144,34 @@ int main(int argc, char** argv)
         auto const it = scenarios().find(args.value("scene"));
         if(it == std::end(scenarios()))
         {
-            std::cerr << "unknown scene" << std::endl;
+            OSP_LOG_ERROR("unknown scene");
             g_testApp.clear_resource_owners();
-            exit(-1);
+            return 1;
         }
 
         g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
 
-        start_magnum_async();
+        start_magnum_async(argc, argv);
     }
 
-    if(!args.isSet("norepl"))
+    if( ! args.isSet("norepl"))
     {
-        // start doing debug cli loop
-        debug_cli_loop();
+        cli_loop(argc, argv);
     }
 
-    // wait for magnum thread to exit if it exists
+    // Wait for magnum thread to exit if it exists.
     if (g_magnumThread.joinable())
     {
         g_magnumThread.join();
     }
 
-    //Kill spdlog
-    spdlog::shutdown();  //>_> -> X.X  *Stab
+    spdlog::shutdown();
     return 0;
 }
 
-void debug_cli_loop()
+void cli_loop(int argc, char** argv)
 {
-    debug_print_help();
+    print_help();
 
     std::string command;
 
@@ -192,8 +180,10 @@ void debug_cli_loop()
         std::cout << "> ";
         std::cin >> command;
 
-        bool magnumOpen = ! g_testApp.m_renderer.m_sessions.empty();
-        if (auto const it = scenarios().find(command);
+        bool const magnumOpen = ! g_testApp.m_renderer.m_sessions.empty();
+        
+        // First check to see if command is the name of a scenario.
+        if (auto const it = scenarios().find(command); 
             it != std::end(scenarios()))
         {
             if (magnumOpen)
@@ -217,68 +207,68 @@ void debug_cli_loop()
                 }
 
                 g_testApp.m_rendererSetup = it->second.m_setup(g_testApp);
-                start_magnum_async();
+                start_magnum_async(argc, argv);
             }
         }
-        else if (command == "help")
-        {
-            debug_print_help();
-        }
-        else if (command == "reopen")
-        {
-            if (magnumOpen)
+        else // Otherwise check all other commands. 
+        { 
+            if (command == "help") 
             {
-                std::cout << "Application is already open\n";
+                print_help();
             }
-            else if ( g_testApp.m_rendererSetup == nullptr )
+            else if (command == "reopen") 
             {
-                std::cout << "No existing scene loaded\n";
+                if (magnumOpen)
+                {
+                    std::cout << "Application is already open\n";
+                }
+                else if (g_testApp.m_rendererSetup == nullptr)
+                {
+                    std::cout << "No existing scene loaded\n";
+                }
+                else
+                {
+                    start_magnum_async(argc, argv);
+                }
             }
-            else
+            else if (command == "list_pkg") 
             {
-                start_magnum_async();
+                print_resources();
             }
+            else if (command == "exit") 
+            {
+                if (magnumOpen)
+                {
+                    OSP_DECLARE_GET_DATA_IDS(g_testApp.m_renderer.m_sessions[1], TESTAPP_DATA_MAGNUM); // declares idActiveApp
+                    osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp).exit();
 
-        }
-        else if (command == "list_pkg")
-        {
-            debug_print_resources();
-        }
-        else if (command == "exit")
-        {
-            if (magnumOpen)
-            {
-                // Request exit if application exists
-                OSP_DECLARE_GET_DATA_IDS(g_testApp.m_renderer.m_sessions[1], TESTAPP_DATA_MAGNUM); // declares idActiveApp
-                osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp).exit();
+                    break;
+                }
             }
-
-            break;
-        }
-        else
-        {
-            std::cout << "that doesn't do anything ._.\n";
+            else 
+            {
+                std::cout << "That command doesn't do anything ._.\n";
+            }
         }
     }
 
     g_testApp.clear_resource_owners();
 }
 
-void start_magnum_async()
+void start_magnum_async(int argc, char** argv)
 {
     if (g_magnumThread.joinable())
     {
         g_magnumThread.join();
     }
-    std::thread t([] {
-
+    std::thread t([argc, argv] () mutable {
         osp::set_thread_logger(g_logMagnumApp);
 
         // Start Magnum application session
         osp::TopTaskBuilder builder{g_testApp.m_tasks, g_testApp.m_renderer.m_edges, g_testApp.m_taskData};
 
         g_testApp.m_windowApp   = scenes::setup_window_app  (builder, g_testApp.m_topData, g_testApp.m_application);
-        g_testApp.m_magnum      = scenes::setup_magnum      (builder, g_testApp.m_topData, g_testApp.m_application, g_testApp.m_windowApp, {g_argc, g_argv});
+        g_testApp.m_magnum      = scenes::setup_magnum      (builder, g_testApp.m_topData, g_testApp.m_application, g_testApp.m_windowApp, MagnumApplication::Arguments{ argc, argv });
 
         OSP_DECLARE_GET_DATA_IDS(g_testApp.m_magnum, TESTAPP_DATA_MAGNUM); // declares idActiveApp
         auto &rActiveApp = osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp);
@@ -312,17 +302,12 @@ void start_magnum_async()
     g_magnumThread.swap(t);
 }
 
-
-
 void load_a_bunch_of_stuff()
 {
     using namespace osp::restypes;
     using namespace Magnum;
     using Primitives::ConeFlag;
     using Primitives::CylinderFlag;
-
-    std::size_t const maxTags = 256; // aka: just two 64-bit integers
-    std::size_t const maxTagsInts = maxTags / 64;
 
     osp::TopTaskBuilder builder{g_testApp.m_tasks, g_testApp.m_applicationGroup.m_edges, g_testApp.m_taskData};
     auto const plApp = g_testApp.m_application.create_pipelines<PlApplication>(builder);
@@ -355,7 +340,6 @@ void load_a_bunch_of_stuff()
         }
     });
 
-
     rResources.resize_types(osp::ResTypeIdReg_t::size());
 
     rResources.data_register<Trade::ImageData2D>(gc_image);
@@ -368,7 +352,7 @@ void load_a_bunch_of_stuff()
     g_testApp.m_defaultPkg = rResources.pkg_create();
 
     // Load sturdy glTF files
-    const std::string_view datapath = {"OSPData/adera/"};
+    const std::string_view datapath = { "OSPData/adera/" };
     const std::vector<std::string_view> meshes =
     {
         "spamcan.sturdy.gltf",
@@ -409,26 +393,24 @@ void load_a_bunch_of_stuff()
     OSP_LOG_INFO("Resource loading complete");
 }
 
-
 //-----------------------------------------------------------------------------
 
-void debug_print_help()
+void print_help()
 {
-
     std::size_t longestName = 0;
-    for (auto const& [name, rTestScn] : scenarios())
+    for (auto const& [rName, rScenerio] : scenarios())
     {
-        longestName = std::max(name.size(), longestName);
+        longestName = std::max(rName.size(), longestName);
     }
 
     std::cout
         << "OSP-Magnum Temporary Debug CLI\n"
         << "Open a scenario:\n";
 
-    for (auto const& [name, rTestScn] : scenarios())
+    for (auto const& [rName, rScenerio] : scenarios())
     {
-        std::string spaces(longestName - name.length(), ' ');
-        std::cout << "* " << name << spaces << " - " << rTestScn.m_desc << "\n";
+        std::string spaces(longestName - rName.length(), ' ');
+        std::cout << "* " << rName << spaces << " - " << rScenerio.m_description << "\n";
     }
 
     std::cout
@@ -439,10 +421,8 @@ void debug_print_help()
         << "* exit      - Deallocate everything and return memory to OS\n";
 }
 
-void debug_print_resources()
+void print_resources()
 {
     // TODO: Add features to list resources in osp::Resources
     std::cout << "Not yet implemented!\n";
 }
-
-
