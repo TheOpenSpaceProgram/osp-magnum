@@ -477,6 +477,19 @@ Session setup_scene_renderer(
     });
 
     rBuilder.task()
+        .name       ("Clear dirty materials once we're done with it")
+        .run_on     ({tgScnRdr.materialDirty(Clear)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender})
+        .func([] (ACtxSceneRender& rScnRender) noexcept
+    {
+        for (Material &rMat : rScnRender.m_materials)
+        {
+            rMat.m_dirty.clear();
+        }
+    });
+
+    rBuilder.task()
         .name       ("Clean up scene owners")
         .run_on     ({tgWin.cleanup(Run_)})
         .push_to    (out.m_tasks)

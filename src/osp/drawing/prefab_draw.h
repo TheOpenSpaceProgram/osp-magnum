@@ -53,7 +53,7 @@ public:
             ACtxDrawing&                rDrawing,
             ACtxSceneRender&            rScnRender);
 
-    static void init_mesh_and_material(
+    static void init_mesh_texture_material(
             ACtxPrefabs&                rPrefabs,
             Resources&                  rResources,
             ACtxBasic const&            rBasic,
@@ -62,7 +62,7 @@ public:
             ACtxSceneRender&            rScnRender,
             MaterialId                  material = lgrn::id_null<MaterialId>());
 
-    static void resync_mesh_and_material(
+    static void resync_mesh_texture_material(
             ACtxPrefabs&                rPrefabs,
             Resources&                  rResources,
             ACtxBasic const&            rBasic,

@@ -46,17 +46,6 @@ using namespace osp;
 namespace testapp::scenes
 {
 
-template <MachTypeId const& MachType_T>
-TopTaskFunc_t gen_allocate_mach()
-{
-    static TopTaskFunc_t const func = wrap_args([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach) noexcept
-    {
-        rUpdMach.localDirty[MachType_T].ints().resize(rScnParts.machines.perType[MachType_T].localIds.vec().capacity());
-    });
-
-    return func;
-}
-
 Session setup_mach_rocket(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any> const  topData,

@@ -124,6 +124,22 @@ enum class EStgLink
 OSP_DECLARE_STAGE_NAMES(EStgLink, "Schedule", "NodeUpd", "MachUpd");
 OSP_DECLARE_STAGE_SCHEDULE(EStgLink, EStgLink::ScheduleLink);
 
+/*
+ * @brief SubdivSkeleton terrain level-of-detail
+ */
+//enum class EStgSkLOD
+//{
+//    SkSubdiv,
+//    ///<
+
+//    SkDel,
+//    ///< Remove triangles
+
+//    SkNew
+//    ///< Subdivide triangles, making more triangles
+//};
+//OSP_DECLARE_STAGE_NAMES(EStgSkLOD, "SkCheck", "SkDel", "SkNew");
+
 //-----------------------------------------------------------------------------
 
 inline void register_stage_enums()
@@ -308,6 +324,14 @@ struct PlNewton
 #define TESTAPP_DATA_ROCKETS_NWT 1, \
     idRocketsNwt
 
+#define TESTAPP_DATA_TERRAIN 3, \
+    idTerrainFrame, idTerrain, idTerrainIco
+struct PlTerrain
+{
+    PipelineDef<EStgCont> skeleton          {"skeleton"};
+    PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
+    PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
+};
 
 //-----------------------------------------------------------------------------
 
