@@ -32,7 +32,7 @@ namespace osp
 {
 
 /**
- * @brief Holds parameters to fully define a Keplerian (ideal 2-body) orbit
+ * @brief Contains an analytical solution to a 2-body orbit around 0,0
  */
 struct KeplerOrbit
 {
@@ -40,18 +40,20 @@ private:
     
     static constexpr double KINDA_SMALL_NUMBER = 1.0E-8;
 
-    // These are private as we may want to change the internal representation in the future
-    struct KeplerOrbitParams
-    {
+public:
+
+    /**
+     * Set of elements to fully define an orbit
+     */
+    struct KeplerOrbitParams {
         double semiMajorAxis;
         double eccentricity;
         double inclination;
         double argumentOfPeriapsis;
         double longitudeOfAscendingNode;
         double meanAnomalyAtEpoch;
-        double epoch;
         double gravitationalParameter;
-        double angularMomentum;
+        double epoch;
     };
 
     KeplerOrbitParams m_params;
@@ -76,7 +78,6 @@ private:
      */
     void get_state_vectors_at_eccentric_anomaly(double const true_anomaly, Vector3d &position, Vector3d &velocity) const;
 
-public:
     /**
      * @brief Compute the position, velocity of the orbit at a given time
      */
@@ -109,10 +110,35 @@ public:
      */
     double get_periapsis() const;
 
-    constexpr bool is_elliptic() const noexcept { return m_params.eccentricity < 1.0 - KINDA_SMALL_NUMBER; }
-    constexpr bool is_circular() const noexcept { return m_params.eccentricity <= KINDA_SMALL_NUMBER; }
-    constexpr bool is_hyperbolic() const noexcept { return m_params.eccentricity > 1.0 + KINDA_SMALL_NUMBER; }
-    constexpr bool is_parabolic() const noexcept { return m_params.eccentricity <= KINDA_SMALL_NUMBER + 1.0 && m_params.eccentricity >= 1.0 - KINDA_SMALL_NUMBER; }
+    /**
+     * @brief Returns true if this orbit is elliptic *or* circular (e<1.0)
+     */
+    constexpr bool is_elliptic_or_circular() const noexcept { 
+        return m_params.eccentricity < 1.0 - KINDA_SMALL_NUMBER; 
+    }
+
+    /**
+     * @brief Returns true if this orbit is circular (e==0.0)
+     */
+    constexpr bool is_circular() const noexcept { 
+        return m_params.eccentricity <= KINDA_SMALL_NUMBER; 
+    }
+
+    /**
+     * @brief Returns true if this orbit is hyperbolic (e>1.0)
+     */ 
+    constexpr bool is_hyperbolic() const noexcept { 
+        return m_params.eccentricity > 1.0 + KINDA_SMALL_NUMBER; 
+    }
+
+    /**
+     * @brief Returns true if this orbit is parabolic (e==1.0)
+     */
+    constexpr bool is_parabolic() const noexcept 
+    { 
+        return m_params.eccentricity <= KINDA_SMALL_NUMBER + 1.0 
+            && m_params.eccentricity >= 1.0 - KINDA_SMALL_NUMBER; 
+    }
 
     /**
      * @brief Compute the Kepler orbit parameters from initial conditions
@@ -124,8 +150,7 @@ public:
      *
      * @return KeplerOrbit
      */
-    static KeplerOrbit from_initial_conditions(Vector3d const radius, Vector3d const velocity, double const epoch = 0.0, double const gravitationalParameter = 1.0);
-    
+    static KeplerOrbit from_initial_conditions(Vector3d const radius, Vector3d const velocity, double const gravitationalParameter, double const epoch = 0.0);
     
     /**
      * @brief Solve for the next time the radius = r, if such a time exists

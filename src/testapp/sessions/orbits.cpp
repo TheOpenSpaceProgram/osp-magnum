@@ -202,7 +202,7 @@ osp::Session setup_orbit_dynamics_kepler(
             Vector3d position = Vector3d(Vector3g(x[i], y[i], z[i]))*scale;    
             Vector3d velocity = Vector3d(vx[i], vy[i], vz[i]);
 
-            orbits.push_back(KeplerOrbit::from_initial_conditions(position, velocity, 0.000f, 1.327e10 ));
+            orbits.push_back(KeplerOrbit::from_initial_conditions(position, velocity, 1.327e8, 0.000f));
         }
 
         for (std::size_t i = 0; i < planetCount; ++i)
