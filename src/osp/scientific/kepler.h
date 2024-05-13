@@ -32,13 +32,12 @@ namespace osp
 {
 
 /**
- * @brief Contains an analytical solution to a 2-body orbit around 0,0
+ * @brief Implementation of the analytical solution to Kepler's equation using the Classical Orbital Elements
  */
 struct KeplerOrbit
 {
 private:
-    
-    static constexpr double KINDA_SMALL_NUMBER = 1.0E-8;
+static constexpr double KINDA_SMALL_NUMBER = 1.0E-8;
 
 public:
 
@@ -58,25 +57,17 @@ public:
 
     KeplerOrbitParams m_params;
 
-    KeplerOrbit(KeplerOrbitParams const params): m_params(params) {}
+    KeplerOrbit(KeplerOrbitParams const params) : m_params(params) {}
 
     /**
-     * @brief Get the eccentric anomaly at a given time
+     * @brief Get the true anomaly at a given time
      */
-    double get_eccentric_anomaly(double const time) const;
+    double get_true_anomaly(double const time) const;
 
     /**
-     * @brief Get the true anomaly at a given eccentric anomaly
-     *
-     * @note This isnt a very satisfying interface for this function,
-     * but having a "get_true_anomaly_at_time" would require double the computation if you wanted both anomalies
+     * @brief Compute the position, velocity of the orbit at a given true anomaly
      */
-    double get_true_anomaly_from_eccentric(double const eccentric_anomaly) const;
-
-    /**
-     * @brief Compute the position, velocity of the orbit at a given eccentric anomaly
-     */
-    void get_state_vectors_at_eccentric_anomaly(double const true_anomaly, Vector3d &position, Vector3d &velocity) const;
+    void get_state_vectors_at_true_anomaly(double const trueAnomaly, Vector3d &position, Vector3d &velocity) const;
 
     /**
      * @brief Compute the position, velocity of the orbit at a given time
@@ -89,9 +80,9 @@ public:
     Vector3d get_acceleration(Vector3d const &radius) const;
 
     /**
-     * @brief Returns a fixed reference frame for the orbit, invariant of time
+     * @brief Returns the euler angle rotation defined by argument of periapsis, longitude of ascending node, and inclination
      */
-    void get_fixed_reference_frame(Vector3d &radial, Vector3d &transverse, Vector3d &outOfPlane) const;
+    void get_uvw_vectors(Vector3d &u, Vector3d &v, Vector3d &w) const;
 
     /**
      * @brief Find Apoapsis of orbit
@@ -113,12 +104,12 @@ public:
     /**
      * @brief Returns true if this orbit is elliptic *or* circular (e<1.0)
      */
-    constexpr bool is_elliptic_or_circular() const noexcept { 
-        return m_params.eccentricity < 1.0 - KINDA_SMALL_NUMBER; 
+    constexpr bool is_elliptic() const noexcept { 
+        return m_params.eccentricity < 1.0; 
     }
 
     /**
-     * @brief Returns true if this orbit is circular (e==0.0)
+     * @brief Returns true if this orbit is circular (e==0.0), a special case of elliptic orbits
      */
     constexpr bool is_circular() const noexcept { 
         return m_params.eccentricity <= KINDA_SMALL_NUMBER; 
@@ -128,16 +119,17 @@ public:
      * @brief Returns true if this orbit is hyperbolic (e>1.0)
      */ 
     constexpr bool is_hyperbolic() const noexcept { 
-        return m_params.eccentricity > 1.0 + KINDA_SMALL_NUMBER; 
+        return m_params.eccentricity > 1.0; 
     }
 
     /**
      * @brief Returns true if this orbit is parabolic (e==1.0)
+     * 
+     * @note Parabolic orbits will likely not be supported by this class
+     * If supporting parabolic orbits is a requirement, look into implementing Modified Equinoctial Elements
      */
-    constexpr bool is_parabolic() const noexcept 
-    { 
-        return m_params.eccentricity <= KINDA_SMALL_NUMBER + 1.0 
-            && m_params.eccentricity >= 1.0 - KINDA_SMALL_NUMBER; 
+    constexpr bool is_parabolic() const noexcept {
+        return m_params.eccentricity == 1.0;
     }
 
     /**
@@ -150,7 +142,7 @@ public:
      *
      * @return KeplerOrbit
      */
-    static KeplerOrbit from_initial_conditions(Vector3d const radius, Vector3d const velocity, double const gravitationalParameter, double const epoch = 0.0);
+    static KeplerOrbit from_initial_conditions(Vector3d const radius, Vector3d velocity, double const gravitationalParameter, double const epoch = 0.0);
     
     /**
      * @brief Solve for the next time the radius = r, if such a time exists
