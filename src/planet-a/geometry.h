@@ -68,7 +68,8 @@ struct SkeletonVertexData
     osp::KeyedVec<planeta::SkVrtxId, osp::Vector3>  normals;
     osp::KeyedVec<planeta::SkTriId,  osp::Vector3l> centers;
 
-    int scale{};
+    /// For the Vector3l variables used in this struct. 2^precision units = 1 meter
+    int precision{};
 };
 
 /**

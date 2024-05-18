@@ -47,6 +47,9 @@ struct ChunkScratchpad
     /// New stitches to apply to currently existing chunks
     osp::KeyedVec<ChunkId, ChunkStitch> stitchCmds;
 
+    /// Newly added chunks
+    std::vector<ChunkId> chunksAdded;
+
     /// Recently added shared vertices, position needs to be copied from skeleton
     osp::BitVector_t sharedAdded;
 

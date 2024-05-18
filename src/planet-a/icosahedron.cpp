@@ -48,7 +48,7 @@ SubdivTriangleSkeleton create_skeleton_icosahedron(
 
     rSkData.positions.resize(skeleton.vrtx_ids().capacity());
     rSkData.normals.resize  (skeleton.vrtx_ids().capacity());
-    double const totalScale = radius * std::pow<double>(2.0, rSkData.scale);
+    double const totalScale = radius * std::pow<double>(2.0, rSkData.precision);
     for (int i = 0; i < gc_icoVrtxCount; i ++)
     {
         rSkData.positions[vrtxIds[i]] = osp::Vector3l(gc_icoVrtxPos[i] * totalScale);
@@ -126,7 +126,7 @@ void ico_calc_middles(
         std::array<osp::MaybeNewId<SkVrtxId>, 3>  const vrtxMid,
         SkeletonVertexData                              &rSkData)
 {
-    float const scale = std::pow(2.0f, rSkData.scale);
+    float const scale = std::pow(2.0f, rSkData.precision);
 
     if (vrtxMid[0].isNew)
     {
@@ -157,7 +157,7 @@ void ico_calc_chunk_edge(
         return;
     }
 
-    float const scale = std::pow(2.0f, rSkData.scale);
+    float const scale = std::pow(2.0f, rSkData.precision);
 
     auto const recurse = [scale, radius, &rSkData] (auto &&self, SkVrtxId const a, SkVrtxId const b, int const currentLevel, ChunkEdgeView_t const view) noexcept -> void
     {
@@ -215,7 +215,7 @@ void ico_calc_sphere_tri_center(
         // 0.5 * terrainMaxHeight           : halve for middle
         // int_2pow<int>(rTerrain.scale)    : Vector3l conversion factor
         // / 3.0f                           : average from sum of 3 values
-        osp::Vector3l const riseToMid = osp::Vector3l(nrmSum * (0.5f * terrainMaxHeight * osp::math::int_2pow<int>(rSkData.scale) / 3.0f));
+        osp::Vector3l const riseToMid = osp::Vector3l(nrmSum * (0.5f * terrainMaxHeight * osp::math::int_2pow<int>(rSkData.precision) / 3.0f));
 
         rSkData.centers[sktriId] = posAvg + riseToMid;
     }

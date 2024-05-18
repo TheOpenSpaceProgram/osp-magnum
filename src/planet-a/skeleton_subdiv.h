@@ -74,7 +74,7 @@ struct SkeletonSubdivScratchpad
     /// directly after creation.
     osp::BitVector_t surfaceRemoved;
 
-    std::uint8_t levelNeedProcess = 7;
+    std::uint8_t levelNeedProcess   {};
 
     OnSubdivideFunc_t onSubdiv      {nullptr};
     UserData_t onSubdivUserData     {{nullptr, nullptr, nullptr, nullptr}};

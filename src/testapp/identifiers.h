@@ -308,14 +308,18 @@ struct PlNewton
 #define TESTAPP_DATA_ROCKETS_NWT 1, \
     idRocketsNwt
 
-#define TESTAPP_DATA_TERRAIN 3, \
-    idTerrainFrame, idTerrain, idTerrainIco
+#define TESTAPP_DATA_TERRAIN 2, \
+    idTerrainFrame, idTerrain
 struct PlTerrain
 {
     PipelineDef<EStgCont> skeleton          {"skeleton"};
     PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
     PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
 };
+
+#define TESTAPP_DATA_TERRAIN_ICO 1, \
+    idTerrainIco
+
 
 //-----------------------------------------------------------------------------
 
