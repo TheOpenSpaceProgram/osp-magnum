@@ -128,6 +128,13 @@ struct SkTriGroupPair
  * * subdivides triangles into 4 new triangles (parents are kept, tracks parent<->child tree)
  * * does NOT store vertex data like positions and normals
  *
+ * Invariants must be followed in order to support seamless transitions between levels of detail:
+ *
+ * * Invariant A: Non-subdivided triangles can only neighbor ONE subdivided triangle.
+ * * Invariant B: For each subdivided triangle neighboring a non-subdivided triangle, the
+ *                subdivided triangle's two children neighboring the non-subdivided triangle
+ *                must not be subdivided.
+ *
  * Triangles are created in groups of 4 (SkTriGroupId) and cannot be individually created.
  */
 class SubdivTriangleSkeleton

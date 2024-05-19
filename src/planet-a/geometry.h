@@ -38,19 +38,7 @@ namespace planeta
 {
 
 /**
- * @brief A subdividable triangle mesh intended as a structural frame for detailed terrain mesh
- *
- * Uses int64 coordinates capable of representing entire planets.
- *
- * Invariants must be followed in order to support seamless transitions between levels of detail:
- *
- * * Invariant A: Non-subdivided triangles can only neighbor ONE subdivided triangle.
- * * Invariant B: For each subdivided triangle neighboring a non-subdivided triangle, the
- *                subdivided triangle's two children neighboring the non-subdivided triangle
- *                must not be subdivided.
- *
- * This is intended for spherical planets, but can easily be used for flat terrain or other
- * weirder shapes.
+ * @brief Position and normal data for \c SubdivTriangleSkeleton
  */
 struct SkeletonVertexData
 {
