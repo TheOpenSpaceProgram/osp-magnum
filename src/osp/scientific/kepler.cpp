@@ -35,7 +35,7 @@ namespace {
 
 using namespace osp;
 
-// PI isn't standard, so define it here. Should it be added to constants.h?
+// M_PI isn't standard, so define it here.
 static constexpr double PI = Magnum::Math::Constants<double>::pi();
 
 /**
@@ -71,8 +71,7 @@ static double solve_kepler_elliptic(double const meanAnomaly, double const eccen
     // initial guess
     double E = meanAnomaly;
 
-    // use newton's method
-    // todo: implement something which converges more quickly
+    // newton-rhapson
     do
     {
         double f_E = E - eccentricity * sin(E) - meanAnomaly;
@@ -101,7 +100,7 @@ static double solve_kepler_hyperbolic(double const meanAnomaly, double const ecc
     // initial guess
     double E = std::log(std::abs(meanAnomaly) + 0.1);
 
-    // use newton's method
+    // newton-rhapson
     do
     {
         double f_E = eccentricity * sinh(E) - E - meanAnomaly;
@@ -336,102 +335,66 @@ double KeplerOrbit::get_periapsis() const
     return m_params.semiMajorAxis * (1 - m_params.eccentricity);
 }
 
-KeplerOrbit KeplerOrbit::from_initial_conditions(Vector3d const radius, Vector3d velocity, double const GM, double const epoch)
+void KeplerOrbit::update_orbit(double const deltaTime)
 {
-    // Don't allow perfectly zero velocity
-    if (velocity.length() < KINDA_SMALL_NUMBER)
+    if (is_elliptic())
     {
-        velocity += Vector3d(std::copysign(KINDA_SMALL_NUMBER, velocity.x()), 0.0, 0.0);
+        double const nu = mean_motion(m_params.gravitationalParameter, m_params.semiMajorAxis);
+        m_params.meanAnomalyAtEpoch += deltaTime * nu;
     }
+    else
+    {
+        double const nu = mean_motion(m_params.gravitationalParameter, -m_params.semiMajorAxis);
+        m_params.meanAnomalyAtEpoch += deltaTime * nu;
+    }
+}
 
+KeplerOrbit KeplerOrbit::from_initial_conditions(Vector3d const radius, Vector3d const velocity, double const GM, double const epoch)
+{
     Vector3d const h = cross(radius, velocity);
-    Vector3d eVec = (cross(velocity, h) / GM) - radius.normalized();
-    double e = eVec.length();
+    Vector3d const eVec = (cross(velocity, h) / GM) - radius.normalized();
+    double const e = eVec.length();
 
     // Vector pointing towards the ascending node
-    Vector3d n = cross(Vector3d(0.0, 0.0, 1.0), h);
+    Vector3d n = cross(Vector3d(0.0, 0.0, 1.0), h) * h.lengthInverted();
 
-    double semiMajorAxis = 1.0 / (2.0 / radius.length() - velocity.dot() / GM);
+    double const semiMajorAxis = 1.0 / (2.0 / radius.length() - velocity.dot() / GM);
+    double const inclination = atan2(h.xy().length(), h.z());
 
-    // Mess things up a little bit to avoid creating a parabolic orbit
-    if (std::abs(e - 1.0) < KINDA_SMALL_NUMBER) {
-        if (e < 1.0) {
-            e = 1.0 - KINDA_SMALL_NUMBER;
-        } else {
-            e = 1.0 + KINDA_SMALL_NUMBER;
-        }
-        eVec = e * eVec.normalized();
-    }
-
-    // Latitude of ascending node
-    double LAN; 
-    if (n.length() <= KINDA_SMALL_NUMBER)
-    {
-        LAN = 0.0;
-    } else {
-        LAN = acos(std::clamp(n.x() / n.length(), -1.0, 1.0));
-    }
-    if (n.y() < 0)
-    {
-        LAN = 2.0 * PI - LAN;
-    }
-
-    double const inclination = acos(h.z() / h.length());
-
-    // Compute true anomaly v and argument of periapsis w
+    // Compute longitude of ascending node LAN, true anomaly v and argument of periapsis w
+    // https://github.com/poliastro/poliastro/blob/main/src/poliastro/core/elements.py
+    double LAN;
     double v;
     double w;
-    if (e > KINDA_SMALL_NUMBER)
-    {
-        // True anomaly
-        double m = dot(eVec, radius) / (e * radius.length());
-        v = acos(std::clamp(m, -1.0, 1.0));
-        if (dot(radius, velocity) < 0)
-        {
-            v = 2.0 * PI - v;
-        }
-        if (m >= 1.0)
-        {
-            v = 0.0;
-        }
 
-        if (n.length() <= KINDA_SMALL_NUMBER) {
-            w = 0.0;
-        } else {
-            // Argument of periapsis (angle between ascending node and periapsis)
-            w = acos(std::clamp(dot(n, eVec) / (e * n.length()), -1.0, 1.0));
+    bool circular = e < KINDA_SMALL_NUMBER;
+    bool equatorial = inclination < KINDA_SMALL_NUMBER;
 
-            if (eVec.z() < 0)
-            {
-                w = 2.0 * PI - w;
-            }
-        }
-    }
-    else if (inclination > KINDA_SMALL_NUMBER)
-    {
-        // If e == 0, the orbit is circular and has no periapsis, so we use argument of latitude as a substitute for argument of periapsis
-        // see https://en.wikipedia.org/wiki/True_anomaly#From_state_vectors
-        double m = dot(n, radius) / (n.length() * radius.length());
-        v = acos(std::clamp(m, -1.0, 1.0));
-        if (radius.z() < 0)
-        {
-            v = 2.0 * PI - v;
-        }
+    double const hInv = h.lengthInverted();
+
+    if (equatorial && !circular) {
+        LAN = 0.0;
+        w = atan2(eVec.y(), eVec.x());
+        v = atan2(dot(h, cross(eVec, radius) * hInv), dot(eVec, radius));
+    } else if (!equatorial && circular) {
+        LAN = atan2(n.y(), n.x());
+        w = 0.0;    
+        v = atan2(dot(radius, cross(h, n) * hInv), dot(n, radius));
+    } else if (equatorial && circular) {
+        LAN = 0.0;
         w = 0.0;
+        v = atan2(radius.y(), radius.x());
     } else {
-        // If both e and inclination are 0, the orbit has no argument of periapsis or latitude
-        // Use true longitude instead:
-        double m = radius.x() / radius.length();
-        v = acos(std::clamp(m, -1.0, 1.0));
-        if (velocity.x() > 0)
-        {
-            v = 2.0 * PI - v;
-        }
-        w = 0.0;
+        LAN = atan2(n.y(), n.x());
+        w = atan2(dot(eVec,cross(h,n) * hInv), dot(eVec,n));
+        v = atan2(dot(radius,cross(h,eVec)) * hInv, dot(eVec,radius));
     }
+    LAN = wrap_angle(LAN);
+    v = wrap_angle(v);
+    w = wrap_angle(w);
 
     // Compute eccentric anomaly from true anomaly
-    // use that to find mean anomaly
+    // and use that to find mean anomaly
     double M0;
     if (e > 1.0)
     {

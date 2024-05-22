@@ -102,6 +102,11 @@ public:
     double get_periapsis() const;
 
     /**
+     * @brief Advance the orbit by a given time, updating the mean anomaly at epoch
+     */
+    void update_orbit(double const deltaTime);
+
+    /**
      * @brief Returns true if this orbit is elliptic *or* circular (e<1.0)
      */
     constexpr bool is_elliptic() const noexcept { 
@@ -142,7 +147,7 @@ public:
      *
      * @return KeplerOrbit
      */
-    static KeplerOrbit from_initial_conditions(Vector3d const radius, Vector3d velocity, double const gravitationalParameter, double const epoch = 0.0);
+    static KeplerOrbit from_initial_conditions(Vector3d const radius, Vector3d const velocity, double const gravitationalParameter, double const epoch = 0.0);
     
     /**
      * @brief Solve for the next time the radius = r, if such a time exists
