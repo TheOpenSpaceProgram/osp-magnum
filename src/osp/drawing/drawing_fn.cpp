@@ -63,12 +63,18 @@ void SysRender::clear_owners(ACtxSceneRender& rCtxScnRdr, ACtxDrawing& rCtxDrawi
 {
     for (TexIdOwner_t &rOwner : std::exchange(rCtxScnRdr.m_diffuseTex, {}))
     {
-        rCtxDrawing.m_texRefCounts.ref_release(std::move(rOwner));
+        if (rOwner.has_value())
+        {
+            rCtxDrawing.m_texRefCounts.ref_release(std::move(rOwner));
+        }
     }
 
     for (MeshIdOwner_t &rOwner : std::exchange(rCtxScnRdr.m_mesh, {}))
     {
-        rCtxDrawing.m_meshRefCounts.ref_release(std::move(rOwner));
+        if (rOwner.has_value())
+        {
+            rCtxDrawing.m_meshRefCounts.ref_release(std::move(rOwner));
+        }
     }
 }
 

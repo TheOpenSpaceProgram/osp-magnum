@@ -33,6 +33,7 @@
 #include "sessions/newton.h"
 #include "sessions/physics.h"
 #include "sessions/shapes.h"
+#include "sessions/terrain.h"
 #include "sessions/universe.h"
 #include "sessions/vehicles.h"
 #include "sessions/vehicles_machines.h"
@@ -41,6 +42,7 @@
 #include "MagnumApplication.h"
 
 #include <adera/activescene/vehicles_vb_fn.h>
+#include <adera/drawing/CameraController.h>
 
 #include <osp/activescene/basic.h>
 #include <osp/core/Resources.h>
@@ -287,6 +289,80 @@ static ScenarioMap_t make_scenarios()
             vehicleCtrl     = setup_vehicle_control     (builder, rTopData, windowApp, scene, parts, signalsFloat);
             cameraVehicle   = setup_camera_vehicle      (builder, rTopData, windowApp, scene, sceneRenderer, commonScene, physics, parts, cameraCtrl, vehicleCtrl);
             thrustIndicator = setup_thrust_indicators   (builder, rTopData, application, windowApp, commonScene, parts, signalsFloat, sceneRenderer, defaultPkg, sc_matFlat);
+
+            setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
+        };
+
+        #undef SCENE_SESSIONS
+        #undef RENDERER_SESSIONS
+
+        return setup_renderer;
+    });
+
+    add_scenario("terrain", "Planet terrain mesh test",
+                 [] (TestApp& rTestApp) -> RendererSetupFunc_t
+    {
+        #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, terrain, terrainIco, terrainSubdiv
+        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, terrainDraw
+
+        using namespace testapp::scenes;
+
+        auto const  defaultPkg      = rTestApp.m_defaultPkg;
+        auto const  application     = rTestApp.m_application;
+        auto        & rTopData      = rTestApp.m_topData;
+
+        TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_scene.m_edges, rTestApp.m_taskData};
+
+        auto & [SCENE_SESSIONS] = resize_then_unpack<7>(rTestApp.m_scene.m_sessions);
+
+        scene           = setup_scene               (builder, rTopData, application);
+        commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
+        physics         = setup_physics             (builder, rTopData, scene, commonScene);
+        physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
+        terrain         = setup_terrain             (builder, rTopData, scene);
+        terrainIco      = setup_terrain_icosahedron (builder, rTopData, terrain);
+        terrainSubdiv   = setup_terrain_subdiv_dist (builder, rTopData, scene, terrain, terrainIco);
+
+        initialize_ico_terrain(rTopData, terrain, terrainIco, {
+            .radius                 = 50.0,
+            .height                 = 5.0,
+            .skelPrecision          = 10, // 2^10 units = 1024 units = 1 meter
+            .skelMaxSubdivLevels    = 7,
+            .chunkSubdivLevels      = 4
+        });
+
+        RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp) -> void
+        {
+            auto const  application     = rTestApp.m_application;
+            auto const  windowApp       = rTestApp.m_windowApp;
+            auto const  magnum          = rTestApp.m_magnum;
+            auto const  defaultPkg      = rTestApp.m_defaultPkg;
+            auto        & rTopData      = rTestApp.m_topData;
+
+            TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
+
+            auto & [SCENE_SESSIONS] = unpack<7>(rTestApp.m_scene.m_sessions);
+            auto & [RENDERER_SESSIONS] = resize_then_unpack<11>(rTestApp.m_renderer.m_sessions);
+
+            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
+            create_materials(rTopData, sceneRenderer, sc_materialCount);
+
+            magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
+            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
+            cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
+            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
+            shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
+            shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
+            cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
+            terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matFlat);
+
+            OSP_DECLARE_GET_DATA_IDS(cameraCtrl,   TESTAPP_DATA_CAMERA_CTRL);
+
+            auto &rCamCtrl = top_get<ACtxCameraController>(rTopData, idCamCtrl);
+            rCamCtrl.m_target = Vector3(0.0f, 0.0f, 50.0f);
+            rCamCtrl.m_orbitDistanceMin = 1.0f;
+            rCamCtrl.m_moveSpeed = 0.5f;
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };

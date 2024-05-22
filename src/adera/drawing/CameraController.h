@@ -61,6 +61,8 @@ struct ACtxCameraController
 
     float m_orbitDistance{20.0f};
 
+    float m_orbitDistanceMin{5.0f};
+
     float m_moveSpeed{1.0f};
 
     osp::input::ControlSubscriber m_controls;

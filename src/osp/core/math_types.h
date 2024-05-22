@@ -47,6 +47,8 @@ using Matrix4       = Magnum::Math::Matrix4<Magnum::Float>;
 
 using Vector2i      = Magnum::Math::Vector2<Magnum::Int>;
 
+using Vector3u      = Magnum::Math::Vector3<Magnum::UnsignedInt>;
+
 using Vector3l      = Magnum::Math::Vector3<Magnum::Long>;
 
 using Vector2       = Magnum::Math::Vector2<Magnum::Float>;
@@ -61,5 +63,9 @@ using Quaterniond   = Magnum::Math::Quaternion<Magnum::Double>;
 using Rad           = Magnum::Math::Rad<Magnum::Float>;
 using Radd          = Magnum::Math::Rad<Magnum::Double>;
 using Deg           = Magnum::Math::Deg<Magnum::Float>;
+
+using Magnum::Math::ZeroInit;
+using Magnum::Math::IdentityInit;
+
 
 } // namespace osp
