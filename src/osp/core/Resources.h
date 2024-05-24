@@ -24,11 +24,13 @@
  */
 #pragma once
 
+#include "copymove_macros.h"
 #include "shared_string.h"
 #include "resourcetypes.h"
 
-#include <longeron/id_management/registry.hpp>
+#include <longeron/id_management/id_set_stl.hpp>
 #include <longeron/id_management/refcount.hpp>
+#include <longeron/id_management/registry_stl.hpp>
 
 #include <entt/core/family.hpp>
 #include <entt/core/any.hpp>
@@ -48,7 +50,7 @@ class Resources
 
     struct PerResType
     {
-        lgrn::IdRegistry<ResId>         m_resIds;
+        lgrn::IdRegistryStl<ResId>      m_resIds;
         lgrn::RefCount<int>             m_resRefs;
         std::vector<res_data_type_t>    m_resDataTypes;
         std::vector<entt::any>          m_resData;
@@ -59,7 +61,7 @@ class Resources
 
     struct PerPkgResType
     {
-        lgrn::HierarchicalBitset<uint64_t> m_owned;
+        lgrn::IdSetStl<ResId> m_owned;
         std::unordered_map< SharedString, ResId, std::hash<SharedString>, std::equal_to<> > m_nameToResId;
     };
 
@@ -69,6 +71,9 @@ class Resources
     };
 
 public:
+
+    Resources() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(Resources);
 
     /**
      * @brief Resize to fit a certain number of resource types
@@ -103,7 +108,7 @@ public:
      */
     [[nodiscard]] SharedString const& name(ResTypeId typeId, ResId resId) const noexcept;
 
-    [[nodiscard]] lgrn::IdRegistry<ResId> const& ids(ResTypeId typeId) const noexcept;
+    [[nodiscard]] lgrn::IdRegistryStl<ResId> const& ids(ResTypeId typeId) const noexcept;
 
     [[nodiscard]] ResIdOwner_t owner_create(ResTypeId typeId, ResId resId) noexcept;
 
@@ -201,9 +206,9 @@ private:
     template <typename T>
     res_container_t<T> const& get_container(PerResType const &rPerResType, ResTypeId typeId) const;
 
-    std::vector<PerResType> m_perResType;
-    lgrn::IdRegistry<PkgId> m_pkgIds;
-    std::vector<PerPkg> m_pkgData;
+    std::vector<PerResType>     m_perResType;
+    lgrn::IdRegistryStl<PkgId>  m_pkgIds;
+    std::vector<PerPkg>         m_pkgData;
 };
 
 template<typename T>

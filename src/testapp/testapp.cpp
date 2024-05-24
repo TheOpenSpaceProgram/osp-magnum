@@ -92,43 +92,28 @@ void TestApp::close_session(osp::Session &rSession)
     close_sessions(osp::ArrayView<osp::Session>(&rSession, 1));
 }
 
-
-template<typename FUNC_T>
-static void resource_for_each_type(osp::ResTypeId const type, osp::Resources& rResources, FUNC_T&& do_thing)
-{
-    lgrn::IdRegistry<osp::ResId> const &rReg = rResources.ids(type);
-    for (std::size_t i = 0; i < rReg.capacity(); ++i)
-    {
-        if (rReg.exists(osp::ResId(i)))
-        {
-            do_thing(osp::ResId(i));
-        }
-    }
-}
-
-
 void TestApp::clear_resource_owners()
 {
     using namespace osp::restypes;
 
     // declares idResources
-    OSP_DECLARE_CREATE_DATA_IDS(m_application, m_topData, TESTAPP_DATA_APPLICATION);
+    OSP_DECLARE_GET_DATA_IDS(m_application, TESTAPP_DATA_APPLICATION);
 
     auto &rResources = osp::top_get<osp::Resources>(m_topData, idResources);
 
     // Texture resources contain osp::TextureImgSource, which refererence counts
     // their associated image data
-    resource_for_each_type(gc_texture, rResources, [&rResources] (osp::ResId const id)
+    for (osp::ResId const id : rResources.ids(gc_texture))
     {
         auto * const pData = rResources.data_try_get<osp::TextureImgSource>(gc_texture, id);
         if (pData != nullptr)
         {
             rResources.owner_destroy(gc_image, std::move(*pData));
         }
-    });
+    };
 
     // Importer data own a lot of other resources
-    resource_for_each_type(gc_importer, rResources, [&rResources] (osp::ResId const id)
+    for (osp::ResId const id : rResources.ids(gc_importer))
     {
         auto * const pData = rResources.data_try_get<osp::ImporterData>(gc_importer, id);
         if (pData != nullptr)
@@ -148,7 +133,7 @@ void TestApp::clear_resource_owners()
                 rResources.owner_destroy(gc_mesh, std::move(rOwner));
             }
         }
-    });
+    };
 }
 
 

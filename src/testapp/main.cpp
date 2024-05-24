@@ -241,9 +241,9 @@ void cli_loop(int argc, char** argv)
                 {
                     OSP_DECLARE_GET_DATA_IDS(g_testApp.m_renderer.m_sessions[1], TESTAPP_DATA_MAGNUM); // declares idActiveApp
                     osp::top_get<MagnumApplication>(g_testApp.m_topData, idActiveApp).exit();
-
-                    break;
                 }
+
+                break;
             }
             else 
             {
