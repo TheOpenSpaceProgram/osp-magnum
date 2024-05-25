@@ -75,8 +75,8 @@ Session setup_terrain(
         .args({               idTerrain })
         .func([] (ACtxTerrain &rTerrain) noexcept
     {
-        rTerrain.scratchpad.surfaceAdded  .reset();
-        rTerrain.scratchpad.surfaceRemoved.reset();
+        rTerrain.scratchpad.surfaceAdded  .clear();
+        rTerrain.scratchpad.surfaceRemoved.clear();
     });
 
     rBuilder.task()
@@ -158,7 +158,7 @@ Session setup_terrain_subdiv_dist(
             // Perform changes on skeleton, delete selected triangles
             unsubdivide_level(level, rSkel, rSkData, rSkSP);
         }
-        rSkSP.distanceTestDone.reset();
+        rSkSP.distanceTestDone.clear();
 
         // ## Subdivide nearby triangles
 
@@ -170,7 +170,7 @@ Session setup_terrain_subdiv_dist(
             for (SkTriId const sktriId : rTerrainIco.icoTri)
             {
                 rSkSP.levels[0].distanceTestNext.push_back(sktriId);
-                rSkSP.distanceTestDone.set(sktriId.value);
+                rSkSP.distanceTestDone.insert(sktriId);
             }
             rSkSP.levelNeedProcess = 0;
         }
@@ -180,7 +180,10 @@ Session setup_terrain_subdiv_dist(
         {
             subdivide_level_by_distance(rTerrainFrame.position, level, rSkel, rSkData, rSkSP);
         }
-        rSkSP.distanceTestDone.reset();
+        rSkSP.distanceTestDone.clear();
+
+        // Uncomment these if some new change breaks something
+        //rSkel.debug_check_invariants();
     });
 
     rBuilder.task()
@@ -205,14 +208,13 @@ Session setup_terrain_subdiv_dist(
         SkeletonSubdivScratchpad   &rSkSP      = rTerrain.scratchpad;
 
         rChSP.chunksAdded       .clear();
-        rChSP.sharedNormalsDirty.reset();
-        rChSP.sharedAdded       .reset();
-        rChSP.sharedRemoved     .reset();
+        rChSP.sharedNormalsDirty.clear();
+        rChSP.sharedAdded       .clear();
+        rChSP.sharedRemoved     .clear();
 
         // Delete chunks of now-deleted Skeleton Triangles
-        for (std::size_t const sktriInt : rSkSP.surfaceRemoved.ones())
+        for (SkTriId const sktriId : rSkSP.surfaceRemoved)
         {
-            auto    const sktriId = SkTriId(sktriInt);
             ChunkId const chunkId = rSkCh.m_triToChunk[sktriId];
 
             subtract_normal_contrib(chunkId, false, rChGeo, rChInfo, rChSP, rSkCh);
@@ -225,10 +227,9 @@ Session setup_terrain_subdiv_dist(
 
         // Create new chunks for each new surface Skeleton Triangle added
         rSkCh.m_triToChunk.resize(rSkel.tri_group_ids().capacity() * 4);
-        for (std::size_t const sktriInt : rSkSP.surfaceAdded.ones())
+        for (SkTriId const sktriId : rSkSP.surfaceAdded)
         {
-            auto const sktriId  = SkTriId::from_index(sktriInt);
-            auto const &corners = rSkel.tri_at(SkTriId(sktriInt)).vertices;
+            auto const &corners = rSkel.tri_at(sktriId).vertices;
 
             ArrayView< MaybeNewId<SkVrtxId> > const edgeVrtxView = rChSP.edgeVertices;
             ArrayView< MaybeNewId<SkVrtxId> > const edgeLft = edgeVrtxView.sliceSize(edgeSize * 0, edgeSize);
@@ -252,18 +253,16 @@ Session setup_terrain_subdiv_dist(
             ico_calc_chunk_edge(rTerrainIco.radius, chLevel, corners[2], corners[0], edgeRte, rSkData);
         }
 
-        for (std::size_t const sktriInt : rSkSP.surfaceAdded.ones())
+        for (SkTriId const sktriId : rSkSP.surfaceAdded)
         {
-            auto const sktriId = SkTriId::from_index(sktriInt);
-            auto const chunkId = rSkCh.m_triToChunk[SkTriId::from_index(sktriInt)];
+            auto const chunkId = rSkCh.m_triToChunk[sktriId];
             restitch_check(chunkId, sktriId, rSkCh, rSkel, rSkData, rChSP);
         }
 
         // Calculate positions for newly added shared vertex
         float const scalepow = std::pow(2.0f, -rSkData.precision);
-        for (std::size_t const sharedVrtxInt : rChSP.sharedAdded.ones())
+        for (SharedVrtxId const sharedVrtxId : rChSP.sharedAdded)
         {
-            auto     const sharedVrtxId = SharedVrtxId::from_index(sharedVrtxInt);
             SkVrtxId const skelVrtx     = rSkCh.m_sharedToSkVrtx[sharedVrtxId];
 
             // Normal is not cleaned up by the previous user. Normal is initially set to zero, and
@@ -272,16 +271,16 @@ Session setup_terrain_subdiv_dist(
 
             //Vector3l const translated = positions[size_t(skelId)] + translaton;
             Vector3d  const scaled = Vector3d(rSkData.positions[skelVrtx]) * scalepow;
-            VertexIdx const vertex = rChInfo.vbufSharedOffset + sharedVrtxInt;
+            VertexIdx const vertex = rChInfo.vbufSharedOffset + sharedVrtxId.value;
 
             // Heightmap goes here (1)
             rChGeo.chunkVbufPos[vertex] = Vector3(scaled);
         }
 
         // Calculate fill vertex positions
-        for (std::size_t const sktriInt : rSkSP.surfaceAdded.ones())
+        for (SkTriId const sktriId : rSkSP.surfaceAdded)
         {
-            auto        const chunk      = rSkCh.m_triToChunk[SkTriId::from_index(sktriInt)];
+            auto        const chunk      = rSkCh.m_triToChunk[sktriId];
             auto        const chunkIdInt = std::size_t(chunk);
             std::size_t const fillOffset = rChInfo.vbufFillOffset + chunkIdInt*rChInfo.fillVrtxCount;
 
@@ -304,26 +303,26 @@ Session setup_terrain_subdiv_dist(
             }
         }
 
-        // Update index buffer and calculate normals
-        for (std::size_t const chunkInt : rSkCh.m_chunkIds.bitview().zeros())
+        // Add or remove faces according to chunk changes. This also calculates normals.
+        // Vertex normals are calculated from a weighted sum of face normals of connected faces.
+        // For shared vertices, we add or subtract face normals from rChGeo.sharedNormalSum.
+        for (ChunkId const chunkId : rSkCh.m_chunkIds)
         {
-            auto    const chunkId    = ChunkId::from_index(chunkInt);
             SkTriId const sktriId    = rSkCh.m_chunkToTri[chunkId];
-            bool    const newlyAdded = rSkSP.surfaceAdded.test(sktriId.value);
+            bool    const newlyAdded = rSkSP.surfaceAdded.contains(sktriId);
 
             update_faces(chunkId, sktriId, newlyAdded, rSkel, rSkData, rChGeo, rChInfo, rChSP, rSkCh);
         }
         std::fill(rChSP.stitchCmds.begin(), rChSP.stitchCmds.end(), ChunkStitch{});
 
-
-        for (std::size_t sharedIdx = 0; sharedIdx < rChSP.sharedNormalsDirty.size(); ++sharedIdx)
-        if (rSkCh.m_sharedIds.exists(SharedVrtxId(sharedIdx)))
+        // Update vertex buffer normals of shared vertices, as rChGeo.sharedNormalSum was modified.
+        for (SharedVrtxId const sharedId : rChSP.sharedNormalsDirty)
         {
-            SharedVrtxId const shared    = SharedVrtxId(sharedIdx);
-            Vector3      const normalSum = rChGeo.sharedNormalSum[shared];
-            rChGeo.chunkVbufNrm[rChInfo.vbufSharedOffset + sharedIdx] = normalSum.normalized();
+            Vector3 const normalSum = rChGeo.sharedNormalSum[sharedId];
+            rChGeo.chunkVbufNrm[rChInfo.vbufSharedOffset + sharedId.value] = normalSum.normalized();
         }
 
+        // Uncomment these if some new change breaks something
         //debug_check_invariants(rChGeo, rChInfo, rSkCh);
 
         // TODO: temporary, write debug obj file every ~10 seconds
@@ -401,10 +400,10 @@ void initialize_ico_terrain(
     for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
     {
         // Notify subsequent functions of the newly added initial icosahedron faces
-        rSP.surfaceAdded.set(tri_id(groupId, 0).value);
-        rSP.surfaceAdded.set(tri_id(groupId, 1).value);
-        rSP.surfaceAdded.set(tri_id(groupId, 2).value);
-        rSP.surfaceAdded.set(tri_id(groupId, 3).value);
+        rSP.surfaceAdded.insert(tri_id(groupId, 0));
+        rSP.surfaceAdded.insert(tri_id(groupId, 1));
+        rSP.surfaceAdded.insert(tri_id(groupId, 2));
+        rSP.surfaceAdded.insert(tri_id(groupId, 3));
     }
 
     // Set function pointer to apply spherical curvature to the skeleton on subdivision.
@@ -459,7 +458,7 @@ void initialize_ico_terrain(
     rTerrain.skChunks = make_skeleton_chunks(chunkSubdivLevels);
 
     // Approximate max number of chunks. Determined experimentally with margin. Surprisingly linear.
-    std::uint32_t const maxChunksApprox = 36 * specs.skelMaxSubdivLevels + 30;
+    std::uint32_t const maxChunksApprox = 42 * specs.skelMaxSubdivLevels + 30;
 
     // Approximate max number of shared vertices. Determined experimentally, roughly 60% of all
     // vertices end up being shared. Margin is inherited from maxChunksApprox.

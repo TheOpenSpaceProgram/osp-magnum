@@ -62,17 +62,17 @@ struct SkeletonSubdivScratchpad
 
     /// Used to record which Skeleton triangles have already been distance-checked. Used for both
     /// subdividing and unsubdividing
-    osp::BitVector_t distanceTestDone;
+    lgrn::IdSetStl<SkTriId> distanceTestDone;
 
-    osp::BitVector_t tryUnsubdiv;
-    osp::BitVector_t cantUnsubdiv;
+    lgrn::IdSetStl<SkTriId> tryUnsubdiv;
+    lgrn::IdSetStl<SkTriId> cantUnsubdiv;
 
     /// Non-subdivided triangles recently added, excluding intermediate triangles removed
     /// directly after creation.
-    osp::BitVector_t surfaceAdded;
+    lgrn::IdSetStl<SkTriId> surfaceAdded;
     /// Non-subdivided triangles recently removed, excluding intermediate triangles removed
     /// directly after creation.
-    osp::BitVector_t surfaceRemoved;
+    lgrn::IdSetStl<SkTriId> surfaceRemoved;
 
     std::uint8_t levelNeedProcess   {};
 

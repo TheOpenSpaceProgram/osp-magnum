@@ -42,11 +42,11 @@ void ChunkScratchpad::resize(ChunkSkeleton const& rChSk)
 {
     auto const maxSharedVrtx = rChSk.m_sharedIds.capacity();
 
-    edgeVertices.resize((rChSk.m_chunkEdgeVrtxCount - 1) * 3);
-    stitchCmds  .resize(rChSk.m_chunkIds.capacity(), {});
-    osp::bitvector_resize(sharedAdded,        maxSharedVrtx);
-    osp::bitvector_resize(sharedRemoved,      maxSharedVrtx);
-    osp::bitvector_resize(sharedNormalsDirty, maxSharedVrtx);
+    edgeVertices        .resize((rChSk.m_chunkEdgeVrtxCount - 1) * 3);
+    stitchCmds          .resize(rChSk.m_chunkIds.capacity(), {});
+    sharedAdded         .resize(maxSharedVrtx);
+    sharedRemoved       .resize(maxSharedVrtx);
+    sharedNormalsDirty  .resize(maxSharedVrtx);
 }
 
 void restitch_check(
@@ -329,11 +329,11 @@ void subtract_normal_contrib(
             break;
         }
 
-        if (rSkCh.m_sharedIds.exists(rContrib.shared) && ! rChSP.sharedRemoved.test(rContrib.shared.value))
+        if (rSkCh.m_sharedIds.exists(rContrib.shared) && ! rChSP.sharedRemoved.contains(rContrib.shared))
         {
             osp::Vector3 &rNormal = rGeom.sharedNormalSum[rContrib.shared];
             rNormal -= rContrib.sum;
-            rChSP.sharedNormalsDirty.set(rContrib.shared.value);
+            rChSP.sharedNormalsDirty.insert(rContrib.shared);
         }
         rContrib.sum *= 0.0f;
     }
@@ -354,12 +354,12 @@ void subtract_normal_contrib(
                 break;
             }
 
-            if (rSkCh.m_sharedIds.exists(shared) && ! rChSP.sharedRemoved.test(shared.value))
+            if (rSkCh.m_sharedIds.exists(shared) && ! rChSP.sharedRemoved.contains(shared))
             {
                 Vector3 const &contrib = fillNormalContrib[i];
                 Vector3       &rNormal = rGeom.sharedNormalSum[shared];
                 rNormal -= contrib;
-                rChSP.sharedNormalsDirty.set(shared.value);
+                rChSP.sharedNormalsDirty.insert(shared);
             }
             fillNormalContrib[i] *= 0.0f;
         }

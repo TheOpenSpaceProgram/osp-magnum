@@ -82,8 +82,8 @@ void SubdivTriangleSkeleton::tri_group_resize_fit_ids()
 
     for (int lvl = 0; lvl < this->levelMax+1; ++lvl)
     {
-        osp::bitvector_resize(levels[lvl].hasSubdivedNeighbor,    triCapacity);
-        osp::bitvector_resize(levels[lvl].hasNonSubdivedNeighbor, triCapacity);
+        levels[lvl].hasSubdivedNeighbor   .resize(triCapacity);
+        levels[lvl].hasNonSubdivedNeighbor.resize(triCapacity);
     }
 }
 
@@ -322,24 +322,24 @@ void SubdivTriangleSkeleton::debug_check_invariants()
 
             if (sktri.children.has_value())
             {
-                LGRN_ASSERTMV(rLvl.hasNonSubdivedNeighbor.test(sktriId.value) == (nonSubdivedNeighbors != 0),
+                LGRN_ASSERTMV(rLvl.hasNonSubdivedNeighbor.contains(sktriId) == (nonSubdivedNeighbors != 0),
                               "Incorrectly set hasNonSubdivedNeighbor",
                               sktriId.value,
                               int(group.depth),
-                              rLvl.hasNonSubdivedNeighbor.test(sktriId.value),
+                              rLvl.hasNonSubdivedNeighbor.contains(sktriId),
                               nonSubdivedNeighbors);
-                LGRN_ASSERTM(rLvl.hasSubdivedNeighbor.test(sktriId.value) == false,
+                LGRN_ASSERTM(rLvl.hasSubdivedNeighbor.contains(sktriId) == false,
                             "hasSubdivedNeighbor is only for non-subdivided tris");
             }
             else
             {
-                LGRN_ASSERTMV(rLvl.hasSubdivedNeighbor.test(sktriId.value) == (subdivedNeighbors != 0),
+                LGRN_ASSERTMV(rLvl.hasSubdivedNeighbor.contains(sktriId) == (subdivedNeighbors != 0),
                               "Incorrectly set hasSubdivedNeighbor",
                               sktriId.value,
                               int(group.depth),
-                              rLvl.hasSubdivedNeighbor.test(sktriId.value),
+                              rLvl.hasSubdivedNeighbor.contains(sktriId),
                               subdivedNeighbors);
-                LGRN_ASSERTM(rLvl.hasNonSubdivedNeighbor.test(sktriId.value) == false,
+                LGRN_ASSERTM(rLvl.hasNonSubdivedNeighbor.contains(sktriId) == false,
                             "hasNonSubdivedNeighbor is only for subdivided tris");
             }
         }
@@ -369,7 +369,7 @@ void SubdivTriangleSkeleton::debug_check_invariants()
 ChunkId ChunkSkeleton::chunk_create(
         SkTriId                               const sktriId,
         SubdivTriangleSkeleton                      &rSkel,
-        osp::BitVector_t                            &rSharedAdded,
+        lgrn::IdSetStl<SharedVrtxId>                &rSharedAdded,
         osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeLft,
         osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeBtm,
         osp::ArrayView<MaybeNewId<SkVrtxId>>  const edgeRte)
@@ -383,7 +383,7 @@ ChunkId ChunkSkeleton::chunk_create(
         MaybeNewId<SharedVrtxId> const shared = shared_get_or_create(vrtx, rSkel);
         if (shared.isNew)
         {
-            rSharedAdded.set(shared.id.value);
+            rSharedAdded.insert(shared.id);
         }
         return shared_store(shared.id);
     };
@@ -422,7 +422,7 @@ ChunkId ChunkSkeleton::chunk_create(
 void ChunkSkeleton::chunk_remove(
         ChunkId                const chunkId,
         SkTriId                const sktriId,
-        osp::BitVector_t             &rSharedRemoved,
+        lgrn::IdSetStl<SharedVrtxId> &rSharedRemoved,
         SubdivTriangleSkeleton       &rSkel) noexcept
 {
     for (SharedVrtxOwner_t& rOwner : shared_vertices_used(chunkId))
@@ -431,7 +431,7 @@ void ChunkSkeleton::chunk_remove(
         auto const status = shared_release(std::exchange(rOwner, {}), rSkel);
         if (status.refCount == 0)
         {
-            rSharedRemoved.set(shared.value);
+            rSharedRemoved.insert(shared);
         }
     }
     m_triToChunk[sktriId] = {};
