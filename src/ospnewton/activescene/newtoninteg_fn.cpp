@@ -242,7 +242,7 @@ void SysNewton::find_colliders_recurse(
         NewtonCompoundCollisionAddSubCollision(pCompound, pCollision);
     }
 
-    if ( ! rCtxPhys.m_hasColliders.test(std::size_t(ent)) )
+    if ( ! rCtxPhys.m_hasColliders.contains(ent) )
     {
         return;
     }

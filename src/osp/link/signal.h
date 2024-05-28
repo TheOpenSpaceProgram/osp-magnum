@@ -38,7 +38,7 @@ using SignalValues_t = std::vector<VALUE_T>;
 template <typename VALUE_T>
 struct UpdateNodes
 {
-    BitVector_t                 nodeDirty;
+    lgrn::IdSetStl<NodeId>      nodeDirty;
     SignalValues_t<VALUE_T>     nodeNewValues;
 
     bool                        dirty{false};
@@ -46,7 +46,7 @@ struct UpdateNodes
     void assign(NodeId node, VALUE_T value)
     {
         dirty = true;
-        nodeDirty.set(node);
+        nodeDirty.insert(node);
         nodeNewValues[node] = std::forward<VALUE_T>(value);
     }
 };
@@ -75,10 +75,10 @@ bool update_signal_nodes(
                 somethingNotified = true;
 
                 // A machine of type "junc.m_type" has new values to read
-                rUpdMach.machTypesDirty.set(junc.type);
+                rUpdMach.machTypesDirty.insert(junc.type);
 
                 // Specify using local Id on which machine needs to update
-                rUpdMach.localDirty[junc.type].set(junc.local);
+                rUpdMach.localDirty[junc.type].insert(junc.local);
             }
         }
     }

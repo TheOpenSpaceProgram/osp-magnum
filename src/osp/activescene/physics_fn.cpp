@@ -54,7 +54,7 @@ void SysPhysics::calculate_subtree_mass_center(
             rMassPos    += childTf.translation() * childMass.m_mass;
         }
 
-        if (rCtxPhys.m_hasColliders.test(std::size_t(child)))
+        if (rCtxPhys.m_hasColliders.contains(child))
         {
             calculate_subtree_mass_center(rTf, rCtxPhys, rScnGraph, child, rMassPos, rTotalMass, childTf);
         }
@@ -88,7 +88,7 @@ void SysPhysics::calculate_subtree_mass_inertia(
             rInertiaTensor += transform_inertia_tensor(inertiaTensor, childMass.m_mass, offset, childTf.rotation());
         }
 
-        if (rCtxPhys.m_hasColliders.test(std::size_t(child)))
+        if (rCtxPhys.m_hasColliders.contains(child))
         {
             calculate_subtree_mass_inertia(rTf, rCtxPhys, rScnGraph, child, rInertiaTensor, childTf);
         }

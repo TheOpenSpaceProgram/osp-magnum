@@ -137,7 +137,7 @@ Session setup_phys_shapes(
         .args       ({      idBasic,                idPhysShapes })
         .func([] (ACtxBasic& rBasic, ACtxPhysShapes& rPhysShapes) noexcept
     {
-        osp::bitvector_resize(rPhysShapes.ownedEnts, rBasic.m_activeIds.capacity());
+        rPhysShapes.ownedEnts.resize(rBasic.m_activeIds.capacity());
         rBasic.m_scnGraph.resize(rBasic.m_activeIds.capacity());
 
         SubtreeBuilder bldScnRoot = SysSceneGraph::add_descendants(rBasic.m_scnGraph, rPhysShapes.m_spawnRequest.size() * 2);
@@ -148,7 +148,7 @@ Session setup_phys_shapes(
             ActiveEnt const root    = rPhysShapes.m_ents[i * 2];
             ActiveEnt const child   = rPhysShapes.m_ents[i * 2 + 1];
 
-            rPhysShapes.ownedEnts.set(std::size_t(root));
+            rPhysShapes.ownedEnts.insert(root);
 
             rBasic.m_transform.emplace(root, ACompTransform{osp::Matrix4::translation(spawn.m_position)});
             rBasic.m_transform.emplace(child, ACompTransform{Matrix4::scaling(spawn.m_size)});
@@ -165,7 +165,7 @@ Session setup_phys_shapes(
         .args       ({            idBasic,                idPhysShapes,             idPhys })
         .func([] (ACtxBasic const& rBasic, ACtxPhysShapes& rPhysShapes, ACtxPhysics& rPhys) noexcept
     {
-        rPhys.m_hasColliders.ints().resize(rBasic.m_activeIds.vec().capacity());
+        rPhys.m_hasColliders.resize(rBasic.m_activeIds.vec().capacity());
         rPhys.m_shape.resize(rBasic.m_activeIds.capacity());
 
         for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
@@ -174,7 +174,7 @@ Session setup_phys_shapes(
             ActiveEnt const root    = rPhysShapes.m_ents[i * 2];
             ActiveEnt const child   = rPhysShapes.m_ents[i * 2 + 1];
 
-            rPhys.m_hasColliders.set(std::size_t(root));
+            rPhys.m_hasColliders.insert(root);
             if (spawn.m_mass != 0.0f)
             {
                 rPhys.m_setVelocity.emplace_back(root, spawn.m_velocity);
@@ -271,17 +271,17 @@ Session setup_phys_shapes_draw(
             ActiveEnt const child   = rPhysShapes.m_ents[i * 2 + 1];
             DrawEnt const drawEnt   = rScnRender.m_activeToDraw[child];
 
-            rScnRender.m_needDrawTf.set(std::size_t(root));
-            rScnRender.m_needDrawTf.set(std::size_t(child));
+            rScnRender.m_needDrawTf.insert(root);
+            rScnRender.m_needDrawTf.insert(child);
 
             rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape));
             rScnRender.m_meshDirty.push_back(drawEnt);
 
-            rMat.m_ents.set(std::size_t(drawEnt));
+            rMat.m_ents.insert(drawEnt);
             rMat.m_dirty.push_back(drawEnt);
 
-            rScnRender.m_visible.set(std::size_t(drawEnt));
-            rScnRender.m_opaque.set(std::size_t(drawEnt));
+            rScnRender.m_visible.insert(drawEnt);
+            rScnRender.m_opaque.insert(drawEnt);
         }
     });
 
@@ -295,9 +295,8 @@ Session setup_phys_shapes_draw(
         .args       ({               idBasic,             idDrawing,                 idScnRender,                idPhysShapes,             idNMesh })
         .func([]    (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxPhysShapes& rPhysShapes, NamedMeshes& rNMesh) noexcept
     {
-        for (std::size_t entInt : rPhysShapes.ownedEnts.ones())
+        for (ActiveEnt root : rPhysShapes.ownedEnts)
         {
-            ActiveEnt const root = ActiveEnt(entInt);
             ActiveEnt const child = *SysSceneGraph::children(rBasic.m_scnGraph, root).begin();
 
             rScnRender.m_activeToDraw[child] = rScnRender.m_drawIds.create();
@@ -315,26 +314,25 @@ Session setup_phys_shapes_draw(
     {
         Material &rMat = rScnRender.m_materials[rPhysShapes.m_materialId];
 
-        for (std::size_t entInt : rPhysShapes.ownedEnts.ones())
+        for (ActiveEnt root : rPhysShapes.ownedEnts)
         {
-            ActiveEnt const root = ActiveEnt(entInt);
             ActiveEnt const child = *SysSceneGraph::children(rBasic.m_scnGraph, root).begin();
 
             //SpawnShape const &spawn = rPhysShapes.m_spawnRequest[i];
             DrawEnt const drawEnt   = rScnRender.m_activeToDraw[child];
 
-            rScnRender.m_needDrawTf.set(std::size_t(root));
-            rScnRender.m_needDrawTf.set(std::size_t(child));
+            rScnRender.m_needDrawTf.insert(root);
+            rScnRender.m_needDrawTf.insert(child);
 
             EShape const shape = rPhys.m_shape.at(child);
             rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(shape));
             rScnRender.m_meshDirty.push_back(drawEnt);
 
-            rMat.m_ents.set(std::size_t(drawEnt));
+            rMat.m_ents.insert(drawEnt);
             rMat.m_dirty.push_back(drawEnt);
 
-            rScnRender.m_visible.set(std::size_t(drawEnt));
-            rScnRender.m_opaque.set(std::size_t(drawEnt));
+            rScnRender.m_visible.insert(drawEnt);
+            rScnRender.m_opaque.insert(drawEnt);
         }
     });
 
@@ -348,7 +346,7 @@ Session setup_phys_shapes_draw(
     {
         for (ActiveEnt const deleted : rActiveEntDel)
         {
-            rPhysShapes.ownedEnts.reset(std::size_t(deleted));
+            rPhysShapes.ownedEnts.erase(deleted);
         }
     });
 
@@ -519,12 +517,12 @@ Session setup_bounds(
         .args       ({            idBasic,                      idBounds,                idOutOfBounds })
         .func([] (ACtxBasic const& rBasic, ActiveEntSet_t const& rBounds, ActiveEntVec_t& rOutOfBounds) noexcept
     {
-        for (std::size_t const ent : rBounds.ones())
+        for (ActiveEnt const ent : rBounds)
         {
-            ACompTransform const &entTf = rBasic.m_transform.get(ActiveEnt(ent));
+            ACompTransform const &entTf = rBasic.m_transform.get(ent);
             if (entTf.m_transform.translation().z() < -10)
             {
-                rOutOfBounds.push_back(ActiveEnt(ent));
+                rOutOfBounds.push_back(ent);
             }
         }
     });
@@ -558,7 +556,7 @@ Session setup_bounds(
         .args       ({      idBasic,                idPhysShapes,                idBounds })
         .func([] (ACtxBasic& rBasic, ACtxPhysShapes& rPhysShapes, ActiveEntSet_t& rBounds) noexcept
     {
-        rBounds.ints().resize(rBasic.m_activeIds.vec().capacity());
+        rBounds.resize(rBasic.m_activeIds.vec().capacity());
 
         for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
         {
@@ -570,7 +568,7 @@ Session setup_bounds(
 
             ActiveEnt const root    = rPhysShapes.m_ents[i * 2];
 
-            rBounds.set(std::size_t(root));
+            rBounds.insert(root);
         }
     });
 
@@ -584,7 +582,7 @@ Session setup_bounds(
     {
         for (osp::active::ActiveEnt const ent : rActiveEntDel)
         {
-            rBounds.reset(std::size_t(ent));
+            rBounds.erase(ent);
         }
     });
 

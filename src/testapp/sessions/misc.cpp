@@ -167,11 +167,11 @@ Session setup_cursor(
 
     rScnRender.m_mesh[cursorEnt] = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cubewire");
     rScnRender.m_color[cursorEnt] = { 0.0f, 1.0f, 0.0f, 1.0f };
-    rScnRender.m_visible.set(std::size_t(cursorEnt));
-    rScnRender.m_opaque.set(std::size_t(cursorEnt));
+    rScnRender.m_visible.insert(cursorEnt);
+    rScnRender.m_opaque.insert(cursorEnt);
 
     Material &rMat = rScnRender.m_materials[material];
-    rMat.m_ents.set(std::size_t(cursorEnt));
+    rMat.m_ents.insert(cursorEnt);
 
     rBuilder.task()
         .name       ("Move cursor")

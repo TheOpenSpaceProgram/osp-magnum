@@ -24,7 +24,7 @@
  */
 #include "tasks.h"
 
-#include "../core/bitvector.h"
+#include <longeron/id_management/id_set_stl.hpp>
 
 #include <array>
 
@@ -64,10 +64,10 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     KeyedVec<PipelineId, PipelineCounts>    plCounts;
     KeyedVec<TaskId, TaskCounts>            taskCounts;
-    BitVector_t                             plInTree;
+    lgrn::IdSetStl<PipelineId>              plInTree;
 
     out.pipelineToFirstAnystg .resize(maxPipelines);
-    bitvector_resize(plInTree, maxPipelines);
+    plInTree.resize(maxPipelines);
     plCounts        .resize(maxPipelines+1);
     taskCounts      .resize(maxTasks+1);
 
@@ -148,8 +148,8 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
         if (parent != lgrn::id_null<PipelineId>())
         {
-            plInTree.set(std::size_t(parent));
-            plInTree.set(std::size_t(child));
+            plInTree.insert(parent);
+            plInTree.insert(child);
 
             PipelineCounts &rChildCounts  = plCounts[child];
             PipelineCounts &rParentCounts = plCounts[parent];
@@ -163,7 +163,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         }
     }
 
-    std::size_t const treeSize = plInTree.count();
+    std::size_t const treeSize = plInTree.size();
 
     // 4. Allocate
 
@@ -375,7 +375,7 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
     {
         auto const pipeline = PipelineId(pipelineInt);
-        if ( ! plInTree.test(pipelineInt) || tasks.m_pipelineParents[pipeline] != lgrn::id_null<PipelineId>())
+        if ( ! plInTree.contains(pipeline) || tasks.m_pipelineParents[pipeline] != lgrn::id_null<PipelineId>())
         {
             continue; // Not in tree or not a root
         }

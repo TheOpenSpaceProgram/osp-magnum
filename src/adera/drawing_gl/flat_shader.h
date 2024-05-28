@@ -80,9 +80,7 @@ struct ArgsForSyncDrawEntFlat
 
 inline void sync_drawent_flat(osp::draw::DrawEnt ent, ArgsForSyncDrawEntFlat const args)
 {
-    auto const entInt = std::size_t(ent);
-
-    bool const hasMaterial = args.hasMaterial.test(entInt);
+    bool const hasMaterial = args.hasMaterial.contains(ent);
     bool const hasTexture =    (args.diffuse.size() > std::size_t(ent))
                             && (args.diffuse[ent].m_glId != lgrn::id_null<osp::draw::TexGlId>());
 
@@ -92,7 +90,7 @@ inline void sync_drawent_flat(osp::draw::DrawEnt ent, ArgsForSyncDrawEntFlat con
 
     if (args.pStorageTransparent != nullptr)
     {
-        auto value = (hasMaterial && args.transparent.test(entInt))
+        auto value = (hasMaterial && args.transparent.contains(ent))
                    ? std::make_optional(osp::draw::EntityToDraw{&draw_ent_flat, {&args.rData, pShader}})
                    : std::nullopt;
 
@@ -101,7 +99,7 @@ inline void sync_drawent_flat(osp::draw::DrawEnt ent, ArgsForSyncDrawEntFlat con
 
     if (args.pStorageOpaque != nullptr)
     {
-        auto value = (hasMaterial && args.opaque.test(entInt))
+        auto value = (hasMaterial && args.opaque.contains(ent))
                    ? std::make_optional(osp::draw::EntityToDraw{&draw_ent_flat, {&args.rData, pShader}})
                    : std::nullopt;
 

@@ -385,7 +385,7 @@ void SysRenderGL::draw_group(
 {
     for (auto const& [ent, toDraw] : entt::basic_view{group.entities}.each())
     {
-        if (visible.test(std::size_t(ent)))
+        if (visible.contains(ent))
         {
             toDraw.draw(ent, viewProj, toDraw.data);
         }

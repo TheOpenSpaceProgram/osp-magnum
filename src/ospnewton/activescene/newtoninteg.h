@@ -28,11 +28,11 @@
 
 #include <osp/activescene/basic.h>
 #include <osp/core/id_map.h>
-#include <osp/core/bitvector.h>
 
 #include <Newton.h>
 
 #include <longeron/id_management/registry_stl.hpp>
+#include <longeron/id_management/id_set_stl.hpp>
 
 #include <entt/core/any.hpp>
 
@@ -93,7 +93,7 @@ struct ACtxNwtWorld
     lgrn::IdRegistryStl<BodyId>                     m_bodyIds;
     std::vector<NwtBodyPtr_t>                       m_bodyPtrs;
     std::vector<ForceFactors_t>                     m_bodyFactors;
-    osp::BitVector_t                                m_bodyDirty;
+    lgrn::IdSetStl<BodyId>                          m_bodyDirty;
 
     std::vector<osp::active::ActiveEnt>             m_bodyToEnt;
     osp::IdMap_t<osp::active::ActiveEnt, BodyId>    m_entToBody;

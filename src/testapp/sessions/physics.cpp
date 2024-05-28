@@ -154,7 +154,7 @@ Session setup_prefabs(
         .func([] (ACtxBasic& rBasic, Resources& rResources, ACtxPrefabs& rPrefabs) noexcept
     {
         rPrefabs.instanceInfo.resize(rBasic.m_activeIds.capacity(), PrefabInstanceInfo{.prefab = lgrn::id_null<PrefabId>()});
-        osp::bitvector_resize(rPrefabs.roots, rBasic.m_activeIds.capacity());
+        rPrefabs.roots.resize(rBasic.m_activeIds.capacity());
         SysPrefabInit::init_info(rPrefabs, rResources);
     });
 
@@ -166,8 +166,8 @@ Session setup_prefabs(
         .args       ({      idBasic,           idResources,             idPhys,             idPrefabs})
         .func([] (ACtxBasic& rBasic, Resources& rResources, ACtxPhysics& rPhys, ACtxPrefabs& rPrefabs) noexcept
     {
-        rPhys.m_hasColliders.ints().resize(rBasic.m_activeIds.vec().capacity());
-        //rPhys.m_massDirty.ints().resize(rActiveIds.vec().capacity());
+        rPhys.m_hasColliders.resize(rBasic.m_activeIds.vec().capacity());
+        //rPhys.m_massDirty.resize(rActiveIds.vec().capacity());
         rPhys.m_shape.resize(rBasic.m_activeIds.capacity());
         SysPrefabInit::init_physics(rPrefabs, rResources, rPhys);
     });

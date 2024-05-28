@@ -171,7 +171,7 @@ void SysPrefabInit::init_info(
 
             if (parents[i] == -1)
             {
-                rPrefabs.roots.set(std::size_t(ent));
+                rPrefabs.roots.insert(ent);
             }
         }
 
@@ -222,11 +222,11 @@ void SysPrefabInit::init_physics(
                 = [&rHasColliders = rCtxPhys.m_hasColliders, ents, objects, parents]
                   (auto const& self, int objectId, ActiveEnt ent) -> void
         {
-            if (rHasColliders.test(std::size_t(ent)))
+            if (rHasColliders.contains(ent))
             {
                 return; // HasColliders bit already set, this means all ancestors have it set too
             }
-            rHasColliders.set(std::size_t(ent));
+            rHasColliders.insert(ent);
 
             int const parentId = parents[objectId];
 
