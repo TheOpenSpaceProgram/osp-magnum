@@ -82,9 +82,9 @@ void exec_update(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec)
                                              "Make sure all pipelines are finished running.");
         }
 
-        for (PipelineId const plInt : rExec.plRequestRun)
+        for (PipelineId const plId : rExec.plRequestRun)
         {
-            pipeline_run_root(tasks, graph, rExec, plInt);
+            pipeline_run_root(tasks, graph, rExec, plId);
         }
         rExec.plRequestRun.clear();
         rExec.hasRequestRun = false;
@@ -105,25 +105,23 @@ void exec_update(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec)
 
         rExec.requestLoop.clear();
 
-        for (PipelineId const plInt : rExec.plAdvance)
+        for (PipelineId const plId : rExec.plAdvance)
         {
-            pipeline_advance_stage(tasks, graph, rExec, plInt);
+            pipeline_advance_stage(tasks, graph, rExec, plId);
         }
 
-        for (PipelineId const plInt : rExec.plAdvance)
+        for (PipelineId const plId : rExec.plAdvance)
         {
-            pipeline_advance_reqs(tasks, graph, rExec, plInt);
+            pipeline_advance_reqs(tasks, graph, rExec, plId);
         }
 
-        for (PipelineId const plInt : rExec.plAdvance)
+        for (PipelineId const plId : rExec.plAdvance)
         {
-            pipeline_advance_run(tasks, graph, rExec, plInt);
+            pipeline_advance_run(tasks, graph, rExec, plId);
         }
         rExec.plAdvance.clear();
-        for (PipelineId const pipeline : rExec.plAdvanceNext)
-        {
-            rExec.plAdvance.insert(pipeline);
-        }
+        
+        rExec.plAdvance.insert(rExec.plAdvanceNext.begin(), rExec.plAdvanceNext.end());
         rExec.plAdvanceNext.clear();
     }
 
