@@ -40,6 +40,7 @@ void BasicChunkMeshGeometry::resize(ChunkSkeleton const& skCh, ChunkMeshBufferIn
     chunkFanNormalContrib  .resize(maxChunks * info.fanMaxSharedCount);
     chunkFillSharedNormals .resize(maxChunks * skCh.m_chunkSharedCount, osp::Vector3{osp::ZeroInit});
     sharedNormalSum        .resize(maxSharedVrtx, osp::Vector3{osp::ZeroInit});
+    sharedPosNoHeightmap   .resize(maxSharedVrtx, osp::Vector3{osp::ZeroInit});
 }
 
 } // namespace planeta

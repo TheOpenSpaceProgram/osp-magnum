@@ -83,9 +83,12 @@ struct BasicChunkMeshGeometry
 {
     void resize(ChunkSkeleton const& skCh, ChunkMeshBufferInfo const& info);
 
-    std::vector<osp::Vector3>           chunkVbufPos;
-    std::vector<osp::Vector3>           chunkVbufNrm;
-    std::vector<osp::Vector3u>          chunkIbuf;
+    std::vector<osp::Vector3>           chunkVbufPos; ///< Vertex buffer positions
+    std::vector<osp::Vector3>           chunkVbufNrm; ///< Vertex buffer normals
+    std::vector<osp::Vector3u>          chunkIbuf;    ///< Index buffer
+
+    /// Shared vertex positions copied from the skeleton and offsetted with no heightmap applied
+    osp::KeyedVec<planeta::SharedVrtxId, osp::Vector3>  sharedPosNoHeightmap;
 
     /// See \c FanNormalContrib; 2D, each row is \c ChunkMeshBufferInfo::fanMaxSharedCount
     std::vector<planeta::FanNormalContrib>              chunkFanNormalContrib;
@@ -95,6 +98,10 @@ struct BasicChunkMeshGeometry
 
     /// Non-normalized sum of face normals of connected faces
     osp::KeyedVec<planeta::SharedVrtxId, osp::Vector3>  sharedNormalSum;
+
+    /// Offset of vertex positions relative to the skeleton positions they were copied from
+    /// "Chunk Mesh Vertex positions = to_float(skeleton positions + skelOffset)"
+    osp::Vector3l skelOffset{osp::ZeroInit};
 };
 
 /**

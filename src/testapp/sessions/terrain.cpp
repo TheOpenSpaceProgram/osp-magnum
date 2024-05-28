@@ -216,10 +216,11 @@ Session setup_terrain_subdiv_dist(
         for (SkTriId const sktriId : rSkSP.surfaceRemoved)
         {
             ChunkId const chunkId = rSkCh.m_triToChunk[sktriId];
-
-            subtract_normal_contrib(chunkId, false, rChGeo, rChInfo, rChSP, rSkCh);
-
-            rSkCh.chunk_remove(chunkId, sktriId, rChSP.sharedRemoved, rSkel);
+            if (chunkId.has_value())
+            {
+                subtract_normal_contrib(chunkId, false, rChGeo, rChInfo, rChSP, rSkCh);
+                rSkCh.chunk_remove(chunkId, sktriId, rChSP.sharedRemoved, rSkel);
+            }
         }
 
         auto const chLevel  = rSkCh.m_chunkSubdivLevel;
@@ -241,6 +242,7 @@ Session setup_terrain_subdiv_dist(
             rSkel.vrtx_create_chunk_edge_recurse(chLevel, corners[2], corners[0], edgeRte);
 
             ChunkId const chunkId = rSkCh.chunk_create(sktriId, rSkel, rChSP.sharedAdded, edgeLft, edgeBtm, edgeRte);
+
             rChSP.chunksAdded.push_back(chunkId);
 
             // chunk_create creates new Skeleton Vertices. Resize is needed after each call
@@ -253,54 +255,60 @@ Session setup_terrain_subdiv_dist(
             ico_calc_chunk_edge(rTerrainIco.radius, chLevel, corners[2], corners[0], edgeRte, rSkData);
         }
 
-        for (SkTriId const sktriId : rSkSP.surfaceAdded)
+        for (ChunkId const chunkId : rChSP.chunksAdded)
         {
-            auto const chunkId = rSkCh.m_triToChunk[sktriId];
-            restitch_check(chunkId, sktriId, rSkCh, rSkel, rSkData, rChSP);
+            restitch_check(chunkId, rSkCh.m_chunkToTri[chunkId], rSkCh, rSkel, rSkData, rChSP);
         }
 
-        // Calculate positions for newly added shared vertex
         float const scalepow = std::pow(2.0f, -rSkData.precision);
+        rChGeo.skelOffset = Vector3l{553, 5431, 567} * int_2pow<int>(rSkData.precision);
+        Vector3d const center = Vector3d(rChGeo.skelOffset) * scalepow;
+
+        // Copy offsetted positions from the skeleton for newly added shared vertex
+
         for (SharedVrtxId const sharedVrtxId : rChSP.sharedAdded)
         {
-            SkVrtxId const skelVrtx     = rSkCh.m_sharedToSkVrtx[sharedVrtxId];
-
             // Normal is not cleaned up by the previous user. Normal is initially set to zero, and
             // face normals added in update_faces(...) will accumulate here.
             rChGeo.sharedNormalSum[sharedVrtxId] = Vector3{ZeroInit};
 
-            //Vector3l const translated = positions[size_t(skelId)] + translaton;
-            Vector3d  const scaled = Vector3d(rSkData.positions[skelVrtx]) * scalepow;
-            VertexIdx const vertex = rChInfo.vbufSharedOffset + sharedVrtxId.value;
+            SkVrtxId  const skelVrtx   = rSkCh.m_sharedToSkVrtx[sharedVrtxId];
+            VertexIdx const vbufVertex = rChInfo.vbufSharedOffset + sharedVrtxId.value;
+            Vector3   const posOut     = Vector3((rSkData.positions[skelVrtx] + rChGeo.skelOffset)) * scalepow;
+
+            rChGeo.sharedPosNoHeightmap[sharedVrtxId] = posOut;
 
             // Heightmap goes here (1)
-            rChGeo.chunkVbufPos[vertex] = Vector3(scaled);
+            rChGeo.chunkVbufPos[vbufVertex] = posOut;
         }
 
         // Calculate fill vertex positions
-        for (SkTriId const sktriId : rSkSP.surfaceAdded)
+        for (ChunkId const chunkId : rChSP.chunksAdded)
         {
-            auto        const chunk      = rSkCh.m_triToChunk[sktriId];
-            auto        const chunkIdInt = std::size_t(chunk);
-            std::size_t const fillOffset = rChInfo.vbufFillOffset + chunkIdInt*rChInfo.fillVrtxCount;
-
-            osp::ArrayView<SharedVrtxOwner_t const> sharedUsed = rSkCh.shared_vertices_used(chunk);
+            std::size_t const fillOffset = rChInfo.vbufFillOffset + chunkId.value*rChInfo.fillVrtxCount;
+            osp::ArrayView<SharedVrtxOwner_t const> sharedUsed = rSkCh.shared_vertices_used(chunkId);
 
             for (ChunkFillSubdivLUT::ToSubdiv const& toSubdiv : rChSP.lut.data())
             {
-                std::size_t const vrtxA = rChSP.lut.index(sharedUsed, fillOffset, rChInfo.vbufSharedOffset, toSubdiv.m_vrtxA);
-                std::size_t const vrtxB = rChSP.lut.index(sharedUsed, fillOffset, rChInfo.vbufSharedOffset, toSubdiv.m_vrtxB);
-                std::size_t const vrtxC = rChInfo.vbufFillOffset + rChInfo.fillVrtxCount*chunkIdInt + toSubdiv.m_fillOut.value;
+                Vector3 const vrtxAPos = toSubdiv.aIsShared
+                                       ? rChGeo.sharedPosNoHeightmap[sharedUsed[toSubdiv.vrtxA]]
+                                       : rChGeo.chunkVbufPos[fillOffset + toSubdiv.vrtxA];
+                Vector3 const vrtxBPos = toSubdiv.bIsShared
+                                       ? rChGeo.sharedPosNoHeightmap[sharedUsed[toSubdiv.vrtxB]]
+                                       : rChGeo.chunkVbufPos[fillOffset + toSubdiv.vrtxB];
 
-                Vector3 &rPosC = rChGeo.chunkVbufPos[vrtxC];
+                Vector3d    const middle     = 0.5*( Vector3d(vrtxAPos) + Vector3d(vrtxBPos) );
+                Vector3d    const centerDiff = Vector3d(middle) - center;
+                double      const centerDist = centerDiff.length();
+                Vector3d    const radialDir  = centerDiff / centerDist;
+                double      const roundness  = rTerrainIco.radius - centerDiff.length();
+                Vector3d    const posOut     = middle + radialDir * roundness;
 
-                // Heightmap goes here (2)
-                Vector3 const avg       = (rChGeo.chunkVbufPos[vrtxA] + rChGeo.chunkVbufPos[vrtxB]) / 2.0f;
-                float   const avgLen    = avg.length();
-                float   const roundness = rTerrainIco.radius - avgLen;
-
-                rPosC = avg + (avg / avgLen) * roundness;
+                rChGeo.chunkVbufPos[fillOffset + toSubdiv.fillOut] = Vector3(posOut);
             }
+
+            // Heightmap goes here (2)
+            // Loop over rChGeo.chunkVbufPos[fillOffset .. fillOffset+rChInfo.fillVrtxCount]
         }
 
         // Add or remove faces according to chunk changes. This also calculates normals.

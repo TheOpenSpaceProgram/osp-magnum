@@ -197,48 +197,24 @@ class ChunkFillSubdivLUT
 public:
     using Vector2us = Magnum::Math::Vector2<std::uint16_t>;
 
-    // Can either be a shared vertex or fill vertex
-    // Fill vertex if (0 to m_chunkVrtxCount-1)
-    // Shared vertex if m_chunkVrtxCount to (m_edgeVrtxCount*3-1)
-    enum class LUTVrtx : std::uint16_t {};
 
     struct ToSubdiv
     {
-        LUTVrtx m_vrtxA;
-        LUTVrtx m_vrtxB;
+        // Both of these can either be a Fill vertex or ChunkLocalSharedId, depending on *IsShared
+        std::uint32_t vrtxA;
+        std::uint32_t vrtxB;
 
-        ChunkLocalSharedId m_fillOut;
+        std::uint32_t fillOut;
+
+        bool aIsShared;
+        bool bIsShared;
     };
-
-    constexpr VertexIdx index(
-            osp::ArrayView<SharedVrtxOwner_t const> sharedUsed,
-            std::uint32_t const                     fillOffset,
-            std::uint32_t const                     sharedOffset,
-            LUTVrtx const                           lutVrtx ) const noexcept
-    {
-        auto const lutVrtxInt   = std::uint16_t(lutVrtx);
-        bool const isShared     = lutVrtxInt > m_fillVrtxCount;
-
-        return isShared ? sharedOffset + sharedUsed[lutVrtxInt-m_fillVrtxCount].value().value
-                        : fillOffset + lutVrtxInt;
-    }
 
     constexpr std::vector<ToSubdiv> const& data() const noexcept { return m_data; }
 
     friend ChunkFillSubdivLUT make_chunk_vrtx_subdiv_lut(std::uint8_t subdivLevel);
 
 private:
-
-    constexpr LUTVrtx id_at(Vector2us const pos) const noexcept
-    {
-        ChunkLocalSharedId const shared = coord_to_shared(pos.x(), pos.y(), m_edgeVrtxCount);
-        if (shared.has_value())
-        {
-            return LUTVrtx(m_fillVrtxCount + std::uint16_t(shared));
-        }
-
-        return LUTVrtx(xy_to_triangular(pos.x() - 1, pos.y() - 2));
-    };
 
     /**
      * @brief subdiv_edge_recurse
@@ -251,10 +227,10 @@ private:
 
     void fill_tri_recurse(Vector2us top, Vector2us lft, Vector2us rte, std::uint8_t level);
 
-    //std::unique_ptr<ToSubdiv[]> m_data;
     std::vector<ToSubdiv> m_data;
-    std::uint16_t m_fillVrtxCount{0};
-    std::uint16_t m_edgeVrtxCount{0};
+
+    std::uint16_t m_fillVrtxCount{};
+    std::uint16_t m_edgeVrtxCount{};
 
 }; // class ChunkFillSubdivLUT
 

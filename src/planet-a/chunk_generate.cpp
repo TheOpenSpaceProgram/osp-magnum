@@ -153,18 +153,22 @@ void restitch_check(
             ChunkId const parentNeighborChunk   = rSkCh.m_triToChunk[parentNeighbor];
             int     const neighborEdge          = rSkel.tri_at(parentNeighbor).find_neighbor_index(parent);
 
-            ChunkStitch const desiredStitch =  {
+            if (parentNeighborChunk.has_value())
+            {
+                ChunkStitch const desiredStitch =  {
                     .enabled        = true,
                     .detailX2       = true,
                     .x2ownEdge      = static_cast<unsigned char>(neighborEdge),
                     .x2neighborEdge = static_cast<unsigned char>(selfEdgeIdx)
-            };
+                };
 
-            ChunkStitch &rStitchCmd = rChSP.stitchCmds[parentNeighborChunk];
-            LGRN_ASSERT(   (rStitchCmd.enabled == false)
-                        || (rStitchCmd.detailX2 == false)
-                        || (rStitchCmd == desiredStitch));
-            rStitchCmd = desiredStitch;
+                ChunkStitch &rStitchCmd = rChSP.stitchCmds[parentNeighborChunk];
+                LGRN_ASSERT(   (rStitchCmd.enabled == false)
+                            || (rStitchCmd.detailX2 == false)
+                            || (rStitchCmd == desiredStitch));
+                rStitchCmd = desiredStitch;
+            }
+            // else, hole in terrain
         }
     }
 
