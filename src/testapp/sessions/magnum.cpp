@@ -203,10 +203,10 @@ Session setup_magnum_scene(
         .args       ({           idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
         .func([] (ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
-        for (auto const drawEntInt : rScnRender.m_drawIds.bitview().zeros())
+        for (DrawEnt const drawEnt : rScnRender.m_drawIds)
         {
             SysRenderGL::sync_drawent_texture(
-                    DrawEnt(drawEntInt),
+                    drawEnt,
                     rScnRender.m_diffuseTex,
                     rDrawingRes.m_texToRes,
                     rScnRenderGl.m_diffuseTexId,
@@ -239,10 +239,10 @@ Session setup_magnum_scene(
         .args       ({           idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
         .func([] (ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
-        for (auto const drawEntInt : rScnRender.m_drawIds.bitview().zeros())
+        for (DrawEnt const drawEnt : rScnRender.m_drawIds)
         {
             SysRenderGL::sync_drawent_mesh(
-                    DrawEnt(drawEntInt),
+                    drawEnt,
                     rScnRender.m_mesh,
                     rDrawingRes.m_meshToRes,
                     rScnRenderGl.m_meshId,

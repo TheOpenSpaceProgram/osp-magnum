@@ -900,9 +900,8 @@ void exec_conform(Tasks const& tasks, ExecContext &rOut)
     rOut.plAdvanceNext.resize(maxPipeline);
     rOut.plRequestRun.resize(maxPipeline);
 
-    for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    for (PipelineId const pipeline : tasks.m_pipelineIds)
     {
-        auto const pipeline = PipelineId(pipelineInt);
         rOut.plData[pipeline].waitStage = tasks.m_pipelineControl[pipeline].waitStage;
     }
 }

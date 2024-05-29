@@ -85,15 +85,14 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
     };
 
     // Max 1 stage for each valid pipeline. Supporting 0-stage pipelines take more effort
-    for (PipelineInt const plInt : tasks.m_pipelineIds.bitview().zeros())
+    for (PipelineId const plId : tasks.m_pipelineIds)
     {
-        plCounts[PipelineId(plInt)].stages = 1;
+        plCounts[PipelineId(plId)].stages = 1;
     }
 
     // Count stages from task run-ons
-    for (TaskInt const taskInt : tasks.m_taskIds.bitview().zeros())
+    for (TaskId const task : tasks.m_taskIds)
     {
-        auto const task                     = TaskId(taskInt);
         auto const [runPipeline, runStage]  = tasks.m_taskRunOn[task];
 
         count_stage(runPipeline, runStage);
@@ -111,9 +110,9 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
         }
     }
 
-    for (PipelineInt const plInt : tasks.m_pipelineIds.bitview().zeros())
+    for (PipelineId const plId : tasks.m_pipelineIds)
     {
-        totalStages += plCounts[PipelineId(plInt)].stages;
+        totalStages += plCounts[plId].stages;
     }
 
     // 2. Count TaskRequiresStages and StageRequiresTasks
@@ -141,9 +140,8 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     // 3. Map out children and siblings in tree
 
-    for (PipelineInt const childPlInt : tasks.m_pipelineIds.bitview().zeros())
+    for (PipelineId const child : tasks.m_pipelineIds)
     {
-        PipelineId const child  = PipelineId(childPlInt);
         PipelineId const parent = tasks.m_pipelineParents[child];
 
         if (parent != lgrn::id_null<PipelineId>())
@@ -246,9 +244,8 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     // 6. Push
 
-    for (TaskInt const taskInt : tasks.m_taskIds.bitview().zeros())
+    for (TaskId const task : tasks.m_taskIds)
     {
-        auto const      task            = TaskId(taskInt);
         auto const      run             = tasks.m_taskRunOn[task];
         auto const      anystg          = anystg_from(out, run.pipeline, run.stage);
         StageCounts     &rStageCounts   = plCounts[run.pipeline].stageCounts[std::size_t(run.stage)];
@@ -372,9 +369,8 @@ TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> 
 
     PipelineTreePos_t rootPos = 0;
 
-    for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
+    for (PipelineId const pipeline : tasks.m_pipelineIds)
     {
-        auto const pipeline = PipelineId(pipelineInt);
         if ( ! plInTree.contains(pipeline) || tasks.m_pipelineParents[pipeline] != lgrn::id_null<PipelineId>())
         {
             continue; // Not in tree or not a root

@@ -387,10 +387,8 @@ MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, Mag
 
     // Set all drawing stuff dirty then sync with renderer.
     // This allows clean re-openning of the scene
-    for (std::size_t const drawEntInt : rScene.m_scnRdr.m_drawIds.bitview().zeros())
+    for (DrawEnt const drawEnt : rScene.m_scnRdr.m_drawIds)
     {
-        auto const drawEnt = DrawEnt(drawEntInt);
-
         // Set all meshs dirty
         if (rScene.m_scnRdr.m_mesh[drawEnt] != lgrn::id_null<MeshId>())
         {
@@ -404,9 +402,9 @@ MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, Mag
         }
     }
 
-    for (std::size_t const materialInt : rScene.m_scnRdr.m_materialIds.bitview().zeros())
+    for (MaterialId const materialId : rScene.m_scnRdr.m_materialIds)
     {
-        Material &mat = rScene.m_scnRdr.m_materials[MaterialId(materialInt)];
+        Material &mat = rScene.m_scnRdr.m_materials[materialId];
         for (DrawEnt const drawEnt : mat.m_ents)
         {
             mat.m_dirty.push_back(drawEnt);

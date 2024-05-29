@@ -125,7 +125,7 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
         std::size_t const remapPartOffset = rVSVB.remapPartOffsets[spVhId];
         std::size_t const remapWeldOffset = rVSVB.remapWeldOffsets[spVhId];
 
-        for (PartId const srcPart : pVData->m_partIds.bitview().zeros())
+        for (PartId const srcPart : pVData->m_partIds)
         {
             PartId const dstPart = *itDstPartIds;
             ++itDstPartIds;
@@ -134,7 +134,7 @@ void SysVehicleSpawnVB::create_parts_and_welds(ACtxVehicleSpawn& rVehicleSpawn, 
             rVSVB.remapParts[remapPartOffset + srcPart] = dstPart;
         }
 
-        for (WeldId const srcWeld : pVData->m_weldIds.bitview().zeros())
+        for (WeldId const srcWeld : pVData->m_weldIds)
         {
             WeldId const dstWeld = *itDstWeldIds;
             ++itDstWeldIds;
@@ -181,7 +181,7 @@ void SysVehicleSpawnVB::request_prefabs(ACtxVehicleSpawn& rVehicleSpawn, ACtxVeh
         }
 
         // Copy Part data from VehicleBuilder to scene
-        for (uint32_t srcPart : pVData->m_partIds.bitview().zeros())
+        for (uint32_t srcPart : pVData->m_partIds)
         {
             PartId const dstPart = *itDstPartIds;
             ++itDstPartIds;

@@ -138,7 +138,7 @@ Session setup_thrust_indicators(
 
         rThrustIndicator.rktToDrawEnt.resize(rockets.localIds.capacity());
 
-        for (MachLocalId const localId : rockets.localIds.bitview().zeros())
+        for (MachLocalId const localId : rockets.localIds)
         {
             DrawEnt& rDrawEnt = rThrustIndicator.rktToDrawEnt[localId];
             if (rDrawEnt == lgrn::id_null<DrawEnt>())
@@ -160,7 +160,7 @@ Session setup_thrust_indicators(
         PerMachType const   &rockets        = rScnParts.machines.perType[gc_mtMagicRocket];
         Nodes const         &floats         = rScnParts.nodePerType[gc_ntSigFloat];
 
-        for (MachLocalId const localId : rockets.localIds.bitview().zeros())
+        for (MachLocalId const localId : rockets.localIds)
         {
             DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[localId];
 

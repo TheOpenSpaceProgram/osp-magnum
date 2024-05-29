@@ -132,9 +132,9 @@ struct ACtxSceneRender
         m_diffuseTex    .resize(size);
         m_mesh          .resize(size);
 
-        for (uint32_t matInt : m_materialIds.bitview().zeros())
+        for (MaterialId matId : m_materialIds)
         {
-            m_materials[MaterialId(matInt)].m_ents.resize(size);
+            m_materials[matId].m_ents.resize(size);
         }
     }
 
