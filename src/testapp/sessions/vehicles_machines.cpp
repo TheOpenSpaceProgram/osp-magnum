@@ -68,7 +68,7 @@ Session setup_mach_rocket(
         .args       ({idScnParts, idUpdMach})
         .func       ([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach)
     {
-        rUpdMach.localDirty[gc_mtMagicRocket].resize(rScnParts.machines.perType[gc_mtMagicRocket].localIds.vec().capacity());
+        rUpdMach.localDirty[gc_mtMagicRocket].resize(rScnParts.machines.perType[gc_mtMagicRocket].localIds.capacity());
     });
 
     return out;
@@ -282,7 +282,7 @@ Session setup_mach_rcsdriver(
         .args       ({idScnParts, idUpdMach})
         .func       ([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach)
     {
-        rUpdMach.localDirty[gc_mtRcsDriver].resize(rScnParts.machines.perType[gc_mtRcsDriver].localIds.vec().capacity());
+        rUpdMach.localDirty[gc_mtRcsDriver].resize(rScnParts.machines.perType[gc_mtRcsDriver].localIds.capacity());
     });
 
     rBuilder.task()

@@ -402,7 +402,7 @@ Session setup_vehicle_spawn_newton(
     {
         LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
 
-        rPhys.m_hasColliders.resize(rBasic.m_activeIds.vec().capacity());
+        rPhys.m_hasColliders.resize(rBasic.m_activeIds.capacity());
 
         auto const& itWeldsFirst        = std::begin(rVehicleSpawn.spawnedWelds);
         auto const& itWeldOffsetsLast   = std::end(rVehicleSpawn.spawnedWeldOffsets);

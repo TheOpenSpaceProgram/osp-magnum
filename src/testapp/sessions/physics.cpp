@@ -166,8 +166,8 @@ Session setup_prefabs(
         .args       ({      idBasic,           idResources,             idPhys,             idPrefabs})
         .func([] (ACtxBasic& rBasic, Resources& rResources, ACtxPhysics& rPhys, ACtxPrefabs& rPrefabs) noexcept
     {
-        rPhys.m_hasColliders.resize(rBasic.m_activeIds.vec().capacity());
-        //rPhys.m_massDirty.resize(rActiveIds.vec().capacity());
+        rPhys.m_hasColliders.resize(rBasic.m_activeIds.capacity());
+        //rPhys.m_massDirty.resize(rActiveIds.capacity());
         rPhys.m_shape.resize(rBasic.m_activeIds.capacity());
         SysPrefabInit::init_physics(rPrefabs, rResources, rPhys);
     });

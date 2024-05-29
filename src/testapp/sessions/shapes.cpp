@@ -165,7 +165,7 @@ Session setup_phys_shapes(
         .args       ({            idBasic,                idPhysShapes,             idPhys })
         .func([] (ACtxBasic const& rBasic, ACtxPhysShapes& rPhysShapes, ACtxPhysics& rPhys) noexcept
     {
-        rPhys.m_hasColliders.resize(rBasic.m_activeIds.vec().capacity());
+        rPhys.m_hasColliders.resize(rBasic.m_activeIds.capacity());
         rPhys.m_shape.resize(rBasic.m_activeIds.capacity());
 
         for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
@@ -556,7 +556,7 @@ Session setup_bounds(
         .args       ({      idBasic,                idPhysShapes,                idBounds })
         .func([] (ACtxBasic& rBasic, ACtxPhysShapes& rPhysShapes, ActiveEntSet_t& rBounds) noexcept
     {
-        rBounds.resize(rBasic.m_activeIds.vec().capacity());
+        rBounds.resize(rBasic.m_activeIds.capacity());
 
         for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
         {
