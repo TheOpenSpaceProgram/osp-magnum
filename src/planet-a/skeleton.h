@@ -34,10 +34,11 @@
 #include "planeta_types.h"
 
 #include <osp/core/array_view.h>
-#include <osp/core/bitvector.h>
 #include <osp/core/copymove_macros.h>
 #include <osp/core/keyed_vector.h>
 #include <osp/core/math_2pow.h>
+
+#include <longeron/id_management/id_set_stl.hpp>
 
 #include <array>
 #include <vector>
@@ -394,10 +395,10 @@ public:
     struct Level
     {
         /// Subdivided triangles that neighbor a non-subdivided one
-        osp::BitVector_t hasNonSubdivedNeighbor;
+        lgrn::IdSetStl<SkTriId> hasNonSubdivedNeighbor;
 
         /// Non-subdivided triangles that neighbor a subdivided one
-        osp::BitVector_t hasSubdivedNeighbor;
+        lgrn::IdSetStl<SkTriId> hasSubdivedNeighbor;
     };
 
     std::array<Level, gc_maxSubdivLevels> levels;
@@ -482,12 +483,12 @@ public:
     ChunkId chunk_create(
             SkTriId                                     sktriId,
             SubdivTriangleSkeleton                      &rSkel,
-            osp::BitVector_t                            &rSharedAdded,
+            lgrn::IdSetStl<SharedVrtxId>                &rSharedAdded,
             osp::ArrayView< osp::MaybeNewId<SkVrtxId> > edgeLft,
             osp::ArrayView< osp::MaybeNewId<SkVrtxId> > edgeBtm,
             osp::ArrayView< osp::MaybeNewId<SkVrtxId> > edgeRte);
 
-    void chunk_remove(ChunkId chunkId, SkTriId sktriId, osp::BitVector_t &rSharedRemoved, SubdivTriangleSkeleton& rSkel) noexcept;
+    void chunk_remove(ChunkId chunkId, SkTriId sktriId, lgrn::IdSetStl<SharedVrtxId> &rSharedRemoved, SubdivTriangleSkeleton& rSkel) noexcept;
 
     /**
      * @brief Get shared vertices used by a chunk

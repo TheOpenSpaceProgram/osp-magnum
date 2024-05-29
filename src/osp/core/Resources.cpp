@@ -41,7 +41,7 @@ ResId Resources::create(ResTypeId const typeId, PkgId const pkgId, SharedString 
     assert(rPkg.m_resTypeOwn.size() > std::size_t(typeId));
     PerPkgResType &rPkgType = rPkg.m_resTypeOwn[std::size_t(typeId)];
     rPkgType.m_owned.resize(rPerResType.m_resIds.capacity());
-    rPkgType.m_owned.set(std::size_t(newResId));
+    rPkgType.m_owned.insert(newResId);
 
     // Track name
     auto const& [newIt, success] = rPkgType.m_nameToResId.emplace(std::move(name), newResId);
@@ -80,7 +80,7 @@ SharedString const& Resources::name(ResTypeId const typeId, ResId const resId) c
     return rPerResType.m_resNames[std::size_t(resId)];
 }
 
-lgrn::IdRegistry<ResId> const& Resources::ids(ResTypeId const typeId) const noexcept
+lgrn::IdRegistryStl<ResId> const& Resources::ids(ResTypeId const typeId) const noexcept
 {
     return get_type(typeId).m_resIds;
 }
