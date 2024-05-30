@@ -26,7 +26,8 @@ jobs:
       fail-fast: false
       matrix:
         config: [Release, Debug]
-        image: [macos-12, macos-13, macos-14]
+        # Don't build with macos-14 yet, newton dynamics 3.14 can't handle it.
+        image: [macos-12, macos-13]
 
     runs-on: ${{ matrix.image }}
 
