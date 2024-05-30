@@ -26,7 +26,7 @@ jobs:
       fail-fast: false
       matrix:
         config: [Release, Debug]
-        image: [macos-12, macos-13]
+        image: [macos-12, macos-13, macos-14]
 
     runs-on: ${{ matrix.image }}
 
