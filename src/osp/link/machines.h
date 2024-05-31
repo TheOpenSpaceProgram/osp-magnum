@@ -25,13 +25,13 @@
 #pragma once
 
 #include "../core/array_view.h"
-#include "../core/bitvector.h"
 #include "../core/global_id.h"
 #include "../core/keyed_vector.h"
 
 #include <longeron/containers/intarray_multimap.hpp>
 #include <longeron/containers/bit_view.hpp>
 #include <longeron/id_management/registry_stl.hpp>
+#include <longeron/id_management/id_set_stl.hpp>
 
 #include <atomic>
 #include <vector>
@@ -81,10 +81,10 @@ struct MachineUpdater
 {
     alignas(64) std::atomic<bool> requestMachineUpdateLoop {false};
 
-    BitVector_t machTypesDirty;
+    lgrn::IdSetStl<MachTypeId> machTypesDirty;
 
     // [MachTypeId][MachLocalId]
-    osp::KeyedVec<MachTypeId, BitVector_t> localDirty;
+    osp::KeyedVec<MachTypeId, lgrn::IdSetStl<MachLocalId>> localDirty;
 };
 
 struct MachinePair

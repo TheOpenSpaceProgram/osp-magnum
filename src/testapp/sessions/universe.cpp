@@ -424,26 +424,26 @@ Session setup_testplanets_draw(
 
             rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
             rScnRender.m_meshDirty.push_back(drawEnt);
-            rScnRender.m_visible.set(std::size_t(drawEnt));
-            rScnRender.m_opaque.set(std::size_t(drawEnt));
-            rMatPlanet.m_ents.set(std::size_t(drawEnt));
+            rScnRender.m_visible.insert(drawEnt);
+            rScnRender.m_opaque.insert(drawEnt);
+            rMatPlanet.m_ents.insert(drawEnt);
             rMatPlanet.m_dirty.push_back(drawEnt);
         }
 
         rScnRender.m_mesh[rPlanetDraw.attractor] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
         rScnRender.m_meshDirty.push_back(rPlanetDraw.attractor);
-        rScnRender.m_visible.set(std::size_t(rPlanetDraw.attractor));
-        rScnRender.m_opaque.set(std::size_t(rPlanetDraw.attractor));
-        rMatPlanet.m_ents.set(std::size_t(rPlanetDraw.attractor));
+        rScnRender.m_visible.insert(rPlanetDraw.attractor);
+        rScnRender.m_opaque.insert(rPlanetDraw.attractor);
+        rMatPlanet.m_ents.insert(rPlanetDraw.attractor);
         rMatPlanet.m_dirty.push_back(rPlanetDraw.attractor);
 
         for (DrawEnt const drawEnt : rPlanetDraw.axis)
         {
             rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(cubeMeshId);
             rScnRender.m_meshDirty.push_back(drawEnt);
-            rScnRender.m_visible.set(std::size_t(drawEnt));
-            rScnRender.m_opaque.set(std::size_t(drawEnt));
-            rMatAxis.m_ents.set(std::size_t(drawEnt));
+            rScnRender.m_visible.insert(drawEnt);
+            rScnRender.m_opaque.insert(drawEnt);
+            rMatAxis.m_ents.insert(drawEnt);
             rMatAxis.m_dirty.push_back(drawEnt);
         }
 

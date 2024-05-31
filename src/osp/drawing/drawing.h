@@ -26,7 +26,6 @@
 
 #include "draw_ent.h"
 
-#include "../core/bitvector.h"
 #include "../core/copymove_macros.h"
 #include "../core/id_map.h"
 #include "../core/keyed_vector.h"
@@ -35,18 +34,20 @@
 #include "../core/storage.h"
 
 #include "../activescene/active_ent.h"
+#include "../activescene/basic.h"
 
 #include <Magnum/Magnum.h>
 #include <Magnum/Math/Color.h>
 
 #include <longeron/id_management/refcount.hpp>
-#include <longeron/id_management/registry_stl.hpp> // for lgrn::IdRegistryStl
+#include <longeron/id_management/registry_stl.hpp>
+#include <longeron/id_management/id_set_stl.hpp>
 
 namespace osp::draw
 {
 
 using DrawEntVec_t  = std::vector<DrawEnt>;
-using DrawEntSet_t  = BitVector_t;
+using DrawEntSet_t  = lgrn::IdSetStl<DrawEnt>;
 
 struct Material
 {
@@ -122,9 +123,9 @@ struct ACtxSceneRender
     {
         std::size_t const size = m_drawIds.capacity();
 
-        bitvector_resize(m_opaque,      size);
-        bitvector_resize(m_transparent, size);
-        bitvector_resize(m_visible,     size);
+        m_opaque.resize(size);
+        m_transparent.resize(size);
+        m_visible.resize(size);
 
         m_drawTransform .resize(size);
         m_color         .resize(size, {1.0f, 1.0f, 1.0f, 1.0f}); // Default white
@@ -133,13 +134,13 @@ struct ACtxSceneRender
 
         for (uint32_t matInt : m_materialIds.bitview().zeros())
         {
-            bitvector_resize(m_materials[MaterialId(matInt)].m_ents, size);
+            m_materials[MaterialId(matInt)].m_ents.resize(size);
         }
     }
 
     void resize_active(std::size_t const size)
     {
-        bitvector_resize(m_needDrawTf, size);
+        m_needDrawTf.resize(size);
         m_activeToDraw      .resize(size, lgrn::id_null<DrawEnt>());
         drawTfObserverEnable.resize(size, 0);
     }
@@ -151,7 +152,7 @@ struct ACtxSceneRender
     DrawEntSet_t                            m_visible;
     DrawEntColors_t                         m_color;
 
-    DrawEntSet_t                            m_needDrawTf;
+    active::ActiveEntSet_t                  m_needDrawTf;
     KeyedVec<active::ActiveEnt, DrawEnt>    m_activeToDraw;
 
     KeyedVec<active::ActiveEnt, uint16_t>   drawTfObserverEnable;

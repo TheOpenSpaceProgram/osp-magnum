@@ -440,7 +440,7 @@ Session setup_scene_renderer(
             {
                 if (std::size_t(ent) < rMat.m_ents.size())
                 {
-                    rMat.m_ents.reset(std::size_t(ent));
+                    rMat.m_ents.erase(ent);
                 }
             }
         }

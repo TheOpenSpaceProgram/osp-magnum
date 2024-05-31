@@ -77,10 +77,8 @@ void SysPrefabDraw::resync_drawents(
         ACtxDrawing&                rDrawing,
         ACtxSceneRender&            rScnRender)
 {
-    for (std::size_t const rootInt : rPrefabs.roots.ones())
+    for (ActiveEnt const root : rPrefabs.roots)
     {
-        auto const root = ActiveEnt::from_index(rootInt);
-
         PrefabInstanceInfo const &rRootInfo = rPrefabs.instanceInfo[root];
 
         LGRN_ASSERT(rRootInfo.prefab   != lgrn::id_null<PrefabId>());
@@ -130,7 +128,7 @@ void SysPrefabDraw::init_mesh_texture_material(
             = [&parents, &ents, &rDrawing, &needDrawTf = rScnRender.m_needDrawTf]
               (auto&& self, int const object, ActiveEnt const ent) noexcept -> void
         {
-            needDrawTf.set(ent.value);
+            needDrawTf.insert(ent);
 
             int const parentObj = parents[object];
 
@@ -176,13 +174,13 @@ void SysPrefabDraw::init_mesh_texture_material(
                 }
             }
 
-            rScnRender.m_opaque.set(drawEnt.value);
-            rScnRender.m_visible.set(drawEnt.value);
+            rScnRender.m_opaque.insert(drawEnt);
+            rScnRender.m_visible.insert(drawEnt);
 
             if (material != lgrn::id_null<MaterialId>())
             {
                 rScnRender.m_materials[material].m_dirty.push_back(drawEnt);
-                rScnRender.m_materials[material].m_ents.set(drawEnt.value);
+                rScnRender.m_materials[material].m_ents.insert(drawEnt);
             }
         }
 
@@ -200,10 +198,8 @@ void SysPrefabDraw::resync_mesh_texture_material(
         ACtxSceneRender&            rScnRender,
         MaterialId                  material)
 {
-    for (std::size_t const rootInt : rPrefabs.roots.ones())
+    for (ActiveEnt const root : rPrefabs.roots)
     {
-        auto const root = ActiveEnt::from_index(rootInt);
-
         PrefabInstanceInfo const &rRootInfo = rPrefabs.instanceInfo[root];
 
         LGRN_ASSERT(rRootInfo.prefab   != lgrn::id_null<PrefabId>());
@@ -248,13 +244,13 @@ void SysPrefabDraw::resync_mesh_texture_material(
                 }
             }
 
-            rScnRender.m_opaque.set(drawEnt.value);
-            rScnRender.m_visible.set(drawEnt.value);
+            rScnRender.m_opaque.insert(drawEnt);
+            rScnRender.m_visible.insert(drawEnt);
 
             if (material != lgrn::id_null<MaterialId>())
             {
                 rScnRender.m_materials[material].m_dirty.push_back(drawEnt);
-                rScnRender.m_materials[material].m_ents.set(drawEnt.value);
+                rScnRender.m_materials[material].m_ents.insert(drawEnt);
             }
         }
     }

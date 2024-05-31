@@ -26,13 +26,13 @@
 
 #include "active_ent.h"
 
-#include "../core/bitvector.h"
 #include "../core/keyed_vector.h"
 #include "../core/math_types.h"
 #include "../core/storage.h"
 
 #include <longeron/id_management/null.hpp>
-#include <longeron/id_management/registry_stl.hpp> // for lgrn::IdRegistryStl
+#include <longeron/id_management/registry_stl.hpp>
+#include <longeron/id_management/id_set_stl.hpp> 
 
 #include <string>
 
@@ -40,7 +40,7 @@ namespace osp::active
 {
 
 using ActiveEntVec_t = std::vector<ActiveEnt>;
-using ActiveEntSet_t = BitVector_t;
+using ActiveEntSet_t = lgrn::IdSetStl<ActiveEnt>;
 
 /**
  * @brief Component for transformation (in meters)

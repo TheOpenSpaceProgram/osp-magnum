@@ -67,7 +67,7 @@ inline void sync_drawent_visualizer(
         ACtxDrawMeshVisualizer&             rData)
 {
     bool alreadyAdded = rStorage.contains(ent);
-    if (hasMaterial.test(std::size_t(ent)))
+    if (hasMaterial.contains(ent))
     {
         if ( ! alreadyAdded)
         {

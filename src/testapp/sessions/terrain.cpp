@@ -593,8 +593,8 @@ Session setup_terrain_debug_draw(
                         rDrawing.m_meshRefCounts.ref_release(std::exchange(rScnRender.m_mesh[rDrawEnt], {}));
                     }
                     rScnRender.m_meshDirty  .push_back  (rDrawEnt);
-                    rScnRender.m_visible    .reset      (rDrawEnt.value);
-                    rMatPlanet.m_ents       .reset      (rDrawEnt.value);
+                    rScnRender.m_visible    .erase      (rDrawEnt);
+                    rMatPlanet.m_ents       .erase      (rDrawEnt);
                     rMatPlanet.m_dirty      .push_back  (rDrawEnt);
 
                     rScnRender.m_drawIds.remove(std::exchange(rDrawEnt, {}));
@@ -630,9 +630,9 @@ Session setup_terrain_debug_draw(
             {
                 rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(cubeMeshId);
                 rScnRender.m_meshDirty.push_back(drawEnt);
-                rScnRender.m_visible.set(drawEnt.value);
-                rScnRender.m_opaque.set(drawEnt.value);
-                rMatPlanet.m_ents.set(drawEnt.value);
+                rScnRender.m_visible.insert(drawEnt);
+                rScnRender.m_opaque.insert(drawEnt);
+                rMatPlanet.m_ents.insert(drawEnt);
                 rMatPlanet.m_dirty.push_back(drawEnt);
             }
 

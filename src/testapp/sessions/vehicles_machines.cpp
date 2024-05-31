@@ -68,7 +68,7 @@ Session setup_mach_rocket(
         .args       ({idScnParts, idUpdMach})
         .func       ([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach)
     {
-        rUpdMach.localDirty[gc_mtMagicRocket].ints().resize(rScnParts.machines.perType[gc_mtMagicRocket].localIds.vec().capacity());
+        rUpdMach.localDirty[gc_mtMagicRocket].resize(rScnParts.machines.perType[gc_mtMagicRocket].localIds.capacity());
     });
 
     return out;
@@ -178,13 +178,13 @@ Session setup_thrust_indicators(
 
             if (thrustMag == 0.0f)
             {
-                rScnRender.m_visible.reset(drawEnt.value);
+                rScnRender.m_visible.erase(drawEnt);
                 continue;
             }
 
-            if (!rMat.m_ents.test(drawEnt.value))
+            if (!rMat.m_ents.contains(drawEnt))
             {
-                rMat.m_ents.set(drawEnt.value);
+                rMat.m_ents.insert(drawEnt);
                 rMat.m_dirty.push_back(drawEnt);
             }
 
@@ -195,8 +195,8 @@ Session setup_thrust_indicators(
                 rScnRender.m_meshDirty.push_back(drawEnt);
             }
 
-            rScnRender.m_visible.set(drawEnt.value);
-            rScnRender.m_opaque .set(drawEnt.value);
+            rScnRender.m_visible.insert(drawEnt);
+            rScnRender.m_opaque .insert(drawEnt);
 
             rScnRender.m_color              [drawEnt] = rThrustIndicator.color;
             rScnRender.drawTfObserverEnable [partEnt] = 1;
@@ -282,7 +282,7 @@ Session setup_mach_rcsdriver(
         .args       ({idScnParts, idUpdMach})
         .func       ([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach)
     {
-        rUpdMach.localDirty[gc_mtRcsDriver].ints().resize(rScnParts.machines.perType[gc_mtRcsDriver].localIds.vec().capacity());
+        rUpdMach.localDirty[gc_mtRcsDriver].resize(rScnParts.machines.perType[gc_mtRcsDriver].localIds.capacity());
     });
 
     rBuilder.task()
@@ -296,7 +296,7 @@ Session setup_mach_rcsdriver(
         Nodes const &rFloatNodes = rScnParts.nodePerType[gc_ntSigFloat];
         PerMachType &rRockets    = rScnParts.machines.perType[gc_mtRcsDriver];
 
-        for (MachLocalId const local : rUpdMach.localDirty[gc_mtRcsDriver].ones())
+        for (MachLocalId const local : rUpdMach.localDirty[gc_mtRcsDriver])
         {
             MachAnyId const mach     = rRockets.localToAny[local];
             auto const      portSpan = lgrn::Span<NodeId const>{rFloatNodes.machToNode[mach]};

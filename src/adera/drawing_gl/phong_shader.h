@@ -82,9 +82,8 @@ struct ArgsForSyncDrawEntPhong
 
 inline void sync_drawent_phong(osp::draw::DrawEnt ent, ArgsForSyncDrawEntPhong const args)
 {
-    auto const entInt = std::size_t(ent);
 
-    bool const hasMaterial = args.hasMaterial.test(entInt);
+    bool const hasMaterial = args.hasMaterial.contains(ent);
     bool const hasTexture = (args.diffuse.size() > std::size_t(ent)) && (args.diffuse[ent].m_glId != lgrn::id_null<osp::draw::TexGlId>());
 
     PhongGL *pShader = hasTexture
@@ -93,7 +92,7 @@ inline void sync_drawent_phong(osp::draw::DrawEnt ent, ArgsForSyncDrawEntPhong c
 
     if (args.pStorageTransparent != nullptr)
     {
-        auto value = (hasMaterial && args.transparent.test(entInt))
+        auto value = (hasMaterial && args.transparent.contains(ent))
                    ? std::make_optional(osp::draw::EntityToDraw{&draw_ent_phong, {&args.rData, pShader}})
                    : std::nullopt;
 
@@ -102,7 +101,7 @@ inline void sync_drawent_phong(osp::draw::DrawEnt ent, ArgsForSyncDrawEntPhong c
 
     if (args.pStorageOpaque != nullptr)
     {
-        auto value = (hasMaterial && args.opaque.test(entInt))
+        auto value = (hasMaterial && args.opaque.contains(ent))
                    ? std::make_optional(osp::draw::EntityToDraw{&draw_ent_phong, {&args.rData, pShader}})
                    : std::nullopt;
 

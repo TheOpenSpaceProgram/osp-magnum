@@ -210,12 +210,12 @@ void SysRender::needs_draw_transforms(
         active::ActiveEntSet_t&         rNeedDrawTf,
         active::ActiveEnt               ent)
 {
-    rNeedDrawTf.set(ent.value);
+    rNeedDrawTf.insert(ent);
 
     active::ActiveEnt const parentEnt = scnGraph.m_entParent[ent];
 
     if (   parentEnt != lgrn::id_null<active::ActiveEnt>()
-        && ! rNeedDrawTf.test(std::size_t(parentEnt)) )
+        && ! rNeedDrawTf.contains(parentEnt) )
     {
         SysRender::needs_draw_transforms(scnGraph, rNeedDrawTf, parentEnt);
     }
@@ -234,7 +234,7 @@ void SysRender::update_draw_transforms(
     {
         active::ActiveEnt const ent = *first;
 
-        if (args.needDrawTf.test(ent.value))
+        if (args.needDrawTf.contains(ent))
         {
             update_draw_transforms_recurse(args, ent, identity, true, func);
         }
@@ -266,7 +266,7 @@ void SysRender::update_draw_transforms_recurse(
 
     for (ActiveEnt entChild : SysSceneGraph::children(args.scnGraph, ent))
     {
-        if (args.needDrawTf.test(std::size_t(entChild)))
+        if (args.needDrawTf.contains(entChild))
         {
             update_draw_transforms_recurse(args, entChild, entDrawTf, depth + 1, func);
         }

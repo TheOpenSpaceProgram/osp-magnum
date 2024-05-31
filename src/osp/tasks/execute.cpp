@@ -26,6 +26,7 @@
 #include "execute.h"
 
 #include <Corrade/Containers/ArrayViewStl.h>
+#include <iterator>
 
 namespace osp
 {
@@ -81,11 +82,11 @@ void exec_update(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec)
                                              "Make sure all pipelines are finished running.");
         }
 
-        for (PipelineInt const plInt : rExec.plRequestRun.ones())
+        for (PipelineId const plId : rExec.plRequestRun)
         {
-            pipeline_run_root(tasks, graph, rExec, PipelineId(plInt));
+            pipeline_run_root(tasks, graph, rExec, plId);
         }
-        rExec.plRequestRun.reset();
+        rExec.plRequestRun.clear();
         rExec.hasRequestRun = false;
     }
 
@@ -104,25 +105,24 @@ void exec_update(Tasks const& tasks, TaskGraph const& graph, ExecContext &rExec)
 
         rExec.requestLoop.clear();
 
-        for (PipelineInt const plInt : rExec.plAdvance.ones())
+        for (PipelineId const plId : rExec.plAdvance)
         {
-            pipeline_advance_stage(tasks, graph, rExec, PipelineId(plInt));
+            pipeline_advance_stage(tasks, graph, rExec, plId);
         }
 
-        for (PipelineInt const plInt : rExec.plAdvance.ones())
+        for (PipelineId const plId : rExec.plAdvance)
         {
-            pipeline_advance_reqs(tasks, graph, rExec, PipelineId(plInt));
+            pipeline_advance_reqs(tasks, graph, rExec, plId);
         }
 
-        for (PipelineInt const plInt : rExec.plAdvance.ones())
+        for (PipelineId const plId : rExec.plAdvance)
         {
-            pipeline_advance_run(tasks, graph, rExec, PipelineId(plInt));
+            pipeline_advance_run(tasks, graph, rExec, plId);
         }
-
-        std::copy(rExec.plAdvanceNext.ints().begin(),
-                  rExec.plAdvanceNext.ints().end(),
-                  rExec.plAdvance    .ints().begin());
-        rExec.plAdvanceNext.reset();
+        rExec.plAdvance.clear();
+        
+        rExec.plAdvance.insert(rExec.plAdvanceNext.begin(), rExec.plAdvanceNext.end());
+        rExec.plAdvanceNext.clear();
     }
 
     exec_log(rExec, ExecContext::UpdateEnd{});
@@ -249,7 +249,7 @@ static int pipeline_run(Tasks const& tasks, TaskGraph const& graph, ExecContext 
 
             ++ rExec.pipelinesRunning;
 
-            rExec.plAdvance.set(std::size_t(pipeline));
+            rExec.plAdvance.insert(pipeline);
             exec_log(rExec, ExecContext::PipelineRun{pipeline});
         }
 
@@ -257,7 +257,7 @@ static int pipeline_run(Tasks const& tasks, TaskGraph const& graph, ExecContext 
         {
             rExecPl.canceled = false;
 
-            rExec.plAdvanceNext.set(std::size_t(pipeline));
+            rExec.plAdvanceNext.insert(pipeline);
             exec_log(rExec, ExecContext::PipelineLoop{pipeline});
         }
 
@@ -608,7 +608,7 @@ static void pipeline_advance_run(Tasks const& tasks, TaskGraph const& graph, Exe
         // No tasks to run. RunTasks are responsible for setting this pipeline dirty once they're
         // all done. If there is none, then this pipeline may get stuck if nothing sets it dirty,
         // so set dirty right away.
-        rExec.plAdvanceNext.set(std::size_t(pipeline));
+        rExec.plAdvanceNext.insert(pipeline);
         rExec.hasPlAdvanceOrLoop = true;
     }
 }
@@ -768,7 +768,7 @@ static void pipeline_try_advance(ExecContext &rExec, ExecPipeline &rExecPl, Pipe
 {
     if (pipeline_can_advance(rExecPl))
     {
-        rExec.plAdvance.set(std::size_t(pipeline));
+        rExec.plAdvance.insert(pipeline);
         rExec.hasPlAdvanceOrLoop = true;
     }
 };
@@ -896,9 +896,9 @@ void exec_conform(Tasks const& tasks, ExecContext &rOut)
     rOut.tasksQueuedRun    .reserve(maxTasks);
     rOut.tasksQueuedBlocked.reserve(maxTasks);
     rOut.plData.resize(maxPipeline);
-    bitvector_resize(rOut.plAdvance,     maxPipeline);
-    bitvector_resize(rOut.plAdvanceNext, maxPipeline);
-    bitvector_resize(rOut.plRequestRun,  maxPipeline);
+    rOut.plAdvance.resize(maxPipeline);
+    rOut.plAdvanceNext.resize(maxPipeline);
+    rOut.plRequestRun.resize(maxPipeline);
 
     for (PipelineInt const pipelineInt : tasks.m_pipelineIds.bitview().zeros())
     {

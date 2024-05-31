@@ -366,9 +366,9 @@ Session setup_shader_visualizer(
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
     {
         Material const &rMat = rScnRender.m_materials[rDrawShVisual.m_materialId];
-        for (auto const drawEntInt : rMat.m_ents.ones())
+        for (DrawEnt const drawEnt : rMat.m_ents)
         {
-            sync_drawent_visualizer(DrawEnt(drawEntInt), rMat.m_ents, rGroupFwd.entities, rDrawShVisual);
+            sync_drawent_visualizer(drawEnt, rMat.m_ents, rGroupFwd.entities, rDrawShVisual);
         }
     });
 
@@ -442,9 +442,9 @@ Session setup_shader_flat(
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawFlat& rDrawShFlat) noexcept
     {
         Material const &rMat = rScnRender.m_materials[rDrawShFlat.materialId];
-        for (auto const drawEntInt : rMat.m_ents.ones())
+        for (DrawEnt const drawEnt : rMat.m_ents)
         {
-            sync_drawent_flat(DrawEnt(drawEntInt),
+            sync_drawent_flat(drawEnt,
             {
                 .hasMaterial    = rMat.m_ents,
                 .pStorageOpaque = &rGroupFwd.entities,
@@ -528,9 +528,9 @@ Session setup_shader_phong(
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawPhong& rDrawShPhong) noexcept
     {
         Material const &rMat = rScnRender.m_materials[rDrawShPhong.materialId];
-        for (auto const drawEntInt : rMat.m_ents.ones())
+        for (DrawEnt const drawEnt : rMat.m_ents)
         {
-            sync_drawent_phong(DrawEnt(drawEntInt),
+            sync_drawent_phong(drawEnt,
             {
                 .hasMaterial    = rMat.m_ents,
                 .pStorageOpaque = &rGroupFwd.entities,

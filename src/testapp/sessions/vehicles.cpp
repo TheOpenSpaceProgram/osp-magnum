@@ -86,7 +86,7 @@ Session setup_parts(
 
     // Resize containers to fit all existing MachTypeIds and NodeTypeIds
     // These Global IDs are dynamically initialized just as the program starts
-    bitvector_resize(rUpdMach.machTypesDirty, MachTypeReg_t::size());
+    rUpdMach.machTypesDirty.resize(MachTypeReg_t::size());
     rUpdMach.localDirty       .resize(MachTypeReg_t::size());
     rScnParts.machines.perType.resize(MachTypeReg_t::size());
     rScnParts.nodePerType     .resize(NodeTypeReg_t::size());
@@ -492,7 +492,7 @@ Session setup_vehicle_spawn_vb(
         Nodes const         &rFloatNodes    = rScnParts.nodePerType[gc_ntSigFloat];
         std::size_t const   maxNodes        = rFloatNodes.nodeIds.capacity();
         rSigUpdFloat.nodeNewValues.resize(maxNodes);
-        bitvector_resize(rSigUpdFloat.nodeDirty, maxNodes);
+        rSigUpdFloat.nodeDirty.resize(maxNodes);
         rSigValFloat.resize(maxNodes);
 
         std::size_t const           newVehicleCount     = rVehicleSpawn.new_vehicle_count();
@@ -547,7 +547,7 @@ Session setup_vehicle_spawn_draw(
     {
         for (ActiveEnt const ent : rVehicleSpawn.rootEnts)
         {
-            rScnRender.m_needDrawTf.set(ent.value);
+            rScnRender.m_needDrawTf.insert(ent);
         }
     });
 
@@ -597,27 +597,27 @@ Session setup_signals_float(
         // NOTE: The various use of reset() clear entire bit arrays, which may or may
         //       not be expensive. They likely optimize to memset
 
-        for (std::size_t const machTypeDirty : rUpdMach.machTypesDirty.ones())
+        for (MachTypeId const machTypeDirty : rUpdMach.machTypesDirty)
         {
-            rUpdMach.localDirty[machTypeDirty].reset();
+            rUpdMach.localDirty[machTypeDirty].clear();
         }
-        rUpdMach.machTypesDirty.reset();
+        rUpdMach.machTypesDirty.clear();
 
         // Sees which nodes changed, and writes into rUpdMach set dirty which MACHINES
         // must be updated next
         update_signal_nodes<float>(
-                rSigUpdFloat.nodeDirty.ones(),
+                rSigUpdFloat.nodeDirty,
                 rFloatNodes.nodeToMach,
                 rScnParts.machines,
                 arrayView(rSigUpdFloat.nodeNewValues),
                 rSigValFloat,
                 rUpdMach);
-        rSigUpdFloat.nodeDirty.reset();
+        rSigUpdFloat.nodeDirty.clear();
         rSigUpdFloat.dirty = false;
 
         // Run tasks needed to update machine types that are dirty
         bool anyMachineNotified = false;
-        for (MachTypeId const type : rUpdMach.machTypesDirty.ones())
+        for (MachTypeId const type : rUpdMach.machTypesDirty)
         {
             anyMachineNotified = true;
         }
