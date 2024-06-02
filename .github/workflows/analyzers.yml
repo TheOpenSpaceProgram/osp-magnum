@@ -67,7 +67,7 @@ jobs:
         cmake --build build --parallel --config ${{ matrix.config }} --target compile-osp-magnum-deps compile-test-deps
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
       if: ${{ matrix.tool == 'CodeQL' }}
       with:
         languages: cpp
@@ -85,7 +85,7 @@ jobs:
     # Unlike clang-analyzer and include-what-you-use, CodeQL can't operate on just the config step. Need to actually build everything.
     - name: Perform CodeQL Analysis
       if: ${{ matrix.tool == 'CodeQL' }}
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v3
       with:
         upload: false
         output: sarif-results
@@ -102,7 +102,7 @@ jobs:
 
     - name: Upload SARIF
       if: ${{ matrix.tool == 'CodeQL' }}
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: sarif-results/cpp.sarif
 
@@ -162,6 +162,6 @@ jobs:
 
       # Upload SARIF file to GitHub Code Scanning Alerts
     - name: Upload SARIF to GitHub
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: ${{ steps.run-analysis.outputs.sarif }}
