@@ -38,7 +38,7 @@ void copy_nodes(
     using lgrn::Span;
 
     // Create new node IDs
-    for (NodeId const srcNode : rSrcNodes.nodeIds.bitview().zeros())
+    for (NodeId const srcNode : rSrcNodes.nodeIds)
     {
         NodeId const dstNode = rDstNodes.nodeIds.create();
         remapNode[srcNode] = dstNode;
@@ -48,7 +48,7 @@ void copy_nodes(
     rDstNodes.nodeToMach.ids_reserve(rDstNodes.nodeIds.capacity());
     rDstNodes.nodeToMach.data_reserve(rDstNodes.nodeToMach.data_size()
                                         + rSrcNodes.nodeToMach.data_size());
-    for (NodeId const srcNode : rSrcNodes.nodeIds.bitview().zeros())
+    for (NodeId const srcNode : rSrcNodes.nodeIds)
     {
         NodeId const dstNode = remapNode[srcNode];
         Span<Junction const> srcJunction = rSrcNodes.nodeToMach[srcNode];
@@ -75,7 +75,7 @@ void copy_nodes(
     rDstNodes.machToNode.ids_reserve(rDstMach.ids.capacity());
     rDstNodes.machToNode.data_reserve(rDstNodes.machToNode.data_size()
                                         + rSrcNodes.machToNode.data_size());
-    for (MachAnyId const srcMach : rSrcMach.ids.bitview().zeros())
+    for (MachAnyId const srcMach : rSrcMach.ids)
     {
         if (rSrcNodes.machToNode.contains(srcMach))
         {

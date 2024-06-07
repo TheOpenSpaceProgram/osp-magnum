@@ -314,7 +314,7 @@ Session setup_vehicle_spawn_vb(
 
             std::size_t const remapMachOffset = rVSVB.remapMachOffsets[vhId];
 
-            for (MachAnyId const srcMach : srcMachines.ids.bitview().zeros())
+            for (MachAnyId const srcMach : srcMachines.ids)
             {
                 MachAnyId const dstMach = *itDstMachIds;
                 ++itDstMachIds;
@@ -367,7 +367,7 @@ Session setup_vehicle_spawn_vb(
             std::size_t const remapPartOffset = rVSVB.remapPartOffsets[vhId];
 
             // Update rScnParts machine->part map
-            for (MachAnyId const srcMach : pVData->m_machines.ids.bitview().zeros())
+            for (MachAnyId const srcMach : pVData->m_machines.ids)
             {
                 MachAnyId const dstMach = rVSVB.remapMachs[remapMachOffset + srcMach];
                 PartId const    srcPart = pVData->m_machToPart[srcMach];
@@ -377,7 +377,7 @@ Session setup_vehicle_spawn_vb(
             }
 
             // Update rScnParts part->machine multimap
-            for (PartId const srcPart : pVData->m_partIds.bitview().zeros())
+            for (PartId const srcPart : pVData->m_partIds)
             {
                 PartId const dstPart = rVSVB.remapParts[remapPartOffset + srcPart];
 
@@ -513,7 +513,7 @@ Session setup_vehicle_spawn_vb(
             std::size_t const   nodeRemapOffset     = remapNodeOffsets2d[vhId.value][gc_ntSigFloat];
             auto const          nodeRemap           = arrayView(rVSVB.remapNodes).exceptPrefix(nodeRemapOffset);
 
-            for (NodeId const srcNode : srcFloatNodes.nodeIds.bitview().zeros())
+            for (NodeId const srcNode : srcFloatNodes.nodeIds)
             {
                 NodeId const dstNode = nodeRemap[srcNode];
                 rSigValFloat[dstNode] = srcFloatValues[srcNode];

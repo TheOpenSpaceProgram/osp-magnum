@@ -621,9 +621,8 @@ Session setup_terrain_debug_draw(
         MeshId                     const cubeMeshId  = rNMesh.m_shapeToMesh.at(EShape::Box);
         SubdivIdRegistry<SkVrtxId> const &vrtxIds    = rTerrain.skeleton.vrtx_ids();
 
-        for (std::size_t const skVertInt : vrtxIds.bitview().zeros())
+        for (SkVrtxId const skVert : vrtxIds)
         {
-            SkVrtxId const skVert  = SkVrtxId::from_index(skVertInt);
             DrawEnt  const drawEnt = rTrnDbgDraw.verts[skVert];
 
             if ( ! rScnRender.m_mesh[drawEnt].has_value() )

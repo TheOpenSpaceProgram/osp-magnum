@@ -69,6 +69,8 @@ public:
     using base_t::capacity;
     using base_t::exists;
     using base_t::size;
+    using base_t::begin;
+    using base_t::end;
 
     /**
      * @brief Create a single ID with no parents

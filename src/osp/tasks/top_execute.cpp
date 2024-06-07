@@ -185,9 +185,8 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
     traverse(traverse, 0, graph.pltreeToPipeline.size(), 0);
 
     // Write pipelines that are not in the tree
-    for (PipelineInt const plInt : tasks.m_pipelineIds.bitview().zeros())
+    for (PipelineId const pipeline : tasks.m_pipelineIds)
     {
-        auto const pipeline = PipelineId(plInt);
         if (graph.pipelineToPltree[pipeline] == lgrn::id_null<PipelineTreePos_t>())
         {
             write_pipeline(pipeline, 0);
