@@ -33,6 +33,7 @@
 #include "chunk_utils.h"
 
 #include <osp/core/math_int64.h>
+#include <osp/core/buffer_format.h>
 
 namespace planeta
 {
@@ -83,9 +84,11 @@ struct BasicChunkMeshGeometry
 {
     void resize(ChunkSkeleton const& skCh, ChunkMeshBufferInfo const& info);
 
-    std::vector<osp::Vector3>           chunkVbufPos; ///< Vertex buffer positions
-    std::vector<osp::Vector3>           chunkVbufNrm; ///< Vertex buffer normals
-    std::vector<osp::Vector3u>          chunkIbuf;    ///< Index buffer
+    Corrade::Containers::Array<unsigned char> vrtxBuffer; ///< Output vertex buffer
+    Corrade::Containers::Array<osp::Vector3u> indxBuffer; ///< Output index buffer
+
+    osp::BufAttribFormat<osp::Vector3> vbufPositions;   ///< Describes Position data in vrtxBuffer
+    osp::BufAttribFormat<osp::Vector3> vbufNormals;     ///< Describes Normal data in vrtxBuffer
 
     /// Shared vertex positions copied from the skeleton and offsetted with no heightmap applied
     osp::KeyedVec<planeta::SharedVrtxId, osp::Vector3>  sharedPosNoHeightmap;
@@ -100,8 +103,9 @@ struct BasicChunkMeshGeometry
     osp::KeyedVec<planeta::SharedVrtxId, osp::Vector3>  sharedNormalSum;
 
     /// Offset of vertex positions relative to the skeleton positions they were copied from
-    /// "Chunk Mesh Vertex positions = to_float(skeleton positions + skelOffset)"
-    osp::Vector3l skelOffset{osp::ZeroInit};
+    /// "Chunk Mesh Vertex positions = to_float(skeleton positions + skelOffset)". This is intended
+    /// to move the mesh's origin closer to the viewer, preventing floating point imprecision.
+    osp::Vector3l originSkelPos{osp::ZeroInit};
 };
 
 /**
@@ -209,8 +213,9 @@ struct TerrainFaceWriter
         selectedFaceNormal = Magnum::Math::cross(u, v).normalized();
     }
 
-    osp::ArrayView<osp::Vector3 const>  vbufPos;
-    osp::ArrayView<osp::Vector3>        vbufNrm;
+    osp::BufAttribFormat<osp::Vector3>::ViewConst_t vbufPos;
+    osp::BufAttribFormat<osp::Vector3>::View_t      vbufNrm;
+
     osp::ArrayView<osp::Vector3>        sharedNormalSum;
     osp::ArrayView<osp::Vector3>        fillNormalContrib;
     osp::ArrayView<FanNormalContrib>    fanNormalContrib;

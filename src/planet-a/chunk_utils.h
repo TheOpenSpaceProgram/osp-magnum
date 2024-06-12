@@ -79,13 +79,16 @@ struct ChunkMeshBufferInfo
     /// Max total faces per chunk. fillFaceCount + fanMaxFaceCount
     std::uint32_t chunkMaxFaceCount;
 
+    /// Total number of faces
+    std::uint32_t faceTotal;
+
     /// Index of first fill vertex within in vertex buffer
     std::uint32_t vbufFillOffset;
     /// Index of first shared vertex within in vertex buffer
     std::uint32_t vbufSharedOffset;
 
-    /// Total size of vertex buffer
-    std::uint32_t vbufSize;
+    /// Total number of vertices
+    std::uint32_t vrtxTotal;
 };
 
 constexpr ChunkMeshBufferInfo make_chunk_mesh_buffer_info(ChunkSkeleton const &skChunks)
@@ -99,6 +102,7 @@ constexpr ChunkMeshBufferInfo make_chunk_mesh_buffer_info(ChunkSkeleton const &s
     std::uint32_t const fanFaceCount      = ChunkMeshBufferInfo::smc_fanFacesVsSubdivLevel[skChunks.m_chunkSubdivLevel];
     std::uint32_t const fillFaceCount     = chunkWidth*chunkWidth - fanFaceCount;
     std::uint32_t const fanMaxFaceCount   = fanFaceCount + fanFaceCount/3 + 1;
+    std::uint32_t const chunkMaxFaceCount = fillFaceCount + fanMaxFaceCount;
     std::uint32_t const fanMaxSharedCount = fanMaxFaceCount + 4;
 
     return
@@ -107,10 +111,11 @@ constexpr ChunkMeshBufferInfo make_chunk_mesh_buffer_info(ChunkSkeleton const &s
         .fillFaceCount       = fillFaceCount,
         .fanMaxFaceCount     = fanMaxFaceCount,
         .fanMaxSharedCount   = fanMaxSharedCount,
-        .chunkMaxFaceCount   = fillFaceCount + fanMaxFaceCount,
+        .chunkMaxFaceCount   = chunkMaxFaceCount,
+        .faceTotal           = maxChunks * chunkMaxFaceCount,
         .vbufFillOffset      = 0,
         .vbufSharedOffset    = fillTotal,
-        .vbufSize            = std::uint32_t(fillTotal + maxSharedVrtx)
+        .vrtxTotal           = std::uint32_t(fillTotal + maxSharedVrtx)
     };
 }
 

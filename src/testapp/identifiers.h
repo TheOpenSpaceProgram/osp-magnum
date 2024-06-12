@@ -426,21 +426,6 @@ struct PlCameraCtrl
 };
 
 
-#define TESTAPP_DATA_SHADER_VISUALIZER 1, \
-    idDrawShVisual
-
-
-
-#define TESTAPP_DATA_SHADER_PHONG 1, \
-    idDrawShPhong
-
-
-
-#define TESTAPP_DATA_SHADER_FLAT 1, \
-    idDrawShFlat
-
-
-
 #define TESTAPP_DATA_INDICATOR 1, \
     idIndicator
 

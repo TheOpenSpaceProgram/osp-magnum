@@ -82,6 +82,8 @@ struct SkeletonSubdivScratchpad
     OnUnsubdivideFunc_t onUnsubdiv  {nullptr};
     UserData_t onUnsubdivUserData   {{nullptr, nullptr, nullptr, nullptr}};
 
+    osp::Vector3l viewerPosition;
+
     std::uint32_t distanceCheckCount{};
 };
 

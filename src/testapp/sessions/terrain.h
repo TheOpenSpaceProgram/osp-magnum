@@ -27,8 +27,8 @@
 #include "../scenarios.h"
 #include "planet-a/chunk_utils.h"
 
+#include <osp/drawing/drawing.h>
 #include <osp/core/math_types.h>
-#include <osp/drawing/draw_ent.h>
 
 #include <planet-a/skeleton.h>
 #include <planet-a/skeleton_subdiv.h>
@@ -45,6 +45,7 @@ namespace testapp::scenes
  */
 struct ACtxTerrainFrame
 {
+    /// Position of scene's (0, 0, 0) origin point from the terrain's frame of reference.
     osp::Vector3l       position;
     osp::Quaterniond    rotation;
     bool                active      {false};
@@ -63,6 +64,8 @@ struct ACtxTerrain
 
     planeta::ChunkScratchpad            chunkSP;
     planeta::SkeletonSubdivScratchpad   scratchpad;
+
+    osp::draw::MeshIdOwner_t            terrainMesh;
 };
 
 struct ACtxTerrainIco
@@ -85,7 +88,8 @@ struct ACtxTerrainIco
 osp::Session setup_terrain(
         osp::TopTaskBuilder         &rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session          const &scene);
+        osp::Session          const &scene,
+        osp::Session          const &commonScene);
 
 /**
  * @brief Icosahedron-specific data for spherical planet terrains

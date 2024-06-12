@@ -303,7 +303,7 @@ static ScenarioMap_t make_scenarios()
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
         #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, terrain, terrainIco, terrainSubdiv
-        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, terrainDraw
+        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor, terrainDraw, terrainDrawGL
 
         using namespace testapp::scenes;
 
@@ -319,17 +319,24 @@ static ScenarioMap_t make_scenarios()
         commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
         physics         = setup_physics             (builder, rTopData, scene, commonScene);
         physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
-        terrain         = setup_terrain             (builder, rTopData, scene);
+        terrain         = setup_terrain             (builder, rTopData, scene, commonScene);
         terrainIco      = setup_terrain_icosahedron (builder, rTopData, terrain);
         terrainSubdiv   = setup_terrain_subdiv_dist (builder, rTopData, scene, terrain, terrainIco);
 
         initialize_ico_terrain(rTopData, terrain, terrainIco, {
-            .radius                 = 50.0,
-            .height                 = 5.0,
+            .radius                 = 12000000.0,
+            .height                 = 10000.0,
             .skelPrecision          = 10, // 2^10 units = 1024 units = 1 meter
-            .skelMaxSubdivLevels    = 7,
+            .skelMaxSubdivLevels    = 19,
             .chunkSubdivLevels      = 4
         });
+
+        OSP_DECLARE_GET_DATA_IDS(terrain,    TESTAPP_DATA_TERRAIN);
+        auto &rTerrain = top_get<ACtxTerrain>(rTopData, idTerrain);
+        auto &rTerrainFrame = top_get<ACtxTerrainFrame>(rTopData, idTerrainFrame);
+
+        //rTerrain.chunkGeom.originSkelPos = Vector3l{0,0,6000000} * 1024;
+        rTerrainFrame.position = Vector3l{0,0,12000000} * 1024;
 
         RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp) -> void
         {
@@ -342,7 +349,7 @@ static ScenarioMap_t make_scenarios()
             TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
 
             auto & [SCENE_SESSIONS] = unpack<7>(rTestApp.m_scene.m_sessions);
-            auto & [RENDERER_SESSIONS] = resize_then_unpack<11>(rTestApp.m_renderer.m_sessions);
+            auto & [RENDERER_SESSIONS] = resize_then_unpack<12>(rTestApp.m_renderer.m_sessions);
 
             sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
             create_materials(rTopData, sceneRenderer, sc_materialCount);
@@ -355,12 +362,13 @@ static ScenarioMap_t make_scenarios()
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
             shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
-            terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matFlat);
+            terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matVisualizer);
+            terrainDrawGL   = setup_terrain_draw_magnum (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, terrain);
 
-            OSP_DECLARE_GET_DATA_IDS(cameraCtrl,   TESTAPP_DATA_CAMERA_CTRL);
+            OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
 
             auto &rCamCtrl = top_get<ACtxCameraController>(rTopData, idCamCtrl);
-            rCamCtrl.m_target = Vector3(0.0f, 0.0f, 50.0f);
+            rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
             rCamCtrl.m_orbitDistanceMin = 1.0f;
             rCamCtrl.m_moveSpeed = 0.5f;
 

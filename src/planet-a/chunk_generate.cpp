@@ -31,6 +31,7 @@
 using osp::ArrayView;
 using osp::Vector3;
 using osp::Vector3u;
+using osp::Vector3l;
 using osp::ZeroInit;
 using osp::arrayView;
 using osp::as_2d;
@@ -41,9 +42,12 @@ namespace planeta
 void ChunkScratchpad::resize(ChunkSkeleton const& rChSk)
 {
     auto const maxSharedVrtx = rChSk.m_sharedIds.capacity();
+    auto const maxChunks     = rChSk.m_chunkIds.capacity();
 
     edgeVertices        .resize((rChSk.m_chunkEdgeVrtxCount - 1) * 3);
-    stitchCmds          .resize(rChSk.m_chunkIds.capacity(), {});
+    stitchCmds          .resize(maxChunks, {});
+    chunksAdded         .resize(maxChunks);
+    chunksRemoved       .resize(maxChunks);
     sharedAdded         .resize(maxSharedVrtx);
     sharedRemoved       .resize(maxSharedVrtx);
     sharedNormalsDirty  .resize(maxSharedVrtx);
@@ -194,14 +198,15 @@ void update_faces(
         return; // Nothing to do
     }
 
-    auto const ibufSlice         = as_2d(arrayView(rGeom.chunkIbuf),              rChInfo.chunkMaxFaceCount).row(chunkId.value);
-    auto const fanNormalContrib  = as_2d(arrayView(rGeom.chunkFanNormalContrib),  rChInfo.fanMaxSharedCount).row(chunkId.value);
-    auto const fillNormalContrib = as_2d(arrayView(rGeom.chunkFillSharedNormals), rSkCh.m_chunkSharedCount) .row(chunkId.value);
+    auto const vbufNormalsView   = rGeom.vbufNormals.view(rGeom.vrtxBuffer, rChInfo.vrtxTotal);
+    auto const ibufSlice         = as_2d(rGeom.indxBuffer,             rChInfo.chunkMaxFaceCount).row(chunkId.value);
+    auto const fanNormalContrib  = as_2d(rGeom.chunkFanNormalContrib,  rChInfo.fanMaxSharedCount).row(chunkId.value);
+    auto const fillNormalContrib = as_2d(rGeom.chunkFillSharedNormals, rSkCh.m_chunkSharedCount) .row(chunkId.value);
     auto const sharedUsed        = rSkCh.shared_vertices_used(chunkId);
 
     TerrainFaceWriter writer{
-        .vbufPos             = rGeom.chunkVbufPos,
-        .vbufNrm             = rGeom.chunkVbufNrm,
+        .vbufPos             = rGeom.vbufPositions.view_const(rGeom.vrtxBuffer, rChInfo.vrtxTotal),
+        .vbufNrm             = vbufNormalsView,
         .sharedNormalSum     = rGeom.sharedNormalSum.base(),
         .fillNormalContrib   = fillNormalContrib,
         .fanNormalContrib    = fanNormalContrib,
@@ -215,7 +220,7 @@ void update_faces(
     if (newlyAdded)
     {
         // Reset fill normals to zero, as values are left over from a previously deleted chunk
-        auto const chunkVbufFillNormals2D = as_2d(arrayView(rGeom.chunkVbufNrm).exceptPrefix(rChInfo.vbufFillOffset), rChInfo.fillVrtxCount);
+        auto const chunkVbufFillNormals2D = as_2d(vbufNormalsView.exceptPrefix(rChInfo.vbufFillOffset), rChInfo.fillVrtxCount);
         auto const vbufFillNormals        = chunkVbufFillNormals2D.row(chunkId.value);
 
         // These aren't cleaned up by the previous chunk that used them
@@ -375,9 +380,11 @@ void debug_check_invariants(
         ChunkMeshBufferInfo           const &rChInfo,
         ChunkSkeleton                 const &rSkCh)
 {
+    auto const vbufNormalsView = rGeom.vbufNormals.view_const(rGeom.vrtxBuffer, rChInfo.vrtxTotal);
+
     auto const check_vertex = [&] (VertexIdx vertex, SharedVrtxId sharedId, ChunkId chunkId)
     {
-        osp::Vector3 const normal = rGeom.chunkVbufNrm[vertex];
+        osp::Vector3 const normal = vbufNormalsView[vertex];
         float   const length = normal.length();
 
         LGRN_ASSERTMV(std::abs(length - 1.0f) < 0.05f, "Normal isn't normalized", length, vertex, sharedId.value, chunkId.value);
@@ -406,8 +413,12 @@ void write_obj(
         ChunkMeshBufferInfo           const &rChInfo,
         ChunkSkeleton                 const &rSkCh)
 {
-    auto const chunkCount = rSkCh.m_chunkIds.size();
+    auto const chunkCount  = rSkCh.m_chunkIds.size();
     auto const sharedCount = rSkCh.m_sharedIds.size();
+
+    auto const vbufPosView = rGeom.vbufPositions.view_const(rGeom.vrtxBuffer, rChInfo.vrtxTotal);
+    auto const vbufNrmView = rGeom.vbufNormals  .view_const(rGeom.vrtxBuffer, rChInfo.vrtxTotal);
+
 
     rStream << "# Terrain mesh debug output\n"
             << "# Chunks: "          << chunkCount  << "/" << rSkCh.m_chunkIds.capacity() << "\n"
@@ -415,19 +426,19 @@ void write_obj(
 
     rStream << "o Planet\n";
 
-    for (osp::Vector3 v : rGeom.chunkVbufPos)
+    for (osp::Vector3 v : vbufPosView)
     {
         rStream << "v " << v.x() << " " << v.y() << " "  << v.z() << "\n";
     }
 
-    for (osp::Vector3 v : rGeom.chunkVbufNrm)
+    for (osp::Vector3 v : vbufNrmView)
     {
         rStream << "vn " << v.x() << " " << v.y() << " "  << v.z() << "\n";
     }
 
     for (std::size_t const chunkIdInt : rSkCh.m_chunkIds.bitview().zeros())
     {
-        auto const view = osp::as_2d(osp::arrayView(rGeom.chunkIbuf), rChInfo.chunkMaxFaceCount).row(chunkIdInt);
+        auto const view = osp::as_2d(rGeom.indxBuffer, rChInfo.chunkMaxFaceCount).row(chunkIdInt);
 
         for (osp::Vector3u const faceIdx : view)
         {
