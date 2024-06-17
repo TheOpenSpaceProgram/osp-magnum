@@ -298,7 +298,13 @@ Session setup_terrain_subdiv_dist(
             vbufPosView[vbufVertex]                   = posOut + radialDir * heightmap(skPos);
         };
 
-        if (true || rChGeo.originSkelPos == rTerrainFrame.position)
+        // TODO: Limit rChGeo.originSkelPos to always be near the surface. There isn't a point in
+        //       translating the mesh when moving away from the terrain.
+        //       Also add a threshold to only translate if the two positions diverge too far. Vary
+        //       the threshold by the maximum present subdivision level, so less translations are
+        //       needed when moving across low-detail terrain.
+
+        if (rChGeo.originSkelPos == rTerrainFrame.position)
         {
             // Copy offsetted positions from the skeleton for newly added shared vertices
 
