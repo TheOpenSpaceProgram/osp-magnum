@@ -314,6 +314,7 @@ struct PlTerrain
 {
     PipelineDef<EStgCont> skeleton          {"skeleton"};
     PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
+    PipelineDef<EStgCont> chunkMesh         {"chunkMesh"};
     PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
 };
 

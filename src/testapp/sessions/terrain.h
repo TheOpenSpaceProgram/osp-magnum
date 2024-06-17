@@ -38,7 +38,7 @@ namespace testapp::scenes
 {
 
 /**
- * @brief Scene orientation relative to planet center
+ * @brief Scene orientation relative to terrain
  *
  * This is intended to be modified by a system responsible for handling floating origin and
  * the Scene's position within a universe.
@@ -70,10 +70,10 @@ struct ACtxTerrain
 
 struct ACtxTerrainIco
 {
-    /// Planet lowest ground level in meters
+    /// Planet lowest ground level in meters. Lowest valley.
     double  radius{};
 
-    /// Planet max ground height in meters
+    /// Planet max ground height in meters. Highest mountain.
     double  height{};
 
     std::array<planeta::SkVrtxId,     12>   icoVrtx;
@@ -121,7 +121,7 @@ struct TerrainTestPlanetSpecs
     /// Skeleton Vector3l precision (2^precision units = 1 meter)
     int             skelPrecision       {};
 
-    /// Skeleton max subdivision levels. 0 for no subdivision. Max is 9.
+    /// Skeleton max subdivision levels. 0 for no subdivision. Max is 23.
     std::uint8_t    skelMaxSubdivLevels {};
 
     /// Number of times an initial triangle is subdivided to form a chunk.
@@ -147,6 +147,7 @@ osp::Session setup_terrain_debug_draw(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
         osp::Session          const &windowApp,
+        osp::Session          const &scene,
         osp::Session          const &sceneRenderer,
         osp::Session          const &cameraCtrl,
         osp::Session          const &commonScene,

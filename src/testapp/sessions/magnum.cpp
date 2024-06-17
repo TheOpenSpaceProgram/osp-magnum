@@ -575,6 +575,7 @@ Session setup_terrain_draw_magnum(
     auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
     auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
     auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
+    auto const tgTrn    = terrain       .get_pipelines<PlTerrain>();
 
     auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
     auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
@@ -586,10 +587,9 @@ Session setup_terrain_draw_magnum(
 
     rDrawTerrainGl.terrainMeshGl = rRenderGl.m_meshIds.create();
     rRenderGl.m_meshGl.emplace(rDrawTerrainGl.terrainMeshGl, Magnum::GL::Mesh{Corrade::NoCreate});
-    //rDrawTerrain.drawEnt = rScnRender.m_drawIds.create();
 
     rBuilder.task()
-        .name       ("Sync GL meshes to entities with scene meshes")
+        .name       ("Sync terrainMeshGl to entities with terrainMesh")
         .run_on     ({tgScnRdr.entMeshDirty(UseOrRun)})
         .sync_with  ({tgScnRdr.mesh(Ready), tgScnRdr.entMesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
@@ -601,12 +601,17 @@ Session setup_terrain_draw_magnum(
             ACompMeshGl         &rEntMeshGl   = rScnRenderGl.m_meshId[drawEnt];
             MeshIdOwner_t const &entMeshScnId = rScnRender.m_mesh[drawEnt];
 
-
+            if (entMeshScnId == rTerrain.terrainMesh)
+            {
+                rScnRenderGl.m_meshId[drawEnt] = ACompMeshGl{
+                        .m_scnId = rTerrain.terrainMesh,
+                        .m_glId  = rDrawTerrainGl.terrainMeshGl };
+            }
         }
     });
 
     rBuilder.task()
-        .name       ("Resync GL meshes")
+        .name       ("Resync terrainMeshGl to entities with terrainMesh")
         .run_on     ({tgWin.resync(Run)})
         .sync_with  ({tgScnRdr.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
@@ -627,9 +632,9 @@ Session setup_terrain_draw_magnum(
     });
 
     rBuilder.task()
-        .name       ("patatas")
+        .name       ("Update terrain mesh GPU buffer data")
         .run_on     ({tgWin.sync(Run)})
-        .sync_with  ({})
+        .sync_with  ({tgTrn.chunkMesh(Ready)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,          idRenderGl,                   idDrawTerrainGl,            idTerrain})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, RenderGL& rRenderGl, ACtxDrawTerrainGL& rDrawTerrainGl, ACtxTerrain& rTerrain) noexcept
@@ -657,6 +662,8 @@ Session setup_terrain_draw_magnum(
         auto const indxBuffer = Corrade::Containers::arrayCast<unsigned char const>(rTerrain.chunkGeom.indxBuffer);
         auto const vrtxBuffer = arrayView<unsigned char const>(rTerrain.chunkGeom.vrtxBuffer);
 
+        // There's faster ways to sync the buffer, but keeping it simple for now
+
         // see "Buffer re-specification" in
         // https://www.khronos.org/opengl/wiki/Buffer_Object_Streaming
 
@@ -665,12 +672,9 @@ Session setup_terrain_draw_magnum(
 
         rDrawTerrainGl.vrtxBufGL.setData({nullptr, vrtxBuffer.size()});
         rDrawTerrainGl.vrtxBufGL.setData(vrtxBuffer);
-
-        //rDrawTerrain.indxBufGL.setData(rTerrain.chunkGeom.);
-        //rTerrain.chunkGeom.
     });
 
     return out;
-} // setup_shader_phong
+} // setup_terrain_draw_magnum
 
 } // namespace testapp::scenes
