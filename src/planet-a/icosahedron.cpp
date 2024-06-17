@@ -190,6 +190,10 @@ void ico_calc_sphere_tri_center(
     using osp::math::int_2pow;
 
     SkTriGroup const &group = rSkel.tri_group_at(groupId);
+    LGRN_ASSERT(group.depth < gc_icoTowerOverHorizonVsLevel.size());
+
+    double const terrainMaxHeight = height + maxRadius * gc_icoTowerOverHorizonVsLevel[group.depth];
+    int    const scale            = int_2pow<int>(rSkData.precision);
 
     for (int i = 0; i < 4; ++i)
     {
@@ -200,24 +204,19 @@ void ico_calc_sphere_tri_center(
         SkVrtxId const vb = tri.vertices[1].value();
         SkVrtxId const vc = tri.vertices[2].value();
 
-        // average without overflow
-        osp::Vector3l const posAvg = rSkData.positions[va] / 3
-                                   + rSkData.positions[vb] / 3
-                                   + rSkData.positions[vc] / 3;
+        // Divide components individually to prevent potential overflow
+        osp::Vector3l const posAverage = rSkData.positions[va] / 3
+                                       + rSkData.positions[vb] / 3
+                                       + rSkData.positions[vc] / 3;
 
-        osp::Vector3  const nrmSum = rSkData.normals[va]
-                                   + rSkData.normals[vb]
-                                   + rSkData.normals[vc];
+        osp::Vector3  const nrmAverage = (  rSkData.normals[va]
+                                          + rSkData.normals[vb]
+                                          + rSkData.normals[vc]) / 3.0;
 
-        LGRN_ASSERT(group.depth < gc_icoTowerOverHorizonVsLevel.size());
-        float const terrainMaxHeight = height + maxRadius * gc_icoTowerOverHorizonVsLevel[group.depth];
 
-        // 0.5 * terrainMaxHeight           : halve for middle
-        // int_2pow<int>(rTerrain.scale)    : Vector3l conversion factor
-        // / 3.0f                           : average from sum of 3 values
-        osp::Vector3l const riseToMid = osp::Vector3l(nrmSum * (0.5f * terrainMaxHeight * osp::math::int_2pow<int>(rSkData.precision) / 3.0f));
+        osp::Vector3l const highestPoint = osp::Vector3l(nrmAverage * terrainMaxHeight * scale);
 
-        rSkData.centers[sktriId] = posAvg + riseToMid;
+        rSkData.centers[sktriId] = posAverage + highestPoint;
     }
 }
 

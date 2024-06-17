@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "magnum.h"
+#include "terrain.h"
 #include "common.h"
 
 #include "../MagnumApplication.h"
@@ -42,6 +43,7 @@
 
 #include <adera/machines/links.h>
 
+#include <planet-a/geometry.h>
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -139,7 +141,7 @@ Session setup_magnum_scene(
 
     auto &rCamera = top_emplace< Camera >(topData, idCamera);
 
-    rCamera.m_far = 1u << 24;
+    rCamera.m_far = 100000000.0f;
     rCamera.m_near = 1.0f;
     rCamera.m_fov = Magnum::Deg(45.0f);
 
@@ -328,7 +330,7 @@ Session setup_shader_visualizer(
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_VISUALIZER)
+    auto const [idDrawShVisual] = out.acquire_data<1>(topData);
 
     auto &rDrawVisual = top_emplace< ACtxDrawMeshVisualizer >(topData, idDrawShVisual);
 
@@ -399,7 +401,8 @@ Session setup_shader_flat(
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_FLAT)
+    auto const [idDrawShFlat] = out.acquire_data<1>(topData);
+
     auto &rDrawFlat = top_emplace< ACtxDrawFlat >(topData, idDrawShFlat);
 
     rDrawFlat.shaderDiffuse       = FlatGL3D{FlatGL3D::Configuration{}.setFlags(FlatGL3D::Flag::Textured)};
@@ -484,7 +487,7 @@ Session setup_shader_phong(
     auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SHADER_PHONG)
+    auto const [idDrawShPhong] = out.acquire_data<1>(topData);
     auto &rDrawPhong = top_emplace< ACtxDrawPhong >(topData, idDrawShPhong);
 
     auto const texturedFlags    = PhongGL::Flag::DiffuseTexture | PhongGL::Flag::AlphaMask | PhongGL::Flag::AmbientTexture;
@@ -545,5 +548,133 @@ Session setup_shader_phong(
     return out;
 } // setup_shader_phong
 
+
+
+
+struct ACtxDrawTerrainGL
+{
+    Magnum::GL::Buffer  vrtxBufGL{Corrade::NoCreate};
+    Magnum::GL::Buffer  indxBufGL{Corrade::NoCreate};
+    MeshGlId            terrainMeshGl;
+    bool                enabled{false};
+};
+
+Session setup_terrain_draw_magnum(
+        TopTaskBuilder              &rBuilder,
+        ArrayView<entt::any>  const topData,
+        Session               const &windowApp,
+        Session               const &sceneRenderer,
+        Session               const &magnum,
+        Session               const &magnumScene,
+        Session               const &terrain)
+{
+    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
+    OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
+    OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
+    OSP_DECLARE_GET_DATA_IDS(terrain,       TESTAPP_DATA_TERRAIN);
+    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
+    auto const tgTrn    = terrain       .get_pipelines<PlTerrain>();
+
+    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
+    auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
+
+    Session out;
+    auto const [idDrawTerrainGl] = out.acquire_data<1>(topData);
+    auto &rDrawTerrainGl = top_emplace< ACtxDrawTerrainGL >(topData, idDrawTerrainGl);
+
+    rDrawTerrainGl.terrainMeshGl = rRenderGl.m_meshIds.create();
+    rRenderGl.m_meshGl.emplace(rDrawTerrainGl.terrainMeshGl, Magnum::GL::Mesh{Corrade::NoCreate});
+
+    rBuilder.task()
+        .name       ("Sync terrainMeshGl to entities with terrainMesh")
+        .run_on     ({tgScnRdr.entMeshDirty(UseOrRun)})
+        .sync_with  ({tgScnRdr.mesh(Ready), tgScnRdr.entMesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({              idDrawTerrainGl,             idTerrain,      idScnRender,                   idScnRenderGl,          idRenderGl })
+        .func([] (ACtxDrawTerrainGL& rDrawTerrainGl, ACtxTerrain& rTerrain, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
+    {
+        for (DrawEnt const drawEnt : rScnRender.m_meshDirty)
+        {
+            ACompMeshGl         &rEntMeshGl   = rScnRenderGl.m_meshId[drawEnt];
+            MeshIdOwner_t const &entMeshScnId = rScnRender.m_mesh[drawEnt];
+
+            if (entMeshScnId == rTerrain.terrainMesh)
+            {
+                rScnRenderGl.m_meshId[drawEnt] = ACompMeshGl{
+                        .m_scnId = rTerrain.terrainMesh,
+                        .m_glId  = rDrawTerrainGl.terrainMeshGl };
+            }
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Resync terrainMeshGl to entities with terrainMesh")
+        .run_on     ({tgWin.resync(Run)})
+        .sync_with  ({tgScnRdr.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({              idDrawTerrainGl,             idTerrain,                 idScnRender,              idScnRenderGl,          idRenderGl })
+        .func([] (ACtxDrawTerrainGL& rDrawTerrainGl, ACtxTerrain& rTerrain, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
+    {
+        for (DrawEnt const drawEnt : rScnRender.m_drawIds)
+        {
+            MeshIdOwner_t const &entMeshScnId = rScnRender.m_mesh[drawEnt];
+
+            if (entMeshScnId == rTerrain.terrainMesh)
+            {
+                rScnRenderGl.m_meshId[drawEnt] = ACompMeshGl{
+                        .m_scnId = rTerrain.terrainMesh,
+                        .m_glId  = rDrawTerrainGl.terrainMeshGl };
+            }
+        }
+    });
+
+    rBuilder.task()
+        .name       ("Update terrain mesh GPU buffer data")
+        .run_on     ({tgWin.sync(Run)})
+        .sync_with  ({tgTrn.chunkMesh(Ready)})
+        .push_to    (out.m_tasks)
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,          idRenderGl,                   idDrawTerrainGl,            idTerrain})
+        .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, RenderGL& rRenderGl, ACtxDrawTerrainGL& rDrawTerrainGl, ACtxTerrain& rTerrain) noexcept
+    {
+        if ( ! rDrawTerrainGl.enabled )
+        {
+            rDrawTerrainGl.enabled = true;
+
+            rDrawTerrainGl.indxBufGL = Magnum::GL::Buffer{};
+            rDrawTerrainGl.vrtxBufGL = Magnum::GL::Buffer{};
+
+            Magnum::GL::Mesh &rMesh = rRenderGl.m_meshGl.get(rDrawTerrainGl.terrainMeshGl);
+
+            rMesh = Mesh{Magnum::GL::MeshPrimitive::Triangles};
+
+            auto const &posFormat = rTerrain.chunkGeom.vbufPositions;
+            auto const &nrmFormat = rTerrain.chunkGeom.vbufNormals;
+
+            rMesh.addVertexBuffer(rDrawTerrainGl.vrtxBufGL, posFormat.offset, posFormat.stride - sizeof(Vector3u), Magnum::Shaders::GenericGL3D::Position{})
+                 .addVertexBuffer(rDrawTerrainGl.vrtxBufGL, nrmFormat.offset, nrmFormat.stride - sizeof(Vector3u), Magnum::Shaders::GenericGL3D::Normal{})
+                 .setIndexBuffer(rDrawTerrainGl.indxBufGL, 0, Magnum::MeshIndexType::UnsignedInt)
+                 .setCount(3*rTerrain.chunkInfo.faceTotal); // 3 vertices in each triangle
+        }
+
+        auto const indxBuffer = Corrade::Containers::arrayCast<unsigned char const>(rTerrain.chunkGeom.indxBuffer);
+        auto const vrtxBuffer = arrayView<unsigned char const>(rTerrain.chunkGeom.vrtxBuffer);
+
+        // There's faster ways to sync the buffer, but keeping it simple for now
+
+        // see "Buffer re-specification" in
+        // https://www.khronos.org/opengl/wiki/Buffer_Object_Streaming
+
+        rDrawTerrainGl.indxBufGL.setData({nullptr, indxBuffer.size()});
+        rDrawTerrainGl.indxBufGL.setData(indxBuffer);
+
+        rDrawTerrainGl.vrtxBufGL.setData({nullptr, vrtxBuffer.size()});
+        rDrawTerrainGl.vrtxBufGL.setData(vrtxBuffer);
+    });
+
+    return out;
+} // setup_terrain_draw_magnum
 
 } // namespace testapp::scenes

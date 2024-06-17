@@ -46,7 +46,7 @@
 namespace planeta
 {
 
-inline constexpr std::size_t gc_maxSubdivLevels = 10;
+inline constexpr std::size_t gc_maxSubdivLevels = 24;
 
 struct SkeletonTriangle
 {
