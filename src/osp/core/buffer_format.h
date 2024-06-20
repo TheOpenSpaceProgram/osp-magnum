@@ -90,7 +90,7 @@ public:
     }
 
     /**
-     * @brief Insert interleved attribute data
+     * @brief Insert interleaved attribute data
      *
      * To make the buffer format [XYZXYZXYZXYZ...] for example, use:
      *
@@ -104,13 +104,13 @@ public:
      * @param count [in] Number of elements
      */
     template <typename ... T>
-    constexpr void insert_interleave(std::size_t count, BufAttribFormat<T>& ... rInterleve)
+    constexpr void insert_interleave(std::size_t count, BufAttribFormat<T>& ... rInterleave)
     {
         constexpr std::size_t stride = (sizeof(T) + ...);
 
-        (rInterleve.m_stride = ... = stride);
+        (rInterleave.m_stride = ... = stride);
 
-        interleave_aux(m_totalSize, rInterleve ...);
+        interleave_aux(m_totalSize, rInterleave ...);
 
         m_totalSize += stride * count;
     }
@@ -123,13 +123,13 @@ public:
 private:
 
     template <typename FIRST_T, typename ... T>
-    constexpr void interleave_aux(std::size_t const pos, BufAttribFormat<FIRST_T>& rInterleveFirst, BufAttribFormat<T>& ... rInterleve)
+    constexpr void interleave_aux(std::size_t const pos, BufAttribFormat<FIRST_T>& rInterleaveFirst, BufAttribFormat<T>& ... rInterleave)
     {
-        rInterleveFirst.m_offset = pos;
+        rInterleaveFirst.m_offset = pos;
 
         if constexpr (sizeof...(T) != 0)
         {
-            interleave_aux(pos + sizeof(FIRST_T), rInterleve ...);
+            interleave_aux(pos + sizeof(FIRST_T), rInterleave ...);
         }
     }
 

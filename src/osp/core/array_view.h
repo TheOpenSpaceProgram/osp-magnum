@@ -27,6 +27,7 @@
 // IWYU pragma: begin_exports
 #include <Corrade/Containers/ArrayView.h>
 #include <Corrade/Containers/StridedArrayView.h>
+#include <Corrade/Containers/StridedArrayViewStl.h>
 // IWYU pragma: end_exports
 
 #include <iterator>

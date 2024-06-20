@@ -26,6 +26,7 @@
 
 #include "FullscreenTriShader.h"
 
+#include "../core/strong_id.h"
 #include "../drawing/drawing_fn.h"
 
 #include <Magnum/GL/Mesh.h>
@@ -41,8 +42,8 @@
 namespace osp::draw
 {
 
-enum class TexGlId : uint32_t { };
-enum class MeshGlId : uint32_t { };
+using TexGlId  = osp::StrongId<std::uint32_t, struct DummyForTexGLId>;
+using MeshGlId = osp::StrongId<std::uint32_t, struct DummyForMeshGlId>;
 
 using TexGlStorage_t    = Storage_t<TexGlId, Magnum::GL::Texture2D>;
 using MeshGlStorage_t   = Storage_t<MeshGlId, Magnum::GL::Mesh>;
