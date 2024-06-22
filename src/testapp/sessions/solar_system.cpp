@@ -379,8 +379,7 @@ Session setup_solar_system_planets_draw(
         CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
 
         rPlanetDraw.drawEnts.resize(rMainSpace.m_satCount, lgrn::id_null<DrawEnt>());
-
-        rScnRender.m_drawIds.create(rPlanetDraw.drawEnts   .begin(), rPlanetDraw.drawEnts   .end());
+        rScnRender.m_drawIds.create(rPlanetDraw.drawEnts.begin(), rPlanetDraw.drawEnts.end());
     });
 
     rBuilder.task()
@@ -396,7 +395,6 @@ Session setup_solar_system_planets_draw(
         Material &rMatPlanet = rScnRender.m_materials[rPlanetDraw.matPlanets];
 
         MeshId const sphereMeshId = rNMesh.m_shapeToMesh.at(EShape::Sphere);
-        MeshId const cubeMeshId   = rNMesh.m_shapeToMesh.at(EShape::Box);
 
         for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
         {
@@ -404,9 +402,9 @@ Session setup_solar_system_planets_draw(
 
             rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
             rScnRender.m_meshDirty.push_back(drawEnt);
-            rScnRender.m_visible.set(std::size_t(drawEnt));
-            rScnRender.m_opaque.set(std::size_t(drawEnt));
-            rMatPlanet.m_ents.set(std::size_t(drawEnt));
+            rScnRender.m_visible.insert(drawEnt);
+            rScnRender.m_opaque.insert(drawEnt);
+            rMatPlanet.m_ents.insert(drawEnt);
             rMatPlanet.m_dirty.push_back(drawEnt);
         }
 
