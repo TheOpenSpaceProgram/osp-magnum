@@ -266,13 +266,6 @@ Session setup_solar_system_testplanets(
 
         auto const nBodyView = rCoordNBody[planetMainSpace].satOrbit.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
-        /*for (std::size_t i = 0; i < rMainSpaceCommon.m_satCount; ++i)
-        {
-            x[i] += vx[i] * scaleDelta;
-            y[i] += vy[i] * scaleDelta;
-            z[i] += vz[i] * scaleDelta;
-        }*/
-
         for (std::size_t i = 0; i < rMainSpaceCommon.m_satCount; ++i) {
             x[i] += vx[i] * scaleDelta;
             y[i] += vy[i] * scaleDelta;
