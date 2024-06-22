@@ -51,13 +51,13 @@ struct ChunkScratchpad
     std::vector<ChunkId> chunksAdded;
 
     /// Recently added shared vertices, position needs to be copied from skeleton
-    osp::BitVector_t sharedAdded;
+    lgrn::IdSetStl<SharedVrtxId> sharedAdded;
 
     /// Recently added shared vertices
-    osp::BitVector_t sharedRemoved;
+    lgrn::IdSetStl<SharedVrtxId> sharedRemoved;
 
     /// Shared vertices that need to recalculate normals
-    osp::BitVector_t sharedNormalsDirty;
+    lgrn::IdSetStl<SharedVrtxId> sharedNormalsDirty;
 };
 
 /**

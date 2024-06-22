@@ -260,7 +260,7 @@ void compound_collect_recurse(
         NewtonCompoundCollisionAddSubCollision(pCompound, rPtr.get());
     }
 
-    if ( ! rCtxPhys.m_hasColliders.test(std::size_t(ent)) )
+    if ( ! rCtxPhys.m_hasColliders.contains(ent) )
     {
         return;
     }
@@ -402,7 +402,7 @@ Session setup_vehicle_spawn_newton(
     {
         LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
 
-        rPhys.m_hasColliders.ints().resize(rBasic.m_activeIds.vec().capacity());
+        rPhys.m_hasColliders.resize(rBasic.m_activeIds.capacity());
 
         auto const& itWeldsFirst        = std::begin(rVehicleSpawn.spawnedWelds);
         auto const& itWeldOffsetsLast   = std::end(rVehicleSpawn.spawnedWeldOffsets);
@@ -424,7 +424,7 @@ Session setup_vehicle_spawn_newton(
                 auto const transform = Matrix4::from(toInit.rotation.toMatrix(), toInit.position);
                 NwtColliderPtr_t pCompound{ NewtonCreateCompoundCollision(rNwt.m_world.get(), 0) };
 
-                rPhys.m_hasColliders.set(std::size_t(weldEnt));
+                rPhys.m_hasColliders.insert(weldEnt);
 
                 // Collect all colliders from hierarchy.
                 NewtonCompoundCollisionBeginAddRemove(pCompound.get());

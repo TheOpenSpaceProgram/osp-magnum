@@ -24,7 +24,6 @@
  */
 #include "skeleton_subdiv.h"
 
-using osp::bitvector_resize;
 using osp::Vector3;
 using osp::Vector3l;
 
@@ -35,11 +34,11 @@ void SkeletonSubdivScratchpad::resize(SubdivTriangleSkeleton &rSkel)
 {
     auto const triCapacity = rSkel.tri_group_ids().capacity() * 4;
 
-    bitvector_resize(this->  distanceTestDone,  triCapacity);
-    bitvector_resize(this->  tryUnsubdiv,       triCapacity);
-    bitvector_resize(this->  cantUnsubdiv,      triCapacity);
-    bitvector_resize(this->  surfaceAdded,      triCapacity);
-    bitvector_resize(this->  surfaceRemoved,    triCapacity);
+    distanceTestDone.resize(triCapacity);
+    tryUnsubdiv     .resize(triCapacity);
+    cantUnsubdiv    .resize(triCapacity);
+    surfaceAdded    .resize(triCapacity);
+    surfaceRemoved  .resize(triCapacity);
 }
 
 void unsubdivide_select_by_distance(
@@ -54,7 +53,7 @@ void unsubdivide_select_by_distance(
 
     auto const maybe_distance_check = [&rSkel, &rSP, &rLvl, &rLvlSP] (SkTriId const sktriId)
     {
-        if (rSP.distanceTestDone.test(sktriId.value))
+        if (rSP.distanceTestDone.contains(sktriId))
         {
             return; // Already checked
         }
@@ -75,15 +74,15 @@ void unsubdivide_select_by_distance(
         }
 
         rLvlSP.distanceTestNext.push_back(sktriId);
-        rSP.distanceTestDone.set(sktriId.value);
+        rSP.distanceTestDone.insert(sktriId);
     };
 
     // Use a floodfill-style algorithm to avoid needing to check every triangle
 
     // Initial seed for floodfill are all subdivided triangles that neighbor a non-subdivided one
-    for (std::size_t const sktriInt : rLvl.hasNonSubdivedNeighbor.ones())
+    for (SkTriId const sktriId : rLvl.hasNonSubdivedNeighbor)
     {
-        maybe_distance_check(SkTriId(sktriInt));
+        maybe_distance_check(sktriId);
     }
 
     while (rLvlSP.distanceTestNext.size() != 0)
@@ -102,7 +101,7 @@ void unsubdivide_select_by_distance(
             if (tooFar)
             {
                 // All checks passed
-                rSP.tryUnsubdiv.set(sktriId.value);
+                rSP.tryUnsubdiv.insert(sktriId);
 
                 // Floodfill by checking neighbors next
                 SkeletonTriangle const& sktri = rSkel.tri_at(sktriId);
@@ -135,8 +134,8 @@ void unsubdivide_deselect_invariant_violations(
             // Pretend neighbor is unsubdivided when it's in tryUnsubdiv, overrided
             // by cantUnsubdiv
             if (rNeighbor.children.has_value()
-                && (  ! rSP.tryUnsubdiv .test(neighbor.value)
-                     || rSP.cantUnsubdiv.test(neighbor.value) ) )
+                && (  ! rSP.tryUnsubdiv .contains(neighbor)
+                     || rSP.cantUnsubdiv.contains(neighbor) ) )
             {
                 // Neighbor is subdivided
                 ++subdivedNeighbors;
@@ -178,22 +177,22 @@ void unsubdivide_deselect_invariant_violations(
 
         if (violates_invariants(sktriId, sktri))
         {
-            rSP.cantUnsubdiv.set(sktriId.value);
+            rSP.cantUnsubdiv.insert(sktriId);
 
             // Recurse into neighbors if they're also tryUnsubdiv
             for (SkTriId const neighbor : sktri.neighbors)
-            if (rSP.tryUnsubdiv.test(neighbor.value) && ! rSP.cantUnsubdiv.test(neighbor.value))
+            if (rSP.tryUnsubdiv.contains(neighbor) && ! rSP.cantUnsubdiv.contains(neighbor))
             {
                 self(self, neighbor);
             }
         }
     };
 
-    for (std::size_t const sktriInt : rSP.tryUnsubdiv.ones())
+    for (SkTriId const sktriId : rSP.tryUnsubdiv)
     {
-        if ( ! rSP.cantUnsubdiv.test(sktriInt) )
+        if ( ! rSP.cantUnsubdiv.contains(sktriId) )
         {
-            check_recurse(check_recurse, SkTriId::from_index(sktriInt));
+            check_recurse(check_recurse, sktriId);
         }
     }
 }
@@ -206,29 +205,27 @@ void unsubdivide_level(
 {
     auto const wont_unsubdivide = [&rSP] (SkTriId const sktriId) -> bool
     {
-        return ( ! rSP.tryUnsubdiv.test(sktriId.value) || rSP.cantUnsubdiv.test(sktriId.value) );
+        return ( ! rSP.tryUnsubdiv.contains(sktriId) || rSP.cantUnsubdiv.contains(sktriId) );
     };
 
     SubdivTriangleSkeleton::Level   &rLvl   = rSkel.levels[lvl];
     SubdivScratchpadLevel           &rLvlSP = rSP  .levels[lvl];
 
-    for (std::size_t const sktriInt : rSP.tryUnsubdiv.ones())
-    if ( ! rSP.cantUnsubdiv.test(sktriInt) )
+    for (SkTriId const sktriId : rSP.tryUnsubdiv)
+    if ( ! rSP.cantUnsubdiv.contains(sktriId) )
     {
         // All checks passed, 100% confirmed sktri will be unsubdivided
-
-        SkTriId const sktriId = SkTriId::from_index(sktriInt);
         SkeletonTriangle &rTri = rSkel.tri_at(sktriId);
 
-        LGRN_ASSERT(!rLvl.hasSubdivedNeighbor.test(sktriInt));
+        LGRN_ASSERT(!rLvl.hasSubdivedNeighbor.contains(sktriId));
         for (SkTriId const neighborId : rTri.neighbors)
         if ( neighborId.has_value() && wont_unsubdivide(neighborId) )
         {
             SkeletonTriangle const& rNeighborTri = rSkel.tri_at(neighborId);
             if ( rNeighborTri.children.has_value() )
             {
-                rLvl.hasNonSubdivedNeighbor.set(neighborId.value);
-                rLvl.hasSubdivedNeighbor.set(sktriInt);
+                rLvl.hasNonSubdivedNeighbor.insert(neighborId);
+                rLvl.hasSubdivedNeighbor.insert(sktriId);
             }
             else
             {
@@ -245,37 +242,37 @@ void unsubdivide_level(
 
                 if (neighborHasSubdivedNeighbor)
                 {
-                    rLvl.hasSubdivedNeighbor.set(neighborId.value);
+                    rLvl.hasSubdivedNeighbor.insert(neighborId);
                 }
                 else
                 {
-                    rLvl.hasSubdivedNeighbor.reset(neighborId.value);
+                    rLvl.hasSubdivedNeighbor.erase(neighborId);
                 }
             }
         }
 
-        rLvl.hasNonSubdivedNeighbor.reset(sktriInt);
+        rLvl.hasNonSubdivedNeighbor.erase(sktriId);
 
-        LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.test(tri_id(rTri.children, 0).value) );
-        LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.test(tri_id(rTri.children, 1).value) );
-        LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.test(tri_id(rTri.children, 2).value) );
-        LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.test(tri_id(rTri.children, 3).value) );
+        LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.contains(tri_id(rTri.children, 0)) );
+        LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.contains(tri_id(rTri.children, 1)) );
+        LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.contains(tri_id(rTri.children, 2)) );
+        LGRN_ASSERT( ! rLvl.hasSubdivedNeighbor.contains(tri_id(rTri.children, 3)) );
 
-        LGRN_ASSERT(!rSP.surfaceAdded.test(sktriInt));
-        rSP.surfaceAdded.set(sktriInt);
+        LGRN_ASSERT(!rSP.surfaceAdded.contains(sktriId));
+        rSP.surfaceAdded.insert(sktriId);
 
         // If child is in surfaceAdded. This means it was just recently unsubdivided.
         // It will be removed right away and is an intermediate step, so don't include it in
         // surfaceAdded or surfaceRemoved.
         auto const check_surface = [&rSP] (SkTriId const child)
         {
-            if (rSP.surfaceAdded.test(child.value))
+            if (rSP.surfaceAdded.contains(child))
             {
-                rSP.surfaceAdded.reset(child.value);
+                rSP.surfaceAdded.erase(child);
             }
             else
             {
-                rSP.surfaceRemoved.set(child.value);
+                rSP.surfaceRemoved.insert(child);
             }
         };
         check_surface(tri_id(rTri.children, 0));
@@ -285,11 +282,11 @@ void unsubdivide_level(
 
         rSP.onUnsubdiv(sktriId, rTri, rSkel, rSkData, rSP.onUnsubdivUserData);
 
-        rSkel.tri_unsubdiv(SkTriId(sktriInt), rTri);
+        rSkel.tri_unsubdiv(sktriId, rTri);
     }
 
-    rSP.tryUnsubdiv.reset();
-    rSP.cantUnsubdiv.reset();
+    rSP.tryUnsubdiv.clear();
+    rSP.cantUnsubdiv.clear();
 }
 
 SkTriGroupId subdivide(
@@ -336,30 +333,30 @@ SkTriGroupId subdivide(
             tri_id(groupId, 2),
             tri_id(groupId, 3),
         });
-        rSP.distanceTestDone.set(tri_id(groupId, 0).value);
-        rSP.distanceTestDone.set(tri_id(groupId, 1).value);
-        rSP.distanceTestDone.set(tri_id(groupId, 2).value);
-        rSP.distanceTestDone.set(tri_id(groupId, 3).value);
+        rSP.distanceTestDone.insert(tri_id(groupId, 0));
+        rSP.distanceTestDone.insert(tri_id(groupId, 1));
+        rSP.distanceTestDone.insert(tri_id(groupId, 2));
+        rSP.distanceTestDone.insert(tri_id(groupId, 3));
     }
 
     // sktri is recently unsubdivided or newly added
     // It will be removed right away and is an intermediate step, so don't include it
     // in surfaceAdded or surfaceRemoved.
-    if (rSP.surfaceAdded.test(sktriId.value))
+    if (rSP.surfaceAdded.contains(sktriId))
     {
-        rSP.surfaceAdded.reset(sktriId.value);
+        rSP.surfaceAdded.erase(sktriId);
     }
     else
     {
-        rSP.surfaceRemoved.set(sktriId.value);
+        rSP.surfaceRemoved.insert(sktriId);
     }
-    rSP.surfaceAdded.set(tri_id(groupId, 0).value);
-    rSP.surfaceAdded.set(tri_id(groupId, 1).value);
-    rSP.surfaceAdded.set(tri_id(groupId, 2).value);
-    rSP.surfaceAdded.set(tri_id(groupId, 3).value);
+    rSP.surfaceAdded.insert(tri_id(groupId, 0));
+    rSP.surfaceAdded.insert(tri_id(groupId, 1));
+    rSP.surfaceAdded.insert(tri_id(groupId, 2));
+    rSP.surfaceAdded.insert(tri_id(groupId, 3));
 
     // hasSubdivedNeighbor is only for Non-subdivided triangles
-    rLvl.hasSubdivedNeighbor.reset(sktriId.value);
+    rLvl.hasSubdivedNeighbor.erase(sktriId);
 
     bool hasNonSubdivNeighbor = false;
 
@@ -386,14 +383,14 @@ SkTriGroupId subdivide(
                 SubdivTriangleSkeleton::Level &rNextLvl = rSkel.levels[lvl+1];
                 if (rSkel.tri_at(neighborEdge.childB).children.has_value())
                 {
-                    rNextLvl.hasSubdivedNeighbor.set(selfEdge.childA.value);
-                    rNextLvl.hasNonSubdivedNeighbor.set(neighborEdge.childB.value);
+                    rNextLvl.hasSubdivedNeighbor.insert(selfEdge.childA);
+                    rNextLvl.hasNonSubdivedNeighbor.insert(neighborEdge.childB);
                 }
 
                 if (rSkel.tri_at(neighborEdge.childA).children.has_value())
                 {
-                    rNextLvl.hasSubdivedNeighbor.set(selfEdge.childB.value);
-                    rNextLvl.hasNonSubdivedNeighbor.set(neighborEdge.childA.value);
+                    rNextLvl.hasSubdivedNeighbor.insert(selfEdge.childB);
+                    rNextLvl.hasNonSubdivedNeighbor.insert(neighborEdge.childA);
                 }
             }
 
@@ -409,28 +406,28 @@ SkTriGroupId subdivide(
 
             if (neighborHasNonSubdivedNeighbor)
             {
-                rLvl.hasNonSubdivedNeighbor.set(neighborId.value);
+                rLvl.hasNonSubdivedNeighbor.insert(neighborId);
             }
             else
             {
-                rLvl.hasNonSubdivedNeighbor.reset(neighborId.value);
+                rLvl.hasNonSubdivedNeighbor.erase(neighborId);
             }
         }
         else
         {
             // Neighbor is not subdivided
             hasNonSubdivNeighbor = true;
-            rLvl.hasSubdivedNeighbor.set(neighborId.value);
+            rLvl.hasSubdivedNeighbor.insert(neighborId);
         }
     }
 
     if (hasNonSubdivNeighbor)
     {
-        rLvl.hasNonSubdivedNeighbor.set(sktriId.value);
+        rLvl.hasNonSubdivedNeighbor.insert(sktriId);
     }
     else
     {
-        rLvl.hasNonSubdivedNeighbor.reset(sktriId.value);
+        rLvl.hasNonSubdivedNeighbor.erase(sktriId);
     }
 
     // Check and immediately fix Invariant A and B violations.
@@ -462,13 +459,13 @@ SkTriGroupId subdivide(
             {
                 // Invariant A violation, more than 2 neighbors subdivided
                 subdivide(neighborId, rSkel.tri_at(neighborId), lvl, hasNextLevel, rSkel, rSkData, rSP);
-                rSP.distanceTestDone.set(neighborId.value);
+                rSP.distanceTestDone.insert(neighborId);
             }
-            else if (!rSP.distanceTestDone.test(neighborId.value))
+            else if (!rSP.distanceTestDone.contains(neighborId))
             {
                 // No Invariant A violation, but floodfill distance-test instead
                 rSP.levels[lvl].distanceTestNext.push_back(neighborId);
-                rSP.distanceTestDone.set(neighborId.value);
+                rSP.distanceTestDone.insert(neighborId);
             }
 
         }
@@ -491,7 +488,7 @@ SkTriGroupId subdivide(
 
             // Adds to ctx.rTerrain.levels[level-1].distanceTestNext
             subdivide(neighborParent, rSkel.tri_at(neighborParent), lvl-1, true, rSkel, rSkData, rSP);
-            rSP.distanceTestDone.set(neighborParent.value);
+            rSP.distanceTestDone.insert(neighborParent);
 
             rSP.levelNeedProcess = std::min<uint8_t>(rSP.levelNeedProcess, lvl-1);
         }
@@ -524,7 +521,7 @@ void subdivide_level_by_distance(
         {
             Vector3l const center = rSkData.centers[sktriId];
 
-            LGRN_ASSERT(rSP.distanceTestDone.test(sktriId.value));
+            LGRN_ASSERT(rSP.distanceTestDone.contains(sktriId));
             bool const distanceNear = osp::is_distance_near(pos, center, rSP.distanceThresholdSubdiv[lvl]);
             ++rSP.distanceCheckCount;
 
@@ -542,10 +539,10 @@ void subdivide_level_by_distance(
                             tri_id(children, 2),
                             tri_id(children, 3),
                         });
-                        rSP.distanceTestDone.set(tri_id(children, 0).value);
-                        rSP.distanceTestDone.set(tri_id(children, 1).value);
-                        rSP.distanceTestDone.set(tri_id(children, 2).value);
-                        rSP.distanceTestDone.set(tri_id(children, 3).value);
+                        rSP.distanceTestDone.insert(tri_id(children, 0));
+                        rSP.distanceTestDone.insert(tri_id(children, 1));
+                        rSP.distanceTestDone.insert(tri_id(children, 2));
+                        rSP.distanceTestDone.insert(tri_id(children, 3));
                     }
                 }
                 else

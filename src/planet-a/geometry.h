@@ -125,7 +125,7 @@ struct TerrainFaceWriter
         fillNormalContrib[local.value]  += selectedFaceNormal;
         sharedNormalSum  [shared.value] += selectedFaceNormal;
 
-        rSharedNormalsDirty.set(shared.value);
+        rSharedNormalsDirty.insert(shared);
     }
 
     void fill_add_normal_filled(VertexIdx const vertex)
@@ -187,7 +187,7 @@ struct TerrainFaceWriter
         {
             rContrib.shared = shared;
             rContrib.sum = osp::Vector3{osp::ZeroInit};
-            rSharedNormalsDirty.set(shared.value);
+            rSharedNormalsDirty.insert(shared);
             std::advance(contribLast, 1);
             LGRN_ASSERT(contribLast != fanNormalContrib.end());
         }
@@ -212,7 +212,7 @@ struct TerrainFaceWriter
     osp::Vector3u                       selectedFaceIndx;
     IndxIt_t                            currentFace;
     ContribIt_t                         contribLast;
-    osp::BitVector_t                    &rSharedNormalsDirty;
+    lgrn::IdSetStl<SharedVrtxId>        &rSharedNormalsDirty;
 };
 static_assert(CFaceWriter<TerrainFaceWriter>, "TerrainFaceWriter must satisfy concept CFaceWriter");
 

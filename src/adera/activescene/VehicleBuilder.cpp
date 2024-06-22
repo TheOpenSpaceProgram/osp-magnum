@@ -201,7 +201,7 @@ VehicleData VehicleBuilder::finalize_release()
 
         // reserve node-to-machine partitions
         rPerNodeType.nodeToMach.data_reserve(rPerNodeType.m_connectCountTotal);
-        for (NodeId node : rPerNodeType.nodeIds.bitview().zeros())
+        for (NodeId node : rPerNodeType.nodeIds)
         {
             rPerNodeType.nodeToMach.emplace(node, rPerNodeType.m_nodeConnectCount[node]);
             lgrn::Span<Junction> junction = rPerNodeType.nodeToMach[node];
@@ -209,7 +209,7 @@ VehicleData VehicleBuilder::finalize_release()
         }
 
         // assign node-to-machine
-        for (MachAnyId const mach : rData.m_machines.ids.bitview().zeros())
+        for (MachAnyId const mach : rData.m_machines.ids)
         {
             lgrn::Span<NodeId> portSpan = rPerNodeType.machToNode[mach];
             lgrn::Span<JuncCustom> customSpan = rPerNodeType.m_machToNodeCustom[mach];
@@ -249,13 +249,13 @@ VehicleData VehicleBuilder::finalize_release()
     using osp::link::MachinePair;
     rData.m_partToMachines.ids_reserve(rData.m_partIds.capacity());
     rData.m_partToMachines.data_reserve(rData.m_machines.ids.capacity());
-    for (PartId const part : rData.m_partIds.bitview().zeros())
+    for (PartId const part : rData.m_partIds)
     {
         rData.m_partToMachines.emplace(part, m_partMachCount[part]);
     }
 
     // Assign part-to-machine partitions
-    for (MachAnyId const mach : rData.m_machines.ids.bitview().zeros())
+    for (MachAnyId const mach : rData.m_machines.ids)
     {
         MachLocalId const   local       = rData.m_machines.machToLocal[mach];
         MachTypeId const    type        = rData.m_machines.machTypes[mach];

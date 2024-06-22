@@ -133,8 +133,8 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     // Resize some containers to fit all existing entities
     std::size_t const maxEnts = rScene.m_activeIds.vec().capacity();
-    rScene.m_matPhong.ints()    .resize(maxEnts);
-    rScene.m_basic.m_scnGraph   .resize(maxEnts);
+    rScene.m_matPhong.resize(maxEnts);
+    rScene.m_basic.m_scnGraph.resize(maxEnts);
     rScene.m_scnRdr.resize_active(maxEnts);
     rScene.m_scnRdr.resize_draw();
 
@@ -146,7 +146,7 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
 
     // Add cube mesh to cube
 
-    rScene.m_scnRdr.m_needDrawTf.set(std::size_t(cubeEnt));
+    rScene.m_scnRdr.m_needDrawTf.insert(cubeEnt);
     rScene.m_scnRdr.m_activeToDraw[cubeEnt] = cubeDraw;
     rScene.m_scnRdr.m_mesh[cubeDraw] = rScene.m_drawing.m_meshRefCounts.ref_add(meshCube);
     rScene.m_scnRdr.m_meshDirty.push_back(cubeDraw);
@@ -155,12 +155,12 @@ entt::any setup_scene(osp::Resources& rResources, osp::PkgId const pkg)
     rScene.m_basic.m_transform.emplace(cubeEnt);
 
     // Add phong material to cube
-    rScene.m_matPhong.set(std::size_t(cubeDraw));
+    rScene.m_matPhong.insert(cubeDraw);
     rScene.m_matPhongDirty.push_back(cubeDraw);
 
     // Add drawble, opaque, and visible component
-    rScene.m_scnRdr.m_visible.set(std::size_t(cubeDraw));
-    rScene.m_scnRdr.m_opaque.set(std::size_t(cubeDraw));
+    rScene.m_scnRdr.m_visible.insert(cubeDraw);
+    rScene.m_scnRdr.m_opaque.insert(cubeDraw);
 
     // Add cube to hierarchy, parented to root
     SubtreeBuilder builder = SysSceneGraph::add_descendants(rScene.m_basic.m_scnGraph, 1);
@@ -387,10 +387,8 @@ MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, Mag
 
     // Set all drawing stuff dirty then sync with renderer.
     // This allows clean re-openning of the scene
-    for (std::size_t const drawEntInt : rScene.m_scnRdr.m_drawIds.bitview().zeros())
+    for (DrawEnt const drawEnt : rScene.m_scnRdr.m_drawIds)
     {
-        auto const drawEnt = DrawEnt(drawEntInt);
-
         // Set all meshs dirty
         if (rScene.m_scnRdr.m_mesh[drawEnt] != lgrn::id_null<MeshId>())
         {
@@ -404,18 +402,18 @@ MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, Mag
         }
     }
 
-    for (std::size_t const materialInt : rScene.m_scnRdr.m_materialIds.bitview().zeros())
+    for (MaterialId const materialId : rScene.m_scnRdr.m_materialIds)
     {
-        Material &mat = rScene.m_scnRdr.m_materials[MaterialId(materialInt)];
-        for (std::size_t const entInt : mat.m_ents.ones())
+        Material &mat = rScene.m_scnRdr.m_materials[materialId];
+        for (DrawEnt const drawEnt : mat.m_ents)
         {
-            mat.m_dirty.push_back(DrawEnt(entInt));
+            mat.m_dirty.push_back(drawEnt);
         }
     }
 
-    for (std::size_t const entInt : rScene.m_matPhong.ones())
+    for (DrawEnt const drawEnt : rScene.m_matPhong)
     {
-        rScene.m_matPhongDirty.emplace_back(entInt);
+        rScene.m_matPhongDirty.emplace_back(drawEnt);
     }
 
     sync_test_scene(rRenderGl, rScene, rRenderer);

@@ -27,7 +27,8 @@
 #include "tasks.h"
 #include "worker.h"
 
-#include "../core/bitvector.h"
+#include <longeron/id_management/id_set_stl.hpp>
+
 
 #include <entt/entity/storage.hpp>
 
@@ -202,11 +203,11 @@ struct ExecContext : public ExecLog
     entt::basic_sparse_set<TaskId>              tasksQueuedRun;
     entt::basic_storage<BlockedTask, TaskId>    tasksQueuedBlocked;
 
-    BitVector_t                         plAdvance;
-    BitVector_t                         plAdvanceNext;
+    lgrn::IdSetStl<PipelineId>          plAdvance;
+    lgrn::IdSetStl<PipelineId>          plAdvanceNext;
     bool                                hasPlAdvanceOrLoop  {false};
 
-    BitVector_t                         plRequestRun;
+    lgrn::IdSetStl<PipelineId>          plRequestRun;
     std::vector<LoopRequestRun>         requestLoop;
     bool                                hasRequestRun {false};
 
@@ -227,7 +228,7 @@ void exec_conform(Tasks const& tasks, ExecContext &rOut);
 
 inline void exec_request_run(ExecContext &rExec, PipelineId pipeline) noexcept
 {
-    rExec.plRequestRun.set(std::size_t(pipeline));
+    rExec.plRequestRun.insert(pipeline);
     rExec.hasRequestRun = true;
 }
 

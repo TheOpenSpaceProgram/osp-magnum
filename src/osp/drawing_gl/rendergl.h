@@ -36,7 +36,7 @@
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/ImageData.h>
 
-#include <longeron/id_management/registry.hpp>
+#include <longeron/id_management/registry_stl.hpp>
 
 namespace osp::draw
 {
@@ -65,11 +65,11 @@ struct RenderGL
     Magnum::GL::Framebuffer             m_fbo{Corrade::NoCreate};
 
     // Renderer-space GL Textures
-    lgrn::IdRegistry<TexGlId>           m_texIds;
+    lgrn::IdRegistryStl<TexGlId>        m_texIds;
     TexGlStorage_t                      m_texGl;
 
     // Renderer-space GL Meshes
-    lgrn::IdRegistry<MeshGlId>          m_meshIds;
+    lgrn::IdRegistryStl<MeshGlId>       m_meshIds;
     MeshGlStorage_t                     m_meshGl;
 
     // Associate GL Texture Ids with resources

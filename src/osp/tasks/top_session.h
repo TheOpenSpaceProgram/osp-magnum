@@ -26,6 +26,7 @@
 
 #include "tasks.h"
 #include "top_utils.h"
+#include "top_worker.h"
 
 #include "../core/unpack.h"
 
@@ -38,7 +39,13 @@
 #include <vector>
 
 #define OSP_AUX_DCDI_C(session, topData, count, ...) \
-    session.m_data.resize(count); \
+    session.m_data.resize(count, lgrn::id_null<osp::TopDataId>()); \
+    for (osp::TopDataId const id : session.m_data) \
+    { \
+        LGRN_ASSERTM(id == lgrn::id_null<osp::TopDataId>(),\
+                     "Can't replace existing TopDataId. " \
+                     "You likely meant to use GET_DATA_IDS instead of CREATE_DATA_IDS?");\
+    } \
     osp::top_reserve(topData, 0, session.m_data.begin(), session.m_data.end()); \
     auto const [__VA_ARGS__] = osp::unpack<count>(session.m_data)
 #define OSP_AUX_DCDI_B(x) x
