@@ -345,6 +345,28 @@ struct PlUniSceneFrame
 
 //-----------------------------------------------------------------------------
 
+// Solar System sessions
+
+#define TESTAPP_DATA_SOLAR_SYSTEM_CORE 2, \
+    idUniverse,         tgSolarSystemDeltaTimeIn
+struct PlSolarSystemCore
+{
+    PipelineDef<EStgOptn> update{ "update            - Solar System update" };
+    PipelineDef<EStgIntr> transfer{ "transfer" };
+};
+
+#define TESTAPP_DATA_SOLAR_SYSTEM_SCENEFRAME 1, \
+    idScnFrame
+struct PlSolarSystemSceneFrame
+{
+    PipelineDef<EStgCont> sceneFrame{ "sceneFrame" };
+};
+
+#define TESTAPP_DATA_SOLAR_SYSTEM_PLANETS 3, \
+    idPlanetMainSpace, idSatSurfaceSpaces, idCoordNBody
+
+//-----------------------------------------------------------------------------
+
 // Renderer sessions, tend to exist only when the window is open
 
 #define TESTAPP_DATA_WINDOW_APP 1, \
