@@ -456,6 +456,7 @@ Session setup_landerplanet_draw(
     {
         if ( ! rCamCtrl.m_target.has_value())
         {
+            OSP_LOG_INFO("Camera Controller target not set");
             return;
         }
         Vector3 &rCamPl = rCamCtrl.m_target.value();
@@ -467,14 +468,17 @@ Session setup_landerplanet_draw(
 
         if ( ! translate.isZero())
         {
-            rCamCtrl.m_transform.translation() -= translate;
-            rCamPl -= translate;
+            // OSP_LOG_INFO("Translate Camera Controller target by {},{},{}", translate.x(), translate.y(), translate.z());
+            // rCamCtrl.m_transform.translation() -= translate;
+            // rCamPl -= translate;
 
             // a bit janky to modify universe stuff directly here, but it works lol
-            Vector3 const rotated = Quaternion(rScnFrame.m_rotation).transformVector(translate);
-            rScnFrame.m_position += Vector3g(math::mul_2pow<Vector3, int>(rotated, rScnFrame.m_precision));
+            // Vector3 const rotated = Quaternion(rScnFrame.m_rotation).transformVector(translate);
+            // OSP_LOG_INFO("Translate SceneFrame by {},{},{}", rotated.x(), rotated.y(), rotated.z());
+            // rScnFrame.m_position += Vector3g(math::mul_2pow<Vector3, int>(rotated, rScnFrame.m_precision));
         }
 
+        // OSP_LOG_INFO("SceneFrame position: {},{},{}", rScnFrame.m_position.x(), rScnFrame.m_position.y(), rScnFrame.m_position.z());
         rScnFrame.m_scenePosition = Vector3g(math::mul_2pow<Vector3, int>(rCamCtrl.m_target.value(), rScnFrame.m_precision));
     });
 
