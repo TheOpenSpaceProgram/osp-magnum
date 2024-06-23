@@ -307,6 +307,7 @@ void load_a_bunch_of_stuff()
 {
     using namespace osp::restypes;
     using namespace Magnum;
+    using namespace testapp::scenes;
     using Primitives::ConeFlag;
     using Primitives::CylinderFlag;
 

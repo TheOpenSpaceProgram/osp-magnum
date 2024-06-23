@@ -53,14 +53,14 @@
 
 #include <algorithm>
 
+#include "scenarios/lander.h"
+
 using namespace adera;
 using namespace osp;
 using namespace osp::active;
 
 namespace testapp
 {
-
-static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene);
 
 // MaterialIds hints which shaders should be used to draw a DrawEnt
 // DrawEnts can be assigned to multiple materials
@@ -446,100 +446,9 @@ static ScenarioMap_t make_scenarios()
         return setup_renderer;
     });
 
-    add_scenario("lander", "Lander simulation game", [] (TestApp& rTestApp) -> RendererSetupFunc_t {
-        #define SCENE_SESSIONS scene, commonScene, uniCore, uniScnFrame, uniPlanet, physics, \
-            prefabs, parts, signalsFloat, vehicleSpawn, vehicleSpawnVB, vehicles, \
-            newton, vehicleSpawnNwt, nwtRocketSet, rocketsNwt, \
-            machRocket, machRcsDriver
-        #define SCENE_SESSIONS_COUNT 18
-        #define RENDERER_SESSIONS sceneRenderer, magnumScene, planetDraw, \
-            cameraCtrl, cameraFree, shVisual, shFlat, shPhong, \
-            prefabDraw, vehicleDraw, vehicleCtrl, cameraVehicle
-        #define RENDERER_SESSIONS_COUNT 12
+    using lander::setup_lander_scenario;
 
-        using namespace testapp::scenes;
-
-        auto const  defaultPkg      = rTestApp.m_defaultPkg;
-        auto const application     = rTestApp.m_application;
-        auto & rTopData            = rTestApp.m_topData;
-
-        TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_scene.m_edges, rTestApp.m_taskData};
-
-        auto & [SCENE_SESSIONS] = resize_then_unpack<SCENE_SESSIONS_COUNT>(rTestApp.m_scene.m_sessions);
-
-        scene = setup_scene(builder, rTopData, application);
-        commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
-
-        auto const tgApp = application.get_pipelines< PlApplication >();
-        uniCore         = setup_uni_core            (builder, rTopData, tgApp.mainLoop);
-        uniScnFrame     = setup_uni_sceneframe      (builder, rTopData, uniCore);
-        uniPlanet       = setup_uni_landerplanet    (builder, rTopData, uniCore, uniScnFrame);
-        
-        physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        prefabs         = setup_prefabs             (builder, rTopData, application, scene, commonScene, physics);
-        parts           = setup_parts               (builder, rTopData, application, scene);
-        signalsFloat    = setup_signals_float       (builder, rTopData, scene, parts);
-        vehicleSpawn    = setup_vehicle_spawn       (builder, rTopData, scene);
-        vehicleSpawnVB  = setup_vehicle_spawn_vb    (builder, rTopData, application, scene, commonScene, prefabs, parts, vehicleSpawn, signalsFloat);
-        vehicles        = setup_prebuilt_vehicles   (builder, rTopData, application, scene);
-
-        machRocket      = setup_mach_rocket         (builder, rTopData, scene, parts, signalsFloat);
-        machRcsDriver   = setup_mach_rcsdriver      (builder, rTopData, scene, parts, signalsFloat);
-
-        newton          = setup_newton              (builder, rTopData, scene, commonScene, physics);
-        vehicleSpawnNwt = setup_vehicle_spawn_newton(builder, rTopData, application, commonScene, physics, prefabs, parts, vehicleSpawn, newton);
-        nwtRocketSet    = setup_newton_factors      (builder, rTopData);
-        rocketsNwt      = setup_rocket_thrust_newton(builder, rTopData, scene, commonScene, physics, prefabs, parts, signalsFloat, newton, nwtRocketSet);
-
-
-        OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,   TESTAPP_DATA_VEHICLE_SPAWN);
-        OSP_DECLARE_GET_DATA_IDS(vehicleSpawnVB, TESTAPP_DATA_VEHICLE_SPAWN_VB);
-        OSP_DECLARE_GET_DATA_IDS(vehicles,   TESTAPP_DATA_TEST_VEHICLES);
-
-        auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
-        auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
-        auto &rPrebuiltVehicles = top_get<PrebuiltVehicles>     (rTopData, idPrebuiltVehicles);
-
-        rVehicleSpawn.spawnRequest.push_back(
-        {
-            .position = {30.0f, 0.0f, 0.0f},
-            .velocity = {0.0f, 0.0f, 0.0f},
-            .rotation = {}
-        });
-        rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
-
-        RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp) -> void
-        {
-            auto const  application     = rTestApp.m_application;
-            auto const  windowApp       = rTestApp.m_windowApp;
-            auto const  magnum          = rTestApp.m_magnum;
-            auto        & rTopData      = rTestApp.m_topData;
-            
-            TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
-
-            auto & [SCENE_SESSIONS] = unpack<SCENE_SESSIONS_COUNT>(rTestApp.m_scene.m_sessions);
-            auto & [RENDERER_SESSIONS] = resize_then_unpack<RENDERER_SESSIONS_COUNT>(rTestApp.m_renderer.m_sessions);
-            
-            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
-            create_materials(rTopData, sceneRenderer, sc_materialCount);
-            
-            magnumScene     = setup_magnum_scene        (builder, rTopData, application, rTestApp.m_windowApp, sceneRenderer, rTestApp.m_magnum, scene, commonScene);
-            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
-            // cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
-            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
-            // shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
-            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
-            planetDraw      = setup_landerplanet_draw    (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, uniCore, uniScnFrame, uniPlanet, sc_matVisualizer, sc_matFlat);
-            
-            prefabDraw      = setup_prefab_draw         (builder, rTopData, application, windowApp, sceneRenderer, commonScene, prefabs, sc_matPhong);
-            vehicleDraw     = setup_vehicle_spawn_draw  (builder, rTopData, sceneRenderer, vehicleSpawn);
-            vehicleCtrl     = setup_vehicle_control     (builder, rTopData, windowApp, scene, parts, signalsFloat);
-            cameraVehicle   = setup_camera_vehicle      (builder, rTopData, windowApp, scene, sceneRenderer, commonScene, physics, parts, cameraCtrl, vehicleCtrl);
-
-            setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
-        };
-        return setup_renderer;
-    });
+    add_scenario("lander", "Lander simulation game", setup_lander_scenario);
 
     return scenarioMap;
 }
@@ -548,134 +457,6 @@ ScenarioMap_t const& scenarios()
 {
     static ScenarioMap_t s_scenarioMap = make_scenarios();
     return s_scenarioMap;
-}
-
-
-//-----------------------------------------------------------------------------
-
-
-struct MainLoopSignals
-{
-    PipelineId mainLoop;
-    PipelineId inputs;
-    PipelineId renderSync;
-    PipelineId renderResync;
-    PipelineId sceneUpdate;
-    PipelineId sceneRender;
-};
-
-/**
- * @brief Runs Task/Pipeline main loop within MagnumApplication
- */
-class CommonMagnumApp : public IOspApplication
-{
-public:
-    CommonMagnumApp(TestApp &rTestApp, MainLoopControl &rMainLoopCtrl, MainLoopSignals signals) noexcept
-     : m_rTestApp       { rTestApp }
-     , m_rMainLoopCtrl  { rMainLoopCtrl }
-     , m_signals        { signals }
-    { }
-
-    void run(MagnumApplication& rApp) override
-    {
-        // Start the main loop
-
-        PipelineId const mainLoop = m_rTestApp.m_application.get_pipelines<PlApplication>().mainLoop;
-        m_rTestApp.m_pExecutor->run(m_rTestApp, mainLoop);
-
-        // Resyncronize renderer
-
-        m_rMainLoopCtrl = MainLoopControl{
-            .doUpdate = false,
-            .doSync   = true,
-            .doResync = true,
-            .doRender = false,
-        };
-
-        signal_all();
-
-        m_rTestApp.m_pExecutor->wait(m_rTestApp);
-    }
-
-    void draw(MagnumApplication& rApp, float delta) override
-    {
-        // Magnum Application's main loop calls this
-
-        m_rMainLoopCtrl = MainLoopControl{
-            .doUpdate = true,
-            .doSync   = true,
-            .doResync = false,
-            .doRender = true,
-        };
-
-        signal_all();
-
-        m_rTestApp.m_pExecutor->wait(m_rTestApp);
-    }
-
-    void exit(MagnumApplication& rApp) override
-    {
-        m_rMainLoopCtrl = MainLoopControl{
-            .doUpdate = false,
-            .doSync   = false,
-            .doResync = false,
-            .doRender = false,
-        };
-
-        signal_all();
-
-        m_rTestApp.m_pExecutor->wait(m_rTestApp);
-
-        if (m_rTestApp.m_pExecutor->is_running(m_rTestApp))
-        {
-            // Main loop must have stopped, but didn't!
-            m_rTestApp.m_pExecutor->wait(m_rTestApp);
-            std::abort();
-        }
-    }
-
-private:
-
-    void signal_all()
-    {
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.mainLoop);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.inputs);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderSync);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderResync);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneUpdate);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneRender);
-    }
-
-    TestApp         &m_rTestApp;
-    MainLoopControl &m_rMainLoopCtrl;
-
-    MainLoopSignals m_signals;
-};
-
-void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene)
-{
-    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_application,    TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,             TESTAPP_DATA_SCENE_RENDERER);
-    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,         TESTAPP_DATA_MAGNUM);
-    OSP_DECLARE_GET_DATA_IDS(magnumScene,               TESTAPP_DATA_MAGNUM_SCENE);
-
-    auto &rMainLoopCtrl = top_get<MainLoopControl>  (rTestApp.m_topData, idMainLoopCtrl);
-    auto &rActiveApp    = top_get<MagnumApplication>(rTestApp.m_topData, idActiveApp);
-    auto &rCamera       = top_get<draw::Camera>     (rTestApp.m_topData, idCamera);
-
-    rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
-
-    MainLoopSignals const signals
-    {
-        .mainLoop     = rTestApp.m_application .get_pipelines<PlApplication>()   .mainLoop,
-        .inputs       = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .inputs,
-        .renderSync   = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .sync,
-        .renderResync = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .resync,
-        .sceneUpdate  = scene                  .get_pipelines<PlScene>()         .update,
-        .sceneRender  = sceneRenderer          .get_pipelines<PlSceneRenderer>() .render,
-    };
-
-    rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, signals) );
 }
 
 } // namespace testapp

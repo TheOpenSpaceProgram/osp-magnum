@@ -47,13 +47,6 @@ namespace scenes
     using enum EStgLink;
 }
 
-struct MainLoopControl
-{
-    bool doUpdate;
-    bool doSync;
-    bool doResync;
-    bool doRender;
-};
 
 struct ScenarioOption
 {

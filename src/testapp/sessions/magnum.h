@@ -89,4 +89,18 @@ osp::Session setup_shader_phong(
         osp::Session const&         magnumScene,
         osp::draw::MaterialId       materialId = lgrn::id_null<osp::draw::MaterialId>());
 
+void setup_magnum_draw(
+        TestApp& rTestApp,
+        osp::Session const& scene,
+        osp::Session const& sceneRenderer,
+        osp::Session const& magnumScene);
+
+struct MainLoopControl
+{
+    bool doUpdate;
+    bool doSync;
+    bool doResync;
+    bool doRender;
+};
+
 }
