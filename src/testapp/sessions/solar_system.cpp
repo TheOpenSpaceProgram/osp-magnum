@@ -157,11 +157,55 @@ Session setup_solar_system_testplanets(
         ++nextBody;
     };
 
-    add_body(Vector3l{ 0, 0                                              , 0 }, Vector3d{ 0.0,         0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 1.0f * std::pow(10, 1), 1000.0f, { 1.0f, 1.0f, 0.0f }); // Sun
-    add_body(Vector3l{ 0, math::mul_2pow<spaceint_t, int>( 10, precision), 0 }, Vector3d{ 1.0,         0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 0.0000000001f,           500.0f, { 0.0f, 0.0f, 1.0f }); // Blue
-    add_body(Vector3l{ 0, math::mul_2pow<spaceint_t, int>(  5, precision), 0 }, Vector3d{ 1.414213562, 0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 0.0000000001f,           250.0f, { 1.0f, 0.0f, 0.0f }); // Red
-    add_body(Vector3l{ 0, math::mul_2pow<spaceint_t, int>(7.5, precision), 0 }, Vector3d{ 1.154700538, 0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 0.0000000001f,           600.0f, { 0.0f, 1.0f, 0.0f }); // Green
-    add_body(Vector3l{ 0, math::mul_2pow<spaceint_t, int>( 12, precision), 0 }, Vector3d{ 0.912870929, 0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 0.0000000001f,           550.0f, { 1.0f, 0.5f, 0.0f }); // Orange
+    add_body // Sun
+    (
+        Vector3l{ 0, 0, 0 }, 
+        Vector3d{ 0.0, 0.0, 0.0 }, 
+        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 
+        1.0f * std::pow(10, 1), 
+        1000.0f, 
+        { 1.0f, 1.0f, 0.0f }
+    );
+
+    add_body // Blue Planet
+    (
+        Vector3l{ 0, math::mul_2pow<spaceint_t, int>( 10, precision), 0 }, 
+        Vector3d{ 1.0,         0.0, 0.0 }, 
+        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 
+        0.0000000001f,           
+        500.0f, 
+        { 0.0f, 0.0f, 1.0f }
+    );
+
+    add_body // Red Planet
+    (
+        Vector3l{ 0, math::mul_2pow<spaceint_t, int>(  5, precision), 0 }, 
+        Vector3d{ 1.414213562, 0.0, 0.0 }, 
+        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 
+        0.0000000001f,           
+        250.0f, 
+        { 1.0f, 0.0f, 0.0f }
+    );
+
+    add_body // Green Planet
+    (
+        Vector3l{ 0, math::mul_2pow<spaceint_t, int>(7.5, precision), 0 }, 
+        Vector3d{ 1.154700538, 0.0, 0.0 }, 
+        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 
+        0.0000000001f,           
+        600.0f, 
+        { 0.0f, 1.0f, 0.0f }
+    );
+
+    add_body // Orange Planet
+    (
+        Vector3l{ 0, math::mul_2pow<spaceint_t, int>( 12, precision), 0 }, 
+        Vector3d{ 0.912870929, 0.0, 0.0 }, 
+        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 
+        0.0000000001f,           
+        550.0f, 
+        { 1.0f, 0.5f, 0.0f }
+    );
 
     top_emplace< CoSpaceId >(topData, idPlanetMainSpace, mainSpace);
     top_emplace< float >(topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
