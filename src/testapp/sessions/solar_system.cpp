@@ -54,46 +54,6 @@ enum Planets {
 
 constexpr unsigned int c_planetCount = 5;
 
-Session setup_solar_system_core(
-        TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any>        topData,
-        PipelineId const            updateOn)
-{
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SOLAR_SYSTEM_CORE);
-
-    top_emplace< Universe > (topData, idUniverse);
-
-    auto const tgUCore = out.create_pipelines<PlSolarSystemCore>(rBuilder);
-
-    rBuilder.pipeline(tgUCore.update).parent(updateOn);//.wait_for_signal(EStgOptn::ModifyOrSignal);
-
-    rBuilder.pipeline(tgUCore.transfer).parent(tgUCore.update);
-
-    return out;
-} // setup_solar_system_core
-
-
-Session setup_solar_system_sceneframe(
-        TopTaskBuilder&             rBuilder,
-        ArrayView<entt::any>        topData,
-        Session const&              solarSystemCore)
-{
-    auto const tgUCore = solarSystemCore.get_pipelines<PlSolarSystemCore>();
-
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SOLAR_SYSTEM_SCENEFRAME);
-
-    top_emplace< SceneFrame > (topData, idScnFrame);
-
-    auto const tgUSFrm = out.create_pipelines<PlSolarSystemSceneFrame>(rBuilder);
-
-    rBuilder.pipeline(tgUSFrm.sceneFrame).parent(tgUCore.update);
-
-    return out;
-} // setup_solar_system_sceneframe
-
-
 Session setup_solar_system_testplanets(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>        topData,
@@ -103,11 +63,11 @@ Session setup_solar_system_testplanets(
     using CoSpaceIdVec_t = std::vector<CoSpaceId>;
     using Corrade::Containers::Array;
 
-    OSP_DECLARE_GET_DATA_IDS(solarSystemCore,     TESTAPP_DATA_SOLAR_SYSTEM_CORE);
-    OSP_DECLARE_GET_DATA_IDS(solarSystemScnFrame, TESTAPP_DATA_SOLAR_SYSTEM_SCENEFRAME);
+    OSP_DECLARE_GET_DATA_IDS(solarSystemCore,     TESTAPP_DATA_UNI_CORE);
+    OSP_DECLARE_GET_DATA_IDS(solarSystemScnFrame, TESTAPP_DATA_UNI_SCENEFRAME);
 
-    auto const tgUCore = solarSystemCore    .get_pipelines<PlSolarSystemCore>();
-    auto const tgUSFrm = solarSystemScnFrame.get_pipelines<PlSolarSystemSceneFrame>();
+    auto const tgUCore = solarSystemCore    .get_pipelines<PlUniCore>();
+    auto const tgUSFrm = solarSystemScnFrame.get_pipelines<PlUniSceneFrame>();
 
     auto &rUniverse = top_get< Universe >(topData, idUniverse);
 
@@ -238,7 +198,7 @@ Session setup_solar_system_testplanets(
     nBodyView[Planets::ORANGE].mass = 0.0000000001;
 
     top_emplace< CoSpaceId >(topData, idPlanetMainSpace, mainSpace);
-    top_emplace< float >(topData, tgSolarSystemDeltaTimeIn, 1.0f / 60.0f);
+    top_emplace< float >(topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
     top_emplace< CoSpaceIdVec_t >(topData, idSatSurfaceSpaces, std::move(satSurfaceSpaces));
 
     // Set initial scene frame
@@ -252,13 +212,13 @@ Session setup_solar_system_testplanets(
         .run_on     (tgUCore.update(Run))
         .sync_with  ({tgUSFrm.sceneFrame(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({     idUniverse,               idPlanetMainSpace,            idScnFrame,                      idSatSurfaceSpaces,           tgSolarSystemDeltaTimeIn,                                       idCoordNBody})
-        .func([] (Universe& rUniverse, CoSpaceId const planetMainSpace, SceneFrame &rScnFrame, CoSpaceIdVec_t const& rSatSurfaceSpaces, float const solarSystemDeltaTimeIn, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
+        .args       ({     idUniverse,               idPlanetMainSpace,            idScnFrame,                      idSatSurfaceSpaces,           tgUniDeltaTimeIn,                                        idCoordNBody})
+        .func([] (Universe& rUniverse, CoSpaceId const planetMainSpace, SceneFrame &rScnFrame, CoSpaceIdVec_t const& rSatSurfaceSpaces, float const uniDeltaTimeIn, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
     {
         CoSpaceCommon &rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
 
         auto const scale = osp::math::mul_2pow<double, int>(1.0, -rMainSpaceCommon.m_precision);
-        double const scaleDelta = solarSystemDeltaTimeIn / scale;
+        double const scaleDelta = uniDeltaTimeIn / scale;
 
         auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
         auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
@@ -287,9 +247,9 @@ Session setup_solar_system_testplanets(
                 Vector3d force = direction * forceMagnitude;
                 Vector3d acceleration = (force / iMass);
 
-                vx[i] += acceleration.x() * solarSystemDeltaTimeIn;
-                vy[i] += acceleration.y() * solarSystemDeltaTimeIn;
-                vz[i] += acceleration.z() * solarSystemDeltaTimeIn;
+                vx[i] += acceleration.x() * uniDeltaTimeIn;
+                vy[i] += acceleration.y() * uniDeltaTimeIn;
+                vz[i] += acceleration.z() * uniDeltaTimeIn;
             }
         }
     });
@@ -319,14 +279,14 @@ Session setup_solar_system_planets_draw(
     OSP_DECLARE_GET_DATA_IDS(commonScene,            TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer,          TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(cameraCtrl,             TESTAPP_DATA_CAMERA_CTRL);
-    OSP_DECLARE_GET_DATA_IDS(solarSystemCore,        TESTAPP_DATA_SOLAR_SYSTEM_CORE);
-    OSP_DECLARE_GET_DATA_IDS(solarSystemScnFrame,    TESTAPP_DATA_SOLAR_SYSTEM_SCENEFRAME);
+    OSP_DECLARE_GET_DATA_IDS(solarSystemCore,        TESTAPP_DATA_UNI_CORE);
+    OSP_DECLARE_GET_DATA_IDS(solarSystemScnFrame,    TESTAPP_DATA_UNI_SCENEFRAME);
     OSP_DECLARE_GET_DATA_IDS(solarSystemTestPlanets, TESTAPP_DATA_SOLAR_SYSTEM_PLANETS);
 
     auto const tgWin    = windowApp          .get_pipelines<PlWindowApp>();
     auto const tgScnRdr = sceneRenderer      .get_pipelines<PlSceneRenderer>();
     auto const tgCmCt   = cameraCtrl         .get_pipelines<PlCameraCtrl>();
-    auto const tgUSFrm  = solarSystemScnFrame.get_pipelines<PlSolarSystemSceneFrame>();
+    auto const tgUSFrm  = solarSystemScnFrame.get_pipelines<PlUniSceneFrame>();
 
     Session out;
 

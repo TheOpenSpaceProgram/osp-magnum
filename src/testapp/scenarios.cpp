@@ -469,8 +469,8 @@ static ScenarioMap_t make_scenarios()
 
             auto const tgApp = application.get_pipelines< PlApplication >();
 
-            solarSystemCore = setup_solar_system_core(builder, rTopData, tgApp.mainLoop);
-            solarSystemScnFrame = setup_solar_system_sceneframe(builder, rTopData, solarSystemCore);
+            solarSystemCore = setup_uni_core(builder, rTopData, tgApp.mainLoop);
+            solarSystemScnFrame = setup_uni_sceneframe(builder, rTopData, solarSystemCore);
             solarSystemTestPlanets = setup_solar_system_testplanets(builder, rTopData, solarSystemCore, solarSystemScnFrame);
 
             RendererSetupFunc_t const setup_renderer = [](TestApp& rTestApp)
