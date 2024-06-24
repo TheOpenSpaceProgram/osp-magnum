@@ -37,22 +37,18 @@ JPH_SUPPRESS_WARNINGS
 
 #include <Jolt/RegisterTypes.h>
 #include <Jolt/Core/Factory.h>
-#include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
-#include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/CylinderShape.h>
 #include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
-#include <Jolt/Physics/Body/BodyActivationListener.h>
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Collision/Shape/CompoundShape.h>
 #include <Jolt/Physics/Collision/Shape/ScaledShape.h>
 #include <Jolt/Physics/Collision/Shape/MutableCompoundShape.h>
 #include <Jolt/Physics/PhysicsStepListener.h>
-#include <Jolt/Core/JobSystemSingleThreaded.h>
 
 JPH_SUPPRESS_WARNING_POP
 
@@ -65,10 +61,7 @@ JPH_SUPPRESS_WARNING_POP
 
 #include <iostream>
 #include <cstdarg>
-#include <thread>
 #include <osp/util/logging.h>
-#include <concepts>
-#include <typeindex> 
 
 #include "osp/core/strong_id.h"
 
@@ -240,7 +233,7 @@ class PhysicsStepListenerImpl : public PhysicsStepListener
 {
 public:
     PhysicsStepListenerImpl(ACtxJoltWorld* pContext) : m_context(pContext) {};
-    void OnStep(float inDeltaTime, PhysicsSystem& inPhysicsSystem) override;
+    void OnStep(float inDeltaTime, PhysicsSystem& rPhysicsSystem) override;
 
 private:
     ACtxJoltWorld* m_context;

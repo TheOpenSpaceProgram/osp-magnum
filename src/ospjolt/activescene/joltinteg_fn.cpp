@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2020 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -99,7 +99,7 @@ void SysJolt::update_world(
 
     rCtxWorld.m_pTransform = std::addressof(rTf);
 
-    uint collisionSteps = 1;
+    int collisionSteps = 1;
     pJoltWorld->Update(timestep, collisionSteps, &rCtxWorld.m_temp_allocator, rCtxWorld.m_joltJobSystem.get());
 }
 
@@ -135,7 +135,7 @@ Ref<Shape> SysJolt::create_primitive(ACtxJoltWorld &rCtxWorld, osp::EShape shape
         return  RotatedTranslatedShapeSettings(
                     Vec3Arg::sZero(), 
                     Quat::sRotation(Vec3::sAxisX(), JPH_PI/2), 
-                    new CylinderShapeSettings(scale.GetY(), 2.0f * scale.GetX())
+                    new CylinderShapeSettings(scale.GetZ(), 2.0f * scale.GetX())
                 ).Create().Get();
         
     default:
@@ -146,7 +146,7 @@ Ref<Shape> SysJolt::create_primitive(ACtxJoltWorld &rCtxWorld, osp::EShape shape
 void SysJolt::scale_shape(Ref<Shape> rShape, Vec3Arg scale) {
     if (rShape->GetSubType() == EShapeSubType::Scaled) {
         ScaledShape* rScaledShape = dynamic_cast<ScaledShape*>(rShape.GetPtr());
-        if (rScaledShape) 
+        if (rScaledShape != nullptr) 
         {
             rShape = new ScaledShape(rScaledShape->GetInnerShape(), scale * rScaledShape->GetScale());
         }
@@ -180,7 +180,7 @@ void SysJolt::find_shapes_recurse(
         ACompTransformStorage_t const&          rTf,
         ActiveEnt                               ent,
         Matrix4 const&                          transform,
-        CompoundShapeSettings&                  pCompound) noexcept
+        CompoundShapeSettings&                  rCompound) noexcept
 {
     // Add jolt shape if exists
     if (rCtxWorld.m_shapes.contains(ent))
@@ -189,7 +189,7 @@ void SysJolt::find_shapes_recurse(
 
         // Set transform relative to root body
         SysJolt::scale_shape(rShape, Vec3MagnumToJolt(transform.scaling()));
-        pCompound.AddShape(
+        rCompound.AddShape(
             Vec3MagnumToJolt(transform.translation()), 
             QuatMagnumToJolt(osp::Quaternion::fromMatrix(transform.rotation())), 
             rShape);
@@ -210,7 +210,7 @@ void SysJolt::find_shapes_recurse(
             Matrix4 const childMatrix = transform * rChildTransform.m_transform;
 
             find_shapes_recurse(
-                    rCtxPhys, rCtxWorld, rScnGraph, rTf, child, childMatrix, pCompound);
+                    rCtxPhys, rCtxWorld, rScnGraph, rTf, child, childMatrix, rCompound);
         }
 
     }
@@ -220,10 +220,10 @@ void SysJolt::find_shapes_recurse(
 //TODO this is locking on all bodies. Is it bad ?
 //The easy fix is to provide multiple step listeners for disjoint sets of bodies, which can then run in parallel.
 //It might not be worth it considering this function should be quite fast.
-void PhysicsStepListenerImpl::OnStep(float inDeltaTime, PhysicsSystem &rJoltWorld)
+void PhysicsStepListenerImpl::OnStep(float inDeltaTime, PhysicsSystem &rPhysicsSystem)
 {
     //no lock as all bodies are already locked
-    BodyInterface &bodyInterface = rJoltWorld.GetBodyInterfaceNoLock();
+    BodyInterface &bodyInterface = rPhysicsSystem.GetBodyInterfaceNoLock();
     for (BodyId bodyId : m_context->m_bodyIds)
     {
         JPH::BodyID joltBodyId = BToJolt(bodyId);
