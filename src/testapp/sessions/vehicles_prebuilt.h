@@ -24,12 +24,18 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include <osp/tasks/tasks.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/resourcetypes.h>
+#include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/util/logging.h>
+
+#include <entt/core/any.hpp>
 
 #include <adera/activescene/VehicleBuilder.h>
 
 #include <osp/core/copymove_macros.h>
-#include <osp/core/keyed_vector.h>
 #include <osp/core/global_id.h>
 #include <osp/core/strong_id.h>
 

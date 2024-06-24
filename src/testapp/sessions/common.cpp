@@ -23,6 +23,7 @@
  * SOFTWARE.
  */
 #include "common.h"
+#include "../identifiers.h"
 #include "../scenarios.h"
 
 #include <adera/drawing/CameraController.h>

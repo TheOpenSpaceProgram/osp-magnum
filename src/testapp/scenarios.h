@@ -25,13 +25,10 @@
 #pragma once
 
 #include "identifiers.h"
-#include "testapp.h"
 
 // IWYU pragma: begin_exports
 #include <osp/tasks/top_utils.h>
 // IWYU pragma: end_exports
-
-#include <unordered_map>
 
 namespace testapp
 {
@@ -55,14 +52,14 @@ struct MainLoopControl
     bool doRender;
 };
 
-struct ScenarioOption
+struct MainLoopSignals
 {
-    std::string_view m_description;
-    SceneSetupFunc_t m_setup;
+    osp::PipelineId mainLoop;
+    osp::PipelineId inputs;
+    osp::PipelineId renderSync;
+    osp::PipelineId renderResync;
+    osp::PipelineId sceneUpdate;
+    osp::PipelineId sceneRender;
 };
-
-using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
-
-ScenarioMap_t const& scenarios();
 
 } // namespace testapp

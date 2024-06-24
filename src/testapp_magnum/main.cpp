@@ -24,10 +24,10 @@
  */
 
 #include "MagnumApplication.h"
-#include "testapp.h"
+#include <testapp/testapp.h>
 #include "scenarios.h"
-#include "identifiers.h"
-#include "sessions/common.h"
+#include <testapp/identifiers.h>
+#include <testapp/sessions/common.h>
 #include "sessions/magnum.h"
 
 #include <osp/core/Resources.h>

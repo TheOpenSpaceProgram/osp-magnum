@@ -24,7 +24,7 @@
  */
 #pragma once
 
-#include <osp/drawing_gl/rendergl.h>
+#include <osp_drawing_gl/rendergl.h>
 
 #include <Magnum/Shaders/FlatGL.h>
 

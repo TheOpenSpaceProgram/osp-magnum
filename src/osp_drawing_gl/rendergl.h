@@ -26,7 +26,7 @@
 
 #include "FullscreenTriShader.h"
 
-#include "../drawing/drawing_fn.h"
+#include <osp/drawing/drawing_fn.h>
 
 #include <Magnum/GL/Mesh.h>
 #include <Magnum/GL/Texture.h>

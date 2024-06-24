@@ -24,6 +24,8 @@
  */
 #include "terrain.h"
 #include "common.h"
+#include "../identifiers.h"
+
 
 #include <planet-a/chunk_generate.h>
 #include <planet-a/chunk_utils.h>

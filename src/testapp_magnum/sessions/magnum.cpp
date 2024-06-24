@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 #include "magnum.h"
-#include "common.h"
+#include <testapp/sessions/common.h>
 
 #include "../MagnumApplication.h"
 
@@ -31,12 +31,12 @@
 #include <Magnum/GL/Renderer.h>
 
 #include <adera/drawing/CameraController.h>
-#include <adera/drawing_gl/flat_shader.h>
-#include <adera/drawing_gl/phong_shader.h>
-#include <adera/drawing_gl/visualizer_shader.h>
+#include <adera_drawing_gl/flat_shader.h>
+#include <adera_drawing_gl/phong_shader.h>
+#include <adera_drawing_gl/visualizer_shader.h>
 #include <osp/activescene/basic_fn.h>
 #include <osp/drawing/drawing.h>
-#include <osp/drawing_gl/rendergl.h>
+#include <osp_drawing_gl/rendergl.h>
 #include <osp/universe/coordinates.h>
 #include <osp/universe/universe.h>
 

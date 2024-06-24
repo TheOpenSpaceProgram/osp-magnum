@@ -24,10 +24,19 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include <osp/tasks/tasks.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/resourcetypes.h>
+#include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/util/logging.h>
+
+#include <entt/core/any.hpp>
+
 
 namespace testapp::scenes
 {
+
 
 /**
  * @brief Support for Parts, Machines, and Links
@@ -76,7 +85,7 @@ osp::Session setup_signals_float(
 /**
  * @brief Links for Magic Rockets
  *
- * This only sets up links and does not apply forces, see setup_rocket_thrust_newton
+ * This only sets up links and does not apply forces, see setup_rocket_thrust_jolt
  */
 osp::Session setup_mach_rocket(
         osp::TopTaskBuilder&        rBuilder,

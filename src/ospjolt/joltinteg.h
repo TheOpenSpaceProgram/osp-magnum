@@ -283,7 +283,7 @@ public:
     //Should this be called on world creation ? not ideal in case of multiple worlds.
     static void initJoltGlobal()
     {
-        std::call_once(ACtxJoltWorld::initFlag, ACtxJoltWorld::initJoltGlobalInternal);
+        ACtxJoltWorld::initJoltGlobalInternal();
     }
 
     
@@ -314,7 +314,6 @@ private:
 
     static void initJoltGlobalInternal() 
     {
-        
         RegisterDefaultAllocator();
 
         // Install trace and assert callbacks

@@ -35,6 +35,8 @@
 #include <osp/drawing/drawing.h>
 #include <osp/util/UserInputHandler.h>
 
+#include "../identifiers.h"
+
 using namespace adera;
 
 using namespace osp::active;

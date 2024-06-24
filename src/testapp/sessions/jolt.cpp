@@ -25,6 +25,7 @@
 #include "jolt.h"
 #include "physics.h"
 #include "shapes.h"
+#include "../identifiers.h"
 
 #include <osp/activescene/basic_fn.h>
 #include <osp/activescene/physics_fn.h>
@@ -36,7 +37,7 @@
 
 #include <adera/machines/links.h>
 
-#include <ospjolt/activescene/joltinteg_fn.h>
+#include <ospjolt/joltinteg_fn.h>
 
 using namespace osp;
 using namespace osp::active;
@@ -662,7 +663,7 @@ static void rocket_thrust_force(BodyId const bodyId, ACtxJoltWorld const& rJolt,
 
     JPH::BodyID joltBodyId = BToJolt(bodyId);
     Quaternion const rot = QuatJoltToMagnum(bodyInterface.GetRotation(joltBodyId));
-    RVec3 joltCOM = bodyInterface.GetCenterOfMassPosition(joltBodyId) - bodyInterface.GetPosition(joltBodyId);
+    RVec3 joltCOM = bodyInterface.GetPosition(joltBodyId) - bodyInterface.GetCenterOfMassPosition(joltBodyId);
     Vector3 com = Vec3JoltToMagnum(joltCOM);
 
     for (BodyRocket const& bodyRocket : rBodyRockets)

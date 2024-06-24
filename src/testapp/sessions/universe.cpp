@@ -34,6 +34,8 @@
 #include <osp/universe/universe.h>
 #include <osp/util/logging.h>
 
+#include "../identifiers.h"
+
 #include <random>
 
 using namespace adera;

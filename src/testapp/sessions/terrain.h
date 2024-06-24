@@ -24,7 +24,14 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include <osp/tasks/tasks.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/resourcetypes.h>
+#include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/util/logging.h>
+
+#include <entt/core/any.hpp>
 #include "planet-a/chunk_utils.h"
 
 #include <osp/core/math_types.h>

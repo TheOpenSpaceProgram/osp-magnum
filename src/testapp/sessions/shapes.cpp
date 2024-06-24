@@ -24,6 +24,7 @@
  */
 #include "shapes.h"
 #include "common.h"
+#include "../identifiers.h"
 
 #include <adera/drawing/CameraController.h>
 

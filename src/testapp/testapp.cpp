@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 #include "testapp.h"
-#include "identifiers.h"
+#include <testapp/identifiers.h>
 
 #include <osp/core/Resources.h>
 #include <osp/drawing/own_restypes.h>

@@ -26,9 +26,9 @@
 #include "rendergl.h"
 #include "FullscreenTriShader.h"
 
-#include "../core/Resources.h"
-#include "../drawing/own_restypes.h"
-#include "../util/logging.h"
+#include <osp/core/Resources.h>
+#include <osp/drawing/own_restypes.h>
+#include <osp/util/logging.h>
 
 #include <Magnum/ImageView.h>
 

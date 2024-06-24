@@ -25,6 +25,13 @@
 #pragma once
 
 #include <osp/tasks/tasks.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/resourcetypes.h>
+#include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/util/logging.h>
+
+#include <entt/core/any.hpp>
 
 #include <array>
 
@@ -286,24 +293,6 @@ struct PlSignalsFloat
     PipelineDef<EStgCont> sigFloatUpdLoop   {"sigFloatUpdLoop   -"};
 };
 
-
-
-#define TESTAPP_DATA_NEWTON 1, \
-    idNwt
-struct PlNewton
-{
-    PipelineDef<EStgCont> nwtBody           {"nwtBody"};
-};
-
-#define TESTAPP_DATA_NEWTON_FORCES 1, \
-    idNwtFactors
-
-
-
-#define TESTAPP_DATA_NEWTON_ACCEL 1, \
-    idAcceleration
-
-
 #define TESTAPP_DATA_JOLT 1, \
     idJolt
 struct PlJolt
@@ -318,12 +307,6 @@ struct PlJolt
 
 #define TESTAPP_DATA_JOLT_ACCEL 1, \
     idAcceleration
-
-
-
-#define TESTAPP_DATA_ROCKETS_NWT 1, \
-    idRocketsNwt
-
 
 #define TESTAPP_DATA_ROCKETS_JOLT 1, \
     idRocketsJolt
@@ -473,5 +456,15 @@ struct PlVehicleCtrl
 {
     PipelineDef<EStgCont> selectedVehicle   {"selectedVehicle"};
 };
+
+namespace scenes {
+    using enum EStgOptn;
+    using enum EStgCont;
+    using enum EStgIntr;
+    using enum EStgRevd;
+    using enum EStgEvnt;
+    using enum EStgFBO;
+    using enum EStgLink;
+}
 
 } // namespace testapp
