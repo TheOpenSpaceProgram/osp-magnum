@@ -119,7 +119,7 @@ Session setup_solar_system_testplanets(
                                       rMainSpaceCommon.m_satRotations[2],
                                       rMainSpaceCommon.m_satRotations[3]);
 
-    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].satOrbit);
+    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].mass);
 
 
     // Allocate data for all planets
@@ -130,7 +130,7 @@ Session setup_solar_system_testplanets(
     auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, c_planetCount);
     auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations,  rMainSpaceCommon.m_data, c_planetCount);
 
-    auto const nBodyView = rCoordNBody[mainSpace].satOrbit.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+    auto const massView = rCoordNBody[mainSpace].mass.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
     x[Planets::SUN] = 0;
     y[Planets::SUN] = 0;
@@ -143,7 +143,7 @@ Session setup_solar_system_testplanets(
     qy[Planets::SUN] = 0.0;
     qz[Planets::SUN] = 0.0;
     qw[Planets::SUN] = 1.0;
-    nBodyView[Planets::SUN].mass = 1.0 * std::pow(10, 1);
+    massView[Planets::SUN] = 1.0 * std::pow(10, 1);
 
     x[Planets::BLUE] = 0;
     y[Planets::BLUE] = math::mul_2pow<spaceint_t, int>(10, precision);
@@ -156,7 +156,7 @@ Session setup_solar_system_testplanets(
     qy[Planets::BLUE] = 0.0;
     qz[Planets::BLUE] = 0.0;
     qw[Planets::BLUE] = 1.0;
-    nBodyView[Planets::BLUE].mass = 0.0000000001;
+    massView[Planets::BLUE] = 0.0000000001;
 
     x[Planets::RED] = 0;
     y[Planets::RED] = math::mul_2pow<spaceint_t, int>(5, precision);
@@ -169,7 +169,7 @@ Session setup_solar_system_testplanets(
     qy[Planets::RED] = 0.0;
     qz[Planets::RED] = 0.0;
     qw[Planets::RED] = 1.0;
-    nBodyView[Planets::RED].mass = 0.0000000001;
+    massView[Planets::RED] = 0.0000000001;
 
     x[Planets::GREEN] = 0;
     y[Planets::GREEN] = math::mul_2pow<spaceint_t, int>(7.5, precision);
@@ -182,7 +182,7 @@ Session setup_solar_system_testplanets(
     qy[Planets::GREEN] = 0.0;
     qz[Planets::GREEN] = 0.0;
     qw[Planets::GREEN] = 1.0;
-    nBodyView[Planets::GREEN].mass = 0.0000000001;
+    massView[Planets::GREEN] = 0.0000000001;
 
     x[Planets::ORANGE] = 0;
     y[Planets::ORANGE] = math::mul_2pow<spaceint_t, int>(12, precision);
@@ -195,7 +195,7 @@ Session setup_solar_system_testplanets(
     qy[Planets::ORANGE] = 0.0;
     qz[Planets::ORANGE] = 0.0;
     qw[Planets::ORANGE] = 1.0;
-    nBodyView[Planets::ORANGE].mass = 0.0000000001;
+    massView[Planets::ORANGE] = 0.0000000001;
 
     top_emplace< CoSpaceId >(topData, idPlanetMainSpace, mainSpace);
     top_emplace< float >(topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
@@ -224,7 +224,7 @@ Session setup_solar_system_testplanets(
         auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
         auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
 
-        auto const nBodyView = rCoordNBody[planetMainSpace].satOrbit.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+        auto const massView = rCoordNBody[planetMainSpace].mass.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
         for (std::size_t i = 0; i < rMainSpaceCommon.m_satCount; ++i) {
             x[i] += vx[i] * scaleDelta;
@@ -234,8 +234,8 @@ Session setup_solar_system_testplanets(
             for (std::size_t j = 0; j < rMainSpaceCommon.m_satCount; ++j) {
                 if (i == j) { continue; }
 
-                double iMass = nBodyView[i].mass;
-                double jMass = nBodyView[j].mass;
+                double iMass = massView[i];
+                double jMass = massView[j];
 
                 Vector3d const iPos = Vector3d(Vector3g(x[i], y[i], z[i])) * scale;
                 Vector3d const jPos = Vector3d(Vector3g(x[j], y[j], z[j])) * scale;

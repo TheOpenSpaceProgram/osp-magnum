@@ -32,14 +32,9 @@
 namespace testapp::scenes
 {
 
-struct NBodyOrbitData
-{
-    double mass;
-};
-
 struct CoSpaceNBody
 {
-    osp::universe::TypedStrideDesc<NBodyOrbitData> satOrbit;
+    osp::universe::TypedStrideDesc<float> mass;
 };
 
 /**
