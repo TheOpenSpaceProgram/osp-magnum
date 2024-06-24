@@ -37,3 +37,6 @@
 [submodule "3rdparty/freetype"]
 	path = 3rdparty/freetype
 	url = https://github.com/freetype/freetype
+[submodule "3rdparty/JoltPhysics"]
+	path = 3rdparty/JoltPhysics
+	url = https://github.com/jrouwe/JoltPhysics.git
