@@ -23,7 +23,7 @@ Welcome aboard! This document presents a high level overview of the project, aim
 * `src/osp` - Core components for a spaceflight simulator.
 * `src/adera` - Fun stuff. More gameplay and visual-effects focused.
 * `src/planet-a` - Planet terrain subdivision code.
-* `src/ospnewton` - Newton Dynamics physics engine integration
+* `src/ospjolt` - Jolt Physics physics engine integration
 * `src/testapp` - Runnable application. Assembles everything to make test scenarios.
 
 Most components are separate building blocks (with intended uses). The 'game engine' only comes into existence within `testapp`.

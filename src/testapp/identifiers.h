@@ -286,24 +286,6 @@ struct PlSignalsFloat
     PipelineDef<EStgCont> sigFloatUpdLoop   {"sigFloatUpdLoop   -"};
 };
 
-
-
-#define TESTAPP_DATA_NEWTON 1, \
-    idNwt
-struct PlNewton
-{
-    PipelineDef<EStgCont> nwtBody           {"nwtBody"};
-};
-
-#define TESTAPP_DATA_NEWTON_FORCES 1, \
-    idNwtFactors
-
-
-
-#define TESTAPP_DATA_NEWTON_ACCEL 1, \
-    idAcceleration
-
-
 #define TESTAPP_DATA_JOLT 1, \
     idJolt
 struct PlJolt
@@ -318,12 +300,6 @@ struct PlJolt
 
 #define TESTAPP_DATA_JOLT_ACCEL 1, \
     idAcceleration
-
-
-
-#define TESTAPP_DATA_ROCKETS_NWT 1, \
-    idRocketsNwt
-
 
 #define TESTAPP_DATA_ROCKETS_JOLT 1, \
     idRocketsJolt

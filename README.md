@@ -30,7 +30,7 @@ By taking advantage of Entity Component System (ECS) architectures and Data-Orie
   * Scene Graph
   * Configurable multipass Renderer
   * Straightforward interface for integrating any physics engine
-    * Out of the box we integrate with Newton Dynamics 3.14c.
+    * Out of the box we integrate with Jolt Physics 5.0.
     * PRs to support other physics engines welcome!!!
   * Wiring/Connection System
     * Resource flow between ship components
@@ -50,7 +50,7 @@ By taking advantage of Entity Component System (ECS) architectures and Data-Orie
 
 ### Extra
 
-* *Newton Dynamics* Physics Engine integration
+* *Jolt Physics* Physics Engine integration
 * Rockets, RCS, and Fuel tanks
 * Rocket exhaust plume effects 
 * Planet terrain, Icosahedron-based tessellation

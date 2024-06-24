@@ -76,7 +76,7 @@ osp::Session setup_signals_float(
 /**
  * @brief Links for Magic Rockets
  *
- * This only sets up links and does not apply forces, see setup_rocket_thrust_newton
+ * This only sets up links and does not apply forces, see setup_rocket_thrust_jolt
  */
 osp::Session setup_mach_rocket(
         osp::TopTaskBuilder&        rBuilder,
