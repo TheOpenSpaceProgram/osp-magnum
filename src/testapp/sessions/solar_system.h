@@ -43,22 +43,6 @@ struct CoSpaceNBody
 };
 
 /**
- * @brief Core Solar System struct with addressable Coordinate Spaces
- */
-osp::Session setup_solar_system_core(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::PipelineId             updateOn);
-
-/**
- * @brief Represents the physics scene's presence in a Solar System
- */
-osp::Session setup_solar_system_sceneframe(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         solarSystemCore);
-
-/**
  * @brief Initializes planet information, position, mass etc...
  */
 osp::Session setup_solar_system_testplanets(
