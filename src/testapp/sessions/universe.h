@@ -26,10 +26,13 @@
 
 #include "../scenarios.h"
 
+#include "osp/universe/universe.h"
 #include <osp/drawing/drawing.h>
 
 namespace testapp::scenes
 {
+
+// Universe Scenario
 
 /**
  * @brief Core Universe struct with addressable Coordinate Spaces
@@ -72,4 +75,38 @@ osp::Session setup_testplanets_draw(
         osp::Session const&         uniTestPlanets,
         osp::draw::MaterialId const matPlanets,
         osp::draw::MaterialId const matAxis);
+
+// Solar System Scenario
+
+struct CoSpaceNBody
+{
+    osp::universe::TypedStrideDesc<float> mass;
+    osp::universe::TypedStrideDesc<float> radius;
+    osp::universe::TypedStrideDesc<Magnum::Color3> color;
+};
+
+/**
+ * @brief Initializes planet information, position, mass etc...
+ */
+osp::Session setup_solar_system_testplanets(
+    osp::TopTaskBuilder& rBuilder,
+    osp::ArrayView<entt::any>   topData,
+    osp::Session const& solarSystemCore,
+    osp::Session const& solarSystemScnFrame);
+
+
+/**
+ * @brief Draw Solar System, specifically designed for setup_solar_system_test_planets
+ */
+osp::Session setup_solar_system_planets_draw(
+    osp::TopTaskBuilder& rBuilder,
+    osp::ArrayView<entt::any>   topData,
+    osp::Session const& windowApp,
+    osp::Session const& sceneRenderer,
+    osp::Session const& cameraCtrl,
+    osp::Session const& commonScene,
+    osp::Session const& solarSystemCore,
+    osp::Session const& solarSystemScnFrame,
+    osp::Session const& solarSystemTestPlanets,
+    osp::draw::MaterialId const matPlanets);
 }

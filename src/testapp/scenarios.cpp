@@ -38,7 +38,6 @@
 #include "sessions/vehicles.h"
 #include "sessions/vehicles_machines.h"
 #include "sessions/vehicles_prebuilt.h"
-#include "sessions/solar_system.h"
 
 #include "MagnumApplication.h"
 
