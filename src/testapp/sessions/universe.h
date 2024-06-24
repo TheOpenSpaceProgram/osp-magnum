@@ -48,6 +48,15 @@ osp::Session setup_uni_sceneframe(
         osp::Session const&         uniCore);
 
 /**
+ * @brief A single planet setup for landing on
+ */
+osp::Session setup_uni_landerplanet(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         uniCore,
+        osp::Session const&         uniScnFrame);
+
+/**
  * @brief Unrealistic planets test, allows SceneFrame to move around and get captured into planets
  */
 osp::Session setup_uni_testplanets(
@@ -56,6 +65,21 @@ osp::Session setup_uni_testplanets(
         osp::Session const&         uniCore,
         osp::Session const&         uniScnFrame);
 
+/**
+ * @brief Draw universe, specifically designed for setup_uni_landerplanet
+ */
+osp::Session setup_landerplanet_draw(
+        osp::TopTaskBuilder&        rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         windowApp,
+        osp::Session const&         sceneRenderer,
+        osp::Session const&         cameraCtrl,
+        osp::Session const&         commonScene,
+        osp::Session const&         uniCore,
+        osp::Session const&         uniScnFrame,
+        osp::Session const&         uniTestPlanets,
+        osp::draw::MaterialId const matPlanets,
+        osp::draw::MaterialId const matAxis);
 
 /**
  * @brief Draw universe, specifically designed for setup_uni_test_planets

@@ -111,7 +111,7 @@ int main(int argc, char** argv)
     // Command line argument parsing
     Corrade::Utility::Arguments args;
     args.addSkippedPrefix("magnum", "Magnum options")
-        .addOption("scene", "none")         .setHelp("scene",       "Set the scene to launch")
+        .addOption("scene", "lander")         .setHelp("scene",       "Set the scene to launch")
         .addOption("config")                .setHelp("config",      "path to configuration file to use")
         .addBooleanOption("norepl")         .setHelp("norepl",      "don't enter read, evaluate, print, loop.")
         .addBooleanOption("log-exec")       .setHelp("log-exec",    "Log Task/Pipeline Execution (Extremely chatty!)")
@@ -298,6 +298,7 @@ void start_magnum_async(int argc, char** argv)
         g_testApp.close_session(g_testApp.m_windowApp);
 
         OSP_LOG_INFO("Closed Magnum Application");
+        std::exit(0);
     });
     g_magnumThread.swap(t);
 }
@@ -306,6 +307,7 @@ void load_a_bunch_of_stuff()
 {
     using namespace osp::restypes;
     using namespace Magnum;
+    using namespace testapp::scenes;
     using Primitives::ConeFlag;
     using Primitives::CylinderFlag;
 

@@ -12,6 +12,7 @@ OSP-MAGNUM.cbp
 CMakeSettings.json
 out/
 .vs/
+.vscode/
 build/
 .vscode/
 .cache
