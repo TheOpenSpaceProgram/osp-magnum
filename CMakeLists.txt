@@ -136,6 +136,8 @@ IF(MSVC)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG> CACHE PATH "")
   # Force multiprocessor compilation for all projects
   add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/MP>)
+  # Force dynamic runtime library to be in debug mode in debug mode.
+  add_compile_options($<$<CONFIG:Debug>:$<$<CXX_COMPILER_ID:MSVC>:/MDd>>)
   # Don't generate a blah.manifest file for each build target.
   add_link_options(LINKER:/MANIFEST:NO)
 ELSEIF(UNIX)
