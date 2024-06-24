@@ -120,7 +120,8 @@ Session setup_solar_system_testplanets(
                                       rMainSpaceCommon.m_satRotations[3]);
 
     partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].mass);
-
+    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].radius);
+    partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].color);
 
     // Allocate data for all planets
     rMainSpaceCommon.m_data = Array<unsigned char>{Corrade::NoInit, bytesUsed};
@@ -130,7 +131,9 @@ Session setup_solar_system_testplanets(
     auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, c_planetCount);
     auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations,  rMainSpaceCommon.m_data, c_planetCount);
 
-    auto const massView = rCoordNBody[mainSpace].mass.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+    auto const massView   = rCoordNBody[mainSpace].mass  .view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+    auto const radiusView = rCoordNBody[mainSpace].radius.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+    auto const colorView  = rCoordNBody[mainSpace].color .view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
     x[Planets::SUN] = 0;
     y[Planets::SUN] = 0;
@@ -143,7 +146,10 @@ Session setup_solar_system_testplanets(
     qy[Planets::SUN] = 0.0;
     qz[Planets::SUN] = 0.0;
     qw[Planets::SUN] = 1.0;
+
     massView[Planets::SUN] = 1.0 * std::pow(10, 1);
+    radiusView[Planets::SUN] = 1000.0f;
+    colorView[Planets::SUN] = { 1.0f, 1.0f, 0.0f };
 
     x[Planets::BLUE] = 0;
     y[Planets::BLUE] = math::mul_2pow<spaceint_t, int>(10, precision);
@@ -156,7 +162,10 @@ Session setup_solar_system_testplanets(
     qy[Planets::BLUE] = 0.0;
     qz[Planets::BLUE] = 0.0;
     qw[Planets::BLUE] = 1.0;
+
     massView[Planets::BLUE] = 0.0000000001;
+    radiusView[Planets::BLUE] = 500.0f;
+    colorView[Planets::BLUE] = { 0.0f, 0.0f, 1.0f };
 
     x[Planets::RED] = 0;
     y[Planets::RED] = math::mul_2pow<spaceint_t, int>(5, precision);
@@ -169,7 +178,10 @@ Session setup_solar_system_testplanets(
     qy[Planets::RED] = 0.0;
     qz[Planets::RED] = 0.0;
     qw[Planets::RED] = 1.0;
+
     massView[Planets::RED] = 0.0000000001;
+    radiusView[Planets::RED] = 250.0f;
+    colorView[Planets::RED] = { 1.0f, 0.0f, 0.0f };
 
     x[Planets::GREEN] = 0;
     y[Planets::GREEN] = math::mul_2pow<spaceint_t, int>(7.5, precision);
@@ -182,7 +194,10 @@ Session setup_solar_system_testplanets(
     qy[Planets::GREEN] = 0.0;
     qz[Planets::GREEN] = 0.0;
     qw[Planets::GREEN] = 1.0;
+
     massView[Planets::GREEN] = 0.0000000001;
+    radiusView[Planets::GREEN] = 600.0f;
+    colorView[Planets::GREEN] = { 0.0f, 1.0f, 0.0f };
 
     x[Planets::ORANGE] = 0;
     y[Planets::ORANGE] = math::mul_2pow<spaceint_t, int>(12, precision);
@@ -195,7 +210,10 @@ Session setup_solar_system_testplanets(
     qy[Planets::ORANGE] = 0.0;
     qz[Planets::ORANGE] = 0.0;
     qw[Planets::ORANGE] = 1.0;
+
     massView[Planets::ORANGE] = 0.0000000001;
+    radiusView[Planets::ORANGE] = 550.0f;
+    colorView[Planets::ORANGE] = { 1.0f, 0.5f, 0.0f };
 
     top_emplace< CoSpaceId >(topData, idPlanetMainSpace, mainSpace);
     top_emplace< float >(topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
@@ -222,7 +240,6 @@ Session setup_solar_system_testplanets(
 
         auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
         auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
-        auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations,  rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
 
         auto const massView = rCoordNBody[planetMainSpace].mass.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
@@ -347,14 +364,17 @@ Session setup_solar_system_planets_draw(
         .run_on     ({tgWin.resync(Run)})
         .sync_with  ({tgScnRdr.drawEntResized(Done), tgScnRdr.materialDirty(Modify_), tgScnRdr.entMeshDirty(Modify_)})
         .push_to    (out.m_tasks)
-        .args       ({           idDrawing,                 idScnRender,             idNMesh,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
-        .func([]    (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
+        .args       ({           idDrawing,                 idScnRender,             idNMesh,            idPlanetDraw,          idUniverse,               idPlanetMainSpace,                                        idCoordNBody})
+        .func([]    (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
     {
         CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
 
         Material &rMatPlanet = rScnRender.m_materials[rPlanetDraw.matPlanets];
 
         MeshId const sphereMeshId = rNMesh.m_shapeToMesh.at(EShape::Sphere);
+
+        CoSpaceCommon& rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
+        auto const colorView = rCoordNBody[planetMainSpace].color.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
         for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
         {
@@ -366,13 +386,9 @@ Session setup_solar_system_planets_draw(
             rScnRender.m_opaque.insert(drawEnt);
             rMatPlanet.m_ents.insert(drawEnt);
             rMatPlanet.m_dirty.push_back(drawEnt);
-        }
 
-        rScnRender.m_color[rPlanetDraw.drawEnts[Planets::SUN]] = { 1.0f, 1.0f, 0.0f, 1.0f };
-        rScnRender.m_color[rPlanetDraw.drawEnts[Planets::BLUE]] = { 0.0f, 0.0f, 1.0f, 1.0f };
-        rScnRender.m_color[rPlanetDraw.drawEnts[Planets::RED]] = { 1.0f, 0.0f, 0.0f, 1.0f };
-        rScnRender.m_color[rPlanetDraw.drawEnts[Planets::GREEN]] = { 0.0f, 1.0f, 0.0f, 1.0f };
-        rScnRender.m_color[rPlanetDraw.drawEnts[Planets::ORANGE]] = { 1.0f, 0.5f, 0.0f, 1.0f };
+            rScnRender.m_color[drawEnt] = colorView[i];
+        }
     });
 
     rBuilder.task()
@@ -380,12 +396,13 @@ Session setup_solar_system_planets_draw(
         .run_on     ({tgScnRdr.render(Run)})
         .sync_with  ({tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEntResized(Done), tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                 idScnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace})
-        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace) noexcept
+        .args       ({        idDrawing,                 idScnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace,                                        idCoordNBody })
+        .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
     {
         CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
         auto const [x, y, z]        = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
         auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
+        auto const radiusView = rCoordNBody[planetMainSpace].radius.view(arrayView(rMainSpace.m_data), c_planetCount);
 
         // Calculate transform from universe to area/local-space for rendering.
         // This can be generalized by finding a common ancestor within the tree
@@ -420,23 +437,7 @@ Session setup_solar_system_planets_draw(
 
             DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
 
-            float radius = 100.0f;
-
-            if (i == Planets::SUN) {
-                radius = 1000.0f;
-            }
-            else if (i == Planets::BLUE) {
-                radius = 500.0f;
-            }
-            else if (i == Planets::RED) {
-                radius = 250.0f;
-            }
-            else if (i == Planets::GREEN) {
-                radius = 600.0f;
-            }
-            else if (i == Planets::ORANGE) {
-                radius = 550.0f;
-            }
+            float radius = radiusView[i];
 
             rScnRender.m_drawTransform[drawEnt] = 
                 Matrix4::translation(Vector3{ (float)x[i], (float)y[i], (float)z[i] })

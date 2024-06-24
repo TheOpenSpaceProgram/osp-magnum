@@ -35,6 +35,8 @@ namespace testapp::scenes
 struct CoSpaceNBody
 {
     osp::universe::TypedStrideDesc<float> mass;
+    osp::universe::TypedStrideDesc<float> radius;
+    osp::universe::TypedStrideDesc<Magnum::Color3> color;
 };
 
 /**
