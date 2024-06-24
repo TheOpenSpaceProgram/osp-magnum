@@ -44,14 +44,6 @@ using namespace osp;
 namespace testapp::scenes
 {
 
-enum Planets {
-    SUN = 0,
-    BLUE = 1,
-    RED = 2,
-    GREEN = 3,
-    ORANGE = 4,
-};
-
 constexpr unsigned int c_planetCount = 5;
 
 Session setup_solar_system_testplanets(
@@ -115,9 +107,9 @@ Session setup_solar_system_testplanets(
 
     // Rotations use XYZWXYZWXYZWXYZW...
     partition(bytesUsed, c_planetCount, rMainSpaceCommon.m_satRotations[0],
-                                      rMainSpaceCommon.m_satRotations[1],
-                                      rMainSpaceCommon.m_satRotations[2],
-                                      rMainSpaceCommon.m_satRotations[3]);
+                                        rMainSpaceCommon.m_satRotations[1],
+                                        rMainSpaceCommon.m_satRotations[2],
+                                        rMainSpaceCommon.m_satRotations[3]);
 
     partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].mass);
     partition(bytesUsed, c_planetCount, rCoordNBody[mainSpace].radius);
@@ -126,94 +118,50 @@ Session setup_solar_system_testplanets(
     // Allocate data for all planets
     rMainSpaceCommon.m_data = Array<unsigned char>{Corrade::NoInit, bytesUsed};
 
-    // Create easily accessible array views for each component
-    auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, c_planetCount);
-    auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, c_planetCount);
-    auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations,  rMainSpaceCommon.m_data, c_planetCount);
+    std::size_t nextBody = 0;
+    auto const add_body = [&rMainSpaceCommon, &nextBody, &rCoordNBody, &mainSpace]
+    (
+        Vector3l position, 
+        Vector3d velocity, 
+        Magnum::Vector4d rotation, 
+        float mass, 
+        float radius, 
+        Magnum::Color3 color
+    )
+    {
+        auto const [x, y, z]        = sat_views(rMainSpaceCommon.m_satPositions,  rMainSpaceCommon.m_data, c_planetCount);
+        auto const [vx, vy, vz]     = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, c_planetCount);
+        auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations,  rMainSpaceCommon.m_data, c_planetCount);
 
-    auto const massView   = rCoordNBody[mainSpace].mass  .view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
-    auto const radiusView = rCoordNBody[mainSpace].radius.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
-    auto const colorView  = rCoordNBody[mainSpace].color .view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+        auto const massView =   rCoordNBody[mainSpace].mass.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+        auto const radiusView = rCoordNBody[mainSpace].radius.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+        auto const colorView =  rCoordNBody[mainSpace].color.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
-    x[Planets::SUN] = 0;
-    y[Planets::SUN] = 0;
-    z[Planets::SUN] = 0;
-    vx[Planets::SUN] = 0.0;
-    vy[Planets::SUN] = 0;
-    vz[Planets::SUN] = 0.0;
+        x[nextBody] = position.x();
+        y[nextBody] = position.y();
+        z[nextBody] = position.z();
 
-    qx[Planets::SUN] = 0.0;
-    qy[Planets::SUN] = 0.0;
-    qz[Planets::SUN] = 0.0;
-    qw[Planets::SUN] = 1.0;
+        vx[nextBody] = velocity.x();
+        vy[nextBody] = velocity.y();
+        vz[nextBody] = velocity.z();
 
-    massView[Planets::SUN] = 1.0 * std::pow(10, 1);
-    radiusView[Planets::SUN] = 1000.0f;
-    colorView[Planets::SUN] = { 1.0f, 1.0f, 0.0f };
+        qx[nextBody] = rotation.x();
+        qy[nextBody] = rotation.y();
+        qz[nextBody] = rotation.z();
+        qw[nextBody] = rotation.w();
 
-    x[Planets::BLUE] = 0;
-    y[Planets::BLUE] = math::mul_2pow<spaceint_t, int>(10, precision);
-    z[Planets::BLUE] = 0;
-    vx[Planets::BLUE] = 1;
-    vy[Planets::BLUE] = 0.0;
-    vz[Planets::BLUE] = 0.0;
+        massView  [nextBody] = mass;
+        radiusView[nextBody] = radius;
+        colorView [nextBody] = color;
 
-    qx[Planets::BLUE] = 0.0;
-    qy[Planets::BLUE] = 0.0;
-    qz[Planets::BLUE] = 0.0;
-    qw[Planets::BLUE] = 1.0;
+        ++nextBody;
+    };
 
-    massView[Planets::BLUE] = 0.0000000001;
-    radiusView[Planets::BLUE] = 500.0f;
-    colorView[Planets::BLUE] = { 0.0f, 0.0f, 1.0f };
-
-    x[Planets::RED] = 0;
-    y[Planets::RED] = math::mul_2pow<spaceint_t, int>(5, precision);
-    z[Planets::RED] = 0;
-    vx[Planets::RED] = 1.414213562;
-    vy[Planets::RED] = 0.0;
-    vz[Planets::RED] = 0.0;
-
-    qx[Planets::RED] = 0.0;
-    qy[Planets::RED] = 0.0;
-    qz[Planets::RED] = 0.0;
-    qw[Planets::RED] = 1.0;
-
-    massView[Planets::RED] = 0.0000000001;
-    radiusView[Planets::RED] = 250.0f;
-    colorView[Planets::RED] = { 1.0f, 0.0f, 0.0f };
-
-    x[Planets::GREEN] = 0;
-    y[Planets::GREEN] = math::mul_2pow<spaceint_t, int>(7.5, precision);
-    z[Planets::GREEN] = 0;
-    vx[Planets::GREEN] = 1.154700538;
-    vy[Planets::GREEN] = 0.0;
-    vz[Planets::GREEN] = 0.0;
-
-    qx[Planets::GREEN] = 0.0;
-    qy[Planets::GREEN] = 0.0;
-    qz[Planets::GREEN] = 0.0;
-    qw[Planets::GREEN] = 1.0;
-
-    massView[Planets::GREEN] = 0.0000000001;
-    radiusView[Planets::GREEN] = 600.0f;
-    colorView[Planets::GREEN] = { 0.0f, 1.0f, 0.0f };
-
-    x[Planets::ORANGE] = 0;
-    y[Planets::ORANGE] = math::mul_2pow<spaceint_t, int>(12, precision);
-    z[Planets::ORANGE] = 0;
-    vx[Planets::ORANGE] = 0.912870929;
-    vy[Planets::ORANGE] = 0.0;
-    vz[Planets::ORANGE] = 0.0;
-
-    qx[Planets::ORANGE] = 0.0;
-    qy[Planets::ORANGE] = 0.0;
-    qz[Planets::ORANGE] = 0.0;
-    qw[Planets::ORANGE] = 1.0;
-
-    massView[Planets::ORANGE] = 0.0000000001;
-    radiusView[Planets::ORANGE] = 550.0f;
-    colorView[Planets::ORANGE] = { 1.0f, 0.5f, 0.0f };
+    add_body(Vector3l{ 0, 0                                              , 0 }, Vector3d{ 0.0,         0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 1.0f * std::pow(10, 1), 1000.0f, { 1.0f, 1.0f, 0.0f }); // Sun
+    add_body(Vector3l{ 0, math::mul_2pow<spaceint_t, int>( 10, precision), 0 }, Vector3d{ 1.0,         0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 0.0000000001f,           500.0f, { 0.0f, 0.0f, 1.0f }); // Blue
+    add_body(Vector3l{ 0, math::mul_2pow<spaceint_t, int>(  5, precision), 0 }, Vector3d{ 1.414213562, 0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 0.0000000001f,           250.0f, { 1.0f, 0.0f, 0.0f }); // Red
+    add_body(Vector3l{ 0, math::mul_2pow<spaceint_t, int>(7.5, precision), 0 }, Vector3d{ 1.154700538, 0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 0.0000000001f,           600.0f, { 0.0f, 1.0f, 0.0f }); // Green
+    add_body(Vector3l{ 0, math::mul_2pow<spaceint_t, int>( 12, precision), 0 }, Vector3d{ 0.912870929, 0.0, 0.0 }, Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 }, 0.0000000001f,           550.0f, { 1.0f, 0.5f, 0.0f }); // Orange
 
     top_emplace< CoSpaceId >(topData, idPlanetMainSpace, mainSpace);
     top_emplace< float >(topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
