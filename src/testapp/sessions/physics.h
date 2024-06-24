@@ -24,15 +24,20 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include <osp/tasks/tasks.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/resourcetypes.h>
+#include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/util/logging.h>
+
+#include <entt/core/any.hpp>
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/physics.h>
 #include <osp/drawing/drawing.h>
 
 #include <longeron/id_management/registry_stl.hpp>
-
-#include <string_view>
 
 namespace testapp::scenes
 {

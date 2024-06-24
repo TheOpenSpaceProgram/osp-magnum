@@ -28,6 +28,8 @@
 
 #include <osp/core/Resources.h>
 
+#include "../identifiers.h"
+
 using namespace adera;
 
 using namespace osp::link;

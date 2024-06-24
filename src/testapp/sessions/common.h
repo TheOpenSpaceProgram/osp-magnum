@@ -24,7 +24,14 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include <osp/tasks/tasks.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/resourcetypes.h>
+#include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/util/logging.h>
+
+#include <entt/core/any.hpp>
 
 #include <osp/core/copymove_macros.h>
 #include <osp/activescene/basic.h>

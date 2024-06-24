@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 #include "physics.h"
-#include "common.h"
+#include "../identifiers.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/physics_fn.h>

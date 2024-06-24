@@ -25,6 +25,7 @@
 #include "jolt.h"
 #include "physics.h"
 #include "shapes.h"
+#include "../identifiers.h"
 
 #include <osp/activescene/basic_fn.h>
 #include <osp/activescene/physics_fn.h>
@@ -36,7 +37,7 @@
 
 #include <adera/machines/links.h>
 
-#include <ospjolt/activescene/joltinteg_fn.h>
+#include <ospjolt/joltinteg_fn.h>
 
 using namespace osp;
 using namespace osp::active;

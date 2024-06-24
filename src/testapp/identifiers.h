@@ -25,6 +25,13 @@
 #pragma once
 
 #include <osp/tasks/tasks.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/resourcetypes.h>
+#include <osp/tasks/top_execute.h>
+#include <osp/tasks/top_session.h>
+#include <osp/util/logging.h>
+
+#include <entt/core/any.hpp>
 
 #include <array>
 
@@ -449,5 +456,15 @@ struct PlVehicleCtrl
 {
     PipelineDef<EStgCont> selectedVehicle   {"selectedVehicle"};
 };
+
+namespace scenes {
+    using enum EStgOptn;
+    using enum EStgCont;
+    using enum EStgIntr;
+    using enum EStgRevd;
+    using enum EStgEvnt;
+    using enum EStgFBO;
+    using enum EStgLink;
+}
 
 } // namespace testapp

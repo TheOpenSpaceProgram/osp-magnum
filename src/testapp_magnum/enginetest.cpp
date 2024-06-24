@@ -29,10 +29,10 @@
 #include <osp/core/Resources.h>
 #include <osp/drawing/drawing.h>
 #include <osp/drawing/own_restypes.h>
-#include <osp/drawing_gl/rendergl.h>
+#include <osp_drawing_gl/rendergl.h>
 
 #include <adera/drawing/CameraController.h>
-#include <adera/drawing_gl/phong_shader.h>
+#include <adera_drawing_gl/phong_shader.h>
 
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/ImageData.h>

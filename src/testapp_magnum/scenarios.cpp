@@ -25,19 +25,19 @@
 
 #include "scenarios.h"
 #include "enginetest.h"
-#include "identifiers.h"
+#include <testapp/identifiers.h>
 
-#include "sessions/common.h"
+#include <testapp/sessions/common.h>
 #include "sessions/magnum.h"
-#include "sessions/misc.h"
-#include "sessions/jolt.h"
-#include "sessions/physics.h"
-#include "sessions/shapes.h"
-#include "sessions/terrain.h"
-#include "sessions/universe.h"
-#include "sessions/vehicles.h"
-#include "sessions/vehicles_machines.h"
-#include "sessions/vehicles_prebuilt.h"
+#include <testapp/sessions/misc.h>
+#include <testapp/sessions/jolt.h>
+#include <testapp/sessions/physics.h>
+#include <testapp/sessions/shapes.h>
+#include <testapp/sessions/terrain.h>
+#include <testapp/sessions/universe.h>
+#include <testapp/sessions/vehicles.h>
+#include <testapp/sessions/vehicles_machines.h>
+#include <testapp/sessions/vehicles_prebuilt.h>
 
 #include "MagnumApplication.h"
 
@@ -459,15 +459,7 @@ ScenarioMap_t const& scenarios()
 //-----------------------------------------------------------------------------
 
 
-struct MainLoopSignals
-{
-    PipelineId mainLoop;
-    PipelineId inputs;
-    PipelineId renderSync;
-    PipelineId renderResync;
-    PipelineId sceneUpdate;
-    PipelineId sceneRender;
-};
+
 
 /**
  * @brief Runs Task/Pipeline main loop within MagnumApplication
