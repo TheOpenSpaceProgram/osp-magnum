@@ -651,7 +651,7 @@ Session setup_solar_system_testplanets(
     add_body(
         { 0, 0, 0 },
         { 0.0, 0.0, 0.0 },
-        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 1.0f, 0.0f, 0.0f }),
         1.0f * std::pow(10, 1),
         1000.0f,
         { 1.0f, 1.0f, 0.0f });
@@ -660,7 +660,7 @@ Session setup_solar_system_testplanets(
     add_body(
         { 0, math::mul_2pow<spaceint_t, int>(10, precision), 0 },
         { 1.0, 0.0, 0.0 },
-        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 1.0f, 0.0f, 0.0f }),
         0.0000000001f,
         500.0f,
         { 0.0f, 0.0f, 1.0f });
@@ -669,7 +669,7 @@ Session setup_solar_system_testplanets(
     add_body(
         { 0, math::mul_2pow<spaceint_t, int>(5, precision), 0 },
         { 1.414213562, 0.0, 0.0 },
-        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 1.0f, 0.0f, 0.0f }),
         0.0000000001f,
         250.0f,
         { 1.0f, 0.0f, 0.0f });
@@ -678,7 +678,7 @@ Session setup_solar_system_testplanets(
     add_body(
         { 0, math::mul_2pow<spaceint_t, int>(7.5, precision), 0 },
         { 1.154700538, 0.0, 0.0 },
-        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 1.0f, 0.0f, 0.0f }),
         0.0000000001f,
         600.0f,
         { 0.0f, 1.0f, 0.0f });
@@ -687,7 +687,7 @@ Session setup_solar_system_testplanets(
     add_body(
         { 0, math::mul_2pow<spaceint_t, int>(12, precision), 0 },
         { 0.912870929, 0.0, 0.0 },
-        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 1.0f, 0.0f, 0.0f }),
         0.0000000001f,
         550.0f,
         { 1.0f, 0.5f, 0.0f });
