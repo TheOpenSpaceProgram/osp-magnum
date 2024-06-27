@@ -366,6 +366,13 @@ struct PlUniSceneFrame
 
 //-----------------------------------------------------------------------------
 
+// Solar System sessions
+
+#define TESTAPP_DATA_SOLAR_SYSTEM_PLANETS 3, \
+    idPlanetMainSpace, idSatSurfaceSpaces, idCoordNBody
+
+//-----------------------------------------------------------------------------
+
 // Renderer sessions, tend to exist only when the window is open
 
 #define TESTAPP_DATA_WINDOW_APP 1, \

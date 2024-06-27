@@ -446,6 +446,70 @@ static ScenarioMap_t make_scenarios()
         return setup_renderer;
     });
 
+    add_scenario("solar-system", "Scenario that simulates a basic solar system.",
+        [](TestApp& rTestApp) -> RendererSetupFunc_t
+        {
+            #define SCENE_SESSIONS      scene, commonScene, solarSystemCore, solarSystemScnFrame, solarSystemTestPlanets
+            #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shFlat, planetsDraw
+
+            using namespace testapp::scenes;
+
+            auto const  defaultPkg = rTestApp.m_defaultPkg;
+            auto const  application = rTestApp.m_application;
+            auto& rTopData = rTestApp.m_topData;
+
+            TopTaskBuilder builder{ rTestApp.m_tasks, rTestApp.m_scene.m_edges, rTestApp.m_taskData };
+
+            auto& [SCENE_SESSIONS] = resize_then_unpack<5>(rTestApp.m_scene.m_sessions);
+
+            // Compose together lots of Sessions
+            scene = setup_scene(builder, rTopData, application);
+            commonScene = setup_common_scene(builder, rTopData, scene, application, defaultPkg);
+
+            auto const tgApp = application.get_pipelines< PlApplication >();
+
+            solarSystemCore = setup_uni_core(builder, rTopData, tgApp.mainLoop);
+            solarSystemScnFrame = setup_uni_sceneframe(builder, rTopData, solarSystemCore);
+            solarSystemTestPlanets = setup_solar_system_testplanets(builder, rTopData, solarSystemCore, solarSystemScnFrame);
+
+            RendererSetupFunc_t const setup_renderer = [](TestApp& rTestApp)
+            {
+                auto const  application = rTestApp.m_application;
+                auto const  windowApp = rTestApp.m_windowApp;
+                auto const  magnum = rTestApp.m_magnum;
+                auto const  defaultPkg = rTestApp.m_defaultPkg;
+                auto& rTopData = rTestApp.m_topData;
+
+                TopTaskBuilder builder{ rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData };
+
+                auto& [SCENE_SESSIONS] = unpack<5>(rTestApp.m_scene.m_sessions);
+                auto& [RENDERER_SESSIONS] = resize_then_unpack<6>(rTestApp.m_renderer.m_sessions);
+
+                sceneRenderer = setup_scene_renderer(builder, rTopData, application, windowApp, commonScene);
+                create_materials(rTopData, sceneRenderer, sc_materialCount);
+
+                magnumScene = setup_magnum_scene(builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
+                cameraCtrl = setup_camera_ctrl(builder, rTopData, windowApp, sceneRenderer, magnumScene);
+
+                OSP_DECLARE_GET_DATA_IDS(cameraCtrl, TESTAPP_DATA_CAMERA_CTRL);
+
+                // Zoom out the camera so that all planets are in view
+                auto& rCameraController = top_get<ACtxCameraController>(rTopData, idCamCtrl);
+                rCameraController.m_orbitDistance += 75000;
+
+                cameraFree = setup_camera_free(builder, rTopData, windowApp, scene, cameraCtrl);
+                shFlat = setup_shader_flat(builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+                planetsDraw = setup_solar_system_planets_draw(builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, solarSystemCore, solarSystemScnFrame, solarSystemTestPlanets, sc_matFlat);
+
+                setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
+            };
+
+            #undef SCENE_SESSIONS
+            #undef RENDERER_SESSIONS
+
+            return setup_renderer;
+        });
+
     return scenarioMap;
 }
 
