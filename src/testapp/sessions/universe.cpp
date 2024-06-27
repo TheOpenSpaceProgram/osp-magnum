@@ -611,93 +611,86 @@ Session setup_solar_system_testplanets(
     rMainSpaceCommon.m_data = Array<unsigned char>{ Corrade::NoInit, bytesUsed };
 
     std::size_t nextBody = 0;
-    auto const add_body = [&rMainSpaceCommon, &nextBody, &rCoordNBody, &mainSpace]
-    (
+    auto const add_body = [&rMainSpaceCommon, &nextBody, &rCoordNBody, &mainSpace] (
         Vector3l position,
         Vector3d velocity,
         Magnum::Vector4d rotation,
         float mass,
         float radius,
-        Magnum::Color3 color
-        )
-        {
-            auto const [x, y, z] = sat_views(rMainSpaceCommon.m_satPositions, rMainSpaceCommon.m_data, c_planetCount);
-            auto const [vx, vy, vz] = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, c_planetCount);
-            auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations, rMainSpaceCommon.m_data, c_planetCount);
+        Magnum::Color3 color)
+    {
+        auto const [x, y, z] = sat_views(rMainSpaceCommon.m_satPositions, rMainSpaceCommon.m_data, c_planetCount);
+        auto const [vx, vy, vz] = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, c_planetCount);
+        auto const [qx, qy, qz, qw] = sat_views(rMainSpaceCommon.m_satRotations, rMainSpaceCommon.m_data, c_planetCount);
 
-            auto const massView = rCoordNBody[mainSpace].mass.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
-            auto const radiusView = rCoordNBody[mainSpace].radius.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
-            auto const colorView = rCoordNBody[mainSpace].color.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+        auto const massView = rCoordNBody[mainSpace].mass.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+        auto const radiusView = rCoordNBody[mainSpace].radius.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+        auto const colorView = rCoordNBody[mainSpace].color.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
-            x[nextBody] = position.x();
-            y[nextBody] = position.y();
-            z[nextBody] = position.z();
+        x[nextBody] = position.x();
+        y[nextBody] = position.y();
+        z[nextBody] = position.z();
 
-            vx[nextBody] = velocity.x();
-            vy[nextBody] = velocity.y();
-            vz[nextBody] = velocity.z();
+        vx[nextBody] = velocity.x();
+        vy[nextBody] = velocity.y();
+        vz[nextBody] = velocity.z();
 
-            qx[nextBody] = rotation.x();
-            qy[nextBody] = rotation.y();
-            qz[nextBody] = rotation.z();
-            qw[nextBody] = rotation.w();
+        qx[nextBody] = rotation.x();
+        qy[nextBody] = rotation.y();
+        qz[nextBody] = rotation.z();
+        qw[nextBody] = rotation.w();
 
-            massView[nextBody] = mass;
-            radiusView[nextBody] = radius;
-            colorView[nextBody] = color;
+        massView[nextBody] = mass;
+        radiusView[nextBody] = radius;
+        colorView[nextBody] = color;
 
-            ++nextBody;
-        };
+        ++nextBody;
+    };
 
-    add_body // Sun
-    (
+    // Sun
+    add_body(
         Vector3l{ 0, 0, 0 },
         Vector3d{ 0.0, 0.0, 0.0 },
         Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
         1.0f * std::pow(10, 1),
         1000.0f,
-        { 1.0f, 1.0f, 0.0f }
-    );
+        { 1.0f, 1.0f, 0.0f });
 
-    add_body // Blue Planet
-    (
+    // Blue Planet
+    add_body(
         Vector3l{ 0, math::mul_2pow<spaceint_t, int>(10, precision), 0 },
         Vector3d{ 1.0,         0.0, 0.0 },
         Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
         0.0000000001f,
         500.0f,
-        { 0.0f, 0.0f, 1.0f }
-    );
+        { 0.0f, 0.0f, 1.0f });
 
-    add_body // Red Planet
-    (
+    // Red Planet
+    add_body(
         Vector3l{ 0, math::mul_2pow<spaceint_t, int>(5, precision), 0 },
         Vector3d{ 1.414213562, 0.0, 0.0 },
         Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
         0.0000000001f,
         250.0f,
-        { 1.0f, 0.0f, 0.0f }
-    );
+        { 1.0f, 0.0f, 0.0f });
 
-    add_body // Green Planet
-    (
+    // Green Planet
+    add_body(
         Vector3l{ 0, math::mul_2pow<spaceint_t, int>(7.5, precision), 0 },
         Vector3d{ 1.154700538, 0.0, 0.0 },
         Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
         0.0000000001f,
         600.0f,
-        { 0.0f, 1.0f, 0.0f }
-    );
+        { 0.0f, 1.0f, 0.0f });
 
-    add_body // Orange Planet
-    (
+    // Orange Planet
+    add_body(
         Vector3l{ 0, math::mul_2pow<spaceint_t, int>(12, precision), 0 },
         Vector3d{ 0.912870929, 0.0, 0.0 },
         Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
         0.0000000001f,
         550.0f,
-        { 1.0f, 0.5f, 0.0f }
-    );
+        { 1.0f, 0.5f, 0.0f });
 
     top_emplace< CoSpaceId >(topData, idPlanetMainSpace, mainSpace);
     top_emplace< float >(topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
@@ -716,44 +709,44 @@ Session setup_solar_system_testplanets(
         .push_to(out.m_tasks)
         .args({ idUniverse,               idPlanetMainSpace,            idScnFrame,                      idSatSurfaceSpaces,           tgUniDeltaTimeIn,                                        idCoordNBody })
         .func([](Universe& rUniverse, CoSpaceId const planetMainSpace, SceneFrame& rScnFrame, CoSpaceIdVec_t const& rSatSurfaceSpaces, float const uniDeltaTimeIn, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
-            {
-                CoSpaceCommon& rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
+    {
+        CoSpaceCommon& rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
 
-                auto const scale = osp::math::mul_2pow<double, int>(1.0, -rMainSpaceCommon.m_precision);
-                double const scaleDelta = uniDeltaTimeIn / scale;
+        auto const scale = osp::math::mul_2pow<double, int>(1.0, -rMainSpaceCommon.m_precision);
+        double const scaleDelta = uniDeltaTimeIn / scale;
 
-                auto const [x, y, z] = sat_views(rMainSpaceCommon.m_satPositions, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
-                auto const [vx, vy, vz] = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
+        auto const [x, y, z] = sat_views(rMainSpaceCommon.m_satPositions, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
+        auto const [vx, vy, vz] = sat_views(rMainSpaceCommon.m_satVelocities, rMainSpaceCommon.m_data, rMainSpaceCommon.m_satCount);
 
-                auto const massView = rCoordNBody[planetMainSpace].mass.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+        auto const massView = rCoordNBody[planetMainSpace].mass.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
-                for (std::size_t i = 0; i < rMainSpaceCommon.m_satCount; ++i) {
-                    x[i] += vx[i] * scaleDelta;
-                    y[i] += vy[i] * scaleDelta;
-                    z[i] += vz[i] * scaleDelta;
+        for (std::size_t i = 0; i < rMainSpaceCommon.m_satCount; ++i) {
+            x[i] += vx[i] * scaleDelta;
+            y[i] += vy[i] * scaleDelta;
+            z[i] += vz[i] * scaleDelta;
 
-                    for (std::size_t j = 0; j < rMainSpaceCommon.m_satCount; ++j) {
-                        if (i == j) { continue; }
+            for (std::size_t j = 0; j < rMainSpaceCommon.m_satCount; ++j) {
+                if (i == j) { continue; }
 
-                        double iMass = massView[i];
-                        double jMass = massView[j];
+                double iMass = massView[i];
+                double jMass = massView[j];
 
-                        Vector3d const iPos = Vector3d(Vector3g(x[i], y[i], z[i])) * scale;
-                        Vector3d const jPos = Vector3d(Vector3g(x[j], y[j], z[j])) * scale;
+                Vector3d const iPos = Vector3d(Vector3g(x[i], y[i], z[i])) * scale;
+                Vector3d const jPos = Vector3d(Vector3g(x[j], y[j], z[j])) * scale;
 
-                        double r = (jPos - iPos).length();
-                        Vector3d direction = (jPos - iPos).normalized();
+                double r = (jPos - iPos).length();
+                Vector3d direction = (jPos - iPos).normalized();
 
-                        double forceMagnitude = (iMass * jMass) / (r * r);
-                        Vector3d force = direction * forceMagnitude;
-                        Vector3d acceleration = (force / iMass);
+                double forceMagnitude = (iMass * jMass) / (r * r);
+                Vector3d force = direction * forceMagnitude;
+                Vector3d acceleration = (force / iMass);
 
-                        vx[i] += acceleration.x() * uniDeltaTimeIn;
-                        vy[i] += acceleration.y() * uniDeltaTimeIn;
-                        vz[i] += acceleration.z() * uniDeltaTimeIn;
-                    }
-                }
-            });
+                vx[i] += acceleration.x() * uniDeltaTimeIn;
+                vy[i] += acceleration.y() * uniDeltaTimeIn;
+                vz[i] += acceleration.z() * uniDeltaTimeIn;
+            }
+        }
+    });
 
     return out;
 } // setup_solar_system_testplanets
@@ -799,30 +792,30 @@ Session setup_solar_system_planets_draw(
         .push_to(out.m_tasks)
         .args({ idCamCtrl,            idScnFrame })
         .func([](ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
-            {
-                if (!rCamCtrl.m_target.has_value())
-                {
-                    return;
-                }
-                Vector3& rCamPl = rCamCtrl.m_target.value();
+    {
+        if (!rCamCtrl.m_target.has_value())
+        {
+            return;
+        }
+        Vector3& rCamPl = rCamCtrl.m_target.value();
 
-                // check origin translation
-                // ADL used for Magnum::Math::sign/floor/abs
-                float const maxDist = 512.0f;
-                Vector3 const translate = sign(rCamPl) * floor(abs(rCamPl) / maxDist) * maxDist;
+        // check origin translation
+        // ADL used for Magnum::Math::sign/floor/abs
+        float const maxDist = 512.0f;
+        Vector3 const translate = sign(rCamPl) * floor(abs(rCamPl) / maxDist) * maxDist;
 
-                if (!translate.isZero())
-                {
-                    rCamCtrl.m_transform.translation() -= translate;
-                    rCamPl -= translate;
+        if (!translate.isZero())
+        {
+            rCamCtrl.m_transform.translation() -= translate;
+            rCamPl -= translate;
 
-                    // a bit janky to modify universe stuff directly here, but it works lol
-                    Vector3 const rotated = Quaternion(rScnFrame.m_rotation).transformVector(translate);
-                    rScnFrame.m_position += Vector3g(math::mul_2pow<Vector3, int>(rotated, rScnFrame.m_precision));
-                }
+            // a bit janky to modify universe stuff directly here, but it works lol
+            Vector3 const rotated = Quaternion(rScnFrame.m_rotation).transformVector(translate);
+            rScnFrame.m_position += Vector3g(math::mul_2pow<Vector3, int>(rotated, rScnFrame.m_precision));
+        }
 
-                rScnFrame.m_scenePosition = Vector3g(math::mul_2pow<Vector3, int>(rCamCtrl.m_target.value(), rScnFrame.m_precision));
-            });
+        rScnFrame.m_scenePosition = Vector3g(math::mul_2pow<Vector3, int>(rCamCtrl.m_target.value(), rScnFrame.m_precision));
+    });
 
     rBuilder.task()
         .name("Resync test planets, create DrawEnts")
@@ -831,12 +824,12 @@ Session setup_solar_system_planets_draw(
         .push_to(out.m_tasks)
         .args({ idScnRender,            idPlanetDraw,          idUniverse,               idPlanetMainSpace })
         .func([](ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
-            {
-                CoSpaceCommon& rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+    {
+        CoSpaceCommon& rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
 
-                rPlanetDraw.drawEnts.resize(rMainSpace.m_satCount, lgrn::id_null<DrawEnt>());
-                rScnRender.m_drawIds.create(rPlanetDraw.drawEnts.begin(), rPlanetDraw.drawEnts.end());
-            });
+        rPlanetDraw.drawEnts.resize(rMainSpace.m_satCount, lgrn::id_null<DrawEnt>());
+        rScnRender.m_drawIds.create(rPlanetDraw.drawEnts.begin(), rPlanetDraw.drawEnts.end());
+    });
 
     rBuilder.task()
         .name("Resync test planets, add mesh and material")
@@ -845,30 +838,30 @@ Session setup_solar_system_planets_draw(
         .push_to(out.m_tasks)
         .args({ idDrawing,                 idScnRender,             idNMesh,            idPlanetDraw,          idUniverse,               idPlanetMainSpace,                                        idCoordNBody })
         .func([](ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
-            {
-                CoSpaceCommon& rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+    {
+        CoSpaceCommon& rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
 
-                Material& rMatPlanet = rScnRender.m_materials[rPlanetDraw.matPlanets];
+        Material& rMatPlanet = rScnRender.m_materials[rPlanetDraw.matPlanets];
 
-                MeshId const sphereMeshId = rNMesh.m_shapeToMesh.at(EShape::Sphere);
+        MeshId const sphereMeshId = rNMesh.m_shapeToMesh.at(EShape::Sphere);
 
-                CoSpaceCommon& rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
-                auto const colorView = rCoordNBody[planetMainSpace].color.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
+        CoSpaceCommon& rMainSpaceCommon = rUniverse.m_coordCommon[planetMainSpace];
+        auto const colorView = rCoordNBody[planetMainSpace].color.view(arrayView(rMainSpaceCommon.m_data), c_planetCount);
 
-                for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
-                {
-                    DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
+        for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+        {
+            DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
 
-                    rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
-                    rScnRender.m_meshDirty.push_back(drawEnt);
-                    rScnRender.m_visible.insert(drawEnt);
-                    rScnRender.m_opaque.insert(drawEnt);
-                    rMatPlanet.m_ents.insert(drawEnt);
-                    rMatPlanet.m_dirty.push_back(drawEnt);
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(sphereMeshId);
+            rScnRender.m_meshDirty.push_back(drawEnt);
+            rScnRender.m_visible.insert(drawEnt);
+            rScnRender.m_opaque.insert(drawEnt);
+            rMatPlanet.m_ents.insert(drawEnt);
+            rMatPlanet.m_dirty.push_back(drawEnt);
 
-                    rScnRender.m_color[drawEnt] = colorView[i];
-                }
-            });
+            rScnRender.m_color[drawEnt] = colorView[i];
+        }
+    });
 
     rBuilder.task()
         .name("Reposition test planet DrawEnts")
@@ -877,55 +870,55 @@ Session setup_solar_system_planets_draw(
         .push_to(out.m_tasks)
         .args({ idDrawing,                 idScnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace,                                        idCoordNBody })
         .func([](ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
-            {
-                CoSpaceCommon& rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
-                auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
-                auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
-                auto const radiusView = rCoordNBody[planetMainSpace].radius.view(arrayView(rMainSpace.m_data), c_planetCount);
+    {
+        CoSpaceCommon& rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
+        auto const [x, y, z] = sat_views(rMainSpace.m_satPositions, rMainSpace.m_data, rMainSpace.m_satCount);
+        auto const [qx, qy, qz, qw] = sat_views(rMainSpace.m_satRotations, rMainSpace.m_data, rMainSpace.m_satCount);
+        auto const radiusView = rCoordNBody[planetMainSpace].radius.view(arrayView(rMainSpace.m_data), c_planetCount);
 
-                // Calculate transform from universe to area/local-space for rendering.
-                // This can be generalized by finding a common ancestor within the tree
-                // of coordinate spaces. Since there's only two possibilities, an if
-                // statement works.
-                CoordTransformer mainToArea;
-                if (rScnFrame.m_parent == planetMainSpace)
-                {
-                    mainToArea = coord_parent_to_child(rMainSpace, rScnFrame);
-                }
-                else
-                {
-                    CoSpaceId const landedId = rScnFrame.m_parent;
-                    CoSpaceCommon& rLanded = rUniverse.m_coordCommon[landedId];
+        // Calculate transform from universe to area/local-space for rendering.
+        // This can be generalized by finding a common ancestor within the tree
+        // of coordinate spaces. Since there's only two possibilities, an if
+        // statement works.
+        CoordTransformer mainToArea;
+        if (rScnFrame.m_parent == planetMainSpace)
+        {
+            mainToArea = coord_parent_to_child(rMainSpace, rScnFrame);
+        }
+        else
+        {
+            CoSpaceId const landedId = rScnFrame.m_parent;
+            CoSpaceCommon& rLanded = rUniverse.m_coordCommon[landedId];
 
-                    CoSpaceTransform const landedTf = coord_get_transform(rLanded, rLanded, x, y, z, qx, qy, qz, qw);
-                    CoordTransformer const mainToLanded = coord_parent_to_child(rMainSpace, landedTf);
-                    CoordTransformer const landedToArea = coord_parent_to_child(landedTf, rScnFrame);
+            CoSpaceTransform const landedTf = coord_get_transform(rLanded, rLanded, x, y, z, qx, qy, qz, qw);
+            CoordTransformer const mainToLanded = coord_parent_to_child(rMainSpace, landedTf);
+            CoordTransformer const landedToArea = coord_parent_to_child(landedTf, rScnFrame);
 
-                    mainToArea = coord_composite(landedToArea, mainToLanded);
-                }
-                Quaternion const mainToAreaRot{ mainToArea.rotation() };
+            mainToArea = coord_composite(landedToArea, mainToLanded);
+        }
+        Quaternion const mainToAreaRot{ mainToArea.rotation() };
 
-                float const f = math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
+        float const f = math::mul_2pow<float, int>(1.0f, -rMainSpace.m_precision);
 
-                for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
-                {
-                    Vector3g const relative = mainToArea.transform_position({ x[i], y[i], z[i] });
-                    Vector3 const relativeMeters = Vector3(relative);
+        for (std::size_t i = 0; i < rMainSpace.m_satCount; ++i)
+        {
+            Vector3g const relative = mainToArea.transform_position({ x[i], y[i], z[i] });
+            Vector3 const relativeMeters = Vector3(relative);
 
-                    Quaterniond const rot{ {qx[i], qy[i], qz[i]}, qw[i] };
+            Quaterniond const rot{ {qx[i], qy[i], qz[i]}, qw[i] };
 
-                    DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
+            DrawEnt const drawEnt = rPlanetDraw.drawEnts[i];
 
-                    float radius = radiusView[i];
+            float radius = radiusView[i];
 
-                    rScnRender.m_drawTransform[drawEnt] =
-                        Matrix4::translation(Vector3{ (float)x[i], (float)y[i], (float)z[i] })
-                        * Matrix4::scaling({ radius, radius, radius })
-                        * Matrix4 {
-                        (mainToAreaRot * Quaternion{ rot }).toMatrix()
-                    };
-                }
-            });
+            rScnRender.m_drawTransform[drawEnt] =
+                Matrix4::translation(Vector3{ (float)x[i], (float)y[i], (float)z[i] })
+                * Matrix4::scaling({ radius, radius, radius })
+                * Matrix4 {
+                (mainToAreaRot * Quaternion{ rot }).toMatrix()
+            };
+        }
+    });
 
     return out;
 } // setup_solar_system_planets_draw
