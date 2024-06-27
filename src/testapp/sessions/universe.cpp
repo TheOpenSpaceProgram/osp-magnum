@@ -614,7 +614,7 @@ Session setup_solar_system_testplanets(
     auto const add_body = [&rMainSpaceCommon, &nextBody, &rCoordNBody, &mainSpace] (
         Vector3l position,
         Vector3d velocity,
-        Magnum::Vector4d rotation,
+        Quaternion rotation,
         float mass,
         float radius,
         Magnum::Color3 color)
@@ -635,10 +635,10 @@ Session setup_solar_system_testplanets(
         vy[nextBody] = velocity.y();
         vz[nextBody] = velocity.z();
 
-        qx[nextBody] = rotation.x();
-        qy[nextBody] = rotation.y();
-        qz[nextBody] = rotation.z();
-        qw[nextBody] = rotation.w();
+        qx[nextBody] = rotation.vector().x();
+        qy[nextBody] = rotation.vector().y();
+        qz[nextBody] = rotation.vector().z();
+        qw[nextBody] = rotation.scalar();
 
         massView[nextBody] = mass;
         radiusView[nextBody] = radius;
@@ -649,45 +649,45 @@ Session setup_solar_system_testplanets(
 
     // Sun
     add_body(
-        Vector3l{ 0, 0, 0 },
-        Vector3d{ 0.0, 0.0, 0.0 },
-        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
+        { 0, 0, 0 },
+        { 0.0, 0.0, 0.0 },
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
         1.0f * std::pow(10, 1),
         1000.0f,
         { 1.0f, 1.0f, 0.0f });
 
     // Blue Planet
     add_body(
-        Vector3l{ 0, math::mul_2pow<spaceint_t, int>(10, precision), 0 },
-        Vector3d{ 1.0,         0.0, 0.0 },
-        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
+        { 0, math::mul_2pow<spaceint_t, int>(10, precision), 0 },
+        { 1.0, 0.0, 0.0 },
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
         0.0000000001f,
         500.0f,
         { 0.0f, 0.0f, 1.0f });
 
     // Red Planet
     add_body(
-        Vector3l{ 0, math::mul_2pow<spaceint_t, int>(5, precision), 0 },
-        Vector3d{ 1.414213562, 0.0, 0.0 },
-        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
+        { 0, math::mul_2pow<spaceint_t, int>(5, precision), 0 },
+        { 1.414213562, 0.0, 0.0 },
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
         0.0000000001f,
         250.0f,
         { 1.0f, 0.0f, 0.0f });
 
     // Green Planet
     add_body(
-        Vector3l{ 0, math::mul_2pow<spaceint_t, int>(7.5, precision), 0 },
-        Vector3d{ 1.154700538, 0.0, 0.0 },
-        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
+        { 0, math::mul_2pow<spaceint_t, int>(7.5, precision), 0 },
+        { 1.154700538, 0.0, 0.0 },
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
         0.0000000001f,
         600.0f,
         { 0.0f, 1.0f, 0.0f });
 
     // Orange Planet
     add_body(
-        Vector3l{ 0, math::mul_2pow<spaceint_t, int>(12, precision), 0 },
-        Vector3d{ 0.912870929, 0.0, 0.0 },
-        Magnum::Vector4d{ 0.0, 0.0, 0.0, 1.0 },
+        { 0, math::mul_2pow<spaceint_t, int>(12, precision), 0 },
+        { 0.912870929, 0.0, 0.0 },
+        Quaternion::rotation(Rad{ 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f }),
         0.0000000001f,
         550.0f,
         { 1.0f, 0.5f, 0.0f });
