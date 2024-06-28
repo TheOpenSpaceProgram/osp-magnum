@@ -56,25 +56,30 @@ target_sources(osp-gdextension PRIVATE "${CPP_FILES}" "${H_FILES}")
 
 target_include_directories(osp-gdextension PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(osp-gdextension PRIVATE godot-cpp OpenSpaceProgram Adera PlanetA OspJolt)
+target_link_libraries(osp-gdextension PRIVATE godot-cpp OpenSpaceProgram Adera PlanetA OspJolt OspTestApp)
 
 target_compile_options(osp-gdextension PRIVATE "-static")
 
 
 # Install library, extension file, and support files in ${CMAKE_INSTALL_PREFIX}/${PROJECT_NAME}
-set( INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/osp-gdextension/" )
+set( INSTALL_DIR "${CMAKE_INSTALL_PREFIX}" )
 
 add_subdirectory( templates )
 
 install( TARGETS osp-gdextension
 LIBRARY
-DESTINATION ${INSTALL_DIR}/${LIB_DIR}
+DESTINATION "${INSTALL_DIR}/osp-gdextension/${LIB_DIR}"
 RUNTIME
-DESTINATION ${INSTALL_DIR}/${LIB_DIR}
+DESTINATION "${INSTALL_DIR}/osp-gdextension/${LIB_DIR}"
 )
 
 # Copy over support files
 install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/support_files/"
+DESTINATION "${INSTALL_DIR}/osp-gdextension/"
+PATTERN ".*" EXCLUDE
+)
+
+install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../../bin/OSPData"
 DESTINATION ${INSTALL_DIR}
 PATTERN ".*" EXCLUDE
 )

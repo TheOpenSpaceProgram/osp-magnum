@@ -15,7 +15,7 @@ set( GD_EXTENSION_FILE_INPUT osp.gdextension )
 # Install the gdextension file
 install(
     FILES ${GD_EXTENSION_FILE_INPUT}
-    DESTINATION ${INSTALL_DIR}
+    DESTINATION "${INSTALL_DIR}/osp-gdextension"
 )
 
 unset( ALLOWED_BUILDS )

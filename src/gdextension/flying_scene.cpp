@@ -1,25 +1,31 @@
 #include "flying_scene.h"
-#include "ospjolt/joltinteg.h"
-#include "ospjolt/joltinteg_fn.h"
+
+#include "osp/tasks/top_utils.h"
+#include "scenarios.h"
+#include "sessions/godot.h"
+#include "testapp/sessions/common.h"
 #include "testapp/testapp.h"
+
+#include <Corrade/Utility/Debug.h>
 #include <Magnum/MeshTools/Transform.h>
 #include <Magnum/Primitives/Cone.h>
 #include <Magnum/Primitives/Cube.h>
 #include <Magnum/Primitives/Cylinder.h>
 #include <Magnum/Primitives/Grid.h>
 #include <Magnum/Primitives/Icosphere.h>
+#include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/MeshData.h>
+#include <Magnum/Trade/TextureData.h>
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
-#include <godot_cpp/classes/world3d.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
 #include <godot_cpp/classes/viewport.hpp>
+#include <godot_cpp/classes/world3d.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2.hpp>
-
 #include <osp/core/Resources.h>
 #include <osp/core/string_concat.h>
 #include <osp/drawing/own_restypes.h>
@@ -30,162 +36,295 @@
 
 using namespace godot;
 
-void FlyingScene::_bind_methods() 
+void FlyingScene::_bind_methods()
 {
+    ClassDB::bind_method(D_METHOD("get_scene"), &FlyingScene::get_scene);
+    ClassDB::bind_method(D_METHOD("set_scene", "scene"), &FlyingScene::set_scene);
+    ClassDB::add_property(
+        "FlyingScene", PropertyInfo(Variant::STRING, "scene"), "set_scene", "get_scene");
 }
 
-FlyingScene::FlyingScene() 
+FlyingScene::FlyingScene()
 {
-	// Initialize any variables here.
-	//m_testApp.m_pExecutor = new ExecutorType();
-	//m_testApp.m_topData.resize(64);
-	//load_a_bunch_of_stuff();
+
+    // setup the Debug thingies
+    new Corrade::Utility::Debug{ &m_dbgStream };
+    new Corrade::Utility::Warning{ &m_warnStream };
+    new Corrade::Utility::Error{ &m_errStream };
+
+    // Initialize any variables here.
+    m_testApp.m_pExecutor = new ExecutorType();
+    m_testApp.m_topData.resize(64);
+    load_a_bunch_of_stuff();
+    godot::UtilityFunctions::print("Resources loaded");
 }
 
-FlyingScene::~FlyingScene() 
+FlyingScene::~FlyingScene()
 {
-	//delete m_joltWorld;
-	//delete (ExecutorType*) m_testApp.m_pExecutor;
+    // delete m_joltWorld;
+    // delete (ExecutorType*) m_testApp.m_pExecutor;
 }
 
-void FlyingScene::_enter_tree() 
+void FlyingScene::_enter_tree()
 {
-	RenderingServer* renderingServer = RenderingServer::get_singleton();
-	m_scenario = get_world_3d()->get_scenario();
-	m_viewport = get_viewport()->get_viewport_rid();
-	m_mainCamera = renderingServer->camera_create();
-	renderingServer->viewport_attach_camera(m_viewport, m_mainCamera);
+    RenderingServer *renderingServer = RenderingServer::get_singleton();
+    m_scenario                       = get_world_3d()->get_scenario();
+    m_viewport                       = get_viewport()->get_viewport_rid();
 
-	Transform3D cform = Transform3D(Basis(), Vector3(0, 0, 4));
-	renderingServer->camera_set_transform(m_mainCamera, cform);
-	renderingServer->viewport_set_scenario(m_viewport, m_scenario);
+    m_lightInstance                  = renderingServer->instance_create();
+    renderingServer->instance_set_scenario(m_lightInstance, m_scenario);
 
-	m_lightInstance = renderingServer->instance_create();
-	renderingServer->instance_set_scenario(m_lightInstance, m_scenario);
-	
-	RID light = renderingServer->directional_light_create();
-	renderingServer->instance_set_base(m_lightInstance, light);
-	
-	Transform3D lform = Transform3D(Basis().rotated(Vector3(1, 1, 0), -1.3), Vector3(0., 0., 0.));
-	renderingServer->instance_set_transform(m_lightInstance, lform);
+    RID light = renderingServer->directional_light_create();
+    renderingServer->instance_set_base(m_lightInstance, light);
 
-	godot::UtilityFunctions::print("Created viewport, camera, scenario, and light");
+    Transform3D lform = Transform3D(Basis().rotated(Vector3(1, 1, 0), -1.3), Vector3(0., 0., 0.));
+    renderingServer->instance_set_transform(m_lightInstance, lform);
 
-	//init physics
-	ospjolt::ACtxJoltWorld::initJoltGlobal();
-	m_joltWorld = new ospjolt::ACtxJoltWorld();
+    godot::UtilityFunctions::print("Created viewport, scenario, and light");
 
-	godot::UtilityFunctions::print("Init physics");
+    godot::UtilityFunctions::print("Scene is ", m_scene);
+    auto const it = scenarios().find(m_scene.utf8().get_data());
+    if ( it == std::end(scenarios()) )
+    {
+        godot::UtilityFunctions::print("Unknown scene");
+        m_testApp.clear_resource_owners();
+        return;
+    }
 
+    m_testApp.m_rendererSetup = it->second.m_setup(m_testApp);
 }
 
-void FlyingScene::_ready() 
+void FlyingScene::_ready()
 {
-	RenderingServer* renderingServer = RenderingServer::get_singleton();
-	RID instance = renderingServer->instance_create();
-	renderingServer->instance_set_scenario(instance, m_scenario);
-
-	RID mesh = renderingServer->make_sphere_mesh(10, 10, 1);
-	renderingServer->instance_set_base(instance, mesh);
-
-	Transform3D xform = Transform3D(Basis(), Vector3(0.5, 0, 0));
-	renderingServer->instance_set_transform(instance, xform);
-
+    setup_app();
 }
 
-void FlyingScene::_physics_process(double delta) 
+void FlyingScene::_physics_process(double delta)
 {
-	// ospjolt::SysJolt::update_world() update the world
+    // ospjolt::SysJolt::update_world() update the world
 }
 
-// void FlyingScene::load_a_bunch_of_stuff()
-// {
-//     using namespace osp::restypes;
-//     using namespace Magnum;
-// 	using Primitives::ConeFlag;
-//     using Primitives::CylinderFlag;
+void FlyingScene::_process(double delta)
+{
+    draw_event();
 
-//     osp::TopTaskBuilder builder{m_testApp.m_tasks, m_testApp.m_applicationGroup.m_edges, m_testApp.m_taskData};
-//     auto const plApp = m_testApp.m_application.create_pipelines<PlApplication>(builder);
+    // print the corrade messages
+    if ( m_dbgStream.tellp() != std::streampos(0) )
+    {
+        godot::UtilityFunctions::print(m_dbgStream.str().data());
+        m_dbgStream.str("");
+    }
+    if ( m_warnStream.tellp() != std::streampos(0) )
+    {
+        godot::UtilityFunctions::print(m_warnStream.str().data());
+        m_warnStream.str("");
+    }
+    if ( m_errStream.tellp() != std::streampos(0) )
+    {
+        godot::UtilityFunctions::print(m_errStream.str().data());
+        m_errStream.str("");
+    }
+}
 
-//     builder.pipeline(plApp.mainLoop).loops(true).wait_for_signal(EStgOptn::ModifyOrSignal);
+void FlyingScene::_exit_tree()
+{
+    destroy_app();
+}
 
-//     // declares idResources and idMainLoopCtrl
-//     OSP_DECLARE_CREATE_DATA_IDS(m_testApp.m_application, m_testApp.m_topData, TESTAPP_DATA_APPLICATION);
+void FlyingScene::load_a_bunch_of_stuff()
+{
+    using namespace osp::restypes;
+    using namespace Magnum;
+    using Primitives::ConeFlag;
+    using Primitives::CylinderFlag;
 
-//     auto &rResources = osp::top_emplace<osp::Resources> (m_testApp.m_topData, idResources);
-//     /* unused */       osp::top_emplace<MainLoopControl>(m_testApp.m_topData, idMainLoopCtrl);
+    osp::TopTaskBuilder builder{ m_testApp.m_tasks,
+                                 m_testApp.m_applicationGroup.m_edges,
+                                 m_testApp.m_taskData };
+    auto const          plApp = m_testApp.m_application.create_pipelines<PlApplication>(builder);
 
-//     builder.task()
-//         .name       ("Schedule Main Loop")
-//         .schedules  ({plApp.mainLoop(EStgOptn::Schedule)})
-//         .push_to    (m_testApp.m_application.m_tasks)
-//         .args       ({                  idMainLoopCtrl})
-//         .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
-//     {
-//         if (   ! rMainLoopCtrl.doUpdate
-//             && ! rMainLoopCtrl.doSync
-//             && ! rMainLoopCtrl.doResync
-//             && ! rMainLoopCtrl.doRender)
-//         {
-//             return osp::TaskAction::Cancel;
-//         }
-//         else
-//         {
-//             return { };
-//         }
-//     });
+    builder.pipeline(plApp.mainLoop).loops(true).wait_for_signal(EStgOptn::ModifyOrSignal);
 
-//     rResources.resize_types(osp::ResTypeIdReg_t::size());
+    // declares idResources and idMainLoopCtrl
+    OSP_DECLARE_CREATE_DATA_IDS(
+        m_testApp.m_application, m_testApp.m_topData, TESTAPP_DATA_APPLICATION);
 
-//     rResources.data_register<Trade::ImageData2D>(gc_image);
-//     rResources.data_register<Trade::TextureData>(gc_texture);
-//     rResources.data_register<osp::TextureImgSource>(gc_texture);
-//     rResources.data_register<Trade::MeshData>(gc_mesh);
-//     rResources.data_register<osp::ImporterData>(gc_importer);
-//     rResources.data_register<osp::Prefabs>(gc_importer);
-//     osp::register_tinygltf_resources(rResources);
-//     m_testApp.m_defaultPkg = rResources.pkg_create();
+    auto &rResources    = osp::top_emplace<osp::Resources>(m_testApp.m_topData, idResources);
+    auto &rMainLoopCtrl = osp::top_emplace<MainLoopControl>(m_testApp.m_topData, idMainLoopCtrl);
+    m_mainLoopCtrl      = &rMainLoopCtrl; // set main loop control
 
-//     // Load sturdy glTF files
-//     const std::string_view datapath = { "OSPData/adera/" };
-//     const std::vector<std::string_view> meshes =
-//     {
-//         "spamcan.sturdy.gltf",
-//         "stomper.sturdy.gltf",
-//         "ph_capsule.sturdy.gltf",
-//         "ph_fuselage.sturdy.gltf",
-//         "ph_engine.sturdy.gltf",
-//         //"ph_plume.sturdy.gltf",
-//         "ph_rcs.sturdy.gltf"
-//         //"ph_rcs_plume.sturdy.gltf"
-//     };
+    builder.task()
+        .name("Schedule Main Loop")
+        .schedules({ plApp.mainLoop(EStgOptn::Schedule) })
+        .push_to(m_testApp.m_application.m_tasks)
+        .args({ idMainLoopCtrl })
+        .func([](MainLoopControl const &rMainLoopCtrl) noexcept -> osp::TaskActions {
+            if ( ! rMainLoopCtrl.doUpdate && ! rMainLoopCtrl.doSync && ! rMainLoopCtrl.doResync
+                 && ! rMainLoopCtrl.doRender )
+            {
+                return osp::TaskAction::Cancel;
+            }
+            else
+            {
+                return {};
+            }
+        });
 
-//     // TODO: Make new gltf loader. This will read gltf files and dump meshes,
-//     //       images, textures, and other relevant data into osp::Resources
-//     for (auto const& meshName : meshes)
-//     {
-//         osp::ResId res = osp::load_tinygltf_file(osp::string_concat(datapath, meshName), rResources, g_testApp.m_defaultPkg);
-//         osp::assigns_prefabs_tinygltf(rResources, res);
-//     }
+    rResources.resize_types(osp::ResTypeIdReg_t::size());
 
-//     // Add a default primitives
-//     auto const add_mesh_quick = [&rResources = rResources, &m_testApp = m_testApp] (std::string_view const name, Trade::MeshData&& data)
-//     {
-//         osp::ResId const meshId = rResources.create(gc_mesh, m_testApp.m_defaultPkg, osp::SharedString::create(name));
-//         rResources.data_add<Trade::MeshData>(gc_mesh, meshId, std::move(data));
-//     };
+    rResources.data_register<Trade::ImageData2D>(gc_image);
+    rResources.data_register<Trade::TextureData>(gc_texture);
+    rResources.data_register<osp::TextureImgSource>(gc_texture);
+    rResources.data_register<Trade::MeshData>(gc_mesh);
+    rResources.data_register<osp::ImporterData>(gc_importer);
+    rResources.data_register<osp::Prefabs>(gc_importer);
+    osp::register_tinygltf_resources(rResources);
+    m_testApp.m_defaultPkg                       = rResources.pkg_create();
 
+    // Load sturdy glTF files
+    // FIXME this works in editor, but probably not for exported game.
+    const std::string_view              datapath = { "OSPData/adera/" };
+    const std::vector<std::string_view> meshes   = {
+        "spamcan.sturdy.gltf",
+        "stomper.sturdy.gltf",
+        "ph_capsule.sturdy.gltf",
+        "ph_fuselage.sturdy.gltf",
+        "ph_engine.sturdy.gltf",
+        //"ph_plume.sturdy.gltf",
+        "ph_rcs.sturdy.gltf"
+        //"ph_rcs_plume.sturdy.gltf"
+    };
 
-//     Trade::MeshData &&cylinder = Magnum::MeshTools::transform3D( Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds), Matrix4::rotationX(Deg(90)), 0);
-//     Trade::MeshData &&cone = Magnum::MeshTools::transform3D( Primitives::coneSolid(3, 16, 1.0f, ConeFlag::CapEnd), Matrix4::rotationX(Deg(90)), 0);
+    // TODO: Make new gltf loader. This will read gltf files and dump meshes,
+    //       images, textures, and other relevant data into osp::Resources
+    for ( auto const &meshName : meshes )
+    {
+        osp::ResId res = osp::load_tinygltf_file(
+            osp::string_concat(datapath, meshName), rResources, m_testApp.m_defaultPkg);
+        osp::assigns_prefabs_tinygltf(rResources, res);
+    }
 
-//     add_mesh_quick("cube", Primitives::cubeSolid());
-//     add_mesh_quick("cubewire", Primitives::cubeWireframe());
-//     add_mesh_quick("sphere", Primitives::icosphereSolid(2));
-//     add_mesh_quick("cylinder", std::move(cylinder));
-//     add_mesh_quick("cone", std::move(cone));
-//     add_mesh_quick("grid64solid", Primitives::grid3DSolid({63, 63}));
+    // Add a default primitives
+    auto const add_mesh_quick = [&rResources = rResources, &m_testApp = m_testApp](
+                                    std::string_view const name, Trade::MeshData &&data) {
+        osp::ResId const meshId =
+            rResources.create(gc_mesh, m_testApp.m_defaultPkg, osp::SharedString::create(name));
+        rResources.data_add<Trade::MeshData>(gc_mesh, meshId, std::move(data));
+    };
 
-//     OSP_LOG_INFO("Resource loading complete");
-// }
+    Trade::MeshData &&cylinder = Magnum::MeshTools::transform3D(
+        Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds),
+        Matrix4::rotationX(Deg(90)),
+        0);
+    Trade::MeshData &&cone = Magnum::MeshTools::transform3D(
+        Primitives::coneSolid(3, 16, 1.0f, ConeFlag::CapEnd), Matrix4::rotationX(Deg(90)), 0);
+
+    add_mesh_quick("cube", Primitives::cubeSolid());
+    add_mesh_quick("cubewire", Primitives::cubeWireframe());
+    add_mesh_quick("sphere", Primitives::icosphereSolid(2));
+    add_mesh_quick("cylinder", std::move(cylinder));
+    add_mesh_quick("cone", std::move(cone));
+    add_mesh_quick("grid64solid", Primitives::grid3DSolid({ 63, 63 }));
+
+    // OSP_LOG_INFO("Resource loading complete");
+}
+
+void FlyingScene::setup_app()
+{
+    OSP_DECLARE_GET_DATA_IDS(m_testApp.m_magnum, TESTAPP_DATA_MAGNUM);
+    osp::top_emplace<FlyingScene *>(m_testApp.m_topData, idActiveApp, this);
+
+    osp::TopTaskBuilder builder{ m_testApp.m_tasks,
+                                 m_testApp.m_renderer.m_edges,
+                                 m_testApp.m_taskData };
+
+    m_testApp.m_windowApp =
+        scenes::setup_window_app(builder, m_testApp.m_topData, m_testApp.m_application);
+
+    m_testApp.m_magnum = scenes::setup_godot(
+        builder, m_testApp.m_topData, m_testApp.m_application, m_testApp.m_windowApp);
+
+    // Setup renderer sessions
+
+    m_testApp.m_rendererSetup(m_testApp);
+
+    m_testApp.m_graph = osp::make_exec_graph(
+        m_testApp.m_tasks, { &m_testApp.m_renderer.m_edges, &m_testApp.m_scene.m_edges });
+    m_executor.load(m_testApp);
+
+    // Start the main loop
+
+    osp::PipelineId const mainLoop =
+        m_testApp.m_application.get_pipelines<PlApplication>().mainLoop;
+    m_testApp.m_pExecutor->run(m_testApp, mainLoop);
+
+    // Resyncronize renderer
+
+    *m_mainLoopCtrl = MainLoopControl{
+        .doUpdate = false,
+        .doSync   = true,
+        .doResync = true,
+        .doRender = false,
+    };
+
+    signal_all();
+
+    m_testApp.m_pExecutor->wait(m_testApp);
+}
+
+void FlyingScene::draw_event()
+{
+    *m_mainLoopCtrl = MainLoopControl{
+        .doUpdate = true,
+        .doSync   = true,
+        .doResync = false,
+        .doRender = true,
+    };
+
+    signal_all();
+
+    m_testApp.m_pExecutor->wait(m_testApp);
+}
+
+void FlyingScene::destroy_app()
+{
+
+    *m_mainLoopCtrl = MainLoopControl{
+        .doUpdate = false,
+        .doSync   = false,
+        .doResync = false,
+        .doRender = false,
+    };
+
+    signal_all();
+
+    m_testApp.m_pExecutor->wait(m_testApp);
+
+    if ( m_testApp.m_pExecutor->is_running(m_testApp) )
+    {
+        // Main loop must have stopped, but didn't!
+        m_testApp.m_pExecutor->wait(m_testApp);
+        std::abort();
+    }
+
+    m_testApp = {};
+    // Closing sessions will delete their associated TopData and Tags
+    m_testApp.m_pExecutor->run(m_testApp, m_testApp.m_windowApp.m_cleanup);
+    m_testApp.close_sessions(m_testApp.m_renderer.m_sessions);
+    m_testApp.m_renderer.m_sessions.clear();
+    m_testApp.m_renderer.m_edges.m_syncWith.clear();
+
+    m_testApp.close_session(m_testApp.m_magnum);
+    m_testApp.close_session(m_testApp.m_windowApp);
+}
+
+void FlyingScene::set_scene(String const &scene)
+{
+    m_scene = scene;
+}
+
+String const &FlyingScene::get_scene() const
+{
+    return m_scene;
+}
+
