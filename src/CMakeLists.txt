@@ -47,39 +47,6 @@ endif()
 add_library(osp-magnum-deps INTERFACE)
 add_custom_target(compile-osp-magnum-deps)
 
-# Include Newton Dynamics to the project
-
-# TODO: find a better way to do this.
-#       Somehow Newton needs some defines for headers to work properly.
-#       This section was based on Newton Dynamic's CMakeLists.txt
-if(UNIX)
-    if (BUILD_64)
-        target_compile_definitions(osp-magnum-deps INTERFACE -D_POSIX_VER_64)
-    else (BUILD_64)
-        target_compile_definitions(osp-magnum-deps INTERFACE -D_POSIX_VER)
-    endif (BUILD_64)
-
-elseif(MSVC)
-    if(WIN32)
-        if(CMAKE_CL_64)
-            target_compile_definitions(osp-magnum-deps INTERFACE -D_WIN_64_VER)
-        else()
-            target_compile_definitions(osp-magnum-deps INTERFACE -D_WIN_32_VER)
-        endif()
-    else()
-        target_compile_definitions(osp-magnum-deps INTERFACE -D_ARM_VER)
-    endif()
-
-elseif(MINGW)
-    if(CMAKE_CL_64)
-        target_compile_definitions(osp-magnum-deps INTERFACE -D_MINGW_64_VER)
-        target_compile_definitions(osp-magnum-deps INTERFACE -D_WIN_64_VER)
-    else()
-        target_compile_definitions(osp-magnum-deps INTERFACE -D_MINGW_32_VER)
-        target_compile_definitions(osp-magnum-deps INTERFACE -D_WIN_32_VER)
-    endif()
-endif()
-
 # TODO: This list shouldn't be required, but there appears to be a bug in cmake where
 # the add_custom_target() command, pointing to an INTERFACE dependency, doesn't
 # result in the dependencies of the interface building.
@@ -99,7 +66,6 @@ SET(OSP_MAGNUM_DEPS_LIBS
             Magnum::AnyImageImporter
             MagnumPlugins::TinyGltfImporter
             MagnumPlugins::StbImageImporter
-            dNewton dScene dModel dVehicle
             toml11
             spdlog
             longeron

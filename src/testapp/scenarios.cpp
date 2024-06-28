@@ -128,7 +128,7 @@ static ScenarioMap_t make_scenarios()
 
     static constexpr auto sc_gravityForce = Vector3{0.0f, 0.0f, -9.81f};
 
-    add_scenario("physics", "Newton Dynamics integration test scenario",
+    add_scenario("physics", "Jolt Physics integration test scenario",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
         #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, jolt, joltGravSet, joltGrav, physShapesJolt
