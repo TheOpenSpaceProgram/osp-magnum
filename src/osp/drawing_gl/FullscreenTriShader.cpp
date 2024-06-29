@@ -32,59 +32,13 @@
 #include <Corrade/Containers/Iterable.h>  // for Containers::Iterable
 #include <Corrade/Containers/Reference.h>
 
-#include <filesystem>
-#include <string>
+#include "osp/util/logging.h"
+#include "osp/util/ExecutablePath.h"
 
-#if defined(_WIN32) || defined(_WIN64)
-    #include <windows.h>
-#elif defined(__APPLE__)
-    #include <mach-o/dyld.h>
-    #include <limits.h>
-#elif defined(__linux__)
-    #include <unistd.h>
-    #include <limits.h>
-#endif
+#include <filesystem>
 
 using namespace osp;
 using namespace Magnum;
-
-std::string getAppPath() 
-{
-    #if defined(_WIN32) || defined(_WIN64)
-
-    char path[MAX_PATH];
-    HMODULE hModule = GetModuleHandle(NULL);
-    GetModuleFileName(hModule, path, MAX_PATH);
-    return std::string(path);
-
-    #elif defined(__APPLE__)
-
-    char path[PATH_MAX];
-    uint32_t size = sizeof(path);
-    if (_NSGetExecutablePath(path, &size) == 0) 
-    {
-        return std::string(path);
-    } 
-    else 
-    {
-            return std::string();
-    }
-
-    #elif defined(__linux__)
-
-    char path[PATH_MAX];
-    ssize_t count = readlink("/proc/self/exe", path, PATH_MAX);
-    if (count != -1) 
-    {
-        return std::string(path);
-    } 
-    else 
-    {
-        return std::string();
-    }
-
-    #endif
-}
 
 FullscreenTriShader::FullscreenTriShader()
 {
@@ -94,6 +48,7 @@ FullscreenTriShader::FullscreenTriShader()
     if ( ! std::filesystem::exists(appPath + "OSPData/adera/Shaders/FullscreenTri.vert")
     || ! std::filesystem::exists(appPath + "OSPData/adera/Shaders/FullscreenTri.frag"))
     {
+        OSP_LOG_ERROR("Failed to find OSPData/adera/Shaders/FullscreenTri.vert or OSPData/adera/Shaders/FullscreenTri.frag");
         return;
     }
     vert.addFile(appPath + "OSPData/adera/Shaders/FullscreenTri.vert");
