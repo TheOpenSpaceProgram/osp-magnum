@@ -115,11 +115,60 @@ void MagnumApplication::mouseScrollEvent(MouseScrollEvent & event)
     m_rUserInput.scroll_delta(static_cast<osp::Vector2i>(event.offset()));
 }
 
+std::string getAppPath2() 
+{
+    #if defined(_WIN32) || defined(_WIN64)
+    #include <windows.h>
+
+    char path[MAX_PATH];
+    HMODULE hModule = GetModuleHandle(NULL);
+    GetModuleFileName(hModule, path, MAX_PATH);
+    return std::string(path);
+
+    #elif defined(__APPLE__)
+    #include <mach-o/dyld.h>
+    #include <limits.h>
+
+    char path[PATH_MAX];
+    uint32_t size = sizeof(path);
+    if (_NSGetExecutablePath(path, &size) == 0) 
+    {
+        return std::string(path);
+    } 
+    else 
+    {
+            return std::string();
+    }
+
+    #elif defined(__linux__)
+    #include <unistd.h>
+    #include <limits.h>
+
+    char path[PATH_MAX];
+    ssize_t count = readlink("/proc/self/exe", path, PATH_MAX);
+    if (count != -1) 
+    {
+        return std::string(path);
+    } 
+    else 
+    {
+        return std::string();
+    }
+
+    #endif
+}
+
 void testapp::config_controls(UserInputHandler& rUserInput)
 {
     // Configure Controls
     //Load toml
-    auto data = toml::parse("settings.toml");
+    std::string const appPath = getAppPath2();
+    if ( ! std::filesystem::exists(appPath + "settings.toml")) 
+    {
+        return;
+    }
+
+    auto data = toml::parse(appPath + "settings.toml"); 
     for (const auto& [k, v] : data.as_table())
     {
         std::string const& primary = toml::find(v, "primary").as_string();
