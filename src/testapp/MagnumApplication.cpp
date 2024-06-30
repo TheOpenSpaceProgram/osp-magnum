@@ -120,7 +120,7 @@ void testapp::config_controls(UserInputHandler& rUserInput)
 {
     // Configure Controls
     //Load toml
-    std::string const appPath = getAppPath();
+    std::string const appPath = osp::filefunctions::get_exe_dir();
     if ( ! std::filesystem::exists(appPath + "settings.toml")) 
     {
         OSP_LOG_ERROR("Failed to find settings.toml");

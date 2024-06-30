@@ -1,4 +1,7 @@
 #pragma once
 #include <string>
 
-std::string getAppPath();
+namespace osp::filefunctions
+{
+std::string get_exe_dir();
+}

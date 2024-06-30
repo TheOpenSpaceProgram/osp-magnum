@@ -44,7 +44,7 @@ FullscreenTriShader::FullscreenTriShader()
 {
     GL::Shader vert{GL::Version::GL430, GL::Shader::Type::Vertex};
     GL::Shader frag{GL::Version::GL430, GL::Shader::Type::Fragment};
-    std::string const appPath = getAppPath();
+    std::string const appPath = osp::filefunctions::get_exe_dir();
     if ( ! std::filesystem::exists(appPath + "OSPData/adera/Shaders/FullscreenTri.vert")
     || ! std::filesystem::exists(appPath + "OSPData/adera/Shaders/FullscreenTri.frag"))
     {

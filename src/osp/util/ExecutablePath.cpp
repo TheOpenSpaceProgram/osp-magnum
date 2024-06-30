@@ -10,7 +10,9 @@
     #include <limits.h>
 #endif
 
-std::string getAppPath() 
+namespace osp::filefunctions
+{
+std::string get_exe_dir() 
 {
     #if defined(_WIN32) || defined(_WIN64)
 
@@ -29,7 +31,7 @@ std::string getAppPath()
     } 
     else 
     {
-            return std::string();
+        return std::string{};
     }
 
     #elif defined(__linux__)
@@ -42,8 +44,9 @@ std::string getAppPath()
     } 
     else 
     {
-        return std::string();
+        return std::string{};
     }
 
     #endif
+}
 }
