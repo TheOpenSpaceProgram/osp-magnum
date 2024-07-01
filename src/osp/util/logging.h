@@ -40,9 +40,9 @@ inline void set_thread_logger(Logger_t logger)
 
 } // namespace osp
 
-#define OSP_LOG_TRACE(...) SPDLOG_LOGGER_TRACE(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_DEBUG(...) SPDLOG_LOGGER_DEBUG(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_INFO(...) SPDLOG_LOGGER_INFO(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_WARN(...) SPDLOG_LOGGER_TRACE(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_ERROR(...) SPDLOG_LOGGER_ERROR(osp::t_logger, __VA_ARGS__)
-#define OSP_LOG_CRITICAL(...) SPDLOG_LOGGER_CRITICAL(osp::t_logger, __VA_ARGS__)
+#define OSP_LOG_TRACE(...) //SPDLOG_LOGGER_TRACE(osp::t_logger, __VA_ARGS__)
+#define OSP_LOG_DEBUG(...) //SPDLOG_LOGGER_DEBUG(osp::t_logger, __VA_ARGS__)
+#define OSP_LOG_INFO(...) //SPDLOG_LOGGER_INFO(osp::t_logger, __VA_ARGS__)
+#define OSP_LOG_WARN(...) //SPDLOG_LOGGER_TRACE(osp::t_logger, __VA_ARGS__)
+#define OSP_LOG_ERROR(...) //SPDLOG_LOGGER_ERROR(osp::t_logger, __VA_ARGS__)
+#define OSP_LOG_CRITICAL(...) //SPDLOG_LOGGER_CRITICAL(osp::t_logger, __VA_ARGS__)

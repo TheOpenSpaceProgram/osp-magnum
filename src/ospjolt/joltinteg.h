@@ -104,7 +104,7 @@ inline osp::Quaternion QuatJoltToMagnum(Quat in)
 static bool AssertFailedImpl(const char *inExpression, const char *inMessage, const char *inFile, uint inLine)
 {
     // Print to the TTY
-    std::cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << std::endl;
+    //std::cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << std::endl;
 
     // Breakpoint
     return true;

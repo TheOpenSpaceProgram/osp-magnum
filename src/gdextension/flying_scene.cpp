@@ -67,6 +67,7 @@ FlyingScene::~FlyingScene()
 
 void FlyingScene::_enter_tree()
 {
+    godot::UtilityFunctions::print("Enter tree");
     RenderingServer *renderingServer = RenderingServer::get_singleton();
     m_scenario                       = get_world_3d()->get_scenario();
     m_viewport                       = get_viewport()->get_viewport_rid();
@@ -75,10 +76,21 @@ void FlyingScene::_enter_tree()
     renderingServer->instance_set_scenario(m_lightInstance, m_scenario);
 
     RID light = renderingServer->directional_light_create();
+    renderingServer->light_set_distance_fade(light, false, 0., 0., 0.);
+    renderingServer->light_set_shadow(light, true);
     renderingServer->instance_set_base(m_lightInstance, light);
 
-    Transform3D lform = Transform3D(Basis().rotated(Vector3(1, 1, 0), -1.3), Vector3(0., 0., 0.));
+    Transform3D lform = Transform3D(Basis().rotated(Vector3(1, 0, 0), 1.), Vector3(0., 0., 0.));
     renderingServer->instance_set_transform(m_lightInstance, lform);
+
+    auto testInstance                  = renderingServer->instance_create();
+    renderingServer->instance_set_scenario(testInstance, m_scenario);
+
+    RID test = renderingServer->make_sphere_mesh(100, 100, 5);
+    renderingServer->instance_set_base(testInstance, test);
+
+    Transform3D Tform = Transform3D(Basis(), Vector3(0., 0., 50.));
+    renderingServer->instance_set_transform(testInstance, Tform);
 
     godot::UtilityFunctions::print("Created viewport, scenario, and light");
 
@@ -107,7 +119,6 @@ void FlyingScene::_physics_process(double delta)
 void FlyingScene::_process(double delta)
 {
     draw_event();
-
     // print the corrade messages
     if ( m_dbgStream.tellp() != std::streampos(0) )
     {
@@ -128,7 +139,7 @@ void FlyingScene::_process(double delta)
 
 void FlyingScene::_exit_tree()
 {
-    destroy_app();
+    // destroy_app();
 }
 
 void FlyingScene::load_a_bunch_of_stuff()
@@ -231,27 +242,25 @@ void FlyingScene::load_a_bunch_of_stuff()
 
 void FlyingScene::setup_app()
 {
-    OSP_DECLARE_GET_DATA_IDS(m_testApp.m_magnum, TESTAPP_DATA_MAGNUM);
-    osp::top_emplace<FlyingScene *>(m_testApp.m_topData, idActiveApp, this);
-
     osp::TopTaskBuilder builder{ m_testApp.m_tasks,
                                  m_testApp.m_renderer.m_edges,
                                  m_testApp.m_taskData };
 
     m_testApp.m_windowApp =
         scenes::setup_window_app(builder, m_testApp.m_topData, m_testApp.m_application);
-
     m_testApp.m_magnum = scenes::setup_godot(
-        builder, m_testApp.m_topData, m_testApp.m_application, m_testApp.m_windowApp);
+        this, builder, m_testApp.m_topData, m_testApp.m_application, m_testApp.m_windowApp);
+
+    godot::UtilityFunctions::print("setup_godot");
 
     // Setup renderer sessions
 
     m_testApp.m_rendererSetup(m_testApp);
-
+    godot::UtilityFunctions::print("renderer");
     m_testApp.m_graph = osp::make_exec_graph(
         m_testApp.m_tasks, { &m_testApp.m_renderer.m_edges, &m_testApp.m_scene.m_edges });
     m_executor.load(m_testApp);
-
+    m_testApp.m_pExecutor = &m_executor;
     // Start the main loop
 
     osp::PipelineId const mainLoop =

@@ -33,7 +33,6 @@ private:
 
     String                  m_scene;
 
-    Thread                 *m_thread;
     ExecutorType            m_executor;
 
     void                    load_a_bunch_of_stuff();

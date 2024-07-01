@@ -25,15 +25,23 @@
 #pragma once
 
 #include "../scenarios.h"
+#include "flying_scene.h"
 #include "render.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/drawing/drawing.h>
 
+namespace godot
+{
+class FlyingScene;
+}
+
 namespace testapp::scenes
 {
 using namespace osp;
-osp::Session setup_godot(osp::TopTaskBuilder      &rBuilder,
+
+osp::Session setup_godot(godot::FlyingScene       *pMainApp,
+                         osp::TopTaskBuilder      &rBuilder,
                          osp::ArrayView<entt::any> topData,
                          osp::Session const       &application,
                          osp::Session const       &windowApp);
@@ -65,13 +73,13 @@ osp::Session setup_shader_visualizer(
 /**
  * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
  */
-osp::Session setup_shader_flat(
+osp::Session setup_flat_draw(
     osp::TopTaskBuilder      &rBuilder,
     osp::ArrayView<entt::any> topData,
     osp::Session const       &windowApp,
     osp::Session const       &sceneRenderer,
-    osp::Session const       &magnum,
-    osp::Session const       &magnumScene,
+    osp::Session const       &godot,
+    osp::Session const       &godotScene,
     osp::draw::MaterialId     materialId = lgrn::id_null<osp::draw::MaterialId>());
 
 /**
@@ -95,19 +103,22 @@ Session setup_camera_ctrl_godot(TopTaskBuilder      &rBuilder,
 struct ACtxDrawFlat
 {
 
-    osp::draw::DrawTransforms_t   *pDrawTf{ nullptr };
-    osp::draw::DrawEntColors_t    *pColor{ nullptr };
-    osp::draw::TexGdEntStorage_t  *pDiffuseTexId{ nullptr };
-    osp::draw::MeshGdEntStorage_t *pMeshId{ nullptr };
+    osp::draw::DrawTransforms_t       *pDrawTf{ nullptr };
+    osp::draw::DrawEntColors_t        *pColor{ nullptr };
+    osp::draw::TexGdEntStorage_t      *pDiffuseTexId{ nullptr };
+    osp::draw::MeshGdEntStorage_t     *pMeshId{ nullptr };
+    osp::draw::InstanceGdEntStorage_t *pInstanceId{ nullptr };
 
-    osp::draw::TexGdStorage_t     *pTexGl{ nullptr };
-    osp::draw::MeshGdStorage_t    *pMeshGl{ nullptr };
+    osp::draw::TexGdStorage_t         *pTexGl{ nullptr };
+    osp::draw::MeshGdStorage_t        *pMeshGl{ nullptr };
 
-    osp::draw::MaterialId          materialId{ lgrn::id_null<osp::draw::MaterialId>() };
+    osp::draw::MaterialId              materialId{ lgrn::id_null<osp::draw::MaterialId>() };
 
-    constexpr void                 assign_pointers(osp::draw::ACtxSceneRender   &rScnRender,
-                                                   osp::draw::ACtxSceneRenderGd &rScnRenderGd,
-                                                   osp::draw::RenderGd          &rRenderGd) noexcept
+    godot::RID                         *scenario;
+
+    constexpr void                     assign_pointers(osp::draw::ACtxSceneRender   &rScnRender,
+                                                       osp::draw::ACtxSceneRenderGd &rScnRenderGd,
+                                                       osp::draw::RenderGd          &rRenderGd) noexcept
     {
         pDrawTf       = &rScnRender.m_drawTransform;
         pColor        = &rScnRender.m_color;
@@ -115,6 +126,8 @@ struct ACtxDrawFlat
         pMeshId       = &rScnRenderGd.m_meshId;
         pTexGl        = &rRenderGd.m_texGd;
         pMeshGl       = &rRenderGd.m_meshGd;
+        pInstanceId   = &rScnRenderGd.m_instanceId;
+        scenario      = &rRenderGd.scenario;
     }
 };
 

@@ -40,14 +40,8 @@ enum class MeshGdId : uint32_t
 {
 };
 
-struct GodotMeshInstance
-{
-    godot::RID mesh;
-    godot::RID instance;
-};
-
 using TexGdStorage_t  = Storage_t<TexGdId, godot::RID>;
-using MeshGdStorage_t = Storage_t<MeshGdId, GodotMeshInstance>;
+using MeshGdStorage_t = Storage_t<MeshGdId, godot::RID>;
 
 /**
  * @brief Main renderer state and essential GL resources
@@ -99,17 +93,19 @@ struct ACompMeshGd
     MeshGdId m_glId{ lgrn::id_null<MeshGdId>() };
 };
 
-using MeshGdEntStorage_t = KeyedVec<DrawEnt, ACompMeshGd>;
-using TexGdEntStorage_t  = KeyedVec<DrawEnt, ACompTexGd>;
+using MeshGdEntStorage_t     = KeyedVec<DrawEnt, ACompMeshGd>;
+using TexGdEntStorage_t      = KeyedVec<DrawEnt, ACompTexGd>;
+using InstanceGdEntStorage_t = KeyedVec<DrawEnt, godot::RID>;
 
 /**
  * @brief OpenGL specific rendering components for rendering a scene
  */
 struct ACtxSceneRenderGd
 {
-    MeshGdEntStorage_t m_meshId;
-    TexGdEntStorage_t  m_diffuseTexId;
-    godot::RID         m_scenario;
+    MeshGdEntStorage_t     m_meshId;
+    TexGdEntStorage_t      m_diffuseTexId;
+    InstanceGdEntStorage_t m_instanceId;
+    godot::RID             m_scenario;
 };
 
 /**
@@ -119,7 +115,6 @@ class SysRenderGd
 {
 
 public:
-
     static void clear_resource_owners(RenderGd &rRenderGd, Resources &rResources);
 
     /**
@@ -157,6 +152,7 @@ public:
                                   KeyedVec<DrawEnt, MeshIdOwner_t> const &cmpMeshIds,
                                   IdMap_t<MeshId, ResIdOwner_t> const    &meshToRes,
                                   MeshGdEntStorage_t                     &rCmpMeshGl,
+                                  InstanceGdEntStorage_t                 &rCmpInstanceGd,
                                   RenderGd                               &rRenderGd);
 
     template <typename ITA_T, typename ITB_T>
@@ -165,10 +161,11 @@ public:
                                   KeyedVec<DrawEnt, MeshIdOwner_t> const &cmpMeshIds,
                                   IdMap_t<MeshId, ResIdOwner_t> const    &meshToRes,
                                   MeshGdEntStorage_t                     &rCmpMeshGl,
+                                  InstanceGdEntStorage_t                 &rCmpInstanceGd,
                                   RenderGd                               &rRenderGd)
     {
         std::for_each(first, last, [&](DrawEnt const ent) {
-            sync_drawent_mesh(ent, cmpMeshIds, meshToRes, rCmpMeshGl, rRenderGd);
+            sync_drawent_mesh(ent, cmpMeshIds, meshToRes, rCmpMeshGl, rCmpInstanceGd, rRenderGd);
         });
     }
 

@@ -37,13 +37,16 @@
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/TextureData.h>
+#include <cstdint>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/input_map.hpp>
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
+#include <godot_cpp/classes/surface_tool.hpp>
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/rid.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/variant.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <osp/core/Resources.h>
@@ -194,36 +197,45 @@ void SysRenderGd::compile_resource_meshes(
 
         // Track with two-way map and store owner
         rRenderGd.m_meshToRes.emplace(newId, std::move(renderOwner));
-        it->second                   = newId;
+        it->second                 = newId;
 
         // Get mesh data
-        auto const &meshData         = rResources.data_get<MeshData>(restypes::gc_mesh, meshRes);
+        MeshData const &meshData   = rResources.data_get<MeshData>(restypes::gc_mesh, meshRes);
+        auto            primitive  = primitiveMToGd(meshData.primitive());
 
-        godot::RenderingServer *rs   = godot::RenderingServer::get_singleton();
-        godot::RID              mesh = rs->mesh_create();
-        godot::RID              instance = rs->instance_create();
-        rs->instance_set_base(instance, mesh);
-        rs->instance_set_scenario(instance, rRenderGd.scenario);
-        godot::Array meshArray;
-        meshArray.resize(godot::Mesh::ARRAY_MAX);
-        godot::PackedVector3Array vertex;
-        godot::PackedInt32Array   indices;
+        godot::RenderingServer *rs = godot::RenderingServer::get_singleton();
+
+        godot::SurfaceTool      st;
+        // why are there two different PrimitiveType enums ?
+        st.begin(static_cast<godot::Mesh::PrimitiveType>(primitive));
+
+        godot::RID mesh = rs->mesh_create();
 
         // TODO copy other attributes as well maybe.
         for ( auto v : meshData.positions3DAsArray() )
         {
-            vertex.push_back(godot::Vector3(v.x(), v.y(), v.z()));
+            //st.set_uv({0, 0});
+            st.add_vertex(godot::Vector3(v.x(), v.y(), v.z()));
         }
-        for ( auto i : meshData.indicesAsArray() )
+        auto indices = meshData.indicesAsArray();
+        //TODO do that using an iterator I guess.
+        for ( auto i = indices.end() - 1; i >= indices.begin(); i--)
         {
-            indices.push_back(i);
+            st.add_index(static_cast<int32_t>(*i));
         }
-        meshArray[godot::Mesh::ARRAY_VERTEX] = vertex;
-        meshArray[godot::Mesh::ARRAY_INDEX]  = indices;
+        if ( primitive == godot::RenderingServer::PRIMITIVE_TRIANGLES )
+        {
+            //st.deindex();
+            st.generate_normals();
+            //st.generate_tangents();
+            
+        }
 
-        rs->mesh_add_surface_from_arrays(mesh, primitiveMToGd(meshData.primitive()), meshArray);
+        godot::Array meshArray = st.commit_to_arrays();
 
-        rRenderGd.m_meshGd.emplace(newId, GodotMeshInstance{ mesh, instance });
+        rs->mesh_add_surface_from_arrays(mesh, primitive, meshArray);
+
+        rRenderGd.m_meshGd.emplace(newId, mesh);
     }
 }
 
@@ -231,6 +243,7 @@ void SysRenderGd::sync_drawent_mesh(DrawEnt const                           ent,
                                     KeyedVec<DrawEnt, MeshIdOwner_t> const &cmpMeshIds,
                                     IdMap_t<MeshId, ResIdOwner_t> const    &meshToRes,
                                     MeshGdEntStorage_t                     &rCmpMeshGl,
+                                    InstanceGdEntStorage_t                 &rCmpInstanceGd,
                                     RenderGd                               &rRenderGd)
 {
     ACompMeshGd         &rEntMeshGl   = rCmpMeshGl[ent];

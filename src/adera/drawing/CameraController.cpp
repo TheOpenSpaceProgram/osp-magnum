@@ -45,7 +45,7 @@ using osp::Vector3;
 void SysCameraController::update_view(ACtxCameraController& rCtrl, float const delta)
 {
     // Process control inputs
-
+    return;
     ControlSubscriber const& controls = rCtrl.m_controls;
 
     Rad yaw = 0.0_degf;
@@ -128,6 +128,7 @@ void SysCameraController::update_move(
         ACtxCameraController& rCtrl,
         float const delta, bool const moveTarget)
 {
+    return;
     ControlSubscriber const& controls = rCtrl.m_controls;
 
     Vector3 const command(

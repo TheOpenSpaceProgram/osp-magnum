@@ -25,6 +25,7 @@
 #include "godot.h"
 
 #include "flying_scene.h"
+#include "osp/core/math_types.h"
 #include "osp/tasks/top_utils.h"
 #include "render.h"
 #include "testapp/identifiers.h"
@@ -35,6 +36,8 @@
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/variant/basis.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
+#include <longeron/id_management/null.hpp>
 #include <osp/activescene/basic_fn.h>
 #include <osp/drawing/drawing.h>
 #include <osp/universe/coordinates.h>
@@ -55,7 +58,8 @@ using osp::input::UserInputHandler;
 namespace testapp::scenes
 {
 
-Session setup_godot(TopTaskBuilder            &rBuilder,
+Session setup_godot(godot::FlyingScene        *pMainApp,
+                    TopTaskBuilder            &rBuilder,
                     ArrayView<entt::any> const topData,
                     Session const             &application,
                     Session const             &windowApp)
@@ -69,6 +73,7 @@ Session setup_godot(TopTaskBuilder            &rBuilder,
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM);
+    osp::top_emplace<godot::FlyingScene *>(topData, idActiveApp, pMainApp);
     auto const tgMgn = out.create_pipelines<PlMagnum>(rBuilder);
 
     rBuilder.pipeline(tgMgn.meshGL).parent(tgWin.sync);
@@ -78,11 +83,10 @@ Session setup_godot(TopTaskBuilder            &rBuilder,
 
     // Order-dependent; MagnumApplication construction starts OpenGL context, needed by RenderGL
     /* unused */ // top_emplace<MagnumApplication>(topData, idActiveApp, args, rUserInput);
-    auto &rRenderGd = top_emplace<RenderGd>(topData, idRenderGl);
+    auto &rRenderGd    = top_emplace<RenderGd>(topData, idRenderGl);
 
-    godot::FlyingScene* mainApp = osp::top_get<godot::FlyingScene *>(topData, idActiveApp);
-    rRenderGd.scenario = mainApp->get_main_scenario();
-    rRenderGd.viewport = mainApp->get_main_viewport();
+    rRenderGd.scenario = pMainApp->get_main_scenario();
+    rRenderGd.viewport = pMainApp->get_main_viewport();
 
     rBuilder.task()
         .name("Clean up renderer")
@@ -135,6 +139,9 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
     rs->viewport_attach_camera(rRenderGd.viewport, rCamera);
 
     rs->camera_set_perspective(rCamera, 45., 1.0f, 1u << 24);
+    godot::Basis basis = { godot::Vector3(1, 0, 0), 0.8 };
+
+    rs->camera_set_transform(rCamera, godot::Transform3D(basis, godot::Vector3(0, -100, 100)));
 
     rBuilder.task()
         .name("Resize ACtxSceneRenderGd to fit all DrawEnts")
@@ -147,6 +154,7 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
             std::size_t const capacity = rScnRender.m_drawIds.capacity();
             rScnRenderGl.m_diffuseTexId.resize(capacity);
             rScnRenderGl.m_meshId.resize(capacity);
+            rScnRenderGl.m_instanceId.resize(capacity);
         });
 
     rBuilder.task()
@@ -240,6 +248,7 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
                                                  rScnRender.m_mesh,
                                                  rDrawingRes.m_meshToRes,
                                                  rScnRenderGl.m_meshId,
+                                                 rScnRenderGl.m_instanceId,
                                                  rRenderGl);
         });
 
@@ -262,6 +271,7 @@ Session setup_godot_scene(TopTaskBuilder            &rBuilder,
                                                      rScnRender.m_mesh,
                                                      rDrawingRes.m_meshToRes,
                                                      rScnRenderGl.m_meshId,
+                                                     rScnRenderGl.m_instanceId,
                                                      rRenderGl);
             }
         });
@@ -316,17 +326,27 @@ void draw_ent_flat(
     void * const pData = std::get<0>(userData);
     assert(pData != nullptr);
 
-    auto &rData                     = *reinterpret_cast<ACtxDrawFlat *>(pData);
+    auto &rData              = *reinterpret_cast<ACtxDrawFlat *>(pData);
 
     // Collect uniform information
-    Matrix4 const    &drawTf        = (*rData.pDrawTf)[ent];
-    auto              rs            = godot::RenderingServer::get_singleton();
+    Matrix4 const &drawTf    = (*rData.pDrawTf)[ent];
+    godot::RID    &rInstance = (*rData.pInstanceId)[ent];
 
-    MeshGdId const    meshId        = (*rData.pMeshId)[ent].m_glId;
-    GodotMeshInstance rMeshInstance = rData.pMeshGl->get(meshId);
-    godot::RID        material      = rs->mesh_surface_get_material(rMeshInstance.mesh, 0);
+    auto           rs        = godot::RenderingServer::get_singleton();
 
-    if ( rData.pDiffuseTexId != nullptr )
+    MeshGdId const meshId    = (*rData.pMeshId)[ent].m_glId;
+    godot::RID     rMesh     = rData.pMeshGl->get(meshId);
+    godot::RID     material  = rs->mesh_surface_get_material(rMesh, 0);
+    // create the material if it does not already exists
+    if ( ! material.is_valid() )
+    {
+        material = rs->material_create();
+        //rs->mesh_surface_set_material(rMesh, 0, material);
+    }
+    // test if the mesh is textured or not.
+    // TODO find a better way to do this.
+    if ( rData.pDiffuseTexId != nullptr
+         && (*rData.pDiffuseTexId)[ent].m_gdId != lgrn::id_null<TexGdId>() )
     {
         TexGdId const texGdId = (*rData.pDiffuseTexId)[ent].m_gdId;
         godot::RID    rTex    = rData.pTexGl->get(texGdId);
@@ -339,6 +359,13 @@ void draw_ent_flat(
         rs->material_set_param(
             material, "albedo_color", godot::Color(color.r(), color.g(), color.b(), color.a()));
     }
+
+    // Create instance if it does not exist
+    if ( ! rInstance.is_valid() )
+    {
+        rInstance = rs->instance_create2(rMesh, *rData.scenario);
+    }
+
     auto rotS   = drawTf.rotationScaling();
     auto basis  = godot::Basis(rotS[0][0],
                               rotS[0][1],
@@ -352,7 +379,7 @@ void draw_ent_flat(
     auto pos    = drawTf.translation();
     auto origin = godot::Vector3(pos.x(), pos.y(), pos.z());
     auto tf     = godot::Transform3D(basis, origin);
-    rs->instance_set_transform(rMeshInstance.instance, tf);
+    rs->instance_set_transform(rInstance, tf);
 }
 
 Session setup_flat_draw(TopTaskBuilder            &rBuilder,
@@ -476,7 +503,7 @@ Session setup_camera_ctrl_godot(TopTaskBuilder            &rBuilder,
             Matrix3                 mRot = rCamCtrl.m_transform.rotation();
             godot::Basis gBasis = { mRot[0][0], mRot[0][1], mRot[0][2], mRot[1][0], mRot[1][1],
                                     mRot[1][2], mRot[2][0], mRot[2][1], mRot[2][2] };
-            rs->camera_set_transform(rCamera, godot::Transform3D(gBasis, gTrans));
+            // rs->camera_set_transform(rCamera, godot::Transform3D(gBasis, gTrans));
         });
 
     return out;

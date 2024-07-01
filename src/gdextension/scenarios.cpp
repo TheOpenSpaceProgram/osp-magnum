@@ -64,10 +64,10 @@ static void setup_godot_draw(TestApp       &rTestApp,
 
 // MaterialIds hints which shaders should be used to draw a DrawEnt
 // DrawEnts can be assigned to multiple materials
-static constexpr auto sc_matVisualizer = draw::MaterialId(0);
-static constexpr auto sc_matFlat       = draw::MaterialId(1);
-static constexpr auto sc_matPhong      = draw::MaterialId(2);
-static constexpr int  sc_materialCount = 4;
+//static constexpr auto sc_matVisualizer = draw::MaterialId(0);
+static constexpr auto sc_matFlat       = draw::MaterialId(0);
+//static constexpr auto sc_matPhong      = draw::MaterialId(2);
+static constexpr int  sc_materialCount = 2;
 
 static ScenarioMap_t  make_scenarios()
 {
@@ -103,7 +103,7 @@ static ScenarioMap_t  make_scenarios()
         scene                  = setup_scene(builder, rTopData, application);
         commonScene = setup_common_scene(builder, rTopData, scene, application, defaultPkg);
         physics     = setup_physics(builder, rTopData, scene, commonScene);
-        physShapes = setup_phys_shapes(builder, rTopData, scene, commonScene, physics, sc_matPhong);
+        physShapes = setup_phys_shapes(builder, rTopData, scene, commonScene, physics, sc_matFlat);
         droppers   = setup_droppers(builder, rTopData, scene, commonScene, physShapes);
         bounds     = setup_bounds(builder, rTopData, scene, commonScene, physShapes);
 
@@ -113,7 +113,7 @@ static ScenarioMap_t  make_scenarios()
         physShapesJolt = setup_phys_shapes_jolt(
             builder, rTopData, commonScene, physics, physShapes, jolt, joltGravSet);
 
-        add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 4);
+        add_floor(rTopData, physShapes, sc_matFlat, defaultPkg, 4);
 
         RendererSetupFunc_t const setup_renderer = [](TestApp &rTestApp) -> void {
             auto const     application = rTestApp.m_application;
@@ -147,8 +147,8 @@ static ScenarioMap_t  make_scenarios()
             // shVisual   = setup_shader_visualizer(
             //     builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene,
             //     sc_matVisualizer);
-            // shFlat = setup_shader_flat(
-            //     builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+            shFlat = setup_flat_draw(
+                builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
             // shPhong = setup_shader_phong(
             //     builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
             camThrow   = setup_thrower(builder, rTopData, windowApp, cameraCtrl, physShapes);
@@ -483,7 +483,7 @@ void setup_godot_draw(TestApp            &rTestApp,
 
     auto &rMainLoopCtrl = osp::top_get<MainLoopControl>(rTestApp.m_topData, idMainLoopCtrl);
     auto &rActiveApp    = osp::top_get<godot::FlyingScene *>(rTestApp.m_topData, idActiveApp);
-    auto &rCamera       = osp::top_get<osp::draw::Camera>(rTestApp.m_topData, idCamera);
+    //auto &rCamera       = osp::top_get<osp::draw::Camera>(rTestApp.m_topData, idCamera);
 
     // rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 

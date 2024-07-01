@@ -385,6 +385,7 @@ Session setup_thrower(
         .args       ({                 idCamCtrl,                idPhysShapes,                   idBtnThrow })
         .func([] (ACtxCameraController& rCamCtrl, ACtxPhysShapes& rPhysShapes, EButtonControlIndex btnThrow) noexcept
     {
+        return;
         // Throw a sphere when the throw button is pressed
         if (rCamCtrl.m_controls.button_held(btnThrow))
         {

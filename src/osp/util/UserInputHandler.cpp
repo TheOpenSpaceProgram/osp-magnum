@@ -160,7 +160,7 @@ EButtonControlIndex UserInputHandler::button_subscribe(std::string_view name)
     {
         // Config not found, no way to have an empty key so far, so throw an exception
         OSP_LOG_ERROR("No config for{}", name);
-        throw std::runtime_error(string_concat("Error: no config with ", name));
+        //throw std::runtime_error(string_concat("Error: no config with ", name));
     }
 
     // Check if the control was already created before
@@ -384,6 +384,7 @@ ControlSubscriber::~ControlSubscriber()
 
 EButtonControlIndex ControlSubscriber::button_subscribe(std::string_view name)
 {
+    return EButtonControlIndex::NONE;
     EButtonControlIndex const index = m_pInputHandler->button_subscribe(name);
     if (EButtonControlIndex::NONE != index)
     {
