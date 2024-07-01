@@ -136,7 +136,7 @@ constexpr ChunkMeshBufferInfo make_chunk_mesh_buffer_info(ChunkSkeleton const &s
  * @param y [in]
  * @return triangular number
  */
-constexpr int xy_to_triangular(int const x, int const y) noexcept
+constexpr std::uint32_t xy_to_triangular(std::uint32_t const x, std::uint32_t const y) noexcept
 {
     return ( y * (y + 1) ) / 2 + x;
 };
@@ -164,7 +164,7 @@ constexpr ChunkLocalSharedId coord_to_shared(
     }
 }
 
-constexpr VertexIdx fill_to_vrtx(ChunkMeshBufferInfo const& info, ChunkId const chunkId, int const triangular)
+constexpr VertexIdx fill_to_vrtx(ChunkMeshBufferInfo const& info, ChunkId const chunkId, std::uint32_t const triangular)
 {
     return info.vbufFillOffset + info.fillVrtxCount * chunkId.value + triangular;
 }

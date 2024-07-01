@@ -245,9 +245,9 @@ Session setup_terrain_subdiv_dist(
             auto const &corners = rSkel.tri_at(sktriId).vertices;
 
             ArrayView< MaybeNewId<SkVrtxId> > const edgeVrtxView = rChSP.edgeVertices;
-            ArrayView< MaybeNewId<SkVrtxId> > const edgeLft = edgeVrtxView.sliceSize(edgeSize * 0, edgeSize);
-            ArrayView< MaybeNewId<SkVrtxId> > const edgeBtm = edgeVrtxView.sliceSize(edgeSize * 1, edgeSize);
-            ArrayView< MaybeNewId<SkVrtxId> > const edgeRte = edgeVrtxView.sliceSize(edgeSize * 2, edgeSize);
+            ArrayView< MaybeNewId<SkVrtxId> > const edgeLft = edgeVrtxView.sliceSize(edgeSize * 0ul, edgeSize);
+            ArrayView< MaybeNewId<SkVrtxId> > const edgeBtm = edgeVrtxView.sliceSize(edgeSize * 1ul, edgeSize);
+            ArrayView< MaybeNewId<SkVrtxId> > const edgeRte = edgeVrtxView.sliceSize(edgeSize * 2ul, edgeSize);
 
             rSkel.vrtx_create_chunk_edge_recurse(chLevel, corners[0], corners[1], edgeLft);
             rSkel.vrtx_create_chunk_edge_recurse(chLevel, corners[1], corners[2], edgeBtm);
@@ -272,27 +272,27 @@ Session setup_terrain_subdiv_dist(
             restitch_check(chunkId, rSkCh.m_chunkToTri[chunkId], rSkCh, rSkel, rSkData, rChSP);
         }
 
-        float const scalepow = std::pow(2.0f, -rSkData.precision);
+        float const scale = std::exp2(float(-rSkData.precision));
 
         auto const vbufPosView = rChGeo.vbufPositions.view(rChGeo.vrtxBuffer, rChInfo.vrtxTotal);
         auto const vbufNrmView = rChGeo.vbufNormals  .view(rChGeo.vrtxBuffer, rChInfo.vrtxTotal);
 
         // TODO: temporary code of course
-        auto const heightmap = [scalepow, h = rTerrainIco.height] (Vector3l posl) -> float
+        auto const heightmap = [scale, h = rTerrainIco.height] (Vector3l posl) -> float
         {
-            return h * std::clamp<double>(    0.1*(0.5 - 0.5*std::cos(0.000050*posl.x()*scalepow*2.0*3.14159))
-                                            + 0.9*(0.5 - 0.5*std::cos(0.000005*posl.y()*scalepow*2.0*3.14159)) , 0.0, 1.0 );
+            return h * std::clamp<double>(    0.1*(0.5 - 0.5*std::cos(0.000050*posl.x()*scale*2.0*3.14159))
+                                            + 0.9*(0.5 - 0.5*std::cos(0.000005*posl.y()*scale*2.0*3.14159)) , 0.0, 1.0 );
         };
 
         auto const update_shared_vrtx_position
-                = [&vbufPosView, &heightmap, scalepow, &rSkCh, &rChInfo, &rSkData, &rChGeo, &rTerrainIco]
+                = [&vbufPosView, &heightmap, scale, &rSkCh, &rChInfo, &rSkData, &rChGeo, &rTerrainIco]
                   (SharedVrtxId const sharedVrtxId)
         {
             SkVrtxId  const skelVrtx   = rSkCh.m_sharedToSkVrtx[sharedVrtxId];
             VertexIdx const vbufVertex = rChInfo.vbufSharedOffset + sharedVrtxId.value;
             Vector3l  const skPos      = rSkData.positions[skelVrtx];
-            Vector3   const posOut     = Vector3{skPos - rChGeo.originSkelPos} * scalepow;
-            Vector3   const radialDir  = Vector3{Vector3d(skPos) * scalepow / rTerrainIco.radius};
+            Vector3   const posOut     = Vector3{skPos - rChGeo.originSkelPos} * scale;
+            Vector3   const radialDir  = Vector3{Vector3d(skPos) * scale / rTerrainIco.radius};
 
             rChGeo.sharedPosNoHeightmap[sharedVrtxId] = posOut;
             vbufPosView[vbufVertex]                   = posOut + radialDir * heightmap(skPos);
@@ -319,7 +319,7 @@ Session setup_terrain_subdiv_dist(
             OSP_LOG_INFO("Translating Terrain Mesh");
 
             Vector3l const deltaOffset  = rChGeo.originSkelPos - rTerrainFrame.position;
-            Vector3  const deltaOffsetF = Vector3(deltaOffset) * scalepow;
+            Vector3  const deltaOffsetF = Vector3(deltaOffset) * scale;
             rChGeo.originSkelPos = rTerrainFrame.position;
 
             // Refresh all shared vertex positions
@@ -344,7 +344,7 @@ Session setup_terrain_subdiv_dist(
             }
         }
 
-        Vector3d const center = -Vector3d(rChGeo.originSkelPos) * scalepow;
+        Vector3d const center = -Vector3d(rChGeo.originSkelPos) * scale;
 
         // Calculate new fill vertex positions
         for (ChunkId const chunkId : rChSP.chunksAdded)
@@ -381,7 +381,7 @@ Session setup_terrain_subdiv_dist(
                 double     const centerDist = centerDiff.length();
                 Vector3    const radialDir  = Vector3{centerDiff / centerDist};
 
-                Vector3l const bigpos = Vector3l(rPos / scalepow) + rChGeo.originSkelPos;
+                Vector3l const bigpos = Vector3l(rPos / scale) + rChGeo.originSkelPos;
 
                 rPos += radialDir * heightmap(bigpos);
             }
@@ -504,7 +504,7 @@ void initialize_ico_terrain(
 
     rTerrain.skData.resize(rTerrain.skeleton);
 
-    double const scale = std::pow(2.0, rTerrain.skData.precision);
+    double const scale     = std::exp2(double(rTerrain.skData.precision));
     double const maxRadius = rTerrainIco.radius + rTerrainIco.height;
 
     for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
@@ -559,16 +559,16 @@ void initialize_ico_terrain(
     for (int level = 0; level < gc_maxSubdivLevels; ++level)
     {
         // Good-enough bounding sphere is ~75% of the edge length (determined using Blender)
-        float const edgeLength = gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * scale;
-        float const subdivRadius = 0.75f * edgeLength;
+        double const edgeLength = gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * scale;
+        double const subdivRadius = 0.75 * edgeLength;
 
         // TODO: Pick thresholds based on the angular diameter (size on screen) of the
         //       chunk triangle mesh that will actually be rendered.
-        rSP.distanceThresholdSubdiv[level] = std::uint64_t(subdivRadius);
+        rSP.distanceThresholdSubdiv[level] = subdivRadius;
 
         // Unsubdivide thresholds should be slightly larger (arbitrary x2) to avoid rapid
         // terrain changes when moving back and forth quickly
-        rSP.distanceThresholdUnsubdiv[level] = std::uint64_t(2.0f * subdivRadius);
+        rSP.distanceThresholdUnsubdiv[level] = 2.0f * subdivRadius;
     }
 
     // ## Prepare Chunk Skeleton
@@ -583,7 +583,7 @@ void initialize_ico_terrain(
     // Approximate max number of shared vertices. Determined experimentally, roughly 60% of all
     // vertices end up being shared. Margin is inherited from maxChunksApprox.
     std::uint32_t const maxVrtxApprox = maxChunksApprox * rTerrain.skChunks.m_chunkSharedCount;
-    std::uint32_t const maxSharedVrtxApprox = 0.6f * maxVrtxApprox;
+    std::uint32_t const maxSharedVrtxApprox = std::uint32_t(0.6f * float(maxVrtxApprox));
 
     rTerrain.skChunks.chunk_reserve(std::uint16_t(maxChunksApprox));
     rTerrain.skChunks.shared_reserve(maxSharedVrtxApprox);
@@ -627,7 +627,6 @@ struct TerrainDebugDraw
 Session setup_terrain_debug_draw(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>  const topData,
-        Session               const &windowApp,
         Session               const &scene,
         Session               const &sceneRenderer,
         Session               const &cameraCtrl,
@@ -644,7 +643,6 @@ Session setup_terrain_debug_draw(
     OSP_DECLARE_GET_DATA_IDS(terrainIco,     TESTAPP_DATA_TERRAIN_ICO);
 
     auto const tgScn    = scene         .get_pipelines<PlScene>();
-    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
     auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
     auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
     auto const tgTrn    = terrain       .get_pipelines<PlTerrain>();
@@ -714,7 +712,7 @@ Session setup_terrain_debug_draw(
         }
 
         // Set position of camera target relative to terrain, used for LOD distance checking
-        rTerrain.scratchpad.viewerPosition = rTerrainFrame.position + Vector3l(rCamPos * scale);
+        rTerrain.scratchpad.viewerPosition = rTerrainFrame.position + Vector3l(rCamPos * float(scale));
 
         Vector3d const viewerPosD          = Vector3d{rTerrain.scratchpad.viewerPosition};
         double   const distanceToCenter    = viewerPosD.length();
@@ -757,7 +755,7 @@ Session setup_terrain_debug_draw(
         .args       ({             idTrnDbgDraw,                  idTerrainFrame,             idTerrain,                 idScnRender })
         .func([] (TerrainDebugDraw& rTrnDbgDraw, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender) noexcept
     {
-        int const scale = int_2pow<int>(rTerrain.skData.precision);
+        float const scale = std::exp2(float(rTerrain.skData.precision));
 
         Vector3 const pos = Vector3(rTerrain.chunkGeom.originSkelPos-rTerrainFrame.position) / scale;
 

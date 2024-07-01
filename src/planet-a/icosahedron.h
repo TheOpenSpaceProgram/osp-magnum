@@ -192,8 +192,8 @@ void ico_calc_chunk_edge(
  */
 void ico_calc_sphere_tri_center(
         SkTriGroupId                    groupId,
-        float                           maxRadius,
-        float                           height,
+        double                          maxRadius,
+        double                          height,
         SubdivTriangleSkeleton    const &rSkel,
         SkeletonVertexData              &rSkData);
 

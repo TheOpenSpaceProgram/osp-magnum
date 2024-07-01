@@ -137,7 +137,7 @@ void initialize_ico_terrain(
         osp::ArrayView<entt::any>   topData,
         osp::Session          const &terrain,
         osp::Session          const &terrainIco,
-        TerrainTestPlanetSpecs      params);
+        TerrainTestPlanetSpecs      specs);
 
 
 /**
@@ -146,7 +146,6 @@ void initialize_ico_terrain(
 osp::Session setup_terrain_debug_draw(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session          const &windowApp,
         osp::Session          const &scene,
         osp::Session          const &sceneRenderer,
         osp::Session          const &cameraCtrl,

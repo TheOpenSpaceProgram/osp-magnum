@@ -55,8 +55,8 @@ struct SkeletonSubdivScratchpad
 
     void resize(SubdivTriangleSkeleton &rSkel);
 
-    std::array<std::uint64_t, gc_maxSubdivLevels> distanceThresholdSubdiv{{}};
-    std::array<std::uint64_t, gc_maxSubdivLevels> distanceThresholdUnsubdiv{{}};
+    std::array<double, gc_maxSubdivLevels> distanceThresholdSubdiv{{}};
+    std::array<double, gc_maxSubdivLevels> distanceThresholdUnsubdiv{{}};
 
     std::array<SubdivScratchpadLevel, gc_maxSubdivLevels> levels;
 

@@ -84,7 +84,7 @@ struct BasicChunkMeshGeometry
 {
     void resize(ChunkSkeleton const& skCh, ChunkMeshBufferInfo const& info);
 
-    Corrade::Containers::Array<unsigned char> vrtxBuffer; ///< Output vertex buffer
+    Corrade::Containers::Array<std::byte>     vrtxBuffer; ///< Output vertex buffer
     Corrade::Containers::Array<osp::Vector3u> indxBuffer; ///< Output index buffer
 
     osp::BufAttribFormat<osp::Vector3> vbufPositions;   ///< Describes Position data in vrtxBuffer

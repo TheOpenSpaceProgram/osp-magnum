@@ -40,7 +40,7 @@ void BasicChunkMeshGeometry::resize(ChunkSkeleton const& skCh, ChunkMeshBufferIn
     vbufPositions = formatBuilder.insert_block<osp::Vector3>(info.vrtxTotal);
     vbufNormals   = formatBuilder.insert_block<osp::Vector3>(info.vrtxTotal);
 
-    vrtxBuffer = Array<unsigned char>(Corrade::ValueInit, formatBuilder.total_size());
+    vrtxBuffer = Array<std::byte>    (Corrade::ValueInit, formatBuilder.total_size());
     indxBuffer = Array<osp::Vector3u>(Corrade::ValueInit, info.faceTotal);
 
     chunkFanNormalContrib  .resize(maxChunks * info.fanMaxSharedCount);

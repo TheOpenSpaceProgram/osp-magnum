@@ -32,7 +32,7 @@ namespace osp
 /**
  * @brief int64 abs(lhs - rhs) with no risk of overflow
  */
-constexpr std::uint64_t absdelta(std::int64_t lhs, std::int64_t rhs) noexcept
+constexpr std::uint64_t abs_difference(std::int64_t lhs, std::int64_t rhs) noexcept
 {
     // TODO: maybe use int128 for compilers that support it?
 
@@ -53,13 +53,12 @@ constexpr std::uint64_t absdelta(std::int64_t lhs, std::int64_t rhs) noexcept
 
 /**
  * @brief (distance between a and b) > threshold
- *
  */
 constexpr bool is_distance_near(Vector3l const a, Vector3l const b, double const threshold) noexcept
 {
-    double const dx( absdelta(a.x(), b.x()) );
-    double const dy( absdelta(a.y(), b.y()) );
-    double const dz( absdelta(a.z(), b.z()) );
+    double const dx = abs_difference(a.x(), b.x());
+    double const dy = abs_difference(a.y(), b.y());
+    double const dz = abs_difference(a.z(), b.z());
 
     return (dx*dx + dy*dy + dz*dz) < threshold*threshold;
 }

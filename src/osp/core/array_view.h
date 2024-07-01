@@ -38,6 +38,8 @@ namespace osp
 using Corrade::Containers::ArrayView;
 using Corrade::Containers::arrayView;
 
+using Corrade::Containers::arrayCast;
+
 /**
  * @brief Wraps a Corrade ArrayView or StridedArrayView to use as a 2D array of equally sized rows
  */

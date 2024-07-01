@@ -44,7 +44,7 @@ void ChunkScratchpad::resize(ChunkSkeleton const& rChSk)
     auto const maxSharedVrtx = rChSk.m_sharedIds.capacity();
     auto const maxChunks     = rChSk.m_chunkIds.capacity();
 
-    edgeVertices        .resize((rChSk.m_chunkEdgeVrtxCount - 1) * 3);
+    edgeVertices        .resize(std::size_t(rChSk.m_chunkEdgeVrtxCount - 1) * 3);
     stitchCmds          .resize(maxChunks, {});
     chunksAdded         .resize(maxChunks);
     chunksRemoved       .resize(maxChunks);

@@ -41,8 +41,8 @@ struct BufAttribFormat
 {
     using View_t        = Corrade::Containers::StridedArrayView1D<T>;
     using ViewConst_t   = Corrade::Containers::StridedArrayView1D<T const>;
-    using Data_t        = Corrade::Containers::ArrayView<unsigned char>;
-    using DataConst_t   = Corrade::Containers::ArrayView<unsigned char const>;
+    using Data_t        = Corrade::Containers::ArrayView<std::byte>;
+    using DataConst_t   = Corrade::Containers::ArrayView<std::byte const>;
 
     constexpr View_t view(Data_t data, std::size_t count) const noexcept
     {

@@ -653,14 +653,15 @@ Session setup_terrain_draw_magnum(
             auto const &posFormat = rTerrain.chunkGeom.vbufPositions;
             auto const &nrmFormat = rTerrain.chunkGeom.vbufNormals;
 
-            rMesh.addVertexBuffer(rDrawTerrainGl.vrtxBufGL, posFormat.offset, posFormat.stride - sizeof(Vector3u), Magnum::Shaders::GenericGL3D::Position{})
-                 .addVertexBuffer(rDrawTerrainGl.vrtxBufGL, nrmFormat.offset, nrmFormat.stride - sizeof(Vector3u), Magnum::Shaders::GenericGL3D::Normal{})
+
+            rMesh.addVertexBuffer(rDrawTerrainGl.vrtxBufGL, GLintptr(posFormat.offset), GLsizei(posFormat.stride - sizeof(Vector3u)), Magnum::Shaders::GenericGL3D::Position{})
+                 .addVertexBuffer(rDrawTerrainGl.vrtxBufGL, GLintptr(nrmFormat.offset), GLsizei(nrmFormat.stride - sizeof(Vector3u)), Magnum::Shaders::GenericGL3D::Normal{})
                  .setIndexBuffer(rDrawTerrainGl.indxBufGL, 0, Magnum::MeshIndexType::UnsignedInt)
-                 .setCount(3*rTerrain.chunkInfo.faceTotal); // 3 vertices in each triangle
+                 .setCount(Magnum::Int(3*rTerrain.chunkInfo.faceTotal)); // 3 vertices in each triangle
         }
 
-        auto const indxBuffer = Corrade::Containers::arrayCast<unsigned char const>(rTerrain.chunkGeom.indxBuffer);
-        auto const vrtxBuffer = arrayView<unsigned char const>(rTerrain.chunkGeom.vrtxBuffer);
+        auto const indxBuffer = arrayCast<unsigned char const>(rTerrain.chunkGeom.indxBuffer);
+        auto const vrtxBuffer = arrayView<std::byte const>(rTerrain.chunkGeom.vrtxBuffer);
 
         // There's faster ways to sync the buffer, but keeping it simple for now
 

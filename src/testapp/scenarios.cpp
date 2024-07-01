@@ -327,8 +327,10 @@ static ScenarioMap_t make_scenarios()
         auto &rTerrain = top_get<ACtxTerrain>(rTopData, idTerrain);
         auto &rTerrainFrame = top_get<ACtxTerrainFrame>(rTopData, idTerrainFrame);
 
+        constexpr std::uint64_t c_earthRadius = 6371000;
+
         initialize_ico_terrain(rTopData, terrain, terrainIco, {
-            .radius                 = 6371000.0, // Earth radius
+            .radius                 = double(c_earthRadius),
             .height                 = 20000.0,   // Height between Mariana Trench and Mount Everest
             .skelPrecision          = 10,        // 2^10 units = 1024 units = 1 meter
             .skelMaxSubdivLevels    = 19,
@@ -336,7 +338,7 @@ static ScenarioMap_t make_scenarios()
         });
 
         // Set scene position relative to planet to be just on the surface
-        rTerrainFrame.position = Vector3l{0,0,6371000} * 1024;
+        rTerrainFrame.position = Vector3l{0,0,c_earthRadius} * 1024;
 
         RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp) -> void
         {
@@ -361,7 +363,7 @@ static ScenarioMap_t make_scenarios()
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
             shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
-            terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, windowApp, scene, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matVisualizer);
+            terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, scene, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matVisualizer);
             terrainDrawGL   = setup_terrain_draw_magnum (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, terrain);
 
             OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
@@ -443,7 +445,7 @@ static ScenarioMap_t make_scenarios()
             shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
             shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
             cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
-            terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, windowApp, scene, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matVisualizer);
+            terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, scene, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matVisualizer);
             terrainDrawGL   = setup_terrain_draw_magnum (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, terrain);
 
             OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
