@@ -56,9 +56,17 @@ void ChunkFillSubdivLUT::subdiv_line_recurse(
 {
     Vector2us const mid = (a + b) / 2;
 
-    ChunkLocalSharedId const out = ChunkLocalSharedId(xy_to_triangular(mid.x() - 1, mid.y() - 2));
+    std::uint32_t      const out     = xy_to_triangular(mid.x() - 1, mid.y() - 2);
+    ChunkLocalSharedId const sharedA = coord_to_shared(a.x(), a.y(), m_edgeVrtxCount);
+    ChunkLocalSharedId const sharedB = coord_to_shared(b.x(), b.y(), m_edgeVrtxCount);
 
-    m_data.emplace_back(ToSubdiv{id_at(a), id_at(b), out});
+    m_data.emplace_back(ToSubdiv{
+        .vrtxA     = std::uint32_t(sharedA.has_value() ? sharedA.value : xy_to_triangular(a.x() - 1, a.y() - 2)),
+        .vrtxB     = std::uint32_t(sharedB.has_value() ? sharedB.value : xy_to_triangular(b.x() - 1, b.y() - 2)),
+        .fillOut   = out,
+        .aIsShared = sharedA.has_value(),
+        .bIsShared = sharedB.has_value()
+    });
 
     if (level > 1)
     {

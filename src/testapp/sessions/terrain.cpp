@@ -40,8 +40,7 @@
 #include <chrono>
 #include <fstream>
 
-using adera::ACtxCameraController;
-
+using namespace adera;
 using namespace planeta;
 using namespace osp;
 using namespace osp::math;
@@ -53,9 +52,13 @@ namespace testapp::scenes
 Session setup_terrain(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>  const topData,
-        Session               const &scene)
+        Session               const &scene,
+        Session               const &commonScene)
 {
+    OSP_DECLARE_GET_DATA_IDS(commonScene, TESTAPP_DATA_COMMON_SCENE);
     auto const tgScn = scene.get_pipelines<PlScene>();
+
+    auto &rDrawing = top_get<ACtxDrawing>(topData, idDrawing);
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_TERRAIN);
@@ -64,9 +67,12 @@ Session setup_terrain(
     rBuilder.pipeline(tgTrn.skeleton)       .parent(tgScn.update);
     rBuilder.pipeline(tgTrn.surfaceChanges) .parent(tgScn.update);
     rBuilder.pipeline(tgTrn.terrainFrame)   .parent(tgScn.update);
+    rBuilder.pipeline(tgTrn.chunkMesh)      .parent(tgScn.update);
 
     auto &rTerrainFrame = top_emplace< ACtxTerrainFrame >(topData, idTerrainFrame);
     auto &rTerrain      = top_emplace< ACtxTerrain >     (topData, idTerrain);
+
+    rTerrain.terrainMesh = rDrawing.m_meshRefCounts.ref_add(rDrawing.m_meshIds.create());
 
     rBuilder.task()
         .name       ("Clear surfaceAdded & surfaceRemoved once we're done with it")
@@ -83,8 +89,8 @@ Session setup_terrain(
         .name       ("Clean up terrain-related IdOwners")
         .run_on     ({tgScn.cleanup(Run_)})
         .push_to    (out.m_tasks)
-        .args       ({        idTerrain })
-        .func([] (ACtxTerrain &rTerrain) noexcept
+        .args       ({        idTerrain,             idDrawing})
+        .func([] (ACtxTerrain &rTerrain, ACtxDrawing &rDrawing) noexcept
     {
         // rTerrain.skChunks has owners referring to rTerrain.skeleton. A reference to
         // rTerrain.skeleton can't be obtained during destruction, we must clear it separately.
@@ -92,6 +98,8 @@ Session setup_terrain(
 
         // rTerrain.skeleton will clean itself up in its destructor, since it only holds owners
         // referring to itself.
+
+        rDrawing.m_meshRefCounts.ref_release(std::move(rTerrain.terrainMesh));
     });
 
     return out;
@@ -141,6 +149,8 @@ Session setup_terrain_subdiv_dist(
         BasicChunkMeshGeometry     &rChGeo     = rTerrain.chunkGeom;
         SkeletonSubdivScratchpad   &rSkSP      = rTerrain.scratchpad;
 
+        Vector3l const& viewerPos = rTerrain.scratchpad.viewerPosition;
+
         // ## Unsubdivide triangles that are too far away
 
         // Unsubdivide is performed first, since it's better to remove stuff before adding new
@@ -152,7 +162,7 @@ Session setup_terrain_subdiv_dist(
         for (int level = rSkel.levelMax-1; level >= 0; --level)
         {
             // Select and deselect only modifies rSkSP
-            unsubdivide_select_by_distance(level, rTerrainFrame.position, rSkel, rSkData, rSkSP);
+            unsubdivide_select_by_distance(level, viewerPos, rSkel, rSkData, rSkSP);
             unsubdivide_deselect_invariant_violations(level, rSkel, rSkData, rSkSP);
 
             // Perform changes on skeleton, delete selected triangles
@@ -178,7 +188,7 @@ Session setup_terrain_subdiv_dist(
         // Do the subdivide for real
         for (int level = 0; level < rSkel.levelMax; ++level)
         {
-            subdivide_level_by_distance(rTerrainFrame.position, level, rSkel, rSkData, rSkSP);
+            subdivide_level_by_distance(viewerPos, level, rSkel, rSkData, rSkSP);
         }
         rSkSP.distanceTestDone.clear();
 
@@ -189,7 +199,7 @@ Session setup_terrain_subdiv_dist(
     rBuilder.task()
         .name       ("Update Terrain Chunks")
         .run_on     ({tgScn.update(Run)})
-        .sync_with  ({tgTrn.terrainFrame(Ready), tgTrn.skeleton(New), tgTrn.surfaceChanges(UseOrRun)})
+        .sync_with  ({tgTrn.terrainFrame(Ready), tgTrn.skeleton(Ready), tgTrn.surfaceChanges(UseOrRun), tgTrn.chunkMesh(Modify)})
         .push_to    (out.m_tasks)
         .args({                    idTerrainFrame,             idTerrain,                idTerrainIco })
         .func([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
@@ -208,6 +218,7 @@ Session setup_terrain_subdiv_dist(
         SkeletonSubdivScratchpad   &rSkSP      = rTerrain.scratchpad;
 
         rChSP.chunksAdded       .clear();
+        rChSP.chunksRemoved     .clear();
         rChSP.sharedNormalsDirty.clear();
         rChSP.sharedAdded       .clear();
         rChSP.sharedRemoved     .clear();
@@ -216,10 +227,12 @@ Session setup_terrain_subdiv_dist(
         for (SkTriId const sktriId : rSkSP.surfaceRemoved)
         {
             ChunkId const chunkId = rSkCh.m_triToChunk[sktriId];
-
-            subtract_normal_contrib(chunkId, false, rChGeo, rChInfo, rChSP, rSkCh);
-
-            rSkCh.chunk_remove(chunkId, sktriId, rChSP.sharedRemoved, rSkel);
+            if (chunkId.has_value())
+            {
+                subtract_normal_contrib(chunkId, false, rChGeo, rChInfo, rChSP, rSkCh);
+                rSkCh.chunk_remove(chunkId, sktriId, rChSP.sharedRemoved, rSkel);
+                rChSP.chunksRemoved.insert(chunkId);
+            }
         }
 
         auto const chLevel  = rSkCh.m_chunkSubdivLevel;
@@ -232,16 +245,17 @@ Session setup_terrain_subdiv_dist(
             auto const &corners = rSkel.tri_at(sktriId).vertices;
 
             ArrayView< MaybeNewId<SkVrtxId> > const edgeVrtxView = rChSP.edgeVertices;
-            ArrayView< MaybeNewId<SkVrtxId> > const edgeLft = edgeVrtxView.sliceSize(edgeSize * 0, edgeSize);
-            ArrayView< MaybeNewId<SkVrtxId> > const edgeBtm = edgeVrtxView.sliceSize(edgeSize * 1, edgeSize);
-            ArrayView< MaybeNewId<SkVrtxId> > const edgeRte = edgeVrtxView.sliceSize(edgeSize * 2, edgeSize);
+            ArrayView< MaybeNewId<SkVrtxId> > const edgeLft = edgeVrtxView.sliceSize(edgeSize * 0ul, edgeSize);
+            ArrayView< MaybeNewId<SkVrtxId> > const edgeBtm = edgeVrtxView.sliceSize(edgeSize * 1ul, edgeSize);
+            ArrayView< MaybeNewId<SkVrtxId> > const edgeRte = edgeVrtxView.sliceSize(edgeSize * 2ul, edgeSize);
 
             rSkel.vrtx_create_chunk_edge_recurse(chLevel, corners[0], corners[1], edgeLft);
             rSkel.vrtx_create_chunk_edge_recurse(chLevel, corners[1], corners[2], edgeBtm);
             rSkel.vrtx_create_chunk_edge_recurse(chLevel, corners[2], corners[0], edgeRte);
 
             ChunkId const chunkId = rSkCh.chunk_create(sktriId, rSkel, rChSP.sharedAdded, edgeLft, edgeBtm, edgeRte);
-            rChSP.chunksAdded.push_back(chunkId);
+
+            rChSP.chunksAdded.insert(chunkId);
 
             // chunk_create creates new Skeleton Vertices. Resize is needed after each call
             rSkData.resize(rSkel);
@@ -253,55 +267,134 @@ Session setup_terrain_subdiv_dist(
             ico_calc_chunk_edge(rTerrainIco.radius, chLevel, corners[2], corners[0], edgeRte, rSkData);
         }
 
-        for (SkTriId const sktriId : rSkSP.surfaceAdded)
+        for (ChunkId const chunkId : rChSP.chunksAdded)
         {
-            auto const chunkId = rSkCh.m_triToChunk[sktriId];
-            restitch_check(chunkId, sktriId, rSkCh, rSkel, rSkData, rChSP);
+            restitch_check(chunkId, rSkCh.m_chunkToTri[chunkId], rSkCh, rSkel, rSkData, rChSP);
         }
 
-        // Calculate positions for newly added shared vertex
-        float const scalepow = std::pow(2.0f, -rSkData.precision);
-        for (SharedVrtxId const sharedVrtxId : rChSP.sharedAdded)
+        float const scale = std::exp2(float(-rSkData.precision));
+
+        auto const vbufPosView = rChGeo.vbufPositions.view(rChGeo.vrtxBuffer, rChInfo.vrtxTotal);
+        auto const vbufNrmView = rChGeo.vbufNormals  .view(rChGeo.vrtxBuffer, rChInfo.vrtxTotal);
+
+        // TODO: temporary code of course
+        auto const heightmap = [scale, h = rTerrainIco.height] (Vector3l posl) -> float
         {
-            SkVrtxId const skelVrtx     = rSkCh.m_sharedToSkVrtx[sharedVrtxId];
+            return h * std::clamp<double>(    0.1*(0.5 - 0.5*std::cos(0.000050*posl.x()*scale*2.0*3.14159))
+                                            + 0.9*(0.5 - 0.5*std::cos(0.000005*posl.y()*scale*2.0*3.14159)) , 0.0, 1.0 );
+        };
 
-            // Normal is not cleaned up by the previous user. Normal is initially set to zero, and
-            // face normals added in update_faces(...) will accumulate here.
-            rChGeo.sharedNormalSum[sharedVrtxId] = Vector3{ZeroInit};
-
-            //Vector3l const translated = positions[size_t(skelId)] + translaton;
-            Vector3d  const scaled = Vector3d(rSkData.positions[skelVrtx]) * scalepow;
-            VertexIdx const vertex = rChInfo.vbufSharedOffset + sharedVrtxId.value;
-
-            // Heightmap goes here (1)
-            rChGeo.chunkVbufPos[vertex] = Vector3(scaled);
-        }
-
-        // Calculate fill vertex positions
-        for (SkTriId const sktriId : rSkSP.surfaceAdded)
+        auto const update_shared_vrtx_position
+                = [&vbufPosView, &heightmap, scale, &rSkCh, &rChInfo, &rSkData, &rChGeo, &rTerrainIco]
+                  (SharedVrtxId const sharedVrtxId)
         {
-            auto        const chunk      = rSkCh.m_triToChunk[sktriId];
-            auto        const chunkIdInt = std::size_t(chunk);
-            std::size_t const fillOffset = rChInfo.vbufFillOffset + chunkIdInt*rChInfo.fillVrtxCount;
+            SkVrtxId  const skelVrtx   = rSkCh.m_sharedToSkVrtx[sharedVrtxId];
+            VertexIdx const vbufVertex = rChInfo.vbufSharedOffset + sharedVrtxId.value;
+            Vector3l  const skPos      = rSkData.positions[skelVrtx];
+            Vector3   const posOut     = Vector3{skPos - rChGeo.originSkelPos} * scale;
+            Vector3   const radialDir  = Vector3{Vector3d(skPos) * scale / rTerrainIco.radius};
 
-            osp::ArrayView<SharedVrtxOwner_t const> sharedUsed = rSkCh.shared_vertices_used(chunk);
+            rChGeo.sharedPosNoHeightmap[sharedVrtxId] = posOut;
+            vbufPosView[vbufVertex]                   = posOut + radialDir * heightmap(skPos);
+        };
 
-            for (ChunkFillSubdivLUT::ToSubdiv const& toSubdiv : rChSP.lut.data())
+        // TODO: Limit rChGeo.originSkelPos to always be near the surface. There isn't a point in
+        //       translating the mesh when moving away from the terrain.
+        //       Also add a threshold to only translate if the two positions diverge too far. Vary
+        //       the threshold by the maximum present subdivision level, so less translations are
+        //       needed when moving across low-detail terrain.
+
+        if (rChGeo.originSkelPos == rTerrainFrame.position)
+        {
+            // Copy offsetted positions from the skeleton for newly added shared vertices
+
+            for (SharedVrtxId const sharedVrtxId : rChSP.sharedAdded)
             {
-                std::size_t const vrtxA = rChSP.lut.index(sharedUsed, fillOffset, rChInfo.vbufSharedOffset, toSubdiv.m_vrtxA);
-                std::size_t const vrtxB = rChSP.lut.index(sharedUsed, fillOffset, rChInfo.vbufSharedOffset, toSubdiv.m_vrtxB);
-                std::size_t const vrtxC = rChInfo.vbufFillOffset + rChInfo.fillVrtxCount*chunkIdInt + toSubdiv.m_fillOut.value;
-
-                Vector3 &rPosC = rChGeo.chunkVbufPos[vrtxC];
-
-                // Heightmap goes here (2)
-                Vector3 const avg       = (rChGeo.chunkVbufPos[vrtxA] + rChGeo.chunkVbufPos[vrtxB]) / 2.0f;
-                float   const avgLen    = avg.length();
-                float   const roundness = rTerrainIco.radius - avgLen;
-
-                rPosC = avg + (avg / avgLen) * roundness;
+                update_shared_vrtx_position(sharedVrtxId);
             }
         }
+        else
+        {
+            // The scene position relative to planet origin has changed.
+            OSP_LOG_INFO("Translating Terrain Mesh");
+
+            Vector3l const deltaOffset  = rChGeo.originSkelPos - rTerrainFrame.position;
+            Vector3  const deltaOffsetF = Vector3(deltaOffset) * scale;
+            rChGeo.originSkelPos = rTerrainFrame.position;
+
+            // Refresh all shared vertex positions
+            for (SharedVrtxId const sharedVrtxId : rSkCh.m_sharedIds)
+            {
+                update_shared_vrtx_position(sharedVrtxId);
+            }
+
+            // Translate all existing chunk fill vertices
+            for (ChunkId const chunkId : rSkCh.m_chunkIds)
+            {
+                if (rChSP.chunksAdded.contains(chunkId))
+                {
+                    continue; // Not added yet, no need to translate
+                }
+
+                std::size_t const fillOffset = rChInfo.vbufFillOffset + chunkId.value*rChInfo.fillVrtxCount;
+                for (Vector3 &rPos : vbufPosView.sliceSize(fillOffset, rChInfo.fillVrtxCount))
+                {
+                    rPos += deltaOffsetF;
+                }
+            }
+        }
+
+        Vector3d const center = -Vector3d(rChGeo.originSkelPos) * scale;
+
+        // Calculate new fill vertex positions
+        for (ChunkId const chunkId : rChSP.chunksAdded)
+        {
+            std::size_t const fillOffset = rChInfo.vbufFillOffset + chunkId.value*rChInfo.fillVrtxCount;
+            osp::ArrayView<SharedVrtxOwner_t const> sharedUsed = rSkCh.shared_vertices_used(chunkId);
+
+            // Use ChunkFillSubdivLUT to generate a spherically curved triangle fill through
+            // building up and subdividing pairs of vertices. Don't apply heightmap yet, as this
+            // will interfere with middle position and curvature calculations.
+            for (ChunkFillSubdivLUT::ToSubdiv const& toSubdiv : rChSP.lut.data())
+            {
+                Vector3 const vrtxAPos = toSubdiv.aIsShared
+                                       ? rChGeo.sharedPosNoHeightmap[sharedUsed[toSubdiv.vrtxA]]
+                                       : vbufPosView[fillOffset + toSubdiv.vrtxA];
+                Vector3 const vrtxBPos = toSubdiv.bIsShared
+                                       ? rChGeo.sharedPosNoHeightmap[sharedUsed[toSubdiv.vrtxB]]
+                                       : vbufPosView[fillOffset + toSubdiv.vrtxB];
+
+                Vector3d    const middle     = 0.5*( Vector3d(vrtxAPos) + Vector3d(vrtxBPos) );
+                Vector3d    const centerDiff = Vector3d(middle) - center;
+                double      const centerDist = centerDiff.length();
+                Vector3d    const radialDir  = centerDiff / centerDist;
+                double      const roundness  = rTerrainIco.radius - centerDiff.length();
+                Vector3d    const posOut     = middle + radialDir * roundness;
+
+                vbufPosView[fillOffset + toSubdiv.fillOut] = Vector3(posOut);
+            }
+
+            // Apply heightmap afterwards
+            for (Vector3 &rPos : vbufPosView.sliceSize(fillOffset, rChInfo.fillVrtxCount))
+            {
+                Vector3d   const centerDiff = Vector3d(rPos) - center;
+                double     const centerDist = centerDiff.length();
+                Vector3    const radialDir  = Vector3{centerDiff / centerDist};
+
+                Vector3l const bigpos = Vector3l(rPos / scale) + rChGeo.originSkelPos;
+
+                rPos += radialDir * heightmap(bigpos);
+            }
+        }
+
+        // Normal is not cleaned up by the previous user; Initially set them to zero.
+        // Face normals added in update_faces(...) will accumulate here.
+        for (SharedVrtxId const sharedVrtxId : rChSP.sharedAdded)
+        {
+            rChGeo.sharedNormalSum[sharedVrtxId] = Vector3{ZeroInit};
+        }
+
+        // Update Index buffer
 
         // Add or remove faces according to chunk changes. This also calculates normals.
         // Vertex normals are calculated from a weighted sum of face normals of connected faces.
@@ -315,23 +408,49 @@ Session setup_terrain_subdiv_dist(
         }
         std::fill(rChSP.stitchCmds.begin(), rChSP.stitchCmds.end(), ChunkStitch{});
 
+        // Fill unused parts of the index buffer with zeros. This includes chunks that are deleted
+        // but not (yet) reused.
+        auto const ibuf2d = as_2d(rChGeo.indxBuffer, rChInfo.chunkMaxFaceCount);
+        for (ChunkId const chunkId : rChSP.chunksRemoved)
+        {
+            if ( ! rSkCh.m_chunkIds.exists(chunkId) )
+            {
+                auto const indicesView = ibuf2d.row(chunkId.value);
+                std::fill(indicesView.begin(), indicesView.end(), Vector3u{0, 0, 0});
+            }
+        }
+
         // Update vertex buffer normals of shared vertices, as rChGeo.sharedNormalSum was modified.
         for (SharedVrtxId const sharedId : rChSP.sharedNormalsDirty)
         {
             Vector3 const normalSum = rChGeo.sharedNormalSum[sharedId];
-            rChGeo.chunkVbufNrm[rChInfo.vbufSharedOffset + sharedId.value] = normalSum.normalized();
+            vbufNrmView[rChInfo.vbufSharedOffset + sharedId.value] = normalSum.normalized();
         }
 
         // Uncomment these if some new change breaks something
         //debug_check_invariants(rChGeo, rChInfo, rSkCh);
 
-        // TODO: temporary, write debug obj file every ~10 seconds
-        static int fish = 0;
-        ++fish;
-        if (fish == 60*10)
-        {
-            fish = 0;
 
+        static unsigned int fish = 1;
+        ++fish;
+
+        // TODO: temporary, write statistics about every second
+        if (fish % 60 == 0)
+        {
+            OSP_LOG_INFO("Terrain stats: \n"
+                         "* Skeleton Triangles:   {}\n"
+                         "* Skeleton Vertices:    {}\n"
+                         "* Chunks:               {}/{}\n"
+                         "* Shared Vertices:      {}/{}\n",
+                         rSkel.tri_group_ids().size()*4, rSkel.vrtx_ids().size(),
+                         rSkCh.m_chunkIds.size(), rSkCh.m_chunkIds.capacity(),
+                         rSkCh.m_sharedIds.size(), rSkCh.m_sharedIds.capacity());
+        }
+
+        /*
+        // TODO: temporary, write debug obj file every ~10 seconds
+        if (fish % (60*10) == 0)
+        {
             auto        const time     = std::chrono::system_clock::now().time_since_epoch().count();
             std::string const filename = fmt::format("planetdebug_{}.obj", time);
 
@@ -346,6 +465,7 @@ Session setup_terrain_subdiv_dist(
             objfile.open(filename);
             write_obj(objfile, rTerrain.chunkGeom, rChInfo, rSkCh);
         }
+        */
     });
 
     return out;
@@ -384,7 +504,7 @@ void initialize_ico_terrain(
 
     rTerrain.skData.resize(rTerrain.skeleton);
 
-    double const scale = std::pow(2.0, rTerrain.skData.precision);
+    double const scale     = std::exp2(double(rTerrain.skData.precision));
     double const maxRadius = rTerrainIco.radius + rTerrainIco.height;
 
     for (SkTriGroupId const groupId : rTerrainIco.icoGroups)
@@ -439,16 +559,16 @@ void initialize_ico_terrain(
     for (int level = 0; level < gc_maxSubdivLevels; ++level)
     {
         // Good-enough bounding sphere is ~75% of the edge length (determined using Blender)
-        float const edgeLength = gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * scale;
-        float const subdivRadius = 0.75f * edgeLength;
+        double const edgeLength = gc_icoMaxEdgeVsLevel[level] * rTerrainIco.radius * scale;
+        double const subdivRadius = 0.75 * edgeLength;
 
         // TODO: Pick thresholds based on the angular diameter (size on screen) of the
         //       chunk triangle mesh that will actually be rendered.
-        rSP.distanceThresholdSubdiv[level] = std::uint64_t(subdivRadius);
+        rSP.distanceThresholdSubdiv[level] = subdivRadius;
 
         // Unsubdivide thresholds should be slightly larger (arbitrary x2) to avoid rapid
         // terrain changes when moving back and forth quickly
-        rSP.distanceThresholdUnsubdiv[level] = std::uint64_t(2.0f * subdivRadius);
+        rSP.distanceThresholdUnsubdiv[level] = 2.0f * subdivRadius;
     }
 
     // ## Prepare Chunk Skeleton
@@ -463,7 +583,7 @@ void initialize_ico_terrain(
     // Approximate max number of shared vertices. Determined experimentally, roughly 60% of all
     // vertices end up being shared. Margin is inherited from maxChunksApprox.
     std::uint32_t const maxVrtxApprox = maxChunksApprox * rTerrain.skChunks.m_chunkSharedCount;
-    std::uint32_t const maxSharedVrtxApprox = 0.6f * maxVrtxApprox;
+    std::uint32_t const maxSharedVrtxApprox = std::uint32_t(0.6f * float(maxVrtxApprox));
 
     rTerrain.skChunks.chunk_reserve(std::uint16_t(maxChunksApprox));
     rTerrain.skChunks.shared_reserve(maxSharedVrtxApprox);
@@ -491,9 +611,8 @@ void initialize_ico_terrain(
                  rTerrain.skChunks.m_chunkSharedCount,
                  rTerrain.chunkInfo.chunkMaxFaceCount,
                  rTerrain.skChunks.m_sharedIds.capacity(),
-                 fmt::group_digits(rTerrain.chunkGeom.chunkIbuf.size() * sizeof(Vector3u)),
-                 fmt::group_digits(  rTerrain.chunkGeom.chunkVbufNrm.size() * sizeof(Vector3)
-                                   + rTerrain.chunkGeom.chunkVbufPos.size() * sizeof(Vector3)));
+                 fmt::group_digits(rTerrain.chunkGeom.vrtxBuffer.size()),
+                 fmt::group_digits(rTerrain.chunkGeom.indxBuffer.size() * sizeof(Vector3u)));
 }
 
 
@@ -502,12 +621,13 @@ struct TerrainDebugDraw
 {
     KeyedVec<SkVrtxId, osp::draw::DrawEnt> verts;
     MaterialId mat;
+    DrawEnt surface;
 };
 
 Session setup_terrain_debug_draw(
         TopTaskBuilder&             rBuilder,
         ArrayView<entt::any>  const topData,
-        Session               const &windowApp,
+        Session               const &scene,
         Session               const &sceneRenderer,
         Session               const &cameraCtrl,
         Session               const &commonScene,
@@ -515,13 +635,14 @@ Session setup_terrain_debug_draw(
         Session               const &terrainIco,
         MaterialId            const mat)
 {
+    OSP_DECLARE_GET_DATA_IDS(scene,          TESTAPP_DATA_SCENE);
     OSP_DECLARE_GET_DATA_IDS(commonScene,    TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer,  TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(cameraCtrl,     TESTAPP_DATA_CAMERA_CTRL);
     OSP_DECLARE_GET_DATA_IDS(terrain,        TESTAPP_DATA_TERRAIN);
     OSP_DECLARE_GET_DATA_IDS(terrainIco,     TESTAPP_DATA_TERRAIN_ICO);
 
-    auto const tgWin    = windowApp     .get_pipelines<PlWindowApp>();
+    auto const tgScn    = scene         .get_pipelines<PlScene>();
     auto const tgScnRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
     auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
     auto const tgTrn    = terrain       .get_pipelines<PlTerrain>();
@@ -532,30 +653,116 @@ Session setup_terrain_debug_draw(
     auto &rTrnDbgDraw = top_emplace< TerrainDebugDraw > (topData, idTrnDbgDraw,
                                                          TerrainDebugDraw{.mat = mat});
 
+    auto &rDrawing   = top_get< ACtxDrawing >       (topData, idDrawing);
+    auto &rScnRender = top_get< ACtxSceneRender >   (topData, idScnRender);
+    auto &rTerrain   = top_get< ACtxTerrain >       (topData, idTerrain);
+
+    rTrnDbgDraw.surface = rScnRender.m_drawIds.create();
+    rScnRender.resize_draw();
+
+    rScnRender.m_visible.insert(rTrnDbgDraw.surface);
+    rScnRender.m_opaque .insert(rTrnDbgDraw.surface);
+    rScnRender.m_materials[mat].m_ents.insert(rTrnDbgDraw.surface);
+    rScnRender.m_materials[mat].m_dirty.push_back(rTrnDbgDraw.surface);
+    rScnRender.m_mesh[rTrnDbgDraw.surface] = rDrawing.m_meshRefCounts.ref_add(rTerrain.terrainMesh);
+
     rBuilder.task()
-        .name       ("Position SceneFrame center to Camera Controller target")
-        .run_on     ({tgWin.inputs(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Ready), tgTrn.terrainFrame(Modify)})
+        .name       ("Handle Scene<-->Terrain positioning and floating origin")
+        .run_on     ({tgScn.update(Run)})
+        .sync_with  ({tgCmCt.camCtrl(Modify), tgTrn.terrainFrame(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,                  idTerrainFrame,             idTerrain,                idTerrainIco })
-        .func([] (ACtxCameraController& rCamCtrl, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
+        .args       ({                 idCamCtrl,           idDeltaTimeIn,                  idTerrainFrame,             idTerrain,                idTerrainIco })
+        .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
-        if ( ! rCamCtrl.m_target.has_value())
+        using Magnum::Math::abs;
+        using Magnum::Math::cross;
+        using Magnum::Math::dot;
+        using Magnum::Math::floor;
+        using Magnum::Math::sign;
+        using Magnum::Math::sqrt;
+
+        if ( ! rCamCtrl.m_target.has_value() )
         {
             return;
         }
-        Vector3 camPos = rCamCtrl.m_target.value();
 
-        float const len = camPos.length();
-        float const midHeightRadius = rTerrainIco.radius + 0.5f*rTerrainIco.height;
-        if (len < midHeightRadius)
+        // Camera translation with controls
+        SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
+
+        int const scale = int_2pow<int>(rTerrain.skData.precision);
+
+        Vector3 &rCamPos = rCamCtrl.m_target.value();
+
+        constexpr float maxDist = 65565.0f;
+
+        // Do a floating origin translation if required
+
+        // Determine if x, y, or z in rCamPos goes further than maxDist, and by how much.
+        // Round up/down towards zero to the closest multiple of maxDist.
+        // Zero if rCamPos is (maxDist) meters away.
+        Vector3 const translateOrigin = sign(rCamPos) * floor(abs(rCamPos) / maxDist) * maxDist;
+        if ( ! translateOrigin.isZero() )
         {
-            camPos *= midHeightRadius / len;
+            // Origin translation involves translating everything in the scene, but in this case
+            // it's just the camera. Terrain will respond accordingly to changes in rTerrainFrame.
+            rCamPos -= translateOrigin;
+
+            // Scene has moved relative to terrain
+            rTerrainFrame.position += Vector3l{translateOrigin} * scale;
         }
 
-        rTerrainFrame.position = Vector3l(camPos * int_2pow<int>(rTerrain.skData.precision));
+        // Set position of camera target relative to terrain, used for LOD distance checking
+        rTerrain.scratchpad.viewerPosition = rTerrainFrame.position + Vector3l(rCamPos * float(scale));
+
+        Vector3d const viewerPosD          = Vector3d{rTerrain.scratchpad.viewerPosition};
+        double   const distanceToCenter    = viewerPosD.length();
+        double   const minDistanceToCenter = (rTerrainIco.radius + rTerrainIco.height) * scale;
+
+        // Enforce minimum distance to center for viewerPosition. This makes it so that moving the
+        // camera below the surface will still show the highest level of detail.
+        if (distanceToCenter < minDistanceToCenter)
+        {
+            rTerrain.scratchpad.viewerPosition *= minDistanceToCenter / distanceToCenter;
+        }
+
+        // Set camera controller's 'up' direction to gravity direction
+
+        Vector3 const upOld = rCamCtrl.m_up;
+        Vector3 const upNew = Vector3{viewerPosD / distanceToCenter};
+        rCamCtrl.m_up = upNew;
+
+        // A bit hacky: Rotate around the target to account for change in 'up' to prevent weird
+        //              behaviour with fast (zoomed-out) camera movement.
+        // return;   // Hard to explain, uncomment this return to see what I mean :>
+
+        // Rotation required to rotate upOld into upNew
+        float const w        = sqrt(upNew.dot() * upNew.dot()) + dot(upOld, upNew);
+        auto  const rotation = Quaternion{cross(upOld, upNew), w}.normalized();
+
+        Vector3 const pivot = rCamCtrl.m_target.value();
+        rCamCtrl.m_transform.translation() -= pivot;
+        rCamCtrl.m_transform = Matrix4{rotation.toMatrix()} * rCamCtrl.m_transform;
+        rCamCtrl.m_transform.translation() += pivot;
+
+        SysCameraController::update_view(rCamCtrl, deltaTimeIn);
     });
 
+    rBuilder.task()
+        .name       ("Reposition terrain surface mesh")
+        .run_on     ({tgScnRdr.render(Run)})
+        .sync_with  ({tgTrn.terrainFrame(Ready), tgTrn.chunkMesh(Ready), tgScnRdr.drawEnt(Ready), tgScnRdr.drawTransforms(Modify_), tgScnRdr.drawEntResized(Done)})
+        .push_to    (out.m_tasks)
+        .args       ({             idTrnDbgDraw,                  idTerrainFrame,             idTerrain,                 idScnRender })
+        .func([] (TerrainDebugDraw& rTrnDbgDraw, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender) noexcept
+    {
+        float const scale = std::exp2(float(rTerrain.skData.precision));
+
+        Vector3 const pos = Vector3(rTerrain.chunkGeom.originSkelPos-rTerrainFrame.position) / scale;
+
+        rScnRender.m_drawTransform[rTrnDbgDraw.surface] = Matrix4::translation(pos);
+    });
+
+#if 0
     // Setup skeleton vertex visualizer
 
     rBuilder.task()
@@ -640,6 +847,7 @@ Session setup_terrain_debug_draw(
                 * Matrix4::scaling({0.05f, 0.05f, 0.05f});
         }
     });
+#endif
 
     return out;
 }

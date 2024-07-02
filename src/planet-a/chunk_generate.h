@@ -47,14 +47,11 @@ struct ChunkScratchpad
     /// New stitches to apply to currently existing chunks
     osp::KeyedVec<ChunkId, ChunkStitch> stitchCmds;
 
-    /// Newly added chunks
-    std::vector<ChunkId> chunksAdded;
+    lgrn::IdSetStl<ChunkId> chunksAdded;   ///< Recently added chunks
+    lgrn::IdSetStl<ChunkId> chunksRemoved; ///< Recently removed chunks
 
-    /// Recently added shared vertices, position needs to be copied from skeleton
-    lgrn::IdSetStl<SharedVrtxId> sharedAdded;
-
-    /// Recently added shared vertices
-    lgrn::IdSetStl<SharedVrtxId> sharedRemoved;
+    lgrn::IdSetStl<SharedVrtxId> sharedAdded;   ///< Recently added shared vertices
+    lgrn::IdSetStl<SharedVrtxId> sharedRemoved; ///< Recently removed shared vertices
 
     /// Shared vertices that need to recalculate normals
     lgrn::IdSetStl<SharedVrtxId> sharedNormalsDirty;

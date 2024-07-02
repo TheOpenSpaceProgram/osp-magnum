@@ -91,20 +91,29 @@ inline constexpr std::array<std::array<uint8_t, 3>, 20> gc_icoNeighbors
 /**
  * @brief Icosahedron Minimum Edge Length vs Subdiv Levels, radius = 1.0
  */
-inline constexpr std::array<float, 10> const gc_icoMinEdgeVsLevel
+inline constexpr std::array<float, 24> const gc_icoMinEdgeVsLevel
 {
-    1.05146222e+0f,  5.46533058e-1f,  2.75904484e-1f,  1.38283174e-1f,  6.91829904e-2f,
-    3.45966718e-2f,  1.72989830e-2f,  8.64957239e-3f,  4.32479631e-3f,  2.16239942e-3f
+    1.05146222e+0f,  5.46533058e-1f,  2.75904484e-1f,  1.38283174e-1f,
+    6.91829904e-2f,  3.45966718e-2f,  1.72989830e-2f,  8.64957239e-3f,
+    4.32479631e-3f,  2.16239942e-3f,  1.08119987e-3f,  5.40599953e-4f,
+    2.70299979e-4f,  1.35149990e-4f,  6.75749950e-5f,  3.37874975e-5f,
+    1.68937487e-5f,  8.44687437e-6f,  4.22343719e-6f,  2.11171859e-6f,
+    1.05585930e-6f,  5.27929648e-7f,  2.63964824e-7f,  1.31982412e-7f
 };
 
 /**
  * @brief Icosahedron Maximum Edge Length vs Subdiv Levels, radius = 1.0
  */
-inline constexpr std::array<float, 10> const gc_icoMaxEdgeVsLevel
-{
-    1.05146222e+0f,  6.18033989e-1f,  3.24919696e-1f,  1.64647160e-1f,  8.26039665e-2f,
-    4.13372560e-2f,  2.06730441e-2f,  1.03370743e-2f,  5.16860619e-3f,  2.58431173e-3f
-};
+inline constexpr std::array<float, 24> const gc_icoMaxEdgeVsLevel
+{{
+    1.05146222e+0f,  6.18033989e-1f,  3.24919696e-1f,  1.64647160e-1f,
+    8.26039665e-2f,  4.13372560e-2f,  2.06730441e-2f,  1.03370743e-2f,
+    5.16860619e-3f,  2.58431173e-3f,  1.29215694e-3f,  6.46078606e-4f,
+    3.23039320e-4f,  1.61519662e-4f,  8.07598312e-5f,  4.03799157e-5f,
+    2.01899578e-5f,  1.00949789e-5f,  5.04748946e-6f,  2.52374473e-6f,
+    1.26187236e-6f,  6.30936182e-7f,  3.15468091e-7f,  1.57734046e-7f
+}};
+
 
 /**
  * @brief Tower height required to clear the horizon over an edge vs Subdiv levels, radius = 1.0
@@ -112,10 +121,14 @@ inline constexpr std::array<float, 10> const gc_icoMaxEdgeVsLevel
  * If identical towers were built on the two vertices spanning an edge, this is how high each tower
  * needs to be in order to see each other over the horizon.
  */
-inline constexpr std::array<float, 10> const gc_icoTowerOverHorizonVsLevel
+inline constexpr std::array<float, 24> const gc_icoTowerOverHorizonVsLevel
 {
-    1.75570505e-1f,  3.95676520e-2f,  9.65341549e-3f,  2.39888395e-3f,  5.98823224e-4f,
-    1.49649798e-4f,  3.74089507e-5f,  9.35201901e-6f,  2.33799109e-6f,  5.84496918e-7f
+    1.75570505e-1f,  3.95676520e-2f,  9.65341549e-3f,  2.39888395e-3f,
+    5.98823224e-4f,  1.49649798e-4f,  3.74089507e-5f,  9.35201901e-6f,
+    2.33799109e-6f,  5.84496918e-7f,  1.46124176e-7f,  3.65310407e-8f,
+    9.13275996e-9f,  2.28318998e-9f,  5.70797494e-10f, 1.42699373e-10f,
+    3.56748433e-11f, 8.91871083e-12f, 2.22967771e-12f, 5.57419427e-13f,
+    1.39354857e-13f, 3.48387142e-14f, 8.70967855e-15f, 2.17741964e-15f
 };
 
 /**
@@ -179,8 +192,8 @@ void ico_calc_chunk_edge(
  */
 void ico_calc_sphere_tri_center(
         SkTriGroupId                    groupId,
-        float                           maxRadius,
-        float                           height,
+        double                          maxRadius,
+        double                          height,
         SubdivTriangleSkeleton    const &rSkel,
         SkeletonVertexData              &rSkData);
 

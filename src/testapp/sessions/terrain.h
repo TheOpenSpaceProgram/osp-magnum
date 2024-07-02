@@ -27,8 +27,8 @@
 #include "../scenarios.h"
 #include "planet-a/chunk_utils.h"
 
+#include <osp/drawing/drawing.h>
 #include <osp/core/math_types.h>
-#include <osp/drawing/draw_ent.h>
 
 #include <planet-a/skeleton.h>
 #include <planet-a/skeleton_subdiv.h>
@@ -38,13 +38,14 @@ namespace testapp::scenes
 {
 
 /**
- * @brief Scene orientation relative to planet center
+ * @brief Scene orientation relative to terrain
  *
  * This is intended to be modified by a system responsible for handling floating origin and
  * the Scene's position within a universe.
  */
 struct ACtxTerrainFrame
 {
+    /// Position of scene's (0, 0, 0) origin point from the terrain's frame of reference.
     osp::Vector3l       position;
     osp::Quaterniond    rotation;
     bool                active      {false};
@@ -63,14 +64,16 @@ struct ACtxTerrain
 
     planeta::ChunkScratchpad            chunkSP;
     planeta::SkeletonSubdivScratchpad   scratchpad;
+
+    osp::draw::MeshIdOwner_t            terrainMesh;
 };
 
 struct ACtxTerrainIco
 {
-    /// Planet lowest ground level in meters
+    /// Planet lowest ground level in meters. Lowest valley.
     double  radius{};
 
-    /// Planet max ground height in meters
+    /// Planet max ground height in meters. Highest mountain.
     double  height{};
 
     std::array<planeta::SkVrtxId,     12>   icoVrtx;
@@ -85,7 +88,8 @@ struct ACtxTerrainIco
 osp::Session setup_terrain(
         osp::TopTaskBuilder         &rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session          const &scene);
+        osp::Session          const &scene,
+        osp::Session          const &commonScene);
 
 /**
  * @brief Icosahedron-specific data for spherical planet terrains
@@ -117,7 +121,7 @@ struct TerrainTestPlanetSpecs
     /// Skeleton Vector3l precision (2^precision units = 1 meter)
     int             skelPrecision       {};
 
-    /// Skeleton max subdivision levels. 0 for no subdivision. Max is 9.
+    /// Skeleton max subdivision levels. 0 for no subdivision. Max is 23.
     std::uint8_t    skelMaxSubdivLevels {};
 
     /// Number of times an initial triangle is subdivided to form a chunk.
@@ -133,7 +137,7 @@ void initialize_ico_terrain(
         osp::ArrayView<entt::any>   topData,
         osp::Session          const &terrain,
         osp::Session          const &terrainIco,
-        TerrainTestPlanetSpecs      params);
+        TerrainTestPlanetSpecs      specs);
 
 
 /**
@@ -142,7 +146,7 @@ void initialize_ico_terrain(
 osp::Session setup_terrain_debug_draw(
         osp::TopTaskBuilder&        rBuilder,
         osp::ArrayView<entt::any>   topData,
-        osp::Session          const &windowApp,
+        osp::Session          const &scene,
         osp::Session          const &sceneRenderer,
         osp::Session          const &cameraCtrl,
         osp::Session          const &commonScene,

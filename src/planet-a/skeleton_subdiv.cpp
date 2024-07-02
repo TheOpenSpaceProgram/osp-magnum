@@ -106,9 +106,11 @@ void unsubdivide_select_by_distance(
                 // Floodfill by checking neighbors next
                 SkeletonTriangle const& sktri = rSkel.tri_at(sktriId);
                 for (SkTriId const neighbor : sktri.neighbors)
-                if (neighbor.has_value())
                 {
-                    maybe_distance_check(neighbor);
+                    if (neighbor.has_value())
+                    {
+                        maybe_distance_check(neighbor);
+                    }
                 }
             }
         }
@@ -128,8 +130,12 @@ void unsubdivide_deselect_invariant_violations(
     {
         int subdivedNeighbors = 0;
         for (SkTriId const neighbor : sktri.neighbors)
-        if (neighbor.has_value())
         {
+            if (!neighbor.has_value())
+            {
+                continue;
+            }
+
             SkeletonTriangle const &rNeighbor = rSkel.tri_at(neighbor);
             // Pretend neighbor is unsubdivided when it's in tryUnsubdiv, overrided
             // by cantUnsubdiv
@@ -147,17 +153,19 @@ void unsubdivide_deselect_invariant_violations(
                 switch (neighborEdge)
                 {
                 case 0:
-                    if (neighborGroup.triangles[0].children.has_value()) return true;
-                    if (neighborGroup.triangles[1].children.has_value()) return true;
+                    if (neighborGroup.triangles[0].children.has_value()) { return true; }
+                    if (neighborGroup.triangles[1].children.has_value()) { return true; }
                     break;
                 case 1:
-                    if (neighborGroup.triangles[1].children.has_value()) return true;
-                    if (neighborGroup.triangles[2].children.has_value()) return true;
+                    if (neighborGroup.triangles[1].children.has_value()) { return true; }
+                    if (neighborGroup.triangles[2].children.has_value()) { return true; }
                     break;
                 case 2:
-                    if (neighborGroup.triangles[2].children.has_value()) return true;
-                    if (neighborGroup.triangles[0].children.has_value()) return true;
+                    if (neighborGroup.triangles[2].children.has_value()) { return true; }
+                    if (neighborGroup.triangles[0].children.has_value()) { return true; }
                     break;
+                default:
+                    LGRN_ASSERTM(false, "This should never happen. Triangles only have 3 sides!");
                 }
             }
         }
@@ -175,12 +183,16 @@ void unsubdivide_deselect_invariant_violations(
     {
         SkeletonTriangle const& sktri = rSkel.tri_at(sktriId);
 
-        if (violates_invariants(sktriId, sktri))
+        if ( ! violates_invariants(sktriId, sktri) )
         {
-            rSP.cantUnsubdiv.insert(sktriId);
+            return;
+        }
 
-            // Recurse into neighbors if they're also tryUnsubdiv
-            for (SkTriId const neighbor : sktri.neighbors)
+        rSP.cantUnsubdiv.insert(sktriId);
+
+        // Recurse into neighbors if they're also tryUnsubdiv
+        for (SkTriId const neighbor : sktri.neighbors)
+        {
             if (rSP.tryUnsubdiv.contains(neighbor) && ! rSP.cantUnsubdiv.contains(neighbor))
             {
                 self(self, neighbor);
@@ -212,15 +224,23 @@ void unsubdivide_level(
     SubdivScratchpadLevel           &rLvlSP = rSP  .levels[lvl];
 
     for (SkTriId const sktriId : rSP.tryUnsubdiv)
-    if ( ! rSP.cantUnsubdiv.contains(sktriId) )
     {
+        if ( rSP.cantUnsubdiv.contains(sktriId) )
+        {
+            continue;
+        }
+
         // All checks passed, 100% confirmed sktri will be unsubdivided
         SkeletonTriangle &rTri = rSkel.tri_at(sktriId);
 
         LGRN_ASSERT(!rLvl.hasSubdivedNeighbor.contains(sktriId));
         for (SkTriId const neighborId : rTri.neighbors)
-        if ( neighborId.has_value() && wont_unsubdivide(neighborId) )
         {
+            if ( ! ( neighborId.has_value() && wont_unsubdivide(neighborId) ) )
+            {
+                continue;
+            }
+
             SkeletonTriangle const& rNeighborTri = rSkel.tri_at(neighborId);
             if ( rNeighborTri.children.has_value() )
             {
@@ -229,18 +249,18 @@ void unsubdivide_level(
             }
             else
             {
-                bool neighborHasSubdivedNeighbor = false;
-                for (SkTriId const neighborNeighborId : rNeighborTri.neighbors)
-                if (   neighborNeighborId.has_value()
-                    && neighborNeighborId != sktriId
-                    && wont_unsubdivide(neighborNeighborId)
-                    && rSkel.is_tri_subdivided(neighborNeighborId) )
+                auto const neighbor_has_subdivided_neighbor = [sktriId, &wont_unsubdivide, &rSkel]
+                        (SkTriId const neighborNeighborId)
                 {
-                    neighborHasSubdivedNeighbor = true;
-                    break;
-                }
+                    return    neighborNeighborId.has_value()
+                           && neighborNeighborId != sktriId
+                           && wont_unsubdivide(neighborNeighborId)
+                           && rSkel.is_tri_subdivided(neighborNeighborId);
+                };
 
-                if (neighborHasSubdivedNeighbor)
+                if (   neighbor_has_subdivided_neighbor(rNeighborTri.neighbors[0])
+                    || neighbor_has_subdivided_neighbor(rNeighborTri.neighbors[1])
+                    || neighbor_has_subdivided_neighbor(rNeighborTri.neighbors[2]) )
                 {
                     rLvl.hasSubdivedNeighbor.insert(neighborId);
                 }
@@ -362,9 +382,13 @@ SkTriGroupId subdivide(
 
     // Check neighbours along all 3 edges
     for (int selfEdgeIdx = 0; selfEdgeIdx < 3; ++selfEdgeIdx)
-    if ( SkTriId const neighborId = neighbors[selfEdgeIdx];
-         neighborId.has_value() )
     {
+        SkTriId const neighborId = neighbors[selfEdgeIdx];
+        if ( ! neighborId.has_value() )
+        {
+            continue; // Neighbor does not exist
+        }
+
         SkeletonTriangle& rNeighbor = rSkel.tri_at(neighborId);
         if (rNeighbor.children.has_value())
         {
@@ -394,17 +418,17 @@ SkTriGroupId subdivide(
                 }
             }
 
-            bool neighborHasNonSubdivedNeighbor = false;
-            for (SkTriId const neighborNeighborId : rNeighbor.neighbors)
-            if (   neighborNeighborId.has_value()
-                && neighborNeighborId != sktriId
-                && ! rSkel.is_tri_subdivided(neighborNeighborId) )
+            auto const neighbor_has_subdivided_neighbor = [sktriId, &rSkel]
+                    (SkTriId const neighborNeighborId)
             {
-                neighborHasNonSubdivedNeighbor = true;
-                break;
-            }
+                return    neighborNeighborId.has_value()
+                       && neighborNeighborId != sktriId
+                       && ! rSkel.is_tri_subdivided(neighborNeighborId);
+            };
 
-            if (neighborHasNonSubdivedNeighbor)
+            if (   neighbor_has_subdivided_neighbor(rNeighbor.neighbors[0])
+                || neighbor_has_subdivided_neighbor(rNeighbor.neighbors[1])
+                || neighbor_has_subdivided_neighbor(rNeighbor.neighbors[2]))
             {
                 rLvl.hasNonSubdivedNeighbor.insert(neighborId);
             }

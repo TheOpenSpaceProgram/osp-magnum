@@ -48,7 +48,7 @@ SubdivTriangleSkeleton create_skeleton_icosahedron(
 
     rSkData.positions.resize(skeleton.vrtx_ids().capacity());
     rSkData.normals.resize  (skeleton.vrtx_ids().capacity());
-    double const totalScale = radius * std::pow<double>(2.0, rSkData.precision);
+    double const totalScale = radius * std::exp2(rSkData.precision);
     for (int i = 0; i < gc_icoVrtxCount; i ++)
     {
         rSkData.positions[vrtxIds[i]] = osp::Vector3l(gc_icoVrtxPos[i] * totalScale);
@@ -116,7 +116,7 @@ static void calc_midpoint_spherical(
     double        const curvature = radius - midLen;
 
     rSkData.normals[mid]   = osp::Vector3(midPosDbl / midLen);
-    rSkData.positions[mid] = midPos + osp::Vector3l(rSkData.normals[mid] * curvature * scale);
+    rSkData.positions[mid] = midPos + osp::Vector3l(osp::Vector3d(rSkData.normals[mid]) * (curvature * scale));
 }
 
 
@@ -126,7 +126,7 @@ void ico_calc_middles(
         std::array<osp::MaybeNewId<SkVrtxId>, 3>  const vrtxMid,
         SkeletonVertexData                              &rSkData)
 {
-    float const scale = std::pow(2.0f, rSkData.precision);
+    double const scale = std::exp2(double(rSkData.precision));
 
     if (vrtxMid[0].isNew)
     {
@@ -157,7 +157,7 @@ void ico_calc_chunk_edge(
         return;
     }
 
-    float const scale = std::pow(2.0f, rSkData.precision);
+    float const scale = std::exp2(float(rSkData.precision));
 
     auto const recurse = [scale, radius, &rSkData] (auto &&self, SkVrtxId const a, SkVrtxId const b, int const currentLevel, ChunkEdgeView_t const view) noexcept -> void
     {
@@ -182,14 +182,16 @@ void ico_calc_chunk_edge(
 
 void ico_calc_sphere_tri_center(
         SkTriGroupId            const groupId,
-        float                   const maxRadius,
-        float                   const height,
+        double                  const maxRadius,
+        double                  const height,
         SubdivTriangleSkeleton  const &rSkel,
         SkeletonVertexData&           rSkData)
 {
-    using osp::math::int_2pow;
-
     SkTriGroup const &group = rSkel.tri_group_at(groupId);
+    LGRN_ASSERT(group.depth < gc_icoTowerOverHorizonVsLevel.size());
+
+    double const terrainMaxHeight = height + maxRadius * gc_icoTowerOverHorizonVsLevel[group.depth];
+    float  const scale            = std::exp2(float(rSkData.precision));
 
     for (int i = 0; i < 4; ++i)
     {
@@ -200,24 +202,18 @@ void ico_calc_sphere_tri_center(
         SkVrtxId const vb = tri.vertices[1].value();
         SkVrtxId const vc = tri.vertices[2].value();
 
-        // average without overflow
-        osp::Vector3l const posAvg = rSkData.positions[va] / 3
-                                   + rSkData.positions[vb] / 3
-                                   + rSkData.positions[vc] / 3;
+        // Divide components individually to prevent potential overflow
+        osp::Vector3l const posAverage = rSkData.positions[va] / 3
+                                       + rSkData.positions[vb] / 3
+                                       + rSkData.positions[vc] / 3;
 
-        osp::Vector3  const nrmSum = rSkData.normals[va]
-                                   + rSkData.normals[vb]
-                                   + rSkData.normals[vc];
+        osp::Vector3  const nrmAverage = (  rSkData.normals[va]
+                                          + rSkData.normals[vb]
+                                          + rSkData.normals[vc]) / 3.0;
 
-        LGRN_ASSERT(group.depth < gc_icoTowerOverHorizonVsLevel.size());
-        float const terrainMaxHeight = height + maxRadius * gc_icoTowerOverHorizonVsLevel[group.depth];
+        osp::Vector3l const highestPoint = osp::Vector3l(nrmAverage * float(terrainMaxHeight * scale));
 
-        // 0.5 * terrainMaxHeight           : halve for middle
-        // int_2pow<int>(rTerrain.scale)    : Vector3l conversion factor
-        // / 3.0f                           : average from sum of 3 values
-        osp::Vector3l const riseToMid = osp::Vector3l(nrmSum * (0.5f * terrainMaxHeight * osp::math::int_2pow<int>(rSkData.precision) / 3.0f));
-
-        rSkData.centers[sktriId] = posAvg + riseToMid;
+        rSkData.centers[sktriId] = posAverage + highestPoint;
     }
 }
 

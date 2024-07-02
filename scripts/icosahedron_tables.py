@@ -126,9 +126,9 @@ print("inline constexpr std::array<osp::Vector3d, 12> gc_icoVrtxPos\n"
 
 # Edge lengths vs subdiv level
 
-edge_length_min = [2.0*sin(0.5*acot(0.5) * 0.5**x) for x in range(0, 10)]
+edge_length_min = [2.0*sin(0.5*acot(0.5) * 0.5**x) for x in range(0, 24)]
 
-print("inline constexpr std::array<float, 10> const gc_icoMinEdgeVsSubdiv\n"
+print("inline constexpr std::array<float, 24> const gc_icoMinEdgeVsSubdiv\n"
       + "{\n"
       + "    " + ", ".join(nstr_float(edge_length) for edge_length in edge_length_min) + "\n"
       + "};\n")
@@ -143,7 +143,7 @@ tri = (
     ( cxa,   -sya,    hei)
 )
 
-for _ in range(0, 10):
+for _ in range(0, 24):
 
     edge_length_max.append(distance(tri[0], tri[1]))
 
@@ -154,7 +154,7 @@ for _ in range(0, 10):
         norm(mid(tri[2], tri[0]))
     )
 
-print("inline constexpr std::array<float, 10> const gc_icoMaxEdgeVsSubdiv\n"
+print("inline constexpr std::array<float, 24> const gc_icoMaxEdgeVsSubdiv\n"
       + "{\n"
       + "    " + ", ".join(nstr_float(edge_length) for edge_length in edge_length_max) + "\n"
       + "};\n")
@@ -165,9 +165,9 @@ print("inline constexpr std::array<float, 10> const gc_icoMaxEdgeVsSubdiv\n"
 # If identical towers were built on the two vertices spanning an edge, this is how high each tower
 # needs to be in order to see each other over the horizon.
 #  = exsec(0.5*acot(0.5) * levels)
-tower_heights = [sec(0.5*acot(0.5) * 0.5**x ) - 1 for x in range(0, 10)]
+tower_heights = [sec(0.5*acot(0.5) * 0.5**x ) - 1 for x in range(0, 24)]
 
-print("inline constexpr std::array<float, 10> const gc_icoTowerOverHorizonVsSubdiv\n"
+print("inline constexpr std::array<float, 24> const gc_icoTowerOverHorizonVsSubdiv\n"
       + "{\n"
       + "    " + ", ".join(nstr_float(edge_length) for edge_length in tower_heights) + "\n"
       + "};\n")

@@ -55,8 +55,8 @@ struct SkeletonSubdivScratchpad
 
     void resize(SubdivTriangleSkeleton &rSkel);
 
-    std::array<std::uint64_t, gc_maxSubdivLevels> distanceThresholdSubdiv{{}};
-    std::array<std::uint64_t, gc_maxSubdivLevels> distanceThresholdUnsubdiv{{}};
+    std::array<double, gc_maxSubdivLevels> distanceThresholdSubdiv{{}};
+    std::array<double, gc_maxSubdivLevels> distanceThresholdUnsubdiv{{}};
 
     std::array<SubdivScratchpadLevel, gc_maxSubdivLevels> levels;
 
@@ -81,6 +81,8 @@ struct SkeletonSubdivScratchpad
 
     OnUnsubdivideFunc_t onUnsubdiv  {nullptr};
     UserData_t onUnsubdivUserData   {{nullptr, nullptr, nullptr, nullptr}};
+
+    osp::Vector3l viewerPosition;
 
     std::uint32_t distanceCheckCount{};
 };

@@ -32,7 +32,7 @@ namespace osp
 /**
  * @brief int64 abs(lhs - rhs) with no risk of overflow
  */
-constexpr std::uint64_t absdelta(std::int64_t lhs, std::int64_t rhs) noexcept
+constexpr std::uint64_t abs_difference(std::int64_t lhs, std::int64_t rhs) noexcept
 {
     // TODO: maybe use int128 for compilers that support it?
 
@@ -53,26 +53,14 @@ constexpr std::uint64_t absdelta(std::int64_t lhs, std::int64_t rhs) noexcept
 
 /**
  * @brief (distance between a and b) > threshold
- *
- * This function is quick and dirty, max threshold is limited to 1,431,655,765
  */
-constexpr bool is_distance_near(Vector3l const a, Vector3l const b, std::uint64_t const threshold) noexcept
+constexpr bool is_distance_near(Vector3l const a, Vector3l const b, double const threshold) noexcept
 {
-    std::uint64_t const dx = absdelta(a.x(), b.x());
-    std::uint64_t const dy = absdelta(a.y(), b.y());
-    std::uint64_t const dz = absdelta(a.z(), b.z());
+    double const dx = abs_difference(a.x(), b.x());
+    double const dy = abs_difference(a.y(), b.y());
+    double const dz = abs_difference(a.z(), b.z());
 
-    // 1431655765 = sqrt(2^64)/3 = max distance without risk of overflow
-    constexpr std::uint64_t dmax = 1431655765ul;
-
-    if (dx > dmax || dy > dmax || dz > dmax)
-    {
-        return false;
-    }
-
-    std::uint64_t const magnitudeSqr = (dx*dx + dy*dy + dz*dz);
-
-    return magnitudeSqr < threshold*threshold;
+    return (dx*dx + dy*dy + dz*dz) < threshold*threshold;
 }
 
 } // namespace osp

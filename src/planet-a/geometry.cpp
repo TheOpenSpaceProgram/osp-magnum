@@ -31,15 +31,22 @@ namespace planeta
 
 void BasicChunkMeshGeometry::resize(ChunkSkeleton const& skCh, ChunkMeshBufferInfo const& info)
 {
+    using Corrade::Containers::Array;
+
     auto const maxChunks     = skCh.m_chunkIds.capacity();
     auto const maxSharedVrtx = skCh.m_sharedIds.capacity();
 
-    chunkVbufPos           .resize(info.vbufSize);
-    chunkVbufNrm           .resize(info.vbufSize);
-    chunkIbuf              .resize(maxChunks * info.chunkMaxFaceCount);
+    osp::BufferFormatBuilder formatBuilder;
+    vbufPositions = formatBuilder.insert_block<osp::Vector3>(info.vrtxTotal);
+    vbufNormals   = formatBuilder.insert_block<osp::Vector3>(info.vrtxTotal);
+
+    vrtxBuffer = Array<std::byte>    (Corrade::ValueInit, formatBuilder.total_size());
+    indxBuffer = Array<osp::Vector3u>(Corrade::ValueInit, info.faceTotal);
+
     chunkFanNormalContrib  .resize(maxChunks * info.fanMaxSharedCount);
     chunkFillSharedNormals .resize(maxChunks * skCh.m_chunkSharedCount, osp::Vector3{osp::ZeroInit});
     sharedNormalSum        .resize(maxSharedVrtx, osp::Vector3{osp::ZeroInit});
+    sharedPosNoHeightmap   .resize(maxSharedVrtx, osp::Vector3{osp::ZeroInit});
 }
 
 } // namespace planeta

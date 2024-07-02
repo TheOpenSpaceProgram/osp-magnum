@@ -599,7 +599,7 @@ static void rocket_thrust_force(NewtonBody const* pBody, BodyId const body, ACtx
 
     auto &rBodyRockets = rRocketsNwt.m_bodyRockets[body];
 
-    if (rBodyRockets.empty())
+    if (rBodyRockets.size() == 0)
     {
         return;
     }

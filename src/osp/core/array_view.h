@@ -26,6 +26,8 @@
 
 // IWYU pragma: begin_exports
 #include <Corrade/Containers/ArrayView.h>
+#include <Corrade/Containers/StridedArrayView.h>
+#include <Corrade/Containers/StridedArrayViewStl.h>
 // IWYU pragma: end_exports
 
 #include <iterator>
@@ -36,34 +38,54 @@ namespace osp
 using Corrade::Containers::ArrayView;
 using Corrade::Containers::arrayView;
 
+using Corrade::Containers::arrayCast;
+
+/**
+ * @brief Wraps a Corrade ArrayView or StridedArrayView to use as a 2D array of equally sized rows
+ */
 template<typename T>
 struct ArrayView2DWrapper
 {
-    constexpr ArrayView<T> row(std::size_t const index) const noexcept
+    // yes, I know that StridedArrayView2D exists, but ".row(...)" is more explicit
+
+    constexpr T row(std::size_t const columnIndex) const noexcept
     {
-        return view.sliceSize(index * columns, columns);
+        return view.sliceSize(columnIndex * rowSize, rowSize);
     }
 
-    ArrayView<T> view;
-    std::size_t columns;
+    T view;
+    std::size_t rowSize; ///< Size of each row, same as the number of columns
 };
 
+/**
+ * @brief Returns an interface that treats an ArrayView as a 2D array of equally sized rows.
+ *
+ * This overload auto-converts ArrayView-compatible types.
+ */
 template<typename T>
-constexpr ArrayView2DWrapper<T> as_2d(ArrayView<T> view, std::size_t columns) noexcept
+    requires requires (T &view) { osp::arrayView(view); }
+constexpr decltype(auto) as_2d(T &view, std::size_t rowSize) noexcept
 {
-    return { .view = view, .columns = columns };
+    return ArrayView2DWrapper<decltype(osp::arrayView(view))>{ .view = osp::arrayView(view), .rowSize = rowSize };
 }
 
 /**
- * @brief slice_2d_row
- * @param view
- * @param index
- * @param size
+ * @brief Returns an interface that treats an ArrayView as a 2D array of equally sized rows.
  */
 template<typename T>
-ArrayView<T> slice_2d_row(ArrayView<T> const& view, std::size_t index, std::size_t size) noexcept
+constexpr ArrayView2DWrapper< ArrayView<T> > as_2d(ArrayView<T> view, std::size_t rowSize) noexcept
 {
-    return view.sliceSize(index, size);
+    return { .view = view, .rowSize = rowSize };
+}
+
+/**
+ * @brief Returns an interface that treats an ArrayView as a 2D array of equally sized rows.
+ */
+template<typename T>
+constexpr ArrayView2DWrapper< Corrade::Containers::StridedArrayView1D<T> >
+        as_2d(Corrade::Containers::StridedArrayView1D<T> view, std::size_t rowSize) noexcept
+{
+    return { .view = view, .rowSize = rowSize };
 }
 
 /**

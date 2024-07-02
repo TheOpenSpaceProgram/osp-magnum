@@ -89,4 +89,13 @@ osp::Session setup_shader_phong(
         osp::Session const&         magnumScene,
         osp::draw::MaterialId       materialId = lgrn::id_null<osp::draw::MaterialId>());
 
+
+osp::Session setup_terrain_draw_magnum(
+        osp::TopTaskBuilder         &rBuilder,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session          const &windowApp,
+        osp::Session          const &sceneRenderer,
+        osp::Session          const &magnum,
+        osp::Session          const &magnumScene,
+        osp::Session          const &terrain);
 }
