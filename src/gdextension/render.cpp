@@ -210,18 +210,20 @@ void SysRenderGd::compile_resource_meshes(
         st.begin(static_cast<godot::Mesh::PrimitiveType>(primitive));
 
         godot::RID mesh = rs->mesh_create();
-
-        // TODO copy other attributes as well maybe.
-        for ( auto v : meshData.positions3DAsArray() )
-        {
-            //st.set_uv({0, 0});
-            st.add_vertex(godot::Vector3(v.x(), v.y(), v.z()));
-        }
+        auto pos = meshData.positions3DAsArray();
+        // TODO copy other attributes as well maybe
         auto indices = meshData.indicesAsArray();
         //TODO do that using an iterator I guess.
-        for ( auto i = indices.end() - 1; i >= indices.begin(); i--)
+        uint32_t sg = 0;
+        for ( auto i = indices.end(); i >= indices.begin() + 1;)
         {
-            st.add_index(static_cast<int32_t>(*i));
+            st.set_smooth_group(sg++);
+            auto v = pos[*(--i)];
+            st.add_vertex(godot::Vector3(v.x(), v.y(), v.z()));
+            v = pos[*(--i)];
+            st.add_vertex(godot::Vector3(v.x(), v.y(), v.z()));
+            v = pos[*(--i)];
+            st.add_vertex(godot::Vector3(v.x(), v.y(), v.z()));
         }
         if ( primitive == godot::RenderingServer::PRIMITIVE_TRIANGLES )
         {

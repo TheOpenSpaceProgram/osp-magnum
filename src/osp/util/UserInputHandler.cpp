@@ -384,7 +384,6 @@ ControlSubscriber::~ControlSubscriber()
 
 EButtonControlIndex ControlSubscriber::button_subscribe(std::string_view name)
 {
-    return EButtonControlIndex::NONE;
     EButtonControlIndex const index = m_pInputHandler->button_subscribe(name);
     if (EButtonControlIndex::NONE != index)
     {

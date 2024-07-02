@@ -1,6 +1,7 @@
 #include "flying_scene.h"
 
 #include "osp/tasks/top_utils.h"
+#include "osp/util/UserInputHandler.h"
 #include "scenarios.h"
 #include "sessions/godot.h"
 #include "testapp/sessions/common.h"
@@ -16,10 +17,17 @@
 #include <Magnum/Trade/ImageData.h>
 #include <Magnum/Trade/MeshData.h>
 #include <Magnum/Trade/TextureData.h>
+#include <godot_cpp/classes/global_constants.hpp>
+#include <godot_cpp/classes/input.hpp>
+#include <godot_cpp/classes/input_event.hpp>
+#include <godot_cpp/classes/input_event_key.hpp>
+#include <godot_cpp/classes/input_event_mouse_button.hpp>
+#include <godot_cpp/classes/input_event_mouse_motion.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
 #include <godot_cpp/classes/resource_saver.hpp>
+#include <godot_cpp/classes/surface_tool.hpp>
 #include <godot_cpp/classes/viewport.hpp>
 #include <godot_cpp/classes/world3d.hpp>
 #include <godot_cpp/core/class_db.hpp>
@@ -46,28 +54,25 @@ void FlyingScene::_bind_methods()
 
 FlyingScene::FlyingScene()
 {
-
     // setup the Debug thingies
     new Corrade::Utility::Debug{ &m_dbgStream };
     new Corrade::Utility::Warning{ &m_warnStream };
     new Corrade::Utility::Error{ &m_errStream };
-
-    // Initialize any variables here.
-    m_testApp.m_pExecutor = new ExecutorType();
-    m_testApp.m_topData.resize(64);
-    load_a_bunch_of_stuff();
-    godot::UtilityFunctions::print("Resources loaded");
 }
 
 FlyingScene::~FlyingScene()
 {
-    // delete m_joltWorld;
-    // delete (ExecutorType*) m_testApp.m_pExecutor;
+    delete (ExecutorType *)m_testApp.m_pExecutor;
 }
 
 void FlyingScene::_enter_tree()
 {
     godot::UtilityFunctions::print("Enter tree");
+    m_testApp.m_pExecutor = new ExecutorType();
+    m_testApp.m_topData.resize(64);
+    load_a_bunch_of_stuff();
+    godot::UtilityFunctions::print("Resources loaded");
+
     RenderingServer *renderingServer = RenderingServer::get_singleton();
     m_scenario                       = get_world_3d()->get_scenario();
     m_viewport                       = get_viewport()->get_viewport_rid();
@@ -77,20 +82,11 @@ void FlyingScene::_enter_tree()
 
     RID light = renderingServer->directional_light_create();
     renderingServer->light_set_distance_fade(light, false, 0., 0., 0.);
-    renderingServer->light_set_shadow(light, true);
+    renderingServer->light_set_shadow(light, false);
     renderingServer->instance_set_base(m_lightInstance, light);
 
-    Transform3D lform = Transform3D(Basis().rotated(Vector3(1, 0, 0), 1.), Vector3(0., 0., 0.));
+    Transform3D lform = Transform3D(Basis().rotated(Vector3(1, 1, 1), -1.), Vector3(0., 0., 0.));
     renderingServer->instance_set_transform(m_lightInstance, lform);
-
-    auto testInstance                  = renderingServer->instance_create();
-    renderingServer->instance_set_scenario(testInstance, m_scenario);
-
-    RID test = renderingServer->make_sphere_mesh(100, 100, 5);
-    renderingServer->instance_set_base(testInstance, test);
-
-    Transform3D Tform = Transform3D(Basis(), Vector3(0., 0., 50.));
-    renderingServer->instance_set_transform(testInstance, Tform);
 
     godot::UtilityFunctions::print("Created viewport, scenario, and light");
 
@@ -118,7 +114,9 @@ void FlyingScene::_physics_process(double delta)
 
 void FlyingScene::_process(double delta)
 {
+    m_pUserInput->update_controls();
     draw_event();
+    m_pUserInput->clear_events();
     // print the corrade messages
     if ( m_dbgStream.tellp() != std::streampos(0) )
     {
@@ -139,7 +137,7 @@ void FlyingScene::_process(double delta)
 
 void FlyingScene::_exit_tree()
 {
-    // destroy_app();
+    destroy_app();
 }
 
 void FlyingScene::load_a_bunch_of_stuff()
@@ -295,6 +293,92 @@ void FlyingScene::draw_event()
     m_testApp.m_pExecutor->wait(m_testApp);
 }
 
+void FlyingScene::_input(const Ref<InputEvent> &input)
+{
+    // FIXME using dynamic_cast is a bit ugly, but afaik it's the best way if we bypass Godot's
+    // InputMap (which we probably shouldn't in the long term)
+
+    // keyboard
+    auto inputKey = dynamic_cast<InputEventKey *>(input.ptr());
+    if ( inputKey != nullptr )
+    {
+        if ( inputKey->is_echo() )
+        {
+            return;
+        }
+        EButtonEvent dir;
+        if ( inputKey->is_pressed() )
+        {
+            dir = EButtonEvent::Pressed;
+        }
+        else if ( inputKey->is_released() )
+        {
+            dir = EButtonEvent::Released;
+        }
+        else
+        {
+            return;
+        }
+        m_pUserInput->event_raw(
+            osp::input::sc_keyboard, (int)inputKey->get_physical_keycode(), dir);
+        return;
+    }
+
+    // mouse button
+    auto inputMouseButton = dynamic_cast<InputEventMouseButton *>(input.ptr());
+    if ( inputMouseButton != nullptr )
+    {
+        if ( inputMouseButton->get_button_index() <= MOUSE_BUTTON_MIDDLE )
+        {
+            EButtonEvent dir;
+            if ( inputMouseButton->is_pressed() )
+            {
+                dir = EButtonEvent::Pressed;
+            }
+            else if ( inputMouseButton->is_released() )
+            {
+                dir = EButtonEvent::Released;
+            }
+            else
+            {
+                return;
+            }
+            m_pUserInput->event_raw(
+                osp::input::sc_mouse, (int)inputMouseButton->get_button_index(), dir);
+            return;
+        }
+        osp::Vector2i scroll_delta;
+        if ( inputMouseButton->get_button_index() == MOUSE_BUTTON_WHEEL_UP )
+        {
+            scroll_delta.y() += static_cast<int>(inputMouseButton->get_factor());
+        }
+        else if ( inputMouseButton->get_button_index() == MOUSE_BUTTON_WHEEL_DOWN )
+        {
+            scroll_delta.y() -= static_cast<int>(inputMouseButton->get_factor());
+        }
+        else if ( inputMouseButton->get_button_index() == MOUSE_BUTTON_WHEEL_RIGHT )
+        {
+            scroll_delta.x() += static_cast<int>(inputMouseButton->get_factor());
+        }
+        else if ( inputMouseButton->get_button_index() == MOUSE_BUTTON_WHEEL_LEFT )
+        {
+            scroll_delta.x() -= static_cast<int>(inputMouseButton->get_factor());
+        }
+        m_pUserInput->scroll_delta(scroll_delta);
+        return;
+    }
+
+    // mouse motion
+    auto inputMouseMotion = dynamic_cast<InputEventMouseMotion *>(input.ptr());
+    if ( inputMouseMotion != nullptr )
+    {
+        godot::Vector2 mdelta = inputMouseMotion->get_relative();
+        // Godot mouse position is in floats apparently. Error is probably minimal.
+        m_pUserInput->mouse_delta({ static_cast<int>(mdelta.x), static_cast<int>(mdelta.y) });
+        return;
+    }
+};
+
 void FlyingScene::destroy_app()
 {
 
@@ -316,7 +400,6 @@ void FlyingScene::destroy_app()
         std::abort();
     }
 
-    m_testApp = {};
     // Closing sessions will delete their associated TopData and Tags
     m_testApp.m_pExecutor->run(m_testApp, m_testApp.m_windowApp.m_cleanup);
     m_testApp.close_sessions(m_testApp.m_renderer.m_sessions);
@@ -325,6 +408,10 @@ void FlyingScene::destroy_app()
 
     m_testApp.close_session(m_testApp.m_magnum);
     m_testApp.close_session(m_testApp.m_windowApp);
+
+    // leak test app cause there is a free bug. FIXME of course.
+    auto leak_tp = new TestApp;
+    std::swap(*leak_tp, m_testApp);
 }
 
 void FlyingScene::set_scene(String const &scene)

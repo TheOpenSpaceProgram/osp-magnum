@@ -56,7 +56,7 @@ target_sources(osp-gdextension PRIVATE "${CPP_FILES}" "${H_FILES}")
 
 target_include_directories(osp-gdextension PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_link_libraries(osp-gdextension PRIVATE godot-cpp OpenSpaceProgram Adera PlanetA OspJolt OspTestApp)
+target_link_libraries(osp-gdextension PRIVATE godot-cpp OpenSpaceProgram Adera PlanetA OspJolt OspTestApp toml11)
 
 target_compile_options(osp-gdextension PRIVATE "-static")
 
@@ -82,4 +82,8 @@ PATTERN ".*" EXCLUDE
 install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../../bin/OSPData"
 DESTINATION ${INSTALL_DIR}
 PATTERN ".*" EXCLUDE
+)
+
+install( FILES "${CMAKE_CURRENT_SOURCE_DIR}/../../bin/settings.toml"
+DESTINATION ${INSTALL_DIR}
 )
