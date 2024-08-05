@@ -1,3 +1,4 @@
+#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2023 Open Space Program Project
@@ -73,3 +74,4 @@ osp::Session setup_thrust_indicators(
         osp::draw::MaterialId       material);
 
 } // namespace testapp::scenes
+#endif

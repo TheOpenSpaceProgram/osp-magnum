@@ -1,3 +1,4 @@
+#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2023 Open Space Program Project
@@ -155,3 +156,4 @@ osp::Session setup_terrain_debug_draw(
         osp::draw::MaterialId       mat);
 
 } // namespace testapp::scenes
+#endif

@@ -1,3 +1,4 @@
+#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2023 Open Space Program Project
@@ -228,3 +229,4 @@ Session setup_prebuilt_vehicles(
 
 
 } // namespace testapp::scenes
+#endif

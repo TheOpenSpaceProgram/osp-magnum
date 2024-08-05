@@ -1,3 +1,4 @@
+#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2022 Open Space Program Project
@@ -25,6 +26,7 @@
 #include "magnum.h"
 #include "terrain.h"
 #include "common.h"
+
 
 #include "../MagnumApplication.h"
 
@@ -679,3 +681,4 @@ Session setup_terrain_draw_magnum(
 } // setup_terrain_draw_magnum
 
 } // namespace testapp::scenes
+#endif

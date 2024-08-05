@@ -1,3 +1,4 @@
+#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2022 Open Space Program Project
@@ -99,3 +100,4 @@ osp::Session setup_terrain_draw_magnum(
         osp::Session          const &magnumScene,
         osp::Session          const &terrain);
 }
+#endif

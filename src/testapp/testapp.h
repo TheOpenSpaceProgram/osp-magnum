@@ -26,91 +26,123 @@
 
 #include <osp/core/keyed_vector.h>
 #include <osp/core/resourcetypes.h>
-#include <osp/tasks/tasks.h>
-#include <osp/tasks/top_execute.h>
-#include <osp/tasks/top_session.h>
+
 #include <osp/util/logging.h>
+
+#include <osp/framework/framework.h>
+#include <osp/framework/builder.h>
+
 
 #include <entt/core/any.hpp>
 
-#include <optional>
+#include <mutex>
 
 namespace testapp
 {
 
+class NonBlockingStdInReader
+{
+public:
+    void start_thread()
+    {
+        thread = std::thread{[this]
+        {
+            while(true)
+            {
+                std::string strIn;
+                std::cin >> strIn;
+
+                std::lock_guard<std::mutex> guard(mutex);
+                messages.emplace_back(std::move(strIn));
+            }
+        }};
+    }
+
+    //void stop(); // TODO
+
+    [[nodiscard]] std::vector<std::string> read()
+    {
+        std::lock_guard<std::mutex> guard(mutex);
+        return std::exchange(messages, {});
+    }
+
+    static NonBlockingStdInReader& instance()
+    {
+        static NonBlockingStdInReader thing;
+        return thing;
+    }
+
+private:
+    std::thread                 thread;
+    std::mutex                  mutex;
+    std::vector<std::string>    messages;
+};
+
+
+
+
+using MainLoopFunc_t = bool(*)();
+
+inline std::vector<MainLoopFunc_t>& main_loop_stack()
+{
+    static std::vector<MainLoopFunc_t> instance;
+    return instance;
+}
+
 struct TestApp;
-class IExecutor;
 
 using RendererSetupFunc_t   = void(*)(TestApp&);
 using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
 
-struct TestAppTasks
+struct MainLoopControl
 {
-    std::vector<entt::any>          m_topData;
-    osp::Tasks                      m_tasks;
-    osp::TopTaskDataVec_t           m_taskData;
-    osp::TaskGraph                  m_graph;
+    bool doUpdate;
 };
 
-struct TestApp : TestAppTasks
-{
-    void close_sessions(osp::ArrayView<osp::Session> sessions);
 
-    void close_session(osp::Session &rSession);
+extern osp::fw::FeatureDef const ftrMain;
+
+
+struct TestApp
+{
+
+//    void close_sessions(osp::ArrayView<osp::Session> sessions);
+
+//    void close_session(osp::Session &rSession);
 
     /**
      * @brief Deal with resource reference counts for a clean termination
      */
     void clear_resource_owners();
 
-    osp::SessionGroup               m_applicationGroup;
-    osp::Session                    m_application;
+    void drive_main_loop();
 
-    osp::SessionGroup               m_scene;
+    void init();
 
-    osp::Session                    m_windowApp;
-    osp::Session                    m_magnum;
-    osp::SessionGroup               m_renderer;
+    osp::fw::Framework m_framework;
 
-    RendererSetupFunc_t             m_rendererSetup { nullptr };
+    osp::fw::ContextId m_mainContext;
 
-    IExecutor                       *m_pExecutor { nullptr };
+
+//    osp::SessionGroup               m_applicationGroup;
+//    osp::Session                    m_application;
+
+//    osp::SessionGroup               m_scene;
+
+//    osp::Session                    m_windowApp;
+//    osp::Session                    m_magnum;
+//    osp::SessionGroup               m_renderer;
+
+//    RendererSetupFunc_t             m_rendererSetup { nullptr };
+
+    osp::fw::IExecutor              *m_pExecutor { nullptr };
 
     osp::PkgId                      m_defaultPkg    { lgrn::id_null<osp::PkgId>() };
 };
 
-class IExecutor
-{
-public:
-
-    virtual void load(TestAppTasks& rAppTasks) = 0;
-
-    virtual void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
-
-    virtual void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) = 0;
-
-    virtual void wait(TestAppTasks& rAppTasks) = 0;
-
-    virtual bool is_running(TestAppTasks const& rAppTasks) = 0;
-};
 
 //-----------------------------------------------------------------------------
 
-class SingleThreadedExecutor final : public IExecutor
-{
-public:
-    void load(TestAppTasks& rAppTasks) override;
 
-    void run(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
-
-    void signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline) override;
-
-    void wait(TestAppTasks& rAppTasks) override;
-
-    bool is_running(TestAppTasks const& rAppTasks) override;
-
-    osp::ExecContext                m_execContext;
-    std::shared_ptr<spdlog::logger> m_log;
-};
 
 } // namespace testapp

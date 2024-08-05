@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -22,37 +22,42 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+ /**
+ * @file
+ * @brief
+ *
+ * dependencies without needing to know the whole framework
+ */
 #pragma once
 
-#include "execute.h"
-#include "tasks.h"
-#include "top_tasks.h"
+#include "../tasks/worker.h"
+#include "../core/strong_id.h"
+#include "../core/array_view.h"
 
+#include <entt/core/any.hpp>
+
+#include <cstdint>
+#include <string>
 #include <vector>
 
-namespace osp
+namespace osp::fw
 {
 
-void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, WorkerContext worker = {});
+using DataId = osp::StrongId<std::uint32_t, struct DummyForDataId>;
 
-struct TopExecWriteState
+
+struct WorkerContext
 {
-    Tasks const             &tasks;
-    TopTaskDataVec_t const  &taskData;
-    TaskGraph const         &graph;
-    ExecContext const       &exec;
+    // TODO: maybe put something here? Thread info?
 };
 
-struct TopExecWriteLog
+struct TaskImpl
 {
-    Tasks const             &tasks;
-    TopTaskDataVec_t const  &taskData;
-    TaskGraph const         &graph;
-    ExecContext const       &exec;
+    using Func_t = TaskActions(*)(WorkerContext, ArrayView<entt::any>) noexcept;
+
+    std::string             debugName;
+    std::vector<DataId>     args;
+    Func_t                  func    { nullptr };
 };
 
-std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write);
-
-std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write);
-
-} // namespace testapp
+} // namespace osp
