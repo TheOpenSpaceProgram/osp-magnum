@@ -1,3 +1,4 @@
+#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2022 Open Space Program Project
@@ -713,3 +714,4 @@ Session setup_rocket_thrust_newton(
 } // namespace testapp::scenes
 
 
+#endif

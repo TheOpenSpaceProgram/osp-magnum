@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -22,55 +22,93 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "top_execute.h"
-#include "top_worker.h"
-#include "execute.h"
+#include "executor.h"
 
-#include <Corrade/Containers/ArrayViewStl.h>
-
-#include <entt/core/any.hpp>
+#include <spdlog/fmt/ostr.h>
 
 #include <algorithm>
 #include <iomanip>
 #include <vector>
 
-namespace osp
+namespace osp::fw
 {
 
-void top_run_blocking(Tasks const& tasks, TaskGraph const& graph, TopTaskDataVec_t& rTaskData, ArrayView<entt::any> topData, ExecContext& rExec, WorkerContext worker)
-{
-    std::vector<entt::any> topDataRefs;
 
-    // Run until there's no tasks left to run
-    while (true)
+void SingleThreadedExecutor::load(Framework& rFramework)
+{
+    m_graph = osp::make_exec_graph(rFramework.tasks);
+    exec_conform(rFramework.tasks, m_execContext);
+    m_execContext.doLogging = m_log != nullptr;
+}
+
+void SingleThreadedExecutor::run(Framework& rAppTasks, PipelineId pipeline)
+{
+    exec_request_run(m_execContext, pipeline);
+}
+
+void SingleThreadedExecutor::signal(Framework& rAppTasks, PipelineId pipeline)
+{
+    exec_signal(m_execContext, pipeline);
+}
+
+void SingleThreadedExecutor::wait(Framework& rAppTasks)
+{
+    if (m_log != nullptr)
     {
-        auto const runTasksLeft = rExec.tasksQueuedRun.size();
-        //auto const blockedTasksLeft = rExec.tasksQueuedBlocked.size();
+        m_log->info("\n>>>>>>>>>> Previous State Changes\n{}\n>>>>>>>>>> Current State\n{}\n",
+                    WriteLog  {rAppTasks.tasks, rAppTasks.taskImpl, m_graph, m_execContext},
+                    WriteState{rAppTasks.tasks, rAppTasks.taskImpl, m_graph, m_execContext} );
+        m_execContext.logMsg.clear();
+    }
 
-        if (runTasksLeft != 0)
+    exec_update(rAppTasks.tasks, m_graph, m_execContext);
+    run_blocking(rAppTasks.tasks, m_graph, rAppTasks.taskImpl, rAppTasks.data, m_execContext);
+
+    if (m_log != nullptr)
+    {
+        m_log->info("\n>>>>>>>>>> New State Changes\n{}",
+                    WriteLog{rAppTasks.tasks, rAppTasks.taskImpl, m_graph, m_execContext} );
+        m_execContext.logMsg.clear();
+    }
+}
+
+bool SingleThreadedExecutor::is_running(Framework const& appTasks)
+{
+    return m_execContext.hasRequestRun || (m_execContext.pipelinesRunning != 0);
+}
+
+
+void SingleThreadedExecutor::run_blocking(
+        Tasks                     const &tasks,
+        TaskGraph                 const &graph,
+        KeyedVec<TaskId, TaskImpl>      &rTaskImpl,
+        KeyedVec<DataId, entt::any>     &fwData,
+        ExecContext                     &rExec,
+        WorkerContext                   worker)
+{
+    std::vector<entt::any> argumentRefs;
+
+    while (rExec.tasksQueuedRun.size() != 0)
+    {
+        TaskId   const willRunId     = rExec.tasksQueuedRun[0];
+        TaskImpl       &rWillRunImpl = rTaskImpl[willRunId];
+
+        if (rWillRunImpl.func != nullptr)
         {
-            TaskId const task = rExec.tasksQueuedRun[0];
-            TopTask &rTopTask = rTaskData[task];
-
-            topDataRefs.clear();
-            topDataRefs.reserve(rTopTask.m_dataUsed.size());
-            for (TopDataId const dataId : rTopTask.m_dataUsed)
+            argumentRefs.clear();
+            argumentRefs.reserve(rWillRunImpl.args.size());
+            for (DataId const dataId : rWillRunImpl.args)
             {
-                topDataRefs.push_back((dataId != lgrn::id_null<TopDataId>())
-                                       ? topData[dataId].as_ref()
-                                       : entt::any{});
+                argumentRefs.push_back(dataId.has_value() ? fwData[dataId].as_ref() : entt::any{});
             }
 
-            bool const shouldRun = (rTopTask.m_func != nullptr);
-
-            // Task function is called here
-            TaskActions const status = shouldRun ? rTopTask.m_func(worker, topDataRefs) : TaskActions{};
-
-            complete_task(tasks, graph, rExec, task, status);
+            TaskActions const status = rWillRunImpl.func(worker, argumentRefs);
+            complete_task(tasks, graph, rExec, willRunId, status);
         }
         else
         {
-            break;
+            // Allow tasks to not have a function.
+            complete_task(tasks, graph, rExec, willRunId, {});
         }
 
         exec_update(tasks, graph, rExec);
@@ -94,7 +132,7 @@ static void write_task_requirements(std::ostream &rStream, Tasks const& tasks, T
 }
 
 
-std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
+std::ostream& operator<<(std::ostream& rStream, SingleThreadedExecutor::WriteState const& write)
 {
     auto const& [tasks, taskData, graph, exec] = write;
 
@@ -144,7 +182,7 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
 
         std::size_t charsUsed = 7; // "PL###" + ": "
 
-        if (info.stageType != lgrn::id_null<PipelineInfo::stage_type_t>())
+        if (info.stageType != lgrn::id_null<PipelineInfo::StageTypeId>())
         {
             auto const stageNames = ArrayView<std::string_view const>{PipelineInfo::sm_stageNames[info.stageType]};
 
@@ -198,7 +236,7 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
 
     for (auto const [task, block] : exec.tasksQueuedBlocked.each())
     {
-        rStream << "Task Blocked: " << "TASK" << TaskInt(task) << " - " << taskData[task].m_debugName << "\n";
+        rStream << "Task Blocked: " << "TASK" << TaskInt(task) << " - " << taskData[task].debugName << "\n";
 
         write_task_requirements(rStream, tasks, graph, exec, task);
     }
@@ -206,9 +244,9 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteState const& write)
     return rStream;
 }
 
-std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write)
+std::ostream& operator<<(std::ostream& rStream, SingleThreadedExecutor::WriteLog const& write)
 {
-    auto const& [tasks, taskData, graph, exec] = write;
+    auto const& [tasks, rTaskImpl, graph, exec] = write;
 
     auto const stage_name = [&tasks=tasks] (PipelineId pl, StageId stg) -> std::string_view
     {
@@ -224,7 +262,7 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write)
         }
     };
 
-    auto const visitMsg = [&rStream, &tasks=tasks, &taskData=taskData, &graph=graph, &stage_name] (auto&& msg)
+    auto const visitMsg = [&rStream, &tasks=tasks, &rTaskImpl=rTaskImpl, &graph=graph, &stage_name] (auto&& msg)
     {
         using MSG_T = std::decay_t<decltype(msg)>;
         if constexpr (std::is_same_v<MSG_T, ExecContext::UpdateStart>)
@@ -270,7 +308,7 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write)
             rStream << "    Enqueue " << (msg.blocked ? "Blocked" : "Run")
                     << " on PL" << std::setw(3) << std::left << PipelineInt(msg.pipeline)
                     << "(" << stage_name(msg.pipeline, msg.stage) << ")"
-                    << " TASK" << TaskInt(msg.task) << " - " << taskData[msg.task].m_debugName << "\n";
+                    << " TASK" << TaskInt(msg.task) << " - " << rTaskImpl[msg.task].debugName << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::EnqueueTaskReq>)
         {
@@ -284,7 +322,7 @@ std::ostream& operator<<(std::ostream& rStream, TopExecWriteLog const& write)
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::CompleteTask>)
         {
-            rStream << "Complete TASK" << TaskInt(msg.task) << " - " << taskData[msg.task].m_debugName << "\n";
+            rStream << "Complete TASK" << TaskInt(msg.task) << " - " << rTaskImpl[msg.task].debugName << "\n";
         }
         else if constexpr (std::is_same_v<MSG_T, ExecContext::ExternalRunRequest>)
         {

@@ -46,8 +46,10 @@
 
 #include <osp/activescene/basic.h>
 #include <osp/core/Resources.h>
-#include <osp/tasks/top_utils.h>
 #include <osp/util/logging.h>
+//#include <osp/util/top_data.h>
+#include <osp/framework/framework.h>
+
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 
@@ -60,7 +62,7 @@ using namespace osp::active;
 namespace testapp
 {
 
-static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene);
+//static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene);
 
 // MaterialIds hints which shaders should be used to draw a DrawEnt
 // DrawEnts can be assigned to multiple materials
@@ -79,6 +81,8 @@ static ScenarioMap_t make_scenarios()
     {
         scenarioMap.emplace(name, ScenarioOption{desc, run});
     };
+
+    #if 0
 
     add_scenario("enginetest", "Simple rotating cube scenario without using Pipelines/Tasks",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
@@ -600,6 +604,7 @@ static ScenarioMap_t make_scenarios()
 
             return setup_renderer;
         });
+    #endif
 
     return scenarioMap;
 }
@@ -640,70 +645,70 @@ public:
     {
         // Start the main loop
 
-        PipelineId const mainLoop = m_rTestApp.m_application.get_pipelines<PlApplication>().mainLoop;
-        m_rTestApp.m_pExecutor->run(m_rTestApp, mainLoop);
+//        PipelineId const mainLoop = m_rTestApp.m_application.get_pipelines<PlApplication>().mainLoop;
+//        m_rTestApp.m_pExecutor->run(m_rTestApp, mainLoop);
 
-        // Resyncronize renderer
+//        // Resyncronize renderer
 
-        m_rMainLoopCtrl = MainLoopControl{
-            .doUpdate = false,
-            .doSync   = true,
-            .doResync = true,
-            .doRender = false,
-        };
+//        m_rMainLoopCtrl = MainLoopControl{
+//            .doUpdate = false,
+//            .doSync   = true,
+//            .doResync = true,
+//            .doRender = false,
+//        };
 
-        signal_all();
+//        signal_all();
 
-        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
     }
 
     void draw(MagnumApplication& rApp, float delta) override
     {
         // Magnum Application's main loop calls this
 
-        m_rMainLoopCtrl = MainLoopControl{
-            .doUpdate = true,
-            .doSync   = true,
-            .doResync = false,
-            .doRender = true,
-        };
+//        m_rMainLoopCtrl = MainLoopControl{
+//            .doUpdate = true,
+//            .doSync   = true,
+//            .doResync = false,
+//            .doRender = true,
+//        };
 
-        signal_all();
+//        signal_all();
 
-        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
     }
 
     void exit(MagnumApplication& rApp) override
     {
-        m_rMainLoopCtrl = MainLoopControl{
-            .doUpdate = false,
-            .doSync   = false,
-            .doResync = false,
-            .doRender = false,
-        };
+//        m_rMainLoopCtrl = MainLoopControl{
+//            .doUpdate = false,
+//            .doSync   = false,
+//            .doResync = false,
+//            .doRender = false,
+//        };
 
-        signal_all();
+//        signal_all();
 
-        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
 
-        if (m_rTestApp.m_pExecutor->is_running(m_rTestApp))
-        {
-            // Main loop must have stopped, but didn't!
-            m_rTestApp.m_pExecutor->wait(m_rTestApp);
-            std::abort();
-        }
+//        if (m_rTestApp.m_pExecutor->is_running(m_rTestApp))
+//        {
+//            // Main loop must have stopped, but didn't!
+//            m_rTestApp.m_pExecutor->wait(m_rTestApp);
+//            std::abort();
+//        }
     }
 
 private:
 
     void signal_all()
     {
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.mainLoop);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.inputs);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderSync);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderResync);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneUpdate);
-        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneRender);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.mainLoop);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.inputs);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderSync);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderResync);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneUpdate);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneRender);
     }
 
     TestApp         &m_rTestApp;
@@ -712,31 +717,31 @@ private:
     MainLoopSignals m_signals;
 };
 
-void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene)
-{
-    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_application,    TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,             TESTAPP_DATA_SCENE_RENDERER);
-    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,         TESTAPP_DATA_MAGNUM);
-    OSP_DECLARE_GET_DATA_IDS(magnumScene,               TESTAPP_DATA_MAGNUM_SCENE);
+//void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene)
+//{
+//    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_application,    TESTAPP_DATA_APPLICATION);
+//    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,             TESTAPP_DATA_SCENE_RENDERER);
+//    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,         TESTAPP_DATA_MAGNUM);
+//    OSP_DECLARE_GET_DATA_IDS(magnumScene,               TESTAPP_DATA_MAGNUM_SCENE);
 
-    auto &rMainLoopCtrl = top_get<MainLoopControl>  (rTestApp.m_topData, idMainLoopCtrl);
-    auto &rActiveApp    = top_get<MagnumApplication>(rTestApp.m_topData, idActiveApp);
-    auto &rCamera       = top_get<draw::Camera>     (rTestApp.m_topData, idCamera);
+//    auto &rMainLoopCtrl = top_get<MainLoopControl>  (rTestApp.m_topData, idMainLoopCtrl);
+//    auto &rActiveApp    = top_get<MagnumApplication>(rTestApp.m_topData, idActiveApp);
+//    auto &rCamera       = top_get<draw::Camera>     (rTestApp.m_topData, idCamera);
 
-    rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
+//    rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 
-    MainLoopSignals const signals
-    {
-        .mainLoop     = rTestApp.m_application .get_pipelines<PlApplication>()   .mainLoop,
-        .inputs       = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .inputs,
-        .renderSync   = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .sync,
-        .renderResync = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .resync,
-        .sceneUpdate  = scene                  .get_pipelines<PlScene>()         .update,
-        .sceneRender  = sceneRenderer          .get_pipelines<PlSceneRenderer>() .render,
-    };
+//    MainLoopSignals const signals
+//    {
+//        .mainLoop     = rTestApp.m_application .get_pipelines<PlApplication>()   .mainLoop,
+//        .inputs       = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .inputs,
+//        .renderSync   = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .sync,
+//        .renderResync = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .resync,
+//        .sceneUpdate  = scene                  .get_pipelines<PlScene>()         .update,
+//        .sceneRender  = sceneRenderer          .get_pipelines<PlSceneRenderer>() .render,
+//    };
 
-    rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, signals) );
-}
+//    rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, signals) );
+//}
 
 } // namespace testapp
 

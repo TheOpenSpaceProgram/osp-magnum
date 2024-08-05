@@ -28,7 +28,7 @@
 #include "testapp.h"
 
 // IWYU pragma: begin_exports
-#include <osp/tasks/top_utils.h>
+//#include <osp/util/top_data.h>
 // IWYU pragma: end_exports
 
 #include <unordered_map>
@@ -47,11 +47,14 @@ namespace scenes
     using enum EStgLink;
 }
 
-struct MainLoopControl
+
+
+struct WindowAppLoopControl
 {
-    bool doUpdate;
-    bool doSync;
     bool doResync;
+
+    bool doSync;
+
     bool doRender;
 };
 

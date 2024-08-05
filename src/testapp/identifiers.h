@@ -25,6 +25,7 @@
 #pragma once
 
 #include <osp/tasks/tasks.h>
+#include <osp/framework/framework.h>
 
 #include <array>
 
@@ -139,15 +140,25 @@ inline void register_stage_enums()
 }
 
 using osp::PipelineDef;
+using osp::fw::DataId;
 
 //-----------------------------------------------------------------------------
 
-#define TESTAPP_DATA_APPLICATION 2, \
-    idResources, idMainLoopCtrl
-struct PlApplication
-{
-    PipelineDef<EStgOptn> mainLoop          {"mainLoop"};
+
+struct FIMainApp {
+    struct DataIds {
+        DataId resources;
+        DataId mainLoopCtrl;
+        DataId frameworkModify;
+        DataId cin;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgOptn> mainLoop          {"mainLoop"};
+        PipelineDef<EStgIntr> cin               {"cin"};
+    };
 };
+
 
 //-----------------------------------------------------------------------------
 

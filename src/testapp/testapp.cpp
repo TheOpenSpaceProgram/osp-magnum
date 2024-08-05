@@ -27,14 +27,101 @@
 
 #include <osp/core/Resources.h>
 #include <osp/drawing/own_restypes.h>
-#include <osp/tasks/top_execute.h>
-#include <osp/tasks/top_utils.h>
+
 #include <osp/vehicles/ImporterData.h>
 #include <spdlog/fmt/ostr.h>
+
+using namespace osp::fw;
 
 namespace testapp
 {
 
+FeatureDef const ftrMain = feature_def([] (FeatureBuilder& rFB, Implement<FIMainApp> mainApp, int g)
+{
+    rFB.data(mainApp.di.mainLoopCtrl)   .emplace<MainLoopControl>();
+    rFB.data(mainApp.di.resources)      .emplace<osp::Resources>();
+    rFB.data(mainApp.di.frameworkModify).emplace<FrameworkModify>();
+    rFB.data(mainApp.di.cin)            .emplace<std::vector<std::string>>();
+
+    rFB.pipeline(mainApp.pl.mainLoop).loops(true).wait_for_signal(EStgOptn::ModifyOrSignal);
+    rFB.pipeline(mainApp.pl.cin).parent(mainApp.pl.mainLoop);
+
+    rFB.task()
+        .name       ("Schedule Main Loop")
+        .schedules  ({mainApp.pl.mainLoop(EStgOptn::Schedule)})
+        .args       ({         mainApp.di.mainLoopCtrl})
+        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rMainLoopCtrl.doUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
+
+    rFB.task()
+        .name       ("Read stdin buffer")
+        .run_on     ({mainApp.pl.mainLoop(EStgOptn::Run)})
+        .sync_with  ({mainApp.pl.cin(EStgIntr::Modify_)})
+        .args       ({            mainApp.di.cin})
+        .func([] (std::vector<std::string> &rCin) noexcept
+    {
+        rCin = NonBlockingStdInReader::instance().read();
+    });
+});
+
+void TestApp::init()
+{
+    LGRN_ASSERTM( ! m_mainContext.has_value() , "Call init() only once. pretty please!");
+    m_mainContext = m_framework.contextIds.create();
+
+    ContextBuilder   cb { .m_contexts = {m_mainContext}, .m_fw = m_framework };
+    cb.add_feature(ftrMain);
+    LGRN_ASSERTM(cb.m_errors.empty(), "Error adding main feature");
+    ContextBuilder::apply(std::move(cb));
+
+    auto const fiMain         = m_framework.get_interface_shorthand<FIMainApp>(m_mainContext);
+    auto       &rResources    = entt::any_cast<osp::Resources&>          (m_framework.data[fiMain.di.resources]);
+    rResources.resize_types(osp::ResTypeIdReg_t::size());
+    m_defaultPkg = rResources.pkg_create();
+
+    m_pExecutor->load(m_framework);
+    m_pExecutor->run(m_framework, fiMain.pl.mainLoop);
+}
+
+void TestApp::drive_main_loop()
+{
+    auto const fiMain         = m_framework.get_interface_shorthand<FIMainApp>(m_mainContext);
+    auto       &rMainLoopCtrl = entt::any_cast<MainLoopControl&>(m_framework.data[fiMain.di.mainLoopCtrl]);
+    auto       &rFWModify     = entt::any_cast<FrameworkModify&>(m_framework.data[fiMain.di.frameworkModify]);
+
+    if ( ! rFWModify.commands.empty() )
+    {
+        // Stop the framework main loop
+        rMainLoopCtrl.doUpdate = false;
+        m_pExecutor->signal(m_framework, fiMain.pl.mainLoop);
+        m_pExecutor->wait(m_framework);
+
+        if (m_pExecutor->is_running(m_framework))
+        {
+            OSP_LOG_CRITICAL("something is blocking the framework main loop from exiting. RIP");
+            std::abort();
+        }
+
+        for (FrameworkModify::Command &rCmd : rFWModify.commands)
+        {
+            rCmd.func(std::move(rCmd.userData));
+        }
+        rFWModify.commands.clear();
+
+        // Restart framework main loop
+        m_pExecutor->load(m_framework);
+        m_pExecutor->run(m_framework, fiMain.pl.mainLoop);
+    }
+
+    rMainLoopCtrl.doUpdate = true;
+
+    m_pExecutor->signal(m_framework, fiMain.pl.mainLoop);
+    m_pExecutor->wait(m_framework);
+}
+
+/*
 void TestApp::close_sessions(osp::ArrayView<osp::Session> const sessions)
 {
     using namespace osp;
@@ -136,51 +223,10 @@ void TestApp::clear_resource_owners()
     };
 }
 
+*/
 
-//-----------------------------------------------------------------------------
 
 
-void SingleThreadedExecutor::load(TestAppTasks& rAppTasks)
-{
-    osp::exec_conform(rAppTasks.m_tasks, m_execContext);
-    m_execContext.doLogging = m_log != nullptr;
-}
-
-void SingleThreadedExecutor::run(TestAppTasks& rAppTasks, osp::PipelineId pipeline)
-{
-    osp::exec_request_run(m_execContext, pipeline);
-}
-
-void SingleThreadedExecutor::signal(TestAppTasks& rAppTasks, osp::PipelineId pipeline)
-{
-    osp::exec_signal(m_execContext, pipeline);
-}
-
-void SingleThreadedExecutor::wait(TestAppTasks& rAppTasks)
-{
-    if (m_log != nullptr)
-    {
-        m_log->info("\n>>>>>>>>>> Previous State Changes\n{}\n>>>>>>>>>> Current State\n{}\n",
-                    osp::TopExecWriteLog  {rAppTasks.m_tasks, rAppTasks.m_taskData, rAppTasks.m_graph, m_execContext},
-                    osp::TopExecWriteState{rAppTasks.m_tasks, rAppTasks.m_taskData, rAppTasks.m_graph, m_execContext} );
-        m_execContext.logMsg.clear();
-    }
-
-    osp::exec_update(rAppTasks.m_tasks, rAppTasks.m_graph, m_execContext);
-    osp::top_run_blocking(rAppTasks.m_tasks, rAppTasks.m_graph, rAppTasks.m_taskData, rAppTasks.m_topData, m_execContext);
-
-    if (m_log != nullptr)
-    {
-        m_log->info("\n>>>>>>>>>> New State Changes\n{}",
-                    osp::TopExecWriteLog{rAppTasks.m_tasks, rAppTasks.m_taskData, rAppTasks.m_graph, m_execContext} );
-        m_execContext.logMsg.clear();
-    }
-}
-
-bool SingleThreadedExecutor::is_running(TestAppTasks const& appTasks)
-{
-    return m_execContext.hasRequestRun || (m_execContext.pipelinesRunning != 0);
-}
 
 
 } // namespace testapp

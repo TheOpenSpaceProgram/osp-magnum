@@ -1,3 +1,4 @@
+
 /**
  * Open Space Program
  * Copyright © 2019-2022 Open Space Program Project
@@ -22,6 +23,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 #include "common.h"
 #include "../scenarios.h"
 
@@ -36,7 +38,7 @@ using namespace adera;
 using namespace osp;
 using namespace osp::active;
 using namespace osp::draw;
-
+#if 0
 namespace testapp::scenes
 {
 
@@ -503,3 +505,4 @@ Session setup_scene_renderer(
 } // setup_scene_renderer
 
 } // namespace testapp::scenes
+#endif

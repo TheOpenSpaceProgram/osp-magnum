@@ -22,6 +22,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+/**
+ * @file
+ * @brief Data structures for representing a complex multi-threaded application as a set of Tasks,
+ *        organized with 'Pipelines' to determine when Tasks must run.
+ *
+ * Refer to docs/tasks.md
+ *
+ * This file only represents the graph structure of tasks. It does NOT contain...
+ * * calls to run or execute Tasks
+ * * data for Tasks (function signature, task name, etc...)
+ */
 #pragma once
 
 #include "../core/array_view.h"
@@ -33,9 +44,7 @@
 #include <entt/core/family.hpp>
 
 #include <cstdint>
-#include <ostream>
 #include <string_view>
-#include <variant>
 #include <vector>
 
 #define OSP_DECLARE_STAGE_NAMES(type, ...)                                                                  \
@@ -78,21 +87,21 @@ enum class SemaphoreId  : SemaphoreInt  { };
 
 struct PipelineInfo
 {
-    using stage_type_family_t = entt::family<struct StageTypeDummy>;
-    using stage_type_t        = stage_type_family_t::value_type;
+    using StageTypeFamily_t   = entt::family<struct StageTypeDummy>;
+    using StageTypeId         = StageTypeFamily_t::value_type;
 
-    static inline KeyedVec<stage_type_t, ArrayView<std::string_view const>> sm_stageNames;
+    static inline KeyedVec<StageTypeId, ArrayView<std::string_view const>> sm_stageNames;
 
     template <typename STAGE_ENUM_T>
     static inline constexpr void register_stage_enum()
     {
-        PipelineInfo::stage_type_t const type = PipelineInfo::stage_type_family_t::value<STAGE_ENUM_T>;
+        PipelineInfo::StageTypeId const type = PipelineInfo::StageTypeFamily_t::value<STAGE_ENUM_T>;
         PipelineInfo::sm_stageNames[type] = stage_names(STAGE_ENUM_T{});
     }
 
     std::string_view    name;
     std::string_view    category;
-    stage_type_t        stageType { lgrn::id_null<stage_type_t>() };
+    StageTypeId         stageType { lgrn::id_null<StageTypeId>() };
 };
 
 struct PipelineControl
@@ -136,14 +145,10 @@ struct Tasks
     KeyedVec<PipelineId, PipelineControl>           m_pipelineControl;
 
     KeyedVec<TaskId, TplPipelineStage>              m_taskRunOn;
-};
 
-struct TaskEdges
-{
     std::vector<TplTaskPipelineStage>   m_syncWith;
-
-    //std::vector<TplTaskSemaphore>       m_semaphoreEdges;
 };
+
 
 using PipelineTreePos_t = uint32_t;
 
@@ -225,12 +230,7 @@ struct TaskGraph
 }; // struct TaskGraph
 
 
-TaskGraph make_exec_graph(Tasks const& tasks, ArrayView<TaskEdges const* const> data);
-
-inline TaskGraph make_exec_graph(Tasks const& tasks, std::initializer_list<TaskEdges const* const> data)
-{
-    return make_exec_graph(tasks, arrayView(data));
-}
+TaskGraph make_exec_graph(Tasks const& tasks);
 
 template <typename KEY_T, typename VALUE_T, typename GETSIZE_T, typename CLAIM_T>
 inline void fanout_partition(KeyedVec<KEY_T, VALUE_T>& rVec, GETSIZE_T&& get_size, CLAIM_T&& claim) noexcept
@@ -305,6 +305,21 @@ inline StageId stage_from(TaskGraph const& graph, AnyStageId const stg) noexcept
     return stage_from(graph, graph.anystgToPipeline[stg], stg);
 }
 
+/**
+ * allows some form of reflection
+ *
+ * @code
+ *
+ * struct MyPipelines {
+ *      PipelineDef<EStgOptn> foo {"foo"};
+ *      PipelineDef<EStgIntr> bar {"bar"};
+ * };
+ * // ...
+ *
+ * MyPipelines pl{};
+ *
+ * @endcode
+ */
 template <typename ENUM_T>
 struct PipelineDef
 {
@@ -322,13 +337,18 @@ struct PipelineDef
 
     constexpr TplPipelineStage operator()(ENUM_T stage) const noexcept { return { m_value, StageId(stage) }; }
 
-    std::string_view m_name;
-
-    PipelineInfo::stage_type_t m_type { PipelineInfo::stage_type_family_t::value<ENUM_T> };
-
-    PipelineId m_value { lgrn::id_null<PipelineId>() };
+    std::string_view            m_name;
+    PipelineInfo::StageTypeId   m_type { PipelineInfo::StageTypeFamily_t::value<ENUM_T> };
+    PipelineId                  m_value { lgrn::id_null<PipelineId>() };
 };
 
 using PipelineDefBlank_t = PipelineDef<int>;
+
+struct PipelineDefInfo
+{
+    std::string_view            name;
+    PipelineInfo::StageTypeId   type;
+};
+
 
 } // namespace osp

@@ -24,18 +24,17 @@
  */
 #pragma once
 
-#include "tasks.h"
-#include "top_utils.h"
-#include "top_worker.h"
+#if 0
+
+#include "top_data.h"
+#include "top_task_builder.h"
 
 #include "../core/unpack.h"
 
 #include <entt/core/any.hpp>
 
 #include <cassert>
-#include <type_traits>
 #include <typeinfo>
-#include <utility>
 #include <vector>
 
 #define OSP_AUX_DCDI_C(session, topData, count, ...) \
@@ -158,3 +157,6 @@ struct SessionGroup
 
 
 } // namespace osp
+
+#endif
+

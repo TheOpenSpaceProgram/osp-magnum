@@ -1,3 +1,4 @@
+#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2022 Open Space Program Project
@@ -189,3 +190,4 @@ Session setup_cursor(
 
 
 } // namespace testapp::scenes
+#endif

@@ -1,3 +1,4 @@
+#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2022 Open Space Program Project
@@ -27,10 +28,9 @@
 #include "../scenarios.h"
 
 #include <osp/core/math_types.h>
-#include <osp/tasks/builder.h>
-#include <osp/tasks/tasks.h>
-#include <osp/tasks/top_session.h>
-#include <osp/tasks/top_tasks.h>
+
+#include <osp/util/top_session.h>
+#include <osp/util/top_tasks.h>
 
 #include <ospnewton/activescene/forcefactors.h>
 
@@ -111,3 +111,4 @@ osp::Session setup_rocket_thrust_newton(
         osp::Session const&         nwtFactors);
 
 } // namespace testapp::scenes
+#endif
