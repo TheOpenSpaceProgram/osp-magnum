@@ -25,7 +25,7 @@
 
 #include "scenarios.h"
 #include "enginetest.h"
-#include "identifiers.h"
+#include "feature_interfaces.h"
 
 #include "sessions/common.h"
 #include "sessions/magnum.h"
@@ -41,6 +41,7 @@
 
 #include "MagnumApplication.h"
 
+#include <adera/application.h>
 #include <adera/activescene/vehicles_vb_fn.h>
 #include <adera/drawing/CameraController.h>
 
@@ -57,12 +58,12 @@
 
 using namespace adera;
 using namespace osp;
+using namespace osp::fw;
 using namespace osp::active;
 
 namespace testapp
 {
 
-//static void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene);
 
 // MaterialIds hints which shaders should be used to draw a DrawEnt
 // DrawEnts can be assigned to multiple materials
@@ -71,34 +72,56 @@ static constexpr auto   sc_matFlat          = draw::MaterialId(1);
 static constexpr auto   sc_matPhong         = draw::MaterialId(2);
 static constexpr int    sc_materialCount    = 4;
 
+FeatureDef const ftrEngineTest = feature_def("EngineTest", [] (FeatureBuilder& rFB, Implement<FIEngineTest> engineTest, DependOn<FIMainApp> mainApp, entt::any data)
+{
+    auto &rResources = rFB.data_get<Resources>(mainApp.di.resources);
+
+    rFB.data(engineTest.di.bigStruct) = enginetest::setup_scene(rResources, entt::any_cast<PkgId>(data));
+});
+
 static ScenarioMap_t make_scenarios()
 {   
     ScenarioMap_t scenarioMap;
 
-    register_stage_enums();
 
-    auto const add_scenario = [&scenarioMap] (std::string_view name, std::string_view desc, SceneSetupFunc_t run)
+    auto const add_scenario = [&scenarioMap] (std::string_view name, ScenarioOption owo)
     {
-        scenarioMap.emplace(name, ScenarioOption{desc, run});
+        scenarioMap.emplace(name, owo);
     };
 
-    #if 0
+    add_scenario("enginetest", {
+        .description = "Simple rotating cube scenario without relying on Framework",
+        .loadFunc = [] (TestApp& rTestApp)
+    {
+        auto            &rFw      = rTestApp.m_framework;
+        auto      const mainApp   = rFw.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto      const &rAppCtxs = entt::any_cast<adera::AppContexts&>(rFw.data[mainApp.di.appContexts]);
 
-    add_scenario("enginetest", "Simple rotating cube scenario without using Pipelines/Tasks",
+        ContextId const uwu       = rFw.contextIds.create();
+        ContextBuilder  cb {  .m_ctxScope = {rTestApp.m_mainContext}, .m_ctx = uwu, .m_rFW = rFw };
+        cb.add_feature(ftrEngineTest, rTestApp.m_defaultPkg);
+        LGRN_ASSERTM(cb.m_errors.empty(), "Error adding main feature");
+        ContextBuilder::apply(std::move(cb));
+    }});
+
+
+/*
+
+    add_scenario("enginetest", " Pipelines/Tasks",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
     {
-        // Declares idResources TopDataId variable, obtained from Session m_application.m_data[0].
+        // Declares mainApp.di.resources TopDataId variable, obtained from Session m_application.m_data[0].
         //
         // This macro expands to:
         //
-        //     auto const [idResources, idMainLoopCtrl] = osp::unpack<2>(rTestApp.m_application.m_data);
+        //     auto const [mainApp.di.resources, mainApp.di.mainLoopCtrl] = osp::unpack<2>(rTestApp.m_application.m_data);
         //
         // TopDataIds can be used to access rTestApp.m_topData. The purpose of TopData is to store
         // all data in a safe, type-erased, and addressable manner that can be easily accessed by
         // Tasks. This also allow reserving IDs before instantiation (which cannot be achieved
         // with (smart) pointers alone)
         OSP_DECLARE_GET_DATA_IDS(rTestApp.m_application, TESTAPP_DATA_APPLICATION);
-        auto &rResources = top_get<Resources>(rTestApp.m_topData, idResources);
+        auto &rResources = rFB.data_get<Resources>(rTestApp.m_topData, mainApp.di.resources);
 
         // Create 1 unnamed session as m_sessions[0], reserving 1 TopDataId as idSceneData
         rTestApp.m_scene.m_sessions.resize(1);
@@ -107,7 +130,7 @@ static ScenarioMap_t make_scenarios()
         // Create scene, store it in rTestApp.m_topData[idSceneData].
         // enginetest::setup_scene returns an entt::any containing one big EngineTestScene struct
         // containing all the scene data: a spinning cube.
-        top_assign<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData, enginetest::setup_scene(rResources, rTestApp.m_defaultPkg));
+        top_assign<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData, );
 
         // Called when the MagnumApplication / window is opened, called again if the window is
         // re-opened after its closed. Closing the window completely destructs MagnumApplication
@@ -115,13 +138,13 @@ static ScenarioMap_t make_scenarios()
         RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp) -> void
         {
             TopDataId const idSceneData = rTestApp.m_scene.m_sessions[0].m_data[0];
-            auto &rScene = top_get<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData);
+            auto &rScene = rFB.data_get<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData);
 
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,     TESTAPP_DATA_MAGNUM);
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
-            auto &rActiveApp    = top_get< MagnumApplication >      (rTestApp.m_topData, idActiveApp);
-            auto &rRenderGl     = top_get< draw::RenderGL >         (rTestApp.m_topData, idRenderGl);
-            auto &rUserInput    = top_get< input::UserInputHandler >(rTestApp.m_topData, idUserInput);
+            auto &rActiveApp    = rFB.data_get< MagnumApplication >      (rTestApp.m_topData, idActiveApp);
+            auto &rRenderGl     = rFB.data_get< draw::RenderGL >         (rTestApp.m_topData, magnum.di.renderGl);
+            auto &rUserInput    = rFB.data_get< input::UserInputHandler >(rTestApp.m_topData, windowApp.di.userInput);
 
             // This creates the renderer actually updates and draws the scene.
             rActiveApp.set_osp_app(enginetest::generate_osp_magnum_app(rScene, rActiveApp, rRenderGl, rUserInput));
@@ -129,6 +152,9 @@ static ScenarioMap_t make_scenarios()
 
         return setup_renderer;
     });
+*/
+     #if 0
+
 
     static constexpr auto sc_gravityForce = Vector3{0.0f, 0.0f, -9.81f};
 
@@ -247,9 +273,9 @@ static ScenarioMap_t make_scenarios()
         OSP_DECLARE_GET_DATA_IDS(vehicleSpawnVB, TESTAPP_DATA_VEHICLE_SPAWN_VB);
         OSP_DECLARE_GET_DATA_IDS(testVehicles,   TESTAPP_DATA_TEST_VEHICLES);
 
-        auto &rVehicleSpawn     = top_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
-        auto &rVehicleSpawnVB   = top_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
-        auto &rPrebuiltVehicles = top_get<PrebuiltVehicles>     (rTopData, idPrebuiltVehicles);
+        auto &rVehicleSpawn     = rFB.data_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
+        auto &rVehicleSpawnVB   = rFB.data_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
+        auto &rPrebuiltVehicles = rFB.data_get<PrebuiltVehicles>     (rTopData, idPrebuiltVehicles);
 
         for (int i = 0; i < 10; ++i)
         {
@@ -328,8 +354,8 @@ static ScenarioMap_t make_scenarios()
         terrainSubdiv   = setup_terrain_subdiv_dist (builder, rTopData, scene, terrain, terrainIco);
 
         OSP_DECLARE_GET_DATA_IDS(terrain,    TESTAPP_DATA_TERRAIN);
-        auto &rTerrain = top_get<ACtxTerrain>(rTopData, idTerrain);
-        auto &rTerrainFrame = top_get<ACtxTerrainFrame>(rTopData, idTerrainFrame);
+        auto &rTerrain = rFB.data_get<ACtxTerrain>(rTopData, idTerrain);
+        auto &rTerrainFrame = rFB.data_get<ACtxTerrainFrame>(rTopData, idTerrainFrame);
 
         constexpr std::uint64_t c_earthRadius = 6371000;
 
@@ -372,7 +398,7 @@ static ScenarioMap_t make_scenarios()
 
             OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
 
-            auto &rCamCtrl = top_get<ACtxCameraController>(rTopData, idCamCtrl);
+            auto &rCamCtrl = rFB.data_get<ACtxCameraController>(rTopData, idCamCtrl);
             rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
             rCamCtrl.m_orbitDistanceMin = 1.0f;
             rCamCtrl.m_moveSpeed = 0.5f;
@@ -412,8 +438,8 @@ static ScenarioMap_t make_scenarios()
         terrainSubdiv   = setup_terrain_subdiv_dist (builder, rTopData, scene, terrain, terrainIco);
 
         OSP_DECLARE_GET_DATA_IDS(terrain,    TESTAPP_DATA_TERRAIN);
-        auto &rTerrain = top_get<ACtxTerrain>(rTopData, idTerrain);
-        auto &rTerrainFrame = top_get<ACtxTerrainFrame>(rTopData, idTerrainFrame);
+        auto &rTerrain = rFB.data_get<ACtxTerrain>(rTopData, idTerrain);
+        auto &rTerrainFrame = rFB.data_get<ACtxTerrainFrame>(rTopData, idTerrainFrame);
 
         initialize_ico_terrain(rTopData, terrain, terrainIco, {
             .radius                 = 100.0,
@@ -454,7 +480,7 @@ static ScenarioMap_t make_scenarios()
 
             OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
 
-            auto &rCamCtrl = top_get<ACtxCameraController>(rTopData, idCamCtrl);
+            auto &rCamCtrl = rFB.data_get<ACtxCameraController>(rTopData, idCamCtrl);
             rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
             rCamCtrl.m_orbitDistanceMin = 1.0f;
             rCamCtrl.m_moveSpeed = 0.5f;
@@ -497,9 +523,9 @@ static ScenarioMap_t make_scenarios()
         joltGrav        = setup_jolt_force_accel  (builder, rTopData, jolt, joltGravSet, Vector3{0.0f, 0.0f, -9.81f});
         physShapesJolt  = setup_phys_shapes_jolt  (builder, rTopData, commonScene, physics, physShapes, jolt, joltGravSet);
 
-        auto const tgApp = application.get_pipelines< PlApplication >();
+        auto const mainApp.pl = application.get_pipelines< PlApplication >();
 
-        uniCore         = setup_uni_core            (builder, rTopData, tgApp.mainLoop);
+        uniCore         = setup_uni_core            (builder, rTopData, mainApp.pl.mainLoop);
         uniScnFrame     = setup_uni_sceneframe      (builder, rTopData, uniCore);
         uniTestPlanets  = setup_uni_testplanets     (builder, rTopData, uniCore, uniScnFrame);
 
@@ -561,9 +587,9 @@ static ScenarioMap_t make_scenarios()
             scene = setup_scene(builder, rTopData, application);
             commonScene = setup_common_scene(builder, rTopData, scene, application, defaultPkg);
 
-            auto const tgApp = application.get_pipelines< PlApplication >();
+            auto const mainApp.pl = application.get_pipelines< PlApplication >();
 
-            solarSystemCore = setup_uni_core(builder, rTopData, tgApp.mainLoop);
+            solarSystemCore = setup_uni_core(builder, rTopData, mainApp.pl.mainLoop);
             solarSystemScnFrame = setup_uni_sceneframe(builder, rTopData, solarSystemCore);
             solarSystemTestPlanets = setup_solar_system_testplanets(builder, rTopData, solarSystemCore, solarSystemScnFrame);
 
@@ -589,7 +615,7 @@ static ScenarioMap_t make_scenarios()
                 OSP_DECLARE_GET_DATA_IDS(cameraCtrl, TESTAPP_DATA_CAMERA_CTRL);
 
                 // Zoom out the camera so that all planets are in view
-                auto& rCameraController = top_get<ACtxCameraController>(rTopData, idCamCtrl);
+                auto& rCameraController = rFB.data_get<ACtxCameraController>(rTopData, idCamCtrl);
                 rCameraController.m_orbitDistance += 75000;
 
                 cameraFree = setup_camera_free(builder, rTopData, windowApp, scene, cameraCtrl);
@@ -619,103 +645,9 @@ ScenarioMap_t const& scenarios()
 //-----------------------------------------------------------------------------
 
 
-struct MainLoopSignals
-{
-    PipelineId mainLoop;
-    PipelineId inputs;
-    PipelineId renderSync;
-    PipelineId renderResync;
-    PipelineId sceneUpdate;
-    PipelineId sceneRender;
-};
 
-/**
- * @brief Runs Task/Pipeline main loop within MagnumApplication
- */
-class CommonMagnumApp : public IOspApplication
-{
-public:
-    CommonMagnumApp(TestApp &rTestApp, MainLoopControl &rMainLoopCtrl, MainLoopSignals signals) noexcept
-     : m_rTestApp       { rTestApp }
-     , m_rMainLoopCtrl  { rMainLoopCtrl }
-     , m_signals        { signals }
-    { }
 
-    void run(MagnumApplication& rApp) override
-    {
-        // Start the main loop
 
-//        PipelineId const mainLoop = m_rTestApp.m_application.get_pipelines<PlApplication>().mainLoop;
-//        m_rTestApp.m_pExecutor->run(m_rTestApp, mainLoop);
-
-//        // Resyncronize renderer
-
-//        m_rMainLoopCtrl = MainLoopControl{
-//            .doUpdate = false,
-//            .doSync   = true,
-//            .doResync = true,
-//            .doRender = false,
-//        };
-
-//        signal_all();
-
-//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
-    }
-
-    void draw(MagnumApplication& rApp, float delta) override
-    {
-        // Magnum Application's main loop calls this
-
-//        m_rMainLoopCtrl = MainLoopControl{
-//            .doUpdate = true,
-//            .doSync   = true,
-//            .doResync = false,
-//            .doRender = true,
-//        };
-
-//        signal_all();
-
-//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
-    }
-
-    void exit(MagnumApplication& rApp) override
-    {
-//        m_rMainLoopCtrl = MainLoopControl{
-//            .doUpdate = false,
-//            .doSync   = false,
-//            .doResync = false,
-//            .doRender = false,
-//        };
-
-//        signal_all();
-
-//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
-
-//        if (m_rTestApp.m_pExecutor->is_running(m_rTestApp))
-//        {
-//            // Main loop must have stopped, but didn't!
-//            m_rTestApp.m_pExecutor->wait(m_rTestApp);
-//            std::abort();
-//        }
-    }
-
-private:
-
-    void signal_all()
-    {
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.mainLoop);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.inputs);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderSync);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderResync);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneUpdate);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneRender);
-    }
-
-    TestApp         &m_rTestApp;
-    MainLoopControl &m_rMainLoopCtrl;
-
-    MainLoopSignals m_signals;
-};
 
 //void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene)
 //{
@@ -724,9 +656,9 @@ private:
 //    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,         TESTAPP_DATA_MAGNUM);
 //    OSP_DECLARE_GET_DATA_IDS(magnumScene,               TESTAPP_DATA_MAGNUM_SCENE);
 
-//    auto &rMainLoopCtrl = top_get<MainLoopControl>  (rTestApp.m_topData, idMainLoopCtrl);
-//    auto &rActiveApp    = top_get<MagnumApplication>(rTestApp.m_topData, idActiveApp);
-//    auto &rCamera       = top_get<draw::Camera>     (rTestApp.m_topData, idCamera);
+//    auto &rMainLoopCtrl = rFB.data_get<MainLoopControl>  (rTestApp.m_topData, mainApp.di.mainLoopCtrl);
+//    auto &rActiveApp    = rFB.data_get<MagnumApplication>(rTestApp.m_topData, idActiveApp);
+//    auto &rCamera       = rFB.data_get<draw::Camera>     (rTestApp.m_topData, idCamera);
 
 //    rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
 

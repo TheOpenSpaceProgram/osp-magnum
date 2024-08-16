@@ -23,11 +23,17 @@
  * SOFTWARE.
  */
 
+#include "Magnum/GL/DefaultFramebuffer.h"
+#include "osp/drawing_gl/rendergl.h"
+
 #include "testapp.h"
 #include "scenarios.h"
-#include "identifiers.h"
+#include "feature_interfaces.h"
 #include "sessions/common.h"
 #include "sessions/magnum.h"
+#include "testapp/MagnumApplication.h"
+
+#include <adera/application.h>
 
 #include <osp/core/Resources.h>
 #include <osp/core/string_concat.h>
@@ -58,11 +64,14 @@
 #include <array>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string_view>
-#include <thread>
 #include <unordered_map>
 
 using namespace testapp;
+
+using adera::MainLoopControl;
+using adera::FrameworkModify;
 
 /**
  * @brief As the name implies
@@ -89,6 +98,115 @@ osp::Logger_t g_logMagnumApp;
 
 using namespace osp::fw;
 
+int g_argc;
+char** g_argv;
+
+struct MainLoopSignals
+{
+    osp::PipelineId mainLoop;
+    osp::PipelineId inputs;
+    osp::PipelineId renderSync;
+    osp::PipelineId renderResync;
+    osp::PipelineId sceneUpdate;
+    osp::PipelineId sceneRender;
+};
+
+/**
+ * @brief Runs Task/Pipeline main loop within MagnumApplication
+ */
+class CommonMagnumApp : public IOspApplication
+{
+public:
+    CommonMagnumApp(TestApp &rTestApp, MainLoopControl &rMainLoopCtrl, MainLoopSignals signals) noexcept
+     : m_rTestApp       { rTestApp }
+     , m_rMainLoopCtrl  { rMainLoopCtrl }
+     , m_signals        { signals }
+    { }
+
+    void run(MagnumApplication& rApp) override
+    {
+        // Start the main loop
+
+//        PipelineId const mainLoop = m_rTestApp.m_application.get_pipelines<PlApplication>().mainLoop;
+//        m_rTestApp.m_pExecutor->run(m_rTestApp, mainLoop);
+
+//        // Resyncronize renderer
+
+//        m_rMainLoopCtrl = MainLoopControl{
+//            .doUpdate = false,
+//            .doSync   = true,
+//            .doResync = true,
+//            .doRender = false,
+//        };
+
+//        signal_all();
+
+//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+    }
+
+    void draw(MagnumApplication& rApp, float delta) override
+    {
+        // Magnum Application's main loop calls this
+        m_rTestApp.drive_main_loop();
+
+//        auto const magnum    = g_testApp->m_framework.get_interface<FIMagnum>   (g_testApp->m_mainContext);
+//        auto       &rRenderGl = entt::any_cast<osp::draw::RenderGL&>  (g_testApp->m_framework.data[magnum.di.renderGl]);
+
+
+//        Magnum::GL::defaultFramebuffer.bind();
+//        auto &rFboColor = rRenderGl.m_texGl.get(rRenderGl.m_fboColor);
+//        osp::draw::SysRenderGL::display_texture(rRenderGl, rFboColor);
+
+//        m_rMainLoopCtrl = MainLoopControl{
+//            .doUpdate = true,
+//            .doSync   = true,
+//            .doResync = false,
+//            .doRender = true,
+//        };
+
+//        signal_all();
+
+//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+    }
+
+    void exit(MagnumApplication& rApp) override
+    {
+//        m_rMainLoopCtrl = MainLoopControl{
+//            .doUpdate = false,
+//            .doSync   = false,
+//            .doResync = false,
+//            .doRender = false,
+//        };
+
+//        signal_all();
+
+//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+
+//        if (m_rTestApp.m_pExecutor->is_running(m_rTestApp))
+//        {
+//            // Main loop must have stopped, but didn't!
+//            m_rTestApp.m_pExecutor->wait(m_rTestApp);
+//            std::abort();
+//        }
+    }
+
+private:
+
+    void signal_all()
+    {
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.mainLoop);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.inputs);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderSync);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderResync);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneUpdate);
+//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneRender);
+    }
+
+    TestApp         &m_rTestApp;
+    MainLoopControl &m_rMainLoopCtrl;
+
+    MainLoopSignals m_signals;
+};
 
 void eval_command(std::string_view const command, FrameworkModify &rFrameworkModify)
 {
@@ -96,7 +214,9 @@ void eval_command(std::string_view const command, FrameworkModify &rFrameworkMod
     auto const it = scenarios().find(command);
     if (it != std::end(scenarios()))
     {
+        ScenarioOption const &rSro = it->second;
 
+        rSro.loadFunc(g_testApp.value());
     }
     else // Otherwise check all other commands.
     {
@@ -106,6 +226,55 @@ void eval_command(std::string_view const command, FrameworkModify &rFrameworkMod
         }
         else if (command == "reopen")
         {
+            rFrameworkModify.commands.push_back({.func = [] (entt::any)
+            {
+                std::cout << "fish :3\n";
+
+                auto const mainApp = g_testApp->m_framework.get_interface<FIMainApp>(g_testApp->m_mainContext);
+                auto       &rAppCtxs = entt::any_cast<adera::AppContexts&>  (g_testApp->m_framework.data[mainApp.di.appContexts]);
+
+                rAppCtxs.window = g_testApp->m_framework.contextIds.create();
+
+                ContextBuilder   cb { .m_ctxScope = { g_testApp->m_mainContext}, .m_ctx = rAppCtxs.window, .m_rFW = g_testApp->m_framework };
+                cb.add_feature(scenes::ftrWindowApp);
+                cb.add_feature(scenes::ftrMagnum, MagnumApplication::Arguments{g_argc, g_argv});
+                LGRN_ASSERTM(cb.m_errors.empty(), "Error adding main feature");
+                ContextBuilder::apply(std::move(cb));
+
+                main_loop_stack().push_back([] () -> bool {
+                    auto &rTestApp = *g_testApp;
+
+                    auto const mainApp   = g_testApp->m_framework.get_interface<FIMainApp>  (g_testApp->m_mainContext);
+                    auto const &rAppCtxs = entt::any_cast<adera::AppContexts&>  (g_testApp->m_framework.data[mainApp.di.appContexts]);
+
+                    auto const windowApp = g_testApp->m_framework.get_interface<FIWindowApp>(rAppCtxs.window);
+                    auto const magnum    = g_testApp->m_framework.get_interface<FIMagnum>   (rAppCtxs.window);
+                    auto       &rMainLoopCtrl = entt::any_cast<MainLoopControl&>  (g_testApp->m_framework.data[mainApp.di.mainLoopCtrl]);
+                    auto       &rMagnumApp    = entt::any_cast<MagnumApplication&>(g_testApp->m_framework.data[magnum.di.magnumApp]);
+
+                    MainLoopSignals const signals
+                    {
+                        .mainLoop     = mainApp     .pl.mainLoop,
+                        .inputs       = windowApp   .pl.inputs,
+                        .renderSync   = windowApp   .pl.sync,
+                        .renderResync = windowApp   .pl.resync,
+                        //.sceneUpdate  = scene                  .get_pipelines<PlScene>()         .update,
+                        //.sceneRender  = sceneRenderer          .get_pipelines<PlSceneRenderer>() .render,
+                    };
+                    rMagnumApp.set_osp_app( std::make_unique<CommonMagnumApp>(g_testApp.value(), rMainLoopCtrl, signals) );
+
+                    // Blocking. Main loop runs in MagnumApplication::drawEvent continues when the close button is pressed
+                    rMagnumApp.exec();
+
+                    rMagnumApp.set_osp_app({});
+
+                    // Destructing MagnumApplication will close the window
+                    g_testApp->m_framework.data[magnum.di.magnumApp].reset();
+
+                    return false;
+                });
+
+            }});
 
         }
         else if (command == "list_pkg")
@@ -126,14 +295,14 @@ void eval_command(std::string_view const command, FrameworkModify &rFrameworkMod
 /**
  * Read-Eval-Print Loop
  */
-auto const ftrREPL = feature_def([] (FeatureBuilder& rFB, DependOn<FIMainApp> mainApp)
+auto const ftrREPL = feature_def("REPL", [] (FeatureBuilder& rFB, DependOn<FIMainApp> mainApp)
 {
     rFB.task()
         .name       ("poll and evaluate commands")
         .run_on     ({mainApp.pl.mainLoop(EStgOptn::Run)})
         .sync_with  ({mainApp.pl.cin(EStgIntr::UseOrRun)})
-        .args       ({                  mainApp.di.cin,        mainApp.di.frameworkModify})
-        .func([] (std::vector<std::string> const &rCin, FrameworkModify &rFrameworkModify) noexcept
+        .args       ({                         mainApp.di.cin,        mainApp.di.frameworkModify})
+        .func       ([] (std::vector<std::string> const &rCin, FrameworkModify &rFrameworkModify) noexcept
     {
         // Poll
         for (std::string const& str : rCin)
@@ -145,6 +314,8 @@ auto const ftrREPL = feature_def([] (FeatureBuilder& rFB, DependOn<FIMainApp> ma
 
 int main(int argc, char** argv)
 {
+    g_argc = argc;
+    g_argv = argv;
     // Command line argument parsing
     Corrade::Utility::Arguments args;
     args.addSkippedPrefix("magnum", "Magnum options")
@@ -197,11 +368,11 @@ int main(int argc, char** argv)
 
     if( ! args.isSet("norepl"))
     {
-        auto const fiMain         = rTestApp.m_framework.get_interface_shorthand<FIMainApp>(rTestApp.m_mainContext);
+        auto const fiMain         = rTestApp.m_framework.get_interface<FIMainApp>(rTestApp.m_mainContext);
         auto       &rFWModify     = entt::any_cast<FrameworkModify&>(rTestApp.m_framework.data[fiMain.di.frameworkModify]);
         rFWModify.commands.push_back({.func = [] (entt::any)
         {
-            ContextBuilder cb { .m_contexts = {g_testApp->m_mainContext}, .m_fw = g_testApp->m_framework };
+            ContextBuilder cb { .m_ctx = g_testApp->m_mainContext, .m_rFW = g_testApp->m_framework };
             cb.add_feature(ftrREPL);
             LGRN_ASSERTM(cb.m_errors.empty(), "Error adding REPL feature");
             ContextBuilder::apply(std::move(cb));
@@ -221,7 +392,11 @@ int main(int argc, char** argv)
     while ( ! rMainLoopStack.empty() )
     {
         MainLoopFunc_t func = rMainLoopStack.back();
-        func();
+        bool const keep = func();
+        if ( ! keep )
+        {
+            rMainLoopStack.pop_back();
+        }
     }
 
     spdlog::shutdown();
@@ -237,7 +412,7 @@ void load_a_bunch_of_stuff()
 
     TestApp &rTestApp = g_testApp.value();
 
-    auto const fiMain      = rTestApp.m_framework.get_interface_shorthand<FIMainApp>(rTestApp.m_mainContext);
+    auto const fiMain      = rTestApp.m_framework.get_interface<FIMainApp>(rTestApp.m_mainContext);
     auto       &rResources = entt::any_cast<osp::Resources&>(rTestApp.m_framework.data[fiMain.di.resources]);
 
     rResources.data_register<Trade::ImageData2D>(gc_image);
@@ -307,12 +482,12 @@ void print_help()
     for (auto const& [rName, rScenerio] : scenarios())
     {
         std::string spaces(longestName - rName.length(), ' ');
-        std::cout << "* " << rName << spaces << " - " << rScenerio.m_description << "\n";
+        std::cout << "* " << rName << spaces << " - " << rScenerio.description << "\n";
     }
 
     std::cout
         << "Other commands:\n"
-       // << "* list_pkg  - List Packages and Resources\n"
+        // << "* list_pkg  - List Packages and Resources\n"
         << "* help      - Show this again\n"
         << "* reopen    - Re-open Magnum Application\n"
         << "* exit      - Deallocate everything and return memory to OS\n";

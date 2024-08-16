@@ -32,10 +32,10 @@
 #include <osp/framework/framework.h>
 #include <osp/framework/builder.h>
 
-
 #include <entt/core/any.hpp>
 
 #include <mutex>
+#include <thread>
 
 namespace testapp
 {
@@ -79,8 +79,6 @@ private:
 };
 
 
-
-
 using MainLoopFunc_t = bool(*)();
 
 inline std::vector<MainLoopFunc_t>& main_loop_stack()
@@ -91,13 +89,9 @@ inline std::vector<MainLoopFunc_t>& main_loop_stack()
 
 struct TestApp;
 
-using RendererSetupFunc_t   = void(*)(TestApp&);
-using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
+//using RendererSetupFunc_t   = void(*)(TestApp&);
+//using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
 
-struct MainLoopControl
-{
-    bool doUpdate;
-};
 
 
 extern osp::fw::FeatureDef const ftrMain;

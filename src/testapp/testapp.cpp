@@ -23,7 +23,9 @@
  * SOFTWARE.
  */
 #include "testapp.h"
-#include "identifiers.h"
+#include "feature_interfaces.h"
+
+#include <adera/application.h>
 
 #include <osp/core/Resources.h>
 #include <osp/drawing/own_restypes.h>
@@ -31,17 +33,19 @@
 #include <osp/vehicles/ImporterData.h>
 #include <spdlog/fmt/ostr.h>
 
+using namespace adera;
 using namespace osp::fw;
 
 namespace testapp
 {
 
-FeatureDef const ftrMain = feature_def([] (FeatureBuilder& rFB, Implement<FIMainApp> mainApp, int g)
+FeatureDef const ftrMain = feature_def("Main", [] (FeatureBuilder& rFB, Implement<FIMainApp> mainApp, entt::any pkg)
 {
-    rFB.data(mainApp.di.mainLoopCtrl)   .emplace<MainLoopControl>();
-    rFB.data(mainApp.di.resources)      .emplace<osp::Resources>();
-    rFB.data(mainApp.di.frameworkModify).emplace<FrameworkModify>();
-    rFB.data(mainApp.di.cin)            .emplace<std::vector<std::string>>();
+    rFB.data_emplace< AppContexts >             (mainApp.di.appContexts);
+    rFB.data_emplace< MainLoopControl >         (mainApp.di.mainLoopCtrl);
+    rFB.data_emplace< osp::Resources >          (mainApp.di.resources);
+    rFB.data_emplace< FrameworkModify >         (mainApp.di.frameworkModify);
+    rFB.data_emplace< std::vector<std::string> >(mainApp.di.cin);
 
     rFB.pipeline(mainApp.pl.mainLoop).loops(true).wait_for_signal(EStgOptn::ModifyOrSignal);
     rFB.pipeline(mainApp.pl.cin).parent(mainApp.pl.mainLoop);
@@ -68,15 +72,15 @@ FeatureDef const ftrMain = feature_def([] (FeatureBuilder& rFB, Implement<FIMain
 
 void TestApp::init()
 {
-    LGRN_ASSERTM( ! m_mainContext.has_value() , "Call init() only once. pretty please!");
+    LGRN_ASSERTM( ! m_mainContext.has_value(), "Call init() only once. pretty please!");
     m_mainContext = m_framework.contextIds.create();
 
-    ContextBuilder   cb { .m_contexts = {m_mainContext}, .m_fw = m_framework };
+    ContextBuilder   cb { .m_ctx = m_mainContext, .m_rFW = m_framework };
     cb.add_feature(ftrMain);
     LGRN_ASSERTM(cb.m_errors.empty(), "Error adding main feature");
     ContextBuilder::apply(std::move(cb));
 
-    auto const fiMain         = m_framework.get_interface_shorthand<FIMainApp>(m_mainContext);
+    auto const fiMain         = m_framework.get_interface<FIMainApp>(m_mainContext);
     auto       &rResources    = entt::any_cast<osp::Resources&>          (m_framework.data[fiMain.di.resources]);
     rResources.resize_types(osp::ResTypeIdReg_t::size());
     m_defaultPkg = rResources.pkg_create();
@@ -87,7 +91,7 @@ void TestApp::init()
 
 void TestApp::drive_main_loop()
 {
-    auto const fiMain         = m_framework.get_interface_shorthand<FIMainApp>(m_mainContext);
+    auto const fiMain         = m_framework.get_interface<FIMainApp>(m_mainContext);
     auto       &rMainLoopCtrl = entt::any_cast<MainLoopControl&>(m_framework.data[fiMain.di.mainLoopCtrl]);
     auto       &rFWModify     = entt::any_cast<FrameworkModify&>(m_framework.data[fiMain.di.frameworkModify]);
 
@@ -183,10 +187,10 @@ void TestApp::clear_resource_owners()
 {
     using namespace osp::restypes;
 
-    // declares idResources
+    // declares mainApp.di.resources
     OSP_DECLARE_GET_DATA_IDS(m_application, TESTAPP_DATA_APPLICATION);
 
-    auto &rResources = osp::top_get<osp::Resources>(m_topData, idResources);
+    auto &rResources = osp::rFB.data_get<osp::Resources>(m_topData, mainApp.di.resources);
 
     // Texture resources contain osp::TextureImgSource, which refererence counts
     // their associated image data

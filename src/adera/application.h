@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2021 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,51 +24,42 @@
  */
 #pragma once
 
-#include "feature_interfaces.h"
-#include "testapp.h"
-
-// IWYU pragma: begin_exports
 #include <osp/framework/framework.h>
-#include <osp/framework/builder.h>
-// IWYU pragma: end_exports
 
-#include <unordered_map>
+#include <entt/core/any.hpp>
 
-namespace testapp
+#include <vector>
+
+namespace adera
 {
 
-namespace scenes
+
+
+struct MainLoopControl
 {
-    using enum EStgOptn;
-    using enum EStgCont;
-    using enum EStgIntr;
-    using enum EStgRevd;
-    using enum EStgEvnt;
-    using enum EStgFBO;
-    using enum EStgLink;
-}
-
-
-
-struct WindowAppLoopControl
-{
-    bool doResync;
-
-    bool doSync;
-
-    bool doRender;
+    bool doUpdate;
 };
 
-struct ScenarioOption
+struct AppContexts
 {
-    using Func_t = void(*)(TestApp&);
-
-    std::string_view    description;
-    Func_t              loadFunc;
+    osp::fw::ContextId main;
+    osp::fw::ContextId window;
+    osp::fw::ContextId universe;
+    osp::fw::ContextId scenes;
 };
 
-using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
+struct FrameworkModify
+{
+    struct Command
+    {
+        using Func_t = void(*)(entt::any);
+        entt::any   userData;
+        Func_t      func;
+    };
 
-ScenarioMap_t const& scenarios();
+    std::vector<Command> commands;
+};
 
-} // namespace testapp
+
+
+} // namespace adera

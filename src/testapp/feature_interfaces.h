@@ -144,9 +144,9 @@ using osp::fw::DataId;
 
 //-----------------------------------------------------------------------------
 
-
 struct FIMainApp {
     struct DataIds {
+        DataId appContexts;
         DataId resources;
         DataId mainLoopCtrl;
         DataId frameworkModify;
@@ -159,29 +159,47 @@ struct FIMainApp {
     };
 };
 
-
 //-----------------------------------------------------------------------------
 
-#define TESTAPP_DATA_SCENE 1, \
-    idDeltaTimeIn
-struct PlScene
-{
-    PipelineDef<EStgEvnt> cleanup           {"cleanup           - Scene cleanup before destruction"};
-    PipelineDef<EStgOptn> update            {"update"};
+struct FIEngineTest {
+    struct DataIds {
+        DataId bigStruct;
+    };
+
+    struct Pipelines { };
 };
 
-#define TESTAPP_DATA_COMMON_SCENE 6, \
-    idBasic, idDrawing, idDrawingRes, idActiveEntDel, idDrawEntDel, idNMesh
-struct PlCommonScene
-{
-    PipelineDef<EStgCont> activeEnt         {"activeEnt         - ACtxBasic::m_activeIds"};
-    PipelineDef<EStgOptn> activeEntResized  {"activeEntResized  - ACtxBasic::m_activeIds option to resize"};
-    PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete   - idActiveEntDel, vector of ActiveEnts that need to be deleted"};
+struct FIScene {
+    struct DataIds {
+        DataId deltaTimeIn;
+    };
 
-    PipelineDef<EStgCont> transform         {"transform         - ACtxBasic::m_transform"};
-    PipelineDef<EStgCont> hierarchy         {"hierarchy         - ACtxBasic::m_scnGraph"};
+    struct Pipelines {
+        PipelineDef<EStgEvnt> cleanup           {"cleanup           - Scene cleanup before destruction"};
+        PipelineDef<EStgOptn> update            {"update"};
+    };
 };
 
+
+struct FICommonScene {
+    struct DataIds {
+        DataId basic;
+        DataId drawing;
+        DataId drawingRes;
+        DataId activeEntDel;
+        DataId drawEntDel;
+        DataId namedMeshes;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgCont> activeEnt         {"activeEnt         - ACtxBasic::m_activeIds"};
+        PipelineDef<EStgOptn> activeEntResized  {"activeEntResized  - ACtxBasic::m_activeIds option to resize"};
+        PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete   - commonScene.di.activeEntDel, vector of ActiveEnts that need to be deleted"};
+
+        PipelineDef<EStgCont> transform         {"transform         - ACtxBasic::m_transform"};
+        PipelineDef<EStgCont> hierarchy         {"hierarchy         - ACtxBasic::m_scnGraph"};
+    };
+};
 
 #define TESTAPP_DATA_PHYSICS 3, \
     idPhys, idHierBody, idPhysIn
@@ -387,18 +405,20 @@ struct PlUniSceneFrame
 
 // Renderer sessions, tend to exist only when the window is open
 
-#define TESTAPP_DATA_WINDOW_APP 1, \
-    idUserInput
-struct PlWindowApp
-{
-    PipelineDef<EStgOptn> inputs            {"inputs"};
-    PipelineDef<EStgOptn> sync              {"sync"};
-    PipelineDef<EStgOptn> resync            {"resync"};
+struct FIWindowApp {
+    struct DataIds {
+        DataId windowAppLoopCtrl;
+        DataId userInput;
+    };
 
-    PipelineDef<EStgEvnt> cleanup           {"cleanup           - Cleanup renderer resources before destruction"};
+    struct Pipelines {
+        PipelineDef<EStgOptn> inputs            {"inputs"};
+        PipelineDef<EStgOptn> sync              {"sync"};
+        PipelineDef<EStgOptn> resync            {"resync"};
 
+        PipelineDef<EStgEvnt> cleanup           {"cleanup           - Cleanup renderer resources before destruction"};
+    };
 };
-
 
 
 #define TESTAPP_DATA_SCENE_RENDERER 2, \
@@ -433,17 +453,20 @@ struct PlSceneRenderer
 
 
 
-#define TESTAPP_DATA_MAGNUM 2, \
-    idActiveApp, idRenderGl
-struct PlMagnum
-{
-    PipelineDef<EStgCont> meshGL            {"meshGL"};
-    PipelineDef<EStgCont> textureGL         {"textureGL"};
+struct FIMagnum {
+    struct DataIds {
+        DataId magnumApp;
+        DataId renderGl;
+    };
 
-    PipelineDef<EStgCont> entMeshGL         {"entMeshGL"};
-    PipelineDef<EStgCont> entTextureGL      {"entTextureGL"};
+    struct Pipelines {
+        PipelineDef<EStgCont> meshGL            {"meshGL"};
+        PipelineDef<EStgCont> textureGL         {"textureGL"};
+
+        PipelineDef<EStgCont> entMeshGL         {"entMeshGL"};
+        PipelineDef<EStgCont> entTextureGL      {"entTextureGL"};
+    };
 };
-
 
 
 #define TESTAPP_DATA_MAGNUM_SCENE 3, \

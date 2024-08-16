@@ -115,8 +115,6 @@ struct filter_parameter_pack<Stuple<>, PRED_T, OUT_T>
 
 
 
-
-
 template <typename CALLABLE_T>
 struct as_function_ptr { };
 
@@ -191,7 +189,6 @@ inline void notused()
 
 using ContextId         = StrongId<std::uint32_t, struct DummyForContextId>;
 
-
 /**
  * @brief (Feature Interface) Type Id
  */
@@ -222,6 +219,7 @@ concept CFeatureInterfaceDef = requires{ typename T::DataIds; typename T::Pipeli
 
 struct FITypeInfo
 {
+    std::string                  name;
     std::size_t                  dataCount;
     std::vector<PipelineDefInfo> pipelines;
 };
@@ -269,17 +267,23 @@ private:
     template<CFeatureInterfaceDef FI_T>
     [[nodiscard]] static FITypeId register_fi() noexcept
     {
-        typename FI_T::Pipelines const pl;
-        auto const members = arrayCast<PipelineDefBlank_t const>(  arrayCast<std::byte const>( arrayView(&pl, 1) )  );
-
         std::vector<PipelineDefInfo> info;
-        info.reserve(members.size());
-        for (PipelineDefBlank_t const& plDef : members)
+        if constexpr ( ! std::is_empty_v<typename FI_T::Pipelines> )
         {
-            info.push_back(PipelineDefInfo{.name = plDef.m_name, .type = plDef.m_type});
+            typename FI_T::Pipelines const pl; // default-init sets names and stuff
+            auto const members = arrayCast<PipelineDefBlank_t const>(  arrayCast<std::byte const>( arrayView(&pl, 1) )  );
+
+            info.reserve(members.size());
+            for (PipelineDefBlank_t const& plDef : members)
+            {
+                info.push_back(PipelineDefInfo{.name = plDef.m_name, .type = plDef.m_type});
+            }
         }
+        // else, (typename FI_T::Pipelines) is an empty struct. sizeof(EmptyStruct) is one byte,
+        // not zero, which confuses arrayCast.
 
         return instance().register_type({
+                .name      = std::string{entt::type_id<FI_T>().name()},
                 .dataCount = sizeof(typename FI_T::DataIds) / sizeof(DataId),
                 .pipelines = std::move(info) });
     }
@@ -319,19 +323,8 @@ struct FeatureSession
 
 struct FeatureContext
 {
+    // a type?
     KeyedVec<FITypeId, FIInstanceId> finterSlots;
-};
-
-struct FrameworkModify
-{
-    struct Command
-    {
-        using Func_t = void(*)(entt::any);
-        entt::any   userData;
-        Func_t      func;
-    };
-
-    std::vector<Command> commands;
 };
 
 struct Framework
@@ -357,7 +350,7 @@ struct Framework
     }
 
     template<CFeatureInterfaceDef FI_T, typename TAG_T = void>
-    [[nodiscard]] FInterfaceShorthand<FI_T, TAG_T> get_interface_shorthand(ContextId ctx) noexcept
+    [[nodiscard]] FInterfaceShorthand<FI_T, TAG_T> get_interface(ContextId ctx) noexcept
     {
         FIInstanceId const fiId = get_interface_id<FI_T>(ctx);
         FInterfaceShorthand<FI_T, TAG_T> out { .id = fiId, .ctx = ctx };
@@ -365,16 +358,22 @@ struct Framework
         if (fiId.has_value())
         {
             FeatureInterface const &rInterface = fiinstData[fiId];
-            auto const plMembers = arrayCast<PipelineDefBlank_t>(  arrayCast<std::byte>( arrayView(&out.pl, 1) )  );
-            for (std::size_t i = 0; i < plMembers.size(); ++i)
+            if constexpr ( ! std::is_empty_v<typename FI_T::Pipelines> )
             {
-                plMembers[i].m_value = rInterface.pipelines[i];
+                auto const plMembers = arrayCast<PipelineDefBlank_t>(  arrayCast<std::byte>( arrayView(&out.pl, 1) )  );
+                for (std::size_t i = 0; i < plMembers.size(); ++i)
+                {
+                    plMembers[i].m_value = rInterface.pipelines[i];
+                }
             }
 
-            auto const diMembers = arrayCast<DataId>(  arrayCast<std::byte>( arrayView(&out.di, 1) )  );
-            for (std::size_t i = 0; i < diMembers.size(); ++i)
+            if constexpr ( ! std::is_empty_v<typename FI_T::DataIds> )
             {
-                diMembers[i] = rInterface.data[i];
+                auto const diMembers = arrayCast<DataId>(  arrayCast<std::byte>( arrayView(&out.di, 1) )  );
+                for (std::size_t i = 0; i < diMembers.size(); ++i)
+                {
+                    diMembers[i] = rInterface.data[i];
+                }
             }
         }
 

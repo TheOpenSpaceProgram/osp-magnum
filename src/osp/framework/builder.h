@@ -159,60 +159,60 @@ struct TaskRef
 
     TaskRef& name(std::string_view debugName)
     {
-        rFramework.taskImpl.resize(rFramework.tasks.m_taskIds.capacity());
-        rFramework.taskImpl[taskId].debugName = debugName;
+        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
+        m_rFW.taskImpl[taskId].debugName = debugName;
         return *this;
     }
 
     TaskRef& args(std::initializer_list<DataId> args)
     {
-        rFramework.taskImpl.resize(rFramework.tasks.m_taskIds.capacity());
-        rFramework.taskImpl[taskId].args = args;
+        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
+        m_rFW.taskImpl[taskId].args = args;
         return *this;
     }
 
     TaskRef& run_on(TplPipelineStage const tpl) noexcept
     {
-        rFramework.tasks.m_taskRunOn.resize(rFramework.tasks.m_taskIds.capacity());
-        rFramework.tasks.m_taskRunOn[taskId] = tpl;
+        m_rFW.tasks.m_taskRunOn.resize(m_rFW.tasks.m_taskIds.capacity());
+        m_rFW.tasks.m_taskRunOn[taskId] = tpl;
 
         return *this;
     }
 
     TaskRef& schedules(TplPipelineStage const tpl) noexcept
     {
-        rFramework.tasks.m_pipelineControl[tpl.pipeline].scheduler = taskId;
+        m_rFW.tasks.m_pipelineControl[tpl.pipeline].scheduler = taskId;
 
         return run_on(tpl);
     }
 
     TaskRef& sync_with(ArrayView<TplPipelineStage const> const specs) noexcept
     {
-        return add_edges(rFramework.tasks.m_syncWith, specs);
+        return add_edges(m_rFW.tasks.m_syncWith, specs);
     }
 
     TaskRef& sync_with(std::initializer_list<TplPipelineStage const> specs) noexcept
     {
-        return add_edges(rFramework.tasks.m_syncWith, specs);
+        return add_edges(m_rFW.tasks.m_syncWith, specs);
     }
 
     template<typename FUNC_T>
     TaskRef& func(FUNC_T&& funcArg)
     {
-        rFramework.taskImpl.resize(rFramework.tasks.m_taskIds.capacity());
-        rFramework.taskImpl[taskId].func = as_task_impl_v<FUNC_T>;
+        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
+        m_rFW.taskImpl[taskId].func = as_task_impl_v<FUNC_T>;
         return *this;
     }
 
     TaskRef& func_raw(TaskImpl::Func_t func)
     {
-        rFramework.taskImpl.resize(rFramework.tasks.m_taskIds.capacity());
-        rFramework.taskImpl[taskId].func = func;
+        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
+        m_rFW.taskImpl[taskId].func = func;
         return *this;
     }
 
     TaskId          taskId;
-    Framework       &rFramework;
+    Framework       &m_rFW;
 
 }; // struct TaskRef
 
@@ -227,21 +227,21 @@ struct PipelineRef
 
     PipelineRef& parent(PipelineId const parent)
     {
-        rFramework.tasks.m_pipelineParents[pipelineId] = parent;
+        m_rFW.tasks.m_pipelineParents[pipelineId] = parent;
         return static_cast<PipelineRef&>(*this);
     }
 
     PipelineRef& parent_with_schedule(PipelineId const parent)
     {
-        rFramework.tasks.m_pipelineParents[pipelineId] = parent;
+        m_rFW.tasks.m_pipelineParents[pipelineId] = parent;
 
         constexpr ENUM_T const scheduleStage = stage_schedule(ENUM_T{0});
         static_assert(scheduleStage != lgrn::id_null<ENUM_T>(), "Pipeline type has no schedule stage");
 
-        TaskId const scheduler = rFramework.tasks.m_pipelineControl[parent].scheduler;
+        TaskId const scheduler = m_rFW.tasks.m_pipelineControl[parent].scheduler;
         LGRN_ASSERTM(scheduler != lgrn::id_null<TaskId>(), "Parent Pipeline has no scheduler task");
 
-        rFramework.tasks.m_syncWith.push_back({
+        m_rFW.tasks.m_syncWith.push_back({
             .task     = scheduler,
             .pipeline = pipelineId,
             .stage    = StageId(scheduleStage)
@@ -252,18 +252,18 @@ struct PipelineRef
 
     PipelineRef& loops(bool const loop)
     {
-        rFramework.tasks.m_pipelineControl[pipelineId].isLoopScope = loop;
+        m_rFW.tasks.m_pipelineControl[pipelineId].isLoopScope = loop;
         return *this;
     }
 
     PipelineRef& wait_for_signal(ENUM_T stage)
     {
-        rFramework.tasks.m_pipelineControl[pipelineId].waitStage = StageId(stage);
+        m_rFW.tasks.m_pipelineControl[pipelineId].waitStage = StageId(stage);
         return *this;
     }
 
     PipelineId      pipelineId;
-    Framework       &rFramework;
+    Framework       &m_rFW;
 
 }; // struct TaskRef
 
@@ -276,32 +276,47 @@ struct FeatureBuilder
 {
     TaskRef task()
     {
-        TaskId const taskId = rFramework.tasks.m_taskIds.create();
-        rFramework.taskImpl.resize(rFramework.tasks.m_taskIds.capacity());
+        TaskId const taskId = m_rFW.tasks.m_taskIds.create();
+        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
         rSession.tasks.push_back(taskId);
         return task(taskId);
     };
 
     [[nodiscard]] constexpr TaskRef task(TaskId const taskId) noexcept
     {
-        return { taskId, rFramework };
+        return { taskId, m_rFW };
     }
 
     [[nodiscard]] entt::any& data(DataId const dataId) noexcept
     {
-        return rFramework.data[dataId];
+        return m_rFW.data[dataId];
+    }
+
+    template<typename T>
+    [[nodiscard]] T& data_get(DataId const dataId) noexcept
+    {
+        return entt::any_cast<T&>(m_rFW.data[dataId]);
+    }
+
+    template<typename T, typename ... ARGS_T>
+    T& data_emplace(DataId const dataId, ARGS_T &&...args) noexcept
+    {
+        entt::any &rData = m_rFW.data[dataId];
+        rData.emplace<T>(std::forward<ARGS_T>(args) ...);
+        return entt::any_cast<T&>(rData);
     }
 
     template <typename ENUM_T>
     [[nodiscard]] constexpr PipelineRef<ENUM_T> pipeline(PipelineDef<ENUM_T> pipelineDef) noexcept
     {
-        return PipelineRef<ENUM_T>{ pipelineDef.m_value, rFramework };
+        return PipelineRef<ENUM_T>{ pipelineDef.m_value, m_rFW };
     }
 
-    Framework       &rFramework;
+    Framework       &m_rFW;
     FeatureSession  &rSession;
     FSessionId      sessionId;
     ContextId       ctx;
+    ArrayView<ContextId const> ctxScope;
 };
 
 
@@ -318,6 +333,7 @@ struct FeatureDef
         bool                optional;
     };
 
+    std::string_view name;
     SetupFunc_t func;
     std::initializer_list<FIRelationship> relationships;
 };
@@ -386,57 +402,55 @@ inline std::initializer_list<FeatureDef::FIRelationship> relations_from_params(S
 
 //-----------------------------------------------------------------------------
 
-// determine what gets passed into the feature def setup function
-//
-// auto const ftrExample = feature_def( /* SETUP FUNCTION */
-//         [] (FeatureBuilder& a, Implement<FIFoo> foo, DependOn<FIBar> bar)
-// {
-//     std::cout << "ho!\n";
-// });ContextId
-//
-// The real setup function is `using SetupFunc_t = void(*)(FeatureBuilder&)` and can't really
-// support the Implement/DependOn stuff directly. So here, we create a new function using template
-// magic that fits the SetupFunc_t signature and does logic to fill the Implement/DependOn args.
-//
-// After extracting function arg types, the example will end up being called like:
-//
-// func( call_setup_args_aux< FeatureBuilder& >(rBuilder),
-//       call_setup_args_aux< Implement<FIFoo> >(rBuilder),
-//       call_setup_args_aux< DependOn<FIBar> >(rBuilder) )
-//
-//
 template<typename T>
 struct Tag { };
 
 template<typename T>
-inline int call_setup_args_aux(Tag<T>, FeatureBuilder &rBuilder, entt::any const&)
+inline int call_setup_args_aux(Tag<T>, FeatureBuilder &rFB, entt::any const&)
 {
     static_assert("unsupported type");
     return 0xdeadbeef;
 }
 
-inline FeatureBuilder& call_setup_args_aux(Tag<FeatureBuilder&>, FeatureBuilder &rBuilder, entt::any const&)
+inline FeatureBuilder& call_setup_args_aux(Tag<FeatureBuilder&>, FeatureBuilder &rFB, entt::any const&)
 {
-    return rBuilder;
+    return rFB;
 }
 
-inline entt::any call_setup_args_aux(Tag<entt::any>, FeatureBuilder &rBuilder, entt::any const& setupData)
+inline entt::any call_setup_args_aux(Tag<entt::any>, FeatureBuilder &rFB, entt::any setupData)
 {
-    return std::move(setupData);
+    return setupData;
 }
 
-template<typename FI_T, typename TAG_T>
-inline FInterfaceShorthand<FI_T, TAG_T> call_setup_args_aux(Tag< FInterfaceShorthand<FI_T, TAG_T> >, FeatureBuilder &rFB, entt::any const&)
+template<typename FI_T>
+inline Implement<FI_T> call_setup_args_aux(Tag< Implement<FI_T> >, FeatureBuilder &rFB, entt::any const&)
 {
-    FInterfaceShorthand<FI_T, TAG_T> out = rFB.rFramework.get_interface_shorthand<FI_T, TAG_T>(rFB.ctx);
+    Implement<FI_T>  out = rFB.m_rFW.get_interface<FI_T, TagImplement>(rFB.ctx);
     LGRN_ASSERTM(out.id.has_value(), "this must have been added by feature_def(...) add_feature(...)");
+    return out;
+}
+
+template<typename FI_T>
+inline DependOn<FI_T> call_setup_args_aux(Tag< DependOn<FI_T> >, FeatureBuilder &rFB, entt::any const&)
+{
+    DependOn<FI_T> out = rFB.m_rFW.get_interface<FI_T, TagDependOn>(rFB.ctx);
+
+    for (ContextId const ctxId : rFB.ctxScope)
+    {
+        if (out.id.has_value())
+        {
+            return out;
+        }
+
+        out = rFB.m_rFW.get_interface<FI_T, TagDependOn>(ctxId);
+    }
     return out;
 }
 
 template<typename FUNC_T, typename ... FUNC_ARG_T>
 constexpr FeatureDef::SetupFunc_t make_setup_func(FUNC_T, Stuple<FUNC_ARG_T...>)
 {
-    return [] (FeatureBuilder& a, entt::any setupData) noexcept -> void
+    return [] (FeatureBuilder& rFB, entt::any setupData) noexcept -> void
     {
         // look through ParamsFiltered_t
         // make arguments?
@@ -444,7 +458,7 @@ constexpr FeatureDef::SetupFunc_t make_setup_func(FUNC_T, Stuple<FUNC_ARG_T...>)
         // call FUNC_T
         FUNC_T hey;
 
-        hey(call_setup_args_aux(Tag<FUNC_ARG_T>{}, a, setupData) ...);
+        hey(call_setup_args_aux(Tag<FUNC_ARG_T>{}, rFB, setupData) ...);
     };
 };
 
@@ -460,13 +474,14 @@ constexpr FeatureDef::SetupFunc_t make_setup_func(FUNC_T, Stuple<FUNC_ARG_T...>)
  * @return
  */
 template<CStatelessLambda FUNC_T>
-FeatureDef feature_def(FUNC_T func)
+FeatureDef feature_def(std::string_view const name, FUNC_T func)
 {
     using FuncPtr_t        = as_function_ptr_t<FUNC_T>;
     using Params_t         = stuple_from_func_params<FuncPtr_t>;
     using ParamsFiltered_t = typename filter_parameter_pack<Params_t, is_setup_arg>::value;
 
-    return { .func          = make_setup_func(func, Params_t{}),
+    return { .name          = name,
+             .func          = make_setup_func(func, Params_t{}),
              .relationships = relations_from_params(ParamsFiltered_t{}) };
 }
 
@@ -478,16 +493,33 @@ struct ContextBuilder
 {
     struct ErrDependencyNotFound
     {
-
+        std::string_view whileAdding;
+        std::string_view requiredFI;
     };
 
     struct ErrAlreadyImplemented
     {
-
+        std::string_view whileAdding;
+        std::string_view alreadyImplFI;
     };
 
-
     using Error_t = std::variant<ErrDependencyNotFound, ErrAlreadyImplemented>;
+
+    FIInstanceId find_dependency(FITypeId type)
+    {
+        FIInstanceId out = m_rFW.get_interface_id(type, m_ctx);
+
+        for (ContextId const ctxId : m_ctxScope)
+        {
+            if (out.has_value())
+            {
+                return out;
+            }
+
+            out = m_rFW.get_interface_id(type, ctxId);
+        }
+        return out;
+    }
 
 
     /**
@@ -499,28 +531,14 @@ struct ContextBuilder
     {
         FeatureSession fsession;
 
-        m_fw.resize_ctx();
+        m_rFW.resize_ctx();
 
-        ContextId const mainCtx = m_contexts.front();
-        FeatureContext &rCtx    = m_fw.contextData[mainCtx];
-
-        auto const find_dependency = [this] (FITypeId type) -> FIInstanceId
-        {
-            for (ContextId const ctxId : m_contexts)
-            {
-                FeatureContext &rCtx    = m_fw.contextData[ctxId];
-                FIInstanceId   &rFInter = rCtx.finterSlots[type];
-
-                if (rFInter.has_value())
-                {
-                    return rFInter;
-                }
-            }
-            return {};
-        };
+        FeatureContext &rCtx = m_rFW.contextData[m_ctx];
 
         for (FeatureDef::FIRelationship const& relation : def.relationships)
         {
+            FITypeInfo const& subjectInfo = m_rInfo.info_for(relation.subject);
+
             if (relation.type == FeatureDef::ERelationType::DependOn)
             {
                 FIInstanceId const found = find_dependency(relation.subject);
@@ -532,7 +550,10 @@ struct ContextBuilder
                 else
                 {
                     // Not found, ERROR!
-                    m_errors.push_back(ErrDependencyNotFound{});
+                    m_errors.push_back(ErrDependencyNotFound{
+                        .whileAdding = def.name,
+                        .requiredFI  = subjectInfo.name
+                    });
                 }
             }
             else if (relation.type == FeatureDef::ERelationType::Implement)
@@ -542,37 +563,38 @@ struct ContextBuilder
                 if (rFInter.has_value())
                 {
                     // Already exists, error
-                    m_errors.push_back(ErrAlreadyImplemented{});
+                    m_errors.push_back(ErrAlreadyImplemented{
+                        .whileAdding   = def.name,
+                        .alreadyImplFI = subjectInfo.name
+                    });
                 }
                 else
                 {
-                    FITypeInfo const& subjectInfo = m_rInfo.info_for(relation.subject);
+                    rFInter = m_rFW.fiinstIds.create();
+                    m_rFW.fiinstData.resize(m_rFW.fiinstIds.capacity());
+                    FeatureInterface &rFI = m_rFW.fiinstData[rFInter];
 
-                    rFInter = m_fw.fiinstIds.create();
-                    m_fw.fiinstData.resize(m_fw.fiinstIds.capacity());
-                    FeatureInterface &rFI = m_fw.fiinstData[rFInter];
-
-                    rFI.context = mainCtx;
+                    rFI.context = m_ctx;
                     rFI.type    = relation.subject;
                     rFI.data     .resize(subjectInfo.dataCount);
                     rFI.pipelines.resize(subjectInfo.pipelines.size());
 
-                    m_fw.dataIds.create(rFI.data.begin(), rFI.data.end());
-                    auto const dataCapacity = m_fw.dataIds.capacity();
-                    m_fw.data.resize(dataCapacity);
+                    m_rFW.dataIds.create(rFI.data.begin(), rFI.data.end());
+                    auto const dataCapacity = m_rFW.dataIds.capacity();
+                    m_rFW.data.resize(dataCapacity);
 
-                    m_fw.tasks.m_pipelineIds.create(rFI.pipelines.begin(), rFI.pipelines.end());
+                    m_rFW.tasks.m_pipelineIds.create(rFI.pipelines.begin(), rFI.pipelines.end());
 
-                    auto const pipelineCapacity = m_fw.tasks.m_pipelineIds.capacity();
-                    m_fw.tasks.m_pipelineInfo   .resize(pipelineCapacity);
-                    m_fw.tasks.m_pipelineControl.resize(pipelineCapacity);
-                    m_fw.tasks.m_pipelineParents.resize(pipelineCapacity, lgrn::id_null<PipelineId>());
+                    auto const pipelineCapacity = m_rFW.tasks.m_pipelineIds.capacity();
+                    m_rFW.tasks.m_pipelineInfo   .resize(pipelineCapacity);
+                    m_rFW.tasks.m_pipelineControl.resize(pipelineCapacity);
+                    m_rFW.tasks.m_pipelineParents.resize(pipelineCapacity, lgrn::id_null<PipelineId>());
 
                     for (std::size_t i = 0; i < subjectInfo.pipelines.size(); ++i)
                     {
                         PipelineId const plId = rFI.pipelines[i];
-                        m_fw.tasks.m_pipelineInfo[plId].stageType = subjectInfo.pipelines[i].type;
-                        m_fw.tasks.m_pipelineInfo[plId].name      = subjectInfo.pipelines[i].name;
+                        m_rFW.tasks.m_pipelineInfo[plId].stageType = subjectInfo.pipelines[i].type;
+                        m_rFW.tasks.m_pipelineInfo[plId].name      = subjectInfo.pipelines[i].name;
                     }
 
                     fsession.finterImplements.push_back(rFInter);
@@ -586,10 +608,11 @@ struct ContextBuilder
         }
 
         FeatureBuilder frog{
-            .rFramework = m_fw,
+            .m_rFW = m_rFW,
             .rSession = fsession,
             .sessionId = {},
-            .ctx = mainCtx };
+            .ctx = m_ctx,
+            .ctxScope = arrayView<ContextId const>(m_ctxScope) };
 
         def.func(frog, std::move(setupData));
     }
@@ -602,9 +625,10 @@ struct ContextBuilder
 
 
     std::vector<Error_t>    m_errors;
-    std::vector<ContextId>  m_contexts;
+    std::vector<ContextId>  m_ctxScope;
+    ContextId               m_ctx;
     FITypeInfoRegistry      &m_rInfo = FITypeInfoRegistry::instance();
-    Framework               &m_fw;
+    Framework               &m_rFW;
 
 };
 
@@ -613,7 +637,7 @@ struct FrameworkBuilder
 
 
 
-    Framework &m_fw;
+    Framework &m_rFW;
 };
 
 } // namespace osp::fw
