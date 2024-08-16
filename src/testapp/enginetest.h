@@ -26,7 +26,7 @@
 
 #include "MagnumApplication.h"
 
-#include <osp/drawing_gl/rendergl.h>
+#include <osp_drawing_gl/rendergl.h>
 
 namespace testapp::enginetest
 {

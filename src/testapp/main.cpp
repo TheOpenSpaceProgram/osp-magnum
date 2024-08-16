@@ -24,7 +24,7 @@
  */
 
 #include "Magnum/GL/DefaultFramebuffer.h"
-#include "osp/drawing_gl/rendergl.h"
+#include "osp_drawing_gl/rendergl.h"
 
 #include "testapp.h"
 #include "scenarios.h"

@@ -1,4 +1,3 @@
-#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2022 Open Space Program Project
@@ -34,70 +33,27 @@
 namespace testapp::scenes
 {
 
-osp::Session setup_magnum(
-        osp::TopTaskBuilder&            rBuilder,
-        osp::ArrayView<entt::any>       topData,
-        osp::Session const&             application,
-        osp::Session const&             windowApp,
-        MagnumApplication::Arguments    args);
+extern osp::fw::FeatureDef const ftrMagnum;
 
 /**
  * @brief stuff needed to render a scene using Magnum
  */
-osp::Session setup_magnum_scene(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         magnum,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene);
+extern osp::fw::FeatureDef const ftrMagnumScene;
 
 /**
  * @brief Magnum MeshVisualizer shader and optional material for drawing ActiveEnts with it
  */
-osp::Session setup_shader_visualizer(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         magnum,
-        osp::Session const&         magnumScene,
-        osp::draw::MaterialId       materialId = lgrn::id_null<osp::draw::MaterialId>());
+extern osp::fw::FeatureDef const ftrShaderVisualizer;
 
 /**
  * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
  */
-osp::Session setup_shader_flat(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         magnum,
-        osp::Session const&         magnumScene,
-        osp::draw::MaterialId       materialId = lgrn::id_null<osp::draw::MaterialId>());
+extern osp::fw::FeatureDef const ftrShaderFlat;
 
 /**
  * @brief Magnum Phong shader and optional material for drawing ActiveEnts with it
  */
-osp::Session setup_shader_phong(
-        osp::TopTaskBuilder&        rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         magnum,
-        osp::Session const&         magnumScene,
-        osp::draw::MaterialId       materialId = lgrn::id_null<osp::draw::MaterialId>());
+extern osp::fw::FeatureDef const ftrShaderPhong;
 
-
-osp::Session setup_terrain_draw_magnum(
-        osp::TopTaskBuilder         &rBuilder,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session          const &windowApp,
-        osp::Session          const &sceneRenderer,
-        osp::Session          const &magnum,
-        osp::Session          const &magnumScene,
-        osp::Session          const &terrain);
+extern osp::fw::FeatureDef const ftrShaderDrawMagnum;
 }
-#endif

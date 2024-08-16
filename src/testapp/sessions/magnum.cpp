@@ -1,4 +1,3 @@
-#if 0
 /**
  * Open Space Program
  * Copyright © 2019-2022 Open Space Program Project
@@ -34,12 +33,12 @@
 #include <Magnum/GL/Renderer.h>
 
 #include <adera/drawing/CameraController.h>
-#include <adera/drawing_gl/flat_shader.h>
-#include <adera/drawing_gl/phong_shader.h>
-#include <adera/drawing_gl/visualizer_shader.h>
+#include <adera_drawing_gl/flat_shader.h>
+#include <adera_drawing_gl/phong_shader.h>
+#include <adera_drawing_gl/visualizer_shader.h>
 #include <osp/activescene/basic_fn.h>
 #include <osp/drawing/drawing.h>
-#include <osp/drawing_gl/rendergl.h>
+#include <osp_drawing_gl/rendergl.h>
 #include <osp/universe/coordinates.h>
 #include <osp/universe/universe.h>
 
@@ -55,6 +54,7 @@ using namespace adera::shader;
 using namespace osp::active;
 using namespace osp::draw;
 using namespace osp::universe;
+using namespace osp::fw;
 using namespace osp;
 
 using osp::input::UserInputHandler;
@@ -65,54 +65,44 @@ namespace testapp::scenes
 {
 
 
-Session setup_magnum(
-        TopTaskBuilder&                 rBuilder,
-        ArrayView<entt::any> const      topData,
-        Session const&                  application,
-        Session const&                  windowApp,
-        MagnumApplication::Arguments    args)
+FeatureDef const ftrMagnum = feature_def("Magnum", [] (
+        FeatureBuilder& rFB, Implement<FIMagnum> magnum, DependOn<FIWindowApp> windowApp,
+        DependOn<FIMainApp> mainApp, entt::any data)
 {
-    OSP_DECLARE_GET_DATA_IDS(application, TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(windowApp,   TESTAPP_DATA_WINDOW_APP);
-    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
-
-    auto& rUserInput = top_get<UserInputHandler>(topData, idUserInput);
+    auto& rUserInput = rFB.data_get<UserInputHandler>(windowApp.di.userInput);
     config_controls(rUserInput);
 
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM);
-    auto const tgMgn = out.create_pipelines<PlMagnum>(rBuilder);
+    rFB.pipeline(magnum.pl.meshGL)         .parent(windowApp.pl.sync);
+    rFB.pipeline(magnum.pl.textureGL)      .parent(windowApp.pl.sync);
+    rFB.pipeline(magnum.pl.entMeshGL)      .parent(windowApp.pl.sync);
+    rFB.pipeline(magnum.pl.entTextureGL)   .parent(windowApp.pl.sync);
 
-    rBuilder.pipeline(tgMgn.meshGL)         .parent(tgWin.sync);
-    rBuilder.pipeline(tgMgn.textureGL)      .parent(tgWin.sync);
-    rBuilder.pipeline(tgMgn.entMeshGL)      .parent(tgWin.sync);
-    rBuilder.pipeline(tgMgn.entTextureGL)   .parent(tgWin.sync);
+    auto const& args = entt::any_cast<MagnumApplication::Arguments>(data);
 
     // Order-dependent; MagnumApplication construction starts OpenGL context, needed by RenderGL
-    /* unused */      top_emplace<MagnumApplication>(topData, idActiveApp, args, rUserInput);
-    auto &rRenderGl = top_emplace<RenderGL>         (topData, idRenderGl);
+    /* not used here */   rFB.data_emplace<MagnumApplication>(magnum.di.magnumApp, args, rUserInput);
+    auto &rRenderGl     = rFB.data_emplace<RenderGL>         (magnum.di.renderGl);
 
     SysRenderGL::setup_context(rRenderGl);
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Clean up Magnum renderer")
-        .run_on     ({tgWin.cleanup(Run_)})
-        .push_to    (out.m_tasks)
-        .args       ({      idResources,          idRenderGl})
+        .run_on     ({windowApp.pl.cleanup(Run_)})
+        .args       ({      mainApp.di.resources,          magnum.di.renderGl})
         .func([] (Resources& rResources, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::clear_resource_owners(rRenderGl, rResources);
         rRenderGl = {}; // Needs the OpenGL thread for destruction
     });
 
-    return out;
-} // setup_magnum
+}); // ftrMagnum
 
 
 
+#if 0
 
 Session setup_magnum_scene(
-        TopTaskBuilder&             rBuilder,
+        TopTaskBuilder&             rFB,
         ArrayView<entt::any> const  topData,
         Session const&              application,
         Session const&              windowApp,
@@ -127,29 +117,29 @@ Session setup_magnum_scene(
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
 
-    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
-    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
-    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const windowApp.pl    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const magnum.pl    = magnum        .get_pipelines< PlMagnum >();
+    auto const scene.plRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
 
     Session out;
     OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_MAGNUM_SCENE);
-    auto const tgMgnScn = out.create_pipelines<PlMagnumScene>(rBuilder);
+    auto const magnum.plScn = out.create_pipelines<PlMagnumScene>(rFB);
 
-    rBuilder.pipeline(tgMgnScn.fbo)             .parent(tgScnRdr.render);
-    rBuilder.pipeline(tgMgnScn.camera)          .parent(tgScnRdr.render);
+    rFB.pipeline(magnum.plScn.fbo)             .parent(scene.plRdr.render);
+    rFB.pipeline(magnum.plScn.camera)          .parent(scene.plRdr.render);
 
-    top_emplace< ACtxSceneRenderGL >    (topData, idScnRenderGl);
-    top_emplace< RenderGroup >          (topData, idGroupFwd);
+    rFB.data_emplace< ACtxSceneRenderGL >    (topData, idScnRenderGl);
+    rFB.data_emplace< RenderGroup >          (topData, idGroupFwd);
 
-    auto &rCamera = top_emplace< Camera >(topData, idCamera);
+    auto &rCamera = rFB.data_emplace< Camera >(topData, idCamera);
 
     rCamera.m_far = 100000000.0f;
     rCamera.m_near = 1.0f;
     rCamera.m_fov = Magnum::Deg(45.0f);
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Resize ACtxSceneRenderGL (OpenGL) to fit all DrawEnts")
-        .run_on     ({tgScnRdr.drawEntResized(Run)})
+        .run_on     ({scene.plRdr.drawEntResized(Run)})
         .sync_with  ({})
         .push_to    (out.m_tasks)
         .args       ({ idScnRender, idScnRenderGl })
@@ -160,34 +150,34 @@ Session setup_magnum_scene(
         rScnRenderGl.m_meshId         .resize(capacity);
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Compile Resource Meshes to GL")
-        .run_on     ({tgScnRdr.meshResDirty(UseOrRun)})
-        .sync_with  ({tgScnRdr.mesh(Ready), tgMgn.meshGL(New), tgScnRdr.entMeshDirty(UseOrRun)})
+        .run_on     ({scene.plRdr.meshResDirty(UseOrRun)})
+        .sync_with  ({scene.plRdr.mesh(Ready), magnum.pl.meshGL(New), scene.plRdr.entMeshDirty(UseOrRun)})
         .push_to    (out.m_tasks)
-        .args       ({                 idDrawingRes,                idResources,          idRenderGl })
+        .args       ({                 commonScene.di.drawingRes,                mainApp.di.resources,          magnum.di.renderGl })
         .func([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::compile_resource_meshes(rDrawingRes, rResources, rRenderGl);
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Compile Resource Textures to GL")
-        .run_on     ({tgScnRdr.textureResDirty(UseOrRun)})
-        .sync_with  ({tgScnRdr.texture(Ready), tgMgn.textureGL(New)})
+        .run_on     ({scene.plRdr.textureResDirty(UseOrRun)})
+        .sync_with  ({scene.plRdr.texture(Ready), magnum.pl.textureGL(New)})
         .push_to    (out.m_tasks)
-        .args       ({                 idDrawingRes,                idResources,          idRenderGl })
+        .args       ({                 commonScene.di.drawingRes,                mainApp.di.resources,          magnum.di.renderGl })
         .func([] (ACtxDrawingRes const& rDrawingRes, osp::Resources& rResources, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::compile_resource_textures(rDrawingRes, rResources, rRenderGl);
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Sync GL textures to entities with scene textures")
-        .run_on     ({tgScnRdr.entTextureDirty(UseOrRun)})
-        .sync_with  ({tgScnRdr.texture(Ready), tgScnRdr.entTexture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgScnRdr.drawEntResized(Done)})
+        .run_on     ({scene.plRdr.entTextureDirty(UseOrRun)})
+        .sync_with  ({scene.plRdr.texture(Ready), scene.plRdr.entTexture(Ready), magnum.pl.textureGL(Ready), magnum.pl.entTextureGL(Modify), scene.plRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({        idDrawing,                idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
+        .args       ({        commonScene.di.drawing,                commonScene.di.drawingRes,                 idScnRender,                   idScnRenderGl,          magnum.di.renderGl })
         .func([] (ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::sync_drawent_texture(
@@ -199,12 +189,12 @@ Session setup_magnum_scene(
                 rRenderGl);
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Resync GL textures")
-        .run_on     ({tgWin.resync(Run)})
-        .sync_with  ({tgScnRdr.texture(Ready), tgMgn.textureGL(Ready), tgMgn.entTextureGL(Modify), tgScnRdr.drawEntResized(Done)})
+        .run_on     ({windowApp.pl.resync(Run)})
+        .sync_with  ({scene.plRdr.texture(Ready), magnum.pl.textureGL(Ready), magnum.pl.entTextureGL(Modify), scene.plRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({           idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
+        .args       ({           commonScene.di.drawingRes,                 idScnRender,                   idScnRenderGl,          magnum.di.renderGl })
         .func([] (ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
         for (DrawEnt const drawEnt : rScnRender.m_drawIds)
@@ -218,12 +208,12 @@ Session setup_magnum_scene(
         }
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Sync GL meshes to entities with scene meshes")
-        .run_on     ({tgScnRdr.entMeshDirty(UseOrRun)})
-        .sync_with  ({tgScnRdr.mesh(Ready), tgScnRdr.entMesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
+        .run_on     ({scene.plRdr.entMeshDirty(UseOrRun)})
+        .sync_with  ({scene.plRdr.mesh(Ready), scene.plRdr.entMesh(Ready), magnum.pl.meshGL(Ready), magnum.pl.entMeshGL(Modify), scene.plRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({           idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
+        .args       ({           commonScene.di.drawingRes,                 idScnRender,                   idScnRenderGl,          magnum.di.renderGl })
         .func([] (ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
         SysRenderGL::sync_drawent_mesh(
@@ -235,12 +225,12 @@ Session setup_magnum_scene(
                 rRenderGl);
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Resync GL meshes")
-        .run_on     ({tgWin.resync(Run)})
-        .sync_with  ({tgScnRdr.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
+        .run_on     ({windowApp.pl.resync(Run)})
+        .sync_with  ({scene.plRdr.mesh(Ready), magnum.pl.meshGL(Ready), magnum.pl.entMeshGL(Modify), scene.plRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({           idDrawingRes,                 idScnRender,                   idScnRenderGl,          idRenderGl })
+        .args       ({           commonScene.di.drawingRes,                 idScnRender,                   idScnRenderGl,          magnum.di.renderGl })
         .func([] (ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
         for (DrawEnt const drawEnt : rScnRender.m_drawIds)
@@ -254,12 +244,12 @@ Session setup_magnum_scene(
         }
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Bind and display off-screen FBO")
-        .run_on     ({tgScnRdr.render(Run)})
-        .sync_with  ({tgMgnScn.fbo(EStgFBO::Bind)})
+        .run_on     ({scene.plRdr.render(Run)})
+        .sync_with  ({magnum.plScn.fbo(EStgFBO::Bind)})
         .push_to    (out.m_tasks)
-        .args       ({              idDrawing,          idRenderGl,                   idGroupFwd,              idCamera })
+        .args       ({              commonScene.di.drawing,          magnum.di.renderGl,                   idGroupFwd,              idCamera })
         .func([] (ACtxDrawing const& rDrawing, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera) noexcept
     {
         using Magnum::GL::Framebuffer;
@@ -275,14 +265,14 @@ Session setup_magnum_scene(
                     | FramebufferClear::Stencil);
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Render Entities")
-        .run_on     ({tgScnRdr.render(Run)})
-        .sync_with  ({tgScnRdr.group(Ready), tgScnRdr.groupEnts(Ready), tgMgnScn.camera(Ready), tgScnRdr.drawTransforms(UseOrRun), tgScnRdr.entMesh(Ready), tgScnRdr.entTexture(Ready),
-                      tgMgn.entMeshGL(Ready), tgMgn.entTextureGL(Ready),
-                      tgScnRdr.drawEnt(Ready)})
+        .run_on     ({scene.plRdr.render(Run)})
+        .sync_with  ({scene.plRdr.group(Ready), scene.plRdr.groupEnts(Ready), magnum.plScn.camera(Ready), scene.plRdr.drawTransforms(UseOrRun), scene.plRdr.entMesh(Ready), scene.plRdr.entTexture(Ready),
+                      magnum.pl.entMeshGL(Ready), magnum.pl.entTextureGL(Ready),
+                      scene.plRdr.drawEnt(Ready)})
         .push_to    (out.m_tasks)
-        .args       ({            idScnRender,          idRenderGl,                   idGroupFwd,              idCamera })
+        .args       ({            idScnRender,          magnum.di.renderGl,                   idGroupFwd,              idCamera })
         .func([] (ACtxSceneRender& rScnRender, RenderGL& rRenderGl, RenderGroup const& rGroupFwd, Camera const& rCamera, WorkerContext ctx) noexcept
     {
         ViewProjMatrix viewProj{rCamera.m_transform.inverted(), rCamera.perspective()};
@@ -291,12 +281,12 @@ Session setup_magnum_scene(
         SysRenderGL::render_opaque(rGroupFwd, rScnRender.m_visible, viewProj);
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Delete entities from render groups")
-        .run_on     ({tgScnRdr.drawEntDelete(UseOrRun)})
-        .sync_with  ({tgScnRdr.groupEnts(Delete)})
+        .run_on     ({scene.plRdr.drawEntDelete(UseOrRun)})
+        .sync_with  ({scene.plRdr.groupEnts(Delete)})
         .push_to    (out.m_tasks)
-        .args       ({              idDrawing,             idGroupFwd,                 idDrawEntDel })
+        .args       ({              commonScene.di.drawing,             idGroupFwd,                 idDrawEntDel })
         .func([] (ACtxDrawing const& rDrawing, RenderGroup& rGroup, DrawEntVec_t const& rDrawEntDel) noexcept
     {
         for (DrawEnt const drawEnt : rDrawEntDel)
@@ -312,7 +302,7 @@ Session setup_magnum_scene(
 
 
 Session setup_shader_visualizer(
-        TopTaskBuilder&             rBuilder,
+        TopTaskBuilder&             rFB,
         ArrayView<entt::any> const  topData,
         Session const&              windowApp,
         Session const&              sceneRenderer,
@@ -323,18 +313,18 @@ Session setup_shader_visualizer(
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
-    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
-    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
-    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
+    auto const windowApp.pl    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const scene.plRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const magnum.pl    = magnum        .get_pipelines< PlMagnum >();
 
-    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
-    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
-    auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
+    auto &rScnRender    = rFB.data_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = rFB.data_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
+    auto &rRenderGl     = rFB.data_get< RenderGL >           (topData, magnum.di.renderGl);
 
     Session out;
     auto const [idDrawShVisual] = out.acquire_data<1>(topData);
 
-    auto &rDrawVisual = top_emplace< ACtxDrawMeshVisualizer >(topData, idDrawShVisual);
+    auto &rDrawVisual = rFB.data_emplace< ACtxDrawMeshVisualizer >(topData, idDrawShVisual);
 
     rDrawVisual.m_materialId = materialId;
     rDrawVisual.m_shader = MeshVisualizer{ MeshVisualizer::Configuration{}.setFlags(MeshVisualizer::Flag::Wireframe) };
@@ -349,10 +339,10 @@ Session setup_shader_visualizer(
         return out;
     }
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Sync MeshVisualizer shader DrawEnts")
-        .run_on     ({tgWin.sync(Run)})
-        .sync_with  ({tgScnRdr.materialDirty(UseOrRun), tgMgn.textureGL(Ready), tgScnRdr.groupEnts(Modify)})
+        .run_on     ({windowApp.pl.sync(Run)})
+        .sync_with  ({scene.plRdr.materialDirty(UseOrRun), magnum.pl.textureGL(Ready), scene.plRdr.groupEnts(Modify)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                        idDrawShVisual})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
@@ -361,10 +351,10 @@ Session setup_shader_visualizer(
         sync_drawent_visualizer(rMat.m_dirty.begin(), rMat.m_dirty.end(), rMat.m_ents, rGroupFwd.entities, rDrawShVisual);
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Resync MeshVisualizer shader DrawEnts")
-        .run_on     ({tgWin.resync(Run)})
-        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .run_on     ({windowApp.pl.resync(Run)})
+        .sync_with  ({scene.plRdr.groupEnts(Modify), scene.plRdr.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                        idDrawShVisual})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxDrawMeshVisualizer& rDrawShVisual) noexcept
@@ -383,7 +373,7 @@ Session setup_shader_visualizer(
 
 
 Session setup_shader_flat(
-        TopTaskBuilder&             rBuilder,
+        TopTaskBuilder&             rFB,
         ArrayView<entt::any> const  topData,
         Session const&              windowApp,
         Session const&              sceneRenderer,
@@ -394,18 +384,18 @@ Session setup_shader_flat(
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
-    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
-    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
-    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
+    auto const windowApp.pl    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const scene.plRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const magnum.pl    = magnum        .get_pipelines< PlMagnum >();
 
-    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
-    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
-    auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
+    auto &rScnRender    = rFB.data_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = rFB.data_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
+    auto &rRenderGl     = rFB.data_get< RenderGL >           (topData, magnum.di.renderGl);
 
     Session out;
     auto const [idDrawShFlat] = out.acquire_data<1>(topData);
 
-    auto &rDrawFlat = top_emplace< ACtxDrawFlat >(topData, idDrawShFlat);
+    auto &rDrawFlat = rFB.data_emplace< ACtxDrawFlat >(topData, idDrawShFlat);
 
     rDrawFlat.shaderDiffuse       = FlatGL3D{FlatGL3D::Configuration{}.setFlags(FlatGL3D::Flag::Textured)};
     rDrawFlat.shaderUntextured    = FlatGL3D{FlatGL3D::Configuration{}};
@@ -417,10 +407,10 @@ Session setup_shader_flat(
         return out;
     }
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Sync Flat shader DrawEnts")
-        .run_on     ({tgWin.sync(Run)})
-        .sync_with  ({tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify), tgScnRdr.materialDirty(UseOrRun)})
+        .run_on     ({windowApp.pl.sync(Run)})
+        .sync_with  ({scene.plRdr.groupEnts(Modify), scene.plRdr.group(Modify), scene.plRdr.materialDirty(UseOrRun)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,              idDrawShFlat})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawFlat& rDrawShFlat) noexcept
@@ -438,10 +428,10 @@ Session setup_shader_flat(
         });
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Resync Flat shader DrawEnts")
-        .run_on     ({tgWin.resync(Run)})
-        .sync_with  ({tgScnRdr.materialDirty(UseOrRun), tgMgn.textureGL(Ready), tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .run_on     ({windowApp.pl.resync(Run)})
+        .sync_with  ({scene.plRdr.materialDirty(UseOrRun), magnum.pl.textureGL(Ready), scene.plRdr.groupEnts(Modify), scene.plRdr.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,              idDrawShFlat})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawFlat& rDrawShFlat) noexcept
@@ -469,7 +459,7 @@ Session setup_shader_flat(
 
 
 Session setup_shader_phong(
-        TopTaskBuilder&             rBuilder,
+        TopTaskBuilder&             rFB,
         ArrayView<entt::any> const  topData,
         Session const&              windowApp,
         Session const&              sceneRenderer,
@@ -480,17 +470,17 @@ Session setup_shader_phong(
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
-    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
-    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
-    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
+    auto const windowApp.pl    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const scene.plRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const magnum.pl    = magnum        .get_pipelines< PlMagnum >();
 
-    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
-    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
-    auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
+    auto &rScnRender    = rFB.data_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = rFB.data_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
+    auto &rRenderGl     = rFB.data_get< RenderGL >           (topData, magnum.di.renderGl);
 
     Session out;
     auto const [idDrawShPhong] = out.acquire_data<1>(topData);
-    auto &rDrawPhong = top_emplace< ACtxDrawPhong >(topData, idDrawShPhong);
+    auto &rDrawPhong = rFB.data_emplace< ACtxDrawPhong >(topData, idDrawShPhong);
 
     auto const texturedFlags    = PhongGL::Flag::DiffuseTexture | PhongGL::Flag::AlphaMask | PhongGL::Flag::AmbientTexture;
     rDrawPhong.shaderDiffuse    = PhongGL{PhongGL::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
@@ -503,10 +493,10 @@ Session setup_shader_phong(
         return out;
     }
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Sync Phong shader DrawEnts")
-        .run_on     ({tgWin.sync(Run)})
-        .sync_with  ({tgScnRdr.materialDirty(UseOrRun), tgMgn.entTextureGL(Ready), tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .run_on     ({windowApp.pl.sync(Run)})
+        .sync_with  ({scene.plRdr.materialDirty(UseOrRun), magnum.pl.entTextureGL(Ready), scene.plRdr.groupEnts(Modify), scene.plRdr.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,               idDrawShPhong})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawPhong& rDrawShPhong) noexcept
@@ -524,10 +514,10 @@ Session setup_shader_phong(
         });
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Resync Phong shader DrawEnts")
-        .run_on     ({tgWin.resync(Run)})
-        .sync_with  ({tgScnRdr.materialDirty(UseOrRun), tgMgn.entTextureGL(Ready), tgScnRdr.groupEnts(Modify), tgScnRdr.group(Modify)})
+        .run_on     ({windowApp.pl.resync(Run)})
+        .sync_with  ({scene.plRdr.materialDirty(UseOrRun), magnum.pl.entTextureGL(Ready), scene.plRdr.groupEnts(Modify), scene.plRdr.group(Modify)})
         .push_to    (out.m_tasks)
         .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,               idDrawShPhong})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, ACtxDrawPhong& rDrawShPhong) noexcept
@@ -562,7 +552,7 @@ struct ACtxDrawTerrainGL
 };
 
 Session setup_terrain_draw_magnum(
-        TopTaskBuilder              &rBuilder,
+        TopTaskBuilder              &rFB,
         ArrayView<entt::any>  const topData,
         Session               const &windowApp,
         Session               const &sceneRenderer,
@@ -574,28 +564,28 @@ Session setup_terrain_draw_magnum(
     OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
     OSP_DECLARE_GET_DATA_IDS(magnum,        TESTAPP_DATA_MAGNUM);
     OSP_DECLARE_GET_DATA_IDS(terrain,       TESTAPP_DATA_TERRAIN);
-    auto const tgWin    = windowApp     .get_pipelines< PlWindowApp >();
-    auto const tgScnRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
-    auto const tgMgn    = magnum        .get_pipelines< PlMagnum >();
+    auto const windowApp.pl    = windowApp     .get_pipelines< PlWindowApp >();
+    auto const scene.plRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const magnum.pl    = magnum        .get_pipelines< PlMagnum >();
     auto const tgTrn    = terrain       .get_pipelines<PlTerrain>();
 
-    auto &rScnRender    = top_get< ACtxSceneRender >    (topData, idScnRender);
-    auto &rScnRenderGl  = top_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
-    auto &rRenderGl     = top_get< RenderGL >           (topData, idRenderGl);
+    auto &rScnRender    = rFB.data_get< ACtxSceneRender >    (topData, idScnRender);
+    auto &rScnRenderGl  = rFB.data_get< ACtxSceneRenderGL >  (topData, idScnRenderGl);
+    auto &rRenderGl     = rFB.data_get< RenderGL >           (topData, magnum.di.renderGl);
 
     Session out;
     auto const [idDrawTerrainGl] = out.acquire_data<1>(topData);
-    auto &rDrawTerrainGl = top_emplace< ACtxDrawTerrainGL >(topData, idDrawTerrainGl);
+    auto &rDrawTerrainGl = rFB.data_emplace< ACtxDrawTerrainGL >(topData, idDrawTerrainGl);
 
     rDrawTerrainGl.terrainMeshGl = rRenderGl.m_meshIds.create();
     rRenderGl.m_meshGl.emplace(rDrawTerrainGl.terrainMeshGl, Magnum::GL::Mesh{Corrade::NoCreate});
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Sync terrainMeshGl to entities with terrainMesh")
-        .run_on     ({tgScnRdr.entMeshDirty(UseOrRun)})
-        .sync_with  ({tgScnRdr.mesh(Ready), tgScnRdr.entMesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
+        .run_on     ({scene.plRdr.entMeshDirty(UseOrRun)})
+        .sync_with  ({scene.plRdr.mesh(Ready), scene.plRdr.entMesh(Ready), magnum.pl.meshGL(Ready), magnum.pl.entMeshGL(Modify), scene.plRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({              idDrawTerrainGl,             idTerrain,      idScnRender,                   idScnRenderGl,          idRenderGl })
+        .args       ({              idDrawTerrainGl,             idTerrain,      idScnRender,                   idScnRenderGl,          magnum.di.renderGl })
         .func([] (ACtxDrawTerrainGL& rDrawTerrainGl, ACtxTerrain& rTerrain, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
         for (DrawEnt const drawEnt : rScnRender.m_meshDirty)
@@ -612,12 +602,12 @@ Session setup_terrain_draw_magnum(
         }
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Resync terrainMeshGl to entities with terrainMesh")
-        .run_on     ({tgWin.resync(Run)})
-        .sync_with  ({tgScnRdr.mesh(Ready), tgMgn.meshGL(Ready), tgMgn.entMeshGL(Modify), tgScnRdr.drawEntResized(Done)})
+        .run_on     ({windowApp.pl.resync(Run)})
+        .sync_with  ({scene.plRdr.mesh(Ready), magnum.pl.meshGL(Ready), magnum.pl.entMeshGL(Modify), scene.plRdr.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({              idDrawTerrainGl,             idTerrain,                 idScnRender,              idScnRenderGl,          idRenderGl })
+        .args       ({              idDrawTerrainGl,             idTerrain,                 idScnRender,              idScnRenderGl,          magnum.di.renderGl })
         .func([] (ACtxDrawTerrainGL& rDrawTerrainGl, ACtxTerrain& rTerrain, ACtxSceneRender& rScnRender, ACtxSceneRenderGL& rScnRenderGl, RenderGL& rRenderGl) noexcept
     {
         for (DrawEnt const drawEnt : rScnRender.m_drawIds)
@@ -633,12 +623,12 @@ Session setup_terrain_draw_magnum(
         }
     });
 
-    rBuilder.task()
+    rFB.task()
         .name       ("Update terrain mesh GPU buffer data")
-        .run_on     ({tgWin.sync(Run)})
+        .run_on     ({windowApp.pl.sync(Run)})
         .sync_with  ({tgTrn.chunkMesh(Ready)})
         .push_to    (out.m_tasks)
-        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,          idRenderGl,                   idDrawTerrainGl,            idTerrain})
+        .args       ({            idScnRender,             idGroupFwd,                         idScnRenderGl,          magnum.di.renderGl,                   idDrawTerrainGl,            idTerrain})
         .func([] (ACtxSceneRender& rScnRender, RenderGroup& rGroupFwd, ACtxSceneRenderGL const& rScnRenderGl, RenderGL& rRenderGl, ACtxDrawTerrainGL& rDrawTerrainGl, ACtxTerrain& rTerrain) noexcept
     {
         if ( ! rDrawTerrainGl.enabled )
@@ -679,6 +669,7 @@ Session setup_terrain_draw_magnum(
 
     return out;
 } // setup_terrain_draw_magnum
+#endif
 
 } // namespace testapp::scenes
-#endif
+
