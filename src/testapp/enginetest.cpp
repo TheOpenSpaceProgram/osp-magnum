@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "MagnumApplication.h"
+#include "MagnumWindowApp.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/basic_fn.h>
@@ -336,10 +336,10 @@ public:
      , m_rRenderGl  {rRenderGl}
     { }
 
-    void run(MagnumApplication& rApp) override
+    void run(MagnumWindowApp& rApp) override
     { }
 
-    void draw(MagnumApplication& rApp, float delta) override
+    void draw(MagnumWindowApp& rApp, float delta) override
     {
         update_test_scene(m_rScene, delta);
 
@@ -352,7 +352,7 @@ public:
         render_test_scene(m_rRenderGl, m_rScene, m_renderer);
     }
 
-    void exit(MagnumApplication& rApp) override
+    void exit(MagnumWindowApp& rApp) override
     {
         osp::draw::SysRenderGL::clear_resource_owners(m_rRenderGl, *m_rScene.m_pResources);
         m_rRenderGl = {}; // clear all GPU resources
@@ -364,7 +364,7 @@ public:
     RenderGL            &m_rRenderGl;
 };
 
-MagnumApplication::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumApplication &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
+MagnumWindowApp::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumWindowApp &rApp, RenderGL& rRenderGl, UserInputHandler& rUserInput)
 {
     using namespace osp::active;
     using namespace osp::draw;

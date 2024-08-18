@@ -1,6 +1,7 @@
+#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2023 Open Space Program Project
  *
  * MIT License
  *
@@ -24,29 +25,37 @@
  */
 #pragma once
 
-#include "MagnumWindowApp.h"
+#include "../scenarios.h"
 
-#include <osp_drawing_gl/rendergl.h>
+#include <adera/activescene/VehicleBuilder.h>
 
-namespace testapp::enginetest
+#include <osp/core/copymove_macros.h>
+#include <osp/core/keyed_vector.h>
+#include <osp/core/global_id.h>
+#include <osp/core/strong_id.h>
+
+#include <memory>
+
+namespace adera
 {
 
-struct EngineTestScene;
+using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
+using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
 
-/**
- * @brief Setup Engine Test Scene
- *
- * @param rResources    [ref] Application Resources containing cube mesh
- * @param pkg           [in] Package Id the cube mesh is under
- *
- * @return entt::any containing scene data
- */
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
+struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
+{
+    PrebuiltVehicles() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
+};
 
-/**
- * @brief Generate IOspApplication for MagnumWindowApp
- */
-MagnumWindowApp::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumWindowApp& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
+inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
+
+osp::Session setup_prebuilt_vehicles(
+        osp::TopTaskBuilder&        rFB,
+        osp::ArrayView<entt::any>   topData,
+        osp::Session const&         application,
+        osp::Session const&         scene);
 
 
-} // namespace testapp::enginetest
+} // namespace adera
+#endif

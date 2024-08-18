@@ -24,29 +24,33 @@
  */
 #pragma once
 
-#include "MagnumWindowApp.h"
+#include <osp/framework/builder.h>
 
-#include <osp_drawing_gl/rendergl.h>
-
-namespace testapp::enginetest
+namespace testapp
 {
 
-struct EngineTestScene;
+extern osp::fw::FeatureDef const ftrMagnum;
 
 /**
- * @brief Setup Engine Test Scene
- *
- * @param rResources    [ref] Application Resources containing cube mesh
- * @param pkg           [in] Package Id the cube mesh is under
- *
- * @return entt::any containing scene data
+ * @brief stuff needed to render a scene using Magnum
  */
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
+extern osp::fw::FeatureDef const ftrMagnumScene;
 
 /**
- * @brief Generate IOspApplication for MagnumWindowApp
+ * @brief Magnum MeshVisualizer shader and optional material for drawing ActiveEnts with it
  */
-MagnumWindowApp::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumWindowApp& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
+extern osp::fw::FeatureDef const ftrShaderVisualizer;
 
+/**
+ * @brief Magnum Flat shader and optional material for drawing ActiveEnts with it
+ */
+extern osp::fw::FeatureDef const ftrShaderFlat;
 
-} // namespace testapp::enginetest
+/**
+ * @brief Magnum Phong shader and optional material for drawing ActiveEnts with it
+ */
+extern osp::fw::FeatureDef const ftrShaderPhong;
+
+extern osp::fw::FeatureDef const ftrShaderDrawMagnum;
+
+} // namespace testapp

@@ -24,7 +24,6 @@
  */
 #pragma once
 
-#include "feature_interfaces.h"
 #include "testapp.h"
 
 // IWYU pragma: begin_exports
@@ -37,32 +36,13 @@
 namespace testapp
 {
 
-namespace scenes
-{
-    using enum EStgOptn;
-    using enum EStgCont;
-    using enum EStgIntr;
-    using enum EStgRevd;
-    using enum EStgEvnt;
-    using enum EStgFBO;
-    using enum EStgLink;
-}
-
-
-
-struct WindowAppLoopControl
-{
-    bool doResync;
-
-    bool doSync;
-
-    bool doRender;
-};
 
 struct ScenarioOption
 {
     using Func_t = void(*)(TestApp&);
 
+    std::string_view    name;
+    std::string_view    brief;
     std::string_view    description;
     Func_t              loadFunc;
 };

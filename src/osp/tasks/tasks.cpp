@@ -64,10 +64,8 @@ TaskGraph make_exec_graph(Tasks const& tasks)
 
     KeyedVec<PipelineId, PipelineCounts>    plCounts;
     KeyedVec<TaskId, TaskCounts>            taskCounts;
-    lgrn::IdSetStl<PipelineId>              plInTree;
 
     out.pipelineToFirstAnystg .resize(maxPipelines);
-    plInTree.resize(maxPipelines);
     plCounts        .resize(maxPipelines+1);
     taskCounts      .resize(maxTasks+1);
 
@@ -140,9 +138,6 @@ TaskGraph make_exec_graph(Tasks const& tasks)
 
         if (parent != lgrn::id_null<PipelineId>())
         {
-            plInTree.insert(parent);
-            plInTree.insert(child);
-
             PipelineCounts &rChildCounts  = plCounts[child];
             PipelineCounts &rParentCounts = plCounts[parent];
 
@@ -155,7 +150,7 @@ TaskGraph make_exec_graph(Tasks const& tasks)
         }
     }
 
-    std::size_t const treeSize = plInTree.size();
+    std::size_t const treeSize = tasks.m_pipelineIds.size();//plInTree.size();
 
     // 4. Allocate
 
@@ -361,20 +356,15 @@ TaskGraph make_exec_graph(Tasks const& tasks)
 
     PipelineTreePos_t rootPos = 0;
 
+    // iterate roots only
     for (PipelineId const pipeline : tasks.m_pipelineIds)
     {
-        if ( ! plInTree.contains(pipeline) || tasks.m_pipelineParents[pipeline] != lgrn::id_null<PipelineId>())
+        if (tasks.m_pipelineParents[pipeline] == lgrn::id_null<PipelineId>())
         {
-            continue; // Not in tree or not a root
+            PipelineCounts const& rRootCounts         = plCounts[pipeline];
+            std::uint32_t  const  rootDescendantCount = add_subtree(add_subtree, pipeline, rRootCounts.firstChild, lgrn::id_null<PipelineTreePos_t>(), rootPos);
+            rootPos += 1 + rootDescendantCount;
         }
-
-        // For each root pipeline
-
-        PipelineCounts const& rRootCounts = plCounts[pipeline];
-
-        uint32_t const rootDescendantCount = add_subtree(add_subtree, pipeline, rRootCounts.firstChild, lgrn::id_null<PipelineTreePos_t>(), rootPos);
-
-        rootPos += 1 + rootDescendantCount;
     }
 
     return out;

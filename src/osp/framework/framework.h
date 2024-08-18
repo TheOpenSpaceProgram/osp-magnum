@@ -340,12 +340,20 @@ struct Framework
 
     [[nodiscard]] inline FIInstanceId get_interface_id(FITypeId type, ContextId ctx) noexcept
     {
+        if ( ! ctx.has_value() )
+        {
+            return {};
+        }
         return contextData[ctx].finterSlots[type];
     }
 
     template<CFeatureInterfaceDef FI_T>
     [[nodiscard]] inline FIInstanceId get_interface_id(ContextId ctx) noexcept
     {
+        if ( ! ctx.has_value() )
+        {
+            return {};
+        }
         return contextData[ctx].finterSlots[FITypeInfoRegistry::get_or_register<FI_T>()];
     }
 

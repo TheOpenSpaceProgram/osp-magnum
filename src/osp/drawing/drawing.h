@@ -31,10 +31,11 @@
 #include "../core/keyed_vector.h"
 #include "../core/math_types.h"
 #include "../core/resourcetypes.h"
-#include "../core/storage.h"
 
 #include "../activescene/active_ent.h"
 #include "../activescene/basic.h"
+
+#include "../scientific/shapes.h"
 
 #include <Magnum/Magnum.h>
 #include <Magnum/Math/Color.h>
@@ -187,6 +188,16 @@ struct Camera
     {
         return Matrix4::perspectiveProjection(m_fov, m_aspectRatio, m_near, m_far);
     }
+};
+
+
+struct NamedMeshes
+{
+    NamedMeshes() = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(NamedMeshes) // Huge compile errors without this. MeshIdOwner_t is move-only.
+
+    entt::dense_map<osp::EShape, osp::draw::MeshIdOwner_t>      m_shapeToMesh;
+    entt::dense_map<std::string_view, osp::draw::MeshIdOwner_t> m_namedMeshs;
 };
 
 } // namespace osp::draw

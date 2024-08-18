@@ -34,52 +34,14 @@
 
 #include <entt/core/any.hpp>
 
-#include <mutex>
-#include <thread>
+
+#include <functional>
+#include <vector>
 
 namespace testapp
 {
 
-class NonBlockingStdInReader
-{
-public:
-    void start_thread()
-    {
-        thread = std::thread{[this]
-        {
-            while(true)
-            {
-                std::string strIn;
-                std::cin >> strIn;
-
-                std::lock_guard<std::mutex> guard(mutex);
-                messages.emplace_back(std::move(strIn));
-            }
-        }};
-    }
-
-    //void stop(); // TODO
-
-    [[nodiscard]] std::vector<std::string> read()
-    {
-        std::lock_guard<std::mutex> guard(mutex);
-        return std::exchange(messages, {});
-    }
-
-    static NonBlockingStdInReader& instance()
-    {
-        static NonBlockingStdInReader thing;
-        return thing;
-    }
-
-private:
-    std::thread                 thread;
-    std::mutex                  mutex;
-    std::vector<std::string>    messages;
-};
-
-
-using MainLoopFunc_t = bool(*)();
+using MainLoopFunc_t = std::function<bool()>;
 
 inline std::vector<MainLoopFunc_t>& main_loop_stack()
 {
@@ -88,13 +50,6 @@ inline std::vector<MainLoopFunc_t>& main_loop_stack()
 }
 
 struct TestApp;
-
-//using RendererSetupFunc_t   = void(*)(TestApp&);
-//using SceneSetupFunc_t      = RendererSetupFunc_t(*)(TestApp&);
-
-
-
-extern osp::fw::FeatureDef const ftrMain;
 
 
 struct TestApp
@@ -112,6 +67,8 @@ struct TestApp
     void drive_main_loop();
 
     void init();
+
+
 
     osp::fw::Framework m_framework;
 
@@ -132,6 +89,20 @@ struct TestApp
     osp::fw::IExecutor              *m_pExecutor { nullptr };
 
     osp::PkgId                      m_defaultPkg    { lgrn::id_null<osp::PkgId>() };
+
+    int m_argc;
+    char** m_argv;
+
+
+    private:
+
+    /**
+     * @brief As the name implies
+     *
+     *
+     * prefer not to use names like this outside of testapp
+     */
+    void load_a_bunch_of_stuff();
 };
 
 

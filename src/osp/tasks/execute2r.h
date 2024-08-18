@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,29 +24,23 @@
  */
 #pragma once
 
-#include "MagnumWindowApp.h"
+/*
 
-#include <osp_drawing_gl/rendergl.h>
+s
+expects an odd or even task?
 
-namespace testapp::enginetest
-{
+in order to move to the next stage, certain conditions must be met:
 
-struct EngineTestScene;
-
-/**
- * @brief Setup Engine Test Scene
- *
- * @param rResources    [ref] Application Resources containing cube mesh
- * @param pkg           [in] Package Id the cube mesh is under
- *
- * @return entt::any containing scene data
- */
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
-
-/**
- * @brief Generate IOspApplication for MagnumWindowApp
- */
-MagnumWindowApp::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumWindowApp& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
+each pipeline has a current stage and an odd/even.
 
 
-} // namespace testapp::enginetest
+
+restrictions to entering a stage:
+* one of the tasks depends on a stage that hasn't yet looped around
+
+
+now how the hell do we do the case where there's only two tasks?
+
+when advancing one pipeline, it would be blocked becuase the other pipeline wants t
+
+*/

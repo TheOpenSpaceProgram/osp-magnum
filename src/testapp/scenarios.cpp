@@ -25,23 +25,21 @@
 
 #include "scenarios.h"
 #include "enginetest.h"
-#include "feature_interfaces.h"
 
-#include "sessions/common.h"
-#include "sessions/magnum.h"
-#include "sessions/misc.h"
-#include "sessions/jolt.h"
-#include "sessions/physics.h"
-#include "sessions/shapes.h"
-#include "sessions/terrain.h"
-#include "sessions/universe.h"
-#include "sessions/vehicles.h"
-#include "sessions/vehicles_machines.h"
-#include "sessions/vehicles_prebuilt.h"
+#include <adera_app/feature_interfaces.h>
+#include <adera_app/features/common.h>
+#include <adera_app/features/misc.h>
+#include <adera_app/features/jolt.h>
+#include <adera_app/features/physics.h>
+#include <adera_app/features/shapes.h>
+#include <adera_app/features/terrain.h>
+#include <adera_app/features/universe.h>
+#include <adera_app/features/vehicles.h>
+#include <adera_app/features/vehicles_machines.h>
+#include <adera_app/features/vehicles_prebuilt.h>
 
-#include "MagnumApplication.h"
 
-#include <adera/application.h>
+#include <adera_app/application.h>
 #include <adera/activescene/vehicles_vb_fn.h>
 #include <adera/drawing/CameraController.h>
 
@@ -54,12 +52,13 @@
 
 #include <Magnum/GL/DefaultFramebuffer.h>
 
-#include <algorithm>
 
 using namespace adera;
 using namespace osp;
 using namespace osp::fw;
 using namespace osp::active;
+
+using namespace ftr_inter;
 
 namespace testapp
 {
@@ -72,10 +71,12 @@ static constexpr auto   sc_matFlat          = draw::MaterialId(1);
 static constexpr auto   sc_matPhong         = draw::MaterialId(2);
 static constexpr int    sc_materialCount    = 4;
 
+/**
+ * Enginetest itself doesn't depend on the framework, but we need to store it somewhere.
+ */
 FeatureDef const ftrEngineTest = feature_def("EngineTest", [] (FeatureBuilder& rFB, Implement<FIEngineTest> engineTest, DependOn<FIMainApp> mainApp, entt::any data)
 {
     auto &rResources = rFB.data_get<Resources>(mainApp.di.resources);
-
     rFB.data(engineTest.di.bigStruct) = enginetest::setup_scene(rResources, entt::any_cast<PkgId>(data));
 });
 
@@ -84,23 +85,25 @@ static ScenarioMap_t make_scenarios()
     ScenarioMap_t scenarioMap;
 
 
-    auto const add_scenario = [&scenarioMap] (std::string_view name, ScenarioOption owo)
+    auto const add_scenario = [&scenarioMap] (ScenarioOption scenario)
     {
-        scenarioMap.emplace(name, owo);
+        scenarioMap.emplace(scenario.name, scenario);
     };
 
-    add_scenario("enginetest", {
-        .description = "Simple rotating cube scenario without relying on Framework",
+    add_scenario({
+        .name        = "enginetest",
+        .brief       = "Simple rotating cube scenario ",
+        .description = "even more explaination",
         .loadFunc = [] (TestApp& rTestApp)
     {
-        auto            &rFw      = rTestApp.m_framework;
-        auto      const mainApp   = rFw.get_interface<FIMainApp>  (rTestApp.m_mainContext);
-        auto      const &rAppCtxs = entt::any_cast<adera::AppContexts&>(rFw.data[mainApp.di.appContexts]);
+        auto        &rFw      = rTestApp.m_framework;
+        auto  const mainApp   = rFw.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto        &rAppCtxs = entt::any_cast<adera::AppContexts&>(rFw.data[mainApp.di.appContexts]);
 
-        ContextId const uwu       = rFw.contextIds.create();
-        ContextBuilder  cb {  .m_ctxScope = {rTestApp.m_mainContext}, .m_ctx = uwu, .m_rFW = rFw };
+        rAppCtxs.scene  = rFw.contextIds.create();
+        ContextBuilder  cb {  .m_ctxScope = {rTestApp.m_mainContext}, .m_ctx = rAppCtxs.scene, .m_rFW = rFw };
         cb.add_feature(ftrEngineTest, rTestApp.m_defaultPkg);
-        LGRN_ASSERTM(cb.m_errors.empty(), "Error adding main feature");
+        LGRN_ASSERTM(cb.m_errors.empty(), "Error adding engine test feature");
         ContextBuilder::apply(std::move(cb));
     }});
 
@@ -132,8 +135,8 @@ static ScenarioMap_t make_scenarios()
         // containing all the scene data: a spinning cube.
         top_assign<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData, );
 
-        // Called when the MagnumApplication / window is opened, called again if the window is
-        // re-opened after its closed. Closing the window completely destructs MagnumApplication
+        // Called when the MagnumWindowApp / window is opened, called again if the window is
+        // re-opened after its closed. Closing the window completely destructs MagnumWindowApp
         // and all GPU resources. EngineTestScene will remain untouched in the background.
         RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp) -> void
         {
@@ -142,7 +145,7 @@ static ScenarioMap_t make_scenarios()
 
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,     TESTAPP_DATA_MAGNUM);
             OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
-            auto &rActiveApp    = rFB.data_get< MagnumApplication >      (rTestApp.m_topData, idActiveApp);
+            auto &rActiveApp    = rFB.data_get< MagnumWindowApp >      (rTestApp.m_topData, idActiveApp);
             auto &rRenderGl     = rFB.data_get< draw::RenderGL >         (rTestApp.m_topData, magnum.di.renderGl);
             auto &rUserInput    = rFB.data_get< input::UserInputHandler >(rTestApp.m_topData, windowApp.di.userInput);
 
@@ -657,7 +660,7 @@ ScenarioMap_t const& scenarios()
 //    OSP_DECLARE_GET_DATA_IDS(magnumScene,               TESTAPP_DATA_MAGNUM_SCENE);
 
 //    auto &rMainLoopCtrl = rFB.data_get<MainLoopControl>  (rTestApp.m_topData, mainApp.di.mainLoopCtrl);
-//    auto &rActiveApp    = rFB.data_get<MagnumApplication>(rTestApp.m_topData, idActiveApp);
+//    auto &rActiveApp    = rFB.data_get<MagnumWindowApp>(rTestApp.m_topData, idActiveApp);
 //    auto &rCamera       = rFB.data_get<draw::Camera>     (rTestApp.m_topData, idCamera);
 
 //    rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});

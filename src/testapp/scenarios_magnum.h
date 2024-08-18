@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,29 +24,13 @@
  */
 #pragma once
 
-#include "MagnumWindowApp.h"
+#include <osp/framework/framework.h>
 
-#include <osp_drawing_gl/rendergl.h>
 
-namespace testapp::enginetest
+namespace testapp
 {
 
-struct EngineTestScene;
-
-/**
- * @brief Setup Engine Test Scene
- *
- * @param rResources    [ref] Application Resources containing cube mesh
- * @param pkg           [in] Package Id the cube mesh is under
- *
- * @return entt::any containing scene data
- */
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
-
-/**
- * @brief Generate IOspApplication for MagnumWindowApp
- */
-MagnumWindowApp::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumWindowApp& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
+void start_magnum_renderer(osp::fw::Framework &rFW, osp::fw::ContextId ctx, entt::any userData);
 
 
-} // namespace testapp::enginetest
+} // namespace testapp

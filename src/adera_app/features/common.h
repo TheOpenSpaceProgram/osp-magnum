@@ -24,29 +24,27 @@
  */
 #pragma once
 
-#include "MagnumWindowApp.h"
 
-#include <osp_drawing_gl/rendergl.h>
+#include <osp/framework/builder.h>
 
-namespace testapp::enginetest
+#include <osp/core/copymove_macros.h>
+#include <osp/activescene/basic.h>
+#include <osp/drawing/drawing.h>
+#include <osp/scientific/shapes.h>
+
+#include <entt/container/dense_map.hpp>
+
+namespace adera
 {
 
-struct EngineTestScene;
+extern osp::fw::FeatureDef const ftrMain;
 
-/**
- * @brief Setup Engine Test Scene
- *
- * @param rResources    [ref] Application Resources containing cube mesh
- * @param pkg           [in] Package Id the cube mesh is under
- *
- * @return entt::any containing scene data
- */
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
+extern osp::fw::FeatureDef const ftrScene;
 
-/**
- * @brief Generate IOspApplication for MagnumWindowApp
- */
-MagnumWindowApp::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumWindowApp& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
+extern osp::fw::FeatureDef const ftrCommonScene;
 
+extern osp::fw::FeatureDef const ftrWindowApp;
 
-} // namespace testapp::enginetest
+extern osp::fw::FeatureDef const ftrRenderer;
+
+} // namespace adera

@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,29 +24,50 @@
  */
 #pragma once
 
-#include "MagnumWindowApp.h"
+#include <osp/framework/framework.h>
 
-#include <osp_drawing_gl/rendergl.h>
+#include <entt/core/any.hpp>
 
-namespace testapp::enginetest
+#include <vector>
+
+namespace adera
 {
 
-struct EngineTestScene;
+struct MainLoopControl
+{
+    bool doUpdate;
+};
 
-/**
- * @brief Setup Engine Test Scene
- *
- * @param rResources    [ref] Application Resources containing cube mesh
- * @param pkg           [in] Package Id the cube mesh is under
- *
- * @return entt::any containing scene data
- */
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
+struct WindowAppLoopControl
+{
+    bool doResync;
 
-/**
- * @brief Generate IOspApplication for MagnumWindowApp
- */
-MagnumWindowApp::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumWindowApp& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
+    bool doSync;
+
+    bool doRender;
+};
+
+struct AppContexts
+{
+    osp::fw::ContextId main;
+    osp::fw::ContextId window;
+    osp::fw::ContextId universe;
+    osp::fw::ContextId scene;
+};
+
+struct FrameworkModify
+{
+    struct Command
+    {
+        using Func_t = void(*)(osp::fw::Framework &rFW, osp::fw::ContextId ctx, entt::any userData);
+        entt::any           userData;
+        osp::fw::ContextId  ctx;
+        Func_t              func;
+    };
+
+    std::vector<Command> commands;
+};
 
 
-} // namespace testapp::enginetest
+
+} // namespace adera

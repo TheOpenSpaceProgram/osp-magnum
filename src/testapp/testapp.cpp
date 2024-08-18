@@ -23,52 +23,38 @@
  * SOFTWARE.
  */
 #include "testapp.h"
-#include "feature_interfaces.h"
 
-#include <adera/application.h>
+#include "features/console.h"
+
+#include <adera_app/feature_interfaces.h>
+#include <adera_app/application.h>
+#include <adera_app/features/common.h>
 
 #include <osp/core/Resources.h>
+#include <osp/framework/builder.h>
 #include <osp/drawing/own_restypes.h>
-
 #include <osp/vehicles/ImporterData.h>
+#include <osp/vehicles/load_tinygltf.h>
+
+#include <Magnum/MeshTools/Transform.h>
+#include <Magnum/Primitives/Cone.h>
+#include <Magnum/Primitives/Cylinder.h>
+#include <Magnum/Primitives/Cube.h>
+#include <Magnum/Primitives/Grid.h>
+#include <Magnum/Primitives/Icosphere.h>
+#include <Magnum/Trade/ImageData.h>
+#include <Magnum/Trade/TextureData.h>
+#include <Magnum/Trade/MeshData.h>
+
 #include <spdlog/fmt/ostr.h>
 
 using namespace adera;
+
 using namespace osp::fw;
+using namespace ftr_inter;
 
 namespace testapp
 {
-
-FeatureDef const ftrMain = feature_def("Main", [] (FeatureBuilder& rFB, Implement<FIMainApp> mainApp, entt::any pkg)
-{
-    rFB.data_emplace< AppContexts >             (mainApp.di.appContexts);
-    rFB.data_emplace< MainLoopControl >         (mainApp.di.mainLoopCtrl);
-    rFB.data_emplace< osp::Resources >          (mainApp.di.resources);
-    rFB.data_emplace< FrameworkModify >         (mainApp.di.frameworkModify);
-    rFB.data_emplace< std::vector<std::string> >(mainApp.di.cin);
-
-    rFB.pipeline(mainApp.pl.mainLoop).loops(true).wait_for_signal(EStgOptn::ModifyOrSignal);
-    rFB.pipeline(mainApp.pl.cin).parent(mainApp.pl.mainLoop);
-
-    rFB.task()
-        .name       ("Schedule Main Loop")
-        .schedules  ({mainApp.pl.mainLoop(EStgOptn::Schedule)})
-        .args       ({         mainApp.di.mainLoopCtrl})
-        .func([] (MainLoopControl const& rMainLoopCtrl) noexcept -> osp::TaskActions
-    {
-        return rMainLoopCtrl.doUpdate ? osp::TaskActions{} : osp::TaskAction::Cancel;
-    });
-
-    rFB.task()
-        .name       ("Read stdin buffer")
-        .run_on     ({mainApp.pl.mainLoop(EStgOptn::Run)})
-        .sync_with  ({mainApp.pl.cin(EStgIntr::Modify_)})
-        .args       ({            mainApp.di.cin})
-        .func([] (std::vector<std::string> &rCin) noexcept
-    {
-        rCin = NonBlockingStdInReader::instance().read();
-    });
-});
 
 void TestApp::init()
 {
@@ -84,6 +70,8 @@ void TestApp::init()
     auto       &rResources    = entt::any_cast<osp::Resources&>          (m_framework.data[fiMain.di.resources]);
     rResources.resize_types(osp::ResTypeIdReg_t::size());
     m_defaultPkg = rResources.pkg_create();
+
+    load_a_bunch_of_stuff();
 
     m_pExecutor->load(m_framework);
     m_pExecutor->run(m_framework, fiMain.pl.mainLoop);
@@ -110,7 +98,7 @@ void TestApp::drive_main_loop()
 
         for (FrameworkModify::Command &rCmd : rFWModify.commands)
         {
-            rCmd.func(std::move(rCmd.userData));
+            rCmd.func(m_framework, rCmd.ctx, std::move(rCmd.userData));
         }
         rFWModify.commands.clear();
 
@@ -231,6 +219,65 @@ void TestApp::clear_resource_owners()
 
 
 
+void TestApp::load_a_bunch_of_stuff()
+{
+    using namespace osp::restypes;
+    using namespace Magnum;
+    using Primitives::ConeFlag;
+    using Primitives::CylinderFlag;
+
+    auto const fiMain      = m_framework.get_interface<FIMainApp>(m_mainContext);
+    auto       &rResources = entt::any_cast<osp::Resources&>(m_framework.data[fiMain.di.resources]);
+
+    rResources.data_register<Trade::ImageData2D>(gc_image);
+    rResources.data_register<Trade::TextureData>(gc_texture);
+    rResources.data_register<osp::TextureImgSource>(gc_texture);
+    rResources.data_register<Trade::MeshData>(gc_mesh);
+    rResources.data_register<osp::ImporterData>(gc_importer);
+    rResources.data_register<osp::Prefabs>(gc_importer);
+    osp::register_tinygltf_resources(rResources);
+
+    // Load sturdy glTF files
+    const std::string_view datapath = { "OSPData/adera/" };
+    const std::vector<std::string_view> meshes =
+    {
+        "spamcan.sturdy.gltf",
+        "stomper.sturdy.gltf",
+        "ph_capsule.sturdy.gltf",
+        "ph_fuselage.sturdy.gltf",
+        "ph_engine.sturdy.gltf",
+        //"ph_plume.sturdy.gltf",
+        "ph_rcs.sturdy.gltf"
+        //"ph_rcs_plume.sturdy.gltf"
+    };
+
+    // TODO: Make new gltf loader. This will read gltf files and dump meshes,
+    //       images, textures, and other relevant data into osp::Resources
+    for (auto const& meshName : meshes)
+    {
+        osp::ResId res = osp::load_tinygltf_file(osp::string_concat(datapath, meshName), rResources, m_defaultPkg);
+        osp::assigns_prefabs_tinygltf(rResources, res);
+    }
+
+    // Add a default primitives
+    auto const add_mesh_quick = [&rResources = rResources, this] (std::string_view const name, Trade::MeshData&& data)
+    {
+        osp::ResId const meshId = rResources.create(gc_mesh, m_defaultPkg, osp::SharedString::create(name));
+        rResources.data_add<Trade::MeshData>(gc_mesh, meshId, std::move(data));
+    };
+
+    Trade::MeshData &&cylinder = Magnum::MeshTools::transform3D( Primitives::cylinderSolid(3, 16, 1.0f, CylinderFlag::CapEnds), Matrix4::rotationX(Deg(90)), 0);
+    Trade::MeshData &&cone = Magnum::MeshTools::transform3D( Primitives::coneSolid(3, 16, 1.0f, ConeFlag::CapEnd), Matrix4::rotationX(Deg(90)), 0);
+
+    add_mesh_quick("cube", Primitives::cubeSolid());
+    add_mesh_quick("cubewire", Primitives::cubeWireframe());
+    add_mesh_quick("sphere", Primitives::icosphereSolid(2));
+    add_mesh_quick("cylinder", std::move(cylinder));
+    add_mesh_quick("cone", std::move(cone));
+    add_mesh_quick("grid64solid", Primitives::grid3DSolid({63, 63}));
+
+    OSP_LOG_INFO("Resource loading complete");
+}
 
 
 } // namespace testapp
