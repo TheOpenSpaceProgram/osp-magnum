@@ -58,32 +58,32 @@ Session setup_parts(
 {
     OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
 
-    auto const scene.pl = scene.get_pipelines<PlScene>();
+    auto const scn.pl = scene.get_pipelines<PlScene>();
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_PARTS);
-    auto const tgParts = out.create_pipelines<PlParts>(rFB);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_PARTS);
+    auto const parts.pl = out.create_pipelines<PlParts>(rFB);
 
-    out.m_cleanup = scene.pl.cleanup;
+    out.m_cleanup = scn.pl.cleanup;
 
-    rFB.pipeline(tgParts.partIds)          .parent(scene.pl.update);
-    rFB.pipeline(tgParts.partPrefabs)      .parent(scene.pl.update);
-    rFB.pipeline(tgParts.partTransformWeld).parent(scene.pl.update);
-    rFB.pipeline(tgParts.partDirty)        .parent(scene.pl.update);
-    rFB.pipeline(tgParts.weldIds)          .parent(scene.pl.update);
-    rFB.pipeline(tgParts.weldDirty)        .parent(scene.pl.update);
-    rFB.pipeline(tgParts.machIds)          .parent(scene.pl.update);
-    rFB.pipeline(tgParts.nodeIds)          .parent(scene.pl.update);
-    rFB.pipeline(tgParts.connect)          .parent(scene.pl.update);
-    rFB.pipeline(tgParts.mapWeldPart)      .parent(scene.pl.update);
-    rFB.pipeline(tgParts.mapPartMach)      .parent(scene.pl.update);
-    rFB.pipeline(tgParts.mapPartActive)    .parent(scene.pl.update);
-    rFB.pipeline(tgParts.mapWeldActive)    .parent(scene.pl.update);
-    rFB.pipeline(tgParts.machUpdExtIn)     .parent(scene.pl.update);
-    rFB.pipeline(tgParts.linkLoop)         .parent(scene.pl.update).loops(true);
+    rFB.pipeline(parts.pl.partIds)          .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.partPrefabs)      .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.partTransformWeld).parent(scn.pl.update);
+    rFB.pipeline(parts.pl.partDirty)        .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.weldIds)          .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.weldDirty)        .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.machIds)          .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.nodeIds)          .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.connect)          .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.mapWeldPart)      .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.mapPartMach)      .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.mapPartActive)    .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.mapWeldActive)    .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.machUpdExtIn)     .parent(scn.pl.update);
+    rFB.pipeline(parts.pl.linkLoop)         .parent(scn.pl.update).loops(true);
 
-    auto &rScnParts = rFB.data_emplace< ACtxParts >      (topData, idScnParts);
-    auto &rUpdMach  = rFB.data_emplace< MachineUpdater > (topData, idUpdMach);
+    auto &rScnParts = rFB.data_emplace< ACtxParts >      (parts.di.scnParts);
+    auto &rUpdMach  = rFB.data_emplace< MachineUpdater > (idUpdMach);
 
     // Resize containers to fit all existing MachTypeIds and NodeTypeIds
     // These Global IDs are dynamically initialized just as the program starts
@@ -94,9 +94,9 @@ Session setup_parts(
 
     rFB.task()
         .name       ("Clear Resource owners")
-        .run_on     ({scene.pl.cleanup(Run_)})
+        .run_on     ({scn.pl.cleanup(Run_)})
         .push_to    (out.m_tasks)
-        .args       ({      idScnParts,           mainApp.di.resources})
+        .args       ({      parts.di.scnParts,           mainApp.di.resources})
         .func([] (ACtxParts& rScnParts, Resources& rResources) noexcept
     {
         for (osp::PrefabPair &rPrefabPair : rScnParts.partPrefabs)
@@ -107,9 +107,9 @@ Session setup_parts(
 
     rFB.task()
         .name       ("Clear Part dirty vectors after use")
-        .run_on     ({tgParts.partDirty(Clear)})
+        .run_on     ({parts.pl.partDirty(Clear)})
         .push_to    (out.m_tasks)
-        .args       ({      idScnParts})
+        .args       ({      parts.di.scnParts})
         .func([] (ACtxParts& rScnParts) noexcept
     {
         rScnParts.partDirty.clear();
@@ -117,9 +117,9 @@ Session setup_parts(
 
     rFB.task()
         .name       ("Clear Weld dirty vectors after use")
-        .run_on     ({tgParts.weldDirty(Clear)})
+        .run_on     ({parts.pl.weldDirty(Clear)})
         .push_to    (out.m_tasks)
-        .args       ({      idScnParts})
+        .args       ({      parts.di.scnParts})
         .func([] (ACtxParts& rScnParts) noexcept
     {
         rScnParts.weldDirty.clear();
@@ -127,8 +127,8 @@ Session setup_parts(
 
     rFB.task()
         .name       ("Schedule Link update")
-        .schedules  ({tgParts.linkLoop(ScheduleLink)})
-        .sync_with  ({scene.pl.update(Run)})
+        .schedules  ({parts.pl.linkLoop(ScheduleLink)})
+        .sync_with  ({scn.pl.update(Run)})
         .push_to    (out.m_tasks)
         .args       ({           idUpdMach})
         .func([] (MachineUpdater& rUpdMach) noexcept -> TaskActions
@@ -152,26 +152,26 @@ Session setup_vehicle_spawn(
         ArrayView<entt::any> const  topData,
         Session const&              scene)
 {
-    auto const scene.pl = scene.get_pipelines<PlScene>();
+    auto const scn.pl = scene.get_pipelines<PlScene>();
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_VEHICLE_SPAWN);
-    auto const tgVhSp = out.create_pipelines<PlVehicleSpawn>(rFB);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_VEHICLE_SPAWN);
+    auto const vhclSpawn.pl = out.create_pipelines<PlVehicleSpawn>(rFB);
 
-    rFB.pipeline(tgVhSp.spawnRequest)  .parent(scene.pl.update);
-    rFB.pipeline(tgVhSp.spawnedParts)  .parent(scene.pl.update);
-    rFB.pipeline(tgVhSp.spawnedWelds)  .parent(scene.pl.update);
-    rFB.pipeline(tgVhSp.rootEnts)      .parent(scene.pl.update);
-    rFB.pipeline(tgVhSp.spawnedMachs)     .parent(scene.pl.update);
+    rFB.pipeline(vhclSpawn.pl.spawnRequest)  .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawn.pl.spawnedParts)  .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawn.pl.spawnedWelds)  .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawn.pl.rootEnts)      .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawn.pl.spawnedMachs)     .parent(scn.pl.update);
 
-    rFB.data_emplace< ACtxVehicleSpawn >     (topData, idVehicleSpawn);
+    rFB.data_emplace< ACtxVehicleSpawn >     (vhclSpawn.di.vehicleSpawn);
 
     rFB.task()
         .name       ("Schedule Vehicle spawn")
-        .schedules  ({tgVhSp.spawnRequest(Schedule_)})
-        .sync_with  ({scene.pl.update(Run)})
+        .schedules  ({vhclSpawn.pl.spawnRequest(Schedule_)})
+        .sync_with  ({scn.pl.update(Run)})
         .push_to    (out.m_tasks)
-        .args       ({                   idVehicleSpawn })
+        .args       ({                   vhclSpawn.di.vehicleSpawn })
         .func([] (ACtxVehicleSpawn const& rVehicleSpawn) noexcept -> TaskActions
     {
         return rVehicleSpawn.spawnRequest.empty() ? TaskAction::Cancel : TaskActions{};
@@ -179,9 +179,9 @@ Session setup_vehicle_spawn(
 
     rFB.task()
         .name       ("Clear Vehicle Spawning vector after use")
-        .run_on     ({tgVhSp.spawnRequest(Clear)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(Clear)})
         .push_to    (out.m_tasks)
-        .args       ({             idVehicleSpawn})
+        .args       ({             vhclSpawn.di.vehicleSpawn})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn) noexcept
     {
         rVehicleSpawn.spawnRequest.clear();
@@ -207,30 +207,30 @@ Session setup_vehicle_spawn_vb(
     OSP_DECLARE_GET_DATA_IDS(prefabs,       TESTAPP_DATA_PREFABS);
     OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT);
     OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,  TESTAPP_DATA_VEHICLE_SPAWN);
-    auto const tgPf     = prefabs       .get_pipelines<PlPrefabs>();
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const tgParts  = parts         .get_pipelines<PlParts>();
+    auto const prefabs.pl     = prefabs       .get_pipelines<PlPrefabs>();
+    auto const scn.pl    = scene         .get_pipelines<PlScene>();
+    auto const parts.pl  = parts         .get_pipelines<PlParts>();
     auto const tgSgFlt  = signalsFloat  .get_pipelines<PlSignalsFloat>();
-    auto const tgVhSp   = vehicleSpawn  .get_pipelines<PlVehicleSpawn>();
+    auto const vhclSpawn.pl   = vehicleSpawn  .get_pipelines<PlVehicleSpawn>();
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_VEHICLE_SPAWN_VB);
-    auto const tgVhSpVB = out.create_pipelines<PlVehicleSpawnVB>(rFB);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_VEHICLE_SPAWN_VB);
+    auto const vhclSpawn.plVB = out.create_pipelines<PlVehicleSpawnVB>(rFB);
 
-    rFB.pipeline(tgVhSpVB.dataVB)      .parent(scene.pl.update);
-    rFB.pipeline(tgVhSpVB.remapParts)  .parent(scene.pl.update);
-    rFB.pipeline(tgVhSpVB.remapWelds)  .parent(scene.pl.update);
-    rFB.pipeline(tgVhSpVB.remapMachs)  .parent(scene.pl.update);
-    rFB.pipeline(tgVhSpVB.remapNodes)  .parent(scene.pl.update);
+    rFB.pipeline(vhclSpawn.plVB.dataVB)      .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawn.plVB.remapParts)  .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawn.plVB.remapWelds)  .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawn.plVB.remapMachs)  .parent(scn.pl.update);
+    rFB.pipeline(vhclSpawn.plVB.remapNodes)  .parent(scn.pl.update);
 
-    rFB.data_emplace< ACtxVehicleSpawnVB >(topData, idVehicleSpawnVB);
+    rFB.data_emplace< ACtxVehicleSpawnVB >(vhclSpawn.di.vehicleSpawnVB);
 
     rFB.task()
         .name       ("Create PartIds and WeldIds for vehicles to spawn from VehicleData")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.spawnedParts(Resize), tgVhSpVB.remapParts(Modify_), tgVhSpVB.remapWelds(Modify_), tgParts.partIds(New), tgParts.weldIds(New), tgParts.mapWeldActive(New)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.pl.spawnedParts(Resize), vhclSpawn.plVB.remapParts(Modify_), vhclSpawn.plVB.remapWelds(Modify_), parts.pl.partIds(New), parts.pl.weldIds(New), parts.pl.mapWeldActive(New)})
         .push_to    (out.m_tasks)
-        .args       ({             idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts})
+        .args       ({             vhclSpawn.di.vehicleSpawn,                    vhclSpawn.di.vehicleSpawnVB,           parts.di.scnParts})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
         SysVehicleSpawnVB::create_parts_and_welds(rVehicleSpawn, rVehicleSpawnVB, rScnParts);
@@ -238,10 +238,10 @@ Session setup_vehicle_spawn_vb(
 
     rFB.task()
         .name       ("Request prefabs for vehicle parts from VehicleBuilder")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgPf.spawnRequest(Modify_), tgVhSp.spawnedParts(UseOrRun)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({prefabs.pl.spawnRequest(Modify_), vhclSpawn.pl.spawnedParts(UseOrRun)})
         .push_to    (out.m_tasks)
-        .args       ({             idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,             idPrefabs,           mainApp.di.resources})
+        .args       ({             vhclSpawn.di.vehicleSpawn,                          vhclSpawn.di.vehicleSpawnVB,           parts.di.scnParts,             prefabs.di.prefabs,           mainApp.di.resources})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
     {
         SysVehicleSpawnVB::request_prefabs(rVehicleSpawn, rVehicleSpawnVB, rScnParts, rPrefabs, rResources);
@@ -249,10 +249,10 @@ Session setup_vehicle_spawn_vb(
 
     rFB.task()
         .name       ("Create Machine IDs copied from VehicleData")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSpVB.dataVB(UseOrRun), tgVhSpVB.remapMachs(Modify_), tgVhSp.spawnedMachs(Resize), tgParts.machIds(New)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.plVB.dataVB(UseOrRun), vhclSpawn.plVB.remapMachs(Modify_), vhclSpawn.pl.spawnedMachs(Resize), parts.pl.machIds(New)})
         .push_to    (out.m_tasks)
-        .args       ({             idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts})
+        .args       ({             vhclSpawn.di.vehicleSpawn,                    vhclSpawn.di.vehicleSpawnVB,           parts.di.scnParts})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
@@ -343,10 +343,10 @@ Session setup_vehicle_spawn_vb(
 
     rFB.task()
         .name       ("Update Part<->Machine maps")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSpVB.dataVB(UseOrRun), tgVhSpVB.remapMachs(UseOrRun), tgVhSpVB.remapParts(UseOrRun), tgParts.mapPartMach(New)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.plVB.dataVB(UseOrRun), vhclSpawn.plVB.remapMachs(UseOrRun), vhclSpawn.plVB.remapParts(UseOrRun), parts.pl.mapPartMach(New)})
         .push_to    (out.m_tasks)
-        .args       ({             idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,             idPrefabs,           mainApp.di.resources})
+        .args       ({             vhclSpawn.di.vehicleSpawn,                          vhclSpawn.di.vehicleSpawnVB,           parts.di.scnParts,             prefabs.di.prefabs,           mainApp.di.resources})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
@@ -404,10 +404,10 @@ Session setup_vehicle_spawn_vb(
 
     rFB.task()
         .name       ("Create (and connect) Node IDs copied from VehicleBuilder")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSpVB.dataVB(UseOrRun), tgVhSpVB.remapMachs(UseOrRun), tgVhSpVB.remapNodes(Modify_), tgParts.nodeIds(New), tgParts.connect(New)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.plVB.dataVB(UseOrRun), vhclSpawn.plVB.remapMachs(UseOrRun), vhclSpawn.plVB.remapNodes(Modify_), parts.pl.nodeIds(New), parts.pl.connect(New)})
         .push_to    (out.m_tasks)
-        .args       ({             idVehicleSpawn,                    idVehicleSpawnVB,           idScnParts})
+        .args       ({             vhclSpawn.di.vehicleSpawn,                    vhclSpawn.di.vehicleSpawnVB,           parts.di.scnParts})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB& rVehicleSpawnVB, ACtxParts& rScnParts) noexcept
     {
         std::size_t const newVehicleCount = rVehicleSpawn.new_vehicle_count();
@@ -459,10 +459,10 @@ Session setup_vehicle_spawn_vb(
 
     rFB.task()
         .name       ("Update PartId<->ActiveEnt mapping")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.spawnedParts(UseOrRun), tgPf.spawnedEnts(UseOrRun), tgParts.mapPartActive(Modify)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.pl.spawnedParts(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), parts.pl.mapPartActive(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({             idVehicleSpawn,                 commonScene.di.basic,           idScnParts,              idPrefabs})
+        .args       ({             vhclSpawn.di.vehicleSpawn,                 comScn.di.basic,           parts.di.scnParts,              prefabs.di.prefabs})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxBasic const& rBasic, ACtxParts& rScnParts,  ACtxPrefabs& rPrefabs) noexcept
     {
         rScnParts.partToActive.resize(rScnParts.partIds.capacity());
@@ -484,10 +484,10 @@ Session setup_vehicle_spawn_vb(
 
     rFB.task()
         .name       ("Copy float signal values from VehicleBuilder")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.spawnedParts(UseOrRun), tgVhSpVB.remapNodes(UseOrRun), tgSgFlt.sigFloatValues(New), tgSgFlt.sigFloatUpdExtIn(New)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.pl.spawnedParts(UseOrRun), vhclSpawn.plVB.remapNodes(UseOrRun), tgSgFlt.sigFloatValues(New), tgSgFlt.sigFloatUpdExtIn(New)})
         .push_to    (out.m_tasks)
-        .args       ({             idVehicleSpawn,                          idVehicleSpawnVB,           idScnParts,                       idSigValFloat,                    idSigUpdFloat})
+        .args       ({             vhclSpawn.di.vehicleSpawn,                          vhclSpawn.di.vehicleSpawnVB,           parts.di.scnParts,                       sigFloat.di.sigValFloat,                    idSigUpdFloat})
         .func([] (ACtxVehicleSpawn& rVehicleSpawn, ACtxVehicleSpawnVB const& rVehicleSpawnVB, ACtxParts& rScnParts, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
         Nodes const         &rFloatNodes    = rScnParts.nodePerType[gc_ntSigFloat];
@@ -533,17 +533,17 @@ Session setup_vehicle_spawn_draw(
 {
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
     OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,  TESTAPP_DATA_VEHICLE_SPAWN);
-    auto const scene.plRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
-    auto const tgVhSp   = vehicleSpawn  .get_pipelines< PlVehicleSpawn >();
+    auto const scnRender.pl = sceneRenderer .get_pipelines< PlSceneRenderer >();
+    auto const vhclSpawn.pl   = vehicleSpawn  .get_pipelines< PlVehicleSpawn >();
 
     Session out;
 
     rFB.task()
         .name       ("Enable Draw Transforms for spawned vehicle root entities")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.rootEnts(UseOrRun), scene.plRdr.drawEntResized(Done)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.pl.rootEnts(UseOrRun), scnRender.pl.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({            idScnRender,                        idVehicleSpawn})
+        .args       ({            scnRender.di.scnRender,                        vhclSpawn.di.vehicleSpawn})
         .func([] (ACtxSceneRender& rScnRender, ACtxVehicleSpawn const& rVehicleSpawn) noexcept
     {
         for (ActiveEnt const ent : rVehicleSpawn.rootEnts)
@@ -563,29 +563,29 @@ Session setup_signals_float(
         Session const&              parts)
 {
     OSP_DECLARE_GET_DATA_IDS(parts, TESTAPP_DATA_PARTS);
-    auto const scene.pl = scene.get_pipelines<PlScene>();
-    auto const tgParts = parts.get_pipelines<PlParts>();
+    auto const scn.pl = scene.get_pipelines<PlScene>();
+    auto const parts.pl = parts.get_pipelines<PlParts>();
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SIGNALS_FLOAT);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_SIGNALS_FLOAT);
     auto const tgSgFlt = out.create_pipelines<PlSignalsFloat>(rFB);
 
-    rFB.pipeline(tgSgFlt.sigFloatValues)   .parent(scene.pl.update);
-    rFB.pipeline(tgSgFlt.sigFloatUpdExtIn) .parent(scene.pl.update);
-    rFB.pipeline(tgSgFlt.sigFloatUpdLoop)  .parent(tgParts.linkLoop);
+    rFB.pipeline(tgSgFlt.sigFloatValues)   .parent(scn.pl.update);
+    rFB.pipeline(tgSgFlt.sigFloatUpdExtIn) .parent(scn.pl.update);
+    rFB.pipeline(tgSgFlt.sigFloatUpdLoop)  .parent(parts.pl.linkLoop);
 
-    rFB.data_emplace< SignalValues_t<float> >    (topData, idSigValFloat);
-    rFB.data_emplace< UpdateNodes<float> >       (topData, idSigUpdFloat);
+    rFB.data_emplace< SignalValues_t<float> >    (sigFloat.di.sigValFloat);
+    rFB.data_emplace< UpdateNodes<float> >       (idSigUpdFloat);
 
     // NOTE: Consider supporting per-thread UpdateNodes<float> to allow multiple threads to write
     //       new float values in parallel.
 
     rFB.task()
         .name       ("Update Signal<float> Nodes")
-        .run_on     ({tgParts.linkLoop(EStgLink::NodeUpd)})
-        .sync_with  ({tgSgFlt.sigFloatUpdExtIn(Ready), tgParts.machUpdExtIn(Ready), tgSgFlt.sigFloatUpdLoop(Modify), tgSgFlt.sigFloatValues(Modify)})
+        .run_on     ({parts.pl.linkLoop(EStgLink::NodeUpd)})
+        .sync_with  ({tgSgFlt.sigFloatUpdExtIn(Ready), parts.pl.machUpdExtIn(Ready), tgSgFlt.sigFloatUpdLoop(Modify), tgSgFlt.sigFloatValues(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({               idSigUpdFloat,                       idSigValFloat,                idUpdMach,                 idScnParts})
+        .args       ({               idSigUpdFloat,                       sigFloat.di.sigValFloat,                idUpdMach,                 parts.di.scnParts})
         .func([] (UpdateNodes<float>& rSigUpdFloat, SignalValues_t<float>& rSigValFloat, MachineUpdater& rUpdMach, ACtxParts const& rScnParts) noexcept
     {
         if ( ! rSigUpdFloat.dirty )

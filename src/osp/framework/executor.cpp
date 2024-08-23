@@ -36,8 +36,9 @@ namespace osp::fw
 
 void SingleThreadedExecutor::load(Framework& rFramework)
 {
-    m_graph = osp::make_exec_graph(rFramework.tasks);
-    exec_conform(rFramework.tasks, m_execContext);
+    m_graph = osp::make_exec_graph(rFramework.m_tasks);
+    m_execContext = {};
+    exec_conform(rFramework.m_tasks, m_execContext);
     m_execContext.doLogging = m_log != nullptr;
 }
 
@@ -56,18 +57,18 @@ void SingleThreadedExecutor::wait(Framework& rAppTasks)
     if (m_log != nullptr)
     {
         m_log->info("\n>>>>>>>>>> Previous State Changes\n{}\n>>>>>>>>>> Current State\n{}\n",
-                    WriteLog  {rAppTasks.tasks, rAppTasks.taskImpl, m_graph, m_execContext},
-                    WriteState{rAppTasks.tasks, rAppTasks.taskImpl, m_graph, m_execContext} );
+                    WriteLog  {rAppTasks.m_tasks, rAppTasks.m_taskImpl, m_graph, m_execContext},
+                    WriteState{rAppTasks.m_tasks, rAppTasks.m_taskImpl, m_graph, m_execContext} );
         m_execContext.logMsg.clear();
     }
 
-    exec_update(rAppTasks.tasks, m_graph, m_execContext);
-    run_blocking(rAppTasks.tasks, m_graph, rAppTasks.taskImpl, rAppTasks.data, m_execContext);
+    exec_update(rAppTasks.m_tasks, m_graph, m_execContext);
+    run_blocking(rAppTasks.m_tasks, m_graph, rAppTasks.m_taskImpl, rAppTasks.m_data, m_execContext);
 
     if (m_log != nullptr)
     {
         m_log->info("\n>>>>>>>>>> New State Changes\n{}",
-                    WriteLog{rAppTasks.tasks, rAppTasks.taskImpl, m_graph, m_execContext} );
+                    WriteLog{rAppTasks.m_tasks, rAppTasks.m_taskImpl, m_graph, m_execContext} );
         m_execContext.logMsg.clear();
     }
 }
@@ -343,4 +344,4 @@ std::ostream& operator<<(std::ostream& rStream, SingleThreadedExecutor::WriteLog
 }
 
 
-} // namespace testapp
+} // namespace adera

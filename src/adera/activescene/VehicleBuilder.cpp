@@ -282,4 +282,4 @@ VehicleData VehicleBuilder::finalize_release()
     return dataOut;
 }
 
-} // namespace testapp
+} // namespace adera

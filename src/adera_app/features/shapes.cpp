@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,7 +23,8 @@
  * SOFTWARE.
  */
 #include "shapes.h"
-#include "common.h"
+
+#include "../feature_interfaces.h"
 
 #include <adera/drawing/CameraController.h>
 
@@ -35,8 +35,11 @@
 
 #include <random>
 
+using namespace ftr_inter;
+using namespace ftr_inter::stages;
 using namespace adera;
 using namespace osp;
+using namespace osp::fw;
 using namespace osp::active;
 using namespace osp::draw;
 
@@ -45,16 +48,11 @@ using osp::input::EButtonControlIndex;
 namespace adera
 {
 
-void add_floor(
-        ArrayView<entt::any> const  topData,
-        Session const&              physShapes,
-        MaterialId const            materialId,
-        PkgId const                 pkg,
-        int const                   size)
+void add_floor(Framework &rFW, ContextId sceneCtx, MaterialId material, PkgId pkg, int size)
 {
-    OSP_DECLARE_GET_DATA_IDS(physShapes, TESTAPP_DATA_PHYS_SHAPES);
+    auto const physShapes = rFW.get_interface<FIPhysShapes>(sceneCtx);
 
-    auto &rPhysShapes = rFB.data_get<ACtxPhysShapes>(topData, idPhysShapes);
+    auto &rPhysShapes = rFW.data_get<ACtxPhysShapes>(physShapes.di.physShapes);
 
     std::mt19937 randGen(69);
     auto distSizeX  = std::uniform_real_distribution<float>{20.0, 80.0};
@@ -80,49 +78,41 @@ void add_floor(
 }
 
 
-
-Session setup_phys_shapes(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              scene,
-        Session const&              commonScene,
-        Session const&              physics,
-        MaterialId const            materialId)
+FeatureDef const ftrPhysicsShapes = feature_def("PhysicsShapes", [] (
+        FeatureBuilder          &rFB,
+        Implement<FIPhysShapes> physShapes,
+        DependOn<FIScene>       scn,
+        DependOn<FICommonScene> comScn,
+        DependOn<FIPhysics>     phys,
+        entt::any               userData)
 {
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const commonScene.pl     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
+    auto const materialId = userData /* if not null */ ? entt::any_cast<MaterialId>(userData)
+                                                       : MaterialId{};
 
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_PHYS_SHAPES);
-    auto const tgShSp = out.create_pipelines<PlPhysShapes>(rFB);
+    rFB.pipeline(physShapes.pl.spawnRequest)  .parent(scn.pl.update);
+    rFB.pipeline(physShapes.pl.spawnedEnts)   .parent(scn.pl.update);
+    rFB.pipeline(physShapes.pl.ownedEnts)     .parent(scn.pl.update);
 
-    rFB.pipeline(tgShSp.spawnRequest)  .parent(scene.pl.update);
-    rFB.pipeline(tgShSp.spawnedEnts)   .parent(scene.pl.update);
-    rFB.pipeline(tgShSp.ownedEnts)     .parent(scene.pl.update);
+    rFB.data_emplace< ACtxPhysShapes > (physShapes.di.physShapes, ACtxPhysShapes{ .m_materialId = materialId });
 
-    rFB.data_emplace< ACtxPhysShapes > (topData, idPhysShapes, ACtxPhysShapes{ .m_materialId = materialId });
+    // TODO: format after framework changes
 
     rFB.task()
         .name       ("Schedule Shape spawn")
-        .schedules  ({tgShSp.spawnRequest(Schedule_)})
-        .sync_with  ({scene.pl.update(Run)})
-        .push_to    (out.m_tasks)
-        .args       ({           idPhysShapes })
-        .func([] (ACtxPhysShapes& rPhysShapes) noexcept -> TaskActions
+        .schedules  ({physShapes.pl.spawnRequest(Schedule_)})
+        .sync_with  ({scn.pl.update(Run)})
+        .args       ({           physShapes.di.physShapes })
+        .func([] (ACtxPhysShapes &rPhysShapes) noexcept -> TaskActions
     {
         return rPhysShapes.m_spawnRequest.empty() ? TaskAction::Cancel : TaskActions{};
     });
 
     rFB.task()
         .name       ("Create ActiveEnts for requested shapes to spawn")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({commonScene.pl.activeEnt(New), commonScene.pl.activeEntResized(Schedule), tgShSp.spawnedEnts(Resize)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,                idPhysShapes})
-        .func([] (ACtxBasic& rBasic, ACtxPhysShapes& rPhysShapes) noexcept
+        .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({comScn.pl.activeEnt(New), comScn.pl.activeEntResized(Schedule), physShapes.pl.spawnedEnts(Resize)})
+        .args       ({      comScn.di.basic,                physShapes.di.physShapes})
+        .func([] (ACtxBasic &rBasic, ACtxPhysShapes &rPhysShapes) noexcept
     {
         LGRN_ASSERTM(!rPhysShapes.m_spawnRequest.empty(), "spawnRequest Use_ shouldn't run if rPhysShapes.m_spawnRequest is empty!");
 
@@ -132,11 +122,10 @@ Session setup_phys_shapes(
 
     rFB.task()
         .name       ("Add hierarchy and transform to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgShSp.ownedEnts(Modify__), commonScene.pl.hierarchy(New), commonScene.pl.transform(New)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,                idPhysShapes })
-        .func([] (ACtxBasic& rBasic, ACtxPhysShapes& rPhysShapes) noexcept
+        .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun), physShapes.pl.ownedEnts(Modify__), comScn.pl.hierarchy(New), comScn.pl.transform(New)})
+        .args       ({      comScn.di.basic,                physShapes.di.physShapes })
+        .func([] (ACtxBasic &rBasic, ACtxPhysShapes &rPhysShapes) noexcept
     {
         rPhysShapes.ownedEnts.resize(rBasic.m_activeIds.capacity());
         rBasic.m_scnGraph.resize(rBasic.m_activeIds.capacity());
@@ -160,11 +149,10 @@ Session setup_phys_shapes(
 
     rFB.task()
         .name       ("Add physics to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgPhy.physBody(Modify), tgPhy.physUpdate(Done)})
-        .push_to    (out.m_tasks)
-        .args       ({            commonScene.di.basic,                idPhysShapes,             idPhys })
-        .func([] (ACtxBasic const& rBasic, ACtxPhysShapes& rPhysShapes, ACtxPhysics& rPhys) noexcept
+        .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun), phys.pl.physBody(Modify), phys.pl.physUpdate(Done)})
+        .args       ({            comScn.di.basic,                physShapes.di.physShapes,             phys.di.phys })
+        .func([] (ACtxBasic const &rBasic, ACtxPhysShapes &rPhysShapes, ACtxPhysics &rPhys) noexcept
     {
         rPhys.m_hasColliders.resize(rBasic.m_activeIds.capacity());
         rPhys.m_shape.resize(rBasic.m_activeIds.capacity());
@@ -192,59 +180,42 @@ Session setup_phys_shapes(
     //TODO
     rFB.task()
         .name       ("Delete basic components")
-        .run_on     ({commonScene.di.activeEntDel(UseOrRun)})
-        .sync_with  ({tgShSp.ownedEnts(Modify__)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,                      commonScene.di.activeEntDel })
-        .func([] (ACtxBasic& rBasic, ActiveEntVec_t const& rActiveEntDel) noexcept
+        .run_on     ({comScn.pl.activeEntDelete(UseOrRun)})
+        .sync_with  ({physShapes.pl.ownedEnts(Modify__)})
+        .args       ({      comScn.di.basic,                      comScn.di.activeEntDel })
+        .func([] (ACtxBasic &rBasic, ActiveEntVec_t const &rActiveEntDel) noexcept
     {
         update_delete_basic(rBasic, rActiveEntDel.cbegin(), rActiveEntDel.cend());
     });
 
     rFB.task()
         .name       ("Clear Shape Spawning vector after use")
-        .run_on     ({tgShSp.spawnRequest(Clear)})
-        .push_to    (out.m_tasks)
-        .args       ({           idPhysShapes })
-        .func([] (ACtxPhysShapes& rPhysShapes) noexcept
+        .run_on     ({physShapes.pl.spawnRequest(Clear)})
+        .args       ({           physShapes.di.physShapes })
+        .func([] (ACtxPhysShapes &rPhysShapes) noexcept
     {
         rPhysShapes.m_spawnRequest.clear();
     });
-
-
-    return out;
-} // setup_phys_shapes
+}); // ftrPhysShapes
 
 
 
-
-Session setup_phys_shapes_draw(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              windowApp,
-        Session const&              sceneRenderer,
-        Session const&              commonScene,
-        Session const&              physics,
-        Session const&              physShapes)
+FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
+        FeatureBuilder              &rFB,
+        DependOn<FISceneRenderer>   scnRender,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys,
+        DependOn<FIPhysShapes>      physShapes,
+        DependOn<FIWindowApp>       windowApp)
 {
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
-    OSP_DECLARE_GET_DATA_IDS(physShapes,    TESTAPP_DATA_PHYS_SHAPES);
-    auto const windowApp.pl    = windowApp     .get_pipelines< PlWindowApp >();
-    auto const scene.plRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
-    auto const commonScene.pl     = commonScene   .get_pipelines< PlCommonScene >();
-    auto const tgShSp   = physShapes    .get_pipelines< PlPhysShapes >();
-
-    Session out;
+    // TODO: format after framework changes
 
     rFB.task()
         .name       ("Create DrawEnts for spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), commonScene.pl.activeEntResized(Done), scene.plRdr.drawEntResized(ModifyOrSignal), scene.plRdr.drawEnt(New)})
-        .push_to    (out.m_tasks)
-        .args       ({               commonScene.di.basic,             commonScene.di.drawing,                 idScnRender,                idPhysShapes,             commonScene.di.namedMeshes })
-        .func([]    (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxPhysShapes& rPhysShapes, NamedMeshes& rNMesh) noexcept
+        .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun), comScn.pl.activeEntResized(Done), scnRender.pl.drawEntResized(ModifyOrSignal), scnRender.pl.drawEnt(New)})
+        .args       ({               comScn.di.basic,             comScn.di.drawing,                 scnRender.di.scnRender,                physShapes.di.physShapes,             comScn.di.namedMeshes })
+        .func([]    (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, ACtxPhysShapes &rPhysShapes, NamedMeshes &rNMesh) noexcept
     {
         for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
         {
@@ -255,13 +226,12 @@ Session setup_phys_shapes_draw(
 
     rFB.task()
         .name       ("Add mesh and material to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun),
-                      scene.plRdr.entMesh(New), scene.plRdr.material(New), scene.plRdr.drawEnt(New), scene.plRdr.drawEntResized(Done),
-                      scene.plRdr.materialDirty(Modify_), scene.plRdr.entMeshDirty(Modify_)})
-        .push_to    (out.m_tasks)
-        .args       ({            commonScene.di.basic,             commonScene.di.drawing,                 idScnRender,                idPhysShapes,             commonScene.di.namedMeshes })
-        .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxPhysShapes& rPhysShapes, NamedMeshes& rNMesh) noexcept
+        .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun),
+                      scnRender.pl.entMesh(New), scnRender.pl.material(New), scnRender.pl.drawEnt(New), scnRender.pl.drawEntResized(Done),
+                      scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
+        .args       ({            comScn.di.basic,             comScn.di.drawing,                 scnRender.di.scnRender,                physShapes.di.physShapes,             comScn.di.namedMeshes })
+        .func([] (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, ACtxPhysShapes &rPhysShapes, NamedMeshes &rNMesh) noexcept
     {
         Material &rMat = rScnRender.m_materials[rPhysShapes.m_materialId];
 
@@ -291,10 +261,9 @@ Session setup_phys_shapes_draw(
     rFB.task()
         .name       ("Resync spawned shapes DrawEnts")
         .run_on     ({windowApp.pl.resync(Run)})
-        .sync_with  ({tgShSp.ownedEnts(UseOrRun_), commonScene.pl.hierarchy(Ready), commonScene.pl.activeEntResized(Done), scene.plRdr.drawEntResized(ModifyOrSignal)})
-        .push_to    (out.m_tasks)
-        .args       ({               commonScene.di.basic,             commonScene.di.drawing,                 idScnRender,                idPhysShapes,             commonScene.di.namedMeshes })
-        .func([]    (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, ACtxPhysShapes& rPhysShapes, NamedMeshes& rNMesh) noexcept
+        .sync_with  ({physShapes.pl.ownedEnts(UseOrRun_), comScn.pl.hierarchy(Ready), comScn.pl.activeEntResized(Done), scnRender.pl.drawEntResized(ModifyOrSignal)})
+        .args       ({               comScn.di.basic,             comScn.di.drawing,                 scnRender.di.scnRender,                physShapes.di.physShapes,             comScn.di.namedMeshes })
+        .func([]    (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, ACtxPhysShapes &rPhysShapes, NamedMeshes &rNMesh) noexcept
     {
         for (ActiveEnt root : rPhysShapes.ownedEnts)
         {
@@ -307,11 +276,10 @@ Session setup_phys_shapes_draw(
     rFB.task()
         .name       ("Resync spawned shapes mesh and material")
         .run_on     ({windowApp.pl.resync(Run)})
-        .sync_with  ({tgShSp.ownedEnts(UseOrRun_), scene.plRdr.entMesh(New), scene.plRdr.material(New), scene.plRdr.drawEnt(New), scene.plRdr.drawEntResized(Done),
-                      scene.plRdr.materialDirty(Modify_), scene.plRdr.entMeshDirty(Modify_)})
-        .push_to    (out.m_tasks)
-        .args       ({            commonScene.di.basic,             commonScene.di.drawing,             idPhys,                idPhysShapes,                 idScnRender,             commonScene.di.namedMeshes })
-        .func([] (ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxPhysics& rPhys, ACtxPhysShapes& rPhysShapes, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh) noexcept
+        .sync_with  ({physShapes.pl.ownedEnts(UseOrRun_), scnRender.pl.entMesh(New), scnRender.pl.material(New), scnRender.pl.drawEnt(New), scnRender.pl.drawEntResized(Done),
+                      scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
+        .args       ({            comScn.di.basic,             comScn.di.drawing,             phys.di.phys,                physShapes.di.physShapes,                 scnRender.di.scnRender,             comScn.di.namedMeshes })
+        .func([] (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxPhysics &rPhys, ACtxPhysShapes &rPhysShapes, ACtxSceneRender &rScnRender, NamedMeshes &rNMesh) noexcept
     {
         Material &rMat = rScnRender.m_materials[rPhysShapes.m_materialId];
 
@@ -339,54 +307,40 @@ Session setup_phys_shapes_draw(
 
     rFB.task()
         .name       ("Remove deleted ActiveEnts from ACtxPhysShapeser")
-        .run_on     ({commonScene.di.activeEntDel(UseOrRun)})
-        .sync_with  ({tgShSp.ownedEnts(Modify__)})
-        .push_to    (out.m_tasks)
-        .args       ({           idPhysShapes,                      commonScene.di.activeEntDel })
-        .func([] (ACtxPhysShapes& rPhysShapes, ActiveEntVec_t const& rActiveEntDel) noexcept
+        .run_on     ({comScn.pl.activeEntDelete(UseOrRun)})
+        .sync_with  ({physShapes.pl.ownedEnts(Modify__)})
+        .args       ({           physShapes.di.physShapes,                      comScn.di.activeEntDel })
+        .func([] (ACtxPhysShapes &rPhysShapes, ActiveEntVec_t const &rActiveEntDel) noexcept
     {
         for (ActiveEnt const deleted : rActiveEntDel)
         {
             rPhysShapes.ownedEnts.erase(deleted);
         }
     });
-
-    return out;
-} // setup_phys_shapes_draw
+}); // setup_phys_shapes_draw
 
 
 
-
-Session setup_thrower(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              windowApp,
-        Session const&              cameraCtrl,
-        Session const&              physShapes)
+FeatureDef const ftrThrower = feature_def("Thrower", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIThrower>        thrower,
+        DependOn<FICameraControl>   camCtrl,
+        DependOn<FIPhysShapes>      physShapes,
+        DependOn<FIWindowApp>       windowApp)
 {
-    OSP_DECLARE_GET_DATA_IDS(physShapes,     TESTAPP_DATA_PHYS_SHAPES);
-    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,   TESTAPP_DATA_CAMERA_CTRL);
-    auto &rCamCtrl = rFB.data_get< ACtxCameraController > (topData, idCamCtrl);
+    auto &rCamCtrl = rFB.data_get< ACtxCameraController > (camCtrl.di.camCtrl);
 
-    auto const windowApp.pl    = windowApp .get_pipelines<PlWindowApp>();
-    auto const tgCmCt   = cameraCtrl.get_pipelines<PlCameraCtrl>();
-    auto const tgShSp   = physShapes.get_pipelines<PlPhysShapes>();
-
-    Session out;
-    auto const [idBtnThrow] = out.acquire_data<1>(topData);
-
-    rFB.data_emplace< EButtonControlIndex > (topData, idBtnThrow, rCamCtrl.m_controls.button_subscribe("debug_throw"));
+    rFB.data_emplace< EButtonControlIndex > (thrower.di.button, rCamCtrl.m_controls.button_subscribe("debug_throw"));
 
     rFB.task()
         .name       ("Throw spheres when pressing space")
         .run_on     ({windowApp.pl.inputs(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Ready), tgShSp.spawnRequest(Modify_)})
-        .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,                idPhysShapes,                   idBtnThrow })
-        .func([] (ACtxCameraController& rCamCtrl, ACtxPhysShapes& rPhysShapes, EButtonControlIndex btnThrow) noexcept
+        .sync_with  ({camCtrl.pl.camCtrl(Ready), physShapes.pl.spawnRequest(Modify_)})
+        .args       ({               camCtrl.di.camCtrl,    physShapes.di.physShapes,          thrower.di.button })
+        .func       ([] (ACtxCameraController &rCamCtrl, ACtxPhysShapes &rPhysShapes, EButtonControlIndex button) noexcept
     {
         // Throw a sphere when the throw button is pressed
-        if (rCamCtrl.m_controls.button_held(btnThrow))
+        if (rCamCtrl.m_controls.button_held(button))
         {
             Matrix4 const &camTf = rCamCtrl.m_transform;
             float const speed = 120;
@@ -407,46 +361,32 @@ Session setup_thrower(
             }
         }
     });
-
-    return out;
-} // setup_thrower
+}); // ftrThrower
 
 
 
-
-Session setup_droppers(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              scene,
-        Session const&              commonScene,
-        Session const&              physShapes)
+FeatureDef const ftrDroppers = feature_def("Droppers", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIDroppers>       droppers,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysShapes>      physShapes)
 {
-    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(physShapes,    TESTAPP_DATA_PHYS_SHAPES);
-
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const tgShSp   = physShapes    .get_pipelines<PlPhysShapes>();
-
-    Session out;
-    auto const [idSpawnTimerA, idSpawnTimerB] = out.acquire_data<2>(topData);
-
-    rFB.data_emplace< float > (topData, idSpawnTimerA, 0.0f);
-    rFB.data_emplace< float > (topData, idSpawnTimerB, 0.0f);
+    rFB.data_emplace< float > (droppers.di.timerA, 0.0f);
+    rFB.data_emplace< float > (droppers.di.timerB, 0.0f);
 
     rFB.task()
         .name       ("Spawn blocks every 2 seconds")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgShSp.spawnRequest(Modify_)})
-        .push_to    (out.m_tasks)
-        .args({                  idPhysShapes,       idSpawnTimerA,          idDeltaTimeIn })
-        .func([] (ACtxPhysShapes& rPhysShapes, float& rSpawnTimer, float const deltaTimeIn) noexcept
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({physShapes.pl.spawnRequest(Modify_)})
+        .args       ({      physShapes.di.physShapes, droppers.di.timerA,     scn.di.deltaTimeIn })
+        .func       ([] (ACtxPhysShapes &rPhysShapes,      float &timer, float const deltaTimeIn) noexcept
 
     {
-        rSpawnTimer += deltaTimeIn;
-        if (rSpawnTimer >= 2.0f)
+        timer += deltaTimeIn;
+        if (timer >= 2.0f)
         {
-            rSpawnTimer -= 2.0f;
+            timer -= 2.0f;
 
             rPhysShapes.m_spawnRequest.push_back({
                 .m_position = {10.0f, 0.0f, 30.0f},
@@ -460,16 +400,15 @@ Session setup_droppers(
 
     rFB.task()
         .name       ("Spawn cylinders every 1 second")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgShSp.spawnRequest(Modify_)})
-        .push_to    (out.m_tasks)
-        .args({                  idPhysShapes,       idSpawnTimerB,          idDeltaTimeIn })
-        .func([] (ACtxPhysShapes& rPhysShapes, float& rSpawnTimer, float const deltaTimeIn) noexcept
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({physShapes.pl.spawnRequest(Modify_)})
+        .args       ({      physShapes.di.physShapes, droppers.di.timerB,     scn.di.deltaTimeIn })
+        .func       ([] (ACtxPhysShapes &rPhysShapes,      float &timer, float const deltaTimeIn) noexcept
     {
-        rSpawnTimer += deltaTimeIn;
-        if (rSpawnTimer >= 1.0f)
+        timer += deltaTimeIn;
+        if (timer >= 1.0f)
         {
-            rSpawnTimer -= 1.0f;
+            timer -= 1.0f;
 
             rPhysShapes.m_spawnRequest.push_back({
                 .m_position = {-10.0f, 0.0, 30.0f},
@@ -480,43 +419,30 @@ Session setup_droppers(
             });
         }
     });
-
-    return out;
-} // setup_droppers
+}); // ftrDroppers
 
 
 
 
-Session setup_bounds(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              scene,
-        Session const&              commonScene,
-        Session const&              physShapes)
+FeatureDef const ftrBounds = feature_def("Bounds", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIBounds>         bounds,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysShapes>      physShapes)
 {
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(physShapes,    TESTAPP_DATA_PHYS_SHAPES);
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const commonScene.pl     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgShSp   = physShapes    .get_pipelines<PlPhysShapes>();
+    rFB.pipeline(bounds.pl.boundsSet)     .parent(scn.pl.update);
+    rFB.pipeline(bounds.pl.outOfBounds)   .parent(scn.pl.update);
 
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_BOUNDS);
-    auto const tgBnds = out.create_pipelines<PlBounds>(rFB);
-
-    rFB.pipeline(tgBnds.boundsSet)     .parent(scene.pl.update);
-    rFB.pipeline(tgBnds.outOfBounds)   .parent(scene.pl.update);
-
-    rFB.data_emplace< ActiveEntSet_t >       (topData, idBounds);
-    rFB.data_emplace< ActiveEntVec_t >       (topData, idOutOfBounds);
+    rFB.data_emplace< ActiveEntSet_t >       (bounds.di.bounds);
+    rFB.data_emplace< ActiveEntVec_t >       (bounds.di.outOfBounds);
 
     rFB.task()
         .name       ("Check for out-of-bounds entities")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({commonScene.pl.transform(Ready), tgBnds.boundsSet(Ready), tgBnds.outOfBounds(Modify__)})
-        .push_to    (out.m_tasks)
-        .args       ({            commonScene.di.basic,                      idBounds,                idOutOfBounds })
-        .func([] (ACtxBasic const& rBasic, ActiveEntSet_t const& rBounds, ActiveEntVec_t& rOutOfBounds) noexcept
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({comScn.pl.transform(Ready), bounds.pl.boundsSet(Ready), bounds.pl.outOfBounds(Modify__)})
+        .args       ({    comScn.di.basic,              bounds.di.bounds,        bounds.di.outOfBounds })
+        .func([] (ACtxBasic const &rBasic, ActiveEntSet_t const &rBounds, ActiveEntVec_t &rOutOfBounds) noexcept
     {
         for (ActiveEnt const ent : rBounds)
         {
@@ -530,32 +456,29 @@ Session setup_bounds(
 
     rFB.task()
         .name       ("Queue-Delete out-of-bounds entities")
-        .run_on     ({tgBnds.outOfBounds(UseOrRun_)})
-        .sync_with  ({commonScene.di.activeEntDel(Modify_), commonScene.pl.hierarchy(Delete)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,                commonScene.di.activeEntDel,                idOutOfBounds })
-        .func([] (ACtxBasic& rBasic, ActiveEntVec_t& rActiveEntDel, ActiveEntVec_t& rOutOfBounds) noexcept
+        .run_on     ({bounds.pl.outOfBounds(UseOrRun_)})
+        .sync_with  ({comScn.pl.activeEntDelete(Modify_), comScn.pl.hierarchy(Delete)})
+        .args       ({     comScn.di.basic,        comScn.di.activeEntDel,        bounds.di.outOfBounds })
+        .func       ([] (ACtxBasic &rBasic, ActiveEntVec_t &rActiveEntDel, ActiveEntVec_t &rOutOfBounds) noexcept
     {
         SysSceneGraph::queue_delete_entities(rBasic.m_scnGraph, rActiveEntDel, rOutOfBounds.begin(), rOutOfBounds.end());
     });
 
     rFB.task()
         .name       ("Clear out-of-bounds vector once we're done with it")
-        .run_on     ({tgBnds.outOfBounds(Clear_)})
-        .push_to    (out.m_tasks)
-        .args       ({           idOutOfBounds })
-        .func([] (ActiveEntVec_t& rOutOfBounds) noexcept
+        .run_on     ({bounds.pl.outOfBounds(Clear_)})
+        .args       ({          bounds.di.outOfBounds })
+        .func       ([] (ActiveEntVec_t &rOutOfBounds) noexcept
     {
         rOutOfBounds.clear();
     });
 
     rFB.task()
         .name       ("Add bounds to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgBnds.boundsSet(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,                idPhysShapes,                idBounds })
-        .func([] (ACtxBasic& rBasic, ACtxPhysShapes& rPhysShapes, ActiveEntSet_t& rBounds) noexcept
+        .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun), bounds.pl.boundsSet(Modify)})
+        .args       ({     comScn.di.basic,    physShapes.di.physShapes,        bounds.di.bounds })
+        .func       ([] (ACtxBasic &rBasic, ACtxPhysShapes &rPhysShapes, ActiveEntSet_t &rBounds) noexcept
     {
         rBounds.resize(rBasic.m_activeIds.capacity());
 
@@ -575,21 +498,17 @@ Session setup_bounds(
 
     rFB.task()
         .name       ("Delete bounds components")
-        .run_on     ({commonScene.di.activeEntDel(UseOrRun)})
-        .sync_with  ({tgBnds.boundsSet(Delete)})
-        .push_to    (out.m_tasks)
-        .args       ({                 commonScene.di.activeEntDel,                idBounds })
-        .func([] (ActiveEntVec_t const& rActiveEntDel, ActiveEntSet_t& rBounds) noexcept
+        .run_on     ({comScn.pl.activeEntDelete(UseOrRun)})
+        .sync_with  ({bounds.pl.boundsSet(Delete)})
+        .args       ({                comScn.di.activeEntDel,        bounds.di.bounds })
+        .func       ([] (ActiveEntVec_t const &rActiveEntDel, ActiveEntSet_t &rBounds) noexcept
     {
         for (osp::active::ActiveEnt const ent : rActiveEntDel)
         {
             rBounds.erase(ent);
         }
     });
-
-    return out;
-} // setup_bounds
+}); // ftrBounds
 
 
 } // namespace adera
-#endif

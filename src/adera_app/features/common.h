@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,15 +24,7 @@
  */
 #pragma once
 
-
 #include <osp/framework/builder.h>
-
-#include <osp/core/copymove_macros.h>
-#include <osp/activescene/basic.h>
-#include <osp/drawing/drawing.h>
-#include <osp/scientific/shapes.h>
-
-#include <entt/container/dense_map.hpp>
 
 namespace adera
 {
@@ -45,6 +37,6 @@ extern osp::fw::FeatureDef const ftrCommonScene;
 
 extern osp::fw::FeatureDef const ftrWindowApp;
 
-extern osp::fw::FeatureDef const ftrRenderer;
+extern osp::fw::FeatureDef const ftrSceneRenderer;
 
 } // namespace adera

@@ -38,20 +38,13 @@
 #include <adera_app/features/vehicles_machines.h>
 #include <adera_app/features/vehicles_prebuilt.h>
 
-
 #include <adera_app/application.h>
 #include <adera/activescene/vehicles_vb_fn.h>
 #include <adera/drawing/CameraController.h>
 
 #include <osp/activescene/basic.h>
-#include <osp/core/Resources.h>
 #include <osp/util/logging.h>
-//#include <osp/util/top_data.h>
 #include <osp/framework/framework.h>
-
-
-#include <Magnum/GL/DefaultFramebuffer.h>
-
 
 using namespace adera;
 using namespace osp;
@@ -62,7 +55,6 @@ using namespace ftr_inter;
 
 namespace testapp
 {
-
 
 // MaterialIds hints which shaders should be used to draw a DrawEnt
 // DrawEnts can be assigned to multiple materials
@@ -92,140 +84,65 @@ static ScenarioMap_t make_scenarios()
 
     add_scenario({
         .name        = "enginetest",
-        .brief       = "Simple rotating cube scenario ",
-        .description = "even more explaination",
+        .brief       = "Simple rotating cube scenario without using framework",
+        .description = "Uses a single large struct to store a simple OSP scene. This demonstrates "
+                       "how OSP components are usable on their own as separate types and "
+                       "functions, independent of any particular framework.\n"
+                       "Controls:\n"
+                       "* [WASD]            - Move camera\n"
+                       "* [QE]              - Move camera up/down\n"
+                       "* [Drag MouseRight] - Orbit camera\n",
         .loadFunc = [] (TestApp& rTestApp)
     {
         auto        &rFw      = rTestApp.m_framework;
         auto  const mainApp   = rFw.get_interface<FIMainApp>  (rTestApp.m_mainContext);
-        auto        &rAppCtxs = entt::any_cast<adera::AppContexts&>(rFw.data[mainApp.di.appContexts]);
+        auto        &rAppCtxs = rFw.data_get<adera::AppContexts&>(mainApp.di.appContexts);
 
-        rAppCtxs.scene  = rFw.contextIds.create();
-        ContextBuilder  cb {  .m_ctxScope = {rTestApp.m_mainContext}, .m_ctx = rAppCtxs.scene, .m_rFW = rFw };
-        cb.add_feature(ftrEngineTest, rTestApp.m_defaultPkg);
-        LGRN_ASSERTM(cb.m_errors.empty(), "Error adding engine test feature");
-        ContextBuilder::apply(std::move(cb));
+
+        rAppCtxs.scene  = rFw.m_contextIds.create();
+        ContextBuilder  sceneCB { rAppCtxs.scene,  {rTestApp.m_mainContext}, rFw };
+        sceneCB.add_feature(ftrEngineTest, rTestApp.m_defaultPkg);
+        LGRN_ASSERTM(sceneCB.m_errors.empty(), "Error adding engine test feature");
+        ContextBuilder::finalize(std::move(sceneCB));
     }});
-
-
-/*
-
-    add_scenario("enginetest", " Pipelines/Tasks",
-                 [] (TestApp& rTestApp) -> RendererSetupFunc_t
-    {
-        // Declares mainApp.di.resources TopDataId variable, obtained from Session m_application.m_data[0].
-        //
-        // This macro expands to:
-        //
-        //     auto const [mainApp.di.resources, mainApp.di.mainLoopCtrl] = osp::unpack<2>(rTestApp.m_application.m_data);
-        //
-        // TopDataIds can be used to access rTestApp.m_topData. The purpose of TopData is to store
-        // all data in a safe, type-erased, and addressable manner that can be easily accessed by
-        // Tasks. This also allow reserving IDs before instantiation (which cannot be achieved
-        // with (smart) pointers alone)
-        OSP_DECLARE_GET_DATA_IDS(rTestApp.m_application, TESTAPP_DATA_APPLICATION);
-        auto &rResources = rFB.data_get<Resources>(rTestApp.m_topData, mainApp.di.resources);
-
-        // Create 1 unnamed session as m_sessions[0], reserving 1 TopDataId as idSceneData
-        rTestApp.m_scene.m_sessions.resize(1);
-        TopDataId const idSceneData = rTestApp.m_scene.m_sessions[0].acquire_data<1>(rTestApp.m_topData)[0];
-
-        // Create scene, store it in rTestApp.m_topData[idSceneData].
-        // enginetest::setup_scene returns an entt::any containing one big EngineTestScene struct
-        // containing all the scene data: a spinning cube.
-        top_assign<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData, );
-
-        // Called when the MagnumWindowApp / window is opened, called again if the window is
-        // re-opened after its closed. Closing the window completely destructs MagnumWindowApp
-        // and all GPU resources. EngineTestScene will remain untouched in the background.
-        RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp) -> void
-        {
-            TopDataId const idSceneData = rTestApp.m_scene.m_sessions[0].m_data[0];
-            auto &rScene = rFB.data_get<enginetest::EngineTestScene>(rTestApp.m_topData, idSceneData);
-
-            OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,     TESTAPP_DATA_MAGNUM);
-            OSP_DECLARE_GET_DATA_IDS(rTestApp.m_windowApp,  TESTAPP_DATA_WINDOW_APP);
-            auto &rActiveApp    = rFB.data_get< MagnumWindowApp >      (rTestApp.m_topData, idActiveApp);
-            auto &rRenderGl     = rFB.data_get< draw::RenderGL >         (rTestApp.m_topData, magnum.di.renderGl);
-            auto &rUserInput    = rFB.data_get< input::UserInputHandler >(rTestApp.m_topData, windowApp.di.userInput);
-
-            // This creates the renderer actually updates and draws the scene.
-            rActiveApp.set_osp_app(enginetest::generate_osp_magnum_app(rScene, rActiveApp, rRenderGl, rUserInput));
-        };
-
-        return setup_renderer;
-    });
-*/
-     #if 0
-
 
     static constexpr auto sc_gravityForce = Vector3{0.0f, 0.0f, -9.81f};
 
-    add_scenario("physics", "Newton Dynamics integration test scenario",
-                 [] (TestApp& rTestApp) -> RendererSetupFunc_t
+    add_scenario({
+        .name        = "physics",
+        .brief       = "Jolt Physics engine integration test",
+        .description = "Controls:\n"
+                       "* [WASD]            - Move camera\n"
+                       "* [QE]              - Move camera up/down\n"
+                       "* [Drag MouseRight] - Orbit camera\n"
+                       "* [Space]           - Throw spheres\n",
+        .loadFunc = [] (TestApp& rTestApp)
     {
-        #define SCENE_SESSIONS      scene, commonScene, physics, physShapes, droppers, bounds, jolt, joltGravSet, joltGrav, physShapesJolt
-        #define RENDERER_SESSIONS   sceneRenderer, magnumScene, cameraCtrl, cameraFree, shVisual, shFlat, shPhong, camThrow, shapeDraw, cursor
+        auto        &rFW      = rTestApp.m_framework;
+        auto  const mainApp   = rFW.get_interface<FIMainApp>  (rTestApp.m_mainContext);
+        auto        &rAppCtxs = rFW.data_get<adera::AppContexts&>(mainApp.di.appContexts);
 
-        using namespace testapp::scenes;
+        rAppCtxs.scene = rFW.m_contextIds.create();
+        ContextBuilder  sceneCB { rAppCtxs.scene, {rTestApp.m_mainContext}, rFW };
+        sceneCB.add_feature(ftrScene);
+        sceneCB.add_feature(ftrCommonScene, rTestApp.m_defaultPkg);
+        sceneCB.add_feature(ftrPhysics);
+        sceneCB.add_feature(ftrPhysicsShapes, osp::draw::MaterialId{0});
+        sceneCB.add_feature(ftrDroppers);
+        sceneCB.add_feature(ftrBounds);
 
-        auto const  defaultPkg      = rTestApp.m_defaultPkg;
-        auto const  application     = rTestApp.m_application;
-        auto        & rTopData      = rTestApp.m_topData;
+        sceneCB.add_feature(ftrJolt);
+        sceneCB.add_feature(ftrJoltForces);
+        sceneCB.add_feature(ftrJoltAccel, sc_gravityForce);
+        sceneCB.add_feature(ftrPhysicsShapesJolt);
 
-        TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_scene.m_edges, rTestApp.m_taskData};
+        ContextBuilder::finalize(std::move(sceneCB));
 
-        auto & [SCENE_SESSIONS] = resize_then_unpack<10>(rTestApp.m_scene.m_sessions);
+        add_floor(rFW, rAppCtxs.scene, osp::draw::MaterialId{0}, rTestApp.m_defaultPkg, 4);
+    }});
 
-        // Compose together lots of Sessions
-        scene           = setup_scene               (builder, rTopData, application);
-        commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
-        physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
-        droppers        = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
-        bounds          = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
+     #if 0
 
-        jolt            = setup_jolt              (builder, rTopData, scene, commonScene, physics);
-        joltGravSet     = setup_jolt_factors      (builder, rTopData);
-        joltGrav        = setup_jolt_force_accel  (builder, rTopData, jolt, joltGravSet, sc_gravityForce);
-        physShapesJolt  = setup_phys_shapes_jolt  (builder, rTopData, commonScene, physics, physShapes, jolt, joltGravSet);
-
-        add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 4);
-
-        RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp) -> void
-        {
-            auto const  application     = rTestApp.m_application;
-            auto const  windowApp       = rTestApp.m_windowApp;
-            auto const  magnum          = rTestApp.m_magnum;
-            auto const  defaultPkg      = rTestApp.m_defaultPkg;
-            auto        & rTopData      = rTestApp.m_topData;
-
-            TopTaskBuilder builder{rTestApp.m_tasks, rTestApp.m_renderer.m_edges, rTestApp.m_taskData};
-
-            auto & [SCENE_SESSIONS] = unpack<10>(rTestApp.m_scene.m_sessions);
-            auto & [RENDERER_SESSIONS] = resize_then_unpack<10>(rTestApp.m_renderer.m_sessions);
-
-            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
-            create_materials(rTopData, sceneRenderer, sc_materialCount);
-
-            magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
-            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
-            cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
-            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
-            shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
-            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
-            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, physShapes);
-            shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
-            cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
-
-            setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
-        };
-
-        #undef SCENE_SESSIONS
-        #undef RENDERER_SESSIONS
-
-        return setup_renderer;
-    });
 
     add_scenario("vehicles", "Physics scenario but with Vehicles",
                  [] (TestApp& rTestApp) -> RendererSetupFunc_t
@@ -247,38 +164,38 @@ static ScenarioMap_t make_scenarios()
 
         auto & [SCENE_SESSIONS] = resize_then_unpack<22>(rTestApp.m_scene.m_sessions);
 
-        scene            = setup_scene               (builder, rTopData, application);
-        commonScene      = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
-        physics          = setup_physics             (builder, rTopData, scene, commonScene);
-        physShapes       = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
-        droppers         = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
-        bounds           = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
+        scene            = setup_scene               (builder, rapplication);
+        commonScene      = setup_common_scene        (builder, rscene, application, defaultPkg);
+        physics          = setup_physics             (builder, rscene, commonScene);
+        physShapes       = setup_phys_shapes         (builder, rscene, commonScene, physics, sc_matPhong);
+        droppers         = setup_droppers            (builder, rscene, commonScene, physShapes);
+        bounds           = setup_bounds              (builder, rscene, commonScene, physShapes);
 
-        prefabs          = setup_prefabs             (builder, rTopData, application, scene, commonScene, physics);
-        parts            = setup_parts               (builder, rTopData, application, scene);
-        signalsFloat     = setup_signals_float       (builder, rTopData, scene, parts);
-        vehicleSpawn     = setup_vehicle_spawn       (builder, rTopData, scene);
-        vehicleSpawnVB   = setup_vehicle_spawn_vb    (builder, rTopData, application, scene, commonScene, prefabs, parts, vehicleSpawn, signalsFloat);
-        testVehicles     = setup_prebuilt_vehicles   (builder, rTopData, application, scene);
+        prefabs          = setup_prefabs             (builder, rapplication, scene, commonScene, physics);
+        parts            = setup_parts               (builder, rapplication, scene);
+        signalsFloat     = setup_signals_float       (builder, rscene, parts);
+        vehicleSpawn     = setup_vehicle_spawn       (builder, rscene);
+        vehicleSpawnVB   = setup_vehicle_spawn_vb    (builder, rapplication, scene, commonScene, prefabs, parts, vehicleSpawn, signalsFloat);
+        testVehicles     = setup_prebuilt_vehicles   (builder, rapplication, scene);
 
-        machRocket       = setup_mach_rocket         (builder, rTopData, scene, parts, signalsFloat);
-        machRcsDriver    = setup_mach_rcsdriver      (builder, rTopData, scene, parts, signalsFloat);
+        machRocket       = setup_mach_rocket         (builder, rscene, parts, signalsFloat);
+        machRcsDriver    = setup_mach_rcsdriver      (builder, rscene, parts, signalsFloat);
 
-        jolt             = setup_jolt              (builder, rTopData, scene, commonScene, physics);
+        jolt             = setup_jolt              (builder, rscene, commonScene, physics);
         joltGravSet      = setup_jolt_factors      (builder, rTopData);
-        joltGrav         = setup_jolt_force_accel  (builder, rTopData, jolt, joltGravSet, sc_gravityForce);
-        physShapesJolt   = setup_phys_shapes_jolt  (builder, rTopData, commonScene, physics, physShapes, jolt, joltGravSet);
-        vehicleSpawnJolt = setup_vehicle_spawn_jolt(builder, rTopData, application, commonScene, physics, prefabs, parts, vehicleSpawn, jolt);
+        joltGrav         = setup_jolt_force_accel  (builder, rjolt, joltGravSet, sc_gravityForce);
+        physShapesJolt   = setup_phys_shapes_jolt  (builder, rcommonScene, physics, physShapes, jolt, joltGravSet);
+        vehicleSpawnJolt = setup_vehicle_spawn_jolt(builder, rapplication, commonScene, physics, prefabs, parts, vehicleSpawn, jolt);
         joltRocketSet    = setup_jolt_factors      (builder, rTopData);
-        rocketsJolt      = setup_rocket_thrust_jolt(builder, rTopData, scene, commonScene, physics, prefabs, parts, signalsFloat, jolt, joltRocketSet);
+        rocketsJolt      = setup_rocket_thrust_jolt(builder, rscene, commonScene, physics, prefabs, parts, signalsFloat, jolt, joltRocketSet);
 
         OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,   TESTAPP_DATA_VEHICLE_SPAWN);
         OSP_DECLARE_GET_DATA_IDS(vehicleSpawnVB, TESTAPP_DATA_VEHICLE_SPAWN_VB);
         OSP_DECLARE_GET_DATA_IDS(testVehicles,   TESTAPP_DATA_TEST_VEHICLES);
 
-        auto &rVehicleSpawn     = rFB.data_get<ACtxVehicleSpawn>     (rTopData, idVehicleSpawn);
-        auto &rVehicleSpawnVB   = rFB.data_get<ACtxVehicleSpawnVB>   (rTopData, idVehicleSpawnVB);
-        auto &rPrebuiltVehicles = rFB.data_get<PrebuiltVehicles>     (rTopData, idPrebuiltVehicles);
+        auto &rVehicleSpawn     = rFB.data_get<ACtxVehicleSpawn>     (rvhclSpawn.di.vehicleSpawn);
+        auto &rVehicleSpawnVB   = rFB.data_get<ACtxVehicleSpawnVB>   (rvhclSpawn.di.vehicleSpawnVB);
+        auto &rPrebuiltVehicles = rFB.data_get<PrebuiltVehicles>     (ridPrebuiltVehicles);
 
         for (int i = 0; i < 10; ++i)
         {
@@ -291,7 +208,7 @@ static ScenarioMap_t make_scenarios()
             rVehicleSpawnVB.dataVB.push_back(rPrebuiltVehicles[gc_pbvSimpleCommandServiceModule].get());
         }
 
-        add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 4);
+        add_floor(rphysShapes, sc_matVisualizer, defaultPkg, 4);
 
         RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp)
         {
@@ -306,22 +223,22 @@ static ScenarioMap_t make_scenarios()
             auto & [SCENE_SESSIONS] = unpack<22>(rTestApp.m_scene.m_sessions);
             auto & [RENDERER_SESSIONS] = resize_then_unpack<14>(rTestApp.m_renderer.m_sessions);
 
-            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
-            create_materials(rTopData, sceneRenderer, sc_materialCount);
+            sceneRenderer   = setup_scene_renderer      (builder, rapplication, windowApp, commonScene);
+            create_materials(rsceneRenderer, sc_materialCount);
 
-            magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
-            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
-            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
-            shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
-            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
-            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, physShapes);
-            shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
-            cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
-            prefabDraw      = setup_prefab_draw         (builder, rTopData, application, windowApp, sceneRenderer, commonScene, prefabs, sc_matPhong);
-            vehicleDraw     = setup_vehicle_spawn_draw  (builder, rTopData, sceneRenderer, vehicleSpawn);
-            vehicleCtrl     = setup_vehicle_control     (builder, rTopData, windowApp, scene, parts, signalsFloat);
-            cameraVehicle   = setup_camera_vehicle      (builder, rTopData, windowApp, scene, sceneRenderer, commonScene, physics, parts, cameraCtrl, vehicleCtrl);
-            thrustIndicator = setup_thrust_indicators   (builder, rTopData, application, windowApp, commonScene, parts, signalsFloat, sceneRenderer, defaultPkg, sc_matFlat);
+            magnumScene     = setup_magnum_scene        (builder, rapplication, windowApp, sceneRenderer, magnum, scene, commonScene);
+            cameraCtrl      = setup_camera_ctrl         (builder, rwindowApp, sceneRenderer, magnumScene);
+            shVisual        = setup_shader_visualizer   (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
+            shFlat          = setup_shader_flat         (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+            shPhong         = setup_shader_phong        (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
+            camThrow        = setup_thrower             (builder, rwindowApp, cameraCtrl, physShapes);
+            shapeDraw       = setup_phys_shapes_draw    (builder, rwindowApp, sceneRenderer, commonScene, physics, physShapes);
+            cursor          = setup_cursor              (builder, rapplication, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
+            prefabDraw      = setup_prefab_draw         (builder, rapplication, windowApp, sceneRenderer, commonScene, prefabs, sc_matPhong);
+            vehicleDraw     = setup_vehicle_spawn_draw  (builder, rsceneRenderer, vehicleSpawn);
+            vehicleCtrl     = setup_vehicle_control     (builder, rwindowApp, scene, parts, signalsFloat);
+            cameraVehicle   = setup_camera_vehicle      (builder, rwindowApp, scene, sceneRenderer, commonScene, physics, parts, cameraCtrl, vehicleCtrl);
+            thrustIndicator = setup_thrust_indicators   (builder, rapplication, windowApp, commonScene, parts, signalsFloat, sceneRenderer, defaultPkg, sc_matFlat);
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };
@@ -348,21 +265,21 @@ static ScenarioMap_t make_scenarios()
 
         auto & [SCENE_SESSIONS] = resize_then_unpack<7>(rTestApp.m_scene.m_sessions);
 
-        scene           = setup_scene               (builder, rTopData, application);
-        commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
-        physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
-        terrain         = setup_terrain             (builder, rTopData, scene, commonScene);
-        terrainIco      = setup_terrain_icosahedron (builder, rTopData, terrain);
-        terrainSubdiv   = setup_terrain_subdiv_dist (builder, rTopData, scene, terrain, terrainIco);
+        scene           = setup_scene               (builder, rapplication);
+        commonScene     = setup_common_scene        (builder, rscene, application, defaultPkg);
+        physics         = setup_physics             (builder, rscene, commonScene);
+        physShapes      = setup_phys_shapes         (builder, rscene, commonScene, physics, sc_matPhong);
+        terrain         = setup_terrain             (builder, rscene, commonScene);
+        terrainIco      = setup_terrain_icosahedron (builder, rterrain);
+        terrainSubdiv   = setup_terrain_subdiv_dist (builder, rscene, terrain, terrainIco);
 
         OSP_DECLARE_GET_DATA_IDS(terrain,    TESTAPP_DATA_TERRAIN);
-        auto &rTerrain = rFB.data_get<ACtxTerrain>(rTopData, idTerrain);
-        auto &rTerrainFrame = rFB.data_get<ACtxTerrainFrame>(rTopData, idTerrainFrame);
+        auto &rTerrain = rFB.data_get<ACtxTerrain>(rterrain.di.terrain);
+        auto &rTerrainFrame = rFB.data_get<ACtxTerrainFrame>(rterrain.di.terrainFrame);
 
         constexpr std::uint64_t c_earthRadius = 6371000;
 
-        initialize_ico_terrain(rTopData, terrain, terrainIco, {
+        initialize_ico_terrain(rterrain, terrainIco, {
             .radius                 = double(c_earthRadius),
             .height                 = 20000.0,   // Height between Mariana Trench and Mount Everest
             .skelPrecision          = 10,        // 2^10 units = 1024 units = 1 meter
@@ -386,22 +303,22 @@ static ScenarioMap_t make_scenarios()
             auto & [SCENE_SESSIONS] = unpack<7>(rTestApp.m_scene.m_sessions);
             auto & [RENDERER_SESSIONS] = resize_then_unpack<11>(rTestApp.m_renderer.m_sessions);
 
-            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
-            create_materials(rTopData, sceneRenderer, sc_materialCount);
+            sceneRenderer   = setup_scene_renderer      (builder, rapplication, windowApp, commonScene);
+            create_materials(rsceneRenderer, sc_materialCount);
 
-            magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
-            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
-            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
-            shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
-            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
-            shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
-            cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
-            terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, scene, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matVisualizer);
-            terrainDrawGL   = setup_terrain_draw_magnum (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, terrain);
+            magnumScene     = setup_magnum_scene        (builder, rapplication, windowApp, sceneRenderer, magnum, scene, commonScene);
+            cameraCtrl      = setup_camera_ctrl         (builder, rwindowApp, sceneRenderer, magnumScene);
+            shVisual        = setup_shader_visualizer   (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
+            shFlat          = setup_shader_flat         (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+            shPhong         = setup_shader_phong        (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
+            shapeDraw       = setup_phys_shapes_draw    (builder, rwindowApp, sceneRenderer, commonScene, physics, physShapes);
+            cursor          = setup_cursor              (builder, rapplication, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
+            terrainDraw     = setup_terrain_debug_draw  (builder, rscene, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matVisualizer);
+            terrainDrawGL   = setup_terrain_draw_magnum (builder, rwindowApp, sceneRenderer, magnum, magnumScene, terrain);
 
             OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
 
-            auto &rCamCtrl = rFB.data_get<ACtxCameraController>(rTopData, idCamCtrl);
+            auto &rCamCtrl = rFB.data_get<ACtxCameraController>(rcamCtrl.di.camCtrl);
             rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
             rCamCtrl.m_orbitDistanceMin = 1.0f;
             rCamCtrl.m_moveSpeed = 0.5f;
@@ -432,19 +349,19 @@ static ScenarioMap_t make_scenarios()
 
         auto & [SCENE_SESSIONS] = resize_then_unpack<7>(rTestApp.m_scene.m_sessions);
 
-        scene           = setup_scene               (builder, rTopData, application);
-        commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
-        physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
-        terrain         = setup_terrain             (builder, rTopData, scene, commonScene);
-        terrainIco      = setup_terrain_icosahedron (builder, rTopData, terrain);
-        terrainSubdiv   = setup_terrain_subdiv_dist (builder, rTopData, scene, terrain, terrainIco);
+        scene           = setup_scene               (builder, rapplication);
+        commonScene     = setup_common_scene        (builder, rscene, application, defaultPkg);
+        physics         = setup_physics             (builder, rscene, commonScene);
+        physShapes      = setup_phys_shapes         (builder, rscene, commonScene, physics, sc_matPhong);
+        terrain         = setup_terrain             (builder, rscene, commonScene);
+        terrainIco      = setup_terrain_icosahedron (builder, rterrain);
+        terrainSubdiv   = setup_terrain_subdiv_dist (builder, rscene, terrain, terrainIco);
 
         OSP_DECLARE_GET_DATA_IDS(terrain,    TESTAPP_DATA_TERRAIN);
-        auto &rTerrain = rFB.data_get<ACtxTerrain>(rTopData, idTerrain);
-        auto &rTerrainFrame = rFB.data_get<ACtxTerrainFrame>(rTopData, idTerrainFrame);
+        auto &rTerrain = rFB.data_get<ACtxTerrain>(rterrain.di.terrain);
+        auto &rTerrainFrame = rFB.data_get<ACtxTerrainFrame>(rterrain.di.terrainFrame);
 
-        initialize_ico_terrain(rTopData, terrain, terrainIco, {
+        initialize_ico_terrain(rterrain, terrainIco, {
             .radius                 = 100.0,
             .height                 = 2.0,
             .skelPrecision          = 10, // 2^10 units = 1024 units = 1 meter
@@ -468,22 +385,22 @@ static ScenarioMap_t make_scenarios()
             auto & [SCENE_SESSIONS] = unpack<7>(rTestApp.m_scene.m_sessions);
             auto & [RENDERER_SESSIONS] = resize_then_unpack<11>(rTestApp.m_renderer.m_sessions);
 
-            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
-            create_materials(rTopData, sceneRenderer, sc_materialCount);
+            sceneRenderer   = setup_scene_renderer      (builder, rapplication, windowApp, commonScene);
+            create_materials(rsceneRenderer, sc_materialCount);
 
-            magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
-            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
-            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
-            shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
-            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
-            shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
-            cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
-            terrainDraw     = setup_terrain_debug_draw  (builder, rTopData, scene, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matVisualizer);
-            terrainDrawGL   = setup_terrain_draw_magnum (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, terrain);
+            magnumScene     = setup_magnum_scene        (builder, rapplication, windowApp, sceneRenderer, magnum, scene, commonScene);
+            cameraCtrl      = setup_camera_ctrl         (builder, rwindowApp, sceneRenderer, magnumScene);
+            shVisual        = setup_shader_visualizer   (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
+            shFlat          = setup_shader_flat         (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+            shPhong         = setup_shader_phong        (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
+            shapeDraw       = setup_phys_shapes_draw    (builder, rwindowApp, sceneRenderer, commonScene, physics, physShapes);
+            cursor          = setup_cursor              (builder, rapplication, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
+            terrainDraw     = setup_terrain_debug_draw  (builder, rscene, sceneRenderer, cameraCtrl, commonScene, terrain, terrainIco, sc_matVisualizer);
+            terrainDrawGL   = setup_terrain_draw_magnum (builder, rwindowApp, sceneRenderer, magnum, magnumScene, terrain);
 
             OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
 
-            auto &rCamCtrl = rFB.data_get<ACtxCameraController>(rTopData, idCamCtrl);
+            auto &rCamCtrl = rFB.data_get<ACtxCameraController>(rcamCtrl.di.camCtrl);
             rCamCtrl.m_target = Vector3(0.0f, 0.0f, 0.0f);
             rCamCtrl.m_orbitDistanceMin = 1.0f;
             rCamCtrl.m_moveSpeed = 0.5f;
@@ -514,25 +431,25 @@ static ScenarioMap_t make_scenarios()
         auto & [SCENE_SESSIONS] = resize_then_unpack<13>(rTestApp.m_scene.m_sessions);
 
         // Compose together lots of Sessions
-        scene           = setup_scene               (builder, rTopData, application);
-        commonScene     = setup_common_scene        (builder, rTopData, scene, application, defaultPkg);
-        physics         = setup_physics             (builder, rTopData, scene, commonScene);
-        physShapes      = setup_phys_shapes         (builder, rTopData, scene, commonScene, physics, sc_matPhong);
-        droppers        = setup_droppers            (builder, rTopData, scene, commonScene, physShapes);
-        bounds          = setup_bounds              (builder, rTopData, scene, commonScene, physShapes);
+        scene           = setup_scene               (builder, rapplication);
+        commonScene     = setup_common_scene        (builder, rscene, application, defaultPkg);
+        physics         = setup_physics             (builder, rscene, commonScene);
+        physShapes      = setup_phys_shapes         (builder, rscene, commonScene, physics, sc_matPhong);
+        droppers        = setup_droppers            (builder, rscene, commonScene, physShapes);
+        bounds          = setup_bounds              (builder, rscene, commonScene, physShapes);
 
-        jolt            = setup_jolt              (builder, rTopData, scene, commonScene, physics);
+        jolt            = setup_jolt              (builder, rscene, commonScene, physics);
         joltGravSet     = setup_jolt_factors      (builder, rTopData);
-        joltGrav        = setup_jolt_force_accel  (builder, rTopData, jolt, joltGravSet, Vector3{0.0f, 0.0f, -9.81f});
-        physShapesJolt  = setup_phys_shapes_jolt  (builder, rTopData, commonScene, physics, physShapes, jolt, joltGravSet);
+        joltGrav        = setup_jolt_force_accel  (builder, rjolt, joltGravSet, Vector3{0.0f, 0.0f, -9.81f});
+        physShapesJolt  = setup_phys_shapes_jolt  (builder, rcommonScene, physics, physShapes, jolt, joltGravSet);
 
         auto const mainApp.pl = application.get_pipelines< PlApplication >();
 
-        uniCore         = setup_uni_core            (builder, rTopData, mainApp.pl.mainLoop);
-        uniScnFrame     = setup_uni_sceneframe      (builder, rTopData, uniCore);
-        uniTestPlanets  = setup_uni_testplanets     (builder, rTopData, uniCore, uniScnFrame);
+        uniCore         = setup_uni_core            (builder, rmainApp.pl.mainLoop);
+        uniScnFrame     = setup_uni_sceneframe      (builder, runiCore);
+        uniTestPlanets  = setup_uni_testplanets     (builder, runiCore, uniScnFrame);
 
-        add_floor(rTopData, physShapes, sc_matVisualizer, defaultPkg, 0);
+        add_floor(rphysShapes, sc_matVisualizer, defaultPkg, 0);
 
         RendererSetupFunc_t const setup_renderer = [] (TestApp& rTestApp)
         {
@@ -547,19 +464,19 @@ static ScenarioMap_t make_scenarios()
             auto & [SCENE_SESSIONS] = unpack<13>(rTestApp.m_scene.m_sessions);
             auto & [RENDERER_SESSIONS] = resize_then_unpack<11>(rTestApp.m_renderer.m_sessions);
 
-            sceneRenderer   = setup_scene_renderer      (builder, rTopData, application, windowApp, commonScene);
-            create_materials(rTopData, sceneRenderer, sc_materialCount);
+            sceneRenderer   = setup_scene_renderer      (builder, rapplication, windowApp, commonScene);
+            create_materials(rsceneRenderer, sc_materialCount);
 
-            magnumScene     = setup_magnum_scene        (builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
-            cameraCtrl      = setup_camera_ctrl         (builder, rTopData, windowApp, sceneRenderer, magnumScene);
-            cameraFree      = setup_camera_free         (builder, rTopData, windowApp, scene, cameraCtrl);
-            shVisual        = setup_shader_visualizer   (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
-            shFlat          = setup_shader_flat         (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
-            shPhong         = setup_shader_phong        (builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
-            camThrow        = setup_thrower             (builder, rTopData, windowApp, cameraCtrl, physShapes);
-            shapeDraw       = setup_phys_shapes_draw    (builder, rTopData, windowApp, sceneRenderer, commonScene, physics, physShapes);
-            cursor          = setup_cursor              (builder, rTopData, application, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
-            planetsDraw     = setup_testplanets_draw    (builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, uniCore, uniScnFrame, uniTestPlanets, sc_matVisualizer, sc_matFlat);
+            magnumScene     = setup_magnum_scene        (builder, rapplication, windowApp, sceneRenderer, magnum, scene, commonScene);
+            cameraCtrl      = setup_camera_ctrl         (builder, rwindowApp, sceneRenderer, magnumScene);
+            cameraFree      = setup_camera_free         (builder, rwindowApp, scene, cameraCtrl);
+            shVisual        = setup_shader_visualizer   (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matVisualizer);
+            shFlat          = setup_shader_flat         (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+            shPhong         = setup_shader_phong        (builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matPhong);
+            camThrow        = setup_thrower             (builder, rwindowApp, cameraCtrl, physShapes);
+            shapeDraw       = setup_phys_shapes_draw    (builder, rwindowApp, sceneRenderer, commonScene, physics, physShapes);
+            cursor          = setup_cursor              (builder, rapplication, sceneRenderer, cameraCtrl, commonScene, sc_matFlat, rTestApp.m_defaultPkg);
+            planetsDraw     = setup_testplanets_draw    (builder, rwindowApp, sceneRenderer, cameraCtrl, commonScene, uniCore, uniScnFrame, uniTestPlanets, sc_matVisualizer, sc_matFlat);
 
             setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
         };
@@ -587,14 +504,14 @@ static ScenarioMap_t make_scenarios()
             auto& [SCENE_SESSIONS] = resize_then_unpack<5>(rTestApp.m_scene.m_sessions);
 
             // Compose together lots of Sessions
-            scene = setup_scene(builder, rTopData, application);
-            commonScene = setup_common_scene(builder, rTopData, scene, application, defaultPkg);
+            scene = setup_scene(builder, rapplication);
+            commonScene = setup_common_scene(builder, rscene, application, defaultPkg);
 
             auto const mainApp.pl = application.get_pipelines< PlApplication >();
 
-            solarSystemCore = setup_uni_core(builder, rTopData, mainApp.pl.mainLoop);
-            solarSystemScnFrame = setup_uni_sceneframe(builder, rTopData, solarSystemCore);
-            solarSystemTestPlanets = setup_solar_system_testplanets(builder, rTopData, solarSystemCore, solarSystemScnFrame);
+            solarSystemCore = setup_uni_core(builder, rmainApp.pl.mainLoop);
+            solarSystemScnFrame = setup_uni_sceneframe(builder, rsolarSystemCore);
+            solarSystemTestPlanets = setup_solar_system_testplanets(builder, rsolarSystemCore, solarSystemScnFrame);
 
             RendererSetupFunc_t const setup_renderer = [](TestApp& rTestApp)
             {
@@ -609,21 +526,21 @@ static ScenarioMap_t make_scenarios()
                 auto& [SCENE_SESSIONS] = unpack<5>(rTestApp.m_scene.m_sessions);
                 auto& [RENDERER_SESSIONS] = resize_then_unpack<6>(rTestApp.m_renderer.m_sessions);
 
-                sceneRenderer = setup_scene_renderer(builder, rTopData, application, windowApp, commonScene);
-                create_materials(rTopData, sceneRenderer, sc_materialCount);
+                sceneRenderer = setup_scene_renderer(builder, rapplication, windowApp, commonScene);
+                create_materials(rsceneRenderer, sc_materialCount);
 
-                magnumScene = setup_magnum_scene(builder, rTopData, application, windowApp, sceneRenderer, magnum, scene, commonScene);
-                cameraCtrl = setup_camera_ctrl(builder, rTopData, windowApp, sceneRenderer, magnumScene);
+                magnumScene = setup_magnum_scene(builder, rapplication, windowApp, sceneRenderer, magnum, scene, commonScene);
+                cameraCtrl = setup_camera_ctrl(builder, rwindowApp, sceneRenderer, magnumScene);
 
                 OSP_DECLARE_GET_DATA_IDS(cameraCtrl, TESTAPP_DATA_CAMERA_CTRL);
 
                 // Zoom out the camera so that all planets are in view
-                auto& rCameraController = rFB.data_get<ACtxCameraController>(rTopData, idCamCtrl);
+                auto& rCameraController = rFB.data_get<ACtxCameraController>(rcamCtrl.di.camCtrl);
                 rCameraController.m_orbitDistance += 75000;
 
-                cameraFree = setup_camera_free(builder, rTopData, windowApp, scene, cameraCtrl);
-                shFlat = setup_shader_flat(builder, rTopData, windowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
-                planetsDraw = setup_solar_system_planets_draw(builder, rTopData, windowApp, sceneRenderer, cameraCtrl, commonScene, solarSystemCore, solarSystemScnFrame, solarSystemTestPlanets, sc_matFlat);
+                cameraFree = setup_camera_free(builder, rwindowApp, scene, cameraCtrl);
+                shFlat = setup_shader_flat(builder, rwindowApp, sceneRenderer, magnum, magnumScene, sc_matFlat);
+                planetsDraw = setup_solar_system_planets_draw(builder, rwindowApp, sceneRenderer, cameraCtrl, commonScene, solarSystemCore, solarSystemScnFrame, solarSystemTestPlanets, sc_matFlat);
 
                 setup_magnum_draw(rTestApp, scene, sceneRenderer, magnumScene);
             };
@@ -643,40 +560,6 @@ ScenarioMap_t const& scenarios()
     static ScenarioMap_t s_scenarioMap = make_scenarios();
     return s_scenarioMap;
 }
-
-
-//-----------------------------------------------------------------------------
-
-
-
-
-
-
-//void setup_magnum_draw(TestApp& rTestApp, Session const& scene, Session const& sceneRenderer, Session const& magnumScene)
-//{
-//    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_application,    TESTAPP_DATA_APPLICATION);
-//    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,             TESTAPP_DATA_SCENE_RENDERER);
-//    OSP_DECLARE_GET_DATA_IDS(rTestApp.m_magnum,         TESTAPP_DATA_MAGNUM);
-//    OSP_DECLARE_GET_DATA_IDS(magnumScene,               TESTAPP_DATA_MAGNUM_SCENE);
-
-//    auto &rMainLoopCtrl = rFB.data_get<MainLoopControl>  (rTestApp.m_topData, mainApp.di.mainLoopCtrl);
-//    auto &rActiveApp    = rFB.data_get<MagnumWindowApp>(rTestApp.m_topData, idActiveApp);
-//    auto &rCamera       = rFB.data_get<draw::Camera>     (rTestApp.m_topData, idCamera);
-
-//    rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
-
-//    MainLoopSignals const signals
-//    {
-//        .mainLoop     = rTestApp.m_application .get_pipelines<PlApplication>()   .mainLoop,
-//        .inputs       = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .inputs,
-//        .renderSync   = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .sync,
-//        .renderResync = rTestApp.m_windowApp   .get_pipelines<PlWindowApp>()     .resync,
-//        .sceneUpdate  = scene                  .get_pipelines<PlScene>()         .update,
-//        .sceneRender  = sceneRenderer          .get_pipelines<PlSceneRenderer>() .render,
-//    };
-
-//    rActiveApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, signals) );
-//}
 
 } // namespace testapp
 

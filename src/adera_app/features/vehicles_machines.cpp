@@ -56,17 +56,17 @@ Session setup_mach_rocket(
 {
     OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
     OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const tgParts  = parts         .get_pipelines<PlParts>();
+    auto const scn.pl    = scene         .get_pipelines<PlScene>();
+    auto const parts.pl  = parts         .get_pipelines<PlParts>();
 
     Session out;
 
     rFB.task()
         .name       ("Allocate Machine update bitset for MagicRocket")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgParts.machIds(Ready), tgParts.machUpdExtIn(New)})
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({parts.pl.machIds(Ready), parts.pl.machUpdExtIn(New)})
         .push_to    (out.m_tasks)
-        .args       ({idScnParts, idUpdMach})
+        .args       ({parts.di.scnParts, idUpdMach})
         .func       ([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach)
     {
         rUpdMach.localDirty[gc_mtMagicRocket].resize(rScnParts.machines.perType[gc_mtMagicRocket].localIds.capacity());
@@ -107,21 +107,21 @@ Session setup_thrust_indicators(
     OSP_DECLARE_GET_DATA_IDS(signalsFloat,   TESTAPP_DATA_SIGNALS_FLOAT)
     OSP_DECLARE_GET_DATA_IDS(sceneRenderer,  TESTAPP_DATA_SCENE_RENDERER);
     auto const windowApp.pl    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const scene.plRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
-    auto const tgParts  = parts         .get_pipelines<PlParts>();
+    auto const scnRender.pl = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const parts.pl  = parts         .get_pipelines<PlParts>();
 
-    auto &rResources        = rFB.data_get< Resources >      (topData, mainApp.di.resources);
-    auto &rBasic            = rFB.data_get< ACtxBasic >      (topData, commonScene.di.basic);
-    auto &rDrawing          = rFB.data_get< ACtxDrawing >    (topData, commonScene.di.drawing);
-    auto &rDrawingRes       = rFB.data_get< ACtxDrawingRes > (topData, commonScene.di.drawingRes);
-    auto &rScnRender        = rFB.data_get< ACtxSceneRender >(topData, idScnRender);
-    auto &rDrawTfObservers  = rFB.data_get< DrawTfObservers >(topData, idDrawTfObservers);
-    auto &rScnParts         = rFB.data_get< ACtxParts >      (topData, idScnParts);
-    auto &rSigValFloat      = rFB.data_get< SignalValues_t<float> > (topData, idSigValFloat);
+    auto &rResources        = rFB.data_get< Resources >      (mainApp.di.resources);
+    auto &rBasic            = rFB.data_get< ACtxBasic >      (comScn.di.basic);
+    auto &rDrawing          = rFB.data_get< ACtxDrawing >    (comScn.di.drawing);
+    auto &rDrawingRes       = rFB.data_get< ACtxDrawingRes > (comScn.di.drawingRes);
+    auto &rScnRender        = rFB.data_get< ACtxSceneRender >(scnRender.di.scnRender);
+    auto &rDrawTfObservers  = rFB.data_get< DrawTfObservers >(scnRender.di.drawTfObservers);
+    auto &rScnParts         = rFB.data_get< ACtxParts >      (parts.di.scnParts);
+    auto &rSigValFloat      = rFB.data_get< SignalValues_t<float> > (sigFloat.di.sigValFloat);
 
     Session out;
     auto const [idThrustIndicator] = out.acquire_data<1>(topData);
-    auto &rThrustIndicator = rFB.data_emplace<ThrustIndicator>(topData, idThrustIndicator);
+    auto &rThrustIndicator = rFB.data_emplace<ThrustIndicator>(idThrustIndicator);
 
     rThrustIndicator.material   = material;
     rThrustIndicator.color      = { 1.0f, 0.2f, 0.8f, 1.0f };
@@ -130,9 +130,9 @@ Session setup_thrust_indicators(
     rFB.task()
         .name       ("Create DrawEnts for Thrust indicators")
         .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({scene.plRdr.drawEntResized(ModifyOrSignal), scene.plRdr.drawEnt(New), tgParts.machIds(Ready)})
+        .sync_with  ({scnRender.pl.drawEntResized(ModifyOrSignal), scnRender.pl.drawEnt(New), parts.pl.machIds(Ready)})
         .push_to    (out.m_tasks)
-        .args       ({               idScnRender,                  idScnParts,                 idThrustIndicator})
+        .args       ({               scnRender.di.scnRender,                  parts.di.scnParts,                 idThrustIndicator})
         .func([]    (ACtxSceneRender &rScnRender,  ACtxParts const& rScnParts, ThrustIndicator& rThrustIndicator) noexcept
     {
         PerMachType const& rockets = rScnParts.machines.perType[gc_mtMagicRocket];
@@ -152,9 +152,9 @@ Session setup_thrust_indicators(
     rFB.task()
         .name       ("Add mesh and materials to Thrust indicators")
         .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({scene.plRdr.drawEntResized(Done), scene.plRdr.drawEnt(Ready), scene.plRdr.entMesh(New), scene.plRdr.material(New), scene.plRdr.materialDirty(Modify_), scene.plRdr.entMeshDirty(Modify_)})
+        .sync_with  ({scnRender.pl.drawEntResized(Done), scnRender.pl.drawEnt(Ready), scnRender.pl.entMesh(New), scnRender.pl.material(New), scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
         .push_to    (out.m_tasks)
-        .args       ({         commonScene.di.basic,                 idScnRender,             commonScene.di.drawing,                      commonScene.di.drawingRes,                 idScnParts,                             idSigValFloat,                 idThrustIndicator})
+        .args       ({         comScn.di.basic,                 scnRender.di.scnRender,             comScn.di.drawing,                      comScn.di.drawingRes,                 parts.di.scnParts,                             sigFloat.di.sigValFloat,                 idThrustIndicator})
         .func([]    (ACtxBasic& rBasic, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, ACtxDrawingRes const& rDrawingRes, ACtxParts const& rScnParts, SignalValues_t<float> const& rSigValFloat, ThrustIndicator& rThrustIndicator) noexcept
     {
         Material            &rMat           = rScnRender.m_materials[rThrustIndicator.material];
@@ -249,7 +249,7 @@ Session setup_thrust_indicators(
         .name       ("Clean up ThrustIndicator")
         .run_on     ({windowApp.pl.cleanup(Run_)})
         .push_to    (out.m_tasks)
-        .args       ({      mainApp.di.resources,             commonScene.di.drawing,                 idThrustIndicator})
+        .args       ({      mainApp.di.resources,             comScn.di.drawing,                 idThrustIndicator})
         .func([] (Resources& rResources, ACtxDrawing& rDrawing, ThrustIndicator& rThrustIndicator) noexcept
     {
         rDrawing.m_meshRefCounts.ref_release(std::move(rThrustIndicator.mesh));
@@ -270,17 +270,17 @@ Session setup_mach_rcsdriver(
 {
     OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
     OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const tgParts  = parts         .get_pipelines<PlParts>();
+    auto const scn.pl    = scene         .get_pipelines<PlScene>();
+    auto const parts.pl  = parts         .get_pipelines<PlParts>();
 
     Session out;
 
     rFB.task()
         .name       ("Allocate Machine update bitset for RcsDriver")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgParts.machIds(Ready), tgParts.machUpdExtIn(New)})
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({parts.pl.machIds(Ready), parts.pl.machUpdExtIn(New)})
         .push_to    (out.m_tasks)
-        .args       ({idScnParts, idUpdMach})
+        .args       ({parts.di.scnParts, idUpdMach})
         .func       ([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach)
     {
         rUpdMach.localDirty[gc_mtRcsDriver].resize(rScnParts.machines.perType[gc_mtRcsDriver].localIds.capacity());
@@ -288,10 +288,10 @@ Session setup_mach_rcsdriver(
 
     rFB.task()
         .name       ("RCS Drivers calculate new values")
-        .run_on     ({tgParts.linkLoop(MachUpd)})
-        .sync_with  ({tgParts.machUpdExtIn(Ready)})
+        .run_on     ({parts.pl.linkLoop(MachUpd)})
+        .sync_with  ({parts.pl.machUpdExtIn(Ready)})
         .push_to    (out.m_tasks)
-        .args       ({      idScnParts,                idUpdMach,                       idSigValFloat,                    idSigUpdFloat})
+        .args       ({      parts.di.scnParts,                idUpdMach,                       sigFloat.di.sigValFloat,                    idSigUpdFloat})
         .func([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
         Nodes const &rFloatNodes = rScnParts.nodePerType[gc_ntSigFloat];
@@ -387,19 +387,19 @@ Session setup_vehicle_control(
     OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
     OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT);
     auto const windowApp.pl    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
+    auto const scn.pl    = scene         .get_pipelines<PlScene>();
     auto const tgSgFlt  = signalsFloat  .get_pipelines<PlSignalsFloat>();
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_VEHICLE_CONTROL);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_VEHICLE_CONTROL);
     auto const tgVhCtrl = out.create_pipelines<PlVehicleCtrl>(rFB);
 
-    rFB.pipeline(tgVhCtrl.selectedVehicle).parent(scene.pl.update);
+    rFB.pipeline(tgVhCtrl.selectedVehicle).parent(scn.pl.update);
 
-    auto &rUserInput = rFB.data_get< input::UserInputHandler >(topData, windowApp.di.userInput);
+    auto &rUserInput = rFB.data_get< input::UserInputHandler >(windowApp.di.userInput);
 
     // TODO: add cleanup task
-    rFB.data_emplace<VehicleControls>(topData, idVhControls, VehicleControls{
+    rFB.data_emplace<VehicleControls>(idVhControls, VehicleControls{
         .btnSwitch  = rUserInput.button_subscribe("game_switch"),
         .btnThrMax  = rUserInput.button_subscribe("vehicle_thr_max"),
         .btnThrMin  = rUserInput.button_subscribe("vehicle_thr_min"),
@@ -418,7 +418,7 @@ Session setup_vehicle_control(
         .run_on     ({windowApp.pl.inputs(Run)})
         .sync_with  ({tgVhCtrl.selectedVehicle(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({      idScnParts,                               windowApp.di.userInput,                 idVhControls})
+        .args       ({      parts.di.scnParts,                               windowApp.di.userInput,                 idVhControls})
         .func([] (ACtxParts& rScnParts, input::UserInputHandler const &rUserInput, VehicleControls &rVhControls) noexcept
     {
         PerMachType &rUsrCtrl    = rScnParts.machines.perType[gc_mtUserCtrl];
@@ -452,10 +452,10 @@ Session setup_vehicle_control(
 
     rFB.task()
         .name       ("Write inputs to UserControl Machines")
-        .run_on     ({scene.pl.update(Run)})
+        .run_on     ({scn.pl.update(Run)})
         .sync_with  ({windowApp.pl.inputs(Run), tgSgFlt.sigFloatUpdExtIn(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({      idScnParts,                idUpdMach,                       idSigValFloat,                    idSigUpdFloat,                               windowApp.di.userInput,                 idVhControls,           idDeltaTimeIn})
+        .args       ({      parts.di.scnParts,                idUpdMach,                       sigFloat.di.sigValFloat,                    idSigUpdFloat,                               windowApp.di.userInput,                 idVhControls,           scn.di.deltaTimeIn})
         .func([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, input::UserInputHandler const& rUserInput, VehicleControls& rVhControls, float const deltaTimeIn) noexcept
     {
         VehicleControls& rVC = rVhControls;
@@ -541,24 +541,24 @@ Session setup_camera_vehicle(
     OSP_DECLARE_GET_DATA_IDS(vehicleCtrl,   TESTAPP_DATA_VEHICLE_CONTROL);
 
     auto const windowApp.pl    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
-    auto const tgPhys   = physics       .get_pipelines<PlPhysics>();
-    auto const tgParts  = parts         .get_pipelines<PlParts>();
+    auto const camCtrl.pl   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const phys.pls   = physics       .get_pipelines<PlPhysics>();
+    auto const parts.pl  = parts         .get_pipelines<PlParts>();
 
     Session out;
 
-    // Don't add commonScene.pl.transform(Modify) to sync_with, even though this uses transforms.
-    // tgPhys.physUpdate(Done) assures physics transforms are done.
+    // Don't add comScn.pl.transform(Modify) to sync_with, even though this uses transforms.
+    // phys.pls.physUpdate(Done) assures physics transforms are done.
     //
-    // tgCmCt.camCtrl(Ready) is needed by the shape thrower, which needs commonScene.pl.transform(New),
+    // camCtrl.pl.camCtrl(Ready) is needed by the shape thrower, which needs comScn.pl.transform(New),
     // causing a circular dependency. The transform pipeline probably needs to be split into
     // a few separate ones.
     rFB.task()
         .name       ("Update vehicle camera")
         .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Modify), tgPhys.physUpdate(Done), tgParts.mapWeldActive(Ready)})
+        .sync_with  ({camCtrl.pl.camCtrl(Modify), phys.pls.physUpdate(Done), parts.pl.mapWeldActive(Ready)})
         .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,           idDeltaTimeIn,                 commonScene.di.basic,                 idVhControls,                 idScnParts})
+        .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn,                 comScn.di.basic,                 idVhControls,                 parts.di.scnParts})
         .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleControls& rVhControls, ACtxParts const& rScnParts) noexcept
     {
         if (rVhControls.selectedUsrCtrl != lgrn::id_null<MachLocalId>())

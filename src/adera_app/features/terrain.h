@@ -38,50 +38,6 @@
 namespace adera
 {
 
-/**
- * @brief Scene orientation relative to terrain
- *
- * This is intended to be modified by a system responsible for handling floating origin and
- * the Scene's position within a universe.
- */
-struct ACtxTerrainFrame
-{
-    /// Position of scene's (0, 0, 0) origin point from the terrain's frame of reference.
-    osp::Vector3l       position;
-    osp::Quaterniond    rotation;
-    bool                active      {false};
-};
-
-struct ACtxTerrain
-{
-    // 'Skeleton' used for managing instances and relationships between vertices, triangles, and
-    // chunks. These are all integer IDs that can be parented, connected, neighboring, etc...
-    planeta::SubdivTriangleSkeleton     skeleton;
-    planeta::SkeletonVertexData         skData;
-    planeta::ChunkSkeleton              skChunks;
-
-    planeta::ChunkMeshBufferInfo        chunkInfo{};
-    planeta::BasicChunkMeshGeometry     chunkGeom;
-
-    planeta::ChunkScratchpad            chunkSP;
-    planeta::SkeletonSubdivScratchpad   scratchpad;
-
-    osp::draw::MeshIdOwner_t            terrainMesh;
-};
-
-struct ACtxTerrainIco
-{
-    /// Planet lowest ground level in meters. Lowest valley.
-    double  radius{};
-
-    /// Planet max ground height in meters. Highest mountain.
-    double  height{};
-
-    std::array<planeta::SkVrtxId,     12>   icoVrtx;
-    std::array<planeta::SkTriGroupId, 5>    icoGroups;
-    std::array<planeta::SkTriId,      20>   icoTri;
-};
-
 
 /**
  * @brief Skeleton, mesh data, and scratchpads to support a single terrain surface within a scene

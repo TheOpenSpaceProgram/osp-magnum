@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -25,7 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include <osp/framework/builder.h>
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/physics.h>
@@ -53,8 +52,8 @@ struct ACtxPhysShapes
 };
 
 void add_floor(
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         physShapes,
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx,
         osp::draw::MaterialId       material,
         osp::PkgId                  pkg,
         int                         size);
@@ -63,53 +62,29 @@ void add_floor(
 /**
  * @brief Queues and logic for spawning physics shapes
  */
-osp::Session setup_phys_shapes(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::draw::MaterialId       materialId);
+extern osp::fw::FeatureDef const ftrPhysicsShapes;
 
-osp::Session setup_phys_shapes_draw(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         physShapes);
+
+extern osp::fw::FeatureDef const ftrPhysicsShapesDraw;
+
 
 /**
  * @brief Throws spheres when pressing space
  */
-osp::Session setup_thrower(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         physShapes);
+extern osp::fw::FeatureDef const ftrThrower;
+
 
 /**
  * @brief Spawn blocks every 2 seconds and spheres every 1 second
  */
-osp::Session setup_droppers(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         physShapes);
+extern osp::fw::FeatureDef const ftrDroppers;
+
 
 /**
  * @brief Entity set to delete entities under Z = -10, added to spawned shapes
  */
-osp::Session setup_bounds(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         physShapes);
+extern osp::fw::FeatureDef const ftrBounds;
+
 
 
 }
-#endif

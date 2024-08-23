@@ -40,6 +40,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <iostream>
+#include <optional>
 
 using namespace testapp;
 using namespace adera;
@@ -59,7 +60,16 @@ osp::Logger_t g_logExecutor;
 osp::Logger_t g_logMagnumApp;
 
 
+void load_scenario(Framework &rFW, ContextId ctx, entt::any userData)
+{
+    auto const& rScenario = entt::any_cast<ScenarioOption const&>(userData);
+    rScenario.loadFunc(g_testApp.value());
 
+    std::cout << "Loaded scenario: " << rScenario.name << "\n"
+              << "--- DESCRIPTION ---\n"
+              << rScenario.description
+              << "-------------------\n";
+}
 
 osp::fw::FeatureDef const ftrMainCommands = feature_def("MainCommands", [] (FeatureBuilder& rFB, DependOn<FIMainApp> mainApp, DependOn<FICinREPL> cinREPL)
 {
@@ -78,14 +88,11 @@ osp::fw::FeatureDef const ftrMainCommands = feature_def("MainCommands", [] (Feat
             {
                 rFrameworkModify.commands.push_back({
                         .userData = entt::make_any<ScenarioOption const&>(it->second),
-                        .func = [] (Framework &rFW, ContextId ctx, entt::any userData)
-                {
-                    auto const& rScenario = entt::any_cast<ScenarioOption const&>(userData);
-                    rSro.loadFunc(g_testApp.value());
-
-                    std::cout << "Loaded scenario: " <<
-
-                }, });
+                        .func = &load_scenario});
+                rFrameworkModify.commands.push_back({
+                        .userData = entt::make_any<TestApp&>(g_testApp.value()),
+                        .ctx = g_testApp->m_mainContext,
+                        .func =  &start_magnum_renderer });
             }
             else if (cmdStr == "help") // Otherwise check all other commands.
             {
@@ -143,8 +150,33 @@ int main(int argc, char** argv)
         g_executor.m_log = g_logExecutor;
     }
 
+    register_stage_enums();
+
+    TestApp &rTestApp = g_testApp.emplace();
+
+    rTestApp.m_argc = argc;
+    rTestApp.m_argv = argv;
+    rTestApp.m_pExecutor = &g_executor;
+
+    rTestApp.m_mainContext = rTestApp.m_framework.m_contextIds.create();
+
+    ContextBuilder mainCB { rTestApp.m_mainContext, {}, rTestApp.m_framework };
+    mainCB.add_feature(ftrMain);
+    if( ! args.isSet("norepl"))
+    {
+        mainCB.add_feature(ftrREPL);
+        mainCB.add_feature(ftrMainCommands);
+        print_help();
+    }
+    bool const success = ContextBuilder::finalize(std::move(mainCB));
+    LGRN_ASSERT(success);
+
+    rTestApp.init();
+
     if(args.value("scene") != "none")
     {
+        auto const mainApp           = rTestApp.m_framework.get_interface<FIMainApp>(rTestApp.m_mainContext);
+        auto       &rFrameworkModify = rTestApp.m_framework.data_get<FrameworkModify>(mainApp.di.frameworkModify);
         auto const it = scenarios().find(args.value("scene"));
         if(it == std::end(scenarios()))
         {
@@ -153,35 +185,13 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        //start_magnum_async(argc, argv);
-    }
-
-    register_stage_enums();
-
-    TestApp &rTestApp = g_testApp.emplace();
-
-    rTestApp.m_argc = argc;
-    rTestApp.m_argv = argv;
-
-    rTestApp.m_pExecutor = &g_executor;
-    rTestApp.init();
-
-
-    if( ! args.isSet("norepl"))
-    {
-        auto const fiMain         = rTestApp.m_framework.get_interface<FIMainApp>(rTestApp.m_mainContext);
-        auto       &rFWModify     = entt::any_cast<FrameworkModify&>(rTestApp.m_framework.data[fiMain.di.frameworkModify]);
-        rFWModify.commands.push_back({
-                .ctx = rTestApp.m_mainContext,
-                .func = [] (Framework &rFW, ContextId ctx, entt::any userData)
-        {
-            ContextBuilder cb { .m_ctx = ctx, .m_rFW = rFW };
-            cb.add_feature(ftrREPL);
-            cb.add_feature(ftrMainCommands);
-            LGRN_ASSERTM(cb.m_errors.empty(), "Error adding REPL feature");
-            ContextBuilder::apply(std::move(cb));
-            print_help();
-        }});
+        rFrameworkModify.commands.push_back({
+                        .userData = entt::make_any<ScenarioOption const&>(it->second),
+                        .func = &load_scenario});
+        rFrameworkModify.commands.push_back({
+                        .userData = entt::make_any<TestApp&>(g_testApp.value()),
+                        .ctx = g_testApp->m_mainContext,
+                        .func =  &start_magnum_renderer });
     }
 
     std::vector<MainLoopFunc_t> &rMainLoopStack = main_loop_stack();

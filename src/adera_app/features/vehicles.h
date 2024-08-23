@@ -52,7 +52,7 @@ osp::Session setup_parts(
  * 1. Tasks write new values to idSigUpdFloat
  *
  * 2. The "Reduce Signal-Float Nodes" task reads new values from idSigUpdFloat(s) and writes them
- *    into idSigValFloat. This changes the input values of connected Machines, marking them dirty.
+ *    into sigFloat.di.sigValFloat. This changes the input values of connected Machines, marking them dirty.
  *    Tags for each unique dirty machine type is added to rMachUpdEnqueue.
  *    Other 'reduce node' tasks could be running in parallel here.
  *

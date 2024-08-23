@@ -66,9 +66,9 @@ struct TestApp
 
     void drive_main_loop();
 
+    bool run_fw_modify_commands();
+
     void init();
-
-
 
     osp::fw::Framework m_framework;
 

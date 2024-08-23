@@ -40,7 +40,7 @@ namespace osp::fw
 {
 
 /**
- * @brief Wrap a lambda with arbitrary arguments into a TaskImpl::Func_t function pointer
+ * @brief Wrap a lambda with arbitrary function arguments into a TaskImpl::Func_t function pointer
  *
  * TaskImpl::Func_t is `TaskActions(*)(WorkerContext, ArrayView<entt::any>) noexcept`
  *
@@ -159,55 +159,55 @@ struct TaskRef
 
     TaskRef& name(std::string_view debugName)
     {
-        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
-        m_rFW.taskImpl[taskId].debugName = debugName;
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        m_rFW.m_taskImpl[taskId].debugName = debugName;
         return *this;
     }
 
     TaskRef& args(std::initializer_list<DataId> args)
     {
-        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
-        m_rFW.taskImpl[taskId].args = args;
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        m_rFW.m_taskImpl[taskId].args = args;
         return *this;
     }
 
     TaskRef& run_on(TplPipelineStage const tpl) noexcept
     {
-        m_rFW.tasks.m_taskRunOn.resize(m_rFW.tasks.m_taskIds.capacity());
-        m_rFW.tasks.m_taskRunOn[taskId] = tpl;
+        m_rFW.m_tasks.m_taskRunOn.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        m_rFW.m_tasks.m_taskRunOn[taskId] = tpl;
 
         return *this;
     }
 
     TaskRef& schedules(TplPipelineStage const tpl) noexcept
     {
-        m_rFW.tasks.m_pipelineControl[tpl.pipeline].scheduler = taskId;
+        m_rFW.m_tasks.m_pipelineControl[tpl.pipeline].scheduler = taskId;
 
         return run_on(tpl);
     }
 
     TaskRef& sync_with(ArrayView<TplPipelineStage const> const specs) noexcept
     {
-        return add_edges(m_rFW.tasks.m_syncWith, specs);
+        return add_edges(m_rFW.m_tasks.m_syncWith, specs);
     }
 
     TaskRef& sync_with(std::initializer_list<TplPipelineStage const> specs) noexcept
     {
-        return add_edges(m_rFW.tasks.m_syncWith, specs);
+        return add_edges(m_rFW.m_tasks.m_syncWith, specs);
     }
 
     template<typename FUNC_T>
     TaskRef& func(FUNC_T&& funcArg)
     {
-        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
-        m_rFW.taskImpl[taskId].func = as_task_impl_v<FUNC_T>;
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        m_rFW.m_taskImpl[taskId].func = as_task_impl_v<FUNC_T>;
         return *this;
     }
 
     TaskRef& func_raw(TaskImpl::Func_t func)
     {
-        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
-        m_rFW.taskImpl[taskId].func = func;
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
+        m_rFW.m_taskImpl[taskId].func = func;
         return *this;
     }
 
@@ -227,21 +227,21 @@ struct PipelineRef
 
     PipelineRef& parent(PipelineId const parent)
     {
-        m_rFW.tasks.m_pipelineParents[pipelineId] = parent;
+        m_rFW.m_tasks.m_pipelineParents[pipelineId] = parent;
         return static_cast<PipelineRef&>(*this);
     }
 
     PipelineRef& parent_with_schedule(PipelineId const parent)
     {
-        m_rFW.tasks.m_pipelineParents[pipelineId] = parent;
+        m_rFW.m_tasks.m_pipelineParents[pipelineId] = parent;
 
         constexpr ENUM_T const scheduleStage = stage_schedule(ENUM_T{0});
         static_assert(scheduleStage != lgrn::id_null<ENUM_T>(), "Pipeline type has no schedule stage");
 
-        TaskId const scheduler = m_rFW.tasks.m_pipelineControl[parent].scheduler;
+        TaskId const scheduler = m_rFW.m_tasks.m_pipelineControl[parent].scheduler;
         LGRN_ASSERTM(scheduler != lgrn::id_null<TaskId>(), "Parent Pipeline has no scheduler task");
 
-        m_rFW.tasks.m_syncWith.push_back({
+        m_rFW.m_tasks.m_syncWith.push_back({
             .task     = scheduler,
             .pipeline = pipelineId,
             .stage    = StageId(scheduleStage)
@@ -252,13 +252,13 @@ struct PipelineRef
 
     PipelineRef& loops(bool const loop)
     {
-        m_rFW.tasks.m_pipelineControl[pipelineId].isLoopScope = loop;
+        m_rFW.m_tasks.m_pipelineControl[pipelineId].isLoopScope = loop;
         return *this;
     }
 
     PipelineRef& wait_for_signal(ENUM_T stage)
     {
-        m_rFW.tasks.m_pipelineControl[pipelineId].waitStage = StageId(stage);
+        m_rFW.m_tasks.m_pipelineControl[pipelineId].waitStage = StageId(stage);
         return *this;
     }
 
@@ -276,8 +276,8 @@ struct FeatureBuilder
 {
     TaskRef task()
     {
-        TaskId const taskId = m_rFW.tasks.m_taskIds.create();
-        m_rFW.taskImpl.resize(m_rFW.tasks.m_taskIds.capacity());
+        TaskId const taskId = m_rFW.m_tasks.m_taskIds.create();
+        m_rFW.m_taskImpl.resize(m_rFW.m_tasks.m_taskIds.capacity());
         rSession.tasks.push_back(taskId);
         return task(taskId);
     };
@@ -289,21 +289,19 @@ struct FeatureBuilder
 
     [[nodiscard]] entt::any& data(DataId const dataId) noexcept
     {
-        return m_rFW.data[dataId];
+        return m_rFW.m_data[dataId];
     }
 
     template<typename T>
     [[nodiscard]] T& data_get(DataId const dataId) noexcept
     {
-        return entt::any_cast<T&>(m_rFW.data[dataId]);
+        return m_rFW.data_get<T>(dataId);
     }
 
     template<typename T, typename ... ARGS_T>
     T& data_emplace(DataId const dataId, ARGS_T &&...args) noexcept
     {
-        entt::any &rData = m_rFW.data[dataId];
-        rData.emplace<T>(std::forward<ARGS_T>(args) ...);
-        return entt::any_cast<T&>(rData);
+        return m_rFW.data_emplace<T>(dataId, std::forward<ARGS_T>(args) ...);
     }
 
     template <typename ENUM_T>
@@ -447,18 +445,20 @@ inline DependOn<FI_T> call_setup_args_aux(Tag< DependOn<FI_T> >, FeatureBuilder 
     return out;
 }
 
-template<typename FUNC_T, typename ... FUNC_ARG_T>
-constexpr FeatureDef::SetupFunc_t make_setup_func(FUNC_T, Stuple<FUNC_ARG_T...>)
+template<typename SETUP_FUNC_T, typename ... FUNC_ARG_T>
+constexpr FeatureDef::SetupFunc_t make_setup_func(SETUP_FUNC_T, Stuple<FUNC_ARG_T...>)
 {
     return [] (FeatureBuilder& rFB, entt::any setupData) noexcept -> void
     {
-        // look through ParamsFiltered_t
-        // make arguments?
+        // example: given SETUP_FUNC_T is `[] (Implement<FIFoo> foo, DependOn<FIBar> bar) {...}`
+        // this will call...
+        //
+        // callable(call_setup_args_aux(Tag< Implement<FIFoo> >, rFB, setupData),
+        //          call_setup_args_aux(Tag< DependOn<FIBar> >,  rFB, setupData));
 
-        // call FUNC_T
-        FUNC_T hey;
 
-        hey(call_setup_args_aux(Tag<FUNC_ARG_T>{}, rFB, setupData) ...);
+        SETUP_FUNC_T callable;
+        callable(call_setup_args_aux(Tag<FUNC_ARG_T>{}, rFB, setupData) ...);
     };
 };
 
@@ -466,22 +466,24 @@ constexpr FeatureDef::SetupFunc_t make_setup_func(FUNC_T, Stuple<FUNC_ARG_T...>)
 
 
 /**
- * @brief define feature
+ * @brief Define a feature
  *
- * does witchcraft to...
- * * automatically implement or depend-on FeatureInterface (FI)
+ * This will automatically read the function arguments of the given setup function lamba, searching
+ * for Implement<...> and DependOn<...> to assign relationships to feature interfaces.
  *
- * @return
+ *
+ * The metaprogramming witchcraft behind how all this works is a little complex, but all it really
+ * does at the end is create a single runtime-readable FeatureDef.
  */
-template<CStatelessLambda FUNC_T>
-FeatureDef feature_def(std::string_view const name, FUNC_T func)
+template<CStatelessLambda SETUP_FUNC_T>
+FeatureDef feature_def(std::string_view const name, SETUP_FUNC_T setup)
 {
-    using FuncPtr_t        = as_function_ptr_t<FUNC_T>;
+    using FuncPtr_t        = as_function_ptr_t<SETUP_FUNC_T>;
     using Params_t         = stuple_from_func_params<FuncPtr_t>;
     using ParamsFiltered_t = typename filter_parameter_pack<Params_t, is_setup_arg>::value;
 
     return { .name          = name,
-             .func          = make_setup_func(func, Params_t{}),
+             .func          = make_setup_func(setup, Params_t{}),
              .relationships = relations_from_params(ParamsFiltered_t{}) };
 }
 
@@ -489,8 +491,17 @@ FeatureDef feature_def(std::string_view const name, FUNC_T func)
 
 
 
-struct ContextBuilder
+class ContextBuilder
 {
+public:
+    ContextBuilder(ContextId ctx, std::vector<ContextId> ctxScope, Framework &rFW)
+     : m_ctx{ctx}
+     , m_ctxScope{std::move(ctxScope)}
+     , m_rInfo{FITypeInfoRegistry::instance()}
+     , m_rFW {rFW}
+    { }
+    ~ContextBuilder();
+
     struct ErrDependencyNotFound
     {
         std::string_view whileAdding;
@@ -521,108 +532,21 @@ struct ContextBuilder
         return out;
     }
 
-
     /**
-     * @brief
+     * @brief Add a feature to the framework. This will evaluate FeatureInterface relationships
+     *        and runs the feature's setup function.
      *
-     * somewhat behaves like C++23/Rust and_then()
+     * Features depend on each other through FeatureInterfaces. The order at which features are
+     * added is important. Make sure all required feature interfaces (eg: DependOn<FIFoo>) are
+     * implemented by previously added features (eg: Implement<FIFoo>).
+     *
+     * Does nothing if there is an error, somewhat like `and_then()` in C++23 or Rust.
      */
-    void add_feature(FeatureDef const &def, entt::any setupData = {}) noexcept
-    {
-        FeatureSession fsession;
+    void add_feature(FeatureDef const &def, entt::any setupData = {}) noexcept;
 
-        m_rFW.resize_ctx();
+    bool has_error() const noexcept { return ! m_errors.empty(); }
 
-        FeatureContext &rCtx = m_rFW.contextData[m_ctx];
-
-        for (FeatureDef::FIRelationship const& relation : def.relationships)
-        {
-            FITypeInfo const& subjectInfo = m_rInfo.info_for(relation.subject);
-
-            if (relation.type == FeatureDef::ERelationType::DependOn)
-            {
-                FIInstanceId const found = find_dependency(relation.subject);
-
-                if (found.has_value())
-                {
-                    fsession.finterDependsOn.push_back(found);
-                }
-                else
-                {
-                    // Not found, ERROR!
-                    m_errors.push_back(ErrDependencyNotFound{
-                        .whileAdding = def.name,
-                        .requiredFI  = subjectInfo.name
-                    });
-                }
-            }
-            else if (relation.type == FeatureDef::ERelationType::Implement)
-            {
-                FIInstanceId &rFInter = rCtx.finterSlots[relation.subject];
-
-                if (rFInter.has_value())
-                {
-                    // Already exists, error
-                    m_errors.push_back(ErrAlreadyImplemented{
-                        .whileAdding   = def.name,
-                        .alreadyImplFI = subjectInfo.name
-                    });
-                }
-                else
-                {
-                    rFInter = m_rFW.fiinstIds.create();
-                    m_rFW.fiinstData.resize(m_rFW.fiinstIds.capacity());
-                    FeatureInterface &rFI = m_rFW.fiinstData[rFInter];
-
-                    rFI.context = m_ctx;
-                    rFI.type    = relation.subject;
-                    rFI.data     .resize(subjectInfo.dataCount);
-                    rFI.pipelines.resize(subjectInfo.pipelines.size());
-
-                    m_rFW.dataIds.create(rFI.data.begin(), rFI.data.end());
-                    auto const dataCapacity = m_rFW.dataIds.capacity();
-                    m_rFW.data.resize(dataCapacity);
-
-                    m_rFW.tasks.m_pipelineIds.create(rFI.pipelines.begin(), rFI.pipelines.end());
-
-                    auto const pipelineCapacity = m_rFW.tasks.m_pipelineIds.capacity();
-                    m_rFW.tasks.m_pipelineInfo   .resize(pipelineCapacity);
-                    m_rFW.tasks.m_pipelineControl.resize(pipelineCapacity);
-                    m_rFW.tasks.m_pipelineParents.resize(pipelineCapacity, lgrn::id_null<PipelineId>());
-
-                    for (std::size_t i = 0; i < subjectInfo.pipelines.size(); ++i)
-                    {
-                        PipelineId const plId = rFI.pipelines[i];
-                        m_rFW.tasks.m_pipelineInfo[plId].stageType = subjectInfo.pipelines[i].type;
-                        m_rFW.tasks.m_pipelineInfo[plId].name      = subjectInfo.pipelines[i].name;
-                    }
-
-                    fsession.finterImplements.push_back(rFInter);
-                }
-            }
-        }
-
-        if ( ! m_errors.empty() )
-        {
-            return; // in error state, do nothing
-        }
-
-        FeatureBuilder frog{
-            .m_rFW = m_rFW,
-            .rSession = fsession,
-            .sessionId = {},
-            .ctx = m_ctx,
-            .ctxScope = arrayView<ContextId const>(m_ctxScope) };
-
-        def.func(frog, std::move(setupData));
-    }
-
-
-    static void apply(ContextBuilder &&eat)
-    {
-
-    }
-
+    static bool finalize(ContextBuilder &&eat);
 
     std::vector<Error_t>    m_errors;
     std::vector<ContextId>  m_ctxScope;
@@ -630,139 +554,8 @@ struct ContextBuilder
     FITypeInfoRegistry      &m_rInfo = FITypeInfoRegistry::instance();
     Framework               &m_rFW;
 
-};
-
-struct FrameworkBuilder
-{
-
-
-
-    Framework &m_rFW;
+private:
+    bool m_finalized{false};
 };
 
 } // namespace osp::fw
-
-
-#if 0
-
-namespace osp
-{
-
-
-
-/**
- * @brief Wrap a function with arbitrary arguments into a TopTaskFunc_t
- *
- * A regular TopTaskFunc_t accepts a ArrayView<entt::any> for passing data of
- * arbitrary types. This needs to be manually casted.
- *
- * wrap_args creates a wrapper function that will automatically cast the
- * entt::anys and call the underlying function.
- *
- * @param a[in]
- *
- * @return TopTaskFunc_t function pointer to wrapper
- */
-template<typename FUNC_T>
-constexpr TopTaskFunc_t wrap_args(FUNC_T funcArg)
-{
-    // TODO: wrap function pointers into a functor
-    static_assert ( ! std::is_function_v<FUNC_T>, "Support for function pointers not yet implemented");
-
-    auto const functionPtr = +funcArg;
-
-    static_assert(std::is_function_v< std::remove_pointer_t<decltype(functionPtr)> >);
-
-    // The original funcArg is discarded, but will be reconstructed in
-    // wrap_args_trait::apply, as static_lambda_t is stored in the type
-    return wrap_args_trait<FUNC_T>::unpack(functionPtr);
-}
-
-//-----------------------------------------------------------------------------
-
-struct TopTaskBuilder;
-struct TopTaskTaskRef;
-
-struct TopTaskBuilderTraits
-{
-    using Builder_t     = TopTaskBuilder;
-    using TaskRef_t     = TopTaskTaskRef;
-
-    template <typename ENUM_T>
-    using PipelineRef_t = PipelineRefBase<TopTaskBuilderTraits, ENUM_T>;
-};
-
-
-/**
- * @brief Convenient interface for building TopTasks
- */
-struct TopTaskBuilder : public TaskBuilderBase<TopTaskBuilderTraits>
-{
-    TopTaskBuilder(Tasks& rTasks, TaskEdges& rEdges, TopTaskDataVec_t& rData)
-     : TaskBuilderBase<TopTaskBuilderTraits>( {rTasks, rEdges} )
-     , m_rData{rData}
-    { }
-    TopTaskBuilder(TopTaskBuilder const& copy) = delete;
-    TopTaskBuilder(TopTaskBuilder && move) = default;
-
-    TopTaskBuilder& operator=(TopTaskBuilder const& copy) = delete;
-
-    TopTaskDataVec_t & m_rData;
-};
-
-struct TopTaskTaskRef : public TaskRefBase<TopTaskBuilderTraits>
-{
-    inline TopTaskTaskRef& name(std::string_view debugName);
-    inline TopTaskTaskRef& args(std::initializer_list<TopDataId> dataUsed);
-
-    template<typename FUNC_T>
-    TopTaskTaskRef& func(FUNC_T&& funcArg);
-    inline TopTaskTaskRef& func_raw(TopTaskFunc_t func);
-
-    inline TopTaskTaskRef& important_deps_count(int value);
-
-    template<typename CONTAINER_T>
-    TopTaskTaskRef& push_to(CONTAINER_T& rContainer);
-};
-
-TopTaskTaskRef& TopTaskTaskRef::name(std::string_view debugName)
-{
-    m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
-    m_rBuilder.m_rData[m_taskId].m_debugName = debugName;
-    return *this;
-}
-
-TopTaskTaskRef& TopTaskTaskRef::args(std::initializer_list<TopDataId> dataUsed)
-{
-    m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
-    m_rBuilder.m_rData[m_taskId].m_dataUsed = dataUsed;
-    return *this;
-}
-
-template<typename FUNC_T>
-TopTaskTaskRef& TopTaskTaskRef::func(FUNC_T&& funcArg)
-{
-    m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
-    m_rBuilder.m_rData[m_taskId].m_func = wrap_args(funcArg);
-    return *this;
-}
-
-TopTaskTaskRef& TopTaskTaskRef::func_raw(TopTaskFunc_t func)
-{
-    m_rBuilder.m_rData.resize(m_rBuilder.m_rTasks.m_taskIds.capacity());
-    m_rBuilder.m_rData[m_taskId].m_func = func;
-    return *this;
-}
-
-template<typename CONTAINER_T>
-TopTaskTaskRef& TopTaskTaskRef::push_to(CONTAINER_T& rContainer)
-{
-    rContainer.push_back(m_taskId);
-    return *this;
-}
-
-
-} // namespace osp
-
-
-#endif

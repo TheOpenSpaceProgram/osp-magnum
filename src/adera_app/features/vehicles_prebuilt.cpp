@@ -119,15 +119,15 @@ Session setup_prebuilt_vehicles(
         Session const&              scene)
 {
     OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
-    auto const scene.pl = scene.get_pipelines<PlScene>();
+    auto const scn.pl = scene.get_pipelines<PlScene>();
 
-    auto &rResources = rFB.data_get<Resources>(topData, mainApp.di.resources);
+    auto &rResources = rFB.data_get<Resources>(mainApp.di.resources);
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_TEST_VEHICLES);
-    out.m_cleanup = scene.pl.cleanup;
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_TEST_VEHICLES);
+    out.m_cleanup = scn.pl.cleanup;
 
-    auto &rPrebuiltVehicles = rFB.data_emplace<PrebuiltVehicles>(topData, idPrebuiltVehicles);
+    auto &rPrebuiltVehicles = rFB.data_emplace<PrebuiltVehicles>(idPrebuiltVehicles);
     rPrebuiltVehicles.resize(PrebuiltVhIdReg_t::size());
 
     using namespace adera;
@@ -206,7 +206,7 @@ Session setup_prebuilt_vehicles(
 
     rFB.task()
         .name       ("Clean up prebuilt vehicles")
-        .run_on     ({scene.pl.cleanup(Run_)})
+        .run_on     ({scn.pl.cleanup(Run_)})
         .push_to    (out.m_tasks)
         .args       ({             idPrebuiltVehicles,          mainApp.di.resources})
         .func([] (PrebuiltVehicles &rPrebuildVehicles, Resources& rResources) noexcept

@@ -166,6 +166,15 @@ struct FIMainApp {
 
     struct Pipelines {
         PipelineDef<EStgOptn> mainLoop          {"mainLoop"};
+        PipelineDef<EStgOptn> stupidWorkaround  {"stupidWorkaround - mainLoop needs a child or else something errors"};
+    };
+};
+
+struct FICleanupContext {
+    struct DataIds { };
+
+    struct Pipelines {
+        PipelineDef<EStgEvnt> cleanup           {"cleanup           - Scene cleanup before destruction"};
     };
 };
 
@@ -179,13 +188,15 @@ struct FIEngineTest {
     struct Pipelines { };
 };
 
+
 struct FIScene {
     struct DataIds {
         DataId deltaTimeIn;
+        DataId loopControl;
     };
 
     struct Pipelines {
-        PipelineDef<EStgEvnt> cleanup           {"cleanup           - Scene cleanup before destruction"};
+        PipelineDef<EStgCont> loopControl       {"loopControl"};
         PipelineDef<EStgOptn> update            {"update"};
     };
 };
@@ -204,212 +215,319 @@ struct FICommonScene {
     struct Pipelines {
         PipelineDef<EStgCont> activeEnt         {"activeEnt         - ACtxBasic::m_activeIds"};
         PipelineDef<EStgOptn> activeEntResized  {"activeEntResized  - ACtxBasic::m_activeIds option to resize"};
-        PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete   - commonScene.di.activeEntDel, vector of ActiveEnts that need to be deleted"};
+        PipelineDef<EStgIntr> activeEntDelete   {"activeEntDelete   - comScn.di.activeEntDel, vector of ActiveEnts that need to be deleted"};
 
         PipelineDef<EStgCont> transform         {"transform         - ACtxBasic::m_transform"};
         PipelineDef<EStgCont> hierarchy         {"hierarchy         - ACtxBasic::m_scnGraph"};
     };
 };
 
-#define TESTAPP_DATA_PHYSICS 3, \
-    idPhys, idHierBody, idPhysIn
-struct PlPhysics
-{
-    PipelineDef<EStgCont> physBody          {"physBody"};
-    PipelineDef<EStgOptn> physUpdate        {"physUpdate"};
+
+struct FIPhysics {
+    struct DataIds {
+        DataId phys;
+        DataId hierBody;
+        DataId physIn;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgCont> physBody          {"physBody"};
+        PipelineDef<EStgOptn> physUpdate        {"physUpdate"};
+    };
 };
 
 
+struct FIPhysShapes {
+    struct DataIds {
+        DataId physShapes;
+    };
 
-#define TESTAPP_DATA_PHYS_SHAPES 1, \
-    idPhysShapes
-struct PlPhysShapes
-{
-    PipelineDef<EStgIntr> spawnRequest      {"spawnRequest      - Spawned shapes"};
-    PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
-    PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
+    struct Pipelines {
+        PipelineDef<EStgIntr> spawnRequest      {"spawnRequest      - Spawned shapes"};
+        PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
+        PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
+    };
 };
 
 
+struct FIThrower {
+    struct DataIds {
+        DataId button;
+    };
 
-#define TESTAPP_DATA_PREFABS 1, \
-    idPrefabs
-struct PlPrefabs
-{
-    PipelineDef<EStgIntr> spawnRequest      {"spawnRequest"};
-    PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
-    PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
-
-    PipelineDef<EStgCont> instanceInfo      {"instanceInfo"};
-
-    PipelineDef<EStgOptn> inSubtree         {"inSubtree"};
+    struct Pipelines { };
 };
 
 
+struct FIDroppers {
+    struct DataIds {
+        DataId timerA;
+        DataId timerB;
+    };
 
-#define TESTAPP_DATA_BOUNDS 2, \
-    idBounds, idOutOfBounds
-struct PlBounds
-{
-    PipelineDef<EStgCont> boundsSet         {"boundsSet"};
-    PipelineDef<EStgRevd> outOfBounds       {"outOfBounds"};
+    struct Pipelines { };
 };
 
 
+struct FIPrefabs {
+    struct DataIds {
+        DataId prefabs;
+    };
 
-#define TESTAPP_DATA_PARTS 2, \
-    idScnParts, idUpdMach
-struct PlParts
-{
-    PipelineDef<EStgCont> partIds           {"partIds           - ACtxParts::partIds"};
-    PipelineDef<EStgCont> partPrefabs       {"partPrefabs       - ACtxParts::partPrefabs"};
-    PipelineDef<EStgCont> partTransformWeld {"partTransformWeld - ACtxParts::partTransformWeld"};
-    PipelineDef<EStgIntr> partDirty         {"partDirty         - ACtxParts::partDirty"};
+    struct Pipelines {
+        PipelineDef<EStgIntr> spawnRequest      {"spawnRequest"};
+        PipelineDef<EStgIntr> spawnedEnts       {"spawnedEnts"};
+        PipelineDef<EStgRevd> ownedEnts         {"ownedEnts"};
 
-    PipelineDef<EStgCont> weldIds           {"weldIds           - ACtxParts::weldIds"};
-    PipelineDef<EStgIntr> weldDirty         {"weldDirty         - ACtxParts::weldDirty"};
+        PipelineDef<EStgCont> instanceInfo      {"instanceInfo"};
 
-    PipelineDef<EStgCont> machIds           {"machIds           - ACtxParts::machines.ids"};
-    PipelineDef<EStgCont> nodeIds           {"nodeIds           - ACtxParts::nodePerType[*].nodeIds"};
-    PipelineDef<EStgCont> connect           {"connect           - ACtxParts::nodePerType[*].nodeToMach/machToNode"};
-
-    PipelineDef<EStgCont> mapWeldPart       {"mapPartWeld       - ACtxParts::weldToParts/partToWeld"};
-    PipelineDef<EStgCont> mapPartMach       {"mapPartMach       - ACtxParts::partToMachines/machineToPart"};
-    PipelineDef<EStgCont> mapPartActive     {"mapPartActive     - ACtxParts::partToActive/activeToPart"};
-    PipelineDef<EStgCont> mapWeldActive     {"mapWeldActive     - ACtxParts::weldToActive"};
-
-    PipelineDef<EStgCont> machUpdExtIn      {"machUpdExtIn      -"};
-
-    PipelineDef<EStgLink> linkLoop          {"linkLoop          - Link update loop"};
+        PipelineDef<EStgOptn> inSubtree         {"inSubtree"};
+    };
 };
 
 
+struct FIPrefabDraw {
+    struct DataIds {
+        DataId material;
+    };
 
-#define TESTAPP_DATA_VEHICLE_SPAWN 1, \
-    idVehicleSpawn
-struct PlVehicleSpawn
-{
-    PipelineDef<EStgIntr> spawnRequest      {"spawnRequest      - ACtxVehicleSpawn::spawnRequest"};
-    PipelineDef<EStgIntr> spawnedParts      {"spawnedParts      - ACtxVehicleSpawn::spawnedPart*"};
-    PipelineDef<EStgIntr> spawnedWelds      {"spawnedWelds      - ACtxVehicleSpawn::spawnedWeld*"};
-    PipelineDef<EStgIntr> rootEnts          {"rootEnts          - ACtxVehicleSpawn::rootEnts"};
-    PipelineDef<EStgIntr> spawnedMachs      {"spawnedMachs      - ACtxVehicleSpawn::spawnedMachs"};
+    struct Pipelines { };
 };
 
 
+struct FIBounds {
+    struct DataIds {
+        DataId bounds;
+        DataId outOfBounds;
+    };
 
-#define TESTAPP_DATA_VEHICLE_SPAWN_VB 1, \
-    idVehicleSpawnVB
-struct PlVehicleSpawnVB
-{
-    PipelineDef<EStgIntr> dataVB            {"dataVB            - ACtxVehicleSpawnVB::dataVB"};
-    PipelineDef<EStgIntr> remapParts        {"remapParts        - ACtxVehicleSpawnVB::remapPart*"};
-    PipelineDef<EStgIntr> remapWelds        {"remapWelds        - ACtxVehicleSpawnVB::remapWeld*"};
-    PipelineDef<EStgIntr> remapMachs        {"remapMachs        - ACtxVehicleSpawnVB::remapMach*"};
-    PipelineDef<EStgIntr> remapNodes        {"remapNodes        - ACtxVehicleSpawnVB::remapNode*"};
+    struct Pipelines {
+        PipelineDef<EStgCont> boundsSet         {"boundsSet"};
+        PipelineDef<EStgRevd> outOfBounds       {"outOfBounds"};
+    };
 };
 
 
+struct FIParts {
+    struct DataIds {
+        DataId scnParts;
+        DataId updMach;
+    };
 
-#define TESTAPP_DATA_TEST_VEHICLES 1, \
-    idPrebuiltVehicles
+    struct Pipelines {
+        PipelineDef<EStgCont> partIds           {"partIds           - ACtxParts::partIds"};
+        PipelineDef<EStgCont> partPrefabs       {"partPrefabs       - ACtxParts::partPrefabs"};
+        PipelineDef<EStgCont> partTransformWeld {"partTransformWeld - ACtxParts::partTransformWeld"};
+        PipelineDef<EStgIntr> partDirty         {"partDirty         - ACtxParts::partDirty"};
 
+        PipelineDef<EStgCont> weldIds           {"weldIds           - ACtxParts::weldIds"};
+        PipelineDef<EStgIntr> weldDirty         {"weldDirty         - ACtxParts::weldDirty"};
 
+        PipelineDef<EStgCont> machIds           {"machIds           - ACtxParts::machines.ids"};
+        PipelineDef<EStgCont> nodeIds           {"nodeIds           - ACtxParts::nodePerType[*].nodeIds"};
+        PipelineDef<EStgCont> connect           {"connect           - ACtxParts::nodePerType[*].nodeToMach/machToNode"};
 
-#define TESTAPP_DATA_SIGNALS_FLOAT 2, \
-    idSigValFloat,      idSigUpdFloat
-struct PlSignalsFloat
-{
-    PipelineDef<EStgCont> sigFloatValues    {"sigFloatValues    -"};
-    PipelineDef<EStgCont> sigFloatUpdExtIn  {"sigFloatUpdExtIn  -"};
-    PipelineDef<EStgCont> sigFloatUpdLoop   {"sigFloatUpdLoop   -"};
+        PipelineDef<EStgCont> mapWeldPart       {"mapPartWeld       - ACtxParts::weldToParts/partToWeld"};
+        PipelineDef<EStgCont> mapPartMach       {"mapPartMach       - ACtxParts::partToMachines/machineToPart"};
+        PipelineDef<EStgCont> mapPartActive     {"mapPartActive     - ACtxParts::partToActive/activeToPart"};
+        PipelineDef<EStgCont> mapWeldActive     {"mapWeldActive     - ACtxParts::weldToActive"};
+
+        PipelineDef<EStgCont> machUpdExtIn      {"machUpdExtIn      -"};
+
+        PipelineDef<EStgLink> linkLoop          {"linkLoop          - Link update loop"};
+    };
 };
 
 
+struct FIVehicleSpawn {
+    struct DataIds {
+        DataId vehicleSpawn;
+    };
 
-#define TESTAPP_DATA_NEWTON 1, \
-    idNwt
-struct PlNewton
-{
-    PipelineDef<EStgCont> nwtBody           {"nwtBody"};
+    struct Pipelines {
+        PipelineDef<EStgIntr> spawnRequest      {"spawnRequest      - ACtxVehicleSpawn::spawnRequest"};
+        PipelineDef<EStgIntr> spawnedParts      {"spawnedParts      - ACtxVehicleSpawn::spawnedPart*"};
+        PipelineDef<EStgIntr> spawnedWelds      {"spawnedWelds      - ACtxVehicleSpawn::spawnedWeld*"};
+        PipelineDef<EStgIntr> rootEnts          {"rootEnts          - ACtxVehicleSpawn::rootEnts"};
+        PipelineDef<EStgIntr> spawnedMachs      {"spawnedMachs      - ACtxVehicleSpawn::spawnedMachs"};
+    };
 };
 
-#define TESTAPP_DATA_NEWTON_FORCES 1, \
-    idNwtFactors
 
+struct FIVehicleSpawnVB {
+    struct DataIds {
+        DataId vehicleSpawnVB;
+    };
 
-
-#define TESTAPP_DATA_NEWTON_ACCEL 1, \
-    idAcceleration
-
-
-#define TESTAPP_DATA_JOLT 1, \
-    idJolt
-struct PlJolt
-{
-    PipelineDef<EStgCont> joltBody           {"joltBody"};
+    struct Pipelines {
+        PipelineDef<EStgIntr> dataVB            {"dataVB            - ACtxVehicleSpawnVB::dataVB"};
+        PipelineDef<EStgIntr> remapParts        {"remapParts        - ACtxVehicleSpawnVB::remapPart*"};
+        PipelineDef<EStgIntr> remapWelds        {"remapWelds        - ACtxVehicleSpawnVB::remapWeld*"};
+        PipelineDef<EStgIntr> remapMachs        {"remapMachs        - ACtxVehicleSpawnVB::remapMach*"};
+        PipelineDef<EStgIntr> remapNodes        {"remapNodes        - ACtxVehicleSpawnVB::remapNode*"};
+    };
 };
 
-#define TESTAPP_DATA_JOLT_FORCES 1, \
-    idJoltFactors
 
+struct FITestVehicles {
+    struct DataIds {
+        DataId prebuiltVehicles;
+    };
 
-
-#define TESTAPP_DATA_JOLT_ACCEL 1, \
-    idAcceleration
-
-
-
-#define TESTAPP_DATA_ROCKETS_NWT 1, \
-    idRocketsNwt
-
-
-#define TESTAPP_DATA_ROCKETS_JOLT 1, \
-    idRocketsJolt
-
-
-#define TESTAPP_DATA_TERRAIN 2, \
-    idTerrainFrame, idTerrain
-struct PlTerrain
-{
-    PipelineDef<EStgCont> skeleton          {"skeleton"};
-    PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
-    PipelineDef<EStgCont> chunkMesh         {"chunkMesh"};
-    PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
+    struct Pipelines { };
 };
 
-#define TESTAPP_DATA_TERRAIN_ICO 1, \
-    idTerrainIco
+
+struct FISignalsFloat {
+    struct DataIds {
+        DataId sigValFloat;
+        DataId sigUpdFloat;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgCont> sigFloatValues    {"sigFloatValues    -"};
+        PipelineDef<EStgCont> sigFloatUpdExtIn  {"sigFloatUpdExtIn  -"};
+        PipelineDef<EStgCont> sigFloatUpdLoop   {"sigFloatUpdLoop   -"};
+    };
+};
+
+
+//#define TESTAPP_DATA_NEWTON 1, \
+//    idNwt
+//struct PlNewton
+//{
+//    PipelineDef<EStgCont> nwtBody           {"nwtBody"};
+//};
+
+//#define TESTAPP_DATA_NEWTON_FORCES 1, \
+//    idNwtFactors
+
+
+
+//#define TESTAPP_DATA_NEWTON_ACCEL 1, \
+//    idAcceleration
+
+struct FIJolt {
+    struct DataIds {
+        DataId jolt;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgCont> joltBody           {"joltBody"};
+    };
+};
+
+
+struct FIJoltForces {
+    struct DataIds {
+        DataId factors;
+    };
+
+    struct Pipelines { };
+};
+
+
+struct FIJoltAccel {
+    struct DataIds {
+        DataId accel;
+    };
+
+    struct Pipelines { };
+};
+
+
+//struct FIRocketsNwt {
+//    struct DataIds {
+//        DataId rocketsNwt;
+//    };
+
+//    struct Pipelines { };
+//};
+
+
+struct FIRocketsJolt {
+    struct DataIds {
+        DataId rocketsJolt;
+    };
+
+    struct Pipelines { };
+};
+
+
+struct FITerrain {
+    struct DataIds {
+        DataId terrainFrame;
+        DataId terrain;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgCont> skeleton          {"skeleton"};
+        PipelineDef<EStgIntr> surfaceChanges    {"surfaceChanges"};
+        PipelineDef<EStgCont> chunkMesh         {"chunkMesh"};
+        PipelineDef<EStgCont> terrainFrame      {"terrainFrame"};
+    };
+};
+
+struct FITerrainIco {
+    struct DataIds {
+        DataId terrainIco;
+    };
+
+    struct Pipelines { };
+};
 
 
 //-----------------------------------------------------------------------------
 
 // Universe sessions
 
-#define TESTAPP_DATA_UNI_CORE 2, \
-    idUniverse,         tgUniDeltaTimeIn
-struct PlUniCore
-{
-    PipelineDef<EStgOptn> update            {"update            - Universe update"};
-    PipelineDef<EStgIntr> transfer          {"transfer"};
+struct FIUniverseCore {
+    struct DataIds {
+        DataId universe;
+        DataId deltaTimeIn;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgOptn> update            {"update            - Universe update"};
+        PipelineDef<EStgIntr> transfer          {"transfer"};
+    };
 };
 
-#define TESTAPP_DATA_UNI_SCENEFRAME 1, \
-    idScnFrame
-struct PlUniSceneFrame
-{
-    PipelineDef<EStgCont> sceneFrame        {"sceneFrame"};
+
+struct FIUniverseSceneFrame {
+    struct DataIds {
+        DataId scnFrame;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgCont> sceneFrame        {"sceneFrame"};
+    };
 };
 
-#define TESTAPP_DATA_UNI_PLANETS 2, \
-    idPlanetMainSpace, idSatSurfaceSpaces
+
+struct FIUniversePlanets {
+    struct DataIds {
+        DataId planetMainSpace;
+        DataId satSurfaceSpaces;
+    };
+
+    struct Pipelines { };
+};
+
 
 //-----------------------------------------------------------------------------
 
 // Solar System sessions
 
-#define TESTAPP_DATA_SOLAR_SYSTEM_PLANETS 3, \
-    idPlanetMainSpace, idSatSurfaceSpaces, idCoordNBody
+struct FISolarSystemPlanets {
+    struct DataIds {
+        DataId planetMainSpace;
+        DataId satSurfaceSpaces;
+        DataId coordNBody;
+    };
+
+    struct Pipelines { };
+};
 
 //-----------------------------------------------------------------------------
 
@@ -425,74 +543,84 @@ struct FIWindowApp {
         PipelineDef<EStgOptn> inputs            {"inputs"};
         PipelineDef<EStgOptn> sync              {"sync"};
         PipelineDef<EStgOptn> resync            {"resync"};
-
-        PipelineDef<EStgEvnt> cleanup           {"cleanup           - Cleanup renderer resources before destruction"};
     };
 };
 
 
-#define TESTAPP_DATA_SCENE_RENDERER 2, \
-    idScnRender, idDrawTfObservers
-struct PlSceneRenderer
-{
-    PipelineDef<EStgOptn> render            {"render            - "};
+struct FISceneRenderer {
+    struct DataIds {
+        DataId scnRender;
+        DataId drawTfObservers;
+    };
 
-    PipelineDef<EStgCont> drawEnt           {"drawEnt           - "};
-    PipelineDef<EStgOptn> drawEntResized    {"drawEntResized    - "};
-    PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete     - Vector of DrawEnts that need to be deleted"};
+    struct Pipelines {
+        PipelineDef<EStgOptn> render            {"render            - "};
 
-    PipelineDef<EStgIntr> entTextureDirty   {"entTextureDirty"};
-    PipelineDef<EStgIntr> entMeshDirty      {"entMeshDirty"};
+        PipelineDef<EStgCont> drawEnt           {"drawEnt           - "};
+        PipelineDef<EStgOptn> drawEntResized    {"drawEntResized    - "};
+        PipelineDef<EStgIntr> drawEntDelete     {"drawEntDelete     - Vector of DrawEnts that need to be deleted"};
 
-    PipelineDef<EStgCont> material          {"material"};
-    PipelineDef<EStgIntr> materialDirty     {"materialDirty"};
+        PipelineDef<EStgIntr> entTextureDirty   {"entTextureDirty"};
+        PipelineDef<EStgIntr> entMeshDirty      {"entMeshDirty"};
 
-    PipelineDef<EStgIntr> drawTransforms    {"drawTransforms"};
+        PipelineDef<EStgCont> material          {"material"};
+        PipelineDef<EStgIntr> materialDirty     {"materialDirty"};
 
-    PipelineDef<EStgCont> group             {"group"};
-    PipelineDef<EStgCont> groupEnts         {"groupEnts"};
-    PipelineDef<EStgCont> entMesh           {"entMesh"};
-    PipelineDef<EStgCont> entTexture        {"entTexture"};
+        PipelineDef<EStgIntr> drawTransforms    {"drawTransforms"};
 
-    PipelineDef<EStgCont> mesh              {"mesh"};
-    PipelineDef<EStgCont> texture           {"texture"};
+        PipelineDef<EStgCont> group             {"group"};
+        PipelineDef<EStgCont> groupEnts         {"groupEnts"};
+        PipelineDef<EStgCont> entMesh           {"entMesh"};
+        PipelineDef<EStgCont> entTexture        {"entTexture"};
 
-    PipelineDef<EStgIntr> meshResDirty      {"meshResDirty"};
-    PipelineDef<EStgIntr> textureResDirty   {"textureResDirty"};
+        PipelineDef<EStgCont> mesh              {"mesh"};
+        PipelineDef<EStgCont> texture           {"texture"};
+
+        PipelineDef<EStgIntr> meshResDirty      {"meshResDirty"};
+        PipelineDef<EStgIntr> textureResDirty   {"textureResDirty"};
+    };
+};
+
+
+struct FICameraControl {
+    struct DataIds {
+        DataId camCtrl;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgCont> camCtrl           {"camCtrl"};
+    };
+};
+
+
+struct FIIndicator {
+    struct DataIds {
+        DataId indicator;
+    };
+
+    struct Pipelines { };
+};
+
+
+struct FICursor {
+    struct DataIds {
+        DataId drawEnt;
+    };
+
+    struct Pipelines { };
 };
 
 
 
-#define TESTAPP_DATA_MAGNUM_SCENE 3, \
-    idScnRenderGl, idGroupFwd, idCamera
-struct PlMagnumScene
-{
-    PipelineDef<EStgFBO>  fbo               {"fboRender"};
+struct FIVehicleControl {
+    struct DataIds {
+        DataId vhControls;
+    };
 
-    PipelineDef<EStgCont> camera            {"camera"};
-
+    struct Pipelines {
+        PipelineDef<EStgCont> selectedVehicle   {"selectedVehicle"};
+    };
 };
 
-
-
-#define TESTAPP_DATA_CAMERA_CTRL 1, \
-    idCamCtrl
-struct PlCameraCtrl
-{
-    PipelineDef<EStgCont> camCtrl           {"camCtrl"};
-};
-
-
-#define TESTAPP_DATA_INDICATOR 1, \
-    idIndicator
-
-
-
-#define TESTAPP_DATA_VEHICLE_CONTROL 1, \
-    idVhControls
-struct PlVehicleCtrl
-{
-    PipelineDef<EStgCont> selectedVehicle   {"selectedVehicle"};
-};
 
 } // namespace ftr_inter

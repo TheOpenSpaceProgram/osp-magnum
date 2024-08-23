@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -37,6 +37,11 @@ extern osp::fw::FeatureDef const ftrMagnum;
 extern osp::fw::FeatureDef const ftrMagnumScene;
 
 /**
+ * @brief Create CameraController connected to an app's UserInputHandler
+ */
+extern osp::fw::FeatureDef const ftrCameraControl;
+
+/**
  * @brief Magnum MeshVisualizer shader and optional material for drawing ActiveEnts with it
  */
 extern osp::fw::FeatureDef const ftrShaderVisualizer;
@@ -51,6 +56,6 @@ extern osp::fw::FeatureDef const ftrShaderFlat;
  */
 extern osp::fw::FeatureDef const ftrShaderPhong;
 
-extern osp::fw::FeatureDef const ftrShaderDrawMagnum;
+extern osp::fw::FeatureDef const ftrTerrainDrawMagnum;
 
 } // namespace testapp

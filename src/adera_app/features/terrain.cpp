@@ -57,29 +57,29 @@ Session setup_terrain(
         Session               const &commonScene)
 {
     OSP_DECLARE_GET_DATA_IDS(commonScene, TESTAPP_DATA_COMMON_SCENE);
-    auto const scene.pl = scene.get_pipelines<PlScene>();
+    auto const scn.pl = scene.get_pipelines<PlScene>();
 
-    auto &rDrawing = rFB.data_get<ACtxDrawing>(topData, commonScene.di.drawing);
+    auto &rDrawing = rFB.data_get<ACtxDrawing>(comScn.di.drawing);
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_TERRAIN);
-    auto const tgTrn = out.create_pipelines<PlTerrain>(rFB);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_TERRAIN);
+    auto const terrain.pl = out.create_pipelines<PlTerrain>(rFB);
 
-    rFB.pipeline(tgTrn.skeleton)       .parent(scene.pl.update);
-    rFB.pipeline(tgTrn.surfaceChanges) .parent(scene.pl.update);
-    rFB.pipeline(tgTrn.terrainFrame)   .parent(scene.pl.update);
-    rFB.pipeline(tgTrn.chunkMesh)      .parent(scene.pl.update);
+    rFB.pipeline(terrain.pl.skeleton)       .parent(scn.pl.update);
+    rFB.pipeline(terrain.pl.surfaceChanges) .parent(scn.pl.update);
+    rFB.pipeline(terrain.pl.terrainFrame)   .parent(scn.pl.update);
+    rFB.pipeline(terrain.pl.chunkMesh)      .parent(scn.pl.update);
 
-    auto &rTerrainFrame = rFB.data_emplace< ACtxTerrainFrame >(topData, idTerrainFrame);
-    auto &rTerrain      = rFB.data_emplace< ACtxTerrain >     (topData, idTerrain);
+    auto &rTerrainFrame = rFB.data_emplace< ACtxTerrainFrame >(terrain.di.terrainFrame);
+    auto &rTerrain      = rFB.data_emplace< ACtxTerrain >     (terrain.di.terrain);
 
     rTerrain.terrainMesh = rDrawing.m_meshRefCounts.ref_add(rDrawing.m_meshIds.create());
 
     rFB.task()
         .name       ("Clear surfaceAdded & surfaceRemoved once we're done with it")
-        .run_on     ({tgTrn.surfaceChanges(Clear)})
+        .run_on     ({terrain.pl.surfaceChanges(Clear)})
         .push_to    (out.m_tasks)
-        .args({               idTerrain })
+        .args({               terrain.di.terrain })
         .func([] (ACtxTerrain &rTerrain) noexcept
     {
         rTerrain.scratchpad.surfaceAdded  .clear();
@@ -88,9 +88,9 @@ Session setup_terrain(
 
     rFB.task()
         .name       ("Clean up terrain-related IdOwners")
-        .run_on     ({scene.pl.cleanup(Run_)})
+        .run_on     ({cleanup.pl.cleanup(Run_)})
         .push_to    (out.m_tasks)
-        .args       ({        idTerrain,             commonScene.di.drawing})
+        .args       ({        terrain.di.terrain,             comScn.di.drawing})
         .func([] (ACtxTerrain &rTerrain, ACtxDrawing &rDrawing) noexcept
     {
         // rTerrain.skChunks has owners referring to rTerrain.skeleton. A reference to
@@ -112,8 +112,8 @@ Session setup_terrain_icosahedron(
         Session               const &terrain)
 {
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_TERRAIN_ICO);
-    rFB.data_emplace< ACtxTerrainIco >     (topData, idTerrainIco);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_TERRAIN_ICO);
+    rFB.data_emplace< ACtxTerrainIco >     (terrain.di.terrainIco);
     return out;
 }
 
@@ -127,17 +127,17 @@ Session setup_terrain_subdiv_dist(
     OSP_DECLARE_GET_DATA_IDS(terrain,    TESTAPP_DATA_TERRAIN);
     OSP_DECLARE_GET_DATA_IDS(terrainIco, TESTAPP_DATA_TERRAIN_ICO);
 
-    auto const tgTrn = terrain  .get_pipelines<PlTerrain>();
-    auto const scene.pl = scene    .get_pipelines<PlScene>();
+    auto const terrain.pl = terrain  .get_pipelines<PlTerrain>();
+    auto const scn.pl = scene    .get_pipelines<PlScene>();
 
     Session out;
 
     rFB.task()
         .name       ("Subdivide triangle skeleton")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgTrn.terrainFrame(Ready), tgTrn.skeleton(New), tgTrn.surfaceChanges(Resize)})
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.skeleton(New), terrain.pl.surfaceChanges(Resize)})
         .push_to    (out.m_tasks)
-        .args({                    idTerrainFrame,             idTerrain,                idTerrainIco })
+        .args({                    terrain.di.terrainFrame,             terrain.di.terrain,                terrain.di.terrainIco })
         .func([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         if ( ! rTerrainFrame.active )
@@ -199,10 +199,10 @@ Session setup_terrain_subdiv_dist(
 
     rFB.task()
         .name       ("Update Terrain Chunks")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgTrn.terrainFrame(Ready), tgTrn.skeleton(Ready), tgTrn.surfaceChanges(UseOrRun), tgTrn.chunkMesh(Modify)})
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.skeleton(Ready), terrain.pl.surfaceChanges(UseOrRun), terrain.pl.chunkMesh(Modify)})
         .push_to    (out.m_tasks)
-        .args({                    idTerrainFrame,             idTerrain,                idTerrainIco })
+        .args({                    terrain.di.terrainFrame,             terrain.di.terrain,                terrain.di.terrainIco })
         .func([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         if ( ! rTerrainFrame.active )
@@ -481,9 +481,9 @@ void initialize_ico_terrain(
     OSP_DECLARE_GET_DATA_IDS(terrain,    TESTAPP_DATA_TERRAIN);
     OSP_DECLARE_GET_DATA_IDS(terrainIco, TESTAPP_DATA_TERRAIN_ICO);
 
-    auto &rTerrain          = rFB.data_get<ACtxTerrain>      (topData, idTerrain);
-    auto &rTerrainFrame     = rFB.data_get<ACtxTerrainFrame> (topData, idTerrainFrame);
-    auto &rTerrainIco       = rFB.data_get<ACtxTerrainIco>   (topData, idTerrainIco);
+    auto &rTerrain          = rFB.data_get<ACtxTerrain>      (terrain.di.terrain);
+    auto &rTerrainFrame     = rFB.data_get<ACtxTerrainFrame> (terrain.di.terrainFrame);
+    auto &rTerrainIco       = rFB.data_get<ACtxTerrainIco>   (terrain.di.terrainIco);
 
     rTerrainFrame.active = true;
 
@@ -643,20 +643,20 @@ Session setup_terrain_debug_draw(
     OSP_DECLARE_GET_DATA_IDS(terrain,        TESTAPP_DATA_TERRAIN);
     OSP_DECLARE_GET_DATA_IDS(terrainIco,     TESTAPP_DATA_TERRAIN_ICO);
 
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const scene.plRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
-    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
-    auto const tgTrn    = terrain       .get_pipelines<PlTerrain>();
+    auto const scn.pl    = scene         .get_pipelines<PlScene>();
+    auto const scnRender.pl = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const camCtrl.pl   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const terrain.pl    = terrain       .get_pipelines<PlTerrain>();
 
     Session out;
     auto const [idTrnDbgDraw] = out.acquire_data<1>(topData);
 
-    auto &rTrnDbgDraw = rFB.data_emplace< TerrainDebugDraw > (topData, idTrnDbgDraw,
+    auto &rTrnDbgDraw = rFB.data_emplace< TerrainDebugDraw > (idTrnDbgDraw,
                                                          TerrainDebugDraw{.mat = mat});
 
-    auto &rDrawing   = rFB.data_get< ACtxDrawing >       (topData, commonScene.di.drawing);
-    auto &rScnRender = rFB.data_get< ACtxSceneRender >   (topData, idScnRender);
-    auto &rTerrain   = rFB.data_get< ACtxTerrain >       (topData, idTerrain);
+    auto &rDrawing   = rFB.data_get< ACtxDrawing >       (comScn.di.drawing);
+    auto &rScnRender = rFB.data_get< ACtxSceneRender >   (scnRender.di.scnRender);
+    auto &rTerrain   = rFB.data_get< ACtxTerrain >       (terrain.di.terrain);
 
     rTrnDbgDraw.surface = rScnRender.m_drawIds.create();
     rScnRender.resize_draw();
@@ -669,10 +669,10 @@ Session setup_terrain_debug_draw(
 
     rFB.task()
         .name       ("Handle Scene<-->Terrain positioning and floating origin")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Modify), tgTrn.terrainFrame(Modify)})
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({camCtrl.pl.camCtrl(Modify), terrain.pl.terrainFrame(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,           idDeltaTimeIn,                  idTerrainFrame,             idTerrain,                idTerrainIco })
+        .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn,                  terrain.di.terrainFrame,             terrain.di.terrain,                terrain.di.terrainIco })
         .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         using Magnum::Math::abs;
@@ -750,10 +750,10 @@ Session setup_terrain_debug_draw(
 
     rFB.task()
         .name       ("Reposition terrain surface mesh")
-        .run_on     ({scene.plRdr.render(Run)})
-        .sync_with  ({tgTrn.terrainFrame(Ready), tgTrn.chunkMesh(Ready), scene.plRdr.drawEnt(Ready), scene.plRdr.drawTransforms(Modify_), scene.plRdr.drawEntResized(Done)})
+        .run_on     ({scnRender.pl.render(Run)})
+        .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.chunkMesh(Ready), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({             idTrnDbgDraw,                  idTerrainFrame,             idTerrain,                 idScnRender })
+        .args       ({             idTrnDbgDraw,                  terrain.di.terrainFrame,             terrain.di.terrain,                 scnRender.di.scnRender })
         .func([] (TerrainDebugDraw& rTrnDbgDraw, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender) noexcept
     {
         float const scale = std::exp2(float(rTerrain.skData.precision));
@@ -768,10 +768,10 @@ Session setup_terrain_debug_draw(
 
     rFB.task()
         .name       ("Create or delete DrawEnts for each SkVrtxId in the terrain skeleton")
-        .run_on     ({scene.plRdr.render(Run)})
-        .sync_with  ({tgTrn.skeleton(Ready), scene.plRdr.drawEnt(Delete), scene.plRdr.entMeshDirty(Modify_), scene.plRdr.materialDirty(Modify_), scene.plRdr.drawEntResized(ModifyOrSignal)})
+        .run_on     ({scnRender.pl.render(Run)})
+        .sync_with  ({terrain.pl.skeleton(Ready), scnRender.pl.drawEnt(Delete), scnRender.pl.entMeshDirty(Modify_), scnRender.pl.materialDirty(Modify_), scnRender.pl.drawEntResized(ModifyOrSignal)})
         .push_to    (out.m_tasks)
-        .args       ({        commonScene.di.drawing,                 idScnRender,             commonScene.di.namedMeshes,                  idTrnDbgDraw,                   idTerrain,                      idTerrainIco })
+        .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,                  idTrnDbgDraw,                   terrain.di.terrain,                      terrain.di.terrainIco })
         .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw& rTrnDbgDraw, ACtxTerrain const &rTerrain, ACtxTerrainIco const &rTerrainIco) noexcept
     {
         Material &rMatPlanet = rScnRender.m_materials[rTrnDbgDraw.mat];
@@ -813,16 +813,16 @@ Session setup_terrain_debug_draw(
         // New DrawEnts may have been created. We can't access rScnRender's members with the new
         // entities yet, since they have not yet been resized.
         //
-        // rScnRender will be resized afterwards by a task with scene.plRdr.drawEntResized(Run),
+        // rScnRender will be resized afterwards by a task with scnRender.pl.drawEntResized(Run),
         // before moving on to "Manage DrawEnts for each terrain SkVrtxId"
     });
 
     rFB.task()
         .name       ("Arrange SkVrtxId DrawEnts as tiny cubes")
-        .run_on     ({scene.plRdr.render(Run)})
-        .sync_with  ({tgTrn.skeleton(Ready), scene.plRdr.drawEnt(Ready), scene.plRdr.drawTransforms(Modify_), scene.plRdr.entMeshDirty(Modify_), scene.plRdr.materialDirty(Modify_), scene.plRdr.drawEntResized(Done)})
+        .run_on     ({scnRender.pl.render(Run)})
+        .sync_with  ({terrain.pl.skeleton(Ready), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Modify_), scnRender.pl.entMeshDirty(Modify_), scnRender.pl.materialDirty(Modify_), scnRender.pl.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({        commonScene.di.drawing,                 idScnRender,             commonScene.di.namedMeshes,                        idTrnDbgDraw,                   idTerrain,                      idTerrainIco })
+        .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,                        idTrnDbgDraw,                   terrain.di.terrain,                      terrain.di.terrainIco })
         .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw const& rTrnDbgDraw, ACtxTerrain const &rTerrain, ACtxTerrainIco const &rTerrainIco) noexcept
     {
         Material                         &rMatPlanet = rScnRender.m_materials[rTrnDbgDraw.mat];

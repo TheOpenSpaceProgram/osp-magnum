@@ -37,6 +37,7 @@ struct ACtxCameraController
 {
     using EButtonControlIndex = osp::input::EButtonControlIndex;
 
+    ACtxCameraController() = default;
     ACtxCameraController(osp::input::UserInputHandler &rInput)
      : m_controls(&rInput)
      , m_btnOrbit(      m_controls.button_subscribe("cam_orbit"))

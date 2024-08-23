@@ -24,13 +24,11 @@
  */
 #pragma once
 
-#include "../core/array_view.h"
+#include "../core/copymove_macros.h"
 #include "../core/math_types.h"
 
-#include <array>
 #include <cstdint>
 #include <limits>
-#include <optional>
 #include <map>
 #include <string>
 #include <vector>
@@ -356,16 +354,19 @@ const UserInputHandler::DeviceId sc_mouse = 1;
 class ControlSubscriber
 {
 public:
+    ControlSubscriber() = default;
     ControlSubscriber(UserInputHandler *pInputHandler) noexcept
      : m_pInputHandler(pInputHandler)
     { }
 
-    ControlSubscriber(ControlSubscriber&& move) noexcept = default;
-    ControlSubscriber& operator=(ControlSubscriber&& move) noexcept = default;
+    OSP_MOVE_ONLY_CTOR_ASSIGN(ControlSubscriber);
 
     ~ControlSubscriber();
 
     EButtonControlIndex button_subscribe(std::string_view name);
+
+    void unsubscribe();
+
     bool button_triggered(EButtonControlIndex index) const
     {
         return m_pInputHandler->button_state(index).m_triggered;
@@ -386,7 +387,7 @@ public:
     { return m_pInputHandler; };
 
 private:
-    UserInputHandler *m_pInputHandler;
+    UserInputHandler *m_pInputHandler{nullptr};
     std::vector<EButtonControlIndex> m_subscribedButtons;
 };
 

@@ -62,26 +62,26 @@ Session setup_newton(
     OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
     OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
 
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const commonScene.pl     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
+    auto const scn.pl    = scene         .get_pipelines<PlScene>();
+    auto const comScn.pl     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const phys.pl    = physics       .get_pipelines<PlPhysics>();
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_NEWTON);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_NEWTON);
     auto const tgNwt = out.create_pipelines<PlNewton>(rFB);
 
-    rFB.pipeline(tgNwt.nwtBody).parent(scene.pl.update);
+    rFB.pipeline(tgNwt.nwtBody).parent(scn.pl.update);
 
-    rFB.data_emplace< ACtxNwtWorld >(topData, idNwt, 2);
+    rFB.data_emplace< ACtxNwtWorld >(idNwt, 2);
 
     using ospnewton::SysNewton;
 
     rFB.task()
         .name       ("Delete Newton components")
-        .run_on     ({commonScene.di.activeEntDel(UseOrRun)})
+        .run_on     ({comScn.di.activeEntDel(UseOrRun)})
         .sync_with  ({tgNwt.nwtBody(Delete)})
         .push_to    (out.m_tasks)
-        .args({                idNwt,                      commonScene.di.activeEntDel })
+        .args({                idNwt,                      comScn.di.activeEntDel })
         .func([] (ACtxNwtWorld& rNwt, ActiveEntVec_t const& rActiveEntDel) noexcept
     {
         SysNewton::update_delete (rNwt, rActiveEntDel.cbegin(), rActiveEntDel.cend());
@@ -89,16 +89,16 @@ Session setup_newton(
 
     rFB.task()
         .name       ("Update Newton world")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgNwt.nwtBody(Prev), commonScene.pl.hierarchy(Prev), tgPhy.physBody(Prev), tgPhy.physUpdate(Run), commonScene.pl.transform(Prev)})
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({tgNwt.nwtBody(Prev), comScn.pl.hierarchy(Prev), phys.pl.physBody(Prev), phys.pl.physUpdate(Run), comScn.pl.transform(Prev)})
         .push_to    (out.m_tasks)
-        .args({             commonScene.di.basic,             idPhys,              idNwt,           idDeltaTimeIn })
+        .args({             comScn.di.basic,             phys.di.phys,              idNwt,           scn.di.deltaTimeIn })
         .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, float const deltaTimeIn, WorkerContext ctx) noexcept
     {
         SysNewton::update_world(rPhys, rNwt, deltaTimeIn, rBasic.m_scnGraph, rBasic.m_transform);
     });
 
-    rFB.data_emplace< ACtxNwtWorld >(topData, idNwt, 2);
+    rFB.data_emplace< ACtxNwtWorld >(idNwt, 2);
 
     return out;
 } // setup_newton
@@ -111,9 +111,9 @@ osp::Session setup_newton_factors(
         ArrayView<entt::any>        topData)
 {
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_NEWTON_FORCES);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_NEWTON_FORCES);
 
-    auto &rFactors = rFB.data_emplace<ForceFactors_t>(topData, idNwtFactors);
+    auto &rFactors = rFB.data_emplace<ForceFactors_t>(idNwtFactors);
 
     std::fill(rFactors.begin(), rFactors.end(), 0);
 
@@ -134,12 +134,12 @@ osp::Session setup_newton_force_accel(
     OSP_DECLARE_GET_DATA_IDS(newton,     TESTAPP_DATA_NEWTON);
     OSP_DECLARE_GET_DATA_IDS(nwtFactors, TESTAPP_DATA_NEWTON_FORCES);
 
-    auto &rNwt      = rFB.data_get<ACtxNwtWorld>(topData, idNwt);
+    auto &rNwt      = rFB.data_get<ACtxNwtWorld>(idNwt);
 
     Session nwtAccel;
-    OSP_DECLARE_CREATE_DATA_IDS(nwtAccel, topData, TESTAPP_DATA_NEWTON_ACCEL);
+    OSP_DECLARE_CREATE_DATA_IDS(nwtAccel, TESTAPP_DATA_NEWTON_ACCEL);
 
-    auto &rAccel    = rFB.data_emplace<Vector3>(topData, idAcceleration, accel);
+    auto &rAccel    = rFB.data_emplace<Vector3>(idAcceleration, accel);
 
     ACtxNwtWorld::ForceFactorFunc const factor
     {
@@ -160,7 +160,7 @@ osp::Session setup_newton_force_accel(
     std::size_t const index = rNwt.m_factors.size();
     rNwt.m_factors.emplace_back(factor);
 
-    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(topData, idNwtFactors));
+    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(idNwtFactors));
     factorBits.set(index);
 
     return nwtAccel;
@@ -185,18 +185,18 @@ Session setup_phys_shapes_newton(
     OSP_DECLARE_GET_DATA_IDS(newton,        TESTAPP_DATA_NEWTON);
     OSP_DECLARE_GET_DATA_IDS(nwtFactors,    TESTAPP_DATA_NEWTON_FORCES);
 
-    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
-    auto const tgShSp   = physShapes    .get_pipelines<PlPhysShapes>();
+    auto const phys.pl    = physics       .get_pipelines<PlPhysics>();
+    auto const physShapes.pl   = physShapes    .get_pipelines<PlPhysShapes>();
     auto const tgNwt    = newton        .get_pipelines<PlNewton>();
 
     Session out;
 
     rFB.task()
         .name       ("Add Newton physics to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgNwt.nwtBody(New), tgPhy.physUpdate(Done)})
+        .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun), tgNwt.nwtBody(New), phys.pl.physUpdate(Done)})
         .push_to    (out.m_tasks)
-        .args({                   commonScene.di.basic,                idPhysShapes,             idPhys,              idNwt,              idNwtFactors })
+        .args({                   comScn.di.basic,                physShapes.di.physShapes,             phys.di.phys,              idNwt,              idNwtFactors })
         .func([] (ACtxBasic const &rBasic, ACtxPhysShapes& rPhysShapes, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ForceFactors_t nwtFactors) noexcept
     {
         for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
@@ -301,21 +301,21 @@ Session setup_vehicle_spawn_newton(
     OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,  TESTAPP_DATA_VEHICLE_SPAWN);
     OSP_DECLARE_GET_DATA_IDS(newton,        TESTAPP_DATA_NEWTON);
     OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    auto const commonScene.pl     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
-    auto const tgPf     = prefabs       .get_pipelines<PlPrefabs>();
-    auto const tgParts  = parts         .get_pipelines<PlParts>();
-    auto const tgVhSp   = vehicleSpawn  .get_pipelines<PlVehicleSpawn>();
+    auto const comScn.pl     = commonScene   .get_pipelines<PlCommonScene>();
+    auto const phys.pl    = physics       .get_pipelines<PlPhysics>();
+    auto const prefabs.pl     = prefabs       .get_pipelines<PlPrefabs>();
+    auto const parts.pl  = parts         .get_pipelines<PlParts>();
+    auto const vhclSpawn.pl   = vehicleSpawn  .get_pipelines<PlVehicleSpawn>();
     auto const tgNwt    = newton        .get_pipelines<PlNewton>();
 
     Session out;
 
     rFB.task()
         .name       ("Create root ActiveEnts for each Weld")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({commonScene.pl.activeEnt(New), commonScene.pl.activeEntResized(Schedule), tgParts.mapWeldActive(Modify), tgVhSp.rootEnts(Resize)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({comScn.pl.activeEnt(New), comScn.pl.activeEntResized(Schedule), parts.pl.mapWeldActive(Modify), vhclSpawn.pl.rootEnts(Resize)})
         .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,                  idVehicleSpawn,           idScnParts})
+        .args       ({      comScn.di.basic,                  vhclSpawn.di.vehicleSpawn,           parts.di.scnParts})
         .func([] (ACtxBasic& rBasic, ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts) noexcept
     {
         LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
@@ -334,10 +334,10 @@ Session setup_vehicle_spawn_newton(
 
     rFB.task()
         .name       ("Add vehicle entities to Scene Graph")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.rootEnts(UseOrRun), tgParts.mapWeldActive(Ready), tgPf.spawnedEnts(UseOrRun), tgPf.spawnRequest(UseOrRun), tgPf.inSubtree(Run), commonScene.pl.transform(Ready), commonScene.pl.hierarchy(Modify)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.pl.rootEnts(UseOrRun), parts.pl.mapWeldActive(Ready), prefabs.pl.spawnedEnts(UseOrRun), prefabs.pl.spawnRequest(UseOrRun), prefabs.pl.inSubtree(Run), comScn.pl.transform(Ready), comScn.pl.hierarchy(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,                        idVehicleSpawn,           idScnParts,             idPrefabs,            mainApp.di.resources})
+        .args       ({      comScn.di.basic,                        vhclSpawn.di.vehicleSpawn,           parts.di.scnParts,             prefabs.di.prefabs,            mainApp.di.resources})
         .func([] (ACtxBasic& rBasic, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
     {
         LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
@@ -395,10 +395,10 @@ Session setup_vehicle_spawn_newton(
 
     rFB.task()
         .name       ("Add Newton physics to Weld entities")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.rootEnts(UseOrRun), tgPf.spawnedEnts(UseOrRun), commonScene.pl.transform(Ready), tgPhy.physBody(Ready), tgNwt.nwtBody(New), tgPhy.physUpdate(Done), commonScene.pl.hierarchy(Ready)})
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.pl.rootEnts(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), comScn.pl.transform(Ready), phys.pl.physBody(Ready), tgNwt.nwtBody(New), phys.pl.physUpdate(Done), comScn.pl.hierarchy(Ready)})
         .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,             idPhys,              idNwt,                        idVehicleSpawn,                 idScnParts})
+        .args       ({      comScn.di.basic,             phys.di.phys,              idNwt,                        vhclSpawn.di.vehicleSpawn,                 parts.di.scnParts})
         .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts) noexcept
     {
         LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
@@ -655,21 +655,21 @@ Session setup_rocket_thrust_newton(
     OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
     OSP_DECLARE_GET_DATA_IDS(newton,        TESTAPP_DATA_NEWTON);
     OSP_DECLARE_GET_DATA_IDS(nwtFactors,    TESTAPP_DATA_NEWTON_FORCES);
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const tgParts  = parts         .get_pipelines<PlParts>();
+    auto const scn.pl    = scene         .get_pipelines<PlScene>();
+    auto const parts.pl  = parts         .get_pipelines<PlParts>();
     auto const tgNwt    = newton        .get_pipelines<PlNewton>();
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_ROCKETS_NWT);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_ROCKETS_NWT);
 
-    auto &rRocketsNwt   = rFB.data_emplace< ACtxRocketsNwt >(topData, idRocketsNwt);
+    auto &rRocketsNwt   = rFB.data_emplace< ACtxRocketsNwt >(idRocketsNwt);
 
     rFB.task()
         .name       ("Assign rockets to Newton bodies")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgParts.weldIds(Ready), tgNwt.nwtBody(Ready), tgParts.connect(Ready)})
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({parts.pl.weldIds(Ready), tgNwt.nwtBody(Ready), parts.pl.connect(Ready)})
         .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,             idPhys,              idNwt,                 idScnParts,                idRocketsNwt,                      idNwtFactors})
+        .args       ({      comScn.di.basic,             phys.di.phys,              idNwt,                 parts.di.scnParts,                idRocketsNwt,                      idNwtFactors})
         .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxNwtWorld& rNwt, ACtxParts const& rScnParts, ACtxRocketsNwt& rRocketsNwt, ForceFactors_t const& rNwtFactors) noexcept
     {
         using adera::gc_mtMagicRocket;
@@ -688,8 +688,8 @@ Session setup_rocket_thrust_newton(
         }
     });
 
-    auto &rScnParts     = rFB.data_get< ACtxParts >              (topData, idScnParts);
-    auto &rSigValFloat  = rFB.data_get< SignalValues_t<float> >  (topData, idSigValFloat);
+    auto &rScnParts     = rFB.data_get< ACtxParts >              (parts.di.scnParts);
+    auto &rSigValFloat  = rFB.data_get< SignalValues_t<float> >  (sigFloat.di.sigValFloat);
     Machines &rMachines = rScnParts.machines;
 
 
@@ -699,12 +699,12 @@ Session setup_rocket_thrust_newton(
         .m_userData = { &rRocketsNwt, &rMachines, &rSigValFloat }
     };
 
-    auto &rNwt = rFB.data_get<ACtxNwtWorld>(topData, idNwt);
+    auto &rNwt = rFB.data_get<ACtxNwtWorld>(idNwt);
 
     std::size_t const index = rNwt.m_factors.size();
     rNwt.m_factors.emplace_back(factor);
 
-    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(topData, idNwtFactors));
+    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(idNwtFactors));
     factorBits.set(index);
 
     return out;

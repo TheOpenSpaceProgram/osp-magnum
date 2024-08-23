@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,146 +23,67 @@
  * SOFTWARE.
  */
 #include "misc.h"
-#include "physics.h"
+
+#include "../feature_interfaces.h"
 
 #include <adera/drawing/CameraController.h>
 #include <osp/activescene/basic_fn.h>
-#include <osp/core/Resources.h>
-#include <osp/core/unpack.h>
 #include <osp/drawing/drawing_fn.h>
 
+using namespace ftr_inter;
+using namespace ftr_inter::stages;
 
 using namespace adera;
 using namespace osp;
 using namespace osp::active;
 using namespace osp::draw;
+using namespace osp::fw;
 
 using osp::input::EButtonControlIndex;
-
-// for the 0xrrggbb_rgbf and angle literalss
-using namespace Magnum::Math::Literals;
 
 namespace adera
 {
 
-void create_materials(
-        ArrayView<entt::any> const  topData,
-        Session const&              sceneRenderer,
-        int const                   count)
+
+FeatureDef const ftrCameraFree = feature_def("CameraFree", [] (
+        FeatureBuilder              &rFB,
+        DependOn<FIWindowApp>       windowApp,
+        DependOn<FIScene>           scn,
+        DependOn<FICameraControl>   camCtrl)
 {
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
-    auto &rScnRender = rFB.data_get< ACtxSceneRender >(topData, idScnRender);
-
-    for (int i = 0; i < count; ++i)
-    {
-        [[maybe_unused]] MaterialId const mat = rScnRender.m_materialIds.create();
-    }
-
-    rScnRender.m_materials.resize(count);
-}
-
-
-
-
-Session setup_camera_ctrl(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              windowApp,
-        Session const&              sceneRenderer,
-        Session const&              magnumScene)
-{
-    OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
-    OSP_DECLARE_GET_DATA_IDS(magnumScene,   TESTAPP_DATA_MAGNUM_SCENE);
-    auto const scene.plRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
-    auto const tgSR     = magnumScene   .get_pipelines<PlMagnumScene>();
-    auto const windowApp.pl    = windowApp     .get_pipelines<PlWindowApp>();
-
-    auto &rUserInput = rFB.data_get< osp::input::UserInputHandler >(topData, windowApp.di.userInput);
-
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_CAMERA_CTRL);
-    auto const tgCmCt = out.create_pipelines<PlCameraCtrl>(rFB);
-
-    rFB.data_emplace< ACtxCameraController > (topData, idCamCtrl, rUserInput);
-
-    rFB.pipeline(tgCmCt.camCtrl).parent(windowApp.pl.sync);
-
-    rFB.task()
-        .name       ("Position Rendering Camera according to Camera Controller")
-        .run_on     ({scene.plRdr.render(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Ready), tgSR.camera(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({                           idCamCtrl,        idCamera })
-        .func([] (ACtxCameraController const& rCamCtrl, Camera &rCamera) noexcept
-    {
-        rCamera.m_transform = rCamCtrl.m_transform;
-    });
-
-    return out;
-} // setup_camera_ctrl
-
-
-
-
-Session setup_camera_free(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              windowApp,
-        Session const&              scene,
-        Session const&              cameraCtrl)
-{
-    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
-
-    auto const windowApp.pl    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
-
-    Session out;
-
     rFB.task()
         .name       ("Move Camera controller")
         .run_on     ({windowApp.pl.inputs(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,           idDeltaTimeIn })
+        .sync_with  ({camCtrl.pl.camCtrl(Modify)})
+        .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn })
         .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn) noexcept
     {
         SysCameraController::update_view(rCamCtrl, deltaTimeIn);
         SysCameraController::update_move(rCamCtrl, deltaTimeIn, true);
     });
-
-    return out;
-} // setup_camera_free
+}); // ftrCameraFree
 
 
 
 
-Session setup_cursor(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              application,
-        Session const&              sceneRenderer,
-        Session const&              cameraCtrl,
-        Session const&              commonScene,
-        MaterialId const            material,
-        PkgId const                 pkg)
+FeatureDef const ftrCursor = feature_def("Cursor", [] (
+        FeatureBuilder              &rFB,
+        Implement<FICursor>         cursor,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FICameraControl>   camCtrl,
+        DependOn<FISceneRenderer>   scnRender,
+        entt::any                   userData)
 {
-    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
-    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
-    auto const scene.plRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const [pkg, material] = entt::any_cast<TplPkgIdMaterialId>(userData);
 
-    auto &rResources    = rFB.data_get< Resources >          (topData, mainApp.di.resources);
-    auto &rScnRender    = rFB.data_get< ACtxSceneRender >    (topData, idScnRender);
-    auto &rDrawing      = rFB.data_get< ACtxDrawing >        (topData, commonScene.di.drawing);
-    auto &rDrawingRes   = rFB.data_get< ACtxDrawingRes >     (topData, commonScene.di.drawingRes);
+    auto &rResources    = rFB.data_get< Resources >          (mainApp.di.resources);
+    auto &rScnRender    = rFB.data_get< ACtxSceneRender >    (scnRender.di.scnRender);
+    auto &rDrawing      = rFB.data_get< ACtxDrawing >        (comScn.di.drawing);
+    auto &rDrawingRes   = rFB.data_get< ACtxDrawingRes >     (comScn.di.drawingRes);
 
-    Session out;
-    auto const [idCursorEnt] = out.acquire_data<1>(topData);
-
-    auto const cursorEnt = rFB.data_emplace<DrawEnt>(topData, idCursorEnt, rScnRender.m_drawIds.create());
+    auto const cursorEnt = rFB.data_emplace<DrawEnt>(cursor.di.drawEnt, rScnRender.m_drawIds.create());
     rScnRender.resize_draw();
 
     rScnRender.m_mesh[cursorEnt] = SysRender::add_drawable_mesh(rDrawing, rDrawingRes, rResources, pkg, "cubewire");
@@ -176,18 +96,15 @@ Session setup_cursor(
 
     rFB.task()
         .name       ("Move cursor")
-        .run_on     ({scene.plRdr.render(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Ready), scene.plRdr.drawTransforms(Modify_), scene.plRdr.drawEntResized(Done)})
-        .push_to    (out.m_tasks)
-        .args       ({        idCursorEnt,                            idCamCtrl,                 idScnRender })
+        .run_on     ({scnRender.pl.render(Run)})
+        .sync_with  ({camCtrl.pl.camCtrl(Ready), scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEntResized(Done)})
+        .args       ({        cursor.di.drawEnt,                            camCtrl.di.camCtrl,                 scnRender.di.scnRender })
         .func([] (DrawEnt const cursorEnt, ACtxCameraController const& rCamCtrl, ACtxSceneRender& rScnRender) noexcept
     {
         rScnRender.m_drawTransform[cursorEnt] = Matrix4::translation(rCamCtrl.m_target.value());
     });
 
-    return out;
-} // setup_cursor
+}); // ftrCursor
 
 
 } // namespace adera
-#endif

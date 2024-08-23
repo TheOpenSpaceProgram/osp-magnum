@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -25,15 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios.h"
-
-#include <osp/activescene/basic.h>
-#include <osp/activescene/physics.h>
-#include <osp/drawing/drawing.h>
-
-#include <longeron/id_management/registry_stl.hpp>
-
-#include <string_view>
+#include <osp/framework/builder.h>
 
 namespace adera
 {
@@ -44,32 +35,13 @@ namespace adera
  *
  * Independent of whichever physics engine is used
  */
-osp::Session setup_physics(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene);
+extern osp::fw::FeatureDef const ftrPhysics;
 
 /**
  * @brief Queues and logic for spawning Prefab resources
  */
-osp::Session setup_prefabs(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics);
+extern osp::fw::FeatureDef const ftrPrefabs;
 
-osp::Session setup_prefab_draw(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         commonScene,
-        osp::Session const&         prefabs,
-        osp::draw::MaterialId       material);
+extern osp::fw::FeatureDef const ftrPrefabDraw;
 
 } // namespace adera
-#endif

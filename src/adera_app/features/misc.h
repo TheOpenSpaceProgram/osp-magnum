@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -25,7 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include <osp/framework/builder.h>
 
 #include <osp/activescene/basic.h>
 #include <osp/drawing/drawing.h>
@@ -33,44 +32,20 @@
 namespace adera
 {
 
-void create_materials(
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         sceneRenderer,
-        int                         count);
-
-/**
- * @brief Create CameraController connected to an app's UserInputHandler
- */
-osp::Session setup_camera_ctrl(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         magnumScene);
-
 /**
  * @brief Adds free cam controls to a CameraController
  */
-osp::Session setup_camera_free(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         scene,
-        osp::Session const&         camera);
+extern osp::fw::FeatureDef const ftrCameraFree;
+
+struct TplPkgIdMaterialId
+{
+    osp::PkgId pkg;
+    osp::draw::MaterialId mat;
+};
 
 /**
  * @brief Wireframe cube over the camera controller's target
  */
-osp::Session setup_cursor(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         commonScene,
-        osp::draw::MaterialId const material,
-        osp::PkgId const            pkg);
-
+extern osp::fw::FeatureDef const ftrCursor;
 
 }
-#endif

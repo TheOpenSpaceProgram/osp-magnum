@@ -23,17 +23,15 @@
  * SOFTWARE.
  */
 #include "console.h"
-
-
-
 #include "../feature_interfaces.h"
 
 #include <adera_app/application.h>
 
 #include <osp/core/Resources.h>
 
-#include <thread>
+#include <iostream>
 #include <mutex>
+#include <thread>
 
 using namespace adera;
 using namespace osp::fw;

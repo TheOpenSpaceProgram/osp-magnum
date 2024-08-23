@@ -55,5 +55,52 @@ struct FIMagnum {
 };
 
 
+struct FIMagnumScene {
+    struct DataIds {
+        DataId scnRenderGl;
+        DataId groupFwd;
+        DataId camera;
+    };
+
+    struct Pipelines {
+        PipelineDef<EStgFBO>  fbo               {"fboRender"};
+        PipelineDef<EStgCont> camera            {"camera"};
+    };
+};
+
+
+struct FIShaderVisualizer {
+    struct DataIds {
+        DataId shader;
+    };
+
+    struct Pipelines { };
+};
+
+struct FIShaderFlat {
+    struct DataIds {
+        DataId shader;
+    };
+
+    struct Pipelines { };
+};
+
+struct FIShaderPhong {
+    struct DataIds {
+        DataId shader;
+    };
+
+    struct Pipelines { };
+};
+
+
+struct FITerrainDrawMagnum {
+    struct DataIds {
+        DataId drawTerrainGL;
+    };
+
+    struct Pipelines { };
+};
+
 
 } // namespace ftr_inter

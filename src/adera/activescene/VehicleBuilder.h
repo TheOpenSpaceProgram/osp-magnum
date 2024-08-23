@@ -230,4 +230,4 @@ VALUES_T& VehicleBuilder::node_values(NodeTypeId nodeType)
     return rValues;
 }
 
-} // namespace testapp
+} // namespace adera

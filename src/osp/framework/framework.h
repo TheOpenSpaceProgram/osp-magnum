@@ -323,18 +323,18 @@ struct FeatureSession
 
 struct FeatureContext
 {
-    // a type?
     KeyedVec<FITypeId, FIInstanceId> finterSlots;
+    std::vector<FSessionId>          sessions;
 };
 
 struct Framework
 {
     void resize_ctx()
     {
-        contextData.resize(contextIds.capacity());
-        for (ContextId const ctxId : contextIds)
+        m_contextData.resize(m_contextIds.capacity());
+        for (ContextId const ctxId : m_contextIds)
         {
-            contextData[ctxId].finterSlots.resize(FITypeInfoRegistry::size());
+            m_contextData[ctxId].finterSlots.resize(FITypeInfoRegistry::size());
         }
     }
 
@@ -344,7 +344,7 @@ struct Framework
         {
             return {};
         }
-        return contextData[ctx].finterSlots[type];
+        return m_contextData[ctx].finterSlots[type];
     }
 
     template<CFeatureInterfaceDef FI_T>
@@ -354,7 +354,7 @@ struct Framework
         {
             return {};
         }
-        return contextData[ctx].finterSlots[FITypeInfoRegistry::get_or_register<FI_T>()];
+        return m_contextData[ctx].finterSlots[FITypeInfoRegistry::get_or_register<FI_T>()];
     }
 
     template<CFeatureInterfaceDef FI_T, typename TAG_T = void>
@@ -365,7 +365,7 @@ struct Framework
 
         if (fiId.has_value())
         {
-            FeatureInterface const &rInterface = fiinstData[fiId];
+            FeatureInterface const &rInterface = m_fiinstData[fiId];
             if constexpr ( ! std::is_empty_v<typename FI_T::Pipelines> )
             {
                 auto const plMembers = arrayCast<PipelineDefBlank_t>(  arrayCast<std::byte>( arrayView(&out.pl, 1) )  );
@@ -388,20 +388,36 @@ struct Framework
         return out;
     }
 
-    Tasks                                       tasks;
-    KeyedVec<TaskId, TaskImpl>                  taskImpl;
+    template<typename T>
+    [[nodiscard]] T& data_get(DataId const dataId) noexcept
+    {
+        return entt::any_cast<T&>(m_data[dataId]);
+    }
 
-    lgrn::IdRegistryStl<DataId>                 dataIds;
-    KeyedVec<DataId, entt::any>                 data;
+    template<typename T, typename ... ARGS_T>
+    T& data_emplace(DataId const dataId, ARGS_T &&...args) noexcept
+    {
+        entt::any &rData = m_data[dataId];
+        rData.emplace<T>(std::forward<ARGS_T>(args) ...);
+        return entt::any_cast<T&>(rData);
+    }
 
-    lgrn::IdRegistryStl<ContextId>              contextIds;
-    KeyedVec< ContextId, FeatureContext >       contextData;
+    void close_context(ContextId ctx);
 
-    lgrn::IdRegistryStl<FIInstanceId>           fiinstIds;
-    KeyedVec<FIInstanceId, FeatureInterface>    fiinstData;
+    Tasks                                       m_tasks;
+    KeyedVec<TaskId, TaskImpl>                  m_taskImpl;
 
-    lgrn::IdRegistryStl<FSessionId>             fsessionIds;
-    KeyedVec<FSessionId, FeatureSession>        fsessionData;
+    lgrn::IdRegistryStl<DataId>                 m_dataIds;
+    KeyedVec<DataId, entt::any>                 m_data;
+
+    lgrn::IdRegistryStl<ContextId>              m_contextIds;
+    KeyedVec< ContextId, FeatureContext >       m_contextData;
+
+    lgrn::IdRegistryStl<FIInstanceId>           m_fiinstIds;
+    KeyedVec<FIInstanceId, FeatureInterface>    m_fiinstData;
+
+    lgrn::IdRegistryStl<FSessionId>             m_fsessionIds;
+    KeyedVec<FSessionId, FeatureSession>        m_fsessionData;
 
 };
 
@@ -421,4 +437,4 @@ public:
 };
 
 
-} // namespace osp
+} // namespace osp::fw

@@ -29,31 +29,25 @@
 
 #include "features/magnum.h"
 #include "MagnumWindowApp.h"
+
 #include <adera_app/application.h>
 #include <adera_app/features/common.h>
+#include <adera_app/features/shapes.h>
+
+#include <adera_app/features/misc.h>
+
 #include <osp/util/UserInputHandler.h>
+
+#include <Magnum/GL/DefaultFramebuffer.h>
 
 using osp::input::UserInputHandler;
 using namespace adera;
-
 using namespace ftr_inter;
-
+using namespace osp;
 using namespace osp::fw;
 
 namespace testapp
 {
-
-
-
-struct MainLoopSignals
-{
-    osp::PipelineId mainLoop;
-    osp::PipelineId inputs;
-    osp::PipelineId renderSync;
-    osp::PipelineId renderResync;
-    osp::PipelineId sceneUpdate;
-    osp::PipelineId sceneRender;
-};
 
 /**
  * @brief Runs Task/Pipeline main loop within MagnumWindowApp
@@ -61,177 +55,210 @@ struct MainLoopSignals
 class CommonMagnumApp : public IOspApplication
 {
 public:
-    CommonMagnumApp(TestApp &rTestApp, MainLoopControl &rMainLoopCtrl, MainLoopSignals signals) noexcept
-     : m_rTestApp       { rTestApp }
-     , m_rMainLoopCtrl  { rMainLoopCtrl }
-     , m_signals        { signals }
-    { }
+
+    struct Members
+    {
+        TestApp                 &rTestApp;
+        MainLoopControl         &rMainLoopCtrl;
+        WindowAppLoopControl    &rWindowLoopCtrl;
+        SceneLoopControl        &rSceneLoopCtrl;
+
+        PipelineId              mainLoop;
+        PipelineId              inputs;
+        PipelineId              renderSync;
+        PipelineId              renderResync;
+    };
+
+    CommonMagnumApp(Members members) noexcept : m{std::move(members)} { }
 
     void run(MagnumWindowApp& rApp) override
     {
-        // Start the main loop
+        // Called once on window startup
 
-//        PipelineId const mainLoop = m_rTestApp.m_application.get_pipelines<PlApplication>().mainLoop;
-//        m_rTestApp.m_pExecutor->run(m_rTestApp, mainLoop);
+        // Resynchronize renderer; Resync+Sync without stepping through time.
+        // This makes sure meshes, textures, shaders, and other GPU-related resources specified by
+        // the scene are properly loaded and assigned to entities within the renderer.
 
-//        // Resyncronize renderer
-
-//        m_rMainLoopCtrl = MainLoopControl{
-//            .doUpdate = false,
-//            .doSync   = true,
-//            .doResync = true,
-//            .doRender = false,
-//        };
-
-//        signal_all();
-
-//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+        m.rMainLoopCtrl  .doUpdate      = true;
+        m.rSceneLoopCtrl .doSceneUpdate = false;
+        m.rWindowLoopCtrl.doResync      = true;
+        m.rWindowLoopCtrl.doSync        = true;
+        m.rWindowLoopCtrl.doRender      = false;
+        signal_all();
+        m.rTestApp.m_pExecutor->wait(m.rTestApp.m_framework);
     }
 
     void draw(MagnumWindowApp& rApp, float delta) override
     {
-        // Magnum Application's main loop calls this
-        m_rTestApp.drive_main_loop();
+        // Called repeatedly by Magnum's main loop
 
-//        auto const magnum    = g_testApp->m_framework.get_interface<FIMagnum>   (g_testApp->m_mainContext);
-//        auto       &rRenderGl = entt::any_cast<osp::draw::RenderGL&>  (g_testApp->m_framework.data[magnum.di.renderGl]);
+        // TODO: m.rTestApp.run_fw_modify_commands();
 
-
-//        Magnum::GL::defaultFramebuffer.bind();
-//        auto &rFboColor = rRenderGl.m_texGl.get(rRenderGl.m_fboColor);
-//        osp::draw::SysRenderGL::display_texture(rRenderGl, rFboColor);
-
-//        m_rMainLoopCtrl = MainLoopControl{
-//            .doUpdate = true,
-//            .doSync   = true,
-//            .doResync = false,
-//            .doRender = true,
-//        };
-
-//        signal_all();
-
-//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
+        m.rMainLoopCtrl  .doUpdate      = true;
+        m.rSceneLoopCtrl .doSceneUpdate = true;
+        m.rWindowLoopCtrl.doResync      = false;
+        m.rWindowLoopCtrl.doSync        = true;
+        m.rWindowLoopCtrl.doRender      = true;
+        signal_all();
+        m.rTestApp.m_pExecutor->wait(m.rTestApp.m_framework);
     }
 
     void exit(MagnumWindowApp& rApp) override
     {
-//        m_rMainLoopCtrl = MainLoopControl{
-//            .doUpdate = false,
-//            .doSync   = false,
-//            .doResync = false,
-//            .doRender = false,
-//        };
+        // Stops the pipeline loop
+        m.rMainLoopCtrl  .doUpdate      = false;
+        m.rSceneLoopCtrl .doSceneUpdate = false;
+        m.rWindowLoopCtrl.doResync      = false;
+        m.rWindowLoopCtrl.doSync        = false;
+        m.rWindowLoopCtrl.doRender      = false;
+        signal_all();
+        m.rTestApp.m_pExecutor->wait(m.rTestApp.m_framework);
 
-//        signal_all();
-
-//        m_rTestApp.m_pExecutor->wait(m_rTestApp);
-
-//        if (m_rTestApp.m_pExecutor->is_running(m_rTestApp))
-//        {
-//            // Main loop must have stopped, but didn't!
-//            m_rTestApp.m_pExecutor->wait(m_rTestApp);
-//            std::abort();
-//        }
+        if (m.rTestApp.m_pExecutor->is_running(m.rTestApp.m_framework))
+        {
+            OSP_LOG_CRITICAL("Expected main loop to stop, but something is blocking it and cannot exit");
+            std::abort();
+        }
     }
 
 private:
 
     void signal_all()
     {
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.mainLoop);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.inputs);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderSync);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.renderResync);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneUpdate);
-//        m_rTestApp.m_pExecutor->signal(m_rTestApp, m_signals.sceneRender);
+        m.rTestApp.m_pExecutor->signal(m.rTestApp.m_framework, m.mainLoop);
+        m.rTestApp.m_pExecutor->signal(m.rTestApp.m_framework, m.inputs);
+        m.rTestApp.m_pExecutor->signal(m.rTestApp.m_framework, m.renderSync);
+        m.rTestApp.m_pExecutor->signal(m.rTestApp.m_framework, m.renderResync);
     }
 
-    TestApp         &m_rTestApp;
-    MainLoopControl &m_rMainLoopCtrl;
-    MainLoopSignals m_signals;
+    Members m;
 };
-
-
-
-void setup_magnum_renderer(
-        TestApp                                 &rTestApp,
-        FInterfaceShorthand<FIMainApp>    const mainApp,
-        AppContexts                       const &rAppCtxs,
-        FInterfaceShorthand<FIWindowApp>  const windowApp,
-        FInterfaceShorthand<FIMagnum>     const magnum,
-        MagnumWindowApp                         &rMagnumApp)
-{
-    Framework &rFW = rTestApp.m_framework;
-
-    auto &rMainLoopCtrl = entt::any_cast<MainLoopControl&>      (rFW.data[mainApp.di.mainLoopCtrl]);
-    auto &rUserInput    = entt::any_cast<UserInputHandler&>     (rFW.data[windowApp.di.userInput]);
-    auto &rRenderGL     = entt::any_cast<osp::draw::RenderGL&>  (rFW.data[magnum.di.renderGl]);
-
-    if (auto engineTest = rFW.get_interface<FIEngineTest>(rAppCtxs.scene);
-        engineTest.id.has_value())
-    {
-        auto &rEngineTest = entt::any_cast<enginetest::EngineTestScene&>(rFW.data[engineTest.di.bigStruct]);
-
-        // This creates the renderer actually updates and draws the scene.
-        rMagnumApp.set_osp_app(enginetest::generate_osp_magnum_app(rEngineTest, rMagnumApp, rRenderGL, rUserInput));
-        return;
-    }
-
-
-    MainLoopSignals const signals
-    {
-        .mainLoop     = mainApp  .pl.mainLoop,
-        .inputs       = windowApp.pl.inputs,
-        .renderSync   = windowApp.pl.sync,
-        .renderResync = windowApp.pl.resync,
-        //.sceneUpdate  = scene                  .get_pipelines<PlScene>()         .update,
-        //.sceneRender  = sceneRenderer          .get_pipelines<PlSceneRenderer>() .render,
-    };
-
-
-    rMagnumApp.set_osp_app( std::make_unique<CommonMagnumApp>(rTestApp, rMainLoopCtrl, signals) );
-}
-
 
 
 void start_magnum_renderer(Framework &rFW, ContextId ctx, entt::any userData)
 {
-    std::cout << "fish :3\n";
-
     TestApp    &rTestApp = entt::any_cast<TestApp&>(userData);
     auto const mainApp   = rFW.get_interface<FIMainApp>(ctx);
-    auto       &rAppCtxs = entt::any_cast<AppContexts&>  (rFW.data[mainApp.di.appContexts]);
+    auto       &rAppCtxs = rFW.data_get<AppContexts&>(mainApp.di.appContexts);
 
-    rAppCtxs.window = rFW.contextIds.create();
+    rAppCtxs.window = rFW.m_contextIds.create();
 
-    ContextBuilder   cb { .m_ctxScope = { ctx }, .m_ctx = rAppCtxs.window, .m_rFW = rFW };
-    cb.add_feature(adera::ftrWindowApp);
-    cb.add_feature(ftrMagnum, MagnumWindowApp::Arguments{rTestApp.m_argc, rTestApp.m_argv});
-    LGRN_ASSERTM(cb.m_errors.empty(), "Error adding main feature");
-    ContextBuilder::apply(std::move(cb));
+    ContextBuilder  windowCB { rAppCtxs.window, { ctx, rAppCtxs.scene }, rFW };
+    windowCB.add_feature(adera::ftrWindowApp);
 
-    main_loop_stack().push_back([&rTestApp] () -> bool {
+    // Adding this feature will open the GUI window
+    windowCB.add_feature(ftrMagnum, MagnumWindowApp::Arguments{rTestApp.m_argc, rTestApp.m_argv});
 
-        Framework &rFW     = rTestApp.m_framework;
+    auto const windowApp        = rFW.get_interface<FIWindowApp>      (rAppCtxs.window);
+    auto const magnum           = rFW.get_interface<FIMagnum>         (rAppCtxs.window);
+    auto const cleanup          = rFW.get_interface<FICleanupContext> (rAppCtxs.window);
+    auto       &rMagnumApp      = rFW.data_get<MagnumWindowApp>       (magnum.di.magnumApp);
+    auto       &rMainLoopCtrl   = rFW.data_get<MainLoopControl>       (mainApp.di.mainLoopCtrl);
+    auto       &rUserInput      = rFW.data_get<UserInputHandler>      (windowApp.di.userInput);
+    auto       &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>  (windowApp.di.windowAppLoopCtrl);
+    auto       &rRenderGL       = rFW.data_get<draw::RenderGL>        (magnum.di.renderGl);
 
-        auto const mainApp        = rFW.get_interface<FIMainApp>(rTestApp.m_mainContext);
-        auto       &rAppCtxs      = entt::any_cast<AppContexts&>  (rFW.data[mainApp.di.appContexts]);
-        auto const windowApp      = rFW.get_interface<FIWindowApp>(rAppCtxs.window);
-        auto const magnum         = rFW.get_interface<FIMagnum>   (rAppCtxs.window);
-        auto       &rMagnumApp    = entt::any_cast<MagnumWindowApp&>(rFW.data[magnum.di.magnumApp]);
+    // Choose which renderer features to use based on information on which features the scene
+    // context contains.
 
-        setup_magnum_renderer(rTestApp, mainApp, rAppCtxs, windowApp, magnum, rMagnumApp);
+    auto const engineTest       = rFW.get_interface<FIEngineTest>(rAppCtxs.scene);
+    auto const scene            = rFW.get_interface<FIScene>(rAppCtxs.scene);
 
-        // Blocking. Main loop runs in MagnumWindowApp::drawEvent continues when the close button is pressed
-        rMagnumApp.exec();
+    bool const isEngineTest = engineTest.id.has_value();
 
-        rMagnumApp.set_osp_app({});
+    if (isEngineTest)
+    {
+        auto &rEngineTest = rFW.data_get<enginetest::EngineTestScene&>(engineTest.di.bigStruct);
 
-        // Destructing MagnumWindowApp will close the window
-        rFW.data[magnum.di.magnumApp].reset();
+        // This creates the renderer actually updates and draws the scene.
+        rMagnumApp.set_osp_app(enginetest::generate_osp_magnum_app(rEngineTest, rMagnumApp, rRenderGL, rUserInput));
+    }
+    else if (scene.id.has_value())
+    {
+        windowCB.add_feature(ftrSceneRenderer);
+        windowCB.add_feature(ftrMagnumScene);
 
-        return false;
-    });
+        auto scnRender      = rFW.get_interface<FISceneRenderer>        (windowCB.m_ctx);
+        auto magnumScn      = rFW.get_interface<FIMagnumScene>          (windowCB.m_ctx);
+        auto &rScnRender    = rFW.data_get<draw::ACtxSceneRender&>      (scnRender.di.scnRender);
+        auto &rCamera       = rFW.data_get<draw::Camera&>               (magnumScn.di.camera);
+
+        auto const mat = rScnRender.m_materialIds.create();
+        rScnRender.m_materials.resize(64);
+
+        windowCB.add_feature(ftrPhysicsShapesDraw);
+        windowCB.add_feature(ftrCameraControl);
+        windowCB.add_feature(ftrCameraFree);
+        windowCB.add_feature(ftrShaderPhong, mat);
+        windowCB.add_feature(ftrCursor, TplPkgIdMaterialId{ rTestApp.m_defaultPkg, mat });
+        windowCB.add_feature(ftrThrower);
+
+        auto &rSceneLoopCtrl    = rFW.data_get<SceneLoopControl&>(scene.di.loopControl);
+        rCamera.set_aspect_ratio(Vector2{Magnum::GL::defaultFramebuffer.viewport().size()});
+
+        CommonMagnumApp::Members members
+        {
+            .rTestApp           = rTestApp,
+            .rMainLoopCtrl      = rMainLoopCtrl,
+            .rWindowLoopCtrl    = rWindowLoopCtrl,
+            .rSceneLoopCtrl     = rSceneLoopCtrl,
+            .mainLoop           = mainApp  .pl.mainLoop,
+            .inputs             = windowApp.pl.inputs,
+            .renderSync         = windowApp.pl.sync,
+            .renderResync       = windowApp.pl.resync,
+        };
+        rMagnumApp.set_osp_app( std::make_unique<CommonMagnumApp>(std::move(members)) );
+    }
+
+    bool const success = ContextBuilder::finalize(std::move(windowCB));
+
+    if ( success )
+    {
+        main_loop_stack().push_back(
+                [&rTestApp, &rMagnumApp, isEngineTest,
+                 magnumApp  = magnum.di.magnumApp,
+                 plCleanup  = PipelineId(cleanup.pl.cleanup),
+                 plMainLoop = mainApp.pl.mainLoop,
+                 windowCtx  = rAppCtxs.window] () -> bool
+        {
+            // Blocking. Main loop runs in MagnumWindowApp::drawEvent() / CommonMagnumApp::draw()
+            // continues when the close button is pressed
+            rMagnumApp.exec();
+
+            // Destruct CommonMagnumApp or EngineTestApp
+            rMagnumApp.set_osp_app({});
+
+            if ( ! isEngineTest )
+            {
+                // Run cleanup pipeline for the window context
+
+                rTestApp.m_pExecutor->run(rTestApp.m_framework, plCleanup);
+                rTestApp.m_pExecutor->wait(rTestApp.m_framework);
+
+                if (rTestApp.m_pExecutor->is_running(rTestApp.m_framework))
+                {
+                    OSP_LOG_CRITICAL("Deadlock in cleanup pipeline");
+                    std::abort();
+                }
+            }
+
+            // Steal the entt::any (internally a void*) for MagnumWindowApp out of the framework
+            // as the GL context is tied to MagnumWindowApp's lifetime. GL context is still needed
+            // to properly destruct other GPU resources in the framework. close_context will
+            // destruct them in an unspecified order otherwise, leading to errors.
+            entt::any magnumAppAny = std::exchange(rTestApp.m_framework.m_data[magnumApp], {});
+
+            rTestApp.m_framework.close_context(windowCtx);
+
+            magnumAppAny.reset();
+
+            // Reload and restart the main loop for the CLI
+            rTestApp.m_pExecutor->load(rTestApp.m_framework);
+            rTestApp.m_pExecutor->run(rTestApp.m_framework, plMainLoop);
+
+            return false;
+        });
+    }
 }
 
 

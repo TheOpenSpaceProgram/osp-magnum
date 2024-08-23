@@ -53,9 +53,9 @@ Session setup_uni_core(
         PipelineId const            updateOn)
 {
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_UNI_CORE);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_UNI_CORE);
 
-    rFB.data_emplace< Universe > (topData, idUniverse);
+    rFB.data_emplace< Universe > (idUniverse);
 
     auto const tgUCore = out.create_pipelines<PlUniCore>(rFB);
 
@@ -77,9 +77,9 @@ Session setup_uni_sceneframe(
     auto const tgUCore =  uniCore.get_pipelines<PlUniCore>();
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_UNI_SCENEFRAME);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_UNI_SCENEFRAME);
 
-    rFB.data_emplace< SceneFrame > (topData, idScnFrame);
+    rFB.data_emplace< SceneFrame > (idScnFrame);
 
     auto const tgUSFrm = out.create_pipelines<PlUniSceneFrame>(rFB);
 
@@ -106,7 +106,7 @@ Session setup_uni_testplanets(
     auto const tgUCore = uniCore    .get_pipelines<PlUniCore>();
     auto const tgUSFrm = uniScnFrame.get_pipelines<PlUniSceneFrame>();
 
-    auto &rUniverse = rFB.data_get< Universe >(topData, idUniverse);
+    auto &rUniverse = rFB.data_get< Universe >(idUniverse);
 
     constexpr int           precision       = 10;
     constexpr int           planetCount     = 64;
@@ -185,16 +185,16 @@ Session setup_uni_testplanets(
 
     // Set initial scene frame
 
-    auto &rScnFrame      = rFB.data_get<SceneFrame>(topData, idScnFrame);
+    auto &rScnFrame      = rFB.data_get<SceneFrame>(idScnFrame);
     rScnFrame.m_parent   = mainSpace;
     rScnFrame.m_position = math::mul_2pow<Vector3g, int>({400, 400, 400}, precision);
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_UNI_PLANETS);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_UNI_PLANETS);
 
-    rFB.data_emplace< CoSpaceId >        (topData, idPlanetMainSpace, mainSpace);
-    rFB.data_emplace< float >            (topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
-    rFB.data_emplace< CoSpaceIdVec_t >   (topData, idSatSurfaceSpaces, std::move(satSurfaceSpaces));
+    rFB.data_emplace< CoSpaceId >        (idPlanetMainSpace, mainSpace);
+    rFB.data_emplace< float >            (tgUniDeltaTimeIn, 1.0f / 60.0f);
+    rFB.data_emplace< CoSpaceIdVec_t >   (idSatSurfaceSpaces, std::move(satSurfaceSpaces));
 
     rFB.task()
         .name       ("Update planets")
@@ -342,15 +342,15 @@ Session setup_testplanets_draw(
     OSP_DECLARE_GET_DATA_IDS(uniTestPlanets, TESTAPP_DATA_UNI_PLANETS);
 
     auto const windowApp.pl    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const scene.plRdr = sceneRenderer .get_pipelines<PlSceneRenderer>();
-    auto const tgCmCt   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
+    auto const scnRender.pl = sceneRenderer .get_pipelines<PlSceneRenderer>();
+    auto const camCtrl.pl   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
     auto const tgUSFrm  = uniScnFrame   .get_pipelines<PlUniSceneFrame>();
 
     Session out;
 
     auto const [idPlanetDraw] = out.acquire_data<1>(topData);
 
-    auto &rPlanetDraw = rFB.data_emplace<PlanetDraw>(topData, idPlanetDraw);
+    auto &rPlanetDraw = rFB.data_emplace<PlanetDraw>(idPlanetDraw);
 
     rPlanetDraw.matPlanets = matPlanets;
     rPlanetDraw.matAxis    = matAxis;
@@ -358,9 +358,9 @@ Session setup_testplanets_draw(
     rFB.task()
         .name       ("Position SceneFrame center to Camera Controller target")
         .run_on     ({windowApp.pl.inputs(Run)})
-        .sync_with  ({tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
+        .sync_with  ({camCtrl.pl.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({                 idCamCtrl,            idScnFrame })
+        .args       ({                 camCtrl.di.camCtrl,            idScnFrame })
         .func([] (ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
     {
         if ( ! rCamCtrl.m_target.has_value())
@@ -391,9 +391,9 @@ Session setup_testplanets_draw(
     rFB.task()
         .name       ("Resync test planets, create DrawEnts")
         .run_on     ({windowApp.pl.resync(Run)})
-        .sync_with  ({scene.plRdr.drawEntResized(ModifyOrSignal)})
+        .sync_with  ({scnRender.pl.drawEntResized(ModifyOrSignal)})
         .push_to    (out.m_tasks)
-        .args       ({               idScnRender,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
+        .args       ({               scnRender.di.scnRender,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
         .func([]    (ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
     {
         CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
@@ -408,9 +408,9 @@ Session setup_testplanets_draw(
     rFB.task()
         .name       ("Resync test planets, add mesh and material")
         .run_on     ({windowApp.pl.resync(Run)})
-        .sync_with  ({scene.plRdr.drawEntResized(Done), scene.plRdr.materialDirty(Modify_), scene.plRdr.entMeshDirty(Modify_)})
+        .sync_with  ({scnRender.pl.drawEntResized(Done), scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
         .push_to    (out.m_tasks)
-        .args       ({           commonScene.di.drawing,                 idScnRender,             commonScene.di.namedMeshes,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
+        .args       ({           comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,            idPlanetDraw,          idUniverse,               idPlanetMainSpace})
         .func([]    (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
     {
         CoSpaceCommon &rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
@@ -457,10 +457,10 @@ Session setup_testplanets_draw(
 
     rFB.task()
         .name       ("Reposition test planet DrawEnts")
-        .run_on     ({scene.plRdr.render(Run)})
-        .sync_with  ({scene.plRdr.drawTransforms(Modify_), scene.plRdr.drawEntResized(Done), tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
+        .run_on     ({scnRender.pl.render(Run)})
+        .sync_with  ({scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEntResized(Done), camCtrl.pl.camCtrl(Ready), tgUSFrm.sceneFrame(Modify)})
         .push_to    (out.m_tasks)
-        .args       ({        commonScene.di.drawing,                 idScnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace})
+        .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace})
         .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace) noexcept
     {
 
@@ -554,7 +554,7 @@ Session setup_solar_system_testplanets(
     auto const tgUCore = solarSystemCore.get_pipelines<PlUniCore>();
     auto const tgUSFrm = solarSystemScnFrame.get_pipelines<PlUniSceneFrame>();
 
-    auto& rUniverse = rFB.data_get< Universe >(topData, idUniverse);
+    auto& rUniverse = rFB.data_get< Universe >(idUniverse);
 
 
     constexpr int precision = 10;
@@ -571,8 +571,8 @@ Session setup_solar_system_testplanets(
     rMainSpaceCommon.m_satCapacity = c_planetCount;
 
     Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_SOLAR_SYSTEM_PLANETS);
-    auto& rCoordNBody = rFB.data_emplace< osp::KeyedVec<CoSpaceId, CoSpaceNBody> >(topData, idCoordNBody);
+    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_SOLAR_SYSTEM_PLANETS);
+    auto& rCoordNBody = rFB.data_emplace< osp::KeyedVec<CoSpaceId, CoSpaceNBody> >(idCoordNBody);
     rCoordNBody.resize(rUniverse.m_coordIds.capacity());
 
     // Associate each planet satellite with their surface coordinate space
@@ -693,13 +693,13 @@ Session setup_solar_system_testplanets(
         550.0f,
         { 1.0f, 0.5f, 0.0f });
 
-    rFB.data_emplace< CoSpaceId >(topData, idPlanetMainSpace, mainSpace);
-    rFB.data_emplace< float >(topData, tgUniDeltaTimeIn, 1.0f / 60.0f);
-    rFB.data_emplace< CoSpaceIdVec_t >(topData, idSatSurfaceSpaces, std::move(satSurfaceSpaces));
+    rFB.data_emplace< CoSpaceId >(idPlanetMainSpace, mainSpace);
+    rFB.data_emplace< float >(tgUniDeltaTimeIn, 1.0f / 60.0f);
+    rFB.data_emplace< CoSpaceIdVec_t >(idSatSurfaceSpaces, std::move(satSurfaceSpaces));
 
     // Set initial scene frame
 
-    auto& rScnFrame = rFB.data_get<SceneFrame>(topData, idScnFrame);
+    auto& rScnFrame = rFB.data_get<SceneFrame>(idScnFrame);
     rScnFrame.m_parent = mainSpace;
     rScnFrame.m_position = math::mul_2pow<Vector3g, int>({ 400, 400, 400 }, precision);
 
@@ -774,24 +774,24 @@ Session setup_solar_system_planets_draw(
     OSP_DECLARE_GET_DATA_IDS(solarSystemTestPlanets, TESTAPP_DATA_SOLAR_SYSTEM_PLANETS);
 
     auto const windowApp.pl = windowApp.get_pipelines<PlWindowApp>();
-    auto const scene.plRdr = sceneRenderer.get_pipelines<PlSceneRenderer>();
-    auto const tgCmCt = cameraCtrl.get_pipelines<PlCameraCtrl>();
+    auto const scnRender.pl = sceneRenderer.get_pipelines<PlSceneRenderer>();
+    auto const camCtrl.pl = cameraCtrl.get_pipelines<PlCameraCtrl>();
     auto const tgUSFrm = solarSystemScnFrame.get_pipelines<PlUniSceneFrame>();
 
     Session out;
 
     auto const [idPlanetDraw] = out.acquire_data<1>(topData);
 
-    auto& rPlanetDraw = rFB.data_emplace<PlanetDraw>(topData, idPlanetDraw);
+    auto& rPlanetDraw = rFB.data_emplace<PlanetDraw>(idPlanetDraw);
 
     rPlanetDraw.matPlanets = matPlanets;
 
     rFB.task()
         .name("Position SceneFrame center to Camera Controller target")
         .run_on({ windowApp.pl.inputs(Run) })
-        .sync_with({ tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify) })
+        .sync_with({ camCtrl.pl.camCtrl(Ready), tgUSFrm.sceneFrame(Modify) })
         .push_to(out.m_tasks)
-        .args({ idCamCtrl,            idScnFrame })
+        .args({ camCtrl.di.camCtrl,            idScnFrame })
         .func([](ACtxCameraController& rCamCtrl, SceneFrame& rScnFrame) noexcept
     {
         if (!rCamCtrl.m_target.has_value())
@@ -821,9 +821,9 @@ Session setup_solar_system_planets_draw(
     rFB.task()
         .name("Resync test planets, create DrawEnts")
         .run_on({ windowApp.pl.resync(Run) })
-        .sync_with({ scene.plRdr.drawEntResized(ModifyOrSignal) })
+        .sync_with({ scnRender.pl.drawEntResized(ModifyOrSignal) })
         .push_to(out.m_tasks)
-        .args({ idScnRender,            idPlanetDraw,          idUniverse,               idPlanetMainSpace })
+        .args({ scnRender.di.scnRender,            idPlanetDraw,          idUniverse,               idPlanetMainSpace })
         .func([](ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace) noexcept
     {
         CoSpaceCommon& rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
@@ -835,9 +835,9 @@ Session setup_solar_system_planets_draw(
     rFB.task()
         .name("Resync test planets, add mesh and material")
         .run_on({ windowApp.pl.resync(Run) })
-        .sync_with({ scene.plRdr.drawEntResized(Done), scene.plRdr.materialDirty(Modify_), scene.plRdr.entMeshDirty(Modify_) })
+        .sync_with({ scnRender.pl.drawEntResized(Done), scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_) })
         .push_to(out.m_tasks)
-        .args({ commonScene.di.drawing,                 idScnRender,             commonScene.di.namedMeshes,            idPlanetDraw,          idUniverse,               idPlanetMainSpace,                                        idCoordNBody })
+        .args({ comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,            idPlanetDraw,          idUniverse,               idPlanetMainSpace,                                        idCoordNBody })
         .func([](ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, PlanetDraw& rPlanetDraw, Universe& rUniverse, CoSpaceId const planetMainSpace, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
     {
         CoSpaceCommon& rMainSpace = rUniverse.m_coordCommon[planetMainSpace];
@@ -866,10 +866,10 @@ Session setup_solar_system_planets_draw(
 
     rFB.task()
         .name("Reposition test planet DrawEnts")
-        .run_on({ scene.plRdr.render(Run) })
-        .sync_with({ scene.plRdr.drawTransforms(Modify_), scene.plRdr.drawEntResized(Done), tgCmCt.camCtrl(Ready), tgUSFrm.sceneFrame(Modify) })
+        .run_on({ scnRender.pl.render(Run) })
+        .sync_with({ scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEntResized(Done), camCtrl.pl.camCtrl(Ready), tgUSFrm.sceneFrame(Modify) })
         .push_to(out.m_tasks)
-        .args({ commonScene.di.drawing,                 idScnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace,                                        idCoordNBody })
+        .args({ comScn.di.drawing,                 scnRender.di.scnRender,            idPlanetDraw,          idUniverse,                  idScnFrame,               idPlanetMainSpace,                                        idCoordNBody })
         .func([](ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, PlanetDraw& rPlanetDraw, Universe& rUniverse, SceneFrame const& rScnFrame, CoSpaceId const planetMainSpace, osp::KeyedVec<CoSpaceId, CoSpaceNBody>& rCoordNBody) noexcept
     {
         CoSpaceCommon& rMainSpace = rUniverse.m_coordCommon[planetMainSpace];

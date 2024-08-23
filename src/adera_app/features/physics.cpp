@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,135 +23,108 @@
  * SOFTWARE.
  */
 #include "physics.h"
-#include "common.h"
+
+#include "../feature_interfaces.h"
 
 #include <osp/activescene/basic.h>
 #include <osp/activescene/physics_fn.h>
 #include <osp/activescene/prefab_fn.h>
-#include <osp/core/Resources.h>
 #include <osp/drawing/drawing_fn.h>
 #include <osp/drawing/prefab_draw.h>
 #include <osp/vehicles/ImporterData.h>
+#include <osp/core/Resources.h>
 
 #include <Magnum/Trade/Trade.h>
 #include <Magnum/Trade/PbrMetallicRoughnessMaterialData.h>
 
-
+using namespace ftr_inter;
+using namespace ftr_inter::stages;
 using namespace osp;
 using namespace osp::active;
 using namespace osp::draw;
-using osp::restypes::gc_importer;
-using Corrade::Containers::arrayView;
+using namespace osp::fw;
 
 namespace adera
 {
 
-
-
-Session setup_physics(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              scene,
-        Session const&              commonScene)
+FeatureDef const ftrPhysics = feature_def("Physics", [] (
+        FeatureBuilder          &rFB,
+        Implement<FIPhysics>    phys,
+        DependOn<FIScene>       scn,
+        DependOn<FICommonScene> comScn)
 {
-    OSP_DECLARE_GET_DATA_IDS(commonScene,  TESTAPP_DATA_COMMON_SCENE);
-    auto const scene.pl = scene      .get_pipelines<PlScene>();
-    auto const commonScene.pl  = commonScene.get_pipelines<PlCommonScene>();
+    rFB.pipeline(phys.pl.physBody)  .parent(scn.pl.update);
+    rFB.pipeline(phys.pl.physUpdate).parent(scn.pl.update);
 
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_PHYSICS);
-    auto const tgPhy = out.create_pipelines<PlPhysics>(rFB);
-
-    rFB.pipeline(tgPhy.physBody)  .parent(scene.pl.update);
-    rFB.pipeline(tgPhy.physUpdate).parent(scene.pl.update);
-
-    rFB.data_emplace< ACtxPhysics >  (topData, idPhys);
+    rFB.data_emplace< ACtxPhysics >  (phys.di.phys);
 
     rFB.task()
         .name       ("Delete Physics components")
-        .run_on     ({commonScene.di.activeEntDel(UseOrRun)})
-        .sync_with  ({tgPhy.physBody(Delete)})
-        .push_to    (out.m_tasks)
-        .args       ({        idPhys,                      commonScene.di.activeEntDel })
-        .func([] (ACtxPhysics& rPhys, ActiveEntVec_t const& rActiveEntDel) noexcept
+        .run_on     ({comScn.pl.activeEntDelete(UseOrRun)})
+        .sync_with  ({phys.pl.physBody(Delete)})
+        .args       ({         phys.di.phys,              comScn.di.activeEntDel })
+        .func       ([] (ACtxPhysics &rPhys, ActiveEntVec_t const &rActiveEntDel) noexcept
     {
         SysPhysics::update_delete_phys(rPhys, rActiveEntDel.cbegin(), rActiveEntDel.cend());
     });
-
-    return out;
-} // setup_physics
+}); // ftrPhysics
 
 
 //-----------------------------------------------------------------------------
 
 
-Session setup_prefabs(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              application,
-        Session const&              scene,
-        Session const&              commonScene,
-        Session const&              physics)
+FeatureDef const ftrPrefabs = feature_def("Prefabs", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIPrefabs>        prefabs,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys)
 {
-    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const commonScene.pl     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
+    rFB.pipeline(prefabs.pl.spawnRequest).parent(scn.pl.update);
+    rFB.pipeline(prefabs.pl.spawnedEnts) .parent(scn.pl.update);
+    rFB.pipeline(prefabs.pl.ownedEnts)   .parent(scn.pl.update);
+    rFB.pipeline(prefabs.pl.instanceInfo).parent(scn.pl.update);
+    rFB.pipeline(prefabs.pl.inSubtree)   .parent(scn.pl.update);
 
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData,  TESTAPP_DATA_PREFABS);
-    auto const tgPf = out.create_pipelines<PlPrefabs>(rFB);
-
-    rFB.pipeline(tgPf.spawnRequest).parent(scene.pl.update);
-    rFB.pipeline(tgPf.spawnedEnts) .parent(scene.pl.update);
-    rFB.pipeline(tgPf.ownedEnts)   .parent(scene.pl.update);
-    rFB.pipeline(tgPf.instanceInfo).parent(scene.pl.update);
-    rFB.pipeline(tgPf.inSubtree)   .parent(scene.pl.update);
-
-    rFB.data_emplace< ACtxPrefabs > (topData, idPrefabs);
+    rFB.data_emplace< ACtxPrefabs > (prefabs.di.prefabs);
 
     rFB.task()
         .name       ("Schedule Prefab spawn")
-        .schedules  ({tgPf.spawnRequest(Schedule_)})
-        .sync_with  ({scene.pl.update(Run)})
-        .push_to    (out.m_tasks)
-        .args       ({              idPrefabs })
-        .func([] (ACtxPrefabs const& rPrefabs) noexcept -> TaskActions
+        .schedules  ({prefabs.pl.spawnRequest(Schedule_)})
+        .sync_with  ({scn.pl.update(Run)})
+        .args       ({            prefabs.di.prefabs })
+        .func       ([] (ACtxPrefabs const &rPrefabs) noexcept -> TaskActions
     {
         return rPrefabs.spawnRequest.empty() ? TaskAction::Cancel : TaskActions{};
     });
 
     rFB.task()
         .name       ("Create Prefab entities")
-        .run_on     ({tgPf.spawnRequest(UseOrRun)})
-        .sync_with  ({commonScene.pl.activeEnt(New), commonScene.pl.activeEntResized(Schedule), tgPf.spawnedEnts(Resize)})
-        .push_to    (out.m_tasks)
-        .args       ({        idPrefabs,           commonScene.di.basic,           mainApp.di.resources})
-        .func([] (ACtxPrefabs& rPrefabs, ACtxBasic& rBasic, Resources& rResources) noexcept
+        .run_on     ({prefabs.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({comScn.pl.activeEnt(New), comScn.pl.activeEntResized(Schedule), prefabs.pl.spawnedEnts(Resize)})
+        .args       ({      prefabs.di.prefabs,   comScn.di.basic,  mainApp.di.resources})
+        .func       ([] (ACtxPrefabs &rPrefabs, ACtxBasic &rBasic, Resources &rResources) noexcept
     {
         SysPrefabInit::create_activeents(rPrefabs, rBasic, rResources);
     });
 
     rFB.task()
         .name       ("Init Prefab transforms")
-        .run_on     ({tgPf.spawnRequest(UseOrRun)})
-        .sync_with  ({tgPf.spawnedEnts(UseOrRun), commonScene.pl.transform(New)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,           mainApp.di.resources,             idPrefabs})
-        .func([] (ACtxBasic& rBasic, Resources& rResources, ACtxPrefabs& rPrefabs) noexcept
+        .run_on     ({prefabs.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({prefabs.pl.spawnedEnts(UseOrRun), comScn.pl.transform(New)})
+        .args       ({     comScn.di.basic,  mainApp.di.resources,    prefabs.di.prefabs})
+        .func       ([] (ACtxBasic &rBasic, Resources &rResources, ACtxPrefabs &rPrefabs) noexcept
     {
         SysPrefabInit::init_transforms(rPrefabs, rResources, rBasic.m_transform);
     });
 
     rFB.task()
         .name       ("Init Prefab instance info")
-        .run_on     ({tgPf.spawnRequest(UseOrRun)})
-        .sync_with  ({tgPf.spawnedEnts(UseOrRun), tgPf.instanceInfo(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,           mainApp.di.resources,             idPrefabs})
-        .func([] (ACtxBasic& rBasic, Resources& rResources, ACtxPrefabs& rPrefabs) noexcept
+        .run_on     ({prefabs.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({prefabs.pl.spawnedEnts(UseOrRun), prefabs.pl.instanceInfo(Modify)})
+        .args       ({     comScn.di.basic,  mainApp.di.resources,    prefabs.di.prefabs})
+        .func       ([] (ACtxBasic &rBasic, Resources &rResources, ACtxPrefabs &rPrefabs) noexcept
     {
         rPrefabs.instanceInfo.resize(rBasic.m_activeIds.capacity(), PrefabInstanceInfo{.prefab = lgrn::id_null<PrefabId>()});
         rPrefabs.roots.resize(rBasic.m_activeIds.capacity());
@@ -161,11 +133,10 @@ Session setup_prefabs(
 
     rFB.task()
         .name       ("Init Prefab physics")
-        .run_on     ({tgPf.spawnRequest(UseOrRun)})
-        .sync_with  ({tgPf.spawnedEnts(UseOrRun), tgPhy.physBody(Modify), tgPhy.physUpdate(Done)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,           mainApp.di.resources,             idPhys,             idPrefabs})
-        .func([] (ACtxBasic& rBasic, Resources& rResources, ACtxPhysics& rPhys, ACtxPrefabs& rPrefabs) noexcept
+        .run_on     ({prefabs.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({prefabs.pl.spawnedEnts(UseOrRun), phys.pl.physBody(Modify), phys.pl.physUpdate(Done)})
+        .args       ({     comScn.di.basic,  mainApp.di.resources,       phys.di.phys,    prefabs.di.prefabs})
+        .func       ([] (ACtxBasic &rBasic, Resources &rResources, ACtxPhysics &rPhys, ACtxPrefabs &rPrefabs) noexcept
     {
         rPhys.m_hasColliders.resize(rBasic.m_activeIds.capacity());
         //rPhys.m_massDirty.resize(rActiveIds.capacity());
@@ -175,77 +146,59 @@ Session setup_prefabs(
 
     rFB.task()
         .name       ("Clear Prefab vector")
-        .run_on     ({tgPf.spawnRequest(Clear)})
-        .push_to    (out.m_tasks)
-        .args       ({        idPrefabs})
-        .func([] (ACtxPrefabs& rPrefabs) noexcept
+        .run_on     ({prefabs.pl.spawnRequest(Clear)})
+        .args       ({        prefabs.di.prefabs})
+        .func       ([] (ACtxPrefabs &rPrefabs) noexcept
     {
         rPrefabs.spawnRequest.clear();
     });
-
-    return out;
-} // setup_prefabs
+}); // ftrPrefabs
 
 
 
-
-Session setup_prefab_draw(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              application,
-        Session const&              windowApp,
-        Session const&              sceneRenderer,
-        Session const&              commonScene,
-        Session const&              prefabs,
-        MaterialId                  material)
+FeatureDef const ftrPrefabDraw = feature_def("PrefabDraw", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIPrefabDraw>     prefabDraw,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys,
+        DependOn<FIPrefabs>         prefabs,
+        DependOn<FIWindowApp>       windowApp,
+        DependOn<FISceneRenderer>   scnRender,
+        entt::any                   userData)
 {
-    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer, TESTAPP_DATA_SCENE_RENDERER);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(prefabs,       TESTAPP_DATA_PREFABS);
-    auto const windowApp.pl    = windowApp     .get_pipelines< PlWindowApp >();
-    auto const scene.plRdr = sceneRenderer .get_pipelines< PlSceneRenderer >();
-    auto const commonScene.pl     = commonScene   .get_pipelines< PlCommonScene >();
-    auto const tgPf     = prefabs       .get_pipelines< PlPrefabs >();
-
-    Session out;
-    auto const [idMaterial] = out.acquire_data<1>(topData);
-
-    rFB.data_emplace<MaterialId>(topData, idMaterial, material);
+    rFB.data_emplace<MaterialId>(prefabDraw.di.material, entt::any_cast<MaterialId>(userData));
 
     rFB.task()
         .name       ("Create DrawEnts for prefabs")
-        .run_on     ({tgPf.spawnRequest(UseOrRun)})
-        .sync_with  ({tgPf.spawnedEnts(UseOrRun), commonScene.pl.activeEntResized(Done), scene.plRdr.drawEntResized(ModifyOrSignal)})
-        .push_to    (out.m_tasks)
-        .args       ({           idPrefabs,           mainApp.di.resources,                 commonScene.di.basic,             commonScene.di.drawing,                 idScnRender})
-        .func([]    (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender) noexcept
+        .run_on     ({prefabs.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({prefabs.pl.spawnedEnts(UseOrRun), comScn.pl.activeEntResized(Done), scnRender.pl.drawEntResized(ModifyOrSignal)})
+        .args       ({      prefabs.di.prefabs,  mainApp.di.resources,         comScn.di.basic,     comScn.di.drawing,      scnRender.di.scnRender})
+        .func       ([] (ACtxPrefabs &rPrefabs, Resources &rResources, ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender) noexcept
     {
         SysPrefabDraw::init_drawents(rPrefabs, rResources, rBasic, rDrawing, rScnRender);
     });
 
     rFB.task()
         .name       ("Add mesh and material to prefabs")
-        .run_on     ({tgPf.spawnRequest(UseOrRun)})
-        .sync_with  ({tgPf.spawnedEnts(UseOrRun), scene.plRdr.drawEnt(New), scene.plRdr.drawEntResized(Done),
-                      scene.plRdr   .entMesh(New), scene.plRdr   .entMeshDirty(Modify_), scene.plRdr   .meshResDirty(Modify_),
-                      scene.plRdr.entTexture(New), scene.plRdr.entTextureDirty(Modify_), scene.plRdr.textureResDirty(Modify_),
-                      scene.plRdr  .material(New), scene.plRdr  .materialDirty(Modify_)})
-        .push_to    (out.m_tasks)
-        .args       ({        idPrefabs,           mainApp.di.resources,                 commonScene.di.basic,             commonScene.di.drawing,                commonScene.di.drawingRes,                 idScnRender,          idMaterial})
-        .func([] (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, MaterialId material) noexcept
+        .run_on     ({prefabs.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({prefabs.pl.spawnedEnts(UseOrRun), scnRender.pl.drawEnt(New), scnRender.pl.drawEntResized(Done),
+                      scnRender.pl.entMesh   (New), scnRender.pl.entMeshDirty   (Modify_),  scnRender.pl.meshResDirty   (Modify_),
+                      scnRender.pl.entTexture(New), scnRender.pl.entTextureDirty(Modify_),  scnRender.pl.textureResDirty(Modify_),
+                      scnRender.pl.material  (New), scnRender.pl.materialDirty  (Modify_)})
+        .args       ({      prefabs.di.prefabs,  mainApp.di.resources,         comScn.di.basic,     comScn.di.drawing,        comScn.di.drawingRes,      scnRender.di.scnRender, prefabDraw.di.material})
+        .func       ([] (ACtxPrefabs &rPrefabs, Resources &rResources, ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxDrawingRes &rDrawingRes, ACtxSceneRender &rScnRender,    MaterialId material) noexcept
     {
         SysPrefabDraw::init_mesh_texture_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender, material);
     });
 
-
     rFB.task()
         .name       ("Resync spawned shapes DrawEnts")
         .run_on     ({windowApp.pl.resync(Run)})
-        .sync_with  ({tgPf.ownedEnts(UseOrRun_), commonScene.pl.hierarchy(Ready), commonScene.pl.activeEntResized(Done), scene.plRdr.drawEntResized(ModifyOrSignal)})
-        .push_to    (out.m_tasks)
-        .args       ({           idPrefabs,           mainApp.di.resources,                 commonScene.di.basic,             commonScene.di.drawing,                 idScnRender})
-        .func([]    (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender) noexcept
+        .sync_with  ({prefabs.pl.ownedEnts(UseOrRun_), comScn.pl.hierarchy(Ready), comScn.pl.activeEntResized(Done), scnRender.pl.drawEntResized(ModifyOrSignal)})
+        .args       ({      prefabs.di.prefabs,  mainApp.di.resources,         comScn.di.basic,     comScn.di.drawing,      scnRender.di.scnRender})
+        .func       ([] (ACtxPrefabs &rPrefabs, Resources &rResources, ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender) noexcept
     {
         SysPrefabDraw::resync_drawents(rPrefabs, rResources, rBasic, rDrawing, rScnRender);
     });
@@ -253,19 +206,14 @@ Session setup_prefab_draw(
     rFB.task()
         .name       ("Resync spawned shapes mesh and material")
         .run_on     ({windowApp.pl.resync(Run)})
-        .sync_with  ({tgPf.ownedEnts(UseOrRun_), scene.plRdr.entMesh(New), scene.plRdr.material(New), scene.plRdr.drawEnt(New), scene.plRdr.drawEntResized(Done),
-                      scene.plRdr.materialDirty(Modify_), scene.plRdr.entMeshDirty(Modify_)})
-        .push_to    (out.m_tasks)
-        .args       ({        idPrefabs,           mainApp.di.resources,                 commonScene.di.basic,             commonScene.di.drawing,                commonScene.di.drawingRes,                 idScnRender,          idMaterial})
-        .func([] (ACtxPrefabs& rPrefabs, Resources& rResources, ACtxBasic const& rBasic, ACtxDrawing& rDrawing, ACtxDrawingRes& rDrawingRes, ACtxSceneRender& rScnRender, MaterialId material) noexcept
+        .sync_with  ({prefabs.pl.ownedEnts(UseOrRun_), scnRender.pl.entMesh(New), scnRender.pl.material(New), scnRender.pl.drawEnt(New), scnRender.pl.drawEntResized(Done),
+                      scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
+        .args       ({      prefabs.di.prefabs,  mainApp.di.resources,         comScn.di.basic,     comScn.di.drawing,        comScn.di.drawingRes,      scnRender.di.scnRender, prefabDraw.di.material})
+        .func       ([] (ACtxPrefabs &rPrefabs, Resources &rResources, ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxDrawingRes &rDrawingRes, ACtxSceneRender &rScnRender,    MaterialId material) noexcept
     {
         SysPrefabDraw::resync_mesh_texture_material(rPrefabs, rResources, rBasic, rDrawing, rDrawingRes, rScnRender, material);
     });
-
-
-    return out;
-} // setup_phys_shapes_draw
+}); // ftrPrefabDraw
 
 
 } // namespace adera
-#endif

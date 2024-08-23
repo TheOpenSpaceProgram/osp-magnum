@@ -58,16 +58,8 @@ namespace testapp
 
 void TestApp::init()
 {
-    LGRN_ASSERTM( ! m_mainContext.has_value(), "Call init() only once. pretty please!");
-    m_mainContext = m_framework.contextIds.create();
-
-    ContextBuilder   cb { .m_ctx = m_mainContext, .m_rFW = m_framework };
-    cb.add_feature(ftrMain);
-    LGRN_ASSERTM(cb.m_errors.empty(), "Error adding main feature");
-    ContextBuilder::apply(std::move(cb));
-
     auto const fiMain         = m_framework.get_interface<FIMainApp>(m_mainContext);
-    auto       &rResources    = entt::any_cast<osp::Resources&>          (m_framework.data[fiMain.di.resources]);
+    auto       &rResources    = m_framework.data_get<osp::Resources&>(fiMain.di.resources);
     rResources.resize_types(osp::ResTypeIdReg_t::size());
     m_defaultPkg = rResources.pkg_create();
 
@@ -79,9 +71,26 @@ void TestApp::init()
 
 void TestApp::drive_main_loop()
 {
+    bool const commandsRan = run_fw_modify_commands();
+    if (commandsRan)
+    {
+        return;
+    }
+
     auto const fiMain         = m_framework.get_interface<FIMainApp>(m_mainContext);
-    auto       &rMainLoopCtrl = entt::any_cast<MainLoopControl&>(m_framework.data[fiMain.di.mainLoopCtrl]);
-    auto       &rFWModify     = entt::any_cast<FrameworkModify&>(m_framework.data[fiMain.di.frameworkModify]);
+    auto       &rMainLoopCtrl = m_framework.data_get<MainLoopControl&>(fiMain.di.mainLoopCtrl);
+
+    rMainLoopCtrl.doUpdate = true;
+
+    m_pExecutor->signal(m_framework, fiMain.pl.mainLoop);
+    m_pExecutor->wait(m_framework);
+}
+
+bool TestApp::run_fw_modify_commands()
+{
+    auto const fiMain         = m_framework.get_interface<FIMainApp>(m_mainContext);
+    auto       &rMainLoopCtrl = m_framework.data_get<MainLoopControl&>(fiMain.di.mainLoopCtrl);
+    auto       &rFWModify     = m_framework.data_get<FrameworkModify&>(fiMain.di.frameworkModify);
 
     if ( ! rFWModify.commands.empty() )
     {
@@ -105,12 +114,10 @@ void TestApp::drive_main_loop()
         // Restart framework main loop
         m_pExecutor->load(m_framework);
         m_pExecutor->run(m_framework, fiMain.pl.mainLoop);
+
+        return true;
     }
-
-    rMainLoopCtrl.doUpdate = true;
-
-    m_pExecutor->signal(m_framework, fiMain.pl.mainLoop);
-    m_pExecutor->wait(m_framework);
+    return false;
 }
 
 /*
@@ -178,7 +185,7 @@ void TestApp::clear_resource_owners()
     // declares mainApp.di.resources
     OSP_DECLARE_GET_DATA_IDS(m_application, TESTAPP_DATA_APPLICATION);
 
-    auto &rResources = osp::rFB.data_get<osp::Resources>(m_topData, mainApp.di.resources);
+    auto &rResources = osp::rFB.data_get<osp::Resources>(m_mainApp.di.resources);
 
     // Texture resources contain osp::TextureImgSource, which refererence counts
     // their associated image data
@@ -227,7 +234,7 @@ void TestApp::load_a_bunch_of_stuff()
     using Primitives::CylinderFlag;
 
     auto const fiMain      = m_framework.get_interface<FIMainApp>(m_mainContext);
-    auto       &rResources = entt::any_cast<osp::Resources&>(m_framework.data[fiMain.di.resources]);
+    auto       &rResources = m_framework.data_get<osp::Resources&>(fiMain.di.resources);
 
     rResources.data_register<Trade::ImageData2D>(gc_image);
     rResources.data_register<Trade::TextureData>(gc_texture);

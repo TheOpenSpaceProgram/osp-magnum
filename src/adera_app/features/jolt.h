@@ -24,19 +24,7 @@
  */
 #pragma once
 
-#if 0
-
-#include "../scenarios.h"
-
-#include <osp/core/math_types.h>
-#include <osp/tasks/builder.h>
-#include <osp/tasks/tasks.h>
-#include <osp/tasks/top_session.h>
-#include <osp/tasks/top_tasks.h>
-
-#include <ospjolt/activescene/forcefactors.h>
-
-#include <longeron/id_management/registry_stl.hpp>
+#include <osp/framework/builder.h>
 
 namespace adera
 {
@@ -44,12 +32,7 @@ namespace adera
 /**
  * @brief Jolt physics integration
  */
-osp::Session setup_jolt(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics);
+extern osp::fw::FeatureDef const ftrJolt;
 
 /**
  * @brief Create a single empty force factor bitset
@@ -57,61 +40,26 @@ osp::Session setup_jolt(
  * This is a simple bitset that can be assigned to a rigid body to set which
  * functions contribute to its force and torque
  */
-osp::Session setup_jolt_factors(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData);
+extern osp::fw::FeatureDef const ftrJoltForces;
 
 /**
  * @brief Setup constant acceleration force, add to a force factor bitset
  */
-osp::Session setup_jolt_force_accel(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         jolt,
-        osp::Session const&         joltFactors,
-        osp::Vector3                accel);
-
+extern osp::fw::FeatureDef const ftrJoltAccel;
 /**
  * @brief Support for Shape Spawner physics using Jolt Physics
  */
-osp::Session setup_phys_shapes_jolt(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         physShapes,
-        osp::Session const&         jolt,
-        osp::Session const&         joltFactors);
+extern osp::fw::FeatureDef const ftrPhysicsShapesJolt;
 
 /**
  * @brief Support for Vehicle physics using Jolt Physics
  */
-osp::Session setup_vehicle_spawn_jolt(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         prefabs,
-        osp::Session const&         parts,
-        osp::Session const&         vehicleSpawn,
-        osp::Session const&         jolt);
+extern osp::fw::FeatureDef const ftrVehicleSpawnJolt;
 
 /**
  * @brief Add thrust forces to Magic Rockets from setup_mach_rocket
  */
-osp::Session setup_rocket_thrust_jolt(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         prefabs,
-        osp::Session const&         parts,
-        osp::Session const&         signalsFloat,
-        osp::Session const&         jolt,
-        osp::Session const&         joltFactors);
+extern osp::fw::FeatureDef const ftrRocketThrustJolt;
 
 } // namespace adera
 
-#endif

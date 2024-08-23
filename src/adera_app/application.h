@@ -38,12 +38,15 @@ struct MainLoopControl
     bool doUpdate;
 };
 
+struct SceneLoopControl
+{
+    bool doSceneUpdate;
+};
+
 struct WindowAppLoopControl
 {
     bool doResync;
-
     bool doSync;
-
     bool doRender;
 };
 

@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -22,11 +22,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
-#if 0
 #include "jolt.h"
-#include "physics.h"
 #include "shapes.h"
+
+#include "../feature_interfaces.h"
 
 #include <osp/activescene/basic_fn.h>
 #include <osp/activescene/physics_fn.h>
@@ -40,9 +39,13 @@
 
 #include <ospjolt/activescene/joltinteg_fn.h>
 
+using namespace ftr_inter;
+using namespace ftr_inter::stages;
 using namespace osp;
 using namespace osp::active;
 using namespace osp::link;
+using namespace osp::fw;
+
 using namespace ospjolt;
 
 using osp::restypes::gc_importer;
@@ -52,42 +55,29 @@ namespace adera
 {
 
 
-Session setup_jolt(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        osp::Session const&         scene,
-        Session const&              commonScene,
-        Session const&              physics)
+FeatureDef const ftrJolt = feature_def("Jolt", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIJolt>           jolt,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys)
 {
     //Mandatory Jolt setup steps (start of program)
     ACtxJoltWorld::initJoltGlobal();
     JPH_IF_ENABLE_ASSERTS(AssertFailed = AssertFailedImpl;)
 
 
-    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
+    rFB.pipeline(jolt.pl.joltBody).parent(scn.pl.update);
 
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const commonScene.pl     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
-
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_JOLT);
-    auto const tgJolt = out.create_pipelines<PlJolt>(rFB);
-
-    rFB.pipeline(tgJolt.joltBody).parent(scene.pl.update);
-
-    rFB.data_emplace< ACtxJoltWorld >(topData, idJolt, 2);
+    rFB.data_emplace< ACtxJoltWorld >(jolt.di.jolt, 2);
 
     using ospjolt::SysJolt;
 
     rFB.task()
         .name       ("Delete Jolt components")
-        .run_on     ({commonScene.di.activeEntDel(UseOrRun)})
-        .sync_with  ({tgJolt.joltBody(Delete)})
-        .push_to    (out.m_tasks)
-        .args({                idJolt,                      commonScene.di.activeEntDel })
+        .run_on     ({comScn.pl.activeEntDelete(UseOrRun)})
+        .sync_with  ({jolt.pl.joltBody(Delete)})
+        .args({                jolt.di.jolt,                      comScn.di.activeEntDel })
         .func([] (ACtxJoltWorld& rJolt, ActiveEntVec_t const& rActiveEntDel) noexcept
     {
         SysJolt::update_delete (rJolt, rActiveEntDel.cbegin(), rActiveEntDel.cend());
@@ -95,57 +85,43 @@ Session setup_jolt(
 
     rFB.task()
         .name       ("Update Jolt world")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgJolt.joltBody(Prev), commonScene.pl.hierarchy(Prev), tgPhy.physBody(Prev), tgPhy.physUpdate(Run), commonScene.pl.transform(Prev)})
-        .push_to    (out.m_tasks)
-        .args({             commonScene.di.basic,             idPhys,              idJolt,           idDeltaTimeIn })
-        .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, float const deltaTimeIn, WorkerContext ctx) noexcept
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({jolt.pl.joltBody(Prev), comScn.pl.hierarchy(Prev), phys.pl.physBody(Prev), phys.pl.physUpdate(Run), comScn.pl.transform(Prev)})
+        .args({             comScn.di.basic,             phys.di.phys,              jolt.di.jolt,           scn.di.deltaTimeIn })
+        .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, float const deltaTimeIn) noexcept
     {
         SysJolt::update_world(rPhys, rJolt, deltaTimeIn, rBasic.m_transform);
     });
 
-    rFB.data_emplace< ACtxJoltWorld >(topData, idJolt, 2);
-
-    return out;
-} // setup_jolt
+    rFB.data_emplace< ACtxJoltWorld >(jolt.di.jolt, 2);
+}); // ftrJolt
 
 
 
-
-osp::Session setup_jolt_factors(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any>        topData)
+FeatureDef const ftrJoltForces = feature_def("JoltForces", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIJoltForces>     joltForces)
 {
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_JOLT_FORCES);
-
-    auto &rFactors = rFB.data_emplace<ForceFactors_t>(topData, idJoltFactors);
-
+    auto &rFactors = rFB.data_emplace<ForceFactors_t>(joltForces.di.factors);
     std::fill(rFactors.begin(), rFactors.end(), 0);
-
-    return out;
-} // setup_jolt_factors
+}); // ftrJoltForces
 
 
 
-
-osp::Session setup_jolt_force_accel(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any>        topData,
-        Session const&              jolt,
-        Session const&              joltFactors,
-        Vector3                     accel)
+FeatureDef const ftrJoltAccel = feature_def("JoltAccel", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIJoltAccel>      joltAccel,
+        DependOn<FIJoltForces>      joltForces,
+        DependOn<FIJolt>            jolt,
+        entt::any                   userData)
 {
+    Vector3 accel = entt::any_cast<Vector3>(userData);
+
     using UserData_t = ACtxJoltWorld::ForceFactorFunc::UserData_t;
-    OSP_DECLARE_GET_DATA_IDS(jolt,     TESTAPP_DATA_JOLT);
-    OSP_DECLARE_GET_DATA_IDS(joltFactors, TESTAPP_DATA_JOLT_FORCES);
+    auto &rJolt      = rFB.data_get<ACtxJoltWorld>(jolt.di.jolt);
 
-    auto &rJolt      = rFB.data_get<ACtxJoltWorld>(topData, idJolt);
 
-    Session joltAccel;
-    OSP_DECLARE_CREATE_DATA_IDS(joltAccel, topData, TESTAPP_DATA_JOLT_ACCEL);
-
-    auto &rAccel    = rFB.data_emplace<Vector3>(topData, idAcceleration, accel);
+    auto &rAccel    = rFB.data_emplace<Vector3>(joltAccel.di.accel, accel);
 
     ACtxJoltWorld::ForceFactorFunc const factor
     {
@@ -166,43 +142,30 @@ osp::Session setup_jolt_force_accel(
     std::size_t const index = rJolt.m_factors.size();
     rJolt.m_factors.emplace_back(factor);
 
-    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(topData, idJoltFactors));
+    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(joltForces.di.factors));
     factorBits.set(index);
 
-    return joltAccel;
-} // setup_jolt_force_accel
+}); // ftrJoltAccel
 
 
 
 
-Session setup_phys_shapes_jolt(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              commonScene,
-        Session const&              physics,
-        Session const&              physShapes,
-        Session const&              jolt,
-        Session const&              joltFactors)
+FeatureDef const ftrPhysicsShapesJolt = feature_def("PhysicsShapesJolt", [] (
+        FeatureBuilder              &rFB,
+        //Implement<FIPhys>      joltAccel,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys,
+        DependOn<FIPhysShapes>      physShapes,
+        DependOn<FIJolt>            jolt,
+        DependOn<FIJoltForces>      joltForces,
+        entt::any                   userData)
 {
-
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
-    OSP_DECLARE_GET_DATA_IDS(physShapes,    TESTAPP_DATA_PHYS_SHAPES);
-    OSP_DECLARE_GET_DATA_IDS(jolt,          TESTAPP_DATA_JOLT);
-    OSP_DECLARE_GET_DATA_IDS(joltFactors,   TESTAPP_DATA_JOLT_FORCES);
-
-    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
-    auto const tgShSp   = physShapes    .get_pipelines<PlPhysShapes>();
-    auto const tgJolt   = jolt          .get_pipelines<PlJolt>();
-
-    Session out;
 
     rFB.task()
         .name       ("Add Jolt physics to spawned shapes")
-        .run_on     ({tgShSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgShSp.spawnedEnts(UseOrRun), tgJolt.joltBody(New), tgPhy.physUpdate(Done)})
-        .push_to    (out.m_tasks)
-        .args({                   commonScene.di.basic,                idPhysShapes,             idPhys,              idJolt,              idJoltFactors })
+        .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun), jolt.pl.joltBody(New), phys.pl.physUpdate(Done)})
+        .args({                   comScn.di.basic,                physShapes.di.physShapes,             phys.di.phys,              jolt.di.jolt,              joltForces.di.factors })
         .func([] (ACtxBasic const &rBasic, ACtxPhysShapes& rPhysShapes, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ForceFactors_t joltFactors) noexcept
     {
 
@@ -261,8 +224,7 @@ Session setup_phys_shapes_jolt(
         bodyInterface.AddBodiesFinalize(addedBodies.data(), numBodies, addState, EActivation::Activate);
     });
 
-    return out;
-} // setup_phys_shapes_jolt
+}); // ftrPhysicsShapesJolt
 
 
 void compound_collect_recurse(
@@ -314,44 +276,28 @@ void compound_collect_recurse(
                     rCtxPhys, rCtxWorld, rBasic, child, childMatrix, rCompound);
         }
     }
-}
+} // void compound_collect_recurse
 
 
-
-Session setup_vehicle_spawn_jolt(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              application,
-        Session const&              commonScene,
-        Session const&              physics,
-        Session const&              prefabs,
-        Session const&              parts,
-        Session const&              vehicleSpawn,
-        Session const&              jolt)
+FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
+        FeatureBuilder              &rFB,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys,
+        DependOn<FIPhysShapes>      physShapes,
+        DependOn<FIPrefabs>         prefabs,
+        DependOn<FIParts>           parts,
+        DependOn<FIJolt>            jolt,
+        DependOn<FIJoltForces>      joltForces,
+        DependOn<FIVehicleSpawn>    vhclSpawn,
+        entt::any                   userData)
 {
-    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
-    OSP_DECLARE_GET_DATA_IDS(prefabs,       TESTAPP_DATA_PREFABS);
-    OSP_DECLARE_GET_DATA_IDS(vehicleSpawn,  TESTAPP_DATA_VEHICLE_SPAWN);
-    OSP_DECLARE_GET_DATA_IDS(jolt,          TESTAPP_DATA_JOLT);
-    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    auto const commonScene.pl     = commonScene   .get_pipelines<PlCommonScene>();
-    auto const tgPhy    = physics       .get_pipelines<PlPhysics>();
-    auto const tgPf     = prefabs       .get_pipelines<PlPrefabs>();
-    auto const tgParts  = parts         .get_pipelines<PlParts>();
-    auto const tgVhSp   = vehicleSpawn  .get_pipelines<PlVehicleSpawn>();
-    auto const tgJolt   = jolt          .get_pipelines<PlJolt>();
-
-    Session out;
-
     rFB.task()
         .name       ("Create root ActiveEnts for each Weld")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({commonScene.pl.activeEnt(New), commonScene.pl.activeEntResized(Schedule), tgParts.mapWeldActive(Modify), tgVhSp.rootEnts(Resize)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,                  idVehicleSpawn,           idScnParts})
-        .func([] (ACtxBasic& rBasic, ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts) noexcept
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({comScn.pl.activeEnt(New), comScn.pl.activeEntResized(Schedule), parts.pl.mapWeldActive(Modify), vhclSpawn.pl.rootEnts(Resize)})
+        .args       ({      comScn.di.basic,                  vhclSpawn.di.vehicleSpawn,           parts.di.scnParts})
+        .func       ([] (ACtxBasic& rBasic, ACtxVehicleSpawn& rVehicleSpawn, ACtxParts& rScnParts) noexcept
     {
         LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
 
@@ -369,11 +315,10 @@ Session setup_vehicle_spawn_jolt(
 
     rFB.task()
         .name       ("Add vehicle entities to Scene Graph")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.rootEnts(UseOrRun), tgParts.mapWeldActive(Ready), tgPf.spawnedEnts(UseOrRun), tgPf.spawnRequest(UseOrRun), tgPf.inSubtree(Run), commonScene.pl.transform(Ready), commonScene.pl.hierarchy(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,                        idVehicleSpawn,           idScnParts,             idPrefabs,            mainApp.di.resources})
-        .func([] (ACtxBasic& rBasic, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.pl.rootEnts(UseOrRun), parts.pl.mapWeldActive(Ready), prefabs.pl.spawnedEnts(UseOrRun), prefabs.pl.spawnRequest(UseOrRun), prefabs.pl.inSubtree(Run), comScn.pl.transform(Ready), comScn.pl.hierarchy(Modify)})
+        .args       ({      comScn.di.basic,                        vhclSpawn.di.vehicleSpawn,           parts.di.scnParts,             prefabs.di.prefabs,            mainApp.di.resources})
+        .func       ([] (ACtxBasic& rBasic, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts& rScnParts, ACtxPrefabs& rPrefabs, Resources& rResources) noexcept
     {
         LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
 
@@ -430,11 +375,10 @@ Session setup_vehicle_spawn_jolt(
 
     rFB.task()
         .name       ("Add Jolt physics to Weld entities")
-        .run_on     ({tgVhSp.spawnRequest(UseOrRun)})
-        .sync_with  ({tgVhSp.rootEnts(UseOrRun), tgPf.spawnedEnts(UseOrRun), commonScene.pl.transform(Ready), tgPhy.physBody(Ready), tgJolt.joltBody(New), tgPhy.physUpdate(Done), commonScene.pl.hierarchy(Ready)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,             idPhys,              idJolt,                        idVehicleSpawn,                 idScnParts})
-        .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts) noexcept
+        .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
+        .sync_with  ({vhclSpawn.pl.rootEnts(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), comScn.pl.transform(Ready), phys.pl.physBody(Ready), jolt.pl.joltBody(New), phys.pl.physUpdate(Done), comScn.pl.hierarchy(Ready)})
+        .args       ({      comScn.di.basic,             phys.di.phys,              jolt.di.jolt,                        vhclSpawn.di.vehicleSpawn,                 parts.di.scnParts})
+        .func       ([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts) noexcept
     {
         LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
 
@@ -523,9 +467,7 @@ Session setup_vehicle_spawn_jolt(
         BodyInterface::AddState addState = bodyInterface.AddBodiesPrepare(addedBodies.data(), numBodies);
         bodyInterface.AddBodiesFinalize(addedBodies.data(), numBodies, addState, EActivation::Activate);
     });
-
-    return out;
-} // setup_vehicle_spawn_jolt
+}); // ftrVehicleSpawnJolt
 
 
 struct BodyRocket
@@ -690,40 +632,41 @@ static void rocket_thrust_force(BodyId const bodyId, ACtxJoltWorld const& rJolt,
     }
 }
 
-Session setup_rocket_thrust_jolt(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              scene,
-        Session const&              commonScene,
-        Session const&              physics,
-        Session const&              prefabs,
-        Session const&              parts,
-        Session const&              signalsFloat,
-        Session const&              jolt,
-        Session const&              joltFactors)
+FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
+        FeatureBuilder              &rFB,
+        DependOn<FIRocketsJolt>     rktJolt,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys,
+        DependOn<FIPrefabs>         prefabs,
+        DependOn<FIParts>           parts,
+        DependOn<FISignalsFloat>    sigFloat,
+        DependOn<FIJolt>            jolt,
+        DependOn<FIJoltForces>      joltForces,
+        DependOn<FIVehicleSpawn>    vhclSpawn,
+        entt::any                   userData)
 {
-    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(physics,       TESTAPP_DATA_PHYSICS);
-    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
-    OSP_DECLARE_GET_DATA_IDS(jolt,          TESTAPP_DATA_JOLT);
-    OSP_DECLARE_GET_DATA_IDS(joltFactors,   TESTAPP_DATA_JOLT_FORCES);
-    auto const scene.pl    = scene         .get_pipelines<PlScene>();
-    auto const tgParts  = parts         .get_pipelines<PlParts>();
-    auto const tgJolt   = jolt          .get_pipelines<PlJolt>();
+//Session setup_rocket_thrust_jolt(
+//        TopTaskBuilder&             rFB,
+//        ArrayView<entt::any> const  topData,
+//        Session const&              scene,
+//        Session const&              commonScene,
+//        Session const&              physics,
+//        Session const&              prefabs,
+//        Session const&              parts,
+//        Session const&              signalsFloat,
+//        Session const&              jolt,
+//        Session const&              joltFactors)
+//{
 
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, topData, TESTAPP_DATA_ROCKETS_JOLT);
-
-    auto &rRocketsJolt   = rFB.data_emplace< ACtxRocketsJolt >(topData, idRocketsJolt);
+    auto &rRocketsJolt   = rFB.data_emplace< ACtxRocketsJolt >(rktJolt.di.rocketsJolt);
 
     rFB.task()
         .name       ("Assign rockets to Jolt bodies")
-        .run_on     ({scene.pl.update(Run)})
-        .sync_with  ({tgParts.weldIds(Ready), tgJolt.joltBody(Ready), tgParts.connect(Ready)})
-        .push_to    (out.m_tasks)
-        .args       ({      commonScene.di.basic,             idPhys,              idJolt,                 idScnParts,                idRocketsJolt,                      idJoltFactors})
+        .run_on     ({scn.pl.update(Run)})
+        .sync_with  ({parts.pl.weldIds(Ready), jolt.pl.joltBody(Ready), parts.pl.connect(Ready)})
+        .args       ({      comScn.di.basic,             phys.di.phys,              jolt.di.jolt,                 parts.di.scnParts,                rktJolt.di.rocketsJolt,                      joltForces.di.factors})
         .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ACtxParts const& rScnParts, ACtxRocketsJolt& rRocketsJolt, ForceFactors_t const& rJoltFactors) noexcept
     {
         using adera::gc_mtMagicRocket;
@@ -742,8 +685,8 @@ Session setup_rocket_thrust_jolt(
         }
     });
 
-    auto &rScnParts     = rFB.data_get< ACtxParts >              (topData, idScnParts);
-    auto &rSigValFloat  = rFB.data_get< SignalValues_t<float> >  (topData, idSigValFloat);
+    auto &rScnParts     = rFB.data_get< ACtxParts >              (parts.di.scnParts);
+    auto &rSigValFloat  = rFB.data_get< SignalValues_t<float> >  (sigFloat.di.sigValFloat);
     Machines &rMachines = rScnParts.machines;
 
 
@@ -753,18 +696,14 @@ Session setup_rocket_thrust_jolt(
         .m_userData = { &rRocketsJolt, &rMachines, &rSigValFloat }
     };
 
-    auto &rJolt = rFB.data_get<ACtxJoltWorld>(topData, idJolt);
+    auto &rJolt = rFB.data_get<ACtxJoltWorld>(jolt.di.jolt);
 
     std::size_t const index = rJolt.m_factors.size();
     rJolt.m_factors.emplace_back(factor);
 
-    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(topData, idJoltFactors));
+    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(joltForces.di.factors));
     factorBits.set(index);
-
-    return out;
-} // setup_rocket_thrust_jolt
+}); // ftrRocketThrustJolt
 
 
 } // namespace adera
-
-#endif
