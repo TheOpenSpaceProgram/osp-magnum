@@ -67,3 +67,5 @@ ADD_SUBDIRECTORY(string_concat)
 ADD_SUBDIRECTORY(shared_string)
 ADD_SUBDIRECTORY(universe)
 ADD_SUBDIRECTORY(tasks)
+ADD_SUBDIRECTORY(framework)
+
