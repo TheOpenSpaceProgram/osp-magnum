@@ -39,17 +39,16 @@
 
 #include <ospjolt/activescene/joltinteg_fn.h>
 
-using namespace ftr_inter;
 using namespace ftr_inter::stages;
-using namespace osp;
+using namespace ftr_inter;
 using namespace osp::active;
-using namespace osp::link;
 using namespace osp::fw;
-
+using namespace osp::link;
+using namespace osp;
 using namespace ospjolt;
 
-using osp::restypes::gc_importer;
 using Corrade::Containers::arrayView;
+using osp::restypes::gc_importer;
 
 namespace adera
 {
@@ -97,78 +96,69 @@ FeatureDef const ftrJolt = feature_def("Jolt", [] (
 }); // ftrJolt
 
 
-
-FeatureDef const ftrJoltForces = feature_def("JoltForces", [] (
+FeatureDef const ftrJoltConstAccel = feature_def("JoltAccel", [] (
         FeatureBuilder              &rFB,
-        Implement<FIJoltForces>     joltForces)
+        Implement<FIJoltConstAccel> joltConstAccel)
 {
-    auto &rFactors = rFB.data_emplace<ForceFactors_t>(joltForces.di.factors);
-    std::fill(rFactors.begin(), rFactors.end(), 0);
-}); // ftrJoltForces
+    rFB.data_emplace<ACtxConstAccel>(joltConstAccel.di.accel);
+}); // ftrJoltAccel
 
-
-
-FeatureDef const ftrJoltAccel = feature_def("JoltAccel", [] (
-        FeatureBuilder              &rFB,
-        Implement<FIJoltAccel>      joltAccel,
-        DependOn<FIJoltForces>      joltForces,
-        DependOn<FIJolt>            jolt,
-        entt::any                   userData)
+ForceFactors_t add_constant_acceleration(
+        osp::Vector3                forceVec,
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx)
 {
-    Vector3 accel = entt::any_cast<Vector3>(userData);
+    auto const jolt         = rFW.get_interface<FIJolt>(sceneCtx);
+    auto const constAccel   = rFW.get_interface<FIJoltConstAccel>(sceneCtx);
+    auto       &rJolt       = rFW.data_get<ACtxJoltWorld>(jolt.di.jolt);
+    auto       &rAccel      = rFW.data_get<ACtxConstAccel>(constAccel.di.accel);
 
-    using UserData_t = ACtxJoltWorld::ForceFactorFunc::UserData_t;
-    auto &rJolt      = rFB.data_get<ACtxJoltWorld>(jolt.di.jolt);
-
-
-    auto &rAccel    = rFB.data_emplace<Vector3>(joltAccel.di.accel, accel);
-
-    ACtxJoltWorld::ForceFactorFunc const factor
+    ACtxJoltWorld::ForceFactorFunc factor
     {
-        .m_func = [] (BodyId const bodyId, ACtxJoltWorld const& rJolt, UserData_t data, Vector3& rForce, Vector3& rTorque) noexcept
+        .m_func = [] (BodyId const bodyId, ACtxJoltWorld const& rJolt, entt::any userData, Vector3& rForce, Vector3& rTorque) noexcept
         {
+            Vector3 const force = entt::any_cast<Vector3>(userData);
             PhysicsSystem *pJoltWorld = rJolt.m_pPhysicsSystem.get();
 
             float inv_mass = SysJolt::get_inverse_mass_no_lock(*pJoltWorld, bodyId);
 
-            auto const& force = *reinterpret_cast<Vector3 const*>(data[0]);
             rForce += force / inv_mass;
         },
-        .m_userData = {&rAccel}
+        .m_userData = entt::make_any<Vector3>(forceVec)
     };
 
     // Register force
 
-    std::size_t const index = rJolt.m_factors.size();
+    auto const index = rJolt.m_factors.size();
     rJolt.m_factors.emplace_back(factor);
 
-    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(joltForces.di.factors));
-    factorBits.set(index);
+    rAccel.forces.push_back({
+        .vec         = forceVec,
+        .factorIndex = static_cast<std::uint8_t>(index)
+    });
 
-}); // ftrJoltAccel
-
-
-
+    ForceFactors_t out;
+    out.set(index);
+    return out;
+}
 
 FeatureDef const ftrPhysicsShapesJolt = feature_def("PhysicsShapesJolt", [] (
         FeatureBuilder              &rFB,
-        //Implement<FIPhys>      joltAccel,
+        Implement<FIPhysShapesJolt> physShapesJolt,
         DependOn<FICommonScene>     comScn,
         DependOn<FIPhysics>         phys,
         DependOn<FIPhysShapes>      physShapes,
-        DependOn<FIJolt>            jolt,
-        DependOn<FIJoltForces>      joltForces,
-        entt::any                   userData)
+        DependOn<FIJolt>            jolt)
 {
+    rFB.data_emplace<ForceFactors_t>(physShapesJolt.di.factors);
 
     rFB.task()
         .name       ("Add Jolt physics to spawned shapes")
         .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
         .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun), jolt.pl.joltBody(New), phys.pl.physUpdate(Done)})
-        .args({                   comScn.di.basic,                physShapes.di.physShapes,             phys.di.phys,              jolt.di.jolt,              joltForces.di.factors })
-        .func([] (ACtxBasic const &rBasic, ACtxPhysShapes& rPhysShapes, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ForceFactors_t joltFactors) noexcept
+        .args       ({           comScn.di.basic,    physShapes.di.physShapes,       phys.di.phys,         jolt.di.jolt,    physShapesJolt.di.factors})
+        .func       ([] (ACtxBasic const &rBasic, ACtxPhysShapes& rPhysShapes, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ForceFactors_t const factors) noexcept
     {
-
         PhysicsSystem *pJoltWorld = rJolt.m_pPhysicsSystem.get();
         BodyInterface &bodyInterface = pJoltWorld->GetBodyInterface();
 
@@ -215,7 +205,7 @@ FeatureDef const ftrPhysicsShapesJolt = feature_def("PhysicsShapesJolt", [] (
             addedBodies.push_back(joltBodyId);
 
             rJolt.m_bodyToEnt[bodyId]    = root;
-            rJolt.m_bodyFactors[bodyId]  = joltFactors;
+            rJolt.m_bodyFactors[bodyId]  = factors;
             rJolt.m_entToBody.emplace(root, bodyId);
 
         }
@@ -225,7 +215,6 @@ FeatureDef const ftrPhysicsShapesJolt = feature_def("PhysicsShapesJolt", [] (
     });
 
 }); // ftrPhysicsShapesJolt
-
 
 void compound_collect_recurse(
         ACtxPhysics const&      rCtxPhys,
@@ -281,6 +270,7 @@ void compound_collect_recurse(
 
 FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
         FeatureBuilder              &rFB,
+        Implement<FIVhclSpawnJolt>  vhclSpawnJolt,
         DependOn<FIMainApp>         mainApp,
         DependOn<FICommonScene>     comScn,
         DependOn<FIPhysics>         phys,
@@ -288,10 +278,10 @@ FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
         DependOn<FIPrefabs>         prefabs,
         DependOn<FIParts>           parts,
         DependOn<FIJolt>            jolt,
-        DependOn<FIJoltForces>      joltForces,
-        DependOn<FIVehicleSpawn>    vhclSpawn,
-        entt::any                   userData)
+        DependOn<FIVehicleSpawn>    vhclSpawn)
 {
+    rFB.data_emplace<ForceFactors_t>(vhclSpawnJolt.di.factors);
+
     rFB.task()
         .name       ("Create root ActiveEnts for each Weld")
         .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
@@ -377,8 +367,8 @@ FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
         .name       ("Add Jolt physics to Weld entities")
         .run_on     ({vhclSpawn.pl.spawnRequest(UseOrRun)})
         .sync_with  ({vhclSpawn.pl.rootEnts(UseOrRun), prefabs.pl.spawnedEnts(UseOrRun), comScn.pl.transform(Ready), phys.pl.physBody(Ready), jolt.pl.joltBody(New), phys.pl.physUpdate(Done), comScn.pl.hierarchy(Ready)})
-        .args       ({      comScn.di.basic,             phys.di.phys,              jolt.di.jolt,                        vhclSpawn.di.vehicleSpawn,                 parts.di.scnParts})
-        .func       ([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts) noexcept
+        .args       ({     comScn.di.basic,       phys.di.phys,         jolt.di.jolt,             vhclSpawn.di.vehicleSpawn,          parts.di.scnParts,     vhclSpawnJolt.di.factors})
+        .func       ([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ACtxVehicleSpawn const& rVehicleSpawn, ACtxParts const& rScnParts, ForceFactors_t const factors) noexcept
     {
         LGRN_ASSERT(rVehicleSpawn.new_vehicle_count() != 0);
 
@@ -402,7 +392,7 @@ FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
 
             std::for_each(itWeldsFirst + std::ptrdiff_t{*itWeldOffsets},
                           itWeldsFirst + std::ptrdiff_t{weldOffsetNext},
-                          [&rBasic, &rScnParts, &rVehicleSpawn, &toInit, &rPhys, &rJolt, &addedBodies] (WeldId const weld)
+                          [&rBasic, &rScnParts, &rVehicleSpawn, &toInit, &rPhys, &rJolt, &addedBodies, factors] (WeldId const weld)
             {
                 ActiveEnt const weldEnt = rScnParts.weldToActive[weld];
 
@@ -420,7 +410,7 @@ FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
                 SysJolt::resize_body_data(rJolt);
 
                 rJolt.m_bodyToEnt[bodyId] = weldEnt;
-                rJolt.m_bodyFactors[bodyId] = {1}; // TODO: temporary
+                rJolt.m_bodyFactors[bodyId] = factors;
                 rJolt.m_entToBody.emplace(weldEnt, bodyId);
 
                 float   totalMass = 0.0f;
@@ -469,6 +459,23 @@ FeatureDef const ftrVehicleSpawnJolt = feature_def("VehicleSpawnJolt", [] (
     });
 }); // ftrVehicleSpawnJolt
 
+void set_phys_shape_factors(
+        ForceFactors_t              factors,
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx)
+{
+    rFW.data_get<ospjolt::ForceFactors_t&>(
+            rFW.get_interface<FIPhysShapesJolt>(sceneCtx).di.factors) = factors;
+}
+
+void set_vehicle_default_factors(
+        ForceFactors_t              factors,
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx)
+{
+    rFW.data_get<ospjolt::ForceFactors_t&>(
+            rFW.get_interface<FIVhclSpawnJolt>(sceneCtx).di.factors) = factors;
+}
 
 struct BodyRocket
 {
@@ -485,23 +492,28 @@ struct ACtxRocketsJolt
     // map each bodyId to a {machine, offset}
     //TODO: make an IdMultiMap or something.
     lgrn::IntArrayMultiMap<BodyId::entity_type, BodyRocket> m_bodyRockets;
-
+    std::uint8_t factorIndex;
 };
 
-static void assign_rockets(
-        ACtxBasic const&            rBasic,
-        ACtxParts const&            rScnParts,
-        ACtxJoltWorld&              rJolt,
-        ACtxRocketsJolt&            rRocketsJolt,
-        Nodes const&                rFloatNodes,
-        PerMachType const&          machtypeRocket,
-        ForceFactors_t const&       rJoltFactors,
-        WeldId const                weld,
-        std::vector<BodyRocket>&    rTemp)
+/**
+ * @brief Search for Rockets in a newly added vehicle rigid body (a Weld), calculate offset and
+ *        rotation, then assign the right force factors to them.
+ */
+static void assign_weld_rockets(
+        WeldId                   const weld,
+        ACtxBasic                const &rBasic,
+        ACtxParts                const &rScnParts,
+        ACtxJoltWorld                  &rJolt,
+        ACtxRocketsJolt                &rRocketsJolt,
+        Nodes                    const &rFloatNodes,
+        PerMachType              const &machtypeRocket,
+        std::vector<BodyRocket>        &rRocketsFoundTemp)
 {
     using adera::gc_mtMagicRocket;
     using adera::ports_magicrocket::gc_throttleIn;
     using adera::ports_magicrocket::gc_multiplierIn;
+
+    rRocketsFoundTemp.clear();
 
     ActiveEnt const weldEnt = rScnParts.weldToActive[weld];
     BodyId const body    = rJolt.m_entToBody.at(weldEnt);
@@ -511,10 +523,14 @@ static void assign_rockets(
         rRocketsJolt.m_bodyRockets.erase(body.value);
     }
 
+    // Each weld consists of multiple parts, iterate them all. Note that each part has their own
+    // individual transforms, so math is needed to calculate stuff with thrust direction and
+    // center-of-mass.
     for (PartId const part : rScnParts.weldToParts[weld])
     {
-        auto const sizeBefore = rTemp.size();
+        auto const sizeBefore = rRocketsFoundTemp.size();
 
+        // Each part contains Machines, some of which may be rockets.
         for (MachinePair const pair : rScnParts.partToMachines[part])
         {
             if (pair.type != gc_mtMagicRocket)
@@ -522,10 +538,10 @@ static void assign_rockets(
                 continue; // This machine is not a rocket
             }
 
-            MachAnyId const mach            = machtypeRocket.localToAny[pair.local];
-            auto const&     portSpan        = rFloatNodes.machToNode[mach];
-            NodeId const    throttleIn      = connected_node(portSpan, gc_throttleIn.port);
-            NodeId const    multiplierIn    = connected_node(portSpan, gc_multiplierIn.port);
+            MachAnyId const  mach         = machtypeRocket.localToAny[pair.local];
+            auto      const& portSpan     = rFloatNodes.machToNode[mach];
+            NodeId    const  throttleIn   = connected_node(portSpan, gc_throttleIn.port);
+            NodeId    const  multiplierIn = connected_node(portSpan, gc_multiplierIn.port);
 
             if (   (throttleIn   == lgrn::id_null<NodeId>())
                 || (multiplierIn == lgrn::id_null<NodeId>()) )
@@ -533,15 +549,17 @@ static void assign_rockets(
                 continue; // Throttle and/or multiplier is not connected
             }
 
-            BodyRocket &rBodyRocket     = rTemp.emplace_back();
+            BodyRocket &rBodyRocket     = rRocketsFoundTemp.emplace_back();
             rBodyRocket.m_local         = pair.local;
             rBodyRocket.m_throttleIn    = throttleIn;
             rBodyRocket.m_multiplierIn  = multiplierIn;
         }
 
-        if (sizeBefore == rTemp.size())
+        auto const rocketsFoundForPart = arrayView(rRocketsFoundTemp).exceptPrefix(sizeBefore);
+
+        if (rocketsFoundForPart.isEmpty())
         {
-            continue; // No rockets found
+            continue; // No rockets found on this part
         }
 
         // calculate transform relative to body root
@@ -561,7 +579,7 @@ static void assign_rockets(
         auto const      rotation    = Quaternion::fromMatrix(transform.rotation());
         Vector3 const   offset      = transform.translation();
 
-        for (BodyRocket &rBodyRocket : arrayView(rTemp).exceptPrefix(sizeBefore))
+        for (BodyRocket &rBodyRocket : rocketsFoundForPart)
         {
             rBodyRocket.m_rotation  = rotation;
             rBodyRocket.m_offset    = offset;
@@ -570,29 +588,28 @@ static void assign_rockets(
 
     ForceFactors_t &rBodyFactors = rJolt.m_bodyFactors[body];
 
-    // TODO: Got lazy, eventually iterate ForceFactors_t instead of
-    //       just using [0]. This breaks if more factor bits are added
-    static_assert(ForceFactors_t{}.size() == 1u);
-
-    if ( rTemp.empty() )
+    if ( rRocketsFoundTemp.empty() )
     {
-        rBodyFactors[0] &= ~rJoltFactors[0];
-        return;
+        rBodyFactors.reset(rRocketsJolt.factorIndex);
     }
-
-    rBodyFactors[0] |= rJoltFactors[0];
-
-    rRocketsJolt.m_bodyRockets.emplace(body.value, rTemp.begin(), rTemp.end());
-    rTemp.clear();
+    else
+    {
+        rBodyFactors.set(rRocketsJolt.factorIndex);
+        rRocketsJolt.m_bodyRockets.emplace(body.value, rRocketsFoundTemp.begin(), rRocketsFoundTemp.end());
+    }
 }
 
-// ACtxjoltWorld::ForceFactorFunc::Func_t
-static void rocket_thrust_force(BodyId const bodyId, ACtxJoltWorld const& rJolt, ACtxJoltWorld::ForceFactorFunc::UserData_t data, Vector3& rForce, Vector3& rTorque) noexcept
+struct RocketThrustUserData
 {
-    auto const& rRocketsJolt     = *reinterpret_cast<ACtxRocketsJolt const*>          (data[0]);
-    auto const& rMachines       = *reinterpret_cast<Machines const*>                (data[1]);
-    auto const& rSigValFloat    = *reinterpret_cast<SignalValues_t<float> const*>   (data[2]);
+    ACtxRocketsJolt       const &rRocketsJolt;
+    Machines              const &rMachines;
+    SignalValues_t<float> const &rSigValFloat;
+};
 
+// ACtxjoltWorld::ForceFactorFunc::Func_t
+static void rocket_thrust_force(BodyId const bodyId, ACtxJoltWorld const& rJolt, entt::any userData, Vector3& rForce, Vector3& rTorque) noexcept
+{
+    auto const [rRocketsJolt, rMachines, rSigValFloat] = entt::any_cast<RocketThrustUserData>(userData);
     auto &rBodyRockets = rRocketsJolt.m_bodyRockets[bodyId.value];
 
     PhysicsSystem *pJoltWorld = rJolt.m_pPhysicsSystem.get();
@@ -634,7 +651,7 @@ static void rocket_thrust_force(BodyId const bodyId, ACtxJoltWorld const& rJolt,
 
 FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
         FeatureBuilder              &rFB,
-        DependOn<FIRocketsJolt>     rktJolt,
+        Implement<FIRocketsJolt>    rktJolt,
         DependOn<FIMainApp>         mainApp,
         DependOn<FIScene>           scn,
         DependOn<FICommonScene>     comScn,
@@ -643,31 +660,17 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
         DependOn<FIParts>           parts,
         DependOn<FISignalsFloat>    sigFloat,
         DependOn<FIJolt>            jolt,
-        DependOn<FIJoltForces>      joltForces,
-        DependOn<FIVehicleSpawn>    vhclSpawn,
-        entt::any                   userData)
+        //DependOn<FIJoltFactors>     joltFactors,
+        DependOn<FIVehicleSpawn>    vhclSpawn)
 {
-//Session setup_rocket_thrust_jolt(
-//        TopTaskBuilder&             rFB,
-//        ArrayView<entt::any> const  topData,
-//        Session const&              scene,
-//        Session const&              commonScene,
-//        Session const&              physics,
-//        Session const&              prefabs,
-//        Session const&              parts,
-//        Session const&              signalsFloat,
-//        Session const&              jolt,
-//        Session const&              joltFactors)
-//{
-
-    auto &rRocketsJolt   = rFB.data_emplace< ACtxRocketsJolt >(rktJolt.di.rocketsJolt);
+    auto &rRocketsJolt = rFB.data_emplace< ACtxRocketsJolt >(rktJolt.di.rocketsJolt);
 
     rFB.task()
         .name       ("Assign rockets to Jolt bodies")
         .run_on     ({scn.pl.update(Run)})
         .sync_with  ({parts.pl.weldIds(Ready), jolt.pl.joltBody(Ready), parts.pl.connect(Ready)})
-        .args       ({      comScn.di.basic,             phys.di.phys,              jolt.di.jolt,                 parts.di.scnParts,                rktJolt.di.rocketsJolt,                      joltForces.di.factors})
-        .func([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ACtxParts const& rScnParts, ACtxRocketsJolt& rRocketsJolt, ForceFactors_t const& rJoltFactors) noexcept
+        .args       ({     comScn.di.basic,       phys.di.phys,         jolt.di.jolt,          parts.di.scnParts,        rktJolt.di.rocketsJolt})
+        .func       ([] (ACtxBasic& rBasic, ACtxPhysics& rPhys, ACtxJoltWorld& rJolt, ACtxParts const& rScnParts, ACtxRocketsJolt& rRocketsJolt) noexcept
     {
         using adera::gc_mtMagicRocket;
 
@@ -681,7 +684,7 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
 
         for (WeldId const weld : rScnParts.weldDirty)
         {
-            assign_rockets(rBasic, rScnParts, rJolt, rRocketsJolt, rFloatNodes, machtypeRocket, rJoltFactors, weld, temp);
+            assign_weld_rockets(weld, rBasic, rScnParts, rJolt, rRocketsJolt, rFloatNodes, machtypeRocket, temp);
         }
     });
 
@@ -689,20 +692,18 @@ FeatureDef const ftrRocketThrustJolt = feature_def("RocketThrustJolt", [] (
     auto &rSigValFloat  = rFB.data_get< SignalValues_t<float> >  (sigFloat.di.sigValFloat);
     Machines &rMachines = rScnParts.machines;
 
-
     ACtxJoltWorld::ForceFactorFunc const factor
     {
-        .m_func = &rocket_thrust_force,
-        .m_userData = { &rRocketsJolt, &rMachines, &rSigValFloat }
+        .m_func     = &rocket_thrust_force,
+        .m_userData = RocketThrustUserData{ rRocketsJolt, rMachines, rSigValFloat }
     };
 
     auto &rJolt = rFB.data_get<ACtxJoltWorld>(jolt.di.jolt);
 
-    std::size_t const index = rJolt.m_factors.size();
+    auto const index = rJolt.m_factors.size();
     rJolt.m_factors.emplace_back(factor);
 
-    auto factorBits = lgrn::bit_view(rFB.data_get<ForceFactors_t>(joltForces.di.factors));
-    factorBits.set(index);
+    rRocketsJolt.factorIndex = static_cast<std::uint8_t>(index);
 }); // ftrRocketThrustJolt
 
 

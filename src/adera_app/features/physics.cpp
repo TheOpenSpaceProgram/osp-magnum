@@ -37,12 +37,12 @@
 #include <Magnum/Trade/Trade.h>
 #include <Magnum/Trade/PbrMetallicRoughnessMaterialData.h>
 
-using namespace ftr_inter;
 using namespace ftr_inter::stages;
-using namespace osp;
+using namespace ftr_inter;
 using namespace osp::active;
 using namespace osp::draw;
 using namespace osp::fw;
+using namespace osp;
 
 namespace adera
 {

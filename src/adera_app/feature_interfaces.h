@@ -250,6 +250,14 @@ struct FIPhysShapes {
 };
 
 
+struct FIPhysShapesDraw {
+    struct DataIds {
+        DataId material;
+    };
+
+    struct Pipelines { };
+};
+
 struct FIThrower {
     struct DataIds {
         DataId button;
@@ -417,8 +425,7 @@ struct FIJolt {
     };
 };
 
-
-struct FIJoltForces {
+struct FIPhysShapesJolt {
     struct DataIds {
         DataId factors;
     };
@@ -426,15 +433,21 @@ struct FIJoltForces {
     struct Pipelines { };
 };
 
+struct FIVhclSpawnJolt {
+    struct DataIds {
+        DataId factors;
+    };
 
-struct FIJoltAccel {
+    struct Pipelines { };
+};
+
+struct FIJoltConstAccel {
     struct DataIds {
         DataId accel;
     };
 
     struct Pipelines { };
 };
-
 
 //struct FIRocketsNwt {
 //    struct DataIds {
@@ -448,6 +461,7 @@ struct FIJoltAccel {
 struct FIRocketsJolt {
     struct DataIds {
         DataId rocketsJolt;
+        DataId factors;
     };
 
     struct Pipelines { };
@@ -476,12 +490,22 @@ struct FITerrainIco {
     struct Pipelines { };
 };
 
+struct FITerrainDbgDraw {
+    struct DataIds {
+        DataId draw;
+    };
+
+    struct Pipelines { };
+};
+
+
+
 
 //-----------------------------------------------------------------------------
 
 // Universe sessions
 
-struct FIUniverseCore {
+struct FIUniCore {
     struct DataIds {
         DataId universe;
         DataId deltaTimeIn;
@@ -494,7 +518,7 @@ struct FIUniverseCore {
 };
 
 
-struct FIUniverseSceneFrame {
+struct FIUniSceneFrame {
     struct DataIds {
         DataId scnFrame;
     };
@@ -505,10 +529,18 @@ struct FIUniverseSceneFrame {
 };
 
 
-struct FIUniversePlanets {
+struct FIUniPlanets {
     struct DataIds {
         DataId planetMainSpace;
         DataId satSurfaceSpaces;
+    };
+
+    struct Pipelines { };
+};
+
+struct FIUniPlanetsDraw {
+    struct DataIds {
+        DataId planetDraw;
     };
 
     struct Pipelines { };
@@ -519,11 +551,19 @@ struct FIUniversePlanets {
 
 // Solar System sessions
 
-struct FISolarSystemPlanets {
+struct FISolarSys {
     struct DataIds {
         DataId planetMainSpace;
         DataId satSurfaceSpaces;
         DataId coordNBody;
+    };
+
+    struct Pipelines { };
+};
+
+struct FISolarSysDraw {
+    struct DataIds {
+        DataId planetDraw;
     };
 
     struct Pipelines { };
@@ -601,6 +641,13 @@ struct FIIndicator {
     struct Pipelines { };
 };
 
+struct FIRktIndicator {
+    struct DataIds {
+        DataId indicator;
+    };
+
+    struct Pipelines { };
+};
 
 struct FICursor {
     struct DataIds {

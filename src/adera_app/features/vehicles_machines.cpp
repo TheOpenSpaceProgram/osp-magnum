@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -23,7 +22,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "vehicles.h"
+#include "vehicles_machines.h"
+#include "misc.h"
+
+#include "../feature_interfaces.h"
 
 #include <adera/activescene/vehicles_vb_fn.h>
 #include <adera/drawing/CameraController.h>
@@ -35,47 +37,37 @@
 #include <osp/core/Resources.h>
 #include <osp/drawing/drawing.h>
 #include <osp/drawing/drawing_fn.h>
+#include <osp/util/logging.h>
 #include <osp/util/UserInputHandler.h>
 
 using namespace adera;
-
+using namespace ftr_inter::stages;
+using namespace ftr_inter;
 using namespace osp::active;
 using namespace osp::draw;
+using namespace osp::fw;
 using namespace osp::link;
 using namespace osp;
 
 namespace adera
 {
 
-Session setup_mach_rocket(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              scene,
-        Session const&              parts,
-        Session const&              signalsFloat)
+FeatureDef const ftrMachMagicRockets = feature_def("MachMagicRockets", [] (
+        FeatureBuilder              &rFB,
+        DependOn<FIScene>           scn,
+        DependOn<FIParts>           parts,
+        DependOn<FISignalsFloat>    sigFloat)
 {
-    OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
-    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    auto const scn.pl    = scene         .get_pipelines<PlScene>();
-    auto const parts.pl  = parts         .get_pipelines<PlParts>();
-
-    Session out;
-
     rFB.task()
         .name       ("Allocate Machine update bitset for MagicRocket")
         .run_on     ({scn.pl.update(Run)})
         .sync_with  ({parts.pl.machIds(Ready), parts.pl.machUpdExtIn(New)})
-        .push_to    (out.m_tasks)
-        .args       ({parts.di.scnParts, idUpdMach})
+        .args       ({parts.di.scnParts, parts.di.updMach})
         .func       ([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach)
     {
         rUpdMach.localDirty[gc_mtMagicRocket].resize(rScnParts.machines.perType[gc_mtMagicRocket].localIds.capacity());
     });
-
-    return out;
-} // setup_mach_rocket
-
-
+}); // setup_mach_rocket
 
 
 struct ThrustIndicator
@@ -89,26 +81,19 @@ struct ThrustIndicator
     float           indicatorScale {0.0001f};
 };
 
-Session setup_thrust_indicators(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              application,
-        Session const&              windowApp,
-        Session const&              commonScene,
-        Session const&              parts,
-        Session const&              signalsFloat,
-        Session const&              sceneRenderer,
-        PkgId const                 pkg,
-        MaterialId const            material)
+FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustIndicator", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIRktIndicator>   rktIndicate,
+        DependOn<FICleanupContext>  cleanup,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIParts>           parts,
+        DependOn<FISignalsFloat>    sigFloat,
+        DependOn<FIWindowApp>       windowApp,
+        DependOn<FISceneRenderer>   scnRender,
+        entt::any                   userData)
 {
-    OSP_DECLARE_GET_DATA_IDS(application,    TESTAPP_DATA_APPLICATION);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,    TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(parts,          TESTAPP_DATA_PARTS);
-    OSP_DECLARE_GET_DATA_IDS(signalsFloat,   TESTAPP_DATA_SIGNALS_FLOAT)
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,  TESTAPP_DATA_SCENE_RENDERER);
-    auto const windowApp.pl    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const scnRender.pl = sceneRenderer .get_pipelines<PlSceneRenderer>();
-    auto const parts.pl  = parts         .get_pipelines<PlParts>();
+    auto const [pkg, material] = entt::any_cast<TplPkgIdMaterialId>(userData);
 
     auto &rResources        = rFB.data_get< Resources >      (mainApp.di.resources);
     auto &rBasic            = rFB.data_get< ACtxBasic >      (comScn.di.basic);
@@ -118,10 +103,7 @@ Session setup_thrust_indicators(
     auto &rDrawTfObservers  = rFB.data_get< DrawTfObservers >(scnRender.di.drawTfObservers);
     auto &rScnParts         = rFB.data_get< ACtxParts >      (parts.di.scnParts);
     auto &rSigValFloat      = rFB.data_get< SignalValues_t<float> > (sigFloat.di.sigValFloat);
-
-    Session out;
-    auto const [idThrustIndicator] = out.acquire_data<1>(topData);
-    auto &rThrustIndicator = rFB.data_emplace<ThrustIndicator>(idThrustIndicator);
+    auto &rThrustIndicator  = rFB.data_emplace<ThrustIndicator>(rktIndicate.di.indicator);
 
     rThrustIndicator.material   = material;
     rThrustIndicator.color      = { 1.0f, 0.2f, 0.8f, 1.0f };
@@ -131,8 +113,7 @@ Session setup_thrust_indicators(
         .name       ("Create DrawEnts for Thrust indicators")
         .run_on     ({windowApp.pl.sync(Run)})
         .sync_with  ({scnRender.pl.drawEntResized(ModifyOrSignal), scnRender.pl.drawEnt(New), parts.pl.machIds(Ready)})
-        .push_to    (out.m_tasks)
-        .args       ({               scnRender.di.scnRender,                  parts.di.scnParts,                 idThrustIndicator})
+        .args       ({               scnRender.di.scnRender,                  parts.di.scnParts,                 rktIndicate.di.indicator})
         .func([]    (ACtxSceneRender &rScnRender,  ACtxParts const& rScnParts, ThrustIndicator& rThrustIndicator) noexcept
     {
         PerMachType const& rockets = rScnParts.machines.perType[gc_mtMagicRocket];
@@ -153,8 +134,7 @@ Session setup_thrust_indicators(
         .name       ("Add mesh and materials to Thrust indicators")
         .run_on     ({windowApp.pl.sync(Run)})
         .sync_with  ({scnRender.pl.drawEntResized(Done), scnRender.pl.drawEnt(Ready), scnRender.pl.entMesh(New), scnRender.pl.material(New), scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
-        .push_to    (out.m_tasks)
-        .args       ({         comScn.di.basic,                 scnRender.di.scnRender,             comScn.di.drawing,                      comScn.di.drawingRes,                 parts.di.scnParts,                             sigFloat.di.sigValFloat,                 idThrustIndicator})
+        .args       ({         comScn.di.basic,                 scnRender.di.scnRender,             comScn.di.drawing,                      comScn.di.drawingRes,                 parts.di.scnParts,                             sigFloat.di.sigValFloat,                 rktIndicate.di.indicator})
         .func([]    (ACtxBasic& rBasic, ACtxSceneRender &rScnRender, ACtxDrawing& rDrawing, ACtxDrawingRes const& rDrawingRes, ACtxParts const& rScnParts, SignalValues_t<float> const& rSigValFloat, ThrustIndicator& rThrustIndicator) noexcept
     {
         Material            &rMat           = rScnRender.m_materials[rThrustIndicator.material];
@@ -247,40 +227,27 @@ Session setup_thrust_indicators(
 
     rFB.task()
         .name       ("Clean up ThrustIndicator")
-        .run_on     ({windowApp.pl.cleanup(Run_)})
-        .push_to    (out.m_tasks)
-        .args       ({      mainApp.di.resources,             comScn.di.drawing,                 idThrustIndicator})
+        .run_on     ({cleanup.pl.cleanup(Run_)})
+        .args       ({      mainApp.di.resources,             comScn.di.drawing,                 rktIndicate.di.indicator})
         .func([] (Resources& rResources, ACtxDrawing& rDrawing, ThrustIndicator& rThrustIndicator) noexcept
     {
         rDrawing.m_meshRefCounts.ref_release(std::move(rThrustIndicator.mesh));
     });
-
-    return out;
-} // setup_thrust_indicators
+}); // ftrMagicRocketThrustIndicator
 
 
 
-
-Session setup_mach_rcsdriver(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              scene,
-        Session const&              parts,
-        Session const&              signalsFloat)
+FeatureDef const ftrMachRCSDriver = feature_def("RCSDriver", [] (
+        FeatureBuilder              &rFB,
+        DependOn<FIScene>           scn,
+        DependOn<FIParts>           parts,
+        DependOn<FISignalsFloat>    sigFloat)
 {
-    OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT)
-    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    auto const scn.pl    = scene         .get_pipelines<PlScene>();
-    auto const parts.pl  = parts         .get_pipelines<PlParts>();
-
-    Session out;
-
     rFB.task()
         .name       ("Allocate Machine update bitset for RcsDriver")
         .run_on     ({scn.pl.update(Run)})
         .sync_with  ({parts.pl.machIds(Ready), parts.pl.machUpdExtIn(New)})
-        .push_to    (out.m_tasks)
-        .args       ({parts.di.scnParts, idUpdMach})
+        .args       ({parts.di.scnParts, parts.di.updMach})
         .func       ([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach)
     {
         rUpdMach.localDirty[gc_mtRcsDriver].resize(rScnParts.machines.perType[gc_mtRcsDriver].localIds.capacity());
@@ -290,8 +257,7 @@ Session setup_mach_rcsdriver(
         .name       ("RCS Drivers calculate new values")
         .run_on     ({parts.pl.linkLoop(MachUpd)})
         .sync_with  ({parts.pl.machUpdExtIn(Ready)})
-        .push_to    (out.m_tasks)
-        .args       ({      parts.di.scnParts,                idUpdMach,                       sigFloat.di.sigValFloat,                    idSigUpdFloat})
+        .args       ({      parts.di.scnParts,                parts.di.updMach,                       sigFloat.di.sigValFloat,                    sigFloat.di.sigUpdFloat})
         .func([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat) noexcept
     {
         Nodes const &rFloatNodes = rScnParts.nodePerType[gc_ntSigFloat];
@@ -350,9 +316,7 @@ Session setup_mach_rcsdriver(
             }
         }
     });
-
-    return out;
-} // setup_mach_rcsdriver
+}); // ftrRCSDriver
 
 
 
@@ -374,32 +338,20 @@ struct VehicleControls
     input::EButtonControlIndex btnRollRt;
 };
 
-Session setup_vehicle_control(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              windowApp,
-        Session const&              scene,
-        Session const&              parts,
-        Session const&              signalsFloat)
+FeatureDef const ftrVehicleControl = feature_def("VehicleControl", [] (
+        FeatureBuilder              &rFB,
+        Implement<FIVehicleControl> vhclCtrl,
+        DependOn<FIWindowApp>       windowApp,
+        DependOn<FIScene>           scn,
+        DependOn<FIParts>           parts,
+        DependOn<FISignalsFloat>    sigFloat)
 {
-    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    OSP_DECLARE_GET_DATA_IDS(windowApp,     TESTAPP_DATA_WINDOW_APP);
-    OSP_DECLARE_GET_DATA_IDS(signalsFloat,  TESTAPP_DATA_SIGNALS_FLOAT);
-    auto const windowApp.pl    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const scn.pl    = scene         .get_pipelines<PlScene>();
-    auto const tgSgFlt  = signalsFloat  .get_pipelines<PlSignalsFloat>();
-
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_VEHICLE_CONTROL);
-    auto const tgVhCtrl = out.create_pipelines<PlVehicleCtrl>(rFB);
-
-    rFB.pipeline(tgVhCtrl.selectedVehicle).parent(scn.pl.update);
+    rFB.pipeline(vhclCtrl.pl.selectedVehicle).parent(scn.pl.update);
 
     auto &rUserInput = rFB.data_get< input::UserInputHandler >(windowApp.di.userInput);
 
     // TODO: add cleanup task
-    rFB.data_emplace<VehicleControls>(idVhControls, VehicleControls{
+    rFB.data_emplace<VehicleControls>(vhclCtrl.di.vhControls, VehicleControls{
         .btnSwitch  = rUserInput.button_subscribe("game_switch"),
         .btnThrMax  = rUserInput.button_subscribe("vehicle_thr_max"),
         .btnThrMin  = rUserInput.button_subscribe("vehicle_thr_min"),
@@ -416,9 +368,8 @@ Session setup_vehicle_control(
     rFB.task()
         .name       ("Select vehicle")
         .run_on     ({windowApp.pl.inputs(Run)})
-        .sync_with  ({tgVhCtrl.selectedVehicle(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({      parts.di.scnParts,                               windowApp.di.userInput,                 idVhControls})
+        .sync_with  ({vhclCtrl.pl.selectedVehicle(Modify)})
+        .args       ({      parts.di.scnParts,                               windowApp.di.userInput,                 vhclCtrl.di.vhControls})
         .func([] (ACtxParts& rScnParts, input::UserInputHandler const &rUserInput, VehicleControls &rVhControls) noexcept
     {
         PerMachType &rUsrCtrl    = rScnParts.machines.perType[gc_mtUserCtrl];
@@ -453,9 +404,8 @@ Session setup_vehicle_control(
     rFB.task()
         .name       ("Write inputs to UserControl Machines")
         .run_on     ({scn.pl.update(Run)})
-        .sync_with  ({windowApp.pl.inputs(Run), tgSgFlt.sigFloatUpdExtIn(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({      parts.di.scnParts,                idUpdMach,                       sigFloat.di.sigValFloat,                    idSigUpdFloat,                               windowApp.di.userInput,                 idVhControls,           scn.di.deltaTimeIn})
+        .sync_with  ({windowApp.pl.inputs(Run), sigFloat.pl.sigFloatUpdExtIn(Modify)})
+        .args       ({      parts.di.scnParts,                parts.di.updMach,                       sigFloat.di.sigValFloat,                    sigFloat.di.sigUpdFloat,                               windowApp.di.userInput,                 vhclCtrl.di.vhControls,           scn.di.deltaTimeIn})
         .func([] (ACtxParts& rScnParts, MachineUpdater& rUpdMach, SignalValues_t<float>& rSigValFloat, UpdateNodes<float>& rSigUpdFloat, input::UserInputHandler const& rUserInput, VehicleControls& rVhControls, float const deltaTimeIn) noexcept
     {
         VehicleControls& rVC = rVhControls;
@@ -516,37 +466,20 @@ Session setup_vehicle_control(
             rUpdMach.requestMachineUpdateLoop = true;
         }
     });
-
-    return out;
-} // setup_vehicle_control
+}); // ftrVehicleControl
 
 
-
-Session setup_camera_vehicle(
-        TopTaskBuilder&             rFB,
-        [[maybe_unused]] ArrayView<entt::any> const topData,
-        Session const&              windowApp,
-        Session const&              scene,
-        Session const&              sceneRenderer,
-        Session const&              commonScene,
-        Session const&              physics,
-        Session const&              parts,
-        Session const&              cameraCtrl,
-        Session const&              vehicleCtrl)
+FeatureDef const ftrVehicleCamera = feature_def("VehicleCamera", [] (
+        FeatureBuilder              &rFB,
+        DependOn<FIWindowApp>       windowApp,
+        DependOn<FIScene>           scn,
+        DependOn<FISceneRenderer>   scnRender,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys,
+        DependOn<FIParts>           parts,
+        DependOn<FICameraControl>   camCtrl,
+        DependOn<FIVehicleControl>  vhclCtrl)
 {
-    OSP_DECLARE_GET_DATA_IDS(scene,         TESTAPP_DATA_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,   TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(parts,         TESTAPP_DATA_PARTS);
-    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,    TESTAPP_DATA_CAMERA_CTRL);
-    OSP_DECLARE_GET_DATA_IDS(vehicleCtrl,   TESTAPP_DATA_VEHICLE_CONTROL);
-
-    auto const windowApp.pl    = windowApp     .get_pipelines<PlWindowApp>();
-    auto const camCtrl.pl   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
-    auto const phys.pls   = physics       .get_pipelines<PlPhysics>();
-    auto const parts.pl  = parts         .get_pipelines<PlParts>();
-
-    Session out;
-
     // Don't add comScn.pl.transform(Modify) to sync_with, even though this uses transforms.
     // phys.pls.physUpdate(Done) assures physics transforms are done.
     //
@@ -556,9 +489,8 @@ Session setup_camera_vehicle(
     rFB.task()
         .name       ("Update vehicle camera")
         .run_on     ({windowApp.pl.sync(Run)})
-        .sync_with  ({camCtrl.pl.camCtrl(Modify), phys.pls.physUpdate(Done), parts.pl.mapWeldActive(Ready)})
-        .push_to    (out.m_tasks)
-        .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn,                 comScn.di.basic,                 idVhControls,                 parts.di.scnParts})
+        .sync_with  ({camCtrl.pl.camCtrl(Modify), phys.pl.physUpdate(Done), parts.pl.mapWeldActive(Ready)})
+        .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn,                 comScn.di.basic,                 vhclCtrl.di.vhControls,                 parts.di.scnParts})
         .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxBasic const& rBasic, VehicleControls& rVhControls, ACtxParts const& rScnParts) noexcept
     {
         if (rVhControls.selectedUsrCtrl != lgrn::id_null<MachLocalId>())
@@ -588,11 +520,7 @@ Session setup_camera_vehicle(
 
         SysCameraController::update_view(rCamCtrl, deltaTimeIn);
     });
-
-    return out;
-} // setup_camera_vehicle
-
+}); // setup_camera_vehicle
 
 
 } // namespace adera
-#endif

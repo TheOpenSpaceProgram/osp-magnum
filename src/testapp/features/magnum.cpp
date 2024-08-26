@@ -448,10 +448,9 @@ FeatureDef const ftrShaderFlat = feature_def("ShaderFlat", [] (
     });
 }); // ftrShaderFlat
 
-
 FeatureDef const ftrShaderPhong = feature_def("ShaderPhong", [] (
         FeatureBuilder              &rFB,
-        Implement<FIShaderFlat>     shFlat,
+        Implement<FIShaderPhong>    shPhong,
         DependOn<FIWindowApp>       windowApp,
         DependOn<FIMagnum>          magnum,
         DependOn<FIMagnumScene>     magnumScn,
@@ -465,7 +464,7 @@ FeatureDef const ftrShaderPhong = feature_def("ShaderPhong", [] (
     auto &rScnRenderGl  = rFB.data_get< ACtxSceneRenderGL >  (magnumScn.di.scnRenderGl);
     auto &rRenderGl     = rFB.data_get< RenderGL >           (magnum.di.renderGl);
 
-    auto &rDrawPhong = rFB.data_emplace< ACtxDrawPhong >(shFlat.di.shader);
+    auto &rDrawPhong = rFB.data_emplace< ACtxDrawPhong >(shPhong.di.shader);
 
     auto const texturedFlags    = PhongGL::Flag::DiffuseTexture | PhongGL::Flag::AlphaMask | PhongGL::Flag::AmbientTexture;
     rDrawPhong.shaderDiffuse    = PhongGL{PhongGL::Configuration{}.setFlags(texturedFlags).setLightCount(2)};
@@ -484,10 +483,10 @@ FeatureDef const ftrShaderPhong = feature_def("ShaderPhong", [] (
         .name       ("Sync Phong shader DrawEnts")
         .run_on     ({windowApp.pl.sync(Run)})
         .sync_with  ({scnRender.pl.materialDirty(UseOrRun), magnum.pl.entTextureGL(Ready), scnRender.pl.groupEnts(Modify), scnRender.pl.group(Modify)})
-        .args       ({            scnRender.di.scnRender,             magnumScn.di.groupFwd,                         magnumScn.di.scnRenderGl,               shFlat.di.shader})
-        .func([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxSceneRenderGL const &rScnRenderGl, ACtxDrawPhong &rDrawShPhong) noexcept
+        .args       ({        scnRender.di.scnRender,  magnumScn.di.groupFwd,              magnumScn.di.scnRenderGl,      shPhong.di.shader})
+        .func       ([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxSceneRenderGL const &rScnRenderGl, ACtxDrawPhong &rShader) noexcept
     {
-        Material const &rMat = rScnRender.m_materials[rDrawShPhong.materialId];
+        Material const &rMat = rScnRender.m_materials[rShader.materialId];
         sync_drawent_phong(rMat.m_dirty.begin(), rMat.m_dirty.end(),
         {
             .hasMaterial    = rMat.m_ents,
@@ -496,7 +495,7 @@ FeatureDef const ftrShaderPhong = feature_def("ShaderPhong", [] (
             .opaque         = rScnRender.m_opaque,
             .transparent    = rScnRender.m_transparent,
             .diffuse        = rScnRenderGl.m_diffuseTexId,
-            .rData          = rDrawShPhong
+            .rData          = rShader
         });
     });
 
@@ -504,10 +503,10 @@ FeatureDef const ftrShaderPhong = feature_def("ShaderPhong", [] (
         .name       ("Resync Phong shader DrawEnts")
         .run_on     ({windowApp.pl.resync(Run)})
         .sync_with  ({scnRender.pl.materialDirty(UseOrRun), magnum.pl.entTextureGL(Ready), scnRender.pl.groupEnts(Modify), scnRender.pl.group(Modify)})
-        .args       ({            scnRender.di.scnRender,             magnumScn.di.groupFwd,                         magnumScn.di.scnRenderGl,               shFlat.di.shader})
-        .func([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxSceneRenderGL const &rScnRenderGl, ACtxDrawPhong &rDrawShPhong) noexcept
+        .args       ({        scnRender.di.scnRender,  magnumScn.di.groupFwd,              magnumScn.di.scnRenderGl,      shPhong.di.shader})
+        .func       ([] (ACtxSceneRender &rScnRender, RenderGroup &rGroupFwd, ACtxSceneRenderGL const &rScnRenderGl, ACtxDrawPhong &rShader) noexcept
     {
-        Material const &rMat = rScnRender.m_materials[rDrawShPhong.materialId];
+        Material const &rMat = rScnRender.m_materials[rShader.materialId];
         for (DrawEnt const drawEnt : rMat.m_ents)
         {
             sync_drawent_phong(drawEnt,
@@ -517,7 +516,7 @@ FeatureDef const ftrShaderPhong = feature_def("ShaderPhong", [] (
                 .opaque         = rScnRender.m_opaque,
                 .transparent    = rScnRender.m_transparent,
                 .diffuse        = rScnRenderGl.m_diffuseTexId,
-                .rData          = rDrawShPhong
+                .rData          = rShader
             });
         }
     });
@@ -537,7 +536,7 @@ struct ACtxDrawTerrainGL
 FeatureDef const ftrTerrainDrawMagnum = feature_def("ShaderPhong", [] (
         FeatureBuilder              &rFB,
         Implement<FITerrainDrawMagnum> terrainMgn,
-        DependOn<FITerrain>       terrain,
+        DependOn<FITerrain>         terrain,
         DependOn<FIWindowApp>       windowApp,
         DependOn<FIMagnum>          magnum,
         DependOn<FIMagnumScene>     magnumScn,

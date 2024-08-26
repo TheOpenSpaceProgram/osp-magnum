@@ -35,19 +35,19 @@
 #include <osp/util/UserInputHandler.h>
 
 using namespace adera;
-using namespace ftr_inter;
 using namespace ftr_inter::stages;
-using namespace osp;
+using namespace ftr_inter;
 using namespace osp::active;
 using namespace osp::draw;
 using namespace osp::fw;
+using namespace osp;
 
 namespace adera
 {
 
 FeatureDef const ftrMain = feature_def("Main", [] (FeatureBuilder &rFB, Implement<FIMainApp> mainApp)
 {
-    rFB.data_emplace< AppContexts >             (mainApp.di.appContexts);
+    rFB.data_emplace< AppContexts >             (mainApp.di.appContexts, AppContexts{.main = rFB.ctx});
     rFB.data_emplace< MainLoopControl >         (mainApp.di.mainLoopCtrl);
     rFB.data_emplace< osp::Resources >          (mainApp.di.resources);
     rFB.data_emplace< FrameworkModify >         (mainApp.di.frameworkModify);
@@ -71,7 +71,7 @@ FeatureDef const ftrScene = feature_def("Scene", [] (
         Implement<FIScene>      scn,
         DependOn<FIMainApp>     mainApp)
 {
-    rFB.data_emplace<float>(scn.di.deltaTimeIn, 1.0f / 60.0f);
+    rFB.data_emplace<float>(scn.di.deltaTimeIn, 0.0f);
     rFB.data_emplace<SceneLoopControl>(scn.di.loopControl);
     rFB.pipeline(scn.pl.loopControl).parent(mainApp.pl.mainLoop);
     rFB.pipeline(scn.pl.update)     .parent(mainApp.pl.mainLoop);
@@ -262,6 +262,15 @@ FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
     /* unused */       rFB.data_emplace<DrawTfObservers>(scnRender.di.drawTfObservers);
 
     // TODO: format after framework changes
+
+    rFB.task()
+        .name       ("Schedule Scene Render")
+        .schedules  ({scnRender.pl.render(Schedule)})
+        .args       ({                   windowApp.di.windowAppLoopCtrl})
+        .func       ([] (WindowAppLoopControl const &rWindowAppLoopCtrl) noexcept -> osp::TaskActions
+    {
+        return rWindowAppLoopCtrl.doRender ? osp::TaskActions{} : osp::TaskAction::Cancel;
+    });
 
     rFB.task()
         .name       ("Resize ACtxSceneRender containers to fit all DrawEnts")

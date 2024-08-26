@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -25,7 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include <osp/framework/builder.h>
 
 namespace adera
 {
@@ -33,11 +32,8 @@ namespace adera
 /**
  * @brief Support for Parts, Machines, and Links
  */
-osp::Session setup_parts(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         scene);
+extern osp::fw::FeatureDef const ftrParts;
+
 
 /**
  * @brief Float Signal Links, allowing Machines to pass floats to each other
@@ -49,9 +45,9 @@ osp::Session setup_parts(
  *
  * Passing values:
  *
- * 1. Tasks write new values to idSigUpdFloat
+ * 1. Tasks write new values to sigFloat.di.sigUpdFloat
  *
- * 2. The "Reduce Signal-Float Nodes" task reads new values from idSigUpdFloat(s) and writes them
+ * 2. The "Reduce Signal-Float Nodes" task reads new values from sigFloat.di.sigUpdFloat(s) and writes them
  *    into sigFloat.di.sigValFloat. This changes the input values of connected Machines, marking them dirty.
  *    Tags for each unique dirty machine type is added to rMachUpdEnqueue.
  *    Other 'reduce node' tasks could be running in parallel here.
@@ -68,33 +64,9 @@ osp::Session setup_parts(
  * eg. A float signal can trigger a fuel valve that triggers a pressure sensor which outputs
  *     another float signal, all running within a single frame.
  */
-osp::Session setup_signals_float(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         parts);
+extern osp::fw::FeatureDef const ftrSignalsFloat;
 
-/**
- * @brief Links for Magic Rockets
- *
- * This only sets up links and does not apply forces, see setup_rocket_thrust_newton
- */
-osp::Session setup_mach_rocket(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         parts,
-        osp::Session const&         signalsFloat);
 
-/**
- * @brief Links for RCS Drivers, which output thrust levels given pitch/yaw/roll controls
- */
-osp::Session setup_mach_rcsdriver(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene,
-        osp::Session const&         parts,
-        osp::Session const&         signalsFloat);
 
 /**
  * @brief Logic and queues for spawning vehicles
@@ -102,32 +74,15 @@ osp::Session setup_mach_rcsdriver(
  * Note that vehicles don't really exist in the scene, and are just collections
  * of conencted Parts
  */
-osp::Session setup_vehicle_spawn(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         scene);
+extern osp::fw::FeatureDef const ftrVehicleSpawn;
 
-osp::Session setup_vehicle_spawn_draw(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         vehicleSpawn);
+
+extern osp::fw::FeatureDef const ftrVehicleSpawnDraw;
 
 /**
  * @brief Support VehicleBuilder data to be used to spawn vehicles
  */
-osp::Session setup_vehicle_spawn_vb(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         scene,
-        osp::Session const&         commonScene,
-        osp::Session const&         prefabs,
-        osp::Session const&         parts,
-        osp::Session const&         vehicleSpawn,
-        osp::Session const&         signalsFloat);
+extern osp::fw::FeatureDef const ftrVehicleSpawnVBData;
 
 
-
-}
-#endif
+} // namespace adera

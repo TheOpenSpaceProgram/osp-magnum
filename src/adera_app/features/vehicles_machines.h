@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -25,53 +24,41 @@
  */
 #pragma once
 
-#include "../scenarios.h"
-
-#include <osp/drawing/draw_ent.h>
+#include <osp/framework/builder.h>
 
 namespace adera
 {
 
 /**
+ * @brief Links for Magic Rockets
+ *
+ * This only sets up links and does not apply forces, see setup_rocket_thrust_newton
+ */
+extern osp::fw::FeatureDef const ftrMachMagicRockets;
+
+
+/**
+ * @brief Links for RCS Drivers, which output thrust levels given pitch/yaw/roll controls
+ */
+extern osp::fw::FeatureDef const ftrMachRCSDriver;
+
+
+/**
  * @brief Controls to select and control a UserControl Machine
  */
-osp::Session setup_vehicle_control(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         scene,
-        osp::Session const&         parts,
-        osp::Session const&         signalsFloat);
+extern osp::fw::FeatureDef const ftrVehicleControl;
+
 
 /**
  * @brief Camera which can free cam or follow a selected vehicle
  */
-osp::Session setup_camera_vehicle(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         scene,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         commonScene,
-        osp::Session const&         physics,
-        osp::Session const&         parts,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         vehicleCtrl);
+extern osp::fw::FeatureDef const ftrVehicleCamera;
+
 
 /**
  * @brief Red indicators over Magic Rockets
  */
-osp::Session setup_thrust_indicators(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         windowApp,
-        osp::Session const&         commonSecne,
-        osp::Session const&         parts,
-        osp::Session const&         signalsFloat,
-        osp::Session const&         sceneRenderer,
-        osp::PkgId const            pkg,
-        osp::draw::MaterialId       material);
+extern osp::fw::FeatureDef const ftrMagicRocketThrustIndicator;
+
 
 } // namespace adera
-#endif

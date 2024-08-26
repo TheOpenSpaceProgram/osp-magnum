@@ -62,6 +62,30 @@ osp::Logger_t g_logMagnumApp;
 
 void load_scenario(Framework &rFW, ContextId ctx, entt::any userData)
 {
+    TestApp    &rTestApp = g_testApp.value();
+    auto const mainApp   = rFW.get_interface<FIMainApp>(rTestApp.m_mainContext);
+    auto       &rAppCtxs = rFW.data_get<AppContexts>(mainApp.di.appContexts);
+
+    if (rAppCtxs.scene.has_value()) // Close existing scene
+    {
+        auto const cleanup = rFW.get_interface<FICleanupContext>(rAppCtxs.scene);
+        if (cleanup.id.has_value())
+        {
+
+            rTestApp.m_pExecutor->run(rTestApp.m_framework, cleanup.pl.cleanup);
+            rTestApp.m_pExecutor->wait(rTestApp.m_framework);
+            if (rTestApp.m_pExecutor->is_running(rTestApp.m_framework))
+            {
+                OSP_LOG_CRITICAL("Failed to close scene context, something deadlocked.");
+                std::abort();
+            }
+        }
+
+        rFW.close_context(rAppCtxs.scene);
+
+        rAppCtxs.scene = {};
+    }
+
     auto const& rScenario = entt::any_cast<ScenarioOption const&>(userData);
     rScenario.loadFunc(g_testApp.value());
 

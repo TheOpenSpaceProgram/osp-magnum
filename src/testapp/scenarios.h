@@ -26,16 +26,12 @@
 
 #include "testapp.h"
 
-// IWYU pragma: begin_exports
-#include <osp/framework/framework.h>
-#include <osp/framework/builder.h>
-// IWYU pragma: end_exports
+#include <osp/drawing/drawing.h>
 
 #include <unordered_map>
 
 namespace testapp
 {
-
 
 struct ScenarioOption
 {

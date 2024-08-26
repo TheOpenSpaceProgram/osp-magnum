@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -25,7 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios.h"
+#include <osp/framework/builder.h>
 
 #include <adera/activescene/VehicleBuilder.h>
 
@@ -50,12 +49,7 @@ struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::Ve
 
 inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
 
-osp::Session setup_prebuilt_vehicles(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         application,
-        osp::Session const&         scene);
-
+extern osp::fw::FeatureDef const ftrPrebuiltVehicles;
 
 } // namespace adera
-#endif
+

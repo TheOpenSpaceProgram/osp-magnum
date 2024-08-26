@@ -26,26 +26,50 @@
 
 #include <osp/framework/builder.h>
 
+#include <osp/core/math_types.h>
+
+#include <ospjolt/activescene/forcefactors.h>
+
+
 namespace adera
 {
+
+struct ACtxConstAccel
+{
+    struct Force
+    {
+        osp::Vector3 vec;
+        std::uint8_t factorIndex;
+    };
+
+    std::vector<Force> forces;
+};
 
 /**
  * @brief Jolt physics integration
  */
 extern osp::fw::FeatureDef const ftrJolt;
 
-/**
- * @brief Create a single empty force factor bitset
- *
- * This is a simple bitset that can be assigned to a rigid body to set which
- * functions contribute to its force and torque
- */
-extern osp::fw::FeatureDef const ftrJoltForces;
+ospjolt::ForceFactors_t add_constant_acceleration(
+        osp::Vector3                forceVec,
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx);
+
+void set_phys_shape_factors(
+        ospjolt::ForceFactors_t     factors,
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx);
+
+void set_vehicle_default_factors(
+        ospjolt::ForceFactors_t     factors,
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx);
 
 /**
- * @brief Setup constant acceleration force, add to a force factor bitset
+ * @brief Setup constant acceleration force
  */
-extern osp::fw::FeatureDef const ftrJoltAccel;
+extern osp::fw::FeatureDef const ftrJoltConstAccel;
+
 /**
  * @brief Support for Shape Spawner physics using Jolt Physics
  */

@@ -32,16 +32,16 @@
 namespace adera
 {
 
-/**
- * @brief Adds free cam controls to a CameraController
- */
-extern osp::fw::FeatureDef const ftrCameraFree;
-
 struct TplPkgIdMaterialId
 {
     osp::PkgId pkg;
     osp::draw::MaterialId mat;
 };
+
+/**
+ * @brief Adds free cam controls to a CameraController
+ */
+extern osp::fw::FeatureDef const ftrCameraFree;
 
 /**
  * @brief Wireframe cube over the camera controller's target

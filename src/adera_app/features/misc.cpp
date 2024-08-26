@@ -30,14 +30,13 @@
 #include <osp/activescene/basic_fn.h>
 #include <osp/drawing/drawing_fn.h>
 
-using namespace ftr_inter;
-using namespace ftr_inter::stages;
-
 using namespace adera;
-using namespace osp;
+using namespace ftr_inter::stages;
+using namespace ftr_inter;
 using namespace osp::active;
 using namespace osp::draw;
 using namespace osp::fw;
+using namespace osp;
 
 using osp::input::EButtonControlIndex;
 

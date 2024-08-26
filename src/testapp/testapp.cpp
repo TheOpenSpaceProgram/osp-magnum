@@ -88,15 +88,15 @@ void TestApp::drive_main_loop()
 
 bool TestApp::run_fw_modify_commands()
 {
-    auto const fiMain         = m_framework.get_interface<FIMainApp>(m_mainContext);
-    auto       &rMainLoopCtrl = m_framework.data_get<MainLoopControl&>(fiMain.di.mainLoopCtrl);
-    auto       &rFWModify     = m_framework.data_get<FrameworkModify&>(fiMain.di.frameworkModify);
+    auto const mainApp        = m_framework.get_interface<FIMainApp>(m_mainContext);
+    auto       &rMainLoopCtrl = m_framework.data_get<MainLoopControl&>(mainApp.di.mainLoopCtrl);
+    auto       &rFWModify     = m_framework.data_get<FrameworkModify&>(mainApp.di.frameworkModify);
 
     if ( ! rFWModify.commands.empty() )
     {
         // Stop the framework main loop
         rMainLoopCtrl.doUpdate = false;
-        m_pExecutor->signal(m_framework, fiMain.pl.mainLoop);
+        m_pExecutor->signal(m_framework, mainApp.pl.mainLoop);
         m_pExecutor->wait(m_framework);
 
         if (m_pExecutor->is_running(m_framework))
@@ -113,79 +113,20 @@ bool TestApp::run_fw_modify_commands()
 
         // Restart framework main loop
         m_pExecutor->load(m_framework);
-        m_pExecutor->run(m_framework, fiMain.pl.mainLoop);
+        m_pExecutor->run(m_framework, mainApp.pl.mainLoop);
 
         return true;
     }
     return false;
 }
 
-/*
-void TestApp::close_sessions(osp::ArrayView<osp::Session> const sessions)
-{
-    using namespace osp;
-
-    // Run cleanup pipelines
-    for (Session &rSession : sessions)
-    {
-        if (rSession.m_cleanup != lgrn::id_null<osp::PipelineId>())
-        {
-            m_pExecutor->run(*this, rSession.m_cleanup);
-        }
-    }
-    m_pExecutor->wait(*this);
-
-    // Clear each session's TopData
-    for (Session &rSession : sessions)
-    {
-        for (TopDataId const id : std::exchange(rSession.m_data, {}))
-        {
-            if (id != lgrn::id_null<TopDataId>())
-            {
-                m_topData[std::size_t(id)].reset();
-            }
-        }
-    }
-
-    // Clear each session's tasks and pipelines
-    for (Session &rSession : sessions)
-    {
-        for (TaskId const task : rSession.m_tasks)
-        {
-            m_tasks.m_taskIds.remove(task);
-
-            TopTask &rCurrTaskData = m_taskData[task];
-            rCurrTaskData.m_debugName.clear();
-            rCurrTaskData.m_dataUsed.clear();
-            rCurrTaskData.m_func = nullptr;
-        }
-        rSession.m_tasks.clear();
-
-        for (PipelineId const pipeline : rSession.m_pipelines)
-        {
-            m_tasks.m_pipelineIds.remove(pipeline);
-            m_tasks.m_pipelineParents[pipeline] = lgrn::id_null<PipelineId>();
-            m_tasks.m_pipelineInfo[pipeline]    = {};
-            m_tasks.m_pipelineControl[pipeline] = {};
-        }
-        rSession.m_pipelines.clear();
-    }
-}
-
-
-void TestApp::close_session(osp::Session &rSession)
-{
-    close_sessions(osp::ArrayView<osp::Session>(&rSession, 1));
-}
-
 void TestApp::clear_resource_owners()
 {
     using namespace osp::restypes;
 
-    // declares mainApp.di.resources
-    OSP_DECLARE_GET_DATA_IDS(m_application, TESTAPP_DATA_APPLICATION);
+    auto const mainApp = m_framework.get_interface<FIMainApp>(m_mainContext);
 
-    auto &rResources = osp::rFB.data_get<osp::Resources>(m_mainApp.di.resources);
+    auto &rResources = m_framework.data_get<osp::Resources>(mainApp.di.resources);
 
     // Texture resources contain osp::TextureImgSource, which refererence counts
     // their associated image data
@@ -222,7 +163,7 @@ void TestApp::clear_resource_owners()
     };
 }
 
-*/
+
 
 
 

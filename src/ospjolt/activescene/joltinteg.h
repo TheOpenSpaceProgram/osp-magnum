@@ -249,11 +249,10 @@ struct ACtxJoltWorld
 public:
     struct ForceFactorFunc
     {
-        using UserData_t = std::array<void*, 6u>;
-        using Func_t = void (*)(BodyId bodyId, ACtxJoltWorld const&, UserData_t, osp::Vector3&, osp::Vector3&) noexcept;
+        using Func_t = void (*)(BodyId bodyId, ACtxJoltWorld const&, entt::any, osp::Vector3&, osp::Vector3&) noexcept;
 
         Func_t      m_func{nullptr};
-        UserData_t  m_userData{nullptr};
+        entt::any   m_userData;
     };
     // The default values are the one suggested in the Jolt hello world exemple for a "real" project.
     // It might be overkill here.

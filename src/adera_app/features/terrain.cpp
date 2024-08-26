@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -24,8 +23,10 @@
  * SOFTWARE.
  */
 #include "terrain.h"
-#include "common.h"
 
+#include "../feature_interfaces.h"
+
+#include <planet-a/activescene/terrain.h>
 #include <planet-a/chunk_generate.h>
 #include <planet-a/chunk_utils.h>
 #include <planet-a/icosahedron.h>
@@ -35,35 +36,31 @@
 #include <osp/core/math_2pow.h>
 #include <osp/core/math_int64.h>
 #include <osp/drawing/drawing.h>
+#include <osp/framework/builder.h>
+#include <osp/util/logging.h>
 
 #include <longeron/utility/asserts.hpp>
 
-#include <chrono>
-#include <fstream>
-
 using namespace adera;
-using namespace planeta;
-using namespace osp;
-using namespace osp::math;
+using namespace ftr_inter::stages;
+using namespace ftr_inter;
 using namespace osp::draw;
+using namespace osp::fw;
+using namespace osp::math;
+using namespace osp;
+using namespace planeta;
 
 namespace adera
 {
 
-Session setup_terrain(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any>  const topData,
-        Session               const &scene,
-        Session               const &commonScene)
+FeatureDef const ftrTerrain = feature_def("Terrain", [] (
+        FeatureBuilder              &rFB,
+        Implement<FITerrain>        terrain,
+        DependOn<FICleanupContext>  cleanup,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn)
 {
-    OSP_DECLARE_GET_DATA_IDS(commonScene, TESTAPP_DATA_COMMON_SCENE);
-    auto const scn.pl = scene.get_pipelines<PlScene>();
-
     auto &rDrawing = rFB.data_get<ACtxDrawing>(comScn.di.drawing);
-
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_TERRAIN);
-    auto const terrain.pl = out.create_pipelines<PlTerrain>(rFB);
 
     rFB.pipeline(terrain.pl.skeleton)       .parent(scn.pl.update);
     rFB.pipeline(terrain.pl.surfaceChanges) .parent(scn.pl.update);
@@ -78,7 +75,6 @@ Session setup_terrain(
     rFB.task()
         .name       ("Clear surfaceAdded & surfaceRemoved once we're done with it")
         .run_on     ({terrain.pl.surfaceChanges(Clear)})
-        .push_to    (out.m_tasks)
         .args({               terrain.di.terrain })
         .func([] (ACtxTerrain &rTerrain) noexcept
     {
@@ -89,7 +85,6 @@ Session setup_terrain(
     rFB.task()
         .name       ("Clean up terrain-related IdOwners")
         .run_on     ({cleanup.pl.cleanup(Run_)})
-        .push_to    (out.m_tasks)
         .args       ({        terrain.di.terrain,             comScn.di.drawing})
         .func([] (ACtxTerrain &rTerrain, ACtxDrawing &rDrawing) noexcept
     {
@@ -103,41 +98,29 @@ Session setup_terrain(
         rDrawing.m_meshRefCounts.ref_release(std::move(rTerrain.terrainMesh));
     });
 
-    return out;
-}
+}); // ftrTerrain
 
-Session setup_terrain_icosahedron(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any>  const topData,
-        Session               const &terrain)
+
+FeatureDef const ftrTerrainIcosahedron = feature_def("TerrainIcosahedron", [] (
+        FeatureBuilder              &rFB,
+        Implement<FITerrainIco>     terrainIco,
+        DependOn<FITerrain>         terrain)
 {
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_TERRAIN_ICO);
-    rFB.data_emplace< ACtxTerrainIco >     (terrain.di.terrainIco);
-    return out;
-}
+    rFB.data_emplace< ACtxTerrainIco >     (terrainIco.di.terrainIco);
+}); // ftrTerrainIcosahedron
 
-Session setup_terrain_subdiv_dist(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any>  const topData,
-        Session               const &scene,
-        Session               const &terrain,
-        Session               const &terrainIco)
+
+FeatureDef const ftrTerrainSubdivDist = feature_def("TerrainSubdivDist", [] (
+        FeatureBuilder              &rFB,
+        DependOn<FIScene>           scn,
+        DependOn<FITerrain>         terrain,
+        DependOn<FITerrainIco>         terrainIco)
 {
-    OSP_DECLARE_GET_DATA_IDS(terrain,    TESTAPP_DATA_TERRAIN);
-    OSP_DECLARE_GET_DATA_IDS(terrainIco, TESTAPP_DATA_TERRAIN_ICO);
-
-    auto const terrain.pl = terrain  .get_pipelines<PlTerrain>();
-    auto const scn.pl = scene    .get_pipelines<PlScene>();
-
-    Session out;
-
     rFB.task()
         .name       ("Subdivide triangle skeleton")
         .run_on     ({scn.pl.update(Run)})
         .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.skeleton(New), terrain.pl.surfaceChanges(Resize)})
-        .push_to    (out.m_tasks)
-        .args({                    terrain.di.terrainFrame,             terrain.di.terrain,                terrain.di.terrainIco })
+        .args({                    terrain.di.terrainFrame,             terrain.di.terrain,                terrainIco.di.terrainIco })
         .func([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         if ( ! rTerrainFrame.active )
@@ -201,8 +184,7 @@ Session setup_terrain_subdiv_dist(
         .name       ("Update Terrain Chunks")
         .run_on     ({scn.pl.update(Run)})
         .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.skeleton(Ready), terrain.pl.surfaceChanges(UseOrRun), terrain.pl.chunkMesh(Modify)})
-        .push_to    (out.m_tasks)
-        .args({                    terrain.di.terrainFrame,             terrain.di.terrain,                terrain.di.terrainIco })
+        .args({                    terrain.di.terrainFrame,             terrain.di.terrain,                terrainIco.di.terrainIco })
         .func([] (ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         if ( ! rTerrainFrame.active )
@@ -468,22 +450,19 @@ Session setup_terrain_subdiv_dist(
         }
         */
     });
-
-    return out;
-}
+}); // ftrTerrainSubdivDist
 
 void initialize_ico_terrain(
-        ArrayView<entt::any>   const topData,
-        Session                const &terrain,
-        Session                const &terrainIco,
-        TerrainTestPlanetSpecs const specs)
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx,
+        TerrainTestPlanetSpecs      specs)
 {
-    OSP_DECLARE_GET_DATA_IDS(terrain,    TESTAPP_DATA_TERRAIN);
-    OSP_DECLARE_GET_DATA_IDS(terrainIco, TESTAPP_DATA_TERRAIN_ICO);
+    auto const terrain      = rFW.get_interface<FITerrain>(sceneCtx);
+    auto const terrainIco   = rFW.get_interface<FITerrainIco>(sceneCtx);
 
-    auto &rTerrain          = rFB.data_get<ACtxTerrain>      (terrain.di.terrain);
-    auto &rTerrainFrame     = rFB.data_get<ACtxTerrainFrame> (terrain.di.terrainFrame);
-    auto &rTerrainIco       = rFB.data_get<ACtxTerrainIco>   (terrain.di.terrainIco);
+    auto &rTerrain          = rFW.data_get<ACtxTerrain>      (terrain.di.terrain);
+    auto &rTerrainFrame     = rFW.data_get<ACtxTerrainFrame> (terrain.di.terrainFrame);
+    auto &rTerrainIco       = rFW.data_get<ACtxTerrainIco>   (terrainIco.di.terrainIco);
 
     rTerrainFrame.active = true;
 
@@ -625,34 +604,19 @@ struct TerrainDebugDraw
     DrawEnt surface;
 };
 
-Session setup_terrain_debug_draw(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any>  const topData,
-        Session               const &scene,
-        Session               const &sceneRenderer,
-        Session               const &cameraCtrl,
-        Session               const &commonScene,
-        Session               const &terrain,
-        Session               const &terrainIco,
-        MaterialId            const mat)
+FeatureDef const ftrTerrainDebugDraw = feature_def("TerrainDebugDraw", [] (
+        FeatureBuilder              &rFB,
+        Implement<FITerrainDbgDraw> terrainDbgDraw,
+        DependOn<FIScene>           scn,
+        DependOn<FISceneRenderer>   scnRender,
+        DependOn<FICameraControl>   camCtrl,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FITerrain>         terrain,
+        DependOn<FITerrainIco>      terrainIco,
+        entt::any                   userData)
 {
-    OSP_DECLARE_GET_DATA_IDS(scene,          TESTAPP_DATA_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(commonScene,    TESTAPP_DATA_COMMON_SCENE);
-    OSP_DECLARE_GET_DATA_IDS(sceneRenderer,  TESTAPP_DATA_SCENE_RENDERER);
-    OSP_DECLARE_GET_DATA_IDS(cameraCtrl,     TESTAPP_DATA_CAMERA_CTRL);
-    OSP_DECLARE_GET_DATA_IDS(terrain,        TESTAPP_DATA_TERRAIN);
-    OSP_DECLARE_GET_DATA_IDS(terrainIco,     TESTAPP_DATA_TERRAIN_ICO);
-
-    auto const scn.pl    = scene         .get_pipelines<PlScene>();
-    auto const scnRender.pl = sceneRenderer .get_pipelines<PlSceneRenderer>();
-    auto const camCtrl.pl   = cameraCtrl    .get_pipelines<PlCameraCtrl>();
-    auto const terrain.pl    = terrain       .get_pipelines<PlTerrain>();
-
-    Session out;
-    auto const [idTrnDbgDraw] = out.acquire_data<1>(topData);
-
-    auto &rTrnDbgDraw = rFB.data_emplace< TerrainDebugDraw > (idTrnDbgDraw,
-                                                         TerrainDebugDraw{.mat = mat});
+    auto const mat = entt::any_cast<MaterialId>(userData);
+    auto &rTrnDbgDraw = rFB.data_emplace< TerrainDebugDraw > (terrainDbgDraw.di.draw, TerrainDebugDraw{.mat = mat});
 
     auto &rDrawing   = rFB.data_get< ACtxDrawing >       (comScn.di.drawing);
     auto &rScnRender = rFB.data_get< ACtxSceneRender >   (scnRender.di.scnRender);
@@ -671,8 +635,7 @@ Session setup_terrain_debug_draw(
         .name       ("Handle Scene<-->Terrain positioning and floating origin")
         .run_on     ({scn.pl.update(Run)})
         .sync_with  ({camCtrl.pl.camCtrl(Modify), terrain.pl.terrainFrame(Modify)})
-        .push_to    (out.m_tasks)
-        .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn,                  terrain.di.terrainFrame,             terrain.di.terrain,                terrain.di.terrainIco })
+        .args       ({                 camCtrl.di.camCtrl,           scn.di.deltaTimeIn,                  terrain.di.terrainFrame,             terrain.di.terrain,                terrainIco.di.terrainIco })
         .func([] (ACtxCameraController& rCamCtrl, float const deltaTimeIn, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxTerrainIco &rTerrainIco) noexcept
     {
         using Magnum::Math::abs;
@@ -752,15 +715,14 @@ Session setup_terrain_debug_draw(
         .name       ("Reposition terrain surface mesh")
         .run_on     ({scnRender.pl.render(Run)})
         .sync_with  ({terrain.pl.terrainFrame(Ready), terrain.pl.chunkMesh(Ready), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Modify_), scnRender.pl.drawEntResized(Done)})
-        .push_to    (out.m_tasks)
-        .args       ({             idTrnDbgDraw,                  terrain.di.terrainFrame,             terrain.di.terrain,                 scnRender.di.scnRender })
-        .func([] (TerrainDebugDraw& rTrnDbgDraw, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender) noexcept
+        .args       ({    terrainDbgDraw.di.draw,                  terrain.di.terrainFrame,             terrain.di.terrain,                 scnRender.di.scnRender })
+        .func       ([] (TerrainDebugDraw& rDraw, ACtxTerrainFrame &rTerrainFrame, ACtxTerrain &rTerrain, ACtxSceneRender &rScnRender) noexcept
     {
         float const scale = std::exp2(float(rTerrain.skData.precision));
 
         Vector3 const pos = Vector3(rTerrain.chunkGeom.originSkelPos-rTerrainFrame.position) / scale;
 
-        rScnRender.m_drawTransform[rTrnDbgDraw.surface] = Matrix4::translation(pos);
+        rScnRender.m_drawTransform[rDraw.surface] = Matrix4::translation(pos);
     });
 
 #if 0
@@ -771,7 +733,7 @@ Session setup_terrain_debug_draw(
         .run_on     ({scnRender.pl.render(Run)})
         .sync_with  ({terrain.pl.skeleton(Ready), scnRender.pl.drawEnt(Delete), scnRender.pl.entMeshDirty(Modify_), scnRender.pl.materialDirty(Modify_), scnRender.pl.drawEntResized(ModifyOrSignal)})
         .push_to    (out.m_tasks)
-        .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,                  idTrnDbgDraw,                   terrain.di.terrain,                      terrain.di.terrainIco })
+        .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,                  idTrnDbgDraw,                   terrain.di.terrain,                      terrainIco.di.terrainIco })
         .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw& rTrnDbgDraw, ACtxTerrain const &rTerrain, ACtxTerrainIco const &rTerrainIco) noexcept
     {
         Material &rMatPlanet = rScnRender.m_materials[rTrnDbgDraw.mat];
@@ -822,7 +784,7 @@ Session setup_terrain_debug_draw(
         .run_on     ({scnRender.pl.render(Run)})
         .sync_with  ({terrain.pl.skeleton(Ready), scnRender.pl.drawEnt(Ready), scnRender.pl.drawTransforms(Modify_), scnRender.pl.entMeshDirty(Modify_), scnRender.pl.materialDirty(Modify_), scnRender.pl.drawEntResized(Done)})
         .push_to    (out.m_tasks)
-        .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,                        idTrnDbgDraw,                   terrain.di.terrain,                      terrain.di.terrainIco })
+        .args       ({        comScn.di.drawing,                 scnRender.di.scnRender,             comScn.di.namedMeshes,                        idTrnDbgDraw,                   terrain.di.terrain,                      terrainIco.di.terrainIco })
         .func([] (ACtxDrawing& rDrawing, ACtxSceneRender& rScnRender, NamedMeshes& rNMesh, TerrainDebugDraw const& rTrnDbgDraw, ACtxTerrain const &rTerrain, ACtxTerrainIco const &rTerrainIco) noexcept
     {
         Material                         &rMatPlanet = rScnRender.m_materials[rTrnDbgDraw.mat];
@@ -850,9 +812,7 @@ Session setup_terrain_debug_draw(
     });
 #endif
 
-    return out;
-}
+}); // ftrTerrainDebugDraw
 
 
 } // namespace adera
-#endif

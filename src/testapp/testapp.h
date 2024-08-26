@@ -55,10 +55,6 @@ struct TestApp;
 struct TestApp
 {
 
-//    void close_sessions(osp::ArrayView<osp::Session> sessions);
-
-//    void close_session(osp::Session &rSession);
-
     /**
      * @brief Deal with resource reference counts for a clean termination
      */
@@ -71,30 +67,15 @@ struct TestApp
     void init();
 
     osp::fw::Framework m_framework;
-
     osp::fw::ContextId m_mainContext;
-
-
-//    osp::SessionGroup               m_applicationGroup;
-//    osp::Session                    m_application;
-
-//    osp::SessionGroup               m_scene;
-
-//    osp::Session                    m_windowApp;
-//    osp::Session                    m_magnum;
-//    osp::SessionGroup               m_renderer;
-
-//    RendererSetupFunc_t             m_rendererSetup { nullptr };
-
-    osp::fw::IExecutor              *m_pExecutor { nullptr };
-
-    osp::PkgId                      m_defaultPkg    { lgrn::id_null<osp::PkgId>() };
+    osp::fw::IExecutor *m_pExecutor  { nullptr };
+    osp::PkgId         m_defaultPkg  { lgrn::id_null<osp::PkgId>() };
 
     int m_argc;
     char** m_argv;
 
 
-    private:
+private:
 
     /**
      * @brief As the name implies

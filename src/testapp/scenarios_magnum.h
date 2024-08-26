@@ -26,11 +26,9 @@
 
 #include <osp/framework/framework.h>
 
-
 namespace testapp
 {
 
 void start_magnum_renderer(osp::fw::Framework &rFW, osp::fw::ContextId ctx, entt::any userData);
-
 
 } // namespace testapp

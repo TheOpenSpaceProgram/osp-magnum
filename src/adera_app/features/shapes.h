@@ -48,13 +48,11 @@ struct ACtxPhysShapes
 
     std::vector<SpawnShape>         m_spawnRequest;
     osp::active::ActiveEntVec_t     m_ents;
-    osp::draw::MaterialId           m_materialId;
 };
 
 void add_floor(
         osp::fw::Framework          &rFW,
         osp::fw::ContextId          sceneCtx,
-        osp::draw::MaterialId       material,
         osp::PkgId                  pkg,
         int                         size);
 

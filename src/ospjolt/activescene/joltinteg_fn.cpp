@@ -244,13 +244,15 @@ void PhysicsStepListenerImpl::OnStep(float inDeltaTime, PhysicsSystem &rPhysicsS
         Vector3 force{0.0f};
         Vector3 torque{0.0f};
 
-        auto factorBits = lgrn::bit_view(m_context->m_bodyFactors[bodyId]);
-        for (std::size_t const factorIdx : factorBits.ones())
+        LGRN_ASSERT(ForceFactors_t{}.size() == 64u);
+        auto const factorsInts = std::initializer_list<std::uint64_t>{m_context->m_bodyFactors[bodyId].to_ullong()};
+        auto const factorsBits = lgrn::bit_view(factorsInts);
+
+        for (std::size_t const factorIdx : factorsBits.ones())
         {   
             ACtxJoltWorld::ForceFactorFunc const& factor = m_context->m_factors[factorIdx];
             factor.m_func(bodyId, *m_context, factor.m_userData, force, torque);
         }
-        Vec3 vel = bodyInterface.GetLinearVelocity(joltBodyId);
 
         bodyInterface.AddForceAndTorque(joltBodyId, Vec3MagnumToJolt(force), Vec3MagnumToJolt(torque));
     }

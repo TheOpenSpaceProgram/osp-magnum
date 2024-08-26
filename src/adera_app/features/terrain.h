@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -25,15 +24,7 @@
  */
 #pragma once
 
-#include "../scenarios.h"
-#include "planet-a/chunk_utils.h"
-
-#include <osp/drawing/drawing.h>
-#include <osp/core/math_types.h>
-
-#include <planet-a/skeleton.h>
-#include <planet-a/skeleton_subdiv.h>
-#include <planet-a/chunk_generate.h>
+#include <osp/framework/builder.h>
 
 namespace adera
 {
@@ -42,30 +33,18 @@ namespace adera
 /**
  * @brief Skeleton, mesh data, and scratchpads to support a single terrain surface within a scene
  */
-osp::Session setup_terrain(
-        osp::TopTaskBuilder         &rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session          const &scene,
-        osp::Session          const &commonScene);
+extern osp::fw::FeatureDef const ftrTerrain;
+
 
 /**
  * @brief Icosahedron-specific data for spherical planet terrains
  */
-osp::Session setup_terrain_icosahedron(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session          const &terrain);
+extern osp::fw::FeatureDef const ftrTerrainIcosahedron;
 
 /**
  * @brief Subdivide-by-distance logic for icosahedron sphere planets
  */
-osp::Session setup_terrain_subdiv_dist(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session          const &scene,
-        osp::Session          const &terrain,
-        osp::Session          const &terrainIco);
-
+extern osp::fw::FeatureDef const ftrTerrainSubdivDist;
 
 struct TerrainTestPlanetSpecs
 {
@@ -91,25 +70,15 @@ struct TerrainTestPlanetSpecs
  * @brief Allocate and set parameters for a icosahedron planet, given specifications
  */
 void initialize_ico_terrain(
-        osp::ArrayView<entt::any>   topData,
-        osp::Session          const &terrain,
-        osp::Session          const &terrainIco,
+        osp::fw::Framework          &rFW,
+        osp::fw::ContextId          sceneCtx,
         TerrainTestPlanetSpecs      specs);
 
 
 /**
  * @brief Uses camera target as position relative to planet, and visualizes terrain skeleton.
  */
-osp::Session setup_terrain_debug_draw(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session          const &scene,
-        osp::Session          const &sceneRenderer,
-        osp::Session          const &cameraCtrl,
-        osp::Session          const &commonScene,
-        osp::Session          const &terrain,
-        osp::Session          const &terrainIco,
-        osp::draw::MaterialId       mat);
+extern osp::fw::FeatureDef const ftrTerrainDebugDraw;
+
 
 } // namespace adera
-#endif

@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2023 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -25,22 +24,24 @@
  */
 #include "vehicles_prebuilt.h"
 
+#include "../feature_interfaces.h"
+
 #include <adera/machines/links.h>
 
 #include <osp/core/Resources.h>
 
+using namespace Magnum::Math::Literals;
 using namespace adera;
-
+using namespace ftr_inter::stages;
+using namespace ftr_inter;
+using namespace osp::fw;
 using namespace osp::link;
 using namespace osp;
 
 using osp::restypes::gc_importer;
 
-using namespace Magnum::Math::Literals;
-
 namespace adera
 {
-
 
 Matrix4 quick_transform(Vector3 const pos, Quaternion const rot) noexcept
 {
@@ -112,22 +113,16 @@ static void add_rcs_block(VehicleBuilder& rFB, VehicleBuilder::WeldVec_t& rWeldT
     rWeldTo.push_back({ nozzleB, nozzleTfB });
 }
 
-Session setup_prebuilt_vehicles(
-        TopTaskBuilder&             rFB,
-        ArrayView<entt::any> const  topData,
-        Session const&              application,
-        Session const&              scene)
+FeatureDef const ftrPrebuiltVehicles = feature_def("PrebuiltVehicles", [] (
+        FeatureBuilder              &rFB,
+        Implement<FITestVehicles>   testVhcls,
+        DependOn<FICleanupContext>  cleanup,
+        DependOn<FIMainApp>         mainApp,
+        DependOn<FIScene>           scn)
 {
-    OSP_DECLARE_GET_DATA_IDS(application,   TESTAPP_DATA_APPLICATION);
-    auto const scn.pl = scene.get_pipelines<PlScene>();
-
     auto &rResources = rFB.data_get<Resources>(mainApp.di.resources);
 
-    Session out;
-    OSP_DECLARE_CREATE_DATA_IDS(out, TESTAPP_DATA_TEST_VEHICLES);
-    out.m_cleanup = scn.pl.cleanup;
-
-    auto &rPrebuiltVehicles = rFB.data_emplace<PrebuiltVehicles>(idPrebuiltVehicles);
+    auto &rPrebuiltVehicles = rFB.data_emplace<PrebuiltVehicles>(testVhcls.di.prebuiltVehicles);
     rPrebuiltVehicles.resize(PrebuiltVhIdReg_t::size());
 
     using namespace adera;
@@ -206,10 +201,9 @@ Session setup_prebuilt_vehicles(
 
     rFB.task()
         .name       ("Clean up prebuilt vehicles")
-        .run_on     ({scn.pl.cleanup(Run_)})
-        .push_to    (out.m_tasks)
-        .args       ({             idPrebuiltVehicles,          mainApp.di.resources})
-        .func([] (PrebuiltVehicles &rPrebuildVehicles, Resources& rResources) noexcept
+        .run_on     ({cleanup.pl.cleanup(Run_)})
+        .args       ({         testVhcls.di.prebuiltVehicles,  mainApp.di.resources})
+        .func       ([] (PrebuiltVehicles &rPrebuildVehicles, Resources& rResources) noexcept
     {
         for (std::unique_ptr<VehicleData> &rpData : rPrebuildVehicles)
         {
@@ -224,9 +218,7 @@ Session setup_prebuilt_vehicles(
         rPrebuildVehicles.clear();
     });
 
-    return out;
-} // setup_prebuilt_vehicles
+}); // setup_prebuilt_vehicles
 
 
 } // namespace adera
-#endif

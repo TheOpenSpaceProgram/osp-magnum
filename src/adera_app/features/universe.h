@@ -1,7 +1,6 @@
-#if 0
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2024 Open Space Program Project
  *
  * MIT License
  *
@@ -25,10 +24,10 @@
  */
 #pragma once
 
-#include "../scenarios.h"
-
-#include "osp/universe/universe.h"
+#include <osp/framework/builder.h>
+#include <osp/universe/universe.h>
 #include <osp/drawing/drawing.h>
+
 
 namespace adera
 {
@@ -38,44 +37,26 @@ namespace adera
 /**
  * @brief Core Universe struct with addressable Coordinate Spaces
  */
-osp::Session setup_uni_core(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::PipelineId             updateOn);
+extern osp::fw::FeatureDef const ftrUniverseCore;
+
 
 /**
  * @brief Represents the physics scene's presence in a Universe
  */
-osp::Session setup_uni_sceneframe(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         uniCore);
+extern osp::fw::FeatureDef const ftrUniverseSceneFrame;
+
 
 /**
  * @brief Unrealistic planets test, allows SceneFrame to move around and get captured into planets
  */
-osp::Session setup_uni_testplanets(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         uniCore,
-        osp::Session const&         uniScnFrame);
+extern osp::fw::FeatureDef const ftrUniverseTestPlanets;
 
 
 /**
  * @brief Draw universe, specifically designed for setup_uni_test_planets
  */
-osp::Session setup_testplanets_draw(
-        osp::TopTaskBuilder&        rFB,
-        osp::ArrayView<entt::any>   topData,
-        osp::Session const&         windowApp,
-        osp::Session const&         sceneRenderer,
-        osp::Session const&         cameraCtrl,
-        osp::Session const&         commonScene,
-        osp::Session const&         uniCore,
-        osp::Session const&         uniScnFrame,
-        osp::Session const&         uniTestPlanets,
-        osp::draw::MaterialId const matPlanets,
-        osp::draw::MaterialId const matAxis);
+extern osp::fw::FeatureDef const ftrUniverseTestPlanetsDraw;
+
 
 // Solar System Scenario
 
@@ -89,26 +70,18 @@ struct CoSpaceNBody
 /**
  * @brief Initializes planet information, position, mass etc...
  */
-osp::Session setup_solar_system_testplanets(
-    osp::TopTaskBuilder& rFB,
-    osp::ArrayView<entt::any>   topData,
-    osp::Session const& solarSystemCore,
-    osp::Session const& solarSystemScnFrame);
+extern osp::fw::FeatureDef const ftrSolarSystem;
 
+struct PlanetDrawParams
+{
+    osp::draw::MaterialId planetMat;
+    osp::draw::MaterialId axisMat;
+};
 
 /**
- * @brief Draw Solar System, specifically designed for setup_solar_system_test_planets
+ * @brief Draw Solar System, specifically designed for ftrSolarSystemPlanets
  */
-osp::Session setup_solar_system_planets_draw(
-    osp::TopTaskBuilder& rFB,
-    osp::ArrayView<entt::any>   topData,
-    osp::Session const& windowApp,
-    osp::Session const& sceneRenderer,
-    osp::Session const& cameraCtrl,
-    osp::Session const& commonScene,
-    osp::Session const& solarSystemCore,
-    osp::Session const& solarSystemScnFrame,
-    osp::Session const& solarSystemTestPlanets,
-    osp::draw::MaterialId const matPlanets);
-}
-#endif
+extern osp::fw::FeatureDef const ftrSolarSystemDraw;
+
+} // namespace adera
+

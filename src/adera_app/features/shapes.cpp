@@ -35,20 +35,20 @@
 
 #include <random>
 
-using namespace ftr_inter;
-using namespace ftr_inter::stages;
 using namespace adera;
-using namespace osp;
-using namespace osp::fw;
+using namespace ftr_inter::stages;
+using namespace ftr_inter;
 using namespace osp::active;
 using namespace osp::draw;
+using namespace osp::fw;
+using namespace osp;
 
 using osp::input::EButtonControlIndex;
 
 namespace adera
 {
 
-void add_floor(Framework &rFW, ContextId sceneCtx, MaterialId material, PkgId pkg, int size)
+void add_floor(Framework &rFW, ContextId sceneCtx, PkgId pkg, int size)
 {
     auto const physShapes = rFW.get_interface<FIPhysShapes>(sceneCtx);
 
@@ -79,21 +79,18 @@ void add_floor(Framework &rFW, ContextId sceneCtx, MaterialId material, PkgId pk
 
 
 FeatureDef const ftrPhysicsShapes = feature_def("PhysicsShapes", [] (
-        FeatureBuilder          &rFB,
-        Implement<FIPhysShapes> physShapes,
-        DependOn<FIScene>       scn,
-        DependOn<FICommonScene> comScn,
-        DependOn<FIPhysics>     phys,
-        entt::any               userData)
+        FeatureBuilder              &rFB,
+        Implement<FIPhysShapes>     physShapes,
+        DependOn<FIScene>           scn,
+        DependOn<FICommonScene>     comScn,
+        DependOn<FIPhysics>         phys,
+        entt::any                   userData)
 {
-    auto const materialId = userData /* if not null */ ? entt::any_cast<MaterialId>(userData)
-                                                       : MaterialId{};
-
     rFB.pipeline(physShapes.pl.spawnRequest)  .parent(scn.pl.update);
     rFB.pipeline(physShapes.pl.spawnedEnts)   .parent(scn.pl.update);
     rFB.pipeline(physShapes.pl.ownedEnts)     .parent(scn.pl.update);
 
-    rFB.data_emplace< ACtxPhysShapes > (physShapes.di.physShapes, ACtxPhysShapes{ .m_materialId = materialId });
+    rFB.data_emplace< ACtxPhysShapes > (physShapes.di.physShapes);
 
     // TODO: format after framework changes
 
@@ -202,20 +199,27 @@ FeatureDef const ftrPhysicsShapes = feature_def("PhysicsShapes", [] (
 
 FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
         FeatureBuilder              &rFB,
+        Implement<FIPhysShapesDraw> physShapesDraw,
         DependOn<FISceneRenderer>   scnRender,
         DependOn<FICommonScene>     comScn,
         DependOn<FIPhysics>         phys,
         DependOn<FIPhysShapes>      physShapes,
-        DependOn<FIWindowApp>       windowApp)
+        DependOn<FIWindowApp>       windowApp,
+        entt::any                   userData)
 {
+    auto const materialId = userData /* if not null */ ? entt::any_cast<MaterialId>(userData)
+                                                       : MaterialId{};
+
+    rFB.data_emplace<MaterialId>(physShapesDraw.di.material, materialId);
+
     // TODO: format after framework changes
 
     rFB.task()
         .name       ("Create DrawEnts for spawned shapes")
         .run_on     ({physShapes.pl.spawnRequest(UseOrRun)})
         .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun), comScn.pl.activeEntResized(Done), scnRender.pl.drawEntResized(ModifyOrSignal), scnRender.pl.drawEnt(New)})
-        .args       ({               comScn.di.basic,             comScn.di.drawing,                 scnRender.di.scnRender,                physShapes.di.physShapes,             comScn.di.namedMeshes })
-        .func([]    (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, ACtxPhysShapes &rPhysShapes, NamedMeshes &rNMesh) noexcept
+        .args       ({       comScn.di.basic,     comScn.di.drawing,      scnRender.di.scnRender,    physShapes.di.physShapes })
+        .func([]    (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, ACtxPhysShapes &rPhysShapes) noexcept
     {
         for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
         {
@@ -230,10 +234,10 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
         .sync_with  ({physShapes.pl.spawnedEnts(UseOrRun),
                       scnRender.pl.entMesh(New), scnRender.pl.material(New), scnRender.pl.drawEnt(New), scnRender.pl.drawEntResized(Done),
                       scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
-        .args       ({            comScn.di.basic,             comScn.di.drawing,                 scnRender.di.scnRender,                physShapes.di.physShapes,             comScn.di.namedMeshes })
-        .func([] (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, ACtxPhysShapes &rPhysShapes, NamedMeshes &rNMesh) noexcept
+        .args       ({           comScn.di.basic,     comScn.di.drawing,      scnRender.di.scnRender,    physShapes.di.physShapes,     comScn.di.namedMeshes, physShapesDraw.di.material })
+        .func       ([] (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, ACtxPhysShapes &rPhysShapes, NamedMeshes &rNamedMeshes,  MaterialId const material) noexcept
     {
-        Material &rMat = rScnRender.m_materials[rPhysShapes.m_materialId];
+        Material &rMat = rScnRender.m_materials[material];
 
         for (std::size_t i = 0; i < rPhysShapes.m_spawnRequest.size(); ++i)
         {
@@ -245,7 +249,7 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
             rScnRender.m_needDrawTf.insert(root);
             rScnRender.m_needDrawTf.insert(child);
 
-            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(spawn.m_shape));
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNamedMeshes.m_shapeToMesh.at(spawn.m_shape));
             rScnRender.m_meshDirty.push_back(drawEnt);
 
             rMat.m_ents.insert(drawEnt);
@@ -262,12 +266,14 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
         .name       ("Resync spawned shapes DrawEnts")
         .run_on     ({windowApp.pl.resync(Run)})
         .sync_with  ({physShapes.pl.ownedEnts(UseOrRun_), comScn.pl.hierarchy(Ready), comScn.pl.activeEntResized(Done), scnRender.pl.drawEntResized(ModifyOrSignal)})
-        .args       ({               comScn.di.basic,             comScn.di.drawing,                 scnRender.di.scnRender,                physShapes.di.physShapes,             comScn.di.namedMeshes })
-        .func([]    (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, ACtxPhysShapes &rPhysShapes, NamedMeshes &rNMesh) noexcept
+        .args       ({       comScn.di.basic,     comScn.di.drawing,      scnRender.di.scnRender,    physShapes.di.physShapes, comScn.di.activeEntDel })
+        .func([]    (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxSceneRender &rScnRender, ACtxPhysShapes &rPhysShapes, ActiveEntVec_t const &rActiveEntDel) noexcept
     {
         for (ActiveEnt root : rPhysShapes.ownedEnts)
         {
-            ActiveEnt const child = *SysSceneGraph::children(rBasic.m_scnGraph, root).begin();
+            LGRN_ASSERT(rBasic.m_activeIds.exists(root));
+            auto const children = SysSceneGraph::children(rBasic.m_scnGraph, root);
+            ActiveEnt const child = *children.begin();
 
             rScnRender.m_activeToDraw[child] = rScnRender.m_drawIds.create();
         }
@@ -278,10 +284,10 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
         .run_on     ({windowApp.pl.resync(Run)})
         .sync_with  ({physShapes.pl.ownedEnts(UseOrRun_), scnRender.pl.entMesh(New), scnRender.pl.material(New), scnRender.pl.drawEnt(New), scnRender.pl.drawEntResized(Done),
                       scnRender.pl.materialDirty(Modify_), scnRender.pl.entMeshDirty(Modify_)})
-        .args       ({            comScn.di.basic,             comScn.di.drawing,             phys.di.phys,                physShapes.di.physShapes,                 scnRender.di.scnRender,             comScn.di.namedMeshes })
-        .func([] (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxPhysics &rPhys, ACtxPhysShapes &rPhysShapes, ACtxSceneRender &rScnRender, NamedMeshes &rNMesh) noexcept
+        .args       ({           comScn.di.basic,     comScn.di.drawing,       phys.di.phys,    physShapes.di.physShapes,      scnRender.di.scnRender,     comScn.di.namedMeshes, physShapesDraw.di.material })
+        .func       ([] (ACtxBasic const &rBasic, ACtxDrawing &rDrawing, ACtxPhysics &rPhys, ACtxPhysShapes &rPhysShapes, ACtxSceneRender &rScnRender, NamedMeshes &rNamedMeshes,  MaterialId const material) noexcept
     {
-        Material &rMat = rScnRender.m_materials[rPhysShapes.m_materialId];
+        Material &rMat = rScnRender.m_materials[material];
 
         for (ActiveEnt root : rPhysShapes.ownedEnts)
         {
@@ -294,7 +300,7 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
             rScnRender.m_needDrawTf.insert(child);
 
             EShape const shape = rPhys.m_shape.at(child);
-            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNMesh.m_shapeToMesh.at(shape));
+            rScnRender.m_mesh[drawEnt] = rDrawing.m_meshRefCounts.ref_add(rNamedMeshes.m_shapeToMesh.at(shape));
             rScnRender.m_meshDirty.push_back(drawEnt);
 
             rMat.m_ents.insert(drawEnt);
@@ -306,11 +312,11 @@ FeatureDef const ftrPhysicsShapesDraw = feature_def("PhysicsShapesDraw", [] (
     });
 
     rFB.task()
-        .name       ("Remove deleted ActiveEnts from ACtxPhysShapeser")
+        .name       ("Remove deleted ActiveEnts from ACtxPhysShapes")
         .run_on     ({comScn.pl.activeEntDelete(UseOrRun)})
         .sync_with  ({physShapes.pl.ownedEnts(Modify__)})
-        .args       ({           physShapes.di.physShapes,                      comScn.di.activeEntDel })
-        .func([] (ACtxPhysShapes &rPhysShapes, ActiveEntVec_t const &rActiveEntDel) noexcept
+        .args       ({      physShapes.di.physShapes,              comScn.di.activeEntDel })
+        .func       ([] (ACtxPhysShapes &rPhysShapes, ActiveEntVec_t const &rActiveEntDel) noexcept
     {
         for (ActiveEnt const deleted : rActiveEntDel)
         {

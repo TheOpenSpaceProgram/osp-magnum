@@ -26,6 +26,8 @@
 
 #include "../util/logging.h"
 
+#include <ostream>
+
 namespace osp::fw
 {
 
