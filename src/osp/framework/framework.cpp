@@ -29,8 +29,6 @@
 namespace osp::fw
 {
 
-
-
 void Framework::close_context(ContextId ctx)
 {
     FeatureContext &rFtrCtx = m_contextData[ctx];

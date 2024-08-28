@@ -66,7 +66,7 @@ namespace testapp
 FeatureDef const ftrEngineTest = feature_def("EngineTest", [] (FeatureBuilder& rFB, Implement<FIEngineTest> engineTest, DependOn<FIMainApp> mainApp, entt::any data)
 {
     auto &rResources = rFB.data_get<Resources>(mainApp.di.resources);
-    rFB.data(engineTest.di.bigStruct) = enginetest::setup_scene(rResources, entt::any_cast<PkgId>(data));
+    rFB.data(engineTest.di.bigStruct) = enginetest::make_scene(rResources, entt::any_cast<PkgId>(data));
 });
 
 static ScenarioMap_t make_scenarios()
@@ -98,8 +98,8 @@ static ScenarioMap_t make_scenarios()
 
         rAppCtxs.scene  = rFw.m_contextIds.create();
         ContextBuilder  sceneCB { rAppCtxs.scene,  {rTestApp.m_mainContext}, rFw };
+        sceneCB.add_feature(ftrScene);
         sceneCB.add_feature(ftrEngineTest, rTestApp.m_defaultPkg);
-        LGRN_ASSERTM(sceneCB.m_errors.empty(), "Error adding engine test feature");
         ContextBuilder::finalize(std::move(sceneCB));
     }});
 
@@ -146,7 +146,21 @@ static ScenarioMap_t make_scenarios()
     add_scenario({
         .name        = "vehicles",
         .brief       = "Physics scenario but with Vehicles",
-        .description = "",
+        .description = "Controls (FREECAM):\n"
+                       "* [WASD]            - Move camera\n"
+                       "* [QE]              - Move camera up/down\n"
+                       "Controls (VEHICLE):\n"
+                       "* [WS]              - RCS Pitch\n"
+                       "* [AD]              - RCS Yaw\n"
+                       "* [QE]              - RCS Roll\n"
+                       "* [Shift]           - Throttle Up\n"
+                       "* [Ctrl]            - Throttle Down\n"
+                       "* [Z]               - Throttle Max\n"
+                       "* [X]               - Throttle Zero\n"
+                       "Controls:\n"
+                       "* [Drag MouseRight] - Orbit camera\n"
+                       "* [Space]           - Throw spheres\n"
+                       "* [V]               - Switch vehicles\n",
         .loadFunc = [] (TestApp& rTestApp)
     {
         auto        &rFW      = rTestApp.m_framework;
@@ -263,8 +277,7 @@ static ScenarioMap_t make_scenarios()
         .description = "Controls:\n"
                        "* [WASD]            - Move camera\n"
                        "* [QE]              - Move camera up/down\n"
-                       "* [Drag MouseRight] - Orbit camera\n"
-                       "* [Space]           - Throw spheres\n",
+                       "* [Drag MouseRight] - Orbit camera\n",
         .loadFunc = [] (TestApp& rTestApp)
     {
         auto        &rFW      = rTestApp.m_framework;
@@ -330,7 +343,7 @@ static ScenarioMap_t make_scenarios()
 
         auto const scene = rFW.get_interface<FIScene>(sceneCtx);
 
-        sceneCB.add_feature(ftrUniverseCore, PipelineId{scene.pl.update});
+        sceneCB.add_feature(ftrUniverseCore, PipelineId{mainApp.pl.mainLoop});
         sceneCB.add_feature(ftrUniverseSceneFrame);
         sceneCB.add_feature(ftrUniverseTestPlanets);
         ContextBuilder::finalize(std::move(sceneCB));

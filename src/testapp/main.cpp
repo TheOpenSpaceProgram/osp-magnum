@@ -23,10 +23,11 @@
  * SOFTWARE.
  */
 #include "testapp.h"
-#include "scenarios.h"
+
 #include "feature_interfaces.h"
-#include "scenarios_magnum.h"
 #include "features/console.h"
+#include "scenarios.h"
+#include "scenarios_magnum.h"
 
 #include <adera_app/application.h>
 #include <adera_app/features/common.h>
@@ -40,7 +41,6 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <iostream>
-#include <optional>
 
 using namespace testapp;
 using namespace adera;
@@ -50,21 +50,20 @@ using namespace ftr_inter::stages;
 
 // called only from commands to display information
 void print_help();
-void print_resources();
 
 osp::fw::SingleThreadedExecutor g_executor;
-std::optional<TestApp>          g_testApp;
+TestApp                         g_testApp;
 
 osp::Logger_t g_mainThreadLogger;
 osp::Logger_t g_logExecutor;
 osp::Logger_t g_logMagnumApp;
 
+bool g_autoLaunchMagnum = true;
 
 void load_scenario(Framework &rFW, ContextId ctx, entt::any userData)
 {
-    TestApp    &rTestApp = g_testApp.value();
-    auto const mainApp   = rFW.get_interface<FIMainApp>(rTestApp.m_mainContext);
-    auto       &rAppCtxs = rFW.data_get<AppContexts>(mainApp.di.appContexts);
+    auto      const mainApp    = rFW.get_interface<FIMainApp>(g_testApp.m_mainContext);
+    auto            &rAppCtxs  = rFW.data_get<AppContexts>(mainApp.di.appContexts);
 
     if (rAppCtxs.scene.has_value()) // Close existing scene
     {
@@ -72,9 +71,9 @@ void load_scenario(Framework &rFW, ContextId ctx, entt::any userData)
         if (cleanup.id.has_value())
         {
 
-            rTestApp.m_pExecutor->run(rTestApp.m_framework, cleanup.pl.cleanup);
-            rTestApp.m_pExecutor->wait(rTestApp.m_framework);
-            if (rTestApp.m_pExecutor->is_running(rTestApp.m_framework))
+            g_testApp.m_pExecutor->run(g_testApp.m_framework, cleanup.pl.cleanup);
+            g_testApp.m_pExecutor->wait(g_testApp.m_framework);
+            if (g_testApp.m_pExecutor->is_running(g_testApp.m_framework))
             {
                 OSP_LOG_CRITICAL("Failed to close scene context, something deadlocked.");
                 std::abort();
@@ -87,7 +86,7 @@ void load_scenario(Framework &rFW, ContextId ctx, entt::any userData)
     }
 
     auto const& rScenario = entt::any_cast<ScenarioOption const&>(userData);
-    rScenario.loadFunc(g_testApp.value());
+    rScenario.loadFunc(g_testApp);
 
     std::cout << "Loaded scenario: " << rScenario.name << "\n"
               << "--- DESCRIPTION ---\n"
@@ -113,22 +112,33 @@ osp::fw::FeatureDef const ftrMainCommands = feature_def("MainCommands", [] (Feat
                 rFrameworkModify.commands.push_back({
                         .userData = entt::make_any<ScenarioOption const&>(it->second),
                         .func = &load_scenario});
-                rFrameworkModify.commands.push_back({
-                        .userData = entt::make_any<TestApp&>(g_testApp.value()),
-                        .ctx = g_testApp->m_mainContext,
-                        .func =  &start_magnum_renderer });
+
+                if (g_autoLaunchMagnum && ! appContexts.window.has_value())
+                {
+                    rFrameworkModify.commands.push_back({
+                            .userData = entt::make_any<TestApp&>(g_testApp),
+                            .ctx = g_testApp.m_mainContext,
+                            .func =  &start_magnum_renderer });
+                }
+
             }
             else if (cmdStr == "help") // Otherwise check all other commands.
             {
                 print_help();
             }
-            else if (cmdStr == "reopen")
+            else if (cmdStr == "magnum")
             {
-                rFrameworkModify.commands.push_back({
-                        .userData = entt::make_any<TestApp&>(g_testApp.value()),
-                        .ctx = g_testApp->m_mainContext,
-                        .func =  &start_magnum_renderer });
-
+                if ( ! appContexts.window.has_value() )
+                {
+                    rFrameworkModify.commands.push_back({
+                            .userData = entt::make_any<TestApp&>(g_testApp),
+                            .ctx = g_testApp.m_mainContext,
+                            .func =  &start_magnum_renderer });
+                }
+                else
+                {
+                    std::cout << "Magnum is already open\n";
+                }
             }
             else if (cmdStr == "exit")
             {
@@ -144,7 +154,6 @@ osp::fw::FeatureDef const ftrMainCommands = feature_def("MainCommands", [] (Feat
 
 int main(int argc, char** argv)
 {
-
     // Command line argument parsing
     Corrade::Utility::Arguments args;
     args.addSkippedPrefix("magnum", "Magnum options")
@@ -166,25 +175,19 @@ int main(int argc, char** argv)
     // Set thread-local logger used by OSP_LOG_* macros
     osp::set_thread_logger(g_mainThreadLogger);
 
-    osp::fw::SingleThreadedExecutor g_executor;
-    //std::optional<TestApp> g_testApp;
+    register_stage_enums();
 
     if (args.isSet("log-exec"))
     {
         g_executor.m_log = g_logExecutor;
     }
 
-    register_stage_enums();
+    g_testApp.m_argc = argc;
+    g_testApp.m_argv = argv;
+    g_testApp.m_pExecutor = &g_executor;
+    g_testApp.m_mainContext = g_testApp.m_framework.m_contextIds.create();
 
-    TestApp &rTestApp = g_testApp.emplace();
-
-    rTestApp.m_argc = argc;
-    rTestApp.m_argv = argv;
-    rTestApp.m_pExecutor = &g_executor;
-
-    rTestApp.m_mainContext = rTestApp.m_framework.m_contextIds.create();
-
-    ContextBuilder mainCB { rTestApp.m_mainContext, {}, rTestApp.m_framework };
+    ContextBuilder mainCB { g_testApp.m_mainContext, {}, g_testApp.m_framework };
     mainCB.add_feature(ftrMain);
     if( ! args.isSet("norepl"))
     {
@@ -192,30 +195,28 @@ int main(int argc, char** argv)
         mainCB.add_feature(ftrMainCommands);
         print_help();
     }
-    bool const success = ContextBuilder::finalize(std::move(mainCB));
-    LGRN_ASSERT(success);
+    ContextBuilder::finalize(std::move(mainCB));
 
-    rTestApp.init();
+    g_testApp.init();
 
     if(args.value("scene") != "none")
     {
-        auto const mainApp           = rTestApp.m_framework.get_interface<FIMainApp>(rTestApp.m_mainContext);
-        auto       &rFrameworkModify = rTestApp.m_framework.data_get<FrameworkModify>(mainApp.di.frameworkModify);
+        auto const mainApp    = g_testApp.m_framework.get_interface<FIMainApp>(g_testApp.m_mainContext);
+        auto       &rFWModify = g_testApp.m_framework.data_get<FrameworkModify>(mainApp.di.frameworkModify);
         auto const it = scenarios().find(args.value("scene"));
         if(it == std::end(scenarios()))
         {
             OSP_LOG_ERROR("unknown scene");
-            //g_testApp.clear_resource_owners();
             return 1;
         }
 
-        rFrameworkModify.commands.push_back({
-                        .userData = entt::make_any<ScenarioOption const&>(it->second),
-                        .func = &load_scenario});
-        rFrameworkModify.commands.push_back({
-                        .userData = entt::make_any<TestApp&>(g_testApp.value()),
-                        .ctx = g_testApp->m_mainContext,
-                        .func =  &start_magnum_renderer });
+        rFWModify.commands.push_back({
+                .userData = entt::make_any<ScenarioOption const&>(it->second),
+                .func = &load_scenario});
+        rFWModify.commands.push_back({
+                .userData = entt::make_any<TestApp&>(g_testApp),
+                .ctx = g_testApp.m_mainContext,
+                .func =  &start_magnum_renderer });
     }
 
     std::vector<MainLoopFunc_t> &rMainLoopStack = main_loop_stack();
@@ -225,24 +226,24 @@ int main(int argc, char** argv)
     {
         if ( rMainLoopStack.empty() )
         {
-            g_testApp->drive_main_loop();
+            g_testApp.drive_default_main_loop();
             std::this_thread::sleep_for (std::chrono::milliseconds(100));
         }
         else
         {
-            MainLoopFunc_t func = rMainLoopStack.back();
-            bool const keep = func();
+            MainLoopFunc_t &rFunc = rMainLoopStack.back();
+            bool const keep = rFunc();
             if ( ! keep )
             {
                 rMainLoopStack.pop_back();
             }
         }
+        // TODO: this never exits
     }
 
     spdlog::shutdown();
     return 0;
 }
-
 
 //-----------------------------------------------------------------------------
 
@@ -268,6 +269,6 @@ void print_help()
         << "Other commands:\n"
         // << "* list_pkg  - List Packages and Resources\n"
         << "* help      - Show this again\n"
-        << "* reopen    - Re-open Magnum Application\n"
+        << "* magnum    - Open Magnum Application\n"
         << "* exit      - Deallocate everything and return memory to OS\n";
 }

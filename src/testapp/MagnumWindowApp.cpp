@@ -58,18 +58,13 @@ MagnumWindowApp::MagnumWindowApp(const Application::Arguments& arguments,
     m_timeline.start();
 }
 
-MagnumWindowApp::~MagnumWindowApp()
-{
-    m_ospApp.reset(nullptr);
-}
-
 void MagnumWindowApp::drawEvent()
 {
     m_rUserInput.update_controls();
 
-    if (m_ospApp != nullptr)
+    if (m_events != nullptr)
     {
-        m_ospApp->draw(*this, m_timeline.previousFrameDuration());
+        m_events->draw(*this, m_timeline.previousFrameDuration());
     }
 
     m_rUserInput.clear_events();

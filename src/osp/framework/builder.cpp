@@ -26,7 +26,7 @@
 
 #include "../util/logging.h"
 
-#include <ostream>
+#include <sstream>
 
 namespace osp::fw
 {
@@ -139,6 +139,7 @@ bool ContextBuilder::finalize(ContextBuilder &&eat)
 
     if (eat.has_error())
     {
+        // Log errors to the terminal
         std::ostringstream os;
 
         auto const visitErr = [&os] (auto&& err)
@@ -160,6 +161,10 @@ bool ContextBuilder::finalize(ContextBuilder &&eat)
         }
 
         OSP_LOG_ERROR("Errors while adding features:\n{}", os.str());
+
+        // TODO: Undo changes by keeping track of and removing all the features added by this
+        //       context builder. just abort for now
+        std::abort();
 
         return false;
     }

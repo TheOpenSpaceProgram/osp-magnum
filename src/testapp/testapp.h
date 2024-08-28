@@ -26,16 +26,12 @@
 
 #include <osp/core/keyed_vector.h>
 #include <osp/core/resourcetypes.h>
-
-#include <osp/util/logging.h>
-
-#include <osp/framework/framework.h>
 #include <osp/framework/builder.h>
+#include <osp/framework/framework.h>
+#include <osp/util/logging.h>
 
 #include <entt/core/any.hpp>
 
-
-#include <functional>
 #include <vector>
 
 namespace testapp
@@ -49,20 +45,27 @@ inline std::vector<MainLoopFunc_t>& main_loop_stack()
     return instance;
 }
 
-struct TestApp;
-
-
 struct TestApp
 {
+    struct UpdateParams {
+        float deltaTimeIn;
+        bool update;
+        bool sceneUpdate;
+        bool resync;
+        bool sync;
+        bool render;
+    };
 
     /**
      * @brief Deal with resource reference counts for a clean termination
      */
     void clear_resource_owners();
 
-    void drive_main_loop();
+    void drive_default_main_loop();
 
-    bool run_fw_modify_commands();
+    void drive_scene_cycle(UpdateParams p);
+
+    void run_context_cleanup(osp::fw::ContextId);
 
     void init();
 
@@ -74,21 +77,14 @@ struct TestApp
     int m_argc;
     char** m_argv;
 
-
 private:
 
     /**
      * @brief As the name implies
      *
-     *
      * prefer not to use names like this outside of testapp
      */
     void load_a_bunch_of_stuff();
 };
-
-
-//-----------------------------------------------------------------------------
-
-
 
 } // namespace testapp

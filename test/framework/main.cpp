@@ -286,3 +286,51 @@ TEST(Tasks, Basics)
 
     EXPECT_FALSE(exec.is_running(fw));
 }
+
+//-----------------------------------------------------------------------------
+
+// Test metaprogramming used by framework
+
+using Input_t = Stuple<int, float, char, std::string, double>;
+using Output_t = filter_parameter_pack< Input_t, std::is_integral >::value;
+
+static_assert(std::is_same_v<Output_t, Stuple<int, char>>);
+
+// Test empty. Nothing is being tested, PRED_T can be anything.
+template<typename T>
+struct Useless{};
+static_assert(std::is_same_v<filter_parameter_pack< Stuple<>, Useless >::value, Stuple<>>);
+
+
+// Some janky technique to pass the parameter pack from stuple to a different type
+
+template<typename ... T>
+struct TargetType {};
+
+// Create a template function with stuple<T...> as an argument, and call it with inferred template
+// parameters to obtain the parameter pack. Return value can be used for the target type.
+template<typename ... T>
+constexpr TargetType<T...> why_cpp(Stuple<T...>) { };
+
+using WhatHow_t = decltype(why_cpp(Output_t{}));
+
+static_assert(std::is_same_v<WhatHow_t, TargetType<int, char>>);
+
+using Lambda_t  = decltype([] (int a, float b) { return 'c'; });
+using FuncPtr_t = char(*)(int, float);
+
+static_assert(std::is_same_v< as_function_ptr_t<Lambda_t>, FuncPtr_t >);
+
+static_assert(std::is_same_v< as_function_ptr_t<FuncPtr_t>, char(*)(int, float) >);
+
+inline void notused()
+{
+    int asdf = 69;
+
+    [[maybe_unused]] auto lambdaWithCapture = [asdf] (int a, float b) { return 'c'; };
+
+    using LambdaWithCapture_t = decltype(lambdaWithCapture);
+
+    static_assert( ! CStatelessLambda<LambdaWithCapture_t> );
+}
+

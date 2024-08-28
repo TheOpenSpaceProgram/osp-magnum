@@ -137,6 +137,8 @@ FeatureDef const ftrPhysicsShapes = feature_def("PhysicsShapes", [] (
 
             rPhysShapes.ownedEnts.insert(root);
 
+            LGRN_ASSERT( ! rBasic.m_transform.contains(root) );
+            LGRN_ASSERT( ! rBasic.m_transform.contains(child) );
             rBasic.m_transform.emplace(root, ACompTransform{osp::Matrix4::translation(spawn.m_position)});
             rBasic.m_transform.emplace(child, ACompTransform{Matrix4::scaling(spawn.m_size)});
             SubtreeBuilder bldRoot = bldScnRoot.add_child(root, 1);

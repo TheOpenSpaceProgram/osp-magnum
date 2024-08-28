@@ -24,8 +24,6 @@
  */
 #pragma once
 
-#include "scenarios.h"
-
 #include <osp/util/UserInputHandler.h>
 
 #include <Magnum/Timeline.h>
@@ -38,25 +36,10 @@
 namespace testapp
 {
 
-class MagnumWindowApp;
-
-class IOspApplication
-{
-public:
-    virtual ~IOspApplication() = default;
-
-    virtual void run(MagnumWindowApp& rApp) = 0;
-    virtual void draw(MagnumWindowApp& rApp, float delta) = 0;
-    virtual void exit(MagnumWindowApp& rApp) = 0;
-};
-
 /**
  * @brief Magnum-powered window application with GL context, main/render loop, and user input.
  *
  * Opens an OS gui window on construction, and closes it on destruction.
- *
- * Customize using \c IOspApplication. Internal IOspApplication can be changed while the window is
- * still open.
  *
  * This must run on the main thread.
  */
@@ -64,13 +47,17 @@ class MagnumWindowApp : public Magnum::Platform::Application
 {
 public:
 
-    using AppPtr_t = std::unique_ptr<IOspApplication>;
+    class IEvents
+    {
+    public:
+        virtual ~IEvents() = default;
+        virtual void draw(MagnumWindowApp& rApp, float delta) = 0;
+    };
+    using EventsPtr_t = std::unique_ptr<IEvents>;
 
     explicit MagnumWindowApp(
             const Magnum::Platform::Application::Arguments& arguments,
             osp::input::UserInputHandler& rUserInput);
-
-    ~MagnumWindowApp();
 
     void keyPressEvent(KeyEvent& event) override;
     void keyReleaseEvent(KeyEvent& event) override;
@@ -80,28 +67,11 @@ public:
     void mouseMoveEvent(MouseMoveEvent& event) override;
     void mouseScrollEvent(MouseScrollEvent& event) override;
 
-    void exec()
-    {
-        m_ospApp->run(*this);
-        Magnum::Platform::Application::exec();
-        m_ospApp->exit(*this);
-    }
-
-    void exit()
-    {
-        Magnum::Platform::Application::exit();
-    }
-
-    void set_osp_app(AppPtr_t ospApp)
-    {
-        m_ospApp = std::move(ospApp);
-    }
+    EventsPtr_t m_events;
 
 private:
 
     void drawEvent() override;
-
-    AppPtr_t m_ospApp;
 
     osp::input::UserInputHandler &m_rUserInput;
 

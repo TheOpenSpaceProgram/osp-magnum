@@ -29,7 +29,6 @@
 #include "../core/array_view.h"
 #include "../core/strong_id.h"
 #include "../core/global_id.h"
-
 #include "../core/keyed_vector.h"
 #include "../tasks/tasks.h"
 
@@ -38,7 +37,6 @@
 #include <Corrade/Containers/ArrayViewStl.h>
 
 #include <utility>
-#include <unordered_map>
 
 namespace osp::fw
 {
@@ -132,60 +130,6 @@ concept CStatelessLambda = requires () { typename as_function_ptr_t<T>; } && ! C
 
 //-----------------------------------------------------------------------------
 
-namespace move_this_to_a_unit_test
-{
-
-using Input_t = Stuple<int, float, char, std::string, double>;
-using Output_t = filter_parameter_pack< Input_t, std::is_integral >::value;
-
-static_assert(std::is_same_v<Output_t, Stuple<int, char>>);
-
-// Test empty. Nothing is being tested, PRED_T can be anything.
-template<typename T>
-struct Useless{};
-static_assert(std::is_same_v<filter_parameter_pack< Stuple<>, Useless >::value, Stuple<>>);
-
-
-// Some janky technique to pass the parameter pack from stuple to a different type
-
-template<typename ... T>
-struct TargetType {};
-
-// Create a template function with stuple<T...> as an argument, and call it with inferred template
-// parameters to obtain the parameter pack. Return value can be used for the target type.
-template<typename ... T>
-constexpr TargetType<T...> why_cpp(Stuple<T...>) { };
-
-using WhatHow_t = decltype(why_cpp(Output_t{}));
-
-static_assert(std::is_same_v<WhatHow_t, TargetType<int, char>>);
-
-using Lambda_t  = decltype([] (int a, float b) { return 'c'; });
-using FuncPtr_t = char(*)(int, float);
-
-static_assert(std::is_same_v< as_function_ptr_t<Lambda_t>, FuncPtr_t >);
-
-static_assert(std::is_same_v< as_function_ptr_t<FuncPtr_t>, char(*)(int, float) >);
-
-inline void notused()
-{
-    int asdf = 69;
-
-    [[maybe_unused]] auto lambdaWithCapture = [asdf] (int a, float b) { return 'c'; };
-
-    using LambdaWithCapture_t = decltype(lambdaWithCapture);
-
-    static_assert( ! CStatelessLambda<LambdaWithCapture_t> );
-}
-
-
-
-}; // move_this_to_a_unit_test
-
-
-
-//-----------------------------------------------------------------------------
-
 
 using ContextId         = StrongId<std::uint32_t, struct DummyForContextId>;
 
@@ -225,7 +169,14 @@ struct FITypeInfo
 };
 
 /**
- * can be bound to a cpp type, but also registered at runtime
+ * @brief Global information on known existing Feature Interfaces
+ *
+ * Each unique type of Feature Interface is assigned an ID at runtime.
+ *
+ * Feature interfaces can be created with a compile time struct (see any feature_interface.h file
+ * for examples).
+ *
+ * Feature interfaces can be registered at runtime by manually calling register_type().
  */
 class FITypeInfoRegistry
 {
@@ -314,6 +265,11 @@ struct FInterfaceShorthand
 
 //-----------------------------------------------------------------------------
 
+/**
+ * @brief Running instance of a feature, added as part of a context.
+ *
+ * These are created when running ContextBuilder::add_feature(...).
+ */
 struct FeatureSession
 {
     std::vector<FIInstanceId>       finterDependsOn;
@@ -327,6 +283,12 @@ struct FeatureContext
     std::vector<FSessionId>          sessions;
 };
 
+/**
+ * @brief Data for an entire application. Stores arbitrary data, tasks with dependencies and flow
+ *        control, and means of managing features in a dynamic way.
+ *
+ * Requires a separate executor to run.
+ */
 struct Framework
 {
     void resize_ctx()
@@ -340,21 +302,27 @@ struct Framework
 
     [[nodiscard]] inline FIInstanceId get_interface_id(FITypeId type, ContextId ctx) noexcept
     {
-        if ( ! ctx.has_value() )
+        if (    ! ctx.has_value()
+             || ! type.has_value()
+             || ctx.value >= m_contextData.size() )
         {
             return {};
         }
-        return m_contextData[ctx].finterSlots[type];
+        FeatureContext const &rFtrCtx = m_contextData[ctx];
+
+        if ( type.value >= rFtrCtx.finterSlots.size() )
+        {
+            return {};
+        }
+
+        return rFtrCtx.finterSlots[type];
     }
 
     template<CFeatureInterfaceDef FI_T>
     [[nodiscard]] inline FIInstanceId get_interface_id(ContextId ctx) noexcept
     {
-        if ( ! ctx.has_value() )
-        {
-            return {};
-        }
-        return m_contextData[ctx].finterSlots[FITypeInfoRegistry::get_or_register<FI_T>()];
+        FITypeId const type = FITypeInfoRegistry::get_or_register<FI_T>();
+        return get_interface_id(type, ctx);
     }
 
     template<CFeatureInterfaceDef FI_T, typename TAG_T = void>
@@ -365,6 +333,9 @@ struct Framework
 
         if (fiId.has_value())
         {
+            // Access struct members of out.pl and out.di as if they're arrays, in order to write
+            // DataIds and PipelineIds to them.
+
             FeatureInterface const &rInterface = m_fiinstData[fiId];
             if constexpr ( ! std::is_empty_v<typename FI_T::Pipelines> )
             {

@@ -24,8 +24,6 @@
  */
 #include "testapp.h"
 
-#include "features/console.h"
-
 #include <adera_app/feature_interfaces.h>
 #include <adera_app/application.h>
 #include <adera_app/features/common.h>
@@ -69,24 +67,7 @@ void TestApp::init()
     m_pExecutor->run(m_framework, fiMain.pl.mainLoop);
 }
 
-void TestApp::drive_main_loop()
-{
-    bool const commandsRan = run_fw_modify_commands();
-    if (commandsRan)
-    {
-        return;
-    }
-
-    auto const fiMain         = m_framework.get_interface<FIMainApp>(m_mainContext);
-    auto       &rMainLoopCtrl = m_framework.data_get<MainLoopControl&>(fiMain.di.mainLoopCtrl);
-
-    rMainLoopCtrl.doUpdate = true;
-
-    m_pExecutor->signal(m_framework, fiMain.pl.mainLoop);
-    m_pExecutor->wait(m_framework);
-}
-
-bool TestApp::run_fw_modify_commands()
+void TestApp::drive_default_main_loop()
 {
     auto const mainApp        = m_framework.get_interface<FIMainApp>(m_mainContext);
     auto       &rMainLoopCtrl = m_framework.data_get<MainLoopControl&>(mainApp.di.mainLoopCtrl);
@@ -115,9 +96,65 @@ bool TestApp::run_fw_modify_commands()
         m_pExecutor->load(m_framework);
         m_pExecutor->run(m_framework, mainApp.pl.mainLoop);
 
-        return true;
+        return;
     }
-    return false;
+
+
+    auto const fiMain         = m_framework.get_interface<FIMainApp>(m_mainContext);
+
+    rMainLoopCtrl.doUpdate = true;
+
+    m_pExecutor->signal(m_framework, fiMain.pl.mainLoop);
+    m_pExecutor->wait(m_framework);
+}
+
+void TestApp::drive_scene_cycle(UpdateParams p)
+{
+    Framework &rFW = m_framework;
+
+    auto const mainApp          = rFW.get_interface<FIMainApp>  (m_mainContext);
+    auto const &rAppCtxs        = rFW.data_get<AppContexts>     (mainApp.di.appContexts);
+    auto       &rMainLoopCtrl   = rFW.data_get<MainLoopControl> (mainApp.di.mainLoopCtrl);
+    rMainLoopCtrl.doUpdate      = p.update;
+
+    auto const scene            = rFW.get_interface<FIScene>    (rAppCtxs.scene);
+    if (scene.id.has_value())
+    {
+        auto       &rSceneLoopCtrl  = rFW.data_get<SceneLoopControl>(scene.di.loopControl);
+        auto       &rDeltaTimeIn    = rFW.data_get<float>           (scene.di.deltaTimeIn);
+        rSceneLoopCtrl.doSceneUpdate = p.sceneUpdate;
+        rDeltaTimeIn                = p.deltaTimeIn;
+    }
+
+    auto const windowApp        = rFW.get_interface<FIWindowApp>      (rAppCtxs.window);
+    auto       &rWindowLoopCtrl = rFW.data_get<WindowAppLoopControl>  (windowApp.di.windowAppLoopCtrl);
+    rWindowLoopCtrl.doRender    = p.render;
+    rWindowLoopCtrl.doSync      = p.sync;
+    rWindowLoopCtrl.doResync    = p.resync;
+
+    m_pExecutor->signal(m_framework, mainApp.pl.mainLoop);
+    m_pExecutor->signal(m_framework, windowApp.pl.inputs);
+    m_pExecutor->signal(m_framework, windowApp.pl.sync);
+    m_pExecutor->signal(m_framework, windowApp.pl.resync);
+
+    m_pExecutor->wait(m_framework);
+}
+
+void TestApp::run_context_cleanup(ContextId ctx)
+{
+    auto const cleanup = m_framework.get_interface<FICleanupContext> (ctx);
+    if ( cleanup.id.has_value() )
+    {
+        // Run cleanup pipeline for the window context
+        m_pExecutor->run(m_framework, cleanup.pl.cleanup);
+        m_pExecutor->wait(m_framework);
+
+        if (m_pExecutor->is_running(m_framework))
+        {
+            OSP_LOG_CRITICAL("Deadlock in cleanup pipeline");
+            std::abort();
+        }
+    }
 }
 
 void TestApp::clear_resource_owners()
@@ -162,10 +199,6 @@ void TestApp::clear_resource_owners()
         }
     };
 }
-
-
-
-
 
 void TestApp::load_a_bunch_of_stuff()
 {

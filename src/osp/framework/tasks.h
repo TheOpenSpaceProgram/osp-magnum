@@ -24,9 +24,7 @@
  */
  /**
  * @file
- * @brief
- *
- * dependencies without needing to know the whole framework
+ * @brief Details about tasks used by the framework
  */
 #pragma once
 
@@ -51,6 +49,9 @@ struct WorkerContext
     // TODO: maybe put something here? Thread info?
 };
 
+/**
+ * @brief Task Implementation associated with each TaskId within the Framework.
+ */
 struct TaskImpl
 {
     using Func_t = TaskActions(*)(WorkerContext, ArrayView<entt::any>) noexcept;

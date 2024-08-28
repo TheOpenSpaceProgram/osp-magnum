@@ -54,6 +54,7 @@ struct AppContexts
 {
     osp::fw::ContextId main;
     osp::fw::ContextId window;
+    osp::fw::ContextId sceneRender;
     osp::fw::ContextId universe;
     osp::fw::ContextId scene;
 };

@@ -32,6 +32,7 @@ namespace testapp::enginetest
 {
 
 struct EngineTestScene;
+struct EngineTestRenderer;
 
 /**
  * @brief Setup Engine Test Scene
@@ -41,12 +42,14 @@ struct EngineTestScene;
  *
  * @return entt::any containing scene data
  */
-entt::any setup_scene(osp::Resources& rResources, osp::PkgId pkg);
+entt::any make_scene(osp::Resources& rResources, osp::PkgId pkg);
 
 /**
- * @brief Generate IOspApplication for MagnumWindowApp
+ * @brief Make EngineTestRenderer
  */
-MagnumWindowApp::AppPtr_t generate_osp_magnum_app(EngineTestScene& rScene, MagnumWindowApp& rApp, osp::draw::RenderGL& rRenderGl, osp::input::UserInputHandler& rUserInput);
 
+entt::any make_renderer(EngineTestScene &rScene, MagnumWindowApp &rApp, osp::draw::RenderGL &rRenderGl, osp::input::UserInputHandler &rUserInput);
+
+void draw(EngineTestScene &rScene, EngineTestRenderer &rRenderer, osp::draw::RenderGL &rRenderGl, MagnumWindowApp &rApp, float delta);
 
 } // namespace testapp::enginetest

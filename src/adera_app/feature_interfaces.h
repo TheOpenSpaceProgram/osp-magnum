@@ -175,6 +175,7 @@ struct FICleanupContext {
 
     struct Pipelines {
         PipelineDef<EStgEvnt> cleanup           {"cleanup           - Scene cleanup before destruction"};
+        PipelineDef<EStgOptn> cleanupWorkaround {"cleanupWorkaround"};
     };
 };
 
@@ -187,6 +188,15 @@ struct FIEngineTest {
 
     struct Pipelines { };
 };
+
+struct FIEngineTestRndr {
+    struct DataIds {
+        DataId renderer;
+    };
+
+    struct Pipelines { };
+};
+
 
 
 struct FIScene {

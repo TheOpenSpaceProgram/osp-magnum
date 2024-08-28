@@ -33,7 +33,6 @@
 #include <type_traits>
 #include <utility>
 
-#include <array>
 #include <variant>
 
 namespace osp::fw
@@ -131,7 +130,7 @@ private:
     template<typename RETURN_T, typename ... ARGS_T>
     static constexpr with_args<RETURN_T, ARGS_T...> dummy([[maybe_unused]] RETURN_T(*func)(ARGS_T...));
 
-    using with_args_spec = decltype( dummy(as_function_ptr_t<FUNCTOR_T>{}) );
+    using with_args_spec = decltype( as_task_impl::dummy(as_function_ptr_t<FUNCTOR_T>{}) );
 
 public:
     static inline constexpr TaskImpl::Func_t value = &with_args_spec::task_impl_out;
@@ -268,9 +267,7 @@ struct PipelineRef
 }; // struct TaskRef
 
 /**
- * @brief builder passed to feature def setup functions
- *
- * containing info about the current feature being built.
+ * @brief Assists with building a single Feature
  */
 struct FeatureBuilder
 {
@@ -392,9 +389,9 @@ inline FeatureDef::FIRelationship relations_from_params_aux(Implement<FI_T>)
 template<typename ... ARGS_T>
 inline std::initializer_list<FeatureDef::FIRelationship> relations_from_params(Stuple<ARGS_T...> _)
 {
-    static std::initializer_list<FeatureDef::FIRelationship> const asdf
+    static std::initializer_list<FeatureDef::FIRelationship> const list
             = { relations_from_params_aux(ARGS_T{}) ... };
-    return asdf;
+    return list;
 }
 
 

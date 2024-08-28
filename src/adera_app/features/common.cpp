@@ -108,6 +108,7 @@ FeatureDef const ftrCommonScene = feature_def("CommonScene", [] (
     rFB.pipeline(comScn.pl.activeEntDelete)     .parent(scn.pl.update);
     rFB.pipeline(comScn.pl.transform)           .parent(scn.pl.update);
     rFB.pipeline(comScn.pl.hierarchy)           .parent(scn.pl.update);
+    rFB.pipeline(cleanup.pl.cleanupWorkaround).parent(cleanup.pl.cleanup);
 
     rFB.task()
         .name       ("Cancel entity delete tasks stuff if no entities were deleted")
@@ -204,6 +205,7 @@ FeatureDef const ftrWindowApp = feature_def("WindowApp", [] (
     rFB.pipeline(windowApp.pl.inputs).parent(mainApp.pl.mainLoop).wait_for_signal(ModifyOrSignal);
     rFB.pipeline(windowApp.pl.sync)  .parent(mainApp.pl.mainLoop).wait_for_signal(ModifyOrSignal);
     rFB.pipeline(windowApp.pl.resync).parent(mainApp.pl.mainLoop).wait_for_signal(ModifyOrSignal);
+    rFB.pipeline(cleanup.pl.cleanupWorkaround).parent(cleanup.pl.cleanup);
 
     auto &rUserInput     = rFB.data_emplace<osp::input::UserInputHandler>(windowApp.di.userInput, 12);
     auto &rWindowAppCtrl = rFB.data_emplace<WindowAppLoopControl>        (windowApp.di.windowAppLoopCtrl);
@@ -232,7 +234,7 @@ FeatureDef const ftrWindowApp = feature_def("WindowApp", [] (
 FeatureDef const ftrSceneRenderer = feature_def("SceneRenderer", [] (
         FeatureBuilder              &rFB,
         Implement<FISceneRenderer>  scnRender,
-        DependOn<FICleanupContext>  cleanup,
+        Implement<FICleanupContext> cleanup,
         DependOn<FICommonScene>     comScn,
         DependOn<FIMainApp>         mainApp,
         DependOn<FIWindowApp>       windowApp)

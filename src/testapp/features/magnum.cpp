@@ -25,25 +25,26 @@
 #include "magnum.h"
 
 #include "../MagnumWindowApp.h"
+#include "../feature_interfaces.h"
 
-#include <Magnum/GL/DefaultFramebuffer.h>
-#include <Magnum/GL/Renderer.h>
 
 #include <adera/drawing/CameraController.h>
+#include <adera/machines/links.h>
 #include <adera_drawing_gl/flat_shader.h>
 #include <adera_drawing_gl/phong_shader.h>
 #include <adera_drawing_gl/visualizer_shader.h>
-#include <osp/activescene/basic_fn.h>
-#include <osp/drawing/drawing.h>
-#include <osp_drawing_gl/rendergl.h>
-#include <osp/universe/coordinates.h>
-#include <osp/universe/universe.h>
-
-#include "../feature_interfaces.h"
-
-#include <adera/machines/links.h>
 
 #include <planet-a/activescene/terrain.h>
+
+#include <osp/activescene/basic_fn.h>
+#include <osp/drawing/drawing.h>
+#include <osp/universe/coordinates.h>
+#include <osp/universe/universe.h>
+#include <osp/util/logging.h>
+#include <osp_drawing_gl/rendergl.h>
+
+#include <Magnum/GL/DefaultFramebuffer.h>
+#include <Magnum/GL/Renderer.h>
 
 // for the 0xrrggbb_rgbf and angle literals
 using namespace Magnum::Math::Literals;
@@ -63,7 +64,6 @@ using osp::input::UserInputHandler;
 
 namespace testapp
 {
-
 
 FeatureDef const ftrMagnum = feature_def("Magnum", [] (
         FeatureBuilder              &rFB,
