@@ -119,8 +119,8 @@ struct as_function_ptr { };
 // Convert lambda to function pointer using `+`, since C++ is the type of language where this shit
 // SOMEHOW works. Function pointers are left untouched.
 template <typename CALLABLE_T>
-    requires (requires (CALLABLE_T t) { { +t } -> CFuncPtr; })
-struct as_function_ptr<CALLABLE_T> { using type = decltype(+CALLABLE_T{}); };
+    requires (CFuncPtr< std::decay_t<decltype(+CALLABLE_T{})> >)
+struct as_function_ptr<CALLABLE_T> { using type = std::decay_t<decltype(+CALLABLE_T{})>; };
 
 template <typename CALLABLE_T>
 using as_function_ptr_t = typename as_function_ptr<CALLABLE_T>::type;
