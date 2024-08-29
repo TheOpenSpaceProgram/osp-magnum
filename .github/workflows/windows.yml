@@ -96,7 +96,7 @@ jobs:
     # MSVC Generator doesn't support the special target "test" like Ninja generator does on linux.
     - name: Run Unit Tests
       run: |
-        ctest --schedule-random --progress --output-on-failure --parallel --no-tests error --build-config ${{ matrix.config }} --test-dir build
+        ctest --schedule-random --progress --output-on-failure --parallel --no-tests=error --build-config ${{ matrix.config }} --test-dir build
 
     - uses: actions/upload-artifact@v4
       with:
