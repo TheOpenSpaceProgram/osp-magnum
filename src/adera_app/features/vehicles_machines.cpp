@@ -204,24 +204,25 @@ FeatureDef const ftrMagicRocketThrustIndicator = feature_def("MagicRocketThrustI
         ActiveEnt const     partEnt     = rScnParts.partToActive[part];
 
         for (MachinePair const pair : rScnParts.partToMachines[part])
-        if (pair.type == gc_mtMagicRocket)
         {
-            DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[pair.local];
-            MachAnyId const anyId           = rockets.localToAny[pair.local];
+            if (pair.type == gc_mtMagicRocket)
+            {
+                DrawEnt const   drawEnt         = rThrustIndicator.rktToDrawEnt[pair.local];
+                MachAnyId const anyId           = rockets.localToAny[pair.local];
 
-            auto const&     portSpan        = floats.machToNode[anyId];
-            NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.port);
-            NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.port);
+                auto const&     portSpan        = floats.machToNode[anyId];
+                NodeId const    throttleIn      = connected_node(portSpan, ports_magicrocket::gc_throttleIn.port);
+                NodeId const    multiplierIn    = connected_node(portSpan, ports_magicrocket::gc_multiplierIn.port);
 
-            float const     throttle        = std::clamp(rSigValFloat[throttleIn], 0.0f, 1.0f);
-            float const     multiplier      = rSigValFloat[multiplierIn];
-            float const     thrustMag       = throttle * multiplier;
+                float const     throttle        = std::clamp(rSigValFloat[throttleIn], 0.0f, 1.0f);
+                float const     multiplier      = rSigValFloat[multiplierIn];
+                float const     thrustMag       = throttle * multiplier;
 
-            rCtxScnRdr.m_drawTransform[drawEnt]
-                    = drawTf
-                    * Matrix4::scaling({1.0f, 1.0f, thrustMag * rThrustIndicator.indicatorScale})
-                    * Matrix4::translation({0.0f, 0.0f, -1.0f})
-                    * Matrix4::scaling({0.2f, 0.2f, 1.0f});
+                rCtxScnRdr.m_drawTransform[drawEnt]
+                        = drawTf
+                        * Matrix4::scaling({1.0f, 1.0f, thrustMag * rThrustIndicator.indicatorScale})
+                        * Matrix4::translation({0.0f, 0.0f, -1.0f})
+                        * Matrix4::scaling({0.2f, 0.2f, 1.0f}); }
         }
     };
 

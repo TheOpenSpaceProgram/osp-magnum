@@ -65,7 +65,7 @@ void ContextBuilder::add_feature(FeatureDef const &def, entt::any setupData) noe
             else
             {
                 // Not found, ERROR!
-                m_errors.push_back(ErrDependencyNotFound{
+                m_errors.emplace_back(ErrDependencyNotFound{
                     .whileAdding = def.name,
                     .requiredFI  = subjectInfo.name
                 });
@@ -78,7 +78,7 @@ void ContextBuilder::add_feature(FeatureDef const &def, entt::any setupData) noe
             if (rFInter.has_value())
             {
                 // Already exists, error
-                m_errors.push_back(ErrAlreadyImplemented{
+                m_errors.emplace_back(ErrAlreadyImplemented{
                     .whileAdding   = def.name,
                     .alreadyImplFI = subjectInfo.name
                 });

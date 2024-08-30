@@ -164,7 +164,7 @@ concept CFeatureInterfaceDef = requires{ typename T::DataIds; typename T::Pipeli
 struct FITypeInfo
 {
     std::string                  name;
-    std::size_t                  dataCount;
+    std::size_t                  dataCount{};
     std::vector<PipelineDefInfo> pipelines;
 };
 
@@ -396,15 +396,15 @@ class IExecutor
 {
 public:
 
-    virtual void load(Framework& rAppTasks) = 0;
+    virtual void load(Framework &rFW) = 0;
 
-    virtual void run(Framework& rAppTasks, osp::PipelineId pipeline) = 0;
+    virtual void run(Framework &rFW, osp::PipelineId pipeline) = 0;
 
-    virtual void signal(Framework& rAppTasks, osp::PipelineId pipeline) = 0;
+    virtual void signal(Framework &rFW, osp::PipelineId pipeline) = 0;
 
-    virtual void wait(Framework& rAppTasks) = 0;
+    virtual void wait(Framework &rFW) = 0;
 
-    virtual bool is_running(Framework const& rAppTasks) = 0;
+    virtual bool is_running(Framework const &rFW) = 0;
 };
 
 

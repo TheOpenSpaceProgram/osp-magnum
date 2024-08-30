@@ -246,8 +246,6 @@ void start_magnum_renderer(Framework &rFW, ContextId ctx, entt::any userData)
     rAppCtxs.window = windowCtx;
     rAppCtxs.sceneRender = sceneRenderCtx;
 
-    bool const success = ContextBuilder::finalize(std::move(windowCB));
-
     auto const magnum           = rFW.get_interface<FIMagnum>         (windowCtx);
     auto       &rMagnumApp      = rFW.data_get<MagnumWindowApp>       (magnum.di.magnumApp);
     rMagnumApp.m_events = std::make_unique<CommonMagnumApp>(rTestApp);

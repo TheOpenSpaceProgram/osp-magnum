@@ -34,46 +34,46 @@ namespace osp::fw
 {
 
 
-void SingleThreadedExecutor::load(Framework& rFramework)
+void SingleThreadedExecutor::load(Framework& rFW)
 {
-    m_graph = osp::make_exec_graph(rFramework.m_tasks);
+    m_graph = osp::make_exec_graph(rFW.m_tasks);
     m_execContext = {};
-    exec_conform(rFramework.m_tasks, m_execContext);
+    exec_conform(rFW.m_tasks, m_execContext);
     m_execContext.doLogging = m_log != nullptr;
 }
 
-void SingleThreadedExecutor::run(Framework& rAppTasks, PipelineId pipeline)
+void SingleThreadedExecutor::run(Framework& rFW, PipelineId pipeline)
 {
     exec_request_run(m_execContext, pipeline);
 }
 
-void SingleThreadedExecutor::signal(Framework& rAppTasks, PipelineId pipeline)
+void SingleThreadedExecutor::signal(Framework& rFW, PipelineId pipeline)
 {
     exec_signal(m_execContext, pipeline);
 }
 
-void SingleThreadedExecutor::wait(Framework& rAppTasks)
+void SingleThreadedExecutor::wait(Framework& rFW)
 {
     if (m_log != nullptr)
     {
         m_log->info("\n>>>>>>>>>> Previous State Changes\n{}\n>>>>>>>>>> Current State\n{}\n",
-                    WriteLog  {rAppTasks.m_tasks, rAppTasks.m_taskImpl, m_graph, m_execContext},
-                    WriteState{rAppTasks.m_tasks, rAppTasks.m_taskImpl, m_graph, m_execContext} );
+                    WriteLog  {rFW.m_tasks, rFW.m_taskImpl, m_graph, m_execContext},
+                    WriteState{rFW.m_tasks, rFW.m_taskImpl, m_graph, m_execContext} );
         m_execContext.logMsg.clear();
     }
 
-    exec_update(rAppTasks.m_tasks, m_graph, m_execContext);
-    run_blocking(rAppTasks.m_tasks, m_graph, rAppTasks.m_taskImpl, rAppTasks.m_data, m_execContext);
+    exec_update(rFW.m_tasks, m_graph, m_execContext);
+    run_blocking(rFW.m_tasks, m_graph, rFW.m_taskImpl, rFW.m_data, m_execContext);
 
     if (m_log != nullptr)
     {
         m_log->info("\n>>>>>>>>>> New State Changes\n{}",
-                    WriteLog{rAppTasks.m_tasks, rAppTasks.m_taskImpl, m_graph, m_execContext} );
+                    WriteLog{rFW.m_tasks, rFW.m_taskImpl, m_graph, m_execContext} );
         m_execContext.logMsg.clear();
     }
 }
 
-bool SingleThreadedExecutor::is_running(Framework const& appTasks)
+bool SingleThreadedExecutor::is_running(Framework const& rFW)
 {
     return m_execContext.hasRequestRun || (m_execContext.pipelinesRunning != 0);
 }
@@ -89,7 +89,7 @@ void SingleThreadedExecutor::run_blocking(
 {
     std::vector<entt::any> argumentRefs;
 
-    while (rExec.tasksQueuedRun.size() != 0)
+    while ( ! rExec.tasksQueuedRun.empty() )
     {
         TaskId   const willRunId     = rExec.tasksQueuedRun[0];
         TaskImpl       &rWillRunImpl = rTaskImpl[willRunId];

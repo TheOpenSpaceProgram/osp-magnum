@@ -58,15 +58,15 @@ public:
         friend std::ostream& operator<<(std::ostream& rStream, WriteLog const& write);
     };
 
-    void load(Framework& rAppTasks) override;
+    void load(Framework& rFW) override;
 
-    void run(Framework& rAppTasks, PipelineId pipeline) override;
+    void run(Framework& rFW, PipelineId pipeline) override;
 
-    void signal(Framework& rAppTasks, PipelineId pipeline) override;
+    void signal(Framework& rFW, PipelineId pipeline) override;
 
-    void wait(Framework& rAppTasks) override;
+    void wait(Framework& rFW) override;
 
-    bool is_running(Framework const& rAppTasks) override;
+    bool is_running(Framework const& rFW) override;
 
     std::shared_ptr<spdlog::logger> m_log;
 
