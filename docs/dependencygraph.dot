@@ -9,7 +9,7 @@ digraph {
     "Longeron++"
     "Magnum & Corrade"
     "Magnum/GL";
-    "Newton Dynamics";
+    "Jolt Physics";
 
     node [shape=rectangle, style=filled, fillcolor=white]
     "osp/core"          -> "Magnum & Corrade";
@@ -36,8 +36,8 @@ digraph {
     "adera/machines"    -> "osp/link";
 
     node [shape=rectangle, style=filled, fillcolor=lightslateblue]
-    "ospnewton/activescene" -> "osp/activescene";
-    "ospnewton/activescene" -> "Newton Dynamics";
+    "ospjolt/activescene" -> "osp/activescene";
+    "ospjolt/activescene" -> "Jolt Physics";
 
     node [shape=rectangle, style=filled, fillcolor=palegreen1]
     "planet-a"          -> "osp/core";
@@ -48,7 +48,7 @@ digraph {
     "testapp/sessions"  -> "adera/machines";
     "testapp/sessions"  -> "adera/drawing_gl";
     "testapp/sessions"  -> "adera/drawing";
-    "testapp/sessions"  -> "ospnewton/activescene";
+    "testapp/sessions"  -> "ospjolt/activescene";
     "testapp/sessions"  -> "planet-a";
     "testapp/sessions"  -> "adera/activescene";
     "testapp"           -> "testapp/sessions";

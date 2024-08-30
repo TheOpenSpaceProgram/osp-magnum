@@ -386,7 +386,6 @@ struct FIVehicleSpawnVB {
     };
 };
 
-
 struct FITestVehicles {
     struct DataIds {
         DataId prebuiltVehicles;
@@ -466,7 +465,6 @@ struct FIJoltConstAccel {
 
 //    struct Pipelines { };
 //};
-
 
 struct FIRocketsJolt {
     struct DataIds {
@@ -668,7 +666,6 @@ struct FICursor {
 };
 
 
-
 struct FIVehicleControl {
     struct DataIds {
         DataId vhControls;
@@ -678,6 +675,5 @@ struct FIVehicleControl {
         PipelineDef<EStgCont> selectedVehicle   {"selectedVehicle"};
     };
 };
-
 
 } // namespace ftr_inter

@@ -43,8 +43,34 @@ IF(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows" AND NOT CMAKE_SYSTEM_VERSION)
     SET(CMAKE_SYSTEM_VERSION "10.0.18362.0" CACHE INTERNAL "" FORCE)
 ENDIF()
 
+#build universally on macOS
+if ( APPLE )
+    set( CMAKE_OSX_ARCHITECTURES "x86_64;arm64" CACHE STRING "" )
+endif()
+
 # Set project name
 PROJECT(OSP-MAGNUM CXX)
+
+# From: https://crascit.com/2016/04/09/using-ccache-with-cmake/
+find_program( CCACHE_PROGRAM ccache )
+
+if ( CCACHE_PROGRAM )
+    # get version information
+    execute_process(
+        COMMAND "${CCACHE_PROGRAM}" --version
+        OUTPUT_VARIABLE CCACHE_VERSION
+    )
+
+    string( REGEX MATCH "[^\r\n]*" CCACHE_VERSION ${CCACHE_VERSION} )
+
+    message( STATUS "Using ccache: ${CCACHE_PROGRAM} (${CCACHE_VERSION})" )
+
+    # Turn on ccache for all targets
+    set( CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}" )
+    set( CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}" )
+
+    unset( CCACHE_VERSION )
+endif()
 
 # Setup things for the test subdir below
 # Has to be in toplevel CMakeLists.txt or ctest gets mad.
@@ -56,7 +82,7 @@ OPTION(OSP_ENABLE_COMPILER_WARNINGS "Build with the majority of compiler warning
 OPTION(OSP_ENABLE_IWYU              "Build with warnings from IWYU turned on" OFF)
 OPTION(OSP_ENABLE_CLANG_TIDY        "Build with warnings from clang-tidy turned on" OFF)
 OPTION(OSP_USE_SYSTEM_SDL           "Build with SDL that you provide if turned on, compiles SDL if turned off. Off by default" OFF)
-
+OPTION(OSP_BUILD_GDEXTENSION        "Build the GDExtension for osp instead of the standalone binary" OFF)
 # If the environment has these set, pull them into proper variables.
 SET(CLANG_COMPILE_FLAGS ${CLANG_COMPILE_FLAGS})
 SET(GCC_COMPILE_FLAGS   ${GCC_COMPILE_FLAGS})
@@ -158,9 +184,12 @@ ADD_SUBDIRECTORY(3rdparty)
 ADD_SUBDIRECTORY(src)
 
 # Unit Tests
-ADD_SUBDIRECTORY(test)
-
+IF (NOT OSP_BUILD_GDEXTENSION)
+    ADD_SUBDIRECTORY(test)
+ENDIF()
 # Set OSP as default startup project in Visual Studio
 set_property(DIRECTORY ${CMAKE_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT osp-magnum)
 # Set execution directory of osp-magnum so that we don't have to copy the files
-set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+if (NOT OSP_BUILD_GDEXTENSION)
+    set_property(TARGET osp-magnum PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+endif()

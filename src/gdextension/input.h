@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2022 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,16 +24,25 @@
  */
 #pragma once
 
-#include <array>
-#include <cstdint>
+#include "scenarios.h"
 
-namespace ospnewton
+#include <osp/util/UserInputHandler.h>
+
+#include <memory>
+
+namespace testapp
 {
-
-// Each rigid body is given 64 bits to enable/disable forces
-// These determine which physics calculations are required for a certain
-// rigid body, such as gravity, thurst, or aerodynamics.
-// Forces are assignable at runtime in ACtxNwtWorld::m_factors
-using ForceFactors_t = std::array<uint64_t, 1u>;
+    
+void config_controls(osp::input::UserInputHandler& rUserInput);
 
 }
+
+/**
+ * Parses the control string from the config file.
+ *
+ * A "None" input returns a empty vector.
+ *
+ * @param Control string
+ * @returns vector of the control created from the string.
+ */
+osp::input::ControlExprConfig_t parse_control(std::string_view str) noexcept;

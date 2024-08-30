@@ -28,7 +28,7 @@
 
 #include <osp/core/math_types.h>
 
-#include <ospjolt/activescene/forcefactors.h>
+#include <ospjolt/forcefactors.h>
 
 
 namespace adera

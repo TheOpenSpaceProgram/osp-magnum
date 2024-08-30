@@ -29,6 +29,7 @@
 namespace adera
 {
 
+
 /**
  * @brief Support for Parts, Machines, and Links
  */
@@ -65,8 +66,6 @@ extern osp::fw::FeatureDef const ftrParts;
  *     another float signal, all running within a single frame.
  */
 extern osp::fw::FeatureDef const ftrSignalsFloat;
-
-
 
 /**
  * @brief Logic and queues for spawning vehicles

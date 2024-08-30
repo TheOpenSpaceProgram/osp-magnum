@@ -28,7 +28,6 @@
 #include <osp/universe/universe.h>
 #include <osp/drawing/drawing.h>
 
-
 namespace adera
 {
 

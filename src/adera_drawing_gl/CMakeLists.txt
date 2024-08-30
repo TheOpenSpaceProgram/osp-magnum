@@ -23,32 +23,37 @@
 # SOFTWARE.
 ##
 
-# TODO put that in the right place. 
+find_package(Magnum REQUIRED
+    GL
+    Shaders
+    MeshTools
+    Primitives
+    Trade
+    )
 
-set(THREADS_PREFER_PTHREAD_FLAG TRUE)
-find_package(Threads)
-if(NOT Threads_FOUND)
-    message(FATAL_ERROR "Can't find a thread library to use!")
-endif()
+SET(DEPS_LIBS
+            Corrade::Main
+            Magnum::GL
+            Magnum::Magnum
+            Magnum::MeshTools
+            Magnum::Primitives
+            Magnum::Shaders
+            Magnum::Trade
+            OpenSpaceProgram
+            longeron
+            OspGL)
 
-#compile as position-independant to avoid link errors on static link
-add_compile_options("-fPIC")
+add_library(AderaGL STATIC)
 
-add_subdirectory(adera)
-add_subdirectory(adera_app)
-add_subdirectory(osp)
-add_subdirectory(planet-a)
-add_subdirectory(ospjolt)
-add_subdirectory(testapp)
+target_compile_features(AderaGL PUBLIC cxx_std_20)
 
-if(OSP_BUILD_GDEXTENSION)
+# Link it to the interface library that describes the dependencies
+target_link_libraries(AderaGL PRIVATE ${DEPS_LIBS})
 
-add_subdirectory(gdextension)
+# Gather paths to OSP headers and sources
+file(GLOB_RECURSE CPP_FILES CONFIGURE_DEPENDS *.cpp)
+file(GLOB_RECURSE H_FILES CONFIGURE_DEPENDS *.h)
+target_sources(AderaGL PRIVATE "${CPP_FILES}" "${H_FILES}")
 
-else()
-
-add_subdirectory(osp_drawing_gl)
-add_subdirectory(adera_drawing_gl)
-
-endif()
-
+# Enforce conformance mode for adera
+target_compile_options(AderaGL PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/permissive->)

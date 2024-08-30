@@ -1,6 +1,6 @@
 /**
  * Open Space Program
- * Copyright © 2019-2024 Open Space Program Project
+ * Copyright © 2019-2021 Open Space Program Project
  *
  * MIT License
  *
@@ -24,31 +24,28 @@
  */
 #pragma once
 
-#include <osp/framework/builder.h>
+#include <testapp/identifiers.h>
+#include <testapp/scenarios.h>
+#include <testapp/testapp.h>
 
-#include <adera/activescene/VehicleBuilder.h>
+// IWYU pragma: begin_exports
+#include <osp/tasks/top_utils.h>
+// IWYU pragma: end_exports
 
-#include <osp/core/copymove_macros.h>
-#include <osp/core/global_id.h>
-#include <osp/core/strong_id.h>
+#include <string_view>
+#include <unordered_map>
 
-#include <memory>
-
-namespace adera
+namespace testapp
 {
 
-using PrebuiltVhId          = osp::StrongId<uint32_t, struct DummyForPBV>;
-using PrebuiltVhIdReg_t     = osp::GlobalIdReg<PrebuiltVhId>;
-
-struct PrebuiltVehicles : osp::KeyedVec< PrebuiltVhId, std::unique_ptr<adera::VehicleData> >
+struct ScenarioOption
 {
-    PrebuiltVehicles() = default;
-    OSP_MOVE_ONLY_CTOR_ASSIGN(PrebuiltVehicles);
+    std::string_view m_description;
+    SceneSetupFunc_t m_setup;
 };
 
-inline PrebuiltVhId const gc_pbvSimpleCommandServiceModule = PrebuiltVhIdReg_t::create();
+using ScenarioMap_t = std::unordered_map<std::string_view, ScenarioOption>;
 
-extern osp::fw::FeatureDef const ftrPrebuiltVehicles;
+ScenarioMap_t const &scenarios();
 
-} // namespace adera
-
+} // namespace testapp

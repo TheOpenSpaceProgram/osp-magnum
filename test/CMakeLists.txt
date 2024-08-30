@@ -32,7 +32,7 @@ include(GoogleTest)
 add_library(test-deps INTERFACE)
 add_custom_target(compile-test-deps)
 
-set(TEST_DEPS_LIBRARIES gtest_main longeron EnTT::EnTT Magnum::Magnum)
+set(TEST_DEPS_LIBRARIES gtest_main longeron EnTT::EnTT Magnum::Magnum OpenSpaceProgram)
 target_link_libraries(test-deps INTERFACE ${TEST_DEPS_LIBRARIES})
 add_dependencies(compile-test-deps ${TEST_DEPS_LIBRARIES})
 

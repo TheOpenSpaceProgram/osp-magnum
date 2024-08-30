@@ -104,7 +104,7 @@ inline osp::Quaternion QuatJoltToMagnum(Quat in)
 static bool AssertFailedImpl(const char *inExpression, const char *inMessage, const char *inFile, uint inLine)
 {
     // Print to the TTY
-    std::cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << std::endl;
+    //std::cout << inFile << ":" << inLine << ": (" << inExpression << ") " << (inMessage != nullptr? inMessage : "") << std::endl;
 
     // Breakpoint
     return true;
@@ -282,7 +282,7 @@ public:
     //Should this be called on world creation ? not ideal in case of multiple worlds.
     static void initJoltGlobal()
     {
-        std::call_once(ACtxJoltWorld::initFlag, ACtxJoltWorld::initJoltGlobalInternal);
+        ACtxJoltWorld::initJoltGlobalInternal();
     }
 
     
@@ -313,7 +313,6 @@ private:
 
     static void initJoltGlobalInternal() 
     {
-        
         RegisterDefaultAllocator();
 
         // Install trace and assert callbacks
